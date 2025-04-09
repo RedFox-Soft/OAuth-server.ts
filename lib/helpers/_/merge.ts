@@ -1,0 +1,25 @@
+/* eslint-disable no-param-reassign, no-continue */
+
+import isPlainObject from './is_plain_object.ts';
+
+function merge(target, ...sources) {
+  for (const source of sources) {
+    if (!isPlainObject(source)) {
+      continue;
+    }
+    for (const [key, value] of Object.entries(source)) {
+      if (key === '__proto__' || key === 'constructor') {
+        continue;
+      }
+      if (isPlainObject(target[key]) && isPlainObject(value)) {
+        target[key] = merge(target[key], value);
+      } else if (typeof value !== 'undefined') {
+        target[key] = value;
+      }
+    }
+  }
+
+  return target;
+}
+
+export default merge;
