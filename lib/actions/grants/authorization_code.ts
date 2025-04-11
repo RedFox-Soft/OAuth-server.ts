@@ -1,7 +1,7 @@
 import { InvalidGrant } from '../../helpers/errors.ts';
 import presence from '../../helpers/validate_presence.ts';
 import instance from '../../helpers/weak_cache.ts';
-import checkPKCE from '../../helpers/pkce.ts';
+import { verifyPKCE } from '../../helpers/pkce.ts';
 import revoke from '../../helpers/revoke.ts';
 import filterClaims from '../../helpers/filter_claims.ts';
 import dpopValidate, { DPOP_OK_WINDOW } from '../../helpers/validate_dpop.ts';
@@ -72,7 +72,7 @@ export const handler = async function authorizationCodeHandler(ctx) {
 		throw new InvalidGrant('grant is expired');
 	}
 
-	checkPKCE(
+	verifyPKCE(
 		ctx.oidc.params.code_verifier,
 		code.codeChallenge,
 		code.codeChallengeMethod

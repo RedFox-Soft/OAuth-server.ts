@@ -32,7 +32,6 @@ import loadAccount from './load_account.ts';
 import loadGrant from './load_grant.ts';
 import interactions from './interactions.ts';
 import respond from './respond.ts';
-import checkPKCE from './check_pkce.ts';
 import interactionEmit from './interaction_emit.ts';
 import getResume from './resume.ts';
 import checkClientGrantType from './check_client_grant_type.ts';
@@ -68,6 +67,12 @@ const parseBody = bodyParser.bind(
 	undefined,
 	'application/x-www-form-urlencoded'
 );
+
+import { authorizationPKCE } from '../../helpers/pkce.ts';
+function checkPKCE({ oidc: { params } }, next) {
+	authorizationPKCE(params);
+	return next();
+}
 
 export default function authorizationAction(provider, endpoint) {
 	const {
@@ -136,6 +141,7 @@ export default function authorizationAction(provider, endpoint) {
 			stack.push(middleware());
 		}
 	};
+
 	const returnTo = /^(code|device)_/.test(endpoint)
 		? 'device_resume'
 		: 'resume';

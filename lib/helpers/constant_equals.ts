@@ -1,12 +1,12 @@
 import { timingSafeEqual } from 'node:crypto';
 
-function paddedBuffer(string, length) {
+function paddedBuffer(string: string, length: number) {
 	const buffer = Buffer.alloc(length, undefined, 'utf8');
 	buffer.write(string);
 	return buffer;
 }
 
-function constantEquals(a, b, minComp = 0) {
+function constantEquals(a: string, b: string, minComp = 0): boolean {
 	if (!Number.isSafeInteger(minComp)) {
 		throw new TypeError('minComp must be an Integer');
 	}
