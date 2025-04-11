@@ -280,33 +280,6 @@ async function issueRefreshToken(ctx, client, code) {
 	);
 }
 
-function pkceRequired(ctx, client) {
-	const fapiProfile = ctx.oidc.isFapi('2.0', '1.0 Final');
-	switch (true) {
-		// FAPI 2.0 as per
-		// https://openid.net/specs/fapi-security-profile-2_0-final.html#section-5.3.2.2-2.5
-		case fapiProfile === '2.0':
-			return true;
-
-		// FAPI 1.0 Advanced as per
-		// https://openid.net/specs/openid-financial-api-part-2-1_0-final.html#authorization-server
-		case fapiProfile === '1.0 Final' &&
-			ctx.oidc.route === 'pushed_authorization_request':
-			return true;
-
-		// All public clients MUST use PKCE as per
-		// https://www.rfc-editor.org/rfc/rfc9700.html#section-2.1.1-2.1
-		case client.clientAuthMethod === 'none':
-			return true;
-
-		// In all other cases use of PKCE is RECOMMENDED as per
-		// https://www.rfc-editor.org/rfc/rfc9700.html#section-2.1.1-2.2
-		// but the server doesn't force them to.
-		default:
-			return false;
-	}
-}
-
 async function pairwiseIdentifier(ctx, accountId, client) {
 	mustChange(
 		'pairwiseIdentifier',
@@ -2222,26 +2195,6 @@ function makeDefaults() {
 		 * ```
 		 */
 		responseTypes: ['code id_token', 'code', 'id_token', 'none'],
-
-		/*
-		 * pkce
-		 * title: [`RFC7636` - Proof Key for Code Exchange (`PKCE`)](https://www.rfc-editor.org/rfc/rfc7636.html)
-		 * description: `PKCE` configuration such as available methods and policy check on required use of
-		 * `PKCE`
-		 * @nodefault
-		 */
-		pkce: {
-			/*
-			 * pkce.required
-			 *
-			 * description: Configures if and when the authorization server requires clients to use `PKCE`. This helper is called
-			 * whenever an authorization request lacks the code_challenge parameter.
-			 * Return
-			 *   - `false` to allow the request to continue without `PKCE`
-			 *   - `true` to abort the request
-			 */
-			required: pkceRequired
-		},
 
 		/*
 		 * routes
