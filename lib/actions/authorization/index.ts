@@ -138,7 +138,7 @@ export default function authorizationAction(provider, endpoint) {
 
 	const use = (middleware, ...only) => {
 		if (only.includes(endpoint)) {
-			stack.push(middleware());
+			stack.push(middleware);
 		}
 	};
 
@@ -147,72 +147,71 @@ export default function authorizationAction(provider, endpoint) {
 		: 'resume';
 
 	/* eslint-disable no-multi-spaces, space-in-parens, function-paren-newline */
-	use(() => noCache, A, DA, R, CV, DR, PAR, BA);
-	use(() => sessionMiddleware, A, R, DR);
-	use(() => deviceUserFlowErrors, CV, DR);
-	use(() => getResume.bind(undefined, allowList, returnTo), R, DR);
-	use(() => deviceUserFlow.bind(undefined, allowList), CV, DR);
-	use(() => parseBody, A, DA, PAR, BA);
+	use(noCache, A, DA, R, CV, DR, PAR, BA);
+	use(sessionMiddleware, A, R, DR);
+	use(deviceUserFlowErrors, CV, DR);
+	use(getResume.bind(undefined, allowList, returnTo), R, DR);
+	use(deviceUserFlow.bind(undefined, allowList), CV, DR);
+	use(parseBody, A, DA, PAR, BA);
 	if (authRequired.has(endpoint)) {
 		const { params: authParams, middleware: tokenAuth } =
 			getTokenAuth(provider);
-		use(() => paramsMiddleware.bind(undefined, authParams), DA, PAR, BA);
+		use(paramsMiddleware.bind(undefined, authParams), DA, PAR, BA);
 		tokenAuth.forEach((tokenAuthMiddleware) => {
-			use(() => tokenAuthMiddleware, DA, PAR, BA);
+			use(tokenAuthMiddleware, DA, PAR, BA);
 		});
 	}
-	use(() => authenticatedClientId, DA, BA);
-	use(() => paramsMiddleware.bind(undefined, allowList), A, DA, PAR, BA);
-	use(() => rejectDupesMiddleware, A, DA, PAR, BA);
-	use(() => rejectUnsupported, A, DA, PAR, BA);
-	use(() => stripOutsideJarParams, PAR, BA);
-	use(() => checkClient, A, DA, R, CV, DR);
-	use(() => checkClientGrantType, DA, BA);
-	use(() => pushedAuthorizationRequestRemapErrors, PAR);
-	use(() => backchannelRequestRemapErrors, BA);
-	use(() => loadPushedAuthorizationRequest, A);
+	use(authenticatedClientId, DA, BA);
+	use(paramsMiddleware.bind(undefined, allowList), A, DA, PAR, BA);
+	use(rejectDupesMiddleware, A, DA, PAR, BA);
+	use(rejectUnsupported, A, DA, PAR, BA);
+	use(stripOutsideJarParams, PAR, BA);
+	use(checkClient, A, DA, R, CV, DR);
+	use(checkClientGrantType, DA, BA);
+	use(pushedAuthorizationRequestRemapErrors, PAR);
+	use(backchannelRequestRemapErrors, BA);
+	use(loadPushedAuthorizationRequest, A);
 	use(
-		() =>
-			processRequestObject.bind(undefined, allowList, rejectDupesMiddleware),
+		processRequestObject.bind(undefined, allowList, rejectDupesMiddleware),
 		A,
 		DA,
 		PAR,
 		BA
 	);
-	use(() => checkResponseMode, A, PAR);
-	use(() => oneRedirectUriClients, A, PAR);
-	use(() => oauthRequired, A, PAR);
-	use(() => rejectRegistration, A, DA, PAR, BA);
-	use(() => checkResponseType, A, PAR);
-	use(() => oidcRequired, A, PAR);
-	use(() => cibaRequired, BA);
-	use(() => assignDefaults, A, DA, BA);
-	use(() => checkPrompt, A, PAR);
-	use(() => checkScope.bind(undefined, allowList), A, DA, PAR, BA);
-	use(() => checkOpenidScope.bind(undefined, allowList), A, DA, PAR, BA);
-	use(() => checkRedirectUri, A, PAR);
-	use(() => checkPKCE, A, PAR);
-	use(() => checkClaims, A, DA, PAR, BA);
-	use(() => unsupportedRar, DA, BA);
-	use(() => checkRar, A, PAR);
-	use(() => checkResource, A, DA, R, CV, DR, PAR, BA);
-	use(() => checkMaxAge, A, DA, PAR, BA);
-	use(() => checkRequestedExpiry, BA);
-	use(() => checkCibaContext, BA);
-	use(() => checkIdTokenHint, A, DA, PAR);
-	use(() => checkDpopJkt, PAR);
-	use(() => checkExtraParams, A, DA, PAR, BA);
-	use(() => interactionEmit, A, R, CV, DR);
-	use(() => assignClaims, A, R, CV, DR, BA);
-	use(() => cibaLoadAccount, BA);
-	use(() => loadAccount, A, R, CV, DR);
-	use(() => loadGrant, A, R, CV, DR);
-	use(() => interactions.bind(undefined, returnTo), A, R, CV, DR);
-	use(() => respond, A, R);
-	use(() => deviceAuthorizationResponse, DA);
-	use(() => deviceUserFlowResponse, CV, DR);
-	use(() => pushedAuthorizationRequestResponse, PAR);
-	use(() => backchannelRequestResponse, BA);
+	use(checkResponseMode, A, PAR);
+	use(oneRedirectUriClients, A, PAR);
+	use(oauthRequired, A, PAR);
+	use(rejectRegistration, A, DA, PAR, BA);
+	use(checkResponseType, A, PAR);
+	use(oidcRequired, A, PAR);
+	use(cibaRequired, BA);
+	use(assignDefaults, A, DA, BA);
+	use(checkPrompt, A, PAR);
+	use(checkScope.bind(undefined, allowList), A, DA, PAR, BA);
+	use(checkOpenidScope.bind(undefined, allowList), A, DA, PAR, BA);
+	use(checkRedirectUri, A, PAR);
+	use(checkPKCE, A, PAR);
+	use(checkClaims, A, DA, PAR, BA);
+	use(unsupportedRar, DA, BA);
+	use(checkRar, A, PAR);
+	use(checkResource, A, DA, R, CV, DR, PAR, BA);
+	use(checkMaxAge, A, DA, PAR, BA);
+	use(checkRequestedExpiry, BA);
+	use(checkCibaContext, BA);
+	use(checkIdTokenHint, A, DA, PAR);
+	use(checkDpopJkt, PAR);
+	use(checkExtraParams, A, DA, PAR, BA);
+	use(interactionEmit, A, R, CV, DR);
+	use(assignClaims, A, R, CV, DR, BA);
+	use(cibaLoadAccount, BA);
+	use(loadAccount, A, R, CV, DR);
+	use(loadGrant, A, R, CV, DR);
+	use(interactions.bind(undefined, returnTo), A, R, CV, DR);
+	use(respond, A, R);
+	use(deviceAuthorizationResponse, DA);
+	use(deviceUserFlowResponse, CV, DR);
+	use(pushedAuthorizationRequestResponse, PAR);
+	use(backchannelRequestResponse, BA);
 	/* eslint-enable no-multi-spaces, space-in-parens, function-paren-newline */
 
 	return stack;
