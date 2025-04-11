@@ -12,35 +12,40 @@ import processResponseTypes from '../../helpers/process_response_types.ts';
  * @emits: authorization.success
  */
 export default async function respond(ctx) {
-  let pushedAuthorizationRequest = ctx.oidc.entities.PushedAuthorizationRequest;
+	let pushedAuthorizationRequest = ctx.oidc.entities.PushedAuthorizationRequest;
 
-  if (!pushedAuthorizationRequest && ctx.oidc.entities.Interaction?.parJti) {
-    pushedAuthorizationRequest = await ctx.oidc.provider.PushedAuthorizationRequest.find(
-      ctx.oidc.entities.Interaction.parJti,
-      { ignoreExpiration: true },
-    );
-  }
+	if (!pushedAuthorizationRequest && ctx.oidc.entities.Interaction?.parJti) {
+		pushedAuthorizationRequest =
+			await ctx.oidc.provider.PushedAuthorizationRequest.find(
+				ctx.oidc.entities.Interaction.parJti,
+				{ ignoreExpiration: true }
+			);
+	}
 
-  if (pushedAuthorizationRequest?.consumed) {
-    throw new InvalidRequestUri('request_uri is invalid, expired, or was already used');
-  }
-  await pushedAuthorizationRequest?.consume();
+	if (pushedAuthorizationRequest?.consumed) {
+		throw new InvalidRequestUri(
+			'request_uri is invalid, expired, or was already used'
+		);
+	}
+	await pushedAuthorizationRequest?.consume();
 
-  const out = await processResponseTypes(ctx);
+	const out = await processResponseTypes(ctx);
 
-  const { oidc: { params } } = ctx;
+	const {
+		oidc: { params }
+	} = ctx;
 
-  if (params.state !== undefined) {
-    out.state = params.state;
-  }
+	if (params.state !== undefined) {
+		out.state = params.state;
+	}
 
-  const { responseMode } = ctx.oidc;
-  if (!out.id_token && !responseMode.includes('jwt')) {
-    out.iss = ctx.oidc.provider.issuer;
-  }
+	const { responseMode } = ctx.oidc;
+	if (!out.id_token && !responseMode.includes('jwt')) {
+		out.iss = ctx.oidc.provider.issuer;
+	}
 
-  ctx.oidc.provider.emit('authorization.success', ctx, out);
+	ctx.oidc.provider.emit('authorization.success', ctx, out);
 
-  const handler = instance(ctx.oidc.provider).responseModes.get(responseMode);
-  await handler(ctx, params.redirect_uri, out);
+	const handler = instance(ctx.oidc.provider).responseModes.get(responseMode);
+	await handler(ctx, params.redirect_uri, out);
 }

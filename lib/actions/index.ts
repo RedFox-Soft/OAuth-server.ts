@@ -10,14 +10,14 @@ import * as endSession from './end_session.ts';
 import * as codeVerification from './code_verification.ts';
 
 export {
-  getAuthorization,
-  userinfo,
-  getToken,
-  jwks,
-  registration,
-  getRevocation,
-  getIntrospection,
-  discovery,
-  endSession,
-  codeVerification,
+	getAuthorization,
+	userinfo,
+	getToken,
+	jwks,
+	registration,
+	getRevocation,
+	getIntrospection,
+	discovery,
+	endSession,
+	codeVerification
 };

@@ -4,8 +4,15 @@ import * as attention from './helpers/attention.ts';
 
 const minimal = 'Jod';
 const { lts: codename } = process.release || {};
-if (!codename || codename.charCodeAt(0) < minimal.charCodeAt(0) || typeof Bun !== 'undefined' || typeof Deno !== 'undefined') {
-  attention.warn('Unsupported runtime. Use Node.js v22.x LTS, or a later LTS release.');
+if (
+	!codename ||
+	codename.charCodeAt(0) < minimal.charCodeAt(0) ||
+	typeof Bun !== 'undefined' ||
+	typeof Deno !== 'undefined'
+) {
+	attention.warn(
+		'Unsupported runtime. Use Node.js v22.x LTS, or a later LTS release.'
+	);
 }
 
 import { Provider } from './provider.ts';

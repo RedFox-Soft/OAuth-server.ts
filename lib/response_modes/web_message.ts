@@ -5,31 +5,39 @@ import pushInlineSha from '../helpers/script_src_sha.ts';
 const statusCodes = new Set([200, 400, 500]);
 
 export default function webMessage(ctx, redirectUri, response) {
-  ctx.type = 'html';
+	ctx.type = 'html';
 
-  if (!statusCodes.has(ctx.status)) {
-    ctx.status = 'error' in response ? 400 : 200;
-  }
+	if (!statusCodes.has(ctx.status)) {
+		ctx.status = 'error' in response ? 400 : 200;
+	}
 
-  ctx.response.remove('X-Frame-Options');
-  const csp = ctx.response.get('Content-Security-Policy');
-  if (csp?.includes('frame-ancestors')) {
-    ctx.response.set('Content-Security-Policy', csp.replace(/ ?frame-ancestors [^;]+;/, ''));
-  }
+	ctx.response.remove('X-Frame-Options');
+	const csp = ctx.response.get('Content-Security-Policy');
+	if (csp?.includes('frame-ancestors')) {
+		ctx.response.set(
+			'Content-Security-Policy',
+			csp.replace(/ ?frame-ancestors [^;]+;/, '')
+		);
+	}
 
-  const data = jsesc({
-    response,
-    redirect_uri: redirectUri,
-  }, { json: true, isScriptContext: true });
+	const data = jsesc(
+		{
+			response,
+			redirect_uri: redirectUri
+		},
+		{ json: true, isScriptContext: true }
+	);
 
-  ctx.body = `<!DOCTYPE html>
+	ctx.body = `<!DOCTYPE html>
 <html>
 <head>
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <title>Web Message Response</title>
 </head>
 <body>
-  <script>${pushInlineSha(ctx, `
+  <script>${pushInlineSha(
+		ctx,
+		`
     (function(win, doc) {
       var data = ${data};
 
@@ -47,7 +55,8 @@ export default function webMessage(ctx, redirectUri, response) {
       var mainWin = win.opener || win.parent;
       respond(mainWin, redirect_uri);
     })(this, this.document);
-  `)}</script>
+  `
+	)}</script>
 </body>
 </html>`;
 }

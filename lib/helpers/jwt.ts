@@ -1,207 +1,229 @@
 import {
-  CompactEncrypt,
-  CompactSign,
-  compactDecrypt,
-  compactVerify,
-  decodeJwt,
-  decodeProtectedHeader,
-  errors,
+	CompactEncrypt,
+	CompactSign,
+	compactDecrypt,
+	compactVerify,
+	decodeJwt,
+	decodeProtectedHeader,
+	errors
 } from 'jose';
 
 import { ExternalSigningKey } from './keystore.ts';
 import * as base64url from './base64url.ts';
 import epochTime from './epoch_time.ts';
 
-const { JWEDecryptionFailed, JWKSNoMatchingKey, JWSSignatureVerificationFailed } = errors;
+const {
+	JWEDecryptionFailed,
+	JWKSNoMatchingKey,
+	JWSSignatureVerificationFailed
+} = errors;
 
 function verifyAudience({ aud }, expected) {
-  if (Array.isArray(aud)) {
-    const match = aud.some((actual) => actual === expected);
-    if (!match) throw new Error(`jwt audience missing ${expected}`);
-  } else if (aud !== expected) {
-    throw new Error(`jwt audience missing ${expected}`);
-  }
+	if (Array.isArray(aud)) {
+		const match = aud.some((actual) => actual === expected);
+		if (!match) throw new Error(`jwt audience missing ${expected}`);
+	} else if (aud !== expected) {
+		throw new Error(`jwt audience missing ${expected}`);
+	}
 }
 
 export async function sign(payload, key, alg, options = {}) {
-  const protectedHeader = {
-    alg,
-    typ: options.typ,
-    ...options.fields,
-  };
-  const timestamp = epochTime();
+	const protectedHeader = {
+		alg,
+		typ: options.typ,
+		...options.fields
+	};
+	const timestamp = epochTime();
 
-  const iat = options.noIat ? undefined : timestamp;
+	const iat = options.noIat ? undefined : timestamp;
 
-  Object.assign(payload, {
-    aud: options.audience !== undefined ? options.audience : payload.aud,
-    exp: options.expiresIn !== undefined ? timestamp + options.expiresIn : payload.exp,
-    iat: payload.iat !== undefined ? payload.iat : iat,
-    iss: options.issuer !== undefined ? options.issuer : payload.iss,
-    sub: options.subject !== undefined ? options.subject : payload.sub,
-  });
+	Object.assign(payload, {
+		aud: options.audience !== undefined ? options.audience : payload.aud,
+		exp:
+			options.expiresIn !== undefined
+				? timestamp + options.expiresIn
+				: payload.exp,
+		iat: payload.iat !== undefined ? payload.iat : iat,
+		iss: options.issuer !== undefined ? options.issuer : payload.iss,
+		sub: options.subject !== undefined ? options.subject : payload.sub
+	});
 
-  if (key instanceof ExternalSigningKey) {
-    const parts = [
-      base64url.encode(JSON.stringify(protectedHeader)),
-      base64url.encode(JSON.stringify(payload)),
-    ];
-    const data = Buffer.from(parts.join('.'));
-    parts.push(base64url.encodeBuffer(await key.sign(data)));
-    return parts.join('.');
-  }
+	if (key instanceof ExternalSigningKey) {
+		const parts = [
+			base64url.encode(JSON.stringify(protectedHeader)),
+			base64url.encode(JSON.stringify(payload))
+		];
+		const data = Buffer.from(parts.join('.'));
+		parts.push(base64url.encodeBuffer(await key.sign(data)));
+		return parts.join('.');
+	}
 
-  return new CompactSign(Buffer.from(JSON.stringify(payload)))
-    .setProtectedHeader(protectedHeader)
-    .sign(key);
+	return new CompactSign(Buffer.from(JSON.stringify(payload)))
+		.setProtectedHeader(protectedHeader)
+		.sign(key);
 }
 
 export function decode(input) {
-  let jwt;
+	let jwt;
 
-  if (Buffer.isBuffer(input)) {
-    jwt = input.toString('utf8');
-  } else if (typeof input !== 'string') {
-    throw new TypeError('invalid JWT.decode input type');
-  } else {
-    jwt = input;
-  }
+	if (Buffer.isBuffer(input)) {
+		jwt = input.toString('utf8');
+	} else if (typeof input !== 'string') {
+		throw new TypeError('invalid JWT.decode input type');
+	} else {
+		jwt = input;
+	}
 
-  const { 0: protectedHeader, 1: payload, length } = jwt.split('.');
+	const { 0: protectedHeader, 1: payload, length } = jwt.split('.');
 
-  if (length !== 3) {
-    throw new TypeError('invalid JWT.decode input');
-  }
+	if (length !== 3) {
+		throw new TypeError('invalid JWT.decode input');
+	}
 
-  return {
-    header: JSON.parse(base64url.decode(protectedHeader)),
-    payload: JSON.parse(base64url.decode(payload)),
-  };
+	return {
+		header: JSON.parse(base64url.decode(protectedHeader)),
+		payload: JSON.parse(base64url.decode(payload))
+	};
 }
 
 export function header(jwt) {
-  return JSON.parse(base64url.decode(jwt.toString().split('.')[0]));
+	return JSON.parse(base64url.decode(jwt.toString().split('.')[0]));
 }
 
-export function assertPayload(payload, {
-  clockTolerance = 0, audience, ignoreExpiration,
-  ignoreAzp, ignoreIssued, ignoreNotBefore, issuer,
-  subject = false,
-} = {}) {
-  const timestamp = epochTime();
+export function assertPayload(
+	payload,
+	{
+		clockTolerance = 0,
+		audience,
+		ignoreExpiration,
+		ignoreAzp,
+		ignoreIssued,
+		ignoreNotBefore,
+		issuer,
+		subject = false
+	} = {}
+) {
+	const timestamp = epochTime();
 
-  if (typeof payload !== 'object') throw new Error('payload is not of JWT type (JSON serialized object)');
+	if (typeof payload !== 'object')
+		throw new Error('payload is not of JWT type (JSON serialized object)');
 
-  if (payload.nbf !== undefined && !ignoreNotBefore) {
-    if (typeof payload.nbf !== 'number') throw new Error('invalid nbf value');
-    if (payload.nbf > timestamp + clockTolerance) throw new Error('jwt not active yet');
-  }
+	if (payload.nbf !== undefined && !ignoreNotBefore) {
+		if (typeof payload.nbf !== 'number') throw new Error('invalid nbf value');
+		if (payload.nbf > timestamp + clockTolerance)
+			throw new Error('jwt not active yet');
+	}
 
-  if (payload.iat !== undefined && !ignoreIssued) {
-    if (typeof payload.iat !== 'number') throw new Error('invalid iat value');
-    if (payload.exp === undefined && payload.iat > timestamp + clockTolerance) {
-      throw new Error('jwt issued in the future');
-    }
-  }
+	if (payload.iat !== undefined && !ignoreIssued) {
+		if (typeof payload.iat !== 'number') throw new Error('invalid iat value');
+		if (payload.exp === undefined && payload.iat > timestamp + clockTolerance) {
+			throw new Error('jwt issued in the future');
+		}
+	}
 
-  if (payload.exp !== undefined && !ignoreExpiration) {
-    if (typeof payload.exp !== 'number') throw new Error('invalid exp value');
-    if (timestamp - clockTolerance >= payload.exp) throw new Error('jwt expired');
-  }
+	if (payload.exp !== undefined && !ignoreExpiration) {
+		if (typeof payload.exp !== 'number') throw new Error('invalid exp value');
+		if (timestamp - clockTolerance >= payload.exp)
+			throw new Error('jwt expired');
+	}
 
-  if (payload.jti !== undefined && typeof payload.jti !== 'string') {
-    throw new Error('invalid jti value');
-  }
+	if (payload.jti !== undefined && typeof payload.jti !== 'string') {
+		throw new Error('invalid jti value');
+	}
 
-  if (payload.iss !== undefined && typeof payload.iss !== 'string') {
-    throw new Error('invalid iss value');
-  }
+	if (payload.iss !== undefined && typeof payload.iss !== 'string') {
+		throw new Error('invalid iss value');
+	}
 
-  if (subject && typeof payload.sub !== 'string') {
-    throw new Error('invalid sub value');
-  }
+	if (subject && typeof payload.sub !== 'string') {
+		throw new Error('invalid sub value');
+	}
 
-  if (audience) {
-    verifyAudience(
-      payload,
-      audience,
-      !ignoreAzp,
-    );
-  }
+	if (audience) {
+		verifyAudience(payload, audience, !ignoreAzp);
+	}
 
-  if (issuer && payload.iss !== issuer) throw new Error('jwt issuer invalid');
+	if (issuer && payload.iss !== issuer) throw new Error('jwt issuer invalid');
 }
 
 export async function verify(jwt, keystore, options = {}) {
-  let verified;
-  let protectedHeader;
-  try {
-    protectedHeader = decodeProtectedHeader(jwt);
+	let verified;
+	let protectedHeader;
+	try {
+		protectedHeader = decodeProtectedHeader(jwt);
 
-    const keys = keystore.selectForVerify({ alg: protectedHeader.alg, kid: protectedHeader.kid });
-    if (keys.length === 0) {
-      throw new JWKSNoMatchingKey();
-    } else {
-      for (const key of keys) {
-        try {
-          verified = await compactVerify(
-            jwt,
-            await keystore.getKeyObject(key, true),
-            { algorithms: options.algorithm ? [options.algorithm] : undefined },
-          );
-        } catch {}
-      }
-    }
+		const keys = keystore.selectForVerify({
+			alg: protectedHeader.alg,
+			kid: protectedHeader.kid
+		});
+		if (keys.length === 0) {
+			throw new JWKSNoMatchingKey();
+		} else {
+			for (const key of keys) {
+				try {
+					verified = await compactVerify(
+						jwt,
+						await keystore.getKeyObject(key, true),
+						{ algorithms: options.algorithm ? [options.algorithm] : undefined }
+					);
+				} catch {}
+			}
+		}
 
-    if (!verified) {
-      throw new JWSSignatureVerificationFailed();
-    }
-  } catch (err) {
-    if (typeof keystore.fresh !== 'function' || keystore.fresh()) {
-      throw err;
-    }
+		if (!verified) {
+			throw new JWSSignatureVerificationFailed();
+		}
+	} catch (err) {
+		if (typeof keystore.fresh !== 'function' || keystore.fresh()) {
+			throw err;
+		}
 
-    await keystore.refresh();
-    // eslint-disable-next-line prefer-rest-params
-    return verify(...arguments);
-  }
+		await keystore.refresh();
+		// eslint-disable-next-line prefer-rest-params
+		return verify(...arguments);
+	}
 
-  const payload = decodeJwt(jwt);
-  assertPayload(payload, options);
+	const payload = decodeJwt(jwt);
+	assertPayload(payload, options);
 
-  return { payload, header: protectedHeader };
+	return { payload, header: protectedHeader };
 }
 
-export async function encrypt(cleartext, key, {
-  enc, alg, fields,
-} = {}) {
-  const protectedHeader = {
-    alg, enc, ...fields,
-  };
+export async function encrypt(cleartext, key, { enc, alg, fields } = {}) {
+	const protectedHeader = {
+		alg,
+		enc,
+		...fields
+	};
 
-  return new CompactEncrypt(Buffer.from(cleartext))
-    .setProtectedHeader(protectedHeader)
-    .encrypt(key);
+	return new CompactEncrypt(Buffer.from(cleartext))
+		.setProtectedHeader(protectedHeader)
+		.encrypt(key);
 }
 
 export async function decrypt(jwe, keystore) {
-  const protectedHeader = decodeProtectedHeader(jwe);
+	const protectedHeader = decodeProtectedHeader(jwe);
 
-  const keys = keystore.selectForDecrypt({ alg: protectedHeader.alg === 'dir' ? protectedHeader.enc : protectedHeader.alg, kid: protectedHeader.kid, epk: protectedHeader.epk });
-  let decrypted;
-  if (keys.length === 0) {
-    throw new JWKSNoMatchingKey();
-  } else {
-    for (const key of keys) {
-      try {
-        decrypted = await compactDecrypt(jwe, keystore.getKeyObject(key));
-      } catch {}
-    }
-  }
+	const keys = keystore.selectForDecrypt({
+		alg:
+			protectedHeader.alg === 'dir' ? protectedHeader.enc : protectedHeader.alg,
+		kid: protectedHeader.kid,
+		epk: protectedHeader.epk
+	});
+	let decrypted;
+	if (keys.length === 0) {
+		throw new JWKSNoMatchingKey();
+	} else {
+		for (const key of keys) {
+			try {
+				decrypted = await compactDecrypt(jwe, keystore.getKeyObject(key));
+			} catch {}
+		}
+	}
 
-  if (!decrypted) {
-    throw new JWEDecryptionFailed();
-  }
+	if (!decrypted) {
+		throw new JWEDecryptionFailed();
+	}
 
-  return Buffer.from(decrypted.plaintext);
+	return Buffer.from(decrypted.plaintext);
 }

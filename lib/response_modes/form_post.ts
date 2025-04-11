@@ -4,24 +4,30 @@ import pushInlineSha from '../helpers/script_src_sha.ts';
 const statusCodes = new Set([200, 400, 500]);
 
 export default function formPost(ctx, action, inputs) {
-  ctx.type = 'html';
+	ctx.type = 'html';
 
-  if (!statusCodes.has(ctx.status)) {
-    ctx.status = 'error' in inputs ? 400 : 200;
-  }
+	if (!statusCodes.has(ctx.status)) {
+		ctx.status = 'error' in inputs ? 400 : 200;
+	}
 
-  const formInputs = Object.entries(inputs)
-    .map(([key, value]) => `<input type="hidden" name="${key}" value="${htmlSafe(value)}"/>`)
-    .join('\n');
+	const formInputs = Object.entries(inputs)
+		.map(
+			([key, value]) =>
+				`<input type="hidden" name="${key}" value="${htmlSafe(value)}"/>`
+		)
+		.join('\n');
 
-  ctx.body = `<!DOCTYPE html>
+	ctx.body = `<!DOCTYPE html>
 <html>
 <head>
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <title>Submitting Callback</title>
-  <script>${pushInlineSha(ctx, `
+  <script>${pushInlineSha(
+		ctx,
+		`
     document.addEventListener('DOMContentLoaded', function () { document.forms[0].submit() });
-  `)}</script>
+  `
+	)}</script>
 </head>
 <body>
   <form method="post" action="${htmlSafe(action)}">

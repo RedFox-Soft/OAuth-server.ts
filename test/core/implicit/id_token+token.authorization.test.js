@@ -8,150 +8,209 @@ const response_type = 'id_token token';
 const scope = 'openid';
 
 describe('IMPLICIT id_token+token', () => {
-  before(bootstrap(import.meta.url));
-  afterEach(function () {
-    this.provider.removeAllListeners();
-  });
+	before(bootstrap(import.meta.url));
+	afterEach(function () {
+		this.provider.removeAllListeners();
+	});
 
-  ['get', 'post'].forEach((verb) => {
-    describe(`${verb} ${route} with session`, () => {
-      before(function () { return this.login(); });
+	['get', 'post'].forEach((verb) => {
+		describe(`${verb} ${route} with session`, () => {
+			before(function () {
+				return this.login();
+			});
 
-      it('responds with a id_token and access_token in fragment', async function () {
-        const auth = new this.AuthorizationRequest({
-          response_type,
-          scope,
-        });
+			it('responds with a id_token and access_token in fragment', async function () {
+				const auth = new this.AuthorizationRequest({
+					response_type,
+					scope
+				});
 
-        await this.wrap({ route, verb, auth })
-          .expect(303)
-          .expect(auth.validateFragment)
-          .expect(auth.validatePresence(['id_token', 'state', 'access_token', 'expires_in', 'token_type', 'scope']))
-          .expect(auth.validateState)
-          .expect(auth.validateClientLocation);
+				await this.wrap({ route, verb, auth })
+					.expect(303)
+					.expect(auth.validateFragment)
+					.expect(
+						auth.validatePresence([
+							'id_token',
+							'state',
+							'access_token',
+							'expires_in',
+							'token_type',
+							'scope'
+						])
+					)
+					.expect(auth.validateState)
+					.expect(auth.validateClientLocation);
 
-        expect(await this.provider.AccessToken.find(auth.res.access_token)).to.have.property('gty', 'implicit');
-      });
+				expect(
+					await this.provider.AccessToken.find(auth.res.access_token)
+				).to.have.property('gty', 'implicit');
+			});
 
-      it('handles mixed up response_type order', async function () {
-        const auth = new this.AuthorizationRequest({
-          response_type: 'token id_token',
-          scope,
-        });
+			it('handles mixed up response_type order', async function () {
+				const auth = new this.AuthorizationRequest({
+					response_type: 'token id_token',
+					scope
+				});
 
-        await this.wrap({ route, verb, auth })
-          .expect(303)
-          .expect(auth.validateFragment)
-          .expect(auth.validatePresence(['id_token', 'state', 'access_token', 'expires_in', 'token_type', 'scope']))
-          .expect(auth.validateState)
-          .expect(auth.validateClientLocation);
+				await this.wrap({ route, verb, auth })
+					.expect(303)
+					.expect(auth.validateFragment)
+					.expect(
+						auth.validatePresence([
+							'id_token',
+							'state',
+							'access_token',
+							'expires_in',
+							'token_type',
+							'scope'
+						])
+					)
+					.expect(auth.validateState)
+					.expect(auth.validateClientLocation);
 
-        expect(await this.provider.AccessToken.find(auth.res.access_token)).to.have.property('gty', 'implicit');
-      });
+				expect(
+					await this.provider.AccessToken.find(auth.res.access_token)
+				).to.have.property('gty', 'implicit');
+			});
 
-      it('populates ctx.oidc.entities', function (done) {
-        this.assertOnce((ctx) => {
-          expect(ctx.oidc.entities).to.have.keys('Client', 'Grant', 'Account', 'AccessToken', 'Session');
-        }, done);
+			it('populates ctx.oidc.entities', function (done) {
+				this.assertOnce((ctx) => {
+					expect(ctx.oidc.entities).to.have.keys(
+						'Client',
+						'Grant',
+						'Account',
+						'AccessToken',
+						'Session'
+					);
+				}, done);
 
-        const auth = new this.AuthorizationRequest({
-          response_type,
-          scope,
-        });
+				const auth = new this.AuthorizationRequest({
+					response_type,
+					scope
+				});
 
-        this.wrap({ route, verb, auth }).end(() => {});
-      });
+				this.wrap({ route, verb, auth }).end(() => {});
+			});
 
-      it('ignores offline_access scope for non code-including response_types', function () {
-        const auth = new this.AuthorizationRequest({
-          response_type,
-          scope: 'openid offline_access',
-        });
+			it('ignores offline_access scope for non code-including response_types', function () {
+				const auth = new this.AuthorizationRequest({
+					response_type,
+					scope: 'openid offline_access'
+				});
 
-        const spy = sinon.spy();
-        this.provider.once('access_token.saved', spy);
-        this.provider.once('access_token.issued', spy);
+				const spy = sinon.spy();
+				this.provider.once('access_token.saved', spy);
+				this.provider.once('access_token.issued', spy);
 
-        return this.wrap({ route, verb, auth })
-          .expect(303)
-          .expect(auth.validateFragment)
-          .expect(auth.validatePresence(['id_token', 'state', 'access_token', 'expires_in', 'token_type', 'scope']))
-          .expect(auth.validateState)
-          .expect(auth.validateClientLocation)
-          .then(() => {
-            expect(spy.getCall(0).firstArg).to.have.property('scope', 'openid');
-          });
-      });
-    });
+				return this.wrap({ route, verb, auth })
+					.expect(303)
+					.expect(auth.validateFragment)
+					.expect(
+						auth.validatePresence([
+							'id_token',
+							'state',
+							'access_token',
+							'expires_in',
+							'token_type',
+							'scope'
+						])
+					)
+					.expect(auth.validateState)
+					.expect(auth.validateClientLocation)
+					.then(() => {
+						expect(spy.getCall(0).firstArg).to.have.property('scope', 'openid');
+					});
+			});
+		});
 
-    describe(`${verb} ${route} with the scope not being fulfilled`, () => {
-      before(function () {
-        return this.login({
-          scope: 'openid profile email',
-          rejectedScopes: ['email'],
-        });
-      });
+		describe(`${verb} ${route} with the scope not being fulfilled`, () => {
+			before(function () {
+				return this.login({
+					scope: 'openid profile email',
+					rejectedScopes: ['email']
+				});
+			});
 
-      it('responds with an extra parameter scope', async function () {
-        const auth = new this.AuthorizationRequest({
-          response_type,
-          scope: 'openid profile email',
-        });
+			it('responds with an extra parameter scope', async function () {
+				const auth = new this.AuthorizationRequest({
+					response_type,
+					scope: 'openid profile email'
+				});
 
-        await this.wrap({ route, verb, auth })
-          .expect(303)
-          .expect(auth.validateFragment)
-          .expect(auth.validatePresence(['id_token', 'state', 'access_token', 'expires_in', 'token_type', 'scope']))
-          .expect(auth.validateState)
-          .expect(auth.validateClientLocation)
-          .expect(auth.validateResponseParameter('scope', 'openid profile'));
-      });
-    });
+				await this.wrap({ route, verb, auth })
+					.expect(303)
+					.expect(auth.validateFragment)
+					.expect(
+						auth.validatePresence([
+							'id_token',
+							'state',
+							'access_token',
+							'expires_in',
+							'token_type',
+							'scope'
+						])
+					)
+					.expect(auth.validateState)
+					.expect(auth.validateClientLocation)
+					.expect(auth.validateResponseParameter('scope', 'openid profile'));
+			});
+		});
 
-    describe(`${verb} ${route} errors`, () => {
-      it('disallowed response mode', function () {
-        const spy = sinon.spy();
-        this.provider.once('authorization.error', spy);
-        const auth = new this.AuthorizationRequest({
-          response_type,
-          scope,
-          response_mode: 'query',
-        });
+		describe(`${verb} ${route} errors`, () => {
+			it('disallowed response mode', function () {
+				const spy = sinon.spy();
+				this.provider.once('authorization.error', spy);
+				const auth = new this.AuthorizationRequest({
+					response_type,
+					scope,
+					response_mode: 'query'
+				});
 
-        return this.wrap({ route, verb, auth })
-          .expect(303)
-          .expect(() => {
-            expect(spy.calledOnce).to.be.true;
-          })
-          .expect(auth.validatePresence(['error', 'error_description', 'state']))
-          .expect(auth.validateState)
-          .expect(auth.validateClientLocation)
-          .expect(auth.validateError('invalid_request'))
-          .expect(auth.validateErrorDescription('requested response_mode is not allowed for the requested response_type'));
-      });
+				return this.wrap({ route, verb, auth })
+					.expect(303)
+					.expect(() => {
+						expect(spy.calledOnce).to.be.true;
+					})
+					.expect(
+						auth.validatePresence(['error', 'error_description', 'state'])
+					)
+					.expect(auth.validateState)
+					.expect(auth.validateClientLocation)
+					.expect(auth.validateError('invalid_request'))
+					.expect(
+						auth.validateErrorDescription(
+							'requested response_mode is not allowed for the requested response_type'
+						)
+					);
+			});
 
-      it('missing mandatory parameter nonce', function () {
-        const spy = sinon.spy();
-        this.provider.once('authorization.error', spy);
-        const auth = new this.AuthorizationRequest({
-          response_type,
-          scope,
-        });
-        delete auth.nonce;
+			it('missing mandatory parameter nonce', function () {
+				const spy = sinon.spy();
+				this.provider.once('authorization.error', spy);
+				const auth = new this.AuthorizationRequest({
+					response_type,
+					scope
+				});
+				delete auth.nonce;
 
-        return this.agent.get(route)
-          .query(auth)
-          .expect(303)
-          .expect(() => {
-            expect(spy.calledOnce).to.be.true;
-          })
-          .expect(auth.validateFragment)
-          .expect(auth.validatePresence(['error', 'error_description', 'state']))
-          .expect(auth.validateState)
-          .expect(auth.validateClientLocation)
-          .expect(auth.validateError('invalid_request'))
-          .expect(auth.validateErrorDescription("missing required parameter 'nonce'"));
-      });
-    });
-  });
+				return this.agent
+					.get(route)
+					.query(auth)
+					.expect(303)
+					.expect(() => {
+						expect(spy.calledOnce).to.be.true;
+					})
+					.expect(auth.validateFragment)
+					.expect(
+						auth.validatePresence(['error', 'error_description', 'state'])
+					)
+					.expect(auth.validateState)
+					.expect(auth.validateClientLocation)
+					.expect(auth.validateError('invalid_request'))
+					.expect(
+						auth.validateErrorDescription("missing required parameter 'nonce'")
+					);
+			});
+		});
+	});
 });

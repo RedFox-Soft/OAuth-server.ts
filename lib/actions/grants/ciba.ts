@@ -9,231 +9,247 @@ import dpopValidate, { DPOP_OK_WINDOW } from '../../helpers/validate_dpop.ts';
 import resolveResource from '../../helpers/resolve_resource.ts';
 import epochTime from '../../helpers/epoch_time.ts';
 
-const {
-  AuthorizationPending,
-  ExpiredToken,
-  InvalidGrant,
-} = errors;
+const { AuthorizationPending, ExpiredToken, InvalidGrant } = errors;
 
 export const gty = 'ciba';
 
 export const handler = async function cibaHandler(ctx) {
-  presence(ctx, 'auth_req_id');
+	presence(ctx, 'auth_req_id');
 
-  if (ctx.oidc.params.authorization_details) {
-    throw new errors.InvalidRequest('authorization_details is unsupported for this grant_type');
-  }
+	if (ctx.oidc.params.authorization_details) {
+		throw new errors.InvalidRequest(
+			'authorization_details is unsupported for this grant_type'
+		);
+	}
 
-  const {
-    findAccount,
-    issueRefreshToken,
-    conformIdTokenClaims,
-    features: {
-      userinfo,
-      mTLS: { getCertificate },
-      dPoP: { allowReplay },
-      resourceIndicators,
-    },
-  } = instance(ctx.oidc.provider).configuration;
+	const {
+		findAccount,
+		issueRefreshToken,
+		conformIdTokenClaims,
+		features: {
+			userinfo,
+			mTLS: { getCertificate },
+			dPoP: { allowReplay },
+			resourceIndicators
+		}
+	} = instance(ctx.oidc.provider).configuration;
 
-  const dPoP = await dpopValidate(ctx);
+	const dPoP = await dpopValidate(ctx);
 
-  const request = await ctx.oidc.provider.BackchannelAuthenticationRequest.find(
-    ctx.oidc.params.auth_req_id,
-    { ignoreExpiration: true },
-  );
+	const request = await ctx.oidc.provider.BackchannelAuthenticationRequest.find(
+		ctx.oidc.params.auth_req_id,
+		{ ignoreExpiration: true }
+	);
 
-  if (!request) {
-    throw new InvalidGrant('backchannel authentication request not found');
-  }
+	if (!request) {
+		throw new InvalidGrant('backchannel authentication request not found');
+	}
 
-  if (request.clientId !== ctx.oidc.client.clientId) {
-    throw new InvalidGrant('client mismatch');
-  }
+	if (request.clientId !== ctx.oidc.client.clientId) {
+		throw new InvalidGrant('client mismatch');
+	}
 
-  let cert;
-  if (ctx.oidc.client.tlsClientCertificateBoundAccessTokens) {
-    cert = getCertificate(ctx);
-    if (!cert) {
-      throw new InvalidGrant('mutual TLS client certificate not provided');
-    }
-  }
+	let cert;
+	if (ctx.oidc.client.tlsClientCertificateBoundAccessTokens) {
+		cert = getCertificate(ctx);
+		if (!cert) {
+			throw new InvalidGrant('mutual TLS client certificate not provided');
+		}
+	}
 
-  if (!dPoP && ctx.oidc.client.dpopBoundAccessTokens) {
-    throw new InvalidGrant('DPoP proof JWT not provided');
-  }
+	if (!dPoP && ctx.oidc.client.dpopBoundAccessTokens) {
+		throw new InvalidGrant('DPoP proof JWT not provided');
+	}
 
-  if (request.isExpired) {
-    throw new ExpiredToken('backchannel authentication request is expired');
-  }
+	if (request.isExpired) {
+		throw new ExpiredToken('backchannel authentication request is expired');
+	}
 
-  if (!request.grantId && !request.error) {
-    throw new AuthorizationPending();
-  }
+	if (!request.grantId && !request.error) {
+		throw new AuthorizationPending();
+	}
 
-  if (request.consumed) {
-    await revoke(ctx, request.grantId);
-    throw new InvalidGrant('backchannel authentication request already consumed');
-  }
+	if (request.consumed) {
+		await revoke(ctx, request.grantId);
+		throw new InvalidGrant(
+			'backchannel authentication request already consumed'
+		);
+	}
 
-  await request.consume();
+	await request.consume();
 
-  if (request.error) {
-    const className = upperFirst(camelCase(request.error));
-    if (errors[className]) {
-      throw new errors[className](request.errorDescription);
-    }
-    throw new errors.CustomOIDCProviderError(request.error, request.errorDescription);
-  }
+	if (request.error) {
+		const className = upperFirst(camelCase(request.error));
+		if (errors[className]) {
+			throw new errors[className](request.errorDescription);
+		}
+		throw new errors.CustomOIDCProviderError(
+			request.error,
+			request.errorDescription
+		);
+	}
 
-  const grant = await ctx.oidc.provider.Grant.find(request.grantId, {
-    ignoreExpiration: true,
-  });
+	const grant = await ctx.oidc.provider.Grant.find(request.grantId, {
+		ignoreExpiration: true
+	});
 
-  if (!grant) {
-    throw new InvalidGrant('grant not found');
-  }
+	if (!grant) {
+		throw new InvalidGrant('grant not found');
+	}
 
-  if (grant.isExpired) {
-    throw new InvalidGrant('grant is expired');
-  }
+	if (grant.isExpired) {
+		throw new InvalidGrant('grant is expired');
+	}
 
-  if (grant.clientId !== ctx.oidc.client.clientId) {
-    throw new InvalidGrant('client mismatch');
-  }
+	if (grant.clientId !== ctx.oidc.client.clientId) {
+		throw new InvalidGrant('client mismatch');
+	}
 
-  ctx.oidc.entity('BackchannelAuthenticationRequest', request);
-  ctx.oidc.entity('Grant', grant);
+	ctx.oidc.entity('BackchannelAuthenticationRequest', request);
+	ctx.oidc.entity('Grant', grant);
 
-  const account = await findAccount(ctx, request.accountId, request);
+	const account = await findAccount(ctx, request.accountId, request);
 
-  if (!account) {
-    throw new InvalidGrant('backchannel authentication request invalid (referenced account not found)');
-  }
+	if (!account) {
+		throw new InvalidGrant(
+			'backchannel authentication request invalid (referenced account not found)'
+		);
+	}
 
-  if (request.accountId !== grant.accountId) {
-    throw new InvalidGrant('accountId mismatch');
-  }
+	if (request.accountId !== grant.accountId) {
+		throw new InvalidGrant('accountId mismatch');
+	}
 
-  ctx.oidc.entity('Account', account);
+	ctx.oidc.entity('Account', account);
 
-  const {
-    AccessToken, IdToken, RefreshToken, ReplayDetection,
-  } = ctx.oidc.provider;
+	const { AccessToken, IdToken, RefreshToken, ReplayDetection } =
+		ctx.oidc.provider;
 
-  const at = new AccessToken({
-    accountId: account.accountId,
-    client: ctx.oidc.client,
-    expiresWithSession: request.expiresWithSession,
-    grantId: request.grantId,
-    gty,
-    sessionUid: request.sessionUid,
-    sid: request.sid,
-  });
+	const at = new AccessToken({
+		accountId: account.accountId,
+		client: ctx.oidc.client,
+		expiresWithSession: request.expiresWithSession,
+		grantId: request.grantId,
+		gty,
+		sessionUid: request.sessionUid,
+		sid: request.sid
+	});
 
-  if (ctx.oidc.client.tlsClientCertificateBoundAccessTokens) {
-    at.setThumbprint('x5t', cert);
-  }
+	if (ctx.oidc.client.tlsClientCertificateBoundAccessTokens) {
+		at.setThumbprint('x5t', cert);
+	}
 
-  if (dPoP) {
-    if (!allowReplay) {
-      const unique = await ReplayDetection.unique(
-        ctx.oidc.client.clientId,
-        dPoP.jti,
-        epochTime() + DPOP_OK_WINDOW,
-      );
+	if (dPoP) {
+		if (!allowReplay) {
+			const unique = await ReplayDetection.unique(
+				ctx.oidc.client.clientId,
+				dPoP.jti,
+				epochTime() + DPOP_OK_WINDOW
+			);
 
-      ctx.assert(unique, new InvalidGrant('DPoP proof JWT Replay detected'));
-    }
+			ctx.assert(unique, new InvalidGrant('DPoP proof JWT Replay detected'));
+		}
 
-    at.setThumbprint('jkt', dPoP.thumbprint);
-  }
+		at.setThumbprint('jkt', dPoP.thumbprint);
+	}
 
-  const resource = await resolveResource(ctx, request, { userinfo, resourceIndicators });
+	const resource = await resolveResource(ctx, request, {
+		userinfo,
+		resourceIndicators
+	});
 
-  if (resource) {
-    const resourceServerInfo = await resourceIndicators
-      .getResourceServerInfo(ctx, resource, ctx.oidc.client);
-    at.resourceServer = new ctx.oidc.provider.ResourceServer(resource, resourceServerInfo);
-    at.scope = grant.getResourceScopeFiltered(resource, request.scopes);
-  } else {
-    at.claims = request.claims;
-    at.scope = grant.getOIDCScopeFiltered(request.scopes);
-  }
+	if (resource) {
+		const resourceServerInfo = await resourceIndicators.getResourceServerInfo(
+			ctx,
+			resource,
+			ctx.oidc.client
+		);
+		at.resourceServer = new ctx.oidc.provider.ResourceServer(
+			resource,
+			resourceServerInfo
+		);
+		at.scope = grant.getResourceScopeFiltered(resource, request.scopes);
+	} else {
+		at.claims = request.claims;
+		at.scope = grant.getOIDCScopeFiltered(request.scopes);
+	}
 
-  ctx.oidc.entity('AccessToken', at);
-  const accessToken = await at.save();
+	ctx.oidc.entity('AccessToken', at);
+	const accessToken = await at.save();
 
-  let refreshToken;
-  if (await issueRefreshToken(ctx, ctx.oidc.client, request)) {
-    const rt = new RefreshToken({
-      accountId: account.accountId,
-      acr: request.acr,
-      amr: request.amr,
-      authTime: request.authTime,
-      claims: request.claims,
-      client: ctx.oidc.client,
-      expiresWithSession: request.expiresWithSession,
-      grantId: request.grantId,
-      gty,
-      nonce: request.nonce,
-      resource: request.resource,
-      rotations: 0,
-      scope: request.scope,
-      sessionUid: request.sessionUid,
-      sid: request.sid,
-    });
+	let refreshToken;
+	if (await issueRefreshToken(ctx, ctx.oidc.client, request)) {
+		const rt = new RefreshToken({
+			accountId: account.accountId,
+			acr: request.acr,
+			amr: request.amr,
+			authTime: request.authTime,
+			claims: request.claims,
+			client: ctx.oidc.client,
+			expiresWithSession: request.expiresWithSession,
+			grantId: request.grantId,
+			gty,
+			nonce: request.nonce,
+			resource: request.resource,
+			rotations: 0,
+			scope: request.scope,
+			sessionUid: request.sessionUid,
+			sid: request.sid
+		});
 
-    if (ctx.oidc.client.clientAuthMethod === 'none') {
-      if (at.jkt) {
-        rt.jkt = at.jkt;
-      }
+		if (ctx.oidc.client.clientAuthMethod === 'none') {
+			if (at.jkt) {
+				rt.jkt = at.jkt;
+			}
 
-      if (at['x5t#S256']) {
-        rt['x5t#S256'] = at['x5t#S256'];
-      }
-    }
+			if (at['x5t#S256']) {
+				rt['x5t#S256'] = at['x5t#S256'];
+			}
+		}
 
-    ctx.oidc.entity('RefreshToken', rt);
-    refreshToken = await rt.save();
-  }
+		ctx.oidc.entity('RefreshToken', rt);
+		refreshToken = await rt.save();
+	}
 
-  let idToken;
-  if (request.scopes.has('openid')) {
-    const claims = filterClaims(request.claims, 'id_token', grant);
-    const rejected = grant.getRejectedOIDCClaims();
-    const token = new IdToken({
-      ...await account.claims('id_token', request.scope, claims, rejected),
-      ...{
-        acr: request.acr,
-        amr: request.amr,
-        auth_time: request.authTime,
-      },
-    }, { ctx });
+	let idToken;
+	if (request.scopes.has('openid')) {
+		const claims = filterClaims(request.claims, 'id_token', grant);
+		const rejected = grant.getRejectedOIDCClaims();
+		const token = new IdToken(
+			{
+				...(await account.claims('id_token', request.scope, claims, rejected)),
+				...{
+					acr: request.acr,
+					amr: request.amr,
+					auth_time: request.authTime
+				}
+			},
+			{ ctx }
+		);
 
-    if (conformIdTokenClaims && userinfo.enabled && !at.aud) {
-      token.scope = 'openid';
-    } else {
-      token.scope = grant.getOIDCScopeFiltered(request.scopes);
-    }
+		if (conformIdTokenClaims && userinfo.enabled && !at.aud) {
+			token.scope = 'openid';
+		} else {
+			token.scope = grant.getOIDCScopeFiltered(request.scopes);
+		}
 
-    token.mask = claims;
-    token.rejected = rejected;
+		token.mask = claims;
+		token.rejected = rejected;
 
-    token.set('nonce', request.nonce);
-    token.set('sid', request.sid);
+		token.set('nonce', request.nonce);
+		token.set('sid', request.sid);
 
-    idToken = await token.issue({ use: 'idtoken' });
-  }
+		idToken = await token.issue({ use: 'idtoken' });
+	}
 
-  ctx.body = {
-    access_token: accessToken,
-    expires_in: at.expiration,
-    id_token: idToken,
-    refresh_token: refreshToken,
-    scope: request.scope ? at.scope : (at.scope || undefined),
-    token_type: at.tokenType,
-  };
+	ctx.body = {
+		access_token: accessToken,
+		expires_in: at.expiration,
+		id_token: idToken,
+		refresh_token: refreshToken,
+		scope: request.scope ? at.scope : at.scope || undefined,
+		token_type: at.tokenType
+	};
 };
 
 export const parameters = new Set(['auth_req_id']);

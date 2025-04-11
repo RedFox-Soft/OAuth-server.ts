@@ -6,20 +6,20 @@ import instance from '../../helpers/weak_cache.ts';
  * other prompts
  */
 export default function checkPrompt(ctx, next) {
-  if (ctx.oidc.params.prompt !== undefined) {
-    const { prompts } = ctx.oidc;
-    const supported = instance(ctx.oidc.provider).configuration.prompts;
+	if (ctx.oidc.params.prompt !== undefined) {
+		const { prompts } = ctx.oidc;
+		const supported = instance(ctx.oidc.provider).configuration.prompts;
 
-    for (const prompt of prompts) {
-      if (!supported.has(prompt)) {
-        throw new InvalidRequest('unsupported prompt value requested');
-      }
-    }
+		for (const prompt of prompts) {
+			if (!supported.has(prompt)) {
+				throw new InvalidRequest('unsupported prompt value requested');
+			}
+		}
 
-    if (prompts.has('none') && prompts.size !== 1) {
-      throw new InvalidRequest('prompt none must only be used alone');
-    }
-  }
+		if (prompts.has('none') && prompts.size !== 1) {
+			throw new InvalidRequest('prompt none must only be used alone');
+		}
+	}
 
-  return next();
+	return next();
 }

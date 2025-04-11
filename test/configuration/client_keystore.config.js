@@ -7,5 +7,5 @@ const config = getConfig();
 merge(config.features, { encryption: { enabled: true } });
 
 export default {
-  config,
+	config
 };

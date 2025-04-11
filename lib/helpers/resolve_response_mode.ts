@@ -1,7 +1,9 @@
 export default function resolve(responseType) {
-  return typeof responseType === 'string' && responseType.includes('token') ? 'fragment' : 'query';
+	return typeof responseType === 'string' && responseType.includes('token')
+		? 'fragment'
+		: 'query';
 }
 
 export function isFrontChannel(responseType) {
-  return resolve(responseType) === 'fragment';
+	return resolve(responseType) === 'fragment';
 }

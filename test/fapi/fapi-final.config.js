@@ -10,34 +10,36 @@ const config = getConfig();
 export const keypair = await generateKeyPair('ES256');
 
 merge(config.features, {
-  fapi: {
-    enabled: true,
-    profile(ctx, client) {
-      assert(ctx, 'ctx not provided in fapi.profile');
-      assert(client, 'client not provided in fapi.profile');
-      return '1.0 Final';
-    },
-  },
-  jwtResponseModes: { enabled: true },
-  requestObjects: {
-    enabled: true,
-  },
+	fapi: {
+		enabled: true,
+		profile(ctx, client) {
+			assert(ctx, 'ctx not provided in fapi.profile');
+			assert(client, 'client not provided in fapi.profile');
+			return '1.0 Final';
+		}
+	},
+	jwtResponseModes: { enabled: true },
+	requestObjects: {
+		enabled: true
+	}
 });
 config.enabledJWA = {
-  requestObjectSigningAlgValues: ['ES256'],
+	requestObjectSigningAlgValues: ['ES256']
 };
 config.acceptQueryParamAccessTokens = true;
 
 export default {
-  config,
-  clients: [{
-    client_id: 'client',
-    client_secret: 'secret',
-    response_types: ['code id_token', 'code'],
-    grant_types: ['implicit', 'authorization_code'],
-    redirect_uris: ['https://client.example.com/cb'],
-    jwks: {
-      keys: [await exportJWK(keypair.publicKey)],
-    },
-  }],
+	config,
+	clients: [
+		{
+			client_id: 'client',
+			client_secret: 'secret',
+			response_types: ['code id_token', 'code'],
+			grant_types: ['implicit', 'authorization_code'],
+			redirect_uris: ['https://client.example.com/cb'],
+			jwks: {
+				keys: [await exportJWK(keypair.publicKey)]
+			}
+		}
+	]
 };

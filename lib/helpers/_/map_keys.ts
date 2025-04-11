@@ -1,9 +1,9 @@
 export default (object, iteratee) => {
-  const result = {};
+	const result = {};
 
-  Object.entries(object).forEach(([key, value]) => {
-    result[iteratee(value, key, object)] = value;
-  });
+	Object.entries(object).forEach(([key, value]) => {
+		result[iteratee(value, key, object)] = value;
+	});
 
-  return result;
+	return result;
 };

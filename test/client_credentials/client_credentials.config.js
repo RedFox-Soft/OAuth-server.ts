@@ -8,13 +8,13 @@ merge(config.features, { clientCredentials: { enabled: true } });
 config.scopes = ['api:read', 'api:write'];
 
 export default {
-  config,
-  client: {
-    client_id: 'client',
-    client_secret: 'secret',
-    grant_types: ['authorization_code', 'client_credentials'],
-    response_types: ['code'],
-    redirect_uris: ['https://client.example.com/cb'],
-    scope: 'api:read',
-  },
+	config,
+	client: {
+		client_id: 'client',
+		client_secret: 'secret',
+		grant_types: ['authorization_code', 'client_credentials'],
+		response_types: ['code'],
+		redirect_uris: ['https://client.example.com/cb'],
+		scope: 'api:read'
+	}
 };

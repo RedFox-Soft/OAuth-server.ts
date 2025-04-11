@@ -5,54 +5,66 @@ import instance from '../../helpers/weak_cache.ts';
 import checkIdTokenHint from './check_id_token_hint.ts';
 
 export default async function cibaLoadAccount(ctx, next) {
-  const mechanisms = omitBy({
-    login_hint_token: ctx.oidc.params.login_hint_token,
-    id_token_hint: ctx.oidc.params.id_token_hint,
-    login_hint: ctx.oidc.params.login_hint,
-  }, (value) => typeof value !== 'string' || !value);
+	const mechanisms = omitBy(
+		{
+			login_hint_token: ctx.oidc.params.login_hint_token,
+			id_token_hint: ctx.oidc.params.id_token_hint,
+			login_hint: ctx.oidc.params.login_hint
+		},
+		(value) => typeof value !== 'string' || !value
+	);
 
-  let mechanism;
-  let length;
-  let value;
+	let mechanism;
+	let length;
+	let value;
 
-  try {
-    ({ 0: [mechanism, value], length } = Object.entries(mechanisms));
-  } catch (err) {}
+	try {
+		({
+			0: [mechanism, value],
+			length
+		} = Object.entries(mechanisms));
+	} catch (err) {}
 
-  if (!length) {
-    throw new InvalidRequest('missing one of required parameters login_hint_token, id_token_hint, or login_hint');
-  } else if (length !== 1) {
-    throw new InvalidRequest('only one of required parameters login_hint_token, id_token_hint, or login_hint must be provided');
-  }
+	if (!length) {
+		throw new InvalidRequest(
+			'missing one of required parameters login_hint_token, id_token_hint, or login_hint'
+		);
+	} else if (length !== 1) {
+		throw new InvalidRequest(
+			'only one of required parameters login_hint_token, id_token_hint, or login_hint must be provided'
+		);
+	}
 
-  const { findAccount, features } = instance(ctx.oidc.provider).configuration;
-  const { ciba } = features;
+	const { findAccount, features } = instance(ctx.oidc.provider).configuration;
+	const { ciba } = features;
 
-  let accountId;
-  // eslint-disable-next-line default-case
-  switch (mechanism) {
-    case 'id_token_hint':
-      await checkIdTokenHint(ctx, () => {});
-      ({ payload: { sub: accountId } } = ctx.oidc.entities.IdTokenHint);
-      break;
-    case 'login_hint_token':
-      accountId = await ciba.processLoginHintToken(ctx, value);
-      break;
-    case 'login_hint':
-      accountId = await ciba.processLoginHint(ctx, value);
-      break;
-  }
+	let accountId;
+	// eslint-disable-next-line default-case
+	switch (mechanism) {
+		case 'id_token_hint':
+			await checkIdTokenHint(ctx, () => {});
+			({
+				payload: { sub: accountId }
+			} = ctx.oidc.entities.IdTokenHint);
+			break;
+		case 'login_hint_token':
+			accountId = await ciba.processLoginHintToken(ctx, value);
+			break;
+		case 'login_hint':
+			accountId = await ciba.processLoginHint(ctx, value);
+			break;
+	}
 
-  if (!accountId) {
-    throw new UnknownUserId('could not identify end-user');
-  }
-  const account = await findAccount(ctx, accountId);
-  if (!account) {
-    throw new UnknownUserId('could not identify end-user');
-  }
-  ctx.oidc.entity('Account', account);
+	if (!accountId) {
+		throw new UnknownUserId('could not identify end-user');
+	}
+	const account = await findAccount(ctx, accountId);
+	if (!account) {
+		throw new UnknownUserId('could not identify end-user');
+	}
+	ctx.oidc.entity('Account', account);
 
-  await ciba.verifyUserCode(ctx, account, value);
+	await ciba.verifyUserCode(ctx, account, value);
 
-  return next();
+	return next();
 }

@@ -14,55 +14,63 @@ import isPlainObject from '../../helpers/_/is_plain_object.ts';
  * Merges requested claims with acr as requested if acr_values is provided
  */
 export default async function checkClaims(ctx, next) {
-  const { params } = ctx.oidc;
+	const { params } = ctx.oidc;
 
-  if (params.claims !== undefined) {
-    const { claimsParameter, userinfo } = instance(ctx.oidc.provider).features;
+	if (params.claims !== undefined) {
+		const { claimsParameter, userinfo } = instance(ctx.oidc.provider).features;
 
-    if (claimsParameter.enabled) {
-      if (params.response_type === 'none') {
-        throw new InvalidRequest('claims parameter should not be combined with response_type none');
-      }
+		if (claimsParameter.enabled) {
+			if (params.response_type === 'none') {
+				throw new InvalidRequest(
+					'claims parameter should not be combined with response_type none'
+				);
+			}
 
-      let claims;
+			let claims;
 
-      try {
-        claims = JSON.parse(params.claims);
-      } catch (err) {
-        throw new InvalidRequest('could not parse the claims parameter JSON');
-      }
+			try {
+				claims = JSON.parse(params.claims);
+			} catch (err) {
+				throw new InvalidRequest('could not parse the claims parameter JSON');
+			}
 
-      if (!isPlainObject(claims)) {
-        throw new InvalidRequest('claims parameter should be a JSON object');
-      }
+			if (!isPlainObject(claims)) {
+				throw new InvalidRequest('claims parameter should be a JSON object');
+			}
 
-      if (claims.userinfo === undefined && claims.id_token === undefined) {
-        throw new InvalidRequest('claims parameter should have userinfo or id_token properties');
-      }
+			if (claims.userinfo === undefined && claims.id_token === undefined) {
+				throw new InvalidRequest(
+					'claims parameter should have userinfo or id_token properties'
+				);
+			}
 
-      if (claims.userinfo !== undefined && !isPlainObject(claims.userinfo)) {
-        throw new InvalidRequest('claims.userinfo should be an object');
-      }
+			if (claims.userinfo !== undefined && !isPlainObject(claims.userinfo)) {
+				throw new InvalidRequest('claims.userinfo should be an object');
+			}
 
-      if (claims.id_token !== undefined && !isPlainObject(claims.id_token)) {
-        throw new InvalidRequest('claims.id_token should be an object');
-      }
+			if (claims.id_token !== undefined && !isPlainObject(claims.id_token)) {
+				throw new InvalidRequest('claims.id_token should be an object');
+			}
 
-      if (claims.userinfo && !userinfo.enabled) {
-        throw new InvalidRequest('claims.userinfo should not be used since userinfo endpoint is not supported');
-      }
+			if (claims.userinfo && !userinfo.enabled) {
+				throw new InvalidRequest(
+					'claims.userinfo should not be used since userinfo endpoint is not supported'
+				);
+			}
 
-      if (params.response_type === 'id_token' && claims.userinfo) {
-        throw new InvalidRequest('claims.userinfo should not be used if access_token is not issued');
-      }
+			if (params.response_type === 'id_token' && claims.userinfo) {
+				throw new InvalidRequest(
+					'claims.userinfo should not be used if access_token is not issued'
+				);
+			}
 
-      await claimsParameter.assertClaimsParameter?.(
-        ctx,
-        claims,
-        ctx.oidc.client,
-      );
-    }
-  }
+			await claimsParameter.assertClaimsParameter?.(
+				ctx,
+				claims,
+				ctx.oidc.client
+			);
+		}
+	}
 
-  return next();
+	return next();
 }

@@ -7,55 +7,62 @@ import * as JWT from '../../helpers/jwt.ts';
 const MAX_TTL = 60;
 
 export default async function pushedAuthorizationRequestResponse(ctx) {
-  let request;
-  let ttl;
-  let dpopJkt;
-  const now = epochTime();
-  if (ctx.oidc.body.request) {
-    ({ request } = ctx.oidc.body);
-    const { payload: { exp, dpop_jkt: thumbprint } } = JWT.decode(request);
-    ttl = exp - now;
+	let request;
+	let ttl;
+	let dpopJkt;
+	const now = epochTime();
+	if (ctx.oidc.body.request) {
+		({ request } = ctx.oidc.body);
+		const {
+			payload: { exp, dpop_jkt: thumbprint }
+		} = JWT.decode(request);
+		ttl = exp - now;
 
-    if (!Number.isInteger(ttl) || ttl > MAX_TTL) {
-      ttl = MAX_TTL;
-    }
-    dpopJkt = thumbprint || ctx.oidc.params.dpop_jkt;
-  } else {
-    ttl = MAX_TTL;
-    const payload = { ...ctx.oidc.params };
+		if (!Number.isInteger(ttl) || ttl > MAX_TTL) {
+			ttl = MAX_TTL;
+		}
+		dpopJkt = thumbprint || ctx.oidc.params.dpop_jkt;
+	} else {
+		ttl = MAX_TTL;
+		const payload = { ...ctx.oidc.params };
 
-    if (payload.claims) {
-      payload.claims = JSON.parse(payload.claims);
-    }
+		if (payload.claims) {
+			payload.claims = JSON.parse(payload.claims);
+		}
 
-    if (payload.authorization_details) {
-      payload.authorization_details = JSON.parse(payload.authorization_details);
-    }
+		if (payload.authorization_details) {
+			payload.authorization_details = JSON.parse(payload.authorization_details);
+		}
 
-    request = new UnsecuredJWT(payload)
-      .setIssuedAt(now)
-      .setIssuer(ctx.oidc.client.clientId)
-      .setAudience(ctx.oidc.issuer)
-      .setExpirationTime(now + MAX_TTL)
-      .setNotBefore(now)
-      .encode();
-    dpopJkt = ctx.oidc.params.dpop_jkt;
-  }
+		request = new UnsecuredJWT(payload)
+			.setIssuedAt(now)
+			.setIssuer(ctx.oidc.client.clientId)
+			.setAudience(ctx.oidc.issuer)
+			.setExpirationTime(now + MAX_TTL)
+			.setNotBefore(now)
+			.encode();
+		dpopJkt = ctx.oidc.params.dpop_jkt;
+	}
 
-  const requestObject = new ctx.oidc.provider.PushedAuthorizationRequest({
-    request,
-    dpopJkt,
-    trusted: ctx.oidc.client.clientAuthMethod !== 'none' || !!ctx.oidc.trusted?.length,
-  });
+	const requestObject = new ctx.oidc.provider.PushedAuthorizationRequest({
+		request,
+		dpopJkt,
+		trusted:
+			ctx.oidc.client.clientAuthMethod !== 'none' || !!ctx.oidc.trusted?.length
+	});
 
-  const id = await requestObject.save(ttl);
+	const id = await requestObject.save(ttl);
 
-  ctx.oidc.entity('PushedAuthorizationRequest', requestObject);
+	ctx.oidc.entity('PushedAuthorizationRequest', requestObject);
 
-  ctx.status = 201;
-  ctx.body = {
-    expires_in: ttl,
-    request_uri: `${PUSHED_REQUEST_URN}${id}`,
-  };
-  ctx.oidc.provider.emit('pushed_authorization_request.success', ctx, ctx.oidc.client);
+	ctx.status = 201;
+	ctx.body = {
+		expires_in: ttl,
+		request_uri: `${PUSHED_REQUEST_URN}${id}`
+	};
+	ctx.oidc.provider.emit(
+		'pushed_authorization_request.success',
+		ctx,
+		ctx.oidc.client
+	);
 }

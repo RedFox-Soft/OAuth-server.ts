@@ -10,113 +10,127 @@ import * as formHtml from '../helpers/user_code_form.ts';
 import formPost from '../response_modes/form_post.ts';
 import { normalize, denormalize } from '../helpers/user_codes.ts';
 import {
-  NoCodeError, NotFoundError, ExpiredError, AlreadyUsedError, AbortedError,
+	NoCodeError,
+	NotFoundError,
+	ExpiredError,
+	AlreadyUsedError,
+	AbortedError
 } from '../helpers/re_render_errors.ts';
 
-const parseBody = bodyParser.bind(undefined, 'application/x-www-form-urlencoded');
+const parseBody = bodyParser.bind(
+	undefined,
+	'application/x-www-form-urlencoded'
+);
 
 export const get = [
-  sessionMiddleware,
-  paramsMiddleware.bind(undefined, new Set(['user_code'])),
-  async function renderCodeVerification(ctx) {
-    const { charset, userCodeInputSource } = instance(ctx.oidc.provider).features.deviceFlow;
+	sessionMiddleware,
+	paramsMiddleware.bind(undefined, new Set(['user_code'])),
+	async function renderCodeVerification(ctx) {
+		const { charset, userCodeInputSource } = instance(ctx.oidc.provider)
+			.features.deviceFlow;
 
-    // TODO: generic xsrf middleware to remove this
-    const secret = crypto.randomBytes(24).toString('hex');
-    ctx.oidc.session.state = { secret };
+		// TODO: generic xsrf middleware to remove this
+		const secret = crypto.randomBytes(24).toString('hex');
+		ctx.oidc.session.state = { secret };
 
-    const action = ctx.oidc.urlFor('code_verification');
-    if (ctx.oidc.params.user_code) {
-      formPost(ctx, action, {
-        xsrf: secret,
-        user_code: ctx.oidc.params.user_code,
-      });
-    } else {
-      await userCodeInputSource(ctx, formHtml.input(action, secret, undefined, charset));
-    }
-  },
+		const action = ctx.oidc.urlFor('code_verification');
+		if (ctx.oidc.params.user_code) {
+			formPost(ctx, action, {
+				xsrf: secret,
+				user_code: ctx.oidc.params.user_code
+			});
+		} else {
+			await userCodeInputSource(
+				ctx,
+				formHtml.input(action, secret, undefined, charset)
+			);
+		}
+	}
 ];
 
 export const post = [
-  sessionMiddleware,
-  parseBody,
-  paramsMiddleware.bind(undefined, new Set(['xsrf', 'user_code', 'confirm', 'abort'])),
-  rejectDupes.bind(undefined, {}),
+	sessionMiddleware,
+	parseBody,
+	paramsMiddleware.bind(
+		undefined,
+		new Set(['xsrf', 'user_code', 'confirm', 'abort'])
+	),
+	rejectDupes.bind(undefined, {}),
 
-  async function codeVerificationCSRF(ctx, next) {
-    if (!ctx.oidc.session.state) {
-      throw new InvalidRequest('could not find device form details');
-    }
-    if (ctx.oidc.session.state.secret !== ctx.oidc.params.xsrf) {
-      throw new InvalidRequest('xsrf token invalid');
-    }
-    await next();
-  },
+	async function codeVerificationCSRF(ctx, next) {
+		if (!ctx.oidc.session.state) {
+			throw new InvalidRequest('could not find device form details');
+		}
+		if (ctx.oidc.session.state.secret !== ctx.oidc.params.xsrf) {
+			throw new InvalidRequest('xsrf token invalid');
+		}
+		await next();
+	},
 
-  async function loadDeviceCodeByUserInput(ctx, next) {
-    const { userCodeConfirmSource, mask } = instance(ctx.oidc.provider).features.deviceFlow;
-    const { user_code: userCode, confirm, abort } = ctx.oidc.params;
+	async function loadDeviceCodeByUserInput(ctx, next) {
+		const { userCodeConfirmSource, mask } = instance(ctx.oidc.provider).features
+			.deviceFlow;
+		const { user_code: userCode, confirm, abort } = ctx.oidc.params;
 
-    if (!userCode) {
-      throw new NoCodeError();
-    }
+		if (!userCode) {
+			throw new NoCodeError();
+		}
 
-    const normalized = normalize(userCode);
-    const code = await ctx.oidc.provider.DeviceCode.findByUserCode(
-      normalized,
-      { ignoreExpiration: true },
-    );
+		const normalized = normalize(userCode);
+		const code = await ctx.oidc.provider.DeviceCode.findByUserCode(normalized, {
+			ignoreExpiration: true
+		});
 
-    if (!code) {
-      throw new NotFoundError(userCode);
-    }
+		if (!code) {
+			throw new NotFoundError(userCode);
+		}
 
-    if (code.isExpired) {
-      throw new ExpiredError(userCode);
-    }
+		if (code.isExpired) {
+			throw new ExpiredError(userCode);
+		}
 
-    if (code.error || code.accountId || code.inFlight) {
-      throw new AlreadyUsedError(userCode);
-    }
+		if (code.error || code.accountId || code.inFlight) {
+			throw new AlreadyUsedError(userCode);
+		}
 
-    ctx.oidc.entity('DeviceCode', code);
+		ctx.oidc.entity('DeviceCode', code);
 
-    if (abort) {
-      Object.assign(code, {
-        error: 'access_denied',
-        errorDescription: 'End-User aborted interaction',
-      });
+		if (abort) {
+			Object.assign(code, {
+				error: 'access_denied',
+				errorDescription: 'End-User aborted interaction'
+			});
 
-      await code.save();
-      throw new AbortedError();
-    }
+			await code.save();
+			throw new AbortedError();
+		}
 
-    if (!confirm) {
-      const client = await ctx.oidc.provider.Client.find(code.clientId);
-      if (!client) {
-        throw new InvalidClient('client is invalid', 'client not found');
-      }
-      ctx.oidc.entity('Client', client);
+		if (!confirm) {
+			const client = await ctx.oidc.provider.Client.find(code.clientId);
+			if (!client) {
+				throw new InvalidClient('client is invalid', 'client not found');
+			}
+			ctx.oidc.entity('Client', client);
 
-      const action = ctx.oidc.urlFor('code_verification');
-      await userCodeConfirmSource(
-        ctx,
-        formHtml.confirm(action, ctx.oidc.session.state.secret, userCode),
-        client,
-        code.deviceInfo,
-        denormalize(normalized, mask),
-      );
-      return;
-    }
+			const action = ctx.oidc.urlFor('code_verification');
+			await userCodeConfirmSource(
+				ctx,
+				formHtml.confirm(action, ctx.oidc.session.state.secret, userCode),
+				client,
+				code.deviceInfo,
+				denormalize(normalized, mask)
+			);
+			return;
+		}
 
-    code.inFlight = true;
-    await code.save();
+		code.inFlight = true;
+		await code.save();
 
-    await next();
-  },
+		await next();
+	},
 
-  function cleanup(ctx, next) {
-    ctx.oidc.session.state = undefined;
-    return next();
-  },
+	function cleanup(ctx, next) {
+		ctx.oidc.session.state = undefined;
+		return next();
+	}
 ];

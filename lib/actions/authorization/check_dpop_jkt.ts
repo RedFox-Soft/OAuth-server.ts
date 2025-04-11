@@ -8,28 +8,30 @@ import instance from '../../helpers/weak_cache.ts';
  * when provided, otherwise defaults dpop_jkt to it.
  */
 export default async function checkDpopJkt(ctx, next) {
-  const { params } = ctx.oidc;
+	const { params } = ctx.oidc;
 
-  const dPoP = await dpopValidate(ctx);
-  if (dPoP) {
-    const { allowReplay } = instance(ctx.oidc.provider).features.dPoP;
-    if (!allowReplay) {
-      const { ReplayDetection } = ctx.oidc.provider;
-      const unique = await ReplayDetection.unique(
-        ctx.oidc.client.clientId,
-        dPoP.jti,
-        epochTime() + DPOP_OK_WINDOW,
-      );
+	const dPoP = await dpopValidate(ctx);
+	if (dPoP) {
+		const { allowReplay } = instance(ctx.oidc.provider).features.dPoP;
+		if (!allowReplay) {
+			const { ReplayDetection } = ctx.oidc.provider;
+			const unique = await ReplayDetection.unique(
+				ctx.oidc.client.clientId,
+				dPoP.jti,
+				epochTime() + DPOP_OK_WINDOW
+			);
 
-      ctx.assert(unique, new InvalidRequest('DPoP proof JWT Replay detected'));
-    }
+			ctx.assert(unique, new InvalidRequest('DPoP proof JWT Replay detected'));
+		}
 
-    if (params.dpop_jkt && params.dpop_jkt !== dPoP.thumbprint) {
-      throw new InvalidRequest('DPoP proof key thumbprint does not match dpop_jkt');
-    } else if (!params.dpop_jkt) {
-      params.dpop_jkt = dPoP.thumbprint;
-    }
-  }
+		if (params.dpop_jkt && params.dpop_jkt !== dPoP.thumbprint) {
+			throw new InvalidRequest(
+				'DPoP proof key thumbprint does not match dpop_jkt'
+			);
+		} else if (!params.dpop_jkt) {
+			params.dpop_jkt = dPoP.thumbprint;
+		}
+	}
 
-  return next();
+	return next();
 }

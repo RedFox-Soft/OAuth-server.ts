@@ -10,203 +10,241 @@ import filterClaims from '../helpers/filter_claims.ts';
 import dpopValidate, { DPOP_OK_WINDOW } from '../helpers/validate_dpop.ts';
 import epochTime from '../helpers/epoch_time.ts';
 import {
-  InvalidToken, InsufficientScope, InvalidDpopProof, UseDpopNonce,
+	InvalidToken,
+	InsufficientScope,
+	InvalidDpopProof,
+	UseDpopNonce
 } from '../helpers/errors.ts';
 
-const PARAM_LIST = new Set([
-  'scope',
-  'access_token',
-]);
+const PARAM_LIST = new Set(['scope', 'access_token']);
 
-const parseBody = bodyParser.bind(undefined, 'application/x-www-form-urlencoded');
+const parseBody = bodyParser.bind(
+	undefined,
+	'application/x-www-form-urlencoded'
+);
 
 export default [
-  noCache,
+	noCache,
 
-  async function setWWWAuthenticateHeader(ctx, next) {
-    try {
-      await next();
-    } catch (err) {
-      if (err.expose) {
-        let scheme;
+	async function setWWWAuthenticateHeader(ctx, next) {
+		try {
+			await next();
+		} catch (err) {
+			if (err.expose) {
+				let scheme;
 
-        if (/dpop/i.test(err.error_description) || (ctx.oidc.accessToken?.jkt)) {
-          scheme = 'DPoP';
-        } else {
-          scheme = 'Bearer';
-        }
+				if (/dpop/i.test(err.error_description) || ctx.oidc.accessToken?.jkt) {
+					scheme = 'DPoP';
+				} else {
+					scheme = 'Bearer';
+				}
 
-        if (err instanceof InvalidDpopProof || err instanceof UseDpopNonce) {
-          // eslint-disable-next-line no-multi-assign
-          err.status = err.statusCode = 401;
-        }
+				if (err instanceof InvalidDpopProof || err instanceof UseDpopNonce) {
+					// eslint-disable-next-line no-multi-assign
+					err.status = err.statusCode = 401;
+				}
 
-        setWWWAuthenticate(ctx, scheme, {
-          realm: ctx.oidc.issuer,
-          ...(err.error_description !== 'no access token provided' ? {
-            error: err.message,
-            error_description: err.error_description,
-            scope: err.scope,
-          } : undefined),
-          ...(scheme === 'DPoP' ? {
-            algs: instance(ctx.oidc.provider).configuration.dPoPSigningAlgValues.join(' '),
-          } : undefined),
-        });
-      }
-      throw err;
-    }
-  },
+				setWWWAuthenticate(ctx, scheme, {
+					realm: ctx.oidc.issuer,
+					...(err.error_description !== 'no access token provided'
+						? {
+								error: err.message,
+								error_description: err.error_description,
+								scope: err.scope
+							}
+						: undefined),
+					...(scheme === 'DPoP'
+						? {
+								algs: instance(
+									ctx.oidc.provider
+								).configuration.dPoPSigningAlgValues.join(' ')
+							}
+						: undefined)
+				});
+			}
+			throw err;
+		}
+	},
 
-  parseBody,
-  paramsMiddleware.bind(undefined, PARAM_LIST),
-  rejectDupes.bind(undefined, {}),
+	parseBody,
+	paramsMiddleware.bind(undefined, PARAM_LIST),
+	rejectDupes.bind(undefined, {}),
 
-  async function validateAccessToken(ctx, next) {
-    const accessTokenValue = ctx.oidc.getAccessToken({ acceptDPoP: true });
+	async function validateAccessToken(ctx, next) {
+		const accessTokenValue = ctx.oidc.getAccessToken({ acceptDPoP: true });
 
-    const dPoP = await dpopValidate(ctx, accessTokenValue);
+		const dPoP = await dpopValidate(ctx, accessTokenValue);
 
-    const accessToken = await ctx.oidc.provider.AccessToken.find(accessTokenValue);
+		const accessToken =
+			await ctx.oidc.provider.AccessToken.find(accessTokenValue);
 
-    ctx.assert(accessToken, new InvalidToken('access token not found'));
+		ctx.assert(accessToken, new InvalidToken('access token not found'));
 
-    ctx.oidc.entity('AccessToken', accessToken);
+		ctx.oidc.entity('AccessToken', accessToken);
 
-    const { scopes } = accessToken;
-    if (!scopes.size || !scopes.has('openid')) {
-      throw new InsufficientScope('access token missing openid scope', 'openid');
-    }
+		const { scopes } = accessToken;
+		if (!scopes.size || !scopes.has('openid')) {
+			throw new InsufficientScope(
+				'access token missing openid scope',
+				'openid'
+			);
+		}
 
-    if (accessToken['x5t#S256']) {
-      const { getCertificate } = instance(ctx.oidc.provider).features.mTLS;
-      const cert = getCertificate(ctx);
-      if (!cert || accessToken['x5t#S256'] !== certificateThumbprint(cert)) {
-        throw new InvalidToken('failed x5t#S256 verification');
-      }
-    }
+		if (accessToken['x5t#S256']) {
+			const { getCertificate } = instance(ctx.oidc.provider).features.mTLS;
+			const cert = getCertificate(ctx);
+			if (!cert || accessToken['x5t#S256'] !== certificateThumbprint(cert)) {
+				throw new InvalidToken('failed x5t#S256 verification');
+			}
+		}
 
-    if (dPoP) {
-      const { allowReplay } = instance(ctx.oidc.provider).features.dPoP;
+		if (dPoP) {
+			const { allowReplay } = instance(ctx.oidc.provider).features.dPoP;
 
-      if (!allowReplay) {
-        const unique = await ctx.oidc.provider.ReplayDetection.unique(
-          accessToken.clientId,
-          dPoP.jti,
-          epochTime() + DPOP_OK_WINDOW,
-        );
+			if (!allowReplay) {
+				const unique = await ctx.oidc.provider.ReplayDetection.unique(
+					accessToken.clientId,
+					dPoP.jti,
+					epochTime() + DPOP_OK_WINDOW
+				);
 
-        ctx.assert(unique, new InvalidToken('DPoP proof JWT Replay detected'));
-      }
-    }
+				ctx.assert(unique, new InvalidToken('DPoP proof JWT Replay detected'));
+			}
+		}
 
-    if (accessToken.jkt && (!dPoP || accessToken.jkt !== dPoP.thumbprint)) {
-      throw new InvalidToken('failed jkt verification');
-    }
+		if (accessToken.jkt && (!dPoP || accessToken.jkt !== dPoP.thumbprint)) {
+			throw new InvalidToken('failed jkt verification');
+		}
 
-    await next();
-  },
+		await next();
+	},
 
-  function validateAudience(ctx, next) {
-    const { oidc: { entities: { AccessToken: accessToken } } } = ctx;
+	function validateAudience(ctx, next) {
+		const {
+			oidc: {
+				entities: { AccessToken: accessToken }
+			}
+		} = ctx;
 
-    if (accessToken.aud !== undefined) {
-      throw new InvalidToken('token audience prevents accessing the userinfo endpoint');
-    }
+		if (accessToken.aud !== undefined) {
+			throw new InvalidToken(
+				'token audience prevents accessing the userinfo endpoint'
+			);
+		}
 
-    return next();
-  },
+		return next();
+	},
 
-  async function validateScope(ctx, next) {
-    if (ctx.oidc.params.scope) {
-      const missing = difference(ctx.oidc.params.scope.split(' '), [...ctx.oidc.accessToken.scopes]);
+	async function validateScope(ctx, next) {
+		if (ctx.oidc.params.scope) {
+			const missing = difference(ctx.oidc.params.scope.split(' '), [
+				...ctx.oidc.accessToken.scopes
+			]);
 
-      if (missing.length !== 0) {
-        throw new InsufficientScope('access token missing requested scope', missing.join(' '));
-      }
-    }
-    await next();
-  },
+			if (missing.length !== 0) {
+				throw new InsufficientScope(
+					'access token missing requested scope',
+					missing.join(' ')
+				);
+			}
+		}
+		await next();
+	},
 
-  async function loadClient(ctx, next) {
-    const client = await ctx.oidc.provider.Client.find(ctx.oidc.accessToken.clientId);
-    ctx.assert(client, new InvalidToken('associated client not found'));
+	async function loadClient(ctx, next) {
+		const client = await ctx.oidc.provider.Client.find(
+			ctx.oidc.accessToken.clientId
+		);
+		ctx.assert(client, new InvalidToken('associated client not found'));
 
-    ctx.oidc.entity('Client', client);
+		ctx.oidc.entity('Client', client);
 
-    await next();
-  },
+		await next();
+	},
 
-  async function loadAccount(ctx, next) {
-    const account = await instance(ctx.oidc.provider).configuration.findAccount(
-      ctx,
-      ctx.oidc.accessToken.accountId,
-      ctx.oidc.accessToken,
-    );
+	async function loadAccount(ctx, next) {
+		const account = await instance(ctx.oidc.provider).configuration.findAccount(
+			ctx,
+			ctx.oidc.accessToken.accountId,
+			ctx.oidc.accessToken
+		);
 
-    ctx.assert(account, new InvalidToken('associated account not found'));
-    ctx.oidc.entity('Account', account);
+		ctx.assert(account, new InvalidToken('associated account not found'));
+		ctx.oidc.entity('Account', account);
 
-    await next();
-  },
+		await next();
+	},
 
-  async function loadGrant(ctx, next) {
-    const grant = await ctx.oidc.provider.Grant.find(ctx.oidc.accessToken.grantId, {
-      ignoreExpiration: true,
-    });
+	async function loadGrant(ctx, next) {
+		const grant = await ctx.oidc.provider.Grant.find(
+			ctx.oidc.accessToken.grantId,
+			{
+				ignoreExpiration: true
+			}
+		);
 
-    if (!grant) {
-      throw new InvalidToken('grant not found');
-    }
+		if (!grant) {
+			throw new InvalidToken('grant not found');
+		}
 
-    if (grant.isExpired) {
-      throw new InvalidToken('grant is expired');
-    }
+		if (grant.isExpired) {
+			throw new InvalidToken('grant is expired');
+		}
 
-    if (grant.clientId !== ctx.oidc.accessToken.clientId) {
-      throw new InvalidToken('clientId mismatch');
-    }
+		if (grant.clientId !== ctx.oidc.accessToken.clientId) {
+			throw new InvalidToken('clientId mismatch');
+		}
 
-    if (grant.accountId !== ctx.oidc.accessToken.accountId) {
-      throw new InvalidToken('accountId mismatch');
-    }
+		if (grant.accountId !== ctx.oidc.accessToken.accountId) {
+			throw new InvalidToken('accountId mismatch');
+		}
 
-    ctx.oidc.entity('Grant', grant);
+		ctx.oidc.entity('Grant', grant);
 
-    await next();
-  },
+		await next();
+	},
 
-  async function respond(ctx) {
-    const claims = filterClaims(ctx.oidc.accessToken.claims, 'userinfo', ctx.oidc.grant);
-    const rejected = ctx.oidc.grant.getRejectedOIDCClaims();
-    const scope = ctx.oidc.grant.getOIDCScopeFiltered(new Set((ctx.oidc.params.scope || ctx.oidc.accessToken.scope).split(' ')));
-    const { client } = ctx.oidc;
+	async function respond(ctx) {
+		const claims = filterClaims(
+			ctx.oidc.accessToken.claims,
+			'userinfo',
+			ctx.oidc.grant
+		);
+		const rejected = ctx.oidc.grant.getRejectedOIDCClaims();
+		const scope = ctx.oidc.grant.getOIDCScopeFiltered(
+			new Set((ctx.oidc.params.scope || ctx.oidc.accessToken.scope).split(' '))
+		);
+		const { client } = ctx.oidc;
 
-    if (client.userinfoSignedResponseAlg || client.userinfoEncryptedResponseAlg) {
-      const token = new ctx.oidc.provider.IdToken(
-        await ctx.oidc.account.claims('userinfo', scope, claims, rejected),
-        { ctx },
-      );
+		if (
+			client.userinfoSignedResponseAlg ||
+			client.userinfoEncryptedResponseAlg
+		) {
+			const token = new ctx.oidc.provider.IdToken(
+				await ctx.oidc.account.claims('userinfo', scope, claims, rejected),
+				{ ctx }
+			);
 
-      token.scope = scope;
-      token.mask = claims;
-      token.rejected = rejected;
+			token.scope = scope;
+			token.mask = claims;
+			token.rejected = rejected;
 
-      ctx.body = await token.issue({
-        expiresAt: ctx.oidc.accessToken.exp,
-        use: 'userinfo',
-      });
-      ctx.type = 'application/jwt; charset=utf-8';
-    } else {
-      const mask = new ctx.oidc.provider.Claims(
-        await ctx.oidc.account.claims('userinfo', scope, claims, rejected),
-        { ctx },
-      );
+			ctx.body = await token.issue({
+				expiresAt: ctx.oidc.accessToken.exp,
+				use: 'userinfo'
+			});
+			ctx.type = 'application/jwt; charset=utf-8';
+		} else {
+			const mask = new ctx.oidc.provider.Claims(
+				await ctx.oidc.account.claims('userinfo', scope, claims, rejected),
+				{ ctx }
+			);
 
-      mask.scope(scope);
-      mask.mask(claims);
-      mask.rejected(rejected);
+			mask.scope(scope);
+			mask.mask(claims);
+			mask.rejected(rejected);
 
-      ctx.body = await mask.result();
-    }
-  },
+			ctx.body = await mask.result();
+		}
+	}
 ];

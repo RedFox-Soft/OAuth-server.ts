@@ -9,37 +9,32 @@ import isSenderConstrained from './mixins/is_sender_constrained.ts';
 import isSessionBound from './mixins/is_session_bound.ts';
 import storesAuth from './mixins/stores_auth.ts';
 
-export default (provider) => class RefreshToken extends apply([
-  consumable,
-  hasGrantType,
-  hasGrantId,
-  isSenderConstrained,
-  isSessionBound(provider),
-  storesAuth,
-  hasFormat(provider, 'RefreshToken', provider.BaseToken),
-]) {
-  constructor(...args) {
-    super(...args);
-    if (!this.iiat) {
-      this.iiat = this.iat || epochTime();
-    }
-  }
+export default (provider) =>
+	class RefreshToken extends apply([
+		consumable,
+		hasGrantType,
+		hasGrantId,
+		isSenderConstrained,
+		isSessionBound(provider),
+		storesAuth,
+		hasFormat(provider, 'RefreshToken', provider.BaseToken)
+	]) {
+		constructor(...args) {
+			super(...args);
+			if (!this.iiat) {
+				this.iiat = this.iat || epochTime();
+			}
+		}
 
-  static get IN_PAYLOAD() {
-    return [
-      ...super.IN_PAYLOAD,
+		static get IN_PAYLOAD() {
+			return [...super.IN_PAYLOAD, 'rar', 'rotations', 'iiat'];
+		}
 
-      'rar',
-      'rotations',
-      'iiat',
-    ];
-  }
-
-  /*
-   * totalLifetime()
-   * number of seconds since the very first refresh token chain iat
-   */
-  totalLifetime() {
-    return epochTime() - this.iiat;
-  }
-};
+		/*
+		 * totalLifetime()
+		 * number of seconds since the very first refresh token chain iat
+		 */
+		totalLifetime() {
+			return epochTime() - this.iiat;
+		}
+	};

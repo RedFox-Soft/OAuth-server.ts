@@ -8,123 +8,169 @@ const response_type = 'code token';
 const scope = 'openid';
 
 describe('HYBRID code+token', () => {
-  before(bootstrap(import.meta.url));
-  afterEach(function () {
-    this.provider.removeAllListeners();
-  });
+	before(bootstrap(import.meta.url));
+	afterEach(function () {
+		this.provider.removeAllListeners();
+	});
 
-  ['get', 'post'].forEach((verb) => {
-    describe(`${verb} ${route} with session`, () => {
-      before(function () { return this.login(); });
+	['get', 'post'].forEach((verb) => {
+		describe(`${verb} ${route} with session`, () => {
+			before(function () {
+				return this.login();
+			});
 
-      it('responds with a access_token and code in fragment', function () {
-        const auth = new this.AuthorizationRequest({
-          response_type,
-          scope,
-        });
+			it('responds with a access_token and code in fragment', function () {
+				const auth = new this.AuthorizationRequest({
+					response_type,
+					scope
+				});
 
-        return this.wrap({ route, verb, auth })
-          .expect(303)
-          .expect(auth.validateFragment)
-          .expect(auth.validatePresence(['code', 'state', 'access_token', 'expires_in', 'token_type', 'scope']))
-          .expect(auth.validateState)
-          .expect(auth.validateClientLocation);
-      });
+				return this.wrap({ route, verb, auth })
+					.expect(303)
+					.expect(auth.validateFragment)
+					.expect(
+						auth.validatePresence([
+							'code',
+							'state',
+							'access_token',
+							'expires_in',
+							'token_type',
+							'scope'
+						])
+					)
+					.expect(auth.validateState)
+					.expect(auth.validateClientLocation);
+			});
 
-      it('handles mixed up response_type order', function () {
-        const auth = new this.AuthorizationRequest({
-          response_type: 'token code',
-          scope,
-        });
+			it('handles mixed up response_type order', function () {
+				const auth = new this.AuthorizationRequest({
+					response_type: 'token code',
+					scope
+				});
 
-        return this.wrap({ route, verb, auth })
-          .expect(303)
-          .expect(auth.validateFragment)
-          .expect(auth.validatePresence(['code', 'state', 'access_token', 'expires_in', 'token_type', 'scope']))
-          .expect(auth.validateState)
-          .expect(auth.validateClientLocation);
-      });
+				return this.wrap({ route, verb, auth })
+					.expect(303)
+					.expect(auth.validateFragment)
+					.expect(
+						auth.validatePresence([
+							'code',
+							'state',
+							'access_token',
+							'expires_in',
+							'token_type',
+							'scope'
+						])
+					)
+					.expect(auth.validateState)
+					.expect(auth.validateClientLocation);
+			});
 
-      it('populates ctx.oidc.entities', function (done) {
-        this.assertOnce((ctx) => {
-          expect(ctx.oidc.entities).to.have.keys('Client', 'Grant', 'Account', 'AuthorizationCode', 'AccessToken', 'Session');
-        }, done);
+			it('populates ctx.oidc.entities', function (done) {
+				this.assertOnce((ctx) => {
+					expect(ctx.oidc.entities).to.have.keys(
+						'Client',
+						'Grant',
+						'Account',
+						'AuthorizationCode',
+						'AccessToken',
+						'Session'
+					);
+				}, done);
 
-        const auth = new this.AuthorizationRequest({
-          response_type,
-          scope,
-        });
+				const auth = new this.AuthorizationRequest({
+					response_type,
+					scope
+				});
 
-        this.wrap({ route, verb, auth }).end(() => {});
-      });
+				this.wrap({ route, verb, auth }).end(() => {});
+			});
 
-      it('ignores the scope offline_access unless prompt consent is present', function () {
-        const spy = sinon.spy();
-        this.provider.once('authorization_code.saved', spy);
-        this.provider.once('access_token.saved', spy);
-        this.provider.once('access_token.issued', spy);
+			it('ignores the scope offline_access unless prompt consent is present', function () {
+				const spy = sinon.spy();
+				this.provider.once('authorization_code.saved', spy);
+				this.provider.once('access_token.saved', spy);
+				this.provider.once('access_token.issued', spy);
 
-        const auth = new this.AuthorizationRequest({
-          response_type,
-          scope: 'openid offline_access',
-        });
+				const auth = new this.AuthorizationRequest({
+					response_type,
+					scope: 'openid offline_access'
+				});
 
-        return this.wrap({ route, verb, auth })
-          .expect(303)
-          .expect(auth.validateFragment)
-          .expect(auth.validateClientLocation)
-          .expect(() => {
-            expect(spy.firstCall.args[0]).to.have.property('scope').and.not.include('offline_access');
-            expect(spy.secondCall.args[0]).to.have.property('scope').and.not.include('offline_access');
-          });
-      });
-    });
+				return this.wrap({ route, verb, auth })
+					.expect(303)
+					.expect(auth.validateFragment)
+					.expect(auth.validateClientLocation)
+					.expect(() => {
+						expect(spy.firstCall.args[0])
+							.to.have.property('scope')
+							.and.not.include('offline_access');
+						expect(spy.secondCall.args[0])
+							.to.have.property('scope')
+							.and.not.include('offline_access');
+					});
+			});
+		});
 
-    describe(`${verb} ${route} with the scope not being fulfilled`, () => {
-      before(function () {
-        return this.login({
-          scope: 'openid profile email',
-          rejectedScopes: ['email'],
-        });
-      });
+		describe(`${verb} ${route} with the scope not being fulfilled`, () => {
+			before(function () {
+				return this.login({
+					scope: 'openid profile email',
+					rejectedScopes: ['email']
+				});
+			});
 
-      it('responds with an extra parameter scope', async function () {
-        const auth = new this.AuthorizationRequest({
-          response_type,
-          scope: 'openid profile email',
-        });
+			it('responds with an extra parameter scope', async function () {
+				const auth = new this.AuthorizationRequest({
+					response_type,
+					scope: 'openid profile email'
+				});
 
-        await this.wrap({ route, verb, auth })
-          .expect(303)
-          .expect(auth.validateFragment)
-          .expect(auth.validatePresence(['code', 'state', 'access_token', 'expires_in', 'token_type', 'scope']))
-          .expect(auth.validateState)
-          .expect(auth.validateClientLocation)
-          .expect(auth.validateResponseParameter('scope', 'openid profile'));
-      });
-    });
+				await this.wrap({ route, verb, auth })
+					.expect(303)
+					.expect(auth.validateFragment)
+					.expect(
+						auth.validatePresence([
+							'code',
+							'state',
+							'access_token',
+							'expires_in',
+							'token_type',
+							'scope'
+						])
+					)
+					.expect(auth.validateState)
+					.expect(auth.validateClientLocation)
+					.expect(auth.validateResponseParameter('scope', 'openid profile'));
+			});
+		});
 
-    describe(`${verb} ${route} errors`, () => {
-      it('disallowed response mode', function () {
-        const spy = sinon.spy();
-        this.provider.once('authorization.error', spy);
-        const auth = new this.AuthorizationRequest({
-          response_type,
-          scope,
-          response_mode: 'query',
-        });
+		describe(`${verb} ${route} errors`, () => {
+			it('disallowed response mode', function () {
+				const spy = sinon.spy();
+				this.provider.once('authorization.error', spy);
+				const auth = new this.AuthorizationRequest({
+					response_type,
+					scope,
+					response_mode: 'query'
+				});
 
-        return this.wrap({ route, verb, auth })
-          .expect(303)
-          .expect(() => {
-            expect(spy.calledOnce).to.be.true;
-          })
-          .expect(auth.validatePresence(['error', 'error_description', 'state']))
-          .expect(auth.validateState)
-          .expect(auth.validateClientLocation)
-          .expect(auth.validateError('invalid_request'))
-          .expect(auth.validateErrorDescription('requested response_mode is not allowed for the requested response_type'));
-      });
-    });
-  });
+				return this.wrap({ route, verb, auth })
+					.expect(303)
+					.expect(() => {
+						expect(spy.calledOnce).to.be.true;
+					})
+					.expect(
+						auth.validatePresence(['error', 'error_description', 'state'])
+					)
+					.expect(auth.validateState)
+					.expect(auth.validateClientLocation)
+					.expect(auth.validateError('invalid_request'))
+					.expect(
+						auth.validateErrorDescription(
+							'requested response_mode is not allowed for the requested response_type'
+						)
+					);
+			});
+		});
+	});
 });

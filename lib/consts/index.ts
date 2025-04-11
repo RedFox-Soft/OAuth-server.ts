@@ -5,9 +5,4 @@ import * as JWA from './jwa.ts';
 
 export const PUSHED_REQUEST_URN = 'urn:ietf:params:oauth:request_uri:';
 
-export {
-  CLIENT_ATTRIBUTES,
-  DEV_KEYSTORE,
-  JWA,
-  PARAM_LIST,
-};
+export { CLIENT_ATTRIBUTES, DEV_KEYSTORE, JWA, PARAM_LIST };

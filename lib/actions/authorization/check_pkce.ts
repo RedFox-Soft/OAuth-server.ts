@@ -20,14 +20,10 @@ export default function checkPKCE(ctx, next) {
 	if (!params.code_challenge_method) {
 		throw new InvalidRequest('code_challenge_method must be provided');
 	}
-
 	if (params.code_challenge_method !== 'S256') {
 		throw new InvalidRequest('not supported value of code_challenge_method');
 	}
-
-	if (params.code_challenge !== undefined) {
-		checkFormat(params.code_challenge, 'code_challenge');
-	}
+	checkFormat(params.code_challenge, 'code_challenge');
 
 	return next();
 }

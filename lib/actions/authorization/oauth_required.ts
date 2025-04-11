@@ -4,8 +4,8 @@ import presence from '../../helpers/validate_presence.ts';
  * Validates presence of mandatory OAuth2.0 parameters response_type, client_id and scope.
  */
 export default function oauthRequired(ctx, next) {
-  // Validate: required oauth params
-  presence(ctx, 'response_type', 'client_id');
+	// Validate: required oauth params
+	presence(ctx, 'response_type', 'client_id');
 
-  return next();
+	return next();
 }

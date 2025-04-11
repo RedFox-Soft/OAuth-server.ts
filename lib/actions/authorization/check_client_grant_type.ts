@@ -1,21 +1,24 @@
 import { InvalidRequest } from '../../helpers/errors.ts';
 
-export default function checkClientGrantType({ oidc: { route, client } }, next) {
-  let grantType;
-  switch (route) {
-    case 'device_authorization':
-      grantType = 'urn:ietf:params:oauth:grant-type:device_code';
-      break;
-    case 'backchannel_authentication':
-      grantType = 'urn:openid:params:grant-type:ciba';
-      break;
-    default:
-      throw new Error('not implemented');
-  }
+export default function checkClientGrantType(
+	{ oidc: { route, client } },
+	next
+) {
+	let grantType;
+	switch (route) {
+		case 'device_authorization':
+			grantType = 'urn:ietf:params:oauth:grant-type:device_code';
+			break;
+		case 'backchannel_authentication':
+			grantType = 'urn:openid:params:grant-type:ciba';
+			break;
+		default:
+			throw new Error('not implemented');
+	}
 
-  if (!client.grantTypeAllowed(grantType)) {
-    throw new InvalidRequest(`${grantType} is not allowed for this client`);
-  }
+	if (!client.grantTypeAllowed(grantType)) {
+		throw new InvalidRequest(`${grantType} is not allowed for this client`);
+	}
 
-  return next();
+	return next();
 }
