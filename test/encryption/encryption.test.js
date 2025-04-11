@@ -1,4 +1,5 @@
 import * as url from 'node:url';
+import * as crypto from 'node:crypto';
 
 import { expect } from 'chai';
 import {
@@ -234,11 +235,14 @@ describe('encryption', () => {
         it('works signed', async function () {
           const client = await this.provider.Client.find('client');
           const [hsSecret] = client.symmetricKeyStore.selectForSign({ alg: 'HS256' });
+          const code_verifier = crypto.randomBytes(32).toString('base64url');
           const signed = await JWT.sign({
             client_id: 'client',
             response_type: 'code',
             redirect_uri: 'https://client.example.com/cb',
             scope: 'openid',
+            code_challenge_method: 'S256',
+            code_challenge: crypto.hash('sha256', code_verifier, 'base64url')
           }, client.symmetricKeyStore.getKeyObject(hsSecret), 'HS256', { issuer: 'client', audience: this.provider.issuer });
 
           let [key] = i(this.provider).keystore.selectForEncrypt({ kty: 'RSA', alg: 'RSA-OAEP' });
@@ -275,11 +279,14 @@ describe('encryption', () => {
         it('works with signed by other than none when an alg is required', async function () {
           const client = await this.provider.Client.find('clientRequestObjectSigningAlg');
           const [hsSecret] = client.symmetricKeyStore.selectForSign({ alg: 'HS256' });
+          const code_verifier = crypto.randomBytes(32).toString('base64url');
           const signed = await JWT.sign({
             client_id: 'clientRequestObjectSigningAlg',
             response_type: 'code',
             redirect_uri: 'https://client.example.com/cb',
             scope: 'openid',
+            code_challenge_method: 'S256',
+            code_challenge: crypto.hash('sha256', code_verifier, 'base64url')
           }, client.symmetricKeyStore.getKeyObject(hsSecret), 'HS256', { issuer: 'clientRequestObjectSigningAlg', audience: this.provider.issuer });
 
           let [key] = i(this.provider).keystore.selectForEncrypt({ kty: 'RSA', alg: 'RSA-OAEP' });

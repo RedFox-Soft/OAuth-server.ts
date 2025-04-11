@@ -1,4 +1,5 @@
 import { SignJWT } from 'jose';
+import crypto from 'node:crypto';
 
 import bootstrap from '../test_helper.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
@@ -39,28 +40,6 @@ describe('Financial-grade API Security Profile 1.0 - Part 2: Advanced (FINAL) be
   describe('FAPI 1.0 Final Authorization Request', () => {
     beforeEach(function () { return this.login(); });
     afterEach(function () { return this.logout(); });
-
-    it('does not require PKCE to be used on the authorization endpoint', function () {
-      const auth = new this.AuthorizationRequest({
-        scope: 'openid',
-        client_id: 'client',
-        response_type: 'code id_token',
-        nonce: 'foo',
-        code_challenge_method: undefined,
-        code_challenge: undefined,
-      });
-
-      return this.wrap({
-        agent: this.agent,
-        route: '/auth',
-        verb: 'get',
-        auth,
-      })
-        .expect(303)
-        .expect(auth.validateFragment)
-        .expect(auth.validatePresence(['id_token', 'code', 'state']))
-        .expect(auth.validateClientLocation);
-    });
 
     it('requires PKCE to be used when PAR is used', function () {
       return this.agent.post('/request')
@@ -137,11 +116,16 @@ describe('Financial-grade API Security Profile 1.0 - Part 2: Advanced (FINAL) be
     afterEach(function () { return this.logout(); });
 
     it('still works', async function () {
+      const code_verifier = crypto.randomBytes(32).toString('base64url');
+      const code_challenge = crypto.createHash('sha256').update(code_verifier).digest('base64url');
+
       const request = await new SignJWT({
         client_id: 'client',
         iss: 'client',
         scope: 'openid',
         response_type: 'code id_token',
+        code_challenge_method: 'S256',
+        code_challenge,
         nonce: 'foo',
         redirect_uri: 'https://client.example.com/cb',
         aud: this.provider.issuer,
@@ -155,6 +139,8 @@ describe('Financial-grade API Security Profile 1.0 - Part 2: Advanced (FINAL) be
         scope: 'openid',
         client_id: 'client',
         response_type: 'code id_token',
+        code_challenge_method: 'S256',
+        code_challenge,
         nonce: 'foo',
         state: 'foo',
       });

@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { parse as parseUrl } from 'node:url';
-import { randomBytes } from 'node:crypto';
+import * as crypto from 'node:crypto';
 
 import { createSandbox } from 'sinon';
 import { expect } from 'chai';
@@ -99,14 +99,19 @@ describe('Back-Channel Logout 1.0', () => {
     skipConsent();
 
     beforeEach(function () {
+      const code_verifier = crypto.randomBytes(32).toString('base64url');
+      this.code_verifier = code_verifier;
+
       return this.agent.get('/auth')
         .query({
           client_id: 'client',
           scope: 'openid offline_access',
           prompt: 'consent',
-          nonce: randomBytes(16).toString('base64url'),
+          nonce: crypto.randomBytes(16).toString('base64url'),
           response_type: 'code id_token',
           redirect_uri: 'https://client.example.com/cb',
+          code_challenge_method: 'S256',
+          code_challenge: crypto.hash('sha256', code_verifier, 'base64url')
         })
         .expect(303)
         .expect((response) => {
@@ -129,6 +134,7 @@ describe('Back-Channel Logout 1.0', () => {
         .type('form')
         .send({
           code: this.code,
+          code_verifier: this.code_verifier,
           grant_type: 'authorization_code',
           redirect_uri: 'https://client.example.com/cb',
         })
@@ -145,6 +151,7 @@ describe('Back-Channel Logout 1.0', () => {
         .type('form')
         .send({
           code: this.code,
+          code_verifier: this.code_verifier,
           grant_type: 'authorization_code',
           redirect_uri: 'https://client.example.com/cb',
         })

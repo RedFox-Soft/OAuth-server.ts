@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { randomBytes, createHash } from 'node:crypto';
 import { parse as parseUrl } from 'node:url';
 
 import { expect } from 'chai';
@@ -54,12 +54,17 @@ describe('Pushed Request Object', () => {
         after(function () { return this.logout(); });
 
         it('allows unregistered redirect_uris to be used', async function () {
+          const code_verifier = randomBytes(32).toString('base64url');
+          const code_challenge = createHash('sha256').update(code_verifier).digest('base64url');
+
           const { body: { request_uri } } = await this.agent.post('/request')
             .auth(clientId, 'secret')
             .type('form')
             .send({
               scope: 'openid',
               response_type: 'code',
+              code_challenge_method: 'S256',
+              code_challenge,
               client_id: clientId,
               iss: clientId,
               aud: this.provider.issuer,
@@ -97,6 +102,7 @@ describe('Pushed Request Object', () => {
             .type('form')
             .send({
               code,
+              code_verifier,
               grant_type: 'authorization_code',
               redirect_uri: 'https://rp.example.com/unlisted',
             })
@@ -105,10 +111,15 @@ describe('Pushed Request Object', () => {
 
         it('except for public clients', async function () {
           const testClientId = 'client-unregistered-test-public';
+          const code_verifier = randomBytes(32).toString('base64url');
+          const code_challenge = createHash('sha256').update(code_verifier).digest('base64url');
+
           return this.agent.post('/request')
             .type('form')
             .send({
               response_type: 'code',
+              code_challenge_method: 'S256',
+              code_challenge,
               client_id: testClientId,
               iss: testClientId,
               aud: this.provider.issuer,
@@ -122,6 +133,9 @@ describe('Pushed Request Object', () => {
         });
 
         it('still validates the URI to be valid redirect_uri', async function () {
+          const code_verifier = randomBytes(32).toString('base64url');
+          const code_challenge = createHash('sha256').update(code_verifier).digest('base64url');
+
           // must only contain valid uris
           await this.agent.post('/request')
             .auth(clientId, 'secret')
@@ -129,6 +143,8 @@ describe('Pushed Request Object', () => {
             .send({
               scope: 'openid',
               response_type: 'code',
+              code_challenge_method: 'S256',
+              code_challenge,
               client_id: clientId,
               iss: clientId,
               aud: this.provider.issuer,
@@ -147,6 +163,8 @@ describe('Pushed Request Object', () => {
             .send({
               scope: 'openid',
               response_type: 'code',
+              code_challenge_method: 'S256',
+              code_challenge,
               client_id: clientId,
               iss: clientId,
               aud: this.provider.issuer,
@@ -183,12 +201,16 @@ describe('Pushed Request Object', () => {
               this.assertOnce((ctx) => {
                 expect(ctx.oidc.entities).to.have.keys('Client', 'PushedAuthorizationRequest');
               }, done);
+              const code_verifier = randomBytes(32).toString('base64');
+              const code_challenge = createHash('sha256').update(code_verifier).digest('base64url');
 
               this.agent.post('/request')
                 .auth(clientId, 'secret')
                 .type('form')
                 .send({
                   response_type: 'code',
+                  code_challenge_method: 'S256',
+                  code_challenge,
                   client_id: clientId,
                   iss: clientId,
                   aud: this.provider.issuer,
@@ -202,12 +224,17 @@ describe('Pushed Request Object', () => {
               const spy2 = sinon.spy();
               this.provider.once('pushed_authorization_request.saved', spy2);
 
+              const code_verifier = randomBytes(32).toString('base64');
+              const code_challenge = createHash('sha256').update(code_verifier).digest('base64url');
+
               await this.agent.post('/request')
                 .auth(clientId, 'secret')
                 .type('form')
                 .send({
                   scope: 'openid',
                   response_type: 'code',
+                  code_challenge_method: 'S256',
+                  code_challenge,
                   client_id: clientId,
                   iss: clientId,
                   extra: 'provided',
@@ -277,12 +304,17 @@ describe('Pushed Request Object', () => {
 
             it('leaves non OIDCProviderError alone', async function () {
               const adapterThrow = new Error('adapter throw!');
+              const code_verifier = randomBytes(32).toString('base64');
+              const code_challenge = createHash('sha256').update(code_verifier).digest('base64url');
+
               sinon.stub(this.TestAdapter.for('PushedAuthorizationRequest'), 'upsert').callsFake(async () => { throw adapterThrow; });
               return this.agent.post('/request')
                 .auth(clientId, 'secret')
                 .type('form')
                 .send({
                   response_type: 'code',
+                  code_challenge_method: 'S256',
+                  code_challenge,
                   client_id: clientId,
                   iss: clientId,
                   aud: this.provider.issuer,
@@ -303,12 +335,17 @@ describe('Pushed Request Object', () => {
             after(function () { return this.logout(); });
 
             it('allows the request_uri to be used', async function () {
+              const code_verifier = randomBytes(32).toString('base64url');
+              const code_challenge = createHash('sha256').update(code_verifier).digest('base64url');
+
               const { body: { request_uri } } = await this.agent.post('/request')
                 .auth(clientId, 'secret')
                 .type('form')
                 .send({
                   scope: 'openid',
                   response_type: 'code',
+                  code_challenge_method: 'S256',
+                  code_challenge,
                   client_id: clientId,
                   iss: clientId,
                   aud: this.provider.issuer,
@@ -336,12 +373,17 @@ describe('Pushed Request Object', () => {
             });
 
             it('allows the request_uri to be used (when request object was not used but client has request_object_signing_alg for its optional use)', async function () {
+              const code_verifier = randomBytes(32).toString('base64url');
+              const code_challenge = createHash('sha256').update(code_verifier).digest('base64url');
+
               const { body: { request_uri } } = await this.agent.post('/request')
                 .auth('client-alg-registered', 'secret')
                 .type('form')
                 .send({
                   scope: 'openid',
                   response_type: 'code',
+                  code_challenge_method: 'S256',
+                  code_challenge,
                   client_id: 'client-alg-registered',
                   iss: 'client-alg-registered',
                   aud: this.provider.issuer,
@@ -418,10 +460,14 @@ describe('Pushed Request Object', () => {
               this.assertOnce((ctx) => {
                 expect(ctx.oidc.entities).to.have.keys('Client', 'PushedAuthorizationRequest');
               }, done);
+              const code_verifier = randomBytes(32).toString('base64');
+              const code_challenge = createHash('sha256').update(code_verifier).digest('base64url');
 
               JWT.sign({
                 jti: randomBytes(16).toString('base64url'),
                 response_type: 'code',
+                code_challenge_method: 'S256',
+                code_challenge,
                 client_id: clientId,
                 iss: clientId,
                 aud: this.provider.issuer,
@@ -437,6 +483,8 @@ describe('Pushed Request Object', () => {
             it('stores a request object and returns a uri', async function () {
               const spy = sinon.spy();
               this.provider.once('pushed_authorization_request.success', spy);
+              const code_verifier = randomBytes(32).toString('base64');
+              const code_challenge = createHash('sha256').update(code_verifier).digest('base64url');
 
               await this.agent.post('/request')
                 .auth(clientId, 'secret')
@@ -445,6 +493,8 @@ describe('Pushed Request Object', () => {
                   request: await JWT.sign({
                     jti: randomBytes(16).toString('base64url'),
                     response_type: 'code',
+                    code_challenge_method: 'S256',
+                    code_challenge,
                     client_id: clientId,
                     extra: 'provided',
                     iss: clientId,
@@ -470,6 +520,8 @@ describe('Pushed Request Object', () => {
             it('defaults to MAX_TTL when no expires_in is present', async function () {
               const spy = sinon.spy();
               this.provider.once('pushed_authorization_request.success', spy);
+              const code_verifier = randomBytes(32).toString('base64');
+              const code_challenge = createHash('sha256').update(code_verifier).digest('base64url');
 
               await this.agent.post('/request')
                 .auth(clientId, 'secret')
@@ -478,6 +530,8 @@ describe('Pushed Request Object', () => {
                   request: await JWT.sign({
                     jti: randomBytes(16).toString('base64url'),
                     response_type: 'code',
+                    code_challenge_method: 'S256',
+                    code_challenge,
                     client_id: clientId,
                     iss: clientId,
                     aud: this.provider.issuer,
@@ -494,6 +548,8 @@ describe('Pushed Request Object', () => {
             it('uses the expiration from JWT when below MAX_TTL', async function () {
               const spy = sinon.spy();
               this.provider.once('pushed_authorization_request.success', spy);
+              const code_verifier = randomBytes(32).toString('base64');
+              const code_challenge = createHash('sha256').update(code_verifier).digest('base64url');
 
               await this.agent.post('/request')
                 .auth(clientId, 'secret')
@@ -502,6 +558,8 @@ describe('Pushed Request Object', () => {
                   request: await JWT.sign({
                     jti: randomBytes(16).toString('base64url'),
                     response_type: 'code',
+                    code_challenge_method: 'S256',
+                    code_challenge,
                     client_id: clientId,
                     iss: clientId,
                     aud: this.provider.issuer,
@@ -522,6 +580,8 @@ describe('Pushed Request Object', () => {
             it('uses MAX_TTL when the expiration from JWT is above it', async function () {
               const spy = sinon.spy();
               this.provider.once('pushed_authorization_request.success', spy);
+              const code_verifier = randomBytes(32).toString('base64');
+              const code_challenge = createHash('sha256').update(code_verifier).digest('base64url');
 
               await this.agent.post('/request')
                 .auth(clientId, 'secret')
@@ -530,6 +590,8 @@ describe('Pushed Request Object', () => {
                   request: await JWT.sign({
                     jti: randomBytes(16).toString('base64url'),
                     response_type: 'code',
+                    code_challenge_method: 'S256',
+                    code_challenge,
                     client_id: clientId,
                     iss: clientId,
                     aud: this.provider.issuer,
@@ -550,6 +612,8 @@ describe('Pushed Request Object', () => {
             it('ignores regular parameters when passing a JAR request', async function () {
               const spy = sinon.spy();
               this.provider.once('pushed_authorization_request.saved', spy);
+              const code_verifier = randomBytes(32).toString('base64');
+              const code_challenge = createHash('sha256').update(code_verifier).digest('base64url');
 
               await this.agent.post('/request')
                 .auth(clientId, 'secret')
@@ -560,6 +624,8 @@ describe('Pushed Request Object', () => {
                   request: await JWT.sign({
                     jti: randomBytes(16).toString('base64url'),
                     response_type: 'code',
+                    code_challenge_method: 'S256',
+                    code_challenge,
                     client_id: clientId,
                     iss: clientId,
                     aud: this.provider.issuer,
@@ -575,6 +641,9 @@ describe('Pushed Request Object', () => {
             });
 
             it('requires the registered request object signing alg be used', async function () {
+              const code_verifier = randomBytes(32).toString('base64');
+              const code_challenge = createHash('sha256').update(code_verifier).digest('base64url');
+
               return this.agent.post('/request')
                 .auth('client-alg-registered', 'secret')
                 .type('form')
@@ -582,6 +651,8 @@ describe('Pushed Request Object', () => {
                   request: await JWT.sign({
                     jti: randomBytes(16).toString('base64url'),
                     response_type: 'code',
+                    code_challenge_method: 'S256',
+                    code_challenge,
                     client_id: 'client-alg-registered',
                   }, this.key, 'HS384'),
                 })
@@ -593,6 +664,9 @@ describe('Pushed Request Object', () => {
             });
 
             it('requires the request object client_id to equal the authenticated client one', async function () {
+              const code_verifier = randomBytes(32).toString('base64');
+              const code_challenge = createHash('sha256').update(code_verifier).digest('base64url');
+
               return this.agent.post('/request')
                 .auth(clientId, 'secret')
                 .type('form')
@@ -600,6 +674,8 @@ describe('Pushed Request Object', () => {
                   request: await JWT.sign({
                     jti: randomBytes(16).toString('base64url'),
                     response_type: 'code',
+                    code_challenge_method: 'S256',
+                    code_challenge,
                     client_id: 'client-foo',
                   }, this.key, 'HS256', { expiresIn: 30 }),
                 })
@@ -611,6 +687,9 @@ describe('Pushed Request Object', () => {
             });
 
             it('remaps invalid_redirect_uri error to invalid_request', async function () {
+              const code_verifier = randomBytes(32).toString('base64');
+              const code_challenge = createHash('sha256').update(code_verifier).digest('base64url');
+
               return this.agent.post('/request')
                 .auth(clientId, 'secret')
                 .type('form')
@@ -618,6 +697,8 @@ describe('Pushed Request Object', () => {
                   request: await JWT.sign({
                     jti: randomBytes(16).toString('base64url'),
                     response_type: 'code',
+                    code_challenge_method: 'S256',
+                    code_challenge,
                     client_id: clientId,
                     iss: clientId,
                     aud: this.provider.issuer,
@@ -634,6 +715,9 @@ describe('Pushed Request Object', () => {
             it('leaves non OIDCProviderError alone', async function () {
               const adapterThrow = new Error('adapter throw!');
               sinon.stub(this.TestAdapter.for('PushedAuthorizationRequest'), 'upsert').callsFake(async () => { throw adapterThrow; });
+              const code_verifier = randomBytes(32).toString('base64');
+              const code_challenge = createHash('sha256').update(code_verifier).digest('base64url');
+
               return this.agent.post('/request')
                 .auth(clientId, 'secret')
                 .type('form')
@@ -641,6 +725,8 @@ describe('Pushed Request Object', () => {
                   request: await JWT.sign({
                     jti: randomBytes(16).toString('base64url'),
                     response_type: 'code',
+                    code_challenge_method: 'S256',
+                    code_challenge,
                     client_id: clientId,
                     iss: clientId,
                     aud: this.provider.issuer,
@@ -662,6 +748,9 @@ describe('Pushed Request Object', () => {
             after(function () { return this.logout(); });
 
             it('allows the request_uri to be used', async function () {
+              const code_verifier = randomBytes(32).toString('base64');
+              const code_challenge = createHash('sha256').update(code_verifier).digest('base64url');
+
               const { body: { request_uri } } = await this.agent.post('/request')
                 .auth(clientId, 'secret')
                 .type('form')
@@ -670,6 +759,8 @@ describe('Pushed Request Object', () => {
                     jti: randomBytes(16).toString('base64url'),
                     scope: 'openid',
                     response_type: 'code',
+                    code_challenge_method: 'S256',
+                    code_challenge,
                     client_id: clientId,
                     iss: clientId,
                     aud: this.provider.issuer,

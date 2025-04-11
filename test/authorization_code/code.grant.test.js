@@ -1,4 +1,5 @@
 import { parse as parseUrl } from 'node:url';
+import * as crypto from 'node:crypto';
 
 import { createSandbox } from 'sinon';
 import { expect } from 'chai';
@@ -32,12 +33,16 @@ describe('grant_type=authorization_code', () => {
     afterEach(function () { return this.logout(); });
 
     beforeEach(function () {
+      const code_verifier = crypto.randomBytes(32).toString('base64url');
+      this.code_verifier = code_verifier;
       return this.agent.get('/auth')
         .query({
           client_id: 'client',
           scope: 'openid',
           response_type: 'code',
           redirect_uri: 'https://client.example.com/cb',
+          code_challenge_method: 'S256',
+          code_challenge: crypto.hash('sha256', code_verifier, 'base64url')
         })
         .expect(303)
         .expect((response) => {
@@ -57,6 +62,7 @@ describe('grant_type=authorization_code', () => {
         .type('form')
         .send({
           code: this.ac,
+          code_verifier: this.code_verifier,
           grant_type: 'authorization_code',
           redirect_uri: 'https://client.example.com/cb',
         })
@@ -81,6 +87,7 @@ describe('grant_type=authorization_code', () => {
         .type('form')
         .send({
           code: this.ac,
+          code_verifier: this.code_verifier,
           grant_type: 'authorization_code',
           redirect_uri: 'https://client.example.com/cb',
         })
@@ -105,6 +112,7 @@ describe('grant_type=authorization_code', () => {
         .type('form')
         .send({
           code: this.ac,
+          code_verifier: this.code_verifier,
           grant_type: 'authorization_code',
           redirect_uri: 'https://client.example.com/cb',
         })
@@ -117,6 +125,7 @@ describe('grant_type=authorization_code', () => {
         .type('form')
         .send({
           code: this.ac,
+          code_verifier: this.code_verifier,
           grant_type: 'authorization_code',
           redirect_uri: 'https://client.example.com/cb',
         })
@@ -143,6 +152,7 @@ describe('grant_type=authorization_code', () => {
           .auth('client', 'secret')
           .send({
             code: this.ac,
+            code_verifier: this.code_verifier,
             grant_type: 'authorization_code',
             redirect_uri: 'https://client.example.com/cb',
           })
@@ -170,6 +180,7 @@ describe('grant_type=authorization_code', () => {
         .auth('client', 'secret')
         .send({
           code: this.ac,
+          code_verifier: this.code_verifier,
           grant_type: 'authorization_code',
           redirect_uri: 'https://client.example.com/cb',
         })
@@ -190,6 +201,7 @@ describe('grant_type=authorization_code', () => {
         .auth('client', 'secret')
         .send({
           code: this.ac,
+          code_verifier: this.code_verifier,
           grant_type: 'authorization_code',
           redirect_uri: 'https://client.example.com/cb',
         })
@@ -208,6 +220,7 @@ describe('grant_type=authorization_code', () => {
         .auth('client2', 'secret')
         .send({
           code: this.ac,
+          code_verifier: this.code_verifier,
           grant_type: 'authorization_code',
           redirect_uri: 'https://client.example.com/cb',
         })
@@ -227,6 +240,7 @@ describe('grant_type=authorization_code', () => {
         .auth('client', 'secret')
         .send({
           code: this.ac,
+          code_verifier: this.code_verifier,
           grant_type: 'foobar',
           redirect_uri: 'https://client.example.com/cb',
         })
@@ -245,6 +259,7 @@ describe('grant_type=authorization_code', () => {
         .auth('client', 'secret')
         .send({
           code: this.ac,
+          code_verifier: this.code_verifier,
           grant_type: 'authorization_code',
           redirect_uri: 'https://client.example.com/cb?thensome',
         })
@@ -264,6 +279,7 @@ describe('grant_type=authorization_code', () => {
         .auth('client', 'secret')
         .send({
           code: this.ac,
+          code_verifier: this.code_verifier,
           grant_type: 'authorization_code',
         })
         .type('form')
@@ -284,6 +300,7 @@ describe('grant_type=authorization_code', () => {
         .auth('client', 'secret')
         .send({
           code: this.ac,
+          code_verifier: this.code_verifier,
           grant_type: 'authorization_code',
           redirect_uri: 'https://client.example.com/cb',
         })
@@ -302,12 +319,16 @@ describe('grant_type=authorization_code', () => {
   context('with real tokens (2/3) - one redirect_uri registered with allowOmittingSingleRegisteredRedirectUri=false', () => {
     beforeEach(async function () {
       await this.login();
+      const code_verifier = crypto.randomBytes(32).toString('base64url');
+      this.code_verifier = code_verifier;
       return this.agent.get('/auth')
         .query({
           client_id: 'client2',
           scope: 'openid',
           response_type: 'code',
           redirect_uri: 'https://client.example.com/cb3',
+          code_challenge_method: 'S256',
+          code_challenge: crypto.hash('sha256', code_verifier, 'base64url')
         })
         .expect(303)
         .expect((response) => {
@@ -324,6 +345,7 @@ describe('grant_type=authorization_code', () => {
         .auth('client', 'secret')
         .send({
           code: this.ac,
+          code_verifier: this.code_verifier,
           grant_type: 'authorization_code',
         })
         .type('form')
@@ -347,11 +369,15 @@ describe('grant_type=authorization_code', () => {
     });
 
     beforeEach(function () {
+      const code_verifier = crypto.randomBytes(32).toString('base64url');
+      this.code_verifier = code_verifier;
       return this.agent.get('/auth')
         .query({
           client_id: 'client2',
           scope: 'openid',
           response_type: 'code',
+          code_challenge_method: 'S256',
+          code_challenge: crypto.hash('sha256', code_verifier, 'base64url')
         })
         .expect(303)
         .expect((response) => {
@@ -371,6 +397,7 @@ describe('grant_type=authorization_code', () => {
         .type('form')
         .send({
           code: this.ac,
+          code_verifier: this.code_verifier,
           grant_type: 'authorization_code',
         })
         .expect(200)
@@ -394,6 +421,7 @@ describe('grant_type=authorization_code', () => {
         .type('form')
         .send({
           code: this.ac,
+          code_verifier: this.code_verifier,
           grant_type: 'authorization_code',
         })
         .end(() => {});
@@ -417,6 +445,7 @@ describe('grant_type=authorization_code', () => {
         .type('form')
         .send({
           code: this.ac,
+          code_verifier: this.code_verifier,
           grant_type: 'authorization_code',
         })
         .end(() => {});
@@ -428,6 +457,7 @@ describe('grant_type=authorization_code', () => {
         .type('form')
         .send({
           code: this.ac,
+          code_verifier: this.code_verifier,
           grant_type: 'authorization_code',
         })
         .expect('cache-control', 'no-store');
@@ -453,6 +483,7 @@ describe('grant_type=authorization_code', () => {
           .auth('client2', 'secret')
           .send({
             code: this.ac,
+            code_verifier: this.code_verifier,
             grant_type: 'authorization_code',
           })
           .type('form')
@@ -479,6 +510,7 @@ describe('grant_type=authorization_code', () => {
         .auth('client2', 'secret')
         .send({
           code: this.ac,
+          code_verifier: this.code_verifier,
           grant_type: 'authorization_code',
         })
         .type('form')
@@ -498,6 +530,7 @@ describe('grant_type=authorization_code', () => {
         .auth('client2', 'secret')
         .send({
           code: this.ac,
+          code_verifier: this.code_verifier,
           grant_type: 'authorization_code',
         })
         .type('form')
@@ -515,6 +548,7 @@ describe('grant_type=authorization_code', () => {
         .auth('client', 'secret')
         .send({
           code: this.ac,
+          code_verifier: this.code_verifier,
           grant_type: 'authorization_code',
           redirect_uri: 'https://client.example.com/cb3',
         })
@@ -534,6 +568,7 @@ describe('grant_type=authorization_code', () => {
         .auth('client2', 'secret')
         .send({
           code: this.ac,
+          code_verifier: this.code_verifier,
           grant_type: 'foobar',
         })
         .type('form')
@@ -551,6 +586,7 @@ describe('grant_type=authorization_code', () => {
         .auth('client2', 'secret')
         .send({
           code: this.ac,
+          code_verifier: this.code_verifier,
           grant_type: 'authorization_code',
           redirect_uri: 'https://client.example.com/cb?thensome',
         })
@@ -575,6 +611,7 @@ describe('grant_type=authorization_code', () => {
         .auth('client2', 'secret')
         .send({
           code: this.ac,
+          code_verifier: this.code_verifier,
           grant_type: 'authorization_code',
         })
         .type('form')
@@ -607,6 +644,7 @@ describe('grant_type=authorization_code', () => {
       return this.agent.post(route)
         .auth('client', 'secret')
         .send({
+          code_verifier: this.code_verifier,
           grant_type: 'authorization_code',
           redirect_uri: 'blah',
         })
@@ -623,6 +661,7 @@ describe('grant_type=authorization_code', () => {
       return this.agent.post(route)
         .auth('client', 'secret')
         .send({
+          code_verifier: this.code_verifier,
           grant_type: 'authorization_code',
           code: 'blah',
         })
@@ -641,6 +680,7 @@ describe('grant_type=authorization_code', () => {
       return this.agent.post(route)
         .auth('client', 'secret')
         .send({
+          code_verifier: this.code_verifier,
           grant_type: 'authorization_code',
           redirect_uri: 'http://client.example.com',
           code: 'eyJraW5kIjoiQXV0aG9yaXphdGlvbkNvZGUiLCJqdGkiOiIxNTU0M2RiYS0zYThmLTRiZWEtYmRjNi04NDQ2N2MwOWZjYTYiLCJpYXQiOjE0NjM2NTk2OTgsImV4cCI6MTQ2MzY1OTc1OCwiaXNzIjoiaHR0cHM6Ly9ndWFyZGVkLWNsaWZmcy04NjM1Lmhlcm9rdWFwcC5jb20vb3AifQ.qUTaR48lavULtmDWBcpwhcF9NXhP8xzc-643h3yWLEgIyxPzKINT-upNn-byflH7P7rQlzZ-9SJKSs72ZVqWWMNikUGgJo-XmLyersONQ8sVx7v0quo4CRXamwyXfz2gq76gFlv5mtsrWwCij1kUnSaFm_HhAcoDPzGtSqhsHNoz36KjdmC3R-m84reQk_LEGizUeV-OmsBWJs3gedPGYcRCvsnW9qa21B0yZO2-HT9VQYY68UIGucDKNvizFRmIgepDZ5PUtsvyPD0PQQ9UHiEZvICeArxPLE8t1xz-lukpTMn8vA_YJ0s7kD9HYJUwxiYIuLXwDUNpGhsegxdvbw',
@@ -666,12 +706,16 @@ describe('grant_type=authorization_code', () => {
       const spy = sinon.spy();
       this.provider.on('server_error', spy);
 
+      const code_verifier = crypto.randomBytes(32).toString('base64url');
+
       return this.agent.post(route)
         .auth('client', 'secret')
         .send({
           grant_type: 'authorization_code',
           code: 'code',
           redirect_uri: 'is there too',
+          code_challenge_method: 'S256',
+          code_challenge: crypto.hash('sha256', code_verifier, 'base64url')
         })
         .type('form')
         .expect(500)

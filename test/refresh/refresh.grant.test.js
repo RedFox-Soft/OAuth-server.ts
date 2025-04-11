@@ -1,5 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { parse as parseUrl } from 'node:url';
+import crypto from 'node:crypto';
 
 import { createSandbox } from 'sinon';
 import base64url from 'base64url';
@@ -30,12 +31,17 @@ describe('grant_type=refresh_token', () => {
   skipConsent();
 
   beforeEach(function (done) {
+    const code_verifier = crypto.randomBytes(32).toString('hex');
+    const code_challenge = crypto.createHash('sha256').update(code_verifier).digest('base64url');
+
     this.agent.get('/auth')
       .query({
         client_id: 'client',
         scope: 'openid email offline_access',
         prompt: 'consent',
         response_type: 'code',
+        code_challenge_method: 'S256',
+        code_challenge,
         redirect_uri: 'https://client.example.com/cb',
         nonce: 'foobarnonce',
       })
@@ -52,6 +58,7 @@ describe('grant_type=refresh_token', () => {
           .type('form')
           .send({
             code,
+            code_verifier,
             grant_type: 'authorization_code',
             redirect_uri: 'https://client.example.com/cb',
           })

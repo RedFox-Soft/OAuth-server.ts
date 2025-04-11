@@ -10,7 +10,7 @@ describe('PKCE RFC7636', () => {
   describe('authorization', () => {
     before(function () { return this.login(); });
 
-    it('checks that codeChallenge is provided if codeChallengeMethod was', function () {
+    it('Should throw Exception in check on PSCE if code_challenge is not defined', function () {
       const auth = new this.AuthorizationRequest({
         response_type: 'code',
         scope: 'openid',
@@ -22,7 +22,7 @@ describe('PKCE RFC7636', () => {
         .query(auth)
         .expect(auth.validatePresence(['error', 'error_description', 'state']))
         .expect(auth.validateError('invalid_request'))
-        .expect(auth.validateErrorDescription('code_challenge must be provided with code_challenge_method'));
+        .expect(auth.validateErrorDescription('Authorization Server policy requires PKCE to be used for this request'));
     });
 
     it('checks that codeChallenge is conform to its ABNF (too short)', function () {

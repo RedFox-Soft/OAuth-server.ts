@@ -531,12 +531,16 @@ describe('features.dPoP', () => {
 
   describe('pushed authorization request', () => {
     it('checks dpop_jkt equals the jwk thumbprint when both are present', async function () {
+      const code_verifier = randomBytes(32).toString('base64url');
+
       await this.agent.post('/request')
         .auth('client', 'secret')
         .send({
           response_type: 'code',
           client_id: 'client',
           dpop_jkt: this.thumbprint,
+          code_challenge_method: 'S256',
+          code_challenge: hash('sha256', code_verifier, 'base64url')
         })
         .set('DPoP', await DPoP(this.keypair, `${this.provider.issuer}${this.suitePath('/request')}`, 'POST'))
         .type('form')
@@ -548,6 +552,8 @@ describe('features.dPoP', () => {
           response_type: 'code',
           client_id: 'client',
           dpop_jkt: 'cbaZgHZazjgQq0Q2-Hy_o2-OCDpPu02S30lNhTsNU1Q',
+          code_challenge_method: 'S256',
+          code_challenge: hash('sha256', code_verifier, 'base64url')
         })
         .set('DPoP', await DPoP(this.keypair, `${this.provider.issuer}${this.suitePath('/request')}`, 'POST'))
         .type('form')
@@ -556,6 +562,8 @@ describe('features.dPoP', () => {
     });
 
     it('sets the request dpop_jkt automatically when missing (no request object used)', async function () {
+      const code_verifier = randomBytes(32).toString('base64url');
+
       let request_uri;
       await this.agent.post('/request')
         .auth('client', 'secret')
@@ -563,6 +571,8 @@ describe('features.dPoP', () => {
           scope: 'openid',
           response_type: 'code',
           client_id: 'client',
+          code_challenge_method: 'S256',
+          code_challenge: hash('sha256', code_verifier, 'base64url')
         })
         .set('DPoP', await DPoP(this.keypair, `${this.provider.issuer}${this.suitePath('/request')}`, 'POST'))
         .type('form')
@@ -588,6 +598,8 @@ describe('features.dPoP', () => {
     });
 
     it('sets the request dpop_jkt automatically when missing (request object used)', async function () {
+      const code_verifier = randomBytes(32).toString('base64url');
+
       let request_uri;
       await this.agent.post('/request')
         .auth('client', 'secret')
@@ -599,6 +611,8 @@ describe('features.dPoP', () => {
             response_type: 'code',
             iss: 'client',
             aud: this.provider.issuer,
+            code_challenge_method: 'S256',
+            code_challenge: hash('sha256', code_verifier, 'base64url')
           })
             .setProtectedHeader({ alg: 'HS256' })
             .setIssuedAt()
@@ -990,12 +1004,16 @@ describe('features.dPoP', () => {
     });
 
     it('@ PAR endpoint', async function () {
+      const code_verifier = randomBytes(32).toString('base64url');
+
       let nonce;
       await this.agent.post('/request')
         .auth('client', 'secret')
         .send({
           response_type: 'code',
           client_id: 'client',
+          code_challenge_method: 'S256',
+          code_challenge: hash('sha256', code_verifier, 'base64url')
         })
         .set('DPoP', await DPoP(this.keypair, `${this.provider.issuer}${this.suitePath('/request')}`, 'POST'))
         .type('form')
@@ -1009,6 +1027,8 @@ describe('features.dPoP', () => {
         .send({
           response_type: 'code',
           client_id: 'client',
+          code_challenge_method: 'S256',
+          code_challenge: hash('sha256', code_verifier, 'base64url')
         })
         .set('DPoP', await DPoP(this.keypair, `${this.provider.issuer}${this.suitePath('/request')}`, 'POST', nonce))
         .type('form')
