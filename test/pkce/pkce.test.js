@@ -47,7 +47,7 @@ describe('PKCE RFC7636', () => {
 				.expect(auth.validateError('invalid_request'))
 				.expect(
 					auth.validateErrorDescription(
-						'code_challenge must be a string with a minimum length of 43 characters'
+						'code_challenge must be a string with a minimum 43 and maximum 128 length characters'
 					)
 				);
 		});
@@ -67,7 +67,7 @@ describe('PKCE RFC7636', () => {
 				.expect(auth.validateError('invalid_request'))
 				.expect(
 					auth.validateErrorDescription(
-						'code_challenge must be a string with a maximum length of 128 characters'
+						'code_challenge must be a string with a minimum 43 and maximum 128 length characters'
 					)
 				);
 		});
@@ -308,7 +308,7 @@ describe('PKCE RFC7636', () => {
 					expect(response.body).to.have.property('error', 'invalid_request');
 					expect(response.body).to.have.property(
 						'error_description',
-						'code_verifier must be a string with a minimum length of 43 characters'
+						'code_verifier must be a string with a minimum 43 and maximum 128 length characters'
 					);
 				});
 		});
@@ -340,7 +340,7 @@ describe('PKCE RFC7636', () => {
 					expect(response.body).to.have.property('error', 'invalid_request');
 					expect(response.body).to.have.property(
 						'error_description',
-						'code_verifier must be a string with a maximum length of 128 characters'
+						'code_verifier must be a string with a minimum 43 and maximum 128 length characters'
 					);
 				});
 		});

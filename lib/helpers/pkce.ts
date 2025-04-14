@@ -4,15 +4,9 @@ import { InvalidGrant, InvalidRequest } from './errors.ts';
 import constantEquals from './constant_equals.ts';
 
 function verifyPKCECode(input: string, param: string) {
-	if (input.length < 43) {
+	if (input.length < 43 || input.length > 128) {
 		throw new InvalidRequest(
-			`${param} must be a string with a minimum length of 43 characters`
-		);
-	}
-
-	if (input.length > 128) {
-		throw new InvalidRequest(
-			`${param} must be a string with a maximum length of 128 characters`
+			`${param} must be a string with a minimum 43 and maximum 128 length characters`
 		);
 	}
 
