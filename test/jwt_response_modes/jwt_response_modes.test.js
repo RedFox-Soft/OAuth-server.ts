@@ -195,37 +195,6 @@ describe('configuration features.jwtResponseModes', () => {
 			return this.logout();
 		});
 
-		it('is forbidden for implicit and hybrid response types unless encrypted', async function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'id_token token',
-				response_mode: 'query.jwt',
-				scope: 'openid'
-			});
-
-			await this.wrap({ route, auth, verb: 'get' })
-				.expect(303)
-				.expect(auth.validatePresence(['response']))
-				.expect(auth.validateClientLocation)
-				.expect(({ headers: { location } }) => {
-					const {
-						query: { response }
-					} = url.parse(location, true);
-					const { payload } = decode(response);
-					expect(payload).to.have.all.keys(
-						'error',
-						'error_description',
-						'state',
-						'aud',
-						'exp',
-						'iss'
-					);
-					expect(payload.error).to.eql('invalid_request');
-					expect(payload.error_description).to.eql(
-						'requested response_mode is not allowed for the requested response_type unless encrypted'
-					);
-				});
-		});
-
 		it('uses the query part when expired', async function () {
 			const auth = new this.AuthorizationRequest({
 				response_type: 'id_token token',

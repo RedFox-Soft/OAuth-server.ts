@@ -143,34 +143,5 @@ describe('HYBRID code+token', () => {
 					.expect(auth.validateResponseParameter('scope', 'openid profile'));
 			});
 		});
-
-		describe(`${verb} ${route} errors`, () => {
-			it('disallowed response mode', function () {
-				const spy = sinon.spy();
-				this.provider.once('authorization.error', spy);
-				const auth = new this.AuthorizationRequest({
-					response_type,
-					scope,
-					response_mode: 'query'
-				});
-
-				return this.wrap({ route, verb, auth })
-					.expect(303)
-					.expect(() => {
-						expect(spy.calledOnce).to.be.true;
-					})
-					.expect(
-						auth.validatePresence(['error', 'error_description', 'state'])
-					)
-					.expect(auth.validateState)
-					.expect(auth.validateClientLocation)
-					.expect(auth.validateError('invalid_request'))
-					.expect(
-						auth.validateErrorDescription(
-							'requested response_mode is not allowed for the requested response_type'
-						)
-					);
-			});
-		});
 	});
 });

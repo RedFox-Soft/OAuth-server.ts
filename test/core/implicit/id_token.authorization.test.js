@@ -71,36 +71,6 @@ describe('IMPLICIT id_token', () => {
 				return this.login();
 			});
 
-			it('disallowed response mode', function () {
-				const spy = sinon.spy();
-				this.provider.once('authorization.error', spy);
-				const auth = new this.AuthorizationRequest({
-					response_type,
-					scope,
-					response_mode: 'query'
-				});
-
-				return (
-					this.wrap({ route, verb, auth })
-						.expect(303)
-						.expect(() => {
-							expect(spy.calledOnce).to.be.true;
-						})
-						// .expect(auth.validateFragment) // response mode will be honoured for error response
-						.expect(
-							auth.validatePresence(['error', 'error_description', 'state'])
-						)
-						.expect(auth.validateState)
-						.expect(auth.validateClientLocation)
-						.expect(auth.validateError('invalid_request'))
-						.expect(
-							auth.validateErrorDescription(
-								'requested response_mode is not allowed for the requested response_type'
-							)
-						)
-				);
-			});
-
 			it('HMAC ID Token Hint with expired secret errors', async function () {
 				const client = await this.provider.Client.find('client-expired-secret');
 				client.clientSecretExpiresAt = 0;

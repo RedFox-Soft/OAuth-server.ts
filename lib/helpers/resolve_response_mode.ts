@@ -3,7 +3,3 @@ export default function resolve(responseType) {
 		? 'fragment'
 		: 'query';
 }
-
-export function isFrontChannel(responseType) {
-	return resolve(responseType) === 'fragment';
-}

@@ -3,7 +3,6 @@ import {
 	UnsupportedResponseMode
 } from '../../helpers/errors.ts';
 import instance from '../../helpers/weak_cache.ts';
-import { isFrontChannel } from '../../helpers/resolve_response_mode.ts';
 
 /*
  * Resolves and assigns params.response_mode if it was not explicitly requested. Validates id_token
@@ -11,8 +10,6 @@ import { isFrontChannel } from '../../helpers/resolve_response_mode.ts';
  */
 export default function checkResponseMode(ctx, next) {
 	const { params, client } = ctx.oidc;
-
-	const frontChannel = isFrontChannel(params.response_type);
 
 	const mode = ctx.oidc.responseMode;
 
@@ -53,18 +50,6 @@ export default function checkResponseMode(ctx, next) {
 			params.response_mode = explicit || undefined;
 			throw err;
 		}
-	}
-
-	const msg =
-		'requested response_mode is not allowed for the requested response_type';
-	if (mode === 'query' && frontChannel) {
-		throw new InvalidRequest(msg);
-	} else if (
-		mode === 'query.jwt' &&
-		frontChannel &&
-		!client.authorizationEncryptedResponseAlg
-	) {
-		throw new InvalidRequest(`${msg} unless encrypted`);
 	}
 
 	return next();
