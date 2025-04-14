@@ -452,9 +452,3 @@ export class Provider extends Koa {
 		return als.getStore();
 	}
 }
-
-Object.defineProperty(Provider.prototype, 'app', {
-	get: util.deprecate(function app() {
-		return this;
-	}, '.app getter is deprecated. The Provider instance is now the Koa app itself')
-});
