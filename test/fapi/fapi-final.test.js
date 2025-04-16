@@ -1,10 +1,12 @@
-import { SignJWT } from 'jose';
+import { SignJWT, decodeJwt } from 'jose';
 import crypto from 'node:crypto';
 
 import bootstrap from '../test_helper.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
 
 import { keypair } from './fapi-final.config.js';
+import { parse } from 'node:url';
+import { expect } from 'chai';
 
 describe('Financial-grade API Security Profile 1.0 - Part 2: Advanced (FINAL) behaviours', () => {
 	before(bootstrap(import.meta.url, { config: 'fapi-final' }));
@@ -157,7 +159,8 @@ describe('Financial-grade API Security Profile 1.0 - Part 2: Advanced (FINAL) be
 				client_id: 'client',
 				iss: 'client',
 				scope: 'openid',
-				response_type: 'code id_token',
+				response_type: 'code',
+				response_mode: 'jwt',
 				code_challenge_method: 'S256',
 				code_challenge,
 				nonce: 'foo',
@@ -174,10 +177,6 @@ describe('Financial-grade API Security Profile 1.0 - Part 2: Advanced (FINAL) be
 				request,
 				scope: 'openid',
 				client_id: 'client',
-				response_type: 'code id_token',
-				code_challenge_method: 'S256',
-				code_challenge,
-				nonce: 'foo',
 				state: 'foo'
 			});
 
@@ -188,7 +187,13 @@ describe('Financial-grade API Security Profile 1.0 - Part 2: Advanced (FINAL) be
 				auth
 			})
 				.expect(303)
-				.expect(auth.validatePresence(['id_token', 'code', 'state']))
+				.expect((res) => {
+					const { response } = parse(res.headers.location, true).query;
+					const jwt = decodeJwt(response);
+					expect(jwt).to.have.property('code');
+					expect(jwt).to.have.property('state', 'foo');
+					expect(jwt).to.have.property('aud', 'client');
+				})
 				.expect(auth.validateClientLocation);
 		});
 
@@ -200,7 +205,7 @@ describe('Financial-grade API Security Profile 1.0 - Part 2: Advanced (FINAL) be
 				iss: 'client',
 				client_id: 'client',
 				scope: 'openid',
-				response_type: 'code id_token',
+				response_type: 'code',
 				nonce: 'foo'
 			})
 				.setProtectedHeader({ alg: 'ES256' })
@@ -210,7 +215,7 @@ describe('Financial-grade API Security Profile 1.0 - Part 2: Advanced (FINAL) be
 				request,
 				scope: 'openid',
 				client_id: 'client',
-				response_type: 'code id_token',
+				response_type: 'code',
 				nonce: 'foo'
 			});
 
@@ -239,7 +244,7 @@ describe('Financial-grade API Security Profile 1.0 - Part 2: Advanced (FINAL) be
 				client_id: 'client',
 				scope: 'openid',
 				iss: 'client',
-				response_type: 'code id_token',
+				response_type: 'code',
 				nonce: 'foo'
 			})
 				.setProtectedHeader({ alg: 'ES256' })
@@ -249,7 +254,7 @@ describe('Financial-grade API Security Profile 1.0 - Part 2: Advanced (FINAL) be
 				request,
 				scope: 'openid',
 				client_id: 'client',
-				response_type: 'code id_token',
+				response_type: 'code',
 				nonce: 'foo'
 			});
 
@@ -278,7 +283,7 @@ describe('Financial-grade API Security Profile 1.0 - Part 2: Advanced (FINAL) be
 				client_id: 'client',
 				scope: 'openid',
 				iss: 'client',
-				response_type: 'code id_token',
+				response_type: 'code',
 				nonce: 'foo'
 			})
 				.setProtectedHeader({ alg: 'ES256' })
@@ -288,7 +293,7 @@ describe('Financial-grade API Security Profile 1.0 - Part 2: Advanced (FINAL) be
 				request,
 				scope: 'openid',
 				client_id: 'client',
-				response_type: 'code id_token',
+				response_type: 'code',
 				nonce: 'foo'
 			});
 

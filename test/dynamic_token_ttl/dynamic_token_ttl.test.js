@@ -112,40 +112,15 @@ describe('dynamic ttl', () => {
 	});
 
 	it('authorization flow returned tokens', async function () {
-		const IdToken = sinon.fake.returns(123);
-		const AccessToken = sinon.fake.returns(1234);
 		const AuthorizationCode = sinon.fake.returns(12);
-		i(this.provider).configuration.ttl.IdToken = IdToken;
-		i(this.provider).configuration.ttl.AccessToken = AccessToken;
 		i(this.provider).configuration.ttl.AuthorizationCode = AuthorizationCode;
 
 		const auth = new this.AuthorizationRequest({
-			response_type: 'code id_token token',
+			response_type: 'code',
 			scope: 'openid'
 		});
 
-		await this.wrap({ route: '/auth', verb: 'get', auth })
-			.expect(303)
-			.expect(({ headers: { location } }) => {
-				const {
-					query: { expires_in, id_token }
-				} = url.parse(location, true);
-				expect(expires_in).to.eql('1234');
-				const {
-					payload: { iat, exp }
-				} = JWT.decode(id_token);
-				expect(exp - iat).to.eql(123);
-			});
-
-		expect(IdToken).to.have.property('calledOnce', true);
-		expect(IdToken.args[0][1]).to.be.an.instanceof(this.provider.IdToken);
-		expect(IdToken.args[0][2]).to.be.an.instanceof(this.provider.Client);
-
-		expect(AccessToken).to.have.property('calledOnce', true);
-		expect(AccessToken.args[0][1]).to.be.an.instanceof(
-			this.provider.AccessToken
-		);
-		expect(AccessToken.args[0][2]).to.be.an.instanceof(this.provider.Client);
+		await this.wrap({ route: '/auth', verb: 'get', auth }).expect(303);
 
 		expect(AuthorizationCode).to.have.property('calledOnce', true);
 		expect(AuthorizationCode.args[0][1]).to.be.an.instanceof(

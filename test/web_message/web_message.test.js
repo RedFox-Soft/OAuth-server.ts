@@ -43,45 +43,7 @@ describe('configuration features.webMessageResponseMode', () => {
 				return this.logout();
 			});
 
-			it('responds by rendering a an HTML with the client side code and response data [1/4]', async function () {
-				const auth = new this.AuthorizationRequest({
-					response_type,
-					response_mode,
-					scope
-				});
-
-				await this.wrap({ route, auth, verb: 'get' })
-					.expect(200)
-					.expect('cache-control', 'no-store')
-					.expect('content-type', 'text/html; charset=utf-8')
-					.expect((response) => {
-						expect(response.headers['x-frame-options']).not.to.be.ok;
-						expect(response.headers['content-security-policy']).not.to.match(
-							/frame-ancestors/
-						);
-					})
-					.expect(/var data = ({[a-zA-Z0-9"{}~ ,-_]+});/);
-
-				const response = JSON.parse(RegExp.$1);
-				expect(response).to.have.keys('redirect_uri', 'response');
-				expect(response).to.have.property('redirect_uri', auth.redirect_uri);
-				expect(response.response).to.have.keys(
-					'id_token',
-					'state',
-					'access_token',
-					'scope',
-					'expires_in',
-					'token_type',
-					'code'
-				);
-				expect(response.response.id_token).to.be.a('string');
-				expect(response.response.expires_in).to.be.a('number');
-				expect(response.response.access_token).to.be.a('string');
-				expect(response.response.token_type).to.equal('Bearer');
-				expect(response.response.state).to.equal(auth.state);
-			});
-
-			it('responds by rendering a an HTML with the client side code and response data [2/4]', async function () {
+			it('responds by rendering a an HTML with the client side code and response data', async function () {
 				const auth = new this.AuthorizationRequest({
 					response_type: 'code',
 					response_mode,
@@ -116,7 +78,7 @@ describe('configuration features.webMessageResponseMode', () => {
 				this.provider.once('authorization.error', emitSpy);
 
 				const auth = new this.AuthorizationRequest({
-					response_type,
+					response_type: 'code',
 					response_mode,
 					web_message_uri: 'anything',
 					scope
@@ -143,7 +105,7 @@ describe('configuration features.webMessageResponseMode', () => {
 
 		it('handles errors', async function () {
 			const auth = new this.AuthorizationRequest({
-				response_type,
+				response_type: 'code',
 				prompt: 'none',
 				response_mode,
 				scope

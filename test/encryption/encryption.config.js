@@ -42,16 +42,17 @@ export default {
 			client_id: 'clientSymmetric',
 			client_secret: 'secret',
 			redirect_uris: ['https://client.example.com/cb'],
-			response_types: ['id_token'],
-			grant_types: ['implicit'],
+			token_endpoint_auth_method: 'none',
+			response_types: ['code'],
+			grant_types: ['authorization_code'],
 			id_token_encrypted_response_alg: 'A128KW'
 		},
 		{
 			client_id: 'clientSymmetric-expired',
 			client_secret: 'secret',
 			redirect_uris: ['https://client.example.com/cb'],
-			response_types: ['id_token'],
-			grant_types: ['implicit'],
+			response_types: ['code'],
+			grant_types: ['authorization_code'],
 			client_secret_expires_at: 1,
 			id_token_encrypted_response_alg: 'A128KW'
 		},
@@ -59,8 +60,8 @@ export default {
 			client_id: 'clientSymmetric-dir',
 			client_secret: 'secret',
 			redirect_uris: ['https://client.example.com/cb'],
-			response_types: ['id_token'],
-			grant_types: ['implicit'],
+			response_types: ['code'],
+			grant_types: ['authorization_code'],
 			id_token_encrypted_response_alg: 'dir'
 		},
 		{

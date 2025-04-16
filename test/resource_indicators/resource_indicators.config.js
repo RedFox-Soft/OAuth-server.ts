@@ -73,10 +73,9 @@ export default {
 			client_id: 'client',
 			token_endpoint_auth_method: 'none',
 			redirect_uris: ['https://client.example.com/cb'],
-			response_types: ['id_token', 'id_token token', 'code'],
+			response_types: ['code'],
 			backchannel_token_delivery_mode: 'poll',
 			grant_types: [
-				'implicit',
 				'refresh_token',
 				'client_credentials',
 				'authorization_code',

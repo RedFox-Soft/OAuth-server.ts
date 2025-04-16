@@ -47,11 +47,9 @@ describe('Back-Channel Logout 1.0', () => {
 							'jti',
 							'sid'
 						);
-						expect(decoded)
-							.to.have.property('events')
-							.and.eql({
-								'http://schemas.openid.net/event/backchannel-logout': {}
-							});
+						expect(decoded).to.have.property('events').and.eql({
+							'http://schemas.openid.net/event/backchannel-logout': {}
+						});
 						expect(decoded).to.have.property('aud', 'client');
 						expect(decoded).to.have.property('sub', 'subject');
 						expect(decoded).to.have.property('sid', 'foo');
@@ -84,11 +82,9 @@ describe('Back-Channel Logout 1.0', () => {
 							'iss',
 							'jti'
 						);
-						expect(decoded)
-							.to.have.property('events')
-							.and.eql({
-								'http://schemas.openid.net/event/backchannel-logout': {}
-							});
+						expect(decoded).to.have.property('events').and.eql({
+							'http://schemas.openid.net/event/backchannel-logout': {}
+						});
 						expect(decoded).to.have.property('aud', 'no-sid');
 						expect(decoded).to.have.property('sub', 'subject');
 						expect(decoded).not.to.have.property('sid');

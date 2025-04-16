@@ -287,7 +287,10 @@ export default function testHelper(
 						: parameters.redirect_uri || (c && c.redirect_uris[0]);
 				this.res = {};
 
-				if (this.response_type && this.response_type.includes('id_token')) {
+				if (
+					this.scope?.includes('openid') ||
+					this.response_type?.includes('id_token')
+				) {
 					this.nonce =
 						'nonce' in parameters
 							? parameters.nonce
@@ -299,7 +302,7 @@ export default function testHelper(
 						'code_challenge_method' in parameters
 							? parameters.code_challenge_method
 							: 'S256';
-					this.code_verifier = crypto.randomBytes(32).toString('base64url');
+					this.code_verifier ??= crypto.randomBytes(32).toString('base64url');
 					this.code_challenge =
 						'code_challenge' in parameters
 							? parameters.code_challenge
@@ -468,6 +471,15 @@ export default function testHelper(
 		};
 
 		AuthorizationRequest.prototype.getToken = function (code) {
+			let authObj = {};
+			const c = clients.find((cl) => cl.client_id === this.client_id);
+			if (c.token_endpoint_auth_method !== 'none') {
+				authObj = {
+					user: this.client_id,
+					secret: c.client_secret
+				};
+			}
+
 			return wrap({
 				route: '/token',
 				verb: 'post',
@@ -477,16 +489,16 @@ export default function testHelper(
 					grant_type: 'authorization_code',
 					code_verifier: this.code_verifier,
 					redirect_uri: this.redirect_uri
-				}
+				},
+				...authObj
 			}).expect(200);
 		};
 
 		async function getToken(auth, options = {}) {
-			const verb = options.verb || 'get';
 			let code;
 			await wrap({
 				route: '/auth',
-				verb,
+				verb: 'get',
 				auth,
 				...options
 			})
@@ -533,15 +545,31 @@ export default function testHelper(
 		}
 
 		function wrap(opts) {
-			const { route, verb, auth, params } = opts;
+			const { route, verb, auth, params, user, secret } = opts;
 			switch (verb) {
-				case 'get':
+				case 'get': {
+					if (user && secret) {
+						return agent
+							.get(route)
+							.auth(user, secret)
+							.query(auth || params);
+					}
 					return agent.get(route).query(auth || params);
-				case 'post':
+				}
+				case 'post': {
+					if (user && secret) {
+						return agent
+							.post(route)
+							.auth(user, secret)
+							.send(auth || params)
+							.type('form');
+					}
 					return agent
 						.post(route)
 						.send(auth || params)
 						.type('form');
+				}
+
 				default:
 					throw new Error('invalid wrap verb');
 			}

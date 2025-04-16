@@ -244,46 +244,4 @@ describe('session bound tokens behaviours', () => {
 			expect(refresh).not.to.have.property('expiresWithSession');
 		});
 	});
-
-	describe('implicit', () => {
-		it('"id_token token" issues token bound to session', async function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'id_token token',
-				scope: 'openid'
-			});
-
-			await this.agent
-				.get('/auth')
-				.query(auth)
-				.expect(303)
-				.expect(
-					auth.validatePresence([
-						'id_token',
-						'state',
-						'access_token',
-						'expires_in',
-						'token_type',
-						'scope'
-					])
-				)
-				.expect(auth.validateState)
-				.expect(auth.validateClientLocation)
-				.expect(assignAuthorizationResponseValues.bind(this));
-
-			const token = await this.provider.AccessToken.find(this.access_token);
-			expect(token).to.have.property('expiresWithSession', true);
-
-			await this.agent
-				.get('/me')
-				.auth(this.access_token, { type: 'bearer' })
-				.expect(200);
-
-			await this.TestAdapter.for('Session').destroy(this.getSessionId());
-
-			await this.agent
-				.get('/me')
-				.auth(this.access_token, { type: 'bearer' })
-				.expect(401);
-		});
-	});
 });

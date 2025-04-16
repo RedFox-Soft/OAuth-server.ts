@@ -17,11 +17,10 @@ export default {
 		grant_types: [
 			'client_credentials',
 			'authorization_code',
-			'implicit',
 			'refresh_token',
 			'urn:ietf:params:oauth:grant-type:device_code'
 		],
-		response_types: ['code', 'code id_token token'],
+		response_types: ['code'],
 		redirect_uris: ['https://rp.example.com/cb']
 	}
 };

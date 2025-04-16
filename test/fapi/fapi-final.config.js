@@ -34,8 +34,8 @@ export default {
 		{
 			client_id: 'client',
 			client_secret: 'secret',
-			response_types: ['code id_token', 'code'],
-			grant_types: ['implicit', 'authorization_code'],
+			response_types: ['code'],
+			grant_types: ['authorization_code'],
 			redirect_uris: ['https://client.example.com/cb'],
 			jwks: {
 				keys: [await exportJWK(keypair.publicKey)]

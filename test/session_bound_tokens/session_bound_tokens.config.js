@@ -13,8 +13,8 @@ export default {
 	clients: [
 		{
 			client_id: 'client',
-			response_types: ['code', 'id_token token'],
-			grant_types: ['authorization_code', 'implicit'],
+			response_types: ['code'],
+			grant_types: ['authorization_code'],
 			redirect_uris: ['https://client.example.com/cb'],
 			token_endpoint_auth_method: 'none',
 			scope: 'openid'

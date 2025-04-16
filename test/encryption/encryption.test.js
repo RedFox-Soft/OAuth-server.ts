@@ -57,43 +57,16 @@ describe('encryption', () => {
 
 	['get', 'post'].forEach((verb) => {
 		describe(`[encryption] IMPLICIT id_token+token ${verb} ${route}`, () => {
-			describe('expired secret id token response', () => {
-				it('errors out with a specific message', function () {
-					const auth = new this.AuthorizationRequest({
-						response_type: 'id_token',
-						client_id: 'clientSymmetric-expired',
-						scope: 'openid'
-					});
-
-					return this.wrap({ route, verb, auth })
-						.expect(303)
-						.expect(
-							auth.validatePresence(['error', 'error_description', 'state'])
-						)
-						.expect(auth.validateState)
-						.expect(auth.validateClientLocation)
-						.expect(auth.validateError('invalid_client'))
-						.expect(
-							auth.validateErrorDescription(
-								'client secret is expired - cannot issue an encrypted ID Token (A128KW)'
-							)
-						);
-				});
-			});
-
 			describe('encrypted authorization results', () => {
-				before(function () {
+				before(async function () {
 					const auth = new this.AuthorizationRequest({
-						response_type: 'id_token token',
+						response_type: 'code',
 						scope: 'openid'
 					});
 
-					return this.wrap({ route, verb, auth })
-						.expect((response) => {
-							const { query } = url.parse(response.headers.location, true);
-							this.id_token = query.id_token;
-							this.access_token = query.access_token;
-						});
+					const response = await this.getToken(auth, { verb });
+					this.id_token = response.body.id_token;
+					this.access_token = response.body.access_token;
 				});
 
 				it('responds with a nested encrypted and signed id_token JWT', async function () {
@@ -423,29 +396,29 @@ describe('encryption', () => {
 			});
 
 			describe('symmetric encryption', () => {
-				before(function () {
+				before(async function () {
 					const auth = new this.AuthorizationRequest({
-						response_type: 'id_token',
+						response_type: 'code',
 						scope: 'openid',
 						client_id: 'clientSymmetric'
 					});
 
-					return this.wrap({ route, verb, auth })
-						.expect((response) => {
-							const { query } = url.parse(response.headers.location, true);
-							this.id_token = query.id_token;
-						});
+					const response = await this.getToken(auth, { verb });
+					this.id_token = response.body.id_token;
 				});
 
 				it('accepts symmetric encrypted Request Objects', async function () {
 					const client = await this.provider.Client.find('clientSymmetric');
+					const code_verifier = crypto.randomBytes(32).toString('base64url');
 					const signed = await JWT.sign(
 						{
 							client_id: 'clientSymmetric',
 							scope: 'openid',
-							response_type: 'id_token',
+							response_type: 'code',
 							nonce: 'foobar',
-							redirect_uri: 'https://client.example.com/cb'
+							redirect_uri: 'https://client.example.com/cb',
+							code_challenge_method: 'S256',
+							code_challenge: crypto.hash('sha256', code_verifier, 'base64url')
 						},
 						Buffer.from('secret'),
 						'HS256',
@@ -461,28 +434,36 @@ describe('encryption', () => {
 						.setProtectedHeader({ enc: 'A128CBC-HS256', alg: 'A128KW' })
 						.encrypt(key);
 
-					return this.wrap({
+					let code;
+					await this.wrap({
 						route,
 						verb,
 						auth: {
 							request: encrypted,
 							scope: 'openid',
-							client_id: 'clientSymmetric',
-							response_type: 'id_token'
+							client_id: 'clientSymmetric'
 						}
 					})
 						.expect(303)
 						.expect((response) => {
+							const { query } = url.parse(response.headers.location, true);
+							code = query.code;
 							const expected = url.parse('https://client.example.com/cb', true);
-							const actual = url.parse(
-								response.headers.location.replace('#', '?'),
-								true
-							);
+							const actual = url.parse(response.headers.location, true);
 							['protocol', 'host', 'pathname'].forEach((attr) => {
 								expect(actual[attr]).to.equal(expected[attr]);
 							});
-							expect(actual.query).to.have.property('id_token');
 						});
+
+					const auth = new this.AuthorizationRequest({
+						response_type: 'code',
+						code_verifier,
+						scope: 'openid',
+						client_id: 'clientSymmetric'
+					});
+					return auth.getToken(code).expect((response) => {
+						expect(response.body).to.have.property('id_token');
+					});
 				});
 
 				it('rejects symmetric encrypted request objects when secret is expired', async function () {
@@ -545,29 +526,29 @@ describe('encryption', () => {
 			});
 
 			describe('direct key agreement symmetric encryption', () => {
-				before(function () {
+				before(async function () {
 					const auth = new this.AuthorizationRequest({
-						response_type: 'id_token',
+						response_type: 'code',
 						scope: 'openid',
 						client_id: 'clientSymmetric-dir'
 					});
 
-					return this.wrap({ route, verb, auth })
-						.expect((response) => {
-							const { query } = url.parse(response.headers.location, true);
-							this.id_token = query.id_token;
-						});
+					const response = await this.getToken(auth, { verb });
+					this.id_token = response.body.id_token;
 				});
 
 				it('accepts symmetric (dir) encrypted Request Objects', async function () {
 					const client = await this.provider.Client.find('clientSymmetric');
+					const code_verifier = crypto.randomBytes(32).toString('base64url');
 					const signed = await JWT.sign(
 						{
 							client_id: 'clientSymmetric-dir',
 							scope: 'openid',
-							response_type: 'id_token',
+							response_type: 'code',
 							nonce: 'foobar',
-							redirect_uri: 'https://client.example.com/cb'
+							redirect_uri: 'https://client.example.com/cb',
+							code_challenge_method: 'S256',
+							code_challenge: crypto.hash('sha256', code_verifier, 'base64url')
 						},
 						Buffer.from('secret'),
 						'HS256',
@@ -583,28 +564,34 @@ describe('encryption', () => {
 						.setProtectedHeader({ enc: 'A128CBC-HS256', alg: 'dir' })
 						.encrypt(key);
 
-					return this.wrap({
+					let code;
+					await this.wrap({
 						route,
 						verb,
 						auth: {
 							request: encrypted,
 							scope: 'openid',
-							client_id: 'clientSymmetric-dir',
-							response_type: 'id_token'
+							client_id: 'clientSymmetric-dir'
 						}
 					})
 						.expect(303)
 						.expect((response) => {
 							const expected = url.parse('https://client.example.com/cb', true);
-							const actual = url.parse(
-								response.headers.location.replace('#', '?'),
-								true
-							);
+							const actual = url.parse(response.headers.location, true);
 							['protocol', 'host', 'pathname'].forEach((attr) => {
 								expect(actual[attr]).to.equal(expected[attr]);
 							});
-							expect(actual.query).to.have.property('id_token');
+							code = actual.query.code;
 						});
+					const auth = new this.AuthorizationRequest({
+						response_type: 'code',
+						code_verifier,
+						scope: 'openid',
+						client_id: 'clientSymmetric-dir'
+					});
+					return auth.getToken(code).expect((response) => {
+						expect(response.body).to.have.property('id_token');
+					});
 				});
 
 				it('rejects symmetric (dir) encrypted request objects when secret is expired', async function () {
