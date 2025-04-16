@@ -16,18 +16,14 @@ describe('userinfo /me', () => {
 		});
 	});
 
-	before(function () {
+	before(async function () {
 		const auth = new this.AuthorizationRequest({
-			response_type: 'id_token token',
+			response_type: 'code',
 			scope: 'openid email'
 		});
 
-		return this.wrap({ auth, verb: 'get', route: '/auth' })
-			.expect(auth.validateFragment)
-			.expect((response) => {
-				const { query } = url.parse(response.headers.location, true);
-				this.access_token = query.access_token;
-			});
+		const response = await this.getToken(auth);
+		this.access_token = response.body.access_token;
 	});
 
 	it('jwtUserinfo can only be enabled with userinfo', () => {

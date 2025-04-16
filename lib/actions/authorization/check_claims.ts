@@ -58,12 +58,6 @@ export default async function checkClaims(ctx, next) {
 				);
 			}
 
-			if (params.response_type === 'id_token' && claims.userinfo) {
-				throw new InvalidRequest(
-					'claims.userinfo should not be used if access_token is not issued'
-				);
-			}
-
 			await claimsParameter.assertClaimsParameter?.(
 				ctx,
 				claims,

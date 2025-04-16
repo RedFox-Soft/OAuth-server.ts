@@ -28,7 +28,6 @@ describe('External Signing Keys', () => {
 
 		return this.wrap({ route, verb: 'get', auth })
 			.expect(303)
-			.expect(auth.validateFragment)
 			.expect(auth.validatePresence(['id_token', 'state']))
 			.expect(auth.validateState)
 			.expect(auth.validateClientLocation);
@@ -44,7 +43,6 @@ describe('External Signing Keys', () => {
 		let id_token;
 		await this.wrap({ route, verb: 'get', auth })
 			.expect(303)
-			.expect(auth.validateFragment)
 			.expect(auth.validatePresence(['id_token', 'state']))
 			.expect(auth.validateState)
 			.expect(auth.validateClientLocation)
@@ -64,7 +62,6 @@ describe('External Signing Keys', () => {
 		auth.id_token_hint = id_token;
 		await this.wrap({ route, verb: 'get', auth })
 			.expect(303)
-			.expect(auth.validateFragment)
 			.expect(auth.validatePresence(['id_token', 'state']))
 			.expect(auth.validateState)
 			.expect(auth.validateClientLocation)

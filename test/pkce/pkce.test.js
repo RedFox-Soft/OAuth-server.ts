@@ -143,7 +143,6 @@ describe('PKCE RFC7636', () => {
 			return this.agent
 				.get('/auth')
 				.query(auth)
-				.expect(auth.validateFragment)
 				.expect(auth.validatePresence(['error', 'error_description', 'state']))
 				.expect(auth.validateError('invalid_request'))
 				.expect(
@@ -163,7 +162,6 @@ describe('PKCE RFC7636', () => {
 				return this.agent
 					.get('/auth')
 					.query(auth)
-					.expect(auth.validateFragment)
 					.expect(auth.validatePresence(['id_token', 'state']));
 			});
 		});

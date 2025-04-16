@@ -188,7 +188,6 @@ describe('Financial-grade API Security Profile 1.0 - Part 2: Advanced (FINAL) be
 				auth
 			})
 				.expect(303)
-				.expect(auth.validateFragment)
 				.expect(auth.validatePresence(['id_token', 'code', 'state']))
 				.expect(auth.validateClientLocation);
 		});
@@ -222,7 +221,6 @@ describe('Financial-grade API Security Profile 1.0 - Part 2: Advanced (FINAL) be
 				auth
 			})
 				.expect(303)
-				.expect(auth.validateFragment)
 				.expect(auth.validatePresence(['error', 'error_description', 'state']))
 				.expect(auth.validateClientLocation)
 				.expect(auth.validateError('invalid_request_object'))
@@ -262,7 +260,6 @@ describe('Financial-grade API Security Profile 1.0 - Part 2: Advanced (FINAL) be
 				auth
 			})
 				.expect(303)
-				.expect(auth.validateFragment)
 				.expect(auth.validatePresence(['error', 'error_description', 'state']))
 				.expect(auth.validateClientLocation)
 				.expect(auth.validateError('invalid_request_object'))
@@ -302,7 +299,6 @@ describe('Financial-grade API Security Profile 1.0 - Part 2: Advanced (FINAL) be
 				auth
 			})
 				.expect(303)
-				.expect(auth.validateFragment)
 				.expect(auth.validatePresence(['error', 'error_description', 'state']))
 				.expect(auth.validateClientLocation)
 				.expect(auth.validateError('invalid_request_object'))

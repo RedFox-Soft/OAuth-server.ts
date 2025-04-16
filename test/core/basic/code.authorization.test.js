@@ -1044,7 +1044,6 @@ describe('BASIC code', () => {
 					.expect(() => {
 						expect(spy.calledOnce).to.be.true;
 					})
-					.expect(auth.validateFragment)
 					.expect(
 						auth.validatePresence(['error', 'error_description', 'state'])
 					)
@@ -1072,7 +1071,6 @@ describe('BASIC code', () => {
 					.expect(() => {
 						expect(spy.calledOnce).to.be.true;
 					})
-					.expect(auth.validateFragment)
 					.expect(
 						auth.validatePresence(['error', 'error_description', 'state'])
 					)

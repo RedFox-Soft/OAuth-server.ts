@@ -67,7 +67,6 @@ describe('encryption', () => {
 
 					return this.wrap({ route, verb, auth })
 						.expect(303)
-						.expect(auth.validateFragment)
 						.expect(
 							auth.validatePresence(['error', 'error_description', 'state'])
 						)
@@ -90,7 +89,6 @@ describe('encryption', () => {
 					});
 
 					return this.wrap({ route, verb, auth })
-						.expect(auth.validateFragment)
 						.expect((response) => {
 							const { query } = url.parse(response.headers.location, true);
 							this.id_token = query.id_token;
@@ -414,7 +412,6 @@ describe('encryption', () => {
 					.expect(() => {
 						client.idTokenEncryptedResponseAlg = 'RSA-OAEP';
 					})
-					.expect(auth.validateFragment)
 					.expect((response) => {
 						const { query } = url.parse(response.headers.location, true);
 						expect(query).to.have.property('error', 'invalid_client_metadata');
@@ -434,7 +431,6 @@ describe('encryption', () => {
 					});
 
 					return this.wrap({ route, verb, auth })
-						.expect(auth.validateFragment)
 						.expect((response) => {
 							const { query } = url.parse(response.headers.location, true);
 							this.id_token = query.id_token;
@@ -529,10 +525,7 @@ describe('encryption', () => {
 					})
 						.expect(303)
 						.expect((response) => {
-							const { query } = url.parse(
-								response.headers.location.replace('#', '?'),
-								true
-							);
+							const { query } = url.parse(response.headers.location, true);
 							expect(query).to.have.property('error', 'invalid_request_object');
 							expect(query).to.have.property(
 								'error_description',
@@ -560,7 +553,6 @@ describe('encryption', () => {
 					});
 
 					return this.wrap({ route, verb, auth })
-						.expect(auth.validateFragment)
 						.expect((response) => {
 							const { query } = url.parse(response.headers.location, true);
 							this.id_token = query.id_token;

@@ -21,8 +21,9 @@ export default {
 	client: {
 		client_id: 'client',
 		client_secret: 'secret',
-		grant_types: ['implicit'],
-		response_types: ['id_token token'],
+		token_endpoint_auth_method: 'none',
+		grant_types: ['authorization_code'],
+		response_types: ['code'],
 		redirect_uris: ['https://client.example.com/cb']
 	}
 };

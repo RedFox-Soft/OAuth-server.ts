@@ -12,7 +12,7 @@ describe('responds with a id_token containing auth_time', () => {
 		return this.login();
 	});
 
-	const response_type = 'id_token';
+	const response_type = 'code';
 	const scope = 'openid';
 
 	it('when max_age was present in the request', async function () {
@@ -23,18 +23,23 @@ describe('responds with a id_token containing auth_time', () => {
 		});
 
 		let id_token;
+		let code;
 
 		await this.wrap({ route: '/auth', verb: 'get', auth })
 			.expect(303)
-			.expect(auth.validateFragment)
-			.expect(auth.validatePresence(['id_token', 'state']))
+
+			.expect(auth.validatePresence(['code', 'state']))
 			.expect(auth.validateState)
 			.expect(auth.validateClientLocation)
 			.expect((response) => {
 				({
-					query: { id_token }
+					query: { code }
 				} = url.parse(response.headers.location, true));
 			});
+
+		await auth.getToken(code).expect((response) => {
+			({ id_token } = response.body);
+		});
 
 		expect(decodeJwt(id_token)).to.have.property('auth_time');
 	});
@@ -58,18 +63,22 @@ describe('responds with a id_token containing auth_time', () => {
 			});
 
 			let id_token;
+			let code;
 
 			await this.wrap({ route: '/auth', verb: 'get', auth })
 				.expect(303)
-				.expect(auth.validateFragment)
-				.expect(auth.validatePresence(['id_token', 'state']))
+				.expect(auth.validatePresence(['code', 'state']))
 				.expect(auth.validateState)
 				.expect(auth.validateClientLocation)
 				.expect((response) => {
 					({
-						query: { id_token }
+						query: { code }
 					} = url.parse(response.headers.location, true));
 				});
+
+			await auth.getToken(code).expect((response) => {
+				({ id_token } = response.body);
+			});
 
 			expect(decodeJwt(id_token)).to.have.property('auth_time');
 		});
@@ -82,18 +91,22 @@ describe('responds with a id_token containing auth_time', () => {
 			});
 
 			let id_token;
+			let code;
 
 			await this.wrap({ route: '/auth', verb: 'get', auth })
 				.expect(303)
-				.expect(auth.validateFragment)
-				.expect(auth.validatePresence(['id_token', 'state']))
+				.expect(auth.validatePresence(['code', 'state']))
 				.expect(auth.validateState)
 				.expect(auth.validateClientLocation)
 				.expect((response) => {
 					({
-						query: { id_token }
+						query: { code }
 					} = url.parse(response.headers.location, true));
 				});
+
+			await auth.getToken(code).expect((response) => {
+				({ id_token } = response.body);
+			});
 
 			expect(decodeJwt(id_token)).to.have.property('auth_time');
 		});
@@ -106,18 +119,22 @@ describe('responds with a id_token containing auth_time', () => {
 			});
 
 			let id_token;
+			let code;
 
 			await this.wrap({ route: '/auth', verb: 'get', auth })
 				.expect(303)
-				.expect(auth.validateFragment)
-				.expect(auth.validatePresence(['id_token', 'state']))
+				.expect(auth.validatePresence(['code', 'state']))
 				.expect(auth.validateState)
 				.expect(auth.validateClientLocation)
 				.expect((response) => {
 					({
-						query: { id_token }
+						query: { code }
 					} = url.parse(response.headers.location, true));
 				});
+
+			await auth.getToken(code).expect((response) => {
+				({ id_token } = response.body);
+			});
 
 			expect(decodeJwt(id_token)).to.have.property('auth_time');
 		});
@@ -131,18 +148,22 @@ describe('responds with a id_token containing auth_time', () => {
 		});
 
 		let id_token;
+		let code;
 
 		await this.wrap({ route: '/auth', verb: 'get', auth })
 			.expect(303)
-			.expect(auth.validateFragment)
-			.expect(auth.validatePresence(['id_token', 'state']))
+			.expect(auth.validatePresence(['code', 'state']))
 			.expect(auth.validateState)
 			.expect(auth.validateClientLocation)
 			.expect((response) => {
 				({
-					query: { id_token }
+					query: { code }
 				} = url.parse(response.headers.location, true));
 			});
+
+		await auth.getToken(code).expect((response) => {
+			({ id_token } = response.body);
+		});
 
 		expect(decodeJwt(id_token)).to.have.property('auth_time');
 	});
@@ -155,18 +176,22 @@ describe('responds with a id_token containing auth_time', () => {
 		});
 
 		let id_token;
+		let code;
 
 		await this.wrap({ route: '/auth', verb: 'get', auth })
 			.expect(303)
-			.expect(auth.validateFragment)
-			.expect(auth.validatePresence(['id_token', 'state']))
+			.expect(auth.validatePresence(['code', 'state']))
 			.expect(auth.validateState)
 			.expect(auth.validateClientLocation)
 			.expect((response) => {
 				({
-					query: { id_token }
+					query: { code }
 				} = url.parse(response.headers.location, true));
 			});
+
+		await auth.getToken(code).expect((response) => {
+			({ id_token } = response.body);
+		});
 
 		expect(decodeJwt(id_token)).to.have.property('auth_time');
 	});

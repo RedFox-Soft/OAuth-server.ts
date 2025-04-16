@@ -1,11 +1,5 @@
-/* eslint-disable no-underscore-dangle */
-
-import { parse as parseLocation } from 'node:url';
-
 import { expect } from 'chai';
-
 import bootstrap from '../test_helper.js';
-import { decode as decodeJWT } from '../../lib/helpers/jwt.ts';
 
 describe('distributed and aggregated claims', () => {
 	before(bootstrap(import.meta.url));
@@ -42,20 +36,23 @@ describe('distributed and aggregated claims', () => {
 		return this.logout();
 	});
 
-	context('id_token', () => {
-		it('should return _claim_names and _claim_sources members', function () {
+	context('userinfo', () => {
+		it('should return _claim_names and _claim_sources members', async function () {
 			const auth = new this.AuthorizationRequest({
-				response_type: 'id_token',
+				response_type: 'code',
 				scope: 'openid profile'
 			});
 
-			return this.wrap({ auth, route: '/auth', verb: 'get' })
-				.expect(auth.validateFragment)
+			const response = await this.getToken(auth);
+
+			const { access_token } = response.body;
+
+			return this.agent
+				.get('/me')
+				.auth(access_token, { type: 'bearer' })
+				.expect(200)
 				.expect((response) => {
-					const {
-						query: { id_token }
-					} = parseLocation(response.headers.location, true);
-					const { payload } = decodeJWT(id_token);
+					const payload = response.body;
 
 					expect(payload).to.have.property('nickname', 'foobar');
 					expect(payload).not.to.have.property('given_name');
@@ -71,97 +68,24 @@ describe('distributed and aggregated claims', () => {
 				});
 		});
 
-		it('does not return the members if these claims arent requested at all', function () {
+		it('does not return the members if these claims arent requested at all', async function () {
 			const auth = new this.AuthorizationRequest({
-				response_type: 'id_token',
+				response_type: 'code',
 				scope: 'openid'
 			});
 
-			return this.wrap({ auth, route: '/auth', verb: 'get' })
-				.expect(auth.validateFragment)
+			const response = await this.getToken(auth);
+			const { access_token } = response.body;
+
+			return this.agent
+				.get('/me')
+				.auth(access_token, { type: 'bearer' })
+				.expect(200)
 				.expect((response) => {
-					const {
-						query: { id_token }
-					} = parseLocation(response.headers.location, true);
-					const { payload } = decodeJWT(id_token);
+					const payload = response.body;
 
 					expect(payload).not.to.have.property('_claim_names');
 					expect(payload).not.to.have.property('_claim_sources');
-				});
-		});
-	});
-
-	context('userinfo', () => {
-		it('should return _claim_names and _claim_sources members', function (done) {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'id_token token',
-				scope: 'openid profile'
-			});
-
-			this.wrap({ auth, route: '/auth', verb: 'get' })
-				.expect(auth.validateFragment)
-				.end((error, authorization) => {
-					if (error) return done(error);
-
-					const {
-						query: { access_token }
-					} = parseLocation(authorization.headers.location, true);
-
-					return this.agent
-						.get('/me')
-						.auth(access_token, { type: 'bearer' })
-						.expect(200)
-						.end((userinfoError, userinfo) => {
-							if (userinfoError) return done(userinfoError);
-
-							const payload = userinfo.body;
-
-							expect(payload).to.have.property('nickname', 'foobar');
-							expect(payload).not.to.have.property('given_name');
-
-							expect(payload).to.have.property('_claim_names');
-							expect(payload).to.have.property('_claim_sources');
-
-							expect(payload._claim_names).to.have.keys(
-								'given_name',
-								'family_name'
-							);
-							expect(payload._claim_sources).to.have.keys('src1', 'src2');
-
-							return done();
-						});
-				});
-		});
-
-		it('does not return the members if these claims arent requested at all', function (done) {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'id_token token',
-				scope: 'openid'
-			});
-
-			this.wrap({ auth, route: '/auth', verb: 'get' })
-				.expect(auth.validateFragment)
-				.end((error, authorization) => {
-					if (error) return done(error);
-
-					const {
-						query: { access_token }
-					} = parseLocation(authorization.headers.location, true);
-
-					return this.agent
-						.get('/me')
-						.auth(access_token, { type: 'bearer' })
-						.expect(200)
-						.end((userinfoError, userinfo) => {
-							if (userinfoError) return done(userinfoError);
-
-							const payload = userinfo.body;
-
-							expect(payload).not.to.have.property('_claim_names');
-							expect(payload).not.to.have.property('_claim_sources');
-
-							return done();
-						});
 				});
 		});
 	});

@@ -126,7 +126,6 @@ describe('dynamic ttl', () => {
 
 		await this.wrap({ route: '/auth', verb: 'get', auth })
 			.expect(303)
-			.expect(auth.validateFragment)
 			.expect(({ headers: { location } }) => {
 				const {
 					query: { expires_in, id_token }

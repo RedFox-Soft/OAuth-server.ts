@@ -217,18 +217,6 @@ export default async function processResponseTypes(ctx) {
 	);
 
 	if ('id_token' in response) {
-		if ('access_token' in response) {
-			response.id_token.set('at_hash', response.access_token);
-		}
-
-		if ('code' in response) {
-			response.id_token.set('c_hash', response.code);
-		}
-
-		if (ctx.oidc.params.state && ctx.oidc.isFapi('1.0 Final')) {
-			response.id_token.set('s_hash', ctx.oidc.params.state);
-		}
-
 		response.id_token = await response.id_token.issue({ use: 'idtoken' });
 	}
 

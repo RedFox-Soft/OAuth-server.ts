@@ -467,6 +467,37 @@ export default function testHelper(
 			return this.validateResponseParameter('error_description', expected);
 		};
 
+		AuthorizationRequest.prototype.getToken = function (code) {
+			return wrap({
+				route: '/token',
+				verb: 'post',
+				params: {
+					client_id: this.client_id,
+					code,
+					grant_type: 'authorization_code',
+					code_verifier: this.code_verifier,
+					redirect_uri: this.redirect_uri
+				}
+			}).expect(200);
+		};
+
+		async function getToken(auth, options = {}) {
+			const verb = options.verb || 'get';
+			let code;
+			await wrap({
+				route: '/auth',
+				verb,
+				auth,
+				...options
+			})
+				.expect(303)
+				.expect((response) => {
+					code = parse(response.headers.location, true).query.code;
+				});
+
+			return auth.getToken(code);
+		}
+
 		function getLastSession() {
 			return lastSession;
 		}
@@ -576,6 +607,7 @@ export default function testHelper(
 			getSessionId,
 			getGrantId,
 			getTokenJti,
+			getToken,
 			login,
 			logout,
 			provider,

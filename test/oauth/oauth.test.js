@@ -407,7 +407,6 @@ describe('requests without the openid scope', () => {
 
 				await this.wrap({ route: '/auth', verb: 'get', auth })
 					.expect(303)
-					.expect(auth.validateFragment)
 					.expect(auth.validatePresence(['error', 'error_description'])) // notice state is not expected
 					.expect(auth.validateClientLocation)
 					.expect(auth.validateError('invalid_request'))
@@ -428,7 +427,6 @@ describe('requests without the openid scope', () => {
 
 				await this.wrap({ route: '/auth', verb: 'get', auth })
 					.expect(303)
-					.expect(auth.validateFragment)
 					.expect(auth.validatePresence(['error', 'error_description'])) // notice state is not expected
 					.expect(auth.validateClientLocation)
 					.expect(auth.validateError('invalid_request'))

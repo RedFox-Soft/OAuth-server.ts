@@ -15,16 +15,17 @@ export default {
 		{
 			client_id: 'client',
 			client_secret: 'secret',
-			grant_types: ['implicit'],
-			response_types: ['id_token token', 'none', 'id_token'],
+			token_endpoint_auth_method: 'none',
+			grant_types: ['implicit', 'authorization_code'],
+			response_types: ['none', 'code'],
 			redirect_uris: ['https://client.example.com/cb']
 		},
 		{
 			client_id: 'client-pairwise',
 			subject_type: 'pairwise',
 			token_endpoint_auth_method: 'none',
-			grant_types: ['implicit'],
-			response_types: ['id_token'],
+			grant_types: ['authorization_code'],
+			response_types: ['code'],
 			redirect_uris: ['https://client.example.com/cb']
 		}
 	]

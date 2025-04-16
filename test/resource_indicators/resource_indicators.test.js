@@ -100,7 +100,6 @@ describe('features.resourceIndicators', () => {
 
 				await this.wrap({ route: '/auth', verb, auth })
 					.expect(303)
-					.expect(auth.validateFragment)
 					.expect(
 						auth.validatePresence(['error', 'error_description', 'state'])
 					)
@@ -116,7 +115,6 @@ describe('features.resourceIndicators', () => {
 				auth.resource = 'urn:wl:explicit';
 				await this.wrap({ route: '/auth', verb, auth })
 					.expect(303)
-					.expect(auth.validateFragment)
 					.expect(
 						auth.validatePresence([
 							'id_token',
@@ -147,7 +145,6 @@ describe('features.resourceIndicators', () => {
 
 				await this.wrap({ route: '/auth', verb, auth })
 					.expect(303)
-					.expect(auth.validateFragment)
 					.expect(
 						auth.validatePresence([
 							'id_token',

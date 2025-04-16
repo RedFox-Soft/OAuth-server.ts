@@ -37,91 +37,6 @@ describe('OAuth 2.0 Authorization Server Issuer Identification', () => {
 				.expect(auth.validateIss);
 		});
 
-		it('response_type=code token', function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'code token',
-				scope: 'openid'
-			});
-
-			return this.wrap({ route: '/auth', verb: 'get', auth })
-				.expect(303)
-				.expect(auth.validateFragment)
-				.expect(auth.validatePresence(['iss'], false))
-				.expect(auth.validateClientLocation)
-				.expect(auth.validateIss);
-		});
-
-		it('response_type=code id_token', function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'code id_token',
-				scope: 'openid'
-			});
-
-			return this.wrap({ route: '/auth', verb: 'get', auth })
-				.expect(303)
-				.expect(auth.validateFragment)
-				.expect(auth.validatePresence(['code', 'state', 'id_token']))
-				.expect(auth.validateClientLocation);
-		});
-
-		it('response_type=code id_token token', function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'code id_token token',
-				scope: 'openid'
-			});
-
-			return this.wrap({ route: '/auth', verb: 'get', auth })
-				.expect(303)
-				.expect(auth.validateFragment)
-				.expect(
-					auth.validatePresence([
-						'code',
-						'state',
-						'id_token',
-						'access_token',
-						'token_type',
-						'expires_in',
-						'scope'
-					])
-				)
-				.expect(auth.validateClientLocation);
-		});
-
-		it('response_type=id_token token', function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'id_token token',
-				scope: 'openid'
-			});
-
-			return this.wrap({ route: '/auth', verb: 'get', auth })
-				.expect(303)
-				.expect(auth.validateFragment)
-				.expect(
-					auth.validatePresence([
-						'state',
-						'id_token',
-						'access_token',
-						'token_type',
-						'expires_in',
-						'scope'
-					])
-				)
-				.expect(auth.validateClientLocation);
-		});
-
-		it('response_type=id_token', function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'id_token',
-				scope: 'openid'
-			});
-
-			return this.wrap({ route: '/auth', verb: 'get', auth })
-				.expect(303)
-				.expect(auth.validateFragment)
-				.expect(auth.validatePresence(['state', 'id_token']))
-				.expect(auth.validateClientLocation);
-		});
-
 		it('response_type=none', function () {
 			const auth = new this.AuthorizationRequest({
 				response_type: 'none',
@@ -183,20 +98,6 @@ describe('OAuth 2.0 Authorization Server Issuer Identification', () => {
 
 			return this.wrap({ route: '/auth', verb: 'get', auth })
 				.expect(303)
-				.expect(auth.validatePresence(['response']))
-				.expect(auth.validateClientLocation);
-		});
-
-		it('error with response_mode=jwt fragment', function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'code id_token',
-				response_mode: 'jwt',
-				scope: 'openid profile'
-			});
-
-			return this.wrap({ route: '/auth', verb: 'get', auth })
-				.expect(303)
-				.expect(auth.validateFragment)
 				.expect(auth.validatePresence(['response']))
 				.expect(auth.validateClientLocation);
 		});

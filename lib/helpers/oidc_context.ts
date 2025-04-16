@@ -4,7 +4,6 @@ import isPlainObject from './_/is_plain_object.ts';
 import omitBy from './_/omit_by.ts';
 import { InvalidRequest } from './errors.ts';
 import instance from './weak_cache.ts';
-import resolveResponseMode from './resolve_response_mode.ts';
 
 const COOKIES = Symbol();
 
@@ -172,7 +171,7 @@ export default function getContext(provider) {
 			}
 
 			if (this.params.response_type !== undefined) {
-				return resolveResponseMode(this.params.response_type);
+				return 'query';
 			}
 
 			return undefined;

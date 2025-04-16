@@ -50,37 +50,6 @@ describe('configuration features.jwtResponseModes', () => {
 			return this.logout();
 		});
 
-		it('defaults to fragment for implicit and hybrid response types', async function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'id_token token',
-				response_mode: 'jwt',
-				scope: 'openid'
-			});
-
-			await this.wrap({ route, auth, verb: 'get' })
-				.expect(303)
-				.expect(auth.validateFragment)
-				.expect(auth.validatePresence(['response']))
-				.expect(auth.validateClientLocation)
-				.expect(({ headers: { location } }) => {
-					const {
-						query: { response }
-					} = url.parse(location, true);
-					const { payload } = decode(response);
-					expect(payload).to.include.keys(
-						'id_token',
-						'access_token',
-						'expires_in',
-						'token_type'
-					);
-					expect(payload).to.have.property('exp').that.is.a('number');
-					expect(payload).to.have.property('aud', 'client');
-					expect(payload).to.have.property('scope', 'openid');
-					expect(payload).to.have.property('state', auth.state);
-					expect(payload).to.have.property('iss', this.provider.issuer);
-				});
-		});
-
 		it('defaults to query for code response type', async function () {
 			const auth = new this.AuthorizationRequest({
 				response_type: 'code',
@@ -137,7 +106,6 @@ describe('configuration features.jwtResponseModes', () => {
 
 				await this.wrap({ route, auth, verb: 'get' })
 					.expect(303)
-					.expect(auth.validateFragment)
 					.expect(auth.validateClientLocation)
 					.expect(auth.validateError('invalid_client'))
 					.expect(

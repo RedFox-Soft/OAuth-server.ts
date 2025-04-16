@@ -1,7 +1,3 @@
-/* eslint-disable no-underscore-dangle */
-
-import { parse as parseLocation } from 'node:url';
-
 import get from 'lodash/get.js';
 import { expect } from 'chai';
 
@@ -31,9 +27,9 @@ expire.setDate(expire.getDate() + 1);
 				return this.logout();
 			});
 
-			it('should return individual claims requested', function () {
+			it('should return individual claims requested', async function () {
 				const auth = new this.AuthorizationRequest({
-					response_type: 'id_token token',
+					response_type: 'code',
 					scope: 'openid',
 					claims: {
 						id_token: {
@@ -47,22 +43,16 @@ expire.setDate(expire.getDate() + 1);
 					}
 				});
 
-				return this.wrap({ route, verb, auth })
-					.expect(303)
-					.expect(auth.validateFragment)
-					.expect(auth.validatePresence(['id_token'], false))
-					.expect((response) => {
-						const {
-							query: { id_token }
-						} = parseLocation(response.headers.location, true);
-						const { payload } = decodeJWT(id_token);
-						expect(payload).to.contain.keys('email', 'middle_name');
-						expect(payload).not.to.have.keys(
-							'preferred_username',
-							'picture',
-							'website'
-						);
-					});
+				const response = await this.getToken(auth, { verb });
+
+				const { id_token } = response.body;
+				const { payload } = decodeJWT(id_token);
+				expect(payload).to.contain.keys('email', 'middle_name');
+				expect(payload).not.to.have.keys(
+					'preferred_username',
+					'picture',
+					'website'
+				);
 			});
 		});
 
@@ -84,7 +74,7 @@ expire.setDate(expire.getDate() + 1);
 				delete client.defaultAcrValues;
 			});
 
-			it('(pre 4.x behavior backfill) should include the acr claim now', function () {
+			it('(pre 4.x behavior backfill) should include the acr claim now', async function () {
 				const descriptor = Object.getOwnPropertyDescriptor(
 					this.provider.OIDCContext.prototype,
 					'acr'
@@ -97,33 +87,24 @@ expire.setDate(expire.getDate() + 1);
 				});
 
 				const auth = new this.AuthorizationRequest({
-					response_type: 'id_token token',
+					response_type: 'code',
 					scope: 'openid'
 				});
 
-				return this.wrap({ route, verb, auth })
-					.expect(auth.validateFragment)
-					.expect(auth.validatePresence(['id_token'], false))
-					.expect((response) => {
-						const {
-							query: { id_token }
-						} = parseLocation(response.headers.location, true);
-						const { payload } = decodeJWT(id_token);
-						expect(payload).to.contain.keys('acr');
-						Object.defineProperty(
-							this.provider.OIDCContext.prototype,
-							'acr',
-							descriptor
-						);
-					})
-					.catch((err) => {
-						Object.defineProperty(
-							this.provider.OIDCContext.prototype,
-							'acr',
-							descriptor
-						);
-						throw err;
-					});
+				let response;
+				try {
+					response = await this.getToken(auth, { verb });
+				} finally {
+					Object.defineProperty(
+						this.provider.OIDCContext.prototype,
+						'acr',
+						descriptor
+					);
+				}
+
+				const { id_token } = response.body;
+				const { payload } = decodeJWT(id_token);
+				expect(payload).to.contain.keys('acr');
 			});
 		});
 
@@ -142,9 +123,9 @@ expire.setDate(expire.getDate() + 1);
 				return this.logout();
 			});
 
-			it('should return individual claims requested', function (done) {
+			it('should return individual claims requested', async function () {
 				const auth = new this.AuthorizationRequest({
-					response_type: 'id_token token',
+					response_type: 'code',
 					scope: 'openid',
 					claims: {
 						userinfo: {
@@ -158,31 +139,20 @@ expire.setDate(expire.getDate() + 1);
 					}
 				});
 
-				this.wrap({ route, verb, auth })
-					.expect(303)
-					.expect(auth.validateFragment)
-					.expect(auth.validatePresence(['access_token', 'scope'], false))
-					.end((err, response) => {
-						if (err) {
-							return done(err);
-						}
+				const response = await this.getToken(auth, { verb });
 
-						const {
-							query: { access_token }
-						} = parseLocation(response.headers.location, true);
-						return this.agent
-							.get('/me')
-							.auth(access_token, { type: 'bearer' })
-							.expect(200)
-							.expect(({ body }) => {
-								expect(body).to.contain.keys('email', 'middle_name');
-								expect(body).not.to.have.keys(
-									'preferred_username',
-									'picture',
-									'website'
-								);
-							})
-							.end(done);
+				const { access_token } = response.body;
+				return this.agent
+					.get('/me')
+					.auth(access_token, { type: 'bearer' })
+					.expect(200)
+					.expect(({ body }) => {
+						expect(body).to.contain.keys('email', 'middle_name');
+						expect(body).not.to.have.keys(
+							'preferred_username',
+							'picture',
+							'website'
+						);
 					});
 			});
 		});
@@ -204,9 +174,9 @@ expire.setDate(expire.getDate() + 1);
 				return this.logout();
 			});
 
-			it('should return individual claims requested', function (done) {
+			it('should return individual claims requested', async function () {
 				const auth = new this.AuthorizationRequest({
-					response_type: 'id_token token',
+					response_type: 'code',
 					scope: 'openid',
 					claims: {
 						id_token: {
@@ -218,33 +188,20 @@ expire.setDate(expire.getDate() + 1);
 					}
 				});
 
-				this.wrap({ route, verb, auth })
-					.expect(303)
-					.expect(auth.validateFragment)
-					.expect(
-						auth.validatePresence(['id_token', 'access_token', 'scope'], false)
-					)
-					.expect((response) => {
-						const {
-							query: { id_token }
-						} = parseLocation(response.headers.location, true);
-						const { payload } = decodeJWT(id_token);
-						expect(payload).to.contain.key('email');
-						expect(payload).not.to.have.key('given_name');
-					})
-					.end((err, response) => {
-						const {
-							query: { access_token }
-						} = parseLocation(response.headers.location, true);
-						this.agent
-							.get('/me')
-							.auth(access_token, { type: 'bearer' })
-							.expect(200)
-							.expect((userinfo) => {
-								expect(userinfo.body).to.contain.key('given_name');
-								expect(userinfo.body).not.to.have.key('email');
-							})
-							.end(done);
+				const response = await this.getToken(auth, { verb });
+
+				const { id_token, access_token } = response.body;
+				const { payload } = decodeJWT(id_token);
+				expect(payload).to.contain.key('email');
+				expect(payload).not.to.have.key('given_name');
+
+				this.agent
+					.get('/me')
+					.auth(access_token, { type: 'bearer' })
+					.expect(200)
+					.expect((userinfo) => {
+						expect(userinfo.body).to.contain.key('given_name');
+						expect(userinfo.body).not.to.have.key('email');
 					});
 			});
 		});
@@ -281,11 +238,11 @@ expire.setDate(expire.getDate() + 1);
 					return sess.save(30); // TODO: bother running the ttl helper?
 				}
 
-				it('session subject value differs from the one requested [1/2]', function () {
+				it('session subject value differs from the one requested [1/2]', async function () {
 					const session = this.getSession();
 					const auth = new this.AuthorizationRequest({
 						client_id: 'client',
-						response_type: 'id_token',
+						response_type: 'code',
 						scope: 'openid',
 						prompt: 'none',
 						claims: {
@@ -299,8 +256,7 @@ expire.setDate(expire.getDate() + 1);
 
 					return this.wrap({ route, verb, auth })
 						.expect(303)
-						.expect(auth.validateFragment)
-						.expect(auth.validatePresence(['id_token', 'state']))
+						.expect(auth.validatePresence(['code', 'state']))
 						.expect(auth.validateState)
 						.expect(auth.validateClientLocation);
 				});
@@ -309,7 +265,7 @@ expire.setDate(expire.getDate() + 1);
 					const session = this.getSession();
 					const auth = new this.AuthorizationRequest({
 						client_id: 'client-pairwise',
-						response_type: 'id_token',
+						response_type: 'code',
 						scope: 'openid',
 						prompt: 'none',
 						claims: {
@@ -323,8 +279,7 @@ expire.setDate(expire.getDate() + 1);
 
 					return this.wrap({ route, verb, auth })
 						.expect(303)
-						.expect(auth.validateFragment)
-						.expect(auth.validatePresence(['id_token', 'state']))
+						.expect(auth.validatePresence(['code', 'state']))
 						.expect(auth.validateState)
 						.expect(auth.validateClientLocation);
 				});
@@ -332,7 +287,7 @@ expire.setDate(expire.getDate() + 1);
 				if (verb === 'get') {
 					it('none of multiple authentication context class references requested are met', function () {
 						const auth = new this.AuthorizationRequest({
-							response_type: 'id_token',
+							response_type: 'code',
 							response_mode: 'fragment',
 							scope: 'openid',
 							prompt: 'none',
@@ -356,14 +311,14 @@ expire.setDate(expire.getDate() + 1);
 						return this.wrap({ route: `${route}/resume`, verb, auth })
 							.expect(303)
 							.expect(auth.validateFragment)
-							.expect(auth.validatePresence(['id_token', 'state']))
+							.expect(auth.validatePresence(['code', 'state']))
 							.expect(auth.validateState)
 							.expect(auth.validateClientLocation);
 					});
 
 					it('single requested authentication context class reference is not met', function () {
 						const auth = new this.AuthorizationRequest({
-							response_type: 'id_token',
+							response_type: 'code',
 							response_mode: 'fragment',
 							scope: 'openid',
 							prompt: 'none',
@@ -387,7 +342,7 @@ expire.setDate(expire.getDate() + 1);
 						return this.wrap({ route: `${route}/resume`, verb, auth })
 							.expect(303)
 							.expect(auth.validateFragment)
-							.expect(auth.validatePresence(['id_token', 'state']))
+							.expect(auth.validatePresence(['code', 'state']))
 							.expect(auth.validateState)
 							.expect(auth.validateClientLocation);
 					});
@@ -398,7 +353,7 @@ expire.setDate(expire.getDate() + 1);
 				it('session subject value differs from the one requested [1/3]', function () {
 					const auth = new this.AuthorizationRequest({
 						client_id: 'client',
-						response_type: 'id_token',
+						response_type: 'code',
 						scope: 'openid',
 						prompt: 'none',
 						claims: {
@@ -412,7 +367,6 @@ expire.setDate(expire.getDate() + 1);
 
 					return this.wrap({ route, verb, auth })
 						.expect(303)
-						.expect(auth.validateFragment)
 						.expect(
 							auth.validatePresence(['error', 'error_description', 'state'])
 						)
@@ -429,7 +383,7 @@ expire.setDate(expire.getDate() + 1);
 				it('session subject value differs from the one requested [2/3]', function () {
 					const auth = new this.AuthorizationRequest({
 						client_id: 'client-pairwise',
-						response_type: 'id_token',
+						response_type: 'code',
 						scope: 'openid',
 						prompt: 'none',
 						claims: {
@@ -443,7 +397,6 @@ expire.setDate(expire.getDate() + 1);
 
 					return this.wrap({ route, verb, auth })
 						.expect(303)
-						.expect(auth.validateFragment)
 						.expect(
 							auth.validatePresence(['error', 'error_description', 'state'])
 						)
@@ -461,7 +414,7 @@ expire.setDate(expire.getDate() + 1);
 					this.logout();
 					const auth = new this.AuthorizationRequest({
 						client_id: 'client-pairwise',
-						response_type: 'id_token',
+						response_type: 'code',
 						scope: 'openid',
 						claims: {
 							id_token: {
@@ -486,7 +439,7 @@ expire.setDate(expire.getDate() + 1);
 
 				it('none of multiple authentication context class references requested are met (1/2)', function () {
 					const auth = new this.AuthorizationRequest({
-						response_type: 'id_token',
+						response_type: 'code',
 						scope: 'openid',
 						prompt: 'none',
 						claims: {
@@ -501,7 +454,6 @@ expire.setDate(expire.getDate() + 1);
 
 					return this.wrap({ route, verb, auth })
 						.expect(303)
-						.expect(auth.validateFragment)
 						.expect(
 							auth.validatePresence(['error', 'error_description', 'state'])
 						)
@@ -517,7 +469,7 @@ expire.setDate(expire.getDate() + 1);
 
 				it('none of multiple authentication context class references requested are met (2/2)', function () {
 					const auth = new this.AuthorizationRequest({
-						response_type: 'id_token',
+						response_type: 'code',
 						scope: 'openid',
 						prompt: 'none',
 						claims: {
@@ -532,7 +484,6 @@ expire.setDate(expire.getDate() + 1);
 
 					return this.wrap({ route, verb, auth })
 						.expect(303)
-						.expect(auth.validateFragment)
 						.expect(
 							auth.validatePresence(['error', 'error_description', 'state'])
 						)
@@ -548,7 +499,7 @@ expire.setDate(expire.getDate() + 1);
 
 				it('single requested authentication context class reference is not met', function () {
 					const auth = new this.AuthorizationRequest({
-						response_type: 'id_token',
+						response_type: 'code',
 						scope: 'openid',
 						prompt: 'none',
 						claims: {
@@ -563,7 +514,6 @@ expire.setDate(expire.getDate() + 1);
 
 					return this.wrap({ route, verb, auth })
 						.expect(303)
-						.expect(auth.validateFragment)
 						.expect(
 							auth.validatePresence(['error', 'error_description', 'state'])
 						)
@@ -579,7 +529,7 @@ expire.setDate(expire.getDate() + 1);
 
 				it('additional claims are requested', function () {
 					const auth = new this.AuthorizationRequest({
-						response_type: 'id_token',
+						response_type: 'code',
 						scope: 'openid',
 						prompt: 'none',
 						claims: {
@@ -589,7 +539,6 @@ expire.setDate(expire.getDate() + 1);
 
 					return this.wrap({ route, verb, auth })
 						.expect(303)
-						.expect(auth.validateFragment)
 						.expect(
 							auth.validatePresence(['error', 'error_description', 'state'])
 						)
@@ -615,7 +564,7 @@ expire.setDate(expire.getDate() + 1);
 					const hint = await idToken.issue({ use: 'idtoken' });
 
 					const auth = new this.AuthorizationRequest({
-						response_type: 'id_token',
+						response_type: 'code',
 						scope: 'openid',
 						prompt: 'none',
 						id_token_hint: hint
@@ -623,7 +572,6 @@ expire.setDate(expire.getDate() + 1);
 
 					return this.wrap({ route, verb, auth })
 						.expect(303)
-						.expect(auth.validateFragment)
 						.expect(
 							auth.validatePresence(['error', 'error_description', 'state'])
 						)
@@ -652,7 +600,7 @@ expire.setDate(expire.getDate() + 1);
 
 					const auth = new this.AuthorizationRequest({
 						client_id: 'client-pairwise',
-						response_type: 'id_token',
+						response_type: 'code',
 						scope: 'openid',
 						prompt: 'none',
 						id_token_hint: hint
@@ -660,7 +608,6 @@ expire.setDate(expire.getDate() + 1);
 
 					return this.wrap({ route, verb, auth })
 						.expect(303)
-						.expect(auth.validateFragment)
 						.expect(
 							auth.validatePresence(['error', 'error_description', 'state'])
 						)
@@ -690,7 +637,7 @@ expire.setDate(expire.getDate() + 1);
 
 					const auth = new this.AuthorizationRequest({
 						client_id: 'client-pairwise',
-						response_type: 'id_token',
+						response_type: 'code',
 						scope: 'openid',
 						id_token_hint: hint
 					});
@@ -716,7 +663,7 @@ expire.setDate(expire.getDate() + 1);
 					const hint = await idToken.issue({ use: 'idtoken' });
 
 					const auth = new this.AuthorizationRequest({
-						response_type: 'id_token',
+						response_type: 'code',
 						scope: 'openid',
 						prompt: 'none',
 						id_token_hint: hint
@@ -724,8 +671,7 @@ expire.setDate(expire.getDate() + 1);
 
 					return this.wrap({ route, verb, auth })
 						.expect(303)
-						.expect(auth.validateFragment)
-						.expect(auth.validatePresence(['id_token', 'state']))
+						.expect(auth.validatePresence(['code', 'state']))
 						.expect(auth.validateState)
 						.expect(auth.validateClientLocation);
 				});
@@ -744,7 +690,7 @@ expire.setDate(expire.getDate() + 1);
 
 					const auth = new this.AuthorizationRequest({
 						client_id: 'client-pairwise',
-						response_type: 'id_token',
+						response_type: 'code',
 						scope: 'openid',
 						prompt: 'none',
 						id_token_hint: hint
@@ -752,8 +698,7 @@ expire.setDate(expire.getDate() + 1);
 
 					return this.wrap({ route, verb, auth })
 						.expect(303)
-						.expect(auth.validateFragment)
-						.expect(auth.validatePresence(['id_token', 'state']))
+						.expect(auth.validatePresence(['code', 'state']))
 						.expect(auth.validateState)
 						.expect(auth.validateClientLocation);
 				});
@@ -785,14 +730,13 @@ expire.setDate(expire.getDate() + 1);
 
 			it('should handle when invalid json is provided', function () {
 				const auth = new this.AuthorizationRequest({
-					response_type: 'id_token token',
+					response_type: 'code',
 					scope: 'openid',
 					claims: 'something'
 				});
 
 				return this.wrap({ route, verb, auth })
 					.expect(303)
-					.expect(auth.validateFragment)
 					.expect(
 						auth.validatePresence(['error', 'error_description', 'state'])
 					)
@@ -808,14 +752,13 @@ expire.setDate(expire.getDate() + 1);
 
 			it('should validate an object is passed', function () {
 				const auth = new this.AuthorizationRequest({
-					response_type: 'id_token token',
+					response_type: 'code',
 					scope: 'openid',
 					claims: 'true'
 				});
 
 				return this.wrap({ route, verb, auth })
 					.expect(303)
-					.expect(auth.validateFragment)
 					.expect(
 						auth.validatePresence(['error', 'error_description', 'state'])
 					)
@@ -831,14 +774,13 @@ expire.setDate(expire.getDate() + 1);
 
 			it('should check accepted properties being present', function () {
 				const auth = new this.AuthorizationRequest({
-					response_type: 'id_token token',
+					response_type: 'code',
 					scope: 'openid',
 					claims: '{"not_recognized": "does not matter"}'
 				});
 
 				return this.wrap({ route, verb, auth })
 					.expect(303)
-					.expect(auth.validateFragment)
 					.expect(
 						auth.validatePresence(['error', 'error_description', 'state'])
 					)
@@ -854,14 +796,13 @@ expire.setDate(expire.getDate() + 1);
 
 			it('should check userinfo property being a simple object', function () {
 				const auth = new this.AuthorizationRequest({
-					response_type: 'id_token token',
+					response_type: 'code',
 					scope: 'openid',
 					claims: '{"userinfo": "Not an Object"}'
 				});
 
 				return this.wrap({ route, verb, auth })
 					.expect(303)
-					.expect(auth.validateFragment)
 					.expect(
 						auth.validatePresence(['error', 'error_description', 'state'])
 					)
@@ -875,14 +816,13 @@ expire.setDate(expire.getDate() + 1);
 
 			it('should check id_token property being a simple object', function () {
 				const auth = new this.AuthorizationRequest({
-					response_type: 'id_token token',
+					response_type: 'code',
 					scope: 'openid',
 					claims: '{"id_token": "Not an Object"}'
 				});
 
 				return this.wrap({ route, verb, auth })
 					.expect(303)
-					.expect(auth.validateFragment)
 					.expect(
 						auth.validatePresence(['error', 'error_description', 'state'])
 					)
@@ -905,7 +845,7 @@ expire.setDate(expire.getDate() + 1);
 
 				it('should not accept userinfo as a property', function () {
 					const auth = new this.AuthorizationRequest({
-						response_type: 'id_token token',
+						response_type: 'code',
 						scope: 'openid',
 						claims: {
 							userinfo: {
@@ -917,7 +857,6 @@ expire.setDate(expire.getDate() + 1);
 
 					return this.wrap({ route, verb, auth })
 						.expect(303)
-						.expect(auth.validateFragment)
 						.expect(
 							auth.validatePresence(['error', 'error_description', 'state'])
 						)
@@ -930,29 +869,6 @@ expire.setDate(expire.getDate() + 1);
 							)
 						);
 				});
-			});
-
-			it('should check that userinfo claims are not specified for id_token requests', function () {
-				const auth = new this.AuthorizationRequest({
-					response_type: 'id_token',
-					scope: 'openid',
-					claims: '{"userinfo": {}}'
-				});
-
-				return this.wrap({ route, verb, auth })
-					.expect(303)
-					.expect(auth.validateFragment)
-					.expect(
-						auth.validatePresence(['error', 'error_description', 'state'])
-					)
-					.expect(auth.validateState)
-					.expect(auth.validateClientLocation)
-					.expect(auth.validateError('invalid_request'))
-					.expect(
-						auth.validateErrorDescription(
-							'claims.userinfo should not be used if access_token is not issued'
-						)
-					);
 			});
 		});
 	});

@@ -256,7 +256,6 @@ describe('session bound tokens behaviours', () => {
 				.get('/auth')
 				.query(auth)
 				.expect(303)
-				.expect(auth.validateFragment)
 				.expect(
 					auth.validatePresence([
 						'id_token',

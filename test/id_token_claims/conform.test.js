@@ -24,14 +24,7 @@ describe('configuration conformIdTokenClaims=true', () => {
 
 	skipConsent();
 
-	[
-		'code id_token token',
-		'code id_token',
-		'code token',
-		'code',
-		'id_token token',
-		'id_token'
-	].forEach((response_type) => {
+	['code id_token', 'code', 'id_token'].forEach((response_type) => {
 		describe(`response_type=${response_type}`, () => {
 			before(async function () {
 				const client = await this.provider.Client.find('client');
@@ -61,10 +54,6 @@ describe('configuration conformIdTokenClaims=true', () => {
 					.get('/auth')
 					.query(auth)
 					.expect(303)
-					.expect((...args) => {
-						if (response_type === 'code') return;
-						auth.validateFragment(...args);
-					})
 					.expect(auth.validateClientLocation);
 
 				({

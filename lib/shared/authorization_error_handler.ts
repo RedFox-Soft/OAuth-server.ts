@@ -3,7 +3,6 @@ import Debug from 'debug';
 import { InvalidRedirectUri } from '../helpers/errors.ts';
 import instance from '../helpers/weak_cache.ts';
 import errOut from '../helpers/err_out.ts';
-import resolveResponseMode from '../helpers/resolve_response_mode.ts';
 import oneRedirectUriClients from '../actions/authorization/one_redirect_uri_clients.ts';
 
 const debug = new Debug('oidc-provider:authentication:error');
@@ -100,7 +99,7 @@ export default (provider) => {
 			} else {
 				let mode = safe(params.response_mode);
 				if (!instance(provider).responseModes.has(mode)) {
-					mode = resolveResponseMode(safe(params.response_type));
+					mode = 'query';
 				}
 				const handler = instance(provider).responseModes.get(mode);
 				await handler(ctx, safe(params.redirect_uri), out);
