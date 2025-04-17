@@ -2188,8 +2188,8 @@ function makeDefaults() {
 		 * ```js
 		 * [
 		 *   'code',
-		 *   'id_token', 'id_token token',
-		 *   'code id_token', 'code token', 'code id_token token',
+		 *   'id_token',
+		 *   'code id_token',
 		 *   'none',
 		 * ]
 		 * ```

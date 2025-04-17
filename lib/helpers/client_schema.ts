@@ -328,12 +328,6 @@ export default function getSchema(provider) {
 						'only one proof of possession mechanism can be made required at a time'
 					);
 				}
-
-				if (length !== 0 && responseTypes.has('token')) {
-					this.invalidate(
-						`response_types must not include "token" when ${pop} is used`
-					);
-				}
 			}
 
 			{

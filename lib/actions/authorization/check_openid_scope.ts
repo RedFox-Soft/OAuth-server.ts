@@ -18,18 +18,9 @@ const GATED = [
 /*
  * Validates that openid scope is requested when openid specific parameters are provided
  */
-export default function checkOpenIdScope(PARAM_LIST, ctx, next) {
+export default function checkOpenIdScope(ctx, next) {
 	if (ctx.oidc.params.scope?.split(' ').includes('openid')) {
 		return next();
-	}
-
-	if (
-		PARAM_LIST.has('response_type') &&
-		ctx.oidc.params.response_type.includes('id_token')
-	) {
-		throw new InvalidRequest(
-			'openid scope must be requested for this response_type'
-		);
 	}
 
 	GATED_CLIENT.forEach(([prop, msg]) => {

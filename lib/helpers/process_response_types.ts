@@ -1,80 +1,6 @@
-import { InvalidTarget } from './errors.ts';
 import instance from './weak_cache.ts';
 import filterClaims from './filter_claims.ts';
 import combinedScope from './combined_scope.ts';
-
-async function tokenHandler(ctx) {
-	const { accountId } = ctx.oidc.session;
-
-	const token = new ctx.oidc.provider.AccessToken({
-		accountId,
-		client: ctx.oidc.client,
-		grantId: ctx.oidc.session.grantIdFor(ctx.oidc.client.clientId),
-		gty: 'implicit',
-		sessionUid: ctx.oidc.session.uid,
-		sid: ctx.oidc.session.sidFor(ctx.oidc.client.clientId)
-	});
-
-	const {
-		expiresWithSession,
-		features: { resourceIndicators }
-	} = instance(ctx.oidc.provider).configuration;
-
-	let { resource } = ctx.oidc.params;
-
-	if (Array.isArray(resource)) {
-		resource = await resourceIndicators.defaultResource(
-			ctx,
-			ctx.oidc.client,
-			resource
-		);
-	}
-
-	if (Array.isArray(resource)) {
-		throw new InvalidTarget(
-			'only a single resource indicator value must be requested/resolved during Access Token Request'
-		);
-	}
-
-	const { grant } = ctx.oidc;
-
-	if (resource) {
-		const resourceServer = ctx.oidc.resourceServers[resource];
-		if (!resourceServer) throw new InvalidTarget();
-		token.resourceServer = resourceServer;
-		token.scope = grant.getResourceScopeFiltered(
-			resource,
-			ctx.oidc.requestParamScopes
-		);
-	} else {
-		token.claims = ctx.oidc.claims;
-		token.scope = grant.getOIDCScopeFiltered(ctx.oidc.requestParamOIDCScopes);
-	}
-
-	if (
-		!token.resourceServer ||
-		token.resourceServer.accessTokenFormat === 'opaque'
-	) {
-		if (await expiresWithSession(ctx, token)) {
-			token.expiresWithSession = true;
-		} else {
-			ctx.oidc.session.authorizationFor(
-				ctx.oidc.client.clientId
-			).persistsLogout = true;
-		}
-	}
-
-	ctx.oidc.entity('AccessToken', token);
-
-	const result = {
-		access_token: await token.save(),
-		expires_in: token.expiration,
-		token_type: token.tokenType,
-		scope: token.scope
-	};
-
-	return result;
-}
 
 async function codeHandler(ctx) {
 	const {
@@ -205,8 +131,6 @@ export default async function processResponseTypes(ctx) {
 				switch (responseType) {
 					case 'code':
 						return codeHandler(ctx);
-					case 'token':
-						return tokenHandler(ctx);
 					case 'id_token':
 						return idTokenHandler(ctx);
 					default:

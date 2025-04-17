@@ -377,7 +377,7 @@ describe('encryption', () => {
 				client.idTokenEncryptedResponseAlg = 'ECDH-ES';
 
 				const auth = new this.AuthorizationRequest({
-					response_type: 'id_token token',
+					response_type: 'id_token',
 					scope: 'openid'
 				});
 

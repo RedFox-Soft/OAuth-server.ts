@@ -6,11 +6,11 @@ describe('response_types Provider configuration', () => {
 	it('fixes common issues', () => {
 		const provider = new Provider('https://op.example.com', {
 			// eslint-disable-line no-new
-			responseTypes: ['token id_token code', 'token id_token']
+			responseTypes: ['id_token code', 'id_token']
 		});
 		expect(i(provider).configuration.responseTypes).to.eql([
-			'code id_token token',
-			'id_token token'
+			'code id_token',
+			'id_token'
 		]);
 	});
 

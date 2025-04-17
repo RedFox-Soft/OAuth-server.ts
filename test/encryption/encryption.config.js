@@ -27,7 +27,7 @@ export default {
 			client_id: 'client',
 			client_secret: 'secret',
 			redirect_uris: ['https://client.example.com/cb'],
-			response_types: ['id_token token', 'code'],
+			response_types: ['id_token', 'code'],
 			grant_types: ['implicit', 'authorization_code'],
 			jwks: { keys: [await exportJWK(keypair.publicKey)] },
 			id_token_encrypted_response_alg: 'RSA-OAEP',

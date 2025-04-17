@@ -8,7 +8,7 @@ export default {
 		client_id: 'client',
 		client_secret: 'secret',
 		grant_types: ['authorization_code', 'implicit'],
-		response_types: ['code', 'code id_token token'],
+		response_types: ['code', 'code id_token'],
 		redirect_uris: [
 			'https://client.example.com/cb',
 			'https://client.example.com/cb"><script>alert(0)</script><x="'

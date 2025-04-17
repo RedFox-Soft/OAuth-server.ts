@@ -4,7 +4,6 @@ import sinon from 'sinon';
 import bootstrap from '../test_helper.js';
 
 const route = '/auth';
-const response_type = 'code id_token token';
 const response_mode = 'web_message';
 const scope = 'openid';
 

@@ -28,7 +28,7 @@ const filterAsymmetricSig = RegExp.prototype.test.bind(
 	/^(?:PS(?:256|384|512)|RS(?:256|384|512)|ES(?:256K?|384|512)|Ed(?:25519|DSA))$/
 );
 
-const supportedResponseTypes = new Set(['none', 'code', 'id_token', 'token']);
+const supportedResponseTypes = new Set(['none', 'code', 'id_token']);
 const fapiProfiles = new Set(['1.0 Final', '2.0']);
 
 class Configuration {
@@ -164,7 +164,6 @@ class Configuration {
 
 			if (
 				(parsed.has('none') && parsed.size !== 1) ||
-				(parsed.has('token') && parsed.size === 1) ||
 				![...parsed].every(Set.prototype.has.bind(supportedResponseTypes))
 			) {
 				throw new TypeError(`unsupported response type: ${type}`);

@@ -188,7 +188,7 @@ export default function authorizationAction(provider, endpoint) {
 	use(assignDefaults, A, DA, BA);
 	use(checkPrompt, A, PAR);
 	use(checkScope.bind(undefined, allowList), A, DA, PAR, BA);
-	use(checkOpenidScope.bind(undefined, allowList), A, DA, PAR, BA);
+	use(checkOpenidScope, A, DA, PAR, BA);
 	use(checkRedirectUri, A, PAR);
 	use(checkPKCE, A, PAR);
 	use(checkClaims, A, DA, PAR, BA);

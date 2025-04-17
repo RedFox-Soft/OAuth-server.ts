@@ -99,7 +99,7 @@ describe('configuration features.jwtResponseModes', () => {
 			it('defaults to fragment for implicit and hybrid response types', async function () {
 				const auth = new this.AuthorizationRequest({
 					client_id: 'client-expired',
-					response_type: 'id_token token',
+					response_type: 'id_token',
 					response_mode: 'jwt',
 					scope: 'openid'
 				});
@@ -165,7 +165,7 @@ describe('configuration features.jwtResponseModes', () => {
 
 		it('uses the query part when expired', async function () {
 			const auth = new this.AuthorizationRequest({
-				response_type: 'id_token token',
+				response_type: 'id_token',
 				response_mode: 'query.jwt',
 				scope: 'openid',
 				client_id: 'client-expired'
@@ -187,7 +187,7 @@ describe('configuration features.jwtResponseModes', () => {
 			this.provider.once('authorization.success', spy);
 			const auth = new this.AuthorizationRequest({
 				client_id: 'client-encrypted',
-				response_type: 'id_token token',
+				response_type: 'id_token',
 				response_mode: 'query.jwt',
 				scope: 'openid'
 			});

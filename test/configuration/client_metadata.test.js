@@ -754,15 +754,7 @@ describe('Client metadata validation', () => {
 	context('response_types', function () {
 		defaultsTo(this.title, ['code']);
 		mustBeArray(this.title);
-		const responseTypes = [
-			'code id_token token',
-			'code id_token',
-			'code token',
-			'code',
-			'id_token token',
-			'id_token',
-			'none'
-		];
+		const responseTypes = ['code id_token', 'code', 'id_token', 'none'];
 		responseTypes.forEach((value) => {
 			const grants = [];
 			if (value.includes('token')) {
@@ -790,14 +782,14 @@ describe('Client metadata validation', () => {
 		);
 		allows(
 			this.title,
-			['token id_token'],
+			['id_token'],
 			{
 				// mixed up order
 				grant_types: ['implicit']
 			},
 			{ responseTypes },
 			(client) => {
-				expect(client.metadata().response_types).to.eql(['id_token token']);
+				expect(client.metadata().response_types).to.eql(['id_token']);
 			}
 		);
 
@@ -1682,36 +1674,6 @@ describe('Client metadata validation', () => {
 		});
 	});
 
-	describe('features.dpop', () => {
-		context('dpop_bound_access_tokens', function () {
-			const configuration = {
-				features: {
-					dPoP: {
-						enabled: true
-					}
-				},
-				responseTypes: ['code', 'code token']
-			};
-			mustBeBoolean(this.title, undefined, configuration);
-			mustBeBoolean(this.title, undefined, configuration);
-			defaultsTo(this.title, false, undefined, configuration);
-			defaultsTo(this.title, true, undefined, {
-				...configuration,
-				clientDefaults: { dpop_bound_access_tokens: true }
-			});
-			rejects(
-				this.title,
-				true,
-				'response_types must not include "token" when dpop_bound_access_tokens is used',
-				{
-					grant_types: ['authorization_code', 'implicit'],
-					response_types: ['code', 'code token']
-				},
-				configuration
-			);
-		});
-	});
-
 	describe('features.ciba', () => {
 		const configuration = {
 			features: {
@@ -2033,31 +1995,6 @@ describe('Client metadata validation', () => {
 					configuration
 				);
 			});
-		});
-	});
-
-	context('features.mTLS.certificateBoundAccessTokens', () => {
-		context('tls_client_certificate_bound_access_tokens', function () {
-			const configuration = {
-				features: {
-					mTLS: { enabled: true, certificateBoundAccessTokens: true }
-				},
-				responseTypes: ['code', 'code token']
-			};
-
-			defaultsTo(this.title, false, undefined, configuration);
-			defaultsTo(this.title, undefined);
-			mustBeBoolean(this.title, undefined, configuration);
-			rejects(
-				this.title,
-				true,
-				'response_types must not include "token" when tls_client_certificate_bound_access_tokens is used',
-				{
-					grant_types: ['authorization_code', 'implicit'],
-					response_types: ['code', 'code token']
-				},
-				configuration
-			);
 		});
 	});
 
