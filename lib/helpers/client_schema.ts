@@ -276,7 +276,7 @@ export default function getSchema(provider) {
 
 			if (
 				this.grant_types.some((type) =>
-					['authorization_code', 'implicit'].includes(type)
+					['authorization_code'].includes(type)
 				) &&
 				!this.response_types.length
 			) {

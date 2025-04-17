@@ -1035,7 +1035,8 @@ describe('BASIC code', () => {
 				const spy = sinon.spy();
 				this.provider.once('authorization.error', spy);
 				const auth = new this.AuthorizationRequest({
-					response_type: 'id_token',
+					client_id: 'client-without-none',
+					response_type: 'none',
 					scope
 				});
 

@@ -40,7 +40,7 @@ export default async function respond(ctx) {
 	}
 
 	const { responseMode } = ctx.oidc;
-	if (!out.id_token && !responseMode.includes('jwt')) {
+	if (!responseMode.includes('jwt')) {
 		out.iss = ctx.oidc.provider.issuer;
 	}
 

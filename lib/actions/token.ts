@@ -38,10 +38,7 @@ export default function tokenAction(provider) {
 
 			const supported = instance(provider).configuration.grantTypes;
 
-			if (
-				!supported.has(ctx.oidc.params.grant_type) ||
-				ctx.oidc.params.grant_type === 'implicit'
-			) {
+			if (!supported.has(ctx.oidc.params.grant_type)) {
 				throw new UnsupportedGrantType();
 			}
 

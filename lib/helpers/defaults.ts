@@ -797,8 +797,8 @@ function makeDefaults() {
 		 *
 		 * ```js
 		 * {
-		 *   response_types: ['code id_token'],
-		 *   grant_types: ['authorization_code', 'implicit'],
+		 *   response_types: ['code'],
+		 *   grant_types: ['authorization_code'],
 		 * }
 		 * ```
 		 *
@@ -2194,7 +2194,7 @@ function makeDefaults() {
 		 * ]
 		 * ```
 		 */
-		responseTypes: ['code', 'id_token', 'none'],
+		responseTypes: ['code', 'none'],
 
 		/*
 		 * routes

@@ -19,7 +19,7 @@ config.extraParams = {
 merge(config.features, {
 	pushedAuthorizationRequests: { enabled: false }
 });
-config.responseTypes = ['id_token', 'code', 'none'];
+config.responseTypes = ['code', 'none'];
 config.allowOmittingSingleRegisteredRedirectUri = false;
 
 const policy = base();
@@ -49,6 +49,13 @@ export default {
 			client_secret: 'secret',
 			grant_types: ['authorization_code', 'refresh_token'],
 			response_types: ['code', 'none'],
+			redirect_uris: ['https://client.example.com/cb']
+		},
+		{
+			client_id: 'client-without-none',
+			client_secret: 'secret',
+			grant_types: ['authorization_code', 'refresh_token'],
+			response_types: ['code'],
 			redirect_uris: ['https://client.example.com/cb']
 		},
 		{

@@ -1,7 +1,6 @@
 import { strict as assert } from 'node:assert';
 import * as util from 'node:util';
 
-import sinon from 'sinon';
 import { expect } from 'chai';
 import merge from 'lodash/merge.js';
 import omit from 'lodash/omit.js';
@@ -687,12 +686,9 @@ describe('Client metadata validation', () => {
 	context('response_types', function () {
 		defaultsTo(this.title, ['code']);
 		mustBeArray(this.title);
-		const responseTypes = ['code id_token', 'code', 'id_token', 'none'];
+		const responseTypes = ['code', 'none'];
 		responseTypes.forEach((value) => {
 			const grants = [];
-			if (value.includes('token')) {
-				grants.push('implicit');
-			}
 			if (value.includes('code')) {
 				grants.push('authorization_code');
 			}
@@ -709,21 +705,9 @@ describe('Client metadata validation', () => {
 			this.title,
 			responseTypes,
 			{
-				grant_types: ['implicit', 'authorization_code']
+				grant_types: ['authorization_code']
 			},
 			{ responseTypes }
-		);
-		allows(
-			this.title,
-			['id_token'],
-			{
-				// mixed up order
-				grant_types: ['implicit']
-			},
-			{ responseTypes },
-			(client) => {
-				expect(client.metadata().response_types).to.eql(['id_token']);
-			}
 		);
 
 		rejects(this.title, [123], /must only contain strings$/);
@@ -917,16 +901,6 @@ describe('Client metadata validation', () => {
 				}
 			});
 			rejects(this.title, 'not-a-method', undefined, undefined, configuration);
-
-			allows(
-				this.title,
-				'none',
-				{
-					response_types: ['id_token'],
-					grant_types: ['implicit']
-				},
-				configuration
-			);
 		});
 
 		context('token_endpoint_auth_signing_alg', function () {
@@ -2159,7 +2133,7 @@ describe('Client metadata validation', () => {
 			defaultsTo('response_types', ['code'], undefined, {
 				clientDefaults: {
 					response_types: ['code'],
-					grant_types: ['authorization_code', 'implicit']
+					grant_types: ['authorization_code']
 				}
 			});
 		}

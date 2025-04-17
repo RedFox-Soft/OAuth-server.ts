@@ -1,5 +1,4 @@
 import instance from './weak_cache.ts';
-import filterClaims from './filter_claims.ts';
 import combinedScope from './combined_scope.ts';
 
 async function codeHandler(ctx) {
@@ -71,78 +70,12 @@ async function codeHandler(ctx) {
 	return { code: await code.save() };
 }
 
-async function idTokenHandler(ctx) {
-	const claims = filterClaims(ctx.oidc.claims, 'id_token', ctx.oidc.grant);
-	const rejected = ctx.oidc.grant.getRejectedOIDCClaims();
-	const scope = ctx.oidc.grant.getOIDCScopeFiltered(
-		ctx.oidc.requestParamScopes
-	);
-	const idToken = new ctx.oidc.provider.IdToken(
-		{
-			...(await ctx.oidc.account.claims('id_token', scope, claims, rejected)),
-			acr: ctx.oidc.acr,
-			amr: ctx.oidc.amr,
-			auth_time: ctx.oidc.session.authTime()
-		},
-		{ ctx }
-	);
-
-	const {
-		conformIdTokenClaims,
-		features: { userinfo }
-	} = instance(ctx.oidc.provider).configuration;
-
-	if (
-		conformIdTokenClaims &&
-		userinfo.enabled &&
-		ctx.oidc.params.response_type !== 'id_token' &&
-		!ctx.oidc.params.resource
-	) {
-		idToken.scope = 'openid';
-	} else {
-		idToken.scope = scope;
-	}
-
-	idToken.mask = claims;
-	idToken.rejected = rejected;
-
-	idToken.set('nonce', ctx.oidc.params.nonce);
-
-	if (
-		ctx.oidc.client.includeSid() ||
-		(ctx.oidc.claims.id_token && 'sid' in ctx.oidc.claims.id_token)
-	) {
-		idToken.set('sid', ctx.oidc.session.sidFor(ctx.oidc.client.clientId));
-	}
-
-	return { id_token: idToken };
-}
-
-/*
- * Resolves each requested response type to a single response object. If one of the hybrid
- * response types is used an appropriate _hash is also pushed on to the id_token.
- */
 export default async function processResponseTypes(ctx) {
-	const responses = ctx.oidc.params.response_type.split(' ');
-	const response = Object.assign(
-		{},
-		...(await Promise.all(
-			responses.map((responseType) => {
-				switch (responseType) {
-					case 'code':
-						return codeHandler(ctx);
-					case 'id_token':
-						return idTokenHandler(ctx);
-					default:
-						return {};
-				}
-			})
-		))
-	);
+	const responseType = ctx.oidc.params.response_type;
 
-	if ('id_token' in response) {
-		response.id_token = await response.id_token.issue({ use: 'idtoken' });
+	if (responseType === 'code') {
+		return codeHandler(ctx);
 	}
 
-	return response;
+	return {};
 }
