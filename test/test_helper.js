@@ -287,21 +287,12 @@ export default function testHelper(
 						: parameters.redirect_uri || (c && c.redirect_uris[0]);
 				this.res = {};
 
-				if (
-					this.scope?.includes('openid') ||
-					this.response_type?.includes('id_token')
-				) {
-					this.nonce =
-						'nonce' in parameters
-							? parameters.nonce
-							: crypto.randomBytes(16).toString('base64url');
+				if (this.scope?.includes('openid')) {
+					this.nonce ??= crypto.randomBytes(16).toString('base64url');
 				}
 
 				if (this.response_type && this.response_type.includes('code')) {
-					this.code_challenge_method =
-						'code_challenge_method' in parameters
-							? parameters.code_challenge_method
-							: 'S256';
+					this.code_challenge_method ??= 'S256';
 					this.code_verifier ??= crypto.randomBytes(32).toString('base64url');
 					this.code_challenge =
 						'code_challenge' in parameters
@@ -470,7 +461,10 @@ export default function testHelper(
 			return this.validateResponseParameter('error_description', expected);
 		};
 
-		AuthorizationRequest.prototype.getToken = function (code) {
+		AuthorizationRequest.prototype.getToken = function (
+			code,
+			{ skipCheck } = {}
+		) {
 			let authObj = {};
 			const c = clients.find((cl) => cl.client_id === this.client_id);
 			if (c.token_endpoint_auth_method !== 'none') {
@@ -480,7 +474,7 @@ export default function testHelper(
 				};
 			}
 
-			return wrap({
+			const res = wrap({
 				route: '/token',
 				verb: 'post',
 				params: {
@@ -491,7 +485,11 @@ export default function testHelper(
 					redirect_uri: this.redirect_uri
 				},
 				...authObj
-			}).expect(200);
+			});
+			if (!skipCheck) {
+				return res;
+			}
+			return res.expect(200);
 		};
 
 		async function getToken(auth, options = {}) {

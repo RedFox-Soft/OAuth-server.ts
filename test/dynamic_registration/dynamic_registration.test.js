@@ -242,8 +242,8 @@ describe('registration features', () => {
 				.send({
 					token_endpoint_auth_method: 'none',
 					redirect_uris: ['https://client.example.com/cb'],
-					response_types: ['id_token'],
-					grant_types: ['implicit']
+					response_types: ['code'],
+					grant_types: ['authorization_code']
 				})
 				.expect(201)
 				.expect((response) => {
@@ -262,8 +262,8 @@ describe('registration features', () => {
 				.send({
 					token_endpoint_auth_method: 'none',
 					redirect_uris: ['https://client.example.com/cb'],
-					response_types: ['id_token'],
-					grant_types: ['implicit'],
+					response_types: ['code'],
+					grant_types: ['authorization_code'],
 					client_secret: 'foo',
 					client_secret_expires_at: 123
 				})
@@ -287,8 +287,8 @@ describe('registration features', () => {
 				.send({
 					token_endpoint_auth_method: 'none',
 					redirect_uris: ['https://client.example.com/cb'],
-					response_types: ['id_token'],
-					grant_types: ['implicit'],
+					response_types: ['code'],
+					grant_types: ['authorization_code'],
 					id_token_signed_response_alg: 'HS256'
 				})
 				.expect(201)
@@ -304,8 +304,8 @@ describe('registration features', () => {
 				.send({
 					token_endpoint_auth_method: 'client_secret_jwt',
 					redirect_uris: ['https://client.example.com/cb'],
-					response_types: ['id_token'],
-					grant_types: ['implicit']
+					response_types: ['code'],
+					grant_types: ['authorization_code']
 				})
 				.expect(201)
 				.expect((response) => {
@@ -366,7 +366,7 @@ describe('registration features', () => {
 					this.failWith(
 						400,
 						'invalid_client_metadata',
-						"grant_types can only contain 'authorization_code', 'implicit', or 'refresh_token'"
+						"grant_types can only contain 'authorization_code' or 'refresh_token'"
 					)
 				);
 		});

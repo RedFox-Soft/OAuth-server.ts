@@ -431,14 +431,6 @@ describe('Client metadata validation', () => {
 			// misses authorization_code
 			response_types: ['id_token', 'code']
 		});
-		rejects(this.title, ['authorization_code'], undefined, {
-			// misses implicit
-			response_types: ['id_token']
-		});
-		rejects(this.title, ['authorization_code'], undefined, {
-			// misses implicit
-			response_types: ['token']
-		});
 	});
 
 	context('id_token_signed_response_alg', function () {
@@ -605,11 +597,6 @@ describe('Client metadata validation', () => {
 		rejects(this.title, ['no-dot-reverse-notation:/some'], undefined, {
 			application_type: 'web'
 		});
-		rejects(this.title, ['https://localhost'], undefined, {
-			application_type: 'web',
-			grant_types: ['implicit', 'authorization_code'],
-			response_types: ['code id_token']
-		});
 		allows(this.title, ['http://localhost'], {
 			application_type: 'web'
 		});
@@ -618,55 +605,6 @@ describe('Client metadata validation', () => {
 		});
 		rejects(this.title, ['not-a-uri'], undefined, {
 			application_type: 'native'
-		});
-		rejects(this.title, ['http://foo/bar'], undefined, {
-			application_type: 'web',
-			grant_types: ['implicit'],
-			response_types: ['id_token']
-		});
-		it('has an schema invalidation hook for forcing https on implicit', async () => {
-			const sandbox = sinon.createSandbox();
-			sandbox.spy(DefaultProvider.Client.Schema.prototype, 'invalidate');
-			await register({
-				grant_types: ['implicit'],
-				response_types: ['id_token'],
-				redirect_uris: ['http://foo/bar']
-			})
-				.then(
-					() => {
-						assert(false);
-					},
-					() => {
-						const spy = DefaultProvider.Client.Schema.prototype.invalidate;
-						expect(spy).to.have.property('calledOnce', true);
-						const call = spy.getCall(0);
-						const [, code] = call.args;
-						expect(code).to.eql('implicit-force-https');
-					}
-				)
-				.finally(() => {
-					sandbox.restore();
-				});
-		});
-		it('has an schema invalidation hook for preventing localhost', async () => {
-			const sandbox = sinon.createSandbox();
-			sandbox.spy(DefaultProvider.Client.Schema.prototype, 'invalidate');
-			await register({
-				grant_types: ['implicit'],
-				response_types: ['id_token'],
-				redirect_uris: ['https://localhost']
-			}).then(
-				() => {
-					assert(false);
-				},
-				() => {
-					const spy = DefaultProvider.Client.Schema.prototype.invalidate;
-					expect(spy).to.have.property('calledOnce', true);
-					const call = spy.getCall(0);
-					const [, code] = call.args;
-					expect(code).to.eql('implicit-forbid-localhost');
-				}
-			);
 		});
 	});
 
@@ -708,11 +646,6 @@ describe('Client metadata validation', () => {
 		});
 		rejects(this.title, ['not-a-uri'], undefined, {
 			application_type: 'native'
-		});
-		rejects(this.title, ['http://foo/bar'], undefined, {
-			application_type: 'web',
-			grant_types: ['implicit'],
-			response_types: ['id_token']
 		});
 	});
 
@@ -2223,9 +2156,9 @@ describe('Client metadata validation', () => {
 					}
 				}
 			);
-			defaultsTo('response_types', ['code id_token'], undefined, {
+			defaultsTo('response_types', ['code'], undefined, {
 				clientDefaults: {
-					response_types: ['code id_token'],
+					response_types: ['code'],
 					grant_types: ['authorization_code', 'implicit']
 				}
 			});

@@ -34,7 +34,7 @@ export default () => ({
 			zoneinfo: null
 		}
 	},
-	responseTypes: ['code', 'id_token', 'none'],
+	responseTypes: ['code', 'none'],
 	features: {},
 	enabledJWA: cloneDeep({ ...JWA })
 });

@@ -1,5 +1,4 @@
 import { parse as parseUrl } from 'node:url';
-import { randomBytes } from 'node:crypto';
 
 import { createSandbox } from 'sinon';
 import { expect } from 'chai';
@@ -50,23 +49,16 @@ describe('logout endpoint', () => {
 		});
 		afterEach(sinon.restore);
 
-		beforeEach(function () {
-			return this.agent
-				.get('/auth')
-				.query({
-					client_id: 'client',
-					scope: 'openid',
-					nonce: randomBytes(16).toString('base64url'),
-					response_type: 'id_token',
-					redirect_uri: 'https://client.example.com/cb'
-				})
-				.expect(303)
-				.expect((response) => {
-					const {
-						query: { id_token: idToken }
-					} = parseUrl(response.headers.location.replace('#', '?'), true);
-					this.idToken = idToken;
-				});
+		beforeEach(async function () {
+			const auth = new this.AuthorizationRequest({
+				client_id: 'client',
+				scope: 'openid',
+				response_type: 'code',
+				redirect_uri: 'https://client.example.com/cb'
+			});
+
+			const response = await this.getToken(auth);
+			this.idToken = response.body.id_token;
 		});
 
 		['get', 'post'].forEach((verb) => {
@@ -229,26 +221,15 @@ describe('logout endpoint', () => {
 						it('rejects HMAC hints if the secret is expired', async function () {
 							const client = await this.provider.Client.find('client-hmac');
 
-							let idToken;
+							const auth = new this.AuthorizationRequest({
+								client_id: 'client-hmac',
+								scope: 'openid',
+								response_type: 'code',
+								redirect_uri: 'https://client.example.com/cb'
+							});
 
-							await this.agent
-								.get('/auth')
-								.query({
-									client_id: 'client-hmac',
-									scope: 'openid',
-									nonce: randomBytes(16).toString('base64url'),
-									response_type: 'id_token',
-									redirect_uri: 'https://client.example.com/cb'
-								})
-								.expect(303)
-								.expect((response) => {
-									({
-										query: { id_token: idToken }
-									} = parseUrl(
-										response.headers.location.replace('#', '?'),
-										true
-									));
-								});
+							const response = await this.getToken(auth);
+							const idToken = response.body.id_token;
 
 							client.clientSecretExpiresAt = 1;
 

@@ -377,22 +377,22 @@ describe('encryption', () => {
 				client.idTokenEncryptedResponseAlg = 'ECDH-ES';
 
 				const auth = new this.AuthorizationRequest({
-					response_type: 'id_token',
+					response_type: 'code',
 					scope: 'openid'
 				});
 
-				return this.wrap({ route, verb, auth })
-					.expect(() => {
-						client.idTokenEncryptedResponseAlg = 'RSA-OAEP';
-					})
-					.expect((response) => {
-						const { query } = url.parse(response.headers.location, true);
-						expect(query).to.have.property('error', 'invalid_client_metadata');
-						expect(query).to.have.property(
-							'error_description',
-							'no suitable encryption key found (ECDH-ES)'
-						);
-					});
+				const response = await this.getToken(auth, { verb });
+
+				client.idTokenEncryptedResponseAlg = 'RSA-OAEP';
+
+				expect(response.body).to.have.property(
+					'error',
+					'invalid_client_metadata'
+				);
+				expect(response.body).to.have.property(
+					'error_description',
+					'no suitable encryption key found (ECDH-ES)'
+				);
 			});
 
 			describe('symmetric encryption', () => {

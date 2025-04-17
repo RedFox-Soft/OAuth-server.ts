@@ -309,14 +309,6 @@ export default function getSchema(provider) {
 				);
 			}
 
-			if (responseTypes.has('id_token')) {
-				if (!this.grant_types.includes('implicit')) {
-					this.invalidate(
-						"grant_types must contain 'implicit' when 'id_token' or 'token' are amongst response_types"
-					);
-				}
-			}
-
 			{
 				const { 0: pop, length } = [
 					'tls_client_certificate_bound_access_tokens',
@@ -610,22 +602,6 @@ export default function getSchema(provider) {
 					case 'web': {
 						if (!['https:', 'http:'].includes(protocol)) {
 							this.invalidate(`${label} must only contain web uris`);
-						}
-
-						if (this.grant_types.includes('implicit')) {
-							if (protocol === 'http:') {
-								this.invalidate(
-									`${label} for web clients using implicit flow MUST only register URLs using the https scheme`,
-									'implicit-force-https'
-								);
-							}
-
-							if (hostname === 'localhost') {
-								this.invalidate(
-									`${label} for web clients using implicit flow must not be using localhost`,
-									'implicit-forbid-localhost'
-								);
-							}
 						}
 						break;
 					}

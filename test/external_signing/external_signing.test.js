@@ -1,4 +1,4 @@
-import * as url from 'node:url';
+import { expect } from 'chai';
 
 import * as jose from 'jose';
 
@@ -7,8 +7,7 @@ import bootstrap, {
 	resetNetConnect
 } from '../test_helper.js';
 
-const route = '/auth';
-const response_type = 'id_token';
+const response_type = 'code';
 const scope = 'openid';
 
 describe('External Signing Keys', () => {
@@ -19,18 +18,15 @@ describe('External Signing Keys', () => {
 	});
 	after(resetNetConnect);
 
-	it('still signs with in-process JWKS', function () {
+	it('still signs with in-process JWKS', async function () {
 		const auth = new this.AuthorizationRequest({
 			client_id: 'client-sig-internal',
 			response_type,
 			scope
 		});
 
-		return this.wrap({ route, verb: 'get', auth })
-			.expect(303)
-			.expect(auth.validatePresence(['id_token', 'state']))
-			.expect(auth.validateState)
-			.expect(auth.validateClientLocation);
+		const response = await this.getToken(auth);
+		expect(response.body).to.have.property('id_token');
 	});
 
 	it('but signs with external keys too and verifies them local', async function () {
@@ -40,17 +36,9 @@ describe('External Signing Keys', () => {
 			scope
 		});
 
-		let id_token;
-		await this.wrap({ route, verb: 'get', auth })
-			.expect(303)
-			.expect(auth.validatePresence(['id_token', 'state']))
-			.expect(auth.validateState)
-			.expect(auth.validateClientLocation)
-			.expect((response) => {
-				({
-					query: { id_token }
-				} = url.parse(response.headers.location.replace('#', '?'), true));
-			});
+		let response = await this.getToken(auth);
+		expect(response.body).to.have.property('id_token');
+		let id_token = response.body.id_token;
 
 		await jose.compactVerify(
 			id_token,
@@ -60,15 +48,8 @@ describe('External Signing Keys', () => {
 		);
 
 		auth.id_token_hint = id_token;
-		await this.wrap({ route, verb: 'get', auth })
-			.expect(303)
-			.expect(auth.validatePresence(['id_token', 'state']))
-			.expect(auth.validateState)
-			.expect(auth.validateClientLocation)
-			.expect((response) => {
-				({
-					query: { id_token }
-				} = url.parse(response.headers.location.replace('#', '?'), true));
-			});
+
+		response = await this.getToken(auth);
+		expect(response.body).to.have.property('id_token');
 	});
 });

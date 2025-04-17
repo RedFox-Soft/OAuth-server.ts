@@ -2194,7 +2194,7 @@ function makeDefaults() {
 		 * ]
 		 * ```
 		 */
-		responseTypes: ['code id_token', 'code', 'id_token', 'none'],
+		responseTypes: ['code', 'id_token', 'none'],
 
 		/*
 		 * routes

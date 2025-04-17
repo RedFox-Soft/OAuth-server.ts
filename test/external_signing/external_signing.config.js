@@ -41,16 +41,16 @@ export default {
 		{
 			client_id: 'client-sig-external',
 			token_endpoint_auth_method: 'none',
-			grant_types: ['implicit'],
-			response_types: ['id_token'],
+			grant_types: ['authorization_code'],
+			response_types: ['code'],
 			redirect_uris: ['https://client.example.com/cb'],
 			id_token_signed_response_alg: 'ES256'
 		},
 		{
 			client_id: 'client-sig-internal',
 			token_endpoint_auth_method: 'none',
-			grant_types: ['implicit'],
-			response_types: ['id_token'],
+			grant_types: ['authorization_code'],
+			response_types: ['code'],
 			redirect_uris: ['https://client.example.com/cb'],
 			id_token_signed_response_alg: 'RS256'
 		}

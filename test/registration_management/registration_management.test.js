@@ -173,8 +173,8 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 		it('provides a secret if suddently needed', async function () {
 			const client = await setup.call(this, {
 				token_endpoint_auth_method: 'none',
-				response_types: ['id_token'],
-				grant_types: ['implicit']
+				response_types: ['code'],
+				grant_types: ['authorization_code']
 			});
 			expect(client).not.to.have.property('client_secret');
 			return this.agent
