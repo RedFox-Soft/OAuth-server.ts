@@ -309,7 +309,7 @@ export default function getSchema(provider) {
 				);
 			}
 
-			if (responseTypes.has('token') || responseTypes.has('id_token')) {
+			if (responseTypes.has('id_token')) {
 				if (!this.grant_types.includes('implicit')) {
 					this.invalidate(
 						"grant_types must contain 'implicit' when 'id_token' or 'token' are amongst response_types"

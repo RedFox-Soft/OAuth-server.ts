@@ -132,40 +132,6 @@ describe('PKCE RFC7636', () => {
 				);
 		});
 
-		it('forces public clients using hybrid flow to use pkce', function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'code id_token',
-				scope: 'openid',
-				code_challenge: undefined,
-				code_challenge_method: undefined
-			});
-
-			return this.agent
-				.get('/auth')
-				.query(auth)
-				.expect(auth.validatePresence(['error', 'error_description', 'state']))
-				.expect(auth.validateError('invalid_request'))
-				.expect(
-					auth.validateErrorDescription(
-						'Authorization Server policy requires PKCE to be used for this request'
-					)
-				);
-		});
-
-		passInteractionChecks('native_client_prompt', () => {
-			it('is not in effect for implicit flows', function () {
-				const auth = new this.AuthorizationRequest({
-					response_type: 'id_token',
-					scope: 'openid'
-				});
-
-				return this.agent
-					.get('/auth')
-					.query(auth)
-					.expect(auth.validatePresence(['id_token', 'state']));
-			});
-		});
-
 		it('stores codeChallenge and codeChallengeMethod in the code', function () {
 			const auth = new this.AuthorizationRequest({
 				response_type: 'code',

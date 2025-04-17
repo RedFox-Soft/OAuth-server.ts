@@ -24,7 +24,7 @@ describe('configuration conformIdTokenClaims=true', () => {
 
 	skipConsent();
 
-	['code id_token', 'code', 'id_token'].forEach((response_type) => {
+	['code'].forEach((response_type) => {
 		describe(`response_type=${response_type}`, () => {
 			before(async function () {
 				const client = await this.provider.Client.find('client');
@@ -109,46 +109,28 @@ describe('configuration conformIdTokenClaims=true', () => {
 				}
 			});
 
-			if (response_type === 'id_token') {
-				it('authorization endpoint id_token has scope requested claims', function () {
-					const { payload } = decodeJWT(this.authorization.id_token);
-					expect(payload).to.contain.keys('gender', 'email');
-					expect(payload).not.to.contain.keys('email_verified');
-				});
-			} else if (response_type.includes('id_token')) {
-				it('authorization endpoint id_token does not have scope requested claims', function () {
-					const { payload } = decodeJWT(this.authorization.id_token);
-					expect(payload).to.contain.keys('gender', 'email');
-					expect(payload).not.to.contain.keys('email_verified');
-				});
-			}
+			it('userinfo has scope requested claims', function () {
+				expect(this.userinfo).to.contain.keys('email', 'gender');
+				expect(this.userinfo).not.to.contain.keys('email_verified');
+			});
 
-			if (response_type !== 'id_token') {
-				it('userinfo has scope requested claims', function () {
-					expect(this.userinfo).to.contain.keys('email', 'gender');
-					expect(this.userinfo).not.to.contain.keys('email_verified');
-				});
+			it('signed userinfo has scope requested claims', function () {
+				const { payload } = decodeJWT(this.userinfoSigned);
+				expect(payload).to.contain.keys('email', 'gender');
+				expect(payload).not.to.contain.keys('email_verified');
+			});
 
-				it('signed userinfo has scope requested claims', function () {
-					const { payload } = decodeJWT(this.userinfoSigned);
-					expect(payload).to.contain.keys('email', 'gender');
-					expect(payload).not.to.contain.keys('email_verified');
-				});
-			}
+			it('token endpoint id_token does not have scope requested claims', function () {
+				const { payload } = decodeJWT(this.token.id_token);
+				expect(payload).to.contain.keys('gender', 'email');
+				expect(payload).not.to.contain.keys('email_verified');
+			});
 
-			if (response_type.includes('code')) {
-				it('token endpoint id_token does not have scope requested claims', function () {
-					const { payload } = decodeJWT(this.token.id_token);
-					expect(payload).to.contain.keys('gender', 'email');
-					expect(payload).not.to.contain.keys('email_verified');
-				});
-
-				it('refreshed id_token does not have scope requested claims', function () {
-					const { payload } = decodeJWT(this.refresh.id_token);
-					expect(payload).to.contain.keys('gender', 'email');
-					expect(payload).not.to.contain.keys('email_verified');
-				});
-			}
+			it('refreshed id_token does not have scope requested claims', function () {
+				const { payload } = decodeJWT(this.refresh.id_token);
+				expect(payload).to.contain.keys('gender', 'email');
+				expect(payload).not.to.contain.keys('email_verified');
+			});
 		});
 	});
 });

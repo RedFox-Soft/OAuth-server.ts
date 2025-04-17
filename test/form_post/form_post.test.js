@@ -21,7 +21,7 @@ describe('/auth', () => {
 
 				it('responds by rendering a self-submitting form with the response', function () {
 					const auth = new this.AuthorizationRequest({
-						response_type: 'code id_token',
+						response_type: 'code',
 						response_mode: 'form_post',
 						scope: 'openid'
 					});
@@ -41,7 +41,7 @@ describe('/auth', () => {
 
 				it('sanitizes the action attribute', function () {
 					const auth = new this.AuthorizationRequest({
-						response_type: 'code id_token',
+						response_type: 'code',
 						response_mode: 'form_post',
 						scope: 'openid',
 						redirect_uri:

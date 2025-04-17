@@ -140,38 +140,37 @@ describe('Back-Channel Logout 1.0', () => {
 		});
 
 		skipConsent();
+		let auth;
 
-		beforeEach(function () {
-			const code_verifier = crypto.randomBytes(32).toString('base64url');
-			this.code_verifier = code_verifier;
+		beforeEach(async function () {
+			auth = new this.AuthorizationRequest({
+				client_id: 'client',
+				scope: 'openid offline_access',
+				prompt: 'consent',
+				response_type: 'code',
+				redirect_uri: 'https://client.example.com/cb'
+			});
+			this.code_verifier = auth.code_verifier;
 
-			return this.agent
-				.get('/auth')
-				.query({
-					client_id: 'client',
-					scope: 'openid offline_access',
-					prompt: 'consent',
-					nonce: crypto.randomBytes(16).toString('base64url'),
-					response_type: 'code id_token',
-					redirect_uri: 'https://client.example.com/cb',
-					code_challenge_method: 'S256',
-					code_challenge: crypto.hash('sha256', code_verifier, 'base64url')
-				})
+			await this.wrap({ route: '/auth', verb: 'get', auth })
 				.expect(303)
 				.expect((response) => {
-					const { query } = parseUrl(
-						response.headers.location.replace('#', '?'),
-						true
-					);
+					const { query } = parseUrl(response.headers.location, true);
 					expect(query).to.have.property('code');
-					expect(query).to.have.property('id_token');
-					this.idToken = query.id_token;
 					this.code = query.code;
 				});
+
+			return;
 		});
 
-		it('makes sid available in id_token issued by authorization endpoint', function () {
-			const payload = JSON.parse(base64url.decode(this.idToken.split('.')[1]));
+		it('makes sid available in id_token issued by authorization endpoint', async function () {
+			let idToken;
+			await auth.getToken(this.code).expect((response) => {
+				expect(response.body).to.have.property('id_token');
+				idToken = response.body.id_token;
+			});
+
+			const payload = JSON.parse(base64url.decode(idToken.split('.')[1]));
 			expect(payload).to.have.property('sid').that.is.a('string');
 		});
 

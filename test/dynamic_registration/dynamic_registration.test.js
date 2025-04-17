@@ -366,7 +366,7 @@ describe('registration features', () => {
 					this.failWith(
 						400,
 						'invalid_client_metadata',
-						"grant_types can only contain 'implicit', 'authorization_code', or 'refresh_token'"
+						"grant_types can only contain 'authorization_code', 'implicit', or 'refresh_token'"
 					)
 				);
 		});
