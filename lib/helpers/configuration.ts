@@ -499,14 +499,12 @@ class Configuration {
 		Object.entries(this.ttl).forEach(([key, value]) => {
 			let valid = false;
 			switch (typeof value) {
-				case 'function':
-					if (
-						value.constructor.toString() ===
-						'function Function() { [native code] }'
-					) {
+				case 'function': {
+					if (value.constructor.toString().includes('[native code]')) {
 						valid = true;
 					}
 					break;
+				}
 				case 'number':
 					if (Number.isSafeInteger(value) && value > 0) {
 						valid = true;

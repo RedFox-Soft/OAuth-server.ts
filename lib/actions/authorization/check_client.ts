@@ -4,7 +4,7 @@ import { InvalidClient } from '../../helpers/errors.ts';
 /*
  * Checks client_id
  */
-export default async function checkClient(ctx, next) {
+export default async function checkClient(ctx) {
 	presence(ctx, 'client_id');
 
 	const client = await ctx.oidc.provider.Client.find(ctx.oidc.params.client_id);
@@ -16,6 +16,4 @@ export default async function checkClient(ctx, next) {
 	}
 
 	ctx.oidc.entity('Client', client);
-
-	return next();
 }

@@ -134,7 +134,7 @@ export default function authorizationAction(provider, endpoint) {
 		allowList.add('dpop_jkt');
 	}
 
-	const stack = [];
+	const stack = [noCache];
 
 	const use = (middleware, ...only) => {
 		if (only.includes(endpoint)) {
@@ -146,8 +146,6 @@ export default function authorizationAction(provider, endpoint) {
 		? 'device_resume'
 		: 'resume';
 
-	/* eslint-disable no-multi-spaces, space-in-parens, function-paren-newline */
-	use(noCache, A, DA, R, CV, DR, PAR, BA);
 	use(sessionMiddleware, A, R, DR);
 	use(deviceUserFlowErrors, CV, DR);
 	use(getResume.bind(undefined, allowList, returnTo), R, DR);
@@ -212,7 +210,6 @@ export default function authorizationAction(provider, endpoint) {
 	use(deviceUserFlowResponse, CV, DR);
 	use(pushedAuthorizationRequestResponse, PAR);
 	use(backchannelRequestResponse, BA);
-	/* eslint-enable no-multi-spaces, space-in-parens, function-paren-newline */
 
 	return stack;
 }

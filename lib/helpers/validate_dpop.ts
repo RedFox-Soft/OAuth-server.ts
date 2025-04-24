@@ -23,7 +23,7 @@ export default async (ctx, accessToken) => {
 		return undefined;
 	}
 
-	const proof = ctx.get('DPoP');
+	const proof = ctx.headers['DPoP'];
 
 	if (!proof) {
 		return undefined;

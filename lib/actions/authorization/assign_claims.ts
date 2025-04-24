@@ -7,7 +7,7 @@ import instance from '../../helpers/weak_cache.ts';
  *
  * Merges requested claims with acr as requested if acr_values is provided
  */
-export default function assignClaims(ctx, next) {
+export default function assignClaims(ctx) {
 	const { params } = ctx.oidc;
 
 	if (
@@ -32,6 +32,4 @@ export default function assignClaims(ctx, next) {
 			id_token: { acr: { values: acrValues.split(' ') } }
 		});
 	}
-
-	return next();
 }

@@ -1,10 +1,10 @@
-import instance from '../../helpers/weak_cache.ts';
+import { globalConfiguration } from '../../globalConfiguration.ts';
 
 /*
  * Load or establish a new Grant object when the user is known.
  */
-export default async function loadGrant(ctx, next) {
-	const { loadExistingGrant } = instance(ctx.oidc.provider).configuration;
+export default async function loadGrant(ctx) {
+	const { loadExistingGrant } = globalConfiguration;
 	if (ctx.oidc.account) {
 		let grant = await loadExistingGrant(ctx);
 		if (grant) {
@@ -24,6 +24,4 @@ export default async function loadGrant(ctx, next) {
 		}
 		ctx.oidc.entity('Grant', grant);
 	}
-
-	return next();
 }

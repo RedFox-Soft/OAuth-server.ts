@@ -892,7 +892,7 @@ function makeDefaults() {
 			 */
 			long: {
 				httpOnly: true, // cookies are not readable by client-side javascript
-				sameSite: 'none'
+				sameSite: 'lax'
 			},
 
 			/*

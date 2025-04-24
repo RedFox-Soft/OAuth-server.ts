@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 
 import { InvalidGrant, InvalidRequest } from './errors.ts';
 import constantEquals from './constant_equals.ts';
+import { AuthorizationParameters } from '../consts/param_list.ts';
 
 function verifyPKCECode(input: string, param: string) {
 	if (input.length < 43 || input.length > 128) {
@@ -15,8 +16,12 @@ function verifyPKCECode(input: string, param: string) {
 	}
 }
 
-export function authorizationPKCE(params: Record<string, string>) {
-	if (!params.response_type.includes('code')) {
+export function authorizationPKCE(params: {
+	code_challenge?: string | undefined;
+	code_challenge_method?: string | undefined;
+	response_type: string;
+}) {
+	if (params.response_type !== 'code') {
 		return;
 	}
 

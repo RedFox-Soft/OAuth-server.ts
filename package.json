@@ -3,13 +3,14 @@
 	"type": "module",
 	"scripts": {
 		"format": "eslint lib example certification test docs --fix",
-		"test": "node --experimental-strip-types ./test/run.js",
+		"test": "bun test $(fd .test.ts test)",
 		"test-ci": "node ./test/ci --experimental-strip-types"
 	},
 	"dependencies": {
 		"@koa/cors": "^5.0.0",
 		"@koa/router": "^13.1.0",
 		"debug": "^4.4.0",
+		"elysia": "^1.2.25",
 		"eta": "^3.5.0",
 		"jose": "^6.0.10",
 		"jsesc": "^3.1.0",
@@ -20,6 +21,7 @@
 		"raw-body": "^3.0.0"
 	},
 	"devDependencies": {
+		"@elysiajs/eden": "^1.2.0",
 		"@eslint/js": "^9.24.0",
 		"@fastify/middie": "^9.0.3",
 		"@hapi/hapi": "^21.4.0",

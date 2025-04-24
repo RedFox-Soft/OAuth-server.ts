@@ -4,17 +4,25 @@ import {
 	RequestUriNotSupported
 } from '../../helpers/errors.ts';
 import instance from '../../helpers/weak_cache.ts';
+import { globalConfiguration } from '../../globalConfiguration.ts';
 
 /*
  * Rejects request and request_uri parameters when not supported. Also rejects wmrm's relay mode.
  */
-export default function rejectUnsupported(ctx, next) {
+export default function rejectUnsupported(
+	params: {
+		request?: string;
+		request_uri?: string;
+		response_mode?: string;
+		web_message_uri?: string;
+	},
+	endpoint: string
+) {
 	const {
 		requestObjects,
 		pushedAuthorizationRequests,
 		webMessageResponseMode
-	} = instance(ctx.oidc.provider).features;
-	const { params } = ctx.oidc;
+	} = globalConfiguration.features;
 
 	if (params.request !== undefined && !requestObjects.enabled) {
 		throw new RequestNotSupported();
@@ -22,7 +30,7 @@ export default function rejectUnsupported(ctx, next) {
 
 	if (
 		params.request_uri !== undefined &&
-		(ctx.oidc.route !== 'authorization' || !pushedAuthorizationRequests.enabled)
+		(endpoint !== 'authorization' || !pushedAuthorizationRequests.enabled)
 	) {
 		throw new RequestUriNotSupported();
 	}
@@ -38,6 +46,4 @@ export default function rejectUnsupported(ctx, next) {
 		error.allow_redirect = false;
 		throw error;
 	}
-
-	return next();
 }

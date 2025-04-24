@@ -268,7 +268,7 @@ export default function getContext(provider) {
 				);
 			}
 
-			const dpop = acceptDPoP && dPoPConfig.enabled && ctx.get('DPoP');
+			const dpop = acceptDPoP && dPoPConfig.enabled && ctx.headers['DPoP'];
 
 			if (mechanism === 'header') {
 				const header = token;

@@ -1,10 +1,8 @@
-import merge from 'lodash/merge.js';
-
 import getConfig from '../default.config.js';
 
 const config = getConfig();
 
-merge(config.features, { deviceFlow: { enabled: true } });
+config.features.deviceFlow = { enabled: true };
 config.issueRefreshToken = (ctx, client) =>
 	client.grantTypeAllowed('refresh_token');
 

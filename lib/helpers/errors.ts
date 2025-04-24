@@ -6,6 +6,7 @@ import camelCase from './_/camel_case.ts';
 
 export class OIDCProviderError extends Error {
 	allow_redirect = true;
+	status = 400;
 
 	constructor(status: number, message: string) {
 		super(message);
@@ -125,7 +126,7 @@ function E(message, errorDescription) {
 	const klass = class extends OIDCProviderError {
 		error_description = errorDescription;
 
-		constructor(description, detail) {
+		constructor(description?: string, detail?: string) {
 			super(400, message);
 			Error.captureStackTrace(this, this.constructor);
 

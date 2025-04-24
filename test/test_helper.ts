@@ -4,21 +4,18 @@ import { parse, pathToFileURL } from 'node:url';
 import * as crypto from 'node:crypto';
 import * as path from 'node:path';
 import * as querystring from 'node:querystring';
-import { createServer } from 'node:http';
-import { once } from 'node:events';
 
 import { setGlobalDispatcher, MockAgent } from 'undici';
 import sinon from 'sinon';
 import { dirname } from 'desm';
 import flatten from 'lodash/flatten.js';
-import { Request } from 'superagent'; // eslint-disable-line import/no-extraneous-dependencies
-import { agent as supertest } from 'supertest';
+import { Request } from 'superagent';
 import { expect } from 'chai';
-import koaMount from 'koa-mount';
+import { afterAll } from 'bun:test';
+
 import base64url from 'base64url';
-import { CookieAccessInfo } from 'cookiejar'; // eslint-disable-line import/no-extraneous-dependencies
-import Express from 'express';
-import Koa from 'koa';
+import { CookieAccessInfo } from 'cookiejar';
+import { treaty } from '@elysiajs/eden';
 
 import nanoid from '../lib/helpers/nanoid.ts';
 import epochTime from '../lib/helpers/epoch_time.ts';
@@ -119,8 +116,6 @@ function readCookie(value) {
 	return parsed[key];
 }
 
-const { port } = globalThis.server.address();
-
 const jwt = (token) => JSON.parse(base64url.decode(token.split('.')[1])).jti;
 
 export default function testHelper(
@@ -133,14 +128,10 @@ export default function testHelper(
 	} = {}
 ) {
 	const dir = dirname(importMetaUrl);
-	// eslint-disable-next-line no-param-reassign
 	base ??= path.basename(dir);
-	const afterPromises = [];
 
-	after(async () => {
-		TestAdapter.clear();
-		globalThis.server.removeAllListeners('request');
-		await Promise.all(afterPromises.map((x) => x()));
+	afterAll(() => {
+		// TestAdapter.clear();
 	});
 
 	return async function () {
@@ -159,7 +150,7 @@ export default function testHelper(
 			config.findAccount = Account.findAccount;
 		}
 
-		const issuerIdentifier = `${protocol}//127.0.0.1:${port}`;
+		const issuerIdentifier = `${protocol}//127.0.0.1:3000`;
 
 		const provider = new Provider(issuerIdentifier, {
 			clients,
@@ -167,11 +158,7 @@ export default function testHelper(
 			adapter: TestAdapter,
 			...config
 		});
-
-		// eslint-disable-next-line prefer-arrow-callback
-		provider.middleware.push(async function neverInvoked(ctx) {
-			ctx.throw(500, 'this is never invoked');
-		});
+		globalThis.provider = provider;
 
 		let agent;
 		let lastSession;
@@ -257,17 +244,14 @@ export default function testHelper(
 			return Account.findAccount({}, accountId)
 				.then(session.save(ttl))
 				.then(() => {
-					agent._saveCookies.bind(agent)({
-						request: { url: provider.issuer },
-						headers: { 'set-cookie': cookies }
-					});
+					return cookies;
 				});
 		}
 
 		class AuthorizationRequest {
 			constructor(parameters = {}) {
 				if (parameters.claims && typeof parameters.claims !== 'string') {
-					parameters.claims = JSON.stringify(parameters.claims); // eslint-disable-line no-param-reassign
+					parameters.claims = JSON.stringify(parameters.claims);
 				}
 
 				Object.assign(this, parameters);
@@ -302,15 +286,15 @@ export default function testHelper(
 
 				Object.defineProperty(this, 'validateClientLocation', {
 					value: (response) => {
-						const actual = parse(response.headers.location, true);
+						const actual = parse(response.headers.get('location'), true);
 						let expected;
 						if (this.redirect_uri) {
-							expect(response.headers.location).to.match(
+							expect(response.headers.get('location')).to.match(
 								new RegExp(this.redirect_uri)
 							);
 							expected = parse(this.redirect_uri, true);
 						} else {
-							expect(response.headers.location).to.match(
+							expect(response.headers.get('location')).to.match(
 								new RegExp(c.redirect_uris[0])
 							);
 							expected = parse(c.redirect_uris[0], true);
@@ -326,7 +310,7 @@ export default function testHelper(
 					value: (response) => {
 						const {
 							query: { state }
-						} = parse(response.headers.location, true);
+						} = parse(response.headers.get('location'), true);
 						expect(state).to.equal(this.state);
 					}
 				});
@@ -335,7 +319,7 @@ export default function testHelper(
 					value: (response) => {
 						const {
 							query: { iss }
-						} = parse(response.headers.location, true);
+						} = parse(response.headers.get('location'), true);
 						expect(iss).to.equal(issuerIdentifier);
 					}
 				});
@@ -343,7 +327,7 @@ export default function testHelper(
 				Object.defineProperty(this, 'validateInteractionRedirect', {
 					value: (response) => {
 						const { hostname, search, query } = parse(
-							response.headers.location
+							response.headers.get('location')
 						);
 						expect(hostname).to.be.null;
 						expect(search).to.be.null;
@@ -400,6 +384,7 @@ export default function testHelper(
 		};
 
 		AuthorizationRequest.prototype.validatePresence = function (
+			response,
 			properties,
 			all
 		) {
@@ -410,7 +395,6 @@ export default function testHelper(
 				absolute = all;
 			}
 
-			// eslint-disable-next-line no-param-reassign
 			properties =
 				!absolute ||
 				properties.includes('id_token') ||
@@ -418,17 +402,15 @@ export default function testHelper(
 					? properties
 					: [...new Set(properties.concat('iss'))];
 
-			return (response) => {
-				const { query } = parse(response.headers.location, true);
-				if (absolute) {
-					expect(query).to.have.keys(properties);
-				} else {
-					expect(query).to.contain.keys(properties);
-				}
-				properties.forEach((key) => {
-					this.res[key] = query[key];
-				});
-			};
+			const { query } = parse(response.headers.get('location'), true);
+			if (absolute) {
+				expect(query).to.have.keys(properties);
+			} else {
+				expect(query).to.contain.keys(properties);
+			}
+			properties.forEach((key) => {
+				this.res[key] = query[key];
+			});
 		};
 
 		AuthorizationRequest.prototype.validateResponseParameter = function (
@@ -461,7 +443,7 @@ export default function testHelper(
 			return this.validateResponseParameter('error_description', expected);
 		};
 
-		AuthorizationRequest.prototype.getToken = function (
+		AuthorizationRequest.prototype.getToken = async function (
 			code,
 			{ skipCheck } = {}
 		) {
@@ -474,7 +456,15 @@ export default function testHelper(
 				};
 			}
 
-			const res = wrap({
+			return await agent.token.post({
+				client_id: this.client_id,
+				code,
+				grant_type: 'authorization_code',
+				code_verifier: this.code_verifier,
+				redirect_uri: this.redirect_uri
+			});
+
+			/*const res = wrap({
 				route: '/token',
 				verb: 'post',
 				params: {
@@ -489,7 +479,7 @@ export default function testHelper(
 			if (!skipCheck) {
 				return res;
 			}
-			return res.expect(200);
+			return res.expect(200);*/
 		};
 
 		async function getToken(auth, options = {}) {
@@ -624,7 +614,29 @@ export default function testHelper(
 			};
 		}
 
-		Object.assign(this, {
+		agent = treaty(provider.elysia);
+
+		if (mountTo !== '/') {
+			['get', 'post', 'put', 'del', 'options', 'trace'].forEach((method) => {
+				const orig = agent[method];
+				agent[method] = function (route, ...args) {
+					if (route.startsWith(mountTo)) {
+						return orig.call(this, route, ...args);
+					}
+					return orig.call(this, `${mountTo}${route}`, ...args);
+				};
+			});
+		}
+
+		/*this.suitePath = (unprefixed) => {
+			if (mountTo === '/') {
+				return unprefixed;
+			}
+
+			return `${mountTo}${unprefixed}`;
+		};*/
+
+		return {
 			assertOnce,
 			AuthorizationRequest,
 			failWith,
@@ -639,101 +651,9 @@ export default function testHelper(
 			provider,
 			TestAdapter,
 			wrap,
-			fetchAgent
-		});
-
-		switch (mountVia) {
-			case 'koa': {
-				const app = new Koa();
-				app.use(koaMount(mountTo, provider));
-				globalThis.server.on('request', app.callback());
-				this.app = app;
-				break;
-			}
-			case 'express': {
-				const app = new Express();
-				app.use(mountTo, provider.callback());
-				globalThis.server.on('request', app);
-				break;
-			}
-			case 'fastify': {
-				const { default: Fastify } = await import('fastify');
-				const { default: middie } = await import('@fastify/middie');
-				const app = new Fastify();
-				await app.register(middie);
-				app.use(mountTo, provider.callback());
-				await new Promise((resolve) => {
-					globalThis.server.close(resolve);
-				});
-				await app.listen({ port, host: '::' });
-				globalThis.server = app.server;
-				afterPromises.push(async () => {
-					await app.close();
-					globalThis.server = createServer().listen(port, '::');
-					await once(globalThis.server, 'listening');
-				});
-				break;
-			}
-			case 'hapi': {
-				const { default: Hapi } = await import('@hapi/hapi');
-				const app = new Hapi.Server({ port });
-				const callback = provider.callback();
-				app.route({
-					path: `${mountTo}/{any*}`,
-					method: '*',
-					config: { payload: { output: 'stream', parse: false } },
-					async handler({ raw: { req, res } }, h) {
-						req.originalUrl = req.url;
-						req.url = req.url.replace(mountTo, '');
-
-						callback(req, res);
-						await once(res, 'finish');
-
-						req.url = req.url.replace('/', mountTo);
-						delete req.originalUrl;
-
-						return res.writableEnded ? h.abandon : h.continue;
-					}
-				});
-				await new Promise((resolve) => {
-					globalThis.server.close(resolve);
-				});
-				await app.start();
-				globalThis.server = app.listener;
-				afterPromises.push(async () => {
-					await app.stop();
-					globalThis.server = createServer().listen(port, '::');
-					await once(globalThis.server, 'listening');
-				});
-				break;
-			}
-			default:
-				globalThis.server.on('request', provider.callback());
-		}
-
-		agent = supertest(globalThis.server);
-
-		if (mountTo !== '/') {
-			['get', 'post', 'put', 'del', 'options', 'trace'].forEach((method) => {
-				const orig = agent[method];
-				agent[method] = function (route, ...args) {
-					if (route.startsWith(mountTo)) {
-						return orig.call(this, route, ...args);
-					}
-					return orig.call(this, `${mountTo}${route}`, ...args);
-				};
-			});
-		}
-
-		this.suitePath = (unprefixed) => {
-			if (mountTo === '/') {
-				return unprefixed;
-			}
-
-			return `${mountTo}${unprefixed}`;
+			fetchAgent,
+			agent
 		};
-
-		this.agent = agent;
 	};
 }
 

@@ -34,7 +34,6 @@ export default () => ({
 			zoneinfo: null
 		}
 	},
-	responseTypes: ['code', 'none'],
 	features: {},
-	enabledJWA: cloneDeep({ ...JWA })
+	enabledJWA: structuredClone({ ...JWA })
 });

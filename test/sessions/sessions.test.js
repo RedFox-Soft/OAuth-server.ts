@@ -13,9 +13,7 @@ describe('session exp handling', () => {
 	before(bootstrap(import.meta.url));
 
 	afterEach(function () {
-		try {
-			this.TestAdapter.for('Session').destroy.restore();
-		} catch (err) {}
+		sinon.restore();
 	});
 	afterEach(function () {
 		return this.logout();

@@ -1,6 +1,6 @@
-import instance from '../helpers/weak_cache.ts';
+import { globalConfiguration } from '../globalConfiguration.ts';
 
-export default async function sessionHandler(ctx, next) {
+export default async function sessionHandler(ctx) {
 	ctx.oidc.session = new Proxy(await ctx.oidc.provider.Session.get(ctx), {
 		set(obj, prop, value) {
 			switch (prop) {
@@ -37,50 +37,29 @@ export default async function sessionHandler(ctx, next) {
 		}
 	});
 
-	try {
-		await next();
-	} finally {
+	return async function setCookies() {
 		const sessionCookieName = ctx.oidc.provider.cookieName('session');
-		const longRegExp = new RegExp(`^${sessionCookieName}(?:\\.sig)?=`);
+		const session = ctx.cookie[sessionCookieName];
 
 		// refresh the session duration
 		if (
 			(!ctx.oidc.session.new || ctx.oidc.session.touched) &&
 			!ctx.oidc.session.destroyed
 		) {
-			let ttl = instance(ctx.oidc.provider).configuration.ttl.Session;
+			let ttl = globalConfiguration.ttl.Session;
 
 			if (typeof ttl === 'function') {
 				ttl = ttl(ctx, ctx.oidc.session);
 			}
 
-			ctx.oidc.cookies.set(
-				sessionCookieName,
-				ctx.oidc.session.id,
-				instance(ctx.oidc.provider).configuration.cookies.long
-			);
+			session.value = ctx.oidc.session.id;
 			await ctx.oidc.session.save(ttl);
 		}
 
-		let setCookie;
-		// eslint-disable-next-line no-cond-assign
-		if ((setCookie = ctx.response.get('set-cookie'))) {
-			if (typeof setCookie === 'string') {
-				setCookie = [setCookie];
-			}
-			setCookie.forEach((cookie, index, ary) => {
-				/* eslint-disable no-param-reassign */
-				if (
-					!cookie.includes('expires=Thu, 01 Jan 1970') &&
-					cookie.match(longRegExp) &&
-					!ctx.oidc.session.transient &&
-					ctx.oidc.session.exp
-				) {
-					ary[index] +=
-						`; expires=${new Date(ctx.oidc.session.exp * 1000).toUTCString()}`;
-				}
-				/* eslint-enable */
+		if (session) {
+			session?.set({
+				expires: new Date(ctx.oidc.session.exp * 1000)
 			});
 		}
-	}
+	};
 }

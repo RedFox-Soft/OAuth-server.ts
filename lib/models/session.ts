@@ -3,6 +3,7 @@
 import nanoid from '../helpers/nanoid.ts';
 import epochTime from '../helpers/epoch_time.ts';
 import instance from '../helpers/weak_cache.ts';
+import { globalConfiguration } from '../globalConfiguration.ts';
 
 import hasFormat from './mixins/has_format.ts';
 
@@ -57,16 +58,10 @@ export default (provider) =>
 		}
 
 		static async get(ctx) {
-			const cookies = ctx.oidc
-				? ctx.oidc.cookies
-				: provider.createContext(ctx.req, ctx.res).cookies;
-			cookies.secure = !cookies.secure && ctx.secure ? true : cookies.secure;
+			const cookieName = globalConfiguration.cookies.names.session;
 
 			// is there supposed to be a session bound? generate if not
-			const cookieSessionId = cookies.get(
-				provider.cookieName('session'),
-				instance(provider).configuration.cookies.long
-			);
+			const cookieSessionId = ctx.cookie[cookieName]?.value;
 
 			let session;
 

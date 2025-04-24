@@ -1,4 +1,5 @@
 import { strict as assert } from 'node:assert';
+import Elysia from 'elysia';
 
 import Router from '@koa/router';
 
@@ -23,11 +24,41 @@ import {
 
 import als from './als.ts';
 import instance from './weak_cache.ts';
+import { authorizationAction } from '../actions/authorization/authorization.ts';
+import { nocache } from '../shared/no_cache.ts';
+import { tokenAction } from '../actions/token.ts';
 
 const discoveryRoute = '/.well-known/openid-configuration';
 
 export default function initializeApp() {
 	const { configuration, features } = instance(this);
+
+	['query', 'fragment', 'form_post'].forEach((mode) => {
+		this.registerResponseMode(mode, responseModes[mode]);
+	});
+
+	Object.entries(grants).forEach(([grantType, { handler, parameters }]) => {
+		const { grantTypeHandlers } = instance(this);
+		if (
+			configuration.grantTypes.has(grantType) &&
+			!grantTypeHandlers.has(grantType)
+		) {
+			let dupes;
+			if (features.resourceIndicators.enabled) {
+				parameters.add('resource');
+				dupes = new Set(['resource']);
+			}
+			if (features.richAuthorizationRequests.enabled) {
+				parameters.add('authorization_details');
+			}
+			this.registerGrantType(grantType, handler, parameters, dupes);
+		}
+	});
+
+	return new Elysia({ strictPath: true })
+		.use(nocache)
+		.use(authorizationAction)
+		.use(tokenAction);
 
 	const CORS_AUTHORIZATION = {
 		exposeHeaders: ['WWW-Authenticate'],
@@ -75,7 +106,7 @@ export default function initializeApp() {
 			typeof route === 'string' && route.charAt(0) === '/',
 			`invalid route ${route}`
 		);
-		route = route.replace(/\/\//g, '/'); // eslint-disable-line no-param-reassign
+		route = route.replace(/\/\//g, '/');
 		stack.forEach(
 			(middleware) => assert.equal(typeof middleware, 'function'),
 			'invalid middleware'
@@ -94,49 +125,27 @@ export default function initializeApp() {
 	}
 
 	const get = (name, route, ...stack) => {
-		route = normalizeRoute(name, route, ...stack); // eslint-disable-line no-param-reassign
+		route = normalizeRoute(name, route, ...stack);
 		router.get(name, route, ensureOIDC, ensureSessionSave, ...stack);
 	};
 	const post = (name, route, ...stack) => {
-		route = normalizeRoute(name, route, ...stack); // eslint-disable-line no-param-reassign
+		route = normalizeRoute(name, route, ...stack);
 		router.post(name, route, ensureOIDC, ensureSessionSave, ...stack);
 	};
 	const del = (name, route, ...stack) => {
-		route = normalizeRoute(name, route, ...stack); // eslint-disable-line no-param-reassign
+		route = normalizeRoute(name, route, ...stack);
 		router.delete(name, route, ensureOIDC, ...stack);
 	};
 	const put = (name, route, ...stack) => {
-		route = normalizeRoute(name, route, ...stack); // eslint-disable-line no-param-reassign
+		route = normalizeRoute(name, route, ...stack);
 		router.put(name, route, ensureOIDC, ...stack);
 	};
 	const options = (name, route, ...stack) => {
-		route = normalizeRoute(name, route, ...stack); // eslint-disable-line no-param-reassign
+		route = normalizeRoute(name, route, ...stack);
 		router.options(name, route, ensureOIDC, ...stack);
 	};
 
 	const { routes } = configuration;
-
-	Object.entries(grants).forEach(([grantType, { handler, parameters }]) => {
-		const { grantTypeHandlers } = instance(this);
-		if (
-			configuration.grantTypes.has(grantType) &&
-			!grantTypeHandlers.has(grantType)
-		) {
-			let dupes;
-			if (features.resourceIndicators.enabled) {
-				parameters.add('resource');
-				dupes = new Set(['resource']);
-			}
-			if (features.richAuthorizationRequests.enabled) {
-				parameters.add('authorization_details');
-			}
-			this.registerGrantType(grantType, handler, parameters, dupes);
-		}
-	});
-
-	['query', 'fragment', 'form_post'].forEach((mode) => {
-		this.registerResponseMode(mode, responseModes[mode]);
-	});
 
 	if (features.webMessageResponseMode.enabled) {
 		this.registerResponseMode('web_message', responseModes.webMessage);

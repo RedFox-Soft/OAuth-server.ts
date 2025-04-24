@@ -3,7 +3,7 @@ import instance from '../../helpers/weak_cache.ts';
 /*
  * Loads the End-User's account referenced by the session.
  */
-export default async function loadAccount(ctx, next) {
+export default async function loadAccount(ctx) {
 	const { accountId } = ctx.oidc.session;
 
 	if (accountId) {
@@ -13,6 +13,4 @@ export default async function loadAccount(ctx, next) {
 		);
 		ctx.oidc.entity('Account', account);
 	}
-
-	return next();
 }

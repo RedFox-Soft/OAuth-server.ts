@@ -3,7 +3,7 @@ import { InvalidRequest } from '../../helpers/errors.ts';
 /*
  * Validates the max_age parameter and handles max_age=0 to prompt=login translation
  */
-export default function checkMaxAge(ctx, next) {
+export default function checkMaxAge(ctx) {
 	if (ctx.oidc.params.max_age !== undefined) {
 		const maxAge = +ctx.oidc.params.max_age;
 
@@ -20,6 +20,4 @@ export default function checkMaxAge(ctx, next) {
 			}
 		}
 	}
-
-	return next();
 }

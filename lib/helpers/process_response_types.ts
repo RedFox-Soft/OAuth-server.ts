@@ -1,11 +1,11 @@
-import instance from './weak_cache.ts';
 import combinedScope from './combined_scope.ts';
+import { globalConfiguration } from '../globalConfiguration.ts';
 
 async function codeHandler(ctx) {
 	const {
 		expiresWithSession,
 		features: { richAuthorizationRequests }
-	} = instance(ctx.oidc.provider).configuration;
+	} = globalConfiguration;
 
 	const { grant } = ctx.oidc;
 

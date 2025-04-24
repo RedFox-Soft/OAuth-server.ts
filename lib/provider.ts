@@ -1,5 +1,5 @@
 import { strict as assert } from 'node:assert';
-import * as util from 'node:util';
+import EventEmitter from 'node:events';
 
 import QuickLRU from 'quick-lru';
 import Koa from 'koa';
@@ -20,7 +20,7 @@ import * as models from './models/index.ts';
 import DPoPNonces from './helpers/dpop_nonces.ts';
 import als from './helpers/als.ts';
 
-export class Provider extends Koa {
+export class Provider extends EventEmitter {
 	#AccessToken;
 
 	#AuthorizationCode;
@@ -85,7 +85,6 @@ export class Provider extends Koa {
 			!hash && !href.endsWith('#'),
 			'Issuer Identifier must not have a fragment component'
 		);
-
 		super();
 
 		this.issuer = issuer;
@@ -123,8 +122,8 @@ export class Provider extends Koa {
 		inititalizeKeyStore.call(this, configuration.jwks);
 		delete configuration.jwks;
 
-		this.#exec = initializeApp.call(this);
-		Koa.prototype.use.call(this, this.#exec);
+		this.elysia = initializeApp.call(this);
+		/// Koa.prototype.use.call(this, this.#exec);
 
 		initializeClients.call(this, configuration.clients);
 		delete configuration.clients;

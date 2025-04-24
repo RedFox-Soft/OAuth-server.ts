@@ -18,9 +18,9 @@ const GATED = [
 /*
  * Validates that openid scope is requested when openid specific parameters are provided
  */
-export default function checkOpenIdScope(ctx, next) {
+export default function checkOpenIdScope(ctx) {
 	if (ctx.oidc.params.scope?.split(' ').includes('openid')) {
-		return next();
+		return;
 	}
 
 	GATED_CLIENT.forEach(([prop, msg]) => {
@@ -42,6 +42,4 @@ export default function checkOpenIdScope(ctx, next) {
 	if (ctx.oidc.route === 'backchannel_authentication') {
 		throw new InvalidRequest('openid scope must be requested for this request');
 	}
-
-	return next();
 }
