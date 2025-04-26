@@ -72,6 +72,12 @@ export default function getContext(provider) {
 		}
 
 		entity(key, value) {
+			if (!this.entities) {
+				console.log(this);
+				console.log(key, value);
+				console.log('entities', this.entities);
+				throw new Error('entities not initialized');
+			}
 			this.entities[key] = value;
 
 			if (key === 'Client') {

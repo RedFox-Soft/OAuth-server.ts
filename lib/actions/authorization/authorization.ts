@@ -87,7 +87,7 @@ export const authorizationAction = new Elysia().get(
 		loadPushedAuthorizationRequest;
 		processRequestObject.bind(undefined, allowList);
 		checkResponseMode;
-		oneRedirectUriClients;
+		oneRedirectUriClients(ctx);
 		oauthRequired;
 		rejectRegistration;
 		checkResponseType;
@@ -123,15 +123,6 @@ export const authorizationAction = new Elysia().get(
 				[cookieName]: t.Optional(t.String())
 			},
 			{ httpOnly: true, sameSite: 'lax', secure: true }
-		),
-		error({ error, set }) {
-			console.log('authorization error', error);
-			if (error instanceof OIDCProviderError) {
-				set.status = error.status;
-				console.log(error);
-				return error.error_description;
-			}
-			return error.message;
-		}
+		)
 	}
 );

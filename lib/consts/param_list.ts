@@ -2,7 +2,7 @@ import { t } from 'elysia';
 
 export const AuthorizationParameters = t.Object({
 	client_id: t.String(),
-	redirect_uri: t.String(),
+	redirect_uri: t.Optional(t.String()),
 	response_type: t.String(),
 
 	state: t.Optional(t.String()),

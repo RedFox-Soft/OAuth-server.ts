@@ -12,9 +12,9 @@ const grantTypeSet = new Set(['grant_type']);
 
 export const tokenAction = new Elysia().post(
 	globalConfiguration.routes.token,
-	async ({ body }) => {
+	async ({ body, headers }) => {
 		const ctx = {
-			headers: {}
+			headers
 		};
 		const provider = globalThis.provider;
 		const OIDCContext = provider.OIDCContext;
@@ -103,6 +103,9 @@ export const tokenAction = new Elysia().post(
 			grant_type: t.String(),
 			code_verifier: t.Optional(t.String()),
 			redirect_uri: t.Optional(t.String())
+		}),
+		headers: t.Object({
+			authorization: t.Optional(t.String())
 		})
 	}
 );

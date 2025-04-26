@@ -3,7 +3,7 @@
 	"type": "module",
 	"scripts": {
 		"format": "eslint lib example certification test docs --fix",
-		"test": "bun test $(fd .test.ts test)",
+		"test": "bun test $(fd .spec.ts test)",
 		"test-ci": "node ./test/ci --experimental-strip-types"
 	},
 	"dependencies": {

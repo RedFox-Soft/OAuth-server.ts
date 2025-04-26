@@ -27,10 +27,6 @@ describe('responds with a id_token containing auth_time', () => {
 		cookie = await setup.login();
 	});
 
-	afterAll(() => {
-		setup.TestAdapter.clear();
-	});
-
 	async function getIdToken(options = {}) {
 		const auth = new setup.AuthorizationRequest({
 			response_type: 'code',

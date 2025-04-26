@@ -11,7 +11,6 @@ import { dirname } from 'desm';
 import flatten from 'lodash/flatten.js';
 import { Request } from 'superagent';
 import { expect } from 'chai';
-import { afterAll } from 'bun:test';
 
 import base64url from 'base64url';
 import { CookieAccessInfo } from 'cookiejar';
@@ -130,10 +129,6 @@ export default function testHelper(
 	const dir = dirname(importMetaUrl);
 	base ??= path.basename(dir);
 
-	afterAll(() => {
-		// TestAdapter.clear();
-	});
-
 	return async function () {
 		const conf = pathToFileURL(
 			path.format({ dir, base: `${base}.config.js` })
@@ -151,6 +146,7 @@ export default function testHelper(
 		}
 
 		const issuerIdentifier = `${protocol}//127.0.0.1:3000`;
+		TestAdapter.clear();
 
 		const provider = new Provider(issuerIdentifier, {
 			clients,
@@ -443,43 +439,27 @@ export default function testHelper(
 			return this.validateResponseParameter('error_description', expected);
 		};
 
-		AuthorizationRequest.prototype.getToken = async function (
-			code,
-			{ skipCheck } = {}
-		) {
-			let authObj = {};
+		AuthorizationRequest.prototype.getToken = async function (code) {
+			let encodedCredentials = {};
 			const c = clients.find((cl) => cl.client_id === this.client_id);
 			if (c.token_endpoint_auth_method !== 'none') {
-				authObj = {
-					user: this.client_id,
-					secret: c.client_secret
+				encodedCredentials = {
+					Authorization: `Basic ${base64url.encode(`${this.client_id}:${c.client_secret}`)}`
 				};
 			}
 
-			return await agent.token.post({
-				client_id: this.client_id,
-				code,
-				grant_type: 'authorization_code',
-				code_verifier: this.code_verifier,
-				redirect_uri: this.redirect_uri
-			});
-
-			/*const res = wrap({
-				route: '/token',
-				verb: 'post',
-				params: {
-					client_id: this.client_id,
+			return await agent.token.post(
+				{
+					client_id: encodedCredentials ? this.client_id : undefined,
 					code,
-					grant_type: 'authorization_code',
+					grant_type: this.grant_type ?? 'authorization_code',
 					code_verifier: this.code_verifier,
 					redirect_uri: this.redirect_uri
 				},
-				...authObj
-			});
-			if (!skipCheck) {
-				return res;
-			}
-			return res.expect(200);*/
+				{
+					headers: encodedCredentials
+				}
+			);
 		};
 
 		async function getToken(auth, options = {}) {
@@ -509,7 +489,7 @@ export default function testHelper(
 		}
 
 		function getSession({ instantiate } = { instantiate: false }) {
-			const sessionId = getSessionId();
+			const sessionId = getLastSession().jti;
 			const raw = TestAdapter.for('Session').syncFind(sessionId);
 
 			if (instantiate) {
