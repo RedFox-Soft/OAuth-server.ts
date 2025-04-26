@@ -11,14 +11,6 @@ import {
 import { decodeJwt } from 'jose';
 import bootstrap from '../test_helper.ts';
 
-const { info, warn } = console;
-console.info = function (...args) {
-	if (!args[0].includes('NOTICE: ')) info.apply(this, args);
-};
-console.warn = function (...args) {
-	if (!args[0].includes('WARNING: ')) warn.apply(this, args);
-};
-
 describe('responds with a id_token containing auth_time', () => {
 	let setup = null;
 	let cookie = null;
@@ -29,13 +21,12 @@ describe('responds with a id_token containing auth_time', () => {
 
 	async function getIdToken(options = {}) {
 		const auth = new setup.AuthorizationRequest({
-			response_type: 'code',
 			scope: 'openid',
 			...options
 		});
 
-		const { response } = await setup.agent.auth.get({
-			query: auth,
+		const { response, error } = await setup.agent.auth.get({
+			query: auth.params,
 			headers: {
 				cookie
 			}

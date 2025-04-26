@@ -15,6 +15,7 @@ import timekeeper from 'timekeeper';
 
 import epochTime from '../../lib/helpers/epoch_time.ts';
 import bootstrap from '../test_helper.js';
+import e from 'express';
 
 const sinon = createSandbox();
 
@@ -50,11 +51,10 @@ describe('grant_type=authorization_code', () => {
 			auth = new setup.AuthorizationRequest({
 				client_id: 'client',
 				scope: 'openid',
-				response_type: 'code',
 				redirect_uri: 'https://client.example.com/cb'
 			});
-			const { response } = await setup.agent.auth.get({
-				query: auth,
+			const { response, error } = await setup.agent.auth.get({
+				query: auth.params,
 				headers: {
 					cookie
 				}
@@ -160,7 +160,7 @@ describe('grant_type=authorization_code', () => {
 			const { ttl } = i(setup.provider).configuration;
 			spyOn(ttl, 'AuthorizationCode').mockReturnValue(5);
 			const { response } = await setup.agent.auth.get({
-				query: auth,
+				query: auth.params,
 				headers: {
 					cookie: session
 				}
@@ -230,7 +230,7 @@ describe('grant_type=authorization_code', () => {
 			const spy = sinon.spy();
 			setup.provider.on('grant.error', spy);
 
-			auth.redirect_uri = 'https://client.example.com/cb?thensome';
+			auth.params.redirect_uri = 'https://client.example.com/cb?thensome';
 			const { error } = await auth.getToken(code);
 			expect(error.status).toBe(400);
 			expect(spy.calledOnce).toBe(true);
@@ -239,7 +239,7 @@ describe('grant_type=authorization_code', () => {
 		});
 
 		it('validates redirect_uri presence', async function () {
-			auth.redirect_uri = undefined;
+			auth.params.redirect_uri = undefined;
 
 			const { error } = await auth.getToken(code);
 			expect(error.status).toBe(400);
@@ -281,7 +281,7 @@ describe('grant_type=authorization_code', () => {
 				redirect_uri: 'https://client.example.com/cb3'
 			});
 			const { response } = await setup.agent.auth.get({
-				query: auth,
+				query: auth.params,
 				headers: {
 					cookie
 				}
@@ -296,7 +296,7 @@ describe('grant_type=authorization_code', () => {
 			const spy = sinon.spy();
 			setup.provider.on('grant.error', spy);
 
-			auth.redirect_uri = undefined;
+			auth.params.redirect_uri = undefined;
 			const { error } = await auth.getToken(code);
 			expect(error.status).toBe(400);
 			expect(spy.calledOnce).toBe(true);
@@ -332,7 +332,7 @@ describe('grant_type=authorization_code', () => {
 			});
 			delete auth.redirect_uri;
 			const { response } = await setup.agent.auth.get({
-				query: auth,
+				query: auth.params,
 				headers: {
 					cookie
 				}
@@ -430,7 +430,7 @@ describe('grant_type=authorization_code', () => {
 			const { ttl } = i(setup.provider).configuration;
 			spyOn(ttl, 'AuthorizationCode').mockReturnValue(5);
 			const { response } = await setup.agent.auth.get({
-				query: auth,
+				query: auth.params,
 				headers: {
 					cookie: session
 				}
@@ -499,7 +499,7 @@ describe('grant_type=authorization_code', () => {
 			const spy = sinon.spy();
 			setup.provider.on('grant.error', spy);
 
-			auth.redirect_uri = 'https://client.example.com/cb?thensome';
+			auth.params.redirect_uri = 'https://client.example.com/cb?thensome';
 			const { error } = await auth.getToken(code);
 			expect(error.status).toBe(400);
 			expect(spy.calledOnce).toBe(true);
@@ -526,127 +526,123 @@ describe('grant_type=authorization_code', () => {
 	});
 
 	describe('validates', () => {
-		/*it('grant_type presence', function () {
-			return this.agent
-				.post(route)
-				.auth('client', 'secret')
-				.send({})
-				.type('form')
-				.expect(400)
-				.expect((response) => {
-					expect(response.body).to.have.property('error', 'invalid_request');
-					expect(response.body)
-						.to.have.property('error_description')
-						.and.matches(/missing required parameter/);
-					expect(response.body)
-						.to.have.property('error_description')
-						.and.matches(/grant_type/);
-				});
+		it('grant_type presence', async function () {
+			const auth = new setup.AuthorizationRequest({
+				client_id: 'client',
+				scope: 'openid'
+			});
+			const { error } = await setup.agent.token.post(
+				{},
+				{
+					headers: auth.basicAuthHeader
+				}
+			);
+			expect(error.status).toBe(422);
+			expect(error.value).toHaveProperty('type', 'validation');
+			expect(error.value).toHaveProperty(
+				'message',
+				'Expected required property'
+			);
+			expect(error.value).toHaveProperty('property', '/grant_type');
 		});
 
-		it('code presence', function () {
-			return this.agent
-				.post(route)
-				.auth('client', 'secret')
-				.send({
-					code_verifier: this.code_verifier,
+		it('code presence', async function () {
+			const auth = new setup.AuthorizationRequest({
+				client_id: 'client',
+				scope: 'openid'
+			});
+			const { error } = await setup.agent.token.post(
+				{
+					code_verifier: auth.code_verifier,
 					grant_type: 'authorization_code',
 					redirect_uri: 'blah'
-				})
-				.type('form')
-				.expect(400)
-				.expect((response) => {
-					expect(response.body).to.have.property('error', 'invalid_request');
-					expect(response.body)
-						.to.have.property('error_description')
-						.and.matches(/missing required parameter/);
-					expect(response.body)
-						.to.have.property('error_description')
-						.and.matches(/code/);
-				});
+				},
+				{
+					headers: auth.basicAuthHeader
+				}
+			);
+			expect(error.status).toBe(400);
+			expect(error.value).toHaveProperty('error', 'invalid_request');
+			expect(error.value).toHaveProperty(
+				'error_description',
+				"missing required parameter 'code'"
+			);
 		});
 
-		it('redirect_uri presence (more then one registered)', function () {
-			return this.agent
-				.post(route)
-				.auth('client', 'secret')
-				.send({
-					code_verifier: this.code_verifier,
+		it('redirect_uri presence (more then one registered)', async function () {
+			const auth = new setup.AuthorizationRequest({
+				client_id: 'client',
+				scope: 'openid'
+			});
+			const { error } = await setup.agent.token.post(
+				{
+					code_verifier: auth.code_verifier,
 					grant_type: 'authorization_code',
 					code: 'blah'
-				})
-				.type('form')
-				.expect(400)
-				.expect((response) => {
-					expect(response.body).to.have.property('error', 'invalid_request');
-					expect(response.body)
-						.to.have.property('error_description')
-						.and.matches(/missing required parameter/);
-					expect(response.body)
-						.to.have.property('error_description')
-						.and.matches(/redirect_uri/);
-				});
+				},
+				{
+					headers: auth.basicAuthHeader
+				}
+			);
+			expect(error.status).toBe(400);
+			expect(error.value).toHaveProperty('error', 'invalid_request');
+			expect(error.value).toHaveProperty(
+				'error_description',
+				"missing required parameter 'redirect_uri'"
+			);
 		});
 
-		it('code being "found"', function () {
+		it('code being "found"', async function () {
 			const spy = sinon.spy();
-			this.provider.on('grant.error', spy);
-			return this.agent
-				.post(route)
-				.auth('client', 'secret')
-				.send({
-					code_verifier: this.code_verifier,
+			setup.provider.on('grant.error', spy);
+
+			const auth = new setup.AuthorizationRequest({
+				client_id: 'client',
+				scope: 'openid'
+			});
+			const { error } = await setup.agent.token.post(
+				{
+					code_verifier: auth.code_verifier,
 					grant_type: 'authorization_code',
 					redirect_uri: 'http://client.example.com',
 					code: 'eyJraW5kIjoiQXV0aG9yaXphdGlvbkNvZGUiLCJqdGkiOiIxNTU0M2RiYS0zYThmLTRiZWEtYmRjNi04NDQ2N2MwOWZjYTYiLCJpYXQiOjE0NjM2NTk2OTgsImV4cCI6MTQ2MzY1OTc1OCwiaXNzIjoiaHR0cHM6Ly9ndWFyZGVkLWNsaWZmcy04NjM1Lmhlcm9rdWFwcC5jb20vb3AifQ.qUTaR48lavULtmDWBcpwhcF9NXhP8xzc-643h3yWLEgIyxPzKINT-upNn-byflH7P7rQlzZ-9SJKSs72ZVqWWMNikUGgJo-XmLyersONQ8sVx7v0quo4CRXamwyXfz2gq76gFlv5mtsrWwCij1kUnSaFm_HhAcoDPzGtSqhsHNoz36KjdmC3R-m84reQk_LEGizUeV-OmsBWJs3gedPGYcRCvsnW9qa21B0yZO2-HT9VQYY68UIGucDKNvizFRmIgepDZ5PUtsvyPD0PQQ9UHiEZvICeArxPLE8t1xz-lukpTMn8vA_YJ0s7kD9HYJUwxiYIuLXwDUNpGhsegxdvbw'
-				})
-				.type('form')
-				.expect(400)
-				.expect(() => {
-					expect(spy.calledOnce).to.be.true;
-					expect(errorDetail(spy)).to.equal('authorization code not found');
-				})
-				.expect((response) => {
-					expect(response.body).to.have.property('error', 'invalid_grant');
-				});
+				},
+				{
+					headers: auth.basicAuthHeader
+				}
+			);
+			expect(error.status).toBe(400);
+			expect(spy.calledOnce).toBe(true);
+			expect(errorDetail(spy)).toBe('authorization code not found');
+			expect(error.value).toHaveProperty('error', 'invalid_grant');
 		});
 	});
 
-	describe('error handling', () => {
-		beforeAll(function () {
-			sinon.stub(setup.provider.Client, 'find').callsFake(async () => {
-				throw new Error();
-			});
+	it('handles exceptions', async function () {
+		spyOn(setup.provider.Client, 'find').mockRejectedValue(new Error());
+		const spy = sinon.spy();
+		setup.provider.on('server_error', spy);
+
+		const auth = new setup.AuthorizationRequest({
+			client_id: 'client',
+			scope: 'openid'
 		});
-
-		it('handles exceptions', function () {
-			const spy = sinon.spy();
-			this.provider.on('server_error', spy);
-
-			const code_verifier = crypto.randomBytes(32).toString('base64url');
-
-			return this.agent
-				.post(route)
-				.auth('client', 'secret')
-				.send({
-					grant_type: 'authorization_code',
-					code: 'code',
-					redirect_uri: 'is there too',
-					code_challenge_method: 'S256',
-					code_challenge: crypto.hash('sha256', code_verifier, 'base64url')
-				})
-				.type('form')
-				.expect(500)
-				.expect(() => {
-					expect(spy.calledOnce).to.be.true;
-				})
-				.expect((response) => {
-					expect(response.body).to.have.property('error', 'server_error');
-					expect(response.body).to.have.property(
-						'error_description',
-						'oops! something went wrong'
-					);
-				});
-		});*/
+		const { error } = await setup.agent.token.post(
+			{
+				grant_type: 'authorization_code',
+				code: 'code',
+				redirect_uri: 'is there too'
+			},
+			{
+				headers: auth.basicAuthHeader
+			}
+		);
+		expect(error.status).toBe(500);
+		expect(spy.calledOnce).toBe(true);
+		expect(error.value).toHaveProperty('error', 'server_error');
+		expect(error.value).toHaveProperty(
+			'error_description',
+			'An unexpected error occurred'
+		);
 	});
 });

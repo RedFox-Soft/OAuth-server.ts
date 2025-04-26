@@ -61,10 +61,14 @@ export default function initializeApp() {
 	});
 
 	return new Elysia({ strictPath: true })
-		.onError(function ({ error, route, set }) {
+		.onError(function ({ error, route, set, code }) {
 			const provider = globalThis.provider;
-			const key = mapErrorCode[route] ?? 'server_error';
-			provider.emit(key, error);
+			if (set.status === 500) {
+				provider.emit('server_error', error);
+			} else {
+				const key = mapErrorCode[route] ?? 'server_error';
+				provider.emit(key, error);
+			}
 
 			if (error instanceof OIDCProviderError) {
 				set.status = error.status;
@@ -72,6 +76,11 @@ export default function initializeApp() {
 					error: error.error,
 					error_description: error.error_description,
 					error_detail: error.error_detail
+				};
+			} else if (code === 'UNKNOWN') {
+				return {
+					error: 'server_error',
+					error_description: 'An unexpected error occurred'
 				};
 			}
 		})

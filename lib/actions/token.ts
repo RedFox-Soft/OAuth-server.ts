@@ -95,7 +95,7 @@ export const tokenAction = new Elysia().post(
 	},
 	{
 		body: t.Object({
-			client_id: t.String(),
+			client_id: t.Optional(t.String()),
 			client_assertion: t.Optional(t.String()),
 			client_assertion_type: t.Optional(t.String()),
 			client_secret: t.Optional(t.String()),

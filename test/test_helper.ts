@@ -30,6 +30,14 @@ setGlobalDispatcher(fetchAgent);
 
 const { _auth } = Request.prototype;
 
+const { info, warn } = console;
+console.info = function (...args) {
+	if (!args[0].includes('NOTICE: ')) info.apply(this, args);
+};
+console.warn = function (...args) {
+	if (!args[0].includes('WARNING: ')) warn.apply(this, args);
+};
+
 function encodeToken(token) {
 	return encodeURIComponent(token).replace(
 		/(?:[-_.!~*'()]|%20)/g,
@@ -245,114 +253,116 @@ export default function testHelper(
 		}
 
 		class AuthorizationRequest {
+			params = {};
+			client = {};
+			res = {};
+			code_verifier = crypto.randomBytes(32).toString('base64url');
+			client_id = '';
+			grant_type = 'authorization_code';
+
 			constructor(parameters = {}) {
 				if (parameters.claims && typeof parameters.claims !== 'string') {
 					parameters.claims = JSON.stringify(parameters.claims);
 				}
+				this.params = parameters;
+				this.params.client_id ??= clients[0].client_id;
+				this.client_id = this.params.client_id;
+				this.client = clients.find(
+					(cl) => cl.client_id === this.params.client_id
+				);
+				this.params.state ??= crypto.randomBytes(16).toString('base64url');
+				this.params.redirect_uri ??= this.client.redirect_uris[0];
 
-				Object.assign(this, parameters);
-
-				this.client_id =
-					'client_id' in parameters
-						? parameters.client_id
-						: clients[0].client_id;
-				const c = clients.find((cl) => cl.client_id === this.client_id);
-				this.state =
-					'state' in parameters
-						? parameters.state
-						: crypto.randomBytes(16).toString('base64url');
-				this.redirect_uri =
-					'redirect_uri' in parameters
-						? parameters.redirect_uri
-						: parameters.redirect_uri || (c && c.redirect_uris[0]);
-				this.res = {};
-
-				if (this.scope?.includes('openid')) {
-					this.nonce ??= crypto.randomBytes(16).toString('base64url');
+				if (this.params.scope?.includes('openid')) {
+					this.params.nonce ??= crypto.randomBytes(16).toString('base64url');
 				}
 
-				if (this.response_type && this.response_type.includes('code')) {
-					this.code_challenge_method ??= 'S256';
-					this.code_verifier ??= crypto.randomBytes(32).toString('base64url');
-					this.code_challenge =
-						'code_challenge' in parameters
-							? parameters.code_challenge
-							: crypto.hash('sha256', this.code_verifier, 'base64url');
+				this.params.response_type ??= 'code';
+				if (this.params.response_type === 'code') {
+					this.params.code_challenge_method ??= 'S256';
+					this.params.code_challenge ??= crypto.hash(
+						'sha256',
+						this.code_verifier,
+						'base64url'
+					);
+				}
+			}
+
+			get basicAuthHeader() {
+				if (this.client.token_endpoint_auth_method === 'none') {
+					return {};
 				}
 
-				Object.defineProperty(this, 'validateClientLocation', {
-					value: (response) => {
-						const actual = parse(response.headers.get('location'), true);
-						let expected;
-						if (this.redirect_uri) {
-							expect(response.headers.get('location')).to.match(
-								new RegExp(this.redirect_uri)
-							);
-							expected = parse(this.redirect_uri, true);
-						} else {
-							expect(response.headers.get('location')).to.match(
-								new RegExp(c.redirect_uris[0])
-							);
-							expected = parse(c.redirect_uris[0], true);
-						}
+				const { client_secret } = this.client;
+				return {
+					Authorization: `Basic ${base64url.encode(`${this.client_id}:${client_secret}`)}`
+				};
+			}
 
-						['protocol', 'host', 'pathname'].forEach((attr) => {
-							expect(actual[attr]).to.equal(expected[attr]);
-						});
-					}
+			validateClientLocation(response) {
+				const actual = parse(response.headers.get('location'), true);
+				let expected;
+				if (this.redirect_uri) {
+					expect(response.headers.get('location')).to.match(
+						new RegExp(this.redirect_uri)
+					);
+					expected = parse(this.redirect_uri, true);
+				} else {
+					expect(response.headers.get('location')).to.match(
+						new RegExp(this.client.redirect_uris[0])
+					);
+					expected = parse(this.client.redirect_uris[0], true);
+				}
+
+				['protocol', 'host', 'pathname'].forEach((attr) => {
+					expect(actual[attr]).to.equal(expected[attr]);
 				});
+			}
 
-				Object.defineProperty(this, 'validateState', {
-					value: (response) => {
-						const {
-							query: { state }
-						} = parse(response.headers.get('location'), true);
-						expect(state).to.equal(this.state);
-					}
-				});
+			validateState(response) {
+				const {
+					query: { state }
+				} = parse(response.headers.get('location'), true);
+				expect(state).to.equal(this.params.state);
+			}
 
-				Object.defineProperty(this, 'validateIss', {
-					value: (response) => {
-						const {
-							query: { iss }
-						} = parse(response.headers.get('location'), true);
-						expect(iss).to.equal(issuerIdentifier);
-					}
-				});
+			validateIss(response) {
+				const {
+					query: { iss }
+				} = parse(response.headers.get('location'), true);
+				expect(iss).to.equal(issuerIdentifier);
+			}
 
-				Object.defineProperty(this, 'validateInteractionRedirect', {
-					value: (response) => {
-						const { hostname, search, query } = parse(
-							response.headers.get('location')
-						);
-						expect(hostname).to.be.null;
-						expect(search).to.be.null;
-						expect(query).to.be.null;
-						expect(response)
-							.to.have.nested.property('headers.set-cookie')
-							.that.is.an('array');
+			validateInteractionRedirect(response) {
+				const { hostname, search, query } = parse(
+					response.headers.get('location')
+				);
+				expect(hostname).to.be.null;
+				expect(search).to.be.null;
+				expect(query).to.be.null;
+				expect(response)
+					.to.have.nested.property('headers.set-cookie')
+					.that.is.an('array');
 
-						const uid = readCookie(getSetCookies(response)[0]);
-						expect(readCookie(getSetCookies(response)[0])).to.equal(
-							readCookie(getSetCookies(response)[1])
-						);
+				const uid = readCookie(getSetCookies(response)[0]);
+				expect(readCookie(getSetCookies(response)[0])).to.equal(
+					readCookie(getSetCookies(response)[1])
+				);
 
-						const interaction = TestAdapter.for('Interaction').syncFind(uid);
+				const interaction = TestAdapter.for('Interaction').syncFind(uid);
 
-						Object.entries(this).forEach(([key, value]) => {
-							if (key === 'res') return;
-							if (key === 'request') return;
-							if (key === 'code_verifier') return;
-							if (key === 'request_uri') return;
-							if (key === 'max_age' && value === 0) {
-								expect(interaction.params).not.to.have.property('max_age');
-								expect(interaction.params)
-									.to.have.property('prompt')
-									.that.contains('login');
-							} else {
-								expect(interaction.params).to.have.property(key, value);
-							}
-						});
+				Object.entries(this).forEach(([key, value]) => {
+					if (key === 'res') return;
+					if (key === 'request') return;
+					if (key === 'code_verifier') return;
+					if (key === 'request_uri') return;
+					if (key === 'max_age' && value === 0) {
+						expect(interaction.params).not.to.have.property('max_age');
+						expect(interaction.params)
+							.to.have.property('prompt')
+							.that.contains('login');
+					} else {
+						expect(interaction.params).to.have.property(key, value);
 					}
 				});
 			}
@@ -440,24 +450,17 @@ export default function testHelper(
 		};
 
 		AuthorizationRequest.prototype.getToken = async function (code) {
-			let encodedCredentials = {};
-			const c = clients.find((cl) => cl.client_id === this.client_id);
-			if (c.token_endpoint_auth_method !== 'none') {
-				encodedCredentials = {
-					Authorization: `Basic ${base64url.encode(`${this.client_id}:${c.client_secret}`)}`
-				};
-			}
-
+			const isBasicAuth = this.client.token_endpoint_auth_method !== 'none';
 			return await agent.token.post(
 				{
-					client_id: encodedCredentials ? this.client_id : undefined,
+					client_id: isBasicAuth ? undefined : this.client_id,
 					code,
-					grant_type: this.grant_type ?? 'authorization_code',
+					grant_type: this.grant_type,
 					code_verifier: this.code_verifier,
-					redirect_uri: this.redirect_uri
+					redirect_uri: this.params.redirect_uri
 				},
 				{
-					headers: encodedCredentials
+					headers: this.basicAuthHeader
 				}
 			);
 		};
