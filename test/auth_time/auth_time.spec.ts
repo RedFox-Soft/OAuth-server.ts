@@ -25,7 +25,7 @@ describe('responds with a id_token containing auth_time', () => {
 			...options
 		});
 
-		const { response, error } = await setup.agent.auth.get({
+		const { response } = await setup.agent.auth.get({
 			query: auth.params,
 			headers: {
 				cookie

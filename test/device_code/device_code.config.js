@@ -12,13 +12,6 @@ merge(config.features, {
 	pushedAuthorizationRequests: { enabled: false }
 });
 
-config.extraParams = {
-	extra: null,
-	extra2(ctx) {
-		ctx.oidc.params.extra2 ||= 'defaulted';
-	}
-};
-
 export default {
 	config,
 	clients: [

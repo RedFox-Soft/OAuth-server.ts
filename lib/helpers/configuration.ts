@@ -44,7 +44,6 @@ class Configuration {
 
 		this.logDraftNotice();
 
-		this.registerExtraParamsValidations();
 		this.ensureSets();
 
 		this.checkResponseTypes();
@@ -103,45 +102,9 @@ class Configuration {
 		}
 	}
 
-	registerExtraParamsValidations() {
-		if (!isPlainObject(this.extraParams)) {
-			return;
-		}
-
-		this.extraParamsValidations = Object.entries(this.extraParams)
-			.map(([key, value]) => {
-				if (value == null) {
-					return undefined;
-				}
-
-				if (
-					typeof value !== 'function' ||
-					!['Function', 'AsyncFunction'].includes(value.constructor.name)
-				) {
-					throw new TypeError(
-						`invalid extraParams.${key} type, it must be a function, null, or undefined`
-					);
-				}
-
-				return [key, value];
-			})
-			.filter(Boolean);
-
-		this.extraParams = new Set(Object.keys(this.extraParams));
-	}
-
 	ensureSets() {
 		for (const [obj, props] of [
-			[
-				this,
-				[
-					'scopes',
-					'subjectTypes',
-					'extraParams',
-					'acrValues',
-					'clientAuthMethods'
-				]
-			],
+			[this, ['scopes', 'subjectTypes', 'acrValues', 'clientAuthMethods']],
 			[this.features.ciba, ['deliveryModes']]
 		]) {
 			for (const prop of props) {

@@ -8,7 +8,6 @@ import checkClient from './check_client.ts';
 import checkResponseMode from './check_response_mode.ts';
 import rejectUnsupported from './reject_unsupported.ts';
 import rejectRegistration from './reject_registration.ts';
-import oauthRequired from './oauth_required.ts';
 import oneRedirectUriClients from './one_redirect_uri_clients.ts';
 import loadPushedAuthorizationRequest from './load_pushed_authorization_request.ts';
 import processRequestObject from './process_request_object.ts';
@@ -28,13 +27,11 @@ import interactions from './interactions.ts';
 import respond from './respond.ts';
 import interactionEmit from './interaction_emit.ts';
 import checkOpenidScope from './check_openid_scope.ts';
-import checkExtraParams from './check_extra_params.ts';
 
 import { globalConfiguration } from '../../globalConfiguration.ts';
 
 import { authorizationPKCE } from '../../helpers/pkce.ts';
 import { AuthorizationParameters } from '../../consts/param_list.ts';
-import { OIDCProviderError } from '../../helpers/errors.ts';
 import sessionHandler from '../../shared/session.ts';
 
 const cookieName = globalConfiguration.cookies.names.session;
@@ -88,7 +85,6 @@ export const authorizationAction = new Elysia().get(
 		processRequestObject.bind(undefined, allowList);
 		checkResponseMode;
 		oneRedirectUriClients(ctx);
-		oauthRequired;
 		rejectRegistration;
 		checkResponseType;
 		oidcRequired;
@@ -103,7 +99,6 @@ export const authorizationAction = new Elysia().get(
 		checkResource;
 		checkMaxAge(ctx);
 		checkIdTokenHint(ctx);
-		checkExtraParams;
 		interactionEmit;
 		assignClaims(ctx);
 		await loadAccount(ctx);

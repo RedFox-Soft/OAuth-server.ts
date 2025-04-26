@@ -13,7 +13,6 @@ import checkClient from './check_client.ts';
 import checkResponseMode from './check_response_mode.ts';
 import rejectUnsupported from './reject_unsupported.ts';
 import rejectRegistration from './reject_registration.ts';
-import oauthRequired from './oauth_required.ts';
 import oneRedirectUriClients from './one_redirect_uri_clients.ts';
 import loadPushedAuthorizationRequest from './load_pushed_authorization_request.ts';
 import processRequestObject from './process_request_object.ts';
@@ -50,7 +49,6 @@ import checkRequestedExpiry from './check_requested_expiry.ts';
 import backchannelRequestResponse from './backchannel_request_response.ts';
 import checkCibaContext from './check_ciba_context.ts';
 import checkDpopJkt from './check_dpop_jkt.ts';
-import checkExtraParams from './check_extra_params.ts';
 import unsupportedRar from './unsupported_rar.ts';
 
 const A = 'authorization';
@@ -82,8 +80,7 @@ export default function authorizationAction(provider, endpoint) {
 			resourceIndicators,
 			richAuthorizationRequests,
 			webMessageResponseMode
-		},
-		extraParams
+		}
 	} = instance(provider).configuration;
 
 	const allowList = new Set(PARAM_LIST);
@@ -107,8 +104,6 @@ export default function authorizationAction(provider, endpoint) {
 	if (richAuthorizationRequests.enabled) {
 		allowList.add('authorization_details');
 	}
-
-	extraParams.forEach(Set.prototype.add.bind(allowList));
 
 	if ([DA, CV, DR, BA].includes(endpoint)) {
 		allowList.delete('web_message_uri');
@@ -178,7 +173,6 @@ export default function authorizationAction(provider, endpoint) {
 	);
 	use(checkResponseMode, A, PAR);
 	use(oneRedirectUriClients, A, PAR);
-	use(oauthRequired, A, PAR);
 	use(rejectRegistration, A, DA, PAR, BA);
 	use(checkResponseType, A, PAR);
 	use(oidcRequired, A, PAR);
@@ -198,7 +192,6 @@ export default function authorizationAction(provider, endpoint) {
 	use(checkCibaContext, BA);
 	use(checkIdTokenHint, A, DA, PAR);
 	use(checkDpopJkt, PAR);
-	use(checkExtraParams, A, DA, PAR, BA);
 	use(interactionEmit, A, R, CV, DR);
 	use(assignClaims, A, R, CV, DR, BA);
 	use(cibaLoadAccount, BA);

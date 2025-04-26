@@ -9,7 +9,6 @@ import getConfig from '../default.config.js';
 
 const config = getConfig();
 
-config.extraParams = ['triggerCustomFail', 'triggerUnrequestable'];
 merge(config.features, {
 	rpInitiatedLogout: { enabled: false }
 });

@@ -1,6 +1,5 @@
 import { strict as assert } from 'node:assert';
 import { parse as parseUrl } from 'node:url';
-import * as crypto from 'node:crypto';
 
 import { createSandbox } from 'sinon';
 import { expect } from 'chai';
