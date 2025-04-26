@@ -6,18 +6,7 @@ import presence from '../../helpers/validate_presence.ts';
  * Validates that openid scope is present is OpenID Connect specific parameters are provided.
  */
 export default function oidcRequired(ctx, next) {
-	const { params } = ctx.oidc;
-
 	const required = new Set(['redirect_uri']);
-
-	// Check for nonce if implicit or hybrid flow responding with id_token issued by the authorization
-	// endpoint
-	if (
-		typeof params.response_type === 'string' &&
-		params.response_type.includes('id_token')
-	) {
-		required.add('nonce');
-	}
 
 	// TODO: move this to a new helper function
 	if (ctx.oidc.isFapi('1.0 Final')) {
