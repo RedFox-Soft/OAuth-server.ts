@@ -499,29 +499,7 @@ export default function getClient(provider) {
 		}
 
 		redirectUriAllowed(value) {
-			const parsed = URL.parse(value);
-			if (!parsed) return false;
-
-			const match = this.redirectUris.find(
-				(allowed) => URL.parse(allowed)?.href === parsed.href
-			);
-			if (
-				!!match ||
-				this.applicationType !== 'native' ||
-				parsed.protocol !== 'http:' ||
-				!LOOPBACKS.has(parsed.hostname)
-			) {
-				return !!match;
-			}
-
-			parsed.port = '';
-
-			return !!this.redirectUris.find((allowed) => {
-				const registered = URL.parse(allowed);
-				if (!registered) return false;
-				registered.port = '';
-				return parsed.href === registered.href;
-			});
+			return this.redirectUris.includes(value);
 		}
 
 		postLogoutRedirectUriAllowed(value) {
