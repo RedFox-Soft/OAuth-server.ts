@@ -8,8 +8,10 @@ import {
 	mock,
 	spyOn
 } from 'bun:test';
+import { provider } from 'lib/provider.js';
 import { decodeJwt } from 'jose';
 import bootstrap from '../test_helper.ts';
+import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
 describe('responds with a id_token containing auth_time', () => {
 	let setup = null;
@@ -20,7 +22,7 @@ describe('responds with a id_token containing auth_time', () => {
 	});
 
 	async function getIdToken(options = {}) {
-		const auth = new setup.AuthorizationRequest({
+		const auth = new AuthorizationRequest({
 			scope: 'openid',
 			...options
 		});
@@ -52,10 +54,9 @@ describe('responds with a id_token containing auth_time', () => {
 
 	describe('special cases', () => {
 		beforeAll(function () {
-			spyOn(
-				setup.provider.OIDCContext.prototype,
-				'promptPending'
-			).mockReturnValue(false);
+			spyOn(provider.OIDCContext.prototype, 'promptPending').mockReturnValue(
+				false
+			);
 		});
 
 		afterAll(() => {
