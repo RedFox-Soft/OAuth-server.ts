@@ -1,13 +1,12 @@
 /* eslint-disable no-underscore-dangle */
 
-import { parse, pathToFileURL } from 'node:url';
+import { pathToFileURL } from 'node:url';
 import * as path from 'node:path';
 
 import { setGlobalDispatcher, MockAgent } from 'undici';
 import sinon from 'sinon';
 import { dirname } from 'desm';
 import flatten from 'lodash/flatten.js';
-import { Request } from 'superagent';
 import { expect } from 'chai';
 
 import base64url from 'base64url';
@@ -27,8 +26,6 @@ const fetchAgent = new MockAgent();
 // fetchAgent.disableNetConnect();
 setGlobalDispatcher(fetchAgent);
 
-const { _auth } = Request.prototype;
-
 const { info, warn } = console;
 console.info = function (...args) {
 	if (!args[0].includes('NOTICE: ')) info.apply(this, args);
@@ -36,38 +33,6 @@ console.info = function (...args) {
 console.warn = function (...args) {
 	if (!args[0].includes('WARNING: ')) warn.apply(this, args);
 };
-
-function encodeToken(token) {
-	return encodeURIComponent(token).replace(
-		/(?:[-_.!~*'()]|%20)/g,
-		(substring) => {
-			switch (substring) {
-				case '-':
-					return '%2D';
-				case '_':
-					return '%5F';
-				case '.':
-					return '%2E';
-				case '!':
-					return '%21';
-				case '~':
-					return '%7E';
-				case '*':
-					return '%2A';
-				case "'":
-					return '%27';
-				case '(':
-					return '%28';
-				case ')':
-					return '%29';
-				case '%20':
-					return '+';
-				default:
-					throw new Error();
-			}
-		}
-	);
-}
 
 process.env.NODE_ENV = process.env.NODE_ENV || 'test';
 

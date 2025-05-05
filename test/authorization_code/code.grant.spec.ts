@@ -67,10 +67,6 @@ describe('grant_type=authorization_code', () => {
 			codeStore = setup.TestAdapter.for('AuthorizationCode').syncFind(jti);
 		});
 
-		afterEach(function () {
-			return setup.logout();
-		});
-
 		it('Should return specific properties on token request', async function () {
 			const spy = mock();
 			provider.on('grant.success', spy);
@@ -330,7 +326,6 @@ describe('grant_type=authorization_code', () => {
 		afterEach(function () {
 			i(provider).configuration.allowOmittingSingleRegisteredRedirectUri =
 				false;
-			return setup.logout();
 		});
 
 		beforeEach(async function () {
