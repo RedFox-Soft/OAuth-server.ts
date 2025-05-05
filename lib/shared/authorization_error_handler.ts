@@ -1,3 +1,4 @@
+import { provider } from 'lib/provider.js';
 import instance from '../helpers/weak_cache.ts';
 import errOut from '../helpers/err_out.ts';
 import oneRedirectUriClients from '../actions/authorization/one_redirect_uri_clients.ts';
@@ -8,7 +9,6 @@ import { mapValueError } from 'elysia';
 
 async function isAllowRedirectUri(params) {
 	const ctx = {};
-	const provider = globalThis.provider;
 	const OIDCContext = provider.OIDCContext;
 	ctx.oidc = new OIDCContext(ctx);
 	ctx.oidc.params = params;
@@ -43,7 +43,6 @@ const mapErrorCode = {
 
 export async function errorHandler(obj) {
 	const { error, set, route, code, request } = obj;
-	const provider = globalThis.provider;
 	if (set.status === 500) {
 		provider.emit('server_error', error);
 	} else {
@@ -110,7 +109,6 @@ async function authorizationErrorHandler({
 	} catch (e) {}
 
 	if (redirectObj) {
-		const provider = globalThis.provider;
 		const out = { ...errOut(error, params.state), iss: provider.issuer };
 		let mode = params.response_mode;
 		if (!instance(provider).responseModes.has(mode)) {

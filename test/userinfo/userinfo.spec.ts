@@ -3,7 +3,7 @@ import * as url from 'node:url';
 import { expect } from 'chai';
 import sinon from 'sinon';
 
-import Provider from '../../lib/index.ts';
+import provider from '../../lib/index.ts';
 import bootstrap from '../test_helper.js';
 
 describe('userinfo /me', () => {
@@ -28,7 +28,7 @@ describe('userinfo /me', () => {
 
 	it('jwtUserinfo can only be enabled with userinfo', () => {
 		expect(() => {
-			new Provider('http://localhost', {
+			new provider('http://localhost', {
 				// eslint-disable-line no-new
 				features: {
 					jwtUserinfo: { enabled: true },

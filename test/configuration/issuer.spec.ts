@@ -4,54 +4,54 @@ import { strict as assert } from 'node:assert';
 
 import { expect } from 'chai';
 
-import Provider from '../../lib/index.ts';
+import provider from '../../lib/index.ts';
 
 describe('Provider issuer configuration', () => {
 	it('validates the issuer input to be present and valid', () => {
 		expect(() => {
-			new Provider();
+			new provider();
 		}).to.throw(assert.AssertionError);
 		expect(() => {
-			new Provider({});
+			new provider({});
 		}).to.throw(assert.AssertionError);
 		expect(() => {
-			new Provider(0);
+			new provider(0);
 		}).to.throw(assert.AssertionError);
 		expect(() => {
-			new Provider(true);
+			new provider(true);
 		}).to.throw(assert.AssertionError);
 		expect(() => {
-			new Provider('');
+			new provider('');
 		}).to.throw(assert.AssertionError);
 		expect(() => {
-			new Provider('https://op.example.com?');
+			new provider('https://op.example.com?');
 		}).to.throw(assert.AssertionError);
 		expect(() => {
-			new Provider('https://op.example.com?query');
+			new provider('https://op.example.com?query');
 		}).to.throw(assert.AssertionError);
 		expect(() => {
-			new Provider('https://op.example.com?query=complete');
+			new provider('https://op.example.com?query=complete');
 		}).to.throw(assert.AssertionError);
 		expect(() => {
-			new Provider('https://op.example.com#fragment');
+			new provider('https://op.example.com#fragment');
 		}).to.throw(assert.AssertionError);
 		expect(() => {
-			new Provider('https://op.example.com?query=and#fragment');
+			new provider('https://op.example.com?query=and#fragment');
 		}).to.throw(assert.AssertionError);
 		expect(() => {
-			new Provider('foobar');
+			new provider('foobar');
 		}).to.throw(assert.AssertionError);
 		expect(() => {
-			new Provider('foobar:');
+			new provider('foobar:');
 		}).to.throw(assert.AssertionError);
 		expect(() => {
-			new Provider('foobar://');
+			new provider('foobar://');
 		}).to.throw(assert.AssertionError);
 		expect(() => {
-			new Provider('op.example.com');
+			new provider('op.example.com');
 		}).to.throw(assert.AssertionError);
 		expect(() => {
-			new Provider('op.example.com:443');
+			new provider('op.example.com:443');
 		}).to.throw(assert.AssertionError);
 	});
 });

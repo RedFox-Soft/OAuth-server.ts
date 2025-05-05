@@ -1,10 +1,10 @@
 import { expect } from 'chai';
 
-import Provider from '../../lib/index.ts';
+import provider from '../../lib/index.ts';
 
 describe('pathFor related behaviors', () => {
 	it('throws an Error when invalid route path is requested', () => {
-		const provider = new Provider('http://localhost');
+		const provider = new provider('http://localhost');
 		expect(provider.pathFor('authorization')).to.equal('/auth');
 		expect(() => provider.pathFor('foobar')).to.throw(
 			Error,
@@ -13,7 +13,7 @@ describe('pathFor related behaviors', () => {
 	});
 
 	it('interactionUrl resolves to /interaction/uid when devInteractions is disabled', async () => {
-		const provider = new Provider('http://localhost', {
+		const provider = new provider('http://localhost', {
 			features: {
 				devInteractions: { enabled: false }
 			}

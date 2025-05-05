@@ -417,4 +417,4 @@ class ProviderClass extends EventEmitter {
 	}
 }
 
-export const Provider = new ProviderClass();
+export const provider = new ProviderClass();

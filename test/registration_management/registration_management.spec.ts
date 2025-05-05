@@ -3,7 +3,7 @@ import sinon from 'sinon';
 import { expect } from 'chai';
 
 import bootstrap from '../test_helper.js';
-import Provider from '../../lib/index.ts';
+import provider from '../../lib/index.ts';
 
 describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 	before(bootstrap(import.meta.url));
@@ -26,7 +26,7 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 	describe('feature flag', () => {
 		it('checks registration is also enabled', () => {
 			expect(() => {
-				new Provider('http://localhost', {
+				new provider('http://localhost', {
 					// eslint-disable-line no-new
 					features: {
 						registrationManagement: { enabled: true }

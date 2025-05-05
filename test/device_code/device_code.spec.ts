@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 
-import Provider from '../../lib/index.ts';
+import provider from '../../lib/index.ts';
 import bootstrap from '../test_helper.js';
 
 describe('configuration features.deviceFlow', () => {
@@ -8,7 +8,7 @@ describe('configuration features.deviceFlow', () => {
 
 	it('can only be configured with digits and base-20 charset', () => {
 		expect(() => {
-			new Provider('http://localhost', {
+			new provider('http://localhost', {
 				// eslint-disable-line no-new
 				features: {
 					deviceFlow: {
@@ -19,7 +19,7 @@ describe('configuration features.deviceFlow', () => {
 			});
 		}).not.to.throw;
 		expect(() => {
-			new Provider('http://localhost', {
+			new provider('http://localhost', {
 				// eslint-disable-line no-new
 				features: {
 					deviceFlow: {
@@ -30,7 +30,7 @@ describe('configuration features.deviceFlow', () => {
 			});
 		}).not.to.throw;
 		expect(() => {
-			new Provider('http://localhost', {
+			new provider('http://localhost', {
 				// eslint-disable-line no-new
 				features: {
 					deviceFlow: {
@@ -44,7 +44,7 @@ describe('configuration features.deviceFlow', () => {
 
 	it('can be configured with a mask', () => {
 		expect(() => {
-			new Provider('http://localhost', {
+			new provider('http://localhost', {
 				// eslint-disable-line no-new
 				features: {
 					deviceFlow: {
@@ -55,7 +55,7 @@ describe('configuration features.deviceFlow', () => {
 			});
 		}).not.to.throw;
 		expect(() => {
-			new Provider('http://localhost', {
+			new provider('http://localhost', {
 				// eslint-disable-line no-new
 				features: {
 					deviceFlow: {
@@ -66,7 +66,7 @@ describe('configuration features.deviceFlow', () => {
 			});
 		}).not.to.throw;
 		expect(() => {
-			new Provider('http://localhost', {
+			new provider('http://localhost', {
 				// eslint-disable-line no-new
 				features: {
 					deviceFlow: {

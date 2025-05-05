@@ -1,5 +1,6 @@
-import Elysia, { t } from 'elysia';
+import { Elysia, t } from 'elysia';
 
+import { provider } from 'lib/provider.js';
 import instance from '../helpers/weak_cache.ts';
 import { UnsupportedGrantType, InvalidRequest } from '../helpers/errors.ts';
 import getTokenAuth from '../shared/token_auth.ts';
@@ -16,7 +17,6 @@ export const tokenAction = new Elysia().post(
 		const ctx = {
 			headers
 		};
-		const provider = globalThis.provider;
 		const OIDCContext = provider.OIDCContext;
 		ctx.oidc = new OIDCContext(ctx);
 		ctx.oidc.params = body;
@@ -64,18 +64,6 @@ export const tokenAction = new Elysia().post(
 			...tokenAuth,
 
 			rejectDupes.bind(undefined, { only: grantTypeSet }),
-
-			async function stripGrantIrrelevantParams(ctx, next) {
-				await next();
-			},
-
-			async function supportedGrantTypeCheck(ctx, next) {
-				await next();
-			},
-
-			async function allowedGrantTypeCheck(ctx, next) {
-				await next();
-			},
 
 			async function rejectDupesOptionalExcept(ctx, next) {
 				const { grantTypeDupes } = instance(provider);

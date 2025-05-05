@@ -8,7 +8,7 @@ import { expect } from 'chai';
 import cloneDeep from 'lodash/cloneDeep.js';
 
 import nanoid from '../../lib/helpers/nanoid.ts';
-import Provider from '../../lib/index.ts';
+import provider from '../../lib/index.ts';
 import bootstrap, {
 	assertNoPendingInterceptors,
 	mock
@@ -60,7 +60,7 @@ describe('client authentication options', () => {
 
 	describe('discovery', () => {
 		it('pushes no algs when neither _jwt method is enabled', () => {
-			const provider = new Provider('http://localhost', {
+			const provider = new provider('http://localhost', {
 				clientAuthMethods: ['none', 'client_secret_basic', 'client_secret_post']
 			});
 
@@ -69,7 +69,7 @@ describe('client authentication options', () => {
 		});
 
 		it('removes client_secret_jwt when no HMAC based alg is enabled', () => {
-			const provider = new Provider('http://localhost', {
+			const provider = new provider('http://localhost', {
 				clientAuthMethods: [
 					'none',
 					'client_secret_jwt',
@@ -88,7 +88,7 @@ describe('client authentication options', () => {
 		});
 
 		it('removes private_key_jwt when no public key crypto based alg is enabled', () => {
-			const provider = new Provider('http://localhost', {
+			const provider = new provider('http://localhost', {
 				clientAuthMethods: [
 					'none',
 					'client_secret_jwt',
@@ -107,7 +107,7 @@ describe('client authentication options', () => {
 		});
 
 		it('pushes only symmetric algs when client_secret_jwt is enabled', () => {
-			const provider = new Provider('http://localhost', {
+			const provider = new provider('http://localhost', {
 				clientAuthMethods: [
 					'none',
 					'client_secret_basic',
@@ -123,7 +123,7 @@ describe('client authentication options', () => {
 		});
 
 		it('pushes only asymmetric algs when private_key_jwt is enabled', () => {
-			const provider = new Provider('http://localhost', {
+			const provider = new provider('http://localhost', {
 				clientAuthMethods: [
 					'none',
 					'client_secret_basic',
@@ -151,7 +151,7 @@ describe('client authentication options', () => {
 		});
 
 		it('pushes all algs when both _jwt methods are enabled', () => {
-			const provider = new Provider('http://localhost', {
+			const provider = new provider('http://localhost', {
 				clientAuthMethods: [
 					'none',
 					'client_secret_basic',

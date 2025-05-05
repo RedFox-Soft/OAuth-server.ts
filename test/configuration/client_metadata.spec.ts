@@ -7,7 +7,7 @@ import omit from 'lodash/omit.js';
 import pull from 'lodash/pull.js';
 import cloneDeep from 'lodash/cloneDeep.js';
 
-import Provider, { errors } from '../../lib/index.ts';
+import provider, { errors } from '../../lib/index.ts';
 import { enabledJWA } from '../default.config.js';
 import sectorIdentifier from '../../lib/helpers/sector_identifier.ts';
 import keys, { stripPrivateJWKFields } from '../keys.js';
@@ -20,7 +20,7 @@ const { InvalidClientMetadata } = errors;
 describe('Client metadata validation', () => {
 	let DefaultProvider;
 	before(() => {
-		DefaultProvider = new Provider('http://localhost', {
+		DefaultProvider = new provider('http://localhost', {
 			jwks: { keys },
 			enabledJWA: cloneDeep(enabledJWA)
 		});
@@ -29,7 +29,7 @@ describe('Client metadata validation', () => {
 	function register(metadata, configuration) {
 		let provider;
 		if (configuration) {
-			provider = new Provider(
+			provider = new provider(
 				'http://localhost',
 				merge(
 					{

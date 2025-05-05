@@ -18,7 +18,7 @@ import { treaty } from '@elysiajs/eden';
 
 import nanoid from '../lib/helpers/nanoid.ts';
 import epochTime from '../lib/helpers/epoch_time.ts';
-import Provider from '../lib/index.ts';
+import provider from '../lib/index.ts';
 import instance from '../lib/helpers/weak_cache.ts';
 
 import { Account, TestAdapter } from './models.js';
@@ -88,7 +88,7 @@ process.env.NODE_ENV = process.env.NODE_ENV || 'test';
 
 globalThis.i = instance;
 
-Object.defineProperties(Object.getPrototypeOf(Provider), {
+Object.defineProperties(Object.getPrototypeOf(provider), {
 	enable: {
 		value(feature, options = {}) {
 			const config = i(this).features[feature];
@@ -156,13 +156,12 @@ export default function testHelper(
 		const issuerIdentifier = `${protocol}//127.0.0.1:3000`;
 		TestAdapter.clear();
 
-		const provider = Provider.init(issuerIdentifier, {
+		provider.init(issuerIdentifier, {
 			clients,
 			jwks: { keys },
 			adapter: TestAdapter,
 			...config
 		});
-		globalThis.provider = provider;
 
 		let agent;
 		let lastSession;

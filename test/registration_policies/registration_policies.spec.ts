@@ -7,7 +7,7 @@ import { createSandbox } from 'sinon';
 import { expect } from 'chai';
 
 import bootstrap from '../test_helper.js';
-import Provider, { errors } from '../../lib/index.ts';
+import provider, { errors } from '../../lib/index.ts';
 
 const sinon = createSandbox();
 
@@ -19,7 +19,7 @@ describe('client registration policies', () => {
 		it('must only be enabled in conjuction with adapter-backed initial access tokens', () => {
 			expect(() => {
 				// eslint-disable-next-line no-new
-				new Provider('http://localhost', {
+				new provider('http://localhost', {
 					features: {
 						registration: {
 							enabled: true,

@@ -1,17 +1,17 @@
 import { expect } from 'chai';
 
-import Provider from '../../lib/index.ts';
+import provider from '../../lib/index.ts';
 
 describe('default findAccount behavior', () => {
 	it('returns a promise', () => {
-		const provider = new Provider('http://localhost');
+		const provider = new provider('http://localhost');
 
 		expect(i(provider).configuration.findAccount({}, 'id') instanceof Promise)
 			.to.be.true;
 	});
 
 	it('resolves to an object with property and accountId property and claims function', () => {
-		const provider = new Provider('http://localhost');
+		const provider = new provider('http://localhost');
 
 		return i(provider)
 			.configuration.findAccount({}, 'id')

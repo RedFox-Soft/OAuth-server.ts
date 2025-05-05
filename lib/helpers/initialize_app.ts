@@ -11,7 +11,6 @@ import error from '../shared/error_handler.ts';
 import {
 	getAuthorization,
 	userinfo,
-	getToken,
 	jwks,
 	registration,
 	getRevocation,

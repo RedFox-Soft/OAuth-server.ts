@@ -3,14 +3,14 @@
 import { expect } from 'chai';
 import sinon from 'sinon';
 
-import Provider from '../../lib/index.ts';
+import provider from '../../lib/index.ts';
 import { InvalidClientMetadata } from '../../lib/helpers/errors.ts';
 
 describe('extraClientMetadata configuration', () => {
 	it('allows for properties to be added to client schema and have them synchronously validated', async () => {
 		const validator = sinon.spy();
 		const properties = ['foo', 'bar', 'foo_bar'];
-		const provider = new Provider('http://localhost:3000', {
+		const provider = new provider('http://localhost:3000', {
 			extraClientMetadata: {
 				properties,
 				validator
@@ -53,7 +53,7 @@ describe('extraClientMetadata configuration', () => {
 	});
 
 	it('can be used to assign standard properties depending on the value of a custom one', async () => {
-		const provider = new Provider('http://localhost:3000', {
+		const provider = new provider('http://localhost:3000', {
 			extraClientMetadata: {
 				properties: ['foo'],
 				validator(ctx, key, value, metadata) {
@@ -78,7 +78,7 @@ describe('extraClientMetadata configuration', () => {
 	});
 
 	it('should not allow props to be added without them being allowed', async () => {
-		const provider = new Provider('http://localhost:3000', {
+		const provider = new provider('http://localhost:3000', {
 			extraClientMetadata: {
 				properties: ['bar'],
 				validator(ctx, key, value, metadata) {
@@ -99,7 +99,7 @@ describe('extraClientMetadata configuration', () => {
 	});
 
 	it('should not allow to update the client so that its invalid', async () => {
-		const provider = new Provider('http://localhost:3000', {
+		const provider = new provider('http://localhost:3000', {
 			extraClientMetadata: {
 				properties: ['foo'],
 				validator(ctx, key, value, metadata) {
@@ -130,7 +130,7 @@ describe('extraClientMetadata configuration', () => {
 
 	it('can be used to add validations to existing standard properties', async () => {
 		const validator = sinon.spy();
-		const provider = new Provider('http://localhost:3000', {
+		const provider = new provider('http://localhost:3000', {
 			// eslint-disable-line no-new
 			extraClientMetadata: {
 				properties: ['client_name'],
@@ -154,7 +154,7 @@ describe('extraClientMetadata configuration', () => {
 
 	it('should throw regular errors during #find()', async () => {
 		try {
-			const provider = new Provider('http://localhost:3000', {
+			const provider = new provider('http://localhost:3000', {
 				// eslint-disable-line no-new
 				extraClientMetadata: {
 					properties: ['client_description'],

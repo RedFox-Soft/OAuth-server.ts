@@ -1,18 +1,18 @@
 import { expect } from 'chai';
 
-import Provider from '../../lib/index.ts';
+import provider from '../../lib/index.ts';
 
 describe('Provider configuration', () => {
 	it('validates subjectTypes members', () => {
 		const throws = [
 			() => {
-				new Provider('http://localhost:3000', {
+				new provider('http://localhost:3000', {
 					// eslint-disable-line no-new
 					subjectTypes: ['public', 'pairwise', 'foobar']
 				});
 			},
 			() => {
-				new Provider('http://localhost:3000', {
+				new provider('http://localhost:3000', {
 					// eslint-disable-line no-new
 					subjectTypes: ['foobar']
 				});
@@ -28,7 +28,7 @@ describe('Provider configuration', () => {
 
 	it('validates subjectTypes presence', () => {
 		expect(() => {
-			new Provider('http://localhost:3000', {
+			new provider('http://localhost:3000', {
 				// eslint-disable-line no-new
 				subjectTypes: []
 			});

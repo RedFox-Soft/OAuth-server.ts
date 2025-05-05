@@ -5,7 +5,7 @@ import { koaBody as upstreamParser } from 'koa-body';
 import sinon from 'sinon';
 import { expect } from 'chai';
 
-import Provider from '../../lib/index.ts';
+import provider from '../../lib/index.ts';
 
 describe('body parser', () => {
 	afterEach(() => {
@@ -14,7 +14,7 @@ describe('body parser', () => {
 
 	describe('application/x-www-form-urlencoded', () => {
 		it('uses the upstream parser albeit reluctantly', async () => {
-			const provider = new Provider('http://localhost:3000', {
+			const provider = new provider('http://localhost:3000', {
 				features: { clientCredentials: { enabled: true } },
 				clients: [
 					{
@@ -46,7 +46,7 @@ describe('body parser', () => {
 		});
 
 		it('removes all qs magic', async () => {
-			const provider = new Provider('http://localhost:3000', {
+			const provider = new provider('http://localhost:3000', {
 				features: { clientCredentials: { enabled: true } },
 				clients: [
 					{
@@ -86,7 +86,7 @@ describe('body parser', () => {
 
 	describe('application/json', () => {
 		it('uses the upstream parser albeit reluctantly', async () => {
-			const provider = new Provider('http://localhost:3000', {
+			const provider = new provider('http://localhost:3000', {
 				features: { registration: { enabled: true } }
 			});
 			const app = new Koa();
@@ -106,7 +106,7 @@ describe('body parser', () => {
 		});
 
 		it('handles parsing errors', async () => {
-			const provider = new Provider('http://localhost:3000', {
+			const provider = new provider('http://localhost:3000', {
 				features: { registration: { enabled: true } }
 			});
 

@@ -1,10 +1,10 @@
 import { expect } from 'chai';
 
-import Provider from '../../lib/index.ts';
+import provider from '../../lib/index.ts';
 
 describe('provider.Grant', () => {
 	before(function () {
-		this.Grant = new Provider('http://localhost').Grant;
+		this.Grant = new provider('http://localhost').Grant;
 	});
 
 	it('manages OIDC Scope', function () {

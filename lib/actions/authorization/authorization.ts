@@ -4,6 +4,7 @@ import { PARAM_LIST } from '../../consts/index.ts';
 import checkRar from '../../shared/check_rar.ts';
 import checkResource from '../../shared/check_resource.ts';
 
+import { provider } from 'lib/provider.js';
 import checkClient from './check_client.ts';
 import checkResponseMode from './check_response_mode.ts';
 import rejectUnsupported from './reject_unsupported.ts';
@@ -125,7 +126,6 @@ export const authorizationAction = new Elysia()
 				cookie,
 				_matchedRouteName: route
 			};
-			const provider = globalThis.provider;
 			const OIDCContext = provider.OIDCContext;
 			ctx.oidc = new OIDCContext(ctx);
 			ctx.oidc.params = query;
@@ -160,7 +160,6 @@ export const authorizationAction = new Elysia()
 				cookie,
 				_matchedRouteName: route
 			};
-			const provider = globalThis.provider;
 			const OIDCContext = provider.OIDCContext;
 			ctx.oidc = new OIDCContext(ctx);
 			ctx.oidc.body = body;

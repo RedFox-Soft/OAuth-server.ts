@@ -5,7 +5,7 @@ import { strict as assert } from 'node:assert';
 import { expect } from 'chai';
 import sinon from 'sinon';
 
-import Provider from '../../lib/index.ts';
+import provider from '../../lib/index.ts';
 
 describe('provider instance', () => {
 	context('draft/experimental spec warnings', () => {
@@ -23,7 +23,7 @@ describe('provider instance', () => {
 		});
 
 		it('it warns when draft/experimental specs are enabled', () => {
-			new Provider('http://localhost', {
+			new provider('http://localhost', {
 				// eslint-disable-line no-new
 				features: { webMessageResponseMode: { enabled: true } }
 			});
@@ -32,7 +32,7 @@ describe('provider instance', () => {
 		});
 
 		it('it is silent when a version is acknowledged', () => {
-			new Provider('http://localhost', {
+			new provider('http://localhost', {
 				// eslint-disable-line no-new
 				features: {
 					webMessageResponseMode: { enabled: true, ack: 'individual-draft-01' }
@@ -44,7 +44,7 @@ describe('provider instance', () => {
 
 		it('throws when an acked feature has breaking changes since', () => {
 			expect(() => {
-				new Provider('http://localhost', {
+				new provider('http://localhost', {
 					// eslint-disable-line no-new
 					features: {
 						webMessageResponseMode: {
@@ -63,7 +63,7 @@ describe('provider instance', () => {
 
 	describe('provider.Client#find', () => {
 		it('ignores non-string inputs', async () => {
-			const provider = new Provider('http://localhost');
+			const provider = new provider('http://localhost');
 			expect(await provider.Client.find([])).to.be.undefined;
 			expect(await provider.Client.find(Buffer)).to.be.undefined;
 			expect(await provider.Client.find({})).to.be.undefined;
@@ -75,28 +75,28 @@ describe('provider instance', () => {
 
 	describe('#urlFor', () => {
 		it('returns the route for unprefixed issuers', () => {
-			const provider = new Provider('http://localhost');
+			const provider = new provider('http://localhost');
 			expect(provider.urlFor('authorization')).to.equal(
 				'http://localhost/auth'
 			);
 		});
 
 		it('returns the route for prefixed issuers (1/2)', () => {
-			const provider = new Provider('http://localhost/op/2.0');
+			const provider = new provider('http://localhost/op/2.0');
 			expect(provider.urlFor('authorization')).to.equal(
 				'http://localhost/op/2.0/auth'
 			);
 		});
 
 		it('returns the route for prefixed issuers (2/2)', () => {
-			const provider = new Provider('http://localhost/op/2.0/');
+			const provider = new provider('http://localhost/op/2.0/');
 			expect(provider.urlFor('authorization')).to.equal(
 				'http://localhost/op/2.0/auth'
 			);
 		});
 
 		it('passes the options', () => {
-			const provider = new Provider('http://localhost');
+			const provider = new provider('http://localhost');
 			expect(provider.urlFor('resume', { uid: 'foo' })).to.equal(
 				'http://localhost/auth/foo'
 			);
@@ -107,7 +107,7 @@ describe('provider instance', () => {
 		const error = new Error('used this adapter');
 
 		it('can be a class', async () => {
-			const provider = new Provider('https://op.example.com', {
+			const provider = new provider('https://op.example.com', {
 				adapter: class {
 					// eslint-disable-next-line
 					async find() {
@@ -124,7 +124,7 @@ describe('provider instance', () => {
 		});
 
 		it('can be a class static function', async () => {
-			const provider = new Provider('https://op.example.com', {
+			const provider = new provider('https://op.example.com', {
 				adapter: class {
 					// eslint-disable-next-line
 					static factory() {
@@ -146,7 +146,7 @@ describe('provider instance', () => {
 		});
 
 		it('can be an arrow function', async () => {
-			const provider = new Provider('https://op.example.com', {
+			const provider = new provider('https://op.example.com', {
 				adapter: () => ({
 					async find() {
 						throw error;

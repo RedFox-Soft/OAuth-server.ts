@@ -3,7 +3,7 @@ import timekeeper from 'timekeeper';
 
 import bootstrap from '../test_helper.js';
 import * as JWT from '../../lib/helpers/jwt.ts';
-import Provider from '../../lib/index.ts';
+import provider from '../../lib/index.ts';
 
 const route = '/token/introspection';
 
@@ -31,7 +31,7 @@ describe('jwtIntrospection features', () => {
 		});
 		it('can only be enabled with introspection', () => {
 			expect(() => {
-				new Provider('http://localhost', {
+				new provider('http://localhost', {
 					// eslint-disable-line no-new
 					features: {
 						jwtIntrospection: { enabled: true }
