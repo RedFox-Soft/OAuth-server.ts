@@ -6,7 +6,7 @@ function paddedBuffer(string: string, length: number) {
 	return buffer;
 }
 
-function constantEquals(a: string, b: string, minComp = 0): boolean {
+function constantEquals(a?: string, b?: string, minComp = 0): boolean {
 	if (!Number.isSafeInteger(minComp)) {
 		throw new TypeError('minComp must be an Integer');
 	}

@@ -5,7 +5,7 @@ import instance from '../../helpers/weak_cache.ts';
  * Validates that all requested scopes are supported by the provider, and that offline_access prompt
  * is requested together with consent prompt
  */
-export default async function checkScope(PARAM_LIST, ctx, next) {
+export default function checkScope(PARAM_LIST, ctx) {
 	const { scopes: statics } = instance(ctx.oidc.provider).configuration;
 	const { prompts, client } = ctx.oidc;
 
@@ -48,6 +48,4 @@ export default async function checkScope(PARAM_LIST, ctx, next) {
 			}
 		}
 	}
-
-	return next();
 }

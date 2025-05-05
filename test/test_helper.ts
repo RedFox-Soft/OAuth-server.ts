@@ -110,8 +110,8 @@ Object.defineProperties(Provider.prototype, {
 	}
 });
 
-function getSetCookies(response) {
-	return response.headers['set-cookie'].filter(
+function getSetCookies(cookies) {
+	return cookies.filter(
 		(val) => !val.includes('Thu, 01 Jan 1970 00:00:00 GMT')
 	);
 }
@@ -271,7 +271,7 @@ export default function testHelper(
 					(cl) => cl.client_id === this.params.client_id
 				);
 				this.params.state ??= crypto.randomBytes(16).toString('base64url');
-				this.params.redirect_uri ??= this.client.redirect_uris[0];
+				this.params.redirect_uri ??= this.client?.redirect_uris[0];
 
 				if (this.params.scope?.includes('openid')) {
 					this.params.nonce ??= crypto.randomBytes(16).toString('base64url');
@@ -340,18 +340,17 @@ export default function testHelper(
 				expect(hostname).to.be.null;
 				expect(search).to.be.null;
 				expect(query).to.be.null;
-				expect(response)
-					.to.have.nested.property('headers.set-cookie')
-					.that.is.an('array');
+				const cookies = response.headers.getSetCookie();
+				expect(Array.isArray(cookies)).to.be.true;
 
-				const uid = readCookie(getSetCookies(response)[0]);
-				expect(readCookie(getSetCookies(response)[0])).to.equal(
-					readCookie(getSetCookies(response)[1])
+				const uid = readCookie(getSetCookies(cookies)[0]);
+				expect(readCookie(getSetCookies(cookies)[0])).to.equal(
+					readCookie(getSetCookies(cookies)[1])
 				);
 
 				const interaction = TestAdapter.for('Interaction').syncFind(uid);
 
-				Object.entries(this).forEach(([key, value]) => {
+				Object.entries(this.params).forEach(([key, value]) => {
 					if (key === 'res') return;
 					if (key === 'request') return;
 					if (key === 'code_verifier') return;
@@ -597,7 +596,14 @@ export default function testHelper(
 			};
 		}
 
-		agent = treaty(provider.elysia);
+		agent = treaty(provider.elysia, {
+			onRequest: (path, fetchInit) => {
+				if (path === '/auth' && fetchInit.method === 'POST') {
+					fetchInit.headers['content-type'] =
+						'application/x-www-form-urlencoded';
+				}
+			}
+		});
 
 		if (mountTo !== '/') {
 			['get', 'post', 'put', 'del', 'options', 'trace'].forEach((method) => {

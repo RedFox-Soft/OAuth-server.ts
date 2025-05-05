@@ -3,8 +3,10 @@ import camelCase from '../../helpers/_/camel_case.ts';
 import * as errors from '../../helpers/errors.ts';
 import instance from '../../helpers/weak_cache.ts';
 import nanoid from '../../helpers/nanoid.ts';
+import omitBy from '../../helpers/_/omit_by.ts';
+import { cookieNames } from '../../consts/param_list.ts';
 
-export default async function interactions(resumeRouteName, ctx, next) {
+export default async function interactions(resumeRouteName, ctx) {
 	const { oidc } = ctx;
 	let failedCheck;
 	let prompt;
@@ -83,7 +85,6 @@ export default async function interactions(resumeRouteName, ctx, next) {
 		}
 
 		oidc.provider.emit('authorization.accepted', ctx);
-		await next();
 		return;
 	}
 
@@ -110,16 +111,14 @@ export default async function interactions(resumeRouteName, ctx, next) {
 	const uid = nanoid();
 
 	const cookieOptions = instance(oidc.provider).configuration.cookies.short;
-	const returnTo = oidc.urlFor(resumeRouteName, {
-		uid
-	});
+	const returnTo = oidc.urlFor(resumeRouteName, { uid });
 
 	const interactionSession = new oidc.provider.Interaction(uid, {
 		returnTo,
 		prompt,
 		lastSubmission: oidc.result,
 		accountId: oidc.session.accountId,
-		params: oidc.params.toPlainObject(),
+		params: omitBy({ ...oidc.params }, (val) => typeof val === 'undefined'),
 		trusted: oidc.trusted,
 		session: oidc.session,
 		grant: oidc.grant,
@@ -141,21 +140,18 @@ export default async function interactions(resumeRouteName, ctx, next) {
 
 	const destination = await interactionUrl(ctx, interactionSession);
 
-	ctx.cookies.set(oidc.provider.cookieName('interaction'), uid, {
-		path: new URL(destination, ctx.oidc.issuer).pathname,
-		...cookieOptions,
+	ctx.cookie[cookieNames.interaction].set({
+		value: uid,
+		path: new URL(destination, ctx.baseUrl).pathname,
 		maxAge: ttl * 1000
 	});
 
-	ctx.cookies.set(oidc.provider.cookieName('resume'), uid, {
-		...cookieOptions,
+	ctx.cookie[cookieNames.resume].set({
+		value: uid,
 		path: new URL(returnTo).pathname,
-		domain: undefined,
-		httpOnly: true,
 		maxAge: ttl * 1000
 	});
 
 	oidc.provider.emit('interaction.started', ctx, prompt);
-	ctx.status = 303;
-	ctx.redirect(destination);
+	return destination;
 }

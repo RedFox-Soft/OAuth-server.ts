@@ -34,6 +34,36 @@ export const AuthorizationParameters = t.Object(
 	{ additionalProperties: false }
 );
 
+export const routeNames = {
+	authorization: '/auth',
+	backchannel_authentication: '/backchannel',
+	code_verification: '/device',
+	device_authorization: '/device/auth',
+	end_session: '/session/end',
+	introspection: '/token/introspection',
+	jwks: '/jwks',
+	pushed_authorization_request: '/request',
+	registration: '/reg',
+	revocation: '/token/revocation',
+	token: '/token',
+	userinfo: '/me'
+};
+
+export const cookieNames = {
+	session: '_session',
+	interaction: '_interaction',
+	resume: '_interaction_resume'
+};
+
+export const AuthorizationCookies = t.Cookie(
+	{
+		_session: t.Optional(t.String()),
+		_interaction: t.Optional(t.String()),
+		_interaction_resume: t.Optional(t.String())
+	},
+	{ httpOnly: true, sameSite: 'lax' }
+);
+
 export const PARAM_LIST = [
 	'acr_values',
 	// 'claims', // added conditionally depending on feature flag

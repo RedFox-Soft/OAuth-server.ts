@@ -866,62 +866,6 @@ export const globalConfiguration = {
 	acceptQueryParamAccessTokens: false,
 
 	/*
-	 * cookies
-	 *
-	 * description: Options for the [cookies module](https://github.com/pillarjs/cookies#cookiesset-name--value---options--)
-	 *   used to keep track of various User-Agent states. The options `maxAge` and `expires` are ignored. Use `ttl.Session`
-	 *   and `ttl.Interaction` to configure the ttl and in turn the cookie expiration values for Session and Interaction
-	 *   models.
-	 * @nodefault
-	 */
-	cookies: {
-		/*
-		 * cookies.names
-		 *
-		 * description: Cookie names used to store and transfer various states.
-		 */
-		names: {
-			session: '_session', // used for main session reference
-			interaction: '_interaction', // used by the interactions for interaction session reference
-			resume: '_interaction_resume' // used when interactions resume authorization for interaction session reference
-		},
-
-		/*
-		 * cookies.long
-		 *
-		 * description: Options for long-term cookies
-		 */
-		long: {
-			httpOnly: true, // cookies are not readable by client-side javascript
-			sameSite: 'lax'
-		},
-
-		/*
-		 * cookies.short
-		 *
-		 * description: Options for short-term cookies
-		 */
-		short: {
-			httpOnly: true, // cookies are not readable by client-side javascript
-			sameSite: 'lax'
-		},
-
-		/*
-		 * cookies.keys
-		 *
-		 * description: [Keygrip](https://www.npmjs.com/package/keygrip) Signing keys used for cookie
-		 *   signing to prevent tampering. You may also pass your own KeyGrip instance.
-		 *
-		 * recommendation: Rotate regularly (by prepending new keys) with a reasonable interval and keep
-		 *   a reasonable history of keys to allow for returning user session cookies to still be valid
-		 *   and re-signed
-		 *
-		 * @skip
-		 */
-		keys: []
-	},
-
-	/*
 	 * discovery
 	 *
 	 * description: Pass additional properties to this object to extend the discovery document

@@ -1,4 +1,4 @@
-import Elysia, { t } from 'elysia';
+import { Elysia } from 'elysia';
 
 import { PARAM_LIST } from '../../consts/index.ts';
 import checkRar from '../../shared/check_rar.ts';
@@ -31,93 +31,146 @@ import checkOpenidScope from './check_openid_scope.ts';
 import { globalConfiguration } from '../../globalConfiguration.ts';
 
 import { authorizationPKCE } from '../../helpers/pkce.ts';
-import { AuthorizationParameters } from '../../consts/param_list.ts';
+import {
+	AuthorizationCookies,
+	AuthorizationParameters,
+	routeNames
+} from '../../consts/param_list.ts';
 import sessionHandler from '../../shared/session.ts';
 
-const cookieName = globalConfiguration.cookies.names.session;
-
-export const authorizationAction = new Elysia().get(
-	globalConfiguration.routes.authorization,
-	async ({ query, error, cookie, redirect }) => {
-		const {
-			features: {
-				claimsParameter,
-				dPoP,
-				resourceIndicators,
-				richAuthorizationRequests,
-				webMessageResponseMode
-			}
-		} = globalConfiguration;
-
-		const allowList = new Set(PARAM_LIST);
-
-		if (!Object.keys(query.claims ?? {}).length) {
-			query.claims = undefined;
+function validdateGlobalParameters(params, error) {
+	const {
+		features: {
+			claimsParameter,
+			dPoP,
+			resourceIndicators,
+			richAuthorizationRequests,
+			webMessageResponseMode
 		}
+	} = globalConfiguration;
 
-		if (query.web_message_uri && !webMessageResponseMode.enabled) {
-			return error(400, 'Web Message Response Mode is not supported');
-		} else if (query.claims && !claimsParameter.enabled) {
-			return error(400, 'Claims Parameter is not supported');
-		} else if (query.resource && !resourceIndicators.enabled) {
-			return error(400, 'Resource Indicators is not supported');
-		} else if (
-			query.authorization_details &&
-			!richAuthorizationRequests.enabled
-		) {
-			return error(400, 'Rich Authorization Requests is not supported');
-		} else if (query.dpop_jkt && !dPoP.enabled) {
-			return error(400, 'DPoP JWK Thumbprint is not supported');
-		}
-
-		const ctx = {
-			cookie
-		};
-		const provider = globalThis.provider;
-		const OIDCContext = provider.OIDCContext;
-		ctx.oidc = new OIDCContext(ctx);
-		ctx.oidc.params = query;
-
-		const setCookies = await sessionHandler(ctx);
-		rejectUnsupported(query, 'authorization');
-		await checkClient(ctx);
-		loadPushedAuthorizationRequest;
-		processRequestObject.bind(undefined, allowList);
-		checkResponseMode;
-		oneRedirectUriClients(ctx);
-		rejectRegistration;
-		checkResponseType;
-		oidcRequired;
-		assignDefaults(ctx);
-		checkPrompt;
-		checkScope.bind(undefined, allowList);
-		checkOpenidScope(ctx);
-		checkRedirectUri;
-		authorizationPKCE(query);
-		checkClaims;
-		checkRar;
-		checkResource;
-		checkMaxAge(ctx);
-		checkIdTokenHint(ctx);
-		interactionEmit;
-		assignClaims(ctx);
-		await loadAccount(ctx);
-		await loadGrant(ctx);
-		interactions.bind(undefined, 'resume');
-		await respond(ctx);
-		await setCookies();
-
-		if (ctx.status === 303 && ctx.redirect) {
-			return redirect(ctx.redirect, 303);
-		}
-	},
-	{
-		query: AuthorizationParameters,
-		cookie: t.Cookie(
-			{
-				[cookieName]: t.Optional(t.String())
-			},
-			{ httpOnly: true, sameSite: 'lax', secure: true }
-		)
+	if (!Object.keys(params.claims ?? {}).length) {
+		params.claims = undefined;
 	}
-);
+
+	if (params.web_message_uri && !webMessageResponseMode.enabled) {
+		return error(400, 'Web Message Response Mode is not supported');
+	} else if (params.claims && !claimsParameter.enabled) {
+		return error(400, 'Claims Parameter is not supported');
+	} else if (params.resource && !resourceIndicators.enabled) {
+		return error(400, 'Resource Indicators is not supported');
+	} else if (
+		params.authorization_details &&
+		!richAuthorizationRequests.enabled
+	) {
+		return error(400, 'Rich Authorization Requests is not supported');
+	} else if (params.dpop_jkt && !dPoP.enabled) {
+		return error(400, 'DPoP JWK Thumbprint is not supported');
+	}
+}
+
+async function authorizationActionHandler(ctx) {
+	const params = ctx.oidc.params;
+
+	const allowList = new Set(PARAM_LIST);
+	const setCookies = await sessionHandler(ctx);
+	rejectUnsupported(params, 'authorization');
+	await checkClient(ctx);
+	loadPushedAuthorizationRequest;
+	processRequestObject.bind(undefined, allowList);
+	checkResponseMode;
+	oneRedirectUriClients(ctx);
+	rejectRegistration;
+	checkResponseType;
+	oidcRequired;
+	assignDefaults(ctx);
+	checkPrompt(ctx);
+	checkScope(allowList, ctx);
+	checkOpenidScope(ctx);
+	checkRedirectUri(ctx);
+	authorizationPKCE(params);
+	checkClaims;
+	checkRar;
+	checkResource;
+	checkMaxAge(ctx);
+	checkIdTokenHint(ctx);
+	interactionEmit;
+	assignClaims(ctx);
+	await loadAccount(ctx);
+	await loadGrant(ctx);
+	let redirectUri = await interactions('resume', ctx);
+	if (redirectUri) {
+		await setCookies();
+		return redirectUri;
+	}
+	redirectUri = await respond(ctx);
+	await setCookies();
+
+	return redirectUri;
+}
+
+export const authorizationAction = new Elysia()
+	.get(
+		routeNames.authorization,
+		async ({ query, error, cookie, redirect, route, request }) => {
+			const errorOut = validdateGlobalParameters(query, error);
+			if (errorOut) {
+				return errorOut;
+			}
+			const url = new URL(request.url);
+			url.search = url.pathname = '';
+
+			const ctx = {
+				baseUrl: url.toString(),
+				cookie,
+				_matchedRouteName: route
+			};
+			const provider = globalThis.provider;
+			const OIDCContext = provider.OIDCContext;
+			ctx.oidc = new OIDCContext(ctx);
+			ctx.oidc.params = query;
+
+			const redirectUri = await authorizationActionHandler(ctx);
+			return redirect(redirectUri, 303);
+		},
+		{
+			query: AuthorizationParameters,
+			cookie: AuthorizationCookies
+		}
+	)
+	.derive(({ request, error }) => {
+		const contentType = request.headers.get('content-type') || '';
+		if (!contentType.includes('application/x-www-form-urlencoded')) {
+			return error(415, 'Unsupported Content-Type');
+		}
+	})
+	.post(
+		routeNames.authorization,
+		async ({ body, error, cookie, redirect, route, request }) => {
+			const errorOut = validdateGlobalParameters(body, error);
+			if (errorOut) {
+				return errorOut;
+			}
+			const url = new URL(request.url);
+			url.search = '';
+			url.pathname = url.pathname.replace(route, '');
+
+			const ctx = {
+				baseUrl: url.toString(),
+				cookie,
+				_matchedRouteName: route
+			};
+			const provider = globalThis.provider;
+			const OIDCContext = provider.OIDCContext;
+			ctx.oidc = new OIDCContext(ctx);
+			ctx.oidc.body = body;
+			ctx.oidc.params = body;
+
+			const redirectUri = await authorizationActionHandler(ctx);
+			return redirect(redirectUri, 303);
+		},
+		{
+			body: AuthorizationParameters,
+			cookie: AuthorizationCookies
+		}
+	);

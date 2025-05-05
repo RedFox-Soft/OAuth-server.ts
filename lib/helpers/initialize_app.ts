@@ -1,5 +1,5 @@
 import { strict as assert } from 'node:assert';
-import Elysia from 'elysia';
+import { Elysia } from 'elysia';
 
 import Router from '@koa/router';
 
@@ -8,7 +8,6 @@ import cors from '../shared/cors.ts';
 import * as grants from '../actions/grants/index.ts';
 import * as responseModes from '../response_modes/index.ts';
 import error from '../shared/error_handler.ts';
-import getAuthError from '../shared/authorization_error_handler.ts';
 import {
 	getAuthorization,
 	userinfo,
@@ -27,13 +26,9 @@ import instance from './weak_cache.ts';
 import { authorizationAction } from '../actions/authorization/authorization.ts';
 import { nocache } from '../shared/no_cache.ts';
 import { tokenAction } from '../actions/token.ts';
-import { OIDCProviderError } from './errors.ts';
+import { errorHandler } from '../shared/authorization_error_handler.ts';
 
 const discoveryRoute = '/.well-known/openid-configuration';
-
-const mapErrorCode = {
-	'/token': 'grant.error'
-};
 
 export default function initializeApp() {
 	const { configuration, features } = instance(this);
@@ -61,29 +56,7 @@ export default function initializeApp() {
 	});
 
 	return new Elysia({ strictPath: true })
-		.onError(function ({ error, route, set, code }) {
-			const provider = globalThis.provider;
-			if (set.status === 500) {
-				provider.emit('server_error', error);
-			} else {
-				const key = mapErrorCode[route] ?? 'server_error';
-				provider.emit(key, error);
-			}
-
-			if (error instanceof OIDCProviderError) {
-				set.status = error.status;
-				return {
-					error: error.error,
-					error_description: error.error_description,
-					error_detail: error.error_detail
-				};
-			} else if (code === 'UNKNOWN') {
-				return {
-					error: 'server_error',
-					error_description: 'An unexpected error occurred'
-				};
-			}
-		})
+		.onError(errorHandler)
 		.use(nocache)
 		.use(authorizationAction)
 		.use(tokenAction);
@@ -407,4 +380,7 @@ export default function initializeApp() {
 	}
 
 	return router.routes();
+}
+function getAuthError(arg0: any) {
+	throw new Error('Function not implemented.');
 }

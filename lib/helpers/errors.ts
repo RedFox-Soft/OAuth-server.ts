@@ -1,6 +1,3 @@
-/* eslint-disable camelcase */
-/* eslint-disable max-classes-per-file */
-
 import upperFirst from './_/upper_first.ts';
 import camelCase from './_/camel_case.ts';
 

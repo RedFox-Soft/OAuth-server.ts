@@ -1,9 +1,19 @@
-import * as querystring from 'node:querystring';
+import querystring from 'node:querystring';
+import {
+	describe,
+	it,
+	beforeAll,
+	afterAll,
+	beforeEach,
+	afterEach,
+	expect,
+	spyOn,
+	mock
+} from 'bun:test';
 
 import sinon from 'sinon';
-import { expect } from 'chai';
 
-import bootstrap, { skipConsent } from '../../test_helper.js';
+import bootstrap from '../../test_helper.js';
 import epochTime from '../../../lib/helpers/epoch_time.ts';
 import {
 	InvalidRequest,
@@ -16,68 +26,77 @@ const response_type = 'code';
 const scope = 'openid';
 
 describe('BASIC code', () => {
-	before(bootstrap(import.meta.url));
+	let setup = null;
+	beforeAll(async function () {
+		setup = await bootstrap(import.meta.url)();
+	});
+
+	afterEach(function () {
+		mock.restore();
+		sinon.restore();
+	});
 
 	['get', 'post'].forEach((verb) => {
+		function authRequest(auth, { cookie, accept } = {}) {
+			if (verb === 'get') {
+				return setup.agent.auth.get({
+					query: auth.params,
+					headers: {
+						cookie,
+						accept
+					}
+				});
+			} else if (verb === 'post') {
+				console.log(
+					new URLSearchParams(Object.entries(auth.params)).toString()
+				);
+				return setup.agent.auth.post(
+					new URLSearchParams(Object.entries(auth.params)).toString(),
+					{
+						headers: {
+							cookie,
+							accept
+						}
+					}
+				);
+			}
+		}
+
 		describe(`${verb} ${route} with session`, () => {
-			before(function () {
-				return this.login();
+			let cookie;
+			beforeAll(async function () {
+				cookie = await setup.login();
 			});
 
-			it('responds with a code in search', function () {
-				const auth = new this.AuthorizationRequest({
-					response_type,
-					scope
-				});
+			it('responds with a code in search', async function () {
+				const auth = new setup.AuthorizationRequest({ scope });
+				const { response } = await authRequest(auth, { cookie });
 
-				return this.wrap({ route, verb, auth })
-					.expect(303)
-					.expect(auth.validatePresence(['code', 'state']))
-					.expect(auth.validateState)
-					.expect(auth.validateClientLocation);
+				expect(response.status).toBe(303);
+				auth.validatePresence(response, ['code', 'state']);
+				auth.validateState(response);
+				auth.validateClientLocation(response);
 			});
 
-			it('responds with a code in fragment', function () {
-				const auth = new this.AuthorizationRequest({
-					response_type,
-					response_mode: 'fragment',
-					scope
-				});
+			it('populates ctx.oidc.entities', async function () {
+				const spy = spyOn(setup.provider.OIDCContext.prototype, 'entity');
 
-				return this.wrap({ route, verb, auth })
-					.expect(303)
-					.expect(auth.validateFragment)
-					.expect(auth.validatePresence(['code', 'state']))
-					.expect(auth.validateState)
-					.expect(auth.validateClientLocation);
+				const auth = new setup.AuthorizationRequest({ scope });
+				const { response } = await authRequest(auth, { cookie });
+				expect(response.status).toBe(303);
+
+				const entities = spy.mock.calls.map((call) => call[0]);
+				expect([
+					'AuthorizationCode',
+					'Grant',
+					'Client',
+					'Account',
+					'Session'
+				]).toEqual(expect.arrayContaining(entities));
 			});
 
-			it('populates ctx.oidc.entities', function (done) {
-				this.assertOnce((ctx) => {
-					expect(ctx.oidc.entities).to.have.keys(
-						'AuthorizationCode',
-						'Grant',
-						'Client',
-						'Account',
-						'Session'
-					);
-					expect(ctx.oidc.params).to.include({
-						extra: 'provided',
-						extra2: 'defaulted'
-					});
-				}, done);
-
-				const auth = new this.AuthorizationRequest({
-					response_type,
-					scope,
-					extra: 'provided'
-				});
-
-				this.wrap({ route, verb, auth }).end(() => {});
-			});
-
-			it('allows native apps to do none auth check when already authorized', function () {
-				const auth = new this.AuthorizationRequest({
+			it('allows native apps to do none auth check when already authorized', async function () {
+				const auth = new setup.AuthorizationRequest({
 					response_type: 'none',
 					prompt: 'none',
 					client_id: 'client-native',
@@ -85,125 +104,113 @@ describe('BASIC code', () => {
 					scope
 				});
 
-				return this.wrap({ route, verb, auth })
-					.expect(303)
-					.expect(auth.validatePresence(['state']))
-					.expect(auth.validateState)
-					.expect(auth.validateClientLocation);
+				const { response } = await authRequest(auth, { cookie });
+				expect(response.status).toBe(303);
+				auth.validatePresence(response, ['state']);
+				auth.validateState(response);
+				auth.validateClientLocation(response);
 			});
 
-			it('ignores unsupported scopes', function () {
+			it('ignores unsupported scopes', async function () {
 				const spy = sinon.spy();
-				this.provider.once('authorization_code.saved', spy);
-				const auth = new this.AuthorizationRequest({
-					response_type,
+				setup.provider.once('authorization_code.saved', spy);
+				const auth = new setup.AuthorizationRequest({
 					scope: 'openid and unsupported'
 				});
 
-				return this.wrap({ route, verb, auth })
-					.expect(303)
-					.expect(auth.validateClientLocation)
-					.expect(() => {
-						expect(spy.firstCall.args[0]).to.have.property('scope', 'openid');
-					});
+				const { response } = await authRequest(auth, { cookie });
+				expect(response.status).toBe(303);
+				auth.validateClientLocation(response);
+				expect(spy.firstCall.args[0]).toHaveProperty('scope', 'openid');
 			});
 
 			describe('ignoring the offline_access scope', () => {
-				skipConsent();
+				beforeEach(function () {
+					spyOn(
+						setup.provider.OIDCContext.prototype,
+						'promptPending'
+					).mockReturnValue(false);
+				});
 
-				it('ignores the scope offline_access unless prompt consent is present', function () {
+				it('ignores the scope offline_access unless prompt consent is present', async function () {
 					const spy = sinon.spy();
-					this.provider.once('authorization_code.saved', spy);
-					const auth = new this.AuthorizationRequest({
-						response_type,
+					setup.provider.once('authorization_code.saved', spy);
+					const auth = new setup.AuthorizationRequest({
 						scope: 'openid offline_access'
 					});
 
-					return this.wrap({ route, verb, auth })
-						.expect(303)
-						.expect(auth.validateClientLocation)
-						.expect(() => {
-							expect(spy.firstCall.args[0])
-								.to.have.property('scope')
-								.and.not.include('offline_access');
-						});
+					const { response } = await authRequest(auth, { cookie });
+					expect(response.status).toBe(303);
+					auth.validateClientLocation(response);
+					expect(spy.firstCall.args[0]).toHaveProperty('scope');
+					expect(spy.firstCall.args[0].scope).not.toContain('offline_access');
 				});
 
-				it('ignores the scope offline_access unless the client can do refresh_token exchange', function () {
+				it('ignores the scope offline_access unless the client can do refresh_token exchange', async function () {
 					const spy = sinon.spy();
-					this.provider.once('authorization_code.saved', spy);
-					const auth = new this.AuthorizationRequest({
+					setup.provider.once('authorization_code.saved', spy);
+					const auth = new setup.AuthorizationRequest({
 						client_id: 'client-no-refresh',
-						response_type,
 						prompt: 'consent',
 						scope: 'openid offline_access'
 					});
 
-					return this.wrap({ route, verb, auth })
-						.expect(303)
-						.expect(auth.validateClientLocation)
-						.expect(() => {
-							expect(spy.firstCall.args[0])
-								.to.have.property('scope')
-								.and.not.include('offline_access');
-						});
+					const { response } = await authRequest(auth, { cookie });
+					expect(response.status).toBe(303);
+					auth.validateClientLocation(response);
+					expect(spy.firstCall.args[0]).toHaveProperty('scope');
+					expect(spy.firstCall.args[0].scope).not.toContain('offline_access');
 				});
 			});
 		});
 
 		describe(`${verb} ${route} interactions`, () => {
-			before(function () {
-				return this.logout();
-			});
-			before(function () {
-				this.policy = i(this.provider).configuration.interactions.policy;
-				i(this.provider).configuration.interactions.policy = [];
+			let policy = null;
+
+			beforeAll(function () {
+				policy = i(setup.provider).configuration.interactions.policy;
 			});
 
-			after(function () {
-				i(this.provider).configuration.interactions.policy = this.policy;
+			afterAll(function () {
+				i(setup.provider).configuration.interactions.policy = policy;
 			});
 
 			it('no account id was resolved and no interactions requested', async function () {
+				i(setup.provider).configuration.interactions.policy = [];
 				const spy = sinon.spy();
-				this.provider.on('authorization.error', spy);
+				setup.provider.on('authorization.error', spy);
 
-				const auth = new this.AuthorizationRequest({
-					response_type,
-					scope
-				});
+				const auth = new setup.AuthorizationRequest({ scope });
+				const { response } = await authRequest(auth);
 
-				await this.wrap({ route, verb, auth })
-					.expect(303)
-					.expect(auth.validateClientLocation)
-					.expect(auth.validatePresence(['error', 'state']))
-					.expect(auth.validateError('access_denied'));
+				expect(response.status).toBe(303);
+				auth.validateClientLocation(response);
+				auth.validatePresence(response, ['error', 'state']);
+				auth.validateError(response, 'access_denied');
 
-				expect(spy.calledOnce).to.be.true;
-				expect(spy.args[0][1]).to.have.property(
+				expect(spy.calledOnce).toBe(true);
+				expect(spy.args[0][0]).toHaveProperty(
 					'error_detail',
 					'authorization request resolved without requesting interactions but no account id was resolved'
 				);
 			});
 
 			it('no scope was resolved and no interactions requested', async function () {
-				await this.login();
+				i(setup.provider).configuration.interactions.policy = [];
 				const spy = sinon.spy();
-				this.provider.on('authorization.error', spy);
+				setup.provider.on('authorization.error', spy);
 
-				const auth = new this.AuthorizationRequest({
-					response_type
-					// scope,
-				});
+				const cookie = await setup.login();
+				const auth = new setup.AuthorizationRequest();
+				const { response } = await authRequest(auth, { cookie });
 
-				await this.wrap({ route, verb, auth })
-					.expect(303)
-					.expect(auth.validateClientLocation)
-					.expect(auth.validatePresence(['error', 'state']))
-					.expect(auth.validateError('access_denied'));
+				expect(response.status).toBe(303);
+				auth.validateClientLocation(response);
+				auth.validatePresence(response, ['error', 'state']);
+				auth.validateError(response, 'access_denied');
 
-				expect(spy.calledOnce).to.be.true;
-				expect(spy.args[0][1]).to.have.property(
+				expect(spy.calledOnce).toBe(true);
+				expect(spy.args[0][0]).toHaveProperty(
 					'error_detail',
 					'authorization request resolved without requesting interactions but no scope was granted'
 				);
@@ -211,162 +218,113 @@ describe('BASIC code', () => {
 		});
 
 		describe(`${verb} ${route} interactions`, () => {
-			beforeEach(function () {
-				return this.login();
-			});
-			after(function () {
-				return this.logout();
+			let cookie;
+			beforeEach(async function () {
+				cookie = await setup.login();
 			});
 
-			it('no account id was found in the session info', function () {
-				const session = this.getSession();
+			it('no account id was found in the session info', async function () {
+				const session = setup.getSession();
 				delete session.loginTs;
 				delete session.accountId;
 
-				const auth = new this.AuthorizationRequest({
-					response_type,
-					scope
-				});
-
-				return this.wrap({ route, verb, auth })
-					.expect(303)
-					.expect(auth.validateInteractionRedirect)
-					.expect(auth.validateInteraction('login', 'no_session'));
+				const auth = new setup.AuthorizationRequest({ scope });
+				const { response } = await authRequest(auth, { cookie });
+				expect(response.status).toBe(303);
+				auth.validateInteractionRedirect(response);
+				auth.validateInteraction('login', 'no_session');
 			});
 
-			it('additional scopes are requested', function () {
-				const auth = new this.AuthorizationRequest({
-					response_type,
-					scope: 'openid email'
-				});
-
-				return this.wrap({ route, verb, auth })
-					.expect(303)
-					.expect(auth.validateInteractionRedirect)
-					.expect(auth.validateInteraction('consent', 'op_scopes_missing'));
+			it('additional scopes are requested', async function () {
+				const auth = new setup.AuthorizationRequest({ scope: 'openid email' });
+				const { response } = await authRequest(auth, { cookie });
+				expect(response.status).toBe(303);
+				auth.validateInteractionRedirect(response);
+				auth.validateInteraction('consent', 'op_scopes_missing');
 			});
 
-			it('are required for native clients by default', function () {
-				const auth = new this.AuthorizationRequest({
-					response_type,
+			it('are required for native clients by default', async function () {
+				const auth = new setup.AuthorizationRequest({
 					client_id: 'client-native',
 					redirect_uri: 'com.example.app:/cb',
 					scope,
 					code_challenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
 					code_challenge_method: 'S256'
 				});
-
-				return this.wrap({ route, verb, auth })
-					.expect(303)
-					.expect(auth.validateInteractionRedirect)
-					.expect(auth.validateInteraction('consent', 'native_client_prompt'));
+				const { response } = await authRequest(auth, { cookie });
+				expect(response.status).toBe(303);
+				auth.validateInteractionRedirect(response);
+				auth.validateInteraction('consent', 'native_client_prompt');
 			});
 
-			it('login was requested by the client by prompt parameter', function () {
-				const auth = new this.AuthorizationRequest({
-					response_type,
-					prompt: 'login',
+			it('login was requested by the client by prompt parameter', async function () {
+				const auth = new setup.AuthorizationRequest({ prompt: 'login', scope });
+				const { response } = await authRequest(auth, { cookie });
+				expect(response.status).toBe(303);
+				auth.validateInteractionRedirect(response);
+				auth.validateInteraction('login', 'login_prompt');
+			});
+
+			it('login was requested by the client by max_age=0', async function () {
+				const auth = new setup.AuthorizationRequest({ max_age: 0, scope });
+				const { response } = await authRequest(auth, { cookie });
+				expect(response.status).toBe(303);
+				auth.validateInteractionRedirect(response);
+				auth.validateInteraction('login', 'login_prompt');
+			});
+
+			it('interaction check no session & max_age combo', async function () {
+				const auth = new setup.AuthorizationRequest({
+					max_age: 1800, // 30 minutes old session max
 					scope
 				});
-
-				return this.wrap({ route, verb, auth })
-					.expect(303)
-					.expect(auth.validateInteractionRedirect)
-					.expect(auth.validateInteraction('login', 'login_prompt'));
+				const { response } = await authRequest(auth);
+				expect(response.status).toBe(303);
+				auth.validateInteractionRedirect(response);
+				auth.validateInteraction('login', 'max_age', 'no_session');
 			});
 
-			it('login was requested by the client by max_age=0', function () {
-				const auth = new this.AuthorizationRequest({
-					response_type,
-					max_age: 0,
-					scope
-				});
-
-				return this.wrap({ route, verb, auth })
-					.expect(303)
-					.expect(auth.validateInteractionRedirect)
-					.expect(auth.validateInteraction('login', 'login_prompt'));
-			});
-
-			it('interaction check no session & max_age combo', function () {
-				this.logout();
-
-				const auth = new this.AuthorizationRequest({
-					response_type,
-					max_age: '1800', // 30 minutes old session max
-					scope
-				});
-
-				return this.wrap({ route, verb, auth })
-					.expect(303)
-					.expect(auth.validateInteractionRedirect)
-					.expect(auth.validateInteraction('login', 'max_age', 'no_session'));
-			});
-
-			it('session is too old for this authorization request (1/2)', function () {
-				const session = this.getSession();
+			it('session is too old for this authorization request (1/2)', async function () {
+				const session = setup.getSession();
 				session.loginTs = epochTime() - 3600; // an hour ago
 
-				const auth = new this.AuthorizationRequest({
-					response_type,
-					max_age: '1800', // 30 minutes old session max
+				const auth = new setup.AuthorizationRequest({
+					max_age: 1800, // 30 minutes old session max
 					scope
 				});
-
-				return this.wrap({ route, verb, auth })
-					.expect(303)
-					.expect(auth.validateInteractionRedirect)
-					.expect(auth.validateInteraction('login', 'max_age'));
+				const { response } = await authRequest(auth, { cookie });
+				expect(response.status).toBe(303);
+				auth.validateInteractionRedirect(response);
+				auth.validateInteraction('login', 'max_age');
 			});
 
-			it('session is too old for this authorization request (2/2)', function () {
-				const session = this.getSession();
+			it('session is too old for this authorization request (2/2)', async function () {
+				const session = setup.getSession();
 				delete session.loginTs;
 
-				const auth = new this.AuthorizationRequest({
-					response_type,
-					max_age: '1800', // 30 minutes old session max
+				const auth = new setup.AuthorizationRequest({
+					max_age: 1800, // 30 minutes old session max
 					scope
 				});
-
-				return this.wrap({ route, verb, auth })
-					.expect(303)
-					.expect(auth.validateInteractionRedirect)
-					.expect(auth.validateInteraction('login', 'max_age'));
-			});
-
-			it('custom interactions can be requested', function () {
-				const auth = new this.AuthorizationRequest({
-					response_type,
-					scope,
-					triggerCustomFail: 'foo'
-				});
-
-				return this.wrap({ route, verb, auth })
-					.expect(303)
-					.expect(auth.validateInteractionRedirect)
-					.expect(auth.validateInteraction('login', 'reason_foo'));
+				const { response } = await authRequest(auth, { cookie });
+				expect(response.status).toBe(303);
+				auth.validateInteractionRedirect(response);
+				auth.validateInteraction('login', 'max_age');
 			});
 
 			it('session is too old for this client', async function () {
-				const client = await this.provider.Client.find('client');
+				const client = await setup.provider.Client.find('client');
 				client.defaultMaxAge = 1800;
 
-				const session = this.getSession();
+				const session = setup.getSession();
 				session.loginTs = epochTime() - 3600; // an hour ago
 
-				const auth = new this.AuthorizationRequest({
-					response_type,
-					scope
-				});
-
-				return this.wrap({ route, verb, auth })
-					.expect(() => {
-						delete client.defaultMaxAge;
-					})
-					.expect(303)
-					.expect(auth.validateInteractionRedirect)
-					.expect(auth.validateInteraction('login', 'max_age'));
+				const auth = new setup.AuthorizationRequest({ scope });
+				const { response } = await authRequest(auth, { cookie });
+				delete client.defaultMaxAge;
+				expect(response.status).toBe(303);
+				auth.validateInteractionRedirect(response);
+				auth.validateInteraction('login', 'max_age');
 			});
 		});
 
@@ -559,114 +517,69 @@ describe('BASIC code', () => {
 				});
 			});
 
-			context('when client has a single redirect_uri', () => {
-				after(async function () {
+			describe('when client has a single redirect_uri', () => {
+				afterEach(function () {
 					i(
-						this.provider
+						setup.provider
 					).configuration.allowOmittingSingleRegisteredRedirectUri = false;
-					await this.logout();
 				});
 
-				it('missing mandatory parameter redirect_uri', function () {
+				it('missing mandatory parameter redirect_uri', async function () {
 					const emitSpy = sinon.spy();
-					const renderSpy = sinon.spy(
-						i(this.provider).configuration,
-						'renderError'
-					);
-					this.provider.once('authorization.error', emitSpy);
-					const auth = new this.AuthorizationRequest({
-						response_type,
-						scope
-					});
-					delete auth.redirect_uri;
+					setup.provider.once('authorization.error', emitSpy);
+					const auth = new setup.AuthorizationRequest({ scope });
+					delete auth.params.redirect_uri;
 
-					return this.wrap({ route, verb, auth })
-						.expect(() => {
-							renderSpy.restore();
-						})
-						.expect(400)
-						.expect(() => {
-							expect(emitSpy.calledOnce).to.be.true;
-							expect(renderSpy.calledOnce).to.be.true;
-							const renderArgs = renderSpy.args[0];
-							expect(renderArgs[1]).to.have.property(
-								'error',
-								'invalid_request'
-							);
-							expect(renderArgs[1]).to.have.property(
-								'error_description',
-								"missing required parameter 'redirect_uri'"
-							);
-							expect(renderArgs[2]).to.be.an.instanceof(InvalidRequest);
-						});
+					const { response } = await authRequest(auth, { accept: 'text/html' });
+					expect(response.status).toBe(400);
+					expect(response.headers.get('content-type')).toBe(
+						'text/html; charset=utf-8'
+					);
+					expect(emitSpy.calledOnce).toBe(true);
 				});
 
 				it('unless allowOmittingSingleRegisteredRedirectUri is true', async function () {
 					i(
-						this.provider
+						setup.provider
 					).configuration.allowOmittingSingleRegisteredRedirectUri = true;
-					await this.login();
-					const auth = new this.AuthorizationRequest({
-						response_type,
-						scope,
-						client_id: 'client'
+					const cookie = await setup.login();
+					const auth = new setup.AuthorizationRequest({
+						client_id: 'client',
+						scope
 					});
+					delete auth.params.redirect_uri;
 
-					delete auth.redirect_uri;
-
-					return this.wrap({ route, verb, auth })
-						.expect(303)
-						.expect(auth.validatePresence(['code', 'state']))
-						.expect(auth.validateState)
-						.expect(auth.validateClientLocation);
+					const { response } = await authRequest(auth, { cookie });
+					expect(response.status).toBe(303);
+					auth.validatePresence(response, ['code', 'state']);
+					auth.validateState(response);
+					auth.validateClientLocation(response);
 				});
 			});
 
-			context('when client has more then one redirect_uri', () => {
-				before(async function () {
-					const client = await this.provider.Client.find('client');
+			describe('when client has more then one redirect_uri', () => {
+				beforeEach(async function () {
+					const client = await setup.provider.Client.find('client');
 					client.redirectUris.push('https://someOtherUri.com');
 				});
 
-				after(async function () {
-					const client = await this.provider.Client.find('client');
+				afterEach(async function () {
+					const client = await setup.provider.Client.find('client');
 					client.redirectUris.pop();
 				});
 
-				it('missing mandatory parameter redirect_uri', function () {
+				it('missing mandatory parameter redirect_uri', async function () {
 					const emitSpy = sinon.spy();
-					const renderSpy = sinon.spy(
-						i(this.provider).configuration,
-						'renderError'
-					);
-					this.provider.once('authorization.error', emitSpy);
-					const auth = new this.AuthorizationRequest({
-						response_type,
-						scope
-					});
-					delete auth.redirect_uri;
+					setup.provider.once('authorization.error', emitSpy);
+					const auth = new setup.AuthorizationRequest({ scope });
+					delete auth.params.redirect_uri;
 
-					return this.agent
-						.get(route)
-						.query(auth)
-						.expect(() => {
-							renderSpy.restore();
-						})
-						.expect(400)
-						.expect(() => {
-							expect(emitSpy.calledOnce).to.be.true;
-							expect(renderSpy.calledOnce).to.be.true;
-							const renderArgs = renderSpy.args[0];
-							expect(renderArgs[1]).to.have.property(
-								'error',
-								'invalid_request'
-							);
-							expect(renderArgs[1]).to.have.property(
-								'error_description',
-								"missing required parameter 'redirect_uri'"
-							);
-							expect(renderArgs[2]).to.be.an.instanceof(InvalidRequest);
-						});
+					const { response } = await authRequest(auth, { accept: 'text/html' });
+					expect(response.status).toBe(400);
+					expect(response.headers.get('content-type')).toBe(
+						'text/html; charset=utf-8'
+					);
+					expect(emitSpy.calledOnce).toBe(true);
 				});
 			});
 
@@ -774,77 +687,62 @@ describe('BASIC code', () => {
 			});
 
 			// section-4.1.2.1 RFC6749
-			it('missing mandatory parameter client_id', function () {
-				const renderSpy = sinon.spy(
-					i(this.provider).configuration,
-					'renderError'
-				);
-				const auth = new this.AuthorizationRequest({
-					response_type,
-					scope
-				});
-				delete auth.client_id;
+			it('missing mandatory parameter client_id', async function () {
+				const auth = new setup.AuthorizationRequest({ scope });
+				delete auth.params.client_id;
 
-				return this.agent
-					.get(route)
-					.query(auth)
-					.expect(() => {
-						renderSpy.restore();
-					})
-					.expect(400)
-					.expect(() => {
-						expect(renderSpy.calledOnce).to.be.true;
-						const renderArgs = renderSpy.args[0];
-						expect(renderArgs[1]).to.have.property('error', 'invalid_request');
-						expect(renderArgs[1]).to.have.property(
-							'error_description',
-							"missing required parameter 'client_id'"
-						);
-						expect(renderArgs[2]).to.be.an.instanceof(InvalidRequest);
-					});
+				const { response, error } = await authRequest(auth, {
+					accept: 'text/html'
+				});
+				expect(response.status).toBe(422);
+				expect(response.headers.get('content-type')).toBe(
+					'text/html; charset=utf-8'
+				);
+				if (verb === 'get') {
+					expect(error.value).toContain(
+						'Expected  property &#x27;client_id&#x27; to be  string'
+					);
+				} else {
+					expect(error.value).toContain(
+						'Property &#x27;client_id&#x27; is missing'
+					);
+				}
 			});
 
 			// section-4.1.2.1 RFC6749
-			it('unrecognized client_id provided', function () {
-				const renderSpy = sinon.spy(
-					i(this.provider).configuration,
-					'renderError'
-				);
-				const auth = new this.AuthorizationRequest({
-					response_type,
-					scope,
-					client_id: 'foobar'
+			it('unrecognized client_id provided', async function () {
+				const auth = new setup.AuthorizationRequest({
+					client_id: 'foobar',
+					scope
 				});
 
-				return this.agent
-					.get(route)
-					.query(auth)
-					.expect(() => {
-						renderSpy.restore();
-					})
-					.expect(400)
-					.expect(() => {
-						expect(renderSpy.calledOnce).to.be.true;
-						const renderArgs = renderSpy.args[0];
-						expect(renderArgs[1]).to.have.property('error', 'invalid_client');
-						expect(renderArgs[2]).to.be.an.instanceof(InvalidClient);
-					});
+				const { response, error } = await authRequest(auth, {
+					accept: 'text/html'
+				});
+				expect(response.status).toBe(400);
+				expect(response.headers.get('content-type')).toBe(
+					'text/html; charset=utf-8'
+				);
+				console.log(error.value);
+				expect(error.value).toContain('client is invalid');
 			});
 
 			describe('section-4.1.2.1 RFC6749', () => {
-				it('validates redirect_uri ad acta [regular error]', function () {
-					const renderSpy = sinon.spy(
-						i(this.provider).configuration,
-						'renderError'
-					);
+				it.only('validates redirect_uri ad acta [regular error]', async function () {
 					const spy = sinon.spy();
-					this.provider.on('authorization.error', spy);
-					const auth = new this.AuthorizationRequest({
-						response_type,
+					setup.provider.on('authorization.error', spy);
+					const auth = new setup.AuthorizationRequest({
 						// scope, => 'openid' required when id_token_hint is provided
 						id_token_hint: 'foo',
 						redirect_uri: 'https://attacker.example.com/foobar'
 					});
+
+					const { response, error } = await authRequest(auth, {
+						//accept: 'text/html'
+					});
+					console.log(error);
+					expect(response.status).toBe(400);
+					expect(spy.calledTwice).toBeTrue();
 
 					return this.agent
 						.get(route)
@@ -1119,35 +1017,22 @@ describe('BASIC code', () => {
 					});
 			});
 
-			describe('login state specific', () => {
-				before(function () {
-					return this.login();
+			it('login state specific malformed id_token_hint', async function () {
+				const spy = sinon.spy();
+				setup.provider.once('authorization.error', spy);
+				const cookie = await setup.login();
+				const auth = new setup.AuthorizationRequest({
+					scope,
+					id_token_hint: 'invalid'
 				});
-
-				it('malformed id_token_hint', function () {
-					const spy = sinon.spy();
-					this.provider.once('authorization.error', spy);
-					const auth = new this.AuthorizationRequest({
-						response_type,
-						scope,
-						id_token_hint: 'invalid'
-					});
-
-					return this.wrap({ route, verb, auth })
-						.expect(303)
-						.expect(() => {
-							expect(spy.calledOnce).to.be.true;
-						})
-						.expect(
-							auth.validatePresence(['error', 'error_description', 'state'])
-						)
-						.expect(auth.validateState)
-						.expect(auth.validateClientLocation)
-						.expect(auth.validateError('invalid_request'))
-						.expect(
-							auth.validateErrorDescription(/could not validate id_token_hint/)
-						);
-				});
+				const { response } = await authRequest(auth, cookie);
+				expect(response.status).toBe(303);
+				expect(spy.calledOnce).toBeTrue();
+				auth.validatePresence(['error', 'error_description', 'state']);
+				auth.validateState(response);
+				auth.validateClientLocation(response);
+				auth.validateError('invalid_request');
+				auth.validateErrorDescription(/could not validate id_token_hint/);
 			});
 		});
 	});

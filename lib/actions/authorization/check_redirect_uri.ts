@@ -34,7 +34,7 @@ function validateUnregisteredUri(ctx) {
 /*
  * Checks that provided redirect_uri is allowed
  */
-export default function checkRedirectUri(ctx, next) {
+export default function checkRedirectUri(ctx) {
 	if (!ctx.oidc.client.redirectUriAllowed(ctx.oidc.params.redirect_uri)) {
 		if (!allowUnregisteredUri(ctx)) {
 			throw new InvalidRedirectUri();
@@ -44,6 +44,4 @@ export default function checkRedirectUri(ctx, next) {
 	}
 
 	ctx.oidc.redirectUriCheckPerformed = true;
-
-	return next();
 }

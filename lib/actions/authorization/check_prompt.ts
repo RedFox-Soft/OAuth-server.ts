@@ -5,7 +5,7 @@ import instance from '../../helpers/weak_cache.ts';
  * Checks that all requested prompts are supported and validates prompt none is not combined with
  * other prompts
  */
-export default function checkPrompt(ctx, next) {
+export default function checkPrompt(ctx) {
 	if (ctx.oidc.params.prompt !== undefined) {
 		const { prompts } = ctx.oidc;
 		const supported = instance(ctx.oidc.provider).configuration.prompts;
@@ -20,6 +20,4 @@ export default function checkPrompt(ctx, next) {
 			throw new InvalidRequest('prompt none must only be used alone');
 		}
 	}
-
-	return next();
 }

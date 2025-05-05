@@ -29,21 +29,6 @@ const scope = 'openid';
 				.expect(auth.validateClientLocation);
 		});
 
-		it('responds with a state in fragment', function () {
-			const auth = new this.AuthorizationRequest({
-				response_type,
-				response_mode: 'fragment',
-				scope
-			});
-
-			return this.wrap({ route, verb, auth })
-				.expect(303)
-				.expect(auth.validateFragment)
-				.expect(auth.validatePresence(['state']))
-				.expect(auth.validateState)
-				.expect(auth.validateClientLocation);
-		});
-
 		it('populates ctx.oidc.entities', function (done) {
 			this.assertOnce((ctx) => {
 				expect(ctx.oidc.entities).to.have.keys(

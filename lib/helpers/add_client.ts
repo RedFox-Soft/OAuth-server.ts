@@ -5,7 +5,7 @@ export default async function add(
 	metadata,
 	{ ctx, store = false } = {}
 ) {
-	const client = new provider.Client(metadata, ctx); // eslint-disable-line no-use-before-define
+	const client = new provider.Client(metadata, ctx);
 
 	if (client.sectorIdentifierUri !== undefined) {
 		await sectorValidate(provider, client);

@@ -6,6 +6,7 @@ import instance from '../helpers/weak_cache.ts';
 import { globalConfiguration } from '../globalConfiguration.ts';
 
 import hasFormat from './mixins/has_format.ts';
+import { cookieNames } from '../consts/param_list.ts';
 
 export default (provider) =>
 	class Session extends hasFormat(
@@ -58,10 +59,8 @@ export default (provider) =>
 		}
 
 		static async get(ctx) {
-			const cookieName = globalConfiguration.cookies.names.session;
-
 			// is there supposed to be a session bound? generate if not
-			const cookieSessionId = ctx.cookie[cookieName]?.value;
+			const cookieSessionId = ctx.cookie[cookieNames.session]?.value;
 
 			let session;
 

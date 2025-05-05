@@ -1,3 +1,4 @@
+import { cookieNames } from '../consts/param_list.ts';
 import { globalConfiguration } from '../globalConfiguration.ts';
 
 export default async function sessionHandler(ctx) {
@@ -38,8 +39,7 @@ export default async function sessionHandler(ctx) {
 	});
 
 	return async function setCookies() {
-		const sessionCookieName = ctx.oidc.provider.cookieName('session');
-		const session = ctx.cookie[sessionCookieName];
+		const session = ctx.cookie[cookieNames.session];
 
 		// refresh the session duration
 		if (

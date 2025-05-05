@@ -47,5 +47,5 @@ export default async function respond(ctx) {
 	ctx.oidc.provider.emit('authorization.success', ctx, out);
 
 	const handler = instance(ctx.oidc.provider).responseModes.get(responseMode);
-	await handler(ctx, params.redirect_uri, out);
+	return await handler(ctx, params.redirect_uri, out);
 }

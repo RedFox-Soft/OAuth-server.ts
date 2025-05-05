@@ -4,6 +4,7 @@ import isPlainObject from './_/is_plain_object.ts';
 import omitBy from './_/omit_by.ts';
 import { InvalidRequest } from './errors.ts';
 import instance from './weak_cache.ts';
+import { routeNames } from '../consts/param_list.ts';
 
 const COOKIES = Symbol();
 
@@ -73,9 +74,6 @@ export default function getContext(provider) {
 
 		entity(key, value) {
 			if (!this.entities) {
-				console.log(this);
-				console.log(key, value);
-				console.log('entities', this.entities);
 				throw new Error('entities not initialized');
 			}
 			this.entities[key] = value;
@@ -86,21 +84,19 @@ export default function getContext(provider) {
 		}
 
 		urlFor(name, opt) {
-			const { originalUrl } = this.ctx.req;
-			const mountPath =
-				originalUrl?.substring(0, originalUrl?.indexOf(this.ctx.request.url)) ||
-				this.ctx.mountPath || // koa-mount
-				this.ctx.req.baseUrl || // expressApp.use('/op', provider.callback());
-				''; // no mount
+			const baseUrl = this.ctx.baseUrl;
+			if (name === 'resume') {
+				return new URL(
+					`${routeNames.authorization}/${opt.uid}`,
+					baseUrl
+				).toString();
+			}
 
-			return new URL(
-				provider.pathFor(name, { mountPath, ...opt }),
-				this.ctx.href
-			).href;
+			throw new Error(`unknown route name: ${name}`);
 		}
 
 		promptPending(name) {
-			if (this.ctx.oidc.route.endsWith('resume')) {
+			if (this.route.endsWith('resume')) {
 				const should = new Set([...this.prompts]);
 				Object.keys(this.result || {}).forEach(
 					Set.prototype.delete.bind(should)

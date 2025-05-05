@@ -13,21 +13,15 @@ export default function formPost(ctx, action, inputs) {
 	const formInputs = Object.entries(inputs)
 		.map(
 			([key, value]) =>
-				`<input type="hidden" name="${key}" value="${htmlSafe(value)}"/>`
+				`<input type="hidden" name="${key}" value="${htmlSafe(value)}"/>\n`
 		)
-		.join('\n');
+		.join();
 
 	ctx.body = `<!DOCTYPE html>
 <html>
 <head>
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <title>Submitting Callback</title>
-  <script>${pushInlineSha(
-		ctx,
-		`
-    document.addEventListener('DOMContentLoaded', function () { document.forms[0].submit() });
-  `
-	)}</script>
+  <script type="module">${pushInlineSha(ctx, `document.forms[0].submit();`)}</script>
 </head>
 <body>
   <form method="post" action="${htmlSafe(action)}">

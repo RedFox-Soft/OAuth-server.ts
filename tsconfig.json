@@ -1,0 +1,18 @@
+{
+	"compilerOptions": {
+		"module": "NodeNext",
+		"esModuleInterop": true,
+		"target": "esnext",
+		"noImplicitAny": true,
+		"moduleResolution": "NodeNext",
+		"sourceMap": true,
+		"outDir": "dist",
+		"baseUrl": ".",
+		"skipLibCheck": true,
+		"strict": true,
+		"jsx": "react",
+		"typeRoots": ["types/", "node_modules/@types"]
+	},
+	"include": ["lib/**/*.ts", "test/**/*.ts"],
+	"exclude": ["node_modules"]
+}

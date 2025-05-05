@@ -9,17 +9,9 @@ import getConfig from '../../default.config.js';
 
 const config = getConfig();
 
-config.extraParams = {
-	triggerCustomFail: null,
-	extra: null,
-	extra2(ctx) {
-		ctx.oidc.params.extra2 ||= 'defaulted';
-	}
-};
 merge(config.features, {
 	pushedAuthorizationRequests: { enabled: false }
 });
-config.responseTypes = ['code', 'none'];
 config.allowOmittingSingleRegisteredRedirectUri = false;
 
 const policy = base();
