@@ -16,6 +16,8 @@ import sinon from 'sinon';
 import bootstrap from '../../test_helper.js';
 import epochTime from '../../../lib/helpers/epoch_time.ts';
 import { InvalidRedirectUri } from '../../../lib/helpers/errors.ts';
+import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
+import { provider } from 'lib/provider.js';
 
 const route = '/auth';
 const response_type = 'code';
@@ -43,9 +45,6 @@ describe('BASIC code', () => {
 					}
 				});
 			} else if (verb === 'post') {
-				console.log(
-					new URLSearchParams(Object.entries(auth.params)).toString()
-				);
 				return setup.agent.auth.post(
 					new URLSearchParams(Object.entries(auth.params)).toString(),
 					{
@@ -64,8 +63,8 @@ describe('BASIC code', () => {
 				cookie = await setup.login();
 			});
 
-			it('responds with a code in search', async function () {
-				const auth = new setup.AuthorizationRequest({ scope });
+			it.only('responds with a code in search', async function () {
+				const auth = new AuthorizationRequest({ scope, response_type: 'none' });
 				const { response } = await authRequest(auth, { cookie });
 
 				expect(response.status).toBe(303);
@@ -75,9 +74,9 @@ describe('BASIC code', () => {
 			});
 
 			it('populates ctx.oidc.entities', async function () {
-				const spy = spyOn(setup.provider.OIDCContext.prototype, 'entity');
+				const spy = spyOn(provider.OIDCContext.prototype, 'entity');
 
-				const auth = new setup.AuthorizationRequest({ scope });
+				const auth = new AuthorizationRequest({ scope });
 				const { response } = await authRequest(auth, { cookie });
 				expect(response.status).toBe(303);
 
@@ -92,7 +91,7 @@ describe('BASIC code', () => {
 			});
 
 			it('allows native apps to do none auth check when already authorized', async function () {
-				const auth = new setup.AuthorizationRequest({
+				const auth = new AuthorizationRequest({
 					response_type: 'none',
 					prompt: 'none',
 					client_id: 'client-native',
@@ -110,7 +109,7 @@ describe('BASIC code', () => {
 			it('ignores unsupported scopes', async function () {
 				const spy = sinon.spy();
 				setup.provider.once('authorization_code.saved', spy);
-				const auth = new setup.AuthorizationRequest({
+				const auth = new AuthorizationRequest({
 					scope: 'openid and unsupported'
 				});
 
@@ -130,8 +129,8 @@ describe('BASIC code', () => {
 
 				it('ignores the scope offline_access unless prompt consent is present', async function () {
 					const spy = sinon.spy();
-					setup.provider.once('authorization_code.saved', spy);
-					const auth = new setup.AuthorizationRequest({
+					provider.once('authorization_code.saved', spy);
+					const auth = new AuthorizationRequest({
 						scope: 'openid offline_access'
 					});
 
@@ -144,8 +143,8 @@ describe('BASIC code', () => {
 
 				it('ignores the scope offline_access unless the client can do refresh_token exchange', async function () {
 					const spy = sinon.spy();
-					setup.provider.once('authorization_code.saved', spy);
-					const auth = new setup.AuthorizationRequest({
+					provider.once('authorization_code.saved', spy);
+					const auth = new AuthorizationRequest({
 						client_id: 'client-no-refresh',
 						prompt: 'consent',
 						scope: 'openid offline_access'
@@ -172,11 +171,11 @@ describe('BASIC code', () => {
 			});
 
 			it('no account id was resolved and no interactions requested', async function () {
-				i(setup.provider).configuration.interactions.policy = [];
+				i(provider).configuration.interactions.policy = [];
 				const spy = sinon.spy();
-				setup.provider.on('authorization.error', spy);
+				provider.on('authorization.error', spy);
 
-				const auth = new setup.AuthorizationRequest({ scope });
+				const auth = new AuthorizationRequest({ scope });
 				const { response } = await authRequest(auth);
 
 				expect(response.status).toBe(303);
@@ -192,12 +191,12 @@ describe('BASIC code', () => {
 			});
 
 			it('no scope was resolved and no interactions requested', async function () {
-				i(setup.provider).configuration.interactions.policy = [];
+				i(provider).configuration.interactions.policy = [];
 				const spy = sinon.spy();
-				setup.provider.on('authorization.error', spy);
+				provider.on('authorization.error', spy);
 
 				const cookie = await setup.login();
-				const auth = new setup.AuthorizationRequest();
+				const auth = new AuthorizationRequest();
 				const { response } = await authRequest(auth, { cookie });
 
 				expect(response.status).toBe(303);
@@ -224,7 +223,7 @@ describe('BASIC code', () => {
 				delete session.loginTs;
 				delete session.accountId;
 
-				const auth = new setup.AuthorizationRequest({ scope });
+				const auth = new AuthorizationRequest({ scope });
 				const { response } = await authRequest(auth, { cookie });
 				expect(response.status).toBe(303);
 				auth.validateInteractionRedirect(response);
@@ -232,7 +231,7 @@ describe('BASIC code', () => {
 			});
 
 			it('additional scopes are requested', async function () {
-				const auth = new setup.AuthorizationRequest({ scope: 'openid email' });
+				const auth = new AuthorizationRequest({ scope: 'openid email' });
 				const { response } = await authRequest(auth, { cookie });
 				expect(response.status).toBe(303);
 				auth.validateInteractionRedirect(response);
@@ -240,7 +239,7 @@ describe('BASIC code', () => {
 			});
 
 			it('are required for native clients by default', async function () {
-				const auth = new setup.AuthorizationRequest({
+				const auth = new AuthorizationRequest({
 					client_id: 'client-native',
 					redirect_uri: 'com.example.app:/cb',
 					scope,
@@ -254,7 +253,7 @@ describe('BASIC code', () => {
 			});
 
 			it('login was requested by the client by prompt parameter', async function () {
-				const auth = new setup.AuthorizationRequest({ prompt: 'login', scope });
+				const auth = new AuthorizationRequest({ prompt: 'login', scope });
 				const { response } = await authRequest(auth, { cookie });
 				expect(response.status).toBe(303);
 				auth.validateInteractionRedirect(response);
@@ -262,7 +261,7 @@ describe('BASIC code', () => {
 			});
 
 			it('login was requested by the client by max_age=0', async function () {
-				const auth = new setup.AuthorizationRequest({ max_age: 0, scope });
+				const auth = new AuthorizationRequest({ max_age: 0, scope });
 				const { response } = await authRequest(auth, { cookie });
 				expect(response.status).toBe(303);
 				auth.validateInteractionRedirect(response);
@@ -270,7 +269,7 @@ describe('BASIC code', () => {
 			});
 
 			it('interaction check no session & max_age combo', async function () {
-				const auth = new setup.AuthorizationRequest({
+				const auth = new AuthorizationRequest({
 					max_age: 1800, // 30 minutes old session max
 					scope
 				});
@@ -284,7 +283,7 @@ describe('BASIC code', () => {
 				const session = setup.getSession();
 				session.loginTs = epochTime() - 3600; // an hour ago
 
-				const auth = new setup.AuthorizationRequest({
+				const auth = new AuthorizationRequest({
 					max_age: 1800, // 30 minutes old session max
 					scope
 				});
@@ -298,7 +297,7 @@ describe('BASIC code', () => {
 				const session = setup.getSession();
 				delete session.loginTs;
 
-				const auth = new setup.AuthorizationRequest({
+				const auth = new AuthorizationRequest({
 					max_age: 1800, // 30 minutes old session max
 					scope
 				});
@@ -315,7 +314,7 @@ describe('BASIC code', () => {
 				const session = setup.getSession();
 				session.loginTs = epochTime() - 3600; // an hour ago
 
-				const auth = new setup.AuthorizationRequest({ scope });
+				const auth = new AuthorizationRequest({ scope });
 				const { response } = await authRequest(auth, { cookie });
 				delete client.defaultMaxAge;
 				expect(response.status).toBe(303);
@@ -329,7 +328,7 @@ describe('BASIC code', () => {
 				// fake a query like this state=foo&state=foo
 				const spy = sinon.spy();
 				this.provider.once('authorization.error', spy);
-				const auth = new this.AuthorizationRequest({
+				const auth = new AuthorizationRequest({
 					response_type,
 					scope,
 					state: 'foo'
@@ -378,7 +377,7 @@ describe('BASIC code', () => {
 				// a validation error prior to validating response mode
 				const spy = sinon.spy();
 				this.provider.once('authorization.error', spy);
-				const auth = new this.AuthorizationRequest({
+				const auth = new AuthorizationRequest({
 					response_type,
 					scope,
 					state: 'foo',
@@ -420,7 +419,7 @@ describe('BASIC code', () => {
 			it('response mode provided twice', function () {
 				const spy = sinon.spy();
 				this.provider.once('authorization.error', spy);
-				const auth = new this.AuthorizationRequest({
+				const auth = new AuthorizationRequest({
 					response_type,
 					scope,
 					response_mode: 'query'
@@ -459,8 +458,8 @@ describe('BASIC code', () => {
 
 			it('unregistered scope requested', function () {
 				const spy = sinon.spy();
-				this.provider.once('authorization.error', spy);
-				const auth = new this.AuthorizationRequest({
+				provider.once('authorization.error', spy);
+				const auth = new AuthorizationRequest({
 					client_id: 'client-limited-scope',
 					response_type: 'code',
 					prompt: 'consent',
@@ -492,8 +491,8 @@ describe('BASIC code', () => {
 			['request', 'request_uri', 'registration'].forEach((param) => {
 				it(`not supported parameter ${param}`, function () {
 					const spy = sinon.spy();
-					this.provider.once('authorization.error', spy);
-					const auth = new this.AuthorizationRequest({
+					provider.once('authorization.error', spy);
+					const auth = new AuthorizationRequest({
 						response_type,
 						scope,
 						[param]: 'some'
@@ -515,15 +514,14 @@ describe('BASIC code', () => {
 
 			describe('when client has a single redirect_uri', () => {
 				afterEach(function () {
-					i(
-						setup.provider
-					).configuration.allowOmittingSingleRegisteredRedirectUri = false;
+					i(provider).configuration.allowOmittingSingleRegisteredRedirectUri =
+						false;
 				});
 
 				it('missing mandatory parameter redirect_uri', async function () {
 					const emitSpy = sinon.spy();
-					setup.provider.once('authorization.error', emitSpy);
-					const auth = new setup.AuthorizationRequest({ scope });
+					provider.once('authorization.error', emitSpy);
+					const auth = new AuthorizationRequest({ scope });
 					delete auth.params.redirect_uri;
 
 					const { response } = await authRequest(auth, { accept: 'text/html' });
@@ -535,11 +533,10 @@ describe('BASIC code', () => {
 				});
 
 				it('unless allowOmittingSingleRegisteredRedirectUri is true', async function () {
-					i(
-						setup.provider
-					).configuration.allowOmittingSingleRegisteredRedirectUri = true;
+					i(provider).configuration.allowOmittingSingleRegisteredRedirectUri =
+						true;
 					const cookie = await setup.login();
-					const auth = new setup.AuthorizationRequest({
+					const auth = new AuthorizationRequest({
 						client_id: 'client',
 						scope
 					});
@@ -555,19 +552,19 @@ describe('BASIC code', () => {
 
 			describe('when client has more then one redirect_uri', () => {
 				beforeEach(async function () {
-					const client = await setup.provider.Client.find('client');
+					const client = await provider.Client.find('client');
 					client.redirectUris.push('https://someOtherUri.com');
 				});
 
 				afterEach(async function () {
-					const client = await setup.provider.Client.find('client');
+					const client = await provider.Client.find('client');
 					client.redirectUris.pop();
 				});
 
 				it('missing mandatory parameter redirect_uri', async function () {
 					const emitSpy = sinon.spy();
-					setup.provider.once('authorization.error', emitSpy);
-					const auth = new setup.AuthorizationRequest({ scope });
+					provider.once('authorization.error', emitSpy);
+					const auth = new AuthorizationRequest({ scope });
 					delete auth.params.redirect_uri;
 
 					const { response } = await authRequest(auth, { accept: 'text/html' });
@@ -581,8 +578,8 @@ describe('BASIC code', () => {
 
 			it('missing mandatory parameter response_type', function () {
 				const spy = sinon.spy();
-				this.provider.once('authorization.error', spy);
-				const auth = new this.AuthorizationRequest({
+				provider.once('authorization.error', spy);
+				const auth = new AuthorizationRequest({
 					scope
 				});
 				delete auth.response_type;
@@ -609,8 +606,8 @@ describe('BASIC code', () => {
 
 			it('unsupported prompt', function () {
 				const spy = sinon.spy();
-				this.provider.once('authorization.error', spy);
-				const auth = new this.AuthorizationRequest({
+				provider.once('authorization.error', spy);
+				const auth = new AuthorizationRequest({
 					response_type,
 					scope,
 					prompt: 'unsupported'
@@ -634,8 +631,8 @@ describe('BASIC code', () => {
 
 			it('supported but not requestable prompt', function () {
 				const spy = sinon.spy();
-				this.provider.once('authorization.error', spy);
-				const auth = new this.AuthorizationRequest({
+				provider.once('authorization.error', spy);
+				const auth = new AuthorizationRequest({
 					response_type,
 					scope,
 					prompt: 'unrequestable'
@@ -659,8 +656,8 @@ describe('BASIC code', () => {
 
 			it('bad prompt combination', function () {
 				const spy = sinon.spy();
-				this.provider.once('authorization.error', spy);
-				const auth = new this.AuthorizationRequest({
+				provider.once('authorization.error', spy);
+				const auth = new AuthorizationRequest({
 					response_type,
 					scope,
 					prompt: 'none login'
@@ -684,7 +681,7 @@ describe('BASIC code', () => {
 
 			// section-4.1.2.1 RFC6749
 			it('missing mandatory parameter client_id', async function () {
-				const auth = new setup.AuthorizationRequest({ scope });
+				const auth = new AuthorizationRequest({ scope });
 				delete auth.params.client_id;
 
 				const { response, error } = await authRequest(auth, {
@@ -707,7 +704,7 @@ describe('BASIC code', () => {
 
 			// section-4.1.2.1 RFC6749
 			it('unrecognized client_id provided', async function () {
-				const auth = new setup.AuthorizationRequest({
+				const auth = new AuthorizationRequest({
 					client_id: 'foobar',
 					scope
 				});
@@ -724,10 +721,10 @@ describe('BASIC code', () => {
 			});
 
 			describe('section-4.1.2.1 RFC6749', () => {
-				it.only('validates redirect_uri ad acta [regular error]', async function () {
+				it('validates redirect_uri ad acta [regular error]', async function () {
 					const spy = sinon.spy();
-					setup.provider.on('authorization.error', spy);
-					const auth = new setup.AuthorizationRequest({
+					provider.on('authorization.error', spy);
+					const auth = new AuthorizationRequest({
 						// scope, => 'openid' required when id_token_hint is provided
 						id_token_hint: 'foo',
 						redirect_uri: 'https://attacker.example.com/foobar'
@@ -736,7 +733,6 @@ describe('BASIC code', () => {
 					const { response, error } = await authRequest(auth, {
 						//accept: 'text/html'
 					});
-					console.log(error);
 					expect(response.status).toBe(400);
 					expect(spy.calledTwice).toBeTrue();
 
@@ -776,18 +772,15 @@ describe('BASIC code', () => {
 				});
 
 				it('validates redirect_uri ad acta [server error]', function () {
-					const renderSpy = sinon.spy(
-						i(this.provider).configuration,
-						'renderError'
-					);
+					const renderSpy = sinon.spy(i(provider).configuration, 'renderError');
 					const authErrorSpy = sinon.spy();
 					const serverErrorSpy = sinon.spy();
-					this.provider.on('authorization.error', authErrorSpy);
-					this.provider.on('server_error', serverErrorSpy);
+					provider.on('authorization.error', authErrorSpy);
+					provider.on('server_error', serverErrorSpy);
 					sinon.stub(i(this.provider).responseModes, 'has').callsFake(() => {
 						throw new Error('foobar');
 					});
-					const auth = new this.AuthorizationRequest({
+					const auth = new AuthorizationRequest({
 						response_type,
 						scope,
 						response_mode: 'fragment',
@@ -831,8 +824,8 @@ describe('BASIC code', () => {
 
 			it('unsupported response_type', function () {
 				const spy = sinon.spy();
-				this.provider.once('authorization.error', spy);
-				const auth = new this.AuthorizationRequest({
+				provider.once('authorization.error', spy);
+				const auth = new AuthorizationRequest({
 					response_type: 'unsupported',
 					scope
 				});
@@ -855,8 +848,8 @@ describe('BASIC code', () => {
 
 			it('invalid max_age (negative)', function () {
 				const spy = sinon.spy();
-				this.provider.once('authorization.error', spy);
-				const auth = new this.AuthorizationRequest({
+				provider.once('authorization.error', spy);
+				const auth = new AuthorizationRequest({
 					response_type,
 					scope: 'openid',
 					max_age: -1
@@ -880,8 +873,8 @@ describe('BASIC code', () => {
 
 			it('invalid max_age (MAX_SAFE_INTEGER)', function () {
 				const spy = sinon.spy();
-				this.provider.once('authorization.error', spy);
-				const auth = new this.AuthorizationRequest({
+				provider.once('authorization.error', spy);
+				const auth = new AuthorizationRequest({
 					response_type,
 					scope: 'openid',
 					max_age: Number.MAX_SAFE_INTEGER + 1
@@ -906,8 +899,8 @@ describe('BASIC code', () => {
 			if (verb === 'post') {
 				it('only supports application/x-www-form-urlencoded', function () {
 					const spy = sinon.spy();
-					this.provider.once('authorization.error', spy);
-					const auth = new this.AuthorizationRequest({
+					provider.once('authorization.error', spy);
+					const auth = new AuthorizationRequest({
 						response_type,
 						scope
 					});
@@ -927,8 +920,8 @@ describe('BASIC code', () => {
 
 			it('restricted response_type', function () {
 				const spy = sinon.spy();
-				this.provider.once('authorization.error', spy);
-				const auth = new this.AuthorizationRequest({
+				provider.once('authorization.error', spy);
+				const auth = new AuthorizationRequest({
 					client_id: 'client-without-none',
 					response_type: 'none',
 					scope
@@ -954,8 +947,8 @@ describe('BASIC code', () => {
 
 			it('unsupported response type validation runs before oidc required params', function () {
 				const spy = sinon.spy();
-				this.provider.once('authorization.error', spy);
-				const auth = new this.AuthorizationRequest({
+				provider.once('authorization.error', spy);
+				const auth = new AuthorizationRequest({
 					response_type: 'id_token token',
 					nonce: undefined,
 					scope
@@ -979,12 +972,9 @@ describe('BASIC code', () => {
 
 			it('redirect_uri mismatch', function () {
 				const emitSpy = sinon.spy();
-				const renderSpy = sinon.spy(
-					i(this.provider).configuration,
-					'renderError'
-				);
-				this.provider.once('authorization.error', emitSpy);
-				const auth = new this.AuthorizationRequest({
+				const renderSpy = sinon.spy(i(provider).configuration, 'renderError');
+				provider.once('authorization.error', emitSpy);
+				const auth = new AuthorizationRequest({
 					response_type,
 					scope,
 					redirect_uri: 'https://client.example.com/cb/not/registered'
@@ -1015,9 +1005,9 @@ describe('BASIC code', () => {
 
 			it('login state specific malformed id_token_hint', async function () {
 				const spy = sinon.spy();
-				setup.provider.once('authorization.error', spy);
+				provider.once('authorization.error', spy);
 				const cookie = await setup.login();
-				const auth = new setup.AuthorizationRequest({
+				const auth = new AuthorizationRequest({
 					scope,
 					id_token_hint: 'invalid'
 				});

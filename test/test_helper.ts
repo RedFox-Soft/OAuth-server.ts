@@ -2,7 +2,6 @@
 
 import { parse, pathToFileURL } from 'node:url';
 import * as path from 'node:path';
-import * as querystring from 'node:querystring';
 
 import { setGlobalDispatcher, MockAgent } from 'undici';
 import sinon from 'sinon';
@@ -69,20 +68,6 @@ function encodeToken(token) {
 		}
 	);
 }
-
-Request.prototype._auth = function (user, pass, options, encoder) {
-	if (options?.type === 'basic') {
-		return _auth.call(
-			this,
-			encodeToken(user),
-			encodeToken(pass),
-			options,
-			encoder
-		);
-	}
-
-	return _auth.call(this, user, pass, options, encoder);
-};
 
 process.env.NODE_ENV = process.env.NODE_ENV || 'test';
 
@@ -153,18 +138,6 @@ export default function testHelper(
 
 		let agent;
 		let lastSession;
-
-		function logout() {
-			const expire = new Date(0);
-			const cookies = [
-				`_session=; path=/; expires=${expire.toGMTString()}; httponly`
-			];
-
-			return agent._saveCookies.bind(agent)({
-				request: { url: provider.issuer },
-				headers: { 'set-cookie': cookies }
-			});
-		}
 
 		async function login({
 			scope = 'openid',
@@ -239,22 +212,6 @@ export default function testHelper(
 				});
 		}
 
-		async function getToken(auth, options = {}) {
-			let code;
-			await wrap({
-				route: '/auth',
-				verb: 'get',
-				auth,
-				...options
-			})
-				.expect(303)
-				.expect((response) => {
-					code = parse(response.headers.location, true).query.code;
-				});
-
-			return auth.getToken(code);
-		}
-
 		function getLastSession() {
 			return lastSession;
 		}
@@ -286,37 +243,6 @@ export default function testHelper(
 				return session.authorizations[clientId].grantId;
 			} catch (err) {
 				throw new Error('getGrantId() failed');
-			}
-		}
-
-		function wrap(opts) {
-			const { route, verb, auth, params, user, secret } = opts;
-			switch (verb) {
-				case 'get': {
-					if (user && secret) {
-						return agent
-							.get(route)
-							.auth(user, secret)
-							.query(auth || params);
-					}
-					return agent.get(route).query(auth || params);
-				}
-				case 'post': {
-					if (user && secret) {
-						return agent
-							.post(route)
-							.auth(user, secret)
-							.send(auth || params)
-							.type('form');
-					}
-					return agent
-						.post(route)
-						.send(auth || params)
-						.type('form');
-				}
-
-				default:
-					throw new Error('invalid wrap verb');
 			}
 		}
 
@@ -409,12 +335,9 @@ export default function testHelper(
 			getSessionId,
 			getGrantId,
 			getTokenJti,
-			getToken,
 			login,
-			logout,
 			provider,
 			TestAdapter,
-			wrap,
 			fetchAgent,
 			agent
 		};

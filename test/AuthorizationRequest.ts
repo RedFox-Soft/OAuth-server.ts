@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { parse } from 'node:url';
+import querystring from 'node:querystring';
 
 import { expect } from 'chai';
 import { TestAdapter } from './models.js';

@@ -1,50 +1,64 @@
-import { expect } from 'chai';
+import { describe, it, beforeAll, expect, spyOn } from 'bun:test';
 
 import bootstrap from '../../test_helper.js';
+import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
+import { provider } from 'lib/provider.js';
 
-const route = '/auth';
-const response_type = 'none';
-const scope = 'openid';
-['get', 'post'].forEach((verb) => {
-	describe(`${verb} ${route} response_type=none`, () => {
-		before(bootstrap(import.meta.url));
+describe('/auth response_type=none', () => {
+	let setup = null;
+	let cookie: string | undefined = undefined;
+	beforeAll(async function () {
+		setup = await bootstrap(import.meta.url)();
+		cookie = await setup.login();
+	});
 
-		before(function () {
-			return this.login();
-		});
-		after(function () {
-			return this.logout();
-		});
-
-		it('responds with a state in search', function () {
-			const auth = new this.AuthorizationRequest({
-				response_type,
-				scope
-			});
-
-			return this.wrap({ route, verb, auth })
-				.expect(303)
-				.expect(auth.validatePresence(['state']))
-				.expect(auth.validateState)
-				.expect(auth.validateClientLocation);
-		});
-
-		it('populates ctx.oidc.entities', function (done) {
-			this.assertOnce((ctx) => {
-				expect(ctx.oidc.entities).to.have.keys(
-					'Client',
-					'Grant',
-					'Account',
-					'Session'
+	['get', 'post'].forEach((verb) => {
+		async function authRequest(auth: AuthorizationRequest) {
+			if (verb === 'get') {
+				return setup.agent.auth.get({
+					query: auth.params,
+					headers: {
+						cookie
+					}
+				});
+			} else if (verb === 'post') {
+				return setup.agent.auth.post(
+					new URLSearchParams(Object.entries(auth.params)).toString(),
+					{
+						headers: {
+							cookie
+						}
+					}
 				);
-			}, done);
+			}
+		}
 
-			const auth = new this.AuthorizationRequest({
-				response_type,
-				scope
+		it(`${verb} responds with a state in search`, async function () {
+			const auth = new AuthorizationRequest({
+				response_type: 'none',
+				scope: 'openid'
 			});
 
-			this.wrap({ route, verb, auth }).end(() => {});
+			const { response } = await authRequest(auth);
+			expect(response.status).toBe(303);
+			auth.validatePresence(response, ['state']);
+			auth.validateState(response);
+			auth.validateClientLocation(response);
+		});
+
+		it(`${verb} populates ctx.oidc.entities`, async function () {
+			const spy = spyOn(provider.OIDCContext.prototype, 'entity');
+			const auth = new AuthorizationRequest({
+				response_type: 'none',
+				scope: 'openid'
+			});
+
+			const { response } = await authRequest(auth);
+			expect(response.status).toBe(303);
+			const entities = spy.mock.calls.map((call) => call[0]);
+			expect(['Client', 'Grant', 'Account', 'Session']).toEqual(
+				expect.arrayContaining(entities)
+			);
 		});
 	});
 });
