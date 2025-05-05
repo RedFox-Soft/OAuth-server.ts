@@ -63,8 +63,8 @@ describe('BASIC code', () => {
 				cookie = await setup.login();
 			});
 
-			it.only('responds with a code in search', async function () {
-				const auth = new AuthorizationRequest({ scope, response_type: 'none' });
+			it('responds with a code in search', async function () {
+				const auth = new AuthorizationRequest({ scope });
 				const { response } = await authRequest(auth, { cookie });
 
 				expect(response.status).toBe(303);
