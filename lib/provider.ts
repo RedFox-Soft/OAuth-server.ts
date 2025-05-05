@@ -2,7 +2,6 @@ import { strict as assert } from 'node:assert';
 import EventEmitter from 'node:events';
 
 import QuickLRU from 'quick-lru';
-import Koa from 'koa';
 
 import Configuration from './helpers/configuration.ts';
 import * as instance from './helpers/weak_cache.ts';
@@ -11,7 +10,6 @@ import initializeAdapter from './helpers/initialize_adapter.ts';
 import initializeApp from './helpers/initialize_app.ts';
 import initializeClients from './helpers/initialize_clients.ts';
 import ResourceServer from './helpers/resource_server.ts';
-import { isWebUri } from './helpers/valid_url.ts';
 import epochTime from './helpers/epoch_time.ts';
 import getClaims from './helpers/claims.ts';
 import getContext from './helpers/oidc_context.ts';
@@ -20,7 +18,7 @@ import * as models from './models/index.ts';
 import DPoPNonces from './helpers/dpop_nonces.ts';
 import als from './helpers/als.ts';
 
-export class Provider extends EventEmitter {
+class ProviderClass extends EventEmitter {
 	#AccessToken;
 
 	#AuthorizationCode;
@@ -59,37 +57,15 @@ export class Provider extends EventEmitter {
 
 	#Session;
 
-	#exec;
+	#int = {};
 
-	#int = {
-		staticClients: new Map(),
-		dynamicClients: new QuickLRU({ maxSize: 100 })
-	};
-
-	constructor(issuer, setup) {
-		assert(
-			issuer,
-			'first argument must be the Issuer Identifier, i.e. https://op.example.com'
-		);
-		assert.equal(typeof issuer, 'string', 'Issuer Identifier must be a string');
-		assert(isWebUri(issuer), 'Issuer Identifier must be a valid web uri');
-
-		const { pathname, host, protocol, search, hash, href } = new URL(issuer);
-		assert(host, 'Issuer Identifier must have a host component');
-		assert(protocol, 'Issuer Identifier must have an URI scheme component');
-		assert(
-			!search && !href.endsWith('?'),
-			'Issuer Identifier must not have a query component'
-		);
-		assert(
-			!hash && !href.endsWith('#'),
-			'Issuer Identifier must not have a fragment component'
-		);
-		super();
-
+	init(issuer, setup) {
 		this.issuer = issuer;
 
 		const configuration = new Configuration(setup);
+		this.#int.staticClients = new Map();
+		this.#int.dynamicClients = new QuickLRU({ maxSize: 100 });
+
 		instance.set(this, this.#int);
 
 		this.#int.configuration = configuration;
@@ -123,10 +99,10 @@ export class Provider extends EventEmitter {
 		delete configuration.jwks;
 
 		this.elysia = initializeApp.call(this);
-		/// Koa.prototype.use.call(this, this.#exec);
 
 		initializeClients.call(this, configuration.clients);
 		delete configuration.clients;
+		return this;
 	}
 
 	urlFor(name, opt) {
@@ -424,17 +400,6 @@ export class Provider extends EventEmitter {
 		return interaction;
 	}
 
-	use(fn) {
-		Koa.prototype.use.call(this, fn);
-		this.middleware.splice(
-			this.middleware.indexOf(this.#exec),
-			0,
-			this.middleware.pop()
-		);
-		return this;
-	}
-
-	// eslint-disable-next-line class-methods-use-this
 	get [Symbol.toStringTag]() {
 		return 'Provider';
 	}
@@ -451,3 +416,5 @@ export class Provider extends EventEmitter {
 		return als.getStore();
 	}
 }
+
+export const Provider = new ProviderClass();

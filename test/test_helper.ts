@@ -88,7 +88,7 @@ process.env.NODE_ENV = process.env.NODE_ENV || 'test';
 
 globalThis.i = instance;
 
-Object.defineProperties(Provider.prototype, {
+Object.defineProperties(Object.getPrototypeOf(Provider), {
 	enable: {
 		value(feature, options = {}) {
 			const config = i(this).features[feature];
@@ -156,7 +156,7 @@ export default function testHelper(
 		const issuerIdentifier = `${protocol}//127.0.0.1:3000`;
 		TestAdapter.clear();
 
-		const provider = new Provider(issuerIdentifier, {
+		const provider = Provider.init(issuerIdentifier, {
 			clients,
 			jwks: { keys },
 			adapter: TestAdapter,

@@ -80,6 +80,9 @@ export async function errorHandler(obj) {
 			error_description
 		};
 	}
+	if (code === 'UNKNOWN' && !isOIDError) {
+		console.error('Unknown error', error);
+	}
 
 	const accept = request.headers.get('accept') || '';
 	if (accept.includes('text/html')) {
