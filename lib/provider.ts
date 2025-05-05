@@ -1,4 +1,3 @@
-import { strict as assert } from 'node:assert';
 import EventEmitter from 'node:events';
 
 import QuickLRU from 'quick-lru';
@@ -60,6 +59,7 @@ class ProviderClass extends EventEmitter {
 	#int = {};
 
 	init(issuer, setup) {
+		const { pathname } = new URL(issuer);
 		this.issuer = issuer;
 
 		const configuration = new Configuration(setup);
