@@ -28,30 +28,4 @@ describe('redirectUri helper', () => {
 
 		expect(result).to.equal('http://client.example.com/?some=other+payload');
 	});
-
-	it('works with fragment', () => {
-		const result = redirectUri(
-			'http://client.example.com/',
-			{
-				some: 'payload'
-			},
-			'fragment'
-		);
-
-		expect(result).to.equal('http://client.example.com/#some=payload');
-	});
-
-	it('works with fragment and keeps query', () => {
-		const result = redirectUri(
-			'http://client.example.com/?present=query',
-			{
-				some: 'payload'
-			},
-			'fragment'
-		);
-
-		expect(result).to.equal(
-			'http://client.example.com/?present=query#some=payload'
-		);
-	});
 });

@@ -1,12 +1,9 @@
-/* eslint-disable camelcase */
 import query from './query.ts';
-import fragment from './fragment.ts';
 import form_post from './form_post.ts';
 import web_message from './web_message.ts';
 
 const modes = {
 	query,
-	fragment,
 	form_post,
 	web_message
 };
@@ -18,14 +15,7 @@ export default async function jwtResponseModes(ctx, redirectUri, payload) {
 
 	let mode;
 	if (params.response_mode === 'jwt') {
-		if (
-			typeof params.response_type === 'string' &&
-			params.response_type.includes('token')
-		) {
-			mode = 'fragment';
-		} else {
-			mode = 'query';
-		}
+		mode = 'query';
 	} else {
 		[mode] = params.response_mode.split('.');
 	}

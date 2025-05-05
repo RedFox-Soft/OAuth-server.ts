@@ -382,12 +382,6 @@ export default function testHelper(
 			};
 		};
 
-		AuthorizationRequest.prototype.validateFragment = function (response) {
-			const { hash } = parse(response.headers.location);
-			expect(hash).to.exist;
-			response.headers.location = response.headers.location.replace('#', '?'); // eslint-disable-line no-param-reassign
-		};
-
 		AuthorizationRequest.prototype.validatePresence = function (
 			response,
 			properties,

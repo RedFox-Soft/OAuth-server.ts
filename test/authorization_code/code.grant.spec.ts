@@ -538,12 +538,11 @@ describe('grant_type=authorization_code', () => {
 				}
 			);
 			expect(error.status).toBe(422);
-			expect(error.value).toHaveProperty('type', 'validation');
+			expect(error.value).toHaveProperty('error', 'invalid_request');
 			expect(error.value).toHaveProperty(
-				'message',
-				'Expected required property'
+				'error_description',
+				"Property 'grant_type' is missing"
 			);
-			expect(error.value).toHaveProperty('property', '/grant_type');
 		});
 
 		it('code presence', async function () {

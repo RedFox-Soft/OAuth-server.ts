@@ -33,7 +33,7 @@ const discoveryRoute = '/.well-known/openid-configuration';
 export default function initializeApp() {
 	const { configuration, features } = instance(this);
 
-	['query', 'fragment', 'form_post'].forEach((mode) => {
+	['query', 'form_post'].forEach((mode) => {
 		this.registerResponseMode(mode, responseModes[mode]);
 	});
 
@@ -155,7 +155,7 @@ export default function initializeApp() {
 	if (features.jwtResponseModes.enabled) {
 		this.registerResponseMode('jwt', responseModes.jwt);
 
-		['query', 'fragment', 'form_post'].forEach((mode) => {
+		['query', 'form_post'].forEach((mode) => {
 			this.registerResponseMode(`${mode}.jwt`, responseModes.jwt);
 		});
 

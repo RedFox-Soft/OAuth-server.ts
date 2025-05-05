@@ -27,7 +27,7 @@ export default function discovery(ctx) {
 			? ctx.oidc.urlFor('registration')
 			: undefined,
 		authorization_response_iss_parameter_supported: true,
-		response_modes_supported: ['form_post', 'fragment', 'query'],
+		response_modes_supported: ['form_post', 'query'],
 		response_types_supported: configuration.responseTypes,
 		scopes_supported: [...configuration.scopes],
 		subject_types_supported: [...configuration.subjectTypes],
@@ -100,7 +100,6 @@ export default function discovery(ctx) {
 		ctx.body.response_modes_supported.push('jwt');
 
 		ctx.body.response_modes_supported.push('query.jwt');
-		ctx.body.response_modes_supported.push('fragment.jwt');
 		ctx.body.response_modes_supported.push('form_post.jwt');
 
 		if (features.webMessageResponseMode.enabled) {

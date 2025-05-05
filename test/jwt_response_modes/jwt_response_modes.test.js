@@ -30,9 +30,6 @@ describe('configuration features.jwtResponseModes', () => {
 						'query.jwt'
 					);
 					expect(response.body.response_modes_supported).to.include(
-						'fragment.jwt'
-					);
-					expect(response.body.response_modes_supported).to.include(
 						'form_post.jwt'
 					);
 					expect(response.body.response_modes_supported).to.include(

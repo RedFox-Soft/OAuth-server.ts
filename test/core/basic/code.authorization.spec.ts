@@ -15,11 +15,7 @@ import sinon from 'sinon';
 
 import bootstrap from '../../test_helper.js';
 import epochTime from '../../../lib/helpers/epoch_time.ts';
-import {
-	InvalidRequest,
-	InvalidClient,
-	InvalidRedirectUri
-} from '../../../lib/helpers/errors.ts';
+import { InvalidRedirectUri } from '../../../lib/helpers/errors.ts';
 
 const route = '/auth';
 const response_type = 'code';
