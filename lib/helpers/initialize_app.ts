@@ -1,8 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { Elysia } from 'elysia';
 
-import Router from '@koa/router';
-
 import devInteractions from '../actions/interaction.ts';
 import cors from '../shared/cors.ts';
 import * as grants from '../actions/grants/index.ts';
@@ -81,9 +79,6 @@ export default function initializeApp() {
 		}),
 		respond: () => {}
 	};
-
-	const router = new Router();
-	instance(this).router = router;
 
 	const ensureOIDC = async (ctx, next) => {
 		let oidcCtx;

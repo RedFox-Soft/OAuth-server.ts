@@ -161,29 +161,31 @@ export class AuthorizationRequest {
 		});
 	}
 
-	validateResponseParameter(parameter, expected) {
-		return (response) => {
-			const {
-				query: { [parameter]: value }
-			} = parse(response.headers.location, true);
-			if (expected.exec) {
-				expect(value).to.match(expected);
-			} else {
-				expect(value).to.equal(expected);
-			}
-		};
+	validateResponseParameter(response, parameter, expected) {
+		const {
+			query: { [parameter]: value }
+		} = parse(response.headers.get('location'), true);
+		if (expected.exec) {
+			expect(value).to.match(expected);
+		} else {
+			expect(value).to.equal(expected);
+		}
 	}
 
-	validateError(expected) {
-		return this.validateResponseParameter('error', expected);
+	validateError(response, expected) {
+		return this.validateResponseParameter(response, 'error', expected);
 	}
 
-	validateScope(expected) {
-		return this.validateResponseParameter('scope', expected);
+	validateScope(response, expected) {
+		return this.validateResponseParameter(response, 'scope', expected);
 	}
 
-	validateErrorDescription(expected) {
-		return this.validateResponseParameter('error_description', expected);
+	validateErrorDescription(response, expected) {
+		return this.validateResponseParameter(
+			response,
+			'error_description',
+			expected
+		);
 	}
 
 	async getToken(code) {

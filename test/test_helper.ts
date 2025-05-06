@@ -3,7 +3,6 @@
 import { pathToFileURL } from 'node:url';
 import * as path from 'node:path';
 
-import { setGlobalDispatcher, MockAgent } from 'undici';
 import sinon from 'sinon';
 import { dirname } from 'desm';
 import flatten from 'lodash/flatten.js';
@@ -21,10 +20,6 @@ import instance from '../lib/helpers/weak_cache.ts';
 import { Account, TestAdapter } from './models.js';
 import keys from './keys.js';
 import { AuthorizationRequest } from './AuthorizationRequest.js';
-
-const fetchAgent = new MockAgent();
-// fetchAgent.disableNetConnect();
-setGlobalDispatcher(fetchAgent);
 
 const { info, warn } = console;
 console.info = function (...args) {
@@ -303,7 +298,6 @@ export default function testHelper(
 			login,
 			provider,
 			TestAdapter,
-			fetchAgent,
 			agent
 		};
 	};
@@ -343,24 +337,4 @@ export function skipConsent() {
 	});
 
 	after(sandbox.restore);
-}
-
-export function enableNetConnect() {
-	fetchAgent.enableNetConnect();
-}
-
-export function resetNetConnect() {
-	fetchAgent.disableNetConnect();
-}
-
-export function disableNetConnect() {
-	fetchAgent.disableNetConnect();
-}
-
-export function assertNoPendingInterceptors() {
-	fetchAgent.assertNoPendingInterceptors();
-}
-
-export function mock(origin) {
-	return fetchAgent.get(origin);
 }

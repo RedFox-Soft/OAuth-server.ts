@@ -1,174 +1,163 @@
 import { parse as parseUrl } from 'node:url';
-
-import { expect } from 'chai';
-
-import bootstrap, { passInteractionChecks } from '../test_helper.js';
+import { describe, it, beforeAll, expect } from 'bun:test';
+import bootstrap from '../test_helper.js';
+import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
+import { provider } from 'lib/provider.js';
 
 describe('PKCE RFC7636', () => {
-	before(bootstrap(import.meta.url));
+	let setup = null;
+	let cookie = null;
+	beforeAll(async function () {
+		setup = await bootstrap(import.meta.url)();
+		cookie = await setup.login();
+	});
 
 	describe('authorization', () => {
-		before(function () {
-			return this.login();
-		});
-
-		it('Should throw Exception in check on PSCE if code_challenge is not defined', function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'code',
+		it('Should throw Exception in check on PSCE if code_challenge is not defined', async function () {
+			const auth = new AuthorizationRequest({
 				scope: 'openid',
-				code_challenge: undefined,
+				code_challenge: '',
 				code_challenge_method: 'S256'
 			});
 
-			return this.agent
-				.get('/auth')
-				.query(auth)
-				.expect(auth.validatePresence(['error', 'error_description', 'state']))
-				.expect(auth.validateError('invalid_request'))
-				.expect(
-					auth.validateErrorDescription(
-						'Authorization Server policy requires PKCE to be used for this request'
-					)
-				);
+			const { response } = await setup.agent.auth.get({
+				query: auth.params,
+				headers: { cookie }
+			});
+			auth.validatePresence(response, ['error', 'error_description', 'state']);
+			auth.validateError(response, 'invalid_request');
+			auth.validateErrorDescription(
+				response,
+				'Authorization Server policy requires PKCE to be used for this request'
+			);
 		});
 
-		it('checks that codeChallenge is conform to its ABNF (too short)', function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'code',
+		it('checks that codeChallenge is conform to its ABNF (too short)', async function () {
+			const auth = new AuthorizationRequest({
 				scope: 'openid',
 				code_challenge_method: 'S256',
 				code_challenge: 'f'.repeat(42)
 			});
 
-			return this.agent
-				.get('/auth')
-				.query(auth)
-				.expect(auth.validatePresence(['error', 'error_description', 'state']))
-				.expect(auth.validateError('invalid_request'))
-				.expect(
-					auth.validateErrorDescription(
-						'code_challenge must be a string with a minimum 43 and maximum 128 length characters'
-					)
-				);
+			const { response } = await setup.agent.auth.get({
+				query: auth.params,
+				headers: { cookie }
+			});
+			auth.validatePresence(response, ['error', 'error_description', 'state']);
+			auth.validateError(response, 'invalid_request');
+			auth.validateErrorDescription(
+				response,
+				'code_challenge must be a string with a minimum 43 and maximum 128 length characters'
+			);
 		});
 
-		it('checks that codeChallenge is conform to its ABNF (too long)', function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'code',
+		it('checks that codeChallenge is conform to its ABNF (too long)', async function () {
+			const auth = new AuthorizationRequest({
 				scope: 'openid',
 				code_challenge_method: 'S256',
 				code_challenge: 'f'.repeat(129)
 			});
 
-			return this.agent
-				.get('/auth')
-				.query(auth)
-				.expect(auth.validatePresence(['error', 'error_description', 'state']))
-				.expect(auth.validateError('invalid_request'))
-				.expect(
-					auth.validateErrorDescription(
-						'code_challenge must be a string with a minimum 43 and maximum 128 length characters'
-					)
-				);
+			const { response } = await setup.agent.auth.get({
+				query: auth.params,
+				headers: { cookie }
+			});
+			auth.validatePresence(response, ['error', 'error_description', 'state']);
+			auth.validateError(response, 'invalid_request');
+			auth.validateErrorDescription(
+				response,
+				'code_challenge must be a string with a minimum 43 and maximum 128 length characters'
+			);
 		});
 
-		it('checks that codeChallenge is conform to its ABNF (charset)', function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'code',
+		it('checks that codeChallenge is conform to its ABNF (charset)', async function () {
+			const auth = new AuthorizationRequest({
 				scope: 'openid',
 				code_challenge_method: 'S256',
 				code_challenge: `${'f'.repeat(42)}&`
 			});
 
-			return this.agent
-				.get('/auth')
-				.query(auth)
-				.expect(auth.validatePresence(['error', 'error_description', 'state']))
-				.expect(auth.validateError('invalid_request'))
-				.expect(
-					auth.validateErrorDescription(
-						'code_challenge contains invalid characters'
-					)
-				);
+			const { response } = await setup.agent.auth.get({
+				query: auth.params,
+				headers: { cookie }
+			});
+			auth.validatePresence(response, ['error', 'error_description', 'state']);
+			auth.validateError(response, 'invalid_request');
+			auth.validateErrorDescription(
+				response,
+				'code_challenge contains invalid characters'
+			);
 		});
 
-		it('validates the value of codeChallengeMethod if provided', function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'code',
+		it('validates the value of codeChallengeMethod if provided', async function () {
+			const auth = new AuthorizationRequest({
 				scope: 'openid',
 				code_challenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
 				code_challenge_method: 'bar'
 			});
 
-			return this.agent
-				.get('/auth')
-				.query(auth)
-				.expect(auth.validatePresence(['error', 'error_description', 'state']))
-				.expect(auth.validateError('invalid_request'))
-				.expect(
-					auth.validateErrorDescription(
-						'not supported value of code_challenge_method'
-					)
-				);
+			const { response } = await setup.agent.auth.get({
+				query: auth.params,
+				headers: { cookie }
+			});
+			auth.validatePresence(response, ['error', 'error_description', 'state']);
+			auth.validateError(response, 'invalid_request');
+			auth.validateErrorDescription(
+				response,
+				'not supported value of code_challenge_method'
+			);
 		});
 
-		it('forces public clients using code flow to use pkce', function () {
-			const auth = new this.AuthorizationRequest({
+		it('forces public clients using code flow to use pkce', async function () {
+			const auth = new AuthorizationRequest({
 				response_type: 'code',
 				scope: 'openid',
-				code_challenge: undefined,
-				code_challenge_method: undefined
+				code_challenge: '',
+				code_challenge_method: ''
 			});
 
-			return this.agent
-				.get('/auth')
-				.query(auth)
-				.expect(auth.validatePresence(['error', 'error_description', 'state']))
-				.expect(auth.validateError('invalid_request'))
-				.expect(
-					auth.validateErrorDescription(
-						'Authorization Server policy requires PKCE to be used for this request'
-					)
-				);
+			const { response } = await setup.agent.auth.get({
+				query: auth.params,
+				headers: { cookie }
+			});
+			auth.validatePresence(response, ['error', 'error_description', 'state']);
+			auth.validateError(response, 'invalid_request');
+			auth.validateErrorDescription(
+				response,
+				'Authorization Server policy requires PKCE to be used for this request'
+			);
 		});
 
-		it('stores codeChallenge and codeChallengeMethod in the code', function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'code',
+		it('stores codeChallenge and codeChallengeMethod in the code', async function () {
+			const auth = new AuthorizationRequest({
 				scope: 'openid',
 				code_challenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
 				code_challenge_method: 'S256'
 			});
 
-			return this.agent
-				.get('/auth')
-				.query(auth)
-				.expect((response) => {
-					const {
-						query: { code }
-					} = parseUrl(response.headers.location, true);
-					const jti = this.getTokenJti(code);
-					const stored =
-						this.TestAdapter.for('AuthorizationCode').syncFind(jti);
+			const { response } = await setup.agent.auth.get({
+				query: auth.params,
+				headers: { cookie }
+			});
 
-					expect(stored).to.have.property('codeChallengeMethod', 'S256');
-					expect(stored).to.have.property(
-						'codeChallenge',
-						'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM'
-					);
-				});
+			const {
+				query: { code }
+			} = parseUrl(response.headers.get('location'), true);
+			const jti = setup.getTokenJti(code);
+			const stored = setup.TestAdapter.for('AuthorizationCode').syncFind(jti);
+			expect(stored).toHaveProperty('codeChallengeMethod', 'S256');
+			expect(stored).toHaveProperty(
+				'codeChallenge',
+				'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM'
+			);
 		});
 	});
 
-	describe('token grant_type=authorization_code', () => {
-		before(function () {
-			return this.login();
-		});
-
+	describe('token grant_type=authorization_code', async () => {
 		it('passes with S256 values', async function () {
-			const authCode = new this.provider.AuthorizationCode({
-				accountId: this.loggedInAccountId,
-				grantId: this.getGrantId(),
+			const authCode = new provider.AuthorizationCode({
+				accountId: setup.loggedInAccountId,
+				grantId: setup.getGrantId(),
 				scope: 'openid',
 				clientId: 'client',
 				codeChallenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
@@ -177,23 +166,20 @@ describe('PKCE RFC7636', () => {
 			});
 			const code = await authCode.save();
 
-			return this.agent
-				.post('/token')
-				.type('form')
-				.send({
-					client_id: 'client',
-					code,
-					grant_type: 'authorization_code',
-					redirect_uri: 'com.example.myapp:/localhost/cb',
-					code_verifier: 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk'
-				})
-				.expect(200);
+			const { response } = await setup.agent.token.post({
+				client_id: 'client',
+				code,
+				grant_type: 'authorization_code',
+				redirect_uri: 'com.example.myapp:/localhost/cb',
+				code_verifier: 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk'
+			});
+			expect(response).toHaveProperty('status', 200);
 		});
 
 		it('checks presence of code_verifier param if code has codeChallenge', async function () {
-			const authCode = new this.provider.AuthorizationCode({
-				accountId: this.loggedInAccountId,
-				grantId: this.getGrantId(),
+			const authCode = new provider.AuthorizationCode({
+				accountId: setup.loggedInAccountId,
+				grantId: setup.getGrantId(),
 				scope: 'openid',
 				clientId: 'client',
 				codeChallenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
@@ -202,25 +188,20 @@ describe('PKCE RFC7636', () => {
 			});
 			const code = await authCode.save();
 
-			return this.agent
-				.post('/token')
-				.type('form')
-				.send({
-					client_id: 'client',
-					code,
-					grant_type: 'authorization_code',
-					redirect_uri: 'com.example.myapp:/localhost/cb'
-				})
-				.expect(400)
-				.expect((response) => {
-					expect(response.body).to.have.property('error', 'invalid_grant');
-				});
+			const { error } = await setup.agent.token.post({
+				client_id: 'client',
+				code,
+				grant_type: 'authorization_code',
+				redirect_uri: 'com.example.myapp:/localhost/cb'
+			});
+			expect(error).toHaveProperty('status', 400);
+			expect(error.value).toHaveProperty('error', 'invalid_grant');
 		});
 
 		it('checks value of code_verifier when method = S256', async function () {
-			const authCode = new this.provider.AuthorizationCode({
-				accountId: this.loggedInAccountId,
-				grantId: this.getGrantId(),
+			const authCode = new provider.AuthorizationCode({
+				accountId: setup.loggedInAccountId,
+				grantId: setup.getGrantId(),
 				scope: 'openid',
 				clientId: 'client',
 				codeChallenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
@@ -229,26 +210,21 @@ describe('PKCE RFC7636', () => {
 			});
 			const code = await authCode.save();
 
-			return this.agent
-				.post('/token')
-				.type('form')
-				.send({
-					client_id: 'client',
-					code,
-					grant_type: 'authorization_code',
-					redirect_uri: 'com.example.myapp:/localhost/cb',
-					code_verifier: 'invalidE9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM'
-				})
-				.expect(400)
-				.expect((response) => {
-					expect(response.body).to.have.property('error', 'invalid_grant');
-				});
+			const { error } = await setup.agent.token.post({
+				client_id: 'client',
+				code,
+				grant_type: 'authorization_code',
+				redirect_uri: 'com.example.myapp:/localhost/cb',
+				code_verifier: 'invalidE9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM'
+			});
+			expect(error).toHaveProperty('status', 400);
+			expect(error.value).toHaveProperty('error', 'invalid_grant');
 		});
 
 		it('checks that code_verifier is conform to its ABNF (too short)', async function () {
-			const authCode = new this.provider.AuthorizationCode({
-				accountId: this.loggedInAccountId,
-				grantId: this.getGrantId(),
+			const authCode = new provider.AuthorizationCode({
+				accountId: setup.loggedInAccountId,
+				grantId: setup.getGrantId(),
 				scope: 'openid',
 				clientId: 'client',
 				codeChallenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
@@ -257,30 +233,25 @@ describe('PKCE RFC7636', () => {
 			});
 			const code = await authCode.save();
 
-			return this.agent
-				.post('/token')
-				.type('form')
-				.send({
-					client_id: 'client',
-					code,
-					grant_type: 'authorization_code',
-					redirect_uri: 'com.example.myapp:/localhost/cb',
-					code_verifier: 'f'.repeat(42)
-				})
-				.expect(400)
-				.expect((response) => {
-					expect(response.body).to.have.property('error', 'invalid_request');
-					expect(response.body).to.have.property(
-						'error_description',
-						'code_verifier must be a string with a minimum 43 and maximum 128 length characters'
-					);
-				});
+			const { error } = await setup.agent.token.post({
+				client_id: 'client',
+				code,
+				grant_type: 'authorization_code',
+				redirect_uri: 'com.example.myapp:/localhost/cb',
+				code_verifier: 'f'.repeat(42)
+			});
+			expect(error).toHaveProperty('status', 400);
+			expect(error.value).toHaveProperty('error', 'invalid_request');
+			expect(error.value).toHaveProperty(
+				'error_description',
+				'code_verifier must be a string with a minimum 43 and maximum 128 length characters'
+			);
 		});
 
 		it('checks that code_verifier is conform to its ABNF (too long)', async function () {
-			const authCode = new this.provider.AuthorizationCode({
-				accountId: this.loggedInAccountId,
-				grantId: this.getGrantId(),
+			const authCode = new provider.AuthorizationCode({
+				accountId: setup.loggedInAccountId,
+				grantId: setup.getGrantId(),
 				scope: 'openid',
 				clientId: 'client',
 				codeChallenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
@@ -289,30 +260,25 @@ describe('PKCE RFC7636', () => {
 			});
 			const code = await authCode.save();
 
-			return this.agent
-				.post('/token')
-				.type('form')
-				.send({
-					client_id: 'client',
-					code,
-					grant_type: 'authorization_code',
-					redirect_uri: 'com.example.myapp:/localhost/cb',
-					code_verifier: 'f'.repeat(129)
-				})
-				.expect(400)
-				.expect((response) => {
-					expect(response.body).to.have.property('error', 'invalid_request');
-					expect(response.body).to.have.property(
-						'error_description',
-						'code_verifier must be a string with a minimum 43 and maximum 128 length characters'
-					);
-				});
+			const { error } = await setup.agent.token.post({
+				client_id: 'client',
+				code,
+				grant_type: 'authorization_code',
+				redirect_uri: 'com.example.myapp:/localhost/cb',
+				code_verifier: 'f'.repeat(129)
+			});
+			expect(error).toHaveProperty('status', 400);
+			expect(error.value).toHaveProperty('error', 'invalid_request');
+			expect(error.value).toHaveProperty(
+				'error_description',
+				'code_verifier must be a string with a minimum 43 and maximum 128 length characters'
+			);
 		});
 
 		it('checks that code_verifier is conform to its ABNF (charset)', async function () {
-			const authCode = new this.provider.AuthorizationCode({
-				accountId: this.loggedInAccountId,
-				grantId: this.getGrantId(),
+			const authCode = new provider.AuthorizationCode({
+				accountId: setup.loggedInAccountId,
+				grantId: setup.getGrantId(),
 				scope: 'openid',
 				clientId: 'client',
 				codeChallenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
@@ -321,30 +287,25 @@ describe('PKCE RFC7636', () => {
 			});
 			const code = await authCode.save();
 
-			return this.agent
-				.post('/token')
-				.type('form')
-				.send({
-					client_id: 'client',
-					code,
-					grant_type: 'authorization_code',
-					redirect_uri: 'com.example.myapp:/localhost/cb',
-					code_verifier: `${'f'.repeat(42)}&`
-				})
-				.expect(400)
-				.expect((response) => {
-					expect(response.body).to.have.property('error', 'invalid_request');
-					expect(response.body).to.have.property(
-						'error_description',
-						'code_verifier contains invalid characters'
-					);
-				});
+			const { error } = await setup.agent.token.post({
+				client_id: 'client',
+				code,
+				grant_type: 'authorization_code',
+				redirect_uri: 'com.example.myapp:/localhost/cb',
+				code_verifier: `${'f'.repeat(42)}&`
+			});
+			expect(error).toHaveProperty('status', 400);
+			expect(error.value).toHaveProperty('error', 'invalid_request');
+			expect(error.value).toHaveProperty(
+				'error_description',
+				'code_verifier contains invalid characters'
+			);
 		});
 
 		it('passes if S256 is used', async function () {
-			const authCode = new this.provider.AuthorizationCode({
-				accountId: this.loggedInAccountId,
-				grantId: this.getGrantId(),
+			const authCode = new provider.AuthorizationCode({
+				accountId: setup.loggedInAccountId,
+				grantId: setup.getGrantId(),
 				scope: 'openid',
 				clientId: 'client',
 				codeChallenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
@@ -353,17 +314,14 @@ describe('PKCE RFC7636', () => {
 			});
 			const code = await authCode.save();
 
-			return this.agent
-				.post('/token')
-				.type('form')
-				.send({
-					client_id: 'client',
-					code,
-					grant_type: 'authorization_code',
-					redirect_uri: 'com.example.myapp:/localhost/cb',
-					code_verifier: 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk'
-				})
-				.expect(200);
+			const { response } = await setup.agent.token.post({
+				client_id: 'client',
+				code,
+				grant_type: 'authorization_code',
+				redirect_uri: 'com.example.myapp:/localhost/cb',
+				code_verifier: 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk'
+			});
+			expect(response).toHaveProperty('status', 200);
 		});
 	});
 });

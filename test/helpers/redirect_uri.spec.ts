@@ -1,5 +1,4 @@
-import { expect } from 'chai';
-
+import { describe, it, expect } from 'bun:test';
 import redirectUri from '../../lib/helpers/redirect_uri.ts';
 
 describe('redirectUri helper', () => {
@@ -8,7 +7,7 @@ describe('redirectUri helper', () => {
 			some: 'payload'
 		});
 
-		expect(result).to.equal('http://client.example.com/?some=payload');
+		expect(result).toBe('http://client.example.com/?some=payload');
 	});
 
 	it('extends the query if part of the redirect_uri', () => {
@@ -16,9 +15,7 @@ describe('redirectUri helper', () => {
 			some: 'payload'
 		});
 
-		expect(result).to.equal(
-			'http://client.example.com/?other=stuff&some=payload'
-		);
+		expect(result).toBe('http://client.example.com/?other=stuff&some=payload');
 	});
 
 	it('payload comes first', () => {
@@ -26,6 +23,6 @@ describe('redirectUri helper', () => {
 			some: 'other payload'
 		});
 
-		expect(result).to.equal('http://client.example.com/?some=other+payload');
+		expect(result).toBe('http://client.example.com/?some=other+payload');
 	});
 });
