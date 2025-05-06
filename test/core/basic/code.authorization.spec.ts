@@ -108,7 +108,7 @@ describe('BASIC code', () => {
 
 			it('ignores unsupported scopes', async function () {
 				const spy = sinon.spy();
-				setup.provider.once('authorization_code.saved', spy);
+				provider.once('authorization_code.saved', spy);
 				const auth = new AuthorizationRequest({
 					scope: 'openid and unsupported'
 				});
@@ -122,7 +122,7 @@ describe('BASIC code', () => {
 			describe('ignoring the offline_access scope', () => {
 				beforeEach(function () {
 					spyOn(
-						setup.provider.OIDCContext.prototype,
+						provider.OIDCContext.prototype,
 						'promptPending'
 					).mockReturnValue(false);
 				});
@@ -308,7 +308,7 @@ describe('BASIC code', () => {
 			});
 
 			it('session is too old for this client', async function () {
-				const client = await setup.provider.Client.find('client');
+				const client = await provider.Client.find('client');
 				client.defaultMaxAge = 1800;
 
 				const session = setup.getSession();
