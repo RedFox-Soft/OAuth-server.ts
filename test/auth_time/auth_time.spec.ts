@@ -10,7 +10,7 @@ import {
 } from 'bun:test';
 import { provider } from 'lib/provider.js';
 import { decodeJwt } from 'jose';
-import bootstrap from '../test_helper.ts';
+import bootstrap, { agent } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
 describe('responds with a id_token containing auth_time', () => {
@@ -27,7 +27,7 @@ describe('responds with a id_token containing auth_time', () => {
 			...options
 		});
 
-		const { response } = await setup.agent.auth.get({
+		const { response } = await agent.auth.get({
 			query: auth.params,
 			headers: {
 				cookie

@@ -13,7 +13,7 @@ import {
 
 import sinon from 'sinon';
 
-import bootstrap from '../../test_helper.js';
+import bootstrap, { agent } from '../../test_helper.js';
 import epochTime from '../../../lib/helpers/epoch_time.ts';
 import { InvalidRedirectUri } from '../../../lib/helpers/errors.ts';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
@@ -37,7 +37,7 @@ describe('BASIC code', () => {
 	['get', 'post'].forEach((verb) => {
 		function authRequest(auth, { cookie, accept } = {}) {
 			if (verb === 'get') {
-				return setup.agent.auth.get({
+				return agent.auth.get({
 					query: auth.params,
 					headers: {
 						cookie,
@@ -45,7 +45,7 @@ describe('BASIC code', () => {
 					}
 				});
 			} else if (verb === 'post') {
-				return setup.agent.auth.post(
+				return agent.auth.post(
 					new URLSearchParams(Object.entries(auth.params)).toString(),
 					{
 						headers: {
@@ -163,11 +163,11 @@ describe('BASIC code', () => {
 			let policy = null;
 
 			beforeAll(function () {
-				policy = i(setup.provider).configuration.interactions.policy;
+				policy = i(provider).configuration.interactions.policy;
 			});
 
 			afterAll(function () {
-				i(setup.provider).configuration.interactions.policy = policy;
+				i(provider).configuration.interactions.policy = policy;
 			});
 
 			it('no account id was resolved and no interactions requested', async function () {
@@ -900,10 +900,7 @@ describe('BASIC code', () => {
 				it('only supports application/x-www-form-urlencoded', function () {
 					const spy = sinon.spy();
 					provider.once('authorization.error', spy);
-					const auth = new AuthorizationRequest({
-						response_type,
-						scope
-					});
+					const auth = new AuthorizationRequest({ scope });
 
 					return this.wrap({ route, verb, auth })
 						.type('json')

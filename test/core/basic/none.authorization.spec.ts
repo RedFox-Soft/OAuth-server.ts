@@ -1,6 +1,6 @@
 import { describe, it, beforeAll, expect, spyOn } from 'bun:test';
 
-import bootstrap from '../../test_helper.js';
+import bootstrap, { agent } from '../../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { provider } from 'lib/provider.js';
 
@@ -15,14 +15,14 @@ describe('/auth response_type=none', () => {
 	['get', 'post'].forEach((verb) => {
 		async function authRequest(auth: AuthorizationRequest) {
 			if (verb === 'get') {
-				return setup.agent.auth.get({
+				return agent.auth.get({
 					query: auth.params,
 					headers: {
 						cookie
 					}
 				});
 			} else if (verb === 'post') {
-				return setup.agent.auth.post(
+				return agent.auth.post(
 					new URLSearchParams(Object.entries(auth.params)).toString(),
 					{
 						headers: {

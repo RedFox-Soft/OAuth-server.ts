@@ -5,6 +5,7 @@ import querystring from 'node:querystring';
 import { expect } from 'chai';
 import { TestAdapter } from './models.js';
 import base64url from 'base64url';
+import { agent } from './test_helper.js';
 
 function getSetCookies(cookies) {
 	return cookies.filter(
@@ -190,7 +191,7 @@ export class AuthorizationRequest {
 
 	async getToken(code) {
 		const isBasicAuth = this.client.token_endpoint_auth_method !== 'none';
-		return await AuthorizationRequest.agent.token.post(
+		return await agent.token.post(
 			{
 				client_id: isBasicAuth ? undefined : this.client_id,
 				code,

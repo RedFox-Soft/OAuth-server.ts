@@ -14,7 +14,7 @@ import { treaty } from '@elysiajs/eden';
 
 import nanoid from '../lib/helpers/nanoid.ts';
 import epochTime from '../lib/helpers/epoch_time.ts';
-import provider from '../lib/index.ts';
+import { provider, elysia } from '../lib/index.ts';
 import instance from '../lib/helpers/weak_cache.ts';
 
 import { Account, TestAdapter } from './models.js';
@@ -56,6 +56,14 @@ Object.defineProperties(Object.getPrototypeOf(provider), {
 });
 
 const jwt = (token) => JSON.parse(base64url.decode(token.split('.')[1])).jti;
+
+export const agent = treaty(elysia, {
+	onRequest: (path, fetchInit) => {
+		if (path === '/auth' && fetchInit.method === 'POST') {
+			fetchInit.headers['content-type'] = 'application/x-www-form-urlencoded';
+		}
+	}
+});
 
 export default function testHelper(
 	importMetaUrl,
@@ -257,16 +265,6 @@ export default function testHelper(
 			};
 		}
 
-		agent = treaty(provider.elysia, {
-			onRequest: (path, fetchInit) => {
-				if (path === '/auth' && fetchInit.method === 'POST') {
-					fetchInit.headers['content-type'] =
-						'application/x-www-form-urlencoded';
-				}
-			}
-		});
-		AuthorizationRequest.agent = agent;
-
 		if (mountTo !== '/') {
 			['get', 'post', 'put', 'del', 'options', 'trace'].forEach((method) => {
 				const orig = agent[method];
@@ -296,9 +294,7 @@ export default function testHelper(
 			getGrantId,
 			getTokenJti,
 			login,
-			provider,
-			TestAdapter,
-			agent
+			TestAdapter
 		};
 	};
 }

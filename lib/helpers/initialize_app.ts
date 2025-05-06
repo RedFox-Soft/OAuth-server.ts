@@ -1,10 +1,8 @@
 import { strict as assert } from 'node:assert';
-import { Elysia } from 'elysia';
 
 import devInteractions from '../actions/interaction.ts';
 import cors from '../shared/cors.ts';
 import * as grants from '../actions/grants/index.ts';
-import * as responseModes from '../response_modes/index.ts';
 import error from '../shared/error_handler.ts';
 import {
 	getAuthorization,
@@ -20,19 +18,16 @@ import {
 
 import als from './als.ts';
 import instance from './weak_cache.ts';
-import { authorizationAction } from '../actions/authorization/authorization.ts';
-import { nocache } from '../shared/no_cache.ts';
-import { tokenAction } from '../actions/token.ts';
-import { errorHandler } from '../shared/authorization_error_handler.ts';
+import query from 'lib/response_modes/query.js';
+import form_post from 'lib/response_modes/form_post.js';
 
 const discoveryRoute = '/.well-known/openid-configuration';
 
 export default function initializeApp() {
 	const { configuration, features } = instance(this);
 
-	['query', 'form_post'].forEach((mode) => {
-		this.registerResponseMode(mode, responseModes[mode]);
-	});
+	this.registerResponseMode('query', query);
+	this.registerResponseMode('form_post', form_post);
 
 	Object.entries(grants).forEach(([grantType, { handler, parameters }]) => {
 		const { grantTypeHandlers } = instance(this);
@@ -51,12 +46,7 @@ export default function initializeApp() {
 			this.registerGrantType(grantType, handler, parameters, dupes);
 		}
 	});
-
-	return new Elysia({ strictPath: true })
-		.onError(errorHandler)
-		.use(nocache)
-		.use(authorizationAction)
-		.use(tokenAction);
+	return;
 
 	const CORS_AUTHORIZATION = {
 		exposeHeaders: ['WWW-Authenticate'],

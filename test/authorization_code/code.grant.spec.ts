@@ -15,7 +15,7 @@ import timekeeper from 'timekeeper';
 
 import { provider } from 'lib/provider.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
-import bootstrap from '../test_helper.js';
+import bootstrap, { agent } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
 function errorDetail(spy) {
@@ -52,7 +52,7 @@ describe('grant_type=authorization_code', () => {
 				scope: 'openid',
 				redirect_uri: 'https://client.example.com/cb'
 			});
-			const { response, error } = await setup.agent.auth.get({
+			const { response, error } = await agent.auth.get({
 				query: auth.params,
 				headers: {
 					cookie
@@ -154,7 +154,7 @@ describe('grant_type=authorization_code', () => {
 		it('validates code is not expired', async function () {
 			const { ttl } = i(provider).configuration;
 			spyOn(ttl, 'AuthorizationCode').mockReturnValue(5);
-			const { response } = await setup.agent.auth.get({
+			const { response } = await agent.auth.get({
 				query: auth.params,
 				headers: {
 					cookie: session
@@ -289,7 +289,7 @@ describe('grant_type=authorization_code', () => {
 				response_type: 'code',
 				redirect_uri: 'https://client.example.com/cb3'
 			});
-			const { response } = await setup.agent.auth.get({
+			const { response } = await agent.auth.get({
 				query: auth.params,
 				headers: {
 					cookie
@@ -338,7 +338,7 @@ describe('grant_type=authorization_code', () => {
 				response_type: 'code'
 			});
 			delete auth.redirect_uri;
-			const { response } = await setup.agent.auth.get({
+			const { response } = await agent.auth.get({
 				query: auth.params,
 				headers: {
 					cookie
@@ -436,7 +436,7 @@ describe('grant_type=authorization_code', () => {
 		it('validates code is not expired', async function () {
 			const { ttl } = i(provider).configuration;
 			spyOn(ttl, 'AuthorizationCode').mockReturnValue(5);
-			const { response } = await setup.agent.auth.get({
+			const { response } = await agent.auth.get({
 				query: auth.params,
 				headers: {
 					cookie: session
@@ -538,7 +538,7 @@ describe('grant_type=authorization_code', () => {
 				client_id: 'client',
 				scope: 'openid'
 			});
-			const { error } = await setup.agent.token.post(
+			const { error } = await agent.token.post(
 				{},
 				{
 					headers: auth.basicAuthHeader
@@ -557,7 +557,7 @@ describe('grant_type=authorization_code', () => {
 				client_id: 'client',
 				scope: 'openid'
 			});
-			const { error } = await setup.agent.token.post(
+			const { error } = await agent.token.post(
 				{
 					code_verifier: auth.code_verifier,
 					grant_type: 'authorization_code',
@@ -580,7 +580,7 @@ describe('grant_type=authorization_code', () => {
 				client_id: 'client',
 				scope: 'openid'
 			});
-			const { error } = await setup.agent.token.post(
+			const { error } = await agent.token.post(
 				{
 					code_verifier: auth.code_verifier,
 					grant_type: 'authorization_code',
@@ -606,7 +606,7 @@ describe('grant_type=authorization_code', () => {
 				client_id: 'client',
 				scope: 'openid'
 			});
-			const { error } = await setup.agent.token.post(
+			const { error } = await agent.token.post(
 				{
 					code_verifier: auth.code_verifier,
 					grant_type: 'authorization_code',
@@ -633,7 +633,7 @@ describe('grant_type=authorization_code', () => {
 			client_id: 'client',
 			scope: 'openid'
 		});
-		const { error } = await setup.agent.token.post(
+		const { error } = await agent.token.post(
 			{
 				grant_type: 'authorization_code',
 				code: 'code',

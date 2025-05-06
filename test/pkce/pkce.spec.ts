@@ -1,6 +1,6 @@
 import { parse as parseUrl } from 'node:url';
 import { describe, it, beforeAll, expect } from 'bun:test';
-import bootstrap from '../test_helper.js';
+import bootstrap, { agent } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { provider } from 'lib/provider.js';
 
@@ -20,7 +20,7 @@ describe('PKCE RFC7636', () => {
 				code_challenge_method: 'S256'
 			});
 
-			const { response } = await setup.agent.auth.get({
+			const { response } = await agent.auth.get({
 				query: auth.params,
 				headers: { cookie }
 			});
@@ -39,7 +39,7 @@ describe('PKCE RFC7636', () => {
 				code_challenge: 'f'.repeat(42)
 			});
 
-			const { response } = await setup.agent.auth.get({
+			const { response } = await agent.auth.get({
 				query: auth.params,
 				headers: { cookie }
 			});
@@ -58,7 +58,7 @@ describe('PKCE RFC7636', () => {
 				code_challenge: 'f'.repeat(129)
 			});
 
-			const { response } = await setup.agent.auth.get({
+			const { response } = await agent.auth.get({
 				query: auth.params,
 				headers: { cookie }
 			});
@@ -77,7 +77,7 @@ describe('PKCE RFC7636', () => {
 				code_challenge: `${'f'.repeat(42)}&`
 			});
 
-			const { response } = await setup.agent.auth.get({
+			const { response } = await agent.auth.get({
 				query: auth.params,
 				headers: { cookie }
 			});
@@ -96,7 +96,7 @@ describe('PKCE RFC7636', () => {
 				code_challenge_method: 'bar'
 			});
 
-			const { response } = await setup.agent.auth.get({
+			const { response } = await agent.auth.get({
 				query: auth.params,
 				headers: { cookie }
 			});
@@ -116,7 +116,7 @@ describe('PKCE RFC7636', () => {
 				code_challenge_method: ''
 			});
 
-			const { response } = await setup.agent.auth.get({
+			const { response } = await agent.auth.get({
 				query: auth.params,
 				headers: { cookie }
 			});
@@ -135,7 +135,7 @@ describe('PKCE RFC7636', () => {
 				code_challenge_method: 'S256'
 			});
 
-			const { response } = await setup.agent.auth.get({
+			const { response } = await agent.auth.get({
 				query: auth.params,
 				headers: { cookie }
 			});
@@ -166,7 +166,7 @@ describe('PKCE RFC7636', () => {
 			});
 			const code = await authCode.save();
 
-			const { response } = await setup.agent.token.post({
+			const { response } = await agent.token.post({
 				client_id: 'client',
 				code,
 				grant_type: 'authorization_code',
@@ -188,7 +188,7 @@ describe('PKCE RFC7636', () => {
 			});
 			const code = await authCode.save();
 
-			const { error } = await setup.agent.token.post({
+			const { error } = await agent.token.post({
 				client_id: 'client',
 				code,
 				grant_type: 'authorization_code',
@@ -210,7 +210,7 @@ describe('PKCE RFC7636', () => {
 			});
 			const code = await authCode.save();
 
-			const { error } = await setup.agent.token.post({
+			const { error } = await agent.token.post({
 				client_id: 'client',
 				code,
 				grant_type: 'authorization_code',
@@ -233,7 +233,7 @@ describe('PKCE RFC7636', () => {
 			});
 			const code = await authCode.save();
 
-			const { error } = await setup.agent.token.post({
+			const { error } = await agent.token.post({
 				client_id: 'client',
 				code,
 				grant_type: 'authorization_code',
@@ -260,7 +260,7 @@ describe('PKCE RFC7636', () => {
 			});
 			const code = await authCode.save();
 
-			const { error } = await setup.agent.token.post({
+			const { error } = await agent.token.post({
 				client_id: 'client',
 				code,
 				grant_type: 'authorization_code',
@@ -287,7 +287,7 @@ describe('PKCE RFC7636', () => {
 			});
 			const code = await authCode.save();
 
-			const { error } = await setup.agent.token.post({
+			const { error } = await agent.token.post({
 				client_id: 'client',
 				code,
 				grant_type: 'authorization_code',
@@ -314,7 +314,7 @@ describe('PKCE RFC7636', () => {
 			});
 			const code = await authCode.save();
 
-			const { response } = await setup.agent.token.post({
+			const { response } = await agent.token.post({
 				client_id: 'client',
 				code,
 				grant_type: 'authorization_code',
