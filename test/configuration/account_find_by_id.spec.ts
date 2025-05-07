@@ -1,17 +1,17 @@
 import { expect } from 'chai';
-
+import { describe, it } from 'bun:test';
 import provider from '../../lib/index.ts';
 
 describe('default findAccount behavior', () => {
 	it('returns a promise', () => {
-		const provider = new provider('http://localhost');
+		provider.init('http://localhost');
 
 		expect(i(provider).configuration.findAccount({}, 'id') instanceof Promise)
 			.to.be.true;
 	});
 
 	it('resolves to an object with property and accountId property and claims function', () => {
-		const provider = new provider('http://localhost');
+		provider.init('http://localhost');
 
 		return i(provider)
 			.configuration.findAccount({}, 'id')

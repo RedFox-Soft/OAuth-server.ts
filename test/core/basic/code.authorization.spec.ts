@@ -1,4 +1,3 @@
-import querystring from 'node:querystring';
 import {
 	describe,
 	it,

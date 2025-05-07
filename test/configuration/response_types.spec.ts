@@ -1,10 +1,10 @@
 import { expect } from 'chai';
-
+import { describe, it } from 'bun:test';
 import provider from '../../lib/index.ts';
 
 describe('response_types Provider configuration', () => {
 	it('fixes common issues', () => {
-		const provider = new provider('https://op.example.com', {
+		provider.init('https://op.example.com', {
 			responseTypes: ['code', 'none']
 		});
 		expect(i(provider).configuration.responseTypes).to.eql(['code', 'none']);
@@ -12,7 +12,7 @@ describe('response_types Provider configuration', () => {
 
 	it('throws when invalid types are configured', () => {
 		expect(() => {
-			new provider('https://op.example.com', {
+			provider.init('https://op.example.com', {
 				responseTypes: ['id_token tokencode']
 			});
 		}).to.throw('unsupported response type: id_token tokencode');
@@ -20,7 +20,7 @@ describe('response_types Provider configuration', () => {
 
 	it('throws when unsupported types are configured', () => {
 		expect(() => {
-			new provider('https://op.example.com', {
+			provider.init('https://op.example.com', {
 				responseTypes: ['token']
 			});
 		}).to.throw('unsupported response type: token');
@@ -28,7 +28,7 @@ describe('response_types Provider configuration', () => {
 
 	it('validates none is always standalone', () => {
 		expect(() => {
-			new provider('https://op.example.com', {
+			provider.init('https://op.example.com', {
 				responseTypes: ['none code']
 			});
 		}).to.throw('unsupported response type: none code');

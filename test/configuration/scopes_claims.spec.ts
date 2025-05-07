@@ -1,10 +1,10 @@
 import { expect } from 'chai';
-
+import { describe, it } from 'bun:test';
 import provider from '../../lib/index.ts';
 
 describe('custom claims', () => {
 	it('allows for claims to be added under openid scope using array syntax', () => {
-		const provider = new provider('https://op.example.com', {
+		provider.init('https://op.example.com', {
 			claims: {
 				openid: ['foo']
 			}
@@ -17,7 +17,7 @@ describe('custom claims', () => {
 	});
 
 	it('allows for claims to be added under openid scope using object syntax', () => {
-		const provider = new provider('https://op.example.com', {
+		provider.init('https://op.example.com', {
 			claims: {
 				openid: { foo: null }
 			}
@@ -30,7 +30,7 @@ describe('custom claims', () => {
 	});
 
 	it('detects new scopes from claims definition', () => {
-		const provider = new provider('https://op.example.com', {
+		provider.init('https://op.example.com', {
 			claims: {
 				insurance: ['company_name', 'coverage'],
 				payment: {
@@ -43,7 +43,7 @@ describe('custom claims', () => {
 	});
 
 	it('removes the acr claim if no acrs are configured', () => {
-		const provider = new provider('https://op.example.com', {
+		provider.init('https://op.example.com', {
 			acrValues: []
 		});
 

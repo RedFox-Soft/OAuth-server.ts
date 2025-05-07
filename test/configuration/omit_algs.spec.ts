@@ -1,12 +1,12 @@
 import { expect } from 'chai';
 import { generateKeyPair, exportJWK } from 'jose';
-
+import { describe, it } from 'bun:test';
 import provider from '../../lib/index.ts';
 
 describe('Provider declaring supported algorithms', () => {
 	it('validates the configuration properties', () => {
 		expect(() => {
-			new provider('https://op.example.com', {
+			provider.init('https://op.example.com', {
 				// eslint-disable-line no-new
 				enabledJWA: {
 					invalidProperty: ['HS256', 'RS256']
@@ -17,7 +17,7 @@ describe('Provider declaring supported algorithms', () => {
 
 	it('validates an array is provided', () => {
 		expect(() => {
-			new provider('https://op.example.com', {
+			provider.init('https://op.example.com', {
 				// eslint-disable-line no-new
 				enabledJWA: {
 					idTokenSigningAlgValues: new Set(['HS256', 'RS256'])
@@ -30,7 +30,7 @@ describe('Provider declaring supported algorithms', () => {
 
 	it('validates only implemented algs are provided', () => {
 		expect(() => {
-			new provider('https://op.example.com', {
+			provider.init('https://op.example.com', {
 				// eslint-disable-line no-new
 				enabledJWA: {
 					clientAuthSigningAlgValues: ['none']
@@ -45,7 +45,7 @@ describe('Provider declaring supported algorithms', () => {
 		const { privateKey } = await generateKeyPair('RS256', {
 			extractable: true
 		});
-		const provider = new provider('https://op.example.com', {
+		provider.init('https://op.example.com', {
 			enabledJWA: {
 				idTokenSigningAlgValues: ['HS256', 'RS256']
 			},

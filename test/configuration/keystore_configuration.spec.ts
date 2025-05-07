@@ -1,7 +1,7 @@
 /* eslint-disable no-new, no-console */
 
 import { randomBytes } from 'node:crypto';
-
+import { describe, it, afterEach } from 'bun:test';
 import { generateKeyPair, exportJWK } from 'jose';
 import { createSandbox } from 'sinon';
 import { expect } from 'chai';
@@ -15,7 +15,7 @@ describe('configuration.jwks', () => {
 
 	it('must be a valid JWKS object', async () => {
 		expect(() => {
-			new provider('http://localhost', {
+			provider.init('http://localhost', {
 				jwks: []
 			});
 		}).to.throw('keystore must be a JSON Web Key Set formatted object');
@@ -23,7 +23,7 @@ describe('configuration.jwks', () => {
 
 	it('must only contain RSA, EC, or OKP keys', () => {
 		expect(() => {
-			new provider('http://localhost', {
+			provider.init('http://localhost', {
 				jwks: {
 					keys: [{ kty: 'oct', k: randomBytes(32).toString('base64url') }]
 				}
@@ -38,7 +38,7 @@ describe('configuration.jwks', () => {
 		const jwks = { keys: [await exportJWK(publicKey)] };
 
 		expect(() => {
-			new provider('http://localhost', { jwks });
+			provider.init('http://localhost', { jwks });
 		}).to.throw('jwks.keys[0].d configuration must be a non-empty string');
 	});
 
@@ -57,7 +57,7 @@ describe('configuration.jwks', () => {
 		};
 
 		expect(() => {
-			new provider('http://localhost', config);
+			provider.init('http://localhost', config);
 		}).to.throw(
 			'jwks.keys configuration must not contain duplicate "kid" values'
 		);
