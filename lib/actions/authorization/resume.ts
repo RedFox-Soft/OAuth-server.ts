@@ -4,7 +4,7 @@ import nanoid from '../../helpers/nanoid.ts';
 import * as errors from '../../helpers/errors.ts';
 import instance from '../../helpers/weak_cache.ts';
 import Params from '../../helpers/params.ts';
-import formPost from '../../response_modes/form_post.ts';
+import { formPost } from '../../html/formPost.js';
 import epochTime from '../../helpers/epoch_time.ts';
 
 export default async function resumeAction(

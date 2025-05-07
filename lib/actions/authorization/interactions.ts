@@ -93,6 +93,7 @@ export default async function interactions(resumeRouteName, ctx) {
 		if (oidc.promptPending('none')) {
 			const className = upperFirst(camelCase(failedCheck.error));
 			if (errors[className]) {
+				console.log(className);
 				throw new errors[className](failedCheck.error_description);
 			}
 			throw new errors.CustomOIDCProviderError(
@@ -101,10 +102,10 @@ export default async function interactions(resumeRouteName, ctx) {
 			);
 		}
 	} catch (err) {
-		const code = /^(code|device)_/.test(oidc.route) ? 400 : 303;
-		err.status = code;
-		err.statusCode = code;
-		err.expose = true;
+		// const code = /^(code|device)_/.test(oidc.route) ? 400 : 303;
+		// err.status = code;
+		// err.statusCode = code;
+		// err.expose = true;
 		throw err;
 	}
 

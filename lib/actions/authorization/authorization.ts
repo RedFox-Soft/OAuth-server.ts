@@ -104,19 +104,19 @@ async function authorizationActionHandler(ctx) {
 	let redirectUri = await interactions('resume', ctx);
 	if (redirectUri) {
 		await setCookies();
-		return redirectUri;
+		return Response.redirect(redirectUri, 303);
 	}
-	redirectUri = await respond(ctx);
+	const response = await respond(ctx);
 	await setCookies();
 
-	return redirectUri;
+	return response;
 }
 
 export const authGet = new Elysia()
 	.derive(noQueryDup(['resource', 'ui_locales', 'authorization_details']))
 	.get(
 		routeNames.authorization,
-		async ({ query, error, cookie, redirect, route, request }) => {
+		async ({ query, error, cookie, route, request }) => {
 			const errorOut = validdateGlobalParameters(query, error);
 			if (errorOut) {
 				return errorOut;
@@ -133,8 +133,7 @@ export const authGet = new Elysia()
 			ctx.oidc = new OIDCContext(ctx);
 			ctx.oidc.params = query;
 
-			const redirectUri = await authorizationActionHandler(ctx);
-			return redirect(redirectUri, 303);
+			return await authorizationActionHandler(ctx);
 		},
 		{
 			query: AuthorizationParameters,
@@ -146,7 +145,7 @@ export const authPost = new Elysia()
 	.derive(contentType('application/x-www-form-urlencoded'))
 	.post(
 		routeNames.authorization,
-		async ({ body, error, cookie, redirect, route, request }) => {
+		async ({ body, error, cookie, route, request }) => {
 			const errorOut = validdateGlobalParameters(body, error);
 			if (errorOut) {
 				return errorOut;
@@ -165,8 +164,7 @@ export const authPost = new Elysia()
 			ctx.oidc.body = body;
 			ctx.oidc.params = body;
 
-			const redirectUri = await authorizationActionHandler(ctx);
-			return redirect(redirectUri, 303);
+			return await authorizationActionHandler(ctx);
 		},
 		{
 			body: AuthorizationParameters,

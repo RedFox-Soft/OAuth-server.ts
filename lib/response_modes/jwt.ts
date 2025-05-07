@@ -1,10 +1,10 @@
 import query from './query.ts';
-import form_post from './form_post.ts';
+import { formPost } from '../html/formPost.js';
 import web_message from './web_message.ts';
 
 const modes = {
 	query,
-	form_post,
+	form_post: formPost,
 	web_message
 };
 

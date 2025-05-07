@@ -13,7 +13,7 @@ import bodyParser from '../shared/conditional_body.ts';
 import paramsMiddleware from '../shared/assemble_params.ts';
 import sessionMiddleware from '../shared/session.ts';
 import revoke from '../helpers/revoke.ts';
-import formPost from '../response_modes/form_post.ts';
+import { formPost } from '../html/formPost.js';
 
 const parseBody = bodyParser.bind(
 	undefined,

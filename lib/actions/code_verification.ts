@@ -7,7 +7,7 @@ import rejectDupes from '../shared/reject_dupes.ts';
 import instance from '../helpers/weak_cache.ts';
 import { InvalidClient, InvalidRequest } from '../helpers/errors.ts';
 import * as formHtml from '../helpers/user_code_form.ts';
-import formPost from '../response_modes/form_post.ts';
+import { formPost } from '../html/formPost.js';
 import { normalize, denormalize } from '../helpers/user_codes.ts';
 import {
 	NoCodeError,

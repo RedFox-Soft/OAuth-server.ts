@@ -1,88 +1,105 @@
-import { expect } from 'chai';
 import sinon from 'sinon';
 
-import bootstrap from '../test_helper.js';
-import safe from '../../lib/helpers/html_safe.ts';
+import { describe, it, beforeAll, expect } from 'bun:test';
+import bootstrap, { agent } from '../test_helper.js';
+import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
+import provider from 'lib/index.js';
 
 const route = '/auth';
 
 describe('/auth', () => {
-	before(bootstrap(import.meta.url));
+	let setup = null;
+	let cookie = null;
+	beforeAll(async function () {
+		setup = await bootstrap(import.meta.url)();
+		cookie = await setup.login();
+	});
 
 	['get', 'post'].forEach((verb) => {
-		describe(`${verb} response_mode=form_post`, () => {
-			context('logged in', () => {
-				before(function () {
-					return this.login();
+		async function authRequest(auth: AuthorizationRequest, skipCookie = false) {
+			if (verb === 'get') {
+				return agent.auth.get({
+					query: auth.params,
+					headers: {
+						cookie: skipCookie ? undefined : cookie
+					}
 				});
-				after(function () {
-					return this.logout();
-				});
+			} else if (verb === 'post') {
+				return agent.auth.post(
+					new URLSearchParams(Object.entries(auth.params)).toString(),
+					{
+						headers: {
+							cookie: skipCookie ? undefined : cookie
+						}
+					}
+				);
+			}
+		}
 
-				it('responds by rendering a self-submitting form with the response', function () {
-					const auth = new this.AuthorizationRequest({
-						response_type: 'code',
+		describe(`${verb} response_mode=form_post`, () => {
+			describe('logged in', () => {
+				it('responds by rendering a self-submitting form with the response', async function () {
+					const auth = new AuthorizationRequest({
 						response_mode: 'form_post',
 						scope: 'openid'
 					});
 
-					return this.wrap({ route, verb, auth })
-						.expect(200)
-						.expect(/input type="hidden" name="code" value=/)
-						.expect(
-							new RegExp(
-								`input type="hidden" name="state" value="${auth.state}"`
-							)
-						)
-						.expect(
-							new RegExp(`form method="post" action="${auth.redirect_uri}"`)
-						);
+					const { data, response } = await authRequest(auth);
+					expect(response.status).toBe(200);
+					expect(response.headers.get('content-type')).toBe(
+						'text/html; charset=utf-8'
+					);
+					expect(data).toContain('input type="hidden" name="code" value=');
+					expect(data).toContain(
+						`input type="hidden" name="state" value="${auth.params.state}"`
+					);
+					expect(data).toContain(
+						`form action="${auth.params.redirect_uri}" method="post"`
+					);
 				});
 
-				it('sanitizes the action attribute', function () {
-					const auth = new this.AuthorizationRequest({
-						response_type: 'code',
+				it('sanitizes the action attribute', async function () {
+					const auth = new AuthorizationRequest({
 						response_mode: 'form_post',
 						scope: 'openid',
 						redirect_uri:
 							'https://client.example.com/cb"><script>alert(0)</script><x="'
 					});
-
-					return this.wrap({ route, verb, auth })
-						.expect(200)
-						.expect(({ text: body }) => {
-							expect(body).to.contain(safe(auth.redirect_uri));
-						});
+					const { data, response } = await authRequest(auth);
+					expect(response.status).toBe(200);
+					expect(response.headers.get('content-type')).toBe(
+						'text/html; charset=utf-8'
+					);
+					expect(data).toContain(
+						'https://client.example.com/cb&quot;&gt;&lt;script&gt;alert(0)&lt;/script&gt;&lt;x=&quot;'
+					);
 				});
 			});
 
-			context('error handling', () => {
-				it('responds by rendering a self-submitting form with the error', function () {
-					const auth = new this.AuthorizationRequest({
-						response_type: 'code',
-						prompt: 'none',
-						response_mode: 'form_post',
-						scope: 'openid'
-					});
-
-					const spy = sinon.spy();
-					this.provider.once('authorization.error', spy);
-
-					return this.wrap({ route, verb, auth })
-						.expect(400)
-						.expect(() => {
-							expect(spy.called).to.be.true;
-						})
-						.expect(/input type="hidden" name="error" value="login_required"/)
-						.expect(
-							new RegExp(
-								`input type="hidden" name="state" value="${auth.state}"`
-							)
-						)
-						.expect(
-							new RegExp(`form method="post" action="${auth.redirect_uri}"`)
-						);
+			it('responds by rendering a self-submitting form with the error', async function () {
+				const auth = new AuthorizationRequest({
+					prompt: 'none',
+					response_mode: 'form_post',
+					scope: 'openid'
 				});
+
+				const spy = sinon.spy();
+				provider.once('authorization.error', spy);
+
+				const { response, error } = await authRequest(auth, true);
+				expect(response.status).toBe(400);
+				expect(response.headers.get('content-type')).toBe(
+					'text/html; charset=utf-8'
+				);
+				expect(error.value).toContain(
+					'input type="hidden" name="error" value="login_required"'
+				);
+				expect(error.value).toContain(
+					`input type="hidden" name="state" value="${auth.params.state}"`
+				);
+				expect(error.value).toContain(
+					`form action="${auth.params.redirect_uri}" method="post"`
+				);
 			});
 		});
 	});

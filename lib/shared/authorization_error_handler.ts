@@ -8,7 +8,7 @@ import {
 } from '../helpers/errors.ts';
 import { getErrorHtmlResponse } from '../html/error.tsx';
 import { routeNames } from 'lib/consts/param_list.js';
-import { mapValueError } from 'elysia';
+import { type Context, mapValueError } from 'elysia';
 
 async function isAllowRedirectUri(params) {
 	const ctx = {};
@@ -119,9 +119,8 @@ async function authorizationErrorHandler({
 	error,
 	query,
 	body,
-	redirect,
 	request
-}) {
+}: Context) {
 	const params = request.method === 'POST' ? body : query;
 	const redirectObj = await isAllowRedirectUri(params);
 
@@ -135,7 +134,7 @@ async function authorizationErrorHandler({
 	if (!instance(provider).responseModes.has(mode)) {
 		mode = 'query';
 	}
+	console.log('mode', mode);
 	const handler = instance(provider).responseModes.get(mode);
-	const url = await handler({}, redirectObj.redirect_uri, out);
-	return redirect(url, 303);
+	return await handler({}, redirectObj.redirect_uri, out);
 }

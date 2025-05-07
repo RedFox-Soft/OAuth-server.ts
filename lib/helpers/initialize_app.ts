@@ -19,7 +19,7 @@ import {
 import als from './als.ts';
 import instance from './weak_cache.ts';
 import query from 'lib/response_modes/query.js';
-import form_post from 'lib/response_modes/form_post.js';
+import { formPost } from 'lib/html/formPost.js';
 
 const discoveryRoute = '/.well-known/openid-configuration';
 
@@ -27,7 +27,7 @@ export default function initializeApp() {
 	const { configuration, features } = instance(this);
 
 	this.registerResponseMode('query', query);
-	this.registerResponseMode('form_post', form_post);
+	this.registerResponseMode('form_post', formPost);
 
 	Object.entries(grants).forEach(([grantType, { handler, parameters }]) => {
 		const { grantTypeHandlers } = instance(this);
