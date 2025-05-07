@@ -8,7 +8,7 @@ import {
  * Validates requested response_type is supported by the provided and allowed in the client
  * configuration
  */
-export default function checkResponseType(ctx, next) {
+export default function checkResponseType(ctx) {
 	const { params } = ctx.oidc;
 	const supported = instance(ctx.oidc.provider).configuration.responseTypes;
 
@@ -25,6 +25,4 @@ export default function checkResponseType(ctx, next) {
 			'requested response_type is not allowed for this client'
 		);
 	}
-
-	return next();
 }

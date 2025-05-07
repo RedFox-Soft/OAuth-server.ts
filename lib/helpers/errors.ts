@@ -3,6 +3,8 @@ import camelCase from './_/camel_case.ts';
 
 export class OIDCProviderError extends Error {
 	allow_redirect = true;
+	error: string;
+	error_description = '';
 	status = 400;
 
 	constructor(status: number, message: string) {

@@ -1,6 +1,5 @@
 import presence from '../helpers/validate_presence.ts';
 import getTokenAuth from '../shared/token_auth.ts';
-import noCache from '../shared/no_cache.ts';
 import instance from '../helpers/weak_cache.ts';
 import { urlencoded as parseBody } from '../shared/selective_body.ts';
 import rejectDupes from '../shared/reject_dupes.ts';
@@ -53,7 +52,6 @@ export default function introspectionAction(provider) {
 	}
 
 	return [
-		noCache,
 		parseBody,
 		paramsMiddleware.bind(undefined, PARAM_LIST),
 		...tokenAuth,

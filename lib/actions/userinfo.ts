@@ -3,7 +3,6 @@ import setWWWAuthenticate from '../helpers/set_www_authenticate.ts';
 import bodyParser from '../shared/conditional_body.ts';
 import rejectDupes from '../shared/reject_dupes.ts';
 import paramsMiddleware from '../shared/assemble_params.ts';
-import noCache from '../shared/no_cache.ts';
 import certificateThumbprint from '../helpers/certificate_thumbprint.ts';
 import instance from '../helpers/weak_cache.ts';
 import filterClaims from '../helpers/filter_claims.ts';
@@ -24,8 +23,6 @@ const parseBody = bodyParser.bind(
 );
 
 export default [
-	noCache,
-
 	async function setWWWAuthenticateHeader(ctx, next) {
 		try {
 			await next();

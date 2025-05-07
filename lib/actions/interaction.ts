@@ -6,7 +6,6 @@ import * as attention from '../helpers/attention.ts';
 import { urlencoded as parseBody } from '../shared/selective_body.ts';
 import * as views from '../views/index.ts';
 import instance from '../helpers/weak_cache.ts';
-import noCache from '../shared/no_cache.ts';
 import { defaults } from '../helpers/defaults.ts';
 
 const {
@@ -51,7 +50,6 @@ your configuration is not in effect"
 
 	return {
 		render: [
-			noCache,
 			async function interactionRender(ctx) {
 				const { uid, prompt, params, session } =
 					await provider.interactionDetails(ctx.req, ctx.res);
@@ -96,7 +94,6 @@ your configuration is not in effect"
 			}
 		],
 		abort: [
-			noCache,
 			function interactionAbort(ctx) {
 				const result = {
 					error: 'access_denied',
@@ -109,7 +106,6 @@ your configuration is not in effect"
 			}
 		],
 		submit: [
-			noCache,
 			parseBody,
 			async function interactionSubmit(ctx) {
 				const {

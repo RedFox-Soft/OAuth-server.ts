@@ -1,4 +1,3 @@
-import noCache from '../../shared/no_cache.ts';
 import bodyParser from '../../shared/conditional_body.ts';
 import rejectDupes from '../../shared/reject_dupes.ts';
 import paramsMiddleware from '../../shared/assemble_params.ts';
@@ -129,7 +128,7 @@ export default function authorizationAction(provider, endpoint) {
 		allowList.add('dpop_jkt');
 	}
 
-	const stack = [noCache];
+	const stack = [];
 
 	const use = (middleware, ...only) => {
 		if (only.includes(endpoint)) {

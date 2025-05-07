@@ -13,10 +13,8 @@ const RENDER_MODES = new Set(['form_post', 'web_message']);
 export default async function jwtResponseModes(ctx, redirectUri, payload) {
 	const { params } = ctx.oidc;
 
-	let mode;
-	if (params.response_mode === 'jwt') {
-		mode = 'query';
-	} else {
+	let mode = 'query';
+	if (params.response_mode !== 'jwt') {
 		[mode] = params.response_mode.split('.');
 	}
 

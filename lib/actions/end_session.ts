@@ -13,7 +13,6 @@ import bodyParser from '../shared/conditional_body.ts';
 import paramsMiddleware from '../shared/assemble_params.ts';
 import sessionMiddleware from '../shared/session.ts';
 import revoke from '../helpers/revoke.ts';
-import noCache from '../shared/no_cache.ts';
 import formPost from '../response_modes/form_post.ts';
 
 const parseBody = bodyParser.bind(
@@ -22,7 +21,6 @@ const parseBody = bodyParser.bind(
 );
 
 export const init = [
-	noCache,
 	sessionMiddleware,
 	parseBody,
 	paramsMiddleware.bind(
@@ -136,7 +134,6 @@ export const init = [
 ];
 
 export const confirm = [
-	noCache,
 	sessionMiddleware,
 	parseBody,
 	paramsMiddleware.bind(undefined, new Set(['xsrf', 'logout'])),
@@ -271,7 +268,6 @@ export const confirm = [
 ];
 
 export const success = [
-	noCache,
 	paramsMiddleware.bind(undefined, new Set(['client_id'])),
 	async function postLogoutSuccess(ctx) {
 		if (ctx.oidc.params.client_id) {

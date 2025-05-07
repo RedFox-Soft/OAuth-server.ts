@@ -38,6 +38,8 @@ import {
 	routeNames
 } from '../../consts/param_list.ts';
 import sessionHandler from '../../shared/session.ts';
+import { noQueryDup } from 'lib/plugins/noQueryDup.js';
+import { contentType } from 'lib/plugins/contentType.js';
 
 function validdateGlobalParameters(params, error) {
 	const {
@@ -77,12 +79,12 @@ async function authorizationActionHandler(ctx) {
 	const setCookies = await sessionHandler(ctx);
 	rejectUnsupported(params, 'authorization');
 	await checkClient(ctx);
-	loadPushedAuthorizationRequest;
+	await loadPushedAuthorizationRequest(ctx);
 	processRequestObject.bind(undefined, allowList);
-	checkResponseMode;
+	checkResponseMode(ctx);
 	oneRedirectUriClients(ctx);
-	rejectRegistration;
-	checkResponseType;
+	rejectRegistration(ctx);
+	checkResponseType(ctx);
 	oidcRequired;
 	assignDefaults(ctx);
 	checkPrompt(ctx);
@@ -94,7 +96,7 @@ async function authorizationActionHandler(ctx) {
 	checkRar;
 	checkResource;
 	checkMaxAge(ctx);
-	checkIdTokenHint(ctx);
+	await checkIdTokenHint(ctx);
 	interactionEmit;
 	assignClaims(ctx);
 	await loadAccount(ctx);
@@ -110,7 +112,8 @@ async function authorizationActionHandler(ctx) {
 	return redirectUri;
 }
 
-export const authorizationAction = new Elysia()
+export const authGet = new Elysia()
+	.derive(noQueryDup(['resource', 'ui_locales', 'authorization_details']))
 	.get(
 		routeNames.authorization,
 		async ({ query, error, cookie, redirect, route, request }) => {
@@ -137,13 +140,10 @@ export const authorizationAction = new Elysia()
 			query: AuthorizationParameters,
 			cookie: AuthorizationCookies
 		}
-	)
-	.derive(({ request, error }) => {
-		const contentType = request.headers.get('content-type') || '';
-		if (!contentType.includes('application/x-www-form-urlencoded')) {
-			return error(415, 'Unsupported Content-Type');
-		}
-	})
+	);
+
+export const authPost = new Elysia()
+	.derive(contentType('application/x-www-form-urlencoded'))
 	.post(
 		routeNames.authorization,
 		async ({ body, error, cookie, redirect, route, request }) => {

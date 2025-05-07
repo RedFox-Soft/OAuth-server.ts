@@ -8,7 +8,7 @@ import instance from '../../helpers/weak_cache.ts';
  * Resolves and assigns params.response_mode if it was not explicitly requested. Validates id_token
  * and token containing responses do not use response_mode query.
  */
-export default function checkResponseMode(ctx, next) {
+export default function checkResponseMode(ctx) {
 	const { params, client } = ctx.oidc;
 
 	const mode = ctx.oidc.responseMode;
@@ -51,6 +51,4 @@ export default function checkResponseMode(ctx, next) {
 			throw err;
 		}
 	}
-
-	return next();
 }

@@ -10,7 +10,7 @@ import rejectRequestAndUri from './reject_request_and_uri.ts';
 /*
  * Validates request_uri is a PAR one when PAR is enabled and loads it. Throws
  */
-export default async function loadPushedAuthorizationRequest(ctx, next) {
+export default async function loadPushedAuthorizationRequest(ctx) {
 	const { pushedAuthorizationRequests } = instance(ctx.oidc.provider).features;
 	const {
 		params,
@@ -45,6 +45,4 @@ export default async function loadPushedAuthorizationRequest(ctx, next) {
 			throw new RequestUriNotSupported();
 		}
 	}
-
-	return next();
 }

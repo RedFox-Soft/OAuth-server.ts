@@ -1,6 +1,5 @@
 import omitBy from '../helpers/_/omit_by.ts';
 import constantEquals from '../helpers/constant_equals.ts';
-import noCache from '../shared/no_cache.ts';
 import { json as parseBody } from '../shared/selective_body.ts';
 import epochTime from '../helpers/epoch_time.ts';
 import { InvalidToken, InvalidRequest } from '../helpers/errors.ts';
@@ -57,7 +56,6 @@ const validateRegistrationAccessToken = [
 ];
 
 export const post = [
-	noCache,
 	setWWWAuthenticateHeader,
 	parseBody,
 	async function validateInitialAccessToken(ctx, next) {
@@ -162,7 +160,6 @@ export const post = [
 ];
 
 export const get = [
-	noCache,
 	...validateRegistrationAccessToken,
 
 	async function clientReadResponse(ctx) {
@@ -185,7 +182,6 @@ export const get = [
 ];
 
 export const put = [
-	noCache,
 	...validateRegistrationAccessToken,
 	parseBody,
 
@@ -308,7 +304,6 @@ export const put = [
 ];
 
 export const del = [
-	noCache,
 	...validateRegistrationAccessToken,
 
 	async function clientRemoveResponse(ctx) {

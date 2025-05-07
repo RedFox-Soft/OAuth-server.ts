@@ -15,7 +15,6 @@ import sinon from 'sinon';
 
 import bootstrap, { agent } from '../../test_helper.js';
 import epochTime from '../../../lib/helpers/epoch_time.ts';
-import { InvalidRedirectUri } from '../../../lib/helpers/errors.ts';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { provider } from 'lib/provider.js';
 
@@ -44,17 +43,23 @@ describe('BASIC code', () => {
 						accept
 					}
 				});
-			} else if (verb === 'post') {
-				return agent.auth.post(
-					new URLSearchParams(Object.entries(auth.params)).toString(),
-					{
-						headers: {
-							cookie,
-							accept
-						}
-					}
-				);
 			}
+
+			const searchParams = new URLSearchParams();
+			for (const [key, value] of Object.entries(auth.params)) {
+				if (Array.isArray(value)) {
+					value.forEach((v) => searchParams.append(key, v));
+				} else {
+					searchParams.append(key, String(value));
+				}
+			}
+
+			return agent.auth.post(searchParams.toString(), {
+				headers: {
+					cookie,
+					accept
+				}
+			});
 		}
 
 		describe(`${verb} ${route} with session`, () => {
@@ -324,172 +329,124 @@ describe('BASIC code', () => {
 		});
 
 		describe(`${verb} ${route} errors`, () => {
-			it('dupe parameters are rejected and ignored in further processing', function () {
+			it('dupe parameters are rejected and ignored in further processing', async function () {
 				// fake a query like this state=foo&state=foo
 				const spy = sinon.spy();
-				this.provider.once('authorization.error', spy);
+				provider.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
-					response_type,
-					scope,
-					state: 'foo'
+					scope: ['openid', 'openid'],
+					state: ['foo', 'foo'],
+					response_type: ['code', 'code']
 				});
 
-				const wrapped = ((data) => {
-					// eslint-disable-line consistent-return
-					switch (verb) {
-						case 'get':
-							return this.agent
-								.get(route)
-								.query(
-									`${data}&state=foo&scope=openid&response_type=${response_type}`
-								);
-						case 'post':
-							return this.agent
-								.post(route)
-								.send(
-									`${data}&state=foo&scope=openid&response_type=${response_type}`
-								)
-								.type('form');
-						default:
-					}
-				})(querystring.stringify(auth));
-
-				return (
-					wrapped
-						.expect(303)
-						.expect(() => {
-							expect(spy.calledOnce).to.be.true;
-						})
-						.expect(auth.validatePresence(['error', 'error_description'])) // notice state is not expected
-						// .expect(auth.validateState) // notice state is not expected
-						.expect(auth.validateClientLocation)
-						.expect(auth.validateError('invalid_request'))
-						.expect(
-							auth.validateErrorDescription(
-								"'response_type', 'scope', and 'state' parameters must not be provided twice"
-							)
-						)
-				);
+				const { response } = await authRequest(auth);
+				expect(response.status).toBe(303);
+				expect(spy.calledOnce).toBeTrue();
+				auth.validatePresence(response, ['error', 'error_description']);
+				auth.validateClientLocation(response);
+				auth.validateError(response, 'invalid_request');
+				if (verb === 'get') {
+					auth.validateErrorDescription(
+						response,
+						'Duplicate query parameter "scope, state, response_type" detected'
+					);
+				}
+				if (verb === 'post') {
+					auth.validateErrorDescription(
+						response,
+						"Expected property 'response_type' to be string but found: code,code"
+					);
+				}
 			});
 
-			it('invalid response mode (not validated yet)', function () {
+			it('invalid response mode (not validated yet)', async function () {
 				// fake a query like this state=foo&state=foo to trigger
 				// a validation error prior to validating response mode
 				const spy = sinon.spy();
-				this.provider.once('authorization.error', spy);
+				provider.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
-					response_type,
 					scope,
-					state: 'foo',
+					state: ['foo', 'bar'],
 					response_mode: 'foo'
 				});
 
-				const wrapped = ((data) => {
-					// eslint-disable-line consistent-return
-					switch (verb) {
-						case 'get':
-							return this.agent.get(route).query(`${data}&state=bar`);
-						case 'post':
-							return this.agent
-								.post(route)
-								.send(`${data}&state=bar`)
-								.type('form');
-						default:
-					}
-				})(querystring.stringify(auth));
-
-				return (
-					wrapped
-						.expect(303)
-						.expect(() => {
-							expect(spy.calledOnce).to.be.true;
-						})
-						.expect(auth.validatePresence(['error', 'error_description'])) // notice state is not expected
-						// .expect(auth.validateState) // notice state is not expected
-						.expect(auth.validateClientLocation)
-						.expect(auth.validateError('invalid_request'))
-						.expect(
-							auth.validateErrorDescription(
-								"'state' parameter must not be provided twice"
-							)
-						)
-				);
-			});
-
-			it('response mode provided twice', function () {
-				const spy = sinon.spy();
-				this.provider.once('authorization.error', spy);
-				const auth = new AuthorizationRequest({
-					response_type,
-					scope,
-					response_mode: 'query'
-				});
-
-				const wrapped = ((data) => {
-					// eslint-disable-line consistent-return
-					switch (verb) {
-						case 'get':
-							return this.agent.get(route).query(`${data}&response_mode=query`);
-						case 'post':
-							return this.agent
-								.post(route)
-								.send(`${data}&response_mode=query`)
-								.type('form');
-						default:
-					}
-				})(querystring.stringify(auth));
-
-				return wrapped
-					.expect(303)
-					.expect(() => {
-						expect(spy.calledOnce).to.be.true;
-					})
-					.expect(
-						auth.validatePresence(['error', 'error_description', 'state'])
-					)
-					.expect(auth.validateClientLocation)
-					.expect(auth.validateError('invalid_request'))
-					.expect(
-						auth.validateErrorDescription(
-							"'response_mode' parameter must not be provided twice"
-						)
+				const { response } = await authRequest(auth);
+				expect(response.status).toBe(303);
+				expect(spy.calledOnce).toBeTrue();
+				auth.validatePresence(response, ['error', 'error_description']);
+				auth.validateClientLocation(response);
+				auth.validateError(response, 'invalid_request');
+				if (verb === 'get') {
+					auth.validateErrorDescription(
+						response,
+						'Duplicate query parameter "state" detected'
 					);
+				}
+				if (verb === 'post') {
+					auth.validateErrorDescription(
+						response,
+						"Expected property 'state' to be string but found: foo,bar"
+					);
+				}
 			});
 
-			it('unregistered scope requested', function () {
+			it('response mode provided twice', async function () {
+				const spy = sinon.spy();
+				provider.once('authorization.error', spy);
+				const auth = new AuthorizationRequest({
+					scope,
+					response_mode: ['query', 'query']
+				});
+				delete auth.params.state;
+
+				const { response } = await authRequest(auth);
+				expect(response.status).toBe(303);
+				expect(spy.calledOnce).toBeTrue();
+				auth.validatePresence(response, ['error', 'error_description']);
+				auth.validateClientLocation(response);
+				auth.validateError(response, 'invalid_request');
+				if (verb === 'get') {
+					auth.validateErrorDescription(
+						response,
+						'Duplicate query parameter "response_mode" detected'
+					);
+				}
+				if (verb === 'post') {
+					auth.validateErrorDescription(
+						response,
+						"Expected property 'response_mode' to be string but found: query,query"
+					);
+				}
+			});
+
+			it('unregistered scope requested', async function () {
 				const spy = sinon.spy();
 				provider.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
 					client_id: 'client-limited-scope',
-					response_type: 'code',
 					prompt: 'consent',
 					scope: 'openid foobar offline_access' // foobar is ignored, offline_access is not allowed
 				});
 
-				return this.wrap({ route, verb, auth })
-					.expect(303)
-					.expect(() => {
-						expect(spy.calledOnce).to.be.true;
-					})
-					.expect(
-						auth.validatePresence([
-							'error',
-							'error_description',
-							'state',
-							'scope'
-						])
-					)
-					.expect(auth.validateState)
-					.expect(auth.validateClientLocation)
-					.expect(auth.validateError('invalid_scope'))
-					.expect(auth.validateScope('offline_access'))
-					.expect(
-						auth.validateErrorDescription('requested scope is not allowed')
-					);
+				const { response } = await authRequest(auth);
+				expect(response.status).toBe(303);
+				expect(spy.calledOnce).toBeTrue();
+				auth.validatePresence(response, [
+					'error',
+					'error_description',
+					'state'
+				]);
+				auth.validateState(response);
+				auth.validateClientLocation(response);
+				auth.validateError(response, 'invalid_scope');
+				auth.validateErrorDescription(
+					response,
+					'requested scope is not allowed'
+				);
 			});
 
 			['request', 'request_uri', 'registration'].forEach((param) => {
-				it(`not supported parameter ${param}`, function () {
+				it(`not supported parameter ${param}`, async function () {
 					const spy = sinon.spy();
 					provider.once('authorization.error', spy);
 					const auth = new AuthorizationRequest({
@@ -498,17 +455,13 @@ describe('BASIC code', () => {
 						[param]: 'some'
 					});
 
-					return this.agent
-						.get(route)
-						.query(auth)
-						.expect(303)
-						.expect(() => {
-							expect(spy.calledOnce).to.be.true;
-						})
-						.expect(auth.validatePresence(['error', 'state']))
-						.expect(auth.validateState)
-						.expect(auth.validateClientLocation)
-						.expect(auth.validateError(`${param}_not_supported`));
+					const { response } = await authRequest(auth);
+					expect(response.status).toBe(303);
+					expect(spy.calledOnce).toBeTrue();
+					auth.validatePresence(response, ['error', 'state']);
+					auth.validateState(response);
+					auth.validateClientLocation(response);
+					auth.validateError(response, `${param}_not_supported`);
 				});
 			});
 
@@ -576,107 +529,102 @@ describe('BASIC code', () => {
 				});
 			});
 
-			it('missing mandatory parameter response_type', function () {
+			it('missing mandatory parameter response_type', async function () {
 				const spy = sinon.spy();
 				provider.once('authorization.error', spy);
-				const auth = new AuthorizationRequest({
-					scope
-				});
-				delete auth.response_type;
+				const auth = new AuthorizationRequest({ scope });
+				delete auth.params.response_type;
 
-				return this.agent
-					.get(route)
-					.query(auth)
-					.expect(303)
-					.expect(() => {
-						expect(spy.calledOnce).to.be.true;
-					})
-					.expect(
-						auth.validatePresence(['error', 'error_description', 'state'])
-					)
-					.expect(auth.validateState)
-					.expect(auth.validateClientLocation)
-					.expect(auth.validateError('invalid_request'))
-					.expect(
-						auth.validateErrorDescription(
-							"missing required parameter 'response_type'"
-						)
-					);
+				const { response } = await authRequest(auth);
+				expect(response.status).toBe(303);
+				expect(spy.calledOnce).toBeTrue();
+				auth.validatePresence(response, [
+					'error',
+					'error_description',
+					'state'
+				]);
+				auth.validateState(response);
+				auth.validateClientLocation(response);
+				auth.validateError(response, 'invalid_request');
+				auth.validateErrorDescription(
+					response,
+					"Expected property 'response_type' to be string but found: undefined"
+				);
 			});
 
-			it('unsupported prompt', function () {
+			it('unsupported prompt', async function () {
 				const spy = sinon.spy();
 				provider.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
-					response_type,
 					scope,
 					prompt: 'unsupported'
 				});
 
-				return this.wrap({ route, verb, auth })
-					.expect(303)
-					.expect(() => {
-						expect(spy.calledOnce).to.be.true;
-					})
-					.expect(
-						auth.validatePresence(['error', 'error_description', 'state'])
-					)
-					.expect(auth.validateState)
-					.expect(auth.validateClientLocation)
-					.expect(auth.validateError('invalid_request'))
-					.expect(
-						auth.validateErrorDescription('unsupported prompt value requested')
-					);
+				const { response } = await authRequest(auth);
+				expect(response.status).toBe(303);
+				expect(spy.calledOnce).toBeTrue();
+				auth.validatePresence(response, [
+					'error',
+					'error_description',
+					'state'
+				]);
+				auth.validateState(response);
+				auth.validateClientLocation(response);
+				auth.validateError(response, 'invalid_request');
+				auth.validateErrorDescription(
+					response,
+					'unsupported prompt value requested'
+				);
 			});
 
-			it('supported but not requestable prompt', function () {
+			it('supported but not requestable prompt', async function () {
 				const spy = sinon.spy();
 				provider.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
-					response_type,
 					scope,
 					prompt: 'unrequestable'
 				});
 
-				return this.wrap({ route, verb, auth })
-					.expect(303)
-					.expect(() => {
-						expect(spy.calledOnce).to.be.true;
-					})
-					.expect(
-						auth.validatePresence(['error', 'error_description', 'state'])
-					)
-					.expect(auth.validateState)
-					.expect(auth.validateClientLocation)
-					.expect(auth.validateError('invalid_request'))
-					.expect(
-						auth.validateErrorDescription('unsupported prompt value requested')
-					);
+				const { response } = await authRequest(auth);
+				expect(response.status).toBe(303);
+				expect(spy.calledOnce).toBeTrue();
+				auth.validatePresence(response, [
+					'error',
+					'error_description',
+					'state'
+				]);
+				auth.validateState(response);
+				auth.validateClientLocation(response);
+				auth.validateError(response, 'invalid_request');
+				auth.validateErrorDescription(
+					response,
+					'unsupported prompt value requested'
+				);
 			});
 
-			it('bad prompt combination', function () {
+			it('bad prompt combination', async function () {
 				const spy = sinon.spy();
 				provider.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
-					response_type,
 					scope,
 					prompt: 'none login'
 				});
 
-				return this.wrap({ route, verb, auth })
-					.expect(303)
-					.expect(() => {
-						expect(spy.calledOnce).to.be.true;
-					})
-					.expect(
-						auth.validatePresence(['error', 'error_description', 'state'])
-					)
-					.expect(auth.validateState)
-					.expect(auth.validateClientLocation)
-					.expect(auth.validateError('invalid_request'))
-					.expect(
-						auth.validateErrorDescription('prompt none must only be used alone')
-					);
+				const { response } = await authRequest(auth);
+				expect(response.status).toBe(303);
+				expect(spy.calledOnce).toBeTrue();
+				auth.validatePresence(response, [
+					'error',
+					'error_description',
+					'state'
+				]);
+				auth.validateState(response);
+				auth.validateClientLocation(response);
+				auth.validateError(response, 'invalid_request');
+				auth.validateErrorDescription(
+					response,
+					'prompt none must only be used alone'
+				);
 			});
 
 			// section-4.1.2.1 RFC6749
@@ -687,19 +635,11 @@ describe('BASIC code', () => {
 				const { response, error } = await authRequest(auth, {
 					accept: 'text/html'
 				});
-				expect(response.status).toBe(422);
+				expect(response.status).toBe(400);
 				expect(response.headers.get('content-type')).toBe(
 					'text/html; charset=utf-8'
 				);
-				if (verb === 'get') {
-					expect(error.value).toContain(
-						'Expected  property &#x27;client_id&#x27; to be  string'
-					);
-				} else {
-					expect(error.value).toContain(
-						'Property &#x27;client_id&#x27; is missing'
-					);
-				}
+				expect(error.value).toContain('client_id is required');
 			});
 
 			// section-4.1.2.1 RFC6749
@@ -716,7 +656,6 @@ describe('BASIC code', () => {
 				expect(response.headers.get('content-type')).toBe(
 					'text/html; charset=utf-8'
 				);
-				console.log(error.value);
 				expect(error.value).toContain('client is invalid');
 			});
 
@@ -731,98 +670,63 @@ describe('BASIC code', () => {
 					});
 
 					const { response, error } = await authRequest(auth, {
-						//accept: 'text/html'
+						accept: 'text/html'
 					});
-					expect(response.status).toBe(400);
+					expect(error.status).toBe(400);
 					expect(spy.calledTwice).toBeTrue();
-
-					return this.agent
-						.get(route)
-						.query(auth)
-						.expect(() => {
-							this.provider.removeAllListeners('authorization.error');
-							renderSpy.restore();
-						})
-						.expect(() => {
-							expect(spy.calledTwice).to.be.true;
-						})
-						.expect(() => {
-							expect(
-								spy.firstCall.calledWithMatch(
-									{},
-									{ message: 'invalid_request' }
-								)
-							).to.be.true;
-							expect(
-								spy.secondCall.calledWithMatch(
-									{},
-									{ message: 'invalid_redirect_uri' }
-								)
-							).to.be.true;
-						})
-						.expect(() => {
-							expect(renderSpy.calledOnce).to.be.true;
-							const renderArgs = renderSpy.args[0];
-							expect(renderArgs[1]).to.have.property(
-								'error',
-								'invalid_redirect_uri'
-							);
-							expect(renderArgs[2]).to.be.an.instanceof(InvalidRedirectUri);
-						});
+					expect(
+						spy.firstCall.calledWithMatch({ message: 'invalid_request' })
+					).toBeTrue();
+					expect(
+						spy.secondCall.calledWithMatch({ message: 'invalid_redirect_uri' })
+					).toBeTrue();
+					expect(response.headers.get('content-type')).toBe(
+						'text/html; charset=utf-8'
+					);
+					expect(error.value).toContain('invalid_redirect_uri');
+					expect(error.value).toContain(
+						'redirect_uri did not match any of the client&#x27;s registered redirect_uris'
+					);
 				});
 
-				it('validates redirect_uri ad acta [server error]', function () {
-					const renderSpy = sinon.spy(i(provider).configuration, 'renderError');
+				it('validates redirect_uri ad acta [server error]', async function () {
 					const authErrorSpy = sinon.spy();
 					const serverErrorSpy = sinon.spy();
-					provider.on('authorization.error', authErrorSpy);
-					provider.on('server_error', serverErrorSpy);
-					sinon.stub(i(this.provider).responseModes, 'has').callsFake(() => {
+					provider.once('authorization.error', authErrorSpy);
+					provider.once('server_error', serverErrorSpy);
+					sinon.stub(i(provider).responseModes, 'has').callsFake(() => {
 						throw new Error('foobar');
 					});
 					const auth = new AuthorizationRequest({
-						response_type,
 						scope,
-						response_mode: 'fragment',
 						redirect_uri: 'https://attacker.example.com/foobar'
 					});
 
-					return this.agent
-						.get(route)
-						.query(auth)
-						.expect(() => {
-							i(this.provider).responseModes.has.restore();
-							this.provider.removeAllListeners('authorization.error');
-							this.provider.removeAllListeners('server_error');
-							renderSpy.restore();
-						})
-						.expect(() => {
-							expect(serverErrorSpy.calledOnce).to.be.true;
-							expect(authErrorSpy.calledOnce).to.be.true;
-						})
-						.expect(() => {
-							expect(serverErrorSpy.calledWithMatch({}, { message: 'foobar' }))
-								.to.be.true;
-							expect(
-								authErrorSpy.calledWithMatch(
-									{},
-									{ message: 'invalid_redirect_uri' }
-								)
-							).to.be.true;
-						})
-						.expect(() => {
-							expect(renderSpy.calledOnce).to.be.true;
-							const renderArgs = renderSpy.args[0];
-							expect(renderArgs[1]).to.have.property(
-								'error',
-								'invalid_redirect_uri'
-							);
-							expect(renderArgs[2]).to.be.an.instanceof(InvalidRedirectUri);
-						});
+					const { response, error } = await authRequest(auth, {
+						accept: 'text/html'
+					});
+					expect(error.status).toBe(400);
+
+					expect(serverErrorSpy.calledOnce).toBeTrue();
+					expect(authErrorSpy.calledOnce).toBeTrue();
+					expect(
+						serverErrorSpy.calledWithMatch({ message: 'foobar' })
+					).toBeTrue();
+					expect(
+						authErrorSpy.calledWithMatch({ message: 'invalid_redirect_uri' })
+					).toBeTrue();
+
+					expect(response.headers.get('content-type')).toBe(
+						'text/html; charset=utf-8'
+					);
+					expect(error.value).toContain('invalid_redirect_uri');
+					expect(error.value).toContain(
+						'redirect_uri did not match any of the client&#x27;s registered redirect_uris'
+					);
 				});
 			});
 
-			it('unsupported response_type', function () {
+			it('unsupported response_type', async function () {
 				const spy = sinon.spy();
 				provider.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
@@ -830,48 +734,49 @@ describe('BASIC code', () => {
 					scope
 				});
 
-				return this.wrap({ route, verb, auth })
-					.expect(303)
-					.expect(() => {
-						expect(spy.calledOnce).to.be.true;
-					})
-					.expect(
-						auth.validatePresence(['error', 'error_description', 'state'])
-					)
-					.expect(auth.validateState)
-					.expect(auth.validateClientLocation)
-					.expect(auth.validateError('unsupported_response_type'))
-					.expect(
-						auth.validateErrorDescription('unsupported response_type requested')
-					);
+				const { response } = await authRequest(auth);
+				expect(response.status).toBe(303);
+				expect(spy.calledOnce).toBeTrue();
+				auth.validatePresence(response, [
+					'error',
+					'error_description',
+					'state'
+				]);
+				auth.validateState(response);
+				auth.validateClientLocation(response);
+				auth.validateError(response, 'unsupported_response_type');
+				auth.validateErrorDescription(
+					response,
+					'unsupported response_type requested'
+				);
 			});
 
-			it('invalid max_age (negative)', function () {
+			it('invalid max_age (negative)', async function () {
 				const spy = sinon.spy();
 				provider.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
-					response_type,
 					scope: 'openid',
 					max_age: -1
 				});
 
-				return this.wrap({ route, verb, auth })
-					.expect(303)
-					.expect(() => {
-						expect(spy.calledOnce).to.be.true;
-					})
-					.expect(
-						auth.validatePresence(['error', 'error_description', 'state'])
-					)
-					.expect(auth.validateState)
-					.expect(auth.validateClientLocation)
-					.expect(auth.validateError('invalid_request'))
-					.expect(
-						auth.validateErrorDescription('invalid max_age parameter value')
-					);
+				const { response } = await authRequest(auth);
+				expect(response.status).toBe(303);
+				expect(spy.calledOnce).toBeTrue();
+				auth.validatePresence(response, [
+					'error',
+					'error_description',
+					'state'
+				]);
+				auth.validateState(response);
+				auth.validateClientLocation(response);
+				auth.validateError(response, 'invalid_request');
+				auth.validateErrorDescription(
+					response,
+					'invalid max_age parameter value'
+				);
 			});
 
-			it('invalid max_age (MAX_SAFE_INTEGER)', function () {
+			it('invalid max_age (MAX_SAFE_INTEGER)', async function () {
 				const spy = sinon.spy();
 				provider.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
@@ -880,42 +785,40 @@ describe('BASIC code', () => {
 					max_age: Number.MAX_SAFE_INTEGER + 1
 				});
 
-				return this.wrap({ route, verb, auth })
-					.expect(303)
-					.expect(() => {
-						expect(spy.calledOnce).to.be.true;
-					})
-					.expect(
-						auth.validatePresence(['error', 'error_description', 'state'])
-					)
-					.expect(auth.validateState)
-					.expect(auth.validateClientLocation)
-					.expect(auth.validateError('invalid_request'))
-					.expect(
-						auth.validateErrorDescription('invalid max_age parameter value')
-					);
+				const { response } = await authRequest(auth);
+				expect(response.status).toBe(303);
+				expect(spy.calledOnce).toBeTrue();
+				auth.validatePresence(response, [
+					'error',
+					'error_description',
+					'state'
+				]);
+				auth.validateState(response);
+				auth.validateClientLocation(response);
+				auth.validateError(response, 'invalid_request');
+				auth.validateErrorDescription(
+					response,
+					'invalid max_age parameter value'
+				);
 			});
 
 			if (verb === 'post') {
-				it('only supports application/x-www-form-urlencoded', function () {
+				it('only supports application/x-www-form-urlencoded', async function () {
 					const spy = sinon.spy();
 					provider.once('authorization.error', spy);
 					const auth = new AuthorizationRequest({ scope });
 
-					return this.wrap({ route, verb, auth })
-						.type('json')
-						.expect(400)
-						.expect(
-							/only application\/x-www-form-urlencoded content-type bodies are supported on POST \/auth/
-						)
-						.expect(/invalid_request/)
-						.expect(() => {
-							expect(spy.calledOnce).to.be.true;
-						});
+					const { error } = await agent.auth.post(auth.params);
+					expect(error.status).toBe(415);
+					expect(error.value).toHaveProperty('error', 'invalid_request');
+					expect(error.value).toHaveProperty(
+						'error_description',
+						'Only application/x-www-form-urlencoded content-type bodies are supported'
+					);
 				});
 			}
 
-			it('restricted response_type', function () {
+			it('restricted response_type', async function () {
 				const spy = sinon.spy();
 				provider.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
@@ -924,25 +827,24 @@ describe('BASIC code', () => {
 					scope
 				});
 
-				return this.wrap({ route, verb, auth })
-					.expect(303)
-					.expect(() => {
-						expect(spy.calledOnce).to.be.true;
-					})
-					.expect(
-						auth.validatePresence(['error', 'error_description', 'state'])
-					)
-					.expect(auth.validateState)
-					.expect(auth.validateClientLocation)
-					.expect(auth.validateError('invalid_request'))
-					.expect(
-						auth.validateErrorDescription(
-							'requested response_type is not allowed for this client'
-						)
-					);
+				const { response } = await authRequest(auth);
+				expect(response.status).toBe(303);
+				expect(spy.calledOnce).toBeTrue();
+				auth.validatePresence(response, [
+					'error',
+					'error_description',
+					'state'
+				]);
+				auth.validateState(response);
+				auth.validateClientLocation(response);
+				auth.validateError(response, 'invalid_request');
+				auth.validateErrorDescription(
+					response,
+					'requested response_type is not allowed for this client'
+				);
 			});
 
-			it('unsupported response type validation runs before oidc required params', function () {
+			it('unsupported response type validation runs before oidc required params', async function () {
 				const spy = sinon.spy();
 				provider.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
@@ -951,53 +853,43 @@ describe('BASIC code', () => {
 					scope
 				});
 
-				return this.wrap({ route, verb, auth })
-					.expect(303)
-					.expect(() => {
-						expect(spy.calledOnce).to.be.true;
-					})
-					.expect(
-						auth.validatePresence(['error', 'error_description', 'state'])
-					)
-					.expect(auth.validateState)
-					.expect(auth.validateClientLocation)
-					.expect(auth.validateError('unsupported_response_type'))
-					.expect(
-						auth.validateErrorDescription('unsupported response_type requested')
-					);
+				const { response } = await authRequest(auth);
+				expect(response.status).toBe(303);
+				expect(spy.calledOnce).toBeTrue();
+				auth.validatePresence(response, [
+					'error',
+					'error_description',
+					'state'
+				]);
+				auth.validateState(response);
+				auth.validateClientLocation(response);
+				auth.validateError(response, 'unsupported_response_type');
+				auth.validateErrorDescription(
+					response,
+					'unsupported response_type requested'
+				);
 			});
 
-			it('redirect_uri mismatch', function () {
+			it('redirect_uri mismatch', async function () {
 				const emitSpy = sinon.spy();
-				const renderSpy = sinon.spy(i(provider).configuration, 'renderError');
 				provider.once('authorization.error', emitSpy);
 				const auth = new AuthorizationRequest({
-					response_type,
 					scope,
 					redirect_uri: 'https://client.example.com/cb/not/registered'
 				});
 
-				return this.agent
-					.get(route)
-					.query(auth)
-					.expect(() => {
-						renderSpy.restore();
-					})
-					.expect(400)
-					.expect(() => {
-						expect(emitSpy.calledOnce).to.be.true;
-						expect(renderSpy.calledOnce).to.be.true;
-						const renderArgs = renderSpy.args[0];
-						expect(renderArgs[1]).to.have.property(
-							'error',
-							'invalid_redirect_uri'
-						);
-						expect(renderArgs[1]).to.have.property(
-							'error_description',
-							"redirect_uri did not match any of the client's registered redirect_uris"
-						);
-						expect(renderArgs[2]).to.be.an.instanceof(InvalidRedirectUri);
-					});
+				const { response, error } = await authRequest(auth, {
+					accept: 'text/html'
+				});
+				expect(response.status).toBe(400);
+				expect(response.headers.get('content-type')).toBe(
+					'text/html; charset=utf-8'
+				);
+				expect(emitSpy.calledOnce).toBe(true);
+				expect(error.value).toContain('invalid_redirect_uri');
+				expect(error.value).toContain(
+					'redirect_uri did not match any of the client&#x27;s registered redirect_uris'
+				);
 			});
 
 			it('login state specific malformed id_token_hint', async function () {
@@ -1008,14 +900,21 @@ describe('BASIC code', () => {
 					scope,
 					id_token_hint: 'invalid'
 				});
-				const { response } = await authRequest(auth, cookie);
+				const { response } = await authRequest(auth, { cookie });
 				expect(response.status).toBe(303);
 				expect(spy.calledOnce).toBeTrue();
-				auth.validatePresence(['error', 'error_description', 'state']);
+				auth.validatePresence(response, [
+					'error',
+					'error_description',
+					'state'
+				]);
 				auth.validateState(response);
 				auth.validateClientLocation(response);
-				auth.validateError('invalid_request');
-				auth.validateErrorDescription(/could not validate id_token_hint/);
+				auth.validateError(response, 'invalid_request');
+				auth.validateErrorDescription(
+					response,
+					/could not validate id_token_hint/
+				);
 			});
 		});
 	});

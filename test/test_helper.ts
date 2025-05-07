@@ -59,7 +59,11 @@ const jwt = (token) => JSON.parse(base64url.decode(token.split('.')[1])).jti;
 
 export const agent = treaty(elysia, {
 	onRequest: (path, fetchInit) => {
-		if (path === '/auth' && fetchInit.method === 'POST') {
+		if (
+			path === '/auth' &&
+			fetchInit.method === 'POST' &&
+			!fetchInit.body?.startsWith?.('{')
+		) {
 			fetchInit.headers['content-type'] = 'application/x-www-form-urlencoded';
 		}
 	}

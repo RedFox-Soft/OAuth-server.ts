@@ -1,8 +1,11 @@
 import { provider } from 'lib/provider.js';
 import instance from '../helpers/weak_cache.ts';
-import errOut from '../helpers/err_out.ts';
 import oneRedirectUriClients from '../actions/authorization/one_redirect_uri_clients.ts';
-import { OIDCProviderError } from '../helpers/errors.ts';
+import {
+	InvalidClient,
+	InvalidRedirectUri,
+	OIDCProviderError
+} from '../helpers/errors.ts';
 import { getErrorHtmlResponse } from '../html/error.tsx';
 import { routeNames } from 'lib/consts/param_list.js';
 import { mapValueError } from 'elysia';
@@ -14,26 +17,52 @@ async function isAllowRedirectUri(params) {
 	ctx.oidc.params = params;
 
 	if (!params.client_id) {
-		return null;
+		throw new InvalidClient('client_id is required', 'client not found');
+	}
+	if (typeof params.client_id !== 'string') {
+		throw new InvalidClient('client is invalid', 'client not found');
 	}
 	const client = await provider.Client.find(params.client_id);
 	if (!client) {
-		return null;
+		throw new InvalidClient('client is invalid', 'client not found');
 	}
 	ctx.oidc.entity('Client', client);
 
 	let redirect_uri = params.redirect_uri;
-	if (!redirect_uri) {
+	if (redirect_uri === undefined) {
 		oneRedirectUriClients(ctx);
 		redirect_uri = params.redirect_uri;
 	}
-	if (!redirect_uri || !client.redirectUriAllowed(redirect_uri)) {
-		return null;
+	if (typeof redirect_uri !== 'string') {
+		throw new InvalidRedirectUri();
+	}
+	if (!client.redirectUriAllowed(redirect_uri)) {
+		throw new InvalidRedirectUri();
 	}
 
-	const state = params.state;
+	const state = typeof params.state !== 'string' ? undefined : params.state;
 
 	return { redirect_uri, state };
+}
+
+function getObjFromError(code: string, errorObj: any) {
+	if (errorObj instanceof OIDCProviderError) {
+		const { error, error_description } = errorObj;
+		return { error, ...(error_description ? { error_description } : {}) };
+	}
+	if (code === 'VALIDATION') {
+		const firstError = errorObj.validator.Errors(errorObj.value).First();
+		const error_description =
+			mapValueError(firstError).summary || 'Validation error';
+		return {
+			error: 'invalid_request',
+			error_description
+		};
+	}
+	return {
+		error: 'server_error',
+		error_description: 'An unexpected error occurred'
+	};
 }
 
 const mapErrorCode = {
@@ -42,7 +71,8 @@ const mapErrorCode = {
 };
 
 export async function errorHandler(obj) {
-	const { error, set, route, code, request } = obj;
+	const { set, route, code, request } = obj;
+	let { error } = obj;
 	if (set.status === 500) {
 		provider.emit('server_error', error);
 	} else {
@@ -50,40 +80,30 @@ export async function errorHandler(obj) {
 		provider.emit(key, error);
 	}
 
-	if (route === routeNames.authorization) {
-		const redirect = await authorizationErrorHandler(obj);
-		if (redirect) {
-			return redirect;
+	if (route === routeNames.authorization && error.allow_redirect !== false) {
+		try {
+			return await authorizationErrorHandler(obj);
+		} catch (e) {
+			if (e instanceof OIDCProviderError) {
+				error = e;
+				const key = mapErrorCode[route] ?? 'server_error';
+				provider.emit(key, error);
+			} else {
+				provider.emit('server_error', e);
+			}
 		}
 	}
 
-	let errorObj = {
-		error: 'server_error',
-		error_description: 'An unexpected error occurred'
-	};
 	const isOIDError = error instanceof OIDCProviderError;
 	if (isOIDError) {
 		set.status = error.status;
-		errorObj = {
-			error: error.error,
-			error_description: error.error_description,
-			error_detail: error.error_detail
-		};
-	}
-	if (code === 'VALIDATION') {
-		const firstError = error.validator.Errors(error.value).First();
-		const error_description =
-			mapValueError(firstError).summary || 'Validation error';
-		errorObj = {
-			error: 'invalid_request',
-			error_description
-		};
 	}
 	if (code === 'UNKNOWN' && !isOIDError) {
 		console.error('Unknown error', error);
 	}
 
 	const accept = request.headers.get('accept') || '';
+	let errorObj = getObjFromError(code, error);
 	if (accept.includes('text/html')) {
 		return getErrorHtmlResponse(
 			set.status,
@@ -95,6 +115,7 @@ export async function errorHandler(obj) {
 }
 
 async function authorizationErrorHandler({
+	code,
 	error,
 	query,
 	body,
@@ -102,20 +123,19 @@ async function authorizationErrorHandler({
 	request
 }) {
 	const params = request.method === 'POST' ? body : query;
+	const redirectObj = await isAllowRedirectUri(params);
 
-	let redirectObj;
-	try {
-		redirectObj = await isAllowRedirectUri(params);
-	} catch (e) {}
-
-	if (redirectObj) {
-		const out = { ...errOut(error, params.state), iss: provider.issuer };
-		let mode = params.response_mode;
-		if (!instance(provider).responseModes.has(mode)) {
-			mode = 'query';
-		}
-		const handler = instance(provider).responseModes.get(mode);
-		const url = await handler({}, params.redirect_uri, out);
-		return redirect(url, 303);
+	const state = redirectObj.state;
+	const out = {
+		...getObjFromError(code, error),
+		...(state ? { state } : {}),
+		iss: provider.issuer
+	};
+	let mode = params.response_mode;
+	if (!instance(provider).responseModes.has(mode)) {
+		mode = 'query';
 	}
+	const handler = instance(provider).responseModes.get(mode);
+	const url = await handler({}, redirectObj.redirect_uri, out);
+	return redirect(url, 303);
 }
