@@ -52,6 +52,12 @@ function getObjFromError(code: string, errorObj: any) {
 	}
 	if (code === 'VALIDATION') {
 		const firstError = errorObj.validator.Errors(errorObj.value).First();
+		if (firstError.schema.type === 'string') {
+			return {
+				error: 'invalid_request',
+				error_description: firstError.schema.error
+			};
+		}
 		const error_description =
 			mapValueError(firstError).summary || 'Validation error';
 		return {

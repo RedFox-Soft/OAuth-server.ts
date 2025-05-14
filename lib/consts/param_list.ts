@@ -50,18 +50,16 @@ export const routeNames = {
 };
 
 export const cookieNames = {
-	session: '_session',
 	interaction: '_interaction',
-	resume: '_interaction_resume'
+	session: '_session'
 };
 
 export const AuthorizationCookies = t.Cookie(
 	{
-		_session: t.Optional(t.String()),
 		_interaction: t.Optional(t.String()),
-		_interaction_resume: t.Optional(t.String())
+		_session: t.Optional(t.String())
 	},
-	{ httpOnly: true, sameSite: 'lax' }
+	{ httpOnly: true, sameSite: 'strict' }
 );
 
 export const PARAM_LIST = [

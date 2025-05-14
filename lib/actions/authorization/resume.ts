@@ -2,46 +2,19 @@ import upperFirst from '../../helpers/_/upper_first.ts';
 import camelCase from '../../helpers/_/camel_case.ts';
 import nanoid from '../../helpers/nanoid.ts';
 import * as errors from '../../helpers/errors.ts';
-import instance from '../../helpers/weak_cache.ts';
-import Params from '../../helpers/params.ts';
 import { formPost } from '../../html/formPost.js';
 import epochTime from '../../helpers/epoch_time.ts';
+import { cookieNames } from 'lib/consts/param_list.js';
 
-export default async function resumeAction(
-	allowList,
-	resumeRouteName,
-	ctx,
-	next
-) {
-	const cookieOptions = instance(ctx.oidc.provider).configuration.cookies.short;
-
-	const cookieId = ctx.cookies.get(
-		ctx.oidc.provider.cookieName('resume'),
-		cookieOptions
-	);
-
-	if (!cookieId) {
-		throw new errors.SessionNotFound('authorization request has expired');
-	}
-
-	const interactionSession = await ctx.oidc.provider.Interaction.find(cookieId);
-	if (!interactionSession) {
-		throw new errors.SessionNotFound('interaction session not found');
-	}
-	ctx.oidc.entity('Interaction', interactionSession);
-
-	if (cookieId !== interactionSession.uid) {
-		throw new errors.SessionNotFound(
-			'authorization session and cookie identifier mismatch'
-		);
-	}
+export default async function resumeAction(ctx, interaction) {
+	ctx.oidc.entity('Interaction', interaction);
 
 	const {
 		result,
 		params: storedParams = {},
 		trusted = [],
 		session: originSession
-	} = interactionSession;
+	} = interaction;
 
 	const { session } = ctx.oidc;
 
@@ -56,9 +29,9 @@ export default async function resumeAction(
 		session.accountId &&
 		session.accountId !== result.login.accountId
 	) {
-		if (interactionSession.session?.uid) {
-			delete interactionSession.session.uid;
-			await interactionSession.save(interactionSession.exp - epochTime());
+		if (interaction.session?.uid) {
+			delete interaction.session.uid;
+			await interaction.save(interaction.exp - epochTime());
 		}
 
 		session.state = {
@@ -75,20 +48,11 @@ export default async function resumeAction(
 		return;
 	}
 
-	await interactionSession.destroy();
+	await interaction.destroy();
 
-	const params = new (Params(allowList))(storedParams);
-	ctx.oidc.params = params;
+	ctx.oidc.params = storedParams;
 	ctx.oidc.trusted = trusted;
 	ctx.oidc.redirectUriCheckPerformed = true;
-
-	const clearOpts = {
-		...cookieOptions,
-		path: new URL(
-			ctx.oidc.urlFor(resumeRouteName, { uid: interactionSession.uid })
-		).pathname
-	};
-	ctx.cookies.set(ctx.oidc.provider.cookieName('resume'), null, clearOpts);
 
 	if (result?.error) {
 		const className = upperFirst(camelCase(result.error));
@@ -118,6 +82,4 @@ export default async function resumeAction(
 	if (!session.new) {
 		session.resetIdentifier();
 	}
-
-	await next();
 }

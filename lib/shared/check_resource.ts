@@ -15,7 +15,7 @@ function emptyResource(params) {
 	);
 }
 
-export default async function checkResource(ctx, next) {
+export default async function checkResource(ctx) {
 	const {
 		oidc: { params, provider, client, resourceServers }
 	} = ctx;
@@ -25,7 +25,7 @@ export default async function checkResource(ctx, next) {
 
 	if (!enabled) {
 		filterStatics(ctx);
-		return next();
+		return;
 	}
 
 	if (params.resource === undefined) {
@@ -40,13 +40,13 @@ export default async function checkResource(ctx, next) {
 
 	if (params.scope && emptyResource(params)) {
 		filterStatics(ctx);
-		return next();
+		return;
 	}
 
 	let { resource } = params;
 
 	if (params.resource === undefined) {
-		return next();
+		return;
 	}
 
 	if (!Array.isArray(params.resource)) {
@@ -74,6 +74,4 @@ export default async function checkResource(ctx, next) {
 			resourceServer
 		);
 	}
-
-	return next();
 }

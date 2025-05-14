@@ -31,7 +31,6 @@ export default function webMessage(ctx, redirectUri, response) {
 	ctx.body = `<!DOCTYPE html>
 <html>
 <head>
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <title>Web Message Response</title>
 </head>
 <body>

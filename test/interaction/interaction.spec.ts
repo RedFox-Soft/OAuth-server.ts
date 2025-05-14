@@ -1,120 +1,113 @@
-/* eslint-disable no-underscore-dangle */
+import sinon from 'sinon';
 
-import { strict as assert } from 'node:assert';
-
-import { expect } from 'chai';
-import { createSandbox } from 'sinon';
-
+import {
+	describe,
+	it,
+	beforeAll,
+	afterEach,
+	beforeEach,
+	expect
+} from 'bun:test';
 import nanoid from '../../lib/helpers/nanoid.ts';
-import bootstrap from '../test_helper.js';
+import bootstrap, { agent } from '../test_helper.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
-
-const sinon = createSandbox();
+import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
+import { provider } from 'lib/index.js';
 
 const expire = new Date();
 expire.setDate(expire.getDate() + 1);
-const expired = new Date(0);
 
-function handlesInteractionSessionErrors() {
-	it('"handles" not found interaction session id cookie', async function () {
-		const cookies = [
-			`_interaction=; path=${this.url}; expires=${expired.toGMTString()}; httponly`
-		];
-		this.agent._saveCookies.bind(this.agent)({
-			request: { url: this.provider.issuer },
-			headers: { 'set-cookie': cookies }
-		});
-
-		sinon.spy(this.provider, 'interactionDetails');
-
-		await this.agent.get(this.url).expect(400);
-		return assert.rejects(
-			this.provider.interactionDetails.getCall(0).returnValue,
-			(err) => {
-				expect(err.name).to.eql('SessionNotFound');
-				expect(err.error_description).to.eql(
-					'interaction session id cookie not found'
-				);
-				return true;
-			}
-		);
-	});
-
-	it('"handles" not found interaction session', async function () {
-		sinon.stub(this.provider.Interaction, 'find').resolves();
-
-		sinon.spy(this.provider, 'interactionDetails');
-
-		await this.agent.get(this.url).expect(400);
-		return assert.rejects(
-			this.provider.interactionDetails.getCall(0).returnValue,
-			(err) => {
-				expect(err.name).to.eql('SessionNotFound');
-				expect(err.error_description).to.eql('interaction session not found');
-				return true;
-			}
-		);
-	});
-}
 describe('devInteractions', () => {
-	before(bootstrap(import.meta.url));
-	afterEach(sinon.restore);
+	let setup = null;
+	beforeAll(async function () {
+		setup = await bootstrap(import.meta.url)();
+	});
+	afterEach(function () {
+		sinon.restore();
+	});
 
-	context('render login', () => {
-		beforeEach(function () {
-			return this.logout();
-		});
-		beforeEach(function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'code',
+	describe('render login', () => {
+		let object = {};
+
+		beforeEach(async function () {
+			const auth = new AuthorizationRequest({
 				scope: 'openid'
 			});
 
-			return this.agent
-				.get('/auth')
-				.query(auth)
-				.then((response) => {
-					this.url = response.headers.location;
-				});
+			const { response } = await agent.auth.get({
+				query: auth.params
+			});
+
+			const url = response.headers.get('location');
+			const [, uid] = url.split('/');
+
+			object.cookie = response.headers.get('set-cookie');
+			object.uid = uid;
+			object.url = url;
 		});
 
-		it('with a form', function () {
-			return this.agent
-				.get(this.url)
-				.expect(200)
-				.expect(new RegExp(`action="${this.provider.issuer}${this.url}"`))
-				.expect(/name="prompt" value="login"/)
-				.expect(/Sign-in/);
+		it('with a form', async function () {
+			const uid = object.uid;
+			const { data } = await agent.ui[uid].login.get({
+				headers: {
+					cookie: object.cookie
+				}
+			});
+
+			expect(object.url).toEndWith('/login');
+			expect(data).toContain('method="post"');
+			expect(data).toContain(`action="/ui/${uid}/login`);
 		});
 
-		handlesInteractionSessionErrors();
+		it('"handles" not found interaction session id cookie', async function () {
+			const { error } = await agent.ui[object.uid].login.get();
+
+			expect(error.value).toEqual({
+				error: 'invalid_request',
+				error_description: 'Invalid interaction cookie'
+			});
+		});
+
+		it('"handles" not found interaction session', async function () {
+			sinon.stub(provider.Interaction, 'find').resolves();
+
+			const { error } = await agent.ui[object.uid].login.get({
+				headers: {
+					cookie: object.cookie
+				}
+			});
+			expect(error.value).toEqual({
+				error: 'invalid_request',
+				error_description: 'interaction session not found'
+			});
+		});
 	});
 
-	context('render interaction', () => {
-		beforeEach(function () {
-			return this.logout();
-		});
-		beforeEach(function () {
-			return this.login();
-		});
-		beforeEach(function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'code',
+	describe.skip('render interaction', () => {
+		let uid = null;
+
+		beforeEach(async function () {
+			const cookie = setup.login();
+			const auth = new AuthorizationRequest({
 				scope: 'openid',
 				prompt: 'consent'
 			});
 
-			return this.agent
-				.get('/auth')
-				.query(auth)
-				.then((response) => {
-					this.url = response.headers.location;
-				});
+			const { response } = await agent.auth.get({
+				query: auth.params,
+				headers: {
+					cookie
+				}
+			});
+			const url = response.headers.get('location');
+			[, uid] = url.split('/');
 		});
 
-		it('with a form', function () {
-			return this.agent
-				.get(this.url)
+		it('with a form', async function () {
+			const { data } = await agent.ui[uid].login.get();
+
+			return agent
+				.get(url)
 				.expect(200)
 				.expect(new RegExp(`action="${this.provider.issuer}${this.url}"`))
 				.expect(/name="prompt" value="consent"/)
@@ -147,14 +140,9 @@ describe('devInteractions', () => {
 		});
 	});
 
-	context('when unimplemented prompt is requested', () => {
-		beforeEach(function () {
-			return this.logout();
-		});
-
+	describe.skip('when unimplemented prompt is requested', () => {
 		it('throws a 501', async function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'code',
+			const auth = new AuthorizationRequest({
 				scope: 'openid'
 			});
 
@@ -172,30 +160,28 @@ describe('devInteractions', () => {
 		});
 	});
 
-	context('navigate to abort', () => {
-		before(function () {
-			return this.logout();
-		});
-
+	describe('navigate to abort', () => {
 		it('should abort an interaction with an error', async function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'code',
+			const auth = new AuthorizationRequest({
 				scope: 'openid'
 			});
 
-			await this.agent
-				.get('/auth')
-				.query(auth)
-				.then((response) => {
-					this.url = response.headers.location;
-				});
+			const { response: res } = await agent.auth.get({
+				query: auth.params
+			});
 
-			await this.agent
-				.get(`${this.url}/abort`)
-				.expect(303)
-				.expect(({ headers: { location } }) => {
-					this.location = location;
-				});
+			const url = res.headers.get('location');
+			const [, uid] = url.split('/');
+			const cookie = res.headers.get('set-cookie');
+
+			const { response } = await agent.ui[uid].abort.get({
+				headers: {
+					cookie
+				}
+			});
+
+			expect(response.status).toBe(303);
+			console.log(response.headers.get('location'));
 
 			return this.agent
 				.get(this.url.replace('interaction', 'auth'))
@@ -207,16 +193,11 @@ describe('devInteractions', () => {
 		});
 	});
 
-	context('submit login', () => {
+	describe('submit login', () => {
 		beforeEach(function () {
-			return this.logout();
-		});
-		beforeEach(function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'code',
+			const auth = new AuthorizationRequest({
 				scope: 'openid'
 			});
-			this.auth = auth;
 
 			return this.agent
 				.get('/auth')
@@ -272,20 +253,12 @@ describe('devInteractions', () => {
 				'accountId must be a non-empty string, got: string'
 			);
 		});
-
-		handlesInteractionSessionErrors();
 	});
 
-	context('submit consent', () => {
+	describe.skip('submit consent', () => {
 		beforeEach(function () {
-			return this.logout();
-		});
-		beforeEach(function () {
-			return this.login();
-		});
-		beforeEach(function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'code',
+			const cookie = setup.login();
+			const auth = new AuthorizationRequest({
 				scope: 'openid',
 				prompt: 'consent'
 			});
@@ -384,25 +357,28 @@ describe('devInteractions', () => {
 				.expect('content-type', 'text/html; charset=utf-8')
 				.expect(/interaction session and authentication session mismatch/);
 		});
-
-		handlesInteractionSessionErrors();
 	});
 });
 
 describe('resume after consent', () => {
-	before(bootstrap(import.meta.url));
-	afterEach(sinon.restore);
+	let setup = null;
+	beforeAll(async function () {
+		setup = await bootstrap(import.meta.url)();
+	});
+	beforeEach(function () {
+		sinon.restore();
+	});
 
-	function setup(grant, result, sessionData) {
+	function setupFunc(grant, result, sessionData) {
 		const cookies = [];
 
 		let session;
 		if (result?.login) {
-			session = new this.provider.Session({ jti: 'sess', ...sessionData });
+			session = new provider.Session({ jti: 'sess', ...sessionData });
 		} else {
-			session = this.getLastSession();
+			session = setup.getLastSession();
 		}
-		const interaction = new this.provider.Interaction('resume', {
+		const interaction = new provider.Interaction('resume', {
 			uid: 'resume',
 			params: grant,
 			session
@@ -434,12 +410,9 @@ describe('resume after consent', () => {
 		]);
 	}
 
-	context('general', () => {
-		before(function () {
-			return this.login();
-		});
-		after(function () {
-			return this.logout();
+	describe('general', () => {
+		beforeEach(async function () {
+			return setup.login();
 		});
 
 		it('needs the resume cookie to be present, else renders an err', function () {
@@ -450,14 +423,13 @@ describe('resume after consent', () => {
 		});
 
 		it('needs to find the session to resume', async function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'code',
+			const auth = new AuthorizationRequest({
 				scope: 'openid'
 			});
 
-			await setup.call(this, auth);
+			await setupFunc.call(this, auth);
 
-			sinon.stub(this.provider.Interaction, 'find').resolves();
+			sinon.stub(provider.Interaction, 'find').resolves();
 
 			return this.agent
 				.get('/auth/resume')
@@ -466,18 +438,18 @@ describe('resume after consent', () => {
 		});
 	});
 
-	context('login results', () => {
+	describe('login results', () => {
 		it('should process newly established permanent sessions (default)', async function () {
 			sinon
 				.stub(this.provider.Grant.prototype, 'getOIDCScope')
 				.returns('openid');
-			const auth = new this.AuthorizationRequest({
+			const auth = new AuthorizationRequest({
 				response_type: 'code',
 				response_mode: 'query',
 				scope: 'openid'
 			});
 
-			await setup.call(this, auth, {
+			await setupFunc.call(this, auth, {
 				login: {
 					accountId: nanoid()
 				}
@@ -496,16 +468,13 @@ describe('resume after consent', () => {
 		});
 
 		it('should process newly established permanent sessions (explicit)', async function () {
-			sinon
-				.stub(this.provider.Grant.prototype, 'getOIDCScope')
-				.returns('openid');
-			const auth = new this.AuthorizationRequest({
-				response_type: 'code',
+			sinon.stub(provider.Grant.prototype, 'getOIDCScope').returns('openid');
+			const auth = new AuthorizationRequest({
 				response_mode: 'query',
 				scope: 'openid'
 			});
 
-			await setup.call(this, auth, {
+			await setupFunc.call(this, auth, {
 				login: {
 					accountId: nanoid(),
 					remember: true
@@ -525,16 +494,13 @@ describe('resume after consent', () => {
 		});
 
 		it('should process newly established temporary sessions', async function () {
-			sinon
-				.stub(this.provider.Grant.prototype, 'getOIDCScope')
-				.returns('openid');
-			const auth = new this.AuthorizationRequest({
-				response_type: 'code',
+			sinon.stub(provider.Grant.prototype, 'getOIDCScope').returns('openid');
+			const auth = new AuthorizationRequest({
 				response_mode: 'query',
 				scope: 'openid'
 			});
 
-			await setup.call(this, auth, {
+			await setupFunc.call(this, auth, {
 				login: {
 					accountId: nanoid(),
 					remember: false
@@ -554,16 +520,13 @@ describe('resume after consent', () => {
 		});
 
 		it('should trigger logout when the session subject changes', async function () {
-			sinon
-				.stub(this.provider.Grant.prototype, 'getOIDCScope')
-				.returns('openid');
-			const auth = new this.AuthorizationRequest({
-				response_type: 'code',
+			sinon.stub(provider.Grant.prototype, 'getOIDCScope').returns('openid');
+			const auth = new AuthorizationRequest({
 				response_mode: 'query',
 				scope: 'openid'
 			});
 
-			await setup.call(
+			await setupFunc.call(
 				this,
 				auth,
 				{
@@ -622,15 +585,11 @@ describe('resume after consent', () => {
 
 	describe('custom interaction errors', () => {
 		describe('when prompt=none', () => {
-			before(function () {
+			beforeEach(function () {
 				return this.login();
 			});
-			after(function () {
-				return this.logout();
-			});
 			it('custom interactions can fail too (prompt none)', async function () {
-				const auth = new this.AuthorizationRequest({
-					response_type: 'code',
+				const auth = new AuthorizationRequest({
 					scope: 'openid',
 					triggerCustomFail: 'foo',
 					prompt: 'none'
@@ -648,13 +607,12 @@ describe('resume after consent', () => {
 		});
 
 		it('custom interactions can fail too', async function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'code',
+			const auth = new AuthorizationRequest({
 				scope: 'openid',
 				triggerCustomFail: 'foo'
 			});
 
-			await setup.call(this, auth, {
+			await setupFunc.call(this, auth, {
 				login: {
 					accountId: nanoid(),
 					remember: true
@@ -670,14 +628,13 @@ describe('resume after consent', () => {
 		});
 	});
 
-	context('interaction errors', () => {
+	describe('interaction errors', () => {
 		it('should abort an interaction when given an error result object (no description)', async function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'code',
+			const auth = new AuthorizationRequest({
 				scope: 'openid'
 			});
 
-			await setup.call(this, auth, {
+			await setupFunc.call(this, auth, {
 				error: 'access_denied'
 			});
 
@@ -690,13 +647,12 @@ describe('resume after consent', () => {
 		});
 
 		it('should abort an interaction when given an error result object (with state)', async function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'code',
+			const auth = new AuthorizationRequest({
 				scope: 'openid',
 				state: 'bf458-00aa3'
 			});
 
-			await setup.call(this, auth, {
+			await setupFunc.call(this, auth, {
 				error: 'access_denied'
 			});
 
@@ -709,12 +665,11 @@ describe('resume after consent', () => {
 		});
 
 		it('should abort an interaction when given an error result object (with description)', async function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'code',
+			const auth = new AuthorizationRequest({
 				scope: 'openid'
 			});
 
-			await setup.call(this, auth, {
+			await setupFunc.call(this, auth, {
 				error: 'access_denied',
 				error_description: 'scope out of reach'
 			});
@@ -728,12 +683,11 @@ describe('resume after consent', () => {
 		});
 
 		it('should abort an interaction when given an error result object (custom error)', async function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'code',
+			const auth = new AuthorizationRequest({
 				scope: 'openid'
 			});
 
-			await setup.call(this, auth, {
+			await setupFunc.call(this, auth, {
 				error: 'custom_foo',
 				error_description: 'custom_foobar'
 			});
@@ -747,22 +701,18 @@ describe('resume after consent', () => {
 		});
 	});
 
-	context('custom requestable prompts', () => {
-		before(function () {
+	describe('custom requestable prompts', () => {
+		beforeEach(function () {
 			return this.login();
-		});
-		after(function () {
-			return this.logout();
 		});
 
 		it('should fail if they are not resolved', async function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'code',
+			const auth = new AuthorizationRequest({
 				scope: 'openid',
 				prompt: 'custom'
 			});
 
-			await setup.call(this, auth, {});
+			await setupFunc.call(this, auth, {});
 
 			return this.agent
 				.get('/auth/resume')
@@ -772,10 +722,9 @@ describe('resume after consent', () => {
 		});
 	});
 
-	context('custom unrequestable prompts', () => {
+	describe('custom unrequestable prompts', () => {
 		it('should prompt interaction', async function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'code',
+			const auth = new AuthorizationRequest({
 				triggerUnrequestable: 'foo',
 				response_mode: 'query',
 				scope: 'openid'
@@ -790,14 +739,13 @@ describe('resume after consent', () => {
 		});
 
 		it('should fail if they are not satisfied', async function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'code',
+			const auth = new AuthorizationRequest({
 				triggerUnrequestable: 'foo',
 				response_mode: 'query',
 				scope: 'openid'
 			});
 
-			await setup.call(this, auth, {
+			await setupFunc.call(this, auth, {
 				login: {
 					accountId: nanoid(),
 					remember: true

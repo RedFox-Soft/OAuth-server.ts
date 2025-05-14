@@ -4,7 +4,8 @@ import * as errors from '../../helpers/errors.ts';
 import instance from '../../helpers/weak_cache.ts';
 import nanoid from '../../helpers/nanoid.ts';
 import omitBy from '../../helpers/_/omit_by.ts';
-import { cookieNames } from '../../consts/param_list.ts';
+import { console } from 'node:inspector';
+import { cookieNames } from 'lib/consts/param_list.js';
 
 export default async function interactions(resumeRouteName, ctx) {
 	const { oidc } = ctx;
@@ -110,13 +111,13 @@ export default async function interactions(resumeRouteName, ctx) {
 	}
 
 	const uid = nanoid();
+	const cookieID = nanoid();
 
-	const cookieOptions = instance(oidc.provider).configuration.cookies.short;
 	const returnTo = oidc.urlFor(resumeRouteName, { uid });
-
 	const interactionSession = new oidc.provider.Interaction(uid, {
 		returnTo,
 		prompt,
+		cookieID,
 		lastSubmission: oidc.result,
 		accountId: oidc.session.accountId,
 		params: omitBy({ ...oidc.params }, (val) => typeof val === 'undefined'),
@@ -139,20 +140,13 @@ export default async function interactions(resumeRouteName, ctx) {
 	await interactionSession.save(ttl);
 	ctx.oidc.entity('Interaction', interactionSession);
 
-	const destination = await interactionUrl(ctx, interactionSession);
-
 	ctx.cookie[cookieNames.interaction].set({
-		value: uid,
-		path: new URL(destination, ctx.baseUrl).pathname,
+		value: cookieID,
+		path: `/ui/${uid}`,
 		maxAge: ttl * 1000
 	});
 
-	ctx.cookie[cookieNames.resume].set({
-		value: uid,
-		path: new URL(returnTo).pathname,
-		maxAge: ttl * 1000
-	});
-
-	oidc.provider.emit('interaction.started', ctx, prompt);
+	oidc.provider.emit('interaction.started', prompt);
+	const destination = `ui/${uid}/${prompt.name}`;
 	return destination;
 }

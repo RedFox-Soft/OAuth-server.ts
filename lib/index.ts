@@ -7,14 +7,20 @@ export { errors, interactionPolicy, provider };
 export { ExternalSigningKey } from './helpers/keystore.ts';
 
 import { Elysia } from 'elysia';
+import { staticPlugin } from '@elysiajs/static';
+
 import { errorHandler } from './shared/authorization_error_handler.js';
 import { nocache } from './plugins/noCache.js';
 import { authGet, authPost } from './actions/authorization/authorization.js';
 import { tokenAction } from './actions/token.js';
+import { ui } from './interactions/index.js';
 
 export const elysia = new Elysia({ strictPath: true })
 	.onError(errorHandler)
+	.use(staticPlugin())
 	.use(nocache)
 	.use(authGet)
 	.use(authPost)
-	.use(tokenAction);
+	.use(tokenAction)
+	.use(ui)
+	.listen(8080);

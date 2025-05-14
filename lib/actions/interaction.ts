@@ -49,62 +49,6 @@ your configuration is not in effect"
 		new URL(ctx.oidc.urlFor('interaction', { uid: interaction.uid })).pathname;
 
 	return {
-		render: [
-			async function interactionRender(ctx) {
-				const { uid, prompt, params, session } =
-					await provider.interactionDetails(ctx.req, ctx.res);
-				const client = await provider.Client.find(params.client_id);
-
-				let view;
-				let title;
-
-				switch (prompt.name) {
-					case 'login':
-						view = 'login';
-						title = 'Sign-in';
-						break;
-					case 'consent':
-						view = 'interaction';
-						title = 'Authorize';
-						break;
-					default:
-						ctx.throw(501, 'not implemented');
-				}
-
-				const locals = {
-					client,
-					uid,
-					abortUrl: ctx.oidc.urlFor('abort', { uid }),
-					submitUrl: ctx.oidc.urlFor('submit', { uid }),
-					details: prompt.details,
-					prompt: prompt.name,
-					params,
-					title,
-					session: session ? dbg(session) : undefined,
-					dbg: {
-						params: dbg(params),
-						prompt: dbg(prompt)
-					}
-				};
-
-				locals.body = views[view](locals);
-
-				ctx.type = 'html';
-				ctx.body = views.layout(locals);
-			}
-		],
-		abort: [
-			function interactionAbort(ctx) {
-				const result = {
-					error: 'access_denied',
-					error_description: 'End-User aborted interaction'
-				};
-
-				return provider.interactionFinished(ctx.req, ctx.res, result, {
-					mergeWithLastSubmission: false
-				});
-			}
-		],
 		submit: [
 			parseBody,
 			async function interactionSubmit(ctx) {
@@ -163,8 +107,6 @@ your configuration is not in effect"
 						});
 						break;
 					}
-					default:
-						ctx.throw(501, 'not implemented');
 				}
 			}
 		]

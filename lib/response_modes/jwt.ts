@@ -1,6 +1,7 @@
 import query from './query.ts';
 import { formPost } from '../html/formPost.js';
 import web_message from './web_message.ts';
+import { provider } from 'lib/provider.js';
 
 const modes = {
 	query,
@@ -18,7 +19,7 @@ export default async function jwtResponseModes(ctx, redirectUri, payload) {
 		[mode] = params.response_mode.split('.');
 	}
 
-	const { IdToken } = this;
+	const { IdToken } = provider;
 	const token = new IdToken({}, { ctx });
 	token.extra = payload;
 

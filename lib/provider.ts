@@ -158,57 +158,6 @@ class ProviderClass extends EventEmitter {
 		return [mountPath, routerUrl].join('');
 	}
 
-	/**
-	 * @name interactionResult
-	 * @api public
-	 */
-	async interactionResult(
-		req,
-		res,
-		result,
-		{ mergeWithLastSubmission = true } = {}
-	) {
-		const interaction = await this.#getInteraction.call(this, req, res);
-
-		if (mergeWithLastSubmission && !('error' in result)) {
-			interaction.result = { ...interaction.lastSubmission, ...result };
-		} else {
-			interaction.result = result;
-		}
-
-		await interaction.save(interaction.exp - epochTime());
-
-		return interaction.returnTo;
-	}
-
-	/**
-	 * @name interactionFinished
-	 * @api public
-	 */
-	async interactionFinished(
-		req,
-		res,
-		result,
-		{ mergeWithLastSubmission = true } = {}
-	) {
-		const returnTo = await this.interactionResult(req, res, result, {
-			mergeWithLastSubmission
-		});
-
-		res.statusCode = 303; // eslint-disable-line no-param-reassign
-		res.setHeader('Location', returnTo);
-		res.setHeader('Content-Length', '0');
-		res.end();
-	}
-
-	/**
-	 * @name interactionDetails
-	 * @api public
-	 */
-	async interactionDetails(req, res) {
-		return this.#getInteraction.call(this, req, res);
-	}
-
 	async backchannelResult(
 		request,
 		result,
@@ -373,15 +322,7 @@ class ProviderClass extends EventEmitter {
 		return ResourceServer;
 	}
 
-	async #getInteraction(req, res) {
-		const ctx = this.createContext(req, res);
-		const id = ctx.cookies.get(
-			this.cookieName('interaction'),
-			this.#int.configuration.cookies.short
-		);
-		if (!id) {
-			throw new SessionNotFound('interaction session id cookie not found');
-		}
+	async #getInteraction(id: string) {
 		const interaction = await this.Interaction.find(id);
 		if (!interaction) {
 			throw new SessionNotFound('interaction session not found');

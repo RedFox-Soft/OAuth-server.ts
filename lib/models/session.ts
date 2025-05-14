@@ -3,7 +3,6 @@
 import nanoid from '../helpers/nanoid.ts';
 import epochTime from '../helpers/epoch_time.ts';
 import instance from '../helpers/weak_cache.ts';
-import { globalConfiguration } from '../globalConfiguration.ts';
 
 import hasFormat from './mixins/has_format.ts';
 import { cookieNames } from '../consts/param_list.ts';
