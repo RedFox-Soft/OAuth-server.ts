@@ -1,4 +1,4 @@
-import { Elysia } from 'elysia';
+import { Elysia, t } from 'elysia';
 
 import { PARAM_LIST } from '../../consts/index.ts';
 import checkRar from '../../shared/check_rar.ts';
@@ -169,5 +169,64 @@ export const authPost = new Elysia()
 		{
 			body: AuthorizationParameters,
 			cookie: AuthorizationCookies
+		}
+	);
+
+export const par = new Elysia()
+	.derive(contentType('application/x-www-form-urlencoded'))
+	.post(
+		routeNames.pushed_authorization_request,
+		async ({ body, error, route, request }) => {
+			const errorOut = validdateGlobalParameters(body, error);
+			if (errorOut) {
+				return errorOut;
+			}
+			const url = new URL(request.url);
+			url.search = '';
+			url.pathname = url.pathname.replace(route, '');
+
+			const ctx = {
+				baseUrl: url.toString(),
+				_matchedRouteName: route
+			};
+			const OIDCContext = provider.OIDCContext;
+			ctx.oidc = new OIDCContext(ctx);
+			ctx.oidc.body = body;
+			ctx.oidc.params = body;
+
+			const { params: authParams, middleware: tokenAuth } =
+				getTokenAuth(provider);
+			paramsMiddleware(authParams, ctx);
+			tokenAuth.forEach((tokenAuthMiddleware) => {
+				tokenAuthMiddleware;
+			});
+
+			paramsMiddleware(allowList);
+			rejectDupesMiddleware;
+			rejectUnsupported;
+			stripOutsideJarParams;
+
+			pushedAuthorizationRequestRemapErrors;
+			processRequestObject.bind(undefined, allowList, rejectDupesMiddleware);
+			checkResponseMode;
+			oneRedirectUriClients;
+			rejectRegistration;
+			checkResponseType;
+			oidcRequired;
+			checkPrompt;
+			checkScope.bind(undefined, allowList);
+			checkOpenidScope;
+			checkRedirectUri;
+			authorizationPKCE(ctx.oidc.params);
+			checkClaims;
+			checkRar;
+			checkResource;
+			checkMaxAge;
+			checkIdTokenHint;
+			checkDpopJkt;
+			pushedAuthorizationRequestResponse;
+		},
+		{
+			body: t.Omit(AuthorizationParameters, ['request_uri'])
 		}
 	);

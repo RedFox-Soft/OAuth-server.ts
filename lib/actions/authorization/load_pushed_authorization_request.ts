@@ -1,11 +1,10 @@
 import {
+	InvalidRequest,
 	InvalidRequestUri,
 	RequestUriNotSupported
 } from '../../helpers/errors.ts';
 import instance from '../../helpers/weak_cache.ts';
 import { PUSHED_REQUEST_URN } from '../../consts/index.ts';
-
-import rejectRequestAndUri from './reject_request_and_uri.ts';
 
 /*
  * Validates request_uri is a PAR one when PAR is enabled and loads it. Throws
@@ -17,7 +16,11 @@ export default async function loadPushedAuthorizationRequest(ctx) {
 		provider: { PushedAuthorizationRequest }
 	} = ctx.oidc;
 
-	rejectRequestAndUri(ctx, () => {});
+	if (params.request !== undefined && params.request_uri !== undefined) {
+		throw new InvalidRequest(
+			'request and request_uri parameters MUST NOT be used together'
+		);
+	}
 
 	if (params.request_uri !== undefined) {
 		if (

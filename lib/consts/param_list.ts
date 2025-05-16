@@ -1,5 +1,4 @@
 import { t } from 'elysia';
-import { error } from 'node:console';
 
 export const AuthorizationParameters = t.Object(
 	{
@@ -51,7 +50,7 @@ export const routeNames = {
 	end_session: '/session/end',
 	introspection: '/token/introspection',
 	jwks: '/jwks',
-	pushed_authorization_request: '/request',
+	pushed_authorization_request: '/par',
 	registration: '/reg',
 	revocation: '/token/revocation',
 	token: '/token',

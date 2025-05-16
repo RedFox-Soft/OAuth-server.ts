@@ -13,7 +13,6 @@ import checkResponseMode from './check_response_mode.ts';
 import rejectUnsupported from './reject_unsupported.ts';
 import rejectRegistration from './reject_registration.ts';
 import oneRedirectUriClients from './one_redirect_uri_clients.ts';
-import loadPushedAuthorizationRequest from './load_pushed_authorization_request.ts';
 import processRequestObject from './process_request_object.ts';
 import oidcRequired from './oidc_required.ts';
 import cibaRequired from './ciba_required.ts';
@@ -29,7 +28,6 @@ import assignClaims from './assign_claims.ts';
 import loadAccount from './load_account.ts';
 import loadGrant from './load_grant.ts';
 import interactions from './interactions.ts';
-import respond from './respond.ts';
 import interactionEmit from './interaction_emit.ts';
 import getResume from './resume.ts';
 import checkClientGrantType from './check_client_grant_type.ts';
@@ -50,8 +48,6 @@ import checkCibaContext from './check_ciba_context.ts';
 import checkDpopJkt from './check_dpop_jkt.ts';
 import unsupportedRar from './unsupported_rar.ts';
 
-const A = 'authorization';
-const R = 'resume';
 const DA = 'device_authorization';
 const CV = 'code_verification';
 const DR = 'device_resume';
@@ -140,11 +136,11 @@ export default function authorizationAction(provider, endpoint) {
 		? 'device_resume'
 		: 'resume';
 
-	use(sessionMiddleware, A, R, DR);
+	use(sessionMiddleware, DR);
 	use(deviceUserFlowErrors, CV, DR);
-	use(getResume.bind(undefined, allowList, returnTo), R, DR);
+	use(getResume.bind(undefined, allowList, returnTo), DR);
 	use(deviceUserFlow.bind(undefined, allowList), CV, DR);
-	use(parseBody, A, DA, PAR, BA);
+	use(parseBody, DA, PAR, BA);
 	if (authRequired.has(endpoint)) {
 		const { params: authParams, middleware: tokenAuth } =
 			getTokenAuth(provider);
@@ -154,50 +150,47 @@ export default function authorizationAction(provider, endpoint) {
 		});
 	}
 	use(authenticatedClientId, DA, BA);
-	use(paramsMiddleware.bind(undefined, allowList), A, DA, PAR, BA);
-	use(rejectDupesMiddleware, A, DA, PAR, BA);
-	use(rejectUnsupported, A, DA, PAR, BA);
+	use(paramsMiddleware.bind(undefined, allowList), DA, PAR, BA);
+	use(rejectDupesMiddleware, DA, PAR, BA);
+	use(rejectUnsupported, DA, PAR, BA);
 	use(stripOutsideJarParams, PAR, BA);
-	use(checkClient, A, DA, R, CV, DR);
+	use(checkClient, DA, CV, DR);
 	use(checkClientGrantType, DA, BA);
 	use(pushedAuthorizationRequestRemapErrors, PAR);
 	use(backchannelRequestRemapErrors, BA);
-	use(loadPushedAuthorizationRequest, A);
 	use(
 		processRequestObject.bind(undefined, allowList, rejectDupesMiddleware),
-		A,
 		DA,
 		PAR,
 		BA
 	);
-	use(checkResponseMode, A, PAR);
-	use(oneRedirectUriClients, A, PAR);
-	use(rejectRegistration, A, DA, PAR, BA);
-	use(checkResponseType, A, PAR);
-	use(oidcRequired, A, PAR);
+	use(checkResponseMode, PAR);
+	use(oneRedirectUriClients, PAR);
+	use(rejectRegistration, DA, PAR, BA);
+	use(checkResponseType, PAR);
+	use(oidcRequired, PAR);
 	use(cibaRequired, BA);
-	use(assignDefaults, A, DA, BA);
-	use(checkPrompt, A, PAR);
-	use(checkScope.bind(undefined, allowList), A, DA, PAR, BA);
-	use(checkOpenidScope, A, DA, PAR, BA);
-	use(checkRedirectUri, A, PAR);
-	use(checkPKCE, A, PAR);
-	use(checkClaims, A, DA, PAR, BA);
+	use(assignDefaults, DA, BA);
+	use(checkPrompt, PAR);
+	use(checkScope.bind(undefined, allowList), DA, PAR, BA);
+	use(checkOpenidScope, DA, PAR, BA);
+	use(checkRedirectUri, PAR);
+	use(checkPKCE, PAR);
+	use(checkClaims, DA, PAR, BA);
 	use(unsupportedRar, DA, BA);
-	use(checkRar, A, PAR);
-	use(checkResource, A, DA, R, CV, DR, PAR, BA);
-	use(checkMaxAge, A, DA, PAR, BA);
+	use(checkRar, PAR);
+	use(checkResource, DA, CV, DR, PAR, BA);
+	use(checkMaxAge, DA, PAR, BA);
 	use(checkRequestedExpiry, BA);
 	use(checkCibaContext, BA);
-	use(checkIdTokenHint, A, DA, PAR);
+	use(checkIdTokenHint, DA, PAR);
 	use(checkDpopJkt, PAR);
-	use(interactionEmit, A, R, CV, DR);
-	use(assignClaims, A, R, CV, DR, BA);
+	use(interactionEmit, CV, DR);
+	use(assignClaims, CV, DR, BA);
 	use(cibaLoadAccount, BA);
-	use(loadAccount, A, R, CV, DR);
-	use(loadGrant, A, R, CV, DR);
-	use(interactions.bind(undefined, returnTo), A, R, CV, DR);
-	use(respond, A, R);
+	use(loadAccount, CV, DR);
+	use(loadGrant, CV, DR);
+	use(interactions.bind(undefined, returnTo), CV, DR);
 	use(deviceAuthorizationResponse, DA);
 	use(deviceUserFlowResponse, CV, DR);
 	use(pushedAuthorizationRequestResponse, PAR);

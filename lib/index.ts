@@ -17,6 +17,7 @@ import { ui } from './interactions/index.js';
 
 export const elysia = new Elysia({ strictPath: true })
 	.onError(errorHandler)
+	.use(staticPlugin({ assets: 'dist' }))
 	.use(staticPlugin())
 	.use(nocache)
 	.use(authGet)

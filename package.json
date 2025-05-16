@@ -3,8 +3,8 @@
 	"type": "module",
 	"scripts": {
 		"format": "eslint lib example certification test docs --fix",
-		"build": "bun build --outdir=public ./lib/interactions/loginClient.tsx",
-		"watch": "bun build --outdir=public --minify ./lib/interactions/loginClient.tsx --watch",
+		"build": "bun build --outdir=dist --minify ./lib/interactions/loginClient.tsx",
+		"watch": "bun build --outdir=dist --minify ./lib/interactions/loginClient.tsx --watch",
 		"test": "bun test $(fd .spec.ts test)",
 		"test-ci": "node ./test/ci --experimental-strip-types"
 	},

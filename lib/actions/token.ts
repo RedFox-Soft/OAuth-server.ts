@@ -97,5 +97,3 @@ export const tokenAction = new Elysia().post(
 		})
 	}
 );
-
-export default function (provider) {}
