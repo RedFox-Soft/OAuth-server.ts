@@ -3,18 +3,6 @@ import crypto from 'node:crypto';
 import { InvalidGrant, InvalidRequest } from './errors.ts';
 import constantEquals from './constant_equals.ts';
 
-function verifyPKCECode(input: string, param: string) {
-	if (input.length < 43 || input.length > 128) {
-		throw new InvalidRequest(
-			`${param} must be a string with a minimum 43 and maximum 128 length characters`
-		);
-	}
-
-	if (/[^\w.\-~]/.test(input)) {
-		throw new InvalidRequest(`${param} contains invalid characters`);
-	}
-}
-
 export function authorizationPKCE(params: {
 	code_challenge?: string | undefined;
 	code_challenge_method?: string | undefined;
@@ -35,7 +23,6 @@ export function authorizationPKCE(params: {
 	if (params.code_challenge_method !== 'S256') {
 		throw new InvalidRequest('not supported value of code_challenge_method');
 	}
-	verifyPKCECode(params.code_challenge, 'code_challenge');
 }
 
 export function verifyPKCE(
@@ -43,10 +30,6 @@ export function verifyPKCE(
 	challenge?: string,
 	method?: string
 ) {
-	if (verifier) {
-		verifyPKCECode(verifier, 'code_verifier');
-	}
-
 	if (verifier || challenge) {
 		try {
 			let expected = verifier;

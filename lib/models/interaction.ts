@@ -69,6 +69,7 @@ export default (provider) =>
 		static get IN_PAYLOAD() {
 			return [
 				...super.IN_PAYLOAD,
+				'cookieID',
 				'session',
 				'params',
 				'prompt',

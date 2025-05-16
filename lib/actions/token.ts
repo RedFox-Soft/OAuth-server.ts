@@ -89,7 +89,7 @@ export const tokenAction = new Elysia().post(
 			client_secret: t.Optional(t.String()),
 			code: t.Optional(t.String()),
 			grant_type: t.String(),
-			code_verifier: t.Optional(t.String()),
+			code_verifier: t.Optional(t.String({ pattern: '^[A-Za-z0-9_-]{43}$' })),
 			redirect_uri: t.Optional(t.String())
 		}),
 		headers: t.Object({

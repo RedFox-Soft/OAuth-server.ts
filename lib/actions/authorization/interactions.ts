@@ -147,6 +147,6 @@ export default async function interactions(resumeRouteName, ctx) {
 	});
 
 	oidc.provider.emit('interaction.started', prompt);
-	const destination = `ui/${uid}/${prompt.name}`;
+	const destination = `/ui/${uid}/${prompt.name}`;
 	return destination;
 }

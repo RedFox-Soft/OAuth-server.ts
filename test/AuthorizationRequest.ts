@@ -104,19 +104,19 @@ export class AuthorizationRequest {
 	}
 
 	validateInteractionRedirect(response) {
-		const { hostname, search, query } = parse(response.headers.get('location'));
+		const location = response.headers.get('location');
+		const { hostname, search, query } = parse(location);
 		expect(hostname).to.be.null;
 		expect(search).to.be.null;
 		expect(query).to.be.null;
 		const cookies = response.headers.getSetCookie();
 		expect(Array.isArray(cookies)).to.be.true;
 
-		const uid = readCookie(getSetCookies(cookies)[0]);
-		expect(readCookie(getSetCookies(cookies)[0])).to.equal(
-			readCookie(getSetCookies(cookies)[1])
-		);
+		const [, , uid] = location.split('/');
 
 		const interaction = TestAdapter.for('Interaction').syncFind(uid);
+		const cookieID = readCookie(getSetCookies(cookies)[0]);
+		expect(cookieID).to.equal(interaction.cookieID);
 
 		Object.entries(this.params).forEach(([key, value]) => {
 			if (key === 'res') return;

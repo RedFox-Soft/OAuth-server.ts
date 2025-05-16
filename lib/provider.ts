@@ -322,25 +322,6 @@ class ProviderClass extends EventEmitter {
 		return ResourceServer;
 	}
 
-	async #getInteraction(id: string) {
-		const interaction = await this.Interaction.find(id);
-		if (!interaction) {
-			throw new SessionNotFound('interaction session not found');
-		}
-
-		if (interaction.session?.uid) {
-			const session = await this.Session.findByUid(interaction.session.uid);
-			if (!session) {
-				throw new SessionNotFound('session not found');
-			}
-			if (interaction.session.accountId !== session.accountId) {
-				throw new SessionNotFound('session principal changed');
-			}
-		}
-
-		return interaction;
-	}
-
 	get [Symbol.toStringTag]() {
 		return 'Provider';
 	}

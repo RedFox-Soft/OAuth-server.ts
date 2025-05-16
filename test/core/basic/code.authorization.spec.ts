@@ -353,7 +353,7 @@ describe('BASIC code', () => {
 				if (verb === 'post') {
 					auth.validateErrorDescription(
 						response,
-						"Expected property 'response_type' to be string but found: code,code"
+						"Property 'response_type' should be one of: 'code', 'none'"
 					);
 				}
 			});
@@ -547,7 +547,7 @@ describe('BASIC code', () => {
 				auth.validateError(response, 'invalid_request');
 				auth.validateErrorDescription(
 					response,
-					"Expected property 'response_type' to be string but found: undefined"
+					"Property 'response_type' should be one of: 'code', 'none'"
 				);
 			});
 
@@ -743,10 +743,10 @@ describe('BASIC code', () => {
 				]);
 				auth.validateState(response);
 				auth.validateClientLocation(response);
-				auth.validateError(response, 'unsupported_response_type');
+				auth.validateError(response, 'invalid_request');
 				auth.validateErrorDescription(
 					response,
-					'unsupported response_type requested'
+					"Property 'response_type' should be one of: 'code', 'none'"
 				);
 			});
 
@@ -771,7 +771,7 @@ describe('BASIC code', () => {
 				auth.validateError(response, 'invalid_request');
 				auth.validateErrorDescription(
 					response,
-					'invalid max_age parameter value'
+					'max_age must be a positive integer'
 				);
 			});
 
@@ -797,7 +797,7 @@ describe('BASIC code', () => {
 				auth.validateError(response, 'invalid_request');
 				auth.validateErrorDescription(
 					response,
-					'invalid max_age parameter value'
+					'max_age must be a positive integer'
 				);
 			});
 
@@ -862,10 +862,10 @@ describe('BASIC code', () => {
 				]);
 				auth.validateState(response);
 				auth.validateClientLocation(response);
-				auth.validateError(response, 'unsupported_response_type');
+				auth.validateError(response, 'invalid_request');
 				auth.validateErrorDescription(
 					response,
-					'unsupported response_type requested'
+					"Property 'response_type' should be one of: 'code', 'none'"
 				);
 			});
 

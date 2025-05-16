@@ -15,10 +15,9 @@ describe('PKCE RFC7636', () => {
 	describe('authorization', () => {
 		it('Should throw Exception in check on PSCE if code_challenge is not defined', async function () {
 			const auth = new AuthorizationRequest({
-				scope: 'openid',
-				code_challenge: '',
-				code_challenge_method: 'S256'
+				scope: 'openid'
 			});
+			auth.params.code_challenge = undefined;
 
 			const { response } = await agent.auth.get({
 				query: auth.params,
@@ -47,7 +46,7 @@ describe('PKCE RFC7636', () => {
 			auth.validateError(response, 'invalid_request');
 			auth.validateErrorDescription(
 				response,
-				'code_challenge must be a string with a minimum 43 and maximum 128 length characters'
+				"Expected string to match '^[A-Za-z0-9_-]{43}$'"
 			);
 		});
 
@@ -66,7 +65,7 @@ describe('PKCE RFC7636', () => {
 			auth.validateError(response, 'invalid_request');
 			auth.validateErrorDescription(
 				response,
-				'code_challenge must be a string with a minimum 43 and maximum 128 length characters'
+				"Expected string to match '^[A-Za-z0-9_-]{43}$'"
 			);
 		});
 
@@ -85,7 +84,7 @@ describe('PKCE RFC7636', () => {
 			auth.validateError(response, 'invalid_request');
 			auth.validateErrorDescription(
 				response,
-				'code_challenge contains invalid characters'
+				"Expected string to match '^[A-Za-z0-9_-]{43}$'"
 			);
 		});
 
@@ -102,19 +101,16 @@ describe('PKCE RFC7636', () => {
 			});
 			auth.validatePresence(response, ['error', 'error_description', 'state']);
 			auth.validateError(response, 'invalid_request');
-			auth.validateErrorDescription(
-				response,
-				'not supported value of code_challenge_method'
-			);
+			auth.validateErrorDescription(response, "Expected 'S256'");
 		});
 
 		it('forces public clients using code flow to use pkce', async function () {
 			const auth = new AuthorizationRequest({
 				response_type: 'code',
-				scope: 'openid',
-				code_challenge: '',
-				code_challenge_method: ''
+				scope: 'openid'
 			});
+			auth.params.code_challenge = undefined;
+			auth.params.code_challenge_method = undefined;
 
 			const { response } = await agent.auth.get({
 				query: auth.params,
@@ -215,7 +211,7 @@ describe('PKCE RFC7636', () => {
 				code,
 				grant_type: 'authorization_code',
 				redirect_uri: 'com.example.myapp:/localhost/cb',
-				code_verifier: 'invalidE9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM'
+				code_verifier: '19Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM'
 			});
 			expect(error).toHaveProperty('status', 400);
 			expect(error.value).toHaveProperty('error', 'invalid_grant');
@@ -240,11 +236,11 @@ describe('PKCE RFC7636', () => {
 				redirect_uri: 'com.example.myapp:/localhost/cb',
 				code_verifier: 'f'.repeat(42)
 			});
-			expect(error).toHaveProperty('status', 400);
+			expect(error).toHaveProperty('status', 422);
 			expect(error.value).toHaveProperty('error', 'invalid_request');
 			expect(error.value).toHaveProperty(
 				'error_description',
-				'code_verifier must be a string with a minimum 43 and maximum 128 length characters'
+				"Expected string to match '^[A-Za-z0-9_-]{43}$'"
 			);
 		});
 
@@ -267,11 +263,11 @@ describe('PKCE RFC7636', () => {
 				redirect_uri: 'com.example.myapp:/localhost/cb',
 				code_verifier: 'f'.repeat(129)
 			});
-			expect(error).toHaveProperty('status', 400);
+			expect(error).toHaveProperty('status', 422);
 			expect(error.value).toHaveProperty('error', 'invalid_request');
 			expect(error.value).toHaveProperty(
 				'error_description',
-				'code_verifier must be a string with a minimum 43 and maximum 128 length characters'
+				"Expected string to match '^[A-Za-z0-9_-]{43}$'"
 			);
 		});
 
@@ -294,11 +290,11 @@ describe('PKCE RFC7636', () => {
 				redirect_uri: 'com.example.myapp:/localhost/cb',
 				code_verifier: `${'f'.repeat(42)}&`
 			});
-			expect(error).toHaveProperty('status', 400);
+			expect(error).toHaveProperty('status', 422);
 			expect(error.value).toHaveProperty('error', 'invalid_request');
 			expect(error.value).toHaveProperty(
 				'error_description',
-				'code_verifier contains invalid characters'
+				"Expected string to match '^[A-Za-z0-9_-]{43}$'"
 			);
 		});
 

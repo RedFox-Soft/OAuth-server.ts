@@ -1,19 +1,28 @@
 import { t } from 'elysia';
+import { error } from 'node:console';
 
 export const AuthorizationParameters = t.Object(
 	{
 		client_id: t.String(),
 		redirect_uri: t.Optional(t.String()),
-		response_type: t.String(),
+		response_type: t.Union([t.Literal('code'), t.Literal('none')], {
+			error: "Property 'response_type' should be one of: 'code', 'none'"
+		}),
 
 		state: t.Optional(t.String()),
 		claims_locales: t.Optional(t.Array(t.String())),
-		code_challenge: t.Optional(t.String()),
-		code_challenge_method: t.Optional(t.String()),
+		code_challenge: t.Optional(t.String({ pattern: '^[A-Za-z0-9_-]{43}$' })),
+		code_challenge_method: t.Optional(t.Literal('S256')),
 		display: t.Optional(t.String()),
 		id_token_hint: t.Optional(t.String()),
 		login_hint: t.Optional(t.String()),
-		max_age: t.Optional(t.Number()),
+		max_age: t.Optional(
+			t.Numeric({
+				minimum: 0,
+				maximum: Number.MAX_SAFE_INTEGER,
+				error: 'max_age must be a positive integer'
+			})
+		),
 		nonce: t.Optional(t.String()),
 		prompt: t.Optional(t.String()),
 		scope: t.Optional(t.String()),

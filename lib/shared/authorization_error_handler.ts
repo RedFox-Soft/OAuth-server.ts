@@ -8,7 +8,7 @@ import {
 } from '../helpers/errors.ts';
 import { getErrorHtmlResponse } from '../html/error.tsx';
 import { routeNames } from 'lib/consts/param_list.js';
-import { type Context, mapValueError } from 'elysia';
+import { type Context, mapValueError, ValidationError } from 'elysia';
 
 async function isAllowRedirectUri(params) {
 	const ctx = {};
@@ -51,8 +51,12 @@ function getObjFromError(code: string, errorObj: any) {
 		return { error, ...(error_description ? { error_description } : {}) };
 	}
 	if (code === 'VALIDATION') {
-		const firstError = errorObj.validator.Errors(errorObj.value).First();
-		if (firstError.schema.type === 'string') {
+		const validator = errorObj.validator ?? errorObj.error.validator;
+		const firstError =
+			'Errors' in validator
+				? validator.Errors(errorObj.value).First()
+				: errorObj;
+		if (firstError.schema.error) {
 			return {
 				error: 'invalid_request',
 				error_description: firstError.schema.error
