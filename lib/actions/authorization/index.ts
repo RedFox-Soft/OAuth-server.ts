@@ -4,24 +4,15 @@ import paramsMiddleware from '../../shared/assemble_params.ts';
 import sessionMiddleware from '../../shared/session.ts';
 import instance from '../../helpers/weak_cache.ts';
 import { PARAM_LIST } from '../../consts/index.ts';
-import checkRar from '../../shared/check_rar.ts';
 import checkResource from '../../shared/check_resource.ts';
 import getTokenAuth from '../../shared/token_auth.ts';
 
 import checkClient from './check_client.ts';
-import checkResponseMode from './check_response_mode.ts';
-import rejectUnsupported from './reject_unsupported.ts';
-import rejectRegistration from './reject_registration.ts';
-import oneRedirectUriClients from './one_redirect_uri_clients.ts';
 import processRequestObject from './process_request_object.ts';
-import oidcRequired from './oidc_required.ts';
 import cibaRequired from './ciba_required.ts';
-import checkPrompt from './check_prompt.ts';
 import checkMaxAge from './check_max_age.ts';
 import checkIdTokenHint from './check_id_token_hint.ts';
 import checkScope from './check_scope.ts';
-import checkResponseType from './check_response_type.ts';
-import checkRedirectUri from './check_redirect_uri.ts';
 import assignDefaults from './assign_defaults.ts';
 import checkClaims from './check_claims.ts';
 import assignClaims from './assign_claims.ts';
@@ -37,41 +28,30 @@ import authenticatedClientId from './authenticated_client_id.ts';
 import deviceUserFlow from './device_user_flow.ts';
 import deviceUserFlowErrors from './device_user_flow_errors.ts';
 import deviceUserFlowResponse from './device_user_flow_response.ts';
-import pushedAuthorizationRequestRemapErrors from './pushed_authorization_request_remap_errors.ts';
 import backchannelRequestRemapErrors from './backchannel_request_remap_errors.ts';
 import stripOutsideJarParams from './strip_outside_jar_params.ts';
-import pushedAuthorizationRequestResponse from './pushed_authorization_request_response.ts';
 import cibaLoadAccount from './ciba_load_account.ts';
 import checkRequestedExpiry from './check_requested_expiry.ts';
 import backchannelRequestResponse from './backchannel_request_response.ts';
 import checkCibaContext from './check_ciba_context.ts';
-import checkDpopJkt from './check_dpop_jkt.ts';
 import unsupportedRar from './unsupported_rar.ts';
 
 const DA = 'device_authorization';
 const CV = 'code_verification';
 const DR = 'device_resume';
-const PAR = 'pushed_authorization_request';
 const BA = 'backchannel_authentication';
 
-const authRequired = new Set([DA, PAR, BA]);
+const authRequired = new Set([DA, BA]);
 
 const parseBody = bodyParser.bind(
 	undefined,
 	'application/x-www-form-urlencoded'
 );
 
-import { authorizationPKCE } from '../../helpers/pkce.ts';
-function checkPKCE({ oidc: { params } }, next) {
-	authorizationPKCE(params);
-	return next();
-}
-
 export default function authorizationAction(provider, endpoint) {
 	const {
 		features: {
 			claimsParameter,
-			dPoP,
 			resourceIndicators,
 			richAuthorizationRequests,
 			webMessageResponseMode
@@ -120,10 +100,6 @@ export default function authorizationAction(provider, endpoint) {
 		allowList.add('requested_expiry');
 	}
 
-	if (dPoP && [A, R, PAR].includes(endpoint)) {
-		allowList.add('dpop_jkt');
-	}
-
 	const stack = [];
 
 	const use = (middleware, ...only) => {
@@ -140,51 +116,40 @@ export default function authorizationAction(provider, endpoint) {
 	use(deviceUserFlowErrors, CV, DR);
 	use(getResume.bind(undefined, allowList, returnTo), DR);
 	use(deviceUserFlow.bind(undefined, allowList), CV, DR);
-	use(parseBody, DA, PAR, BA);
+	use(parseBody, DA, BA);
 	if (authRequired.has(endpoint)) {
 		const { params: authParams, middleware: tokenAuth } =
 			getTokenAuth(provider);
-		use(paramsMiddleware.bind(undefined, authParams), DA, PAR, BA);
+		use(paramsMiddleware.bind(undefined, authParams), DA, BA);
 		tokenAuth.forEach((tokenAuthMiddleware) => {
-			use(tokenAuthMiddleware, DA, PAR, BA);
+			use(tokenAuthMiddleware, DA, BA);
 		});
 	}
 	use(authenticatedClientId, DA, BA);
-	use(paramsMiddleware.bind(undefined, allowList), DA, PAR, BA);
-	use(rejectDupesMiddleware, DA, PAR, BA);
-	use(rejectUnsupported, DA, PAR, BA);
-	use(stripOutsideJarParams, PAR, BA);
+	use(paramsMiddleware.bind(undefined, allowList), DA, BA);
+	use(rejectDupesMiddleware, DA, BA);
+	// use(rejectUnsupported, DA, BA);
+	use(stripOutsideJarParams, BA);
 	use(checkClient, DA, CV, DR);
 	use(checkClientGrantType, DA, BA);
-	use(pushedAuthorizationRequestRemapErrors, PAR);
 	use(backchannelRequestRemapErrors, BA);
 	use(
 		processRequestObject.bind(undefined, allowList, rejectDupesMiddleware),
 		DA,
-		PAR,
 		BA
 	);
-	use(checkResponseMode, PAR);
-	use(oneRedirectUriClients, PAR);
-	use(rejectRegistration, DA, PAR, BA);
-	use(checkResponseType, PAR);
-	use(oidcRequired, PAR);
+	// use(rejectRegistration, DA, BA);
 	use(cibaRequired, BA);
 	use(assignDefaults, DA, BA);
-	use(checkPrompt, PAR);
-	use(checkScope.bind(undefined, allowList), DA, PAR, BA);
-	use(checkOpenidScope, DA, PAR, BA);
-	use(checkRedirectUri, PAR);
-	use(checkPKCE, PAR);
-	use(checkClaims, DA, PAR, BA);
+	use(checkScope.bind(undefined, allowList), DA, BA);
+	use(checkOpenidScope, DA, BA);
+	use(checkClaims, DA, BA);
 	use(unsupportedRar, DA, BA);
-	use(checkRar, PAR);
-	use(checkResource, DA, CV, DR, PAR, BA);
-	use(checkMaxAge, DA, PAR, BA);
+	use(checkResource, DA, CV, DR, BA);
+	use(checkMaxAge, DA, BA);
 	use(checkRequestedExpiry, BA);
 	use(checkCibaContext, BA);
-	use(checkIdTokenHint, DA, PAR);
-	use(checkDpopJkt, PAR);
+	use(checkIdTokenHint, DA);
 	use(interactionEmit, CV, DR);
 	use(assignClaims, CV, DR, BA);
 	use(cibaLoadAccount, BA);
@@ -193,7 +158,6 @@ export default function authorizationAction(provider, endpoint) {
 	use(interactions.bind(undefined, returnTo), CV, DR);
 	use(deviceAuthorizationResponse, DA);
 	use(deviceUserFlowResponse, CV, DR);
-	use(pushedAuthorizationRequestResponse, PAR);
 	use(backchannelRequestResponse, BA);
 
 	return stack;

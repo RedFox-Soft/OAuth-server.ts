@@ -7,8 +7,6 @@ import checkResource from '../../shared/check_resource.ts';
 import { provider } from 'lib/provider.js';
 import checkClient from './check_client.ts';
 import checkResponseMode from './check_response_mode.ts';
-import rejectUnsupported from './reject_unsupported.ts';
-import rejectRegistration from './reject_registration.ts';
 import oneRedirectUriClients from './one_redirect_uri_clients.ts';
 import loadPushedAuthorizationRequest from './load_pushed_authorization_request.ts';
 import processRequestObject from './process_request_object.ts';
@@ -28,10 +26,12 @@ import interactions from './interactions.ts';
 import respond from './respond.ts';
 import interactionEmit from './interaction_emit.ts';
 import checkOpenidScope from './check_openid_scope.ts';
+import getTokenAuth from '../../shared/token_auth.ts';
+import stripOutsideJarParams from './strip_outside_jar_params.ts';
+import pushedAuthorizationRequestRemapErrors from './pushed_authorization_request_remap_errors.ts';
+import checkDpopJkt from './check_dpop_jkt.ts';
+import pushedAuthorizationRequestResponse from './pushed_authorization_request_response.ts';
 
-import { globalConfiguration } from '../../globalConfiguration.ts';
-
-import { authorizationPKCE } from '../../helpers/pkce.ts';
 import {
 	AuthorizationCookies,
 	AuthorizationParameters,
@@ -40,50 +40,16 @@ import {
 import sessionHandler from '../../shared/session.ts';
 import { noQueryDup } from 'lib/plugins/noQueryDup.js';
 import { contentType } from 'lib/plugins/contentType.js';
-
-function validdateGlobalParameters(params, error) {
-	const {
-		features: {
-			claimsParameter,
-			dPoP,
-			resourceIndicators,
-			richAuthorizationRequests,
-			webMessageResponseMode
-		}
-	} = globalConfiguration;
-
-	if (!Object.keys(params.claims ?? {}).length) {
-		params.claims = undefined;
-	}
-
-	if (params.web_message_uri && !webMessageResponseMode.enabled) {
-		return error(400, 'Web Message Response Mode is not supported');
-	} else if (params.claims && !claimsParameter.enabled) {
-		return error(400, 'Claims Parameter is not supported');
-	} else if (params.resource && !resourceIndicators.enabled) {
-		return error(400, 'Resource Indicators is not supported');
-	} else if (
-		params.authorization_details &&
-		!richAuthorizationRequests.enabled
-	) {
-		return error(400, 'Rich Authorization Requests is not supported');
-	} else if (params.dpop_jkt && !dPoP.enabled) {
-		return error(400, 'DPoP JWK Thumbprint is not supported');
-	}
-}
+import { authVerification } from './authVerification.js';
 
 async function authorizationActionHandler(ctx) {
-	const params = ctx.oidc.params;
-
 	const allowList = new Set(PARAM_LIST);
 	const setCookies = await sessionHandler(ctx);
-	rejectUnsupported(params, 'authorization');
 	await checkClient(ctx);
 	await loadPushedAuthorizationRequest(ctx);
 	processRequestObject.bind(undefined, allowList);
 	checkResponseMode(ctx);
 	oneRedirectUriClients(ctx);
-	rejectRegistration(ctx);
 	checkResponseType(ctx);
 	oidcRequired;
 	assignDefaults(ctx);
@@ -91,7 +57,6 @@ async function authorizationActionHandler(ctx) {
 	checkScope(allowList, ctx);
 	checkOpenidScope(ctx);
 	checkRedirectUri(ctx);
-	authorizationPKCE(params);
 	checkClaims;
 	checkRar;
 	checkResource;
@@ -114,73 +79,73 @@ async function authorizationActionHandler(ctx) {
 
 export const authGet = new Elysia()
 	.derive(noQueryDup(['resource', 'ui_locales', 'authorization_details']))
-	.get(
-		routeNames.authorization,
-		async ({ query, error, cookie, route, request }) => {
-			const errorOut = validdateGlobalParameters(query, error);
-			if (errorOut) {
-				return errorOut;
-			}
-			const url = new URL(request.url);
-			url.search = url.pathname = '';
+	.guard({
+		query: AuthorizationParameters,
+		cookie: AuthorizationCookies
+	})
+	.resolve(({ query }) => {
+		authVerification(query);
+	})
+	.get(routeNames.authorization, async ({ query, cookie, route, request }) => {
+		const url = new URL(request.url);
+		url.search = url.pathname = '';
 
-			const ctx = {
-				baseUrl: url.toString(),
-				cookie,
-				_matchedRouteName: route
-			};
-			const OIDCContext = provider.OIDCContext;
-			ctx.oidc = new OIDCContext(ctx);
-			ctx.oidc.params = query;
+		const ctx = {
+			baseUrl: url.toString(),
+			cookie,
+			_matchedRouteName: route
+		};
+		const OIDCContext = provider.OIDCContext;
+		ctx.oidc = new OIDCContext(ctx);
+		ctx.oidc.params = query;
 
-			return await authorizationActionHandler(ctx);
-		},
-		{
-			query: AuthorizationParameters,
-			cookie: AuthorizationCookies
-		}
-	);
+		return await authorizationActionHandler(ctx);
+	});
 
 export const authPost = new Elysia()
 	.derive(contentType('application/x-www-form-urlencoded'))
-	.post(
-		routeNames.authorization,
-		async ({ body, error, cookie, route, request }) => {
-			const errorOut = validdateGlobalParameters(body, error);
-			if (errorOut) {
-				return errorOut;
-			}
-			const url = new URL(request.url);
-			url.search = '';
-			url.pathname = url.pathname.replace(route, '');
+	.guard({
+		body: AuthorizationParameters,
+		cookie: AuthorizationCookies
+	})
+	.resolve(({ body }) => {
+		authVerification(body);
+	})
+	.post(routeNames.authorization, async ({ body, cookie, route, request }) => {
+		const url = new URL(request.url);
+		url.search = '';
+		url.pathname = url.pathname.replace(route, '');
 
-			const ctx = {
-				baseUrl: url.toString(),
-				cookie,
-				_matchedRouteName: route
-			};
-			const OIDCContext = provider.OIDCContext;
-			ctx.oidc = new OIDCContext(ctx);
-			ctx.oidc.body = body;
-			ctx.oidc.params = body;
+		const ctx = {
+			baseUrl: url.toString(),
+			cookie,
+			_matchedRouteName: route
+		};
+		const OIDCContext = provider.OIDCContext;
+		ctx.oidc = new OIDCContext(ctx);
+		ctx.oidc.body = body;
+		ctx.oidc.params = body;
 
-			return await authorizationActionHandler(ctx);
-		},
-		{
-			body: AuthorizationParameters,
-			cookie: AuthorizationCookies
-		}
-	);
+		return await authorizationActionHandler(ctx);
+	});
 
 export const par = new Elysia()
 	.derive(contentType('application/x-www-form-urlencoded'))
+	.guard({
+		body: t.Composite([
+			t.Omit(AuthorizationParameters, ['request_uri', 'client_id']),
+			t.Object({
+				client_id: t.Optional(t.String()),
+				client_secret: t.Optional(t.String())
+			})
+		])
+	})
+	.resolve(({ body }) => {
+		authVerification(body);
+	})
 	.post(
 		routeNames.pushed_authorization_request,
-		async ({ body, error, route, request }) => {
-			const errorOut = validdateGlobalParameters(body, error);
-			if (errorOut) {
-				return errorOut;
-			}
+		async ({ body, route, request }) => {
 			const url = new URL(request.url);
 			url.search = '';
 			url.pathname = url.pathname.replace(route, '');
@@ -196,37 +161,27 @@ export const par = new Elysia()
 
 			const { params: authParams, middleware: tokenAuth } =
 				getTokenAuth(provider);
-			paramsMiddleware(authParams, ctx);
 			tokenAuth.forEach((tokenAuthMiddleware) => {
 				tokenAuthMiddleware;
 			});
 
-			paramsMiddleware(allowList);
-			rejectDupesMiddleware;
-			rejectUnsupported;
 			stripOutsideJarParams;
 
 			pushedAuthorizationRequestRemapErrors;
-			processRequestObject.bind(undefined, allowList, rejectDupesMiddleware);
+			processRequestObject.bind(undefined, allowList);
 			checkResponseMode;
 			oneRedirectUriClients;
-			rejectRegistration;
 			checkResponseType;
 			oidcRequired;
 			checkPrompt;
 			checkScope.bind(undefined, allowList);
 			checkOpenidScope;
 			checkRedirectUri;
-			authorizationPKCE(ctx.oidc.params);
 			checkClaims;
 			checkRar;
 			checkResource;
-			checkMaxAge;
 			checkIdTokenHint;
 			checkDpopJkt;
 			pushedAuthorizationRequestResponse;
-		},
-		{
-			body: t.Omit(AuthorizationParameters, ['request_uri'])
 		}
 	);

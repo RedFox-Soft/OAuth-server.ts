@@ -86,6 +86,16 @@ export class InvalidRequest extends OIDCProviderError {
 	}
 }
 
+export class NotSupportedError extends OIDCProviderError {
+	constructor(message = 'request is not supported') {
+		super(400, 'not_supported');
+		Error.captureStackTrace(this, this.constructor);
+		Object.assign(this, {
+			error_description: message
+		});
+	}
+}
+
 export class SessionNotFound extends InvalidRequest {}
 
 export class InvalidClientAuth extends OIDCProviderError {
@@ -165,8 +175,6 @@ export const InvalidTarget = E(
 export const InvalidUserCode = E('invalid_user_code');
 export const LoginRequired = E('login_required');
 export const MissingUserCode = E('missing_user_code');
-export const RegistrationNotSupported = E('registration_not_supported');
-export const RequestNotSupported = E('request_not_supported');
 export const RequestUriNotSupported = E('request_uri_not_supported');
 export const SlowDown = E(
 	'slow_down',

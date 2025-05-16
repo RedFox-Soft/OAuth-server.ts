@@ -457,10 +457,14 @@ describe('BASIC code', () => {
 					const { response } = await authRequest(auth);
 					expect(response.status).toBe(303);
 					expect(spy.calledOnce).toBeTrue();
-					auth.validatePresence(response, ['error', 'state']);
+					auth.validatePresence(response, [
+						'error',
+						'error_description',
+						'state'
+					]);
 					auth.validateState(response);
 					auth.validateClientLocation(response);
-					auth.validateError(response, `${param}_not_supported`);
+					auth.validateError(response, 'not_supported');
 				});
 			});
 
