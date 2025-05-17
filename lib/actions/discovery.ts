@@ -28,7 +28,7 @@ export default function discovery(ctx) {
 			: undefined,
 		authorization_response_iss_parameter_supported: true,
 		response_modes_supported: ['form_post', 'query'],
-		response_types_supported: configuration.responseTypes,
+		response_types_supported: ['none', 'code'],
 		scopes_supported: [...configuration.scopes],
 		subject_types_supported: [...configuration.subjectTypes],
 		token_endpoint_auth_methods_supported: [...configuration.clientAuthMethods],

@@ -2127,28 +2127,6 @@ function makeDefaults() {
 		jwks: undefined,
 
 		/*
-		 * responseTypes
-		 *
-		 * description: Array of response_type values that the authorization server supports. The default omits all response
-		 * types that result in access tokens being issued by the authorization endpoint directly as per
-		 * [`RFC9700 - Best Current Practice for OAuth 2.0 Security`](https://www.rfc-editor.org/rfc/rfc9700.html#section-2.1.2)
-		 * You can still enable them if you need to.
-		 *
-		 * example: Supported values list
-		 * These are values defined in [`OIDC Core 1.0`](https://openid.net/specs/openid-connect-core-1_0-errata2.html#Authentication)
-		 * and [OAuth 2.0 Multiple Response Type Encoding Practices](https://openid.net/specs/oauth-v2-multiple-response-types-1_0-final.html)
-		 * ```js
-		 * [
-		 *   'code',
-		 *   'id_token',
-		 *   'code id_token',
-		 *   'none',
-		 * ]
-		 * ```
-		 */
-		responseTypes: ['code', 'none'],
-
-		/*
 		 * routes
 		 *
 		 * description: Routing values used by the authorization server. Only provide routes starting with "/"

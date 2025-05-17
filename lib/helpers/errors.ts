@@ -196,8 +196,4 @@ export const UnsupportedResponseMode = E(
 	'unsupported_response_mode',
 	'unsupported response_mode requested'
 );
-export const UnsupportedResponseType = E(
-	'unsupported_response_type',
-	'unsupported response_type requested'
-);
 export const UseDpopNonce = E('use_dpop_nonce');

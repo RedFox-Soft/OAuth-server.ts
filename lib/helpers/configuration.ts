@@ -28,7 +28,6 @@ const filterAsymmetricSig = RegExp.prototype.test.bind(
 	/^(?:PS(?:256|384|512)|RS(?:256|384|512)|ES(?:256K?|384|512)|Ed(?:25519|DSA))$/
 );
 
-const supportedResponseTypes = new Set(['none', 'code']);
 const fapiProfiles = new Set(['1.0 Final', '2.0']);
 
 class Configuration {
@@ -46,7 +45,6 @@ class Configuration {
 
 		this.ensureSets();
 
-		this.checkResponseTypes();
 		this.checkAllowedJWA();
 		this.checkFapiProfile();
 		this.collectScopes();
@@ -119,33 +117,8 @@ class Configuration {
 		}
 	}
 
-	checkResponseTypes() {
-		const types = new Set();
-
-		this.responseTypes.forEach((type) => {
-			const parsed = new Set(type.split(' '));
-
-			if (
-				(parsed.has('none') && parsed.size !== 1) ||
-				![...parsed].every(Set.prototype.has.bind(supportedResponseTypes))
-			) {
-				throw new TypeError(`unsupported response type: ${type}`);
-			}
-
-			types.add([...parsed].sort().join(' '));
-		});
-
-		this.responseTypes = [...types];
-	}
-
 	collectGrantTypes() {
-		this.grantTypes = new Set();
-
-		this.responseTypes.forEach((responseType) => {
-			if (responseType.includes('code')) {
-				this.grantTypes.add('authorization_code');
-			}
-		});
+		this.grantTypes = new Set(['authorization_code']);
 
 		if (
 			this.scopes.has('offline_access') ||

@@ -5,7 +5,6 @@ import getConfig from '../default.config.js';
 const config = getConfig();
 
 delete config.claims;
-config.responseTypes = ['code', 'none'];
 config.scopes = ['openid', 'offline_access', 'api:read'];
 merge(config.features, {
 	claimsParameter: { enabled: true },

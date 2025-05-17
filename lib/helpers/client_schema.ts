@@ -161,7 +161,7 @@ export default function getSchema(provider) {
 			configuration.requestObjectEncryptionAlgValues,
 		request_object_encryption_enc: () =>
 			configuration.requestObjectEncryptionEncValues,
-		response_types: () => configuration.responseTypes,
+		response_types: () => ['code', 'none'],
 		response_modes: () => [...instance(provider).responseModes.keys()],
 		subject_type: () => configuration.subjectTypes,
 		authorization_details_types: () =>

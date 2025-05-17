@@ -70,14 +70,6 @@ class ProviderClass extends EventEmitter {
 		this.#int.configuration = configuration;
 		this.#int.features = configuration.features;
 
-		if (Array.isArray(configuration.cookies.keys)) {
-			if (configuration.cookies.keys.length) {
-				this.keys = configuration.cookies.keys;
-			}
-		} else if (configuration.cookies.keys) {
-			this.keys = configuration.cookies.keys;
-		}
-
 		if (configuration.features.dPoP.nonceSecret !== undefined) {
 			this.#int.DPoPNonces = new DPoPNonces(
 				configuration.features.dPoP.nonceSecret
