@@ -25,7 +25,6 @@ merge(config.features, {
 config.enabledJWA = {
 	requestObjectSigningAlgValues: ['ES256']
 };
-config.acceptQueryParamAccessTokens = true;
 
 export default {
 	config,

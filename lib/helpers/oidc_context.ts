@@ -10,7 +10,6 @@ const COOKIES = Symbol();
 
 export default function getContext(provider) {
 	const {
-		acceptQueryParamAccessTokens,
 		features: { dPoP: dPoPConfig, fapi },
 		scopes: oidcScopes
 	} = instance(provider).configuration;
@@ -223,10 +222,7 @@ export default function getContext(provider) {
 			return this.entities.Grant;
 		}
 
-		getAccessToken({
-			acceptDPoP = false,
-			acceptQueryParam = acceptQueryParamAccessTokens && !fapi.enabled
-		} = {}) {
+		getAccessToken({ acceptDPoP = false } = {}) {
 			if (this.#accessToken) {
 				return this.#accessToken;
 			}
@@ -237,8 +233,7 @@ export default function getContext(provider) {
 					body:
 						ctx.is('application/x-www-form-urlencoded') &&
 						ctx.oidc.body?.access_token,
-					header: ctx.headers.authorization,
-					query: ctx.query.access_token
+					header: ctx.headers.authorization
 				},
 				(value) => typeof value !== 'string' || !value
 			);
@@ -261,12 +256,6 @@ export default function getContext(provider) {
 			if (length > 1) {
 				throw new InvalidRequest(
 					'access token must only be provided using one mechanism'
-				);
-			}
-
-			if (!acceptQueryParam && mechanism === 'query') {
-				throw new InvalidRequest(
-					'access tokens must not be provided via query parameter'
 				);
 			}
 

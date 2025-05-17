@@ -132,13 +132,19 @@ export const authPost = new Elysia()
 export const par = new Elysia()
 	.derive(contentType('application/x-www-form-urlencoded'))
 	.guard({
-		body: t.Composite([
-			t.Omit(AuthorizationParameters, ['request_uri', 'client_id']),
-			t.Object({
-				client_id: t.Optional(t.String()),
-				client_secret: t.Optional(t.String())
-			})
-		])
+		body: t.Composite(
+			[
+				t.Omit(AuthorizationParameters, ['request_uri', 'client_id']),
+				t.Object({
+					client_id: t.Optional(t.String()),
+					client_secret: t.Optional(t.String())
+				})
+			],
+			{ additionalProperties: false }
+		),
+		headers: t.Object({
+			authorization: t.Optional(t.String())
+		})
 	})
 	.resolve(({ body }) => {
 		authVerification(body);

@@ -856,16 +856,6 @@ export const globalConfiguration = {
 	allowOmittingSingleRegisteredRedirectUri: true,
 
 	/*
-	 * acceptQueryParamAccessTokens
-	 *
-	 * description: Several OAuth 2.0 / OIDC profiles prohibit the use of query strings to carry
-	 * access tokens. This setting either allows (true) or prohibits (false) that mechanism to be
-	 * used.
-	 *
-	 */
-	acceptQueryParamAccessTokens: false,
-
-	/*
 	 * discovery
 	 *
 	 * description: Pass additional properties to this object to extend the discovery document

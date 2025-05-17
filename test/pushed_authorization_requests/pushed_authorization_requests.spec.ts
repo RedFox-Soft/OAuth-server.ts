@@ -1,6 +1,7 @@
 import { randomBytes, createHash } from 'node:crypto';
 import { parse as parseUrl } from 'node:url';
 
+import { describe, it } from 'bun:test';
 import { expect } from 'chai';
 import sinon from 'sinon';
 import { importJWK, decodeProtectedHeader, decodeJwt } from 'jose';
@@ -9,7 +10,7 @@ import * as JWT from '../../lib/helpers/jwt.ts';
 import bootstrap from '../test_helper.js';
 
 describe('Pushed Request Object', () => {
-	context('w/o Request Objects', () => {
+	describe('w/o Request Objects', () => {
 		before(bootstrap(import.meta.url));
 
 		describe('discovery', () => {

@@ -855,16 +855,6 @@ function makeDefaults() {
 		allowOmittingSingleRegisteredRedirectUri: true,
 
 		/*
-		 * acceptQueryParamAccessTokens
-		 *
-		 * description: Several OAuth 2.0 / OIDC profiles prohibit the use of query strings to carry
-		 * access tokens. This setting either allows (true) or prohibits (false) that mechanism to be
-		 * used.
-		 *
-		 */
-		acceptQueryParamAccessTokens: false,
-
-		/*
 		 * cookies
 		 *
 		 * description: Options for the [cookies module](https://github.com/pillarjs/cookies#cookiesset-name--value---options--)
