@@ -1,176 +1,210 @@
-/* eslint-disable max-len */
-
+import { Elysia } from 'elysia';
 import defaults from '../helpers/_/defaults.ts';
 import instance from '../helpers/weak_cache.ts';
+import { provider } from 'lib/index.js';
+import { routeNames } from 'lib/consts/param_list.js';
 
-export default function discovery(ctx) {
-	const { configuration, features } = instance(ctx.oidc.provider);
-
-	ctx.body = {
-		acr_values_supported: configuration.acrValues.size
-			? [...configuration.acrValues]
-			: undefined,
-		authorization_endpoint: ctx.oidc.urlFor('authorization'),
-		device_authorization_endpoint: features.deviceFlow.enabled
-			? ctx.oidc.urlFor('device_authorization')
-			: undefined,
-		claims_parameter_supported: features.claimsParameter.enabled,
-		claims_supported: [...configuration.claimsSupported],
-		code_challenge_methods_supported: ['S256'],
-		end_session_endpoint: features.rpInitiatedLogout.enabled
-			? ctx.oidc.urlFor('end_session')
-			: undefined,
-		grant_types_supported: [...configuration.grantTypes],
-		issuer: ctx.oidc.issuer,
-		jwks_uri: ctx.oidc.urlFor('jwks'),
-		registration_endpoint: features.registration.enabled
-			? ctx.oidc.urlFor('registration')
-			: undefined,
-		authorization_response_iss_parameter_supported: true,
-		response_modes_supported: ['form_post', 'query'],
-		response_types_supported: ['none', 'code'],
-		scopes_supported: [...configuration.scopes],
-		subject_types_supported: [...configuration.subjectTypes],
-		token_endpoint_auth_methods_supported: [...configuration.clientAuthMethods],
-		token_endpoint_auth_signing_alg_values_supported:
-			configuration.clientAuthSigningAlgValues,
-		token_endpoint: ctx.oidc.urlFor('token')
+function urls(baseUrl: string) {
+	return {
+		authorization_endpoint: new URL(routeNames.authorization, baseUrl).href,
+		device_authorization_endpoint: new URL(
+			routeNames.device_authorization,
+			baseUrl
+		).href,
+		end_session_endpoint: new URL(routeNames.end_session, baseUrl).href,
+		jwks_uri: new URL(routeNames.jwks, baseUrl).href,
+		pushed_authorization_request_endpoint: new URL(
+			routeNames.pushed_authorization_request,
+			baseUrl
+		).href,
+		registration_endpoint: new URL(routeNames.registration, baseUrl).href,
+		token_endpoint: new URL(routeNames.token, baseUrl).href,
+		userinfo_endpoint: new URL(routeNames.userinfo, baseUrl).href,
+		introspection_endpoint: new URL(routeNames.introspection, baseUrl).href,
+		revocation_endpoint: new URL(routeNames.revocation, baseUrl).href,
+		backchannel_authentication_endpoint: new URL(
+			routeNames.backchannel_authentication,
+			baseUrl
+		).href
 	};
+}
 
-	const {
-		pushedAuthorizationRequests,
-		requestObjects,
-		richAuthorizationRequests
-	} = features;
+export const discovery = new Elysia().get(
+	'/.well-known/openid-configuration',
+	function ({ request }) {
+		const { configuration, features } = instance(provider);
+		const url = new URL(request.url);
+		url.pathname = '';
+		url.search = '';
+		const urlObj = urls(url.toString());
 
-	ctx.body.id_token_signing_alg_values_supported =
-		configuration.idTokenSigningAlgValues;
-	if (features.encryption.enabled) {
-		ctx.body.id_token_encryption_alg_values_supported =
-			configuration.idTokenEncryptionAlgValues;
-		ctx.body.id_token_encryption_enc_values_supported =
-			configuration.idTokenEncryptionEncValues;
-	}
+		const body = {
+			acr_values_supported: configuration.acrValues.size
+				? [...configuration.acrValues]
+				: undefined,
+			authorization_endpoint: urlObj.authorization_endpoint,
+			device_authorization_endpoint: features.deviceFlow.enabled
+				? urlObj.device_authorization_endpoint
+				: undefined,
+			claims_parameter_supported: features.claimsParameter.enabled,
+			claims_supported: [...configuration.claimsSupported],
+			code_challenge_methods_supported: ['S256'],
+			end_session_endpoint: features.rpInitiatedLogout.enabled
+				? urlObj.end_session_endpoint
+				: undefined,
+			grant_types_supported: [...configuration.grantTypes],
+			issuer: url.toString(),
+			jwks_uri: urlObj.jwks_uri,
+			registration_endpoint: features.registration.enabled
+				? urlObj.registration_endpoint
+				: undefined,
+			authorization_response_iss_parameter_supported: true,
+			response_modes_supported: ['form_post', 'query'],
+			response_types_supported: ['none', 'code'],
+			scopes_supported: [...configuration.scopes],
+			subject_types_supported: [...configuration.subjectTypes],
+			token_endpoint_auth_methods_supported: [
+				...configuration.clientAuthMethods
+			],
+			token_endpoint_auth_signing_alg_values_supported:
+				configuration.clientAuthSigningAlgValues,
+			token_endpoint: urlObj.token_endpoint
+		};
 
-	if (pushedAuthorizationRequests.enabled) {
-		ctx.body.pushed_authorization_request_endpoint = ctx.oidc.urlFor(
-			'pushed_authorization_request'
-		);
-		ctx.body.require_pushed_authorization_requests =
-			pushedAuthorizationRequests.requirePushedAuthorizationRequests
-				? true
-				: undefined;
-	}
+		const {
+			pushedAuthorizationRequests,
+			requestObjects,
+			richAuthorizationRequests
+		} = features;
 
-	ctx.body.request_uri_parameter_supported = false;
-	if (requestObjects.enabled) {
-		ctx.body.request_parameter_supported = true;
-		ctx.body.request_object_signing_alg_values_supported =
-			configuration.requestObjectSigningAlgValues;
-		ctx.body.require_signed_request_object =
-			requestObjects.requireSignedRequestObject ? true : undefined;
-
+		body.id_token_signing_alg_values_supported =
+			configuration.idTokenSigningAlgValues;
 		if (features.encryption.enabled) {
-			ctx.body.request_object_encryption_alg_values_supported =
-				configuration.requestObjectEncryptionAlgValues;
-			ctx.body.request_object_encryption_enc_values_supported =
-				configuration.requestObjectEncryptionEncValues;
+			body.id_token_encryption_alg_values_supported =
+				configuration.idTokenEncryptionAlgValues;
+			body.id_token_encryption_enc_values_supported =
+				configuration.idTokenEncryptionEncValues;
 		}
-	}
 
-	if (features.userinfo.enabled) {
-		ctx.body.userinfo_endpoint = ctx.oidc.urlFor('userinfo');
-		if (features.jwtUserinfo.enabled) {
-			ctx.body.userinfo_signing_alg_values_supported =
-				configuration.userinfoSigningAlgValues;
+		if (pushedAuthorizationRequests.enabled) {
+			body.pushed_authorization_request_endpoint =
+				urlObj.pushed_authorization_request_endpoint;
+			body.require_pushed_authorization_requests =
+				pushedAuthorizationRequests.requirePushedAuthorizationRequests
+					? true
+					: undefined;
+		}
+
+		body.request_uri_parameter_supported = false;
+		if (requestObjects.enabled) {
+			body.request_parameter_supported = true;
+			body.request_object_signing_alg_values_supported =
+				configuration.requestObjectSigningAlgValues;
+			body.require_signed_request_object =
+				requestObjects.requireSignedRequestObject ? true : undefined;
+
 			if (features.encryption.enabled) {
-				ctx.body.userinfo_encryption_alg_values_supported =
-					configuration.userinfoEncryptionAlgValues;
-				ctx.body.userinfo_encryption_enc_values_supported =
-					configuration.userinfoEncryptionEncValues;
+				body.request_object_encryption_alg_values_supported =
+					configuration.requestObjectEncryptionAlgValues;
+				body.request_object_encryption_enc_values_supported =
+					configuration.requestObjectEncryptionEncValues;
 			}
 		}
-	}
 
-	if (features.webMessageResponseMode.enabled) {
-		ctx.body.response_modes_supported.push('web_message');
-	}
-
-	if (features.jwtResponseModes.enabled) {
-		ctx.body.response_modes_supported.push('jwt');
-
-		ctx.body.response_modes_supported.push('query.jwt');
-		ctx.body.response_modes_supported.push('form_post.jwt');
+		if (features.userinfo.enabled) {
+			body.userinfo_endpoint = urlObj.userinfo_endpoint;
+			if (features.jwtUserinfo.enabled) {
+				body.userinfo_signing_alg_values_supported =
+					configuration.userinfoSigningAlgValues;
+				if (features.encryption.enabled) {
+					body.userinfo_encryption_alg_values_supported =
+						configuration.userinfoEncryptionAlgValues;
+					body.userinfo_encryption_enc_values_supported =
+						configuration.userinfoEncryptionEncValues;
+				}
+			}
+		}
 
 		if (features.webMessageResponseMode.enabled) {
-			ctx.body.response_modes_supported.push('web_message.jwt');
+			body.response_modes_supported.push('web_message');
 		}
 
-		ctx.body.authorization_signing_alg_values_supported =
-			configuration.authorizationSigningAlgValues;
+		if (features.jwtResponseModes.enabled) {
+			body.response_modes_supported.push('jwt');
 
-		if (features.encryption.enabled) {
-			ctx.body.authorization_encryption_alg_values_supported =
-				configuration.authorizationEncryptionAlgValues;
-			ctx.body.authorization_encryption_enc_values_supported =
-				configuration.authorizationEncryptionEncValues;
+			body.response_modes_supported.push('query.jwt');
+			body.response_modes_supported.push('form_post.jwt');
+
+			if (features.webMessageResponseMode.enabled) {
+				body.response_modes_supported.push('web_message.jwt');
+			}
+
+			body.authorization_signing_alg_values_supported =
+				configuration.authorizationSigningAlgValues;
+
+			if (features.encryption.enabled) {
+				body.authorization_encryption_alg_values_supported =
+					configuration.authorizationEncryptionAlgValues;
+				body.authorization_encryption_enc_values_supported =
+					configuration.authorizationEncryptionEncValues;
+			}
 		}
-	}
 
-	if (features.introspection.enabled) {
-		ctx.body.introspection_endpoint = ctx.oidc.urlFor('introspection');
-	}
-
-	if (features.jwtIntrospection.enabled) {
-		ctx.body.introspection_signing_alg_values_supported =
-			configuration.introspectionSigningAlgValues;
-		if (features.encryption.enabled) {
-			ctx.body.introspection_encryption_alg_values_supported =
-				configuration.introspectionEncryptionAlgValues;
-			ctx.body.introspection_encryption_enc_values_supported =
-				configuration.introspectionEncryptionEncValues;
+		if (features.introspection.enabled) {
+			body.introspection_endpoint = urlObj.introspection_endpoint;
 		}
-	}
 
-	if (features.dPoP.enabled) {
-		ctx.body.dpop_signing_alg_values_supported =
-			configuration.dPoPSigningAlgValues;
-	}
+		if (features.jwtIntrospection.enabled) {
+			body.introspection_signing_alg_values_supported =
+				configuration.introspectionSigningAlgValues;
+			if (features.encryption.enabled) {
+				body.introspection_encryption_alg_values_supported =
+					configuration.introspectionEncryptionAlgValues;
+				body.introspection_encryption_enc_values_supported =
+					configuration.introspectionEncryptionEncValues;
+			}
+		}
 
-	if (features.revocation.enabled) {
-		ctx.body.revocation_endpoint = ctx.oidc.urlFor('revocation');
-	}
+		if (features.dPoP.enabled) {
+			body.dpop_signing_alg_values_supported =
+				configuration.dPoPSigningAlgValues;
+		}
 
-	if (features.backchannelLogout.enabled) {
-		ctx.body.backchannel_logout_supported = true;
-		ctx.body.backchannel_logout_session_supported = true;
-	}
+		if (features.revocation.enabled) {
+			body.revocation_endpoint = urlObj.revocation_endpoint;
+		}
 
-	if (features.mTLS.enabled && features.mTLS.certificateBoundAccessTokens) {
-		ctx.body.tls_client_certificate_bound_access_tokens = true;
-	}
+		if (features.backchannelLogout.enabled) {
+			body.backchannel_logout_supported = true;
+			body.backchannel_logout_session_supported = true;
+		}
 
-	if (features.ciba.enabled) {
-		ctx.body.backchannel_authentication_endpoint = ctx.oidc.urlFor(
-			'backchannel_authentication'
-		);
-		ctx.body.backchannel_token_delivery_modes_supported = [
-			...features.ciba.deliveryModes
-		];
-		ctx.body.backchannel_user_code_parameter_supported = true;
-		ctx.body.backchannel_authentication_request_signing_alg_values_supported =
-			requestObjects.enabled
-				? configuration.requestObjectSigningAlgValues.filter(
-						(alg) => !alg.startsWith('HS')
-					)
-				: undefined;
-	}
+		if (features.mTLS.enabled && features.mTLS.certificateBoundAccessTokens) {
+			body.tls_client_certificate_bound_access_tokens = true;
+		}
 
-	if (richAuthorizationRequests.enabled) {
-		ctx.body.authorization_details_types_supported = Object.keys(
-			richAuthorizationRequests.types
-		);
-	}
+		if (features.ciba.enabled) {
+			body.backchannel_authentication_endpoint =
+				urlObj.backchannel_authentication_endpoint;
+			body.backchannel_token_delivery_modes_supported = [
+				...features.ciba.deliveryModes
+			];
+			body.backchannel_user_code_parameter_supported = true;
+			body.backchannel_authentication_request_signing_alg_values_supported =
+				requestObjects.enabled
+					? configuration.requestObjectSigningAlgValues.filter(
+							(alg) => !alg.startsWith('HS')
+						)
+					: undefined;
+		}
 
-	defaults(ctx.body, configuration.discovery);
-}
+		if (richAuthorizationRequests.enabled) {
+			body.authorization_details_types_supported = Object.keys(
+				richAuthorizationRequests.types
+			);
+		}
+
+		defaults(body, configuration.discovery);
+		return body;
+	}
+);

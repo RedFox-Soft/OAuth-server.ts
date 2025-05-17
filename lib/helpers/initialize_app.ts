@@ -11,7 +11,6 @@ import {
 	registration,
 	getRevocation,
 	getIntrospection,
-	discovery,
 	endSession,
 	codeVerification
 } from '../actions/index.ts';

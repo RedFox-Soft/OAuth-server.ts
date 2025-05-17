@@ -1,59 +1,53 @@
 import { randomBytes, createHash } from 'node:crypto';
 import { parse as parseUrl } from 'node:url';
 
-import { describe, it } from 'bun:test';
-import { expect } from 'chai';
+import { describe, it, beforeAll, afterEach, expect } from 'bun:test';
 import sinon from 'sinon';
 import { importJWK, decodeProtectedHeader, decodeJwt } from 'jose';
 
 import * as JWT from '../../lib/helpers/jwt.ts';
-import bootstrap from '../test_helper.js';
+import bootstrap, { agent } from '../test_helper.js';
+import { provider } from 'lib/provider.js';
 
 describe('Pushed Request Object', () => {
 	describe('w/o Request Objects', () => {
-		before(bootstrap(import.meta.url));
+		let setup = null;
+		beforeAll(async function () {
+			setup = await bootstrap(import.meta.url)();
+		});
 
 		describe('discovery', () => {
 			it('extends the well known config', async function () {
-				await this.agent
-					.get('/.well-known/openid-configuration')
-					.expect((response) => {
-						expect(response.body).not.to.have.property(
-							'request_object_endpoint'
-						);
-						expect(response.body).to.have.property(
-							'pushed_authorization_request_endpoint'
-						);
-						expect(response.body).not.to.have.property(
-							'request_object_signing_alg_values_supported'
-						);
-						expect(response.body).to.have.property(
-							'request_uri_parameter_supported',
-							false
-						);
-						expect(response.body).not.to.have.property(
-							'require_pushed_authorization_requests'
-						);
-					});
+				const { data } =
+					await agent['.well-known']['openid-configuration'].get();
+
+				expect(data).not.toHaveProperty('request_object_endpoint');
+				expect(data).toHaveProperty('pushed_authorization_request_endpoint');
+				expect(data).not.toHaveProperty(
+					'request_object_signing_alg_values_supported'
+				);
+				expect(data).toHaveProperty('request_uri_parameter_supported', false);
+				expect(data).not.toHaveProperty(
+					'require_pushed_authorization_requests'
+				);
 
 				i(
-					this.provider
+					provider
 				).features.pushedAuthorizationRequests.requirePushedAuthorizationRequests =
 					true;
 
-				return this.agent
-					.get('/.well-known/openid-configuration')
-					.expect((response) => {
-						expect(response.body).to.have.property(
-							'require_pushed_authorization_requests',
-							true
-						);
-					});
+				const { data: newData } =
+					await agent['.well-known']['openid-configuration'].get();
+
+				expect(newData).toHaveProperty(
+					'require_pushed_authorization_requests',
+					true
+				);
 			});
 
-			after(function () {
+			afterEach(function () {
 				i(
-					this.provider
+					provider
 				).features.pushedAuthorizationRequests.requirePushedAuthorizationRequests =
 					false;
 			});
@@ -63,7 +57,7 @@ describe('Pushed Request Object', () => {
 			const requirePushedAuthorizationRequests =
 				clientId === 'client-par-required';
 
-			context('allowUnregisteredRedirectUris', () => {
+			describe('allowUnregisteredRedirectUris', () => {
 				before(function () {
 					i(
 						this.provider
