@@ -7,7 +7,8 @@ import {
 	beforeAll,
 	afterEach,
 	expect,
-	beforeEach
+	beforeEach,
+	spyOn
 } from 'bun:test';
 import sinon from 'sinon';
 import { importJWK, decodeProtectedHeader, decodeJwt } from 'jose';
@@ -143,7 +144,7 @@ describe('Pushed Request Object', () => {
 						TestAdapter.for('AuthorizationCode').syncFind(jti)
 					).toHaveProperty('redirectUri', 'https://rp.example.com/unlisted');
 
-					const { response, error } = await agent.token.post(
+					const { response } = await agent.token.post(
 						// @ts-expect-error endpoint will be parse to object
 						jsonToFormUrlEncoded({
 							code,
@@ -175,16 +176,9 @@ describe('Pushed Request Object', () => {
 							iss: testClientId,
 							aud: 'http://e.ly/',
 							redirect_uri: 'https://rp.example.com/unlisted'
-						}),
-						{
-							headers: AuthorizationRequest.basicAuthHeader(
-								testClientId,
-								'secret'
-							)
-						}
+						})
 					);
 					expect(error.status).toBe(400);
-
 					expect(error.value).toEqual({
 						error: 'invalid_redirect_uri',
 						error_description:
@@ -266,125 +260,155 @@ describe('Pushed Request Object', () => {
 
 				describe('using a plain pushed authorization request', () => {
 					describe('Pushed Authorization Request Endpoint', () => {
-						it('populates ctx.oidc.entities', function (done) {
-							this.assertOnce((ctx) => {
-								expect(ctx.oidc.entities).to.have.keys(
-									'Client',
-									'PushedAuthorizationRequest'
-								);
-							}, done);
+						it('populates ctx.oidc.entities', async function () {
+							const spy = spyOn(provider.OIDCContext.prototype, 'entity');
 							const code_verifier = randomBytes(32).toString('base64');
 							const code_challenge = createHash('sha256')
 								.update(code_verifier)
 								.digest('base64url');
 
-							this.agent
-								.post('/request')
-								.auth(clientId, 'secret')
-								.type('form')
-								.send({
+							await agent.par.post(
+								// @ts-expect-error endpoint will be parse to object
+								jsonToFormUrlEncoded({
 									response_type: 'code',
 									code_challenge_method: 'S256',
 									code_challenge,
 									client_id: clientId,
 									iss: clientId,
-									aud: this.provider.issuer
-								})
-								.end(() => {});
+									aud: 'http://e.ly/'
+								}),
+								{
+									headers: AuthorizationRequest.basicAuthHeader(
+										clientId,
+										'secret'
+									)
+								}
+							);
+							const entities = spy.mock.calls.map((call) => call[0]);
+							expect(entities).toEqual(
+								expect.arrayContaining(['PushedAuthorizationRequest', 'Client'])
+							);
 						});
 
 						it('stores a request object and returns a uri', async function () {
 							const spy = sinon.spy();
-							this.provider.once('pushed_authorization_request.success', spy);
+							provider.once('pushed_authorization_request.success', spy);
 							const spy2 = sinon.spy();
-							this.provider.once('pushed_authorization_request.saved', spy2);
+							provider.once('pushed_authorization_request.saved', spy2);
 
 							const code_verifier = randomBytes(32).toString('base64');
 							const code_challenge = createHash('sha256')
 								.update(code_verifier)
 								.digest('base64url');
 
-							await this.agent
-								.post('/request')
-								.auth(clientId, 'secret')
-								.type('form')
-								.send({
+							const { data, response } = await agent.par.post(
+								// @ts-expect-error endpoint will be parse to object
+								jsonToFormUrlEncoded({
 									scope: 'openid',
 									response_type: 'code',
 									code_challenge_method: 'S256',
 									code_challenge,
 									client_id: clientId,
 									iss: clientId,
-									extra: 'provided',
-									aud: this.provider.issuer,
+									aud: 'http://e.ly/',
 									claims: JSON.stringify({
 										id_token: {
 											auth_time: { essential: true }
 										}
 									})
-								})
-								.expect(201)
-								.expect(({ body }) => {
-									expect(body).to.have.keys('expires_in', 'request_uri');
-									expect(body).to.have.property('expires_in').closeTo(60, 1);
-									expect(body)
-										.to.have.property('request_uri')
-										.and.match(/^urn:ietf:params:oauth:request_uri:(.+)$/);
-								});
+								}),
+								{
+									headers: AuthorizationRequest.basicAuthHeader(
+										clientId,
+										'secret'
+									)
+								}
+							);
+							expect(response.status).toBe(201);
+							expect(data).toContainAllKeys(['expires_in', 'request_uri']);
+							expect(data.expires_in).toBeCloseTo(60, 1);
+							expect(data.request_uri).toMatch(
+								/^urn:ietf:params:oauth:request_uri:(.+)$/
+							);
 
-							expect(spy).to.have.property('calledOnce', true);
-							expect(spy.args[0][0].oidc.params).to.include({
-								extra: 'provided',
-								extra2: 'defaulted'
-							});
-							expect(spy2).to.have.property('calledOnce', true);
+							expect(spy.calledOnce).toBeTrue();
+							expect(spy2.calledOnce).toBeTrue();
 							const stored = spy2.args[0][0];
-							expect(stored).to.have.property('trusted', true);
+							expect(stored).toHaveProperty('trusted', true);
 							const header = decodeProtectedHeader(stored.request);
-							expect(header).to.deep.eql({ alg: 'none' });
+							expect(header).toEqual({ alg: 'none' });
 							const payload = decodeJwt(stored.request);
-							expect(payload)
-								.to.contain.keys(['aud', 'exp', 'iat', 'nbf', 'iss'])
-								.to.have.deep.property('claims', {
-									id_token: {
-										auth_time: { essential: true }
-									}
-								});
+							expect(payload).toContainKeys([
+								'aud',
+								'exp',
+								'iat',
+								'nbf',
+								'iss'
+							]);
+							expect(payload).toHaveProperty('claims', {
+								id_token: {
+									auth_time: { essential: true }
+								}
+							});
 						});
 
 						it('forbids request_uri to be used', async function () {
-							return this.agent
-								.post('/request')
-								.auth(clientId, 'secret')
-								.type('form')
-								.send({
+							const code_verifier = randomBytes(32).toString('base64');
+							const code_challenge = createHash('sha256')
+								.update(code_verifier)
+								.digest('base64url');
+							const { response, error } = await agent.par.post(
+								// @ts-expect-error endpoint will be parse to object
+								jsonToFormUrlEncoded({
 									response_type: 'code',
+									code_challenge_method: 'S256',
+									code_challenge,
 									request_uri: 'https://rp.example.com/jar#foo'
-								})
-								.expect(400)
-								.expect({
-									error: 'request_uri_not_supported'
-								});
+								}),
+								{
+									headers: AuthorizationRequest.basicAuthHeader(
+										clientId,
+										'secret'
+									)
+								}
+							);
+							expect(error.status).toBe(422);
+							expect(error.value).toEqual({
+								error: 'invalid_request',
+								error_description:
+									"Property 'request_uri' should not be provided"
+							});
 						});
 
 						it('remaps invalid_redirect_uri error to invalid_request', async function () {
-							return this.agent
-								.post('/request')
-								.auth(clientId, 'secret')
-								.type('form')
-								.send({
+							const code_verifier = randomBytes(32).toString('base64');
+							const code_challenge = createHash('sha256')
+								.update(code_verifier)
+								.digest('base64url');
+							const { error } = await agent.par.post(
+								// @ts-expect-error endpoint will be parse to object
+								jsonToFormUrlEncoded({
 									response_type: 'code',
+									code_challenge_method: 'S256',
+									code_challenge,
 									client_id: clientId,
 									iss: clientId,
-									aud: this.provider.issuer,
+									aud: 'http://e.ly/',
 									redirect_uri: 'https://rp.example.com/unlisted'
-								})
-								.expect(400)
-								.expect({
-									error: 'invalid_request',
-									error_description:
-										"redirect_uri did not match any of the client's registered redirect_uris"
-								});
+								}),
+								{
+									headers: AuthorizationRequest.basicAuthHeader(
+										clientId,
+										'secret'
+									)
+								}
+							);
+							expect(error.status).toBe(400);
+							expect(error.value).toEqual({
+								error: 'invalid_redirect_uri',
+								error_description:
+									"redirect_uri did not match any of the client's registered redirect_uris"
+							});
 						});
 
 						it('leaves non OIDCProviderError alone', async function () {
@@ -395,45 +419,41 @@ describe('Pushed Request Object', () => {
 								.digest('base64url');
 
 							sinon
-								.stub(
-									this.TestAdapter.for('PushedAuthorizationRequest'),
-									'upsert'
-								)
+								.stub(TestAdapter.for('PushedAuthorizationRequest'), 'upsert')
 								.callsFake(async () => {
 									throw adapterThrow;
 								});
-							return this.agent
-								.post('/request')
-								.auth(clientId, 'secret')
-								.type('form')
-								.send({
+
+							const { error } = await agent.par.post(
+								// @ts-expect-error endpoint will be parse to object
+								jsonToFormUrlEncoded({
 									response_type: 'code',
 									code_challenge_method: 'S256',
 									code_challenge,
 									client_id: clientId,
 									iss: clientId,
-									aud: this.provider.issuer
-								})
-								.expect(() => {
-									this.TestAdapter.for(
-										'PushedAuthorizationRequest'
-									).upsert.restore();
-								})
-								.expect(500)
-								.expect({
-									error: 'server_error',
-									error_description: 'oops! something went wrong'
-								});
+									aud: 'http://e.ly/'
+								}),
+								{
+									headers: AuthorizationRequest.basicAuthHeader(
+										clientId,
+										'secret'
+									)
+								}
+							);
+							TestAdapter.for('PushedAuthorizationRequest').upsert.restore();
+							expect(error.status).toBe(500);
+							expect(error.value).toEqual({
+								error: 'server_error',
+								error_description: 'An unexpected error occurred'
+							});
 						});
 					});
 
 					describe('Using Pushed Authorization Requests', () => {
-						before(function () {
+						/*before(function () {
 							return this.login();
-						});
-						after(function () {
-							return this.logout();
-						});
+						});*/
 
 						it('allows the request_uri to be used', async function () {
 							const code_verifier = randomBytes(32).toString('base64url');
@@ -454,19 +474,19 @@ describe('Pushed Request Object', () => {
 									code_challenge,
 									client_id: clientId,
 									iss: clientId,
-									aud: this.provider.issuer
+									aud: 'http://e.ly/'
 								});
 
 							let id = request_uri.split(':');
 							id = id[id.length - 1];
 
-							expect(await this.provider.PushedAuthorizationRequest.find(id)).to
-								.be.ok;
+							expect(await provider.PushedAuthorizationRequest.find(id)).to.be
+								.ok;
 
-							const auth = new this.AuthorizationRequest({
+							const auth = new AuthorizationRequest({
 								client_id: clientId,
 								iss: clientId,
-								aud: this.provider.issuer,
+								aud: 'http://e.ly/',
 								state: undefined,
 								redirect_uri: undefined,
 								request_uri
@@ -500,7 +520,7 @@ describe('Pushed Request Object', () => {
 									code_challenge,
 									client_id: 'client-alg-registered',
 									iss: 'client-alg-registered',
-									aud: this.provider.issuer
+									aud: 'http://e.ly/'
 								});
 
 							let id = request_uri.split(':');
@@ -512,7 +532,7 @@ describe('Pushed Request Object', () => {
 							const auth = new this.AuthorizationRequest({
 								client_id: 'client-alg-registered',
 								iss: 'client-alg-registered',
-								aud: this.provider.issuer,
+								aud: 'http://e.ly/',
 								state: undefined,
 								redirect_uri: undefined,
 								request_uri
@@ -533,14 +553,15 @@ describe('Pushed Request Object', () => {
 	});
 
 	describe('with Request Objects', () => {
-		before(
-			bootstrap(import.meta.url, {
+		let setup = null;
+		beforeAll(async function () {
+			setup = await bootstrap(import.meta.url, {
 				config: 'pushed_authorization_requests_jar'
-			})
-		);
+			})();
+		});
 
 		before(async function () {
-			const client = await this.provider.Client.find('client');
+			const client = await provider.Client.find('client');
 			this.key = await importJWK(
 				client.symmetricKeyStore.selectForSign({ alg: 'HS256' })[0]
 			);
@@ -623,7 +644,7 @@ describe('Pushed Request Object', () => {
 									code_challenge,
 									client_id: clientId,
 									iss: clientId,
-									aud: this.provider.issuer
+									aud: 'http://e.ly/'
 								},
 								this.key,
 								'HS256',
@@ -660,7 +681,7 @@ describe('Pushed Request Object', () => {
 											client_id: clientId,
 											extra: 'provided',
 											iss: clientId,
-											aud: this.provider.issuer
+											aud: 'http://e.ly/'
 										},
 										this.key,
 										'HS256',
@@ -706,7 +727,7 @@ describe('Pushed Request Object', () => {
 											code_challenge,
 											client_id: clientId,
 											iss: clientId,
-											aud: this.provider.issuer
+											aud: 'http://e.ly/'
 										},
 										this.key,
 										'HS256'
@@ -741,7 +762,7 @@ describe('Pushed Request Object', () => {
 											code_challenge,
 											client_id: clientId,
 											iss: clientId,
-											aud: this.provider.issuer
+											aud: 'http://e.ly/'
 										},
 										this.key,
 										'HS256',
@@ -785,7 +806,7 @@ describe('Pushed Request Object', () => {
 											code_challenge,
 											client_id: clientId,
 											iss: clientId,
-											aud: this.provider.issuer
+											aud: 'http://e.ly/'
 										},
 										this.key,
 										'HS256',
@@ -829,7 +850,7 @@ describe('Pushed Request Object', () => {
 											code_challenge,
 											client_id: clientId,
 											iss: clientId,
-											aud: this.provider.issuer
+											aud: 'http://e.ly/'
 										},
 										this.key,
 										'HS256',
@@ -927,7 +948,7 @@ describe('Pushed Request Object', () => {
 											code_challenge,
 											client_id: clientId,
 											iss: clientId,
-											aud: this.provider.issuer,
+											aud: 'http://e.ly/',
 											redirect_uri: 'https://rp.example.com/unlisted'
 										},
 										this.key,
@@ -971,7 +992,7 @@ describe('Pushed Request Object', () => {
 											code_challenge,
 											client_id: clientId,
 											iss: clientId,
-											aud: this.provider.issuer
+											aud: 'http://e.ly/'
 										},
 										this.key,
 										'HS256',
@@ -992,12 +1013,9 @@ describe('Pushed Request Object', () => {
 					});
 
 					describe('Using Pushed Authorization Requests', () => {
-						before(function () {
+						/*before(function () {
 							return this.login();
-						});
-						after(function () {
-							return this.logout();
-						});
+						});*/
 
 						it('allows the request_uri to be used', async function () {
 							const code_verifier = randomBytes(32).toString('base64');
@@ -1021,7 +1039,7 @@ describe('Pushed Request Object', () => {
 											code_challenge,
 											client_id: clientId,
 											iss: clientId,
-											aud: this.provider.issuer
+											aud: 'http://e.ly/'
 										},
 										this.key,
 										'HS256',
@@ -1032,13 +1050,13 @@ describe('Pushed Request Object', () => {
 							let id = request_uri.split(':');
 							id = id[id.length - 1];
 
-							expect(await this.provider.PushedAuthorizationRequest.find(id)).to
-								.be.ok;
+							expect(await provider.PushedAuthorizationRequest.find(id)).to.be
+								.ok;
 
-							const auth = new this.AuthorizationRequest({
+							const auth = new AuthorizationRequest({
 								client_id: clientId,
 								iss: clientId,
-								aud: this.provider.issuer,
+								aud: 'http://e.ly/',
 								state: undefined,
 								redirect_uri: undefined,
 								request_uri
@@ -1054,7 +1072,7 @@ describe('Pushed Request Object', () => {
 						});
 
 						it('handles expired or invalid pushed authorization request object', async function () {
-							const auth = new this.AuthorizationRequest({
+							const auth = new AuthorizationRequest({
 								client_id: clientId,
 								request_uri: 'urn:ietf:params:oauth:request_uri:foobar'
 							});

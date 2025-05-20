@@ -25,34 +25,7 @@ export default async function checkClaims(ctx) {
 					'claims parameter should not be combined with response_type none'
 				);
 			}
-
-			let claims;
-
-			try {
-				claims = JSON.parse(params.claims);
-			} catch (err) {
-				throw new InvalidRequest('could not parse the claims parameter JSON');
-			}
-
-			if (!isPlainObject(claims)) {
-				throw new InvalidRequest('claims parameter should be a JSON object');
-			}
-
-			if (claims.userinfo === undefined && claims.id_token === undefined) {
-				throw new InvalidRequest(
-					'claims parameter should have userinfo or id_token properties'
-				);
-			}
-
-			if (claims.userinfo !== undefined && !isPlainObject(claims.userinfo)) {
-				throw new InvalidRequest('claims.userinfo should be an object');
-			}
-
-			if (claims.id_token !== undefined && !isPlainObject(claims.id_token)) {
-				throw new InvalidRequest('claims.id_token should be an object');
-			}
-
-			if (claims.userinfo && !userinfo.enabled) {
+			if (params.claims.userinfo && !userinfo.enabled) {
 				throw new InvalidRequest(
 					'claims.userinfo should not be used since userinfo endpoint is not supported'
 				);
@@ -60,7 +33,7 @@ export default async function checkClaims(ctx) {
 
 			await claimsParameter.assertClaimsParameter?.(
 				ctx,
-				claims,
+				params.claims,
 				ctx.oidc.client
 			);
 		}

@@ -42,16 +42,13 @@ import { noQueryDup } from 'lib/plugins/noQueryDup.js';
 import { contentType } from 'lib/plugins/contentType.js';
 import { authVerification } from './authVerification.js';
 
-const authorizationRequest = t.Composite(
-	[
-		t.Omit(
-			AuthorizationParameters,
-			['request_uri', 'request', 'client_id'],
-			t.Object({ client_id: t.Optional(t.String()) })
-		)
-	],
-	{ additionalProperties: false }
-);
+const authorizationRequest = t.Composite([
+	t.Omit(
+		AuthorizationParameters,
+		['request_uri', 'request', 'client_id'],
+		t.Object({ client_id: t.Optional(t.String()) })
+	)
+]);
 
 async function authorizationActionHandler(ctx) {
 	const allowList = new Set(PARAM_LIST);
@@ -143,16 +140,13 @@ export const authPost = new Elysia()
 export const par = new Elysia()
 	.derive(contentType('application/x-www-form-urlencoded'))
 	.guard({
-		body: t.Composite(
-			[
-				t.Omit(AuthorizationParameters, ['request_uri', 'client_id']),
-				t.Object({
-					client_id: t.Optional(t.String()),
-					client_secret: t.Optional(t.String())
-				})
-			],
-			{ additionalProperties: false }
-		),
+		body: t.Composite([
+			t.Omit(AuthorizationParameters, ['request_uri', 'client_id']),
+			t.Object({
+				client_id: t.Optional(t.String()),
+				client_secret: t.Optional(t.String())
+			})
+		]),
 		headers: t.Object({
 			authorization: t.Optional(t.String())
 		})
@@ -188,8 +182,8 @@ export const par = new Elysia()
 			const allowList = new Set(PARAM_LIST);
 			pushedAuthorizationRequestRemapErrors;
 			processRequestObject.bind(undefined, allowList);
-			checkResponseMode;
-			oneRedirectUriClients;
+			checkResponseMode(ctx);
+			oneRedirectUriClients(ctx);
 			checkResponseType(ctx);
 			oidcRequired(ctx);
 			checkPrompt(ctx);
@@ -202,5 +196,12 @@ export const par = new Elysia()
 			await checkIdTokenHint(ctx);
 			await checkDpopJkt(ctx);
 			return pushedAuthorizationRequestResponse(ctx);
+		},
+		{
+			detail: {
+				body: {
+					cleanup: false
+				}
+			}
 		}
 	);

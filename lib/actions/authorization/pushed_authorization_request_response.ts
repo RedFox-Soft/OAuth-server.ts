@@ -26,10 +26,6 @@ export default async function pushedAuthorizationRequestResponse(ctx) {
 		ttl = MAX_TTL;
 		const payload = { ...ctx.oidc.params };
 
-		if (payload.claims) {
-			payload.claims = JSON.parse(payload.claims);
-		}
-
 		if (payload.authorization_details) {
 			payload.authorization_details = JSON.parse(payload.authorization_details);
 		}

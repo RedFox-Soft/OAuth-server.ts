@@ -20,7 +20,7 @@ import { tokenAction } from './actions/token.js';
 import { ui } from './interactions/index.js';
 import { discovery } from './actions/discovery.js';
 
-export const elysia = new Elysia({ strictPath: true })
+export const elysia = new Elysia({ strictPath: true, normalize: false })
 	.onError(errorHandler)
 	.use(staticPlugin({ assets: 'dist' }))
 	.use(staticPlugin())
