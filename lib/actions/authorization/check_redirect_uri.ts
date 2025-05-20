@@ -5,7 +5,7 @@ function allowUnregisteredUri(ctx) {
 	const { pushedAuthorizationRequests } = instance(ctx.oidc.provider).features;
 
 	return (
-		(ctx.oidc.route === 'pushed_authorization_request' ||
+		(ctx.oidc.route === '/par' ||
 			'PushedAuthorizationRequest' in ctx.oidc.entities) &&
 		pushedAuthorizationRequests.allowUnregisteredRedirectUris &&
 		ctx.oidc.client.sectorIdentifierUri === undefined &&

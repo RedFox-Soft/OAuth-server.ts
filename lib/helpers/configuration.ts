@@ -9,6 +9,7 @@ import * as formatters from './formatters.ts';
 import getDefaults from './defaults.ts';
 import { STABLE, EXPERIMENTS } from './features.ts';
 import * as attention from './attention.ts';
+import { globalConfiguration } from 'lib/globalConfiguration.js';
 
 function featuresTypeErrorCheck({ features }) {
 	for (const value of Object.values(features)) {
@@ -63,10 +64,7 @@ class Configuration {
 		this.checkCibaDeliveryModes();
 		this.checkRichAuthorizationRequests();
 
-		delete this.cookies.long.maxAge;
-		delete this.cookies.long.expires;
-		delete this.cookies.short.maxAge;
-		delete this.cookies.short.expires;
+		merge(globalConfiguration, pick(this, ...Object.keys(this)));
 
 		// release #defaults
 		this.#defaults = undefined;

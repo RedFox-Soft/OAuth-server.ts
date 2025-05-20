@@ -57,15 +57,23 @@ const jwt = (token) => JSON.parse(base64url.decode(token.split('.')[1])).jti;
 
 export const agent = treaty(elysia, {
 	onRequest: (path, fetchInit) => {
-		if (
-			path === '/auth' &&
-			fetchInit.method === 'POST' &&
-			!fetchInit.body?.startsWith?.('{')
-		) {
+		if (fetchInit.method === 'POST' && !fetchInit.body?.startsWith?.('{')) {
 			fetchInit.headers['content-type'] = 'application/x-www-form-urlencoded';
 		}
 	}
 });
+
+export function jsonToFormUrlEncoded(json: Record<string, unknown>) {
+	const searchParams = new URLSearchParams();
+	for (const [key, value] of Object.entries(json)) {
+		if (Array.isArray(value)) {
+			value.forEach((v) => searchParams.append(key, v));
+		} else {
+			searchParams.append(key, String(value));
+		}
+	}
+	return searchParams.toString();
+}
 
 export default function testHelper(
 	importMetaUrl,

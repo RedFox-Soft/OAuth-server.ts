@@ -42,12 +42,23 @@ import { noQueryDup } from 'lib/plugins/noQueryDup.js';
 import { contentType } from 'lib/plugins/contentType.js';
 import { authVerification } from './authVerification.js';
 
+const authorizationRequest = t.Composite(
+	[
+		t.Omit(
+			AuthorizationParameters,
+			['request_uri', 'request', 'client_id'],
+			t.Object({ client_id: t.Optional(t.String()) })
+		)
+	],
+	{ additionalProperties: false }
+);
+
 async function authorizationActionHandler(ctx) {
 	const allowList = new Set(PARAM_LIST);
 	const setCookies = await sessionHandler(ctx);
 	await checkClient(ctx);
 	await loadPushedAuthorizationRequest(ctx);
-	processRequestObject.bind(undefined, allowList);
+	await processRequestObject(authorizationRequest, ctx);
 	checkResponseMode(ctx);
 	oneRedirectUriClients(ctx);
 	checkResponseType(ctx);
@@ -151,14 +162,15 @@ export const par = new Elysia()
 	})
 	.post(
 		routeNames.pushed_authorization_request,
-		async ({ body, route, request }) => {
+		async ({ body, route, request, headers }) => {
 			const url = new URL(request.url);
 			url.search = '';
 			url.pathname = url.pathname.replace(route, '');
 
 			const ctx = {
 				baseUrl: url.toString(),
-				_matchedRouteName: route
+				_matchedRouteName: route,
+				headers
 			};
 			const OIDCContext = provider.OIDCContext;
 			ctx.oidc = new OIDCContext(ctx);
@@ -167,27 +179,28 @@ export const par = new Elysia()
 
 			const { params: authParams, middleware: tokenAuth } =
 				getTokenAuth(provider);
-			tokenAuth.forEach((tokenAuthMiddleware) => {
-				tokenAuthMiddleware;
-			});
+			for (const middleware of tokenAuth) {
+				await middleware(ctx, () => {});
+			}
 
 			stripOutsideJarParams;
 
+			const allowList = new Set(PARAM_LIST);
 			pushedAuthorizationRequestRemapErrors;
 			processRequestObject.bind(undefined, allowList);
 			checkResponseMode;
 			oneRedirectUriClients;
-			checkResponseType;
-			oidcRequired;
-			checkPrompt;
-			checkScope.bind(undefined, allowList);
-			checkOpenidScope;
-			checkRedirectUri;
-			checkClaims;
-			checkRar;
-			checkResource;
-			checkIdTokenHint;
-			checkDpopJkt;
-			pushedAuthorizationRequestResponse;
+			checkResponseType(ctx);
+			oidcRequired(ctx);
+			checkPrompt(ctx);
+			checkScope(allowList, ctx);
+			checkOpenidScope(ctx);
+			checkRedirectUri(ctx);
+			await checkClaims(ctx);
+			await checkRar(ctx);
+			await checkResource(ctx);
+			await checkIdTokenHint(ctx);
+			await checkDpopJkt(ctx);
+			return pushedAuthorizationRequestResponse(ctx);
 		}
 	);

@@ -3,7 +3,7 @@ import { t } from 'elysia';
 export const AuthorizationParameters = t.Object(
 	{
 		client_id: t.String(),
-		redirect_uri: t.Optional(t.String()),
+		redirect_uri: t.Optional(t.String({ format: 'uri' })),
 		response_type: t.Union([t.Literal('code'), t.Literal('none')], {
 			error: "Property 'response_type' should be one of: 'code', 'none'"
 		}),
@@ -34,7 +34,15 @@ export const AuthorizationParameters = t.Object(
 
 		// added conditionally depending on feature flag which will be checked in the code
 		web_message_uri: t.Optional(t.String()),
-		claims: t.Optional(t.Object({})),
+		claims: t.Optional(
+			t.Object(
+				{
+					id_token: t.Optional(t.Object({})),
+					userinfo: t.Optional(t.Object({}))
+				},
+				{ additionalProperties: false }
+			)
+		),
 		resource: t.Optional(t.Array(t.String())),
 		authorization_details: t.Optional(t.Array(t.Object({}))),
 		dpop_jkt: t.Optional(t.String())

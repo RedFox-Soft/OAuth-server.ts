@@ -1,13 +1,22 @@
 import { randomBytes, createHash } from 'node:crypto';
 import { parse as parseUrl } from 'node:url';
 
-import { describe, it, beforeAll, afterEach, expect } from 'bun:test';
+import {
+	describe,
+	it,
+	beforeAll,
+	afterEach,
+	expect,
+	beforeEach
+} from 'bun:test';
 import sinon from 'sinon';
 import { importJWK, decodeProtectedHeader, decodeJwt } from 'jose';
 
 import * as JWT from '../../lib/helpers/jwt.ts';
-import bootstrap, { agent } from '../test_helper.js';
+import bootstrap, { agent, jsonToFormUrlEncoded } from '../test_helper.js';
 import { provider } from 'lib/provider.js';
+import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
+import { TestAdapter } from 'test/models.js';
 
 describe('Pushed Request Object', () => {
 	describe('w/o Request Objects', () => {
@@ -58,23 +67,18 @@ describe('Pushed Request Object', () => {
 				clientId === 'client-par-required';
 
 			describe('allowUnregisteredRedirectUris', () => {
-				before(function () {
+				beforeEach(function () {
 					i(
-						this.provider
+						provider
 					).features.pushedAuthorizationRequests.allowUnregisteredRedirectUris =
 						true;
+					return setup.login();
 				});
-				after(function () {
+				afterEach(function () {
 					i(
-						this.provider
+						provider
 					).features.pushedAuthorizationRequests.allowUnregisteredRedirectUris =
 						false;
-				});
-				before(function () {
-					return this.login();
-				});
-				after(function () {
-					return this.logout();
 				});
 
 				it('allows unregistered redirect_uris to be used', async function () {
@@ -83,71 +87,75 @@ describe('Pushed Request Object', () => {
 						.update(code_verifier)
 						.digest('base64url');
 
-					const {
-						body: { request_uri }
-					} = await this.agent
-						.post('/request')
-						.auth(clientId, 'secret')
-						.type('form')
-						.send({
+					const par = await agent.par.post(
+						// @ts-expect-error endpoint will be parse to object
+						jsonToFormUrlEncoded({
 							scope: 'openid',
 							response_type: 'code',
 							code_challenge_method: 'S256',
 							code_challenge,
 							client_id: clientId,
 							iss: clientId,
-							aud: this.provider.issuer,
+							aud: 'http://e.ly/',
 							redirect_uri: 'https://rp.example.com/unlisted'
-						})
-						.expect(201);
+						}),
+						{
+							headers: AuthorizationRequest.basicAuthHeader(clientId, 'secret')
+						}
+					);
+					expect(par.response.status).toBe(201);
+					const { request_uri } = par.data;
 
 					let id = request_uri.split(':');
 					id = id[id.length - 1];
 
 					const { request } =
-						await this.provider.PushedAuthorizationRequest.find(id);
-					expect(decodeJwt(request)).to.have.property(
+						await provider.PushedAuthorizationRequest.find(id);
+					expect(decodeJwt(request)).toHaveProperty(
 						'redirect_uri',
 						'https://rp.example.com/unlisted'
 					);
 
-					const auth = new this.AuthorizationRequest({
+					const auth = new AuthorizationRequest({
 						client_id: clientId,
 						iss: clientId,
-						aud: this.provider.issuer,
-						state: undefined,
-						redirect_uri: undefined,
+						aud: 'http://e.ly/',
 						request_uri
 					});
+					delete auth.params.redirect_uri;
+					delete auth.params.state;
 
-					let code;
-					await this.wrap({ route: '/auth', verb: 'get', auth })
-						.expect(303)
-						.expect(auth.validatePresence(['code']))
-						.expect((response) => {
-							({
-								query: { code }
-							} = parseUrl(response.headers.location, true));
-							const jti = this.getTokenJti(code);
-							expect(
-								this.TestAdapter.for('AuthorizationCode').syncFind(jti)
-							).to.have.property(
-								'redirectUri',
-								'https://rp.example.com/unlisted'
-							);
-						});
+					const cookie = await setup.login();
+					const authGet = await agent.auth.get({
+						query: auth.params,
+						headers: {
+							cookie
+						}
+					});
 
-					return this.agent
-						.post('/token')
-						.auth(clientId, 'secret')
-						.type('form')
-						.send({
+					expect(authGet.response.status).toBe(303);
+					auth.validatePresence(authGet.response, ['code']);
+					const {
+						query: { code }
+					} = parseUrl(authGet.response.headers.get('location'), true);
+					const jti = setup.getTokenJti(code);
+					expect(
+						TestAdapter.for('AuthorizationCode').syncFind(jti)
+					).toHaveProperty('redirectUri', 'https://rp.example.com/unlisted');
+
+					const { response, error } = await agent.token.post(
+						// @ts-expect-error endpoint will be parse to object
+						jsonToFormUrlEncoded({
 							code,
 							code_verifier,
 							grant_type: 'authorization_code',
 							redirect_uri: 'https://rp.example.com/unlisted'
-						})
-						.expect(200);
+						}),
+						{
+							headers: auth.basicAuthHeader
+						}
+					);
+					expect(response.status).toBe(200);
 				});
 
 				it('except for public clients', async function () {
@@ -157,24 +165,31 @@ describe('Pushed Request Object', () => {
 						.update(code_verifier)
 						.digest('base64url');
 
-					return this.agent
-						.post('/request')
-						.type('form')
-						.send({
+					const { error } = await agent.par.post(
+						// @ts-expect-error endpoint will be parse to object
+						jsonToFormUrlEncoded({
 							response_type: 'code',
 							code_challenge_method: 'S256',
 							code_challenge,
 							client_id: testClientId,
 							iss: testClientId,
-							aud: this.provider.issuer,
+							aud: 'http://e.ly/',
 							redirect_uri: 'https://rp.example.com/unlisted'
-						})
-						.expect(400)
-						.expect({
-							error: 'invalid_request',
-							error_description:
-								"redirect_uri did not match any of the client's registered redirect_uris"
-						});
+						}),
+						{
+							headers: AuthorizationRequest.basicAuthHeader(
+								testClientId,
+								'secret'
+							)
+						}
+					);
+					expect(error.status).toBe(400);
+
+					expect(error.value).toEqual({
+						error: 'invalid_redirect_uri',
+						error_description:
+							"redirect_uri did not match any of the client's registered redirect_uris"
+					});
 				});
 
 				it('still validates the URI to be valid redirect_uri', async function () {
@@ -184,46 +199,50 @@ describe('Pushed Request Object', () => {
 						.digest('base64url');
 
 					// must only contain valid uris
-					await this.agent
-						.post('/request')
-						.auth(clientId, 'secret')
-						.type('form')
-						.send({
+					const par = await agent.par.post(
+						// @ts-expect-error endpoint will be parse to object
+						jsonToFormUrlEncoded({
 							scope: 'openid',
 							response_type: 'code',
 							code_challenge_method: 'S256',
 							code_challenge,
 							client_id: clientId,
 							iss: clientId,
-							aud: this.provider.issuer,
+							aud: 'http://e.ly/',
 							redirect_uri: 'not-a-valid-uri'
-						})
-						.expect(400)
-						.expect({
-							error: 'invalid_request',
-							error_description: 'redirect_uri must only contain valid uris'
-						});
+						}),
+						{
+							headers: AuthorizationRequest.basicAuthHeader(clientId, 'secret')
+						}
+					);
+					expect(par.response.status).toBe(422);
+					expect(par.error.value).toEqual({
+						error: 'invalid_request',
+						error_description: "Property 'redirect_uri' should be uri"
+					});
 
 					// must not contain fragments
-					await this.agent
-						.post('/request')
-						.auth(clientId, 'secret')
-						.type('form')
-						.send({
+					const { error } = await agent.par.post(
+						// @ts-expect-error endpoint will be parse to object
+						jsonToFormUrlEncoded({
 							scope: 'openid',
 							response_type: 'code',
 							code_challenge_method: 'S256',
 							code_challenge,
 							client_id: clientId,
 							iss: clientId,
-							aud: this.provider.issuer,
+							aud: 'http://e.ly/',
 							redirect_uri: 'https://rp.example.com/unlisted#fragment'
-						})
-						.expect(400)
-						.expect({
-							error: 'invalid_request',
-							error_description: 'redirect_uri must not contain fragments'
-						});
+						}),
+						{
+							headers: AuthorizationRequest.basicAuthHeader(clientId, 'secret')
+						}
+					);
+					expect(error.status).toBe(400);
+					expect(error.value).toEqual({
+						error: 'invalid_request',
+						error_description: 'redirect_uri must not contain fragments'
+					});
 				});
 			});
 
@@ -513,7 +532,7 @@ describe('Pushed Request Object', () => {
 		});
 	});
 
-	context('with Request Objects', () => {
+	describe('with Request Objects', () => {
 		before(
 			bootstrap(import.meta.url, {
 				config: 'pushed_authorization_requests_jar'

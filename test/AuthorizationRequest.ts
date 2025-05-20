@@ -64,8 +64,12 @@ export class AuthorizationRequest {
 		}
 
 		const { client_secret } = this.client;
+		return AuthorizationRequest.basicAuthHeader(this.client_id, client_secret);
+	}
+
+	static basicAuthHeader(client_id, client_secret) {
 		return {
-			Authorization: `Basic ${base64url.encode(`${this.client_id}:${client_secret}`)}`
+			Authorization: `Basic ${base64url.encode(`${client_id}:${client_secret}`)}`
 		};
 	}
 

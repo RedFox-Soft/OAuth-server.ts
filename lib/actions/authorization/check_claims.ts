@@ -13,7 +13,7 @@ import isPlainObject from '../../helpers/_/is_plain_object.ts';
  *
  * Merges requested claims with acr as requested if acr_values is provided
  */
-export default async function checkClaims(ctx, next) {
+export default async function checkClaims(ctx) {
 	const { params } = ctx.oidc;
 
 	if (params.claims !== undefined) {
@@ -65,6 +65,4 @@ export default async function checkClaims(ctx, next) {
 			);
 		}
 	}
-
-	return next();
 }

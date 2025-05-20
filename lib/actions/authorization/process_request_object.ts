@@ -5,18 +5,14 @@ import {
 	InvalidRequestObject,
 	OIDCProviderError
 } from '../../helpers/errors.ts';
-import isPlainObject from '../../helpers/_/is_plain_object.ts';
+import { TSchema } from 'elysia';
+import { Value } from '@sinclair/typebox/value';
 
 /*
  * Decrypts and validates the content of provided request parameter and replaces the parameters
  * provided via OAuth2.0 authorization request with these
  */
-export default async function processRequestObject(
-	PARAM_LIST,
-	rejectDupesMiddleware,
-	ctx,
-	next
-) {
+export default async function processRequestObject(schema: TSchema, ctx) {
 	const { params, client, route } = ctx.oidc;
 
 	const pushedRequestObject = 'PushedAuthorizationRequest' in ctx.oidc.entities;
@@ -41,7 +37,7 @@ export default async function processRequestObject(
 	}
 
 	if (params.request === undefined) {
-		return next();
+		return;
 	}
 
 	let trusted = false; // signed or encrypted by client confidential material
@@ -115,25 +111,8 @@ export default async function processRequestObject(
 		header: { alg }
 	} = decoded;
 
-	const request = Object.entries(payload).reduce((acc, [key, value]) => {
-		if (PARAM_LIST.has(key)) {
-			if (key === 'claims' && isPlainObject(value)) {
-				acc[key] = JSON.stringify(value);
-			} else if (key === 'authorization_details' && Array.isArray(value)) {
-				acc[key] = JSON.stringify(value);
-			} else if (Array.isArray(value)) {
-				acc[key] = value;
-			} else if (typeof value !== 'string') {
-				acc[key] = String(value);
-			} else {
-				acc[key] = value;
-			}
-		}
-
-		return acc;
-	}, {});
-
-	rejectDupesMiddleware({ oidc: { params: request } }, () => {});
+	Value.Check(schema, payload);
+	const request = payload;
 
 	const original = {};
 	for (const param of ['state', 'response_mode', 'response_type']) {
@@ -272,6 +251,4 @@ export default async function processRequestObject(
 		params.dpop_jkt = ctx.oidc.entities.PushedAuthorizationRequest.dpopJkt;
 		ctx.oidc.trusted?.push('dpop_jkt');
 	}
-
-	return next();
 }

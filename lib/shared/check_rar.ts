@@ -5,7 +5,7 @@ import {
 import instance from '../helpers/weak_cache.ts';
 import isPlainObject from '../helpers/_/is_plain_object.ts';
 
-export default async function checkRar(ctx, next) {
+export default async function checkRar(ctx) {
 	const { params, client } = ctx.oidc;
 
 	if (params.authorization_details !== undefined) {
@@ -40,7 +40,7 @@ export default async function checkRar(ctx, next) {
 
 			if (!details.length) {
 				params.authorization_details = undefined;
-				return next();
+				return;
 			}
 
 			let i = 0;
@@ -105,6 +105,4 @@ export default async function checkRar(ctx, next) {
 			}
 		}
 	}
-
-	return next();
 }

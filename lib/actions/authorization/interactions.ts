@@ -94,7 +94,6 @@ export default async function interactions(resumeRouteName, ctx) {
 		if (oidc.promptPending('none')) {
 			const className = upperFirst(camelCase(failedCheck.error));
 			if (errors[className]) {
-				console.log(className);
 				throw new errors[className](failedCheck.error_description);
 			}
 			throw new errors.CustomOIDCProviderError(

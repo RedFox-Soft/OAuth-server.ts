@@ -3,7 +3,6 @@ import type { Context } from 'elysia';
 
 export const contentType = (allowType = 'application/json') => {
 	return ({ request }: Context) => {
-		console.log('Method', request.method);
 		const contentType = request.headers.get('content-type') || '';
 		if (!contentType.includes(allowType)) {
 			const error = new InvalidRequest(

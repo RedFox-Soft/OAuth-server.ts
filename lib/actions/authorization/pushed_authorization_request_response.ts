@@ -55,14 +55,18 @@ export default async function pushedAuthorizationRequestResponse(ctx) {
 
 	ctx.oidc.entity('PushedAuthorizationRequest', requestObject);
 
-	ctx.status = 201;
-	ctx.body = {
-		expires_in: ttl,
-		request_uri: `${PUSHED_REQUEST_URN}${id}`
-	};
 	ctx.oidc.provider.emit(
 		'pushed_authorization_request.success',
 		ctx,
 		ctx.oidc.client
+	);
+	return new Response(
+		JSON.stringify({
+			expires_in: ttl,
+			request_uri: `${PUSHED_REQUEST_URN}${id}`
+		}),
+		{
+			status: 201
+		}
 	);
 }

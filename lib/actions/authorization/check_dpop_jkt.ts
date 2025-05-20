@@ -7,7 +7,7 @@ import instance from '../../helpers/weak_cache.ts';
  * Validates dpop_jkt equals the used DPoP proof thumbprint
  * when provided, otherwise defaults dpop_jkt to it.
  */
-export default async function checkDpopJkt(ctx, next) {
+export default async function checkDpopJkt(ctx) {
 	const { params } = ctx.oidc;
 
 	const dPoP = await dpopValidate(ctx);
@@ -32,6 +32,4 @@ export default async function checkDpopJkt(ctx, next) {
 			params.dpop_jkt = dPoP.thumbprint;
 		}
 	}
-
-	return next();
 }

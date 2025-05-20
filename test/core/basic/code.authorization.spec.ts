@@ -12,7 +12,7 @@ import {
 
 import sinon from 'sinon';
 
-import bootstrap, { agent } from '../../test_helper.js';
+import bootstrap, { agent, jsonToFormUrlEncoded } from '../../test_helper.js';
 import epochTime from '../../../lib/helpers/epoch_time.ts';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { provider } from 'lib/provider.js';
@@ -44,16 +44,8 @@ describe('BASIC code', () => {
 				});
 			}
 
-			const searchParams = new URLSearchParams();
-			for (const [key, value] of Object.entries(auth.params)) {
-				if (Array.isArray(value)) {
-					value.forEach((v) => searchParams.append(key, v));
-				} else {
-					searchParams.append(key, String(value));
-				}
-			}
-
-			return agent.auth.post(searchParams.toString(), {
+			// @ts-expect-error string will be converted to form url encoded
+			return agent.auth.post(jsonToFormUrlEncoded(auth.params), {
 				headers: {
 					cookie,
 					accept

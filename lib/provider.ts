@@ -15,6 +15,7 @@ import { OIDCProviderError } from './helpers/errors.ts';
 import * as models from './models/index.ts';
 import DPoPNonces from './helpers/dpop_nonces.ts';
 import als from './helpers/als.ts';
+import { globalConfiguration } from './globalConfiguration.js';
 
 class ProviderClass extends EventEmitter {
 	#AccessToken;
@@ -67,8 +68,8 @@ class ProviderClass extends EventEmitter {
 
 		instance.set(this, this.#int);
 
-		this.#int.configuration = configuration;
-		this.#int.features = configuration.features;
+		this.#int.configuration = globalConfiguration;
+		this.#int.features = globalConfiguration.features;
 
 		if (configuration.features.dPoP.nonceSecret !== undefined) {
 			this.#int.DPoPNonces = new DPoPNonces(

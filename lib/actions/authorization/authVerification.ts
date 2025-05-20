@@ -52,7 +52,7 @@ export function authVerification(params: auth) {
 		throw new NotSupportedError('Request Object is not supported');
 	} else if (
 		params.request_uri !== undefined &&
-		pushedAuthorizationRequests.enabled
+		!pushedAuthorizationRequests.enabled
 	) {
 		// For Authorization endpoint only
 		throw new NotSupportedError('Request URI is not supported');

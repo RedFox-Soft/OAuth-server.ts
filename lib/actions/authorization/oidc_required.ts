@@ -5,7 +5,7 @@ import presence from '../../helpers/validate_presence.ts';
  * are used.
  * Validates that openid scope is present is OpenID Connect specific parameters are provided.
  */
-export default function oidcRequired(ctx, next) {
+export default function oidcRequired(ctx) {
 	const required = new Set(['redirect_uri']);
 
 	// TODO: move this to a new helper function
@@ -14,6 +14,4 @@ export default function oidcRequired(ctx, next) {
 	}
 
 	presence(ctx, ...required);
-
-	return next();
 }
