@@ -3,9 +3,11 @@ import { t } from 'elysia';
 export const AuthorizationParameters = t.Object({
 	client_id: t.String(),
 	redirect_uri: t.Optional(t.String({ format: 'uri' })),
-	response_type: t.Union([t.Literal('code'), t.Literal('none')], {
-		error: "Property 'response_type' should be one of: 'code', 'none'"
-	}),
+	response_type: t.Optional(
+		t.Union([t.Literal('code'), t.Literal('none')], {
+			error: "Property 'response_type' should be one of: 'code', 'none'"
+		})
+	),
 
 	state: t.Optional(t.String()),
 	claims_locales: t.Optional(t.Array(t.String())),

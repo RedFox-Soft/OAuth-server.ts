@@ -144,7 +144,6 @@ async function authorizationErrorHandler({
 	if (!instance(provider).responseModes.has(mode)) {
 		mode = 'query';
 	}
-	console.log('mode', mode);
 	const handler = instance(provider).responseModes.get(mode);
 	return await handler({}, redirectObj.redirect_uri, out);
 }

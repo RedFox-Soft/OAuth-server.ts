@@ -6,7 +6,7 @@ import constantEquals from './constant_equals.ts';
 export function authorizationPKCE(params: {
 	code_challenge?: string | undefined;
 	code_challenge_method?: string | undefined;
-	response_type: string;
+	response_type?: string;
 }) {
 	if (params.response_type !== 'code') {
 		return;

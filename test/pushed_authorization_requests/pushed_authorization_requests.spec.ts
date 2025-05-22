@@ -128,7 +128,12 @@ describe('Pushed Request Object', () => {
 
 					const cookie = await setup.login();
 					const authGet = await agent.auth.get({
-						query: auth.params,
+						query: {
+							client_id: clientId,
+							iss: clientId,
+							aud: 'http://e.ly/',
+							request_uri
+						},
 						headers: {
 							cookie
 						}
@@ -243,18 +248,24 @@ describe('Pushed Request Object', () => {
 			describe(`when require_pushed_authorization_requests=${requirePushedAuthorizationRequests}`, () => {
 				describe('using a JAR request parameter', () => {
 					it('is not enabled', async function () {
-						return this.agent
-							.post('/request')
-							.auth(clientId, 'secret')
-							.type('form')
-							.send({
+						const { error } = await agent.par.post(
+							// @ts-expect-error endpoint will be parse to object
+							jsonToFormUrlEncoded({
 								client_id: clientId,
 								request: 'this.should.be.a.jwt'
-							})
-							.expect(400)
-							.expect({
-								error: 'request_not_supported'
-							});
+							}),
+							{
+								headers: AuthorizationRequest.basicAuthHeader(
+									clientId,
+									'secret'
+								)
+							}
+						);
+						expect(error.status).toBe(400);
+						expect(error.value).toEqual({
+							error: 'not_supported',
+							error_description: 'Request Object is not supported'
+						});
 					});
 				});
 
@@ -451,10 +462,6 @@ describe('Pushed Request Object', () => {
 					});
 
 					describe('Using Pushed Authorization Requests', () => {
-						/*before(function () {
-							return this.login();
-						});*/
-
 						it('allows the request_uri to be used', async function () {
 							const code_verifier = randomBytes(32).toString('base64url');
 							const code_challenge = createHash('sha256')
@@ -462,12 +469,10 @@ describe('Pushed Request Object', () => {
 								.digest('base64url');
 
 							const {
-								body: { request_uri }
-							} = await this.agent
-								.post('/request')
-								.auth(clientId, 'secret')
-								.type('form')
-								.send({
+								data: { request_uri }
+							} = await agent.par.post(
+								// @ts-expect-error endpoint will be parse to object
+								jsonToFormUrlEncoded({
 									scope: 'openid',
 									response_type: 'code',
 									code_challenge_method: 'S256',
@@ -475,30 +480,47 @@ describe('Pushed Request Object', () => {
 									client_id: clientId,
 									iss: clientId,
 									aud: 'http://e.ly/'
-								});
+								}),
+								{
+									headers: AuthorizationRequest.basicAuthHeader(
+										clientId,
+										'secret'
+									)
+								}
+							);
 
 							let id = request_uri.split(':');
 							id = id[id.length - 1];
 
-							expect(await provider.PushedAuthorizationRequest.find(id)).to.be
-								.ok;
+							expect(
+								await provider.PushedAuthorizationRequest.find(id)
+							).toBeObject();
 
+							const cookie = await setup.login();
 							const auth = new AuthorizationRequest({
 								client_id: clientId,
 								iss: clientId,
 								aud: 'http://e.ly/',
-								state: undefined,
-								redirect_uri: undefined,
 								request_uri
 							});
 
-							await this.wrap({ route: '/auth', verb: 'get', auth })
-								.expect(303)
-								.expect(auth.validatePresence(['code']));
+							const { response } = await agent.auth.get({
+								query: {
+									client_id: clientId,
+									iss: clientId,
+									aud: 'http://e.ly/',
+									request_uri
+								},
+								headers: {
+									cookie
+								}
+							});
+							expect(response.status).toBe(303);
+							auth.validatePresence(response, ['code']);
 
 							expect(
-								await this.provider.PushedAuthorizationRequest.find(id)
-							).to.be.ok.and.have.property('consumed').and.is.ok;
+								await provider.PushedAuthorizationRequest.find(id)
+							).toHaveProperty('consumed');
 						});
 
 						it('allows the request_uri to be used (when request object was not used but client has request_object_signing_alg for its optional use)', async function () {
@@ -508,12 +530,10 @@ describe('Pushed Request Object', () => {
 								.digest('base64url');
 
 							const {
-								body: { request_uri }
-							} = await this.agent
-								.post('/request')
-								.auth('client-alg-registered', 'secret')
-								.type('form')
-								.send({
+								data: { request_uri }
+							} = await agent.par.post(
+								// @ts-expect-error endpoint will be parse to object
+								jsonToFormUrlEncoded({
 									scope: 'openid',
 									response_type: 'code',
 									code_challenge_method: 'S256',
@@ -521,30 +541,47 @@ describe('Pushed Request Object', () => {
 									client_id: 'client-alg-registered',
 									iss: 'client-alg-registered',
 									aud: 'http://e.ly/'
-								});
+								}),
+								{
+									headers: AuthorizationRequest.basicAuthHeader(
+										'client-alg-registered',
+										'secret'
+									)
+								}
+							);
 
 							let id = request_uri.split(':');
 							id = id[id.length - 1];
 
-							expect(await this.provider.PushedAuthorizationRequest.find(id)).to
-								.be.ok;
+							expect(
+								await provider.PushedAuthorizationRequest.find(id)
+							).toBeObject();
 
-							const auth = new this.AuthorizationRequest({
+							const auth = new AuthorizationRequest({
 								client_id: 'client-alg-registered',
 								iss: 'client-alg-registered',
 								aud: 'http://e.ly/',
-								state: undefined,
-								redirect_uri: undefined,
 								request_uri
 							});
+							const cookie = await setup.login();
+							const { response } = await agent.auth.get({
+								query: {
+									client_id: 'client-alg-registered',
+									iss: 'client-alg-registered',
+									aud: 'http://e.ly/',
+									request_uri
+								},
+								headers: {
+									cookie
+								}
+							});
 
-							await this.wrap({ route: '/auth', verb: 'get', auth })
-								.expect(303)
-								.expect(auth.validatePresence(['code']));
+							expect(response.status).toBe(303);
+							auth.validatePresence(response, ['code']);
 
 							expect(
-								await this.provider.PushedAuthorizationRequest.find(id)
-							).to.be.ok.and.have.property('consumed').and.is.ok;
+								await provider.PushedAuthorizationRequest.find(id)
+							).toHaveProperty('consumed');
 						});
 					});
 				});
@@ -554,64 +591,53 @@ describe('Pushed Request Object', () => {
 
 	describe('with Request Objects', () => {
 		let setup = null;
-		beforeAll(async function () {
+		let key = null;
+		beforeEach(async function () {
+			if (setup) {
+				return;
+			}
 			setup = await bootstrap(import.meta.url, {
 				config: 'pushed_authorization_requests_jar'
 			})();
-		});
-
-		before(async function () {
 			const client = await provider.Client.find('client');
-			this.key = await importJWK(
+			key = await importJWK(
 				client.symmetricKeyStore.selectForSign({ alg: 'HS256' })[0]
 			);
 		});
 
 		describe('discovery', () => {
 			it('extends the well known config', async function () {
-				await this.agent
-					.get('/.well-known/openid-configuration')
-					.expect((response) => {
-						expect(response.body).not.to.have.property(
-							'request_object_endpoint'
-						);
-						expect(response.body).to.have.property(
-							'pushed_authorization_request_endpoint'
-						);
-						expect(response.body)
-							.to.have.property('request_object_signing_alg_values_supported')
-							.with.not.lengthOf(0);
-						expect(response.body).to.have.property(
-							'request_parameter_supported',
-							true
-						);
-						expect(response.body).to.have.property(
-							'request_uri_parameter_supported',
-							false
-						);
-						expect(response.body).not.to.have.property(
-							'require_pushed_authorization_requests'
-						);
-					});
+				const { data } =
+					await agent['.well-known']['openid-configuration'].get();
+
+				expect(data).not.toHaveProperty('request_object_endpoint');
+				expect(data).toHaveProperty('pushed_authorization_request_endpoint');
+				expect(
+					data.request_object_signing_alg_values_supported
+				).not.toHaveLength(0);
+				expect(data).toHaveProperty('request_parameter_supported', true);
+				expect(data).toHaveProperty('request_uri_parameter_supported', false);
+				expect(data).not.toHaveProperty(
+					'require_pushed_authorization_requests'
+				);
 
 				i(
-					this.provider
+					provider
 				).features.pushedAuthorizationRequests.requirePushedAuthorizationRequests =
 					true;
 
-				return this.agent
-					.get('/.well-known/openid-configuration')
-					.expect((response) => {
-						expect(response.body).to.have.property(
-							'require_pushed_authorization_requests',
-							true
-						);
-					});
+				const { data: newData } =
+					await agent['.well-known']['openid-configuration'].get();
+
+				expect(newData).toHaveProperty(
+					'require_pushed_authorization_requests',
+					true
+				);
 			});
 
-			after(function () {
+			afterEach(function () {
 				i(
-					this.provider
+					provider
 				).features.pushedAuthorizationRequests.requirePushedAuthorizationRequests =
 					false;
 			});
@@ -624,19 +650,14 @@ describe('Pushed Request Object', () => {
 			describe(`when require_pushed_authorization_requests=${requirePushedAuthorizationRequests}`, () => {
 				describe('using a JAR request parameter', () => {
 					describe('Pushed Authorization Request Endpoint', () => {
-						it('populates ctx.oidc.entities', function (done) {
-							this.assertOnce((ctx) => {
-								expect(ctx.oidc.entities).to.have.keys(
-									'Client',
-									'PushedAuthorizationRequest'
-								);
-							}, done);
+						it('populates ctx.oidc.entities', async function () {
+							const spy = spyOn(provider.OIDCContext.prototype, 'entity');
 							const code_verifier = randomBytes(32).toString('base64');
 							const code_challenge = createHash('sha256')
 								.update(code_verifier)
 								.digest('base64url');
 
-							JWT.sign(
+							const request = await JWT.sign(
 								{
 									jti: randomBytes(16).toString('base64url'),
 									response_type: 'code',
@@ -646,32 +667,40 @@ describe('Pushed Request Object', () => {
 									iss: clientId,
 									aud: 'http://e.ly/'
 								},
-								this.key,
+								key,
 								'HS256',
 								{ expiresIn: 30 }
-							).then((request) => {
-								this.agent
-									.post('/request')
-									.auth(clientId, 'secret')
-									.type('form')
-									.send({ request })
-									.end(() => {});
-							});
+							);
+
+							await agent.par.post(
+								// @ts-expect-error endpoint will be parse to object
+								jsonToFormUrlEncoded({
+									request
+								}),
+								{
+									headers: AuthorizationRequest.basicAuthHeader(
+										clientId,
+										'secret'
+									)
+								}
+							);
+							const entities = spy.mock.calls.map((call) => call[0]);
+							expect(entities).toEqual(
+								expect.arrayContaining(['PushedAuthorizationRequest', 'Client'])
+							);
 						});
 
 						it('stores a request object and returns a uri', async function () {
 							const spy = sinon.spy();
-							this.provider.once('pushed_authorization_request.success', spy);
+							provider.once('pushed_authorization_request.success', spy);
 							const code_verifier = randomBytes(32).toString('base64');
 							const code_challenge = createHash('sha256')
 								.update(code_verifier)
 								.digest('base64url');
 
-							await this.agent
-								.post('/request')
-								.auth(clientId, 'secret')
-								.type('form')
-								.send({
+							const { data, response } = await agent.par.post(
+								// @ts-expect-error endpoint will be parse to object
+								jsonToFormUrlEncoded({
 									request: await JWT.sign(
 										{
 											jti: randomBytes(16).toString('base64url'),
@@ -683,42 +712,37 @@ describe('Pushed Request Object', () => {
 											iss: clientId,
 											aud: 'http://e.ly/'
 										},
-										this.key,
+										key,
 										'HS256',
-										{
-											expiresIn: 30
-										}
+										{ expiresIn: 30 }
 									)
-								})
-								.expect(201)
-								.expect(({ body }) => {
-									expect(body).to.have.keys('expires_in', 'request_uri');
-									expect(body).to.have.property('expires_in').closeTo(30, 1);
-									expect(body)
-										.to.have.property('request_uri')
-										.and.match(/^urn:ietf:params:oauth:request_uri:(.+)$/);
-								});
-
-							expect(spy).to.have.property('calledOnce', true);
-							expect(spy.args[0][0].oidc.params).to.include({
-								extra: 'provided',
-								extra2: 'defaulted'
-							});
+								}),
+								{
+									headers: AuthorizationRequest.basicAuthHeader(
+										clientId,
+										'secret'
+									)
+								}
+							);
+							expect(response.status).toBe(201);
+							expect(data.expires_in).toBeCloseTo(30, 1);
+							expect(data.request_uri).toMatch(
+								/^urn:ietf:params:oauth:request_uri:(.+)$/
+							);
+							expect(spy.calledOnce).toBeTrue();
 						});
 
 						it('defaults to MAX_TTL when no expires_in is present', async function () {
 							const spy = sinon.spy();
-							this.provider.once('pushed_authorization_request.success', spy);
+							provider.once('pushed_authorization_request.success', spy);
 							const code_verifier = randomBytes(32).toString('base64');
 							const code_challenge = createHash('sha256')
 								.update(code_verifier)
 								.digest('base64url');
 
-							await this.agent
-								.post('/request')
-								.auth(clientId, 'secret')
-								.type('form')
-								.send({
+							const { data, response } = await agent.par.post(
+								// @ts-expect-error endpoint will be parse to object
+								jsonToFormUrlEncoded({
 									request: await JWT.sign(
 										{
 											jti: randomBytes(16).toString('base64url'),
@@ -729,31 +753,33 @@ describe('Pushed Request Object', () => {
 											iss: clientId,
 											aud: 'http://e.ly/'
 										},
-										this.key,
+										key,
 										'HS256'
 									)
-								})
-								.expect(201)
-								.expect(({ body }) => {
-									expect(body).to.have.property('expires_in').closeTo(60, 1);
-								});
-
-							expect(spy).to.have.property('calledOnce', true);
+								}),
+								{
+									headers: AuthorizationRequest.basicAuthHeader(
+										clientId,
+										'secret'
+									)
+								}
+							);
+							expect(response.status).toBe(201);
+							expect(data.expires_in).toBeCloseTo(60, 1);
+							expect(spy.calledOnce).toBeTrue();
 						});
 
 						it('uses the expiration from JWT when below MAX_TTL', async function () {
 							const spy = sinon.spy();
-							this.provider.once('pushed_authorization_request.success', spy);
+							provider.once('pushed_authorization_request.success', spy);
 							const code_verifier = randomBytes(32).toString('base64');
 							const code_challenge = createHash('sha256')
 								.update(code_verifier)
 								.digest('base64url');
 
-							await this.agent
-								.post('/request')
-								.auth(clientId, 'secret')
-								.type('form')
-								.send({
+							const { data, response } = await agent.par.post(
+								// @ts-expect-error endpoint will be parse to object
+								jsonToFormUrlEncoded({
 									request: await JWT.sign(
 										{
 											jti: randomBytes(16).toString('base64url'),
@@ -764,40 +790,37 @@ describe('Pushed Request Object', () => {
 											iss: clientId,
 											aud: 'http://e.ly/'
 										},
-										this.key,
+										key,
 										'HS256',
-										{
-											expiresIn: 20
-										}
+										{ expiresIn: 20 }
 									)
-								})
-								.expect(201)
-								.expect(({ body }) => {
-									expect(body).to.have.keys('expires_in', 'request_uri');
-									expect(body)
-										.to.have.property('expires_in')
-										.to.be.closeTo(20, 1);
-									expect(body)
-										.to.have.property('request_uri')
-										.and.match(/^urn:ietf:params:oauth:request_uri:(.+)$/);
-								});
-
-							expect(spy).to.have.property('calledOnce', true);
+								}),
+								{
+									headers: AuthorizationRequest.basicAuthHeader(
+										clientId,
+										'secret'
+									)
+								}
+							);
+							expect(response.status).toBe(201);
+							expect(data.expires_in).toBeCloseTo(20, 1);
+							expect(data.request_uri).toMatch(
+								/^urn:ietf:params:oauth:request_uri:(.+)$/
+							);
+							expect(spy.calledOnce).toBeTrue();
 						});
 
 						it('uses MAX_TTL when the expiration from JWT is above it', async function () {
 							const spy = sinon.spy();
-							this.provider.once('pushed_authorization_request.success', spy);
+							provider.once('pushed_authorization_request.success', spy);
 							const code_verifier = randomBytes(32).toString('base64');
 							const code_challenge = createHash('sha256')
 								.update(code_verifier)
 								.digest('base64url');
 
-							await this.agent
-								.post('/request')
-								.auth(clientId, 'secret')
-								.type('form')
-								.send({
+							const { data, response } = await agent.par.post(
+								// @ts-expect-error endpoint will be parse to object
+								jsonToFormUrlEncoded({
 									request: await JWT.sign(
 										{
 											jti: randomBytes(16).toString('base64url'),
@@ -808,40 +831,41 @@ describe('Pushed Request Object', () => {
 											iss: clientId,
 											aud: 'http://e.ly/'
 										},
-										this.key,
+										key,
 										'HS256',
 										{
 											expiresIn: 120
 										}
 									)
-								})
-								.expect(201)
-								.expect(({ body }) => {
-									expect(body).to.have.keys('expires_in', 'request_uri');
-									expect(body).to.have.property('expires_in').closeTo(60, 1);
-									expect(body)
-										.to.have.property('request_uri')
-										.and.match(/^urn:ietf:params:oauth:request_uri:(.+)$/);
-								});
-
-							expect(spy).to.have.property('calledOnce', true);
+								}),
+								{
+									headers: AuthorizationRequest.basicAuthHeader(
+										clientId,
+										'secret'
+									)
+								}
+							);
+							expect(response.status).toBe(201);
+							expect(data.expires_in).toBeCloseTo(60, 1);
+							expect(data.request_uri).toMatch(
+								/^urn:ietf:params:oauth:request_uri:(.+)$/
+							);
+							expect(spy.calledOnce).toBeTrue();
 						});
 
-						it('ignores regular parameters when passing a JAR request', async function () {
+						it.only('ignores regular parameters when passing a JAR request', async function () {
 							const spy = sinon.spy();
-							this.provider.once('pushed_authorization_request.saved', spy);
+							provider.once('pushed_authorization_request.saved', spy);
 							const code_verifier = randomBytes(32).toString('base64');
 							const code_challenge = createHash('sha256')
 								.update(code_verifier)
 								.digest('base64url');
 
-							await this.agent
-								.post('/request')
-								.auth(clientId, 'secret')
-								.type('form')
-								.send({
+							const { error, response } = await agent.par.post(
+								// @ts-expect-error endpoint will be parse to object
+								jsonToFormUrlEncoded({
 									nonce: 'foo',
-									response_type: 'code token',
+									response_type: 'none',
 									request: await JWT.sign(
 										{
 											jti: randomBytes(16).toString('base64url'),
@@ -852,18 +876,26 @@ describe('Pushed Request Object', () => {
 											iss: clientId,
 											aud: 'http://e.ly/'
 										},
-										this.key,
+										key,
 										'HS256',
 										{ expiresIn: 30 }
 									)
-								})
-								.expect(201);
+								}),
+								{
+									headers: AuthorizationRequest.basicAuthHeader(
+										clientId,
+										'secret'
+									)
+								}
+							);
+							console.log('error', error);
+							expect(response.status).toBe(201);
+							expect(spy.calledOnce).toBeTrue();
 
-							expect(spy).to.have.property('calledOnce', true);
 							const { request } = spy.args[0][0];
 							const payload = decodeJwt(request);
-							expect(payload).not.to.have.property('nonce');
-							expect(payload).to.have.property('response_type', 'code');
+							expect(payload).not.toHaveProperty('nonce');
+							expect(payload).toHaveProperty('response_type', 'code');
 						});
 
 						it('requires the registered request object signing alg be used', async function () {

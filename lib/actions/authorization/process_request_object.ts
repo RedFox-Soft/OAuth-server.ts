@@ -7,6 +7,7 @@ import {
 } from '../../helpers/errors.ts';
 import { TSchema } from 'elysia';
 import { Value } from '@sinclair/typebox/value';
+import { ISSUER } from 'lib/helpers/env.js';
 
 /*
  * Decrypts and validates the content of provided request parameter and replaces the parameters
@@ -18,7 +19,7 @@ export default async function processRequestObject(schema: TSchema, ctx) {
 	const pushedRequestObject = 'PushedAuthorizationRequest' in ctx.oidc.entities;
 	if (
 		client.requirePushedAuthorizationRequests &&
-		route !== 'pushed_authorization_request' &&
+		route !== '/par' &&
 		!pushedRequestObject
 	) {
 		throw new InvalidRequest('Pushed Authorization Request must be used');
@@ -181,7 +182,7 @@ export default async function processRequestObject(schema: TSchema, ctx) {
 
 	const opts = {
 		issuer: client.clientId,
-		audience: ctx.oidc.issuer,
+		audience: ISSUER,
 		clockTolerance: configuration.clockTolerance,
 		ignoreAzp: true
 	};

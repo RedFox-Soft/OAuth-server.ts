@@ -5,7 +5,7 @@
 		"format": "eslint lib example certification test docs --fix",
 		"build": "bun build --outdir=dist --minify ./lib/interactions/loginClient.tsx",
 		"watch": "bun build --outdir=dist --minify ./lib/interactions/loginClient.tsx --watch",
-		"test": "bun test $(fd .spec.ts test)",
+		"test": "set NODE_ENV=test && bun test $(fd .spec.ts test)",
 		"test-ci": "node ./test/ci --experimental-strip-types"
 	},
 	"dependencies": {
@@ -49,7 +49,6 @@
 		"koa-body": "^6.0.1",
 		"koa-mount": "^4.0.0",
 		"lodash": "^4.17.21",
-		"mocha": "^11.2.1",
 		"moment": "^2.30.1",
 		"openid-client": "^6.4.1",
 		"prettier": "^3.5.3",

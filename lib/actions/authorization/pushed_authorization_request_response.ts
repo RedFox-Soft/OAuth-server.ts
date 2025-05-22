@@ -3,6 +3,7 @@ import { UnsecuredJWT } from 'jose';
 import { PUSHED_REQUEST_URN } from '../../consts/index.ts';
 import epochTime from '../../helpers/epoch_time.ts';
 import * as JWT from '../../helpers/jwt.ts';
+import { ISSUER } from 'lib/helpers/env.js';
 
 const MAX_TTL = 60;
 
@@ -33,7 +34,7 @@ export default async function pushedAuthorizationRequestResponse(ctx) {
 		request = new UnsecuredJWT(payload)
 			.setIssuedAt(now)
 			.setIssuer(ctx.oidc.client.clientId)
-			.setAudience(ctx.oidc.issuer)
+			.setAudience(ISSUER)
 			.setExpirationTime(now + MAX_TTL)
 			.setNotBefore(now)
 			.encode();

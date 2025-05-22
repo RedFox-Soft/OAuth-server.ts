@@ -168,7 +168,7 @@ export const par = new Elysia()
 			};
 			const OIDCContext = provider.OIDCContext;
 			ctx.oidc = new OIDCContext(ctx);
-			ctx.oidc.body = body;
+			ctx.oidc.body = { ...body };
 			ctx.oidc.params = body;
 
 			const { params: authParams, middleware: tokenAuth } =
@@ -181,7 +181,7 @@ export const par = new Elysia()
 
 			const allowList = new Set(PARAM_LIST);
 			pushedAuthorizationRequestRemapErrors;
-			processRequestObject.bind(undefined, allowList);
+			await processRequestObject(authorizationRequest, ctx);
 			checkResponseMode(ctx);
 			oneRedirectUriClients(ctx);
 			checkResponseType(ctx);
@@ -196,12 +196,5 @@ export const par = new Elysia()
 			await checkIdTokenHint(ctx);
 			await checkDpopJkt(ctx);
 			return pushedAuthorizationRequestResponse(ctx);
-		},
-		{
-			detail: {
-				body: {
-					cleanup: false
-				}
-			}
 		}
 	);

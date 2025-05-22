@@ -1,6 +1,5 @@
 import { InvalidRequest } from '../../helpers/errors.ts';
 import instance from '../../helpers/weak_cache.ts';
-import isPlainObject from '../../helpers/_/is_plain_object.ts';
 
 /*
  * If claims parameter is provided and supported handles its validation
