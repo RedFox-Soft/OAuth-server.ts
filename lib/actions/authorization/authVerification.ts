@@ -2,7 +2,6 @@ import { type Static } from 'elysia';
 import { AuthorizationParameters } from 'lib/consts/param_list.js';
 import { globalConfiguration } from 'lib/globalConfiguration.js';
 import { NotSupportedError } from 'lib/helpers/errors.js';
-import { authorizationPKCE } from 'lib/helpers/pkce.js';
 
 type auth = Omit<Static<typeof AuthorizationParameters>, 'client_id'>;
 
@@ -57,6 +56,4 @@ export function authVerification(params: auth) {
 		// For Authorization endpoint only
 		throw new NotSupportedError('Request URI is not supported');
 	}
-
-	authorizationPKCE(params);
 }

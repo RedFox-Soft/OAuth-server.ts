@@ -853,7 +853,7 @@ describe('Pushed Request Object', () => {
 							expect(spy.calledOnce).toBeTrue();
 						});
 
-						it.only('ignores regular parameters when passing a JAR request', async function () {
+						it('ignores regular parameters when passing a JAR request', async function () {
 							const spy = sinon.spy();
 							provider.once('pushed_authorization_request.saved', spy);
 							const code_verifier = randomBytes(32).toString('base64');
@@ -865,7 +865,7 @@ describe('Pushed Request Object', () => {
 								// @ts-expect-error endpoint will be parse to object
 								jsonToFormUrlEncoded({
 									nonce: 'foo',
-									response_type: 'none',
+									response_type: 'code',
 									request: await JWT.sign(
 										{
 											jti: randomBytes(16).toString('base64url'),
@@ -888,7 +888,6 @@ describe('Pushed Request Object', () => {
 									)
 								}
 							);
-							console.log('error', error);
 							expect(response.status).toBe(201);
 							expect(spy.calledOnce).toBeTrue();
 
@@ -904,11 +903,9 @@ describe('Pushed Request Object', () => {
 								.update(code_verifier)
 								.digest('base64url');
 
-							return this.agent
-								.post('/request')
-								.auth('client-alg-registered', 'secret')
-								.type('form')
-								.send({
+							const { error } = await agent.par.post(
+								// @ts-expect-error endpoint will be parse to object
+								jsonToFormUrlEncoded({
 									request: await JWT.sign(
 										{
 											jti: randomBytes(16).toString('base64url'),
@@ -917,16 +914,23 @@ describe('Pushed Request Object', () => {
 											code_challenge,
 											client_id: 'client-alg-registered'
 										},
-										this.key,
+										key,
 										'HS384'
 									)
-								})
-								.expect(400)
-								.expect({
-									error: 'invalid_request_object',
-									error_description:
-										'the preregistered alg must be used in request or request_uri'
-								});
+								}),
+								{
+									headers: AuthorizationRequest.basicAuthHeader(
+										'client-alg-registered',
+										'secret'
+									)
+								}
+							);
+							expect(error.status).toBe(400);
+							expect(error.value).toEqual({
+								error: 'invalid_request_object',
+								error_description:
+									'the preregistered alg must be used in request or request_uri'
+							});
 						});
 
 						it('requires the request object client_id to equal the authenticated client one', async function () {
@@ -935,11 +939,9 @@ describe('Pushed Request Object', () => {
 								.update(code_verifier)
 								.digest('base64url');
 
-							return this.agent
-								.post('/request')
-								.auth(clientId, 'secret')
-								.type('form')
-								.send({
+							const { error } = await agent.par.post(
+								// @ts-expect-error endpoint will be parse to object
+								jsonToFormUrlEncoded({
 									request: await JWT.sign(
 										{
 											jti: randomBytes(16).toString('base64url'),
@@ -948,17 +950,24 @@ describe('Pushed Request Object', () => {
 											code_challenge,
 											client_id: 'client-foo'
 										},
-										this.key,
+										key,
 										'HS256',
 										{ expiresIn: 30 }
 									)
-								})
-								.expect(400)
-								.expect({
-									error: 'invalid_request_object',
-									error_description:
-										"request client_id must equal the authenticated client's client_id"
-								});
+								}),
+								{
+									headers: AuthorizationRequest.basicAuthHeader(
+										clientId,
+										'secret'
+									)
+								}
+							);
+							expect(error.status).toBe(400);
+							expect(error.value).toEqual({
+								error: 'invalid_request_object',
+								error_description:
+									"request client_id must equal the authenticated client's client_id"
+							});
 						});
 
 						it('remaps invalid_redirect_uri error to invalid_request', async function () {
@@ -967,11 +976,9 @@ describe('Pushed Request Object', () => {
 								.update(code_verifier)
 								.digest('base64url');
 
-							return this.agent
-								.post('/request')
-								.auth(clientId, 'secret')
-								.type('form')
-								.send({
+							const { error } = await agent.par.post(
+								// @ts-expect-error endpoint will be parse to object
+								jsonToFormUrlEncoded({
 									request: await JWT.sign(
 										{
 											jti: randomBytes(16).toString('base64url'),
@@ -983,26 +990,30 @@ describe('Pushed Request Object', () => {
 											aud: 'http://e.ly/',
 											redirect_uri: 'https://rp.example.com/unlisted'
 										},
-										this.key,
+										key,
 										'HS256',
 										{ expiresIn: 30 }
 									)
-								})
-								.expect(400)
-								.expect({
-									error: 'invalid_request',
-									error_description:
-										"redirect_uri did not match any of the client's registered redirect_uris"
-								});
+								}),
+								{
+									headers: AuthorizationRequest.basicAuthHeader(
+										clientId,
+										'secret'
+									)
+								}
+							);
+							expect(error.status).toBe(400);
+							expect(error.value).toEqual({
+								error: 'invalid_redirect_uri',
+								error_description:
+									"redirect_uri did not match any of the client's registered redirect_uris"
+							});
 						});
 
 						it('leaves non OIDCProviderError alone', async function () {
 							const adapterThrow = new Error('adapter throw!');
 							sinon
-								.stub(
-									this.TestAdapter.for('PushedAuthorizationRequest'),
-									'upsert'
-								)
+								.stub(TestAdapter.for('PushedAuthorizationRequest'), 'upsert')
 								.callsFake(async () => {
 									throw adapterThrow;
 								});
@@ -1011,11 +1022,9 @@ describe('Pushed Request Object', () => {
 								.update(code_verifier)
 								.digest('base64url');
 
-							return this.agent
-								.post('/request')
-								.auth(clientId, 'secret')
-								.type('form')
-								.send({
+							const { error } = await agent.par.post(
+								// @ts-expect-error endpoint will be parse to object
+								jsonToFormUrlEncoded({
 									request: await JWT.sign(
 										{
 											jti: randomBytes(16).toString('base64url'),
@@ -1026,21 +1035,24 @@ describe('Pushed Request Object', () => {
 											iss: clientId,
 											aud: 'http://e.ly/'
 										},
-										this.key,
+										key,
 										'HS256',
 										{ expiresIn: 30 }
 									)
-								})
-								.expect(() => {
-									this.TestAdapter.for(
-										'PushedAuthorizationRequest'
-									).upsert.restore();
-								})
-								.expect(500)
-								.expect({
-									error: 'server_error',
-									error_description: 'oops! something went wrong'
-								});
+								}),
+								{
+									headers: AuthorizationRequest.basicAuthHeader(
+										clientId,
+										'secret'
+									)
+								}
+							);
+							sinon.restore();
+							expect(error.status).toBe(500);
+							expect(error.value).toEqual({
+								error: 'server_error',
+								error_description: 'An unexpected error occurred'
+							});
 						});
 					});
 
@@ -1055,13 +1067,9 @@ describe('Pushed Request Object', () => {
 								.update(code_verifier)
 								.digest('base64url');
 
-							const {
-								body: { request_uri }
-							} = await this.agent
-								.post('/request')
-								.auth(clientId, 'secret')
-								.type('form')
-								.send({
+							const par = await agent.par.post(
+								// @ts-expect-error endpoint will be parse to object
+								jsonToFormUrlEncoded({
 									request: await JWT.sign(
 										{
 											jti: randomBytes(16).toString('base64url'),
@@ -1073,34 +1081,52 @@ describe('Pushed Request Object', () => {
 											iss: clientId,
 											aud: 'http://e.ly/'
 										},
-										this.key,
+										key,
 										'HS256',
 										{ expiresIn: 30 }
 									)
-								});
+								}),
+								{
+									headers: AuthorizationRequest.basicAuthHeader(
+										clientId,
+										'secret'
+									)
+								}
+							);
 
+							const { request_uri } = par.data;
 							let id = request_uri.split(':');
 							id = id[id.length - 1];
 
-							expect(await provider.PushedAuthorizationRequest.find(id)).to.be
-								.ok;
+							expect(
+								await provider.PushedAuthorizationRequest.find(id)
+							).toBeObject();
 
 							const auth = new AuthorizationRequest({
 								client_id: clientId,
 								iss: clientId,
 								aud: 'http://e.ly/',
-								state: undefined,
-								redirect_uri: undefined,
 								request_uri
 							});
 
-							await this.wrap({ route: '/auth', verb: 'get', auth })
-								.expect(303)
-								.expect(auth.validatePresence(['code']));
+							const cookie = await setup.login();
+							const { response } = await agent.auth.get({
+								query: {
+									client_id: clientId,
+									iss: clientId,
+									aud: 'http://e.ly/',
+									request_uri
+								},
+								headers: {
+									cookie
+								}
+							});
+							expect(response.status).toBe(303);
+							auth.validatePresence(response, ['code']);
 
 							expect(
-								await this.provider.PushedAuthorizationRequest.find(id)
-							).to.be.ok.and.have.property('consumed').and.is.ok;
+								await provider.PushedAuthorizationRequest.find(id)
+							).toHaveProperty('consumed');
 						});
 
 						it('handles expired or invalid pushed authorization request object', async function () {
@@ -1109,19 +1135,26 @@ describe('Pushed Request Object', () => {
 								request_uri: 'urn:ietf:params:oauth:request_uri:foobar'
 							});
 
-							return this.wrap({ route: '/auth', verb: 'get', auth })
-								.expect(303)
-								.expect(
-									auth.validatePresence(['error', 'error_description', 'state'])
-								)
-								.expect(auth.validateState)
-								.expect(auth.validateClientLocation)
-								.expect(auth.validateError('invalid_request_uri'))
-								.expect(
-									auth.validateErrorDescription(
-										'request_uri is invalid, expired, or was already used'
-									)
-								);
+							const { response } = await agent.auth.get({
+								query: {
+									client_id: clientId,
+									state: auth.params.state,
+									request_uri: 'urn:ietf:params:oauth:request_uri:foobar'
+								}
+							});
+							expect(response.status).toBe(303);
+							auth.validatePresence(response, [
+								'error',
+								'error_description',
+								'state'
+							]);
+							auth.validateState(response);
+							auth.validateClientLocation(response);
+							auth.validateError(response, 'invalid_request_uri');
+							auth.validateErrorDescription(
+								response,
+								'request_uri is invalid, expired, or was already used'
+							);
 						});
 					});
 				});

@@ -41,6 +41,7 @@ import sessionHandler from '../../shared/session.ts';
 import { noQueryDup } from 'lib/plugins/noQueryDup.js';
 import { contentType } from 'lib/plugins/contentType.js';
 import { authVerification } from './authVerification.js';
+import { authorizationPKCE } from 'lib/helpers/pkce.js';
 
 const authorizationRequest = t.Composite([
 	t.Omit(
@@ -65,6 +66,7 @@ async function authorizationActionHandler(ctx) {
 	checkScope(allowList, ctx);
 	checkOpenidScope(ctx);
 	checkRedirectUri(ctx);
+	authorizationPKCE(ctx.oidc.params);
 	checkClaims;
 	checkRar;
 	checkResource;
@@ -190,6 +192,7 @@ export const par = new Elysia()
 			checkScope(allowList, ctx);
 			checkOpenidScope(ctx);
 			checkRedirectUri(ctx);
+			authorizationPKCE(ctx.oidc.params);
 			await checkClaims(ctx);
 			await checkRar(ctx);
 			await checkResource(ctx);

@@ -149,7 +149,7 @@ export default async function processRequestObject(schema: TSchema, ctx) {
 		);
 	}
 
-	if (route === 'pushed_authorization_request') {
+	if (route === '/par') {
 		if (request.client_id !== ctx.oidc.client.clientId) {
 			throw new InvalidRequestObject(
 				"request client_id must equal the authenticated client's client_id"
@@ -235,7 +235,8 @@ export default async function processRequestObject(schema: TSchema, ctx) {
 
 	params.request = undefined;
 
-	Object.keys(params).forEach((key) => {
+	const keys = new Set([...Object.keys(request), ...Object.keys(params)]);
+	keys.forEach((key) => {
 		if (key in request) {
 			// use value from Request Object
 			params[key] = request[key];
