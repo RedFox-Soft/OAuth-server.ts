@@ -12,7 +12,8 @@ merge(config.features, {
 	},
 	claimsParameter: {
 		enabled: true
-	}
+	},
+	requestObjects: { enabled: true }
 });
 
 function allowUnregisteredClient(suffix, metadata) {

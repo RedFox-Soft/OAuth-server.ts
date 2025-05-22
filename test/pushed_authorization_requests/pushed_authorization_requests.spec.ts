@@ -8,7 +8,8 @@ import {
 	afterEach,
 	expect,
 	beforeEach,
-	spyOn
+	spyOn,
+	mock
 } from 'bun:test';
 import sinon from 'sinon';
 import { importJWK, decodeProtectedHeader, decodeJwt } from 'jose';
@@ -20,10 +21,18 @@ import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
 
 describe('Pushed Request Object', () => {
+	let setup = null;
+	beforeAll(async function () {
+		setup = await bootstrap(import.meta.url)();
+	});
+	afterEach(() => {
+		sinon.restore();
+		mock.restore();
+	});
+
 	describe('w/o Request Objects', () => {
-		let setup = null;
-		beforeAll(async function () {
-			setup = await bootstrap(import.meta.url)();
+		beforeEach(function () {
+			i(provider).features.requestObjects.enabled = false;
 		});
 
 		describe('discovery', () => {
@@ -73,7 +82,6 @@ describe('Pushed Request Object', () => {
 						provider
 					).features.pushedAuthorizationRequests.allowUnregisteredRedirectUris =
 						true;
-					return setup.login();
 				});
 				afterEach(function () {
 					i(
@@ -590,19 +598,15 @@ describe('Pushed Request Object', () => {
 	});
 
 	describe('with Request Objects', () => {
-		let setup = null;
 		let key = null;
-		beforeEach(async function () {
-			if (setup) {
-				return;
-			}
-			setup = await bootstrap(import.meta.url, {
-				config: 'pushed_authorization_requests_jar'
-			})();
+		beforeAll(async function () {
 			const client = await provider.Client.find('client');
 			key = await importJWK(
 				client.symmetricKeyStore.selectForSign({ alg: 'HS256' })[0]
 			);
+		});
+		beforeEach(function () {
+			i(provider).features.requestObjects.enabled = true;
 		});
 
 		describe('discovery', () => {
@@ -1047,7 +1051,6 @@ describe('Pushed Request Object', () => {
 									)
 								}
 							);
-							sinon.restore();
 							expect(error.status).toBe(500);
 							expect(error.value).toEqual({
 								error: 'server_error',
@@ -1057,10 +1060,6 @@ describe('Pushed Request Object', () => {
 					});
 
 					describe('Using Pushed Authorization Requests', () => {
-						/*before(function () {
-							return this.login();
-						});*/
-
 						it('allows the request_uri to be used', async function () {
 							const code_verifier = randomBytes(32).toString('base64');
 							const code_challenge = createHash('sha256')
