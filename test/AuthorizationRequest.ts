@@ -142,7 +142,7 @@ export class AuthorizationRequest {
 		});
 	}
 
-	validateInteraction(response, eName, ...eReasons) {
+	validateInteraction(response: Response, eName, ...eReasons) {
 		const location = response.headers.get('location');
 		const [, , uid] = location.split('/');
 		const {

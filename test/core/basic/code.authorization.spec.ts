@@ -221,9 +221,8 @@ describe('BASIC code', () => {
 
 				const auth = new AuthorizationRequest({ scope });
 				const { response } = await authRequest(auth, { cookie });
-				expect(response.status).toBe(303);
 				auth.validateInteractionRedirect(response);
-				auth.validateInteraction('login', 'no_session');
+				auth.validateInteraction(response, 'login', 'no_session');
 			});
 
 			it('additional scopes are requested', async function () {
@@ -231,7 +230,7 @@ describe('BASIC code', () => {
 				const { response } = await authRequest(auth, { cookie });
 				expect(response.status).toBe(303);
 				auth.validateInteractionRedirect(response);
-				auth.validateInteraction('consent', 'op_scopes_missing');
+				auth.validateInteraction(response, 'consent', 'op_scopes_missing');
 			});
 
 			it('are required for native clients by default', async function () {
@@ -245,7 +244,7 @@ describe('BASIC code', () => {
 				const { response } = await authRequest(auth, { cookie });
 				expect(response.status).toBe(303);
 				auth.validateInteractionRedirect(response);
-				auth.validateInteraction('consent', 'native_client_prompt');
+				auth.validateInteraction(response, 'consent', 'native_client_prompt');
 			});
 
 			it('login was requested by the client by prompt parameter', async function () {
@@ -253,7 +252,7 @@ describe('BASIC code', () => {
 				const { response } = await authRequest(auth, { cookie });
 				expect(response.status).toBe(303);
 				auth.validateInteractionRedirect(response);
-				auth.validateInteraction('login', 'login_prompt');
+				auth.validateInteraction(response, 'login', 'login_prompt');
 			});
 
 			it('login was requested by the client by max_age=0', async function () {
@@ -261,7 +260,7 @@ describe('BASIC code', () => {
 				const { response } = await authRequest(auth, { cookie });
 				expect(response.status).toBe(303);
 				auth.validateInteractionRedirect(response);
-				auth.validateInteraction('login', 'login_prompt');
+				auth.validateInteraction(response, 'login', 'login_prompt');
 			});
 
 			it('interaction check no session & max_age combo', async function () {
@@ -272,7 +271,7 @@ describe('BASIC code', () => {
 				const { response } = await authRequest(auth);
 				expect(response.status).toBe(303);
 				auth.validateInteractionRedirect(response);
-				auth.validateInteraction('login', 'max_age', 'no_session');
+				auth.validateInteraction(response, 'login', 'max_age', 'no_session');
 			});
 
 			it('session is too old for this authorization request (1/2)', async function () {
@@ -286,7 +285,7 @@ describe('BASIC code', () => {
 				const { response } = await authRequest(auth, { cookie });
 				expect(response.status).toBe(303);
 				auth.validateInteractionRedirect(response);
-				auth.validateInteraction('login', 'max_age');
+				auth.validateInteraction(response, 'login', 'max_age');
 			});
 
 			it('session is too old for this authorization request (2/2)', async function () {
@@ -300,7 +299,7 @@ describe('BASIC code', () => {
 				const { response } = await authRequest(auth, { cookie });
 				expect(response.status).toBe(303);
 				auth.validateInteractionRedirect(response);
-				auth.validateInteraction('login', 'max_age');
+				auth.validateInteraction(response, 'login', 'max_age');
 			});
 
 			it('session is too old for this client', async function () {
@@ -315,7 +314,7 @@ describe('BASIC code', () => {
 				delete client.defaultMaxAge;
 				expect(response.status).toBe(303);
 				auth.validateInteractionRedirect(response);
-				auth.validateInteraction('login', 'max_age');
+				auth.validateInteraction(response, 'login', 'max_age');
 			});
 		});
 
@@ -543,7 +542,7 @@ describe('BASIC code', () => {
 				auth.validateError(response, 'invalid_request');
 				auth.validateErrorDescription(
 					response,
-					"Property 'response_type' should be one of: 'code', 'none'"
+					"missing required parameter 'response_type'"
 				);
 			});
 

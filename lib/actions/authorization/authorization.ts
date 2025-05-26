@@ -31,6 +31,7 @@ import stripOutsideJarParams from './strip_outside_jar_params.ts';
 import pushedAuthorizationRequestRemapErrors from './pushed_authorization_request_remap_errors.ts';
 import checkDpopJkt from './check_dpop_jkt.ts';
 import pushedAuthorizationRequestResponse from './pushed_authorization_request_response.ts';
+import presence from '../../helpers/validate_presence.ts';
 
 import {
 	AuthorizationCookies,
@@ -56,6 +57,7 @@ async function authorizationActionHandler(ctx) {
 	await processRequestObject(authorizationRequest, ctx);
 	checkResponseMode(ctx);
 	oneRedirectUriClients(ctx);
+	presence(ctx, 'response_type');
 	checkResponseType(ctx);
 	oidcRequired;
 	assignDefaults(ctx);
@@ -184,6 +186,7 @@ export const par = new Elysia()
 			await processRequestObject(authorizationRequest, ctx);
 			checkResponseMode(ctx);
 			oneRedirectUriClients(ctx);
+			presence(ctx, 'response_type');
 			checkResponseType(ctx);
 			oidcRequired(ctx);
 			checkPrompt(ctx);
