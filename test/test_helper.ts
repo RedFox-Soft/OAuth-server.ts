@@ -116,6 +116,7 @@ export default function testHelper(
 
 		let agent;
 		let lastSession;
+		let lastAccountId;
 
 		async function login({
 			scope = 'openid',
@@ -129,7 +130,7 @@ export default function testHelper(
 			const loginTs = epochTime();
 			const expire = new Date();
 			expire.setDate(expire.getDate() + 1);
-			this.loggedInAccountId = accountId;
+			lastAccountId = accountId;
 
 			const session = new provider.Session({
 				jti: sessionId,
@@ -300,6 +301,9 @@ export default function testHelper(
 			failWith,
 			getLastSession,
 			getSession,
+			getAccountId() {
+				return lastAccountId;
+			},
 			getSessionId,
 			getGrantId,
 			getTokenJti,

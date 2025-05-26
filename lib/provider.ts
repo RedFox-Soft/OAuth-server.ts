@@ -125,14 +125,6 @@ class ProviderClass extends EventEmitter {
 		grantParams.forEach(Set.prototype.add.bind(grantTypeParams.get(undefined)));
 	}
 
-	cookieName(type) {
-		const name = this.#int.configuration.cookies.names[type];
-		if (!name) {
-			throw new Error(`cookie name for type ${type} is not configured`);
-		}
-		return name;
-	}
-
 	registerResponseMode(name, handler) {
 		const { responseModes } = this.#int;
 		if (!responseModes.has(name)) {

@@ -66,7 +66,7 @@ export const ui = new Elysia()
 		return Response.redirect(interaction.returnTo, 303);
 	})
 	.get('ui/:uid/resume', async ({ interaction, cookie }) => {
-		const ctx = {};
+		const ctx = { cookie, _matchedRouteName: 'ui.resume' };
 		const OIDCContext = provider.OIDCContext;
 		ctx.oidc = new OIDCContext(ctx);
 

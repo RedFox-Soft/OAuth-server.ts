@@ -1,7 +1,6 @@
 import * as events from 'node:events';
 
 import isPlainObject from './_/is_plain_object.ts';
-import omitBy from './_/omit_by.ts';
 import { InvalidRequest } from './errors.ts';
 import instance from './weak_cache.ts';
 import { routeNames } from '../consts/param_list.ts';
@@ -115,7 +114,7 @@ export default function getContext(provider) {
 			const requestParamClaims = new Set();
 
 			if (this.params.claims) {
-				const { userinfo, id_token: idToken } = JSON.parse(this.params.claims);
+				const { userinfo, id_token: idToken } = this.params.claims;
 
 				const claims = instance(provider).configuration.claimsSupported;
 				if (userinfo) {
@@ -227,72 +226,30 @@ export default function getContext(provider) {
 				return this.#accessToken;
 			}
 
-			const { ctx } = this;
-			const mechanisms = omitBy(
-				{
-					body:
-						ctx.is('application/x-www-form-urlencoded') &&
-						ctx.oidc.body?.access_token,
-					header: ctx.headers.authorization
-				},
-				(value) => typeof value !== 'string' || !value
-			);
+			const dpop = acceptDPoP && dPoPConfig.enabled && this.ctx.headers.dpop;
 
-			let mechanism;
-			let length;
-			let token;
+			const header = this.ctx.headers.authorization;
+			const parts = header.split(' ');
 
-			try {
-				({
-					0: [mechanism, token],
-					length
-				} = Object.entries(mechanisms));
-			} catch (err) {}
-
-			if (!length) {
-				throw new InvalidRequest('no access token provided');
+			if (parts.length !== 2) {
+				throw new InvalidRequest('invalid authorization header value format');
 			}
+			const [scheme, value] = parts;
 
-			if (length > 1) {
+			if (dpop && scheme.toLowerCase() !== 'dpop') {
 				throw new InvalidRequest(
-					'access token must only be provided using one mechanism'
+					'authorization header scheme must be `DPoP` when DPoP is used'
+				);
+			} else if (!dpop && scheme.toLowerCase() === 'dpop') {
+				throw new InvalidRequest('`DPoP` header not provided');
+			} else if (!dpop && scheme.toLowerCase() !== 'bearer') {
+				throw new InvalidRequest(
+					'authorization header scheme must be `Bearer`'
 				);
 			}
 
-			const dpop = acceptDPoP && dPoPConfig.enabled && ctx.headers['DPoP'];
-
-			if (mechanism === 'header') {
-				const header = token;
-				const { 0: scheme, 1: value, length: parts } = header.split(' ');
-
-				if (parts !== 2) {
-					throw new InvalidRequest('invalid authorization header value format');
-				}
-
-				if (dpop && scheme.toLowerCase() !== 'dpop') {
-					throw new InvalidRequest(
-						'authorization header scheme must be `DPoP` when DPoP is used'
-					);
-				} else if (!dpop && scheme.toLowerCase() === 'dpop') {
-					throw new InvalidRequest('`DPoP` header not provided');
-				} else if (!dpop && scheme.toLowerCase() !== 'bearer') {
-					throw new InvalidRequest(
-						'authorization header scheme must be `Bearer`'
-					);
-				}
-
-				token = value;
-			}
-
-			if (dpop && mechanism !== 'header') {
-				throw new InvalidRequest(
-					'`DPoP` tokens must be provided via an authorization header'
-				);
-			}
-
-			this.#accessToken = token;
-
-			return token;
+			this.#accessToken = value;
+			return value;
 		}
 	}
 

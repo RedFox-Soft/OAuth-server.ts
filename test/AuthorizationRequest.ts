@@ -122,6 +122,10 @@ export class AuthorizationRequest {
 		const cookieID = readCookie(getSetCookies(cookies)[0]);
 		expect(cookieID).to.equal(interaction.cookieID);
 
+		if (interaction.params.claims) {
+			interaction.params.claims = JSON.stringify(interaction.params.claims);
+		}
+
 		Object.entries(this.params).forEach(([key, value]) => {
 			if (key === 'res') return;
 			if (key === 'request') return;
@@ -138,15 +142,14 @@ export class AuthorizationRequest {
 		});
 	}
 
-	validateInteraction(eName, ...eReasons) {
-		return (response) => {
-			const uid = readCookie(getSetCookies(response)[0]);
-			const {
-				prompt: { name, reasons }
-			} = TestAdapter.for('Interaction').syncFind(uid);
-			expect(name).to.equal(eName);
-			expect(reasons).to.contain.members(eReasons);
-		};
+	validateInteraction(response, eName, ...eReasons) {
+		const location = response.headers.get('location');
+		const [, , uid] = location.split('/');
+		const {
+			prompt: { name, reasons }
+		} = TestAdapter.for('Interaction').syncFind(uid);
+		expect(name).to.equal(eName);
+		expect(reasons).to.contain.members(eReasons);
 	}
 
 	validatePresence(response, properties, all = true) {

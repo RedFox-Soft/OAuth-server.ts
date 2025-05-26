@@ -1,182 +1,166 @@
 import get from 'lodash/get.js';
-import { expect } from 'chai';
+import url from 'node:url';
+import {
+	describe,
+	it,
+	beforeAll,
+	expect,
+	beforeEach,
+	afterEach
+} from 'bun:test';
 
 import { decode as decodeJWT } from '../../lib/helpers/jwt.ts';
-import bootstrap from '../test_helper.js';
+import bootstrap, { agent, jsonToFormUrlEncoded } from '../test_helper.js';
+import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
+import { provider } from 'lib/provider.js';
 
 const route = '/auth';
 const expire = new Date();
 
 expire.setDate(expire.getDate() + 1);
 ['get', 'post'].forEach((verb) => {
+	function authRequest(auth, { cookie } = {}) {
+		if (verb === 'get') {
+			return agent.auth.get({
+				query: auth.params,
+				headers: { cookie }
+			});
+		}
+
+		// @ts-expect-error string will be converted to form url encoded
+		return agent.auth.post(jsonToFormUrlEncoded(auth.params), {
+			headers: { cookie }
+		});
+	}
+
 	describe(`claimsParameter via ${verb} ${route}`, () => {
-		before(bootstrap(import.meta.url));
+		let setup = null;
+		async function getToken(auth, { cookie: cookieHeader } = {}) {
+			const cookie = cookieHeader || (await setup.login());
+			const authRes = await authRequest(auth, { cookie });
+			const location = authRes.response.headers.get('location');
+			const {
+				query: { code }
+			} = url.parse(location, true);
+			if (!code) {
+				console.error('no code in location', location);
+			}
 
-		describe('specify id_token', () => {
-			before(function () {
-				return this.login({
-					claims: {
-						id_token: {
-							email: null,
-							middle_name: {}
-						}
+			const token = await auth.getToken(code);
+			expect(token.response.status).toBe(200);
+			return token.data;
+		}
+
+		beforeAll(async function () {
+			setup = await bootstrap(import.meta.url)();
+		});
+
+		it('specify id_token should return individual claims requested', async function () {
+			const auth = new AuthorizationRequest({
+				scope: 'openid',
+				claims: {
+					id_token: {
+						email: null,
+						middle_name: {},
+
+						preferred_username: 'not returned',
+						picture: 1, // not returned
+						website: true // not returned
 					}
-				});
+				}
 			});
-			after(function () {
-				return this.logout();
-			});
-
-			it('should return individual claims requested', async function () {
-				const auth = new this.AuthorizationRequest({
-					response_type: 'code',
-					scope: 'openid',
-					claims: {
-						id_token: {
-							email: null,
-							middle_name: {},
-
-							preferred_username: 'not returned',
-							picture: 1, // not returned
-							website: true // not returned
-						}
+			const cookie = await setup.login({
+				claims: {
+					id_token: {
+						email: null,
+						middle_name: {}
 					}
-				});
-
-				const response = await this.getToken(auth, { verb });
-
-				const { id_token } = response.body;
-				const { payload } = decodeJWT(id_token);
-				expect(payload).to.contain.keys('email', 'middle_name');
-				expect(payload).not.to.have.keys(
-					'preferred_username',
-					'picture',
-					'website'
-				);
+				}
 			});
+
+			const { id_token } = await getToken(auth, { cookie });
+
+			const { payload } = decodeJWT(id_token);
+			expect(payload).toContainKeys(['email', 'middle_name']);
+			expect(payload).not.toContainKeys([
+				'preferred_username',
+				'picture',
+				'website'
+			]);
 		});
 
 		describe('with acr_values on the client', () => {
-			before(function () {
-				return this.login();
-			});
-			after(function () {
-				return this.logout();
-			});
-
-			before(async function () {
-				const client = await this.provider.Client.find('client');
+			beforeEach(async function () {
+				const client = await provider.Client.find('client');
 				client.defaultAcrValues = ['1', '2'];
 			});
 
-			after(async function () {
-				const client = await this.provider.Client.find('client');
+			afterEach(async function () {
+				const client = await provider.Client.find('client');
 				delete client.defaultAcrValues;
 			});
 
 			it('(pre 4.x behavior backfill) should include the acr claim now', async function () {
 				const descriptor = Object.getOwnPropertyDescriptor(
-					this.provider.OIDCContext.prototype,
+					provider.OIDCContext.prototype,
 					'acr'
 				);
 
-				Object.defineProperty(this.provider.OIDCContext.prototype, 'acr', {
+				Object.defineProperty(provider.OIDCContext.prototype, 'acr', {
 					get() {
 						return get(this, 'result.login.acr', '0');
 					}
 				});
 
-				const auth = new this.AuthorizationRequest({
-					response_type: 'code',
-					scope: 'openid'
-				});
+				const auth = new AuthorizationRequest({ scope: 'openid' });
+				const { id_token } = await getToken(auth);
 
-				let response;
-				try {
-					response = await this.getToken(auth, { verb });
-				} finally {
-					Object.defineProperty(
-						this.provider.OIDCContext.prototype,
-						'acr',
-						descriptor
-					);
-				}
-
-				const { id_token } = response.body;
 				const { payload } = decodeJWT(id_token);
-				expect(payload).to.contain.keys('acr');
+				expect(payload).toContainKey('acr');
 			});
 		});
 
-		describe('specify userinfo', () => {
-			before(function () {
-				return this.login({
-					claims: {
-						id_token: {
-							email: null,
-							middle_name: {}
-						}
+		it('specify userinfo should return individual claims requested', async function () {
+			const auth = new AuthorizationRequest({
+				scope: 'openid',
+				claims: {
+					userinfo: {
+						email: null,
+						middle_name: {},
+
+						preferred_username: 'not returned',
+						picture: 1, // not returned
+						website: true // not returned
 					}
-				});
-			});
-			after(function () {
-				return this.logout();
+				}
 			});
 
-			it('should return individual claims requested', async function () {
-				const auth = new this.AuthorizationRequest({
-					response_type: 'code',
-					scope: 'openid',
-					claims: {
-						userinfo: {
-							email: null,
-							middle_name: {},
-
-							preferred_username: 'not returned',
-							picture: 1, // not returned
-							website: true // not returned
-						}
+			const cookie = await setup.login({
+				claims: {
+					id_token: {
+						email: null,
+						middle_name: {}
 					}
-				});
-
-				const response = await this.getToken(auth, { verb });
-
-				const { access_token } = response.body;
-				return this.agent
-					.get('/me')
-					.auth(access_token, { type: 'bearer' })
-					.expect(200)
-					.expect(({ body }) => {
-						expect(body).to.contain.keys('email', 'middle_name');
-						expect(body).not.to.have.keys(
-							'preferred_username',
-							'picture',
-							'website'
-						);
-					});
+				}
 			});
+			const { access_token } = await getToken(auth, { cookie });
+			const { data, response } = await agent.userinfo.get({
+				headers: {
+					authorization: `Bearer ${access_token}`
+				}
+			});
+			expect(response.status).toBe(200);
+			expect(data).toContainKeys(['email', 'middle_name']);
+			expect(data).not.toContainKeys([
+				'preferred_username',
+				'picture',
+				'website'
+			]);
 		});
 
 		describe('specify both id_token and userinfo', () => {
-			before(function () {
-				return this.login({
-					claims: {
-						id_token: {
-							email: null
-						},
-						userinfo: {
-							given_name: null
-						}
-					}
-				});
-			});
-			after(function () {
-				return this.logout();
-			});
-
 			it('should return individual claims requested', async function () {
-				const auth = new this.AuthorizationRequest({
-					response_type: 'code',
+				const auth = new AuthorizationRequest({
 					scope: 'openid',
 					claims: {
 						id_token: {
@@ -187,62 +171,41 @@ expire.setDate(expire.getDate() + 1);
 						}
 					}
 				});
+				const cookie = await setup.login({
+					claims: {
+						id_token: {
+							email: null
+						},
+						userinfo: {
+							given_name: null
+						}
+					}
+				});
 
-				const response = await this.getToken(auth, { verb });
+				const { id_token, access_token } = await getToken(auth, { cookie });
 
-				const { id_token, access_token } = response.body;
 				const { payload } = decodeJWT(id_token);
-				expect(payload).to.contain.key('email');
-				expect(payload).not.to.have.key('given_name');
+				expect(payload).toContainKey('email');
+				expect(payload).not.toContainKey('given_name');
 
-				this.agent
-					.get('/me')
-					.auth(access_token, { type: 'bearer' })
-					.expect(200)
-					.expect((userinfo) => {
-						expect(userinfo.body).to.contain.key('given_name');
-						expect(userinfo.body).not.to.have.key('email');
-					});
+				const { data, response } = await agent.userinfo.get({
+					headers: {
+						authorization: `Bearer ${access_token}`
+					}
+				});
+				expect(response.status).toBe(200);
+				expect(data).toContainKey('given_name');
+				expect(data).not.toContainKey('email');
 			});
 		});
 
 		describe('related interactions', () => {
-			beforeEach(function () {
-				return this.login();
-			});
-			afterEach(function () {
-				return this.logout();
-			});
-			context('are met', () => {
-				function setup(grant, result) {
-					const cookies = [];
-
-					const sess = new this.provider.Interaction('resume', {
-						uid: 'resume'
-					});
-					if (grant) {
-						const cookie = `_interaction_resume=resume; path=${this.suitePath('/auth/resume')}; expires=${expire.toGMTString()}; httponly`;
-						cookies.push(cookie);
-						Object.assign(sess, { params: grant });
-					}
-
-					if (result) {
-						Object.assign(sess, { result });
-					}
-
-					this.agent._saveCookies.bind(this.agent)({
-						request: { url: this.provider.issuer },
-						headers: { 'set-cookie': cookies }
-					});
-
-					return sess.save(30); // TODO: bother running the ttl helper?
-				}
-
+			describe('are met', () => {
 				it('session subject value differs from the one requested [1/2]', async function () {
-					const session = this.getSession();
-					const auth = new this.AuthorizationRequest({
+					const cookie = await setup.login();
+					const session = setup.getSession();
+					const auth = new AuthorizationRequest({
 						client_id: 'client',
-						response_type: 'code',
 						scope: 'openid',
 						prompt: 'none',
 						claims: {
@@ -254,18 +217,18 @@ expire.setDate(expire.getDate() + 1);
 						}
 					});
 
-					return this.wrap({ route, verb, auth })
-						.expect(303)
-						.expect(auth.validatePresence(['code', 'state']))
-						.expect(auth.validateState)
-						.expect(auth.validateClientLocation);
+					const { response } = await authRequest(auth, { cookie });
+					expect(response.status).toBe(303);
+					auth.validatePresence(response, ['code', 'state']);
+					auth.validateState(response);
+					auth.validateClientLocation(response);
 				});
 
-				it('session subject value differs from the one requested [2/2]', function () {
-					const session = this.getSession();
-					const auth = new this.AuthorizationRequest({
+				it('session subject value differs from the one requested [2/2]', async function () {
+					const cookie = await setup.login();
+					const session = setup.getSession();
+					const auth = new AuthorizationRequest({
 						client_id: 'client-pairwise',
-						response_type: 'code',
 						scope: 'openid',
 						prompt: 'none',
 						claims: {
@@ -277,18 +240,38 @@ expire.setDate(expire.getDate() + 1);
 						}
 					});
 
-					return this.wrap({ route, verb, auth })
-						.expect(303)
-						.expect(auth.validatePresence(['code', 'state']))
-						.expect(auth.validateState)
-						.expect(auth.validateClientLocation);
+					const { response } = await authRequest(auth, { cookie });
+					expect(response.status).toBe(303);
+					auth.validatePresence(response, ['code', 'state']);
+					auth.validateState(response);
+					auth.validateClientLocation(response);
 				});
 
 				if (verb === 'get') {
-					it('none of multiple authentication context class references requested are met', function () {
-						const auth = new this.AuthorizationRequest({
-							response_type: 'code',
-							response_mode: 'fragment',
+					async function setupFun(auth, result) {
+						const cookies = [];
+
+						const sess = new provider.Interaction('resume', {
+							uid: 'resume',
+							cookieID: 'cookieID'
+						});
+						if (auth) {
+							const cookie = `_interaction=cookieID; path=/ui/resume/resume; expires=${expire.toGMTString()}; httponly`;
+							cookies.push(cookie);
+							Object.assign(sess, { params: auth.params });
+						}
+
+						if (result) {
+							Object.assign(sess, { result });
+						}
+
+						await sess.save(30);
+						return cookies;
+					}
+
+					it('none of multiple authentication context class references requested are met', async function () {
+						const seesion = await setup.login();
+						const auth = new AuthorizationRequest({
 							scope: 'openid',
 							prompt: 'none',
 							claims: {
@@ -301,25 +284,25 @@ expire.setDate(expire.getDate() + 1);
 							}
 						});
 
-						setup.call(this, auth, {
+						const cookie = await setupFun(auth, {
 							login: {
-								accountId: this.loggedInAccountId,
+								accountId: setup.getAccountId(),
 								acr: '2'
 							}
 						});
 
-						return this.wrap({ route: `${route}/resume`, verb, auth })
-							.expect(303)
-							.expect(auth.validateFragment)
-							.expect(auth.validatePresence(['code', 'state']))
-							.expect(auth.validateState)
-							.expect(auth.validateClientLocation);
+						const { response } = await agent.ui['resume'].resume.get({
+							headers: { cookie: [seesion, cookie].join('; ') }
+						});
+						expect(response.status).toBe(303);
+						auth.validatePresence(response, ['code', 'state']);
+						auth.validateState(response);
+						auth.validateClientLocation(response);
 					});
 
-					it('single requested authentication context class reference is not met', function () {
-						const auth = new this.AuthorizationRequest({
-							response_type: 'code',
-							response_mode: 'fragment',
+					it('single requested authentication context class reference is not met', async function () {
+						const session = await setup.login();
+						const auth = new AuthorizationRequest({
 							scope: 'openid',
 							prompt: 'none',
 							claims: {
@@ -332,28 +315,29 @@ expire.setDate(expire.getDate() + 1);
 							}
 						});
 
-						setup.call(this, auth, {
+						const cookie = await setupFun(auth, {
 							login: {
-								accountId: this.loggedInAccountId,
+								accountId: setup.getAccountId(),
 								acr: '1'
 							}
 						});
 
-						return this.wrap({ route: `${route}/resume`, verb, auth })
-							.expect(303)
-							.expect(auth.validateFragment)
-							.expect(auth.validatePresence(['code', 'state']))
-							.expect(auth.validateState)
-							.expect(auth.validateClientLocation);
+						const { response, error } = await agent.ui['resume'].resume.get({
+							headers: { cookie: [session, cookie].join('; ') }
+						});
+						console.log(error);
+						expect(response.status).toBe(303);
+						auth.validatePresence(response, ['code', 'state']);
+						auth.validateState(response);
+						auth.validateClientLocation(response);
 					});
 				}
 			});
 
-			context('are not met', () => {
-				it('session subject value differs from the one requested [1/3]', function () {
-					const auth = new this.AuthorizationRequest({
+			describe('are not met', () => {
+				it('session subject value differs from the one requested [1/3]', async function () {
+					const auth = new AuthorizationRequest({
 						client_id: 'client',
-						response_type: 'code',
 						scope: 'openid',
 						prompt: 'none',
 						claims: {
@@ -365,25 +349,27 @@ expire.setDate(expire.getDate() + 1);
 						}
 					});
 
-					return this.wrap({ route, verb, auth })
-						.expect(303)
-						.expect(
-							auth.validatePresence(['error', 'error_description', 'state'])
-						)
-						.expect(auth.validateState)
-						.expect(auth.validateClientLocation)
-						.expect(auth.validateError('login_required'))
-						.expect(
-							auth.validateErrorDescription(
-								'requested subject could not be obtained'
-							)
-						);
+					const cookie = await setup.login();
+					const { response } = await authRequest(auth, { cookie });
+
+					expect(response.status).toBe(303);
+					auth.validatePresence(response, [
+						'error',
+						'error_description',
+						'state'
+					]);
+					auth.validateState(response);
+					auth.validateClientLocation(response);
+					auth.validateError(response, 'login_required');
+					auth.validateErrorDescription(
+						response,
+						'requested subject could not be obtained'
+					);
 				});
 
-				it('session subject value differs from the one requested [2/3]', function () {
-					const auth = new this.AuthorizationRequest({
+				it('session subject value differs from the one requested [2/3]', async function () {
+					const auth = new AuthorizationRequest({
 						client_id: 'client-pairwise',
-						response_type: 'code',
 						scope: 'openid',
 						prompt: 'none',
 						claims: {
@@ -395,26 +381,26 @@ expire.setDate(expire.getDate() + 1);
 						}
 					});
 
-					return this.wrap({ route, verb, auth })
-						.expect(303)
-						.expect(
-							auth.validatePresence(['error', 'error_description', 'state'])
-						)
-						.expect(auth.validateState)
-						.expect(auth.validateClientLocation)
-						.expect(auth.validateError('login_required'))
-						.expect(
-							auth.validateErrorDescription(
-								'requested subject could not be obtained'
-							)
-						);
+					const cookie = await setup.login();
+					const { response } = await authRequest(auth, { cookie });
+					expect(response.status).toBe(303);
+					auth.validatePresence(response, [
+						'error',
+						'error_description',
+						'state'
+					]);
+					auth.validateState(response);
+					auth.validateClientLocation(response);
+					auth.validateError(response, 'login_required');
+					auth.validateErrorDescription(
+						response,
+						'requested subject could not be obtained'
+					);
 				});
 
-				it('session subject value differs from the one requested [3/3]', function () {
-					this.logout();
-					const auth = new this.AuthorizationRequest({
+				it('session subject value differs from the one requested [3/3]', async function () {
+					const auth = new AuthorizationRequest({
 						client_id: 'client-pairwise',
-						response_type: 'code',
 						scope: 'openid',
 						claims: {
 							id_token: {
@@ -425,21 +411,19 @@ expire.setDate(expire.getDate() + 1);
 						}
 					});
 
-					return this.wrap({ route, verb, auth })
-						.expect(303)
-						.expect(auth.validateInteractionRedirect)
-						.expect(
-							auth.validateInteraction(
-								'login',
-								'claims_id_token_sub_value',
-								'no_session'
-							)
-						);
+					const { response } = await authRequest(auth);
+					expect(response.status).toBe(303);
+					auth.validateInteractionRedirect(response);
+					auth.validateInteraction(
+						response,
+						'login',
+						'claims_id_token_sub_value',
+						'no_session'
+					);
 				});
 
-				it('none of multiple authentication context class references requested are met (1/2)', function () {
-					const auth = new this.AuthorizationRequest({
-						response_type: 'code',
+				it('none of multiple authentication context class references requested are met (1/2)', async function () {
+					const auth = new AuthorizationRequest({
 						scope: 'openid',
 						prompt: 'none',
 						claims: {
@@ -452,24 +436,25 @@ expire.setDate(expire.getDate() + 1);
 						}
 					});
 
-					return this.wrap({ route, verb, auth })
-						.expect(303)
-						.expect(
-							auth.validatePresence(['error', 'error_description', 'state'])
-						)
-						.expect(auth.validateState)
-						.expect(auth.validateClientLocation)
-						.expect(auth.validateError('login_required'))
-						.expect(
-							auth.validateErrorDescription(
-								'none of the requested ACRs could not be obtained'
-							)
-						);
+					const cookie = await setup.login();
+					const { response } = await authRequest(auth, { cookie });
+					expect(response.status).toBe(303);
+					auth.validatePresence(response, [
+						'error',
+						'error_description',
+						'state'
+					]);
+					auth.validateState(response);
+					auth.validateClientLocation(response);
+					auth.validateError(response, 'login_required');
+					auth.validateErrorDescription(
+						response,
+						'none of the requested ACRs could not be obtained'
+					);
 				});
 
-				it('none of multiple authentication context class references requested are met (2/2)', function () {
-					const auth = new this.AuthorizationRequest({
-						response_type: 'code',
+				it('none of multiple authentication context class references requested are met (2/2)', async function () {
+					const auth = new AuthorizationRequest({
 						scope: 'openid',
 						prompt: 'none',
 						claims: {
@@ -482,24 +467,25 @@ expire.setDate(expire.getDate() + 1);
 						}
 					});
 
-					return this.wrap({ route, verb, auth })
-						.expect(303)
-						.expect(
-							auth.validatePresence(['error', 'error_description', 'state'])
-						)
-						.expect(auth.validateState)
-						.expect(auth.validateClientLocation)
-						.expect(auth.validateError('invalid_request'))
-						.expect(
-							auth.validateErrorDescription(
-								'invalid claims.id_token.acr.values type'
-							)
-						);
+					const cookie = setup.login();
+					const { response } = await authRequest(auth, { cookie });
+					expect(response.status).toBe(303);
+					auth.validatePresence(response, [
+						'error',
+						'error_description',
+						'state'
+					]);
+					auth.validateState(response);
+					auth.validateClientLocation(response);
+					auth.validateError(response, 'invalid_request');
+					auth.validateErrorDescription(
+						response,
+						'invalid claims.id_token.acr.values type'
+					);
 				});
 
-				it('single requested authentication context class reference is not met', function () {
-					const auth = new this.AuthorizationRequest({
-						response_type: 'code',
+				it('single requested authentication context class reference is not met', async function () {
+					const auth = new AuthorizationRequest({
 						scope: 'openid',
 						prompt: 'none',
 						claims: {
@@ -512,24 +498,25 @@ expire.setDate(expire.getDate() + 1);
 						}
 					});
 
-					return this.wrap({ route, verb, auth })
-						.expect(303)
-						.expect(
-							auth.validatePresence(['error', 'error_description', 'state'])
-						)
-						.expect(auth.validateState)
-						.expect(auth.validateClientLocation)
-						.expect(auth.validateError('login_required'))
-						.expect(
-							auth.validateErrorDescription(
-								'requested ACR could not be obtained'
-							)
-						);
+					const cookie = await setup.login();
+					const { response } = await authRequest(auth, { cookie });
+					expect(response.status).toBe(303);
+					auth.validatePresence(response, [
+						'error',
+						'error_description',
+						'state'
+					]);
+					auth.validateState(response);
+					auth.validateClientLocation(response);
+					auth.validateError(response, 'login_required');
+					auth.validateErrorDescription(
+						response,
+						'requested ACR could not be obtained'
+					);
 				});
 
-				it('additional claims are requested', function () {
-					const auth = new this.AuthorizationRequest({
-						response_type: 'code',
+				it('additional claims are requested', async function () {
+					const auth = new AuthorizationRequest({
 						scope: 'openid',
 						prompt: 'none',
 						claims: {
@@ -537,22 +524,26 @@ expire.setDate(expire.getDate() + 1);
 						}
 					});
 
-					return this.wrap({ route, verb, auth })
-						.expect(303)
-						.expect(
-							auth.validatePresence(['error', 'error_description', 'state'])
-						)
-						.expect(auth.validateState)
-						.expect(auth.validateClientLocation)
-						.expect(auth.validateError('consent_required'))
-						.expect(
-							auth.validateErrorDescription('requested claims not granted')
-						);
+					const cookie = await setup.login();
+					const { response } = await authRequest(auth, { cookie });
+					expect(response.status).toBe(303);
+					auth.validatePresence(response, [
+						'error',
+						'error_description',
+						'state'
+					]);
+					auth.validateState(response);
+					auth.validateClientLocation(response);
+					auth.validateError(response, 'consent_required');
+					auth.validateErrorDescription(
+						response,
+						'requested claims not granted'
+					);
 				});
 
 				it('id_token_hint belongs to a user that is not currently logged in [1/3]', async function () {
-					const client = await this.provider.Client.find('client');
-					const { IdToken } = this.provider;
+					const client = await provider.Client.find('client');
+					const { IdToken } = provider;
 					const idToken = new IdToken(
 						{
 							sub: 'not-the-droid-you-are-looking-for'
@@ -563,31 +554,32 @@ expire.setDate(expire.getDate() + 1);
 					idToken.scope = 'openid';
 					const hint = await idToken.issue({ use: 'idtoken' });
 
-					const auth = new this.AuthorizationRequest({
-						response_type: 'code',
+					const auth = new AuthorizationRequest({
 						scope: 'openid',
 						prompt: 'none',
 						id_token_hint: hint
 					});
 
-					return this.wrap({ route, verb, auth })
-						.expect(303)
-						.expect(
-							auth.validatePresence(['error', 'error_description', 'state'])
-						)
-						.expect(auth.validateState)
-						.expect(auth.validateClientLocation)
-						.expect(auth.validateError('login_required'))
-						.expect(
-							auth.validateErrorDescription(
-								'id_token_hint and authenticated subject do not match'
-							)
-						);
+					const cookie = await setup.login();
+					const { response } = await authRequest(auth, { cookie });
+					expect(response.status).toBe(303);
+					auth.validatePresence(response, [
+						'error',
+						'error_description',
+						'state'
+					]);
+					auth.validateState(response);
+					auth.validateClientLocation(response);
+					auth.validateError(response, 'login_required');
+					auth.validateErrorDescription(
+						response,
+						'id_token_hint and authenticated subject do not match'
+					);
 				});
 
 				it('id_token_hint belongs to a user that is not currently logged in [2/3]', async function () {
-					const client = await this.provider.Client.find('client-pairwise');
-					const { IdToken } = this.provider;
+					const client = await provider.Client.find('client-pairwise');
+					const { IdToken } = provider;
 					const idToken = new IdToken(
 						{
 							sub: 'not-the-droid-you-are-looking-for'
@@ -598,33 +590,33 @@ expire.setDate(expire.getDate() + 1);
 					idToken.scope = 'openid';
 					const hint = await idToken.issue({ use: 'idtoken' });
 
-					const auth = new this.AuthorizationRequest({
+					const auth = new AuthorizationRequest({
 						client_id: 'client-pairwise',
-						response_type: 'code',
 						scope: 'openid',
 						prompt: 'none',
 						id_token_hint: hint
 					});
 
-					return this.wrap({ route, verb, auth })
-						.expect(303)
-						.expect(
-							auth.validatePresence(['error', 'error_description', 'state'])
-						)
-						.expect(auth.validateState)
-						.expect(auth.validateClientLocation)
-						.expect(auth.validateError('login_required'))
-						.expect(
-							auth.validateErrorDescription(
-								'id_token_hint and authenticated subject do not match'
-							)
-						);
+					const cookie = await setup.login();
+					const { response } = await authRequest(auth, { cookie });
+					expect(response.status).toBe(303);
+					auth.validatePresence(response, [
+						'error',
+						'error_description',
+						'state'
+					]);
+					auth.validateState(response);
+					auth.validateClientLocation(response);
+					auth.validateError(response, 'login_required');
+					auth.validateErrorDescription(
+						response,
+						'id_token_hint and authenticated subject do not match'
+					);
 				});
 
 				it('id_token_hint belongs to a user that is not currently logged in [3/3]', async function () {
-					this.logout();
-					const client = await this.provider.Client.find('client-pairwise');
-					const { IdToken } = this.provider;
+					const client = await provider.Client.find('client-pairwise');
+					const { IdToken } = provider;
 					const idToken = new IdToken(
 						{
 							sub: 'not-the-droid-you-are-looking-for'
@@ -635,25 +627,28 @@ expire.setDate(expire.getDate() + 1);
 					idToken.scope = 'openid';
 					const hint = await idToken.issue({ use: 'idtoken' });
 
-					const auth = new this.AuthorizationRequest({
+					const auth = new AuthorizationRequest({
 						client_id: 'client-pairwise',
-						response_type: 'code',
 						scope: 'openid',
 						id_token_hint: hint
 					});
 
-					return this.wrap({ route, verb, auth })
-						.expect(303)
-						.expect(auth.validateInteractionRedirect)
-						.expect(
-							auth.validateInteraction('login', 'id_token_hint', 'no_session')
-						);
+					const { response } = await authRequest(auth);
+					expect(response.status).toBe(303);
+					auth.validateInteractionRedirect(response);
+					auth.validateInteraction(
+						response,
+						'login',
+						'id_token_hint',
+						'no_session'
+					);
 				});
 
 				it('id_token_hint belongs to a user that is currently logged in [1/2]', async function () {
-					const session = this.getSession();
-					const client = await this.provider.Client.find('client');
-					const { IdToken } = this.provider;
+					const cookie = await setup.login();
+					const session = setup.getSession();
+					const client = await provider.Client.find('client');
+					const { IdToken } = provider;
 					const idToken = new IdToken(
 						{ sub: session.accountId },
 						{ client, ctx: undefined }
@@ -662,24 +657,24 @@ expire.setDate(expire.getDate() + 1);
 					idToken.scope = 'openid';
 					const hint = await idToken.issue({ use: 'idtoken' });
 
-					const auth = new this.AuthorizationRequest({
-						response_type: 'code',
+					const auth = new AuthorizationRequest({
 						scope: 'openid',
 						prompt: 'none',
 						id_token_hint: hint
 					});
 
-					return this.wrap({ route, verb, auth })
-						.expect(303)
-						.expect(auth.validatePresence(['code', 'state']))
-						.expect(auth.validateState)
-						.expect(auth.validateClientLocation);
+					const { response } = await authRequest(auth, { cookie });
+					expect(response.status).toBe(303);
+					auth.validatePresence(response, ['code', 'state']);
+					auth.validateState(response);
+					auth.validateClientLocation(response);
 				});
 
 				it('id_token_hint belongs to a user that is currently logged in [2/2]', async function () {
-					const session = this.getSession();
-					const client = await this.provider.Client.find('client-pairwise');
-					const { IdToken } = this.provider;
+					const cookie = await setup.login();
+					const session = setup.getSession();
+					const client = await provider.Client.find('client-pairwise');
+					const { IdToken } = provider;
 					const idToken = new IdToken(
 						{ sub: session.accountId },
 						{ client, ctx: undefined }
@@ -688,164 +683,179 @@ expire.setDate(expire.getDate() + 1);
 					idToken.scope = 'openid';
 					const hint = await idToken.issue({ use: 'idtoken' });
 
-					const auth = new this.AuthorizationRequest({
+					const auth = new AuthorizationRequest({
 						client_id: 'client-pairwise',
-						response_type: 'code',
 						scope: 'openid',
 						prompt: 'none',
 						id_token_hint: hint
 					});
 
-					return this.wrap({ route, verb, auth })
-						.expect(303)
-						.expect(auth.validatePresence(['code', 'state']))
-						.expect(auth.validateState)
-						.expect(auth.validateClientLocation);
+					const { response } = await authRequest(auth, { cookie });
+					expect(response.status).toBe(303);
+					auth.validatePresence(response, ['code', 'state']);
+					auth.validateState(response);
+					auth.validateClientLocation(response);
 				});
 			});
 		});
 
 		describe('parameter validations', () => {
-			it('should not be combined with response_type=none', function () {
-				const auth = new this.AuthorizationRequest({
+			it('should not be combined with response_type=none', async function () {
+				const auth = new AuthorizationRequest({
 					response_type: 'none',
 					scope: 'openid',
-					claims: 'something'
+					claims: {
+						id_token: {
+							email: null,
+							middle_name: {}
+						}
+					}
 				});
 
-				return this.wrap({ route, verb, auth })
-					.expect(303)
-					.expect(
-						auth.validatePresence(['error', 'error_description', 'state'])
-					)
-					.expect(auth.validateState)
-					.expect(auth.validateClientLocation)
-					.expect(auth.validateError('invalid_request'))
-					.expect(
-						auth.validateErrorDescription(
-							'claims parameter should not be combined with response_type none'
-						)
-					);
+				const cookie = await setup.login();
+				const { response } = await authRequest(auth, { cookie });
+				expect(response.status).toBe(303);
+				auth.validatePresence(response, [
+					'error',
+					'error_description',
+					'state'
+				]);
+				auth.validateState(response);
+				auth.validateClientLocation(response);
+				auth.validateError(response, 'invalid_request');
+				auth.validateErrorDescription(
+					response,
+					'claims parameter should not be combined with response_type none'
+				);
 			});
 
-			it('should handle when invalid json is provided', function () {
-				const auth = new this.AuthorizationRequest({
-					response_type: 'code',
+			it('should handle when invalid json is provided', async function () {
+				const auth = new AuthorizationRequest({
 					scope: 'openid',
 					claims: 'something'
 				});
 
-				return this.wrap({ route, verb, auth })
-					.expect(303)
-					.expect(
-						auth.validatePresence(['error', 'error_description', 'state'])
-					)
-					.expect(auth.validateState)
-					.expect(auth.validateClientLocation)
-					.expect(auth.validateError('invalid_request'))
-					.expect(
-						auth.validateErrorDescription(
-							'could not parse the claims parameter JSON'
-						)
-					);
+				const cookie = await setup.login();
+				const { response } = await authRequest(auth, { cookie });
+				expect(response.status).toBe(303);
+				auth.validatePresence(response, [
+					'error',
+					'error_description',
+					'state'
+				]);
+				auth.validateState(response);
+				auth.validateClientLocation(response);
+				auth.validateError(response, 'invalid_request');
+				auth.validateErrorDescription(
+					response,
+					"Property 'claims' should be one of: 'ObjectString', 'undefined'"
+				);
 			});
 
-			it('should validate an object is passed', function () {
-				const auth = new this.AuthorizationRequest({
-					response_type: 'code',
+			it('should validate an object is passed', async function () {
+				const auth = new AuthorizationRequest({
 					scope: 'openid',
 					claims: 'true'
 				});
 
-				return this.wrap({ route, verb, auth })
-					.expect(303)
-					.expect(
-						auth.validatePresence(['error', 'error_description', 'state'])
-					)
-					.expect(auth.validateState)
-					.expect(auth.validateClientLocation)
-					.expect(auth.validateError('invalid_request'))
-					.expect(
-						auth.validateErrorDescription(
-							'claims parameter should be a JSON object'
-						)
-					);
+				const cookie = await setup.login();
+				const { response } = await authRequest(auth, { cookie });
+				expect(response.status).toBe(303);
+				auth.validatePresence(response, [
+					'error',
+					'error_description',
+					'state'
+				]);
+				auth.validateState(response);
+				auth.validateClientLocation(response);
+				auth.validateError(response, 'invalid_request');
+				auth.validateErrorDescription(
+					response,
+					"Property 'claims' should be one of: 'ObjectString', 'undefined'"
+				);
 			});
 
-			it('should check accepted properties being present', function () {
-				const auth = new this.AuthorizationRequest({
-					response_type: 'code',
+			it('should check accepted properties being present', async function () {
+				const auth = new AuthorizationRequest({
 					scope: 'openid',
 					claims: '{"not_recognized": "does not matter"}'
 				});
 
-				return this.wrap({ route, verb, auth })
-					.expect(303)
-					.expect(
-						auth.validatePresence(['error', 'error_description', 'state'])
-					)
-					.expect(auth.validateState)
-					.expect(auth.validateClientLocation)
-					.expect(auth.validateError('invalid_request'))
-					.expect(
-						auth.validateErrorDescription(
-							'claims parameter should have userinfo or id_token properties'
-						)
-					);
+				const cookie = await setup.login();
+				const { response } = await authRequest(auth, { cookie });
+				expect(response.status).toBe(303);
+				console.log(response.headers.get('location'));
+				auth.validatePresence(response, [
+					'error',
+					'error_description',
+					'state'
+				]);
+				auth.validateState(response);
+				auth.validateClientLocation(response);
+				auth.validateError(response, 'invalid_request');
+				auth.validateErrorDescription(
+					response,
+					'claims parameter should be object with userinfo or id_token properties'
+				);
 			});
 
-			it('should check userinfo property being a simple object', function () {
-				const auth = new this.AuthorizationRequest({
-					response_type: 'code',
+			it('should check userinfo property being a simple object', async function () {
+				const auth = new AuthorizationRequest({
 					scope: 'openid',
 					claims: '{"userinfo": "Not an Object"}'
 				});
 
-				return this.wrap({ route, verb, auth })
-					.expect(303)
-					.expect(
-						auth.validatePresence(['error', 'error_description', 'state'])
-					)
-					.expect(auth.validateState)
-					.expect(auth.validateClientLocation)
-					.expect(auth.validateError('invalid_request'))
-					.expect(
-						auth.validateErrorDescription('claims.userinfo should be an object')
-					);
+				const cookie = await setup.login();
+				const { response } = await authRequest(auth, { cookie });
+				expect(response.status).toBe(303);
+				auth.validatePresence(response, [
+					'error',
+					'error_description',
+					'state'
+				]);
+				auth.validateState(response);
+				auth.validateClientLocation(response);
+				auth.validateError(response, 'invalid_request');
+				auth.validateErrorDescription(
+					response,
+					'claims.userinfo must be an object'
+				);
 			});
 
-			it('should check id_token property being a simple object', function () {
-				const auth = new this.AuthorizationRequest({
-					response_type: 'code',
+			it('should check id_token property being a simple object', async function () {
+				const auth = new AuthorizationRequest({
 					scope: 'openid',
 					claims: '{"id_token": "Not an Object"}'
 				});
 
-				return this.wrap({ route, verb, auth })
-					.expect(303)
-					.expect(
-						auth.validatePresence(['error', 'error_description', 'state'])
-					)
-					.expect(auth.validateState)
-					.expect(auth.validateClientLocation)
-					.expect(auth.validateError('invalid_request'))
-					.expect(
-						auth.validateErrorDescription('claims.id_token should be an object')
-					);
+				const cookie = await setup.login();
+				const { response } = await authRequest(auth, { cookie });
+				expect(response.status).toBe(303);
+				auth.validatePresence(response, [
+					'error',
+					'error_description',
+					'state'
+				]);
+				auth.validateState(response);
+				auth.validateClientLocation(response);
+				auth.validateError(response, 'invalid_request');
+				auth.validateErrorDescription(
+					response,
+					'claims.id_token must be an object'
+				);
 			});
 
 			describe('when userinfo is disabled', () => {
-				before(function () {
-					i(this.provider).features.userinfo.enabled = false;
+				beforeEach(function () {
+					i(provider).features.userinfo.enabled = false;
 				});
 
-				after(function () {
-					i(this.provider).features.userinfo.enabled = false;
+				afterEach(function () {
+					i(provider).features.userinfo.enabled = true;
 				});
 
-				it('should not accept userinfo as a property', function () {
-					const auth = new this.AuthorizationRequest({
-						response_type: 'code',
+				it('should not accept userinfo as a property', async function () {
+					const auth = new AuthorizationRequest({
 						scope: 'openid',
 						claims: {
 							userinfo: {
@@ -855,19 +865,22 @@ expire.setDate(expire.getDate() + 1);
 						}
 					});
 
-					return this.wrap({ route, verb, auth })
-						.expect(303)
-						.expect(
-							auth.validatePresence(['error', 'error_description', 'state'])
-						)
-						.expect(auth.validateState)
-						.expect(auth.validateClientLocation)
-						.expect(auth.validateError('invalid_request'))
-						.expect(
-							auth.validateErrorDescription(
-								'claims.userinfo should not be used since userinfo endpoint is not supported'
-							)
-						);
+					const cookie = await setup.login();
+					const { response } = await authRequest(auth, { cookie });
+
+					expect(response.status).toBe(303);
+					auth.validatePresence(response, [
+						'error',
+						'error_description',
+						'state'
+					]);
+					auth.validateState(response);
+					auth.validateClientLocation(response);
+					auth.validateError(response, 'invalid_request');
+					auth.validateErrorDescription(
+						response,
+						'claims.userinfo should not be used since userinfo endpoint is not supported'
+					);
 				});
 			});
 		});

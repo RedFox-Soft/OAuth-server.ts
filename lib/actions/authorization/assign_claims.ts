@@ -14,7 +14,7 @@ export default function assignClaims(ctx) {
 		params.claims !== undefined &&
 		instance(ctx.oidc.provider).features.claimsParameter.enabled
 	) {
-		ctx.oidc.claims = JSON.parse(params.claims);
+		ctx.oidc.claims = params.claims;
 	}
 
 	if (

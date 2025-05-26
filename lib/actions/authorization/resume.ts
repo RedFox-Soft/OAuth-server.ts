@@ -4,7 +4,6 @@ import nanoid from '../../helpers/nanoid.ts';
 import * as errors from '../../helpers/errors.ts';
 import { formPost } from '../../html/formPost.js';
 import epochTime from '../../helpers/epoch_time.ts';
-import { cookieNames } from 'lib/consts/param_list.js';
 
 export default async function resumeAction(ctx, interaction) {
 	ctx.oidc.entity('Interaction', interaction);

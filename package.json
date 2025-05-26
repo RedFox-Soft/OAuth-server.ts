@@ -5,8 +5,6 @@
 		"format": "eslint lib example certification test docs --fix",
 		"build": "bun build --outdir=dist --minify ./lib/interactions/loginClient.tsx",
 		"watch": "bun build --outdir=dist --minify ./lib/interactions/loginClient.tsx --watch",
-		"test": "set NODE_ENV=test && bun test $(fd .spec.ts test)",
-		"test-ci": "node ./test/ci --experimental-strip-types"
 	},
 	"dependencies": {
 		"@ant-design/cssinjs": "^1.23.0",

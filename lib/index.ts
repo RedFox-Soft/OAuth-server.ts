@@ -19,6 +19,7 @@ import {
 import { tokenAction } from './actions/token.js';
 import { ui } from './interactions/index.js';
 import { discovery } from './actions/discovery.js';
+import { userinfo } from './actions/userinfo.js';
 
 export const elysia = new Elysia({ strictPath: true, normalize: false })
 	.onError(errorHandler)
@@ -30,5 +31,6 @@ export const elysia = new Elysia({ strictPath: true, normalize: false })
 	.use(authPost)
 	.use(par)
 	.use(tokenAction)
+	.use(userinfo)
 	.use(ui)
 	.listen(8080);

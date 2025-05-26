@@ -44,11 +44,8 @@ import { authVerification } from './authVerification.js';
 import { authorizationPKCE } from 'lib/helpers/pkce.js';
 
 const authorizationRequest = t.Composite([
-	t.Omit(
-		AuthorizationParameters,
-		['request_uri', 'request', 'client_id'],
-		t.Object({ client_id: t.Optional(t.String()) })
-	)
+	t.Omit(AuthorizationParameters, ['request_uri', 'request', 'client_id']),
+	t.Object({ client_id: t.Optional(t.String()) })
 ]);
 
 async function authorizationActionHandler(ctx) {
@@ -67,9 +64,9 @@ async function authorizationActionHandler(ctx) {
 	checkOpenidScope(ctx);
 	checkRedirectUri(ctx);
 	authorizationPKCE(ctx.oidc.params);
-	checkClaims;
-	checkRar;
-	checkResource;
+	await checkClaims(ctx);
+	await checkRar(ctx);
+	await checkResource(ctx);
 	checkMaxAge(ctx);
 	await checkIdTokenHint(ctx);
 	interactionEmit;
@@ -142,6 +139,7 @@ export const authPost = new Elysia()
 export const par = new Elysia()
 	.derive(contentType('application/x-www-form-urlencoded'))
 	.guard({
+		query: t.Object({}),
 		body: t.Composite([
 			t.Omit(AuthorizationParameters, ['request_uri', 'client_id']),
 			t.Object({

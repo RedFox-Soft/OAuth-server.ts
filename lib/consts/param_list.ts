@@ -38,10 +38,21 @@ export const AuthorizationParameters = t.Object({
 	// added conditionally depending on feature flag which will be checked in the code
 	web_message_uri: t.Optional(t.String()),
 	claims: t.Optional(
-		t.ObjectString({
-			id_token: t.Optional(t.Object({})),
-			userinfo: t.Optional(t.Object({}))
-		})
+		t.ObjectString(
+			{
+				id_token: t.Optional(
+					t.Object({}, { error: 'claims.id_token must be an object' })
+				),
+				userinfo: t.Optional(
+					t.Object({}, { error: 'claims.userinfo must be an object' })
+				)
+			},
+			{
+				additionalProperties: false,
+				error:
+					'claims parameter should be object with userinfo or id_token properties'
+			}
+		)
 	),
 	resource: t.Optional(t.Array(t.String())),
 	authorization_details: t.Optional(t.Array(t.Object({}))),
@@ -60,7 +71,7 @@ export const routeNames = {
 	registration: '/reg',
 	revocation: '/token/revocation',
 	token: '/token',
-	userinfo: '/me'
+	userinfo: '/userinfo'
 };
 
 export const cookieNames = {

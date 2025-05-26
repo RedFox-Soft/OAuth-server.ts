@@ -4,7 +4,6 @@ import * as errors from '../../helpers/errors.ts';
 import instance from '../../helpers/weak_cache.ts';
 import nanoid from '../../helpers/nanoid.ts';
 import omitBy from '../../helpers/_/omit_by.ts';
-import { console } from 'node:inspector';
 import { cookieNames } from 'lib/consts/param_list.js';
 
 export default async function interactions(resumeRouteName, ctx) {
