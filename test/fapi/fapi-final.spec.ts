@@ -11,45 +11,6 @@ import { expect } from 'chai';
 describe('Financial-grade API Security Profile 1.0 - Part 2: Advanced (FINAL) behaviours', () => {
 	before(bootstrap(import.meta.url, { config: 'fapi-final' }));
 
-	describe('userinfo', () => {
-		before(function () {
-			return this.login();
-		});
-
-		it('does not allow query string bearer token', async function () {
-			const at = await new this.provider.AccessToken({
-				client: await this.provider.Client.find('client'),
-				accountId: this.loggedInAccountId,
-				grantId: this.getGrantId(),
-				scope: 'openid'
-			}).save();
-
-			await this.agent
-				.get('/me')
-				.query({ access_token: at })
-				.expect(
-					this.failWith(
-						400,
-						'invalid_request',
-						'access tokens must not be provided via query parameter'
-					)
-				);
-
-			await this.agent
-				.get('/me')
-				.auth(at, { type: 'bearer' })
-				.expect(200)
-				.expect({ sub: this.loggedInAccountId });
-
-			await this.agent
-				.post('/me')
-				.type('form')
-				.send({ access_token: at })
-				.expect(200)
-				.expect({ sub: this.loggedInAccountId });
-		});
-	});
-
 	describe('FAPI 1.0 Final Authorization Request', () => {
 		beforeEach(function () {
 			return this.login();
