@@ -15,9 +15,6 @@ describe('Financial-grade API Security Profile 1.0 - Part 2: Advanced (FINAL) be
 		beforeEach(function () {
 			return this.login();
 		});
-		afterEach(function () {
-			return this.logout();
-		});
 
 		it('requires PKCE to be used when PAR is used', function () {
 			return this.agent
