@@ -1,8 +1,7 @@
 import * as crypto from 'node:crypto';
 
-import sessionMiddleware from '../shared/session.ts';
+import sessionHandler from '../shared/session.ts';
 import paramsMiddleware from '../shared/assemble_params.ts';
-import bodyParser from '../shared/conditional_body.ts';
 import rejectDupes from '../shared/reject_dupes.ts';
 import instance from '../helpers/weak_cache.ts';
 import { InvalidClient, InvalidRequest } from '../helpers/errors.ts';
@@ -16,14 +15,50 @@ import {
 	AlreadyUsedError,
 	AbortedError
 } from '../helpers/re_render_errors.ts';
+import { Elysia, t } from 'elysia';
+import { AuthorizationCookies, routeNames } from 'lib/consts/param_list.js';
+import { provider } from 'lib/provider.js';
+import interactions from './authorization/interactions.js';
+import loadGrant from './authorization/load_grant.js';
+import loadAccount from './authorization/load_account.js';
+import assignClaims from './authorization/assign_claims.js';
+import checkResource from 'lib/shared/check_resource.js';
+import checkClient from './authorization/check_client.js';
+import deviceUserFlowErrors from './authorization/device_user_flow_errors.js';
+import deviceUserFlowResponse from './authorization/device_user_flow_response.js';
 
-const parseBody = bodyParser.bind(
-	undefined,
-	'application/x-www-form-urlencoded'
-);
+async function codeVerificationActionHandler(ctx) {
+	deviceUserFlowErrors;
+	await checkClient(ctx);
+	await checkResource(ctx);
+	assignClaims(ctx);
+	await loadAccount(ctx);
+	await loadGrant(cxt);
+	interactions('device_resume', ctx);
+	await deviceUserFlowResponse(ctx);
+}
+
+export const codeVerification = new Elysia()
+	.guard({
+		cookies: AuthorizationCookies
+	})
+	.get(
+		routeNames.code_verification,
+		async ({ cookie, query }) => {
+			const ctx = { cookie };
+			const OIDCContext = provider.OIDCContext;
+			ctx.oidc = new OIDCContext(ctx);
+
+			const setCookies = await sessionHandler();
+		},
+		{
+			query: t.Object({
+				user_code: t.Optional(t.String())
+			})
+		}
+	);
 
 export const get = [
-	sessionMiddleware,
 	paramsMiddleware.bind(undefined, new Set(['user_code'])),
 	async function renderCodeVerification(ctx) {
 		const { charset, userCodeInputSource } = instance(ctx.oidc.provider)
@@ -49,8 +84,6 @@ export const get = [
 ];
 
 export const post = [
-	sessionMiddleware,
-	parseBody,
 	paramsMiddleware.bind(
 		undefined,
 		new Set(['xsrf', 'user_code', 'confirm', 'abort'])

@@ -10,9 +10,14 @@ import { PUSHED_REQUEST_URN } from '../../consts/index.ts';
  */
 export default async function loadPushedAuthorizationRequest(ctx) {
 	const {
+		client,
 		params,
 		provider: { PushedAuthorizationRequest }
 	} = ctx.oidc;
+
+	if (client.requirePushedAthoruizationRequests && !params.request_uri) {
+		throw new InvalidRequest('Pushed Authorization Request must beuse d');
+	}
 
 	if (params.request !== undefined && params.request_uri !== undefined) {
 		throw new InvalidRequest(

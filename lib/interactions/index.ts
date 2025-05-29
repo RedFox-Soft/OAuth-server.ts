@@ -12,6 +12,11 @@ import assignClaims from 'lib/actions/authorization/assign_claims.js';
 import loadAccount from 'lib/actions/authorization/load_account.js';
 import loadGrant from 'lib/actions/authorization/load_grant.js';
 import interactions from 'lib/actions/authorization/interactions.js';
+import {
+	AlreadyUsedError,
+	ExpiredError,
+	NotFoundError
+} from 'lib/helpers/re_render_errors.js';
 
 const htmlTeamplate = Bun.file('./lib/interactions/htmlTeamplate.html');
 
@@ -82,4 +87,39 @@ export const ui = new Elysia()
 		await interactions('resume', ctx);
 		await setCookies();
 		return respond(ctx);
+	})
+	.get('ui/:uid/device_resume', async ({ interaction, cookie }) => {
+		const ctx = { cookie, _matchedRouteName: 'ui.device_resume' };
+		const OIDCContext = provider.OIDCContext;
+		ctx.oidc = new OIDCContext(ctx);
+
+		const setCookies = await sessionHandler(ctx);
+
+		deviceUserFlowErrors;
+		await getResume(ctx, interaction);
+		cookie._interaction.remove();
+
+		const code = await ctx.oidc.provider.DeviceCode.find(
+			interaction.deviceCode,
+			{ ignoreExpiration: true, ignoreSessionBinding: true }
+		);
+
+		if (!code) {
+			throw new NotFoundError();
+		} else if (code.isExpired) {
+			throw new ExpiredError();
+		} else if (code.error || code.accountId) {
+			throw new AlreadyUsedError();
+		}
+		ctx.oidc.entity('DeviceCode', code);
+
+		await checkClient(ctx);
+		await checkResource(ctx);
+		provider.emit('interaction.ended');
+		assignClaims(ctx);
+		await loadAccount(ctx);
+		await loadGrant(ctx);
+		await interactions('device_resume', ctx);
+		await setCookies();
+		deviceUserFlowResponse;
 	});

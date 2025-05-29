@@ -22,9 +22,7 @@ export function authVerification(params: auth) {
 		params.claims = undefined;
 	}
 
-	if (params.registration !== undefined) {
-		throw new NotSupportedError('Registration is not supported');
-	} else if (
+	if (
 		(params.web_message_uri !== undefined ||
 			params.response_mode?.includes('web_message')) &&
 		!webMessageResponseMode.enabled

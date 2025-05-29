@@ -1,4 +1,3 @@
-import getAuthorization from './authorization/index.ts';
 import userinfo from './userinfo.ts';
 import jwks from './jwks.ts';
 import * as registration from './registration.ts';
@@ -8,7 +7,6 @@ import * as endSession from './end_session.ts';
 import * as codeVerification from './code_verification.ts';
 
 export {
-	getAuthorization,
 	userinfo,
 	jwks,
 	registration,

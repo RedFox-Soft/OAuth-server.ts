@@ -9,6 +9,11 @@ import { TSchema } from 'elysia';
 import { Value } from '@sinclair/typebox/value';
 import { ISSUER } from 'lib/helpers/env.js';
 
+export function isEncryptedJWT(jwt: string): boolean {
+	// Encrypted JWTs have 5 parts, while signed JWTs have 3
+	return jwt.split('.').length === 5;
+}
+
 /*
  * Decrypts and validates the content of provided request parameter and replaces the parameters
  * provided via OAuth2.0 authorization request with these
@@ -17,23 +22,10 @@ export default async function processRequestObject(schema: TSchema, ctx) {
 	const { params, client, route } = ctx.oidc;
 
 	const pushedRequestObject = 'PushedAuthorizationRequest' in ctx.oidc.entities;
-	if (
-		client.requirePushedAuthorizationRequests &&
-		route !== '/par' &&
-		!pushedRequestObject
-	) {
-		throw new InvalidRequest('Pushed Authorization Request must be used');
-	}
-
 	const isBackchannelAuthentication = route === 'backchannel_authentication';
 	const { configuration, features } = instance(ctx.oidc.provider);
 
-	if (
-		params.request === undefined &&
-		(client.requireSignedRequestObject ||
-			(client.backchannelAuthenticationRequestSigningAlg &&
-				isBackchannelAuthentication))
-	) {
+	if (params.request === undefined && client.requireSignedRequestObject) {
 		throw new InvalidRequest('Request Object must be used by this client');
 	}
 
@@ -43,13 +35,7 @@ export default async function processRequestObject(schema: TSchema, ctx) {
 
 	let trusted = false; // signed or encrypted by client confidential material
 
-	if (features.encryption.enabled && params.request.split('.').length === 5) {
-		if (isBackchannelAuthentication) {
-			throw new InvalidRequest(
-				'Encrypted Request Objects are not supported by CIBA'
-			);
-		}
-
+	if (features.encryption.enabled && isEncryptedJWT(params.request)) {
 		try {
 			const header = JWT.header(params.request);
 

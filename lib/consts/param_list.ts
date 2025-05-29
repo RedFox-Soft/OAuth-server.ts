@@ -27,7 +27,9 @@ export const AuthorizationParameters = t.Object({
 	prompt: t.Optional(t.String()),
 	scope: t.Optional(t.String()),
 	response_mode: t.Optional(t.String()),
-	registration: t.Optional(t.String()),
+	registration: t.Optional(
+		t.Undefined({ error: 'Registration is not supported' })
+	),
 	request: t.Optional(t.String()),
 	request_uri: t.Optional(t.String()),
 	ui_locales: t.Optional(t.Array(t.String())),
@@ -59,6 +61,35 @@ export const AuthorizationParameters = t.Object({
 	dpop_jkt: t.Optional(t.String())
 });
 
+export const DeviceAuthorizationParameters = t.Omit(AuthorizationParameters, [
+	'web_message_uri',
+	'response_type',
+	'response_mode',
+	'code_challenge_method',
+	'code_challenge',
+	'state',
+	'redirect_uri',
+	'prompt'
+]);
+
+const BackchannelAuthParameters = t.Composite([
+	DeviceAuthorizationParameters,
+	t.Object({
+		client_notification_token: t.Optional(t.String()),
+		login_hint_token: t.Optional(t.String()),
+		binding_message: t.Optional(t.String()),
+		user_code: t.Optional(t.String()),
+		request_context: t.Optional(t.String()),
+		requested_expiry: t.Optional(
+			t.Numeric({
+				minimum: 0,
+				maximum: Number.MAX_SAFE_INTEGER,
+				error: 'requested_expiry must be a positive integer'
+			})
+		)
+	})
+]);
+
 export const routeNames = {
 	authorization: '/auth',
 	backchannel_authentication: '/backchannel',
@@ -72,7 +103,7 @@ export const routeNames = {
 	revocation: '/token/revocation',
 	token: '/token',
 	userinfo: '/userinfo'
-};
+} as const;
 
 export const cookieNames = {
 	interaction: '_interaction',

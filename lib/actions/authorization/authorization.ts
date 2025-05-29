@@ -53,6 +53,7 @@ async function authorizationActionHandler(ctx) {
 	const allowList = new Set(PARAM_LIST);
 	const setCookies = await sessionHandler(ctx);
 	await checkClient(ctx);
+
 	await loadPushedAuthorizationRequest(ctx);
 	await processRequestObject(authorizationRequest, ctx);
 	checkResponseMode(ctx);
