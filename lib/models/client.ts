@@ -16,7 +16,6 @@ import constantEquals from '../helpers/constant_equals.ts';
 import { InvalidClient, InvalidClientMetadata } from '../helpers/errors.ts';
 import certificateThumbprint from '../helpers/certificate_thumbprint.ts';
 import sectorIdentifier from '../helpers/sector_identifier.ts';
-import { LOOPBACKS } from '../consts/client_attributes.ts';
 import sectorValidate from '../helpers/sector_validate.ts';
 import addClient from '../helpers/add_client.ts';
 import getSchema from '../helpers/client_schema.ts';
@@ -367,6 +366,7 @@ export default function getClient(provider) {
 		static #adapter;
 
 		constructor(metadata, ctx) {
+			Client.#Schema = getSchema(provider);
 			const schema = new Client.Schema(metadata, ctx);
 
 			Object.assign(
