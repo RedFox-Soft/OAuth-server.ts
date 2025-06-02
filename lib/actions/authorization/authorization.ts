@@ -1,4 +1,4 @@
-import { Elysia, t } from 'elysia';
+import { Elysia, t, ValidationError } from 'elysia';
 
 import { PARAM_LIST } from '../../consts/index.ts';
 import checkRar from '../../shared/check_rar.ts';
@@ -78,7 +78,7 @@ export async function isAllowRedirectUri(params) {
 	try {
 		await processRequestObject(authorizationRequest, ctx);
 	} catch (e) {
-		if (!(e instanceof OIDCProviderError)) {
+		if (!(e instanceof OIDCProviderError) && !(e instanceof ValidationError)) {
 			throw e;
 		}
 	}
