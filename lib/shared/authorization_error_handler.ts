@@ -1,49 +1,10 @@
 import { provider } from 'lib/provider.js';
 import instance from '../helpers/weak_cache.ts';
-import oneRedirectUriClients from '../actions/authorization/one_redirect_uri_clients.ts';
-import {
-	InvalidClient,
-	InvalidRedirectUri,
-	OIDCProviderError
-} from '../helpers/errors.ts';
+import { OIDCProviderError } from '../helpers/errors.ts';
 import { getErrorHtmlResponse } from '../html/error.tsx';
 import { routeNames } from 'lib/consts/param_list.js';
-import { type Context, mapValueError, ValidationError } from 'elysia';
-
-async function isAllowRedirectUri(params) {
-	const ctx = {};
-	const OIDCContext = provider.OIDCContext;
-	ctx.oidc = new OIDCContext(ctx);
-	ctx.oidc.params = params;
-
-	if (!params.client_id) {
-		throw new InvalidClient('client_id is required', 'client not found');
-	}
-	if (typeof params.client_id !== 'string') {
-		throw new InvalidClient('client is invalid', 'client not found');
-	}
-	const client = await provider.Client.find(params.client_id);
-	if (!client) {
-		throw new InvalidClient('client is invalid', 'client not found');
-	}
-	ctx.oidc.entity('Client', client);
-
-	let redirect_uri = params.redirect_uri;
-	if (redirect_uri === undefined) {
-		oneRedirectUriClients(ctx);
-		redirect_uri = params.redirect_uri;
-	}
-	if (typeof redirect_uri !== 'string') {
-		throw new InvalidRedirectUri();
-	}
-	if (!client.redirectUriAllowed(redirect_uri)) {
-		throw new InvalidRedirectUri();
-	}
-
-	const state = typeof params.state !== 'string' ? undefined : params.state;
-
-	return { redirect_uri, state };
-}
+import { type Context, mapValueError } from 'elysia';
+import { isAllowRedirectUri } from 'lib/actions/authorization/authorization.js';
 
 function getObjFromError(code: string, errorObj: any) {
 	if (errorObj instanceof OIDCProviderError) {
@@ -57,10 +18,14 @@ function getObjFromError(code: string, errorObj: any) {
 				? validator.Errors(errorObj.value).First()
 				: errorObj;
 		if (firstError.schema.error) {
-			return {
-				error: 'invalid_request',
-				error_description: firstError.schema.error
-			};
+			const schemaError = firstError.schema.error;
+			if (typeof schemaError === 'string') {
+				return {
+					error: 'invalid_request',
+					error_description: firstError.schema.error
+				};
+			}
+			return schemaError;
 		}
 		const error_description =
 			mapValueError(firstError).summary || 'Validation error';
@@ -77,7 +42,8 @@ function getObjFromError(code: string, errorObj: any) {
 
 const mapErrorCode = {
 	[routeNames.token]: 'grant.error',
-	[routeNames.authorization]: 'authorization.error'
+	[routeNames.authorization]: 'authorization.error',
+	[routeNames.device_authorization]: 'device_authorization.error'
 };
 
 export async function errorHandler(obj) {

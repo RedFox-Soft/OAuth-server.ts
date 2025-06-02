@@ -4,6 +4,7 @@ import { PUSHED_REQUEST_URN } from '../../consts/index.ts';
 import epochTime from '../../helpers/epoch_time.ts';
 import * as JWT from '../../helpers/jwt.ts';
 import { ISSUER } from 'lib/helpers/env.js';
+import { nanoid } from 'nanoid';
 
 const MAX_TTL = 60;
 
@@ -32,6 +33,7 @@ export default async function pushedAuthorizationRequestResponse(ctx) {
 		}
 
 		request = new UnsecuredJWT(payload)
+			.setJti(nanoid())
 			.setIssuedAt(now)
 			.setIssuer(ctx.oidc.client.clientId)
 			.setAudience(ISSUER)

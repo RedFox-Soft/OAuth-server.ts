@@ -1,800 +1,702 @@
 import * as crypto from 'node:crypto';
-import { parse } from 'node:url';
+import { parse, URL } from 'node:url';
 
+import { describe, it, beforeAll, afterEach, expect, mock } from 'bun:test';
 import { importJWK } from 'jose';
 import sinon from 'sinon';
-import { expect } from 'chai';
 
 import * as JWT from '../../lib/helpers/jwt.ts';
-import bootstrap from '../test_helper.js';
+import bootstrap, { agent, jsonToFormUrlEncoded } from '../test_helper.js';
+import { provider } from 'lib/provider.js';
+import { ISSUER } from 'lib/helpers/env.js';
+import { ValidationError } from 'elysia';
+import { isError } from 'node:util';
 
 describe('request parameter features', () => {
-	before(bootstrap(import.meta.url));
+	let setup = null;
+	beforeAll(async function () {
+		setup = await bootstrap(import.meta.url)();
+	});
+
+	afterEach(function () {
+		mock.restore();
+	});
 
 	describe('configuration features.request', () => {
 		it('extends discovery', async function () {
-			await this.agent
-				.get('/.well-known/openid-configuration')
-				.expect(200)
-				.expect((response) => {
-					expect(response.body).to.have.property(
-						'request_parameter_supported',
-						true
-					);
-					expect(response.body).not.to.have.property(
-						'require_signed_request_object'
-					);
-				});
+			const { data } = await agent['.well-known']['openid-configuration'].get();
+			expect(data).toHaveProperty('request_parameter_supported', true);
+			expect(data).not.toHaveProperty('require_signed_request_object');
 
-			i(this.provider).features.requestObjects.requireSignedRequestObject =
-				true;
+			i(provider).features.requestObjects.requireSignedRequestObject = true;
 
-			await this.agent
-				.get('/.well-known/openid-configuration')
-				.expect(200)
-				.expect((response) => {
-					expect(response.body).to.have.property(
-						'request_parameter_supported',
-						true
-					);
-					expect(response.body).to.have.property(
-						'require_signed_request_object',
-						true
-					);
-				});
+			const { data: newData } =
+				await agent['.well-known']['openid-configuration'].get();
+
+			expect(newData).toHaveProperty('request_parameter_supported', true);
+			expect(newData).toHaveProperty('require_signed_request_object', true);
 		});
 
-		after(function () {
-			i(this.provider).features.requestObjects.requireSignedRequestObject =
-				false;
+		afterEach(function () {
+			i(provider).features.requestObjects.requireSignedRequestObject = false;
 		});
 	});
 
-	function redirectSuccess(response) {
-		const expected = parse('https://client.example.com/cb', true);
-		const actual = parse(response.headers.location, true);
-		['protocol', 'host', 'pathname'].forEach((attr) => {
-			expect(actual[attr]).to.equal(expected[attr]);
+	async function authorization(
+		client_id: string,
+		{
+			jwtPayload = {},
+			payload = {},
+			verb = 'get',
+			isError = false,
+			jwtKey
+		} = {}
+	) {
+		const code_verifier = crypto.randomBytes(32).toString('base64url');
+		const code_challenge = crypto.hash('sha256', code_verifier, 'base64url');
+		const request = await JWT.sign(
+			{
+				jti: crypto.randomBytes(16).toString('base64url'),
+				client_id,
+				redirect_uri: 'https://client.example.com/cb',
+				response_type: 'code',
+				code_challenge_method: 'S256',
+				code_challenge,
+				...jwtPayload
+			},
+			jwtKey ?? Buffer.from('secret'),
+			'HS256',
+			{ issuer: client_id, audience: ISSUER, expiresIn: 30 }
+		);
+
+		const cookie = await setup.login({
+			claims: { id_token: { email: null } }
 		});
-		expect(actual.query).to.have.property('code');
+		let authResp = null;
+		if (verb === 'get') {
+			authResp = await agent.auth.get({
+				query: {
+					client_id,
+					request,
+					...payload
+				},
+				headers: {
+					cookie
+				}
+			});
+		} else {
+			authResp = await agent.auth.post(
+				// @ts-expect-error endpoint will be parse to object
+				jsonToFormUrlEncoded({
+					client_id,
+					request,
+					...payload
+				}),
+				{
+					headers: {
+						cookie
+					}
+				}
+			);
+		}
+
+		if (isError) {
+			expect(authResp.status).toBe(303);
+			return authResp;
+		}
+
+		if (jwtPayload.response_mode === 'form_post') {
+			expect(authResp.status).toBe(200);
+			expect(authResp.response.headers.get('content-type')).toBe(
+				'text/html; charset=utf-8'
+			);
+			return authResp;
+		}
+		expect(authResp.status).toBe(303);
+		const location = authResp.response.headers.get('location');
+		expect(location?.startsWith('https://client.example.com/cb')).toBeTrue();
+		const params = new URLSearchParams(parse(location).query);
+		expect(params.get('code')).not.toBeNull();
+
+		return authResp;
 	}
-	function httpSuccess({ body }) {
-		expect(body).to.contain.key('device_code');
+
+	async function authorizationDevice(
+		client_id: string,
+		{ jwtPayload = {}, payload = {}, isError = false, jwtKey } = {}
+	) {
+		const request = await JWT.sign(
+			{
+				jti: crypto.randomBytes(16).toString('base64url'),
+				client_id,
+				...jwtPayload
+			},
+			jwtKey ?? Buffer.from('secret'),
+			'HS256',
+			{ issuer: client_id, audience: ISSUER, expiresIn: 30 }
+		);
+
+		const cookie = await setup.login({
+			claims: { id_token: { email: null } }
+		});
+
+		const authResp = await agent.device.auth.post(
+			// @ts-expect-error endpoint will be parse to object
+			jsonToFormUrlEncoded({
+				client_id,
+				request,
+				...payload
+			}),
+			{
+				headers: {
+					cookie
+				}
+			}
+		);
+
+		if (isError) {
+			expect([400, 422]).toContain(authResp.status);
+			return authResp;
+		}
+
+		expect(authResp.response.status).toBe(200);
+		expect(authResp.data).toHaveProperty('device_code');
+		return authResp;
 	}
 
 	[
 		[
-			'/auth',
+			'auth',
 			'get',
+			authorization,
 			'authorization.error',
-			303,
-			303,
-			redirectSuccess,
 			'authorization.success'
 		],
 		[
 			'/auth',
 			'post',
+			authorization,
 			'authorization.error',
-			303,
-			303,
-			redirectSuccess,
 			'authorization.success'
 		],
 		[
 			'/device/auth',
 			'post',
+			authorizationDevice,
 			'device_authorization.error',
-			200,
-			400,
-			httpSuccess,
 			'device_authorization.success'
 		]
-	].forEach(
-		([
-			route,
-			verb,
-			errorEvt,
-			successCode,
-			errorCode,
-			successFnCheck,
-			successEvt
-		]) => {
-			describe(`${route} ${verb} passing request parameters as JWTs`, () => {
-				before(function () {
-					return this.login({
-						claims: { id_token: { email: null } }
-					});
-				});
-				after(function () {
-					i(this.provider).configuration.clockTolerance = 0;
-					return this.logout();
-				});
-				if (route === '/auth') {
-					beforeEach(function () {
-						this.code_challenge_method = 'S256';
-						this.code_verifier = crypto.randomBytes(32).toString('base64url');
-						this.code_challenge = crypto.hash(
-							'sha256',
-							this.code_verifier,
-							'base64url'
-						);
-					});
-				}
+	].forEach(([route, verb, authorizationRequest, errorEvt, successEvt]) => {
+		describe(`${route} ${verb} passing request parameters as JWTs`, () => {
+			afterEach(function () {
+				i(provider).configuration.clockTolerance = 0;
+			});
 
-				it('does not use anything from the OAuth 2.0 parameters', async function () {
-					const spy = sinon.spy();
-					this.provider.once('authorization.success', spy);
+			it('does not use anything from the OAuth 2.0 parameters', async function () {
+				const spy = sinon.spy();
+				provider.once('authorization.success', spy);
 
-					if (successCode === 200) {
-						this.provider.once('device_authorization.success', ({ oidc }) => {
-							this.provider.emit('authorization.success', {
-								oidc: { params: oidc.entities.DeviceCode.params }
-							});
+				if (route === '/device/auth') {
+					provider.once('device_authorization.success', ({ oidc }) => {
+						provider.emit('authorization.success', {
+							oidc: { params: oidc.entities.DeviceCode.params }
 						});
-					}
-
-					await JWT.sign(
-						{
-							jti: crypto.randomBytes(16).toString('base64url'),
-							client_id: 'client',
-							response_type: 'code',
-							redirect_uri: 'https://client.example.com/cb',
-							code_challenge_method: this.code_challenge_method,
-							code_challenge: this.code_challenge,
-							scope: 'openid'
-						},
-						Buffer.from('secret'),
-						'HS256',
-						{ issuer: 'client', audience: this.provider.issuer, expiresIn: 30 }
-					).then((request) =>
-						this.wrap({
-							agent: this.agent,
-							route,
-							verb,
-							auth: {
-								request,
-								ui_locales: 'foo',
-								client_id: 'client'
-							}
-						})
-							.expect(successCode)
-							.expect(successFnCheck)
-							.expect(() => {
-								expect(spy.calledOnce).to.be.true;
-								expect(spy.args[0][0].oidc.params.ui_locales).to.eq(undefined);
-							})
-					);
-				});
-
-				it('can contain max_age parameter as a number and it (and other params too) will be forced as string', async function () {
-					const spy = sinon.spy();
-					this.provider.once(successEvt, spy);
-
-					await JWT.sign(
-						{
-							jti: crypto.randomBytes(16).toString('base64url'),
-							client_id: 'client',
-							response_type: 'code',
-							scope: 'openid',
-							redirect_uri: 'https://client.example.com/cb',
-							code_challenge_method: this.code_challenge_method,
-							code_challenge: this.code_challenge,
-							max_age: 300
-						},
-						Buffer.from('secret'),
-						'HS256',
-						{ issuer: 'client', audience: this.provider.issuer, expiresIn: 30 }
-					).then((request) =>
-						this.wrap({
-							agent: this.agent,
-							route,
-							verb,
-							auth: {
-								request,
-								scope: 'openid',
-								client_id: 'client',
-								response_type: 'code'
-							}
-						})
-							.expect(successCode)
-							.expect(successFnCheck)
-					);
-
-					expect(
-						spy.calledWithMatch({
-							oidc: { params: { max_age: sinon.match.string } }
-						})
-					).to.be.true;
-				});
-
-				it('can contain params as array and have them handled as dupes', async function () {
-					const spy = sinon.spy();
-					this.provider.once(errorEvt, spy);
-
-					return JWT.sign(
-						{
-							jti: crypto.randomBytes(16).toString('base64url'),
-							client_id: 'client',
-							response_type: 'code',
-							scope: ['openid', 'profile'],
-							redirect_uri: 'https://client.example.com/cb',
-							code_challenge_method: this.code_challenge_method,
-							code_challenge: this.code_challenge
-						},
-						Buffer.from('secret'),
-						'HS256',
-						{ issuer: 'client', audience: this.provider.issuer, expiresIn: 30 }
-					).then((request) =>
-						this.wrap({
-							agent: this.agent,
-							route,
-							verb,
-							auth: {
-								request,
-								scope: 'openid',
-								client_id: 'client',
-								response_type: 'code'
-							}
-						})
-							.expect(errorCode)
-							.expect(() => {
-								expect(spy.calledOnce).to.be.true;
-								expect(spy.args[0][1]).to.have.property(
-									'message',
-									'invalid_request'
-								);
-								expect(spy.args[0][1]).to.have.property(
-									'error_description',
-									"'scope' parameter must not be provided twice"
-								);
-							})
-					);
-				});
-
-				it('can contain claims parameter as JSON', async function () {
-					const spy = sinon.spy();
-					this.provider.once(successEvt, spy);
-					const claims = JSON.stringify({ id_token: { email: null } });
-
-					await JWT.sign(
-						{
-							jti: crypto.randomBytes(16).toString('base64url'),
-							client_id: 'client',
-							response_type: 'code',
-							redirect_uri: 'https://client.example.com/cb',
-							code_challenge_method: this.code_challenge_method,
-							code_challenge: this.code_challenge,
-							scope: 'openid',
-							claims
-						},
-						Buffer.from('secret'),
-						'HS256',
-						{ issuer: 'client', audience: this.provider.issuer, expiresIn: 30 }
-					).then((request) =>
-						this.wrap({
-							agent: this.agent,
-							route,
-							verb,
-							auth: {
-								request,
-								scope: 'openid',
-								client_id: 'client',
-								response_type: 'code'
-							}
-						})
-							.expect(successCode)
-							.expect(successFnCheck)
-					);
-
-					expect(spy.calledWithMatch({ oidc: { params: { claims } } })).to.be
-						.true;
-				});
-
-				it('can contain claims parameter as object', async function () {
-					const spy = sinon.spy();
-					this.provider.once(successEvt, spy);
-					const claims = { id_token: { email: null } };
-
-					await JWT.sign(
-						{
-							jti: crypto.randomBytes(16).toString('base64url'),
-							client_id: 'client',
-							response_type: 'code',
-							redirect_uri: 'https://client.example.com/cb',
-							code_challenge_method: this.code_challenge_method,
-							code_challenge: this.code_challenge,
-							claims: { id_token: { email: null } },
-							scope: 'openid'
-						},
-						Buffer.from('secret'),
-						'HS256',
-						{ issuer: 'client', audience: this.provider.issuer, expiresIn: 30 }
-					).then((request) =>
-						this.wrap({
-							agent: this.agent,
-							route,
-							verb,
-							auth: {
-								request,
-								scope: 'openid',
-								client_id: 'client',
-								response_type: 'code'
-							}
-						})
-							.expect(successCode)
-							.expect(successFnCheck)
-					);
-
-					expect(
-						spy.calledWithMatch({
-							oidc: { params: { claims: JSON.stringify(claims) } }
-						})
-					).to.be.true;
-				});
-
-				it('can accept Request Objects issued within acceptable system clock skew', async function () {
-					const client = await this.provider.Client.find('client-with-HS-sig');
-					let [key] = client.symmetricKeyStore.selectForSign({ alg: 'HS256' });
-					key = await importJWK(key);
-					i(this.provider).configuration.clockTolerance = 10;
-					return JWT.sign(
-						{
-							jti: crypto.randomBytes(16).toString('base64url'),
-							iat: Math.ceil(Date.now() / 1000) + 5,
-							client_id: 'client-with-HS-sig',
-							scope: 'openid',
-							response_type: 'code',
-							redirect_uri: 'https://client.example.com/cb',
-							code_challenge_method: this.code_challenge_method,
-							code_challenge: this.code_challenge
-						},
-						key,
-						'HS256',
-						{
-							issuer: 'client-with-HS-sig',
-							audience: this.provider.issuer,
-							expiresIn: 30
-						}
-					).then((request) =>
-						this.wrap({
-							agent: this.agent,
-							route,
-							verb,
-							auth: {
-								request,
-								scope: 'openid',
-								client_id: 'client-with-HS-sig',
-								response_type: 'code'
-							}
-						})
-							.expect(successCode)
-							.expect(successFnCheck)
-					);
-				});
-
-				it('works with signed by an actual DSA', async function () {
-					const client = await this.provider.Client.find('client-with-HS-sig');
-					let [key] = client.symmetricKeyStore.selectForSign({ alg: 'HS256' });
-					key = await importJWK(key);
-					return JWT.sign(
-						{
-							jti: crypto.randomBytes(16).toString('base64url'),
-							client_id: 'client-with-HS-sig',
-							scope: 'openid',
-							response_type: 'code',
-							redirect_uri: 'https://client.example.com/cb',
-							code_challenge_method: this.code_challenge_method,
-							code_challenge: this.code_challenge
-						},
-						key,
-						'HS256',
-						{
-							issuer: 'client-with-HS-sig',
-							audience: this.provider.issuer,
-							expiresIn: 30
-						}
-					).then((request) =>
-						this.wrap({
-							agent: this.agent,
-							route,
-							verb,
-							auth: {
-								request,
-								scope: 'openid',
-								client_id: 'client-with-HS-sig',
-								response_type: 'code'
-							}
-						})
-							.expect(successCode)
-							.expect(successFnCheck)
-					);
-				});
-
-				it('rejects HMAC based requests when signed with an expired secret', async function () {
-					const client = await this.provider.Client.find(
-						'client-with-HS-sig-expired'
-					);
-					let [key] = client.symmetricKeyStore.selectForSign({ alg: 'HS256' });
-					key = await importJWK(key);
-
-					const spy = sinon.spy();
-					this.provider.once(errorEvt, spy);
-
-					return JWT.sign(
-						{
-							jti: crypto.randomBytes(16).toString('base64url'),
-							client_id: 'client-with-HS-sig-expired',
-							response_type: 'code',
-							redirect_uri: 'https://client.example.com/cb',
-							code_challenge_method: this.code_challenge_method,
-							code_challenge: this.code_challenge
-						},
-						key,
-						'HS256',
-						{
-							issuer: 'client-with-HS-sig-expired',
-							audience: this.provider.issuer,
-							expiresIn: 30
-						}
-					).then((request) =>
-						this.wrap({
-							agent: this.agent,
-							route,
-							verb,
-							auth: {
-								request,
-								scope: 'openid',
-								client_id: 'client-with-HS-sig-expired',
-								response_type: 'code'
-							}
-						})
-							.expect(errorCode)
-							.expect(() => {
-								expect(spy.calledOnce).to.be.true;
-								expect(spy.args[0][1]).to.have.property(
-									'message',
-									'invalid_request_object'
-								);
-								expect(spy.args[0][1]).to.have.property(
-									'error_description',
-									'could not validate the Request Object - the client secret used for its signature is expired'
-								);
-							})
-					);
-				});
-
-				it('doesnt allow request inception', function () {
-					const spy = sinon.spy();
-					this.provider.once(errorEvt, spy);
-
-					return JWT.sign(
-						{
-							jti: crypto.randomBytes(16).toString('base64url'),
-							client_id: 'client',
-							response_type: 'code',
-							request: 'request inception',
-							redirect_uri: 'https://client.example.com/cb',
-							code_challenge_method: this.code_challenge_method,
-							code_challenge: this.code_challenge
-						},
-						Buffer.from('secret'),
-						'HS256',
-						{ issuer: 'client', audience: this.provider.issuer, expiresIn: 30 }
-					).then((request) =>
-						this.wrap({
-							agent: this.agent,
-							route,
-							verb,
-							auth: {
-								request,
-								scope: 'openid',
-								client_id: 'client',
-								response_type: 'code'
-							}
-						})
-							.expect(errorCode)
-							.expect(() => {
-								expect(spy.calledOnce).to.be.true;
-								expect(spy.args[0][1]).to.have.property(
-									'message',
-									'invalid_request_object'
-								);
-								expect(spy.args[0][1]).to.have.property(
-									'error_description',
-									'Request Object must not contain request or request_uri properties'
-								);
-							})
-					);
-				});
-
-				it('doesnt allow requestUri inception', function () {
-					const spy = sinon.spy();
-					this.provider.once(errorEvt, spy);
-
-					return JWT.sign(
-						{
-							jti: crypto.randomBytes(16).toString('base64url'),
-							client_id: 'client',
-							response_type: 'code',
-							request_uri: 'request uri inception',
-							redirect_uri: 'https://client.example.com/cb',
-							code_challenge_method: this.code_challenge_method,
-							code_challenge: this.code_challenge
-						},
-						Buffer.from('secret'),
-						'HS256',
-						{ issuer: 'client', audience: this.provider.issuer, expiresIn: 30 }
-					).then((request) =>
-						this.wrap({
-							agent: this.agent,
-							route,
-							verb,
-							auth: {
-								request,
-								scope: 'openid',
-								client_id: 'client',
-								response_type: 'code'
-							}
-						})
-							.expect(errorCode)
-							.expect(() => {
-								expect(spy.calledOnce).to.be.true;
-								expect(spy.args[0][1]).to.have.property(
-									'message',
-									'invalid_request_object'
-								);
-								expect(spy.args[0][1]).to.have.property(
-									'error_description',
-									'Request Object must not contain request or request_uri properties'
-								);
-							})
-					);
-				});
-
-				if (route !== '/device/auth') {
-					it('may contain a response_mode and it will be honoured', function () {
-						return JWT.sign(
-							{
-								jti: crypto.randomBytes(16).toString('base64url'),
-								client_id: 'client',
-								response_type: 'code',
-								response_mode: 'fragment',
-								scope: 'openid',
-								redirect_uri: 'https://client.example.com/cb',
-								code_challenge_method: this.code_challenge_method,
-								code_challenge: this.code_challenge
-							},
-							Buffer.from('secret'),
-							'HS256',
-							{
-								issuer: 'client',
-								audience: this.provider.issuer,
-								expiresIn: 30
-							}
-						).then((request) =>
-							this.wrap({
-								agent: this.agent,
-								route,
-								verb,
-								auth: {
-									request,
-									scope: 'openid',
-									client_id: 'client',
-									response_type: 'code'
-								}
-							})
-								.expect(this.AuthorizationRequest.prototype.validateFragment)
-								.expect(successCode)
-								.expect(successFnCheck)
-						);
-					});
-
-					it('checks the response mode from the request', function () {
-						const spy = sinon.spy();
-						this.provider.once(errorEvt, spy);
-
-						return JWT.sign(
-							{
-								jti: crypto.randomBytes(16).toString('base64url'),
-								client_id: 'client',
-								response_type: 'code',
-								redirect_uri: 'https://client.example.com/cb',
-								code_challenge_method: this.code_challenge_method,
-								code_challenge: this.code_challenge,
-								response_mode: 'foo'
-							},
-							Buffer.from('secret'),
-							'HS256',
-							{
-								issuer: 'client',
-								audience: this.provider.issuer,
-								expiresIn: 30
-							}
-						).then((request) =>
-							this.wrap({
-								agent: this.agent,
-								route,
-								verb,
-								auth: {
-									request,
-									scope: 'openid',
-									client_id: 'client',
-									response_type: 'code',
-									response_mode: 'query'
-								}
-							})
-								.expect(errorCode)
-								.expect(() => {
-									expect(spy.calledOnce).to.be.true;
-									expect(spy.args[0][1]).to.have.property(
-										'message',
-										'unsupported_response_mode'
-									);
-									expect(spy.args[0][1]).to.have.property(
-										'error_description',
-										'unsupported response_mode requested'
-									);
-								})
-						);
-					});
-
-					it('doesnt allow response_type to differ', function () {
-						const spy = sinon.spy();
-						this.provider.once(errorEvt, spy);
-
-						return JWT.sign(
-							{
-								jti: crypto.randomBytes(16).toString('base64url'),
-								client_id: 'client',
-								response_type: 'id_token',
-								redirect_uri: 'https://client.example.com/cb',
-								code_challenge_method: this.code_challenge_method,
-								code_challenge: this.code_challenge
-							},
-							Buffer.from('secret'),
-							'HS256',
-							{
-								issuer: 'client',
-								audience: this.provider.issuer,
-								expiresIn: 30
-							}
-						).then((request) =>
-							this.wrap({
-								agent: this.agent,
-								route,
-								verb,
-								auth: {
-									request,
-									scope: 'openid',
-									client_id: 'client',
-									response_type: 'code'
-								}
-							})
-								.expect(errorCode)
-								.expect(() => {
-									expect(spy.calledOnce).to.be.true;
-									expect(spy.args[0][1]).to.have.property(
-										'message',
-										'invalid_request_object'
-									);
-									expect(spy.args[0][1]).to.have.property(
-										'error_description',
-										'request response_type must equal the one in request parameters'
-									);
-								})
-						);
-					});
-
-					it('uses the state from the request even if its validations will fail', function () {
-						const spy = sinon.spy();
-						this.provider.once(errorEvt, spy);
-
-						return JWT.sign(
-							{
-								jti: crypto.randomBytes(16).toString('base64url'),
-								client_id: 'client2',
-								response_type: 'code',
-								redirect_uri: 'https://client.example.com/cb',
-								code_challenge_method: this.code_challenge_method,
-								code_challenge: this.code_challenge,
-								state: 'foobar'
-							},
-							Buffer.from('secret'),
-							'HS256',
-							{
-								issuer: 'client2',
-								audience: this.provider.issuer,
-								expiresIn: 30
-							}
-						).then((request) =>
-							this.wrap({
-								agent: this.agent,
-								route,
-								verb,
-								auth: {
-									request,
-									scope: 'openid',
-									client_id: 'client',
-									response_type: 'code'
-								}
-							})
-								.expect(
-									this.AuthorizationRequest.prototype.validateResponseParameter.call(
-										{},
-										'state',
-										'foobar'
-									)
-								)
-								.expect(errorCode)
-								.expect(() => {
-									expect(spy.calledOnce).to.be.true;
-									expect(spy.args[0][1]).to.have.property(
-										'message',
-										'invalid_request_object'
-									);
-									expect(spy.args[0][1]).to.have.property(
-										'error_description',
-										'request client_id must equal the one in request parameters'
-									);
-								})
-						);
 					});
 				}
 
-				it('doesnt allow client_id to differ', function () {
-					const spy = sinon.spy();
-					this.provider.once(errorEvt, spy);
+				await authorizationRequest('client', {
+					jwtPayload: {
+						scope: 'openid'
+					},
+					payload: {
+						ui_locales: 'foo'
+					},
+					verb
+				});
 
-					return JWT.sign(
-						{
-							jti: crypto.randomBytes(16).toString('base64url'),
-							client_id: 'client2',
-							response_type: 'code',
-							redirect_uri: 'https://client.example.com/cb',
-							code_challenge_method: this.code_challenge_method,
-							code_challenge: this.code_challenge
+				expect(spy.calledOnce).toBeTrue();
+				expect(spy.args[0][0].oidc.params.ui_locales).toBeUndefined();
+			});
+
+			it('can contain max_age parameter as a number and it (and other params too) will be forced as string', async function () {
+				const spy = sinon.spy();
+				provider.once(successEvt, spy);
+
+				await authorizationRequest('client', {
+					jwtPayload: {
+						scope: 'openid',
+						max_age: 300
+					},
+					payload: {
+						scope: 'openid',
+						response_type: 'code'
+					},
+					verb
+				});
+
+				expect(
+					spy.calledWithMatch({
+						oidc: { params: { max_age: sinon.match.number } }
+					})
+				).toBeTrue();
+			});
+
+			it('can contain params as array and have them handled as dupes', async function () {
+				const spy = sinon.spy();
+				provider.once(errorEvt, spy);
+
+				await authorizationRequest('client', {
+					jwtPayload: {
+						scope: ['openid', 'profile']
+					},
+					payload: {
+						scope: 'openid'
+					},
+					verb,
+					isError: true
+				});
+
+				expect(spy.calledOnce).toBeTrue();
+				expect(spy.args[0][0]).toBeInstanceOf(ValidationError);
+			});
+
+			it('can contain claims parameter as JSON', async function () {
+				const spy = sinon.spy();
+				provider.once(successEvt, spy);
+				const claims = JSON.stringify({ id_token: { email: null } });
+
+				await authorizationRequest('client', {
+					jwtPayload: {
+						scope: 'openid',
+						claims
+					},
+					payload: {
+						scope: 'openid'
+					},
+					verb
+				});
+
+				expect(
+					spy.calledWithMatch({ oidc: { params: { claims } } })
+				).toBeTrue();
+			});
+
+			it('can contain claims parameter as object', async function () {
+				const spy = sinon.spy();
+				provider.once(successEvt, spy);
+				const claims = { id_token: { email: null } };
+
+				await authorizationRequest('client', {
+					jwtPayload: {
+						scope: 'openid',
+						claims
+					},
+					payload: {
+						scope: 'openid'
+					},
+					verb
+				});
+
+				expect(
+					spy.calledWithMatch({
+						oidc: { params: { claims } }
+					})
+				).toBeTrue();
+			});
+
+			it('can accept Request Objects issued within acceptable system clock skew', async function () {
+				const client = await provider.Client.find('client-with-HS-sig');
+				let [key] = client.symmetricKeyStore.selectForSign({ alg: 'HS256' });
+				key = await importJWK(key);
+				i(provider).configuration.clockTolerance = 10;
+
+				await authorizationRequest('client-with-HS-sig', {
+					jwtPayload: {
+						scope: 'openid',
+						iat: Math.ceil(Date.now() / 1000) + 5
+					},
+					payload: {
+						scope: 'openid'
+					},
+					verb,
+					jwtKey: key
+				});
+			});
+
+			it('works with signed by an actual DSA', async function () {
+				const client = await provider.Client.find('client-with-HS-sig');
+				let [key] = client.symmetricKeyStore.selectForSign({ alg: 'HS256' });
+				key = await importJWK(key);
+
+				await authorizationRequest('client-with-HS-sig', {
+					jwtPayload: {
+						scope: 'openid'
+					},
+					payload: {
+						scope: 'openid'
+					},
+					verb,
+					jwtKey: key
+				});
+			});
+
+			it('rejects HMAC based requests when signed with an expired secret', async function () {
+				const client = await provider.Client.find('client-with-HS-sig-expired');
+				let [key] = client.symmetricKeyStore.selectForSign({ alg: 'HS256' });
+				key = await importJWK(key);
+
+				const spy = sinon.spy();
+				provider.once(errorEvt, spy);
+
+				await authorizationRequest('client-with-HS-sig-expired', {
+					jwtPayload: {
+						scope: 'openid'
+					},
+					payload: {
+						scope: 'openid'
+					},
+					verb,
+					jwtKey: key,
+					isError: true
+				});
+
+				expect(spy.calledOnce).toBeTrue();
+				expect(spy.args[0][0]).toHaveProperty(
+					'message',
+					'invalid_request_object'
+				);
+				expect(spy.args[0][0]).toHaveProperty(
+					'error_description',
+					'could not validate the Request Object - the client secret used for its signature is expired'
+				);
+			});
+
+			it('doesnt allow request inception', async function () {
+				const spy = sinon.spy();
+				provider.once(errorEvt, spy);
+
+				await authorizationRequest('client', {
+					jwtPayload: {
+						scope: 'openid',
+						request: 'request inception'
+					},
+					payload: {
+						scope: 'openid'
+					},
+					verb,
+					isError: true
+				});
+
+				expect(spy.calledOnce).toBeTrue();
+				expect(spy.args[0][0]).toBeInstanceOf(ValidationError);
+			});
+
+			it('doesnt allow requestUri inception', async function () {
+				const spy = sinon.spy();
+				provider.once(errorEvt, spy);
+
+				await authorizationRequest('client', {
+					jwtPayload: {
+						scope: 'openid',
+						request_uri: 'request uri inception'
+					},
+					payload: {
+						scope: 'openid'
+					},
+					verb,
+					isError: true
+				});
+
+				expect(spy.calledOnce).toBeTrue();
+				expect(spy.args[0][0]).toBeInstanceOf(ValidationError);
+			});
+
+			if (route !== '/device/auth') {
+				it('may contain a response_mode and it will be honoured', async function () {
+					await authorizationRequest('client', {
+						jwtPayload: {
+							scope: 'openid',
+							response_mode: 'form_post'
 						},
-						Buffer.from('secret'),
-						'HS256',
-						{ issuer: 'client2', audience: this.provider.issuer, expiresIn: 30 }
-					).then((request) =>
-						this.wrap({
-							agent: this.agent,
-							route,
-							verb,
-							auth: {
-								request,
-								scope: 'openid',
-								client_id: 'client',
-								response_type: 'code'
-							}
-						})
-							.expect(errorCode)
-							.expect(() => {
-								expect(spy.calledOnce).to.be.true;
-								expect(spy.args[0][1]).to.have.property(
-									'message',
-									'invalid_request_object'
-								);
-								expect(spy.args[0][1]).to.have.property(
-									'error_description',
-									'request client_id must equal the one in request parameters'
-								);
-							})
+						payload: {
+							scope: 'openid'
+						},
+						verb
+					});
+				});
+
+				it('checks the response mode from the request', async function () {
+					const spy = sinon.spy();
+					provider.once(errorEvt, spy);
+
+					await authorizationRequest('client', {
+						jwtPayload: {
+							scope: 'openid',
+							response_mode: 'foo'
+						},
+						payload: {
+							scope: 'openid',
+							response_mode: 'query'
+						},
+						verb,
+						isError: true
+					});
+
+					expect(spy.calledOnce).toBeTrue();
+					expect(spy.args[0][0]).toHaveProperty(
+						'message',
+						'unsupported_response_mode'
+					);
+					expect(spy.args[0][0]).toHaveProperty(
+						'error_description',
+						'unsupported response_mode requested'
 					);
 				});
 
-				it('handles invalid signed looklike jwts', function () {
+				it('doesnt allow response_type to differ', async function () {
 					const spy = sinon.spy();
-					this.provider.once(errorEvt, spy);
+					provider.once(errorEvt, spy);
 
-					return this.wrap({
+					await authorizationRequest('client', {
+						jwtPayload: {
+							scope: 'openid',
+							response_type: 'code'
+						},
+						payload: {
+							scope: 'openid',
+							response_type: 'none'
+						},
+						verb,
+						isError: true
+					});
+
+					expect(spy.calledOnce).toBeTrue();
+					expect(spy.args[0][0]).toHaveProperty(
+						'message',
+						'invalid_request_object'
+					);
+					expect(spy.args[0][0]).toHaveProperty(
+						'error_description',
+						'request response_type must equal the one in request parameters'
+					);
+				});
+
+				it.only('uses the state from the request even if its validations will fail', async function () {
+					const spy = sinon.spy();
+					provider.once(errorEvt, spy);
+
+					const { response } = await authorizationRequest('client', {
+						jwtPayload: {
+							scope: 'openid',
+							state: 'foobar',
+							client_id: 'client2'
+						},
+						payload: {
+							scope: 'openid'
+						},
+						verb,
+						isError: true
+					});
+					const location = response.headers.get('location');
+					const params = new URL(location).searchParams;
+					expect(params.get('state')).toBe('foobar');
+
+					expect(spy.calledOnce).toBeTrue();
+					expect(spy.args[0][0]).toHaveProperty(
+						'message',
+						'invalid_request_object'
+					);
+					expect(spy.args[0][1]).toHaveProperty(
+						'error_description',
+						'request client_id must equal the one in request parameters'
+					);
+				});
+			}
+
+			it('doesnt allow client_id to differ', function () {
+				const spy = sinon.spy();
+				this.provider.once(errorEvt, spy);
+
+				return JWT.sign(
+					{
+						jti: crypto.randomBytes(16).toString('base64url'),
+						client_id: 'client2',
+						response_type: 'code',
+						redirect_uri: 'https://client.example.com/cb',
+						code_challenge_method: this.code_challenge_method,
+						code_challenge: this.code_challenge
+					},
+					Buffer.from('secret'),
+					'HS256',
+					{ issuer: 'client2', audience: this.provider.issuer, expiresIn: 30 }
+				).then((request) =>
+					this.wrap({
 						agent: this.agent,
 						route,
 						verb,
 						auth: {
-							request: 'definitely.notsigned.jwt',
+							request,
+							scope: 'openid',
+							client_id: 'client',
+							response_type: 'code'
+						}
+					})
+						.expect(errorCode)
+						.expect(() => {
+							expect(spy.calledOnce).to.be.true;
+							expect(spy.args[0][1]).to.have.property(
+								'message',
+								'invalid_request_object'
+							);
+							expect(spy.args[0][1]).to.have.property(
+								'error_description',
+								'request client_id must equal the one in request parameters'
+							);
+						})
+				);
+			});
+
+			it('handles invalid signed looklike jwts', function () {
+				const spy = sinon.spy();
+				this.provider.once(errorEvt, spy);
+
+				return this.wrap({
+					agent: this.agent,
+					route,
+					verb,
+					auth: {
+						request: 'definitely.notsigned.jwt',
+						scope: 'openid',
+						client_id: 'client',
+						response_type: 'code'
+					}
+				})
+					.expect(errorCode)
+					.expect(() => {
+						expect(spy.calledOnce).to.be.true;
+						expect(spy.args[0][1]).to.have.property(
+							'message',
+							'invalid_request_object'
+						);
+						expect(spy.args[0][1])
+							.to.have.property('error_description')
+							.and.matches(/could not parse Request Object/);
+					});
+			});
+
+			it('doesnt allow clients with predefined alg to bypass this alg', function () {
+				const spy = sinon.spy();
+				this.provider.once(errorEvt, spy);
+
+				return JWT.sign(
+					{
+						jti: crypto.randomBytes(16).toString('base64url'),
+						client_id: 'client-with-HS-sig',
+						scope: 'openid',
+						response_type: 'code',
+						redirect_uri: 'https://client.example.com/cb',
+						code_challenge_method: this.code_challenge_method,
+						code_challenge: this.code_challenge
+					},
+					Buffer.from('secret'),
+					'HS512',
+					{
+						issuer: 'client-with-HS-sig',
+						audience: this.provider.issuer,
+						expiresIn: 30
+					}
+				).then((request) =>
+					this.wrap({
+						agent: this.agent,
+						route,
+						verb,
+						auth: {
+							request,
+							scope: 'openid',
+							client_id: 'client-with-HS-sig',
+							response_type: 'code'
+						}
+					})
+						.expect(errorCode)
+						.expect(() => {
+							expect(spy.calledOnce).to.be.true;
+							expect(spy.args[0][1]).to.have.property(
+								'message',
+								'invalid_request_object'
+							);
+							expect(spy.args[0][1]).to.have.property(
+								'error_description',
+								'the preregistered alg must be used in request or request_uri'
+							);
+						})
+				);
+			});
+
+			it('unsupported algs must not be used', async function () {
+				const spy = sinon.spy();
+				this.provider.once(errorEvt, spy);
+
+				return JWT.sign(
+					{
+						jti: crypto.randomBytes(16).toString('base64url'),
+						client_id: 'client',
+						response_type: 'code',
+						redirect_uri: 'https://client.example.com/cb',
+						code_challenge_method: this.code_challenge_method,
+						code_challenge: this.code_challenge
+					},
+					crypto.createSecretKey(crypto.randomBytes(48)),
+					'HS384',
+					{ issuer: 'client', audience: this.provider.issuer, expiresIn: 30 }
+				).then((request) =>
+					this.wrap({
+						agent: this.agent,
+						route,
+						verb,
+						auth: {
+							request,
+							scope: 'openid',
+							client_id: 'client',
+							response_type: 'code'
+						}
+					})
+						.expect(errorCode)
+						.expect(() => {
+							expect(spy.calledOnce).to.be.true;
+							expect(spy.args[0][1]).to.have.property(
+								'message',
+								'invalid_request_object'
+							);
+							expect(spy.args[0][1]).to.have.property(
+								'error_description',
+								'unsupported signed request alg'
+							);
+						})
+				);
+			});
+
+			it('bad signatures will be rejected', async function () {
+				const spy = sinon.spy();
+				this.provider.once(errorEvt, spy);
+				return JWT.sign(
+					{
+						jti: crypto.randomBytes(16).toString('base64url'),
+						client_id: 'client',
+						response_type: 'code',
+						redirect_uri: 'https://client.example.com/cb',
+						code_challenge_method: this.code_challenge_method,
+						code_challenge: this.code_challenge
+					},
+					Buffer.from('not THE secret'),
+					'HS256',
+					{ issuer: 'client', audience: this.provider.issuer, expiresIn: 30 }
+				).then((request) =>
+					this.wrap({
+						agent: this.agent,
+						route,
+						verb,
+						auth: {
+							request,
 							scope: 'openid',
 							client_id: 'client',
 							response_type: 'code'
@@ -809,221 +711,89 @@ describe('request parameter features', () => {
 							);
 							expect(spy.args[0][1])
 								.to.have.property('error_description')
-								.and.matches(/could not parse Request Object/);
-						});
-				});
-
-				it('doesnt allow clients with predefined alg to bypass this alg', function () {
-					const spy = sinon.spy();
-					this.provider.once(errorEvt, spy);
-
-					return JWT.sign(
-						{
-							jti: crypto.randomBytes(16).toString('base64url'),
-							client_id: 'client-with-HS-sig',
-							scope: 'openid',
-							response_type: 'code',
-							redirect_uri: 'https://client.example.com/cb',
-							code_challenge_method: this.code_challenge_method,
-							code_challenge: this.code_challenge
-						},
-						Buffer.from('secret'),
-						'HS512',
-						{
-							issuer: 'client-with-HS-sig',
-							audience: this.provider.issuer,
-							expiresIn: 30
-						}
-					).then((request) =>
-						this.wrap({
-							agent: this.agent,
-							route,
-							verb,
-							auth: {
-								request,
-								scope: 'openid',
-								client_id: 'client-with-HS-sig',
-								response_type: 'code'
-							}
+								.that.matches(/could not validate Request Object/);
 						})
-							.expect(errorCode)
-							.expect(() => {
-								expect(spy.calledOnce).to.be.true;
-								expect(spy.args[0][1]).to.have.property(
-									'message',
-									'invalid_request_object'
-								);
-								expect(spy.args[0][1]).to.have.property(
-									'error_description',
-									'the preregistered alg must be used in request or request_uri'
-								);
-							})
-					);
-				});
-
-				it('unsupported algs must not be used', async function () {
-					const spy = sinon.spy();
-					this.provider.once(errorEvt, spy);
-
-					return JWT.sign(
-						{
-							jti: crypto.randomBytes(16).toString('base64url'),
-							client_id: 'client',
-							response_type: 'code',
-							redirect_uri: 'https://client.example.com/cb',
-							code_challenge_method: this.code_challenge_method,
-							code_challenge: this.code_challenge
-						},
-						crypto.createSecretKey(crypto.randomBytes(48)),
-						'HS384',
-						{ issuer: 'client', audience: this.provider.issuer, expiresIn: 30 }
-					).then((request) =>
-						this.wrap({
-							agent: this.agent,
-							route,
-							verb,
-							auth: {
-								request,
-								scope: 'openid',
-								client_id: 'client',
-								response_type: 'code'
-							}
-						})
-							.expect(errorCode)
-							.expect(() => {
-								expect(spy.calledOnce).to.be.true;
-								expect(spy.args[0][1]).to.have.property(
-									'message',
-									'invalid_request_object'
-								);
-								expect(spy.args[0][1]).to.have.property(
-									'error_description',
-									'unsupported signed request alg'
-								);
-							})
-					);
-				});
-
-				it('bad signatures will be rejected', async function () {
-					const spy = sinon.spy();
-					this.provider.once(errorEvt, spy);
-					return JWT.sign(
-						{
-							jti: crypto.randomBytes(16).toString('base64url'),
-							client_id: 'client',
-							response_type: 'code',
-							redirect_uri: 'https://client.example.com/cb',
-							code_challenge_method: this.code_challenge_method,
-							code_challenge: this.code_challenge
-						},
-						Buffer.from('not THE secret'),
-						'HS256',
-						{ issuer: 'client', audience: this.provider.issuer, expiresIn: 30 }
-					).then((request) =>
-						this.wrap({
-							agent: this.agent,
-							route,
-							verb,
-							auth: {
-								request,
-								scope: 'openid',
-								client_id: 'client',
-								response_type: 'code'
-							}
-						})
-							.expect(errorCode)
-							.expect(() => {
-								expect(spy.calledOnce).to.be.true;
-								expect(spy.args[0][1]).to.have.property(
-									'message',
-									'invalid_request_object'
-								);
-								expect(spy.args[0][1])
-									.to.have.property('error_description')
-									.that.matches(/could not validate Request Object/);
-							})
-					);
-				});
-
-				it('rejects "registration" parameter part of the Request Object', function () {
-					const spy = sinon.spy();
-					this.provider.once(errorEvt, spy);
-
-					return JWT.sign(
-						{
-							jti: crypto.randomBytes(16).toString('base64url'),
-							client_id: 'client',
-							response_type: 'code',
-							redirect_uri: 'https://client.example.com/cb',
-							code_challenge_method: this.code_challenge_method,
-							code_challenge: this.code_challenge,
-							registration: 'foo'
-						},
-						Buffer.from('secret'),
-						'HS256',
-						{ issuer: 'client', audience: this.provider.issuer, expiresIn: 30 }
-					).then((request) =>
-						this.wrap({
-							agent: this.agent,
-							route,
-							verb,
-							auth: {
-								request,
-								scope: 'openid',
-								client_id: 'client',
-								response_type: 'code'
-							}
-						})
-							.expect(errorCode)
-							.expect(() => {
-								expect(spy.calledOnce).to.be.true;
-								expect(spy.args[0][1]).to.have.property(
-									'message',
-									'registration_not_supported'
-								);
-							})
-					);
-				});
-
-				it('handles unrecognized parameters', async function () {
-					const client = await this.provider.Client.find('client-with-HS-sig');
-					let [key] = client.symmetricKeyStore.selectForSign({ alg: 'HS256' });
-					key = await importJWK(key);
-					return JWT.sign(
-						{
-							jti: crypto.randomBytes(16).toString('base64url'),
-							client_id: 'client-with-HS-sig',
-							unrecognized: true,
-							response_type: 'code',
-							scope: 'openid',
-							redirect_uri: 'https://client.example.com/cb',
-							code_challenge_method: this.code_challenge_method,
-							code_challenge: this.code_challenge
-						},
-						key,
-						'HS256',
-						{
-							issuer: 'client-with-HS-sig',
-							audience: this.provider.issuer,
-							expiresIn: 30
-						}
-					).then((request) =>
-						this.wrap({
-							agent: this.agent,
-							route,
-							verb,
-							auth: {
-								request,
-								scope: 'openid',
-								client_id: 'client-with-HS-sig',
-								response_type: 'code'
-							}
-						})
-							.expect(successCode)
-							.expect(successFnCheck)
-					);
-				});
+				);
 			});
-		}
-	);
+
+			it('rejects "registration" parameter part of the Request Object', function () {
+				const spy = sinon.spy();
+				this.provider.once(errorEvt, spy);
+
+				return JWT.sign(
+					{
+						jti: crypto.randomBytes(16).toString('base64url'),
+						client_id: 'client',
+						response_type: 'code',
+						redirect_uri: 'https://client.example.com/cb',
+						code_challenge_method: this.code_challenge_method,
+						code_challenge: this.code_challenge,
+						registration: 'foo'
+					},
+					Buffer.from('secret'),
+					'HS256',
+					{ issuer: 'client', audience: this.provider.issuer, expiresIn: 30 }
+				).then((request) =>
+					this.wrap({
+						agent: this.agent,
+						route,
+						verb,
+						auth: {
+							request,
+							scope: 'openid',
+							client_id: 'client',
+							response_type: 'code'
+						}
+					})
+						.expect(errorCode)
+						.expect(() => {
+							expect(spy.calledOnce).to.be.true;
+							expect(spy.args[0][1]).to.have.property(
+								'message',
+								'registration_not_supported'
+							);
+						})
+				);
+			});
+
+			it('handles unrecognized parameters', async function () {
+				const client = await this.provider.Client.find('client-with-HS-sig');
+				let [key] = client.symmetricKeyStore.selectForSign({ alg: 'HS256' });
+				key = await importJWK(key);
+				return JWT.sign(
+					{
+						jti: crypto.randomBytes(16).toString('base64url'),
+						client_id: 'client-with-HS-sig',
+						unrecognized: true,
+						response_type: 'code',
+						scope: 'openid',
+						redirect_uri: 'https://client.example.com/cb',
+						code_challenge_method: this.code_challenge_method,
+						code_challenge: this.code_challenge
+					},
+					key,
+					'HS256',
+					{
+						issuer: 'client-with-HS-sig',
+						audience: this.provider.issuer,
+						expiresIn: 30
+					}
+				).then((request) =>
+					this.wrap({
+						agent: this.agent,
+						route,
+						verb,
+						auth: {
+							request,
+							scope: 'openid',
+							client_id: 'client-with-HS-sig',
+							response_type: 'code'
+						}
+					})
+						.expect(successCode)
+						.expect(successFnCheck)
+				);
+			});
+		});
+	});
 });

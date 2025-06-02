@@ -21,13 +21,22 @@ import cibaLoadAccount from './ciba_load_account.ts';
 import backchannelRequestResponse from './backchannel_request_response.ts';
 import checkCibaContext from './check_ciba_context.ts';
 import unsupportedRar from './unsupported_rar.ts';
-import { routeNames } from 'lib/consts/param_list.js';
-import { Elysia } from 'elysia';
+import {
+	DeviceAuthorizationParameters,
+	JWTparameters,
+	routeNames
+} from 'lib/consts/param_list.js';
+import { Elysia, t } from 'elysia';
 import { provider } from 'lib/provider.js';
 import { InvalidRequest } from 'lib/helpers/errors.js';
 
 const deviceAuthGrantType = 'urn:ietf:params:oauth:grant-type:device_code';
 const backchannelAuthGrantType = 'urn:openid:params:grant-type:ciba';
+
+const DeviceRequest = t.Composite([
+	t.Omit(DeviceAuthorizationParameters, ['request']),
+	JWTparameters
+]);
 
 async function authentication(ctx) {
 	const { params: authParams, middleware: tokenAuth } = getTokenAuth(provider);
@@ -36,38 +45,60 @@ async function authentication(ctx) {
 		tokenAuthMiddleware;
 	});
 
-	if (!ctx.oidc.body.client_id) {
-		ctx.oidc.body.client_id = ctx.oidc.client.clientId;
+	if (!ctx.body.client_id) {
+		ctx.body.client_id = ctx.oidc.client.clientId;
 	}
 }
 
-export const deviceAuth = new Elysia().post(
-	routeNames.device_authorization,
-	async ({ body }) => {
-		const ctx = { body };
-		const OIDCContext = provider.OIDCContext;
-		ctx.oidc = new OIDCContext(ctx);
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null;
+}
 
-		authentication;
-		checkClient;
-		const client = ctx.oidc.client;
-		if (!client.grantTypeAllowed(deviceAuthGrantType)) {
-			throw new InvalidRequest(
-				`${deviceAuthGrantType} is not allowed for this client`
-			);
+export const deviceAuth = new Elysia()
+	.derive(({ body }) => {
+		if (
+			isRecord(body) &&
+			'ui_locales' in body &&
+			typeof body.ui_locales === 'string'
+		) {
+			body.ui_locales = [body.ui_locales];
 		}
-		processRequestObject.bind(undefined, allowList);
-		assignDefaults;
-		checkScope.bind(undefined, allowList);
-		checkOpenidScope;
-		checkClaims;
-		unsupportedRar;
-		checkResource;
-		checkMaxAge;
-		checkIdTokenHint;
-		deviceAuthorizationResponse;
-	}
-);
+	})
+	.post(
+		routeNames.device_authorization,
+		async ({ body, server, request }) => {
+			const ctx = { body };
+			const OIDCContext = provider.OIDCContext;
+			ctx.oidc = new OIDCContext(ctx);
+			ctx.oidc.params = { ...body };
+
+			await authentication(ctx);
+			await checkClient(ctx);
+			const client = ctx.oidc.client;
+			if (!client.grantTypeAllowed(deviceAuthGrantType)) {
+				throw new InvalidRequest(
+					`${deviceAuthGrantType} is not allowed for this client`
+				);
+			}
+			await processRequestObject(DeviceRequest, ctx);
+			assignDefaults(ctx);
+			checkScope(new Set(), ctx);
+			checkOpenidScope(ctx);
+			await checkClaims(ctx);
+			unsupportedRar(ctx);
+			await checkResource(ctx);
+			checkMaxAge(ctx);
+			await checkIdTokenHint(ctx);
+			const deviceInfo = {
+				ip: server?.requestIP(request),
+				ua: request.headers.get('user-agent')
+			};
+			return deviceAuthorizationResponse(ctx, deviceInfo);
+		},
+		{
+			body: DeviceAuthorizationParameters
+		}
+	);
 
 export const backchannelAuth = new Elysia().post(
 	routeNames.backchannel_authentication,

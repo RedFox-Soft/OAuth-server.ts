@@ -5,8 +5,7 @@ import {
 	InvalidRequestObject,
 	OIDCProviderError
 } from '../../helpers/errors.ts';
-import { TSchema } from 'elysia';
-import { Value } from '@sinclair/typebox/value';
+import { getSchemaValidator, TSchema, ValidationError } from 'elysia';
 import { ISSUER } from 'lib/helpers/env.js';
 
 export function isEncryptedJWT(jwt: string): boolean {
@@ -98,9 +97,12 @@ export default async function processRequestObject(schema: TSchema, ctx) {
 		header: { alg }
 	} = decoded;
 
-	Value.Check(schema, payload);
-	const request = payload;
+	const validator = getSchemaValidator(schema);
+	if (!validator.Check(payload)) {
+		throw new ValidationError('requestObject', validator, payload);
+	}
 
+	const request = payload;
 	const original = {};
 	for (const param of ['state', 'response_mode', 'response_type']) {
 		original[param] = params[param];

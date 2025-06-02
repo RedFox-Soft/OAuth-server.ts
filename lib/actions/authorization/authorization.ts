@@ -36,6 +36,7 @@ import presence from '../../helpers/validate_presence.ts';
 import {
 	AuthorizationCookies,
 	AuthorizationParameters,
+	JWTparameters,
 	routeNames
 } from '../../consts/param_list.ts';
 import sessionHandler from '../../shared/session.ts';
@@ -43,11 +44,61 @@ import { noQueryDup } from 'lib/plugins/noQueryDup.js';
 import { contentType } from 'lib/plugins/contentType.js';
 import { authVerification } from './authVerification.js';
 import { authorizationPKCE } from 'lib/helpers/pkce.js';
+import {
+	InvalidClient,
+	InvalidRedirectUri,
+	OIDCProviderError
+} from 'lib/helpers/errors.js';
 
 const authorizationRequest = t.Composite([
 	t.Omit(AuthorizationParameters, ['request_uri', 'request', 'client_id']),
-	t.Object({ client_id: t.Optional(t.String()) })
+	t.Object({
+		client_id: t.Optional(t.String())
+	}),
+	JWTparameters
 ]);
+
+export async function isAllowRedirectUri(params) {
+	const ctx = {};
+	const OIDCContext = provider.OIDCContext;
+	ctx.oidc = new OIDCContext(ctx);
+	ctx.oidc.params = params;
+
+	if (!params.client_id) {
+		throw new InvalidClient('client_id is required', 'client not found');
+	}
+	if (typeof params.client_id !== 'string') {
+		throw new InvalidClient('client is invalid', 'client not found');
+	}
+	const client = await provider.Client.find(params.client_id);
+	if (!client) {
+		throw new InvalidClient('client is invalid', 'client not found');
+	}
+	ctx.oidc.entity('Client', client);
+	try {
+		await processRequestObject(authorizationRequest, ctx);
+	} catch (e) {
+		if (!(e instanceof OIDCProviderError)) {
+			throw e;
+		}
+	}
+
+	let redirect_uri = params.redirect_uri;
+	if (redirect_uri === undefined) {
+		oneRedirectUriClients(ctx);
+		redirect_uri = params.redirect_uri;
+	}
+	if (typeof redirect_uri !== 'string') {
+		throw new InvalidRedirectUri();
+	}
+	if (!client.redirectUriAllowed(redirect_uri)) {
+		throw new InvalidRedirectUri();
+	}
+
+	const state = typeof params.state !== 'string' ? undefined : params.state;
+
+	return { redirect_uri, state };
+}
 
 async function authorizationActionHandler(ctx) {
 	const allowList = new Set(PARAM_LIST);
@@ -112,8 +163,21 @@ export const authGet = new Elysia()
 		return await authorizationActionHandler(ctx);
 	});
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null;
+}
+
 export const authPost = new Elysia()
 	.derive(contentType('application/x-www-form-urlencoded'))
+	.derive(({ body }) => {
+		if (
+			isRecord(body) &&
+			'ui_locales' in body &&
+			typeof body.ui_locales === 'string'
+		) {
+			body.ui_locales = [body.ui_locales];
+		}
+	})
 	.guard({
 		body: AuthorizationParameters,
 		cookie: AuthorizationCookies

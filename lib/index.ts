@@ -20,8 +20,9 @@ import { tokenAction } from './actions/token.js';
 import { ui } from './interactions/index.js';
 import { discovery } from './actions/discovery.js';
 import { userinfo } from './actions/userinfo.js';
+import { backchannelAuth, deviceAuth } from './actions/authorization/device.js';
 
-export const elysia = new Elysia({ strictPath: true, normalize: false })
+export const elysia = new Elysia({ strictPath: true, normalize: 'exactMirror' })
 	.onError(errorHandler)
 	.use(staticPlugin({ assets: 'dist' }))
 	.use(staticPlugin())
@@ -29,6 +30,8 @@ export const elysia = new Elysia({ strictPath: true, normalize: false })
 	.use(discovery)
 	.use(authGet)
 	.use(authPost)
+	.use(deviceAuth)
+	.use(backchannelAuth)
 	.use(par)
 	.use(tokenAction)
 	.use(userinfo)

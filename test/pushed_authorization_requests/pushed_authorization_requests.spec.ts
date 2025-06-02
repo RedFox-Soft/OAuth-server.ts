@@ -104,8 +104,6 @@ describe('Pushed Request Object', () => {
 							code_challenge_method: 'S256',
 							code_challenge,
 							client_id: clientId,
-							iss: clientId,
-							aud: 'http://e.ly/',
 							redirect_uri: 'https://rp.example.com/unlisted'
 						}),
 						{
@@ -127,8 +125,6 @@ describe('Pushed Request Object', () => {
 
 					const auth = new AuthorizationRequest({
 						client_id: clientId,
-						iss: clientId,
-						aud: 'http://e.ly/',
 						request_uri
 					});
 					delete auth.params.redirect_uri;
@@ -138,8 +134,6 @@ describe('Pushed Request Object', () => {
 					const authGet = await agent.auth.get({
 						query: {
 							client_id: clientId,
-							iss: clientId,
-							aud: 'http://e.ly/',
 							request_uri
 						},
 						headers: {
@@ -186,8 +180,6 @@ describe('Pushed Request Object', () => {
 							code_challenge_method: 'S256',
 							code_challenge,
 							client_id: testClientId,
-							iss: testClientId,
-							aud: 'http://e.ly/',
 							redirect_uri: 'https://rp.example.com/unlisted'
 						})
 					);
@@ -214,8 +206,6 @@ describe('Pushed Request Object', () => {
 							code_challenge_method: 'S256',
 							code_challenge,
 							client_id: clientId,
-							iss: clientId,
-							aud: 'http://e.ly/',
 							redirect_uri: 'not-a-valid-uri'
 						}),
 						{
@@ -237,8 +227,6 @@ describe('Pushed Request Object', () => {
 							code_challenge_method: 'S256',
 							code_challenge,
 							client_id: clientId,
-							iss: clientId,
-							aud: 'http://e.ly/',
 							redirect_uri: 'https://rp.example.com/unlisted#fragment'
 						}),
 						{
@@ -292,9 +280,7 @@ describe('Pushed Request Object', () => {
 									response_type: 'code',
 									code_challenge_method: 'S256',
 									code_challenge,
-									client_id: clientId,
-									iss: clientId,
-									aud: 'http://e.ly/'
+									client_id: clientId
 								}),
 								{
 									headers: AuthorizationRequest.basicAuthHeader(
@@ -328,8 +314,6 @@ describe('Pushed Request Object', () => {
 									code_challenge_method: 'S256',
 									code_challenge,
 									client_id: clientId,
-									iss: clientId,
-									aud: 'http://e.ly/',
 									claims: JSON.stringify({
 										id_token: {
 											auth_time: { essential: true }
@@ -358,6 +342,7 @@ describe('Pushed Request Object', () => {
 							expect(header).toEqual({ alg: 'none' });
 							const payload = decodeJwt(stored.request);
 							expect(payload).toContainKeys([
+								'jti',
 								'aud',
 								'exp',
 								'iat',
@@ -411,8 +396,6 @@ describe('Pushed Request Object', () => {
 									code_challenge_method: 'S256',
 									code_challenge,
 									client_id: clientId,
-									iss: clientId,
-									aud: 'http://e.ly/',
 									redirect_uri: 'https://rp.example.com/unlisted'
 								}),
 								{
@@ -449,9 +432,7 @@ describe('Pushed Request Object', () => {
 									response_type: 'code',
 									code_challenge_method: 'S256',
 									code_challenge,
-									client_id: clientId,
-									iss: clientId,
-									aud: 'http://e.ly/'
+									client_id: clientId
 								}),
 								{
 									headers: AuthorizationRequest.basicAuthHeader(
@@ -485,9 +466,7 @@ describe('Pushed Request Object', () => {
 									response_type: 'code',
 									code_challenge_method: 'S256',
 									code_challenge,
-									client_id: clientId,
-									iss: clientId,
-									aud: 'http://e.ly/'
+									client_id: clientId
 								}),
 								{
 									headers: AuthorizationRequest.basicAuthHeader(
@@ -507,16 +486,12 @@ describe('Pushed Request Object', () => {
 							const cookie = await setup.login();
 							const auth = new AuthorizationRequest({
 								client_id: clientId,
-								iss: clientId,
-								aud: 'http://e.ly/',
 								request_uri
 							});
 
 							const { response } = await agent.auth.get({
 								query: {
 									client_id: clientId,
-									iss: clientId,
-									aud: 'http://e.ly/',
 									request_uri
 								},
 								headers: {
@@ -546,9 +521,7 @@ describe('Pushed Request Object', () => {
 									response_type: 'code',
 									code_challenge_method: 'S256',
 									code_challenge,
-									client_id: 'client-alg-registered',
-									iss: 'client-alg-registered',
-									aud: 'http://e.ly/'
+									client_id: 'client-alg-registered'
 								}),
 								{
 									headers: AuthorizationRequest.basicAuthHeader(
@@ -567,16 +540,12 @@ describe('Pushed Request Object', () => {
 
 							const auth = new AuthorizationRequest({
 								client_id: 'client-alg-registered',
-								iss: 'client-alg-registered',
-								aud: 'http://e.ly/',
 								request_uri
 							});
 							const cookie = await setup.login();
 							const { response } = await agent.auth.get({
 								query: {
 									client_id: 'client-alg-registered',
-									iss: 'client-alg-registered',
-									aud: 'http://e.ly/',
 									request_uri
 								},
 								headers: {
@@ -712,7 +681,6 @@ describe('Pushed Request Object', () => {
 											code_challenge_method: 'S256',
 											code_challenge,
 											client_id: clientId,
-											extra: 'provided',
 											iss: clientId,
 											aud: 'http://e.ly/'
 										},
@@ -736,7 +704,7 @@ describe('Pushed Request Object', () => {
 							expect(spy.calledOnce).toBeTrue();
 						});
 
-						it('defaults to MAX_TTL when no expires_in is present', async function () {
+						it('Error when no expires_in is present', async function () {
 							const spy = sinon.spy();
 							provider.once('pushed_authorization_request.success', spy);
 							const code_verifier = randomBytes(32).toString('base64');
@@ -744,7 +712,7 @@ describe('Pushed Request Object', () => {
 								.update(code_verifier)
 								.digest('base64url');
 
-							const { data, response } = await agent.par.post(
+							const { error } = await agent.par.post(
 								// @ts-expect-error endpoint will be parse to object
 								jsonToFormUrlEncoded({
 									request: await JWT.sign(
@@ -768,9 +736,11 @@ describe('Pushed Request Object', () => {
 									)
 								}
 							);
-							expect(response.status).toBe(201);
-							expect(data.expires_in).toBeCloseTo(60, 1);
-							expect(spy.calledOnce).toBeTrue();
+							expect(error.status).toBe(422);
+							expect(error.value).toEqual({
+								error: 'invalid_request',
+								error_description: "Property 'exp' is missing"
+							});
 						});
 
 						it('uses the expiration from JWT when below MAX_TTL', async function () {
@@ -916,10 +886,13 @@ describe('Pushed Request Object', () => {
 											response_type: 'code',
 											code_challenge_method: 'S256',
 											code_challenge,
-											client_id: 'client-alg-registered'
+											client_id: 'client-alg-registered',
+											iss: 'client-alg-registered',
+											aud: 'http://e.ly/'
 										},
 										key,
-										'HS384'
+										'HS384',
+										{ expiresIn: 30 }
 									)
 								}),
 								{
@@ -952,7 +925,9 @@ describe('Pushed Request Object', () => {
 											response_type: 'code',
 											code_challenge_method: 'S256',
 											code_challenge,
-											client_id: 'client-foo'
+											client_id: 'client-foo',
+											iss: clientId,
+											aud: 'http://e.ly/'
 										},
 										key,
 										'HS256',

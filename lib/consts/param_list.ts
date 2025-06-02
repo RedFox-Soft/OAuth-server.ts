@@ -28,14 +28,17 @@ export const AuthorizationParameters = t.Object({
 	scope: t.Optional(t.String()),
 	response_mode: t.Optional(t.String()),
 	registration: t.Optional(
-		t.Undefined({ error: 'Registration is not supported' })
+		t.Undefined({
+			error: {
+				error: 'not_supported',
+				error_description: 'Registration is not supported'
+			}
+		})
 	),
 	request: t.Optional(t.String()),
 	request_uri: t.Optional(t.String()),
 	ui_locales: t.Optional(t.Array(t.String())),
 	acr_values: t.Optional(t.String()),
-	iss: t.Optional(t.String()),
-	aud: t.Optional(t.String({ format: 'uri' })),
 
 	// added conditionally depending on feature flag which will be checked in the code
 	web_message_uri: t.Optional(t.String()),
@@ -69,8 +72,18 @@ export const DeviceAuthorizationParameters = t.Omit(AuthorizationParameters, [
 	'code_challenge',
 	'state',
 	'redirect_uri',
-	'prompt'
+	'prompt',
+	'request_uri'
 ]);
+
+export const JWTparameters = t.Object({
+	jti: t.String(),
+	iss: t.String(),
+	aud: t.String({ format: 'uri' }),
+	exp: t.Integer({ minimum: 0 }),
+	iat: t.Optional(t.Integer({ minimum: 0 })),
+	nbf: t.Optional(t.Integer({ minimum: 0 }))
+});
 
 const BackchannelAuthParameters = t.Composite([
 	DeviceAuthorizationParameters,
