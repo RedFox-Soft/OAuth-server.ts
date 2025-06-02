@@ -1,92 +1,102 @@
-import { expect } from 'chai';
-import bootstrap from '../test_helper.js';
+import { describe, it, beforeAll, expect } from 'bun:test';
+import bootstrap, { agent } from '../test_helper.js';
+import { provider } from 'lib/provider.js';
+import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
 describe('distributed and aggregated claims', () => {
-	before(bootstrap(import.meta.url));
-	before(function () {
-		i(this.provider).configuration.findAccount = (ctx, id) =>
-			Promise.resolve({
-				accountId: id,
-				claims() {
-					return {
-						sub: id,
-						nickname: 'foobar',
-						_claim_names: {
-							given_name: 'src1',
-							family_name: 'src2',
-							email: 'notused'
+	let setup = null;
+	beforeAll(async function () {
+		setup = await bootstrap(import.meta.url)();
+
+		i(provider).configuration.findAccount = async (ctx, id) => ({
+			accountId: id,
+			claims() {
+				return {
+					sub: id,
+					nickname: 'foobar',
+					_claim_names: {
+						given_name: 'src1',
+						family_name: 'src2',
+						email: 'notused'
+					},
+					_claim_sources: {
+						src1: {
+							endpoint: 'https://op.example.com/me',
+							access_token: 'distributed'
 						},
-						_claim_sources: {
-							src1: {
-								endpoint: 'https://op.example.com/me',
-								access_token: 'distributed'
-							},
-							src2: { JWT: 'foo.bar.baz' },
-							notused: { JWT: 'foo.bar.baz' }
-						}
-					};
-				}
-			});
+						src2: { JWT: 'foo.bar.baz' },
+						notused: { JWT: 'foo.bar.baz' }
+					}
+				};
+			}
+		});
 	});
 
-	before(function () {
-		return this.login({ scope: 'openid profile' });
-	});
-	after(function () {
-		return this.logout();
-	});
-
-	context('userinfo', () => {
+	describe('userinfo', () => {
 		it('should return _claim_names and _claim_sources members', async function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'code',
+			const auth = new AuthorizationRequest({
 				scope: 'openid profile'
 			});
 
-			const response = await this.getToken(auth);
+			const cookie = await setup.login({ scope: 'openid profile' });
 
-			const { access_token } = response.body;
+			const authRes = await agent.auth.get({
+				query: auth.params,
+				headers: {
+					cookie
+				}
+			});
+			expect(authRes.status).toBe(303);
+			const location = authRes.headers.get('location');
+			const code = new URL(location).searchParams.get('code');
 
-			return this.agent
-				.get('/me')
-				.auth(access_token, { type: 'bearer' })
-				.expect(200)
-				.expect((response) => {
-					const payload = response.body;
+			const res = await auth.getToken(code);
+			const { access_token } = res.data;
 
-					expect(payload).to.have.property('nickname', 'foobar');
-					expect(payload).not.to.have.property('given_name');
+			const { data } = await agent.userinfo.get({
+				headers: {
+					authorization: `Bearer ${access_token}`
+				}
+			});
 
-					expect(payload).to.have.property('_claim_names');
-					expect(payload).to.have.property('_claim_sources');
+			expect(data).toHaveProperty('nickname', 'foobar');
+			expect(data).not.toHaveProperty('given_name');
 
-					expect(payload._claim_names).to.have.keys(
-						'given_name',
-						'family_name'
-					);
-					expect(payload._claim_sources).to.have.keys('src1', 'src2');
-				});
+			expect(data).toHaveProperty('_claim_names');
+			expect(data).toHaveProperty('_claim_sources');
+
+			expect(data._claim_names).toContainKeys(['given_name', 'family_name']);
+			expect(data._claim_sources).toContainKeys(['src1', 'src2']);
 		});
 
 		it('does not return the members if these claims arent requested at all', async function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'code',
+			const auth = new AuthorizationRequest({
 				scope: 'openid'
 			});
 
-			const response = await this.getToken(auth);
-			const { access_token } = response.body;
+			const cookie = await setup.login({ scope: 'openid profile' });
 
-			return this.agent
-				.get('/me')
-				.auth(access_token, { type: 'bearer' })
-				.expect(200)
-				.expect((response) => {
-					const payload = response.body;
+			const authRes = await agent.auth.get({
+				query: auth.params,
+				headers: {
+					cookie
+				}
+			});
+			expect(authRes.status).toBe(303);
+			const location = authRes.headers.get('location');
+			const code = new URL(location).searchParams.get('code');
 
-					expect(payload).not.to.have.property('_claim_names');
-					expect(payload).not.to.have.property('_claim_sources');
-				});
+			const res = await auth.getToken(code);
+			const { access_token } = res.data;
+
+			const { data } = await agent.userinfo.get({
+				headers: {
+					authorization: `Bearer ${access_token}`
+				}
+			});
+
+			expect(data).not.toHaveProperty('_claim_names');
+			expect(data).not.toHaveProperty('_claim_sources');
 		});
 	});
 });

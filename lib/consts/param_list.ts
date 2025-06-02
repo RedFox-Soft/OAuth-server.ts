@@ -94,9 +94,8 @@ const BackchannelAuthParameters = t.Composite([
 		user_code: t.Optional(t.String()),
 		request_context: t.Optional(t.String()),
 		requested_expiry: t.Optional(
-			t.Numeric({
+			t.Integer({
 				minimum: 0,
-				maximum: Number.MAX_SAFE_INTEGER,
 				error: 'requested_expiry must be a positive integer'
 			})
 		)
