@@ -16,6 +16,7 @@ import * as models from './models/index.ts';
 import DPoPNonces from './helpers/dpop_nonces.ts';
 import als from './helpers/als.ts';
 import { globalConfiguration } from './globalConfiguration.js';
+import { Client } from './models/client.js';
 
 class ProviderClass extends EventEmitter {
 	#AccessToken;
@@ -25,8 +26,6 @@ class ProviderClass extends EventEmitter {
 	#BaseToken;
 
 	#Claims;
-
-	#Client;
 
 	#ClientCredentials;
 
@@ -230,8 +229,7 @@ class ProviderClass extends EventEmitter {
 	}
 
 	get Client() {
-		this.#Client ||= models.getClient(this);
-		return this.#Client;
+		return Client;
 	}
 
 	get Grant() {

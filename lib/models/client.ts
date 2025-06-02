@@ -19,6 +19,7 @@ import sectorIdentifier from '../helpers/sector_identifier.ts';
 import sectorValidate from '../helpers/sector_validate.ts';
 import addClient from '../helpers/add_client.ts';
 import getSchema from '../helpers/client_schema.ts';
+import { provider } from 'lib/provider.js';
 
 // intentionally ignore x5t#S256 so that they are left to be calculated by the library
 const EC_CURVES = new Set(['P-256', 'P-384', 'P-521']);
@@ -128,514 +129,503 @@ function deriveEncryptionKey(secret, length) {
 	return crypto.hash(digest, secret, 'buffer').subarray(0, length);
 }
 
-export default function getClient(provider) {
-	class ClientKeyStore extends KeyStore {
-		#client;
+class ClientKeyStore extends KeyStore {
+	#client;
 
-		#provider = provider;
+	#provider = provider;
 
-		constructor(clientInstance) {
-			super();
+	constructor(clientInstance) {
+		super();
 
-			this.#client = clientInstance;
-		}
-
-		get client() {
-			return this.#client;
-		}
-
-		get provider() {
-			return this.#provider;
-		}
-
-		get jwksUri() {
-			return this.client?.jwksUri;
-		}
-
-		fresh() {
-			if (!this.jwksUri) return true;
-			const now = epochTime();
-			return !!this.freshUntil && this.freshUntil > now;
-		}
-
-		stale() {
-			return !this.fresh();
-		}
-
-		add(key) {
-			if (
-				this.client.clientAuthMethod === 'self_signed_tls_client_auth' &&
-				Array.isArray(key.x5c) &&
-				key.x5c.length
-			) {
-				// eslint-disable-next-line no-param-reassign
-				key['x5t#S256'] = certificateThumbprint(key.x5c[0]);
-			}
-			super.add(key);
-		}
-
-		async refresh() {
-			if (this.fresh()) return;
-
-			if (!this.lock) {
-				this.lock = (async () => {
-					/**
-					 * @type typeof fetch
-					 */
-					const request = instance(provider).configuration.fetch;
-					const response = await request(new URL(this.jwksUri).href, {
-						method: 'GET',
-						headers: {
-							Accept: 'application/json'
-						}
-					});
-
-					const body = await response.json();
-					const { headers, status } = response;
-
-					// min refetch in 60 seconds unless cache headers say a longer response ttl
-					const freshUntil = [epochTime() + 60];
-
-					if (headers.has('expires')) {
-						freshUntil.push(epochTime(Date.parse(headers.get('expires'))));
-					}
-
-					if (
-						headers.has('cache-control') &&
-						/max-age=(\d+)/.test(headers.get('cache-control'))
-					) {
-						const maxAge = parseInt(RegExp.$1, 10);
-						freshUntil.push(epochTime() + maxAge);
-					}
-
-					this.freshUntil = Math.max(...freshUntil.filter(Boolean));
-
-					if (status !== 200) {
-						throw new Error(
-							`unexpected jwks_uri response status code, expected 200 OK, got ${status} ${STATUS_CODES[status]}`
-						);
-					}
-
-					validateJWKS(body);
-
-					this.clear();
-					body.keys
-						.map(checkJWK)
-						.filter(Boolean)
-						.forEach(ClientKeyStore.prototype.add.bind(this));
-
-					delete this.lock;
-				})().catch((err) => {
-					delete this.lock;
-					throw new InvalidClientMetadata(
-						'client JSON Web Key Set failed to be refreshed',
-						err.error_description || err.message
-					);
-				});
-			}
-
-			await this.lock;
-		}
+		this.#client = clientInstance;
 	}
 
-	function buildAsymmetricKeyStore(client) {
-		Object.defineProperty(client, 'asymmetricKeyStore', {
-			configurable: true,
-			get() {
-				const keystore = new ClientKeyStore(this);
-				Object.defineProperty(this, 'asymmetricKeyStore', {
-					configurable: false,
-					value: keystore
-				});
-
-				return this.asymmetricKeyStore;
-			}
-		});
+	get client() {
+		return this.#client;
 	}
 
-	function buildSymmetricKeyStore(client) {
-		const { configuration } = instance(provider);
-		Object.defineProperty(client, 'symmetricKeyStore', {
-			configurable: false,
-			value: new KeyStore()
-		});
+	get provider() {
+		return this.#provider;
+	}
 
-		const algs = new Set();
+	get jwksUri() {
+		return this.client?.jwksUri;
+	}
 
-		if (client.clientSecret) {
-			if (client.clientAuthMethod === 'client_secret_jwt') {
-				if (client.clientAuthSigningAlg) {
-					algs.add(client.clientAuthSigningAlg);
-				} else {
-					configuration.clientAuthSigningAlgValues?.forEach(
-						Set.prototype.add.bind(algs)
-					);
+	fresh() {
+		if (!this.jwksUri) return true;
+		const now = epochTime();
+		return !!this.freshUntil && this.freshUntil > now;
+	}
+
+	stale() {
+		return !this.fresh();
+	}
+
+	add(key) {
+		if (
+			this.client.clientAuthMethod === 'self_signed_tls_client_auth' &&
+			Array.isArray(key.x5c) &&
+			key.x5c.length
+		) {
+			// eslint-disable-next-line no-param-reassign
+			key['x5t#S256'] = certificateThumbprint(key.x5c[0]);
+		}
+		super.add(key);
+	}
+
+	async refresh() {
+		if (this.fresh()) return;
+
+		if (!this.lock) {
+			this.lock = (async () => {
+				/**
+				 * @type typeof fetch
+				 */
+				const request = instance(provider).configuration.fetch;
+				const response = await request(new URL(this.jwksUri).href, {
+					method: 'GET',
+					headers: {
+						Accept: 'application/json'
+					}
+				});
+
+				const body = await response.json();
+				const { headers, status } = response;
+
+				// min refetch in 60 seconds unless cache headers say a longer response ttl
+				const freshUntil = [epochTime() + 60];
+
+				if (headers.has('expires')) {
+					freshUntil.push(epochTime(Date.parse(headers.get('expires'))));
 				}
-			}
 
-			[
-				'introspectionSignedResponseAlg',
-				'userinfoSignedResponseAlg',
-				'authorizationSignedResponseAlg',
-				'idTokenSignedResponseAlg',
-				'requestObjectSigningAlg'
-			].forEach((prop) => {
-				algs.add(client[prop]);
-			});
-
-			if (!client.requestObjectSigningAlg) {
-				configuration.requestObjectSigningAlgValues.forEach(
-					Set.prototype.add.bind(algs)
-				);
-			}
-
-			configuration.requestObjectEncryptionAlgValues.forEach(
-				Set.prototype.add.bind(algs)
-			);
-
-			if (configuration.requestObjectEncryptionAlgValues.includes('dir')) {
-				configuration.requestObjectEncryptionEncValues.forEach(
-					Set.prototype.add.bind(algs)
-				);
-			}
-
-			[
-				'idTokenEncryptedResponse',
-				'userinfoEncryptedResponse',
-				'introspectionEncryptedResponse',
-				'authorizationEncryptedResponse'
-			].forEach((prop) => {
-				algs.add(client[`${prop}Alg`]);
-				if (client[`${prop}Alg`] === 'dir') {
-					algs.add(client[`${prop}Enc`]);
-				}
-			});
-
-			algs.delete(undefined);
-
-			for (const alg of algs) {
 				if (
-					!(
-						alg.startsWith('HS') ||
-						/^A(\d{3})(?:GCM)?KW$/.test(alg) ||
-						/^A(\d{3})(?:GCM|CBC-HS(\d{3}))$/.test(alg)
-					)
+					headers.has('cache-control') &&
+					/max-age=(\d+)/.test(headers.get('cache-control'))
 				) {
-					algs.delete(alg);
+					const maxAge = parseInt(RegExp.$1, 10);
+					freshUntil.push(epochTime() + maxAge);
 				}
-			}
 
-			for (const alg of algs) {
-				if (alg.startsWith('HS')) {
-					client.symmetricKeyStore.add({
-						alg,
-						use: 'sig',
-						kty: 'oct',
-						k: base64url.encode(client.clientSecret)
-					});
-				} else if (/^A(\d{3})(?:GCM)?KW$/.test(alg)) {
-					const len = parseInt(RegExp.$1, 10) / 8;
-					client.symmetricKeyStore.add({
-						alg,
-						use: 'enc',
-						kty: 'oct',
-						k: deriveEncryptionKey(client.clientSecret, len).toString(
-							'base64url'
-						)
-					});
-				} else if (/^A(\d{3})(?:GCM|CBC-HS(\d{3}))$/.test(alg)) {
-					const len = parseInt(RegExp.$2 || RegExp.$1, 10) / 8;
-					client.symmetricKeyStore.add({
-						alg,
-						use: 'enc',
-						kty: 'oct',
-						k: deriveEncryptionKey(client.clientSecret, len).toString(
-							'base64url'
-						)
-					});
+				this.freshUntil = Math.max(...freshUntil.filter(Boolean));
+
+				if (status !== 200) {
+					throw new Error(
+						`unexpected jwks_uri response status code, expected 200 OK, got ${status} ${STATUS_CODES[status]}`
+					);
 				}
-			}
-		}
-	}
 
-	class Client {
-		#sectorIdentifier = null;
+				validateJWKS(body);
 
-		static #Schema = getSchema(provider);
-
-		static #adapter;
-
-		constructor(metadata, ctx) {
-			Client.#Schema = getSchema(provider);
-			const schema = new Client.Schema(metadata, ctx);
-
-			Object.assign(
-				this,
-				mapKeys(schema, (value, key) => {
-					if (!instance(provider).RECOGNIZED_METADATA.includes(key)) {
-						return key;
-					}
-
-					return camelCase(key);
-				})
-			);
-
-			buildAsymmetricKeyStore(this);
-			buildSymmetricKeyStore(this);
-
-			validateJWKS(this.jwks);
-
-			if (this.jwks) {
-				this.jwks.keys
+				this.clear();
+				body.keys
 					.map(checkJWK)
 					.filter(Boolean)
-					.forEach(ClientKeyStore.prototype.add.bind(this.asymmetricKeyStore));
-			}
-		}
+					.forEach(ClientKeyStore.prototype.add.bind(this));
 
-		static get adapter() {
-			this.#adapter ||= isConstructable(instance(provider).Adapter)
-				? new (instance(provider).Adapter)('Client')
-				: instance(provider).Adapter('Client');
-			return this.#adapter;
-		}
-
-		async backchannelPing(backchannelAuthenticationRequest) {
-			if (
-				!this.backchannelClientNotificationEndpoint ||
-				this.backchannelTokenDeliveryMode !== 'ping' ||
-				!backchannelAuthenticationRequest ||
-				!backchannelAuthenticationRequest.jti ||
-				backchannelAuthenticationRequest.kind !==
-					'BackchannelAuthenticationRequest' ||
-				!backchannelAuthenticationRequest.params.client_notification_token
-			) {
-				throw new TypeError();
-			}
-
-			/**
-			 * @type typeof fetch
-			 */
-			const request = instance(provider).configuration.fetch;
-			return request(new URL(this.backchannelClientNotificationEndpoint).href, {
-				method: 'POST',
-				headers: {
-					authorization: `Bearer ${backchannelAuthenticationRequest.params.client_notification_token}`,
-					'content-type': 'application/json'
-				},
-				body: JSON.stringify({
-					auth_req_id: backchannelAuthenticationRequest.jti
-				})
-			}).then((response) => {
-				const { status } = response;
-				if (status !== 204 && status !== 200) {
-					const error = new Error(
-						`expected 204 No Content from ${this.backchannelClientNotificationEndpoint}, got: ${status} ${STATUS_CODES[status]}`
-					);
-					error.response = response;
-					throw error;
-				}
+				delete this.lock;
+			})().catch((err) => {
+				delete this.lock;
+				throw new InvalidClientMetadata(
+					'client JSON Web Key Set failed to be refreshed',
+					err.error_description || err.message
+				);
 			});
 		}
 
-		async backchannelLogout(sub, sid) {
-			const logoutToken = new provider.IdToken(
-				{ sub },
-				{ client: this, ctx: undefined }
-			);
-			logoutToken.mask = { sub: null };
-			logoutToken.set('events', {
-				'http://schemas.openid.net/event/backchannel-logout': {}
+		await this.lock;
+	}
+}
+
+function buildAsymmetricKeyStore(client) {
+	Object.defineProperty(client, 'asymmetricKeyStore', {
+		configurable: true,
+		get() {
+			const keystore = new ClientKeyStore(this);
+			Object.defineProperty(this, 'asymmetricKeyStore', {
+				configurable: false,
+				value: keystore
 			});
-			logoutToken.set('jti', nanoid());
 
-			if (this.backchannelLogoutSessionRequired) {
-				logoutToken.set('sid', sid);
+			return this.asymmetricKeyStore;
+		}
+	});
+}
+
+function buildSymmetricKeyStore(client) {
+	const { configuration } = instance(provider);
+	Object.defineProperty(client, 'symmetricKeyStore', {
+		configurable: false,
+		value: new KeyStore()
+	});
+
+	const algs = new Set();
+
+	if (client.clientSecret) {
+		if (client.clientAuthMethod === 'client_secret_jwt') {
+			if (client.clientAuthSigningAlg) {
+				algs.add(client.clientAuthSigningAlg);
+			} else {
+				configuration.clientAuthSigningAlgValues?.forEach(
+					Set.prototype.add.bind(algs)
+				);
 			}
-
-			/**
-			 * @type typeof fetch
-			 */
-			const request = instance(provider).configuration.fetch;
-			return request(new URL(this.backchannelLogoutUri).href, {
-				method: 'POST',
-				headers: {
-					'content-type': 'application/x-www-form-urlencoded'
-				},
-				body: new URLSearchParams({
-					logout_token: await logoutToken.issue({ use: 'logout' })
-				})
-			}).then((response) => {
-				const { status } = response;
-				if (status !== 200 && status !== 204) {
-					const error = new Error(
-						`expected 200 OK from ${this.backchannelLogoutUri}, got: ${status} ${STATUS_CODES[status]}`
-					);
-					error.response = response;
-					throw error;
-				}
-			});
 		}
 
-		responseTypeAllowed(type) {
-			return this.responseTypes.includes(type);
-		}
+		[
+			'introspectionSignedResponseAlg',
+			'userinfoSignedResponseAlg',
+			'authorizationSignedResponseAlg',
+			'idTokenSignedResponseAlg',
+			'requestObjectSigningAlg'
+		].forEach((prop) => {
+			algs.add(client[prop]);
+		});
 
-		// eslint-disable-next-line no-unused-vars
-		responseModeAllowed(responseMode, responseType, fapiProfile) {
-			if (
-				fapiProfile === '1.0 Final' &&
-				!responseType.includes('id_token') &&
-				!responseMode.includes('jwt')
-			) {
-				return false;
-			}
-
-			return this.responseModes?.includes(responseMode) !== false;
-		}
-
-		grantTypeAllowed(type) {
-			return this.grantTypes.includes(type);
-		}
-
-		redirectUriAllowed(value) {
-			return this.redirectUris.includes(value);
-		}
-
-		postLogoutRedirectUriAllowed(value) {
-			const parsed = URL.parse(value);
-			if (!parsed) return false;
-			return !!this.postLogoutRedirectUris.find(
-				(allowed) => URL.parse(allowed)?.href === parsed.href
+		if (!client.requestObjectSigningAlg) {
+			configuration.requestObjectSigningAlgValues.forEach(
+				Set.prototype.add.bind(algs)
 			);
 		}
 
-		static async validate(metadata) {
-			const client = new Client(metadata);
+		configuration.requestObjectEncryptionAlgValues.forEach(
+			Set.prototype.add.bind(algs)
+		);
 
-			if (client.sectorIdentifierUri !== undefined) {
-				await sectorValidate(provider, client);
+		if (configuration.requestObjectEncryptionAlgValues.includes('dir')) {
+			configuration.requestObjectEncryptionEncValues.forEach(
+				Set.prototype.add.bind(algs)
+			);
+		}
+
+		[
+			'idTokenEncryptedResponse',
+			'userinfoEncryptedResponse',
+			'introspectionEncryptedResponse',
+			'authorizationEncryptedResponse'
+		].forEach((prop) => {
+			algs.add(client[`${prop}Alg`]);
+			if (client[`${prop}Alg`] === 'dir') {
+				algs.add(client[`${prop}Enc`]);
+			}
+		});
+
+		algs.delete(undefined);
+
+		for (const alg of algs) {
+			if (
+				!(
+					alg.startsWith('HS') ||
+					/^A(\d{3})(?:GCM)?KW$/.test(alg) ||
+					/^A(\d{3})(?:GCM|CBC-HS(\d{3}))$/.test(alg)
+				)
+			) {
+				algs.delete(alg);
 			}
 		}
 
-		metadata() {
-			return mapKeys(this, (value, key) => {
-				const snaked = snakeCase(key);
-				if (!instance(provider).RECOGNIZED_METADATA.includes(snaked)) {
+		for (const alg of algs) {
+			if (alg.startsWith('HS')) {
+				client.symmetricKeyStore.add({
+					alg,
+					use: 'sig',
+					kty: 'oct',
+					k: base64url.encode(client.clientSecret)
+				});
+			} else if (/^A(\d{3})(?:GCM)?KW$/.test(alg)) {
+				const len = parseInt(RegExp.$1, 10) / 8;
+				client.symmetricKeyStore.add({
+					alg,
+					use: 'enc',
+					kty: 'oct',
+					k: deriveEncryptionKey(client.clientSecret, len).toString('base64url')
+				});
+			} else if (/^A(\d{3})(?:GCM|CBC-HS(\d{3}))$/.test(alg)) {
+				const len = parseInt(RegExp.$2 || RegExp.$1, 10) / 8;
+				client.symmetricKeyStore.add({
+					alg,
+					use: 'enc',
+					kty: 'oct',
+					k: deriveEncryptionKey(client.clientSecret, len).toString('base64url')
+				});
+			}
+		}
+	}
+}
+
+export class Client {
+	#sectorIdentifier = null;
+
+	static get Schema() {
+		return getSchema(provider);
+	}
+
+	static #adapter;
+
+	constructor(metadata, ctx) {
+		const schema = new Client.Schema(metadata, ctx);
+
+		Object.assign(
+			this,
+			mapKeys(schema, (value, key) => {
+				if (!instance(provider).RECOGNIZED_METADATA.includes(key)) {
 					return key;
 				}
 
-				return snaked;
-			});
-		}
+				return camelCase(key);
+			})
+		);
 
-		get sectorIdentifier() {
-			if (this.#sectorIdentifier === null) {
-				this.#sectorIdentifier = sectorIdentifier(this);
-			}
+		buildAsymmetricKeyStore(this);
+		buildSymmetricKeyStore(this);
 
-			return this.#sectorIdentifier;
-		}
+		validateJWKS(this.jwks);
 
-		includeSid() {
-			return this.backchannelLogoutUri && this.backchannelLogoutSessionRequired;
-		}
-
-		compareClientSecret(actual) {
-			return constantEquals(this.clientSecret, actual, 1000);
-		}
-
-		checkClientSecretExpiration(message, errorOverride) {
-			if (!this.clientSecretExpiresAt) {
-				return;
-			}
-
-			const { clockTolerance } = instance(provider).configuration;
-
-			if (epochTime() - clockTolerance >= this.clientSecretExpiresAt) {
-				const err = new InvalidClient(
-					message,
-					`client_id ${this.clientId} client_secret expired at ${this.clientSecretExpiresAt}`
-				);
-				if (errorOverride) {
-					err.error = errorOverride;
-					err.message = errorOverride;
-				}
-				throw err;
-			}
-		}
-
-		get clientAuthMethod() {
-			return this.tokenEndpointAuthMethod;
-		}
-
-		get clientAuthSigningAlg() {
-			return this.tokenEndpointAuthSigningAlg;
-		}
-
-		static async find(id) {
-			if (typeof id !== 'string') {
-				return undefined;
-			}
-
-			const { staticClients, dynamicClients } = instance(provider);
-
-			if (staticClients.has(id)) {
-				const cached = staticClients.get(id);
-
-				if (!(cached instanceof Client)) {
-					const client = new Client(cached);
-					if (client.sectorIdentifierUri !== undefined) {
-						await sectorValidate(provider, client);
-					}
-					Object.defineProperty(client, 'noManage', { value: true });
-					staticClients.set(id, client);
-				}
-
-				return staticClients.get(id);
-			}
-
-			const properties = await this.adapter.find(id);
-
-			if (!properties) {
-				return undefined;
-			}
-
-			const propHash = crypto.hash(
-				'sha256',
-				JSON.stringify(properties),
-				'base64url'
-			);
-			let client = dynamicClients.get(propHash);
-
-			if (!client) {
-				client = await addClient(provider, properties, { store: false });
-				dynamicClients.set(propHash, client);
-			}
-
-			return client;
-		}
-
-		static needsSecret(metadata) {
-			if (!nonSecretAuthMethods.has(metadata.token_endpoint_auth_method)) {
-				return true;
-			}
-
-			if (signAlgAttributes.some(isHmac, metadata)) {
-				return true;
-			}
-
-			if (clientEncryptions.some(isSymmetricAlg, metadata)) {
-				return true;
-			}
-
-			return false;
-		}
-
-		static get Schema() {
-			return this.#Schema;
+		if (this.jwks) {
+			this.jwks.keys
+				.map(checkJWK)
+				.filter(Boolean)
+				.forEach(ClientKeyStore.prototype.add.bind(this.asymmetricKeyStore));
 		}
 	}
 
-	return Client;
+	static get adapter() {
+		this.#adapter ||= isConstructable(instance(provider).Adapter)
+			? new (instance(provider).Adapter)('Client')
+			: instance(provider).Adapter('Client');
+		return this.#adapter;
+	}
+
+	async backchannelPing(backchannelAuthenticationRequest) {
+		if (
+			!this.backchannelClientNotificationEndpoint ||
+			this.backchannelTokenDeliveryMode !== 'ping' ||
+			!backchannelAuthenticationRequest ||
+			!backchannelAuthenticationRequest.jti ||
+			backchannelAuthenticationRequest.kind !==
+				'BackchannelAuthenticationRequest' ||
+			!backchannelAuthenticationRequest.params.client_notification_token
+		) {
+			throw new TypeError();
+		}
+
+		/**
+		 * @type typeof fetch
+		 */
+		const request = instance(provider).configuration.fetch;
+		return request(new URL(this.backchannelClientNotificationEndpoint).href, {
+			method: 'POST',
+			headers: {
+				authorization: `Bearer ${backchannelAuthenticationRequest.params.client_notification_token}`,
+				'content-type': 'application/json'
+			},
+			body: JSON.stringify({
+				auth_req_id: backchannelAuthenticationRequest.jti
+			})
+		}).then((response) => {
+			const { status } = response;
+			if (status !== 204 && status !== 200) {
+				const error = new Error(
+					`expected 204 No Content from ${this.backchannelClientNotificationEndpoint}, got: ${status} ${STATUS_CODES[status]}`
+				);
+				error.response = response;
+				throw error;
+			}
+		});
+	}
+
+	async backchannelLogout(sub, sid) {
+		const logoutToken = new provider.IdToken(
+			{ sub },
+			{ client: this, ctx: undefined }
+		);
+		logoutToken.mask = { sub: null };
+		logoutToken.set('events', {
+			'http://schemas.openid.net/event/backchannel-logout': {}
+		});
+		logoutToken.set('jti', nanoid());
+
+		if (this.backchannelLogoutSessionRequired) {
+			logoutToken.set('sid', sid);
+		}
+
+		/**
+		 * @type typeof fetch
+		 */
+		const request = instance(provider).configuration.fetch;
+		return request(new URL(this.backchannelLogoutUri).href, {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/x-www-form-urlencoded'
+			},
+			body: new URLSearchParams({
+				logout_token: await logoutToken.issue({ use: 'logout' })
+			})
+		}).then((response) => {
+			const { status } = response;
+			if (status !== 200 && status !== 204) {
+				const error = new Error(
+					`expected 200 OK from ${this.backchannelLogoutUri}, got: ${status} ${STATUS_CODES[status]}`
+				);
+				error.response = response;
+				throw error;
+			}
+		});
+	}
+
+	responseTypeAllowed(type) {
+		return this.responseTypes.includes(type);
+	}
+
+	// eslint-disable-next-line no-unused-vars
+	responseModeAllowed(responseMode, responseType, fapiProfile) {
+		if (
+			fapiProfile === '1.0 Final' &&
+			!responseType.includes('id_token') &&
+			!responseMode.includes('jwt')
+		) {
+			return false;
+		}
+
+		return this.responseModes?.includes(responseMode) !== false;
+	}
+
+	grantTypeAllowed(type) {
+		return this.grantTypes.includes(type);
+	}
+
+	redirectUriAllowed(value) {
+		return this.redirectUris.includes(value);
+	}
+
+	postLogoutRedirectUriAllowed(value) {
+		const parsed = URL.parse(value);
+		if (!parsed) return false;
+		return !!this.postLogoutRedirectUris.find(
+			(allowed) => URL.parse(allowed)?.href === parsed.href
+		);
+	}
+
+	static async validate(metadata) {
+		const client = new Client(metadata);
+
+		if (client.sectorIdentifierUri !== undefined) {
+			await sectorValidate(provider, client);
+		}
+	}
+
+	metadata() {
+		return mapKeys(this, (value, key) => {
+			const snaked = snakeCase(key);
+			if (!instance(provider).RECOGNIZED_METADATA.includes(snaked)) {
+				return key;
+			}
+
+			return snaked;
+		});
+	}
+
+	get sectorIdentifier() {
+		if (this.#sectorIdentifier === null) {
+			this.#sectorIdentifier = sectorIdentifier(this);
+		}
+
+		return this.#sectorIdentifier;
+	}
+
+	includeSid() {
+		return this.backchannelLogoutUri && this.backchannelLogoutSessionRequired;
+	}
+
+	compareClientSecret(actual) {
+		return constantEquals(this.clientSecret, actual, 1000);
+	}
+
+	checkClientSecretExpiration(message, errorOverride) {
+		if (!this.clientSecretExpiresAt) {
+			return;
+		}
+
+		const { clockTolerance } = instance(provider).configuration;
+
+		if (epochTime() - clockTolerance >= this.clientSecretExpiresAt) {
+			const err = new InvalidClient(
+				message,
+				`client_id ${this.clientId} client_secret expired at ${this.clientSecretExpiresAt}`
+			);
+			if (errorOverride) {
+				err.error = errorOverride;
+				err.message = errorOverride;
+			}
+			throw err;
+		}
+	}
+
+	get clientAuthMethod() {
+		return this.tokenEndpointAuthMethod;
+	}
+
+	get clientAuthSigningAlg() {
+		return this.tokenEndpointAuthSigningAlg;
+	}
+
+	static async find(id) {
+		if (typeof id !== 'string') {
+			return undefined;
+		}
+
+		const { staticClients, dynamicClients } = instance(provider);
+
+		if (staticClients.has(id)) {
+			const cached = staticClients.get(id);
+
+			if (!(cached instanceof Client)) {
+				const client = new Client(cached);
+				if (client.sectorIdentifierUri !== undefined) {
+					await sectorValidate(provider, client);
+				}
+				Object.defineProperty(client, 'noManage', { value: true });
+				staticClients.set(id, client);
+			}
+
+			return staticClients.get(id);
+		}
+
+		const properties = await this.adapter.find(id);
+
+		if (!properties) {
+			return undefined;
+		}
+
+		const propHash = crypto.hash(
+			'sha256',
+			JSON.stringify(properties),
+			'base64url'
+		);
+		let client = dynamicClients.get(propHash);
+
+		if (!client) {
+			client = await addClient(provider, properties, { store: false });
+			dynamicClients.set(propHash, client);
+		}
+
+		return client;
+	}
+
+	static needsSecret(metadata) {
+		if (!nonSecretAuthMethods.has(metadata.token_endpoint_auth_method)) {
+			return true;
+		}
+
+		if (signAlgAttributes.some(isHmac, metadata)) {
+			return true;
+		}
+
+		if (clientEncryptions.some(isSymmetricAlg, metadata)) {
+			return true;
+		}
+
+		return false;
+	}
 }

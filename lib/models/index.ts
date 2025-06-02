@@ -2,7 +2,6 @@ import getAccessToken from './access_token.ts';
 import getAuthorizationCode from './authorization_code.ts';
 import getBaseModel from './base_model.ts';
 import getBaseToken from './base_token.ts';
-import getClient from './client.ts';
 import getClientCredentials from './client_credentials.ts';
 import getDeviceCode from './device_code.ts';
 import getBackchannelAuthenticationRequest from './backchannel_authentication_request.ts';
@@ -22,7 +21,6 @@ export {
 	getBackchannelAuthenticationRequest,
 	getBaseModel,
 	getBaseToken,
-	getClient,
 	getClientCredentials,
 	getDeviceCode,
 	getIdToken,
