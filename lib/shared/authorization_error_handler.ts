@@ -3,8 +3,15 @@ import instance from '../helpers/weak_cache.ts';
 import { OIDCProviderError } from '../helpers/errors.ts';
 import { getErrorHtmlResponse } from '../html/error.tsx';
 import { routeNames } from 'lib/consts/param_list.js';
-import { type Context, mapValueError } from 'elysia';
+import { type Context, mapValueError, ValidationError } from 'elysia';
 import { isAllowRedirectUri } from 'lib/actions/authorization/authorization.js';
+
+function getFirstError(error: ValidationError) {
+	const validator = error.validator ?? error.error.validator;
+	const firstError =
+		'Errors' in validator ? validator.Errors(error.value).First() : error;
+	return firstError;
+}
 
 function getObjFromError(code: string, errorObj: any) {
 	if (errorObj instanceof OIDCProviderError) {
@@ -12,11 +19,7 @@ function getObjFromError(code: string, errorObj: any) {
 		return { error, ...(error_description ? { error_description } : {}) };
 	}
 	if (code === 'VALIDATION') {
-		const validator = errorObj.validator ?? errorObj.error.validator;
-		const firstError =
-			'Errors' in validator
-				? validator.Errors(errorObj.value).First()
-				: errorObj;
+		const firstError = getFirstError(errorObj);
 		if (firstError.schema.error) {
 			const schemaError = firstError.schema.error;
 			if (typeof schemaError === 'string') {
@@ -97,6 +100,13 @@ async function authorizationErrorHandler({
 	body,
 	request
 }: Context) {
+	if (error instanceof ValidationError) {
+		const firstError = getFirstError(error);
+		if (firstError.path === '/redirect_uri') {
+			throw error;
+		}
+	}
+
 	const params = request.method === 'POST' ? body : query;
 	const redirectObj = await isAllowRedirectUri(params);
 

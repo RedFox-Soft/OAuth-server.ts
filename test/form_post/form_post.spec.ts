@@ -63,16 +63,15 @@ describe('/auth', () => {
 						response_mode: 'form_post',
 						scope: 'openid',
 						redirect_uri:
-							'https://client.example.com/cb"><script>alert(0)</script><x="'
+							'https://client.example.com/cb"><script>alert(0)</script><x="/'
 					});
-					const { data, response } = await authRequest(auth);
-					expect(response.status).toBe(200);
-					expect(response.headers.get('content-type')).toBe(
-						'text/html; charset=utf-8'
-					);
-					expect(data).toContain(
-						'https://client.example.com/cb&quot;&gt;&lt;script&gt;alert(0)&lt;/script&gt;&lt;x=&quot;'
-					);
+					const { error } = await authRequest(auth);
+					expect(error.status).toBe(422);
+
+					expect(error.value).toEqual({
+						error: 'invalid_request',
+						error_description: "Property 'redirect_uri' should be uri"
+					});
 				});
 			});
 

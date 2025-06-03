@@ -548,7 +548,7 @@ describe('grant_type=authorization_code', () => {
 			expect(error.value).toHaveProperty('error', 'invalid_request');
 			expect(error.value).toHaveProperty(
 				'error_description',
-				"Expected property 'grant_type' to be string but found: undefined"
+				"Property 'grant_type' is missing"
 			);
 		});
 

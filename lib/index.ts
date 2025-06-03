@@ -22,7 +22,7 @@ import { discovery } from './actions/discovery.js';
 import { userinfo } from './actions/userinfo.js';
 import { backchannelAuth, deviceAuth } from './actions/authorization/device.js';
 
-export const elysia = new Elysia({ strictPath: true, normalize: 'exactMirror' })
+export const elysia = new Elysia({ strictPath: true, normalize: false })
 	.onError(errorHandler)
 	.use(staticPlugin({ assets: 'dist' }))
 	.use(staticPlugin())

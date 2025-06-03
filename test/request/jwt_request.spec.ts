@@ -234,8 +234,7 @@ describe('request parameter features', () => {
 						max_age: 300
 					},
 					payload: {
-						scope: 'openid',
-						response_type: 'code'
+						scope: 'openid'
 					},
 					verb
 				});

@@ -642,6 +642,7 @@ describe('BASIC code', () => {
 					client_id: 'foobar',
 					scope
 				});
+				delete auth.params.redirect_uri;
 
 				const { response, error } = await authRequest(auth, {
 					accept: 'text/html'
