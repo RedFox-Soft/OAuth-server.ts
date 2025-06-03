@@ -325,7 +325,6 @@ expire.setDate(expire.getDate() + 1);
 						const { response, error } = await agent.ui['resume'].resume.get({
 							headers: { cookie: [session, cookie].join('; ') }
 						});
-						console.log(error);
 						expect(response.status).toBe(303);
 						auth.validatePresence(response, ['code', 'state']);
 						auth.validateState(response);
@@ -784,7 +783,6 @@ expire.setDate(expire.getDate() + 1);
 				const cookie = await setup.login();
 				const { response } = await authRequest(auth, { cookie });
 				expect(response.status).toBe(303);
-				console.log(response.headers.get('location'));
 				auth.validatePresence(response, [
 					'error',
 					'error_description',

@@ -19,6 +19,12 @@ import { Account, TestAdapter } from './models.js';
 import keys from './keys.js';
 import { AuthorizationRequest } from './AuthorizationRequest.js';
 
+import { ApplicationConfig } from '../lib/configs/application.js';
+import { ClientDefaults } from 'lib/configs/clientBase.js';
+
+const applicationDefaultSettings = { ...ApplicationConfig };
+const clientDefaultSettings = { ...ClientDefaults };
+
 const { info, warn } = console;
 console.info = function (...args) {
 	if (!args[0].includes('NOTICE: ')) info.apply(this, args);
@@ -91,7 +97,11 @@ export default function testHelper(
 		const conf = pathToFileURL(
 			path.format({ dir, base: `${base}.config.js` })
 		).toString();
-		const { default: mod } = await import(conf);
+		const {
+			default: mod,
+			ApplicationConfig: app,
+			ClientDefaults: clientSettings
+		} = await import(conf);
 		const { config, client } = mod;
 		let { clients } = mod;
 
@@ -104,6 +114,8 @@ export default function testHelper(
 			config.findAccount = Account.findAccount;
 		}
 
+		Object.assign(ApplicationConfig, applicationDefaultSettings, app || {});
+		Object.assign(ClientDefaults, clientDefaultSettings, clientSettings || {});
 		const issuerIdentifier = `${protocol}//127.0.0.1:3000`;
 		TestAdapter.clear();
 

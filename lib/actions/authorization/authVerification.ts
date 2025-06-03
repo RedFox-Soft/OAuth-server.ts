@@ -2,6 +2,7 @@ import { type Static } from 'elysia';
 import { AuthorizationParameters } from 'lib/consts/param_list.js';
 import { globalConfiguration } from 'lib/globalConfiguration.js';
 import { NotSupportedError } from 'lib/helpers/errors.js';
+import { ApplicationConfig } from 'lib/configs/application.js';
 
 type auth = Omit<Static<typeof AuthorizationParameters>, 'client_id'>;
 
@@ -13,8 +14,7 @@ export function authVerification(params: auth) {
 			resourceIndicators,
 			richAuthorizationRequests,
 			webMessageResponseMode,
-			requestObjects,
-			pushedAuthorizationRequests
+			requestObjects
 		}
 	} = globalConfiguration;
 
@@ -49,7 +49,7 @@ export function authVerification(params: auth) {
 		throw new NotSupportedError('Request Object is not supported');
 	} else if (
 		params.request_uri !== undefined &&
-		!pushedAuthorizationRequests.enabled
+		!ApplicationConfig['par.enabled']
 	) {
 		// For Authorization endpoint only
 		throw new NotSupportedError('Request URI is not supported');

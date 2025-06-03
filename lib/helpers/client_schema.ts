@@ -95,10 +95,6 @@ export default function getSchema(provider) {
 		}
 	}
 
-	if (features.pushedAuthorizationRequests.enabled) {
-		RECOGNIZED_METADATA.push('require_pushed_authorization_requests');
-	}
-
 	if (features.encryption.enabled) {
 		RECOGNIZED_METADATA.push('id_token_encrypted_response_alg');
 		RECOGNIZED_METADATA.push('id_token_encrypted_response_enc');
@@ -288,7 +284,6 @@ export default function getSchema(provider) {
 				if (
 					!par.enabled ||
 					!par.allowUnregisteredRedirectUris ||
-					!this.require_pushed_authorization_requests ||
 					this.token_endpoint_auth_method === 'none' ||
 					this.sector_identifier_uri
 				) {

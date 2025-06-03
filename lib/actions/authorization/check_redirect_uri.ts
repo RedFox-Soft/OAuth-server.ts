@@ -1,13 +1,11 @@
 import { InvalidRedirectUri, InvalidRequest } from '../../helpers/errors.ts';
-import instance from '../../helpers/weak_cache.ts';
+import { ApplicationConfig } from '../../configs/application.js';
 
 function allowUnregisteredUri(ctx) {
-	const { pushedAuthorizationRequests } = instance(ctx.oidc.provider).features;
-
 	return (
 		(ctx.oidc.route === '/par' ||
 			'PushedAuthorizationRequest' in ctx.oidc.entities) &&
-		pushedAuthorizationRequests.allowUnregisteredRedirectUris &&
+		ApplicationConfig['par.allowUnregisteredRedirectUris'] &&
 		ctx.oidc.client.sectorIdentifierUri === undefined &&
 		ctx.oidc.client.clientAuthMethod !== 'none'
 	);

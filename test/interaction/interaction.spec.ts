@@ -181,7 +181,6 @@ describe('devInteractions', () => {
 			});
 
 			expect(response.status).toBe(303);
-			console.log(response.headers.get('location'));
 
 			return this.agent
 				.get(this.url.replace('interaction', 'auth'))

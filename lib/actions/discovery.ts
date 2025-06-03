@@ -3,6 +3,21 @@ import defaults from '../helpers/_/defaults.ts';
 import instance from '../helpers/weak_cache.ts';
 import { provider } from 'lib/index.js';
 import { routeNames } from 'lib/consts/param_list.js';
+import { calculateDiscovery } from 'lib/configs/discoverySupport.js';
+import { ApplicationConfig } from '../configs/application.js';
+import { ReturnType } from '@sinclair/typebox';
+
+type OmitEnabled<T> = {
+	[K in keyof T as K extends `${infer _}enabled` ? K : never]: T[K];
+};
+type discoveryKeys = keyof ReturnType<typeof calculateDiscovery>;
+type featuresKeys = keyof OmitEnabled<typeof ApplicationConfig>;
+const featuresKeyMap: Record<featuresKeys, Array<discoveryKeys>> = {
+	'par.enabled': [
+		'pushed_authorization_request_endpoint',
+		'require_pushed_authorization_requests'
+	]
+} as const;
 
 function urls(baseUrl: string) {
 	return {
@@ -13,10 +28,6 @@ function urls(baseUrl: string) {
 		).href,
 		end_session_endpoint: new URL(routeNames.end_session, baseUrl).href,
 		jwks_uri: new URL(routeNames.jwks, baseUrl).href,
-		pushed_authorization_request_endpoint: new URL(
-			routeNames.pushed_authorization_request,
-			baseUrl
-		).href,
 		registration_endpoint: new URL(routeNames.registration, baseUrl).href,
 		token_endpoint: new URL(routeNames.token, baseUrl).href,
 		userinfo_endpoint: new URL(routeNames.userinfo, baseUrl).href,
@@ -48,19 +59,16 @@ export const discovery = new Elysia().get(
 				: undefined,
 			claims_parameter_supported: features.claimsParameter.enabled,
 			claims_supported: [...configuration.claimsSupported],
-			code_challenge_methods_supported: ['S256'],
+
 			end_session_endpoint: features.rpInitiatedLogout.enabled
 				? urlObj.end_session_endpoint
 				: undefined,
 			grant_types_supported: [...configuration.grantTypes],
-			issuer: url.toString(),
 			jwks_uri: urlObj.jwks_uri,
 			registration_endpoint: features.registration.enabled
 				? urlObj.registration_endpoint
 				: undefined,
 			authorization_response_iss_parameter_supported: true,
-			response_modes_supported: ['form_post', 'query'],
-			response_types_supported: ['none', 'code'],
 			scopes_supported: [...configuration.scopes],
 			subject_types_supported: [...configuration.subjectTypes],
 			token_endpoint_auth_methods_supported: [
@@ -68,14 +76,21 @@ export const discovery = new Elysia().get(
 			],
 			token_endpoint_auth_signing_alg_values_supported:
 				configuration.clientAuthSigningAlgValues,
-			token_endpoint: urlObj.token_endpoint
+			token_endpoint: urlObj.token_endpoint,
+			...calculateDiscovery()
 		};
 
-		const {
-			pushedAuthorizationRequests,
-			requestObjects,
-			richAuthorizationRequests
-		} = features;
+		const keys = Object.keys(featuresKeyMap) as featuresKeys[];
+		keys.forEach((feature) => {
+			if (ApplicationConfig[feature] === false) {
+				const keys = featuresKeyMap[feature];
+				keys.forEach((key: discoveryKeys) => {
+					delete body[key];
+				});
+			}
+		});
+
+		const { requestObjects, richAuthorizationRequests } = features;
 
 		body.id_token_signing_alg_values_supported =
 			configuration.idTokenSigningAlgValues;
@@ -84,15 +99,6 @@ export const discovery = new Elysia().get(
 				configuration.idTokenEncryptionAlgValues;
 			body.id_token_encryption_enc_values_supported =
 				configuration.idTokenEncryptionEncValues;
-		}
-
-		if (pushedAuthorizationRequests.enabled) {
-			body.pushed_authorization_request_endpoint =
-				urlObj.pushed_authorization_request_endpoint;
-			body.require_pushed_authorization_requests =
-				pushedAuthorizationRequests.requirePushedAuthorizationRequests
-					? true
-					: undefined;
 		}
 
 		body.request_uri_parameter_supported = false;
@@ -203,6 +209,16 @@ export const discovery = new Elysia().get(
 				richAuthorizationRequests.types
 			);
 		}
+
+		Object.keys(body).forEach((key) => {
+			if (
+				key in body &&
+				key !== 'request_uri_parameter_supported' &&
+				body[key] === false
+			) {
+				delete body[key];
+			}
+		});
 
 		defaults(body, configuration.discovery);
 		return body;

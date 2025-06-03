@@ -19,6 +19,8 @@ import bootstrap, { agent, jsonToFormUrlEncoded } from '../test_helper.js';
 import { provider } from 'lib/provider.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
+import { ApplicationConfig } from 'lib/configs/application.js';
+import { ClientDefaults } from 'lib/configs/clientBase.js';
 
 describe('Pushed Request Object', () => {
 	let setup = null;
@@ -50,9 +52,7 @@ describe('Pushed Request Object', () => {
 					'require_pushed_authorization_requests'
 				);
 
-				i(
-					provider
-				).features.pushedAuthorizationRequests.requirePushedAuthorizationRequests =
+				ClientDefaults['authorization.requirePushedAuthorizationRequests'] =
 					true;
 
 				const { data: newData } =
@@ -65,9 +65,7 @@ describe('Pushed Request Object', () => {
 			});
 
 			afterEach(function () {
-				i(
-					provider
-				).features.pushedAuthorizationRequests.requirePushedAuthorizationRequests =
+				ClientDefaults['authorization.requirePushedAuthorizationRequests'] =
 					false;
 			});
 		});
@@ -78,16 +76,10 @@ describe('Pushed Request Object', () => {
 
 			describe('allowUnregisteredRedirectUris', () => {
 				beforeEach(function () {
-					i(
-						provider
-					).features.pushedAuthorizationRequests.allowUnregisteredRedirectUris =
-						true;
+					ApplicationConfig['par.allowUnregisteredRedirectUris'] = true;
 				});
 				afterEach(function () {
-					i(
-						provider
-					).features.pushedAuthorizationRequests.allowUnregisteredRedirectUris =
-						false;
+					ApplicationConfig['par.allowUnregisteredRedirectUris'] = false;
 				});
 
 				it('allows unregistered redirect_uris to be used', async function () {
@@ -594,9 +586,7 @@ describe('Pushed Request Object', () => {
 					'require_pushed_authorization_requests'
 				);
 
-				i(
-					provider
-				).features.pushedAuthorizationRequests.requirePushedAuthorizationRequests =
+				ClientDefaults['authorization.requirePushedAuthorizationRequests'] =
 					true;
 
 				const { data: newData } =
@@ -609,9 +599,7 @@ describe('Pushed Request Object', () => {
 			});
 
 			afterEach(function () {
-				i(
-					provider
-				).features.pushedAuthorizationRequests.requirePushedAuthorizationRequests =
+				ClientDefaults['authorization.requirePushedAuthorizationRequests'] =
 					false;
 			});
 		});

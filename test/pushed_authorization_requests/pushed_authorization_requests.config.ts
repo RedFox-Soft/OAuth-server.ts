@@ -5,11 +5,6 @@ import getConfig from '../default.config.js';
 const config = getConfig();
 
 merge(config.features, {
-	pushedAuthorizationRequests: {
-		requirePushedAuthorizationRequests: false,
-		enabled: true,
-		allowUnregisteredRedirectUris: false
-	},
 	claimsParameter: {
 		enabled: true
 	},
@@ -26,6 +21,10 @@ function allowUnregisteredClient(suffix, metadata) {
 		...metadata
 	};
 }
+
+export const ApplicationConfig = {
+	'par.enabled': true
+};
 
 export default {
 	config,

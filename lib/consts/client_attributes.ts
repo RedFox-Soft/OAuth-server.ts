@@ -37,7 +37,6 @@ const DEFAULT = {
 	introspection_signed_response_alg: 'RS256',
 	post_logout_redirect_uris: [],
 	require_auth_time: false,
-	require_pushed_authorization_requests: false,
 	require_signed_request_object: false,
 	dpop_bound_access_tokens: false,
 	response_types: ['code'],
@@ -58,7 +57,6 @@ const BOOL = [
 	'backchannel_user_code_parameter',
 	'dpop_bound_access_tokens',
 	'require_auth_time',
-	'require_pushed_authorization_requests',
 	'require_signed_request_object',
 	'tls_client_certificate_bound_access_tokens',
 	'use_mtls_endpoint_aliases'

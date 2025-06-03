@@ -1,0 +1,22 @@
+import { ISSUER } from 'lib/configs/env.js';
+import { routeNames } from 'lib/consts/param_list.js';
+import { ClientDefaults } from 'lib/configs/clientBase.js';
+import { ApplicationConfig } from './application.js';
+
+const discovery = {
+	issuer: ISSUER,
+	response_modes_supported: ['form_post', 'query'],
+	response_types_supported: ['none', 'code'],
+	code_challenge_methods_supported: ['S256'],
+
+	pushed_authorization_request_endpoint: `${ISSUER}${routeNames.pushed_authorization_request}`,
+	request_uri_parameter_supported: false,
+	require_pushed_authorization_requests: false
+};
+
+export function calculateDiscovery() {
+	discovery.require_pushed_authorization_requests =
+		ClientDefaults['authorization.requirePushedAuthorizationRequests'];
+	discovery.request_uri_parameter_supported = ApplicationConfig['par.enabled'];
+	return discovery;
+}
