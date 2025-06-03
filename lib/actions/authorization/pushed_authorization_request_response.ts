@@ -3,7 +3,7 @@ import { UnsecuredJWT } from 'jose';
 import { PUSHED_REQUEST_URN } from '../../consts/index.ts';
 import epochTime from '../../helpers/epoch_time.ts';
 import * as JWT from '../../helpers/jwt.ts';
-import { ISSUER } from 'lib/helpers/env.js';
+import { ISSUER } from 'lib/configs/env.js';
 import { nanoid } from 'nanoid';
 
 const MAX_TTL = 60;

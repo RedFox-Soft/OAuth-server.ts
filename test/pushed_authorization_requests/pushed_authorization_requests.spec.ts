@@ -638,7 +638,7 @@ describe('Pushed Request Object', () => {
 									code_challenge,
 									client_id: clientId,
 									iss: clientId,
-									aud: 'http://e.ly/'
+									aud: 'http://e.ly'
 								},
 								key,
 								'HS256',
@@ -682,7 +682,7 @@ describe('Pushed Request Object', () => {
 											code_challenge,
 											client_id: clientId,
 											iss: clientId,
-											aud: 'http://e.ly/'
+											aud: 'http://e.ly'
 										},
 										key,
 										'HS256',
@@ -723,7 +723,7 @@ describe('Pushed Request Object', () => {
 											code_challenge,
 											client_id: clientId,
 											iss: clientId,
-											aud: 'http://e.ly/'
+											aud: 'http://e.ly'
 										},
 										key,
 										'HS256'
@@ -762,7 +762,7 @@ describe('Pushed Request Object', () => {
 											code_challenge,
 											client_id: clientId,
 											iss: clientId,
-											aud: 'http://e.ly/'
+											aud: 'http://e.ly'
 										},
 										key,
 										'HS256',
@@ -803,7 +803,7 @@ describe('Pushed Request Object', () => {
 											code_challenge,
 											client_id: clientId,
 											iss: clientId,
-											aud: 'http://e.ly/'
+											aud: 'http://e.ly'
 										},
 										key,
 										'HS256',
@@ -848,7 +848,7 @@ describe('Pushed Request Object', () => {
 											code_challenge,
 											client_id: clientId,
 											iss: clientId,
-											aud: 'http://e.ly/'
+											aud: 'http://e.ly'
 										},
 										key,
 										'HS256',
@@ -888,7 +888,7 @@ describe('Pushed Request Object', () => {
 											code_challenge,
 											client_id: 'client-alg-registered',
 											iss: 'client-alg-registered',
-											aud: 'http://e.ly/'
+											aud: 'http://e.ly'
 										},
 										key,
 										'HS384',
@@ -927,7 +927,7 @@ describe('Pushed Request Object', () => {
 											code_challenge,
 											client_id: 'client-foo',
 											iss: clientId,
-											aud: 'http://e.ly/'
+											aud: 'http://e.ly'
 										},
 										key,
 										'HS256',
@@ -966,7 +966,7 @@ describe('Pushed Request Object', () => {
 											code_challenge,
 											client_id: clientId,
 											iss: clientId,
-											aud: 'http://e.ly/',
+											aud: 'http://e.ly',
 											redirect_uri: 'https://rp.example.com/unlisted'
 										},
 										key,
@@ -1012,7 +1012,7 @@ describe('Pushed Request Object', () => {
 											code_challenge,
 											client_id: clientId,
 											iss: clientId,
-											aud: 'http://e.ly/'
+											aud: 'http://e.ly'
 										},
 										key,
 										'HS256',
@@ -1053,7 +1053,7 @@ describe('Pushed Request Object', () => {
 											code_challenge,
 											client_id: clientId,
 											iss: clientId,
-											aud: 'http://e.ly/'
+											aud: 'http://e.ly'
 										},
 										key,
 										'HS256',
@@ -1079,7 +1079,7 @@ describe('Pushed Request Object', () => {
 							const auth = new AuthorizationRequest({
 								client_id: clientId,
 								iss: clientId,
-								aud: 'http://e.ly/',
+								aud: 'http://e.ly',
 								request_uri
 							});
 
@@ -1088,7 +1088,7 @@ describe('Pushed Request Object', () => {
 								query: {
 									client_id: clientId,
 									iss: clientId,
-									aud: 'http://e.ly/',
+									aud: 'http://e.ly',
 									request_uri
 								},
 								headers: {

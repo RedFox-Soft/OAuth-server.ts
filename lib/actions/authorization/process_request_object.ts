@@ -6,7 +6,7 @@ import {
 	OIDCProviderError
 } from '../../helpers/errors.ts';
 import { getSchemaValidator, TSchema, ValidationError } from 'elysia';
-import { ISSUER } from 'lib/helpers/env.js';
+import { ISSUER } from 'lib/configs/env.js';
 
 export function isEncryptedJWT(jwt: string): boolean {
 	// Encrypted JWTs have 5 parts, while signed JWTs have 3

@@ -8,7 +8,7 @@ import sinon from 'sinon';
 import * as JWT from '../../lib/helpers/jwt.ts';
 import bootstrap, { agent, jsonToFormUrlEncoded } from '../test_helper.js';
 import { provider } from 'lib/provider.js';
-import { ISSUER } from 'lib/helpers/env.js';
+import { ISSUER } from 'lib/configs/env.js';
 import { ValidationError } from 'elysia';
 
 describe('request parameter features', () => {
