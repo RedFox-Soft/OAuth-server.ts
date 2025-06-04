@@ -32,7 +32,6 @@ function urls(baseUrl: string) {
 		registration_endpoint: new URL(routeNames.registration, baseUrl).href,
 		token_endpoint: new URL(routeNames.token, baseUrl).href,
 		userinfo_endpoint: new URL(routeNames.userinfo, baseUrl).href,
-		introspection_endpoint: new URL(routeNames.introspect, baseUrl).href,
 		revocation_endpoint: new URL(routeNames.revocation, baseUrl).href,
 		backchannel_authentication_endpoint: new URL(
 			routeNames.backchannel_authentication,
@@ -155,10 +154,6 @@ export const discovery = new Elysia().get(
 				body.authorization_encryption_enc_values_supported =
 					configuration.authorizationEncryptionEncValues;
 			}
-		}
-
-		if (features.introspection.enabled) {
-			body.introspection_endpoint = urlObj.introspection_endpoint;
 		}
 
 		if (features.jwtIntrospection.enabled) {

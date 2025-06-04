@@ -13,32 +13,28 @@ const introspectable = new Set([
 ]);
 const JWT = 'application/token-introspection+jwt';
 
-function getAccessToken(token) {
-	const { AccessToken } = provider;
-	return AccessToken.find(token);
-}
-
-function getClientCredentials(token) {
-	const { grantTypeHandlers } = instance(provider);
-	const { ClientCredentials } = provider;
-	if (!grantTypeHandlers.has('client_credentials')) {
-		return undefined;
+const tokenTypes = {
+	access_token(token: string) {
+		const { AccessToken } = provider;
+		return AccessToken.find(token);
+	},
+	client_credentials(token: string) {
+		const { grantTypeHandlers } = instance(provider);
+		const { ClientCredentials } = provider;
+		if (!grantTypeHandlers.has('client_credentials')) {
+			return;
+		}
+		return ClientCredentials.find(token);
+	},
+	refresh_token(token: string) {
+		const { grantTypeHandlers } = instance(provider);
+		const { RefreshToken } = provider;
+		if (!grantTypeHandlers.has('refresh_token')) {
+			return;
+		}
+		return RefreshToken.find(token);
 	}
-	return ClientCredentials.find(token);
-}
-
-function getRefreshToken(token) {
-	const { grantTypeHandlers } = instance(provider);
-	const { RefreshToken } = provider;
-	if (!grantTypeHandlers.has('refresh_token')) {
-		return undefined;
-	}
-	return RefreshToken.find(token);
-}
-
-function findResult(results) {
-	return results.find((found) => !!found);
-}
+};
 
 async function renderTokenResponse(ctx) {
 	const { params } = ctx.oidc;
@@ -55,40 +51,19 @@ async function renderTokenResponse(ctx) {
 
 	let token;
 
-	switch (params.token_type_hint) {
-		case 'access_token':
-			token = await getAccessToken(params.token).then((result) => {
-				if (result) return result;
-				return Promise.all([
-					getClientCredentials(params.token),
-					getRefreshToken(params.token)
-				]).then(findResult);
-			});
-			break;
-		case 'client_credentials':
-			token = await getClientCredentials(params.token).then((result) => {
-				if (result) return result;
-				return Promise.all([
-					getAccessToken(params.token),
-					getRefreshToken(params.token)
-				]).then(findResult);
-			});
-			break;
-		case 'refresh_token':
-			token = await getRefreshToken(params.token).then((result) => {
-				if (result) return result;
-				return Promise.all([
-					getAccessToken(params.token),
-					getClientCredentials(params.token)
-				]).then(findResult);
-			});
-			break;
-		default:
-			token = await Promise.all([
-				getAccessToken(params.token),
-				getClientCredentials(params.token),
-				getRefreshToken(params.token)
-			]).then(findResult);
+	const methodToken = tokenTypes[params.token_type_hint];
+	if (methodToken) {
+		token = await methodToken(params.token);
+		if (!token) {
+			const otherMethods = Object.keys(tokenTypes)
+				.filter((type) => type !== params.token_type_hint)
+				.map((type) => tokenTypes[type](params.token));
+			token = (await Promise.all(otherMethods)).find((t) => t);
+		}
+	} else {
+		token = (
+			await Promise.all(Object.values(tokenTypes).map((fn) => fn(params.token)))
+		).find((t) => t);
 	}
 
 	if (!token?.isValid) {
@@ -178,6 +153,46 @@ export const introspect = new Elysia().post(
 		for (const middleware of tokenAuth) {
 			await middleware(ctx, () => {});
 		}
+
+		const { configuration } = instance(provider);
+		const {
+			features: { jwtIntrospection }
+		} = configuration;
+		const { IdToken } = provider;
+		if (jwtIntrospection.enabled) {
+			const { client } = ctx.oidc;
+
+			const {
+				introspectionEncryptedResponseAlg: encrypt,
+				introspectionSignedResponseAlg: sign
+			} = client;
+
+			const accepts = ctx.accepts('json', JWT);
+			if (encrypt && accepts !== JWT) {
+				throw new InvalidRequest(
+					`introspection must be requested with Accept: ${JWT} for this client`
+				);
+			}
+
+			const body = await renderTokenResponse(ctx);
+
+			if ((encrypt || sign) && accepts === JWT) {
+				const token = new IdToken({}, { ctx });
+				token.extra = {
+					token_introspection: body,
+					aud: body.aud
+				};
+
+				ctx.body = await token.issue({ use: 'introspection' });
+				return new Response(ctx.body, {
+					headers: {
+						'Content-Type': 'application/token-introspection+jwt; charset=utf-8'
+					}
+				});
+			}
+			return body;
+		}
+
 		return await renderTokenResponse(ctx);
 	},
 	{
@@ -194,46 +209,3 @@ export const introspect = new Elysia().post(
 		})
 	}
 );
-
-export default function introspectionAction(provider) {
-	const { configuration } = instance(provider);
-	const {
-		features: { jwtIntrospection }
-	} = configuration;
-	const { IdToken } = provider;
-
-	return [
-		async function jwtIntrospectionResponse(ctx, next) {
-			if (jwtIntrospection.enabled) {
-				const { client } = ctx.oidc;
-
-				const {
-					introspectionEncryptedResponseAlg: encrypt,
-					introspectionSignedResponseAlg: sign
-				} = client;
-
-				const accepts = ctx.accepts('json', JWT);
-				if (encrypt && accepts !== JWT) {
-					throw new InvalidRequest(
-						`introspection must be requested with Accept: ${JWT} for this client`
-					);
-				}
-
-				await next();
-
-				if ((encrypt || sign) && accepts === JWT) {
-					const token = new IdToken({}, { ctx });
-					token.extra = {
-						token_introspection: ctx.body,
-						aud: ctx.body.aud
-					};
-
-					ctx.body = await token.issue({ use: 'introspection' });
-					ctx.type = 'application/token-introspection+jwt; charset=utf-8';
-				}
-			} else {
-				await next();
-			}
-		}
-	];
-}

@@ -9,7 +9,6 @@ import {
 	jwks,
 	registration,
 	getRevocation,
-	getIntrospection,
 	endSession,
 	codeVerification
 } from '../actions/index.ts';
