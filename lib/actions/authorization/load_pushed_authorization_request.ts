@@ -30,9 +30,6 @@ export default async function loadPushedAuthorizationRequest(ctx) {
 	if (!params.request_uri.startsWith(PUSHED_REQUEST_URN)) {
 		throw new RequestUriNotSupported();
 	}
-	if (!URL.canParse(params.request_uri)) {
-		throw new InvalidRequestUri('invalid request_uri');
-	}
 
 	const [, id] = params.request_uri.split(PUSHED_REQUEST_URN);
 	const pushedAuthorizationRequest = await PushedAuthorizationRequest.find(id, {

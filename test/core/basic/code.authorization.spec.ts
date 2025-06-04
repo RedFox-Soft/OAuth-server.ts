@@ -442,7 +442,7 @@ describe('BASIC code', () => {
 					const auth = new AuthorizationRequest({
 						response_type,
 						scope,
-						[param]: 'some'
+						[param]: 'http://sjssjsjsjs/sss'
 					});
 
 					const { response } = await authRequest(auth);

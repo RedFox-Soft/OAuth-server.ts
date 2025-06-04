@@ -36,7 +36,7 @@ export const AuthorizationParameters = t.Object({
 		})
 	),
 	request: t.Optional(t.String()),
-	request_uri: t.Optional(t.String()),
+	request_uri: t.Optional(t.String({ format: 'uri' })),
 	ui_locales: t.Optional(t.Array(t.String())),
 	acr_values: t.Optional(t.String()),
 
