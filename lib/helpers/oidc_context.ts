@@ -1,11 +1,9 @@
-import * as events from 'node:events';
+import events from 'node:events';
 
 import isPlainObject from './_/is_plain_object.ts';
 import { InvalidRequest } from './errors.ts';
 import instance from './weak_cache.ts';
 import { routeNames } from '../consts/param_list.ts';
-
-const COOKIES = Symbol();
 
 export default function getContext(provider) {
 	const {
@@ -30,21 +28,6 @@ export default function getContext(provider) {
 			this.entities = {};
 			this.claims = {};
 			this.resourceServers = {};
-		}
-
-		get cookies() {
-			if (!this[COOKIES]) {
-				this[COOKIES] = provider.createContext(
-					this.ctx.req,
-					this.ctx.res
-				).cookies;
-				this[COOKIES].secure =
-					!this[COOKIES].secure && this.ctx.secure
-						? true
-						: this[COOKIES].secure;
-			}
-
-			return this[COOKIES];
 		}
 
 		get fapiProfile() {

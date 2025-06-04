@@ -16,7 +16,8 @@ const featuresKeyMap: Record<featuresKeys, Array<discoveryKeys>> = {
 	'par.enabled': [
 		'pushed_authorization_request_endpoint',
 		'require_pushed_authorization_requests'
-	]
+	],
+	'introspection.enabled': ['introspection_endpoint']
 } as const;
 
 function urls(baseUrl: string) {
@@ -31,7 +32,7 @@ function urls(baseUrl: string) {
 		registration_endpoint: new URL(routeNames.registration, baseUrl).href,
 		token_endpoint: new URL(routeNames.token, baseUrl).href,
 		userinfo_endpoint: new URL(routeNames.userinfo, baseUrl).href,
-		introspection_endpoint: new URL(routeNames.introspection, baseUrl).href,
+		introspection_endpoint: new URL(routeNames.introspect, baseUrl).href,
 		revocation_endpoint: new URL(routeNames.revocation, baseUrl).href,
 		backchannel_authentication_endpoint: new URL(
 			routeNames.backchannel_authentication,

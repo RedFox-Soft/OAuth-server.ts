@@ -21,6 +21,7 @@ import { ui } from './interactions/index.js';
 import { discovery } from './actions/discovery.js';
 import { userinfo } from './actions/userinfo.js';
 import { backchannelAuth, deviceAuth } from './actions/authorization/device.js';
+import { introspect } from './actions/introspection.js';
 
 export const elysia = new Elysia({ strictPath: true, normalize: false })
 	.onError(errorHandler)
@@ -33,6 +34,7 @@ export const elysia = new Elysia({ strictPath: true, normalize: false })
 	.use(deviceAuth)
 	.use(backchannelAuth)
 	.use(par)
+	.use(introspect)
 	.use(tokenAction)
 	.use(userinfo)
 	.use(ui)

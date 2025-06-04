@@ -1,560 +1,526 @@
-import sinon from 'sinon';
-import { expect } from 'chai';
+import {
+	describe,
+	it,
+	expect,
+	beforeAll,
+	afterEach,
+	spyOn,
+	mock
+} from 'bun:test';
 
-import bootstrap from '../test_helper.js';
+import bootstrap, { agent } from '../test_helper.js';
+import { ISSUER } from 'lib/configs/env.js';
+import { provider } from 'lib/provider.js';
+import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
 const route = '/token/introspection';
 
 describe('introspection features', () => {
-	before(bootstrap(import.meta.url));
+	let setup = null;
+	beforeAll(async function () {
+		setup = await bootstrap(import.meta.url)();
+	});
+	afterEach(function () {
+		mock.restore();
+	});
 
 	describe('enriched discovery', () => {
-		it('shows the url now', function () {
-			return this.agent
-				.get('/.well-known/openid-configuration')
-				.expect(200)
-				.expect((response) => {
-					expect(response.body)
-						.to.have.property('introspection_endpoint')
-						.and.matches(/token\/introspect/);
-					expect(response.body).not.to.have.property(
-						'introspection_signing_alg_values_supported'
-					);
-				});
+		it('shows the url now', async function () {
+			const { data } = await agent['.well-known']['openid-configuration'].get();
+
+			expect(data).toHaveProperty(
+				'introspection_endpoint',
+				`${ISSUER}/token/introspect`
+			);
+			expect(data).not.toHaveProperty(
+				'introspection_signing_alg_values_supported'
+			);
 		});
 	});
 
 	describe('/token/introspection', () => {
-		before(function () {
-			return this.login({ accountId: 'accountId' });
+		beforeAll(function () {
+			return setup.login({ accountId: 'accountId' });
 		});
 		it('returns the properties for access token [no hint]', async function () {
-			const at = new this.provider.AccessToken({
+			const at = new provider.AccessToken({
 				accountId: 'accountId',
-				grantId: this.getGrantId(),
-				client: await this.provider.Client.find('client'),
+				grantId: setup.getGrantId(),
+				client: await provider.Client.find('client'),
 				scope: 'scope',
 				aud: 'urn:example:foo'
 			});
 
 			const token = await at.save();
-			return this.agent
-				.post(route)
-				.auth('client', 'secret')
-				.send({
-					token
-				})
-				.type('form')
-				.expect(200)
-				.expect((response) => {
-					expect(response.body).to.contain.keys(
-						'client_id',
-						'scope',
-						'sub',
-						'iss',
-						'iat',
-						'exp',
-						'token_type',
-						'aud'
-					);
-					expect(response.body.sub).to.equal('accountId');
-					expect(response.body.token_type).to.equal('Bearer');
-					expect(response.body.iss).to.equal(this.provider.issuer);
-					expect(response.body.aud).to.equal('urn:example:foo');
-				});
+			const { data, status } = await agent.token.introspect.post(
+				{ token },
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+			expect(status).toBe(200);
+			expect(data).toContainKeys([
+				'client_id',
+				'scope',
+				'sub',
+				'iss',
+				'iat',
+				'exp',
+				'token_type',
+				'aud'
+			]);
+			expect(data.sub).toBe('accountId');
+			expect(data.token_type).toBe('Bearer');
+			expect(data.iss).toBe(ISSUER);
+			expect(data.aud).toBe('urn:example:foo');
 		});
 
 		it('returns the properties for access token [correct hint]', async function () {
-			const at = new this.provider.AccessToken({
+			const at = new provider.AccessToken({
 				accountId: 'accountId',
-				grantId: this.getGrantId(),
-				client: await this.provider.Client.find('client'),
+				grantId: setup.getGrantId(),
+				client: await provider.Client.find('client'),
 				scope: 'scope'
 			});
 
 			const token = await at.save();
-			return this.agent
-				.post(route)
-				.auth('client', 'secret')
-				.send({
-					token,
-					token_type_hint: 'access_token'
-				})
-				.type('form')
-				.expect(200)
-				.expect((response) => {
-					expect(response.body).to.contain.keys('client_id', 'scope', 'sub');
-					expect(response.body.sub).to.equal('accountId');
-				});
+			const { data, status } = await agent.token.introspect.post(
+				{ token, token_type_hint: 'access_token' },
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+			expect(status).toBe(200);
+
+			expect(data).toContainKeys(['client_id', 'scope', 'sub']);
+			expect(data.sub).toBe('accountId');
 		});
 
 		it('returns the properties for access token [wrong hint]', async function () {
-			const at = new this.provider.AccessToken({
+			const at = new provider.AccessToken({
 				accountId: 'accountId',
-				grantId: this.getGrantId(),
-				client: await this.provider.Client.find('client'),
+				grantId: setup.getGrantId(),
+				client: await provider.Client.find('client'),
 				scope: 'scope'
 			});
 
 			const token = await at.save();
-			return this.agent
-				.post(route)
-				.auth('client', 'secret')
-				.send({
-					token,
-					token_type_hint: 'refresh_token'
-				})
-				.type('form')
-				.expect(200)
-				.expect((response) => {
-					expect(response.body).to.contain.keys('client_id', 'scope', 'sub');
-					expect(response.body.sub).to.equal('accountId');
-				});
+			const { data, status } = await agent.token.introspect.post(
+				{ token, token_type_hint: 'refresh_token' },
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+			expect(status).toBe(200);
+
+			expect(data).toContainKeys(['client_id', 'scope', 'sub']);
+			expect(data.sub).toBe('accountId');
 		});
 
 		it('returns the properties for access token [unrecognized hint]', async function () {
-			const at = new this.provider.AccessToken({
+			const at = new provider.AccessToken({
 				accountId: 'accountId',
-				grantId: this.getGrantId(),
-				client: await this.provider.Client.find('client'),
+				grantId: setup.getGrantId(),
+				client: await provider.Client.find('client'),
 				scope: 'scope'
 			});
 
 			const token = await at.save();
-			return this.agent
-				.post(route)
-				.auth('client', 'secret')
-				.send({
-					token,
-					token_type_hint: 'foobar'
-				})
-				.type('form')
-				.expect(200)
-				.expect((response) => {
-					expect(response.body).to.contain.keys('client_id', 'scope', 'sub');
-					expect(response.body.sub).to.equal('accountId');
-				});
+			const { data, status } = await agent.token.introspect.post(
+				{ token, token_type_hint: 'foobar' },
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+			expect(status).toBe(200);
+
+			expect(data).toContainKeys(['client_id', 'scope', 'sub']);
+			expect(data.sub).toBe('accountId');
 		});
 
 		it('returns the properties for refresh token [no hint]', async function () {
-			const rt = new this.provider.RefreshToken({
+			const rt = new provider.RefreshToken({
 				accountId: 'accountId',
-				grantId: this.getGrantId(),
-				client: await this.provider.Client.find('client'),
+				grantId: setup.getGrantId(),
+				client: await provider.Client.find('client'),
 				scope: 'scope'
 			});
 
 			const token = await rt.save();
-			return this.agent
-				.post(route)
-				.auth('client', 'secret')
-				.send({ token })
-				.type('form')
-				.expect(200)
-				.expect((response) => {
-					expect(response.body).to.contain.keys('client_id', 'scope', 'sub');
-				});
+			const { data, status } = await agent.token.introspect.post(
+				{ token },
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+			expect(status).toBe(200);
+			expect(data).toContainKeys(['client_id', 'scope', 'sub']);
 		});
 
 		it('returns the properties for refresh token [correct hint]', async function () {
-			const rt = new this.provider.RefreshToken({
+			const rt = new provider.RefreshToken({
 				accountId: 'accountId',
-				grantId: this.getGrantId(),
-				client: await this.provider.Client.find('client'),
+				grantId: setup.getGrantId(),
+				client: await provider.Client.find('client'),
 				scope: 'scope'
 			});
 
 			const token = await rt.save();
-			return this.agent
-				.post(route)
-				.auth('client', 'secret')
-				.send({ token, token_type_hint: 'refresh_token' })
-				.type('form')
-				.expect(200)
-				.expect((response) => {
-					expect(response.body).to.contain.keys('client_id', 'scope', 'sub');
-				});
+			const { data, status } = await agent.token.introspect.post(
+				{ token, token_type_hint: 'refresh_token' },
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+			expect(status).toBe(200);
+			expect(data).toContainKeys(['client_id', 'scope', 'sub']);
 		});
 
 		it('returns the properties for refresh token [wrong hint]', async function () {
-			const rt = new this.provider.RefreshToken({
+			const rt = new provider.RefreshToken({
 				accountId: 'accountId',
-				grantId: this.getGrantId(),
-				client: await this.provider.Client.find('client'),
+				grantId: setup.getGrantId(),
+				client: await provider.Client.find('client'),
 				scope: 'scope'
 			});
 
 			const token = await rt.save();
-			return this.agent
-				.post(route)
-				.auth('client', 'secret')
-				.send({ token, token_type_hint: 'client_credentials' })
-				.type('form')
-				.expect(200)
-				.expect((response) => {
-					expect(response.body).to.contain.keys('client_id', 'scope', 'sub');
-				});
+			const { data, status } = await agent.token.introspect.post(
+				{ token, token_type_hint: 'client_credentials' },
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+			expect(status).toBe(200);
+			expect(data).toContainKeys(['client_id', 'scope', 'sub']);
 		});
 
 		it('returns the properties for refresh token [unrecognized hint]', async function () {
-			const rt = new this.provider.RefreshToken({
+			const rt = new provider.RefreshToken({
 				accountId: 'accountId',
-				grantId: this.getGrantId(),
-				client: await this.provider.Client.find('client'),
+				grantId: setup.getGrantId(),
+				client: await provider.Client.find('client'),
 				scope: 'scope'
 			});
 
 			const token = await rt.save();
-			return this.agent
-				.post(route)
-				.auth('client', 'secret')
-				.send({ token, token_type_hint: 'foobar' })
-				.type('form')
-				.expect(200)
-				.expect((response) => {
-					expect(response.body).to.contain.keys('client_id', 'scope', 'sub');
-				});
+			const { data, status } = await agent.token.introspect.post(
+				{ token, token_type_hint: 'foobar' },
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+			expect(status).toBe(200);
+			expect(data).toContainKeys(['client_id', 'scope', 'sub']);
 		});
 
 		it('returns the properties for client credentials token [no hint]', async function () {
-			const rt = new this.provider.ClientCredentials({
-				client: await this.provider.Client.find('client')
+			const rt = new provider.ClientCredentials({
+				client: await provider.Client.find('client')
 			});
 
 			const token = await rt.save();
-			return this.agent
-				.post(route)
-				.auth('client', 'secret')
-				.send({ token })
-				.type('form')
-				.expect(200)
-				.expect((response) => {
-					expect(response.body).to.contain.keys('client_id');
-				});
+			const { data, status } = await agent.token.introspect.post(
+				{ token },
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+			expect(status).toBe(200);
+			expect(data).toContainKey('client_id');
 		});
 
 		it('returns the properties for client credentials token [correct hint]', async function () {
-			const rt = new this.provider.ClientCredentials({
-				client: await this.provider.Client.find('client')
+			const rt = new provider.ClientCredentials({
+				client: await provider.Client.find('client')
 			});
 
 			const token = await rt.save();
-			return this.agent
-				.post(route)
-				.auth('client', 'secret')
-				.send({ token, token_type_hint: 'client_credentials' })
-				.type('form')
-				.expect(200)
-				.expect((response) => {
-					expect(response.body).to.contain.keys('client_id');
-				});
+			const { data, status } = await agent.token.introspect.post(
+				{ token, token_type_hint: 'client_credentials' },
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+			expect(status).toBe(200);
+			expect(data).toContainKey('client_id');
 		});
 
 		it('returns the properties for client credentials token [wrong hint]', async function () {
-			const rt = new this.provider.ClientCredentials({
-				client: await this.provider.Client.find('client')
+			const rt = new provider.ClientCredentials({
+				client: await provider.Client.find('client')
 			});
 
 			const token = await rt.save();
-			return this.agent
-				.post(route)
-				.auth('client', 'secret')
-				.send({ token, token_type_hint: 'access_token' })
-				.type('form')
-				.expect(200)
-				.expect((response) => {
-					expect(response.body).to.contain.keys('client_id');
-				});
+			const { data, status } = await agent.token.introspect.post(
+				{ token, token_type_hint: 'access_token' },
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+			expect(status).toBe(200);
+			expect(data).toContainKey('client_id');
 		});
 
 		it('returns the properties for client credentials token [unrecognized hint]', async function () {
-			const rt = new this.provider.ClientCredentials({
-				client: await this.provider.Client.find('client')
+			const rt = new provider.ClientCredentials({
+				client: await provider.Client.find('client')
 			});
 
 			const token = await rt.save();
-			return this.agent
-				.post(route)
-				.auth('client', 'secret')
-				.send({ token, token_type_hint: 'foobar' })
-				.type('form')
-				.expect(200)
-				.expect((response) => {
-					expect(response.body).to.contain.keys('client_id');
-				});
+			const { data, status } = await agent.token.introspect.post(
+				{ token, token_type_hint: 'foobar' },
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+			expect(status).toBe(200);
+			expect(data).toContainKey('client_id');
 		});
 
 		it('can be called by pairwise clients', async function () {
-			const rt = new this.provider.RefreshToken({
+			const rt = new provider.RefreshToken({
 				accountId: 'accountId',
-				grantId: this.getGrantId('client-pairwise'),
+				grantId: setup.getGrantId('client-pairwise'),
 				clientId: 'client-pairwise',
 				scope: 'scope'
 			});
 
 			const token = await rt.save();
-			return this.agent
-				.post(route)
-				.auth('client-pairwise', 'secret')
-				.send({ token })
-				.type('form')
-				.expect(200)
-				.expect((response) => {
-					expect(response.body).to.contain.keys('client_id', 'scope', 'sub');
-					expect(response.body.sub).not.to.equal('accountId');
-				});
+			const { data, status } = await agent.token.introspect.post(
+				{ token },
+				{
+					headers: AuthorizationRequest.basicAuthHeader(
+						'client-pairwise',
+						'secret'
+					)
+				}
+			);
+			expect(status).toBe(200);
+			expect(data).toContainKeys(['client_id', 'scope', 'sub']);
+			expect(data.sub).not.toBe('accountId');
 		});
 
 		it('can be called by RS clients and uses the original subject_type', async function () {
-			const rt = new this.provider.RefreshToken({
+			const rt = new provider.RefreshToken({
 				accountId: 'accountId',
-				grantId: this.getGrantId('client-pairwise'),
+				grantId: setup.getGrantId('client-pairwise'),
 				clientId: 'client-pairwise',
 				scope: 'scope'
 			});
 
 			const token = await rt.save();
-			return this.agent
-				.post(route)
-				.auth('client-introspection', 'secret')
-				.send({ token })
-				.type('form')
-				.expect(200)
-				.expect((response) => {
-					expect(response.body).to.contain.keys('client_id', 'scope', 'sub');
-					expect(response.body.sub).not.to.equal('accountId');
-				});
+			const { data, status } = await agent.token.introspect.post(
+				{ token },
+				{
+					headers: AuthorizationRequest.basicAuthHeader(
+						'client-pairwise',
+						'secret'
+					)
+				}
+			);
+			expect(status).toBe(200);
+			expect(data).toContainKeys(['client_id', 'scope', 'sub']);
+			expect(data.sub).not.toBe('accountId');
 		});
 
-		it('returns token-endpoint-like cache headers', function () {
-			return this.agent
-				.post(route)
-				.auth('client', 'secret')
-				.send({})
-				.type('form')
-				.expect('cache-control', 'no-store');
+		it('returns token-endpoint-like cache headers', async function () {
+			const { headers } = await agent.token.introspect.post(
+				{},
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+			expect(headers.get('cache-control')).toBe('no-store');
 		});
 
-		it('validates token param presence', function () {
-			return this.agent
-				.post(route)
-				.auth('client', 'secret')
-				.send({})
-				.type('form')
-				.expect(400)
-				.expect((response) => {
-					expect(response.body).to.have.property('error', 'invalid_request');
-					expect(response.body).to.have.property(
-						'error_description',
-						"missing required parameter 'token'"
-					);
-				});
+		it('validates token param presence', async function () {
+			const { error } = await agent.token.introspect.post(
+				{},
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+			expect(error.status).toBe(422);
+			expect(error.value).toHaveProperty('error', 'invalid_request');
+			expect(error.value).toHaveProperty(
+				'error_description',
+				"Property 'token' is missing"
+			);
 		});
 
-		it('responds with active=false for total bs', function () {
-			return this.agent
-				.post(route)
-				.auth('client', 'secret')
-				.send({
-					token: 'this is not even a token'
-				})
-				.type('form')
-				.expect(200)
-				.expect((response) => {
-					expect(response.body).to.have.property('active', false);
-					expect(response.body).to.have.keys('active');
-				});
+		it('responds with active=false for total bs', async function () {
+			const { data, status } = await agent.token.introspect.post(
+				{ token: 'this is not even a token' },
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+			expect(status).toBe(200);
+			expect(data).toEqual({ active: false });
 		});
 
 		it('responds with active=false when client auth = none and token does not belong to it', async function () {
-			const at = new this.provider.AccessToken({
+			const at = new provider.AccessToken({
 				accountId: 'accountId',
-				grantId: this.getGrantId(),
-				client: await this.provider.Client.find('client'),
+				grantId: setup.getGrantId(),
+				client: await provider.Client.find('client'),
 				scope: 'scope'
 			});
 
 			const token = await at.save();
-			return this.agent
-				.post(route)
-				.send({
-					token,
-					client_id: 'client-none'
-				})
-				.type('form')
-				.expect(200)
-				.expect((response) => {
-					expect(response.body).to.have.property('active', false);
-					expect(response.body).to.have.keys('active');
-				});
+			const { data, status } = await agent.token.introspect.post({
+				token,
+				client_id: 'client-none'
+			});
+			expect(status).toBe(200);
+			expect(data).toEqual({ active: false });
 		});
 
-		it('emits on (i.e. auth) error', function () {
-			const spy = sinon.spy();
-			this.provider.once('introspection.error', spy);
+		it('emits on (i.e. auth) error', async function () {
+			const spy = mock();
+			provider.once('introspection.error', spy);
 
-			return this.agent
-				.post(route)
-				.auth('client', 'invalid')
-				.send({})
-				.type('form')
-				.expect(401)
-				.expect(() => {
-					expect(spy.calledOnce).to.be.true;
-				});
+			const { status } = await agent.token.introspect.post(
+				{ token: 'invalid' },
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'invalid')
+				}
+			);
+			expect(status).toBe(401);
+			expect(spy).toBeCalledTimes(1);
 		});
 
 		it('ignores unsupported tokens', async function () {
-			const ac = new this.provider.AuthorizationCode({ clientId: 'client' });
-			return this.agent
-				.post(route)
-				.auth('client', 'secret')
-				.send({
-					token: await ac.save()
-				})
-				.type('form')
-				.expect(200)
-				.expect((response) => {
-					expect(response.body).to.have.property('active', false);
-					expect(response.body).to.have.keys('active');
-				});
+			const ac = new provider.AuthorizationCode({ clientId: 'client' });
+			const token = await ac.save();
+			const { data, status } = await agent.token.introspect.post(
+				{ token },
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+			expect(status).toBe(200);
+			expect(data).toEqual({ active: false });
 		});
 
 		it('responds only with active=false when token is expired', async function () {
-			const at = new this.provider.AccessToken({
+			const at = new provider.AccessToken({
 				accountId: 'accountId',
-				grantId: this.getGrantId(),
-				client: await this.provider.Client.find('client'),
+				grantId: setup.getGrantId(),
+				client: await provider.Client.find('client'),
 				scope: 'scope',
 				expiresIn: -1
 			});
+			const token = await at.save();
 
-			return this.agent
-				.post(route)
-				.auth('client', 'secret')
-				.send({
-					token: await at.save()
-				})
-				.type('form')
-				.expect(200)
-				.expect((response) => {
-					expect(response.body).to.have.property('active', false);
-					expect(response.body).to.have.keys('active');
-				});
+			const { data, status } = await agent.token.introspect.post(
+				{ token },
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+			expect(status).toBe(200);
+			expect(data).toEqual({ active: false });
 		});
 
 		it('responds only with active=false when token is already consumed', async function () {
-			const rt = new this.provider.RefreshToken({
+			const rt = new provider.RefreshToken({
 				accountId: 'accountId',
-				grantId: this.getGrantId(),
-				client: await this.provider.Client.find('client'),
+				grantId: setup.getGrantId(),
+				client: await provider.Client.find('client'),
 				scope: 'scope'
 			});
 
 			const token = await rt.save();
 			await rt.consume();
-
-			return this.agent
-				.post(route)
-				.auth('client', 'secret')
-				.send({
-					token
-				})
-				.type('form')
-				.expect(200)
-				.expect((response) => {
-					expect(response.body).to.have.property('active', false);
-					expect(response.body).to.have.keys('active');
-				});
+			const { data, status } = await agent.token.introspect.post(
+				{ token },
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+			expect(status).toBe(200);
+			expect(data).toEqual({ active: false });
 		});
 
 		it('does not allow to introspect the uninstrospectable (in case adapter is implemented wrong)', async function () {
-			sinon.stub(this.provider.AccessToken, 'find').callsFake(() => ({
+			spyOn(provider.AccessToken, 'find').mockReturnValue({
 				isValid: true,
 				kind: 'AuthorizationCode'
-			}));
+			});
 
-			return this.agent
-				.post(route)
-				.auth('client', 'secret')
-				.send({
-					token: 'foo'
-				})
-				.type('form')
-				.expect(200)
-				.expect((response) => {
-					expect(response.body).to.have.property('active', false);
-					expect(response.body).to.have.keys('active');
-					this.provider.AccessToken.find.restore();
-				})
-				.catch((err) => {
-					this.provider.AccessToken.find.restore();
-					throw err;
-				});
+			const { data, status } = await agent.token.introspect.post(
+				{ token: 'foo' },
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+
+			expect(status).toBe(200);
+			expect(data).toEqual({ active: false });
 		});
 
 		describe('populates ctx.oidc.entities', () => {
-			it('when introspecting an AccessToken', function (done) {
-				this.assertOnce((ctx) => {
-					expect(ctx.oidc.entities).to.have.keys('Client', 'AccessToken');
-				}, done);
+			it('when introspecting an AccessToken', async function () {
+				const spy = spyOn(provider.OIDCContext.prototype, 'entity');
 
-				(async () => {
-					const at = new this.provider.AccessToken({
-						accountId: 'accountId',
-						client: await this.provider.Client.find('client'),
-						scope: 'scope'
-					});
+				const at = new provider.AccessToken({
+					accountId: 'accountId',
+					client: await provider.Client.find('client'),
+					scope: 'scope'
+				});
 
-					const token = await at.save();
-					await this.agent
-						.post(route)
-						.auth('client', 'secret')
-						.send({
-							token
-						})
-						.type('form');
-				})().catch(done);
+				const token = await at.save();
+				await agent.token.introspect.post(
+					{ token },
+					{
+						headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+					}
+				);
+
+				const entities = spy.mock.calls.map((call) => call[0]);
+				expect(entities).toEqual(['Client', 'AccessToken']);
 			});
 
-			it('when introspecting a RefreshToken', function (done) {
-				this.assertOnce((ctx) => {
-					expect(ctx.oidc.entities).to.have.keys('Client', 'RefreshToken');
-				}, done);
+			it('when introspecting a RefreshToken', async function () {
+				const spy = spyOn(provider.OIDCContext.prototype, 'entity');
 
-				(async () => {
-					const rt = new this.provider.RefreshToken({
-						accountId: 'accountId',
-						client: await this.provider.Client.find('client'),
-						scope: 'scope'
-					});
+				const rt = new provider.RefreshToken({
+					accountId: 'accountId',
+					client: await provider.Client.find('client'),
+					scope: 'scope'
+				});
 
-					const token = await rt.save();
-					await this.agent
-						.post(route)
-						.auth('client', 'secret')
-						.send({ token })
-						.type('form');
-				})().catch(done);
+				const token = await rt.save();
+				await agent.token.introspect.post(
+					{ token },
+					{
+						headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+					}
+				);
+
+				const entities = spy.mock.calls.map((call) => call[0]);
+				expect(entities).toEqual(['Client', 'RefreshToken']);
 			});
 
-			it('when introspecting ClientCredentials', function (done) {
-				this.assertOnce((ctx) => {
-					expect(ctx.oidc.entities).to.have.keys('Client', 'ClientCredentials');
-				}, done);
+			it('when introspecting ClientCredentials', async function () {
+				const spy = spyOn(provider.OIDCContext.prototype, 'entity');
 
-				(async () => {
-					const rt = new this.provider.ClientCredentials({
-						client: await this.provider.Client.find('client')
-					});
+				const rt = new provider.ClientCredentials({
+					client: await provider.Client.find('client')
+				});
 
-					const token = await rt.save();
-					await this.agent
-						.post(route)
-						.auth('client', 'secret')
-						.send({ token })
-						.type('form');
-				})().catch(done);
+				const token = await rt.save();
+				await agent.token.introspect.post(
+					{ token },
+					{
+						headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+					}
+				);
+
+				const entities = spy.mock.calls.map((call) => call[0]);
+				expect(entities).toEqual(['Client', 'ClientCredentials']);
 			});
 		});
 	});

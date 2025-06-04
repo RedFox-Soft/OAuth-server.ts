@@ -9,9 +9,12 @@ const discovery = {
 	response_types_supported: ['none', 'code'],
 	code_challenge_methods_supported: ['S256'],
 
+	// par.enabled is used to determine if the pushed_authorization_request_endpoint is available
 	pushed_authorization_request_endpoint: `${ISSUER}${routeNames.pushed_authorization_request}`,
 	request_uri_parameter_supported: false,
-	require_pushed_authorization_requests: false
+	require_pushed_authorization_requests: false,
+
+	introspection_endpoint: `${ISSUER}${routeNames.introspect}`
 };
 
 export function calculateDiscovery() {

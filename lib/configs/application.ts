@@ -13,7 +13,18 @@ export const ApplicationConfig = {
 	 *
 	 * description: Allows unregistered redirect_uri values to be used by authenticated clients using PAR that do not use a `sector_identifier_uri`.
 	 */
-	'par.allowUnregisteredRedirectUris': false
+	'par.allowUnregisteredRedirectUris': false,
+
+	/*
+	 * features.introspection
+	 *
+	 * title: [`RFC7662`](https://www.rfc-editor.org/rfc/rfc7662.html) - OAuth 2.0 Token Introspection
+	 *
+	 * description: Enables Token Introspection for:
+	 *   - opaque access tokens
+	 *   - refresh tokens
+	 */
+	'introspection.enabled': false
 };
 
 export type ApplicationConfigType = typeof ApplicationConfig;

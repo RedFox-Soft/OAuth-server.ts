@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 import { generateKeyPair, generateSecret, exportJWK } from 'jose';
+import { describe, it } from 'bun:test';
 
 import * as JWT from '../../lib/helpers/jwt.ts';
 import epochTime from '../../lib/helpers/epoch_time.ts';

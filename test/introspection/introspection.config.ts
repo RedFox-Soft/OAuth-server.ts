@@ -6,10 +6,13 @@ const config = getConfig();
 
 config.subjectTypes = ['public', 'pairwise'];
 merge(config.features, {
-	introspection: { enabled: true },
 	encryption: { enabled: true },
 	clientCredentials: { enabled: true }
 });
+
+export const ApplicationConfig = {
+	'introspection.enabled': true
+};
 
 export default {
 	config,
