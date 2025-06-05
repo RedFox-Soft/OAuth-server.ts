@@ -480,10 +480,6 @@ async function renderError(ctx, out, error) {
     </html>`;
 }
 
-async function interactionsUrl(ctx, interaction) {
-	return `/interaction/${interaction.uid}`;
-}
-
 async function findAccount(ctx, sub, token) {
 	// @param ctx - koa request context
 	// @param sub {string} - account identifier (subject)
@@ -2279,15 +2275,7 @@ export const globalConfiguration = {
 		 * // prompt.checks.add(check, index) => adds a Check instance to a specific index, default is add the check as the last one
 		 * ```
 		 */
-		policy: defaultPolicy(),
-
-		/*
-		 * interactions.url
-		 *
-		 * description: Function used to determine where to redirect User-Agent for necessary
-		 *   interaction, can return both absolute and relative urls.
-		 */
-		url: interactionsUrl
+		policy: defaultPolicy()
 	},
 
 	/*

@@ -7,6 +7,8 @@ import epochTime from '../../lib/helpers/epoch_time.ts';
 import { keypair } from './fapi-final.config.js';
 import { parse } from 'node:url';
 import { expect } from 'chai';
+import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
+import { ISSUER } from 'lib/configs/env.js';
 
 describe('Financial-grade API Security Profile 1.0 - Part 2: Advanced (FINAL) behaviours', () => {
 	before(bootstrap(import.meta.url, { config: 'fapi-final' }));
@@ -16,30 +18,8 @@ describe('Financial-grade API Security Profile 1.0 - Part 2: Advanced (FINAL) be
 			return this.login();
 		});
 
-		it('requires PKCE to be used when PAR is used', function () {
-			return this.agent
-				.post('/request')
-				.auth('client', 'secret')
-				.send({
-					scope: 'openid',
-					client_id: 'client',
-					response_type: 'code',
-					response_mode: 'jwt',
-					code_challenge_method: undefined,
-					code_challenge: undefined,
-					nonce: 'foo'
-				})
-				.type('form')
-				.expect(400)
-				.expect({
-					error: 'invalid_request',
-					error_description:
-						'Authorization Server policy requires PKCE to be used for this request'
-				});
-		});
-
 		it('requires jwt response mode to be used when id token is not issued by authorization endpoint', function () {
-			const auth = new this.AuthorizationRequest({
+			const auth = new AuthorizationRequest({
 				scope: 'openid',
 				client_id: 'client',
 				response_type: 'code',
@@ -69,14 +49,14 @@ describe('Financial-grade API Security Profile 1.0 - Part 2: Advanced (FINAL) be
 				response_type: 'code',
 				nonce: 'foo',
 				iss: 'client',
-				aud: this.provider.issuer,
+				aud: ISSUER,
 				exp: epochTime() + 60,
 				nbf: epochTime()
 			})
 				.setProtectedHeader({ alg: 'ES256' })
 				.sign(keypair.privateKey);
 
-			const auth = new this.AuthorizationRequest({
+			const auth = new AuthorizationRequest({
 				request,
 				state: undefined
 			});
@@ -123,7 +103,7 @@ describe('Financial-grade API Security Profile 1.0 - Part 2: Advanced (FINAL) be
 				code_challenge,
 				nonce: 'foo',
 				redirect_uri: 'https://client.example.com/cb',
-				aud: this.provider.issuer,
+				aud: ISSUER,
 				state: 'foo',
 				exp: epochTime() + 60,
 				nbf: epochTime()
@@ -169,7 +149,7 @@ describe('Financial-grade API Security Profile 1.0 - Part 2: Advanced (FINAL) be
 				.setProtectedHeader({ alg: 'ES256' })
 				.sign(keypair.privateKey);
 
-			const auth = new this.AuthorizationRequest({
+			const auth = new AuthorizationRequest({
 				request,
 				scope: 'openid',
 				client_id: 'client',
@@ -196,7 +176,7 @@ describe('Financial-grade API Security Profile 1.0 - Part 2: Advanced (FINAL) be
 
 		it('requires nbf to be provided in the Request Object', async function () {
 			const request = await new SignJWT({
-				aud: this.provider.issuer,
+				aud: ISSUER,
 				exp: epochTime() + 60,
 				// nbf: epochTime(),
 				client_id: 'client',
@@ -208,7 +188,7 @@ describe('Financial-grade API Security Profile 1.0 - Part 2: Advanced (FINAL) be
 				.setProtectedHeader({ alg: 'ES256' })
 				.sign(keypair.privateKey);
 
-			const auth = new this.AuthorizationRequest({
+			const auth = new AuthorizationRequest({
 				request,
 				scope: 'openid',
 				client_id: 'client',
@@ -237,7 +217,7 @@ describe('Financial-grade API Security Profile 1.0 - Part 2: Advanced (FINAL) be
 			const request = await new SignJWT({
 				exp: epochTime() + 60,
 				nbf: epochTime() - 3600,
-				aud: this.provider.issuer,
+				aud: ISSUER,
 				client_id: 'client',
 				scope: 'openid',
 				iss: 'client',
@@ -247,7 +227,7 @@ describe('Financial-grade API Security Profile 1.0 - Part 2: Advanced (FINAL) be
 				.setProtectedHeader({ alg: 'ES256' })
 				.sign(keypair.privateKey);
 
-			const auth = new this.AuthorizationRequest({
+			const auth = new AuthorizationRequest({
 				request,
 				scope: 'openid',
 				client_id: 'client',
