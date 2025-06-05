@@ -1,12 +1,8 @@
-import { type Static } from 'elysia';
-import { AuthorizationParameters } from 'lib/consts/param_list.js';
 import { globalConfiguration } from 'lib/globalConfiguration.js';
 import { NotSupportedError } from 'lib/helpers/errors.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 
-type auth = Omit<Static<typeof AuthorizationParameters>, 'client_id'>;
-
-export function authVerification(params: auth) {
+export function featureVerification(params: Record<string, unknown>) {
 	const {
 		features: {
 			claimsParameter,
@@ -19,18 +15,20 @@ export function authVerification(params: auth) {
 	} = globalConfiguration;
 
 	if (!Object.keys(params.claims ?? {}).length) {
-		params.claims = undefined;
+		delete params.claims;
 	}
 
+	const isWebMessageResponseMode =
+		typeof params.response_mode === 'string' &&
+		params.response_mode.includes('web_message');
 	if (
-		(params.web_message_uri !== undefined ||
-			params.response_mode?.includes('web_message')) &&
+		(params.web_message_uri !== undefined || isWebMessageResponseMode) &&
 		!webMessageResponseMode.enabled
 	) {
 		const error = new NotSupportedError(
 			'Web Message Response Mode is not supported'
 		);
-		if (params.response_mode?.includes('web_message')) {
+		if (isWebMessageResponseMode) {
 			error.allow_redirect = false;
 		}
 		throw error;

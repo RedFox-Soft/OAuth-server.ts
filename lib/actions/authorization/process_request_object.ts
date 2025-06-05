@@ -17,7 +17,11 @@ export function isEncryptedJWT(jwt: string): boolean {
  * Decrypts and validates the content of provided request parameter and replaces the parameters
  * provided via OAuth2.0 authorization request with these
  */
-export default async function processRequestObject(schema: TSchema, ctx) {
+export default async function processRequestObject(
+	schema: TSchema,
+	ctx,
+	{ clientAlg }: { clientAlg?: string } = {}
+) {
 	const { params, client, route } = ctx.oidc;
 
 	const pushedRequestObject = 'PushedAuthorizationRequest' in ctx.oidc.entities;
@@ -109,12 +113,6 @@ export default async function processRequestObject(schema: TSchema, ctx) {
 		if (request[param] !== undefined) {
 			params[param] = request[param];
 		}
-	}
-
-	if (request.request !== undefined || request.request_uri !== undefined) {
-		throw new InvalidRequestObject(
-			'Request Object must not contain request or request_uri properties'
-		);
 	}
 
 	if (

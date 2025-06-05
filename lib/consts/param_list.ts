@@ -85,7 +85,7 @@ export const JWTparameters = t.Object({
 	nbf: t.Optional(t.Integer({ minimum: 0 }))
 });
 
-const BackchannelAuthParameters = t.Composite([
+export const BackchannelAuthParameters = t.Composite([
 	DeviceAuthorizationParameters,
 	t.Object({
 		client_notification_token: t.Optional(t.String()),

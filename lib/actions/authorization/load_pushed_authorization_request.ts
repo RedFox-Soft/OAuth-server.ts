@@ -15,8 +15,11 @@ export default async function loadPushedAuthorizationRequest(ctx) {
 		provider: { PushedAuthorizationRequest }
 	} = ctx.oidc;
 
-	if (client.requirePushedAthoruizationRequests && !params.request_uri) {
-		throw new InvalidRequest('Pushed Authorization Request must beuse d');
+	if (
+		client['authorization.requirePushedAuthorizationRequests'] &&
+		!params.request_uri
+	) {
+		throw new InvalidRequest('Pushed Authorization Request must be used');
 	}
 
 	if (params.request !== undefined && params.request_uri !== undefined) {
@@ -42,4 +45,5 @@ export default async function loadPushedAuthorizationRequest(ctx) {
 	}
 	ctx.oidc.entity('PushedAuthorizationRequest', pushedAuthorizationRequest);
 	params.request = pushedAuthorizationRequest.request;
+	return pushedAuthorizationRequest;
 }

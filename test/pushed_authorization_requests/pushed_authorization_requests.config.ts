@@ -38,7 +38,7 @@ export default {
 			client_id: 'client-par-required',
 			client_secret: 'secret',
 			redirect_uris: ['https://rp.example.com/cb'],
-			require_pushed_authorization_requests: true
+			'authorization.requirePushedAuthorizationRequests': true
 		},
 		{
 			client_id: 'client-alg-registered',

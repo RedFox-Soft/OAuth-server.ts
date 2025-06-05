@@ -237,23 +237,6 @@ export default function initializeApp() {
 		options('cors.revocation', routes.revocation, CORS.client, CORS.respond);
 	}
 
-	if (features.introspection.enabled) {
-		const introspection = getIntrospection(this);
-		post(
-			'introspection',
-			routes.introspection,
-			error(this, 'introspection.error'),
-			CORS.client,
-			...introspection
-		);
-		options(
-			'cors.introspection',
-			routes.introspection,
-			CORS.client,
-			CORS.respond
-		);
-	}
-
 	post(
 		'end_session_confirm',
 		`${routes.end_session}/confirm`,
@@ -319,26 +302,6 @@ export default function initializeApp() {
 			`${routes.code_verification}/:uid`,
 			error(this, 'device_resume.error'),
 			...deviceResume
-		);
-	}
-
-	if (features.pushedAuthorizationRequests.enabled) {
-		const pushedAuthorizationRequests = getAuthorization(
-			this,
-			'pushed_authorization_request'
-		);
-		post(
-			'pushed_authorization_request',
-			routes.pushed_authorization_request,
-			error(this, 'pushed_authorization_request.error'),
-			CORS.client,
-			...pushedAuthorizationRequests
-		);
-		options(
-			'cors.pushed_authorization_request',
-			routes.pushed_authorization_request,
-			CORS.client,
-			CORS.respond
 		);
 	}
 

@@ -11,14 +11,17 @@ merge(config.features, {
 	encryption: { enabled: true },
 	introspection: { enabled: true },
 	jwtIntrospection: { enabled: true },
-	jwtUserinfo: { enabled: true },
-	pushedAuthorizationRequests: { enabled: true }
+	jwtUserinfo: { enabled: true }
 });
 
 pull(config.enabledJWA.requestObjectEncryptionAlgValues, 'RSA-OAEP-512');
 pull(config.enabledJWA.requestObjectEncryptionEncValues, 'A192CBC-HS384');
 
 export const keypair = await generateKeyPair('RSA-OAEP');
+
+export const ApplicationConfig = {
+	'par.enabled': true
+};
 
 export default {
 	config,

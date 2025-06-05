@@ -9,9 +9,6 @@ import getConfig from '../../default.config.js';
 
 const config = getConfig();
 
-merge(config.features, {
-	pushedAuthorizationRequests: { enabled: false }
-});
 config.allowOmittingSingleRegisteredRedirectUri = false;
 
 const policy = base();

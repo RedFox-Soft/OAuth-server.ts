@@ -384,9 +384,6 @@ describe('Client metadata validation', () => {
 				requestObjects: {
 					enabled,
 					requireSignedRequestObject: value
-				},
-				pushedAuthorizationRequests: {
-					enabled: false
 				}
 			}
 		});

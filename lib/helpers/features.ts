@@ -13,7 +13,6 @@ export const STABLE = new Set([
 	'jwtIntrospection',
 	'jwtUserinfo',
 	'mTLS',
-	'pushedAuthorizationRequests',
 	'registration',
 	'registrationManagement',
 	'requestObjects',

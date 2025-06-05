@@ -42,7 +42,7 @@ import {
 import sessionHandler from '../../shared/session.ts';
 import { noQueryDup } from 'lib/plugins/noQueryDup.js';
 import { contentType } from 'lib/plugins/contentType.js';
-import { authVerification } from './authVerification.js';
+import { featureVerification } from './featureVerification.js';
 import { authorizationPKCE } from 'lib/helpers/pkce.js';
 import {
 	InvalidClient,
@@ -105,8 +105,19 @@ async function authorizationActionHandler(ctx) {
 	const setCookies = await sessionHandler(ctx);
 	await checkClient(ctx);
 
-	await loadPushedAuthorizationRequest(ctx);
-	await processRequestObject(authorizationRequest, ctx);
+	const cient = ctx.oidc.client;
+	const pushedAuthorizationRequest = await loadPushedAuthorizationRequest(ctx);
+	const requestOptions = {
+		clientAlg: cient.requestObjectSigningAlg,
+		trusted: false,
+		isPar: false
+	};
+	if (pushedAuthorizationRequest) {
+		requestOptions.isPar = true;
+		requestOptions.clientAlg = undefined;
+		requestOptions.trusted = pushedAuthorizationRequest.trusted;
+	}
+	await processRequestObject(authorizationRequest, ctx, requestOptions);
 	checkResponseMode(ctx);
 	oneRedirectUriClients(ctx);
 	presence(ctx, 'response_type');
@@ -145,7 +156,7 @@ export const authGet = new Elysia()
 		cookie: AuthorizationCookies
 	})
 	.resolve(({ query }) => {
-		authVerification(query);
+		featureVerification(query);
 	})
 	.get(routeNames.authorization, async ({ query, cookie, route, request }) => {
 		const url = new URL(request.url);
@@ -183,7 +194,7 @@ export const authPost = new Elysia()
 		cookie: AuthorizationCookies
 	})
 	.resolve(({ body }) => {
-		authVerification(body);
+		featureVerification(body);
 	})
 	.post(routeNames.authorization, async ({ body, cookie, route, request }) => {
 		const url = new URL(request.url);
@@ -219,7 +230,7 @@ export const par = new Elysia()
 		})
 	})
 	.resolve(({ body }) => {
-		authVerification(body);
+		featureVerification(body);
 	})
 	.post(
 		routeNames.pushed_authorization_request,
@@ -248,7 +259,10 @@ export const par = new Elysia()
 
 			const allowList = new Set(PARAM_LIST);
 			pushedAuthorizationRequestRemapErrors;
-			await processRequestObject(authorizationRequest, ctx);
+			const client = ctx.oidc.client;
+			await processRequestObject(authorizationRequest, ctx, {
+				clientAlg: client.requestObjectSigningAlg
+			});
 			checkResponseMode(ctx);
 			oneRedirectUriClients(ctx);
 			presence(ctx, 'response_type');

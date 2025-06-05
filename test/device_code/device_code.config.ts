@@ -8,8 +8,7 @@ merge(config.features, {
 	deviceFlow: { enabled: true },
 	backchannelLogout: { enabled: true },
 	claimsParameter: { enabled: true },
-	rpInitiatedLogout: { enabled: false },
-	pushedAuthorizationRequests: { enabled: false }
+	rpInitiatedLogout: { enabled: false }
 });
 
 export default {

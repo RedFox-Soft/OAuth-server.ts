@@ -1345,33 +1345,6 @@ function makeDefaults() {
 			jwtResponseModes: { enabled: false },
 
 			/*
-			 * features.pushedAuthorizationRequests
-			 *
-			 * title: [`RFC9126`](https://www.rfc-editor.org/rfc/rfc9126.html) - OAuth 2.0 Pushed Authorization Requests (`PAR`)
-			 *
-			 * description: Enables the use of `pushed_authorization_request_endpoint` defined by the Pushed
-			 * Authorization Requests RFC.
-			 */
-			pushedAuthorizationRequests: {
-				enabled: true,
-
-				/*
-				 * features.pushedAuthorizationRequests.requirePushedAuthorizationRequests
-				 *
-				 * description: Makes the use of `PAR` required for all authorization
-				 * requests as an authorization server policy.
-				 */
-				requirePushedAuthorizationRequests: false,
-
-				/*
-				 * features.pushedAuthorizationRequests.allowUnregisteredRedirectUris
-				 *
-				 * description: Allows unregistered redirect_uri values to be used by authenticated clients using PAR that do not use a `sector_identifier_uri`.
-				 */
-				allowUnregisteredRedirectUris: false
-			},
-
-			/*
 			 * features.registration
 			 *
 			 * title: [`Dynamic Client Registration 1.0`](https://openid.net/specs/openid-connect-registration-1_0-errata2.html) and [`RFC7591` - OAuth 2.0 Dynamic Client Registration Protocol](https://www.rfc-editor.org/rfc/rfc7591.html)

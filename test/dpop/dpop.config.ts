@@ -10,7 +10,6 @@ merge(config.features, {
 	clientCredentials: { enabled: true },
 	introspection: { enabled: true },
 	deviceFlow: { enabled: true },
-	pushedAuthorizationRequests: { enabled: true },
 	requestObjects: { enabled: true },
 	ciba: {
 		enabled: true,
@@ -31,6 +30,10 @@ merge(config.features, {
 		}
 	}
 });
+
+export const ApplicationConfig = {
+	'par.enabled': true
+};
 
 export default {
 	config,

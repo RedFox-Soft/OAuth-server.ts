@@ -20,6 +20,7 @@ import sectorValidate from '../helpers/sector_validate.ts';
 import addClient from '../helpers/add_client.ts';
 import getSchema from '../helpers/client_schema.ts';
 import { provider } from 'lib/provider.js';
+import { ClientDefaults } from 'lib/configs/clientBase.js';
 
 // intentionally ignore x5t#S256 so that they are left to be calculated by the library
 const EC_CURVES = new Set(['P-256', 'P-384', 'P-521']);
@@ -368,6 +369,7 @@ export class Client {
 
 		Object.assign(
 			this,
+			ClientDefaults,
 			mapKeys(schema, (value, key) => {
 				if (!instance(provider).RECOGNIZED_METADATA.includes(key)) {
 					return key;

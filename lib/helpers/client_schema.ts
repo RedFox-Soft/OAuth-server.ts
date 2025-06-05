@@ -7,6 +7,8 @@ import instance from './weak_cache.ts';
 import * as formatters from './formatters.ts';
 import pick from './_/pick.ts';
 import omitBy from './_/omit_by.ts';
+import Application from 'koa';
+import { ApplicationConfig } from 'lib/configs/application.js';
 
 const W3CEmailRegExp =
 	/^[a-zA-Z0-9.!#$%&’*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$/;
@@ -252,7 +254,6 @@ export default function getSchema(provider) {
 			this.redirectUris();
 			this.checkContacts();
 			this.jarPolicy();
-			this.parPolicy();
 
 			// max_age and client_secret_expires_at format
 			['default_max_age', 'client_secret_expires_at'].forEach((prop) => {
@@ -280,10 +281,7 @@ export default function getSchema(provider) {
 			}
 
 			if (responseTypes.size && !this.redirect_uris.length) {
-				const { pushedAuthorizationRequests: par } = features;
 				if (
-					!par.enabled ||
-					!par.allowUnregisteredRedirectUris ||
 					this.token_endpoint_auth_method === 'none' ||
 					this.sector_identifier_uri
 				) {
@@ -648,13 +646,6 @@ export default function getSchema(provider) {
 					this
 				);
 			});
-		}
-
-		parPolicy() {
-			const par = features.pushedAuthorizationRequests;
-			if (par.enabled && par.requirePushedAuthorizationRequests) {
-				this.require_pushed_authorization_requests = true;
-			}
 		}
 
 		jarPolicy() {
