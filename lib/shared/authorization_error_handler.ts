@@ -103,7 +103,10 @@ async function authorizationErrorHandler({
 }: Context) {
 	if (error instanceof ValidationError) {
 		const firstError = getFirstError(error);
-		if (firstError.path === '/redirect_uri') {
+		if (
+			firstError.path === '/redirect_uri' ||
+			firstError.path === '/client_id'
+		) {
 			throw error;
 		}
 	}

@@ -629,11 +629,20 @@ describe('BASIC code', () => {
 				const { response, error } = await authRequest(auth, {
 					accept: 'text/html'
 				});
-				expect(response.status).toBe(400);
+				expect(response.status).toBe(422);
 				expect(response.headers.get('content-type')).toBe(
 					'text/html; charset=utf-8'
 				);
-				expect(error.value).toContain('client_id is required');
+				if (verb === 'get') {
+					expect(error.value).toContain(
+						'Expected property &#x27;client_id&#x27; to be string but found: undefined'
+					);
+				}
+				if (verb === 'post') {
+					expect(error.value).toContain(
+						'Property &#x27;client_id&#x27; is missing'
+					);
+				}
 			});
 
 			// section-4.1.2.1 RFC6749

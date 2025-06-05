@@ -64,12 +64,6 @@ export async function isAllowRedirectUri(params) {
 	ctx.oidc = new OIDCContext(ctx);
 	ctx.oidc.params = params;
 
-	if (!params.client_id) {
-		throw new InvalidClient('client_id is required', 'client not found');
-	}
-	if (typeof params.client_id !== 'string') {
-		throw new InvalidClient('client is invalid', 'client not found');
-	}
 	const client = await provider.Client.find(params.client_id);
 	if (!client) {
 		throw new InvalidClient('client is invalid', 'client not found');
