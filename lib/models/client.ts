@@ -480,13 +480,8 @@ export class Client {
 		return this.responseTypes.includes(type);
 	}
 
-	// eslint-disable-next-line no-unused-vars
-	responseModeAllowed(responseMode, responseType, fapiProfile) {
-		if (
-			fapiProfile === '1.0 Final' &&
-			!responseType.includes('id_token') &&
-			!responseMode.includes('jwt')
-		) {
+	responseModeAllowed(responseMode, fapiProfile) {
+		if (fapiProfile === '1.0 Final' && !responseMode.includes('jwt')) {
 			return false;
 		}
 
