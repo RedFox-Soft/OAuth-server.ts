@@ -49,6 +49,7 @@ import {
 	InvalidRedirectUri,
 	OIDCProviderError
 } from 'lib/helpers/errors.js';
+import { OIDCContext } from 'lib/helpers/oidc_context.js';
 
 const authorizationRequest = t.Composite([
 	t.Omit(AuthorizationParameters, ['request_uri', 'request', 'client_id']),
@@ -60,7 +61,6 @@ const authorizationRequest = t.Composite([
 
 export async function isAllowRedirectUri(params) {
 	const ctx = {};
-	const OIDCContext = provider.OIDCContext;
 	ctx.oidc = new OIDCContext(ctx);
 	ctx.oidc.params = params;
 
@@ -161,7 +161,6 @@ export const authGet = new Elysia()
 			cookie,
 			_matchedRouteName: route
 		};
-		const OIDCContext = provider.OIDCContext;
 		ctx.oidc = new OIDCContext(ctx);
 		ctx.oidc.params = query;
 
@@ -200,7 +199,6 @@ export const authPost = new Elysia()
 			cookie,
 			_matchedRouteName: route
 		};
-		const OIDCContext = provider.OIDCContext;
 		ctx.oidc = new OIDCContext(ctx);
 		ctx.oidc.body = body;
 		ctx.oidc.params = body;
@@ -238,7 +236,6 @@ export const par = new Elysia()
 				_matchedRouteName: route,
 				headers
 			};
-			const OIDCContext = provider.OIDCContext;
 			ctx.oidc = new OIDCContext(ctx);
 			ctx.oidc.body = { ...body };
 			ctx.oidc.params = body;

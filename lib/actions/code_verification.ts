@@ -26,6 +26,7 @@ import checkResource from 'lib/shared/check_resource.js';
 import checkClient from './authorization/check_client.js';
 import deviceUserFlowErrors from './authorization/device_user_flow_errors.js';
 import deviceUserFlowResponse from './authorization/device_user_flow_response.js';
+import { OIDCContext } from 'lib/helpers/oidc_context.js';
 
 async function codeVerificationActionHandler(ctx) {
 	deviceUserFlowErrors;
@@ -46,7 +47,6 @@ export const codeVerification = new Elysia()
 		routeNames.code_verification,
 		async ({ cookie, query }) => {
 			const ctx = { cookie };
-			const OIDCContext = provider.OIDCContext;
 			ctx.oidc = new OIDCContext(ctx);
 
 			const setCookies = await sessionHandler();

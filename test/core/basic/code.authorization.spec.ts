@@ -16,6 +16,7 @@ import bootstrap, { agent, jsonToFormUrlEncoded } from '../../test_helper.js';
 import epochTime from '../../../lib/helpers/epoch_time.ts';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { provider } from 'lib/provider.js';
+import { OIDCContext } from 'lib/helpers/oidc_context.js';
 
 const route = '/auth';
 const response_type = 'code';
@@ -70,7 +71,7 @@ describe('BASIC code', () => {
 			});
 
 			it('populates ctx.oidc.entities', async function () {
-				const spy = spyOn(provider.OIDCContext.prototype, 'entity');
+				const spy = spyOn(OIDCContext.prototype, 'entity');
 
 				const auth = new AuthorizationRequest({ scope });
 				const { response } = await authRequest(auth, { cookie });
@@ -117,10 +118,7 @@ describe('BASIC code', () => {
 
 			describe('ignoring the offline_access scope', () => {
 				beforeEach(function () {
-					spyOn(
-						provider.OIDCContext.prototype,
-						'promptPending'
-					).mockReturnValue(false);
+					spyOn(OIDCContext.prototype, 'promptPending').mockReturnValue(false);
 				});
 
 				it('ignores the scope offline_access unless prompt consent is present', async function () {

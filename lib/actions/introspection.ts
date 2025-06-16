@@ -5,6 +5,7 @@ import { Elysia, t } from 'elysia';
 import { routeNames } from 'lib/consts/param_list.js';
 import { provider } from 'lib/provider.js';
 import { ISSUER } from 'lib/configs/env.js';
+import { OIDCContext } from 'lib/helpers/oidc_context.js';
 
 const introspectable = new Set([
 	'AccessToken',
@@ -71,7 +72,7 @@ async function renderTokenResponse(ctx) {
 	}
 
 	if (token.grantId) {
-		const grant = await ctx.oidc.provider.Grant.find(token.grantId, {
+		const grant = await provider.Grant.find(token.grantId, {
 			ignoreExpiration: true
 		});
 
@@ -143,7 +144,6 @@ export const introspect = new Elysia().post(
 		const ctx = {
 			headers
 		};
-		const OIDCContext = provider.OIDCContext;
 		ctx.oidc = new OIDCContext(ctx);
 		ctx.oidc.params = body;
 		ctx.oidc.body = body;

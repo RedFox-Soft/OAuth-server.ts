@@ -21,6 +21,7 @@ import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { ClientDefaults } from 'lib/configs/clientBase.js';
+import { OIDCContext } from 'lib/helpers/oidc_context.js';
 
 describe('Pushed Request Object', () => {
 	let setup = null;
@@ -260,7 +261,7 @@ describe('Pushed Request Object', () => {
 				describe('using a plain pushed authorization request', () => {
 					describe('Pushed Authorization Request Endpoint', () => {
 						it('populates ctx.oidc.entities', async function () {
-							const spy = spyOn(provider.OIDCContext.prototype, 'entity');
+							const spy = spyOn(OIDCContext.prototype, 'entity');
 							const code_verifier = randomBytes(32).toString('base64');
 							const code_challenge = createHash('sha256')
 								.update(code_verifier)
@@ -612,7 +613,7 @@ describe('Pushed Request Object', () => {
 				describe('using a JAR request parameter', () => {
 					describe('Pushed Authorization Request Endpoint', () => {
 						it('populates ctx.oidc.entities', async function () {
-							const spy = spyOn(provider.OIDCContext.prototype, 'entity');
+							const spy = spyOn(OIDCContext.prototype, 'entity');
 							const code_verifier = randomBytes(32).toString('base64');
 							const code_challenge = createHash('sha256')
 								.update(code_verifier)

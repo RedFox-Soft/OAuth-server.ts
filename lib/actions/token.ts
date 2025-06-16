@@ -8,6 +8,7 @@ import { urlencoded as parseBody } from '../shared/selective_body.ts';
 import rejectDupes from '../shared/reject_dupes.ts';
 import paramsMiddleware from '../shared/assemble_params.ts';
 import { globalConfiguration } from '../globalConfiguration.ts';
+import { OIDCContext } from 'lib/helpers/oidc_context.js';
 
 const grantTypeSet = new Set(['grant_type']);
 
@@ -17,7 +18,6 @@ export const tokenAction = new Elysia().post(
 		const ctx = {
 			headers
 		};
-		const OIDCContext = provider.OIDCContext;
 		ctx.oidc = new OIDCContext(ctx);
 		ctx.oidc.params = body;
 		ctx.oidc.body = body;

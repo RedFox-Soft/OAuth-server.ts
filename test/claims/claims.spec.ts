@@ -13,6 +13,7 @@ import { decode as decodeJWT } from '../../lib/helpers/jwt.ts';
 import bootstrap, { agent, jsonToFormUrlEncoded } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { provider } from 'lib/provider.js';
+import { OIDCContext } from 'lib/helpers/oidc_context.js';
 
 const route = '/auth';
 const expire = new Date();
@@ -102,11 +103,11 @@ expire.setDate(expire.getDate() + 1);
 
 			it('(pre 4.x behavior backfill) should include the acr claim now', async function () {
 				const descriptor = Object.getOwnPropertyDescriptor(
-					provider.OIDCContext.prototype,
+					OIDCContext.prototype,
 					'acr'
 				);
 
-				Object.defineProperty(provider.OIDCContext.prototype, 'acr', {
+				Object.defineProperty(OIDCContext.prototype, 'acr', {
 					get() {
 						return get(this, 'result.login.acr', '0');
 					}

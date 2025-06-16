@@ -17,6 +17,7 @@ import { provider } from 'lib/provider.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
 import bootstrap, { agent } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
+import { OIDCContext } from 'lib/helpers/oidc_context.js';
 
 function errorDetail(spy) {
 	return spy.args[0][0].error_detail;
@@ -87,7 +88,7 @@ describe('grant_type=authorization_code', () => {
 		});
 
 		it('populates ctx.oidc.entities (no offline_access)', async function () {
-			const spy = spyOn(provider.OIDCContext.prototype, 'entity');
+			const spy = spyOn(OIDCContext.prototype, 'entity');
 
 			const { response } = await auth.getToken(code);
 			expect(response.status).toBe(200);
@@ -108,7 +109,7 @@ describe('grant_type=authorization_code', () => {
 		});
 
 		it('populates ctx.oidc.entities (w/ offline_access)', async function () {
-			const spy = spyOn(provider.OIDCContext.prototype, 'entity');
+			const spy = spyOn(OIDCContext.prototype, 'entity');
 			setup.TestAdapter.for('Grant').syncUpdate(
 				setup.getSession().authorizations.client.grantId,
 				{
@@ -374,7 +375,7 @@ describe('grant_type=authorization_code', () => {
 		});
 
 		it('populates ctx.oidc.entities (no offline_access)', async function () {
-			const spy = spyOn(provider.OIDCContext.prototype, 'entity');
+			const spy = spyOn(OIDCContext.prototype, 'entity');
 			const { response } = await auth.getToken(code);
 			expect(response.status).toBe(200);
 			const entities = spy.mock.calls.map((call) => call[0]);
@@ -392,7 +393,7 @@ describe('grant_type=authorization_code', () => {
 		});
 
 		it('populates ctx.oidc.entities (w/ offline_access)', async function () {
-			const spy = spyOn(provider.OIDCContext.prototype, 'entity');
+			const spy = spyOn(OIDCContext.prototype, 'entity');
 			setup.TestAdapter.for('Grant').syncUpdate(
 				setup.getSession().authorizations.client2.grantId,
 				{

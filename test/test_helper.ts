@@ -21,6 +21,7 @@ import { AuthorizationRequest } from './AuthorizationRequest.js';
 
 import { ApplicationConfig } from '../lib/configs/application.js';
 import { ClientDefaults } from 'lib/configs/clientBase.js';
+import { OIDCContext } from 'lib/helpers/oidc_context.js';
 
 const applicationDefaultSettings = { ...ApplicationConfig };
 const clientDefaultSettings = { ...ClientDefaults };
@@ -154,7 +155,7 @@ export default function testHelper(
 			const cookies = [sessionCookie];
 
 			session.authorizations = {};
-			const ctx = new provider.OIDCContext({ req: { socket: {} }, res: {} });
+			const ctx = new OIDCContext({ req: { socket: {} }, res: {} });
 			ctx.params = { scope, claims };
 
 			if (ctx.params.claims && typeof ctx.params.claims !== 'string') {
@@ -353,9 +354,7 @@ export function skipConsent() {
 	const sandbox = sinon.createSandbox();
 
 	before(function () {
-		sandbox
-			.stub(this.provider.OIDCContext.prototype, 'promptPending')
-			.returns(false);
+		sandbox.stub(OIDCContext.prototype, 'promptPending').returns(false);
 	});
 
 	after(sandbox.restore);

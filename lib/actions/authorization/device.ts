@@ -31,6 +31,7 @@ import { Elysia, t } from 'elysia';
 import { provider } from 'lib/provider.js';
 import { InvalidRequest } from 'lib/helpers/errors.js';
 import { featureVerification } from './featureVerification.js';
+import { OIDCContext } from 'lib/helpers/oidc_context.js';
 
 const deviceAuthGrantType = 'urn:ietf:params:oauth:grant-type:device_code';
 const backchannelAuthGrantType = 'urn:openid:params:grant-type:ciba';
@@ -79,7 +80,6 @@ export const deviceAuth = new Elysia()
 	})
 	.post(routeNames.device_authorization, async ({ body, server, request }) => {
 		const ctx = { body };
-		const OIDCContext = provider.OIDCContext;
 		ctx.oidc = new OIDCContext(ctx);
 		ctx.oidc.params = { ...body };
 
@@ -118,7 +118,6 @@ export const backchannelAuth = new Elysia()
 	})
 	.post(routeNames.backchannel_authentication, async ({ body }) => {
 		const ctx = { body };
-		const OIDCContext = provider.OIDCContext;
 		ctx.oidc = new OIDCContext(ctx);
 
 		authentication;

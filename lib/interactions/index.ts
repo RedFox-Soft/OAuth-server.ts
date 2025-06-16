@@ -17,6 +17,7 @@ import {
 	ExpiredError,
 	NotFoundError
 } from 'lib/helpers/re_render_errors.js';
+import { OIDCContext } from 'lib/helpers/oidc_context.js';
 
 const htmlTeamplate = Bun.file('./lib/interactions/htmlTeamplate.html');
 
@@ -72,7 +73,6 @@ export const ui = new Elysia()
 	})
 	.get('ui/:uid/resume', async ({ interaction, cookie }) => {
 		const ctx = { cookie, _matchedRouteName: 'ui.resume' };
-		const OIDCContext = provider.OIDCContext;
 		ctx.oidc = new OIDCContext(ctx);
 
 		const setCookies = await sessionHandler(ctx);
@@ -90,7 +90,6 @@ export const ui = new Elysia()
 	})
 	.get('ui/:uid/device_resume', async ({ interaction, cookie }) => {
 		const ctx = { cookie, _matchedRouteName: 'ui.device_resume' };
-		const OIDCContext = provider.OIDCContext;
 		ctx.oidc = new OIDCContext(ctx);
 
 		const setCookies = await sessionHandler(ctx);

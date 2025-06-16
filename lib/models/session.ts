@@ -6,6 +6,7 @@ import instance from '../helpers/weak_cache.ts';
 
 import hasFormat from './mixins/has_format.ts';
 import { cookieNames } from '../consts/param_list.ts';
+import { OIDCContext } from 'lib/helpers/oidc_context.js';
 
 export default (provider) =>
 	class Session extends hasFormat(
@@ -78,7 +79,7 @@ export default (provider) =>
 				}
 			}
 
-			if (ctx.oidc instanceof provider.OIDCContext) {
+			if (ctx.oidc instanceof OIDCContext) {
 				ctx.oidc.entity('Session', session);
 			}
 

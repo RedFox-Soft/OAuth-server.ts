@@ -12,8 +12,7 @@ import bootstrap, { agent } from '../test_helper.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { provider } from 'lib/provider.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
-
-const route = '/token/introspection';
+import { OIDCContext } from 'lib/helpers/oidc_context.js';
 
 describe('introspection features', () => {
 	let setup = null;
@@ -463,7 +462,7 @@ describe('introspection features', () => {
 
 		describe('populates ctx.oidc.entities', () => {
 			it('when introspecting an AccessToken', async function () {
-				const spy = spyOn(provider.OIDCContext.prototype, 'entity');
+				const spy = spyOn(OIDCContext.prototype, 'entity');
 
 				const at = new provider.AccessToken({
 					accountId: 'accountId',
@@ -484,7 +483,7 @@ describe('introspection features', () => {
 			});
 
 			it('when introspecting a RefreshToken', async function () {
-				const spy = spyOn(provider.OIDCContext.prototype, 'entity');
+				const spy = spyOn(OIDCContext.prototype, 'entity');
 
 				const rt = new provider.RefreshToken({
 					accountId: 'accountId',
@@ -505,7 +504,7 @@ describe('introspection features', () => {
 			});
 
 			it('when introspecting ClientCredentials', async function () {
-				const spy = spyOn(provider.OIDCContext.prototype, 'entity');
+				const spy = spyOn(OIDCContext.prototype, 'entity');
 
 				const rt = new provider.ClientCredentials({
 					client: await provider.Client.find('client')

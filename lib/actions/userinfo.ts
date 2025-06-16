@@ -12,7 +12,7 @@ import {
 	UseDpopNonce
 } from '../helpers/errors.ts';
 import { routeNames } from 'lib/consts/param_list.js';
-import { provider } from 'lib/provider.js';
+import { OIDCContext } from 'lib/helpers/oidc_context.js';
 
 export const userinfo = new Elysia()
 	.guard({
@@ -29,7 +29,6 @@ export const userinfo = new Elysia()
 		const ctx = {
 			headers
 		};
-		const OIDCContext = provider.OIDCContext;
 		ctx.oidc = new OIDCContext(ctx);
 
 		const accessTokenValue = ctx.oidc.getAccessToken({

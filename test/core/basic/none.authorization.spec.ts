@@ -3,6 +3,7 @@ import { describe, it, beforeAll, expect, spyOn } from 'bun:test';
 import bootstrap, { agent } from '../../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { provider } from 'lib/provider.js';
+import { OIDCContext } from 'lib/helpers/oidc_context.js';
 
 describe('/auth response_type=none', () => {
 	let setup = null;
@@ -47,7 +48,7 @@ describe('/auth response_type=none', () => {
 		});
 
 		it(`${verb} populates ctx.oidc.entities`, async function () {
-			const spy = spyOn(provider.OIDCContext.prototype, 'entity');
+			const spy = spyOn(OIDCContext.prototype, 'entity');
 			const auth = new AuthorizationRequest({
 				response_type: 'none',
 				scope: 'openid'
