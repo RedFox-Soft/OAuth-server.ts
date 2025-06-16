@@ -2,12 +2,21 @@ import * as crypto from 'node:crypto';
 
 import { jwtVerify, EmbeddedJWK, calculateJwkThumbprint } from 'jose';
 
-import { InvalidDpopProof, UseDpopNonce } from './errors.ts';
+import { InvalidHeaderAuthorization } from './errors.js';
 import instance from './weak_cache.ts';
 import epochTime from './epoch_time.ts';
 
 const weakMap = new WeakMap();
 export const DPOP_OK_WINDOW = 300;
+
+class InvalidDpopProof extends InvalidHeaderAuthorization {
+	message = 'invalid_dpop_proof';
+	name = 'InvalidDpopProof';
+}
+class UseDpopNonce extends InvalidHeaderAuthorization {
+	message = 'use_dpop_nonce';
+	name = 'UseDpopNonce';
+}
 
 export default async (ctx, accessToken) => {
 	if (weakMap.has(ctx)) {

@@ -1,8 +1,17 @@
 import * as url from 'node:url';
 import { hash, randomBytes, randomUUID } from 'node:crypto';
+import {
+	describe,
+	it,
+	beforeAll,
+	beforeEach,
+	spyOn,
+	afterEach,
+	mock,
+	expect
+} from 'bun:test';
 
 import sinon from 'sinon';
-import { expect } from 'chai';
 import {
 	SignJWT,
 	exportJWK,
@@ -12,8 +21,12 @@ import {
 
 import nanoid from '../../lib/helpers/nanoid.ts';
 import epochTime from '../../lib/helpers/epoch_time.ts';
-import bootstrap, { skipConsent } from '../test_helper.js';
+import bootstrap, { agent, skipConsent } from '../test_helper.js';
 import * as base64url from '../../lib/helpers/base64url.ts';
+import { OIDCContext } from 'lib/helpers/oidc_context.js';
+import { provider } from 'lib/provider.js';
+import { ISSUER } from 'lib/configs/env.js';
+import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
 function ath(accessToken) {
 	return hash('sha256', accessToken, 'base64url');
@@ -43,122 +56,118 @@ async function DPoP(
 }
 
 describe('features.dPoP', () => {
-	before(bootstrap(import.meta.url));
-	before(function () {
-		return this.login({ scope: 'openid offline_access' });
+	let setup = null;
+	let cookie = null;
+	let keypair = null;
+	let jwk = null;
+	let thumbprint = null;
+
+	beforeAll(async function () {
+		setup = await bootstrap(import.meta.url)();
+		cookie = await setup.login({ scope: 'openid offline_access' });
+		keypair = await generateKeyPair('ES256', { extractable: true });
+		jwk = await exportJWK(keypair.publicKey);
+		thumbprint = await calculateJwkThumbprint(jwk);
 	});
-	skipConsent();
-	before(async function () {
-		this.keypair = await generateKeyPair('ES256', { extractable: true });
-		this.jwk = await exportJWK(this.keypair.publicKey);
-		this.thumbprint = await calculateJwkThumbprint(this.jwk);
+
+	beforeEach(function () {
+		spyOn(OIDCContext.prototype, 'promptPending').mockReturnValue(false);
+	});
+
+	afterEach(function () {
+		mock.restore();
 	});
 
 	it('extends discovery', async function () {
-		await this.agent
-			.get('/.well-known/openid-configuration')
-			.expect(200)
-			.expect((response) => {
-				expect(response.body).to.have.deep.property(
-					'dpop_signing_alg_values_supported',
-					['ES256', 'PS256']
-				);
-			});
+		const { data, status } =
+			await agent['.well-known']['openid-configuration'].get();
+
+		expect(status).toBe(200);
+		expect(data).toHaveProperty('dpop_signing_alg_values_supported', [
+			'ES256',
+			'PS256'
+		]);
 	});
 
 	describe('userinfo', () => {
 		it('validates the way DPoP proof JWT is provided', async function () {
-			const at = new this.provider.AccessToken({
+			const at = new provider.AccessToken({
 				accountId: 'account',
-				client: await this.provider.Client.find('client'),
+				client: await provider.Client.find('client'),
 				scope: 'openid'
 			});
-			at.setThumbprint('jkt', this.thumbprint);
+			at.setThumbprint('jkt', thumbprint);
 
-			expect(() => at.setThumbprint('x5t', 'foo'))
-				.to.throw()
-				.with.property(
-					'error_description',
-					'multiple proof-of-posession mechanisms are not allowed'
-				);
+			expect(() => at.setThumbprint('x5t', 'foo')).toThrow(
+				expect.objectContaining({
+					error_description:
+						'multiple proof-of-posession mechanisms are not allowed'
+				})
+			);
 
 			const dpop = await at.save();
 
-			await this.agent
-				.get('/me')
-				.set('Authorization', `Bearer ${dpop}`)
-				.expect(401)
-				.expect({
-					error: 'invalid_token',
-					error_description: 'invalid token provided'
-				})
-				.expect('WWW-Authenticate', /^DPoP /)
-				.expect('WWW-Authenticate', /error="invalid_token"/)
-				.expect('WWW-Authenticate', /algs="ES256 PS256"/);
+			const bearer = await agent.userinfo.get({
+				headers: {
+					authorization: `Bearer ${dpop}`
+				}
+			});
+			expect(bearer.status).toBe(401);
+			expect(bearer.error.value).toEqual({
+				error: 'invalid_token',
+				error_description: 'invalid token provided'
+			});
+			expect(bearer.headers.get('www-authenticate')).toMatch(/^Bearer /);
+			expect(bearer.headers.get('www-authenticate')).toMatch(
+				/error="invalid_token"/
+			);
 
-			await this.agent
-				.get('/me')
-				.set('Authorization', `DPoP ${dpop}`)
-				.expect(400)
-				.expect({
-					error: 'invalid_request',
-					error_description: '`DPoP` header not provided'
-				})
-				.expect('WWW-Authenticate', /^DPoP /)
-				.expect('WWW-Authenticate', /algs="ES256 PS256"/);
+			const dpopEmpty = await agent.userinfo.get({
+				headers: {
+					authorization: `DPoP ${dpop}`
+				}
+			});
+			expect(dpopEmpty.status).toBe(401);
+			expect(dpopEmpty.error.value).toEqual({
+				error: 'invalid_header_authorization',
+				error_description: '`DPoP` header not provided'
+			});
+			expect(dpopEmpty.headers.get('www-authenticate')).toMatch(/^DPoP /);
+			expect(dpopEmpty.headers.get('www-authenticate')).toMatch(
+				/algs="ES256 PS256"/
+			);
 
-			await this.agent
-				.post('/me')
-				.set(
-					'DPoP',
-					await DPoP(
-						this.keypair,
-						`${this.provider.issuer}${this.suitePath('/me')}`,
-						'POST',
-						undefined,
-						dpop
-					)
-				)
-				.send({ access_token: dpop })
-				.type('form')
-				.expect(400)
-				.expect({
-					error: 'invalid_request',
-					error_description:
-						'`DPoP` tokens must be provided via an authorization header'
-				})
-				.expect('WWW-Authenticate', /^DPoP /)
-				.expect('WWW-Authenticate', /algs="ES256 PS256"/);
-
-			await this.agent
-				.get('/me')
-				.set(
-					'DPoP',
-					await DPoP(
-						this.keypair,
-						`${this.provider.issuer}${this.suitePath('/me')}`,
-						'GET',
-						undefined,
-						dpop
-					)
-				)
-				.set('Authorization', `Bearer ${dpop}`)
-				.expect(400)
-				.expect({
-					error: 'invalid_request',
-					error_description:
-						'authorization header scheme must be `DPoP` when DPoP is used'
-				})
-				.expect('WWW-Authenticate', /^DPoP /)
-				.expect('WWW-Authenticate', /algs="ES256 PS256"/);
+			const dpopKey = await DPoP(
+				keypair,
+				`${ISSUER}/userinfo`,
+				'POST',
+				undefined,
+				dpop
+			);
+			const dpopRes = await agent.userinfo.get({
+				headers: {
+					dpop: `DPoP ${dpopKey}`,
+					authorization: `Bearer ${dpop}`
+				}
+			});
+			expect(dpopRes.status).toBe(401);
+			expect(dpopRes.error.value).toEqual({
+				error: 'invalid_header_authorization',
+				error_description:
+					'authorization header scheme must be `DPoP` when DPoP is used'
+			});
+			expect(dpopRes.headers.get('www-authenticate')).toMatch(/^DPoP /);
+			expect(dpopRes.headers.get('www-authenticate')).toMatch(
+				/algs="ES256 PS256"/
+			);
 		});
 
-		context('validates the DPoP proof JWT is conform', () => {
+		describe('validates the DPoP proof JWT is conform', () => {
 			before(async function () {
-				const at = new this.provider.AccessToken({
+				const at = new provider.AccessToken({
 					accountId: this.loggedInAccountId,
 					grantId: this.getGrantId(),
-					client: await this.provider.Client.find('client'),
+					client: await provider.Client.find('client'),
 					scope: 'openid'
 				});
 				at.setThumbprint('jkt', this.thumbprint);
@@ -168,12 +177,12 @@ describe('features.dPoP', () => {
 			});
 
 			afterEach(function () {
-				this.provider.removeAllListeners('userinfo.error');
+				provider.removeAllListeners('userinfo.error');
 			});
 
 			it('invalid typ', async function () {
 				const spy = sinon.spy();
-				this.provider.on('userinfo.error', spy);
+				provider.on('userinfo.error', spy);
 
 				for (const value of ['JWT', 'secevent+jwt']) {
 					await this.agent
@@ -208,7 +217,7 @@ describe('features.dPoP', () => {
 
 			it('alg mismatch', async function () {
 				const spy = sinon.spy();
-				this.provider.on('userinfo.error', spy);
+				provider.on('userinfo.error', spy);
 				for (const value of [1, true, 'none', 'HS256', 'unsupported']) {
 					await this.agent
 						.get('/me')
@@ -239,7 +248,7 @@ describe('features.dPoP', () => {
 
 			it('embedded jwk header', async function () {
 				const spy = sinon.spy();
-				this.provider.on('userinfo.error', spy);
+				provider.on('userinfo.error', spy);
 				for (const value of [undefined, '', 1, true, null, 'foo', []]) {
 					await this.agent
 						.get('/me')
@@ -275,7 +284,7 @@ describe('features.dPoP', () => {
 
 			it('no private key in header', async function () {
 				const spy = sinon.spy();
-				this.provider.on('userinfo.error', spy);
+				provider.on('userinfo.error', spy);
 				await this.agent
 					.get('/me')
 					.set(
@@ -309,7 +318,7 @@ describe('features.dPoP', () => {
 
 			it('no symmetric key in header', async function () {
 				const spy = sinon.spy();
-				this.provider.on('userinfo.error', spy);
+				provider.on('userinfo.error', spy);
 				await this.agent
 					.get('/me')
 					.set(
@@ -348,7 +357,7 @@ describe('features.dPoP', () => {
 						'DPoP',
 						await new SignJWT({
 							htm: 'POST',
-							htu: `${this.provider.issuer}${this.suitePath('/me')}`
+							htu: `${ISSUER}${this.suitePath('/me')}`
 						})
 							.setProtectedHeader({
 								alg: 'ES256',
@@ -376,7 +385,7 @@ describe('features.dPoP', () => {
 						'DPoP',
 						await new SignJWT({
 							htm: 'POST',
-							htu: `${this.provider.issuer}${this.suitePath('/me')}`,
+							htu: `${ISSUER}${this.suitePath('/me')}`,
 							ath: this.ath
 						})
 							.setProtectedHeader({
@@ -406,7 +415,7 @@ describe('features.dPoP', () => {
 						'DPoP',
 						await new SignJWT({
 							htm: 'GET',
-							htu: `${this.provider.issuer}${this.suitePath('/token')}`,
+							htu: `${ISSUER}${this.suitePath('/token')}`,
 							ath: this.ath
 						})
 							.setProtectedHeader({
@@ -432,16 +441,16 @@ describe('features.dPoP', () => {
 			for (const enabled of [true, false]) {
 				describe(`with DPoP-Nonces ${enabled ? 'enabled' : 'disabled'}`, () => {
 					before(function () {
-						({ DPoPNonces: this.DPoPNonces } = i(this.provider));
+						({ DPoPNonces: this.DPoPNonces } = i(provider));
 						if (enabled) {
-							i(this.provider).DPoPNonces = this.DPoPNonces;
+							i(provider).DPoPNonces = this.DPoPNonces;
 						} else {
-							i(this.provider).DPoPNonces = undefined;
+							i(provider).DPoPNonces = undefined;
 						}
 					});
 
 					after(function () {
-						i(this.provider).DPoPNonces = this.DPoPNonces;
+						i(provider).DPoPNonces = this.DPoPNonces;
 					});
 
 					for (const offset of [301, -301]) {
@@ -452,7 +461,7 @@ describe('features.dPoP', () => {
 									'DPoP',
 									await new SignJWT({
 										htm: 'GET',
-										htu: `${this.provider.issuer}${this.suitePath('/me')}`,
+										htu: `${ISSUER}${this.suitePath('/me')}`,
 										ath: this.ath
 									})
 										.setProtectedHeader({
@@ -497,10 +506,10 @@ describe('features.dPoP', () => {
 		});
 
 		it('acts like an RS checking the DPoP proof and thumbprint now', async function () {
-			const at = new this.provider.AccessToken({
+			const at = new provider.AccessToken({
 				accountId: this.loggedInAccountId,
 				grantId: this.getGrantId(),
-				client: await this.provider.Client.find('client'),
+				client: await provider.Client.find('client'),
 				scope: 'openid'
 			});
 			at.setThumbprint('jkt', this.thumbprint);
@@ -508,7 +517,7 @@ describe('features.dPoP', () => {
 			const dpop = await at.save();
 			const proof = await DPoP(
 				this.keypair,
-				`${this.provider.issuer}${this.suitePath('/me')}`,
+				`${ISSUER}${this.suitePath('/me')}`,
 				'GET',
 				undefined,
 				dpop
@@ -521,7 +530,7 @@ describe('features.dPoP', () => {
 				.expect(200);
 
 			let spy = sinon.spy();
-			this.provider.once('userinfo.error', spy);
+			provider.once('userinfo.error', spy);
 
 			await this.agent
 				.get('/me')
@@ -540,7 +549,7 @@ describe('features.dPoP', () => {
 			);
 
 			spy = sinon.spy();
-			this.provider.once('userinfo.error', spy);
+			provider.once('userinfo.error', spy);
 
 			await this.agent
 				.get('/me')
@@ -549,7 +558,7 @@ describe('features.dPoP', () => {
 					'DPoP',
 					await DPoP(
 						await generateKeyPair('ES256', { extractable: true }),
-						`${this.provider.issuer}${this.suitePath('/me')}`,
+						`${ISSUER}${this.suitePath('/me')}`,
 						'GET',
 						undefined,
 						dpop
@@ -568,7 +577,7 @@ describe('features.dPoP', () => {
 					'DPoP',
 					await DPoP(
 						this.keypair,
-						`${this.provider.issuer}${this.suitePath('/me')}`,
+						`${ISSUER}${this.suitePath('/me')}`,
 						'GET',
 						undefined,
 						'anotherAccessTokenValue'
@@ -587,7 +596,7 @@ describe('features.dPoP', () => {
 			);
 
 			spy = sinon.spy();
-			this.provider.once('userinfo.error', spy);
+			provider.once('userinfo.error', spy);
 
 			await this.agent
 				.get('/me')
@@ -608,26 +617,26 @@ describe('features.dPoP', () => {
 
 	describe('introspection', () => {
 		it('exposes cnf and DPoP proof JWT type now', async function () {
-			const at = new this.provider.AccessToken({
+			const at = new provider.AccessToken({
 				accountId: 'account',
-				client: await this.provider.Client.find('client'),
+				client: await provider.Client.find('client'),
 				scope: 'openid'
 			});
-			at.setThumbprint('jkt', this.thumbprint);
+			at.setThumbprint('jkt', thumbprint);
 
 			const token = await at.save();
 
-			await this.agent
-				.post('/token/introspection')
-				.auth('client', 'secret')
-				.send({ token })
-				.type('form')
-				.expect(200)
-				.expect(({ body }) => {
-					expect(body).to.have.property('cnf');
-					expect(body).to.have.property('token_type', 'DPoP');
-					expect(body.cnf).to.have.property('jkt');
-				});
+			const { data, status } = await agent.token.introspect.post(
+				{ token },
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+			expect(status).toBe(200);
+			expect(data).toHaveProperty('active', true);
+			expect(data).toHaveProperty('token_type', 'DPoP');
+			expect(data).toHaveProperty('cnf');
+			expect(data.cnf).toHaveProperty('jkt', thumbprint);
 		});
 	});
 
@@ -652,7 +661,7 @@ describe('features.dPoP', () => {
 
 		it('binds the access token to the jwk', async function () {
 			const spy = sinon.spy();
-			this.provider.once('grant.success', spy);
+			provider.once('grant.success', spy);
 
 			await this.agent
 				.post('/token')
@@ -666,7 +675,7 @@ describe('features.dPoP', () => {
 					'DPoP',
 					await DPoP(
 						this.keypair,
-						`${this.provider.issuer}${this.suitePath('/token')}`,
+						`${ISSUER}${this.suitePath('/token')}`,
 						'POST'
 					)
 				)
@@ -684,7 +693,7 @@ describe('features.dPoP', () => {
 
 		it('binds the refresh token to the jwk for public clients', async function () {
 			const spy = sinon.spy();
-			this.provider.once('grant.success', spy);
+			provider.once('grant.success', spy);
 
 			// changes the code to client-none
 			this.TestAdapter.for('DeviceCode').syncUpdate(this.getTokenJti(this.dc), {
@@ -705,7 +714,7 @@ describe('features.dPoP', () => {
 					'DPoP',
 					await DPoP(
 						this.keypair,
-						`${this.provider.issuer}${this.suitePath('/token')}`,
+						`${ISSUER}${this.suitePath('/token')}`,
 						'POST'
 					)
 				)
@@ -740,7 +749,7 @@ describe('features.dPoP', () => {
 
 		it('binds the access token to the jwk', async function () {
 			const spy = sinon.spy();
-			this.provider.once('grant.success', spy);
+			provider.once('grant.success', spy);
 
 			await this.agent
 				.post('/token')
@@ -754,7 +763,7 @@ describe('features.dPoP', () => {
 					'DPoP',
 					await DPoP(
 						this.keypair,
-						`${this.provider.issuer}${this.suitePath('/token')}`,
+						`${ISSUER}${this.suitePath('/token')}`,
 						'POST'
 					)
 				)
@@ -772,7 +781,7 @@ describe('features.dPoP', () => {
 
 		it('binds the refresh token to the jwk for public clients', async function () {
 			const spy = sinon.spy();
-			this.provider.once('grant.success', spy);
+			provider.once('grant.success', spy);
 
 			// changes the code to client-none
 			this.TestAdapter.for('BackchannelAuthenticationRequest').syncUpdate(
@@ -800,7 +809,7 @@ describe('features.dPoP', () => {
 					'DPoP',
 					await DPoP(
 						this.keypair,
-						`${this.provider.issuer}${this.suitePath('/token')}`,
+						`${ISSUER}${this.suitePath('/token')}`,
 						'POST'
 					)
 				)
@@ -827,7 +836,7 @@ describe('features.dPoP', () => {
 				.send({
 					response_type: 'code',
 					client_id: 'client',
-					dpop_jkt: this.thumbprint,
+					dpop_jkt: thumbprint,
 					code_challenge_method: 'S256',
 					code_challenge: hash('sha256', code_verifier, 'base64url')
 				})
@@ -835,7 +844,7 @@ describe('features.dPoP', () => {
 					'DPoP',
 					await DPoP(
 						this.keypair,
-						`${this.provider.issuer}${this.suitePath('/request')}`,
+						`${ISSUER}${this.suitePath('/request')}`,
 						'POST'
 					)
 				)
@@ -856,7 +865,7 @@ describe('features.dPoP', () => {
 					'DPoP',
 					await DPoP(
 						this.keypair,
-						`${this.provider.issuer}${this.suitePath('/request')}`,
+						`${ISSUER}${this.suitePath('/request')}`,
 						'POST'
 					)
 				)
@@ -886,7 +895,7 @@ describe('features.dPoP', () => {
 					'DPoP',
 					await DPoP(
 						this.keypair,
-						`${this.provider.issuer}${this.suitePath('/request')}`,
+						`${ISSUER}${this.suitePath('/request')}`,
 						'POST'
 					)
 				)
@@ -929,14 +938,14 @@ describe('features.dPoP', () => {
 						scope: 'openid',
 						response_type: 'code',
 						iss: 'client',
-						aud: this.provider.issuer,
+						aud: ISSUER,
 						code_challenge_method: 'S256',
 						code_challenge: hash('sha256', code_verifier, 'base64url')
 					})
 						.setProtectedHeader({ alg: 'HS256' })
 						.setIssuedAt()
 						.setIssuer('client')
-						.setAudience(this.provider.issuer)
+						.setAudience(ISSUER)
 						.setExpirationTime('1m')
 						.setNotBefore('0s')
 						.sign(Buffer.from('secret'))
@@ -945,7 +954,7 @@ describe('features.dPoP', () => {
 					'DPoP',
 					await DPoP(
 						this.keypair,
-						`${this.provider.issuer}${this.suitePath('/request')}`,
+						`${ISSUER}${this.suitePath('/request')}`,
 						'POST'
 					)
 				)
@@ -998,7 +1007,7 @@ describe('features.dPoP', () => {
 			describe('authorization_code', () => {
 				it('binds the access token to the jwk', async function () {
 					const spy = sinon.spy();
-					this.provider.once('grant.success', spy);
+					provider.once('grant.success', spy);
 
 					await this.agent
 						.post('/token')
@@ -1014,7 +1023,7 @@ describe('features.dPoP', () => {
 							'DPoP',
 							await DPoP(
 								this.keypair,
-								`${this.provider.issuer}${this.suitePath('/token')}`,
+								`${ISSUER}${this.suitePath('/token')}`,
 								'POST'
 							)
 						)
@@ -1055,7 +1064,7 @@ describe('features.dPoP', () => {
 			describe('authorization_code', () => {
 				it('binds the access token to the jwk', async function () {
 					const spy = sinon.spy();
-					this.provider.once('grant.success', spy);
+					provider.once('grant.success', spy);
 
 					await this.agent
 						.post('/token')
@@ -1071,7 +1080,7 @@ describe('features.dPoP', () => {
 							'DPoP',
 							await DPoP(
 								this.keypair,
-								`${this.provider.issuer}${this.suitePath('/token')}`,
+								`${ISSUER}${this.suitePath('/token')}`,
 								'POST'
 							)
 						)
@@ -1089,7 +1098,7 @@ describe('features.dPoP', () => {
 
 				it('checks the dpop_jkt matches the proof jwk thumbprint', async function () {
 					const spy = sinon.spy();
-					this.provider.once('grant.error', spy);
+					provider.once('grant.error', spy);
 
 					await this.agent
 						.post('/token')
@@ -1105,7 +1114,7 @@ describe('features.dPoP', () => {
 							'DPoP',
 							await DPoP(
 								await generateKeyPair('ES256', { extractable: true }),
-								`${this.provider.issuer}${this.suitePath('/token')}`,
+								`${ISSUER}${this.suitePath('/token')}`,
 								'POST'
 							)
 						)
@@ -1124,7 +1133,7 @@ describe('features.dPoP', () => {
 
 				it('requires dpop to be used when dpop_jkt was present', async function () {
 					const spy = sinon.spy();
-					this.provider.once('grant.error', spy);
+					provider.once('grant.error', spy);
 
 					await this.agent
 						.post('/token')
@@ -1183,7 +1192,7 @@ describe('features.dPoP', () => {
 						'DPoP',
 						await DPoP(
 							this.keypair,
-							`${this.provider.issuer}${this.suitePath('/token')}`,
+							`${ISSUER}${this.suitePath('/token')}`,
 							'POST'
 						)
 					)
@@ -1194,7 +1203,7 @@ describe('features.dPoP', () => {
 
 			it('binds the access token to the jwk', async function () {
 				const spy = sinon.spy();
-				this.provider.once('grant.success', spy);
+				provider.once('grant.success', spy);
 
 				await this.agent
 					.post('/token')
@@ -1208,7 +1217,7 @@ describe('features.dPoP', () => {
 						'DPoP',
 						await DPoP(
 							this.keypair,
-							`${this.provider.issuer}${this.suitePath('/token')}`,
+							`${ISSUER}${this.suitePath('/token')}`,
 							'POST'
 						)
 					)
@@ -1249,7 +1258,7 @@ describe('features.dPoP', () => {
 		describe('authorization_code', () => {
 			it('binds the access token to the jwk', async function () {
 				const spy = sinon.spy();
-				this.provider.once('grant.success', spy);
+				provider.once('grant.success', spy);
 
 				await this.agent
 					.post('/token')
@@ -1265,7 +1274,7 @@ describe('features.dPoP', () => {
 						'DPoP',
 						await DPoP(
 							this.keypair,
-							`${this.provider.issuer}${this.suitePath('/token')}`,
+							`${ISSUER}${this.suitePath('/token')}`,
 							'POST'
 						)
 					)
@@ -1298,7 +1307,7 @@ describe('features.dPoP', () => {
 						'DPoP',
 						await DPoP(
 							this.keypair,
-							`${this.provider.issuer}${this.suitePath('/token')}`,
+							`${ISSUER}${this.suitePath('/token')}`,
 							'POST'
 						)
 					)
@@ -1309,7 +1318,7 @@ describe('features.dPoP', () => {
 
 			it('binds the access token to the jwk', async function () {
 				const spy = sinon.spy();
-				this.provider.once('grant.success', spy);
+				provider.once('grant.success', spy);
 
 				await this.agent
 					.post('/token')
@@ -1323,7 +1332,7 @@ describe('features.dPoP', () => {
 						'DPoP',
 						await DPoP(
 							this.keypair,
-							`${this.provider.issuer}${this.suitePath('/token')}`,
+							`${ISSUER}${this.suitePath('/token')}`,
 							'POST'
 						)
 					)
@@ -1341,7 +1350,7 @@ describe('features.dPoP', () => {
 
 			it('verifies the request made with the same cert jwk', async function () {
 				const spy = sinon.spy();
-				this.provider.once('grant.error', spy);
+				provider.once('grant.error', spy);
 
 				await this.agent
 					.post('/token')
@@ -1354,7 +1363,7 @@ describe('features.dPoP', () => {
 						'DPoP',
 						await DPoP(
 							await generateKeyPair('ES256', { extractable: true }),
-							`${this.provider.issuer}${this.suitePath('/token')}`,
+							`${ISSUER}${this.suitePath('/token')}`,
 							'POST'
 						)
 					)
@@ -1377,7 +1386,7 @@ describe('features.dPoP', () => {
 	describe('client_credentials', () => {
 		it('binds the access token to the jwk', async function () {
 			const spy = sinon.spy();
-			this.provider.once('grant.success', spy);
+			provider.once('grant.success', spy);
 
 			await this.agent
 				.post('/token')
@@ -1387,7 +1396,7 @@ describe('features.dPoP', () => {
 					'DPoP',
 					await DPoP(
 						this.keypair,
-						`${this.provider.issuer}${this.suitePath('/token')}`,
+						`${ISSUER}${this.suitePath('/token')}`,
 						'POST'
 					)
 				)
@@ -1430,7 +1439,7 @@ describe('features.dPoP', () => {
 					'DPoP',
 					await DPoP(
 						this.keypair,
-						`${this.provider.issuer}${this.suitePath('/me')}`,
+						`${ISSUER}${this.suitePath('/me')}`,
 						'GET',
 						'foo',
 						'foo'
@@ -1452,7 +1461,7 @@ describe('features.dPoP', () => {
 					'DPoP',
 					await DPoP(
 						this.keypair,
-						`${this.provider.issuer}${this.suitePath('/me')}`,
+						`${ISSUER}${this.suitePath('/me')}`,
 						'GET',
 						nonce,
 						'foo'
@@ -1475,7 +1484,7 @@ describe('features.dPoP', () => {
 					'DPoP',
 					await DPoP(
 						this.keypair,
-						`${this.provider.issuer}${this.suitePath('/token')}`,
+						`${ISSUER}${this.suitePath('/token')}`,
 						'POST',
 						'foo'
 					)
@@ -1498,7 +1507,7 @@ describe('features.dPoP', () => {
 					'DPoP',
 					await DPoP(
 						this.keypair,
-						`${this.provider.issuer}${this.suitePath('/token')}`,
+						`${ISSUER}${this.suitePath('/token')}`,
 						'POST',
 						nonce
 					)
@@ -1510,12 +1519,12 @@ describe('features.dPoP', () => {
 
 	describe('required nonce', () => {
 		before(function () {
-			this.orig = i(this.provider).features.dPoP.requireNonce;
-			i(this.provider).features.dPoP.requireNonce = () => true;
+			this.orig = i(provider).features.dPoP.requireNonce;
+			i(provider).features.dPoP.requireNonce = () => true;
 		});
 
 		after(function () {
-			i(this.provider).features.dPoP.requireNonce = this.orig;
+			i(provider).features.dPoP.requireNonce = this.orig;
 		});
 
 		it('@ PAR endpoint', async function () {
@@ -1535,7 +1544,7 @@ describe('features.dPoP', () => {
 					'DPoP',
 					await DPoP(
 						this.keypair,
-						`${this.provider.issuer}${this.suitePath('/request')}`,
+						`${ISSUER}${this.suitePath('/request')}`,
 						'POST'
 					)
 				)
@@ -1563,7 +1572,7 @@ describe('features.dPoP', () => {
 					'DPoP',
 					await DPoP(
 						this.keypair,
-						`${this.provider.issuer}${this.suitePath('/request')}`,
+						`${ISSUER}${this.suitePath('/request')}`,
 						'POST',
 						nonce
 					)
@@ -1585,7 +1594,7 @@ describe('features.dPoP', () => {
 					'DPoP',
 					await DPoP(
 						this.keypair,
-						`${this.provider.issuer}${this.suitePath('/me')}`,
+						`${ISSUER}${this.suitePath('/me')}`,
 						'GET',
 						undefined,
 						'foo'
@@ -1607,7 +1616,7 @@ describe('features.dPoP', () => {
 					'DPoP',
 					await DPoP(
 						this.keypair,
-						`${this.provider.issuer}${this.suitePath('/me')}`,
+						`${ISSUER}${this.suitePath('/me')}`,
 						'GET',
 						nonce,
 						'foo'
@@ -1634,7 +1643,7 @@ describe('features.dPoP', () => {
 					'DPoP',
 					await DPoP(
 						this.keypair,
-						`${this.provider.issuer}${this.suitePath('/token')}`,
+						`${ISSUER}${this.suitePath('/token')}`,
 						'POST'
 					)
 				)
@@ -1656,7 +1665,7 @@ describe('features.dPoP', () => {
 					'DPoP',
 					await DPoP(
 						this.keypair,
-						`${this.provider.issuer}${this.suitePath('/token')}`,
+						`${ISSUER}${this.suitePath('/token')}`,
 						'POST',
 						nonce
 					)

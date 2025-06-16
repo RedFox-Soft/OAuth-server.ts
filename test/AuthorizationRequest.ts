@@ -69,7 +69,7 @@ export class AuthorizationRequest {
 
 	static basicAuthHeader(client_id, client_secret) {
 		return {
-			Authorization: `Basic ${base64url.encode(`${client_id}:${client_secret}`)}`
+			authorization: `Basic ${base64url.encode(`${client_id}:${client_secret}`)}`
 		};
 	}
 

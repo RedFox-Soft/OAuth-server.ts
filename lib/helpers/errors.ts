@@ -86,6 +86,17 @@ export class InvalidRequest extends OIDCProviderError {
 	}
 }
 
+export class InvalidHeaderAuthorization extends OIDCProviderError {
+	constructor(description = 'invalid header authorization') {
+		super(401, 'invalid_header_authorization');
+		Error.captureStackTrace(this, this.constructor);
+		Object.assign(this, {
+			error_description: description,
+			expose: true
+		});
+	}
+}
+
 export class NotSupportedError extends OIDCProviderError {
 	constructor(message = 'request is not supported') {
 		super(400, 'not_supported');
@@ -164,7 +175,6 @@ export const InteractionRequired = E('interaction_required');
 export const InvalidBindingMessage = E('invalid_binding_message');
 export const InvalidAuthorizationDetails = E('invalid_authorization_details');
 export const InvalidClient = E('invalid_client');
-export const InvalidDpopProof = E('invalid_dpop_proof');
 export const InvalidRequestObject = E('invalid_request_object');
 export const InvalidRequestUri = E('invalid_request_uri');
 export const InvalidSoftwareStatement = E('invalid_software_statement');
@@ -196,4 +206,3 @@ export const UnsupportedResponseMode = E(
 	'unsupported_response_mode',
 	'unsupported response_mode requested'
 );
-export const UseDpopNonce = E('use_dpop_nonce');

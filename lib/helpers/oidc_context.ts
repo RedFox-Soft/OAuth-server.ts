@@ -1,5 +1,5 @@
 import isPlainObject from './_/is_plain_object.ts';
-import { InvalidRequest } from './errors.ts';
+import { InvalidHeaderAuthorization } from './errors.ts';
 import instance from './weak_cache.ts';
 import { routeNames } from '../consts/param_list.ts';
 import { provider } from '../provider.js';
@@ -212,18 +212,22 @@ export class OIDCContext {
 		const parts = header.split(' ');
 
 		if (parts.length !== 2) {
-			throw new InvalidRequest('invalid authorization header value format');
+			throw new InvalidHeaderAuthorization(
+				'invalid authorization header value format'
+			);
 		}
 		const [scheme, value] = parts;
 
 		if (dpop && scheme.toLowerCase() !== 'dpop') {
-			throw new InvalidRequest(
+			throw new InvalidHeaderAuthorization(
 				'authorization header scheme must be `DPoP` when DPoP is used'
 			);
 		} else if (!dpop && scheme.toLowerCase() === 'dpop') {
-			throw new InvalidRequest('`DPoP` header not provided');
+			throw new InvalidHeaderAuthorization('`DPoP` header not provided');
 		} else if (!dpop && scheme.toLowerCase() !== 'bearer') {
-			throw new InvalidRequest('authorization header scheme must be `Bearer`');
+			throw new InvalidHeaderAuthorization(
+				'authorization header scheme must be `Bearer`'
+			);
 		}
 
 		this.#accessToken = value;

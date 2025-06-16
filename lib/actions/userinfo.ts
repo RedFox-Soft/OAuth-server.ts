@@ -1,16 +1,10 @@
 import { Elysia, t } from 'elysia';
-import setWWWAuthenticate from '../helpers/set_www_authenticate.ts';
 import certificateThumbprint from '../helpers/certificate_thumbprint.ts';
 import instance from '../helpers/weak_cache.ts';
 import filterClaims from '../helpers/filter_claims.ts';
 import dpopValidate, { DPOP_OK_WINDOW } from '../helpers/validate_dpop.ts';
 import epochTime from '../helpers/epoch_time.ts';
-import {
-	InvalidToken,
-	InsufficientScope,
-	InvalidDpopProof,
-	UseDpopNonce
-} from '../helpers/errors.ts';
+import { InvalidToken, InsufficientScope } from '../helpers/errors.ts';
 import { routeNames } from 'lib/consts/param_list.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 
@@ -22,8 +16,7 @@ export const userinfo = new Elysia()
 				error: 'no access token provided'
 			}),
 			dpop: t.Optional(t.String())
-		}),
-		query: t.Object({})
+		})
 	})
 	.get(routeNames.userinfo, async ({ headers }) => {
 		const ctx = {
@@ -173,42 +166,3 @@ export const userinfo = new Elysia()
 			return await mask.result();
 		}
 	});
-
-export default [
-	async function setWWWAuthenticateHeader(ctx, next) {
-		try {
-			await next();
-		} catch (err) {
-			if (err.expose) {
-				let scheme;
-
-				if (/dpop/i.test(err.error_description) || ctx.oidc.accessToken?.jkt) {
-					scheme = 'DPoP';
-				} else {
-					scheme = 'Bearer';
-				}
-
-				if (err instanceof InvalidDpopProof || err instanceof UseDpopNonce) {
-					// eslint-disable-next-line no-multi-assign
-					err.status = err.statusCode = 401;
-				}
-
-				setWWWAuthenticate(ctx, scheme, {
-					realm: ctx.oidc.issuer,
-					error: err.message,
-					error_description: err.error_description,
-					scope: err.scope,
-
-					...(scheme === 'DPoP'
-						? {
-								algs: instance(
-									ctx.oidc.provider
-								).configuration.dPoPSigningAlgValues.join(' ')
-							}
-						: undefined)
-				});
-			}
-			throw err;
-		}
-	}
-];

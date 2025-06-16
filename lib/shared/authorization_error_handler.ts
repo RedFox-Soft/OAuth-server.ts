@@ -1,16 +1,52 @@
 import { provider } from 'lib/provider.js';
-import instance from '../helpers/weak_cache.ts';
+import instance, { get } from '../helpers/weak_cache.ts';
 import { OIDCProviderError } from '../helpers/errors.ts';
 import { getErrorHtmlResponse } from '../html/error.tsx';
 import { routeNames } from 'lib/consts/param_list.js';
-import { type Context, mapValueError, ValidationError } from 'elysia';
+import {
+	type Context,
+	ErrorContext,
+	mapValueError,
+	ValidationError
+} from 'elysia';
 import { isAllowRedirectUri } from 'lib/actions/authorization/authorization.js';
+import { ISSUER } from 'lib/configs/env.js';
 
 function getFirstError(error: ValidationError) {
 	const validator = error.validator ?? error.error.validator;
 	const firstError =
 		'Errors' in validator ? validator.Errors(error.value).First() : error;
 	return firstError;
+}
+
+export default function getWWWAuthenticate(
+	authorization: string,
+	isDpop: boolean,
+	errorObj: { error: string; error_description?: string }
+) {
+	let scheme = '';
+	if (authorization.startsWith('dpop') || isDpop) {
+		scheme = 'DPoP';
+	} else if (authorization.startsWith('bearer')) {
+		scheme = 'Bearer';
+	} else {
+		return;
+	}
+	const obj = {
+		realm: ISSUER,
+		...errorObj,
+		...(scheme === 'DPoP'
+			? {
+					algs: instance(provider).configuration.dPoPSigningAlgValues.join(' ')
+				}
+			: undefined)
+	};
+
+	const wwwAuth = Object.entries(obj)
+		.map(([key, val]) => `${key}="${val.replace(/"/g, '\\"')}"`)
+		.join(', ');
+
+	return `${scheme} ${wwwAuth}`;
 }
 
 function getObjFromError(code: string, errorObj: any) {
@@ -50,7 +86,7 @@ const mapErrorCode = {
 	[routeNames.introspect]: 'introspection.error'
 };
 
-export async function errorHandler(obj) {
+export async function errorHandler(obj: ErrorContext) {
 	const { set, route, code, request } = obj;
 	let { error } = obj;
 	if (set.status === 500) {
@@ -84,6 +120,15 @@ export async function errorHandler(obj) {
 
 	const accept = request.headers.get('accept') || '';
 	let errorObj = getObjFromError(code, error);
+	if (isOIDError && error.status === 401) {
+		const auth = request.headers.get('authorization')?.toLowerCase() ?? '';
+		const isDpop = !!request.headers.get('dpop');
+		const authError = getWWWAuthenticate(auth, isDpop, errorObj);
+		if (authError) {
+			set.headers['WWW-Authenticate'] = authError;
+		}
+	}
+
 	if (accept.includes('text/html')) {
 		return getErrorHtmlResponse(
 			set.status,

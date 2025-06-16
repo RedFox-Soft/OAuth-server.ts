@@ -5,7 +5,6 @@ import cors from '../shared/cors.ts';
 import * as grants from '../actions/grants/index.ts';
 import error from '../shared/error_handler.ts';
 import {
-	userinfo,
 	jwks,
 	registration,
 	getRevocation,
