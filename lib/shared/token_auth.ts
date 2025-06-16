@@ -1,11 +1,9 @@
 import { InvalidRequest, InvalidClientAuth } from '../helpers/errors.ts';
-import setWWWAuthenticate from '../helpers/set_www_authenticate.ts';
 import * as JWT from '../helpers/jwt.ts';
 import instance from '../helpers/weak_cache.ts';
 import certificateThumbprint from '../helpers/certificate_thumbprint.ts';
 import { noVSCHAR } from '../consts/client_attributes.ts';
 
-import rejectDupes from './reject_dupes.ts';
 import getJWTAuthMiddleware from './token_jwt_auth.ts';
 
 const assertionType = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
@@ -45,25 +43,7 @@ export default function tokenAuth(provider) {
 	return {
 		params: authParams,
 		middleware: [
-			rejectDupes.bind(undefined, { only: authParams }),
-			async function setWWWAuthenticateHeader(ctx, next) {
-				try {
-					await next();
-				} catch (err) {
-					if (
-						err.statusCode === 401 &&
-						ctx.header.authorization !== undefined
-					) {
-						setWWWAuthenticate(ctx, 'Basic', {
-							realm: provider.issuer,
-							error: err.message,
-							error_description: err.error_description
-						});
-					}
-					throw err;
-				}
-			},
-			async function findClientId(ctx, next) {
+			async function findClientId(ctx) {
 				const {
 					params: {
 						client_id: clientId,
@@ -188,10 +168,8 @@ export default function tokenAuth(provider) {
 						'no client authentication mechanism provided'
 					);
 				}
-
-				return next();
 			},
-			async function loadClient(ctx, next) {
+			async function loadClient(ctx) {
 				const client = await provider.Client.find(
 					ctx.oidc.authorization.clientId
 				);
@@ -201,10 +179,8 @@ export default function tokenAuth(provider) {
 				}
 
 				ctx.oidc.entity('Client', client);
-
-				await next();
 			},
-			async function auth(ctx, next) {
+			async function auth(ctx) {
 				const {
 					params,
 					client: { clientAuthMethod, clientAuthSigningAlg },
@@ -332,8 +308,6 @@ export default function tokenAuth(provider) {
 						break;
 					}
 				}
-
-				await next();
 			}
 		]
 	};

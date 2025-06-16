@@ -4,13 +4,12 @@ import { provider } from 'lib/provider.js';
 import instance from '../helpers/weak_cache.ts';
 import { UnsupportedGrantType, InvalidRequest } from '../helpers/errors.ts';
 import getTokenAuth from '../shared/token_auth.ts';
-import { urlencoded as parseBody } from '../shared/selective_body.ts';
-import rejectDupes from '../shared/reject_dupes.ts';
-import paramsMiddleware from '../shared/assemble_params.ts';
 import { globalConfiguration } from '../globalConfiguration.ts';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
-
-const grantTypeSet = new Set(['grant_type']);
+import {
+	codeGrantParameters,
+	refreshTokenGrantParameters
+} from './grants/index.js';
 
 export const tokenAction = new Elysia().post(
 	globalConfiguration.routes.token,
@@ -27,7 +26,7 @@ export const tokenAction = new Elysia().post(
 		const { grantTypeParams } = instance(provider);
 
 		for (const middleware of tokenAuth) {
-			await middleware(ctx, () => {});
+			await middleware(ctx);
 		}
 
 		const grantParams = grantTypeParams.get(ctx.oidc.params.grant_type);
@@ -57,41 +56,20 @@ export const tokenAction = new Elysia().post(
 		provider.emit('grant.success', ctx);
 
 		return data;
-
-		return [
-			parseBody,
-			paramsMiddleware.bind(undefined, grantTypeParams.get(undefined)),
-			...tokenAuth,
-
-			rejectDupes.bind(undefined, { only: grantTypeSet }),
-
-			async function rejectDupesOptionalExcept(ctx, next) {
-				const { grantTypeDupes } = instance(provider);
-				const grantType = ctx.oidc.params.grant_type;
-				if (grantTypeDupes.has(grantType)) {
-					return rejectDupes(
-						{ except: grantTypeDupes.get(grantType) },
-						ctx,
-						next
-					);
-				}
-				return rejectDupes({}, ctx, next);
-			},
-
-			async function callTokenHandler(ctx) {}
-		];
 	},
 	{
-		body: t.Object({
-			client_id: t.Optional(t.String()),
-			client_assertion: t.Optional(t.String()),
-			client_assertion_type: t.Optional(t.String()),
-			client_secret: t.Optional(t.String()),
-			code: t.Optional(t.String()),
-			grant_type: t.String(),
-			code_verifier: t.Optional(t.String({ pattern: '^[A-Za-z0-9_-]{43}$' })),
-			redirect_uri: t.Optional(t.String())
-		}),
+		body: t.Composite([
+			t.Object({
+				client_id: t.Optional(t.String()),
+				client_assertion: t.Optional(t.String()),
+				client_assertion_type: t.Optional(t.String()),
+				client_secret: t.Optional(t.String()),
+				scope: t.Optional(t.String()),
+				grant_type: t.String()
+			}),
+			t.Partial(codeGrantParameters),
+			t.Partial(refreshTokenGrantParameters)
+		]),
 		headers: t.Object({
 			authorization: t.Optional(t.String())
 		})

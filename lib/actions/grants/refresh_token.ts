@@ -227,7 +227,7 @@ export const handler = async function refreshTokenHandler(ctx) {
 	const scope = ctx.oidc.params.scope
 		? ctx.oidc.requestParamScopes
 		: refreshToken.scopes;
-	await checkRar(ctx, () => {});
+	await checkRar(ctx);
 	const resource = await resolveResource(
 		ctx,
 		refreshToken,
@@ -297,7 +297,7 @@ export const handler = async function refreshTokenHandler(ctx) {
 		idToken = await token.issue({ use: 'idtoken' });
 	}
 
-	ctx.body = {
+	return {
 		access_token: accessToken,
 		expires_in: at.expiration,
 		id_token: idToken,

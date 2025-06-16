@@ -163,7 +163,7 @@ export const handler = async function authorizationCodeHandler(ctx) {
 		at.setThumbprint('jkt', dPoP.thumbprint);
 	}
 
-	await checkRar(ctx, () => {});
+	await checkRar(ctx);
 	const resource = await resolveResource(ctx, code, {
 		userinfo,
 		resourceIndicators

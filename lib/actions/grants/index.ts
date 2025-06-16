@@ -1,4 +1,14 @@
-/* eslint-disable camelcase, import/export */
+import { t } from 'elysia';
+
+export const codeGrantParameters = t.Object({
+	code: t.String(),
+	redirect_uri: t.Optional(t.String()),
+	code_verifier: t.String({ pattern: '^[A-Za-z0-9_-]{43}$' })
+});
+
+export const refreshTokenGrantParameters = t.Object({
+	refresh_token: t.String()
+});
 
 export * as authorization_code from './authorization_code.ts';
 export * as client_credentials from './client_credentials.ts';

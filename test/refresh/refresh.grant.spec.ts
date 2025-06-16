@@ -1,836 +1,745 @@
 import { strict as assert } from 'node:assert';
 import { parse as parseUrl } from 'node:url';
-import crypto from 'node:crypto';
+import {
+	describe,
+	it,
+	beforeAll,
+	afterEach,
+	beforeEach,
+	spyOn,
+	mock,
+	expect
+} from 'bun:test';
 
-import { createSandbox } from 'sinon';
 import base64url from 'base64url';
-import { expect } from 'chai';
 import timekeeper from 'timekeeper';
 
-import bootstrap, { skipConsent } from '../test_helper.js';
-
-const sinon = createSandbox();
+import bootstrap, { agent } from '../test_helper.js';
+import { provider } from 'lib/provider.js';
+import { OIDCContext } from 'lib/helpers/oidc_context.js';
+import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
+import { TestAdapter } from 'test/models.js';
 
 const route = '/token';
 
 function errorDetail(spy) {
-	return spy.args[0][1].error_detail;
+	return spy.mock.calls[0][0].error_detail;
 }
 
 describe('grant_type=refresh_token', () => {
-	before(bootstrap(import.meta.url));
-
-	afterEach(() => timekeeper.reset());
-	afterEach(function () {
-		this.provider.removeAllListeners();
-	});
-	afterEach(sinon.restore);
-
-	beforeEach(function () {
-		return this.login({ scope: 'openid email offline_access' });
-	});
-	afterEach(function () {
-		return this.logout();
-	});
-	skipConsent();
-
-	beforeEach(function (done) {
-		const code_verifier = crypto.randomBytes(32).toString('hex');
-		const code_challenge = crypto
-			.createHash('sha256')
-			.update(code_verifier)
-			.digest('base64url');
-
-		this.agent
-			.get('/auth')
-			.query({
-				client_id: 'client',
-				scope: 'openid email offline_access',
-				prompt: 'consent',
-				response_type: 'code',
-				code_challenge_method: 'S256',
-				code_challenge,
-				redirect_uri: 'https://client.example.com/cb',
-				nonce: 'foobarnonce'
-			})
-			.expect(303)
-			.end((err, authResponse) => {
-				if (err) {
-					return done(err);
-				}
-
-				const {
-					query: { code }
-				} = parseUrl(authResponse.headers.location, true);
-
-				return this.agent
-					.post(route)
-					.auth('client', 'secret')
-					.type('form')
-					.send({
-						code,
-						code_verifier,
-						grant_type: 'authorization_code',
-						redirect_uri: 'https://client.example.com/cb'
-					})
-					.expect(200)
-					.expect((response) => {
-						expect(response.body).to.have.property('refresh_token');
-						const jti = this.getTokenJti(response.body.refresh_token);
-						this.refreshToken =
-							this.TestAdapter.for('RefreshToken').syncFind(jti);
-						expect(this.refreshToken).to.have.property(
-							'gty',
-							'authorization_code'
-						);
-						this.rt = response.body.refresh_token;
-					})
-					.end(done);
-			});
+	let setup = null;
+	beforeAll(async function () {
+		setup = await bootstrap(import.meta.url)();
 	});
 
-	afterEach(function () {
-		this.provider.removeAllListeners();
+	beforeEach(() => {
+		spyOn(OIDCContext.prototype, 'promptPending').mockReturnValue(false);
+		const { ttl } = i(provider).configuration;
+		spyOn(ttl, 'RefreshToken').mockReturnValue(5);
 	});
 
-	it('returns the right stuff', function () {
-		const { rt } = this;
-		const spy = sinon.spy();
-		this.provider.on('grant.success', spy);
+	afterEach(() => {
+		provider.removeAllListeners();
+		timekeeper.reset();
+		mock.restore();
+	});
 
-		return this.agent
-			.post(route)
-			.auth('client', 'secret')
-			.send({
+	let refreshToken = null;
+	let rt = null;
+	beforeEach(async function () {
+		const authReq = new AuthorizationRequest({
+			client_id: 'client',
+			scope: 'openid email offline_access',
+			prompt: 'consent',
+			redirect_uri: 'https://client.example.com/cb',
+			nonce: 'foobarnonce'
+		});
+		const cookie = await setup.login({ scope: 'openid email offline_access' });
+		const auth = await agent.auth.get({
+			query: authReq.params,
+			headers: {
+				cookie
+			}
+		});
+		expect(auth.status).toBe(303);
+		const {
+			query: { code }
+		} = parseUrl(auth.headers.get('location'), true);
+
+		const { data } = await authReq.getToken(code);
+
+		expect(data).toHaveProperty('refresh_token');
+		const jti = setup.getTokenJti(data.refresh_token);
+		refreshToken = TestAdapter.for('RefreshToken').syncFind(jti);
+		expect(refreshToken).toHaveProperty('gty', 'authorization_code');
+		rt = data.refresh_token;
+	});
+
+	it('returns the right stuff', async function () {
+		const spy = mock();
+		provider.on('grant.success', spy);
+
+		const { data, status } = await agent.token.post(
+			{
 				refresh_token: rt,
 				grant_type: 'refresh_token'
-			})
-			.type('form')
-			.expect(200)
-			.expect(() => {
-				expect(spy.calledOnce).to.be.true;
-			})
-			.expect(({ body }) => {
-				expect(body).to.have.keys(
-					'access_token',
-					'id_token',
-					'expires_in',
-					'token_type',
-					'refresh_token',
-					'scope'
-				);
-				const refreshIdToken = JSON.parse(
-					base64url.decode(body.id_token.split('.')[1])
-				);
-				expect(refreshIdToken).to.have.property('nonce', 'foobarnonce');
-				expect(body).to.have.property('refresh_token').that.is.a('string');
-			});
+			},
+			{
+				headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+			}
+		);
+		expect(status).toBe(200);
+		expect(spy).toBeCalledTimes(1);
+		expect(data).toContainKeys([
+			'access_token',
+			'id_token',
+			'expires_in',
+			'token_type',
+			'refresh_token',
+			'scope'
+		]);
+		const refreshIdToken = JSON.parse(
+			base64url.decode(data.id_token.split('.')[1])
+		);
+		expect(refreshIdToken).toHaveProperty('nonce', 'foobarnonce');
+		expect(data.refresh_token).toBeString();
 	});
 
-	it('populates ctx.oidc.entities', function (done) {
-		this.assertOnce((ctx) => {
-			expect(ctx.oidc.entities).to.have.keys(
+	it('populates ctx.oidc.entities', async function () {
+		const spy = spyOn(OIDCContext.prototype, 'entity');
+
+		await agent.token.post(
+			{
+				refresh_token: rt,
+				grant_type: 'refresh_token'
+			},
+			{
+				headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+			}
+		);
+
+		const entities = spy.mock.calls.map((call) => call[0]);
+		expect([
+			'Account',
+			'Grant',
+			'Client',
+			'AccessToken',
+			'RefreshToken'
+		]).toEqual(expect.arrayContaining(entities));
+		const refreshToken = spy.mock.calls.find(
+			(call) => call[0] === 'RefreshToken'
+		);
+		expect(refreshToken[1]).toHaveProperty('gty', 'authorization_code');
+		const accessToken = spy.mock.calls.find(
+			(call) => call[0] === 'AccessToken'
+		);
+		expect(accessToken[1]).toHaveProperty(
+			'gty',
+			'authorization_code refresh_token'
+		);
+	});
+
+	describe('validates', () => {
+		it('validates the refresh token is not expired', async function () {
+			timekeeper.travel(Date.now() + 10 * 1000);
+			const spy = mock();
+			provider.on('grant.error', spy);
+
+			const { error } = await agent.token.post(
+				{
+					refresh_token: rt,
+					grant_type: 'refresh_token'
+				},
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+			expect(error.status).toBe(400);
+			expect(spy).toBeCalledTimes(1);
+			expect(error.value).toEqual({
+				error: 'invalid_grant',
+				error_description: 'grant request is invalid'
+			});
+			expect(errorDetail(spy)).toBe('refresh token is expired');
+		});
+
+		it('validates that token belongs to client', async function () {
+			const spy = mock();
+			provider.on('grant.error', spy);
+
+			const { error } = await agent.token.post(
+				{
+					refresh_token: rt,
+					grant_type: 'refresh_token'
+				},
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client2', 'secret')
+				}
+			);
+			expect(error.status).toBe(400);
+			expect(spy).toBeCalledTimes(1);
+			expect(errorDetail(spy)).toBe('client mismatch');
+			expect(error.value).toEqual({
+				error: 'invalid_grant',
+				error_description: 'grant request is invalid'
+			});
+		});
+
+		it('scopes are not getting extended (single)', async function () {
+			const { error } = await agent.token.post(
+				{
+					refresh_token: rt,
+					grant_type: 'refresh_token',
+					scope: 'openid profile'
+				},
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+			expect(error.status).toBe(400);
+			expect(error.value).toEqual({
+				error: 'invalid_scope',
+				error_description: 'refresh token missing requested scope'
+			});
+		});
+
+		it('scopes are not getting extended (multiple)', async function () {
+			const { error } = await agent.token.post(
+				{
+					refresh_token: rt,
+					grant_type: 'refresh_token',
+					scope: 'openid profile address'
+				},
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+			expect(error.status).toBe(400);
+			expect(error.value).toEqual({
+				error: 'invalid_scope',
+				error_description: 'refresh token missing requested scopes'
+			});
+		});
+
+		it('scopes can get slimmer (1/2) - no openid scope, ID Token is not issued', async function () {
+			const spy = mock();
+			provider.on('access_token.saved', spy);
+			provider.on('access_token.issued', spy);
+
+			const { data, status } = await agent.token.post(
+				{
+					refresh_token: rt,
+					grant_type: 'refresh_token',
+					scope: 'email'
+				},
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+			expect(status).toBe(200);
+			expect(spy.mock.calls[0][0]).toHaveProperty('kind', 'AccessToken');
+			expect(spy.mock.calls[0][0]).toHaveProperty('scope', 'email');
+			expect(data).toHaveProperty('scope', 'email');
+			expect(data).not.toHaveProperty('id_token');
+		});
+
+		it('scopes can get slimmer (2/2) - openid scope is present, ID Token is issued', async function () {
+			const spy = mock();
+			provider.on('access_token.saved', spy);
+			provider.on('access_token.issued', spy);
+
+			const { data, status } = await agent.token.post(
+				{
+					refresh_token: rt,
+					grant_type: 'refresh_token',
+					scope: 'openid email'
+				},
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+			expect(status).toBe(200);
+			expect(spy.mock.calls[0][0]).toHaveProperty('kind', 'AccessToken');
+			expect(spy.mock.calls[0][0]).toHaveProperty('scope', 'openid email');
+			expect(data).toHaveProperty('scope', 'openid email');
+			expect(data).toHaveProperty('id_token');
+		});
+
+		it('validates account is still there', async function () {
+			spyOn(i(provider).configuration, 'findAccount').mockResolvedValue(null);
+
+			const spy = mock();
+			provider.on('grant.error', spy);
+
+			const { error } = await agent.token.post(
+				{
+					refresh_token: rt,
+					grant_type: 'refresh_token'
+				},
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+			expect(error.status).toBe(400);
+			expect(spy).toBeCalledTimes(1);
+			expect(errorDetail(spy)).toBe(
+				'refresh token invalid (referenced account not found)'
+			);
+			expect(error.value).toEqual({
+				error: 'invalid_grant',
+				error_description: 'grant request is invalid'
+			});
+		});
+	});
+
+	it('refresh_token presence', async function () {
+		const { error } = await agent.token.post(
+			{
+				grant_type: 'refresh_token'
+			},
+			{
+				headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+			}
+		);
+		expect(error.status).toBe(400);
+		expect(error.value).toEqual({
+			error: 'invalid_request',
+			error_description: "missing required parameter 'refresh_token'"
+		});
+	});
+
+	it('code being "found"', async function () {
+		const spy = mock();
+		provider.on('grant.error', spy);
+
+		const { error } = await agent.token.post(
+			{
+				grant_type: 'refresh_token',
+				refresh_token:
+					'eyJraW5kIjoiUmVmcmVzaFRva2VuIiwianRpIjoiYzc4ZjdlYjMtZjdkYi00ZDNmLWFjNzUtYTY3MTA2NTUxOTYyIiwiaWF0IjoxNDYzNjY5Mjk1LCJleHAiOjE0NjM2NzEwOTUsImlzcyI6Imh0dHA6Ly8xMjcuMC4wLjE6NjAxNDMifQ.KJxy5D3_lwAlBs6E0INhrjJm1Bk9BrPlRacoyYztt5s_yxWidNua_eSvMbmRqqIq6t2hGguW7ZkEJhVHGNxvaHctGjSIrAOjaZhh1noqP9keXnATf2N2Twdsz-Viim5F0A7vu9OlhNm75P-yfreOTmmbQ4goM5449Dvq_xli2gmgg1j4HnASAI3YuxAzCCSJPbJDE2UL0-_q7nIvH0Ak2RuNbTJLjYt36jymfLnJ2OOe1z9N2RuZrIQQy7ksAIJkJs_3SJ0RYKDBtUplPC2fK7qsNk4wUTgxLJE3Xp_sJZKwVG2ascsVdexVnUCxqDN3xt9MpI14M3Zw7UwGghdIfQ'
+			},
+			{
+				headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+			}
+		);
+		expect(error.status).toBe(400);
+		expect(spy).toBeCalledTimes(1);
+		expect(errorDetail(spy)).toBe('refresh token not found');
+		expect(error.value).toEqual({
+			error: 'invalid_grant',
+			error_description: 'grant request is invalid'
+		});
+	});
+
+	describe('rotateRefreshToken=true', () => {
+		beforeEach(function () {
+			i(provider).configuration.rotateRefreshToken = true;
+		});
+
+		afterEach(function () {
+			i(provider).configuration.rotateRefreshToken = false;
+		});
+
+		it('populates ctx.oidc.entities', async function () {
+			const spy = spyOn(OIDCContext.prototype, 'entity');
+
+			await agent.token.post(
+				{
+					refresh_token: rt,
+					grant_type: 'refresh_token'
+				},
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+			const entities = spy.mock.calls.map((call) => call[0]);
+			expect([
 				'Account',
 				'Grant',
 				'Client',
 				'AccessToken',
+				'RotatedRefreshToken',
 				'RefreshToken'
+			]).toEqual(expect.arrayContaining(entities));
+			const rotatedRefreshToken = spy.mock.calls.find(
+				(call) => call[0] === 'RotatedRefreshToken'
 			);
-			expect(ctx.oidc.entities.RefreshToken).to.have.property(
+			expect(rotatedRefreshToken[1]).toHaveProperty(
 				'gty',
 				'authorization_code'
 			);
-			expect(ctx.oidc.entities.AccessToken).to.have.property(
+			const refreshToken = spy.mock.calls.findLast(
+				(call) => call[0] === 'RefreshToken'
+			);
+			expect(refreshToken[1]).not.toEqual(rotatedRefreshToken[1]);
+			expect(refreshToken[1]).toHaveProperty(
 				'gty',
 				'authorization_code refresh_token'
 			);
-		}, done);
-
-		this.agent
-			.post(route)
-			.auth('client', 'secret')
-			.send({
-				refresh_token: this.rt,
-				grant_type: 'refresh_token'
-			})
-			.type('form')
-			.end(() => {});
-	});
-
-	describe('validates', () => {
-		context('', () => {
-			before(function () {
-				const { ttl } = i(this.provider).configuration;
-				this.prev = ttl.RefreshToken;
-				ttl.RefreshToken = 5;
-			});
-
-			after(function () {
-				i(this.provider).configuration.ttl.RefreshToken = this.prev;
-			});
-
-			it('validates the refresh token is not expired', function () {
-				timekeeper.travel(Date.now() + 10 * 1000);
-				const { rt } = this;
-				const spy = sinon.spy();
-				this.provider.on('grant.error', spy);
-
-				return this.agent
-					.post(route)
-					.auth('client', 'secret')
-					.send({
-						refresh_token: rt,
-						grant_type: 'refresh_token'
-					})
-					.type('form')
-					.expect(400)
-					.expect(() => {
-						expect(spy.calledOnce).to.be.true;
-						expect(errorDetail(spy)).to.equal('refresh token is expired');
-					})
-					.expect((response) => {
-						expect(response.body).to.have.property('error', 'invalid_grant');
-					});
-			});
+			const accessToken = spy.mock.calls.find(
+				(call) => call[0] === 'AccessToken'
+			);
+			expect(accessToken[1]).toHaveProperty(
+				'gty',
+				'authorization_code refresh_token'
+			);
 		});
 
-		it('validates that token belongs to client', function () {
-			const { rt } = this;
-			const spy = sinon.spy();
-			this.provider.on('grant.error', spy);
+		it('issues a new refresh token and consumes the old one', async function () {
+			const consumeSpy = mock();
+			const issueSpy = mock();
+			provider.on('refresh_token.consumed', consumeSpy);
+			provider.on('refresh_token.saved', issueSpy);
 
-			return this.agent
-				.post(route)
-				.auth('client2', 'secret')
-				.send({
+			const { data, status } = await agent.token.post(
+				{
 					refresh_token: rt,
 					grant_type: 'refresh_token'
-				})
-				.type('form')
-				.expect(400)
-				.expect(() => {
-					expect(spy.calledOnce).to.be.true;
-					expect(errorDetail(spy)).to.equal('client mismatch');
-				})
-				.expect((response) => {
-					expect(response.body).to.have.property('error', 'invalid_grant');
-				});
+				},
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+			expect(status).toBe(200);
+			expect(consumeSpy).toBeCalledTimes(1);
+			expect(issueSpy).toBeCalled();
+			expect(data).toContainKeys([
+				'access_token',
+				'id_token',
+				'expires_in',
+				'token_type',
+				'refresh_token',
+				'scope'
+			]);
+			const refreshIdToken = JSON.parse(
+				base64url.decode(data.id_token.split('.')[1])
+			);
+			expect(refreshIdToken).toHaveProperty('nonce', 'foobarnonce');
+			expect(data.refresh_token).toBeString();
+			expect(data.refresh_token).not.toEqual(rt);
 		});
 
-		it('scopes are not getting extended (single)', function () {
-			const { rt } = this;
-			const spy = sinon.spy();
-			this.provider.on('grant.error', spy);
+		it('the new refresh token has identical scope to the old one', async function () {
+			const consumeSpy = mock();
+			const issueSpy = mock();
+			provider.on('refresh_token.consumed', consumeSpy);
+			provider.on('refresh_token.saved', issueSpy);
+			provider.on('access_token.saved', issueSpy);
+			provider.on('access_token.issued', issueSpy);
 
-			return this.agent
-				.post(route)
-				.auth('client', 'secret')
-				.send({
-					refresh_token: rt,
-					grant_type: 'refresh_token',
-					scope: 'openid profile'
-				})
-				.type('form')
-				.expect(400)
-				.expect((response) => {
-					expect(response.body).to.have.property('error', 'invalid_scope');
-					expect(response.body).to.have.property(
-						'error_description',
-						'refresh token missing requested scope'
-					);
-					expect(response.body).to.have.property('scope', 'profile');
-				});
-		});
-
-		it('scopes are not getting extended (multiple)', function () {
-			const { rt } = this;
-			const spy = sinon.spy();
-			this.provider.on('grant.error', spy);
-
-			return this.agent
-				.post(route)
-				.auth('client', 'secret')
-				.send({
-					refresh_token: rt,
-					grant_type: 'refresh_token',
-					scope: 'openid profile address'
-				})
-				.type('form')
-				.expect(400)
-				.expect((response) => {
-					expect(response.body).to.have.property('error', 'invalid_scope');
-					expect(response.body).to.have.property(
-						'error_description',
-						'refresh token missing requested scopes'
-					);
-					expect(response.body).to.have.property('scope', 'profile address');
-				});
-		});
-
-		it('scopes can get slimmer (1/2) - no openid scope, ID Token is not issued', function () {
-			const { rt } = this;
-			const spy = sinon.spy();
-			this.provider.on('access_token.saved', spy);
-			this.provider.on('access_token.issued', spy);
-
-			return this.agent
-				.post(route)
-				.auth('client', 'secret')
-				.send({
-					refresh_token: rt,
-					grant_type: 'refresh_token',
-					scope: 'email'
-				})
-				.type('form')
-				.expect(200)
-				.expect(({ body }) => {
-					expect(spy.firstCall.args[0]).to.have.property('kind', 'AccessToken');
-					expect(spy.firstCall.args[0]).to.have.property('scope', 'email');
-					expect(body).to.have.property('scope', 'email');
-					expect(body).not.to.have.property('id_token');
-				});
-		});
-
-		it('scopes can get slimmer (2/2) - openid scope is present, ID Token is issued', function () {
-			const { rt } = this;
-			const spy = sinon.spy();
-			this.provider.on('access_token.saved', spy);
-			this.provider.on('access_token.issued', spy);
-
-			return this.agent
-				.post(route)
-				.auth('client', 'secret')
-				.send({
-					refresh_token: rt,
-					grant_type: 'refresh_token',
-					scope: 'openid email'
-				})
-				.type('form')
-				.expect(200)
-				.expect(({ body }) => {
-					expect(spy.firstCall.args[0]).to.have.property('kind', 'AccessToken');
-					expect(spy.firstCall.args[0]).to.have.property(
-						'scope',
-						'openid email'
-					);
-					expect(body).to.have.property('scope', 'openid email');
-					expect(body).to.have.property('id_token');
-				});
-		});
-
-		it('validates account is still there', function () {
-			const { rt } = this;
-			sinon
-				.stub(i(this.provider).configuration, 'findAccount')
-				.callsFake(() => Promise.resolve());
-
-			const spy = sinon.spy();
-			this.provider.on('grant.error', spy);
-
-			return this.agent
-				.post(route)
-				.auth('client', 'secret')
-				.send({
+			const { status } = await agent.token.post(
+				{
 					refresh_token: rt,
 					grant_type: 'refresh_token'
-				})
-				.type('form')
-				.expect(400)
-				.expect(() => {
-					expect(spy.calledOnce).to.be.true;
-					expect(errorDetail(spy)).to.equal(
-						'refresh token invalid (referenced account not found)'
-					);
-				})
-				.expect((response) => {
-					expect(response.body).to.have.property('error', 'invalid_grant');
-				});
-		});
-	});
-
-	it('refresh_token presence', function () {
-		return this.agent
-			.post(route)
-			.auth('client', 'secret')
-			.send({
-				grant_type: 'refresh_token'
-			})
-			.type('form')
-			.expect(400)
-			.expect((response) => {
-				expect(response.body).to.have.property('error', 'invalid_request');
-				expect(response.body)
-					.to.have.property('error_description')
-					.and.matches(/missing required parameter/);
-				expect(response.body)
-					.to.have.property('error_description')
-					.and.matches(/refresh_token/);
-			});
-	});
-
-	it('code being "found"', function () {
-		const spy = sinon.spy();
-		this.provider.on('grant.error', spy);
-		return this.agent
-			.post(route)
-			.auth('client', 'secret')
-			.send({
-				grant_type: 'refresh_token',
-				refresh_token:
-					'eyJraW5kIjoiUmVmcmVzaFRva2VuIiwianRpIjoiYzc4ZjdlYjMtZjdkYi00ZDNmLWFjNzUtYTY3MTA2NTUxOTYyIiwiaWF0IjoxNDYzNjY5Mjk1LCJleHAiOjE0NjM2NzEwOTUsImlzcyI6Imh0dHA6Ly8xMjcuMC4wLjE6NjAxNDMifQ.KJxy5D3_lwAlBs6E0INhrjJm1Bk9BrPlRacoyYztt5s_yxWidNua_eSvMbmRqqIq6t2hGguW7ZkEJhVHGNxvaHctGjSIrAOjaZhh1noqP9keXnATf2N2Twdsz-Viim5F0A7vu9OlhNm75P-yfreOTmmbQ4goM5449Dvq_xli2gmgg1j4HnASAI3YuxAzCCSJPbJDE2UL0-_q7nIvH0Ak2RuNbTJLjYt36jymfLnJ2OOe1z9N2RuZrIQQy7ksAIJkJs_3SJ0RYKDBtUplPC2fK7qsNk4wUTgxLJE3Xp_sJZKwVG2ascsVdexVnUCxqDN3xt9MpI14M3Zw7UwGghdIfQ'
-			})
-			.type('form')
-			.expect(400)
-			.expect(() => {
-				expect(spy.calledOnce).to.be.true;
-				expect(errorDetail(spy)).to.equal('refresh token not found');
-			})
-			.expect((response) => {
-				expect(response.body).to.have.property('error', 'invalid_grant');
-			});
-	});
-
-	describe('rotateRefreshToken=true', () => {
-		before(function () {
-			i(this.provider).configuration.rotateRefreshToken = true;
+				},
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+			expect(status).toBe(200);
+			expect(consumeSpy).toBeCalledTimes(1);
+			expect(issueSpy).toBeCalledTimes(2);
+			expect(consumeSpy.mock.calls[0][0]).toHaveProperty(
+				'scope',
+				'openid email offline_access'
+			);
+			expect(issueSpy.mock.calls[0][0]).toHaveProperty(
+				'scope',
+				'openid email offline_access'
+			);
 		});
 
-		after(function () {
-			i(this.provider).configuration.rotateRefreshToken = false;
-		});
+		it('the new refresh token has identical scope to the old one even if the access token is requested with less scopes', async function () {
+			const consumeSpy = mock();
+			const issueSpy = mock();
+			provider.on('refresh_token.consumed', consumeSpy);
+			provider.on('refresh_token.saved', issueSpy);
+			provider.on('access_token.saved', issueSpy);
+			provider.on('access_token.issued', issueSpy);
 
-		it('populates ctx.oidc.entities', function (done) {
-			this.assertOnce((ctx) => {
-				expect(ctx.oidc.entities).to.have.keys(
-					'Account',
-					'Grant',
-					'Client',
-					'AccessToken',
-					'RotatedRefreshToken',
-					'RefreshToken'
-				);
-				expect(ctx.oidc.entities.RotatedRefreshToken).not.to.eql(
-					ctx.oidc.entities.RefreshToken
-				);
-				expect(ctx.oidc.entities.RotatedRefreshToken).to.have.property(
-					'gty',
-					'authorization_code'
-				);
-				expect(ctx.oidc.entities.RefreshToken).to.have.property(
-					'gty',
-					'authorization_code refresh_token'
-				);
-				expect(ctx.oidc.entities.AccessToken).to.have.property(
-					'gty',
-					'authorization_code refresh_token'
-				);
-			}, done);
-
-			this.agent
-				.post(route)
-				.auth('client', 'secret')
-				.send({
-					refresh_token: this.rt,
-					grant_type: 'refresh_token'
-				})
-				.type('form')
-				.end(() => {});
-		});
-
-		it('issues a new refresh token and consumes the old one', function () {
-			const { rt } = this;
-			const consumeSpy = sinon.spy();
-			const issueSpy = sinon.spy();
-			this.provider.on('refresh_token.consumed', consumeSpy);
-			this.provider.on('refresh_token.saved', issueSpy);
-
-			return this.agent
-				.post(route)
-				.auth('client', 'secret')
-				.send({
-					refresh_token: rt,
-					grant_type: 'refresh_token'
-				})
-				.type('form')
-				.expect(200)
-				.expect(() => {
-					expect(consumeSpy.calledOnce).to.be.true;
-					expect(issueSpy.called).to.be.true;
-				})
-				.expect((response) => {
-					expect(response.body).to.have.keys(
-						'access_token',
-						'id_token',
-						'expires_in',
-						'token_type',
-						'refresh_token',
-						'scope'
-					);
-					const refreshIdToken = JSON.parse(
-						base64url.decode(response.body.id_token.split('.')[1])
-					);
-					expect(refreshIdToken).to.have.property('nonce', 'foobarnonce');
-					expect(response.body).to.have.property('refresh_token').not.equal(rt);
-				});
-		});
-
-		it('the new refresh token has identical scope to the old one', function () {
-			const { rt } = this;
-			const consumeSpy = sinon.spy();
-			const issueSpy = sinon.spy();
-			this.provider.on('refresh_token.consumed', consumeSpy);
-			this.provider.on('refresh_token.saved', issueSpy);
-			this.provider.on('access_token.saved', issueSpy);
-			this.provider.on('access_token.issued', issueSpy);
-
-			return this.agent
-				.post(route)
-				.auth('client', 'secret')
-				.send({
-					refresh_token: rt,
-					grant_type: 'refresh_token'
-				})
-				.type('form')
-				.expect(200)
-				.expect(() => {
-					expect(consumeSpy.calledOnce).to.be.true;
-					expect(issueSpy.calledTwice).to.be.true;
-					expect(consumeSpy.firstCall.args[0]).to.have.property(
-						'scope',
-						'openid email offline_access'
-					);
-					expect(issueSpy.firstCall.args[0]).to.have.property(
-						'scope',
-						'openid email offline_access'
-					);
-				});
-		});
-
-		it('the new refresh token has identical scope to the old one even if the access token is requested with less scopes', function () {
-			const { rt } = this;
-			const consumeSpy = sinon.spy();
-			const issueSpy = sinon.spy();
-			this.provider.on('refresh_token.consumed', consumeSpy);
-			this.provider.on('refresh_token.saved', issueSpy);
-			this.provider.on('access_token.saved', issueSpy);
-			this.provider.on('access_token.issued', issueSpy);
-
-			return this.agent
-				.post(route)
-				.auth('client', 'secret')
-				.send({
+			const { status } = await agent.token.post(
+				{
 					refresh_token: rt,
 					scope: 'openid',
 					grant_type: 'refresh_token'
-				})
-				.type('form')
-				.expect(200)
-				.expect(() => {
-					expect(consumeSpy.calledOnce).to.be.true;
-					expect(issueSpy.calledTwice).to.be.true;
-					expect(consumeSpy.firstCall.args[0]).to.have.property(
-						'scope',
-						'openid email offline_access'
-					);
-					expect(issueSpy.firstCall.args[0]).to.have.property(
-						'scope',
-						'openid email offline_access'
-					);
-					expect(issueSpy.secondCall.args[0]).to.have.property(
-						'scope',
-						'openid'
-					);
-				});
-		});
-
-		it('revokes the complete grant if the old token is used again', function () {
-			const { rt } = this;
-
-			const grantRevokeSpy = sinon.spy();
-			const tokenDestroySpy = sinon.spy();
-			this.provider.on('grant.revoked', grantRevokeSpy);
-			this.provider.on('refresh_token.destroyed', tokenDestroySpy);
-
-			return assert.rejects(
-				Promise.all([
-					this.agent
-						.post(route)
-						.auth('client', 'secret')
-						.send({
-							refresh_token: rt,
-							grant_type: 'refresh_token'
-						})
-						.type('form')
-						.expect(200), // one of them will fail.
-					this.agent
-						.post(route)
-						.auth('client', 'secret')
-						.send({
-							refresh_token: rt,
-							grant_type: 'refresh_token'
-						})
-						.type('form')
-						.expect(200) // one of them will fail.
-				]),
-				() => {
-					expect(grantRevokeSpy.calledOnce).to.be.true;
-					expect(tokenDestroySpy.calledOnce).to.be.true;
-					return true;
+				},
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 				}
 			);
+			expect(status).toBe(200);
+			expect(consumeSpy).toBeCalledTimes(1);
+			expect(issueSpy).toBeCalledTimes(2);
+			expect(consumeSpy.mock.calls[0][0]).toHaveProperty(
+				'scope',
+				'openid email offline_access'
+			);
+			expect(issueSpy.mock.calls[0][0]).toHaveProperty(
+				'scope',
+				'openid email offline_access'
+			);
+			expect(issueSpy.mock.calls[1][0]).toHaveProperty('scope', 'openid');
+		});
+
+		it('revokes the complete grant if the old token is used again', async function () {
+			const grantRevokeSpy = mock();
+			const tokenDestroySpy = mock();
+			provider.on('grant.revoked', grantRevokeSpy);
+			provider.on('refresh_token.destroyed', tokenDestroySpy);
+
+			await agent.token.post(
+				{
+					refresh_token: rt,
+					grant_type: 'refresh_token'
+				},
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+
+			const { error } = await agent.token.post(
+				{
+					refresh_token: rt,
+					grant_type: 'refresh_token'
+				},
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+			expect(error.status).toBe(400);
+			expect(grantRevokeSpy).toBeCalledTimes(1);
+			expect(tokenDestroySpy).toBeCalledTimes(1);
 		});
 	});
 
 	describe('rotateRefreshToken is a function (returns true)', () => {
 		beforeEach(function () {
-			i(this.provider).configuration.rotateRefreshToken = sinon
-				.mock()
-				.returns(true);
+			const conf = i(provider).configuration;
+			spyOn(conf, 'rotateRefreshToken').mockReturnValue(true);
 		});
 
-		afterEach(function () {
-			const spy = i(this.provider).configuration.rotateRefreshToken;
-			i(this.provider).configuration.rotateRefreshToken = false;
-			expect(spy.calledOnce).to.be.true;
-		});
+		it('populates ctx.oidc.entities', async function () {
+			const spy = spyOn(OIDCContext.prototype, 'entity');
 
-		it('populates ctx.oidc.entities', function (done) {
-			this.assertOnce((ctx) => {
-				expect(ctx.oidc.entities).to.have.keys(
-					'Account',
-					'Grant',
-					'Client',
-					'AccessToken',
-					'RotatedRefreshToken',
-					'RefreshToken'
-				);
-				expect(ctx.oidc.entities.RotatedRefreshToken).not.to.eql(
-					ctx.oidc.entities.RefreshToken
-				);
-				expect(ctx.oidc.entities.RotatedRefreshToken).to.have.property(
-					'gty',
-					'authorization_code'
-				);
-				expect(ctx.oidc.entities.RefreshToken).to.have.property(
-					'gty',
-					'authorization_code refresh_token'
-				);
-				expect(ctx.oidc.entities.AccessToken).to.have.property(
-					'gty',
-					'authorization_code refresh_token'
-				);
-			}, done);
-
-			this.agent
-				.post(route)
-				.auth('client', 'secret')
-				.send({
-					refresh_token: this.rt,
-					grant_type: 'refresh_token'
-				})
-				.type('form')
-				.end(() => {});
-		});
-
-		it('issues a new refresh token and consumes the old one', function () {
-			const { rt } = this;
-			const consumeSpy = sinon.spy();
-			const issueSpy = sinon.spy();
-			this.provider.on('refresh_token.consumed', consumeSpy);
-			this.provider.on('refresh_token.saved', issueSpy);
-
-			return this.agent
-				.post(route)
-				.auth('client', 'secret')
-				.send({
+			await agent.token.post(
+				{
 					refresh_token: rt,
 					grant_type: 'refresh_token'
-				})
-				.type('form')
-				.expect(200)
-				.expect(() => {
-					expect(consumeSpy.calledOnce).to.be.true;
-					expect(issueSpy.called).to.be.true;
-				})
-				.expect((response) => {
-					expect(response.body).to.have.keys(
-						'access_token',
-						'id_token',
-						'expires_in',
-						'token_type',
-						'refresh_token',
-						'scope'
-					);
-					const refreshIdToken = JSON.parse(
-						base64url.decode(response.body.id_token.split('.')[1])
-					);
-					expect(refreshIdToken).to.have.property('nonce', 'foobarnonce');
-					expect(response.body).to.have.property('refresh_token').not.equal(rt);
-				});
+				},
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+			const entities = spy.mock.calls.map((call) => call[0]);
+			expect([
+				'Account',
+				'Grant',
+				'Client',
+				'AccessToken',
+				'RotatedRefreshToken',
+				'RefreshToken'
+			]).toEqual(expect.arrayContaining(entities));
+			const rotatedRefreshToken = spy.mock.calls.find(
+				(call) => call[0] === 'RotatedRefreshToken'
+			);
+			expect(rotatedRefreshToken[1]).toHaveProperty(
+				'gty',
+				'authorization_code'
+			);
+			const refreshToken = spy.mock.calls.findLast(
+				(call) => call[0] === 'RefreshToken'
+			);
+			expect(refreshToken[1]).not.toEqual(rotatedRefreshToken[1]);
+			expect(refreshToken[1]).toHaveProperty(
+				'gty',
+				'authorization_code refresh_token'
+			);
+			const accessToken = spy.mock.calls.find(
+				(call) => call[0] === 'AccessToken'
+			);
+			expect(accessToken[1]).toHaveProperty(
+				'gty',
+				'authorization_code refresh_token'
+			);
 		});
 
-		it('the new refresh token has identical scope to the old one', function () {
-			const { rt } = this;
-			const consumeSpy = sinon.spy();
-			const issueSpy = sinon.spy();
-			this.provider.on('refresh_token.consumed', consumeSpy);
-			this.provider.on('refresh_token.saved', issueSpy);
+		it('issues a new refresh token and consumes the old one', async function () {
+			const consumeSpy = mock();
+			const issueSpy = mock();
+			provider.on('refresh_token.consumed', consumeSpy);
+			provider.on('refresh_token.saved', issueSpy);
 
-			return this.agent
-				.post(route)
-				.auth('client', 'secret')
-				.send({
+			const { data, status } = await agent.token.post(
+				{
 					refresh_token: rt,
 					grant_type: 'refresh_token'
-				})
-				.type('form')
-				.expect(200)
-				.expect(() => {
-					expect(consumeSpy.calledOnce).to.be.true;
-					expect(issueSpy.called).to.be.true;
-					expect(consumeSpy.firstCall.args[0]).to.have.property(
-						'scope',
-						'openid email offline_access'
-					);
-					expect(issueSpy.firstCall.args[0]).to.have.property(
-						'scope',
-						'openid email offline_access'
-					);
-				});
+				},
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+			expect(status).toBe(200);
+			expect(consumeSpy).toBeCalledTimes(1);
+			expect(issueSpy).toBeCalled();
+			expect(data).toContainKeys([
+				'access_token',
+				'id_token',
+				'expires_in',
+				'token_type',
+				'refresh_token',
+				'scope'
+			]);
+			const refreshIdToken = JSON.parse(
+				base64url.decode(data.id_token.split('.')[1])
+			);
+			expect(refreshIdToken).toHaveProperty('nonce', 'foobarnonce');
+			expect(data.refresh_token).toBeString();
+			expect(data.refresh_token).not.toEqual(rt);
 		});
 
-		it('the new refresh token has identical scope to the old one even if the access token is requested with less scopes', function () {
-			const { rt } = this;
-			const consumeSpy = sinon.spy();
-			const issueSpy = sinon.spy();
-			this.provider.on('refresh_token.consumed', consumeSpy);
-			this.provider.on('refresh_token.saved', issueSpy);
-			this.provider.on('access_token.saved', issueSpy);
-			this.provider.on('access_token.issued', issueSpy);
+		it('the new refresh token has identical scope to the old one', async function () {
+			const consumeSpy = mock();
+			const issueSpy = mock();
+			provider.on('refresh_token.consumed', consumeSpy);
+			provider.on('refresh_token.saved', issueSpy);
 
-			return this.agent
-				.post(route)
-				.auth('client', 'secret')
-				.send({
+			const { status } = await agent.token.post(
+				{
+					refresh_token: rt,
+					grant_type: 'refresh_token'
+				},
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+			expect(status).toBe(200);
+			expect(consumeSpy).toBeCalledTimes(1);
+			expect(issueSpy).toBeCalled();
+			expect(consumeSpy.mock.calls[0][0]).toHaveProperty(
+				'scope',
+				'openid email offline_access'
+			);
+			expect(issueSpy.mock.calls[0][0]).toHaveProperty(
+				'scope',
+				'openid email offline_access'
+			);
+		});
+
+		it('the new refresh token has identical scope to the old one even if the access token is requested with less scopes', async function () {
+			const consumeSpy = mock();
+			const issueSpy = mock();
+			provider.on('refresh_token.consumed', consumeSpy);
+			provider.on('refresh_token.saved', issueSpy);
+			provider.on('access_token.saved', issueSpy);
+			provider.on('access_token.issued', issueSpy);
+
+			const { status } = await agent.token.post(
+				{
 					refresh_token: rt,
 					scope: 'openid',
 					grant_type: 'refresh_token'
-				})
-				.type('form')
-				.expect(200)
-				.expect(() => {
-					expect(consumeSpy.calledOnce).to.be.true;
-					expect(issueSpy.calledTwice).to.be.true;
-					expect(consumeSpy.firstCall.args[0]).to.have.property(
-						'scope',
-						'openid email offline_access'
-					);
-					expect(issueSpy.firstCall.args[0]).to.have.property(
-						'scope',
-						'openid email offline_access'
-					);
-					expect(issueSpy.secondCall.args[0]).to.have.property(
-						'scope',
-						'openid'
-					);
-				});
-		});
-
-		it('revokes the complete grant if the old token is used again', function () {
-			const { rt } = this;
-
-			const grantRevokeSpy = sinon.spy();
-			const tokenDestroySpy = sinon.spy();
-			this.provider.on('grant.revoked', grantRevokeSpy);
-			this.provider.on('refresh_token.destroyed', tokenDestroySpy);
-
-			return assert.rejects(
-				Promise.all([
-					this.agent
-						.post(route)
-						.auth('client', 'secret')
-						.send({
-							refresh_token: rt,
-							grant_type: 'refresh_token'
-						})
-						.type('form')
-						.expect(200), // one of them will fail.
-					this.agent
-						.post(route)
-						.auth('client', 'secret')
-						.send({
-							refresh_token: rt,
-							grant_type: 'refresh_token'
-						})
-						.type('form')
-						.expect(200) // one of them will fail.
-				]),
-				() => {
-					expect(grantRevokeSpy.calledOnce).to.be.true;
-					expect(tokenDestroySpy.calledOnce).to.be.true;
-					return true;
+				},
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 				}
 			);
+			expect(status).toBe(200);
+			expect(consumeSpy).toBeCalledTimes(1);
+			expect(issueSpy).toBeCalledTimes(2);
+			expect(consumeSpy.mock.calls[0][0]).toHaveProperty(
+				'scope',
+				'openid email offline_access'
+			);
+			expect(issueSpy.mock.calls[0][0]).toHaveProperty(
+				'scope',
+				'openid email offline_access'
+			);
+			expect(issueSpy.mock.calls[1][0]).toHaveProperty('scope', 'openid');
+		});
+
+		it('revokes the complete grant if the old token is used again', async function () {
+			const grantRevokeSpy = mock();
+			const tokenDestroySpy = mock();
+			provider.on('grant.revoked', grantRevokeSpy);
+			provider.on('refresh_token.destroyed', tokenDestroySpy);
+
+			await agent.token.post(
+				{
+					refresh_token: rt,
+					grant_type: 'refresh_token'
+				},
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+
+			const { error } = await agent.token.post(
+				{
+					refresh_token: rt,
+					grant_type: 'refresh_token'
+				},
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+			expect(error.status).toBe(400);
+			expect(grantRevokeSpy).toBeCalledTimes(1);
+			expect(tokenDestroySpy).toBeCalledTimes(1);
 		});
 	});
 
 	describe('rotateRefreshToken is a function (returns false)', () => {
 		beforeEach(function () {
-			i(this.provider).configuration.rotateRefreshToken = sinon
-				.mock()
-				.returns(false);
+			const conf = i(provider).configuration;
+			spyOn(conf, 'rotateRefreshToken').mockReturnValue(false);
 		});
 
-		afterEach(function () {
-			const spy = i(this.provider).configuration.rotateRefreshToken;
-			i(this.provider).configuration.rotateRefreshToken = false;
-			expect(spy.calledOnce).to.be.true;
-		});
+		it('does not rotate', async function () {
+			const spy = spyOn(OIDCContext.prototype, 'entity');
 
-		it('does not rotate', function (done) {
-			this.assertOnce((ctx) => {
-				expect(ctx.oidc.entities).to.have.keys(
-					'Account',
-					'Grant',
-					'Client',
-					'AccessToken',
-					'RefreshToken'
-				);
-				expect(ctx.oidc.entities.RefreshToken).to.have.property(
-					'gty',
-					'authorization_code'
-				);
-				expect(ctx.oidc.entities.AccessToken).to.have.property(
-					'gty',
-					'authorization_code refresh_token'
-				);
-			}, done);
-
-			this.agent
-				.post(route)
-				.auth('client', 'secret')
-				.send({
-					refresh_token: this.rt,
+			const { data, status } = await agent.token.post(
+				{
+					refresh_token: rt,
 					grant_type: 'refresh_token'
-				})
-				.type('form')
-				.expect(200)
-				.expect(({ body }) => {
-					expect(body).to.have.keys(
-						'access_token',
-						'id_token',
-						'expires_in',
-						'token_type',
-						'refresh_token',
-						'scope'
-					);
-					const refreshIdToken = JSON.parse(
-						base64url.decode(body.id_token.split('.')[1])
-					);
-					expect(refreshIdToken).to.have.property('nonce', 'foobarnonce');
-					expect(body).to.have.property('refresh_token').that.is.a('string');
-				})
-				.end(() => {});
+				},
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+			expect(status).toBe(200);
+			expect(data).toContainKeys([
+				'access_token',
+				'id_token',
+				'expires_in',
+				'token_type',
+				'refresh_token',
+				'scope'
+			]);
+			const refreshIdToken = JSON.parse(
+				base64url.decode(data.id_token.split('.')[1])
+			);
+			expect(refreshIdToken).toHaveProperty('nonce', 'foobarnonce');
+			expect(data.refresh_token).toEqual(rt);
+
+			const entities = spy.mock.calls.map((call) => call[0]);
+			expect([
+				'Account',
+				'Grant',
+				'Client',
+				'AccessToken',
+				'RefreshToken'
+			]).toEqual(expect.arrayContaining(entities));
+			const refreshToken = spy.mock.calls.find(
+				(call) => call[0] === 'RefreshToken'
+			);
+			expect(refreshToken[1]).toHaveProperty('gty', 'authorization_code');
+			const accessToken = spy.mock.calls.find(
+				(call) => call[0] === 'AccessToken'
+			);
+			expect(accessToken[1]).toHaveProperty(
+				'gty',
+				'authorization_code refresh_token'
+			);
 		});
 	});
 });

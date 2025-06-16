@@ -209,7 +209,6 @@ export const authPost = new Elysia()
 export const par = new Elysia()
 	.derive(contentType('application/x-www-form-urlencoded'))
 	.guard({
-		query: t.Object({}),
 		body: t.Composite([
 			t.Omit(AuthorizationParameters, ['request_uri', 'client_id']),
 			t.Object({
@@ -243,7 +242,7 @@ export const par = new Elysia()
 			const { params: authParams, middleware: tokenAuth } =
 				getTokenAuth(provider);
 			for (const middleware of tokenAuth) {
-				await middleware(ctx, () => {});
+				await middleware(ctx);
 			}
 
 			stripOutsideJarParams;
