@@ -16,6 +16,7 @@ import als from './als.ts';
 import instance from './weak_cache.ts';
 import query from 'lib/response_modes/query.js';
 import { formPost } from 'lib/html/formPost.js';
+import jwt from 'lib/response_modes/jwt.js';
 
 const discoveryRoute = '/.well-known/openid-configuration';
 
@@ -24,6 +25,14 @@ export default function initializeApp() {
 
 	this.registerResponseMode('query', query);
 	this.registerResponseMode('form_post', formPost);
+
+	if (features.jwtResponseModes.enabled) {
+		this.registerResponseMode('jwt', jwt);
+
+		['query', 'form_post'].forEach((mode) => {
+			this.registerResponseMode(`${mode}.jwt`, jwt);
+		});
+	}
 
 	Object.entries(grants).forEach(([grantType, { handler, parameters }]) => {
 		const { grantTypeHandlers } = instance(this);
@@ -128,20 +137,12 @@ export default function initializeApp() {
 
 	const { routes } = configuration;
 
-	if (features.webMessageResponseMode.enabled) {
-		this.registerResponseMode('web_message', responseModes.webMessage);
-	}
-
 	if (features.jwtResponseModes.enabled) {
 		this.registerResponseMode('jwt', responseModes.jwt);
 
 		['query', 'form_post'].forEach((mode) => {
 			this.registerResponseMode(`${mode}.jwt`, responseModes.jwt);
 		});
-
-		if (features.webMessageResponseMode.enabled) {
-			this.registerResponseMode('web_message.jwt', responseModes.jwt);
-		}
 	}
 
 	const authorization = getAuthorization(this, 'authorization');

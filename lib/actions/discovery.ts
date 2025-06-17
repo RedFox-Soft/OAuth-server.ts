@@ -131,20 +131,7 @@ export const discovery = new Elysia().get(
 			}
 		}
 
-		if (features.webMessageResponseMode.enabled) {
-			body.response_modes_supported.push('web_message');
-		}
-
 		if (features.jwtResponseModes.enabled) {
-			body.response_modes_supported.push('jwt');
-
-			body.response_modes_supported.push('query.jwt');
-			body.response_modes_supported.push('form_post.jwt');
-
-			if (features.webMessageResponseMode.enabled) {
-				body.response_modes_supported.push('web_message.jwt');
-			}
-
 			body.authorization_signing_alg_values_supported =
 				configuration.authorizationSigningAlgValues;
 

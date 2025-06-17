@@ -1,15 +1,13 @@
 import query from './query.ts';
 import { formPost } from '../html/formPost.js';
-import web_message from './web_message.ts';
 import { provider } from 'lib/provider.js';
 
 const modes = {
 	query,
-	form_post: formPost,
-	web_message
+	form_post: formPost
 };
 
-const RENDER_MODES = new Set(['form_post', 'web_message']);
+const RENDER_MODES = new Set(['form_post']);
 
 export default async function jwtResponseModes(ctx, redirectUri, payload) {
 	const { params } = ctx.oidc;

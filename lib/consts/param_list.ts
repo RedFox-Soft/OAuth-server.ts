@@ -41,7 +41,6 @@ export const AuthorizationParameters = t.Object({
 	acr_values: t.Optional(t.String()),
 
 	// added conditionally depending on feature flag which will be checked in the code
-	web_message_uri: t.Optional(t.String()),
 	claims: t.Optional(
 		t.ObjectString(
 			{
@@ -65,7 +64,6 @@ export const AuthorizationParameters = t.Object({
 });
 
 export const DeviceAuthorizationParameters = t.Omit(AuthorizationParameters, [
-	'web_message_uri',
 	'response_type',
 	'response_mode',
 	'code_challenge_method',

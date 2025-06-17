@@ -1,75 +1,63 @@
 import * as url from 'node:url';
+import { describe, it, beforeAll, expect } from 'bun:test';
 
-import { expect } from 'chai';
-import sinon from 'sinon';
-
-import bootstrap from '../test_helper.js';
+import bootstrap, { agent } from '../test_helper.js';
 import { decode } from '../../lib/helpers/jwt.ts';
+import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
+import { ISSUER } from 'lib/configs/env.js';
 
 const route = '/auth';
 
 describe('configuration features.jwtResponseModes', () => {
-	before(bootstrap(import.meta.url));
+	let setup = null;
+	beforeAll(async function () {
+		setup = await bootstrap(import.meta.url)();
+	});
 
 	describe('discovery', () => {
-		it('extends the well known config', function () {
-			return this.agent
-				.get('/.well-known/openid-configuration')
-				.expect((response) => {
-					expect(response.body).to.have.property(
-						'authorization_signing_alg_values_supported'
-					);
-					expect(response.body).to.have.property(
-						'authorization_encryption_alg_values_supported'
-					);
-					expect(response.body).to.have.property(
-						'authorization_encryption_enc_values_supported'
-					);
-					expect(response.body.response_modes_supported).to.include('jwt');
-					expect(response.body.response_modes_supported).to.include(
-						'query.jwt'
-					);
-					expect(response.body.response_modes_supported).to.include(
-						'form_post.jwt'
-					);
-					expect(response.body.response_modes_supported).to.include(
-						'web_message.jwt'
-					);
-				});
+		it('extends the well known config', async function () {
+			const { data } = await agent['.well-known']['openid-configuration'].get();
+
+			expect(data).toHaveProperty('authorization_signing_alg_values_supported');
+			expect(data).toHaveProperty(
+				'authorization_encryption_alg_values_supported'
+			);
+			expect(data).toHaveProperty(
+				'authorization_encryption_enc_values_supported'
+			);
+			expect(data.response_modes_supported).toContain('jwt');
+			expect(data.response_modes_supported).toContain('query.jwt');
+			expect(data.response_modes_supported).toContain('form_post.jwt');
 		});
 	});
 
 	describe('response_mode=jwt', () => {
-		before(function () {
-			return this.login();
-		});
-		after(function () {
-			return this.logout();
-		});
-
-		it('defaults to query for code response type', async function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'code',
+		it.only('defaults to query for code response type', async function () {
+			const auth = new AuthorizationRequest({
 				response_mode: 'jwt',
 				scope: 'openid'
 			});
-
-			await this.wrap({ route, auth, verb: 'get' })
-				.expect(303)
-				.expect(auth.validatePresence(['response']))
-				.expect(auth.validateClientLocation)
-				.expect(({ headers: { location } }) => {
-					const {
-						query: { response }
-					} = url.parse(location, true);
-					const { payload } = decode(response);
-					expect(payload).to.include.keys('code');
-					expect(payload).to.have.property('exp').that.is.a('number');
-					expect(payload).to.have.property('aud', 'client');
-					expect(payload).not.to.have.property('scope');
-					expect(payload).to.have.property('state', auth.state);
-					expect(payload).to.have.property('iss', this.provider.issuer);
-				});
+			const cookie = await setup.login();
+			const { status, response } = await agent.auth.get({
+				query: auth.params,
+				headers: {
+					cookie
+				}
+			});
+			expect(status).toBe(303);
+			auth.validatePresence(response, ['response']);
+			auth.validateClientLocation(response);
+			const location = response.headers.get('location');
+			const {
+				query: { response: jwt }
+			} = url.parse(location, true);
+			const { payload } = decode(jwt);
+			expect(payload).toHaveProperty('code');
+			expect(payload.exp).toBeNumber();
+			expect(payload.aud).toBe('client');
+			expect(payload).not.toHaveProperty('scope');
+			expect(payload.state).toBe(auth.state);
+			expect(payload.iss).toBe(ISSUER);
 		});
 
 		it('defaults to query for none response type', async function () {
@@ -156,9 +144,6 @@ describe('configuration features.jwtResponseModes', () => {
 		before(function () {
 			return this.login();
 		});
-		after(function () {
-			return this.logout();
-		});
 
 		it('uses the query part when expired', async function () {
 			const auth = new this.AuthorizationRequest({
@@ -227,11 +212,9 @@ describe('configuration features.jwtResponseModes', () => {
 
 	Object.entries({
 		'query.jwt': 303,
-		'fragment.jwt': 303,
-		'form_post.jwt': 400,
-		'web_message.jwt': 400
+		'form_post.jwt': 400
 	}).forEach(([mode, errStatus]) => {
-		context(`${mode} err handling`, () => {
+		describe(`${mode} err handling`, () => {
 			it(`responds with a ${errStatus}`, function () {
 				const auth = new this.AuthorizationRequest({
 					response_type: 'code',

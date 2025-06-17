@@ -86,7 +86,7 @@ class ProviderClass extends EventEmitter {
 		inititalizeKeyStore.call(this, configuration.jwks);
 		delete configuration.jwks;
 
-		this.elysia = initializeApp.call(this);
+		initializeApp.call(this);
 
 		initializeClients.call(this, configuration.clients);
 		delete configuration.clients;

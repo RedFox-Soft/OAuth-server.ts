@@ -6,7 +6,6 @@ const config = getConfig();
 
 merge(config.features, {
 	encryption: { enabled: true },
-	webMessageResponseMode: { enabled: true },
 	jwtResponseModes: { enabled: true }
 });
 

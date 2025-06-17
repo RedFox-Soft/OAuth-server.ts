@@ -18,8 +18,14 @@ const discovery = {
 };
 
 export function calculateDiscovery() {
-	discovery.require_pushed_authorization_requests =
+	const copy = { ...discovery };
+	copy.require_pushed_authorization_requests =
 		ClientDefaults['authorization.requirePushedAuthorizationRequests'];
-	discovery.request_uri_parameter_supported = ApplicationConfig['par.enabled'];
-	return discovery;
+	copy.request_uri_parameter_supported = ApplicationConfig['par.enabled'];
+
+	if (ApplicationConfig['responseMode.jwt.enabled']) {
+		copy.response_modes_supported.push('jwt', 'query.jwt', 'form_post.jwt');
+	}
+
+	return copy;
 }

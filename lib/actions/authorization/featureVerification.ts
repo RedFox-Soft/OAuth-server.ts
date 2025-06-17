@@ -9,7 +9,6 @@ export function featureVerification(params: Record<string, unknown>) {
 			dPoP,
 			resourceIndicators,
 			richAuthorizationRequests,
-			webMessageResponseMode,
 			requestObjects
 		}
 	} = globalConfiguration;
@@ -18,21 +17,7 @@ export function featureVerification(params: Record<string, unknown>) {
 		delete params.claims;
 	}
 
-	const isWebMessageResponseMode =
-		typeof params.response_mode === 'string' &&
-		params.response_mode.includes('web_message');
-	if (
-		(params.web_message_uri !== undefined || isWebMessageResponseMode) &&
-		!webMessageResponseMode.enabled
-	) {
-		const error = new NotSupportedError(
-			'Web Message Response Mode is not supported'
-		);
-		if (isWebMessageResponseMode) {
-			error.allow_redirect = false;
-		}
-		throw error;
-	} else if (params.claims !== undefined && !claimsParameter.enabled) {
+	if (params.claims !== undefined && !claimsParameter.enabled) {
 		throw new NotSupportedError('Claims Parameter is not supported');
 	} else if (params.resource !== undefined && !resourceIndicators.enabled) {
 		throw new NotSupportedError('Resource Indicators is not supported');

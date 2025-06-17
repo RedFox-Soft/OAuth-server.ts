@@ -28,10 +28,6 @@ export const EXPERIMENTS = new Map(
 			name: 'OAuth 2.0 Rich Authorization Requests',
 			version: ['experimental-01']
 		},
-		webMessageResponseMode: {
-			name: 'OAuth 2.0 Web Message Response Mode - draft 01',
-			version: ['individual-draft-01']
-		},
 		externalSigningSupport: {
 			name: 'External Signing Key Support',
 			version: ['experimental-01']

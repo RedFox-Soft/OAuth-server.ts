@@ -24,7 +24,16 @@ export const ApplicationConfig = {
 	 *   - opaque access tokens
 	 *   - refresh tokens
 	 */
-	'introspection.enabled': false
+	'introspection.enabled': false,
+
+	/*
+	 * features.jwtResponseModes
+	 *
+	 * title: [JWT Secured Authorization Response Mode (`JARM`)](https://openid.net/specs/oauth-v2-jarm-final.html)
+	 *
+	 * description: Enables JWT Secured Authorization Responses
+	 */
+	'responseMode.jwt.enabled': false
 };
 
 export type ApplicationConfigType = typeof ApplicationConfig;

@@ -878,51 +878,6 @@ export const globalConfiguration = {
 	 *   acknowledge an experimental feature version (this will remove the warning) and ensure
 	 *   the Provider configuration will throw an error if a new version of oidc-provider includes
 	 *   breaking changes to this experimental feature.
-	 *
-	 * example: Acknowledging an experimental feature
-	 *
-	 * ```js
-	 * import * as oidc from 'oidc-provider'
-	 *
-	 * new oidc.Provider('http://localhost:3000', {
-	 *   features: {
-	 *     webMessageResponseMode: {
-	 *       enabled: true,
-	 *     },
-	 *   },
-	 * });
-	 *
-	 * // The above code produces this NOTICE
-	 * // NOTICE: The following experimental features are enabled and their implemented version not acknowledged
-	 * // NOTICE:   - OAuth 2.0 Web Message Response Mode - draft 01 (Acknowledging this feature's implemented version can be done with the value 'individual-draft-01')
-	 * // NOTICE: Breaking changes between experimental feature updates may occur and these will be published as MINOR semver oidc-provider updates.
-	 * // NOTICE: You may disable this notice and be warned when breaking updates occur by acknowledging the current experiment's version. See the documentation for more details.
-	 *
-	 * new oidc.Provider('http://localhost:3000', {
-	 *   features: {
-	 *     webMessageResponseMode: {
-	 *       enabled: true,
-	 *       ack: 'individual-draft-01',
-	 *     },
-	 *   },
-	 * });
-	 * // No more NOTICE, at this point if the experimental was updated and contained no breaking
-	 * // changes, you're good to go, still no NOTICE, your code is safe to run.
-	 *
-	 * // Now lets assume you upgrade oidc-provider version and it includes a breaking change in
-	 * // this experimental feature
-	 * new oidc.Provider('http://localhost:3000', {
-	 *   features: {
-	 *     webMessageResponseMode: {
-	 *       enabled: true,
-	 *       ack: 'individual-draft-01',
-	 *     },
-	 *   },
-	 * });
-	 * // Thrown:
-	 * // Error: An unacknowledged version of an experimental feature is included in this oidc-provider version.
-	 * ```
-	 * @nodefault
 	 */
 	features: {
 		/*
@@ -1870,22 +1825,6 @@ export const globalConfiguration = {
 		 * enables the relevant client metadata for setting up signing and/or encryption.
 		 */
 		jwtUserinfo: { enabled: false },
-
-		/*
-		 * features.webMessageResponseMode
-		 *
-		 * title: [draft-sakimura-oauth-wmrm-01](https://tools.ietf.org/html/draft-sakimura-oauth-wmrm-01) - OAuth 2.0 Web Message Response Mode
-		 *
-		 * description: Enables `web_message` response mode. Only Simple Mode is supported. Requests containing
-		 * the Relay Mode parameters will be rejected. This is an experimental feature.
-		 *
-		 * recommendation: Although a general advise to use a `helmet` (e.g. for [express](https://www.npmjs.com/package/helmet),
-		 * [koa](https://www.npmjs.com/package/koa-helmet)) it is especially advised for your interaction
-		 * views routes if Web Message Response Mode is enabled in your deployment. You will have to experiment
-		 * with removal of the Cross-Origin-Embedder-Policy and Cross-Origin-Opener-Policy headers at various
-		 * endpoints throughout the authorization request end-user journey to finalize this feature.
-		 */
-		webMessageResponseMode: { enabled: false, ack: undefined },
 
 		/*
 		 * features.externalSigningSupport

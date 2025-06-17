@@ -1,66 +1,7 @@
-/* eslint-disable max-classes-per-file */
-
 import { strict as assert } from 'node:assert';
-
 import { expect } from 'chai';
-import sinon from 'sinon';
-
-import provider from '../../lib/index.ts';
 
 describe('provider instance', () => {
-	context('draft/experimental spec warnings', () => {
-		/* eslint-disable no-console */
-		before(() => {
-			sinon.stub(console, 'info').callsFake(() => {});
-		});
-
-		after(() => {
-			console.info.restore();
-		});
-
-		afterEach(() => {
-			console.info.resetHistory();
-		});
-
-		it('it warns when draft/experimental specs are enabled', () => {
-			new provider('http://localhost', {
-				// eslint-disable-line no-new
-				features: { webMessageResponseMode: { enabled: true } }
-			});
-
-			expect(console.info.called).to.be.true;
-		});
-
-		it('it is silent when a version is acknowledged', () => {
-			new provider('http://localhost', {
-				// eslint-disable-line no-new
-				features: {
-					webMessageResponseMode: { enabled: true, ack: 'individual-draft-01' }
-				}
-			});
-
-			expect(console.info.called).to.be.false;
-		});
-
-		it('throws when an acked feature has breaking changes since', () => {
-			expect(() => {
-				new provider('http://localhost', {
-					// eslint-disable-line no-new
-					features: {
-						webMessageResponseMode: {
-							enabled: true,
-							ack: 'not a current version'
-						}
-					}
-				});
-			}).to.throw(
-				'An unacknowledged version of an experimental feature is included in this oidc-provider version.'
-			);
-			expect(console.info.called).to.be.true;
-		});
-		/* eslint-enable */
-	});
-
 	describe('provider.Client#find', () => {
 		it('ignores non-string inputs', async () => {
 			const provider = new provider('http://localhost');

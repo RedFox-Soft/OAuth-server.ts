@@ -751,16 +751,6 @@ describe('Client metadata validation', () => {
 			features: { jwtResponseModes: { enabled: true } }
 		});
 
-		allows(this.title, ['web_message'], undefined, {
-			features: { webMessageResponseMode: { enabled: true } }
-		});
-		allows(this.title, ['web_message.jwt'], undefined, {
-			features: {
-				webMessageResponseMode: { enabled: true },
-				jwtResponseModes: { enabled: true }
-			}
-		});
-
 		rejects(this.title, [123], /must only contain strings$/);
 		rejects(this.title, [], /must contain members$/);
 		rejects(this.title, ['not-a-mode']);

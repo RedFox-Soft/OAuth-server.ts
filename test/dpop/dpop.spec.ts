@@ -21,7 +21,7 @@ import {
 
 import nanoid from '../../lib/helpers/nanoid.ts';
 import epochTime from '../../lib/helpers/epoch_time.ts';
-import bootstrap, { agent, skipConsent } from '../test_helper.js';
+import bootstrap, { agent } from '../test_helper.js';
 import * as base64url from '../../lib/helpers/base64url.ts';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { provider } from 'lib/provider.js';
