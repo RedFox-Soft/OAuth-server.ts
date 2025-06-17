@@ -1,90 +1,75 @@
 import instance from './weak_cache.ts';
-import pick from './_/pick.ts';
-import merge from './_/merge.ts';
-import isPlainObject from './_/is_plain_object.ts';
+import { pick, isPlainObject, merge } from './_/object.js';
+import { provider } from 'lib/provider.js';
+import { type Client } from 'lib/models/client.js';
 
-export default function getClaims(provider) {
-	const {
-		claims: claimConfig,
-		claimsSupported,
-		pairwiseIdentifier
-	} = instance(provider).configuration;
+type ClaimsData = Record<string, unknown> & {
+	_claim_names?: Record<string, string>;
+	_claim_sources?: Record<string, unknown>;
+};
 
-	return class Claims {
-		constructor(
-			available,
-			{ ctx, client = ctx ? ctx.oidc.client : undefined }
-		) {
-			if (!isPlainObject(available)) {
-				throw new TypeError(
-					'expected claims to be an object, are you sure claims() method resolves with or returns one?'
-				);
+export class Claims {
+	client: Client;
+	available: ClaimsData = {};
+	filter: Record<string, unknown> = {};
+
+	constructor(client: Client, available: ClaimsData) {
+		this.available = available;
+		this.client = client;
+	}
+
+	scope(value = '') {
+		if (Object.keys(this.filter).length) {
+			throw new Error('scope cannot be assigned after mask has been set');
+		}
+		const { claims: claimConfig } = instance(provider).configuration;
+		value.split(' ').forEach((scope) => {
+			this.mask(claimConfig[scope]);
+		});
+		return this;
+	}
+
+	mask(value: Record<string, unknown>) {
+		merge(this.filter, value);
+	}
+
+	rejected(value = []) {
+		value.forEach((claim) => {
+			delete this.filter[claim];
+		});
+	}
+
+	async result() {
+		const { available } = this;
+		const { claimsSupported, pairwiseIdentifier } =
+			instance(provider).configuration;
+		const include = Object.entries(this.filter)
+			.filter(
+				([key, value]) =>
+					(value === null || isPlainObject(value)) && claimsSupported.has(key)
+			)
+			.map(([key, value]) => key);
+
+		const claims = pick(available, ...include);
+
+		if (available._claim_names && available._claim_sources) {
+			const names = pick(available._claim_names, ...include);
+			claims._claim_names = names;
+			claims._claim_sources = pick(
+				available._claim_sources,
+				...Object.values(names)
+			);
+
+			if (!Object.keys(names).length) {
+				delete claims._claim_names;
+				delete claims._claim_sources;
 			}
-			if (!(client instanceof provider.Client)) {
-				throw new TypeError('second argument must be a Client instance');
-			}
-			this.available = available;
-			this.client = client;
-			this.ctx = ctx;
-			this.filter = {};
 		}
 
-		scope(value = '') {
-			if (Object.keys(this.filter).length) {
-				throw new Error('scope cannot be assigned after mask has been set');
-			}
-			value.split(' ').forEach((scope) => {
-				this.mask(claimConfig[scope]);
-			});
-			return this;
+		if (this.client.subjectType === 'pairwise' && claims.sub) {
+			claims.sub = await pairwiseIdentifier(claims.sub, this.client);
 		}
 
-		mask(value) {
-			merge(this.filter, value);
-		}
-
-		rejected(value = []) {
-			value.forEach((claim) => {
-				delete this.filter[claim];
-			});
-		}
-
-		async result() {
-			const { available } = this;
-			const include = Object.entries(this.filter)
-				.map(([key, value]) => {
-					if (value === null || isPlainObject(value)) {
-						return key;
-					}
-
-					return undefined;
-				})
-				.filter((key) => key && claimsSupported.has(key));
-
-			const claims = pick(available, ...include);
-
-			if (available._claim_names && available._claim_sources) {
-				claims._claim_names = pick(available._claim_names, ...include);
-				claims._claim_sources = pick(
-					available._claim_sources,
-					...Object.values(claims._claim_names)
-				);
-
-				if (!Object.keys(claims._claim_names).length) {
-					delete claims._claim_names;
-					delete claims._claim_sources;
-				}
-			}
-
-			if (this.client.subjectType === 'pairwise' && claims.sub) {
-				claims.sub = await pairwiseIdentifier(
-					this.ctx,
-					claims.sub,
-					this.client
-				);
-			}
-
-			return claims;
-		}
-	};
+		return claims;
+	}
 }

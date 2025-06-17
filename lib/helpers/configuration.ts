@@ -1,9 +1,7 @@
 import { JWA } from '../consts/index.ts';
 
-import isPlainObject from './_/is_plain_object.ts';
 import remove from './_/remove.ts';
-import merge from './_/merge.ts';
-import pick from './_/pick.ts';
+import { isPlainObject, merge, pick } from './_/object.js';
 import set from './_/set.ts';
 import * as formatters from './formatters.ts';
 import getDefaults from './defaults.ts';

@@ -2,14 +2,15 @@ import { format } from 'node:util';
 
 import { generate as tokenHash } from 'oidc-token-hash';
 
-import merge from '../helpers/_/merge.ts';
 import epochTime from '../helpers/epoch_time.ts';
 import * as JWT from '../helpers/jwt.ts';
 import { InvalidClientMetadata } from '../helpers/errors.ts';
 import instance from '../helpers/weak_cache.ts';
-import isPlainObject from '../helpers/_/is_plain_object.ts';
 import { ISSUER } from 'lib/configs/env.js';
 import { provider } from 'lib/provider.js';
+import { type Client } from './client.js';
+import { Claims } from 'lib/helpers/claims.js';
+import { isPlainObject, merge } from 'lib/helpers/_/object.js';
 
 const hashes = ['at_hash', 'c_hash', 's_hash'];
 
@@ -35,6 +36,8 @@ const messages = {
 };
 
 export class IdToken {
+	client: Client;
+
 	constructor(available, { ctx, client = ctx ? ctx.oidc.client : undefined }) {
 		if (!isPlainObject(available)) {
 			throw new TypeError(
@@ -62,10 +65,7 @@ export class IdToken {
 	}
 
 	async payload() {
-		const mask = new provider.Claims(this.available, {
-			ctx: this.ctx,
-			client: this.client
-		});
+		const mask = new Claims(this.client, this.available);
 
 		mask.scope(this.scope);
 		mask.mask(this.mask);

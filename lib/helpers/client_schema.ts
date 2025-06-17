@@ -5,10 +5,8 @@ import { InvalidClientMetadata } from './errors.ts';
 import sectorIdentifier from './sector_identifier.ts';
 import instance from './weak_cache.ts';
 import * as formatters from './formatters.ts';
-import pick from './_/pick.ts';
+import { pick } from './_/object.js';
 import omitBy from './_/omit_by.ts';
-import Application from 'koa';
-import { ApplicationConfig } from 'lib/configs/application.js';
 
 const W3CEmailRegExp =
 	/^[a-zA-Z0-9.!#$%&’*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$/;

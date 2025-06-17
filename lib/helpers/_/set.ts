@@ -1,4 +1,4 @@
-import isPlainObject from './is_plain_object.ts';
+import { isPlainObject } from './object.js';
 
 export default (object, path, value) => {
 	const properties = path.split('.');

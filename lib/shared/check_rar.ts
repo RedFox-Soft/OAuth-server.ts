@@ -1,9 +1,9 @@
+import { isPlainObject } from 'lib/helpers/_/object.js';
 import {
 	InvalidAuthorizationDetails,
 	InvalidRequest
 } from '../helpers/errors.ts';
 import instance from '../helpers/weak_cache.ts';
-import isPlainObject from '../helpers/_/is_plain_object.ts';
 
 export default async function checkRar(ctx) {
 	const { params, client } = ctx.oidc;

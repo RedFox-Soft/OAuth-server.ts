@@ -9,7 +9,6 @@ import initializeAdapter from './helpers/initialize_adapter.ts';
 import initializeApp from './helpers/initialize_app.ts';
 import initializeClients from './helpers/initialize_clients.ts';
 import ResourceServer from './helpers/resource_server.ts';
-import getClaims from './helpers/claims.ts';
 import { OIDCProviderError } from './helpers/errors.ts';
 import * as models from './models/index.ts';
 import DPoPNonces from './helpers/dpop_nonces.ts';
@@ -24,8 +23,6 @@ class ProviderClass extends EventEmitter {
 	#AuthorizationCode;
 
 	#BaseToken;
-
-	#Claims;
 
 	#ClientCredentials;
 
@@ -202,11 +199,6 @@ class ProviderClass extends EventEmitter {
 		if (client.backchannelTokenDeliveryMode === 'ping') {
 			await client.backchannelPing(request);
 		}
-	}
-
-	get Claims() {
-		this.#Claims ||= getClaims(this);
-		return this.#Claims;
 	}
 
 	get BaseToken() {

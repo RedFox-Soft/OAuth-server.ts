@@ -1,8 +1,8 @@
-import isPlainObject from './_/is_plain_object.ts';
 import { InvalidHeaderAuthorization } from './errors.ts';
 import instance from './weak_cache.ts';
 import { routeNames } from '../consts/param_list.ts';
 import { provider } from '../provider.js';
+import { isPlainObject } from './_/object.js';
 
 export class OIDCContext {
 	#requestParamClaims = null;

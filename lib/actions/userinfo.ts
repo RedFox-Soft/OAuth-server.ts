@@ -7,6 +7,7 @@ import epochTime from '../helpers/epoch_time.ts';
 import { InvalidToken, InsufficientScope } from '../helpers/errors.ts';
 import { routeNames } from 'lib/consts/param_list.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
+import { Claims } from 'lib/helpers/claims.js';
 
 export const userinfo = new Elysia()
 	.guard({
@@ -154,9 +155,9 @@ export const userinfo = new Elysia()
 				}
 			});
 		} else {
-			const mask = new ctx.oidc.provider.Claims(
-				await ctx.oidc.account.claims('userinfo', scope, claims, rejected),
-				{ ctx }
+			const mask = new Claims(
+				client,
+				await ctx.oidc.account.claims('userinfo', scope, claims, rejected)
 			);
 
 			mask.scope(scope);

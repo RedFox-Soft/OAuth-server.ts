@@ -282,7 +282,7 @@ async function issueRefreshToken(ctx, client, code) {
 	);
 }
 
-async function pairwiseIdentifier(ctx, accountId, client) {
+async function pairwiseIdentifier(accountId, client) {
 	mustChange(
 		'pairwiseIdentifier',
 		'provide an implementation for pairwise identifiers, the default one uses `os.hostname()` as salt and is therefore not fit for anything else than development'

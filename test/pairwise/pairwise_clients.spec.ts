@@ -7,6 +7,7 @@ import bootstrap, {
 	mock
 } from '../test_helper.js';
 import addClient from '../../lib/helpers/add_client.ts';
+import { Claims } from 'lib/helpers/claims.js';
 
 describe('pairwise features', () => {
 	before(bootstrap(import.meta.url));
@@ -438,10 +439,7 @@ describe('pairwise features', () => {
 		it('returns different subs', async function () {
 			const subs = await Promise.all(
 				map(clients, async (client) => {
-					const claims = new this.provider.Claims(
-						{ sub: 'accountId' },
-						{ client, ctx: undefined }
-					);
+					const claims = new Claims(client, { sub: 'accountId' });
 					claims.scope('openid');
 
 					const { sub } = await claims.result();

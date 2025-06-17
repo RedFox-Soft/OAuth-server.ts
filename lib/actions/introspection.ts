@@ -100,14 +100,10 @@ async function renderTokenResponse(ctx) {
 		if (token.clientId !== ctx.oidc.client.clientId) {
 			const client = await provider.Client.find(token.clientId);
 			if (client.subjectType === 'pairwise') {
-				ctx.body.sub = await pairwiseIdentifier(ctx, ctx.body.sub, client);
+				ctx.body.sub = await pairwiseIdentifier(ctx.body.sub, client);
 			}
 		} else if (ctx.oidc.client.subjectType === 'pairwise') {
-			ctx.body.sub = await pairwiseIdentifier(
-				ctx,
-				ctx.body.sub,
-				ctx.oidc.client
-			);
+			ctx.body.sub = await pairwiseIdentifier(ctx.body.sub, ctx.oidc.client);
 		}
 	}
 

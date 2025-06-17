@@ -1,4 +1,4 @@
-import merge from '../../helpers/_/merge.ts';
+import { merge } from 'lib/helpers/_/object.js';
 import instance from '../../helpers/weak_cache.ts';
 
 /*

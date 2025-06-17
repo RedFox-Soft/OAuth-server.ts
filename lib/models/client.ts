@@ -6,7 +6,6 @@ import KeyStore from '../helpers/keystore.ts';
 import snakeCase from '../helpers/_/snake_case.ts';
 import mapKeys from '../helpers/_/map_keys.ts';
 import camelCase from '../helpers/_/camel_case.ts';
-import isPlainObject from '../helpers/_/is_plain_object.ts';
 import * as base64url from '../helpers/base64url.ts';
 import nanoid from '../helpers/nanoid.ts';
 import epochTime from '../helpers/epoch_time.ts';
@@ -21,6 +20,7 @@ import addClient from '../helpers/add_client.ts';
 import getSchema from '../helpers/client_schema.ts';
 import { provider } from 'lib/provider.js';
 import { ClientDefaults } from 'lib/configs/clientBase.js';
+import { isPlainObject } from 'lib/helpers/_/object.js';
 
 // intentionally ignore x5t#S256 so that they are left to be calculated by the library
 const EC_CURVES = new Set(['P-256', 'P-384', 'P-521']);

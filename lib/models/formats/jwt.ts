@@ -140,7 +140,7 @@ export default (provider, { opaque }) => {
 				}
 				if (client.subjectType === 'pairwise') {
 					const { pairwiseIdentifier } = instance(provider).configuration;
-					sub = await pairwiseIdentifier(als.getStore(), sub, client);
+					sub = await pairwiseIdentifier(sub, client);
 				}
 			}
 

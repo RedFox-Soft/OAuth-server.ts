@@ -1,6 +1,6 @@
 import instance from './weak_cache.ts';
-import isPlainObject from './_/is_plain_object.ts';
 import { InvalidClientMetadata } from './errors.ts';
+import { isPlainObject } from './_/object.js';
 
 function addStatic(metadata) {
 	const { staticClients } = instance(this);

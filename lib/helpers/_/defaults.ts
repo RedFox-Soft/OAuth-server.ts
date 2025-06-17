@@ -1,6 +1,4 @@
-/* eslint-disable no-continue, no-param-reassign */
-
-import isPlainObject from './is_plain_object.ts';
+import { isPlainObject } from './object.js';
 
 function defaults(deep, target, ...sources) {
 	for (const source of sources) {

@@ -76,7 +76,6 @@ export default () =>
 
 				if (oidc.client.subjectType === 'pairwise') {
 					sub = await instance(oidc.provider).configuration.pairwiseIdentifier(
-						ctx,
 						sub,
 						oidc.client
 					);
@@ -111,7 +110,6 @@ export default () =>
 
 				if (oidc.client.subjectType === 'pairwise') {
 					sub = await instance(oidc.provider).configuration.pairwiseIdentifier(
-						ctx,
 						sub,
 						oidc.client
 					);
