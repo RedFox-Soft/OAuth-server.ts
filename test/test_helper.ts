@@ -349,13 +349,3 @@ export function passInteractionChecks(...reasons) {
 		cb();
 	});
 }
-
-export function skipConsent() {
-	const sandbox = sinon.createSandbox();
-
-	before(function () {
-		sandbox.stub(OIDCContext.prototype, 'promptPending').returns(false);
-	});
-
-	after(sandbox.restore);
-}

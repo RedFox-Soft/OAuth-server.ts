@@ -3,7 +3,6 @@ import presence from '../helpers/validate_presence.ts';
 import instance from '../helpers/weak_cache.ts';
 import getTokenAuth from '../shared/token_auth.ts';
 import { urlencoded as parseBody } from '../shared/selective_body.ts';
-import rejectDupes from '../shared/reject_dupes.ts';
 import paramsMiddleware from '../shared/assemble_params.ts';
 import revoke from '../helpers/revoke.ts';
 
@@ -44,7 +43,6 @@ export default function revocationAction(provider) {
 		parseBody,
 		paramsMiddleware.bind(undefined, PARAM_LIST),
 		...tokenAuth,
-		rejectDupes.bind(undefined, {}),
 
 		async function validateTokenPresence(ctx, next) {
 			presence(ctx, 'token');

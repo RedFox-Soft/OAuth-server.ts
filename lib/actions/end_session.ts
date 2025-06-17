@@ -8,7 +8,6 @@ import {
 import * as JWT from '../helpers/jwt.ts';
 import redirectUri from '../helpers/redirect_uri.ts';
 import instance from '../helpers/weak_cache.ts';
-import rejectDupes from '../shared/reject_dupes.ts';
 import bodyParser from '../shared/conditional_body.ts';
 import paramsMiddleware from '../shared/assemble_params.ts';
 import sessionMiddleware from '../shared/session.ts';
@@ -34,7 +33,6 @@ export const init = [
 			'logout_hint'
 		])
 	),
-	rejectDupes.bind(undefined, {}),
 
 	async function endSessionChecks(ctx, next) {
 		const { params } = ctx.oidc;
@@ -137,7 +135,6 @@ export const confirm = [
 	sessionMiddleware,
 	parseBody,
 	paramsMiddleware.bind(undefined, new Set(['xsrf', 'logout'])),
-	rejectDupes.bind(undefined, {}),
 
 	async function checkLogoutToken(ctx, next) {
 		if (!ctx.oidc.session.state) {

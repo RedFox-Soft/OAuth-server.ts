@@ -2,7 +2,6 @@ import * as crypto from 'node:crypto';
 
 import sessionHandler from '../shared/session.ts';
 import paramsMiddleware from '../shared/assemble_params.ts';
-import rejectDupes from '../shared/reject_dupes.ts';
 import instance from '../helpers/weak_cache.ts';
 import { InvalidClient, InvalidRequest } from '../helpers/errors.ts';
 import * as formHtml from '../helpers/user_code_form.ts';
@@ -17,7 +16,6 @@ import {
 } from '../helpers/re_render_errors.ts';
 import { Elysia, t } from 'elysia';
 import { AuthorizationCookies, routeNames } from 'lib/consts/param_list.js';
-import { provider } from 'lib/provider.js';
 import interactions from './authorization/interactions.js';
 import loadGrant from './authorization/load_grant.js';
 import loadAccount from './authorization/load_account.js';
@@ -88,7 +86,6 @@ export const post = [
 		undefined,
 		new Set(['xsrf', 'user_code', 'confirm', 'abort'])
 	),
-	rejectDupes.bind(undefined, {}),
 
 	async function codeVerificationCSRF(ctx, next) {
 		if (!ctx.oidc.session.state) {
