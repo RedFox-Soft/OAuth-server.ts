@@ -163,12 +163,12 @@ async function authorizationErrorHandler({
 	const out = {
 		...getObjFromError(code, error),
 		...(state ? { state } : {}),
-		iss: provider.issuer
+		iss: ISSUER
 	};
 	let mode = params.response_mode;
 	if (!instance(provider).responseModes.has(mode)) {
 		mode = 'query';
 	}
 	const handler = instance(provider).responseModes.get(mode);
-	return await handler({}, redirectObj.redirect_uri, out);
+	return await handler(redirectObj.ctx, redirectObj.redirect_uri, out);
 }

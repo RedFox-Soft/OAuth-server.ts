@@ -16,6 +16,7 @@ import DPoPNonces from './helpers/dpop_nonces.ts';
 import als from './helpers/als.ts';
 import { globalConfiguration } from './globalConfiguration.js';
 import { Client } from './models/client.js';
+import { IdToken } from './models/id_token.js';
 
 class ProviderClass extends EventEmitter {
 	#AccessToken;
@@ -33,8 +34,6 @@ class ProviderClass extends EventEmitter {
 	#BackchannelAuthenticationRequest;
 
 	#Grant;
-
-	#IdToken;
 
 	#InitialAccessToken;
 
@@ -216,8 +215,7 @@ class ProviderClass extends EventEmitter {
 	}
 
 	get IdToken() {
-		this.#IdToken ||= models.getIdToken(this);
-		return this.#IdToken;
+		return IdToken;
 	}
 
 	get Client() {

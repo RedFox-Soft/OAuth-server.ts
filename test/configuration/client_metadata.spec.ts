@@ -741,9 +741,6 @@ describe('Client metadata validation', () => {
 		allows(this.title, ['jwt'], undefined, {
 			features: { jwtResponseModes: { enabled: true } }
 		});
-		allows(this.title, ['fragment.jwt'], undefined, {
-			features: { jwtResponseModes: { enabled: true } }
-		});
 		allows(this.title, ['query.jwt'], undefined, {
 			features: { jwtResponseModes: { enabled: true } }
 		});

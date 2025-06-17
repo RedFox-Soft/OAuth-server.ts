@@ -17,6 +17,7 @@ import checkRar from '../../shared/check_rar.ts';
 
 import { gty as cibaGty } from './ciba.ts';
 import { gty as deviceCodeGty } from './device_code.ts';
+import { IdToken } from 'lib/models/id_token.js';
 
 function rarSupported(token) {
 	const [origin] = token.gty.split(' ');
@@ -41,8 +42,7 @@ export const handler = async function refreshTokenHandler(ctx) {
 		}
 	} = instance(ctx.oidc.provider).configuration;
 
-	const { RefreshToken, AccessToken, IdToken, ReplayDetection } =
-		ctx.oidc.provider;
+	const { RefreshToken, AccessToken, ReplayDetection } = ctx.oidc.provider;
 	const { client } = ctx.oidc;
 
 	const dPoP = await dpopValidate(ctx);

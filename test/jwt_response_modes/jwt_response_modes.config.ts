@@ -9,6 +9,10 @@ merge(config.features, {
 	jwtResponseModes: { enabled: true }
 });
 
+export const ApplicationConfig = {
+	'responseMode.jwt.enabled': true
+};
+
 export default {
 	config,
 	clients: [

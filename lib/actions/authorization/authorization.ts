@@ -91,7 +91,7 @@ export async function isAllowRedirectUri(params) {
 
 	const state = typeof params.state !== 'string' ? undefined : params.state;
 
-	return { redirect_uri, state };
+	return { redirect_uri, state, ctx };
 }
 
 async function authorizationActionHandler(ctx) {

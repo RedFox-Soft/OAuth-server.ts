@@ -6,6 +6,7 @@ import { routeNames } from 'lib/consts/param_list.js';
 import { provider } from 'lib/provider.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
+import { IdToken } from 'lib/models/id_token.js';
 
 const introspectable = new Set([
 	'AccessToken',
@@ -158,7 +159,6 @@ export const introspect = new Elysia().post(
 		const {
 			features: { jwtIntrospection }
 		} = configuration;
-		const { IdToken } = provider;
 		if (jwtIntrospection.enabled) {
 			const { client } = ctx.oidc;
 

@@ -8,6 +8,7 @@ import dpopValidate, { DPOP_OK_WINDOW } from '../../helpers/validate_dpop.ts';
 import resolveResource from '../../helpers/resolve_resource.ts';
 import epochTime from '../../helpers/epoch_time.ts';
 import checkRar from '../../shared/check_rar.ts';
+import { IdToken } from 'lib/models/id_token.js';
 
 const gty = 'authorization_code';
 
@@ -122,8 +123,7 @@ export const handler = async function authorizationCodeHandler(ctx) {
 
 	ctx.oidc.entity('Account', account);
 
-	const { AccessToken, IdToken, RefreshToken, ReplayDetection } =
-		ctx.oidc.provider;
+	const { AccessToken, RefreshToken, ReplayDetection } = ctx.oidc.provider;
 
 	const at = new AccessToken({
 		accountId: account.accountId,

@@ -8,6 +8,7 @@ import revoke from '../../helpers/revoke.ts';
 import dpopValidate, { DPOP_OK_WINDOW } from '../../helpers/validate_dpop.ts';
 import resolveResource from '../../helpers/resolve_resource.ts';
 import epochTime from '../../helpers/epoch_time.ts';
+import { IdToken } from 'lib/models/id_token.js';
 
 const { AuthorizationPending, ExpiredToken, InvalidGrant } = errors;
 
@@ -119,8 +120,7 @@ export const handler = async function deviceCodeHandler(ctx) {
 
 	ctx.oidc.entity('Account', account);
 
-	const { AccessToken, IdToken, RefreshToken, ReplayDetection } =
-		ctx.oidc.provider;
+	const { AccessToken, RefreshToken, ReplayDetection } = ctx.oidc.provider;
 
 	const at = new AccessToken({
 		accountId: account.accountId,
