@@ -544,12 +544,9 @@ expire.setDate(expire.getDate() + 1);
 				it('id_token_hint belongs to a user that is not currently logged in [1/3]', async function () {
 					const client = await provider.Client.find('client');
 					const { IdToken } = provider;
-					const idToken = new IdToken(
-						{
-							sub: 'not-the-droid-you-are-looking-for'
-						},
-						{ client, ctx: undefined }
-					);
+					const idToken = new IdToken(client, {
+						sub: 'not-the-droid-you-are-looking-for'
+					});
 
 					idToken.scope = 'openid';
 					const hint = await idToken.issue({ use: 'idtoken' });
@@ -580,12 +577,9 @@ expire.setDate(expire.getDate() + 1);
 				it('id_token_hint belongs to a user that is not currently logged in [2/3]', async function () {
 					const client = await provider.Client.find('client-pairwise');
 					const { IdToken } = provider;
-					const idToken = new IdToken(
-						{
-							sub: 'not-the-droid-you-are-looking-for'
-						},
-						{ client, ctx: undefined }
-					);
+					const idToken = new IdToken(client, {
+						sub: 'not-the-droid-you-are-looking-for'
+					});
 
 					idToken.scope = 'openid';
 					const hint = await idToken.issue({ use: 'idtoken' });
@@ -617,12 +611,9 @@ expire.setDate(expire.getDate() + 1);
 				it('id_token_hint belongs to a user that is not currently logged in [3/3]', async function () {
 					const client = await provider.Client.find('client-pairwise');
 					const { IdToken } = provider;
-					const idToken = new IdToken(
-						{
-							sub: 'not-the-droid-you-are-looking-for'
-						},
-						{ client, ctx: undefined }
-					);
+					const idToken = new IdToken(client, {
+						sub: 'not-the-droid-you-are-looking-for'
+					});
 
 					idToken.scope = 'openid';
 					const hint = await idToken.issue({ use: 'idtoken' });
@@ -649,10 +640,7 @@ expire.setDate(expire.getDate() + 1);
 					const session = setup.getSession();
 					const client = await provider.Client.find('client');
 					const { IdToken } = provider;
-					const idToken = new IdToken(
-						{ sub: session.accountId },
-						{ client, ctx: undefined }
-					);
+					const idToken = new IdToken(client, { sub: session.accountId });
 
 					idToken.scope = 'openid';
 					const hint = await idToken.issue({ use: 'idtoken' });
@@ -675,10 +663,7 @@ expire.setDate(expire.getDate() + 1);
 					const session = setup.getSession();
 					const client = await provider.Client.find('client-pairwise');
 					const { IdToken } = provider;
-					const idToken = new IdToken(
-						{ sub: session.accountId },
-						{ client, ctx: undefined }
-					);
+					const idToken = new IdToken(client, { sub: session.accountId });
 
 					idToken.scope = 'openid';
 					const hint = await idToken.issue({ use: 'idtoken' });

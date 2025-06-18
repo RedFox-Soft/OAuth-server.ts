@@ -5,7 +5,8 @@ import sinon from 'sinon';
 import cloneDeep from 'lodash/cloneDeep.js';
 
 import bootstrap, { skipConsent } from '../test_helper.js';
-import * as JWT from '../../lib/helpers/jwt.ts';
+import { IdToken } from 'lib/models/id_token.js';
+import { Client } from 'lib/models/client.js';
 
 describe('dynamic ttl', () => {
 	before(bootstrap(import.meta.url));
@@ -77,10 +78,10 @@ describe('dynamic ttl', () => {
 			}
 		);
 
-		const IdToken = sinon.fake.returns(123);
+		const IdTokenFunc = sinon.fake.returns(123);
 		const AccessToken = sinon.fake.returns(1234);
 		const RefreshToken = sinon.fake.returns(12345);
-		i(this.provider).configuration.ttl.IdToken = IdToken;
+		i(this.provider).configuration.ttl.IdToken = IdTokenFunc;
 		i(this.provider).configuration.ttl.AccessToken = AccessToken;
 		i(this.provider).configuration.ttl.RefreshToken = RefreshToken;
 
@@ -94,21 +95,21 @@ describe('dynamic ttl', () => {
 			.type('form')
 			.expect(200);
 
-		expect(IdToken).to.have.property('calledOnce', true);
-		expect(IdToken.args[0][1]).to.be.an.instanceof(this.provider.IdToken);
-		expect(IdToken.args[0][2]).to.be.an.instanceof(this.provider.Client);
+		expect(IdTokenFunc).to.have.property('calledOnce', true);
+		expect(IdTokenFunc.args[0][1]).to.be.an.instanceof(IdToken);
+		expect(IdTokenFunc.args[0][2]).to.be.an.instanceof(Client);
 
 		expect(AccessToken).to.have.property('calledOnce', true);
 		expect(AccessToken.args[0][1]).to.be.an.instanceof(
 			this.provider.AccessToken
 		);
-		expect(AccessToken.args[0][2]).to.be.an.instanceof(this.provider.Client);
+		expect(AccessToken.args[0][2]).to.be.an.instanceof(Client);
 
 		expect(RefreshToken).to.have.property('calledOnce', true);
 		expect(RefreshToken.args[0][1]).to.be.an.instanceof(
 			this.provider.RefreshToken
 		);
-		expect(RefreshToken.args[0][2]).to.be.an.instanceof(this.provider.Client);
+		expect(RefreshToken.args[0][2]).to.be.an.instanceof(Client);
 	});
 
 	it('authorization flow returned tokens', async function () {
@@ -132,10 +133,10 @@ describe('dynamic ttl', () => {
 	});
 
 	it('authorization code', async function () {
-		const IdToken = sinon.fake.returns(123);
+		const IdTokenFunc = sinon.fake.returns(123);
 		const AccessToken = sinon.fake.returns(1234);
 		const RefreshToken = sinon.fake.returns(12345);
-		i(this.provider).configuration.ttl.IdToken = IdToken;
+		i(this.provider).configuration.ttl.IdToken = IdTokenFunc;
 		i(this.provider).configuration.ttl.AccessToken = AccessToken;
 		i(this.provider).configuration.ttl.RefreshToken = RefreshToken;
 
@@ -167,21 +168,21 @@ describe('dynamic ttl', () => {
 			.type('form')
 			.expect(200);
 
-		expect(IdToken).to.have.property('calledOnce', true);
-		expect(IdToken.args[0][1]).to.be.an.instanceof(this.provider.IdToken);
-		expect(IdToken.args[0][2]).to.be.an.instanceof(this.provider.Client);
+		expect(IdTokenFunc).to.have.property('calledOnce', true);
+		expect(IdTokenFunc.args[0][1]).to.be.an.instanceof(IdToken);
+		expect(IdTokenFunc.args[0][2]).to.be.an.instanceof(Client);
 
 		expect(AccessToken).to.have.property('calledOnce', true);
 		expect(AccessToken.args[0][1]).to.be.an.instanceof(
 			this.provider.AccessToken
 		);
-		expect(AccessToken.args[0][2]).to.be.an.instanceof(this.provider.Client);
+		expect(AccessToken.args[0][2]).to.be.an.instanceof(Client);
 
 		expect(RefreshToken).to.have.property('calledOnce', true);
 		expect(RefreshToken.args[0][1]).to.be.an.instanceof(
 			this.provider.RefreshToken
 		);
-		expect(RefreshToken.args[0][2]).to.be.an.instanceof(this.provider.Client);
+		expect(RefreshToken.args[0][2]).to.be.an.instanceof(Client);
 	});
 
 	it('refreshed tokens', async function () {
@@ -218,10 +219,10 @@ describe('dynamic ttl', () => {
 				refresh_token = rt;
 			});
 
-		const IdToken = sinon.fake.returns(123);
+		const IdTokenFunc = sinon.fake.returns(123);
 		const AccessToken = sinon.fake.returns(1234);
 		const RefreshToken = sinon.fake.returns(12345);
-		i(this.provider).configuration.ttl.IdToken = IdToken;
+		i(this.provider).configuration.ttl.IdToken = IdTokenFunc;
 		i(this.provider).configuration.ttl.AccessToken = AccessToken;
 		i(this.provider).configuration.ttl.RefreshToken = RefreshToken;
 
@@ -236,20 +237,20 @@ describe('dynamic ttl', () => {
 			.type('form')
 			.expect(200);
 
-		expect(IdToken).to.have.property('calledOnce', true);
-		expect(IdToken.args[0][1]).to.be.an.instanceof(this.provider.IdToken);
-		expect(IdToken.args[0][2]).to.be.an.instanceof(this.provider.Client);
+		expect(IdTokenFunc).to.have.property('calledOnce', true);
+		expect(IdTokenFunc.args[0][1]).to.be.an.instanceof(IdToken);
+		expect(IdTokenFunc.args[0][2]).to.be.an.instanceof(Client);
 
 		expect(AccessToken).to.have.property('calledOnce', true);
 		expect(AccessToken.args[0][1]).to.be.an.instanceof(
 			this.provider.AccessToken
 		);
-		expect(AccessToken.args[0][2]).to.be.an.instanceof(this.provider.Client);
+		expect(AccessToken.args[0][2]).to.be.an.instanceof(Client);
 
 		expect(RefreshToken).to.have.property('calledOnce', true);
 		expect(RefreshToken.args[0][1]).to.be.an.instanceof(
 			this.provider.RefreshToken
 		);
-		expect(RefreshToken.args[0][2]).to.be.an.instanceof(this.provider.Client);
+		expect(RefreshToken.args[0][2]).to.be.an.instanceof(Client);
 	});
 });

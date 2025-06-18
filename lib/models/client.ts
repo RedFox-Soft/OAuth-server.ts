@@ -21,6 +21,7 @@ import getSchema from '../helpers/client_schema.ts';
 import { provider } from 'lib/provider.js';
 import { ClientDefaults } from 'lib/configs/clientBase.js';
 import { isPlainObject } from 'lib/helpers/_/object.js';
+import { IdToken } from './id_token.js';
 
 // intentionally ignore x5t#S256 so that they are left to be calculated by the library
 const EC_CURVES = new Set(['P-256', 'P-384', 'P-521']);
@@ -438,10 +439,7 @@ export class Client {
 	}
 
 	async backchannelLogout(sub, sid) {
-		const logoutToken = new provider.IdToken(
-			{ sub },
-			{ client: this, ctx: undefined }
-		);
+		const logoutToken = new IdToken(this, { sub });
 		logoutToken.mask = { sub: null };
 		logoutToken.set('events', {
 			'http://schemas.openid.net/event/backchannel-logout': {}

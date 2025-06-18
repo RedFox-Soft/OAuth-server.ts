@@ -4,12 +4,13 @@ import epochTime from '../../helpers/epoch_time.ts';
 import instance from '../../helpers/weak_cache.ts';
 import nanoid from '../../helpers/nanoid.ts';
 import als from '../../helpers/als.ts';
+import { provider } from 'lib/provider.js';
 
 const withExtra = new Set(['AccessToken', 'ClientCredentials']);
 const bitsPerSymbol = Math.log2(64);
 const tokenLength = (i) => Math.ceil(i / bitsPerSymbol);
 
-export default (provider) => ({
+export const opaque = {
 	generateTokenId() {
 		let length;
 		if (this.kind !== 'PushedAuthorizationRequest') {
@@ -62,4 +63,4 @@ export default (provider) => ({
 
 		return stored;
 	}
-});
+};

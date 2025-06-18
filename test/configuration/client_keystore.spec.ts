@@ -11,6 +11,7 @@ import bootstrap, {
 	mock
 } from '../test_helper.js';
 import initializeClients from '../../lib/helpers/initialize_clients.ts';
+import { IdToken } from 'lib/models/id_token.js';
 
 const sinon = createSandbox();
 
@@ -285,8 +286,7 @@ describe('client keystore refresh', () => {
 			client.asymmetricKeyStore.freshUntil = epochTime() - 1;
 			expect(client.asymmetricKeyStore.stale()).to.be.true;
 
-			const { IdToken } = this.provider;
-			const token = new IdToken({ foo: 'bar' }, { client, ctx: undefined });
+			const token = new IdToken(client, { foo: 'bar' });
 
 			await token.issue({ use: 'idtoken' });
 		});

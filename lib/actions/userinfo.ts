@@ -8,6 +8,7 @@ import { InvalidToken, InsufficientScope } from '../helpers/errors.ts';
 import { routeNames } from 'lib/consts/param_list.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { Claims } from 'lib/helpers/claims.js';
+import { IdToken } from 'lib/models/id_token.js';
 
 export const userinfo = new Elysia()
 	.guard({
@@ -136,9 +137,9 @@ export const userinfo = new Elysia()
 			client.userinfoSignedResponseAlg ||
 			client.userinfoEncryptedResponseAlg
 		) {
-			const token = new ctx.oidc.provider.IdToken(
-				await ctx.oidc.account.claims('userinfo', scope, claims, rejected),
-				{ ctx }
+			const token = new IdToken(
+				client,
+				await ctx.oidc.account.claims('userinfo', scope, claims, rejected)
 			);
 
 			token.scope = scope;

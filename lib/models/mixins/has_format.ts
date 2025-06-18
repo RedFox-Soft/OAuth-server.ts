@@ -1,15 +1,20 @@
 import instance from '../../helpers/weak_cache.ts';
-import formatsGenerator from '../formats/index.ts';
+import { dynamic } from '../formats/dynamic.js';
+import { jwt } from '../formats/jwt.js';
+import { opaque } from '../formats/opaque.js';
 
 const DEFAULT = 'opaque';
+const formats = {
+	opaque,
+	jwt,
+	dynamic
+};
 
 function AccessTokenFormat(ctx, token) {
 	return token.resourceServer?.accessTokenFormat ?? 'opaque';
 }
 
 export default (provider, type, superclass) => {
-	const formats = formatsGenerator(provider);
-
 	let FORMAT;
 	if (type === 'AccessToken' || type === 'ClientCredentials') {
 		FORMAT = AccessTokenFormat;

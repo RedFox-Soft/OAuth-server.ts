@@ -215,17 +215,14 @@ export const handler = async function cibaHandler(ctx) {
 	if (request.scopes.has('openid')) {
 		const claims = filterClaims(request.claims, 'id_token', grant);
 		const rejected = grant.getRejectedOIDCClaims();
-		const token = new IdToken(
-			{
-				...(await account.claims('id_token', request.scope, claims, rejected)),
-				...{
-					acr: request.acr,
-					amr: request.amr,
-					auth_time: request.authTime
-				}
-			},
-			{ ctx }
-		);
+		const token = new IdToken(ctx.oidc.client, {
+			...(await account.claims('id_token', request.scope, claims, rejected)),
+			...{
+				acr: request.acr,
+				amr: request.amr,
+				auth_time: request.authTime
+			}
+		});
 
 		if (conformIdTokenClaims && userinfo.enabled && !at.aud) {
 			token.scope = 'openid';

@@ -1,3 +1,4 @@
+import { IdToken } from 'lib/models/id_token.js';
 import { InvalidRequest, OIDCProviderError } from '../../helpers/errors.ts';
 
 /*
@@ -8,7 +9,7 @@ export default async function checkIdTokenHint(ctx) {
 	if (oidc.params.id_token_hint !== undefined) {
 		let idTokenHint;
 		try {
-			idTokenHint = await oidc.provider.IdToken.validate(
+			idTokenHint = await IdToken.validate(
 				oidc.params.id_token_hint,
 				oidc.client
 			);

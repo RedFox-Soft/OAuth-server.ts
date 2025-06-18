@@ -335,7 +335,7 @@ function BackchannelAuthenticationRequestTTL(ctx, request, client) {
 	return 10 * 60; // 10 minutes in seconds
 }
 
-function IdTokenTTL(ctx, token, client) {
+function IdTokenTTL(token, client) {
 	shouldChange('ttl.IdToken', 'define the expiration for IdToken artifacts');
 	return 60 * 60; // 1 hour in seconds
 }

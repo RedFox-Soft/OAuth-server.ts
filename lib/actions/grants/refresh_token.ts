@@ -268,20 +268,17 @@ export const handler = async function refreshTokenHandler(ctx) {
 	if (scope.has('openid')) {
 		const claims = filterClaims(refreshToken.claims, 'id_token', grant);
 		const rejected = grant.getRejectedOIDCClaims();
-		const token = new IdToken(
-			{
-				...(await account.claims(
-					'id_token',
-					[...scope].join(' '),
-					claims,
-					rejected
-				)),
-				acr: refreshToken.acr,
-				amr: refreshToken.amr,
-				auth_time: refreshToken.authTime
-			},
-			{ ctx }
-		);
+		const token = new IdToken(ctx.oidc.client, {
+			...(await account.claims(
+				'id_token',
+				[...scope].join(' '),
+				claims,
+				rejected
+			)),
+			acr: refreshToken.acr,
+			amr: refreshToken.amr,
+			auth_time: refreshToken.authTime
+		});
 
 		if (conformIdTokenClaims && userinfo.enabled && !at.aud) {
 			token.scope = 'openid';

@@ -13,6 +13,7 @@ import paramsMiddleware from '../shared/assemble_params.ts';
 import sessionMiddleware from '../shared/session.ts';
 import revoke from '../helpers/revoke.ts';
 import { formPost } from '../html/formPost.js';
+import { IdToken } from 'lib/models/id_token.js';
 
 const parseBody = bodyParser.bind(
 	undefined,
@@ -66,7 +67,7 @@ export const init = [
 				);
 			}
 			try {
-				await ctx.oidc.provider.IdToken.validate(params.id_token_hint, client);
+				await IdToken.validate(params.id_token_hint, client);
 			} catch (err) {
 				if (err instanceof OIDCProviderError) {
 					throw err;

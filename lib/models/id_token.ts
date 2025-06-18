@@ -10,7 +10,7 @@ import { ISSUER } from 'lib/configs/env.js';
 import { provider } from 'lib/provider.js';
 import { type Client } from './client.js';
 import { Claims } from 'lib/helpers/claims.js';
-import { isPlainObject, merge } from 'lib/helpers/_/object.js';
+import { merge } from 'lib/helpers/_/object.js';
 
 const hashes = ['at_hash', 'c_hash', 's_hash'];
 
@@ -37,17 +37,12 @@ const messages = {
 
 export class IdToken {
 	client: Client;
+	available: Record<string, unknown>;
+	extra: Record<string, unknown> = {};
 
-	constructor(available, { ctx, client = ctx ? ctx.oidc.client : undefined }) {
-		if (!isPlainObject(available)) {
-			throw new TypeError(
-				'expected claims to be an object, are you sure claims() method resolves with or returns one?'
-			);
-		}
-		this.extra = {};
+	constructor(client: Client, available: Record<string, unknown> = {}) {
 		this.available = available;
 		this.client = client;
-		this.ctx = ctx;
 	}
 
 	static expiresIn(...args) {
@@ -60,7 +55,7 @@ export class IdToken {
 		return ttl(...args);
 	}
 
-	set(key, value) {
+	set(key: string, value: unknown) {
 		this.extra[key] = value;
 	}
 
@@ -88,8 +83,7 @@ export class IdToken {
 				alg = client.idTokenSignedResponseAlg;
 				signOptions = {
 					audience: client.clientId,
-					expiresIn:
-						expiresIn || this.constructor.expiresIn(this.ctx, this, client),
+					expiresIn: expiresIn || IdToken.expiresIn(this, client),
 					issuer: ISSUER,
 					subject: payload.sub
 				};

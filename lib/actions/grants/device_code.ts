@@ -212,17 +212,14 @@ export const handler = async function deviceCodeHandler(ctx) {
 	if (code.scopes.has('openid')) {
 		const claims = filterClaims(code.claims, 'id_token', grant);
 		const rejected = grant.getRejectedOIDCClaims();
-		const token = new IdToken(
-			{
-				...(await account.claims('id_token', code.scope, claims, rejected)),
-				...{
-					acr: code.acr,
-					amr: code.amr,
-					auth_time: code.authTime
-				}
-			},
-			{ ctx }
-		);
+		const token = new IdToken(ctx.oidc.client, {
+			...(await account.claims('id_token', code.scope, claims, rejected)),
+			...{
+				acr: code.acr,
+				amr: code.amr,
+				auth_time: code.authTime
+			}
+		});
 
 		if (conformIdTokenClaims && userinfo.enabled && !at.aud) {
 			token.scope = 'openid';

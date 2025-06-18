@@ -29,7 +29,7 @@ export class Claims {
 		return this;
 	}
 
-	mask(value: Record<string, unknown>) {
+	mask(value: Record<string, unknown> = {}) {
 		merge(this.filter, value);
 	}
 

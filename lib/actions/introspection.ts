@@ -173,7 +173,7 @@ export const introspect = new Elysia().post(
 			const body = await renderTokenResponse(ctx);
 
 			if ((encrypt || sign) && accepts === JWT) {
-				const token = new IdToken({}, { ctx });
+				const token = new IdToken(client);
 				token.extra = {
 					token_introspection: body,
 					aud: body.aud
