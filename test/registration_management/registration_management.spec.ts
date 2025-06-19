@@ -197,7 +197,7 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 		it('emits an event', async function () {
 			const client = await setup.call(this, {});
 			const spy = sinon.spy();
-			this.provider.once('registration_update.success', spy);
+			provider.once('registration_update.success', spy);
 
 			return this.agent
 				.put(`/reg/${client.client_id}`)
@@ -294,11 +294,11 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 		});
 
 		it('cannot update non-dynamic clients', async function () {
-			const rat = new this.provider.RegistrationAccessToken({
+			const rat = new provider.RegistrationAccessToken({
 				clientId: 'client'
 			});
 			const bearer = await rat.save();
-			const client = await this.provider.Client.find('client');
+			const client = await provider.Client.find('client');
 			return this.agent
 				.put('/reg/client')
 				.auth(bearer, { type: 'bearer' })
@@ -318,7 +318,7 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 
 		describe('rotateRegistrationAccessToken', () => {
 			before(function () {
-				const conf = i(this.provider).configuration;
+				const conf = i(provider).configuration;
 				conf.features.registrationManagement = {
 					enabled: true,
 					rotateRegistrationAccessToken: true
@@ -326,14 +326,14 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 			});
 
 			after(function () {
-				const conf = i(this.provider).configuration;
+				const conf = i(provider).configuration;
 				conf.features.registrationManagement = { enabled: true };
 			});
 
 			it('destroys the old RegistrationAccessToken', async function () {
 				const client = await setup.call(this, {});
 				const spy = sinon.spy();
-				this.provider.once('registration_access_token.destroyed', spy);
+				provider.once('registration_access_token.destroyed', spy);
 
 				return this.agent
 					.put(`/reg/${client.client_id}`)
@@ -367,7 +367,7 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 			it('issues and returns new RegistrationAccessToken', async function () {
 				const client = await setup.call(this, {});
 				const spy = sinon.spy();
-				this.provider.once('registration_access_token.saved', spy);
+				provider.once('registration_access_token.saved', spy);
 
 				return this.agent
 					.put(`/reg/${client.client_id}`)
@@ -397,7 +397,7 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 				.expect(204);
 
 			expect(
-				await this.provider.RegistrationAccessToken.find(
+				await provider.RegistrationAccessToken.find(
 					client.registration_access_token
 				)
 			).to.be.undefined;
@@ -421,7 +421,7 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 		it('emits an event', async function () {
 			const client = await setup.call(this, {});
 			const spy = sinon.spy();
-			this.provider.once('registration_delete.success', spy);
+			provider.once('registration_delete.success', spy);
 
 			return this.agent
 				.del(`/reg/${client.client_id}`)
@@ -450,7 +450,7 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 		});
 
 		it('cannot delete non-dynamic clients', async function () {
-			const rat = new this.provider.RegistrationAccessToken({
+			const rat = new provider.RegistrationAccessToken({
 				clientId: 'client'
 			});
 			const bearer = await rat.save();

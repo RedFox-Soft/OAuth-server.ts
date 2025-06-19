@@ -3,9 +3,11 @@ import { expect } from 'chai';
 
 import bootstrap from '../test_helper.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
+import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
+import { TestAdapter } from 'test/models.js';
+import { provider } from 'lib/provider.js';
 
 const route = '/auth';
-const response_type = 'code';
 const scope = 'openid';
 const verb = 'get';
 
@@ -25,12 +27,8 @@ describe('session exp handling', () => {
 		const oldSessionId = this.getSessionId();
 		session.exp = epochTime() - 300;
 
-		sinon.spy(this.TestAdapter.for('Session'), 'destroy');
-
-		const auth = new this.AuthorizationRequest({
-			response_type,
-			scope
-		});
+		sinon.spy(TestAdapter.for('Session'), 'destroy');
+		const auth = new AuthorizationRequest({ scope });
 
 		await this.wrap({ route, verb, auth })
 			.expect(303)
@@ -44,21 +42,18 @@ describe('session exp handling', () => {
 
 	describe('clockTolerance', () => {
 		afterEach(function () {
-			i(this.provider).configuration.clockTolerance = 0;
+			i(provider).configuration.clockTolerance = 0;
 		});
 
 		it('respects clockTolerance option', async function () {
 			await this.login();
 			const session = this.getSession();
-			i(this.provider).configuration.clockTolerance = 10;
+			i(provider).configuration.clockTolerance = 10;
 			session.exp = epochTime() - 5;
 
-			sinon.spy(this.TestAdapter.for('Session'), 'destroy');
+			sinon.spy(TestAdapter.for('Session'), 'destroy');
 
-			const auth = new this.AuthorizationRequest({
-				response_type,
-				scope
-			});
+			const auth = new AuthorizationRequest({ scope });
 
 			await this.wrap({ route, verb, auth })
 				.expect(303)
@@ -66,22 +61,19 @@ describe('session exp handling', () => {
 				.expect(auth.validateState)
 				.expect(auth.validateClientLocation);
 
-			expect(this.TestAdapter.for('Session').destroy.called).to.be.false;
+			expect(TestAdapter.for('Session').destroy.called).to.be.false;
 		});
 
 		it('generates a new session id when an expired session is found by the adapter', async function () {
 			await this.login();
 			const session = this.getSession();
-			i(this.provider).configuration.clockTolerance = 10;
+			i(provider).configuration.clockTolerance = 10;
 			session.exp = epochTime() - 10;
 			const oldSessionId = this.getSessionId();
 
-			sinon.spy(this.TestAdapter.for('Session'), 'destroy');
+			sinon.spy(TestAdapter.for('Session'), 'destroy');
 
-			const auth = new this.AuthorizationRequest({
-				response_type,
-				scope
-			});
+			const auth = new AuthorizationRequest({ scope });
 
 			await this.wrap({ route, verb, auth })
 				.expect(303)

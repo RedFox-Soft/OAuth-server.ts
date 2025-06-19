@@ -16,6 +16,7 @@ import bootstrap, {
 import clientKey from '../client.sig.key.js';
 import * as JWT from '../../lib/helpers/jwt.ts';
 import { JWA } from '../../lib/consts/index.ts';
+import { ISSUER } from 'lib/configs/env.js';
 
 const mtlsKeys = JSON.parse(
 	readFileSync('test/jwks/jwks.json', {
@@ -53,14 +54,14 @@ describe('client authentication options', () => {
 	afterEach(assertNoPendingInterceptors);
 
 	before(function () {
-		this.provider.registerGrantType('foo', (ctx) => {
+		provider.registerGrantType('foo', (ctx) => {
 			ctx.body = { success: true };
 		});
 	});
 
 	describe('discovery', () => {
 		it('pushes no algs when neither _jwt method is enabled', () => {
-			const provider = new provider('http://localhost', {
+			provider.init('http://localhost', {
 				clientAuthMethods: ['none', 'client_secret_basic', 'client_secret_post']
 			});
 
@@ -217,7 +218,7 @@ describe('client authentication options', () => {
 
 		it('rejects the "auth" if secret was also provided', function () {
 			const spy = sinon.spy();
-			this.provider.once('grant.error', spy);
+			provider.once('grant.error', spy);
 			return this.agent
 				.post(route)
 				.send({
@@ -377,7 +378,7 @@ describe('client authentication options', () => {
 
 		it('rejects invalid secrets', function () {
 			const spy = sinon.spy();
-			this.provider.once('grant.error', spy);
+			provider.once('grant.error', spy);
 			return this.agent
 				.post(route)
 				.send({
@@ -530,7 +531,7 @@ describe('client authentication options', () => {
 
 		it('rejects invalid secrets', function () {
 			const spy = sinon.spy();
-			this.provider.once('grant.error', spy);
+			provider.once('grant.error', spy);
 			return this.agent
 				.post(route)
 				.send({
@@ -549,7 +550,7 @@ describe('client authentication options', () => {
 
 		it('requires the client_secret to be sent', function () {
 			const spy = sinon.spy();
-			this.provider.once('grant.error', spy);
+			provider.once('grant.error', spy);
 			return this.agent
 				.post(route)
 				.send({
@@ -590,7 +591,7 @@ describe('client authentication options', () => {
 		before(async function () {
 			this.key = await importJWK(
 				(
-					await this.provider.Client.find('client-jwt-secret')
+					await provider.Client.find('client-jwt-secret')
 				).symmetricKeyStore.selectForSign({ alg: 'HS256' })[0]
 			);
 		});
@@ -599,7 +600,7 @@ describe('client authentication options', () => {
 			return JWT.sign(
 				{
 					jti: nanoid(),
-					aud: this.provider.issuer,
+					aud: ISSUER,
 					sub: 'client-jwt-secret',
 					iss: 'client-jwt-secret'
 				},
@@ -625,7 +626,7 @@ describe('client authentication options', () => {
 				return JWT.sign(
 					{
 						jti: nanoid(),
-						aud: [this.provider.issuer],
+						aud: [ISSUER],
 						sub: 'client-jwt-secret',
 						iss: 'client-jwt-secret'
 					},
@@ -648,8 +649,8 @@ describe('client authentication options', () => {
 
 			it('accepts the auth when aud is the token endpoint', async function () {
 				for (const aud of [
-					this.provider.issuer + this.suitePath('/token'),
-					[this.provider.issuer + this.suitePath('/token')]
+					ISSUER + this.suitePath('/token'),
+					[ISSUER + this.suitePath('/token')]
 				]) {
 					await JWT.sign(
 						{
@@ -678,8 +679,8 @@ describe('client authentication options', () => {
 
 			it('accepts the auth when aud is the token endpoint at another endpoint', async function () {
 				for (const aud of [
-					this.provider.issuer + this.suitePath('/token'),
-					[this.provider.issuer + this.suitePath('/token')]
+					ISSUER + this.suitePath('/token'),
+					[ISSUER + this.suitePath('/token')]
 				]) {
 					await JWT.sign(
 						{
@@ -708,8 +709,8 @@ describe('client authentication options', () => {
 
 			it('accepts the auth when aud is the url of another endpoint it is used at', async function () {
 				for (const aud of [
-					this.provider.issuer + this.suitePath('/token/introspection'),
-					[this.provider.issuer + this.suitePath('/token/introspection')]
+					ISSUER + this.suitePath('/token/introspection'),
+					[ISSUER + this.suitePath('/token/introspection')]
 				]) {
 					await JWT.sign(
 						{
@@ -739,11 +740,11 @@ describe('client authentication options', () => {
 
 		it('rejects the auth if this is actually a none-client', async function () {
 			const spy = sinon.spy();
-			this.provider.once('grant.error', spy);
+			provider.once('grant.error', spy);
 			return JWT.sign(
 				{
 					jti: nanoid(),
-					aud: this.provider.issuer,
+					aud: ISSUER,
 					sub: 'client-none',
 					iss: 'client-none'
 				},
@@ -776,7 +777,7 @@ describe('client authentication options', () => {
 			return JWT.sign(
 				{
 					jti: nanoid(),
-					aud: this.provider.issuer,
+					aud: ISSUER,
 					sub: 'client-jwt-secret',
 					iss: 'client-jwt-secret'
 				},
@@ -807,7 +808,7 @@ describe('client authentication options', () => {
 			return JWT.sign(
 				{
 					jti: nanoid(),
-					aud: this.provider.issuer,
+					aud: ISSUER,
 					sub: 'client-jwt-secret',
 					iss: 'client-jwt-secret'
 				},
@@ -855,11 +856,11 @@ describe('client authentication options', () => {
 
 		it('exp must be set', function () {
 			const spy = sinon.spy();
-			this.provider.once('grant.error', spy);
+			provider.once('grant.error', spy);
 			return JWT.sign(
 				{
 					jti: nanoid(),
-					aud: this.provider.issuer,
+					aud: ISSUER,
 					sub: 'client-jwt-secret',
 					iss: 'client-jwt-secret',
 					exp: ''
@@ -892,7 +893,7 @@ describe('client authentication options', () => {
 
 		it('aud must be set', function () {
 			const spy = sinon.spy();
-			this.provider.once('grant.error', spy);
+			provider.once('grant.error', spy);
 			return JWT.sign(
 				{
 					jti: nanoid(),
@@ -927,11 +928,11 @@ describe('client authentication options', () => {
 
 		it('jti must be set', function () {
 			const spy = sinon.spy();
-			this.provider.once('grant.error', spy);
+			provider.once('grant.error', spy);
 			return JWT.sign(
 				{
 					// jti: nanoid(),
-					aud: this.provider.issuer,
+					aud: ISSUER,
 					sub: 'client-jwt-secret',
 					iss: 'client-jwt-secret'
 				},
@@ -963,11 +964,11 @@ describe('client authentication options', () => {
 
 		it('iss must be set', function () {
 			const spy = sinon.spy();
-			this.provider.once('grant.error', spy);
+			provider.once('grant.error', spy);
 			return JWT.sign(
 				{
 					jti: nanoid(),
-					aud: this.provider.issuer,
+					aud: ISSUER,
 					sub: 'client-jwt-secret'
 					// iss: 'client-jwt-secret',
 				},
@@ -999,11 +1000,11 @@ describe('client authentication options', () => {
 
 		it('sub must be set', function () {
 			const spy = sinon.spy();
-			this.provider.once('grant.error', spy);
+			provider.once('grant.error', spy);
 			return JWT.sign(
 				{
 					jti: nanoid(),
-					aud: this.provider.issuer,
+					aud: ISSUER,
 					// sub: 'client-jwt-secret',
 					iss: 'client-jwt-secret'
 				},
@@ -1035,11 +1036,11 @@ describe('client authentication options', () => {
 
 		it('iss must be the client id', function () {
 			const spy = sinon.spy();
-			this.provider.once('grant.error', spy);
+			provider.once('grant.error', spy);
 			return JWT.sign(
 				{
 					jti: nanoid(),
-					aud: this.provider.issuer,
+					aud: ISSUER,
 					sub: 'client-jwt-secret',
 					iss: 'not equal to clientid'
 				},
@@ -1073,7 +1074,7 @@ describe('client authentication options', () => {
 			return JWT.sign(
 				{
 					jti: nanoid(),
-					aud: this.provider.issuer,
+					aud: ISSUER,
 					sub: 'client-jwt-secret',
 					iss: 'client-jwt-secret'
 				},
@@ -1104,7 +1105,7 @@ describe('client authentication options', () => {
 			return JWT.sign(
 				{
 					jti: nanoid(),
-					aud: this.provider.issuer,
+					aud: ISSUER,
 					sub: 'client-jwt-secret',
 					iss: 'client-jwt-secret'
 				},
@@ -1134,7 +1135,7 @@ describe('client authentication options', () => {
 			return JWT.sign(
 				{
 					jti: nanoid(),
-					aud: this.provider.issuer,
+					aud: ISSUER,
 					sub: 'client-jwt-secret',
 					iss: 'client-jwt-secret'
 				},
@@ -1180,11 +1181,11 @@ describe('client authentication options', () => {
 
 		it('rejects valid format and signature but expired/invalid jwts', function () {
 			const spy = sinon.spy();
-			this.provider.once('grant.error', spy);
+			provider.once('grant.error', spy);
 			return JWT.sign(
 				{
 					jti: nanoid(),
-					aud: this.provider.issuer,
+					aud: ISSUER,
 					sub: 'client-jwt-secret',
 					iss: 'client-jwt-secret'
 				},
@@ -1215,13 +1216,13 @@ describe('client authentication options', () => {
 		it('rejects assertions when the secret is expired', async function () {
 			const key = await importJWK(
 				(
-					await this.provider.Client.find('secret-expired-jwt')
+					await provider.Client.find('secret-expired-jwt')
 				).symmetricKeyStore.selectForSign({ alg: 'HS256' })[0]
 			);
 			return JWT.sign(
 				{
 					jti: nanoid(),
-					aud: this.provider.issuer,
+					aud: ISSUER,
 					sub: 'secret-expired-jwt',
 					iss: 'secret-expired-jwt'
 				},
@@ -1255,7 +1256,7 @@ describe('client authentication options', () => {
 				return JWT.sign(
 					{
 						jti: nanoid(),
-						aud: this.provider.issuer,
+						aud: ISSUER,
 						sub: 'client-jwt-secret',
 						iss: 'client-jwt-secret'
 					},
@@ -1276,7 +1277,7 @@ describe('client authentication options', () => {
 						.type('form')
 						.expect(tokenAuthSucceeded)
 						.then(() => {
-							this.provider.once('grant.error', spy);
+							provider.once('grant.error', spy);
 						})
 						.then(() =>
 							this.agent
@@ -1304,20 +1305,20 @@ describe('client authentication options', () => {
 		describe('when token_endpoint_auth_signing_alg is set on the client', () => {
 			before(async function () {
 				(
-					await this.provider.Client.find('client-jwt-secret')
+					await provider.Client.find('client-jwt-secret')
 				).tokenEndpointAuthSigningAlg = 'HS384';
 			});
 			after(async function () {
-				delete (await this.provider.Client.find('client-jwt-secret'))
+				delete (await provider.Client.find('client-jwt-secret'))
 					.tokenEndpointAuthSigningAlg;
 			});
 			it('rejects signatures with different algorithm', function () {
 				const spy = sinon.spy();
-				this.provider.once('grant.error', spy);
+				provider.once('grant.error', spy);
 				return JWT.sign(
 					{
 						jti: nanoid(),
-						aud: this.provider.issuer,
+						aud: ISSUER,
 						sub: 'client-jwt-secret',
 						iss: 'client-jwt-secret'
 					},
@@ -1351,14 +1352,14 @@ describe('client authentication options', () => {
 		const privateKey = createPrivateKey({ format: 'jwk', key: clientKey });
 
 		after(function () {
-			i(this.provider).configuration.clockTolerance = 0;
+			i(provider).configuration.clockTolerance = 0;
 		});
 
 		it('accepts the auth', function () {
 			return JWT.sign(
 				{
 					jti: nanoid(),
-					aud: this.provider.issuer,
+					aud: ISSUER,
 					sub: 'client-jwt-key',
 					iss: 'client-jwt-key'
 				},
@@ -1382,11 +1383,11 @@ describe('client authentication options', () => {
 		});
 
 		it('accepts client assertions issued within acceptable system clock skew', function () {
-			i(this.provider).configuration.clockTolerance = 10;
+			i(provider).configuration.clockTolerance = 10;
 			return JWT.sign(
 				{
 					jti: nanoid(),
-					aud: this.provider.issuer,
+					aud: ISSUER,
 					sub: 'client-jwt-key',
 					iss: 'client-jwt-key',
 					iat: Math.ceil(Date.now() / 1000) + 5

@@ -1,12 +1,13 @@
 import { ISSUER } from 'lib/configs/env.js';
 import { generate, normalize } from '../../helpers/user_codes.ts';
 import instance from '../../helpers/weak_cache.ts';
+import { DeviceCode } from 'lib/models/device_code.js';
 
 export default async function deviceAuthorizationResponse(ctx, deviceInfo) {
 	const { charset, mask } = instance(ctx.oidc.provider).features.deviceFlow;
 	const userCode = generate(charset, mask);
 
-	const dc = new ctx.oidc.provider.DeviceCode({
+	const dc = new DeviceCode({
 		client: ctx.oidc.client,
 		deviceInfo,
 		params: ctx.oidc.params,

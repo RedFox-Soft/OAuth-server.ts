@@ -23,6 +23,7 @@ import { ApplicationConfig } from 'lib/configs/application.js';
 import { ClientDefaults } from 'lib/configs/clientBase.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { PushedAuthorizationRequest } from 'lib/models/pushed_authorization_request.js';
+import { ISSUER } from 'lib/configs/env.js';
 
 describe('Pushed Request Object', () => {
 	let setup = null;
@@ -623,7 +624,7 @@ describe('Pushed Request Object', () => {
 									code_challenge,
 									client_id: clientId,
 									iss: clientId,
-									aud: 'http://e.ly'
+									aud: ISSUER
 								},
 								key,
 								'HS256',
@@ -667,7 +668,7 @@ describe('Pushed Request Object', () => {
 											code_challenge,
 											client_id: clientId,
 											iss: clientId,
-											aud: 'http://e.ly'
+											aud: ISSUER
 										},
 										key,
 										'HS256',
@@ -708,7 +709,7 @@ describe('Pushed Request Object', () => {
 											code_challenge,
 											client_id: clientId,
 											iss: clientId,
-											aud: 'http://e.ly'
+											aud: ISSUER
 										},
 										key,
 										'HS256'
@@ -747,7 +748,7 @@ describe('Pushed Request Object', () => {
 											code_challenge,
 											client_id: clientId,
 											iss: clientId,
-											aud: 'http://e.ly'
+											aud: ISSUER
 										},
 										key,
 										'HS256',
@@ -788,7 +789,7 @@ describe('Pushed Request Object', () => {
 											code_challenge,
 											client_id: clientId,
 											iss: clientId,
-											aud: 'http://e.ly'
+											aud: ISSUER
 										},
 										key,
 										'HS256',
@@ -833,7 +834,7 @@ describe('Pushed Request Object', () => {
 											code_challenge,
 											client_id: clientId,
 											iss: clientId,
-											aud: 'http://e.ly'
+											aud: ISSUER
 										},
 										key,
 										'HS256',
@@ -873,7 +874,7 @@ describe('Pushed Request Object', () => {
 											code_challenge,
 											client_id: 'client-alg-registered',
 											iss: 'client-alg-registered',
-											aud: 'http://e.ly'
+											aud: ISSUER
 										},
 										key,
 										'HS384',
@@ -912,7 +913,7 @@ describe('Pushed Request Object', () => {
 											code_challenge,
 											client_id: 'client-foo',
 											iss: clientId,
-											aud: 'http://e.ly'
+											aud: ISSUER
 										},
 										key,
 										'HS256',
@@ -951,7 +952,7 @@ describe('Pushed Request Object', () => {
 											code_challenge,
 											client_id: clientId,
 											iss: clientId,
-											aud: 'http://e.ly',
+											aud: ISSUER,
 											redirect_uri: 'https://rp.example.com/unlisted'
 										},
 										key,
@@ -997,7 +998,7 @@ describe('Pushed Request Object', () => {
 											code_challenge,
 											client_id: clientId,
 											iss: clientId,
-											aud: 'http://e.ly'
+											aud: ISSUER
 										},
 										key,
 										'HS256',
@@ -1038,7 +1039,7 @@ describe('Pushed Request Object', () => {
 											code_challenge,
 											client_id: clientId,
 											iss: clientId,
-											aud: 'http://e.ly'
+											aud: ISSUER
 										},
 										key,
 										'HS256',
@@ -1062,7 +1063,7 @@ describe('Pushed Request Object', () => {
 							const auth = new AuthorizationRequest({
 								client_id: clientId,
 								iss: clientId,
-								aud: 'http://e.ly',
+								aud: ISSUER,
 								request_uri
 							});
 
@@ -1071,7 +1072,7 @@ describe('Pushed Request Object', () => {
 								query: {
 									client_id: clientId,
 									iss: clientId,
-									aud: 'http://e.ly',
+									aud: ISSUER,
 									request_uri
 								},
 								headers: {

@@ -334,7 +334,7 @@ export function passInteractionChecks(...reasons) {
 
 	context('', () => {
 		before(function () {
-			const { policy } = i(this.provider).configuration.interactions;
+			const { policy } = i(provider).configuration.interactions;
 
 			const iChecks = flatten(policy.map((i) => i.checks));
 

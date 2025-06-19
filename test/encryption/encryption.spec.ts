@@ -13,6 +13,9 @@ import bootstrap from '../test_helper.js';
 import * as JWT from '../../lib/helpers/jwt.ts';
 
 import { keypair } from './encryption.config.js';
+import { provider } from 'lib/provider.js';
+import { ISSUER } from 'lib/configs/env.js';
+import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
 const route = '/auth';
 
@@ -46,7 +49,7 @@ describe('encryption', () => {
 		].forEach((attr) => {
 			it(`symmetric ${attr} makes client secret mandatory (${alg})`, function () {
 				expect(
-					this.provider.Client.needsSecret({
+					provider.Client.needsSecret({
 						token_endpoint_auth_method: 'none',
 						[attr]: alg
 					})
@@ -59,10 +62,7 @@ describe('encryption', () => {
 		describe(`[encryption] IMPLICIT id_token+token ${verb} ${route}`, () => {
 			describe('encrypted authorization results', () => {
 				before(async function () {
-					const auth = new this.AuthorizationRequest({
-						response_type: 'code',
-						scope: 'openid'
-					});
+					const auth = new AuthorizationRequest({ scope: 'openid' });
 
 					const response = await this.getToken(auth, { verb });
 					this.id_token = response.body.id_token;
@@ -83,7 +83,7 @@ describe('encryption', () => {
 
 				it('duplicates iss and aud as JWE Header Parameters in an encrypted ID Token', function () {
 					const header = decodeProtectedHeader(this.id_token);
-					expect(header).to.have.property('iss').eql(this.provider.issuer);
+					expect(header).to.have.property('iss').eql(ISSUER);
 					expect(header).to.have.property('aud').eql('client');
 				});
 
@@ -100,7 +100,7 @@ describe('encryption', () => {
 							if (err) throw err;
 
 							const header = decodeProtectedHeader(response.text);
-							expect(header).to.have.property('iss').eql(this.provider.issuer);
+							expect(header).to.have.property('iss').eql(ISSUER);
 							expect(header).to.have.property('aud').eql('client');
 
 							const { plaintext } = await compactDecrypt(
@@ -119,13 +119,13 @@ describe('encryption', () => {
 
 				describe('userinfo signed - expired client secret', () => {
 					before(async function () {
-						const client = await this.provider.Client.find('client');
+						const client = await provider.Client.find('client');
 						client.userinfoSignedResponseAlg = 'HS256';
 						client.clientSecretExpiresAt = 1;
 					});
 
 					after(async function () {
-						const client = await this.provider.Client.find('client');
+						const client = await provider.Client.find('client');
 						client.userinfoSignedResponseAlg = 'RS256';
 						client.clientSecretExpiresAt = 0;
 					});
@@ -145,13 +145,13 @@ describe('encryption', () => {
 
 				describe('userinfo symmetric encrypted - expired client secret', () => {
 					before(async function () {
-						const client = await this.provider.Client.find('client');
+						const client = await provider.Client.find('client');
 						client.clientSecretExpiresAt = 1;
 						client.userinfoEncryptedResponseAlg = 'dir';
 					});
 
 					after(async function () {
-						const client = await this.provider.Client.find('client');
+						const client = await provider.Client.find('client');
 						client.clientSecretExpiresAt = 0;
 						client.userinfoEncryptedResponseAlg = 'RSA-OAEP';
 					});
@@ -180,14 +180,14 @@ describe('encryption', () => {
 						},
 						Buffer.from('secret'),
 						'HS256',
-						{ issuer: 'client', audience: this.provider.issuer }
+						{ issuer: 'client', audience: ISSUER }
 					);
 
-					let [key] = i(this.provider).keystore.selectForEncrypt({
+					let [key] = i(provider).keystore.selectForEncrypt({
 						kty: 'RSA',
 						alg: 'RSA-OAEP-512'
 					});
-					key = i(this.provider).keystore.getKeyObject(key, true);
+					key = i(provider).keystore.getKeyObject(key, true);
 
 					const encrypted = await new CompactEncrypt(encoder.encode(signed))
 						.setProtectedHeader({ enc: 'A128CBC-HS256', alg: 'RSA-OAEP-512' })
@@ -221,14 +221,14 @@ describe('encryption', () => {
 						},
 						Buffer.from('secret'),
 						'HS256',
-						{ issuer: 'client', audience: this.provider.issuer }
+						{ issuer: 'client', audience: ISSUER }
 					);
 
-					let [key] = i(this.provider).keystore.selectForEncrypt({
+					let [key] = i(provider).keystore.selectForEncrypt({
 						kty: 'RSA',
 						alg: 'RSA-OAEP-512'
 					});
-					key = i(this.provider).keystore.getKeyObject(key, true);
+					key = i(provider).keystore.getKeyObject(key, true);
 
 					const encrypted = await new CompactEncrypt(encoder.encode(signed))
 						.setProtectedHeader({ enc: 'A192CBC-HS384', alg: 'RSA-OAEP-512' })
@@ -256,7 +256,7 @@ describe('encryption', () => {
 
 			describe('Pushed Request Object encryption', () => {
 				it('works signed', async function () {
-					const client = await this.provider.Client.find('client');
+					const client = await provider.Client.find('client');
 					const [hsSecret] = client.symmetricKeyStore.selectForSign({
 						alg: 'HS256'
 					});
@@ -272,14 +272,14 @@ describe('encryption', () => {
 						},
 						client.symmetricKeyStore.getKeyObject(hsSecret),
 						'HS256',
-						{ issuer: 'client', audience: this.provider.issuer }
+						{ issuer: 'client', audience: ISSUER }
 					);
 
-					let [key] = i(this.provider).keystore.selectForEncrypt({
+					let [key] = i(provider).keystore.selectForEncrypt({
 						kty: 'RSA',
 						alg: 'RSA-OAEP'
 					});
-					key = i(this.provider).keystore.getKeyObject(key, true);
+					key = i(provider).keystore.getKeyObject(key, true);
 
 					const encrypted = await new CompactEncrypt(encoder.encode(signed))
 						.setProtectedHeader({ enc: 'A128CBC-HS256', alg: 'RSA-OAEP' })
@@ -311,7 +311,7 @@ describe('encryption', () => {
 				});
 
 				it('works with signed by other than none when an alg is required', async function () {
-					const client = await this.provider.Client.find(
+					const client = await provider.Client.find(
 						'clientRequestObjectSigningAlg'
 					);
 					const [hsSecret] = client.symmetricKeyStore.selectForSign({
@@ -331,15 +331,15 @@ describe('encryption', () => {
 						'HS256',
 						{
 							issuer: 'clientRequestObjectSigningAlg',
-							audience: this.provider.issuer
+							audience: ISSUER
 						}
 					);
 
-					let [key] = i(this.provider).keystore.selectForEncrypt({
+					let [key] = i(provider).keystore.selectForEncrypt({
 						kty: 'RSA',
 						alg: 'RSA-OAEP'
 					});
-					key = i(this.provider).keystore.getKeyObject(key, true);
+					key = i(provider).keystore.getKeyObject(key, true);
 
 					const encrypted = await new CompactEncrypt(encoder.encode(signed))
 						.setProtectedHeader({ enc: 'A128CBC-HS256', alg: 'RSA-OAEP' })
@@ -372,14 +372,11 @@ describe('encryption', () => {
 			});
 
 			it('handles when no suitable encryption key is found', async function () {
-				const client = await this.provider.Client.find('client');
+				const client = await provider.Client.find('client');
 
 				client.idTokenEncryptedResponseAlg = 'ECDH-ES';
 
-				const auth = new this.AuthorizationRequest({
-					response_type: 'code',
-					scope: 'openid'
-				});
+				const auth = new AuthorizationRequest({ scope: 'openid' });
 
 				const response = await this.getToken(auth, { verb });
 
@@ -397,8 +394,7 @@ describe('encryption', () => {
 
 			describe('symmetric encryption', () => {
 				before(async function () {
-					const auth = new this.AuthorizationRequest({
-						response_type: 'code',
+					const auth = new AuthorizationRequest({
 						scope: 'openid',
 						client_id: 'clientSymmetric'
 					});
@@ -408,7 +404,7 @@ describe('encryption', () => {
 				});
 
 				it('accepts symmetric encrypted Request Objects', async function () {
-					const client = await this.provider.Client.find('clientSymmetric');
+					const client = await provider.Client.find('clientSymmetric');
 					const code_verifier = crypto.randomBytes(32).toString('base64url');
 					const signed = await JWT.sign(
 						{
@@ -422,7 +418,7 @@ describe('encryption', () => {
 						},
 						Buffer.from('secret'),
 						'HS256',
-						{ issuer: 'clientSymmetric', audience: this.provider.issuer }
+						{ issuer: 'clientSymmetric', audience: ISSUER }
 					);
 
 					let [key] = client.symmetricKeyStore.selectForEncrypt({
@@ -455,8 +451,7 @@ describe('encryption', () => {
 							});
 						});
 
-					const auth = new this.AuthorizationRequest({
-						response_type: 'code',
+					const auth = new AuthorizationRequest({
 						code_verifier,
 						scope: 'openid',
 						client_id: 'clientSymmetric'
@@ -467,9 +462,7 @@ describe('encryption', () => {
 				});
 
 				it('rejects symmetric encrypted request objects when secret is expired', async function () {
-					const client = await this.provider.Client.find(
-						'clientSymmetric-expired'
-					);
+					const client = await provider.Client.find('clientSymmetric-expired');
 					const signed = await JWT.sign(
 						{
 							client_id: 'clientSymmetric-expired',
@@ -480,7 +473,7 @@ describe('encryption', () => {
 						'HS256',
 						{
 							issuer: 'clientSymmetric-expired',
-							audience: this.provider.issuer
+							audience: ISSUER
 						}
 					);
 
@@ -520,15 +513,14 @@ describe('encryption', () => {
 					expect(this.id_token.split('.')).to.have.lengthOf(5);
 					const header = decodeProtectedHeader(this.id_token);
 					expect(header).to.have.property('alg', 'A128KW');
-					expect(header).to.have.property('iss').eql(this.provider.issuer);
+					expect(header).to.have.property('iss').eql(ISSUER);
 					expect(header).to.have.property('aud').eql('clientSymmetric');
 				});
 			});
 
 			describe('direct key agreement symmetric encryption', () => {
 				before(async function () {
-					const auth = new this.AuthorizationRequest({
-						response_type: 'code',
+					const auth = new AuthorizationRequest({
 						scope: 'openid',
 						client_id: 'clientSymmetric-dir'
 					});
@@ -538,7 +530,7 @@ describe('encryption', () => {
 				});
 
 				it('accepts symmetric (dir) encrypted Request Objects', async function () {
-					const client = await this.provider.Client.find('clientSymmetric');
+					const client = await provider.Client.find('clientSymmetric');
 					const code_verifier = crypto.randomBytes(32).toString('base64url');
 					const signed = await JWT.sign(
 						{
@@ -552,7 +544,7 @@ describe('encryption', () => {
 						},
 						Buffer.from('secret'),
 						'HS256',
-						{ issuer: 'clientSymmetric-dir', audience: this.provider.issuer }
+						{ issuer: 'clientSymmetric-dir', audience: ISSUER }
 					);
 
 					let [key] = client.symmetricKeyStore.selectForEncrypt({
@@ -583,8 +575,7 @@ describe('encryption', () => {
 							});
 							code = actual.query.code;
 						});
-					const auth = new this.AuthorizationRequest({
-						response_type: 'code',
+					const auth = new AuthorizationRequest({
 						code_verifier,
 						scope: 'openid',
 						client_id: 'clientSymmetric-dir'
@@ -595,7 +586,7 @@ describe('encryption', () => {
 				});
 
 				it('rejects symmetric (dir) encrypted request objects when secret is expired', async function () {
-					const client = await this.provider.Client.find('clientSymmetric');
+					const client = await provider.Client.find('clientSymmetric');
 					const signed = await JWT.sign(
 						{
 							client_id: 'clientSymmetric-expired',
@@ -606,7 +597,7 @@ describe('encryption', () => {
 						'HS256',
 						{
 							issuer: 'clientSymmetric-expired',
-							audience: this.provider.issuer
+							audience: ISSUER
 						}
 					);
 
@@ -650,7 +641,7 @@ describe('encryption', () => {
 					const header = decodeProtectedHeader(this.id_token);
 					expect(header).to.have.property('alg', 'dir');
 					expect(header).to.have.property('enc', 'A128CBC-HS256');
-					expect(header).to.have.property('iss').eql(this.provider.issuer);
+					expect(header).to.have.property('iss').eql(ISSUER);
 					expect(header).to.have.property('aud').eql('clientSymmetric-dir');
 				});
 			});

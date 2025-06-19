@@ -2,6 +2,8 @@ import { expect } from 'chai';
 import sinon from 'sinon';
 
 import bootstrap from '../test_helper.js';
+import { provider } from 'lib/provider.js';
+import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
 describe('custom response modes', () => {
 	before(bootstrap(import.meta.url));
@@ -12,16 +14,15 @@ describe('custom response modes', () => {
 
 	it('allows for grant types to be added', function () {
 		expect(() => {
-			this.provider.registerResponseMode('custom', () => {});
+			provider.registerResponseMode('custom', () => {});
 		}).not.to.throw();
 	});
 
 	it('is used for success authorization results', function () {
 		const spy = sinon.spy();
-		this.provider.registerResponseMode('custom2', spy);
+		provider.registerResponseMode('custom2', spy);
 
-		const auth = new this.AuthorizationRequest({
-			response_type: 'code',
+		const auth = new AuthorizationRequest({
 			scope: 'openid',
 			response_mode: 'custom2'
 		});
@@ -38,10 +39,9 @@ describe('custom response modes', () => {
 
 	it('is used for error authorization results', function () {
 		const spy = sinon.spy();
-		this.provider.registerResponseMode('custom3', spy);
+		provider.registerResponseMode('custom3', spy);
 
-		const auth = new this.AuthorizationRequest({
-			response_type: 'code',
+		const auth = new AuthorizationRequest({
 			scope: 'openid',
 			response_mode: 'custom3',
 			prompt: 'none login' // causes invalid_request
@@ -63,8 +63,7 @@ describe('custom response modes', () => {
 	});
 
 	it('handles invalid response_mode values', function () {
-		const auth = new this.AuthorizationRequest({
-			response_type: 'code',
+		const auth = new AuthorizationRequest({
 			scope: 'openid',
 			response_mode: 'foo'
 		});

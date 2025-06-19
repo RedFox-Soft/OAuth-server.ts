@@ -6,8 +6,9 @@ import bootstrap, {
 	enableNetConnect,
 	resetNetConnect
 } from '../test_helper.js';
+import { ISSUER } from 'lib/configs/env.js';
+import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
-const response_type = 'code';
 const scope = 'openid';
 
 describe('External Signing Keys', () => {
@@ -19,9 +20,8 @@ describe('External Signing Keys', () => {
 	after(resetNetConnect);
 
 	it('still signs with in-process JWKS', async function () {
-		const auth = new this.AuthorizationRequest({
+		const auth = new AuthorizationRequest({
 			client_id: 'client-sig-internal',
-			response_type,
 			scope
 		});
 
@@ -30,9 +30,8 @@ describe('External Signing Keys', () => {
 	});
 
 	it('but signs with external keys too and verifies them local', async function () {
-		const auth = new this.AuthorizationRequest({
+		const auth = new AuthorizationRequest({
 			client_id: 'client-sig-external',
-			response_type,
 			scope
 		});
 
@@ -42,9 +41,7 @@ describe('External Signing Keys', () => {
 
 		await jose.compactVerify(
 			id_token,
-			jose.createRemoteJWKSet(
-				new URL(this.provider.issuer + this.suitePath('/jwks'))
-			)
+			jose.createRemoteJWKSet(new URL(ISSUER + this.suitePath('/jwks')))
 		);
 
 		auth.id_token_hint = id_token;

@@ -1,7 +1,6 @@
 import getAccessToken from './access_token.ts';
 import getAuthorizationCode from './authorization_code.ts';
 import getClientCredentials from './client_credentials.ts';
-import getDeviceCode from './device_code.ts';
 import getBackchannelAuthenticationRequest from './backchannel_authentication_request.ts';
 import getInitialAccessToken from './initial_access_token.ts';
 import getInteraction from './interaction.ts';
@@ -14,7 +13,6 @@ export {
 	getAuthorizationCode,
 	getBackchannelAuthenticationRequest,
 	getClientCredentials,
-	getDeviceCode,
 	getInitialAccessToken,
 	getInteraction,
 	getRefreshToken,

@@ -38,11 +38,6 @@ export class OIDCContext {
 		return i !== -1 ? oneOf[i] : undefined;
 	}
 
-	get issuer() {
-		// eslint-disable-line class-methods-use-this
-		return provider.issuer;
-	}
-
 	get provider() {
 		// eslint-disable-line class-methods-use-this
 		return provider;

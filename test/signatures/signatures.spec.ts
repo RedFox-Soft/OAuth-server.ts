@@ -3,6 +3,8 @@ import { expect } from 'chai';
 import bootstrap from '../test_helper.js';
 import { decode } from '../../lib/helpers/jwt.ts';
 import epochTime from '../../lib/helpers/epoch_time.ts';
+import { provider } from 'lib/provider.js';
+import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
 describe('signatures', () => {
 	before(bootstrap(import.meta.url));
@@ -15,9 +17,9 @@ describe('signatures', () => {
 			return this.logout();
 		});
 		beforeEach(async function () {
-			const ac = new this.provider.AuthorizationCode({
+			const ac = new provider.AuthorizationCode({
 				accountId: this.loggedInAccountId,
-				acr: i(this.provider).configuration.acrValues[0],
+				acr: i(provider).configuration.acrValues[0],
 				authTime: epochTime(),
 				clientId: 'client-sig-HS256',
 				grantId: this.getGrantId('client-sig-HS256'),
@@ -51,8 +53,7 @@ describe('signatures', () => {
 		});
 
 		it('the HS256 signed token can be used as id_token_hint', function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'code',
+			const auth = new AuthorizationRequest({
 				scope: 'openid',
 				prompt: 'none',
 				id_token_hint: this.idToken

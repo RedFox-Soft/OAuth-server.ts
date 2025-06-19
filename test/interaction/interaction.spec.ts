@@ -14,6 +14,8 @@ import epochTime from '../../lib/helpers/epoch_time.ts';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { provider } from 'lib/index.js';
 import { Session } from 'lib/models/session.js';
+import { ISSUER } from 'lib/configs/env.js';
+import { TestAdapter } from 'test/models.js';
 
 const expire = new Date();
 expire.setDate(expire.getDate() + 1);
@@ -110,7 +112,7 @@ describe('devInteractions', () => {
 			return agent
 				.get(url)
 				.expect(200)
-				.expect(new RegExp(`action="${this.provider.issuer}${this.url}"`))
+				.expect(new RegExp(`action="${ISSUER}${this.url}"`))
 				.expect(/name="prompt" value="consent"/)
 				.expect(/Authorize/);
 		});
@@ -154,7 +156,7 @@ describe('devInteractions', () => {
 
 			const split = url.split('/');
 			const uid = split[split.length - 1];
-			const interaction = this.TestAdapter.for('Interaction').syncFind(uid);
+			const interaction = TestAdapter.for('Interaction').syncFind(uid);
 			interaction.prompt.name = 'notimplemented';
 
 			return this.agent.get(url).expect(501);
@@ -228,7 +230,7 @@ describe('devInteractions', () => {
 		it('checks that the account is a non empty string', async function () {
 			let location;
 			const spy = sinon.spy();
-			this.provider.once('server_error', spy);
+			provider.once('server_error', spy);
 
 			await this.agent
 				.post(`${this.url}`)
@@ -400,7 +402,7 @@ describe('resume after consent', () => {
 		}
 
 		this.agent._saveCookies.bind(this.agent)({
-			request: { url: this.provider.issuer },
+			request: { url: ISSUER },
 			headers: { 'set-cookie': cookies }
 		});
 
@@ -440,9 +442,7 @@ describe('resume after consent', () => {
 
 	describe('login results', () => {
 		it('should process newly established permanent sessions (default)', async function () {
-			sinon
-				.stub(this.provider.Grant.prototype, 'getOIDCScope')
-				.returns('openid');
+			sinon.stub(provider.Grant.prototype, 'getOIDCScope').returns('openid');
 			const auth = new AuthorizationRequest({
 				response_type: 'code',
 				response_mode: 'query',
@@ -563,7 +563,7 @@ describe('resume after consent', () => {
 				})
 				.expect(/<form method="post" action=".+\/session\/end\/confirm">/);
 
-			expect(await this.provider.Interaction.find('resume')).to.be.ok;
+			expect(await provider.Interaction.find('resume')).to.be.ok;
 
 			await this.agent
 				.post('/session/end/confirm')

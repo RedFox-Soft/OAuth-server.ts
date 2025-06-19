@@ -2,6 +2,7 @@ import sinon from 'sinon';
 import { expect } from 'chai';
 
 import bootstrap from '../test_helper.js';
+import { provider } from 'lib/provider.js';
 
 const route = '/token';
 
@@ -10,7 +11,7 @@ describe('grant_type=client_credentials w/ resourceIndicators', () => {
 
 	it('provides a Bearer client credentials opaque token', function () {
 		const spy = sinon.spy();
-		this.provider.once('client_credentials.saved', spy);
+		provider.once('client_credentials.saved', spy);
 
 		return this.agent
 			.post(route)
@@ -44,7 +45,7 @@ describe('grant_type=client_credentials w/ resourceIndicators', () => {
 
 	it('provides a Bearer client credentials jwt token', function () {
 		const spy = sinon.spy();
-		this.provider.once('client_credentials.issued', spy);
+		provider.once('client_credentials.issued', spy);
 
 		return this.agent
 			.post(route)
@@ -143,8 +144,8 @@ describe('grant_type=client_credentials w/ resourceIndicators', () => {
 
 	it('checks the policy and adds the resource', async function () {
 		const spy = sinon.spy();
-		this.provider.once('client_credentials.saved', spy);
-		this.provider.once('client_credentials.issued', spy);
+		provider.once('client_credentials.saved', spy);
+		provider.once('client_credentials.issued', spy);
 
 		await this.agent
 			.post(route)
@@ -180,8 +181,8 @@ describe('grant_type=client_credentials w/ resourceIndicators', () => {
 
 	it('also ignores resource unrecognized scopes', async function () {
 		const spy = sinon.spy();
-		this.provider.once('client_credentials.saved', spy);
-		this.provider.once('client_credentials.issued', spy);
+		provider.once('client_credentials.saved', spy);
+		provider.once('client_credentials.issued', spy);
 
 		await this.agent
 			.post(route)
@@ -202,8 +203,8 @@ describe('grant_type=client_credentials w/ resourceIndicators', () => {
 
 	it('applies the default resource', async function () {
 		const spy = sinon.spy();
-		this.provider.once('client_credentials.saved', spy);
-		this.provider.once('client_credentials.issued', spy);
+		provider.once('client_credentials.saved', spy);
+		provider.once('client_credentials.issued', spy);
 
 		await this.agent
 			.post(route)

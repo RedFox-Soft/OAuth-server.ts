@@ -19,6 +19,7 @@ import {
 } from 'lib/helpers/re_render_errors.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { Session } from 'lib/models/session.js';
+import { DeviceCode } from 'lib/models/device_code.js';
 
 const htmlTeamplate = Bun.file('./lib/interactions/htmlTeamplate.html');
 
@@ -99,10 +100,10 @@ export const ui = new Elysia()
 		await getResume(ctx, interaction);
 		cookie._interaction.remove();
 
-		const code = await ctx.oidc.provider.DeviceCode.find(
-			interaction.deviceCode,
-			{ ignoreExpiration: true, ignoreSessionBinding: true }
-		);
+		const code = await DeviceCode.find(interaction.deviceCode, {
+			ignoreExpiration: true,
+			ignoreSessionBinding: true
+		});
 
 		if (!code) {
 			throw new NotFoundError();

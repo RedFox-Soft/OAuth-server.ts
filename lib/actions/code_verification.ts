@@ -25,6 +25,7 @@ import checkClient from './authorization/check_client.js';
 import deviceUserFlowErrors from './authorization/device_user_flow_errors.js';
 import deviceUserFlowResponse from './authorization/device_user_flow_response.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
+import { DeviceCode } from 'lib/models/device_code.js';
 
 async function codeVerificationActionHandler(ctx) {
 	deviceUserFlowErrors;
@@ -107,7 +108,7 @@ export const post = [
 		}
 
 		const normalized = normalize(userCode);
-		const code = await ctx.oidc.provider.DeviceCode.findByUserCode(normalized, {
+		const code = await DeviceCode.findByUserCode(normalized, {
 			ignoreExpiration: true
 		});
 

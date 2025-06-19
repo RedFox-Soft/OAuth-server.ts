@@ -2,6 +2,9 @@ import { expect } from 'chai';
 import sinon from 'sinon';
 
 import bootstrap from '../test_helper.js';
+import { ISSUER } from 'lib/configs/env.js';
+import { provider } from 'lib/provider.js';
+import { TestAdapter } from 'test/models.js';
 
 describe('registration features', () => {
 	before(bootstrap(import.meta.url));
@@ -39,7 +42,7 @@ describe('registration features', () => {
 						.and.eql(['code']);
 					expect(response.body).to.have.property(
 						'registration_client_uri',
-						`${this.provider.issuer}${this.suitePath(`/reg/${response.body.client_id}`)}`
+						`${ISSUER}${this.suitePath(`/reg/${response.body.client_id}`)}`
 					);
 				});
 		});
@@ -62,13 +65,13 @@ describe('registration features', () => {
 
 		context('when issueRegistrationAccessToken is false', () => {
 			before(function () {
-				const config = i(this.provider).features.registration;
+				const config = i(provider).features.registration;
 				this.orig = config.issueRegistrationAccessToken;
 				config.issueRegistrationAccessToken = false;
 			});
 
 			after(function () {
-				i(this.provider).features.registration.issueRegistrationAccessToken =
+				i(provider).features.registration.issueRegistrationAccessToken =
 					this.orig;
 			});
 
@@ -107,13 +110,13 @@ describe('registration features', () => {
 			'when issueRegistrationAccessToken is a function returning false',
 			() => {
 				before(function () {
-					const config = i(this.provider).features.registration;
+					const config = i(provider).features.registration;
 					this.orig = config.issueRegistrationAccessToken;
 					config.issueRegistrationAccessToken = () => false;
 				});
 
 				after(function () {
-					i(this.provider).features.registration.issueRegistrationAccessToken =
+					i(provider).features.registration.issueRegistrationAccessToken =
 						this.orig;
 				});
 
@@ -153,13 +156,13 @@ describe('registration features', () => {
 			'when issueRegistrationAccessToken is a function returning true',
 			() => {
 				before(function () {
-					const config = i(this.provider).features.registration;
+					const config = i(provider).features.registration;
 					this.orig = config.issueRegistrationAccessToken;
 					config.issueRegistrationAccessToken = () => true;
 				});
 
 				after(function () {
-					i(this.provider).features.registration.issueRegistrationAccessToken =
+					i(provider).features.registration.issueRegistrationAccessToken =
 						this.orig;
 				});
 
@@ -197,13 +200,13 @@ describe('registration features', () => {
 
 		context('when issueRegistrationAccessToken is true', () => {
 			before(function () {
-				const config = i(this.provider).features.registration;
+				const config = i(provider).features.registration;
 				this.orig = config.issueRegistrationAccessToken;
 				config.issueRegistrationAccessToken = true;
 			});
 
 			after(function () {
-				i(this.provider).features.registration.issueRegistrationAccessToken =
+				i(provider).features.registration.issueRegistrationAccessToken =
 					this.orig;
 			});
 
@@ -275,7 +278,7 @@ describe('registration features', () => {
 					);
 				});
 
-			const client = await this.provider.Client.find(client_id);
+			const client = await provider.Client.find(client_id);
 
 			expect(client).not.to.have.property('clientSecret');
 			expect(client).not.to.have.property('clientSecretExpiresAt');
@@ -325,8 +328,8 @@ describe('registration features', () => {
 
 		it('stores the client and emits an event', function () {
 			const spy = sinon.spy();
-			this.provider.once('registration_create.success', spy);
-			const adapter = this.TestAdapter.for('Client');
+			provider.once('registration_create.success', spy);
+			const adapter = TestAdapter.for('Client');
 			const upsert = sinon.spy(adapter, 'upsert');
 
 			return this.agent
@@ -343,14 +346,14 @@ describe('registration features', () => {
 		});
 
 		it('uses the adapter to find stored clients', function () {
-			const adapter = this.TestAdapter.for('Client');
+			const adapter = TestAdapter.for('Client');
 			adapter.store.set('Client:foobar', {
 				client_id: 'foobar',
 				client_secret: 'foobarbaz',
 				redirect_uris: ['https://client.example.com/cb']
 			});
 
-			return this.provider.Client.find('foobar').then((client) => {
+			return provider.Client.find('foobar').then((client) => {
 				expect(client).to.be.ok;
 			});
 		});
@@ -404,13 +407,13 @@ describe('registration features', () => {
 		describe('initial access tokens', () => {
 			describe('fix string one', () => {
 				before(function () {
-					this.provider.enable('registration', {
+					provider.enable('registration', {
 						initialAccessToken: 'foobar'
 					});
 				});
 
 				after(function () {
-					this.provider.enable('registration', {
+					provider.enable('registration', {
 						initialAccessToken: undefined
 					});
 				});
@@ -454,38 +457,36 @@ describe('registration features', () => {
 
 			describe('using a model', () => {
 				before(function () {
-					this.provider.enable('registration', { initialAccessToken: true });
+					provider.enable('registration', { initialAccessToken: true });
 
-					const iat = new this.provider.InitialAccessToken({});
+					const iat = new provider.InitialAccessToken({});
 					return iat.save().then((value) => {
 						this.token = value;
 					});
 				});
 
 				after(function () {
-					this.provider.enable('registration', {
+					provider.enable('registration', {
 						initialAccessToken: undefined
 					});
 				});
 
 				it('allows the developers to insert new tokens with no expiration', function () {
-					return new this.provider.InitialAccessToken().save().then((v) => {
+					return new provider.InitialAccessToken().save().then((v) => {
 						const jti = this.getTokenJti(v);
-						const token =
-							this.TestAdapter.for('InitialAccessToken').syncFind(jti);
+						const token = TestAdapter.for('InitialAccessToken').syncFind(jti);
 						expect(token).not.to.have.property('exp');
 					});
 				});
 
 				it('allows the developers to insert new tokens with expiration', function () {
-					return new this.provider.InitialAccessToken({
+					return new provider.InitialAccessToken({
 						expiresIn: 24 * 60 * 60
 					})
 						.save()
 						.then((v) => {
 							const jti = this.getTokenJti(v);
-							const token =
-								this.TestAdapter.for('InitialAccessToken').syncFind(jti);
+							const token = TestAdapter.for('InitialAccessToken').syncFind(jti);
 							expect(token).to.have.property('exp');
 						});
 				});
@@ -614,7 +615,7 @@ describe('registration features', () => {
 						.and.eql(['code']);
 					expect(response.body).to.have.property(
 						'registration_client_uri',
-						`${this.provider.issuer}${this.suitePath(`/reg/${response.body.client_id}`)}`
+						`${ISSUER}${this.suitePath(`/reg/${response.body.client_id}`)}`
 					);
 				});
 		});
@@ -687,7 +688,7 @@ describe('registration features', () => {
 
 		it('invalidates registration_access_token if used on the wrong client', function () {
 			const spy = sinon.spy();
-			this.provider.once('registration_access_token.destroyed', spy);
+			provider.once('registration_access_token.destroyed', spy);
 
 			return this.agent
 				.get('/reg/foobar')
@@ -704,7 +705,7 @@ describe('registration features', () => {
 		});
 
 		it('cannot read non-dynamic clients', async function () {
-			const rat = new this.provider.RegistrationAccessToken({
+			const rat = new provider.RegistrationAccessToken({
 				clientId: 'client'
 			});
 			const bearer = await rat.save();

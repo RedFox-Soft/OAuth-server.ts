@@ -7,6 +7,10 @@ import bootstrap, { passInteractionChecks } from '../test_helper.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
 import { generate } from '../../lib/helpers/user_codes.ts';
 import { Session } from 'lib/models/session.js';
+import { provider } from 'lib/provider.js';
+import { ISSUER } from 'lib/configs/env.js';
+import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
+import { DeviceCode } from 'lib/models/device_code.js';
 
 const sinon = createSandbox();
 const { any } = sinon.match;
@@ -40,13 +44,13 @@ describe('device interaction resume /device/:uid/', () => {
 		};
 
 		const session = new Session({ jti: 'sess', ...sessionData });
-		const deviceCode = await new this.provider.DeviceCode({
+		const deviceCode = await new DeviceCode({
 			params,
 			clientId: 'client',
 			userCode
 		}).save();
 
-		const interaction = new this.provider.Interaction(uid, {
+		const interaction = new provider.Interaction(uid, {
 			uid,
 			session,
 			deviceCode
@@ -67,7 +71,7 @@ describe('device interaction resume /device/:uid/', () => {
 		}
 
 		this.agent._saveCookies.bind(this.agent)({
-			request: { url: this.provider.issuer },
+			request: { url: ISSUER },
 			headers: { 'set-cookie': cookies }
 		});
 
@@ -81,7 +85,7 @@ describe('device interaction resume /device/:uid/', () => {
 		context('general', () => {
 			it('needs the resume cookie to be present, else renders an err', async function () {
 				const spy = sinon.spy(
-					i(this.provider).features.deviceFlow,
+					i(provider).features.deviceFlow,
 					'userCodeInputSource'
 				);
 
@@ -100,7 +104,7 @@ describe('device interaction resume /device/:uid/', () => {
 				);
 
 				this.agent._saveCookies.bind(this.agent)({
-					request: { url: this.provider.issuer },
+					request: { url: ISSUER },
 					headers: {
 						'set-cookie': `_interaction_resume=; path=${path}; httpOnly`
 					}
@@ -137,18 +141,15 @@ describe('device interaction resume /device/:uid/', () => {
 
 			it('needs to find the session to resume', async function () {
 				const spy = sinon.spy(
-					i(this.provider).features.deviceFlow,
+					i(provider).features.deviceFlow,
 					'userCodeInputSource'
 				);
 
-				const auth = new this.AuthorizationRequest({
-					response_type: 'code',
-					scope: 'openid'
-				});
+				const auth = new AuthorizationRequest({ scope: 'openid' });
 
 				await setup.call(this, auth);
 
-				sinon.stub(this.provider.Interaction, 'find').resolves();
+				sinon.stub(provider.Interaction, 'find').resolves();
 
 				await this.agent
 					.get(path)
@@ -181,18 +182,15 @@ describe('device interaction resume /device/:uid/', () => {
 
 			it('needs to find the code to resume', async function () {
 				const spy = sinon.spy(
-					i(this.provider).features.deviceFlow,
+					i(provider).features.deviceFlow,
 					'userCodeInputSource'
 				);
 
-				const auth = new this.AuthorizationRequest({
-					response_type: 'code',
-					scope: 'openid'
-				});
+				const auth = new AuthorizationRequest({ scope: 'openid' });
 
 				await setup.call(this, auth);
 
-				sinon.stub(this.provider.DeviceCode, 'find').resolves();
+				sinon.stub(DeviceCode, 'find').resolves();
 
 				await this.agent
 					.get(path)
@@ -223,20 +221,15 @@ describe('device interaction resume /device/:uid/', () => {
 
 			it('checks code is not expired', async function () {
 				const spy = sinon.spy(
-					i(this.provider).features.deviceFlow,
+					i(provider).features.deviceFlow,
 					'userCodeInputSource'
 				);
 
-				const auth = new this.AuthorizationRequest({
-					response_type: 'code',
-					scope: 'openid'
-				});
+				const auth = new AuthorizationRequest({ scope: 'openid' });
 
 				await setup.call(this, auth);
 
-				sinon
-					.stub(this.provider.DeviceCode, 'find')
-					.resolves({ isExpired: true });
+				sinon.stub(DeviceCode, 'find').resolves({ isExpired: true });
 
 				await this.agent
 					.get(path)
@@ -267,20 +260,15 @@ describe('device interaction resume /device/:uid/', () => {
 
 			it('checks code is not used already (1/2)', async function () {
 				const spy = sinon.spy(
-					i(this.provider).features.deviceFlow,
+					i(provider).features.deviceFlow,
 					'userCodeInputSource'
 				);
 
-				const auth = new this.AuthorizationRequest({
-					response_type: 'code',
-					scope: 'openid'
-				});
+				const auth = new AuthorizationRequest({ scope: 'openid' });
 
 				await setup.call(this, auth);
 
-				sinon
-					.stub(this.provider.DeviceCode, 'find')
-					.resolves({ accountId: 'foo' });
+				sinon.stub(DeviceCode, 'find').resolves({ accountId: 'foo' });
 
 				await this.agent
 					.get(path)
@@ -311,20 +299,15 @@ describe('device interaction resume /device/:uid/', () => {
 
 			it('checks code is not used already (2/2)', async function () {
 				const spy = sinon.spy(
-					i(this.provider).features.deviceFlow,
+					i(provider).features.deviceFlow,
 					'userCodeInputSource'
 				);
 
-				const auth = new this.AuthorizationRequest({
-					response_type: 'code',
-					scope: 'openid'
-				});
+				const auth = new AuthorizationRequest({ scope: 'openid' });
 
 				await setup.call(this, auth);
 
-				sinon
-					.stub(this.provider.DeviceCode, 'find')
-					.resolves({ error: 'access_denied' });
+				sinon.stub(DeviceCode, 'find').resolves({ error: 'access_denied' });
 
 				await this.agent
 					.get(path)
@@ -356,13 +339,8 @@ describe('device interaction resume /device/:uid/', () => {
 
 		context('login results', () => {
 			it('should process newly established permanent sessions (default)', async function () {
-				sinon
-					.stub(this.provider.Grant.prototype, 'getOIDCScope')
-					.returns('openid');
-				const spy = sinon.spy(
-					i(this.provider).features.deviceFlow,
-					'successSource'
-				);
+				sinon.stub(provider.Grant.prototype, 'getOIDCScope').returns('openid');
+				const spy = sinon.spy(i(provider).features.deviceFlow, 'successSource');
 
 				await setup.call(
 					this,
@@ -391,18 +369,13 @@ describe('device interaction resume /device/:uid/', () => {
 						);
 					});
 
-				const code = await this.provider.DeviceCode.findByUserCode(userCode);
+				const code = await DeviceCode.findByUserCode(userCode);
 				expect(code).to.have.property('accountId');
 			});
 
 			it('should process newly established permanent sessions (explicit)', async function () {
-				sinon
-					.stub(this.provider.Grant.prototype, 'getOIDCScope')
-					.returns('openid');
-				const spy = sinon.spy(
-					i(this.provider).features.deviceFlow,
-					'successSource'
-				);
+				sinon.stub(provider.Grant.prototype, 'getOIDCScope').returns('openid');
+				const spy = sinon.spy(i(provider).features.deviceFlow, 'successSource');
 
 				await setup.call(
 					this,
@@ -432,18 +405,13 @@ describe('device interaction resume /device/:uid/', () => {
 						);
 					});
 
-				const code = await this.provider.DeviceCode.findByUserCode(userCode);
+				const code = await DeviceCode.findByUserCode(userCode);
 				expect(code).to.have.property('accountId');
 			});
 
 			it('should process newly established temporary sessions', async function () {
-				sinon
-					.stub(this.provider.Grant.prototype, 'getOIDCScope')
-					.returns('openid');
-				const spy = sinon.spy(
-					i(this.provider).features.deviceFlow,
-					'successSource'
-				);
+				sinon.stub(provider.Grant.prototype, 'getOIDCScope').returns('openid');
+				const spy = sinon.spy(i(provider).features.deviceFlow, 'successSource');
 
 				await setup.call(
 					this,
@@ -470,17 +438,13 @@ describe('device interaction resume /device/:uid/', () => {
 						expect(this.getSession()).to.be.ok.and.have.property('transient');
 					});
 
-				const code = await this.provider.DeviceCode.findByUserCode(userCode);
+				const code = await DeviceCode.findByUserCode(userCode);
 				expect(code).to.have.property('accountId');
 			});
 
 			it('should trigger logout when the session subject changes', async function () {
-				sinon
-					.stub(this.provider.Grant.prototype, 'getOIDCScope')
-					.returns('openid');
-				const auth = new this.AuthorizationRequest({
-					scope: 'openid'
-				});
+				sinon.stub(provider.Grant.prototype, 'getOIDCScope').returns('openid');
+				const auth = new AuthorizationRequest({ scope: 'openid' });
 
 				await setup.call(
 					this,
@@ -519,7 +483,7 @@ describe('device interaction resume /device/:uid/', () => {
 					})
 					.expect(/<form method="post" action=".+\/session\/end\/confirm">/);
 
-				expect(await this.provider.Interaction.find(uid)).to.be.ok;
+				expect(await provider.Interaction.find(uid)).to.be.ok;
 
 				await this.agent
 					.post('/session/end/confirm')
@@ -532,7 +496,7 @@ describe('device interaction resume /device/:uid/', () => {
 					.expect('location', state.postLogoutRedirectUri);
 
 				await this.agent
-					.get(state.postLogoutRedirectUri.replace(this.provider.issuer, ''))
+					.get(state.postLogoutRedirectUri.replace(ISSUER, ''))
 					.expect(200);
 			});
 		});
@@ -540,7 +504,7 @@ describe('device interaction resume /device/:uid/', () => {
 		context('interaction errors', () => {
 			it('should abort an interaction when given an error result object', async function () {
 				const spy = sinon.spy(
-					i(this.provider).features.deviceFlow,
+					i(provider).features.deviceFlow,
 					'userCodeInputSource'
 				);
 

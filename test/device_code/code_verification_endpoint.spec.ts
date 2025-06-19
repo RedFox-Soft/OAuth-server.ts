@@ -3,6 +3,8 @@ import { expect } from 'chai';
 import timekeeper from 'timekeeper';
 
 import bootstrap, { passInteractionChecks } from '../test_helper.js';
+import { provider } from 'lib/provider.js';
+import { DeviceCode } from 'lib/models/device_code.js';
 
 const sinon = createSandbox();
 
@@ -87,13 +89,13 @@ describe('POST code_verification endpoint w/o verification', () => {
 	});
 
 	afterEach(function () {
-		this.provider.removeAllListeners('code_verification.error');
+		provider.removeAllListeners('code_verification.error');
 		sinon.restore();
 	});
 
 	it('renders a confirmation page', async function () {
 		const spy = sinon.spy(
-			i(this.provider).features.deviceFlow,
+			i(provider).features.deviceFlow,
 			'userCodeConfirmSource'
 		);
 		const deviceInfo = {
@@ -101,7 +103,7 @@ describe('POST code_verification endpoint w/o verification', () => {
 			ua: 'foo'
 		};
 
-		await new this.provider.DeviceCode({
+		await new DeviceCode({
 			clientId: 'client',
 			userCode: 'FOOCODE',
 			deviceInfo
@@ -136,9 +138,9 @@ describe('POST code_verification endpoint w/o verification', () => {
 
 	it('re-renders on no submitted code', async function () {
 		const errSpy = sinon.spy();
-		this.provider.once('code_verification.error', errSpy);
+		provider.once('code_verification.error', errSpy);
 		const spy = sinon.spy(
-			i(this.provider).features.deviceFlow,
+			i(provider).features.deviceFlow,
 			'userCodeInputSource'
 		);
 
@@ -173,9 +175,9 @@ describe('POST code_verification endpoint w/o verification', () => {
 
 	it('re-renders on not found code', async function () {
 		const errSpy = sinon.spy();
-		this.provider.once('code_verification.error', errSpy);
+		provider.once('code_verification.error', errSpy);
 		const spy = sinon.spy(
-			i(this.provider).features.deviceFlow,
+			i(provider).features.deviceFlow,
 			'userCodeInputSource'
 		);
 
@@ -213,14 +215,12 @@ describe('POST code_verification endpoint w/o verification', () => {
 
 	it('re-renders on found but expired code', async function () {
 		const errSpy = sinon.spy();
-		this.provider.once('code_verification.error', errSpy);
+		provider.once('code_verification.error', errSpy);
 		const spy = sinon.spy(
-			i(this.provider).features.deviceFlow,
+			i(provider).features.deviceFlow,
 			'userCodeInputSource'
 		);
-		await new this.provider.DeviceCode({
-			userCode: 'FOOEXPIRED'
-		}).save();
+		await new DeviceCode({ userCode: 'FOOEXPIRED' }).save();
 
 		timekeeper.travel(Date.now() + (10 * 60 + 10) * 1000);
 		await this.agent
@@ -257,12 +257,12 @@ describe('POST code_verification endpoint w/o verification', () => {
 
 	it('re-renders on found but already user code', async function () {
 		const errSpy = sinon.spy();
-		this.provider.once('code_verification.error', errSpy);
+		provider.once('code_verification.error', errSpy);
 		const spy = sinon.spy(
-			i(this.provider).features.deviceFlow,
+			i(provider).features.deviceFlow,
 			'userCodeInputSource'
 		);
-		await new this.provider.DeviceCode({
+		await new DeviceCode({
 			userCode: 'FOOCONSUMED',
 			accountId: 'account'
 		}).save();
@@ -301,17 +301,17 @@ describe('POST code_verification endpoint w/o verification', () => {
 
 	it('re-renders on invalid client', async function () {
 		const errSpy = sinon.spy();
-		this.provider.once('code_verification.error', errSpy);
+		provider.once('code_verification.error', errSpy);
 		const spy = sinon.spy(
-			i(this.provider).features.deviceFlow,
+			i(provider).features.deviceFlow,
 			'userCodeInputSource'
 		);
-		await new this.provider.DeviceCode({
+		await new DeviceCode({
 			userCode: 'FOONOTFOUNDCLIENT',
 			clientId: 'client'
 		}).save();
 
-		sinon.stub(this.provider.Client, 'find').callsFake(async () => {});
+		sinon.stub(provider.Client, 'find').callsFake(async () => {});
 		await this.agent
 			.post(route)
 			.send({
@@ -344,14 +344,12 @@ describe('POST code_verification endpoint w/o verification', () => {
 
 	it('re-renders on !ctx.oidc.session.state', async function () {
 		const errSpy = sinon.spy();
-		this.provider.once('code_verification.error', errSpy);
+		provider.once('code_verification.error', errSpy);
 		const spy = sinon.spy(
-			i(this.provider).features.deviceFlow,
+			i(provider).features.deviceFlow,
 			'userCodeInputSource'
 		);
-		await new this.provider.DeviceCode({
-			userCode: 'FOOCSRF1'
-		}).save();
+		await new DeviceCode({ userCode: 'FOOCSRF1' }).save();
 
 		delete this.getSession().state;
 		await this.agent
@@ -389,14 +387,12 @@ describe('POST code_verification endpoint w/o verification', () => {
 
 	it('re-renders on invalid csrf', async function () {
 		const errSpy = sinon.spy();
-		this.provider.once('code_verification.error', errSpy);
+		provider.once('code_verification.error', errSpy);
 		const spy = sinon.spy(
-			i(this.provider).features.deviceFlow,
+			i(provider).features.deviceFlow,
 			'userCodeInputSource'
 		);
-		await new this.provider.DeviceCode({
-			userCode: 'FOOCSRF2'
-		}).save();
+		await new DeviceCode({ userCode: 'FOOCSRF2' }).save();
 
 		await this.agent
 			.post(route)
@@ -450,11 +446,11 @@ describe('POST code_verification endpoint w/ verification', () => {
 	passInteractionChecks('native_client_prompt', 'op_claims_missing', () => {
 		it('accepts an abort command', async function () {
 			const spy = sinon.spy(
-				i(this.provider).features.deviceFlow,
+				i(provider).features.deviceFlow,
 				'userCodeInputSource'
 			);
 
-			let code = await new this.provider.DeviceCode({
+			let code = await new DeviceCode({
 				clientId: 'client',
 				userCode: 'FOO',
 				params: {
@@ -476,7 +472,7 @@ describe('POST code_verification endpoint w/ verification', () => {
 				.expect(200)
 				.expect(/The Sign-in request was interrupted/);
 
-			code = await this.provider.DeviceCode.find(code);
+			code = await DeviceCode.find(code);
 
 			expect(code).not.to.have.property('accountId');
 			expect(code).to.have.property('error', 'access_denied');
@@ -489,12 +485,9 @@ describe('POST code_verification endpoint w/ verification', () => {
 		});
 
 		it('renders a confirmation and assigns', async function () {
-			const spy = sinon.spy(
-				i(this.provider).features.deviceFlow,
-				'successSource'
-			);
+			const spy = sinon.spy(i(provider).features.deviceFlow, 'successSource');
 
-			let code = await new this.provider.DeviceCode({
+			let code = await new DeviceCode({
 				clientId: 'client',
 				userCode: 'FOO',
 				params: {
@@ -514,7 +507,7 @@ describe('POST code_verification endpoint w/ verification', () => {
 				.type('form')
 				.expect(200);
 
-			code = await this.provider.DeviceCode.find(code);
+			code = await DeviceCode.find(code);
 
 			const session = this.getSession();
 
@@ -530,12 +523,9 @@ describe('POST code_verification endpoint w/ verification', () => {
 		});
 
 		it('renders a confirmation and assigns (incl. sid because of client configuration)', async function () {
-			const spy = sinon.spy(
-				i(this.provider).features.deviceFlow,
-				'successSource'
-			);
+			const spy = sinon.spy(i(provider).features.deviceFlow, 'successSource');
 
-			let code = await new this.provider.DeviceCode({
+			let code = await new DeviceCode({
 				clientId: 'client-backchannel',
 				userCode: 'FOO',
 				params: {
@@ -554,19 +544,16 @@ describe('POST code_verification endpoint w/ verification', () => {
 				.type('form')
 				.expect(200);
 
-			code = await this.provider.DeviceCode.find(code);
+			code = await DeviceCode.find(code);
 
 			expect(code).to.have.property('sid');
 			expect(spy.calledOnce).to.be.true;
 		});
 
 		it('renders a confirmation and assigns (incl. sid because of claims)', async function () {
-			const spy = sinon.spy(
-				i(this.provider).features.deviceFlow,
-				'successSource'
-			);
+			const spy = sinon.spy(i(provider).features.deviceFlow, 'successSource');
 
-			let code = await new this.provider.DeviceCode({
+			let code = await new DeviceCode({
 				clientId: 'client',
 				userCode: 'FOO',
 				params: {
@@ -586,19 +573,16 @@ describe('POST code_verification endpoint w/ verification', () => {
 				.type('form')
 				.expect(200);
 
-			code = await this.provider.DeviceCode.find(code);
+			code = await DeviceCode.find(code);
 
 			expect(code).to.have.property('sid');
 			expect(spy.calledOnce).to.be.true;
 		});
 
 		it('allows for punctuation to be included and characters to be downcased', async function () {
-			const spy = sinon.spy(
-				i(this.provider).features.deviceFlow,
-				'successSource'
-			);
+			const spy = sinon.spy(i(provider).features.deviceFlow, 'successSource');
 
-			let code = await new this.provider.DeviceCode({
+			let code = await new DeviceCode({
 				clientId: 'client',
 				userCode: 'FOOBAR',
 				params: {
@@ -618,7 +602,7 @@ describe('POST code_verification endpoint w/ verification', () => {
 				.type('form')
 				.expect(200);
 
-			code = await this.provider.DeviceCode.find(code);
+			code = await DeviceCode.find(code);
 
 			const session = this.getSession();
 

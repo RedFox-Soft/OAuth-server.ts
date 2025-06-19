@@ -3,6 +3,10 @@ import { expect } from 'chai';
 
 import epochTime from '../../lib/helpers/epoch_time.ts';
 import bootstrap from '../test_helper.js';
+import { Client } from 'lib/models/client.js';
+import { TestAdapter } from 'test/models.js';
+import { provider } from 'lib/provider.js';
+import { DeviceCode } from 'lib/models/device_code.js';
 
 const sinon = createSandbox();
 
@@ -88,9 +92,9 @@ describe('opaque storage', () => {
 
 	it('for AccessToken', async function () {
 		const kind = 'AccessToken';
-		const upsert = spy(this.TestAdapter.for('AccessToken'), 'upsert');
-		const client = await this.provider.Client.find(clientId);
-		const token = new this.provider.AccessToken({ client, ...fullPayload });
+		const upsert = spy(TestAdapter.for('AccessToken'), 'upsert');
+		const client = await Client.find(clientId);
+		const token = new provider.AccessToken({ client, ...fullPayload });
 		await token.save();
 
 		expect(upsert.getCall(0).args[0]).to.have.lengthOf(43);
@@ -116,8 +120,8 @@ describe('opaque storage', () => {
 	});
 
 	it('for AccessToken extraTokenClaims gets assigned upon save()', async function () {
-		const client = await this.provider.Client.find(clientId);
-		const token = new this.provider.AccessToken({
+		const client = await Client.find(clientId);
+		const token = new provider.AccessToken({
 			client,
 			...fullPayload,
 			extra: undefined
@@ -129,9 +133,9 @@ describe('opaque storage', () => {
 
 	it('for AuthorizationCode', async function () {
 		const kind = 'AuthorizationCode';
-		const upsert = spy(this.TestAdapter.for('AuthorizationCode'), 'upsert');
-		const client = await this.provider.Client.find(clientId);
-		const token = new this.provider.AuthorizationCode({
+		const upsert = spy(TestAdapter.for('AuthorizationCode'), 'upsert');
+		const client = await Client.find(clientId);
+		const token = new provider.AuthorizationCode({
 			client,
 			...fullPayload
 		});
@@ -166,9 +170,9 @@ describe('opaque storage', () => {
 
 	it('for DeviceCode', async function () {
 		const kind = 'DeviceCode';
-		const upsert = spy(this.TestAdapter.for('DeviceCode'), 'upsert');
-		const client = await this.provider.Client.find(clientId);
-		const token = new this.provider.DeviceCode({ client, ...fullPayload });
+		const upsert = spy(TestAdapter.for('DeviceCode'), 'upsert');
+		const client = await Client.find(clientId);
+		const token = new DeviceCode({ client, ...fullPayload });
 		await token.save();
 
 		expect(upsert.getCall(0).args[0]).to.have.lengthOf(43);
@@ -203,11 +207,11 @@ describe('opaque storage', () => {
 	it('for BackchannelAuthenticationRequest', async function () {
 		const kind = 'BackchannelAuthenticationRequest';
 		const upsert = spy(
-			this.TestAdapter.for('BackchannelAuthenticationRequest'),
+			TestAdapter.for('BackchannelAuthenticationRequest'),
 			'upsert'
 		);
-		const client = await this.provider.Client.find(clientId);
-		const token = new this.provider.BackchannelAuthenticationRequest({
+		const client = await Client.find(clientId);
+		const token = new provider.BackchannelAuthenticationRequest({
 			client,
 			...fullPayload
 		});
@@ -241,9 +245,9 @@ describe('opaque storage', () => {
 
 	it('for RefreshToken', async function () {
 		const kind = 'RefreshToken';
-		const upsert = spy(this.TestAdapter.for('RefreshToken'), 'upsert');
-		const client = await this.provider.Client.find(clientId);
-		const token = new this.provider.RefreshToken({ client, ...fullPayload });
+		const upsert = spy(TestAdapter.for('RefreshToken'), 'upsert');
+		const client = await Client.find(clientId);
+		const token = new provider.RefreshToken({ client, ...fullPayload });
 		await token.save();
 
 		expect(upsert.getCall(0).args[0]).to.have.lengthOf(43);
@@ -276,9 +280,9 @@ describe('opaque storage', () => {
 
 	it('for ClientCredentials', async function () {
 		const kind = 'ClientCredentials';
-		const upsert = spy(this.TestAdapter.for('ClientCredentials'), 'upsert');
-		const client = await this.provider.Client.find(clientId);
-		const token = new this.provider.ClientCredentials({
+		const upsert = spy(TestAdapter.for('ClientCredentials'), 'upsert');
+		const client = await Client.find(clientId);
+		const token = new provider.ClientCredentials({
 			client,
 			...fullPayload
 		});
@@ -300,8 +304,8 @@ describe('opaque storage', () => {
 	});
 
 	it('for ClientCredentials extraTokenClaims gets assigned upon save()', async function () {
-		const client = await this.provider.Client.find(clientId);
-		const token = new this.provider.ClientCredentials({
+		const client = await Client.find(clientId);
+		const token = new provider.ClientCredentials({
 			client,
 			...fullPayload,
 			extra: undefined
@@ -313,8 +317,8 @@ describe('opaque storage', () => {
 
 	it('for InitialAccessToken', async function () {
 		const kind = 'InitialAccessToken';
-		const upsert = spy(this.TestAdapter.for('InitialAccessToken'), 'upsert');
-		const token = new this.provider.InitialAccessToken({
+		const upsert = spy(TestAdapter.for('InitialAccessToken'), 'upsert');
+		const token = new provider.InitialAccessToken({
 			expiresIn: 100,
 			...fullPayload
 		});
@@ -332,12 +336,9 @@ describe('opaque storage', () => {
 
 	it('for RegistrationAccessToken', async function () {
 		const kind = 'RegistrationAccessToken';
-		const upsert = spy(
-			this.TestAdapter.for('RegistrationAccessToken'),
-			'upsert'
-		);
-		const client = await this.provider.Client.find(clientId);
-		const token = new this.provider.RegistrationAccessToken({
+		const upsert = spy(TestAdapter.for('RegistrationAccessToken'), 'upsert');
+		const client = await Client.find(clientId);
+		const token = new provider.RegistrationAccessToken({
 			client,
 			expiresIn: 100,
 			...fullPayload

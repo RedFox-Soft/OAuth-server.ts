@@ -12,7 +12,6 @@ import ResourceServer from './helpers/resource_server.ts';
 import { OIDCProviderError } from './helpers/errors.ts';
 import * as models from './models/index.ts';
 import DPoPNonces from './helpers/dpop_nonces.ts';
-import als from './helpers/als.ts';
 import { globalConfiguration } from './globalConfiguration.js';
 import { Client } from './models/client.js';
 import { IdToken } from './models/id_token.js';
@@ -23,8 +22,6 @@ class ProviderClass extends EventEmitter {
 	#AuthorizationCode;
 
 	#ClientCredentials;
-
-	#DeviceCode;
 
 	#BackchannelAuthenticationRequest;
 
@@ -240,11 +237,6 @@ class ProviderClass extends EventEmitter {
 		return this.#RegistrationAccessToken;
 	}
 
-	get DeviceCode() {
-		this.#DeviceCode ||= models.getDeviceCode(this);
-		return this.#DeviceCode;
-	}
-
 	get BackchannelAuthenticationRequest() {
 		this.#BackchannelAuthenticationRequest ||=
 			models.getBackchannelAuthenticationRequest(this);
@@ -258,18 +250,6 @@ class ProviderClass extends EventEmitter {
 
 	get [Symbol.toStringTag]() {
 		return 'Provider';
-	}
-
-	toJSON() {
-		return { issuer: this.issuer };
-	}
-
-	inspect() {
-		return `[${this[Symbol.toStringTag]} ${this.issuer}]`;
-	}
-
-	static get ctx() {
-		return als.getStore();
 	}
 }
 

@@ -2,6 +2,7 @@ import instance from '../../helpers/weak_cache.ts';
 import { InvalidRequestUri } from '../../helpers/errors.ts';
 import processResponseTypes from '../../helpers/process_response_types.ts';
 import { PushedAuthorizationRequest } from 'lib/models/pushed_authorization_request.js';
+import { ISSUER } from 'lib/configs/env.js';
 
 /*
  * Based on the authorization request response mode either redirects with parameters in query or
@@ -41,7 +42,7 @@ export default async function respond(ctx) {
 
 	const { responseMode } = ctx.oidc;
 	if (!responseMode.includes('jwt')) {
-		out.iss = ctx.oidc.provider.issuer;
+		out.iss = ISSUER;
 	}
 
 	ctx.oidc.provider.emit('authorization.success', ctx, out);

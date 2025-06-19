@@ -8,6 +8,9 @@ import bootstrap from '../test_helper.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
 
 import { keypair } from './fapi2.config.js';
+import { ISSUER } from 'lib/configs/env.js';
+import { provider } from 'lib/provider.js';
+import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
 const sinon = createSandbox();
 
@@ -21,8 +24,8 @@ describe('FAPI 2.0 Final behaviours', () => {
 		});
 
 		it('does not allow query string bearer token', async function () {
-			const at = await new this.provider.AccessToken({
-				client: await this.provider.Client.find('client'),
+			const at = await new provider.AccessToken({
+				client: await provider.Client.find('client'),
 				accountId: this.loggedInAccountId,
 				grantId: this.getGrantId(),
 				scope: 'openid'
@@ -63,13 +66,12 @@ describe('FAPI 2.0 Final behaviours', () => {
 		});
 
 		it('requires PKCE to be used on the authorization endpoint', function () {
-			const auth = new this.AuthorizationRequest({
+			const auth = new AuthorizationRequest({
 				scope: 'openid',
-				client_id: 'client',
-				response_type: 'code',
-				code_challenge_method: undefined,
-				code_challenge: undefined
+				client_id: 'client'
 			});
+			delete auth.params.code_challenge_method;
+			delete auth.params.code_challenge;
 
 			return this.wrap({
 				agent: this.agent,
@@ -89,7 +91,7 @@ describe('FAPI 2.0 Final behaviours', () => {
 
 		it('requires pkjwt audience to be the issuer identifier', async function () {
 			const spy = sinon.spy();
-			this.provider.on('pushed_authorization_request.error', spy);
+			provider.on('pushed_authorization_request.error', spy);
 
 			await this.agent
 				.post('/request')
@@ -103,7 +105,7 @@ describe('FAPI 2.0 Final behaviours', () => {
 						jti: crypto.randomUUID(),
 						sub: 'client',
 						iss: 'client',
-						aud: this.provider.issuer + this.suitePath('/token'),
+						aud: ISSUER + this.suitePath('/token'),
 						exp: epochTime() + 60,
 						nbf: epochTime()
 					})
@@ -140,7 +142,7 @@ describe('FAPI 2.0 Final behaviours', () => {
 				scope: 'openid',
 				response_type: 'code',
 				redirect_uri: 'https://client.example.com/cb',
-				aud: this.provider.issuer,
+				aud: ISSUER,
 				exp: epochTime() + 60,
 				nbf: epochTime(),
 				code_challenge_method: 'S256',
@@ -149,11 +151,10 @@ describe('FAPI 2.0 Final behaviours', () => {
 				.setProtectedHeader({ alg: 'ES256' })
 				.sign(keypair.privateKey);
 
-			const auth = new this.AuthorizationRequest({
+			const auth = new AuthorizationRequest({
 				request,
 				scope: 'openid',
-				client_id: 'client',
-				response_type: 'code'
+				client_id: 'client'
 			});
 
 			return this.wrap({
@@ -169,7 +170,7 @@ describe('FAPI 2.0 Final behaviours', () => {
 
 		it('requires exp to be provided in the Request Object', async function () {
 			const request = await new SignJWT({
-				aud: this.provider.issuer,
+				aud: ISSUER,
 				code_challenge_method: 'S256',
 				code_challenge: crypto.hash('sha256', 'foo', 'base64url'),
 				// exp: epochTime() + 60,
@@ -182,11 +183,10 @@ describe('FAPI 2.0 Final behaviours', () => {
 				.setProtectedHeader({ alg: 'ES256' })
 				.sign(keypair.privateKey);
 
-			const auth = new this.AuthorizationRequest({
+			const auth = new AuthorizationRequest({
 				request,
 				scope: 'openid',
-				client_id: 'client',
-				response_type: 'code'
+				client_id: 'client'
 			});
 
 			return this.wrap({
@@ -208,7 +208,7 @@ describe('FAPI 2.0 Final behaviours', () => {
 
 		it('requires nbf to be provided in the Request Object', async function () {
 			const request = await new SignJWT({
-				aud: this.provider.issuer,
+				aud: ISSUER,
 				code_challenge_method: 'S256',
 				code_challenge: crypto.hash('sha256', 'foo', 'base64url'),
 				exp: epochTime() + 60,
@@ -221,11 +221,10 @@ describe('FAPI 2.0 Final behaviours', () => {
 				.setProtectedHeader({ alg: 'ES256' })
 				.sign(keypair.privateKey);
 
-			const auth = new this.AuthorizationRequest({
+			const auth = new AuthorizationRequest({
 				request,
 				scope: 'openid',
-				client_id: 'client',
-				response_type: 'code'
+				client_id: 'client'
 			});
 
 			return this.wrap({
@@ -249,7 +248,7 @@ describe('FAPI 2.0 Final behaviours', () => {
 			const request = await new SignJWT({
 				exp: epochTime() + 60,
 				nbf: epochTime() - 3600,
-				aud: this.provider.issuer,
+				aud: ISSUER,
 				code_challenge_method: 'S256',
 				code_challenge: crypto.hash('sha256', 'foo', 'base64url'),
 				client_id: 'client',
@@ -260,11 +259,10 @@ describe('FAPI 2.0 Final behaviours', () => {
 				.setProtectedHeader({ alg: 'ES256' })
 				.sign(keypair.privateKey);
 
-			const auth = new this.AuthorizationRequest({
+			const auth = new AuthorizationRequest({
 				request,
 				scope: 'openid',
-				client_id: 'client',
-				response_type: 'code'
+				client_id: 'client'
 			});
 
 			return this.wrap({

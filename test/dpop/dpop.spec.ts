@@ -27,6 +27,7 @@ import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { provider } from 'lib/provider.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
+import { TestAdapter } from 'test/models.js';
 
 function ath(accessToken) {
 	return hash('sha256', accessToken, 'base64url');
@@ -652,7 +653,7 @@ describe('features.dPoP', () => {
 					this.dc = dc;
 				});
 
-			this.TestAdapter.for('DeviceCode').syncUpdate(this.getTokenJti(this.dc), {
+			TestAdapter.for('DeviceCode').syncUpdate(this.getTokenJti(this.dc), {
 				scope: 'openid offline_access',
 				accountId: this.loggedInAccountId,
 				grantId: this.getGrantId()
@@ -696,7 +697,7 @@ describe('features.dPoP', () => {
 			provider.once('grant.success', spy);
 
 			// changes the code to client-none
-			this.TestAdapter.for('DeviceCode').syncUpdate(this.getTokenJti(this.dc), {
+			TestAdapter.for('DeviceCode').syncUpdate(this.getTokenJti(this.dc), {
 				clientId: 'client-none',
 				accountId: this.loggedInAccountId,
 				grantId: this.getGrantId('client-none')
@@ -784,16 +785,16 @@ describe('features.dPoP', () => {
 			provider.once('grant.success', spy);
 
 			// changes the code to client-none
-			this.TestAdapter.for('BackchannelAuthenticationRequest').syncUpdate(
+			TestAdapter.for('BackchannelAuthenticationRequest').syncUpdate(
 				this.getTokenJti(this.reqId),
 				{
 					clientId: 'client-none'
 				}
 			);
-			const { grantId } = this.TestAdapter.for(
+			const { grantId } = TestAdapter.for(
 				'BackchannelAuthenticationRequest'
 			).syncFind(this.getTokenJti(this.reqId));
-			this.TestAdapter.for('Grant').syncUpdate(grantId, {
+			TestAdapter.for('Grant').syncUpdate(grantId, {
 				clientId: 'client-none'
 			});
 
@@ -905,9 +906,7 @@ describe('features.dPoP', () => {
 					({ request_uri } = body);
 				});
 
-			const auth = new this.AuthorizationRequest({
-				request_uri
-			});
+			const auth = new AuthorizationRequest({ request_uri });
 
 			let code;
 			await this.wrap({ route: '/auth', verb: 'get', auth })
@@ -919,8 +918,7 @@ describe('features.dPoP', () => {
 					} = url.parse(location, true));
 				});
 
-			const { dpopJkt } =
-				this.TestAdapter.for('AuthorizationCode').syncFind(code);
+			const { dpopJkt } = TestAdapter.for('AuthorizationCode').syncFind(code);
 			expect(dpopJkt).to.be.a('string').of.length(43);
 		});
 
@@ -964,9 +962,7 @@ describe('features.dPoP', () => {
 					({ request_uri } = body);
 				});
 
-			const auth = new this.AuthorizationRequest({
-				request_uri
-			});
+			const auth = new AuthorizationRequest({ request_uri });
 
 			let code;
 			await this.wrap({ route: '/auth', verb: 'get', auth })
@@ -978,8 +974,7 @@ describe('features.dPoP', () => {
 					} = url.parse(location, true));
 				});
 
-			const { dpopJkt } =
-				this.TestAdapter.for('AuthorizationCode').syncFind(code);
+			const { dpopJkt } = TestAdapter.for('AuthorizationCode').syncFind(code);
 			expect(dpopJkt).to.be.a('string').of.length(43);
 		});
 	});
@@ -987,8 +982,7 @@ describe('features.dPoP', () => {
 	describe('authorization flow', () => {
 		describe('without dpop_jkt', () => {
 			beforeEach(async function () {
-				const auth = (this.auth = new this.AuthorizationRequest({
-					response_type: 'code',
+				const auth = (this.auth = new AuthorizationRequest({
 					scope: 'openid offline_access',
 					prompt: 'consent'
 				}));
@@ -1043,8 +1037,7 @@ describe('features.dPoP', () => {
 
 		describe('with dpop_jkt', () => {
 			beforeEach(async function () {
-				const auth = (this.auth = new this.AuthorizationRequest({
-					response_type: 'code',
+				const auth = (this.auth = new AuthorizationRequest({
 					scope: 'openid offline_access',
 					prompt: 'consent',
 					dpop_jkt: this.thumbprint
@@ -1162,8 +1155,7 @@ describe('features.dPoP', () => {
 
 		describe('refresh_token', () => {
 			beforeEach(async function () {
-				const auth = (this.auth = new this.AuthorizationRequest({
-					response_type: 'code',
+				const auth = (this.auth = new AuthorizationRequest({
 					scope: 'openid offline_access',
 					prompt: 'consent'
 				}));
@@ -1237,9 +1229,8 @@ describe('features.dPoP', () => {
 
 	describe('authorization flow (public client)', () => {
 		beforeEach(async function () {
-			const auth = (this.auth = new this.AuthorizationRequest({
+			const auth = (this.auth = new AuthorizationRequest({
 				client_id: 'client-none',
-				response_type: 'code',
 				scope: 'openid offline_access',
 				prompt: 'consent'
 			}));

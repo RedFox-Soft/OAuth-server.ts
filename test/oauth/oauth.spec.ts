@@ -5,12 +5,15 @@ import { expect } from 'chai';
 import snakeCase from 'lodash/snakeCase.js';
 
 import bootstrap, { skipConsent } from '../test_helper.js';
+import { provider } from 'lib/provider.js';
+import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
+import { TestAdapter } from 'test/models.js';
 
 describe('requests without the openid scope', () => {
 	before(bootstrap(import.meta.url));
 
 	afterEach(function () {
-		this.provider.removeAllListeners();
+		provider.removeAllListeners();
 	});
 
 	describe('openid scope gated parameters', () => {
@@ -23,10 +26,7 @@ describe('requests without the openid scope', () => {
 			'nonce'
 		].forEach((param) => {
 			it(`${param} can only be used when openid is amongst the requested scopes`, async function () {
-				const auth = new this.AuthorizationRequest({
-					response_type: 'code',
-					[param]: 'foo'
-				});
+				const auth = new AuthorizationRequest({ [param]: 'foo' });
 
 				await this.wrap({ route: '/auth', verb: 'get', auth })
 					.expect(303)
@@ -49,12 +49,9 @@ describe('requests without the openid scope', () => {
 			requireAuthTime: true
 		}).forEach(([clientProperty, value]) => {
 			it(`must be provided when client is configured with ${snakeCase(clientProperty)}`, async function () {
-				const auth = new this.AuthorizationRequest({
-					client_id: 'client',
-					response_type: 'code'
-				});
+				const auth = new AuthorizationRequest({ client_id: 'client' });
 
-				const client = await this.provider.Client.find('client');
+				const client = await provider.Client.find('client');
 
 				client[clientProperty] = value;
 
@@ -88,15 +85,11 @@ describe('requests without the openid scope', () => {
 			});
 
 			describe('response_type=code', () => {
-				const response_type = 'code';
 				it('gets a code from the authorization endpoint', async function () {
-					const auth = new this.AuthorizationRequest({
-						response_type,
-						scope
-					});
+					const auth = new AuthorizationRequest({ scope });
 
 					const spy = sinon.spy();
-					this.provider.on('authorization_code.saved', spy);
+					provider.on('authorization_code.saved', spy);
 
 					await this.wrap({ route: '/auth', verb: 'get', auth })
 						.expect(303)
@@ -109,10 +102,7 @@ describe('requests without the openid scope', () => {
 
 				describe('authorization code exchange', () => {
 					beforeEach(async function () {
-						const auth = (this.auth = new this.AuthorizationRequest({
-							response_type,
-							scope
-						}));
+						const auth = (this.auth = new AuthorizationRequest({ scope }));
 
 						await this.wrap({ route: '/auth', verb: 'get', auth })
 							.expect(303)
@@ -128,8 +118,8 @@ describe('requests without the openid scope', () => {
 
 					it('gets an access token', async function () {
 						const spy = sinon.spy();
-						this.provider.on('access_token.saved', spy);
-						this.provider.on('access_token.issued', spy);
+						provider.on('access_token.saved', spy);
+						provider.on('access_token.issued', spy);
 
 						await this.agent
 							.post('/token')
@@ -151,7 +141,7 @@ describe('requests without the openid scope', () => {
 					});
 
 					it('gets an access token and a refresh token', async function () {
-						const adapter = this.TestAdapter.for('AuthorizationCode');
+						const adapter = TestAdapter.for('AuthorizationCode');
 						const jti = this.getTokenJti(this.code);
 
 						const refreshScope = `${scope || ''} offline_access`.trim();
@@ -161,9 +151,9 @@ describe('requests without the openid scope', () => {
 						});
 
 						const spy = sinon.spy();
-						this.provider.on('access_token.saved', spy);
-						this.provider.on('access_token.issued', spy);
-						this.provider.on('refresh_token.saved', spy);
+						provider.on('access_token.saved', spy);
+						provider.on('access_token.issued', spy);
+						provider.on('refresh_token.saved', spy);
 
 						await this.agent
 							.post('/token')
@@ -196,8 +186,7 @@ describe('requests without the openid scope', () => {
 					});
 
 					beforeEach(async function () {
-						const auth = new this.AuthorizationRequest({
-							response_type,
+						const auth = new AuthorizationRequest({
 							scope: refreshScope,
 							prompt: 'consent'
 						});
@@ -230,9 +219,9 @@ describe('requests without the openid scope', () => {
 
 					it('gets an access token and a refresh token', async function () {
 						const spy = sinon.spy();
-						this.provider.on('access_token.saved', spy);
-						this.provider.on('access_token.issued', spy);
-						this.provider.on('refresh_token.saved', spy);
+						provider.on('access_token.saved', spy);
+						provider.on('access_token.issued', spy);
+						provider.on('refresh_token.saved', spy);
 
 						await this.agent
 							.post('/token')
@@ -257,16 +246,14 @@ describe('requests without the openid scope', () => {
 			});
 
 			describe('response_type=none', () => {
-				const response_type = 'none';
-
 				it('gets nothing from the authorization endpoint', async function () {
-					const auth = new this.AuthorizationRequest({
-						response_type,
+					const auth = new AuthorizationRequest({
+						response_type: 'none',
 						scope
 					});
 
 					const spy = sinon.spy();
-					this.provider.on('authorization.success', spy);
+					provider.on('authorization.success', spy);
 
 					await this.wrap({ route: '/auth', verb: 'get', auth })
 						.expect(303)
@@ -288,7 +275,7 @@ describe('requests without the openid scope', () => {
 			});
 			it('accepts the device authorization request', async function () {
 				const spy = sinon.spy();
-				this.provider.on('device_code.saved', spy);
+				provider.on('device_code.saved', spy);
 
 				await this.agent
 					.post('/device/auth')
@@ -309,7 +296,7 @@ describe('requests without the openid scope', () => {
 
 			describe('urn:ietf:params:oauth:grant-type:device_code', () => {
 				beforeEach(async function () {
-					this.provider.on('device_code.saved', (token) => {
+					provider.on('device_code.saved', (token) => {
 						this.jti = token.jti;
 					});
 
@@ -325,7 +312,7 @@ describe('requests without the openid scope', () => {
 							this.code = body.device_code;
 						});
 
-					this.TestAdapter.for('DeviceCode').syncUpdate(this.jti, {
+					TestAdapter.for('DeviceCode').syncUpdate(this.jti, {
 						scope,
 						accountId: this.loggedInAccountId,
 						grantId: this.getGrantId('client'),
@@ -335,8 +322,8 @@ describe('requests without the openid scope', () => {
 
 				it('gets an access token', async function () {
 					const spy = sinon.spy();
-					this.provider.on('access_token.saved', spy);
-					this.provider.on('access_token.issued', spy);
+					provider.on('access_token.saved', spy);
+					provider.on('access_token.issued', spy);
 
 					await this.agent
 						.post('/token')
@@ -359,11 +346,11 @@ describe('requests without the openid scope', () => {
 				it('gets an access and a refresh_token', async function () {
 					const refreshScope = `${scope || ''} offline_access`.trim();
 					const spy = sinon.spy();
-					this.provider.on('access_token.saved', spy);
-					this.provider.on('access_token.issued', spy);
-					this.provider.on('refresh_token.saved', spy);
+					provider.on('access_token.saved', spy);
+					provider.on('access_token.issued', spy);
+					provider.on('refresh_token.saved', spy);
 
-					this.TestAdapter.for('DeviceCode').syncUpdate(this.jti, {
+					TestAdapter.for('DeviceCode').syncUpdate(this.jti, {
 						scope: refreshScope
 					});
 

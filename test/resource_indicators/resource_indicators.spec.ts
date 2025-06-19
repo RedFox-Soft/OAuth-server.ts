@@ -7,6 +7,8 @@ import { expect } from 'chai';
 
 import bootstrap from '../test_helper.js';
 import { defaults } from '../../lib/helpers/defaults.ts';
+import { provider } from 'lib/provider.js';
+import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
 const {
 	features: { resourceIndicators }
@@ -35,7 +37,7 @@ describe('features.resourceIndicators defaults', () => {
 describe('features.resourceIndicators', () => {
 	before(bootstrap(import.meta.url));
 	afterEach(function () {
-		this.provider.removeAllListeners();
+		provider.removeAllListeners();
 	});
 	before(function () {
 		return this.login({
@@ -85,14 +87,11 @@ describe('features.resourceIndicators', () => {
 
 	['get', 'post'].forEach((verb) => {
 		describe(`${verb} response_type includes code`, () => {
-			const response_type = 'code';
-
 			it('checks the policy and adds the resource', async function () {
 				const spy = sinon.spy();
-				this.provider.once('authorization_code.saved', spy);
+				provider.once('authorization_code.saved', spy);
 
-				const auth = new this.AuthorizationRequest({
-					response_type,
+				const auth = new AuthorizationRequest({
 					resource: 'urn:not:allowed',
 					scope: 'api:read'
 				});
@@ -123,10 +122,10 @@ describe('features.resourceIndicators', () => {
 				expect(code.resource).to.equal('urn:wl:explicit');
 
 				const spy2 = sinon.spy();
-				this.provider.once('access_token.saved', spy2);
-				this.provider.once('access_token.issued', spy2);
+				provider.once('access_token.saved', spy2);
+				provider.once('access_token.issued', spy2);
 				const spy3 = sinon.spy();
-				this.provider.once('refresh_token.saved', spy3);
+				provider.once('refresh_token.saved', spy3);
 
 				await this.agent
 					.post('/token')
@@ -148,10 +147,10 @@ describe('features.resourceIndicators', () => {
 				expect(rt.resource).to.equal('urn:wl:explicit');
 
 				const spy4 = sinon.spy();
-				this.provider.once('access_token.saved', spy4);
-				this.provider.once('access_token.issued', spy4);
+				provider.once('access_token.saved', spy4);
+				provider.once('access_token.issued', spy4);
 				const spy5 = sinon.spy();
-				this.provider.once('refresh_token.saved', spy5);
+				provider.once('refresh_token.saved', spy5);
 
 				await this.agent
 					.post('/token')
@@ -174,10 +173,9 @@ describe('features.resourceIndicators', () => {
 
 			it('applies the default resource', async function () {
 				const spy = sinon.spy();
-				this.provider.once('authorization_code.saved', spy);
+				provider.once('authorization_code.saved', spy);
 
-				const auth = new this.AuthorizationRequest({
-					response_type,
+				const auth = new AuthorizationRequest({
 					scope: 'api:read'
 				});
 
@@ -192,10 +190,10 @@ describe('features.resourceIndicators', () => {
 				expect(code.resource).to.equal('urn:wl:default');
 
 				const spy2 = sinon.spy();
-				this.provider.once('access_token.saved', spy2);
-				this.provider.once('access_token.issued', spy2);
+				provider.once('access_token.saved', spy2);
+				provider.once('access_token.issued', spy2);
 				const spy3 = sinon.spy();
-				this.provider.once('refresh_token.saved', spy3);
+				provider.once('refresh_token.saved', spy3);
 
 				await this.agent
 					.post('/token')
@@ -217,10 +215,10 @@ describe('features.resourceIndicators', () => {
 				expect(rt.resource).to.equal('urn:wl:default');
 
 				const spy4 = sinon.spy();
-				this.provider.once('access_token.saved', spy4);
-				this.provider.once('access_token.issued', spy4);
+				provider.once('access_token.saved', spy4);
+				provider.once('access_token.issued', spy4);
 				const spy5 = sinon.spy();
-				this.provider.once('refresh_token.saved', spy5);
+				provider.once('refresh_token.saved', spy5);
 
 				await this.agent
 					.post('/token')
@@ -243,10 +241,9 @@ describe('features.resourceIndicators', () => {
 
 			it('applies the default resource (when useGrantedResource returns true)', async function () {
 				const spy = sinon.spy();
-				this.provider.once('authorization_code.saved', spy);
+				provider.once('authorization_code.saved', spy);
 
-				const auth = new this.AuthorizationRequest({
-					response_type,
+				const auth = new AuthorizationRequest({
 					scope: 'openid api:read'
 				});
 
@@ -261,10 +258,10 @@ describe('features.resourceIndicators', () => {
 				expect(code.resource).to.equal('urn:wl:default');
 
 				const spy2 = sinon.spy();
-				this.provider.once('access_token.saved', spy2);
-				this.provider.once('access_token.issued', spy2);
+				provider.once('access_token.saved', spy2);
+				provider.once('access_token.issued', spy2);
 				const spy3 = sinon.spy();
-				this.provider.once('refresh_token.saved', spy3);
+				provider.once('refresh_token.saved', spy3);
 
 				await this.agent
 					.post('/token')
@@ -287,10 +284,10 @@ describe('features.resourceIndicators', () => {
 				expect(rt.resource).to.equal('urn:wl:default');
 
 				const spy4 = sinon.spy();
-				this.provider.once('access_token.saved', spy4);
-				this.provider.once('access_token.issued', spy4);
+				provider.once('access_token.saved', spy4);
+				provider.once('access_token.issued', spy4);
 				const spy5 = sinon.spy();
-				this.provider.once('refresh_token.saved', spy5);
+				provider.once('refresh_token.saved', spy5);
 
 				await this.agent
 					.post('/token')
@@ -314,10 +311,9 @@ describe('features.resourceIndicators', () => {
 
 			it('applies the explicit resource', async function () {
 				const spy = sinon.spy();
-				this.provider.once('authorization_code.saved', spy);
+				provider.once('authorization_code.saved', spy);
 
-				const auth = new this.AuthorizationRequest({
-					response_type,
+				const auth = new AuthorizationRequest({
 					scope: 'openid api:read'
 				});
 
@@ -332,10 +328,10 @@ describe('features.resourceIndicators', () => {
 				expect(code.resource).to.equal('urn:wl:default');
 
 				const spy2 = sinon.spy();
-				this.provider.once('access_token.saved', spy2);
-				this.provider.once('access_token.issued', spy2);
+				provider.once('access_token.saved', spy2);
+				provider.once('access_token.issued', spy2);
 				const spy3 = sinon.spy();
-				this.provider.once('refresh_token.saved', spy3);
+				provider.once('refresh_token.saved', spy3);
 
 				await this.agent
 					.post('/token')
@@ -358,10 +354,10 @@ describe('features.resourceIndicators', () => {
 				expect(rt.resource).to.equal('urn:wl:default');
 
 				const spy4 = sinon.spy();
-				this.provider.once('access_token.saved', spy4);
-				this.provider.once('access_token.issued', spy4);
+				provider.once('access_token.saved', spy4);
+				provider.once('access_token.issued', spy4);
 				const spy5 = sinon.spy();
-				this.provider.once('refresh_token.saved', spy5);
+				provider.once('refresh_token.saved', spy5);
 
 				await this.agent
 					.post('/token')
@@ -429,10 +425,10 @@ describe('features.resourceIndicators', () => {
 				.expect(200);
 
 			const spy = sinon.spy();
-			this.provider.once('access_token.saved', spy);
-			this.provider.once('access_token.issued', spy);
+			provider.once('access_token.saved', spy);
+			provider.once('access_token.issued', spy);
 			const spy2 = sinon.spy();
-			this.provider.once('refresh_token.saved', spy2);
+			provider.once('refresh_token.saved', spy2);
 
 			await this.agent
 				.post('/token')
@@ -453,10 +449,10 @@ describe('features.resourceIndicators', () => {
 			expect(rt.resource).to.equal('urn:wl:explicit');
 
 			const spy3 = sinon.spy();
-			this.provider.once('access_token.saved', spy3);
-			this.provider.once('access_token.issued', spy3);
+			provider.once('access_token.saved', spy3);
+			provider.once('access_token.issued', spy3);
 			const spy4 = sinon.spy();
-			this.provider.once('refresh_token.saved', spy4);
+			provider.once('refresh_token.saved', spy4);
 
 			await this.agent
 				.post('/token')
@@ -505,10 +501,10 @@ describe('features.resourceIndicators', () => {
 				.expect(200);
 
 			const spy = sinon.spy();
-			this.provider.once('access_token.saved', spy);
-			this.provider.once('access_token.issued', spy);
+			provider.once('access_token.saved', spy);
+			provider.once('access_token.issued', spy);
 			const spy2 = sinon.spy();
-			this.provider.once('refresh_token.saved', spy2);
+			provider.once('refresh_token.saved', spy2);
 
 			await this.agent
 				.post('/token')
@@ -529,10 +525,10 @@ describe('features.resourceIndicators', () => {
 			expect(rt.resource).to.equal('urn:wl:default');
 
 			const spy3 = sinon.spy();
-			this.provider.once('access_token.saved', spy3);
-			this.provider.once('access_token.issued', spy3);
+			provider.once('access_token.saved', spy3);
+			provider.once('access_token.issued', spy3);
 			const spy4 = sinon.spy();
-			this.provider.once('refresh_token.saved', spy4);
+			provider.once('refresh_token.saved', spy4);
 
 			await this.agent
 				.post('/token')
@@ -581,10 +577,10 @@ describe('features.resourceIndicators', () => {
 				.expect(200);
 
 			const spy = sinon.spy();
-			this.provider.once('access_token.saved', spy);
-			this.provider.once('access_token.issued', spy);
+			provider.once('access_token.saved', spy);
+			provider.once('access_token.issued', spy);
 			const spy2 = sinon.spy();
-			this.provider.once('refresh_token.saved', spy2);
+			provider.once('refresh_token.saved', spy2);
 
 			await this.agent
 				.post('/token')
@@ -606,10 +602,10 @@ describe('features.resourceIndicators', () => {
 			expect(rt.resource).to.equal('urn:wl:default');
 
 			const spy3 = sinon.spy();
-			this.provider.once('access_token.saved', spy3);
-			this.provider.once('access_token.issued', spy3);
+			provider.once('access_token.saved', spy3);
+			provider.once('access_token.issued', spy3);
 			const spy4 = sinon.spy();
-			this.provider.once('refresh_token.saved', spy4);
+			provider.once('refresh_token.saved', spy4);
 
 			await this.agent
 				.post('/token')
@@ -659,10 +655,10 @@ describe('features.resourceIndicators', () => {
 				.expect(200);
 
 			const spy = sinon.spy();
-			this.provider.once('access_token.saved', spy);
-			this.provider.once('access_token.issued', spy);
+			provider.once('access_token.saved', spy);
+			provider.once('access_token.issued', spy);
 			const spy2 = sinon.spy();
-			this.provider.once('refresh_token.saved', spy2);
+			provider.once('refresh_token.saved', spy2);
 
 			await this.agent
 				.post('/token')
@@ -684,10 +680,10 @@ describe('features.resourceIndicators', () => {
 			expect(rt.resource).to.equal('urn:wl:default');
 
 			const spy3 = sinon.spy();
-			this.provider.once('access_token.saved', spy3);
-			this.provider.once('access_token.issued', spy3);
+			provider.once('access_token.saved', spy3);
+			provider.once('access_token.issued', spy3);
 			const spy4 = sinon.spy();
-			this.provider.once('refresh_token.saved', spy4);
+			provider.once('refresh_token.saved', spy4);
 
 			await this.agent
 				.post('/token')
@@ -743,10 +739,10 @@ describe('features.resourceIndicators', () => {
 				});
 
 			const spy = sinon.spy();
-			this.provider.once('access_token.saved', spy);
-			this.provider.once('access_token.issued', spy);
+			provider.once('access_token.saved', spy);
+			provider.once('access_token.issued', spy);
 			const spy2 = sinon.spy();
-			this.provider.once('refresh_token.saved', spy2);
+			provider.once('refresh_token.saved', spy2);
 
 			await this.agent
 				.post('/token')
@@ -768,10 +764,10 @@ describe('features.resourceIndicators', () => {
 			expect(rt.resource).to.equal('urn:wl:explicit');
 
 			const spy3 = sinon.spy();
-			this.provider.once('access_token.saved', spy3);
-			this.provider.once('access_token.issued', spy3);
+			provider.once('access_token.saved', spy3);
+			provider.once('access_token.issued', spy3);
 			const spy4 = sinon.spy();
-			this.provider.once('refresh_token.saved', spy4);
+			provider.once('refresh_token.saved', spy4);
 
 			await this.agent
 				.post('/token')
@@ -809,10 +805,10 @@ describe('features.resourceIndicators', () => {
 				});
 
 			const spy = sinon.spy();
-			this.provider.once('access_token.saved', spy);
-			this.provider.once('access_token.issued', spy);
+			provider.once('access_token.saved', spy);
+			provider.once('access_token.issued', spy);
 			const spy2 = sinon.spy();
-			this.provider.once('refresh_token.saved', spy2);
+			provider.once('refresh_token.saved', spy2);
 
 			await this.agent
 				.post('/token')
@@ -834,10 +830,10 @@ describe('features.resourceIndicators', () => {
 			expect(rt.resource).to.equal('urn:wl:default');
 
 			const spy3 = sinon.spy();
-			this.provider.once('access_token.saved', spy3);
-			this.provider.once('access_token.issued', spy3);
+			provider.once('access_token.saved', spy3);
+			provider.once('access_token.issued', spy3);
 			const spy4 = sinon.spy();
-			this.provider.once('refresh_token.saved', spy4);
+			provider.once('refresh_token.saved', spy4);
 
 			await this.agent
 				.post('/token')
@@ -875,10 +871,10 @@ describe('features.resourceIndicators', () => {
 				});
 
 			const spy = sinon.spy();
-			this.provider.once('access_token.saved', spy);
-			this.provider.once('access_token.issued', spy);
+			provider.once('access_token.saved', spy);
+			provider.once('access_token.issued', spy);
 			const spy2 = sinon.spy();
-			this.provider.once('refresh_token.saved', spy2);
+			provider.once('refresh_token.saved', spy2);
 
 			await this.agent
 				.post('/token')
@@ -899,10 +895,10 @@ describe('features.resourceIndicators', () => {
 			expect(rt.resource).to.equal('urn:wl:default');
 
 			const spy3 = sinon.spy();
-			this.provider.once('access_token.saved', spy3);
-			this.provider.once('access_token.issued', spy3);
+			provider.once('access_token.saved', spy3);
+			provider.once('access_token.issued', spy3);
 			const spy4 = sinon.spy();
-			this.provider.once('refresh_token.saved', spy4);
+			provider.once('refresh_token.saved', spy4);
 
 			await this.agent
 				.post('/token')
@@ -926,10 +922,10 @@ describe('features.resourceIndicators', () => {
 
 	describe('userinfo', () => {
 		it('allows userinfo for audience-less tokens', async function () {
-			const at = new this.provider.AccessToken({
+			const at = new provider.AccessToken({
 				accountId: this.loggedInAccountId,
 				grantId: this.getGrantId(),
-				client: await this.provider.Client.find('client'),
+				client: await provider.Client.find('client'),
 				scope: 'openid api:read',
 				aud: undefined
 			});
@@ -940,10 +936,10 @@ describe('features.resourceIndicators', () => {
 		});
 
 		it('fails userinfo for string userinfo url tokens', async function () {
-			const at = new this.provider.AccessToken({
+			const at = new provider.AccessToken({
 				accountId: this.loggedInAccountId,
 				grantId: this.getGrantId(),
-				client: await this.provider.Client.find('client'),
+				client: await provider.Client.find('client'),
 				scope: 'openid api:read',
 				aud: 'urn:foo:bar'
 			});
@@ -951,7 +947,7 @@ describe('features.resourceIndicators', () => {
 			const bearer = await at.save();
 
 			const spy = sinon.spy();
-			this.provider.once('userinfo.error', spy);
+			provider.once('userinfo.error', spy);
 
 			await this.agent
 				.get('/me')
@@ -971,10 +967,10 @@ describe('features.resourceIndicators', () => {
 
 		[{}, false, 1].forEach((aud, i, { length }) => {
 			it(`fails on various invalid aud values ${i + 1}/${length}`, async function () {
-				const at = new this.provider.AccessToken({
+				const at = new provider.AccessToken({
 					accountId: this.loggedInAccountId,
 					grantId: this.getGrantId(),
-					client: await this.provider.Client.find('client'),
+					client: await provider.Client.find('client'),
 					scope: 'openid api:read',
 					aud
 				});
@@ -982,7 +978,7 @@ describe('features.resourceIndicators', () => {
 				const bearer = await at.save();
 
 				const spy = sinon.spy();
-				this.provider.once('userinfo.error', spy);
+				provider.once('userinfo.error', spy);
 
 				await this.agent
 					.get('/me')

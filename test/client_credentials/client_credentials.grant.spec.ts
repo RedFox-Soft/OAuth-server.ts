@@ -2,6 +2,7 @@ import sinon from 'sinon';
 import { expect } from 'chai';
 
 import bootstrap from '../test_helper.js';
+import { provider } from 'lib/provider.js';
 
 const route = '/token';
 
@@ -10,7 +11,7 @@ describe('grant_type=client_credentials', () => {
 
 	it('provides a Bearer client credentials token', function () {
 		const spy = sinon.spy();
-		this.provider.once('grant.success', spy);
+		provider.once('grant.success', spy);
 
 		return this.agent
 			.post(route)
@@ -36,8 +37,8 @@ describe('grant_type=client_credentials', () => {
 
 	it('ignores unsupported scopes', async function () {
 		const spy = sinon.spy();
-		this.provider.once('client_credentials.saved', spy);
-		this.provider.once('client_credentials.issued', spy);
+		provider.once('client_credentials.saved', spy);
+		provider.once('client_credentials.issued', spy);
 
 		await this.agent
 			.post(route)

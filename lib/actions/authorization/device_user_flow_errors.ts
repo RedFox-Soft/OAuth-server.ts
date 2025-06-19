@@ -1,6 +1,7 @@
 import { AccessDenied } from '../../helpers/errors.ts';
 import errOut from '../../helpers/err_out.ts';
 import { ReRenderError, AbortedError } from '../../helpers/re_render_errors.ts';
+import { DeviceCode } from 'lib/models/device_code.js';
 
 export default async function deviceUserFlowErrors(ctx, next) {
 	try {
@@ -12,10 +13,10 @@ export default async function deviceUserFlowErrors(ctx, next) {
 			let code = ctx.oidc.deviceCode;
 
 			if (!code && ctx.oidc.entities.Interaction?.deviceCode) {
-				code = await ctx.oidc.provider.DeviceCode.find(
-					ctx.oidc.entities.Interaction.deviceCode,
-					{ ignoreExpiration: true, ignoreSessionBinding: true }
-				);
+				code = await DeviceCode.find(ctx.oidc.entities.Interaction.deviceCode, {
+					ignoreExpiration: true,
+					ignoreSessionBinding: true
+				});
 			}
 
 			if (code) {

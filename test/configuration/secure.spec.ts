@@ -2,6 +2,7 @@ import sinon from 'sinon';
 import { expect } from 'chai';
 
 import bootstrap from '../test_helper.js';
+import { provider } from 'lib/provider.js';
 
 describe('x-forwarded-proto trust', () => {
 	/* eslint-disable no-console */
@@ -19,7 +20,7 @@ describe('x-forwarded-proto trust', () => {
 			if (this.app) {
 				this.app.proxy = true;
 			} else {
-				this.provider.proxy = true;
+				provider.proxy = true;
 			}
 			await this.agent
 				.get('/.well-known/openid-configuration', acceptUnauthorized)

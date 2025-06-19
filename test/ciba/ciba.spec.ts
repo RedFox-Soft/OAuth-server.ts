@@ -12,6 +12,8 @@ import bootstrap, {
 } from '../test_helper.js';
 
 import { emitter } from './ciba.config.js';
+import { provider } from 'lib/provider.js';
+import { ISSUER } from 'lib/configs/env.js';
 
 describe('features.ciba', () => {
 	afterEach(assertNoPendingInterceptors);
@@ -42,31 +44,28 @@ describe('features.ciba', () => {
 		describe('Provider.prototype.backchannelResult', () => {
 			it('"request" can be a string (BackchannelAuthenticationRequest jti)', async function () {
 				const result = new AccessDenied();
-				const request = new this.provider.BackchannelAuthenticationRequest({
+				const request = new provider.BackchannelAuthenticationRequest({
 					clientId: 'client'
 				});
 				await request.save();
-				await this.provider.backchannelResult(request.jti, result);
-				return assert.rejects(
-					this.provider.backchannelResult('notfound', result),
-					{
-						name: 'Error',
-						message: 'BackchannelAuthenticationRequest not found'
-					}
-				);
+				await provider.backchannelResult(request.jti, result);
+				return assert.rejects(provider.backchannelResult('notfound', result), {
+					name: 'Error',
+					message: 'BackchannelAuthenticationRequest not found'
+				});
 			});
 
 			it('"request" can be a BackchannelAuthenticationRequest instance', async function () {
-				const result = new this.provider.Grant({
+				const result = new provider.Grant({
 					clientId: 'client',
 					accountId: 'accountId'
 				});
-				const request = new this.provider.BackchannelAuthenticationRequest({
+				const request = new provider.BackchannelAuthenticationRequest({
 					clientId: 'client',
 					accountId: 'accountId'
 				});
 				await request.save();
-				return this.provider.backchannelResult(request, result);
+				return provider.backchannelResult(request, result);
 			});
 
 			it('"request" must be a supported type', async function () {
@@ -82,32 +81,32 @@ describe('features.ciba', () => {
 					new Set(),
 					new Error()
 				]) {
-					await assert.rejects(
-						this.provider.backchannelResult(request, result),
-						{ name: 'TypeError', message: 'invalid "request" argument' }
-					);
+					await assert.rejects(provider.backchannelResult(request, result), {
+						name: 'TypeError',
+						message: 'invalid "request" argument'
+					});
 				}
 			});
 
 			it('"result" can be a string (Grant jti)', async function () {
-				const result = new this.provider.Grant({
+				const result = new provider.Grant({
 					clientId: 'client',
 					accountId: 'accountId'
 				});
-				const request = new this.provider.BackchannelAuthenticationRequest({
+				const request = new provider.BackchannelAuthenticationRequest({
 					clientId: 'client',
 					accountId: 'accountId'
 				});
 				await result.save();
-				await this.provider.backchannelResult(request, result.jti);
-				return assert.rejects(
-					this.provider.backchannelResult(request, 'notfound'),
-					{ name: 'Error', message: 'Grant not found' }
-				);
+				await provider.backchannelResult(request, result.jti);
+				return assert.rejects(provider.backchannelResult(request, 'notfound'), {
+					name: 'Error',
+					message: 'Grant not found'
+				});
 			});
 
 			it('"result" must be a supported type', async function () {
-				const request = new this.provider.BackchannelAuthenticationRequest({
+				const request = new provider.BackchannelAuthenticationRequest({
 					clientId: 'client'
 				});
 
@@ -121,74 +120,74 @@ describe('features.ciba', () => {
 					new Set(),
 					new Error()
 				]) {
-					await assert.rejects(
-						this.provider.backchannelResult(request, result),
-						{ name: 'TypeError', message: 'invalid "result" argument' }
-					);
+					await assert.rejects(provider.backchannelResult(request, result), {
+						name: 'TypeError',
+						message: 'invalid "result" argument'
+					});
 				}
 			});
 
 			it('request.clientId must be a valid client', async function () {
 				const result = new AccessDenied();
-				const request = new this.provider.BackchannelAuthenticationRequest({
+				const request = new provider.BackchannelAuthenticationRequest({
 					clientId: 'notfound'
 				});
-				return assert.rejects(
-					this.provider.backchannelResult(request, result),
-					{ name: 'Error', message: 'Client not found' }
-				);
+				return assert.rejects(provider.backchannelResult(request, result), {
+					name: 'Error',
+					message: 'Client not found'
+				});
 			});
 
 			it('request.clientId must match result.clientId', async function () {
-				const result = new this.provider.Grant({
+				const result = new provider.Grant({
 					clientId: 'client',
 					accountId: 'accountId'
 				});
-				const request = new this.provider.BackchannelAuthenticationRequest({
+				const request = new provider.BackchannelAuthenticationRequest({
 					clientId: 'client-ping',
 					accountId: 'accountId'
 				});
-				return assert.rejects(
-					this.provider.backchannelResult(request, result),
-					{ name: 'Error', message: 'client mismatch' }
-				);
+				return assert.rejects(provider.backchannelResult(request, result), {
+					name: 'Error',
+					message: 'client mismatch'
+				});
 			});
 
 			it('request.accountId must match result.accountId', async function () {
-				const result = new this.provider.Grant({
+				const result = new provider.Grant({
 					clientId: 'client',
 					accountId: 'accountId'
 				});
-				const request = new this.provider.BackchannelAuthenticationRequest({
+				const request = new provider.BackchannelAuthenticationRequest({
 					clientId: 'client',
 					accountId: 'accountId-2'
 				});
-				return assert.rejects(
-					this.provider.backchannelResult(request, result),
-					{ name: 'Error', message: 'accountId mismatch' }
-				);
+				return assert.rejects(provider.backchannelResult(request, result), {
+					name: 'Error',
+					message: 'accountId mismatch'
+				});
 			});
 
 			it('saves the "request"', async function () {
-				const result = new this.provider.Grant({
+				const result = new provider.Grant({
 					clientId: 'client',
 					accountId: 'accountId'
 				});
-				const request = new this.provider.BackchannelAuthenticationRequest({
+				const request = new provider.BackchannelAuthenticationRequest({
 					clientId: 'client',
 					accountId: 'accountId'
 				});
 				expect(request.jti).not.to.be.ok;
-				await this.provider.backchannelResult(request, result);
+				await provider.backchannelResult(request, result);
 				expect(request.jti).to.be.ok;
 			});
 
 			it('pings the client (204)', async function () {
-				const result = new this.provider.Grant({
+				const result = new provider.Grant({
 					clientId: 'client-ping',
 					accountId: 'accountId'
 				});
-				const request = new this.provider.BackchannelAuthenticationRequest({
+				const request = new provider.BackchannelAuthenticationRequest({
 					clientId: 'client-ping',
 					accountId: 'accountId',
 					params: { client_notification_token: 'foo' }
@@ -199,15 +198,15 @@ describe('features.ciba', () => {
 						method: 'POST'
 					})
 					.reply(204);
-				await this.provider.backchannelResult(request, result);
+				await provider.backchannelResult(request, result);
 			});
 
 			it('pings the client (200)', async function () {
-				const result = new this.provider.Grant({
+				const result = new provider.Grant({
 					clientId: 'client-ping',
 					accountId: 'accountId'
 				});
-				const request = new this.provider.BackchannelAuthenticationRequest({
+				const request = new provider.BackchannelAuthenticationRequest({
 					clientId: 'client-ping',
 					accountId: 'accountId',
 					params: { client_notification_token: 'foo' }
@@ -218,15 +217,15 @@ describe('features.ciba', () => {
 						method: 'POST'
 					})
 					.reply(200);
-				await this.provider.backchannelResult(request, result);
+				await provider.backchannelResult(request, result);
 			});
 
 			it('pings the client (400)', async function () {
-				const result = new this.provider.Grant({
+				const result = new provider.Grant({
 					clientId: 'client-ping',
 					accountId: 'accountId'
 				});
-				const request = new this.provider.BackchannelAuthenticationRequest({
+				const request = new provider.BackchannelAuthenticationRequest({
 					clientId: 'client-ping',
 					accountId: 'accountId',
 					params: { client_notification_token: 'foo' }
@@ -237,14 +236,11 @@ describe('features.ciba', () => {
 						method: 'POST'
 					})
 					.reply(400);
-				return assert.rejects(
-					this.provider.backchannelResult(request, result),
-					{
-						name: 'Error',
-						message:
-							'expected 204 No Content from https://rp.example.com/ping, got: 400 Bad Request'
-					}
-				);
+				return assert.rejects(provider.backchannelResult(request, result), {
+					name: 'Error',
+					message:
+						'expected 204 No Content from https://rp.example.com/ping, got: 400 Bad Request'
+				});
 			});
 		});
 
@@ -367,13 +363,13 @@ describe('features.ciba', () => {
 						}),
 					once(emitter, 'triggerAuthenticationDevice')
 				]);
-				const grant = new this.provider.Grant({
+				const grant = new provider.Grant({
 					accountId: 'accountId',
 					clientId: 'client'
 				});
 				grant.addOIDCScope('openid');
 				await grant.save();
-				await this.provider.backchannelResult(request, grant);
+				await provider.backchannelResult(request, grant);
 
 				const {
 					body: { id_token }
@@ -426,7 +422,7 @@ describe('features.ciba', () => {
 			describe('client validation', () => {
 				it('only responds to clients with urn:openid:params:grant-type:ciba enabled', function () {
 					const spy = sinon.spy();
-					this.provider.once('backchannel_authentication.error', spy);
+					provider.once('backchannel_authentication.error', spy);
 
 					return this.agent
 						.post(route)
@@ -448,7 +444,7 @@ describe('features.ciba', () => {
 
 				it('rejects invalid clients', function () {
 					const spy = sinon.spy();
-					this.provider.once('backchannel_authentication.error', spy);
+					provider.once('backchannel_authentication.error', spy);
 
 					return this.agent
 						.post(route)
@@ -470,7 +466,7 @@ describe('features.ciba', () => {
 
 			it('rejects other than application/x-www-form-urlencoded', function () {
 				const spy = sinon.spy();
-				this.provider.once('backchannel_authentication.error', spy);
+				provider.once('backchannel_authentication.error', spy);
 
 				return this.agent
 					.post(route)
@@ -493,7 +489,7 @@ describe('features.ciba', () => {
 				['request', 'request_uri', 'registration'].forEach((param) => {
 					it(`check for not supported parameter ${param}`, function () {
 						const spy = sinon.spy();
-						this.provider.once('backchannel_authentication.error', spy);
+						provider.once('backchannel_authentication.error', spy);
 
 						return this.agent
 							.post(route)
@@ -516,7 +512,7 @@ describe('features.ciba', () => {
 
 				it('could not resolve Account', async function () {
 					const spy = sinon.spy();
-					this.provider.once('backchannel_authentication.error', spy);
+					provider.once('backchannel_authentication.error', spy);
 
 					return this.agent
 						.post(route)
@@ -539,7 +535,7 @@ describe('features.ciba', () => {
 
 				it('could not resolve account identifier', async function () {
 					const spy = sinon.spy();
-					this.provider.once('backchannel_authentication.error', spy);
+					provider.once('backchannel_authentication.error', spy);
 
 					return this.agent
 						.post(route)
@@ -562,7 +558,7 @@ describe('features.ciba', () => {
 
 				it('requires the scope param', async function () {
 					const spy = sinon.spy();
-					this.provider.once('backchannel_authentication.error', spy);
+					provider.once('backchannel_authentication.error', spy);
 
 					return this.agent
 						.post(route)
@@ -583,7 +579,7 @@ describe('features.ciba', () => {
 
 				it('requires the client_notification_token param when using ping', async function () {
 					const spy = sinon.spy();
-					this.provider.once('backchannel_authentication.error', spy);
+					provider.once('backchannel_authentication.error', spy);
 
 					return this.agent
 						.post(route)
@@ -606,7 +602,7 @@ describe('features.ciba', () => {
 
 				it('requires the scope param with openid', async function () {
 					const spy = sinon.spy();
-					this.provider.once('backchannel_authentication.error', spy);
+					provider.once('backchannel_authentication.error', spy);
 
 					return this.agent
 						.post(route)
@@ -629,7 +625,7 @@ describe('features.ciba', () => {
 
 				it('validates requested_expiry', async function () {
 					const spy = sinon.spy();
-					this.provider.once('backchannel_authentication.error', spy);
+					provider.once('backchannel_authentication.error', spy);
 
 					return this.agent
 						.post(route)
@@ -652,7 +648,7 @@ describe('features.ciba', () => {
 
 				it('validates one of the hints is provided', async function () {
 					const spy = sinon.spy();
-					this.provider.once('backchannel_authentication.error', spy);
+					provider.once('backchannel_authentication.error', spy);
 
 					return this.agent
 						.post(route)
@@ -675,7 +671,7 @@ describe('features.ciba', () => {
 
 				it('validates exactly one of the hints is provided', async function () {
 					const spy = sinon.spy();
-					this.provider.once('backchannel_authentication.error', spy);
+					provider.once('backchannel_authentication.error', spy);
 
 					return this.agent
 						.post(route)
@@ -700,7 +696,7 @@ describe('features.ciba', () => {
 
 				it('request_not_supported', async function () {
 					const spy = sinon.spy();
-					this.provider.once('backchannel_authentication.error', spy);
+					provider.once('backchannel_authentication.error', spy);
 
 					return this.agent
 						.post(route)
@@ -745,7 +741,7 @@ describe('features.ciba', () => {
 				['request_uri', 'registration'].forEach((param) => {
 					it(`check for not supported parameter ${param}`, function () {
 						const spy = sinon.spy();
-						this.provider.once('backchannel_authentication.error', spy);
+						provider.once('backchannel_authentication.error', spy);
 
 						return this.agent
 							.post(route)
@@ -768,7 +764,7 @@ describe('features.ciba', () => {
 
 				it('validates request object is used', async function () {
 					const spy = sinon.spy();
-					this.provider.once('backchannel_authentication.error', spy);
+					provider.once('backchannel_authentication.error', spy);
 
 					await this.agent
 						.post(route)
@@ -810,7 +806,7 @@ describe('features.ciba', () => {
 								.setNotBefore('0s')
 								.setIssuer('client-signed')
 								.setIssuedAt()
-								.setAudience(this.provider.issuer)
+								.setAudience(ISSUER)
 								.sign(privateKey)
 						})
 						.type('form')
@@ -819,7 +815,7 @@ describe('features.ciba', () => {
 
 				it('validates request object claims are present (exp)', async function () {
 					const spy = sinon.spy();
-					this.provider.once('backchannel_authentication.error', spy);
+					provider.once('backchannel_authentication.error', spy);
 
 					const { privateKey } = await generateKeyPair('ES256');
 
@@ -838,7 +834,7 @@ describe('features.ciba', () => {
 								.setNotBefore('0s')
 								.setIssuer('client-signed')
 								.setIssuedAt()
-								.setAudience(this.provider.issuer)
+								.setAudience(ISSUER)
 								.sign(privateKey)
 						})
 						.type('form')
@@ -855,7 +851,7 @@ describe('features.ciba', () => {
 
 				it('validates request object claims are present (nbf)', async function () {
 					const spy = sinon.spy();
-					this.provider.once('backchannel_authentication.error', spy);
+					provider.once('backchannel_authentication.error', spy);
 
 					const { privateKey } = await generateKeyPair('ES256');
 
@@ -874,7 +870,7 @@ describe('features.ciba', () => {
 								// .setNotBefore('0s')
 								.setIssuer('client-signed')
 								.setIssuedAt()
-								.setAudience(this.provider.issuer)
+								.setAudience(ISSUER)
 								.sign(privateKey)
 						})
 						.type('form')
@@ -891,7 +887,7 @@ describe('features.ciba', () => {
 
 				it('validates request object claims are present (jti)', async function () {
 					const spy = sinon.spy();
-					this.provider.once('backchannel_authentication.error', spy);
+					provider.once('backchannel_authentication.error', spy);
 
 					const { privateKey } = await generateKeyPair('ES256');
 
@@ -910,7 +906,7 @@ describe('features.ciba', () => {
 								.setNotBefore('0s')
 								.setIssuer('client-signed')
 								.setIssuedAt()
-								.setAudience(this.provider.issuer)
+								.setAudience(ISSUER)
 								.sign(privateKey)
 						})
 						.type('form')
@@ -927,7 +923,7 @@ describe('features.ciba', () => {
 
 				it('validates request object claims are present (iat)', async function () {
 					const spy = sinon.spy();
-					this.provider.once('backchannel_authentication.error', spy);
+					provider.once('backchannel_authentication.error', spy);
 
 					const { privateKey } = await generateKeyPair('ES256');
 
@@ -946,7 +942,7 @@ describe('features.ciba', () => {
 								.setNotBefore('0s')
 								.setIssuer('client-signed')
 								// .setIssuedAt()
-								.setAudience(this.provider.issuer)
+								.setAudience(ISSUER)
 								.sign(privateKey)
 						})
 						.type('form')
@@ -963,7 +959,7 @@ describe('features.ciba', () => {
 
 				it('validates Encrypted Request Objects are not used', async function () {
 					const spy = sinon.spy();
-					this.provider.once('backchannel_authentication.error', spy);
+					provider.once('backchannel_authentication.error', spy);
 
 					return this.agent
 						.post(route)

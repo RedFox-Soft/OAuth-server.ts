@@ -3,6 +3,8 @@ import { expect } from 'chai';
 
 import bootstrap from '../test_helper.js';
 import { normalize } from '../../lib/helpers/user_codes.ts';
+import { provider } from 'lib/provider.js';
+import { DeviceCode } from 'lib/models/device_code.js';
 
 const route = '/device/auth';
 
@@ -11,7 +13,7 @@ describe('device_authorization_endpoint', () => {
 
 	it('rejects other than application/x-www-form-urlencoded', function () {
 		const spy = sinon.spy();
-		this.provider.once('device_authorization.error', spy);
+		provider.once('device_authorization.error', spy);
 
 		return this.agent
 			.post(route)
@@ -34,7 +36,7 @@ describe('device_authorization_endpoint', () => {
 	describe('client validation', () => {
 		it('only responds to clients with urn:ietf:params:oauth:grant-type:device_code enabled', function () {
 			const spy = sinon.spy();
-			this.provider.once('device_authorization.error', spy);
+			provider.once('device_authorization.error', spy);
 
 			return this.agent
 				.post(route)
@@ -56,7 +58,7 @@ describe('device_authorization_endpoint', () => {
 
 		it('rejects invalid clients', function () {
 			const spy = sinon.spy();
-			this.provider.once('device_authorization.error', spy);
+			provider.once('device_authorization.error', spy);
 
 			return this.agent
 				.post(route)
@@ -80,7 +82,7 @@ describe('device_authorization_endpoint', () => {
 		['request', 'request_uri', 'registration'].forEach((param) => {
 			it(`check for not supported parameter ${param}`, function () {
 				const spy = sinon.spy();
-				this.provider.once('device_authorization.error', spy);
+				provider.once('device_authorization.error', spy);
 
 				return this.agent
 					.post(route)
@@ -103,7 +105,7 @@ describe('device_authorization_endpoint', () => {
 
 	it('responds with json 200', async function () {
 		const spy = sinon.spy();
-		this.provider.once('device_authorization.success', spy);
+		provider.once('device_authorization.success', spy);
 		let response;
 
 		await this.agent
@@ -145,7 +147,7 @@ describe('device_authorization_endpoint', () => {
 				response = body;
 			});
 
-		const dc = await this.provider.DeviceCode.find(response.device_code);
+		const dc = await DeviceCode.find(response.device_code);
 		expect(dc).to.be.ok;
 		expect(dc).to.have.property('clientId', 'client');
 		expect(dc)

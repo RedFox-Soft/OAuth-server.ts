@@ -4,6 +4,9 @@ import base64url from 'base64url';
 
 import bootstrap from '../test_helper.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
+import { provider } from 'lib/provider.js';
+import { DeviceCode } from 'lib/models/device_code.js';
+import { TestAdapter } from 'test/models.js';
 
 const route = '/token';
 const grant_type = 'urn:ietf:params:oauth:grant-type:device_code';
@@ -26,9 +29,9 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code w/ conformIdTo
 
 	it('returns the right stuff', async function () {
 		const spy = sinon.spy();
-		this.provider.once('grant.success', spy);
+		provider.once('grant.success', spy);
 
-		const deviceCode = new this.provider.DeviceCode({
+		const deviceCode = new DeviceCode({
 			accountId: 'sub',
 			grantId: this.getGrantId(),
 			scope: 'openid profile offline_access',
@@ -76,9 +79,9 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 
 	it('returns the right stuff', async function () {
 		const spy = sinon.spy();
-		this.provider.once('grant.success', spy);
+		provider.once('grant.success', spy);
 
-		const deviceCode = new this.provider.DeviceCode({
+		const deviceCode = new DeviceCode({
 			accountId: 'sub',
 			grantId: this.getGrantId(),
 			scope: 'openid profile offline_access',
@@ -129,7 +132,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 			);
 		}, done);
 
-		const deviceCode = new this.provider.DeviceCode({
+		const deviceCode = new DeviceCode({
 			accountId: 'sub',
 			grantId: this.getGrantId(),
 			scope: 'openid',
@@ -168,7 +171,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 			);
 		}, done);
 
-		const deviceCode = new this.provider.DeviceCode({
+		const deviceCode = new DeviceCode({
 			accountId: 'sub',
 			grantId: this.getGrantId(),
 			scope: 'openid offline_access',
@@ -206,7 +209,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 
 		it('code being "found"', function () {
 			const spy = sinon.spy();
-			this.provider.once('grant.error', spy);
+			provider.once('grant.error', spy);
 			return this.agent
 				.post(route)
 				.send({
@@ -228,13 +231,13 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 
 		it('validates account is still there', async function () {
 			sinon
-				.stub(i(this.provider).configuration, 'findAccount')
+				.stub(i(provider).configuration, 'findAccount')
 				.callsFake(() => Promise.resolve());
 
 			const spy = sinon.spy();
-			this.provider.once('grant.error', spy);
+			provider.once('grant.error', spy);
 
-			const deviceCode = new this.provider.DeviceCode({
+			const deviceCode = new DeviceCode({
 				accountId: 'sub',
 				grantId: this.getGrantId(),
 				scope: 'openid',
@@ -264,9 +267,9 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 
 		it('code belongs to client', async function () {
 			const spy = sinon.spy();
-			this.provider.once('grant.error', spy);
+			provider.once('grant.error', spy);
 
-			const deviceCode = new this.provider.DeviceCode({
+			const deviceCode = new DeviceCode({
 				accountId: 'sub',
 				grantId: this.getGrantId(),
 				scope: 'openid',
@@ -294,17 +297,17 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 
 		context('', () => {
 			before(function () {
-				const { ttl } = i(this.provider).configuration;
+				const { ttl } = i(provider).configuration;
 				this.prev = ttl.DeviceCode;
 				ttl.DeviceCode = 0;
 			});
 
 			after(function () {
-				i(this.provider).configuration.ttl.DeviceCode = this.prev;
+				i(provider).configuration.ttl.DeviceCode = this.prev;
 			});
 
 			it('validates code is not expired', async function () {
-				const deviceCode = new this.provider.DeviceCode({
+				const deviceCode = new DeviceCode({
 					scope: 'openid',
 					clientId: 'client'
 				});
@@ -327,7 +330,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 		});
 
 		it('consumes the code', async function () {
-			const deviceCode = new this.provider.DeviceCode({
+			const deviceCode = new provider.DeviceCode({
 				accountId: 'sub',
 				grantId: this.getGrantId(),
 				scope: 'openid',
@@ -346,16 +349,16 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 				.expect(200)
 				.expect(() => {
 					const jti = this.getTokenJti(code);
-					const stored = this.TestAdapter.for('DeviceCode').syncFind(jti);
+					const stored = TestAdapter.for('DeviceCode').syncFind(jti);
 					expect(stored).to.have.property('consumed').and.be.most(epochTime());
 				});
 		});
 
 		it('validates code is not already used', async function () {
 			const spy = sinon.spy();
-			this.provider.once('grant.error', spy);
+			provider.once('grant.error', spy);
 
-			const deviceCode = new this.provider.DeviceCode({
+			const deviceCode = new DeviceCode({
 				accountId: 'sub',
 				grantId: this.getGrantId(),
 				scope: 'openid',
@@ -384,7 +387,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 	});
 
 	it('responds with authorization_pending if interactions are still pending resolving', async function () {
-		const deviceCode = new this.provider.DeviceCode({
+		const deviceCode = new DeviceCode({
 			scope: 'openid',
 			clientId: 'client'
 			// error: missing
@@ -409,7 +412,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 	});
 
 	it('responds with a custom error if one is resolved with', async function () {
-		const deviceCode = new this.provider.DeviceCode({
+		const deviceCode = new DeviceCode({
 			scope: 'openid',
 			clientId: 'client',
 			error: 'foo',
@@ -434,9 +437,9 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 
 	it('responds with a built-in error if one is resolved with', async function () {
 		const spy = sinon.spy();
-		this.provider.once('grant.error', spy);
+		provider.once('grant.error', spy);
 
-		const deviceCode = new this.provider.DeviceCode({
+		const deviceCode = new DeviceCode({
 			scope: 'openid',
 			clientId: 'client',
 			error: 'access_denied',

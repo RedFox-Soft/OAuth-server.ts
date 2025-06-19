@@ -6,6 +6,8 @@ import { expect } from 'chai';
 
 import bootstrap, { skipConsent } from '../test_helper.js';
 import { decode as decodeJWT } from '../../lib/helpers/jwt.ts';
+import { provider } from 'lib/provider.js';
+import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
 const redirect_uri = 'https://client.example.com/cb';
 const scope = 'openid email offline_access';
@@ -24,113 +26,106 @@ describe('configuration conformIdTokenClaims=true', () => {
 
 	skipConsent();
 
-	['code'].forEach((response_type) => {
-		describe(`response_type=${response_type}`, () => {
-			before(async function () {
-				const client = await this.provider.Client.find('client');
+	describe('response_type=code', () => {
+		before(async function () {
+			const client = await provider.Client.find('client');
 
-				const claims = JSON.stringify({
-					id_token: { gender: null, email: null, email_verified: null },
-					...(response_type !== 'id_token'
-						? { userinfo: { gender: null } }
-						: undefined)
-				});
-
-				const auth = new this.AuthorizationRequest({
-					response_type,
-					scope,
-					claims,
-					prompt
-				});
-
-				let id_token;
-				let refresh_token;
-				let code;
-				let access_token;
-
-				const {
-					headers: { location }
-				} = await this.agent
-					.get('/auth')
-					.query(auth)
-					.expect(303)
-					.expect(auth.validateClientLocation);
-
-				({
-					query: { code, id_token, access_token }
-				} = parseUrl(location, true));
-
-				this.authorization = { id_token };
-
-				if (response_type.includes('code')) {
-					({
-						body: { id_token, refresh_token }
-					} = await this.agent
-						.post('/token')
-						.send({
-							client_id,
-							code,
-							grant_type: 'authorization_code',
-							code_verifier: auth.code_verifier,
-							redirect_uri
-						})
-						.type('form')
-						.expect(200));
-
-					this.token = { id_token };
-
-					({
-						body: { id_token, access_token }
-					} = await this.agent
-						.post('/token')
-						.send({ client_id, grant_type: 'refresh_token', refresh_token })
-						.type('form')
-						.expect(200));
-
-					this.refresh = { id_token };
-				}
-
-				if (access_token) {
-					let userinfo;
-					delete client.userinfoSignedResponseAlg;
-					({ body: userinfo } = await this.agent
-						.get('/me')
-						.auth(access_token, { type: 'bearer' })
-						.expect(200));
-					this.userinfo = userinfo;
-
-					client.userinfoSignedResponseAlg = 'HS256';
-					await this.provider.Client.find('client');
-					({ text: userinfo } = await this.agent
-						.get('/me')
-						.auth(access_token, { type: 'bearer' })
-						.expect(200));
-					this.userinfoSigned = userinfo;
-				}
+			const claims = JSON.stringify({
+				id_token: { gender: null, email: null, email_verified: null },
+				userinfo: { gender: null }
 			});
 
-			it('userinfo has scope requested claims', function () {
-				expect(this.userinfo).to.contain.keys('email', 'gender');
-				expect(this.userinfo).not.to.contain.keys('email_verified');
+			const auth = new AuthorizationRequest({
+				scope,
+				claims,
+				prompt
 			});
 
-			it('signed userinfo has scope requested claims', function () {
-				const { payload } = decodeJWT(this.userinfoSigned);
-				expect(payload).to.contain.keys('email', 'gender');
-				expect(payload).not.to.contain.keys('email_verified');
-			});
+			let id_token;
+			let refresh_token;
+			let code;
+			let access_token;
 
-			it('token endpoint id_token does not have scope requested claims', function () {
-				const { payload } = decodeJWT(this.token.id_token);
-				expect(payload).to.contain.keys('gender', 'email');
-				expect(payload).not.to.contain.keys('email_verified');
-			});
+			const {
+				headers: { location }
+			} = await this.agent
+				.get('/auth')
+				.query(auth)
+				.expect(303)
+				.expect(auth.validateClientLocation);
 
-			it('refreshed id_token does not have scope requested claims', function () {
-				const { payload } = decodeJWT(this.refresh.id_token);
-				expect(payload).to.contain.keys('gender', 'email');
-				expect(payload).not.to.contain.keys('email_verified');
-			});
+			({
+				query: { code, id_token, access_token }
+			} = parseUrl(location, true));
+
+			this.authorization = { id_token };
+
+			({
+				body: { id_token, refresh_token }
+			} = await this.agent
+				.post('/token')
+				.send({
+					client_id,
+					code,
+					grant_type: 'authorization_code',
+					code_verifier: auth.code_verifier,
+					redirect_uri
+				})
+				.type('form')
+				.expect(200));
+
+			this.token = { id_token };
+
+			({
+				body: { id_token, access_token }
+			} = await this.agent
+				.post('/token')
+				.send({ client_id, grant_type: 'refresh_token', refresh_token })
+				.type('form')
+				.expect(200));
+
+			this.refresh = { id_token };
+
+			if (access_token) {
+				let userinfo;
+				delete client.userinfoSignedResponseAlg;
+				({ body: userinfo } = await this.agent
+					.get('/me')
+					.auth(access_token, { type: 'bearer' })
+					.expect(200));
+				this.userinfo = userinfo;
+
+				client.userinfoSignedResponseAlg = 'HS256';
+				await provider.Client.find('client');
+				({ text: userinfo } = await this.agent
+					.get('/me')
+					.auth(access_token, { type: 'bearer' })
+					.expect(200));
+				this.userinfoSigned = userinfo;
+			}
+		});
+
+		it('userinfo has scope requested claims', function () {
+			expect(this.userinfo).to.contain.keys('email', 'gender');
+			expect(this.userinfo).not.to.contain.keys('email_verified');
+		});
+
+		it('signed userinfo has scope requested claims', function () {
+			const { payload } = decodeJWT(this.userinfoSigned);
+			expect(payload).to.contain.keys('email', 'gender');
+			expect(payload).not.to.contain.keys('email_verified');
+		});
+
+		it('token endpoint id_token does not have scope requested claims', function () {
+			const { payload } = decodeJWT(this.token.id_token);
+			expect(payload).to.contain.keys('gender', 'email');
+			expect(payload).not.to.contain.keys('email_verified');
+		});
+
+		it('refreshed id_token does not have scope requested claims', function () {
+			const { payload } = decodeJWT(this.refresh.id_token);
+			expect(payload).to.contain.keys('gender', 'email');
+			expect(payload).not.to.contain.keys('email_verified');
 		});
 	});
 });

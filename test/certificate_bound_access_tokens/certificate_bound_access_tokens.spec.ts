@@ -6,6 +6,9 @@ import sinon from 'sinon';
 import { expect } from 'chai';
 
 import bootstrap, { skipConsent } from '../test_helper.js';
+import { provider } from 'lib/provider.js';
+import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
+import { TestAdapter } from 'test/models.js';
 
 const crt = new X509Certificate(
 	readFileSync('./test/jwks/client.crt', { encoding: 'ascii' })
@@ -37,10 +40,10 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 	describe('userinfo', () => {
 		it('acts like an RS checking the thumbprint now', async function () {
-			const at = new this.provider.AccessToken({
+			const at = new provider.AccessToken({
 				grantId: this.getGrantId('client'),
 				accountId: this.loggedInAccountId,
-				client: await this.provider.Client.find('client'),
+				client: await provider.Client.find('client'),
 				scope: 'openid'
 			});
 			at.setThumbprint('x5t', crt);
@@ -72,10 +75,10 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 	describe('introspection', () => {
 		it('exposes cnf now', async function () {
-			const at = new this.provider.AccessToken({
+			const at = new provider.AccessToken({
 				grantId: this.getGrantId('client'),
 				accountId: this.loggedInAccountId,
-				client: await this.provider.Client.find('client'),
+				client: await provider.Client.find('client'),
 				scope: 'openid'
 			});
 			at.setThumbprint('x5t', crt);
@@ -111,7 +114,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 					this.dc = dc;
 				});
 
-			this.TestAdapter.for('DeviceCode').syncUpdate(this.getTokenJti(this.dc), {
+			TestAdapter.for('DeviceCode').syncUpdate(this.getTokenJti(this.dc), {
 				grantId: this.getGrantId('client'),
 				scope: 'openid offline_access',
 				accountId: this.loggedInAccountId
@@ -120,7 +123,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 		it('binds the access token to the certificate', async function () {
 			const spy = sinon.spy();
-			this.provider.once('grant.success', spy);
+			provider.once('grant.success', spy);
 
 			await this.agent
 				.post('/token')
@@ -145,7 +148,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 		it('verifies the request made with mutual-TLS', async function () {
 			const spy = sinon.spy();
-			this.provider.once('grant.error', spy);
+			provider.once('grant.error', spy);
 
 			await this.agent
 				.post('/token')
@@ -170,10 +173,10 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 		it('binds the refresh token to the certificate for public clients', async function () {
 			const spy = sinon.spy();
-			this.provider.once('grant.success', spy);
+			provider.once('grant.success', spy);
 
 			// changes the code to client-none and
-			this.TestAdapter.for('DeviceCode').syncUpdate(this.getTokenJti(this.dc), {
+			TestAdapter.for('DeviceCode').syncUpdate(this.getTokenJti(this.dc), {
 				clientId: 'client-none',
 				grantId: this.getGrantId('client-none'),
 				accountId: this.loggedInAccountId
@@ -219,7 +222,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 		it('binds the access token to the certificate', async function () {
 			const spy = sinon.spy();
-			this.provider.once('grant.success', spy);
+			provider.once('grant.success', spy);
 
 			await this.agent
 				.post('/token')
@@ -244,7 +247,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 		it('verifies the request made with mutual-TLS', async function () {
 			const spy = sinon.spy();
-			this.provider.once('grant.error', spy);
+			provider.once('grant.error', spy);
 
 			await this.agent
 				.post('/token')
@@ -269,19 +272,19 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 		it('binds the refresh token to the certificate for public clients', async function () {
 			const spy = sinon.spy();
-			this.provider.once('grant.success', spy);
+			provider.once('grant.success', spy);
 
 			// changes the code to client-none
-			this.TestAdapter.for('BackchannelAuthenticationRequest').syncUpdate(
+			TestAdapter.for('BackchannelAuthenticationRequest').syncUpdate(
 				this.getTokenJti(this.reqId),
 				{
 					clientId: 'client-none'
 				}
 			);
-			const { grantId } = this.TestAdapter.for(
+			const { grantId } = TestAdapter.for(
 				'BackchannelAuthenticationRequest'
 			).syncFind(this.getTokenJti(this.reqId));
-			this.TestAdapter.for('Grant').syncUpdate(grantId, {
+			TestAdapter.for('Grant').syncUpdate(grantId, {
 				clientId: 'client-none'
 			});
 
@@ -314,8 +317,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 		skipConsent();
 
 		beforeEach(async function () {
-			const auth = (this.auth = new this.AuthorizationRequest({
-				response_type: 'code',
+			const auth = (this.auth = new AuthorizationRequest({
 				scope: 'openid offline_access',
 				prompt: 'consent'
 			}));
@@ -334,7 +336,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 		describe('authorization_code', () => {
 			it('binds the access token to the certificate', async function () {
 				const spy = sinon.spy();
-				this.provider.once('grant.success', spy);
+				provider.once('grant.success', spy);
 
 				await this.agent
 					.post('/token')
@@ -361,7 +363,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 			it('verifies the request made with mutual-TLS', async function () {
 				const spy = sinon.spy();
-				this.provider.once('grant.error', spy);
+				provider.once('grant.error', spy);
 
 				await this.agent
 					.post('/token')
@@ -407,7 +409,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 			it('binds the access token to the certificate', async function () {
 				const spy = sinon.spy();
-				this.provider.once('grant.success', spy);
+				provider.once('grant.success', spy);
 
 				await this.agent
 					.post('/token')
@@ -432,7 +434,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 			it('verifies the request made with mutual-TLS', async function () {
 				const spy = sinon.spy();
-				this.provider.once('grant.error', spy);
+				provider.once('grant.error', spy);
 
 				await this.agent
 					.post('/token')
@@ -464,9 +466,8 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 		skipConsent();
 
 		beforeEach(async function () {
-			const auth = (this.auth = new this.AuthorizationRequest({
+			const auth = (this.auth = new AuthorizationRequest({
 				client_id: 'client-none',
-				response_type: 'code',
 				scope: 'openid offline_access',
 				prompt: 'consent'
 			}));
@@ -485,7 +486,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 		describe('authorization_code', () => {
 			it('binds the access token to the certificate', async function () {
 				const spy = sinon.spy();
-				this.provider.once('grant.success', spy);
+				provider.once('grant.success', spy);
 
 				await this.agent
 					.post('/token')
@@ -512,7 +513,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 			it('verifies the request made with mutual-TLS', async function () {
 				const spy = sinon.spy();
-				this.provider.once('grant.error', spy);
+				provider.once('grant.error', spy);
 
 				await this.agent
 					.post('/token')
@@ -558,7 +559,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 			it('binds the access token to the certificate', async function () {
 				const spy = sinon.spy();
-				this.provider.once('grant.success', spy);
+				provider.once('grant.success', spy);
 
 				await this.agent
 					.post('/token')
@@ -583,7 +584,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 			it('verifies the request made with mutual-TLS', async function () {
 				const spy = sinon.spy();
-				this.provider.once('grant.error', spy);
+				provider.once('grant.error', spy);
 
 				await this.agent
 					.post('/token')
@@ -608,7 +609,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 			it('verifies the request made with mutual-TLS using the same cert', async function () {
 				const spy = sinon.spy();
-				this.provider.once('grant.error', spy);
+				provider.once('grant.error', spy);
 
 				await this.agent
 					.post('/token')
@@ -642,7 +643,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 	describe('client_credentials', () => {
 		it('binds the access token to the certificate', async function () {
 			const spy = sinon.spy();
-			this.provider.once('grant.success', spy);
+			provider.once('grant.success', spy);
 
 			await this.agent
 				.post('/token')
@@ -663,7 +664,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 		it('verifies the request was made with mutual-TLS', async function () {
 			const spy = sinon.spy();
-			this.provider.once('grant.error', spy);
+			provider.once('grant.error', spy);
 
 			await this.agent
 				.post('/token')

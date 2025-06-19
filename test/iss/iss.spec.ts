@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 
 import bootstrap from '../test_helper.js';
+import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
 describe('OAuth 2.0 Authorization Server Issuer Identification', () => {
 	before(bootstrap(import.meta.url));
@@ -25,10 +26,7 @@ describe('OAuth 2.0 Authorization Server Issuer Identification', () => {
 		});
 
 		it('response_type=code', function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'code',
-				scope: 'openid'
-			});
+			const auth = new AuthorizationRequest({ scope: 'openid' });
 
 			return this.wrap({ route: '/auth', verb: 'get', auth })
 				.expect(303)
@@ -38,7 +36,7 @@ describe('OAuth 2.0 Authorization Server Issuer Identification', () => {
 		});
 
 		it('response_type=none', function () {
-			const auth = new this.AuthorizationRequest({
+			const auth = new AuthorizationRequest({
 				response_type: 'none',
 				scope: 'openid'
 			});
@@ -51,8 +49,7 @@ describe('OAuth 2.0 Authorization Server Issuer Identification', () => {
 		});
 
 		it('response_mode=jwt', function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'code',
+			const auth = new AuthorizationRequest({
 				response_mode: 'jwt',
 				scope: 'openid'
 			});
@@ -64,8 +61,7 @@ describe('OAuth 2.0 Authorization Server Issuer Identification', () => {
 		});
 
 		it('error with regular response modes', function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'code',
+			const auth = new AuthorizationRequest({
 				scope: 'openid profile'
 			});
 
@@ -77,7 +73,7 @@ describe('OAuth 2.0 Authorization Server Issuer Identification', () => {
 		});
 
 		it('error with response_type none', function () {
-			const auth = new this.AuthorizationRequest({
+			const auth = new AuthorizationRequest({
 				response_type: 'none',
 				scope: 'openid profile'
 			});
@@ -90,8 +86,7 @@ describe('OAuth 2.0 Authorization Server Issuer Identification', () => {
 		});
 
 		it('error with response_mode=jwt', function () {
-			const auth = new this.AuthorizationRequest({
-				response_type: 'code',
+			const auth = new AuthorizationRequest({
 				response_mode: 'jwt',
 				scope: 'openid profile'
 			});

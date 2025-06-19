@@ -3,6 +3,7 @@ import { createSandbox } from 'sinon';
 
 import bootstrap from '../test_helper.js';
 import { InvalidRequest } from '../../lib/helpers/errors.ts';
+import { provider } from 'lib/provider.js';
 
 const sinon = createSandbox();
 
@@ -27,9 +28,9 @@ describe(route, () => {
 	});
 
 	it('is configurable with extra properties', function () {
-		i(this.provider).configuration.discovery.service_documentation =
+		i(provider).configuration.discovery.service_documentation =
 			'https://docs.example.com';
-		i(this.provider).configuration.discovery.authorization_endpoint =
+		i(provider).configuration.discovery.authorization_endpoint =
 			'this will not be used';
 
 		return this.agent.get(route).expect((response) => {
@@ -45,7 +46,7 @@ describe(route, () => {
 
 	describe('with errors', () => {
 		before(function () {
-			sinon.stub(this.provider, 'pathFor').throws(new InvalidRequest());
+			sinon.stub(provider, 'pathFor').throws(new InvalidRequest());
 		});
 
 		after(sinon.restore);
@@ -59,7 +60,7 @@ describe(route, () => {
 
 		it('emits discovery.error on errors', function () {
 			const spy = sinon.spy();
-			this.provider.once('discovery.error', spy);
+			provider.once('discovery.error', spy);
 
 			return this.agent.get(route).expect(() => {
 				expect(spy.called).to.be.true;
@@ -69,7 +70,7 @@ describe(route, () => {
 
 	describe('with exceptions', () => {
 		before(function () {
-			sinon.stub(this.provider, 'pathFor').throws();
+			sinon.stub(provider, 'pathFor').throws();
 		});
 
 		after(sinon.restore);
@@ -87,7 +88,7 @@ describe(route, () => {
 
 		it('emits server_error on exceptions', function () {
 			const spy = sinon.spy();
-			this.provider.once('server_error', spy);
+			provider.once('server_error', spy);
 
 			return this.agent.get(route).expect(() => {
 				expect(spy.called).to.be.true;

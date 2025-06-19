@@ -10,6 +10,8 @@ import bootstrap, {
 	assertNoPendingInterceptors,
 	mock
 } from '../test_helper.js';
+import { provider } from 'lib/provider.js';
+import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
 const sinon = createSandbox();
 
@@ -21,7 +23,7 @@ describe('Back-Channel Logout 1.0', () => {
 
 	describe('Client#backchannelLogout', () => {
 		it('triggers the call', async function () {
-			const client = await this.provider.Client.find('client');
+			const client = await provider.Client.find('client');
 
 			mock('https://client.example.com')
 				.intercept({
@@ -61,7 +63,7 @@ describe('Back-Channel Logout 1.0', () => {
 		});
 
 		it('omits sid when its not required', async function () {
-			const client = await this.provider.Client.find('no-sid');
+			const client = await provider.Client.find('no-sid');
 
 			mock('https://no-sid.example.com')
 				.intercept({
@@ -96,7 +98,7 @@ describe('Back-Channel Logout 1.0', () => {
 		});
 
 		it('handles non-200 OK responses', async function () {
-			const client = await this.provider.Client.find('no-sid');
+			const client = await provider.Client.find('no-sid');
 
 			mock('https://no-sid.example.com')
 				.intercept({
@@ -134,19 +136,15 @@ describe('Back-Channel Logout 1.0', () => {
 		beforeEach(function () {
 			return this.login({ scope: 'openid offline_access' });
 		});
-		afterEach(function () {
-			return this.logout();
-		});
 
 		skipConsent();
 		let auth;
 
 		beforeEach(async function () {
-			auth = new this.AuthorizationRequest({
+			auth = new AuthorizationRequest({
 				client_id: 'client',
 				scope: 'openid offline_access',
 				prompt: 'consent',
-				response_type: 'code',
 				redirect_uri: 'https://client.example.com/cb'
 			});
 			this.code_verifier = auth.code_verifier;
@@ -237,9 +235,9 @@ describe('Back-Channel Logout 1.0', () => {
 				postLogoutRedirectUri: 'https://rp.example.com/'
 			};
 			const params = { logout: 'yes', xsrf: '123' };
-			const client = await this.provider.Client.find('client');
-			const client2 = await this.provider.Client.find('second-client');
-			const client3 = await this.provider.Client.find('no-sid');
+			const client = await provider.Client.find('client');
+			const client2 = await provider.Client.find('second-client');
+			const client3 = await provider.Client.find('no-sid');
 
 			sinon.spy(client, 'backchannelLogout');
 			sinon.spy(client2, 'backchannelLogout');
@@ -253,9 +251,9 @@ describe('Back-Channel Logout 1.0', () => {
 				.reply(200);
 
 			const successSpy = sinon.spy();
-			this.provider.once('backchannel.success', successSpy);
+			provider.once('backchannel.success', successSpy);
 			const errorSpy = sinon.spy();
-			this.provider.once('backchannel.error', errorSpy);
+			provider.once('backchannel.error', errorSpy);
 
 			const { accountId } = session;
 
@@ -292,8 +290,8 @@ describe('Back-Channel Logout 1.0', () => {
 				postLogoutRedirectUri: 'https://rp.example.com/'
 			};
 			const params = { xsrf: '123' };
-			const client = await this.provider.Client.find('client');
-			const client2 = await this.provider.Client.find('second-client');
+			const client = await provider.Client.find('client');
+			const client2 = await provider.Client.find('second-client');
 
 			sinon.spy(client, 'backchannelLogout');
 			sinon.spy(client2, 'backchannelLogout');
@@ -323,8 +321,8 @@ describe('Back-Channel Logout 1.0', () => {
 				postLogoutRedirectUri: 'https://rp.example.com/'
 			};
 			const params = { logout: 'yes', xsrf: '123' };
-			const client = await this.provider.Client.find('client');
-			const client2 = await this.provider.Client.find('second-client');
+			const client = await provider.Client.find('client');
+			const client2 = await provider.Client.find('second-client');
 			delete client.backchannelLogoutUri;
 
 			sinon.spy(client, 'backchannelLogout');

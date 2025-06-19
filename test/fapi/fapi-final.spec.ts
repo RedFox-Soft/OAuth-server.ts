@@ -111,7 +111,7 @@ describe('Financial-grade API Security Profile 1.0 - Part 2: Advanced (FINAL) be
 				.setProtectedHeader({ alg: 'ES256' })
 				.sign(keypair.privateKey);
 
-			const auth = new this.AuthorizationRequest({
+			const auth = new AuthorizationRequest({
 				request,
 				scope: 'openid',
 				client_id: 'client',
@@ -137,7 +137,7 @@ describe('Financial-grade API Security Profile 1.0 - Part 2: Advanced (FINAL) be
 
 		it('requires exp to be provided in the Request Object', async function () {
 			const request = await new SignJWT({
-				aud: this.provider.issuer,
+				aud: ISSUER,
 				// exp: epochTime() + 60,
 				nbf: epochTime(),
 				iss: 'client',

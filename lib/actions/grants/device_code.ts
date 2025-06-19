@@ -10,6 +10,7 @@ import resolveResource from '../../helpers/resolve_resource.ts';
 import epochTime from '../../helpers/epoch_time.ts';
 import { IdToken } from 'lib/models/id_token.js';
 import { ReplayDetection } from 'lib/models/replay_detection.js';
+import { DeviceCode } from 'lib/models/device_code.js';
 
 const { AuthorizationPending, ExpiredToken, InvalidGrant } = errors;
 
@@ -38,12 +39,9 @@ export const handler = async function deviceCodeHandler(ctx) {
 
 	const dPoP = await dpopValidate(ctx);
 
-	const code = await ctx.oidc.provider.DeviceCode.find(
-		ctx.oidc.params.device_code,
-		{
-			ignoreExpiration: true
-		}
-	);
+	const code = await DeviceCode.find(ctx.oidc.params.device_code, {
+		ignoreExpiration: true
+	});
 
 	if (!code) {
 		throw new InvalidGrant('device code not found');
