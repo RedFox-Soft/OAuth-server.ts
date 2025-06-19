@@ -18,6 +18,7 @@ import {
 	NotFoundError
 } from 'lib/helpers/re_render_errors.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
+import { Session } from 'lib/models/session.js';
 
 const htmlTeamplate = Bun.file('./lib/interactions/htmlTeamplate.html');
 
@@ -40,7 +41,7 @@ export const ui = new Elysia()
 		}
 
 		if (interaction.session?.uid) {
-			const session = await provider.Session.findByUid(interaction.session.uid);
+			const session = await Session.findByUid(interaction.session.uid);
 			if (!session) {
 				throw new SessionNotFound('session not found');
 			}

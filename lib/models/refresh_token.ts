@@ -1,8 +1,8 @@
 import epochTime from '../helpers/epoch_time.ts';
+import { BaseToken } from './base_token.js';
 
 import apply from './mixins/apply.ts';
 import consumable from './mixins/consumable.ts';
-import hasFormat from './mixins/has_format.ts';
 import hasGrantId from './mixins/has_grant_id.ts';
 import hasGrantType from './mixins/has_grant_type.ts';
 import isSenderConstrained from './mixins/is_sender_constrained.ts';
@@ -15,9 +15,9 @@ export default (provider) =>
 		hasGrantType,
 		hasGrantId,
 		isSenderConstrained,
-		isSessionBound(provider),
+		isSessionBound,
 		storesAuth,
-		hasFormat(provider, 'RefreshToken', provider.BaseToken)
+		BaseToken
 	]) {
 		constructor(...args) {
 			super(...args);

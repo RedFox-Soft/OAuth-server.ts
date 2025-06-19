@@ -9,6 +9,7 @@ import { routeNames } from 'lib/consts/param_list.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { Claims } from 'lib/helpers/claims.js';
 import { IdToken } from 'lib/models/id_token.js';
+import { ReplayDetection } from 'lib/models/replay_detection.js';
 
 export const userinfo = new Elysia()
 	.guard({
@@ -60,7 +61,7 @@ export const userinfo = new Elysia()
 			const { allowReplay } = instance(ctx.oidc.provider).features.dPoP;
 
 			if (!allowReplay) {
-				const unique = await ctx.oidc.provider.ReplayDetection.unique(
+				const unique = await ReplayDetection.unique(
 					accessToken.clientId,
 					dPoP.jti,
 					epochTime() + DPOP_OK_WINDOW

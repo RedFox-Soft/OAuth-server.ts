@@ -4,16 +4,13 @@ import {
 	RequestUriNotSupported
 } from '../../helpers/errors.ts';
 import { PUSHED_REQUEST_URN } from '../../consts/index.ts';
+import { PushedAuthorizationRequest } from 'lib/models/pushed_authorization_request.js';
 
 /*
  * Validates request_uri is a PAR one when PAR is enabled and loads it. Throws
  */
 export default async function loadPushedAuthorizationRequest(ctx) {
-	const {
-		client,
-		params,
-		provider: { PushedAuthorizationRequest }
-	} = ctx.oidc;
+	const { client, params } = ctx.oidc;
 
 	if (
 		client['authorization.requirePushedAuthorizationRequests'] &&

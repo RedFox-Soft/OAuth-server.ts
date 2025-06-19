@@ -1,6 +1,7 @@
 import instance from '../../helpers/weak_cache.ts';
 import { InvalidRequestUri } from '../../helpers/errors.ts';
 import processResponseTypes from '../../helpers/process_response_types.ts';
+import { PushedAuthorizationRequest } from 'lib/models/pushed_authorization_request.js';
 
 /*
  * Based on the authorization request response mode either redirects with parameters in query or
@@ -15,11 +16,10 @@ export default async function respond(ctx) {
 	let pushedAuthorizationRequest = ctx.oidc.entities.PushedAuthorizationRequest;
 
 	if (!pushedAuthorizationRequest && ctx.oidc.entities.Interaction?.parJti) {
-		pushedAuthorizationRequest =
-			await ctx.oidc.provider.PushedAuthorizationRequest.find(
-				ctx.oidc.entities.Interaction.parJti,
-				{ ignoreExpiration: true }
-			);
+		pushedAuthorizationRequest = await PushedAuthorizationRequest.find(
+			ctx.oidc.entities.Interaction.parJti,
+			{ ignoreExpiration: true }
+		);
 	}
 
 	if (pushedAuthorizationRequest?.consumed) {

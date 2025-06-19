@@ -1,4 +1,6 @@
-export default (provider) => (superclass) =>
+import { Session } from '../session.js';
+
+export default (superclass) =>
 	class extends superclass {
 		static get IN_PAYLOAD() {
 			return [...super.IN_PAYLOAD, 'sessionUid', 'expiresWithSession'];
@@ -14,7 +16,7 @@ export default (provider) => (superclass) =>
 				return token;
 			}
 
-			const session = await provider.Session.findByUid(token.sessionUid);
+			const session = await Session.findByUid(token.sessionUid);
 
 			// related session was not found
 			if (!session) {

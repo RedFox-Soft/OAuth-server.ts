@@ -2,6 +2,7 @@ import { InvalidRequest } from '../../helpers/errors.ts';
 import dpopValidate, { DPOP_OK_WINDOW } from '../../helpers/validate_dpop.ts';
 import epochTime from '../../helpers/epoch_time.ts';
 import instance from '../../helpers/weak_cache.ts';
+import { ReplayDetection } from 'lib/models/replay_detection.js';
 
 /*
  * Validates dpop_jkt equals the used DPoP proof thumbprint
@@ -14,7 +15,6 @@ export default async function checkDpopJkt(ctx) {
 	if (dPoP) {
 		const { allowReplay } = instance(ctx.oidc.provider).features.dPoP;
 		if (!allowReplay) {
-			const { ReplayDetection } = ctx.oidc.provider;
 			const unique = await ReplayDetection.unique(
 				ctx.oidc.client.clientId,
 				dPoP.jti,

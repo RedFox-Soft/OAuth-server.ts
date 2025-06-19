@@ -1,17 +1,11 @@
-import instance from '../helpers/weak_cache.ts';
 import epochTime from '../helpers/epoch_time.ts';
-
-import hasFormat from './mixins/has_format.ts';
+import { BaseModel } from './base_model.js';
 
 export default (provider) =>
-	class Interaction extends hasFormat(
-		provider,
-		'Interaction',
-		instance(provider).BaseModel
-	) {
+	class Interaction extends BaseModel {
 		constructor(jti, payload) {
 			if (arguments.length === 2) {
-				if (payload.session instanceof instance(provider).BaseModel) {
+				if (payload.session instanceof BaseModel) {
 					const { session } = payload;
 					Object.assign(
 						payload,
@@ -29,7 +23,7 @@ export default (provider) =>
 					);
 				}
 
-				if (payload.grant instanceof instance(provider).BaseModel) {
+				if (payload.grant instanceof BaseModel) {
 					const { grant } = payload;
 					if (grant.jti) {
 						Object.assign(payload, { grantId: grant.jti });

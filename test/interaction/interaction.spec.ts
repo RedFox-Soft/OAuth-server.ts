@@ -13,6 +13,7 @@ import bootstrap, { agent } from '../test_helper.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { provider } from 'lib/index.js';
+import { Session } from 'lib/models/session.js';
 
 const expire = new Date();
 expire.setDate(expire.getDate() + 1);
@@ -373,7 +374,7 @@ describe('resume after consent', () => {
 
 		let session;
 		if (result?.login) {
-			session = new provider.Session({ jti: 'sess', ...sessionData });
+			session = new Session({ jti: 'sess', ...sessionData });
 		} else {
 			session = setup.getLastSession();
 		}

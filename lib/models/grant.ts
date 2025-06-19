@@ -1,8 +1,4 @@
-/* eslint-disable no-unused-expressions */
-/* eslint-disable no-param-reassign */
-
-import apply from './mixins/apply.ts';
-import hasFormat from './mixins/has_format.ts';
+import { BaseToken } from './base_token.js';
 
 const NON_REJECTABLE_CLAIMS = new Set([
 	'sub',
@@ -14,9 +10,7 @@ const NON_REJECTABLE_CLAIMS = new Set([
 ]);
 
 export default (provider) =>
-	class Grant extends apply([
-		hasFormat(provider, 'Grant', provider.BaseToken)
-	]) {
+	class Grant extends BaseToken {
 		static get IN_PAYLOAD() {
 			return [
 				'accountId',

@@ -8,10 +8,11 @@ import {
 import dpopValidate, { DPOP_OK_WINDOW } from '../../helpers/validate_dpop.ts';
 import checkResource from '../../shared/check_resource.ts';
 import epochTime from '../../helpers/epoch_time.ts';
+import { ReplayDetection } from 'lib/models/replay_detection.js';
 
 export const handler = async function clientCredentialsHandler(ctx) {
 	const { client } = ctx.oidc;
-	const { ClientCredentials, ReplayDetection } = ctx.oidc.provider;
+	const { ClientCredentials } = ctx.oidc.provider;
 	const {
 		features: {
 			mTLS: { getCertificate },

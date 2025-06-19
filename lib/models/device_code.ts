@@ -1,8 +1,8 @@
 import constantEquals from '../helpers/constant_equals.ts';
+import { BaseToken } from './base_token.js';
 
 import apply from './mixins/apply.ts';
 import consumable from './mixins/consumable.ts';
-import hasFormat from './mixins/has_format.ts';
 import hasGrantId from './mixins/has_grant_id.ts';
 import isSessionBound from './mixins/is_session_bound.ts';
 import storesAuth from './mixins/stores_auth.ts';
@@ -11,9 +11,9 @@ export default (provider) =>
 	class DeviceCode extends apply([
 		consumable,
 		hasGrantId,
-		isSessionBound(provider),
+		isSessionBound,
 		storesAuth,
-		hasFormat(provider, 'DeviceCode', provider.BaseToken)
+		BaseToken
 	]) {
 		static async findByUserCode(userCode, { ignoreExpiration = false } = {}) {
 			const stored = await this.adapter.findByUserCode(userCode);

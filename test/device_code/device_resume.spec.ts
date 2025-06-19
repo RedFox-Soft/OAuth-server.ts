@@ -6,6 +6,7 @@ import nanoid from '../../lib/helpers/nanoid.ts';
 import bootstrap, { passInteractionChecks } from '../test_helper.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
 import { generate } from '../../lib/helpers/user_codes.ts';
+import { Session } from 'lib/models/session.js';
 
 const sinon = createSandbox();
 const { any } = sinon.match;
@@ -38,7 +39,7 @@ describe('device interaction resume /device/:uid/', () => {
 			...auth
 		};
 
-		const session = new this.provider.Session({ jti: 'sess', ...sessionData });
+		const session = new Session({ jti: 'sess', ...sessionData });
 		const deviceCode = await new this.provider.DeviceCode({
 			params,
 			clientId: 'client',

@@ -10,20 +10,20 @@ const formats = {
 };
 
 export const dynamic = {
-	generateTokenId(...args) {
+	generateTokenId() {
 		const resolver = instance(provider).dynamic[this.constructor.name];
 		const format = resolver(als.getStore(), this);
-		if (!formats[format] || format === 'dynamic') {
+		if (!formats[format]) {
 			throw new Error('invalid format resolved');
 		}
 		this.format = format;
-		return formats[format].generateTokenId.apply(this, args);
+		return formats[format].generateTokenId.call(this);
 	},
-	async getValueAndPayload(...args) {
+	async getValueAndPayload() {
 		const { format } = this;
-		if (!formats[format] || format === 'dynamic') {
+		if (!formats[format]) {
 			throw new Error('invalid format resolved');
 		}
-		return formats[format].getValueAndPayload.apply(this, args);
+		return formats[format].getValueAndPayload.call(this);
 	}
 };

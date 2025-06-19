@@ -1874,7 +1874,7 @@ export const globalConfiguration = {
 		 *
 		 * example: To have e.g. Refresh Tokens values longer than Access Tokens.
 		 * ```js
-		 * function bitsOfOpaqueRandomness(ctx, token) {
+		 * function bitsOfOpaqueRandomness(token) {
 		 *   if (token.kind === 'RefreshToken') {
 		 *     return 384;
 		 *   }

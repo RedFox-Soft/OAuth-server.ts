@@ -1,6 +1,7 @@
 import { InvalidClientAuth } from '../helpers/errors.ts';
 import instance from '../helpers/weak_cache.ts';
 import * as JWT from '../helpers/jwt.ts';
+import { ReplayDetection } from 'lib/models/replay_detection.js';
 
 export default function getTokenJwtAuth(provider) {
 	const { clockTolerance, assertJwtClientAuthClaimsAndHeader } =
@@ -69,7 +70,7 @@ export default function getTokenJwtAuth(provider) {
 			ctx.oidc.client
 		);
 
-		const unique = await provider.ReplayDetection.unique(
+		const unique = await ReplayDetection.unique(
 			payload.iss,
 			payload.jti,
 			payload.exp + clockTolerance

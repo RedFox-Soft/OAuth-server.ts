@@ -22,8 +22,6 @@ class ProviderClass extends EventEmitter {
 
 	#AuthorizationCode;
 
-	#BaseToken;
-
 	#ClientCredentials;
 
 	#DeviceCode;
@@ -38,15 +36,9 @@ class ProviderClass extends EventEmitter {
 
 	#mountPath;
 
-	#PushedAuthorizationRequest;
-
 	#RefreshToken;
 
 	#RegistrationAccessToken;
-
-	#ReplayDetection;
-
-	#Session;
 
 	#int = {};
 
@@ -73,7 +65,6 @@ class ProviderClass extends EventEmitter {
 		this.#int.grantTypeHandlers = new Map();
 		this.#int.grantTypeDupes = new Map();
 		this.#int.grantTypeParams = new Map([[undefined, new Set()]]);
-		this.#int.BaseModel = models.getBaseModel(this);
 
 		this.#mountPath = pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
 
@@ -201,11 +192,6 @@ class ProviderClass extends EventEmitter {
 		}
 	}
 
-	get BaseToken() {
-		this.#BaseToken ||= models.getBaseToken(this);
-		return this.#BaseToken;
-	}
-
 	get IdToken() {
 		return IdToken;
 	}
@@ -217,11 +203,6 @@ class ProviderClass extends EventEmitter {
 	get Grant() {
 		this.#Grant ||= models.getGrant(this);
 		return this.#Grant;
-	}
-
-	get Session() {
-		this.#Session ||= models.getSession(this);
-		return this.#Session;
 	}
 
 	get Interaction() {
@@ -268,17 +249,6 @@ class ProviderClass extends EventEmitter {
 		this.#BackchannelAuthenticationRequest ||=
 			models.getBackchannelAuthenticationRequest(this);
 		return this.#BackchannelAuthenticationRequest;
-	}
-
-	get PushedAuthorizationRequest() {
-		this.#PushedAuthorizationRequest ||=
-			models.getPushedAuthorizationRequest(this);
-		return this.#PushedAuthorizationRequest;
-	}
-
-	get ReplayDetection() {
-		this.#ReplayDetection ||= models.getReplayDetection(this);
-		return this.#ReplayDetection;
 	}
 
 	// eslint-disable-next-line class-methods-use-this

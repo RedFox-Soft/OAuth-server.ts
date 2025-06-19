@@ -5,15 +5,16 @@ import hasGrantId from './mixins/has_grant_id.ts';
 import isSenderConstrained from './mixins/is_sender_constrained.ts';
 import isSessionBound from './mixins/is_session_bound.ts';
 import setAudience from './mixins/set_audience.ts';
+import { BaseToken } from './base_token.js';
 
 export default (provider) =>
 	class AccessToken extends apply([
 		hasGrantType,
 		hasGrantId,
 		isSenderConstrained,
-		isSessionBound(provider),
+		isSessionBound,
 		setAudience,
-		hasFormat(provider, 'AccessToken', provider.BaseToken)
+		hasFormat(provider, 'AccessToken', BaseToken)
 	]) {
 		static get IN_PAYLOAD() {
 			return [

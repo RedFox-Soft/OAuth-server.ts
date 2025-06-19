@@ -22,6 +22,7 @@ import { TestAdapter } from 'test/models.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { ClientDefaults } from 'lib/configs/clientBase.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
+import { PushedAuthorizationRequest } from 'lib/models/pushed_authorization_request.js';
 
 describe('Pushed Request Object', () => {
 	let setup = null;
@@ -109,8 +110,7 @@ describe('Pushed Request Object', () => {
 					let id = request_uri.split(':');
 					id = id[id.length - 1];
 
-					const { request } =
-						await provider.PushedAuthorizationRequest.find(id);
+					const { request } = await PushedAuthorizationRequest.find(id);
 					expect(decodeJwt(request)).toHaveProperty(
 						'redirect_uri',
 						'https://rp.example.com/unlisted'
@@ -472,9 +472,7 @@ describe('Pushed Request Object', () => {
 							let id = request_uri.split(':');
 							id = id[id.length - 1];
 
-							expect(
-								await provider.PushedAuthorizationRequest.find(id)
-							).toBeObject();
+							expect(await PushedAuthorizationRequest.find(id)).toBeObject();
 
 							const cookie = await setup.login();
 							const auth = new AuthorizationRequest({
@@ -494,9 +492,9 @@ describe('Pushed Request Object', () => {
 							expect(response.status).toBe(303);
 							auth.validatePresence(response, ['code']);
 
-							expect(
-								await provider.PushedAuthorizationRequest.find(id)
-							).toHaveProperty('consumed');
+							expect(await PushedAuthorizationRequest.find(id)).toHaveProperty(
+								'consumed'
+							);
 						});
 
 						it('allows the request_uri to be used (when request object was not used but client has request_object_signing_alg for its optional use)', async function () {
@@ -527,9 +525,7 @@ describe('Pushed Request Object', () => {
 							let id = request_uri.split(':');
 							id = id[id.length - 1];
 
-							expect(
-								await provider.PushedAuthorizationRequest.find(id)
-							).toBeObject();
+							expect(await PushedAuthorizationRequest.find(id)).toBeObject();
 
 							const auth = new AuthorizationRequest({
 								client_id: 'client-alg-registered',
@@ -549,9 +545,9 @@ describe('Pushed Request Object', () => {
 							expect(response.status).toBe(303);
 							auth.validatePresence(response, ['code']);
 
-							expect(
-								await provider.PushedAuthorizationRequest.find(id)
-							).toHaveProperty('consumed');
+							expect(await PushedAuthorizationRequest.find(id)).toHaveProperty(
+								'consumed'
+							);
 						});
 					});
 				});
@@ -1061,9 +1057,7 @@ describe('Pushed Request Object', () => {
 							let id = request_uri.split(':');
 							id = id[id.length - 1];
 
-							expect(
-								await provider.PushedAuthorizationRequest.find(id)
-							).toBeObject();
+							expect(await PushedAuthorizationRequest.find(id)).toBeObject();
 
 							const auth = new AuthorizationRequest({
 								client_id: clientId,
@@ -1087,9 +1081,9 @@ describe('Pushed Request Object', () => {
 							expect(response.status).toBe(303);
 							auth.validatePresence(response, ['code']);
 
-							expect(
-								await provider.PushedAuthorizationRequest.find(id)
-							).toHaveProperty('consumed');
+							expect(await PushedAuthorizationRequest.find(id)).toHaveProperty(
+								'consumed'
+							);
 						});
 
 						it('handles expired or invalid pushed authorization request object', async function () {

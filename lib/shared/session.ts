@@ -1,8 +1,9 @@
+import { Session } from 'lib/models/session.js';
 import { cookieNames } from '../consts/param_list.ts';
 import { globalConfiguration } from '../globalConfiguration.ts';
 
 export default async function sessionHandler(ctx) {
-	ctx.oidc.session = new Proxy(await ctx.oidc.provider.Session.get(ctx), {
+	ctx.oidc.session = new Proxy(await Session.get(ctx), {
 		set(obj, prop, value) {
 			switch (prop) {
 				case 'touched':

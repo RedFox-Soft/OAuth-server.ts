@@ -6,6 +6,7 @@ import nanoid from '../../helpers/nanoid.ts';
 import als from '../../helpers/als.ts';
 import { opaque } from './opaque.js';
 import { provider } from 'lib/provider.js';
+import { ISSUER } from 'lib/configs/env.js';
 
 async function getResourceServerConfig(token) {
 	const { keystore, configuration } = instance(provider);
@@ -146,7 +147,7 @@ export const jwt = {
 			authorization_details: rar,
 			scope: scope || undefined,
 			client_id: clientId,
-			iss: provider.issuer,
+			iss: ISSUER,
 			aud,
 			...(x5t || jkt ? { cnf: {} } : undefined)
 		};
@@ -193,7 +194,7 @@ export const jwt = {
 			const encrypted = await JWT.encrypt(signed, config.encrypt.key, {
 				fields: {
 					kid: config.encrypt.kid,
-					iss: provider.issuer,
+					iss: ISSUER,
 					aud: structuredToken.payload.aud,
 					cty: 'at+jwt'
 				},
@@ -213,7 +214,7 @@ export const jwt = {
 			const encrypted = await JWT.encrypt(cleartext, config.encrypt.key, {
 				fields: {
 					kid: config.encrypt.kid,
-					iss: provider.issuer,
+					iss: ISSUER,
 					aud: structuredToken.payload.aud,
 					typ: 'at+jwt',
 					...structuredToken.header

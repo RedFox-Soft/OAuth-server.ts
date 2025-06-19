@@ -5,6 +5,7 @@ import epochTime from '../../helpers/epoch_time.ts';
 import * as JWT from '../../helpers/jwt.ts';
 import { ISSUER } from 'lib/configs/env.js';
 import { nanoid } from 'nanoid';
+import { PushedAuthorizationRequest } from 'lib/models/pushed_authorization_request.js';
 
 const MAX_TTL = 60;
 
@@ -43,7 +44,7 @@ export default async function pushedAuthorizationRequestResponse(ctx) {
 		dpopJkt = ctx.oidc.params.dpop_jkt;
 	}
 
-	const requestObject = new ctx.oidc.provider.PushedAuthorizationRequest({
+	const requestObject = new PushedAuthorizationRequest({
 		request,
 		dpopJkt,
 		trusted:

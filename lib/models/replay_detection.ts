@@ -1,33 +1,25 @@
-import * as crypto from 'node:crypto';
+import crypto from 'node:crypto';
+import epochTime from '../helpers/epoch_time.js';
+import { BaseModel } from './base_model.js';
 
-import instance from '../helpers/weak_cache.ts';
-import epochTime from '../helpers/epoch_time.ts';
+export class ReplayDetection extends BaseModel {
+	static get IN_PAYLOAD() {
+		return [...super.IN_PAYLOAD, 'iss'];
+	}
 
-import hasFormat from './mixins/has_format.ts';
+	static async unique(iss, jti, exp) {
+		const id = crypto.hash('sha256', `${iss}${jti}`, 'base64url');
 
-export default (provider) =>
-	class ReplayDetection extends hasFormat(
-		provider,
-		'ReplayDetection',
-		instance(provider).BaseModel
-	) {
-		static get IN_PAYLOAD() {
-			return [...super.IN_PAYLOAD, 'iss'];
+		const found = await this.find(id);
+
+		if (found) {
+			return false;
 		}
 
-		static async unique(iss, jti, exp) {
-			const id = crypto.hash('sha256', `${iss}${jti}`, 'base64url');
+		const inst = this.instantiate({ jti: id, iss });
 
-			const found = await this.find(id);
+		await inst.save(exp - epochTime());
 
-			if (found) {
-				return false;
-			}
-
-			const inst = this.instantiate({ jti: id, iss });
-
-			await inst.save(exp - epochTime());
-
-			return true;
-		}
-	};
+		return true;
+	}
+}

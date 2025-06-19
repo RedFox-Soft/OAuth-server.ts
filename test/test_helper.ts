@@ -22,6 +22,7 @@ import { AuthorizationRequest } from './AuthorizationRequest.js';
 import { ApplicationConfig } from '../lib/configs/application.js';
 import { ClientDefaults } from 'lib/configs/clientBase.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
+import { Session } from 'lib/models/session.js';
 
 const applicationDefaultSettings = { ...ApplicationConfig };
 const clientDefaultSettings = { ...ClientDefaults };
@@ -145,7 +146,7 @@ export default function testHelper(
 			expire.setDate(expire.getDate() + 1);
 			lastAccountId = accountId;
 
-			const session = new provider.Session({
+			const session = new Session({
 				jti: sessionId,
 				loginTs,
 				accountId
@@ -219,7 +220,7 @@ export default function testHelper(
 			const raw = TestAdapter.for('Session').syncFind(sessionId);
 
 			if (instantiate) {
-				return new provider.Session(raw);
+				return new Session(raw);
 			}
 
 			return raw;
