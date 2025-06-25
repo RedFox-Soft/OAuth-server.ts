@@ -374,16 +374,6 @@ function GrantTTL(ctx, grant, client) {
 	return 14 * 24 * 60 * 60; // 14 days in seconds
 }
 
-function extraClientMetadataValidator(ctx, key, value, metadata) {
-	// @param ctx - koa request context (only provided when a client is being constructed during
-	//              Client Registration Request or Client Update Request
-	// @param key - the client metadata property name
-	// @param value - the property value
-	// @param metadata - the current accumulated client metadata
-	// @param ctx - koa request context (only provided when a client is being constructed during
-	//              Client Registration Request or Client Update Request
-}
-
 async function postLogoutSuccessSource(ctx) {
 	// @param ctx - koa request context
 	shouldChange(
@@ -1683,10 +1673,6 @@ function makeDefaults() {
 				 * description: Function used to load information about a Resource Server (API) and check if the
 				 *   client is meant to request scopes for that particular resource.
 				 *
-				 * recommendation: Only allow client's pre-registered resource values, to pre-register these
-				 *   you shall use the `extraClientMetadata` configuration option to define a custom metadata
-				 *   and use that to implement your policy using this function.
-				 *
 				 * example: Resource Server (API) with two scopes, an expected audience value, an Access Token TTL and a JWT Access Token Format.
 				 * ```js
 				 * {
@@ -2083,35 +2069,6 @@ function makeDefaults() {
 			Interaction: InteractionTTL,
 			RefreshToken: RefreshTokenTTL,
 			Session: SessionTTL
-		},
-
-		/*
-		 * extraClientMetadata
-		 *
-		 * description: Allows for custom client metadata to be defined, validated, manipulated as well as
-		 *   for existing property validations to be extended. Existing properties are snakeCased on
-		 *   a Client instance (e.g. `client.redirectUris`), new properties (defined by this
-		 *   configuration) will be available with their names verbatim (e.g.
-		 *   `client['urn:example:client:my-property']`)
-		 * @nodefault
-		 */
-		extraClientMetadata: {
-			/*
-			 * extraClientMetadata.properties
-			 *
-			 * description: Array of property names that clients will be allowed to have defined.
-			 */
-			properties: [],
-			/*
-			 * extraClientMetadata.validator
-			 *
-			 * description: validator function that will be executed in order once for every property
-			 *   defined in `extraClientMetadata.properties`, regardless of its value or presence on the
-			 *   client metadata passed in. Must be synchronous, async validators or functions returning
-			 *   Promise will be rejected during runtime. To modify the current client metadata values (for
-			 *   current key or any other) just modify the passed in `metadata` argument.
-			 */
-			validator: extraClientMetadataValidator
 		},
 
 		/*

@@ -219,23 +219,11 @@ export default function getSchema(provider) {
 	};
 
 	class Schema {
-		constructor(
-			metadata,
-			ctx,
-			processCustomMetadata = !!configuration.extraClientMetadata.properties
-				.length
-		) {
+		constructor(metadata) {
 			Object.assign(
 				this,
 				omitBy(pick(DEFAULT, ...RECOGNIZED_METADATA), isUndefined),
-				omitBy(
-					pick(
-						metadata,
-						...RECOGNIZED_METADATA,
-						...configuration.extraClientMetadata.properties
-					),
-					isUndefined
-				)
+				omitBy(pick(metadata, ...RECOGNIZED_METADATA), isUndefined)
 			);
 
 			this.required();
@@ -350,16 +338,7 @@ export default function getSchema(provider) {
 				this.invalidate('jwks and jwks_uri must not be used at the same time');
 			}
 
-			if (processCustomMetadata) {
-				this.processCustomMetadata(ctx);
-			}
-
 			this.ensureStripUnrecognized();
-
-			if (processCustomMetadata) {
-				// eslint-disable-next-line no-constructor-return
-				return new Schema(this, ctx, false);
-			}
 		}
 
 		invalidate(message, code) {
@@ -635,17 +614,6 @@ export default function getSchema(provider) {
 			}
 		}
 
-		processCustomMetadata(ctx) {
-			configuration.extraClientMetadata.properties.forEach((prop) => {
-				configuration.extraClientMetadata.validator(
-					ctx,
-					prop,
-					this[prop],
-					this
-				);
-			});
-		}
-
 		jarPolicy() {
 			if (
 				features.requestObjects.enabled &&
@@ -656,10 +624,7 @@ export default function getSchema(provider) {
 		}
 
 		ensureStripUnrecognized() {
-			const allowed = [
-				...RECOGNIZED_METADATA,
-				...configuration.extraClientMetadata.properties
-			];
+			const allowed = [...RECOGNIZED_METADATA];
 			Object.keys(this).forEach((prop) => {
 				if (!allowed.includes(prop)) {
 					delete this[prop];

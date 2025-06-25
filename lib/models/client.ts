@@ -366,7 +366,7 @@ export class Client {
 	static #adapter;
 
 	constructor(metadata, ctx) {
-		const schema = new Client.Schema(metadata, ctx);
+		const schema = new Client.Schema(metadata);
 
 		Object.assign(
 			this,
