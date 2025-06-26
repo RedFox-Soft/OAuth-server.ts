@@ -50,6 +50,7 @@ import {
 	OIDCProviderError
 } from 'lib/helpers/errors.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
+import { Client } from 'lib/models/client.js';
 
 const authorizationRequest = t.Composite([
 	t.Omit(AuthorizationParameters, ['request_uri', 'request', 'client_id']),
@@ -64,7 +65,7 @@ export async function isAllowRedirectUri(params) {
 	ctx.oidc = new OIDCContext(ctx);
 	ctx.oidc.params = params;
 
-	const client = await provider.Client.find(params.client_id);
+	const client = await Client.find(params.client_id);
 	if (!client) {
 		throw new InvalidClient('client is invalid', 'client not found');
 	}

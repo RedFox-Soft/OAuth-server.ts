@@ -19,6 +19,7 @@ import bootstrap, { agent } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { TestAdapter } from 'test/models.js';
+import { ttl } from 'lib/configs/liveTime.js';
 
 function errorDetail(spy) {
 	return spy.args[0][0].error_detail;
@@ -151,7 +152,6 @@ describe('grant_type=authorization_code', () => {
 		});
 
 		it('validates code is not expired', async function () {
-			const { ttl } = i(provider).configuration;
 			spyOn(ttl, 'AuthorizationCode').mockReturnValue(5);
 			const { response } = await agent.auth.get({
 				query: auth.params,
@@ -430,7 +430,6 @@ describe('grant_type=authorization_code', () => {
 		});
 
 		it('validates code is not expired', async function () {
-			const { ttl } = i(provider).configuration;
 			spyOn(ttl, 'AuthorizationCode').mockReturnValue(5);
 			const { response } = await agent.auth.get({
 				query: auth.params,

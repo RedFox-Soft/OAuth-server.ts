@@ -7,6 +7,7 @@ import { provider } from 'lib/provider.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { IdToken } from 'lib/models/id_token.js';
+import { RefreshToken } from 'lib/models/refresh_token.js';
 
 const introspectable = new Set([
 	'AccessToken',
@@ -30,7 +31,6 @@ const tokenTypes = {
 	},
 	refresh_token(token: string) {
 		const { grantTypeHandlers } = instance(provider);
-		const { RefreshToken } = provider;
 		if (!grantTypeHandlers.has('refresh_token')) {
 			return;
 		}

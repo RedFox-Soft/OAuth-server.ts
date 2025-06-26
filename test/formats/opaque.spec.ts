@@ -7,6 +7,7 @@ import { Client } from 'lib/models/client.js';
 import { TestAdapter } from 'test/models.js';
 import { provider } from 'lib/provider.js';
 import { DeviceCode } from 'lib/models/device_code.js';
+import { RefreshToken } from 'lib/models/refresh_token.js';
 
 const sinon = createSandbox();
 
@@ -247,7 +248,7 @@ describe('opaque storage', () => {
 		const kind = 'RefreshToken';
 		const upsert = spy(TestAdapter.for('RefreshToken'), 'upsert');
 		const client = await Client.find(clientId);
-		const token = new provider.RefreshToken({ client, ...fullPayload });
+		const token = new RefreshToken({ client, ...fullPayload });
 		await token.save();
 
 		expect(upsert.getCall(0).args[0]).to.have.lengthOf(43);

@@ -5,6 +5,7 @@ import instance from '../../helpers/weak_cache.ts';
 import nanoid from '../../helpers/nanoid.ts';
 import omitBy from '../../helpers/_/omit_by.ts';
 import { cookieNames } from 'lib/consts/param_list.js';
+import { ttl } from 'lib/configs/liveTime.js';
 
 export default async function interactions(resumeRouteName, ctx) {
 	const { oidc } = ctx;
@@ -129,19 +130,13 @@ export default async function interactions(resumeRouteName, ctx) {
 			oidc.entities.Interaction?.parJti
 	});
 
-	let ttl = instance(ctx.oidc.provider).configuration.ttl.Interaction;
-
-	if (typeof ttl === 'function') {
-		ttl = ttl(ctx, interactionSession);
-	}
-
-	await interactionSession.save(ttl);
+	await interactionSession.save(ttl.Interaction);
 	ctx.oidc.entity('Interaction', interactionSession);
 
 	ctx.cookie[cookieNames.interaction].set({
 		value: cookieID,
 		path: `/ui/${uid}`,
-		maxAge: ttl * 1000
+		maxAge: ttl.Interaction * 1000
 	});
 
 	oidc.provider.emit('interaction.started', prompt);

@@ -11,6 +11,7 @@ import epochTime from '../../helpers/epoch_time.ts';
 import { IdToken } from 'lib/models/id_token.js';
 import { ReplayDetection } from 'lib/models/replay_detection.js';
 import { DeviceCode } from 'lib/models/device_code.js';
+import { RefreshToken } from 'lib/models/refresh_token.js';
 
 const { AuthorizationPending, ExpiredToken, InvalidGrant } = errors;
 
@@ -119,7 +120,7 @@ export const handler = async function deviceCodeHandler(ctx) {
 
 	ctx.oidc.entity('Account', account);
 
-	const { AccessToken, RefreshToken } = ctx.oidc.provider;
+	const { AccessToken } = ctx.oidc.provider;
 
 	const at = new AccessToken({
 		accountId: account.accountId,

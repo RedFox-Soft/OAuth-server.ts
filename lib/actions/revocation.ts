@@ -5,6 +5,7 @@ import getTokenAuth from '../shared/token_auth.ts';
 import { urlencoded as parseBody } from '../shared/selective_body.ts';
 import paramsMiddleware from '../shared/assemble_params.ts';
 import revoke from '../helpers/revoke.ts';
+import { RefreshToken } from 'lib/models/refresh_token.js';
 
 const revokeable = new Set([
 	'AccessToken',
@@ -32,7 +33,7 @@ export default function revocationAction(provider) {
 		if (!grantTypeHandlers.has('refresh_token')) {
 			return undefined;
 		}
-		return provider.RefreshToken.find(token);
+		return RefreshToken.find(token);
 	}
 
 	function findResult(results) {

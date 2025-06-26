@@ -1625,7 +1625,6 @@ export const globalConfiguration = {
 			 *
 			 *   // OPTIONAL
 			 *   // Issued Token TTL
-			 *   // Default is - see `ttl` configuration
 			 *   accessTokenTTL?: number,
 			 *
 			 *   // Issued Token Format

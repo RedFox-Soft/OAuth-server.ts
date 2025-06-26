@@ -7,6 +7,7 @@ import bootstrap, { skipConsent } from '../test_helper.js';
 import { provider } from 'lib/provider.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
+import { RefreshToken } from 'lib/models/refresh_token.js';
 
 function assignAuthorizationResponseValues({ headers: { location } }) {
 	const {
@@ -107,7 +108,7 @@ describe('session bound tokens behaviours', () => {
 				.expect(200)
 				.expect(assignTokenResponseValues.bind(this));
 
-			let refresh = await provider.RefreshToken.find(this.refresh_token);
+			let refresh = await RefreshToken.find(this.refresh_token);
 			expect(refresh).to.have.property('expiresWithSession', true);
 
 			const token = await provider.AccessToken.find(this.access_token);
@@ -128,7 +129,7 @@ describe('session bound tokens behaviours', () => {
 				.expect(200)
 				.expect(assignTokenResponseValues.bind(this));
 
-			refresh = await provider.RefreshToken.find(this.refresh_token);
+			refresh = await RefreshToken.find(this.refresh_token);
 			expect(refresh).to.have.property('expiresWithSession', true);
 
 			{
@@ -186,7 +187,7 @@ describe('session bound tokens behaviours', () => {
 				.expect(200)
 				.expect(assignTokenResponseValues.bind(this));
 
-			let refresh = await provider.RefreshToken.find(this.refresh_token);
+			let refresh = await RefreshToken.find(this.refresh_token);
 			expect(refresh).not.to.have.property('expiresWithSession');
 
 			{
@@ -212,7 +213,7 @@ describe('session bound tokens behaviours', () => {
 
 			const token = await provider.AccessToken.find(this.access_token);
 			expect(token).not.to.have.property('expiresWithSession');
-			refresh = await provider.RefreshToken.find(this.refresh_token);
+			refresh = await RefreshToken.find(this.refresh_token);
 			expect(refresh).not.to.have.property('expiresWithSession');
 
 			await TestAdapter.for('Session').destroy(this.getSessionId());
@@ -238,7 +239,7 @@ describe('session bound tokens behaviours', () => {
 				expect(token).not.to.have.property('expiresWithSession');
 			}
 
-			refresh = await provider.RefreshToken.find(this.refresh_token);
+			refresh = await RefreshToken.find(this.refresh_token);
 			expect(refresh).not.to.have.property('expiresWithSession');
 		});
 	});

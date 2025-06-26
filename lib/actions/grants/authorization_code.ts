@@ -10,6 +10,7 @@ import epochTime from '../../helpers/epoch_time.ts';
 import checkRar from '../../shared/check_rar.ts';
 import { IdToken } from 'lib/models/id_token.js';
 import { ReplayDetection } from 'lib/models/replay_detection.js';
+import { RefreshToken } from 'lib/models/refresh_token.js';
 
 const gty = 'authorization_code';
 
@@ -124,7 +125,7 @@ export const handler = async function authorizationCodeHandler(ctx) {
 
 	ctx.oidc.entity('Account', account);
 
-	const { AccessToken, RefreshToken } = ctx.oidc.provider;
+	const { AccessToken } = ctx.oidc.provider;
 
 	const at = new AccessToken({
 		accountId: account.accountId,

@@ -1,6 +1,6 @@
 import { Session } from 'lib/models/session.js';
-import { cookieNames } from '../consts/param_list.ts';
-import { globalConfiguration } from '../globalConfiguration.ts';
+import { cookieNames } from '../consts/param_list.js';
+import { ttl } from 'lib/configs/liveTime.js';
 
 export default async function sessionHandler(ctx) {
 	ctx.oidc.session = new Proxy(await Session.get(ctx), {
@@ -47,14 +47,8 @@ export default async function sessionHandler(ctx) {
 			(!ctx.oidc.session.new || ctx.oidc.session.touched) &&
 			!ctx.oidc.session.destroyed
 		) {
-			let ttl = globalConfiguration.ttl.Session;
-
-			if (typeof ttl === 'function') {
-				ttl = ttl(ctx, ctx.oidc.session);
-			}
-
 			session.value = ctx.oidc.session.id;
-			await ctx.oidc.session.save(ttl);
+			await ctx.oidc.session.save(ttl.Session);
 		}
 
 		if (session) {

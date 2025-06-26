@@ -1,7 +1,6 @@
-import instance from '../helpers/weak_cache.ts';
 import als from '../helpers/als.ts';
 import { BaseModel } from './base_model.js';
-import { provider } from 'lib/provider.js';
+import { ttl } from '../configs/liveTime.js';
 
 export class BaseToken extends BaseModel {
 	#client;
@@ -40,17 +39,9 @@ export class BaseToken extends BaseModel {
 	}
 
 	static expiresIn(...args) {
-		const ttl = instance(provider).configuration.ttl[this.name];
-
-		if (typeof ttl === 'number') {
-			return ttl;
+		if (this.name in ttl) {
+			return ttl[this.name](...args);
 		}
-
-		if (typeof ttl === 'function') {
-			return ttl(...args);
-		}
-
-		return undefined;
 	}
 
 	async save() {

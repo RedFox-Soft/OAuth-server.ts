@@ -1,51 +1,56 @@
 import * as url from 'node:url';
+import {
+	describe,
+	it,
+	beforeAll,
+	spyOn,
+	beforeEach,
+	afterEach,
+	mock,
+	expect
+} from 'bun:test';
 
-import { expect } from 'chai';
-import sinon from 'sinon';
-import cloneDeep from 'lodash/cloneDeep.js';
-
-import bootstrap, { skipConsent } from '../test_helper.js';
+import bootstrap, { agent } from '../test_helper.js';
 import { IdToken } from 'lib/models/id_token.js';
 import { Client } from 'lib/models/client.js';
 import { provider } from 'lib/provider.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { TestAdapter } from 'test/models.js';
+import { RefreshToken } from 'lib/models/refresh_token.js';
+import { OIDCContext } from 'lib/helpers/oidc_context.js';
+import { ttl } from 'lib/configs/liveTime.js';
 
 describe('dynamic ttl', () => {
-	before(bootstrap(import.meta.url));
-	skipConsent();
-	before(function () {
-		this.prev = cloneDeep(i(provider).configuration.ttl);
+	let setup = null;
+	beforeAll(async function () {
+		setup = await bootstrap(import.meta.url)();
+	});
+
+	beforeEach(function () {
+		spyOn(OIDCContext.prototype, 'promptPending').mockReturnValue(false);
 	});
 	afterEach(function () {
-		i(provider).configuration.ttl = this.prev;
+		mock.restore();
 	});
-	before(function () {
-		return this.login({ scope: 'openid offline_access' });
-	});
+
+	// return setup.login({ scope: 'openid offline_access' });
 
 	it('client credentials', async function () {
-		const ClientCredentials = sinon.fake.returns(123);
-		i(provider).configuration.ttl.ClientCredentials = ClientCredentials;
+		const clientSpy = spyOn(ttl, 'ClientCredentials').mockReturnValue(123);
 
-		await this.agent
-			.post('/token')
-			.send({
-				client_id: 'client',
-				grant_type: 'client_credentials'
-			})
-			.type('form')
-			.expect(200)
-			.expect(({ body: { expires_in } }) => {
-				expect(expires_in).to.eql(123);
-			});
+		const { data, status } = await agent.token.post({
+			client_id: 'client',
+			grant_type: 'client_credentials'
+		});
+		expect(status).toBe(200);
+		expect(data).toHaveProperty('expires_in', 123);
 
-		expect(ClientCredentials).to.have.property('calledOnce', true);
-		expect(ClientCredentials.args[0][1]).to.be.an.instanceof(
+		expect(clientSpy).toBeCalledTimes(1);
+		expect(clientSpy.mock.calls[0][1]).toBeInstanceOf(
 			provider.ClientCredentials
 		);
-		expect(ClientCredentials.args[0][2]).to.be.an.instanceof(provider.Client);
+		expect(clientSpy.mock.calls[0][2]).toBeInstanceOf(Client);
 	});
 
 	it('device flow init', async function () {
@@ -79,10 +84,10 @@ describe('dynamic ttl', () => {
 
 		const IdTokenFunc = sinon.fake.returns(123);
 		const AccessToken = sinon.fake.returns(1234);
-		const RefreshToken = sinon.fake.returns(12345);
+		const RefreshTokenFunc = sinon.fake.returns(12345);
 		i(provider).configuration.ttl.IdToken = IdTokenFunc;
 		i(provider).configuration.ttl.AccessToken = AccessToken;
-		i(provider).configuration.ttl.RefreshToken = RefreshToken;
+		i(provider).configuration.ttl.RefreshToken = RefreshTokenFunc;
 
 		await this.agent
 			.post('/token')
@@ -102,9 +107,9 @@ describe('dynamic ttl', () => {
 		expect(AccessToken.args[0][1]).to.be.an.instanceof(provider.AccessToken);
 		expect(AccessToken.args[0][2]).to.be.an.instanceof(Client);
 
-		expect(RefreshToken).to.have.property('calledOnce', true);
-		expect(RefreshToken.args[0][1]).to.be.an.instanceof(provider.RefreshToken);
-		expect(RefreshToken.args[0][2]).to.be.an.instanceof(Client);
+		expect(RefreshTokenFunc).to.have.property('calledOnce', true);
+		expect(RefreshTokenFunc.args[0][1]).to.be.an.instanceof(RefreshToken);
+		expect(RefreshTokenFunc.args[0][2]).to.be.an.instanceof(Client);
 	});
 
 	it('authorization flow returned tokens', async function () {
@@ -119,16 +124,16 @@ describe('dynamic ttl', () => {
 		expect(AuthorizationCode.args[0][1]).to.be.an.instanceof(
 			provider.AuthorizationCode
 		);
-		expect(AuthorizationCode.args[0][2]).to.be.an.instanceof(provider.Client);
+		expect(AuthorizationCode.args[0][2]).to.be.an.instanceof(Client);
 	});
 
 	it('authorization code', async function () {
 		const IdTokenFunc = sinon.fake.returns(123);
 		const AccessToken = sinon.fake.returns(1234);
-		const RefreshToken = sinon.fake.returns(12345);
+		const RefreshTokenFunc = sinon.fake.returns(12345);
 		i(provider).configuration.ttl.IdToken = IdTokenFunc;
 		i(provider).configuration.ttl.AccessToken = AccessToken;
-		i(provider).configuration.ttl.RefreshToken = RefreshToken;
+		i(provider).configuration.ttl.RefreshToken = RefreshTokenFunc;
 
 		const auth = new AuthorizationRequest({
 			scope: 'openid offline_access',
@@ -165,9 +170,9 @@ describe('dynamic ttl', () => {
 		expect(AccessToken.args[0][1]).to.be.an.instanceof(provider.AccessToken);
 		expect(AccessToken.args[0][2]).to.be.an.instanceof(Client);
 
-		expect(RefreshToken).to.have.property('calledOnce', true);
-		expect(RefreshToken.args[0][1]).to.be.an.instanceof(provider.RefreshToken);
-		expect(RefreshToken.args[0][2]).to.be.an.instanceof(Client);
+		expect(RefreshTokenFunc).to.have.property('calledOnce', true);
+		expect(RefreshTokenFunc.args[0][1]).to.be.an.instanceof(RefreshToken);
+		expect(RefreshTokenFunc.args[0][2]).to.be.an.instanceof(Client);
 	});
 
 	it('refreshed tokens', async function () {
@@ -205,10 +210,10 @@ describe('dynamic ttl', () => {
 
 		const IdTokenFunc = sinon.fake.returns(123);
 		const AccessToken = sinon.fake.returns(1234);
-		const RefreshToken = sinon.fake.returns(12345);
+		const RefreshTokenFunc = sinon.fake.returns(12345);
 		i(provider).configuration.ttl.IdToken = IdTokenFunc;
 		i(provider).configuration.ttl.AccessToken = AccessToken;
-		i(provider).configuration.ttl.RefreshToken = RefreshToken;
+		i(provider).configuration.ttl.RefreshToken = RefreshTokenFunc;
 
 		await this.agent
 			.post('/token')
@@ -229,8 +234,8 @@ describe('dynamic ttl', () => {
 		expect(AccessToken.args[0][1]).to.be.an.instanceof(provider.AccessToken);
 		expect(AccessToken.args[0][2]).to.be.an.instanceof(Client);
 
-		expect(RefreshToken).to.have.property('calledOnce', true);
-		expect(RefreshToken.args[0][1]).to.be.an.instanceof(provider.RefreshToken);
-		expect(RefreshToken.args[0][2]).to.be.an.instanceof(Client);
+		expect(RefreshTokenFunc).to.have.property('calledOnce', true);
+		expect(RefreshTokenFunc.args[0][1]).to.be.an.instanceof(RefreshToken);
+		expect(RefreshTokenFunc.args[0][2]).to.be.an.instanceof(Client);
 	});
 });

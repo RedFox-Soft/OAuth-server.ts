@@ -23,6 +23,7 @@ import { ApplicationConfig } from '../lib/configs/application.js';
 import { ClientDefaults } from 'lib/configs/clientBase.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { Session } from 'lib/models/session.js';
+import { ttl } from 'lib/configs/liveTime.js';
 
 const applicationDefaultSettings = { ...ApplicationConfig };
 const clientDefaultSettings = { ...ClientDefaults };
@@ -192,14 +193,8 @@ export default function testHelper(
 				};
 			}
 
-			let ttl = i(provider).configuration.ttl.Session;
-
-			if (typeof ttl === 'function') {
-				ttl = ttl(ctx, session);
-			}
-
 			return Account.findAccount({}, accountId)
-				.then(session.save(ttl))
+				.then(session.save(ttl.Session))
 				.then(() => {
 					return cookies;
 				});

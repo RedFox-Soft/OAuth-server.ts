@@ -1,4 +1,3 @@
-import { strict as assert } from 'node:assert';
 import { parse as parseUrl } from 'node:url';
 import {
 	describe,
@@ -19,6 +18,7 @@ import { provider } from 'lib/provider.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
+import { ttl } from 'lib/configs/liveTime.js';
 
 const route = '/token';
 
@@ -34,7 +34,6 @@ describe('grant_type=refresh_token', () => {
 
 	beforeEach(() => {
 		spyOn(OIDCContext.prototype, 'promptPending').mockReturnValue(false);
-		const { ttl } = i(provider).configuration;
 		spyOn(ttl, 'RefreshToken').mockReturnValue(5);
 	});
 

@@ -33,8 +33,6 @@ class ProviderClass extends EventEmitter {
 
 	#mountPath;
 
-	#RefreshToken;
-
 	#RegistrationAccessToken;
 
 	#int = {};
@@ -215,11 +213,6 @@ class ProviderClass extends EventEmitter {
 	get AuthorizationCode() {
 		this.#AuthorizationCode ||= models.getAuthorizationCode(this);
 		return this.#AuthorizationCode;
-	}
-
-	get RefreshToken() {
-		this.#RefreshToken ||= models.getRefreshToken(this);
-		return this.#RefreshToken;
 	}
 
 	get ClientCredentials() {

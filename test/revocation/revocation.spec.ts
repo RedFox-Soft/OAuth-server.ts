@@ -4,6 +4,7 @@ import { expect } from 'chai';
 import bootstrap from '../test_helper.js';
 import { provider } from 'lib/provider.js';
 import { Client } from 'lib/models/client.js';
+import { RefreshToken } from 'lib/models/refresh_token.js';
 
 const sinon = createSandbox();
 const route = '/token/revocation';
@@ -190,15 +191,15 @@ describe('revocation features', () => {
 		});
 
 		it('revokes refresh token [no hint]', async function () {
-			const rt = new provider.RefreshToken({
+			const rt = new RefreshToken({
 				accountId: 'accountId',
 				grantId: 'foo',
-				client: await provider.Client.find('client'),
+				client: await Client.find('client'),
 				scope: 'scope'
 			});
 
 			const rtDestroy = sinon
-				.stub(provider.RefreshToken.prototype, 'destroy')
+				.stub(RefreshToken.prototype, 'destroy')
 				.callsFake(() => Promise.resolve());
 			const grantDestroy = sinon
 				.stub(provider.Grant.adapter, 'destroy')
@@ -219,15 +220,15 @@ describe('revocation features', () => {
 		});
 
 		it('revokes refresh token [correct hint]', async function () {
-			const rt = new provider.RefreshToken({
+			const rt = new RefreshToken({
 				accountId: 'accountId',
 				grantId: 'foo',
-				client: await provider.Client.find('client'),
+				client: await Client.find('client'),
 				scope: 'scope'
 			});
 
 			const stub = sinon
-				.stub(provider.RefreshToken.prototype, 'destroy')
+				.stub(RefreshToken.prototype, 'destroy')
 				.callsFake(() => Promise.resolve());
 
 			const token = await rt.save();
@@ -244,15 +245,15 @@ describe('revocation features', () => {
 		});
 
 		it('revokes refresh token [wrong hint]', async function () {
-			const rt = new provider.RefreshToken({
+			const rt = new RefreshToken({
 				accountId: 'accountId',
 				grantId: 'foo',
-				client: await provider.Client.find('client'),
+				client: await Client.find('client'),
 				scope: 'scope'
 			});
 
 			const stub = sinon
-				.stub(provider.RefreshToken.prototype, 'destroy')
+				.stub(RefreshToken.prototype, 'destroy')
 				.callsFake(() => Promise.resolve());
 
 			const token = await rt.save();
@@ -269,15 +270,15 @@ describe('revocation features', () => {
 		});
 
 		it('revokes refresh token [unrecognized hint]', async function () {
-			const rt = new provider.RefreshToken({
+			const rt = new RefreshToken({
 				accountId: 'accountId',
 				grantId: 'foo',
-				client: await provider.Client.find('client'),
+				client: await Client.find('client'),
 				scope: 'scope'
 			});
 
 			const stub = sinon
-				.stub(provider.RefreshToken.prototype, 'destroy')
+				.stub(RefreshToken.prototype, 'destroy')
 				.callsFake(() => Promise.resolve());
 
 			const token = await rt.save();
@@ -510,10 +511,10 @@ describe('revocation features', () => {
 				}, done);
 
 				(async () => {
-					const rt = new provider.RefreshToken({
+					const rt = new RefreshToken({
 						accountId: 'accountId',
 						grantId: 'foo',
-						client: await provider.Client.find('client'),
+						client: await Client.find('client'),
 						scope: 'scope'
 					});
 
@@ -533,7 +534,7 @@ describe('revocation features', () => {
 
 				(async () => {
 					const rt = new provider.ClientCredentials({
-						client: await provider.Client.find('client')
+						client: await Client.find('client')
 					});
 
 					const token = await rt.save();

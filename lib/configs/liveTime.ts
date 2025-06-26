@@ -27,10 +27,10 @@ export const clockTolerance = 10;
  * will have their TTL refreshed (via rotation).
  */
 export const ttl = {
-	AccessToken(token, client) {
+	AccessToken(ctx, token, client) {
 		return token.resourceServer?.accessTokenTTL || 60 * 60; // 1 hour in seconds
 	},
-	AuthorizationCode(code, client) {
+	AuthorizationCode(ctx, code, client) {
 		return 60; // 1 minute in seconds
 	},
 	BackchannelAuthenticationRequest(ctx, request, client) {
@@ -40,19 +40,16 @@ export const ttl = {
 
 		return 10 * 60; // 10 minutes in seconds
 	},
-	ClientCredentials(token, client) {
+	ClientCredentials(ctx, token, client) {
 		return token.resourceServer?.accessTokenTTL || 10 * 60; // 10 minutes in seconds
 	},
-	DeviceCode(deviceCode, client) {
+	DeviceCode(ctx, deviceCode, client) {
 		return 10 * 60; // 10 minutes in seconds
 	},
-	Grant(grant, client) {
+	Grant(ctx, grant, client) {
 		return 14 * 24 * 60 * 60; // 14 days in seconds
 	},
 	IdToken(token: IdToken, client: Client) {
-		return 60 * 60; // 1 hour in seconds
-	},
-	Interaction(interaction) {
 		return 60 * 60; // 1 hour in seconds
 	},
 	RefreshToken(ctx, token, client) {
@@ -68,7 +65,6 @@ export const ttl = {
 
 		return 14 * 24 * 60 * 60; // 14 days in seconds
 	},
-	Session(ctx, session) {
-		return 14 * 24 * 60 * 60; // 14 days in seconds
-	}
+	Interaction: 60 * 60, // 1 hour in seconds
+	Session: 14 * 24 * 60 * 60 // 14 days in seconds
 };

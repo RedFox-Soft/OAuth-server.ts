@@ -4,15 +4,15 @@ import { provider } from 'lib/provider.js';
 import instance from '../helpers/weak_cache.ts';
 import { UnsupportedGrantType, InvalidRequest } from '../helpers/errors.ts';
 import getTokenAuth from '../shared/token_auth.ts';
-import { globalConfiguration } from '../globalConfiguration.ts';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import {
 	codeGrantParameters,
 	refreshTokenGrantParameters
 } from './grants/index.js';
+import { routeNames } from 'lib/consts/param_list.js';
 
 export const tokenAction = new Elysia().post(
-	globalConfiguration.routes.token,
+	routeNames.token,
 	async ({ body, headers }) => {
 		const ctx = {
 			headers

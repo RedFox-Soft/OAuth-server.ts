@@ -13,6 +13,8 @@ import { ISSUER } from 'lib/configs/env.js';
 import { provider } from 'lib/provider.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
+import { RefreshToken } from 'lib/models/refresh_token.js';
+import { Client } from 'lib/models/client.js';
 
 describe('introspection features', () => {
 	let setup = null;
@@ -45,7 +47,7 @@ describe('introspection features', () => {
 			const at = new provider.AccessToken({
 				accountId: 'accountId',
 				grantId: setup.getGrantId(),
-				client: await provider.Client.find('client'),
+				client: await Client.find('client'),
 				scope: 'scope',
 				aud: 'urn:example:foo'
 			});
@@ -78,7 +80,7 @@ describe('introspection features', () => {
 			const at = new provider.AccessToken({
 				accountId: 'accountId',
 				grantId: setup.getGrantId(),
-				client: await provider.Client.find('client'),
+				client: await Client.find('client'),
 				scope: 'scope'
 			});
 
@@ -99,7 +101,7 @@ describe('introspection features', () => {
 			const at = new provider.AccessToken({
 				accountId: 'accountId',
 				grantId: setup.getGrantId(),
-				client: await provider.Client.find('client'),
+				client: await Client.find('client'),
 				scope: 'scope'
 			});
 
@@ -120,7 +122,7 @@ describe('introspection features', () => {
 			const at = new provider.AccessToken({
 				accountId: 'accountId',
 				grantId: setup.getGrantId(),
-				client: await provider.Client.find('client'),
+				client: await Client.find('client'),
 				scope: 'scope'
 			});
 
@@ -138,10 +140,10 @@ describe('introspection features', () => {
 		});
 
 		it('returns the properties for refresh token [no hint]', async function () {
-			const rt = new provider.RefreshToken({
+			const rt = new RefreshToken({
 				accountId: 'accountId',
 				grantId: setup.getGrantId(),
-				client: await provider.Client.find('client'),
+				client: await Client.find('client'),
 				scope: 'scope'
 			});
 
@@ -157,10 +159,10 @@ describe('introspection features', () => {
 		});
 
 		it('returns the properties for refresh token [correct hint]', async function () {
-			const rt = new provider.RefreshToken({
+			const rt = new RefreshToken({
 				accountId: 'accountId',
 				grantId: setup.getGrantId(),
-				client: await provider.Client.find('client'),
+				client: await Client.find('client'),
 				scope: 'scope'
 			});
 
@@ -176,10 +178,10 @@ describe('introspection features', () => {
 		});
 
 		it('returns the properties for refresh token [wrong hint]', async function () {
-			const rt = new provider.RefreshToken({
+			const rt = new RefreshToken({
 				accountId: 'accountId',
 				grantId: setup.getGrantId(),
-				client: await provider.Client.find('client'),
+				client: await Client.find('client'),
 				scope: 'scope'
 			});
 
@@ -195,10 +197,10 @@ describe('introspection features', () => {
 		});
 
 		it('returns the properties for refresh token [unrecognized hint]', async function () {
-			const rt = new provider.RefreshToken({
+			const rt = new RefreshToken({
 				accountId: 'accountId',
 				grantId: setup.getGrantId(),
-				client: await provider.Client.find('client'),
+				client: await Client.find('client'),
 				scope: 'scope'
 			});
 
@@ -215,7 +217,7 @@ describe('introspection features', () => {
 
 		it('returns the properties for client credentials token [no hint]', async function () {
 			const rt = new provider.ClientCredentials({
-				client: await provider.Client.find('client')
+				client: await Client.find('client')
 			});
 
 			const token = await rt.save();
@@ -231,7 +233,7 @@ describe('introspection features', () => {
 
 		it('returns the properties for client credentials token [correct hint]', async function () {
 			const rt = new provider.ClientCredentials({
-				client: await provider.Client.find('client')
+				client: await Client.find('client')
 			});
 
 			const token = await rt.save();
@@ -247,7 +249,7 @@ describe('introspection features', () => {
 
 		it('returns the properties for client credentials token [wrong hint]', async function () {
 			const rt = new provider.ClientCredentials({
-				client: await provider.Client.find('client')
+				client: await Client.find('client')
 			});
 
 			const token = await rt.save();
@@ -263,7 +265,7 @@ describe('introspection features', () => {
 
 		it('returns the properties for client credentials token [unrecognized hint]', async function () {
 			const rt = new provider.ClientCredentials({
-				client: await provider.Client.find('client')
+				client: await Client.find('client')
 			});
 
 			const token = await rt.save();
@@ -278,7 +280,7 @@ describe('introspection features', () => {
 		});
 
 		it('can be called by pairwise clients', async function () {
-			const rt = new provider.RefreshToken({
+			const rt = new RefreshToken({
 				accountId: 'accountId',
 				grantId: setup.getGrantId('client-pairwise'),
 				clientId: 'client-pairwise',
@@ -301,7 +303,7 @@ describe('introspection features', () => {
 		});
 
 		it('can be called by RS clients and uses the original subject_type', async function () {
-			const rt = new provider.RefreshToken({
+			const rt = new RefreshToken({
 				accountId: 'accountId',
 				grantId: setup.getGrantId('client-pairwise'),
 				clientId: 'client-pairwise',
@@ -363,7 +365,7 @@ describe('introspection features', () => {
 			const at = new provider.AccessToken({
 				accountId: 'accountId',
 				grantId: setup.getGrantId(),
-				client: await provider.Client.find('client'),
+				client: await Client.find('client'),
 				scope: 'scope'
 			});
 
@@ -407,7 +409,7 @@ describe('introspection features', () => {
 			const at = new provider.AccessToken({
 				accountId: 'accountId',
 				grantId: setup.getGrantId(),
-				client: await provider.Client.find('client'),
+				client: await Client.find('client'),
 				scope: 'scope',
 				expiresIn: -1
 			});
@@ -424,10 +426,10 @@ describe('introspection features', () => {
 		});
 
 		it('responds only with active=false when token is already consumed', async function () {
-			const rt = new provider.RefreshToken({
+			const rt = new RefreshToken({
 				accountId: 'accountId',
 				grantId: setup.getGrantId(),
-				client: await provider.Client.find('client'),
+				client: await Client.find('client'),
 				scope: 'scope'
 			});
 
@@ -466,7 +468,7 @@ describe('introspection features', () => {
 
 				const at = new provider.AccessToken({
 					accountId: 'accountId',
-					client: await provider.Client.find('client'),
+					client: await Client.find('client'),
 					scope: 'scope'
 				});
 
@@ -485,9 +487,9 @@ describe('introspection features', () => {
 			it('when introspecting a RefreshToken', async function () {
 				const spy = spyOn(OIDCContext.prototype, 'entity');
 
-				const rt = new provider.RefreshToken({
+				const rt = new RefreshToken({
 					accountId: 'accountId',
-					client: await provider.Client.find('client'),
+					client: await Client.find('client'),
 					scope: 'scope'
 				});
 
@@ -507,7 +509,7 @@ describe('introspection features', () => {
 				const spy = spyOn(OIDCContext.prototype, 'entity');
 
 				const rt = new provider.ClientCredentials({
-					client: await provider.Client.find('client')
+					client: await Client.find('client')
 				});
 
 				const token = await rt.save();

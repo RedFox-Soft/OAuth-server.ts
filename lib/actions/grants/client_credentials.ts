@@ -92,7 +92,7 @@ export const handler = async function clientCredentialsHandler(ctx) {
 	ctx.oidc.entity('ClientCredentials', token);
 	const value = await token.save();
 
-	ctx.body = {
+	return {
 		access_token: value,
 		expires_in: token.expiration,
 		token_type: token.tokenType,

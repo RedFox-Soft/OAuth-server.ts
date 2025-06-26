@@ -58,7 +58,6 @@ class Configuration {
 		this.checkDependantFeatures();
 		this.checkDeviceFlow();
 		this.checkAuthMethods();
-		this.checkTTL();
 		this.checkCibaDeliveryModes();
 		this.checkRichAuthorizationRequests();
 
@@ -425,35 +424,6 @@ class Configuration {
 				'richAuthorizationRequests is only available in conjuction with enabled resourceIndicators'
 			);
 		}
-	}
-
-	checkTTL() {
-		Object.entries(this.ttl).forEach(([key, value]) => {
-			let valid = false;
-			switch (typeof value) {
-				case 'function': {
-					if (value.constructor.toString().includes('[native code]')) {
-						valid = true;
-					}
-					break;
-				}
-				case 'number':
-					if (Number.isSafeInteger(value) && value > 0) {
-						valid = true;
-					}
-					break;
-				case 'undefined': // does not expire
-					valid = true;
-					break;
-				default:
-			}
-
-			if (!valid) {
-				throw new TypeError(
-					`ttl.${key} must be a positive integer or a regular function returning one`
-				);
-			}
-		});
 	}
 
 	checkFapiProfile() {
