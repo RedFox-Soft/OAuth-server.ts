@@ -3,6 +3,7 @@ import { describe, it, beforeAll, expect } from 'bun:test';
 import bootstrap, { agent } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { provider } from 'lib/provider.js';
+import { TestAdapter } from 'test/models.js';
 
 describe('PKCE RFC7636', () => {
 	let setup = null;
@@ -140,7 +141,7 @@ describe('PKCE RFC7636', () => {
 				query: { code }
 			} = parseUrl(response.headers.get('location'), true);
 			const jti = setup.getTokenJti(code);
-			const stored = setup.TestAdapter.for('AuthorizationCode').syncFind(jti);
+			const stored = TestAdapter.for('AuthorizationCode').syncFind(jti);
 			expect(stored).toHaveProperty('codeChallengeMethod', 'S256');
 			expect(stored).toHaveProperty(
 				'codeChallenge',

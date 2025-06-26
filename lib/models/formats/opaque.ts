@@ -5,10 +5,11 @@ import instance from '../../helpers/weak_cache.ts';
 import nanoid from '../../helpers/nanoid.ts';
 import als from '../../helpers/als.ts';
 import { provider } from 'lib/provider.js';
+import { clockTolerance } from 'lib/configs/liveTime.js';
 
 const withExtra = new Set(['AccessToken', 'ClientCredentials']);
 const bitsPerSymbol = Math.log2(64);
-const tokenLength = (i) => Math.ceil(i / bitsPerSymbol);
+const tokenLength = (i: number) => Math.ceil(i / bitsPerSymbol);
 
 export class Opaque {
 	generateTokenId() {
@@ -52,10 +53,9 @@ export class Opaque {
 			throw new TypeError();
 		if ('format' in stored && stored.format !== 'opaque') throw new TypeError();
 
-		const { configuration } = instance(provider);
 		assertPayload(stored, {
 			ignoreExpiration,
-			clockTolerance: configuration.clockTolerance
+			clockTolerance
 		});
 
 		return stored;

@@ -321,8 +321,7 @@ export default function testHelper(
 			getSessionId,
 			getGrantId,
 			getTokenJti,
-			login,
-			TestAdapter
+			login
 		};
 	};
 }

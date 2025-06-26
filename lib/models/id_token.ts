@@ -11,6 +11,7 @@ import { provider } from 'lib/provider.js';
 import { type Client } from './client.js';
 import { Claims } from 'lib/helpers/claims.js';
 import { merge } from 'lib/helpers/_/object.js';
+import { clockTolerance, ttl } from 'lib/configs/liveTime.js';
 
 const hashes = ['at_hash', 'c_hash', 's_hash'];
 
@@ -45,16 +46,6 @@ export class IdToken {
 		this.client = client;
 	}
 
-	static expiresIn(...args) {
-		const ttl = instance(provider).configuration.ttl[this.name];
-
-		if (typeof ttl === 'number') {
-			return ttl;
-		}
-
-		return ttl(...args);
-	}
-
 	set(key: string, value: unknown) {
 		this.extra[key] = value;
 	}
@@ -83,7 +74,7 @@ export class IdToken {
 				alg = client.idTokenSignedResponseAlg;
 				signOptions = {
 					audience: client.clientId,
-					expiresIn: expiresIn || IdToken.expiresIn(this, client),
+					expiresIn: expiresIn || ttl.IdToken(this, client),
 					issuer: ISSUER,
 					subject: payload.sub
 				};
@@ -241,7 +232,7 @@ export class IdToken {
 		});
 	}
 
-	static async validate(jwt, client) {
+	static async validate(jwt, client: Client) {
 		const alg = client.idTokenSignedResponseAlg;
 
 		let keyOrStore;
@@ -258,7 +249,7 @@ export class IdToken {
 			ignoreExpiration: true,
 			audience: client.clientId,
 			issuer: ISSUER,
-			clockTolerance: instance(provider).configuration.clockTolerance,
+			clockTolerance,
 			algorithm: alg,
 			subject: true
 		};

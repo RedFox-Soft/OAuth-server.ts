@@ -18,6 +18,7 @@ import epochTime from '../../lib/helpers/epoch_time.ts';
 import bootstrap, { agent } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
+import { TestAdapter } from 'test/models.js';
 
 function errorDetail(spy) {
 	return spy.args[0][0].error_detail;
@@ -65,7 +66,7 @@ describe('grant_type=authorization_code', () => {
 			code = query.code;
 
 			const jti = setup.getTokenJti(query.code);
-			codeStore = setup.TestAdapter.for('AuthorizationCode').syncFind(jti);
+			codeStore = TestAdapter.for('AuthorizationCode').syncFind(jti);
 		});
 
 		it('Should return specific properties on token request', async function () {
@@ -110,18 +111,15 @@ describe('grant_type=authorization_code', () => {
 
 		it('populates ctx.oidc.entities (w/ offline_access)', async function () {
 			const spy = spyOn(OIDCContext.prototype, 'entity');
-			setup.TestAdapter.for('Grant').syncUpdate(
+			TestAdapter.for('Grant').syncUpdate(
 				setup.getSession().authorizations.client.grantId,
 				{
 					scope: 'openid offline_access'
 				}
 			);
-			setup.TestAdapter.for('AuthorizationCode').syncUpdate(
-				setup.getTokenJti(code),
-				{
-					scope: 'openid offline_access'
-				}
-			);
+			TestAdapter.for('AuthorizationCode').syncUpdate(setup.getTokenJti(code), {
+				scope: 'openid offline_access'
+			});
 
 			const { response } = await auth.getToken(code);
 			expect(response.status).toBe(200);
@@ -351,7 +349,7 @@ describe('grant_type=authorization_code', () => {
 			code = query.code;
 
 			const jti = setup.getTokenJti(query.code);
-			codeStore = setup.TestAdapter.for('AuthorizationCode').syncFind(jti);
+			codeStore = TestAdapter.for('AuthorizationCode').syncFind(jti);
 		});
 
 		it('returns the right stuff', async function () {
@@ -394,18 +392,15 @@ describe('grant_type=authorization_code', () => {
 
 		it('populates ctx.oidc.entities (w/ offline_access)', async function () {
 			const spy = spyOn(OIDCContext.prototype, 'entity');
-			setup.TestAdapter.for('Grant').syncUpdate(
+			TestAdapter.for('Grant').syncUpdate(
 				setup.getSession().authorizations.client2.grantId,
 				{
 					scope: 'openid offline_access'
 				}
 			);
-			setup.TestAdapter.for('AuthorizationCode').syncUpdate(
-				setup.getTokenJti(code),
-				{
-					scope: 'openid offline_access'
-				}
-			);
+			TestAdapter.for('AuthorizationCode').syncUpdate(setup.getTokenJti(code), {
+				scope: 'openid offline_access'
+			});
 
 			const { response } = await auth.getToken(code);
 			expect(response.status).toBe(200);

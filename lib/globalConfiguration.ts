@@ -295,87 +295,6 @@ async function pairwiseIdentifier(accountId, client) {
 		.digest('hex');
 }
 
-function AccessTokenTTL(ctx, token, client) {
-	shouldChange(
-		'ttl.AccessToken',
-		'define the expiration for AccessToken artifacts'
-	);
-	return token.resourceServer?.accessTokenTTL || 60 * 60; // 1 hour in seconds
-}
-
-function AuthorizationCodeTTL(ctx, code, client) {
-	return 60; // 1 minute in seconds
-}
-
-function ClientCredentialsTTL(ctx, token, client) {
-	shouldChange(
-		'ttl.ClientCredentials',
-		'define the expiration for ClientCredentials artifacts'
-	);
-	return token.resourceServer?.accessTokenTTL || 10 * 60; // 10 minutes in seconds
-}
-
-function DeviceCodeTTL(ctx, deviceCode, client) {
-	shouldChange(
-		'ttl.DeviceCode',
-		'define the expiration for DeviceCode artifacts'
-	);
-	return 10 * 60; // 10 minutes in seconds
-}
-
-function BackchannelAuthenticationRequestTTL(ctx, request, client) {
-	shouldChange(
-		'ttl.BackchannelAuthenticationRequest',
-		'define the expiration for BackchannelAuthenticationRequest artifacts'
-	);
-	if (ctx?.oidc?.params.requested_expiry) {
-		return Math.min(10 * 60, +ctx.oidc.params.requested_expiry); // 10 minutes in seconds or requested_expiry, whichever is shorter
-	}
-
-	return 10 * 60; // 10 minutes in seconds
-}
-
-function IdTokenTTL(token, client) {
-	shouldChange('ttl.IdToken', 'define the expiration for IdToken artifacts');
-	return 60 * 60; // 1 hour in seconds
-}
-
-function RefreshTokenTTL(ctx, token, client) {
-	shouldChange(
-		'ttl.RefreshToken',
-		'define the expiration for RefreshToken artifacts'
-	);
-	if (
-		ctx?.oidc?.entities.RotatedRefreshToken &&
-		client.applicationType === 'web' &&
-		client.clientAuthMethod === 'none' &&
-		!token.isSenderConstrained()
-	) {
-		// Non-Sender Constrained SPA RefreshTokens do not have infinite expiration through rotation
-		return ctx.oidc.entities.RotatedRefreshToken.remainingTTL;
-	}
-
-	return 14 * 24 * 60 * 60; // 14 days in seconds
-}
-
-function InteractionTTL(ctx, interaction) {
-	shouldChange(
-		'ttl.Interaction',
-		'define the expiration for Interaction artifacts'
-	);
-	return 60 * 60; // 1 hour in seconds
-}
-
-function SessionTTL(ctx, session) {
-	shouldChange('ttl.Session', 'define the expiration for Session artifacts');
-	return 14 * 24 * 60 * 60; // 14 days in seconds
-}
-
-function GrantTTL(ctx, grant, client) {
-	shouldChange('ttl.Grant', 'define the expiration for Grant artifacts');
-	return 14 * 24 * 60 * 60; // 14 days in seconds
-}
-
 async function postLogoutSuccessSource(ctx) {
 	// @param ctx - koa request context
 	shouldChange(
@@ -796,17 +715,6 @@ export const globalConfiguration = {
 		response_types: ['code'],
 		token_endpoint_auth_method: 'client_secret_basic'
 	},
-
-	/*
-	 * clockTolerance
-	 *
-	 * description: A `Number` value (in seconds) describing the allowed system clock skew for
-	 *   validating client-provided JWTs, e.g. Request Objects, DPoP Proofs and otherwise comparing
-	 *   timestamps
-	 * recommendation: Only set this to a reasonable value when needed to cover server-side client and
-	 *   oidc-provider server clock skew.
-	 */
-	clockTolerance: 15,
 
 	/*
 	 * conformIdTokenClaims
@@ -2027,50 +1935,6 @@ export const globalConfiguration = {
 		'private_key_jwt',
 		'none'
 	],
-
-	/*
-	 * ttl
-	 *
-	 * description: description: Expirations for various token and session types.
-	 * The value can be a number (in seconds) or a synchronous function that dynamically returns
-	 * value based on the context.
-	 *
-	 * recommendation: Do not set token TTLs longer then they absolutely have to be, the shorter
-	 * the TTL, the better.
-	 *
-	 * recommendation: Rather than setting crazy high Refresh Token TTL look into `rotateRefreshToken`
-	 * configuration option which is set up in way that when refresh tokens are regularly used they
-	 * will have their TTL refreshed (via rotation).
-	 *
-	 * example: To resolve a ttl on runtime for each new token
-	 * Configure `ttl` for a given token type with a function like so, this must return a value, not a
-	 * Promise.
-	 *
-	 * ```js
-	 * {
-	 *   ttl: {
-	 *     AccessToken(ctx, token, client) {
-	 *       // return a Number (in seconds) for the given token (first argument), the associated client is
-	 *       // passed as a second argument
-	 *       // Tip: if the values are entirely client based memoize the results
-	 *       return resolveTTLfor(token, client);
-	 *     },
-	 *   },
-	 * }
-	 * ```
-	 */
-	ttl: {
-		AccessToken: AccessTokenTTL,
-		AuthorizationCode: AuthorizationCodeTTL,
-		BackchannelAuthenticationRequest: BackchannelAuthenticationRequestTTL,
-		ClientCredentials: ClientCredentialsTTL,
-		DeviceCode: DeviceCodeTTL,
-		Grant: GrantTTL,
-		IdToken: IdTokenTTL,
-		Interaction: InteractionTTL,
-		RefreshToken: RefreshTokenTTL,
-		Session: SessionTTL
-	},
 
 	/*
 	 * renderError

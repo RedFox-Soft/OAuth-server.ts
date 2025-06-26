@@ -2,9 +2,10 @@ import { InvalidClientAuth } from '../helpers/errors.ts';
 import instance from '../helpers/weak_cache.ts';
 import * as JWT from '../helpers/jwt.ts';
 import { ReplayDetection } from 'lib/models/replay_detection.js';
+import { clockTolerance } from 'lib/configs/liveTime.js';
 
 export default function getTokenJwtAuth(provider) {
-	const { clockTolerance, assertJwtClientAuthClaimsAndHeader } =
+	const { assertJwtClientAuthClaimsAndHeader } =
 		instance(provider).configuration;
 	return async function tokenJwtAuth(ctx, keystore, algorithms) {
 		const acceptedAud = ctx.oidc.clientJwtAuthExpectedAudience();
@@ -56,8 +57,7 @@ export default function getTokenJwtAuth(provider) {
 
 		try {
 			await JWT.verify(ctx.oidc.params.client_assertion, keystore, {
-				clockTolerance,
-				ignoreAzp: true
+				clockTolerance
 			});
 		} catch (err) {
 			throw new InvalidClientAuth(err.message);

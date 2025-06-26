@@ -1351,10 +1351,6 @@ describe('client authentication options', () => {
 	describe('private_key_jwt auth', () => {
 		const privateKey = createPrivateKey({ format: 'jwk', key: clientKey });
 
-		after(function () {
-			i(provider).configuration.clockTolerance = 0;
-		});
-
 		it('accepts the auth', function () {
 			return JWT.sign(
 				{
@@ -1383,7 +1379,6 @@ describe('client authentication options', () => {
 		});
 
 		it('accepts client assertions issued within acceptable system clock skew', function () {
-			i(provider).configuration.clockTolerance = 10;
 			return JWT.sign(
 				{
 					jti: nanoid(),

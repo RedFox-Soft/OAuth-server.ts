@@ -333,11 +333,6 @@ function BackchannelAuthenticationRequestTTL(ctx, request, client) {
 	return 10 * 60; // 10 minutes in seconds
 }
 
-function IdTokenTTL(ctx, token, client) {
-	shouldChange('ttl.IdToken', 'define the expiration for IdToken artifacts');
-	return 60 * 60; // 1 hour in seconds
-}
-
 function RefreshTokenTTL(ctx, token, client) {
 	shouldChange(
 		'ttl.RefreshToken',
@@ -795,17 +790,6 @@ function makeDefaults() {
 			response_types: ['code'],
 			token_endpoint_auth_method: 'client_secret_basic'
 		},
-
-		/*
-		 * clockTolerance
-		 *
-		 * description: A `Number` value (in seconds) describing the allowed system clock skew for
-		 *   validating client-provided JWTs, e.g. Request Objects, DPoP Proofs and otherwise comparing
-		 *   timestamps
-		 * recommendation: Only set this to a reasonable value when needed to cover server-side client and
-		 *   oidc-provider server clock skew.
-		 */
-		clockTolerance: 15,
 
 		/*
 		 * conformIdTokenClaims
@@ -2065,7 +2049,6 @@ function makeDefaults() {
 			ClientCredentials: ClientCredentialsTTL,
 			DeviceCode: DeviceCodeTTL,
 			Grant: GrantTTL,
-			IdToken: IdTokenTTL,
 			Interaction: InteractionTTL,
 			RefreshToken: RefreshTokenTTL,
 			Session: SessionTTL

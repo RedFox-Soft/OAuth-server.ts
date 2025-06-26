@@ -4,7 +4,6 @@ import { inspect } from 'node:util';
 
 import * as attention from '../helpers/attention.ts';
 import { urlencoded as parseBody } from '../shared/selective_body.ts';
-import * as views from '../views/index.ts';
 import instance from '../helpers/weak_cache.ts';
 import { defaults } from '../helpers/defaults.ts';
 

@@ -5,7 +5,6 @@ import bootstrap from '../test_helper.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
-import { provider } from 'lib/provider.js';
 
 const route = '/auth';
 const scope = 'openid';
@@ -41,14 +40,9 @@ describe('session exp handling', () => {
 	});
 
 	describe('clockTolerance', () => {
-		afterEach(function () {
-			i(provider).configuration.clockTolerance = 0;
-		});
-
 		it('respects clockTolerance option', async function () {
 			await this.login();
 			const session = this.getSession();
-			i(provider).configuration.clockTolerance = 10;
 			session.exp = epochTime() - 5;
 
 			sinon.spy(TestAdapter.for('Session'), 'destroy');
@@ -67,7 +61,6 @@ describe('session exp handling', () => {
 		it('generates a new session id when an expired session is found by the adapter', async function () {
 			await this.login();
 			const session = this.getSession();
-			i(provider).configuration.clockTolerance = 10;
 			session.exp = epochTime() - 10;
 			const oldSessionId = this.getSessionId();
 

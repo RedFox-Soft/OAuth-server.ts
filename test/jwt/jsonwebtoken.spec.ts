@@ -202,20 +202,6 @@ describe('JSON Web Token (JWT) RFC7519 implementation', () => {
 				);
 		});
 
-		it('nbf ignored', async () => {
-			const keyobject = await generateSecret('HS256', { extractable: true });
-			const jwk = await exportJWK(keyobject);
-			return JWT.sign(
-				{ data: true, nbf: epochTime() + 3600 },
-				keyobject,
-				'HS256'
-			).then((jwt) =>
-				JWT.verify(jwt, new KeyStore([jwk]), {
-					ignoreNotBefore: true
-				})
-			);
-		});
-
 		it('nbf accepted within set clock tolerance', async () => {
 			const keyobject = await generateSecret('HS256', { extractable: true });
 			const jwk = await exportJWK(keyobject);
@@ -242,7 +228,10 @@ describe('JSON Web Token (JWT) RFC7519 implementation', () => {
 					(err) => {
 						expect(err).to.be.ok;
 						expect(err).to.be.an.instanceOf(Error);
-						expect(err).to.have.property('message', 'invalid nbf value');
+						expect(err).to.have.property(
+							'message',
+							'invalid jwt payload: /nbf Expected integer'
+						);
 					}
 				);
 		});
@@ -269,23 +258,6 @@ describe('JSON Web Token (JWT) RFC7519 implementation', () => {
 						expect(err).to.have.property('message', 'jwt issued in the future');
 					}
 				);
-		});
-
-		it('iat ignored', async () => {
-			const keyobject = await generateSecret('HS256', { extractable: true });
-			const jwk = await exportJWK(keyobject);
-			return JWT.sign(
-				{ data: true, iat: epochTime() + 3600 },
-				keyobject,
-				'HS256',
-				{
-					noTimestamp: true
-				}
-			).then((jwt) =>
-				JWT.verify(jwt, new KeyStore([jwk]), {
-					ignoreIssued: true
-				})
-			);
 		});
 
 		it('iat accepted within set clock tolerance', async () => {
@@ -319,7 +291,10 @@ describe('JSON Web Token (JWT) RFC7519 implementation', () => {
 					(err) => {
 						expect(err).to.be.ok;
 						expect(err).to.be.an.instanceOf(Error);
-						expect(err).to.have.property('message', 'invalid iat value');
+						expect(err).to.have.property(
+							'message',
+							'invalid jwt payload: /iat Expected integer'
+						);
 					}
 				);
 		});
@@ -385,7 +360,10 @@ describe('JSON Web Token (JWT) RFC7519 implementation', () => {
 					(err) => {
 						expect(err).to.be.ok;
 						expect(err).to.be.an.instanceOf(Error);
-						expect(err).to.have.property('message', 'invalid exp value');
+						expect(err).to.have.property(
+							'message',
+							'invalid jwt payload: /exp Expected integer'
+						);
 					}
 				);
 		});

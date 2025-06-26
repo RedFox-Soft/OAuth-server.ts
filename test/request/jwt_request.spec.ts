@@ -194,10 +194,6 @@ describe('request parameter features', () => {
 		]
 	].forEach(([route, verb, authorizationRequest, errorEvt, successEvt]) => {
 		describe(`${route} ${verb} passing request parameters as JWTs`, () => {
-			afterEach(function () {
-				i(provider).configuration.clockTolerance = 0;
-			});
-
 			it('does not use anything from the OAuth 2.0 parameters', async function () {
 				const spy = sinon.spy();
 				provider.once('authorization.success', spy);
@@ -313,7 +309,6 @@ describe('request parameter features', () => {
 				const client = await provider.Client.find('client-with-HS-sig');
 				let [key] = client.symmetricKeyStore.selectForSign({ alg: 'HS256' });
 				key = await importJWK(key);
-				i(provider).configuration.clockTolerance = 10;
 
 				await authorizationRequest('client-with-HS-sig', {
 					jwtPayload: {

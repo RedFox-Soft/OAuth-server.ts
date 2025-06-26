@@ -3,6 +3,7 @@ import instance from './weak_cache.ts';
 import { routeNames } from '../consts/param_list.ts';
 import { provider } from '../provider.js';
 import { isPlainObject } from './_/object.js';
+import { ISSUER } from 'lib/configs/env.js';
 
 export class OIDCContext {
 	#requestParamClaims = null;
@@ -39,7 +40,6 @@ export class OIDCContext {
 	}
 
 	get provider() {
-		// eslint-disable-line class-methods-use-this
 		return provider;
 	}
 
@@ -111,11 +111,7 @@ export class OIDCContext {
 	}
 
 	clientJwtAuthExpectedAudience() {
-		return new Set([
-			this.issuer,
-			this.urlFor('token'),
-			this.urlFor(this.route)
-		]);
+		return new Set([ISSUER, this.urlFor('token'), this.urlFor(this.route)]);
 	}
 
 	get requestParamScopes() {

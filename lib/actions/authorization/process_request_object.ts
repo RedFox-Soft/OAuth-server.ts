@@ -7,6 +7,7 @@ import {
 } from '../../helpers/errors.ts';
 import { getSchemaValidator, TSchema, ValidationError } from 'elysia';
 import { ISSUER } from 'lib/configs/env.js';
+import { clockTolerance } from 'lib/configs/liveTime.js';
 
 export function isEncryptedJWT(jwt: string): boolean {
 	// Encrypted JWTs have 5 parts, while signed JWTs have 3
@@ -169,8 +170,7 @@ export default async function processRequestObject(
 	const opts = {
 		issuer: client.clientId,
 		audience: ISSUER,
-		clockTolerance: configuration.clockTolerance,
-		ignoreAzp: true
+		clockTolerance
 	};
 
 	try {

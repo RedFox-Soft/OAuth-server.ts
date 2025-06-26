@@ -8,6 +8,8 @@ import {
 	errors
 } from 'jose';
 
+import { Type as t, type Static } from '@sinclair/typebox';
+import { Value } from '@sinclair/typebox/value';
 import { ExternalSigningKey } from './keystore.ts';
 import * as base64url from './base64url.ts';
 import epochTime from './epoch_time.ts';
@@ -17,15 +19,6 @@ const {
 	JWKSNoMatchingKey,
 	JWSSignatureVerificationFailed
 } = errors;
-
-function verifyAudience({ aud }, expected) {
-	if (Array.isArray(aud)) {
-		const match = aud.some((actual) => actual === expected);
-		if (!match) throw new Error(`jwt audience missing ${expected}`);
-	} else if (aud !== expected) {
-		throw new Error(`jwt audience missing ${expected}`);
-	}
-}
 
 export async function sign(payload, key, alg, options = {}) {
 	const protectedHeader = {
@@ -90,60 +83,76 @@ export function header(jwt) {
 	return JSON.parse(base64url.decode(jwt.toString().split('.')[0]));
 }
 
+const jwtPayloadSchema = t.Object({
+	nbf: t.Optional(t.Integer()),
+	iat: t.Optional(t.Integer()),
+	exp: t.Optional(t.Integer()),
+	jti: t.Optional(t.String()),
+	iss: t.Optional(t.String()),
+	sub: t.Optional(t.String()),
+	aud: t.Optional(t.Union([t.String(), t.Array(t.String())]))
+});
+type payloadType = Record<string, unknown> & Static<typeof jwtPayloadSchema>;
+
 export function assertPayload(
-	payload,
+	payload: payloadType,
 	{
 		clockTolerance = 0,
 		audience,
-		ignoreExpiration,
-		ignoreAzp,
-		ignoreIssued,
-		ignoreNotBefore,
+		ignoreExpiration = false,
 		issuer,
 		subject = false
+	}: {
+		clockTolerance?: number;
+		audience?: string;
+		ignoreExpiration?: boolean;
+		issuer?: string;
+		subject?: boolean;
 	} = {}
 ) {
 	const timestamp = epochTime();
 
-	if (typeof payload !== 'object')
-		throw new Error('payload is not of JWT type (JSON serialized object)');
-
-	if (payload.nbf !== undefined && !ignoreNotBefore) {
-		if (typeof payload.nbf !== 'number') throw new Error('invalid nbf value');
-		if (payload.nbf > timestamp + clockTolerance)
-			throw new Error('jwt not active yet');
+	if (Value.Check(jwtPayloadSchema, payload) === false) {
+		const error = Value.Errors(jwtPayloadSchema, payload).First();
+		throw new TypeError(
+			`invalid jwt payload: ${error?.path} ${error?.message}`
+		);
 	}
 
-	if (payload.iat !== undefined && !ignoreIssued) {
-		if (typeof payload.iat !== 'number') throw new Error('invalid iat value');
-		if (payload.exp === undefined && payload.iat > timestamp + clockTolerance) {
-			throw new Error('jwt issued in the future');
-		}
+	if (payload.nbf !== undefined && payload.nbf > timestamp + clockTolerance) {
+		throw new Error('jwt not active yet');
 	}
-
-	if (payload.exp !== undefined && !ignoreExpiration) {
-		if (typeof payload.exp !== 'number') throw new Error('invalid exp value');
-		if (timestamp - clockTolerance >= payload.exp)
-			throw new Error('jwt expired');
+	if (
+		payload.iat !== undefined &&
+		payload.exp === undefined &&
+		payload.iat > timestamp + clockTolerance
+	) {
+		throw new Error('jwt issued in the future');
 	}
-
-	if (payload.jti !== undefined && typeof payload.jti !== 'string') {
-		throw new Error('invalid jti value');
+	if (
+		payload.exp !== undefined &&
+		!ignoreExpiration &&
+		timestamp - clockTolerance >= payload.exp
+	) {
+		throw new Error('jwt expired');
 	}
-
-	if (payload.iss !== undefined && typeof payload.iss !== 'string') {
-		throw new Error('invalid iss value');
-	}
-
-	if (subject && typeof payload.sub !== 'string') {
+	if (subject && !payload.sub) {
 		throw new Error('invalid sub value');
 	}
 
 	if (audience) {
-		verifyAudience(payload, audience, !ignoreAzp);
+		const aud = payload.aud;
+		if (Array.isArray(aud)) {
+			const match = aud.some((actual) => actual === audience);
+			if (!match) throw new Error(`jwt audience missing ${audience}`);
+		} else if (aud !== audience) {
+			throw new Error(`jwt audience missing ${audience}`);
+		}
 	}
 
-	if (issuer && payload.iss !== issuer) throw new Error('jwt issuer invalid');
+	if (issuer && payload.iss !== issuer) {
+		throw new Error('jwt issuer invalid');
+	}
 }
 
 export async function verify(jwt, keystore, options = {}) {
