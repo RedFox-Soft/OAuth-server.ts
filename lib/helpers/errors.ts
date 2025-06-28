@@ -85,11 +85,12 @@ export class InvalidRequest extends OIDCProviderError {
 }
 
 export class InvalidHeaderAuthorization extends OIDCProviderError {
-	constructor(description = 'invalid header authorization') {
+	constructor(description = 'invalid header authorization', detail?: string) {
 		super(401, 'invalid_header_authorization');
 		Error.captureStackTrace(this, this.constructor);
 		Object.assign(this, {
 			error_description: description,
+			error_detail: detail,
 			expose: true
 		});
 	}

@@ -10,15 +10,13 @@ import revoke from '../../helpers/revoke.ts';
 import certificateThumbprint from '../../helpers/certificate_thumbprint.ts';
 import * as formatters from '../../helpers/formatters.ts';
 import filterClaims from '../../helpers/filter_claims.ts';
-import dpopValidate, { DPOP_OK_WINDOW } from '../../helpers/validate_dpop.ts';
+import { dpopValidate, validateReplay } from '../../helpers/validate_dpop.js';
 import resolveResource from '../../helpers/resolve_resource.ts';
-import epochTime from '../../helpers/epoch_time.ts';
 import checkRar from '../../shared/check_rar.ts';
 
 import { gty as cibaGty } from './ciba.ts';
 import { gty as deviceCodeGty } from './device_code.ts';
 import { IdToken } from 'lib/models/id_token.js';
-import { ReplayDetection } from 'lib/models/replay_detection.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 
 function rarSupported(token) {
@@ -38,7 +36,6 @@ export const handler = async function refreshTokenHandler(ctx) {
 		features: {
 			userinfo,
 			mTLS: { getCertificate },
-			dPoP: { allowReplay },
 			resourceIndicators,
 			richAuthorizationRequests
 		}
@@ -118,15 +115,7 @@ export const handler = async function refreshTokenHandler(ctx) {
 		}
 	}
 
-	if (dPoP && !allowReplay) {
-		const unique = await ReplayDetection.unique(
-			client.clientId,
-			dPoP.jti,
-			epochTime() + DPOP_OK_WINDOW
-		);
-
-		ctx.assert(unique, new InvalidGrant('DPoP proof JWT Replay detected'));
-	}
+	await validateReplay(client.clientId, dPoP);
 
 	if (refreshToken.jkt && (!dPoP || refreshToken.jkt !== dPoP.thumbprint)) {
 		throw new InvalidGrant('failed jkt verification');

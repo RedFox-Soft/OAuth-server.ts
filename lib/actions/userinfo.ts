@@ -2,14 +2,16 @@ import { Elysia, t } from 'elysia';
 import certificateThumbprint from '../helpers/certificate_thumbprint.ts';
 import instance from '../helpers/weak_cache.ts';
 import filterClaims from '../helpers/filter_claims.ts';
-import dpopValidate, { DPOP_OK_WINDOW } from '../helpers/validate_dpop.ts';
-import epochTime from '../helpers/epoch_time.ts';
+import {
+	dpopValidate,
+	setNonceHeader,
+	validateReplay
+} from '../helpers/validate_dpop.js';
 import { InvalidToken, InsufficientScope } from '../helpers/errors.ts';
 import { routeNames } from 'lib/consts/param_list.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { Claims } from 'lib/helpers/claims.js';
 import { IdToken } from 'lib/models/id_token.js';
-import { ReplayDetection } from 'lib/models/replay_detection.js';
 import { Client } from 'lib/models/client.js';
 import { provider } from 'lib/provider.js';
 
@@ -23,7 +25,7 @@ export const userinfo = new Elysia()
 			dpop: t.Optional(t.String())
 		})
 	})
-	.get(routeNames.userinfo, async ({ headers }) => {
+	.get(routeNames.userinfo, async ({ headers, set }) => {
 		const ctx = {
 			headers
 		};
@@ -32,11 +34,12 @@ export const userinfo = new Elysia()
 		const accessTokenId = ctx.oidc.getAccessToken({
 			acceptDPoP: true
 		});
-		const dPoP = await dpopValidate(ctx, {
+		const dPoP = await dpopValidate(headers.dpop, {
 			accessTokenId,
 			method: 'GET',
 			route: routeNames.userinfo
 		});
+		setNonceHeader(set.headers, dPoP);
 
 		const accessToken = await provider.AccessToken.find(accessTokenId);
 		if (!accessToken) {
@@ -59,19 +62,7 @@ export const userinfo = new Elysia()
 			}
 		}
 
-		if (dPoP) {
-			const { allowReplay } = instance(provider).features.dPoP;
-
-			if (!allowReplay) {
-				const unique = await ReplayDetection.unique(
-					accessToken.clientId,
-					dPoP.jti,
-					epochTime() + DPOP_OK_WINDOW
-				);
-
-				ctx.assert(unique, new InvalidToken('DPoP proof JWT Replay detected'));
-			}
-		}
+		await validateReplay(accessToken.clientId, dPoP);
 
 		if (accessToken.jkt && (!dPoP || accessToken.jkt !== dPoP.thumbprint)) {
 			throw new InvalidToken('failed jkt verification');

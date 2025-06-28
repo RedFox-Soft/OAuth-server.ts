@@ -1,15 +1,13 @@
 import { InvalidGrant } from '../../helpers/errors.ts';
 import presence from '../../helpers/validate_presence.ts';
 import instance from '../../helpers/weak_cache.ts';
-import { verifyPKCE } from '../../helpers/pkce.ts';
+import { verifyPKCE } from '../../helpers/pkce.js';
 import revoke from '../../helpers/revoke.ts';
 import filterClaims from '../../helpers/filter_claims.ts';
-import dpopValidate, { DPOP_OK_WINDOW } from '../../helpers/validate_dpop.ts';
+import { dpopValidate, validateReplay } from '../../helpers/validate_dpop.js';
 import resolveResource from '../../helpers/resolve_resource.ts';
-import epochTime from '../../helpers/epoch_time.ts';
 import checkRar from '../../shared/check_rar.ts';
 import { IdToken } from 'lib/models/id_token.js';
-import { ReplayDetection } from 'lib/models/replay_detection.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 
 const gty = 'authorization_code';
@@ -24,8 +22,7 @@ export const handler = async function authorizationCodeHandler(ctx) {
 			userinfo,
 			mTLS: { getCertificate },
 			resourceIndicators,
-			richAuthorizationRequests,
-			dPoP: { allowReplay }
+			richAuthorizationRequests
 		}
 	} = instance(ctx.oidc.provider).configuration;
 
@@ -145,17 +142,8 @@ export const handler = async function authorizationCodeHandler(ctx) {
 		throw new InvalidGrant('missing DPoP proof JWT');
 	}
 
+	await validateReplay(ctx.oidc.client.clientId, dPoP);
 	if (dPoP) {
-		if (!allowReplay) {
-			const unique = await ReplayDetection.unique(
-				ctx.oidc.client.clientId,
-				dPoP.jti,
-				epochTime() + DPOP_OK_WINDOW
-			);
-
-			ctx.assert(unique, new InvalidGrant('DPoP proof JWT Replay detected'));
-		}
-
 		if (code.dpopJkt && code.dpopJkt !== dPoP.thumbprint) {
 			throw new InvalidGrant(
 				'DPoP proof key thumbprint does not match dpop_jkt'

@@ -2,13 +2,14 @@ import * as crypto from 'node:crypto';
 import { jwtVerify, EmbeddedJWK, calculateJwkThumbprint } from 'jose';
 
 import { ApplicationConfig as config } from 'lib/configs/application.js';
-import { InvalidHeaderAuthorization } from './errors.js';
+import { InvalidHeaderAuthorization, InvalidToken } from './errors.js';
 import epochTime from './epoch_time.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { DPoPNonces } from './dpop_nonces.js';
 import { dPoPSigningAlgValues } from 'lib/configs/jwaAlgorithms.js';
+import { HTTPHeaders } from 'elysia/types';
+import { ReplayDetection } from 'lib/models/replay_detection.js';
 
-const weakMap = new WeakMap();
 export const DPOP_OK_WINDOW = 300;
 
 class InvalidDpopProof extends InvalidHeaderAuthorization {
@@ -26,17 +27,12 @@ type options = {
 	route?: string;
 };
 
-export default async (
-	ctx,
+export async function dpopValidate(
+	proof: string | undefined,
 	{ accessTokenId, method = 'POST', route }: options = {}
-) => {
-	if (weakMap.has(ctx)) {
-		return weakMap.get(ctx);
-	}
-
-	const proof = ctx.headers['dpop'];
+) {
 	if (!config['dpop.enabled'] || !proof) {
-		return undefined;
+		return;
 	}
 
 	const dPoPInstance = DPoPNonces.fabrica();
@@ -45,7 +41,6 @@ export default async (
 		throw new Error('features.dPoP.nonceSecret configuration is missing');
 	}
 
-	const nextNonce = dPoPInstance?.nextNonce();
 	let payload;
 	let protectedHeader;
 	try {
@@ -71,7 +66,6 @@ export default async (
 			const diff = Math.abs(now - payload.iat);
 			if (diff > DPOP_OK_WINDOW) {
 				if (dPoPInstance) {
-					ctx.set('DPoP-Nonce', nextNonce);
 					throw new UseDpopNonce(
 						'DPoP proof iat is not recent enough, use a DPoP nonce instead'
 					);
@@ -88,7 +82,7 @@ export default async (
 
 		{
 			const actual = URL.parse(payload.htu);
-			if (!actual) return false;
+			if (!actual) return;
 			actual.hash = '';
 			actual.search = '';
 
@@ -111,23 +105,59 @@ export default async (
 	}
 
 	if (!payload.nonce && requireNonce) {
-		ctx.set('DPoP-Nonce', nextNonce);
 		throw new UseDpopNonce('nonce is required in the DPoP proof');
 	}
 
 	if (payload.nonce && !dPoPInstance?.checkNonce(payload.nonce)) {
-		ctx.set('DPoP-Nonce', nextNonce);
 		throw new UseDpopNonce('invalid nonce in DPoP proof');
 	}
 
-	if (payload.nonce !== nextNonce) {
+	/*if (payload.nonce !== nextNonce) {
 		ctx.set('DPoP-Nonce', nextNonce);
-	}
+	}*/
 
 	const thumbprint = await calculateJwkThumbprint(protectedHeader.jwk);
 
-	const result = { thumbprint, jti: payload.jti, iat: payload.iat };
-	weakMap.set(ctx, result);
+	return {
+		thumbprint,
+		jti: payload.jti,
+		iat: payload.iat,
+		nonce: payload.nonce
+	};
+}
 
-	return result;
-};
+export function setNonceHeader(
+	headers: HTTPHeaders,
+	dPoP: { nonce?: string } | undefined
+) {
+	if (!dPoP?.nonce) {
+		return;
+	}
+
+	const dPoPInstance = DPoPNonces.fabrica();
+	if (!dPoPInstance) {
+		throw new Error('features.dPoP.nonceSecret configuration is missing');
+	}
+	if (dPoP.nonce !== dPoPInstance.nextNonce()) {
+		headers['DPoP-Nonce'] = dPoPInstance.nextNonce();
+	}
+}
+
+export async function validateReplay(
+	clientId: string,
+	dPoP: Awaited<ReturnType<typeof dpopValidate>>
+) {
+	if (!dPoP) {
+		return;
+	}
+	if (!config['dpop.allowReplay']) {
+		const unique = await ReplayDetection.unique(
+			clientId,
+			dPoP.jti,
+			epochTime() + DPOP_OK_WINDOW
+		);
+		if (!unique) {
+			throw new InvalidToken('DPoP proof JWT Replay detected');
+		}
+	}
+}

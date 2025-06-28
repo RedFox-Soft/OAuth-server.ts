@@ -16,7 +16,8 @@ import {
 	SignJWT,
 	exportJWK,
 	calculateJwkThumbprint,
-	generateKeyPair
+	generateKeyPair,
+	type GenerateKeyPairResult
 } from 'jose';
 
 import nanoid from '../../lib/helpers/nanoid.ts';
@@ -28,17 +29,25 @@ import { provider } from 'lib/provider.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
+import { Client } from 'lib/models/client.js';
 
 function ath(accessToken) {
 	return hash('sha256', accessToken, 'base64url');
 }
 
 async function DPoP(
-	keypair,
-	htu,
-	htm,
-	nonce = undefined,
-	accessToken = undefined
+	keypair: GenerateKeyPairResult,
+	{
+		accessToken,
+		nonce,
+		htu = `${ISSUER}/userinfo`,
+		htm = 'GET'
+	}: {
+		accessToken?: string;
+		nonce?: string;
+		htu?: string;
+		htm?: 'GET' | 'POST';
+	} = {}
 ) {
 	return new SignJWT({
 		htu,
@@ -56,17 +65,16 @@ async function DPoP(
 		.sign(keypair.privateKey);
 }
 
-describe('features.dPoP', () => {
+describe('features.dPoP', async () => {
 	let setup = null;
 	let cookie = null;
-	let keypair = null;
+	let keypair = await generateKeyPair('ES256', { extractable: true });
 	let jwk = null;
 	let thumbprint = null;
 
 	beforeAll(async function () {
 		setup = await bootstrap(import.meta.url)();
 		cookie = await setup.login({ scope: 'openid offline_access' });
-		keypair = await generateKeyPair('ES256', { extractable: true });
 		jwk = await exportJWK(keypair.publicKey);
 		thumbprint = await calculateJwkThumbprint(jwk);
 	});
@@ -138,13 +146,7 @@ describe('features.dPoP', () => {
 				/algs="ES256 PS256"/
 			);
 
-			const dpopKey = await DPoP(
-				keypair,
-				`${ISSUER}/userinfo`,
-				'POST',
-				undefined,
-				dpop
-			);
+			const dpopKey = await DPoP(keypair, { accessToken: dpop, htm: 'POST' });
 			const dpopRes = await agent.userinfo.get({
 				headers: {
 					dpop: `DPoP ${dpopKey}`,
@@ -508,108 +510,95 @@ describe('features.dPoP', () => {
 
 		it('acts like an RS checking the DPoP proof and thumbprint now', async function () {
 			const at = new provider.AccessToken({
-				accountId: this.loggedInAccountId,
-				grantId: this.getGrantId(),
-				client: await provider.Client.find('client'),
+				accountId: setup.getAccountId(),
+				grantId: setup.getGrantId(),
+				client: await Client.find('client'),
 				scope: 'openid'
 			});
-			at.setThumbprint('jkt', this.thumbprint);
+			at.setThumbprint('jkt', thumbprint);
 
 			const dpop = await at.save();
-			const proof = await DPoP(
-				this.keypair,
-				`${ISSUER}${this.suitePath('/me')}`,
-				'GET',
-				undefined,
-				dpop
-			);
+			const proof = await DPoP(keypair, { accessToken: dpop });
 
-			await this.agent
-				.get('/me')
-				.set('Authorization', `DPoP ${dpop}`)
-				.set('DPoP', proof)
-				.expect(200);
+			const user = await agent.userinfo.get({
+				headers: {
+					authorization: `DPoP ${dpop}`,
+					dpop: proof
+				}
+			});
+			expect(user.status).toBe(200);
 
-			let spy = sinon.spy();
+			let spy = mock();
 			provider.once('userinfo.error', spy);
 
-			await this.agent
-				.get('/me')
-				.set('Authorization', `DPoP ${dpop}`)
-				.set('DPoP', proof)
-				.expect(401)
-				.expect({
-					error: 'invalid_token',
-					error_description: 'invalid token provided'
-				});
+			let { error } = await agent.userinfo.get({
+				headers: {
+					authorization: `DPoP ${dpop}`,
+					dpop: proof
+				}
+			});
+			expect(error?.status).toBe(401);
+			expect(error?.value).toEqual({
+				error: 'invalid_token',
+				error_description: 'invalid token provided'
+			});
 
-			expect(spy).to.have.property('calledOnce', true);
-			expect(spy.args[0][1]).to.have.property(
+			expect(spy).toBeCalledTimes(1);
+			expect(spy.mock.calls[0][0]).toHaveProperty(
 				'error_detail',
 				'DPoP proof JWT Replay detected'
 			);
 
-			spy = sinon.spy();
+			spy = mock();
 			provider.once('userinfo.error', spy);
 
-			await this.agent
-				.get('/me')
-				.set('Authorization', `DPoP ${dpop}`)
-				.set(
-					'DPoP',
-					await DPoP(
+			({ error } = await agent.userinfo.get({
+				headers: {
+					authorization: `DPoP ${dpop}`,
+					dpop: await DPoP(
 						await generateKeyPair('ES256', { extractable: true }),
-						`${ISSUER}${this.suitePath('/me')}`,
-						'GET',
-						undefined,
-						dpop
+						{ accessToken: dpop }
 					)
-				)
-				.expect({
-					error: 'invalid_token',
-					error_description: 'invalid token provided'
-				})
-				.expect(401);
-
-			await this.agent
-				.get('/me')
-				.set('Authorization', `DPoP ${dpop}`)
-				.set(
-					'DPoP',
-					await DPoP(
-						this.keypair,
-						`${ISSUER}${this.suitePath('/me')}`,
-						'GET',
-						undefined,
-						'anotherAccessTokenValue'
-					)
-				)
-				.expect({
-					error: 'invalid_dpop_proof',
-					error_description: 'DPoP proof ath mismatch'
-				})
-				.expect(401);
-
-			expect(spy).to.have.property('calledOnce', true);
-			expect(spy.args[0][1]).to.have.property(
+				}
+			}));
+			expect(error?.status).toBe(401);
+			expect(error?.value).toEqual({
+				error: 'invalid_token',
+				error_description: 'invalid token provided'
+			});
+			expect(spy).toBeCalledTimes(1);
+			expect(spy.mock.calls[0][0]).toHaveProperty(
 				'error_detail',
 				'failed jkt verification'
 			);
 
-			spy = sinon.spy();
+			({ error } = await agent.userinfo.get({
+				headers: {
+					authorization: `DPoP ${dpop}`,
+					dpop: await DPoP(keypair, { accessToken: 'anotherAccessTokenValue' })
+				}
+			}));
+			expect(error?.status).toBe(401);
+			expect(error?.value).toEqual({
+				error: 'invalid_header_authorization',
+				error_description: 'DPoP proof ath mismatch'
+			});
+
+			spy = mock();
 			provider.once('userinfo.error', spy);
 
-			await this.agent
-				.get('/me')
-				.set('Authorization', `Bearer ${dpop}`)
-				.expect({
-					error: 'invalid_token',
-					error_description: 'invalid token provided'
-				})
-				.expect(401);
-
-			expect(spy).to.have.property('calledOnce', true);
-			expect(spy.args[0][1]).to.have.property(
+			({ error } = await agent.userinfo.get({
+				headers: {
+					authorization: `Bearer ${dpop}`
+				}
+			}));
+			expect(error?.status).toBe(401);
+			expect(error?.value).toEqual({
+				error: 'invalid_token',
+				error_description: 'invalid token provided'
+			});
+			expect(spy).toBeCalledTimes(1);
+			expect(spy.mock.calls[0][0]).toHaveProperty(
 				'error_detail',
 				'failed jkt verification'
 			);
@@ -674,11 +663,10 @@ describe('features.dPoP', () => {
 				.type('form')
 				.set(
 					'DPoP',
-					await DPoP(
-						this.keypair,
-						`${ISSUER}${this.suitePath('/token')}`,
-						'POST'
-					)
+					await DPoP(keypair, {
+						htu: `${ISSUER}/token`,
+						htm: 'POST'
+					})
 				)
 				.expect(200);
 
@@ -713,11 +701,10 @@ describe('features.dPoP', () => {
 				.type('form')
 				.set(
 					'DPoP',
-					await DPoP(
-						this.keypair,
-						`${ISSUER}${this.suitePath('/token')}`,
-						'POST'
-					)
+					await DPoP(keypair, {
+						htu: `${ISSUER}/token`,
+						htm: 'POST'
+					})
 				)
 				.expect(200);
 
@@ -762,11 +749,10 @@ describe('features.dPoP', () => {
 				.type('form')
 				.set(
 					'DPoP',
-					await DPoP(
-						this.keypair,
-						`${ISSUER}${this.suitePath('/token')}`,
-						'POST'
-					)
+					await DPoP(keypair, {
+						htu: `${ISSUER}/token`,
+						htm: 'POST'
+					})
 				)
 				.expect(200);
 
@@ -808,11 +794,10 @@ describe('features.dPoP', () => {
 				.type('form')
 				.set(
 					'DPoP',
-					await DPoP(
-						this.keypair,
-						`${ISSUER}${this.suitePath('/token')}`,
-						'POST'
-					)
+					await DPoP(keypair, {
+						htu: `${ISSUER}/token`,
+						htm: 'POST'
+					})
 				)
 				.expect(200);
 
@@ -843,11 +828,10 @@ describe('features.dPoP', () => {
 				})
 				.set(
 					'DPoP',
-					await DPoP(
-						this.keypair,
-						`${ISSUER}${this.suitePath('/request')}`,
-						'POST'
-					)
+					await DPoP(keypair, {
+						htu: `${ISSUER}/par`,
+						htm: 'POST'
+					})
 				)
 				.type('form')
 				.expect(201);
@@ -864,11 +848,10 @@ describe('features.dPoP', () => {
 				})
 				.set(
 					'DPoP',
-					await DPoP(
-						this.keypair,
-						`${ISSUER}${this.suitePath('/request')}`,
-						'POST'
-					)
+					await DPoP(keypair, {
+						htu: `${ISSUER}/par`,
+						htm: 'POST'
+					})
 				)
 				.type('form')
 				.expect(400)
@@ -894,11 +877,10 @@ describe('features.dPoP', () => {
 				})
 				.set(
 					'DPoP',
-					await DPoP(
-						this.keypair,
-						`${ISSUER}${this.suitePath('/request')}`,
-						'POST'
-					)
+					await DPoP(keypair, {
+						htu: `${ISSUER}/par`,
+						htm: 'POST'
+					})
 				)
 				.type('form')
 				.expect(201)
@@ -950,11 +932,10 @@ describe('features.dPoP', () => {
 				})
 				.set(
 					'DPoP',
-					await DPoP(
-						this.keypair,
-						`${ISSUER}${this.suitePath('/request')}`,
-						'POST'
-					)
+					await DPoP(keypair, {
+						htu: `${ISSUER}/par`,
+						htm: 'POST'
+					})
 				)
 				.type('form')
 				.expect(201)
@@ -1015,11 +996,10 @@ describe('features.dPoP', () => {
 						.type('form')
 						.set(
 							'DPoP',
-							await DPoP(
-								this.keypair,
-								`${ISSUER}${this.suitePath('/token')}`,
-								'POST'
-							)
+							await DPoP(keypair, {
+								htu: `${ISSUER}/token`,
+								htm: 'POST'
+							})
 						)
 						.expect(200);
 
@@ -1071,11 +1051,10 @@ describe('features.dPoP', () => {
 						.type('form')
 						.set(
 							'DPoP',
-							await DPoP(
-								this.keypair,
-								`${ISSUER}${this.suitePath('/token')}`,
-								'POST'
-							)
+							await DPoP(keypair, {
+								htu: `${ISSUER}/token`,
+								htm: 'POST'
+							})
 						)
 						.expect(200);
 
@@ -1107,8 +1086,10 @@ describe('features.dPoP', () => {
 							'DPoP',
 							await DPoP(
 								await generateKeyPair('ES256', { extractable: true }),
-								`${ISSUER}${this.suitePath('/token')}`,
-								'POST'
+								{
+									htu: `${ISSUER}/token`,
+									htm: 'POST'
+								}
 							)
 						)
 						.expect(400)
@@ -1182,11 +1163,10 @@ describe('features.dPoP', () => {
 					.type('form')
 					.set(
 						'DPoP',
-						await DPoP(
-							this.keypair,
-							`${ISSUER}${this.suitePath('/token')}`,
-							'POST'
-						)
+						await DPoP(keypair, {
+							htu: `${ISSUER}/token`,
+							htm: 'POST'
+						})
 					)
 					.expect(({ body }) => {
 						this.rt = body.refresh_token;
@@ -1207,11 +1187,10 @@ describe('features.dPoP', () => {
 					.type('form')
 					.set(
 						'DPoP',
-						await DPoP(
-							this.keypair,
-							`${ISSUER}${this.suitePath('/token')}`,
-							'POST'
-						)
+						await DPoP(keypair, {
+							htu: `${ISSUER}/token`,
+							htm: 'POST'
+						})
 					)
 					.expect(200);
 
@@ -1263,11 +1242,10 @@ describe('features.dPoP', () => {
 					.type('form')
 					.set(
 						'DPoP',
-						await DPoP(
-							this.keypair,
-							`${ISSUER}${this.suitePath('/token')}`,
-							'POST'
-						)
+						await DPoP(keypair, {
+							htu: `${ISSUER}/token`,
+							htm: 'POST'
+						})
 					)
 					.expect(200);
 
@@ -1296,11 +1274,10 @@ describe('features.dPoP', () => {
 					.type('form')
 					.set(
 						'DPoP',
-						await DPoP(
-							this.keypair,
-							`${ISSUER}${this.suitePath('/token')}`,
-							'POST'
-						)
+						await DPoP(keypair, {
+							htu: `${ISSUER}/token`,
+							htm: 'POST'
+						})
 					)
 					.expect(({ body }) => {
 						this.rt = body.refresh_token;
@@ -1321,11 +1298,10 @@ describe('features.dPoP', () => {
 					.type('form')
 					.set(
 						'DPoP',
-						await DPoP(
-							this.keypair,
-							`${ISSUER}${this.suitePath('/token')}`,
-							'POST'
-						)
+						await DPoP(keypair, {
+							htu: `${ISSUER}/token`,
+							htm: 'POST'
+						})
 					)
 					.expect(200);
 
@@ -1352,11 +1328,10 @@ describe('features.dPoP', () => {
 					})
 					.set(
 						'DPoP',
-						await DPoP(
-							await generateKeyPair('ES256', { extractable: true }),
-							`${ISSUER}${this.suitePath('/token')}`,
-							'POST'
-						)
+						await DPoP(await generateKeyPair('ES256', { extractable: true }), {
+							htu: `${ISSUER}/token`,
+							htm: 'POST'
+						})
 					)
 					.type('form')
 					.expect(400)
@@ -1385,11 +1360,10 @@ describe('features.dPoP', () => {
 				.send({ grant_type: 'client_credentials' })
 				.set(
 					'DPoP',
-					await DPoP(
-						this.keypair,
-						`${ISSUER}${this.suitePath('/token')}`,
-						'POST'
-					)
+					await DPoP(keypair, {
+						htu: `${ISSUER}/token`,
+						htm: 'POST'
+					})
 				)
 				.type('form')
 				.expect(200);
@@ -1428,13 +1402,10 @@ describe('features.dPoP', () => {
 				.set('Authorization', 'DPoP foo')
 				.set(
 					'DPoP',
-					await DPoP(
-						this.keypair,
-						`${ISSUER}${this.suitePath('/me')}`,
-						'GET',
-						'foo',
-						'foo'
-					)
+					await DPoP(keypair, {
+						accessToken: 'foo',
+						nonce: 'foo'
+					})
 				)
 				.expect(401)
 				.expect({
@@ -1450,13 +1421,10 @@ describe('features.dPoP', () => {
 				.set('Authorization', 'DPoP foo')
 				.set(
 					'DPoP',
-					await DPoP(
-						this.keypair,
-						`${ISSUER}${this.suitePath('/me')}`,
-						'GET',
+					await DPoP(keypair, {
 						nonce,
-						'foo'
-					)
+						accessToken: 'foo'
+					})
 				)
 				.expect(401)
 				.expect({
@@ -1473,12 +1441,11 @@ describe('features.dPoP', () => {
 				.send({ grant_type: 'client_credentials' })
 				.set(
 					'DPoP',
-					await DPoP(
-						this.keypair,
-						`${ISSUER}${this.suitePath('/token')}`,
-						'POST',
-						'foo'
-					)
+					await DPoP(keypair, {
+						htu: `${ISSUER}/token`,
+						htm: 'POST',
+						nonce: 'foo'
+					})
 				)
 				.type('form')
 				.expect(400)
@@ -1496,12 +1463,11 @@ describe('features.dPoP', () => {
 				.send({ grant_type: 'client_credentials' })
 				.set(
 					'DPoP',
-					await DPoP(
-						this.keypair,
-						`${ISSUER}${this.suitePath('/token')}`,
-						'POST',
+					await DPoP(keypair, {
+						htu: `${ISSUER}/token`,
+						htm: 'POST',
 						nonce
-					)
+					})
 				)
 				.type('form')
 				.expect(200);
@@ -1533,11 +1499,10 @@ describe('features.dPoP', () => {
 				})
 				.set(
 					'DPoP',
-					await DPoP(
-						this.keypair,
-						`${ISSUER}${this.suitePath('/request')}`,
-						'POST'
-					)
+					await DPoP(keypair, {
+						htu: `${ISSUER}/par`,
+						htm: 'POST'
+					})
 				)
 				.type('form')
 				.expect(400)
@@ -1561,12 +1526,11 @@ describe('features.dPoP', () => {
 				})
 				.set(
 					'DPoP',
-					await DPoP(
-						this.keypair,
-						`${ISSUER}${this.suitePath('/request')}`,
-						'POST',
+					await DPoP(keypair, {
+						htu: `${ISSUER}/par`,
+						htm: 'POST',
 						nonce
-					)
+					})
 				)
 				.type('form')
 				.expect(201)
@@ -1583,13 +1547,9 @@ describe('features.dPoP', () => {
 				.set('Authorization', 'DPoP foo')
 				.set(
 					'DPoP',
-					await DPoP(
-						this.keypair,
-						`${ISSUER}${this.suitePath('/me')}`,
-						'GET',
-						undefined,
-						'foo'
-					)
+					await DPoP(keypair, {
+						accessToken: 'foo'
+					})
 				)
 				.expect(401)
 				.expect({
@@ -1605,13 +1565,10 @@ describe('features.dPoP', () => {
 				.set('Authorization', 'DPoP foo')
 				.set(
 					'DPoP',
-					await DPoP(
-						this.keypair,
-						`${ISSUER}${this.suitePath('/me')}`,
-						'GET',
+					await DPoP(keypair, {
 						nonce,
-						'foo'
-					)
+						accessToken: 'foo'
+					})
 				)
 				.expect(401)
 				.expect((response) => {
@@ -1632,11 +1589,10 @@ describe('features.dPoP', () => {
 				.send({ grant_type: 'client_credentials' })
 				.set(
 					'DPoP',
-					await DPoP(
-						this.keypair,
-						`${ISSUER}${this.suitePath('/token')}`,
-						'POST'
-					)
+					await DPoP(keypair, {
+						htu: `${ISSUER}/token`,
+						htm: 'POST'
+					})
 				)
 				.type('form')
 				.expect(400)
@@ -1654,12 +1610,11 @@ describe('features.dPoP', () => {
 				.send({ grant_type: 'client_credentials' })
 				.set(
 					'DPoP',
-					await DPoP(
-						this.keypair,
-						`${ISSUER}${this.suitePath('/token')}`,
-						'POST',
+					await DPoP(keypair, {
+						htu: `${ISSUER}/token`,
+						htm: 'POST',
 						nonce
-					)
+					})
 				)
 				.type('form')
 				.expect(200)

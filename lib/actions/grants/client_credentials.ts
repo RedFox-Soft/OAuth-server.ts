@@ -5,18 +5,15 @@ import {
 	InvalidScope,
 	InvalidRequest
 } from '../../helpers/errors.ts';
-import dpopValidate, { DPOP_OK_WINDOW } from '../../helpers/validate_dpop.ts';
+import { dpopValidate, validateReplay } from '../../helpers/validate_dpop.js';
 import checkResource from '../../shared/check_resource.ts';
-import epochTime from '../../helpers/epoch_time.ts';
-import { ReplayDetection } from 'lib/models/replay_detection.js';
 
 export const handler = async function clientCredentialsHandler(ctx) {
 	const { client } = ctx.oidc;
 	const { ClientCredentials } = ctx.oidc.provider;
 	const {
 		features: {
-			mTLS: { getCertificate },
-			dPoP: { allowReplay }
+			mTLS: { getCertificate }
 		},
 		scopes: statics
 	} = instance(ctx.oidc.provider).configuration;
@@ -73,19 +70,10 @@ export const handler = async function clientCredentialsHandler(ctx) {
 		token.setThumbprint('x5t', cert);
 	}
 
+	await validateReplay(client.clientId, dPoP);
 	if (dPoP) {
-		if (!allowReplay) {
-			const unique = await ReplayDetection.unique(
-				client.clientId,
-				dPoP.jti,
-				epochTime() + DPOP_OK_WINDOW
-			);
-
-			ctx.assert(unique, new InvalidGrant('DPoP proof JWT Replay detected'));
-		}
-
 		token.setThumbprint('jkt', dPoP.thumbprint);
-	} else if (ctx.oidc.client.dpopBoundAccessTokens) {
+	} else if (client.dpopBoundAccessTokens) {
 		throw new InvalidGrant('DPoP proof JWT not provided');
 	}
 

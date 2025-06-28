@@ -12,6 +12,8 @@ import {
 import { isAllowRedirectUri } from 'lib/actions/authorization/authorization.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { dPoPSigningAlgValues } from 'lib/configs/jwaAlgorithms.js';
+import { UseDpopNonce } from 'lib/helpers/validate_dpop.js';
+import { DPoPNonces } from 'lib/helpers/dpop_nonces.js';
 
 function getFirstError(error: ValidationError) {
 	const validator = error.validator ?? error.error.validator;
@@ -84,7 +86,8 @@ const mapErrorCode = {
 	[routeNames.token]: 'grant.error',
 	[routeNames.authorization]: 'authorization.error',
 	[routeNames.device_authorization]: 'device_authorization.error',
-	[routeNames.introspect]: 'introspection.error'
+	[routeNames.introspect]: 'introspection.error',
+	[routeNames.userinfo]: 'userinfo.error'
 };
 
 export async function errorHandler(obj: ErrorContext) {
@@ -119,7 +122,6 @@ export async function errorHandler(obj: ErrorContext) {
 		console.error('Unknown error', error);
 	}
 
-	const accept = request.headers.get('accept') || '';
 	let errorObj = getObjFromError(code, error);
 	if (isOIDError && error.status === 401) {
 		const auth = request.headers.get('authorization')?.toLowerCase() ?? '';
@@ -129,7 +131,15 @@ export async function errorHandler(obj: ErrorContext) {
 			set.headers['WWW-Authenticate'] = authError;
 		}
 	}
+	if (isOIDError && error instanceof UseDpopNonce) {
+		const dPoPInstance = DPoPNonces.fabrica();
+		if (!dPoPInstance) {
+			throw new Error('features.dPoP.nonceSecret configuration is missing');
+		}
+		set.headers['DPoP-Nonce'] = dPoPInstance.nextNonce();
+	}
 
+	const accept = request.headers.get('accept') || '';
 	if (accept.includes('text/html')) {
 		return getErrorHtmlResponse(
 			set.status,

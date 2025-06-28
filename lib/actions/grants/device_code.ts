@@ -5,11 +5,9 @@ import presence from '../../helpers/validate_presence.ts';
 import instance from '../../helpers/weak_cache.ts';
 import filterClaims from '../../helpers/filter_claims.ts';
 import revoke from '../../helpers/revoke.ts';
-import dpopValidate, { DPOP_OK_WINDOW } from '../../helpers/validate_dpop.ts';
+import { dpopValidate, validateReplay } from '../../helpers/validate_dpop.js';
 import resolveResource from '../../helpers/resolve_resource.ts';
-import epochTime from '../../helpers/epoch_time.ts';
 import { IdToken } from 'lib/models/id_token.js';
-import { ReplayDetection } from 'lib/models/replay_detection.js';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 
@@ -33,7 +31,6 @@ export const handler = async function deviceCodeHandler(ctx) {
 		features: {
 			userinfo,
 			mTLS: { getCertificate },
-			dPoP: { allowReplay },
 			resourceIndicators
 		}
 	} = instance(ctx.oidc.provider).configuration;
@@ -136,17 +133,8 @@ export const handler = async function deviceCodeHandler(ctx) {
 		at.setThumbprint('x5t', cert);
 	}
 
+	await validateReplay(ctx.oidc.client.clientId, dPoP);
 	if (dPoP) {
-		if (!allowReplay) {
-			const unique = await ReplayDetection.unique(
-				ctx.oidc.client.clientId,
-				dPoP.jti,
-				epochTime() + DPOP_OK_WINDOW
-			);
-
-			ctx.assert(unique, new InvalidGrant('DPoP proof JWT Replay detected'));
-		}
-
 		at.setThumbprint('jkt', dPoP.thumbprint);
 	}
 

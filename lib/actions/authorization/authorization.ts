@@ -29,7 +29,6 @@ import checkOpenidScope from './check_openid_scope.ts';
 import getTokenAuth from '../../shared/token_auth.ts';
 import stripOutsideJarParams from './strip_outside_jar_params.ts';
 import pushedAuthorizationRequestRemapErrors from './pushed_authorization_request_remap_errors.ts';
-import checkDpopJkt from './check_dpop_jkt.ts';
 import pushedAuthorizationRequestResponse from './pushed_authorization_request_response.ts';
 import presence from '../../helpers/validate_presence.ts';
 
@@ -47,10 +46,16 @@ import { authorizationPKCE } from 'lib/helpers/pkce.js';
 import {
 	InvalidClient,
 	InvalidRedirectUri,
+	InvalidRequest,
 	OIDCProviderError
 } from 'lib/helpers/errors.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { Client } from 'lib/models/client.js';
+import {
+	dpopValidate,
+	setNonceHeader,
+	validateReplay
+} from 'lib/helpers/validate_dpop.js';
 
 const authorizationRequest = t.Composite([
 	t.Omit(AuthorizationParameters, ['request_uri', 'request', 'client_id']),
@@ -218,7 +223,8 @@ export const par = new Elysia()
 			})
 		]),
 		headers: t.Object({
-			authorization: t.Optional(t.String())
+			authorization: t.Optional(t.String()),
+			dpop: t.Optional(t.String())
 		})
 	})
 	.resolve(({ body }) => {
@@ -226,7 +232,7 @@ export const par = new Elysia()
 	})
 	.post(
 		routeNames.pushed_authorization_request,
-		async ({ body, route, request, headers }) => {
+		async ({ body, route, request, headers, set }) => {
 			const url = new URL(request.url);
 			url.search = '';
 			url.pathname = url.pathname.replace(route, '');
@@ -263,12 +269,27 @@ export const par = new Elysia()
 			checkScope(allowList, ctx);
 			checkOpenidScope(ctx);
 			checkRedirectUri(ctx);
-			authorizationPKCE(ctx.oidc.params);
+			authorizationPKCE(body);
 			await checkClaims(ctx);
 			await checkRar(ctx);
 			await checkResource(ctx);
 			await checkIdTokenHint(ctx);
-			await checkDpopJkt(ctx);
+
+			const dPoP = await dpopValidate(headers.dpop, {
+				route: routeNames.pushed_authorization_request
+			});
+			setNonceHeader(set.headers, dPoP);
+			await validateReplay(client.clientId, dPoP);
+			if (dPoP) {
+				if (body.dpop_jkt && body.dpop_jkt !== dPoP.thumbprint) {
+					throw new InvalidRequest(
+						'DPoP proof key thumbprint does not match dpop_jkt'
+					);
+				} else if (!body.dpop_jkt) {
+					body.dpop_jkt = dPoP.thumbprint;
+				}
+			}
+
 			return pushedAuthorizationRequestResponse(ctx);
 		}
 	);
