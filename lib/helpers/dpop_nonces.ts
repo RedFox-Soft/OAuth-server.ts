@@ -1,10 +1,8 @@
-/* eslint-disable no-plusplus, no-bitwise, no-param-reassign */
-
 import { hkdfSync } from 'node:crypto';
+import * as base64url from './base64url.js';
+import { ApplicationConfig } from 'lib/configs/application.js';
 
-import * as base64url from './base64url.ts';
-
-function sixfourbeify(value) {
+function sixfourbeify(value: number): Uint8Array<ArrayBuffer> {
 	const buf = Buffer.alloc(8);
 	for (let i = buf.length - 1; i >= 0; i--) {
 		buf[i] = value & 0xff;
@@ -14,13 +12,13 @@ function sixfourbeify(value) {
 	return buf;
 }
 
-function compute(secret, step) {
+function compute(secret: Uint8Array<ArrayBuffer>, step: number) {
 	return base64url.encodeBuffer(
 		Buffer.from(hkdfSync('sha256', secret, sixfourbeify(step), '', 32))
 	);
 }
 
-function compare(server, client) {
+function compare(server: string, client: string) {
 	let result = 0;
 
 	if (server.length !== client.length) {
@@ -37,22 +35,18 @@ function compare(server, client) {
 
 const STEP = 60;
 
-export default class DPoPNonces {
+export class DPoPNonces {
 	#counter;
 
 	#secret;
 
-	#prevprev;
+	#prevprev: string;
+	#prev: string;
+	#now: string;
+	#next: string;
+	#nextnext: string;
 
-	#prev;
-
-	#now;
-
-	#next;
-
-	#nextnext;
-
-	constructor(secret) {
+	constructor(secret: Buffer) {
 		if (!Buffer.isBuffer(secret) || secret.byteLength !== 32) {
 			throw new TypeError(
 				'features.dPoP.nonceSecret must be a 32-byte Buffer instance'
@@ -68,7 +62,7 @@ export default class DPoPNonces {
 			this.#counter,
 			this.#counter + 1,
 			this.#counter++ + 2
-		].map(compute.bind(undefined, this.#secret));
+		].map((_) => compute(this.#secret, _));
 
 		setInterval(() => {
 			[this.#prevprev, this.#prev, this.#now, this.#next, this.#nextnext] = [
@@ -81,11 +75,11 @@ export default class DPoPNonces {
 		}, STEP * 1000).unref();
 	}
 
-	nextNonce() {
+	nextNonce(): string {
 		return this.#next;
 	}
 
-	checkNonce(nonce) {
+	checkNonce(nonce: string): boolean {
 		let result = 0;
 
 		for (const server of [
@@ -99,5 +93,13 @@ export default class DPoPNonces {
 		}
 
 		return result === 0;
+	}
+
+	static #singleton: DPoPNonces | undefined;
+	static fabrica(): DPoPNonces | undefined {
+		const nonceSecret = ApplicationConfig['dpop.nonceSecret'];
+		if (nonceSecret !== undefined) {
+			return (DPoPNonces.#singleton ??= new DPoPNonces(nonceSecret));
+		}
 	}
 }

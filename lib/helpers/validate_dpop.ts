@@ -1,10 +1,12 @@
 import * as crypto from 'node:crypto';
-
 import { jwtVerify, EmbeddedJWK, calculateJwkThumbprint } from 'jose';
 
+import { ApplicationConfig as config } from 'lib/configs/application.js';
 import { InvalidHeaderAuthorization } from './errors.js';
-import instance from './weak_cache.ts';
-import epochTime from './epoch_time.ts';
+import epochTime from './epoch_time.js';
+import { ISSUER } from 'lib/configs/env.js';
+import { DPoPNonces } from './dpop_nonces.js';
+import { dPoPSigningAlgValues } from 'lib/configs/jwaAlgorithms.js';
 
 const weakMap = new WeakMap();
 export const DPOP_OK_WINDOW = 300;
@@ -13,42 +15,37 @@ class InvalidDpopProof extends InvalidHeaderAuthorization {
 	message = 'invalid_dpop_proof';
 	name = 'InvalidDpopProof';
 }
-class UseDpopNonce extends InvalidHeaderAuthorization {
+export class UseDpopNonce extends InvalidHeaderAuthorization {
 	message = 'use_dpop_nonce';
 	name = 'UseDpopNonce';
 }
 
-export default async (ctx, accessToken) => {
+type options = {
+	accessTokenId?: string;
+	method?: 'GET' | 'POST';
+	route?: string;
+};
+
+export default async (
+	ctx,
+	{ accessTokenId, method = 'POST', route }: options = {}
+) => {
 	if (weakMap.has(ctx)) {
 		return weakMap.get(ctx);
 	}
 
-	const {
-		features: { dPoP: dPoPConfig },
-		dPoPSigningAlgValues
-	} = instance(ctx.oidc.provider).configuration;
-
-	if (!dPoPConfig.enabled) {
+	const proof = ctx.headers['dpop'];
+	if (!config['dpop.enabled'] || !proof) {
 		return undefined;
 	}
 
-	const proof = ctx.headers['DPoP'];
-
-	if (!proof) {
-		return undefined;
-	}
-
-	const { DPoPNonces } = instance(ctx.oidc.provider);
-
-	const requireNonce = dPoPConfig.requireNonce(ctx);
-	if (typeof requireNonce !== 'boolean') {
-		throw new Error('features.dPoP.requireNonce must return a boolean');
-	}
-	if (requireNonce && !DPoPNonces) {
+	const dPoPInstance = DPoPNonces.fabrica();
+	const requireNonce = config['dpop.requireNonce'];
+	if (requireNonce && !dPoPInstance) {
 		throw new Error('features.dPoP.nonceSecret configuration is missing');
 	}
 
-	const nextNonce = DPoPNonces?.nextNonce();
+	const nextNonce = dPoPInstance?.nextNonce();
 	let payload;
 	let protectedHeader;
 	try {
@@ -73,7 +70,7 @@ export default async (ctx, accessToken) => {
 			const now = epochTime();
 			const diff = Math.abs(now - payload.iat);
 			if (diff > DPOP_OK_WINDOW) {
-				if (nextNonce) {
+				if (dPoPInstance) {
 					ctx.set('DPoP-Nonce', nextNonce);
 					throw new UseDpopNonce(
 						'DPoP proof iat is not recent enough, use a DPoP nonce instead'
@@ -81,28 +78,27 @@ export default async (ctx, accessToken) => {
 				}
 				throw new InvalidDpopProof('DPoP proof iat is not recent enough');
 			}
-		} else if (!DPoPNonces) {
+		} else if (!dPoPInstance) {
 			throw new InvalidDpopProof('DPoP nonces are not supported');
 		}
 
-		if (payload.htm !== ctx.method) {
+		if (payload.htm !== method) {
 			throw new InvalidDpopProof('DPoP proof htm mismatch');
 		}
 
 		{
-			const expected = new URL(ctx.oidc.urlFor(ctx.oidc.route)).href;
 			const actual = URL.parse(payload.htu);
 			if (!actual) return false;
 			actual.hash = '';
 			actual.search = '';
 
-			if (actual?.href !== expected) {
+			if (actual?.href !== ISSUER + route) {
 				throw new InvalidDpopProof('DPoP proof htu mismatch');
 			}
 		}
 
-		if (accessToken) {
-			const ath = crypto.hash('sha256', accessToken, 'base64url');
+		if (accessTokenId) {
+			const ath = crypto.hash('sha256', accessTokenId, 'base64url');
 			if (payload.ath !== ath) {
 				throw new InvalidDpopProof('DPoP proof ath mismatch');
 			}
@@ -119,7 +115,7 @@ export default async (ctx, accessToken) => {
 		throw new UseDpopNonce('nonce is required in the DPoP proof');
 	}
 
-	if (payload.nonce && !DPoPNonces.checkNonce(payload.nonce)) {
+	if (payload.nonce && !dPoPInstance?.checkNonce(payload.nonce)) {
 		ctx.set('DPoP-Nonce', nextNonce);
 		throw new UseDpopNonce('invalid nonce in DPoP proof');
 	}

@@ -10,6 +10,8 @@ import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { Claims } from 'lib/helpers/claims.js';
 import { IdToken } from 'lib/models/id_token.js';
 import { ReplayDetection } from 'lib/models/replay_detection.js';
+import { Client } from 'lib/models/client.js';
+import { provider } from 'lib/provider.js';
 
 export const userinfo = new Elysia()
 	.guard({
@@ -27,19 +29,19 @@ export const userinfo = new Elysia()
 		};
 		ctx.oidc = new OIDCContext(ctx);
 
-		const accessTokenValue = ctx.oidc.getAccessToken({
+		const accessTokenId = ctx.oidc.getAccessToken({
 			acceptDPoP: true
 		});
-		const dPoP = await dpopValidate(ctx, accessTokenValue);
+		const dPoP = await dpopValidate(ctx, {
+			accessTokenId,
+			method: 'GET',
+			route: routeNames.userinfo
+		});
 
-		const accessToken =
-			await ctx.oidc.provider.AccessToken.find(accessTokenValue);
-
+		const accessToken = await provider.AccessToken.find(accessTokenId);
 		if (!accessToken) {
 			throw new InvalidToken('access token not found');
 		}
-
-		ctx.oidc.entity('AccessToken', accessToken);
 
 		const { scopes } = accessToken;
 		if (!scopes.size || !scopes.has('openid')) {
@@ -50,7 +52,7 @@ export const userinfo = new Elysia()
 		}
 
 		if (accessToken['x5t#S256']) {
-			const { getCertificate } = instance(ctx.oidc.provider).features.mTLS;
+			const { getCertificate } = instance(provider).features.mTLS;
 			const cert = getCertificate(ctx);
 			if (!cert || accessToken['x5t#S256'] !== certificateThumbprint(cert)) {
 				throw new InvalidToken('failed x5t#S256 verification');
@@ -58,7 +60,7 @@ export const userinfo = new Elysia()
 		}
 
 		if (dPoP) {
-			const { allowReplay } = instance(ctx.oidc.provider).features.dPoP;
+			const { allowReplay } = instance(provider).features.dPoP;
 
 			if (!allowReplay) {
 				const unique = await ReplayDetection.unique(
@@ -80,31 +82,24 @@ export const userinfo = new Elysia()
 			);
 		}
 
-		const client = await ctx.oidc.provider.Client.find(
-			ctx.oidc.accessToken.clientId
-		);
+		const client = await Client.find(accessToken.clientId);
 		if (!client) {
 			new InvalidToken('associated client not found');
 		}
-		ctx.oidc.entity('Client', client);
 
-		const account = await instance(ctx.oidc.provider).configuration.findAccount(
+		const account = await instance(provider).configuration.findAccount(
 			ctx,
-			ctx.oidc.accessToken.accountId,
-			ctx.oidc.accessToken
+			accessToken.accountId,
+			accessToken
 		);
 
 		if (!account) {
 			throw new InvalidToken('associated account not found');
 		}
-		ctx.oidc.entity('Account', account);
 
-		const grant = await ctx.oidc.provider.Grant.find(
-			ctx.oidc.accessToken.grantId,
-			{
-				ignoreExpiration: true
-			}
-		);
+		const grant = await provider.Grant.find(accessToken.grantId, {
+			ignoreExpiration: true
+		});
 
 		if (!grant) {
 			throw new InvalidToken('grant not found');
@@ -114,24 +109,18 @@ export const userinfo = new Elysia()
 			throw new InvalidToken('grant is expired');
 		}
 
-		if (grant.clientId !== ctx.oidc.accessToken.clientId) {
+		if (grant.clientId !== accessToken.clientId) {
 			throw new InvalidToken('clientId mismatch');
 		}
 
-		if (grant.accountId !== ctx.oidc.accessToken.accountId) {
+		if (grant.accountId !== accessToken.accountId) {
 			throw new InvalidToken('accountId mismatch');
 		}
 
-		ctx.oidc.entity('Grant', grant);
-
-		const claims = filterClaims(
-			ctx.oidc.accessToken.claims,
-			'userinfo',
-			ctx.oidc.grant
-		);
-		const rejected = ctx.oidc.grant.getRejectedOIDCClaims();
-		const scope = ctx.oidc.grant.getOIDCScopeFiltered(
-			new Set(ctx.oidc.accessToken.scope.split(' '))
+		const claims = filterClaims(accessToken.claims, 'userinfo', grant);
+		const rejected = grant.getRejectedOIDCClaims();
+		const scope = grant.getOIDCScopeFiltered(
+			new Set(accessToken.scope.split(' '))
 		);
 
 		if (
@@ -140,7 +129,7 @@ export const userinfo = new Elysia()
 		) {
 			const token = new IdToken(
 				client,
-				await ctx.oidc.account.claims('userinfo', scope, claims, rejected)
+				await account.claims('userinfo', scope, claims, rejected)
 			);
 
 			token.scope = scope;
@@ -148,7 +137,7 @@ export const userinfo = new Elysia()
 			token.rejected = rejected;
 
 			const body = await token.issue({
-				expiresAt: ctx.oidc.accessToken.exp,
+				expiresAt: accessToken.exp,
 				use: 'userinfo'
 			});
 			return new Response(body, {
@@ -159,7 +148,7 @@ export const userinfo = new Elysia()
 		} else {
 			const mask = new Claims(
 				client,
-				await ctx.oidc.account.claims('userinfo', scope, claims, rejected)
+				await account.claims('userinfo', scope, claims, rejected)
 			);
 
 			mask.scope(scope);

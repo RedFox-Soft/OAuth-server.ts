@@ -13,8 +13,6 @@ export class OIDCProviderError extends Error {
 		this.message = message;
 		this.error = message;
 		this.status = status;
-		this.statusCode = status;
-		this.expose = status < 500;
 	}
 }
 
@@ -63,7 +61,7 @@ export class InvalidScope extends OIDCProviderError {
 }
 
 export class InsufficientScope extends OIDCProviderError {
-	constructor(description, scope, detail) {
+	constructor(description: string, scope: string, detail?: string) {
 		super(403, 'insufficient_scope');
 		Error.captureStackTrace(this, this.constructor);
 		Object.assign(this, {

@@ -4,9 +4,7 @@ import getConfig from '../default.config.js';
 
 const config = getConfig();
 
-config.enabledJWA.dPoPSigningAlgValues = ['ES256', 'PS256'];
 merge(config.features, {
-	dPoP: { enabled: true, nonceSecret: Buffer.alloc(32, 0) },
 	clientCredentials: { enabled: true },
 	introspection: { enabled: true },
 	deviceFlow: { enabled: true },
@@ -32,7 +30,9 @@ merge(config.features, {
 });
 
 export const ApplicationConfig = {
-	'par.enabled': true
+	'par.enabled': true,
+	'dpop.enabled': true,
+	'dpop.nonceSecret': Buffer.alloc(32, 0)
 };
 
 export default {

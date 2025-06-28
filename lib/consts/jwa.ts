@@ -61,6 +61,3 @@ export const requestObjectEncryptionEncValues = [...encryptionEncValues];
 export const userinfoEncryptionEncValues = [...encryptionEncValues];
 export const introspectionEncryptionEncValues = [...encryptionEncValues];
 export const authorizationEncryptionEncValues = [...encryptionEncValues];
-export const dPoPSigningAlgValues = [...signingAlgValues].filter(
-	(alg) => !alg.startsWith('HS')
-);

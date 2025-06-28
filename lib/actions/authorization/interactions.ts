@@ -104,7 +104,6 @@ export default async function interactions(resumeRouteName, ctx) {
 	} catch (err) {
 		// const code = /^(code|device)_/.test(oidc.route) ? 400 : 303;
 		// err.status = code;
-		// err.statusCode = code;
 		// err.expose = true;
 		throw err;
 	}

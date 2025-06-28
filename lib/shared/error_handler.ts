@@ -25,7 +25,7 @@ export default function getErrorHandler(provider, eventName) {
 			await next();
 		} catch (err) {
 			const out = errOut(err);
-			ctx.status = err.statusCode || 500;
+			ctx.status = err.code || 500;
 
 			if (err.expose && !(err instanceof ReRenderError)) {
 				debug(

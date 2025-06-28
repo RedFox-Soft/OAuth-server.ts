@@ -2442,24 +2442,7 @@ export const globalConfiguration = {
 			'A128GCM',
 			'A256CBC-HS512',
 			'A256GCM'
-		],
-
-		/*
-		 * enabledJWA.dPoPSigningAlgValues
-		 *
-		 * description: JWS "alg" Algorithm values the authorization server supports to verify signed DPoP proof JWTs with
-		 *
-		 * example: Supported values list
-		 * ```js
-		 * [
-		 *   'RS256', 'RS384', 'RS512',
-		 *   'PS256', 'PS384', 'PS512',
-		 *   'ES256', 'ES384', 'ES512',
-		 *   'Ed25519', 'EdDSA',
-		 * ]
-		 * ```
-		 */
-		dPoPSigningAlgValues: ['ES256', 'Ed25519', 'EdDSA']
+		]
 	},
 
 	/**

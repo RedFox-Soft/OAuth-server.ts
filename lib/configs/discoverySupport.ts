@@ -2,6 +2,7 @@ import { ISSUER } from 'lib/configs/env.js';
 import { routeNames } from 'lib/consts/param_list.js';
 import { ClientDefaults } from 'lib/configs/clientBase.js';
 import { ApplicationConfig } from './application.js';
+import { dPoPSigningAlgValues } from './jwaAlgorithms.js';
 
 const discovery = {
 	issuer: ISSUER,
@@ -14,7 +15,9 @@ const discovery = {
 	request_uri_parameter_supported: false,
 	require_pushed_authorization_requests: false,
 
-	introspection_endpoint: `${ISSUER}${routeNames.introspect}`
+	introspection_endpoint: `${ISSUER}${routeNames.introspect}`,
+
+	dpop_signing_alg_values_supported: dPoPSigningAlgValues
 };
 
 export function calculateDiscovery() {

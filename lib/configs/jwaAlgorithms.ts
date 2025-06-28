@@ -1,0 +1,423 @@
+type signingAlgValues =
+	| 'HS256'
+	| 'HS384'
+	| 'HS512'
+	| 'RS256'
+	| 'RS384'
+	| 'RS512'
+	| 'PS256'
+	| 'PS384'
+	| 'PS512'
+	| 'ES256'
+	| 'ES384'
+	| 'ES512'
+	| 'Ed25519'
+	| 'EdDSA';
+
+type encryptionAlgValues =
+	// asymmetric
+	| 'RSA-OAEP'
+	| 'RSA-OAEP-256'
+	| 'RSA-OAEP-384'
+	| 'RSA-OAEP-512'
+	| 'ECDH-ES'
+	| 'ECDH-ES+A128KW'
+	| 'ECDH-ES+A192KW'
+	| 'ECDH-ES+A256KW'
+	// symmetric
+	| 'A128GCMKW'
+	| 'A192GCMKW'
+	| 'A256GCMKW'
+	| 'A128KW'
+	| 'A192KW'
+	| 'A256KW'
+	// direct
+	| 'dir';
+
+type encryptionEncValues =
+	| 'A128CBC-HS256'
+	| 'A128GCM'
+	| 'A192CBC-HS384'
+	| 'A192GCM'
+	| 'A256CBC-HS512'
+	| 'A256GCM';
+
+/*
+ * clientAuthSigningAlgValues
+ *
+ * description: JWS "alg" Algorithm values the authorization server supports for signed JWT Client Authentication
+ *
+ * example: Supported values list
+ * ```js
+ * [
+ *   'RS256', 'RS384', 'RS512',
+ *   'PS256', 'PS384', 'PS512',
+ *   'ES256', 'ES384', 'ES512',
+ *   'Ed25519', 'EdDSA',
+ *   'HS256', 'HS384', 'HS512',
+ * ]
+ * ```
+ */
+export const clientAuthSigningAlgValues = [
+	'HS256',
+	'RS256',
+	'PS256',
+	'ES256',
+	'Ed25519',
+	'EdDSA'
+];
+
+/*
+ * idTokenSigningAlgValues
+ *
+ * description: JWS "alg" Algorithm values the authorization server supports to sign ID Tokens with.
+ *
+ * example: Supported values list
+ * ```js
+ * [
+ *   'RS256', 'RS384', 'RS512',
+ *   'PS256', 'PS384', 'PS512',
+ *   'ES256', 'ES384', 'ES512',
+ *   'Ed25519', 'EdDSA',
+ *   'HS256', 'HS384', 'HS512',
+ * ]
+ * ```
+ */
+export const idTokenSigningAlgValues = [
+	'RS256',
+	'PS256',
+	'ES256',
+	'Ed25519',
+	'EdDSA'
+];
+
+/*
+ * requestObjectSigningAlgValues
+ *
+ * description: JWS "alg" Algorithm values the authorization server supports to receive signed Request Objects (`JAR`) with
+ *
+ * example: Supported values list
+ * ```js
+ * [
+ *   'RS256', 'RS384', 'RS512',
+ *   'PS256', 'PS384', 'PS512',
+ *   'ES256', 'ES384', 'ES512',
+ *   'Ed25519', 'EdDSA',
+ *   'HS256', 'HS384', 'HS512',
+ * ]
+ * ```
+ */
+export const requestObjectSigningAlgValues = [
+	'HS256',
+	'RS256',
+	'PS256',
+	'ES256',
+	'Ed25519',
+	'EdDSA'
+];
+
+/*
+ * userinfoSigningAlgValues
+ *
+ * description: JWS "alg" Algorithm values the authorization server supports to sign UserInfo responses with
+ *
+ * example: Supported values list
+ * ```js
+ * [
+ *   'RS256', 'RS384', 'RS512',
+ *   'PS256', 'PS384', 'PS512',
+ *   'ES256', 'ES384', 'ES512',
+ *   'Ed25519', 'EdDSA',
+ *   'HS256', 'HS384', 'HS512',
+ * ]
+ * ```
+ */
+export const userinfoSigningAlgValues = [
+	'RS256',
+	'PS256',
+	'ES256',
+	'Ed25519',
+	'EdDSA'
+];
+
+/*
+ * introspectionSigningAlgValues
+ *
+ * description: JWS "alg" Algorithm values the authorization server supports to sign JWT Introspection responses with
+ *
+ * example: Supported values list
+ * ```js
+ * [
+ *   'RS256', 'RS384', 'RS512',
+ *   'PS256', 'PS384', 'PS512',
+ *   'ES256', 'ES384', 'ES512',
+ *   'Ed25519', 'EdDSA',
+ *   'HS256', 'HS384', 'HS512',
+ * ]
+ * ```
+ */
+export const introspectionSigningAlgValues = [
+	'RS256',
+	'PS256',
+	'ES256',
+	'Ed25519',
+	'EdDSA'
+];
+
+/*
+ * authorizationSigningAlgValues
+ *
+ * description: JWS "alg" Algorithm values the authorization server supports to sign JWT Authorization Responses (`JARM`) with
+ *
+ * example: Supported values list
+ * ```js
+ * [
+ *   'RS256', 'RS384', 'RS512',
+ *   'PS256', 'PS384', 'PS512',
+ *   'ES256', 'ES384', 'ES512',
+ *   'Ed25519', 'EdDSA',
+ *   'HS256', 'HS384', 'HS512',
+ * ]
+ * ```
+ */
+export const authorizationSigningAlgValues = [
+	'RS256',
+	'PS256',
+	'ES256',
+	'Ed25519',
+	'EdDSA'
+];
+/*
+ * idTokenEncryptionAlgValues
+ *
+ * description: JWE "alg" Algorithm values the authorization server supports for ID Token encryption
+ *
+ * example: Supported values list
+ * ```js
+ * [
+ *   // asymmetric RSAES based
+ *   'RSA-OAEP', 'RSA-OAEP-256', 'RSA-OAEP-384', 'RSA-OAEP-512',
+ *   // asymmetric ECDH-ES based
+ *   'ECDH-ES', 'ECDH-ES+A128KW', 'ECDH-ES+A192KW', 'ECDH-ES+A256KW',
+ *   // symmetric AES key wrapping
+ *   'A128KW', 'A192KW', 'A256KW', 'A128GCMKW', 'A192GCMKW', 'A256GCMKW',
+ *   // direct encryption
+ *   'dir',
+ * ]
+ * ```
+ */
+export const idTokenEncryptionAlgValues = [
+	'A128KW',
+	'A256KW',
+	'ECDH-ES',
+	'RSA-OAEP',
+	'RSA-OAEP-256',
+	'dir'
+];
+/*
+ * requestObjectEncryptionAlgValues
+ *
+ * description: JWE "alg" Algorithm values the authorization server supports to receive encrypted Request Objects (`JAR`) with
+ *
+ * example: Supported values list
+ * ```js
+ * [
+ *   // asymmetric RSAES based
+ *   'RSA-OAEP', 'RSA-OAEP-256', 'RSA-OAEP-384', 'RSA-OAEP-512',
+ *   // asymmetric ECDH-ES based
+ *   'ECDH-ES', 'ECDH-ES+A128KW', 'ECDH-ES+A192KW', 'ECDH-ES+A256KW',
+ *   // symmetric AES key wrapping
+ *   'A128KW', 'A192KW', 'A256KW', 'A128GCMKW', 'A192GCMKW', 'A256GCMKW',
+ *   // direct encryption
+ *   'dir',
+ * ]
+ * ```
+ */
+export const requestObjectEncryptionAlgValues = [
+	'A128KW',
+	'A256KW',
+	'ECDH-ES',
+	'RSA-OAEP',
+	'RSA-OAEP-256',
+	'dir'
+];
+/*
+ * userinfoEncryptionAlgValues
+ *
+ * description: JWE "alg" Algorithm values the authorization server supports for UserInfo Response encryption
+ *
+ * example: Supported values list
+ * ```js
+ * [
+ *   // asymmetric RSAES based
+ *   'RSA-OAEP', 'RSA-OAEP-256', 'RSA-OAEP-384', 'RSA-OAEP-512',
+ *   // asymmetric ECDH-ES based
+ *   'ECDH-ES', 'ECDH-ES+A128KW', 'ECDH-ES+A192KW', 'ECDH-ES+A256KW',
+ *   // symmetric AES key wrapping
+ *   'A128KW', 'A192KW', 'A256KW', 'A128GCMKW', 'A192GCMKW', 'A256GCMKW',
+ *   // direct encryption
+ *   'dir',
+ * ]
+ * ```
+ */
+export const userinfoEncryptionAlgValues = [
+	'A128KW',
+	'A256KW',
+	'ECDH-ES',
+	'RSA-OAEP',
+	'RSA-OAEP-256',
+	'dir'
+];
+/*
+ * introspectionEncryptionAlgValues
+ *
+ * description: JWE "alg" Algorithm values the authorization server supports for JWT Introspection response
+ * encryption
+ *
+ * example: Supported values list
+ * ```js
+ * [
+ *   // asymmetric RSAES based
+ *   'RSA-OAEP', 'RSA-OAEP-256', 'RSA-OAEP-384', 'RSA-OAEP-512',
+ *   // asymmetric ECDH-ES based
+ *   'ECDH-ES', 'ECDH-ES+A128KW', 'ECDH-ES+A192KW', 'ECDH-ES+A256KW',
+ *   // symmetric AES key wrapping
+ *   'A128KW', 'A192KW', 'A256KW', 'A128GCMKW', 'A192GCMKW', 'A256GCMKW',
+ *   // direct encryption
+ *   'dir',
+ * ]
+ * ```
+ */
+export const introspectionEncryptionAlgValues = [
+	'A128KW',
+	'A256KW',
+	'ECDH-ES',
+	'RSA-OAEP',
+	'RSA-OAEP-256',
+	'dir'
+];
+/*
+ * authorizationEncryptionAlgValues
+ *
+ * description: JWE "alg" Algorithm values the authorization server supports for JWT Authorization response (`JARM`)
+ * encryption
+ *
+ * example: Supported values list
+ * ```js
+ * [
+ *   // asymmetric RSAES based
+ *   'RSA-OAEP', 'RSA-OAEP-256', 'RSA-OAEP-384', 'RSA-OAEP-512',
+ *   // asymmetric ECDH-ES based
+ *   'ECDH-ES', 'ECDH-ES+A128KW', 'ECDH-ES+A192KW', 'ECDH-ES+A256KW',
+ *   // symmetric AES key wrapping
+ *   'A128KW', 'A192KW', 'A256KW', 'A128GCMKW', 'A192GCMKW', 'A256GCMKW',
+ *   // direct encryption
+ *   'dir',
+ * ]
+ * ```
+ */
+export const authorizationEncryptionAlgValues = [
+	'A128KW',
+	'A256KW',
+	'ECDH-ES',
+	'RSA-OAEP',
+	'RSA-OAEP-256',
+	'dir'
+];
+/*
+ * idTokenEncryptionEncValues
+ *
+ * description: JWE "enc" Content Encryption Algorithm values the authorization server supports to encrypt ID Tokens with
+ *
+ * example: Supported values list
+ * ```js
+ * [
+ *   'A128CBC-HS256', 'A128GCM', 'A192CBC-HS384', 'A192GCM', 'A256CBC-HS512', 'A256GCM',
+ * ]
+ * ```
+ */
+export const idTokenEncryptionEncValues = [
+	'A128CBC-HS256',
+	'A128GCM',
+	'A256CBC-HS512',
+	'A256GCM'
+];
+/*
+ * requestObjectEncryptionEncValues
+ *
+ * description: JWE "enc" Content Encryption Algorithm values the authorization server supports to decrypt Request Objects (`JAR`) with
+ *
+ * example: Supported values list
+ * ```js
+ * [
+ *   'A128CBC-HS256', 'A128GCM', 'A192CBC-HS384', 'A192GCM', 'A256CBC-HS512', 'A256GCM',
+ * ]
+ * ```
+ */
+export const requestObjectEncryptionEncValues = [
+	'A128CBC-HS256',
+	'A128GCM',
+	'A256CBC-HS512',
+	'A256GCM'
+];
+/*
+ * userinfoEncryptionEncValues
+ *
+ * description: JWE "enc" Content Encryption Algorithm values the authorization server supports to encrypt UserInfo responses with
+ *
+ * example: Supported values list
+ * ```js
+ * [
+ *   'A128CBC-HS256', 'A128GCM', 'A192CBC-HS384', 'A192GCM', 'A256CBC-HS512', 'A256GCM',
+ * ]
+ * ```
+ */
+export const userinfoEncryptionEncValues = [
+	'A128CBC-HS256',
+	'A128GCM',
+	'A256CBC-HS512',
+	'A256GCM'
+];
+/*
+ * introspectionEncryptionEncValues
+ *
+ * description: JWE "enc" Content Encryption Algorithm values the authorization server supports to encrypt JWT Introspection responses with
+ *
+ * example: Supported values list
+ * ```js
+ * [
+ *   'A128CBC-HS256', 'A128GCM', 'A192CBC-HS384', 'A192GCM', 'A256CBC-HS512', 'A256GCM',
+ * ]
+ * ```
+ */
+export const introspectionEncryptionEncValues = [
+	'A128CBC-HS256',
+	'A128GCM',
+	'A256CBC-HS512',
+	'A256GCM'
+];
+/*
+ * authorizationEncryptionEncValues
+ *
+ * description: JWE "enc" Content Encryption Algorithm values the authorization server supports to encrypt JWT Authorization Responses (`JARM`) with
+ *
+ * example: Supported values list
+ * ```js
+ * [
+ *   'A128CBC-HS256', 'A128GCM', 'A192CBC-HS384', 'A192GCM', 'A256CBC-HS512', 'A256GCM',
+ * ]
+ * ```
+ */
+export const authorizationEncryptionEncValues = [
+	'A128CBC-HS256',
+	'A128GCM',
+	'A256CBC-HS512',
+	'A256GCM'
+];
+/*
+ * dPoPSigningAlgValues
+ *
+ * description: JWS "alg" Algorithm values the authorization server supports to verify signed DPoP proof JWTs with
+ */
+export type dPoPSigningAlgType = Exclude<signingAlgValues, `HS${string}`>;
+export const dPoPSigningAlgValues: dPoPSigningAlgType[] = ['ES256', 'PS256'];

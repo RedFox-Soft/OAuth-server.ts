@@ -1,5 +1,5 @@
 import { provider } from 'lib/provider.js';
-import instance, { get } from '../helpers/weak_cache.ts';
+import instance from '../helpers/weak_cache.ts';
 import { OIDCProviderError } from '../helpers/errors.ts';
 import { getErrorHtmlResponse } from '../html/error.tsx';
 import { routeNames } from 'lib/consts/param_list.js';
@@ -11,6 +11,7 @@ import {
 } from 'elysia';
 import { isAllowRedirectUri } from 'lib/actions/authorization/authorization.js';
 import { ISSUER } from 'lib/configs/env.js';
+import { dPoPSigningAlgValues } from 'lib/configs/jwaAlgorithms.js';
 
 function getFirstError(error: ValidationError) {
 	const validator = error.validator ?? error.error.validator;
@@ -37,7 +38,7 @@ export default function getWWWAuthenticate(
 		...errorObj,
 		...(scheme === 'DPoP'
 			? {
-					algs: instance(provider).configuration.dPoPSigningAlgValues.join(' ')
+					algs: dPoPSigningAlgValues.join(' ')
 				}
 			: undefined)
 	};

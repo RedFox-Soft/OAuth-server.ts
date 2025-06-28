@@ -11,7 +11,6 @@ import initializeClients from './helpers/initialize_clients.ts';
 import ResourceServer from './helpers/resource_server.ts';
 import { OIDCProviderError } from './helpers/errors.ts';
 import * as models from './models/index.ts';
-import DPoPNonces from './helpers/dpop_nonces.ts';
 import { globalConfiguration } from './globalConfiguration.js';
 import { Client } from './models/client.js';
 import { IdToken } from './models/id_token.js';
@@ -49,12 +48,6 @@ class ProviderClass extends EventEmitter {
 
 		this.#int.configuration = globalConfiguration;
 		this.#int.features = globalConfiguration.features;
-
-		if (configuration.features.dPoP.nonceSecret !== undefined) {
-			this.#int.DPoPNonces = new DPoPNonces(
-				configuration.features.dPoP.nonceSecret
-			);
-		}
 
 		this.#int.responseModes = new Map();
 		this.#int.grantTypeHandlers = new Map();

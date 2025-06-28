@@ -327,12 +327,6 @@ class Configuration {
 			enabled.encryption
 		);
 
-		this.setAlgs(
-			'dPoPSigningAlgValues',
-			allowList.dPoPSigningAlgValues.slice(),
-			enabled.dPoP
-		);
-
 		this.clientAuthSigningAlgValues =
 			this.enabledJWA.clientAuthSigningAlgValues;
 

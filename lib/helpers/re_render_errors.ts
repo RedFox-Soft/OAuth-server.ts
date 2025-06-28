@@ -7,7 +7,6 @@ export class ReRenderError extends Error {
 		this.message = message;
 		this.name = this.constructor.name;
 		this.status = 200;
-		this.statusCode = 200;
 		this.expose = true;
 		Error.captureStackTrace(this, this.constructor);
 	}

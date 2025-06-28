@@ -17,6 +17,7 @@ const featuresKeyMap: Record<featuresKeys, Array<discoveryKeys>> = {
 		'pushed_authorization_request_endpoint',
 		'require_pushed_authorization_requests'
 	],
+	'dpop.enabled': ['dpop_signing_alg_values_supported'],
 	'introspection.enabled': ['introspection_endpoint']
 } as const;
 
@@ -152,11 +153,6 @@ export const discovery = new Elysia().get(
 				body.introspection_encryption_enc_values_supported =
 					configuration.introspectionEncryptionEncValues;
 			}
-		}
-
-		if (features.dPoP.enabled) {
-			body.dpop_signing_alg_values_supported =
-				configuration.dPoPSigningAlgValues;
 		}
 
 		if (features.revocation.enabled) {
