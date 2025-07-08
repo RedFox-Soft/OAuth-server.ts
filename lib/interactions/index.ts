@@ -1,6 +1,6 @@
 import { Elysia, t } from 'elysia';
 import { provider } from 'lib/provider.js';
-import { loginServer } from './loginServer.tsx';
+import { consentServer, loginServer } from './serverRender.js';
 import { SessionNotFound } from 'lib/helpers/errors.js';
 import epochTime from '../helpers/epoch_time.ts';
 import sessionHandler from 'lib/shared/session.js';
@@ -64,6 +64,17 @@ export const ui = new Elysia()
 			}
 		});
 	})
+	.get('ui/:uid/consent', async ({ params: { uid } }) => {
+		let html = await htmlTeamplate.text();
+		html = html
+			.replace('<!--app-title-->', 'Consent Page')
+			.replace('<!--app-html-->', consentServer(uid));
+		return new Response(html, {
+			headers: {
+				'Content-Type': 'text/html; charset=utf-8'
+			}
+		});
+	} )
 	.get('ui/:uid/abort', async ({ interaction }) => {
 		interaction.result = {
 			error: 'access_denied',

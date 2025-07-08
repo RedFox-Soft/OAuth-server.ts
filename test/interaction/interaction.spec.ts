@@ -42,7 +42,7 @@ describe('devInteractions', () => {
 			});
 
 			const url = response.headers.get('location');
-			const [, uid] = url.split('/');
+			const [,, uid] = url.split('/');
 
 			object.cookie = response.headers.get('set-cookie');
 			object.uid = uid;
@@ -51,7 +51,7 @@ describe('devInteractions', () => {
 
 		it('with a form', async function () {
 			const uid = object.uid;
-			const { data } = await agent.ui[uid].login.get({
+			const { data , error} = await agent.ui[uid].login.get({
 				headers: {
 					cookie: object.cookie
 				}
@@ -103,7 +103,7 @@ describe('devInteractions', () => {
 				}
 			});
 			const url = response.headers.get('location');
-			[, uid] = url.split('/');
+			[,, uid] = url.split('/');
 		});
 
 		it('with a form', async function () {

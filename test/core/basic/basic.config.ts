@@ -1,10 +1,5 @@
-import merge from 'lodash/merge.js';
-
-import {
-	Prompt,
-	Check,
-	base
-} from '../../../lib/helpers/interaction_policy/index.ts';
+import { type CheckPartial } from 'lib/helpers/interaction_policy/prompt.js';
+import { Prompt, base } from '../../../lib/helpers/interaction_policy/index.ts';
 import getConfig from '../../default.config.js';
 
 const config = getConfig();
@@ -13,20 +8,24 @@ config.allowOmittingSingleRegisteredRedirectUri = false;
 
 const policy = base();
 
-const check = new Check(
-	'reason_foo',
-	'error_description_foo',
-	'error_foo',
-	(ctx) => {
+const check: CheckPartial = {
+	reason: 'reason_foo',
+	description: 'error_description_foo',
+	error: 'error_foo',
+	check: (ctx) => {
 		if (ctx.oidc.params.triggerCustomFail) {
 			return true;
 		}
 		return false;
 	}
-);
+};
 
-policy.get('login').checks.add(check);
-policy.add(new Prompt({ name: 'unrequestable', requestable: false }));
+class CustomPrompt extends Prompt {
+	name = 'unrequestable';
+}
+
+policy.get('login').checks.push(check);
+policy.add(new CustomPrompt());
 
 config.interactions = { policy };
 

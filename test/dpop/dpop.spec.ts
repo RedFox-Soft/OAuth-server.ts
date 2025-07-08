@@ -3,7 +3,6 @@ import { hash, randomBytes, randomUUID } from 'node:crypto';
 import {
 	describe,
 	it,
-	beforeAll,
 	beforeEach,
 	spyOn,
 	afterEach,
@@ -66,18 +65,11 @@ async function DPoP(
 }
 
 describe('features.dPoP', async () => {
-	let setup = null;
-	let cookie = null;
-	let keypair = await generateKeyPair('ES256', { extractable: true });
-	let jwk = null;
-	let thumbprint = null;
-
-	beforeAll(async function () {
-		setup = await bootstrap(import.meta.url)();
-		cookie = await setup.login({ scope: 'openid offline_access' });
-		jwk = await exportJWK(keypair.publicKey);
-		thumbprint = await calculateJwkThumbprint(jwk);
-	});
+	const setup = await bootstrap(import.meta.url)();
+	const cookie = await setup.login({ scope: 'openid offline_access' });
+	const keypair = await generateKeyPair('ES256', { extractable: true });
+	const jwk = await exportJWK(keypair.publicKey);;
+	const thumbprint = await calculateJwkThumbprint(jwk);
 
 	beforeEach(function () {
 		spyOn(OIDCContext.prototype, 'promptPending').mockReturnValue(false);

@@ -12,44 +12,12 @@ export default async function interactions(resumeRouteName, ctx) {
 	let failedCheck;
 	let prompt;
 
-	const { policy, url: interactionUrl } = instance(oidc.provider).configuration
-		.interactions;
+	const { policy } = instance(oidc.provider).configuration.interactions;
 
-	for (const { name, checks, details: promptDetails } of policy) {
-		let results = (
-			await Promise.all(
-				[...checks].map(
-					async ({ reason, description, error, details, check }) => {
-						if (await check(ctx)) {
-							return {
-								[reason]: { error, description, details: await details(ctx) }
-							};
-						}
-
-						return undefined;
-					}
-				)
-			)
-		).filter(Boolean);
-
-		if (results.length) {
-			results = Object.assign({}, ...results);
-			prompt = {
-				name,
-				reasons: Object.keys(results),
-				details: Object.assign(
-					{},
-					await promptDetails(ctx),
-					...Object.values(results).map((r) => r.details)
-				)
-			};
-
-			const [[, { error, description }]] = Object.entries(results);
-			failedCheck = {
-				error: error || 'interaction_required',
-				error_description:
-					description || 'interaction is required from the end-user'
-			};
+	for (const poly of policy) {
+		const result = await poly.executeChecks(ctx);
+		if (result) {
+			({ firstError: failedCheck, ...prompt } = result);
 			break;
 		}
 	}
@@ -90,22 +58,15 @@ export default async function interactions(resumeRouteName, ctx) {
 	}
 
 	// if interaction needed but prompt=none => throw;
-	try {
-		if (oidc.promptPending('none')) {
-			const className = upperFirst(camelCase(failedCheck.error));
-			if (errors[className]) {
-				throw new errors[className](failedCheck.error_description);
-			}
-			throw new errors.CustomOIDCProviderError(
-				failedCheck.error,
-				failedCheck.error_description
-			);
+	if (oidc.promptPending('none')) {
+		const className = upperFirst(camelCase(failedCheck.error));
+		if (errors[className]) {
+			throw new errors[className](failedCheck.error_description);
 		}
-	} catch (err) {
-		// const code = /^(code|device)_/.test(oidc.route) ? 400 : 303;
-		// err.status = code;
-		// err.expose = true;
-		throw err;
+		throw new errors.CustomOIDCProviderError(
+			failedCheck.error,
+			failedCheck.error_description
+		);
 	}
 
 	const uid = nanoid();

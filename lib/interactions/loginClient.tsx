@@ -1,6 +1,7 @@
 import { hydrateRoot } from 'react-dom/client';
-import React, { StrictMode } from 'react';
+import { StrictMode } from 'react';
 import { LoginPage } from './loginPage.tsx';
+import { ConsentPage } from './consentPage.tsx';
 
 function calculateUid() {
 	const url = new URL(window.location.href);
@@ -8,10 +9,20 @@ function calculateUid() {
 	return uid;
 }
 
+function pageName() {
+	const url = new URL(window.location.href);
+	const [,, name] = url.pathname.split('/');
+	return name;
+}
+
 hydrateRoot(
 	// @ts-expect-error root which already exists
 	document.getElementById('root'),
 	<StrictMode>
-		<LoginPage uid={calculateUid()} />
+		{pageName() === 'login' ? (
+			<LoginPage uid={calculateUid()} />
+		) : (
+			<ConsentPage uid={calculateUid()} />
+		)}
 	</StrictMode>
 );

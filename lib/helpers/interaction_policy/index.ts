@@ -1,5 +1,4 @@
-import Check from './check.ts';
-import Prompt from './prompt.ts';
+import { Prompt } from './prompt.js';
 import login from './prompts/login.ts';
 import consent from './prompts/consent.ts';
 
@@ -40,4 +39,4 @@ const base = () => {
 	return DEFAULT;
 };
 
-export { Check, Prompt, base };
+export { Prompt, base };

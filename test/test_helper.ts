@@ -7,7 +7,6 @@ import flatten from 'lodash/flatten.js';
 import { expect } from 'chai';
 
 import base64url from 'base64url';
-import { CookieAccessInfo } from 'cookiejar';
 import { treaty } from '@elysiajs/eden';
 
 import nanoid from '../lib/helpers/nanoid.ts';

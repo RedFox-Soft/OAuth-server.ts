@@ -1,11 +1,8 @@
 import merge from 'lodash/merge.js';
 
-import {
-	Check,
-	Prompt,
-	base
-} from '../../lib/helpers/interaction_policy/index.ts';
+import { Prompt, base } from '../../lib/helpers/interaction_policy/index.ts';
 import getConfig from '../default.config.js';
+import { type CheckPartial } from 'lib/helpers/interaction_policy/prompt.js';
 
 const config = getConfig();
 
@@ -15,35 +12,46 @@ merge(config.features, {
 
 const policy = base();
 
-const check = new Check(
-	'reason_foo',
-	'error_description_foo',
-	'error_foo',
-	(ctx) => {
+const check: CheckPartial = {
+	reason: 'reason_foo',
+	description: 'error_description_foo',
+	error: 'error_foo',
+	check: (ctx: any) => {
 		if (ctx.oidc.params.triggerCustomFail) {
 			return true;
 		}
 		return false;
 	}
-);
+};
 
-policy.get('login').checks.add(check);
-policy.add(new Prompt({ name: 'custom', requestable: true }));
-policy.add(
-	new Prompt(
-		{ name: 'unrequestable', requestable: false },
-		new Check('un_foo', 'un_foo_desc', 'un_foo_err', (ctx) => {
-			if (
-				ctx.oidc.params.triggerUnrequestable &&
-				(!ctx.oidc.result || !('foo' in ctx.oidc.result))
-			) {
-				return true;
+policy.get('login').checks.push(check);
+
+class CustomPrompt extends Prompt {
+	name = 'custom';
+}
+policy.add(new CustomPrompt());
+
+class UnrequestablePrompt extends Prompt {
+	name = 'unrequestable';
+	requestable = false;
+	checks = [
+		{
+			reason: 'un_foo',
+			description: 'un_foo_desc',
+			error: 'un_foo_err',
+			check: (ctx: any) => {
+				if (
+					ctx.oidc.params.triggerUnrequestable &&
+					(!ctx.oidc.result || !('foo' in ctx.oidc.result))
+				) {
+					return true;
+				}
+				return false;
 			}
-			return false;
-		})
-	),
-	0
-);
+		}
+	];
+}
+policy.add(new UnrequestablePrompt());
 
 config.interactions = { policy };
 
