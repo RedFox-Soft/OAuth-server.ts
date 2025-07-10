@@ -2,6 +2,7 @@ import * as url from 'node:url';
 import * as crypto from 'node:crypto';
 
 import { expect } from 'chai';
+import { describe, it } from 'bun:test';
 import {
 	compactDecrypt,
 	CompactEncrypt,
@@ -16,6 +17,7 @@ import { keypair } from './encryption.config.js';
 import { provider } from 'lib/provider.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
+import { Client } from 'lib/models/client.js';
 
 const route = '/auth';
 
@@ -49,7 +51,7 @@ describe('encryption', () => {
 		].forEach((attr) => {
 			it(`symmetric ${attr} makes client secret mandatory (${alg})`, function () {
 				expect(
-					provider.Client.needsSecret({
+					Client.needsSecret({
 						token_endpoint_auth_method: 'none',
 						[attr]: alg
 					})

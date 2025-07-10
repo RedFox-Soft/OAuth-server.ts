@@ -6,6 +6,12 @@ import { routeNames } from 'lib/consts/param_list.js';
 import { calculateDiscovery } from 'lib/configs/discoverySupport.js';
 import { ApplicationConfig } from '../configs/application.js';
 import { ReturnType } from '@sinclair/typebox';
+import {
+	authorizationSigningAlgValues,
+	introspectionSigningAlgValues,
+	requestObjectEncryptionAlgValues,
+	userinfoSigningAlgValues
+} from 'lib/configs/jwaAlgorithms.js';
 
 type OmitEnabled<T> = {
 	[K in keyof T as K extends `${infer _}enabled` ? K : never]: T[K];
@@ -110,7 +116,7 @@ export const discovery = new Elysia().get(
 
 			if (features.encryption.enabled) {
 				body.request_object_encryption_alg_values_supported =
-					configuration.requestObjectEncryptionAlgValues;
+					requestObjectEncryptionAlgValues;
 				body.request_object_encryption_enc_values_supported =
 					configuration.requestObjectEncryptionEncValues;
 			}
@@ -119,8 +125,7 @@ export const discovery = new Elysia().get(
 		if (features.userinfo.enabled) {
 			body.userinfo_endpoint = urlObj.userinfo_endpoint;
 			if (features.jwtUserinfo.enabled) {
-				body.userinfo_signing_alg_values_supported =
-					configuration.userinfoSigningAlgValues;
+				body.userinfo_signing_alg_values_supported = userinfoSigningAlgValues;
 				if (features.encryption.enabled) {
 					body.userinfo_encryption_alg_values_supported =
 						configuration.userinfoEncryptionAlgValues;
@@ -132,7 +137,7 @@ export const discovery = new Elysia().get(
 
 		if (features.jwtResponseModes.enabled) {
 			body.authorization_signing_alg_values_supported =
-				configuration.authorizationSigningAlgValues;
+				authorizationSigningAlgValues;
 
 			if (features.encryption.enabled) {
 				body.authorization_encryption_alg_values_supported =
@@ -144,7 +149,7 @@ export const discovery = new Elysia().get(
 
 		if (features.jwtIntrospection.enabled) {
 			body.introspection_signing_alg_values_supported =
-				configuration.introspectionSigningAlgValues;
+				introspectionSigningAlgValues;
 			if (features.encryption.enabled) {
 				body.introspection_encryption_alg_values_supported =
 					configuration.introspectionEncryptionAlgValues;

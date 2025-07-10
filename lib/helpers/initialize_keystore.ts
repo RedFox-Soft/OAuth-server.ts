@@ -8,9 +8,11 @@ import * as attention from './attention.ts';
 import instance from './weak_cache.ts';
 import KeyStore from './keystore.ts';
 import {
+	ECOKPEncAlg,
 	ECSignAlg,
 	type encryptionAlgValues,
 	OKPSignAlg,
+	RSAEncAlg,
 	RSASignAlg,
 	signingAlgs,
 	type signingAlgValues
@@ -25,19 +27,6 @@ const BaseKey = t.Object({
 	x5c: t.Optional(t.Array(t.String(), { minContains: 1 })),
 	key_ops: t.Optional(t.Array(t.String()))
 });
-
-const RSAEncAlg = [
-	'RSA-OAEP',
-	'RSA-OAEP-256',
-	'RSA-OAEP-384',
-	'RSA-OAEP-512'
-] as const;
-const ECOKPEncAlg = [
-	'ECDH-ES',
-	'ECDH-ES+A128KW',
-	'ECDH-ES+A192KW',
-	'ECDH-ES+A256KW'
-] as const;
 
 const RSAKey = t.Composite(
 	[
@@ -190,38 +179,7 @@ const calculateKid = (jwk: preJWKS) => {
 };
 
 function registerKey(input, keystore) {
-	const { configuration } = instance(this);
-
 	const key = structuredClone(input);
-
-	const encryptionAlgs = key.use === 'enc' && key.alg;
-	if (encryptionAlgs) {
-		[
-			// 'idTokenEncryptionAlgValues',
-			'requestObjectEncryptionAlgValues'
-			// 'userinfoEncryptionAlgValues',
-		].forEach((prop) => {
-			if (!configuration[prop].includes(encryptionAlgs)) {
-				configuration[prop].push(encryptionAlgs);
-			}
-		});
-	}
-
-	const signingAlgs = key.use === 'sig' && key.alg;
-	if (signingAlgs) {
-		[
-			// 'requestObjectSigningAlgValues' uses client's keystore
-			// 'tokenEndpointAuthSigningAlgValues' uses client's keystore
-			'userinfoSigningAlgValues',
-			'introspectionSigningAlgValues',
-			'authorizationSigningAlgValues'
-		].forEach((prop) => {
-			if (!configuration[prop].includes(signingAlgs)) {
-				configuration[prop].push(signingAlgs);
-			}
-		});
-	}
-
 	keystore.add(key);
 }
 

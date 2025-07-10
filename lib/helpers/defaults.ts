@@ -2123,72 +2123,6 @@ function makeDefaults() {
 			],
 
 			/*
-			 * enabledJWA.userinfoSigningAlgValues
-			 *
-			 * description: JWS "alg" Algorithm values the authorization server supports to sign UserInfo responses with
-			 *
-			 * example: Supported values list
-			 * ```js
-			 * [
-			 *   'RS256', 'RS384', 'RS512',
-			 *   'PS256', 'PS384', 'PS512',
-			 *   'ES256', 'ES384', 'ES512',
-			 *   'Ed25519', 'EdDSA',
-			 *   'HS256', 'HS384', 'HS512',
-			 * ]
-			 * ```
-			 */
-			userinfoSigningAlgValues: ['RS256', 'PS256', 'ES256', 'Ed25519', 'EdDSA'],
-
-			/*
-			 * enabledJWA.introspectionSigningAlgValues
-			 *
-			 * description: JWS "alg" Algorithm values the authorization server supports to sign JWT Introspection responses with
-			 *
-			 * example: Supported values list
-			 * ```js
-			 * [
-			 *   'RS256', 'RS384', 'RS512',
-			 *   'PS256', 'PS384', 'PS512',
-			 *   'ES256', 'ES384', 'ES512',
-			 *   'Ed25519', 'EdDSA',
-			 *   'HS256', 'HS384', 'HS512',
-			 * ]
-			 * ```
-			 */
-			introspectionSigningAlgValues: [
-				'RS256',
-				'PS256',
-				'ES256',
-				'Ed25519',
-				'EdDSA'
-			],
-
-			/*
-			 * enabledJWA.authorizationSigningAlgValues
-			 *
-			 * description: JWS "alg" Algorithm values the authorization server supports to sign JWT Authorization Responses (`JARM`) with
-			 *
-			 * example: Supported values list
-			 * ```js
-			 * [
-			 *   'RS256', 'RS384', 'RS512',
-			 *   'PS256', 'PS384', 'PS512',
-			 *   'ES256', 'ES384', 'ES512',
-			 *   'Ed25519', 'EdDSA',
-			 *   'HS256', 'HS384', 'HS512',
-			 * ]
-			 * ```
-			 */
-			authorizationSigningAlgValues: [
-				'RS256',
-				'PS256',
-				'ES256',
-				'Ed25519',
-				'EdDSA'
-			],
-
-			/*
 			 * enabledJWA.idTokenEncryptionAlgValues
 			 *
 			 * description: JWE "alg" Algorithm values the authorization server supports for ID Token encryption
@@ -2208,34 +2142,6 @@ function makeDefaults() {
 			 * ```
 			 */
 			idTokenEncryptionAlgValues: [
-				'A128KW',
-				'A256KW',
-				'ECDH-ES',
-				'RSA-OAEP',
-				'RSA-OAEP-256',
-				'dir'
-			],
-
-			/*
-			 * enabledJWA.requestObjectEncryptionAlgValues
-			 *
-			 * description: JWE "alg" Algorithm values the authorization server supports to receive encrypted Request Objects (`JAR`) with
-			 *
-			 * example: Supported values list
-			 * ```js
-			 * [
-			 *   // asymmetric RSAES based
-			 *   'RSA-OAEP', 'RSA-OAEP-256', 'RSA-OAEP-384', 'RSA-OAEP-512',
-			 *   // asymmetric ECDH-ES based
-			 *   'ECDH-ES', 'ECDH-ES+A128KW', 'ECDH-ES+A192KW', 'ECDH-ES+A256KW',
-			 *   // symmetric AES key wrapping
-			 *   'A128KW', 'A192KW', 'A256KW', 'A128GCMKW', 'A192GCMKW', 'A256GCMKW',
-			 *   // direct encryption
-			 *   'dir',
-			 * ]
-			 * ```
-			 */
-			requestObjectEncryptionAlgValues: [
 				'A128KW',
 				'A256KW',
 				'ECDH-ES',

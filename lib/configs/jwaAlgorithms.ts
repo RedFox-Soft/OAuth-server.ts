@@ -28,28 +28,40 @@ const alg = getAlgorithm(JWKS_KEYS);
  * description: JWS "alg" Algorithm values the authorization server supports to sign ID Tokens with.
  * Base on Global Keystore which will be fill startup application, Symmetric algorithm should be added manually.
  */
-export const idTokenSigningAlgValues: signingAlgValues[] = [...alg.sign];
+export const idTokenSigningAlgValues: signingAlgValues[] = [
+	'HS256',
+	...alg.sign
+];
 /*
  * userinfoSigningAlgValues
  *
  * description: JWS "alg" Algorithm values the authorization server supports to sign UserInfo responses with
  * Base on Global Keystore which will be fill startup application, Symmetric algorithm should be added manually.
  */
-export const userinfoSigningAlgValues: signingAlgValues[] = [...alg.sign];
+export const userinfoSigningAlgValues: signingAlgValues[] = [
+	'HS256',
+	...alg.sign
+];
 /*
  * introspectionSigningAlgValues
  *
  * description: JWS "alg" Algorithm values the authorization server supports to sign JWT Introspection responses with
  * Base on Global Keystore which will be fill startup application, Symmetric algorithm should be added manually.
  */
-export const introspectionSigningAlgValues: signingAlgValues[] = [...alg.sign];
+export const introspectionSigningAlgValues: signingAlgValues[] = [
+	'HS256',
+	...alg.sign
+];
 /*
  * authorizationSigningAlgValues
  *
  * description: JWS "alg" Algorithm values the authorization server supports to sign JWT Authorization Responses (`JARM`) with
  * Base on Global Keystore which will be fill startup application, Symmetric algorithm should be added manually.
  */
-export const authorizationSigningAlgValues: signingAlgValues[] = [...alg.sign];
+export const authorizationSigningAlgValues: signingAlgValues[] = [
+	'HS256',
+	...alg.sign
+];
 /*
  * requestObjectEncryptionAlgValues
  *

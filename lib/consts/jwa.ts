@@ -47,11 +47,7 @@ const encryptionEncValues = [
 
 export const clientAuthSigningAlgValues = [...signingAlgValues];
 export const requestObjectSigningAlgValues = [...signingAlgValues];
-export const userinfoSigningAlgValues = [...signingAlgValues];
-export const introspectionSigningAlgValues = [...signingAlgValues];
-export const authorizationSigningAlgValues = [...signingAlgValues];
 export const idTokenEncryptionAlgValues = [...encryptionAlgValues];
-export const requestObjectEncryptionAlgValues = [...encryptionAlgValues];
 export const userinfoEncryptionAlgValues = [...encryptionAlgValues];
 export const introspectionEncryptionAlgValues = [...encryptionAlgValues];
 export const authorizationEncryptionAlgValues = [...encryptionAlgValues];

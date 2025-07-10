@@ -254,25 +254,12 @@ class Configuration {
 			enabled.requestObjects
 		);
 		this.setAlgs(
-			'requestObjectEncryptionAlgValues',
-			allowList.requestObjectEncryptionAlgValues.filter(
-				RegExp.prototype.test.bind(/^(A|dir$)/)
-			),
-			enabled.encryption,
-			enabled.requestObjects
-		);
-		this.setAlgs(
 			'requestObjectEncryptionEncValues',
 			allowList.requestObjectEncryptionEncValues.slice(),
 			enabled.encryption,
 			enabled.requestObjects
 		);
 
-		this.setAlgs(
-			'userinfoSigningAlgValues',
-			allowList.userinfoSigningAlgValues.filter(filterHS),
-			enabled.jwtUserinfo
-		);
 		this.setAlgs(
 			'userinfoEncryptionAlgValues',
 			allowList.userinfoEncryptionAlgValues.slice(),
@@ -287,11 +274,6 @@ class Configuration {
 		);
 
 		this.setAlgs(
-			'introspectionSigningAlgValues',
-			allowList.introspectionSigningAlgValues.filter(filterHS),
-			enabled.jwtIntrospection
-		);
-		this.setAlgs(
 			'introspectionEncryptionAlgValues',
 			allowList.introspectionEncryptionAlgValues.slice(),
 			enabled.jwtIntrospection,
@@ -304,11 +286,6 @@ class Configuration {
 			enabled.encryption
 		);
 
-		this.setAlgs(
-			'authorizationSigningAlgValues',
-			allowList.authorizationSigningAlgValues.filter(filterHS),
-			enabled.jwtResponseModes
-		);
 		this.setAlgs(
 			'authorizationEncryptionAlgValues',
 			allowList.authorizationEncryptionAlgValues.slice(),

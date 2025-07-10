@@ -8,6 +8,7 @@ import {
 import { getSchemaValidator, TSchema, ValidationError } from 'elysia';
 import { ISSUER } from 'lib/configs/env.js';
 import { clockTolerance } from 'lib/configs/liveTime.js';
+import { requestObjectEncryptionAlgValues } from 'lib/configs/jwaAlgorithms.js';
 
 export function isEncryptedJWT(jwt: string): boolean {
 	// Encrypted JWTs have 5 parts, while signed JWTs have 3
@@ -43,9 +44,7 @@ export default async function processRequestObject(
 		try {
 			const header = JWT.header(params.request);
 
-			if (
-				!configuration.requestObjectEncryptionAlgValues.includes(header.alg)
-			) {
+			if (!requestObjectEncryptionAlgValues.includes(header.alg)) {
 				throw new TypeError('unsupported encrypted request alg');
 			}
 			if (

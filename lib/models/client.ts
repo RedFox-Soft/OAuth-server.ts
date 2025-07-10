@@ -23,6 +23,7 @@ import { ClientDefaults } from 'lib/configs/clientBase.js';
 import { isPlainObject } from 'lib/helpers/_/object.js';
 import { IdToken } from './id_token.js';
 import { clockTolerance } from 'lib/configs/liveTime.js';
+import { requestObjectEncryptionAlgValues } from 'lib/configs/jwaAlgorithms.js';
 
 // intentionally ignore x5t#S256 so that they are left to be calculated by the library
 const EC_CURVES = new Set(['P-256', 'P-384', 'P-521']);
@@ -292,11 +293,9 @@ function buildSymmetricKeyStore(client) {
 			);
 		}
 
-		configuration.requestObjectEncryptionAlgValues.forEach(
-			Set.prototype.add.bind(algs)
-		);
+		requestObjectEncryptionAlgValues.forEach(Set.prototype.add.bind(algs));
 
-		if (configuration.requestObjectEncryptionAlgValues.includes('dir')) {
+		if (requestObjectEncryptionAlgValues.includes('dir')) {
 			configuration.requestObjectEncryptionEncValues.forEach(
 				Set.prototype.add.bind(algs)
 			);

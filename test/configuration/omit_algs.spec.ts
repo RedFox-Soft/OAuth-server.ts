@@ -31,6 +31,6 @@ describe('Provider declaring supported algorithms', () => {
 
 	it('Validate idTokenSigningAlgValues which depend of ENV JWKS', async () => {
 		const alg = getAlgorithm(JWKS_KEYS);
-		expect(idTokenSigningAlgValues).toEqual(alg.sign);
+		expect(idTokenSigningAlgValues).toEqual(['HS256', ...alg.sign]);
 	});
 });

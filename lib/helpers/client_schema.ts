@@ -7,7 +7,13 @@ import instance from './weak_cache.ts';
 import * as formatters from './formatters.ts';
 import { pick } from './_/object.js';
 import omitBy from './_/omit_by.ts';
-import { idTokenSigningAlgValues } from 'lib/configs/jwaAlgorithms.js';
+import {
+	authorizationSigningAlgValues,
+	idTokenSigningAlgValues,
+	introspectionSigningAlgValues,
+	requestObjectEncryptionAlgValues,
+	userinfoSigningAlgValues
+} from 'lib/configs/jwaAlgorithms.js';
 
 const W3CEmailRegExp =
 	/^[a-zA-Z0-9.!#$%&’*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$/;
@@ -154,8 +160,7 @@ export default function getSchema(provider) {
 			configuration.requestObjectSigningAlgValues.filter(
 				(alg) => !alg.startsWith('HS')
 			),
-		request_object_encryption_alg: () =>
-			configuration.requestObjectEncryptionAlgValues,
+		request_object_encryption_alg: () => requestObjectEncryptionAlgValues,
 		request_object_encryption_enc: () =>
 			configuration.requestObjectEncryptionEncValues,
 		response_types: () => ['code', 'none'],
@@ -204,19 +209,17 @@ export default function getSchema(provider) {
 			configuration.userinfoEncryptionAlgValues,
 		userinfo_encrypted_response_enc: () =>
 			configuration.userinfoEncryptionEncValues,
-		userinfo_signed_response_alg: () => configuration.userinfoSigningAlgValues,
+		userinfo_signed_response_alg: () => userinfoSigningAlgValues,
 		introspection_encrypted_response_alg: () =>
 			configuration.introspectionEncryptionAlgValues,
 		introspection_encrypted_response_enc: () =>
 			configuration.introspectionEncryptionEncValues,
-		introspection_signed_response_alg: () =>
-			configuration.introspectionSigningAlgValues,
+		introspection_signed_response_alg: () => introspectionSigningAlgValues,
 		authorization_encrypted_response_alg: () =>
 			configuration.authorizationEncryptionAlgValues,
 		authorization_encrypted_response_enc: () =>
 			configuration.authorizationEncryptionEncValues,
-		authorization_signed_response_alg: () =>
-			configuration.authorizationSigningAlgValues
+		authorization_signed_response_alg: () => authorizationSigningAlgValues
 	};
 
 	class Schema {
