@@ -1,8 +1,8 @@
-import { expect } from 'chai';
-import { generateKeyPair, exportJWK } from 'jose';
-import { describe, it } from 'bun:test';
+import { describe, it, expect } from 'bun:test';
 import provider from '../../lib/index.ts';
-import '../test_helper.js';
+import { idTokenSigningAlgValues } from 'lib/configs/jwaAlgorithms.js';
+import { getAlgorithm } from 'lib/helpers/initialize_keystore.js';
+import { JWKS_KEYS } from 'lib/configs/env.js';
 
 describe('Provider declaring supported algorithms', () => {
 	it('validates the configuration properties', () => {
@@ -13,20 +13,7 @@ describe('Provider declaring supported algorithms', () => {
 					invalidProperty: ['HS256', 'RS256']
 				}
 			});
-		}).to.throw('invalid property enabledJWA.invalidProperty provided');
-	});
-
-	it('validates an array is provided', () => {
-		expect(() => {
-			provider.init('https://op.example.com', {
-				// eslint-disable-line no-new
-				enabledJWA: {
-					idTokenSigningAlgValues: new Set(['HS256', 'RS256'])
-				}
-			});
-		}).to.throw(
-			'invalid type for enabledJWA.idTokenSigningAlgValues provided, expected Array'
-		);
+		}).toThrow('invalid property enabledJWA.invalidProperty provided');
 	});
 
 	it('validates only implemented algs are provided', () => {
@@ -37,27 +24,13 @@ describe('Provider declaring supported algorithms', () => {
 					clientAuthSigningAlgValues: ['none']
 				}
 			});
-		}).to.throw(
+		}).toThrow(
 			'unsupported enabledJWA.clientAuthSigningAlgValues algorithm provided'
 		);
 	});
 
-	it('idTokenSigningAlgValues', async () => {
-		const { privateKey } = await generateKeyPair('RS256', {
-			extractable: true
-		});
-		const jwk = await exportJWK(privateKey);
-		jwk.alg = 'RS256';
-		provider.init('https://op.example.com', {
-			enabledJWA: {
-				idTokenSigningAlgValues: ['HS256', 'RS256']
-			},
-			jwks: { keys: [jwk] }
-		});
-
-		expect(i(provider).configuration.idTokenSigningAlgValues).to.eql([
-			'HS256',
-			'RS256'
-		]);
+	it('Validate idTokenSigningAlgValues which depend of ENV JWKS', async () => {
+		const alg = getAlgorithm(JWKS_KEYS);
+		expect(idTokenSigningAlgValues).toEqual(alg.sign);
 	});
 });

@@ -1,47 +1,11 @@
-type signingAlgValues =
-	| 'HS256'
-	| 'HS384'
-	| 'HS512'
-	| 'RS256'
-	| 'RS384'
-	| 'RS512'
-	| 'PS256'
-	| 'PS384'
-	| 'PS512'
-	| 'ES256'
-	| 'ES384'
-	| 'ES512'
-	| 'Ed25519'
-	| 'EdDSA';
-export type asymmetricSigningAlgType = Exclude<signingAlgValues, `HS${string}`>;
-
-type encryptionAlgValues =
-	// asymmetric
-	| 'RSA-OAEP'
-	| 'RSA-OAEP-256'
-	| 'RSA-OAEP-384'
-	| 'RSA-OAEP-512'
-	| 'ECDH-ES'
-	| 'ECDH-ES+A128KW'
-	| 'ECDH-ES+A192KW'
-	| 'ECDH-ES+A256KW'
-	// symmetric
-	| 'A128GCMKW'
-	| 'A192GCMKW'
-	| 'A256GCMKW'
-	| 'A128KW'
-	| 'A192KW'
-	| 'A256KW'
-	// direct
-	| 'dir';
-
-type encryptionEncValues =
-	| 'A128CBC-HS256'
-	| 'A128GCM'
-	| 'A192CBC-HS384'
-	| 'A192GCM'
-	| 'A256CBC-HS512'
-	| 'A256GCM';
+import { getAlgorithm } from 'lib/helpers/initialize_keystore.js';
+import { JWKS_KEYS } from './env.js';
+import {
+	type asymmetricSigningAlgType,
+	type encryptionEncValues,
+	type encryptionAlgValues,
+	type signingAlgValues
+} from './jwaConsts.js';
 
 /*
  * clientAuthSigningAlgValues
@@ -57,34 +21,35 @@ export const clientAuthSigningAlgValues: signingAlgValues[] = [
 	'EdDSA'
 ];
 
+const alg = getAlgorithm(JWKS_KEYS);
 /*
  * idTokenSigningAlgValues
  *
  * description: JWS "alg" Algorithm values the authorization server supports to sign ID Tokens with.
  * Base on Global Keystore which will be fill startup application, Symmetric algorithm should be added manually.
  */
-export const idTokenSigningAlgValues: signingAlgValues[] = [];
+export const idTokenSigningAlgValues: signingAlgValues[] = [...alg.sign];
 /*
  * userinfoSigningAlgValues
  *
  * description: JWS "alg" Algorithm values the authorization server supports to sign UserInfo responses with
  * Base on Global Keystore which will be fill startup application, Symmetric algorithm should be added manually.
  */
-export const userinfoSigningAlgValues: signingAlgValues[] = [];
+export const userinfoSigningAlgValues: signingAlgValues[] = [...alg.sign];
 /*
  * introspectionSigningAlgValues
  *
  * description: JWS "alg" Algorithm values the authorization server supports to sign JWT Introspection responses with
  * Base on Global Keystore which will be fill startup application, Symmetric algorithm should be added manually.
  */
-export const introspectionSigningAlgValues: signingAlgValues[] = [];
+export const introspectionSigningAlgValues: signingAlgValues[] = [...alg.sign];
 /*
  * authorizationSigningAlgValues
  *
  * description: JWS "alg" Algorithm values the authorization server supports to sign JWT Authorization Responses (`JARM`) with
  * Base on Global Keystore which will be fill startup application, Symmetric algorithm should be added manually.
  */
-export const authorizationSigningAlgValues: signingAlgValues[] = [];
+export const authorizationSigningAlgValues: signingAlgValues[] = [...alg.sign];
 /*
  * requestObjectEncryptionAlgValues
  *
@@ -92,6 +57,7 @@ export const authorizationSigningAlgValues: signingAlgValues[] = [];
  * Base on Global Keystore which will be fill startup application, Symmetric algorithm should be added manually.
  */
 export const requestObjectEncryptionAlgValues: encryptionAlgValues[] = [
+	...alg.enc,
 	'A128KW',
 	'A256KW',
 	'dir'

@@ -7,6 +7,14 @@ import { DEV_KEYSTORE } from '../consts/index.ts';
 import * as attention from './attention.ts';
 import instance from './weak_cache.ts';
 import KeyStore from './keystore.ts';
+import {
+	ECSignAlg,
+	type encryptionAlgValues,
+	OKPSignAlg,
+	RSASignAlg,
+	signingAlgs,
+	type signingAlgValues
+} from 'lib/configs/jwaConsts.js';
 
 const BaseKey = t.Object({
 	kid: t.Optional(t.String()),
@@ -18,19 +26,18 @@ const BaseKey = t.Object({
 	key_ops: t.Optional(t.Array(t.String()))
 });
 
-const RSASignAlg = ['PS256', 'PS384', 'PS512', 'RS256', 'RS384', 'RS512'];
-const ECSignAlg = ['ES256', 'ES384', 'ES512'];
-const OKPSignAlg = ['EdDSA', 'Ed25519'];
-const SignAlg = new Set([...RSASignAlg, ...ECSignAlg, ...OKPSignAlg]);
-
-const RSAEncAlg = ['RSA-OAEP', 'RSA-OAEP-256', 'RSA-OAEP-384', 'RSA-OAEP-512'];
+const RSAEncAlg = [
+	'RSA-OAEP',
+	'RSA-OAEP-256',
+	'RSA-OAEP-384',
+	'RSA-OAEP-512'
+] as const;
 const ECOKPEncAlg = [
 	'ECDH-ES',
 	'ECDH-ES+A128KW',
 	'ECDH-ES+A192KW',
 	'ECDH-ES+A256KW'
-];
-const EncAlg = new Set([...RSAEncAlg, ...ECOKPEncAlg]);
+] as const;
 
 const RSAKey = t.Composite(
 	[
@@ -85,10 +92,18 @@ const OKPKey = t.Composite(
 	],
 	{ additionalProperties: false }
 );
+type reqProp = {
+	kid: string;
+	use: 'enc' | 'sig';
+};
 type StaticRSAKey = Static<typeof RSAKey>;
 type StaticECKey = Static<typeof ECKey>;
 type StaticOKPKey = Static<typeof OKPKey>;
-type JWKS = StaticRSAKey | StaticECKey | StaticOKPKey;
+type preJWKS = StaticRSAKey | StaticECKey | StaticOKPKey;
+type JWKS =
+	| (reqProp & StaticRSAKey)
+	| (reqProp & StaticECKey)
+	| (reqProp & StaticOKPKey);
 
 const ktyMap = {
 	RSA: RSAKey,
@@ -100,16 +115,18 @@ function typeboxErrorMessage(error?: ValueError) {
 	return error?.schema.error ?? `${error?.path} ${error?.message}`;
 }
 
-function verifyJWKs(jwks: unknown): jwks is { keys: JWKS[] } {
+export function verifyJWKs(jwks: unknown): jwks is { keys: JWKS[] } {
 	if (
 		typeof jwks !== 'object' ||
 		jwks === null ||
 		!('keys' in jwks) ||
-		!Array.isArray(jwks.keys)
+		!Array.isArray(jwks.keys) ||
+		jwks.keys.length === 0
 	) {
 		throw new Error('keystore must be a JSON Web Key Set formatted object');
 	}
 	const uniqueKid = new Set();
+	const SignAlg = new Set<string>(signingAlgs);
 	for (let i = 0; i < jwks.keys.length; i++) {
 		const key = jwks.keys[i];
 		if (typeof key !== 'object' || key === null) {
@@ -128,6 +145,7 @@ function verifyJWKs(jwks: unknown): jwks is { keys: JWKS[] } {
 			const errorMessage = typeboxErrorMessage(error);
 			throw new Error(`jwks.keys[${i}] has validation failed ${errorMessage}`);
 		}
+		key.use ??= SignAlg.has(key.alg) ? 'sig' : 'enc';
 		key.kid ??= calculateKid(key);
 		if (uniqueKid.has(key.kid)) {
 			throw new Error(
@@ -140,7 +158,7 @@ function verifyJWKs(jwks: unknown): jwks is { keys: JWKS[] } {
 	return true;
 }
 
-const calculateKid = (jwk: JWKS) => {
+const calculateKid = (jwk: preJWKS) => {
 	let components;
 
 	switch (jwk.kty) {
@@ -171,28 +189,12 @@ const calculateKid = (jwk: JWKS) => {
 	return crypto.hash('sha256', JSON.stringify(components), 'base64url');
 };
 
-const jwkSignatureAlgorithms = (jwk) => {
-	if ((jwk.use && jwk.use !== 'sig') || !SignAlg.has(jwk.alg)) {
-		return;
-	}
-	jwk.use ??= 'sig';
-	return jwk.alg;
-};
-
-const jwkEncryptionAlgorithms = (jwk) => {
-	if ((jwk.use && jwk.use !== 'enc') || !EncAlg.has(jwk.alg)) {
-		return;
-	}
-	jwk.use ??= 'enc';
-	return jwk.alg;
-};
-
 function registerKey(input, keystore) {
 	const { configuration } = instance(this);
 
 	const key = structuredClone(input);
 
-	const encryptionAlgs = jwkEncryptionAlgorithms(key);
+	const encryptionAlgs = key.use === 'enc' && key.alg;
 	if (encryptionAlgs) {
 		[
 			// 'idTokenEncryptionAlgValues',
@@ -205,10 +207,9 @@ function registerKey(input, keystore) {
 		});
 	}
 
-	const signingAlgs = jwkSignatureAlgorithms(key);
+	const signingAlgs = key.use === 'sig' && key.alg;
 	if (signingAlgs) {
 		[
-			'idTokenSigningAlgValues',
 			// 'requestObjectSigningAlgValues' uses client's keystore
 			// 'tokenEndpointAuthSigningAlgValues' uses client's keystore
 			'userinfoSigningAlgValues',
@@ -222,6 +223,22 @@ function registerKey(input, keystore) {
 	}
 
 	keystore.add(key);
+}
+
+export function getAlgorithm(keys: JWKS[]) {
+	const signAlg = new Set<string>();
+	const encAlg = new Set<string>();
+	for (const key of keys) {
+		if (key.use === 'sig') {
+			signAlg.add(key.alg);
+		} else if (key.use === 'enc') {
+			encAlg.add(key.alg);
+		}
+	}
+	return {
+		sign: Array.from(signAlg) as signingAlgValues[],
+		enc: Array.from(encAlg) as encryptionAlgValues[]
+	};
 }
 
 export default function initialize(jwks) {

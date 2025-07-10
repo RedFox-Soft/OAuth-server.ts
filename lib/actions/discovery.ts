@@ -93,8 +93,6 @@ export const discovery = new Elysia().get(
 
 		const { requestObjects, richAuthorizationRequests } = features;
 
-		body.id_token_signing_alg_values_supported =
-			configuration.idTokenSigningAlgValues;
 		if (features.encryption.enabled) {
 			body.id_token_encryption_alg_values_supported =
 				configuration.idTokenEncryptionAlgValues;

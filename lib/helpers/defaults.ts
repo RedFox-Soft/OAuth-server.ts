@@ -2098,24 +2098,6 @@ function makeDefaults() {
 			],
 
 			/*
-			 * enabledJWA.idTokenSigningAlgValues
-			 *
-			 * description: JWS "alg" Algorithm values the authorization server supports to sign ID Tokens with.
-			 *
-			 * example: Supported values list
-			 * ```js
-			 * [
-			 *   'RS256', 'RS384', 'RS512',
-			 *   'PS256', 'PS384', 'PS512',
-			 *   'ES256', 'ES384', 'ES512',
-			 *   'Ed25519', 'EdDSA',
-			 *   'HS256', 'HS384', 'HS512',
-			 * ]
-			 * ```
-			 */
-			idTokenSigningAlgValues: ['RS256', 'PS256', 'ES256', 'Ed25519', 'EdDSA'],
-
-			/*
 			 * enabledJWA.requestObjectSigningAlgValues
 			 *
 			 * description: JWS "alg" Algorithm values the authorization server supports to receive signed Request Objects (`JAR`) with

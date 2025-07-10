@@ -7,6 +7,7 @@ import instance from './weak_cache.ts';
 import * as formatters from './formatters.ts';
 import { pick } from './_/object.js';
 import omitBy from './_/omit_by.ts';
+import { idTokenSigningAlgValues } from 'lib/configs/jwaAlgorithms.js';
 
 const W3CEmailRegExp =
 	/^[a-zA-Z0-9.!#$%&’*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$/;
@@ -145,7 +146,7 @@ export default function getSchema(provider) {
 			configuration.idTokenEncryptionAlgValues,
 		id_token_encrypted_response_enc: () =>
 			configuration.idTokenEncryptionEncValues,
-		id_token_signed_response_alg: () => configuration.idTokenSigningAlgValues,
+		id_token_signed_response_alg: () => idTokenSigningAlgValues,
 		request_object_signing_alg: () =>
 			configuration.requestObjectSigningAlgValues,
 		backchannel_token_delivery_mode: () => features.ciba.deliveryModes,

@@ -239,10 +239,6 @@ class Configuration {
 		};
 
 		this.setAlgs(
-			'idTokenSigningAlgValues',
-			allowList.idTokenSigningAlgValues.filter(filterHS)
-		);
-		this.setAlgs(
 			'idTokenEncryptionAlgValues',
 			allowList.idTokenEncryptionAlgValues.slice()
 		);

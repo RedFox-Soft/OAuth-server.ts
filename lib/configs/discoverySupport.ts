@@ -2,7 +2,10 @@ import { ISSUER } from 'lib/configs/env.js';
 import { routeNames } from 'lib/consts/param_list.js';
 import { ClientDefaults } from 'lib/configs/clientBase.js';
 import { ApplicationConfig } from './application.js';
-import { dPoPSigningAlgValues } from './jwaAlgorithms.js';
+import {
+	dPoPSigningAlgValues,
+	idTokenSigningAlgValues
+} from './jwaAlgorithms.js';
 
 const discovery = {
 	issuer: ISSUER,
@@ -17,6 +20,7 @@ const discovery = {
 
 	introspection_endpoint: `${ISSUER}${routeNames.introspect}`,
 
+	id_token_signing_alg_values_supported: idTokenSigningAlgValues,
 	dpop_signing_alg_values_supported: dPoPSigningAlgValues
 };
 
