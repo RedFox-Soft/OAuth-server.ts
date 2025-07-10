@@ -2,6 +2,7 @@ import { expect } from 'chai';
 import { generateKeyPair, exportJWK } from 'jose';
 import { describe, it } from 'bun:test';
 import provider from '../../lib/index.ts';
+import '../test_helper.js';
 
 describe('Provider declaring supported algorithms', () => {
 	it('validates the configuration properties', () => {
@@ -45,13 +46,13 @@ describe('Provider declaring supported algorithms', () => {
 		const { privateKey } = await generateKeyPair('RS256', {
 			extractable: true
 		});
+		const jwk = await exportJWK(privateKey);
+		jwk.alg = 'RS256';
 		provider.init('https://op.example.com', {
 			enabledJWA: {
 				idTokenSigningAlgValues: ['HS256', 'RS256']
 			},
-			jwks: {
-				keys: [await exportJWK(privateKey)]
-			}
+			jwks: { keys: [jwk] }
 		});
 
 		expect(i(provider).configuration.idTokenSigningAlgValues).to.eql([

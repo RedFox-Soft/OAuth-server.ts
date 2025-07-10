@@ -130,7 +130,7 @@ class ProviderClass extends EventEmitter {
 			throw new TypeError('invalid "request" argument');
 		}
 
-		const client = await this.Client.find(request.clientId);
+		const client = await Client.find(request.clientId);
 		if (!client) {
 			throw new Error('Client not found');
 		}

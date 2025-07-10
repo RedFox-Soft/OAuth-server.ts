@@ -142,10 +142,6 @@ const getKtyFromJWEAlg = (alg, epk) => {
 	}
 };
 
-const selectForDSA = Symbol();
-const selectForEncDec = Symbol();
-const filter = Symbol();
-
 function stripPrivate(jwk) {
 	const { d, p, q, dp, dq, qi, oth, ...pub } = jwk;
 	return pub;
@@ -160,7 +156,7 @@ class KeyStore {
 		this.#keys = keys;
 	}
 
-	[selectForDSA](options, operation) {
+	#selectForDSA(options, operation) {
 		const {
 			alg,
 			kid,
@@ -170,7 +166,7 @@ class KeyStore {
 
 		const scoring = { alg, use: 'sig' };
 
-		return this[filter]((jwk) => {
+		return this.#filter((jwk) => {
 			let candidate =
 				typeof kty === 'string' ? jwk.kty === kty : kty.includes(jwk.kty);
 
@@ -199,19 +195,19 @@ class KeyStore {
 	}
 
 	selectForVerify(options) {
-		return this[selectForDSA](options, 'verify');
+		return this.#selectForDSA(options, 'verify');
 	}
 
 	selectForSign(options) {
-		return this[selectForDSA](options, 'sign');
+		return this.#selectForDSA(options, 'sign');
 	}
 
-	[selectForEncDec](options, operation) {
+	#selectForEncDec(options, operation) {
 		const { alg, kid, epk, kty = getKtyFromJWEAlg(alg, epk) } = options;
 
 		const scoring = { alg, use: 'enc' };
 
-		return this[filter]((jwk) => {
+		return this.#filter((jwk) => {
 			let candidate = Array.isArray(kty)
 				? kty.includes(jwk.kty)
 				: jwk.kty === kty;
@@ -253,14 +249,14 @@ class KeyStore {
 	}
 
 	selectForDecrypt(options) {
-		return this[selectForEncDec](options, 'decrypt');
+		return this.#selectForEncDec(options, 'decrypt');
 	}
 
 	selectForEncrypt(options) {
-		return this[selectForEncDec](options, 'encrypt');
+		return this.#selectForEncDec(options, 'encrypt');
 	}
 
-	[filter](selector, scoring) {
+	#filter(selector, scoring) {
 		return this.#keys
 			.filter(selector)
 			.sort(

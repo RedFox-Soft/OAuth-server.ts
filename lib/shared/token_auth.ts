@@ -5,6 +5,7 @@ import certificateThumbprint from '../helpers/certificate_thumbprint.ts';
 import { noVSCHAR } from '../consts/client_attributes.ts';
 
 import getJWTAuthMiddleware from './token_jwt_auth.ts';
+import { Client } from 'lib/models/client.js';
 
 const assertionType = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
 
@@ -170,9 +171,7 @@ export default function tokenAuth(provider) {
 				}
 			},
 			async function loadClient(ctx) {
-				const client = await provider.Client.find(
-					ctx.oidc.authorization.clientId
-				);
+				const client = await Client.find(ctx.oidc.authorization.clientId);
 
 				if (!client) {
 					throw new InvalidClientAuth('client not found');

@@ -1,14 +1,13 @@
 import { generateKeyPair, exportJWK } from 'jose';
 
-function exportJwk({ privateKey }) {
-	return exportJWK(privateKey);
+async function generateJWK(alg: string) {
+	const pair = await generateKeyPair(alg, { extractable: true });
+	const jwk = await exportJWK(pair.privateKey);
+	jwk.alg = alg;
+	return jwk;
 }
 
-export default await Promise.all([
-	generateKeyPair('RS256', { extractable: true }).then(exportJwk),
-	generateKeyPair('ES256', { extractable: true }).then(exportJwk),
-	generateKeyPair('EdDSA', { extractable: true }).then(exportJwk)
-]);
+export default await Promise.all(['RS256', 'ES256', 'EdDSA'].map(generateJWK));
 
 export function stripPrivateJWKFields(key) {
 	const publicKey = structuredClone(key);

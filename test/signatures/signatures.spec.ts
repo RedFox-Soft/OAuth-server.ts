@@ -13,9 +13,7 @@ describe('signatures', () => {
 		before(function () {
 			return this.login();
 		});
-		after(function () {
-			return this.logout();
-		});
+
 		beforeEach(async function () {
 			const ac = new provider.AuthorizationCode({
 				accountId: this.loggedInAccountId,

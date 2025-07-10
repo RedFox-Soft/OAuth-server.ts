@@ -1,13 +1,146 @@
-import { strict as assert } from 'node:assert';
-import * as crypto from 'node:crypto';
+import { Type as t, type Static } from '@sinclair/typebox';
+import { Value, type ValueError } from '@sinclair/typebox/value';
+import crypto from 'node:crypto';
 
 import { DEV_KEYSTORE } from '../consts/index.ts';
 
 import * as attention from './attention.ts';
 import instance from './weak_cache.ts';
-import KeyStore, { ExternalSigningKey } from './keystore.ts';
+import KeyStore from './keystore.ts';
 
-const calculateKid = (jwk) => {
+const BaseKey = t.Object({
+	kid: t.Optional(t.String()),
+	kty: t.Union([t.Literal('RSA'), t.Literal('EC'), t.Literal('OKP')], {
+		error: 'only RSA, EC, or OKP keys should be part of jwks'
+	}),
+	use: t.Optional(t.Union([t.Literal('sig'), t.Literal('enc')])),
+	x5c: t.Optional(t.Array(t.String(), { minContains: 1 })),
+	key_ops: t.Optional(t.Array(t.String()))
+});
+
+const RSASignAlg = ['PS256', 'PS384', 'PS512', 'RS256', 'RS384', 'RS512'];
+const ECSignAlg = ['ES256', 'ES384', 'ES512'];
+const OKPSignAlg = ['EdDSA', 'Ed25519'];
+const SignAlg = new Set([...RSASignAlg, ...ECSignAlg, ...OKPSignAlg]);
+
+const RSAEncAlg = ['RSA-OAEP', 'RSA-OAEP-256', 'RSA-OAEP-384', 'RSA-OAEP-512'];
+const ECOKPEncAlg = [
+	'ECDH-ES',
+	'ECDH-ES+A128KW',
+	'ECDH-ES+A192KW',
+	'ECDH-ES+A256KW'
+];
+const EncAlg = new Set([...RSAEncAlg, ...ECOKPEncAlg]);
+
+const RSAKey = t.Composite(
+	[
+		BaseKey,
+		t.Object({
+			kty: t.Literal('RSA'),
+			alg: t.Union([...RSASignAlg, ...RSAEncAlg].map((alg) => t.Literal(alg))),
+			e: t.String(),
+			n: t.String(),
+			d: t.String(),
+			p: t.String(),
+			q: t.String(),
+			dp: t.String(),
+			dq: t.String(),
+			qi: t.String()
+		})
+	],
+	{ additionalProperties: false }
+);
+
+const ECKey = t.Composite(
+	[
+		BaseKey,
+		t.Object({
+			kty: t.Literal('EC'),
+			alg: t.Union([...ECSignAlg, ...ECOKPEncAlg].map((alg) => t.Literal(alg))),
+			crv: t.Union([
+				t.Literal('P-256'),
+				t.Literal('P-384'),
+				t.Literal('P-521')
+			]),
+			x: t.String(),
+			y: t.String(),
+			d: t.String()
+		})
+	],
+	{ additionalProperties: false }
+);
+
+const OKPKey = t.Composite(
+	[
+		BaseKey,
+		t.Object({
+			kty: t.Literal('OKP'),
+			alg: t.Union(
+				[...OKPSignAlg, ...ECOKPEncAlg].map((alg) => t.Literal(alg))
+			),
+			crv: t.Union([t.Literal('Ed25519'), t.Literal('X25519')]),
+			x: t.String(),
+			d: t.String()
+		})
+	],
+	{ additionalProperties: false }
+);
+type StaticRSAKey = Static<typeof RSAKey>;
+type StaticECKey = Static<typeof ECKey>;
+type StaticOKPKey = Static<typeof OKPKey>;
+type JWKS = StaticRSAKey | StaticECKey | StaticOKPKey;
+
+const ktyMap = {
+	RSA: RSAKey,
+	EC: ECKey,
+	OKP: OKPKey
+};
+
+function typeboxErrorMessage(error?: ValueError) {
+	return error?.schema.error ?? `${error?.path} ${error?.message}`;
+}
+
+function verifyJWKs(jwks: unknown): jwks is { keys: JWKS[] } {
+	if (
+		typeof jwks !== 'object' ||
+		jwks === null ||
+		!('keys' in jwks) ||
+		!Array.isArray(jwks.keys)
+	) {
+		throw new Error('keystore must be a JSON Web Key Set formatted object');
+	}
+	const uniqueKid = new Set();
+	for (let i = 0; i < jwks.keys.length; i++) {
+		const key = jwks.keys[i];
+		if (typeof key !== 'object' || key === null) {
+			throw new Error(`jwks.keys[${i}] must be an object`);
+		}
+
+		if (!Value.Check(BaseKey, key)) {
+			const error = Value.Errors(BaseKey, key).First();
+			const errorMessage = typeboxErrorMessage(error);
+			throw new Error(`jwks.keys[${i}] has validation failed ${errorMessage}`);
+		}
+
+		const schema = ktyMap[key.kty];
+		if (!Value.Check(schema, key)) {
+			const error = Value.Errors(schema, key).First();
+			const errorMessage = typeboxErrorMessage(error);
+			throw new Error(`jwks.keys[${i}] has validation failed ${errorMessage}`);
+		}
+		key.kid ??= calculateKid(key);
+		if (uniqueKid.has(key.kid)) {
+			throw new Error(
+				`jwks.keys[${i}].kid must be unique, found duplicate: ${key.kid}`
+			);
+		}
+		uniqueKid.add(key.kid);
+	}
+
+	return true;
+}
+
+const calculateKid = (jwk: JWKS) => {
 	let components;
 
 	switch (jwk.kty) {
@@ -33,266 +166,62 @@ const calculateKid = (jwk) => {
 				x: jwk.x
 			};
 			break;
-		default:
-			return undefined;
 	}
 
 	return crypto.hash('sha256', JSON.stringify(components), 'base64url');
 };
-const KEY_TYPES = new Set(['RSA', 'EC', 'OKP']);
 
 const jwkSignatureAlgorithms = (jwk) => {
-	if (jwk.use !== 'sig' && jwk.use !== undefined) {
-		return [];
+	if ((jwk.use && jwk.use !== 'sig') || !SignAlg.has(jwk.alg)) {
+		return;
 	}
-
-	let available;
-
-	switch (jwk.kty) {
-		case 'RSA':
-			available = ['PS256', 'PS384', 'PS512', 'RS256', 'RS384', 'RS512'];
-			break;
-		case 'EC':
-			switch (jwk.crv) {
-				case 'P-256':
-					available = ['ES256'];
-					break;
-				case 'P-384':
-					available = ['ES384'];
-					break;
-				case 'P-521':
-					available = ['ES512'];
-					break;
-				default:
-			}
-			break;
-		case 'OKP':
-			switch (jwk.crv) {
-				case 'Ed25519':
-					available = ['EdDSA', 'Ed25519'];
-					break;
-				default:
-			}
-			break;
-		default:
-	}
-
-	if (jwk.alg) {
-		if (available && available.includes(jwk.alg)) {
-			return [jwk.alg];
-		}
-		return [];
-	}
-
-	return available || [];
+	jwk.use ??= 'sig';
+	return jwk.alg;
 };
 
 const jwkEncryptionAlgorithms = (jwk) => {
-	if (jwk.use !== 'enc' && jwk.use !== undefined) {
-		return [];
+	if ((jwk.use && jwk.use !== 'enc') || !EncAlg.has(jwk.alg)) {
+		return;
 	}
-
-	let available;
-
-	switch (jwk.kty) {
-		case 'RSA':
-			available = ['RSA-OAEP', 'RSA-OAEP-256', 'RSA-OAEP-384', 'RSA-OAEP-512'];
-			break;
-		case 'EC':
-			switch (jwk.crv) {
-				case 'P-256':
-				case 'P-384':
-				case 'P-521':
-					available = [
-						'ECDH-ES',
-						'ECDH-ES+A128KW',
-						'ECDH-ES+A192KW',
-						'ECDH-ES+A256KW'
-					];
-					break;
-				default:
-			}
-			break;
-		case 'OKP':
-			switch (jwk.crv) {
-				case 'X25519':
-					available = [
-						'ECDH-ES',
-						'ECDH-ES+A128KW',
-						'ECDH-ES+A192KW',
-						'ECDH-ES+A256KW'
-					];
-					break;
-				default:
-			}
-			break;
-		default:
-	}
-
-	if (jwk.alg) {
-		if (available && available.includes(jwk.alg)) {
-			return [jwk.alg];
-		}
-		return [];
-	}
-
-	return available || [];
+	jwk.use ??= 'enc';
+	return jwk.alg;
 };
 
-function checkString(value, property, i) {
-	assert(
-		typeof value === 'string' && value,
-		`jwks.keys[${i}].${property} configuration must be a non-empty string`
-	);
-}
+function registerKey(input, keystore) {
+	const { configuration } = instance(this);
 
-function isExternal(key) {
-	return key instanceof ExternalSigningKey;
-}
+	const key = structuredClone(input);
 
-function registerKey(input, i, keystore, kids) {
-	const { configuration, features } = instance(this);
-
-	let key;
-	if (isExternal(input)) {
-		assert(
-			features.externalSigningSupport.enabled,
-			'features.externalSigningSupport must be enabled for ExternalSigningKey support'
-		);
-		key = input;
-	} else {
-		key = structuredClone(input);
-	}
-	assert(
-		KEY_TYPES.has(key.kty),
-		`only RSA, EC, or OKP keys should be part of jwks configuration (index ${i})`
-	);
-	key.kid ??= calculateKid(key);
-	checkString(key.kid, 'kid', i);
-
-	assert(
-		!kids.has(key.kid),
-		'jwks.keys configuration must not contain duplicate "kid" values'
-	);
-	kids.add(key.kid);
-
-	switch (key.kty) {
-		case 'OKP':
-			checkString(key.crv, 'crv', i);
-			checkString(key.x, 'x', i);
-			if (!(key instanceof ExternalSigningKey)) {
-				checkString(key.d, 'd', i);
-			}
-			break;
-		case 'EC':
-			checkString(key.crv, 'crv', i);
-			checkString(key.x, 'x', i);
-			checkString(key.y, 'y', i);
-			if (!(key instanceof ExternalSigningKey)) {
-				checkString(key.d, 'd', i);
-			}
-			break;
-		case 'RSA':
-			checkString(key.e, 'e', i);
-			checkString(key.n, 'n', i);
-			if (!(key instanceof ExternalSigningKey)) {
-				checkString(key.d, 'd', i);
-				checkString(key.p, 'p', i);
-				checkString(key.q, 'q', i);
-				checkString(key.dp, 'dp', i);
-				checkString(key.dq, 'dq', i);
-				checkString(key.qi, 'qi', i);
-			}
-			break;
-		default:
-			throw new Error('unreachable');
-	}
-
-	if (key instanceof ExternalSigningKey) {
-		assert(
-			key.use === 'sig',
-			`jwks.keys[${i}] configuration "use" must be "sig"`
-		);
-	}
-
-	if (key.key_ops !== undefined) {
-		assert(
-			Array.isArray(key.key_ops) &&
-				key.key_ops.length &&
-				key.key_ops.every((x) => typeof x === 'string' && x),
-			`jwks.keys[${i}].key_ops configuration must be an array of strings`
-		);
-	}
-
-	if (key.x5c !== undefined) {
-		assert(
-			Array.isArray(key.x5c) &&
-				key.x5c.length &&
-				key.x5c.every((x) => typeof x === 'string' && x),
-			`jwks.keys[${i}].x5c configuration must be an array of strings`
-		);
-	}
-
-	let encryptionAlgs;
-	if (features.encryption.enabled) {
-		encryptionAlgs = jwkEncryptionAlgorithms(key);
-
+	const encryptionAlgs = jwkEncryptionAlgorithms(key);
+	if (encryptionAlgs) {
 		[
 			// 'idTokenEncryptionAlgValues',
 			'requestObjectEncryptionAlgValues'
 			// 'userinfoEncryptionAlgValues',
 		].forEach((prop) => {
-			configuration[prop] = [
-				...new Set([...configuration[prop], ...encryptionAlgs])
-			].filter((v) => configuration.enabledJWA[prop].includes(v));
+			if (!configuration[prop].includes(encryptionAlgs)) {
+				configuration[prop].push(encryptionAlgs);
+			}
 		});
 	}
 
 	const signingAlgs = jwkSignatureAlgorithms(key);
-	[
-		'idTokenSigningAlgValues',
-		// 'requestObjectSigningAlgValues' uses client's keystore
-		// 'tokenEndpointAuthSigningAlgValues' uses client's keystore
-		'userinfoSigningAlgValues',
-		'introspectionSigningAlgValues',
-		'authorizationSigningAlgValues'
-	].forEach((prop) => {
-		configuration[prop] = [
-			...new Set([...configuration[prop], ...signingAlgs])
-		].filter((v) => configuration.enabledJWA[prop].includes(v));
-	});
-
-	const combined = signingAlgs.concat(encryptionAlgs).filter(Boolean);
-
-	/* eslint-disable no-param-reassign */
-	if (combined.length === 1 && key.alg !== combined[0]) {
-		[key.alg] = combined;
+	if (signingAlgs) {
+		[
+			'idTokenSigningAlgValues',
+			// 'requestObjectSigningAlgValues' uses client's keystore
+			// 'tokenEndpointAuthSigningAlgValues' uses client's keystore
+			'userinfoSigningAlgValues',
+			'introspectionSigningAlgValues',
+			'authorizationSigningAlgValues'
+		].forEach((prop) => {
+			if (!configuration[prop].includes(signingAlgs)) {
+				configuration[prop].push(signingAlgs);
+			}
+		});
 	}
 
-	if (isExternal(key) && combined.length > 1) {
-		checkString(key.alg, 'alg', i);
-	}
-
-	if (encryptionAlgs?.length && !signingAlgs.length && key.use !== 'enc') {
-		key.use = 'enc';
-	} else if (
-		signingAlgs.length &&
-		!encryptionAlgs?.length &&
-		key.use !== 'sig'
-	) {
-		key.use = 'sig';
-	}
-
-	if (!Array.isArray(key.x5c) || !key.x5c.length) {
-		delete key.x5c;
-	}
-
-	assert(
-		combined.length,
-		`jwks.keys[${i}] is of no use given the other configuration, remove it`
-	);
 	keystore.add(key);
-	/* eslint-enable */
 }
 
 export default function initialize(jwks) {
@@ -308,15 +237,12 @@ provide your own in the configuration "jwks" property'
 	}
 
 	const keystore = new KeyStore();
-	const kids = new Set();
 
 	try {
-		if (!Array.isArray(jwks.keys)) {
-			throw new Error();
-		}
-		// eslint-disable-next-line no-plusplus
+		verifyJWKs(jwks);
+
 		for (let i = 0; i < jwks.keys.length; i++) {
-			registerKey.call(this, jwks.keys[i], i, keystore, kids);
+			registerKey.call(this, jwks.keys[i], keystore);
 		}
 	} catch (err) {
 		throw new Error(

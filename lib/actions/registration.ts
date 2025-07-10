@@ -6,6 +6,7 @@ import { InvalidToken, InvalidRequest } from '../helpers/errors.ts';
 import instance from '../helpers/weak_cache.ts';
 import setWWWAuthenticate from '../helpers/set_www_authenticate.ts';
 import addClient from '../helpers/add_client.ts';
+import { Client } from 'lib/models/client.js';
 
 const FORBIDDEN = [
 	'registration_access_token',
@@ -41,7 +42,7 @@ const validateRegistrationAccessToken = [
 		);
 		ctx.assert(regAccessToken, new InvalidToken('token not found'));
 
-		const client = await ctx.oidc.provider.Client.find(ctx.params.clientId);
+		const client = await Client.find(ctx.params.clientId);
 
 		if (client?.clientId !== regAccessToken.clientId) {
 			await regAccessToken.destroy();

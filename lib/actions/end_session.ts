@@ -14,6 +14,7 @@ import sessionMiddleware from '../shared/session.ts';
 import revoke from '../helpers/revoke.ts';
 import { formPost } from '../html/formPost.js';
 import { IdToken } from 'lib/models/id_token.js';
+import { Client } from 'lib/models/client.js';
 
 const parseBody = bodyParser.bind(
 	undefined,
@@ -59,7 +60,7 @@ export const init = [
 					'client_id does not match the provided id_token_hint'
 				);
 			}
-			client = await ctx.oidc.provider.Client.find(clientId);
+			client = await Client.find(clientId);
 			if (!client) {
 				throw new InvalidClient(
 					'unrecognized id_token_hint audience',
@@ -81,7 +82,7 @@ export const init = [
 			}
 			ctx.oidc.entity('Client', client);
 		} else if (params.client_id) {
-			client = await ctx.oidc.provider.Client.find(params.client_id);
+			client = await Client.find(params.client_id);
 			if (!client) {
 				throw new InvalidClient('client is invalid', 'client not found');
 			}
@@ -165,7 +166,7 @@ export const confirm = [
 
 			for (const clientId of clientIds) {
 				if (params.logout || clientId === state.clientId) {
-					const client = await ctx.oidc.provider.Client.find(clientId);
+					const client = await Client.find(clientId);
 					if (client) {
 						const sid = session.sidFor(client.clientId);
 						if (client.backchannelLogoutUri) {
@@ -202,10 +203,7 @@ export const confirm = [
 		}
 
 		if (state.clientId) {
-			ctx.oidc.entity(
-				'Client',
-				await ctx.oidc.provider.Client.find(state.clientId)
-			);
+			ctx.oidc.entity('Client', await Client.find(state.clientId));
 		}
 
 		if (params.logout) {
@@ -269,9 +267,7 @@ export const success = [
 	paramsMiddleware.bind(undefined, new Set(['client_id'])),
 	async function postLogoutSuccess(ctx) {
 		if (ctx.oidc.params.client_id) {
-			const client = await ctx.oidc.provider.Client.find(
-				ctx.oidc.params.client_id
-			);
+			const client = await Client.find(ctx.oidc.params.client_id);
 			if (!client) {
 				throw new InvalidClient('client is invalid', 'client not found');
 			}

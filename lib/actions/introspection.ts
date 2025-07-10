@@ -8,6 +8,7 @@ import { ISSUER } from 'lib/configs/env.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { IdToken } from 'lib/models/id_token.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
+import { Client } from 'lib/models/client.js';
 
 const introspectable = new Set([
 	'AccessToken',
@@ -98,7 +99,7 @@ async function renderTokenResponse(ctx) {
 	if (token.accountId) {
 		ctx.body.sub = token.accountId;
 		if (token.clientId !== ctx.oidc.client.clientId) {
-			const client = await provider.Client.find(token.clientId);
+			const client = await Client.find(token.clientId);
 			if (client.subjectType === 'pairwise') {
 				ctx.body.sub = await pairwiseIdentifier(ctx.body.sub, client);
 			}

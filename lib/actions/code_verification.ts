@@ -26,6 +26,7 @@ import deviceUserFlowErrors from './authorization/device_user_flow_errors.js';
 import deviceUserFlowResponse from './authorization/device_user_flow_response.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { DeviceCode } from 'lib/models/device_code.js';
+import { Client } from 'lib/models/client.js';
 
 async function codeVerificationActionHandler(ctx) {
 	deviceUserFlowErrors;
@@ -137,7 +138,7 @@ export const post = [
 		}
 
 		if (!confirm) {
-			const client = await ctx.oidc.provider.Client.find(code.clientId);
+			const client = await Client.find(code.clientId);
 			if (!client) {
 				throw new InvalidClient('client is invalid', 'client not found');
 			}

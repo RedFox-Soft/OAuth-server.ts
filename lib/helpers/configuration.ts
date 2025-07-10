@@ -235,8 +235,7 @@ class Configuration {
 			requestObjects: this.features.requestObjects.enabled,
 			jwtUserinfo: this.features.jwtUserinfo.enabled,
 			jwtIntrospection: this.features.jwtIntrospection.enabled,
-			jwtResponseModes: this.features.jwtResponseModes.enabled,
-			dPoP: this.features.dPoP.enabled
+			jwtResponseModes: this.features.jwtResponseModes.enabled
 		};
 
 		this.setAlgs(
