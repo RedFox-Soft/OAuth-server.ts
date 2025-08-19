@@ -27,10 +27,6 @@ export const EXPERIMENTS = new Map(
 		richAuthorizationRequests: {
 			name: 'OAuth 2.0 Rich Authorization Requests',
 			version: ['experimental-01']
-		},
-		externalSigningSupport: {
-			name: 'External Signing Key Support',
-			version: ['experimental-01']
 		}
 	})
 );

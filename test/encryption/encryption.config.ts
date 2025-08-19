@@ -14,7 +14,7 @@ merge(config.features, {
 	jwtUserinfo: { enabled: true }
 });
 
-pull(config.enabledJWA.requestObjectEncryptionAlgValues, 'RSA-OAEP-512');
+// pull(config.enabledJWA.requestObjectEncryptionAlgValues, 'RSA-OAEP-512');
 pull(config.enabledJWA.requestObjectEncryptionEncValues, 'A192CBC-HS384');
 
 export const keypair = await generateKeyPair('RSA-OAEP');

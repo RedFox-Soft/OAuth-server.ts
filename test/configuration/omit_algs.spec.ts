@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'bun:test';
 import provider from '../../lib/index.ts';
 import { idTokenSigningAlgValues } from 'lib/configs/jwaAlgorithms.js';
-import { getAlgorithm } from 'lib/helpers/initialize_keystore.js';
+import { getAlgorithm } from 'lib/configs/verifyJWKs.js';
 import { JWKS_KEYS } from 'lib/configs/env.js';
 
 describe('Provider declaring supported algorithms', () => {

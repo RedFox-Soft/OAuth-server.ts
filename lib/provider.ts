@@ -4,7 +4,6 @@ import QuickLRU from 'quick-lru';
 
 import Configuration from './helpers/configuration.ts';
 import * as instance from './helpers/weak_cache.ts';
-import inititalizeKeyStore from './helpers/initialize_keystore.ts';
 import initializeAdapter from './helpers/initialize_adapter.ts';
 import initializeApp from './helpers/initialize_app.ts';
 import initializeClients from './helpers/initialize_clients.ts';
@@ -14,6 +13,8 @@ import * as models from './models/index.ts';
 import { globalConfiguration } from './globalConfiguration.js';
 import { Client } from './models/client.js';
 import { IdToken } from './models/id_token.js';
+import { JWKS_KEYS } from './configs/env.js';
+import KeyStore from './helpers/keystore.js';
 
 class ProviderClass extends EventEmitter {
 	#AccessToken;
@@ -58,7 +59,25 @@ class ProviderClass extends EventEmitter {
 
 		initializeAdapter.call(this, configuration.adapter);
 
-		inititalizeKeyStore.call(this, configuration.jwks);
+		const keystore = new KeyStore();
+		JWKS_KEYS.forEach((key) => keystore.add(structuredClone(key)));
+
+		this.#int.keystore = keystore;
+		const keys = [...keystore].map((key) => ({
+			kty: key.kty,
+			use: key.use,
+			key_ops: key.key_ops ? [...key.key_ops] : undefined,
+			kid: key.kid,
+			alg: key.alg,
+			crv: key.crv,
+			e: key.e,
+			n: key.n,
+			x: key.x,
+			x5c: key.x5c ? [...key.x5c] : undefined,
+			y: key.y
+		}));
+		this.#int.jwks = { keys };
+
 		delete configuration.jwks;
 
 		initializeApp.call(this);

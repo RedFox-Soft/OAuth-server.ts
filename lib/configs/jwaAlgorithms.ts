@@ -1,4 +1,4 @@
-import { getAlgorithm } from 'lib/helpers/initialize_keystore.js';
+import { getAlgorithm } from 'lib/configs/verifyJWKs.js';
 import { JWKS_KEYS } from './env.js';
 import {
 	type asymmetricSigningAlgType,

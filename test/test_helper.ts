@@ -15,7 +15,6 @@ import { provider, elysia } from '../lib/index.ts';
 import instance from '../lib/helpers/weak_cache.ts';
 
 import { Account, TestAdapter } from './models.js';
-import keys from './keys.js';
 import { AuthorizationRequest } from './AuthorizationRequest.js';
 
 import { ApplicationConfig } from '../lib/configs/application.js';
@@ -123,7 +122,6 @@ export default function testHelper(
 
 		provider.init(issuerIdentifier, {
 			clients,
-			jwks: { keys },
 			adapter: TestAdapter,
 			...config
 		});

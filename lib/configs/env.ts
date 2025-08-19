@@ -1,4 +1,4 @@
-import { verifyJWKs } from 'lib/helpers/initialize_keystore.js';
+import { verifyJWKs } from 'lib/configs/verifyJWKs.js';
 
 const issuer = process.env.ISSUER;
 if (!issuer) {

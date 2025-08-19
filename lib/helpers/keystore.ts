@@ -1,83 +1,3 @@
-/* eslint-disable class-methods-use-this, max-classes-per-file, no-plusplus */
-
-export class ExternalSigningKey {
-	#publicJwk;
-
-	#kid;
-
-	#alg;
-
-	get kid() {
-		return this.#kid;
-	}
-
-	set kid(value) {
-		this.#kid = value;
-	}
-
-	get alg() {
-		return this.#alg;
-	}
-
-	set alg(value) {
-		this.#alg = value;
-	}
-
-	get use() {
-		return 'sig';
-	}
-
-	#ensurePublicJwk() {
-		this.#publicJwk ||= this.keyObject().export({ format: 'jwk' });
-	}
-
-	get kty() {
-		this.#ensurePublicJwk();
-		return this.#publicJwk.kty;
-	}
-
-	get e() {
-		this.#ensurePublicJwk();
-		return this.#publicJwk.e;
-	}
-
-	get n() {
-		this.#ensurePublicJwk();
-		return this.#publicJwk.n;
-	}
-
-	get x() {
-		this.#ensurePublicJwk();
-		return this.#publicJwk.x;
-	}
-
-	get y() {
-		this.#ensurePublicJwk();
-		return this.#publicJwk.y;
-	}
-
-	get crv() {
-		this.#ensurePublicJwk();
-		return this.#publicJwk.crv;
-	}
-
-	get key_ops() {
-		return undefined;
-	}
-
-	get x5c() {
-		return undefined;
-	}
-
-	keyObject() {
-		throw new Error('not implemented');
-	}
-
-	sign() {
-		throw new Error('not implemented');
-	}
-}
-
 const keyscore = (key, { alg, use }) => {
 	let score = 0;
 
@@ -273,10 +193,6 @@ class KeyStore {
 	}
 
 	getKeyObject(input, getPublic = false) {
-		if (input instanceof ExternalSigningKey) {
-			return getPublic ? input.keyObject() : input;
-		}
-
 		if (input.kty === 'oct' || !input.d || !getPublic) {
 			return input;
 		}

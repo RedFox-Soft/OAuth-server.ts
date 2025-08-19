@@ -10,7 +10,6 @@ import {
 
 import { Type as t, type Static } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
-import { ExternalSigningKey } from './keystore.ts';
 import * as base64url from './base64url.ts';
 import epochTime from './epoch_time.ts';
 
@@ -40,16 +39,6 @@ export async function sign(payload, key, alg, options = {}) {
 		iss: options.issuer !== undefined ? options.issuer : payload.iss,
 		sub: options.subject !== undefined ? options.subject : payload.sub
 	});
-
-	if (key instanceof ExternalSigningKey) {
-		const parts = [
-			base64url.encode(JSON.stringify(protectedHeader)),
-			base64url.encode(JSON.stringify(payload))
-		];
-		const data = Buffer.from(parts.join('.'));
-		parts.push(base64url.encodeBuffer(await key.sign(data)));
-		return parts.join('.');
-	}
 
 	return new CompactSign(Buffer.from(JSON.stringify(payload)))
 		.setProtectedHeader(protectedHeader)

@@ -4,7 +4,6 @@ import * as interactionPolicy from './helpers/interaction_policy/index.ts';
 
 export default provider;
 export { errors, interactionPolicy, provider };
-export { ExternalSigningKey } from './helpers/keystore.ts';
 
 import { Elysia } from 'elysia';
 import { staticPlugin } from '@elysiajs/static';

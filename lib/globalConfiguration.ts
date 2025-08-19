@@ -1717,22 +1717,7 @@ export const globalConfiguration = {
 		 * description: Enables the userinfo to optionally return signed and/or encrypted JWTs, also
 		 * enables the relevant client metadata for setting up signing and/or encryption.
 		 */
-		jwtUserinfo: { enabled: false },
-
-		/*
-		 * features.externalSigningSupport
-		 *
-		 * title: External Signing Support
-		 *
-		 * description: Enables the use of the exported `ExternalSigningKey` class instances in place
-		 * of a Private JWK in the `jwks.keys` configuration array. This allows Digital Signature
-		 * Algorithm (such as PS256, ES256, or others) signatures to be produced externally, for example
-		 * via a KMS service or an HSM.
-		 * This is an experimental feature.
-		 *
-		 * see: [KMS integration with AWS Key Management Service](https://github.com/panva/node-oidc-provider/discussions/1316)
-		 */
-		externalSigningSupport: { enabled: false, ack: undefined }
+		jwtUserinfo: { enabled: false }
 	},
 
 	/*

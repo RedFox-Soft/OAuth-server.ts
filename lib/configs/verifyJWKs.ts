@@ -1,12 +1,6 @@
 import { Type as t, type Static } from '@sinclair/typebox';
 import { Value, type ValueError } from '@sinclair/typebox/value';
 import crypto from 'node:crypto';
-
-import { DEV_KEYSTORE } from '../consts/index.ts';
-
-import * as attention from './attention.ts';
-import instance from './weak_cache.ts';
-import KeyStore from './keystore.ts';
 import {
 	ECOKPEncAlg,
 	ECSignAlg,
@@ -178,11 +172,6 @@ const calculateKid = (jwk: preJWKS) => {
 	return crypto.hash('sha256', JSON.stringify(components), 'base64url');
 };
 
-function registerKey(input, keystore) {
-	const key = structuredClone(input);
-	keystore.add(key);
-}
-
 export function getAlgorithm(keys: JWKS[]) {
 	const signAlg = new Set<string>();
 	const encAlg = new Set<string>();
@@ -197,48 +186,4 @@ export function getAlgorithm(keys: JWKS[]) {
 		sign: Array.from(signAlg) as signingAlgValues[],
 		enc: Array.from(encAlg) as encryptionAlgValues[]
 	};
-}
-
-export default function initialize(jwks) {
-	if (jwks === undefined) {
-		// eslint-disable-next-line no-param-reassign
-		jwks = structuredClone(DEV_KEYSTORE);
-		/* eslint-disable no-multi-str */
-		attention.warn(
-			'a quick start development-only signing keys are used, you are expected to \
-provide your own in the configuration "jwks" property'
-		);
-		/* eslint-enable */
-	}
-
-	const keystore = new KeyStore();
-
-	try {
-		verifyJWKs(jwks);
-
-		for (let i = 0; i < jwks.keys.length; i++) {
-			registerKey.call(this, jwks.keys[i], keystore);
-		}
-	} catch (err) {
-		throw new Error(
-			err.message || 'keystore must be a JSON Web Key Set formatted object',
-			{ cause: err }
-		);
-	}
-
-	instance(this).keystore = keystore;
-	const keys = [...keystore].map((key) => ({
-		kty: key.kty,
-		use: key.use,
-		key_ops: key.key_ops ? [...key.key_ops] : undefined,
-		kid: key.kid,
-		alg: key.alg,
-		crv: key.crv,
-		e: key.e,
-		n: key.n,
-		x: key.x,
-		x5c: key.x5c ? [...key.x5c] : undefined,
-		y: key.y
-	}));
-	instance(this).jwks = { keys };
 }
