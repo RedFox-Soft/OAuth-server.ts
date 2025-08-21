@@ -21,7 +21,7 @@ export default function checkResponseMode(ctx) {
 		throw new UnsupportedResponseMode();
 	}
 
-	if (!ctx.oidc.client.responseModeAllowed(mode, ctx.oidc.fapiProfile)) {
+	if (!ctx.oidc.client.responseModeAllowed(mode)) {
 		throw new InvalidRequest(
 			'requested response_mode is not allowed for this client or request'
 		);

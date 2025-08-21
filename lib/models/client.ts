@@ -478,11 +478,7 @@ export class Client {
 		return this.responseTypes.includes(type);
 	}
 
-	responseModeAllowed(responseMode, fapiProfile) {
-		if (fapiProfile === '1.0 Final' && !responseMode.includes('jwt')) {
-			return false;
-		}
-
+	responseModeAllowed(responseMode) {
 		return this.responseModes?.includes(responseMode) !== false;
 	}
 

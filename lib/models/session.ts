@@ -37,7 +37,7 @@ export class Session extends BaseModel {
 		];
 	}
 
-	static async findByUid(uid) {
+	static async findByUid(uid: string) {
 		const stored = await this.adapter.findByUid(uid);
 		if (!stored) {
 			return undefined;
@@ -78,7 +78,7 @@ export class Session extends BaseModel {
 		return session;
 	}
 
-	async save(ttl) {
+	async save(ttl: number) {
 		if (typeof ttl !== 'number') {
 			throw new TypeError('"ttl" argument must be a number');
 		}

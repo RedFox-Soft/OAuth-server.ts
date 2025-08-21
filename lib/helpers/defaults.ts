@@ -550,7 +550,7 @@ async function assertJwtClaimsAndHeader(ctx, claims, header, client) {
 	// @param client - the Client instance
 
 	const requiredClaims = [];
-	const fapiProfile = ctx.oidc.isFapi('1.0 Final', '2.0');
+	const fapiProfile = ctx.oidc.isFapi('2.0');
 
 	if (fapiProfile) {
 		requiredClaims.push('exp', 'aud', 'nbf');
@@ -1120,7 +1120,6 @@ function makeDefaults() {
 				 * description: The specific profile of `FAPI` to enable. Supported values are:
 				 *
 				 * - '2.0' Enables behaviours from [FAPI 2.0 Security Profile](https://openid.net/specs/fapi-security-profile-2_0-final.html)
-				 * - '1.0 Final' Enables behaviours from [FAPI 1.0 Security Profile - Part 2: Advanced](https://openid.net/specs/openid-financial-api-part-2-1_0-final.html)
 				 * - Function returning one of the other supported values, or undefined if `FAPI` behaviours are to be ignored. The function is invoked with two arguments `(ctx, client)` and serves the purpose of allowing the used profile to be context-specific.
 				 */
 				profile: undefined

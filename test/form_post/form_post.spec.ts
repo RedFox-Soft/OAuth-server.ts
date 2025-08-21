@@ -5,8 +5,6 @@ import bootstrap, { agent } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import provider from 'lib/index.js';
 
-const route = '/auth';
-
 describe('/auth', () => {
 	let setup = null;
 	let cookie = null;

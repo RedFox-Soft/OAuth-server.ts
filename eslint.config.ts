@@ -11,7 +11,7 @@ export default tseslint.config(
 			flatConfigs.recommended,
 			tseslint.configs.strict
 		],
-		files: ['**/*.{js, ts,tsx}'],
+		files: ['**/*.{js,ts,tsx}'],
 		languageOptions: {
 			ecmaVersion: 2020,
 			globals: globals.browser

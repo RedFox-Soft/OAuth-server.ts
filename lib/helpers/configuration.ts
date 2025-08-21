@@ -27,7 +27,7 @@ const filterAsymmetricSig = RegExp.prototype.test.bind(
 	/^(?:PS(?:256|384|512)|RS(?:256|384|512)|ES(?:256K?|384|512)|Ed(?:25519|DSA))$/
 );
 
-const fapiProfiles = new Set(['1.0 Final', '2.0']);
+const fapiProfiles = new Set(['2.0']);
 
 class Configuration {
 	#defaults = getDefaults();
