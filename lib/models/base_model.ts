@@ -83,14 +83,14 @@ export class BaseModel extends Opaque {
 		return IN_PAYLOAD;
 	}
 
-	static async find(value, { ignoreExpiration = false } = {}) {
+	static async find(value: string, { ignoreExpiration = false } = {}) {
 		if (typeof value !== 'string') {
-			return undefined;
+			return;
 		}
 
 		const stored = await this.adapter.find(value);
 		if (!stored) {
-			return undefined;
+			return;
 		}
 
 		try {
@@ -98,11 +98,11 @@ export class BaseModel extends Opaque {
 
 			return this.instantiate(payload);
 		} catch (err) {
-			return undefined;
+			return;
 		}
 	}
 
-	emit(eventName) {
+	emit(eventName: string) {
 		provider.emit(`${snakeCase(this.kind)}.${eventName}`, this);
 	}
 

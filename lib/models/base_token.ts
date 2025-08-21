@@ -1,6 +1,7 @@
 import als from '../helpers/als.ts';
 import { BaseModel } from './base_model.js';
 import { ttl } from '../configs/liveTime.js';
+import { jwt } from './formats/jwt.js';
 
 export class BaseToken extends BaseModel {
 	#client;
@@ -72,5 +73,27 @@ export class BaseToken extends BaseModel {
 		return new Set(
 			Array.isArray(this.resource) ? this.resource : [this.resource]
 		);
+	}
+
+	generateTokenId() {
+		const format = this.resourceServer?.accessTokenFormat ?? 'opaque';
+		if (format === 'opaque') {
+			return super.generateTokenId();
+		}
+		if (format !== 'jwt') {
+			throw new Error('invalid format resolved');
+		}
+		return jwt.generateTokenId.call(this);
+	}
+
+	async getValueAndPayload() {
+		const format = this.resourceServer?.accessTokenFormat ?? 'opaque';
+		if (format === 'opaque') {
+			return super.getValueAndPayload();
+		}
+		if (format !== 'jwt') {
+			throw new Error('invalid format resolved');
+		}
+		return jwt.getValueAndPayload.call(this);
 	}
 }
