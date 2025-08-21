@@ -9,6 +9,8 @@ import bootstrap from '../test_helper.js';
 import { defaults } from '../../lib/helpers/defaults.ts';
 import { provider } from 'lib/provider.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
+import { AccessToken } from 'lib/models/access_token.js';
+import { Client } from 'lib/models/client.js';
 
 const {
 	features: { resourceIndicators }
@@ -922,10 +924,10 @@ describe('features.resourceIndicators', () => {
 
 	describe('userinfo', () => {
 		it('allows userinfo for audience-less tokens', async function () {
-			const at = new provider.AccessToken({
+			const at = new AccessToken({
 				accountId: this.loggedInAccountId,
 				grantId: this.getGrantId(),
-				client: await provider.Client.find('client'),
+				client: await Client.find('client'),
 				scope: 'openid api:read',
 				aud: undefined
 			});
@@ -936,10 +938,10 @@ describe('features.resourceIndicators', () => {
 		});
 
 		it('fails userinfo for string userinfo url tokens', async function () {
-			const at = new provider.AccessToken({
+			const at = new AccessToken({
 				accountId: this.loggedInAccountId,
 				grantId: this.getGrantId(),
-				client: await provider.Client.find('client'),
+				client: await Client.find('client'),
 				scope: 'openid api:read',
 				aud: 'urn:foo:bar'
 			});
@@ -967,10 +969,10 @@ describe('features.resourceIndicators', () => {
 
 		[{}, false, 1].forEach((aud, i, { length }) => {
 			it(`fails on various invalid aud values ${i + 1}/${length}`, async function () {
-				const at = new provider.AccessToken({
+				const at = new AccessToken({
 					accountId: this.loggedInAccountId,
 					grantId: this.getGrantId(),
-					client: await provider.Client.find('client'),
+					client: await Client.find('client'),
 					scope: 'openid api:read',
 					aud
 				});

@@ -6,27 +6,26 @@ import isSessionBound from './mixins/is_session_bound.ts';
 import setAudience from './mixins/set_audience.ts';
 import { BaseToken } from './base_token.js';
 
-export default () =>
-	class AccessToken extends apply([
-		hasGrantType,
-		hasGrantId,
-		isSenderConstrained,
-		isSessionBound,
-		setAudience,
-		BaseToken
-	]) {
-		static get IN_PAYLOAD() {
-			return [
-				...super.IN_PAYLOAD,
+export class AccessToken extends apply([
+	hasGrantType,
+	hasGrantId,
+	isSenderConstrained,
+	isSessionBound,
+	setAudience,
+	BaseToken
+]) {
+	static get IN_PAYLOAD() {
+		return [
+			...super.IN_PAYLOAD,
 
-				'accountId',
-				'aud',
-				'rar',
-				'claims',
-				'extra',
-				'grantId',
-				'scope',
-				'sid'
-			];
-		}
-	};
+			'accountId',
+			'aud',
+			'rar',
+			'claims',
+			'extra',
+			'grantId',
+			'scope',
+			'sid'
+		];
+	}
+}

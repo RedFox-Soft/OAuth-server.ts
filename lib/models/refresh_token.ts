@@ -7,7 +7,7 @@ import hasGrantId from './mixins/has_grant_id.ts';
 import hasGrantType from './mixins/has_grant_type.ts';
 import isSenderConstrained from './mixins/is_sender_constrained.ts';
 import isSessionBound from './mixins/is_session_bound.ts';
-import storesAuth from './mixins/stores_auth.ts';
+import { authPayload } from './mixins/stores_auth.js';
 
 export class RefreshToken extends apply([
 	consumable,
@@ -15,7 +15,6 @@ export class RefreshToken extends apply([
 	hasGrantId,
 	isSenderConstrained,
 	isSessionBound,
-	storesAuth,
 	BaseToken
 ]) {
 	constructor(...args) {
@@ -26,7 +25,7 @@ export class RefreshToken extends apply([
 	}
 
 	static get IN_PAYLOAD() {
-		return [...super.IN_PAYLOAD, 'rar', 'rotations', 'iiat'];
+		return [...super.IN_PAYLOAD, ...authPayload, 'rar', 'rotations', 'iiat'];
 	}
 
 	/*

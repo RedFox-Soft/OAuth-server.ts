@@ -21,6 +21,7 @@ import { RefreshToken } from 'lib/models/refresh_token.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { ttl } from 'lib/configs/liveTime.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';
+import { AccessToken } from 'lib/models/access_token.js';
 
 describe('dynamic ttl', () => {
 	let setup = null;
@@ -94,9 +95,7 @@ describe('dynamic ttl', () => {
 		expect(idTokenSpy.mock.calls[0][1]).toBeInstanceOf(Client);
 
 		expect(accessTokenSpy).toHaveBeenCalledTimes(1);
-		expect(accessTokenSpy.mock.calls[0][1]).toBeInstanceOf(
-			provider.AccessToken
-		);
+		expect(accessTokenSpy.mock.calls[0][1]).toBeInstanceOf(AccessToken);
 		expect(accessTokenSpy.mock.calls[0][2]).toBeInstanceOf(Client);
 
 		expect(refreshTokenSpy).toHaveBeenCalledTimes(1);
@@ -161,9 +160,7 @@ describe('dynamic ttl', () => {
 		expect(idTokenSpy.mock.calls[0][1]).toBeInstanceOf(Client);
 
 		expect(accessTokenSpy).toHaveBeenCalledTimes(1);
-		expect(accessTokenSpy.mock.calls[0][1]).toBeInstanceOf(
-			provider.AccessToken
-		);
+		expect(accessTokenSpy.mock.calls[0][1]).toBeInstanceOf(AccessToken);
 		expect(accessTokenSpy.mock.calls[0][2]).toBeInstanceOf(Client);
 
 		expect(refreshTokenSpy).toHaveBeenCalledTimes(1);
@@ -216,9 +213,7 @@ describe('dynamic ttl', () => {
 		expect(idTokenSpy.mock.calls[0][1]).toBeInstanceOf(Client);
 
 		expect(accessTokenSpy).toHaveBeenCalledTimes(1);
-		expect(accessTokenSpy.mock.calls[0][1]).toBeInstanceOf(
-			provider.AccessToken
-		);
+		expect(accessTokenSpy.mock.calls[0][1]).toBeInstanceOf(AccessToken);
 		expect(accessTokenSpy.mock.calls[0][2]).toBeInstanceOf(Client);
 
 		expect(refreshTokenSpy).toHaveBeenCalledTimes(1);

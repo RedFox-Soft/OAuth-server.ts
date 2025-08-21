@@ -11,6 +11,7 @@
 		"skipLibCheck": true,
 		"strict": true,
 		"jsx": "react",
+		"noEmit": true,
 		"typeRoots": ["types/", "node_modules/@types"]
 	},
 	"include": ["lib/**/*.ts", "test/**/*.ts"],

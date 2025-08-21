@@ -14,6 +14,8 @@ import bootstrap from '../test_helper.js';
 import { provider } from 'lib/provider.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { TestAdapter } from 'test/models.js';
+import { Client } from 'lib/models/client.js';
+import { AccessToken } from 'lib/models/access_token.js';
 
 const sinon = createSandbox();
 
@@ -111,8 +113,8 @@ describe('jwt format', () => {
 				}
 			});
 
-			const client = await provider.Client.find(clientId);
-			const token = new provider.AccessToken({
+			const client = await Client.find(clientId);
+			const token = new AccessToken({
 				client,
 				...fullPayload,
 				resourceServer
@@ -129,8 +131,8 @@ describe('jwt format', () => {
 				audience: 'foo'
 			});
 
-			const client = await provider.Client.find(clientId);
-			const token = new provider.AccessToken({
+			const client = await Client.find(clientId);
+			const token = new AccessToken({
 				client,
 				...fullPayload,
 				resourceServer
@@ -152,8 +154,8 @@ describe('jwt format', () => {
 				jwt: {}
 			});
 
-			const client = await provider.Client.find(clientId);
-			const token = new provider.AccessToken({
+			const client = await Client.find(clientId);
+			const token = new AccessToken({
 				client,
 				...fullPayload,
 				resourceServer
@@ -177,8 +179,8 @@ describe('jwt format', () => {
 				}
 			});
 
-			const client = await provider.Client.find(clientId);
-			const token = new provider.AccessToken({
+			const client = await Client.find(clientId);
+			const token = new AccessToken({
 				client,
 				...fullPayload,
 				resourceServer
@@ -206,8 +208,8 @@ describe('jwt format', () => {
 				}
 			});
 
-			const client = await provider.Client.find(clientId);
-			const token = new provider.AccessToken({
+			const client = await Client.find(clientId);
+			const token = new AccessToken({
 				client,
 				...fullPayload,
 				resourceServer
@@ -228,8 +230,8 @@ describe('jwt format', () => {
 				}
 			});
 
-			const client = await provider.Client.find(clientId);
-			const token = new provider.AccessToken({
+			const client = await Client.find(clientId);
+			const token = new AccessToken({
 				client,
 				...fullPayload,
 				resourceServer
@@ -257,8 +259,8 @@ describe('jwt format', () => {
 				}
 			});
 
-			const client = await provider.Client.find(clientId);
-			const token = new provider.AccessToken({
+			const client = await Client.find(clientId);
+			const token = new AccessToken({
 				client,
 				...fullPayload,
 				resourceServer
@@ -281,8 +283,8 @@ describe('jwt format', () => {
 				}
 			});
 
-			const client = await provider.Client.find(clientId);
-			const token = new provider.AccessToken({
+			const client = await Client.find(clientId);
+			const token = new AccessToken({
 				client,
 				...fullPayload,
 				resourceServer
@@ -305,8 +307,8 @@ describe('jwt format', () => {
 				}
 			});
 
-			const client = await provider.Client.find(clientId);
-			const token = new provider.AccessToken({
+			const client = await Client.find(clientId);
+			const token = new AccessToken({
 				client,
 				...fullPayload,
 				resourceServer
@@ -332,8 +334,8 @@ describe('jwt format', () => {
 				}
 			});
 
-			const client = await provider.Client.find(clientId);
-			const token = new provider.AccessToken({
+			const client = await Client.find(clientId);
+			const token = new AccessToken({
 				client,
 				...fullPayload,
 				resourceServer
@@ -363,8 +365,8 @@ describe('jwt format', () => {
 				}
 			});
 
-			const client = await provider.Client.find(clientId);
-			const token = new provider.AccessToken({
+			const client = await Client.find(clientId);
+			const token = new AccessToken({
 				client,
 				...fullPayload,
 				resourceServer
@@ -398,8 +400,8 @@ describe('jwt format', () => {
 				}
 			});
 
-			const client = await provider.Client.find(clientId);
-			const token = new provider.AccessToken({
+			const client = await Client.find(clientId);
+			const token = new AccessToken({
 				client,
 				...fullPayload,
 				resourceServer
@@ -430,8 +432,8 @@ describe('jwt format', () => {
 				}
 			});
 
-			const client = await provider.Client.find(clientId);
-			const token = new provider.AccessToken({
+			const client = await Client.find(clientId);
+			const token = new AccessToken({
 				client,
 				...fullPayload,
 				resourceServer
@@ -459,8 +461,8 @@ describe('jwt format', () => {
 				}
 			});
 
-			const client = await provider.Client.find(clientId);
-			const token = new provider.AccessToken({
+			const client = await Client.find(clientId);
+			const token = new AccessToken({
 				client,
 				...fullPayload,
 				resourceServer
@@ -494,8 +496,8 @@ describe('jwt format', () => {
 				}
 			});
 
-			const client = await provider.Client.find(clientId);
-			const token = new provider.AccessToken({
+			const client = await Client.find(clientId);
+			const token = new AccessToken({
 				client,
 				...fullPayload,
 				resourceServer
@@ -521,8 +523,8 @@ describe('jwt format', () => {
 				}
 			});
 
-			const client = await provider.Client.find(clientId);
-			const token = new provider.AccessToken({
+			const client = await Client.find(clientId);
+			const token = new AccessToken({
 				client,
 				...fullPayload,
 				resourceServer
@@ -548,8 +550,8 @@ describe('jwt format', () => {
 				}
 			});
 
-			const client = await provider.Client.find(clientId);
-			const token = new provider.AccessToken({
+			const client = await Client.find(clientId);
+			const token = new AccessToken({
 				client,
 				...fullPayload,
 				resourceServer
@@ -574,8 +576,8 @@ describe('jwt format', () => {
 				}
 			});
 
-			const client = await provider.Client.find(clientId);
-			const token = new provider.AccessToken({
+			const client = await Client.find(clientId);
+			const token = new AccessToken({
 				client,
 				...fullPayload,
 				resourceServer
@@ -602,8 +604,8 @@ describe('jwt format', () => {
 				}
 			});
 
-			const client = await provider.Client.find(clientId);
-			const token = new provider.AccessToken({
+			const client = await Client.find(clientId);
+			const token = new AccessToken({
 				client,
 				...fullPayload,
 				resourceServer
@@ -630,8 +632,8 @@ describe('jwt format', () => {
 				}
 			});
 
-			const client = await provider.Client.find(clientId);
-			const token = new provider.AccessToken({
+			const client = await Client.find(clientId);
+			const token = new AccessToken({
 				client,
 				...fullPayload,
 				resourceServer
@@ -656,8 +658,8 @@ describe('jwt format', () => {
 				}
 			});
 
-			const client = await provider.Client.find(clientId);
-			const token = new provider.AccessToken({
+			const client = await Client.find(clientId);
+			const token = new AccessToken({
 				client,
 				...fullPayload,
 				resourceServer
@@ -685,8 +687,8 @@ describe('jwt format', () => {
 				}
 			});
 
-			const client = await provider.Client.find(clientId);
-			const token = new provider.AccessToken({
+			const client = await Client.find(clientId);
+			const token = new AccessToken({
 				client,
 				...fullPayload,
 				resourceServer
@@ -714,8 +716,8 @@ describe('jwt format', () => {
 				}
 			});
 
-			const client = await provider.Client.find(clientId);
-			const token = new provider.AccessToken({
+			const client = await Client.find(clientId);
+			const token = new AccessToken({
 				client,
 				...fullPayload,
 				resourceServer
@@ -746,8 +748,8 @@ describe('jwt format', () => {
 
 				delete resourceServer.jwt.encrypt[prop];
 
-				const client = await provider.Client.find(clientId);
-				const token = new provider.AccessToken({
+				const client = await Client.find(clientId);
+				const token = new AccessToken({
 					client,
 					...fullPayload,
 					resourceServer
@@ -765,8 +767,8 @@ describe('jwt format', () => {
 
 	it('for AccessToken', async function () {
 		const upsert = sinon.spy(TestAdapter.for('AccessToken'), 'upsert');
-		const client = await provider.Client.find(clientId);
-		const token = new provider.AccessToken({ client, ...fullPayload });
+		const client = await Client.find(clientId);
+		const token = new AccessToken({ client, ...fullPayload });
 		const issued = sinon.spy();
 		provider.on('access_token.issued', issued);
 		const jwt = await token.save();
@@ -796,8 +798,8 @@ describe('jwt format', () => {
 
 	it('for pairwise AccessToken', async function () {
 		const upsert = sinon.spy(TestAdapter.for('AccessToken'), 'upsert');
-		const client = await provider.Client.find('pairwise');
-		const token = new provider.AccessToken({ client, ...fullPayload });
+		const client = await Client.find('pairwise');
+		const token = new AccessToken({ client, ...fullPayload });
 		const issued = sinon.spy();
 		provider.on('access_token.issued', issued);
 		const jwt = await token.save();
@@ -865,8 +867,8 @@ describe('jwt format', () => {
 		});
 
 		it('allows the payload to be extended', async function () {
-			const client = await provider.Client.find(clientId);
-			const accessToken = new provider.AccessToken({
+			const client = await Client.find(clientId);
+			const accessToken = new AccessToken({
 				client,
 				...fullPayload
 			});

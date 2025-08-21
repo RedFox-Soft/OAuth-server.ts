@@ -9,6 +9,7 @@ import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { IdToken } from 'lib/models/id_token.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { Client } from 'lib/models/client.js';
+import { AccessToken } from 'lib/models/access_token.js';
 
 const introspectable = new Set([
 	'AccessToken',
@@ -19,7 +20,6 @@ const JWT = 'application/token-introspection+jwt';
 
 const tokenTypes = {
 	access_token(token: string) {
-		const { AccessToken } = provider;
 		return AccessToken.find(token);
 	},
 	client_credentials(token: string) {

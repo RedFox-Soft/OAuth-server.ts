@@ -5,6 +5,7 @@ import bootstrap from '../test_helper.js';
 import { provider } from 'lib/provider.js';
 import { Client } from 'lib/models/client.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
+import { AccessToken } from 'lib/models/access_token.js';
 
 const sinon = createSandbox();
 const route = '/token/revocation';
@@ -31,7 +32,7 @@ describe('revocation features', () => {
 
 	describe(route, () => {
 		it('revokes access token [no hint]', async function () {
-			const at = new provider.AccessToken({
+			const at = new AccessToken({
 				accountId: 'accountId',
 				grantId: 'foo',
 				client: await Client.find('client'),
@@ -39,7 +40,7 @@ describe('revocation features', () => {
 			});
 
 			const atDestroy = sinon
-				.stub(provider.AccessToken.prototype, 'destroy')
+				.stub(AccessToken.prototype, 'destroy')
 				.callsFake(() => Promise.resolve());
 			const grantDestroy = sinon
 				.stub(provider.Grant.adapter, 'destroy')
@@ -60,7 +61,7 @@ describe('revocation features', () => {
 		});
 
 		it('revokes access token and grant when configured', async function () {
-			const at = new provider.AccessToken({
+			const at = new AccessToken({
 				accountId: 'accountId',
 				grantId: 'foo',
 				client: await Client.find('client'),
@@ -71,7 +72,7 @@ describe('revocation features', () => {
 				.stub(i(provider).configuration, 'revokeGrantPolicy')
 				.callsFake(() => true);
 			const atDestroy = sinon
-				.stub(provider.AccessToken.prototype, 'destroy')
+				.stub(AccessToken.prototype, 'destroy')
 				.callsFake(() => Promise.resolve());
 			const grantDestroy = sinon
 				.stub(provider.Grant.adapter, 'destroy')
@@ -92,7 +93,7 @@ describe('revocation features', () => {
 		});
 
 		it('revokes access token [correct hint]', async function () {
-			const at = new provider.AccessToken({
+			const at = new AccessToken({
 				accountId: 'accountId',
 				grantId: 'foo',
 				client: await Client.find('client'),
@@ -100,7 +101,7 @@ describe('revocation features', () => {
 			});
 
 			const stub = sinon
-				.stub(provider.AccessToken.prototype, 'destroy')
+				.stub(AccessToken.prototype, 'destroy')
 				.callsFake(() => Promise.resolve());
 
 			const token = await at.save();
@@ -117,7 +118,7 @@ describe('revocation features', () => {
 		});
 
 		it('revokes access token [wrong hint]', async function () {
-			const at = new provider.AccessToken({
+			const at = new AccessToken({
 				accountId: 'accountId',
 				grantId: 'foo',
 				client: await Client.find('client'),
@@ -125,7 +126,7 @@ describe('revocation features', () => {
 			});
 
 			const stub = sinon
-				.stub(provider.AccessToken.prototype, 'destroy')
+				.stub(AccessToken.prototype, 'destroy')
 				.callsFake(() => Promise.resolve());
 
 			const token = await at.save();
@@ -142,7 +143,7 @@ describe('revocation features', () => {
 		});
 
 		it('revokes access token [unrecognized hint]', async function () {
-			const at = new provider.AccessToken({
+			const at = new AccessToken({
 				accountId: 'accountId',
 				grantId: 'foo',
 				client: await Client.find('client'),
@@ -150,7 +151,7 @@ describe('revocation features', () => {
 			});
 
 			const stub = sinon
-				.stub(provider.AccessToken.prototype, 'destroy')
+				.stub(AccessToken.prototype, 'destroy')
 				.callsFake(() => Promise.resolve());
 
 			const token = await at.save();
@@ -167,14 +168,14 @@ describe('revocation features', () => {
 		});
 
 		it('propagates exceptions on find', async function () {
-			const at = new provider.AccessToken({
+			const at = new AccessToken({
 				accountId: 'accountId',
 				grantId: 'foo',
-				client: await provider.Client.find('client'),
+				client: await Client.find('client'),
 				scope: 'scope'
 			});
 
-			sinon.stub(provider.AccessToken, 'find').callsFake(async () => {
+			sinon.stub(AccessToken, 'find').callsFake(async () => {
 				throw new Error();
 			});
 
@@ -424,10 +425,10 @@ describe('revocation features', () => {
 		});
 
 		it('does not revoke tokens of other clients', async function () {
-			const at = new provider.AccessToken({
+			const at = new AccessToken({
 				accountId: 'accountId',
 				grantId: 'foo',
-				client: await provider.Client.find('client2'),
+				client: await Client.find('client2'),
 				scope: 'scope'
 			});
 
@@ -462,7 +463,7 @@ describe('revocation features', () => {
 		});
 
 		it('does not allow to revoke the unrevokable (in case adapter is implemented wrong)', async function () {
-			sinon.stub(provider.AccessToken, 'find').callsFake(() => ({
+			sinon.stub(AccessToken, 'find').callsFake(() => ({
 				isValid: true,
 				kind: 'AuthorizationCode'
 			}));
@@ -487,10 +488,10 @@ describe('revocation features', () => {
 				}, done);
 
 				(async () => {
-					const at = new provider.AccessToken({
+					const at = new AccessToken({
 						accountId: 'accountId',
 						grantId: 'foo',
-						client: await provider.Client.find('client'),
+						client: await Client.find('client'),
 						scope: 'scope'
 					});
 

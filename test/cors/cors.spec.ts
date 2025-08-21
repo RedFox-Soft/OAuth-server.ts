@@ -2,6 +2,8 @@ import { expect } from 'chai';
 
 import bootstrap from '../test_helper.js';
 import { provider } from 'lib/provider.js';
+import { AccessToken } from 'lib/models/access_token.js';
+import { Client } from 'lib/models/client.js';
 
 function req(verb, url, origin, ...methods) {
 	const request = this.agent[verb](url).set('Origin', origin);
@@ -49,10 +51,10 @@ describe('CORS setup', () => {
 		return this.login();
 	});
 	before(async function () {
-		const at = new provider.AccessToken({
+		const at = new AccessToken({
 			accountId: this.loggedInAccountId,
 			grantId: this.getGrantId(),
-			client: await provider.Client.find('client'),
+			client: await Client.find('client'),
 			scope: 'openid'
 		});
 

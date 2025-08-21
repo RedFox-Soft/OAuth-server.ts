@@ -10,6 +10,7 @@ import resolveResource from '../../helpers/resolve_resource.ts';
 import { IdToken } from 'lib/models/id_token.js';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
+import { AccessToken } from 'lib/models/access_token.js';
 
 const { AuthorizationPending, ExpiredToken, InvalidGrant } = errors;
 
@@ -116,8 +117,6 @@ export const handler = async function deviceCodeHandler(ctx) {
 	}
 
 	ctx.oidc.entity('Account', account);
-
-	const { AccessToken } = ctx.oidc.provider;
 
 	const at = new AccessToken({
 		accountId: account.accountId,

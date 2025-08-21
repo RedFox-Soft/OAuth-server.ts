@@ -4,6 +4,8 @@ import sinon from 'sinon';
 import provider from '../../lib/index.ts';
 import bootstrap from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
+import { AccessToken } from 'lib/models/access_token.js';
+import { Client } from 'lib/models/client.js';
 
 describe('userinfo /me', () => {
 	before(bootstrap(import.meta.url));
@@ -91,10 +93,10 @@ describe('userinfo /me', () => {
 	});
 
 	it('validates the openid scope is present', async function () {
-		const at = await new provider.AccessToken({
-			client: await provider.Client.find('client')
+		const at = await new AccessToken({
+			client: await Client.find('client')
 		}).save();
-		sinon.stub(provider.Client, 'find').callsFake(async () => undefined);
+		sinon.stub(Client, 'find').callsFake(async () => undefined);
 		return this.agent
 			.get('/me')
 			.auth(at, { type: 'bearer' })
@@ -112,23 +114,23 @@ describe('userinfo /me', () => {
 	});
 
 	it('validates a client is still valid for a found token', async function () {
-		const at = await new provider.AccessToken({
-			client: await provider.Client.find('client'),
+		const at = await new AccessToken({
+			client: await Client.find('client'),
 			scope: 'openid'
 		}).save();
-		sinon.stub(provider.Client, 'find').callsFake(async () => undefined);
+		sinon.stub(Client, 'find').callsFake(async () => undefined);
 		return this.agent
 			.get('/me')
 			.auth(at, { type: 'bearer' })
 			.expect(() => {
-				provider.Client.find.restore();
+				Client.find.restore();
 			})
 			.expect(this.failWith(401, 'invalid_token', 'invalid token provided'));
 	});
 
 	it('validates an account still valid for a found token', async function () {
-		const at = await new provider.AccessToken({
-			client: await provider.Client.find('client'),
+		const at = await new AccessToken({
+			client: await Client.find('client'),
 			scope: 'openid',
 			accountId: 'notfound'
 		}).save();

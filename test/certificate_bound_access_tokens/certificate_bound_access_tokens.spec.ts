@@ -9,6 +9,8 @@ import bootstrap, { skipConsent } from '../test_helper.js';
 import { provider } from 'lib/provider.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
+import { AccessToken } from 'lib/models/access_token.js';
+import { Client } from 'lib/models/client.js';
 
 const crt = new X509Certificate(
 	readFileSync('./test/jwks/client.crt', { encoding: 'ascii' })
@@ -40,10 +42,10 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 	describe('userinfo', () => {
 		it('acts like an RS checking the thumbprint now', async function () {
-			const at = new provider.AccessToken({
+			const at = new AccessToken({
 				grantId: this.getGrantId('client'),
 				accountId: this.loggedInAccountId,
-				client: await provider.Client.find('client'),
+				client: await Client.find('client'),
 				scope: 'openid'
 			});
 			at.setThumbprint('x5t', crt);
@@ -75,10 +77,10 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 	describe('introspection', () => {
 		it('exposes cnf now', async function () {
-			const at = new provider.AccessToken({
+			const at = new AccessToken({
 				grantId: this.getGrantId('client'),
 				accountId: this.loggedInAccountId,
-				client: await provider.Client.find('client'),
+				client: await Client.find('client'),
 				scope: 'openid'
 			});
 			at.setThumbprint('x5t', crt);
@@ -139,11 +141,11 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 			expect(spy).to.have.property('calledOnce', true);
 			const {
 				oidc: {
-					entities: { AccessToken, RefreshToken }
+					entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 				}
 			} = spy.args[0][0];
-			expect(AccessToken).to.have.property('x5t#S256', expectedS256);
-			expect(RefreshToken).not.to.have.property('x5t#S256');
+			expect(accessToken).to.have.property('x5t#S256', expectedS256);
+			expect(refreshToken).not.to.have.property('x5t#S256');
 		});
 
 		it('verifies the request made with mutual-TLS', async function () {
@@ -196,11 +198,11 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 			expect(spy).to.have.property('calledOnce', true);
 			const {
 				oidc: {
-					entities: { AccessToken, RefreshToken }
+					entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 				}
 			} = spy.args[0][0];
-			expect(AccessToken).to.have.property('x5t#S256', expectedS256);
-			expect(RefreshToken).to.have.property('x5t#S256', expectedS256);
+			expect(accessToken).to.have.property('x5t#S256', expectedS256);
+			expect(refreshToken).to.have.property('x5t#S256', expectedS256);
 		});
 	});
 
@@ -238,11 +240,11 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 			expect(spy).to.have.property('calledOnce', true);
 			const {
 				oidc: {
-					entities: { AccessToken, RefreshToken }
+					entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 				}
 			} = spy.args[0][0];
-			expect(AccessToken).to.have.property('x5t#S256', expectedS256);
-			expect(RefreshToken).not.to.have.property('x5t#S256');
+			expect(accessToken).to.have.property('x5t#S256', expectedS256);
+			expect(refreshToken).not.to.have.property('x5t#S256');
 		});
 
 		it('verifies the request made with mutual-TLS', async function () {
@@ -302,11 +304,11 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 			expect(spy).to.have.property('calledOnce', true);
 			const {
 				oidc: {
-					entities: { AccessToken, RefreshToken }
+					entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 				}
 			} = spy.args[0][0];
-			expect(AccessToken).to.have.property('x5t#S256', expectedS256);
-			expect(RefreshToken).to.have.property('x5t#S256', expectedS256);
+			expect(accessToken).to.have.property('x5t#S256', expectedS256);
+			expect(refreshToken).to.have.property('x5t#S256', expectedS256);
 		});
 	});
 
@@ -354,11 +356,11 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 				expect(spy).to.have.property('calledOnce', true);
 				const {
 					oidc: {
-						entities: { AccessToken, RefreshToken }
+						entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 					}
 				} = spy.args[0][0];
-				expect(AccessToken).to.have.property('x5t#S256', expectedS256);
-				expect(RefreshToken).not.to.have.property('x5t#S256');
+				expect(accessToken).to.have.property('x5t#S256', expectedS256);
+				expect(refreshToken).not.to.have.property('x5t#S256');
 			});
 
 			it('verifies the request made with mutual-TLS', async function () {
@@ -425,11 +427,11 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 				expect(spy).to.have.property('calledOnce', true);
 				const {
 					oidc: {
-						entities: { AccessToken, RefreshToken }
+						entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 					}
 				} = spy.args[0][0];
-				expect(AccessToken).to.have.property('x5t#S256', expectedS256);
-				expect(RefreshToken['x5t#S256']).to.be.undefined;
+				expect(accessToken).to.have.property('x5t#S256', expectedS256);
+				expect(refreshToken['x5t#S256']).to.be.undefined;
 			});
 
 			it('verifies the request made with mutual-TLS', async function () {
@@ -504,11 +506,11 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 				expect(spy).to.have.property('calledOnce', true);
 				const {
 					oidc: {
-						entities: { AccessToken, RefreshToken }
+						entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 					}
 				} = spy.args[0][0];
-				expect(AccessToken).to.have.property('x5t#S256', expectedS256);
-				expect(RefreshToken).to.have.property('x5t#S256', expectedS256);
+				expect(accessToken).to.have.property('x5t#S256', expectedS256);
+				expect(refreshToken).to.have.property('x5t#S256', expectedS256);
 			});
 
 			it('verifies the request made with mutual-TLS', async function () {
@@ -575,11 +577,11 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 				expect(spy).to.have.property('calledOnce', true);
 				const {
 					oidc: {
-						entities: { AccessToken, RefreshToken }
+						entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 					}
 				} = spy.args[0][0];
-				expect(AccessToken).to.have.property('x5t#S256', expectedS256);
-				expect(RefreshToken).to.have.property('x5t#S256', expectedS256);
+				expect(accessToken).to.have.property('x5t#S256', expectedS256);
+				expect(refreshToken).to.have.property('x5t#S256', expectedS256);
 			});
 
 			it('verifies the request made with mutual-TLS', async function () {

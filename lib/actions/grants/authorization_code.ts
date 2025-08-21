@@ -10,6 +10,7 @@ import checkRar from '../../shared/check_rar.ts';
 import { IdToken } from 'lib/models/id_token.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';
+import { AccessToken } from 'lib/models/access_token.js';
 
 const gty = 'authorization_code';
 
@@ -119,8 +120,6 @@ export const handler = async function authorizationCodeHandler(ctx) {
 	}
 
 	ctx.oidc.entity('Account', account);
-
-	const { AccessToken } = ctx.oidc.provider;
 
 	const at = new AccessToken({
 		accountId: account.accountId,

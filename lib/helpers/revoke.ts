@@ -2,6 +2,7 @@ import { DeviceCode } from 'lib/models/device_code.js';
 import instance from './weak_cache.ts';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';
+import { AccessToken } from 'lib/models/access_token.js';
 
 export default async function revoke(ctx, grantId) {
 	const {
@@ -25,7 +26,7 @@ export default async function revoke(ctx, grantId) {
 
 	await Promise.all(
 		[
-			provider.AccessToken,
+			AccessToken,
 			refreshToken ? RefreshToken : undefined,
 			authorizationCode ? AuthorizationCode : undefined,
 			deviceCode ? DeviceCode : undefined,

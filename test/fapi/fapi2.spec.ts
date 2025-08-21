@@ -11,6 +11,8 @@ import { keypair } from './fapi2.config.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { provider } from 'lib/provider.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
+import { AccessToken } from 'lib/models/access_token.js';
+import { Client } from 'lib/models/client.js';
 
 const sinon = createSandbox();
 
@@ -24,8 +26,8 @@ describe('FAPI 2.0 Final behaviours', () => {
 		});
 
 		it('does not allow query string bearer token', async function () {
-			const at = await new provider.AccessToken({
-				client: await provider.Client.find('client'),
+			const at = await new AccessToken({
+				client: await Client.find('client'),
 				accountId: this.loggedInAccountId,
 				grantId: this.getGrantId(),
 				scope: 'openid'

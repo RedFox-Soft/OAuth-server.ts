@@ -9,6 +9,7 @@ import { provider } from 'lib/provider.js';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';
+import { AccessToken } from 'lib/models/access_token.js';
 
 const sinon = createSandbox();
 
@@ -96,7 +97,7 @@ describe('opaque storage', () => {
 		const kind = 'AccessToken';
 		const upsert = spy(TestAdapter.for('AccessToken'), 'upsert');
 		const client = await Client.find(clientId);
-		const token = new provider.AccessToken({ client, ...fullPayload });
+		const token = new AccessToken({ client, ...fullPayload });
 		await token.save();
 
 		expect(upsert.getCall(0).args[0]).to.have.lengthOf(43);
@@ -123,7 +124,7 @@ describe('opaque storage', () => {
 
 	it('for AccessToken extraTokenClaims gets assigned upon save()', async function () {
 		const client = await Client.find(clientId);
-		const token = new provider.AccessToken({
+		const token = new AccessToken({
 			client,
 			...fullPayload,
 			extra: undefined

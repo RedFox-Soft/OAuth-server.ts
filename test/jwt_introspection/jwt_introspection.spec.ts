@@ -5,6 +5,8 @@ import bootstrap from '../test_helper.js';
 import * as JWT from '../../lib/helpers/jwt.ts';
 import provider from '../../lib/index.ts';
 import { ISSUER } from 'lib/configs/env.js';
+import { AccessToken } from 'lib/models/access_token.js';
+import { Client } from 'lib/models/client.js';
 
 const route = '/token/introspection';
 
@@ -46,10 +48,10 @@ describe('jwtIntrospection features', () => {
 		it('returns the response as json when not negotiated to be a JWT', async function () {
 			const now = Date.now();
 			timekeeper.freeze(now);
-			const at = new provider.AccessToken({
+			const at = new AccessToken({
 				accountId: 'accountId',
 				grantId: this.getGrantId(),
-				client: await provider.Client.find('client-signed'),
+				client: await Client.find('client-signed'),
 				scope: 'openid'
 			});
 
@@ -129,10 +131,10 @@ describe('jwtIntrospection features', () => {
 		});
 
 		it('errors when secret is expired for HMAC alg', async function () {
-			const at = new provider.AccessToken({
+			const at = new AccessToken({
 				accountId: 'accountId',
 				grantId: this.getGrantId(),
-				client: await provider.Client.find('client-HS-expired'),
+				client: await Client.find('client-HS-expired'),
 				scope: 'openid'
 			});
 
@@ -156,10 +158,10 @@ describe('jwtIntrospection features', () => {
 		});
 
 		it('non-authenticated without accept: application/token-introspection+jwt fails', async function () {
-			const at = new provider.AccessToken({
+			const at = new AccessToken({
 				accountId: 'accountId',
 				grantId: this.getGrantId(),
-				client: await provider.Client.find('client-encrypted'),
+				client: await Client.find('client-encrypted'),
 				scope: 'openid'
 			});
 

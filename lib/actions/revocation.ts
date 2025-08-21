@@ -6,6 +6,7 @@ import { urlencoded as parseBody } from '../shared/selective_body.ts';
 import paramsMiddleware from '../shared/assemble_params.ts';
 import revoke from '../helpers/revoke.ts';
 import { RefreshToken } from 'lib/models/refresh_token.js';
+import { AccessToken } from 'lib/models/access_token.js';
 
 const revokeable = new Set([
 	'AccessToken',
@@ -19,7 +20,7 @@ export default function revocationAction(provider) {
 	const { grantTypeHandlers } = instance(provider);
 
 	function getAccessToken(token) {
-		return provider.AccessToken.find(token);
+		return AccessToken.find(token);
 	}
 
 	function getClientCredentials(token) {

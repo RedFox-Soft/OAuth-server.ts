@@ -14,6 +14,7 @@ import { Claims } from 'lib/helpers/claims.js';
 import { IdToken } from 'lib/models/id_token.js';
 import { Client } from 'lib/models/client.js';
 import { provider } from 'lib/provider.js';
+import { AccessToken } from 'lib/models/access_token.js';
 
 export const userinfo = new Elysia()
 	.guard({
@@ -41,7 +42,7 @@ export const userinfo = new Elysia()
 		});
 		setNonceHeader(set.headers, dPoP);
 
-		const accessToken = await provider.AccessToken.find(accessTokenId);
+		const accessToken = await AccessToken.find(accessTokenId);
 		if (!accessToken) {
 			throw new InvalidToken('access token not found');
 		}

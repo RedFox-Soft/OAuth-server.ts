@@ -1,5 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { expect } from 'chai';
+import { AccessToken } from 'lib/models/access_token.js';
+import { Client } from 'lib/models/client.js';
 
 describe('provider instance', () => {
 	describe('provider.Client#find', () => {
@@ -56,10 +58,10 @@ describe('provider instance', () => {
 					}
 				}
 			});
-			await assert.rejects(provider.AccessToken.find('tokenValue'), {
+			await assert.rejects(AccessToken.find('tokenValue'), {
 				message: 'used this adapter'
 			});
-			await assert.rejects(provider.Client.find('clientId'), {
+			await assert.rejects(Client.find('clientId'), {
 				message: 'used this adapter'
 			});
 		});
@@ -78,10 +80,10 @@ describe('provider instance', () => {
 					}
 				}.factory
 			});
-			await assert.rejects(provider.AccessToken.find('tokenValue'), {
+			await assert.rejects(AccessToken.find('tokenValue'), {
 				message: 'used this adapter'
 			});
-			await assert.rejects(provider.Client.find('clientId'), {
+			await assert.rejects(Client.find('clientId'), {
 				message: 'used this adapter'
 			});
 		});
@@ -94,10 +96,10 @@ describe('provider instance', () => {
 					}
 				})
 			});
-			await assert.rejects(provider.AccessToken.find('tokenValue'), {
+			await assert.rejects(AccessToken.find('tokenValue'), {
 				message: 'used this adapter'
 			});
-			await assert.rejects(provider.Client.find('clientId'), {
+			await assert.rejects(Client.find('clientId'), {
 				message: 'used this adapter'
 			});
 		});

@@ -18,6 +18,7 @@ import { gty as cibaGty } from './ciba.ts';
 import { gty as deviceCodeGty } from './device_code.ts';
 import { IdToken } from 'lib/models/id_token.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
+import { AccessToken } from 'lib/models/access_token.js';
 
 function rarSupported(token) {
 	const [origin] = token.gty.split(' ');
@@ -41,7 +42,6 @@ export const handler = async function refreshTokenHandler(ctx) {
 		}
 	} = instance(ctx.oidc.provider).configuration;
 
-	const { AccessToken } = ctx.oidc.provider;
 	const { client } = ctx.oidc;
 
 	const dPoP = await dpopValidate(ctx);

@@ -29,6 +29,7 @@ import { ISSUER } from 'lib/configs/env.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
 import { Client } from 'lib/models/client.js';
+import { AccessToken } from 'lib/models/access_token.js';
 
 function ath(accessToken) {
 	return hash('sha256', accessToken, 'base64url');
@@ -68,7 +69,7 @@ describe('features.dPoP', async () => {
 	const setup = await bootstrap(import.meta.url)();
 	const cookie = await setup.login({ scope: 'openid offline_access' });
 	const keypair = await generateKeyPair('ES256', { extractable: true });
-	const jwk = await exportJWK(keypair.publicKey);;
+	const jwk = await exportJWK(keypair.publicKey);
 	const thumbprint = await calculateJwkThumbprint(jwk);
 
 	beforeEach(function () {
@@ -92,9 +93,9 @@ describe('features.dPoP', async () => {
 
 	describe('userinfo', () => {
 		it('validates the way DPoP proof JWT is provided', async function () {
-			const at = new provider.AccessToken({
+			const at = new AccessToken({
 				accountId: 'account',
-				client: await provider.Client.find('client'),
+				client: await Client.find('client'),
 				scope: 'openid'
 			});
 			at.setThumbprint('jkt', thumbprint);
@@ -159,10 +160,10 @@ describe('features.dPoP', async () => {
 
 		describe('validates the DPoP proof JWT is conform', () => {
 			before(async function () {
-				const at = new provider.AccessToken({
+				const at = new AccessToken({
 					accountId: this.loggedInAccountId,
 					grantId: this.getGrantId(),
-					client: await provider.Client.find('client'),
+					client: await Client.find('client'),
 					scope: 'openid'
 				});
 				at.setThumbprint('jkt', this.thumbprint);
@@ -501,7 +502,7 @@ describe('features.dPoP', async () => {
 		});
 
 		it('acts like an RS checking the DPoP proof and thumbprint now', async function () {
-			const at = new provider.AccessToken({
+			const at = new AccessToken({
 				accountId: setup.getAccountId(),
 				grantId: setup.getGrantId(),
 				client: await Client.find('client'),
@@ -599,9 +600,9 @@ describe('features.dPoP', async () => {
 
 	describe('introspection', () => {
 		it('exposes cnf and DPoP proof JWT type now', async function () {
-			const at = new provider.AccessToken({
+			const at = new AccessToken({
 				accountId: 'account',
-				client: await provider.Client.find('client'),
+				client: await Client.find('client'),
 				scope: 'openid'
 			});
 			at.setThumbprint('jkt', thumbprint);
@@ -665,11 +666,11 @@ describe('features.dPoP', async () => {
 			expect(spy).to.have.property('calledOnce', true);
 			const {
 				oidc: {
-					entities: { AccessToken, RefreshToken }
+					entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 				}
 			} = spy.args[0][0];
-			expect(AccessToken).to.have.property('jkt', this.thumbprint);
-			expect(RefreshToken).not.to.have.property('jkt');
+			expect(accessToken).to.have.property('jkt', this.thumbprint);
+			expect(refreshToken).not.to.have.property('jkt');
 		});
 
 		it('binds the refresh token to the jwk for public clients', async function () {

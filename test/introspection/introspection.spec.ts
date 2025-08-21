@@ -16,6 +16,7 @@ import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { Client } from 'lib/models/client.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';
+import { AccessToken } from 'lib/models/access_token.js';
 
 describe('introspection features', () => {
 	let setup = null;
@@ -45,7 +46,7 @@ describe('introspection features', () => {
 			return setup.login({ accountId: 'accountId' });
 		});
 		it('returns the properties for access token [no hint]', async function () {
-			const at = new provider.AccessToken({
+			const at = new AccessToken({
 				accountId: 'accountId',
 				grantId: setup.getGrantId(),
 				client: await Client.find('client'),
@@ -78,7 +79,7 @@ describe('introspection features', () => {
 		});
 
 		it('returns the properties for access token [correct hint]', async function () {
-			const at = new provider.AccessToken({
+			const at = new AccessToken({
 				accountId: 'accountId',
 				grantId: setup.getGrantId(),
 				client: await Client.find('client'),
@@ -99,7 +100,7 @@ describe('introspection features', () => {
 		});
 
 		it('returns the properties for access token [wrong hint]', async function () {
-			const at = new provider.AccessToken({
+			const at = new AccessToken({
 				accountId: 'accountId',
 				grantId: setup.getGrantId(),
 				client: await Client.find('client'),
@@ -120,7 +121,7 @@ describe('introspection features', () => {
 		});
 
 		it('returns the properties for access token [unrecognized hint]', async function () {
-			const at = new provider.AccessToken({
+			const at = new AccessToken({
 				accountId: 'accountId',
 				grantId: setup.getGrantId(),
 				client: await Client.find('client'),
@@ -363,7 +364,7 @@ describe('introspection features', () => {
 		});
 
 		it('responds with active=false when client auth = none and token does not belong to it', async function () {
-			const at = new provider.AccessToken({
+			const at = new AccessToken({
 				accountId: 'accountId',
 				grantId: setup.getGrantId(),
 				client: await Client.find('client'),
@@ -407,7 +408,7 @@ describe('introspection features', () => {
 		});
 
 		it('responds only with active=false when token is expired', async function () {
-			const at = new provider.AccessToken({
+			const at = new AccessToken({
 				accountId: 'accountId',
 				grantId: setup.getGrantId(),
 				client: await Client.find('client'),
@@ -447,7 +448,7 @@ describe('introspection features', () => {
 		});
 
 		it('does not allow to introspect the uninstrospectable (in case adapter is implemented wrong)', async function () {
-			spyOn(provider.AccessToken, 'find').mockReturnValue({
+			spyOn(AccessToken, 'find').mockReturnValue({
 				isValid: true,
 				kind: 'AuthorizationCode'
 			});
@@ -467,7 +468,7 @@ describe('introspection features', () => {
 			it('when introspecting an AccessToken', async function () {
 				const spy = spyOn(OIDCContext.prototype, 'entity');
 
-				const at = new provider.AccessToken({
+				const at = new AccessToken({
 					accountId: 'accountId',
 					client: await Client.find('client'),
 					scope: 'scope'

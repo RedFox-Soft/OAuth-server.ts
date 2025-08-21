@@ -17,8 +17,6 @@ import { JWKS_KEYS } from './configs/env.js';
 import KeyStore from './helpers/keystore.js';
 
 class ProviderClass extends EventEmitter {
-	#AccessToken;
-
 	#ClientCredentials;
 
 	#BackchannelAuthenticationRequest;
@@ -213,11 +211,6 @@ class ProviderClass extends EventEmitter {
 	get Interaction() {
 		this.#Interaction ||= models.getInteraction(this);
 		return this.#Interaction;
-	}
-
-	get AccessToken() {
-		this.#AccessToken ||= models.getAccessToken(this);
-		return this.#AccessToken;
 	}
 
 	get ClientCredentials() {
