@@ -9,6 +9,7 @@ import resolveResource from '../../helpers/resolve_resource.ts';
 import checkRar from '../../shared/check_rar.ts';
 import { IdToken } from 'lib/models/id_token.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
+import { AuthorizationCode } from 'lib/models/authorization_code.js';
 
 const gty = 'authorization_code';
 
@@ -41,12 +42,9 @@ export const handler = async function authorizationCodeHandler(ctx) {
 
 	const dPoP = await dpopValidate(ctx);
 
-	const code = await ctx.oidc.provider.AuthorizationCode.find(
-		ctx.oidc.params.code,
-		{
-			ignoreExpiration: true
-		}
-	);
+	const code = await AuthorizationCode.find(ctx.oidc.params.code, {
+		ignoreExpiration: true
+	});
 
 	if (!code) {
 		throw new InvalidGrant('authorization code not found');

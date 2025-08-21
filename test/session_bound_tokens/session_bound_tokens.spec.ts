@@ -8,6 +8,7 @@ import { provider } from 'lib/provider.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
+import { AuthorizationCode } from 'lib/models/authorization_code.js';
 
 function assignAuthorizationResponseValues({ headers: { location } }) {
 	const {
@@ -47,7 +48,7 @@ describe('session bound tokens behaviours', () => {
 				.expect(auth.validateClientLocation)
 				.expect(assignAuthorizationResponseValues.bind(this));
 
-			const code = await provider.AuthorizationCode.find(this.code);
+			const code = await AuthorizationCode.find(this.code);
 			expect(code).to.have.property('expiresWithSession', true);
 
 			await this.agent
@@ -93,7 +94,7 @@ describe('session bound tokens behaviours', () => {
 				.expect(auth.validateClientLocation)
 				.expect(assignAuthorizationResponseValues.bind(this));
 
-			const code = await provider.AuthorizationCode.find(this.code);
+			const code = await AuthorizationCode.find(this.code);
 			expect(code).to.have.property('expiresWithSession', true);
 
 			await this.agent
@@ -172,7 +173,7 @@ describe('session bound tokens behaviours', () => {
 				.expect(auth.validateClientLocation)
 				.expect(assignAuthorizationResponseValues.bind(this));
 
-			const code = await provider.AuthorizationCode.find(this.code);
+			const code = await AuthorizationCode.find(this.code);
 			expect(code).not.to.have.property('expiresWithSession');
 
 			await this.agent

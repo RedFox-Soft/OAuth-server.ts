@@ -275,6 +275,7 @@ export const par = new Elysia()
 			await checkResource(ctx);
 			await checkIdTokenHint(ctx);
 
+			// DPOP Verification
 			const dPoP = await dpopValidate(headers.dpop, {
 				route: routeNames.pushed_authorization_request
 			});

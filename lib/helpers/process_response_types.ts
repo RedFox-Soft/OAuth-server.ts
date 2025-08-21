@@ -1,5 +1,6 @@
 import combinedScope from './combined_scope.ts';
 import { globalConfiguration } from '../globalConfiguration.ts';
+import { AuthorizationCode } from 'lib/models/authorization_code.js';
 
 async function codeHandler(ctx) {
 	const {
@@ -15,7 +16,7 @@ async function codeHandler(ctx) {
 		ctx.oidc.resourceServers
 	);
 
-	const code = new ctx.oidc.provider.AuthorizationCode({
+	const code = new AuthorizationCode({
 		accountId: ctx.oidc.session.accountId,
 		acr: ctx.oidc.acr,
 		amr: ctx.oidc.amr,

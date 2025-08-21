@@ -9,7 +9,7 @@ import { expect } from 'chai';
 import base64url from 'base64url';
 import { treaty } from '@elysiajs/eden';
 
-import nanoid from '../lib/helpers/nanoid.ts';
+import nanoid from '../lib/helpers/nanoid.js';
 import epochTime from '../lib/helpers/epoch_time.ts';
 import { provider, elysia } from '../lib/index.ts';
 import instance from '../lib/helpers/weak_cache.ts';

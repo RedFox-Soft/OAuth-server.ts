@@ -1,6 +1,7 @@
 import { DeviceCode } from 'lib/models/device_code.js';
 import instance from './weak_cache.ts';
 import { RefreshToken } from 'lib/models/refresh_token.js';
+import { AuthorizationCode } from 'lib/models/authorization_code.js';
 
 export default async function revoke(ctx, grantId) {
 	const {
@@ -26,7 +27,7 @@ export default async function revoke(ctx, grantId) {
 		[
 			provider.AccessToken,
 			refreshToken ? RefreshToken : undefined,
-			authorizationCode ? provider.AuthorizationCode : undefined,
+			authorizationCode ? AuthorizationCode : undefined,
 			deviceCode ? DeviceCode : undefined,
 			backchannelAuthenticationRequest
 				? provider.BackchannelAuthenticationRequest

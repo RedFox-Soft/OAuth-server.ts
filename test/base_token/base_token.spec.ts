@@ -10,6 +10,7 @@ import { provider } from 'lib/provider.js';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { TestAdapter } from 'test/models.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
+import { AuthorizationCode } from 'lib/models/authorization_code.js';
 
 const sinon = createSandbox();
 
@@ -150,13 +151,13 @@ describe('BaseToken', () => {
 	});
 
 	it('consumed token save saves consumed', async function () {
-		let token = new provider.AuthorizationCode({
+		let token = new AuthorizationCode({
 			grantId: 'foo',
 			consumed: true
 		});
 		const first = await token.save();
 
-		token = await provider.AuthorizationCode.find(first);
+		token = await AuthorizationCode.find(first);
 		expect(token.consumed).to.be.true;
 	});
 

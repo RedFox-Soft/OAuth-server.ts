@@ -4,6 +4,7 @@ import bootstrap, { agent } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { provider } from 'lib/provider.js';
 import { TestAdapter } from 'test/models.js';
+import { AuthorizationCode } from 'lib/models/authorization_code.js';
 
 describe('PKCE RFC7636', () => {
 	let setup = null;
@@ -152,7 +153,7 @@ describe('PKCE RFC7636', () => {
 
 	describe('token grant_type=authorization_code', async () => {
 		it('passes with S256 values', async function () {
-			const authCode = new provider.AuthorizationCode({
+			const authCode = new AuthorizationCode({
 				accountId: setup.getAccountId(),
 				grantId: setup.getGrantId(),
 				scope: 'openid',
@@ -174,7 +175,7 @@ describe('PKCE RFC7636', () => {
 		});
 
 		it('checks presence of code_verifier param if code has codeChallenge', async function () {
-			const authCode = new provider.AuthorizationCode({
+			const authCode = new AuthorizationCode({
 				accountId: setup.getAccountId(),
 				grantId: setup.getGrantId(),
 				scope: 'openid',
@@ -196,7 +197,7 @@ describe('PKCE RFC7636', () => {
 		});
 
 		it('checks value of code_verifier when method = S256', async function () {
-			const authCode = new provider.AuthorizationCode({
+			const authCode = new AuthorizationCode({
 				accountId: setup.getAccountId(),
 				grantId: setup.getGrantId(),
 				scope: 'openid',
@@ -219,7 +220,7 @@ describe('PKCE RFC7636', () => {
 		});
 
 		it('checks that code_verifier is conform to its ABNF (too short)', async function () {
-			const authCode = new provider.AuthorizationCode({
+			const authCode = new AuthorizationCode({
 				accountId: setup.getAccountId(),
 				grantId: setup.getGrantId(),
 				scope: 'openid',
@@ -246,7 +247,7 @@ describe('PKCE RFC7636', () => {
 		});
 
 		it('checks that code_verifier is conform to its ABNF (too long)', async function () {
-			const authCode = new provider.AuthorizationCode({
+			const authCode = new AuthorizationCode({
 				accountId: setup.getAccountId(),
 				grantId: setup.getGrantId(),
 				scope: 'openid',
@@ -273,7 +274,7 @@ describe('PKCE RFC7636', () => {
 		});
 
 		it('checks that code_verifier is conform to its ABNF (charset)', async function () {
-			const authCode = new provider.AuthorizationCode({
+			const authCode = new AuthorizationCode({
 				accountId: setup.getAccountId(),
 				grantId: setup.getGrantId(),
 				scope: 'openid',
@@ -300,7 +301,7 @@ describe('PKCE RFC7636', () => {
 		});
 
 		it('passes if S256 is used', async function () {
-			const authCode = new provider.AuthorizationCode({
+			const authCode = new AuthorizationCode({
 				accountId: setup.getAccountId(),
 				grantId: setup.getGrantId(),
 				scope: 'openid',

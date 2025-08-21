@@ -10,6 +10,10 @@ export const refreshTokenGrantParameters = t.Object({
 	refresh_token: t.String()
 });
 
+export const deviceCodeGrantParameters = t.Object({
+	device_code: t.String()
+});
+
 export * as authorization_code from './authorization_code.ts';
 export * as client_credentials from './client_credentials.ts';
 export * as refresh_token from './refresh_token.ts';

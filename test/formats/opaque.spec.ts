@@ -8,6 +8,7 @@ import { TestAdapter } from 'test/models.js';
 import { provider } from 'lib/provider.js';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
+import { AuthorizationCode } from 'lib/models/authorization_code.js';
 
 const sinon = createSandbox();
 
@@ -136,7 +137,7 @@ describe('opaque storage', () => {
 		const kind = 'AuthorizationCode';
 		const upsert = spy(TestAdapter.for('AuthorizationCode'), 'upsert');
 		const client = await Client.find(clientId);
-		const token = new provider.AuthorizationCode({
+		const token = new AuthorizationCode({
 			client,
 			...fullPayload
 		});

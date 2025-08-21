@@ -6,16 +6,15 @@ import isSessionBound from './mixins/is_session_bound.ts';
 import storesAuth from './mixins/stores_auth.ts';
 import storesPKCE from './mixins/stores_pkce.ts';
 
-export default (provider) =>
-	class AuthorizationCode extends apply([
-		consumable,
-		isSessionBound,
-		hasGrantId,
-		storesAuth,
-		storesPKCE,
-		BaseToken
-	]) {
-		static get IN_PAYLOAD() {
-			return [...super.IN_PAYLOAD, 'redirectUri', 'dpopJkt', 'rar'];
-		}
-	};
+export class AuthorizationCode extends apply([
+	consumable,
+	isSessionBound,
+	hasGrantId,
+	storesAuth,
+	storesPKCE,
+	BaseToken
+]) {
+	static get IN_PAYLOAD() {
+		return [...super.IN_PAYLOAD, 'redirectUri', 'dpopJkt', 'rar'];
+	}
+}

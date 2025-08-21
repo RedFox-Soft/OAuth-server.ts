@@ -19,8 +19,6 @@ import KeyStore from './helpers/keystore.js';
 class ProviderClass extends EventEmitter {
 	#AccessToken;
 
-	#AuthorizationCode;
-
 	#ClientCredentials;
 
 	#BackchannelAuthenticationRequest;
@@ -220,11 +218,6 @@ class ProviderClass extends EventEmitter {
 	get AccessToken() {
 		this.#AccessToken ||= models.getAccessToken(this);
 		return this.#AccessToken;
-	}
-
-	get AuthorizationCode() {
-		this.#AuthorizationCode ||= models.getAuthorizationCode(this);
-		return this.#AuthorizationCode;
 	}
 
 	get ClientCredentials() {

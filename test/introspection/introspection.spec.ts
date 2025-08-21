@@ -15,6 +15,7 @@ import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { Client } from 'lib/models/client.js';
+import { AuthorizationCode } from 'lib/models/authorization_code.js';
 
 describe('introspection features', () => {
 	let setup = null;
@@ -393,7 +394,7 @@ describe('introspection features', () => {
 		});
 
 		it('ignores unsupported tokens', async function () {
-			const ac = new provider.AuthorizationCode({ clientId: 'client' });
+			const ac = new AuthorizationCode({ clientId: 'client' });
 			const token = await ac.save();
 			const { data, status } = await agent.token.introspect.post(
 				{ token },

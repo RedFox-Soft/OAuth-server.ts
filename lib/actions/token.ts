@@ -7,6 +7,7 @@ import getTokenAuth from '../shared/token_auth.ts';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import {
 	codeGrantParameters,
+	deviceCodeGrantParameters,
 	refreshTokenGrantParameters
 } from './grants/index.js';
 import { routeNames } from 'lib/consts/param_list.js';
@@ -68,7 +69,8 @@ export const tokenAction = new Elysia().post(
 				grant_type: t.String()
 			}),
 			t.Partial(codeGrantParameters),
-			t.Partial(refreshTokenGrantParameters)
+			t.Partial(refreshTokenGrantParameters),
+			t.Partial(deviceCodeGrantParameters)
 		]),
 		headers: t.Object({
 			authorization: t.Optional(t.String())

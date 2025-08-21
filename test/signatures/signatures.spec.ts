@@ -5,6 +5,7 @@ import { decode } from '../../lib/helpers/jwt.ts';
 import epochTime from '../../lib/helpers/epoch_time.ts';
 import { provider } from 'lib/provider.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
+import { AuthorizationCode } from 'lib/models/authorization_code.js';
 
 describe('signatures', () => {
 	before(bootstrap(import.meta.url));
@@ -15,7 +16,7 @@ describe('signatures', () => {
 		});
 
 		beforeEach(async function () {
-			const ac = new provider.AuthorizationCode({
+			const ac = new AuthorizationCode({
 				accountId: this.loggedInAccountId,
 				acr: i(provider).configuration.acrValues[0],
 				authTime: epochTime(),
