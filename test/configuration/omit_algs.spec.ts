@@ -7,8 +7,7 @@ import { JWKS_KEYS } from 'lib/configs/env.js';
 describe('Provider declaring supported algorithms', () => {
 	it('validates the configuration properties', () => {
 		expect(() => {
-			provider.init('https://op.example.com', {
-				// eslint-disable-line no-new
+			provider.init({
 				enabledJWA: {
 					invalidProperty: ['HS256', 'RS256']
 				}
@@ -18,8 +17,7 @@ describe('Provider declaring supported algorithms', () => {
 
 	it('validates only implemented algs are provided', () => {
 		expect(() => {
-			provider.init('https://op.example.com', {
-				// eslint-disable-line no-new
+			provider.init({
 				enabledJWA: {
 					clientAuthSigningAlgValues: ['none']
 				}

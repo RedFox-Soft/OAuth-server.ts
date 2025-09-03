@@ -28,8 +28,7 @@ describe('userinfo /me', () => {
 
 	it('jwtUserinfo can only be enabled with userinfo', () => {
 		expect(() => {
-			provider.init('http://localhost', {
-				// eslint-disable-line no-new
+			provider.init({
 				features: {
 					jwtUserinfo: { enabled: true },
 					userinfo: { enabled: false }

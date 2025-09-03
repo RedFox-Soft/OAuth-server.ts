@@ -34,8 +34,7 @@ describe('jwtIntrospection features', () => {
 		});
 		it('can only be enabled with introspection', () => {
 			expect(() => {
-				provider.init('http://localhost', {
-					// eslint-disable-line no-new
+				provider.init({
 					features: {
 						jwtIntrospection: { enabled: true }
 					}

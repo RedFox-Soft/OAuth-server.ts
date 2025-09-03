@@ -4,10 +4,8 @@ import provider from '../../lib/index.ts';
 
 describe('custom claims', () => {
 	it('allows for claims to be added under openid scope using array syntax', () => {
-		provider.init('https://op.example.com', {
-			claims: {
-				openid: ['foo']
-			}
+		provider.init({
+			claims: { openid: ['foo'] }
 		});
 
 		expect(i(provider).configuration.claims.openid).to.eql({
@@ -17,10 +15,8 @@ describe('custom claims', () => {
 	});
 
 	it('allows for claims to be added under openid scope using object syntax', () => {
-		provider.init('https://op.example.com', {
-			claims: {
-				openid: { foo: null }
-			}
+		provider.init({
+			claims: { openid: { foo: null } }
 		});
 
 		expect(i(provider).configuration.claims.openid).to.eql({
@@ -30,7 +26,7 @@ describe('custom claims', () => {
 	});
 
 	it('detects new scopes from claims definition', () => {
-		provider.init('https://op.example.com', {
+		provider.init({
 			claims: {
 				insurance: ['company_name', 'coverage'],
 				payment: {
@@ -43,9 +39,7 @@ describe('custom claims', () => {
 	});
 
 	it('removes the acr claim if no acrs are configured', () => {
-		provider.init('https://op.example.com', {
-			acrValues: []
-		});
+		provider.init({ acrValues: [] });
 
 		expect(i(provider).configuration.claimsSupported).not.to.contain('acr');
 	});

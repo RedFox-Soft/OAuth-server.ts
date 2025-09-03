@@ -19,8 +19,7 @@ describe('client registration policies', () => {
 	describe('configuration', () => {
 		it('must only be enabled in conjuction with adapter-backed initial access tokens', () => {
 			expect(() => {
-				// eslint-disable-next-line no-new
-				provider.init('http://localhost', {
+				provider.init({
 					features: {
 						registration: {
 							enabled: true,

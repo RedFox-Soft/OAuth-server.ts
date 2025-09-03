@@ -117,10 +117,9 @@ export default function testHelper(
 
 		Object.assign(ApplicationConfig, applicationDefaultSettings, app || {});
 		Object.assign(ClientDefaults, clientDefaultSettings, clientSettings || {});
-		const issuerIdentifier = `${protocol}//127.0.0.1:3000`;
 		TestAdapter.clear();
 
-		provider.init(issuerIdentifier, {
+		provider.init({
 			clients,
 			adapter: TestAdapter,
 			...config

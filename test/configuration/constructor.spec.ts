@@ -8,7 +8,7 @@ describe('Provider configuration', () => {
 	describe('clients', () => {
 		it('may contain static clients when these have at least the client_id', () => {
 			expect(() => {
-				provider.init('http://localhost:3000', {
+				provider.init({
 					clients: [null]
 				});
 			})
@@ -18,7 +18,7 @@ describe('Provider configuration', () => {
 					'client_id is mandatory property for statically configured clients'
 				);
 			expect(() => {
-				provider.init('http://localhost:3000', {
+				provider.init({
 					clients: [{}]
 				});
 			})
@@ -30,7 +30,7 @@ describe('Provider configuration', () => {
 		});
 		it('client_id must be unique amongst the static clients', () => {
 			expect(() => {
-				provider.init('http://localhost:3000', {
+				provider.init({
 					clients: [{ client_id: 'foo' }, { client_id: 'foo' }]
 				});
 			})
@@ -44,26 +44,26 @@ describe('Provider configuration', () => {
 
 	describe('acrValues', () => {
 		it('only accepts arrays and sets', () => {
-			provider.init('http://localhost:3000', {
+			provider.init({
 				acrValues: ['bronze', 'silver']
 			});
-			provider.init('http://localhost:3000', {
+			provider.init({
 				acrValues: new Set(['bronze', 'silver'])
 			});
 			expect(() => {
-				provider.init('http://localhost:3000', { acrValues: { bronze: true } });
+				provider.init({ acrValues: { bronze: true } });
 			}).to.throw('acrValues must be an Array or Set');
 		});
 	});
 
 	describe('subjectTypes', () => {
 		it('only accepts arrays and sets', () => {
-			provider.init('http://localhost:3000', { subjectTypes: ['public'] });
-			provider.init('http://localhost:3000', {
+			provider.init({ subjectTypes: ['public'] });
+			provider.init({
 				subjectTypes: new Set(['public'])
 			});
 			expect(() => {
-				provider.init('http://localhost:3000', {
+				provider.init({
 					subjectTypes: { bronze: true }
 				});
 			}).to.throw('subjectTypes must be an Array or Set');
@@ -72,19 +72,19 @@ describe('Provider configuration', () => {
 
 	describe('scopes', () => {
 		it('only accepts arrays and sets', () => {
-			provider.init('http://localhost:3000', { scopes: ['foo', 'bar'] });
-			provider.init('http://localhost:3000', {
+			provider.init({ scopes: ['foo', 'bar'] });
+			provider.init({
 				scopes: new Set(['foo', 'bar'])
 			});
 			expect(() => {
-				provider.init('http://localhost:3000', { scopes: { foo: true } });
+				provider.init({ scopes: { foo: true } });
 			}).to.throw('scopes must be an Array or Set');
 		});
 	});
 
 	it('validates configuration clientAuthMethods members', () => {
 		expect(() => {
-			provider.init('http://localhost:3000', { clientAuthMethods: ['foo'] });
+			provider.init({ clientAuthMethods: ['foo'] });
 		}).to.throw(
 			"only supported clientAuthMethods are 'none', 'client_secret_basic', 'client_secret_jwt', 'client_secret_post', and 'private_key_jwt'"
 		);

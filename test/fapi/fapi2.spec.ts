@@ -63,9 +63,6 @@ describe('FAPI 2.0 Final behaviours', () => {
 		beforeEach(function () {
 			return this.login();
 		});
-		afterEach(function () {
-			return this.logout();
-		});
 
 		it('requires PKCE to be used on the authorization endpoint', function () {
 			const auth = new AuthorizationRequest({
@@ -132,9 +129,6 @@ describe('FAPI 2.0 Final behaviours', () => {
 	describe('Request Object', () => {
 		beforeEach(function () {
 			return this.login();
-		});
-		afterEach(function () {
-			return this.logout();
 		});
 
 		it('still works', async function () {

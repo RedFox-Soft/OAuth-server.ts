@@ -61,7 +61,7 @@ describe('client authentication options', () => {
 
 	describe('discovery', () => {
 		it('pushes no algs when neither _jwt method is enabled', () => {
-			provider.init('http://localhost', {
+			provider.init({
 				clientAuthMethods: ['none', 'client_secret_basic', 'client_secret_post']
 			});
 

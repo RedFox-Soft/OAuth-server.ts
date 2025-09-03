@@ -27,16 +27,11 @@ class ProviderClass extends EventEmitter {
 
 	#Interaction;
 
-	#mountPath;
-
 	#RegistrationAccessToken;
 
 	#int = {};
 
-	init(issuer, setup) {
-		const { pathname } = new URL(issuer);
-		this.issuer = issuer;
-
+	init(setup) {
 		const configuration = new Configuration(setup);
 		this.#int.staticClients = new Map();
 		this.#int.dynamicClients = new QuickLRU({ maxSize: 100 });
@@ -50,8 +45,6 @@ class ProviderClass extends EventEmitter {
 		this.#int.grantTypeHandlers = new Map();
 		this.#int.grantTypeDupes = new Map();
 		this.#int.grantTypeParams = new Map([[undefined, new Set()]]);
-
-		this.#mountPath = pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
 
 		initializeAdapter.call(this, configuration.adapter);
 
@@ -118,7 +111,7 @@ class ProviderClass extends EventEmitter {
 		}
 	}
 
-	pathFor(name, { mountPath = this.#mountPath, ...opts } = {}) {
+	pathFor(name, { mountPath = '', ...opts } = {}) {
 		const routerUrl = this.#int.router.url(name, opts);
 
 		if (routerUrl instanceof Error) {
