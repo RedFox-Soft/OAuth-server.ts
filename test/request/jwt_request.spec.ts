@@ -94,7 +94,8 @@ describe('request parameter features', () => {
 				}),
 				{
 					headers: {
-						cookie
+						cookie,
+						['content-type']: 'application/x-www-form-urlencoded'
 					}
 				}
 			);
@@ -155,7 +156,8 @@ describe('request parameter features', () => {
 			}),
 			{
 				headers: {
-					cookie
+					cookie,
+					['content-type']: 'application/x-www-form-urlencoded'
 				}
 			}
 		);

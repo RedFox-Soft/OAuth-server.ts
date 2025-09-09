@@ -27,7 +27,8 @@ describe('/auth', () => {
 					new URLSearchParams(Object.entries(auth.params)).toString(),
 					{
 						headers: {
-							cookie: skipCookie ? undefined : cookie
+							cookie: skipCookie ? undefined : cookie,
+							['content-type']: 'application/x-www-form-urlencoded'
 						}
 					}
 				);

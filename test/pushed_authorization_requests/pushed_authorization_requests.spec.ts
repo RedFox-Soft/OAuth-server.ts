@@ -102,7 +102,10 @@ describe('Pushed Request Object', () => {
 							redirect_uri: 'https://rp.example.com/unlisted'
 						}),
 						{
-							headers: AuthorizationRequest.basicAuthHeader(clientId, 'secret')
+							headers: {
+								['content-type']: 'application/x-www-form-urlencoded',
+								...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
+							}
 						}
 					);
 					expect(par.response.status).toBe(201);
@@ -145,7 +148,7 @@ describe('Pushed Request Object', () => {
 						TestAdapter.for('AuthorizationCode').syncFind(jti)
 					).toHaveProperty('redirectUri', 'https://rp.example.com/unlisted');
 
-					const { response } = await agent.token.post(
+					const { response, error } = await agent.token.post(
 						// @ts-expect-error endpoint will be parse to object
 						jsonToFormUrlEncoded({
 							code,
@@ -154,7 +157,10 @@ describe('Pushed Request Object', () => {
 							redirect_uri: 'https://rp.example.com/unlisted'
 						}),
 						{
-							headers: auth.basicAuthHeader
+							headers: {
+								['content-type']: 'application/x-www-form-urlencoded',
+								...auth.basicAuthHeader
+							}
 						}
 					);
 					expect(response.status).toBe(200);
@@ -175,7 +181,12 @@ describe('Pushed Request Object', () => {
 							code_challenge,
 							client_id: testClientId,
 							redirect_uri: 'https://rp.example.com/unlisted'
-						})
+						}),
+						{
+							headers: {
+								['content-type']: 'application/x-www-form-urlencoded'
+							}
+						}
 					);
 					expect(error.status).toBe(400);
 					expect(error.value).toEqual({
@@ -203,7 +214,10 @@ describe('Pushed Request Object', () => {
 							redirect_uri: 'not-a-valid-uri'
 						}),
 						{
-							headers: AuthorizationRequest.basicAuthHeader(clientId, 'secret')
+							headers: {
+								['content-type']: 'application/x-www-form-urlencoded',
+								...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
+							}
 						}
 					);
 					expect(par.response.status).toBe(422);
@@ -224,7 +238,10 @@ describe('Pushed Request Object', () => {
 							redirect_uri: 'https://rp.example.com/unlisted#fragment'
 						}),
 						{
-							headers: AuthorizationRequest.basicAuthHeader(clientId, 'secret')
+							headers: {
+								['content-type']: 'application/x-www-form-urlencoded',
+								...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
+							}
 						}
 					);
 					expect(error.status).toBe(400);
@@ -245,10 +262,10 @@ describe('Pushed Request Object', () => {
 								request: 'this.should.be.a.jwt'
 							}),
 							{
-								headers: AuthorizationRequest.basicAuthHeader(
-									clientId,
-									'secret'
-								)
+								headers: {
+									['content-type']: 'application/x-www-form-urlencoded',
+									...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
+								}
 							}
 						);
 						expect(error.status).toBe(400);
@@ -277,10 +294,10 @@ describe('Pushed Request Object', () => {
 									client_id: clientId
 								}),
 								{
-									headers: AuthorizationRequest.basicAuthHeader(
-										clientId,
-										'secret'
-									)
+									headers: {
+										['content-type']: 'application/x-www-form-urlencoded',
+										...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
+									}
 								}
 							);
 							const entities = spy.mock.calls.map((call) => call[0]);
@@ -315,10 +332,10 @@ describe('Pushed Request Object', () => {
 									})
 								}),
 								{
-									headers: AuthorizationRequest.basicAuthHeader(
-										clientId,
-										'secret'
-									)
+									headers: {
+										['content-type']: 'application/x-www-form-urlencoded',
+										...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
+									}
 								}
 							);
 							expect(response.status).toBe(201);
@@ -364,10 +381,10 @@ describe('Pushed Request Object', () => {
 									request_uri: 'https://rp.example.com/jar#foo'
 								}),
 								{
-									headers: AuthorizationRequest.basicAuthHeader(
-										clientId,
-										'secret'
-									)
+									headers: {
+										['content-type']: 'application/x-www-form-urlencoded',
+										...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
+									}
 								}
 							);
 							expect(error.status).toBe(422);
@@ -393,10 +410,10 @@ describe('Pushed Request Object', () => {
 									redirect_uri: 'https://rp.example.com/unlisted'
 								}),
 								{
-									headers: AuthorizationRequest.basicAuthHeader(
-										clientId,
-										'secret'
-									)
+									headers: {
+										['content-type']: 'application/x-www-form-urlencoded',
+										...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
+									}
 								}
 							);
 							expect(error.status).toBe(400);
@@ -429,10 +446,10 @@ describe('Pushed Request Object', () => {
 									client_id: clientId
 								}),
 								{
-									headers: AuthorizationRequest.basicAuthHeader(
-										clientId,
-										'secret'
-									)
+									headers: {
+										['content-type']: 'application/x-www-form-urlencoded',
+										...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
+									}
 								}
 							);
 							TestAdapter.for('PushedAuthorizationRequest').upsert.restore();
@@ -463,10 +480,10 @@ describe('Pushed Request Object', () => {
 									client_id: clientId
 								}),
 								{
-									headers: AuthorizationRequest.basicAuthHeader(
-										clientId,
-										'secret'
-									)
+									headers: {
+										['content-type']: 'application/x-www-form-urlencoded',
+										...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
+									}
 								}
 							);
 
@@ -516,10 +533,13 @@ describe('Pushed Request Object', () => {
 									client_id: 'client-alg-registered'
 								}),
 								{
-									headers: AuthorizationRequest.basicAuthHeader(
-										'client-alg-registered',
-										'secret'
-									)
+									headers: {
+										['content-type']: 'application/x-www-form-urlencoded',
+										...AuthorizationRequest.basicAuthHeader(
+											'client-alg-registered',
+											'secret'
+										)
+									}
 								}
 							);
 
@@ -637,10 +657,10 @@ describe('Pushed Request Object', () => {
 									request
 								}),
 								{
-									headers: AuthorizationRequest.basicAuthHeader(
-										clientId,
-										'secret'
-									)
+									headers: {
+										['content-type']: 'application/x-www-form-urlencoded',
+										...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
+									}
 								}
 							);
 							const entities = spy.mock.calls.map((call) => call[0]);
@@ -676,10 +696,10 @@ describe('Pushed Request Object', () => {
 									)
 								}),
 								{
-									headers: AuthorizationRequest.basicAuthHeader(
-										clientId,
-										'secret'
-									)
+									headers: {
+										['content-type']: 'application/x-www-form-urlencoded',
+										...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
+									}
 								}
 							);
 							expect(response.status).toBe(201);
@@ -716,10 +736,10 @@ describe('Pushed Request Object', () => {
 									)
 								}),
 								{
-									headers: AuthorizationRequest.basicAuthHeader(
-										clientId,
-										'secret'
-									)
+									headers: {
+										['content-type']: 'application/x-www-form-urlencoded',
+										...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
+									}
 								}
 							);
 							expect(error.status).toBe(422);
@@ -756,10 +776,10 @@ describe('Pushed Request Object', () => {
 									)
 								}),
 								{
-									headers: AuthorizationRequest.basicAuthHeader(
-										clientId,
-										'secret'
-									)
+									headers: {
+										['content-type']: 'application/x-www-form-urlencoded',
+										...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
+									}
 								}
 							);
 							expect(response.status).toBe(201);
@@ -799,10 +819,10 @@ describe('Pushed Request Object', () => {
 									)
 								}),
 								{
-									headers: AuthorizationRequest.basicAuthHeader(
-										clientId,
-										'secret'
-									)
+									headers: {
+										['content-type']: 'application/x-www-form-urlencoded',
+										...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
+									}
 								}
 							);
 							expect(response.status).toBe(201);
@@ -842,10 +862,10 @@ describe('Pushed Request Object', () => {
 									)
 								}),
 								{
-									headers: AuthorizationRequest.basicAuthHeader(
-										clientId,
-										'secret'
-									)
+									headers: {
+										['content-type']: 'application/x-www-form-urlencoded',
+										...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
+									}
 								}
 							);
 							expect(response.status).toBe(201);
@@ -882,10 +902,13 @@ describe('Pushed Request Object', () => {
 									)
 								}),
 								{
-									headers: AuthorizationRequest.basicAuthHeader(
-										'client-alg-registered',
-										'secret'
-									)
+									headers: {
+										['content-type']: 'application/x-www-form-urlencoded',
+										...AuthorizationRequest.basicAuthHeader(
+											'client-alg-registered',
+											'secret'
+										)
+									}
 								}
 							);
 							expect(error.status).toBe(400);
@@ -921,10 +944,10 @@ describe('Pushed Request Object', () => {
 									)
 								}),
 								{
-									headers: AuthorizationRequest.basicAuthHeader(
-										clientId,
-										'secret'
-									)
+									headers: {
+										['content-type']: 'application/x-www-form-urlencoded',
+										...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
+									}
 								}
 							);
 							expect(error.status).toBe(400);
@@ -961,10 +984,10 @@ describe('Pushed Request Object', () => {
 									)
 								}),
 								{
-									headers: AuthorizationRequest.basicAuthHeader(
-										clientId,
-										'secret'
-									)
+									headers: {
+										['content-type']: 'application/x-www-form-urlencoded',
+										...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
+									}
 								}
 							);
 							expect(error.status).toBe(400);
@@ -1006,10 +1029,10 @@ describe('Pushed Request Object', () => {
 									)
 								}),
 								{
-									headers: AuthorizationRequest.basicAuthHeader(
-										clientId,
-										'secret'
-									)
+									headers: {
+										['content-type']: 'application/x-www-form-urlencoded',
+										...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
+									}
 								}
 							);
 							expect(error.status).toBe(500);
@@ -1047,10 +1070,10 @@ describe('Pushed Request Object', () => {
 									)
 								}),
 								{
-									headers: AuthorizationRequest.basicAuthHeader(
-										clientId,
-										'secret'
-									)
+									headers: {
+										['content-type']: 'application/x-www-form-urlencoded',
+										...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
+									}
 								}
 							);
 

@@ -62,13 +62,7 @@ Object.defineProperties(Object.getPrototypeOf(provider), {
 
 const jwt = (token) => JSON.parse(base64url.decode(token.split('.')[1])).jti;
 
-export const agent = treaty(elysia, {
-	onRequest: (path, fetchInit) => {
-		if (fetchInit.method === 'POST' && !fetchInit.body?.startsWith?.('{')) {
-			fetchInit.headers['content-type'] = 'application/x-www-form-urlencoded';
-		}
-	}
-});
+export const agent = treaty(elysia);
 
 export function jsonToFormUrlEncoded(json: Record<string, unknown>) {
 	const searchParams = new URLSearchParams();

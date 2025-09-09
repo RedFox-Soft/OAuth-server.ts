@@ -16,9 +16,8 @@ import { UseDpopNonce } from 'lib/helpers/validate_dpop.js';
 import { DPoPNonces } from 'lib/helpers/dpop_nonces.js';
 
 function getFirstError(error: ValidationError) {
-	const validator = error.validator ?? error.error.validator;
 	const firstError =
-		'Errors' in validator ? validator.Errors(error.value).First() : error;
+		'valueError' in error ? mapValueError(error.valueError) : error;
 	return firstError;
 }
 

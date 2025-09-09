@@ -2,7 +2,6 @@ import { parse as parseUrl } from 'node:url';
 import { describe, it, beforeAll, expect } from 'bun:test';
 import bootstrap, { agent } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
-import { provider } from 'lib/provider.js';
 import { TestAdapter } from 'test/models.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';
 

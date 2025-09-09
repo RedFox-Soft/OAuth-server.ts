@@ -2,7 +2,6 @@ import { describe, it, beforeAll, expect, spyOn } from 'bun:test';
 
 import bootstrap, { agent } from '../../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
-import { provider } from 'lib/provider.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 
 describe('/auth response_type=none', () => {
@@ -27,7 +26,8 @@ describe('/auth response_type=none', () => {
 					new URLSearchParams(Object.entries(auth.params)).toString(),
 					{
 						headers: {
-							cookie
+							cookie,
+							['content-type']: 'application/x-www-form-urlencoded'
 						}
 					}
 				);

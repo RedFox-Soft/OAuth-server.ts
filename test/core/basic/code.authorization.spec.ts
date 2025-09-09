@@ -45,11 +45,11 @@ describe('BASIC code', () => {
 				});
 			}
 
-			// @ts-expect-error string will be converted to form url encoded
 			return agent.auth.post(jsonToFormUrlEncoded(auth.params), {
 				headers: {
 					cookie,
-					accept
+					accept,
+					['content-type']: 'application/x-www-form-urlencoded'
 				}
 			});
 		}

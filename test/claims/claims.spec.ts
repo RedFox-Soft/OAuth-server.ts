@@ -30,7 +30,7 @@ expire.setDate(expire.getDate() + 1);
 
 		// @ts-expect-error string will be converted to form url encoded
 		return agent.auth.post(jsonToFormUrlEncoded(auth.params), {
-			headers: { cookie }
+			headers: { cookie, ['content-type']: 'application/x-www-form-urlencoded' }
 		});
 	}
 

@@ -227,7 +227,6 @@ class ProviderClass extends EventEmitter {
 		return this.#BackchannelAuthenticationRequest;
 	}
 
-	// eslint-disable-next-line class-methods-use-this
 	get ResourceServer() {
 		return ResourceServer;
 	}
