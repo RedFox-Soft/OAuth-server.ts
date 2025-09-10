@@ -13,7 +13,7 @@ merge(config.features, {
 
 function allowUnregisteredClient(suffix, metadata) {
 	return {
-		client_id: `client-unregistered-test-${suffix}`,
+		clientId: `client-unregistered-test-${suffix}`,
 		application_type: 'web',
 		token_endpoint_auth_method: 'client_secret_basic',
 		client_secret: 'secret',
@@ -30,18 +30,18 @@ export default {
 	config,
 	clients: [
 		{
-			client_id: 'client',
+			clientId: 'client',
 			client_secret: 'secret',
 			redirect_uris: ['https://rp.example.com/cb']
 		},
 		{
-			client_id: 'client-par-required',
+			clientId: 'client-par-required',
 			client_secret: 'secret',
 			redirect_uris: ['https://rp.example.com/cb'],
 			'authorization.requirePushedAuthorizationRequests': true
 		},
 		{
-			client_id: 'client-alg-registered',
+			clientId: 'client-alg-registered',
 			client_secret: 'secret',
 			request_object_signing_alg: 'HS256',
 			redirect_uris: ['https://rp.example.com/cb']

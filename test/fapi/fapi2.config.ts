@@ -30,7 +30,7 @@ export default {
 	config,
 	clients: [
 		{
-			client_id: 'client',
+			clientId: 'client',
 			token_endpoint_auth_method: 'private_key_jwt',
 			response_types: ['code'],
 			grant_types: ['authorization_code'],

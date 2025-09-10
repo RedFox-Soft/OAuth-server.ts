@@ -10,7 +10,7 @@ export default {
 	config,
 	clients: [
 		{
-			client_id: 'client',
+			clientId: 'client',
 			client_secret: 'secret',
 			response_types: ['code'],
 			grant_types: ['authorization_code', 'refresh_token'],
@@ -19,7 +19,7 @@ export default {
 			backchannel_logout_session_required: true
 		},
 		{
-			client_id: 'second-client',
+			clientId: 'second-client',
 			client_secret: 'secret',
 			response_types: ['code'],
 			grant_types: ['authorization_code', 'refresh_token'],
@@ -29,7 +29,7 @@ export default {
 			backchannel_logout_session_required: true
 		},
 		{
-			client_id: 'no-sid',
+			clientId: 'no-sid',
 			client_secret: 'secret',
 			response_types: ['code'],
 			grant_types: ['authorization_code', 'refresh_token'],

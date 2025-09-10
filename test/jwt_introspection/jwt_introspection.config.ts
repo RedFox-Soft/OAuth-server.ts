@@ -14,13 +14,13 @@ export default {
 	config,
 	clients: [
 		{
-			client_id: 'client-signed',
+			clientId: 'client-signed',
 			client_secret: 'secret',
 			introspection_signed_response_alg: 'RS256',
 			redirect_uris: ['https://client.example.com/cb']
 		},
 		{
-			client_id: 'client-HS-expired',
+			clientId: 'client-HS-expired',
 			client_secret: 'secret',
 			client_secret_expires_at: 1,
 			token_endpoint_auth_method: 'none',
@@ -28,7 +28,7 @@ export default {
 			redirect_uris: ['https://client.example.com/cb']
 		},
 		{
-			client_id: 'client-encrypted',
+			clientId: 'client-encrypted',
 			client_secret: 'secret',
 			token_endpoint_auth_method: 'none',
 			introspection_encrypted_response_alg: 'A128KW',

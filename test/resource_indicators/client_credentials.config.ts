@@ -32,7 +32,7 @@ merge(config.features, {
 export default {
 	config,
 	client: {
-		client_id: 'client',
+		clientId: 'client',
 		client_secret: 'secret',
 		grant_types: ['client_credentials'],
 		response_types: [],

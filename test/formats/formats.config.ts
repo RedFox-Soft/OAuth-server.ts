@@ -20,12 +20,12 @@ export default {
 	config,
 	clients: [
 		{
-			client_id: 'client',
+			clientId: 'client',
 			client_secret: 'secret',
 			redirect_uris: ['https://client.example.com/cb']
 		},
 		{
-			client_id: 'pairwise',
+			clientId: 'pairwise',
 			client_secret: 'secret',
 			redirect_uris: ['https://client.example.com/cb'],
 			subject_type: 'pairwise'

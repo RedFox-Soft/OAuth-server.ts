@@ -20,10 +20,12 @@ import addClient from '../helpers/add_client.ts';
 import getSchema from '../helpers/client_schema.ts';
 import { provider } from 'lib/provider.js';
 import { ClientDefaults } from 'lib/configs/clientBase.js';
-import { isPlainObject } from 'lib/helpers/_/object.js';
+import { isPlainObject, pick } from 'lib/helpers/_/object.js';
 import { IdToken } from './id_token.js';
 import { clockTolerance } from 'lib/configs/liveTime.js';
 import { requestObjectEncryptionAlgValues } from 'lib/configs/jwaAlgorithms.js';
+import { ClientSchema } from 'lib/configs/clientSchema.js';
+import { Value } from '@sinclair/typebox/value';
 
 // intentionally ignore x5t#S256 so that they are left to be calculated by the library
 const EC_CURVES = new Set(['P-256', 'P-384', 'P-521']);
@@ -368,9 +370,30 @@ export class Client {
 	constructor(metadata, ctx) {
 		const schema = new Client.Schema(metadata);
 
+		const clientMetadata = {
+			...ClientDefaults,
+			...metadata
+		};
+		if (!Value.Check(ClientSchema, clientMetadata)) {
+			console.log(
+				[...Value.Errors(ClientSchema, clientMetadata)]
+					.map(({ message, path }) => `${path} ${message}`.trim())
+					.join(', ')
+			);
+			throw new InvalidClientMetadata(
+				'client metadata validation error',
+				[...Value.Errors(ClientSchema, metadata)]
+					.map(({ message, path }) => `${path} ${message}`.trim())
+					.join(', ')
+			);
+		}
 		Object.assign(
 			this,
 			ClientDefaults,
+			pick(metadata, ...Object.keys(ClientSchema.properties))
+		);
+		Object.assign(
+			this,
 			mapKeys(schema, (value, key) => {
 				if (!instance(provider).RECOGNIZED_METADATA.includes(key)) {
 					return key;

@@ -155,7 +155,7 @@ export default function testHelper(
 			}
 
 			for (const cl of clients) {
-				const grant = new provider.Grant({ clientId: cl.client_id, accountId });
+				const grant = new provider.Grant({ clientId: cl.clientId, accountId });
 				grant.addOIDCScope(scope);
 				if (ctx.params.claims) {
 					grant.addOIDCClaims(
@@ -177,7 +177,7 @@ export default function testHelper(
 				}
 
 				const grantId = await grant.save();
-				session.authorizations[cl.client_id] = {
+				session.authorizations[cl.clientId] = {
 					sid: nanoid(),
 					grantId
 				};
@@ -211,12 +211,11 @@ export default function testHelper(
 			return raw;
 		}
 
-		function getGrantId(client_id) {
+		function getGrantId(clientId) {
 			const session = getSession();
-			let clientId = client_id;
 
-			if (!clientId && client) clientId = client.client_id;
-			if (!clientId && clients) clientId = clients[0].client_id;
+			if (!clientId && client) clientId = client.clientId;
+			if (!clientId && clients) clientId = clients[0].clientId;
 			try {
 				return session.authorizations[clientId].grantId;
 			} catch (err) {

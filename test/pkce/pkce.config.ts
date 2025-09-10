@@ -13,7 +13,7 @@ export default {
 	config,
 	clients: [
 		{
-			client_id: 'client',
+			clientId: 'client',
 			response_types: ['code'],
 			grant_types: ['authorization_code', 'refresh_token'],
 			redirect_uris: ['https://rp.example.com/cb'],

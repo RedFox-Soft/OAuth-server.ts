@@ -47,7 +47,7 @@ export default {
 	config,
 	clients: [
 		{
-			client_id: 'client',
+			clientId: 'client',
 			client_secret: 'secret',
 			grant_types: [
 				'authorization_code',
@@ -62,7 +62,7 @@ export default {
 			tls_client_certificate_bound_access_tokens: true
 		},
 		{
-			client_id: 'client-none',
+			clientId: 'client-none',
 			grant_types: [
 				'authorization_code',
 				'urn:ietf:params:oauth:grant-type:device_code',

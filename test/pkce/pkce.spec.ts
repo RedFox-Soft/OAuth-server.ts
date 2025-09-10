@@ -163,7 +163,7 @@ describe('PKCE RFC7636', () => {
 			});
 			const code = await authCode.save();
 
-			const { response } = await agent.token.post({
+			const { response, error } = await agent.token.post({
 				client_id: 'client',
 				code,
 				grant_type: 'authorization_code',

@@ -10,7 +10,7 @@ export default {
 	config,
 	clients: [
 		{
-			client_id: 'client',
+			clientId: 'client',
 			client_secret: 'secret',
 			grant_types: ['authorization_code'],
 			response_types: ['code'],
@@ -18,7 +18,7 @@ export default {
 			redirect_uris: ['https://client.example.com/cb']
 		},
 		{
-			client_id: 'client-static-with-sector',
+			clientId: 'client-static-with-sector',
 			client_secret: 'secret',
 			grant_types: ['authorization_code'],
 			response_types: ['code'],

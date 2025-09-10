@@ -10,7 +10,7 @@ config.scopes = ['api:read', 'api:write'];
 export default {
 	config,
 	client: {
-		client_id: 'client',
+		clientId: 'client',
 		client_secret: 'secret',
 		grant_types: ['authorization_code', 'client_credentials'],
 		response_types: ['code'],

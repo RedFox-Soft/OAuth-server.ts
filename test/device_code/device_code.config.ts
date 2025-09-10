@@ -15,7 +15,7 @@ export default {
 	config,
 	clients: [
 		{
-			client_id: 'client',
+			clientId: 'client',
 			grant_types: [
 				'urn:ietf:params:oauth:grant-type:device_code',
 				'refresh_token'
@@ -26,7 +26,7 @@ export default {
 			application_type: 'native'
 		},
 		{
-			client_id: 'client-other',
+			clientId: 'client-other',
 			grant_types: [
 				'urn:ietf:params:oauth:grant-type:device_code',
 				'refresh_token'
@@ -37,14 +37,14 @@ export default {
 			application_type: 'native'
 		},
 		{
-			client_id: 'client-not-allowed',
+			clientId: 'client-not-allowed',
 			token_endpoint_auth_method: 'none',
 			grant_types: [],
 			redirect_uris: [],
 			response_types: []
 		},
 		{
-			client_id: 'client-backchannel',
+			clientId: 'client-backchannel',
 			grant_types: [
 				'urn:ietf:params:oauth:grant-type:device_code',
 				'refresh_token'
@@ -57,7 +57,7 @@ export default {
 			backchannel_logout_session_required: true
 		},
 		{
-			client_id: 'client-basic-auth',
+			clientId: 'client-basic-auth',
 			client_secret: 'secret',
 			grant_types: ['urn:ietf:params:oauth:grant-type:device_code'],
 			response_types: [],

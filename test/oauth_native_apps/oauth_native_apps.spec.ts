@@ -16,7 +16,7 @@ describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
 			it('allows custom uri scheme uris with localhost', function () {
 				return addClient(provider, {
 					application_type: 'native',
-					client_id: 'native-custom',
+					clientId: 'native-custom',
 					grant_types: ['authorization_code'],
 					response_types: ['code'],
 					token_endpoint_auth_method: 'none',
@@ -31,7 +31,7 @@ describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
 				return assert.rejects(
 					addClient(provider, {
 						application_type: 'native',
-						client_id: 'native-custom',
+						clientId: 'native-custom',
 						grant_types: ['authorization_code'],
 						response_types: ['code'],
 						token_endpoint_auth_method: 'none',
@@ -53,7 +53,7 @@ describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
 			it('allows claimed https uris', function () {
 				return addClient(provider, {
 					application_type: 'native',
-					client_id: 'native-custom',
+					clientId: 'native-custom',
 					grant_types: ['authorization_code'],
 					response_types: ['code'],
 					token_endpoint_auth_method: 'none',
@@ -65,7 +65,7 @@ describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
 				return assert.rejects(
 					addClient(provider, {
 						application_type: 'native',
-						client_id: 'native-custom',
+						clientId: 'native-custom',
 						grant_types: ['authorization_code'],
 						response_types: ['code'],
 						token_endpoint_auth_method: 'none',
@@ -87,7 +87,7 @@ describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
 			it('catches invalid urls being passed in', function () {
 				return addClient(provider, {
 					application_type: 'native',
-					client_id: 'native-custom',
+					clientId: 'native-custom',
 					grant_types: ['authorization_code'],
 					response_types: ['code'],
 					token_endpoint_auth_method: 'none',
@@ -102,7 +102,7 @@ describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
 			it('allows http protocol localhost loopback uris', function () {
 				return addClient(provider, {
 					application_type: 'native',
-					client_id: 'native-custom',
+					clientId: 'native-custom',
 					grant_types: ['authorization_code'],
 					response_types: ['code'],
 					token_endpoint_auth_method: 'none',
@@ -118,7 +118,7 @@ describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
 			it('allows http protocol IPv4 loopback uris', function () {
 				return addClient(provider, {
 					application_type: 'native',
-					client_id: 'native-custom',
+					clientId: 'native-custom',
 					grant_types: ['authorization_code'],
 					response_types: ['code'],
 					token_endpoint_auth_method: 'none',
@@ -134,7 +134,7 @@ describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
 			it('allows http protocol IPv6 loopback uris', function () {
 				return addClient(provider, {
 					application_type: 'native',
-					client_id: 'native-custom',
+					clientId: 'native-custom',
 					grant_types: ['authorization_code'],
 					response_types: ['code'],
 					token_endpoint_auth_method: 'none',
@@ -151,7 +151,7 @@ describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
 				return assert.rejects(
 					addClient(provider, {
 						application_type: 'native',
-						client_id: 'native-custom',
+						clientId: 'native-custom',
 						grant_types: ['authorization_code'],
 						response_types: ['code'],
 						token_endpoint_auth_method: 'none',

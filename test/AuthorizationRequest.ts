@@ -4,8 +4,10 @@ import querystring from 'node:querystring';
 
 import { expect } from 'chai';
 import { TestAdapter } from './models.js';
-import base64url from 'base64url';
 import { agent } from './test_helper.js';
+import { AuthorizationParameters } from '../lib/consts/param_list.js';
+import { type Static } from 'elysia';
+import { type ClientSchemaType } from 'lib/configs/clientSchema.js';
 
 function getSetCookies(cookies) {
 	return cookies.filter(
@@ -20,25 +22,33 @@ function readCookie(value) {
 	return parsed[key];
 }
 
-export class AuthorizationRequest {
-	static clients = [];
+type AuthParams = Static<typeof AuthorizationParameters> & {
+	claims?: object | string;
+};
 
-	params = {};
-	client = {};
+export class AuthorizationRequest {
+	static clients: ClientSchemaType[] = [];
+
+	params: AuthParams;
+	client: ClientSchemaType;
 	res = {};
 	code_verifier = crypto.randomBytes(32).toString('base64url');
-	client_id = '';
+	client_id: string;
 	grant_type = 'authorization_code';
 
-	constructor(parameters = {}) {
+	constructor(parameters: Partial<AuthParams> = {}) {
 		if (parameters.claims && typeof parameters.claims !== 'string') {
 			parameters.claims = JSON.stringify(parameters.claims);
 		}
+		if (!AuthorizationRequest.clients[0]) {
+			throw new Error('No clients have been registered');
+		}
+
+		parameters.client_id ??= AuthorizationRequest.clients[0].clientId;
 		this.params = parameters;
-		this.params.client_id ??= AuthorizationRequest.clients[0].client_id;
 		this.client_id = this.params.client_id;
 		this.client = AuthorizationRequest.clients.find(
-			(cl) => cl.client_id === this.params.client_id
+			(cl) => cl.clientId === this.params.client_id
 		);
 		this.params.state ??= crypto.randomBytes(16).toString('base64url');
 		this.params.redirect_uri ??= this.client?.redirect_uris[0];
@@ -67,24 +77,22 @@ export class AuthorizationRequest {
 		return AuthorizationRequest.basicAuthHeader(this.client_id, client_secret);
 	}
 
-	static basicAuthHeader(client_id, client_secret) {
-		return {
-			authorization: `Basic ${base64url.encode(`${client_id}:${client_secret}`)}`
-		};
+	static basicAuthHeader(clientId: string, clientSecret: string) {
+		const str = Buffer.from(`${clientId}:${clientSecret}`).toString(
+			'base64url'
+		);
+		return { authorization: `Basic ${str}` };
 	}
 
 	validateClientLocation(response) {
-		const actual = parse(response.headers.get('location'), true);
+		const location = response.headers.get('location');
+		const actual = parse(location, true);
 		let expected;
 		if (this.params.redirect_uri) {
-			expect(response.headers.get('location')).to.match(
-				new RegExp(this.params.redirect_uri)
-			);
+			expect(location).to.match(new RegExp(this.params.redirect_uri));
 			expected = parse(this.params.redirect_uri, true);
 		} else {
-			expect(response.headers.get('location')).to.match(
-				new RegExp(this.client.redirect_uris[0])
-			);
+			expect(location).to.match(new RegExp(this.client.redirect_uris[0]));
 			expected = parse(this.client.redirect_uris[0], true);
 		}
 

@@ -1,7 +1,6 @@
 const RECOGNIZED_METADATA = [
 	'application_type',
 	'client_id_issued_at',
-	'client_id',
 	'client_name',
 	'client_secret_expires_at',
 	'client_secret',
@@ -47,7 +46,6 @@ const DEFAULT = {
 };
 
 const REQUIRED = [
-	'client_id'
 	// 'client_secret', => validated elsewhere and only needed somewhen
 	// 'redirect_uris', => validated elsewhere and handled elsewhere
 ];
@@ -82,7 +80,6 @@ const STRING = [
 	'backchannel_client_notification_endpoint',
 	'backchannel_logout_uri',
 	'backchannel_token_delivery_mode',
-	'client_id',
 	'client_name',
 	'client_secret',
 	'client_uri',
@@ -181,7 +178,6 @@ export const noVSCHAR = /[^\x20-\x7E]/;
 // const noNQSCHAR = /[^\x20-\x21\x23-\x5B\x5D-\x7E]/;
 
 const SYNTAX = {
-	client_id: noVSCHAR,
 	client_secret: noVSCHAR
 };
 

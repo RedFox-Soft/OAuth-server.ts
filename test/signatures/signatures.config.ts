@@ -6,7 +6,7 @@ export default {
 	config,
 	clients: [
 		{
-			client_id: 'client-sig-none',
+			clientId: 'client-sig-none',
 			client_secret: 'secret',
 			response_types: ['code'],
 			grant_types: ['authorization_code'],
@@ -14,7 +14,7 @@ export default {
 			redirect_uris: ['https://client.example.com/cb']
 		},
 		{
-			client_id: 'client-sig-HS256',
+			clientId: 'client-sig-HS256',
 			client_secret: 'secret',
 			response_types: ['code'],
 			grant_types: ['authorization_code'],

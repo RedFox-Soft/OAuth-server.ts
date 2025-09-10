@@ -17,14 +17,14 @@ export default {
 	config,
 	clients: [
 		{
-			client_id: 'client',
+			clientId: 'client',
 			grant_types: ['authorization_code'],
 			response_types: ['code', 'none'],
 			redirect_uris: ['https://client.example.com'],
 			token_endpoint_auth_method: 'none'
 		},
 		{
-			client_id: 'client-encrypted',
+			clientId: 'client-encrypted',
 			client_secret: 'secret',
 			grant_types: ['authorization_code'],
 			response_types: ['code', 'none'],
@@ -32,7 +32,7 @@ export default {
 			authorization_encrypted_response_alg: 'A128KW'
 		},
 		{
-			client_id: 'client-expired',
+			clientId: 'client-expired',
 			client_secret: 'secret',
 			client_secret_expires_at: 1,
 			grant_types: ['authorization_code'],

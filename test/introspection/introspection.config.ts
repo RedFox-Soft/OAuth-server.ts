@@ -18,25 +18,25 @@ export default {
 	config,
 	clients: [
 		{
-			client_id: 'client',
+			clientId: 'client',
 			client_secret: 'secret',
 			redirect_uris: ['https://client.example.com/cb']
 		},
 		{
-			client_id: 'client-pairwise',
+			clientId: 'client-pairwise',
 			client_secret: 'secret',
 			subject_type: 'pairwise',
 			redirect_uris: ['https://client.example.com/cb']
 		},
 		{
-			client_id: 'client-introspection',
+			clientId: 'client-introspection',
 			client_secret: 'secret',
 			redirect_uris: [],
 			response_types: [],
 			grant_types: []
 		},
 		{
-			client_id: 'client-none',
+			clientId: 'client-none',
 			token_endpoint_auth_method: 'none',
 			redirect_uris: [],
 			grant_types: [],

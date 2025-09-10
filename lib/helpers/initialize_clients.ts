@@ -4,19 +4,19 @@ import { isPlainObject } from './_/object.js';
 
 function addStatic(metadata) {
 	const { staticClients } = instance(this);
-	if (!isPlainObject(metadata) || !metadata.client_id) {
+	if (!isPlainObject(metadata) || !metadata.clientId) {
 		throw new InvalidClientMetadata(
 			'client_id is mandatory property for statically configured clients'
 		);
 	}
 
-	if (staticClients.has(metadata.client_id)) {
+	if (staticClients.has(metadata.clientId)) {
 		throw new InvalidClientMetadata(
 			'client_id must be unique amongst statically configured clients'
 		);
 	}
 
-	staticClients.set(metadata.client_id, structuredClone(metadata));
+	staticClients.set(metadata.clientId, structuredClone(metadata));
 }
 
 export default function initializeClients(clients = []) {

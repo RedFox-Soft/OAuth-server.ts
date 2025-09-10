@@ -20,7 +20,7 @@ export default {
 	config,
 	clients: [
 		{
-			client_id: 'client',
+			clientId: 'client',
 			token_endpoint_auth_method: 'none',
 			client_secret: 'secret',
 			grant_types: [
@@ -30,7 +30,7 @@ export default {
 			redirect_uris: ['https://client.example.com/cb']
 		},
 		{
-			client_id: 'client-requiredSignedRequestObject',
+			clientId: 'client-requiredSignedRequestObject',
 			token_endpoint_auth_method: 'none',
 			require_signed_request_object: true,
 			client_secret: 'secret',
@@ -41,7 +41,7 @@ export default {
 			redirect_uris: ['https://client.example.com/cb']
 		},
 		{
-			client_id: 'client-with-HS-sig',
+			clientId: 'client-with-HS-sig',
 			token_endpoint_auth_method: 'none',
 			client_secret: 'secret',
 			request_object_signing_alg: 'HS256',
@@ -52,7 +52,7 @@ export default {
 			redirect_uris: ['https://client.example.com/cb']
 		},
 		{
-			client_id: 'client-with-HS-sig-expired',
+			clientId: 'client-with-HS-sig-expired',
 			client_secret_expires_at: 1,
 			token_endpoint_auth_method: 'none',
 			client_secret: 'secret',

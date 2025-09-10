@@ -14,7 +14,7 @@ merge(config.features, {
 export default {
 	config,
 	client: {
-		client_id: 'client',
+		clientId: 'client',
 		grant_types: [
 			'client_credentials',
 			'urn:ietf:params:oauth:grant-type:device_code'

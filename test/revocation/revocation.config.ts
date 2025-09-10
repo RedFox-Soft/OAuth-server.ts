@@ -13,12 +13,12 @@ export default {
 	config,
 	clients: [
 		{
-			client_id: 'client',
+			clientId: 'client',
 			client_secret: 'secret',
 			redirect_uris: ['https://client.example.com/cb']
 		},
 		{
-			client_id: 'client2',
+			clientId: 'client2',
 			client_secret: 'secret',
 			redirect_uris: ['https://client2.example.com/cb']
 		}

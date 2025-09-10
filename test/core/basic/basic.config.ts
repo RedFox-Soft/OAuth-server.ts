@@ -33,21 +33,21 @@ export default {
 	config,
 	clients: [
 		{
-			client_id: 'client',
+			clientId: 'client',
 			client_secret: 'secret',
 			grant_types: ['authorization_code', 'refresh_token'],
 			response_types: ['code', 'none'],
 			redirect_uris: ['https://client.example.com/cb']
 		},
 		{
-			client_id: 'client-without-none',
+			clientId: 'client-without-none',
 			client_secret: 'secret',
 			grant_types: ['authorization_code', 'refresh_token'],
 			response_types: ['code'],
 			redirect_uris: ['https://client.example.com/cb']
 		},
 		{
-			client_id: 'client-no-refresh',
+			clientId: 'client-no-refresh',
 			client_secret: 'secret',
 			grant_types: ['authorization_code'],
 			response_types: ['code', 'none'],
@@ -55,14 +55,14 @@ export default {
 		},
 		{
 			application_type: 'native',
-			client_id: 'client-native',
+			clientId: 'client-native',
 			client_secret: 'secret',
 			grant_types: ['authorization_code', 'refresh_token'],
 			response_types: ['code', 'none'],
 			redirect_uris: ['com.example.app:/cb']
 		},
 		{
-			client_id: 'client-limited-scope',
+			clientId: 'client-limited-scope',
 			client_secret: 'secret',
 			redirect_uris: ['https://client.example.com/cb'],
 			scope: 'openid',

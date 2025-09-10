@@ -6,14 +6,14 @@ export default {
 	config,
 	clients: [
 		{
-			client_id: 'client',
+			clientId: 'client',
 			response_types: ['code'],
 			grant_types: ['authorization_code'],
 			redirect_uris: ['https://client.example.com/cb'],
 			token_endpoint_auth_method: 'none'
 		},
 		{
-			client_id: 'client-hmac',
+			clientId: 'client-hmac',
 			client_secret: 'secret',
 			response_types: ['code'],
 			grant_types: ['authorization_code'],

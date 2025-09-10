@@ -39,7 +39,7 @@ export default {
 	config,
 	clients: [
 		{
-			client_id: 'client',
+			clientId: 'client',
 			client_secret: 'secret',
 			grant_types: [
 				'authorization_code',
@@ -53,7 +53,7 @@ export default {
 			redirect_uris: ['https://client.example.com/cb']
 		},
 		{
-			client_id: 'client-none',
+			clientId: 'client-none',
 			grant_types: [
 				'authorization_code',
 				'urn:ietf:params:oauth:grant-type:device_code',

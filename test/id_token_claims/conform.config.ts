@@ -13,7 +13,7 @@ export default {
 	config,
 	clients: [
 		{
-			client_id: 'client',
+			clientId: 'client',
 			client_secret: 'secret',
 			token_endpoint_auth_method: 'none',
 			grant_types: ['authorization_code', 'refresh_token'],

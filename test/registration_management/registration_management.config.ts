@@ -15,7 +15,7 @@ merge(config.features, {
 export default {
 	config,
 	client: {
-		client_id: 'client',
+		clientId: 'client',
 		client_secret: 'secret',
 		redirect_uris: ['https://client.example.com/cb']
 	}

@@ -12,7 +12,7 @@ export default {
 	config,
 	clients: [
 		{
-			client_id: 'client',
+			clientId: 'client',
 			token_endpoint_auth_method: 'none',
 			redirect_uris: ['https://client.example.com/cb'],
 			grant_types: ['authorization_code'],

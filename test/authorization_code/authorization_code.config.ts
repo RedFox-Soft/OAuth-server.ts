@@ -8,7 +8,7 @@ export default {
 	config,
 	clients: [
 		{
-			client_id: 'client',
+			clientId: 'client',
 			client_secret: 'secret',
 			grant_types: ['authorization_code', 'refresh_token'],
 			response_types: ['code'],
@@ -18,7 +18,7 @@ export default {
 			]
 		},
 		{
-			client_id: 'client2',
+			clientId: 'client2',
 			client_secret: 'secret',
 			grant_types: ['authorization_code', 'refresh_token'],
 			redirect_uris: ['https://client.example.com/cb3']

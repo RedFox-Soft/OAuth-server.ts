@@ -11,12 +11,13 @@ export default tseslint.config(
 			flatConfigs.recommended,
 			tseslint.configs.strict
 		],
-		files: ['**/*.{js,ts,tsx}'],
+		files: ['**/*.{ts,tsx}'],
 		languageOptions: {
 			ecmaVersion: 2020,
 			globals: globals.browser
 		},
 		rules: {
+			'import/no-unresolved': 'off',
 			'@typescript-eslint/no-unused-vars': [
 				'error',
 				{ argsIgnorePattern: '^_' }

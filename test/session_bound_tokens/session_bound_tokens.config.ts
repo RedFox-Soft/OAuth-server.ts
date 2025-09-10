@@ -10,7 +10,7 @@ export default {
 	config,
 	clients: [
 		{
-			client_id: 'client',
+			clientId: 'client',
 			response_types: ['code'],
 			grant_types: ['authorization_code'],
 			redirect_uris: ['https://client.example.com/cb'],
@@ -18,7 +18,7 @@ export default {
 			scope: 'openid'
 		},
 		{
-			client_id: 'client-refresh',
+			clientId: 'client-refresh',
 			response_types: ['code'],
 			grant_types: ['authorization_code', 'refresh_token'],
 			redirect_uris: ['https://client.example.com/cb'],
@@ -26,7 +26,7 @@ export default {
 			scope: 'openid'
 		},
 		{
-			client_id: 'client-offline',
+			clientId: 'client-offline',
 			response_types: ['code'],
 			grant_types: ['authorization_code', 'refresh_token'],
 			redirect_uris: ['https://client.example.com/cb'],

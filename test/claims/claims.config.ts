@@ -13,7 +13,7 @@ export default {
 	config,
 	clients: [
 		{
-			client_id: 'client',
+			clientId: 'client',
 			client_secret: 'secret',
 			token_endpoint_auth_method: 'none',
 			grant_types: ['authorization_code'],
@@ -21,7 +21,7 @@ export default {
 			redirect_uris: ['https://client.example.com/cb']
 		},
 		{
-			client_id: 'client-pairwise',
+			clientId: 'client-pairwise',
 			subject_type: 'pairwise',
 			token_endpoint_auth_method: 'none',
 			grant_types: ['authorization_code'],

@@ -27,7 +27,7 @@ export default {
 	config,
 	clients: [
 		{
-			client_id: 'client',
+			clientId: 'client',
 			client_secret: 'secret',
 			redirect_uris: ['https://client.example.com/cb'],
 			response_types: ['code'],
@@ -42,7 +42,7 @@ export default {
 			// userinfo_encrypted_response_enc: 'A128CBC-HS256',
 		},
 		{
-			client_id: 'clientSymmetric',
+			clientId: 'clientSymmetric',
 			client_secret: 'secret',
 			redirect_uris: ['https://client.example.com/cb'],
 			token_endpoint_auth_method: 'none',
@@ -51,7 +51,7 @@ export default {
 			id_token_encrypted_response_alg: 'A128KW'
 		},
 		{
-			client_id: 'clientSymmetric-expired',
+			clientId: 'clientSymmetric-expired',
 			client_secret: 'secret',
 			redirect_uris: ['https://client.example.com/cb'],
 			response_types: ['code'],
@@ -60,7 +60,7 @@ export default {
 			id_token_encrypted_response_alg: 'A128KW'
 		},
 		{
-			client_id: 'clientSymmetric-dir',
+			clientId: 'clientSymmetric-dir',
 			client_secret: 'secret',
 			redirect_uris: ['https://client.example.com/cb'],
 			response_types: ['code'],
@@ -68,7 +68,7 @@ export default {
 			id_token_encrypted_response_alg: 'dir'
 		},
 		{
-			client_id: 'clientRequestObjectSigningAlg',
+			clientId: 'clientRequestObjectSigningAlg',
 			client_secret: 'secret',
 			redirect_uris: ['https://client.example.com/cb'],
 			response_types: ['code'],

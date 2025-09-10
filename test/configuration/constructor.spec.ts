@@ -31,7 +31,7 @@ describe('Provider configuration', () => {
 		it('client_id must be unique amongst the static clients', () => {
 			expect(() => {
 				provider.init({
-					clients: [{ client_id: 'foo' }, { client_id: 'foo' }]
+					clients: [{ clientId: 'foo' }, { clientId: 'foo' }]
 				});
 			})
 				.to.throw(Error)

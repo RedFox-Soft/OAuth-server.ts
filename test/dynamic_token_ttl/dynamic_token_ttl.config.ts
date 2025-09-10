@@ -12,7 +12,7 @@ merge(config.features, {
 export default {
 	config,
 	client: {
-		client_id: 'client',
+		clientId: 'client',
 		token_endpoint_auth_method: 'none',
 		grant_types: [
 			'client_credentials',

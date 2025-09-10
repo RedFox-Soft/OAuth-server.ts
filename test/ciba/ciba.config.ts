@@ -55,7 +55,7 @@ export default {
 	config,
 	clients: [
 		{
-			client_id: 'client',
+			clientId: 'client',
 			grant_types: ['urn:openid:params:grant-type:ciba', 'refresh_token'],
 			response_types: [],
 			redirect_uris: [],
@@ -63,7 +63,7 @@ export default {
 			backchannel_token_delivery_mode: 'poll'
 		},
 		{
-			client_id: 'client-ping',
+			clientId: 'client-ping',
 			grant_types: ['urn:openid:params:grant-type:ciba', 'refresh_token'],
 			response_types: [],
 			redirect_uris: [],
@@ -72,7 +72,7 @@ export default {
 			backchannel_token_delivery_mode: 'ping'
 		},
 		{
-			client_id: 'client-signed',
+			clientId: 'client-signed',
 			grant_types: ['urn:openid:params:grant-type:ciba', 'refresh_token'],
 			response_types: [],
 			redirect_uris: [],
@@ -82,7 +82,7 @@ export default {
 			jwks_uri: 'https://rp.example.com/jwks'
 		},
 		{
-			client_id: 'client-not-allowed',
+			clientId: 'client-not-allowed',
 			token_endpoint_auth_method: 'none',
 			grant_types: [],
 			redirect_uris: [],

@@ -5,7 +5,7 @@ const config = getConfig();
 export default {
 	config,
 	client: {
-		client_id: 'client',
+		clientId: 'client',
 		client_secret: 'secret',
 		grant_types: ['authorization_code'],
 		response_types: ['code'],
