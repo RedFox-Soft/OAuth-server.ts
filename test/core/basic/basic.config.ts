@@ -34,37 +34,37 @@ export default {
 	clients: [
 		{
 			clientId: 'client',
-			client_secret: 'secret',
+			clientSecret: 'secret',
 			grant_types: ['authorization_code', 'refresh_token'],
 			response_types: ['code', 'none'],
-			redirect_uris: ['https://client.example.com/cb']
+			redirectUris: ['https://client.example.com/cb']
 		},
 		{
 			clientId: 'client-without-none',
-			client_secret: 'secret',
+			clientSecret: 'secret',
 			grant_types: ['authorization_code', 'refresh_token'],
 			response_types: ['code'],
-			redirect_uris: ['https://client.example.com/cb']
+			redirectUris: ['https://client.example.com/cb']
 		},
 		{
 			clientId: 'client-no-refresh',
-			client_secret: 'secret',
+			clientSecret: 'secret',
 			grant_types: ['authorization_code'],
 			response_types: ['code', 'none'],
-			redirect_uris: ['https://client.example.com/cb']
+			redirectUris: ['https://client.example.com/cb']
 		},
 		{
 			application_type: 'native',
 			clientId: 'client-native',
-			client_secret: 'secret',
+			clientSecret: 'secret',
 			grant_types: ['authorization_code', 'refresh_token'],
 			response_types: ['code', 'none'],
-			redirect_uris: ['com.example.app:/cb']
+			redirectUris: ['com.example.app:/cb']
 		},
 		{
 			clientId: 'client-limited-scope',
-			client_secret: 'secret',
-			redirect_uris: ['https://client.example.com/cb'],
+			clientSecret: 'secret',
+			redirectUris: ['https://client.example.com/cb'],
 			scope: 'openid',
 			grant_types: ['authorization_code', 'refresh_token']
 		}

@@ -47,7 +47,7 @@ export default async function sectorValidate(provider, client) {
 			const match = client.redirectUris.every((uri) => body.includes(uri));
 			if (!match)
 				throw new Error(
-					'all registered redirect_uris must be included in the sector_identifier_uri response'
+					'all registered redirectUris must be included in the sector_identifier_uri response'
 				);
 		}
 

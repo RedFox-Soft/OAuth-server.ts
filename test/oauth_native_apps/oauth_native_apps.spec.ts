@@ -20,7 +20,7 @@ describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
 					grant_types: ['authorization_code'],
 					response_types: ['code'],
 					token_endpoint_auth_method: 'none',
-					redirect_uris: [
+					redirectUris: [
 						'com.example.app://localhost/op/callback',
 						'com.example.app:/op/callback'
 					]
@@ -35,13 +35,13 @@ describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
 						grant_types: ['authorization_code'],
 						response_types: ['code'],
 						token_endpoint_auth_method: 'none',
-						redirect_uris: ['myapp:/op/callback']
+						redirectUris: ['myapp:/op/callback']
 					}),
 					(err) => {
 						expect(err).toHaveProperty('message', 'invalid_redirect_uri');
 						expect(err).toHaveProperty(
 							'error_description',
-							'redirect_uris for native clients using Custom URI scheme should use reverse domain name based scheme'
+							'redirectUris for native clients using Custom URI scheme should use reverse domain name based scheme'
 						);
 						return true;
 					}
@@ -57,7 +57,7 @@ describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
 					grant_types: ['authorization_code'],
 					response_types: ['code'],
 					token_endpoint_auth_method: 'none',
-					redirect_uris: ['https://claimed.example.com/op/callback']
+					redirectUris: ['https://claimed.example.com/op/callback']
 				});
 			});
 
@@ -69,13 +69,13 @@ describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
 						grant_types: ['authorization_code'],
 						response_types: ['code'],
 						token_endpoint_auth_method: 'none',
-						redirect_uris: ['https://localhost/op/callback']
+						redirectUris: ['https://localhost/op/callback']
 					}),
 					(err) => {
 						expect(err).toHaveProperty('message', 'invalid_redirect_uri');
 						expect(err).toHaveProperty(
 							'error_description',
-							'redirect_uris for native clients using claimed HTTPS URIs must not be using localhost as hostname'
+							'redirectUris for native clients using claimed HTTPS URIs must not be using localhost as hostname'
 						);
 						return true;
 					}
@@ -91,7 +91,7 @@ describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
 					grant_types: ['authorization_code'],
 					response_types: ['code'],
 					token_endpoint_auth_method: 'none',
-					redirect_uris: ['http://127.0.0.1:2355/op/callback']
+					redirectUris: ['http://127.0.0.1:2355/op/callback']
 				}).then((client) => {
 					expect(client.redirectUriAllowed('http:')).toBeFalse();
 					expect(client.redirectUriAllowed('http://127.0.0.')).toBeFalse();
@@ -106,7 +106,7 @@ describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
 					grant_types: ['authorization_code'],
 					response_types: ['code'],
 					token_endpoint_auth_method: 'none',
-					redirect_uris: ['http://localhost/op/callback']
+					redirectUris: ['http://localhost/op/callback']
 				}).then((client) => {
 					expect(client.redirectUris).toContain('http://localhost/op/callback');
 					expect(
@@ -122,7 +122,7 @@ describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
 					grant_types: ['authorization_code'],
 					response_types: ['code'],
 					token_endpoint_auth_method: 'none',
-					redirect_uris: ['http://127.0.0.1/op/callback']
+					redirectUris: ['http://127.0.0.1/op/callback']
 				}).then((client) => {
 					expect(client.redirectUris).toContain('http://127.0.0.1/op/callback');
 					expect(
@@ -138,7 +138,7 @@ describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
 					grant_types: ['authorization_code'],
 					response_types: ['code'],
 					token_endpoint_auth_method: 'none',
-					redirect_uris: ['http://[::1]/op/callback']
+					redirectUris: ['http://[::1]/op/callback']
 				}).then((client) => {
 					expect(client.redirectUris).toContain('http://[::1]/op/callback');
 					expect(
@@ -155,13 +155,13 @@ describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
 						grant_types: ['authorization_code'],
 						response_types: ['code'],
 						token_endpoint_auth_method: 'none',
-						redirect_uris: ['http://rp.example.com/op/callback']
+						redirectUris: ['http://rp.example.com/op/callback']
 					}),
 					(err) => {
 						expect(err).toHaveProperty('message', 'invalid_redirect_uri');
 						expect(err).toHaveProperty(
 							'error_description',
-							'redirect_uris for native clients using http as a protocol can only use loopback addresses as hostnames'
+							'redirectUris for native clients using http as a protocol can only use loopback addresses as hostnames'
 						);
 						return true;
 					}

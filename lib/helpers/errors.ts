@@ -35,8 +35,8 @@ export class InvalidToken extends OIDCProviderError {
 }
 
 export class InvalidClientMetadata extends OIDCProviderError {
-	constructor(description, detail) {
-		const message = description.startsWith('redirect_uris')
+	constructor(description: string, detail?: string) {
+		const message = description.startsWith('redirectUris')
 			? 'invalid_redirect_uri'
 			: 'invalid_client_metadata';
 		super(400, message);
@@ -130,7 +130,7 @@ export class InvalidGrant extends OIDCProviderError {
 
 export class InvalidRedirectUri extends OIDCProviderError {
 	error_description =
-		"redirect_uri did not match any of the client's registered redirect_uris";
+		"redirect_uri did not match any of the client's registered redirectUris";
 
 	allow_redirect = false;
 

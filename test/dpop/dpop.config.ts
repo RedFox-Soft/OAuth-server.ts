@@ -40,7 +40,7 @@ export default {
 	clients: [
 		{
 			clientId: 'client',
-			client_secret: 'secret',
+			clientSecret: 'secret',
 			grant_types: [
 				'authorization_code',
 				'refresh_token',
@@ -50,7 +50,7 @@ export default {
 			],
 			response_types: ['code'],
 			backchannel_token_delivery_mode: 'poll',
-			redirect_uris: ['https://client.example.com/cb']
+			redirectUris: ['https://client.example.com/cb']
 		},
 		{
 			clientId: 'client-none',
@@ -62,7 +62,7 @@ export default {
 			],
 			response_types: ['code'],
 			backchannel_token_delivery_mode: 'poll',
-			redirect_uris: ['https://client.example.com/cb'],
+			redirectUris: ['https://client.example.com/cb'],
 			token_endpoint_auth_method: 'none'
 		}
 	]

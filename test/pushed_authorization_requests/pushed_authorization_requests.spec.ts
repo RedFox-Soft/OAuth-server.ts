@@ -85,7 +85,7 @@ describe('Pushed Request Object', () => {
 					ApplicationConfig['par.allowUnregisteredRedirectUris'] = false;
 				});
 
-				it('allows unregistered redirect_uris to be used', async function () {
+				it('allows unregistered redirectUris to be used', async function () {
 					const code_verifier = randomBytes(32).toString('base64url');
 					const code_challenge = createHash('sha256')
 						.update(code_verifier)
@@ -192,7 +192,7 @@ describe('Pushed Request Object', () => {
 					expect(error.value).toEqual({
 						error: 'invalid_redirect_uri',
 						error_description:
-							"redirect_uri did not match any of the client's registered redirect_uris"
+							"redirect_uri did not match any of the client's registered redirectUris"
 					});
 				});
 
@@ -420,7 +420,7 @@ describe('Pushed Request Object', () => {
 							expect(error.value).toEqual({
 								error: 'invalid_redirect_uri',
 								error_description:
-									"redirect_uri did not match any of the client's registered redirect_uris"
+									"redirect_uri did not match any of the client's registered redirectUris"
 							});
 						});
 
@@ -994,7 +994,7 @@ describe('Pushed Request Object', () => {
 							expect(error.value).toEqual({
 								error: 'invalid_redirect_uri',
 								error_description:
-									"redirect_uri did not match any of the client's registered redirect_uris"
+									"redirect_uri did not match any of the client's registered redirectUris"
 							});
 						});
 

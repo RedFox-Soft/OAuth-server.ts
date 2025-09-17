@@ -14,7 +14,7 @@ export default {
 		{
 			clientId: 'client',
 			token_endpoint_auth_method: 'none',
-			redirect_uris: ['https://client.example.com/cb'],
+			redirectUris: ['https://client.example.com/cb'],
 			grant_types: ['authorization_code'],
 			scope: 'openid',
 			response_types: ['code', 'none']

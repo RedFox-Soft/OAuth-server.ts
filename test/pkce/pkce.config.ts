@@ -16,7 +16,7 @@ export default {
 			clientId: 'client',
 			response_types: ['code'],
 			grant_types: ['authorization_code', 'refresh_token'],
-			redirect_uris: ['https://rp.example.com/cb'],
+			redirectUris: ['https://rp.example.com/cb'],
 			token_endpoint_auth_method: 'none'
 		}
 	]

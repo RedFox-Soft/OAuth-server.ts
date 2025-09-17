@@ -14,6 +14,7 @@ import {
 	requestObjectEncryptionAlgValues,
 	userinfoSigningAlgValues
 } from 'lib/configs/jwaAlgorithms.js';
+import { validateRedirectUri } from './validateRedirectUri.js';
 
 const W3CEmailRegExp =
 	/^[a-zA-Z0-9.!#$%&’*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$/;
@@ -29,9 +30,7 @@ const {
 	HTTPS_URI,
 	LOOPBACKS,
 	RECOGNIZED_METADATA: RECOGNIZED,
-	REQUIRED,
 	STRING,
-	SYNTAX,
 	WEB_URI,
 	WHEN
 } = CLIENT_ATTRIBUTES;
@@ -224,6 +223,7 @@ export default function getSchema(provider) {
 
 	class Schema {
 		constructor(metadata) {
+			this.metadata = metadata;
 			Object.assign(
 				this,
 				omitBy(pick(DEFAULT, ...RECOGNIZED_METADATA), isUndefined),
@@ -235,13 +235,12 @@ export default function getSchema(provider) {
 			this.whens();
 			this.arrays();
 			this.strings();
-			this.syntax();
 			this.normalizeResponseTypes();
 			this.enums();
 			this.webUris();
 			this.scopes();
 			this.postLogoutRedirectUris();
-			this.redirectUris();
+			validateRedirectUri(metadata.redirectUris, this.application_type);
 			this.checkContacts();
 			this.jarPolicy();
 
@@ -270,12 +269,12 @@ export default function getSchema(provider) {
 				this.invalidate('response_types must contain members');
 			}
 
-			if (responseTypes.size && !this.redirect_uris.length) {
+			if (responseTypes.size && !this.metadata.redirectUris.length) {
 				if (
 					this.token_endpoint_auth_method === 'none' ||
 					this.sector_identifier_uri
 				) {
-					this.invalidate('redirect_uris must contain members');
+					this.invalidate('redirectUris must contain members');
 				}
 			}
 
@@ -345,21 +344,18 @@ export default function getSchema(provider) {
 			this.ensureStripUnrecognized();
 		}
 
-		invalidate(message, code) {
-			// eslint-disable-line class-methods-use-this, no-unused-vars
+		invalidate(message) {
 			throw new InvalidClientMetadata(message);
 		}
 
 		required() {
-			const checked = REQUIRED.slice();
+			const checked = [];
 			if (provider.Client.needsSecret(this)) {
-				checked.push('client_secret');
+				checked.push('clientSecret');
 			}
 
 			if (Array.isArray(this.response_types) && this.response_types.length) {
-				checked.push('redirect_uris');
-			} else if (this.redirect_uris === undefined) {
-				this.redirect_uris = [];
+				checked.push('redirectUris');
 			}
 
 			if (
@@ -401,15 +397,16 @@ export default function getSchema(provider) {
 				if (
 					Array.isArray(this.response_types) &&
 					this.response_types.length &&
-					Array.isArray(this.redirect_uris) &&
-					new Set(this.redirect_uris.map((uri) => new URL(uri).host)).size > 1
+					Array.isArray(this.metadata.redirectUris) &&
+					new Set(this.metadata.redirectUris.map((uri) => new URL(uri).host))
+						.size > 1
 				) {
 					checked.push('sector_identifier_uri');
 				}
 			}
 
 			checked.forEach((prop) => {
-				if (!this[prop]) {
+				if (!this[prop] && !this.metadata[prop]) {
 					this.invalidate(`${prop} is mandatory property`);
 				}
 			});
@@ -550,62 +547,12 @@ export default function getSchema(provider) {
 
 		postLogoutRedirectUris() {
 			if (this.post_logout_redirect_uris) {
-				this.redirectUris(
+				validateRedirectUri(
 					this.post_logout_redirect_uris,
-					'post_logout_redirect_uris'
+					this.application_type,
+					{ label: 'post_logout_redirect_uris' }
 				);
 			}
-		}
-
-		redirectUris(uris = this.redirect_uris, label = 'redirect_uris') {
-			uris.forEach((redirectUri) => {
-				const parsed = URL.parse(redirectUri);
-				if (!parsed) {
-					this.invalidate(`${label} must only contain valid uris`);
-				}
-
-				const { hostname, protocol, hash } = parsed;
-
-				if (hash) {
-					this.invalidate(`${label} must not contain fragments`);
-				}
-
-				switch (
-					this.application_type // eslint-disable-line default-case
-				) {
-					case 'web': {
-						if (!['https:', 'http:'].includes(protocol)) {
-							this.invalidate(`${label} must only contain web uris`);
-						}
-						break;
-					}
-					case 'native': {
-						switch (protocol) {
-							case 'http:': // Loopback Interface Redirection
-								if (!LOOPBACKS.has(hostname)) {
-									this.invalidate(
-										`${label} for native clients using http as a protocol can only use loopback addresses as hostnames`
-									);
-								}
-								break;
-							case 'https:': // Claimed HTTPS URI Redirection
-								if (LOOPBACKS.has(hostname)) {
-									this.invalidate(
-										`${label} for native clients using claimed HTTPS URIs must not be using ${hostname} as hostname`
-									);
-								}
-								break;
-							default: // Private-use URI Scheme Redirection
-								if (!protocol.includes('.')) {
-									this.invalidate(
-										`${label} for native clients using Custom URI scheme should use reverse domain name based scheme`
-									);
-								}
-						}
-						break;
-					}
-				}
-			});
 		}
 
 		checkContacts() {
@@ -647,14 +594,6 @@ export default function getSchema(provider) {
 					}
 				});
 				this.scope = [...parsed].join(' ');
-			}
-		}
-
-		syntax() {
-			for (const [prop, regexp] of Object.entries(SYNTAX)) {
-				if (regexp.exec(this[prop])) {
-					this.invalidate(`invalid ${prop} value`);
-				}
 			}
 		}
 	}

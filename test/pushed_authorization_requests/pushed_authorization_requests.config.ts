@@ -16,8 +16,8 @@ function allowUnregisteredClient(suffix, metadata) {
 		clientId: `client-unregistered-test-${suffix}`,
 		application_type: 'web',
 		token_endpoint_auth_method: 'client_secret_basic',
-		client_secret: 'secret',
-		redirect_uris: ['https://rp.example.com/cb'],
+		clientSecret: 'secret',
+		redirectUris: ['https://rp.example.com/cb'],
 		...metadata
 	};
 }
@@ -31,20 +31,20 @@ export default {
 	clients: [
 		{
 			clientId: 'client',
-			client_secret: 'secret',
-			redirect_uris: ['https://rp.example.com/cb']
+			clientSecret: 'secret',
+			redirectUris: ['https://rp.example.com/cb']
 		},
 		{
 			clientId: 'client-par-required',
-			client_secret: 'secret',
-			redirect_uris: ['https://rp.example.com/cb'],
+			clientSecret: 'secret',
+			redirectUris: ['https://rp.example.com/cb'],
 			'authorization.requirePushedAuthorizationRequests': true
 		},
 		{
 			clientId: 'client-alg-registered',
-			client_secret: 'secret',
+			clientSecret: 'secret',
 			request_object_signing_alg: 'HS256',
-			redirect_uris: ['https://rp.example.com/cb']
+			redirectUris: ['https://rp.example.com/cb']
 		},
 		allowUnregisteredClient('public', { token_endpoint_auth_method: 'none' })
 	]

@@ -33,7 +33,7 @@ export class AuthorizationRequest {
 	client: ClientSchemaType;
 	res = {};
 	code_verifier = crypto.randomBytes(32).toString('base64url');
-	client_id: string;
+	clientId: string;
 	grant_type = 'authorization_code';
 
 	constructor(parameters: Partial<AuthParams> = {}) {
@@ -46,12 +46,12 @@ export class AuthorizationRequest {
 
 		parameters.client_id ??= AuthorizationRequest.clients[0].clientId;
 		this.params = parameters;
-		this.client_id = this.params.client_id;
+		this.clientId = this.params.client_id;
 		this.client = AuthorizationRequest.clients.find(
 			(cl) => cl.clientId === this.params.client_id
 		);
 		this.params.state ??= crypto.randomBytes(16).toString('base64url');
-		this.params.redirect_uri ??= this.client?.redirect_uris[0];
+		this.params.redirect_uri ??= this.client?.redirectUris[0];
 
 		if (this.params.scope?.includes('openid')) {
 			this.params.nonce ??= crypto.randomBytes(16).toString('base64url');
@@ -73,8 +73,8 @@ export class AuthorizationRequest {
 			return {};
 		}
 
-		const { client_secret } = this.client;
-		return AuthorizationRequest.basicAuthHeader(this.client_id, client_secret);
+		const { clientSecret } = this.client;
+		return AuthorizationRequest.basicAuthHeader(this.clientId, clientSecret);
 	}
 
 	static basicAuthHeader(clientId: string, clientSecret: string) {
@@ -92,8 +92,8 @@ export class AuthorizationRequest {
 			expect(location).to.match(new RegExp(this.params.redirect_uri));
 			expected = parse(this.params.redirect_uri, true);
 		} else {
-			expect(location).to.match(new RegExp(this.client.redirect_uris[0]));
-			expected = parse(this.client.redirect_uris[0], true);
+			expect(location).to.match(new RegExp(this.client.redirectUris[0]));
+			expected = parse(this.client.redirectUris[0], true);
 		}
 
 		['protocol', 'host', 'pathname'].forEach((attr) => {
@@ -208,7 +208,7 @@ export class AuthorizationRequest {
 		const isBasicAuth = this.client.token_endpoint_auth_method !== 'none';
 		return await agent.token.post(
 			{
-				client_id: isBasicAuth ? undefined : this.client_id,
+				client_id: isBasicAuth ? undefined : this.clientId,
 				code,
 				grant_type: this.grant_type,
 				code_verifier: this.code_verifier,

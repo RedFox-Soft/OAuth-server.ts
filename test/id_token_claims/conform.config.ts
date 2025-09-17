@@ -14,11 +14,11 @@ export default {
 	clients: [
 		{
 			clientId: 'client',
-			client_secret: 'secret',
+			clientSecret: 'secret',
 			token_endpoint_auth_method: 'none',
 			grant_types: ['authorization_code', 'refresh_token'],
 			response_types: ['code'],
-			redirect_uris: ['https://client.example.com/cb'],
+			redirectUris: ['https://client.example.com/cb'],
 			userinfo_signed_response_alg: 'HS256'
 		}
 	]

@@ -14,13 +14,13 @@ export default {
 	clients: [
 		{
 			clientId: 'client',
-			client_secret: 'secret',
-			redirect_uris: ['https://client.example.com/cb']
+			clientSecret: 'secret',
+			redirectUris: ['https://client.example.com/cb']
 		},
 		{
 			clientId: 'client2',
-			client_secret: 'secret',
-			redirect_uris: ['https://client2.example.com/cb']
+			clientSecret: 'secret',
+			redirectUris: ['https://client2.example.com/cb']
 		}
 	]
 };

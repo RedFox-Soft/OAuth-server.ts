@@ -1,5 +1,6 @@
 import { InvalidRedirectUri, InvalidRequest } from '../../helpers/errors.ts';
 import { ApplicationConfig } from '../../configs/application.js';
+import { validateRedirectUri } from 'lib/helpers/validateRedirectUri.js';
 
 function allowUnregisteredUri(ctx) {
 	return (
@@ -11,24 +12,6 @@ function allowUnregisteredUri(ctx) {
 	);
 }
 
-function validateUnregisteredUri(ctx) {
-	const { redirectUris: validator } = ctx.oidc.provider.Client.Schema.prototype;
-
-	validator.call(
-		{
-			...ctx.oidc.client.metadata(),
-			invalidate(detail) {
-				throw new InvalidRequest(
-					detail.replace('redirect_uris', 'redirect_uri')
-				);
-			}
-		},
-		[ctx.oidc.params.redirect_uri]
-	);
-
-	return true;
-}
-
 /*
  * Checks that provided redirect_uri is allowed
  */
@@ -38,7 +21,11 @@ export default function checkRedirectUri(ctx) {
 			throw new InvalidRedirectUri();
 		}
 
-		validateUnregisteredUri(ctx);
+		validateRedirectUri(
+			[ctx.oidc.params.redirect_uri],
+			ctx.oidc.client.applicationType,
+			{ label: 'redirect_uri', ErrorClass: InvalidRequest }
+		);
 	}
 
 	ctx.oidc.redirectUriCheckPerformed = true;

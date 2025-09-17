@@ -15,24 +15,24 @@ export default {
 	clients: [
 		{
 			clientId: 'client-signed',
-			client_secret: 'secret',
+			clientSecret: 'secret',
 			introspection_signed_response_alg: 'RS256',
-			redirect_uris: ['https://client.example.com/cb']
+			redirectUris: ['https://client.example.com/cb']
 		},
 		{
 			clientId: 'client-HS-expired',
-			client_secret: 'secret',
+			clientSecret: 'secret',
 			client_secret_expires_at: 1,
 			token_endpoint_auth_method: 'none',
 			introspection_signed_response_alg: 'HS256',
-			redirect_uris: ['https://client.example.com/cb']
+			redirectUris: ['https://client.example.com/cb']
 		},
 		{
 			clientId: 'client-encrypted',
-			client_secret: 'secret',
+			clientSecret: 'secret',
 			token_endpoint_auth_method: 'none',
 			introspection_encrypted_response_alg: 'A128KW',
-			redirect_uris: ['https://client.example.com/cb']
+			redirectUris: ['https://client.example.com/cb']
 		}
 	]
 };

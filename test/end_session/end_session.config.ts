@@ -9,15 +9,15 @@ export default {
 			clientId: 'client',
 			response_types: ['code'],
 			grant_types: ['authorization_code'],
-			redirect_uris: ['https://client.example.com/cb'],
+			redirectUris: ['https://client.example.com/cb'],
 			token_endpoint_auth_method: 'none'
 		},
 		{
 			clientId: 'client-hmac',
-			client_secret: 'secret',
+			clientSecret: 'secret',
 			response_types: ['code'],
 			grant_types: ['authorization_code'],
-			redirect_uris: ['https://client.example.com/cb'],
+			redirectUris: ['https://client.example.com/cb'],
 			token_endpoint_auth_method: 'none',
 			id_token_signed_response_alg: 'HS256'
 		}

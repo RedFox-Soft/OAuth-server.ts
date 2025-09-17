@@ -389,7 +389,6 @@ export class Client {
 		}
 		Object.assign(
 			this,
-			ClientDefaults,
 			pick(metadata, ...Object.keys(ClientSchema.properties))
 		);
 		Object.assign(

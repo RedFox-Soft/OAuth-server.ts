@@ -41,7 +41,7 @@ describe('grant_type=authorization_code', () => {
 		provider.removeAllListeners('server_error');
 	});
 
-	describe('with real tokens (1/3) - more than one redirect_uris registered', () => {
+	describe('with real tokens (1/3) - more than one redirectUris registered', () => {
 		let auth = null;
 		let code: string | undefined;
 		let codeStore = null;
@@ -209,7 +209,7 @@ describe('grant_type=authorization_code', () => {
 		it('validates code belongs to client', async function () {
 			const spy = mock();
 			provider.on('grant.error', spy);
-			auth.client_id = 'client2';
+			auth.clientId = 'client2';
 
 			const { error } = await auth.getToken(code);
 			expect(error.status).toBe(400);
@@ -481,7 +481,7 @@ describe('grant_type=authorization_code', () => {
 			const spy = sinon.spy();
 			provider.on('grant.error', spy);
 
-			auth.client_id = 'client';
+			auth.clientId = 'client';
 			auth.redirect_uri = 'https://client.example.com/cb2';
 			const { error } = await auth.getToken(code);
 			expect(error.status).toBe(400);

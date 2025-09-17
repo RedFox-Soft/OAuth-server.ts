@@ -1,6 +1,6 @@
 import { Type as t, type Static } from '@sinclair/typebox';
 
-export const noVSCHAR = /[\x20-\x7E]/;
+export const vsCHAR = /[\x20-\x7E]/;
 
 export const ClientSchema = t.Object({
 	/*
@@ -8,7 +8,20 @@ export const ClientSchema = t.Object({
 	 *
 	 * description: The client identifier.
 	 */
-	clientId: t.String({ pattern: noVSCHAR.source }),
+	clientId: t.String({ pattern: vsCHAR.source }),
+	/*
+	 * clientSecret
+	 *
+	 * description: The client secret. The client MAY omit the parameter if the
+	 * client is public.
+	 */
+	clientSecret: t.Optional(t.String({ pattern: vsCHAR.source })),
+	/*
+	 * redirectUris
+	 *
+	 * description: The list of allowed redirect URIs for the client.
+	 */
+	redirectUris: t.Array(t.String({ format: 'uri' })),
 	subjectType: t.Union([t.Literal('pairwise'), t.Literal('public')]),
 	/*
 	 * requirePushedAuthorizationRequests

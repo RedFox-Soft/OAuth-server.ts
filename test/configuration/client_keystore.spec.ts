@@ -50,9 +50,9 @@ describe('client keystore refresh', () => {
 	before(async function () {
 		initializeClients.call(provider, [
 			{
-				client_id: 'client',
-				client_secret: 'secret',
-				redirect_uris: ['https://client.example.com/cb'],
+				clientId: 'client',
+				clientSecret: 'secret',
+				redirectUris: ['https://client.example.com/cb'],
 				jwks_uri: 'https://client.example.com/jwks',
 				id_token_signed_response_alg: 'HS256',
 				id_token_encrypted_response_alg: 'ECDH-ES+A128KW',

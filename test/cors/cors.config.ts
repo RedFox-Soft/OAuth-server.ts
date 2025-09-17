@@ -20,7 +20,7 @@ export default {
 			'urn:ietf:params:oauth:grant-type:device_code'
 		],
 		response_types: [],
-		redirect_uris: [],
+		redirectUris: [],
 		token_endpoint_auth_method: 'none'
 	}
 };

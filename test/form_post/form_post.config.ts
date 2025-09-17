@@ -6,12 +6,12 @@ export default {
 	config,
 	client: {
 		clientId: 'client',
-		client_secret: 'secret',
+		clientSecret: 'secret',
 		grant_types: ['authorization_code'],
 		response_types: ['code'],
-		redirect_uris: [
+		redirectUris: [
 			'https://client.example.com/cb',
-			'https://client.example.com/cb"><script>alert(0)</script><x="'
+			'https://client.example.com/cb%22%3Cscript%3Ealert(0)%3C/script%3E%3Cx=%22'
 		]
 	}
 };

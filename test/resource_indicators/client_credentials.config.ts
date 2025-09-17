@@ -33,9 +33,9 @@ export default {
 	config,
 	client: {
 		clientId: 'client',
-		client_secret: 'secret',
+		clientSecret: 'secret',
 		grant_types: ['client_credentials'],
 		response_types: [],
-		redirect_uris: []
+		redirectUris: []
 	}
 };

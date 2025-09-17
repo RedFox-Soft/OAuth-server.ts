@@ -43,7 +43,8 @@ describe('/auth', () => {
 						scope: 'openid'
 					});
 
-					const { data, response } = await authRequest(auth);
+					const { data, response, error } = await authRequest(auth);
+					console.log(error);
 					expect(response.status).toBe(200);
 					expect(response.headers.get('content-type')).toBe(
 						'text/html; charset=utf-8'

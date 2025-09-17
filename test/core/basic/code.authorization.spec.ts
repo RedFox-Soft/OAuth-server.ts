@@ -687,7 +687,7 @@ describe('BASIC code', () => {
 					);
 					expect(error.value).toContain('invalid_redirect_uri');
 					expect(error.value).toContain(
-						'redirect_uri did not match any of the client&#x27;s registered redirect_uris'
+						'redirect_uri did not match any of the client&#x27;s registered redirectUris'
 					);
 				});
 
@@ -723,7 +723,7 @@ describe('BASIC code', () => {
 					);
 					expect(error.value).toContain('invalid_redirect_uri');
 					expect(error.value).toContain(
-						'redirect_uri did not match any of the client&#x27;s registered redirect_uris'
+						'redirect_uri did not match any of the client&#x27;s registered redirectUris'
 					);
 				});
 			});
@@ -890,7 +890,7 @@ describe('BASIC code', () => {
 				expect(emitSpy.calledOnce).toBe(true);
 				expect(error.value).toContain('invalid_redirect_uri');
 				expect(error.value).toContain(
-					'redirect_uri did not match any of the client&#x27;s registered redirect_uris'
+					'redirect_uri did not match any of the client&#x27;s registered redirectUris'
 				);
 			});
 

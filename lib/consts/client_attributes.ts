@@ -3,7 +3,6 @@ const RECOGNIZED_METADATA = [
 	'client_id_issued_at',
 	'client_name',
 	'client_secret_expires_at',
-	'client_secret',
 	'client_uri',
 	'contacts',
 	'default_acr_values',
@@ -15,7 +14,6 @@ const RECOGNIZED_METADATA = [
 	'jwks',
 	'logo_uri',
 	'policy_uri',
-	'redirect_uris',
 	'require_auth_time',
 	'response_types',
 	'response_modes',
@@ -45,11 +43,6 @@ const DEFAULT = {
 	authorization_details_types: []
 };
 
-const REQUIRED = [
-	// 'client_secret', => validated elsewhere and only needed somewhen
-	// 'redirect_uris', => validated elsewhere and handled elsewhere
-];
-
 const BOOL = [
 	'backchannel_logout_session_required',
 	'backchannel_user_code_parameter',
@@ -65,7 +58,6 @@ const ARYS = [
 	'default_acr_values',
 	'grant_types',
 	'post_logout_redirect_uris',
-	'redirect_uris',
 	'response_types',
 	'response_modes',
 	'authorization_details_types'
@@ -81,7 +73,6 @@ const STRING = [
 	'backchannel_logout_uri',
 	'backchannel_token_delivery_mode',
 	'client_name',
-	'client_secret',
 	'client_uri',
 	'id_token_encrypted_response_alg',
 	'id_token_encrypted_response_enc',
@@ -115,7 +106,6 @@ const STRING = [
 	'default_acr_values',
 	'grant_types',
 	'post_logout_redirect_uris',
-	'redirect_uris',
 	'response_types',
 	'response_modes',
 	'authorization_details_types'
@@ -174,12 +164,6 @@ const ENUM = {
 };
 
 export const noVSCHAR = /[^\x20-\x7E]/;
-// const noNQCHAR = /[^\x21\x23-\x5B\x5D-\x7E]/;
-// const noNQSCHAR = /[^\x20-\x21\x23-\x5B\x5D-\x7E]/;
-
-const SYNTAX = {
-	client_secret: noVSCHAR
-};
 
 export {
 	ARYS,
@@ -189,9 +173,7 @@ export {
 	HTTPS_URI,
 	LOOPBACKS,
 	RECOGNIZED_METADATA,
-	REQUIRED,
 	STRING,
-	SYNTAX,
 	WEB_URI,
 	WHEN
 };

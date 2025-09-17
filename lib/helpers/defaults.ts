@@ -653,10 +653,10 @@ function makeDefaults() {
 		 *
 		 * example: Available Metadata
 		 *
-		 * application_type, client_id, client_name, client_secret, client_uri, contacts,
+		 * application_type, client_name, client_uri, contacts,
 		 * default_acr_values, default_max_age, grant_types, id_token_signed_response_alg,
 		 * initiate_login_uri, jwks, jwks_uri, logo_uri, policy_uri, post_logout_redirect_uris,
-		 * redirect_uris, require_auth_time, response_types, response_modes, scope, sector_identifier_uri,
+		 * require_auth_time, response_types, response_modes, scope, sector_identifier_uri,
 		 * subject_type, token_endpoint_auth_method, tos_uri, userinfo_signed_response_alg
 		 *
 		 * <br/><br/>The following metadata is available but may not be recognized depending on your

@@ -57,7 +57,7 @@ describe('signatures', () => {
 				prompt: 'none',
 				id_token_hint: this.idToken
 			});
-			auth.client_id = 'client-sig-HS256';
+			auth.clientId = 'client-sig-HS256';
 
 			return this.wrap({ auth, route: '/auth', verb: 'get' })
 				.expect(303)

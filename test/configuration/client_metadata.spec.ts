@@ -44,9 +44,9 @@ describe('Client metadata validation', () => {
 		}
 
 		return addClient(provider, {
-			client_id: 'client',
-			client_secret: 'secret',
-			redirect_uris: ['https://client.example.com/cb'],
+			clientId: 'client',
+			clientSecret: 'secret',
+			redirectUris: ['https://client.example.com/cb'],
 			...metadata
 		});
 	}

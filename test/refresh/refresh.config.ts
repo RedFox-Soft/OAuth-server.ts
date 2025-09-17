@@ -9,16 +9,16 @@ export default {
 	clients: [
 		{
 			clientId: 'client',
-			client_secret: 'secret',
+			clientSecret: 'secret',
 			grant_types: ['authorization_code', 'refresh_token'],
 			response_types: ['code'],
-			redirect_uris: ['https://client.example.com/cb']
+			redirectUris: ['https://client.example.com/cb']
 		},
 		{
 			clientId: 'client2',
-			client_secret: 'secret',
+			clientSecret: 'secret',
 			grant_types: ['authorization_code', 'refresh_token'],
-			redirect_uris: ['https://client.example.com/cb']
+			redirectUris: ['https://client.example.com/cb']
 		}
 	]
 };

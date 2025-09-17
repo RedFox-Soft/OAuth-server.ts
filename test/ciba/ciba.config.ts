@@ -58,7 +58,7 @@ export default {
 			clientId: 'client',
 			grant_types: ['urn:openid:params:grant-type:ciba', 'refresh_token'],
 			response_types: [],
-			redirect_uris: [],
+			redirectUris: [],
 			token_endpoint_auth_method: 'none',
 			backchannel_token_delivery_mode: 'poll'
 		},
@@ -66,7 +66,7 @@ export default {
 			clientId: 'client-ping',
 			grant_types: ['urn:openid:params:grant-type:ciba', 'refresh_token'],
 			response_types: [],
-			redirect_uris: [],
+			redirectUris: [],
 			token_endpoint_auth_method: 'none',
 			backchannel_client_notification_endpoint: 'https://rp.example.com/ping',
 			backchannel_token_delivery_mode: 'ping'
@@ -75,7 +75,7 @@ export default {
 			clientId: 'client-signed',
 			grant_types: ['urn:openid:params:grant-type:ciba', 'refresh_token'],
 			response_types: [],
-			redirect_uris: [],
+			redirectUris: [],
 			token_endpoint_auth_method: 'none',
 			backchannel_token_delivery_mode: 'poll',
 			backchannel_authentication_request_signing_alg: 'ES256',
@@ -85,7 +85,7 @@ export default {
 			clientId: 'client-not-allowed',
 			token_endpoint_auth_method: 'none',
 			grant_types: [],
-			redirect_uris: [],
+			redirectUris: [],
 			response_types: []
 		}
 	]

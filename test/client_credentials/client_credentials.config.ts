@@ -11,10 +11,10 @@ export default {
 	config,
 	client: {
 		clientId: 'client',
-		client_secret: 'secret',
+		clientSecret: 'secret',
 		grant_types: ['authorization_code', 'client_credentials'],
 		response_types: ['code'],
-		redirect_uris: ['https://client.example.com/cb'],
+		redirectUris: ['https://client.example.com/cb'],
 		scope: 'api:read'
 	}
 };

@@ -67,48 +67,48 @@ export default {
 		{
 			token_endpoint_auth_method: 'none',
 			clientId: 'client-none',
-			client_secret: 'secret',
+			clientSecret: 'secret',
 			grant_types: ['foo'],
 			response_types: [],
-			redirect_uris: []
+			redirectUris: []
 		},
 		{
 			token_endpoint_auth_method: 'client_secret_basic',
 			clientId: 'client-basic',
-			client_secret: 'secret',
+			clientSecret: 'secret',
 			grant_types: ['foo'],
 			response_types: [],
-			redirect_uris: []
+			redirectUris: []
 		},
 		{
 			token_endpoint_auth_method: 'client_secret_basic',
 			clientId: 'an:identifier',
-			client_secret: 'some secure & non-standard secret',
+			clientSecret: 'some secure & non-standard secret',
 			grant_types: ['foo'],
 			response_types: [],
-			redirect_uris: []
+			redirectUris: []
 		},
 		{
 			token_endpoint_auth_method: 'client_secret_post',
 			clientId: 'client-post',
-			client_secret: 'secret',
+			clientSecret: 'secret',
 			grant_types: ['foo'],
 			response_types: [],
-			redirect_uris: []
+			redirectUris: []
 		},
 		{
 			token_endpoint_auth_method: 'client_secret_jwt',
 			clientId: 'client-jwt-secret',
-			client_secret: 'secret',
+			clientSecret: 'secret',
 			grant_types: ['foo'],
 			response_types: [],
-			redirect_uris: []
+			redirectUris: []
 		},
 		{
 			clientId: 'client-jwt-key',
 			grant_types: ['foo'],
 			response_types: [],
-			redirect_uris: [],
+			redirectUris: [],
 			token_endpoint_auth_method: 'private_key_jwt',
 			jwks: {
 				keys: [clientKey]
@@ -118,7 +118,7 @@ export default {
 			clientId: 'client-pki-mtls',
 			grant_types: ['foo'],
 			response_types: [],
-			redirect_uris: [],
+			redirectUris: [],
 			token_endpoint_auth_method: 'tls_client_auth',
 			tls_client_auth_san_dns: 'rp.example.com'
 		},
@@ -126,7 +126,7 @@ export default {
 			clientId: 'client-self-signed-mtls',
 			grant_types: ['foo'],
 			response_types: [],
-			redirect_uris: [],
+			redirectUris: [],
 			token_endpoint_auth_method: 'self_signed_tls_client_auth',
 			jwks: mtlsKeys
 		},
@@ -134,7 +134,7 @@ export default {
 			clientId: 'client-self-signed-mtls-rsa',
 			grant_types: ['foo'],
 			response_types: [],
-			redirect_uris: [],
+			redirectUris: [],
 			token_endpoint_auth_method: 'self_signed_tls_client_auth',
 			jwks: rsaKeys
 		},
@@ -142,35 +142,35 @@ export default {
 			clientId: 'client-self-signed-mtls-jwks_uri',
 			grant_types: ['foo'],
 			response_types: [],
-			redirect_uris: [],
+			redirectUris: [],
 			token_endpoint_auth_method: 'self_signed_tls_client_auth',
 			jwks_uri: 'https://client.example.com/jwks'
 		},
 		{
 			clientId: 'secret-expired-basic',
-			client_secret: 'secret',
+			clientSecret: 'secret',
 			grant_types: ['foo'],
 			response_types: [],
-			redirect_uris: [],
+			redirectUris: [],
 			client_secret_expires_at: 1
 		},
 		{
 			clientId: 'secret-expired-jwt',
-			client_secret: 'secret',
+			clientSecret: 'secret',
 			token_endpoint_auth_method: 'client_secret_jwt',
 			grant_types: ['foo'],
 			response_types: [],
-			redirect_uris: [],
+			redirectUris: [],
 			client_secret_expires_at: 1
 		},
 		// Appendix B
 		{
 			token_endpoint_auth_method: 'client_secret_basic',
 			clientId: ' %&+',
-			client_secret: ' %&+',
+			clientSecret: ' %&+',
 			grant_types: ['foo'],
 			response_types: [],
-			redirect_uris: []
+			redirectUris: []
 		}
 	]
 };

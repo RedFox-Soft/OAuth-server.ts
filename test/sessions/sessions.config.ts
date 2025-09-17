@@ -7,8 +7,8 @@ export default {
 	clients: [
 		{
 			clientId: 'client',
-			client_secret: 'secret',
-			redirect_uris: ['https://client.example.com/cb']
+			clientSecret: 'secret',
+			redirectUris: ['https://client.example.com/cb']
 		}
 	]
 };

@@ -19,26 +19,26 @@ export default {
 	clients: [
 		{
 			clientId: 'client',
-			client_secret: 'secret',
-			redirect_uris: ['https://client.example.com/cb']
+			clientSecret: 'secret',
+			redirectUris: ['https://client.example.com/cb']
 		},
 		{
 			clientId: 'client-pairwise',
-			client_secret: 'secret',
+			clientSecret: 'secret',
 			subject_type: 'pairwise',
-			redirect_uris: ['https://client.example.com/cb']
+			redirectUris: ['https://client.example.com/cb']
 		},
 		{
 			clientId: 'client-introspection',
-			client_secret: 'secret',
-			redirect_uris: [],
+			clientSecret: 'secret',
+			redirectUris: [],
 			response_types: [],
 			grant_types: []
 		},
 		{
 			clientId: 'client-none',
 			token_endpoint_auth_method: 'none',
-			redirect_uris: [],
+			redirectUris: [],
 			grant_types: [],
 			response_types: []
 		}

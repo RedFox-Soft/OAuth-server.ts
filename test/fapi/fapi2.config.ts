@@ -34,7 +34,7 @@ export default {
 			token_endpoint_auth_method: 'private_key_jwt',
 			response_types: ['code'],
 			grant_types: ['authorization_code'],
-			redirect_uris: ['https://client.example.com/cb'],
+			redirectUris: ['https://client.example.com/cb'],
 			jwks: {
 				keys: [await exportJWK(keypair.publicKey)]
 			}

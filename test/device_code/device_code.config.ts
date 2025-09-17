@@ -21,7 +21,7 @@ export default {
 				'refresh_token'
 			],
 			response_types: [],
-			redirect_uris: [],
+			redirectUris: [],
 			token_endpoint_auth_method: 'none',
 			application_type: 'native'
 		},
@@ -32,7 +32,7 @@ export default {
 				'refresh_token'
 			],
 			response_types: [],
-			redirect_uris: [],
+			redirectUris: [],
 			token_endpoint_auth_method: 'none',
 			application_type: 'native'
 		},
@@ -40,7 +40,7 @@ export default {
 			clientId: 'client-not-allowed',
 			token_endpoint_auth_method: 'none',
 			grant_types: [],
-			redirect_uris: [],
+			redirectUris: [],
 			response_types: []
 		},
 		{
@@ -50,7 +50,7 @@ export default {
 				'refresh_token'
 			],
 			response_types: [],
-			redirect_uris: [],
+			redirectUris: [],
 			token_endpoint_auth_method: 'none',
 			application_type: 'native',
 			backchannel_logout_uri: 'https://rp.example.com/backchannel',
@@ -58,10 +58,10 @@ export default {
 		},
 		{
 			clientId: 'client-basic-auth',
-			client_secret: 'secret',
+			clientSecret: 'secret',
 			grant_types: ['urn:ietf:params:oauth:grant-type:device_code'],
 			response_types: [],
-			redirect_uris: [],
+			redirectUris: [],
 			token_endpoint_auth_method: 'client_secret_basic',
 			application_type: 'native'
 		}

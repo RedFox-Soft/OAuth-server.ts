@@ -21,6 +21,6 @@ export default {
 			'urn:ietf:params:oauth:grant-type:device_code'
 		],
 		response_types: ['code'],
-		redirect_uris: ['https://rp.example.com/cb']
+		redirectUris: ['https://rp.example.com/cb']
 	}
 };

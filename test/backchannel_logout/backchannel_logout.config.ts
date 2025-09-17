@@ -11,29 +11,29 @@ export default {
 	clients: [
 		{
 			clientId: 'client',
-			client_secret: 'secret',
+			clientSecret: 'secret',
 			response_types: ['code'],
 			grant_types: ['authorization_code', 'refresh_token'],
-			redirect_uris: ['https://client.example.com/cb'],
+			redirectUris: ['https://client.example.com/cb'],
 			backchannel_logout_uri: 'https://client.example.com/backchannel_logout',
 			backchannel_logout_session_required: true
 		},
 		{
 			clientId: 'second-client',
-			client_secret: 'secret',
+			clientSecret: 'secret',
 			response_types: ['code'],
 			grant_types: ['authorization_code', 'refresh_token'],
-			redirect_uris: ['https://second-client.example.com/cb'],
+			redirectUris: ['https://second-client.example.com/cb'],
 			backchannel_logout_uri:
 				'https://second-client.example.com/backchannel_logout',
 			backchannel_logout_session_required: true
 		},
 		{
 			clientId: 'no-sid',
-			client_secret: 'secret',
+			clientSecret: 'secret',
 			response_types: ['code'],
 			grant_types: ['authorization_code', 'refresh_token'],
-			redirect_uris: ['https://no-sid.example.com/cb'],
+			redirectUris: ['https://no-sid.example.com/cb'],
 			backchannel_logout_uri: 'https://no-sid.example.com/backchannel_logout'
 			// backchannel_logout_session_required: false,
 		}
