@@ -1085,8 +1085,6 @@ describe('Pushed Request Object', () => {
 
 							const auth = new AuthorizationRequest({
 								client_id: clientId,
-								iss: clientId,
-								aud: ISSUER,
 								request_uri
 							});
 
@@ -1094,8 +1092,6 @@ describe('Pushed Request Object', () => {
 							const { response } = await agent.auth.get({
 								query: {
 									client_id: clientId,
-									iss: clientId,
-									aud: ISSUER,
 									request_uri
 								},
 								headers: {

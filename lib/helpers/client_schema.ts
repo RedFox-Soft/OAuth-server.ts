@@ -26,9 +26,7 @@ const {
 	ARYS,
 	BOOL,
 	DEFAULT: DEFAULTS,
-	ENUM: ENUMS,
 	HTTPS_URI,
-	LOOPBACKS,
 	RECOGNIZED_METADATA: RECOGNIZED,
 	STRING,
 	WEB_URI,
@@ -144,7 +142,6 @@ export default function getSchema(provider) {
 	instance(provider).RECOGNIZED_METADATA = RECOGNIZED_METADATA;
 
 	const ENUM = {
-		...ENUMS,
 		default_acr_values: () => configuration.acrValues,
 		grant_types: () => configuration.grantTypes,
 		id_token_encrypted_response_alg: () =>
@@ -240,7 +237,7 @@ export default function getSchema(provider) {
 			this.webUris();
 			this.scopes();
 			this.postLogoutRedirectUris();
-			validateRedirectUri(metadata.redirectUris, this.application_type);
+			validateRedirectUri(metadata.redirectUris, metadata.applicationType);
 			this.checkContacts();
 			this.jarPolicy();
 
@@ -549,7 +546,7 @@ export default function getSchema(provider) {
 			if (this.post_logout_redirect_uris) {
 				validateRedirectUri(
 					this.post_logout_redirect_uris,
-					this.application_type,
+					this.metadata.applicationType,
 					{ label: 'post_logout_redirect_uris' }
 				);
 			}

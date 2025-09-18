@@ -22,6 +22,12 @@ export const ClientSchema = t.Object({
 	 * description: The list of allowed redirect URIs for the client.
 	 */
 	redirectUris: t.Array(t.String({ format: 'uri' })),
+	/*
+	 * applicationType
+	 *
+	 * description: The type of application the client is using.
+	 */
+	applicationType: t.Union([t.Literal('web'), t.Literal('native')]),
 	subjectType: t.Union([t.Literal('pairwise'), t.Literal('public')]),
 	/*
 	 * requirePushedAuthorizationRequests

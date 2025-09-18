@@ -295,7 +295,7 @@ describe('Client metadata validation', () => {
 		);
 	};
 
-	context('application_type', function () {
+	context('applicationType', function () {
 		defaultsTo(this.title, 'web');
 		mustBeString(this.title);
 
@@ -303,7 +303,7 @@ describe('Client metadata validation', () => {
 		allows(this.title, 'native', {
 			redirect_uris: ['com.example.myapp:/localhost/redirect']
 		});
-		rejects(this.title, 'foobar', "application_type must be 'native' or 'web'");
+		rejects(this.title, 'foobar', "applicationType must be 'native' or 'web'");
 	});
 
 	context('client_id', function () {
@@ -478,10 +478,10 @@ describe('Client metadata validation', () => {
 		rejects(this.title, [], /must contain members$/);
 
 		allows(this.title, ['http://some'], {
-			application_type: 'web'
+			applicationType: 'web'
 		});
 		allows(this.title, ['https://some'], {
-			application_type: 'web'
+			applicationType: 'web'
 		});
 		context('PAR allowUnregisteredRedirectUris', () => {
 			allows(
@@ -500,7 +500,7 @@ describe('Client metadata validation', () => {
 				this.title,
 				[],
 				{
-					application_type: 'native',
+					applicationType: 'native',
 					require_pushed_authorization_requests: true
 				},
 				{
@@ -587,20 +587,20 @@ describe('Client metadata validation', () => {
 			['https://rp.example.com#whatever'],
 			/redirect_uris must not contain fragments$/,
 			{
-				application_type: 'web'
+				applicationType: 'web'
 			}
 		);
 		rejects(this.title, ['no-dot-reverse-notation:/some'], undefined, {
-			application_type: 'web'
+			applicationType: 'web'
 		});
 		allows(this.title, ['http://localhost'], {
-			application_type: 'web'
+			applicationType: 'web'
 		});
 		rejects(this.title, ['http://some'], undefined, {
-			application_type: 'native'
+			applicationType: 'native'
 		});
 		rejects(this.title, ['not-a-uri'], undefined, {
-			application_type: 'native'
+			applicationType: 'native'
 		});
 	});
 
@@ -613,35 +613,35 @@ describe('Client metadata validation', () => {
 		rejects(this.title, [123], /must only contain strings$/);
 
 		allows(this.title, ['http://some'], {
-			application_type: 'web'
+			applicationType: 'web'
 		});
 		allows(this.title, ['https://some'], {
-			application_type: 'web'
+			applicationType: 'web'
 		});
 		rejects(
 			this.title,
 			['https://rp.example.com#whatever'],
 			/post_logout_redirect_uris must not contain fragments$/,
 			{
-				application_type: 'web'
+				applicationType: 'web'
 			}
 		);
 		rejects(this.title, ['no-dot-reverse-notation:/some'], undefined, {
-			application_type: 'web'
+			applicationType: 'web'
 		});
 		rejects(this.title, ['https://localhost'], undefined, {
-			application_type: 'web',
+			applicationType: 'web',
 			grant_types: ['implicit', 'authorization_code'],
 			response_types: ['code id_token']
 		});
 		allows(this.title, ['http://localhost'], {
-			application_type: 'web'
+			applicationType: 'web'
 		});
 		rejects(this.title, ['http://some'], undefined, {
-			application_type: 'native'
+			applicationType: 'native'
 		});
 		rejects(this.title, ['not-a-uri'], undefined, {
-			application_type: 'native'
+			applicationType: 'native'
 		});
 	});
 

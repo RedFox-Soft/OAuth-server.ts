@@ -1,5 +1,4 @@
 const RECOGNIZED_METADATA = [
-	'application_type',
 	'client_id_issued_at',
 	'client_name',
 	'client_secret_expires_at',
@@ -25,7 +24,6 @@ const RECOGNIZED_METADATA = [
 ];
 
 const DEFAULT = {
-	application_type: 'web',
 	authorization_signed_response_alg: 'RS256',
 	backchannel_logout_session_required: false,
 	backchannel_user_code_parameter: false,
@@ -64,7 +62,6 @@ const ARYS = [
 ];
 
 const STRING = [
-	'application_type',
 	'authorization_encrypted_response_alg',
 	'authorization_encrypted_response_enc',
 	'authorization_signed_response_alg',
@@ -159,17 +156,12 @@ const HTTPS_URI = [
 
 const LOOPBACKS = new Set(['localhost', '127.0.0.1', '[::1]']);
 
-const ENUM = {
-	application_type: () => ['native', 'web']
-};
-
 export const noVSCHAR = /[^\x20-\x7E]/;
 
 export {
 	ARYS,
 	BOOL,
 	DEFAULT,
-	ENUM,
 	HTTPS_URI,
 	LOOPBACKS,
 	RECOGNIZED_METADATA,

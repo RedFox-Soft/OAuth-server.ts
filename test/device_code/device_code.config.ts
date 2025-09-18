@@ -23,7 +23,7 @@ export default {
 			response_types: [],
 			redirectUris: [],
 			token_endpoint_auth_method: 'none',
-			application_type: 'native'
+			applicationType: 'native'
 		},
 		{
 			clientId: 'client-other',
@@ -34,7 +34,7 @@ export default {
 			response_types: [],
 			redirectUris: [],
 			token_endpoint_auth_method: 'none',
-			application_type: 'native'
+			applicationType: 'native'
 		},
 		{
 			clientId: 'client-not-allowed',
@@ -52,7 +52,7 @@ export default {
 			response_types: [],
 			redirectUris: [],
 			token_endpoint_auth_method: 'none',
-			application_type: 'native',
+			applicationType: 'native',
 			backchannel_logout_uri: 'https://rp.example.com/backchannel',
 			backchannel_logout_session_required: true
 		},
@@ -63,7 +63,7 @@ export default {
 			response_types: [],
 			redirectUris: [],
 			token_endpoint_auth_method: 'client_secret_basic',
-			application_type: 'native'
+			applicationType: 'native'
 		}
 	]
 };

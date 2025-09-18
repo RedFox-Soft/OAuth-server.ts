@@ -54,7 +54,7 @@ export default {
 			redirectUris: ['https://client.example.com/cb']
 		},
 		{
-			application_type: 'native',
+			applicationType: 'native',
 			clientId: 'client-native',
 			clientSecret: 'secret',
 			grant_types: ['authorization_code', 'refresh_token'],

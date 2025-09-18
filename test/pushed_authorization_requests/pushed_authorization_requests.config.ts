@@ -14,7 +14,7 @@ merge(config.features, {
 function allowUnregisteredClient(suffix, metadata) {
 	return {
 		clientId: `client-unregistered-test-${suffix}`,
-		application_type: 'web',
+		applicationType: 'web',
 		token_endpoint_auth_method: 'client_secret_basic',
 		clientSecret: 'secret',
 		redirectUris: ['https://rp.example.com/cb'],

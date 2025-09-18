@@ -654,7 +654,7 @@ export const globalConfiguration = {
 	 *
 	 * example: Available Metadata
 	 *
-	 * application_type, client_name, client_uri, contacts,
+	 * client_name, client_uri, contacts,
 	 * default_acr_values, default_max_age, grant_types, id_token_signed_response_alg,
 	 * initiate_login_uri, jwks, jwks_uri, logo_uri, policy_uri, post_logout_redirect_uris,
 	 * require_auth_time, response_types, response_modes, scope, sector_identifier_uri,
