@@ -13,7 +13,7 @@ export default {
 			clientId: 'client',
 			clientSecret: 'secret',
 			grant_types: ['authorization_code'],
-			response_types: ['code'],
+			responseTypes: ['code'],
 			subject_type: 'pairwise',
 			redirectUris: ['https://client.example.com/cb']
 		},
@@ -21,7 +21,7 @@ export default {
 			clientId: 'client-static-with-sector',
 			clientSecret: 'secret',
 			grant_types: ['authorization_code'],
-			response_types: ['code'],
+			responseTypes: ['code'],
 			subject_type: 'pairwise',
 			redirectUris: ['https://client.example.com/cb'],
 			sector_identifier_uri: 'https://foobar.example.com/sector'

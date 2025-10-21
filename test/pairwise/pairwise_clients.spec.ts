@@ -220,8 +220,8 @@ describe('pairwise features', () => {
 						);
 
 					return addClient(provider, {
-						client_id: 'client',
-						response_types: [],
+						clientId: 'client',
+						responseTypes: [],
 						backchannel_token_delivery_mode: 'poll',
 						grant_types: ['urn:openid:params:grant-type:ciba'],
 						token_endpoint_auth_method: 'private_key_jwt',
@@ -258,8 +258,8 @@ describe('pairwise features', () => {
 						);
 
 					return addClient(provider, {
-						client_id: 'client',
-						response_types: [],
+						clientId: 'client',
+						responseTypes: [],
 						grant_types: ['urn:ietf:params:oauth:grant-type:device_code'],
 						token_endpoint_auth_method: 'private_key_jwt',
 						jwks_uri: 'https://client.example.com/jwks',
@@ -318,9 +318,9 @@ describe('pairwise features', () => {
 					.reply(200, JSON.stringify('https://client.example.com/cb'));
 
 				return addClient(provider, {
-					client_id: 'client',
-					client_secret: 'secret',
-					redirect_uris: [
+					clientId: 'client',
+					clientSecret: 'secret',
+					redirectUris: [
 						'https://client.example.com/cb',
 						'https://missing.example.com/forum/cb'
 					],
@@ -348,9 +348,9 @@ describe('pairwise features', () => {
 					.reply(500);
 
 				return addClient(provider, {
-					client_id: 'client',
-					client_secret: 'secret',
-					redirect_uris: [
+					clientId: 'client',
+					clientSecret: 'secret',
+					redirectUris: [
 						'https://client.example.com/cb',
 						'https://missing.example.com/forum/cb'
 					],

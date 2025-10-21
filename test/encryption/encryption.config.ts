@@ -30,7 +30,7 @@ export default {
 			clientId: 'client',
 			clientSecret: 'secret',
 			redirectUris: ['https://client.example.com/cb'],
-			response_types: ['code'],
+			responseTypes: ['code'],
 			grant_types: ['authorization_code'],
 			jwks: { keys: [await exportJWK(keypair.publicKey)] },
 			id_token_encrypted_response_alg: 'RSA-OAEP',
@@ -46,7 +46,7 @@ export default {
 			clientSecret: 'secret',
 			redirectUris: ['https://client.example.com/cb'],
 			token_endpoint_auth_method: 'none',
-			response_types: ['code'],
+			responseTypes: ['code'],
 			grant_types: ['authorization_code'],
 			id_token_encrypted_response_alg: 'A128KW'
 		},
@@ -54,7 +54,7 @@ export default {
 			clientId: 'clientSymmetric-expired',
 			clientSecret: 'secret',
 			redirectUris: ['https://client.example.com/cb'],
-			response_types: ['code'],
+			responseTypes: ['code'],
 			grant_types: ['authorization_code'],
 			client_secret_expires_at: 1,
 			id_token_encrypted_response_alg: 'A128KW'
@@ -63,7 +63,7 @@ export default {
 			clientId: 'clientSymmetric-dir',
 			clientSecret: 'secret',
 			redirectUris: ['https://client.example.com/cb'],
-			response_types: ['code'],
+			responseTypes: ['code'],
 			grant_types: ['authorization_code'],
 			id_token_encrypted_response_alg: 'dir'
 		},
@@ -71,7 +71,7 @@ export default {
 			clientId: 'clientRequestObjectSigningAlg',
 			clientSecret: 'secret',
 			redirectUris: ['https://client.example.com/cb'],
-			response_types: ['code'],
+			responseTypes: ['code'],
 			grant_types: ['authorization_code'],
 			request_object_signing_alg: 'HS256'
 		}

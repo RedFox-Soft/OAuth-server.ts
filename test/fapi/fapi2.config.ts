@@ -32,7 +32,7 @@ export default {
 		{
 			clientId: 'client',
 			token_endpoint_auth_method: 'private_key_jwt',
-			response_types: ['code'],
+			responseTypes: ['code'],
 			grant_types: ['authorization_code'],
 			redirectUris: ['https://client.example.com/cb'],
 			jwks: {

@@ -425,7 +425,7 @@ describe('Client metadata validation', () => {
 		rejects(this.title, ['not-a-type']);
 		rejects(this.title, ['implicit'], undefined, {
 			// misses authorization_code
-			response_types: ['id_token', 'code']
+			responseTypes: ['id_token', 'code']
 		});
 	});
 
@@ -433,7 +433,7 @@ describe('Client metadata validation', () => {
 		defaultsTo(this.title, 'RS256');
 		mustBeString(this.title);
 		rejects(this.title, 'none', undefined, {
-			response_types: ['code id_token']
+			responseTypes: ['code id_token']
 		});
 		rejects(this.title, 'none');
 	});
@@ -632,7 +632,7 @@ describe('Client metadata validation', () => {
 		rejects(this.title, ['https://localhost'], undefined, {
 			applicationType: 'web',
 			grant_types: ['implicit', 'authorization_code'],
-			response_types: ['code id_token']
+			responseTypes: ['code id_token']
 		});
 		allows(this.title, ['http://localhost'], {
 			applicationType: 'web'
@@ -680,7 +680,7 @@ describe('Client metadata validation', () => {
 		mustBeBoolean(this.title);
 	});
 
-	context('response_types', function () {
+	context('responseTypes', function () {
 		defaultsTo(this.title, ['code']);
 		mustBeArray(this.title);
 		const responseTypes = ['code', 'none'];
@@ -1574,7 +1574,7 @@ describe('Client metadata validation', () => {
 		const metadata = {
 			grant_types: ['urn:openid:params:grant-type:ciba'],
 			redirect_uris: [],
-			response_types: [],
+			responseTypes: [],
 			backchannel_token_delivery_mode: 'poll'
 		};
 
@@ -1670,7 +1670,7 @@ describe('Client metadata validation', () => {
 				...metadata,
 				jwks_uri: 'https://rp.example.com/sector',
 				subject_type: 'pairwise',
-				response_types: ['code'],
+				responseTypes: ['code'],
 				grant_types: [...metadata.grant_types, 'authorization_code'],
 				redirect_uris: ['https://rp.example.com/cb']
 			}
@@ -1692,7 +1692,7 @@ describe('Client metadata validation', () => {
 		const configuration = { features: { deviceFlow: { enabled: true } } };
 		const metadata = {
 			grant_types: ['urn:ietf:params:oauth:grant-type:device_code'],
-			response_types: [],
+			responseTypes: [],
 			redirect_uris: undefined
 		};
 
@@ -1736,7 +1736,7 @@ describe('Client metadata validation', () => {
 				...metadata,
 				jwks_uri: 'https://rp.example.com/sector',
 				subject_type: 'pairwise',
-				response_types: ['code'],
+				responseTypes: ['code'],
 				grant_types: [...metadata.grant_types, 'authorization_code'],
 				redirect_uris: ['https://rp.example.com/cb']
 			}
@@ -1760,7 +1760,7 @@ describe('Client metadata validation', () => {
 		};
 		const metadata = {
 			grant_types: ['client_credentials'],
-			response_types: [],
+			responseTypes: [],
 			redirect_uris: undefined
 		};
 
@@ -2013,7 +2013,7 @@ describe('Client metadata validation', () => {
 			client_id: 'authorization-server',
 			client_secret: 'foobar',
 			redirect_uris: [],
-			response_types: [],
+			responseTypes: [],
 			grant_types: []
 		}).then((client) => {
 			expect(client.grantTypes).to.be.empty;
@@ -2027,7 +2027,7 @@ describe('Client metadata validation', () => {
 				client_id: 'resource-server',
 				client_secret: 'foobar',
 				redirect_uris: [],
-				response_types: [],
+				responseTypes: [],
 				grant_types: ['client_credentials']
 			},
 			{
@@ -2066,7 +2066,7 @@ describe('Client metadata validation', () => {
 				client_id: 'authorization-server',
 				client_secret: 'foobar',
 				redirect_uris: [],
-				response_types: [],
+				responseTypes: [],
 				grant_types: [],
 				subject_type: 'pairwise'
 			},
@@ -2114,9 +2114,9 @@ describe('Client metadata validation', () => {
 					}
 				}
 			);
-			defaultsTo('response_types', ['code'], undefined, {
+			defaultsTo('responseTypes', ['code'], undefined, {
 				clientDefaults: {
-					response_types: ['code'],
+					responseTypes: ['code'],
 					grant_types: ['authorization_code']
 				}
 			});

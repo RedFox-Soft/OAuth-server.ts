@@ -36,21 +36,21 @@ export default {
 			clientId: 'client',
 			clientSecret: 'secret',
 			grant_types: ['authorization_code', 'refresh_token'],
-			response_types: ['code', 'none'],
+			responseTypes: ['code', 'none'],
 			redirectUris: ['https://client.example.com/cb']
 		},
 		{
 			clientId: 'client-without-none',
 			clientSecret: 'secret',
 			grant_types: ['authorization_code', 'refresh_token'],
-			response_types: ['code'],
+			responseTypes: ['code'],
 			redirectUris: ['https://client.example.com/cb']
 		},
 		{
 			clientId: 'client-no-refresh',
 			clientSecret: 'secret',
 			grant_types: ['authorization_code'],
-			response_types: ['code', 'none'],
+			responseTypes: ['code', 'none'],
 			redirectUris: ['https://client.example.com/cb']
 		},
 		{
@@ -58,7 +58,7 @@ export default {
 			clientId: 'client-native',
 			clientSecret: 'secret',
 			grant_types: ['authorization_code', 'refresh_token'],
-			response_types: ['code', 'none'],
+			responseTypes: ['code', 'none'],
 			redirectUris: ['com.example.app:/cb']
 		},
 		{

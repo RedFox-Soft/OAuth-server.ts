@@ -21,7 +21,7 @@ export default {
 			'refresh_token',
 			'urn:ietf:params:oauth:grant-type:device_code'
 		],
-		response_types: ['code', 'none'],
+		responseTypes: ['code', 'none'],
 		redirectUris: ['https://client.example.com/cb']
 	}
 };

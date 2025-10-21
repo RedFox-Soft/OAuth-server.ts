@@ -56,7 +56,7 @@ export default {
 				'urn:openid:params:grant-type:ciba',
 				'client_credentials'
 			],
-			response_types: ['code'],
+			responseTypes: ['code'],
 			backchannel_token_delivery_mode: 'poll',
 			redirectUris: ['https://client.example.com/cb'],
 			tls_client_certificate_bound_access_tokens: true
@@ -69,7 +69,7 @@ export default {
 				'urn:openid:params:grant-type:ciba',
 				'refresh_token'
 			],
-			response_types: ['code'],
+			responseTypes: ['code'],
 			backchannel_token_delivery_mode: 'poll',
 			redirectUris: ['https://client.example.com/cb'],
 			token_endpoint_auth_method: 'none',

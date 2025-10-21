@@ -9,7 +9,7 @@ export default {
 		clientSecret: 'secret',
 		token_endpoint_auth_method: 'none',
 		grant_types: ['authorization_code'],
-		response_types: ['code'],
+		responseTypes: ['code'],
 		redirectUris: ['https://client.example.com/cb']
 	}
 };

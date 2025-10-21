@@ -20,7 +20,7 @@ export default {
 				'urn:ietf:params:oauth:grant-type:device_code',
 				'refresh_token'
 			],
-			response_types: [],
+			responseTypes: [],
 			redirectUris: [],
 			token_endpoint_auth_method: 'none',
 			applicationType: 'native'
@@ -31,7 +31,7 @@ export default {
 				'urn:ietf:params:oauth:grant-type:device_code',
 				'refresh_token'
 			],
-			response_types: [],
+			responseTypes: [],
 			redirectUris: [],
 			token_endpoint_auth_method: 'none',
 			applicationType: 'native'
@@ -41,7 +41,7 @@ export default {
 			token_endpoint_auth_method: 'none',
 			grant_types: [],
 			redirectUris: [],
-			response_types: []
+			responseTypes: []
 		},
 		{
 			clientId: 'client-backchannel',
@@ -49,7 +49,7 @@ export default {
 				'urn:ietf:params:oauth:grant-type:device_code',
 				'refresh_token'
 			],
-			response_types: [],
+			responseTypes: [],
 			redirectUris: [],
 			token_endpoint_auth_method: 'none',
 			applicationType: 'native',
@@ -60,7 +60,7 @@ export default {
 			clientId: 'client-basic-auth',
 			clientSecret: 'secret',
 			grant_types: ['urn:ietf:params:oauth:grant-type:device_code'],
-			response_types: [],
+			responseTypes: [],
 			redirectUris: [],
 			token_endpoint_auth_method: 'client_secret_basic',
 			applicationType: 'native'

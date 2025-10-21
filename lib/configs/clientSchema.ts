@@ -28,6 +28,17 @@ export const ClientSchema = t.Object({
 	 * description: The type of application the client is using.
 	 */
 	applicationType: t.Union([t.Literal('web'), t.Literal('native')]),
+	/*
+	 * responseTypes
+	 *
+	 * description: The list of response types supported by the client.
+	 */
+	responseTypes: t.Array(t.Union([t.Literal('code'), t.Literal('none')])),
+	/*
+	 * subjectType
+	 *
+	 * description: The subject type requested for responses to this client.
+	 */
 	subjectType: t.Union([t.Literal('pairwise'), t.Literal('public')]),
 	/*
 	 * requirePushedAuthorizationRequests

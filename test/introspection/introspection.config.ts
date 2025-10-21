@@ -32,7 +32,7 @@ export default {
 			clientId: 'client-introspection',
 			clientSecret: 'secret',
 			redirectUris: [],
-			response_types: [],
+			responseTypes: [],
 			grant_types: []
 		},
 		{
@@ -40,7 +40,7 @@ export default {
 			token_endpoint_auth_method: 'none',
 			redirectUris: [],
 			grant_types: [],
-			response_types: []
+			responseTypes: []
 		}
 	]
 };

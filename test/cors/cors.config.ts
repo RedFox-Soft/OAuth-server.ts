@@ -19,7 +19,7 @@ export default {
 			'client_credentials',
 			'urn:ietf:params:oauth:grant-type:device_code'
 		],
-		response_types: [],
+		responseTypes: [],
 		redirectUris: [],
 		token_endpoint_auth_method: 'none'
 	}

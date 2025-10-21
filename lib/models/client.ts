@@ -367,9 +367,11 @@ export class Client {
 
 	static #adapter;
 
-	constructor(metadata, ctx) {
-		const schema = new Client.Schema(metadata);
-
+	constructor(metadata) {
+		const schema = new Client.Schema({
+			...ClientDefaults,
+			...metadata
+		});
 		const clientMetadata = {
 			...ClientDefaults,
 			...metadata
@@ -389,7 +391,7 @@ export class Client {
 		}
 		Object.assign(
 			this,
-			pick(metadata, ...Object.keys(ClientSchema.properties))
+			pick(clientMetadata, ...Object.keys(ClientSchema.properties))
 		);
 		Object.assign(
 			this,
@@ -581,11 +583,7 @@ export class Client {
 		return this.tokenEndpointAuthSigningAlg;
 	}
 
-	static async find(id) {
-		if (typeof id !== 'string') {
-			return undefined;
-		}
-
+	static async find(id: string): Promise<Client | undefined> {
 		const { staticClients, dynamicClients } = instance(provider);
 
 		if (staticClients.has(id)) {
@@ -606,7 +604,7 @@ export class Client {
 		const properties = await this.adapter.find(id);
 
 		if (!properties) {
-			return undefined;
+			return;
 		}
 
 		const propHash = crypto.hash(

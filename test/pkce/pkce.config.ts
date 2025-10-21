@@ -14,7 +14,7 @@ export default {
 	clients: [
 		{
 			clientId: 'client',
-			response_types: ['code'],
+			responseTypes: ['code'],
 			grant_types: ['authorization_code', 'refresh_token'],
 			redirectUris: ['https://rp.example.com/cb'],
 			token_endpoint_auth_method: 'none'

@@ -159,7 +159,6 @@ export default function getSchema(provider) {
 		request_object_encryption_alg: () => requestObjectEncryptionAlgValues,
 		request_object_encryption_enc: () =>
 			configuration.requestObjectEncryptionEncValues,
-		response_types: () => ['code', 'none'],
 		response_modes: () => [...instance(provider).responseModes.keys()],
 		subject_type: () => configuration.subjectTypes,
 		authorization_details_types: () =>
@@ -232,7 +231,6 @@ export default function getSchema(provider) {
 			this.whens();
 			this.arrays();
 			this.strings();
-			this.normalizeResponseTypes();
 			this.enums();
 			this.webUris();
 			this.scopes();
@@ -253,20 +251,16 @@ export default function getSchema(provider) {
 				}
 			});
 
-			const responseTypes = new Set(
-				this.response_types.map((rt) => rt.split(' ')).flat()
-			);
+			const responseTypes = this.metadata.responseTypes;
 
 			if (
-				this.grant_types.some((type) =>
-					['authorization_code'].includes(type)
-				) &&
-				!this.response_types.length
+				this.grant_types.includes('authorization_code') &&
+				!responseTypes?.length
 			) {
-				this.invalidate('response_types must contain members');
+				this.invalidate('responseTypes must contain members');
 			}
 
-			if (responseTypes.size && !this.metadata.redirectUris.length) {
+			if (responseTypes?.length && !this.metadata.redirectUris.length) {
 				if (
 					this.token_endpoint_auth_method === 'none' ||
 					this.sector_identifier_uri
@@ -275,16 +269,16 @@ export default function getSchema(provider) {
 				}
 			}
 
-			if (responseTypes.size && this.response_modes?.length === 0) {
+			if (responseTypes?.length && this.response_modes?.length === 0) {
 				this.invalidate('response_modes must contain members');
 			}
 
 			if (
-				responseTypes.has('code') &&
+				responseTypes?.includes('code') &&
 				!this.grant_types.includes('authorization_code')
 			) {
 				this.invalidate(
-					"grant_types must contain 'authorization_code' when code is amongst response_types"
+					"grant_types must contain 'authorization_code' when code is amongst responseTypes"
 				);
 			}
 
@@ -351,7 +345,7 @@ export default function getSchema(provider) {
 				checked.push('clientSecret');
 			}
 
-			if (Array.isArray(this.response_types) && this.response_types.length) {
+			if (this.metadata.responseTypes?.length) {
 				checked.push('redirectUris');
 			}
 
@@ -366,10 +360,7 @@ export default function getSchema(provider) {
 
 				if (this.subject_type === 'pairwise') {
 					checked.push('jwks_uri');
-					if (
-						Array.isArray(this.response_types) &&
-						this.response_types.length
-					) {
+					if (this.metadata.responseTypes?.length) {
 						checked.push('sector_identifier_uri');
 					}
 				}
@@ -383,17 +374,13 @@ export default function getSchema(provider) {
 					)
 				) {
 					checked.push('jwks_uri');
-					if (
-						Array.isArray(this.response_types) &&
-						this.response_types.length
-					) {
+					if (this.metadata.responseTypes?.length) {
 						checked.push('sector_identifier_uri');
 					}
 				}
 
 				if (
-					Array.isArray(this.response_types) &&
-					this.response_types.length &&
+					this.metadata.responseTypes?.length &&
 					Array.isArray(this.metadata.redirectUris) &&
 					new Set(this.metadata.redirectUris.map((uri) => new URL(uri).host))
 						.size > 1
@@ -534,12 +521,6 @@ export default function getSchema(provider) {
 					}
 				}
 			});
-		}
-
-		normalizeResponseTypes() {
-			this.response_types = this.response_types.map((type) =>
-				[...new Set(type.split(' '))].sort().join(' ')
-			);
 		}
 
 		postLogoutRedirectUris() {

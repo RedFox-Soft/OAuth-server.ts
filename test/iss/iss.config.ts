@@ -17,7 +17,7 @@ export default {
 			redirectUris: ['https://client.example.com/cb'],
 			grant_types: ['authorization_code'],
 			scope: 'openid',
-			response_types: ['code', 'none']
+			responseTypes: ['code', 'none']
 		}
 	]
 };

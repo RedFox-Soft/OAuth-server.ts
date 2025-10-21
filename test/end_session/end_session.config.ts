@@ -7,7 +7,7 @@ export default {
 	clients: [
 		{
 			clientId: 'client',
-			response_types: ['code'],
+			responseTypes: ['code'],
 			grant_types: ['authorization_code'],
 			redirectUris: ['https://client.example.com/cb'],
 			token_endpoint_auth_method: 'none'
@@ -15,7 +15,7 @@ export default {
 		{
 			clientId: 'client-hmac',
 			clientSecret: 'secret',
-			response_types: ['code'],
+			responseTypes: ['code'],
 			grant_types: ['authorization_code'],
 			redirectUris: ['https://client.example.com/cb'],
 			token_endpoint_auth_method: 'none',

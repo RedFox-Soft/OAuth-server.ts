@@ -20,7 +20,7 @@ export default {
 			'refresh_token',
 			'urn:ietf:params:oauth:grant-type:device_code'
 		],
-		response_types: ['code'],
+		responseTypes: ['code'],
 		redirectUris: ['https://rp.example.com/cb']
 	}
 };
