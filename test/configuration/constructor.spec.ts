@@ -56,20 +56,6 @@ describe('Provider configuration', () => {
 		});
 	});
 
-	describe('subjectTypes', () => {
-		it('only accepts arrays and sets', () => {
-			provider.init({ subjectTypes: ['public'] });
-			provider.init({
-				subjectTypes: new Set(['public'])
-			});
-			expect(() => {
-				provider.init({
-					subjectTypes: { bronze: true }
-				});
-			}).to.throw('subjectTypes must be an Array or Set');
-		});
-	});
-
 	describe('scopes', () => {
 		it('only accepts arrays and sets', () => {
 			provider.init({ scopes: ['foo', 'bar'] });

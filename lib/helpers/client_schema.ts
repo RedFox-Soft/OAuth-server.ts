@@ -46,13 +46,6 @@ export default function getSchema(provider) {
 	const DEFAULT_CONFIGURATION = structuredClone(configuration.clientDefaults);
 	Object.assign(DEFAULT, DEFAULT_CONFIGURATION);
 
-	if (
-		configuration.subjectTypes.size === 1 &&
-		configuration.subjectTypes.has('pairwise')
-	) {
-		DEFAULT.subject_type = 'pairwise';
-	}
-
 	if (features.mTLS.enabled && features.mTLS.tlsClientAuth) {
 		RECOGNIZED_METADATA.push('tls_client_auth_subject_dn');
 		RECOGNIZED_METADATA.push('tls_client_auth_san_dns');
@@ -159,12 +152,10 @@ export default function getSchema(provider) {
 		request_object_encryption_alg: () => requestObjectEncryptionAlgValues,
 		request_object_encryption_enc: () =>
 			configuration.requestObjectEncryptionEncValues,
-		response_modes: () => [...instance(provider).responseModes.keys()],
-		subject_type: () => configuration.subjectTypes,
 		authorization_details_types: () =>
 			Object.keys(features.richAuthorizationRequests.types),
 		token_endpoint_auth_method: (metadata) => {
-			if (metadata.subject_type === 'pairwise') {
+			if (metadata.metadata.subjectType === 'pairwise') {
 				for (const grant of [
 					'urn:ietf:params:oauth:grant-type:device_code',
 					'urn:openid:params:grant-type:ciba'
@@ -269,8 +260,8 @@ export default function getSchema(provider) {
 				}
 			}
 
-			if (responseTypes?.length && this.response_modes?.length === 0) {
-				this.invalidate('response_modes must contain members');
+			if (responseTypes?.length && this.metadata.responseModes?.length === 0) {
+				this.invalidate('responseModes must contain members');
 			}
 
 			if (
@@ -358,7 +349,7 @@ export default function getSchema(provider) {
 					checked.push('backchannel_client_notification_endpoint');
 				}
 
-				if (this.subject_type === 'pairwise') {
+				if (this.metadata.subjectType === 'pairwise') {
 					checked.push('jwks_uri');
 					if (this.metadata.responseTypes?.length) {
 						checked.push('sector_identifier_uri');
@@ -366,7 +357,7 @@ export default function getSchema(provider) {
 				}
 			}
 
-			if (this.subject_type === 'pairwise') {
+			if (this.metadata.subjectType === 'pairwise') {
 				if (
 					Array.isArray(this.grant_types) &&
 					this.grant_types.includes(

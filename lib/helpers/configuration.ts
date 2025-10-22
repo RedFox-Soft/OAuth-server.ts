@@ -54,7 +54,6 @@ class Configuration {
 		this.collectClaims();
 		this.defaultSigAlg();
 		this.collectGrantTypes();
-		this.checkSubjectTypes();
 		this.checkDependantFeatures();
 		this.checkDeviceFlow();
 		this.checkAuthMethods();
@@ -97,7 +96,7 @@ class Configuration {
 
 	ensureSets() {
 		for (const [obj, props] of [
-			[this, ['scopes', 'subjectTypes', 'acrValues', 'clientAuthMethods']],
+			[this, ['scopes', 'acrValues', 'clientAuthMethods']],
 			[this.features.ciba, ['deliveryModes']]
 		]) {
 			for (const prop of props) {
@@ -317,20 +316,6 @@ class Configuration {
 		if (!this.clientAuthSigningAlgValues.length) {
 			this.clientAuthSigningAlgValues = undefined;
 		}
-	}
-
-	checkSubjectTypes() {
-		if (!this.subjectTypes.size) {
-			throw new TypeError('subjectTypes must not be empty');
-		}
-
-		this.subjectTypes.forEach((type) => {
-			if (!['public', 'pairwise'].includes(type)) {
-				throw new TypeError(
-					'only public and pairwise subjectTypes are supported'
-				);
-			}
-		});
 	}
 
 	checkCibaDeliveryModes() {

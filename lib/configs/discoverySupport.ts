@@ -12,6 +12,7 @@ const discovery = {
 	response_modes_supported: ['form_post', 'query'],
 	response_types_supported: ['none', 'code'],
 	code_challenge_methods_supported: ['S256'],
+	subject_types_supported: ['public', 'pairwise'],
 
 	// par.enabled is used to determine if the pushed_authorization_request_endpoint is available
 	pushed_authorization_request_endpoint: `${ISSUER}${routeNames.pushed_authorization_request}`,

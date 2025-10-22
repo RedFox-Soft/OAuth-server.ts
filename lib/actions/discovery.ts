@@ -77,7 +77,6 @@ export const discovery = new Elysia().get(
 				: undefined,
 			authorization_response_iss_parameter_supported: true,
 			scopes_supported: [...configuration.scopes],
-			subject_types_supported: [...configuration.subjectTypes],
 			token_endpoint_auth_methods_supported: [
 				...configuration.clientAuthMethods
 			],

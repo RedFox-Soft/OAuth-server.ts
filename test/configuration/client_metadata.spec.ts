@@ -713,7 +713,7 @@ describe('Client metadata validation', () => {
 		rejects(this.title, ['not-a-type', 'none']);
 	});
 
-	context('response_modes', function () {
+	context('responseModes', function () {
 		defaultsTo(this.title, undefined, undefined, undefined, (client) => {
 			expect(client.responseModeAllowed('query')).to.be.true;
 			expect(client.responseModeAllowed('fragment')).to.be.true;

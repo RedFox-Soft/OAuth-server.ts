@@ -35,6 +35,22 @@ export const ClientSchema = t.Object({
 	 */
 	responseTypes: t.Array(t.Union([t.Literal('code'), t.Literal('none')])),
 	/*
+	 * responseModes
+	 *
+	 * description: The list of response modes supported by the client.
+	 */
+	responseModes: t.Optional(
+		t.Array(
+			t.Union([
+				t.Literal('query'),
+				t.Literal('form_post'),
+				t.Literal('jwt'),
+				t.Literal('jwt.query'),
+				t.Literal('jwt.form_post')
+			])
+		)
+	),
+	/*
 	 * subjectType
 	 *
 	 * description: The subject type requested for responses to this client.

@@ -304,7 +304,7 @@ describe('introspection features', () => {
 			expect(data.sub).not.toBe('accountId');
 		});
 
-		it('can be called by RS clients and uses the original subject_type', async function () {
+		it('can be called by RS clients and uses the original subjectType', async function () {
 			const rt = new RefreshToken({
 				accountId: 'accountId',
 				grantId: setup.getGrantId('client-pairwise'),

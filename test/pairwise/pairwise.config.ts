@@ -2,7 +2,6 @@ import getConfig from '../default.config.js';
 
 const config = getConfig();
 
-config.subjectTypes = ['public', 'pairwise'];
 config.features.ciba = { enabled: true };
 config.features.deviceFlow = { enabled: true };
 
@@ -14,7 +13,7 @@ export default {
 			clientSecret: 'secret',
 			grant_types: ['authorization_code'],
 			responseTypes: ['code'],
-			subject_type: 'pairwise',
+			subjectType: 'pairwise',
 			redirectUris: ['https://client.example.com/cb']
 		},
 		{
@@ -22,7 +21,7 @@ export default {
 			clientSecret: 'secret',
 			grant_types: ['authorization_code'],
 			responseTypes: ['code'],
-			subject_type: 'pairwise',
+			subjectType: 'pairwise',
 			redirectUris: ['https://client.example.com/cb'],
 			sector_identifier_uri: 'https://foobar.example.com/sector'
 		}

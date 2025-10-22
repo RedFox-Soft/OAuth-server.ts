@@ -14,10 +14,8 @@ const RECOGNIZED_METADATA = [
 	'logo_uri',
 	'policy_uri',
 	'require_auth_time',
-	'response_modes',
 	'scope',
 	'sector_identifier_uri',
-	'subject_type',
 	'token_endpoint_auth_method',
 	'tos_uri'
 ];
@@ -33,7 +31,6 @@ const DEFAULT = {
 	require_auth_time: false,
 	require_signed_request_object: false,
 	dpop_bound_access_tokens: false,
-	subject_type: 'public',
 	tls_client_certificate_bound_access_tokens: false,
 	token_endpoint_auth_method: 'client_secret_basic',
 	authorization_details_types: []
@@ -54,7 +51,6 @@ const ARYS = [
 	'default_acr_values',
 	'grant_types',
 	'post_logout_redirect_uris',
-	'response_modes',
 	'authorization_details_types'
 ];
 
@@ -83,7 +79,6 @@ const STRING = [
 	'request_object_signing_alg',
 	'scope',
 	'sector_identifier_uri',
-	'subject_type',
 	'tls_client_auth_san_dns',
 	'tls_client_auth_san_email',
 	'tls_client_auth_san_ip',
@@ -100,7 +95,6 @@ const STRING = [
 	'default_acr_values',
 	'grant_types',
 	'post_logout_redirect_uris',
-	'response_modes',
 	'authorization_details_types'
 ];
 

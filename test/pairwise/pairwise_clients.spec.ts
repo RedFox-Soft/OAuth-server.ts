@@ -22,7 +22,7 @@ describe('pairwise features', () => {
 					client_id: 'client',
 					client_secret: 'secret',
 					redirect_uris: ['https://client.example.com/cb'],
-					subject_type: 'pairwise'
+					subjectType: 'pairwise'
 				}).then((client) => {
 					expect(client.sectorIdentifier).to.be.ok;
 					expect(client.sectorIdentifier).to.eq('client.example.com');
@@ -37,7 +37,7 @@ describe('pairwise features', () => {
 						'https://client.example.com/cb',
 						'https://client.example.com/forum/cb'
 					],
-					subject_type: 'pairwise'
+					subjectType: 'pairwise'
 				}).then((client) => {
 					expect(client.sectorIdentifier).to.be.ok;
 					expect(client.sectorIdentifier).to.eq('client.example.com');
@@ -52,7 +52,7 @@ describe('pairwise features', () => {
 						'https://client.example.com/cb',
 						'https://wrongsubdomain.example.com/forum/cb'
 					],
-					subject_type: 'pairwise'
+					subjectType: 'pairwise'
 				}).then(
 					(client) => {
 						expect(client).not.to.be.ok;
@@ -69,7 +69,7 @@ describe('pairwise features', () => {
 		});
 
 		context('sector_identifier_uri is provided', () => {
-			it('is not ignored even without subject_type=pairwise', function () {
+			it('is not ignored even without subjectType=pairwise', function () {
 				mock('https://foobar.example.com')
 					.intercept({
 						path: '/sector'
@@ -90,7 +90,7 @@ describe('pairwise features', () => {
 						'https://another.example.com/forum/cb'
 					],
 					sector_identifier_uri: 'https://foobar.example.com/sector',
-					subject_type: 'public'
+					subjectType: 'public'
 				}).then((client) => {
 					expect(client).to.be.ok;
 					expect(client.sectorIdentifier).to.eq('foobar.example.com');
@@ -118,7 +118,7 @@ describe('pairwise features', () => {
 						'https://another.example.com/forum/cb'
 					],
 					sector_identifier_uri: 'https://foobar.example.com/sector',
-					subject_type: 'pairwise'
+					subjectType: 'pairwise'
 				}).then((client) => {
 					expect(client).to.be.ok;
 					expect(client.sectorIdentifier).to.eq('foobar.example.com');
@@ -155,7 +155,7 @@ describe('pairwise features', () => {
 						'https://another.example.com/forum/cb'
 					],
 					sector_identifier_uri: 'http://client.example.com/sector',
-					subject_type: 'pairwise'
+					subjectType: 'pairwise'
 				}).then(
 					(client) => {
 						expect(client).not.to.be.ok;
@@ -190,7 +190,7 @@ describe('pairwise features', () => {
 						'https://missing.example.com/forum/cb'
 					],
 					sector_identifier_uri: 'https://client.example.com/sector',
-					subject_type: 'pairwise'
+					subjectType: 'pairwise'
 				}).then(
 					(client) => {
 						expect(client).not.to.be.ok;
@@ -227,7 +227,7 @@ describe('pairwise features', () => {
 						token_endpoint_auth_method: 'private_key_jwt',
 						jwks_uri: 'https://client.example.com/jwks',
 						sector_identifier_uri: 'https://client.example.com/sector',
-						subject_type: 'pairwise'
+						subjectType: 'pairwise'
 					}).then(
 						(client) => {
 							expect(client).not.to.be.ok;
@@ -264,7 +264,7 @@ describe('pairwise features', () => {
 						token_endpoint_auth_method: 'private_key_jwt',
 						jwks_uri: 'https://client.example.com/jwks',
 						sector_identifier_uri: 'https://client.example.com/sector',
-						subject_type: 'pairwise'
+						subjectType: 'pairwise'
 					}).then(
 						(client) => {
 							expect(client).not.to.be.ok;
@@ -295,7 +295,7 @@ describe('pairwise features', () => {
 						'https://missing.example.com/forum/cb'
 					],
 					sector_identifier_uri: 'https://client.example.com/sector',
-					subject_type: 'pairwise'
+					subjectType: 'pairwise'
 				}).then(
 					(client) => {
 						expect(client).not.to.be.ok;
@@ -325,7 +325,7 @@ describe('pairwise features', () => {
 						'https://missing.example.com/forum/cb'
 					],
 					sector_identifier_uri: 'https://client.example.com/sector',
-					subject_type: 'pairwise'
+					subjectType: 'pairwise'
 				}).then(
 					(client) => {
 						expect(client).not.to.be.ok;
@@ -355,7 +355,7 @@ describe('pairwise features', () => {
 						'https://missing.example.com/forum/cb'
 					],
 					sector_identifier_uri: 'https://client.example.com/sector',
-					subject_type: 'pairwise'
+					subjectType: 'pairwise'
 				}).then(
 					(client) => {
 						expect(client).not.to.be.ok;
@@ -378,14 +378,14 @@ describe('pairwise features', () => {
 					.reply(201, JSON.stringify('https://client.example.com/cb'));
 
 				return addClient(provider, {
-					client_id: 'client',
-					client_secret: 'secret',
-					redirect_uris: [
+					clientId: 'client',
+					clientSecret: 'secret',
+					redirectUris: [
 						'https://client.example.com/cb',
 						'https://missing.example.com/forum/cb'
 					],
 					sector_identifier_uri: 'https://client.example.com/sector',
-					subject_type: 'pairwise'
+					subjectType: 'pairwise'
 				}).then(
 					(client) => {
 						expect(client).not.to.be.ok;
@@ -410,7 +410,7 @@ describe('pairwise features', () => {
 				client_id: 'clientOne',
 				client_secret: 'secret',
 				redirect_uris: ['https://clientone.com/cb'],
-				subject_type: 'pairwise'
+				subjectType: 'pairwise'
 			}).then((client) => {
 				clients.push(client);
 			});
@@ -421,7 +421,7 @@ describe('pairwise features', () => {
 				client_id: 'clientTwo',
 				client_secret: 'secret',
 				redirect_uris: ['https://clienttwo.com/cb'],
-				subject_type: 'pairwise'
+				subjectType: 'pairwise'
 			}).then((client) => {
 				clients.push(client);
 			});

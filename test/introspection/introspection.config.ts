@@ -4,7 +4,6 @@ import getConfig from '../default.config.js';
 
 const config = getConfig();
 
-config.subjectTypes = ['public', 'pairwise'];
 merge(config.features, {
 	encryption: { enabled: true },
 	clientCredentials: { enabled: true }
@@ -25,7 +24,7 @@ export default {
 		{
 			clientId: 'client-pairwise',
 			clientSecret: 'secret',
-			subject_type: 'pairwise',
+			subjectType: 'pairwise',
 			redirectUris: ['https://client.example.com/cb']
 		},
 		{

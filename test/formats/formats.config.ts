@@ -13,7 +13,6 @@ merge(config.features, {
 		}
 	}
 });
-config.subjectTypes = ['public', 'pairwise'];
 config.pairwiseIdentifier = () => 'pairwise-sub';
 
 export default {
@@ -28,7 +27,7 @@ export default {
 			clientId: 'pairwise',
 			clientSecret: 'secret',
 			redirectUris: ['https://client.example.com/cb'],
-			subject_type: 'pairwise'
+			subjectType: 'pairwise'
 		}
 	]
 };
