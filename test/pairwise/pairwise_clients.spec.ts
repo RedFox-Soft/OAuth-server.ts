@@ -223,7 +223,7 @@ describe('pairwise features', () => {
 						clientId: 'client',
 						responseTypes: [],
 						backchannel_token_delivery_mode: 'poll',
-						grant_types: ['urn:openid:params:grant-type:ciba'],
+						grantTypes: ['urn:openid:params:grant-type:ciba'],
 						token_endpoint_auth_method: 'private_key_jwt',
 						jwks_uri: 'https://client.example.com/jwks',
 						sector_identifier_uri: 'https://client.example.com/sector',
@@ -260,7 +260,7 @@ describe('pairwise features', () => {
 					return addClient(provider, {
 						clientId: 'client',
 						responseTypes: [],
-						grant_types: ['urn:ietf:params:oauth:grant-type:device_code'],
+						grantTypes: ['urn:ietf:params:oauth:grant-type:device_code'],
 						token_endpoint_auth_method: 'private_key_jwt',
 						jwks_uri: 'https://client.example.com/jwks',
 						sector_identifier_uri: 'https://client.example.com/sector',

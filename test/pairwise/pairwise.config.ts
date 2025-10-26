@@ -11,7 +11,7 @@ export default {
 		{
 			clientId: 'client',
 			clientSecret: 'secret',
-			grant_types: ['authorization_code'],
+			grantTypes: ['authorization_code'],
 			responseTypes: ['code'],
 			subjectType: 'pairwise',
 			redirectUris: ['https://client.example.com/cb']
@@ -19,7 +19,7 @@ export default {
 		{
 			clientId: 'client-static-with-sector',
 			clientSecret: 'secret',
-			grant_types: ['authorization_code'],
+			grantTypes: ['authorization_code'],
 			responseTypes: ['code'],
 			subjectType: 'pairwise',
 			redirectUris: ['https://client.example.com/cb'],

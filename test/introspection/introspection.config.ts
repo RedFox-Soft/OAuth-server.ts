@@ -32,13 +32,13 @@ export default {
 			clientSecret: 'secret',
 			redirectUris: [],
 			responseTypes: [],
-			grant_types: []
+			grantTypes: []
 		},
 		{
 			clientId: 'client-none',
 			token_endpoint_auth_method: 'none',
 			redirectUris: [],
-			grant_types: [],
+			grantTypes: [],
 			responseTypes: []
 		}
 	]

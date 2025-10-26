@@ -10,14 +10,14 @@ export default {
 		{
 			clientId: 'client',
 			clientSecret: 'secret',
-			grant_types: ['authorization_code', 'refresh_token'],
+			grantTypes: ['authorization_code', 'refresh_token'],
 			responseTypes: ['code'],
 			redirectUris: ['https://client.example.com/cb']
 		},
 		{
 			clientId: 'client2',
 			clientSecret: 'secret',
-			grant_types: ['authorization_code', 'refresh_token'],
+			grantTypes: ['authorization_code', 'refresh_token'],
 			redirectUris: ['https://client.example.com/cb']
 		}
 	]

@@ -655,7 +655,7 @@ export const globalConfiguration = {
 	 * example: Available Metadata
 	 *
 	 * client_name, client_uri, contacts,
-	 * default_acr_values, default_max_age, grant_types, id_token_signed_response_alg,
+	 * default_acr_values, default_max_age, id_token_signed_response_alg,
 	 * initiate_login_uri, jwks, jwks_uri, logo_uri, policy_uri, post_logout_redirect_uris,
 	 * require_auth_time, scope, sector_identifier_uri,
 	 * token_endpoint_auth_method, tos_uri, userinfo_signed_response_alg
@@ -709,7 +709,6 @@ export const globalConfiguration = {
 	 *
 	 */
 	clientDefaults: {
-		grant_types: ['authorization_code'],
 		id_token_signed_response_alg: 'RS256',
 		token_endpoint_auth_method: 'client_secret_basic'
 	},

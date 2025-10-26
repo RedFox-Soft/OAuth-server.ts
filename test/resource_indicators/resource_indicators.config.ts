@@ -75,7 +75,7 @@ export default {
 			redirectUris: ['https://client.example.com/cb'],
 			responseTypes: ['code'],
 			backchannel_token_delivery_mode: 'poll',
-			grant_types: [
+			grantTypes: [
 				'refresh_token',
 				'client_credentials',
 				'authorization_code',

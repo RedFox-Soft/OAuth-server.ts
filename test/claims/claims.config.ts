@@ -15,7 +15,7 @@ export default {
 			clientId: 'client',
 			clientSecret: 'secret',
 			token_endpoint_auth_method: 'none',
-			grant_types: ['authorization_code'],
+			grantTypes: ['authorization_code'],
 			responseTypes: ['none', 'code'],
 			redirectUris: ['https://client.example.com/cb']
 		},
@@ -23,7 +23,7 @@ export default {
 			clientId: 'client-pairwise',
 			subjectType: 'pairwise',
 			token_endpoint_auth_method: 'none',
-			grant_types: ['authorization_code'],
+			grantTypes: ['authorization_code'],
 			responseTypes: ['code'],
 			redirectUris: ['https://client.example.com/cb']
 		}

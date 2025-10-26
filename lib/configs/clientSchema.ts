@@ -51,6 +51,20 @@ export const ClientSchema = t.Object({
 		)
 	),
 	/*
+	 * grantTypes
+	 *
+	 * description: The list of grant types supported by the client.
+	 */
+	grantTypes: t.Array(
+		t.Union([
+			t.Literal('authorization_code'),
+			t.Literal('refresh_token'),
+			t.Literal('client_credentials'),
+			t.Literal('urn:ietf:params:oauth:grant-type:device_code'),
+			t.Literal('urn:openid:params:grant-type:ciba')
+		])
+	),
+	/*
 	 * subjectType
 	 *
 	 * description: The subject type requested for responses to this client.

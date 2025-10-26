@@ -35,21 +35,21 @@ export default {
 		{
 			clientId: 'client',
 			clientSecret: 'secret',
-			grant_types: ['authorization_code', 'refresh_token'],
+			grantTypes: ['authorization_code', 'refresh_token'],
 			responseTypes: ['code', 'none'],
 			redirectUris: ['https://client.example.com/cb']
 		},
 		{
 			clientId: 'client-without-none',
 			clientSecret: 'secret',
-			grant_types: ['authorization_code', 'refresh_token'],
+			grantTypes: ['authorization_code', 'refresh_token'],
 			responseTypes: ['code'],
 			redirectUris: ['https://client.example.com/cb']
 		},
 		{
 			clientId: 'client-no-refresh',
 			clientSecret: 'secret',
-			grant_types: ['authorization_code'],
+			grantTypes: ['authorization_code'],
 			responseTypes: ['code', 'none'],
 			redirectUris: ['https://client.example.com/cb']
 		},
@@ -57,7 +57,7 @@ export default {
 			applicationType: 'native',
 			clientId: 'client-native',
 			clientSecret: 'secret',
-			grant_types: ['authorization_code', 'refresh_token'],
+			grantTypes: ['authorization_code', 'refresh_token'],
 			responseTypes: ['code', 'none'],
 			redirectUris: ['com.example.app:/cb']
 		},
@@ -66,7 +66,7 @@ export default {
 			clientSecret: 'secret',
 			redirectUris: ['https://client.example.com/cb'],
 			scope: 'openid',
-			grant_types: ['authorization_code', 'refresh_token']
+			grantTypes: ['authorization_code', 'refresh_token']
 		}
 	]
 };

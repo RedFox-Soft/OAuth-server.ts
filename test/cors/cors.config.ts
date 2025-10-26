@@ -15,7 +15,7 @@ export default {
 	config,
 	client: {
 		clientId: 'client',
-		grant_types: [
+		grantTypes: [
 			'client_credentials',
 			'urn:ietf:params:oauth:grant-type:device_code'
 		],

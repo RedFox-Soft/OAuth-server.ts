@@ -416,7 +416,7 @@ describe('Client metadata validation', () => {
 		rejects(this.title, []);
 	});
 
-	context('grant_types', function () {
+	context('grantTypes', function () {
 		defaultsTo(this.title, ['authorization_code']);
 		mustBeArray(this.title);
 		allows(this.title, ['authorization_code', 'refresh_token']);
@@ -631,7 +631,7 @@ describe('Client metadata validation', () => {
 		});
 		rejects(this.title, ['https://localhost'], undefined, {
 			applicationType: 'web',
-			grant_types: ['implicit', 'authorization_code'],
+			grantTypes: ['implicit', 'authorization_code'],
 			responseTypes: ['code id_token']
 		});
 		allows(this.title, ['http://localhost'], {
@@ -693,7 +693,7 @@ describe('Client metadata validation', () => {
 				this.title,
 				[value],
 				{
-					grant_types: grants
+					grantTypes: grants
 				},
 				{ responseTypes }
 			);
@@ -702,7 +702,7 @@ describe('Client metadata validation', () => {
 			this.title,
 			responseTypes,
 			{
-				grant_types: ['authorization_code']
+				grantTypes: ['authorization_code']
 			},
 			{ responseTypes }
 		);
@@ -1572,7 +1572,7 @@ describe('Client metadata validation', () => {
 			}
 		};
 		const metadata = {
-			grant_types: ['urn:openid:params:grant-type:ciba'],
+			grantTypes: ['urn:openid:params:grant-type:ciba'],
 			redirect_uris: [],
 			responseTypes: [],
 			backchannel_token_delivery_mode: 'poll'
@@ -1671,7 +1671,7 @@ describe('Client metadata validation', () => {
 				jwks_uri: 'https://rp.example.com/sector',
 				subject_type: 'pairwise',
 				responseTypes: ['code'],
-				grant_types: [...metadata.grant_types, 'authorization_code'],
+				grantTypes: [...metadata.grantTypes, 'authorization_code'],
 				redirect_uris: ['https://rp.example.com/cb']
 			}
 		);
@@ -1691,7 +1691,7 @@ describe('Client metadata validation', () => {
 	describe('features.deviceFlow', () => {
 		const configuration = { features: { deviceFlow: { enabled: true } } };
 		const metadata = {
-			grant_types: ['urn:ietf:params:oauth:grant-type:device_code'],
+			grantTypes: ['urn:ietf:params:oauth:grant-type:device_code'],
 			responseTypes: [],
 			redirect_uris: undefined
 		};
@@ -1737,7 +1737,7 @@ describe('Client metadata validation', () => {
 				jwks_uri: 'https://rp.example.com/sector',
 				subject_type: 'pairwise',
 				responseTypes: ['code'],
-				grant_types: [...metadata.grant_types, 'authorization_code'],
+				grantTypes: [...metadata.grantTypes, 'authorization_code'],
 				redirect_uris: ['https://rp.example.com/cb']
 			}
 		);
@@ -1759,7 +1759,7 @@ describe('Client metadata validation', () => {
 			features: { clientCredentials: { enabled: true } }
 		};
 		const metadata = {
-			grant_types: ['client_credentials'],
+			grantTypes: ['client_credentials'],
 			responseTypes: [],
 			redirect_uris: undefined
 		};
@@ -2014,7 +2014,7 @@ describe('Client metadata validation', () => {
 			client_secret: 'foobar',
 			redirect_uris: [],
 			responseTypes: [],
-			grant_types: []
+			grantTypes: []
 		}).then((client) => {
 			expect(client.grantTypes).to.be.empty;
 			expect(client.responseTypes).to.be.empty;
@@ -2028,7 +2028,7 @@ describe('Client metadata validation', () => {
 				client_secret: 'foobar',
 				redirect_uris: [],
 				responseTypes: [],
-				grant_types: ['client_credentials']
+				grantTypes: ['client_credentials']
 			},
 			{
 				features: { clientCredentials: { enabled: true } }
@@ -2067,7 +2067,7 @@ describe('Client metadata validation', () => {
 				client_secret: 'foobar',
 				redirect_uris: [],
 				responseTypes: [],
-				grant_types: [],
+				grantTypes: [],
 				subject_type: 'pairwise'
 			},
 			{ subjectTypes: ['pairwise', 'public'] }
@@ -2105,19 +2105,19 @@ describe('Client metadata validation', () => {
 				}
 			});
 			defaultsTo(
-				'grant_types',
+				'grantTypes',
 				['authorization_code', 'refresh_token'],
 				undefined,
 				{
 					clientDefaults: {
-						grant_types: ['authorization_code', 'refresh_token']
+						grantTypes: ['authorization_code', 'refresh_token']
 					}
 				}
 			);
 			defaultsTo('responseTypes', ['code'], undefined, {
 				clientDefaults: {
 					responseTypes: ['code'],
-					grant_types: ['authorization_code']
+					grantTypes: ['authorization_code']
 				}
 			});
 		}

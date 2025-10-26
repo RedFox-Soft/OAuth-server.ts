@@ -136,7 +136,6 @@ export default function getSchema(provider) {
 
 	const ENUM = {
 		default_acr_values: () => configuration.acrValues,
-		grant_types: () => configuration.grantTypes,
 		id_token_encrypted_response_alg: () =>
 			configuration.idTokenEncryptionAlgValues,
 		id_token_encrypted_response_enc: () =>
@@ -161,7 +160,7 @@ export default function getSchema(provider) {
 					'urn:openid:params:grant-type:ciba'
 				]) {
 					if (
-						metadata.grant_types.includes(grant) &&
+						metadata.metadata.grantTypes.includes(grant) &&
 						!['private_key_jwt', 'self_signed_tls_client_auth'].includes(
 							metadata.token_endpoint_auth_method
 						)
@@ -245,7 +244,7 @@ export default function getSchema(provider) {
 			const responseTypes = this.metadata.responseTypes;
 
 			if (
-				this.grant_types.includes('authorization_code') &&
+				this.metadata.grantTypes.includes('authorization_code') &&
 				!responseTypes?.length
 			) {
 				this.invalidate('responseTypes must contain members');
@@ -266,10 +265,10 @@ export default function getSchema(provider) {
 
 			if (
 				responseTypes?.includes('code') &&
-				!this.grant_types.includes('authorization_code')
+				!this.metadata.grantTypes.includes('authorization_code')
 			) {
 				this.invalidate(
-					"grant_types must contain 'authorization_code' when code is amongst responseTypes"
+					"grantTypes must contain 'authorization_code' when code is amongst responseTypes"
 				);
 			}
 
@@ -341,8 +340,8 @@ export default function getSchema(provider) {
 			}
 
 			if (
-				Array.isArray(this.grant_types) &&
-				this.grant_types.includes('urn:openid:params:grant-type:ciba')
+				Array.isArray(this.metadata.grantTypes) &&
+				this.metadata.grantTypes.includes('urn:openid:params:grant-type:ciba')
 			) {
 				checked.push('backchannel_token_delivery_mode');
 				if (this.backchannel_token_delivery_mode !== 'poll') {
@@ -359,8 +358,8 @@ export default function getSchema(provider) {
 
 			if (this.metadata.subjectType === 'pairwise') {
 				if (
-					Array.isArray(this.grant_types) &&
-					this.grant_types.includes(
+					Array.isArray(this.metadata.grantTypes) &&
+					this.metadata.grantTypes.includes(
 						'urn:ietf:params:oauth:grant-type:device_code'
 					)
 				) {

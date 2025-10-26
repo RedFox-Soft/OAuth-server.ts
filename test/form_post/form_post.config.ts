@@ -7,7 +7,7 @@ export default {
 	client: {
 		clientId: 'client',
 		clientSecret: 'secret',
-		grant_types: ['authorization_code'],
+		grantTypes: ['authorization_code'],
 		responseTypes: ['code'],
 		redirectUris: [
 			'https://client.example.com/cb',

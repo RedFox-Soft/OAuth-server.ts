@@ -49,7 +49,7 @@ export default {
 		{
 			clientId: 'client',
 			clientSecret: 'secret',
-			grant_types: [
+			grantTypes: [
 				'authorization_code',
 				'refresh_token',
 				'urn:ietf:params:oauth:grant-type:device_code',
@@ -63,7 +63,7 @@ export default {
 		},
 		{
 			clientId: 'client-none',
-			grant_types: [
+			grantTypes: [
 				'authorization_code',
 				'urn:ietf:params:oauth:grant-type:device_code',
 				'urn:openid:params:grant-type:ciba',

@@ -23,7 +23,7 @@ export default {
 			clientId: 'client',
 			token_endpoint_auth_method: 'none',
 			clientSecret: 'secret',
-			grant_types: [
+			grantTypes: [
 				'urn:ietf:params:oauth:grant-type:device_code',
 				'authorization_code'
 			],
@@ -34,7 +34,7 @@ export default {
 			token_endpoint_auth_method: 'none',
 			require_signed_request_object: true,
 			clientSecret: 'secret',
-			grant_types: [
+			grantTypes: [
 				'urn:ietf:params:oauth:grant-type:device_code',
 				'authorization_code'
 			],
@@ -45,7 +45,7 @@ export default {
 			token_endpoint_auth_method: 'none',
 			clientSecret: 'secret',
 			request_object_signing_alg: 'HS256',
-			grant_types: [
+			grantTypes: [
 				'urn:ietf:params:oauth:grant-type:device_code',
 				'authorization_code'
 			],
@@ -57,7 +57,7 @@ export default {
 			token_endpoint_auth_method: 'none',
 			clientSecret: 'secret',
 			request_object_signing_alg: 'HS256',
-			grant_types: [
+			grantTypes: [
 				'urn:ietf:params:oauth:grant-type:device_code',
 				'authorization_code'
 			],

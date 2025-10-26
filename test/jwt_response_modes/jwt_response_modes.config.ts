@@ -18,7 +18,7 @@ export default {
 	clients: [
 		{
 			clientId: 'client',
-			grant_types: ['authorization_code'],
+			grantTypes: ['authorization_code'],
 			responseTypes: ['code', 'none'],
 			redirectUris: ['https://client.example.com'],
 			token_endpoint_auth_method: 'none'
@@ -26,7 +26,7 @@ export default {
 		{
 			clientId: 'client-encrypted',
 			clientSecret: 'secret',
-			grant_types: ['authorization_code'],
+			grantTypes: ['authorization_code'],
 			responseTypes: ['code', 'none'],
 			redirectUris: ['https://client.example.com'],
 			authorization_encrypted_response_alg: 'A128KW'
@@ -35,7 +35,7 @@ export default {
 			clientId: 'client-expired',
 			clientSecret: 'secret',
 			client_secret_expires_at: 1,
-			grant_types: ['authorization_code'],
+			grantTypes: ['authorization_code'],
 			responseTypes: ['code', 'none'],
 			redirectUris: ['https://client.example.com'],
 			authorization_signed_response_alg: 'HS256'

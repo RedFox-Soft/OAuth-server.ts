@@ -1,3 +1,4 @@
+import { describe, it } from 'bun:test';
 import { X509Certificate } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import * as url from 'node:url';
@@ -21,9 +22,6 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 	before(bootstrap(import.meta.url));
 	before(function () {
 		return this.login();
-	});
-	after(function () {
-		return this.logout();
 	});
 
 	describe('discovery', () => {

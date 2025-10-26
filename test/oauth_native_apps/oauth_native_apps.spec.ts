@@ -17,7 +17,7 @@ describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
 				return addClient(provider, {
 					applicationType: 'native',
 					clientId: 'native-custom',
-					grant_types: ['authorization_code'],
+					grantTypes: ['authorization_code'],
 					responseTypes: ['code'],
 					token_endpoint_auth_method: 'none',
 					redirectUris: [
@@ -32,7 +32,7 @@ describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
 					addClient(provider, {
 						applicationType: 'native',
 						clientId: 'native-custom',
-						grant_types: ['authorization_code'],
+						grantTypes: ['authorization_code'],
 						responseTypes: ['code'],
 						token_endpoint_auth_method: 'none',
 						redirectUris: ['myapp:/op/callback']
@@ -54,7 +54,7 @@ describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
 				return addClient(provider, {
 					applicationType: 'native',
 					clientId: 'native-custom',
-					grant_types: ['authorization_code'],
+					grantTypes: ['authorization_code'],
 					responseTypes: ['code'],
 					token_endpoint_auth_method: 'none',
 					redirectUris: ['https://claimed.example.com/op/callback']
@@ -66,7 +66,7 @@ describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
 					addClient(provider, {
 						applicationType: 'native',
 						clientId: 'native-custom',
-						grant_types: ['authorization_code'],
+						grantTypes: ['authorization_code'],
 						responseTypes: ['code'],
 						token_endpoint_auth_method: 'none',
 						redirectUris: ['https://localhost/op/callback']
@@ -88,7 +88,7 @@ describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
 				return addClient(provider, {
 					applicationType: 'native',
 					clientId: 'native-custom',
-					grant_types: ['authorization_code'],
+					grantTypes: ['authorization_code'],
 					responseTypes: ['code'],
 					token_endpoint_auth_method: 'none',
 					redirectUris: ['http://127.0.0.1:2355/op/callback']
@@ -103,7 +103,7 @@ describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
 				return addClient(provider, {
 					applicationType: 'native',
 					clientId: 'native-custom',
-					grant_types: ['authorization_code'],
+					grantTypes: ['authorization_code'],
 					responseTypes: ['code'],
 					token_endpoint_auth_method: 'none',
 					redirectUris: ['http://localhost/op/callback']
@@ -119,7 +119,7 @@ describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
 				return addClient(provider, {
 					applicationType: 'native',
 					clientId: 'native-custom',
-					grant_types: ['authorization_code'],
+					grantTypes: ['authorization_code'],
 					responseTypes: ['code'],
 					token_endpoint_auth_method: 'none',
 					redirectUris: ['http://127.0.0.1/op/callback']
@@ -135,7 +135,7 @@ describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
 				return addClient(provider, {
 					applicationType: 'native',
 					clientId: 'native-custom',
-					grant_types: ['authorization_code'],
+					grantTypes: ['authorization_code'],
 					responseTypes: ['code'],
 					token_endpoint_auth_method: 'none',
 					redirectUris: ['http://[::1]/op/callback']
@@ -152,7 +152,7 @@ describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
 					addClient(provider, {
 						applicationType: 'native',
 						clientId: 'native-custom',
-						grant_types: ['authorization_code'],
+						grantTypes: ['authorization_code'],
 						responseTypes: ['code'],
 						token_endpoint_auth_method: 'none',
 						redirectUris: ['http://rp.example.com/op/callback']

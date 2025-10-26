@@ -12,7 +12,7 @@ export default {
 	client: {
 		clientId: 'client',
 		clientSecret: 'secret',
-		grant_types: ['authorization_code', 'client_credentials'],
+		grantTypes: ['authorization_code', 'client_credentials'],
 		responseTypes: ['code'],
 		redirectUris: ['https://client.example.com/cb'],
 		scope: 'api:read'

@@ -12,14 +12,14 @@ export default {
 			clientId: 'client',
 			token_endpoint_auth_method: 'none',
 			responseTypes: ['code'],
-			grant_types: ['authorization_code'],
+			grantTypes: ['authorization_code'],
 			redirectUris: ['https://client.example.com/cb']
 		},
 		{
 			clientId: 'client-with-require_auth_time',
 			token_endpoint_auth_method: 'none',
 			responseTypes: ['code'],
-			grant_types: ['authorization_code'],
+			grantTypes: ['authorization_code'],
 			redirectUris: ['https://client.example.com/cb'],
 			require_auth_time: true
 		},
@@ -27,7 +27,7 @@ export default {
 			clientId: 'client-with-default_max_age',
 			token_endpoint_auth_method: 'none',
 			responseTypes: ['code'],
-			grant_types: ['authorization_code'],
+			grantTypes: ['authorization_code'],
 			redirectUris: ['https://client.example.com/cb'],
 			default_max_age: 999
 		},
@@ -35,7 +35,7 @@ export default {
 			clientId: 'client-with-default_max_age-zero',
 			token_endpoint_auth_method: 'none',
 			responseTypes: ['code'],
-			grant_types: ['authorization_code'],
+			grantTypes: ['authorization_code'],
 			redirectUris: ['https://client.example.com/cb'],
 			default_max_age: 0
 		}

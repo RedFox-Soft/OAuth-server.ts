@@ -14,7 +14,7 @@ export default {
 	client: {
 		clientId: 'client',
 		token_endpoint_auth_method: 'none',
-		grant_types: [
+		grantTypes: [
 			'client_credentials',
 			'authorization_code',
 			'refresh_token',

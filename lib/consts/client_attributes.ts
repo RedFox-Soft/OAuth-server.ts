@@ -6,7 +6,6 @@ const RECOGNIZED_METADATA = [
 	'contacts',
 	'default_acr_values',
 	'default_max_age',
-	'grant_types',
 	'id_token_signed_response_alg',
 	'initiate_login_uri',
 	'jwks_uri',
@@ -24,7 +23,6 @@ const DEFAULT = {
 	authorization_signed_response_alg: 'RS256',
 	backchannel_logout_session_required: false,
 	backchannel_user_code_parameter: false,
-	grant_types: ['authorization_code'],
 	id_token_signed_response_alg: 'RS256',
 	introspection_signed_response_alg: 'RS256',
 	post_logout_redirect_uris: [],
@@ -49,7 +47,6 @@ const BOOL = [
 const ARYS = [
 	'contacts',
 	'default_acr_values',
-	'grant_types',
 	'post_logout_redirect_uris',
 	'authorization_details_types'
 ];
@@ -93,7 +90,6 @@ const STRING = [
 	// in arrays
 	'contacts',
 	'default_acr_values',
-	'grant_types',
 	'post_logout_redirect_uris',
 	'authorization_details_types'
 ];

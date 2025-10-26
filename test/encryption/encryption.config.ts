@@ -31,7 +31,7 @@ export default {
 			clientSecret: 'secret',
 			redirectUris: ['https://client.example.com/cb'],
 			responseTypes: ['code'],
-			grant_types: ['authorization_code'],
+			grantTypes: ['authorization_code'],
 			jwks: { keys: [await exportJWK(keypair.publicKey)] },
 			id_token_encrypted_response_alg: 'RSA-OAEP',
 			// id_token_encrypted_response_enc: 'A128CBC-HS256',
@@ -47,7 +47,7 @@ export default {
 			redirectUris: ['https://client.example.com/cb'],
 			token_endpoint_auth_method: 'none',
 			responseTypes: ['code'],
-			grant_types: ['authorization_code'],
+			grantTypes: ['authorization_code'],
 			id_token_encrypted_response_alg: 'A128KW'
 		},
 		{
@@ -55,7 +55,7 @@ export default {
 			clientSecret: 'secret',
 			redirectUris: ['https://client.example.com/cb'],
 			responseTypes: ['code'],
-			grant_types: ['authorization_code'],
+			grantTypes: ['authorization_code'],
 			client_secret_expires_at: 1,
 			id_token_encrypted_response_alg: 'A128KW'
 		},
@@ -64,7 +64,7 @@ export default {
 			clientSecret: 'secret',
 			redirectUris: ['https://client.example.com/cb'],
 			responseTypes: ['code'],
-			grant_types: ['authorization_code'],
+			grantTypes: ['authorization_code'],
 			id_token_encrypted_response_alg: 'dir'
 		},
 		{
@@ -72,7 +72,7 @@ export default {
 			clientSecret: 'secret',
 			redirectUris: ['https://client.example.com/cb'],
 			responseTypes: ['code'],
-			grant_types: ['authorization_code'],
+			grantTypes: ['authorization_code'],
 			request_object_signing_alg: 'HS256'
 		}
 	]

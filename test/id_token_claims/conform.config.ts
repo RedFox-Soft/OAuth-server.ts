@@ -16,7 +16,7 @@ export default {
 			clientId: 'client',
 			clientSecret: 'secret',
 			token_endpoint_auth_method: 'none',
-			grant_types: ['authorization_code', 'refresh_token'],
+			grantTypes: ['authorization_code', 'refresh_token'],
 			responseTypes: ['code'],
 			redirectUris: ['https://client.example.com/cb'],
 			userinfo_signed_response_alg: 'HS256'

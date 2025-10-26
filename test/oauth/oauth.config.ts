@@ -16,7 +16,7 @@ export default {
 	client: {
 		clientId: 'client',
 		token_endpoint_auth_method: 'none',
-		grant_types: [
+		grantTypes: [
 			'authorization_code',
 			'refresh_token',
 			'urn:ietf:params:oauth:grant-type:device_code'

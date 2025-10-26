@@ -12,7 +12,7 @@ export default {
 		{
 			clientId: 'client',
 			responseTypes: ['code'],
-			grant_types: ['authorization_code'],
+			grantTypes: ['authorization_code'],
 			redirectUris: ['https://client.example.com/cb'],
 			token_endpoint_auth_method: 'none',
 			scope: 'openid'
@@ -20,7 +20,7 @@ export default {
 		{
 			clientId: 'client-refresh',
 			responseTypes: ['code'],
-			grant_types: ['authorization_code', 'refresh_token'],
+			grantTypes: ['authorization_code', 'refresh_token'],
 			redirectUris: ['https://client.example.com/cb'],
 			token_endpoint_auth_method: 'none',
 			scope: 'openid'
@@ -28,7 +28,7 @@ export default {
 		{
 			clientId: 'client-offline',
 			responseTypes: ['code'],
-			grant_types: ['authorization_code', 'refresh_token'],
+			grantTypes: ['authorization_code', 'refresh_token'],
 			redirectUris: ['https://client.example.com/cb'],
 			token_endpoint_auth_method: 'none',
 			scope: 'openid offline_access'

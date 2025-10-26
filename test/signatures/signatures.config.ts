@@ -9,7 +9,7 @@ export default {
 			clientId: 'client-sig-none',
 			clientSecret: 'secret',
 			responseTypes: ['code'],
-			grant_types: ['authorization_code'],
+			grantTypes: ['authorization_code'],
 			id_token_signed_response_alg: 'none',
 			redirectUris: ['https://client.example.com/cb']
 		},
@@ -17,7 +17,7 @@ export default {
 			clientId: 'client-sig-HS256',
 			clientSecret: 'secret',
 			responseTypes: ['code'],
-			grant_types: ['authorization_code'],
+			grantTypes: ['authorization_code'],
 			id_token_signed_response_alg: 'HS256',
 			redirectUris: ['https://client.example.com/cb']
 		}
