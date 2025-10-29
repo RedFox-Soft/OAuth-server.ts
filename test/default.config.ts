@@ -1,9 +1,3 @@
-import cloneDeep from 'lodash/cloneDeep.js';
-
-import { JWA } from '../lib/consts/index.ts';
-
-export const enabledJWA = cloneDeep({ ...JWA });
-
 export default () => ({
 	claims: {
 		address: {
@@ -34,6 +28,5 @@ export default () => ({
 			zoneinfo: null
 		}
 	},
-	features: {},
-	enabledJWA: structuredClone({ ...JWA })
+	features: {}
 });

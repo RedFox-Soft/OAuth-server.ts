@@ -1,4 +1,3 @@
-import pull from 'lodash/pull.js';
 import merge from 'lodash/merge.js';
 
 import getConfig from '../default.config.js';
@@ -13,8 +12,6 @@ merge(config.features, {
 	claimsParameter: { enabled: true },
 	deviceFlow: { enabled: true }
 });
-
-pull(config.enabledJWA.requestObjectSigningAlgValues, 'HS384');
 
 export default {
 	config,

@@ -23,7 +23,12 @@ import { ClientDefaults } from 'lib/configs/clientBase.js';
 import { isPlainObject, pick } from 'lib/helpers/_/object.js';
 import { IdToken } from './id_token.js';
 import { clockTolerance } from 'lib/configs/liveTime.js';
-import { requestObjectEncryptionAlgValues } from 'lib/configs/jwaAlgorithms.js';
+import {
+	clientAuthSigningAlgValues,
+	requestObjectEncryptionAlgValues,
+	requestObjectEncryptionEncValues,
+	requestObjectSigningAlgValues
+} from 'lib/configs/jwaAlgorithms.js';
 import { ClientSchema } from 'lib/configs/clientSchema.js';
 import { Value } from '@sinclair/typebox/value';
 
@@ -273,9 +278,7 @@ function buildSymmetricKeyStore(client) {
 			if (client.clientAuthSigningAlg) {
 				algs.add(client.clientAuthSigningAlg);
 			} else {
-				configuration.clientAuthSigningAlgValues?.forEach(
-					Set.prototype.add.bind(algs)
-				);
+				clientAuthSigningAlgValues.forEach(Set.prototype.add.bind(algs));
 			}
 		}
 
@@ -290,17 +293,13 @@ function buildSymmetricKeyStore(client) {
 		});
 
 		if (!client.requestObjectSigningAlg) {
-			configuration.requestObjectSigningAlgValues.forEach(
-				Set.prototype.add.bind(algs)
-			);
+			requestObjectSigningAlgValues.forEach(Set.prototype.add.bind(algs));
 		}
 
 		requestObjectEncryptionAlgValues.forEach(Set.prototype.add.bind(algs));
 
 		if (requestObjectEncryptionAlgValues.includes('dir')) {
-			configuration.requestObjectEncryptionEncValues.forEach(
-				Set.prototype.add.bind(algs)
-			);
+			requestObjectEncryptionEncValues.forEach(Set.prototype.add.bind(algs));
 		}
 
 		[

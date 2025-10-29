@@ -6,6 +6,7 @@ import { noVSCHAR } from '../consts/client_attributes.ts';
 
 import getJWTAuthMiddleware from './token_jwt_auth.ts';
 import { Client } from 'lib/models/client.js';
+import { clientAuthSigningAlgValues } from 'lib/configs/jwaAlgorithms.js';
 
 const assertionType = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
 
@@ -221,7 +222,7 @@ export default function tokenAuth(provider) {
 							ctx.oidc.client.symmetricKeyStore,
 							clientAuthSigningAlg
 								? [clientAuthSigningAlg]
-								: configuration.clientAuthSigningAlgValues.filter((alg) =>
+								: clientAuthSigningAlgValues.filter((alg) =>
 										alg.startsWith('HS')
 									)
 						);
@@ -234,7 +235,7 @@ export default function tokenAuth(provider) {
 							ctx.oidc.client.asymmetricKeyStore,
 							clientAuthSigningAlg
 								? [clientAuthSigningAlg]
-								: configuration.clientAuthSigningAlgValues.filter(
+								: clientAuthSigningAlgValues.filter(
 										(alg) => !alg.startsWith('HS')
 									)
 						);

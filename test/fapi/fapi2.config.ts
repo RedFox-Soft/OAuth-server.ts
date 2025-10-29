@@ -22,9 +22,6 @@ merge(config.features, {
 		enabled: true
 	}
 });
-config.enabledJWA = {
-	requestObjectSigningAlgValues: ['ES256']
-};
 
 export default {
 	config,

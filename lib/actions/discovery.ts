@@ -7,9 +7,20 @@ import { calculateDiscovery } from 'lib/configs/discoverySupport.js';
 import { ApplicationConfig } from '../configs/application.js';
 import { ReturnType } from '@sinclair/typebox';
 import {
+	authorizationEncryptionAlgValues,
+	authorizationEncryptionEncValues,
 	authorizationSigningAlgValues,
+	clientAuthSigningAlgValues,
+	idTokenEncryptionAlgValues,
+	idTokenEncryptionEncValues,
+	introspectionEncryptionAlgValues,
+	introspectionEncryptionEncValues,
 	introspectionSigningAlgValues,
 	requestObjectEncryptionAlgValues,
+	requestObjectEncryptionEncValues,
+	requestObjectSigningAlgValues,
+	userinfoEncryptionAlgValues,
+	userinfoEncryptionEncValues,
 	userinfoSigningAlgValues
 } from 'lib/configs/jwaAlgorithms.js';
 
@@ -81,7 +92,7 @@ export const discovery = new Elysia().get(
 				...configuration.clientAuthMethods
 			],
 			token_endpoint_auth_signing_alg_values_supported:
-				configuration.clientAuthSigningAlgValues,
+				clientAuthSigningAlgValues,
 			token_endpoint: urlObj.token_endpoint,
 			...calculateDiscovery()
 		};
@@ -100,16 +111,16 @@ export const discovery = new Elysia().get(
 
 		if (features.encryption.enabled) {
 			body.id_token_encryption_alg_values_supported =
-				configuration.idTokenEncryptionAlgValues;
+				idTokenEncryptionAlgValues;
 			body.id_token_encryption_enc_values_supported =
-				configuration.idTokenEncryptionEncValues;
+				idTokenEncryptionEncValues;
 		}
 
 		body.request_uri_parameter_supported = false;
 		if (requestObjects.enabled) {
 			body.request_parameter_supported = true;
 			body.request_object_signing_alg_values_supported =
-				configuration.requestObjectSigningAlgValues;
+				requestObjectSigningAlgValues;
 			body.require_signed_request_object =
 				requestObjects.requireSignedRequestObject ? true : undefined;
 
@@ -117,7 +128,7 @@ export const discovery = new Elysia().get(
 				body.request_object_encryption_alg_values_supported =
 					requestObjectEncryptionAlgValues;
 				body.request_object_encryption_enc_values_supported =
-					configuration.requestObjectEncryptionEncValues;
+					requestObjectEncryptionEncValues;
 			}
 		}
 
@@ -127,9 +138,9 @@ export const discovery = new Elysia().get(
 				body.userinfo_signing_alg_values_supported = userinfoSigningAlgValues;
 				if (features.encryption.enabled) {
 					body.userinfo_encryption_alg_values_supported =
-						configuration.userinfoEncryptionAlgValues;
+						userinfoEncryptionAlgValues;
 					body.userinfo_encryption_enc_values_supported =
-						configuration.userinfoEncryptionEncValues;
+						userinfoEncryptionEncValues;
 				}
 			}
 		}
@@ -140,9 +151,9 @@ export const discovery = new Elysia().get(
 
 			if (features.encryption.enabled) {
 				body.authorization_encryption_alg_values_supported =
-					configuration.authorizationEncryptionAlgValues;
+					authorizationEncryptionAlgValues;
 				body.authorization_encryption_enc_values_supported =
-					configuration.authorizationEncryptionEncValues;
+					authorizationEncryptionEncValues;
 			}
 		}
 
@@ -151,9 +162,9 @@ export const discovery = new Elysia().get(
 				introspectionSigningAlgValues;
 			if (features.encryption.enabled) {
 				body.introspection_encryption_alg_values_supported =
-					configuration.introspectionEncryptionAlgValues;
+					introspectionEncryptionAlgValues;
 				body.introspection_encryption_enc_values_supported =
-					configuration.introspectionEncryptionEncValues;
+					introspectionEncryptionEncValues;
 			}
 		}
 
@@ -179,9 +190,7 @@ export const discovery = new Elysia().get(
 			body.backchannel_user_code_parameter_supported = true;
 			body.backchannel_authentication_request_signing_alg_values_supported =
 				requestObjects.enabled
-					? configuration.requestObjectSigningAlgValues.filter(
-							(alg) => !alg.startsWith('HS')
-						)
+					? requestObjectSigningAlgValues.filter((alg) => !alg.startsWith('HS'))
 					: undefined;
 		}
 

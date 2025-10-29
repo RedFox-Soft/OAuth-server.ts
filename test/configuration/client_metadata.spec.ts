@@ -4,11 +4,9 @@ import * as util from 'node:util';
 import { expect } from 'chai';
 import merge from 'lodash/merge.js';
 import omit from 'lodash/omit.js';
-import pull from 'lodash/pull.js';
 import cloneDeep from 'lodash/cloneDeep.js';
 
 import provider, { errors } from '../../lib/index.ts';
-import { enabledJWA } from '../default.config.js';
 import sectorIdentifier from '../../lib/helpers/sector_identifier.ts';
 import keys, { stripPrivateJWKFields } from '../keys.js';
 import addClient from '../../lib/helpers/add_client.ts';
@@ -21,8 +19,7 @@ describe('Client metadata validation', () => {
 	let DefaultProvider;
 	before(() => {
 		DefaultProvider = new provider('http://localhost', {
-			jwks: { keys },
-			enabledJWA: cloneDeep(enabledJWA)
+			jwks: { keys }
 		});
 	});
 
@@ -33,8 +30,7 @@ describe('Client metadata validation', () => {
 				'http://localhost',
 				merge(
 					{
-						jwks: { keys },
-						enabledJWA: cloneDeep(enabledJWA)
+						jwks: { keys }
 					},
 					configuration
 				)
@@ -912,25 +908,6 @@ describe('Client metadata validation', () => {
 						...additional
 					},
 					configuration
-				);
-
-				rejects(
-					this.title,
-					`${accepted}384`,
-					/^token_endpoint_auth_signing_alg must be/,
-					{
-						token_endpoint_auth_method: method,
-						...additional
-					},
-					{
-						enabledJWA: {
-							clientAuthSigningAlgValues: pull(
-								cloneDeep(enabledJWA.clientAuthSigningAlgValues),
-								`${accepted}384`
-							)
-						},
-						...configuration
-					}
 				);
 			});
 		});

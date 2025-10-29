@@ -9,9 +9,13 @@ import { pick } from './_/object.js';
 import omitBy from './_/omit_by.ts';
 import {
 	authorizationSigningAlgValues,
+	clientAuthSigningAlgValues,
+	idTokenEncryptionAlgValues,
 	idTokenSigningAlgValues,
 	introspectionSigningAlgValues,
 	requestObjectEncryptionAlgValues,
+	requestObjectSigningAlgValues,
+	userinfoEncryptionEncValues,
 	userinfoSigningAlgValues
 } from 'lib/configs/jwaAlgorithms.js';
 import { validateRedirectUri } from './validateRedirectUri.js';
@@ -55,9 +59,7 @@ export default function getSchema(provider) {
 		RECOGNIZED_METADATA.push('use_mtls_endpoint_aliases');
 	}
 
-	if (configuration.clientAuthSigningAlgValues) {
-		RECOGNIZED_METADATA.push('token_endpoint_auth_signing_alg');
-	}
+	RECOGNIZED_METADATA.push('token_endpoint_auth_signing_alg');
 
 	if (features.jwtUserinfo.enabled) {
 		RECOGNIZED_METADATA.push('userinfo_signed_response_alg');
@@ -136,18 +138,14 @@ export default function getSchema(provider) {
 
 	const ENUM = {
 		default_acr_values: () => configuration.acrValues,
-		id_token_encrypted_response_alg: () =>
-			configuration.idTokenEncryptionAlgValues,
+		id_token_encrypted_response_alg: () => idTokenEncryptionAlgValues,
 		id_token_encrypted_response_enc: () =>
 			configuration.idTokenEncryptionEncValues,
 		id_token_signed_response_alg: () => idTokenSigningAlgValues,
-		request_object_signing_alg: () =>
-			configuration.requestObjectSigningAlgValues,
+		request_object_signing_alg: () => requestObjectSigningAlgValues,
 		backchannel_token_delivery_mode: () => features.ciba.deliveryModes,
 		backchannel_authentication_request_signing_alg: () =>
-			configuration.requestObjectSigningAlgValues.filter(
-				(alg) => !alg.startsWith('HS')
-			),
+			requestObjectSigningAlgValues.filter((alg) => !alg.startsWith('HS')),
 		request_object_encryption_alg: () => requestObjectEncryptionAlgValues,
 		request_object_encryption_enc: () =>
 			configuration.requestObjectEncryptionEncValues,
@@ -179,21 +177,16 @@ export default function getSchema(provider) {
 		}) => {
 			switch (method) {
 				case 'private_key_jwt':
-					return configuration.clientAuthSigningAlgValues.filter(
-						(x) => !x.startsWith('HS')
-					);
+					return clientAuthSigningAlgValues.filter((x) => !x.startsWith('HS'));
 				case 'client_secret_jwt':
-					return configuration.clientAuthSigningAlgValues.filter((x) =>
-						x.startsWith('HS')
-					);
+					return clientAuthSigningAlgValues.filter((x) => x.startsWith('HS'));
 				default:
 					return [];
 			}
 		},
 		userinfo_encrypted_response_alg: () =>
 			configuration.userinfoEncryptionAlgValues,
-		userinfo_encrypted_response_enc: () =>
-			configuration.userinfoEncryptionEncValues,
+		userinfo_encrypted_response_enc: () => userinfoEncryptionEncValues,
 		userinfo_signed_response_alg: () => userinfoSigningAlgValues,
 		introspection_encrypted_response_alg: () =>
 			configuration.introspectionEncryptionAlgValues,

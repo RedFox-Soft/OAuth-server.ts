@@ -1,6 +1,3 @@
-import { JWA } from '../consts/index.ts';
-
-import remove from './_/remove.ts';
 import { isPlainObject, merge, pick } from './_/object.js';
 import set from './_/set.ts';
 import * as formatters from './formatters.ts';
@@ -19,14 +16,6 @@ function featuresTypeErrorCheck({ features }) {
 	}
 }
 
-function filterHS(alg) {
-	return alg.startsWith('HS');
-}
-
-const filterAsymmetricSig = RegExp.prototype.test.bind(
-	/^(?:PS(?:256|384|512)|RS(?:256|384|512)|ES(?:256K?|384|512)|Ed(?:25519|DSA))$/
-);
-
 const fapiProfiles = new Set(['2.0']);
 
 class Configuration {
@@ -44,7 +33,6 @@ class Configuration {
 
 		this.ensureSets();
 
-		this.checkAllowedJWA();
 		this.checkFapiProfile();
 		this.collectScopes();
 		this.collectPrompts();
@@ -52,7 +40,6 @@ class Configuration {
 		this.ensureOpenIdSub();
 		this.removeAcrIfEmpty();
 		this.collectClaims();
-		this.defaultSigAlg();
 		this.collectGrantTypes();
 		this.checkDependantFeatures();
 		this.checkDeviceFlow();
@@ -194,128 +181,6 @@ class Configuration {
 		});
 
 		this.claimsSupported = claims;
-	}
-
-	checkAllowedJWA() {
-		Object.entries(this.enabledJWA).forEach(([key, value]) => {
-			if (!JWA[key]) {
-				throw new TypeError(`invalid property enabledJWA.${key} provided`);
-			}
-
-			if (!Array.isArray(value)) {
-				throw new TypeError(
-					`invalid type for enabledJWA.${key} provided, expected Array`
-				);
-			}
-
-			value.forEach((alg) => {
-				if (!JWA[key].includes(alg)) {
-					throw new TypeError(
-						`unsupported enabledJWA.${key} algorithm provided`
-					);
-				}
-			});
-		});
-	}
-
-	setAlgs(prop, values, ...features) {
-		if (features.length === 0 || features.every((enabled) => !!enabled)) {
-			this[prop] = values;
-		} else {
-			this[prop] = [];
-		}
-	}
-
-	defaultSigAlg() {
-		const allowList = this.enabledJWA;
-
-		const enabled = {
-			encryption: this.features.encryption.enabled,
-			requestObjects: this.features.requestObjects.enabled,
-			jwtUserinfo: this.features.jwtUserinfo.enabled,
-			jwtIntrospection: this.features.jwtIntrospection.enabled,
-			jwtResponseModes: this.features.jwtResponseModes.enabled
-		};
-
-		this.setAlgs(
-			'idTokenEncryptionAlgValues',
-			allowList.idTokenEncryptionAlgValues.slice()
-		);
-		this.setAlgs(
-			'idTokenEncryptionEncValues',
-			allowList.idTokenEncryptionEncValues.slice(),
-			enabled.encryption
-		);
-
-		this.setAlgs(
-			'requestObjectSigningAlgValues',
-			allowList.requestObjectSigningAlgValues.slice(),
-			enabled.requestObjects
-		);
-		this.setAlgs(
-			'requestObjectEncryptionEncValues',
-			allowList.requestObjectEncryptionEncValues.slice(),
-			enabled.encryption,
-			enabled.requestObjects
-		);
-
-		this.setAlgs(
-			'userinfoEncryptionAlgValues',
-			allowList.userinfoEncryptionAlgValues.slice(),
-			enabled.jwtUserinfo,
-			enabled.encryption
-		);
-		this.setAlgs(
-			'userinfoEncryptionEncValues',
-			allowList.userinfoEncryptionEncValues.slice(),
-			enabled.jwtUserinfo,
-			enabled.encryption
-		);
-
-		this.setAlgs(
-			'introspectionEncryptionAlgValues',
-			allowList.introspectionEncryptionAlgValues.slice(),
-			enabled.jwtIntrospection,
-			enabled.encryption
-		);
-		this.setAlgs(
-			'introspectionEncryptionEncValues',
-			allowList.introspectionEncryptionEncValues.slice(),
-			enabled.jwtIntrospection,
-			enabled.encryption
-		);
-
-		this.setAlgs(
-			'authorizationEncryptionAlgValues',
-			allowList.authorizationEncryptionAlgValues.slice(),
-			enabled.jwtResponseModes,
-			enabled.encryption
-		);
-		this.setAlgs(
-			'authorizationEncryptionEncValues',
-			allowList.authorizationEncryptionEncValues.slice(),
-			enabled.jwtResponseModes,
-			enabled.encryption
-		);
-
-		this.clientAuthSigningAlgValues =
-			this.enabledJWA.clientAuthSigningAlgValues;
-
-		if (!this.clientAuthMethods.has('client_secret_jwt')) {
-			remove(this.clientAuthSigningAlgValues, filterHS);
-		} else if (!this.clientAuthSigningAlgValues.find(filterHS)) {
-			this.clientAuthMethods.delete('client_secret_jwt');
-		}
-
-		if (!this.clientAuthMethods.has('private_key_jwt')) {
-			remove(this.clientAuthSigningAlgValues, filterAsymmetricSig);
-		} else if (!this.clientAuthSigningAlgValues.find(filterAsymmetricSig)) {
-			this.clientAuthMethods.delete('private_key_jwt');
-		}
-
-		if (!this.clientAuthSigningAlgValues.length) {
-			this.clientAuthSigningAlgValues = undefined;
-		}
 	}
 
 	checkCibaDeliveryModes() {

@@ -576,7 +576,7 @@ describe('request parameter features', () => {
 						scope: 'openid'
 					},
 					verb,
-					alg: 'HS512',
+					alg: 'HS384',
 					isError: true
 				});
 
@@ -601,7 +601,7 @@ describe('request parameter features', () => {
 					},
 					verb,
 					jwtKey: crypto.createSecretKey(crypto.randomBytes(48)),
-					alg: 'HS384',
+					alg: 'HS512',
 					isError: true
 				});
 

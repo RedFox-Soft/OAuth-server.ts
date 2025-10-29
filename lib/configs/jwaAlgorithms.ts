@@ -82,6 +82,7 @@ export const requestObjectEncryptionAlgValues: encryptionAlgValues[] = [
  */
 export const requestObjectSigningAlgValues: signingAlgValues[] = [
 	'HS256',
+	'HS384',
 	'RS256',
 	'PS256',
 	'ES256',
@@ -161,6 +162,7 @@ export const idTokenEncryptionEncValues: encryptionEncValues[] = [
  */
 export const requestObjectEncryptionEncValues: encryptionEncValues[] = [
 	'A128CBC-HS256',
+	'A192CBC-HS384',
 	'A128GCM',
 	'A256CBC-HS512',
 	'A256GCM'

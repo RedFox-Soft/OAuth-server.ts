@@ -1,6 +1,5 @@
 import { generateKeyPair, exportJWK } from 'jose';
 import merge from 'lodash/merge.js';
-import pull from 'lodash/pull.js';
 
 import getConfig from '../default.config.js';
 
@@ -13,9 +12,6 @@ merge(config.features, {
 	jwtIntrospection: { enabled: true },
 	jwtUserinfo: { enabled: true }
 });
-
-// pull(config.enabledJWA.requestObjectEncryptionAlgValues, 'RSA-OAEP-512');
-pull(config.enabledJWA.requestObjectEncryptionEncValues, 'A192CBC-HS384');
 
 export const keypair = await generateKeyPair('RSA-OAEP');
 

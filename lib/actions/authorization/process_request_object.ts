@@ -8,7 +8,11 @@ import {
 import { getSchemaValidator, TSchema, ValidationError } from 'elysia';
 import { ISSUER } from 'lib/configs/env.js';
 import { clockTolerance } from 'lib/configs/liveTime.js';
-import { requestObjectEncryptionAlgValues } from 'lib/configs/jwaAlgorithms.js';
+import {
+	requestObjectEncryptionAlgValues,
+	requestObjectEncryptionEncValues,
+	requestObjectSigningAlgValues
+} from 'lib/configs/jwaAlgorithms.js';
 
 export function isEncryptedJWT(jwt: string): boolean {
 	// Encrypted JWTs have 5 parts, while signed JWTs have 3
@@ -47,9 +51,7 @@ export default async function processRequestObject(
 			if (!requestObjectEncryptionAlgValues.includes(header.alg)) {
 				throw new TypeError('unsupported encrypted request alg');
 			}
-			if (
-				!configuration.requestObjectEncryptionEncValues.includes(header.enc)
-			) {
+			if (!requestObjectEncryptionEncValues.includes(header.enc)) {
 				throw new TypeError('unsupported encrypted request enc');
 			}
 
@@ -150,10 +152,7 @@ export default async function processRequestObject(
 		throw new InvalidRequestObject('request client_id mismatch');
 	}
 
-	if (
-		!pushedRequestObject &&
-		!configuration.requestObjectSigningAlgValues.includes(alg)
-	) {
+	if (!pushedRequestObject && !requestObjectSigningAlgValues.includes(alg)) {
 		throw new InvalidRequestObject('unsupported signed request alg');
 	}
 
