@@ -61,7 +61,8 @@ export const ClientSchema = t.Object({
 			t.Literal('refresh_token'),
 			t.Literal('client_credentials'),
 			t.Literal('urn:ietf:params:oauth:grant-type:device_code'),
-			t.Literal('urn:openid:params:grant-type:ciba')
+			t.Literal('urn:openid:params:grant-type:ciba'),
+			t.String()
 		])
 	),
 	/*

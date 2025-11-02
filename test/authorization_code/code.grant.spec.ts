@@ -226,8 +226,12 @@ describe('grant_type=authorization_code', () => {
 			auth.grant_type = 'foobar';
 
 			const { error } = await auth.getToken(code);
-			expect(error.status).toBe(400);
-			expect(error.value).toHaveProperty('error', 'unsupported_grant_type');
+			expect(error.status).toBe(422);
+			expect(error.value).toHaveProperty('error', 'invalid_request');
+			expect(error.value).toHaveProperty(
+				'error_description',
+				'invalid grant_type'
+			);
 		});
 
 		it('validates used redirect_uri', async function () {
@@ -493,8 +497,12 @@ describe('grant_type=authorization_code', () => {
 		it('validates a grant type is supported', async function () {
 			auth.grant_type = 'foobar';
 			const { error } = await auth.getToken(code);
-			expect(error.status).toBe(400);
-			expect(error.value).toHaveProperty('error', 'unsupported_grant_type');
+			expect(error.status).toBe(422);
+			expect(error.value).toHaveProperty('error', 'invalid_request');
+			expect(error.value).toHaveProperty(
+				'error_description',
+				'invalid grant_type'
+			);
 		});
 
 		it('validates used redirect_uri (should it be provided)', async function () {
@@ -543,7 +551,7 @@ describe('grant_type=authorization_code', () => {
 			expect(error.value).toHaveProperty('error', 'invalid_request');
 			expect(error.value).toHaveProperty(
 				'error_description',
-				"Property 'grant_type' is missing"
+				'invalid grant_type'
 			);
 		});
 

@@ -138,9 +138,10 @@ async function renderTokenResponse(ctx) {
 
 export const introspect = new Elysia().post(
 	routeNames.introspect,
-	async function ({ headers, body }) {
+	async function ({ headers, body, route }) {
 		const ctx = {
-			headers
+			headers,
+			_matchedRouteName: route
 		};
 		ctx.oidc = new OIDCContext(ctx);
 		ctx.oidc.params = body;

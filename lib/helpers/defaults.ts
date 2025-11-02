@@ -663,7 +663,7 @@ function makeDefaults() {
 		 * provider's configuration.<br/><br/>
 		 *
 		 * authorization_encrypted_response_alg, authorization_encrypted_response_enc,
-		 * authorization_signed_response_alg, backchannel_logout_session_required, backchannel_logout_uri,
+		 * backchannel_logout_session_required, backchannel_logout_uri,
 		 * id_token_encrypted_response_alg,
 		 * id_token_encrypted_response_enc, introspection_encrypted_response_alg,
 		 * introspection_encrypted_response_enc, introspection_signed_response_alg,

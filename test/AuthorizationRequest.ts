@@ -78,7 +78,8 @@ export class AuthorizationRequest {
 	}
 
 	static basicAuthHeader(clientId: string, clientSecret: string) {
-		const str = Buffer.from(`${clientId}:${clientSecret}`).toString(
+		const enc = encodeURIComponent;
+		const str = Buffer.from(`${enc(clientId)}:${enc(clientSecret)}`).toString(
 			'base64url'
 		);
 		return { authorization: `Basic ${str}` };

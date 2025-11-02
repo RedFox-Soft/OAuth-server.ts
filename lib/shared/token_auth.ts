@@ -193,9 +193,7 @@ export default function tokenAuth(provider) {
 					);
 				}
 
-				switch (
-					clientAuthMethod // eslint-disable-line default-case
-				) {
+				switch (clientAuthMethod) {
 					case 'none':
 						break;
 

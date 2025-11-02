@@ -265,7 +265,6 @@ function buildAsymmetricKeyStore(client) {
 }
 
 function buildSymmetricKeyStore(client) {
-	const { configuration } = instance(provider);
 	Object.defineProperty(client, 'symmetricKeyStore', {
 		configurable: false,
 		value: new KeyStore()

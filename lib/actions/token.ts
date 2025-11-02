@@ -8,15 +8,20 @@ import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import {
 	codeGrantParameters,
 	deviceCodeGrantParameters,
+	executeGrant,
+	grantStore,
 	refreshTokenGrantParameters
 } from './grants/index.js';
 import { routeNames } from 'lib/consts/param_list.js';
 
+const grantTypes = Array.from(grantStore.keys());
+
 export const tokenAction = new Elysia().post(
 	routeNames.token,
-	async ({ body, headers }) => {
+	async ({ body, headers, route }) => {
 		const ctx = {
-			headers
+			headers,
+			_matchedRouteName: route
 		};
 		ctx.oidc = new OIDCContext(ctx);
 		ctx.oidc.params = body;
@@ -39,24 +44,14 @@ export const tokenAction = new Elysia().post(
 			});
 		}
 
-		const supported = instance(provider).configuration.grantTypes;
-		if (!supported.has(ctx.oidc.params.grant_type)) {
-			throw new UnsupportedGrantType();
-		}
-
 		if (!ctx.oidc.client.grantTypeAllowed(ctx.oidc.params.grant_type)) {
 			throw new InvalidRequest(
 				'requested grant type is not allowed for this client'
 			);
 		}
 
-		const grantType = ctx.oidc.params.grant_type;
-
-		const { grantTypeHandlers } = instance(provider);
-		const data = await grantTypeHandlers.get(grantType)(ctx);
-		provider.emit('grant.success', ctx);
-
-		return data;
+		const grantType = body.grant_type;
+		return executeGrant(grantType, ctx);
 	},
 	{
 		body: t.Composite([
@@ -66,7 +61,10 @@ export const tokenAction = new Elysia().post(
 				client_assertion_type: t.Optional(t.String()),
 				client_secret: t.Optional(t.String()),
 				scope: t.Optional(t.String()),
-				grant_type: t.String()
+				grant_type: t.Union(
+					grantTypes.map((gt) => t.Literal(gt)),
+					{ error: 'invalid grant_type' }
+				)
 			}),
 			t.Partial(codeGrantParameters),
 			t.Partial(refreshTokenGrantParameters),

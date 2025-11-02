@@ -111,7 +111,11 @@ export class OIDCContext {
 	}
 
 	clientJwtAuthExpectedAudience() {
-		return new Set([ISSUER, this.urlFor('token'), this.urlFor(this.route)]);
+		return new Set([
+			ISSUER,
+			`${ISSUER}${routeNames.token}`,
+			`${ISSUER}${this.route}`
+		]);
 	}
 
 	get requestParamScopes() {

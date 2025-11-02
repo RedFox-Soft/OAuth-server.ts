@@ -8,13 +8,18 @@ import * as formatters from './formatters.ts';
 import { pick } from './_/object.js';
 import omitBy from './_/omit_by.ts';
 import {
+	authorizationEncryptionAlgValues,
+	authorizationEncryptionEncValues,
 	authorizationSigningAlgValues,
 	clientAuthSigningAlgValues,
 	idTokenEncryptionAlgValues,
 	idTokenSigningAlgValues,
+	introspectionEncryptionAlgValues,
+	introspectionEncryptionEncValues,
 	introspectionSigningAlgValues,
 	requestObjectEncryptionAlgValues,
 	requestObjectSigningAlgValues,
+	userinfoEncryptionAlgValues,
 	userinfoEncryptionEncValues,
 	userinfoSigningAlgValues
 } from 'lib/configs/jwaAlgorithms.js';
@@ -184,19 +189,18 @@ export default function getSchema(provider) {
 					return [];
 			}
 		},
-		userinfo_encrypted_response_alg: () =>
-			configuration.userinfoEncryptionAlgValues,
+		userinfo_encrypted_response_alg: () => userinfoEncryptionAlgValues,
 		userinfo_encrypted_response_enc: () => userinfoEncryptionEncValues,
 		userinfo_signed_response_alg: () => userinfoSigningAlgValues,
 		introspection_encrypted_response_alg: () =>
-			configuration.introspectionEncryptionAlgValues,
+			introspectionEncryptionAlgValues,
 		introspection_encrypted_response_enc: () =>
-			configuration.introspectionEncryptionEncValues,
+			introspectionEncryptionEncValues,
 		introspection_signed_response_alg: () => introspectionSigningAlgValues,
 		authorization_encrypted_response_alg: () =>
-			configuration.authorizationEncryptionAlgValues,
+			authorizationEncryptionAlgValues,
 		authorization_encrypted_response_enc: () =>
-			configuration.authorizationEncryptionEncValues,
+			authorizationEncryptionEncValues,
 		authorization_signed_response_alg: () => authorizationSigningAlgValues
 	};
 
