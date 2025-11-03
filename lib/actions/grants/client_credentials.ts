@@ -87,5 +87,3 @@ export const handler = async function clientCredentialsHandler(ctx) {
 		scope: token.scope || undefined
 	};
 };
-
-export const parameters = new Set(['scope']);

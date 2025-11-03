@@ -237,5 +237,3 @@ export const handler = async function cibaHandler(ctx) {
 		token_type: at.tokenType
 	};
 };
-
-export const parameters = new Set(['auth_req_id']);

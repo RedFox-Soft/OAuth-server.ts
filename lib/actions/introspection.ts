@@ -147,8 +147,7 @@ export const introspect = new Elysia().post(
 		ctx.oidc.params = body;
 		ctx.oidc.body = body;
 
-		const { middleware: tokenAuth } = getTokenAuth(provider);
-
+		const tokenAuth = getTokenAuth();
 		for (const middleware of tokenAuth) {
 			await middleware(ctx);
 		}

@@ -4,7 +4,7 @@
  * - either JAR or plain request is provided
  * - request_uri is not used
  */
-export default function stripOutsideJarParams(ctx, next) {
+export default function stripOutsideJarParams(ctx) {
 	const JAR = !!ctx.oidc.params.request;
 
 	for (const [param, value] of Object.entries(ctx.oidc.params)) {
@@ -14,6 +14,4 @@ export default function stripOutsideJarParams(ctx, next) {
 			}
 		}
 	}
-
-	return next();
 }

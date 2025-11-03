@@ -295,5 +295,3 @@ export const handler = async function refreshTokenHandler(ctx) {
 		authorization_details: at.rar
 	};
 };
-
-export const parameters = new Set(['refresh_token', 'scope']);

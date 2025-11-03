@@ -232,5 +232,3 @@ export const handler = async function deviceCodeHandler(ctx) {
 		token_type: at.tokenType
 	};
 };
-
-export const parameters = new Set(['device_code']);

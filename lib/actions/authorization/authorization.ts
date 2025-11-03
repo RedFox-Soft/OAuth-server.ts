@@ -4,7 +4,6 @@ import { PARAM_LIST } from '../../consts/index.ts';
 import checkRar from '../../shared/check_rar.ts';
 import checkResource from '../../shared/check_resource.ts';
 
-import { provider } from 'lib/provider.js';
 import checkClient from './check_client.ts';
 import checkResponseMode from './check_response_mode.ts';
 import oneRedirectUriClients from './one_redirect_uri_clients.ts';
@@ -244,13 +243,12 @@ export const par = new Elysia()
 			ctx.oidc.body = { ...body };
 			ctx.oidc.params = body;
 
-			const { params: authParams, middleware: tokenAuth } =
-				getTokenAuth(provider);
+			const tokenAuth = getTokenAuth();
 			for (const middleware of tokenAuth) {
 				await middleware(ctx);
 			}
 
-			stripOutsideJarParams;
+			stripOutsideJarParams(ctx);
 
 			const allowList = new Set(PARAM_LIST);
 			pushedAuthorizationRequestRemapErrors;

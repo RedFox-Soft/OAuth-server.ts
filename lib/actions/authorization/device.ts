@@ -1,4 +1,3 @@
-import paramsMiddleware from '../../shared/assemble_params.ts';
 import checkResource from '../../shared/check_resource.ts';
 import getTokenAuth from '../../shared/token_auth.ts';
 
@@ -28,7 +27,6 @@ import {
 	BackchannelAuthParameters
 } from 'lib/consts/param_list.js';
 import { Elysia, t } from 'elysia';
-import { provider } from 'lib/provider.js';
 import { InvalidRequest } from 'lib/helpers/errors.js';
 import { featureVerification } from './featureVerification.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
@@ -47,8 +45,7 @@ const BacckchannelRequest = t.Composite([
 ]);
 
 async function authentication(ctx) {
-	const { params: authParams, middleware: tokenAuth } = getTokenAuth(provider);
-	paramsMiddleware.bind(undefined, authParams);
+	const tokenAuth = getTokenAuth();
 	tokenAuth.forEach((tokenAuthMiddleware) => {
 		tokenAuthMiddleware;
 	});

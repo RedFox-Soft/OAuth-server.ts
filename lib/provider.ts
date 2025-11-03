@@ -43,7 +43,6 @@ class ProviderClass extends EventEmitter {
 
 		this.#int.responseModes = new Map();
 		this.#int.grantTypeHandlers = new Map();
-		this.#int.grantTypeParams = new Map([[undefined, new Set()]]);
 
 		initializeAdapter.call(this, configuration.adapter);
 
@@ -79,22 +78,10 @@ class ProviderClass extends EventEmitter {
 		return new URL(this.pathFor(name, opt), this.issuer).href;
 	}
 
-	registerGrantType(name, handler, params) {
+	registerGrantType(name, handler) {
 		this.#int.configuration.grantTypes.add(name);
-
-		const { grantTypeHandlers, grantTypeParams } = this.#int;
-
-		const grantParams = new Set(['grant_type']);
+		const { grantTypeHandlers } = this.#int;
 		grantTypeHandlers.set(name, handler);
-
-		if (params && typeof params === 'string') {
-			grantParams.add(params);
-		} else if (params && (Array.isArray(params) || params instanceof Set)) {
-			params.forEach(Set.prototype.add.bind(grantParams));
-		}
-
-		grantTypeParams.set(name, grantParams);
-		grantParams.forEach(Set.prototype.add.bind(grantTypeParams.get(undefined)));
 	}
 
 	registerResponseMode(name, handler) {

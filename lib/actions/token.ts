@@ -1,9 +1,6 @@
 import { Elysia, t } from 'elysia';
-
-import { provider } from 'lib/provider.js';
-import instance from '../helpers/weak_cache.ts';
 import { InvalidRequest } from '../helpers/errors.ts';
-import getTokenAuth from '../shared/token_auth.ts';
+import getTokenAuth, { authParams } from '../shared/token_auth.ts';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import {
 	codeGrantParameters,
@@ -27,39 +24,24 @@ export const tokenAction = new Elysia().post(
 		ctx.oidc.params = body;
 		ctx.oidc.body = body;
 
-		const { params: authParams, middleware: tokenAuth } =
-			getTokenAuth(provider);
-		const { grantTypeParams } = instance(provider);
-
+		const tokenAuth = getTokenAuth();
 		for (const middleware of tokenAuth) {
 			await middleware(ctx);
 		}
 
-		const grantParams = grantTypeParams.get(ctx.oidc.params.grant_type);
-		if (grantParams) {
-			Object.keys(ctx.oidc.params).forEach((key) => {
-				if (!(authParams.has(key) || grantParams.has(key))) {
-					delete ctx.oidc.params[key];
-				}
-			});
-		}
-
-		if (!ctx.oidc.client.grantTypeAllowed(ctx.oidc.params.grant_type)) {
+		const grantType = body.grant_type;
+		if (!ctx.oidc.client.grantTypeAllowed(grantType)) {
 			throw new InvalidRequest(
 				'requested grant type is not allowed for this client'
 			);
 		}
 
-		const grantType = body.grant_type;
 		return executeGrant(grantType, ctx);
 	},
 	{
 		body: t.Composite([
+			authParams,
 			t.Object({
-				client_id: t.Optional(t.String()),
-				client_assertion: t.Optional(t.String()),
-				client_assertion_type: t.Optional(t.String()),
-				client_secret: t.Optional(t.String()),
 				scope: t.Optional(t.String()),
 				grant_type: t.Union(
 					grantTypes.map((gt) => t.Literal(gt)),

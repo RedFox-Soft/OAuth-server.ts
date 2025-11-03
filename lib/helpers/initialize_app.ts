@@ -34,19 +34,13 @@ export default function initializeApp() {
 		});
 	}
 
-	Object.entries(grants).forEach(([grantType, { handler, parameters }]) => {
+	Object.entries(grants).forEach(([grantType, { handler }]) => {
 		const { grantTypeHandlers } = instance(this);
 		if (
 			configuration.grantTypes.has(grantType) &&
 			!grantTypeHandlers.has(grantType)
 		) {
-			if (features.resourceIndicators.enabled) {
-				parameters.add('resource');
-			}
-			if (features.richAuthorizationRequests.enabled) {
-				parameters.add('authorization_details');
-			}
-			this.registerGrantType(grantType, handler, parameters);
+			this.registerGrantType(grantType, handler);
 		}
 	});
 	return;

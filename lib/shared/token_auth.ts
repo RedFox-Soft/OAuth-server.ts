@@ -7,8 +7,17 @@ import { noVSCHAR } from '../consts/client_attributes.ts';
 import getJWTAuthMiddleware from './token_jwt_auth.ts';
 import { Client } from 'lib/models/client.js';
 import { clientAuthSigningAlgValues } from 'lib/configs/jwaAlgorithms.js';
+import { t } from 'elysia';
+import { provider } from 'lib/provider.js';
 
 const assertionType = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
+
+export const authParams = t.Object({
+	client_id: t.Optional(t.String()),
+	client_assertion: t.Optional(t.String()),
+	client_assertion_type: t.Optional(t.String()),
+	client_secret: t.Optional(t.String())
+});
 
 // see https://tools.ietf.org/html/rfc6749#appendix-B
 function decodeAuthToken(token) {
@@ -19,294 +28,256 @@ function decodeAuthToken(token) {
 	return authToken;
 }
 
-export default function tokenAuth(provider) {
+export default function tokenAuth() {
 	const tokenJwtAuth = getJWTAuthMiddleware(provider);
-	const authParams = new Set(['client_id']);
-	const { configuration, features } = instance(provider);
+	const { features } = instance(provider);
 
-	configuration.clientAuthMethods.forEach((method) => {
-		switch (method) {
-			case 'client_secret_post':
-				authParams.add('client_secret');
-				break;
-			case 'client_secret_jwt':
-			case 'private_key_jwt':
-				authParams.add('client_assertion');
-				authParams.add('client_assertion_type');
-				break;
-			default:
-		}
-	});
+	return [
+		async function findClientId(ctx) {
+			const {
+				params: {
+					client_id: clientId,
+					client_assertion: clientAssertion,
+					client_assertion_type: clientAssertionType,
+					client_secret: clientSecret
+				}
+			} = ctx.oidc;
 
-	authParams.forEach(
-		Set.prototype.add.bind(instance(provider).grantTypeParams.get(undefined))
-	);
-
-	return {
-		params: authParams,
-		middleware: [
-			async function findClientId(ctx) {
-				const {
-					params: {
-						client_id: clientId,
-						client_assertion: clientAssertion,
-						client_assertion_type: clientAssertionType,
-						client_secret: clientSecret
-					}
-				} = ctx.oidc;
-
-				if (ctx.headers.authorization !== undefined) {
-					const parts = ctx.headers.authorization.split(' ');
-					if (parts.length !== 2 || parts[0].toLowerCase() !== 'basic') {
-						throw new InvalidRequest(
-							'invalid authorization header value format'
-						);
-					}
-
-					const basic = Buffer.from(parts[1], 'base64').toString('utf8');
-					const i = basic.indexOf(':');
-
-					if (i === -1) {
-						throw new InvalidRequest(
-							'invalid authorization header value format'
-						);
-					}
-
-					try {
-						ctx.oidc.authorization.clientId = decodeAuthToken(
-							basic.slice(0, i)
-						);
-						ctx.oidc.authorization.clientSecret = decodeAuthToken(
-							basic.slice(i + 1)
-						);
-					} catch (err) {
-						throw new InvalidRequest(
-							'client_id and client_secret in the authorization header are not properly encoded'
-						);
-					}
-
-					if (
-						clientId !== undefined &&
-						ctx.oidc.authorization.clientId !== clientId
-					) {
-						throw new InvalidRequest(
-							'mismatch in body and authorization client ids'
-						);
-					}
-
-					if (!ctx.oidc.authorization.clientSecret) {
-						throw new InvalidRequest(
-							'client_secret must be provided in the Authorization header'
-						);
-					}
-
-					if (clientSecret !== undefined) {
-						throw new InvalidRequest(
-							'client authentication must only be provided using one mechanism'
-						);
-					}
-
-					ctx.oidc.authorization.methods = [
-						'client_secret_basic',
-						'client_secret_post'
-					];
-				} else if (clientId !== undefined) {
-					ctx.oidc.authorization.clientId = clientId;
-					ctx.oidc.authorization.methods = clientSecret
-						? ['client_secret_basic', 'client_secret_post']
-						: ['none', 'tls_client_auth', 'self_signed_tls_client_auth'];
+			if (ctx.headers.authorization !== undefined) {
+				const parts = ctx.headers.authorization.split(' ');
+				if (parts.length !== 2 || parts[0].toLowerCase() !== 'basic') {
+					throw new InvalidRequest('invalid authorization header value format');
 				}
 
-				if (clientAssertion !== undefined) {
-					if (
-						clientSecret !== undefined ||
-						ctx.headers.authorization !== undefined
-					) {
-						throw new InvalidRequest(
-							'client authentication must only be provided using one mechanism'
-						);
-					}
+				const basic = Buffer.from(parts[1], 'base64').toString('utf8');
+				const i = basic.indexOf(':');
 
-					let sub;
-					try {
-						({
-							payload: { sub }
-						} = JWT.decode(clientAssertion));
-					} catch (err) {
-						throw new InvalidRequest('invalid client_assertion format');
-					}
-
-					if (!sub) {
-						throw new InvalidClientAuth(
-							'sub (JWT subject) must be provided in the client_assertion JWT'
-						);
-					}
-
-					if (clientId && sub !== clientId) {
-						throw new InvalidRequest(
-							'subject of client_assertion must be the same as client_id provided in the body'
-						);
-					}
-
-					if (clientAssertionType === undefined) {
-						throw new InvalidRequest('client_assertion_type must be provided');
-					}
-
-					if (clientAssertionType !== assertionType) {
-						throw new InvalidRequest(
-							`client_assertion_type must have value ${assertionType}`
-						);
-					}
-
-					ctx.oidc.authorization.clientId = sub;
-					ctx.oidc.authorization.methods = [
-						'client_secret_jwt',
-						'private_key_jwt'
-					];
+				if (i === -1) {
+					throw new InvalidRequest('invalid authorization header value format');
 				}
 
-				if (!ctx.oidc.authorization.clientId) {
+				try {
+					ctx.oidc.authorization.clientId = decodeAuthToken(basic.slice(0, i));
+					ctx.oidc.authorization.clientSecret = decodeAuthToken(
+						basic.slice(i + 1)
+					);
+				} catch (err) {
 					throw new InvalidRequest(
-						'no client authentication mechanism provided'
+						'client_id and client_secret in the authorization header are not properly encoded'
 					);
 				}
-			},
-			async function loadClient(ctx) {
-				const client = await Client.find(ctx.oidc.authorization.clientId);
 
-				if (!client) {
-					throw new InvalidClientAuth('client not found');
+				if (
+					clientId !== undefined &&
+					ctx.oidc.authorization.clientId !== clientId
+				) {
+					throw new InvalidRequest(
+						'mismatch in body and authorization client ids'
+					);
 				}
 
-				ctx.oidc.entity('Client', client);
-			},
-			async function auth(ctx) {
-				const {
-					params,
-					client: { clientAuthMethod, clientAuthSigningAlg },
-					authorization: { methods, clientSecret }
-				} = ctx.oidc;
+				if (!ctx.oidc.authorization.clientSecret) {
+					throw new InvalidRequest(
+						'client_secret must be provided in the Authorization header'
+					);
+				}
 
-				if (!methods.includes(clientAuthMethod)) {
+				if (clientSecret !== undefined) {
+					throw new InvalidRequest(
+						'client authentication must only be provided using one mechanism'
+					);
+				}
+
+				ctx.oidc.authorization.methods = [
+					'client_secret_basic',
+					'client_secret_post'
+				];
+			} else if (clientId !== undefined) {
+				ctx.oidc.authorization.clientId = clientId;
+				ctx.oidc.authorization.methods = clientSecret
+					? ['client_secret_basic', 'client_secret_post']
+					: ['none', 'tls_client_auth', 'self_signed_tls_client_auth'];
+			}
+
+			if (clientAssertion !== undefined) {
+				if (
+					clientSecret !== undefined ||
+					ctx.headers.authorization !== undefined
+				) {
+					throw new InvalidRequest(
+						'client authentication must only be provided using one mechanism'
+					);
+				}
+
+				let sub;
+				try {
+					({
+						payload: { sub }
+					} = JWT.decode(clientAssertion));
+				} catch (err) {
+					throw new InvalidRequest('invalid client_assertion format');
+				}
+
+				if (!sub) {
 					throw new InvalidClientAuth(
-						'the provided authentication mechanism does not match the registered client authentication method'
+						'sub (JWT subject) must be provided in the client_assertion JWT'
 					);
 				}
 
-				switch (clientAuthMethod) {
-					case 'none':
-						break;
+				if (clientId && sub !== clientId) {
+					throw new InvalidRequest(
+						'subject of client_assertion must be the same as client_id provided in the body'
+					);
+				}
 
-					case 'client_secret_basic':
-					case 'client_secret_post': {
-						ctx.oidc.client.checkClientSecretExpiration(
-							'could not authenticate the client - its client secret is expired'
-						);
-						const actual = params.client_secret || clientSecret;
-						const matches = await ctx.oidc.client.compareClientSecret(actual);
-						if (!matches) {
-							throw new InvalidClientAuth('invalid secret provided');
-						}
+				if (clientAssertionType === undefined) {
+					throw new InvalidRequest('client_assertion_type must be provided');
+				}
 
-						break;
+				if (clientAssertionType !== assertionType) {
+					throw new InvalidRequest(
+						`client_assertion_type must have value ${assertionType}`
+					);
+				}
+
+				ctx.oidc.authorization.clientId = sub;
+				ctx.oidc.authorization.methods = [
+					'client_secret_jwt',
+					'private_key_jwt'
+				];
+			}
+
+			if (!ctx.oidc.authorization.clientId) {
+				throw new InvalidRequest('no client authentication mechanism provided');
+			}
+		},
+		async function loadClient(ctx) {
+			const client = await Client.find(ctx.oidc.authorization.clientId);
+
+			if (!client) {
+				throw new InvalidClientAuth('client not found');
+			}
+
+			ctx.oidc.entity('Client', client);
+		},
+		async function auth(ctx) {
+			const {
+				params,
+				client: { clientAuthMethod, clientAuthSigningAlg },
+				authorization: { methods, clientSecret }
+			} = ctx.oidc;
+
+			if (!methods.includes(clientAuthMethod)) {
+				throw new InvalidClientAuth(
+					'the provided authentication mechanism does not match the registered client authentication method'
+				);
+			}
+
+			switch (clientAuthMethod) {
+				case 'none':
+					break;
+
+				case 'client_secret_basic':
+				case 'client_secret_post': {
+					ctx.oidc.client.checkClientSecretExpiration(
+						'could not authenticate the client - its client secret is expired'
+					);
+					const actual = params.client_secret || clientSecret;
+					const matches = await ctx.oidc.client.compareClientSecret(actual);
+					if (!matches) {
+						throw new InvalidClientAuth('invalid secret provided');
 					}
 
-					case 'client_secret_jwt':
-						ctx.oidc.client.checkClientSecretExpiration(
-							'could not authenticate the client - its client secret used for the client_assertion is expired'
-						);
-						await tokenJwtAuth(
-							ctx,
-							ctx.oidc.client.symmetricKeyStore,
-							clientAuthSigningAlg
-								? [clientAuthSigningAlg]
-								: clientAuthSigningAlgValues.filter((alg) =>
-										alg.startsWith('HS')
-									)
-						);
+					break;
+				}
 
-						break;
+				case 'client_secret_jwt':
+					ctx.oidc.client.checkClientSecretExpiration(
+						'could not authenticate the client - its client secret used for the client_assertion is expired'
+					);
+					await tokenJwtAuth(
+						ctx,
+						ctx.oidc.client.symmetricKeyStore,
+						clientAuthSigningAlg
+							? [clientAuthSigningAlg]
+							: clientAuthSigningAlgValues.filter((alg) => alg.startsWith('HS'))
+					);
 
-					case 'private_key_jwt':
-						await tokenJwtAuth(
-							ctx,
-							ctx.oidc.client.asymmetricKeyStore,
-							clientAuthSigningAlg
-								? [clientAuthSigningAlg]
-								: clientAuthSigningAlgValues.filter(
-										(alg) => !alg.startsWith('HS')
-									)
-						);
+					break;
 
-						break;
+				case 'private_key_jwt':
+					await tokenJwtAuth(
+						ctx,
+						ctx.oidc.client.asymmetricKeyStore,
+						clientAuthSigningAlg
+							? [clientAuthSigningAlg]
+							: clientAuthSigningAlgValues.filter(
+									(alg) => !alg.startsWith('HS')
+								)
+					);
 
-					case 'tls_client_auth': {
-						const {
-							getCertificate,
-							certificateAuthorized,
-							certificateSubjectMatches
-						} = features.mTLS;
+					break;
 
-						const cert = getCertificate(ctx);
+				case 'tls_client_auth': {
+					const {
+						getCertificate,
+						certificateAuthorized,
+						certificateSubjectMatches
+					} = features.mTLS;
 
-						if (!cert) {
-							throw new InvalidClientAuth(
-								'client certificate was not provided'
-							);
-						}
+					const cert = getCertificate(ctx);
 
-						if (!certificateAuthorized(ctx)) {
-							throw new InvalidClientAuth(
-								'client certificate was not verified'
-							);
-						}
+					if (!cert) {
+						throw new InvalidClientAuth('client certificate was not provided');
+					}
 
-						for (const [prop, key] of Object.entries({
-							tlsClientAuthSubjectDn: 'tls_client_auth_subject_dn',
-							tlsClientAuthSanDns: 'tls_client_auth_san_dns',
-							tlsClientAuthSanIp: 'tls_client_auth_san_ip',
-							tlsClientAuthSanEmail: 'tls_client_auth_san_email',
-							tlsClientAuthSanUri: 'tls_client_auth_san_uri'
-						})) {
-							const value = ctx.oidc.client[prop];
-							if (value) {
-								if (!certificateSubjectMatches(ctx, key, value)) {
-									throw new InvalidClientAuth(
-										'certificate subject value does not match the registered one'
-									);
-								}
-								break;
+					if (!certificateAuthorized(ctx)) {
+						throw new InvalidClientAuth('client certificate was not verified');
+					}
+
+					for (const [prop, key] of Object.entries({
+						tlsClientAuthSubjectDn: 'tls_client_auth_subject_dn',
+						tlsClientAuthSanDns: 'tls_client_auth_san_dns',
+						tlsClientAuthSanIp: 'tls_client_auth_san_ip',
+						tlsClientAuthSanEmail: 'tls_client_auth_san_email',
+						tlsClientAuthSanUri: 'tls_client_auth_san_uri'
+					})) {
+						const value = ctx.oidc.client[prop];
+						if (value) {
+							if (!certificateSubjectMatches(ctx, key, value)) {
+								throw new InvalidClientAuth(
+									'certificate subject value does not match the registered one'
+								);
 							}
+							break;
 						}
-
-						break;
 					}
-					case 'self_signed_tls_client_auth': {
-						const { getCertificate } = features.mTLS;
-						const cert = getCertificate(ctx);
 
-						if (!cert) {
-							throw new InvalidClientAuth(
-								'client certificate was not provided'
-							);
-						}
+					break;
+				}
+				case 'self_signed_tls_client_auth': {
+					const { getCertificate } = features.mTLS;
+					const cert = getCertificate(ctx);
 
-						await ctx.oidc.client.asymmetricKeyStore.refresh();
-						const expected = certificateThumbprint(cert);
-						const match = [...ctx.oidc.client.asymmetricKeyStore].find(
-							({ 'x5t#S256': actual }) => actual === expected
+					if (!cert) {
+						throw new InvalidClientAuth('client certificate was not provided');
+					}
+
+					await ctx.oidc.client.asymmetricKeyStore.refresh();
+					const expected = certificateThumbprint(cert);
+					const match = [...ctx.oidc.client.asymmetricKeyStore].find(
+						({ 'x5t#S256': actual }) => actual === expected
+					);
+
+					if (!match) {
+						throw new InvalidClientAuth(
+							'unregistered client certificate provided'
 						);
-
-						if (!match) {
-							throw new InvalidClientAuth(
-								'unregistered client certificate provided'
-							);
-						}
-
-						break;
 					}
+
+					break;
 				}
 			}
-		]
-	};
+		}
+	];
 }

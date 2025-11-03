@@ -253,5 +253,3 @@ export const handler = async function authorizationCodeHandler(ctx) {
 		authorization_details: at.rar
 	};
 };
-
-export const parameters = new Set(['code', 'code_verifier', 'redirect_uri']);
