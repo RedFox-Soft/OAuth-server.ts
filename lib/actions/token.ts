@@ -2,7 +2,7 @@ import { Elysia, t } from 'elysia';
 
 import { provider } from 'lib/provider.js';
 import instance from '../helpers/weak_cache.ts';
-import { UnsupportedGrantType, InvalidRequest } from '../helpers/errors.ts';
+import { InvalidRequest } from '../helpers/errors.ts';
 import getTokenAuth from '../shared/token_auth.ts';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import {

@@ -40,15 +40,13 @@ export default function initializeApp() {
 			configuration.grantTypes.has(grantType) &&
 			!grantTypeHandlers.has(grantType)
 		) {
-			let dupes;
 			if (features.resourceIndicators.enabled) {
 				parameters.add('resource');
-				dupes = new Set(['resource']);
 			}
 			if (features.richAuthorizationRequests.enabled) {
 				parameters.add('authorization_details');
 			}
-			this.registerGrantType(grantType, handler, parameters, dupes);
+			this.registerGrantType(grantType, handler, parameters);
 		}
 	});
 	return;
