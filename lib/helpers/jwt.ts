@@ -177,8 +177,7 @@ export async function verify(jwt, keystore, options = {}) {
 		}
 
 		await keystore.refresh();
-		// eslint-disable-next-line prefer-rest-params
-		return verify(...arguments);
+		return verify(jwt, keystore, options);
 	}
 
 	const payload = decodeJwt(jwt);

@@ -32,7 +32,7 @@ export default async function processRequestObject(
 
 	const pushedRequestObject = 'PushedAuthorizationRequest' in ctx.oidc.entities;
 	const isBackchannelAuthentication = route === 'backchannel_authentication';
-	const { configuration, features } = instance(ctx.oidc.provider);
+	const { features } = instance(ctx.oidc.provider);
 
 	if (params.request === undefined && client.requireSignedRequestObject) {
 		throw new InvalidRequest('Request Object must be used by this client');
