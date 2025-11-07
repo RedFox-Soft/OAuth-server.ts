@@ -45,31 +45,22 @@ export async function sign(payload, key, alg, options = {}) {
 		.sign(key);
 }
 
-export function decode(input) {
-	let jwt;
-
-	if (Buffer.isBuffer(input)) {
-		jwt = input.toString('utf8');
-	} else if (typeof input !== 'string') {
-		throw new TypeError('invalid JWT.decode input type');
-	} else {
-		jwt = input;
-	}
-
+export function decode(jwt: string): {
+	header: Record<string, unknown>;
+	payload: payloadType;
+} {
 	const { 0: protectedHeader, 1: payload, length } = jwt.split('.');
-
 	if (length !== 3) {
 		throw new TypeError('invalid JWT.decode input');
 	}
-
 	return {
 		header: JSON.parse(base64url.decode(protectedHeader)),
 		payload: JSON.parse(base64url.decode(payload))
 	};
 }
 
-export function header(jwt) {
-	return JSON.parse(base64url.decode(jwt.toString().split('.')[0]));
+export function header(jwt: string): Record<string, unknown> {
+	return JSON.parse(base64url.decode(jwt.split('.')[0]));
 }
 
 const jwtPayloadSchema = t.Object({
@@ -144,7 +135,7 @@ export function assertPayload(
 	}
 }
 
-export async function verify(jwt, keystore, options = {}) {
+export async function verify(jwt: string, keystore, options = {}) {
 	let verified;
 	let protectedHeader;
 	try {

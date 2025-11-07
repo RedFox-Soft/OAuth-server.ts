@@ -528,21 +528,6 @@ async function assertClaimsParameter(ctx, claims, client) {
 	// @param client - the Client instance
 }
 
-async function assertJwtClientAuthClaimsAndHeader(ctx, claims, header, client) {
-	// @param ctx - koa request context
-	// @param claims - parsed JWT Client Authentication Assertion Claims Set as object
-	// @param header - parsed JWT Client Authentication Assertion Headers as object
-	// @param client - the Client instance
-
-	if (ctx.oidc.isFapi('2.0')) {
-		if (claims.aud !== ctx.oidc.issuer) {
-			throw new errors.InvalidClientAuth(
-				'audience (aud) must equal the issuer identifier url'
-			);
-		}
-	}
-}
-
 async function assertJwtClaimsAndHeader(ctx, claims, header, client) {
 	// @param ctx - koa request context
 	// @param claims - parsed Request Object JWT Claims Set as object
@@ -2003,14 +1988,6 @@ function makeDefaults() {
 		 *   - otherwise only rotate tokens if they're being used close to their expiration (>= 70% TTL passed)
 		 */
 		rotateRefreshToken,
-
-		/**
-		 * assertJwtClientAuthClaimsAndHeader
-		 *
-		 * description: Helper function used to validate the JWT Client Authentication Assertion Claims Set and Header beyond
-		 * what its specification mandates.
-		 */
-		assertJwtClientAuthClaimsAndHeader,
 
 		/*
 		 * fetch

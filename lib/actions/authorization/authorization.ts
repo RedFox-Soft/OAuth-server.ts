@@ -24,7 +24,7 @@ import interactions from './interactions.ts';
 import respond from './respond.ts';
 import interactionEmit from './interaction_emit.ts';
 import checkOpenidScope from './check_openid_scope.ts';
-import getTokenAuth from '../../shared/token_auth.ts';
+import { tokenAuth } from '../../shared/token_auth.ts';
 import stripOutsideJarParams from './strip_outside_jar_params.ts';
 import pushedAuthorizationRequestRemapErrors from './pushed_authorization_request_remap_errors.ts';
 import pushedAuthorizationRequestResponse from './pushed_authorization_request_response.ts';
@@ -243,10 +243,7 @@ export const par = new Elysia()
 			ctx.oidc.body = { ...body };
 			ctx.oidc.params = body;
 
-			const tokenAuth = getTokenAuth();
-			for (const middleware of tokenAuth) {
-				await middleware(ctx);
-			}
+			await tokenAuth(ctx);
 
 			stripOutsideJarParams(ctx);
 

@@ -1,5 +1,5 @@
 import checkResource from '../../shared/check_resource.ts';
-import getTokenAuth from '../../shared/token_auth.ts';
+import { tokenAuth } from '../../shared/token_auth.ts';
 
 import checkClient from './check_client.ts';
 import processRequestObject, {
@@ -45,10 +45,7 @@ const BacckchannelRequest = t.Composite([
 ]);
 
 async function authentication(ctx) {
-	const tokenAuth = getTokenAuth();
-	tokenAuth.forEach((tokenAuthMiddleware) => {
-		tokenAuthMiddleware;
-	});
+	await tokenAuth(ctx);
 
 	if (!ctx.body.client_id) {
 		ctx.body.client_id = ctx.oidc.client.clientId;

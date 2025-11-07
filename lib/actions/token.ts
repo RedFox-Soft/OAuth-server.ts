@@ -1,6 +1,6 @@
 import { Elysia, t } from 'elysia';
 import { InvalidRequest } from '../helpers/errors.ts';
-import getTokenAuth, { authParams } from '../shared/token_auth.ts';
+import { tokenAuth, authParams } from '../shared/token_auth.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import {
 	codeGrantParameters,
@@ -24,10 +24,7 @@ export const tokenAction = new Elysia().post(
 		ctx.oidc.params = body;
 		ctx.oidc.body = body;
 
-		const tokenAuth = getTokenAuth();
-		for (const middleware of tokenAuth) {
-			await middleware(ctx);
-		}
+		await tokenAuth(ctx);
 
 		const grantType = body.grant_type;
 		if (!ctx.oidc.client.grantTypeAllowed(grantType)) {

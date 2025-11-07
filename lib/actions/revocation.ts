@@ -1,7 +1,7 @@
 import { InvalidRequest } from '../helpers/errors.ts';
 import presence from '../helpers/validate_presence.ts';
 import instance from '../helpers/weak_cache.ts';
-import getTokenAuth from '../shared/token_auth.ts';
+import { tokenAuth } from '../shared/token_auth.ts';
 import { urlencoded as parseBody } from '../shared/selective_body.ts';
 import paramsMiddleware from '../shared/assemble_params.ts';
 import revoke from '../helpers/revoke.ts';
@@ -14,9 +14,9 @@ const revokeable = new Set([
 	'RefreshToken'
 ]);
 
-export default function revocationAction(provider) {
-	const { params: authParams, middleware: tokenAuth } = getTokenAuth(provider);
-	const PARAM_LIST = new Set(['token', 'token_type_hint', ...authParams]);
+export default async function revocationAction(provider) {
+	await tokenAuth(ctx);
+	const PARAM_LIST = new Set(['token', 'token_type_hint']);
 	const { grantTypeHandlers } = instance(provider);
 
 	function getAccessToken(token) {

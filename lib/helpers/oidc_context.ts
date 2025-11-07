@@ -3,7 +3,6 @@ import instance from './weak_cache.ts';
 import { routeNames } from '../consts/param_list.ts';
 import { provider } from '../provider.js';
 import { isPlainObject } from './_/object.js';
-import { ISSUER } from 'lib/configs/env.js';
 
 export class OIDCContext {
 	#requestParamClaims = null;
@@ -108,14 +107,6 @@ export class OIDCContext {
 		this.#requestParamClaims = requestParamClaims;
 
 		return requestParamClaims;
-	}
-
-	clientJwtAuthExpectedAudience() {
-		return new Set([
-			ISSUER,
-			`${ISSUER}${routeNames.token}`,
-			`${ISSUER}${this.route}`
-		]);
 	}
 
 	get requestParamScopes() {

@@ -1,4 +1,4 @@
-import getTokenAuth from '../shared/token_auth.ts';
+import { tokenAuth } from '../shared/token_auth.js';
 import instance from '../helpers/weak_cache.ts';
 import { InvalidRequest } from '../helpers/errors.ts';
 import { Elysia, t } from 'elysia';
@@ -147,10 +147,7 @@ export const introspect = new Elysia().post(
 		ctx.oidc.params = body;
 		ctx.oidc.body = body;
 
-		const tokenAuth = getTokenAuth();
-		for (const middleware of tokenAuth) {
-			await middleware(ctx);
-		}
+		await tokenAuth(ctx);
 
 		const { configuration } = instance(provider);
 		const {
