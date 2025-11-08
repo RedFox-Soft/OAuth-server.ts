@@ -46,13 +46,14 @@ export function hasGrant(grantType: string): boolean {
 
 export async function executeGrant(
 	grantType: string,
-	ctx
+	ctx,
+	dPoP
 ): Promise<Response | Record<string, unknown>> {
 	const grant = grantStore.get(grantType);
 	if (!hasGrant(grantType)) {
 		throw new UnsupportedGrantType();
 	}
-	const res: Response | Record<string, unknown> = await grant(ctx);
+	const res: Response | Record<string, unknown> = await grant(ctx, dPoP);
 	provider.emit('grant.success', ctx);
 	return res;
 }

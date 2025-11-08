@@ -19,7 +19,7 @@ export const authParams = t.Object({
 	client_secret: t.Optional(t.String())
 });
 
-type authParamsType = Static<typeof authParams>;
+type authParamsType = Record<string, unknown> & Static<typeof authParams>;
 
 // see https://tools.ietf.org/html/rfc6749#appendix-B
 function decodeAuthToken(token: string): string {
@@ -143,10 +143,14 @@ function findClientId(
 	return res;
 }
 
-export async function tokenAuth(ctx) {
+export async function tokenAuth(
+	params: authParamsType,
+	headers: Record<string, string | undefined>,
+	ctx
+) {
 	const { features } = instance(provider);
 
-	const auth = findClientId(ctx.oidc.params, ctx.headers?.authorization);
+	const auth = findClientId(params, headers?.authorization);
 
 	const client = await Client.find(auth.clientId);
 	if (!client) {
@@ -155,11 +159,7 @@ export async function tokenAuth(ctx) {
 
 	ctx.oidc.entity('Client', client);
 
-	const {
-		params,
-		client: { clientAuthMethod, clientAuthSigningAlg }
-	} = ctx.oidc;
-
+	const { clientAuthMethod, clientAuthSigningAlg } = client;
 	if (!auth.methods.includes(clientAuthMethod)) {
 		throw new InvalidClientAuth(
 			'the provided authentication mechanism does not match the registered client authentication method'
@@ -172,11 +172,11 @@ export async function tokenAuth(ctx) {
 
 		case 'client_secret_basic':
 		case 'client_secret_post': {
-			ctx.oidc.client.checkClientSecretExpiration(
+			client.checkClientSecretExpiration(
 				'could not authenticate the client - its client secret is expired'
 			);
 			const actual = params.client_secret || auth.clientSecret;
-			const matches = await ctx.oidc.client.compareClientSecret(actual);
+			const matches = await client.compareClientSecret(actual);
 			if (!matches) {
 				throw new InvalidClientAuth('invalid secret provided');
 			}
@@ -185,12 +185,12 @@ export async function tokenAuth(ctx) {
 		}
 
 		case 'client_secret_jwt':
-			ctx.oidc.client.checkClientSecretExpiration(
+			client.checkClientSecretExpiration(
 				'could not authenticate the client - its client secret used for the client_assertion is expired'
 			);
 			await tokenJwtAuth(
 				ctx,
-				ctx.oidc.client.symmetricKeyStore,
+				client.symmetricKeyStore,
 				clientAuthSigningAlg
 					? [clientAuthSigningAlg]
 					: clientAuthSigningAlgValues.filter((alg) => alg.startsWith('HS'))
@@ -201,7 +201,7 @@ export async function tokenAuth(ctx) {
 		case 'private_key_jwt':
 			await tokenJwtAuth(
 				ctx,
-				ctx.oidc.client.asymmetricKeyStore,
+				client.asymmetricKeyStore,
 				clientAuthSigningAlg
 					? [clientAuthSigningAlg]
 					: clientAuthSigningAlgValues.filter((alg) => !alg.startsWith('HS'))
@@ -233,7 +233,7 @@ export async function tokenAuth(ctx) {
 				tlsClientAuthSanEmail: 'tls_client_auth_san_email',
 				tlsClientAuthSanUri: 'tls_client_auth_san_uri'
 			})) {
-				const value = ctx.oidc.client[prop];
+				const value = client[prop];
 				if (value) {
 					if (!certificateSubjectMatches(ctx, key, value)) {
 						throw new InvalidClientAuth(
@@ -254,9 +254,9 @@ export async function tokenAuth(ctx) {
 				throw new InvalidClientAuth('client certificate was not provided');
 			}
 
-			await ctx.oidc.client.asymmetricKeyStore.refresh();
+			await client.asymmetricKeyStore.refresh();
 			const expected = certificateThumbprint(cert);
-			const match = [...ctx.oidc.client.asymmetricKeyStore].find(
+			const match = [...client.asymmetricKeyStore].find(
 				({ 'x5t#S256': actual }) => actual === expected
 			);
 

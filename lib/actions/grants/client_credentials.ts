@@ -5,10 +5,9 @@ import {
 	InvalidScope,
 	InvalidRequest
 } from '../../helpers/errors.ts';
-import { dpopValidate, validateReplay } from '../../helpers/validate_dpop.js';
 import checkResource from '../../shared/check_resource.ts';
 
-export const handler = async function clientCredentialsHandler(ctx) {
+export const handler = async function clientCredentialsHandler(ctx, dPoP) {
 	const { client } = ctx.oidc;
 	const { ClientCredentials } = ctx.oidc.provider;
 	const {
@@ -17,8 +16,6 @@ export const handler = async function clientCredentialsHandler(ctx) {
 		},
 		scopes: statics
 	} = instance(ctx.oidc.provider).configuration;
-
-	const dPoP = await dpopValidate(ctx);
 
 	if (ctx.oidc.params.authorization_details) {
 		throw new InvalidRequest(
@@ -70,7 +67,6 @@ export const handler = async function clientCredentialsHandler(ctx) {
 		token.setThumbprint('x5t', cert);
 	}
 
-	await validateReplay(client.clientId, dPoP);
 	if (dPoP) {
 		token.setThumbprint('jkt', dPoP.thumbprint);
 	} else if (client.dpopBoundAccessTokens) {

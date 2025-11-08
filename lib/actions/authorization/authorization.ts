@@ -243,7 +243,7 @@ export const par = new Elysia()
 			ctx.oidc.body = { ...body };
 			ctx.oidc.params = body;
 
-			await tokenAuth(ctx);
+			await tokenAuth(body, headers, ctx);
 
 			stripOutsideJarParams(ctx);
 

@@ -5,7 +5,6 @@ import presence from '../../helpers/validate_presence.ts';
 import instance from '../../helpers/weak_cache.ts';
 import filterClaims from '../../helpers/filter_claims.ts';
 import revoke from '../../helpers/revoke.ts';
-import { dpopValidate, validateReplay } from '../../helpers/validate_dpop.js';
 import resolveResource from '../../helpers/resolve_resource.ts';
 import { IdToken } from 'lib/models/id_token.js';
 import { DeviceCode } from 'lib/models/device_code.js';
@@ -16,7 +15,7 @@ const { AuthorizationPending, ExpiredToken, InvalidGrant } = errors;
 
 export const gty = 'device_code';
 
-export const handler = async function deviceCodeHandler(ctx) {
+export const handler = async function deviceCodeHandler(ctx, dPoP) {
 	presence(ctx, 'device_code');
 
 	if (ctx.oidc.params.authorization_details) {
@@ -35,8 +34,6 @@ export const handler = async function deviceCodeHandler(ctx) {
 			resourceIndicators
 		}
 	} = instance(ctx.oidc.provider).configuration;
-
-	const dPoP = await dpopValidate(ctx);
 
 	const code = await DeviceCode.find(ctx.oidc.params.device_code, {
 		ignoreExpiration: true
@@ -132,7 +129,6 @@ export const handler = async function deviceCodeHandler(ctx) {
 		at.setThumbprint('x5t', cert);
 	}
 
-	await validateReplay(ctx.oidc.client.clientId, dPoP);
 	if (dPoP) {
 		at.setThumbprint('jkt', dPoP.thumbprint);
 	}

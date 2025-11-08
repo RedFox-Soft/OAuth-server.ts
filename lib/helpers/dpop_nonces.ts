@@ -95,10 +95,11 @@ export class DPoPNonces {
 		return result === 0;
 	}
 
+	static enabling = true;
 	static #singleton: DPoPNonces | undefined;
 	static fabrica(): DPoPNonces | undefined {
 		const nonceSecret = ApplicationConfig['dpop.nonceSecret'];
-		if (nonceSecret !== undefined) {
+		if (DPoPNonces.enabling && nonceSecret !== undefined) {
 			return (DPoPNonces.#singleton ??= new DPoPNonces(nonceSecret));
 		}
 	}

@@ -10,7 +10,6 @@ import revoke from '../../helpers/revoke.ts';
 import certificateThumbprint from '../../helpers/certificate_thumbprint.ts';
 import * as formatters from '../../helpers/formatters.ts';
 import filterClaims from '../../helpers/filter_claims.ts';
-import { dpopValidate, validateReplay } from '../../helpers/validate_dpop.js';
 import resolveResource from '../../helpers/resolve_resource.ts';
 import checkRar from '../../shared/check_rar.ts';
 
@@ -27,7 +26,7 @@ function rarSupported(token) {
 
 const gty = 'refresh_token';
 
-export const handler = async function refreshTokenHandler(ctx) {
+export const handler = async function refreshTokenHandler(ctx, dPoP) {
 	presence(ctx, 'refresh_token');
 
 	const {
@@ -43,8 +42,6 @@ export const handler = async function refreshTokenHandler(ctx) {
 	} = instance(ctx.oidc.provider).configuration;
 
 	const { client } = ctx.oidc;
-
-	const dPoP = await dpopValidate(ctx);
 
 	let refreshTokenValue = ctx.oidc.params.refresh_token;
 	let refreshToken = await RefreshToken.find(refreshTokenValue, {
@@ -114,8 +111,6 @@ export const handler = async function refreshTokenHandler(ctx) {
 			);
 		}
 	}
-
-	await validateReplay(client.clientId, dPoP);
 
 	if (refreshToken.jkt && (!dPoP || refreshToken.jkt !== dPoP.thumbprint)) {
 		throw new InvalidGrant('failed jkt verification');

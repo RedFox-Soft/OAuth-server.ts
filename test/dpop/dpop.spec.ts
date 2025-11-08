@@ -30,6 +30,7 @@ import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
 import { Client } from 'lib/models/client.js';
 import { AccessToken } from 'lib/models/access_token.js';
+import { DPoPNonces } from 'lib/helpers/dpop_nonces.js';
 
 function ath(accessToken) {
 	return hash('sha256', accessToken, 'base64url');
@@ -159,17 +160,19 @@ describe('features.dPoP', async () => {
 		});
 
 		describe('validates the DPoP proof JWT is conform', () => {
-			before(async function () {
+			let access_token = null;
+			let ath = null;
+			beforeEach(async function () {
 				const at = new AccessToken({
-					accountId: this.loggedInAccountId,
-					grantId: this.getGrantId(),
+					accountId: setup.getAccountId(),
+					grantId: setup.getGrantId(),
 					client: await Client.find('client'),
 					scope: 'openid'
 				});
-				at.setThumbprint('jkt', this.thumbprint);
+				at.setThumbprint('jkt', thumbprint);
 
-				this.access_token = await at.save();
-				this.ath = hash('sha256', this.access_token, 'base64url');
+				access_token = await at.save();
+				ath = hash('sha256', access_token, 'base64url');
 			});
 
 			afterEach(function () {
@@ -177,65 +180,64 @@ describe('features.dPoP', async () => {
 			});
 
 			it('invalid typ', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.on('userinfo.error', spy);
 
 				for (const value of ['JWT', 'secevent+jwt']) {
-					await this.agent
-						.get('/me')
-						.set(
-							'DPoP',
-							await new SignJWT({})
+					const { error, headers } = await agent.userinfo.get({
+						headers: {
+							authorization: `DPoP ${access_token}`,
+							dpop: await new SignJWT({})
 								.setProtectedHeader({
 									alg: 'ES256',
-									jwk: this.jwk,
+									jwk,
 									typ: value
 								})
-								.sign(this.keypair.privateKey)
-						)
-						.set('Authorization', `DPoP ${this.access_token}`)
-						.expect(401)
-						.expect({
-							error: 'invalid_dpop_proof',
-							error_description: 'invalid DPoP key binding'
-						})
-						.expect('WWW-Authenticate', /^DPoP /)
-						.expect('WWW-Authenticate', /error="invalid_dpop_proof"/)
-						.expect('WWW-Authenticate', /algs="ES256 PS256"/);
+								.sign(keypair.privateKey)
+						}
+					});
+					expect(error.status).toBe(401);
+					expect(error.value).toEqual({
+						error: 'invalid_dpop_proof',
+						error_description: 'invalid DPoP key binding'
+					});
+					expect(headers.get('www-authenticate')).toMatch(/^DPoP /);
+					expect(headers.get('www-authenticate')).toMatch(
+						/error="invalid_dpop_proof"/
+					);
+					expect(headers.get('www-authenticate')).toMatch(/algs="ES256 PS256"/);
 				}
 
-				for (const {
-					args: [, err]
-				} of spy.getCalls()) {
-					expect(err.error_detail).to.eql('unexpected "typ" JWT header value');
+				for (const [err] of spy.mock.calls) {
+					expect(err.error_detail).toBe('unexpected "typ" JWT header value');
 				}
 			});
 
 			it('alg mismatch', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.on('userinfo.error', spy);
+
 				for (const value of [1, true, 'none', 'HS256', 'unsupported']) {
-					await this.agent
-						.get('/me')
-						.set(
-							'DPoP',
-							`${base64url.encode(JSON.stringify({ jwk: this.jwk, typ: 'dpop+jwt', alg: value }))}.e30.`
-						)
-						.set('Authorization', `DPoP ${this.access_token}`)
-						.expect(401)
-						.expect({
-							error: 'invalid_dpop_proof',
-							error_description: 'invalid DPoP key binding'
-						})
-						.expect('WWW-Authenticate', /^DPoP /)
-						.expect('WWW-Authenticate', /error="invalid_dpop_proof"/)
-						.expect('WWW-Authenticate', /algs="ES256 PS256"/);
+					const { error, headers } = await agent.userinfo.get({
+						headers: {
+							authorization: `DPoP ${access_token}`,
+							dpop: `${base64url.encode(JSON.stringify({ jwk, typ: 'dpop+jwt', alg: value }))}.e30.`
+						}
+					});
+					expect(error.status).toBe(401);
+					expect(error.value).toEqual({
+						error: 'invalid_dpop_proof',
+						error_description: 'invalid DPoP key binding'
+					});
+					expect(headers.get('www-authenticate')).toMatch(/^DPoP /);
+					expect(headers.get('www-authenticate')).toMatch(
+						/error="invalid_dpop_proof"/
+					);
+					expect(headers.get('www-authenticate')).toMatch(/algs="ES256 PS256"/);
 				}
 
-				for (const {
-					args: [, err]
-				} of spy.getCalls()) {
-					expect(err.error_detail).to.be.oneOf([
+				for (const [err] of spy.mock.calls) {
+					expect(err.error_detail).toBeOneOf([
 						'"alg" (Algorithm) Header Parameter value not allowed',
 						'JWS "alg" (Algorithm) Header Parameter missing or invalid'
 					]);
@@ -243,258 +245,253 @@ describe('features.dPoP', async () => {
 			});
 
 			it('embedded jwk header', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.on('userinfo.error', spy);
+
 				for (const value of [undefined, '', 1, true, null, 'foo', []]) {
-					await this.agent
-						.get('/me')
-						.set(
-							'DPoP',
-							await new SignJWT({})
+					const { error, headers } = await agent.userinfo.get({
+						headers: {
+							authorization: `DPoP ${access_token}`,
+							dpop: await new SignJWT({})
 								.setProtectedHeader({
 									alg: 'ES256',
 									jwk: value,
 									typ: 'dpop+jwt'
 								})
-								.sign(this.keypair.privateKey)
-						)
-						.set('Authorization', `DPoP ${this.access_token}`)
-						.expect(401)
-						.expect({
-							error: 'invalid_dpop_proof',
-							error_description: 'invalid DPoP key binding'
-						})
-						.expect('WWW-Authenticate', /^DPoP /)
-						.expect('WWW-Authenticate', /error="invalid_dpop_proof"/)
-						.expect('WWW-Authenticate', /algs="ES256 PS256"/);
+								.sign(keypair.privateKey)
+						}
+					});
+					expect(error.status).toBe(401);
+					expect(error.value).toEqual({
+						error: 'invalid_dpop_proof',
+						error_description: 'invalid DPoP key binding'
+					});
+					expect(headers.get('www-authenticate')).toMatch(/^DPoP /);
+					expect(headers.get('www-authenticate')).toMatch(
+						/error="invalid_dpop_proof"/
+					);
+					expect(headers.get('www-authenticate')).toMatch(/algs="ES256 PS256"/);
 				}
 
-				for (const {
-					args: [, err]
-				} of spy.getCalls()) {
-					expect(err.error_detail).to.eql(
+				for (const [err] of spy.mock.calls) {
+					expect(err.error_detail).toBe(
 						'"jwk" (JSON Web Key) Header Parameter must be a JSON object'
 					);
 				}
 			});
 
 			it('no private key in header', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.on('userinfo.error', spy);
-				await this.agent
-					.get('/me')
-					.set(
-						'DPoP',
-						await new SignJWT({})
+
+				const { error, headers } = await agent.userinfo.get({
+					headers: {
+						authorization: `DPoP ${access_token}`,
+						dpop: await new SignJWT({})
 							.setProtectedHeader({
 								alg: 'ES256',
-								jwk: await exportJWK(this.keypair.privateKey),
+								jwk: await exportJWK(keypair.privateKey),
 								typ: 'dpop+jwt'
 							})
-							.sign(this.keypair.privateKey)
-					)
-					.set('Authorization', `DPoP ${this.access_token}`)
-					.expect(401)
-					.expect({
-						error: 'invalid_dpop_proof',
-						error_description: 'invalid DPoP key binding'
-					})
-					.expect('WWW-Authenticate', /^DPoP /)
-					.expect('WWW-Authenticate', /error="invalid_dpop_proof"/)
-					.expect('WWW-Authenticate', /algs="ES256 PS256"/);
+							.sign(keypair.privateKey)
+					}
+				});
+				expect(error.status).toBe(401);
+				expect(error.value).toEqual({
+					error: 'invalid_dpop_proof',
+					error_description: 'invalid DPoP key binding'
+				});
+				expect(headers.get('www-authenticate')).toMatch(/^DPoP /);
+				expect(headers.get('www-authenticate')).toMatch(
+					/error="invalid_dpop_proof"/
+				);
+				expect(headers.get('www-authenticate')).toMatch(/algs="ES256 PS256"/);
 
-				for (const {
-					args: [, err]
-				} of spy.getCalls()) {
-					expect(err.error_detail).to.eql(
+				for (const [err] of spy.mock.calls) {
+					expect(err.error_detail).toBe(
 						'"jwk" (JSON Web Key) Header Parameter must be a public key'
 					);
 				}
 			});
 
 			it('no symmetric key in header', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.on('userinfo.error', spy);
-				await this.agent
-					.get('/me')
-					.set(
-						'DPoP',
-						await new SignJWT({})
+
+				const { error, headers } = await agent.userinfo.get({
+					headers: {
+						authorization: `DPoP ${access_token}`,
+						dpop: await new SignJWT({})
 							.setProtectedHeader({
 								alg: 'ES256',
 								jwk: await exportJWK(randomBytes(32)),
 								typ: 'dpop+jwt'
 							})
-							.sign(this.keypair.privateKey)
-					)
-					.set('Authorization', `DPoP ${this.access_token}`)
-					.expect(401)
-					.expect({
-						error: 'invalid_dpop_proof',
-						error_description: 'invalid DPoP key binding'
-					})
-					.expect('WWW-Authenticate', /^DPoP /)
-					.expect('WWW-Authenticate', /error="invalid_dpop_proof"/)
-					.expect('WWW-Authenticate', /algs="ES256 PS256"/);
+							.sign(keypair.privateKey)
+					}
+				});
+				expect(error.status).toBe(401);
+				expect(error.value).toEqual({
+					error: 'invalid_dpop_proof',
+					error_description: 'invalid DPoP key binding'
+				});
+				expect(headers.get('www-authenticate')).toMatch(/^DPoP /);
+				expect(headers.get('www-authenticate')).toMatch(
+					/error="invalid_dpop_proof"/
+				);
+				expect(headers.get('www-authenticate')).toMatch(/algs="ES256 PS256"/);
 
-				for (const {
-					args: [, err]
-				} of spy.getCalls()) {
-					expect(err.error_detail).to.eql(
+				for (const [err] of spy.mock.calls) {
+					expect(err.error_detail).toBe(
 						'"jwk" (JSON Web Key) Header Parameter must be a public key'
 					);
 				}
 			});
 
 			it('missing jti', async function () {
-				await this.agent
-					.get('/me')
-					.set(
-						'DPoP',
-						await new SignJWT({
+				const { error, headers } = await agent.userinfo.get({
+					headers: {
+						authorization: `DPoP ${access_token}`,
+						dpop: await new SignJWT({
 							htm: 'POST',
-							htu: `${ISSUER}${this.suitePath('/me')}`
+							htu: `${ISSUER}/userinfo`
 						})
 							.setProtectedHeader({
 								alg: 'ES256',
 								typ: 'dpop+jwt',
-								jwk: this.jwk
+								jwk
 							})
 							.setIssuedAt()
-							.sign(this.keypair.privateKey)
-					)
-					.set('Authorization', `DPoP ${this.access_token}`)
-					.expect(401)
-					.expect({
-						error: 'invalid_dpop_proof',
-						error_description: 'DPoP proof must have a jti string property'
-					})
-					.expect('WWW-Authenticate', /^DPoP /)
-					.expect('WWW-Authenticate', /error="invalid_dpop_proof"/)
-					.expect('WWW-Authenticate', /algs="ES256 PS256"/);
+							.sign(keypair.privateKey)
+					}
+				});
+				expect(error.status).toBe(401);
+				expect(error.value).toEqual({
+					error: 'invalid_dpop_proof',
+					error_description: 'DPoP proof must have a jti string property'
+				});
+				expect(headers.get('www-authenticate')).toMatch(/^DPoP /);
+				expect(headers.get('www-authenticate')).toMatch(
+					/error="invalid_dpop_proof"/
+				);
+				expect(headers.get('www-authenticate')).toMatch(/algs="ES256 PS256"/);
 			});
 
 			it('htm mismatch', async function () {
-				await this.agent
-					.get('/me')
-					.set(
-						'DPoP',
-						await new SignJWT({
+				const { error, headers } = await agent.userinfo.get({
+					headers: {
+						authorization: `DPoP ${access_token}`,
+						dpop: await new SignJWT({
 							htm: 'POST',
-							htu: `${ISSUER}${this.suitePath('/me')}`,
-							ath: this.ath
+							htu: `${ISSUER}/userinfo`,
+							ath
 						})
 							.setProtectedHeader({
 								alg: 'ES256',
 								typ: 'dpop+jwt',
-								jwk: this.jwk
+								jwk
 							})
 							.setIssuedAt()
 							.setJti(randomUUID())
-							.sign(this.keypair.privateKey)
-					)
-					.set('Authorization', `DPoP ${this.access_token}`)
-					.expect(401)
-					.expect({
-						error: 'invalid_dpop_proof',
-						error_description: 'DPoP proof htm mismatch'
-					})
-					.expect('WWW-Authenticate', /^DPoP /)
-					.expect('WWW-Authenticate', /error="invalid_dpop_proof"/)
-					.expect('WWW-Authenticate', /algs="ES256 PS256"/);
+							.sign(keypair.privateKey)
+					}
+				});
+				expect(error.status).toBe(401);
+				expect(error.value).toEqual({
+					error: 'invalid_dpop_proof',
+					error_description: 'DPoP proof htm mismatch'
+				});
+				expect(headers.get('www-authenticate')).toMatch(/^DPoP /);
+				expect(headers.get('www-authenticate')).toMatch(
+					/error="invalid_dpop_proof"/
+				);
+				expect(headers.get('www-authenticate')).toMatch(/algs="ES256 PS256"/);
 			});
 
 			it('htu mismatch', async function () {
-				await this.agent
-					.get('/me')
-					.set(
-						'DPoP',
-						await new SignJWT({
+				const { error, headers } = await agent.userinfo.get({
+					headers: {
+						authorization: `DPoP ${access_token}`,
+						dpop: await new SignJWT({
 							htm: 'GET',
-							htu: `${ISSUER}${this.suitePath('/token')}`,
-							ath: this.ath
+							htu: `${ISSUER}/token`,
+							ath
 						})
 							.setProtectedHeader({
 								alg: 'ES256',
 								typ: 'dpop+jwt',
-								jwk: this.jwk
+								jwk
 							})
 							.setIssuedAt()
 							.setJti(randomUUID())
-							.sign(this.keypair.privateKey)
-					)
-					.set('Authorization', `DPoP ${this.access_token}`)
-					.expect(401)
-					.expect({
-						error: 'invalid_dpop_proof',
-						error_description: 'DPoP proof htu mismatch'
-					})
-					.expect('WWW-Authenticate', /^DPoP /)
-					.expect('WWW-Authenticate', /error="invalid_dpop_proof"/)
-					.expect('WWW-Authenticate', /algs="ES256 PS256"/);
+							.sign(keypair.privateKey)
+					}
+				});
+				expect(error.status).toBe(401);
+				expect(error.value).toEqual({
+					error: 'invalid_dpop_proof',
+					error_description: 'DPoP proof htu mismatch'
+				});
+				expect(headers.get('www-authenticate')).toMatch(/^DPoP /);
+				expect(headers.get('www-authenticate')).toMatch(
+					/error="invalid_dpop_proof"/
+				);
+				expect(headers.get('www-authenticate')).toMatch(/algs="ES256 PS256"/);
 			});
 
 			for (const enabled of [true, false]) {
 				describe(`with DPoP-Nonces ${enabled ? 'enabled' : 'disabled'}`, () => {
-					before(function () {
-						({ DPoPNonces: this.DPoPNonces } = i(provider));
-						if (enabled) {
-							i(provider).DPoPNonces = this.DPoPNonces;
-						} else {
-							i(provider).DPoPNonces = undefined;
-						}
+					beforeEach(function () {
+						DPoPNonces.enabling = enabled;
 					});
 
-					after(function () {
-						i(provider).DPoPNonces = this.DPoPNonces;
+					afterEach(function () {
+						DPoPNonces.enabling = true;
 					});
 
 					for (const offset of [301, -301]) {
 						it(`iat too ${offset > 0 ? 'far in the future' : 'old'}`, async function () {
-							await this.agent
-								.get('/me')
-								.set(
-									'DPoP',
-									await new SignJWT({
+							const { error, headers } = await agent.userinfo.get({
+								headers: {
+									authorization: `DPoP ${access_token}`,
+									dpop: await new SignJWT({
 										htm: 'GET',
-										htu: `${ISSUER}${this.suitePath('/me')}`,
-										ath: this.ath
+										htu: `${ISSUER}/userinfo`,
+										ath
 									})
 										.setProtectedHeader({
 											alg: 'ES256',
 											typ: 'dpop+jwt',
-											jwk: this.jwk
+											jwk
 										})
 										.setIssuedAt(epochTime() - 301)
 										.setJti(randomUUID())
-										.sign(this.keypair.privateKey)
-								)
-								.set('Authorization', `DPoP ${this.access_token}`)
-								.expect(401)
-								.expect('WWW-Authenticate', /^DPoP /)
-								.expect('WWW-Authenticate', /algs="ES256 PS256"/)
-								.expect(
-									'WWW-Authenticate',
-									/DPoP proof iat is not recent enough/
-								)
-								.expect(({ headers }) => {
-									if (enabled) {
-										expect(headers)
-											.to.have.property('dpop-nonce')
-											.that.matches(/^[\w-]{43}$/);
-										expect(headers)
-											.to.have.property('www-authenticate')
-											.that.matches(/error="use_dpop_nonce"/);
-										expect(headers)
-											.to.have.property('www-authenticate')
-											.that.matches(/use a DPoP nonce instead/);
-									} else {
-										expect(headers).not.to.have.property('dpop-nonce');
-										expect(headers)
-											.to.have.property('www-authenticate')
-											.that.matches(/error="invalid_dpop_proof"/);
-									}
-								});
+										.sign(keypair.privateKey)
+								}
+							});
+							expect(error.status).toBe(401);
+							expect(headers.get('www-authenticate')).toMatch(/^DPoP /);
+							expect(headers.get('www-authenticate')).toMatch(
+								/DPoP proof iat is not recent enough/
+							);
+							expect(headers.get('www-authenticate')).toMatch(
+								/algs="ES256 PS256"/
+							);
+
+							if (enabled) {
+								expect(headers.get('dpop-nonce')).toMatch(/^[\w-]{43}$/);
+								expect(headers.get('www-authenticate')).toMatch(
+									/error="use_dpop_nonce"/
+								);
+								expect(headers.get('www-authenticate')).toMatch(
+									/use a DPoP nonce instead/
+								);
+							} else {
+								expect(headers.has('dpop-nonce')).toBe(false);
+								expect(headers.get('www-authenticate')).toMatch(
+									/error="invalid_dpop_proof"/
+								);
+							}
 						});
 					}
 				});
@@ -573,7 +570,7 @@ describe('features.dPoP', async () => {
 			}));
 			expect(error?.status).toBe(401);
 			expect(error?.value).toEqual({
-				error: 'invalid_header_authorization',
+				error: 'invalid_dpop_proof',
 				error_description: 'DPoP proof ath mismatch'
 			});
 
@@ -1342,48 +1339,49 @@ describe('features.dPoP', async () => {
 		});
 	});
 
-	describe('client_credentials', () => {
-		it('binds the access token to the jwk', async function () {
-			const spy = sinon.spy();
-			provider.once('grant.success', spy);
+	it('client_credentials binds the access token to the jwk', async function () {
+		const spy = mock();
+		provider.once('grant.success', spy);
 
-			await this.agent
-				.post('/token')
-				.auth('client', 'secret')
-				.send({ grant_type: 'client_credentials' })
-				.set(
-					'DPoP',
-					await DPoP(keypair, {
+		const res = await agent.token.post(
+			{ grant_type: 'client_credentials' },
+			{
+				headers: {
+					...AuthorizationRequest.basicAuthHeader('client', 'secret'),
+					dpop: await DPoP(keypair, {
 						htu: `${ISSUER}/token`,
 						htm: 'POST'
 					})
-				)
-				.type('form')
-				.expect(200);
-
-			expect(spy).to.have.property('calledOnce', true);
-			const {
-				oidc: {
-					entities: { ClientCredentials }
 				}
-			} = spy.args[0][0];
-			expect(ClientCredentials).to.have.property('jkt', this.thumbprint);
-		});
+			}
+		);
+		expect(res.status).toBe(200);
+
+		expect(spy).toBeCalledTimes(1);
+		const {
+			oidc: {
+				entities: { ClientCredentials }
+			}
+		} = spy.mock.calls[0][0];
+		expect(ClientCredentials).toHaveProperty('jkt', thumbprint);
 	});
 
 	describe('status codes at the token endpoint', () => {
 		it('should be 400 for invalid_dpop_proof', async function () {
-			await this.agent
-				.post('/token')
-				.auth('client', 'secret')
-				.send({ grant_type: 'client_credentials' })
-				.set('DPoP', 'invalid')
-				.type('form')
-				.expect(400)
-				.expect({
-					error: 'invalid_dpop_proof',
-					error_description: 'invalid DPoP key binding'
-				});
+			const { error } = await agent.token.post(
+				{ grant_type: 'client_credentials' },
+				{
+					headers: {
+						...AuthorizationRequest.basicAuthHeader('client', 'secret'),
+						dpop: 'invalid'
+					}
+				}
+			);
+			expect(error.status).toBe(400);
+			expect(error.value).toEqual({
+				error: 'invalid_dpop_proof',
+				error_description: 'invalid DPoP key binding'
+			});
 		});
 	});
 

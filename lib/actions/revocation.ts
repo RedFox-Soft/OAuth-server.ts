@@ -15,7 +15,7 @@ const revokeable = new Set([
 ]);
 
 export default async function revocationAction(provider) {
-	await tokenAuth(ctx);
+	await tokenAuth(params, headers, ctx);
 	const PARAM_LIST = new Set(['token', 'token_type_hint']);
 	const { grantTypeHandlers } = instance(provider);
 
@@ -44,7 +44,6 @@ export default async function revocationAction(provider) {
 	return [
 		parseBody,
 		paramsMiddleware.bind(undefined, PARAM_LIST),
-		...tokenAuth,
 
 		async function validateTokenPresence(ctx, next) {
 			presence(ctx, 'token');

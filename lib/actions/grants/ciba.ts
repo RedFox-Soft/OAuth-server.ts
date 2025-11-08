@@ -5,7 +5,6 @@ import presence from '../../helpers/validate_presence.ts';
 import instance from '../../helpers/weak_cache.ts';
 import filterClaims from '../../helpers/filter_claims.ts';
 import revoke from '../../helpers/revoke.ts';
-import { dpopValidate, validateReplay } from '../../helpers/validate_dpop.js';
 import resolveResource from '../../helpers/resolve_resource.ts';
 import { IdToken } from 'lib/models/id_token.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
@@ -15,7 +14,7 @@ const { AuthorizationPending, ExpiredToken, InvalidGrant } = errors;
 
 export const gty = 'ciba';
 
-export const handler = async function cibaHandler(ctx) {
+export const handler = async function cibaHandler(ctx, dPoP) {
 	presence(ctx, 'auth_req_id');
 
 	if (ctx.oidc.params.authorization_details) {
@@ -34,8 +33,6 @@ export const handler = async function cibaHandler(ctx) {
 			resourceIndicators
 		}
 	} = instance(ctx.oidc.provider).configuration;
-
-	const dPoP = await dpopValidate(ctx);
 
 	const request = await ctx.oidc.provider.BackchannelAuthenticationRequest.find(
 		ctx.oidc.params.auth_req_id,
@@ -137,7 +134,6 @@ export const handler = async function cibaHandler(ctx) {
 		at.setThumbprint('x5t', cert);
 	}
 
-	await validateReplay(ctx.oidc.client.clientId, dPoP);
 	if (dPoP) {
 		at.setThumbprint('jkt', dPoP.thumbprint);
 	}

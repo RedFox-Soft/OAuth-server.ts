@@ -147,7 +147,7 @@ export const introspect = new Elysia().post(
 		ctx.oidc.params = body;
 		ctx.oidc.body = body;
 
-		await tokenAuth(ctx);
+		await tokenAuth(body, headers, ctx);
 
 		const { configuration } = instance(provider);
 		const {

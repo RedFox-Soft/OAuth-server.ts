@@ -12,13 +12,15 @@ import { ReplayDetection } from 'lib/models/replay_detection.js';
 
 export const DPOP_OK_WINDOW = 300;
 
-class InvalidDpopProof extends InvalidHeaderAuthorization {
-	message = 'invalid_dpop_proof';
+export class InvalidDpopProof extends InvalidHeaderAuthorization {
+	error = 'invalid_dpop_proof';
 	name = 'InvalidDpopProof';
+	status = 400;
 }
 export class UseDpopNonce extends InvalidHeaderAuthorization {
-	message = 'use_dpop_nonce';
+	error = 'use_dpop_nonce';
 	name = 'UseDpopNonce';
+	status = 400;
 }
 
 type options = {

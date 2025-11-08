@@ -10,12 +10,17 @@ import {
 	refreshTokenGrantParameters
 } from './grants/index.js';
 import { routeNames } from 'lib/consts/param_list.js';
+import {
+	dpopValidate,
+	setNonceHeader,
+	validateReplay
+} from 'lib/helpers/validate_dpop.js';
 
 const grantTypes = Array.from(grantStore.keys());
 
 export const tokenAction = new Elysia().post(
 	routeNames.token,
-	async ({ body, headers, route }) => {
+	async ({ body, headers, route, set }) => {
 		const ctx = {
 			headers,
 			_matchedRouteName: route
@@ -24,7 +29,10 @@ export const tokenAction = new Elysia().post(
 		ctx.oidc.params = body;
 		ctx.oidc.body = body;
 
-		await tokenAuth(ctx);
+		await tokenAuth(body, headers, ctx);
+		const dPoP = await dpopValidate(headers.dpop, { route });
+		setNonceHeader(set.headers, dPoP);
+		await validateReplay(ctx.oidc.client.clientId, dPoP);
 
 		const grantType = body.grant_type;
 		if (!ctx.oidc.client.grantTypeAllowed(grantType)) {
@@ -33,7 +41,7 @@ export const tokenAction = new Elysia().post(
 			);
 		}
 
-		return executeGrant(grantType, ctx);
+		return executeGrant(grantType, ctx, dPoP);
 	},
 	{
 		body: t.Composite([
@@ -50,7 +58,8 @@ export const tokenAction = new Elysia().post(
 			t.Partial(deviceCodeGrantParameters)
 		]),
 		headers: t.Object({
-			authorization: t.Optional(t.String())
+			authorization: t.Optional(t.String()),
+			dpop: t.Optional(t.String())
 		})
 	}
 );

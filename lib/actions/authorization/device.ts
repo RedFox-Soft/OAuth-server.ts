@@ -44,8 +44,8 @@ const BacckchannelRequest = t.Composite([
 	JWTparameters
 ]);
 
-async function authentication(ctx) {
-	await tokenAuth(ctx);
+async function authentication(params, headers, ctx) {
+	await tokenAuth(params, headers, ctx);
 
 	if (!ctx.body.client_id) {
 		ctx.body.client_id = ctx.oidc.client.clientId;
@@ -72,36 +72,39 @@ export const deviceAuth = new Elysia()
 	.resolve(({ body }) => {
 		featureVerification(body);
 	})
-	.post(routeNames.device_authorization, async ({ body, server, request }) => {
-		const ctx = { body };
-		ctx.oidc = new OIDCContext(ctx);
-		ctx.oidc.params = { ...body };
+	.post(
+		routeNames.device_authorization,
+		async ({ body, headers, server, request }) => {
+			const ctx = { body };
+			ctx.oidc = new OIDCContext(ctx);
+			ctx.oidc.params = { ...body };
 
-		await authentication(ctx);
-		await checkClient(ctx);
-		const client = ctx.oidc.client;
-		if (!client.grantTypeAllowed(deviceAuthGrantType)) {
-			throw new InvalidRequest(
-				`${deviceAuthGrantType} is not allowed for this client`
-			);
+			await authentication(body, headers, ctx);
+			await checkClient(ctx);
+			const client = ctx.oidc.client;
+			if (!client.grantTypeAllowed(deviceAuthGrantType)) {
+				throw new InvalidRequest(
+					`${deviceAuthGrantType} is not allowed for this client`
+				);
+			}
+			await processRequestObject(DeviceRequest, ctx, {
+				clientAlg: client.requestObjectSigningAlg
+			});
+			assignDefaults(ctx);
+			checkScope(new Set(), ctx);
+			checkOpenidScope(ctx);
+			await checkClaims(ctx);
+			unsupportedRar(ctx);
+			await checkResource(ctx);
+			checkMaxAge(ctx);
+			await checkIdTokenHint(ctx);
+			const deviceInfo = {
+				ip: server?.requestIP(request),
+				ua: request.headers.get('user-agent')
+			};
+			return deviceAuthorizationResponse(ctx, deviceInfo);
 		}
-		await processRequestObject(DeviceRequest, ctx, {
-			clientAlg: client.requestObjectSigningAlg
-		});
-		assignDefaults(ctx);
-		checkScope(new Set(), ctx);
-		checkOpenidScope(ctx);
-		await checkClaims(ctx);
-		unsupportedRar(ctx);
-		await checkResource(ctx);
-		checkMaxAge(ctx);
-		await checkIdTokenHint(ctx);
-		const deviceInfo = {
-			ip: server?.requestIP(request),
-			ua: request.headers.get('user-agent')
-		};
-		return deviceAuthorizationResponse(ctx, deviceInfo);
-	});
+	);
 
 export const backchannelAuth = new Elysia()
 	.guard({

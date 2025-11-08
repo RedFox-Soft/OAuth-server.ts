@@ -4,7 +4,9 @@ import instance from '../helpers/weak_cache.ts';
 import filterClaims from '../helpers/filter_claims.ts';
 import {
 	dpopValidate,
+	InvalidDpopProof,
 	setNonceHeader,
+	UseDpopNonce,
 	validateReplay
 } from '../helpers/validate_dpop.js';
 import { InvalidToken, InsufficientScope } from '../helpers/errors.ts';
@@ -35,11 +37,19 @@ export const userinfo = new Elysia()
 		const accessTokenId = ctx.oidc.getAccessToken({
 			acceptDPoP: true
 		});
-		const dPoP = await dpopValidate(headers.dpop, {
-			accessTokenId,
-			method: 'GET',
-			route: routeNames.userinfo
-		});
+		let dPoP = null;
+		try {
+			dPoP = await dpopValidate(headers.dpop, {
+				accessTokenId,
+				method: 'GET',
+				route: routeNames.userinfo
+			});
+		} catch (err) {
+			if (err instanceof UseDpopNonce || err instanceof InvalidDpopProof) {
+				err.status = 401;
+				throw err;
+			}
+		}
 		setNonceHeader(set.headers, dPoP);
 
 		const accessToken = await AccessToken.find(accessTokenId);
