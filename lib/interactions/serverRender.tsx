@@ -1,7 +1,7 @@
 import { renderToString } from 'react-dom/server';
 import React, { StrictMode } from 'react';
-import { LoginPage } from './loginPage.tsx';
-import { ConsentPage } from './consentPage.tsx';
+import { LoginPage } from './loginPage.js';
+import { ConsentPage } from './consentPage.js';
 
 export const loginServer = (uid: string) => {
 	return renderToString(
@@ -14,7 +14,11 @@ export const loginServer = (uid: string) => {
 export const consentServer = (uid: string) => {
 	return renderToString(
 		<StrictMode>
-			<ConsentPage uid={uid} />
+			<ConsentPage
+				uid={uid}
+				clientName={''}
+				scopes={[]}
+			/>
 		</StrictMode>
 	);
-}
+};

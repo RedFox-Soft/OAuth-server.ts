@@ -14,6 +14,7 @@ import bootstrap, { agent, jsonToFormUrlEncoded } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { provider } from 'lib/provider.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
+import { Interaction } from 'lib/models/interaction.js';
 
 const route = '/auth';
 const expire = new Date();
@@ -252,7 +253,7 @@ expire.setDate(expire.getDate() + 1);
 					async function setupFun(auth, result) {
 						const cookies = [];
 
-						const sess = new provider.Interaction('resume', {
+						const sess = new Interaction('resume', {
 							uid: 'resume',
 							cookieID: 'cookieID'
 						});

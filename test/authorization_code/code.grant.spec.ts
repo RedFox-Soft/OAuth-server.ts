@@ -267,13 +267,14 @@ describe('grant_type=authorization_code', () => {
 				.stub(i(provider).configuration, 'findAccount')
 				.callsFake(() => Promise.resolve());
 
-			const spy = sinon.spy();
+			const spy = mock();
 			provider.on('grant.error', spy);
 
 			const { error } = await auth.getToken(code);
 			expect(error.status).toBe(400);
-			expect(spy.calledOnce).toBe(true);
-			expect(errorDetail(spy)).toBe(
+			expect(spy).toBeCalledTimes(1);
+			const err = spy.mock.calls[0][0];
+			expect(err.error_detail).toBe(
 				'authorization code invalid (referenced account not found)'
 			);
 			expect(error.value).toHaveProperty('error', 'invalid_grant');

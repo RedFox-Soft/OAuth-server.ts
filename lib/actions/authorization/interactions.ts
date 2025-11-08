@@ -6,6 +6,7 @@ import nanoid from '../../helpers/nanoid.ts';
 import omitBy from '../../helpers/_/omit_by.ts';
 import { cookieNames } from 'lib/consts/param_list.js';
 import { ttl } from 'lib/configs/liveTime.js';
+import { Interaction } from 'lib/models/interaction.js';
 
 export default async function interactions(resumeRouteName, ctx) {
 	const { oidc } = ctx;
@@ -73,7 +74,7 @@ export default async function interactions(resumeRouteName, ctx) {
 	const cookieID = nanoid();
 
 	const returnTo = oidc.urlFor(resumeRouteName, { uid });
-	const interactionSession = new oidc.provider.Interaction(uid, {
+	const interactionSession = new Interaction(uid, {
 		returnTo,
 		prompt,
 		cookieID,

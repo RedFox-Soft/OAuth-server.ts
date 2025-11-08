@@ -11,6 +11,7 @@ import { provider } from 'lib/provider.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { DeviceCode } from 'lib/models/device_code.js';
+import { Interaction } from 'lib/models/interaction.js';
 
 const sinon = createSandbox();
 const { any } = sinon.match;
@@ -50,7 +51,7 @@ describe('device interaction resume /device/:uid/', () => {
 			userCode
 		}).save();
 
-		const interaction = new provider.Interaction(uid, {
+		const interaction = new Interaction(uid, {
 			uid,
 			session,
 			deviceCode
@@ -149,7 +150,7 @@ describe('device interaction resume /device/:uid/', () => {
 
 				await setup.call(this, auth);
 
-				sinon.stub(provider.Interaction, 'find').resolves();
+				sinon.stub(Interaction, 'find').resolves();
 
 				await this.agent
 					.get(path)
@@ -483,7 +484,7 @@ describe('device interaction resume /device/:uid/', () => {
 					})
 					.expect(/<form method="post" action=".+\/session\/end\/confirm">/);
 
-				expect(await provider.Interaction.find(uid)).to.be.ok;
+				expect(await Interaction.find(uid)).to.be.ok;
 
 				await this.agent
 					.post('/session/end/confirm')

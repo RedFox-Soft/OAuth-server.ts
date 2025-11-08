@@ -1,5 +1,3 @@
-import cors from '@koa/cors';
-
 import { InvalidRequest } from '../helpers/errors.ts';
 import instance from '../helpers/weak_cache.ts';
 

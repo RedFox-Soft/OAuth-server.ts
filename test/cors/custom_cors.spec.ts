@@ -1,5 +1,4 @@
 import { expect } from 'chai';
-import cors from '@koa/cors';
 
 import bootstrap from '../test_helper.js';
 

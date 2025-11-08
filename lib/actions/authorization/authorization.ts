@@ -24,7 +24,7 @@ import interactions from './interactions.ts';
 import respond from './respond.ts';
 import interactionEmit from './interaction_emit.ts';
 import checkOpenidScope from './check_openid_scope.ts';
-import { tokenAuth } from '../../shared/token_auth.ts';
+import { authHeaders, authParams, tokenAuth } from '../../shared/token_auth.ts';
 import stripOutsideJarParams from './strip_outside_jar_params.ts';
 import pushedAuthorizationRequestRemapErrors from './pushed_authorization_request_remap_errors.ts';
 import pushedAuthorizationRequestResponse from './pushed_authorization_request_response.ts';
@@ -211,15 +211,9 @@ export const par = new Elysia()
 	.guard({
 		body: t.Composite([
 			t.Omit(AuthorizationParameters, ['request_uri', 'client_id']),
-			t.Object({
-				client_id: t.Optional(t.String()),
-				client_secret: t.Optional(t.String())
-			})
+			authParams
 		]),
-		headers: t.Object({
-			authorization: t.Optional(t.String()),
-			dpop: t.Optional(t.String())
-		})
+		headers: authHeaders
 	})
 	.resolve(({ body }) => {
 		featureVerification(body);

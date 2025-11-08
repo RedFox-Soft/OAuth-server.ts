@@ -11,7 +11,7 @@ function calculateUid() {
 
 function pageName() {
 	const url = new URL(window.location.href);
-	const [,, name] = url.pathname.split('/');
+	const [, , name] = url.pathname.split('/');
 	return name;
 }
 
@@ -22,7 +22,11 @@ hydrateRoot(
 		{pageName() === 'login' ? (
 			<LoginPage uid={calculateUid()} />
 		) : (
-			<ConsentPage uid={calculateUid()} />
+			<ConsentPage
+				uid={calculateUid()}
+				clientName={''}
+				scopes={[]}
+			/>
 		)}
 	</StrictMode>
 );

@@ -16,15 +16,13 @@ import { provider } from 'lib/index.js';
 import { Session } from 'lib/models/session.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { TestAdapter } from 'test/models.js';
+import { Interaction } from 'lib/models/interaction.js';
 
 const expire = new Date();
 expire.setDate(expire.getDate() + 1);
 
-describe('devInteractions', () => {
-	let setup = null;
-	beforeAll(async function () {
-		setup = await bootstrap(import.meta.url)();
-	});
+describe('devInteractions', async () => {
+	const setup = await bootstrap(import.meta.url)();
 	afterEach(function () {
 		sinon.restore();
 	});
@@ -36,13 +34,12 @@ describe('devInteractions', () => {
 			const auth = new AuthorizationRequest({
 				scope: 'openid'
 			});
-
 			const { response } = await agent.auth.get({
 				query: auth.params
 			});
 
 			const url = response.headers.get('location');
-			const [,, uid] = url.split('/');
+			const [, , uid] = url.split('/');
 
 			object.cookie = response.headers.get('set-cookie');
 			object.uid = uid;
@@ -51,7 +48,7 @@ describe('devInteractions', () => {
 
 		it('with a form', async function () {
 			const uid = object.uid;
-			const { data , error} = await agent.ui[uid].login.get({
+			const { data } = await agent.ui[uid].login.get({
 				headers: {
 					cookie: object.cookie
 				}
@@ -72,7 +69,7 @@ describe('devInteractions', () => {
 		});
 
 		it('"handles" not found interaction session', async function () {
-			sinon.stub(provider.Interaction, 'find').resolves();
+			sinon.stub(Interaction, 'find').resolves();
 
 			const { error } = await agent.ui[object.uid].login.get({
 				headers: {
@@ -86,11 +83,13 @@ describe('devInteractions', () => {
 		});
 	});
 
-	describe.skip('render interaction', () => {
+	describe('render interaction', () => {
 		let uid = null;
+		let cookie = null;
+		let url = null;
 
 		beforeEach(async function () {
-			const cookie = setup.login();
+			const login = setup.login();
 			const auth = new AuthorizationRequest({
 				scope: 'openid',
 				prompt: 'consent'
@@ -99,15 +98,21 @@ describe('devInteractions', () => {
 			const { response } = await agent.auth.get({
 				query: auth.params,
 				headers: {
-					cookie
+					cookie: login
 				}
 			});
-			const url = response.headers.get('location');
-			[,, uid] = url.split('/');
+			cookie = response.headers.get('set-cookie');
+			url = response.headers.get('location');
+			[, , uid] = url.split('/');
 		});
 
 		it('with a form', async function () {
-			const { data } = await agent.ui[uid].login.get();
+			const { data } = await agent.ui[uid].consent.get({
+				headers: {
+					cookie
+				}
+			});
+			console.log(data);
 
 			return agent
 				.get(url)
@@ -380,7 +385,7 @@ describe('resume after consent', () => {
 		} else {
 			session = setup.getLastSession();
 		}
-		const interaction = new provider.Interaction('resume', {
+		const interaction = new Interaction('resume', {
 			uid: 'resume',
 			params: grant,
 			session
@@ -431,7 +436,7 @@ describe('resume after consent', () => {
 
 			await setupFunc.call(this, auth);
 
-			sinon.stub(provider.Interaction, 'find').resolves();
+			sinon.stub(Interaction, 'find').resolves();
 
 			return this.agent
 				.get('/auth/resume')
@@ -563,7 +568,7 @@ describe('resume after consent', () => {
 				})
 				.expect(/<form method="post" action=".+\/session\/end\/confirm">/);
 
-			expect(await provider.Interaction.find('resume')).to.be.ok;
+			expect(await Interaction.find('resume')).to.be.ok;
 
 			await this.agent
 				.post('/session/end/confirm')

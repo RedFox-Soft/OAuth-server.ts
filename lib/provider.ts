@@ -25,8 +25,6 @@ class ProviderClass extends EventEmitter {
 
 	#InitialAccessToken;
 
-	#Interaction;
-
 	#RegistrationAccessToken;
 
 	#int = {};
@@ -179,11 +177,6 @@ class ProviderClass extends EventEmitter {
 	get Grant() {
 		this.#Grant ||= models.getGrant(this);
 		return this.#Grant;
-	}
-
-	get Interaction() {
-		this.#Interaction ||= models.getInteraction(this);
-		return this.#Interaction;
 	}
 
 	get ClientCredentials() {

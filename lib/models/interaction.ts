@@ -1,80 +1,79 @@
-import epochTime from '../helpers/epoch_time.ts';
+import epochTime from '../helpers/epoch_time.js';
 import { BaseModel } from './base_model.js';
 
-export default (provider) =>
-	class Interaction extends BaseModel {
-		constructor(jti, payload) {
-			if (arguments.length === 2) {
-				if (payload.session instanceof BaseModel) {
-					const { session } = payload;
-					Object.assign(
-						payload,
-						session.accountId
-							? {
-									session: {
-										accountId: session.accountId,
-										...(session.uid ? { uid: session.uid } : undefined),
-										...(session.jti ? { cookie: session.jti } : undefined),
-										...(session.acr ? { acr: session.acr } : undefined),
-										...(session.amr ? { amr: session.amr } : undefined)
-									}
+export class Interaction extends BaseModel {
+	constructor(jti: string, payload: Record<string, unknown>) {
+		if (arguments.length === 2) {
+			if (payload.session instanceof BaseModel) {
+				const { session } = payload;
+				Object.assign(
+					payload,
+					session.accountId
+						? {
+								session: {
+									accountId: session.accountId,
+									...(session.uid ? { uid: session.uid } : undefined),
+									...(session.jti ? { cookie: session.jti } : undefined),
+									...(session.acr ? { acr: session.acr } : undefined),
+									...(session.amr ? { amr: session.amr } : undefined)
 								}
-							: { session: undefined }
-					);
-				}
-
-				if (payload.grant instanceof BaseModel) {
-					const { grant } = payload;
-					if (grant.jti) {
-						Object.assign(payload, { grantId: grant.jti });
-					}
-				}
-
-				super({ jti, ...payload });
-			} else {
-				super(jti);
-			}
-		}
-
-		get uid() {
-			return this.jti;
-		}
-
-		set uid(value) {
-			this.jti = value;
-		}
-
-		async save(ttl) {
-			if (typeof ttl !== 'number') {
-				throw new TypeError('"ttl" argument must be a number');
-			}
-			return super.save(ttl);
-		}
-
-		async persist() {
-			if (typeof this.exp !== 'number') {
-				throw new TypeError(
-					'persist can only be called on previously persisted Interactions'
+							}
+						: { session: undefined }
 				);
 			}
-			return this.save(this.exp - epochTime());
-		}
 
-		static get IN_PAYLOAD() {
-			return [
-				...super.IN_PAYLOAD,
-				'cookieID',
-				'session',
-				'params',
-				'prompt',
-				'result',
-				'returnTo',
-				'trusted',
-				'grantId',
-				'lastSubmission',
-				'deviceCode',
-				'cid',
-				'parJti'
-			];
+			if (payload.grant instanceof BaseModel) {
+				const { grant } = payload;
+				if (grant.jti) {
+					Object.assign(payload, { grantId: grant.jti });
+				}
+			}
+
+			super({ jti, ...payload });
+		} else {
+			super(jti);
 		}
-	};
+	}
+
+	get uid() {
+		return this.jti;
+	}
+
+	set uid(value) {
+		this.jti = value;
+	}
+
+	async save(ttl) {
+		if (typeof ttl !== 'number') {
+			throw new TypeError('"ttl" argument must be a number');
+		}
+		return super.save(ttl);
+	}
+
+	async persist() {
+		if (typeof this.exp !== 'number') {
+			throw new TypeError(
+				'persist can only be called on previously persisted Interactions'
+			);
+		}
+		return this.save(this.exp - epochTime());
+	}
+
+	static get IN_PAYLOAD() {
+		return [
+			...super.IN_PAYLOAD,
+			'cookieID',
+			'session',
+			'params',
+			'prompt',
+			'result',
+			'returnTo',
+			'trusted',
+			'grantId',
+			'lastSubmission',
+			'deviceCode',
+			'cid',
+			'parJti'
+		];
+	}
+}

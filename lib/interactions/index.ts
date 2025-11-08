@@ -2,7 +2,7 @@ import { Elysia, t } from 'elysia';
 import { provider } from 'lib/provider.js';
 import { consentServer, loginServer } from './serverRender.js';
 import { SessionNotFound } from 'lib/helpers/errors.js';
-import epochTime from '../helpers/epoch_time.ts';
+import epochTime from '../helpers/epoch_time.js';
 import sessionHandler from 'lib/shared/session.js';
 import respond from 'lib/actions/authorization/respond.js';
 import getResume from 'lib/actions/authorization/resume.js';
@@ -20,6 +20,7 @@ import {
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { Session } from 'lib/models/session.js';
 import { DeviceCode } from 'lib/models/device_code.js';
+import { Interaction } from 'lib/models/interaction.js';
 
 const htmlTeamplate = Bun.file('./lib/interactions/htmlTeamplate.html');
 
@@ -36,7 +37,7 @@ export const ui = new Elysia()
 	})
 	.resolve(async ({ cookie, params }) => {
 		const cookieId = cookie._interaction.value;
-		const interaction = await provider.Interaction.find(params.uid);
+		const interaction = await Interaction.find(params.uid);
 		if (!interaction) {
 			throw new SessionNotFound('interaction session not found');
 		}
@@ -74,7 +75,7 @@ export const ui = new Elysia()
 				'Content-Type': 'text/html; charset=utf-8'
 			}
 		});
-	} )
+	})
 	.get('ui/:uid/abort', async ({ interaction }) => {
 		interaction.result = {
 			error: 'access_denied',
