@@ -1,6 +1,6 @@
 import { Elysia, t } from 'elysia';
 import { InvalidRequest } from '../helpers/errors.ts';
-import { tokenAuth, authParams } from '../shared/token_auth.js';
+import { tokenAuth, authParams, authHeaders } from '../shared/token_auth.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import {
 	codeGrantParameters,
@@ -57,9 +57,6 @@ export const tokenAction = new Elysia().post(
 			t.Partial(refreshTokenGrantParameters),
 			t.Partial(deviceCodeGrantParameters)
 		]),
-		headers: t.Object({
-			authorization: t.Optional(t.String()),
-			dpop: t.Optional(t.String())
-		})
+		headers: authHeaders
 	}
 );

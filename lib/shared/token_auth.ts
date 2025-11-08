@@ -19,6 +19,11 @@ export const authParams = t.Object({
 	client_secret: t.Optional(t.String())
 });
 
+export const authHeaders = t.Object({
+	authorization: t.Optional(t.String()),
+	dpop: t.Optional(t.String())
+});
+
 type authParamsType = Record<string, unknown> & Static<typeof authParams>;
 
 // see https://tools.ietf.org/html/rfc6749#appendix-B

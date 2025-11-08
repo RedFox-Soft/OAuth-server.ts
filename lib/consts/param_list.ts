@@ -63,16 +63,18 @@ export const AuthorizationParameters = t.Object({
 	dpop_jkt: t.Optional(t.String())
 });
 
-export const DeviceAuthorizationParameters = t.Omit(AuthorizationParameters, [
-	'response_type',
-	'response_mode',
-	'code_challenge_method',
-	'code_challenge',
-	'state',
-	'redirect_uri',
-	'prompt',
-	'request_uri'
-]);
+export const DeviceAuthorizationParameters = t.Partial(
+	t.Omit(AuthorizationParameters, [
+		'response_type',
+		'response_mode',
+		'code_challenge_method',
+		'code_challenge',
+		'state',
+		'redirect_uri',
+		'prompt',
+		'request_uri'
+	])
+);
 
 export const JWTparameters = t.Object({
 	jti: t.String(),

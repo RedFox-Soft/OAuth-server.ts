@@ -1,7 +1,6 @@
 import checkResource from '../../shared/check_resource.ts';
-import { tokenAuth } from '../../shared/token_auth.ts';
+import { authHeaders, authParams, tokenAuth } from '../../shared/token_auth.ts';
 
-import checkClient from './check_client.ts';
 import processRequestObject, {
 	isEncryptedJWT
 } from './process_request_object.ts';
@@ -49,6 +48,7 @@ async function authentication(params, headers, ctx) {
 
 	if (!ctx.body.client_id) {
 		ctx.body.client_id = ctx.oidc.client.clientId;
+		ctx.oidc.params.client_id = ctx.oidc.client.clientId;
 	}
 }
 
@@ -58,7 +58,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 export const deviceAuth = new Elysia()
 	.guard({
-		body: DeviceAuthorizationParameters
+		body: t.Composite([authParams, DeviceAuthorizationParameters]),
+		headers: authHeaders
 	})
 	.derive(({ body }) => {
 		if (
@@ -80,7 +81,6 @@ export const deviceAuth = new Elysia()
 			ctx.oidc.params = { ...body };
 
 			await authentication(body, headers, ctx);
-			await checkClient(ctx);
 			const client = ctx.oidc.client;
 			if (!client.grantTypeAllowed(deviceAuthGrantType)) {
 				throw new InvalidRequest(
