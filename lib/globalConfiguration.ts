@@ -130,10 +130,6 @@ async function userCodeInputSource(ctx, form, out, err) {
     </html>`;
 }
 
-function requireNonce(ctx) {
-	return false;
-}
-
 async function userCodeConfirmSource(ctx, form, client, deviceInfo, userCode) {
 	// @param ctx - koa request context
 	// @param form - form source (id="op.deviceConfirmForm") to be embedded in the page and
@@ -772,38 +768,6 @@ export const globalConfiguration = {
 		 * users.
 		 */
 		devInteractions: { enabled: true },
-
-		/*
-		 * features.dPoP
-		 *
-		 * title: [`RFC9449`](https://www.rfc-editor.org/rfc/rfc9449.html) - OAuth 2.0 Demonstration of Proof-of-Possession at the Application Layer (`DPoP`)
-		 *
-		 * description: Enables `DPoP` - mechanism for sender-constraining tokens via a
-		 * proof-of-possession mechanism on the application level.
-		 */
-		dPoP: {
-			enabled: true,
-
-			/**
-			 * features.dPoP.nonceSecret
-			 *
-			 * description: A secret value used for generating server-provided DPoP nonces.
-			 * Must be a 32-byte length Buffer instance when provided.
-			 */
-			nonceSecret: undefined,
-			/**
-			 * features.dPoP.requireNonce
-			 *
-			 * description: Function used to determine whether a DPoP nonce is required or not.
-			 */
-			requireNonce,
-			/**
-			 * features.dPoP.allowReplay
-			 *
-			 * description: Controls whether DPoP Proof Replay Detection is used or not.
-			 */
-			allowReplay: false
-		},
 
 		/*
 		 * features.backchannelLogout

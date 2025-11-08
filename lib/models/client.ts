@@ -375,7 +375,7 @@ export class Client {
 			...metadata
 		};
 		if (!Value.Check(ClientSchema, clientMetadata)) {
-			console.log(
+			console.error(
 				[...Value.Errors(ClientSchema, clientMetadata)]
 					.map(({ message, path }) => `${path} ${message}`.trim())
 					.join(', ')

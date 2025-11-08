@@ -40,7 +40,7 @@ export async function dpopValidate(
 	const dPoPInstance = DPoPNonces.fabrica();
 	const requireNonce = config['dpop.requireNonce'];
 	if (requireNonce && !dPoPInstance) {
-		throw new Error('features.dPoP.nonceSecret configuration is missing');
+		throw new Error('dpop.nonceSecret configuration is missing');
 	}
 
 	let payload;
@@ -138,7 +138,7 @@ export function setNonceHeader(
 
 	const dPoPInstance = DPoPNonces.fabrica();
 	if (!dPoPInstance) {
-		throw new Error('features.dPoP.nonceSecret configuration is missing');
+		throw new Error('dpop.nonceSecret configuration is missing');
 	}
 	if (dPoP.nonce !== dPoPInstance.nextNonce()) {
 		headers['DPoP-Nonce'] = dPoPInstance.nextNonce();

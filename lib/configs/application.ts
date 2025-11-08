@@ -34,7 +34,7 @@ export const ApplicationConfig = {
 	/**
 	 * features.dPoP.requireNonce
 	 *
-	 * description: Function used to determine whether a DPoP nonce is required or not.
+	 * description: Determine whether a DPoP nonce is required or not.
 	 */
 	'dpop.requireNonce': false,
 	/**

@@ -133,7 +133,7 @@ export async function errorHandler(obj: ErrorContext) {
 	if (isOIDError && error instanceof UseDpopNonce) {
 		const dPoPInstance = DPoPNonces.fabrica();
 		if (!dPoPInstance) {
-			throw new Error('features.dPoP.nonceSecret configuration is missing');
+			throw new Error('dpop.nonceSecret configuration is missing');
 		}
 		set.headers['DPoP-Nonce'] = dPoPInstance.nextNonce();
 	}

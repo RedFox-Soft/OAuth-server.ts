@@ -131,9 +131,7 @@ export default function getSchema(provider) {
 		}
 	}
 
-	if (features.dPoP.enabled) {
-		RECOGNIZED_METADATA.push('dpop_bound_access_tokens');
-	}
+	RECOGNIZED_METADATA.push('dpop_bound_access_tokens');
 
 	if (features.richAuthorizationRequests.enabled) {
 		RECOGNIZED_METADATA.push('authorization_details_types');

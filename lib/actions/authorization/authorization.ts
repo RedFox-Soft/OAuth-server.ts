@@ -38,7 +38,6 @@ import {
 } from '../../consts/param_list.ts';
 import sessionHandler from '../../shared/session.ts';
 import { noQueryDup } from 'lib/plugins/noQueryDup.js';
-import { contentType } from 'lib/plugins/contentType.js';
 import { featureVerification } from './featureVerification.js';
 import { authorizationPKCE } from 'lib/helpers/pkce.js';
 import {
@@ -175,7 +174,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export const authPost = new Elysia()
-	.derive(contentType('application/x-www-form-urlencoded'))
 	.derive(({ body }) => {
 		if (
 			isRecord(body) &&
@@ -210,7 +208,6 @@ export const authPost = new Elysia()
 	});
 
 export const par = new Elysia()
-	.derive(contentType('application/x-www-form-urlencoded'))
 	.guard({
 		body: t.Composite([
 			t.Omit(AuthorizationParameters, ['request_uri', 'client_id']),

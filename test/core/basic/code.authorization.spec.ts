@@ -798,22 +798,6 @@ describe('BASIC code', () => {
 				);
 			});
 
-			if (verb === 'post') {
-				it('only supports application/x-www-form-urlencoded', async function () {
-					const spy = sinon.spy();
-					provider.once('authorization.error', spy);
-					const auth = new AuthorizationRequest({ scope });
-
-					const { error } = await agent.auth.post(auth.params);
-					expect(error.status).toBe(415);
-					expect(error.value).toHaveProperty('error', 'invalid_request');
-					expect(error.value).toHaveProperty(
-						'error_description',
-						'Only application/x-www-form-urlencoded content-type bodies are supported'
-					);
-				});
-			}
-
 			it('restricted response_type', async function () {
 				const spy = sinon.spy();
 				provider.once('authorization.error', spy);

@@ -2,7 +2,7 @@ import { InvalidRequest, InvalidClientAuth } from '../helpers/errors.ts';
 import * as JWT from '../helpers/jwt.ts';
 import instance from '../helpers/weak_cache.ts';
 import certificateThumbprint from '../helpers/certificate_thumbprint.ts';
-import { noVSCHAR } from '../consts/client_attributes.ts';
+import { noVSCHAR } from '../consts/client_attributes.js';
 
 import { tokenJwtAuth } from './token_jwt_auth.js';
 import { Client } from 'lib/models/client.js';

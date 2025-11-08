@@ -48,9 +48,7 @@ export class DPoPNonces {
 
 	constructor(secret: Buffer) {
 		if (!Buffer.isBuffer(secret) || secret.byteLength !== 32) {
-			throw new TypeError(
-				'features.dPoP.nonceSecret must be a 32-byte Buffer instance'
-			);
+			throw new TypeError('dpop.nonceSecret must be a 32-byte Buffer instance');
 		}
 
 		this.#secret = Uint8Array.prototype.slice.call(secret);

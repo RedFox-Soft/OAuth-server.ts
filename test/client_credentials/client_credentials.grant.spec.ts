@@ -25,7 +25,6 @@ describe('grant_type=client_credentials', () => {
 		);
 		expect(status).toBe(200);
 		expect(spy).toBeCalledTimes(1);
-		console.log(data);
 		['access_token', 'expires_in', 'token_type', 'scope'].forEach((prop) =>
 			expect(data).toHaveProperty(prop)
 		);

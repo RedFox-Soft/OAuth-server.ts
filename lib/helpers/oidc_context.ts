@@ -3,6 +3,7 @@ import instance from './weak_cache.ts';
 import { routeNames } from '../consts/param_list.ts';
 import { provider } from '../provider.js';
 import { isPlainObject } from './_/object.js';
+import { ApplicationConfig as config } from 'lib/configs/application.js';
 
 export class OIDCContext {
 	#requestParamClaims = null;
@@ -189,11 +190,7 @@ export class OIDCContext {
 			return this.#accessToken;
 		}
 
-		const {
-			features: { dPoP: dPoPConfig }
-		} = instance(provider).configuration;
-		const dpop = acceptDPoP && dPoPConfig.enabled && this.ctx.headers.dpop;
-
+		const dpop = acceptDPoP && config['dpop.enabled'] && this.ctx.headers.dpop;
 		const header = this.ctx.headers.authorization;
 		const parts = header.split(' ');
 

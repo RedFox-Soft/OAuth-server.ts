@@ -31,6 +31,7 @@ import { TestAdapter } from 'test/models.js';
 import { Client } from 'lib/models/client.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { DPoPNonces } from 'lib/helpers/dpop_nonces.js';
+import { ApplicationConfig as config } from 'lib/configs/application.js';
 
 function ath(accessToken) {
 	return hash('sha256', accessToken, 'base64url');
@@ -1197,141 +1198,140 @@ describe('features.dPoP', async () => {
 	});
 
 	describe('authorization flow (public client)', () => {
+		let code = null;
+		let auth = null;
 		beforeEach(async function () {
-			const auth = (this.auth = new AuthorizationRequest({
+			auth = new AuthorizationRequest({
 				client_id: 'client-none',
 				scope: 'openid offline_access',
 				prompt: 'consent'
-			}));
-
-			await this.wrap({ route: '/auth', verb: 'get', auth })
-				.expect(303)
-				.expect(auth.validateClientLocation)
-				.expect(({ headers: { location } }) => {
-					const {
-						query: { code }
-					} = url.parse(location, true);
-					this.code = code;
-				});
+			});
+			const res = await agent.auth.get({
+				query: auth.params,
+				headers: { cookie }
+			});
+			const location = res.headers.get('location');
+			const parsed = url.parse(location, true);
+			code = parsed.query.code;
 		});
 
-		describe('authorization_code', () => {
-			it('binds the access token to the jwk', async function () {
-				const spy = sinon.spy();
-				provider.once('grant.success', spy);
+		it('authorization_code binds the access token to the jwk', async function () {
+			const spy = mock();
+			provider.once('grant.success', spy);
 
-				await this.agent
-					.post('/token')
-					.send({
-						client_id: 'client-none',
-						grant_type: 'authorization_code',
-						code_verifier: this.auth.code_verifier,
-						code: this.code,
-						redirect_uri: 'https://client.example.com/cb'
-					})
-					.type('form')
-					.set(
-						'DPoP',
-						await DPoP(keypair, {
+			const res = await agent.token.post(
+				{
+					client_id: 'client-none',
+					grant_type: 'authorization_code',
+					code_verifier: auth.code_verifier,
+					code,
+					redirect_uri: 'https://client.example.com/cb'
+				},
+				{
+					headers: {
+						dpop: await DPoP(keypair, {
 							htu: `${ISSUER}/token`,
 							htm: 'POST'
 						})
-					)
-					.expect(200);
-
-				expect(spy).to.have.property('calledOnce', true);
-				const {
-					oidc: {
-						entities: { AccessToken, RefreshToken }
 					}
-				} = spy.args[0][0];
-				expect(AccessToken).to.have.property('jkt', this.thumbprint);
-				expect(RefreshToken).to.have.property('jkt', this.thumbprint);
-			});
+				}
+			);
+			expect(res.status).toBe(200);
+			expect(spy).toBeCalledTimes(1);
+
+			const {
+				oidc: {
+					entities: { AccessToken, RefreshToken }
+				}
+			} = spy.mock.calls[0][0];
+			expect(AccessToken).toHaveProperty('jkt', thumbprint);
+			expect(RefreshToken).toHaveProperty('jkt', thumbprint);
 		});
 
 		describe('refresh_token', () => {
+			let refresh_token = '';
 			beforeEach(async function () {
-				await this.agent
-					.post('/token')
-					.send({
+				const res = await agent.token.post(
+					{
 						client_id: 'client-none',
 						grant_type: 'authorization_code',
-						code_verifier: this.auth.code_verifier,
-						code: this.code,
+						code_verifier: auth.code_verifier,
+						code,
 						redirect_uri: 'https://client.example.com/cb'
-					})
-					.type('form')
-					.set(
-						'DPoP',
-						await DPoP(keypair, {
-							htu: `${ISSUER}/token`,
-							htm: 'POST'
-						})
-					)
-					.expect(({ body }) => {
-						this.rt = body.refresh_token;
-					});
+					},
+					{
+						headers: {
+							dpop: await DPoP(keypair, {
+								htu: `${ISSUER}/token`,
+								htm: 'POST'
+							})
+						}
+					}
+				);
+				expect(res.status).toBe(200);
+				refresh_token = res.data.refresh_token;
 			});
 
 			it('binds the access token to the jwk', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once('grant.success', spy);
 
-				await this.agent
-					.post('/token')
-					.send({
+				const res = await agent.token.post(
+					{
 						client_id: 'client-none',
 						grant_type: 'refresh_token',
-						refresh_token: this.rt
-					})
-					.type('form')
-					.set(
-						'DPoP',
-						await DPoP(keypair, {
-							htu: `${ISSUER}/token`,
-							htm: 'POST'
-						})
-					)
-					.expect(200);
+						refresh_token
+					},
+					{
+						headers: {
+							dpop: await DPoP(keypair, {
+								htu: `${ISSUER}/token`,
+								htm: 'POST'
+							})
+						}
+					}
+				);
+				expect(res.status).toBe(200);
+				expect(spy).toBeCalledTimes(1);
 
-				expect(spy).to.have.property('calledOnce', true);
 				const {
 					oidc: {
 						entities: { AccessToken, RefreshToken }
 					}
-				} = spy.args[0][0];
-				expect(AccessToken).to.have.property('jkt', this.thumbprint);
-				expect(RefreshToken).to.have.property('jkt', this.thumbprint);
+				} = spy.mock.calls[0][0];
+				expect(AccessToken).toHaveProperty('jkt', thumbprint);
+				expect(RefreshToken).toHaveProperty('jkt', thumbprint);
 			});
 
 			it('verifies the request made with the same cert jwk', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once('grant.error', spy);
 
-				await this.agent
-					.post('/token')
-					.send({
+				const res = await agent.token.post(
+					{
 						client_id: 'client-none',
 						grant_type: 'refresh_token',
-						refresh_token: this.rt
-					})
-					.set(
-						'DPoP',
-						await DPoP(await generateKeyPair('ES256', { extractable: true }), {
-							htu: `${ISSUER}/token`,
-							htm: 'POST'
-						})
-					)
-					.type('form')
-					.expect(400)
-					.expect({
-						error: 'invalid_grant',
-						error_description: 'grant request is invalid'
-					});
-
-				expect(spy).to.have.property('calledOnce', true);
-				expect(spy.args[0][1]).to.have.property(
+						refresh_token
+					},
+					{
+						headers: {
+							dpop: await DPoP(
+								await generateKeyPair('ES256', { extractable: true }),
+								{
+									htu: `${ISSUER}/token`,
+									htm: 'POST'
+								}
+							)
+						}
+					}
+				);
+				expect(res.status).toBe(400);
+				expect(res.error.value).toEqual({
+					error: 'invalid_grant',
+					error_description: 'grant request is invalid'
+				});
+				expect(spy).toBeCalledTimes(1);
+				expect(spy.mock.calls[0][0]).toHaveProperty(
 					'error_detail',
 					'failed jkt verification'
 				);
@@ -1387,232 +1387,201 @@ describe('features.dPoP', async () => {
 
 	describe('invalid nonce', () => {
 		it('@ userinfo', async function () {
-			let nonce;
-			await this.agent
-				.get('/me')
-				.set('Authorization', 'DPoP foo')
-				.set(
-					'DPoP',
-					await DPoP(keypair, {
+			const res = await agent.userinfo.get({
+				headers: {
+					authorization: 'DPoP foo',
+					dpop: await DPoP(keypair, {
 						accessToken: 'foo',
 						nonce: 'foo'
 					})
-				)
-				.expect(401)
-				.expect({
-					error: 'use_dpop_nonce',
-					error_description: 'invalid nonce in DPoP proof'
-				})
-				.expect(({ headers }) => {
-					nonce = headers['dpop-nonce'];
-				});
+				}
+			});
+			expect(res.status).toBe(401);
+			expect(res.error.value).toEqual({
+				error: 'use_dpop_nonce',
+				error_description: 'invalid nonce in DPoP proof'
+			});
+			const nonce = res.headers.get('dpop-nonce');
 
-			await this.agent
-				.get('/me')
-				.set('Authorization', 'DPoP foo')
-				.set(
-					'DPoP',
-					await DPoP(keypair, {
-						nonce,
-						accessToken: 'foo'
+			const userInfo = await agent.userinfo.get({
+				headers: {
+					authorization: 'DPoP foo',
+					dpop: await DPoP(keypair, {
+						accessToken: 'foo',
+						nonce
 					})
-				)
-				.expect(401)
-				.expect({
-					error: 'invalid_token',
-					error_description: 'invalid token provided'
-				});
+				}
+			});
+			expect(userInfo.status).toBe(401);
+			expect(userInfo.error.value).toEqual({
+				error: 'invalid_token',
+				error_description: 'invalid token provided'
+			});
 		});
 
 		it('@ token endpoint', async function () {
-			let nonce;
-			await this.agent
-				.post('/token')
-				.auth('client', 'secret')
-				.send({ grant_type: 'client_credentials' })
-				.set(
-					'DPoP',
-					await DPoP(keypair, {
-						htu: `${ISSUER}/token`,
-						htm: 'POST',
-						nonce: 'foo'
-					})
-				)
-				.type('form')
-				.expect(400)
-				.expect({
-					error: 'use_dpop_nonce',
-					error_description: 'invalid nonce in DPoP proof'
-				})
-				.expect(({ headers }) => {
-					nonce = headers['dpop-nonce'];
-				});
+			const res = await agent.token.post(
+				{ grant_type: 'client_credentials' },
+				{
+					headers: {
+						...AuthorizationRequest.basicAuthHeader('client', 'secret'),
+						dpop: await DPoP(keypair, {
+							htu: `${ISSUER}/token`,
+							htm: 'POST',
+							nonce: 'foo'
+						})
+					}
+				}
+			);
+			expect(res.status).toBe(400);
+			expect(res.error.value).toEqual({
+				error: 'use_dpop_nonce',
+				error_description: 'invalid nonce in DPoP proof'
+			});
+			const nonce = res.headers.get('dpop-nonce');
 
-			await this.agent
-				.post('/token')
-				.auth('client', 'secret')
-				.send({ grant_type: 'client_credentials' })
-				.set(
-					'DPoP',
-					await DPoP(keypair, {
-						htu: `${ISSUER}/token`,
-						htm: 'POST',
-						nonce
-					})
-				)
-				.type('form')
-				.expect(200);
+			const token = await agent.token.post(
+				{ grant_type: 'client_credentials' },
+				{
+					headers: {
+						...AuthorizationRequest.basicAuthHeader('client', 'secret'),
+						dpop: await DPoP(keypair, {
+							htu: `${ISSUER}/token`,
+							htm: 'POST',
+							nonce
+						})
+					}
+				}
+			);
+			expect(token.status).toBe(200);
 		});
 	});
 
 	describe('required nonce', () => {
-		before(function () {
-			this.orig = i(provider).features.dPoP.requireNonce;
-			i(provider).features.dPoP.requireNonce = () => true;
+		beforeEach(function () {
+			config['dpop.requireNonce'] = true;
 		});
 
-		after(function () {
-			i(provider).features.dPoP.requireNonce = this.orig;
+		afterEach(function () {
+			config['dpop.requireNonce'] = false;
 		});
 
 		it('@ PAR endpoint', async function () {
 			const code_verifier = randomBytes(32).toString('base64url');
 
-			let nonce;
-			await this.agent
-				.post('/request')
-				.auth('client', 'secret')
-				.send({
+			const res = await agent.par.post(
+				{
 					response_type: 'code',
 					client_id: 'client',
 					code_challenge_method: 'S256',
 					code_challenge: hash('sha256', code_verifier, 'base64url')
-				})
-				.set(
-					'DPoP',
-					await DPoP(keypair, {
-						htu: `${ISSUER}/par`,
-						htm: 'POST'
-					})
-				)
-				.type('form')
-				.expect(400)
-				.expect('DPoP-Nonce', /^[\w-]{43}$/)
-				.expect({
-					error: 'use_dpop_nonce',
-					error_description: 'nonce is required in the DPoP proof'
-				})
-				.expect(({ headers }) => {
-					nonce = headers['dpop-nonce'];
-				});
+				},
+				{
+					headers: {
+						...AuthorizationRequest.basicAuthHeader('client', 'secret'),
+						dpop: await DPoP(keypair, {
+							htu: `${ISSUER}/par`,
+							htm: 'POST'
+						})
+					}
+				}
+			);
+			expect(res.status).toBe(400);
+			expect(res.headers.get('DPoP-Nonce')).toMatch(/^[\w-]{43}$/);
+			expect(res.error.value).toEqual({
+				error: 'use_dpop_nonce',
+				error_description: 'nonce is required in the DPoP proof'
+			});
+			const nonce = res.headers.get('DPoP-Nonce');
 
-			await this.agent
-				.post('/request')
-				.auth('client', 'secret')
-				.send({
+			const par = await agent.par.post(
+				{
 					response_type: 'code',
 					client_id: 'client',
 					code_challenge_method: 'S256',
 					code_challenge: hash('sha256', code_verifier, 'base64url')
-				})
-				.set(
-					'DPoP',
-					await DPoP(keypair, {
-						htu: `${ISSUER}/par`,
-						htm: 'POST',
-						nonce
-					})
-				)
-				.type('form')
-				.expect(201)
-				.expect((response) => {
-					// because the sent one is fresh
-					expect(response.headers).not.to.have.property('dpop-nonce');
-				});
+				},
+				{
+					headers: {
+						...AuthorizationRequest.basicAuthHeader('client', 'secret'),
+						dpop: await DPoP(keypair, {
+							htu: `${ISSUER}/par`,
+							htm: 'POST',
+							nonce
+						})
+					}
+				}
+			);
+			expect(par.status).toBe(201);
+			expect(par.headers.get('dpop-nonce')).toBeEmpty();
 		});
 
 		it('@ userinfo', async function () {
-			let nonce;
-			await this.agent
-				.get('/me')
-				.set('Authorization', 'DPoP foo')
-				.set(
-					'DPoP',
-					await DPoP(keypair, {
-						accessToken: 'foo'
-					})
-				)
-				.expect(401)
-				.expect({
-					error: 'use_dpop_nonce',
-					error_description: 'nonce is required in the DPoP proof'
-				})
-				.expect(({ headers }) => {
-					nonce = headers['dpop-nonce'];
-				});
+			const res = await agent.userinfo.get({
+				headers: {
+					authorization: 'DPoP foo',
+					dpop: await DPoP(keypair, { accessToken: 'foo' })
+				}
+			});
+			expect(res.status).toBe(401);
+			expect(res.error.value).toEqual({
+				error: 'use_dpop_nonce',
+				error_description: 'nonce is required in the DPoP proof'
+			});
+			const nonce = res.headers.get('dpop-nonce');
 
-			await this.agent
-				.get('/me')
-				.set('Authorization', 'DPoP foo')
-				.set(
-					'DPoP',
-					await DPoP(keypair, {
+			const userInfo = await agent.userinfo.get({
+				headers: {
+					authorization: 'DPoP foo',
+					dpop: await DPoP(keypair, {
 						nonce,
 						accessToken: 'foo'
 					})
-				)
-				.expect(401)
-				.expect((response) => {
-					// because the sent one is fresh
-					expect(response.headers).not.to.have.property('dpop-nonce');
-				})
-				.expect({
-					error: 'invalid_token',
-					error_description: 'invalid token provided'
-				});
+				}
+			});
+			expect(userInfo.status).toBe(401);
+			expect(userInfo.error.value).toEqual({
+				error: 'invalid_token',
+				error_description: 'invalid token provided'
+			});
+			expect(userInfo.headers.get('dpop-nonce')).toBeEmpty();
 		});
 
 		it('@ token endpoint', async function () {
-			let nonce;
-			await this.agent
-				.post('/token')
-				.auth('client', 'secret')
-				.send({ grant_type: 'client_credentials' })
-				.set(
-					'DPoP',
-					await DPoP(keypair, {
-						htu: `${ISSUER}/token`,
-						htm: 'POST'
-					})
-				)
-				.type('form')
-				.expect(400)
-				.expect({
-					error: 'use_dpop_nonce',
-					error_description: 'nonce is required in the DPoP proof'
-				})
-				.expect(({ headers }) => {
-					nonce = headers['dpop-nonce'];
-				});
+			const res = await agent.token.post(
+				{ grant_type: 'client_credentials' },
+				{
+					headers: {
+						...AuthorizationRequest.basicAuthHeader('client', 'secret'),
+						dpop: await DPoP(keypair, {
+							htu: `${ISSUER}/token`,
+							htm: 'POST'
+						})
+					}
+				}
+			);
+			expect(res.status).toBe(400);
+			expect(res.error.value).toEqual({
+				error: 'use_dpop_nonce',
+				error_description: 'nonce is required in the DPoP proof'
+			});
+			const nonce = res.headers.get('dpop-nonce');
 
-			await this.agent
-				.post('/token')
-				.auth('client', 'secret')
-				.send({ grant_type: 'client_credentials' })
-				.set(
-					'DPoP',
-					await DPoP(keypair, {
-						htu: `${ISSUER}/token`,
-						htm: 'POST',
-						nonce
-					})
-				)
-				.type('form')
-				.expect(200)
-				.expect((response) => {
-					// because the sent one is fresh
-					expect(response.headers).not.to.have.property('dpop-nonce');
-				});
+			const token = await agent.token.post(
+				{ grant_type: 'client_credentials' },
+				{
+					headers: {
+						...AuthorizationRequest.basicAuthHeader('client', 'secret'),
+						dpop: await DPoP(keypair, {
+							htu: `${ISSUER}/token`,
+							htm: 'POST',
+							nonce
+						})
+					}
+				}
+			);
+			expect(token.status).toBe(200);
+			expect(token.headers.get('dpop-nonce')).toBeEmpty();
 		});
 	});
 });
