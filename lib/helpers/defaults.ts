@@ -11,6 +11,7 @@ import nanoid from './nanoid.ts';
 import { base as defaultPolicy } from './interaction_policy/index.ts';
 import htmlSafe from './html_safe.ts';
 import * as errors from './errors.ts';
+import { ApplicationConfig as config } from 'lib/configs/application.js';
 
 const warned = new Set();
 function shouldChange(name, msg) {
@@ -531,9 +532,9 @@ async function assertJwtClaimsAndHeader(ctx, claims, header, client) {
 	// @param client - the Client instance
 
 	const requiredClaims = [];
-	const fapiProfile = ctx.oidc.isFapi('2.0');
+	const isFapi = config['fapi.enabled'];
 
-	if (fapiProfile) {
+	if (isFapi) {
 		requiredClaims.push('exp', 'aud', 'nbf');
 	}
 
@@ -549,7 +550,7 @@ async function assertJwtClaimsAndHeader(ctx, claims, header, client) {
 		}
 	}
 
-	if (fapiProfile) {
+	if (isFapi) {
 		const diff = claims.exp - claims.nbf;
 		if (Math.sign(diff) !== 1 || diff > 3600) {
 			throw new errors.InvalidRequestObject(
@@ -1049,27 +1050,6 @@ function makeDefaults() {
 			 * encrypted ID Tokens and allow receiving encrypted Request Objects.
 			 */
 			encryption: { enabled: false },
-
-			/*
-			 * features.fapi
-			 *
-			 * title: Financial-grade API Security Profile (`FAPI`)
-			 *
-			 * description: Enables extra Authorization Server behaviours defined in FAPI that cannot be
-			 * achieved by other configuration options.
-			 */
-			fapi: {
-				enabled: false,
-				/*
-				 * features.fapi.profile
-				 *
-				 * description: The specific profile of `FAPI` to enable. Supported values are:
-				 *
-				 * - '2.0' Enables behaviours from [FAPI 2.0 Security Profile](https://openid.net/specs/fapi-security-profile-2_0-final.html)
-				 * - Function returning one of the other supported values, or undefined if `FAPI` behaviours are to be ignored. The function is invoked with two arguments `(ctx, client)` and serves the purpose of allowing the used profile to be context-specific.
-				 */
-				profile: undefined
-			},
 
 			/*
 			 * features.rpInitiatedLogout

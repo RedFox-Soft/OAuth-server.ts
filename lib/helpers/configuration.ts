@@ -16,8 +16,6 @@ function featuresTypeErrorCheck({ features }) {
 	}
 }
 
-const fapiProfiles = new Set(['2.0']);
-
 class Configuration {
 	#defaults = getDefaults();
 
@@ -33,7 +31,6 @@ class Configuration {
 
 		this.ensureSets();
 
-		this.checkFapiProfile();
 		this.collectScopes();
 		this.collectPrompts();
 		this.unpackArrayClaims();
@@ -239,30 +236,6 @@ class Configuration {
 			throw new TypeError(
 				'richAuthorizationRequests is only available in conjuction with enabled resourceIndicators'
 			);
-		}
-	}
-
-	checkFapiProfile() {
-		if (!this.features.fapi.enabled) {
-			this.features.fapi.profile = () => undefined;
-		} else if (typeof this.features.fapi.profile === 'function') {
-			const helper = this.features.fapi.profile;
-			this.features.fapi.profile = (...args) => {
-				const profile = helper(...args);
-				if (profile && !fapiProfiles.has(profile)) {
-					throw new TypeError(
-						`'profile' must be ${formatters.formatList([...fapiProfiles], { type: 'disjunction' })}`
-					);
-				}
-				return profile || undefined;
-			};
-		} else if (!fapiProfiles.has(this.features.fapi.profile)) {
-			throw new TypeError(
-				`'profile' must be ${formatters.formatList([...fapiProfiles], { type: 'disjunction' })}`
-			);
-		} else {
-			const value = this.features.fapi.profile;
-			this.features.fapi.profile = () => value;
 		}
 	}
 

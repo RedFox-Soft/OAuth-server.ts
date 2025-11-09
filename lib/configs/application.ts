@@ -62,7 +62,19 @@ export const ApplicationConfig = {
 	 *
 	 * description: Enables JWT Secured Authorization Responses
 	 */
-	'responseMode.jwt.enabled': false
+	'responseMode.jwt.enabled': false,
+
+	/*
+	 * features.fapi
+	 *
+	 * title: Financial-grade API Security Profile (`FAPI`)
+	 *
+	 * description: Enables extra Authorization Server behaviours defined in FAPI that cannot be
+	 * achieved by other configuration options.
+	 *
+	 * '2.0' Enables behaviours from [FAPI 2.0 Security Profile](https://openid.net/specs/fapi-security-profile-2_0-final.html)
+	 */
+	'fapi.enabled': false
 };
 
 export type ApplicationConfigType = typeof ApplicationConfig;

@@ -83,6 +83,8 @@ function getObjFromError(code: string, errorObj: any) {
 
 const mapErrorCode = {
 	[routeNames.token]: 'grant.error',
+	[routeNames.pushed_authorization_request]:
+		'pushed_authorization_request.error',
 	[routeNames.authorization]: 'authorization.error',
 	[routeNames.device_authorization]: 'device_authorization.error',
 	[routeNames.introspect]: 'introspection.error',

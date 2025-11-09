@@ -7,7 +7,6 @@ export const STABLE = new Set([
 	'devInteractions',
 	'dPoP',
 	'encryption',
-	'fapi',
 	'introspection',
 	'jwtResponseModes',
 	'jwtIntrospection',

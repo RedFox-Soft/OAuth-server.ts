@@ -5,6 +5,7 @@ import { clockTolerance } from 'lib/configs/liveTime.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { routeNames } from 'lib/consts/param_list.js';
 import { assertJwtClientAuthClaimsAndHeader } from 'lib/addon/index.js';
+import { ApplicationConfig as config } from 'lib/configs/application.js';
 
 type Entries<T> = {
 	[K in keyof T]: [K, T[K]];
@@ -72,7 +73,8 @@ export async function tokenJwtAuth(ctx, keystore, algorithms) {
 		throw new InvalidClientAuth(message);
 	}
 
-	if (ctx.oidc.isFapi('2.0')) {
+	const isFapi = config['fapi.enabled'];
+	if (isFapi) {
 		if (payload.aud !== ISSUER) {
 			throw new InvalidClientAuth(
 				'audience (aud) must equal the issuer identifier url'

@@ -10,8 +10,6 @@ export class OIDCContext {
 
 	#accessToken = null;
 
-	#fapiProfile = null;
-
 	constructor(ctx) {
 		this.ctx = ctx;
 		this.route = ctx._matchedRouteName;
@@ -23,20 +21,11 @@ export class OIDCContext {
 		this.resourceServers = {};
 	}
 
-	get fapiProfile() {
-		if (this.#fapiProfile === null) {
-			const {
-				features: { fapi }
-			} = instance(provider).configuration;
-			this.#fapiProfile = fapi.profile(this.ctx, this.client);
-		}
-
-		return this.#fapiProfile;
-	}
-
-	isFapi(...oneOf) {
-		const i = oneOf.indexOf(this.fapiProfile);
-		return i !== -1 ? oneOf[i] : undefined;
+	isFapi() {
+		const {
+			features: { fapi }
+		} = instance(provider).configuration;
+		return fapi.enabled;
 	}
 
 	get provider() {

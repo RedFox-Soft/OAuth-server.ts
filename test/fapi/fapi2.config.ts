@@ -1,5 +1,3 @@
-import { strict as assert } from 'node:assert';
-
 import { generateKeyPair, exportJWK } from 'jose';
 import merge from 'lodash/merge.js';
 
@@ -10,18 +8,14 @@ const config = getConfig();
 export const keypair = await generateKeyPair('ES256');
 
 merge(config.features, {
-	fapi: {
-		enabled: true,
-		profile(ctx, client) {
-			assert(ctx, 'ctx not provided in fapi.profile');
-			assert(client, 'client not provided in fapi.profile');
-			return '2.0';
-		}
-	},
 	requestObjects: {
 		enabled: true
 	}
 });
+
+export const ApplicationConfig = {
+	'fapi.enabled': true
+};
 
 export default {
 	config,
