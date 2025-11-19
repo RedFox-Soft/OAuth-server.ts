@@ -7,7 +7,7 @@ FROM oven/bun:${BUN_VERSION}-alpine AS base
 LABEL fly_launch_runtime="Bun"
 
 # Bun app lives here
-WORKDIR /lib
+WORKDIR /app
 
 # Set production environment
 ENV NODE_ENV="production"
@@ -35,7 +35,7 @@ RUN rm -rf node_modules && \
 FROM base
 
 # Copy built application
-COPY --from=build /dist /dist
+COPY --from=build /app /app
 
 # Start the server by default, this can be overwritten at runtime
 EXPOSE 3000
