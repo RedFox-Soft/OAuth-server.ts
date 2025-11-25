@@ -82,7 +82,6 @@ class MemoryAdapter {
 	}
 
 	async revokeByGrantId(grantId) {
-		// eslint-disable-line class-methods-use-this
 		const grantKey = grantKeyFor(grantId);
 		const grant = storage.get(grantKey);
 		if (grant) {

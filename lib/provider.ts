@@ -203,10 +203,6 @@ class ProviderClass extends EventEmitter {
 	get ResourceServer() {
 		return ResourceServer;
 	}
-
-	get [Symbol.toStringTag]() {
-		return 'Provider';
-	}
 }
 
 export const provider = new ProviderClass();
