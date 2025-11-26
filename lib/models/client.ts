@@ -1,5 +1,4 @@
-/* eslint-disable max-classes-per-file */
-import * as crypto from 'node:crypto';
+import crypto from 'node:crypto';
 import { STATUS_CODES } from 'node:http';
 
 import KeyStore from '../helpers/keystore.ts';
@@ -9,7 +8,6 @@ import camelCase from '../helpers/_/camel_case.ts';
 import * as base64url from '../helpers/base64url.ts';
 import nanoid from '../helpers/nanoid.ts';
 import epochTime from '../helpers/epoch_time.ts';
-import isConstructable from '../helpers/type_validators.ts';
 import instance from '../helpers/weak_cache.ts';
 import constantEquals from '../helpers/constant_equals.ts';
 import { InvalidClient, InvalidClientMetadata } from '../helpers/errors.ts';
@@ -31,6 +29,7 @@ import {
 } from 'lib/configs/jwaAlgorithms.js';
 import { ClientSchema } from 'lib/configs/clientSchema.js';
 import { Value } from '@sinclair/typebox/value';
+import { adapter } from 'lib/adapters/index.js';
 
 // intentionally ignore x5t#S256 so that they are left to be calculated by the library
 const EC_CURVES = new Set(['P-256', 'P-384', 'P-521']);
@@ -363,8 +362,6 @@ export class Client {
 		return getSchema(provider);
 	}
 
-	static #adapter;
-
 	constructor(metadata) {
 		const schema = new Client.Schema({
 			...ClientDefaults,
@@ -413,13 +410,6 @@ export class Client {
 				.filter(Boolean)
 				.forEach(ClientKeyStore.prototype.add.bind(this.asymmetricKeyStore));
 		}
-	}
-
-	static get adapter() {
-		this.#adapter ||= isConstructable(instance(provider).Adapter)
-			? new (instance(provider).Adapter)('Client')
-			: instance(provider).Adapter('Client');
-		return this.#adapter;
 	}
 
 	async backchannelPing(backchannelAuthenticationRequest) {
@@ -599,7 +589,7 @@ export class Client {
 			return staticClients.get(id);
 		}
 
-		const properties = await this.adapter.find(id);
+		const properties = await adapter('Client').find(id);
 
 		if (!properties) {
 			return;

@@ -1,11 +1,9 @@
-/* eslint-disable max-classes-per-file */
-
 import { strict as assert } from 'node:assert';
 
 import { expect } from 'chai';
 
 import epochTime from '../lib/helpers/epoch_time.ts';
-import MemoryAdapter, { setStorage } from '../lib/adapters/memory_adapter.ts';
+import { MemoryAdapter, setStorage } from '../lib/adapters/memory.js';
 
 const map = new Map();
 
@@ -18,7 +16,6 @@ const testStorage = new Map();
 
 export class TestAdapter extends MemoryAdapter {
 	constructor(name) {
-		// eslint-disable-next-line no-constructor-return
 		if (testStorage.has(name)) return testStorage.get(name);
 		super(name);
 		this.store = map;
@@ -39,7 +36,6 @@ export class TestAdapter extends MemoryAdapter {
 	}
 
 	clear() {
-		// eslint-disable-line class-methods-use-this
 		map.clear();
 	}
 
@@ -115,7 +111,6 @@ export class Account {
 		};
 	}
 
-	// eslint-disable-next-line no-unused-vars
 	static async findAccount(ctx, sub, token) {
 		if (sub === 'notfound') {
 			return undefined;

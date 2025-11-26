@@ -1,8 +1,6 @@
 import crypto from 'node:crypto';
 import os from 'node:os';
 
-import MemoryAdapter from './adapters/memory_adapter.ts';
-
 import * as attention from './helpers/attention.ts';
 import nanoid from './helpers/nanoid.ts';
 import { base as defaultPolicy } from './helpers/interaction_policy/index.ts';
@@ -568,28 +566,6 @@ export const globalConfiguration = {
 	 * description: Array of strings, the Authentication Context Class References that the authorization server supports.
 	 */
 	acrValues: [],
-
-	/*
-	 * adapter
-	 *
-	 * description: The provided example and any new instance of oidc-provider will use the basic
-	 * in-memory adapter for storing issued tokens, codes, user sessions, dynamically registered
-	 * clients, etc. This is fine as long as you develop, configure and generally just play around
-	 * since every time you restart your process all information will be lost. As soon as you cannot
-	 * live with this limitation you will be required to provide your own custom adapter constructor
-	 * for oidc-provider to use. This constructor will be called for every model accessed the first
-	 * time it is needed.
-	 *
-	 * see: [The interface oidc-provider expects](/example/my_adapter.js)
-	 * see: [Example MongoDB adapter implementation](https://github.com/panva/node-oidc-provider/discussions/1308)
-	 * see: [Example Redis adapter implementation](https://github.com/panva/node-oidc-provider/discussions/1309)
-	 * see: [Example Redis w/ JSON Adapter](https://github.com/panva/node-oidc-provider/discussions/1310)
-	 * see: [Default in-memory adapter implementation](/lib/adapters/memory_adapter.js)
-	 * see: [Community Contributed Adapter Archive](https://github.com/panva/node-oidc-provider/discussions/1311)
-	 *
-	 * @nodefault
-	 */
-	adapter: MemoryAdapter,
 
 	/*
 	 * claims

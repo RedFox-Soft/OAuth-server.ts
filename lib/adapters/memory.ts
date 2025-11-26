@@ -1,6 +1,5 @@
 import QuickLRU from 'quick-lru';
-
-import epochTime from '../helpers/epoch_time.ts';
+import epochTime from '../helpers/epoch_time.js';
 
 let storage = new QuickLRU({ maxSize: 1000 });
 
@@ -24,7 +23,7 @@ const grantable = new Set([
 	'BackchannelAuthenticationRequest'
 ]);
 
-class MemoryAdapter {
+export class MemoryAdapter {
 	constructor(model) {
 		this.model = model;
 	}
@@ -91,7 +90,6 @@ class MemoryAdapter {
 	}
 }
 
-export default MemoryAdapter;
 export function setStorage(store) {
 	storage = store;
 }

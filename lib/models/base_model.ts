@@ -1,28 +1,11 @@
 import snakeCase from '../helpers/_/snake_case.ts';
 import epochTime from '../helpers/epoch_time.ts';
 import pickBy from '../helpers/_/pick_by.ts';
-import instance from '../helpers/weak_cache.ts';
-import isConstructable from '../helpers/type_validators.ts';
 import { Opaque } from './formats/opaque.js';
 import { provider } from 'lib/provider.js';
+import { adapter } from 'lib/adapters/index.js';
 
 const IN_PAYLOAD = ['iat', 'exp', 'jti', 'kind'];
-
-const adapterCache = new WeakMap();
-
-function adapter(ctx) {
-	const obj = typeof ctx === 'function' ? ctx : ctx.constructor;
-
-	if (!adapterCache.has(obj)) {
-		if (isConstructable(instance(provider).Adapter)) {
-			adapterCache.set(obj, new (instance(provider).Adapter)(obj.name));
-		} else {
-			adapterCache.set(obj, instance(provider).Adapter(obj.name));
-		}
-	}
-
-	return adapterCache.get(obj);
-}
 
 export class BaseModel extends Opaque {
 	constructor({ jti, kind, ...payload } = {}) {
@@ -72,11 +55,11 @@ export class BaseModel extends Opaque {
 	}
 
 	static get adapter() {
-		return adapter(this);
+		return adapter(this.name);
 	}
 
 	get adapter() {
-		return adapter(this);
+		return adapter(this.constructor.name);
 	}
 
 	static get IN_PAYLOAD() {

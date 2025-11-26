@@ -6,7 +6,6 @@ import timekeeper from 'timekeeper';
 import { describe, it, beforeAll, beforeEach, afterEach } from 'bun:test';
 
 import bootstrap from '../test_helper.js';
-import { provider } from 'lib/provider.js';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { TestAdapter } from 'test/models.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';

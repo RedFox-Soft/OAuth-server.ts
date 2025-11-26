@@ -4,7 +4,6 @@ import QuickLRU from 'quick-lru';
 
 import Configuration from './helpers/configuration.ts';
 import * as instance from './helpers/weak_cache.ts';
-import initializeAdapter from './helpers/initialize_adapter.ts';
 import initializeApp from './helpers/initialize_app.ts';
 import initializeClients from './helpers/initialize_clients.ts';
 import ResourceServer from './helpers/resource_server.ts';
@@ -41,8 +40,6 @@ class ProviderClass extends EventEmitter {
 
 		this.#int.responseModes = new Map();
 		this.#int.grantTypeHandlers = new Map();
-
-		initializeAdapter.call(this, configuration.adapter);
 
 		const keystore = new KeyStore();
 		JWKS_KEYS.forEach((key) => keystore.add(structuredClone(key)));
