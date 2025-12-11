@@ -1,8 +1,10 @@
 import { MongoClient, ServerApiVersion } from 'mongodb';
 import { COLLECTIONS } from './collections';
 
-if (!process.env.MONGODB_URI) {
-	throw new Error('MONGODB_URI must be provided as an env var');
+if (!process.env.MONGODB_URI || !process.env.DATABASE_NAME) {
+	throw new Error(
+		'MONGODB_URI and DATABASE_NAME must be provided as an env var'
+	);
 }
 
 const options = {
@@ -14,7 +16,7 @@ const options = {
 };
 
 const dbClient = new MongoClient(process.env.MONGODB_URI, options);
-const db = (await dbClient.connect()).db();
+const db = (await dbClient.connect()).db(process.env.DATABASE_NAME);
 
 const grantable = new Set([
 	'AccessToken',
@@ -56,3 +58,5 @@ for (const name of COLLECTIONS) {
 		}
 	]);
 }
+
+dbClient.close();

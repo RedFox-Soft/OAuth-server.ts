@@ -16,7 +16,7 @@ export const ConsentPage: React.FC<ConsentPageProps> = ({
 	scopes
 }) => (
 	<Space
-		direction="vertical"
+		orientation="vertical"
 		style={{ width: '100%', alignItems: 'center', marginTop: 48 }}
 	>
 		<Card style={{ maxWidth: 400, width: '100%' }}>
