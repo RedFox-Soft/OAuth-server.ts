@@ -37,4 +37,4 @@ export const elysia = new Elysia({ strictPath: true, normalize: false })
 	.use(tokenAction)
 	.use(userinfo)
 	.use(ui)
-	.listen(8080);
+	.listen(3000);
