@@ -28,6 +28,11 @@ class ProviderClass extends EventEmitter {
 
 	#int = {};
 
+	constructor() {
+		super();
+		this.init({});
+	}
+
 	init(setup) {
 		const configuration = new Configuration(setup);
 		this.#int.staticClients = new Map();
