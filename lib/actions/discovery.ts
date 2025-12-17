@@ -23,6 +23,7 @@ import {
 	userinfoEncryptionEncValues,
 	userinfoSigningAlgValues
 } from 'lib/configs/jwaAlgorithms.js';
+import { ISSUER } from 'lib/configs/env.js';
 
 type OmitEnabled<T> = {
 	[K in keyof T as K extends `${infer _}enabled` ? K : never]: T[K];
@@ -60,12 +61,9 @@ function urls(baseUrl: string) {
 
 export const discovery = new Elysia().get(
 	'/.well-known/openid-configuration',
-	function ({ request }) {
+	function () {
 		const { configuration, features } = instance(provider);
-		const url = new URL(request.url);
-		url.pathname = '';
-		url.search = '';
-		const urlObj = urls(url.toString());
+		const urlObj = urls(ISSUER);
 
 		const body = {
 			acr_values_supported: configuration.acrValues.size
