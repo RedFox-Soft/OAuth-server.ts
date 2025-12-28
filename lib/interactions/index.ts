@@ -65,7 +65,7 @@ export const ui = new Elysia()
 			}
 		});
 	})
-	.get('ui/:uid/consent', async ({ params: { uid } }) => {
+	.get('ui/:uid/consent', async ({ params: { uid }, interaction }) => {
 		let html = await htmlTeamplate.text();
 		html = html
 			.replace('<!--app-title-->', 'Consent Page')

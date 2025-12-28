@@ -590,7 +590,6 @@ export class Client {
 		}
 
 		const properties = await adapter('Client').find(id);
-
 		if (!properties) {
 			return;
 		}

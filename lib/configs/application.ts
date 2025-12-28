@@ -1,3 +1,5 @@
+import { configStore } from '../adapters/index.js';
+
 export const ApplicationConfig = {
 	/*
 	 * pushedAuthorizationRequests
@@ -76,5 +78,6 @@ export const ApplicationConfig = {
 	 */
 	'fapi.enabled': false
 };
+Object.assign(ApplicationConfig, await configStore.get());
 
 export type ApplicationConfigType = typeof ApplicationConfig;

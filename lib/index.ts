@@ -24,8 +24,7 @@ import { introspect } from './actions/introspection.js';
 
 export const elysia = new Elysia({ strictPath: true, normalize: false })
 	.onError(errorHandler)
-	.use(staticPlugin({ assets: 'dist' }))
-	.use(staticPlugin())
+	.use(staticPlugin({ assets: 'public' }))
 	.use(nocache)
 	.use(discovery)
 	.use(authGet)

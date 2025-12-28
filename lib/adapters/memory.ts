@@ -3,15 +3,15 @@ import epochTime from '../helpers/epoch_time.js';
 
 let storage = new QuickLRU({ maxSize: 1000 });
 
-function grantKeyFor(id) {
+function grantKeyFor(id: string) {
 	return `grant:${id}`;
 }
 
-function sessionUidKeyFor(id) {
+function sessionUidKeyFor(id: string) {
 	return `sessionUid:${id}`;
 }
 
-function userCodeKeyFor(userCode) {
+function userCodeKeyFor(userCode: string) {
 	return `userCode:${userCode}`;
 }
 
@@ -23,6 +23,20 @@ const grantable = new Set([
 	'BackchannelAuthenticationRequest'
 ]);
 
+class ConfigStore {
+	static instance = new ConfigStore();
+	private config: Record<string, any> = {};
+
+	async get(): Promise<Record<string, any> | null> {
+		return this.config;
+	}
+
+	async set(config: Record<string, any>): Promise<void> {
+		this.config = config;
+	}
+}
+
+export const configStore = ConfigStore.instance;
 export class MemoryAdapter {
 	constructor(model) {
 		this.model = model;

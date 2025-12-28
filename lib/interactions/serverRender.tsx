@@ -1,5 +1,5 @@
 import { renderToString } from 'react-dom/server';
-import React, { StrictMode } from 'react';
+import { StrictMode } from 'react';
 import { LoginPage } from './loginPage.js';
 import { ConsentPage } from './consentPage.js';
 

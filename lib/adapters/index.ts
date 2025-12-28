@@ -1,16 +1,19 @@
-import { MemoryAdapter } from './memory.js';
+import { MemoryAdapter, configStore as memoryConfig } from './memory.js';
 
 let Adapter = MemoryAdapter;
+export let configStore = memoryConfig;
 
 if (process.env.MONGODB_URI) {
-	Adapter = (await import('./mongodb.ts')).MongoAdapter;
+	const mongodb = await import('./mongodb.ts');
+	Adapter = mongodb.MongoAdapter;
+	configStore = mongodb.configStore;
 }
 
 if (process.env.NODE_ENV === 'test') {
 	Adapter = (await import('../../test/models.ts')).TestAdapter;
 }
 
-const cache = new Map();
+export const cache = new Map();
 export function adapter(name: string) {
 	if (!cache.has(name)) {
 		cache.set(name, new Adapter(name));

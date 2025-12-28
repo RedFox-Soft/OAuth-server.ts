@@ -5,13 +5,13 @@ import { ConsentPage } from './consentPage.tsx';
 
 function calculateUid() {
 	const url = new URL(window.location.href);
-	const [, uid] = url.pathname.split('/');
+	const [, , uid] = url.pathname.split('/');
 	return uid;
 }
 
 function pageName() {
 	const url = new URL(window.location.href);
-	const [, , name] = url.pathname.split('/');
+	const [, , , name] = url.pathname.split('/');
 	return name;
 }
 

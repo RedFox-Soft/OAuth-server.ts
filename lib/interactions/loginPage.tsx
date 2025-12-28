@@ -1,6 +1,5 @@
 import { Form, Input, Button, Checkbox, Flex, Card } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
-import React from 'react';
 import { buildUILoginPath } from './buildUIPath.js';
 
 export function LoginPage({ uid }: { uid: string }) {

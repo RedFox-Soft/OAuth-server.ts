@@ -1,4 +1,5 @@
-import { MongoClient, ServerApiVersion } from 'mongodb';
+import { MongoClient, ObjectId, ServerApiVersion } from 'mongodb';
+import crypto from 'crypto';
 
 if (!process.env.MONGODB_URI || !process.env.DATABASE_NAME) {
 	throw new Error(
@@ -16,6 +17,37 @@ const options = {
 
 const dbClient = new MongoClient(process.env.MONGODB_URI, options);
 const db = (await dbClient.connect()).db(process.env.DATABASE_NAME);
+
+function stringTo24CharHex(str: string) {
+	// Use SHA-256 and take the first 12 bytes (24 hex characters)
+	const hash = crypto.createHash('sha256').update(str).digest('hex');
+	return hash.substring(0, 24);
+}
+
+class ConfigStore {
+	static instance = new ConfigStore();
+	private collectionName = 'serviceConfig';
+	private configId = new ObjectId(stringTo24CharHex('appConfig'));
+
+	async get(): Promise<Record<string, unknown> | null> {
+		const result = await db
+			.collection(this.collectionName)
+			.findOne({ _id: this.configId });
+		return result?.config || null;
+	}
+
+	async set(config: Record<string, unknown>): Promise<void> {
+		await db
+			.collection(this.collectionName)
+			.updateOne(
+				{ _id: this.configId },
+				{ $set: { config, updatedAt: new Date() } },
+				{ upsert: true }
+			);
+	}
+}
+
+export const configStore = ConfigStore.instance;
 
 export class MongoAdapter {
 	name: string;
