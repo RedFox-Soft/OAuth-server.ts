@@ -734,7 +734,7 @@ expire.setDate(expire.getDate() + 1);
 				auth.validateError(response, 'invalid_request');
 				auth.validateErrorDescription(
 					response,
-					"Property 'claims' should be one of: 'ObjectString', 'undefined'"
+					"Property 'claims' should be one of: 'ObjectString', 'object'"
 				);
 			});
 
@@ -757,7 +757,7 @@ expire.setDate(expire.getDate() + 1);
 				auth.validateError(response, 'invalid_request');
 				auth.validateErrorDescription(
 					response,
-					"Property 'claims' should be one of: 'ObjectString', 'undefined'"
+					"Property 'claims' should be one of: 'ObjectString', 'object'"
 				);
 			});
 

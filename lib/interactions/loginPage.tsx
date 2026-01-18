@@ -1,6 +1,6 @@
 import { Form, Input, Button, Checkbox, Flex, Card } from 'antd';
-import { UserOutlined, LockOutlined } from '@ant-design/icons';
-import { buildUILoginPath } from './buildUIPath.js';
+import { UserOutlined, LockOutlined, GoogleOutlined } from '@ant-design/icons';
+import { buildUILoginPath, buildUIRegistrationPath } from './buildUIPath.js';
 
 export function LoginPage({ uid }: { uid: string }) {
 	return (
@@ -54,6 +54,14 @@ export function LoginPage({ uid }: { uid: string }) {
 						/>
 					</Form.Item>
 					<Form.Item>
+						<Button
+							block
+							icon={<GoogleOutlined />}
+						>
+							Sign in with Google
+						</Button>
+					</Form.Item>
+					<Form.Item>
 						<Flex
 							justify="space-between"
 							align="center"
@@ -77,7 +85,7 @@ export function LoginPage({ uid }: { uid: string }) {
 						>
 							Log in
 						</Button>
-						or <a href="">Register now!</a>
+						or <a href={buildUIRegistrationPath(uid)}>Register now!</a>
 					</Form.Item>
 				</Form>
 			</Card>
