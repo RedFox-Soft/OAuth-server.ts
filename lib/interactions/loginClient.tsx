@@ -21,7 +21,6 @@ hydrateRoot(
 	document.getElementById('root'),
 	<StrictMode>
 		{(() => {
-			console.log(pageName());
 			switch (pageName()) {
 				case 'login':
 					return <LoginPage uid={calculateUid()} />;

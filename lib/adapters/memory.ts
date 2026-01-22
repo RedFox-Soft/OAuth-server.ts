@@ -23,6 +23,33 @@ const grantable = new Set([
 	'BackchannelAuthenticationRequest'
 ]);
 
+export class UserStore {
+	private users = new Map<string, Record<string, any>>();
+	name = 'redfox';
+
+	constructor(name?: string) {
+		if (name) {
+			this.name = name;
+		}
+	}
+
+	async findByEmail(email: string): Promise<Record<string, any> | null> {
+		return this.users.get(email.toLowerCase()) || null;
+	}
+
+	async create(email: string, password: string): Promise<void> {
+		this.users.set(email.toLowerCase(), {
+			email,
+			verified: false,
+			password,
+			active: true,
+			createdAt: new Date(),
+			updatedAt: new Date(),
+			lastLoginAt: null
+		});
+	}
+}
+
 class ConfigStore {
 	static instance = new ConfigStore();
 	private config: Record<string, any> = {};

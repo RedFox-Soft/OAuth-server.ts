@@ -89,7 +89,7 @@ describe('devInteractions', async () => {
 		let url = null;
 
 		beforeEach(async function () {
-			const login = setup.login();
+			const login = await setup.login();
 			const auth = new AuthorizationRequest({
 				scope: 'openid',
 				prompt: 'consent'
@@ -101,12 +101,13 @@ describe('devInteractions', async () => {
 					cookie: login
 				}
 			});
-			cookie = response.headers.get('set-cookie');
+			cookie = [response.headers.get('set-cookie'), login];
 			url = response.headers.get('location');
 			[, , uid] = url.split('/');
 		});
 
 		it('with a form', async function () {
+			console.log('URL:', cookie);
 			const { data } = await agent.ui[uid].consent.get({
 				headers: {
 					cookie

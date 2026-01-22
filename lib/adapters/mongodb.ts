@@ -24,6 +24,35 @@ function stringTo24CharHex(str: string) {
 	return hash.substring(0, 24);
 }
 
+export class UserStore {
+	private prefix = 'user_';
+	name = 'redfox';
+	constructor(name?: string) {
+		if (name) {
+			this.name = name;
+		}
+	}
+
+	async findByEmail(email: string): Promise<Record<string, any> | null> {
+		const result = await db
+			.collection(this.prefix + this.name)
+			.findOne({ email: email.toLowerCase() });
+		return result || null;
+	}
+
+	async create(email: string, password: string): Promise<void> {
+		await db.collection(this.prefix + this.name).insertOne({
+			email,
+			verified: false,
+			password,
+			active: true,
+			createdAt: new Date(),
+			updatedAt: new Date(),
+			lastLoginAt: null
+		});
+	}
+}
+
 class ConfigStore {
 	static instance = new ConfigStore();
 	private collectionName = 'serviceConfig';

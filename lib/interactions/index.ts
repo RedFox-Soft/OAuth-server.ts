@@ -25,6 +25,7 @@ import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { Session } from 'lib/models/session.js';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { Interaction } from 'lib/models/interaction.js';
+import { getUserStore } from 'lib/adapters/index.js';
 
 const htmlTeamplate = Bun.file('./lib/interactions/htmlTeamplate.html');
 
@@ -80,6 +81,26 @@ export const ui = new Elysia()
 			}
 		});
 	})
+	.post(
+		'ui/:uid/registration',
+		async ({ body, params: { uid } }) => {
+			if (body.password !== body.confirmPassword) {
+				return new Response('Passwords do not match', { status: 400 });
+			}
+			await getUserStore().create(
+				body.email,
+				await Bun.password.hash(body.password)
+			);
+			return Response.redirect(`/ui/${uid}/login`, 303);
+		},
+		{
+			body: t.Object({
+				email: t.String(),
+				password: t.String(),
+				confirmPassword: t.String()
+			})
+		}
+	)
 	.get('ui/:uid/consent', async ({ params: { uid }, interaction }) => {
 		let html = await htmlTeamplate.text();
 		html = html

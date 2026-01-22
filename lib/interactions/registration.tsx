@@ -1,6 +1,6 @@
-import { LockOutlined, MailOutlined, UserOutlined } from '@ant-design/icons';
+import { LockOutlined, MailOutlined } from '@ant-design/icons';
 import { Button, Card, Flex, Form, Input } from 'antd';
-import { buildUIRegistrationPath } from './buildUIPath.js';
+import { buildUILoginPath, buildUIRegistrationPath } from './buildUIPath.js';
 
 export function RegistrationPage({ uid }: { uid: string }) {
 	return (
@@ -33,12 +33,19 @@ export function RegistrationPage({ uid }: { uid: string }) {
 					name="registration"
 					method="post"
 					action={buildUIRegistrationPath(uid)}
+					onFinish={() => {
+						document.forms.registration.submit();
+					}}
 				>
 					<Form.Item
 						name="email"
-						rules={[{ required: true, message: 'Please input your Email!' }]}
+						rules={[
+							{ required: true, message: 'Please input your Email!' },
+							{ type: 'email', message: 'Please enter a valid Email!' }
+						]}
 					>
 						<Input
+							name="email"
 							prefix={<MailOutlined />}
 							placeholder="Email"
 						/>
@@ -48,6 +55,7 @@ export function RegistrationPage({ uid }: { uid: string }) {
 						rules={[{ required: true, message: 'Please input your Password!' }]}
 					>
 						<Input
+							name="password"
 							prefix={<LockOutlined />}
 							type="password"
 							placeholder="Password"
@@ -69,6 +77,7 @@ export function RegistrationPage({ uid }: { uid: string }) {
 						]}
 					>
 						<Input
+							name="confirmPassword"
 							prefix={<LockOutlined />}
 							type="password"
 							placeholder="Confirm Password"
@@ -83,7 +92,7 @@ export function RegistrationPage({ uid }: { uid: string }) {
 						>
 							Register
 						</Button>
-						or <a href="">Already have an account?</a>
+						or <a href={buildUILoginPath(uid)}>Already have an account?</a>
 					</Form.Item>
 				</Form>
 			</Card>
