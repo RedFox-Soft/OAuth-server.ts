@@ -4,6 +4,12 @@ import { LoginPage } from './loginPage.tsx';
 import { ConsentPage } from './consentPage.tsx';
 import { RegistrationPage } from './registration.tsx';
 
+declare global {
+	interface Window {
+		PROPS?: unknown;
+	}
+}
+
 function calculateUid() {
 	const url = new URL(window.location.href);
 	const [, , uid] = url.pathname.split('/');
@@ -16,6 +22,8 @@ function pageName() {
 	return name;
 }
 
+const props = window.PROPS || {};
+
 hydrateRoot(
 	// @ts-expect-error root which already exists
 	document.getElementById('root'),
@@ -23,7 +31,12 @@ hydrateRoot(
 		{(() => {
 			switch (pageName()) {
 				case 'login':
-					return <LoginPage uid={calculateUid()} />;
+					return (
+						<LoginPage
+							uid={calculateUid()}
+							{...props}
+						/>
+					);
 				case 'consent':
 					return (
 						<ConsentPage

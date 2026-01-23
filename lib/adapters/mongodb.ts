@@ -1,5 +1,6 @@
 import { MongoClient, ObjectId, ServerApiVersion } from 'mongodb';
 import crypto from 'crypto';
+import { type User } from './types.js';
 
 if (!process.env.MONGODB_URI || !process.env.DATABASE_NAME) {
 	throw new Error(
@@ -33,16 +34,22 @@ export class UserStore {
 		}
 	}
 
-	async findByEmail(email: string): Promise<Record<string, any> | null> {
+	async findByEmail(email: string): Promise<User | null> {
 		const result = await db
-			.collection(this.prefix + this.name)
+			.collection<User>(this.prefix + this.name)
 			.findOne({ email: email.toLowerCase() });
 		return result || null;
 	}
 
 	async create(email: string, password: string): Promise<void> {
-		await db.collection(this.prefix + this.name).insertOne({
-			email,
+		const existingUser = await this.findByEmail(email);
+		if (existingUser) {
+			throw new Error('User with this email already exists');
+		}
+
+		await db.collection<User>(this.prefix + this.name).insertOne({
+			_id: new ObjectId(),
+			email: email.toLowerCase(),
 			verified: false,
 			password,
 			active: true,

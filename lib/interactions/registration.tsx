@@ -34,7 +34,7 @@ export function RegistrationPage({ uid }: { uid: string }) {
 					method="post"
 					action={buildUIRegistrationPath(uid)}
 					onFinish={() => {
-						document.forms.registration.submit();
+						document.forms.namedItem('registration')?.submit();
 					}}
 				>
 					<Form.Item

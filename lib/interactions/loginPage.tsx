@@ -1,8 +1,19 @@
 import { Form, Input, Button, Checkbox, Flex, Card } from 'antd';
-import { UserOutlined, LockOutlined, GoogleOutlined } from '@ant-design/icons';
+import {
+	UserOutlined,
+	LockOutlined,
+	GoogleOutlined,
+	ExclamationCircleOutlined
+} from '@ant-design/icons';
 import { buildUILoginPath, buildUIRegistrationPath } from './buildUIPath.js';
 
-export function LoginPage({ uid }: { uid: string }) {
+export function LoginPage({
+	uid,
+	errorMessage
+}: {
+	uid: string;
+	errorMessage?: string;
+}) {
 	return (
 		<Flex
 			justify="center"
@@ -33,12 +44,38 @@ export function LoginPage({ uid }: { uid: string }) {
 					initialValues={{ remember: true }}
 					method="post"
 					action={buildUILoginPath(uid)}
+					onFinish={() => {
+						document.forms.namedItem('login')?.submit();
+					}}
 				>
+					{errorMessage && (
+						<Form.Item>
+							<div
+								style={{
+									padding: '12px 16px',
+									borderRadius: '6px',
+									border: '1px solid #ffccc7',
+									backgroundColor: '#fff2f0',
+									display: 'flex',
+									alignItems: 'center',
+									gap: '8px'
+								}}
+							>
+								<span style={{ color: '#ff4d4f', fontSize: '14px' }}>
+									<ExclamationCircleOutlined />
+								</span>
+								<span style={{ color: '#ff4d4f', fontSize: '14px' }}>
+									{errorMessage}
+								</span>
+							</div>
+						</Form.Item>
+					)}
 					<Form.Item
 						name="username"
 						rules={[{ required: true, message: 'Please input your Username!' }]}
 					>
 						<Input
+							name="username"
 							prefix={<UserOutlined />}
 							placeholder="Username"
 						/>
@@ -48,6 +85,7 @@ export function LoginPage({ uid }: { uid: string }) {
 						rules={[{ required: true, message: 'Please input your Password!' }]}
 					>
 						<Input
+							name="password"
 							prefix={<LockOutlined />}
 							type="password"
 							placeholder="Password"
@@ -71,7 +109,7 @@ export function LoginPage({ uid }: { uid: string }) {
 								valuePropName="checked"
 								noStyle
 							>
-								<Checkbox>Remember me</Checkbox>
+								<Checkbox name="remember">Remember me</Checkbox>
 							</Form.Item>
 							<a href="">Forgot password</a>
 						</Flex>

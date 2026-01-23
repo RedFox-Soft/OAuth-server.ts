@@ -1,5 +1,6 @@
 import QuickLRU from 'quick-lru';
 import epochTime from '../helpers/epoch_time.js';
+import { type User } from './types.js';
 
 let storage = new QuickLRU({ maxSize: 1000 });
 
@@ -24,7 +25,7 @@ const grantable = new Set([
 ]);
 
 export class UserStore {
-	private users = new Map<string, Record<string, any>>();
+	private users = new Map<string, User>();
 	name = 'redfox';
 
 	constructor(name?: string) {
@@ -33,12 +34,17 @@ export class UserStore {
 		}
 	}
 
-	async findByEmail(email: string): Promise<Record<string, any> | null> {
+	async findByEmail(email: string): Promise<User | null> {
 		return this.users.get(email.toLowerCase()) || null;
 	}
 
 	async create(email: string, password: string): Promise<void> {
+		if (this.users.has(email.toLowerCase())) {
+			throw new Error('User with this email already exists');
+		}
+
 		this.users.set(email.toLowerCase(), {
+			_id: crypto.randomUUID(),
 			email,
 			verified: false,
 			password,

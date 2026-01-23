@@ -27,7 +27,23 @@ import { DeviceCode } from 'lib/models/device_code.js';
 import { Interaction } from 'lib/models/interaction.js';
 import { getUserStore } from 'lib/adapters/index.js';
 
-const htmlTeamplate = Bun.file('./lib/interactions/htmlTeamplate.html');
+async function resume(interaction) {
+	const ctx = { cookie, _matchedRouteName: 'ui.resume' };
+	ctx.oidc = new OIDCContext(ctx);
+
+	const setCookies = await sessionHandler(ctx);
+	await getResume(ctx, interaction);
+	cookie._interaction.remove();
+	await checkClient(ctx);
+	await checkResource(ctx);
+	provider.emit('interaction.ended');
+	assignClaims(ctx);
+	await loadAccount(ctx);
+	await loadGrant(ctx);
+	await interactions('resume', ctx);
+	await setCookies();
+	return respond(ctx);
+}
 
 export const ui = new Elysia()
 	.guard({
@@ -59,28 +75,35 @@ export const ui = new Elysia()
 
 		return { interaction };
 	})
-	.get('ui/:uid/login', async ({ params: { uid } }) => {
-		let html = await htmlTeamplate.text();
-		html = html
-			.replace('<!--app-title-->', 'Login Page')
-			.replace('<!--app-html-->', loginServer(uid));
-		return new Response(html, {
-			headers: {
-				'Content-Type': 'text/html; charset=utf-8'
+	.get('ui/:uid/login', async ({ params: { uid } }) => loginServer(uid))
+	.post(
+		'ui/:uid/login',
+		async ({ body, params: { uid } }) => {
+			const userStore = getUserStore();
+			const user = await userStore.findByEmail(body.username);
+			if (!user) {
+				return loginServer(uid, 'Invalid username or password');
 			}
-		});
-	})
-	.get('ui/:uid/registration', async ({ params: { uid } }) => {
-		let html = await htmlTeamplate.text();
-		html = html
-			.replace('<!--app-title-->', 'Registration Page')
-			.replace('<!--app-html-->', registrationServer(uid));
-		return new Response(html, {
-			headers: {
-				'Content-Type': 'text/html; charset=utf-8'
+			const validPassword = await Bun.password.verify(
+				body.password,
+				user.password
+			);
+			if (!validPassword) {
+				return loginServer(uid, 'Invalid username or password');
 			}
-		});
-	})
+			return Response.redirect(`/ui/${uid}/consent`, 303);
+		},
+		{
+			body: t.Object({
+				username: t.String(),
+				password: t.String(),
+				remember: t.Boolean()
+			})
+		}
+	)
+	.get('ui/:uid/registration', async ({ params: { uid } }) =>
+		registrationServer(uid)
+	)
 	.post(
 		'ui/:uid/registration',
 		async ({ body, params: { uid } }) => {
@@ -101,17 +124,7 @@ export const ui = new Elysia()
 			})
 		}
 	)
-	.get('ui/:uid/consent', async ({ params: { uid }, interaction }) => {
-		let html = await htmlTeamplate.text();
-		html = html
-			.replace('<!--app-title-->', 'Consent Page')
-			.replace('<!--app-html-->', consentServer(uid));
-		return new Response(html, {
-			headers: {
-				'Content-Type': 'text/html; charset=utf-8'
-			}
-		});
-	})
+	.get('ui/:uid/consent', async ({ params: { uid } }) => consentServer(uid))
 	.get('ui/:uid/abort', async ({ interaction }) => {
 		interaction.result = {
 			error: 'access_denied',
@@ -120,23 +133,6 @@ export const ui = new Elysia()
 		await interaction.save(interaction.exp - epochTime());
 
 		return Response.redirect(interaction.returnTo, 303);
-	})
-	.get('ui/:uid/resume', async ({ interaction, cookie }) => {
-		const ctx = { cookie, _matchedRouteName: 'ui.resume' };
-		ctx.oidc = new OIDCContext(ctx);
-
-		const setCookies = await sessionHandler(ctx);
-		await getResume(ctx, interaction);
-		cookie._interaction.remove();
-		await checkClient(ctx);
-		await checkResource(ctx);
-		provider.emit('interaction.ended');
-		assignClaims(ctx);
-		await loadAccount(ctx);
-		await loadGrant(ctx);
-		await interactions('resume', ctx);
-		await setCookies();
-		return respond(ctx);
 	})
 	.get('ui/:uid/device_resume', async ({ interaction, cookie }) => {
 		const ctx = { cookie, _matchedRouteName: 'ui.device_resume' };
