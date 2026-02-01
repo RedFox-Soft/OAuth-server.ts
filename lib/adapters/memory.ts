@@ -34,18 +34,27 @@ export class UserStore {
 		}
 	}
 
+	async find(_id: string): Promise<User | null> {
+		return this.users.get(_id) || null;
+	}
+
 	async findByEmail(email: string): Promise<User | null> {
-		return this.users.get(email.toLowerCase()) || null;
+		for (const user of this.users.values()) {
+			if (user.email.toLowerCase() === email.toLowerCase()) {
+				return user;
+			}
+		}
+		return null;
 	}
 
 	async create(email: string, password: string): Promise<void> {
 		if (this.users.has(email.toLowerCase())) {
 			throw new Error('User with this email already exists');
 		}
+		const _id = crypto.randomUUID();
 
-		this.users.set(email.toLowerCase(), {
-			_id: crypto.randomUUID(),
-			sub: crypto.randomUUID().replaceAll('-', ''),
+		this.users.set(_id, {
+			_id,
 			email,
 			verified: false,
 			password,

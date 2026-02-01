@@ -9,6 +9,7 @@ import * as errors from './errors.ts';
 import { ApplicationConfig as config } from 'lib/configs/application.js';
 import { Grant } from 'lib/models/grant.js';
 import { TrustedGrant } from 'lib/models/trustedGrant.js';
+import { getUserStore } from 'lib/adapters/index.js';
 
 const warned = new Set();
 function shouldChange(name, msg) {
@@ -386,7 +387,8 @@ async function findAccount(ctx, sub, token) {
 	// @param sub {string} - account identifier (subject)
 	// @param token - is a reference to the token used for which a given account is being loaded,
 	//   is undefined in scenarios where claims are returned from authorization endpoint
-	mustChange('findAccount', 'use your own account model');
+	// const user = await getUserStore().find(sub);
+
 	return {
 		accountId: sub,
 		// @param use {string} - can either be "id_token" or "userinfo", depending on

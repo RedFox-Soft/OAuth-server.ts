@@ -34,6 +34,13 @@ export class UserStore {
 		}
 	}
 
+	async find(_id: string): Promise<User | null> {
+		const result = await db
+			.collection<User>(this.prefix + this.name)
+			.findOne({ _id });
+		return result || null;
+	}
+
 	async findByEmail(email: string): Promise<User | null> {
 		const result = await db
 			.collection<User>(this.prefix + this.name)
@@ -48,8 +55,7 @@ export class UserStore {
 		}
 
 		await db.collection<User>(this.prefix + this.name).insertOne({
-			_id: new ObjectId(),
-			sub: crypto.randomUUID().replaceAll('-', ''),
+			_id: crypto.randomUUID().replaceAll('-', ''),
 			email: email.toLowerCase(),
 			verified: false,
 			password,
