@@ -4,6 +4,7 @@ import { routeNames } from '../consts/param_list.ts';
 import { provider } from '../provider.js';
 import { isPlainObject } from './_/object.js';
 import { ApplicationConfig as config } from 'lib/configs/application.js';
+import { ISSUER } from 'lib/configs/env.js';
 
 export class OIDCContext {
 	#requestParamClaims = null;
@@ -44,11 +45,10 @@ export class OIDCContext {
 	}
 
 	urlFor(name, opt) {
-		const baseUrl = this.ctx.baseUrl;
 		if (name === 'resume') {
 			return new URL(
 				`${routeNames.authorization}/${opt.uid}`,
-				baseUrl
+				ISSUER
 			).toString();
 		}
 

@@ -6,6 +6,7 @@ import { provider } from 'lib/provider.js';
 import { Client } from 'lib/models/client.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AccessToken } from 'lib/models/access_token.js';
+import { Grant } from 'lib/models/grant.js';
 
 const sinon = createSandbox();
 const route = '/token/revocation';
@@ -43,7 +44,7 @@ describe('revocation features', () => {
 				.stub(AccessToken.prototype, 'destroy')
 				.callsFake(() => Promise.resolve());
 			const grantDestroy = sinon
-				.stub(provider.Grant.adapter, 'destroy')
+				.stub(Grant.adapter, 'destroy')
 				.callsFake(() => Promise.resolve());
 
 			const token = await at.save();
@@ -75,7 +76,7 @@ describe('revocation features', () => {
 				.stub(AccessToken.prototype, 'destroy')
 				.callsFake(() => Promise.resolve());
 			const grantDestroy = sinon
-				.stub(provider.Grant.adapter, 'destroy')
+				.stub(Grant.adapter, 'destroy')
 				.callsFake(() => Promise.resolve());
 
 			const token = await at.save();
@@ -203,7 +204,7 @@ describe('revocation features', () => {
 				.stub(RefreshToken.prototype, 'destroy')
 				.callsFake(() => Promise.resolve());
 			const grantDestroy = sinon
-				.stub(provider.Grant.adapter, 'destroy')
+				.stub(Grant.adapter, 'destroy')
 				.callsFake(() => Promise.resolve());
 
 			const token = await rt.save();

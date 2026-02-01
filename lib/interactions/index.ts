@@ -26,8 +26,9 @@ import { Session } from 'lib/models/session.js';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { Interaction } from 'lib/models/interaction.js';
 import { getUserStore } from 'lib/adapters/index.js';
+import { Grant } from 'lib/models/grant.js';
 
-async function resume(interaction) {
+async function resume(interaction, cookie) {
 	const ctx = { cookie, _matchedRouteName: 'ui.resume' };
 	ctx.oidc = new OIDCContext(ctx);
 
@@ -43,6 +44,39 @@ async function resume(interaction) {
 	await interactions('resume', ctx);
 	await setCookies();
 	return respond(ctx);
+}
+
+async function createGrant(interaction) {
+	const { grantId } = interaction;
+	let grant;
+	if (grantId) {
+		// we'll be modifying existing grant in existing session
+		grant = await Grant.find(grantId);
+	} else {
+		// we're establishing a new grant
+		grant = new Grant({
+			accountId: session.accountId,
+			clientId: params.client_id
+		});
+	}
+
+	if (details.missingOIDCScope) {
+		grant.addOIDCScope(details.missingOIDCScope.join(' '));
+	}
+	if (details.missingOIDCClaims) {
+		grant.addOIDCClaims(details.missingOIDCClaims);
+	}
+	if (details.missingResourceScopes) {
+		for (const [indicator, scope] of Object.entries(
+			details.missingResourceScopes
+		)) {
+			grant.addResourceScope(indicator, scope.join(' '));
+		}
+	}
+	const result = { consent: { grantId: await grant.save() } };
+	await provider.interactionFinished(ctx.req, ctx.res, result, {
+		mergeWithLastSubmission: true
+	});
 }
 
 export const ui = new Elysia()
@@ -78,7 +112,7 @@ export const ui = new Elysia()
 	.get('ui/:uid/login', async ({ params: { uid } }) => loginServer(uid))
 	.post(
 		'ui/:uid/login',
-		async ({ body, params: { uid } }) => {
+		async ({ body, params: { uid }, interaction, cookie }) => {
 			const userStore = getUserStore();
 			const user = await userStore.findByEmail(body.username);
 			if (!user) {
@@ -91,13 +125,18 @@ export const ui = new Elysia()
 			if (!validPassword) {
 				return loginServer(uid, 'Invalid username or password');
 			}
-			return Response.redirect(`/ui/${uid}/consent`, 303);
+			interaction.result = {
+				login: {
+					accountId: user.sub
+				}
+			};
+			return resume(interaction, cookie);
 		},
 		{
 			body: t.Object({
 				username: t.String(),
 				password: t.String(),
-				remember: t.Boolean()
+				remember: t.Optional(t.Literal('on'))
 			})
 		}
 	)

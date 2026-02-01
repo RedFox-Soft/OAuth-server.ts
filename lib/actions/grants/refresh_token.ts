@@ -18,6 +18,7 @@ import { gty as deviceCodeGty } from './device_code.ts';
 import { IdToken } from 'lib/models/id_token.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AccessToken } from 'lib/models/access_token.js';
+import { Grant } from 'lib/models/grant.js';
 
 function rarSupported(token) {
 	const [origin] = token.gty.split(' ');
@@ -82,7 +83,7 @@ export const handler = async function refreshTokenHandler(ctx, dPoP) {
 		throw new InvalidGrant('failed x5t#S256 verification');
 	}
 
-	const grant = await ctx.oidc.provider.Grant.find(refreshToken.grantId, {
+	const grant = await Grant.find(refreshToken.grantId, {
 		ignoreExpiration: true
 	});
 

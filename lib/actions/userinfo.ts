@@ -17,6 +17,8 @@ import { IdToken } from 'lib/models/id_token.js';
 import { Client } from 'lib/models/client.js';
 import { provider } from 'lib/provider.js';
 import { AccessToken } from 'lib/models/access_token.js';
+import { Grant } from 'lib/models/grant.js';
+import { TrustedGrant } from 'lib/models/trustedGrant.js';
 
 export const userinfo = new Elysia()
 	.guard({
@@ -99,9 +101,17 @@ export const userinfo = new Elysia()
 			throw new InvalidToken('associated account not found');
 		}
 
-		const grant = await provider.Grant.find(accessToken.grantId, {
-			ignoreExpiration: true
-		});
+		let grant;
+		if (client['consent.require'] === false) {
+			grant = new TrustedGrant({
+				accountId: accessToken.accountId,
+				clientId: accessToken.clientId
+			});
+		} else {
+			grant = await Grant.find(code.grantId, {
+				ignoreExpiration: true
+			});
+		}
 
 		if (!grant) {
 			throw new InvalidToken('grant not found');

@@ -7,6 +7,8 @@ import { base as defaultPolicy } from './interaction_policy/index.ts';
 import htmlSafe from './html_safe.ts';
 import * as errors from './errors.ts';
 import { ApplicationConfig as config } from 'lib/configs/application.js';
+import { Grant } from 'lib/models/grant.js';
+import { TrustedGrant } from 'lib/models/trustedGrant.js';
 
 const warned = new Set();
 function shouldChange(name, msg) {
@@ -425,12 +427,16 @@ function rotateRefreshToken(ctx) {
 }
 
 async function loadExistingGrant(ctx) {
+	const clientId = ctx.oidc.client.clientId;
 	const grantId =
-		ctx.oidc.result?.consent?.grantId ||
-		ctx.oidc.session.grantIdFor(ctx.oidc.client.clientId);
+		ctx.oidc.result?.consent?.grantId || ctx.oidc.session.grantIdFor(clientId);
 
 	if (grantId) {
-		return ctx.oidc.provider.Grant.find(grantId);
+		return Grant.find(grantId);
+	}
+	const accountId = ctx.oidc.account?.accountId;
+	if (ctx.oidc.client['consent.require'] === false && accountId) {
+		return new TrustedGrant({ accountId, clientId });
 	}
 	return undefined;
 }

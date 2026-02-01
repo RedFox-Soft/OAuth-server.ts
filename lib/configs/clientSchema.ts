@@ -97,7 +97,13 @@ export const ClientSchema = t.Object({
 	 * description: The default signing algorithm for request objects
 	 * when using backchannel authentication.
 	 */
-	'requestObject.backChannelSigningAlg': t.Optional(t.String())
+	'requestObject.backChannelSigningAlg': t.Optional(t.String()),
+	/*
+	 * consent.require
+	 *
+	 * description: Makes end-user consent required for this client.
+	 */
+	'consent.require': t.Boolean()
 });
 
 export type ClientSchemaType = Static<typeof ClientSchema>;

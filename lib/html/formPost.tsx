@@ -1,4 +1,3 @@
-import React from 'react';
 import pushInlineSha from '../helpers/script_src_sha.js';
 import { renderToStaticMarkup } from 'react-dom/server';
 

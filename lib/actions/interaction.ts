@@ -6,6 +6,7 @@ import * as attention from '../helpers/attention.ts';
 import { urlencoded as parseBody } from '../shared/selective_body.ts';
 import instance from '../helpers/weak_cache.ts';
 import { defaults } from '../helpers/defaults.ts';
+import { Grant } from 'lib/models/grant.js';
 
 const {
 	interactions: { url: defaultInteractionUri }
@@ -78,10 +79,10 @@ your configuration is not in effect"
 						let grant;
 						if (grantId) {
 							// we'll be modifying existing grant in existing session
-							grant = await provider.Grant.find(grantId);
+							grant = await Grant.find(grantId);
 						} else {
 							// we're establishing a new grant
-							grant = new provider.Grant({
+							grant = new Grant({
 								accountId: session.accountId,
 								clientId: params.client_id
 							});

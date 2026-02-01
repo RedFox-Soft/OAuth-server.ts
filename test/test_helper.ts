@@ -22,6 +22,7 @@ import { ClientDefaults } from 'lib/configs/clientBase.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { Session } from 'lib/models/session.js';
 import { ttl } from 'lib/configs/liveTime.js';
+import { Grant } from 'lib/models/grant.js';
 
 const applicationDefaultSettings = { ...ApplicationConfig };
 const clientDefaultSettings = { ...ClientDefaults };
@@ -155,7 +156,7 @@ export default function testHelper(
 			}
 
 			for (const cl of clients) {
-				const grant = new provider.Grant({ clientId: cl.clientId, accountId });
+				const grant = new Grant({ clientId: cl.clientId, accountId });
 				grant.addOIDCScope(scope);
 				if (ctx.params.claims) {
 					grant.addOIDCClaims(

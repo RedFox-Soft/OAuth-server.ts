@@ -17,6 +17,7 @@ import { Session } from 'lib/models/session.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { TestAdapter } from 'test/models.js';
 import { Interaction } from 'lib/models/interaction.js';
+import { Grant } from 'lib/models/grant.js';
 
 const expire = new Date();
 expire.setDate(expire.getDate() + 1);
@@ -448,7 +449,7 @@ describe('resume after consent', () => {
 
 	describe('login results', () => {
 		it('should process newly established permanent sessions (default)', async function () {
-			sinon.stub(provider.Grant.prototype, 'getOIDCScope').returns('openid');
+			sinon.stub(Grant.prototype, 'getOIDCScope').returns('openid');
 			const auth = new AuthorizationRequest({
 				response_type: 'code',
 				response_mode: 'query',
@@ -474,7 +475,7 @@ describe('resume after consent', () => {
 		});
 
 		it('should process newly established permanent sessions (explicit)', async function () {
-			sinon.stub(provider.Grant.prototype, 'getOIDCScope').returns('openid');
+			sinon.stub(Grant.prototype, 'getOIDCScope').returns('openid');
 			const auth = new AuthorizationRequest({
 				response_mode: 'query',
 				scope: 'openid'
@@ -500,7 +501,7 @@ describe('resume after consent', () => {
 		});
 
 		it('should process newly established temporary sessions', async function () {
-			sinon.stub(provider.Grant.prototype, 'getOIDCScope').returns('openid');
+			sinon.stub(Grant.prototype, 'getOIDCScope').returns('openid');
 			const auth = new AuthorizationRequest({
 				response_mode: 'query',
 				scope: 'openid'
@@ -526,7 +527,7 @@ describe('resume after consent', () => {
 		});
 
 		it('should trigger logout when the session subject changes', async function () {
-			sinon.stub(provider.Grant.prototype, 'getOIDCScope').returns('openid');
+			sinon.stub(Grant.prototype, 'getOIDCScope').returns('openid');
 			const auth = new AuthorizationRequest({
 				response_mode: 'query',
 				scope: 'openid'

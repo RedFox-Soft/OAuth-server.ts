@@ -7,5 +7,6 @@ export const ClientDefaults: Omit<ClientSchemaType, 'clientId'> = {
 	grantTypes: ['authorization_code'],
 	subjectType: 'public',
 	'authorization.requirePushedAuthorizationRequests': false,
-	'requestObject.require': false
+	'requestObject.require': false,
+	'consent.require': true
 };

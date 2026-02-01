@@ -1,3 +1,4 @@
+import { Grant } from 'lib/models/grant.js';
 import { globalConfiguration } from '../../globalConfiguration.ts';
 
 /*
@@ -17,7 +18,7 @@ export default async function loadGrant(ctx) {
 			ctx.oidc.session.ensureClientContainer(ctx.oidc.params.client_id);
 			ctx.oidc.session.grantIdFor(ctx.oidc.params.client_id, grant.jti);
 		} else {
-			grant = new ctx.oidc.provider.Grant({
+			grant = new Grant({
 				accountId: ctx.oidc.account.accountId,
 				clientId: ctx.oidc.client.clientId
 			});

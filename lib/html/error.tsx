@@ -1,4 +1,3 @@
-import React from 'react';
 import { Result } from 'antd';
 import { createCache, extractStyle, StyleProvider } from '@ant-design/cssinjs';
 import { renderToStaticMarkup } from 'react-dom/server';

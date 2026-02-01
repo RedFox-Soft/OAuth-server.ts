@@ -45,6 +45,7 @@ export class UserStore {
 
 		this.users.set(email.toLowerCase(), {
 			_id: crypto.randomUUID(),
+			sub: crypto.randomUUID().replaceAll('-', ''),
 			email,
 			verified: false,
 			password,

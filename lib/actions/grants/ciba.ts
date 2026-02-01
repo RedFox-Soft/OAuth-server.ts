@@ -9,6 +9,7 @@ import resolveResource from '../../helpers/resolve_resource.ts';
 import { IdToken } from 'lib/models/id_token.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AccessToken } from 'lib/models/access_token.js';
+import { Grant } from 'lib/models/grant.js';
 
 const { AuthorizationPending, ExpiredToken, InvalidGrant } = errors;
 
@@ -87,7 +88,7 @@ export const handler = async function cibaHandler(ctx, dPoP) {
 		);
 	}
 
-	const grant = await ctx.oidc.provider.Grant.find(request.grantId, {
+	const grant = await Grant.find(request.grantId, {
 		ignoreExpiration: true
 	});
 

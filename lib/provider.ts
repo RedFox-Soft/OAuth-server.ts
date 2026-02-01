@@ -14,13 +14,12 @@ import { Client } from './models/client.js';
 import { IdToken } from './models/id_token.js';
 import { JWKS_KEYS } from './configs/env.js';
 import KeyStore from './helpers/keystore.js';
+import { Grant } from './models/grant.js';
 
 class ProviderClass extends EventEmitter {
 	#ClientCredentials;
 
 	#BackchannelAuthenticationRequest;
-
-	#Grant;
 
 	#InitialAccessToken;
 
@@ -107,7 +106,6 @@ class ProviderClass extends EventEmitter {
 		{ acr, amr, authTime, sessionUid, expiresWithSession, sid } = {}
 	) {
 		if (typeof request === 'string' && request) {
-			// eslint-disable-next-line no-param-reassign
 			request = await this.BackchannelAuthenticationRequest.find(request, {
 				ignoreExpiration: true
 			});
@@ -124,15 +122,14 @@ class ProviderClass extends EventEmitter {
 		}
 
 		if (typeof result === 'string' && result) {
-			// eslint-disable-next-line no-param-reassign
-			result = await this.Grant.find(result);
+			result = await Grant.find(result);
 			if (!result) {
 				throw new Error('Grant not found');
 			}
 		}
 
 		switch (true) {
-			case result instanceof this.Grant:
+			case result instanceof Grant:
 				if (request.clientId !== result.clientId) {
 					throw new Error('client mismatch');
 				}
@@ -174,11 +171,6 @@ class ProviderClass extends EventEmitter {
 
 	get Client() {
 		return Client;
-	}
-
-	get Grant() {
-		this.#Grant ||= models.getGrant(this);
-		return this.#Grant;
 	}
 
 	get ClientCredentials() {

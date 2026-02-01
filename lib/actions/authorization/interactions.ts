@@ -10,12 +10,16 @@ import { Interaction } from 'lib/models/interaction.js';
 
 export default async function interactions(resumeRouteName, ctx) {
 	const { oidc } = ctx;
+	const client = oidc.client;
 	let failedCheck;
 	let prompt;
 
 	const { policy } = instance(oidc.provider).configuration.interactions;
 
 	for (const poly of policy) {
+		if (poly.name === 'consent' && client['consent.require'] === false) {
+			continue;
+		}
 		const result = await poly.executeChecks(ctx);
 		if (result) {
 			({ firstError: failedCheck, ...prompt } = result);

@@ -2,6 +2,7 @@ import merge from 'lodash/merge.js';
 
 import * as errors from '../../lib/helpers/errors.ts';
 import getConfig from '../default.config.js';
+import { Grant } from 'lib/models/grant.js';
 
 const config = getConfig();
 
@@ -22,7 +23,7 @@ merge(config, {
 			validateRequestContext() {},
 			verifyUserCode() {},
 			async triggerAuthenticationDevice(ctx, request) {
-				const grant = new ctx.oidc.provider.Grant({
+				const grant = new Grant({
 					clientId: request.clientId,
 					accountId: request.accountId
 				});

@@ -3,6 +3,7 @@ import instance from './weak_cache.ts';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';
 import { AccessToken } from 'lib/models/access_token.js';
+import { Grant } from 'lib/models/grant.js';
 
 export default async function revoke(ctx, grantId) {
 	const {
@@ -35,7 +36,7 @@ export default async function revoke(ctx, grantId) {
 				: undefined
 		]
 			.map((model) => model && model.revokeByGrantId(grantId))
-			.concat(revokeGrant ? provider.Grant.adapter.destroy(grantId) : undefined)
+			.concat(revokeGrant ? Grant.adapter.destroy(grantId) : undefined)
 	);
 	if (revokeGrant) {
 		ctx.oidc.provider.emit('grant.revoked', ctx, grantId);

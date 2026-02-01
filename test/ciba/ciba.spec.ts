@@ -14,6 +14,7 @@ import bootstrap, {
 import { emitter } from './ciba.config.js';
 import { provider } from 'lib/provider.js';
 import { ISSUER } from 'lib/configs/env.js';
+import { Grant } from 'lib/models/grant.js';
 
 describe('features.ciba', () => {
 	afterEach(assertNoPendingInterceptors);
@@ -56,7 +57,7 @@ describe('features.ciba', () => {
 			});
 
 			it('"request" can be a BackchannelAuthenticationRequest instance', async function () {
-				const result = new provider.Grant({
+				const result = new Grant({
 					clientId: 'client',
 					accountId: 'accountId'
 				});
@@ -89,7 +90,7 @@ describe('features.ciba', () => {
 			});
 
 			it('"result" can be a string (Grant jti)', async function () {
-				const result = new provider.Grant({
+				const result = new Grant({
 					clientId: 'client',
 					accountId: 'accountId'
 				});
@@ -139,7 +140,7 @@ describe('features.ciba', () => {
 			});
 
 			it('request.clientId must match result.clientId', async function () {
-				const result = new provider.Grant({
+				const result = new Grant({
 					clientId: 'client',
 					accountId: 'accountId'
 				});
@@ -154,7 +155,7 @@ describe('features.ciba', () => {
 			});
 
 			it('request.accountId must match result.accountId', async function () {
-				const result = new provider.Grant({
+				const result = new Grant({
 					clientId: 'client',
 					accountId: 'accountId'
 				});
@@ -169,7 +170,7 @@ describe('features.ciba', () => {
 			});
 
 			it('saves the "request"', async function () {
-				const result = new provider.Grant({
+				const result = new Grant({
 					clientId: 'client',
 					accountId: 'accountId'
 				});
@@ -183,7 +184,7 @@ describe('features.ciba', () => {
 			});
 
 			it('pings the client (204)', async function () {
-				const result = new provider.Grant({
+				const result = new Grant({
 					clientId: 'client-ping',
 					accountId: 'accountId'
 				});
@@ -202,7 +203,7 @@ describe('features.ciba', () => {
 			});
 
 			it('pings the client (200)', async function () {
-				const result = new provider.Grant({
+				const result = new Grant({
 					clientId: 'client-ping',
 					accountId: 'accountId'
 				});
@@ -221,7 +222,7 @@ describe('features.ciba', () => {
 			});
 
 			it('pings the client (400)', async function () {
-				const result = new provider.Grant({
+				const result = new Grant({
 					clientId: 'client-ping',
 					accountId: 'accountId'
 				});
@@ -363,7 +364,7 @@ describe('features.ciba', () => {
 						}),
 					once(emitter, 'triggerAuthenticationDevice')
 				]);
-				const grant = new provider.Grant({
+				const grant = new Grant({
 					accountId: 'accountId',
 					clientId: 'client'
 				});

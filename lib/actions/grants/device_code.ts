@@ -10,6 +10,7 @@ import { IdToken } from 'lib/models/id_token.js';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AccessToken } from 'lib/models/access_token.js';
+import { Grant } from 'lib/models/grant.js';
 
 const { AuthorizationPending, ExpiredToken, InvalidGrant } = errors;
 
@@ -82,7 +83,7 @@ export const handler = async function deviceCodeHandler(ctx, dPoP) {
 		throw new errors.CustomOIDCProviderError(code.error, code.errorDescription);
 	}
 
-	const grant = await ctx.oidc.provider.Grant.find(code.grantId, {
+	const grant = await Grant.find(code.grantId, {
 		ignoreExpiration: true
 	});
 

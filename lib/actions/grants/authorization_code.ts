@@ -10,6 +10,8 @@ import { IdToken } from 'lib/models/id_token.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';
 import { AccessToken } from 'lib/models/access_token.js';
+import { Grant } from 'lib/models/grant.js';
+import { TrustedGrant } from 'lib/models/trustedGrant.js';
 
 const gty = 'authorization_code';
 
@@ -56,9 +58,18 @@ export const handler = async function authorizationCodeHandler(ctx, dPoP) {
 		throw new InvalidGrant('authorization code is expired');
 	}
 
-	const grant = await ctx.oidc.provider.Grant.find(code.grantId, {
-		ignoreExpiration: true
-	});
+	const client = ctx.oidc.client;
+	let grant;
+	if (client['consent.require'] === false) {
+		grant = new TrustedGrant({
+			accountId: code.accountId,
+			clientId: code.clientId
+		});
+	} else {
+		grant = await Grant.find(code.grantId, {
+			ignoreExpiration: true
+		});
+	}
 
 	if (!grant) {
 		throw new InvalidGrant('grant not found');

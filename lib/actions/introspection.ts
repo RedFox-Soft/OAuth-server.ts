@@ -10,6 +10,7 @@ import { IdToken } from 'lib/models/id_token.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { Client } from 'lib/models/client.js';
 import { AccessToken } from 'lib/models/access_token.js';
+import { Grant } from 'lib/models/grant.js';
 
 const introspectable = new Set([
 	'AccessToken',
@@ -74,7 +75,7 @@ async function renderTokenResponse(ctx) {
 	}
 
 	if (token.grantId) {
-		const grant = await provider.Grant.find(token.grantId, {
+		const grant = await Grant.find(token.grantId, {
 			ignoreExpiration: true
 		});
 

@@ -49,6 +49,7 @@ export class UserStore {
 
 		await db.collection<User>(this.prefix + this.name).insertOne({
 			_id: new ObjectId(),
+			sub: crypto.randomUUID().replaceAll('-', ''),
 			email: email.toLowerCase(),
 			verified: false,
 			password,

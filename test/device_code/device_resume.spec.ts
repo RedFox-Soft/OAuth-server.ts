@@ -12,6 +12,7 @@ import { ISSUER } from 'lib/configs/env.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { Interaction } from 'lib/models/interaction.js';
+import { Grant } from 'lib/models/grant.js';
 
 const sinon = createSandbox();
 const { any } = sinon.match;
@@ -340,7 +341,7 @@ describe('device interaction resume /device/:uid/', () => {
 
 		context('login results', () => {
 			it('should process newly established permanent sessions (default)', async function () {
-				sinon.stub(provider.Grant.prototype, 'getOIDCScope').returns('openid');
+				sinon.stub(Grant.prototype, 'getOIDCScope').returns('openid');
 				const spy = sinon.spy(i(provider).features.deviceFlow, 'successSource');
 
 				await setup.call(
@@ -375,7 +376,7 @@ describe('device interaction resume /device/:uid/', () => {
 			});
 
 			it('should process newly established permanent sessions (explicit)', async function () {
-				sinon.stub(provider.Grant.prototype, 'getOIDCScope').returns('openid');
+				sinon.stub(Grant.prototype, 'getOIDCScope').returns('openid');
 				const spy = sinon.spy(i(provider).features.deviceFlow, 'successSource');
 
 				await setup.call(
@@ -411,7 +412,7 @@ describe('device interaction resume /device/:uid/', () => {
 			});
 
 			it('should process newly established temporary sessions', async function () {
-				sinon.stub(provider.Grant.prototype, 'getOIDCScope').returns('openid');
+				sinon.stub(Grant.prototype, 'getOIDCScope').returns('openid');
 				const spy = sinon.spy(i(provider).features.deviceFlow, 'successSource');
 
 				await setup.call(
@@ -444,7 +445,7 @@ describe('device interaction resume /device/:uid/', () => {
 			});
 
 			it('should trigger logout when the session subject changes', async function () {
-				sinon.stub(provider.Grant.prototype, 'getOIDCScope').returns('openid');
+				sinon.stub(Grant.prototype, 'getOIDCScope').returns('openid');
 				const auth = new AuthorizationRequest({ scope: 'openid' });
 
 				await setup.call(

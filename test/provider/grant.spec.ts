@@ -1,73 +1,68 @@
-import { expect } from 'chai';
+import { describe, it, expect } from 'bun:test';
+import { Grant } from 'lib/models/grant.js';
 
-import provider from '../../lib/index.ts';
-
-describe('provider.Grant', () => {
-	before(function () {
-		this.Grant = new provider('http://localhost').Grant;
-	});
-
+describe('Grant', () => {
 	it('manages OIDC Scope', function () {
-		const grant = new this.Grant();
-		expect(grant.getOIDCScope()).to.eql('');
+		const grant = new Grant();
+		expect(grant.getOIDCScope()).toBe('');
 		grant.addOIDCScope('openid');
 		grant.addOIDCScope(['email']);
 		grant.addOIDCScope(new Set(['profile']));
-		expect(grant.getOIDCScope()).to.eql('openid email profile');
+		expect(grant.getOIDCScope()).toBe('openid email profile');
 		grant.addOIDCScope('openid openid');
 		grant.addOIDCScope(['email', 'email']);
 		grant.addOIDCScope(new Set(['profile', 'profile']));
-		expect(grant.getOIDCScope()).to.eql('openid email profile');
+		expect(grant.getOIDCScope()).toBe('openid email profile');
 		grant.addOIDCScope('address');
 		grant.rejectOIDCScope('email');
 		grant.rejectOIDCScope(['profile']);
 		grant.rejectOIDCScope(new Set(['address']));
-		expect(grant.getOIDCScope()).to.eql('openid');
-		expect(grant.getRejectedOIDCScope()).to.eql('email profile address');
+		expect(grant.getOIDCScope()).toBe('openid');
+		expect(grant.getRejectedOIDCScope()).toBe('email profile address');
 		grant.rejectOIDCScope('phone');
-		expect(grant.getOIDCScopeEncountered()).to.eql(
+		expect(grant.getOIDCScopeEncountered()).toBe(
 			'openid email profile address phone'
 		);
 
 		grant.rejected = undefined;
 
-		expect(grant.getOIDCScopeFiltered(new Set(['email', 'profile']))).to.eql(
+		expect(grant.getOIDCScopeFiltered(new Set(['email', 'profile']))).toBe(
 			'email profile'
 		);
 		expect(
 			grant.getOIDCScopeFiltered(new Set(['email', 'profile', 'missing']))
-		).to.eql('email profile');
-		expect(grant.getOIDCScopeFiltered(['email', 'profile'])).to.eql(
+		).toBe('email profile');
+		expect(grant.getOIDCScopeFiltered(['email', 'profile'])).toBe(
 			'email profile'
 		);
-		expect(grant.getOIDCScopeFiltered(['email', 'profile', 'missing'])).to.eql(
+		expect(grant.getOIDCScopeFiltered(['email', 'profile', 'missing'])).toBe(
 			'email profile'
 		);
 	});
 
 	it('manages OIDC Claims', function () {
-		const grant = new this.Grant();
-		expect(grant.getOIDCClaims()).to.deep.eql([]);
+		const grant = new Grant();
+		expect(grant.getOIDCClaims()).toEqual([]);
 		grant.addOIDCClaims(['sub']);
 		grant.addOIDCClaims(['email']);
 		grant.addOIDCClaims(new Set(['name']));
-		expect(grant.getOIDCClaims()).to.deep.eql(['sub', 'email', 'name']);
+		expect(grant.getOIDCClaims()).toEqual(['sub', 'email', 'name']);
 		grant.addOIDCClaims(['sub', 'sub']);
 		grant.addOIDCClaims(['email', 'email']);
 		grant.addOIDCClaims(new Set(['name', 'name']));
-		expect(grant.getOIDCClaims()).to.deep.eql(['sub', 'email', 'name']);
+		expect(grant.getOIDCClaims()).toEqual(['sub', 'email', 'name']);
 		grant.addOIDCClaims(['nickname']);
 		grant.rejectOIDCClaims(['email']);
 		grant.rejectOIDCClaims(['name']);
 		grant.rejectOIDCClaims(new Set(['nickname']));
-		expect(grant.getOIDCClaims()).to.deep.eql(['sub']);
-		expect(grant.getRejectedOIDCClaims()).to.deep.eql([
+		expect(grant.getOIDCClaims()).toEqual(['sub']);
+		expect(grant.getRejectedOIDCClaims()).toEqual([
 			'email',
 			'name',
 			'nickname'
 		]);
 		grant.rejectOIDCClaims(['phone']);
-		expect(grant.getOIDCClaimsEncountered()).to.deep.eql([
+		expect(grant.getOIDCClaimsEncountered()).toEqual([
 			'sub',
 			'email',
 			'name',
@@ -77,43 +72,45 @@ describe('provider.Grant', () => {
 
 		grant.rejected = undefined;
 
-		expect(grant.getOIDCClaimsFiltered(new Set(['email', 'name']))).to.deep.eql(
-			['email', 'name']
-		);
-		expect(
-			grant.getOIDCClaimsFiltered(new Set(['email', 'name', 'missing']))
-		).to.deep.eql(['email', 'name']);
-		expect(grant.getOIDCClaimsFiltered(['email', 'name'])).to.deep.eql([
+		expect(grant.getOIDCClaimsFiltered(new Set(['email', 'name']))).toEqual([
 			'email',
 			'name'
 		]);
 		expect(
-			grant.getOIDCClaimsFiltered(['email', 'name', 'missing'])
-		).to.deep.eql(['email', 'name']);
+			grant.getOIDCClaimsFiltered(new Set(['email', 'name', 'missing']))
+		).toEqual(['email', 'name']);
+		expect(grant.getOIDCClaimsFiltered(['email', 'name'])).toEqual([
+			'email',
+			'name'
+		]);
+		expect(grant.getOIDCClaimsFiltered(['email', 'name', 'missing'])).toEqual([
+			'email',
+			'name'
+		]);
 	});
 
 	it('manages Resource Scope', function () {
-		const grant = new this.Grant();
+		const grant = new Grant();
 		const resource = 'urn:example:rs';
-		expect(grant.getResourceScope(resource)).to.eql('');
+		expect(grant.getResourceScope(resource)).toBe('');
 		grant.addResourceScope(resource, 'read');
 		grant.addResourceScope(resource, ['create']);
 		grant.addResourceScope(resource, new Set(['delete']));
-		expect(grant.getResourceScope(resource)).to.eql('read create delete');
+		expect(grant.getResourceScope(resource)).toBe('read create delete');
 		grant.addResourceScope(resource, 'read read');
 		grant.addResourceScope(resource, ['create', 'create']);
 		grant.addResourceScope(resource, new Set(['delete', 'delete']));
-		expect(grant.getResourceScope(resource)).to.eql('read create delete');
+		expect(grant.getResourceScope(resource)).toBe('read create delete');
 		grant.addResourceScope(resource, 'update');
 		grant.rejectResourceScope(resource, 'create');
 		grant.rejectResourceScope(resource, ['delete']);
 		grant.rejectResourceScope(resource, new Set(['update']));
-		expect(grant.getResourceScope(resource)).to.eql('read');
-		expect(grant.getRejectedResourceScope(resource)).to.eql(
+		expect(grant.getResourceScope(resource)).toBe('read');
+		expect(grant.getRejectedResourceScope(resource)).toBe(
 			'create delete update'
 		);
 		grant.rejectResourceScope(resource, 'phone');
-		expect(grant.getResourceScopeEncountered(resource)).to.eql(
+		expect(grant.getResourceScopeEncountered(resource)).toBe(
 			'read create delete update phone'
 		);
 
@@ -121,18 +118,18 @@ describe('provider.Grant', () => {
 
 		expect(
 			grant.getResourceScopeFiltered(resource, new Set(['create', 'delete']))
-		).to.eql('create delete');
+		).toBe('create delete');
 		expect(
 			grant.getResourceScopeFiltered(
 				resource,
 				new Set(['create', 'delete', 'missing'])
 			)
-		).to.eql('create delete');
-		expect(
-			grant.getResourceScopeFiltered(resource, ['create', 'delete'])
-		).to.eql('create delete');
+		).toBe('create delete');
+		expect(grant.getResourceScopeFiltered(resource, ['create', 'delete'])).toBe(
+			'create delete'
+		);
 		expect(
 			grant.getResourceScopeFiltered(resource, ['create', 'delete', 'missing'])
-		).to.eql('create delete');
+		).toBe('create delete');
 	});
 });
