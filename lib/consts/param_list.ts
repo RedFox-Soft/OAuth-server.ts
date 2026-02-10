@@ -107,7 +107,7 @@ export const routeNames = {
 	backchannel_authentication: '/backchannel',
 	code_verification: '/device',
 	device_authorization: '/device/auth',
-	end_session: '/session/end',
+	end_session: '/logout',
 	introspect: '/token/introspect',
 	jwks: '/jwks',
 	pushed_authorization_request: '/par',

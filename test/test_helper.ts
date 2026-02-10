@@ -77,15 +77,7 @@ export function jsonToFormUrlEncoded(json: Record<string, unknown>) {
 	return searchParams.toString();
 }
 
-export default function testHelper(
-	importMetaUrl,
-	{
-		config: base,
-		protocol = 'http:',
-		mountVia = process.env.MOUNT_VIA,
-		mountTo = mountVia ? process.env.MOUNT_TO || '/' : '/'
-	} = {}
-) {
+export default function testHelper(importMetaUrl, { config: base } = {}) {
 	const dir = dirname(importMetaUrl);
 	base ??= path.basename(dir);
 
@@ -274,26 +266,6 @@ export default function testHelper(
 				if (scope) check.match(new RegExp(`scope="${scope}"`));
 			};
 		}
-
-		if (mountTo !== '/') {
-			['get', 'post', 'put', 'del', 'options', 'trace'].forEach((method) => {
-				const orig = agent[method];
-				agent[method] = function (route, ...args) {
-					if (route.startsWith(mountTo)) {
-						return orig.call(this, route, ...args);
-					}
-					return orig.call(this, `${mountTo}${route}`, ...args);
-				};
-			});
-		}
-
-		/*this.suitePath = (unprefixed) => {
-			if (mountTo === '/') {
-				return unprefixed;
-			}
-
-			return `${mountTo}${unprefixed}`;
-		};*/
 
 		return {
 			assertOnce,

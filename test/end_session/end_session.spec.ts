@@ -1,41 +1,43 @@
+import { beforeAll, describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { parse as parseUrl } from 'node:url';
 
-import { createSandbox } from 'sinon';
-import { expect } from 'chai';
+import sinon from 'sinon';
 import timekeeper from 'timekeeper';
 
-import bootstrap from '../test_helper.js';
+import bootstrap, { agent } from '../test_helper.js';
 import * as JWT from '../../lib/helpers/jwt.ts';
 import { InvalidClient, InvalidRequest } from '../../lib/helpers/errors.ts';
 import { ISSUER } from 'lib/configs/env.js';
 import { provider } from 'lib/provider.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
+import { Client } from 'lib/models/client.js';
+import setup from 'test/device_code/device_code_non_conform.config.js';
 
-const sinon = createSandbox();
-
+const verbs = ['get', 'post'] as const;
 const route = '/session/end';
 
 describe('logout endpoint', () => {
-	before(bootstrap(import.meta.url));
+	let setup;
+	beforeAll(async () => {
+		setup = await bootstrap(import.meta)();
+	});
 	afterEach(() => timekeeper.reset());
 
 	describe('when logged out', () => {
-		['get', 'post'].forEach((verb) => {
+		verbs.forEach((verb) => {
 			describe(`${verb.toUpperCase()} end_session`, () => {
-				it('autosubmits the confirmation form', function () {
-					return this.wrap({ route, verb })
-						.expect(200)
-						.expect(({ text: body }) => {
-							const { state } = this.getSession();
+				it('autosubmits the confirmation form', async function () {
+					const res = await agent.logout[verb]();
+					expect(res.status).toBe(200);
 
-							expect(state.secret).to.be.ok;
-							expect(state.postLogoutRedirectUri).to.be.undefined;
-
-							expect(body).to.include(
+					const { state } = setup.getSession();
+					expect(state.secret).to.be.ok;
+					expect(state.postLogoutRedirectUri).to.be.undefined;
+					expect(body).to.include(
 								`input type="hidden" name="xsrf" value="${state.secret}"`
 							);
-							expect(body).to.include(
+					expect(body).to.include(
 								`form method="post" action="${ISSUER}${this.suitePath('/session/end/confirm')}"`
 							);
 						});
@@ -45,32 +47,30 @@ describe('logout endpoint', () => {
 	});
 
 	describe('when logged in', () => {
-		beforeEach(function () {
-			return this.login();
-		});
-		afterEach(sinon.restore);
-
+		let cookies;
 		beforeEach(async function () {
 			const auth = new AuthorizationRequest({
 				client_id: 'client',
 				scope: 'openid',
 				redirect_uri: 'https://client.example.com/cb'
 			});
-
+			cookies = setup.login();
 			const response = await this.getToken(auth);
 			this.idToken = response.body.id_token;
+			
 		});
+		afterEach(sinon.restore);
 
-		['get', 'post'].forEach((verb) => {
+		verbs.forEach((verb) => {
 			describe(`${verb.toUpperCase()} end_session`, () => {
 				context('client with postLogoutRedirectUris', () => {
 					before(async function () {
-						(await provider.Client.find('client')).postLogoutRedirectUris = [
+						(await Client.find('client')).postLogoutRedirectUris = [
 							'https://client.example.com/logout/cb'
 						];
 					});
 					after(async function () {
-						(await provider.Client.find('client')).postLogoutRedirectUris = [];
+						(await Client.find('client')).postLogoutRedirectUris = [];
 					});
 
 					it('even when expired', function () {
@@ -214,12 +214,12 @@ describe('logout endpoint', () => {
 
 					describe('expired client secrets', () => {
 						after(async function () {
-							const client = await provider.Client.find('client-hmac');
+							const client = await Client.find('client-hmac');
 							client.clientSecretExpiresAt = 0;
 						});
 
 						it('rejects HMAC hints if the secret is expired', async function () {
-							const client = await provider.Client.find('client-hmac');
+							const client = await Client.find('client-hmac');
 
 							const auth = new AuthorizationRequest({
 								client_id: 'client-hmac',

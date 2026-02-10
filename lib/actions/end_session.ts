@@ -1,3 +1,4 @@
+import { Elysia, t } from 'elysia';
 import * as crypto from 'node:crypto';
 
 import {
@@ -15,30 +16,29 @@ import revoke from '../helpers/revoke.ts';
 import { formPost } from '../html/formPost.js';
 import { IdToken } from 'lib/models/id_token.js';
 import { Client } from 'lib/models/client.js';
+import { AuthorizationCookies, routeNames } from 'lib/consts/param_list.js';
 
 const parseBody = bodyParser.bind(
 	undefined,
 	'application/x-www-form-urlencoded'
 );
 
-export const init = [
-	sessionMiddleware,
-	parseBody,
-	paramsMiddleware.bind(
-		undefined,
-		new Set([
-			'id_token_hint',
-			'post_logout_redirect_uri',
-			'state',
-			'ui_locales',
-			'client_id',
-			'logout_hint'
-		])
-	),
+const logoutParameters = t.Object({
+	id_token_hint: t.Optional(t.String()),
+	post_logout_redirect_uri: t.Optional(t.String()),
+	state: t.Optional(t.String()),
+	ui_locales: t.Optional(t.String()),
+	client_id: t.Optional(t.String()),
+	logout_hint: t.Optional(t.String())
+});
 
-	async function endSessionChecks(ctx, next) {
-		const { params } = ctx.oidc;
-
+export const logoutAction = new Elysia()
+	.guard({
+		query: logoutParameters,
+		cookie: AuthorizationCookies
+	})
+	.get(routeNames.end_session, async ({ query }) => {
+		const params = query;
 		let client;
 		if (params.id_token_hint) {
 			try {
@@ -99,11 +99,6 @@ export const init = [
 			params.post_logout_redirect_uri = undefined;
 		}
 
-		await next();
-	},
-
-	async function renderLogout(ctx) {
-		// TODO: generic xsrf middleware to remove this
 		const secret = crypto.randomBytes(24).toString('hex');
 
 		ctx.oidc.session.state = {
@@ -130,8 +125,7 @@ export const init = [
 				logout: 'yes'
 			});
 		}
-	}
-];
+	});
 
 export const confirm = [
 	sessionMiddleware,
