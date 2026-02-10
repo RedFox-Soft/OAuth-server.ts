@@ -1,5 +1,5 @@
 import * as crypto from 'node:crypto';
-import { jwtVerify, EmbeddedJWK, calculateJwkThumbprint } from 'jose';
+import { jwtVerify, EmbeddedJWK, calculateJwkThumbprint,  type JWTPayload, type JWTHeaderParameters } from 'jose';
 
 import { ApplicationConfig as config } from 'lib/configs/application.js';
 import { InvalidHeaderAuthorization, InvalidToken } from './errors.js';
@@ -43,8 +43,8 @@ export async function dpopValidate(
 		throw new Error('dpop.nonceSecret configuration is missing');
 	}
 
-	let payload;
-	let protectedHeader;
+	let payload: JWTPayload;
+	let protectedHeader: JWTHeaderParameters;
 	try {
 		({ protectedHeader, payload } = await jwtVerify(proof, EmbeddedJWK, {
 			algorithms: dPoPSigningAlgValues,
@@ -83,6 +83,9 @@ export async function dpopValidate(
 		}
 
 		{
+			if (typeof payload.htu !== 'string' || !payload.htu) {
+				return;
+			}
 			const actual = URL.parse(payload.htu);
 			if (!actual) return;
 			actual.hash = '';
@@ -103,7 +106,7 @@ export async function dpopValidate(
 		if (err instanceof InvalidDpopProof || err instanceof UseDpopNonce) {
 			throw err;
 		}
-		throw new InvalidDpopProof('invalid DPoP key binding', err.message);
+		throw new InvalidDpopProof('invalid DPoP key binding', err instanceof Error ? err.message : String(err));
 	}
 
 	if (!payload.nonce && requireNonce) {
@@ -118,6 +121,9 @@ export async function dpopValidate(
 		ctx.set('DPoP-Nonce', nextNonce);
 	}*/
 
+	if (!protectedHeader.jwk) {
+		throw new UseDpopNonce('invalid Signed JWT Header Parameter jwk in DPoP');
+	}
 	const thumbprint = await calculateJwkThumbprint(protectedHeader.jwk);
 
 	return {
