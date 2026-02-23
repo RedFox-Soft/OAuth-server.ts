@@ -21,7 +21,7 @@ import { discovery } from './actions/discovery.js';
 import { userinfo } from './actions/userinfo.js';
 import { backchannelAuth, deviceAuth } from './actions/authorization/device.js';
 import { introspect } from './actions/introspection.js';
-import { logoutAction } from './actions/end_session.js';
+import { logoutAction, logoutConfirmAction } from './actions/end_session.js';
 
 export const elysia = new Elysia({ strictPath: true, normalize: false })
 	.onError(errorHandler)
@@ -36,6 +36,7 @@ export const elysia = new Elysia({ strictPath: true, normalize: false })
 	.use(introspect)
 	.use(tokenAction)
 	.use(logoutAction)
+	.use(logoutConfirmAction)
 	.use(userinfo)
 	.use(ui)
 	.listen(3000);

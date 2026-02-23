@@ -188,20 +188,12 @@ export default function testHelper(importMetaUrl, { config: base } = {}) {
 		}
 
 		function getSessionId() {
-			const { value: sessionId } =
-				agent.jar.getCookie('_session', CookieAccessInfo.All) || {};
-			return sessionId;
+			return getLastSession().jti;
 		}
 
-		function getSession({ instantiate } = { instantiate: false }) {
-			const sessionId = getLastSession().jti;
-			const raw = TestAdapter.for('Session').syncFind(sessionId);
-
-			if (instantiate) {
-				return new Session(raw);
-			}
-
-			return raw;
+		function getSession(id?: string) {
+			const sessionId = id ?? getLastSession().jti;
+			return TestAdapter.for('Session').syncFind(sessionId);
 		}
 
 		function getGrantId(clientId) {

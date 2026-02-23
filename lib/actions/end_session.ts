@@ -9,19 +9,15 @@ import {
 import * as JWT from '../helpers/jwt.ts';
 import redirectUri from '../helpers/redirect_uri.ts';
 import instance from '../helpers/weak_cache.ts';
-import bodyParser from '../shared/conditional_body.ts';
-import paramsMiddleware from '../shared/assemble_params.ts';
-import sessionMiddleware from '../shared/session.ts';
 import revoke from '../helpers/revoke.ts';
-import { formPost } from '../html/formPost.js';
 import { IdToken } from 'lib/models/id_token.js';
 import { Client } from 'lib/models/client.js';
 import { AuthorizationCookies, routeNames } from 'lib/consts/param_list.js';
-
-const parseBody = bodyParser.bind(
-	undefined,
-	'application/x-www-form-urlencoded'
-);
+import { OIDCContext } from 'lib/helpers/oidc_context.js';
+import sessionHandler from '../shared/session.ts';
+import { logoutSuccess } from '../html/logoutSuccess.tsx';
+import { logout } from '../html/logout.tsx';
+import { provider } from '../provider.js';
 
 const logoutParameters = t.Object({
 	id_token_hint: t.Optional(t.String()),
@@ -37,7 +33,14 @@ export const logoutAction = new Elysia()
 		query: logoutParameters,
 		cookie: AuthorizationCookies
 	})
-	.get(routeNames.end_session, async ({ query }) => {
+	.get(routeNames.end_session, async ({ query, cookie, route }) => {
+		const ctx = {
+			cookie,
+			_matchedRouteName: route
+		};
+		ctx.oidc = new OIDCContext(ctx);
+		ctx.oidc.params = query;
+		const setCookies = await sessionHandler(ctx);
 		const params = query;
 		let client;
 		if (params.id_token_hint) {
@@ -108,50 +111,44 @@ export const logoutAction = new Elysia()
 			postLogoutRedirectUri: ctx.oidc.params.post_logout_redirect_uri
 		};
 
-		const action = ctx.oidc.urlFor('end_session_confirm');
-
+		await setCookies();
 		if (ctx.oidc.session.accountId) {
-			ctx.type = 'html';
-			ctx.status = 200;
-
-			const formHtml = `<form id="op.logoutForm" method="post" action="${action}"><input type="hidden" name="xsrf" value="${secret}"/></form>`;
-			await instance(ctx.oidc.provider).features.rpInitiatedLogout.logoutSource(
-				ctx,
-				formHtml
-			);
-		} else {
-			formPost(ctx, action, {
-				xsrf: secret,
-				logout: 'yes'
-			});
+			return logout(secret);
 		}
+		return logoutSuccess();
 	});
 
-export const confirm = [
-	sessionMiddleware,
-	parseBody,
-	paramsMiddleware.bind(undefined, new Set(['xsrf', 'logout'])),
+export const logoutConfirmAction = new Elysia()
+	.guard({
+		body: t.Object({
+			xsrf: t.String(),
+			logout: t.Optional(t.Literal('true'))
+		}),
+		cookie: AuthorizationCookies
+	})
+	.post(routeNames.end_session_confirm, async ({ body, cookie, route }) => {
+		const ctx = {
+			cookie,
+			_matchedRouteName: route
+		};
+		ctx.oidc = new OIDCContext(ctx);
+		const setCookies = await sessionHandler(ctx);
 
-	async function checkLogoutToken(ctx, next) {
 		if (!ctx.oidc.session.state) {
 			throw new InvalidRequest('could not find logout details');
 		}
-		if (ctx.oidc.session.state.secret !== ctx.oidc.params.xsrf) {
+		if (ctx.oidc.session.state.secret !== body.xsrf) {
 			throw new InvalidRequest('xsrf token invalid');
 		}
-		await next();
-	},
 
-	async function endSession(ctx) {
 		const {
 			oidc: { session, params }
 		} = ctx;
 		const { state } = session;
 
 		const {
-			features: { backchannelLogout },
-			cookies: { long: opts }
-		} = instance(ctx.oidc.provider).configuration;
+			features: { backchannelLogout }
+		} = instance(provider).configuration;
 
 		if (backchannelLogout.enabled) {
 			const clientIds = Object.keys(session.authorizations || {});
@@ -200,7 +197,7 @@ export const confirm = [
 			ctx.oidc.entity('Client', await Client.find(state.clientId));
 		}
 
-		if (params.logout) {
+		if (body.logout) {
 			if (session.authorizations) {
 				await Promise.all(
 					Object.entries(session.authorizations).map(
@@ -220,13 +217,12 @@ export const confirm = [
 			}
 
 			await session.destroy();
-
-			ctx.cookies.set(ctx.oidc.provider.cookieName('session'), null, opts);
+			cookie._session.remove();
 		} else if (state.clientId) {
 			const grantId = session.grantIdFor(state.clientId);
 			if (grantId && !session.authorizationFor(state.clientId).persistsLogout) {
 				await revoke(ctx, grantId);
-				ctx.oidc.provider.emit('grant.revoked', ctx, grantId);
+				provider.emit('grant.revoked', ctx, grantId);
 			}
 			session.state = undefined;
 			if (session.authorizations) {
@@ -235,40 +231,15 @@ export const confirm = [
 			session.resetIdentifier();
 		}
 
+		provider.emit('end_session.success', ctx);
+		await setCookies();
+
 		const usePostLogoutUri = state.postLogoutRedirectUri;
-		const forwardClientId =
-			!usePostLogoutUri && !params.logout && state.clientId;
-		const uri = redirectUri(
-			usePostLogoutUri
-				? state.postLogoutRedirectUri
-				: ctx.oidc.urlFor('end_session_success'),
-			{
-				...(usePostLogoutUri && state.state != null
-					? { state: state.state }
-					: undefined), // != intended
-				...(forwardClientId ? { client_id: state.clientId } : undefined)
-			}
-		);
-
-		ctx.oidc.provider.emit('end_session.success', ctx);
-
-		ctx.status = 303;
-		ctx.redirect(uri);
-	}
-];
-
-export const success = [
-	paramsMiddleware.bind(undefined, new Set(['client_id'])),
-	async function postLogoutSuccess(ctx) {
-		if (ctx.oidc.params.client_id) {
-			const client = await Client.find(ctx.oidc.params.client_id);
-			if (!client) {
-				throw new InvalidClient('client is invalid', 'client not found');
-			}
-			ctx.oidc.entity('Client', client);
+		if (usePostLogoutUri) {
+			const param = state.state != null ? { state: state.state } : {};
+			const uri = redirectUri(state.postLogoutRedirectUri, param);
+			return Response.redirect(uri, 303);
 		}
-		await instance(
-			ctx.oidc.provider
-		).features.rpInitiatedLogout.postLogoutSuccessSource(ctx);
-	}
-];
+
+		return logoutSuccess();
+	});

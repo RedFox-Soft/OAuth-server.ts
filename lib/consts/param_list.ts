@@ -108,6 +108,7 @@ export const routeNames = {
 	code_verification: '/device',
 	device_authorization: '/device/auth',
 	end_session: '/logout',
+	end_session_confirm: '/logout/confirm',
 	introspect: '/token/introspect',
 	jwks: '/jwks',
 	pushed_authorization_request: '/par',

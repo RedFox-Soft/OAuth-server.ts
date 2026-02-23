@@ -88,7 +88,9 @@ const mapErrorCode = {
 	[routeNames.authorization]: 'authorization.error',
 	[routeNames.device_authorization]: 'device_authorization.error',
 	[routeNames.introspect]: 'introspection.error',
-	[routeNames.userinfo]: 'userinfo.error'
+	[routeNames.userinfo]: 'userinfo.error',
+	[routeNames.end_session]: 'end_session.error',
+	[routeNames.end_session_confirm]: 'end_session_confirm.error'
 };
 
 export async function errorHandler(obj: ErrorContext) {

@@ -54,7 +54,9 @@ function renderLogoutForm(secret: string) {
 								</Button>
 								<Button
 									block
+									name="logout"
 									type="primary"
+									value="true"
 									htmlType="submit"
 									className="logout logout-submit"
 									autoFocus
