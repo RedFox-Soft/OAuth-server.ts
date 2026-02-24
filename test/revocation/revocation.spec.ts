@@ -7,6 +7,7 @@ import { Client } from 'lib/models/client.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Grant } from 'lib/models/grant.js';
+import { ClientCredentials } from 'lib/models/client_credentials.js';
 
 const sinon = createSandbox();
 const route = '/token/revocation';
@@ -297,12 +298,12 @@ describe('revocation features', () => {
 		});
 
 		it('revokes client credentials token [no hint]', async function () {
-			const rt = new provider.ClientCredentials({
-				client: await provider.Client.find('client')
+			const rt = new ClientCredentials({
+				client: await Client.find('client')
 			});
 
 			const stub = sinon
-				.stub(provider.ClientCredentials.prototype, 'destroy')
+				.stub(ClientCredentials.prototype, 'destroy')
 				.callsFake(() => Promise.resolve());
 
 			const token = await rt.save();
@@ -319,12 +320,12 @@ describe('revocation features', () => {
 		});
 
 		it('revokes client credentials token [correct hint]', async function () {
-			const rt = new provider.ClientCredentials({
-				client: await provider.Client.find('client')
+			const rt = new ClientCredentials({
+				client: await Client.find('client')
 			});
 
 			const stub = sinon
-				.stub(provider.ClientCredentials.prototype, 'destroy')
+				.stub(ClientCredentials.prototype, 'destroy')
 				.callsFake(() => Promise.resolve());
 
 			const token = await rt.save();
@@ -341,12 +342,12 @@ describe('revocation features', () => {
 		});
 
 		it('revokes client credentials token [wrong hint]', async function () {
-			const rt = new provider.ClientCredentials({
-				client: await provider.Client.find('client')
+			const rt = new ClientCredentials({
+				client: await Client.find('client')
 			});
 
 			const stub = sinon
-				.stub(provider.ClientCredentials.prototype, 'destroy')
+				.stub(ClientCredentials.prototype, 'destroy')
 				.callsFake(() => Promise.resolve());
 
 			const token = await rt.save();
@@ -363,12 +364,12 @@ describe('revocation features', () => {
 		});
 
 		it('revokes client credentials token [unrecognized hint]', async function () {
-			const rt = new provider.ClientCredentials({
-				client: await provider.Client.find('client')
+			const rt = new ClientCredentials({
+				client: await Client.find('client')
 			});
 
 			const stub = sinon
-				.stub(provider.ClientCredentials.prototype, 'destroy')
+				.stub(ClientCredentials.prototype, 'destroy')
 				.callsFake(() => Promise.resolve());
 
 			const token = await rt.save();
@@ -535,7 +536,7 @@ describe('revocation features', () => {
 				}, done);
 
 				(async () => {
-					const rt = new provider.ClientCredentials({
+					const rt = new ClientCredentials({
 						client: await Client.find('client')
 					});
 

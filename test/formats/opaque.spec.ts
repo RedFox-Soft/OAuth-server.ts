@@ -10,6 +10,7 @@ import { DeviceCode } from 'lib/models/device_code.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';
 import { AccessToken } from 'lib/models/access_token.js';
+import { ClientCredentials } from 'lib/models/client_credentials.js';
 
 const sinon = createSandbox();
 
@@ -285,7 +286,7 @@ describe('opaque storage', () => {
 		const kind = 'ClientCredentials';
 		const upsert = spy(TestAdapter.for('ClientCredentials'), 'upsert');
 		const client = await Client.find(clientId);
-		const token = new provider.ClientCredentials({
+		const token = new ClientCredentials({
 			client,
 			...fullPayload
 		});
@@ -308,7 +309,7 @@ describe('opaque storage', () => {
 
 	it('for ClientCredentials extraTokenClaims gets assigned upon save()', async function () {
 		const client = await Client.find(clientId);
-		const token = new provider.ClientCredentials({
+		const token = new ClientCredentials({
 			client,
 			...fullPayload,
 			extra: undefined

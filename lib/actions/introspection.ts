@@ -11,6 +11,7 @@ import { RefreshToken } from 'lib/models/refresh_token.js';
 import { Client } from 'lib/models/client.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Grant } from 'lib/models/grant.js';
+import { ClientCredentials } from 'lib/models/client_credentials.js';
 
 const introspectable = new Set([
 	'AccessToken',
@@ -25,7 +26,6 @@ const tokenTypes = {
 	},
 	client_credentials(token: string) {
 		const { grantTypeHandlers } = instance(provider);
-		const { ClientCredentials } = provider;
 		if (!grantTypeHandlers.has('client_credentials')) {
 			return;
 		}

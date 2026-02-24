@@ -16,6 +16,7 @@ import { ISSUER } from 'lib/configs/env.js';
 import { TestAdapter } from 'test/models.js';
 import { Client } from 'lib/models/client.js';
 import { AccessToken } from 'lib/models/access_token.js';
+import { ClientCredentials } from 'lib/models/client_credentials.js';
 
 const sinon = createSandbox();
 
@@ -829,8 +830,8 @@ describe('jwt format', () => {
 
 	it('for ClientCredentials', async function () {
 		const upsert = sinon.spy(TestAdapter.for('ClientCredentials'), 'upsert');
-		const client = await provider.Client.find(clientId);
-		const token = new provider.ClientCredentials({
+		const client = await Client.find(clientId);
+		const token = new ClientCredentials({
 			client,
 			...fullPayload
 		});

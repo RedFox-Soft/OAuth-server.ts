@@ -17,6 +17,7 @@ import { RefreshToken } from 'lib/models/refresh_token.js';
 import { Client } from 'lib/models/client.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';
 import { AccessToken } from 'lib/models/access_token.js';
+import { ClientCredentials } from 'lib/models/client_credentials.js';
 
 describe('introspection features', () => {
 	let setup = null;
@@ -218,7 +219,7 @@ describe('introspection features', () => {
 		});
 
 		it('returns the properties for client credentials token [no hint]', async function () {
-			const rt = new provider.ClientCredentials({
+			const rt = new ClientCredentials({
 				client: await Client.find('client')
 			});
 
@@ -234,7 +235,7 @@ describe('introspection features', () => {
 		});
 
 		it('returns the properties for client credentials token [correct hint]', async function () {
-			const rt = new provider.ClientCredentials({
+			const rt = new ClientCredentials({
 				client: await Client.find('client')
 			});
 
@@ -250,7 +251,7 @@ describe('introspection features', () => {
 		});
 
 		it('returns the properties for client credentials token [wrong hint]', async function () {
-			const rt = new provider.ClientCredentials({
+			const rt = new ClientCredentials({
 				client: await Client.find('client')
 			});
 
@@ -266,7 +267,7 @@ describe('introspection features', () => {
 		});
 
 		it('returns the properties for client credentials token [unrecognized hint]', async function () {
-			const rt = new provider.ClientCredentials({
+			const rt = new ClientCredentials({
 				client: await Client.find('client')
 			});
 
@@ -510,7 +511,7 @@ describe('introspection features', () => {
 			it('when introspecting ClientCredentials', async function () {
 				const spy = spyOn(OIDCContext.prototype, 'entity');
 
-				const rt = new provider.ClientCredentials({
+				const rt = new ClientCredentials({
 					client: await Client.find('client')
 				});
 

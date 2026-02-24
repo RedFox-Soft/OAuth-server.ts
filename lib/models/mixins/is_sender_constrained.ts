@@ -10,7 +10,7 @@ export default (superclass) =>
 			return [...super.IN_PAYLOAD, x5t, jkt];
 		}
 
-		setThumbprint(prop, input) {
+		setThumbprint(prop: 'x5t' | 'jkt', input: string) {
 			switch (prop) {
 				case 'x5t':
 					if (this[jkt]) {
@@ -28,8 +28,6 @@ export default (superclass) =>
 					}
 					this[jkt] = input;
 					break;
-				default:
-					throw new Error('unsupported');
 			}
 		}
 

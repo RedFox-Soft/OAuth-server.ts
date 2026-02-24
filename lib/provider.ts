@@ -17,8 +17,6 @@ import KeyStore from './helpers/keystore.js';
 import { Grant } from './models/grant.js';
 
 class ProviderClass extends EventEmitter {
-	#ClientCredentials;
-
 	#BackchannelAuthenticationRequest;
 
 	#InitialAccessToken;
@@ -171,11 +169,6 @@ class ProviderClass extends EventEmitter {
 
 	get Client() {
 		return Client;
-	}
-
-	get ClientCredentials() {
-		this.#ClientCredentials ||= models.getClientCredentials(this);
-		return this.#ClientCredentials;
 	}
 
 	get InitialAccessToken() {

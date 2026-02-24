@@ -22,6 +22,7 @@ import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { ttl } from 'lib/configs/liveTime.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';
 import { AccessToken } from 'lib/models/access_token.js';
+import { ClientCredentials } from 'lib/models/client_credentials.js';
 
 describe('dynamic ttl', () => {
 	let setup = null;
@@ -49,9 +50,7 @@ describe('dynamic ttl', () => {
 		expect(data).toHaveProperty('expires_in', 123);
 
 		expect(clientSpy).toBeCalledTimes(1);
-		expect(clientSpy.mock.calls[0][1]).toBeInstanceOf(
-			provider.ClientCredentials
-		);
+		expect(clientSpy.mock.calls[0][1]).toBeInstanceOf(ClientCredentials);
 		expect(clientSpy.mock.calls[0][2]).toBeInstanceOf(Client);
 	});
 

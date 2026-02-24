@@ -13,7 +13,6 @@ import { parse as parseUrl } from 'node:url';
 
 import bootstrap, { agent } from '../test_helper.js';
 import * as JWT from '../../lib/helpers/jwt.js';
-import { InvalidClient } from '../../lib/helpers/errors.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { provider } from 'lib/provider.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';

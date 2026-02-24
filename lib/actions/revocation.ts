@@ -7,6 +7,7 @@ import paramsMiddleware from '../shared/assemble_params.ts';
 import revoke from '../helpers/revoke.ts';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AccessToken } from 'lib/models/access_token.js';
+import { ClientCredentials } from 'lib/models/client_credentials.js';
 
 const revokeable = new Set([
 	'AccessToken',
@@ -27,7 +28,7 @@ export default async function revocationAction(provider) {
 		if (!grantTypeHandlers.has('client_credentials')) {
 			return undefined;
 		}
-		return provider.ClientCredentials.find(token);
+		return ClientCredentials.find(token);
 	}
 
 	function getRefreshToken(token) {

@@ -1,6 +1,4 @@
-import sinon from 'sinon';
-
-import { describe, it, beforeAll, expect } from 'bun:test';
+import { describe, it, beforeAll, expect, mock, afterEach } from 'bun:test';
 import bootstrap, { agent } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import provider from 'lib/index.js';
@@ -11,6 +9,10 @@ describe('/auth', () => {
 	beforeAll(async function () {
 		setup = await bootstrap(import.meta.url)();
 		cookie = await setup.login();
+	});
+
+	afterEach(function () {
+		mock.restore();
 	});
 
 	['get', 'post'].forEach((verb) => {
@@ -43,7 +45,7 @@ describe('/auth', () => {
 						scope: 'openid'
 					});
 
-					const { data, response, error } = await authRequest(auth);
+					const { data, response } = await authRequest(auth);
 					expect(response.status).toBe(200);
 					expect(response.headers.get('content-type')).toBe(
 						'text/html; charset=utf-8'
@@ -81,7 +83,7 @@ describe('/auth', () => {
 					scope: 'openid'
 				});
 
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once('authorization.error', spy);
 
 				const { response, error } = await authRequest(auth, true);
@@ -98,6 +100,7 @@ describe('/auth', () => {
 				expect(error.value).toContain(
 					`form action="${auth.params.redirect_uri}" method="post"`
 				);
+				expect(spy).toHaveBeenCalled();
 			});
 		});
 	});

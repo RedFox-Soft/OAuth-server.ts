@@ -6,10 +6,10 @@ import {
 	InvalidRequest
 } from '../../helpers/errors.ts';
 import checkResource from '../../shared/check_resource.ts';
+import { ClientCredentials } from 'lib/models/client_credentials.js';
 
 export const handler = async function clientCredentialsHandler(ctx, dPoP) {
 	const { client } = ctx.oidc;
-	const { ClientCredentials } = ctx.oidc.provider;
 	const {
 		features: {
 			mTLS: { getCertificate }
