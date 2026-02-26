@@ -263,10 +263,6 @@ async function getResourceServerInfo(ctx, resourceIndicator, client) {
 	throw new InvalidTarget();
 }
 
-async function extraTokenClaims(ctx, token) {
-	return undefined;
-}
-
 async function expiresWithSession(ctx, code) {
 	return !code.scopes.has('offline_access');
 }
@@ -1544,49 +1540,7 @@ export const globalConfiguration = {
 		jwtUserinfo: { enabled: false }
 	},
 
-	/*
-	 * extraTokenClaims
-	 *
-	 * description: Function used to add additional claims to an Access Token
-	 *   when it is being issued. For `opaque` Access Tokens these claims will be stored
-	 *   in your storage under the `extra` property and returned by introspection as top
-	 *   level claims. For `jwt` Access Tokens these will be top level claims.
-	 *   Returned claims will not overwrite pre-existing top level claims.
-	 *
-	 * example: To add an arbitrary claim to an Access Token
-	 * ```js
-	 * {
-	 *   async extraTokenClaims(ctx, token) {
-	 *     return {
-	 *       'urn:idp:example:foo': 'bar',
-	 *     };
-	 *   }
-	 * }
-	 * ```
-	 */
-	extraTokenClaims,
-
 	formats: {
-		/*
-		 * formats.bitsOfOpaqueRandomness
-		 *
-		 * description: The value should be an integer (or a function returning an integer) and the
-		 *   resulting opaque token length is equal to `Math.ceil(i / Math.log2(n))` where n is the
-		 *   number of symbols in the used alphabet, 64 in our case.
-		 *
-		 * example: To have e.g. Refresh Tokens values longer than Access Tokens.
-		 * ```js
-		 * function bitsOfOpaqueRandomness(token) {
-		 *   if (token.kind === 'RefreshToken') {
-		 *     return 384;
-		 *   }
-		 *
-		 *   return 256;
-		 * }
-		 * ```
-		 */
-		bitsOfOpaqueRandomness: 256,
-
 		/*
 		 * formats.customizers
 		 *

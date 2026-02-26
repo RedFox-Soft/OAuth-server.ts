@@ -16,7 +16,7 @@ export class ReplayDetection extends BaseModel {
 			return false;
 		}
 
-		const inst = this.instantiate({ jti: id, iss });
+		const inst = new this({ jti: id, iss });
 
 		await inst.save(exp - epochTime());
 

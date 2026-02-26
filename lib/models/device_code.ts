@@ -21,7 +21,7 @@ export class DeviceCode extends apply([
 			if (!constantEquals(userCode, payload.userCode)) {
 				return;
 			}
-			return this.instantiate(payload);
+			return new this(payload);
 		} catch (err) {
 			return;
 		}

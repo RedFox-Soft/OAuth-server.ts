@@ -2,9 +2,8 @@ import * as crypto from 'node:crypto';
 
 import * as JWT from '../../helpers/jwt.ts';
 import instance from '../../helpers/weak_cache.ts';
-import nanoid from '../../helpers/nanoid.ts';
+import nanoid from '../../helpers/nanoid.js';
 import als from '../../helpers/als.ts';
-import { opaque } from './opaque.js';
 import { provider } from 'lib/provider.js';
 import { ISSUER } from 'lib/configs/env.js';
 
@@ -111,8 +110,7 @@ export const jwt = {
 	generateTokenId() {
 		return nanoid();
 	},
-	async getValueAndPayload() {
-		const { payload } = await opaque.getValueAndPayload.call(this);
+	async getValueAndPayload(payload) {
 		const {
 			aud,
 			jti,

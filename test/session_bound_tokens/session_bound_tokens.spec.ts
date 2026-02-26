@@ -4,7 +4,6 @@ import * as url from 'node:url';
 import { expect } from 'chai';
 
 import bootstrap, { skipConsent } from '../test_helper.js';
-import { provider } from 'lib/provider.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';

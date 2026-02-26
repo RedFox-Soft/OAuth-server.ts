@@ -43,7 +43,7 @@ export class Interaction extends BaseModel {
 		this.jti = value;
 	}
 
-	async save(ttl) {
+	async save(ttl: number) {
 		if (typeof ttl !== 'number') {
 			throw new TypeError('"ttl" argument must be a number');
 		}

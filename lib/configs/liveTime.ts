@@ -2,6 +2,13 @@ import type { Client } from 'lib/models/client.js';
 import type { IdToken } from 'lib/models/id_token.js';
 
 /*
+ * The constant which determines how many bits of randomness the opaque token should have. 256 bits is the same as the default for uuidv4, and is considered sufficient for security purposes. It also results in a token length of 43 characters when using nanoid, which is a reasonable length for an opaque token.
+ * If you want to increase the security of the opaque tokens, you can increase this constant. However, keep in mind that increasing the number of bits will also increase the length of the generated token, which may have implications for storage and transmission.
+ * For most applications, 256 bits should be more than enough to ensure the security of opaque tokens.
+ */
+export const bitsOfOpaqueRandomness = 256;
+
+/*
  * clockTolerance
  *
  * description: A `Number` value (in seconds) describing the allowed system clock skew for

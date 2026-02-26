@@ -44,7 +44,7 @@ export class Session extends BaseModel {
 		}
 		try {
 			const payload = await this.verify(stored);
-			return this.instantiate(payload);
+			return new this(payload);
 		} catch (err) {
 			return undefined;
 		}
@@ -65,9 +65,9 @@ export class Session extends BaseModel {
 				// underlying session was removed since we have a session id in cookie, let's assign an
 				// empty data so that session.new is not true and cookie will get written even if nothing
 				// gets written to it
-				session = this.instantiate({});
+				session = new this({});
 			} else {
-				session = this.instantiate();
+				session = new this();
 			}
 		}
 

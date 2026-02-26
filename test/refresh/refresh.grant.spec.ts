@@ -20,8 +20,6 @@ import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
 import { ttl } from 'lib/configs/liveTime.js';
 
-const route = '/token';
-
 function errorDetail(spy) {
 	return spy.mock.calls[0][0].error_detail;
 }

@@ -88,12 +88,13 @@ export class BaseToken extends BaseModel {
 
 	async getValueAndPayload() {
 		const format = this.resourceServer?.accessTokenFormat ?? 'opaque';
+		const result = await super.getValueAndPayload();
 		if (format === 'opaque') {
-			return super.getValueAndPayload();
+			return result;
 		}
 		if (format !== 'jwt') {
 			throw new Error('invalid format resolved');
 		}
-		return jwt.getValueAndPayload.call(this);
+		return jwt.getValueAndPayload.call(this, result.payload);
 	}
 }

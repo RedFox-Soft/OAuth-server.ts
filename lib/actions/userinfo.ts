@@ -29,7 +29,7 @@ async function userInfo({ headers, set }) {
 	const accessTokenId = ctx.oidc.getAccessToken({
 		acceptDPoP: true
 	});
-	let dPoP = null;
+	let dPoP: Awaited<ReturnType<typeof dpopValidate>>;
 	try {
 		dPoP = await dpopValidate(headers.dpop, {
 			accessTokenId,
@@ -39,8 +39,8 @@ async function userInfo({ headers, set }) {
 	} catch (err) {
 		if (err instanceof UseDpopNonce || err instanceof InvalidDpopProof) {
 			err.status = 401;
-			throw err;
 		}
+		throw err;
 	}
 	setNonceHeader(set.headers, dPoP);
 

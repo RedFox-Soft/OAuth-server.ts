@@ -13,7 +13,6 @@ import {
 import bootstrap, { agent } from '../test_helper.js';
 import { IdToken } from 'lib/models/id_token.js';
 import { Client } from 'lib/models/client.js';
-import { provider } from 'lib/provider.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { TestAdapter } from 'test/models.js';

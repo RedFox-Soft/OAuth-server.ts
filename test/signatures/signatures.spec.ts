@@ -1,4 +1,4 @@
-import { expect } from 'chai';
+import { describe, it, beforeAll, beforeEach } from 'bun:test';
 
 import bootstrap from '../test_helper.js';
 import { decode } from '../../lib/helpers/jwt.ts';
@@ -8,20 +8,22 @@ import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';
 
 describe('signatures', () => {
-	before(bootstrap(import.meta.url));
+	let setup = null;
+	beforeAll(async function () {
+		setup = await bootstrap(import.meta.url)();
+	});
 
 	describe('when id_token_signed_response_alg=HS256', () => {
-		before(function () {
-			return this.login();
-		});
+		let cookie = null;
 
 		beforeEach(async function () {
+			cookie = await setup.login();
 			const ac = new AuthorizationCode({
-				accountId: this.loggedInAccountId,
+				accountId: setup.loggedInAccountId,
 				acr: i(provider).configuration.acrValues[0],
 				authTime: epochTime(),
 				clientId: 'client-sig-HS256',
-				grantId: this.getGrantId('client-sig-HS256'),
+				grantId: setup.getGrantId('client-sig-HS256'),
 				redirectUri: 'https://client.example.com/cb',
 				scope: 'openid'
 			});

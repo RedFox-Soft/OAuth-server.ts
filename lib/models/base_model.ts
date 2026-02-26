@@ -1,3 +1,5 @@
+import { Type as t, type Static } from '@sinclair/typebox';
+import { Value } from '@sinclair/typebox/value';
 import snakeCase from '../helpers/_/snake_case.ts';
 import epochTime from '../helpers/epoch_time.ts';
 import pickBy from '../helpers/_/pick_by.ts';
@@ -7,8 +9,22 @@ import { adapter } from 'lib/adapters/index.js';
 
 const IN_PAYLOAD = ['iat', 'exp', 'jti', 'kind'];
 
-export class BaseModel extends Opaque {
-	constructor({ jti, kind, ...payload } = {}) {
+export const BaseModelPayload = t.Object({
+	jti: t.Optional(t.String()),
+	kind: t.Optional(t.String()),
+	exp: t.Optional(t.Number()),
+	iat: t.Optional(t.Number())
+});
+
+type BaseModelPayload = Static<typeof BaseModelPayload>;
+
+export class BaseModel<
+	T extends BaseModelPayload = BaseModelPayload
+> extends Opaque {
+	model = BaseModelPayload;
+	payload = {} as T;
+
+	constructor({ jti, kind, ...payload }: T = {} as T) {
 		super();
 		Object.assign(
 			this,
@@ -23,11 +39,7 @@ export class BaseModel extends Opaque {
 		this.jti = jti;
 	}
 
-	static instantiate(payload) {
-		return new this(payload);
-	}
-
-	async save(ttl) {
+	async save(ttl: number) {
 		if (!this.jti) {
 			this.jti = this.generateTokenId();
 		}
@@ -66,7 +78,11 @@ export class BaseModel extends Opaque {
 		return IN_PAYLOAD;
 	}
 
-	static async find(value: string, { ignoreExpiration = false } = {}) {
+	static async find<T extends BaseModelPayload = BaseModelPayload>(
+		this: new (payload: T) => BaseModel<T>,
+		value: string,
+		{ ignoreExpiration = false } = {}
+	): Promise<InstanceType<typeof this> | undefined> {
 		if (typeof value !== 'string') {
 			return;
 		}
@@ -79,7 +95,7 @@ export class BaseModel extends Opaque {
 		try {
 			const payload = await this.verify(stored, { ignoreExpiration });
 
-			return this.instantiate(payload);
+			return new this(payload);
 		} catch (err) {
 			return;
 		}
