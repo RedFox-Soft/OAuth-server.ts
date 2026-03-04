@@ -17,7 +17,7 @@ async function codeHandler(ctx) {
 	);
 
 	const code = new AuthorizationCode({
-		accountId: ctx.oidc.session.accountId,
+		accountId: ctx.oidc.session.payload.accountId,
 		acr: ctx.oidc.acr,
 		amr: ctx.oidc.amr,
 		authTime: ctx.oidc.session.authTime(),
@@ -30,30 +30,31 @@ async function codeHandler(ctx) {
 		redirectUri: ctx.oidc.params.redirect_uri,
 		resource: Object.keys(ctx.oidc.resourceServers),
 		scope: [...scopeSet].join(' '),
-		sessionUid: ctx.oidc.session.uid,
+		sessionUid: ctx.oidc.session.payload.uid,
 		dpopJkt: ctx.oidc.params.dpop_jkt
 	});
 
 	if (richAuthorizationRequests.enabled) {
-		code.rar = await richAuthorizationRequests.rarForAuthorizationCode(ctx);
+		code.payload.rar =
+			await richAuthorizationRequests.rarForAuthorizationCode(ctx);
 	}
 
-	if (Object.keys(code.claims).length === 0) {
-		delete code.claims;
+	if (Object.keys(code.payload.claims).length === 0) {
+		delete code.payload.claims;
 	}
 
 	// eslint-disable-next-line default-case
-	switch (code.resource.length) {
+	switch (code.payload.resource.length) {
 		case 0:
-			delete code.resource;
+			delete code.payload.resource;
 			break;
 		case 1:
-			[code.resource] = code.resource;
+			[code.payload.resource] = code.payload.resource;
 			break;
 	}
 
 	if (await expiresWithSession(ctx, code)) {
-		code.expiresWithSession = true;
+		code.payload.expiresWithSession = true;
 	} else {
 		ctx.oidc.session.authorizationFor(ctx.oidc.client.clientId).persistsLogout =
 			true;
@@ -63,7 +64,7 @@ async function codeHandler(ctx) {
 		ctx.oidc.client.includeSid() ||
 		(ctx.oidc.claims.id_token && 'sid' in ctx.oidc.claims.id_token)
 	) {
-		code.sid = ctx.oidc.session.sidFor(ctx.oidc.client.clientId);
+		code.payload.sid = ctx.oidc.session.sidFor(ctx.oidc.client.clientId);
 	}
 
 	ctx.oidc.entity('AuthorizationCode', code);

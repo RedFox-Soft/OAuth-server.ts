@@ -668,8 +668,8 @@ describe('features.dPoP', async () => {
 					entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 				}
 			} = spy.mock.calls[0][0];
-			expect(accessToken).toHaveProperty('jkt', thumbprint);
-			expect(refreshToken).not.toHaveProperty('jkt');
+			expect(accessToken.payload).toHaveProperty('jkt', thumbprint);
+			expect(refreshToken.payload).not.toHaveProperty('jkt');
 		});
 
 		it('binds the refresh token to the jwk for public clients', async function () {
@@ -706,8 +706,8 @@ describe('features.dPoP', async () => {
 					entities: { AccessToken, RefreshToken }
 				}
 			} = spy.mock.calls[0][0];
-			expect(AccessToken).toHaveProperty('jkt', thumbprint);
-			expect(RefreshToken).toHaveProperty('jkt', thumbprint);
+			expect(AccessToken.payload).toHaveProperty('jkt', thumbprint);
+			expect(RefreshToken.payload).toHaveProperty('jkt', thumbprint);
 		});
 	});
 
@@ -993,8 +993,8 @@ describe('features.dPoP', async () => {
 						entities: { AccessToken, RefreshToken }
 					}
 				} = spy.mock.calls[0][0];
-				expect(AccessToken).toHaveProperty('jkt', thumbprint);
-				expect(RefreshToken).not.toHaveProperty('jkt');
+				expect(AccessToken.payload).toHaveProperty('jkt', thumbprint);
+				expect(RefreshToken.payload).not.toHaveProperty('jkt');
 			});
 		});
 
@@ -1046,8 +1046,8 @@ describe('features.dPoP', async () => {
 						entities: { AccessToken, RefreshToken }
 					}
 				} = spy.mock.calls[0][0];
-				expect(AccessToken).toHaveProperty('jkt', thumbprint);
-				expect(RefreshToken).not.toHaveProperty('jkt');
+				expect(AccessToken.payload).toHaveProperty('jkt', thumbprint);
+				expect(RefreshToken.payload).not.toHaveProperty('jkt');
 			});
 
 			it('authorization_code checks the dpop_jkt matches the proof jwk thumbprint', async function () {
@@ -1179,8 +1179,8 @@ describe('features.dPoP', async () => {
 						entities: { AccessToken, RefreshToken }
 					}
 				} = spy.mock.calls[0][0];
-				expect(AccessToken).toHaveProperty('jkt', thumbprint);
-				expect(RefreshToken.jkt).toBeEmpty();
+				expect(AccessToken.payload).toHaveProperty('jkt', thumbprint);
+				expect(RefreshToken.payload.jkt).toBeEmpty();
 			});
 		});
 	});
@@ -1232,8 +1232,8 @@ describe('features.dPoP', async () => {
 					entities: { AccessToken, RefreshToken }
 				}
 			} = spy.mock.calls[0][0];
-			expect(AccessToken).toHaveProperty('jkt', thumbprint);
-			expect(RefreshToken).toHaveProperty('jkt', thumbprint);
+			expect(AccessToken.payload).toHaveProperty('jkt', thumbprint);
+			expect(RefreshToken.payload).toHaveProperty('jkt', thumbprint);
 		});
 
 		describe('refresh_token', () => {
@@ -1287,8 +1287,8 @@ describe('features.dPoP', async () => {
 						entities: { AccessToken, RefreshToken }
 					}
 				} = spy.mock.calls[0][0];
-				expect(AccessToken).toHaveProperty('jkt', thumbprint);
-				expect(RefreshToken).toHaveProperty('jkt', thumbprint);
+				expect(AccessToken.payload).toHaveProperty('jkt', thumbprint);
+				expect(RefreshToken.payload).toHaveProperty('jkt', thumbprint);
 			});
 
 			it('verifies the request made with the same cert jwk', async function () {
@@ -1351,7 +1351,7 @@ describe('features.dPoP', async () => {
 				entities: { ClientCredentials }
 			}
 		} = spy.mock.calls[0][0];
-		expect(ClientCredentials).toHaveProperty('jkt', thumbprint);
+		expect(ClientCredentials.payload).toHaveProperty('jkt', thumbprint);
 	});
 
 	describe('status codes at the token endpoint', () => {

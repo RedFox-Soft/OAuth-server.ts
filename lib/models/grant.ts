@@ -1,4 +1,6 @@
-import { BaseToken } from './base_token.js';
+import { Type as t, type Static } from '@sinclair/typebox';
+import { BaseToken, BaseTokenPayload } from './base_token.js';
+import consent from 'lib/helpers/interaction_policy/prompts/consent.js';
 
 const NON_REJECTABLE_CLAIMS = new Set([
 	'sub',
@@ -9,52 +11,70 @@ const NON_REJECTABLE_CLAIMS = new Set([
 	'iss'
 ]);
 
-export class Grant extends BaseToken {
-	static get IN_PAYLOAD() {
-		return [
-			'accountId',
-			'clientId',
-			'resources',
-			'openid',
-			'rejected',
-			'rar',
-			...super.IN_PAYLOAD
-		];
-	}
+const GrantPayload = t.Composite([
+	BaseTokenPayload,
+	t.Object({
+		resources: t.Optional(t.Record(t.String(), t.String())),
+		openid: t.Optional(
+			t.Object({
+				scope: t.Optional(t.String()),
+				claims: t.Optional(t.Array(t.String()))
+			})
+		),
+		rejected: t.Optional(
+			t.Object({
+				resources: t.Optional(t.Record(t.String(), t.String())),
+				openid: t.Optional(
+					t.Object({
+						scope: t.Optional(t.String()),
+						claims: t.Optional(t.Array(t.String()))
+					})
+				)
+			})
+		),
+		rar: t.Optional(t.Array(t.Unknown()))
+	})
+]);
+type GrantPayloadType = Static<typeof GrantPayload>;
+
+export class Grant extends BaseToken<GrantPayloadType> {
+	model = GrantPayload;
 
 	clean() {
+		const context = this.payload || this;
 		if (
-			this.openid &&
-			!this.openid.scope &&
-			(!this.openid.claims || this.openid.claims.length === 0)
+			consent.openid &&
+			!context.openid.scope &&
+			(!context.openid.claims || context.openid.claims.length === 0)
 		) {
-			delete this.openid;
+			delete context.openid;
 		}
 
-		if (this.resources) {
-			for (const [identifier, value] of Object.entries(this.resources)) {
+		if (context.resources) {
+			for (const [identifier, value] of Object.entries(context.resources)) {
 				if (!value) {
-					delete this.resources[identifier];
+					delete context.resources[identifier];
 				}
 			}
-			if (Object.keys(this.resources).length === 0) {
-				delete this.resources;
+			if (Object.keys(context.resources).length === 0) {
+				delete context.resources;
 			}
 		}
 	}
 
 	async save(...args) {
 		this.clean();
-		if (this.rejected) this.clean.call(this.rejected);
+		if (this.payload.rejected) this.clean.call(this.payload.rejected);
 
 		return super.save(...args);
 	}
 
 	getOIDCScope() {
-		if (this.openid?.scope) {
-			if (this.rejected) {
-				const rejected = this.getOIDCScope.call(this.rejected).split(' ');
-				const granted = new Set(this.openid.scope.split(' '));
+		const context = this.payload || this;
+		if (context.openid?.scope) {
+			if (context.rejected) {
+				const rejected = this.getOIDCScope.call(context.rejected).split(' ');
+				const granted = new Set(context.openid.scope.split(' '));
 				for (const scope of rejected) {
 					if (scope !== 'openid') {
 						granted.delete(scope);
@@ -62,14 +82,14 @@ export class Grant extends BaseToken {
 				}
 				return [...granted].join(' ');
 			}
-			return this.openid.scope;
+			return context.openid.scope;
 		}
 		return '';
 	}
 
 	getRejectedOIDCScope() {
-		this.rejected ||= {};
-		return this.getOIDCScope.call(this.rejected);
+		this.payload.rejected ||= {};
+		return this.getOIDCScope.call(this.payload.rejected);
 	}
 
 	getOIDCScopeFiltered(filter) {
@@ -90,19 +110,20 @@ export class Grant extends BaseToken {
 		} else if (typeof scope !== 'string') {
 			throw new TypeError('"scope" must be a string');
 		}
-		this.openid ||= {};
-		if (this.openid.scope) {
-			this.openid.scope = [
-				...new Set([...this.openid.scope.split(' '), ...scope.split(' ')])
+		const context = this.payload || this;
+		context.openid ||= {};
+		if (context.openid.scope) {
+			context.openid.scope = [
+				...new Set([...context.openid.scope.split(' '), ...scope.split(' ')])
 			].join(' ');
 		} else {
-			this.openid.scope = scope;
+			context.openid.scope = scope;
 		}
 	}
 
 	rejectOIDCScope(...args) {
-		this.rejected ||= {};
-		this.addOIDCScope.call(this.rejected, ...args);
+		this.payload.rejected ||= {};
+		this.addOIDCScope.call(this.payload.rejected, ...args);
 	}
 
 	getOIDCScopeEncountered() {
@@ -111,29 +132,30 @@ export class Grant extends BaseToken {
 		return granted.concat(rejected).join(' ');
 	}
 
-	getResourceScope(resource) {
+	getResourceScope(resource: string) {
 		if (typeof resource !== 'string') {
 			throw new TypeError('"resource" must be a string');
 		}
-		if (this.resources?.[resource]) {
-			if (this.rejected) {
+		const context = this.payload || this;
+		if (context.resources?.[resource]) {
+			if (context.rejected) {
 				const rejected = this.getResourceScope
-					.call(this.rejected, resource)
+					.call(context.rejected, resource)
 					.split(' ');
-				const granted = new Set(this.resources[resource].split(' '));
+				const granted = new Set(context.resources[resource].split(' '));
 				for (const scope of rejected) {
 					granted.delete(scope);
 				}
 				return [...granted].join(' ');
 			}
-			return this.resources[resource];
+			return context.resources[resource];
 		}
 		return '';
 	}
 
 	getRejectedResourceScope(...args) {
-		this.rejected ||= {};
-		return this.getResourceScope.call(this.rejected, ...args);
+		this.payload.rejected ||= {};
+		return this.getResourceScope.call(this.payload.rejected, ...args);
 	}
 
 	getResourceScopeFiltered(resource, filter) {
@@ -160,22 +182,23 @@ export class Grant extends BaseToken {
 		} else if (typeof scope !== 'string') {
 			throw new TypeError('"scope" must be a string');
 		}
-		this.resources ||= {};
-		if (this.resources[resource]) {
-			this.resources[resource] = [
+		const context = this.payload || this;
+		context.resources ||= {};
+		if (context.resources[resource]) {
+			context.resources[resource] = [
 				...new Set([
-					...this.resources[resource].split(' '),
+					...context.resources[resource].split(' '),
 					...scope.split(' ')
 				])
 			].join(' ');
 		} else {
-			this.resources[resource] = scope;
+			context.resources[resource] = scope;
 		}
 	}
 
 	rejectResourceScope(...args) {
-		this.rejected ||= {};
-		this.addResourceScope.call(this.rejected, ...args);
+		this.payload.rejected ||= {};
+		this.addResourceScope.call(this.payload.rejected, ...args);
 	}
 
 	getResourceScopeEncountered(resource) {
@@ -188,10 +211,11 @@ export class Grant extends BaseToken {
 	}
 
 	getOIDCClaims() {
-		if (this.openid?.claims) {
-			if (this.rejected) {
-				const rejected = this.getOIDCClaims.call(this.rejected);
-				const granted = new Set(this.openid.claims);
+		const context = this.payload || this;
+		if (context.openid?.claims) {
+			if (context.rejected) {
+				const rejected = this.getOIDCClaims.call(context.rejected);
+				const granted = new Set(context.openid.claims);
 				for (const claim of rejected) {
 					if (!NON_REJECTABLE_CLAIMS.has(claim)) {
 						granted.delete(claim);
@@ -199,14 +223,14 @@ export class Grant extends BaseToken {
 				}
 				return [...granted];
 			}
-			return this.openid.claims;
+			return context.openid.claims;
 		}
 		return [];
 	}
 
 	getRejectedOIDCClaims() {
-		this.rejected ||= {};
-		return this.getOIDCClaims.call(this.rejected);
+		this.payload.rejected ||= {};
+		return this.getOIDCClaims.call(this.payload.rejected);
 	}
 
 	getOIDCClaimsFiltered(filter) {
@@ -228,17 +252,20 @@ export class Grant extends BaseToken {
 		if (claims.some((claim) => typeof claim !== 'string')) {
 			throw new TypeError('"claims" must be an array of strings');
 		}
-		this.openid ||= {};
-		if (this.openid.claims) {
-			this.openid.claims = [...new Set([...this.openid.claims, ...claims])];
+		const context = this.payload || this;
+		context.openid ||= {};
+		if (context.openid.claims) {
+			context.openid.claims = [
+				...new Set([...context.openid.claims, ...claims])
+			];
 		} else {
-			this.openid.claims = claims;
+			context.openid.claims = claims;
 		}
 	}
 
 	rejectOIDCClaims(...args) {
-		this.rejected ||= {};
-		this.addOIDCClaims.call(this.rejected, ...args);
+		this.payload.rejected ||= {};
+		this.addOIDCClaims.call(this.payload.rejected, ...args);
 	}
 
 	getOIDCClaimsEncountered() {
@@ -248,7 +275,7 @@ export class Grant extends BaseToken {
 	}
 
 	addRar(detail) {
-		this.rar ||= [];
-		this.rar.push(detail);
+		this.payload.rar ||= [];
+		this.payload.rar.push(detail);
 	}
 }

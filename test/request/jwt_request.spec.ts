@@ -203,7 +203,7 @@ describe('request parameter features', () => {
 				if (route === '/device/auth') {
 					provider.once('device_authorization.success', ({ oidc }) => {
 						provider.emit('authorization.success', {
-							oidc: { params: oidc.entities.DeviceCode.params }
+							oidc: { params: oidc.entities.DeviceCode.payload.params }
 						});
 					});
 				}

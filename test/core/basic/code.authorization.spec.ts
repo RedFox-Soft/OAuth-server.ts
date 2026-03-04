@@ -113,7 +113,7 @@ describe('BASIC code', () => {
 				const { response } = await authRequest(auth, { cookie });
 				expect(response.status).toBe(303);
 				auth.validateClientLocation(response);
-				expect(spy.firstCall.args[0]).toHaveProperty('scope', 'openid');
+				expect(spy.firstCall.args[0].payload).toHaveProperty('scope', 'openid');
 			});
 
 			describe('ignoring the offline_access scope', () => {
@@ -131,8 +131,10 @@ describe('BASIC code', () => {
 					const { response } = await authRequest(auth, { cookie });
 					expect(response.status).toBe(303);
 					auth.validateClientLocation(response);
-					expect(spy.firstCall.args[0]).toHaveProperty('scope');
-					expect(spy.firstCall.args[0].scope).not.toContain('offline_access');
+					expect(spy.firstCall.args[0].payload).toHaveProperty('scope');
+					expect(spy.firstCall.args[0].payload.scope).not.toContain(
+						'offline_access'
+					);
 				});
 
 				it('ignores the scope offline_access unless the client can do refresh_token exchange', async function () {
@@ -147,8 +149,10 @@ describe('BASIC code', () => {
 					const { response } = await authRequest(auth, { cookie });
 					expect(response.status).toBe(303);
 					auth.validateClientLocation(response);
-					expect(spy.firstCall.args[0]).toHaveProperty('scope');
-					expect(spy.firstCall.args[0].scope).not.toContain('offline_access');
+					expect(spy.firstCall.args[0].payload).toHaveProperty('scope');
+					expect(spy.firstCall.args[0].payload.scope).not.toContain(
+						'offline_access'
+					);
 				});
 			});
 		});

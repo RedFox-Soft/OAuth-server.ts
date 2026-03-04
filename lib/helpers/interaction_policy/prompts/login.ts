@@ -29,7 +29,7 @@ class LoginPromt extends Prompt {
 			description: 'End-User authentication is required',
 			check: (ctx: any) => {
 				const { oidc } = ctx;
-				if (oidc.session.accountId) {
+				if (oidc.session.payload.accountId) {
 					return false;
 				}
 				return true;
@@ -43,7 +43,7 @@ class LoginPromt extends Prompt {
 				if (oidc.params.max_age === undefined) {
 					return false;
 				}
-				if (!oidc.session.accountId) {
+				if (!oidc.session.payload.accountId) {
 					return true;
 				}
 				if (
@@ -64,7 +64,7 @@ class LoginPromt extends Prompt {
 					return false;
 				}
 				const { payload } = oidc.entities.IdTokenHint;
-				let sub = oidc.session.accountId;
+				let sub = oidc.session.payload.accountId;
 				if (sub === undefined) {
 					return true;
 				}
@@ -92,7 +92,7 @@ class LoginPromt extends Prompt {
 				) {
 					return false;
 				}
-				let sub = oidc.session.accountId;
+				let sub = oidc.session.payload.accountId;
 				if (sub === undefined) {
 					return true;
 				}

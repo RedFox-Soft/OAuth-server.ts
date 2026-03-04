@@ -41,6 +41,6 @@ export default async function loadPushedAuthorizationRequest(ctx) {
 		);
 	}
 	ctx.oidc.entity('PushedAuthorizationRequest', pushedAuthorizationRequest);
-	params.request = pushedAuthorizationRequest.request;
+	params.request = pushedAuthorizationRequest.payload.request;
 	return pushedAuthorizationRequest;
 }

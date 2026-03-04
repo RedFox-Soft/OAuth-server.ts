@@ -51,7 +51,7 @@ describe('grant_type=client_credentials', () => {
 		);
 
 		const [[token]] = spy.mock.calls;
-		expect(token).toHaveProperty('scope', 'api:read');
+		expect(token.payload).toHaveProperty('scope', 'api:read');
 	});
 
 	it('checks clients scope allow list', async function () {

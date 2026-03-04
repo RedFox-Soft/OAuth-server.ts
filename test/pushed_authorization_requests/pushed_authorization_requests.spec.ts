@@ -114,7 +114,8 @@ describe('Pushed Request Object', () => {
 					let id = request_uri.split(':');
 					id = id[id.length - 1];
 
-					const { request } = await PushedAuthorizationRequest.find(id);
+					const { request } =
+						(await PushedAuthorizationRequest.find(id))?.payload || {};
 					expect(decodeJwt(request)).toHaveProperty(
 						'redirect_uri',
 						'https://rp.example.com/unlisted'
@@ -148,7 +149,7 @@ describe('Pushed Request Object', () => {
 						TestAdapter.for('AuthorizationCode').syncFind(jti)
 					).toHaveProperty('redirectUri', 'https://rp.example.com/unlisted');
 
-					const { response, error } = await agent.token.post(
+					const { response } = await agent.token.post(
 						// @ts-expect-error endpoint will be parse to object
 						jsonToFormUrlEncoded({
 							code,
@@ -347,7 +348,7 @@ describe('Pushed Request Object', () => {
 
 							expect(spy.calledOnce).toBeTrue();
 							expect(spy2.calledOnce).toBeTrue();
-							const stored = spy2.args[0][0];
+							const stored = spy2.args[0][0].payload;
 							expect(stored).toHaveProperty('trusted', true);
 							const header = decodeProtectedHeader(stored.request);
 							expect(header).toEqual({ alg: 'none' });
@@ -510,9 +511,9 @@ describe('Pushed Request Object', () => {
 							expect(response.status).toBe(303);
 							auth.validatePresence(response, ['code']);
 
-							expect(await PushedAuthorizationRequest.find(id)).toHaveProperty(
-								'consumed'
-							);
+							expect(
+								(await PushedAuthorizationRequest.find(id))?.payload
+							).toHaveProperty('consumed');
 						});
 
 						it('allows the request_uri to be used (when request object was not used but client has request_object_signing_alg for its optional use)', async function () {
@@ -566,9 +567,9 @@ describe('Pushed Request Object', () => {
 							expect(response.status).toBe(303);
 							auth.validatePresence(response, ['code']);
 
-							expect(await PushedAuthorizationRequest.find(id)).toHaveProperty(
-								'consumed'
-							);
+							expect(
+								(await PushedAuthorizationRequest.find(id))?.payload
+							).toHaveProperty('consumed');
 						});
 					});
 				});
@@ -871,7 +872,7 @@ describe('Pushed Request Object', () => {
 							expect(response.status).toBe(201);
 							expect(spy.calledOnce).toBeTrue();
 
-							const { request } = spy.args[0][0];
+							const { request } = spy.args[0][0].payload;
 							const payload = decodeJwt(request);
 							expect(payload).not.toHaveProperty('nonce');
 							expect(payload).toHaveProperty('response_type', 'code');
@@ -1101,9 +1102,9 @@ describe('Pushed Request Object', () => {
 							expect(response.status).toBe(303);
 							auth.validatePresence(response, ['code']);
 
-							expect(await PushedAuthorizationRequest.find(id)).toHaveProperty(
-								'consumed'
-							);
+							expect(
+								(await PushedAuthorizationRequest.find(id))?.payload
+							).toHaveProperty('consumed');
 						});
 
 						it('handles expired or invalid pushed authorization request object', async function () {

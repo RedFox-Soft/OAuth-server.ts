@@ -1,4 +1,3 @@
-import pickBy from '../../helpers/_/pick_by.ts';
 import { assertPayload } from '../../helpers/jwt.js';
 import epochTime from '../../helpers/epoch_time.js';
 import nanoid from '../../helpers/nanoid.js';
@@ -6,38 +5,45 @@ import {
 	bitsOfOpaqueRandomness,
 	clockTolerance
 } from 'lib/configs/liveTime.js';
+import { BaseModelPayload } from '../base_model.js';
 
 const bitsPerSymbol = Math.log2(64);
 const tokenLength = (i: number) => Math.ceil(i / bitsPerSymbol);
 
 export abstract class Opaque {
-	declare expiration: number;
-	declare iat: number;
-	declare exp: number;
-	declare jti: string;
-	declare static IN_PAYLOAD: string[];
+	declare payload: BaseModelPayload;
+	abstract get id(): string;
+
+	get expiration() {
+		if (typeof this.payload.exp === 'undefined') {
+			throw new TypeError('expiration not set');
+		}
+		return this.payload.exp - epochTime();
+	}
 
 	generateTokenId(): string {
 		const length = tokenLength(bitsOfOpaqueRandomness);
 		return nanoid(length);
 	}
-	async getValueAndPayload() {
+	async getValueAndPayload(): Promise<{
+		value: string;
+		payload?: BaseModelPayload;
+	}> {
 		const now = epochTime();
-		const exp = this.exp || now + this.expiration;
 		const payload = {
-			iat: this.iat || now,
-			...(exp ? { exp } : undefined),
-			...pickBy(
-				this,
-				(val, key) =>
-					this.constructor.IN_PAYLOAD.includes(key) &&
-					typeof val !== 'undefined'
-			)
+			iat: now,
+			...this.payload
 		};
+		if (typeof payload.exp === 'undefined') {
+			payload.exp = now + this.expiration;
+		}
 
-		return { value: this.jti, payload };
+		return { value: this.id, payload };
 	}
-	static async verify(stored, { ignoreExpiration } = {}) {
+	static async verify(
+		stored: Record<string, unknown>,
+		{ ignoreExpiration = false } = {}
+	) {
 		// checks that legacy tokens aren't accepted as opaque when their jti is passed
 		if ('jwt' in stored || 'jwt-ietf' in stored || 'paseto' in stored)
 			throw new TypeError();

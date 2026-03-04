@@ -9,10 +9,10 @@ export default async function loadGrant(ctx) {
 	if (ctx.oidc.account) {
 		let grant = await loadExistingGrant(ctx);
 		if (grant) {
-			if (grant.accountId !== ctx.oidc.account.accountId) {
+			if (grant.payload.accountId !== ctx.oidc.account.accountId) {
 				throw new Error('accountId mismatch');
 			}
-			if (grant.clientId !== ctx.oidc.client.clientId) {
+			if (grant.payload.clientId !== ctx.oidc.client.clientId) {
 				throw new Error('clientId mismatch');
 			}
 			ctx.oidc.session.ensureClientContainer(ctx.oidc.params.client_id);

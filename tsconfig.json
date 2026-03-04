@@ -1,10 +1,10 @@
 {
 	"compilerOptions": {
-		"module": "NodeNext",
+		"module": "nodenext",
 		"esModuleInterop": true,
 		"target": "esnext",
 		"noImplicitAny": true,
-		"moduleResolution": "NodeNext",
+		"moduleResolution": "nodenext",
 		"sourceMap": true,
 		"outDir": "dist",
 		"baseUrl": ".",

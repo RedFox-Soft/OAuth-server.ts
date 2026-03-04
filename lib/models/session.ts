@@ -1,52 +1,65 @@
-import nanoid from '../helpers/nanoid.ts';
-import epochTime from '../helpers/epoch_time.ts';
+import { Type as t, type Static } from '@sinclair/typebox';
+import nanoid from '../helpers/nanoid.js';
+import epochTime from '../helpers/epoch_time.js';
 
-import { cookieNames } from '../consts/param_list.ts';
+import { cookieNames } from '../consts/param_list.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
-import { BaseModel } from './base_model.js';
+import { BaseModel, BaseModelPayload } from './base_model.js';
 
-export class Session extends BaseModel {
-	constructor(payload) {
-		super(payload);
-		if (!payload) {
-			Object.defineProperty(this, 'new', { value: true });
-		}
-		this.uid = this.uid || nanoid();
-		this.jti = this.jti || nanoid();
+const SessionPayload = t.Composite([
+	BaseModelPayload,
+	t.Object({
+		uid: t.String(),
+		accountId: t.Optional(t.String()),
+		loginTs: t.Optional(t.Number()),
+		amr: t.Optional(t.Array(t.String())),
+		acr: t.Optional(t.String()),
+		transient: t.Optional(t.Boolean()),
+		state: t.Optional(t.String()),
+		authorizations: t.Optional(
+			t.Record(
+				t.String(),
+				t.Object({
+					sid: t.Optional(t.String()),
+					grantId: t.Optional(t.String())
+				})
+			)
+		)
+	})
+]);
+type SessionPayloadType = Static<typeof SessionPayload>;
+
+function sessionPayload(
+	payload: Partial<SessionPayloadType> = {}
+): SessionPayloadType {
+	payload.uid ||= nanoid();
+	payload.jti ||= nanoid();
+	return payload as SessionPayloadType;
+}
+
+export class Session extends BaseModel<SessionPayloadType> {
+	model = SessionPayload;
+	#isNew = false;
+
+	constructor(payload?: Partial<SessionPayloadType>) {
+		super(sessionPayload(payload));
+		this.#isNew = !payload;
 	}
 
-	get id() {
-		return this.jti;
-	}
-
-	set id(value) {
-		this.jti = value;
-	}
-
-	static get IN_PAYLOAD() {
-		return [
-			...super.IN_PAYLOAD,
-			'uid',
-			'acr',
-			'amr',
-			'accountId',
-			'loginTs',
-			'transient',
-			'state',
-			'authorizations'
-		];
+	get isNew() {
+		return this.#isNew;
 	}
 
 	static async findByUid(uid: string) {
 		const stored = await this.adapter.findByUid(uid);
 		if (!stored) {
-			return undefined;
+			return;
 		}
 		try {
 			const payload = await this.verify(stored);
 			return new this(payload);
 		} catch (err) {
-			return undefined;
+			return;
 		}
 	}
 
@@ -58,17 +71,12 @@ export class Session extends BaseModel {
 
 		if (cookieSessionId) {
 			session = await this.find(cookieSessionId);
-		}
-
-		if (!session) {
-			if (cookieSessionId) {
-				// underlying session was removed since we have a session id in cookie, let's assign an
-				// empty data so that session.new is not true and cookie will get written even if nothing
-				// gets written to it
-				session = new this({});
-			} else {
-				session = new this();
-			}
+			// underlying session was removed since we have a session id in cookie, let's assign an
+			// empty data so that session.new is not true and cookie will get written even if nothing
+			// gets written to it
+			session ||= new this({});
+		} else {
+			session = new this();
 		}
 
 		if (ctx.oidc instanceof OIDCContext) {
@@ -95,12 +103,12 @@ export class Session extends BaseModel {
 	}
 
 	async persist() {
-		if (typeof this.exp !== 'number') {
+		if (typeof this.payload.exp !== 'number') {
 			throw new TypeError(
 				'persist can only be called on previously persisted Sessions'
 			);
 		}
-		return this.save(this.exp - epochTime());
+		return this.save(this.payload.exp - epochTime());
 	}
 
 	async destroy() {
@@ -115,14 +123,14 @@ export class Session extends BaseModel {
 	}
 
 	authTime() {
-		return this.loginTs;
+		return this.payload.loginTs;
 	}
 
-	past(age) {
+	past(age: number | string) {
 		const maxAge = +age;
 
-		if (this.loginTs) {
-			return epochTime() - this.loginTs > maxAge;
+		if (this.payload.loginTs) {
+			return epochTime() - this.payload.loginTs > maxAge;
 		}
 
 		return true;
@@ -130,16 +138,16 @@ export class Session extends BaseModel {
 
 	authorizationFor(clientId) {
 		// the call will not set, let's not modify the session object
-		if (arguments.length === 1 && !this.authorizations) {
+		if (arguments.length === 1 && !this.payload.authorizations) {
 			return {};
 		}
 
-		this.authorizations = this.authorizations || {};
-		if (!this.authorizations[clientId]) {
-			this.authorizations[clientId] = {};
+		this.payload.authorizations = this.payload.authorizations || {};
+		if (!this.payload.authorizations[clientId]) {
+			this.payload.authorizations[clientId] = {};
 		}
 
-		return this.authorizations[clientId];
+		return this.payload.authorizations[clientId];
 	}
 
 	sidFor(clientId, value) {

@@ -53,7 +53,7 @@ export const handler = async function refreshTokenHandler(ctx, dPoP) {
 		throw new InvalidGrant('refresh token not found');
 	}
 
-	if (refreshToken.clientId !== client.clientId) {
+	if (refreshToken.payload.clientId !== client.clientId) {
 		throw new InvalidGrant('client mismatch');
 	}
 
@@ -64,7 +64,7 @@ export const handler = async function refreshTokenHandler(ctx, dPoP) {
 	let cert;
 	if (
 		client.tlsClientCertificateBoundAccessTokens ||
-		refreshToken['x5t#S256']
+		refreshToken.payload['x5t#S256']
 	) {
 		cert = getCertificate(ctx);
 		if (!cert) {
@@ -77,13 +77,13 @@ export const handler = async function refreshTokenHandler(ctx, dPoP) {
 	}
 
 	if (
-		refreshToken['x5t#S256'] &&
-		refreshToken['x5t#S256'] !== certificateThumbprint(cert)
+		refreshToken.payload['x5t#S256'] &&
+		refreshToken.payload['x5t#S256'] !== certificateThumbprint(cert)
 	) {
 		throw new InvalidGrant('failed x5t#S256 verification');
 	}
 
-	const grant = await Grant.find(refreshToken.grantId, {
+	const grant = await Grant.find(refreshToken.payload.grantId, {
 		ignoreExpiration: true
 	});
 
@@ -95,7 +95,7 @@ export const handler = async function refreshTokenHandler(ctx, dPoP) {
 		throw new InvalidGrant('grant is expired');
 	}
 
-	if (grant.clientId !== client.clientId) {
+	if (grant.payload.clientId !== client.clientId) {
 		throw new InvalidGrant('client mismatch');
 	}
 
@@ -113,14 +113,21 @@ export const handler = async function refreshTokenHandler(ctx, dPoP) {
 		}
 	}
 
-	if (refreshToken.jkt && (!dPoP || refreshToken.jkt !== dPoP.thumbprint)) {
+	if (
+		refreshToken.payload.jkt &&
+		(!dPoP || refreshToken.payload.jkt !== dPoP.thumbprint)
+	) {
 		throw new InvalidGrant('failed jkt verification');
 	}
 
 	ctx.oidc.entity('RefreshToken', refreshToken);
 	ctx.oidc.entity('Grant', grant);
 
-	const account = await findAccount(ctx, refreshToken.accountId, refreshToken);
+	const account = await findAccount(
+		ctx,
+		refreshToken.payload.accountId,
+		refreshToken
+	);
 
 	if (!account) {
 		throw new InvalidGrant(
@@ -128,16 +135,16 @@ export const handler = async function refreshTokenHandler(ctx, dPoP) {
 		);
 	}
 
-	if (refreshToken.accountId !== grant.accountId) {
+	if (refreshToken.payload.accountId !== grant.payload.accountId) {
 		throw new InvalidGrant('accountId mismatch');
 	}
 
 	ctx.oidc.entity('Account', account);
 
-	if (refreshToken.consumed) {
+	if (refreshToken.payload.consumed) {
 		await Promise.all([
 			refreshToken.destroy(),
-			revoke(ctx, refreshToken.grantId)
+			revoke(ctx, refreshToken.payload.grantId)
 		]);
 		throw new InvalidGrant('refresh token already used');
 	}
@@ -157,32 +164,32 @@ export const handler = async function refreshTokenHandler(ctx, dPoP) {
 		ctx.oidc.entity('RotatedRefreshToken', refreshToken);
 
 		refreshToken = new RefreshToken({
-			accountId: refreshToken.accountId,
-			acr: refreshToken.acr,
-			amr: refreshToken.amr,
-			authTime: refreshToken.authTime,
-			claims: refreshToken.claims,
+			accountId: refreshToken.payload.accountId,
+			acr: refreshToken.payload.acr,
+			amr: refreshToken.payload.amr,
+			authTime: refreshToken.payload.authTime,
+			claims: refreshToken.payload.claims,
 			client,
-			expiresWithSession: refreshToken.expiresWithSession,
-			iiat: refreshToken.iiat,
-			grantId: refreshToken.grantId,
-			gty: refreshToken.gty,
-			nonce: refreshToken.nonce,
-			resource: refreshToken.resource,
+			expiresWithSession: refreshToken.payload.expiresWithSession,
+			iiat: refreshToken.payload.iiat,
+			grantId: refreshToken.payload.grantId,
+			gty: refreshToken.payload.gty,
+			nonce: refreshToken.payload.nonce,
+			resource: refreshToken.payload.resource,
 			rotations:
-				typeof refreshToken.rotations === 'number'
-					? refreshToken.rotations + 1
+				typeof refreshToken.payload.rotations === 'number'
+					? refreshToken.payload.rotations + 1
 					: 1,
-			scope: refreshToken.scope,
-			sessionUid: refreshToken.sessionUid,
-			sid: refreshToken.sid,
-			rar: refreshToken.rar,
-			'x5t#S256': refreshToken['x5t#S256'],
-			jkt: refreshToken.jkt
+			scope: refreshToken.payload.scope,
+			sessionUid: refreshToken.payload.sessionUid,
+			sid: refreshToken.payload.sid,
+			rar: refreshToken.payload.rar,
+			'x5t#S256': refreshToken.payload['x5t#S256'],
+			jkt: refreshToken.payload.jkt
 		});
 
-		if (refreshToken.gty && !refreshToken.gty.endsWith(gty)) {
-			refreshToken.gty = `${refreshToken.gty} ${gty}`;
+		if (refreshToken.payload.gty && !refreshToken.payload.gty.endsWith(gty)) {
+			refreshToken.payload.gty = `${refreshToken.payload.gty} ${gty}`;
 		}
 
 		ctx.oidc.entity('RefreshToken', refreshToken);
@@ -192,11 +199,11 @@ export const handler = async function refreshTokenHandler(ctx, dPoP) {
 	const at = new AccessToken({
 		accountId: account.accountId,
 		client,
-		expiresWithSession: refreshToken.expiresWithSession,
-		grantId: refreshToken.grantId,
-		gty: refreshToken.gty,
-		sessionUid: refreshToken.sessionUid,
-		sid: refreshToken.sid
+		expiresWithSession: refreshToken.payload.expiresWithSession,
+		grantId: refreshToken.payload.grantId,
+		gty: refreshToken.payload.gty,
+		sessionUid: refreshToken.payload.sessionUid,
+		sid: refreshToken.payload.sid
 	});
 
 	if (client.tlsClientCertificateBoundAccessTokens) {
@@ -207,8 +214,8 @@ export const handler = async function refreshTokenHandler(ctx, dPoP) {
 		at.setThumbprint('jkt', dPoP.thumbprint);
 	}
 
-	if (at.gty && !at.gty.endsWith(gty)) {
-		at.gty = `${at.gty} ${gty}`;
+	if (at.payload.gty && !at.payload.gty.endsWith(gty)) {
+		at.payload.gty = `${at.payload.gty} ${gty}`;
 	}
 
 	const scope = ctx.oidc.params.scope
@@ -232,17 +239,17 @@ export const handler = async function refreshTokenHandler(ctx, dPoP) {
 			resource,
 			resourceServerInfo
 		);
-		at.scope = grant.getResourceScopeFiltered(
+		at.payload.scope = grant.getResourceScopeFiltered(
 			resource,
 			[...scope].filter(Set.prototype.has.bind(at.resourceServer.scopes))
 		);
 	} else {
-		at.claims = refreshToken.claims;
-		at.scope = grant.getOIDCScopeFiltered(scope);
+		at.payload.claims = refreshToken.payload.claims;
+		at.payload.scope = grant.getOIDCScopeFiltered(scope);
 	}
 
 	if (richAuthorizationRequests.enabled && at.resourceServer) {
-		at.rar = await richAuthorizationRequests.rarForRefreshTokenResponse(
+		at.payload.rar = await richAuthorizationRequests.rarForRefreshTokenResponse(
 			ctx,
 			at.resourceServer
 		);
@@ -253,7 +260,7 @@ export const handler = async function refreshTokenHandler(ctx, dPoP) {
 
 	let idToken;
 	if (scope.has('openid')) {
-		const claims = filterClaims(refreshToken.claims, 'id_token', grant);
+		const claims = filterClaims(refreshToken.payload.claims, 'id_token', grant);
 		const rejected = grant.getRejectedOIDCClaims();
 		const token = new IdToken(ctx.oidc.client, {
 			...(await account.claims(
@@ -262,12 +269,12 @@ export const handler = async function refreshTokenHandler(ctx, dPoP) {
 				claims,
 				rejected
 			)),
-			acr: refreshToken.acr,
-			amr: refreshToken.amr,
-			auth_time: refreshToken.authTime
+			acr: refreshToken.payload.acr,
+			amr: refreshToken.payload.amr,
+			auth_time: refreshToken.payload.authTime
 		});
 
-		if (conformIdTokenClaims && userinfo.enabled && !at.aud) {
+		if (conformIdTokenClaims && userinfo.enabled && !at.payload.aud) {
 			token.scope = 'openid';
 		} else {
 			token.scope = grant.getOIDCScopeFiltered(scope);
@@ -275,8 +282,8 @@ export const handler = async function refreshTokenHandler(ctx, dPoP) {
 		token.mask = claims;
 		token.rejected = rejected;
 
-		token.set('nonce', refreshToken.nonce);
-		token.set('sid', refreshToken.sid);
+		token.set('nonce', refreshToken.payload.nonce);
+		token.set('sid', refreshToken.payload.sid);
 
 		idToken = await token.issue({ use: 'idtoken' });
 	}
@@ -286,8 +293,8 @@ export const handler = async function refreshTokenHandler(ctx, dPoP) {
 		expires_in: at.expiration,
 		id_token: idToken,
 		refresh_token: refreshTokenValue,
-		scope: refreshToken.scope ? at.scope : at.scope || undefined,
+		scope: at.payload.scope || undefined,
 		token_type: at.tokenType,
-		authorization_details: at.rar
+		authorization_details: at.payload.rar
 	};
 };

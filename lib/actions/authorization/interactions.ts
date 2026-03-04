@@ -30,7 +30,7 @@ export default async function interactions(resumeRouteName, ctx) {
 	// no interaction requested
 	if (!prompt) {
 		// check there's an accountId to continue
-		if (!oidc.session.accountId) {
+		if (!oidc.session.payload.accountId) {
 			throw new errors.AccessDenied(
 				undefined,
 				'authorization request resolved without requesting interactions but no account id was resolved'
@@ -83,7 +83,7 @@ export default async function interactions(resumeRouteName, ctx) {
 		prompt,
 		cookieID,
 		lastSubmission: oidc.result,
-		accountId: oidc.session.accountId,
+		accountId: oidc.session.payload.accountId,
 		params: omitBy({ ...oidc.params }, (val) => typeof val === 'undefined'),
 		trusted: oidc.trusted,
 		session: oidc.session,

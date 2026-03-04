@@ -175,9 +175,8 @@ export const jwt = {
 
 		const config = await getResourceServerConfig(this);
 
-		let signed;
 		if (config.sign) {
-			signed = await JWT.sign(
+			const signed = await JWT.sign(
 				structuredToken.payload,
 				config.sign.key,
 				config.sign.alg,
@@ -186,24 +185,22 @@ export const jwt = {
 					fields: { kid: config.sign.kid, ...structuredToken.header }
 				}
 			);
-		}
 
-		if (config.sign && config.encrypt) {
-			const encrypted = await JWT.encrypt(signed, config.encrypt.key, {
-				fields: {
-					kid: config.encrypt.kid,
-					iss: ISSUER,
-					aud: structuredToken.payload.aud,
-					cty: 'at+jwt'
-				},
-				enc: config.encrypt.enc,
-				alg: config.encrypt.alg
-			});
+			if (config.encrypt) {
+				const encrypted = await JWT.encrypt(signed, config.encrypt.key, {
+					fields: {
+						kid: config.encrypt.kid,
+						iss: ISSUER,
+						aud: structuredToken.payload.aud,
+						cty: 'at+jwt'
+					},
+					enc: config.encrypt.enc,
+					alg: config.encrypt.alg
+				});
 
-			return { value: encrypted };
-		}
+				return { value: encrypted };
+			}
 
-		if (config.sign) {
 			return { value: signed };
 		}
 

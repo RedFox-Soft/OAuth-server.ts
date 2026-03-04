@@ -54,33 +54,39 @@ async function userInfo({ headers, set }) {
 		throw new InsufficientScope('access token missing openid scope', 'openid');
 	}
 
-	if (accessToken['x5t#S256']) {
+	if (accessToken.payload['x5t#S256']) {
 		const { getCertificate } = instance(provider).features.mTLS;
 		const cert = getCertificate(ctx);
-		if (!cert || accessToken['x5t#S256'] !== certificateThumbprint(cert)) {
+		if (
+			!cert ||
+			accessToken.payload['x5t#S256'] !== certificateThumbprint(cert)
+		) {
 			throw new InvalidToken('failed x5t#S256 verification');
 		}
 	}
 
-	await validateReplay(accessToken.clientId, dPoP);
+	await validateReplay(accessToken.payload.clientId, dPoP);
 
-	if (accessToken.jkt && (!dPoP || accessToken.jkt !== dPoP.thumbprint)) {
+	if (
+		accessToken.payload.jkt &&
+		(!dPoP || accessToken.payload.jkt !== dPoP.thumbprint)
+	) {
 		throw new InvalidToken('failed jkt verification');
 	}
-	if (accessToken.aud !== undefined) {
+	if (accessToken.payload.aud !== undefined) {
 		throw new InvalidToken(
 			'token audience prevents accessing the userinfo endpoint'
 		);
 	}
 
-	const client = await Client.find(accessToken.clientId);
+	const client = await Client.find(accessToken.payload.clientId);
 	if (!client) {
 		throw new InvalidToken('associated client not found');
 	}
 
 	const account = await instance(provider).configuration.findAccount(
 		ctx,
-		accessToken.accountId,
+		accessToken.payload.accountId,
 		accessToken
 	);
 
@@ -91,11 +97,11 @@ async function userInfo({ headers, set }) {
 	let grant;
 	if (client['consent.require'] === false) {
 		grant = new TrustedGrant({
-			accountId: accessToken.accountId,
-			clientId: accessToken.clientId
+			accountId: accessToken.payload.accountId,
+			clientId: accessToken.payload.clientId
 		});
 	} else {
-		grant = await Grant.find(accessToken.grantId, {
+		grant = await Grant.find(accessToken.payload.grantId, {
 			ignoreExpiration: true
 		});
 	}
@@ -108,18 +114,18 @@ async function userInfo({ headers, set }) {
 		throw new InvalidToken('grant is expired');
 	}
 
-	if (grant.clientId !== accessToken.clientId) {
+	if (grant.payload.clientId !== accessToken.payload.clientId) {
 		throw new InvalidToken('clientId mismatch');
 	}
 
-	if (grant.accountId !== accessToken.accountId) {
+	if (grant.payload.accountId !== accessToken.payload.accountId) {
 		throw new InvalidToken('accountId mismatch');
 	}
 
-	const claims = filterClaims(accessToken.claims, 'userinfo', grant);
+	const claims = filterClaims(accessToken.payload.claims, 'userinfo', grant);
 	const rejected = grant.getRejectedOIDCClaims();
 	const scope = grant.getOIDCScopeFiltered(
-		new Set(accessToken.scope.split(' '))
+		new Set(accessToken.payload.scope.split(' '))
 	);
 
 	if (client.userinfoSignedResponseAlg || client.userinfoEncryptedResponseAlg) {
@@ -128,9 +134,9 @@ async function userInfo({ headers, set }) {
 			await account.claims('userinfo', scope, claims, rejected)
 		);
 
-		token.scope = scope;
-		token.mask = claims;
-		token.rejected = rejected;
+		token.payload.scope = scope;
+		token.payload.mask = claims;
+		token.payload.rejected = rejected;
 
 		const body = await token.issue({
 			expiresAt: accessToken.exp,

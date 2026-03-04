@@ -3,16 +3,9 @@ import { BaseToken } from './base_token.js';
 
 import apply from './mixins/apply.ts';
 import consumable from './mixins/consumable.ts';
-import hasGrantId from './mixins/has_grant_id.ts';
-import isSessionBound from './mixins/is_session_bound.ts';
 import { authPayload } from './mixins/stores_auth.js';
 
-export class DeviceCode extends apply([
-	consumable,
-	hasGrantId,
-	isSessionBound,
-	BaseToken
-]) {
+export class DeviceCode extends apply([consumable, BaseToken]) {
 	static async findByUserCode(userCode, { ignoreExpiration = false } = {}) {
 		const stored = await this.adapter.findByUserCode(userCode);
 		if (!stored) return;
@@ -27,6 +20,7 @@ export class DeviceCode extends apply([
 		}
 	}
 
+	static isSessionBound = true;
 	static get IN_PAYLOAD() {
 		return [
 			...super.IN_PAYLOAD,

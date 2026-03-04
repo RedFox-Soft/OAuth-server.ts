@@ -55,7 +55,7 @@ describe('grant_type=authorization_code', () => {
 				scope: 'openid',
 				redirect_uri: 'https://client.example.com/cb'
 			});
-			const { response, error } = await agent.auth.get({
+			const { response } = await agent.auth.get({
 				query: auth.params,
 				headers: {
 					cookie
@@ -107,7 +107,10 @@ describe('grant_type=authorization_code', () => {
 				'AuthorizationCode',
 				'AccessToken'
 			]).toEqual(expect.arrayContaining(entities));
-			expect(accessToken[1]).toHaveProperty('gty', 'authorization_code');
+			expect(accessToken[1].payload).toHaveProperty(
+				'gty',
+				'authorization_code'
+			);
 		});
 
 		it('populates ctx.oidc.entities (w/ offline_access)', async function () {
@@ -141,8 +144,14 @@ describe('grant_type=authorization_code', () => {
 				'AccessToken',
 				'RefreshToken'
 			]).toEqual(expect.arrayContaining(entities));
-			expect(accessToken[1]).toHaveProperty('gty', 'authorization_code');
-			expect(refreshToken[1]).toHaveProperty('gty', 'authorization_code');
+			expect(accessToken[1].payload).toHaveProperty(
+				'gty',
+				'authorization_code'
+			);
+			expect(refreshToken[1].payload).toHaveProperty(
+				'gty',
+				'authorization_code'
+			);
 		});
 
 		it('returns token-endpoint-like cache headers', async function () {
@@ -392,7 +401,10 @@ describe('grant_type=authorization_code', () => {
 				'AuthorizationCode',
 				'AccessToken'
 			]).toEqual(expect.arrayContaining(entities));
-			expect(accessToken[1]).toHaveProperty('gty', 'authorization_code');
+			expect(accessToken[1].payload).toHaveProperty(
+				'gty',
+				'authorization_code'
+			);
 		});
 
 		it('populates ctx.oidc.entities (w/ offline_access)', async function () {
@@ -424,8 +436,14 @@ describe('grant_type=authorization_code', () => {
 				'AccessToken',
 				'RefreshToken'
 			]).toEqual(expect.arrayContaining(entities));
-			expect(accessToken[1]).toHaveProperty('gty', 'authorization_code');
-			expect(refreshToken[1]).toHaveProperty('gty', 'authorization_code');
+			expect(accessToken[1].payload).toHaveProperty(
+				'gty',
+				'authorization_code'
+			);
+			expect(refreshToken[1].payload).toHaveProperty(
+				'gty',
+				'authorization_code'
+			);
 		});
 
 		it('returns token-endpoint-like cache headers', async function () {

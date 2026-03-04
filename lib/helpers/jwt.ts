@@ -89,7 +89,7 @@ export function assertPayload(
 		issuer?: string;
 		subject?: boolean;
 	} = {}
-) {
+): asserts payload is payloadType {
 	const timestamp = epochTime();
 
 	if (Value.Check(jwtPayloadSchema, payload) === false) {

@@ -65,7 +65,10 @@ describe('BaseToken', () => {
 		const jti = setup.getTokenJti(token);
 		const stored = TestAdapter.for('RefreshToken').syncFind(jti);
 		stored.consumed = true;
-		expect(await RefreshToken.find(token)).toHaveProperty('consumed', true);
+		expect((await RefreshToken.find(token)).payload).toHaveProperty(
+			'consumed',
+			true
+		);
 	});
 
 	it('uses expiration for upsert from global settings if not specified in token values', async function () {
@@ -116,17 +119,17 @@ describe('BaseToken', () => {
 		const first = await token.save();
 
 		token = await RefreshToken.find(first);
-		expect(token.scope).toBeUndefined();
-		token.scope = 'openid profile';
+		expect(token.payload.scope).toBeUndefined();
+		token.payload.scope = 'openid profile';
 		const second = await token.save();
 
 		token = await RefreshToken.find(first);
-		expect(token.scope).toBe('openid profile');
-		token.scope = 'openid profile email';
+		expect(token.payload.scope).toBe('openid profile');
+		token.payload.scope = 'openid profile email';
 		const third = await token.save();
 
 		token = await RefreshToken.find(first);
-		expect(token.scope).toBe('openid profile email');
+		expect(token.payload.scope).toBe('openid profile email');
 
 		expect(second).toEqual(first);
 		expect(third).toEqual(second);
@@ -152,7 +155,7 @@ describe('BaseToken', () => {
 		const first = await token.save();
 
 		token = await AuthorizationCode.find(first);
-		expect(token.consumed).toBeTrue();
+		expect(token.payload.consumed).toBeTrue();
 	});
 
 	it('rethrows adapter#findByUserCode errors (Device Code)', async function () {

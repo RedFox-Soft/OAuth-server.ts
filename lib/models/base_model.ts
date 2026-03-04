@@ -1,8 +1,7 @@
 import { Type as t, type Static } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
-import snakeCase from '../helpers/_/snake_case.ts';
-import epochTime from '../helpers/epoch_time.ts';
-import pickBy from '../helpers/_/pick_by.ts';
+import snakeCase from '../helpers/_/snake_case.js';
+import epochTime from '../helpers/epoch_time.js';
 import { Opaque } from './formats/opaque.js';
 import { provider } from 'lib/provider.js';
 import { adapter } from 'lib/adapters/index.js';
@@ -16,43 +15,40 @@ export const BaseModelPayload = t.Object({
 	iat: t.Optional(t.Number())
 });
 
-type BaseModelPayload = Static<typeof BaseModelPayload>;
+export type BaseModelPayloadType = Static<typeof BaseModelPayload>;
 
 export class BaseModel<
-	T extends BaseModelPayload = BaseModelPayload
+	T extends BaseModelPayloadType = BaseModelPayloadType
 > extends Opaque {
 	model = BaseModelPayload;
 	payload = {} as T;
 
-	constructor({ jti, kind, ...payload }: T = {} as T) {
+	constructor(payload: T = {} as T) {
 		super();
-		Object.assign(
-			this,
-			pickBy(payload, (val, key) => this.constructor.IN_PAYLOAD.includes(key))
-		);
 
+		const check = Value.Check(this.model, payload);
+		if (!check) {
+			throw new TypeError('invalid payload');
+		}
+		this.payload = payload;
+		const { kind } = payload;
 		if (kind && kind !== this.constructor.name) {
 			throw new TypeError('kind mismatch');
 		}
-
-		this.kind = kind || this.constructor.name;
-		this.jti = jti;
+		payload.kind = kind || this.constructor.name;
 	}
 
 	async save(ttl: number) {
-		if (!this.jti) {
-			this.jti = this.generateTokenId();
-		}
-
 		// this is true for all BaseToken descendants
 		if (typeof this.constructor.expiresIn !== 'function') {
-			this.exp = epochTime() + ttl;
+			this.payload.exp = epochTime() + ttl;
 		}
 
+		const jti = this.id;
 		const { value, payload } = await this.getValueAndPayload();
 
 		if (payload) {
-			await this.adapter.upsert(this.jti, payload, ttl);
+			await this.adapter.upsert(jti, payload, ttl);
 			this.emit('saved');
 		} else {
 			this.emit('issued');
@@ -61,8 +57,22 @@ export class BaseModel<
 		return value;
 	}
 
+	get id() {
+		if (typeof this.payload.jti === 'undefined') {
+			this.payload.jti = this.generateTokenId();
+		}
+		return this.payload.jti;
+	}
+
+	set id(value) {
+		this.payload.jti = value;
+	}
+
 	async destroy() {
-		await this.adapter.destroy(this.jti);
+		if (!this.id) {
+			return;
+		}
+		await this.adapter.destroy(this.id);
 		this.emit('destroyed');
 	}
 
@@ -78,11 +88,11 @@ export class BaseModel<
 		return IN_PAYLOAD;
 	}
 
-	static async find<T extends BaseModelPayload = BaseModelPayload>(
-		this: new (payload: T) => BaseModel<T>,
+	static async find<A extends BaseModelPayloadType, T extends BaseModel<A>>(
+		this: new (payload: A) => T,
 		value: string,
 		{ ignoreExpiration = false } = {}
-	): Promise<InstanceType<typeof this> | undefined> {
+	): Promise<T | undefined> {
 		if (typeof value !== 'string') {
 			return;
 		}
@@ -102,7 +112,8 @@ export class BaseModel<
 	}
 
 	emit(eventName: string) {
-		provider.emit(`${snakeCase(this.kind)}.${eventName}`, this);
+		const kind = this.constructor.name;
+		provider.emit(`${snakeCase(kind)}.${eventName}`, this);
 	}
 
 	/*
@@ -113,9 +124,8 @@ export class BaseModel<
 	 */
 	ttlPercentagePassed() {
 		const now = epochTime();
-		const percentage = Math.floor(
-			100 * ((now - this.iat) / (this.exp - this.iat))
-		);
+		const { iat, exp } = this.payload;
+		const percentage = Math.floor(100 * ((now - iat) / (exp - iat)));
 		return Math.max(Math.min(100, percentage), 0);
 	}
 
@@ -124,13 +134,15 @@ export class BaseModel<
 	}
 
 	get isExpired() {
-		return this.exp <= epochTime();
+		const { exp } = this.payload;
+		return exp <= epochTime();
 	}
 
 	get remainingTTL() {
-		if (!this.exp) {
+		const { exp } = this.payload;
+		if (!exp) {
 			return this.expiration;
 		}
-		return this.exp - epochTime();
+		return exp - epochTime();
 	}
 }

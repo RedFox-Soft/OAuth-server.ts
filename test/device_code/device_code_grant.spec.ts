@@ -126,7 +126,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 				'DeviceCode',
 				'AccessToken'
 			);
-			expect(ctx.oidc.entities.AccessToken).to.have.property(
+			expect(ctx.oidc.entities.AccessToken.payload).to.have.property(
 				'gty',
 				'device_code'
 			);

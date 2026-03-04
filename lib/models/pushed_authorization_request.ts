@@ -1,12 +1,25 @@
-import apply from './mixins/apply.ts';
-import consumable from './mixins/consumable.ts';
-import { BaseModel } from './base_model.js';
+import { Type as t, type Static } from '@sinclair/typebox';
+import consumable from './mixins/consumable.js';
+import { BaseModel, BaseModelPayload } from './base_model.js';
 import nanoid from 'lib/helpers/nanoid.js';
 
-export class PushedAuthorizationRequest extends apply([consumable, BaseModel]) {
-	static get IN_PAYLOAD() {
-		return [...super.IN_PAYLOAD, 'request', 'dpopJkt', 'trusted'];
-	}
+const PushedAuthorizationRequestPayload = t.Composite([
+	BaseModelPayload,
+	t.Object({
+		request: t.String(),
+		dpopJkt: t.Optional(t.String()),
+		trusted: t.Optional(t.Boolean()),
+		consumed: t.Boolean()
+	})
+]);
+type PushedAuthorizationRequestPayloadType = Static<
+	typeof PushedAuthorizationRequestPayload
+>;
+
+export class PushedAuthorizationRequest extends consumable<PushedAuthorizationRequestPayloadType>(
+	BaseModel
+) {
+	model = PushedAuthorizationRequestPayload;
 
 	generateTokenId() {
 		return nanoid();

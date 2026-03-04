@@ -104,7 +104,7 @@ export const logoutAction = new Elysia()
 
 		const secret = crypto.randomBytes(24).toString('hex');
 
-		ctx.oidc.session.state = {
+		ctx.oidc.session.payload.state = {
 			secret,
 			clientId: ctx.oidc.client ? ctx.oidc.client.clientId : undefined,
 			state: ctx.oidc.params.state,
@@ -112,7 +112,7 @@ export const logoutAction = new Elysia()
 		};
 
 		await setCookies();
-		if (ctx.oidc.session.accountId) {
+		if (ctx.oidc.session.payload.accountId) {
 			return logout(secret);
 		}
 		return logoutSuccess();
@@ -134,17 +134,17 @@ export const logoutConfirmAction = new Elysia()
 		ctx.oidc = new OIDCContext(ctx);
 		const setCookies = await sessionHandler(ctx);
 
-		if (!ctx.oidc.session.state) {
+		if (!ctx.oidc.session.payload.state) {
 			throw new InvalidRequest('could not find logout details');
 		}
-		if (ctx.oidc.session.state.secret !== body.xsrf) {
+		if (ctx.oidc.session.payload.state.secret !== body.xsrf) {
 			throw new InvalidRequest('xsrf token invalid');
 		}
 
 		const {
 			oidc: { session, params }
 		} = ctx;
-		const { state } = session;
+		const { state } = session.payload;
 
 		const {
 			features: { backchannelLogout }
@@ -198,9 +198,9 @@ export const logoutConfirmAction = new Elysia()
 		}
 
 		if (body.logout) {
-			if (session.authorizations) {
+			if (session.payload.authorizations) {
 				await Promise.all(
-					Object.entries(session.authorizations).map(
+					Object.entries(session.payload.authorizations).map(
 						async ([clientId, { grantId }]) => {
 							// Drop the grants without offline_access
 							// Note: tokens that don't get dropped due to offline_access having being added
@@ -224,9 +224,9 @@ export const logoutConfirmAction = new Elysia()
 				await revoke(ctx, grantId);
 				provider.emit('grant.revoked', ctx, grantId);
 			}
-			session.state = undefined;
-			if (session.authorizations) {
-				delete session.authorizations[state.clientId];
+			session.payload.state = undefined;
+			if (session.payload.authorizations) {
+				delete session.payload.authorizations[state.clientId];
 			}
 			session.resetIdentifier();
 		}

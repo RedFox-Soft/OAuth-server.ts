@@ -1,38 +1,42 @@
-import { InvalidRequest } from '../../helpers/errors.ts';
-import certificateThumbprint from '../../helpers/certificate_thumbprint.ts';
+import { InvalidRequest } from '../../helpers/errors.js';
+import certificateThumbprint from '../../helpers/certificate_thumbprint.js';
+import { type BaseToken, type BaseTokenPayloadType } from '../base_token.js';
 
 const x5t = 'x5t#S256';
 const jkt = 'jkt';
 
-export default (superclass) =>
-	class extends superclass {
-		static get IN_PAYLOAD() {
-			return [...super.IN_PAYLOAD, x5t, jkt];
-		}
+type ConstrainedPayload = BaseTokenPayloadType & {
+	'x5t#S256'?: string;
+	jkt?: string;
+};
 
+export default function constrained<TPayload extends ConstrainedPayload>(
+	superclass: typeof BaseToken<TPayload>
+) {
+	return class extends superclass {
 		setThumbprint(prop: 'x5t' | 'jkt', input: string) {
 			switch (prop) {
 				case 'x5t':
-					if (this[jkt]) {
+					if (this.payload[jkt]) {
 						throw new InvalidRequest(
 							'multiple proof-of-posession mechanisms are not allowed'
 						);
 					}
-					this[x5t] = certificateThumbprint(input);
+					this.payload[x5t] = certificateThumbprint(input);
 					break;
 				case 'jkt':
-					if (this[x5t]) {
+					if (this.payload[x5t]) {
 						throw new InvalidRequest(
 							'multiple proof-of-posession mechanisms are not allowed'
 						);
 					}
-					this[jkt] = input;
+					this.payload[jkt] = input;
 					break;
 			}
 		}
 
 		isSenderConstrained() {
-			if (this[jkt] || this[x5t]) {
+			if (this.payload[jkt] || this.payload[x5t]) {
 				return true;
 			}
 
@@ -40,10 +44,11 @@ export default (superclass) =>
 		}
 
 		get tokenType() {
-			if (this[jkt]) {
+			if (this.payload[jkt]) {
 				return 'DPoP';
 			}
 
 			return 'Bearer';
 		}
 	};
+}

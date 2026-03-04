@@ -126,11 +126,11 @@ describe('grant_type=refresh_token', () => {
 		const refreshToken = spy.mock.calls.find(
 			(call) => call[0] === 'RefreshToken'
 		);
-		expect(refreshToken[1]).toHaveProperty('gty', 'authorization_code');
+		expect(refreshToken[1].payload).toHaveProperty('gty', 'authorization_code');
 		const accessToken = spy.mock.calls.find(
 			(call) => call[0] === 'AccessToken'
 		);
-		expect(accessToken[1]).toHaveProperty(
+		expect(accessToken[1].payload).toHaveProperty(
 			'gty',
 			'authorization_code refresh_token'
 		);
@@ -234,8 +234,11 @@ describe('grant_type=refresh_token', () => {
 				}
 			);
 			expect(status).toBe(200);
-			expect(spy.mock.calls[0][0]).toHaveProperty('kind', 'AccessToken');
-			expect(spy.mock.calls[0][0]).toHaveProperty('scope', 'email');
+			expect(spy.mock.calls[0][0].payload).toHaveProperty(
+				'kind',
+				'AccessToken'
+			);
+			expect(spy.mock.calls[0][0].payload).toHaveProperty('scope', 'email');
 			expect(data).toHaveProperty('scope', 'email');
 			expect(data).not.toHaveProperty('id_token');
 		});
@@ -256,8 +259,14 @@ describe('grant_type=refresh_token', () => {
 				}
 			);
 			expect(status).toBe(200);
-			expect(spy.mock.calls[0][0]).toHaveProperty('kind', 'AccessToken');
-			expect(spy.mock.calls[0][0]).toHaveProperty('scope', 'openid email');
+			expect(spy.mock.calls[0][0].payload).toHaveProperty(
+				'kind',
+				'AccessToken'
+			);
+			expect(spy.mock.calls[0][0].payload).toHaveProperty(
+				'scope',
+				'openid email'
+			);
 			expect(data).toHaveProperty('scope', 'openid email');
 			expect(data).toHaveProperty('id_token');
 		});
@@ -361,22 +370,22 @@ describe('grant_type=refresh_token', () => {
 			const rotatedRefreshToken = spy.mock.calls.find(
 				(call) => call[0] === 'RotatedRefreshToken'
 			);
-			expect(rotatedRefreshToken[1]).toHaveProperty(
+			expect(rotatedRefreshToken[1].payload).toHaveProperty(
 				'gty',
 				'authorization_code'
 			);
 			const refreshToken = spy.mock.calls.findLast(
 				(call) => call[0] === 'RefreshToken'
 			);
-			expect(refreshToken[1]).not.toEqual(rotatedRefreshToken[1]);
-			expect(refreshToken[1]).toHaveProperty(
+			expect(refreshToken[1].payload).not.toEqual(rotatedRefreshToken[1]);
+			expect(refreshToken[1].payload).toHaveProperty(
 				'gty',
 				'authorization_code refresh_token'
 			);
 			const accessToken = spy.mock.calls.find(
 				(call) => call[0] === 'AccessToken'
 			);
-			expect(accessToken[1]).toHaveProperty(
+			expect(accessToken[1].payload).toHaveProperty(
 				'gty',
 				'authorization_code refresh_token'
 			);
@@ -436,11 +445,11 @@ describe('grant_type=refresh_token', () => {
 			expect(status).toBe(200);
 			expect(consumeSpy).toBeCalledTimes(1);
 			expect(issueSpy).toBeCalledTimes(2);
-			expect(consumeSpy.mock.calls[0][0]).toHaveProperty(
+			expect(consumeSpy.mock.calls[0][0].payload).toHaveProperty(
 				'scope',
 				'openid email offline_access'
 			);
-			expect(issueSpy.mock.calls[0][0]).toHaveProperty(
+			expect(issueSpy.mock.calls[0][0].payload).toHaveProperty(
 				'scope',
 				'openid email offline_access'
 			);
@@ -467,15 +476,18 @@ describe('grant_type=refresh_token', () => {
 			expect(status).toBe(200);
 			expect(consumeSpy).toBeCalledTimes(1);
 			expect(issueSpy).toBeCalledTimes(2);
-			expect(consumeSpy.mock.calls[0][0]).toHaveProperty(
+			expect(consumeSpy.mock.calls[0][0].payload).toHaveProperty(
 				'scope',
 				'openid email offline_access'
 			);
-			expect(issueSpy.mock.calls[0][0]).toHaveProperty(
+			expect(issueSpy.mock.calls[0][0].payload).toHaveProperty(
 				'scope',
 				'openid email offline_access'
 			);
-			expect(issueSpy.mock.calls[1][0]).toHaveProperty('scope', 'openid');
+			expect(issueSpy.mock.calls[1][0].payload).toHaveProperty(
+				'scope',
+				'openid'
+			);
 		});
 
 		it('revokes the complete grant if the old token is used again', async function () {
@@ -539,22 +551,22 @@ describe('grant_type=refresh_token', () => {
 			const rotatedRefreshToken = spy.mock.calls.find(
 				(call) => call[0] === 'RotatedRefreshToken'
 			);
-			expect(rotatedRefreshToken[1]).toHaveProperty(
+			expect(rotatedRefreshToken[1].payload).toHaveProperty(
 				'gty',
 				'authorization_code'
 			);
 			const refreshToken = spy.mock.calls.findLast(
 				(call) => call[0] === 'RefreshToken'
 			);
-			expect(refreshToken[1]).not.toEqual(rotatedRefreshToken[1]);
-			expect(refreshToken[1]).toHaveProperty(
+			expect(refreshToken[1].payload).not.toEqual(rotatedRefreshToken[1]);
+			expect(refreshToken[1].payload).toHaveProperty(
 				'gty',
 				'authorization_code refresh_token'
 			);
 			const accessToken = spy.mock.calls.find(
 				(call) => call[0] === 'AccessToken'
 			);
-			expect(accessToken[1]).toHaveProperty(
+			expect(accessToken[1].payload).toHaveProperty(
 				'gty',
 				'authorization_code refresh_token'
 			);
@@ -612,11 +624,11 @@ describe('grant_type=refresh_token', () => {
 			expect(status).toBe(200);
 			expect(consumeSpy).toBeCalledTimes(1);
 			expect(issueSpy).toBeCalled();
-			expect(consumeSpy.mock.calls[0][0]).toHaveProperty(
+			expect(consumeSpy.mock.calls[0][0].payload).toHaveProperty(
 				'scope',
 				'openid email offline_access'
 			);
-			expect(issueSpy.mock.calls[0][0]).toHaveProperty(
+			expect(issueSpy.mock.calls[0][0].payload).toHaveProperty(
 				'scope',
 				'openid email offline_access'
 			);
@@ -643,15 +655,18 @@ describe('grant_type=refresh_token', () => {
 			expect(status).toBe(200);
 			expect(consumeSpy).toBeCalledTimes(1);
 			expect(issueSpy).toBeCalledTimes(2);
-			expect(consumeSpy.mock.calls[0][0]).toHaveProperty(
+			expect(consumeSpy.mock.calls[0][0].payload).toHaveProperty(
 				'scope',
 				'openid email offline_access'
 			);
-			expect(issueSpy.mock.calls[0][0]).toHaveProperty(
+			expect(issueSpy.mock.calls[0][0].payload).toHaveProperty(
 				'scope',
 				'openid email offline_access'
 			);
-			expect(issueSpy.mock.calls[1][0]).toHaveProperty('scope', 'openid');
+			expect(issueSpy.mock.calls[1][0].payload).toHaveProperty(
+				'scope',
+				'openid'
+			);
 		});
 
 		it('revokes the complete grant if the old token is used again', async function () {
@@ -729,11 +744,14 @@ describe('grant_type=refresh_token', () => {
 			const refreshToken = spy.mock.calls.find(
 				(call) => call[0] === 'RefreshToken'
 			);
-			expect(refreshToken[1]).toHaveProperty('gty', 'authorization_code');
+			expect(refreshToken[1].payload).toHaveProperty(
+				'gty',
+				'authorization_code'
+			);
 			const accessToken = spy.mock.calls.find(
 				(call) => call[0] === 'AccessToken'
 			);
-			expect(accessToken[1]).toHaveProperty(
+			expect(accessToken[1].payload).toHaveProperty(
 				'gty',
 				'authorization_code refresh_token'
 			);

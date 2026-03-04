@@ -23,7 +23,7 @@ export const handler = async function clientCredentialsHandler(ctx, dPoP) {
 		);
 	}
 
-	await checkResource(ctx, () => {});
+	await checkResource(ctx);
 
 	const scopes = [...new Set(ctx.oidc.params.scope?.split(' '))];
 
@@ -50,7 +50,7 @@ export const handler = async function clientCredentialsHandler(ctx, dPoP) {
 			);
 		}
 		token.resourceServer = resourceServer;
-		token.scope =
+		token.payload.scope =
 			scopes
 				.filter(
 					Set.prototype.has.bind(new Set(resourceServer.scope.split(' ')))
@@ -80,6 +80,6 @@ export const handler = async function clientCredentialsHandler(ctx, dPoP) {
 		access_token: value,
 		expires_in: token.expiration,
 		token_type: token.tokenType,
-		scope: token.scope || undefined
+		scope: token.payload.scope || undefined
 	};
 };

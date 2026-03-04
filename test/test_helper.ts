@@ -23,6 +23,7 @@ import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { Session } from 'lib/models/session.js';
 import { ttl } from 'lib/configs/liveTime.js';
 import { Grant } from 'lib/models/grant.js';
+export { Grant } from 'lib/models/grant.js';
 
 const applicationDefaultSettings = { ...ApplicationConfig };
 const clientDefaultSettings = { ...ClientDefaults };
@@ -139,7 +140,7 @@ export default function testHelper(importMetaUrl, { config: base } = {}) {
 			const sessionCookie = `_session=${sessionId}; path=/; expires=${expire.toGMTString()}; httponly`;
 			const cookies = [sessionCookie];
 
-			session.authorizations = {};
+			session.payload.authorizations = {};
 			const ctx = new OIDCContext({ req: { socket: {} }, res: {} });
 			ctx.params = { scope, claims };
 
@@ -170,7 +171,7 @@ export default function testHelper(importMetaUrl, { config: base } = {}) {
 				}
 
 				const grantId = await grant.save();
-				session.authorizations[cl.clientId] = {
+				session.payload.authorizations[cl.clientId] = {
 					sid: nanoid(),
 					grantId
 				};
@@ -188,11 +189,11 @@ export default function testHelper(importMetaUrl, { config: base } = {}) {
 		}
 
 		function getSessionId() {
-			return getLastSession().jti;
+			return getLastSession().id;
 		}
 
 		function getSession(id?: string) {
-			const sessionId = id ?? getLastSession().jti;
+			const sessionId = id ?? getLastSession().id;
 			return TestAdapter.for('Session').syncFind(sessionId);
 		}
 

@@ -1,31 +1,38 @@
-import epochTime from '../helpers/epoch_time.ts';
-import { BaseToken } from './base_token.js';
+import { Type as t, type Static } from '@sinclair/typebox';
+import epochTime from '../helpers/epoch_time.js';
+import { BaseToken, BaseTokenPayload } from './base_token.js';
 
-import apply from './mixins/apply.ts';
-import consumable from './mixins/consumable.ts';
-import hasGrantId from './mixins/has_grant_id.ts';
-import hasGrantType from './mixins/has_grant_type.ts';
-import isSenderConstrained from './mixins/is_sender_constrained.ts';
-import isSessionBound from './mixins/is_session_bound.ts';
-import { authPayload } from './mixins/stores_auth.js';
+import consumable from './mixins/consumable.js';
+import constrained from './mixins/is_sender_constrained.js';
+import { authPayloadModel } from './mixins/stores_auth.js';
 
-export class RefreshToken extends apply([
-	consumable,
-	hasGrantType,
-	hasGrantId,
-	isSenderConstrained,
-	isSessionBound,
-	BaseToken
-]) {
-	constructor(...args) {
-		super(...args);
-		if (!this.iiat) {
-			this.iiat = this.iat || epochTime();
+const RefreshTokenSchema = t.Composite([
+	BaseTokenPayload,
+	authPayloadModel,
+	t.Object({
+		iiat: t.Number(),
+		gty: t.String(),
+		rar: t.Optional(t.Unknown()),
+		rotations: t.Optional(t.Number()),
+		consumed: t.Boolean(),
+		'x5t#S256': t.Optional(t.String()),
+		jkt: t.Optional(t.String())
+	})
+]);
+
+type RefreshTokenPayload = Static<typeof RefreshTokenSchema>;
+
+export class RefreshToken extends consumable<RefreshTokenPayload>(
+	constrained<RefreshTokenPayload>(BaseToken)
+) {
+	model = RefreshTokenSchema;
+	static isSessionBound = true;
+
+	constructor(payload: RefreshTokenPayload) {
+		super(payload);
+		if (!this.payload.iiat) {
+			this.payload.iiat = this.payload.iat || epochTime();
 		}
-	}
-
-	static get IN_PAYLOAD() {
-		return [...super.IN_PAYLOAD, ...authPayload, 'rar', 'rotations', 'iiat'];
 	}
 
 	/*
@@ -33,6 +40,6 @@ export class RefreshToken extends apply([
 	 * number of seconds since the very first refresh token chain iat
 	 */
 	totalLifetime() {
-		return epochTime() - this.iiat;
+		return epochTime() - this.payload.iiat;
 	}
 }

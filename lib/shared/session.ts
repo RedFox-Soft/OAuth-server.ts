@@ -53,7 +53,7 @@ export default async function sessionHandler(ctx) {
 
 		if (session) {
 			session?.set({
-				expires: new Date(ctx.oidc.session.exp * 1000)
+				expires: new Date(ctx.oidc.session.payload.exp * 1000)
 			});
 		}
 	};

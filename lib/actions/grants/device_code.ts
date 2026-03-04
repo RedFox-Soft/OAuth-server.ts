@@ -44,7 +44,7 @@ export const handler = async function deviceCodeHandler(ctx, dPoP) {
 		throw new InvalidGrant('device code not found');
 	}
 
-	if (code.clientId !== ctx.oidc.client.clientId) {
+	if (code.payload.clientId !== ctx.oidc.client.clientId) {
 		throw new InvalidGrant('client mismatch');
 	}
 
@@ -64,26 +64,29 @@ export const handler = async function deviceCodeHandler(ctx, dPoP) {
 		throw new ExpiredToken('device code is expired');
 	}
 
-	if (!code.accountId && !code.error) {
+	if (!code.payload.accountId && !code.payload.error) {
 		throw new AuthorizationPending();
 	}
 
-	if (code.consumed) {
-		await revoke(ctx, code.grantId);
+	if (code.payload.consumed) {
+		await revoke(ctx, code.payload.grantId);
 		throw new InvalidGrant('device code already consumed');
 	}
 
 	await code.consume();
 
-	if (code.error) {
-		const className = upperFirst(camelCase(code.error));
+	if (code.payload.error) {
+		const className = upperFirst(camelCase(code.payload.error));
 		if (errors[className]) {
-			throw new errors[className](code.errorDescription);
+			throw new errors[className](code.payload.errorDescription);
 		}
-		throw new errors.CustomOIDCProviderError(code.error, code.errorDescription);
+		throw new errors.CustomOIDCProviderError(
+			code.payload.error,
+			code.payload.errorDescription
+		);
 	}
 
-	const grant = await Grant.find(code.grantId, {
+	const grant = await Grant.find(code.payload.grantId, {
 		ignoreExpiration: true
 	});
 
@@ -95,14 +98,14 @@ export const handler = async function deviceCodeHandler(ctx, dPoP) {
 		throw new InvalidGrant('grant is expired');
 	}
 
-	if (grant.clientId !== ctx.oidc.client.clientId) {
+	if (grant.payload.clientId !== ctx.oidc.client.clientId) {
 		throw new InvalidGrant('client mismatch');
 	}
 
 	ctx.oidc.entity('DeviceCode', code);
 	ctx.oidc.entity('Grant', grant);
 
-	const account = await findAccount(ctx, code.accountId, code);
+	const account = await findAccount(ctx, code.payload.accountId, code);
 
 	if (!account) {
 		throw new InvalidGrant(
@@ -110,7 +113,7 @@ export const handler = async function deviceCodeHandler(ctx, dPoP) {
 		);
 	}
 
-	if (code.accountId !== grant.accountId) {
+	if (code.payload.accountId !== grant.payload.accountId) {
 		throw new InvalidGrant('accountId mismatch');
 	}
 
@@ -120,10 +123,10 @@ export const handler = async function deviceCodeHandler(ctx, dPoP) {
 		accountId: account.accountId,
 		client: ctx.oidc.client,
 		expiresWithSession: code.expiresWithSession,
-		grantId: code.grantId,
+		grantId: code.payload.grantId,
 		gty,
-		sessionUid: code.sessionUid,
-		sid: code.sid
+		sessionUid: code.payload.sessionUid,
+		sid: code.payload.sid
 	});
 
 	if (ctx.oidc.client.tlsClientCertificateBoundAccessTokens) {
@@ -179,12 +182,12 @@ export const handler = async function deviceCodeHandler(ctx, dPoP) {
 		});
 
 		if (ctx.oidc.client.clientAuthMethod === 'none') {
-			if (at.jkt) {
-				rt.jkt = at.jkt;
+			if (at.payload.jkt) {
+				rt.payload.jkt = at.payload.jkt;
 			}
 
-			if (at['x5t#S256']) {
-				rt['x5t#S256'] = at['x5t#S256'];
+			if (at.payload['x5t#S256']) {
+				rt.payload['x5t#S256'] = at.payload['x5t#S256'];
 			}
 		}
 
@@ -197,11 +200,16 @@ export const handler = async function deviceCodeHandler(ctx, dPoP) {
 		const claims = filterClaims(code.claims, 'id_token', grant);
 		const rejected = grant.getRejectedOIDCClaims();
 		const token = new IdToken(ctx.oidc.client, {
-			...(await account.claims('id_token', code.scope, claims, rejected)),
+			...(await account.claims(
+				'id_token',
+				code.payload.scope,
+				claims,
+				rejected
+			)),
 			...{
-				acr: code.acr,
-				amr: code.amr,
-				auth_time: code.authTime
+				acr: code.payload.acr,
+				amr: code.payload.amr,
+				auth_time: code.payload.authTime
 			}
 		});
 
@@ -225,7 +233,7 @@ export const handler = async function deviceCodeHandler(ctx, dPoP) {
 		expires_in: at.expiration,
 		id_token: idToken,
 		refresh_token: refreshToken,
-		scope: code.scope ? at.scope : at.scope || undefined,
+		scope: code.payload.scope || at.payload.scope || undefined,
 		token_type: at.tokenType
 	};
 };

@@ -232,9 +232,10 @@ export default async function processRequestObject(
 
 	if (
 		pushedRequestObject &&
-		ctx.oidc.entities.PushedAuthorizationRequest.dpopJkt
+		ctx.oidc.entities.PushedAuthorizationRequest.payload.dpopJkt
 	) {
-		params.dpop_jkt = ctx.oidc.entities.PushedAuthorizationRequest.dpopJkt;
+		params.dpop_jkt =
+			ctx.oidc.entities.PushedAuthorizationRequest.payload.dpopJkt;
 		ctx.oidc.trusted?.push('dpop_jkt');
 	}
 }

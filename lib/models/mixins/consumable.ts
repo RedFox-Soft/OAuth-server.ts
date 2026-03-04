@@ -1,15 +1,25 @@
-export default (superclass) =>
-	class extends superclass {
-		static get IN_PAYLOAD() {
-			return [...super.IN_PAYLOAD, 'consumed'];
+import { type BaseModel, type BaseModelPayloadType } from '../base_model.js';
+
+type ConsumdedPayload = BaseModelPayloadType & { consumed: boolean };
+
+export default function consumable<TPayload extends ConsumdedPayload>(
+	superclass: typeof BaseModel<TPayload>
+) {
+	return class extends superclass {
+		constructor(payload: TPayload) {
+			if (typeof payload.consumed === 'undefined') {
+				payload.consumed = false;
+			}
+			super(payload);
 		}
 
 		async consume() {
-			await this.adapter.consume(this.jti);
+			await this.adapter.consume(this.id);
 			this.emit('consumed');
 		}
 
 		get isValid() {
-			return !this.consumed && !this.isExpired;
+			return !this.payload.consumed && !this.isExpired;
 		}
 	};
+}

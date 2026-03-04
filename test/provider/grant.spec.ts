@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test';
-import { Grant } from 'lib/models/grant.js';
+import { Grant } from '../test_helper.js';
 
 describe('Grant', () => {
 	it('manages OIDC Scope', function () {
@@ -24,7 +24,7 @@ describe('Grant', () => {
 			'openid email profile address phone'
 		);
 
-		grant.rejected = undefined;
+		grant.payload.rejected = undefined;
 
 		expect(grant.getOIDCScopeFiltered(new Set(['email', 'profile']))).toBe(
 			'email profile'
@@ -70,7 +70,7 @@ describe('Grant', () => {
 			'phone'
 		]);
 
-		grant.rejected = undefined;
+		grant.payload.rejected = undefined;
 
 		expect(grant.getOIDCClaimsFiltered(new Set(['email', 'name']))).toEqual([
 			'email',
@@ -114,7 +114,7 @@ describe('Grant', () => {
 			'read create delete update phone'
 		);
 
-		grant.rejected = undefined;
+		grant.payload.rejected = undefined;
 
 		expect(
 			grant.getResourceScopeFiltered(resource, new Set(['create', 'delete']))

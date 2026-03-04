@@ -22,7 +22,6 @@ import loadAccount from './load_account.ts';
 import loadGrant from './load_grant.ts';
 import interactions from './interactions.ts';
 import respond from './respond.ts';
-import interactionEmit from './interaction_emit.ts';
 import checkOpenidScope from './check_openid_scope.ts';
 import { authHeaders, authParams, tokenAuth } from '../../shared/token_auth.ts';
 import stripOutsideJarParams from './strip_outside_jar_params.ts';
@@ -130,7 +129,6 @@ async function authorizationActionHandler(ctx) {
 	await checkResource(ctx);
 	checkMaxAge(ctx);
 	await checkIdTokenHint(ctx);
-	interactionEmit;
 	assignClaims(ctx);
 	await loadAccount(ctx);
 	await loadGrant(ctx);

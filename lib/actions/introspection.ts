@@ -74,21 +74,21 @@ async function renderTokenResponse(ctx) {
 		return ctx.body;
 	}
 
-	if (token.grantId) {
-		const grant = await Grant.find(token.grantId, {
+	if (token.payload.grantId) {
+		const grant = await Grant.find(token.payload.grantId, {
 			ignoreExpiration: true
 		});
 
 		if (!grant) return ctx.body;
 		if (grant.isExpired) return ctx.body;
-		if (grant.clientId !== token.clientId) return ctx.body;
-		if (grant.accountId !== token.accountId) return ctx.body;
+		if (grant.payload.clientId !== token.payload.clientId) return ctx.body;
+		if (grant.payload.accountId !== token.payload.accountId) return ctx.body;
 
 		ctx.oidc.entity('Grant', grant);
 	}
 
-	if (introspectable.has(token.kind)) {
-		ctx.oidc.entity(token.kind, token);
+	if (introspectable.has(token.payload.kind)) {
+		ctx.oidc.entity(token.payload.kind, token);
 	} else {
 		return ctx.body;
 	}
@@ -97,10 +97,10 @@ async function renderTokenResponse(ctx) {
 		return ctx.body;
 	}
 
-	if (token.accountId) {
-		ctx.body.sub = token.accountId;
-		if (token.clientId !== ctx.oidc.client.clientId) {
-			const client = await Client.find(token.clientId);
+	if (token.payload.accountId) {
+		ctx.body.sub = token.payload.accountId;
+		if (token.payload.clientId !== ctx.oidc.client.clientId) {
+			const client = await Client.find(token.payload.clientId);
 			if (client.subjectType === 'pairwise') {
 				ctx.body.sub = await pairwiseIdentifier(ctx.body.sub, client);
 			}
@@ -112,27 +112,28 @@ async function renderTokenResponse(ctx) {
 	Object.assign(ctx.body, {
 		...token.extra,
 		active: true,
-		client_id: token.clientId,
-		exp: token.exp,
-		iat: token.iat,
-		sid: token.sid,
+		client_id: token.payload.clientId,
+		exp: token.payload.exp,
+		iat: token.payload.iat,
+		sid: token.payload.sid,
 		iss: ISSUER,
-		jti: token.jti !== params.token ? token.jti : undefined,
-		aud: token.aud,
-		authorization_details: token.rar
+		jti: token.payload.jti !== params.token ? token.payload.jti : undefined,
+		aud: token.payload.aud,
+		authorization_details: token.payload.rar
 			? await richAuthorizationRequests.rarForIntrospectionResponse(ctx, token)
 			: undefined,
-		scope: token.scope || undefined,
+		scope: token.payload.scope || undefined,
 		cnf: token.isSenderConstrained() ? {} : undefined,
-		token_type: token.kind !== 'RefreshToken' ? token.tokenType : undefined
+		token_type:
+			token.payload.kind !== 'RefreshToken' ? token.tokenType : undefined
 	});
 
-	if (token['x5t#S256']) {
-		ctx.body.cnf['x5t#S256'] = token['x5t#S256'];
+	if (token.payload['x5t#S256']) {
+		ctx.body.cnf['x5t#S256'] = token.payload['x5t#S256'];
 	}
 
-	if (token.jkt) {
-		ctx.body.cnf.jkt = token.jkt;
+	if (token.payload.jkt) {
+		ctx.body.cnf.jkt = token.payload.jkt;
 	}
 	return ctx.body;
 }
