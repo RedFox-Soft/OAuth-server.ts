@@ -5,6 +5,7 @@ import epochTime from '../helpers/epoch_time.js';
 import { cookieNames } from '../consts/param_list.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { BaseModel, BaseModelPayload } from './base_model.js';
+import { ttl } from 'lib/configs/liveTime.js';
 
 const SessionPayload = t.Composite([
 	BaseModelPayload,
@@ -39,7 +40,10 @@ function sessionPayload(
 
 export class Session extends BaseModel<SessionPayloadType> {
 	model = SessionPayload;
-	#isNew = false;
+	#isDestroyed = false;
+	#isNew = true;
+	#oldId: string | undefined;
+	touched = false;
 
 	constructor(payload?: Partial<SessionPayloadType>) {
 		super(sessionPayload(payload));
@@ -86,38 +90,28 @@ export class Session extends BaseModel<SessionPayloadType> {
 		return session;
 	}
 
-	async save(ttl: number) {
-		if (typeof ttl !== 'number') {
-			throw new TypeError('"ttl" argument must be a number');
+	async save() {
+		if (this.#isDestroyed) {
+			return this.id;
 		}
 		// one by one adapter ops to allow for uid to have a unique index
-		if (this.oldId) {
-			await this.adapter.destroy(this.oldId);
+		if (this.#oldId) {
+			await this.adapter.destroy(this.#oldId);
+			this.#oldId = undefined;
 		}
 
-		const result = await super.save(ttl);
-
+		const result = await super.save(ttl.Session);
 		this.touched = false;
-
 		return result;
-	}
-
-	async persist() {
-		if (typeof this.payload.exp !== 'number') {
-			throw new TypeError(
-				'persist can only be called on previously persisted Sessions'
-			);
-		}
-		return this.save(this.payload.exp - epochTime());
 	}
 
 	async destroy() {
 		await super.destroy();
-		this.destroyed = true;
+		this.#isDestroyed = true;
 	}
 
 	resetIdentifier() {
-		this.oldId = this.id;
+		this.#oldId = this.id;
 		this.id = nanoid();
 		this.touched = true;
 	}
@@ -136,43 +130,34 @@ export class Session extends BaseModel<SessionPayloadType> {
 		return true;
 	}
 
-	authorizationFor(clientId) {
-		// the call will not set, let's not modify the session object
-		if (arguments.length === 1 && !this.payload.authorizations) {
-			return {};
-		}
-
-		this.payload.authorizations = this.payload.authorizations || {};
-		if (!this.payload.authorizations[clientId]) {
-			this.payload.authorizations[clientId] = {};
-		}
+	authorizationFor(clientId: string) {
+		this.payload.authorizations ||= {};
+		this.payload.authorizations[clientId] ||= {};
 
 		return this.payload.authorizations[clientId];
 	}
 
-	sidFor(clientId, value) {
-		const authorization = this.authorizationFor(...arguments);
-
+	sidFor(clientId: string, value?: string) {
 		if (value) {
+			const authorization = this.authorizationFor(clientId);
 			authorization.sid = value;
-			return undefined;
+			return;
 		}
 
-		return authorization.sid;
+		return this.payload.authorizations?.[clientId]?.sid;
 	}
 
-	grantIdFor(clientId, value) {
-		const authorization = this.authorizationFor(...arguments);
-
+	grantIdFor(clientId: string, value?: string) {
 		if (value) {
+			const authorization = this.authorizationFor(clientId);
 			authorization.grantId = value;
-			return undefined;
+			return;
 		}
 
-		return authorization.grantId;
+		return this.payload.authorizations?.[clientId]?.grantId;
 	}
 
-	ensureClientContainer(clientId) {
+	ensureClientContainer(clientId: string) {
 		if (!this.sidFor(clientId)) {
 			this.sidFor(clientId, nanoid());
 		}
@@ -186,9 +171,14 @@ export class Session extends BaseModel<SessionPayloadType> {
 			amr,
 			acr
 		} = details;
+		if (typeof accountId !== 'string' || !accountId) {
+			throw new TypeError(
+				`accountId must be a non-empty string, got: ${typeof accountId}`
+			);
+		}
 
 		Object.assign(
-			this,
+			this.payload,
 			{
 				accountId,
 				loginTs,

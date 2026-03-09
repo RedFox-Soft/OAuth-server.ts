@@ -493,7 +493,6 @@ describe('logout endpoint', () => {
 				);
 				expect(status).toBe(400);
 				expect(spy).toHaveBeenCalled();
-				console.log(spy.mock.calls[0][0]);
 				expect(spy).toHaveBeenCalledWith(
 					expect.objectContaining({
 						error: 'invalid_request',

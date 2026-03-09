@@ -1,6 +1,5 @@
 import { strict as assert } from 'node:assert';
 
-import devInteractions from '../actions/interaction.ts';
 import cors from '../shared/cors.ts';
 import * as grants from '../actions/grants/index.ts';
 import error from '../shared/error_handler.ts';
@@ -96,16 +95,6 @@ export default function initializeApp() {
 		routeMap.set(name, route);
 		return route;
 	}
-	async function ensureSessionSave(ctx, next) {
-		try {
-			await next();
-		} finally {
-			if (ctx.oidc.session?.touched && !ctx.oidc.session.destroyed) {
-				await ctx.oidc.session.persist();
-			}
-		}
-	}
-
 	const get = (name, route, ...stack) => {
 		route = normalizeRoute(name, route, ...stack);
 		router.get(name, route, ensureOIDC, ensureSessionSave, ...stack);
@@ -305,14 +294,6 @@ export default function initializeApp() {
 			error(this, 'backchannel_authentication.error'),
 			...ciba
 		);
-	}
-
-	if (features.devInteractions.enabled) {
-		const interaction = devInteractions(this);
-
-		get('interaction', '/interaction/:uid', error(this), ...interaction.render);
-		post('submit', '/interaction/:uid', error(this), ...interaction.submit);
-		get('abort', '/interaction/:uid/abort', error(this), ...interaction.abort);
 	}
 
 	return router.routes();

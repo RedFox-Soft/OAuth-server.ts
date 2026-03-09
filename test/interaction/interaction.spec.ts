@@ -15,7 +15,6 @@ import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { provider } from 'lib/index.js';
 import { Session } from 'lib/models/session.js';
 import { ISSUER } from 'lib/configs/env.js';
-import { TestAdapter } from 'test/models.js';
 import { Interaction } from 'lib/models/interaction.js';
 import { Grant } from 'lib/models/grant.js';
 
@@ -108,65 +107,47 @@ describe('devInteractions', async () => {
 		});
 
 		it('with a form', async function () {
-			console.log('URL:', cookie);
-			const { data } = await agent.ui[uid].consent.get({
+			const { data, status } = await agent.ui[uid].consent.get({
 				headers: {
 					cookie
 				}
 			});
-			console.log(data);
-
-			return agent
-				.get(url)
-				.expect(200)
-				.expect(new RegExp(`action="${ISSUER}${this.url}"`))
-				.expect(/name="prompt" value="consent"/)
-				.expect(/Authorize/);
+			expect(status).toBe(200);
+			expect(data).toContain('method="post"');
+			expect(data).toContain('Consent Required');
 		});
 
 		it('checks that the authentication session is still there', async function () {
-			const session = this.getSession({ instantiate: true });
+			const session = setup.getLastSession();
 			await session.destroy();
 
-			await this.agent
-				.get(this.url)
-				.accept('text/html')
-				.expect(400)
-				.expect('content-type', 'text/html; charset=utf-8')
-				.expect(/session not found/);
+			const { error } = await agent.ui[uid].consent.get({
+				headers: {
+					cookie
+				}
+			});
+			expect(error.status).toBe(400);
+			expect(error.value).toEqual({
+				error: 'invalid_request',
+				error_description: 'session not found'
+			});
 		});
 
 		it("checks that the authentication session's principal didn't change", async function () {
-			const session = this.getSession({ instantiate: true });
-			session.accountId = 'foobar';
-			await session.persist();
+			const session = setup.getLastSession();
+			session.payload.accountId = 'foobar';
+			await session.save();
 
-			await this.agent
-				.get(this.url)
-				.accept('text/html')
-				.expect(400)
-				.expect('content-type', 'text/html; charset=utf-8')
-				.expect(/session principal changed/);
-		});
-	});
-
-	describe.skip('when unimplemented prompt is requested', () => {
-		it('throws a 501', async function () {
-			const auth = new AuthorizationRequest({
-				scope: 'openid'
+			const { error } = await agent.ui[uid].consent.get({
+				headers: {
+					cookie
+				}
 			});
-
-			const url = await this.agent
-				.get('/auth')
-				.query(auth)
-				.then((response) => response.headers.location);
-
-			const split = url.split('/');
-			const uid = split[split.length - 1];
-			const interaction = TestAdapter.for('Interaction').syncFind(uid);
-			interaction.prompt.name = 'notimplemented';
-
-			return this.agent.get(url).expect(501);
+			expect(error.status).toBe(400);
+			expect(error.value).toEqual({
+				error: 'invalid_request',
+				error_description: 'session principal changed'
+			});
 		});
 	});
 
@@ -181,14 +162,19 @@ describe('devInteractions', async () => {
 			});
 
 			const url = res.headers.get('location');
-			const [, uid] = url.split('/');
+			const [, , uid] = url.split('/');
 			const cookie = res.headers.get('set-cookie');
 
-			const { response } = await agent.ui[uid].abort.get({
-				headers: {
-					cookie
+			const { response, error } = await agent.ui[uid].consent.post(
+				{
+					action: 'cancel'
+				},
+				{
+					headers: {
+						cookie
+					}
 				}
-			});
+			);
 
 			expect(response.status).toBe(303);
 

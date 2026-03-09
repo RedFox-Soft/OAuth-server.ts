@@ -16,7 +16,7 @@ export default async function loadGrant(ctx) {
 				throw new Error('clientId mismatch');
 			}
 			ctx.oidc.session.ensureClientContainer(ctx.oidc.params.client_id);
-			ctx.oidc.session.grantIdFor(ctx.oidc.params.client_id, grant.jti);
+			ctx.oidc.session.grantIdFor(ctx.oidc.params.client_id, grant.id);
 		} else {
 			grant = new Grant({
 				accountId: ctx.oidc.account.accountId,

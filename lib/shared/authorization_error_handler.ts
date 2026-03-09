@@ -96,7 +96,6 @@ const mapErrorCode = {
 export async function errorHandler(obj: ErrorContext) {
 	const { set, route, code, request } = obj;
 	let { error } = obj;
-	console.error(error);
 	if (set.status === 500) {
 		provider.emit('server_error', error);
 	} else {

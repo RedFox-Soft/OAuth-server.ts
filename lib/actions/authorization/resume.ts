@@ -1,9 +1,8 @@
-import upperFirst from '../../helpers/_/upper_first.ts';
-import camelCase from '../../helpers/_/camel_case.ts';
-import nanoid from '../../helpers/nanoid.ts';
-import * as errors from '../../helpers/errors.ts';
-import { formPost } from '../../html/formPost.js';
-import epochTime from '../../helpers/epoch_time.ts';
+import nanoid from '../../helpers/nanoid.js';
+import epochTime from '../../helpers/epoch_time.js';
+import { ISSUER } from 'lib/configs/env.js';
+import { logout } from 'lib/html/logout.js';
+import { SessionNotFound } from '../../helpers/errors.js';
 
 export default async function resumeAction(ctx, interaction) {
 	ctx.oidc.entity('Interaction', interaction);
@@ -13,12 +12,12 @@ export default async function resumeAction(ctx, interaction) {
 		params: storedParams = {},
 		trusted = [],
 		session: originSession
-	} = interaction;
+	} = interaction.payload;
 
 	const { session } = ctx.oidc;
 
 	if (originSession?.uid && originSession.uid !== session.uid) {
-		throw new errors.SessionNotFound(
+		throw new SessionNotFound(
 			'interaction session and authentication session mismatch'
 		);
 	}
@@ -33,18 +32,14 @@ export default async function resumeAction(ctx, interaction) {
 			await interaction.save(interaction.exp - epochTime());
 		}
 
+		const secret = nanoid();
 		session.state = {
-			secret: nanoid(),
+			secret,
 			clientId: storedParams.client_id,
-			postLogoutRedirectUri: ctx.oidc.urlFor(ctx.oidc.route, ctx.params)
+			postLogoutRedirectUri: `${ISSUER}/ui/${interaction.uid}/resume`
 		};
 
-		formPost(ctx, ctx.oidc.urlFor('end_session_confirm'), {
-			xsrf: session.state.secret,
-			logout: 'yes'
-		});
-
-		return;
+		return logout(secret);
 	}
 
 	await interaction.destroy();
@@ -52,17 +47,6 @@ export default async function resumeAction(ctx, interaction) {
 	ctx.oidc.params = storedParams;
 	ctx.oidc.trusted = trusted;
 	ctx.oidc.redirectUriCheckPerformed = true;
-
-	if (result?.error) {
-		const className = upperFirst(camelCase(result.error));
-		if (errors[className]) {
-			throw new errors[className](result.error_description);
-		}
-		throw new errors.CustomOIDCProviderError(
-			result.error,
-			result.error_description
-		);
-	}
 
 	if (result?.login) {
 		const { remember = true, accountId, ts: loginTs, amr, acr } = result.login;
@@ -78,7 +62,7 @@ export default async function resumeAction(ctx, interaction) {
 
 	ctx.oidc.result = result;
 
-	if (!session.new) {
+	if (!session.isNew) {
 		session.resetIdentifier();
 	}
 }

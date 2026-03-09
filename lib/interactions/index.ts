@@ -5,7 +5,7 @@ import {
 	loginServer,
 	registrationServer
 } from './serverRender.js';
-import { SessionNotFound } from 'lib/helpers/errors.js';
+import { AccessDenied, SessionNotFound } from 'lib/helpers/errors.js';
 import epochTime from '../helpers/epoch_time.js';
 import sessionHandler from 'lib/shared/session.js';
 import respond from 'lib/actions/authorization/respond.js';
@@ -33,7 +33,10 @@ async function resume(interaction, cookie) {
 	ctx.oidc = new OIDCContext(ctx);
 
 	const setCookies = await sessionHandler(ctx);
-	await getResume(ctx, interaction);
+	const confirmPage = await getResume(ctx, interaction);
+	if (confirmPage) {
+		return confirmPage;
+	}
 	cookie._interaction.remove();
 	await checkClient(ctx);
 	await checkResource(ctx);
@@ -73,9 +76,8 @@ async function createGrant(interaction) {
 			grant.addResourceScope(indicator, scope.join(' '));
 		}
 	}
-	const result = { consent: { grantId: await grant.save() } };
-	await provider.interactionFinished(ctx.req, ctx.res, result, {
-		mergeWithLastSubmission: true
+	Object.assign(interaction.result, {
+		consent: { grantId: await grant.save() }
 	});
 }
 
@@ -97,12 +99,12 @@ export const ui = new Elysia()
 			throw new SessionNotFound('interaction session not found');
 		}
 
-		if (interaction.session?.uid) {
-			const session = await Session.findByUid(interaction.session.uid);
+		if (interaction.payload.session?.uid) {
+			const session = await Session.findByUid(interaction.payload.session.uid);
 			if (!session) {
 				throw new SessionNotFound('session not found');
 			}
-			if (interaction.session.accountId !== session.accountId) {
+			if (interaction.payload.session.accountId !== session.payload.accountId) {
 				throw new SessionNotFound('session principal changed');
 			}
 		}
@@ -125,9 +127,10 @@ export const ui = new Elysia()
 			if (!validPassword) {
 				return loginServer(uid, 'Invalid username or password');
 			}
-			interaction.result = {
+			interaction.payload.result = {
 				login: {
-					accountId: user.sub
+					accountId: user._id,
+					transient: body.remember === 'on'
 				}
 			};
 			return resume(interaction, cookie);
@@ -164,15 +167,24 @@ export const ui = new Elysia()
 		}
 	)
 	.get('ui/:uid/consent', async ({ params: { uid } }) => consentServer(uid))
-	.get('ui/:uid/abort', async ({ interaction }) => {
-		interaction.result = {
-			error: 'access_denied',
-			error_description: 'End-User aborted interaction'
-		};
-		await interaction.save(interaction.exp - epochTime());
+	.post(
+		'ui/:uid/consent',
+		async ({ body, interaction, cookie }) => {
+			if (body.action === 'allow') {
+				return resume(interaction, cookie);
+			}
 
-		return Response.redirect(interaction.returnTo, 303);
-	})
+			throw new AccessDenied('End-User denied consent');
+		},
+		{
+			body: t.Object({
+				action: t.Union([t.Literal('allow'), t.Literal('cancel')])
+			})
+		}
+	)
+	.get('ui/:uid/resume', async ({ interaction, cookie }) =>
+		resume(interaction, cookie)
+	)
 	.get('ui/:uid/device_resume', async ({ interaction, cookie }) => {
 		const ctx = { cookie, _matchedRouteName: 'ui.device_resume' };
 		ctx.oidc = new OIDCContext(ctx);

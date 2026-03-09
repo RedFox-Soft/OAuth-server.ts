@@ -8,14 +8,22 @@ export class Interaction extends BaseModel {
 				const { session } = payload;
 				Object.assign(
 					payload,
-					session.accountId
+					session.payload.accountId
 						? {
 								session: {
-									accountId: session.accountId,
-									...(session.uid ? { uid: session.uid } : undefined),
-									...(session.jti ? { cookie: session.jti } : undefined),
-									...(session.acr ? { acr: session.acr } : undefined),
-									...(session.amr ? { amr: session.amr } : undefined)
+									accountId: session.payload.accountId,
+									...(session.payload.uid
+										? { uid: session.payload.uid }
+										: undefined),
+									...(session.payload.jti
+										? { cookie: session.payload.jti }
+										: undefined),
+									...(session.payload.acr
+										? { acr: session.payload.acr }
+										: undefined),
+									...(session.payload.amr
+										? { amr: session.payload.amr }
+										: undefined)
 								}
 							}
 						: { session: undefined }
@@ -24,8 +32,8 @@ export class Interaction extends BaseModel {
 
 			if (payload.grant instanceof BaseModel) {
 				const { grant } = payload;
-				if (grant.jti) {
-					Object.assign(payload, { grantId: grant.jti });
+				if (grant.id) {
+					Object.assign(payload, { grantId: grant.id });
 				}
 			}
 

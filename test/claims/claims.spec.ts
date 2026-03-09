@@ -260,11 +260,11 @@ expire.setDate(expire.getDate() + 1);
 						if (auth) {
 							const cookie = `_interaction=cookieID; path=/ui/resume/resume; expires=${expire.toGMTString()}; httponly`;
 							cookies.push(cookie);
-							Object.assign(sess, { params: auth.params });
+							Object.assign(sess.payload, { params: auth.params });
 						}
 
 						if (result) {
-							Object.assign(sess, { result });
+							Object.assign(sess.payload, { result });
 						}
 
 						await sess.save(30);

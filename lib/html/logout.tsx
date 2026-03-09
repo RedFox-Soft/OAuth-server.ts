@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { createCache, extractStyle, StyleProvider } from '@ant-design/cssinjs';
 import { Button, Form } from 'antd';
 import { Card, Flex } from 'antd';
+import { routeNames } from 'lib/consts/param_list.js';
 
 const cache = createCache();
 function renderLogoutForm(secret: string) {
@@ -35,6 +36,7 @@ function renderLogoutForm(secret: string) {
 						<p>Do you want to sign-out?</p>
 					</div>
 					<Form
+						action={routeNames.end_session_confirm}
 						component="form"
 						method="post"
 					>
