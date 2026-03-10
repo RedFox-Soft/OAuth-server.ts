@@ -3,13 +3,7 @@ import { strict as assert } from 'node:assert';
 import cors from '../shared/cors.ts';
 import * as grants from '../actions/grants/index.ts';
 import error from '../shared/error_handler.ts';
-import {
-	jwks,
-	registration,
-	getRevocation,
-	endSession,
-	codeVerification
-} from '../actions/index.ts';
+import { jwks, registration, codeVerification } from '../actions/index.ts';
 
 import als from './als.ts';
 import instance from './weak_cache.ts';
@@ -204,46 +198,6 @@ export default function initializeApp() {
 				...registration.del
 			);
 		}
-	}
-
-	if (features.revocation.enabled) {
-		const revocation = getRevocation(this);
-		post(
-			'revocation',
-			routes.revocation,
-			error(this, 'revocation.error'),
-			CORS.client,
-			...revocation
-		);
-		options('cors.revocation', routes.revocation, CORS.client, CORS.respond);
-	}
-
-	post(
-		'end_session_confirm',
-		`${routes.end_session}/confirm`,
-		error(this, 'end_session_confirm.error'),
-		...endSession.confirm
-	);
-
-	if (features.rpInitiatedLogout.enabled) {
-		post(
-			'end_session',
-			routes.end_session,
-			error(this, 'end_session.error'),
-			...endSession.init
-		);
-		get(
-			'end_session',
-			routes.end_session,
-			error(this, 'end_session.error'),
-			...endSession.init
-		);
-		get(
-			'end_session_success',
-			`${routes.end_session}/success`,
-			error(this, 'end_session_success.error'),
-			...endSession.success
-		);
 	}
 
 	if (features.deviceFlow.enabled) {

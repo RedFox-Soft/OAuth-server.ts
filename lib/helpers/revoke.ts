@@ -3,13 +3,12 @@ import instance from './weak_cache.ts';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';
 import { AccessToken } from 'lib/models/access_token.js';
-import { Grant } from 'lib/models/grant.js';
 
 export default async function revoke(ctx, grantId) {
 	const {
 		oidc: { client, provider }
 	} = ctx;
-	const { grantTypes, revokeGrantPolicy } = instance(provider).configuration;
+	const { grantTypes } = instance(provider).configuration;
 	const refreshToken = client
 		? client.grantTypeAllowed('refresh_token')
 		: grantTypes.has('refresh_token');
@@ -23,8 +22,6 @@ export default async function revoke(ctx, grantId) {
 		? client.grantTypeAllowed('urn:openid:params:grant-type:ciba')
 		: grantTypes.has('urn:openid:params:grant-type:ciba');
 
-	const revokeGrant = await revokeGrantPolicy(ctx);
-
 	await Promise.all(
 		[
 			AccessToken,
@@ -34,11 +31,6 @@ export default async function revoke(ctx, grantId) {
 			backchannelAuthenticationRequest
 				? provider.BackchannelAuthenticationRequest
 				: undefined
-		]
-			.map((model) => model && model.revokeByGrantId(grantId))
-			.concat(revokeGrant ? Grant.adapter.destroy(grantId) : undefined)
+		].map((model) => model && model.revokeByGrantId(grantId))
 	);
-	if (revokeGrant) {
-		ctx.oidc.provider.emit('grant.revoked', ctx, grantId);
-	}
 }

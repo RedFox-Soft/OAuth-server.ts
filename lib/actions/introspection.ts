@@ -31,11 +31,7 @@ const tokenTypes = {
 		}
 		return ClientCredentials.find(token);
 	},
-	async refresh_token(token: string) {
-		const { grantTypeHandlers } = instance(provider);
-		if (!grantTypeHandlers.has('refresh_token')) {
-			return;
-		}
+	refresh_token(token: string) {
 		return RefreshToken.find(token);
 	}
 };
@@ -50,8 +46,6 @@ async function renderTokenResponse(ctx) {
 			richAuthorizationRequests
 		}
 	} = configuration;
-
-	ctx.body = { active: false };
 
 	let token;
 
@@ -71,7 +65,7 @@ async function renderTokenResponse(ctx) {
 	}
 
 	if (!token?.isValid) {
-		return ctx.body;
+		return { active: false };
 	}
 
 	if (token.payload.grantId) {
@@ -79,10 +73,14 @@ async function renderTokenResponse(ctx) {
 			ignoreExpiration: true
 		});
 
-		if (!grant) return ctx.body;
-		if (grant.isExpired) return ctx.body;
-		if (grant.payload.clientId !== token.payload.clientId) return ctx.body;
-		if (grant.payload.accountId !== token.payload.accountId) return ctx.body;
+		if (
+			!grant ||
+			grant.isExpired ||
+			grant.payload.clientId !== token.payload.clientId ||
+			grant.payload.accountId !== token.payload.accountId
+		) {
+			return { active: false };
+		}
 
 		ctx.oidc.entity('Grant', grant);
 	}
@@ -90,13 +88,14 @@ async function renderTokenResponse(ctx) {
 	if (introspectable.has(token.payload.kind)) {
 		ctx.oidc.entity(token.payload.kind, token);
 	} else {
-		return ctx.body;
+		return { active: false };
 	}
 
 	if (!(await allowedPolicy(ctx, ctx.oidc.client, token))) {
-		return ctx.body;
+		return { active: false };
 	}
 
+	ctx.body = { active: false };
 	if (token.payload.accountId) {
 		ctx.body.sub = token.payload.accountId;
 		if (token.payload.clientId !== ctx.oidc.client.clientId) {

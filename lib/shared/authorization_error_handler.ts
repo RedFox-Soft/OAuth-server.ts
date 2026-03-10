@@ -90,7 +90,8 @@ const mapErrorCode = {
 	[routeNames.introspect]: 'introspection.error',
 	[routeNames.userinfo]: 'userinfo.error',
 	[routeNames.end_session]: 'end_session.error',
-	[routeNames.end_session_confirm]: 'end_session_confirm.error'
+	[routeNames.end_session_confirm]: 'end_session_confirm.error',
+	[routeNames.revocation]: 'revocation.error'
 };
 
 export async function errorHandler(obj: ErrorContext) {

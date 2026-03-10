@@ -22,6 +22,7 @@ import { userinfo } from './actions/userinfo.js';
 import { backchannelAuth, deviceAuth } from './actions/authorization/device.js';
 import { introspect } from './actions/introspection.js';
 import { logoutAction, logoutConfirmAction } from './actions/end_session.js';
+import { revocation } from './actions/revocation.js';
 
 export const elysia = new Elysia({ strictPath: true, normalize: false })
 	.onError(errorHandler)
@@ -34,6 +35,7 @@ export const elysia = new Elysia({ strictPath: true, normalize: false })
 	.use(backchannelAuth)
 	.use(par)
 	.use(introspect)
+	.use(revocation)
 	.use(tokenAction)
 	.use(logoutAction)
 	.use(logoutConfirmAction)

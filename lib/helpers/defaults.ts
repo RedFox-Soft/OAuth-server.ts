@@ -373,13 +373,6 @@ async function loadExistingGrant(ctx) {
 	return undefined;
 }
 
-function revokeGrantPolicy(ctx) {
-	if (ctx.oidc.route === 'revocation' && ctx.oidc.entities.AccessToken) {
-		return false;
-	}
-	return true;
-}
-
 function sectorIdentifierUriValidate(client) {
 	// @param client - the Client instance
 	return true;
@@ -1653,23 +1646,6 @@ function makeDefaults() {
 		 * description: Function used to present errors to the User-Agent
 		 */
 		renderError,
-
-		/*
-		 * revokeGrantPolicy
-		 *
-		 * description: Function called in a number of different context to determine whether
-		 * an underlying Grant entry should also be revoked or not.
-		 *
-		 * contexts:
-		 * - RP-Initiated Logout
-		 * - Opaque Access Token Revocation
-		 * - Refresh Token Revocation
-		 * - Authorization Code re-use
-		 * - Device Code re-use
-		 * - Backchannel Authentication Request re-use
-		 * - Rotated Refresh Token re-use
-		 */
-		revokeGrantPolicy,
 
 		/*
 		 * sectorIdentifierUriValidate

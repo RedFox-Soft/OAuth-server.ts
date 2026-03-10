@@ -85,7 +85,17 @@ export const ApplicationConfig = {
 	 *
 	 * description: Enables `grant_type=client_credentials` to be used on the token endpoint.
 	 */
-	'clientCredentials.enabled': false
+	'clientCredentials.enabled': false,
+
+	/*
+	 * scopes
+	 *
+	 * description: Array of additional scope values that the authorization server signals to support in the discovery
+	 *   endpoint. Only add scopes the authorization server has a corresponding resource for.
+	 *   Resource Server scopes don't belong here, see `features.resourceIndicators` for configuring
+	 *   those.
+	 */
+	scopes: ['openid', 'offline_access']
 };
 Object.assign(ApplicationConfig, await configStore.get());
 

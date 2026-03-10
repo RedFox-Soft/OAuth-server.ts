@@ -375,13 +375,6 @@ async function loadExistingGrant(ctx) {
 	return undefined;
 }
 
-function revokeGrantPolicy(ctx) {
-	if (ctx.oidc.route === 'revocation' && ctx.oidc.entities.AccessToken) {
-		return false;
-	}
-	return true;
-}
-
 function sectorIdentifierUriValidate(client) {
 	// @param client - the Client instance
 	return true;
@@ -1606,16 +1599,6 @@ export const globalConfiguration = {
 	},
 
 	/*
-	 * scopes
-	 *
-	 * description: Array of additional scope values that the authorization server signals to support in the discovery
-	 *   endpoint. Only add scopes the authorization server has a corresponding resource for.
-	 *   Resource Server scopes don't belong here, see `features.resourceIndicators` for configuring
-	 *   those.
-	 */
-	scopes: ['openid', 'offline_access'],
-
-	/*
 	 * pairwiseIdentifier
 	 *
 	 * description: Function used by the authorization server when resolving pairwise ID Token and Userinfo sub claim
@@ -1654,23 +1637,6 @@ export const globalConfiguration = {
 	 * description: Function used to present errors to the User-Agent
 	 */
 	renderError,
-
-	/*
-	 * revokeGrantPolicy
-	 *
-	 * description: Function called in a number of different context to determine whether
-	 * an underlying Grant entry should also be revoked or not.
-	 *
-	 * contexts:
-	 * - RP-Initiated Logout
-	 * - Opaque Access Token Revocation
-	 * - Refresh Token Revocation
-	 * - Authorization Code re-use
-	 * - Device Code re-use
-	 * - Backchannel Authentication Request re-use
-	 * - Rotated Refresh Token re-use
-	 */
-	revokeGrantPolicy,
 
 	/*
 	 * sectorIdentifierUriValidate
