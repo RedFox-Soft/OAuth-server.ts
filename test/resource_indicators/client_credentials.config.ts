@@ -6,7 +6,6 @@ import getConfig from '../default.config.js';
 const config = getConfig();
 
 merge(config.features, {
-	clientCredentials: { enabled: true },
 	resourceIndicators: {
 		getResourceServerInfo(ctx, resourceIndicator) {
 			const [, wl, format] = resourceIndicator.split(':');
@@ -28,6 +27,10 @@ merge(config.features, {
 		}
 	}
 });
+
+export const ApplicationConfig = {
+	'clientCredentials.enabled': true
+};
 
 export default {
 	config,

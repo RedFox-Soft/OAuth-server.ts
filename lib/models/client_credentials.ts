@@ -1,9 +1,20 @@
-import isSenderConstrained from './mixins/is_sender_constrained.ts';
-import apply from './mixins/apply.ts';
-import { BaseToken } from './base_token.js';
+import { Type as t, type Static } from '@sinclair/typebox';
+import constrained from './mixins/is_sender_constrained.js';
+import { BaseToken, BaseTokenPayload } from './base_token.js';
 
-export class ClientCredentials extends apply([isSenderConstrained, BaseToken]) {
-	static get IN_PAYLOAD() {
-		return [...super.IN_PAYLOAD, 'aud', 'extra', 'scope'];
-	}
+const ClientCredentialsPayload = t.Composite([
+	BaseTokenPayload,
+	t.Object({
+		scope: t.Optional(t.String()),
+		'x5t#S256': t.Optional(t.String()),
+		jkt: t.Optional(t.String())
+	})
+]);
+
+export type ClientCredentialsPayload = Static<typeof ClientCredentialsPayload>;
+
+export class ClientCredentials extends constrained(
+	BaseToken<ClientCredentialsPayload>
+) {
+	model = ClientCredentialsPayload;
 }

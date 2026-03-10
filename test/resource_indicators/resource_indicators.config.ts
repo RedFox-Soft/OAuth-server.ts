@@ -12,7 +12,6 @@ merge(config, {
 	},
 	features: {
 		introspection: { enabled: true },
-		clientCredentials: { enabled: true },
 		deviceFlow: { enabled: true },
 		ciba: {
 			enabled: true,
@@ -66,6 +65,10 @@ merge(config, {
 		}
 	}
 });
+
+export const ApplicationConfig = {
+	'clientCredentials.enabled': true
+};
 
 export default {
 	config,

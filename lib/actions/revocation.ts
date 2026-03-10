@@ -1,4 +1,4 @@
-import { InvalidRequest } from '../helpers/errors.ts';
+import { InvalidRequest } from '../helpers/errors.js';
 import presence from '../helpers/validate_presence.ts';
 import instance from '../helpers/weak_cache.ts';
 import { tokenAuth } from '../shared/token_auth.ts';
@@ -8,6 +8,7 @@ import revoke from '../helpers/revoke.ts';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { ClientCredentials } from 'lib/models/client_credentials.js';
+import { hasGrant } from './grants/index.js';
 
 const revokeable = new Set([
 	'AccessToken',
@@ -25,15 +26,15 @@ export default async function revocationAction(provider) {
 	}
 
 	function getClientCredentials(token) {
-		if (!grantTypeHandlers.has('client_credentials')) {
-			return undefined;
+		if (!hasGrant('client_credentials')) {
+			return;
 		}
 		return ClientCredentials.find(token);
 	}
 
 	function getRefreshToken(token) {
 		if (!grantTypeHandlers.has('refresh_token')) {
-			return undefined;
+			return;
 		}
 		return RefreshToken.find(token);
 	}

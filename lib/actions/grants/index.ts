@@ -17,20 +17,20 @@ export const deviceCodeGrantParameters = t.Object({
 });
 
 export * as authorization_code from './authorization_code.ts';
-export * as client_credentials from './client_credentials.ts';
 export * as refresh_token from './refresh_token.ts';
 export * as 'urn:ietf:params:oauth:grant-type:device_code' from './device_code.ts';
 export * as 'urn:openid:params:grant-type:ciba' from './ciba.ts';
 
 import * as authorization_code from './authorization_code.ts';
-import * as client_credentials from './client_credentials.ts';
+import { clientCredentials } from './client_credentials.ts';
 import * as refresh_token from './refresh_token.ts';
 import * as device_code from './device_code.ts';
 import * as ciba from './ciba.ts';
+import { ApplicationConfig as config } from 'lib/configs/application.js';
 
 export const grantStore = new Map([
 	['authorization_code', authorization_code.handler],
-	['client_credentials', client_credentials.handler],
+	['client_credentials', clientCredentials],
 	['refresh_token', refresh_token.handler],
 	['urn:ietf:params:oauth:grant-type:device_code', device_code.handler],
 	['urn:openid:params:grant-type:ciba', ciba.handler]
@@ -41,6 +41,13 @@ if (process.env.NODE_ENV === 'test') {
 }
 
 export function hasGrant(grantType: string): boolean {
+	if (
+		!config['clientCredentials.enabled'] &&
+		grantType === 'client_credentials'
+	) {
+		return false;
+	}
+
 	return grantStore.has(grantType);
 }
 

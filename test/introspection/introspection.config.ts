@@ -5,12 +5,12 @@ import getConfig from '../default.config.js';
 const config = getConfig();
 
 merge(config.features, {
-	encryption: { enabled: true },
-	clientCredentials: { enabled: true }
+	encryption: { enabled: true }
 });
 
 export const ApplicationConfig = {
-	'introspection.enabled': true
+	'introspection.enabled': true,
+	'clientCredentials.enabled': true
 };
 
 export default {

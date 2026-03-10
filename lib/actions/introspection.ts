@@ -12,6 +12,7 @@ import { Client } from 'lib/models/client.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Grant } from 'lib/models/grant.js';
 import { ClientCredentials } from 'lib/models/client_credentials.js';
+import { hasGrant } from './grants/index.js';
 
 const introspectable = new Set([
 	'AccessToken',
@@ -24,14 +25,13 @@ const tokenTypes = {
 	access_token(token: string) {
 		return AccessToken.find(token);
 	},
-	client_credentials(token: string) {
-		const { grantTypeHandlers } = instance(provider);
-		if (!grantTypeHandlers.has('client_credentials')) {
+	async client_credentials(token: string) {
+		if (!hasGrant('client_credentials')) {
 			return;
 		}
 		return ClientCredentials.find(token);
 	},
-	refresh_token(token: string) {
+	async refresh_token(token: string) {
 		const { grantTypeHandlers } = instance(provider);
 		if (!grantTypeHandlers.has('refresh_token')) {
 			return;

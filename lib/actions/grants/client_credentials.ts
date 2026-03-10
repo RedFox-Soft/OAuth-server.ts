@@ -8,7 +8,7 @@ import {
 import checkResource from '../../shared/check_resource.ts';
 import { ClientCredentials } from 'lib/models/client_credentials.js';
 
-export const handler = async function clientCredentialsHandler(ctx, dPoP) {
+export async function clientCredentials(ctx, dPoP) {
 	const { client } = ctx.oidc;
 	const {
 		features: {
@@ -82,4 +82,4 @@ export const handler = async function clientCredentialsHandler(ctx, dPoP) {
 		token_type: token.tokenType,
 		scope: token.payload.scope || undefined
 	};
-};
+}

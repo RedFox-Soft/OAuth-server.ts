@@ -884,15 +884,6 @@ function makeDefaults() {
 			},
 
 			/*
-			 * features.clientCredentials
-			 *
-			 * title: [`RFC6749`](https://www.rfc-editor.org/rfc/rfc6749.html#section-1.3.4) - Client Credentials
-			 *
-			 * description: Enables `grant_type=client_credentials` to be used on the token endpoint.
-			 */
-			clientCredentials: { enabled: false },
-
-			/*
 			 * features.deviceFlow
 			 *
 			 * title: [`RFC8628`](https://www.rfc-editor.org/rfc/rfc8628.html) - OAuth 2.0 Device Authorization Grant (`Device Flow`)

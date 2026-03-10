@@ -76,7 +76,16 @@ export const ApplicationConfig = {
 	 *
 	 * '2.0' Enables behaviours from [FAPI 2.0 Security Profile](https://openid.net/specs/fapi-security-profile-2_0-final.html)
 	 */
-	'fapi.enabled': false
+	'fapi.enabled': false,
+
+	/*
+	 * features.clientCredentials
+	 *
+	 * title: [`RFC6749`](https://www.rfc-editor.org/rfc/rfc6749.html#section-1.3.4) - Client Credentials
+	 *
+	 * description: Enables `grant_type=client_credentials` to be used on the token endpoint.
+	 */
+	'clientCredentials.enabled': false
 };
 Object.assign(ApplicationConfig, await configStore.get());
 

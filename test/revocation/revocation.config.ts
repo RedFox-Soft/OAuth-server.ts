@@ -5,9 +5,12 @@ import getConfig from '../default.config.js';
 const config = getConfig();
 
 merge(config.features, {
-	revocation: { enabled: true },
-	clientCredentials: { enabled: true }
+	revocation: { enabled: true }
 });
+
+export const ApplicationConfig = {
+	'clientCredentials.enabled': true
+};
 
 export default {
 	config,

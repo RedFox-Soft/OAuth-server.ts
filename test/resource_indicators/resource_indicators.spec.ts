@@ -1,9 +1,5 @@
-/* eslint-disable prefer-destructuring */
-
+import { describe, it, beforeAll } from 'bun:test';
 import { strict as assert } from 'node:assert';
-
-import sinon from 'sinon';
-import { expect } from 'chai';
 
 import bootstrap from '../test_helper.js';
 import { defaults } from '../../lib/helpers/defaults.ts';
@@ -37,7 +33,9 @@ describe('features.resourceIndicators defaults', () => {
 });
 
 describe('features.resourceIndicators', () => {
-	before(bootstrap(import.meta.url));
+	beforeAll(async function () {
+		await bootstrap(import.meta.url)();
+	});
 	afterEach(function () {
 		provider.removeAllListeners();
 	});

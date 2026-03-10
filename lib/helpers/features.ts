@@ -2,7 +2,6 @@ export const STABLE = new Set([
 	'backchannelLogout',
 	'ciba',
 	'claimsParameter',
-	'clientCredentials',
 	'deviceFlow',
 	'devInteractions',
 	'dPoP',

@@ -7,9 +7,12 @@ const config = getConfig();
 merge(config.features, {
 	introspection: { enabled: true },
 	revocation: { enabled: true },
-	deviceFlow: { enabled: true },
-	clientCredentials: { enabled: true }
+	deviceFlow: { enabled: true }
 });
+
+export const ApplicationConfig = {
+	'clientCredentials.enabled': true
+};
 
 export default {
 	config,

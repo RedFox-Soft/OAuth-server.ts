@@ -1,5 +1,5 @@
 import { Elysia, t } from 'elysia';
-import { InvalidRequest } from '../helpers/errors.ts';
+import { InvalidRequest } from '../helpers/errors.js';
 import { tokenAuth, authParams, authHeaders } from '../shared/token_auth.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import {
@@ -48,6 +48,7 @@ export const tokenAction = new Elysia().post(
 			authParams,
 			t.Object({
 				scope: t.Optional(t.String()),
+				resource: t.Optional(t.String({ format: 'uri' })),
 				grant_type: t.Union(
 					grantTypes.map((gt) => t.Literal(gt)),
 					{ error: 'invalid grant_type' }

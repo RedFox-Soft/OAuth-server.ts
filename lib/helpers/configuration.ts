@@ -105,10 +105,6 @@ class Configuration {
 			this.grantTypes.add('refresh_token');
 		}
 
-		if (this.features.clientCredentials.enabled) {
-			this.grantTypes.add('client_credentials');
-		}
-
 		if (this.features.deviceFlow.enabled) {
 			this.grantTypes.add('urn:ietf:params:oauth:grant-type:device_code');
 		}

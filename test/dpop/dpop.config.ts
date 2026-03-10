@@ -6,7 +6,6 @@ import { Grant } from 'lib/models/grant.js';
 const config = getConfig();
 
 merge(config.features, {
-	clientCredentials: { enabled: true },
 	introspection: { enabled: true },
 	deviceFlow: { enabled: true },
 	requestObjects: { enabled: true },
@@ -33,7 +32,8 @@ merge(config.features, {
 export const ApplicationConfig = {
 	'par.enabled': true,
 	'dpop.enabled': true,
-	'dpop.nonceSecret': Buffer.alloc(32, 0)
+	'dpop.nonceSecret': Buffer.alloc(32, 0),
+	'clientCredentials.enabled': true
 };
 
 export default {
