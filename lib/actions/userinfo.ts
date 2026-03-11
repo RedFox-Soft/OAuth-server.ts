@@ -18,7 +18,6 @@ import { Client } from 'lib/models/client.js';
 import { provider } from 'lib/provider.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Grant } from 'lib/models/grant.js';
-import { TrustedGrant } from 'lib/models/trustedGrant.js';
 
 async function userInfo({ headers, set }) {
 	const ctx = {
@@ -94,17 +93,9 @@ async function userInfo({ headers, set }) {
 		throw new InvalidToken('associated account not found');
 	}
 
-	let grant;
-	if (client['consent.require'] === false) {
-		grant = new TrustedGrant({
-			accountId: accessToken.payload.accountId,
-			clientId: accessToken.payload.clientId
-		});
-	} else {
-		grant = await Grant.find(accessToken.payload.grantId, {
-			ignoreExpiration: true
-		});
-	}
+	const grant = await Grant.find(accessToken.payload.grantId, {
+		ignoreExpiration: true
+	});
 
 	if (!grant) {
 		throw new InvalidToken('grant not found');

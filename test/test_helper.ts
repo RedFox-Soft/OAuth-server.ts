@@ -113,7 +113,6 @@ export default function testHelper(importMetaUrl, { config: base } = {}) {
 			...config
 		});
 
-		let agent;
 		let lastSession;
 		let lastAccountId;
 

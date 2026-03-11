@@ -12,7 +12,6 @@ import {
 } from './helpers/errors.ts';
 import { ApplicationConfig as config } from './configs/application.js';
 import { Grant } from './models/grant.js';
-import { TrustedGrant } from './models/trustedGrant.js';
 
 const warned = new Set();
 function shouldChange(name, msg) {
@@ -73,16 +72,6 @@ function deviceInfo(ctx) {
 		ip: ctx.ip,
 		ua: ctx.get('user-agent')
 	};
-}
-
-function fetch(url, options) {
-	/* eslint-disable no-param-reassign */
-	options.signal = AbortSignal.timeout(2500);
-	options.headers = new Headers(options.headers);
-	options.headers.set('user-agent', ''); // removes the user-agent header in Node's global fetch()
-	// eslint-disable-next-line no-undef
-	return globalThis.fetch(url, options);
-	/* eslint-enable no-param-reassign */
 }
 
 async function userCodeInputSource(ctx, form, out, err) {
@@ -361,18 +350,20 @@ function rotateRefreshToken(ctx) {
 }
 
 async function loadExistingGrant(ctx) {
-	const clientId = ctx.oidc.client.clientId;
+	const client = ctx.oidc.client;
 	const grantId =
-		ctx.oidc.result?.consent?.grantId || ctx.oidc.session.grantIdFor(clientId);
+		ctx.oidc.result?.consent?.grantId ||
+		ctx.oidc.session.grantIdFor(client.clientId);
 
 	if (grantId) {
 		return Grant.find(grantId);
 	}
 	const accountId = ctx.oidc.account?.accountId;
-	if (ctx.oidc.client['consent.require'] === false && accountId) {
-		return new TrustedGrant({ accountId, clientId });
+	if (client['consent.require'] === false && accountId) {
+		const grant = new Grant({ accountId, clientId: client.clientId, client });
+		await grant.save();
+		return grant;
 	}
-	return undefined;
 }
 
 function sectorIdentifierUriValidate(client) {
@@ -1742,28 +1733,5 @@ export const globalConfiguration = {
 	 *   - otherwise always rotate public client tokens that are not sender-constrained
 	 *   - otherwise only rotate tokens if they're being used close to their expiration (>= 70% TTL passed)
 	 */
-	rotateRefreshToken,
-
-	/*
-	 * fetch
-	 *
-	 * description: Function called whenever calls to an external HTTP(S) resource are being made. The interface as well
-	 * as expected return is the [Fetch API's](https://fetch.spec.whatwg.org/)
-	 * [`fetch()`](https://developer.mozilla.org/en-US/docs/Web/API/Window/fetch). The default is using timeout of 2500ms
-	 * and not sending a user-agent header.
-	 *
-	 * example: To change the request's timeout
-	 *
-	 * To change all request's timeout configure the fetch as a function like so:
-	 *
-	 * ```js
-	 *  {
-	 *    fetch(url, options) {
-	 *      options.signal = AbortSignal.timeout(5000);
-	 *      return globalThis.fetch(url, options);
-	 *    }
-	 *  }
-	 * ```
-	 */
-	fetch
+	rotateRefreshToken
 };

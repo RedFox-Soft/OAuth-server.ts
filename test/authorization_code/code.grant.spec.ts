@@ -196,6 +196,7 @@ describe('grant_type=authorization_code', () => {
 			codeStore.consumed = epochTime();
 
 			const { error } = await auth.getToken(code);
+			console.log(error.value);
 			expect(error.status).toBe(400);
 			expect(grantRevokeSpy).toBeCalledTimes(1);
 			expect(grantErrorSpy).toBeCalledTimes(1);

@@ -189,11 +189,7 @@ class ClientKeyStore extends KeyStore {
 
 		if (!this.lock) {
 			this.lock = (async () => {
-				/**
-				 * @type typeof fetch
-				 */
-				const request = instance(provider).configuration.fetch;
-				const response = await request(new URL(this.jwksUri).href, {
+				const response = await fetch(new URL(this.jwksUri).href, {
 					method: 'GET',
 					headers: {
 						Accept: 'application/json'
@@ -425,11 +421,7 @@ export class Client {
 			throw new TypeError();
 		}
 
-		/**
-		 * @type typeof fetch
-		 */
-		const request = instance(provider).configuration.fetch;
-		return request(new URL(this.backchannelClientNotificationEndpoint).href, {
+		return fetch(new URL(this.backchannelClientNotificationEndpoint).href, {
 			method: 'POST',
 			headers: {
 				authorization: `Bearer ${backchannelAuthenticationRequest.params.client_notification_token}`,
@@ -462,11 +454,7 @@ export class Client {
 			logoutToken.set('sid', sid);
 		}
 
-		/**
-		 * @type typeof fetch
-		 */
-		const request = instance(provider).configuration.fetch;
-		return request(new URL(this.backchannelLogoutUri).href, {
+		return fetch(new URL(this.backchannelLogoutUri).href, {
 			method: 'POST',
 			headers: {
 				'content-type': 'application/x-www-form-urlencoded'

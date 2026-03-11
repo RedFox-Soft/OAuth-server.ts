@@ -8,11 +8,7 @@ export default async function sectorValidate(provider, client) {
 		return;
 	}
 
-	/**
-	 * @type typeof fetch
-	 */
-	const request = instance(provider).configuration.fetch;
-	const response = await request(new URL(client.sectorIdentifierUri).href, {
+	const response = await fetch(new URL(client.sectorIdentifierUri).href, {
 		method: 'GET',
 		headers: {
 			accept: 'application/json'

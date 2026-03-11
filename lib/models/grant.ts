@@ -14,6 +14,9 @@ const NON_REJECTABLE_CLAIMS = new Set([
 const GrantPayload = t.Composite([
 	BaseTokenPayload,
 	t.Object({
+		createdAt: t.Number(),
+		lastModifiedAt: t.Number(),
+		trusted: t.Boolean(),
 		resources: t.Optional(t.Record(t.String(), t.String())),
 		openid: t.Optional(
 			t.Object({
@@ -39,6 +42,14 @@ type GrantPayloadType = Static<typeof GrantPayload>;
 
 export class Grant extends BaseToken<GrantPayloadType> {
 	model = GrantPayload;
+
+	constructor(payload: Partial<GrantPayloadType> = {}) {
+		super(payload);
+		this.payload.createdAt ||= Date.now();
+		this.payload.lastModifiedAt ||= Date.now();
+		this.payload.trusted ??=
+			this.client?.['consent.require'] === false || false;
+	}
 
 	clean() {
 		const context = this.payload || this;
@@ -92,11 +103,12 @@ export class Grant extends BaseToken<GrantPayloadType> {
 		return this.getOIDCScope.call(this.payload.rejected);
 	}
 
-	getOIDCScopeFiltered(filter) {
+	getOIDCScopeFiltered(filter: Set<string> | string[]) {
 		if (Array.isArray(filter)) {
 			filter = new Set(filter);
-		} else if (!(filter instanceof Set)) {
-			throw new TypeError('"filter" must be an instance of Set');
+		}
+		if (this.payload.trusted) {
+			return Array.from(filter).join(' ');
 		}
 		const granted = this.getOIDCScope().split(' ');
 		return granted.filter(Set.prototype.has.bind(filter)).join(' ');
@@ -158,14 +170,12 @@ export class Grant extends BaseToken<GrantPayloadType> {
 		return this.getResourceScope.call(this.payload.rejected, ...args);
 	}
 
-	getResourceScopeFiltered(resource, filter) {
-		if (typeof resource !== 'string') {
-			throw new TypeError('"resource" must be a string');
-		}
+	getResourceScopeFiltered(resource: string, filter: Set<string> | string[]) {
 		if (Array.isArray(filter)) {
 			filter = new Set(filter);
-		} else if (!(filter instanceof Set)) {
-			throw new TypeError('"filter" must be an instance of Set');
+		}
+		if (this.payload.trusted) {
+			return Array.from(filter).join(' ');
 		}
 		const granted = this.getResourceScope(resource).split(' ');
 		return granted.filter(Set.prototype.has.bind(filter)).join(' ');
@@ -233,11 +243,12 @@ export class Grant extends BaseToken<GrantPayloadType> {
 		return this.getOIDCClaims.call(this.payload.rejected);
 	}
 
-	getOIDCClaimsFiltered(filter) {
+	getOIDCClaimsFiltered(filter: Set<string> | string[]) {
 		if (Array.isArray(filter)) {
 			filter = new Set(filter);
-		} else if (!(filter instanceof Set)) {
-			throw new TypeError('"filter" must be an instance of Set');
+		}
+		if (this.payload.trusted) {
+			return Array.from(filter);
 		}
 		const granted = this.getOIDCClaims();
 		return granted.filter(Set.prototype.has.bind(filter));
