@@ -1,22 +1,31 @@
+import { expect } from 'bun:test';
 import crypto from 'node:crypto';
 import { parse } from 'node:url';
 import querystring from 'node:querystring';
 
-import { expect } from 'chai';
 import { TestAdapter } from './models.js';
 import { agent } from './test_helper.js';
 import { AuthorizationParameters } from '../lib/consts/param_list.js';
 import { type Static } from 'elysia';
 import { type ClientSchemaType } from 'lib/configs/clientSchema.js';
+import { ISSUER } from 'lib/configs/env.js';
 
-function getSetCookies(cookies) {
+function getSetCookies(cookies: string[]) {
 	return cookies.filter(
 		(val) => !val.includes('Thu, 01 Jan 1970 00:00:00 GMT')
 	);
 }
 
-function readCookie(value) {
-	expect(value).to.exist;
+function getLocation(res: Response) {
+	const location = res.headers.get('location');
+	if (!location) {
+		throw new Error('missing location header');
+	}
+	return location;
+}
+
+function readCookie(value: string) {
+	expect(value).toBeTruthy();
 	const parsed = querystring.parse(value, '; ');
 	const key = Object.keys(parsed)[0];
 	return parsed[key];
@@ -85,51 +94,53 @@ export class AuthorizationRequest {
 		return { authorization: `Basic ${str}` };
 	}
 
-	validateClientLocation(response) {
-		const location = response.headers.get('location');
+	validateClientLocation(response: Response) {
+		const location = getLocation(response);
 		const actual = parse(location, true);
 		let expected;
 		if (this.params.redirect_uri) {
-			expect(location).to.match(new RegExp(this.params.redirect_uri));
+			expect(location).toMatch(new RegExp(this.params.redirect_uri));
 			expected = parse(this.params.redirect_uri, true);
 		} else {
-			expect(location).to.match(new RegExp(this.client.redirectUris[0]));
+			expect(location).toMatch(new RegExp(this.client.redirectUris[0]));
 			expected = parse(this.client.redirectUris[0], true);
 		}
 
 		['protocol', 'host', 'pathname'].forEach((attr) => {
-			expect(actual[attr]).to.equal(expected[attr]);
+			expect(actual[attr]).toBe(expected[attr]);
 		});
 	}
 
-	validateState(response) {
+	validateState(response: Response) {
+		const location = getLocation(response);
 		const {
 			query: { state }
-		} = parse(response.headers.get('location'), true);
-		expect(state).to.equal(this.params.state);
+		} = parse(location, true);
+		expect(state).toBe(this.params.state);
 	}
 
-	validateIss(response) {
+	validateIss(response: Response) {
+		const location = getLocation(response);
 		const {
 			query: { iss }
-		} = parse(response.headers.get('location'), true);
-		expect(iss).to.equal(issuerIdentifier);
+		} = parse(location, true);
+		expect(iss).toBe(ISSUER);
 	}
 
-	validateInteractionRedirect(response) {
-		const location = response.headers.get('location');
+	validateInteractionRedirect(response: Response) {
+		const location = getLocation(response);
 		const { hostname, search, query } = parse(location);
-		expect(hostname).to.be.null;
-		expect(search).to.be.null;
-		expect(query).to.be.null;
+		expect(hostname).toBeNull();
+		expect(search).toBeNull();
+		expect(query).toBeNull();
 		const cookies = response.headers.getSetCookie();
-		expect(Array.isArray(cookies)).to.be.true;
+		expect(Array.isArray(cookies)).toBeTrue();
 
 		const [, , uid] = location.split('/');
 
 		const interaction = TestAdapter.for('Interaction').syncFind(uid);
 		const cookieID = readCookie(getSetCookies(cookies)[0]);
-		expect(cookieID).to.equal(interaction.cookieID);
+		expect(cookieID).toBe(interaction.cookieID);
 
 		if (interaction.params.claims) {
 			interaction.params.claims = JSON.stringify(interaction.params.claims);
@@ -141,63 +152,69 @@ export class AuthorizationRequest {
 			if (key === 'code_verifier') return;
 			if (key === 'request_uri') return;
 			if (key === 'max_age' && value === 0) {
-				expect(interaction.params).not.to.have.property('max_age');
-				expect(interaction.params)
-					.to.have.property('prompt')
-					.that.contains('login');
+				expect(interaction.params).not.toHaveProperty('max_age');
+				expect(interaction.params.prompt).toContain('login');
 			} else {
-				expect(interaction.params).to.have.property(key, value);
+				expect(interaction.params).toHaveProperty(key, value);
 			}
 		});
 	}
 
-	validateInteraction(response: Response, eName, ...eReasons) {
-		const location = response.headers.get('location');
+	validateInteraction(
+		response: Response,
+		eName: string,
+		...eReasons: string[]
+	) {
+		const location = getLocation(response);
 		const [, , uid] = location.split('/');
 		const {
 			prompt: { name, reasons }
 		} = TestAdapter.for('Interaction').syncFind(uid);
-		expect(name).to.equal(eName);
-		expect(reasons).to.contain.members(eReasons);
+		expect(name).toBe(eName);
+		expect(reasons).toEqual(expect.arrayContaining(eReasons));
 	}
 
-	validatePresence(response, properties, all = true) {
+	validatePresence(response: Response, properties: string[], all = true) {
 		properties =
 			!all || properties.includes('id_token') || properties.includes('response')
 				? properties
 				: [...new Set(properties.concat('iss'))];
 
-		const { query } = parse(response.headers.get('location'), true);
+		const { query } = parse(getLocation(response), true);
 		if (all) {
-			expect(query).to.have.keys(properties);
+			expect(Object.keys(query)).toEqual(properties);
 		} else {
-			expect(query).to.contain.keys(properties);
+			expect(Object.keys(query)).toEqual(expect.arrayContaining(properties));
 		}
 		properties.forEach((key) => {
 			this.res[key] = query[key];
 		});
 	}
 
-	validateResponseParameter(response, parameter, expected) {
+	validateResponseParameter(
+		response: Response,
+		parameter: string,
+		expected: string | RegExp
+	) {
 		const {
 			query: { [parameter]: value }
-		} = parse(response.headers.get('location'), true);
-		if (expected.exec) {
-			expect(value).to.match(expected);
+		} = parse(getLocation(response), true);
+		if (expected instanceof RegExp) {
+			expect(value).toMatch(expected);
 		} else {
-			expect(value).to.equal(expected);
+			expect(value).toBe(expected);
 		}
 	}
 
-	validateError(response, expected) {
+	validateError(response: Response, expected: string) {
 		return this.validateResponseParameter(response, 'error', expected);
 	}
 
-	validateScope(response, expected) {
+	validateScope(response: Response, expected: string) {
 		return this.validateResponseParameter(response, 'scope', expected);
 	}
 
-	validateErrorDescription(response, expected) {
+	validateErrorDescription(response: Response, expected: string) {
 		return this.validateResponseParameter(
 			response,
 			'error_description',
@@ -205,7 +222,7 @@ export class AuthorizationRequest {
 		);
 	}
 
-	async getToken(code) {
+	async getToken(code: string) {
 		const isBasicAuth = this.client.token_endpoint_auth_method !== 'none';
 		return await agent.token.post(
 			{

@@ -17,7 +17,7 @@ export class OIDCProviderError extends Error {
 }
 
 export class CustomOIDCProviderError extends OIDCProviderError {
-	constructor(message, description) {
+	constructor(message: string, description: string) {
 		super(400, message);
 		Error.captureStackTrace(this, this.constructor);
 		Object.assign(this, { error_description: description });

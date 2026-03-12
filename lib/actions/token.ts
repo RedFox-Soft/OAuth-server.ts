@@ -1,7 +1,6 @@
 import { Elysia, t } from 'elysia';
 import { InvalidRequest } from '../helpers/errors.js';
-import { tokenAuth, authParams, authHeaders } from '../shared/token_auth.js';
-import { OIDCContext } from 'lib/helpers/oidc_context.js';
+import { authParams, authHeaders } from '../shared/token_auth.js';
 import {
 	codeGrantParameters,
 	deviceCodeGrantParameters,
@@ -15,21 +14,13 @@ import {
 	setNonceHeader,
 	validateReplay
 } from 'lib/helpers/validate_dpop.js';
+import { AuthPlugin } from 'lib/plugins/auth.js';
 
 const grantTypes = Array.from(grantStore.keys());
 
-export const tokenAction = new Elysia().post(
+export const tokenAction = new Elysia().use(AuthPlugin).post(
 	routeNames.token,
-	async ({ body, headers, route, set }) => {
-		const ctx = {
-			headers,
-			_matchedRouteName: route
-		};
-		ctx.oidc = new OIDCContext(ctx);
-		ctx.oidc.params = body;
-		ctx.oidc.body = body;
-
-		await tokenAuth(body, headers, ctx);
+	async ({ body, headers, route, set, ctx }) => {
 		const dPoP = await dpopValidate(headers.dpop, { route });
 		setNonceHeader(set.headers, dPoP);
 		await validateReplay(ctx.oidc.client.clientId, dPoP);

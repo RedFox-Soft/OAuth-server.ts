@@ -4,7 +4,7 @@ import {
 	InvalidTarget,
 	InvalidScope,
 	InvalidRequest
-} from '../../helpers/errors.ts';
+} from '../../helpers/errors.js';
 import checkResource from '../../shared/check_resource.ts';
 import { ClientCredentials } from 'lib/models/client_credentials.js';
 

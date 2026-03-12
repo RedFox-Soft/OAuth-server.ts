@@ -34,7 +34,7 @@ export const grantStore = new Map([
 	['refresh_token', refresh_token.handler],
 	['urn:ietf:params:oauth:grant-type:device_code', device_code.handler],
 	['urn:openid:params:grant-type:ciba', ciba.handler]
-]);
+]) as const;
 
 if (process.env.NODE_ENV === 'test') {
 	grantStore.set('foo', async () => ({ success: true }));
