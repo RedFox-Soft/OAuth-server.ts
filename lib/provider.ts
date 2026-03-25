@@ -41,7 +41,6 @@ class ProviderClass extends EventEmitter {
 		this.#int.features = globalConfiguration.features;
 
 		this.#int.responseModes = new Map();
-		this.#int.grantTypeHandlers = new Map();
 
 		const keystore = new KeyStore();
 		JWKS_KEYS.forEach((key) => keystore.add(structuredClone(key)));
@@ -73,12 +72,6 @@ class ProviderClass extends EventEmitter {
 
 	urlFor(name, opt) {
 		return new URL(this.pathFor(name, opt), this.issuer).href;
-	}
-
-	registerGrantType(name, handler) {
-		this.#int.configuration.grantTypes.add(name);
-		const { grantTypeHandlers } = this.#int;
-		grantTypeHandlers.set(name, handler);
 	}
 
 	registerResponseMode(name, handler) {

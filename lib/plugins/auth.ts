@@ -1,6 +1,11 @@
-import { Elysia } from 'elysia';
+import { Elysia, t } from 'elysia';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { tokenAuth } from 'lib/shared/token_auth.js';
+
+export const authHeaders = t.Object({
+	authorization: t.Optional(t.String()),
+	dpop: t.Optional(t.String())
+});
 
 export const AuthPlugin = new Elysia().derive(
 	{ as: 'scoped' },

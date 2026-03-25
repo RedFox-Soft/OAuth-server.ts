@@ -5,7 +5,7 @@ import querystring from 'node:querystring';
 
 import { TestAdapter } from './models.js';
 import { agent } from './test_helper.js';
-import { AuthorizationParameters } from '../lib/consts/param_list.js';
+import { type AuthorizationParameters } from '../lib/consts/param_list.js';
 import { type Static } from 'elysia';
 import { type ClientSchemaType } from 'lib/configs/clientSchema.js';
 import { ISSUER } from 'lib/configs/env.js';
@@ -207,19 +207,15 @@ export class AuthorizationRequest {
 	}
 
 	validateError(response: Response, expected: string) {
-		return this.validateResponseParameter(response, 'error', expected);
+		this.validateResponseParameter(response, 'error', expected);
 	}
 
 	validateScope(response: Response, expected: string) {
-		return this.validateResponseParameter(response, 'scope', expected);
+		this.validateResponseParameter(response, 'scope', expected);
 	}
 
 	validateErrorDescription(response: Response, expected: string) {
-		return this.validateResponseParameter(
-			response,
-			'error_description',
-			expected
-		);
+		this.validateResponseParameter(response, 'error_description', expected);
 	}
 
 	async getToken(code: string) {

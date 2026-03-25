@@ -10,9 +10,7 @@ import {
 	mock
 } from 'bun:test';
 
-import sinon from 'sinon';
 import timekeeper from 'timekeeper';
-
 import { provider } from 'lib/provider.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
 import bootstrap, { agent } from '../test_helper.js';
@@ -20,10 +18,6 @@ import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { TestAdapter } from 'test/models.js';
 import { ttl } from 'lib/configs/liveTime.js';
-
-function errorDetail(spy) {
-	return spy.args[0][0].error_detail;
-}
 
 describe('grant_type=authorization_code', () => {
 	let setup = null;
@@ -33,7 +27,6 @@ describe('grant_type=authorization_code', () => {
 
 	afterEach(() => {
 		timekeeper.reset();
-		sinon.restore();
 		mock.restore();
 
 		provider.removeAllListeners('grant.success');
@@ -72,7 +65,7 @@ describe('grant_type=authorization_code', () => {
 
 		it('Should return specific properties on token request', async function () {
 			const spy = mock();
-			provider.on('grant.success', spy);
+			provider.once('grant.success', spy);
 
 			const { data, response } = await auth.getToken(code);
 			expect(response.status).toBe(200);
@@ -273,9 +266,9 @@ describe('grant_type=authorization_code', () => {
 		});
 
 		it('validates account is still there', async function () {
-			sinon
-				.stub(i(provider).configuration, 'findAccount')
-				.callsFake(() => Promise.resolve());
+			spyOn(i(provider).configuration, 'findAccount').mockResolvedValue(
+				undefined
+			);
 
 			const spy = mock();
 			provider.on('grant.error', spy);
@@ -316,13 +309,13 @@ describe('grant_type=authorization_code', () => {
 		});
 
 		it('validates redirect_uri presence', async function () {
-			const spy = sinon.spy();
+			const spy = mock();
 			provider.on('grant.error', spy);
 
 			auth.params.redirect_uri = undefined;
 			const { error } = await auth.getToken(code);
 			expect(error.status).toBe(400);
-			expect(spy.calledOnce).toBe(true);
+			expect(spy).toBeCalledTimes(1);
 			expect(error.value).toHaveProperty('error', 'invalid_request');
 			expect(error.value).toHaveProperty(
 				'error_description',
@@ -368,13 +361,13 @@ describe('grant_type=authorization_code', () => {
 		});
 
 		it('returns the right stuff', async function () {
-			const spy = sinon.spy();
+			const spy = mock();
 			provider.on('grant.success', spy);
 
 			const { data, response } = await auth.getToken(code);
 
 			expect(response.status).toBe(200);
-			expect(spy.calledOnce).toBe(true);
+			expect(spy).toBeCalledTimes(1);
 			expect(Object.keys(data)).toEqual(
 				expect.arrayContaining([
 					'access_token',
@@ -465,20 +458,24 @@ describe('grant_type=authorization_code', () => {
 			const code = query.code;
 
 			timekeeper.travel(Date.now() + 10 * 1000);
-			const spy = sinon.spy();
+			const spy = mock();
 			provider.on('grant.error', spy);
 
 			const { error } = await auth.getToken(code);
 
 			expect(error.status).toBe(400);
-			expect(spy.calledOnce).toBe(true);
-			expect(errorDetail(spy)).toBe('authorization code is expired');
+			expect(spy).toBeCalledTimes(1);
+			expect(spy).toBeCalledWith(
+				expect.objectContaining({
+					error_detail: 'authorization code is expired'
+				})
+			);
 			expect(error.value).toHaveProperty('error', 'invalid_grant');
 		});
 
 		it('validates code is not already used', async function () {
-			const grantErrorSpy = sinon.spy();
-			const grantRevokeSpy = sinon.spy();
+			const grantErrorSpy = mock();
+			const grantRevokeSpy = mock();
 			provider.on('grant.error', grantErrorSpy);
 			provider.on('grant.revoked', grantRevokeSpy);
 
@@ -486,10 +483,12 @@ describe('grant_type=authorization_code', () => {
 
 			const { error } = await auth.getToken(code);
 			expect(error.status).toBe(400);
-			expect(grantRevokeSpy.calledOnce).toBe(true);
-			expect(grantErrorSpy.calledOnce).toBe(true);
-			expect(errorDetail(grantErrorSpy)).toBe(
-				'authorization code already consumed'
+			expect(grantRevokeSpy).toBeCalledTimes(1);
+			expect(grantErrorSpy).toBeCalledTimes(1);
+			expect(grantErrorSpy).toBeCalledWith(
+				expect.objectContaining({
+					error_detail: 'authorization code already consumed'
+				})
 			);
 			expect(error.value).toHaveProperty('error', 'invalid_grant');
 		});
@@ -502,15 +501,19 @@ describe('grant_type=authorization_code', () => {
 		});
 
 		it('validates code belongs to client', async function () {
-			const spy = sinon.spy();
+			const spy = mock();
 			provider.on('grant.error', spy);
 
 			auth.clientId = 'client';
 			auth.redirect_uri = 'https://client.example.com/cb2';
 			const { error } = await auth.getToken(code);
 			expect(error.status).toBe(400);
-			expect(spy.calledOnce).toBe(true);
-			expect(errorDetail(spy)).toBe('client mismatch');
+			expect(spy).toBeCalledTimes(1);
+			expect(spy).toBeCalledWith(
+				expect.objectContaining({
+					error_detail: 'client mismatch'
+				})
+			);
 			expect(error.value).toHaveProperty('error', 'invalid_grant');
 		});
 
@@ -526,30 +529,37 @@ describe('grant_type=authorization_code', () => {
 		});
 
 		it('validates used redirect_uri (should it be provided)', async function () {
-			const spy = sinon.spy();
+			const spy = mock();
 			provider.on('grant.error', spy);
 
 			auth.params.redirect_uri = 'https://client.example.com/cb?thensome';
 			const { error } = await auth.getToken(code);
 			expect(error.status).toBe(400);
-			expect(spy.calledOnce).toBe(true);
-			expect(errorDetail(spy)).toBe('authorization code redirect_uri mismatch');
+			expect(spy).toBeCalledTimes(1);
+			expect(spy).toBeCalledWith(
+				expect.objectContaining({
+					error_detail: 'authorization code redirect_uri mismatch'
+				})
+			);
 			expect(error.value).toHaveProperty('error', 'invalid_grant');
 		});
 
 		it('validates account is still there', async function () {
-			sinon
-				.stub(i(provider).configuration, 'findAccount')
-				.callsFake(() => Promise.resolve());
+			spyOn(i(provider).configuration, 'findAccount').mockResolvedValue(
+				undefined
+			);
 
-			const spy = sinon.spy();
+			const spy = mock();
 			provider.on('grant.error', spy);
 
 			const { error } = await auth.getToken(code);
 			expect(error.status).toBe(400);
-			expect(spy.calledOnce).toBe(true);
-			expect(errorDetail(spy)).toBe(
-				'authorization code invalid (referenced account not found)'
+			expect(spy).toBeCalledTimes(1);
+			expect(spy).toBeCalledWith(
+				expect.objectContaining({
+					error_detail:
+						'authorization code invalid (referenced account not found)'
+				})
 			);
 			expect(error.value).toHaveProperty('error', 'invalid_grant');
 		});
@@ -622,7 +632,7 @@ describe('grant_type=authorization_code', () => {
 		});
 
 		it('code being "found"', async function () {
-			const spy = sinon.spy();
+			const spy = mock();
 			provider.on('grant.error', spy);
 
 			const auth = new AuthorizationRequest({
@@ -641,15 +651,19 @@ describe('grant_type=authorization_code', () => {
 				}
 			);
 			expect(error.status).toBe(400);
-			expect(spy.calledOnce).toBe(true);
-			expect(errorDetail(spy)).toBe('authorization code not found');
+			expect(spy).toBeCalledTimes(1);
+			expect(spy).toBeCalledWith(
+				expect.objectContaining({
+					error_detail: 'authorization code not found'
+				})
+			);
 			expect(error.value).toHaveProperty('error', 'invalid_grant');
 		});
 	});
 
 	it('handles exceptions', async function () {
 		spyOn(provider.Client, 'find').mockRejectedValue(new Error());
-		const spy = sinon.spy();
+		const spy = mock();
 		provider.on('server_error', spy);
 
 		const auth = new AuthorizationRequest({
@@ -667,7 +681,7 @@ describe('grant_type=authorization_code', () => {
 			}
 		);
 		expect(error.status).toBe(500);
-		expect(spy.calledOnce).toBe(true);
+		expect(spy).toBeCalledTimes(1);
 		expect(error.value).toHaveProperty('error', 'server_error');
 		expect(error.value).toHaveProperty(
 			'error_description',

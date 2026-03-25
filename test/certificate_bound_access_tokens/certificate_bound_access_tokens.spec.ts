@@ -1,17 +1,15 @@
-import { describe, it } from 'bun:test';
+import { describe, it, beforeAll, expect, beforeEach } from 'bun:test';
 import { X509Certificate } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import * as url from 'node:url';
 
-import sinon from 'sinon';
-import { expect } from 'chai';
-
-import bootstrap, { skipConsent } from '../test_helper.js';
+import bootstrap, { agent } from '../test_helper.js';
 import { provider } from 'lib/provider.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
+import { InvalidRequest } from 'lib/helpers/errors.js';
 
 const crt = new X509Certificate(
 	readFileSync('./test/jwks/client.crt', { encoding: 'ascii' })
@@ -19,57 +17,62 @@ const crt = new X509Certificate(
 const expectedS256 = 'A4DtL2JmUMhAsvJj5tKyn64SqzmuXbMrJa0n761y5v0';
 
 describe('features.mTLS.certificateBoundAccessTokens', () => {
-	before(bootstrap(import.meta.url));
-	before(function () {
-		return this.login();
+	let setup;
+	let cookie;
+	beforeAll(async function () {
+		setup = await bootstrap(import.meta.url)();
+		cookie = await setup.login();
 	});
 
-	describe('discovery', () => {
-		it('extends discovery', function () {
-			return this.agent
-				.get('/.well-known/openid-configuration')
-				.expect(200)
-				.expect((response) => {
-					expect(response.body).to.have.property(
-						'tls_client_certificate_bound_access_tokens',
-						true
-					);
-				});
-		});
+	it('discovery extends discovery', async function () {
+		const { data, status } =
+			await agent['.well-known']['openid-configuration'].get();
+		expect(status).toBe(200);
+		expect(data).toHaveProperty(
+			'tls_client_certificate_bound_access_tokens',
+			true
+		);
 	});
 
 	describe('userinfo', () => {
 		it('acts like an RS checking the thumbprint now', async function () {
 			const at = new AccessToken({
-				grantId: this.getGrantId('client'),
-				accountId: this.loggedInAccountId,
+				grantId: setup.getGrantId('client'),
+				accountId: setup.getAccountId(),
 				client: await Client.find('client'),
 				scope: 'openid'
 			});
 			at.setThumbprint('x5t', crt);
 
-			expect(() => at.setThumbprint('jkt', 'foo'))
-				.to.throw()
-				.with.property(
-					'error_description',
+			expect(() => at.setThumbprint('jkt', 'foo')).toThrowError(
+				new InvalidRequest(
 					'multiple proof-of-posession mechanisms are not allowed'
-				);
+				)
+			);
 
 			const bearer = await at.save();
+			const tr = await agent.userinfo.get({
+				headers: {
+					authorization: `Bearer ${bearer}`
+				}
+			});
+			expect(tr.status).toBe(401);
 
-			await this.agent.get('/me').auth(bearer, { type: 'bearer' }).expect(401);
+			const res = await agent.userinfo.get({
+				headers: {
+					authorization: `Bearer ${bearer}`,
+					'x-client-cert': 'foobar'
+				}
+			});
+			expect(res.status).toBe(401);
 
-			await this.agent
-				.get('/me')
-				.auth(bearer, { type: 'bearer' })
-				.set('x-ssl-client-cert', 'foobar')
-				.expect(401);
-
-			await this.agent
-				.get('/me')
-				.auth(bearer, { type: 'bearer' })
-				.set('x-ssl-client-cert', crt.raw.toString('base64'))
-				.expect(200);
+			const { status } = await agent.userinfo.get({
+				headers: {
+					authorization: `Bearer ${bearer}`,
+					'x-client-cert': crt.raw.toString('base64')
+				}
+			});
+			expect(status).toBe(200);
 		});
 	});
 
@@ -100,8 +103,9 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 	});
 
 	describe('urn:ietf:params:oauth:grant-type:device_code', () => {
-		before(function () {
-			return this.login({ scope: 'openid offline_access' });
+		let cookie;
+		beforeAll(async function () {
+			cookie = await setup.login({ scope: 'openid offline_access' });
 		});
 		beforeEach(async function () {
 			await this.agent
@@ -311,10 +315,10 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 	});
 
 	describe('authorization flow', () => {
-		before(function () {
-			return this.login({ scope: 'openid offline_access' });
+		let cookie;
+		beforeAll(async function () {
+			cookie = await setup.login({ scope: 'openid offline_access' });
 		});
-		skipConsent();
 
 		beforeEach(async function () {
 			const auth = (this.auth = new AuthorizationRequest({
@@ -460,10 +464,10 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 	});
 
 	describe('authorization flow (public client)', () => {
-		before(function () {
-			return this.login({ scope: 'openid offline_access' });
+		let cookie;
+		beforeAll(async function () {
+			cookie = await setup.login({ scope: 'openid offline_access' });
 		});
-		skipConsent();
 
 		beforeEach(async function () {
 			const auth = (this.auth = new AuthorizationRequest({

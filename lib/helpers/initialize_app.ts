@@ -1,7 +1,6 @@
 import { strict as assert } from 'node:assert';
 
 import cors from '../shared/cors.ts';
-import * as grants from '../actions/grants/index.ts';
 import error from '../shared/error_handler.ts';
 import { jwks, registration, codeVerification } from '../actions/index.ts';
 
@@ -26,16 +25,6 @@ export default function initializeApp() {
 			this.registerResponseMode(`${mode}.jwt`, jwt);
 		});
 	}
-
-	Object.entries(grants).forEach(([grantType, { handler }]) => {
-		const { grantTypeHandlers } = instance(this);
-		if (
-			configuration.grantTypes.has(grantType) &&
-			!grantTypeHandlers.has(grantType)
-		) {
-			this.registerGrantType(grantType, handler);
-		}
-	});
 	return;
 
 	const CORS_AUTHORIZATION = {

@@ -23,7 +23,7 @@ import loadGrant from './load_grant.ts';
 import interactions from './interactions.ts';
 import respond from './respond.ts';
 import checkOpenidScope from './check_openid_scope.ts';
-import { authHeaders, authParams, tokenAuth } from '../../shared/token_auth.ts';
+import { authParams, tokenAuth } from '../../shared/token_auth.ts';
 import stripOutsideJarParams from './strip_outside_jar_params.ts';
 import pushedAuthorizationRequestRemapErrors from './pushed_authorization_request_remap_errors.ts';
 import pushedAuthorizationRequestResponse from './pushed_authorization_request_response.ts';
@@ -52,6 +52,7 @@ import {
 	setNonceHeader,
 	validateReplay
 } from 'lib/helpers/validate_dpop.js';
+import { authHeaders } from 'lib/plugins/auth.js';
 
 const authorizationRequest = t.Composite([
 	t.Omit(AuthorizationParameters, ['request_uri', 'request', 'client_id']),

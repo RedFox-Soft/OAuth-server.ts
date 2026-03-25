@@ -1,5 +1,5 @@
 import checkResource from '../../shared/check_resource.ts';
-import { authHeaders, authParams, tokenAuth } from '../../shared/token_auth.ts';
+import { authParams, tokenAuth } from '../../shared/token_auth.ts';
 
 import processRequestObject, {
 	isEncryptedJWT
@@ -29,6 +29,7 @@ import { Elysia, t } from 'elysia';
 import { InvalidRequest } from 'lib/helpers/errors.js';
 import { featureVerification } from './featureVerification.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
+import { authHeaders } from 'lib/plugins/auth.js';
 
 const deviceAuthGrantType = 'urn:ietf:params:oauth:grant-type:device_code';
 const backchannelAuthGrantType = 'urn:openid:params:grant-type:ciba';

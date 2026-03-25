@@ -10,7 +10,6 @@ import {
 	expect
 } from 'bun:test';
 
-import sinon from 'sinon';
 import {
 	SignJWT,
 	exportJWK,
@@ -728,7 +727,7 @@ describe('features.dPoP', async () => {
 		});
 
 		it('binds the access token to the jwk', async function () {
-			const spy = sinon.spy();
+			const spy = mock();
 			provider.once('grant.success', spy);
 
 			await this.agent
@@ -759,7 +758,7 @@ describe('features.dPoP', async () => {
 		});
 
 		it('binds the refresh token to the jwk for public clients', async function () {
-			const spy = sinon.spy();
+			const spy = mock();
 			provider.once('grant.success', spy);
 
 			// changes the code to client-none

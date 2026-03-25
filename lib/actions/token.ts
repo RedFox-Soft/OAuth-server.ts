@@ -1,6 +1,6 @@
 import { Elysia, t } from 'elysia';
 import { InvalidRequest } from '../helpers/errors.js';
-import { authParams, authHeaders } from '../shared/token_auth.js';
+import { authParams } from '../shared/token_auth.js';
 import {
 	codeGrantParameters,
 	deviceCodeGrantParameters,
@@ -14,7 +14,7 @@ import {
 	setNonceHeader,
 	validateReplay
 } from 'lib/helpers/validate_dpop.js';
-import { AuthPlugin } from 'lib/plugins/auth.js';
+import { AuthPlugin, authHeaders } from 'lib/plugins/auth.js';
 
 const grantTypes = Array.from(grantStore.keys());
 

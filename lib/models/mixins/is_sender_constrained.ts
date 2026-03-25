@@ -1,6 +1,7 @@
 import { InvalidRequest } from '../../helpers/errors.js';
 import certificateThumbprint from '../../helpers/certificate_thumbprint.js';
 import { type BaseToken, type BaseTokenPayloadType } from '../base_token.js';
+import { type X509Certificate } from 'node:crypto';
 
 const x5t = 'x5t#S256';
 const jkt = 'jkt';
@@ -14,7 +15,7 @@ export default function constrained<TPayload extends ConstrainedPayload>(
 	superclass: typeof BaseToken<TPayload>
 ) {
 	return class extends superclass {
-		setThumbprint(prop: 'x5t' | 'jkt', input: string) {
+		setThumbprint(prop: 'x5t' | 'jkt', input: string | X509Certificate) {
 			switch (prop) {
 				case 'x5t':
 					if (this.payload[jkt]) {

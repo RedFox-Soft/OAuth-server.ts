@@ -1,8 +1,8 @@
-import * as crypto from 'node:crypto';
+import { X509Certificate, hash } from 'node:crypto';
 
 export default function certThumbprint(cert) {
 	let data;
-	if (cert instanceof crypto.X509Certificate) {
+	if (cert instanceof X509Certificate) {
 		data = cert.raw;
 	} else {
 		data = Buffer.from(
@@ -11,5 +11,5 @@ export default function certThumbprint(cert) {
 		);
 	}
 
-	return crypto.hash('sha256', data, 'base64url');
+	return hash('sha256', data, 'base64url');
 }
