@@ -1,4 +1,13 @@
-import { describe, it, beforeAll, expect, beforeEach } from 'bun:test';
+import {
+	describe,
+	it,
+	beforeAll,
+	expect,
+	beforeEach,
+	afterEach,
+	mock,
+	spyOn
+} from 'bun:test';
 import { X509Certificate } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import * as url from 'node:url';
@@ -10,6 +19,7 @@ import { TestAdapter } from 'test/models.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { InvalidRequest } from 'lib/helpers/errors.js';
+import { OIDCContext } from 'lib/helpers/oidc_context.js';
 
 const crt = new X509Certificate(
 	readFileSync('./test/jwks/client.crt', { encoding: 'ascii' })
@@ -18,10 +28,12 @@ const expectedS256 = 'A4DtL2JmUMhAsvJj5tKyn64SqzmuXbMrJa0n761y5v0';
 
 describe('features.mTLS.certificateBoundAccessTokens', () => {
 	let setup;
-	let cookie;
 	beforeAll(async function () {
 		setup = await bootstrap(import.meta.url)();
-		cookie = await setup.login();
+		await setup.login();
+	});
+	afterEach(function () {
+		mock.restore();
 	});
 
 	it('discovery extends discovery', async function () {
@@ -79,8 +91,8 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 	describe('introspection', () => {
 		it('exposes cnf now', async function () {
 			const at = new AccessToken({
-				grantId: this.getGrantId('client'),
-				accountId: this.loggedInAccountId,
+				grantId: setup.getGrantId('client'),
+				accountId: setup.getAccountId(),
 				client: await Client.find('client'),
 				scope: 'openid'
 			});
@@ -88,17 +100,16 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 			const token = await at.save();
 
-			await this.agent
-				.post('/token/introspection')
-				.auth('client', 'secret')
-				.send({ token })
-				.type('form')
-				.expect(200)
-				.expect(({ body }) => {
-					expect(body).to.have.property('cnf');
-					expect(body).to.have.property('token_type', 'Bearer');
-					expect(body.cnf).to.have.property('x5t#S256');
-				});
+			const { status, data } = await agent.token.introspect.post(
+				{ token },
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+			expect(status).toBe(200);
+			expect(data).toHaveProperty('cnf');
+			expect(data).toHaveProperty('token_type', 'Bearer');
+			expect(data.cnf).toHaveProperty('x5t#S256');
 		});
 	});
 
@@ -316,77 +327,61 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 	describe('authorization flow', () => {
 		let cookie;
+		let auth;
+		let code;
 		beforeAll(async function () {
 			cookie = await setup.login({ scope: 'openid offline_access' });
 		});
 
 		beforeEach(async function () {
-			const auth = (this.auth = new AuthorizationRequest({
+			auth = new AuthorizationRequest({
 				scope: 'openid offline_access',
 				prompt: 'consent'
-			}));
-
-			await this.wrap({ route: '/auth', verb: 'get', auth })
-				.expect(303)
-				.expect(auth.validateClientLocation)
-				.expect(({ headers: { location } }) => {
-					const {
-						query: { code }
-					} = url.parse(location, true);
-					this.code = code;
-				});
+			});
+			spyOn(OIDCContext.prototype, 'promptPending').mockReturnValue(false);
+			const res = await agent.auth.get({
+				query: auth.params,
+				headers: {
+					cookie
+				}
+			});
+			const location = res.headers.get('location');
+			({
+				query: { code }
+			} = url.parse(location, true));
 		});
 
 		describe('authorization_code', () => {
 			it('binds the access token to the certificate', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once('grant.success', spy);
-
-				await this.agent
-					.post('/token')
-					.auth('client', 'secret')
-					.send({
-						grant_type: 'authorization_code',
-						code_verifier: this.auth.code_verifier,
-						code: this.code,
-						redirect_uri: 'https://client.example.com/cb'
-					})
-					.type('form')
-					.set('x-ssl-client-cert', crt.raw.toString('base64'))
-					.expect(200);
-
-				expect(spy).to.have.property('calledOnce', true);
+				const { status } = await auth.getToken(code, {
+					headers: { 'x-client-cert': crt.raw.toString('base64') }
+				});
+				expect(status).toBe(200);
+				expect(spy).toBeCalledTimes(1);
 				const {
 					oidc: {
 						entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 					}
-				} = spy.args[0][0];
-				expect(accessToken).to.have.property('x5t#S256', expectedS256);
-				expect(refreshToken).not.to.have.property('x5t#S256');
+				} = spy.mock.calls[0][0];
+				expect(accessToken.payload).toHaveProperty('x5t#S256', expectedS256);
+				expect(refreshToken.payload).not.toHaveProperty('x5t#S256');
 			});
 
 			it('verifies the request made with mutual-TLS', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once('grant.error', spy);
 
-				await this.agent
-					.post('/token')
-					.auth('client', 'secret')
-					.send({
-						grant_type: 'authorization_code',
-						code_verifier: this.auth.code_verifier,
-						code: this.code,
-						redirect_uri: 'https://client.example.com/cb'
-					})
-					.type('form')
-					.expect(400)
-					.expect({
-						error: 'invalid_grant',
-						error_description: 'grant request is invalid'
-					});
+				const { error } = await auth.getToken(code);
+				expect(error.status).toBe(400);
+				expect(error.value).toEqual({
+					error: 'invalid_grant',
+					error_description: 'grant request is invalid'
+				});
 
-				expect(spy).to.have.property('calledOnce', true);
-				expect(spy.args[0][1]).to.have.property(
+				expect(spy).toBeCalledTimes(1);
+				expect(spy.mock.calls[0][0]).toHaveProperty(
 					'error_detail',
 					'mutual TLS client certificate not provided'
 				);
@@ -394,68 +389,65 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 		});
 
 		describe('refresh_token', () => {
+			let refresh_token;
 			beforeEach(async function () {
-				await this.agent
-					.post('/token')
-					.auth('client', 'secret')
-					.send({
-						grant_type: 'authorization_code',
-						code_verifier: this.auth.code_verifier,
-						code: this.code,
-						redirect_uri: 'https://client.example.com/cb'
-					})
-					.type('form')
-					.set('x-ssl-client-cert', crt.raw.toString('base64'))
-					.expect(({ body }) => {
-						this.rt = body.refresh_token;
-					});
+				const { data } = await auth.getToken(code, {
+					headers: { 'x-client-cert': crt.raw.toString('base64') }
+				});
+				refresh_token = data.refresh_token;
 			});
 
 			it('binds the access token to the certificate', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once('grant.success', spy);
 
-				await this.agent
-					.post('/token')
-					.auth('client', 'secret')
-					.send({
+				const { status } = await agent.token.post(
+					{
 						grant_type: 'refresh_token',
-						refresh_token: this.rt
-					})
-					.type('form')
-					.set('x-ssl-client-cert', crt.raw.toString('base64'))
-					.expect(200);
+						refresh_token
+					},
+					{
+						headers: {
+							'x-client-cert': crt.raw.toString('base64'),
+							...auth.basicAuthHeader
+						}
+					}
+				);
+				expect(status).toBe(200);
 
-				expect(spy).to.have.property('calledOnce', true);
+				expect(spy).toBeCalledTimes(1);
 				const {
 					oidc: {
 						entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 					}
-				} = spy.args[0][0];
-				expect(accessToken).to.have.property('x5t#S256', expectedS256);
-				expect(refreshToken['x5t#S256']).to.be.undefined;
+				} = spy.mock.calls[0][0];
+				expect(accessToken.payload).toHaveProperty('x5t#S256', expectedS256);
+				expect(refreshToken.payload['x5t#S256']).toBeUndefined();
 			});
 
 			it('verifies the request made with mutual-TLS', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once('grant.error', spy);
 
-				await this.agent
-					.post('/token')
-					.auth('client', 'secret')
-					.send({
+				const { error } = await agent.token.post(
+					{
 						grant_type: 'refresh_token',
-						refresh_token: this.rt
-					})
-					.type('form')
-					.expect(400)
-					.expect({
-						error: 'invalid_grant',
-						error_description: 'grant request is invalid'
-					});
+						refresh_token
+					},
+					{
+						headers: {
+							...auth.basicAuthHeader
+						}
+					}
+				);
+				expect(error.status).toBe(400);
+				expect(error.value).toEqual({
+					error: 'invalid_grant',
+					error_description: 'grant request is invalid'
+				});
 
-				expect(spy).to.have.property('calledOnce', true);
-				expect(spy.args[0][1]).to.have.property(
+				expect(spy).toBeCalledTimes(1);
+				expect(spy.mock.calls[0][0]).toHaveProperty(
 					'error_detail',
 					'mutual TLS client certificate not provided'
 				);
@@ -465,78 +457,64 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 	describe('authorization flow (public client)', () => {
 		let cookie;
+		let auth;
+		let code;
 		beforeAll(async function () {
 			cookie = await setup.login({ scope: 'openid offline_access' });
 		});
 
 		beforeEach(async function () {
-			const auth = (this.auth = new AuthorizationRequest({
+			auth = new AuthorizationRequest({
 				client_id: 'client-none',
 				scope: 'openid offline_access',
 				prompt: 'consent'
-			}));
+			});
+			spyOn(OIDCContext.prototype, 'promptPending').mockReturnValue(false);
 
-			await this.wrap({ route: '/auth', verb: 'get', auth })
-				.expect(303)
-				.expect(auth.validateClientLocation)
-				.expect(({ headers: { location } }) => {
-					const {
-						query: { code }
-					} = url.parse(location, true);
-					this.code = code;
-				});
+			const res = await agent.auth.get({
+				query: auth.params,
+				headers: {
+					cookie
+				}
+			});
+			const location = res.headers.get('location');
+			({
+				query: { code }
+			} = url.parse(location, true));
 		});
 
 		describe('authorization_code', () => {
 			it('binds the access token to the certificate', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once('grant.success', spy);
 
-				await this.agent
-					.post('/token')
-					.send({
-						client_id: 'client-none',
-						grant_type: 'authorization_code',
-						code_verifier: this.auth.code_verifier,
-						code: this.code,
-						redirect_uri: 'https://client.example.com/cb'
-					})
-					.type('form')
-					.set('x-ssl-client-cert', crt.raw.toString('base64'))
-					.expect(200);
-
-				expect(spy).to.have.property('calledOnce', true);
+				const { status } = await auth.getToken(code, {
+					headers: { 'x-client-cert': crt.raw.toString('base64') }
+				});
+				expect(status).toBe(200);
+				expect(spy).toBeCalledTimes(1);
 				const {
 					oidc: {
 						entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 					}
-				} = spy.args[0][0];
-				expect(accessToken).to.have.property('x5t#S256', expectedS256);
-				expect(refreshToken).to.have.property('x5t#S256', expectedS256);
+				} = spy.mock.calls[0][0];
+				expect(accessToken.payload).toHaveProperty('x5t#S256', expectedS256);
+				expect(refreshToken.payload).toHaveProperty('x5t#S256', expectedS256);
 			});
 
 			it('verifies the request made with mutual-TLS', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once('grant.error', spy);
 
-				await this.agent
-					.post('/token')
-					.send({
-						client_id: 'client-none',
-						grant_type: 'authorization_code',
-						code_verifier: this.auth.code_verifier,
-						code: this.code,
-						redirect_uri: 'https://client.example.com/cb'
-					})
-					.type('form')
-					.expect(400)
-					.expect({
-						error: 'invalid_grant',
-						error_description: 'grant request is invalid'
-					});
+				const { error } = await auth.getToken(code);
+				expect(error.status).toBe(400);
+				expect(error.value).toEqual({
+					error: 'invalid_grant',
+					error_description: 'grant request is invalid'
+				});
 
-				expect(spy).to.have.property('calledOnce', true);
-				expect(spy.args[0][1]).to.have.property(
+				expect(spy).toBeCalledTimes(1);
+				expect(spy.mock.calls[0][0]).toHaveProperty(
 					'error_detail',
 					'mutual TLS client certificate not provided'
 				);
@@ -544,99 +522,90 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 		});
 
 		describe('refresh_token', () => {
+			let refresh_token;
 			beforeEach(async function () {
-				await this.agent
-					.post('/token')
-					.send({
-						client_id: 'client-none',
-						grant_type: 'authorization_code',
-						code_verifier: this.auth.code_verifier,
-						code: this.code,
-						redirect_uri: 'https://client.example.com/cb'
-					})
-					.type('form')
-					.set('x-ssl-client-cert', crt.raw.toString('base64'))
-					.expect(({ body }) => {
-						this.rt = body.refresh_token;
-					});
+				const { data } = await auth.getToken(code, {
+					headers: { 'x-client-cert': crt.raw.toString('base64') }
+				});
+				refresh_token = data.refresh_token;
 			});
 
 			it('binds the access token to the certificate', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once('grant.success', spy);
 
-				await this.agent
-					.post('/token')
-					.send({
+				const { status } = await agent.token.post(
+					{
 						client_id: 'client-none',
 						grant_type: 'refresh_token',
-						refresh_token: this.rt
-					})
-					.type('form')
-					.set('x-ssl-client-cert', crt.raw.toString('base64'))
-					.expect(200);
+						refresh_token
+					},
+					{
+						headers: {
+							'x-client-cert': crt.raw.toString('base64')
+						}
+					}
+				);
+				expect(status).toBe(200);
 
-				expect(spy).to.have.property('calledOnce', true);
+				expect(spy).toBeCalledTimes(1);
 				const {
 					oidc: {
 						entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 					}
-				} = spy.args[0][0];
-				expect(accessToken).to.have.property('x5t#S256', expectedS256);
-				expect(refreshToken).to.have.property('x5t#S256', expectedS256);
+				} = spy.mock.calls[0][0];
+				expect(accessToken.payload).toHaveProperty('x5t#S256', expectedS256);
+				expect(refreshToken.payload).toHaveProperty('x5t#S256', expectedS256);
 			});
 
 			it('verifies the request made with mutual-TLS', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once('grant.error', spy);
 
-				await this.agent
-					.post('/token')
-					.send({
-						client_id: 'client-none',
-						grant_type: 'refresh_token',
-						refresh_token: this.rt
-					})
-					.type('form')
-					.expect(400)
-					.expect({
-						error: 'invalid_grant',
-						error_description: 'grant request is invalid'
-					});
+				const { error } = await agent.token.post({
+					client_id: 'client-none',
+					grant_type: 'refresh_token',
+					refresh_token
+				});
+				expect(error.status).toBe(400);
+				expect(error.value).toEqual({
+					error: 'invalid_grant',
+					error_description: 'grant request is invalid'
+				});
 
-				expect(spy).to.have.property('calledOnce', true);
-				expect(spy.args[0][1]).to.have.property(
+				expect(spy).toBeCalledTimes(1);
+				expect(spy.mock.calls[0][0]).toHaveProperty(
 					'error_detail',
 					'mutual TLS client certificate not provided'
 				);
 			});
 
 			it('verifies the request made with mutual-TLS using the same cert', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once('grant.error', spy);
 
-				await this.agent
-					.post('/token')
-					.send({
+				const { error } = await agent.token.post(
+					{
 						client_id: 'client-none',
 						grant_type: 'refresh_token',
-						refresh_token: this.rt
-					})
-					.set(
-						'x-ssl-client-cert',
-						new X509Certificate(
-							readFileSync('./test/jwks/rsa.crt', { encoding: 'ascii' })
-						).raw.toString('base64')
-					)
-					.type('form')
-					.expect(400)
-					.expect({
-						error: 'invalid_grant',
-						error_description: 'grant request is invalid'
-					});
+						refresh_token
+					},
+					{
+						headers: {
+							'x-client-cert': new X509Certificate(
+								readFileSync('./test/jwks/rsa.crt', { encoding: 'ascii' })
+							).raw.toString('base64')
+						}
+					}
+				);
+				expect(error.status).toBe(400);
+				expect(error.value).toEqual({
+					error: 'invalid_grant',
+					error_description: 'grant request is invalid'
+				});
 
-				expect(spy).to.have.property('calledOnce', true);
-				expect(spy.args[0][1]).to.have.property(
+				expect(spy).toBeCalledTimes(1);
+				expect(spy.mock.calls[0][0]).toHaveProperty(
 					'error_detail',
 					'failed x5t#S256 verification'
 				);
@@ -646,43 +615,56 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 	describe('client_credentials', () => {
 		it('binds the access token to the certificate', async function () {
-			const spy = sinon.spy();
+			const spy = mock();
 			provider.once('grant.success', spy);
 
-			await this.agent
-				.post('/token')
-				.auth('client', 'secret')
-				.send({ grant_type: 'client_credentials' })
-				.set('x-ssl-client-cert', crt.raw.toString('base64'))
-				.type('form')
-				.expect(200);
+			const { status } = await agent.token.post(
+				{
+					grant_type: 'client_credentials'
+				},
+				{
+					headers: {
+						...AuthorizationRequest.basicAuthHeader('client', 'secret'),
+						'x-client-cert': crt.raw.toString('base64')
+					}
+				}
+			);
+			expect(status).toBe(200);
 
-			expect(spy).to.have.property('calledOnce', true);
+			expect(spy).toBeCalledTimes(1);
 			const {
 				oidc: {
 					entities: { ClientCredentials }
 				}
-			} = spy.args[0][0];
-			expect(ClientCredentials).to.have.property('x5t#S256', expectedS256);
+			} = spy.mock.calls[0][0];
+			expect(ClientCredentials.payload).toHaveProperty(
+				'x5t#S256',
+				expectedS256
+			);
 		});
 
 		it('verifies the request was made with mutual-TLS', async function () {
-			const spy = sinon.spy();
+			const spy = mock();
 			provider.once('grant.error', spy);
 
-			await this.agent
-				.post('/token')
-				.auth('client', 'secret')
-				.send({ grant_type: 'client_credentials' })
-				.type('form')
-				.expect(400)
-				.expect({
-					error: 'invalid_grant',
-					error_description: 'grant request is invalid'
-				});
+			const { error } = await agent.token.post(
+				{
+					grant_type: 'client_credentials'
+				},
+				{
+					headers: {
+						...AuthorizationRequest.basicAuthHeader('client', 'secret')
+					}
+				}
+			);
+			expect(error.status).toBe(400);
+			expect(error.value).toEqual({
+				error: 'invalid_grant',
+				error_description: 'grant request is invalid'
+			});
 
-			expect(spy).to.have.property('calledOnce', true);
-			expect(spy.args[0][1]).to.have.property(
+			expect(spy).toBeCalledTimes(1);
+			expect(spy.mock.calls[0][0]).toHaveProperty(
 				'error_detail',
 				'mutual TLS client certificate not provided'
 			);

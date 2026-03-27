@@ -218,7 +218,7 @@ export class AuthorizationRequest {
 		this.validateResponseParameter(response, 'error_description', expected);
 	}
 
-	async getToken(code: string) {
+	async getToken(code: string, { headers = {} } = {}) {
 		const isBasicAuth = this.client.token_endpoint_auth_method !== 'none';
 		return await agent.token.post(
 			{
@@ -229,7 +229,7 @@ export class AuthorizationRequest {
 				redirect_uri: this.params.redirect_uri
 			},
 			{
-				headers: this.basicAuthHeader
+				headers: { ...this.basicAuthHeader, ...headers }
 			}
 		);
 	}
