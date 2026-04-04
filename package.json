@@ -9,9 +9,9 @@
 	},
 	"dependencies": {
 		"@ant-design/cssinjs": "^2.1.2",
-		"@ant-design/icons": "^6.1.0",
+		"@ant-design/icons": "^6.1.1",
 		"@elysiajs/static": "^1.4.7",
-		"antd": "^6.3.4",
+		"antd": "^6.3.5",
 		"debug": "^4.4.3",
 		"elysia": "^1.4.28",
 		"jose": "^6.2.2",
@@ -25,7 +25,7 @@
 		"react-dom": "^19.2.4"
 	},
 	"devDependencies": {
-		"@elysiajs/eden": "^1.4.8",
+		"@elysiajs/eden": "^1.4.9",
 		"@eslint/js": "^10.0.1",
 		"@types/bun": "^1.3.11",
 		"@types/react": "^19.2.14",
@@ -35,13 +35,13 @@
 		"desm": "^1.3.1",
 		"eslint": "^10.1.0",
 		"jiti": "^2.6.1",
-		"lodash": "^4.17.23",
+		"lodash": "^4.18.1",
 		"moment": "^2.30.1",
 		"openid-client": "^6.8.2",
 		"prettier": "^3.8.1",
 		"sinon": "^21.0.3",
 		"timekeeper": "^2.3.1",
-		"typescript": "^5.9.3",
-		"typescript-eslint": "^8.57.2"
+		"typescript": "^6.0.2",
+		"typescript-eslint": "^8.58.0"
 	}
 }

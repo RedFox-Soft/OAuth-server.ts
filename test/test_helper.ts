@@ -1,16 +1,14 @@
 import { pathToFileURL } from 'node:url';
 import * as path from 'node:path';
 
-import sinon from 'sinon';
 import { dirname } from 'desm';
-import flatten from 'lodash/flatten.js';
 import { expect } from 'chai';
 
 import base64url from 'base64url';
 import { treaty } from '@elysiajs/eden';
 
 import nanoid from '../lib/helpers/nanoid.js';
-import epochTime from '../lib/helpers/epoch_time.ts';
+import epochTime from '../lib/helpers/epoch_time.js';
 import { provider, elysia } from '../lib/index.ts';
 import instance from '../lib/helpers/weak_cache.ts';
 
@@ -23,6 +21,7 @@ import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { Session } from 'lib/models/session.js';
 import { ttl } from 'lib/configs/liveTime.js';
 import { Grant } from 'lib/models/grant.js';
+import { ISSUER } from 'lib/configs/env.js';
 export { Grant } from 'lib/models/grant.js';
 
 const applicationDefaultSettings = { ...ApplicationConfig };
@@ -140,8 +139,7 @@ export default function testHelper(importMetaUrl, { config: base } = {}) {
 			const cookies = [sessionCookie];
 
 			session.payload.authorizations = {};
-			const ctx = new OIDCContext({ req: { socket: {} }, res: {} });
-			ctx.params = { scope, claims };
+			const ctx = new OIDCContext({ scope, claims });
 
 			if (ctx.params.claims && typeof ctx.params.claims !== 'string') {
 				ctx.params.claims = JSON.stringify(ctx.params.claims);
@@ -236,13 +234,10 @@ export default function testHelper(importMetaUrl, { config: base } = {}) {
 
 		function failWith(code, error, error_description, scope) {
 			return ({ status, body, headers: { 'www-authenticate': wwwAuth } }) => {
-				const {
-					provider: { issuer }
-				} = this;
 				expect(status).to.eql(code);
 				expect(body).to.have.property('error', error);
 				expect(body).to.have.property('error_description', error_description);
-				expect(wwwAuth).to.match(new RegExp(`^Bearer realm="${issuer}"`));
+				expect(wwwAuth).to.match(new RegExp(`^Bearer realm="${ISSUER}"`));
 				let check = expect(wwwAuth);
 				if (error_description === 'no access token provided') {
 					check = check.not.to;
@@ -273,28 +268,4 @@ export default function testHelper(importMetaUrl, { config: base } = {}) {
 			login
 		};
 	};
-}
-
-export function passInteractionChecks(...reasons) {
-	const cb = reasons.pop();
-
-	const sandbox = sinon.createSandbox();
-
-	context('', () => {
-		before(function () {
-			const { policy } = i(provider).configuration.interactions;
-
-			const iChecks = flatten(policy.map((i) => i.checks));
-
-			iChecks
-				.filter((check) => reasons.includes(check.reason))
-				.forEach((check) => {
-					sandbox.stub(check, 'check').returns(false);
-				});
-		});
-
-		after(sandbox.restore);
-
-		cb();
-	});
 }

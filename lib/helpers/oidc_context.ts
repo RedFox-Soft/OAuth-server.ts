@@ -1,3 +1,5 @@
+import { X509Certificate } from 'node:crypto';
+
 import { InvalidHeaderAuthorization } from './errors.ts';
 import instance from './weak_cache.ts';
 import { routeNames } from '../consts/param_list.ts';
@@ -6,14 +8,21 @@ import { isPlainObject } from './_/object.js';
 import { ApplicationConfig as config } from 'lib/configs/application.js';
 import { ISSUER } from 'lib/configs/env.js';
 
-export class OIDCContext {
+export class OIDCContext<T extends Record<string, unknown>> {
 	#requestParamClaims = null;
 
-	#accessToken = null;
+	#accessToken: string | null = null;
+	params: T;
+	#headers: Record<string, string | undefined>;
 
-	constructor(ctx) {
-		this.ctx = ctx;
-		this.route = ctx._matchedRouteName;
+	constructor(
+		params: T,
+		headers: Record<string, string | undefined> = {},
+		route = 'anonymous'
+	) {
+		this.params = params;
+		this.route = route;
+		this.#headers = headers;
 		this.authorization = {};
 		this.redirectUriCheckPerformed = false;
 		this.webMessageUriCheckPerformed = false;
@@ -174,13 +183,25 @@ export class OIDCContext {
 		return this.entities.Grant;
 	}
 
+	getClientCertificate() {
+		const cert = this.#headers['x-client-cert'];
+		if (!cert) {
+			return;
+		}
+		try {
+			return new X509Certificate(Buffer.from(cert, 'base64'));
+		} catch {
+			return;
+		}
+	}
+
 	getAccessToken({ acceptDPoP = false } = {}) {
 		if (this.#accessToken) {
 			return this.#accessToken;
 		}
 
-		const dpop = acceptDPoP && config['dpop.enabled'] && this.ctx.headers.dpop;
-		const header = this.ctx.headers.authorization;
+		const dpop = acceptDPoP && config['dpop.enabled'] && this.#headers.dpop;
+		const header = this.#headers.authorization ?? '';
 		const parts = header.split(' ');
 
 		if (parts.length !== 2) {

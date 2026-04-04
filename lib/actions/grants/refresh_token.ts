@@ -34,12 +34,7 @@ export const handler = async function refreshTokenHandler(ctx, dPoP) {
 		findAccount,
 		conformIdTokenClaims,
 		rotateRefreshToken,
-		features: {
-			userinfo,
-			mTLS: { getCertificate },
-			resourceIndicators,
-			richAuthorizationRequests
-		}
+		features: { userinfo, resourceIndicators, richAuthorizationRequests }
 	} = instance(ctx.oidc.provider).configuration;
 
 	const { client } = ctx.oidc;
@@ -66,7 +61,7 @@ export const handler = async function refreshTokenHandler(ctx, dPoP) {
 		client.tlsClientCertificateBoundAccessTokens ||
 		refreshToken.payload['x5t#S256']
 	) {
-		cert = getCertificate(ctx);
+		cert = ctx.oidc.getClientCertificate();
 		if (!cert) {
 			throw new InvalidGrant('mutual TLS client certificate not provided');
 		}

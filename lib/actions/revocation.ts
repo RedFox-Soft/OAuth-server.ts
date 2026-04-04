@@ -1,13 +1,12 @@
 import { Elysia, t } from 'elysia';
 import { InvalidRequest } from '../helpers/errors.js';
-import { tokenAuth } from '../shared/token_auth.ts';
-import revoke from '../helpers/revoke.ts';
+import revoke from '../helpers/revoke.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { ClientCredentials } from 'lib/models/client_credentials.js';
 import { hasGrant } from './grants/index.js';
 import { routeNames } from 'lib/consts/param_list.js';
-import { OIDCContext } from 'lib/helpers/oidc_context.js';
+import { authHeaders, AuthPlugin } from 'lib/plugins/auth.js';
 
 const revokeable = new Set([
 	'AccessToken',
@@ -15,7 +14,7 @@ const revokeable = new Set([
 	'RefreshToken'
 ]);
 
-const uriMapTypes = {
+const uriMapTypes: Record<string, string> = {
 	'urn:ietf:params:oauth:token-type:access_token': 'access_token',
 	'urn:ietf:params:oauth:token-type:refresh_token': 'refresh_token'
 };
@@ -34,31 +33,29 @@ const tokenTypes = {
 		return RefreshToken.find(token);
 	}
 };
+type TokenType = keyof typeof tokenTypes;
 
-export const revocation = new Elysia().post(
+function isTokenType(type?: string): type is TokenType {
+	if (type === undefined) {
+		return false;
+	}
+	const tType = type in uriMapTypes ? uriMapTypes[type] : type;
+	return tType in tokenTypes;
+}
+
+export const revocation = new Elysia().use(AuthPlugin).post(
 	routeNames.revocation,
-	async function ({ headers, body, route }) {
-		const ctx = {
-			headers,
-			_matchedRouteName: route
-		};
-		ctx.oidc = new OIDCContext(ctx);
-		ctx.oidc.params = body;
-		ctx.oidc.body = body;
+	async function ({ body: params, oidc }) {
+		const ctx = { oidc };
 
-		await tokenAuth(body, headers, ctx);
+		let token: AccessToken | RefreshToken | ClientCredentials | undefined;
 
-		const { params } = ctx.oidc;
-		let token;
-		const tokenType =
-			uriMapTypes[params.token_type_hint] || params.token_type_hint;
-
-		const methodToken = tokenTypes[tokenType];
-		if (methodToken) {
+		if (isTokenType(params.token_type_hint)) {
+			const methodToken = tokenTypes[params.token_type_hint];
 			token = await methodToken(params.token);
 			if (!token) {
-				const otherMethods = Object.keys(tokenTypes)
-					.filter((type) => type !== tokenType)
+				const otherMethods = (Object.keys(tokenTypes) as TokenType[])
+					.filter((type) => type !== params.token_type_hint)
 					.map((type) => tokenTypes[type](params.token));
 				token = (await Promise.all(otherMethods)).find((t) => t);
 			}
@@ -97,8 +94,6 @@ export const revocation = new Elysia().post(
 			token: t.String(),
 			token_type_hint: t.Optional(t.String())
 		}),
-		headers: t.Object({
-			authorization: t.Optional(t.String())
-		})
+		headers: authHeaders
 	}
 );

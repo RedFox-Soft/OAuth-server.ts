@@ -64,8 +64,7 @@ const authorizationRequest = t.Composite([
 
 export async function isAllowRedirectUri(params) {
 	const ctx = {};
-	ctx.oidc = new OIDCContext(ctx);
-	ctx.oidc.params = params;
+	ctx.oidc = new OIDCContext(params);
 
 	const client = await Client.find(params.client_id);
 	if (!client) {
@@ -162,8 +161,7 @@ export const authGet = new Elysia()
 			cookie,
 			_matchedRouteName: route
 		};
-		ctx.oidc = new OIDCContext(ctx);
-		ctx.oidc.params = query;
+		ctx.oidc = new OIDCContext(query, {}, route);
 
 		return await authorizationActionHandler(ctx);
 	});
@@ -199,9 +197,8 @@ export const authPost = new Elysia()
 			cookie,
 			_matchedRouteName: route
 		};
-		ctx.oidc = new OIDCContext(ctx);
+		ctx.oidc = new OIDCContext(body, {}, route);
 		ctx.oidc.body = body;
-		ctx.oidc.params = body;
 
 		return await authorizationActionHandler(ctx);
 	});
@@ -229,11 +226,10 @@ export const par = new Elysia()
 				_matchedRouteName: route,
 				headers
 			};
-			ctx.oidc = new OIDCContext(ctx);
+			ctx.oidc = new OIDCContext(body, headers, route);
 			ctx.oidc.body = { ...body };
-			ctx.oidc.params = body;
 
-			await tokenAuth(body, headers, ctx);
+			await tokenAuth(body, headers, ctx.oidc);
 
 			stripOutsideJarParams(ctx);
 

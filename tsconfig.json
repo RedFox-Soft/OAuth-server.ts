@@ -7,12 +7,15 @@
 		"moduleResolution": "nodenext",
 		"sourceMap": true,
 		"outDir": "dist",
-		"baseUrl": ".",
 		"strict": true,
 		"jsxImportSource": "react",
 		"jsx": "react-jsx",
 		"noEmit": true,
-		"typeRoots": ["types/", "node_modules/@types"]
+		"typeRoots": ["types/", "node_modules/@types"],
+		"paths": {
+			"test/*": ["./test/*"],
+			"lib/*": ["./lib/*"]
+		}
 	},
 	"include": ["lib/**/*.ts", "test/**/*.ts"],
 	"exclude": ["node_modules"]

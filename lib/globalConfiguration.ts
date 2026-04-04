@@ -39,14 +39,6 @@ function clientBasedCORS(ctx, origin, client) {
 	return false;
 }
 
-function getCertificate(ctx) {
-	mustChange(
-		'features.mTLS.getCertificate',
-		'retrieve the PEM-formatted client certificate from the request context'
-	);
-	throw new Error('features.mTLS.getCertificate function not configured');
-}
-
 function certificateAuthorized(ctx) {
 	mustChange(
 		'features.mTLS.certificateAuthorized',
@@ -820,14 +812,6 @@ export const globalConfiguration = {
 			 *   configuration.
 			 */
 			tlsClientAuth: false,
-
-			/*
-			 * features.mTLS.getCertificate
-			 *
-			 * description: Function used to retrieve a `crypto.X509Certificate` instance,
-			 *   or a PEM-formatted string, representation of client certificate used in the request.
-			 */
-			getCertificate,
 
 			/*
 			 * features.mTLS.certificateAuthorized

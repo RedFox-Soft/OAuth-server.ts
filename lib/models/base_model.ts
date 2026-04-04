@@ -10,7 +10,7 @@ const IN_PAYLOAD = ['iat', 'exp', 'jti', 'kind'];
 
 export const BaseModelPayload = t.Object({
 	jti: t.Optional(t.String()),
-	kind: t.Optional(t.String()),
+	kind: t.String(),
 	exp: t.Optional(t.Number()),
 	iat: t.Optional(t.Number())
 });

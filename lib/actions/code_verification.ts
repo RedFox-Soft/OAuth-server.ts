@@ -47,7 +47,7 @@ export const codeVerification = new Elysia()
 		routeNames.code_verification,
 		async ({ cookie, query }) => {
 			const ctx = { cookie };
-			ctx.oidc = new OIDCContext(ctx);
+			ctx.oidc = new OIDCContext(query);
 
 			const setCookies = await sessionHandler();
 		},

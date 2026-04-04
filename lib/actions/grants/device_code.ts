@@ -29,11 +29,7 @@ export const handler = async function deviceCodeHandler(ctx, dPoP) {
 		findAccount,
 		issueRefreshToken,
 		conformIdTokenClaims,
-		features: {
-			userinfo,
-			mTLS: { getCertificate },
-			resourceIndicators
-		}
+		features: { userinfo, resourceIndicators }
 	} = instance(ctx.oidc.provider).configuration;
 
 	const code = await DeviceCode.find(ctx.oidc.params.device_code, {
@@ -50,7 +46,7 @@ export const handler = async function deviceCodeHandler(ctx, dPoP) {
 
 	let cert;
 	if (ctx.oidc.client.tlsClientCertificateBoundAccessTokens) {
-		cert = getCertificate(ctx);
+		cert = ctx.oidc.getClientCertificate();
 		if (!cert) {
 			throw new InvalidGrant('mutual TLS client certificate not provided');
 		}

@@ -20,12 +20,7 @@ export const handler = async function authorizationCodeHandler(ctx, dPoP) {
 		issueRefreshToken,
 		allowOmittingSingleRegisteredRedirectUri,
 		conformIdTokenClaims,
-		features: {
-			userinfo,
-			mTLS: { getCertificate },
-			resourceIndicators,
-			richAuthorizationRequests
-		}
+		features: { userinfo, resourceIndicators, richAuthorizationRequests }
 	} = instance(ctx.oidc.provider).configuration;
 
 	if (
@@ -80,7 +75,7 @@ export const handler = async function authorizationCodeHandler(ctx, dPoP) {
 
 	let cert;
 	if (ctx.oidc.client.tlsClientCertificateBoundAccessTokens) {
-		cert = getCertificate(ctx);
+		cert = ctx.oidc.getClientCertificate();
 		if (!cert) {
 			throw new InvalidGrant('mutual TLS client certificate not provided');
 		}

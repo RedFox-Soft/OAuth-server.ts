@@ -38,12 +38,17 @@ describe('UserInfo', () => {
 		auth.validatePresence(response, ['code', 'state']);
 		auth.validateState(response);
 		auth.validateClientLocation(response);
+		const location = response.headers.get('location');
+		if (!location) {
+			throw new Error('location header is missing');
+		}
 
-		const {
-			query: { code }
-		} = url.parse(response.headers.get('location'), true);
-
+		const { code } = url.parse(location, true).query;
 		const { data } = await auth.getToken(code);
+
+		if (!data?.access_token) {
+			throw new Error('access_token is missing');
+		}
 		access_token = data.access_token;
 	});
 

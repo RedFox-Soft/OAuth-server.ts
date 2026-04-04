@@ -35,11 +35,9 @@ export const logoutAction = new Elysia()
 	})
 	.get(routeNames.end_session, async ({ query, cookie, route }) => {
 		const ctx = {
-			cookie,
-			_matchedRouteName: route
+			cookie
 		};
-		ctx.oidc = new OIDCContext(ctx);
-		ctx.oidc.params = query;
+		ctx.oidc = new OIDCContext(query, {}, route);
 		const setCookies = await sessionHandler(ctx);
 		const params = query;
 		let client;
@@ -131,7 +129,7 @@ export const logoutConfirmAction = new Elysia()
 			cookie,
 			_matchedRouteName: route
 		};
-		ctx.oidc = new OIDCContext(ctx);
+		ctx.oidc = new OIDCContext(body, {}, route);
 		const setCookies = await sessionHandler(ctx);
 
 		if (!ctx.oidc.session.payload.state) {

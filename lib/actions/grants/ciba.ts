@@ -28,11 +28,7 @@ export const handler = async function cibaHandler(ctx, dPoP) {
 		findAccount,
 		issueRefreshToken,
 		conformIdTokenClaims,
-		features: {
-			userinfo,
-			mTLS: { getCertificate },
-			resourceIndicators
-		}
+		features: { userinfo, resourceIndicators }
 	} = instance(ctx.oidc.provider).configuration;
 
 	const request = await ctx.oidc.provider.BackchannelAuthenticationRequest.find(
@@ -50,7 +46,7 @@ export const handler = async function cibaHandler(ctx, dPoP) {
 
 	let cert;
 	if (ctx.oidc.client.tlsClientCertificateBoundAccessTokens) {
-		cert = getCertificate(ctx);
+		cert = ctx.oidc.getClientCertificate();
 		if (!cert) {
 			throw new InvalidGrant('mutual TLS client certificate not provided');
 		}

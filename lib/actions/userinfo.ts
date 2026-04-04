@@ -23,7 +23,7 @@ async function userInfo({ headers, set }) {
 	const ctx = {
 		headers
 	};
-	ctx.oidc = new OIDCContext(ctx);
+	ctx.oidc = new OIDCContext({}, headers);
 
 	const accessTokenId = ctx.oidc.getAccessToken({
 		acceptDPoP: true
@@ -54,8 +54,7 @@ async function userInfo({ headers, set }) {
 	}
 
 	if (accessToken.payload['x5t#S256']) {
-		const { getCertificate } = instance(provider).features.mTLS;
-		const cert = getCertificate(ctx);
+		const cert = ctx.oidc.getClientCertificate();
 		if (
 			!cert ||
 			accessToken.payload['x5t#S256'] !== certificateThumbprint(cert)

@@ -1,5 +1,3 @@
-import { X509Certificate } from 'node:crypto';
-
 import merge from 'lodash/merge.js';
 
 import getConfig from '../default.config.js';
@@ -10,16 +8,7 @@ const config = getConfig();
 merge(config.features, {
 	mTLS: {
 		enabled: true,
-		certificateBoundAccessTokens: true,
-		getCertificate(ctx) {
-			try {
-				return new X509Certificate(
-					Buffer.from(ctx.headers['x-client-cert'], 'base64')
-				);
-			} catch (e) {
-				return undefined;
-			}
-		}
+		certificateBoundAccessTokens: true
 	},
 	introspection: { enabled: true },
 	deviceFlow: { enabled: true },

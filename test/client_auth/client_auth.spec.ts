@@ -1,6 +1,5 @@
 import { createPrivateKey, X509Certificate } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { request } from 'node:http';
 
 import { importJWK } from 'jose';
 import {

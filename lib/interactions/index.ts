@@ -30,7 +30,7 @@ import { Grant } from 'lib/models/grant.js';
 
 async function resume(interaction, cookie) {
 	const ctx = { cookie, _matchedRouteName: 'ui.resume' };
-	ctx.oidc = new OIDCContext(ctx);
+	ctx.oidc = new OIDCContext({}, {}, 'ui.resume');
 
 	const setCookies = await sessionHandler(ctx);
 	const confirmPage = await getResume(ctx, interaction);
@@ -187,7 +187,7 @@ export const ui = new Elysia()
 	)
 	.get('ui/:uid/device_resume', async ({ interaction, cookie }) => {
 		const ctx = { cookie, _matchedRouteName: 'ui.device_resume' };
-		ctx.oidc = new OIDCContext(ctx);
+		ctx.oidc = new OIDCContext({}, {}, 'ui.device_resume');
 
 		const setCookies = await sessionHandler(ctx);
 

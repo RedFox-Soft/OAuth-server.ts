@@ -9,6 +9,7 @@ import { Client } from 'lib/models/client.js';
 import { clientAuthSigningAlgValues } from 'lib/configs/jwaAlgorithms.js';
 import { type Static, t } from 'elysia';
 import { provider } from 'lib/provider.js';
+import { type OIDCContext } from 'lib/helpers/oidc_context.js';
 
 const assertionType = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
 
@@ -19,7 +20,8 @@ export const authParams = t.Object({
 	client_secret: t.Optional(t.String())
 });
 
-type authParamsType = Record<string, unknown> & Static<typeof authParams>;
+export type authParamsType = Record<string, unknown> &
+	Static<typeof authParams>;
 
 // see https://tools.ietf.org/html/rfc6749#appendix-B
 function decodeAuthToken(token: string): string {
@@ -146,7 +148,7 @@ function findClientId(
 export async function tokenAuth(
 	params: authParamsType,
 	headers: Record<string, string | undefined>,
-	ctx
+	oidc: OIDCContext<authParamsType>
 ) {
 	const { features } = instance(provider);
 
@@ -157,7 +159,7 @@ export async function tokenAuth(
 		throw new InvalidClientAuth('client not found');
 	}
 
-	ctx.oidc.entity('Client', client);
+	oidc.entity('Client', client);
 
 	const { clientAuthMethod, clientAuthSigningAlg } = client;
 	if (!auth.methods.includes(clientAuthMethod)) {
@@ -189,7 +191,7 @@ export async function tokenAuth(
 				'could not authenticate the client - its client secret used for the client_assertion is expired'
 			);
 			await tokenJwtAuth(
-				ctx,
+				oidc,
 				client.symmetricKeyStore,
 				clientAuthSigningAlg
 					? [clientAuthSigningAlg]
@@ -200,7 +202,7 @@ export async function tokenAuth(
 
 		case 'private_key_jwt':
 			await tokenJwtAuth(
-				ctx,
+				oidc,
 				client.asymmetricKeyStore,
 				clientAuthSigningAlg
 					? [clientAuthSigningAlg]
@@ -210,19 +212,15 @@ export async function tokenAuth(
 			break;
 
 		case 'tls_client_auth': {
-			const {
-				getCertificate,
-				certificateAuthorized,
-				certificateSubjectMatches
-			} = features.mTLS;
+			const { certificateAuthorized, certificateSubjectMatches } =
+				features.mTLS;
 
-			const cert = getCertificate(ctx);
-
+			const cert = oidc.getClientCertificate();
 			if (!cert) {
 				throw new InvalidClientAuth('client certificate was not provided');
 			}
 
-			if (!certificateAuthorized(ctx)) {
+			if (!certificateAuthorized(oidc)) {
 				throw new InvalidClientAuth('client certificate was not verified');
 			}
 
@@ -235,7 +233,7 @@ export async function tokenAuth(
 			})) {
 				const value = client[prop];
 				if (value) {
-					if (!certificateSubjectMatches(ctx, key, value)) {
+					if (!certificateSubjectMatches(oidc, key, value)) {
 						throw new InvalidClientAuth(
 							'certificate subject value does not match the registered one'
 						);
@@ -247,9 +245,7 @@ export async function tokenAuth(
 			break;
 		}
 		case 'self_signed_tls_client_auth': {
-			const { getCertificate } = features.mTLS;
-			const cert = getCertificate(ctx);
-
+			const cert = oidc.getClientCertificate();
 			if (!cert) {
 				throw new InvalidClientAuth('client certificate was not provided');
 			}

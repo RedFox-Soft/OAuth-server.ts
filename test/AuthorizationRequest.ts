@@ -186,9 +186,6 @@ export class AuthorizationRequest {
 		} else {
 			expect(Object.keys(query)).toEqual(expect.arrayContaining(properties));
 		}
-		properties.forEach((key) => {
-			this.res[key] = query[key];
-		});
 	}
 
 	validateResponseParameter(
@@ -218,7 +215,10 @@ export class AuthorizationRequest {
 		this.validateResponseParameter(response, 'error_description', expected);
 	}
 
-	async getToken(code: string, { headers = {} } = {}) {
+	async getToken(code?: string | string[], { headers = {} } = {}) {
+		if (!code || Array.isArray(code)) {
+			throw new Error('authorization code is required to get token');
+		}
 		const isBasicAuth = this.client.token_endpoint_auth_method !== 'none';
 		return await agent.token.post(
 			{

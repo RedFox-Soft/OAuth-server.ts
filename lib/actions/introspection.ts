@@ -144,11 +144,10 @@ export const introspect = new Elysia().post(
 			headers,
 			_matchedRouteName: route
 		};
-		ctx.oidc = new OIDCContext(ctx);
-		ctx.oidc.params = body;
+		ctx.oidc = new OIDCContext(body, headers, route);
 		ctx.oidc.body = body;
 
-		await tokenAuth(body, headers, ctx);
+		await tokenAuth(body, headers, ctx.oidc);
 
 		const { configuration } = instance(provider);
 		const {

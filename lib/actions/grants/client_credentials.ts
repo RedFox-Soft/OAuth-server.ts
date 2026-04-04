@@ -10,12 +10,7 @@ import { ClientCredentials } from 'lib/models/client_credentials.js';
 
 export async function clientCredentials(ctx, dPoP) {
 	const { client } = ctx.oidc;
-	const {
-		features: {
-			mTLS: { getCertificate }
-		},
-		scopes: statics
-	} = instance(ctx.oidc.provider).configuration;
+	const { scopes: statics } = instance(ctx.oidc.provider).configuration;
 
 	if (ctx.oidc.params.authorization_details) {
 		throw new InvalidRequest(
@@ -59,7 +54,7 @@ export async function clientCredentials(ctx, dPoP) {
 	}
 
 	if (client.tlsClientCertificateBoundAccessTokens) {
-		const cert = getCertificate(ctx);
+		const cert = ctx.oidc.getClientCertificate();
 
 		if (!cert) {
 			throw new InvalidGrant('mutual TLS client certificate not provided');

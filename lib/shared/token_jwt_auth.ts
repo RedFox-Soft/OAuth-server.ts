@@ -6,6 +6,8 @@ import { ISSUER } from 'lib/configs/env.js';
 import { routeNames } from 'lib/consts/param_list.js';
 import { assertJwtClientAuthClaimsAndHeader } from 'lib/addon/index.js';
 import { ApplicationConfig as config } from 'lib/configs/application.js';
+import { type OIDCContext } from 'lib/helpers/oidc_context.js';
+import { type authParamsType } from './token_auth.js';
 
 type Entries<T> = {
 	[K in keyof T]: [K, T[K]];
@@ -36,20 +38,24 @@ function checkPayload(
 	}
 }
 
-export async function tokenJwtAuth(ctx, keystore, algorithms) {
+export async function tokenJwtAuth(
+	oidc: OIDCContext<authParamsType>,
+	keystore,
+	algorithms
+) {
 	const auds = new Set([
 		ISSUER,
 		`${ISSUER}${routeNames.token}`,
-		`${ISSUER}${ctx.oidc.route}`
+		`${ISSUER}${oidc.route}`
 	]);
-	const { header, payload } = JWT.decode(ctx.oidc.params.client_assertion);
+	const { header, payload } = JWT.decode(oidc.params.client_assertion);
 
 	if (!algorithms.includes(header.alg)) {
 		throw new InvalidClientAuth('alg mismatch');
 	}
 	checkPayload(payload);
 
-	if (payload.iss !== ctx.oidc.client.clientId) {
+	if (payload.iss !== oidc.client.clientId) {
 		throw new InvalidClientAuth('iss (JWT issuer) must be the client_id');
 	}
 	if (Array.isArray(payload.aud)) {
@@ -65,7 +71,7 @@ export async function tokenJwtAuth(ctx, keystore, algorithms) {
 	}
 
 	try {
-		await JWT.verify(ctx.oidc.params.client_assertion, keystore, {
+		await JWT.verify(oidc.params.client_assertion, keystore, {
 			clockTolerance
 		});
 	} catch (err) {
@@ -82,7 +88,7 @@ export async function tokenJwtAuth(ctx, keystore, algorithms) {
 		}
 	}
 
-	await assertJwtClientAuthClaimsAndHeader(ctx.oidc.client, payload, header);
+	await assertJwtClientAuthClaimsAndHeader(oidc.client, payload, header);
 
 	const unique = await ReplayDetection.unique(
 		payload.iss,

@@ -20,19 +20,20 @@ const grantTypes = Array.from(grantStore.keys());
 
 export const tokenAction = new Elysia().use(AuthPlugin).post(
 	routeNames.token,
-	async ({ body, headers, route, set, ctx }) => {
+	async ({ body, headers, route, set, oidc }) => {
+		const client = oidc.client;
 		const dPoP = await dpopValidate(headers.dpop, { route });
 		setNonceHeader(set.headers, dPoP);
-		await validateReplay(ctx.oidc.client.clientId, dPoP);
+		await validateReplay(client.clientId, dPoP);
 
 		const grantType = body.grant_type;
-		if (!ctx.oidc.client.grantTypeAllowed(grantType)) {
+		if (!client.grantTypeAllowed(grantType)) {
 			throw new InvalidRequest(
 				'requested grant type is not allowed for this client'
 			);
 		}
 
-		return executeGrant(grantType, ctx, dPoP);
+		return executeGrant(grantType, { oidc }, dPoP);
 	},
 	{
 		body: t.Composite([

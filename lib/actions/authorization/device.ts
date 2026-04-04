@@ -45,7 +45,7 @@ const BacckchannelRequest = t.Composite([
 ]);
 
 async function authentication(params, headers, ctx) {
-	await tokenAuth(params, headers, ctx);
+	await tokenAuth(params, headers, ctx.oidc);
 
 	if (!ctx.body.client_id) {
 		ctx.body.client_id = ctx.oidc.client.clientId;
@@ -78,8 +78,7 @@ export const deviceAuth = new Elysia()
 		routeNames.device_authorization,
 		async ({ body, headers, server, request }) => {
 			const ctx = { body };
-			ctx.oidc = new OIDCContext(ctx);
-			ctx.oidc.params = { ...body };
+			ctx.oidc = new OIDCContext(body, headers);
 
 			await authentication(body, headers, ctx);
 			const client = ctx.oidc.client;
@@ -116,7 +115,7 @@ export const backchannelAuth = new Elysia()
 	})
 	.post(routeNames.backchannel_authentication, async ({ body }) => {
 		const ctx = { body };
-		ctx.oidc = new OIDCContext(ctx);
+		ctx.oidc = new OIDCContext(body);
 
 		authentication;
 		stripOutsideJarParams;
