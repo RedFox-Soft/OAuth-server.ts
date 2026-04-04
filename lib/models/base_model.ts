@@ -26,6 +26,7 @@ export class BaseModel<
 	constructor(payload: T = {} as T) {
 		super();
 
+		payload.kind ||= this.constructor.name;
 		const check = Value.Check(this.model, payload);
 		if (!check) {
 			throw new TypeError('invalid payload');
@@ -35,7 +36,6 @@ export class BaseModel<
 		if (kind && kind !== this.constructor.name) {
 			throw new TypeError('kind mismatch');
 		}
-		payload.kind = kind || this.constructor.name;
 	}
 
 	async save(ttl: number) {

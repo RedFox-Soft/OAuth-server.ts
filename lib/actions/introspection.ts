@@ -1,11 +1,9 @@
-import { tokenAuth } from '../shared/token_auth.js';
 import instance from '../helpers/weak_cache.ts';
 import { InvalidRequest } from '../helpers/errors.ts';
 import { Elysia, t } from 'elysia';
 import { routeNames } from 'lib/consts/param_list.js';
 import { provider } from 'lib/provider.js';
 import { ISSUER } from 'lib/configs/env.js';
-import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { IdToken } from 'lib/models/id_token.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { Client } from 'lib/models/client.js';
@@ -13,6 +11,7 @@ import { AccessToken } from 'lib/models/access_token.js';
 import { Grant } from 'lib/models/grant.js';
 import { ClientCredentials } from 'lib/models/client_credentials.js';
 import { hasGrant } from './grants/index.js';
+import { AuthPlugin, authHeaders } from 'lib/plugins/auth.js';
 
 const introspectable = new Set([
 	'AccessToken',
@@ -137,17 +136,10 @@ async function renderTokenResponse(ctx) {
 	return ctx.body;
 }
 
-export const introspect = new Elysia().post(
+export const introspect = new Elysia().use(AuthPlugin).post(
 	routeNames.introspect,
-	async function ({ headers, body, route }) {
-		const ctx = {
-			headers,
-			_matchedRouteName: route
-		};
-		ctx.oidc = new OIDCContext(body, headers, route);
-		ctx.oidc.body = body;
-
-		await tokenAuth(body, headers, ctx.oidc);
+	async function ({ oidc }) {
+		const ctx = { oidc };
 
 		const { configuration } = instance(provider);
 		const {
@@ -198,8 +190,6 @@ export const introspect = new Elysia().post(
 			client_assertion_type: t.Optional(t.String()),
 			client_secret: t.Optional(t.String())
 		}),
-		headers: t.Object({
-			authorization: t.Optional(t.String())
-		})
+		headers: authHeaders
 	}
 );
