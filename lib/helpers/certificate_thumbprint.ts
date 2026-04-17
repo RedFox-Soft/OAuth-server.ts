@@ -1,6 +1,6 @@
 import { X509Certificate, hash } from 'node:crypto';
 
-export default function certThumbprint(cert) {
+export default function certThumbprint(cert: string | X509Certificate) {
 	let data;
 	if (cert instanceof X509Certificate) {
 		data = cert.raw;

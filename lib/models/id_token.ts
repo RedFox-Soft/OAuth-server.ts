@@ -2,8 +2,8 @@ import { format } from 'node:util';
 
 import { generate as tokenHash } from 'oidc-token-hash';
 
-import epochTime from '../helpers/epoch_time.ts';
-import * as JWT from '../helpers/jwt.ts';
+import epochTime from '../helpers/epoch_time.js';
+import * as JWT from '../helpers/jwt.js';
 import { InvalidClientMetadata } from '../helpers/errors.ts';
 import instance from '../helpers/weak_cache.ts';
 import { ISSUER } from 'lib/configs/env.js';

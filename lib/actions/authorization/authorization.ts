@@ -23,9 +23,7 @@ import loadGrant from './load_grant.ts';
 import interactions from './interactions.ts';
 import respond from './respond.ts';
 import checkOpenidScope from './check_openid_scope.ts';
-import { authParams, tokenAuth } from '../../shared/token_auth.ts';
 import stripOutsideJarParams from './strip_outside_jar_params.ts';
-import pushedAuthorizationRequestRemapErrors from './pushed_authorization_request_remap_errors.ts';
 import pushedAuthorizationRequestResponse from './pushed_authorization_request_response.ts';
 import presence from '../../helpers/validate_presence.ts';
 
@@ -52,7 +50,7 @@ import {
 	setNonceHeader,
 	validateReplay
 } from 'lib/helpers/validate_dpop.js';
-import { authHeaders } from 'lib/plugins/auth.js';
+import { authHeaders, authParams, AuthPlugin } from 'lib/plugins/auth.js';
 
 const authorizationRequest = t.Composite([
 	t.Omit(AuthorizationParameters, ['request_uri', 'request', 'client_id']),
@@ -204,6 +202,7 @@ export const authPost = new Elysia()
 	});
 
 export const par = new Elysia()
+	.use(AuthPlugin)
 	.guard({
 		body: t.Composite([
 			t.Omit(AuthorizationParameters, ['request_uri', 'client_id']),
@@ -216,25 +215,14 @@ export const par = new Elysia()
 	})
 	.post(
 		routeNames.pushed_authorization_request,
-		async ({ body, route, request, headers, set }) => {
-			const url = new URL(request.url);
-			url.search = '';
-			url.pathname = url.pathname.replace(route, '');
-
-			const ctx = {
-				baseUrl: url.toString(),
-				_matchedRouteName: route,
-				headers
-			};
-			ctx.oidc = new OIDCContext(body, headers, route);
+		async ({ body, headers, set, oidc }) => {
+			const ctx = { oidc };
+			oidc.params = body;
 			ctx.oidc.body = { ...body };
-
-			await tokenAuth(body, headers, ctx.oidc);
 
 			stripOutsideJarParams(ctx);
 
 			const allowList = new Set(PARAM_LIST);
-			pushedAuthorizationRequestRemapErrors;
 			const client = ctx.oidc.client;
 			await processRequestObject(authorizationRequest, ctx, {
 				clientAlg: client.requestObjectSigningAlg

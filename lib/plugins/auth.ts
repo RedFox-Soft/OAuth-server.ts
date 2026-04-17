@@ -1,4 +1,4 @@
-import { Elysia, t } from 'elysia';
+import { Elysia, Static, t } from 'elysia';
 import { InvalidClientAuth } from 'lib/helpers/errors.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { tokenAuth } from 'lib/shared/token_auth.js';
@@ -7,6 +7,16 @@ export const authHeaders = t.Object({
 	authorization: t.Optional(t.String()),
 	dpop: t.Optional(t.String())
 });
+
+export const authParams = t.Object({
+	client_id: t.Optional(t.String()),
+	client_assertion: t.Optional(t.String()),
+	client_assertion_type: t.Optional(t.String()),
+	client_secret: t.Optional(t.String())
+});
+
+export type authParamsType = Record<string, unknown> &
+	Static<typeof authParams>;
 
 function isObject(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null;

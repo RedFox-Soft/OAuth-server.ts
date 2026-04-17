@@ -1,27 +1,17 @@
 import { InvalidRequest, InvalidClientAuth } from '../helpers/errors.ts';
 import * as JWT from '../helpers/jwt.ts';
 import instance from '../helpers/weak_cache.ts';
-import certificateThumbprint from '../helpers/certificate_thumbprint.ts';
+import certificateThumbprint from '../helpers/certificate_thumbprint.js';
 import { noVSCHAR } from '../consts/client_attributes.js';
 
 import { tokenJwtAuth } from './token_jwt_auth.js';
 import { Client } from 'lib/models/client.js';
 import { clientAuthSigningAlgValues } from 'lib/configs/jwaAlgorithms.js';
-import { type Static, t } from 'elysia';
 import { provider } from 'lib/provider.js';
 import { type OIDCContext } from 'lib/helpers/oidc_context.js';
+import { type authParamsType } from 'lib/plugins/auth.js';
 
 const assertionType = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
-
-export const authParams = t.Object({
-	client_id: t.Optional(t.String()),
-	client_assertion: t.Optional(t.String()),
-	client_assertion_type: t.Optional(t.String()),
-	client_secret: t.Optional(t.String())
-});
-
-export type authParamsType = Record<string, unknown> &
-	Static<typeof authParams>;
 
 // see https://tools.ietf.org/html/rfc6749#appendix-B
 function decodeAuthToken(token: string): string {

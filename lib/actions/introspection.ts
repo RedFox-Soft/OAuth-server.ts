@@ -11,7 +11,7 @@ import { AccessToken } from 'lib/models/access_token.js';
 import { Grant } from 'lib/models/grant.js';
 import { ClientCredentials } from 'lib/models/client_credentials.js';
 import { hasGrant } from './grants/index.js';
-import { AuthPlugin, authHeaders } from 'lib/plugins/auth.js';
+import { AuthPlugin, authHeaders, authParams } from 'lib/plugins/auth.js';
 
 const introspectable = new Set([
 	'AccessToken',
@@ -182,14 +182,13 @@ export const introspect = new Elysia().use(AuthPlugin).post(
 		return await renderTokenResponse(ctx);
 	},
 	{
-		body: t.Object({
-			token: t.String(),
-			token_type_hint: t.Optional(t.String()),
-			client_id: t.Optional(t.String()),
-			client_assertion: t.Optional(t.String()),
-			client_assertion_type: t.Optional(t.String()),
-			client_secret: t.Optional(t.String())
-		}),
+		body: t.Composite([
+			t.Object({
+				token: t.String(),
+				token_type_hint: t.Optional(t.String())
+			}),
+			authParams
+		]),
 		headers: authHeaders
 	}
 );

@@ -7,7 +7,7 @@ import { routeNames } from 'lib/consts/param_list.js';
 import { assertJwtClientAuthClaimsAndHeader } from 'lib/addon/index.js';
 import { ApplicationConfig as config } from 'lib/configs/application.js';
 import { type OIDCContext } from 'lib/helpers/oidc_context.js';
-import { type authParamsType } from './token_auth.js';
+import { type authParamsType } from 'lib/plugins/auth.js';
 
 type Entries<T> = {
 	[K in keyof T]: [K, T[K]];

@@ -47,10 +47,6 @@ const tokenAuthRejected = {
 	error_description: 'client authentication failed'
 };
 
-function errorDetail(spy) {
-	return spy.mock.calls[0][0].error_detail;
-}
-
 describe('client authentication options', () => {
 	beforeAll(async function () {
 		await bootstrap(import.meta.url)();

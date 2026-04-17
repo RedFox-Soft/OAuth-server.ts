@@ -11,6 +11,7 @@
 		"jsxImportSource": "react",
 		"jsx": "react-jsx",
 		"noEmit": true,
+		"skipLibCheck": true,
 		"typeRoots": ["types/", "node_modules/@types"],
 		"paths": {
 			"test/*": ["./test/*"],

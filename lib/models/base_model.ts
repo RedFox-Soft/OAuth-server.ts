@@ -10,18 +10,19 @@ const IN_PAYLOAD = ['iat', 'exp', 'jti', 'kind'];
 
 export const BaseModelPayload = t.Object({
 	jti: t.Optional(t.String()),
-	kind: t.String(),
+	kind: t.Optional(t.String()),
 	exp: t.Optional(t.Number()),
 	iat: t.Optional(t.Number())
 });
 
 export type BaseModelPayloadType = Static<typeof BaseModelPayload>;
+type Req<T, K extends keyof T> = Required<Pick<T, K>> & Omit<T, K>;
 
 export class BaseModel<
 	T extends BaseModelPayloadType = BaseModelPayloadType
 > extends Opaque {
 	model = BaseModelPayload;
-	payload = {} as T;
+	payload = {} as Req<T, 'kind'>;
 
 	constructor(payload: T = {} as T) {
 		super();
@@ -31,7 +32,7 @@ export class BaseModel<
 		if (!check) {
 			throw new TypeError('invalid payload');
 		}
-		this.payload = payload;
+		this.payload = payload as Req<T, 'kind'>;
 		const { kind } = payload;
 		if (kind && kind !== this.constructor.name) {
 			throw new TypeError('kind mismatch');

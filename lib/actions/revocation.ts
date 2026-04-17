@@ -2,7 +2,7 @@ import { Elysia, t } from 'elysia';
 import { InvalidRequest } from '../helpers/errors.js';
 import revoke from '../helpers/revoke.js';
 import { routeNames } from 'lib/consts/param_list.js';
-import { authHeaders, AuthPlugin } from 'lib/plugins/auth.js';
+import { authHeaders, AuthPlugin, authParams } from 'lib/plugins/auth.js';
 import { findToken } from '../shared/findToken.js';
 
 const revokeable = new Set([
@@ -40,10 +40,13 @@ export const revocation = new Elysia().use(AuthPlugin).post(
 		}
 	},
 	{
-		body: t.Object({
-			token: t.String(),
-			token_type_hint: t.Optional(t.String())
-		}),
+		body: t.Composite([
+			t.Object({
+				token: t.String(),
+				token_type_hint: t.Optional(t.String())
+			}),
+			authParams
+		]),
 		headers: authHeaders
 	}
 );
