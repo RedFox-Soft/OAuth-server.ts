@@ -91,7 +91,7 @@ export const deviceAuth = new Elysia()
 				clientAlg: client.requestObjectSigningAlg
 			});
 			assignDefaults(ctx);
-			checkScope(new Set(), ctx);
+			checkScope(ctx);
 			checkOpenidScope(ctx);
 			await checkClaims(ctx);
 			unsupportedRar(ctx);

@@ -5,7 +5,7 @@ import instance from '../../helpers/weak_cache.ts';
  * Validates that all requested scopes are supported by the provider, and that offline_access prompt
  * is requested together with consent prompt
  */
-export default function checkScope(PARAM_LIST, ctx) {
+export default function checkScope(ctx, isAuth = false) {
 	const { scopes: statics } = instance(ctx.oidc.provider).configuration;
 	const { prompts, client } = ctx.oidc;
 
@@ -25,8 +25,8 @@ export default function checkScope(PARAM_LIST, ctx) {
 
 	if (scopes.includes('offline_access')) {
 		if (
-			(PARAM_LIST.has('response_type') && !responseType.includes('code')) ||
-			(PARAM_LIST.has('prompt') && !prompts.has('consent')) ||
+			(isAuth && !responseType.includes('code')) ||
+			(isAuth && !prompts.has('consent')) ||
 			!client.grantTypeAllowed('refresh_token')
 		) {
 			scopes.splice(scopes.indexOf('offline_access'), 1);

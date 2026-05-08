@@ -1,6 +1,5 @@
 import { Elysia, t, ValidationError } from 'elysia';
 
-import { PARAM_LIST } from '../../consts/index.ts';
 import checkRar from '../../shared/check_rar.ts';
 import checkResource from '../../shared/check_resource.ts';
 
@@ -95,7 +94,6 @@ export async function isAllowRedirectUri(params) {
 }
 
 async function authorizationActionHandler(ctx) {
-	const allowList = new Set(PARAM_LIST);
 	const setCookies = await sessionHandler(ctx);
 	await checkClient(ctx);
 
@@ -118,7 +116,7 @@ async function authorizationActionHandler(ctx) {
 	checkResponseType(ctx);
 	assignDefaults(ctx);
 	checkPrompt(ctx);
-	checkScope(allowList, ctx);
+	checkScope(ctx, true);
 	checkOpenidScope(ctx);
 	checkRedirectUri(ctx);
 	authorizationPKCE(ctx.oidc.params);
@@ -222,7 +220,6 @@ export const par = new Elysia()
 
 			stripOutsideJarParams(ctx);
 
-			const allowList = new Set(PARAM_LIST);
 			const client = ctx.oidc.client;
 			await processRequestObject(authorizationRequest, ctx, {
 				clientAlg: client.requestObjectSigningAlg
@@ -232,7 +229,7 @@ export const par = new Elysia()
 			presence(ctx, 'response_type', 'redirect_uri');
 			checkResponseType(ctx);
 			checkPrompt(ctx);
-			checkScope(allowList, ctx);
+			checkScope(ctx, true);
 			checkOpenidScope(ctx);
 			checkRedirectUri(ctx);
 			authorizationPKCE(body);

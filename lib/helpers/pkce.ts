@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 
-import { InvalidGrant, InvalidRequest } from './errors.ts';
-import constantEquals from './constant_equals.ts';
+import { InvalidGrant, InvalidRequest } from './errors.js';
+import constantEquals from './constant_equals.js';
 
 export function authorizationPKCE(params: {
 	code_challenge?: string | undefined;
@@ -44,7 +44,7 @@ export function verifyPKCE(
 			if (!constantEquals(challenge, expected)) {
 				throw new Error();
 			}
-		} catch (err) {
+		} catch {
 			throw new InvalidGrant('PKCE verification failed');
 		}
 	}
