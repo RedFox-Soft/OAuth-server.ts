@@ -2,14 +2,14 @@ import {
 	MemoryAdapter,
 	UserStore as MemoryUser,
 	configStore as memoryConfig
-} from './memory.js';
+} from './memory/index.js';
 
 let Adapter = MemoryAdapter;
 let UserStore = MemoryUser;
 export let configStore = memoryConfig;
 
 if (process.env.MONGODB_URI) {
-	const mongodb = await import('./mongodb.js');
+	const mongodb = await import('./mongodb/index.js');
 	Adapter = mongodb.MongoAdapter;
 	configStore = mongodb.configStore;
 	UserStore = mongodb.UserStore;

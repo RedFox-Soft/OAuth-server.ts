@@ -3,7 +3,7 @@ import { strict as assert } from 'node:assert';
 import { expect } from 'chai';
 
 import epochTime from '../lib/helpers/epoch_time.ts';
-import { MemoryAdapter, setStorage } from '../lib/adapters/memory.js';
+import { MemoryAdapter, setStorage } from '../lib/adapters/memory/index.js';
 
 const map = new Map();
 

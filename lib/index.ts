@@ -23,9 +23,11 @@ import { backchannelAuth, deviceAuth } from './actions/authorization/device.js';
 import { introspect } from './actions/introspection.js';
 import { logoutAction, logoutConfirmAction } from './actions/end_session.js';
 import { revocation } from './actions/revocation.js';
+import { healthCheck } from './actions/health.js';
 
 export const elysia = new Elysia({ strictPath: true, normalize: false })
 	.onError(errorHandler)
+	.use(healthCheck)
 	.use(staticPlugin({ assets: 'public' }))
 	.use(nocache)
 	.use(discovery)

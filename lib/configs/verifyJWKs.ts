@@ -79,11 +79,11 @@ type reqProp = {
 	kid: string;
 	use: 'enc' | 'sig';
 };
-type StaticRSAKey = Static<typeof RSAKey>;
+export type StaticRSAKey = Static<typeof RSAKey>;
 type StaticECKey = Static<typeof ECKey>;
 type StaticOKPKey = Static<typeof OKPKey>;
 type preJWKS = StaticRSAKey | StaticECKey | StaticOKPKey;
-type JWKS =
+export type JWKS =
 	| (reqProp & StaticRSAKey)
 	| (reqProp & StaticECKey)
 	| (reqProp & StaticOKPKey);
