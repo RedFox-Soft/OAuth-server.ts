@@ -1,5 +1,8 @@
 import epochTime from '../helpers/epoch_time.js';
 import { BaseModel } from './base_model.js';
+import type { BaseModelPayloadType } from './base_model.js';
+
+export type InteractionPayloadType = BaseModelPayloadType;
 
 export class Interaction extends BaseModel {
 	constructor(jti: string, payload: Record<string, unknown>) {

@@ -1,6 +1,9 @@
 import crypto from 'node:crypto';
 import epochTime from '../helpers/epoch_time.js';
 import { BaseModel } from './base_model.js';
+import type { BaseModelPayloadType } from './base_model.js';
+
+export type ReplayDetectionPayloadType = BaseModelPayloadType & { iss: string };
 
 export class ReplayDetection extends BaseModel {
 	static get IN_PAYLOAD() {
@@ -16,7 +19,8 @@ export class ReplayDetection extends BaseModel {
 			return false;
 		}
 
-		const inst = new this({ jti: id, iss });
+		const payload = { jti: id, iss };
+		const inst = new this(payload);
 
 		await inst.save(exp - epochTime());
 

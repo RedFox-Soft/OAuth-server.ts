@@ -38,7 +38,7 @@ const GrantPayload = t.Composite([
 		rar: t.Optional(t.Array(t.Unknown()))
 	})
 ]);
-type GrantPayloadType = Static<typeof GrantPayload>;
+export type GrantPayloadType = Static<typeof GrantPayload>;
 
 export class Grant extends BaseToken<GrantPayloadType> {
 	model = GrantPayload;

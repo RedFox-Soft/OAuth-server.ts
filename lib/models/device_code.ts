@@ -1,9 +1,12 @@
 import constantEquals from '../helpers/constant_equals.ts';
 import { BaseToken } from './base_token.js';
+import type { BaseTokenPayloadType } from './base_token.js';
 
 import apply from './mixins/apply.ts';
 import consumable from './mixins/consumable.ts';
 import { authPayload } from './mixins/stores_auth.js';
+
+export type DeviceCodePayloadType = BaseTokenPayloadType;
 
 export class DeviceCode extends apply([consumable, BaseToken]) {
 	static async findByUserCode(userCode, { ignoreExpiration = false } = {}) {

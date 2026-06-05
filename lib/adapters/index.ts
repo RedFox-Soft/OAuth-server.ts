@@ -10,6 +10,7 @@ import type {
 	JWKSStoreInstance,
 	ModelAdapter,
 	ModelAdapterConstructor,
+	PayloadForModel,
 	UserStoreConstructor,
 	UserStoreInstance
 } from './types.js';
@@ -34,12 +35,20 @@ if (process.env.NODE_ENV === 'test') {
 export const jwksStore: JWKSStoreInstance = new JWKSStoreClass();
 
 export const cache = new Map();
-export function adapter(name: string): ModelAdapter {
+export function adapter<TModelName extends string>(
+	name: TModelName
+): ModelAdapter<PayloadForModel<TModelName>> {
 	if (!cache.has(name)) {
 		cache.set(name, new Adapter(name));
 	}
-	return cache.get(name) as ModelAdapter;
+	return cache.get(name) as ModelAdapter<PayloadForModel<TModelName>>;
 }
+
+export type {
+	KnownModelName,
+	ModelPayloadByName,
+	PayloadForModel
+} from './modelTypes.js';
 
 const userStores = new Map<string, UserStoreInstance>();
 export function getUserStore(area = 'redfox'): UserStoreInstance {

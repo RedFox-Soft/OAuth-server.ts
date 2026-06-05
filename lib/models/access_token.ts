@@ -15,7 +15,7 @@ const AccessTokenPayload = t.Composite([
 		jkt: t.Optional(t.String())
 	})
 ]);
-type AccessTokenPayloadType = Static<typeof AccessTokenPayload>;
+export type AccessTokenPayloadType = Static<typeof AccessTokenPayload>;
 
 export class AccessToken extends constrained<AccessTokenPayloadType>(
 	BaseToken

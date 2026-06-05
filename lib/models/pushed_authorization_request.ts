@@ -12,7 +12,7 @@ const PushedAuthorizationRequestPayload = t.Composite([
 		consumed: t.Boolean()
 	})
 ]);
-type PushedAuthorizationRequestPayloadType = Static<
+export type PushedAuthorizationRequestPayloadType = Static<
 	typeof PushedAuthorizationRequestPayload
 >;
 

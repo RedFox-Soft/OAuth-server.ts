@@ -11,19 +11,25 @@ export interface User {
 	lastLoginAt: Date | null;
 }
 
-export interface ModelAdapter {
-	upsert(id: string, payload: unknown, expiresIn?: number): Promise<void>;
-	find(id: string): Promise<unknown>;
-	findByUserCode(userCode: string): Promise<unknown>;
-	findByUid(uid: string): Promise<unknown>;
+export interface ModelAdapter<TPayload = unknown> {
+	upsert(id: string, payload: TPayload, expiresIn?: number): Promise<void>;
+	find(id: string): Promise<TPayload | undefined>;
+	findByUserCode(userCode: string): Promise<TPayload | undefined>;
+	findByUid(uid: string): Promise<TPayload | undefined>;
 	destroy(id: string): Promise<void>;
 	revokeByGrantId(grantId: string): Promise<void>;
 	consume(id: string): Promise<void>;
 }
 
 export interface ModelAdapterConstructor {
-	new (name: string): ModelAdapter;
+	new (name: string): ModelAdapter<Record<string, unknown>>;
 }
+
+export type {
+	KnownModelName,
+	ModelPayloadByName,
+	PayloadForModel
+} from './modelTypes.js';
 
 export interface AdapterConfigStore {
 	get(): Promise<Record<string, unknown> | null>;

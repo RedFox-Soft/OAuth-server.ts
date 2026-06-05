@@ -1,77 +1,122 @@
 import epochTime from '../../helpers/epoch_time.js';
 import { getStorage } from './storage.js';
 import {
+	modelKeyFor,
 	grantKeyFor,
 	sessionUidKeyFor,
 	userCodeKeyFor,
-	grantable
+	grantable,
+	type ModelStorageKey
 } from './helpers.js';
 import type { ModelAdapter } from '../types.js';
+import type { PayloadForModel } from '../modelTypes.js';
 
-export class MemoryAdapter implements ModelAdapter {
-	model: string;
+type AdapterStoreValue<TModelName extends string> =
+	| PayloadForModel<TModelName>
+	| string
+	| string[];
 
-	constructor(model: string) {
+function getStringField(payload: unknown, field: string): string | undefined {
+	if (payload && typeof payload === 'object') {
+		const value = Reflect.get(payload, field);
+		if (typeof value === 'string') {
+			return value;
+		}
+	}
+}
+
+export class MemoryAdapter<
+	TModelName extends string = string
+> implements ModelAdapter<PayloadForModel<TModelName>> {
+	model: TModelName;
+
+	constructor(model: TModelName) {
 		this.model = model;
 	}
 
-	key(id: string) {
-		return `${this.model}:${id}`;
+	key(id: string): ModelStorageKey<TModelName> {
+		return modelKeyFor(this.model, id);
 	}
 
 	async destroy(id: string) {
 		const key = this.key(id);
-		getStorage().delete(key);
+		const storage = getStorage<AdapterStoreValue<TModelName>>();
+		storage.delete(key);
 	}
 
 	async consume(id: string) {
-		getStorage().get(this.key(id)).consumed = epochTime();
+		const storage = getStorage<AdapterStoreValue<TModelName>>();
+		const stored = storage.get<PayloadForModel<TModelName>>(this.key(id));
+		if (stored) {
+			Reflect.set(stored, 'consumed', epochTime());
+		}
 	}
 
 	async find(id: string) {
-		return getStorage().get(this.key(id));
+		const storage = getStorage<AdapterStoreValue<TModelName>>();
+		return storage.get<PayloadForModel<TModelName>>(this.key(id));
 	}
 
 	async findByUid(uid: string) {
-		const id = getStorage().get(sessionUidKeyFor(uid));
+		const storage = getStorage<AdapterStoreValue<TModelName>>();
+		const id = storage.get<string>(sessionUidKeyFor(uid));
+		if (typeof id !== 'string') {
+			return;
+		}
 		return this.find(id);
 	}
 
 	async findByUserCode(userCode: string) {
-		const id = getStorage().get(userCodeKeyFor(userCode));
+		const storage = getStorage<AdapterStoreValue<TModelName>>();
+		const id = storage.get<string>(userCodeKeyFor(userCode));
+		if (typeof id !== 'string') {
+			return;
+		}
 		return this.find(id);
 	}
 
-	async upsert(id: string, payload: any, expiresIn: number) {
+	async upsert(
+		id: string,
+		payload: PayloadForModel<TModelName>,
+		expiresIn: number
+	) {
 		const key = this.key(id);
-		const storage = getStorage();
+		const storage = getStorage<AdapterStoreValue<TModelName>>();
+		const uid = getStringField(payload, 'uid');
+		const grantId = getStringField(payload, 'grantId');
+		const userCode = getStringField(payload, 'userCode');
 
-		if (this.model === 'Session') {
-			storage.set(sessionUidKeyFor(payload.uid), id, expiresIn * 1000);
+		if (this.model === 'Session' && uid) {
+			storage.set<string>(sessionUidKeyFor(uid), id, {
+				maxAge: expiresIn * 1000
+			});
 		}
 
-		const { grantId, userCode } = payload;
 		if (grantable.has(this.model) && grantId) {
 			const grantKey = grantKeyFor(grantId);
-			const grant = storage.get(grantKey);
+			const grant = storage.get<string[]>(grantKey);
 			if (!grant) {
-				storage.set(grantKey, [key]);
+				storage.set<string[]>(grantKey, [key]);
 			} else {
 				grant.push(key);
 			}
 		}
 
 		if (userCode) {
-			storage.set(userCodeKeyFor(userCode), id, expiresIn * 1000);
+			storage.set<string>(userCodeKeyFor(userCode), id, {
+				maxAge: expiresIn * 1000
+			});
 		}
 
-		storage.set(key, payload, expiresIn * 1000);
+		storage.set<PayloadForModel<TModelName>>(key, payload, {
+			maxAge: expiresIn * 1000
+		});
 	}
 
 	async revokeByGrantId(grantId: string) {
 		const grantKey = grantKeyFor(grantId);
-		const storage = getStorage();
-		const grant = storage.get(grantKey);
+		const storage = getStorage<AdapterStoreValue<TModelName>>();
+		const grant = storage.get<string[]>(grantKey);
 		if (grant) {
 			grant.forEach((token: string) => storage.delete(token));
 			storage.delete(grantKey);

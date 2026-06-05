@@ -28,7 +28,7 @@ const SessionPayload = t.Composite([
 		)
 	})
 ]);
-type SessionPayloadType = Static<typeof SessionPayload>;
+export type SessionPayloadType = Static<typeof SessionPayload>;
 
 function sessionPayload(
 	payload: Partial<SessionPayloadType> = {}

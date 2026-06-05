@@ -20,7 +20,7 @@ const RefreshTokenSchema = t.Composite([
 	})
 ]);
 
-type RefreshTokenPayload = Static<typeof RefreshTokenSchema>;
+export type RefreshTokenPayload = Static<typeof RefreshTokenSchema>;
 
 export class RefreshToken extends consumable<RefreshTokenPayload>(
 	constrained<RefreshTokenPayload>(BaseToken)

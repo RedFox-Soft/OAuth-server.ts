@@ -1,16 +1,19 @@
 import { db } from './db.js';
 import type { ModelAdapter } from '../types.js';
+import type { PayloadForModel } from '../modelTypes.js';
 
-export class MongoAdapter implements ModelAdapter {
-	name: string;
+export class MongoAdapter<
+	TModelName extends string = string
+> implements ModelAdapter<PayloadForModel<TModelName>> {
+	name: TModelName;
 
-	constructor(name: string) {
+	constructor(name: TModelName) {
 		this.name = name;
 	}
 
 	async upsert(
 		_id: string,
-		payload: Record<string, unknown>,
+		payload: PayloadForModel<TModelName>,
 		expiresIn: number
 	) {
 		let expiresAt!: Date;
@@ -72,8 +75,9 @@ export class MongoAdapter implements ModelAdapter {
 	}
 
 	coll(name: string = this.name) {
-		return db.collection<{ _id: string; payload: Record<string, unknown> }>(
-			name
-		);
+		return db.collection<{
+			_id: string;
+			payload: PayloadForModel<TModelName>;
+		}>(name);
 	}
 }
