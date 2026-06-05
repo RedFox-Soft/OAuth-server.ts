@@ -1,13 +1,14 @@
 import crypto from 'crypto';
 import { ObjectId } from 'mongodb';
 import { db } from './db.js';
+import type { AdapterConfigStore } from '../types.js';
 
 function stringTo24CharHex(str: string) {
 	const hash = crypto.createHash('sha256').update(str).digest('hex');
 	return hash.substring(0, 24);
 }
 
-class ConfigStore {
+class ConfigStore implements AdapterConfigStore {
 	static instance = new ConfigStore();
 	private collectionName = 'serviceConfig';
 	private configId = new ObjectId(stringTo24CharHex('appConfig'));

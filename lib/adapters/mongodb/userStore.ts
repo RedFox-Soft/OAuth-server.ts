@@ -1,8 +1,8 @@
 import crypto from 'crypto';
 import { db } from './db.js';
-import { type User } from '../types.js';
+import { type User, type UserStoreInstance } from '../types.js';
 
-export class UserStore {
+export class UserStore implements UserStoreInstance {
 	private prefix = 'user_';
 	name = 'redfox';
 

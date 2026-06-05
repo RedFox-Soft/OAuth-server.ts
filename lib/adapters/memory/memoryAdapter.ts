@@ -6,8 +6,9 @@ import {
 	userCodeKeyFor,
 	grantable
 } from './helpers.js';
+import type { ModelAdapter } from '../types.js';
 
-export class MemoryAdapter {
+export class MemoryAdapter implements ModelAdapter {
 	model: string;
 
 	constructor(model: string) {

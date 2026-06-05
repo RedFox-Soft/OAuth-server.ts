@@ -1,12 +1,14 @@
-export class ConfigStore {
-	static instance = new ConfigStore();
-	private config: Record<string, any> = {};
+import type { AdapterConfigStore } from '../types.js';
 
-	async get(): Promise<Record<string, any> | null> {
+export class ConfigStore implements AdapterConfigStore {
+	static instance = new ConfigStore();
+	private config: Record<string, unknown> = {};
+
+	async get(): Promise<Record<string, unknown> | null> {
 		return this.config;
 	}
 
-	async set(config: Record<string, any>): Promise<void> {
+	async set(config: Record<string, unknown>): Promise<void> {
 		this.config = config;
 	}
 }

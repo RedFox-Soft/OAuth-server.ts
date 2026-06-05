@@ -1,6 +1,6 @@
-import { type User } from '../types.js';
+import { type User, type UserStoreInstance } from '../types.js';
 
-export class UserStore {
+export class UserStore implements UserStoreInstance {
 	private users = new Map<string, User>();
 	name = 'redfox';
 

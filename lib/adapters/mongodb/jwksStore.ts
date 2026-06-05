@@ -1,7 +1,8 @@
 import { db } from './db.js';
 import { type JWKS } from 'lib/configs/verifyJWKs.ts';
+import type { JWKSStoreInstance } from '../types.js';
 
-export class JWKSStore {
+export class JWKSStore implements JWKSStoreInstance {
 	private collectionName = 'jwks';
 
 	async get(keyId: string): Promise<Record<string, JWKS> | null> {
