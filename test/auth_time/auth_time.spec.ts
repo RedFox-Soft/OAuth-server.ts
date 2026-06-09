@@ -13,11 +13,10 @@ import bootstrap, { agent } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 
-describe('responds with a id_token containing auth_time', () => {
-	let setup = null;
-	let cookie = null;
+describe('responds with a id_token containing auth_time', async () => {
+	let setup = await bootstrap(import.meta.url)();
+	let cookie = '';
 	beforeAll(async function () {
-		setup = await bootstrap(import.meta.url)();
 		cookie = await setup.login();
 	});
 

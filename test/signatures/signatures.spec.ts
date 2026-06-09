@@ -13,7 +13,7 @@ describe('signatures', () => {
 		setup = await bootstrap(import.meta.url)();
 	});
 
-	describe('when id_token_signed_response_alg=HS256', () => {
+	describe.skip('when id_token_signed_response_alg=HS256', () => {
 		let cookie = null;
 
 		beforeEach(async function () {

@@ -4,6 +4,15 @@
   <p><strong>Open-source OAuth 2.0 and OpenID Connect authorization server — built with Bun and TypeScript.</strong></p>
 
   <p>
+    <a href="https://github.com/RedFox-Soft/OAuth-server.ts/actions/workflows/ci.yml">
+      <img src="https://github.com/RedFox-Soft/OAuth-server.ts/actions/workflows/ci.yml/badge.svg" alt="CI status" />
+    </a>
+    <a href="https://codecov.io/gh/RedFox-Soft/OAuth-server.ts">
+      <img src="https://codecov.io/gh/RedFox-Soft/OAuth-server.ts/branch/main/graph/badge.svg" alt="Coverage status" />
+    </a>
+  </p>
+
+  <p>
     <a href="https://datatracker.ietf.org/doc/html/rfc6749">OAuth 2.0</a> ·
     <a href="https://openid.net/specs/openid-connect-core-1_0.html">OpenID Connect</a> ·
     <a href="https://bun.sh/">Bun</a> ·

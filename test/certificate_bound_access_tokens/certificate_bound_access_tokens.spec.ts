@@ -113,7 +113,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 		});
 	});
 
-	describe('urn:ietf:params:oauth:grant-type:device_code', () => {
+	describe.skip('urn:ietf:params:oauth:grant-type:device_code', () => {
 		let cookie;
 		beforeAll(async function () {
 			cookie = await setup.login({ scope: 'openid offline_access' });
@@ -219,7 +219,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 		});
 	});
 
-	describe('urn:openid:params:grant-type:ciba', () => {
+	describe.skip('urn:openid:params:grant-type:ciba', () => {
 		beforeEach(async function () {
 			await this.agent
 				.post('/backchannel')

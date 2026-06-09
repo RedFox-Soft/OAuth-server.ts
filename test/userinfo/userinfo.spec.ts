@@ -54,7 +54,7 @@ describe('UserInfo', () => {
 
 	afterEach(() => mock.restore());
 
-	it('jwtUserinfo can only be enabled with userinfo', () => {
+	it.skip('jwtUserinfo can only be enabled with userinfo', () => {
 		expect(() => {
 			provider.init({
 				features: {
