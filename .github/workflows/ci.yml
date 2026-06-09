@@ -32,5 +32,6 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          slug: RedFox-Soft/OAuth-server.ts
           files: coverage/lcov.info
           fail_ci_if_error: true
