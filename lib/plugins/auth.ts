@@ -18,6 +18,15 @@ export const authParams = t.Object({
 export type authParamsType = Record<string, unknown> &
 	Static<typeof authParams>;
 
+export function withBody<T extends Record<string, unknown>>(
+	oidc: OIDCContext<authParamsType>,
+	body: T
+): OIDCContext<authParamsType & T> {
+	const typed = oidc as unknown as OIDCContext<authParamsType & T>;
+	typed.params = body as authParamsType & T;
+	return typed;
+}
+
 function isObject(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null;
 }

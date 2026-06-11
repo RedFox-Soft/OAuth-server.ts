@@ -6,18 +6,22 @@ import * as JWT from '../../helpers/jwt.ts';
 import { ISSUER } from 'lib/configs/env.js';
 import { nanoid } from 'nanoid';
 import { PushedAuthorizationRequest } from 'lib/models/pushed_authorization_request.js';
+import { provider } from 'lib/provider.ts';
 
 const MAX_TTL = 60;
 
-export default async function pushedAuthorizationRequestResponse(ctx) {
-	let request;
-	let ttl;
+export default async function pushedAuthorizationRequestResponse(
+	ctx,
+	requestBody?: string
+) {
+	let ttl: number;
 	let dpopJkt;
 	const now = epochTime();
-	if (ctx.oidc.body.request) {
-		({ request } = ctx.oidc.body);
+	let request: string;
+	if (requestBody) {
+		request = requestBody;
 		const {
-			payload: { exp, dpop_jkt: thumbprint }
+			payload: { exp = now, dpop_jkt: thumbprint }
 		} = JWT.decode(request);
 		ttl = exp - now;
 
@@ -55,11 +59,7 @@ export default async function pushedAuthorizationRequestResponse(ctx) {
 
 	ctx.oidc.entity('PushedAuthorizationRequest', requestObject);
 
-	ctx.oidc.provider.emit(
-		'pushed_authorization_request.success',
-		ctx,
-		ctx.oidc.client
-	);
+	provider.emit('pushed_authorization_request.success', ctx, ctx.oidc.client);
 	return new Response(
 		JSON.stringify({
 			expires_in: ttl,

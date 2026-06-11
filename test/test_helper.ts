@@ -139,21 +139,21 @@ export default function testHelper(importMetaUrl, { config: base } = {}) {
 			const cookies = [sessionCookie];
 
 			session.payload.authorizations = {};
-			const ctx = new OIDCContext({ scope, claims });
+			const oidc = new OIDCContext({ scope, claims });
 
-			if (ctx.params.claims && typeof ctx.params.claims !== 'string') {
-				ctx.params.claims = JSON.stringify(ctx.params.claims);
+			if (oidc.params.claims && typeof oidc.params.claims !== 'string') {
+				oidc.params.claims = JSON.stringify(oidc.params.claims);
 			}
 
 			for (const cl of clients) {
 				const grant = new Grant({ clientId: cl.clientId, accountId });
 				grant.addOIDCScope(scope);
-				if (ctx.params.claims) {
+				if (oidc.params.claims) {
 					grant.addOIDCClaims(
-						Object.keys(JSON.parse(ctx.params.claims).id_token || {})
+						Object.keys(JSON.parse(oidc.params.claims).id_token || {})
 					);
 					grant.addOIDCClaims(
-						Object.keys(JSON.parse(ctx.params.claims).userinfo || {})
+						Object.keys(JSON.parse(oidc.params.claims).userinfo || {})
 					);
 				}
 				if (rejectedScopes.length) {

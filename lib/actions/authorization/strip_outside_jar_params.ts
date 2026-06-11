@@ -1,17 +1,24 @@
+import type { OIDCContext } from 'lib/helpers/oidc_context.ts';
+
+interface JarParameters {
+	request?: string;
+	client_id?: string;
+	[key: string]: unknown;
+}
+
 /*
  * Makes sure that
  * - unauthenticated clients send the JAR Request Object
  * - either JAR or plain request is provided
  * - request_uri is not used
  */
-export default function stripOutsideJarParams(ctx) {
-	const JAR = !!ctx.oidc.params.request;
+export default function stripOutsideJarParams(
+	oidc: OIDCContext<JarParameters>
+) {
+	const { request, client_id } = oidc.params;
+	const JAR = !!request;
 
-	for (const [param, value] of Object.entries(ctx.oidc.params)) {
-		if (value !== undefined) {
-			if (JAR && param !== 'client_id' && param !== 'request') {
-				ctx.oidc.params[param] = undefined;
-			}
-		}
+	if (JAR) {
+		oidc.params = { request, client_id };
 	}
 }

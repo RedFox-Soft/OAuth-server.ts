@@ -11,7 +11,6 @@ import {
 	spyOn,
 	mock
 } from 'bun:test';
-import sinon from 'sinon';
 import { importJWK, decodeProtectedHeader, decodeJwt } from 'jose';
 
 import * as JWT from '../../lib/helpers/jwt.ts';
@@ -24,14 +23,11 @@ import { ClientDefaults } from 'lib/configs/clientBase.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { PushedAuthorizationRequest } from 'lib/models/pushed_authorization_request.js';
 import { ISSUER } from 'lib/configs/env.js';
+import { Client } from 'lib/models/client.ts';
 
-describe('Pushed Request Object', () => {
-	let setup = null;
-	beforeAll(async function () {
-		setup = await bootstrap(import.meta.url)();
-	});
+describe('Pushed Request Object', async () => {
+	const setup = await bootstrap(import.meta.url)();
 	afterEach(() => {
-		sinon.restore();
 		mock.restore();
 	});
 
@@ -109,13 +105,14 @@ describe('Pushed Request Object', () => {
 						}
 					);
 					expect(par.response.status).toBe(201);
-					const { request_uri } = par.data;
-
-					let id = request_uri.split(':');
-					id = id[id.length - 1];
+					const request_uri = par.data?.request_uri ?? '';
+					const id = request_uri.split(':').at(-1) ?? '';
 
 					const { request } =
 						(await PushedAuthorizationRequest.find(id))?.payload || {};
+					if (!request) {
+						throw new Error('Request not found in PushedAuthorizationRequest');
+					}
 					expect(decodeJwt(request)).toHaveProperty(
 						'redirect_uri',
 						'https://rp.example.com/unlisted'
@@ -222,7 +219,7 @@ describe('Pushed Request Object', () => {
 						}
 					);
 					expect(par.response.status).toBe(422);
-					expect(par.error.value).toEqual({
+					expect(par.error?.value).toEqual({
 						error: 'invalid_request',
 						error_description: "Property 'redirect_uri' should be uri"
 					});
@@ -308,9 +305,9 @@ describe('Pushed Request Object', () => {
 						});
 
 						it('stores a request object and returns a uri', async function () {
-							const spy = sinon.spy();
+							const spy = mock();
 							provider.once('pushed_authorization_request.success', spy);
-							const spy2 = sinon.spy();
+							const spy2 = mock((_par: PushedAuthorizationRequest) => {});
 							provider.once('pushed_authorization_request.saved', spy2);
 
 							const code_verifier = randomBytes(32).toString('base64');
@@ -341,14 +338,14 @@ describe('Pushed Request Object', () => {
 							);
 							expect(response.status).toBe(201);
 							expect(data).toContainAllKeys(['expires_in', 'request_uri']);
-							expect(data.expires_in).toBeCloseTo(60, 1);
-							expect(data.request_uri).toMatch(
+							expect(data?.expires_in).toBeCloseTo(60, 1);
+							expect(data?.request_uri).toMatch(
 								/^urn:ietf:params:oauth:request_uri:(.+)$/
 							);
 
-							expect(spy.calledOnce).toBeTrue();
-							expect(spy2.calledOnce).toBeTrue();
-							const stored = spy2.args[0][0].payload;
+							expect(spy).toHaveBeenCalledTimes(1);
+							expect(spy2).toHaveBeenCalledTimes(1);
+							const stored = spy2.mock.calls[0][0].payload;
 							expect(stored).toHaveProperty('trusted', true);
 							const header = decodeProtectedHeader(stored.request);
 							expect(header).toEqual({ alg: 'none' });
@@ -373,7 +370,7 @@ describe('Pushed Request Object', () => {
 							const code_challenge = createHash('sha256')
 								.update(code_verifier)
 								.digest('base64url');
-							const { response, error } = await agent.par.post(
+							const { error } = await agent.par.post(
 								// @ts-expect-error endpoint will be parse to object
 								jsonToFormUrlEncoded({
 									response_type: 'code',
@@ -432,11 +429,10 @@ describe('Pushed Request Object', () => {
 								.update(code_verifier)
 								.digest('base64url');
 
-							sinon
-								.stub(TestAdapter.for('PushedAuthorizationRequest'), 'upsert')
-								.callsFake(async () => {
-									throw adapterThrow;
-								});
+							spyOn(
+								TestAdapter.for('PushedAuthorizationRequest'),
+								'upsert'
+							).mockRejectedValue(adapterThrow);
 
 							const { error } = await agent.par.post(
 								// @ts-expect-error endpoint will be parse to object
@@ -453,7 +449,6 @@ describe('Pushed Request Object', () => {
 									}
 								}
 							);
-							TestAdapter.for('PushedAuthorizationRequest').upsert.restore();
 							expect(error.status).toBe(500);
 							expect(error.value).toEqual({
 								error: 'server_error',
@@ -580,7 +575,7 @@ describe('Pushed Request Object', () => {
 	describe('with Request Objects', () => {
 		let key = null;
 		beforeAll(async function () {
-			const client = await provider.Client.find('client');
+			const client = await Client.find('client');
 			key = await importJWK(
 				client.symmetricKeyStore.selectForSign({ alg: 'HS256' })[0]
 			);
@@ -671,7 +666,7 @@ describe('Pushed Request Object', () => {
 						});
 
 						it('stores a request object and returns a uri', async function () {
-							const spy = sinon.spy();
+							const spy = mock();
 							provider.once('pushed_authorization_request.success', spy);
 							const code_verifier = randomBytes(32).toString('base64');
 							const code_challenge = createHash('sha256')
@@ -704,15 +699,15 @@ describe('Pushed Request Object', () => {
 								}
 							);
 							expect(response.status).toBe(201);
-							expect(data.expires_in).toBeCloseTo(30, 1);
-							expect(data.request_uri).toMatch(
+							expect(data?.expires_in).toBeCloseTo(30, 1);
+							expect(data?.request_uri).toMatch(
 								/^urn:ietf:params:oauth:request_uri:(.+)$/
 							);
-							expect(spy.calledOnce).toBeTrue();
+							expect(spy).toHaveBeenCalledTimes(1);
 						});
 
 						it('Error when no expires_in is present', async function () {
-							const spy = sinon.spy();
+							const spy = mock();
 							provider.once('pushed_authorization_request.success', spy);
 							const code_verifier = randomBytes(32).toString('base64');
 							const code_challenge = createHash('sha256')
@@ -751,7 +746,7 @@ describe('Pushed Request Object', () => {
 						});
 
 						it('uses the expiration from JWT when below MAX_TTL', async function () {
-							const spy = sinon.spy();
+							const spy = mock();
 							provider.once('pushed_authorization_request.success', spy);
 							const code_verifier = randomBytes(32).toString('base64');
 							const code_challenge = createHash('sha256')
@@ -784,15 +779,15 @@ describe('Pushed Request Object', () => {
 								}
 							);
 							expect(response.status).toBe(201);
-							expect(data.expires_in).toBeCloseTo(20, 1);
-							expect(data.request_uri).toMatch(
+							expect(data?.expires_in).toBeCloseTo(20, 1);
+							expect(data?.request_uri).toMatch(
 								/^urn:ietf:params:oauth:request_uri:(.+)$/
 							);
-							expect(spy.calledOnce).toBeTrue();
+							expect(spy).toHaveBeenCalledTimes(1);
 						});
 
 						it('uses MAX_TTL when the expiration from JWT is above it', async function () {
-							const spy = sinon.spy();
+							const spy = mock((_e: unknown) => {});
 							provider.once('pushed_authorization_request.success', spy);
 							const code_verifier = randomBytes(32).toString('base64');
 							const code_challenge = createHash('sha256')
@@ -831,18 +826,18 @@ describe('Pushed Request Object', () => {
 							expect(data.request_uri).toMatch(
 								/^urn:ietf:params:oauth:request_uri:(.+)$/
 							);
-							expect(spy.calledOnce).toBeTrue();
+							expect(spy).toHaveBeenCalledTimes(1);
 						});
 
 						it('ignores regular parameters when passing a JAR request', async function () {
-							const spy = sinon.spy();
+							const spy = mock((_par: PushedAuthorizationRequest) => {});
 							provider.once('pushed_authorization_request.saved', spy);
 							const code_verifier = randomBytes(32).toString('base64');
 							const code_challenge = createHash('sha256')
 								.update(code_verifier)
 								.digest('base64url');
 
-							const { error, response } = await agent.par.post(
+							const { response } = await agent.par.post(
 								// @ts-expect-error endpoint will be parse to object
 								jsonToFormUrlEncoded({
 									nonce: 'foo',
@@ -870,9 +865,9 @@ describe('Pushed Request Object', () => {
 								}
 							);
 							expect(response.status).toBe(201);
-							expect(spy.calledOnce).toBeTrue();
+							expect(spy).toHaveBeenCalledTimes(1);
 
-							const { request } = spy.args[0][0].payload;
+							const { request } = spy.mock.calls[0][0].payload;
 							const payload = decodeJwt(request);
 							expect(payload).not.toHaveProperty('nonce');
 							expect(payload).toHaveProperty('response_type', 'code');
@@ -1001,11 +996,10 @@ describe('Pushed Request Object', () => {
 
 						it('leaves non OIDCProviderError alone', async function () {
 							const adapterThrow = new Error('adapter throw!');
-							sinon
-								.stub(TestAdapter.for('PushedAuthorizationRequest'), 'upsert')
-								.callsFake(async () => {
-									throw adapterThrow;
-								});
+							spyOn(
+								TestAdapter.for('PushedAuthorizationRequest'),
+								'upsert'
+							).mockRejectedValue(adapterThrow);
 							const code_verifier = randomBytes(32).toString('base64');
 							const code_challenge = createHash('sha256')
 								.update(code_verifier)
@@ -1078,9 +1072,8 @@ describe('Pushed Request Object', () => {
 								}
 							);
 
-							const { request_uri } = par.data;
-							let id = request_uri.split(':');
-							id = id[id.length - 1];
+							const request_uri = par.data?.request_uri ?? '';
+							const id = request_uri.split(':').at(-1) ?? '';
 
 							expect(await PushedAuthorizationRequest.find(id)).toBeObject();
 

@@ -49,7 +49,12 @@ import {
 	setNonceHeader,
 	validateReplay
 } from 'lib/helpers/validate_dpop.js';
-import { authHeaders, authParams, AuthPlugin } from 'lib/plugins/auth.js';
+import {
+	authHeaders,
+	authParams,
+	AuthPlugin,
+	withBody
+} from 'lib/plugins/auth.js';
 
 const authorizationRequest = t.Composite([
 	t.Omit(AuthorizationParameters, ['request_uri', 'request', 'client_id']),
@@ -194,7 +199,6 @@ export const authPost = new Elysia()
 			_matchedRouteName: route
 		};
 		ctx.oidc = new OIDCContext(body, {}, route);
-		ctx.oidc.body = body;
 
 		return await authorizationActionHandler(ctx);
 	});
@@ -213,14 +217,14 @@ export const par = new Elysia()
 	})
 	.post(
 		routeNames.pushed_authorization_request,
-		async ({ body, headers, set, oidc }) => {
+		async ({ body, headers, set, oidc: oidcInc }) => {
+			const oidc = withBody(oidcInc, body);
 			const ctx = { oidc };
-			oidc.params = body;
-			ctx.oidc.body = { ...body };
 
-			stripOutsideJarParams(ctx);
+			stripOutsideJarParams(oidc);
+			const { request } = oidc.params;
+			const client = oidc.client;
 
-			const client = ctx.oidc.client;
 			await processRequestObject(authorizationRequest, ctx, {
 				clientAlg: client.requestObjectSigningAlg
 			});
@@ -232,7 +236,7 @@ export const par = new Elysia()
 			checkScope(ctx, true);
 			checkOpenidScope(ctx);
 			checkRedirectUri(ctx);
-			authorizationPKCE(body);
+			authorizationPKCE(oidc.params);
 			await checkClaims(ctx);
 			await checkRar(ctx);
 			await checkResource(ctx);
@@ -245,15 +249,19 @@ export const par = new Elysia()
 			setNonceHeader(set.headers, dPoP);
 			await validateReplay(client.clientId, dPoP);
 			if (dPoP) {
-				if (body.dpop_jkt && body.dpop_jkt !== dPoP.thumbprint) {
+				if (oidc.params.dpop_jkt && oidc.params.dpop_jkt !== dPoP.thumbprint) {
 					throw new InvalidRequest(
 						'DPoP proof key thumbprint does not match dpop_jkt'
 					);
-				} else if (!body.dpop_jkt) {
-					body.dpop_jkt = dPoP.thumbprint;
+				} else if (!oidc.params.dpop_jkt) {
+					oidc.params.dpop_jkt = dPoP.thumbprint;
 				}
 			}
 
-			return pushedAuthorizationRequestResponse(ctx);
+			return pushedAuthorizationRequestResponse(ctx, request);
+		},
+		{
+			response: t.Object({ request_uri: t.String(), expires_in: t.Number() }),
+			status: 201
 		}
 	);
