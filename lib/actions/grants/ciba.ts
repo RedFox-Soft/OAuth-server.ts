@@ -16,7 +16,7 @@ const { AuthorizationPending, ExpiredToken, InvalidGrant } = errors;
 export const gty = 'ciba';
 
 export const handler = async function cibaHandler(ctx, dPoP) {
-	presence(ctx, 'auth_req_id');
+	presence(ctx.oidc, 'auth_req_id');
 
 	if (ctx.oidc.params.authorization_details) {
 		throw new errors.InvalidRequest(

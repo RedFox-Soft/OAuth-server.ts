@@ -34,7 +34,7 @@ export const handler = async function authorizationCodeHandler(ctx, dPoP) {
 		}
 	}
 
-	presence(ctx, 'code', 'redirect_uri');
+	presence(ctx.oidc, 'code', 'redirect_uri');
 
 	const code = await AuthorizationCode.find(ctx.oidc.params.code, {
 		ignoreExpiration: true

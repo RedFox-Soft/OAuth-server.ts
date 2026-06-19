@@ -136,7 +136,7 @@ describe('Pushed Request Object', async () => {
 						}
 					});
 
-					expect(authGet.response.status).toBe(303);
+					expect(authGet.status).toBe(303);
 					auth.validatePresence(authGet.response, ['code']);
 					const {
 						query: { code }
@@ -186,8 +186,8 @@ describe('Pushed Request Object', async () => {
 							}
 						}
 					);
-					expect(error.status).toBe(400);
-					expect(error.value).toEqual({
+					expect(error?.status).toBe(400);
+					expect(error?.value).toEqual({
 						error: 'invalid_redirect_uri',
 						error_description:
 							"redirect_uri did not match any of the client's registered redirectUris"
@@ -242,8 +242,8 @@ describe('Pushed Request Object', async () => {
 							}
 						}
 					);
-					expect(error.status).toBe(400);
-					expect(error.value).toEqual({
+					expect(error?.status).toBe(400);
+					expect(error?.value).toEqual({
 						error: 'invalid_request',
 						error_description: 'redirect_uri must not contain fragments'
 					});
@@ -266,8 +266,8 @@ describe('Pushed Request Object', async () => {
 								}
 							}
 						);
-						expect(error.status).toBe(400);
-						expect(error.value).toEqual({
+						expect(error?.status).toBe(400);
+						expect(error?.value).toEqual({
 							error: 'not_supported',
 							error_description: 'Request Object is not supported'
 						});
@@ -385,8 +385,8 @@ describe('Pushed Request Object', async () => {
 									}
 								}
 							);
-							expect(error.status).toBe(422);
-							expect(error.value).toEqual({
+							expect(error?.status).toBe(422);
+							expect(error?.value).toEqual({
 								error: 'invalid_request',
 								error_description:
 									"Property 'request_uri' should not be provided"
@@ -414,8 +414,8 @@ describe('Pushed Request Object', async () => {
 									}
 								}
 							);
-							expect(error.status).toBe(400);
-							expect(error.value).toEqual({
+							expect(error?.status).toBe(400);
+							expect(error?.value).toEqual({
 								error: 'invalid_redirect_uri',
 								error_description:
 									"redirect_uri did not match any of the client's registered redirectUris"
@@ -907,8 +907,8 @@ describe('Pushed Request Object', async () => {
 									}
 								}
 							);
-							expect(error.status).toBe(400);
-							expect(error.value).toEqual({
+							expect(error?.status).toBe(400);
+							expect(error?.value).toEqual({
 								error: 'invalid_request_object',
 								error_description:
 									'the preregistered alg must be used in request or request_uri'
@@ -946,8 +946,8 @@ describe('Pushed Request Object', async () => {
 									}
 								}
 							);
-							expect(error.status).toBe(400);
-							expect(error.value).toEqual({
+							expect(error?.status).toBe(400);
+							expect(error?.value).toEqual({
 								error: 'invalid_request_object',
 								error_description:
 									"request client_id must equal the authenticated client's client_id"

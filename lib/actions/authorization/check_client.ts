@@ -6,7 +6,7 @@ import { Client } from 'lib/models/client.js';
  * Checks client_id
  */
 export default async function checkClient(ctx) {
-	presence(ctx, 'client_id');
+	presence(ctx.oidc, 'client_id');
 
 	const client = await Client.find(ctx.oidc.params.client_id);
 

@@ -28,7 +28,7 @@ function rarSupported(token) {
 const gty = 'refresh_token';
 
 export const handler = async function refreshTokenHandler(ctx, dPoP) {
-	presence(ctx, 'refresh_token');
+	presence(ctx.oidc, 'refresh_token');
 
 	const {
 		findAccount,

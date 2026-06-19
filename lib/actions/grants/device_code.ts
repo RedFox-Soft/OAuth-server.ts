@@ -17,7 +17,7 @@ const { AuthorizationPending, ExpiredToken, InvalidGrant } = errors;
 export const gty = 'device_code';
 
 export const handler = async function deviceCodeHandler(ctx, dPoP) {
-	presence(ctx, 'device_code');
+	presence(ctx.oidc, 'device_code');
 
 	if (ctx.oidc.params.authorization_details) {
 		throw new errors.InvalidRequest(

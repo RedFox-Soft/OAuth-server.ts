@@ -117,7 +117,7 @@ async function authorizationActionHandler(ctx) {
 	await processRequestObject(authorizationRequest, ctx, requestOptions);
 	checkResponseMode(ctx);
 	oneRedirectUriClients(ctx);
-	presence(ctx, 'response_type', 'redirect_uri');
+	presence(ctx.oidc, 'response_type', 'redirect_uri');
 	checkResponseType(ctx);
 	assignDefaults(ctx);
 	checkPrompt(ctx);
@@ -230,7 +230,7 @@ export const par = new Elysia()
 			});
 			checkResponseMode(ctx);
 			oneRedirectUriClients(ctx);
-			presence(ctx, 'response_type', 'redirect_uri');
+			presence(ctx.oidc, 'response_type', 'redirect_uri');
 			checkResponseType(ctx);
 			checkPrompt(ctx);
 			checkScope(ctx, true);

@@ -1,17 +1,14 @@
 import * as formatters from './formatters.ts';
 import { InvalidRequest } from './errors.ts';
+import type { OIDCContext } from './oidc_context.ts';
 
-export default function validatePresence(ctx, ...required) {
-	const { params } = ctx.oidc;
-	const missing = required
-		.map((param) => {
-			if (params[param] === undefined) {
-				return param;
-			}
-
-			return undefined;
-		})
-		.filter(Boolean);
+export default function validatePresence(
+	oidc: OIDCContext<Record<string, unknown>>,
+	...required: string[]
+) {
+	const missing = required.filter(
+		(param) => typeof oidc.params[param] === 'undefined'
+	);
 
 	if (missing.length) {
 		throw new InvalidRequest(

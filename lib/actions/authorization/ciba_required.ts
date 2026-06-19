@@ -7,7 +7,7 @@ export default function oidcRequired(ctx, next) {
 		required.add('client_notification_token');
 	}
 
-	presence(ctx, ...required);
+	presence(ctx.oidc, ...required);
 
 	return next();
 }
