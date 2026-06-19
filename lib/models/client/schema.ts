@@ -1,29 +1,34 @@
-import { CLIENT_ATTRIBUTES } from '../consts/index.ts';
+import { CLIENT_ATTRIBUTES } from '../../consts/index.ts';
+import { noVSCHAR } from '../../consts/client_attributes.ts';
+import { ApplicationConfig } from '../../configs/application.ts';
 
-import * as validUrl from './valid_url.ts';
-import { InvalidClientMetadata } from './errors.ts';
-import sectorIdentifier from './sector_identifier.ts';
-import instance from './weak_cache.ts';
-import * as formatters from './formatters.ts';
-import { pick } from './_/object.js';
-import omitBy from './_/omit_by.ts';
+import * as validUrl from '../../helpers/valid_url.ts';
+import { InvalidClientMetadata } from '../../helpers/errors.ts';
+import sectorIdentifier from '../../helpers/sector_identifier.ts';
+import instance from '../../helpers/weak_cache.ts';
+import * as formatters from '../../helpers/formatters.ts';
+import { pick } from '../../helpers/_/object.js';
+import omitBy from '../../helpers/_/omit_by.ts';
+import { needsSecret } from './secret.ts';
 import {
 	authorizationEncryptionAlgValues,
 	authorizationEncryptionEncValues,
 	authorizationSigningAlgValues,
 	clientAuthSigningAlgValues,
 	idTokenEncryptionAlgValues,
+	idTokenEncryptionEncValues,
 	idTokenSigningAlgValues,
 	introspectionEncryptionAlgValues,
 	introspectionEncryptionEncValues,
 	introspectionSigningAlgValues,
 	requestObjectEncryptionAlgValues,
+	requestObjectEncryptionEncValues,
 	requestObjectSigningAlgValues,
 	userinfoEncryptionAlgValues,
 	userinfoEncryptionEncValues,
 	userinfoSigningAlgValues
 } from 'lib/configs/jwaAlgorithms.js';
-import { validateRedirectUri } from './validateRedirectUri.js';
+import { validateRedirectUri } from '../../helpers/validateRedirectUri.js';
 
 const W3CEmailRegExp =
 	/^[a-zA-Z0-9.!#$%&’*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$/;
@@ -142,16 +147,14 @@ export default function getSchema(provider) {
 	const ENUM = {
 		default_acr_values: () => configuration.acrValues,
 		id_token_encrypted_response_alg: () => idTokenEncryptionAlgValues,
-		id_token_encrypted_response_enc: () =>
-			configuration.idTokenEncryptionEncValues,
+		id_token_encrypted_response_enc: () => idTokenEncryptionEncValues,
 		id_token_signed_response_alg: () => idTokenSigningAlgValues,
 		request_object_signing_alg: () => requestObjectSigningAlgValues,
 		backchannel_token_delivery_mode: () => features.ciba.deliveryModes,
 		backchannel_authentication_request_signing_alg: () =>
 			requestObjectSigningAlgValues.filter((alg) => !alg.startsWith('HS')),
 		request_object_encryption_alg: () => requestObjectEncryptionAlgValues,
-		request_object_encryption_enc: () =>
-			configuration.requestObjectEncryptionEncValues,
+		request_object_encryption_enc: () => requestObjectEncryptionEncValues,
 		authorization_details_types: () =>
 			Object.keys(features.richAuthorizationRequests.types),
 		token_endpoint_auth_method: (metadata) => {
@@ -212,6 +215,7 @@ export default function getSchema(provider) {
 			);
 
 			this.required();
+			this.baseKeys();
 			this.booleans();
 			this.whens();
 			this.arrays();
@@ -220,7 +224,10 @@ export default function getSchema(provider) {
 			this.webUris();
 			this.scopes();
 			this.postLogoutRedirectUris();
-			validateRedirectUri(metadata.redirectUris, metadata.applicationType);
+			validateRedirectUri(
+				metadata.redirectUris ?? [],
+				metadata.applicationType
+			);
 			this.checkContacts();
 			this.jarPolicy();
 
@@ -239,17 +246,26 @@ export default function getSchema(provider) {
 			const responseTypes = this.metadata.responseTypes;
 
 			if (
+				Array.isArray(this.metadata.grantTypes) &&
 				this.metadata.grantTypes.includes('authorization_code') &&
 				!responseTypes?.length
 			) {
 				this.invalidate('responseTypes must contain members');
 			}
 
-			if (responseTypes?.length && !this.metadata.redirectUris.length) {
-				if (
-					this.token_endpoint_auth_method === 'none' ||
-					this.sector_identifier_uri
-				) {
+			if (responseTypes?.length && !this.metadata.redirectUris?.length) {
+				// Empty redirect_uris is only permissible when PAR allows
+				// unregistered redirect URIs AND this client requires PAR — and
+				// never for `none` auth or pairwise sector clients (which resolve a
+				// sector from the redirect URIs).
+				const parAllowsUnregistered =
+					ApplicationConfig['par.enabled'] &&
+					ApplicationConfig['par.allowUnregisteredRedirectUris'] &&
+					this.metadata['authorization.requirePushedAuthorizationRequests'] &&
+					this.token_endpoint_auth_method !== 'none' &&
+					!this.sector_identifier_uri;
+
+				if (!parAllowsUnregistered) {
 					this.invalidate('redirectUris must contain members');
 				}
 			}
@@ -260,6 +276,7 @@ export default function getSchema(provider) {
 
 			if (
 				responseTypes?.includes('code') &&
+				Array.isArray(this.metadata.grantTypes) &&
 				!this.metadata.grantTypes.includes('authorization_code')
 			) {
 				this.invalidate(
@@ -324,9 +341,120 @@ export default function getSchema(provider) {
 			throw new InvalidClientMetadata(message);
 		}
 
+		// The base registration keys are camelCased and live on `this.metadata`
+		// (not in the snake_case RECOGNIZED_METADATA the other passes iterate), so
+		// they bypass `strings()`/`arrays()`/`enums()`. Validate them here with the
+		// same upstream message shapes (kept camelCased to match `metadata()` and
+		// the `invalid_redirect_uri` mapping) before the constructor reaches the
+		// inline `responseTypes`/`grantTypes` checks that assume valid arrays.
+		baseKeys() {
+			const m = this.metadata;
+
+			if (m.applicationType !== undefined) {
+				if (
+					typeof m.applicationType !== 'string' ||
+					!m.applicationType.length
+				) {
+					this.invalidate(
+						'applicationType must be a non-empty string if provided'
+					);
+				}
+				if (!['web', 'native'].includes(m.applicationType)) {
+					this.invalidate("applicationType must be 'native' or 'web'");
+				}
+			}
+
+			if (
+				m.clientId === undefined ||
+				m.clientId === null ||
+				m.clientId === ''
+			) {
+				this.invalidate('clientId is mandatory property');
+			}
+			if (typeof m.clientId !== 'string') {
+				this.invalidate('clientId must be a non-empty string if provided');
+			}
+			if (noVSCHAR.test(m.clientId)) {
+				this.invalidate('invalid client_id value');
+			}
+
+			if (
+				m.clientSecret === undefined ||
+				m.clientSecret === null ||
+				m.clientSecret === ''
+			) {
+				if (needsSecret(this)) {
+					this.invalidate('clientSecret is mandatory property');
+				}
+			} else {
+				if (typeof m.clientSecret !== 'string') {
+					this.invalidate(
+						'clientSecret must be a non-empty string if provided'
+					);
+				}
+				if (noVSCHAR.test(m.clientSecret)) {
+					this.invalidate('invalid client_secret value');
+				}
+			}
+
+			if (m.subjectType !== undefined) {
+				if (typeof m.subjectType !== 'string' || !m.subjectType.length) {
+					this.invalidate('subjectType must be a non-empty string if provided');
+				}
+				if (!['public', 'pairwise'].includes(m.subjectType)) {
+					this.invalidate('subjectType must be public or pairwise');
+				}
+			}
+
+			const responseModeValues = [
+				'query',
+				'form_post',
+				...(features.jwtResponseModes.enabled
+					? ['jwt', 'jwt.query', 'jwt.form_post']
+					: [])
+			];
+			// responseTypes/responseModes are restricted to a known set (mirroring the
+			// ClientSchema unions). grantTypes is intentionally open (ClientSchema
+			// permits any string), so it is only type-checked below, not enum-checked.
+			[
+				['responseTypes', ['code', 'none']],
+				['responseModes', responseModeValues]
+			].forEach(([prop, only]) => {
+				const value = m[prop];
+				if (value === undefined) {
+					return;
+				}
+				if (!Array.isArray(value)) {
+					this.invalidate(`${prop} must be an array`);
+				}
+				value.forEach((member) => {
+					if (typeof member !== 'string') {
+						this.invalidate(`${prop} must only contain strings`);
+					}
+				});
+				if (!value.every((member) => only.includes(member))) {
+					this.invalidate(`${prop} must be one of ${only.join(', ')}`);
+				}
+			});
+
+			// redirectUris: only reached when not mandatory (required() throws first
+			// for the missing/empty-string cases when responseTypes are present), so
+			// a non-array here (incl. null for grant-only clients) is a type error.
+			if (m.redirectUris !== undefined && m.redirectUris !== '') {
+				if (!Array.isArray(m.redirectUris)) {
+					this.invalidate('redirectUris must be an array');
+				}
+				m.redirectUris.forEach((member) => {
+					if (typeof member !== 'string') {
+						this.invalidate('redirectUris must only contain strings');
+					}
+				});
+			}
+		}
+
 		required() {
 			const checked = [];
-			if (provider.Client.needsSecret(this)) {
+			if (needsSecret(this)) {
 				checked.push('clientSecret');
 			}
 

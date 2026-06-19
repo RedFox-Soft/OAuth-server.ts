@@ -1,20 +1,15 @@
+import { describe, it, beforeAll, afterEach, spyOn, mock } from 'bun:test';
 import { strict as assert } from 'node:assert';
 
 import moment from 'moment';
-import { createSandbox } from 'sinon';
 import { expect } from 'chai';
 
 import * as JWT from '../../lib/helpers/jwt.ts';
 import epochTime from '../../lib/helpers/epoch_time.ts';
-import bootstrap, {
-	assertNoPendingInterceptors,
-	mock
-} from '../test_helper.js';
+import bootstrap from '../test_helper.js';
 import initializeClients from '../../lib/helpers/initialize_clients.ts';
 import { IdToken } from 'lib/models/id_token.js';
 import { provider } from 'lib/provider.js';
-
-const sinon = createSandbox();
 
 const keys = [
 	{
@@ -29,25 +24,22 @@ function setResponse(
 	body = {
 		keys
 	},
-	statusCode = 200,
+	status = 200,
 	headers = {}
 ) {
-	mock('https://client.example.com')
-		.intercept({
-			path: '/jwks'
-		})
-		.reply(statusCode, typeof body === 'string' ? body : JSON.stringify(body), {
+	spyOn(globalThis, 'fetch').mockResolvedValue(
+		new Response(typeof body === 'string' ? body : JSON.stringify(body), {
+			status,
 			headers
-		});
+		})
+	);
 }
 
 // NOTE: these tests are to be run sequentially, picking one random won't pass
 describe('client keystore refresh', () => {
-	afterEach(assertNoPendingInterceptors);
+	beforeAll(async function () {
+		await bootstrap(import.meta.url, { config: 'client_keystore' })();
 
-	before(bootstrap(import.meta.url, { config: 'client_keystore' }));
-
-	before(async function () {
 		initializeClients.call(provider, [
 			{
 				clientId: 'client',
@@ -55,13 +47,15 @@ describe('client keystore refresh', () => {
 				redirectUris: ['https://client.example.com/cb'],
 				jwks_uri: 'https://client.example.com/jwks',
 				id_token_signed_response_alg: 'HS256',
-				id_token_encrypted_response_alg: 'ECDH-ES+A128KW',
+				id_token_encrypted_response_alg: 'ECDH-ES',
 				id_token_encrypted_response_enc: 'A128CBC-HS256'
 			}
 		]);
 	});
 
-	afterEach(sinon.restore);
+	afterEach(() => {
+		mock.restore();
+	});
 
 	it('gets the jwks from the uri (and does only one request concurrently)', async function () {
 		setResponse();
@@ -72,6 +66,7 @@ describe('client keystore refresh', () => {
 			client.asymmetricKeyStore.refresh()
 		]);
 
+		expect(globalThis.fetch.mock.calls).to.have.lengthOf(1);
 		expect(client.asymmetricKeyStore.selectForSign({ kty: 'EC' })).not.to.be
 			.empty;
 	});
@@ -90,7 +85,7 @@ describe('client keystore refresh', () => {
 		});
 
 		const client = await provider.Client.find('client');
-		sinon.stub(client.asymmetricKeyStore, 'fresh').returns(false);
+		spyOn(client.asymmetricKeyStore, 'fresh').mockReturnValue(false);
 		return Promise.all([
 			assert.rejects(client.asymmetricKeyStore.refresh(), (err) => {
 				expect(err).to.be.an('error');
@@ -121,7 +116,7 @@ describe('client keystore refresh', () => {
 		});
 		setResponse();
 
-		sinon.stub(client.asymmetricKeyStore, 'fresh').returns(false);
+		spyOn(client.asymmetricKeyStore, 'fresh').mockReturnValue(false);
 		await client.asymmetricKeyStore.refresh();
 		expect(
 			client.asymmetricKeyStore.selectForSign({ kty: 'EC' })
@@ -132,7 +127,7 @@ describe('client keystore refresh', () => {
 		setResponse({ keys: [] });
 
 		const client = await provider.Client.find('client');
-		sinon.stub(client.asymmetricKeyStore, 'fresh').returns(false);
+		spyOn(client.asymmetricKeyStore, 'fresh').mockReturnValue(false);
 		await client.asymmetricKeyStore.refresh();
 
 		expect(client.asymmetricKeyStore.selectForSign({ kty: 'EC' })).to.be.empty;
@@ -142,7 +137,7 @@ describe('client keystore refresh', () => {
 		setResponse({ keys: [] }, 201);
 
 		const client = await provider.Client.find('client');
-		sinon.stub(client.asymmetricKeyStore, 'fresh').returns(false);
+		spyOn(client.asymmetricKeyStore, 'fresh').mockReturnValue(false);
 		return assert.rejects(client.asymmetricKeyStore.refresh(), (err) => {
 			expect(err).to.be.an('error');
 			expect(err.message).to.equal('invalid_client_metadata');
@@ -157,7 +152,7 @@ describe('client keystore refresh', () => {
 		setResponse('not json');
 
 		const client = await provider.Client.find('client');
-		sinon.stub(client.asymmetricKeyStore, 'fresh').returns(false);
+		spyOn(client.asymmetricKeyStore, 'fresh').mockReturnValue(false);
 		return assert.rejects(client.asymmetricKeyStore.refresh(), (err) => {
 			expect(err).to.be.an('error');
 			expect(err.message).to.equal('invalid_client_metadata');
@@ -172,7 +167,7 @@ describe('client keystore refresh', () => {
 		setResponse({ keys: {} });
 
 		const client = await provider.Client.find('client');
-		sinon.stub(client.asymmetricKeyStore, 'fresh').returns(false);
+		spyOn(client.asymmetricKeyStore, 'fresh').mockReturnValue(false);
 		return assert.rejects(client.asymmetricKeyStore.refresh(), (err) => {
 			expect(err).to.be.an('error');
 			expect(err.message).to.equal('invalid_client_metadata');
@@ -194,8 +189,9 @@ describe('client keystore refresh', () => {
 
 			const freshUntil = epochTime(until);
 
-			sinon.stub(client.asymmetricKeyStore, 'fresh').callsFake(function () {
-				this.fresh.restore();
+			const spy = spyOn(client.asymmetricKeyStore, 'fresh');
+			spy.mockImplementation(function () {
+				spy.mockRestore();
 				return false;
 			});
 			await client.asymmetricKeyStore.refresh();
@@ -215,8 +211,9 @@ describe('client keystore refresh', () => {
 
 			const freshUntil = epochTime(until);
 
-			sinon.stub(client.asymmetricKeyStore, 'fresh').callsFake(function () {
-				this.fresh.restore();
+			const spy = spyOn(client.asymmetricKeyStore, 'fresh');
+			spy.mockImplementation(function () {
+				spy.mockRestore();
 				return false;
 			});
 			await client.asymmetricKeyStore.refresh();
@@ -226,8 +223,6 @@ describe('client keystore refresh', () => {
 		});
 
 		it('uses the max-age if Cache-Control is missing', async function () {
-			this.retries(1);
-
 			const client = await provider.Client.find('client');
 
 			setResponse(undefined, undefined, {
@@ -236,8 +231,9 @@ describe('client keystore refresh', () => {
 
 			const freshUntil = epochTime() + 3600;
 
-			sinon.stub(client.asymmetricKeyStore, 'fresh').callsFake(function () {
-				this.fresh.restore();
+			const spy = spyOn(client.asymmetricKeyStore, 'fresh');
+			spy.mockImplementation(function () {
+				spy.mockRestore();
 				return false;
 			});
 			await client.asymmetricKeyStore.refresh();
@@ -247,16 +243,15 @@ describe('client keystore refresh', () => {
 		});
 
 		it('falls back to 1 minute throttle if no caching header is found', async function () {
-			this.retries(1);
-
 			const client = await provider.Client.find('client');
 
 			setResponse();
 
 			const freshUntil = epochTime() + 60;
 
-			sinon.stub(client.asymmetricKeyStore, 'fresh').callsFake(function () {
-				this.fresh.restore();
+			const spy = spyOn(client.asymmetricKeyStore, 'fresh');
+			spy.mockImplementation(function () {
+				spy.mockRestore();
 				return false;
 			});
 			await client.asymmetricKeyStore.refresh();

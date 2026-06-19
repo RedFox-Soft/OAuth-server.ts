@@ -52,18 +52,21 @@ The test suite loads `.env.test` automatically via Bun.
 lib/
   index.ts              ← library entry: exports provider, elysia, errors
   provider.ts           ← ProviderClass (EventEmitter); holds config, models, key store
-  actions/              ← per-endpoint request handlers
+  actions/              ← per-endpoint request handlers (operate on `oidc`, the OIDCContext)
     authorization/      ← authorization endpoint pipeline (validate → interact → respond)
     grants/             ← grant type handlers (auth_code, refresh_token, device, ciba)
-  models/               ← AccessToken, RefreshToken, IdToken, Grant, Client, Session, …
+  models/               ← AccessToken, RefreshToken, IdToken, Grant, Session, …
+    client.ts           ← façade: validated plain-object client + pure-function exports
+    client/             ← checks, secret, sector, keystore, backchannel, validate, schema
+  addon/                ← behavioural config-default functions (CORS, mTLS, claims, findAccount, …)
   helpers/              ← JWT, crypto, claims, validation utilities
   adapters/             ← MongoDB adapter; TestAdapter (in-memory) for tests
   plugins/              ← Elysia plugins: noCache, noQueryDup, auth
   interactions/         ← Login/consent UI endpoints (React + Ant Design)
   views/                ← React components rendered server-side for interaction pages
   response_modes/       ← query, fragment, form_post, JWT response modes
-  shared/               ← CORS, session, error handler, resource validation middleware
-  configs/              ← algorithm lists, token lifetimes, env parsing
+  shared/               ← CORS, session, authorization_error_handler (shared onError), resource validation
+  configs/              ← application.ts (single source of config DATA), algorithm lists, token lifetimes, env
 database/               ← MongoDB collection definitions + TTL index setup
 test/
   test_helper.ts        ← bootstrap: loads *.config.ts per feature, wires adapter + provider
@@ -73,15 +76,19 @@ test/
 
 ### Key patterns
 
-**Action pipeline** — Each endpoint is a composed sequence of async actions that receive and mutate an `OIDCContext`. Add a new step by inserting a function in the relevant pipeline array.
+**Action pipeline** — Each endpoint is a composed sequence of async functions that take the typed `OIDCContext` **directly as `oidc`** (the former `ctx = { oidc }` wrapper is gone). Helpers have `(oidc)` signatures and read `oidc.params`/`oidc.client`/`oidc.entities`/`oidc.cookie`/etc.; handlers **return** their typed response value (no `ctx.body`/`ctx.status` mutation). User-overridable config callbacks (findAccount, resourceIndicators.\*, interaction-policy `check(ctx)`, response-mode handlers) keep a `{ oidc }`-shaped argument as a public-API boundary; callers pass `{ oidc }` there. Event payloads that tests inspect (`authorization.success`, `registration_create.success`, `device_authorization.success`) stay `{ oidc }`-shaped.
+
+**Config** — `lib/configs/application.ts` is the **single source of truth for all flag/option DATA** (flat dotted keys, each with an inline description). Behavioural function defaults live in `lib/addon/`. `lib/helpers/configuration.ts` (`Configuration`) expands the flat data into the nested `features.*` shape, runs the validation/collection passes, and **owns** the resolved object `provider.ts` reads — there is no `globalConfiguration.ts`.
 
 **Adapter pattern** — All persistence goes through a `StorageAdapter` interface. Swap implementations without touching business logic. Use `TestAdapter` (in-memory) for unit/integration tests.
 
-**Provider singleton** — `provider.init(config)` merges user config with `globalConfiguration`. After init, models are accessed as `provider.Client`, `provider.Grant`, etc.
+**Provider singleton** — `provider.init(config)` resolves config via `Configuration`. After init, models are accessed as `provider.Grant`, etc. `provider.Client` is a **namespace** (`find`/`validate`/`needsSecret`/`validateClient`/`adapter`), not a class.
+
+**Client model** — A client is a TypeBox `ClientSchema`-validated **plain object** (`validateClient(metadata)`), not a class instance. Behaviour lives in pure functions under `lib/models/client/` (`checks`, `secret`, `sector`, `keystore`, `backchannel`); `lib/models/client.ts` re-exports them. The object exposes the historical method/getter surface (delegating to those functions) for call-site/test compatibility.
 
 **Interaction system** — Login/consent are React pages served by `/interaction/*` routes. Interaction result is POSTed back; the server resumes the authorization flow.
 
-**Error convention** — Throw `OIDCProviderError(code, description)`. The shared error handler converts it to an RFC-compliant JSON response.
+**Error convention** — Throw an `OIDCProviderError` subclass (`lib/helpers/errors.ts`). The subclasses are registered with the Elysia app via `.error({...})` in `lib/index.ts`; a single shared app-level `onError` (`lib/shared/authorization_error_handler.ts`) formats every one (RFC 6749 §5.2 body, `WWW-Authenticate`, `DPoP-Nonce`, response-mode/JARM delivery, HTML variant) and endpoints declare per-route `response` schemas. The legacy Koa-style `shared/error_handler.ts` has been removed.
 
 ---
 

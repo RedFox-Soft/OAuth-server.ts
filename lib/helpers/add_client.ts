@@ -1,11 +1,7 @@
 import sectorValidate from './sector_validate.ts';
 
-export default async function add(
-	provider,
-	metadata,
-	{ ctx, store = false } = {}
-) {
-	const client = new provider.Client(metadata, ctx);
+export default async function add(provider, metadata, { store = false } = {}) {
+	const client = provider.Client.validateClient(metadata);
 
 	if (client.sectorIdentifierUri !== undefined) {
 		await sectorValidate(provider, client);
