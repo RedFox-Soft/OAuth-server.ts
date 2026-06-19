@@ -1,5 +1,3 @@
-/* eslint-disable no-param-reassign */
-
 import { strict as assert } from 'node:assert';
 import * as url from 'node:url';
 

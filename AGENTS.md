@@ -10,13 +10,13 @@ Implemented specs: Authorization Code + PKCE, Client Credentials, Refresh Token,
 
 ## Runtime & toolchain
 
-| Tool | Version | Purpose |
-|------|---------|---------|
-| Bun | latest | Runtime, package manager, test runner, bundler |
-| TypeScript | 6.x | Strict mode; `paths` aliases `lib/` and `test/` |
-| Elysia | 1.4.x | HTTP framework |
-| ESLint + typescript-eslint | 10.x / 8.x | Linting (`bun run format` applies fixes) |
-| Prettier | 3.x | Formatting — tabs, single quotes, no trailing commas |
+| Tool                       | Version    | Purpose                                              |
+| -------------------------- | ---------- | ---------------------------------------------------- |
+| Bun                        | latest     | Runtime, package manager, test runner, bundler       |
+| TypeScript                 | 6.x        | Strict mode; `paths` aliases `lib/` and `test/`      |
+| Elysia                     | 1.4.x      | HTTP framework                                       |
+| ESLint + typescript-eslint | 10.x / 8.x | Linting (`bun run format` applies fixes)             |
+| Prettier                   | 3.x        | Formatting — tabs, single quotes, no trailing commas |
 
 ---
 
@@ -34,13 +34,13 @@ bun run watch           # watch-mode bundle for loginClient.tsx
 
 ## Environment variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `ISSUER` | yes | Canonical server URL (e.g. `https://auth.example.com`) |
-| `JWKS` | yes | JSON stringified JWKS with private RS256 keys |
-| `MONGODB_URI` | yes | MongoDB connection string |
-| `DATABASE_NAME` | yes | MongoDB database name |
-| `NODE_ENV` | test only | Set to `test` to use in-memory adapter |
+| Variable        | Required  | Description                                            |
+| --------------- | --------- | ------------------------------------------------------ |
+| `ISSUER`        | yes       | Canonical server URL (e.g. `https://auth.example.com`) |
+| `JWKS`          | yes       | JSON stringified JWKS with private RS256 keys          |
+| `MONGODB_URI`   | yes       | MongoDB connection string                              |
+| `DATABASE_NAME` | yes       | MongoDB database name                                  |
+| `NODE_ENV`      | test only | Set to `test` to use in-memory adapter                 |
 
 The test suite loads `.env.test` automatically via Bun.
 
@@ -90,6 +90,7 @@ test/
 Tests use **Bun's native test runner** with **Chai** assertions and **Sinon** stubs/spies.
 
 Each feature area has:
+
 - `*.config.ts` — provider config for that feature (clients, scopes, features flags)
 - `*.spec.ts` — test cases using the Eden type-safe HTTP client
 
@@ -121,5 +122,5 @@ Time-sensitive tests use `timekeeper` to freeze/travel time.
 - Tabs for indentation, single quotes, no trailing commas (Prettier enforces).
 - Unused variables must be prefixed with `_` (ESLint enforces).
 - No `any` — use proper types or `unknown` with narrowing.
-- No comments explaining *what* — only *why* when non-obvious.
+- No comments explaining _what_ — only _why_ when non-obvious.
 - `bun run format` must pass before committing.

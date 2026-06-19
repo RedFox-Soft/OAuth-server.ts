@@ -56,7 +56,6 @@ describe('opaque storage', () => {
 
 	// TODO: add Session and Interaction
 
-	/* eslint-disable object-property-newline */
 	const fullPayload = {
 		accountId,
 		claims,
@@ -90,7 +89,6 @@ describe('opaque storage', () => {
 		jkt: s256,
 		dpopJkt
 	};
-	/* eslint-enable object-property-newline */
 
 	afterEach(sinon.restore);
 

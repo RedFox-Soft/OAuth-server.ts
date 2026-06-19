@@ -49,7 +49,7 @@ describe('Client metadata validation', () => {
 
 	const mustBeString = (
 		prop,
-		values = [[], 123, true, null, false, {}, ''], // eslint-disable-line default-param-last
+		values = [[], 123, true, null, false, {}, ''],
 		metadata,
 		configuration
 	) => {
@@ -59,7 +59,7 @@ describe('Client metadata validation', () => {
 				msg = util.format(`${msg}, [client %j]`, omit(metadata, ['jwks.keys']));
 			if (configuration)
 				msg = util.format(`${msg}, [provider %j]`, configuration);
-			// eslint-disable-next-line max-len
+
 			it(msg, () =>
 				assert.rejects(
 					register({ ...metadata, [prop]: value }, configuration),
@@ -114,7 +114,6 @@ describe('Client metadata validation', () => {
 		});
 	};
 
-	// eslint-disable-next-line default-param-last
 	const mustBeArray = (
 		prop,
 		values = [{}, 'string', 123, true, null, false],
@@ -249,7 +248,7 @@ describe('Client metadata validation', () => {
 			msg = util.format(`${msg}, [client %j]`, omit(metadata, ['jwks.keys']));
 		if (configuration)
 			msg = util.format(`${msg}, [provider %j]`, configuration);
-		// eslint-disable-next-line max-len
+
 		it(msg, () =>
 			register({ ...metadata, [prop]: value }, configuration).then(
 				assertion,
@@ -270,7 +269,7 @@ describe('Client metadata validation', () => {
 			msg = util.format(`${msg}, [client %j]`, omit(metadata, ['jwks.keys']));
 		if (configuration)
 			msg = util.format(`${msg}, [provider %j]`, configuration);
-		// eslint-disable-next-line max-len
+
 		it(msg, () =>
 			assert.rejects(
 				register({ ...metadata, [prop]: value }, configuration),

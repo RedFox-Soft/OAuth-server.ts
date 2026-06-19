@@ -9,7 +9,6 @@ describe('configuration features.deviceFlow', () => {
 	it('can only be configured with digits and base-20 charset', () => {
 		expect(() => {
 			new provider('http://localhost', {
-				// eslint-disable-line no-new
 				features: {
 					deviceFlow: {
 						enabled: true,
@@ -20,7 +19,6 @@ describe('configuration features.deviceFlow', () => {
 		}).not.to.throw;
 		expect(() => {
 			new provider('http://localhost', {
-				// eslint-disable-line no-new
 				features: {
 					deviceFlow: {
 						enabled: true,
@@ -31,7 +29,6 @@ describe('configuration features.deviceFlow', () => {
 		}).not.to.throw;
 		expect(() => {
 			new provider('http://localhost', {
-				// eslint-disable-line no-new
 				features: {
 					deviceFlow: {
 						enabled: true,
@@ -45,7 +42,6 @@ describe('configuration features.deviceFlow', () => {
 	it('can be configured with a mask', () => {
 		expect(() => {
 			new provider('http://localhost', {
-				// eslint-disable-line no-new
 				features: {
 					deviceFlow: {
 						enabled: true,
@@ -56,7 +52,6 @@ describe('configuration features.deviceFlow', () => {
 		}).not.to.throw;
 		expect(() => {
 			new provider('http://localhost', {
-				// eslint-disable-line no-new
 				features: {
 					deviceFlow: {
 						enabled: true,
@@ -67,7 +62,6 @@ describe('configuration features.deviceFlow', () => {
 		}).not.to.throw;
 		expect(() => {
 			new provider('http://localhost', {
-				// eslint-disable-line no-new
 				features: {
 					deviceFlow: {
 						enabled: true,

@@ -1,4 +1,3 @@
-/* eslint-disable no-underscore-dangle */
 import instance from '../helpers/weak_cache.ts';
 import { InvalidTarget } from '../helpers/errors.ts';
 

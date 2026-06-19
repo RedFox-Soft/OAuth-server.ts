@@ -28,7 +28,7 @@ describe('devInteractions', async () => {
 	});
 
 	describe('render login', () => {
-		let object = {};
+		const object = {};
 
 		beforeEach(async function () {
 			const auth = new AuthorizationRequest({

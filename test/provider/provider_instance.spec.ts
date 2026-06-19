@@ -52,7 +52,6 @@ describe.skip('provider instance', () => {
 		it('can be a class', async () => {
 			const provider = new provider('https://op.example.com', {
 				adapter: class {
-					// eslint-disable-next-line
 					async find() {
 						throw error;
 					}
@@ -69,9 +68,7 @@ describe.skip('provider instance', () => {
 		it('can be a class static function', async () => {
 			const provider = new provider('https://op.example.com', {
 				adapter: class {
-					// eslint-disable-next-line
 					static factory() {
-						// eslint-disable-next-line
 						return {
 							async find() {
 								throw error;

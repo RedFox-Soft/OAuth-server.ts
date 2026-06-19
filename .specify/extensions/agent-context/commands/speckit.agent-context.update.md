@@ -1,5 +1,5 @@
 ---
-description: "Refresh the managed Spec Kit section in the coding agent context file"
+description: 'Refresh the managed Spec Kit section in the coding agent context file'
 ---
 
 # Update Coding Agent Context

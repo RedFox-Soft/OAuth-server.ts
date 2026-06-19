@@ -39,7 +39,7 @@ export default async function cibaLoadAccount(ctx, next) {
 	const { ciba } = features;
 
 	let accountId;
-	// eslint-disable-next-line default-case
+
 	switch (mechanism) {
 		case 'id_token_hint':
 			await checkIdTokenHint(ctx, () => {});

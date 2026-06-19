@@ -1,5 +1,3 @@
-/* eslint-disable no-new */
-
 import { expect } from 'chai';
 import { describe, it } from 'bun:test';
 import provider from '../../lib/index.ts';

@@ -133,7 +133,7 @@ async function authorizationActionHandler(ctx) {
 	assignClaims(ctx);
 	await loadAccount(ctx);
 	await loadGrant(ctx);
-	let redirectUri = await interactions('resume', ctx);
+	const redirectUri = await interactions('resume', ctx);
 	if (redirectUri) {
 		await setCookies();
 		return Response.redirect(redirectUri, 303);

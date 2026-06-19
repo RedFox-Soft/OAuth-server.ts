@@ -43,7 +43,6 @@ async function codeHandler(ctx) {
 		delete code.payload.claims;
 	}
 
-	// eslint-disable-next-line default-case
 	switch (code.payload.resource.length) {
 		case 0:
 			delete code.payload.resource;

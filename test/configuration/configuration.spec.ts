@@ -6,7 +6,6 @@ describe('Provider configuration', () => {
 	it('checks that a feature configuration property is valid', () => {
 		expect(() => {
 			new Configuration({
-				// eslint-disable-line no-new
 				features: {
 					foo: {}
 				}
@@ -17,7 +16,6 @@ describe('Provider configuration', () => {
 	it('checks that a stable feature does not have an ack', () => {
 		expect(() => {
 			new Configuration({
-				// eslint-disable-line no-new
 				features: {
 					deviceFlow: {
 						enabled: true,
@@ -33,7 +31,6 @@ describe('Provider configuration', () => {
 	it('checks that a feature configuration is not a boolean', () => {
 		expect(() => {
 			new Configuration({
-				// eslint-disable-line no-new
 				features: {
 					devInteractions: false
 				}
@@ -43,7 +40,6 @@ describe('Provider configuration', () => {
 		);
 		expect(() => {
 			new Configuration({
-				// eslint-disable-line no-new
 				features: {
 					devInteractions: true
 				}

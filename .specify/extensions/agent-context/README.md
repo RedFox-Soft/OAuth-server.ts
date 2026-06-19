@@ -14,8 +14,8 @@ Not every Spec Kit user wants Spec Kit to write into the coding agent's context 
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
+| Command                        | Description                                                                       |
+| ------------------------------ | --------------------------------------------------------------------------------- |
 | `speckit.agent-context.update` | Refresh the managed section in the agent context file with the current plan path. |
 
 ## Configuration
@@ -29,8 +29,8 @@ context_file: CLAUDE.md
 
 # Delimiters for the managed Spec Kit section
 context_markers:
-  start: "<!-- SPECKIT START -->"
-  end: "<!-- SPECKIT END -->"
+  start: '<!-- SPECKIT START -->'
+  end: '<!-- SPECKIT END -->'
 ```
 
 - `context_file` — the project-relative path to the coding agent context file, written by `specify init` and `specify integration install`.
@@ -40,7 +40,7 @@ context_markers:
 
 The bundled update scripts require **Python 3** with **PyYAML** for YAML/upsert processing (PowerShell can also use `ConvertFrom-Yaml` when available).
 
-PyYAML ships with the `specify` CLI and is normally available via the same `python3` interpreter. If a hook reports *"PyYAML is required … not available in the current Python environment"*, it means the system `python3` differs from the one used to install Spec Kit. To resolve, run:
+PyYAML ships with the `specify` CLI and is normally available via the same `python3` interpreter. If a hook reports _"PyYAML is required … not available in the current Python environment"_, it means the system `python3` differs from the one used to install Spec Kit. To resolve, run:
 
 ```bash
 pip install pyyaml

@@ -126,7 +126,7 @@ export async function errorHandler(obj: ErrorContext) {
 		console.error('Unknown error', error);
 	}
 
-	let errorObj = getObjFromError(code, error);
+	const errorObj = getObjFromError(code, error);
 	if (isOIDError && error.status === 401) {
 		const auth = request.headers.get('authorization')?.toLowerCase() ?? '';
 		const isDpop = !!request.headers.get('dpop');

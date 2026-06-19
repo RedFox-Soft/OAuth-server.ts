@@ -1,5 +1,11 @@
 import * as crypto from 'node:crypto';
-import { jwtVerify, EmbeddedJWK, calculateJwkThumbprint,  type JWTPayload, type JWTHeaderParameters } from 'jose';
+import {
+	jwtVerify,
+	EmbeddedJWK,
+	calculateJwkThumbprint,
+	type JWTPayload,
+	type JWTHeaderParameters
+} from 'jose';
 
 import { ApplicationConfig as config } from 'lib/configs/application.js';
 import { InvalidHeaderAuthorization, InvalidToken } from './errors.js';
@@ -106,7 +112,10 @@ export async function dpopValidate(
 		if (err instanceof InvalidDpopProof || err instanceof UseDpopNonce) {
 			throw err;
 		}
-		throw new InvalidDpopProof('invalid DPoP key binding', err instanceof Error ? err.message : String(err));
+		throw new InvalidDpopProof(
+			'invalid DPoP key binding',
+			err instanceof Error ? err.message : String(err)
+		);
 	}
 
 	if (!payload.nonce && requireNonce) {

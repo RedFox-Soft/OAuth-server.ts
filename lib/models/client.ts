@@ -132,7 +132,7 @@ function deriveEncryptionKey(secret, length) {
 				? 'sha384'
 				: length <= 64
 					? 'sha512'
-					: false; // eslint-disable-line no-nested-ternary
+					: false;
 	if (!digest) {
 		throw new Error('unsupported symmetric encryption key derivation');
 	}
@@ -178,7 +178,6 @@ class ClientKeyStore extends KeyStore {
 			Array.isArray(key.x5c) &&
 			key.x5c.length
 		) {
-			// eslint-disable-next-line no-param-reassign
 			key['x5t#S256'] = certificateThumbprint(key.x5c[0]);
 		}
 		super.add(key);

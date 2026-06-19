@@ -1,5 +1,3 @@
-/* eslint-disable no-console */
-
 export function captureConsoleInfo(fn, color) {
 	let out;
 	const { isTTY } = process.stdout;

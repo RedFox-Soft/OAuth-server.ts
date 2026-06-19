@@ -5,7 +5,6 @@ import bootstrap from '../test_helper.js';
 import { provider } from 'lib/provider.js';
 
 describe('x-forwarded-proto trust', () => {
-	/* eslint-disable no-console */
 	beforeEach(() => {
 		sinon.stub(console, 'warn').returns();
 	});

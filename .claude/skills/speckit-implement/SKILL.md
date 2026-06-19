@@ -1,15 +1,14 @@
 ---
-name: "speckit-implement"
-description: "Execute the implementation plan by processing and executing all tasks defined in tasks.md"
-argument-hint: "Optional implementation guidance or task filter"
-compatibility: "Requires spec-kit project structure with .specify/ directory"
+name: 'speckit-implement'
+description: 'Execute the implementation plan by processing and executing all tasks defined in tasks.md'
+argument-hint: 'Optional implementation guidance or task filter'
+compatibility: 'Requires spec-kit project structure with .specify/ directory'
 metadata:
-  author: "github-spec-kit"
-  source: "templates/commands/implement.md"
+  author: 'github-spec-kit'
+  source: 'templates/commands/implement.md'
 user-invocable: true
 disable-model-invocation: false
 ---
-
 
 ## User Input
 
@@ -22,6 +21,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 ## Pre-Execution Checks
 
 **Check for extension hooks (before implementation)**:
+
 - Check if `.specify/extensions.yml` exists in the project root.
 - If it exists, read it and look for entries under the `hooks.before_implement` key
 - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
@@ -32,6 +32,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 - When constructing slash commands from hook command names, replace dots (`.`) with hyphens (`-`). For example, `speckit.git.commit` → `/speckit-git-commit`.
 - For each executable hook, output the following based on its `optional` flag:
   - **Optional hook** (`optional: true`):
+
     ```
     ## Extension Hooks
 
@@ -42,16 +43,19 @@ You **MUST** consider the user input before proceeding (if not empty).
     Prompt: {prompt}
     To execute: `/{command}`
     ```
+
   - **Mandatory hook** (`optional: false`):
+
     ```
     ## Extension Hooks
 
     **Automatic Pre-Hook**: {extension}
     Executing: `/{command}`
     EXECUTE_COMMAND: {command}
-    
+
     Wait for the result of the hook command before proceeding to the Outline.
     ```
+
 - If no hooks are registered or `.specify/extensions.yml` does not exist, skip silently
 
 ## Outline
@@ -108,12 +112,12 @@ You **MUST** consider the user input before proceeding (if not empty).
      git rev-parse --git-dir 2>/dev/null
      ```
 
-   - Check if Dockerfile* exists or Docker in plan.md → create/verify .dockerignore
-   - Check if .eslintrc* exists → create/verify .eslintignore
-   - Check if eslint.config.* exists → ensure the config's `ignores` entries cover required patterns
-   - Check if .prettierrc* exists → create/verify .prettierignore
+   - Check if Dockerfile\* exists or Docker in plan.md → create/verify .dockerignore
+   - Check if .eslintrc\* exists → create/verify .eslintignore
+   - Check if eslint.config.\* exists → ensure the config's `ignores` entries cover required patterns
+   - Check if .prettierrc\* exists → create/verify .prettierignore
    - Check if .npmrc or package.json exists → create/verify .npmignore (if publishing)
-   - Check if terraform files (*.tf) exist → create/verify .terraformignore
+   - Check if terraform files (\*.tf) exist → create/verify .terraformignore
    - Check if .helmignore needed (helm charts present) → create/verify .helmignore
 
    **If ignore file already exists**: Verify it contains essential patterns, append missing critical patterns only
@@ -150,7 +154,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 6. Execute implementation following the task plan:
    - **Phase-by-phase execution**: Complete each phase before moving to the next
-   - **Respect dependencies**: Run sequential tasks in order, parallel tasks [P] can run together  
+   - **Respect dependencies**: Run sequential tasks in order, parallel tasks [P] can run together
    - **Follow TDD approach**: Execute test tasks before their corresponding implementation tasks
    - **File-based coordination**: Tasks affecting the same files must run sequentially
    - **Validation checkpoints**: Verify each phase completion before proceeding
@@ -183,6 +187,7 @@ Note: This command assumes a complete task breakdown exists in tasks.md. If task
 **You MUST complete this section before reporting completion to the user.**
 
 Check if `.specify/extensions.yml` exists in the project root.
+
 - If it does not exist, or no hooks are registered under `hooks.after_implement`, skip to the Completion Report.
 - If it exists, read it and look for entries under the `hooks.after_implement` key.
 - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue to the Completion Report.
@@ -193,6 +198,7 @@ Check if `.specify/extensions.yml` exists in the project root.
 - When constructing slash commands from hook command names, replace dots (`.`) with hyphens (`-`). For example, `speckit.git.commit` → `/speckit-git-commit`.
 - For each executable hook, output the following based on its `optional` flag:
   - **Mandatory hook** (`optional: false`) — **You MUST emit `EXECUTE_COMMAND:` for each mandatory hook**:
+
     ```
     ## Extension Hooks
 
@@ -200,7 +206,9 @@ Check if `.specify/extensions.yml` exists in the project root.
     Executing: `/{command}`
     EXECUTE_COMMAND: {command}
     ```
+
   - **Optional hook** (`optional: true`):
+
     ```
     ## Extension Hooks
 

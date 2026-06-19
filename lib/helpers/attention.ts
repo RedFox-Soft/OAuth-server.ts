@@ -17,9 +17,9 @@ function colorizeStderr(str) {
 }
 
 export function info(str) {
-	console.info(colorizeStdout(`oidc-provider NOTICE: ${str}`)); // eslint-disable-line no-console
+	console.info(colorizeStdout(`oidc-provider NOTICE: ${str}`));
 }
 
 export function warn(str) {
-	console.warn(colorizeStderr(`oidc-provider WARNING: ${str}`)); // eslint-disable-line no-console
+	console.warn(colorizeStderr(`oidc-provider WARNING: ${str}`));
 }

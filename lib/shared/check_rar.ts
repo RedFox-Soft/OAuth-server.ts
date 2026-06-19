@@ -100,7 +100,6 @@ export default async function checkRar(ctx) {
 
 				await config.validate(ctx, detail, client);
 
-				// eslint-disable-next-line no-plusplus
 				i++;
 			}
 		}
