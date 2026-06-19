@@ -1,7 +1,7 @@
 import { shouldChange } from './_warn.ts';
 import htmlSafe from '../helpers/html_safe.ts';
 
-export async function renderError(ctx, out, error) {
+export async function renderError(ctx, out, _error) {
 	shouldChange('renderError', 'customize the look of the error page');
 	ctx.type = 'html';
 	ctx.body = `<!DOCTYPE html>

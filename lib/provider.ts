@@ -9,7 +9,6 @@ import initializeClients from './helpers/initialize_clients.ts';
 import ResourceServer from './helpers/resource_server.ts';
 import { OIDCProviderError } from './helpers/errors.ts';
 import * as models from './models/index.ts';
-import { globalConfiguration } from './globalConfiguration.js';
 import { Client } from './models/client.js';
 import { IdToken } from './models/id_token.js';
 import { JWKS_KEYS } from './configs/env.js';
@@ -37,8 +36,8 @@ class ProviderClass extends EventEmitter {
 
 		instance.set(this, this.#int);
 
-		this.#int.configuration = globalConfiguration;
-		this.#int.features = globalConfiguration.features;
+		this.#int.configuration = configuration;
+		this.#int.features = configuration.features;
 
 		this.#int.responseModes = new Map();
 

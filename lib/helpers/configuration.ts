@@ -4,7 +4,6 @@ import * as formatters from './formatters.ts';
 import getDefaults from './defaults.ts';
 import { STABLE, EXPERIMENTS } from './features.ts';
 import * as attention from './attention.ts';
-import { globalConfiguration } from 'lib/globalConfiguration.js';
 
 function featuresTypeErrorCheck({ features }) {
 	for (const value of Object.values(features)) {
@@ -43,8 +42,6 @@ class Configuration {
 		this.checkAuthMethods();
 		this.checkCibaDeliveryModes();
 		this.checkRichAuthorizationRequests();
-
-		merge(globalConfiguration, pick(this, ...Object.keys(this)));
 
 		// release #defaults
 		this.#defaults = undefined;

@@ -40,8 +40,7 @@ import {
 	triggerAuthenticationDevice
 } from '../addon/ciba.ts';
 import { base as defaultPolicy } from './interaction_policy/index.ts';
-import * as errors from './errors.ts';
-import { Grant } from 'lib/models/grant.js';
+import { ApplicationConfig as config } from 'lib/configs/application.js';
 
 function makeDefaults() {
 	const defaults = {
@@ -228,7 +227,7 @@ function makeDefaults() {
 			 * authentication flows as soon as possible. These views are not meant to ever be seen by actual
 			 * users.
 			 */
-			devInteractions: { enabled: true },
+			devInteractions: { enabled: config['devInteractions.enabled'] },
 
 			/*
 			 * features.backchannelLogout
@@ -237,7 +236,7 @@ function makeDefaults() {
 			 *
 			 * description: Enables Back-Channel Logout features.
 			 */
-			backchannelLogout: { enabled: false },
+			backchannelLogout: { enabled: config['backchannelLogout.enabled'] },
 
 			/*
 			 * features.ciba
@@ -248,7 +247,7 @@ function makeDefaults() {
 			 *
 			 */
 			ciba: {
-				enabled: false,
+				enabled: config['ciba.enabled'],
 
 				/*
 				 * features.ciba.deliveryModes
@@ -258,7 +257,7 @@ function makeDefaults() {
 				 *   - `ping`
 				 *
 				 */
-				deliveryModes: ['poll'],
+				deliveryModes: [...config['ciba.deliveryModes']],
 
 				/*
 				 * features.ciba.triggerAuthenticationDevice
@@ -358,7 +357,7 @@ function makeDefaults() {
 			 *
 			 */
 			mTLS: {
-				enabled: false,
+				enabled: config['mTLS.enabled'],
 
 				/*
 				 * features.mTLS.certificateBoundAccessTokens
@@ -366,7 +365,7 @@ function makeDefaults() {
 				 * description: Enables section 3 & 4 Mutual TLS Client Certificate-Bound Tokens by exposing
 				 * the client's `tls_client_certificate_bound_access_tokens` metadata property.
 				 */
-				certificateBoundAccessTokens: false,
+				certificateBoundAccessTokens: config['mTLS.certificateBoundAccessTokens'],
 
 				/*
 				 * features.mTLS.selfSignedTlsClientAuth
@@ -375,7 +374,7 @@ function makeDefaults() {
 				 *   method `self_signed_tls_client_auth` for use in the server's `clientAuthMethods`
 				 *   configuration.
 				 */
-				selfSignedTlsClientAuth: false,
+				selfSignedTlsClientAuth: config['mTLS.selfSignedTlsClientAuth'],
 
 				/*
 				 * features.mTLS.tlsClientAuth
@@ -384,7 +383,7 @@ function makeDefaults() {
 				 *   `tls_client_auth` for use in the server's `clientAuthMethods`
 				 *   configuration.
 				 */
-				tlsClientAuth: false,
+				tlsClientAuth: config['mTLS.tlsClientAuth'],
 
 				/*
 				 * features.mTLS.certificateAuthorized
@@ -415,7 +414,7 @@ function makeDefaults() {
 			 *
 			 */
 			claimsParameter: {
-				enabled: false,
+				enabled: config['claimsParameter.enabled'],
 
 				/**
 				 * features.claimsParameter.assertClaimsParameter
@@ -433,7 +432,7 @@ function makeDefaults() {
 			 * description: Enables Device Authorization Grant
 			 */
 			deviceFlow: {
-				enabled: false,
+				enabled: config['deviceFlow.enabled'],
 
 				/*
 				 * features.deviceFlow.charset
@@ -442,7 +441,7 @@ function makeDefaults() {
 				 *   - `base-20` uses BCDFGHJKLMNPQRSTVWXZ
 				 *   - `digits` uses 0123456789
 				 */
-				charset: 'base-20',
+				charset: config['deviceFlow.charset'],
 
 				/*
 				 * features.deviceFlow.mask
@@ -451,7 +450,7 @@ function makeDefaults() {
 				 *   be replaced by random chars from the charset, `-`(dash) and ` ` (space) characters may be
 				 *   included for readability. See the RFC for details about minimal recommended entropy.
 				 */
-				mask: '****-****',
+				mask: config['deviceFlow.mask'],
 
 				/*
 				 * features.deviceFlow.deviceInfo
@@ -493,7 +492,7 @@ function makeDefaults() {
 			 * description: Enables encryption features such as receiving encrypted UserInfo responses,
 			 * encrypted ID Tokens and allow receiving encrypted Request Objects.
 			 */
-			encryption: { enabled: false },
+			encryption: { enabled: config['encryption.enabled'] },
 
 			/*
 			 * features.rpInitiatedLogout
@@ -503,7 +502,7 @@ function makeDefaults() {
 			 * description: Enables RP-Initiated Logout features
 			 */
 			rpInitiatedLogout: {
-				enabled: true
+				enabled: config['rpInitiatedLogout.enabled']
 			},
 
 			/*
@@ -517,7 +516,7 @@ function makeDefaults() {
 			 *
 			 */
 			introspection: {
-				enabled: false,
+				enabled: config['introspection.enabled'],
 
 				/*
 				 * features.introspection.allowedPolicy
@@ -535,7 +534,7 @@ function makeDefaults() {
 			 *
 			 * description: Enables JWT responses for Token Introspection features
 			 */
-			jwtIntrospection: { enabled: false },
+			jwtIntrospection: { enabled: config['jwtIntrospection.enabled'] },
 
 			/*
 			 * features.jwtResponseModes
@@ -544,7 +543,7 @@ function makeDefaults() {
 			 *
 			 * description: Enables JWT Secured Authorization Responses
 			 */
-			jwtResponseModes: { enabled: false },
+			jwtResponseModes: { enabled: config['responseMode.jwt.enabled'] },
 
 			/*
 			 * features.registration
@@ -554,7 +553,7 @@ function makeDefaults() {
 			 * description: Enables Dynamic Client Registration.
 			 */
 			registration: {
-				enabled: false,
+				enabled: config['registration.enabled'],
 
 				/*
 				 * features.registration.initialAccessToken
@@ -570,7 +569,7 @@ function makeDefaults() {
 				 * new (provider.InitialAccessToken)({}).save().then(console.log);
 				 * ```
 				 */
-				initialAccessToken: false,
+				initialAccessToken: config['registration.initialAccessToken'],
 
 				/*
 				 * features.registration.policies
@@ -628,7 +627,7 @@ function makeDefaults() {
 				 * ctx.oidc.entities.RegistrationAccessToken.policies = ['update-policy'];
 				 * ```
 				 */
-				policies: undefined,
+				policies: config['registration.policies'],
 
 				/*
 				 * features.registration.idFactory
@@ -665,7 +664,9 @@ function makeDefaults() {
 				 * }
 				 * ```
 				 */
-				issueRegistrationAccessToken: true
+				issueRegistrationAccessToken: config[
+					'registration.issueRegistrationAccessToken'
+				]
 			},
 
 			/*
@@ -676,7 +677,7 @@ function makeDefaults() {
 			 * description: Enables Update and Delete features described in the RFC
 			 */
 			registrationManagement: {
-				enabled: false,
+				enabled: config['registrationManagement.enabled'],
 
 				/*
 				 * features.registrationManagement.rotateRegistrationAccessToken
@@ -704,7 +705,9 @@ function makeDefaults() {
 				 * }
 				 * ```
 				 */
-				rotateRegistrationAccessToken: true
+				rotateRegistrationAccessToken: config[
+					'registrationManagement.rotateRegistrationAccessToken'
+				]
 			},
 
 			/*
@@ -717,8 +720,8 @@ function makeDefaults() {
 			 *   This is an experimental feature.
 			 */
 			richAuthorizationRequests: {
-				enabled: false,
-				ack: undefined,
+				enabled: config['richAuthorizationRequests.enabled'],
+				ack: config['richAuthorizationRequests.ack'],
 				/**
 				 * features.richAuthorizationRequests.types
 				 *
@@ -773,14 +776,14 @@ function makeDefaults() {
 				 * }
 				 * ```
 				 */
-				types: {},
+				types: { ...config['richAuthorizationRequests.types'] },
 				/*
 				 * features.richAuthorizationRequests.rarForAuthorizationCode
 				 *
 				 * description: Function used to transform the requested and granted RAR details that are then stored
 				 *   in the authorization code. Return array of details or undefined.
 				 */
-				rarForAuthorizationCode(ctx) {
+				rarForAuthorizationCode(_ctx) {
 					// decision points:
 					// - ctx.oidc.client
 					// - ctx.oidc.resourceServers
@@ -801,7 +804,7 @@ function makeDefaults() {
 				 *   returned in the Access Token Response as authorization_details as well as assigned to the
 				 *   issued Access Token. Return array of details or undefined.
 				 */
-				rarForCodeResponse(ctx, resourceServer) {
+				rarForCodeResponse(_ctx, _resourceServer) {
 					// decision points:
 					// - ctx.oidc.client
 					// - resourceServer
@@ -823,7 +826,7 @@ function makeDefaults() {
 				 *   returned in the Access Token Response as authorization_details as well as assigned to the
 				 *   issued Access Token. Return array of details or undefined.
 				 */
-				rarForRefreshTokenResponse(ctx, resourceServer) {
+				rarForRefreshTokenResponse(_ctx, _resourceServer) {
 					// decision points:
 					// - ctx.oidc.client
 					// - resourceServer
@@ -845,7 +848,7 @@ function makeDefaults() {
 				 *   returned in the Access Token Response as authorization_details as well as assigned to the
 				 *   issued Access Token. Return array of details or undefined.
 				 */
-				rarForIntrospectionResponse(ctx, token) {
+				rarForIntrospectionResponse(_ctx, _token) {
 					// decision points:
 					// - ctx.oidc.client
 					// - token.kind
@@ -902,7 +905,7 @@ function makeDefaults() {
 			 * Server (returned from `features.resourceIndicators.getResourceServerInfo`).
 			 */
 			resourceIndicators: {
-				enabled: true,
+				enabled: config['resourceIndicators.enabled'],
 
 				/*
 				 * features.resourceIndicators.defaultResource
@@ -1020,7 +1023,7 @@ function makeDefaults() {
 			 * description: Enables the use and validations of the `request` parameter.
 			 */
 			requestObjects: {
-				enabled: false,
+				enabled: config['requestObjects.enabled'],
 
 				/*
 				 * features.requestObjects.requireSignedRequestObject
@@ -1028,7 +1031,7 @@ function makeDefaults() {
 				 * description: Makes the use of signed request objects required for all authorization
 				 * requests as an authorization server policy.
 				 */
-				requireSignedRequestObject: false,
+				requireSignedRequestObject: config['requestObjects.requireSignedRequestObject'],
 
 				/**
 				 * features.requestObjects.assertJwtClaimsAndHeader
@@ -1049,7 +1052,7 @@ function makeDefaults() {
 			 *   - refresh tokens
 			 *
 			 */
-			revocation: { enabled: false },
+			revocation: { enabled: config['revocation.enabled'] },
 
 			/*
 			 * features.userinfo
@@ -1059,7 +1062,7 @@ function makeDefaults() {
 			 * description: Enables the userinfo endpoint. Its use requires an opaque Access Token with at least
 			 * `openid` scope that's without a Resource Server audience.
 			 */
-			userinfo: { enabled: true },
+			userinfo: { enabled: config['userinfo.enabled'] },
 
 			/*
 			 * features.jwtUserinfo
@@ -1069,7 +1072,7 @@ function makeDefaults() {
 			 * description: Enables the userinfo to optionally return signed and/or encrypted JWTs, also
 			 * enables the relevant client metadata for setting up signing and/or encryption.
 			 */
-			jwtUserinfo: { enabled: false }
+			jwtUserinfo: { enabled: config['jwtUserinfo.enabled'] }
 		},
 
 		formats: {

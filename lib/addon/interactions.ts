@@ -68,8 +68,7 @@ export async function userCodeConfirmSource(
 		'features.deviceFlow.userCodeConfirmSource',
 		'customize the look of the user code confirmation page'
 	);
-	const { clientId, clientName, clientUri, logoUri, policyUri, tosUri } =
-		ctx.oidc.client;
+	const { clientId, clientName } = ctx.oidc.client;
 	ctx.body = `<!DOCTYPE html>
     <html>
     <head>
@@ -108,15 +107,7 @@ export async function successSource(ctx) {
 		'features.deviceFlow.successSource',
 		'customize the look of the device code success page'
 	);
-	const {
-		clientId,
-		clientName,
-		clientUri,
-		initiateLoginUri,
-		logoUri,
-		policyUri,
-		tosUri
-	} = ctx.oidc.client;
+	const { clientName } = ctx.oidc.client;
 	ctx.body = `<!DOCTYPE html>
     <html>
     <head>

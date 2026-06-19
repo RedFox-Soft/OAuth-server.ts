@@ -1,6 +1,6 @@
 import { Grant } from '../models/grant.js';
 
-export async function findAccount(ctx, sub, token) {
+export async function findAccount(ctx, sub, _token) {
 	// @param ctx - koa request context
 	// @param sub {string} - account identifier (subject)
 	// @param token - is a reference to the token used for which a given account is being loaded,
@@ -19,7 +19,7 @@ export async function findAccount(ctx, sub, token) {
 		//   "id_token" or "userinfo" (depends on the "use" param)
 		// @param rejected {Array[String]} - claim names that were rejected by the end-user, you might
 		//   want to skip loading some claims from external resources or through db projection
-		async claims(use, scope, claims, rejected) {
+		async claims(_use, _scope, _claims, _rejected) {
 			return { sub };
 		}
 	};

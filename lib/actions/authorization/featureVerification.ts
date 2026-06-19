@@ -1,6 +1,7 @@
-import { globalConfiguration } from 'lib/globalConfiguration.js';
 import { NotSupportedError } from 'lib/helpers/errors.js';
 import { ApplicationConfig as config } from 'lib/configs/application.js';
+import instance from 'lib/helpers/weak_cache.js';
+import { provider } from 'lib/provider.js';
 
 export function featureVerification(params: Record<string, unknown>) {
 	const {
@@ -10,7 +11,7 @@ export function featureVerification(params: Record<string, unknown>) {
 			richAuthorizationRequests,
 			requestObjects
 		}
-	} = globalConfiguration;
+	} = instance(provider).configuration;
 
 	if (!Object.keys(params.claims ?? {}).length) {
 		delete params.claims;

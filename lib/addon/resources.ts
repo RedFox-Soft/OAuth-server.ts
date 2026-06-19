@@ -13,14 +13,18 @@ export async function defaultResource(ctx, client, oneOf) {
 	return undefined;
 }
 
-export async function useGrantedResource(ctx, model) {
+export async function useGrantedResource(_ctx, _model) {
 	// @param ctx - koa request context
 	// @param model - depending on the request's grant_type this can be either an AuthorizationCode, BackchannelAuthenticationRequest,
 	//                RefreshToken, or DeviceCode model instance.
 	return false;
 }
 
-export async function getResourceServerInfo(ctx, resourceIndicator, client) {
+export async function getResourceServerInfo(
+	_ctx,
+	_resourceIndicator,
+	_client
+) {
 	// @param ctx - koa request context
 	// @param resourceIndicator - resource indicator value either requested or resolved by the defaultResource helper.
 	// @param client - client making the request

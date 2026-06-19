@@ -4,11 +4,11 @@ import os from 'node:os';
 import { mustChange } from './_warn.ts';
 import nanoid from '../helpers/nanoid.ts';
 
-export function idFactory(ctx) {
+export function idFactory(_ctx) {
 	return nanoid();
 }
 
-export async function secretFactory(ctx) {
+export async function secretFactory(_ctx) {
 	return crypto.randomBytes(64).toString('base64url');
 }
 

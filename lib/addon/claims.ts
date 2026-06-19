@@ -1,18 +1,18 @@
 import * as errors from '../helpers/errors.ts';
 import { ApplicationConfig as config } from '../configs/application.js';
 
-export function sectorIdentifierUriValidate(client) {
+export function sectorIdentifierUriValidate(_client) {
 	// @param client - the Client instance
 	return true;
 }
 
-export async function assertClaimsParameter(ctx, claims, client) {
+export async function assertClaimsParameter(_ctx, _claims, _client) {
 	// @param ctx - koa request context
 	// @param claims - parsed claims parameter
 	// @param client - the Client instance
 }
 
-export async function assertJwtClaimsAndHeader(ctx, claims, header, client) {
+export async function assertJwtClaimsAndHeader(ctx, claims, _header, _client) {
 	// @param ctx - koa request context
 	// @param claims - parsed Request Object JWT Claims Set as object
 	// @param header - parsed Request Object JWT Headers as object

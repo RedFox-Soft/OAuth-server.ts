@@ -1,7 +1,7 @@
 import { shouldChange, mustChange } from './_warn.ts';
 import * as errors from '../helpers/errors.ts';
 
-export async function processLoginHintToken(ctx, loginHintToken) {
+export async function processLoginHintToken(_ctx, _loginHintToken) {
 	// @param ctx - koa request context
 	// @param loginHintToken - string value of the login_hint_token parameter
 	mustChange(
@@ -11,7 +11,7 @@ export async function processLoginHintToken(ctx, loginHintToken) {
 	throw new Error('features.ciba.processLoginHintToken not implemented');
 }
 
-export async function processLoginHint(ctx, loginHint) {
+export async function processLoginHint(_ctx, _loginHint) {
 	// @param ctx - koa request context
 	// @param loginHint - string value of the login_hint parameter
 	mustChange(
@@ -21,7 +21,7 @@ export async function processLoginHint(ctx, loginHint) {
 	throw new Error('features.ciba.processLoginHint not implemented');
 }
 
-export async function verifyUserCode(ctx, account, userCode) {
+export async function verifyUserCode(_ctx, _account, _userCode) {
 	// @param ctx - koa request context
 	// @param account -
 	// @param userCode - string value of the user_code parameter, when not provided it is undefined
@@ -46,7 +46,7 @@ export async function validateBindingMessage(ctx, bindingMessage) {
 	}
 }
 
-export async function validateRequestContext(ctx, requestContext) {
+export async function validateRequestContext(_ctx, _requestContext) {
 	// @param ctx - koa request context
 	// @param requestContext - string value of the request_context parameter, when not provided it is undefined
 	mustChange(
@@ -56,7 +56,12 @@ export async function validateRequestContext(ctx, requestContext) {
 	throw new Error('features.ciba.validateRequestContext not implemented');
 }
 
-export async function triggerAuthenticationDevice(ctx, request, account, client) {
+export async function triggerAuthenticationDevice(
+	_ctx,
+	_request,
+	_account,
+	_client
+) {
 	// @param ctx - koa request context
 	// @param request - the BackchannelAuthenticationRequest instance
 	// @param account - the account object retrieved by findAccount
