@@ -4,12 +4,12 @@ import instance from '../../helpers/weak_cache.ts';
 
 import checkIdTokenHint from './check_id_token_hint.ts';
 
-export default async function cibaLoadAccount(ctx, next) {
+export default async function cibaLoadAccount(oidc, next) {
 	const mechanisms = omitBy(
 		{
-			login_hint_token: ctx.oidc.params.login_hint_token,
-			id_token_hint: ctx.oidc.params.id_token_hint,
-			login_hint: ctx.oidc.params.login_hint
+			login_hint_token: oidc.params.login_hint_token,
+			id_token_hint: oidc.params.id_token_hint,
+			login_hint: oidc.params.login_hint
 		},
 		(value) => typeof value !== 'string' || !value
 	);
@@ -35,36 +35,36 @@ export default async function cibaLoadAccount(ctx, next) {
 		);
 	}
 
-	const { findAccount, features } = instance(ctx.oidc.provider).configuration;
+	const { findAccount, features } = instance(oidc.provider).configuration;
 	const { ciba } = features;
 
 	let accountId;
 
 	switch (mechanism) {
 		case 'id_token_hint':
-			await checkIdTokenHint(ctx, () => {});
+			await checkIdTokenHint(oidc);
 			({
 				payload: { sub: accountId }
-			} = ctx.oidc.entities.IdTokenHint);
+			} = oidc.entities.IdTokenHint);
 			break;
 		case 'login_hint_token':
-			accountId = await ciba.processLoginHintToken(ctx, value);
+			accountId = await ciba.processLoginHintToken({ oidc }, value);
 			break;
 		case 'login_hint':
-			accountId = await ciba.processLoginHint(ctx, value);
+			accountId = await ciba.processLoginHint({ oidc }, value);
 			break;
 	}
 
 	if (!accountId) {
 		throw new UnknownUserId('could not identify end-user');
 	}
-	const account = await findAccount(ctx, accountId);
+	const account = await findAccount({ oidc }, accountId);
 	if (!account) {
 		throw new UnknownUserId('could not identify end-user');
 	}
-	ctx.oidc.entity('Account', account);
+	oidc.entity('Account', account);
 
-	await ciba.verifyUserCode(ctx, account, value);
+	await ciba.verifyUserCode({ oidc }, account, value);
 
 	return next();
 }

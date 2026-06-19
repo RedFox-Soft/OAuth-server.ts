@@ -28,15 +28,15 @@ import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { Client } from 'lib/models/client.js';
 
-async function codeVerificationActionHandler(ctx) {
+async function codeVerificationActionHandler(oidc) {
 	deviceUserFlowErrors;
-	await checkClient(ctx);
-	await checkResource(ctx);
-	assignClaims(ctx);
-	await loadAccount(ctx);
-	await loadGrant(cxt);
-	interactions('device_resume', ctx);
-	await deviceUserFlowResponse(ctx);
+	await checkClient(oidc);
+	await checkResource(oidc);
+	assignClaims(oidc);
+	await loadAccount(oidc);
+	await loadGrant(oidc);
+	interactions('device_resume', oidc);
+	await deviceUserFlowResponse(oidc);
 }
 
 export const codeVerification = new Elysia()
@@ -46,10 +46,10 @@ export const codeVerification = new Elysia()
 	.get(
 		routeNames.code_verification,
 		async ({ cookie, query }) => {
-			const ctx = { cookie };
-			ctx.oidc = new OIDCContext(query);
+			const oidc = new OIDCContext(query);
+			oidc.cookie = cookie;
 
-			const setCookies = await sessionHandler();
+			const setCookies = await sessionHandler(oidc);
 		},
 		{
 			query: t.Object({

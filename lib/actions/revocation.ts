@@ -4,6 +4,7 @@ import revoke from '../helpers/revoke.js';
 import { routeNames } from 'lib/consts/param_list.js';
 import { authHeaders, AuthPlugin, authParams } from 'lib/plugins/auth.js';
 import { findToken } from '../shared/findToken.js';
+import { OAuthError } from 'lib/shared/response_schemas.js';
 
 const revokeable = new Set([
 	'AccessToken',
@@ -14,8 +15,6 @@ const revokeable = new Set([
 export const revocation = new Elysia().use(AuthPlugin).post(
 	routeNames.revocation,
 	async function ({ body: params, oidc }) {
-		const ctx = { oidc };
-
 		const token = await findToken(params.token, params.token_type_hint);
 		if (!token) {
 			return;
@@ -24,9 +23,9 @@ export const revocation = new Elysia().use(AuthPlugin).post(
 		if (!revokeable.has(token.payload.kind)) {
 			return;
 		}
-		ctx.oidc.entity(token.payload.kind, token);
+		oidc.entity(token.payload.kind, token);
 
-		if (token.payload.clientId !== ctx.oidc.client.clientId) {
+		if (token.payload.clientId !== oidc.client.clientId) {
 			throw new InvalidRequest('this token does not belong to you');
 		}
 
@@ -36,7 +35,7 @@ export const revocation = new Elysia().use(AuthPlugin).post(
 			token.payload.kind === 'RefreshToken' ||
 			token.payload.kind === 'AccessToken'
 		) {
-			await revoke(ctx, token.payload.grantId);
+			await revoke({ oidc }, token.payload.grantId);
 		}
 	},
 	{
@@ -47,6 +46,11 @@ export const revocation = new Elysia().use(AuthPlugin).post(
 			}),
 			authParams
 		]),
-		headers: authHeaders
+		headers: authHeaders,
+		response: {
+			200: t.Void(),
+			400: OAuthError,
+			401: OAuthError
+		}
 	}
 );

@@ -3,19 +3,19 @@ import { generate, normalize } from '../../helpers/user_codes.ts';
 import instance from '../../helpers/weak_cache.ts';
 import { DeviceCode } from 'lib/models/device_code.js';
 
-export default async function deviceAuthorizationResponse(ctx, deviceInfo) {
-	const { charset, mask } = instance(ctx.oidc.provider).features.deviceFlow;
+export default async function deviceAuthorizationResponse(oidc, deviceInfo) {
+	const { charset, mask } = instance(oidc.provider).features.deviceFlow;
 	const userCode = generate(charset, mask);
 
 	const dc = new DeviceCode({
-		client: ctx.oidc.client,
+		client: oidc.client,
 		deviceInfo,
-		params: ctx.oidc.params,
+		params: oidc.params,
 		userCode: normalize(userCode)
 	});
 
-	ctx.oidc.entity('DeviceCode', dc);
-	ctx.body = {
+	oidc.entity('DeviceCode', dc);
+	const body = {
 		device_code: await dc.save(),
 		user_code: userCode,
 		verification_uri: ISSUER + '/device',
@@ -23,6 +23,7 @@ export default async function deviceAuthorizationResponse(ctx, deviceInfo) {
 		expires_in: dc.expiration
 	};
 
-	ctx.oidc.provider.emit('device_authorization.success', ctx, ctx.body);
-	return ctx.body;
+	// event payload kept `{ oidc }`-shaped (was `ctx`)
+	oidc.provider.emit('device_authorization.success', { oidc }, body);
+	return body;
 }

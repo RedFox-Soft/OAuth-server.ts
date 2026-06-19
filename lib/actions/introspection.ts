@@ -12,6 +12,10 @@ import { Grant } from 'lib/models/grant.js';
 import { ClientCredentials } from 'lib/models/client_credentials.js';
 import { hasGrant } from './grants/index.js';
 import { AuthPlugin, authHeaders, authParams } from 'lib/plugins/auth.js';
+import {
+	IntrospectionResponse,
+	OAuthError
+} from 'lib/shared/response_schemas.js';
 
 const introspectable = new Set([
 	'AccessToken',
@@ -35,8 +39,8 @@ const tokenTypes = {
 	}
 };
 
-async function renderTokenResponse(ctx) {
-	const { params } = ctx.oidc;
+async function renderTokenResponse(oidc) {
+	const { params } = oidc;
 	const { configuration } = instance(provider);
 	const {
 		pairwiseIdentifier,
@@ -81,33 +85,33 @@ async function renderTokenResponse(ctx) {
 			return { active: false };
 		}
 
-		ctx.oidc.entity('Grant', grant);
+		oidc.entity('Grant', grant);
 	}
 
 	if (introspectable.has(token.payload.kind)) {
-		ctx.oidc.entity(token.payload.kind, token);
+		oidc.entity(token.payload.kind, token);
 	} else {
 		return { active: false };
 	}
 
-	if (!(await allowedPolicy(ctx, ctx.oidc.client, token))) {
+	if (!(await allowedPolicy({ oidc }, oidc.client, token))) {
 		return { active: false };
 	}
 
-	ctx.body = { active: false };
+	const body: any = { active: false };
 	if (token.payload.accountId) {
-		ctx.body.sub = token.payload.accountId;
-		if (token.payload.clientId !== ctx.oidc.client.clientId) {
+		body.sub = token.payload.accountId;
+		if (token.payload.clientId !== oidc.client.clientId) {
 			const client = await Client.find(token.payload.clientId);
 			if (client.subjectType === 'pairwise') {
-				ctx.body.sub = await pairwiseIdentifier(ctx.body.sub, client);
+				body.sub = await pairwiseIdentifier(body.sub, client);
 			}
-		} else if (ctx.oidc.client.subjectType === 'pairwise') {
-			ctx.body.sub = await pairwiseIdentifier(ctx.body.sub, ctx.oidc.client);
+		} else if (oidc.client.subjectType === 'pairwise') {
+			body.sub = await pairwiseIdentifier(body.sub, oidc.client);
 		}
 	}
 
-	Object.assign(ctx.body, {
+	Object.assign(body, {
 		...token.extra,
 		active: true,
 		client_id: token.payload.clientId,
@@ -118,7 +122,10 @@ async function renderTokenResponse(ctx) {
 		jti: token.payload.jti !== params.token ? token.payload.jti : undefined,
 		aud: token.payload.aud,
 		authorization_details: token.payload.rar
-			? await richAuthorizationRequests.rarForIntrospectionResponse(ctx, token)
+			? await richAuthorizationRequests.rarForIntrospectionResponse(
+					{ oidc },
+					token
+				)
 			: undefined,
 		scope: token.payload.scope || undefined,
 		cnf: token.isSenderConstrained() ? {} : undefined,
@@ -127,40 +134,39 @@ async function renderTokenResponse(ctx) {
 	});
 
 	if (token.payload['x5t#S256']) {
-		ctx.body.cnf['x5t#S256'] = token.payload['x5t#S256'];
+		body.cnf['x5t#S256'] = token.payload['x5t#S256'];
 	}
 
 	if (token.payload.jkt) {
-		ctx.body.cnf.jkt = token.payload.jkt;
+		body.cnf.jkt = token.payload.jkt;
 	}
-	return ctx.body;
+	return body;
 }
 
 export const introspect = new Elysia().use(AuthPlugin).post(
 	routeNames.introspect,
-	async function ({ oidc }) {
-		const ctx = { oidc };
-
+	async function ({ oidc, request }) {
 		const { configuration } = instance(provider);
 		const {
 			features: { jwtIntrospection }
 		} = configuration;
 		if (jwtIntrospection.enabled) {
-			const { client } = ctx.oidc;
+			const { client } = oidc;
 
 			const {
 				introspectionEncryptedResponseAlg: encrypt,
 				introspectionSignedResponseAlg: sign
 			} = client;
 
-			const accepts = ctx.accepts('json', JWT);
+			const accept = request.headers.get('accept') || '';
+			const accepts = accept.includes(JWT) ? JWT : 'json';
 			if (encrypt && accepts !== JWT) {
 				throw new InvalidRequest(
 					`introspection must be requested with Accept: ${JWT} for this client`
 				);
 			}
 
-			const body = await renderTokenResponse(ctx);
+			const body = await renderTokenResponse(oidc);
 
 			if ((encrypt || sign) && accepts === JWT) {
 				const token = new IdToken(client);
@@ -169,8 +175,8 @@ export const introspect = new Elysia().use(AuthPlugin).post(
 					aud: body.aud
 				};
 
-				ctx.body = await token.issue({ use: 'introspection' });
-				return new Response(ctx.body, {
+				const jwt = await token.issue({ use: 'introspection' });
+				return new Response(jwt, {
 					headers: {
 						'Content-Type': 'application/token-introspection+jwt; charset=utf-8'
 					}
@@ -179,7 +185,7 @@ export const introspect = new Elysia().use(AuthPlugin).post(
 			return body;
 		}
 
-		return await renderTokenResponse(ctx);
+		return await renderTokenResponse(oidc);
 	},
 	{
 		body: t.Composite([
@@ -189,6 +195,11 @@ export const introspect = new Elysia().use(AuthPlugin).post(
 			}),
 			authParams
 		]),
-		headers: authHeaders
+		headers: authHeaders,
+		response: {
+			200: IntrospectionResponse,
+			400: OAuthError,
+			401: OAuthError
+		}
 	}
 );

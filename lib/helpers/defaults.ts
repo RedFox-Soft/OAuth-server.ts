@@ -365,7 +365,8 @@ function makeDefaults() {
 				 * description: Enables section 3 & 4 Mutual TLS Client Certificate-Bound Tokens by exposing
 				 * the client's `tls_client_certificate_bound_access_tokens` metadata property.
 				 */
-				certificateBoundAccessTokens: config['mTLS.certificateBoundAccessTokens'],
+				certificateBoundAccessTokens:
+					config['mTLS.certificateBoundAccessTokens'],
 
 				/*
 				 * features.mTLS.selfSignedTlsClientAuth
@@ -664,9 +665,8 @@ function makeDefaults() {
 				 * }
 				 * ```
 				 */
-				issueRegistrationAccessToken: config[
-					'registration.issueRegistrationAccessToken'
-				]
+				issueRegistrationAccessToken:
+					config['registration.issueRegistrationAccessToken']
 			},
 
 			/*
@@ -705,9 +705,8 @@ function makeDefaults() {
 				 * }
 				 * ```
 				 */
-				rotateRegistrationAccessToken: config[
-					'registrationManagement.rotateRegistrationAccessToken'
-				]
+				rotateRegistrationAccessToken:
+					config['registrationManagement.rotateRegistrationAccessToken']
 			},
 
 			/*
@@ -1031,7 +1030,8 @@ function makeDefaults() {
 				 * description: Makes the use of signed request objects required for all authorization
 				 * requests as an authorization server policy.
 				 */
-				requireSignedRequestObject: config['requestObjects.requireSignedRequestObject'],
+				requireSignedRequestObject:
+					config['requestObjects.requireSignedRequestObject'],
 
 				/**
 				 * features.requestObjects.assertJwtClaimsAndHeader

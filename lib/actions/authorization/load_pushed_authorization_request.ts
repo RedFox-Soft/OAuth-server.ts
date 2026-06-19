@@ -9,8 +9,8 @@ import { PushedAuthorizationRequest } from 'lib/models/pushed_authorization_requ
 /*
  * Validates request_uri is a PAR one when PAR is enabled and loads it. Throws
  */
-export default async function loadPushedAuthorizationRequest(ctx) {
-	const { client, params } = ctx.oidc;
+export default async function loadPushedAuthorizationRequest(oidc) {
+	const { client, params } = oidc;
 
 	if (
 		client['authorization.requirePushedAuthorizationRequests'] &&
@@ -40,7 +40,7 @@ export default async function loadPushedAuthorizationRequest(ctx) {
 			'request_uri is invalid, expired, or was already used'
 		);
 	}
-	ctx.oidc.entity('PushedAuthorizationRequest', pushedAuthorizationRequest);
+	oidc.entity('PushedAuthorizationRequest', pushedAuthorizationRequest);
 	params.request = pushedAuthorizationRequest.payload.request;
 	return pushedAuthorizationRequest;
 }

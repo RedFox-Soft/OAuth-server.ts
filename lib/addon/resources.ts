@@ -20,11 +20,7 @@ export async function useGrantedResource(_ctx, _model) {
 	return false;
 }
 
-export async function getResourceServerInfo(
-	_ctx,
-	_resourceIndicator,
-	_client
-) {
+export async function getResourceServerInfo(_ctx, _resourceIndicator, _client) {
 	// @param ctx - koa request context
 	// @param resourceIndicator - resource indicator value either requested or resolved by the defaultResource helper.
 	// @param client - client making the request

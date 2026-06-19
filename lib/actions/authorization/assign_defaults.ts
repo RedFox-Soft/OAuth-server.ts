@@ -2,8 +2,8 @@
  * assign max_age and acr_values if it is not provided explictly but is configured with default
  * values on the client
  */
-export default function assignDefaults(ctx) {
-	const { params, client } = ctx.oidc;
+export default function assignDefaults(oidc) {
+	const { params, client } = oidc;
 
 	if (!params.acr_values && client.defaultAcrValues) {
 		params.acr_values = client.defaultAcrValues.join(' ');

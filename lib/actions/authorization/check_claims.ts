@@ -12,11 +12,11 @@ import instance from '../../helpers/weak_cache.ts';
  *
  * Merges requested claims with acr as requested if acr_values is provided
  */
-export default async function checkClaims(ctx) {
-	const { params } = ctx.oidc;
+export default async function checkClaims(oidc) {
+	const { params } = oidc;
 
 	if (params.claims !== undefined) {
-		const { claimsParameter, userinfo } = instance(ctx.oidc.provider).features;
+		const { claimsParameter, userinfo } = instance(oidc.provider).features;
 
 		if (claimsParameter.enabled) {
 			if (params.response_type === 'none') {
@@ -31,9 +31,9 @@ export default async function checkClaims(ctx) {
 			}
 
 			await claimsParameter.assertClaimsParameter?.(
-				ctx,
+				oidc,
 				params.claims,
-				ctx.oidc.client
+				oidc.client
 			);
 		}
 	}

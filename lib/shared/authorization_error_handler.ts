@@ -185,5 +185,9 @@ async function authorizationErrorHandler({
 		mode = 'query';
 	}
 	const handler = instance(provider).responseModes.get(mode);
-	return await handler(redirectObj.ctx, redirectObj.redirect_uri, out);
+	return await handler(
+		{ oidc: redirectObj.oidc },
+		redirectObj.redirect_uri,
+		out
+	);
 }

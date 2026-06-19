@@ -12,8 +12,8 @@ export async function assertClaimsParameter(_ctx, _claims, _client) {
 	// @param client - the Client instance
 }
 
-export async function assertJwtClaimsAndHeader(ctx, claims, _header, _client) {
-	// @param ctx - koa request context
+export async function assertJwtClaimsAndHeader(oidc, claims, _header, _client) {
+	// @param oidc - the per-request oidc context
 	// @param claims - parsed Request Object JWT Claims Set as object
 	// @param header - parsed Request Object JWT Headers as object
 	// @param client - the Client instance
@@ -25,7 +25,7 @@ export async function assertJwtClaimsAndHeader(ctx, claims, _header, _client) {
 		requiredClaims.push('exp', 'aud', 'nbf');
 	}
 
-	if (ctx.oidc.route === 'backchannel_authentication') {
+	if (oidc.route === 'backchannel_authentication') {
 		requiredClaims.push('exp', 'iat', 'nbf', 'jti');
 	}
 

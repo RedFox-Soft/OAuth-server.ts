@@ -49,7 +49,9 @@ export class OIDCContext<T extends Record<string, unknown>> {
 		this.entities[key] = value;
 
 		if (key === 'Client') {
-			provider.emit('assign.client', this.ctx, value);
+			// `this` is the oidc context (formerly the `ctx.oidc` payload); there is no
+			// `ctx` wrapper anymore, so emit the context itself as the event payload.
+			provider.emit('assign.client', this, value);
 		}
 	}
 

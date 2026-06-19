@@ -31,22 +31,23 @@ import { Grant } from 'lib/models/grant.js';
 async function resume(interaction, cookie) {
 	const ctx = { cookie, _matchedRouteName: 'ui.resume' };
 	ctx.oidc = new OIDCContext({}, {}, 'ui.resume');
+	ctx.oidc.cookie = cookie;
 
-	const setCookies = await sessionHandler(ctx);
-	const confirmPage = await getResume(ctx, interaction);
+	const setCookies = await sessionHandler(ctx.oidc);
+	const confirmPage = await getResume(ctx.oidc, interaction);
 	if (confirmPage) {
 		return confirmPage;
 	}
 	cookie._interaction.remove();
-	await checkClient(ctx);
-	await checkResource(ctx);
+	await checkClient(ctx.oidc);
+	await checkResource(ctx.oidc);
 	provider.emit('interaction.ended');
-	assignClaims(ctx);
-	await loadAccount(ctx);
-	await loadGrant(ctx);
-	await interactions('resume', ctx);
+	assignClaims(ctx.oidc);
+	await loadAccount(ctx.oidc);
+	await loadGrant(ctx.oidc);
+	await interactions('resume', ctx.oidc);
 	await setCookies();
-	return respond(ctx);
+	return respond(ctx.oidc);
 }
 
 async function createGrant(interaction) {
@@ -188,11 +189,12 @@ export const ui = new Elysia()
 	.get('ui/:uid/device_resume', async ({ interaction, cookie }) => {
 		const ctx = { cookie, _matchedRouteName: 'ui.device_resume' };
 		ctx.oidc = new OIDCContext({}, {}, 'ui.device_resume');
+		ctx.oidc.cookie = cookie;
 
-		const setCookies = await sessionHandler(ctx);
+		const setCookies = await sessionHandler(ctx.oidc);
 
 		deviceUserFlowErrors;
-		await getResume(ctx, interaction);
+		await getResume(ctx.oidc, interaction);
 		cookie._interaction.remove();
 
 		const code = await DeviceCode.find(interaction.deviceCode, {
@@ -209,13 +211,13 @@ export const ui = new Elysia()
 		}
 		ctx.oidc.entity('DeviceCode', code);
 
-		await checkClient(ctx);
-		await checkResource(ctx);
+		await checkClient(ctx.oidc);
+		await checkResource(ctx.oidc);
 		provider.emit('interaction.ended');
-		assignClaims(ctx);
-		await loadAccount(ctx);
-		await loadGrant(ctx);
-		await interactions('device_resume', ctx);
+		assignClaims(ctx.oidc);
+		await loadAccount(ctx.oidc);
+		await loadGrant(ctx.oidc);
+		await interactions('device_resume', ctx.oidc);
 		await setCookies();
 		deviceUserFlowResponse;
 	});

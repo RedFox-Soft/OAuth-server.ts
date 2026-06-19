@@ -8,20 +8,17 @@ import instance from '../../helpers/weak_cache.ts';
  * Resolves and assigns params.response_mode if it was not explicitly requested. Validates id_token
  * and token containing responses do not use response_mode query.
  */
-export default function checkResponseMode(ctx) {
-	const { params, client } = ctx.oidc;
+export default function checkResponseMode(oidc) {
+	const { params, client } = oidc;
 
-	const mode = ctx.oidc.responseMode;
+	const mode = oidc.responseMode;
 
-	if (
-		mode !== undefined &&
-		!instance(ctx.oidc.provider).responseModes.has(mode)
-	) {
+	if (mode !== undefined && !instance(oidc.provider).responseModes.has(mode)) {
 		params.response_mode = undefined;
 		throw new UnsupportedResponseMode();
 	}
 
-	if (!ctx.oidc.client.responseModeAllowed(mode)) {
+	if (!oidc.client.responseModeAllowed(mode)) {
 		throw new InvalidRequest(
 			'requested response_mode is not allowed for this client or request'
 		);

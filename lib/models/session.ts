@@ -67,9 +67,9 @@ export class Session extends BaseModel<SessionPayloadType> {
 		}
 	}
 
-	static async get(ctx) {
+	static async get(oidc) {
 		// is there supposed to be a session bound? generate if not
-		const cookieSessionId = ctx.cookie[cookieNames.session]?.value;
+		const cookieSessionId = oidc.cookie[cookieNames.session]?.value;
 
 		let session;
 
@@ -83,8 +83,8 @@ export class Session extends BaseModel<SessionPayloadType> {
 			session = new this();
 		}
 
-		if (ctx.oidc instanceof OIDCContext) {
-			ctx.oidc.entity('Session', session);
+		if (oidc instanceof OIDCContext) {
+			oidc.entity('Session', session);
 		}
 
 		return session;

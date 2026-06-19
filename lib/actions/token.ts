@@ -32,7 +32,7 @@ export const tokenAction = new Elysia().use(AuthPlugin).post(
 			);
 		}
 
-		return executeGrant(grantType, { oidc }, dPoP);
+		return executeGrant(grantType, oidc, dPoP);
 	},
 	{
 		body: t.Composite([
@@ -50,5 +50,12 @@ export const tokenAction = new Elysia().use(AuthPlugin).post(
 			t.Partial(deviceCodeGrantParameters)
 		]),
 		headers: authHeaders
+		// NOTE: a typed `response` map cannot be added here yet. Declaring one forces Elysia to
+		// type-check this handler against the route's body schema, whose `grant_type` field is
+		// currently `never` (the `t.Union(grantTypes.map(t.Literal))` union collapses at the type
+		// level — a pre-existing body-typing bug, unrelated to US4). That makes the handler fail to
+		// satisfy `InlineHandlerNonMacro`. Once the `grant_type` union is typed (grant-handler
+		// typing, US2/US3 debt) the success body can be typed as an open record (`executeGrant`
+		// returns `Response | Record<string, unknown>`). See contracts/endpoint-responses.md.
 	}
 );

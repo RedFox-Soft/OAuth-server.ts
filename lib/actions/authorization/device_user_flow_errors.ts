@@ -3,17 +3,17 @@ import errOut from '../../helpers/err_out.ts';
 import { ReRenderError, AbortedError } from '../../helpers/re_render_errors.ts';
 import { DeviceCode } from 'lib/models/device_code.js';
 
-export default async function deviceUserFlowErrors(ctx, next) {
+export default async function deviceUserFlowErrors(oidc, next) {
 	try {
 		await next();
 	} catch (err) {
 		if (!(err instanceof ReRenderError)) {
 			const out = errOut(err);
 
-			let code = ctx.oidc.deviceCode;
+			let code = oidc.deviceCode;
 
-			if (!code && ctx.oidc.entities.Interaction?.deviceCode) {
-				code = await DeviceCode.find(ctx.oidc.entities.Interaction.deviceCode, {
+			if (!code && oidc.entities.Interaction?.deviceCode) {
+				code = await DeviceCode.find(oidc.entities.Interaction.deviceCode, {
 					ignoreExpiration: true,
 					ignoreSessionBinding: true
 				});

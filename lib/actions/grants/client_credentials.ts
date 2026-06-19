@@ -8,19 +8,19 @@ import {
 import checkResource from '../../shared/check_resource.ts';
 import { ClientCredentials } from 'lib/models/client_credentials.js';
 
-export async function clientCredentials(ctx, dPoP) {
-	const { client } = ctx.oidc;
-	const { scopes: statics } = instance(ctx.oidc.provider).configuration;
+export async function clientCredentials(oidc, dPoP) {
+	const { client } = oidc;
+	const { scopes: statics } = instance(oidc.provider).configuration;
 
-	if (ctx.oidc.params.authorization_details) {
+	if (oidc.params.authorization_details) {
 		throw new InvalidRequest(
 			'authorization_details is unsupported for this grant_type'
 		);
 	}
 
-	await checkResource(ctx);
+	await checkResource(oidc);
 
-	const scopes = [...new Set(ctx.oidc.params.scope?.split(' '))];
+	const scopes = [...new Set(oidc.params.scope?.split(' '))];
 
 	if (client.scope) {
 		const allowList = new Set(client.scope.split(' '));
@@ -37,7 +37,7 @@ export async function clientCredentials(ctx, dPoP) {
 		scope: scopes.join(' ') || undefined
 	});
 
-	const { 0: resourceServer, length } = Object.values(ctx.oidc.resourceServers);
+	const { 0: resourceServer, length } = Object.values(oidc.resourceServers);
 	if (resourceServer) {
 		if (length !== 1) {
 			throw new InvalidTarget(
@@ -54,7 +54,7 @@ export async function clientCredentials(ctx, dPoP) {
 	}
 
 	if (client.tlsClientCertificateBoundAccessTokens) {
-		const cert = ctx.oidc.getClientCertificate();
+		const cert = oidc.getClientCertificate();
 
 		if (!cert) {
 			throw new InvalidGrant('mutual TLS client certificate not provided');
@@ -68,7 +68,7 @@ export async function clientCredentials(ctx, dPoP) {
 		throw new InvalidGrant('DPoP proof JWT not provided');
 	}
 
-	ctx.oidc.entity('ClientCredentials', token);
+	oidc.entity('ClientCredentials', token);
 	const value = await token.save();
 
 	return {

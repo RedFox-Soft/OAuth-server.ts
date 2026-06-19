@@ -5,13 +5,13 @@ import instance from '../../helpers/weak_cache.ts';
  * Validates that all requested scopes are supported by the provider, and that offline_access prompt
  * is requested together with consent prompt
  */
-export default function checkScope(ctx, isAuth = false) {
-	const { scopes: statics } = instance(ctx.oidc.provider).configuration;
-	const { prompts, client } = ctx.oidc;
+export default function checkScope(oidc, isAuth = false) {
+	const { scopes: statics } = instance(oidc.provider).configuration;
+	const { prompts, client } = oidc;
 
-	const scopes = [...new Set(ctx.oidc.params.scope?.split(' '))];
+	const scopes = [...new Set(oidc.params.scope?.split(' '))];
 
-	const responseType = ctx.oidc.params.response_type;
+	const responseType = oidc.params.response_type;
 
 	/*
 	 * Upon receipt of a scope parameter containing the offline_access value, the Authorization Server
@@ -34,9 +34,9 @@ export default function checkScope(ctx, isAuth = false) {
 	}
 
 	if (scopes.length) {
-		ctx.oidc.params.scope = scopes.join(' ');
+		oidc.params.scope = scopes.join(' ');
 	} else {
-		ctx.oidc.params.scope = undefined;
+		oidc.params.scope = undefined;
 	}
 
 	if (client.scope) {

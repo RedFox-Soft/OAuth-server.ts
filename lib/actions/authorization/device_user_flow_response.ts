@@ -1,26 +1,26 @@
 import instance from '../../helpers/weak_cache.ts';
 import combinedScope from '../../helpers/combined_scope.ts';
 
-export default async function deviceVerificationResponse(ctx) {
-	const { configuration, features } = instance(ctx.oidc.provider);
-	const code = ctx.oidc.deviceCode;
+export default async function deviceVerificationResponse(oidc) {
+	const { configuration, features } = instance(oidc.provider);
+	const code = oidc.deviceCode;
 
 	const scopeSet = combinedScope(
-		ctx.oidc.grant,
-		ctx.oidc.requestParamScopes,
-		ctx.oidc.resourceServers
+		oidc.grant,
+		oidc.requestParamScopes,
+		oidc.resourceServers
 	);
 
 	Object.assign(code, {
-		accountId: ctx.oidc.session.accountId,
-		acr: ctx.oidc.acr,
-		amr: ctx.oidc.amr,
-		authTime: ctx.oidc.session.authTime(),
-		claims: ctx.oidc.claims,
-		grantId: ctx.oidc.session.grantIdFor(ctx.oidc.client.clientId),
+		accountId: oidc.session.accountId,
+		acr: oidc.acr,
+		amr: oidc.amr,
+		authTime: oidc.session.authTime(),
+		claims: oidc.claims,
+		grantId: oidc.session.grantIdFor(oidc.client.clientId),
 		scope: [...scopeSet].join(' '),
-		sessionUid: ctx.oidc.session.uid,
-		resource: Object.keys(ctx.oidc.resourceServers)
+		sessionUid: oidc.session.uid,
+		resource: Object.keys(oidc.resourceServers)
 	});
 
 	if (Object.keys(code.claims).length === 0) {
@@ -36,23 +36,22 @@ export default async function deviceVerificationResponse(ctx) {
 			break;
 	}
 
-	if (await configuration.expiresWithSession(ctx, code)) {
+	if (await configuration.expiresWithSession({ oidc }, code)) {
 		code.expiresWithSession = true;
 	} else {
-		ctx.oidc.session.authorizationFor(ctx.oidc.client.clientId).persistsLogout =
-			true;
+		oidc.session.authorizationFor(oidc.client.clientId).persistsLogout = true;
 	}
 
 	if (
-		ctx.oidc.client.includeSid() ||
-		(ctx.oidc.claims.id_token && 'sid' in ctx.oidc.claims.id_token)
+		oidc.client.includeSid() ||
+		(oidc.claims.id_token && 'sid' in oidc.claims.id_token)
 	) {
-		code.sid = ctx.oidc.session.sidFor(ctx.oidc.client.clientId);
+		code.sid = oidc.session.sidFor(oidc.client.clientId);
 	}
 
 	await code.save();
 
-	await features.deviceFlow.successSource(ctx);
+	await features.deviceFlow.successSource({ oidc });
 
-	ctx.oidc.provider.emit('authorization.success', ctx);
+	oidc.provider.emit('authorization.success', { oidc });
 }

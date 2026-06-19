@@ -1,9 +1,9 @@
 import instance from '../helpers/weak_cache.ts';
 import { InvalidTarget } from '../helpers/errors.ts';
 
-const filterStatics = (ctx) => {
-	if (ctx.oidc.params.scope && !ctx.oidc.params.resource) {
-		ctx.oidc.params.scope = [...ctx.oidc.requestParamOIDCScopes].join(' ');
+const filterStatics = (oidc) => {
+	if (oidc.params.scope && !oidc.params.resource) {
+		oidc.params.scope = [...oidc.requestParamOIDCScopes].join(' ');
 	}
 };
 
@@ -14,21 +14,20 @@ function emptyResource(params) {
 	);
 }
 
-export default async function checkResource(ctx) {
-	const {
-		oidc: { params, provider, client, resourceServers }
-	} = ctx;
+export default async function checkResource(oidc) {
+	const { params, provider, client, resourceServers } = oidc;
 
 	const { defaultResource, enabled, getResourceServerInfo } =
 		instance(provider).features.resourceIndicators;
 
 	if (!enabled) {
-		filterStatics(ctx);
+		filterStatics(oidc);
 		return;
 	}
 
 	if (params.resource === undefined) {
-		params.resource = await defaultResource(ctx, client);
+		// defaultResource is a user-overridable callback expecting a `ctx`-shaped arg
+		params.resource = await defaultResource({ oidc }, client);
 
 		if (params.authorization_details && emptyResource(params)) {
 			throw new InvalidTarget(
@@ -38,7 +37,7 @@ export default async function checkResource(ctx) {
 	}
 
 	if (params.scope && emptyResource(params)) {
-		filterStatics(ctx);
+		filterStatics(oidc);
 		return;
 	}
 
@@ -67,8 +66,13 @@ export default async function checkResource(ctx) {
 			);
 		}
 
-		const resourceServer = await getResourceServerInfo(ctx, identifier, client);
-		resourceServers[identifier] = new ctx.oidc.provider.ResourceServer(
+		// getResourceServerInfo is a user-overridable callback expecting a `ctx`-shaped arg
+		const resourceServer = await getResourceServerInfo(
+			{ oidc },
+			identifier,
+			client
+		);
+		resourceServers[identifier] = new oidc.provider.ResourceServer(
 			identifier,
 			resourceServer
 		);

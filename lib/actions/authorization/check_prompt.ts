@@ -5,10 +5,10 @@ import instance from '../../helpers/weak_cache.ts';
  * Checks that all requested prompts are supported and validates prompt none is not combined with
  * other prompts
  */
-export default function checkPrompt(ctx) {
-	if (ctx.oidc.params.prompt !== undefined) {
-		const { prompts } = ctx.oidc;
-		const supported = instance(ctx.oidc.provider).configuration.prompts;
+export default function checkPrompt(oidc) {
+	if (oidc.params.prompt !== undefined) {
+		const { prompts } = oidc;
+		const supported = instance(oidc.provider).configuration.prompts;
 
 		for (const prompt of prompts) {
 			if (!supported.has(prompt)) {

@@ -55,6 +55,11 @@ import {
 	AuthPlugin,
 	withBody
 } from 'lib/plugins/auth.js';
+import {
+	OAuthError,
+	ParResponse,
+	RedirectOrHtmlResponse
+} from 'lib/shared/response_schemas.js';
 
 const authorizationRequest = t.Composite([
 	t.Omit(AuthorizationParameters, ['request_uri', 'request', 'client_id']),
@@ -65,16 +70,15 @@ const authorizationRequest = t.Composite([
 ]);
 
 export async function isAllowRedirectUri(params) {
-	const ctx = {};
-	ctx.oidc = new OIDCContext(params);
+	const oidc = new OIDCContext(params);
 
 	const client = await Client.find(params.client_id);
 	if (!client) {
 		throw new InvalidClient('client is invalid', 'client not found');
 	}
-	ctx.oidc.entity('Client', client);
+	oidc.entity('Client', client);
 	try {
-		await processRequestObject(authorizationRequest, ctx);
+		await processRequestObject(authorizationRequest, oidc);
 	} catch (e) {
 		if (!(e instanceof OIDCProviderError) && !(e instanceof ValidationError)) {
 			throw e;
@@ -83,7 +87,7 @@ export async function isAllowRedirectUri(params) {
 
 	let redirect_uri = params.redirect_uri;
 	if (redirect_uri === undefined) {
-		oneRedirectUriClients(ctx);
+		oneRedirectUriClients(oidc);
 		redirect_uri = params.redirect_uri;
 	}
 	if (typeof redirect_uri !== 'string') {
@@ -95,15 +99,15 @@ export async function isAllowRedirectUri(params) {
 
 	const state = typeof params.state !== 'string' ? undefined : params.state;
 
-	return { redirect_uri, state, ctx };
+	return { redirect_uri, state, oidc };
 }
 
-async function authorizationActionHandler(ctx) {
-	const setCookies = await sessionHandler(ctx);
-	await checkClient(ctx);
+async function authorizationActionHandler(oidc) {
+	const setCookies = await sessionHandler(oidc);
+	await checkClient(oidc);
 
-	const cient = ctx.oidc.client;
-	const pushedAuthorizationRequest = await loadPushedAuthorizationRequest(ctx);
+	const cient = oidc.client;
+	const pushedAuthorizationRequest = await loadPushedAuthorizationRequest(oidc);
 	const requestOptions = {
 		clientAlg: cient.requestObjectSigningAlg,
 		trusted: false,
@@ -114,31 +118,31 @@ async function authorizationActionHandler(ctx) {
 		requestOptions.clientAlg = undefined;
 		requestOptions.trusted = pushedAuthorizationRequest.trusted;
 	}
-	await processRequestObject(authorizationRequest, ctx, requestOptions);
-	checkResponseMode(ctx);
-	oneRedirectUriClients(ctx);
-	presence(ctx.oidc, 'response_type', 'redirect_uri');
-	checkResponseType(ctx);
-	assignDefaults(ctx);
-	checkPrompt(ctx);
-	checkScope(ctx, true);
-	checkOpenidScope(ctx);
-	checkRedirectUri(ctx);
-	authorizationPKCE(ctx.oidc.params);
-	await checkClaims(ctx);
-	await checkRar(ctx);
-	await checkResource(ctx);
-	checkMaxAge(ctx);
-	await checkIdTokenHint(ctx);
-	assignClaims(ctx);
-	await loadAccount(ctx);
-	await loadGrant(ctx);
-	const redirectUri = await interactions('resume', ctx);
+	await processRequestObject(authorizationRequest, oidc, requestOptions);
+	checkResponseMode(oidc);
+	oneRedirectUriClients(oidc);
+	presence(oidc, 'response_type', 'redirect_uri');
+	checkResponseType(oidc);
+	assignDefaults(oidc);
+	checkPrompt(oidc);
+	checkScope(oidc, true);
+	checkOpenidScope(oidc);
+	checkRedirectUri(oidc);
+	authorizationPKCE(oidc.params);
+	await checkClaims(oidc);
+	await checkRar(oidc);
+	await checkResource(oidc);
+	checkMaxAge(oidc);
+	await checkIdTokenHint(oidc);
+	assignClaims(oidc);
+	await loadAccount(oidc);
+	await loadGrant(oidc);
+	const redirectUri = await interactions('resume', oidc);
 	if (redirectUri) {
 		await setCookies();
 		return Response.redirect(redirectUri, 303);
 	}
-	const response = await respond(ctx);
+	const response = await respond(oidc);
 	await setCookies();
 
 	return response;
@@ -153,19 +157,22 @@ export const authGet = new Elysia()
 	.resolve(({ query }) => {
 		featureVerification(query);
 	})
-	.get(routeNames.authorization, async ({ query, cookie, route, request }) => {
-		const url = new URL(request.url);
-		url.search = url.pathname = '';
+	.get(
+		routeNames.authorization,
+		async ({ query, cookie, route, request }) => {
+			const url = new URL(request.url);
+			url.search = url.pathname = '';
 
-		const ctx = {
-			baseUrl: url.toString(),
-			cookie,
-			_matchedRouteName: route
-		};
-		ctx.oidc = new OIDCContext(query, {}, route);
+			const oidc = new OIDCContext(query, {}, route);
+			oidc.cookie = cookie;
+			oidc.baseUrl = url.toString();
 
-		return await authorizationActionHandler(ctx);
-	});
+			return await authorizationActionHandler(oidc);
+		},
+		{
+			response: { 200: RedirectOrHtmlResponse, 400: OAuthError }
+		}
+	);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null;
@@ -188,20 +195,23 @@ export const authPost = new Elysia()
 	.resolve(({ body }) => {
 		featureVerification(body);
 	})
-	.post(routeNames.authorization, async ({ body, cookie, route, request }) => {
-		const url = new URL(request.url);
-		url.search = '';
-		url.pathname = url.pathname.replace(route, '');
+	.post(
+		routeNames.authorization,
+		async ({ body, cookie, route, request }) => {
+			const url = new URL(request.url);
+			url.search = '';
+			url.pathname = url.pathname.replace(route, '');
 
-		const ctx = {
-			baseUrl: url.toString(),
-			cookie,
-			_matchedRouteName: route
-		};
-		ctx.oidc = new OIDCContext(body, {}, route);
+			const oidc = new OIDCContext(body, {}, route);
+			oidc.cookie = cookie;
+			oidc.baseUrl = url.toString();
 
-		return await authorizationActionHandler(ctx);
-	});
+			return await authorizationActionHandler(oidc);
+		},
+		{
+			response: { 200: RedirectOrHtmlResponse, 400: OAuthError }
+		}
+	);
 
 export const par = new Elysia()
 	.use(AuthPlugin)
@@ -219,28 +229,27 @@ export const par = new Elysia()
 		routeNames.pushed_authorization_request,
 		async ({ body, headers, set, oidc: oidcInc }) => {
 			const oidc = withBody(oidcInc, body);
-			const ctx = { oidc };
 
 			stripOutsideJarParams(oidc);
 			const { request } = oidc.params;
 			const client = oidc.client;
 
-			await processRequestObject(authorizationRequest, ctx, {
+			await processRequestObject(authorizationRequest, oidc, {
 				clientAlg: client.requestObjectSigningAlg
 			});
-			checkResponseMode(ctx);
-			oneRedirectUriClients(ctx);
-			presence(ctx.oidc, 'response_type', 'redirect_uri');
-			checkResponseType(ctx);
-			checkPrompt(ctx);
-			checkScope(ctx, true);
-			checkOpenidScope(ctx);
-			checkRedirectUri(ctx);
+			checkResponseMode(oidc);
+			oneRedirectUriClients(oidc);
+			presence(oidc, 'response_type', 'redirect_uri');
+			checkResponseType(oidc);
+			checkPrompt(oidc);
+			checkScope(oidc, true);
+			checkOpenidScope(oidc);
+			checkRedirectUri(oidc);
 			authorizationPKCE(oidc.params);
-			await checkClaims(ctx);
-			await checkRar(ctx);
-			await checkResource(ctx);
-			await checkIdTokenHint(ctx);
+			await checkClaims(oidc);
+			await checkRar(oidc);
+			await checkResource(oidc);
+			await checkIdTokenHint(oidc);
 
 			// DPOP Verification
 			const dPoP = await dpopValidate(headers.dpop, {
@@ -258,10 +267,14 @@ export const par = new Elysia()
 				}
 			}
 
-			return pushedAuthorizationRequestResponse(ctx, request);
+			return pushedAuthorizationRequestResponse(oidc, request);
 		},
 		{
-			response: t.Object({ request_uri: t.String(), expires_in: t.Number() }),
+			response: {
+				201: ParResponse,
+				400: OAuthError,
+				401: OAuthError
+			},
 			status: 201
 		}
 	);

@@ -24,6 +24,7 @@ import {
 	userinfoSigningAlgValues
 } from 'lib/configs/jwaAlgorithms.js';
 import { ISSUER } from 'lib/configs/env.js';
+import { DiscoveryResponse, OAuthError } from 'lib/shared/response_schemas.js';
 
 type OmitEnabled<T> = {
 	[K in keyof T as K extends `${infer _}enabled` ? K : never]: T[K];
@@ -210,5 +211,8 @@ export const discovery = new Elysia().get(
 
 		defaults(body, configuration.discovery);
 		return body;
+	},
+	{
+		response: { 200: DiscoveryResponse, 500: OAuthError }
 	}
 );

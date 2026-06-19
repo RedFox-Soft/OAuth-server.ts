@@ -30,6 +30,11 @@ import { InvalidRequest } from 'lib/helpers/errors.js';
 import { featureVerification } from './featureVerification.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { authHeaders, authParams } from 'lib/plugins/auth.js';
+import {
+	BackchannelAuthenticationResponse,
+	DeviceAuthorizationResponse,
+	OAuthError
+} from 'lib/shared/response_schemas.js';
 
 const deviceAuthGrantType = 'urn:ietf:params:oauth:grant-type:device_code';
 const backchannelAuthGrantType = 'urn:openid:params:grant-type:ciba';
@@ -44,12 +49,13 @@ const BacckchannelRequest = t.Composite([
 	JWTparameters
 ]);
 
-async function authentication(params, headers, ctx) {
-	await tokenAuth(params, headers, ctx.oidc);
+async function authentication(params, headers, oidc) {
+	await tokenAuth(params, headers, oidc);
 
-	if (!ctx.body.client_id) {
-		ctx.body.client_id = ctx.oidc.client.clientId;
-		ctx.oidc.params.client_id = ctx.oidc.client.clientId;
+	// params is the request body object here; setting client_id on it preserves prior behaviour
+	if (!params.client_id) {
+		params.client_id = oidc.client.clientId;
+		oidc.params.client_id = oidc.client.clientId;
 	}
 }
 
@@ -77,32 +83,38 @@ export const deviceAuth = new Elysia()
 	.post(
 		routeNames.device_authorization,
 		async ({ body, headers, server, request }) => {
-			const ctx = { body };
-			ctx.oidc = new OIDCContext(body, headers);
+			const oidc = new OIDCContext(body, headers);
 
-			await authentication(body, headers, ctx);
-			const client = ctx.oidc.client;
+			await authentication(body, headers, oidc);
+			const client = oidc.client;
 			if (!client.grantTypeAllowed(deviceAuthGrantType)) {
 				throw new InvalidRequest(
 					`${deviceAuthGrantType} is not allowed for this client`
 				);
 			}
-			await processRequestObject(DeviceRequest, ctx, {
+			await processRequestObject(DeviceRequest, oidc, {
 				clientAlg: client.requestObjectSigningAlg
 			});
-			assignDefaults(ctx);
-			checkScope(ctx);
-			checkOpenidScope(ctx);
-			await checkClaims(ctx);
-			unsupportedRar(ctx);
-			await checkResource(ctx);
-			checkMaxAge(ctx);
-			await checkIdTokenHint(ctx);
+			assignDefaults(oidc);
+			checkScope(oidc);
+			checkOpenidScope(oidc);
+			await checkClaims(oidc);
+			unsupportedRar(oidc);
+			await checkResource(oidc);
+			checkMaxAge(oidc);
+			await checkIdTokenHint(oidc);
 			const deviceInfo = {
 				ip: server?.requestIP(request),
 				ua: request.headers.get('user-agent')
 			};
-			return deviceAuthorizationResponse(ctx, deviceInfo);
+			return deviceAuthorizationResponse(oidc, deviceInfo);
+		},
+		{
+			response: {
+				200: DeviceAuthorizationResponse,
+				400: OAuthError,
+				401: OAuthError
+			}
 		}
 	);
 
@@ -113,39 +125,48 @@ export const backchannelAuth = new Elysia()
 	.resolve(({ body }) => {
 		featureVerification(body);
 	})
-	.post(routeNames.backchannel_authentication, async ({ body }) => {
-		const ctx = { body };
-		ctx.oidc = new OIDCContext(body);
+	.post(
+		routeNames.backchannel_authentication,
+		async ({ body }) => {
+			const oidc = new OIDCContext(body);
 
-		authentication;
-		stripOutsideJarParams;
-		const client = ctx.oidc.client;
-		if (!client.grantTypeAllowed(backchannelAuthGrantType)) {
-			throw new InvalidRequest(
-				`${backchannelAuthGrantType} is not allowed for this client`
-			);
+			authentication;
+			stripOutsideJarParams;
+			const client = oidc.client;
+			if (!client.grantTypeAllowed(backchannelAuthGrantType)) {
+				throw new InvalidRequest(
+					`${backchannelAuthGrantType} is not allowed for this client`
+				);
+			}
+			backchannelRequestRemapErrors;
+
+			if (body.request !== undefined && isEncryptedJWT(body.request)) {
+				throw new InvalidRequest(
+					'Encrypted Request Objects are not supported by CIBA'
+				);
+			}
+
+			processRequestObject(BacckchannelRequest, oidc, {
+				clientAlg: client.backchannelAuthenticationRequestSigningAlg
+			});
+			cibaRequired;
+			assignDefaults;
+			checkScope.bind(undefined, allowList);
+			checkOpenidScope;
+			checkClaims;
+			unsupportedRar;
+			checkResource;
+			checkMaxAge;
+			checkCibaContext;
+			assignClaims;
+			cibaLoadAccount;
+			backchannelRequestResponse;
+		},
+		{
+			response: {
+				200: BackchannelAuthenticationResponse,
+				400: OAuthError,
+				401: OAuthError
+			}
 		}
-		backchannelRequestRemapErrors;
-
-		if (body.request !== undefined && isEncryptedJWT(body.request)) {
-			throw new InvalidRequest(
-				'Encrypted Request Objects are not supported by CIBA'
-			);
-		}
-
-		processRequestObject(BacckchannelRequest, ctx, {
-			clientAlg: client.backchannelAuthenticationRequestSigningAlg
-		});
-		cibaRequired;
-		assignDefaults;
-		checkScope.bind(undefined, allowList);
-		checkOpenidScope;
-		checkClaims;
-		unsupportedRar;
-		checkResource;
-		checkMaxAge;
-		checkCibaContext;
-		assignClaims;
-		cibaLoadAccount;
-		backchannelRequestResponse;
-	});
+	);

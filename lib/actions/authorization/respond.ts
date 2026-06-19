@@ -13,12 +13,12 @@ import { ISSUER } from 'lib/configs/env.js';
  *
  * @emits: authorization.success
  */
-export default async function respond(ctx) {
-	let pushedAuthorizationRequest = ctx.oidc.entities.PushedAuthorizationRequest;
+export default async function respond(oidc) {
+	let pushedAuthorizationRequest = oidc.entities.PushedAuthorizationRequest;
 
-	if (!pushedAuthorizationRequest && ctx.oidc.entities.Interaction?.parJti) {
+	if (!pushedAuthorizationRequest && oidc.entities.Interaction?.parJti) {
 		pushedAuthorizationRequest = await PushedAuthorizationRequest.find(
-			ctx.oidc.entities.Interaction.parJti,
+			oidc.entities.Interaction.parJti,
 			{ ignoreExpiration: true }
 		);
 	}
@@ -30,23 +30,24 @@ export default async function respond(ctx) {
 	}
 	await pushedAuthorizationRequest?.consume();
 
-	const out = await processResponseTypes(ctx);
+	// processResponseTypes + response-mode handlers are `ctx`-shaped boundaries (the latter is a
+	// public, user-registrable handler API), so they receive a `{ oidc }` payload.
+	const out = await processResponseTypes({ oidc });
 
-	const {
-		oidc: { params }
-	} = ctx;
+	const { params } = oidc;
 
 	if (params.state !== undefined) {
 		out.state = params.state;
 	}
 
-	const { responseMode } = ctx.oidc;
+	const { responseMode } = oidc;
 	if (!responseMode.includes('jwt')) {
 		out.iss = ISSUER;
 	}
 
-	ctx.oidc.provider.emit('authorization.success', ctx, out);
+	// event payload kept `{ oidc }`-shaped: tests assert `args[0][0].oidc.params`
+	oidc.provider.emit('authorization.success', { oidc }, out);
 
-	const handler = instance(ctx.oidc.provider).responseModes.get(responseMode);
-	return await handler(ctx, params.redirect_uri, out);
+	const handler = instance(oidc.provider).responseModes.get(responseMode);
+	return await handler({ oidc }, params.redirect_uri, out);
 }

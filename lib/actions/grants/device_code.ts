@@ -16,10 +16,10 @@ const { AuthorizationPending, ExpiredToken, InvalidGrant } = errors;
 
 export const gty = 'device_code';
 
-export const handler = async function deviceCodeHandler(ctx, dPoP) {
-	presence(ctx.oidc, 'device_code');
+export const handler = async function deviceCodeHandler(oidc, dPoP) {
+	presence(oidc, 'device_code');
 
-	if (ctx.oidc.params.authorization_details) {
+	if (oidc.params.authorization_details) {
 		throw new errors.InvalidRequest(
 			'authorization_details is unsupported for this grant_type'
 		);
@@ -30,9 +30,9 @@ export const handler = async function deviceCodeHandler(ctx, dPoP) {
 		issueRefreshToken,
 		conformIdTokenClaims,
 		features: { userinfo, resourceIndicators }
-	} = instance(ctx.oidc.provider).configuration;
+	} = instance(oidc.provider).configuration;
 
-	const code = await DeviceCode.find(ctx.oidc.params.device_code, {
+	const code = await DeviceCode.find(oidc.params.device_code, {
 		ignoreExpiration: true
 	});
 
@@ -40,19 +40,19 @@ export const handler = async function deviceCodeHandler(ctx, dPoP) {
 		throw new InvalidGrant('device code not found');
 	}
 
-	if (code.payload.clientId !== ctx.oidc.client.clientId) {
+	if (code.payload.clientId !== oidc.client.clientId) {
 		throw new InvalidGrant('client mismatch');
 	}
 
 	let cert;
-	if (ctx.oidc.client.tlsClientCertificateBoundAccessTokens) {
-		cert = ctx.oidc.getClientCertificate();
+	if (oidc.client.tlsClientCertificateBoundAccessTokens) {
+		cert = oidc.getClientCertificate();
 		if (!cert) {
 			throw new InvalidGrant('mutual TLS client certificate not provided');
 		}
 	}
 
-	if (!dPoP && ctx.oidc.client.dpopBoundAccessTokens) {
+	if (!dPoP && oidc.client.dpopBoundAccessTokens) {
 		throw new InvalidGrant('DPoP proof JWT not provided');
 	}
 
@@ -65,7 +65,7 @@ export const handler = async function deviceCodeHandler(ctx, dPoP) {
 	}
 
 	if (code.payload.consumed) {
-		await revoke(ctx, code.payload.grantId);
+		await revoke({ oidc }, code.payload.grantId);
 		throw new InvalidGrant('device code already consumed');
 	}
 
@@ -94,14 +94,14 @@ export const handler = async function deviceCodeHandler(ctx, dPoP) {
 		throw new InvalidGrant('grant is expired');
 	}
 
-	if (grant.payload.clientId !== ctx.oidc.client.clientId) {
+	if (grant.payload.clientId !== oidc.client.clientId) {
 		throw new InvalidGrant('client mismatch');
 	}
 
-	ctx.oidc.entity('DeviceCode', code);
-	ctx.oidc.entity('Grant', grant);
+	oidc.entity('DeviceCode', code);
+	oidc.entity('Grant', grant);
 
-	const account = await findAccount(ctx, code.payload.accountId, code);
+	const account = await findAccount({ oidc }, code.payload.accountId, code);
 
 	if (!account) {
 		throw new InvalidGrant(
@@ -113,11 +113,11 @@ export const handler = async function deviceCodeHandler(ctx, dPoP) {
 		throw new InvalidGrant('accountId mismatch');
 	}
 
-	ctx.oidc.entity('Account', account);
+	oidc.entity('Account', account);
 
 	const at = new AccessToken({
 		accountId: account.accountId,
-		client: ctx.oidc.client,
+		client: oidc.client,
 		expiresWithSession: code.expiresWithSession,
 		grantId: code.payload.grantId,
 		gty,
@@ -125,7 +125,7 @@ export const handler = async function deviceCodeHandler(ctx, dPoP) {
 		sid: code.payload.sid
 	});
 
-	if (ctx.oidc.client.tlsClientCertificateBoundAccessTokens) {
+	if (oidc.client.tlsClientCertificateBoundAccessTokens) {
 		at.setThumbprint('x5t', cert);
 	}
 
@@ -133,18 +133,18 @@ export const handler = async function deviceCodeHandler(ctx, dPoP) {
 		at.setThumbprint('jkt', dPoP.thumbprint);
 	}
 
-	const resource = await resolveResource(ctx, code, {
+	const resource = await resolveResource({ oidc }, code, {
 		userinfo,
 		resourceIndicators
 	});
 
 	if (resource) {
 		const resourceServerInfo = await resourceIndicators.getResourceServerInfo(
-			ctx,
+			{ oidc },
 			resource,
-			ctx.oidc.client
+			oidc.client
 		);
-		at.resourceServer = new ctx.oidc.provider.ResourceServer(
+		at.resourceServer = new oidc.provider.ResourceServer(
 			resource,
 			resourceServerInfo
 		);
@@ -154,18 +154,18 @@ export const handler = async function deviceCodeHandler(ctx, dPoP) {
 		at.scope = grant.getOIDCScopeFiltered(code.scopes);
 	}
 
-	ctx.oidc.entity('AccessToken', at);
+	oidc.entity('AccessToken', at);
 	const accessToken = await at.save();
 
 	let refreshToken;
-	if (await issueRefreshToken(ctx, ctx.oidc.client, code)) {
+	if (await issueRefreshToken({ oidc }, oidc.client, code)) {
 		const rt = new RefreshToken({
 			accountId: account.accountId,
 			acr: code.acr,
 			amr: code.amr,
 			authTime: code.authTime,
 			claims: code.claims,
-			client: ctx.oidc.client,
+			client: oidc.client,
 			expiresWithSession: code.expiresWithSession,
 			grantId: code.grantId,
 			gty,
@@ -177,7 +177,7 @@ export const handler = async function deviceCodeHandler(ctx, dPoP) {
 			sid: code.sid
 		});
 
-		if (ctx.oidc.client.clientAuthMethod === 'none') {
+		if (oidc.client.clientAuthMethod === 'none') {
 			if (at.payload.jkt) {
 				rt.payload.jkt = at.payload.jkt;
 			}
@@ -187,7 +187,7 @@ export const handler = async function deviceCodeHandler(ctx, dPoP) {
 			}
 		}
 
-		ctx.oidc.entity('RefreshToken', rt);
+		oidc.entity('RefreshToken', rt);
 		refreshToken = await rt.save();
 	}
 
@@ -195,7 +195,7 @@ export const handler = async function deviceCodeHandler(ctx, dPoP) {
 	if (code.scopes.has('openid')) {
 		const claims = filterClaims(code.claims, 'id_token', grant);
 		const rejected = grant.getRejectedOIDCClaims();
-		const token = new IdToken(ctx.oidc.client, {
+		const token = new IdToken(oidc.client, {
 			...(await account.claims(
 				'id_token',
 				code.payload.scope,
@@ -224,7 +224,7 @@ export const handler = async function deviceCodeHandler(ctx, dPoP) {
 		idToken = await token.issue({ use: 'idtoken' });
 	}
 
-	ctx.body = {
+	return {
 		access_token: accessToken,
 		expires_in: at.expiration,
 		id_token: idToken,

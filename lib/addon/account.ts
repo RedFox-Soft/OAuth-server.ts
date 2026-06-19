@@ -25,16 +25,16 @@ export async function findAccount(ctx, sub, _token) {
 	};
 }
 
-export async function loadExistingGrant(ctx) {
-	const clientId = ctx.oidc.client.clientId;
+export async function loadExistingGrant(oidc) {
+	const clientId = oidc.client.clientId;
 	const grantId =
-		ctx.oidc.result?.consent?.grantId || ctx.oidc.session.grantIdFor(clientId);
+		oidc.result?.consent?.grantId || oidc.session.grantIdFor(clientId);
 
 	if (grantId) {
 		return Grant.find(grantId);
 	}
-	const accountId = ctx.oidc.account?.accountId;
-	if (ctx.oidc.client['consent.require'] === false && accountId) {
+	const accountId = oidc.account?.accountId;
+	if (oidc.client['consent.require'] === false && accountId) {
 		const grant = new Grant({ accountId, clientId });
 		await grant.save();
 		return grant;

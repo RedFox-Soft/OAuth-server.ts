@@ -18,14 +18,12 @@ import { Client } from 'lib/models/client.js';
 import { provider } from 'lib/provider.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Grant } from 'lib/models/grant.js';
+import { OAuthError, UserinfoResponse } from 'lib/shared/response_schemas.js';
 
 async function userInfo({ headers, set }) {
-	const ctx = {
-		headers
-	};
-	ctx.oidc = new OIDCContext({}, headers);
+	const oidc = new OIDCContext({}, headers);
 
-	const accessTokenId = ctx.oidc.getAccessToken({
+	const accessTokenId = oidc.getAccessToken({
 		acceptDPoP: true
 	});
 	let dPoP: Awaited<ReturnType<typeof dpopValidate>>;
@@ -54,7 +52,7 @@ async function userInfo({ headers, set }) {
 	}
 
 	if (accessToken.payload['x5t#S256']) {
-		const cert = ctx.oidc.getClientCertificate();
+		const cert = oidc.getClientCertificate();
 		if (
 			!cert ||
 			accessToken.payload['x5t#S256'] !== certificateThumbprint(cert)
@@ -83,7 +81,7 @@ async function userInfo({ headers, set }) {
 	}
 
 	const account = await instance(provider).configuration.findAccount(
-		ctx,
+		{ oidc },
 		accessToken.payload.accountId,
 		accessToken
 	);
@@ -161,5 +159,9 @@ export const userinfo = new Elysia()
 			dpop: t.Optional(t.String())
 		})
 	})
-	.get(routeNames.userinfo, userInfo)
-	.post(routeNames.userinfo, userInfo);
+	.get(routeNames.userinfo, userInfo, {
+		response: { 200: UserinfoResponse, 401: OAuthError }
+	})
+	.post(routeNames.userinfo, userInfo, {
+		response: { 200: UserinfoResponse, 401: OAuthError }
+	});

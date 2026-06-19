@@ -1,17 +1,17 @@
 import instance from '../../helpers/weak_cache.ts';
 
-export default async function backchannelRequestResponse(ctx) {
-	const { BackchannelAuthenticationRequest } = ctx.oidc.provider;
-	const { ciba } = instance(ctx.oidc.provider).features;
+export default async function backchannelRequestResponse(oidc) {
+	const { BackchannelAuthenticationRequest } = oidc.provider;
+	const { ciba } = instance(oidc.provider).features;
 
 	const request = new BackchannelAuthenticationRequest({
-		accountId: ctx.oidc.account.accountId,
-		claims: ctx.oidc.claims,
-		client: ctx.oidc.client,
-		nonce: ctx.oidc.params.nonce,
-		params: ctx.oidc.params.toPlainObject(),
-		resource: Object.keys(ctx.oidc.resourceServers),
-		scope: [...ctx.oidc.requestParamScopes].join(' ')
+		accountId: oidc.account.accountId,
+		claims: oidc.claims,
+		client: oidc.client,
+		nonce: oidc.params.nonce,
+		params: oidc.params.toPlainObject(),
+		resource: Object.keys(oidc.resourceServers),
+		scope: [...oidc.requestParamScopes].join(' ')
 	});
 
 	switch (request.resource.length) {
@@ -23,19 +23,21 @@ export default async function backchannelRequestResponse(ctx) {
 			break;
 	}
 
-	ctx.oidc.entity('BackchannelAuthenticationRequest', request);
+	oidc.entity('BackchannelAuthenticationRequest', request);
 
 	const id = await request.save();
 
-	ctx.body = {
+	const body = {
 		expires_in: request.expiration,
 		auth_req_id: id
 	};
 
 	await ciba.triggerAuthenticationDevice(
-		ctx,
+		{ oidc },
 		request,
-		ctx.oidc.account,
-		ctx.oidc.client
+		oidc.account,
+		oidc.client
 	);
+
+	return body;
 }

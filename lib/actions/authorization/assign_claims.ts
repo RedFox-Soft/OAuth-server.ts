@@ -7,28 +7,28 @@ import instance from '../../helpers/weak_cache.ts';
  *
  * Merges requested claims with acr as requested if acr_values is provided
  */
-export default function assignClaims(ctx) {
-	const { params } = ctx.oidc;
+export default function assignClaims(oidc) {
+	const { params } = oidc;
 
 	if (
 		params.claims !== undefined &&
-		instance(ctx.oidc.provider).features.claimsParameter.enabled
+		instance(oidc.provider).features.claimsParameter.enabled
 	) {
-		ctx.oidc.claims = params.claims;
+		oidc.claims = params.claims;
 	}
 
 	if (
 		params.max_age !== undefined ||
-		ctx.oidc.client.requireAuthTime ||
-		ctx.oidc.prompts.has('login')
+		oidc.client.requireAuthTime ||
+		oidc.prompts.has('login')
 	) {
-		merge(ctx.oidc.claims, { id_token: { auth_time: { essential: true } } });
+		merge(oidc.claims, { id_token: { auth_time: { essential: true } } });
 	}
 
 	const acrValues = params.acr_values;
 
 	if (acrValues) {
-		merge(ctx.oidc.claims, {
+		merge(oidc.claims, {
 			id_token: { acr: { values: acrValues.split(' ') } }
 		});
 	}

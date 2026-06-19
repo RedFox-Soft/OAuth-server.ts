@@ -4,8 +4,8 @@ import { ISSUER } from 'lib/configs/env.js';
 import { logout } from 'lib/html/logout.js';
 import { SessionNotFound } from '../../helpers/errors.js';
 
-export default async function resumeAction(ctx, interaction) {
-	ctx.oidc.entity('Interaction', interaction);
+export default async function resumeAction(oidc, interaction) {
+	oidc.entity('Interaction', interaction);
 
 	const {
 		result,
@@ -14,7 +14,7 @@ export default async function resumeAction(ctx, interaction) {
 		session: originSession
 	} = interaction.payload;
 
-	const { session } = ctx.oidc;
+	const { session } = oidc;
 
 	if (originSession?.uid && originSession.uid !== session.uid) {
 		throw new SessionNotFound(
@@ -44,9 +44,9 @@ export default async function resumeAction(ctx, interaction) {
 
 	await interaction.destroy();
 
-	ctx.oidc.params = storedParams;
-	ctx.oidc.trusted = trusted;
-	ctx.oidc.redirectUriCheckPerformed = true;
+	oidc.params = storedParams;
+	oidc.trusted = trusted;
+	oidc.redirectUriCheckPerformed = true;
 
 	if (result?.login) {
 		const { remember = true, accountId, ts: loginTs, amr, acr } = result.login;
@@ -60,7 +60,7 @@ export default async function resumeAction(ctx, interaction) {
 		});
 	}
 
-	ctx.oidc.result = result;
+	oidc.result = result;
 
 	if (!session.isNew) {
 		session.resetIdentifier();

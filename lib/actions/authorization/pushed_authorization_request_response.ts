@@ -11,7 +11,7 @@ import { provider } from 'lib/provider.ts';
 const MAX_TTL = 60;
 
 export default async function pushedAuthorizationRequestResponse(
-	ctx,
+	oidc,
 	requestBody?: string
 ) {
 	let ttl: number;
@@ -28,10 +28,10 @@ export default async function pushedAuthorizationRequestResponse(
 		if (!Number.isInteger(ttl) || ttl > MAX_TTL) {
 			ttl = MAX_TTL;
 		}
-		dpopJkt = thumbprint || ctx.oidc.params.dpop_jkt;
+		dpopJkt = thumbprint || oidc.params.dpop_jkt;
 	} else {
 		ttl = MAX_TTL;
-		const payload = { ...ctx.oidc.params };
+		const payload = { ...oidc.params };
 
 		if (payload.authorization_details) {
 			payload.authorization_details = JSON.parse(payload.authorization_details);
@@ -40,26 +40,26 @@ export default async function pushedAuthorizationRequestResponse(
 		request = new UnsecuredJWT(payload)
 			.setJti(nanoid())
 			.setIssuedAt(now)
-			.setIssuer(ctx.oidc.client.clientId)
+			.setIssuer(oidc.client.clientId)
 			.setAudience(ISSUER)
 			.setExpirationTime(now + MAX_TTL)
 			.setNotBefore(now)
 			.encode();
-		dpopJkt = ctx.oidc.params.dpop_jkt;
+		dpopJkt = oidc.params.dpop_jkt;
 	}
 
 	const requestObject = new PushedAuthorizationRequest({
 		request,
 		dpopJkt,
-		trusted:
-			ctx.oidc.client.clientAuthMethod !== 'none' || !!ctx.oidc.trusted?.length
+		trusted: oidc.client.clientAuthMethod !== 'none' || !!oidc.trusted?.length
 	});
 
 	const id = await requestObject.save(ttl);
 
-	ctx.oidc.entity('PushedAuthorizationRequest', requestObject);
+	oidc.entity('PushedAuthorizationRequest', requestObject);
 
-	provider.emit('pushed_authorization_request.success', ctx, ctx.oidc.client);
+	// event payload kept `{ oidc }`-shaped (was `ctx`)
+	provider.emit('pushed_authorization_request.success', { oidc }, oidc.client);
 	return new Response(
 		JSON.stringify({
 			expires_in: ttl,

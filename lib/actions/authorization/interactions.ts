@@ -8,8 +8,7 @@ import { cookieNames } from 'lib/consts/param_list.js';
 import { ttl } from 'lib/configs/liveTime.js';
 import { Interaction } from 'lib/models/interaction.js';
 
-export default async function interactions(resumeRouteName, ctx) {
-	const { oidc } = ctx;
+export default async function interactions(resumeRouteName, oidc) {
 	const client = oidc.client;
 	let failedCheck;
 	let prompt;
@@ -20,7 +19,9 @@ export default async function interactions(resumeRouteName, ctx) {
 		if (poly.name === 'consent' && client['consent.require'] === false) {
 			continue;
 		}
-		const result = await poly.executeChecks(ctx);
+		// the interaction-policy check signature is a public extension API: checks read the
+		// oidc context off a ctx-shaped argument, so the policy boundary keeps the wrapper shape.
+		const result = await poly.executeChecks({ oidc });
 		if (result) {
 			({ firstError: failedCheck, ...prompt } = result);
 			break;
@@ -43,7 +44,7 @@ export default async function interactions(resumeRouteName, ctx) {
 		// denied rather then issuing a code/token without scopes
 		if (
 			!oidc.grant.getOIDCScopeFiltered(oidc.requestParamOIDCScopes) &&
-			Object.keys(ctx.oidc.resourceServers).every(
+			Object.keys(oidc.resourceServers).every(
 				(resource) =>
 					!oidc.grant.getResourceScopeFiltered(
 						resource,
@@ -58,7 +59,7 @@ export default async function interactions(resumeRouteName, ctx) {
 			);
 		}
 
-		oidc.provider.emit('authorization.accepted', ctx);
+		oidc.provider.emit('authorization.accepted', oidc);
 		return;
 	}
 
@@ -96,9 +97,9 @@ export default async function interactions(resumeRouteName, ctx) {
 	});
 
 	await interactionSession.save(ttl.Interaction);
-	ctx.oidc.entity('Interaction', interactionSession);
+	oidc.entity('Interaction', interactionSession);
 
-	ctx.cookie[cookieNames.interaction].set({
+	oidc.cookie[cookieNames.interaction].set({
 		value: cookieID,
 		path: `/ui/${uid}`,
 		maxAge: ttl.Interaction * 1000

@@ -5,11 +5,11 @@ import {
 } from '../helpers/errors.ts';
 import instance from '../helpers/weak_cache.ts';
 
-export default async function checkRar(ctx) {
-	const { params, client } = ctx.oidc;
+export default async function checkRar(oidc) {
+	const { params, client } = oidc;
 
 	if (params.authorization_details !== undefined) {
-		const { richAuthorizationRequests } = instance(ctx.oidc.provider).features;
+		const { richAuthorizationRequests } = instance(oidc.provider).features;
 
 		if (richAuthorizationRequests.enabled) {
 			if (
@@ -98,7 +98,8 @@ export default async function checkRar(ctx) {
 					);
 				}
 
-				await config.validate(ctx, detail, client);
+				// config.validate is a user-defined RAR type validator expecting a `ctx`-shaped arg
+				await config.validate({ oidc }, detail, client);
 
 				i++;
 			}

@@ -15,10 +15,10 @@ const { AuthorizationPending, ExpiredToken, InvalidGrant } = errors;
 
 export const gty = 'ciba';
 
-export const handler = async function cibaHandler(ctx, dPoP) {
-	presence(ctx.oidc, 'auth_req_id');
+export const handler = async function cibaHandler(oidc, dPoP) {
+	presence(oidc, 'auth_req_id');
 
-	if (ctx.oidc.params.authorization_details) {
+	if (oidc.params.authorization_details) {
 		throw new errors.InvalidRequest(
 			'authorization_details is unsupported for this grant_type'
 		);
@@ -29,10 +29,10 @@ export const handler = async function cibaHandler(ctx, dPoP) {
 		issueRefreshToken,
 		conformIdTokenClaims,
 		features: { userinfo, resourceIndicators }
-	} = instance(ctx.oidc.provider).configuration;
+	} = instance(oidc.provider).configuration;
 
-	const request = await ctx.oidc.provider.BackchannelAuthenticationRequest.find(
-		ctx.oidc.params.auth_req_id,
+	const request = await oidc.provider.BackchannelAuthenticationRequest.find(
+		oidc.params.auth_req_id,
 		{ ignoreExpiration: true }
 	);
 
@@ -40,19 +40,19 @@ export const handler = async function cibaHandler(ctx, dPoP) {
 		throw new InvalidGrant('backchannel authentication request not found');
 	}
 
-	if (request.clientId !== ctx.oidc.client.clientId) {
+	if (request.clientId !== oidc.client.clientId) {
 		throw new InvalidGrant('client mismatch');
 	}
 
 	let cert;
-	if (ctx.oidc.client.tlsClientCertificateBoundAccessTokens) {
-		cert = ctx.oidc.getClientCertificate();
+	if (oidc.client.tlsClientCertificateBoundAccessTokens) {
+		cert = oidc.getClientCertificate();
 		if (!cert) {
 			throw new InvalidGrant('mutual TLS client certificate not provided');
 		}
 	}
 
-	if (!dPoP && ctx.oidc.client.dpopBoundAccessTokens) {
+	if (!dPoP && oidc.client.dpopBoundAccessTokens) {
 		throw new InvalidGrant('DPoP proof JWT not provided');
 	}
 
@@ -65,7 +65,7 @@ export const handler = async function cibaHandler(ctx, dPoP) {
 	}
 
 	if (request.consumed) {
-		await revoke(ctx, request.grantId);
+		await revoke({ oidc }, request.grantId);
 		throw new InvalidGrant(
 			'backchannel authentication request already consumed'
 		);
@@ -96,14 +96,14 @@ export const handler = async function cibaHandler(ctx, dPoP) {
 		throw new InvalidGrant('grant is expired');
 	}
 
-	if (grant.clientId !== ctx.oidc.client.clientId) {
+	if (grant.clientId !== oidc.client.clientId) {
 		throw new InvalidGrant('client mismatch');
 	}
 
-	ctx.oidc.entity('BackchannelAuthenticationRequest', request);
-	ctx.oidc.entity('Grant', grant);
+	oidc.entity('BackchannelAuthenticationRequest', request);
+	oidc.entity('Grant', grant);
 
-	const account = await findAccount(ctx, request.accountId, request);
+	const account = await findAccount({ oidc }, request.accountId, request);
 
 	if (!account) {
 		throw new InvalidGrant(
@@ -115,11 +115,11 @@ export const handler = async function cibaHandler(ctx, dPoP) {
 		throw new InvalidGrant('accountId mismatch');
 	}
 
-	ctx.oidc.entity('Account', account);
+	oidc.entity('Account', account);
 
 	const at = new AccessToken({
 		accountId: account.accountId,
-		client: ctx.oidc.client,
+		client: oidc.client,
 		expiresWithSession: request.expiresWithSession,
 		grantId: request.grantId,
 		gty,
@@ -127,7 +127,7 @@ export const handler = async function cibaHandler(ctx, dPoP) {
 		sid: request.sid
 	});
 
-	if (ctx.oidc.client.tlsClientCertificateBoundAccessTokens) {
+	if (oidc.client.tlsClientCertificateBoundAccessTokens) {
 		at.setThumbprint('x5t', cert);
 	}
 
@@ -135,18 +135,18 @@ export const handler = async function cibaHandler(ctx, dPoP) {
 		at.setThumbprint('jkt', dPoP.thumbprint);
 	}
 
-	const resource = await resolveResource(ctx, request, {
+	const resource = await resolveResource({ oidc }, request, {
 		userinfo,
 		resourceIndicators
 	});
 
 	if (resource) {
 		const resourceServerInfo = await resourceIndicators.getResourceServerInfo(
-			ctx,
+			{ oidc },
 			resource,
-			ctx.oidc.client
+			oidc.client
 		);
-		at.resourceServer = new ctx.oidc.provider.ResourceServer(
+		at.resourceServer = new oidc.provider.ResourceServer(
 			resource,
 			resourceServerInfo
 		);
@@ -156,18 +156,18 @@ export const handler = async function cibaHandler(ctx, dPoP) {
 		at.scope = grant.getOIDCScopeFiltered(request.scopes);
 	}
 
-	ctx.oidc.entity('AccessToken', at);
+	oidc.entity('AccessToken', at);
 	const accessToken = await at.save();
 
 	let refreshToken;
-	if (await issueRefreshToken(ctx, ctx.oidc.client, request)) {
+	if (await issueRefreshToken({ oidc }, oidc.client, request)) {
 		const rt = new RefreshToken({
 			accountId: account.accountId,
 			acr: request.acr,
 			amr: request.amr,
 			authTime: request.authTime,
 			claims: request.claims,
-			client: ctx.oidc.client,
+			client: oidc.client,
 			expiresWithSession: request.expiresWithSession,
 			grantId: request.grantId,
 			gty,
@@ -179,7 +179,7 @@ export const handler = async function cibaHandler(ctx, dPoP) {
 			sid: request.sid
 		});
 
-		if (ctx.oidc.client.clientAuthMethod === 'none') {
+		if (oidc.client.clientAuthMethod === 'none') {
 			if (at.jkt) {
 				rt.jkt = at.jkt;
 			}
@@ -189,7 +189,7 @@ export const handler = async function cibaHandler(ctx, dPoP) {
 			}
 		}
 
-		ctx.oidc.entity('RefreshToken', rt);
+		oidc.entity('RefreshToken', rt);
 		refreshToken = await rt.save();
 	}
 
@@ -197,7 +197,7 @@ export const handler = async function cibaHandler(ctx, dPoP) {
 	if (request.scopes.has('openid')) {
 		const claims = filterClaims(request.claims, 'id_token', grant);
 		const rejected = grant.getRejectedOIDCClaims();
-		const token = new IdToken(ctx.oidc.client, {
+		const token = new IdToken(oidc.client, {
 			...(await account.claims('id_token', request.scope, claims, rejected)),
 			...{
 				acr: request.acr,
@@ -221,7 +221,7 @@ export const handler = async function cibaHandler(ctx, dPoP) {
 		idToken = await token.issue({ use: 'idtoken' });
 	}
 
-	ctx.body = {
+	return {
 		access_token: accessToken,
 		expires_in: at.expiration,
 		id_token: idToken,

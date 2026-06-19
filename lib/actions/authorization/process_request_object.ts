@@ -25,14 +25,14 @@ export function isEncryptedJWT(jwt: string): boolean {
  */
 export default async function processRequestObject(
 	schema: TSchema,
-	ctx,
+	oidc,
 	{ clientAlg }: { clientAlg?: string } = {}
 ) {
-	const { params, client, route } = ctx.oidc;
+	const { params, client, route } = oidc;
 
-	const pushedRequestObject = 'PushedAuthorizationRequest' in ctx.oidc.entities;
+	const pushedRequestObject = 'PushedAuthorizationRequest' in oidc.entities;
 	const isBackchannelAuthentication = route === 'backchannel_authentication';
-	const { features } = instance(ctx.oidc.provider);
+	const { features } = instance(oidc.provider);
 
 	if (params.request === undefined && client.requireSignedRequestObject) {
 		throw new InvalidRequest('Request Object must be used by this client');
@@ -66,14 +66,14 @@ export default async function processRequestObject(
 			} else {
 				decrypted = await JWT.decrypt(
 					params.request,
-					instance(ctx.oidc.provider).keystore
+					instance(oidc.provider).keystore
 				);
 			}
 
 			params.request = decrypted.toString('utf8');
 
-			if (ctx.oidc.body) {
-				ctx.oidc.body.request = params.request;
+			if (oidc.body) {
+				oidc.body.request = params.request;
 			}
 		} catch (err) {
 			if (err instanceof OIDCProviderError) {
@@ -138,7 +138,7 @@ export default async function processRequestObject(
 	}
 
 	if (route === '/par') {
-		if (request.client_id !== ctx.oidc.client.clientId) {
+		if (request.client_id !== oidc.client.clientId) {
 			throw new InvalidRequestObject(
 				"request client_id must equal the authenticated client's client_id"
 			);
@@ -181,7 +181,7 @@ export default async function processRequestObject(
 	}
 
 	await features.requestObjects.assertJwtClaimsAndHeader(
-		ctx,
+		oidc,
 		structuredClone(decoded.payload),
 		structuredClone(decoded.header),
 		client
@@ -214,7 +214,7 @@ export default async function processRequestObject(
 	}
 
 	if (trusted) {
-		ctx.oidc.trusted = Object.keys(request);
+		oidc.trusted = Object.keys(request);
 	}
 
 	params.request = undefined;
@@ -232,10 +232,9 @@ export default async function processRequestObject(
 
 	if (
 		pushedRequestObject &&
-		ctx.oidc.entities.PushedAuthorizationRequest.payload.dpopJkt
+		oidc.entities.PushedAuthorizationRequest.payload.dpopJkt
 	) {
-		params.dpop_jkt =
-			ctx.oidc.entities.PushedAuthorizationRequest.payload.dpopJkt;
-		ctx.oidc.trusted?.push('dpop_jkt');
+		params.dpop_jkt = oidc.entities.PushedAuthorizationRequest.payload.dpopJkt;
+		oidc.trusted?.push('dpop_jkt');
 	}
 }

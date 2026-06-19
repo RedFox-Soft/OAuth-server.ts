@@ -1,16 +1,16 @@
 import { Session } from 'lib/models/session.js';
 import { cookieNames } from '../consts/param_list.js';
 
-export default async function sessionHandler(ctx) {
-	ctx.oidc.session = await Session.get(ctx);
+export default async function sessionHandler(oidc) {
+	oidc.session = await Session.get(oidc);
 
 	return async function setCookies() {
-		const session = ctx.cookie[cookieNames.session];
+		const session = oidc.cookie[cookieNames.session];
 		if (session.value) {
-			await ctx.oidc.session.save();
+			await oidc.session.save();
 			session.set({
-				value: ctx.oidc.session.id,
-				expires: new Date(ctx.oidc.session.payload.exp * 1000)
+				value: oidc.session.id,
+				expires: new Date(oidc.session.payload.exp * 1000)
 			});
 		}
 	};

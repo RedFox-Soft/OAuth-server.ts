@@ -4,8 +4,7 @@ import { InvalidRequest, OIDCProviderError } from '../../helpers/errors.ts';
 /*
  * Validates the incoming id_token_hint
  */
-export default async function checkIdTokenHint(ctx) {
-	const { oidc } = ctx;
+export default async function checkIdTokenHint(oidc) {
 	if (oidc.params.id_token_hint !== undefined) {
 		let idTokenHint;
 		try {
@@ -24,6 +23,6 @@ export default async function checkIdTokenHint(ctx) {
 				err.message
 			);
 		}
-		ctx.oidc.entity('IdTokenHint', idTokenHint);
+		oidc.entity('IdTokenHint', idTokenHint);
 	}
 }

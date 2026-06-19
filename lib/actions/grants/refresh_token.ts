@@ -27,19 +27,19 @@ function rarSupported(token) {
 
 const gty = 'refresh_token';
 
-export const handler = async function refreshTokenHandler(ctx, dPoP) {
-	presence(ctx.oidc, 'refresh_token');
+export const handler = async function refreshTokenHandler(oidc, dPoP) {
+	presence(oidc, 'refresh_token');
 
 	const {
 		findAccount,
 		conformIdTokenClaims,
 		rotateRefreshToken,
 		features: { userinfo, resourceIndicators, richAuthorizationRequests }
-	} = instance(ctx.oidc.provider).configuration;
+	} = instance(oidc.provider).configuration;
 
-	const { client } = ctx.oidc;
+	const { client } = oidc;
 
-	let refreshTokenValue = ctx.oidc.params.refresh_token;
+	let refreshTokenValue = oidc.params.refresh_token;
 	let refreshToken = await RefreshToken.find(refreshTokenValue, {
 		ignoreExpiration: true
 	});
@@ -61,13 +61,13 @@ export const handler = async function refreshTokenHandler(ctx, dPoP) {
 		client.tlsClientCertificateBoundAccessTokens ||
 		refreshToken.payload['x5t#S256']
 	) {
-		cert = ctx.oidc.getClientCertificate();
+		cert = oidc.getClientCertificate();
 		if (!cert) {
 			throw new InvalidGrant('mutual TLS client certificate not provided');
 		}
 	}
 
-	if (!dPoP && ctx.oidc.client.dpopBoundAccessTokens) {
+	if (!dPoP && oidc.client.dpopBoundAccessTokens) {
 		throw new InvalidGrant('DPoP proof JWT not provided');
 	}
 
@@ -94,9 +94,9 @@ export const handler = async function refreshTokenHandler(ctx, dPoP) {
 		throw new InvalidGrant('client mismatch');
 	}
 
-	if (ctx.oidc.params.scope) {
+	if (oidc.params.scope) {
 		const missing = difference(
-			[...ctx.oidc.requestParamScopes],
+			[...oidc.requestParamScopes],
 			[...refreshToken.scopes]
 		);
 
@@ -115,11 +115,11 @@ export const handler = async function refreshTokenHandler(ctx, dPoP) {
 		throw new InvalidGrant('failed jkt verification');
 	}
 
-	ctx.oidc.entity('RefreshToken', refreshToken);
-	ctx.oidc.entity('Grant', grant);
+	oidc.entity('RefreshToken', refreshToken);
+	oidc.entity('Grant', grant);
 
 	const account = await findAccount(
-		ctx,
+		{ oidc },
 		refreshToken.payload.accountId,
 		refreshToken
 	);
@@ -134,17 +134,17 @@ export const handler = async function refreshTokenHandler(ctx, dPoP) {
 		throw new InvalidGrant('accountId mismatch');
 	}
 
-	ctx.oidc.entity('Account', account);
+	oidc.entity('Account', account);
 
 	if (refreshToken.payload.consumed) {
 		await Promise.all([
 			refreshToken.destroy(),
-			revoke(ctx, refreshToken.payload.grantId)
+			revoke({ oidc }, refreshToken.payload.grantId)
 		]);
 		throw new InvalidGrant('refresh token already used');
 	}
 
-	if (ctx.oidc.params.authorization_details && !rarSupported(refreshToken)) {
+	if (oidc.params.authorization_details && !rarSupported(refreshToken)) {
 		throw new InvalidRequest(
 			'authorization_details is unsupported for this refresh token'
 		);
@@ -153,10 +153,10 @@ export const handler = async function refreshTokenHandler(ctx, dPoP) {
 	if (
 		rotateRefreshToken === true ||
 		(typeof rotateRefreshToken === 'function' &&
-			(await rotateRefreshToken(ctx)))
+			(await rotateRefreshToken({ oidc })))
 	) {
 		await refreshToken.consume();
-		ctx.oidc.entity('RotatedRefreshToken', refreshToken);
+		oidc.entity('RotatedRefreshToken', refreshToken);
 
 		refreshToken = new RefreshToken({
 			accountId: refreshToken.payload.accountId,
@@ -187,7 +187,7 @@ export const handler = async function refreshTokenHandler(ctx, dPoP) {
 			refreshToken.payload.gty = `${refreshToken.payload.gty} ${gty}`;
 		}
 
-		ctx.oidc.entity('RefreshToken', refreshToken);
+		oidc.entity('RefreshToken', refreshToken);
 		refreshTokenValue = await refreshToken.save();
 	}
 
@@ -213,12 +213,12 @@ export const handler = async function refreshTokenHandler(ctx, dPoP) {
 		at.payload.gty = `${at.payload.gty} ${gty}`;
 	}
 
-	const scope = ctx.oidc.params.scope
-		? ctx.oidc.requestParamScopes
+	const scope = oidc.params.scope
+		? oidc.requestParamScopes
 		: refreshToken.scopes;
-	await checkRar(ctx);
+	await checkRar(oidc);
 	const resource = await resolveResource(
-		ctx,
+		{ oidc },
 		refreshToken,
 		{ userinfo, resourceIndicators },
 		scope
@@ -226,11 +226,11 @@ export const handler = async function refreshTokenHandler(ctx, dPoP) {
 
 	if (resource) {
 		const resourceServerInfo = await resourceIndicators.getResourceServerInfo(
-			ctx,
+			{ oidc },
 			resource,
-			ctx.oidc.client
+			oidc.client
 		);
-		at.resourceServer = new ctx.oidc.provider.ResourceServer(
+		at.resourceServer = new oidc.provider.ResourceServer(
 			resource,
 			resourceServerInfo
 		);
@@ -245,19 +245,19 @@ export const handler = async function refreshTokenHandler(ctx, dPoP) {
 
 	if (richAuthorizationRequests.enabled && at.resourceServer) {
 		at.payload.rar = await richAuthorizationRequests.rarForRefreshTokenResponse(
-			ctx,
+			{ oidc },
 			at.resourceServer
 		);
 	}
 
-	ctx.oidc.entity('AccessToken', at);
+	oidc.entity('AccessToken', at);
 	const accessToken = await at.save();
 
 	let idToken;
 	if (scope.has('openid')) {
 		const claims = filterClaims(refreshToken.payload.claims, 'id_token', grant);
 		const rejected = grant.getRejectedOIDCClaims();
-		const token = new IdToken(ctx.oidc.client, {
+		const token = new IdToken(oidc.client, {
 			...(await account.claims(
 				'id_token',
 				[...scope].join(' '),
