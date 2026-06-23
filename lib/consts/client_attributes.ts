@@ -34,15 +34,7 @@ const DEFAULT = {
 	authorization_details_types: []
 };
 
-const BOOL = [
-	'backchannel_logout_session_required',
-	'backchannel_user_code_parameter',
-	'dpop_bound_access_tokens',
-	'require_auth_time',
-	'require_signed_request_object',
-	'tls_client_certificate_bound_access_tokens',
-	'use_mtls_endpoint_aliases'
-];
+// BOOL removed: boolean type is now enforced declaratively in clientSchema.ts (TypeBox).
 
 const ARYS = [
 	'contacts',
@@ -55,7 +47,6 @@ const STRING = [
 	'authorization_encrypted_response_alg',
 	'authorization_encrypted_response_enc',
 	'authorization_signed_response_alg',
-	'backchannel_authentication_request_signing_alg',
 	'backchannel_client_notification_endpoint',
 	'backchannel_logout_uri',
 	'backchannel_token_delivery_mode',
@@ -73,7 +64,6 @@ const STRING = [
 	'policy_uri',
 	'request_object_encryption_alg',
 	'request_object_encryption_enc',
-	'request_object_signing_alg',
 	'scope',
 	'sector_identifier_uri',
 	'tls_client_auth_san_dns',
@@ -122,36 +112,11 @@ const WHEN = {
 	authorization_encrypted_response_alg: ['authorization_signed_response_alg']
 };
 
-const WEB_URI = [
-	'backchannel_client_notification_endpoint',
-	'backchannel_logout_uri',
-	'client_uri',
-	'initiate_login_uri',
-	'jwks_uri',
-	'logo_uri',
-	'policy_uri',
-	'sector_identifier_uri',
-	'tos_uri'
-];
-
-const HTTPS_URI = [
-	'backchannel_client_notification_endpoint',
-	'initiate_login_uri',
-	'sector_identifier_uri'
-];
+// WEB_URI / HTTPS_URI removed: web/https URL shapes are now enforced declaratively
+// in lib/configs/clientSchema.ts (TypeBox formats), not by the engine's webUris() pass.
 
 const LOOPBACKS = new Set(['localhost', '127.0.0.1', '[::1]']);
 
 export const noVSCHAR = /[^\x20-\x7E]/;
 
-export {
-	ARYS,
-	BOOL,
-	DEFAULT,
-	HTTPS_URI,
-	LOOPBACKS,
-	RECOGNIZED_METADATA,
-	STRING,
-	WEB_URI,
-	WHEN
-};
+export { ARYS, DEFAULT, LOOPBACKS, RECOGNIZED_METADATA, STRING, WHEN };

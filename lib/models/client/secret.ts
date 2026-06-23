@@ -19,7 +19,8 @@ const clientEncryptions = [
 ];
 const signAlgAttributes = [
 	'id_token_signed_response_alg',
-	'request_object_signing_alg',
+	// canonical (Model B) dotted key; the snake `request_object_signing_alg` no longer exists internally
+	'requestObject.signingAlg',
 	'token_endpoint_auth_signing_alg',
 	'userinfo_signed_response_alg',
 	'introspection_signed_response_alg',
@@ -67,8 +68,9 @@ export function checkClientSecretExpiration(
 	}
 }
 
-// Auth-method / HMAC / symmetric-encryption derivation. Operates on raw
-// snake_case metadata (as the former static Client.needsSecret did).
+// Auth-method / HMAC / symmetric-encryption derivation. Operates on recognized
+// snake_case metadata plus the canonical dotted `requestObject.signingAlg` key
+// (callers must make that key readable on the passed object — see schema.ts).
 export function needsSecret(metadata): boolean {
 	if (!nonSecretAuthMethods.has(metadata.token_endpoint_auth_method)) {
 		return true;

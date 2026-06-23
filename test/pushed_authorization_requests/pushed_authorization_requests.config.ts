@@ -43,7 +43,7 @@ export default {
 		{
 			clientId: 'client-alg-registered',
 			clientSecret: 'secret',
-			request_object_signing_alg: 'HS256',
+			'requestObject.signingAlg': 'HS256',
 			redirectUris: ['https://rp.example.com/cb']
 		},
 		allowUnregisteredClient('public', { token_endpoint_auth_method: 'none' })

@@ -2,9 +2,11 @@ import { Type as t, type Static } from '@sinclair/typebox';
 import { Value, type ValueError } from '@sinclair/typebox/value';
 import crypto from 'node:crypto';
 import {
+	ECCurves,
 	ECOKPEncAlg,
 	ECSignAlg,
 	type encryptionAlgValues,
+	OKPCurves,
 	OKPSignAlg,
 	RSAEncAlg,
 	RSASignAlg,
@@ -47,11 +49,7 @@ const ECKey = t.Composite(
 		t.Object({
 			kty: t.Literal('EC'),
 			alg: t.Union([...ECSignAlg, ...ECOKPEncAlg].map((alg) => t.Literal(alg))),
-			crv: t.Union([
-				t.Literal('P-256'),
-				t.Literal('P-384'),
-				t.Literal('P-521')
-			]),
+			crv: t.Union(ECCurves.map((c) => t.Literal(c))),
 			x: t.String(),
 			y: t.String(),
 			d: t.String()
@@ -68,7 +66,7 @@ const OKPKey = t.Composite(
 			alg: t.Union(
 				[...OKPSignAlg, ...ECOKPEncAlg].map((alg) => t.Literal(alg))
 			),
-			crv: t.Union([t.Literal('Ed25519'), t.Literal('X25519')]),
+			crv: t.Union(OKPCurves.map((c) => t.Literal(c))),
 			x: t.String(),
 			d: t.String()
 		})

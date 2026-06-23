@@ -69,7 +69,7 @@ export default {
 			redirectUris: ['https://client.example.com/cb'],
 			responseTypes: ['code'],
 			grantTypes: ['authorization_code'],
-			request_object_signing_alg: 'HS256'
+			'requestObject.signingAlg': 'HS256'
 		}
 	]
 };

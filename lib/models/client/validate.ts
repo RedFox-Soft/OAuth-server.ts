@@ -32,8 +32,7 @@ import {
 	ClientKeyStore,
 	buildAsymmetricKeyStore,
 	buildSymmetricKeyStore,
-	checkJWK,
-	validateJWKS
+	validateJWK
 } from './keystore.ts';
 
 // Marks a static client that has already been validated and cached, replacing
@@ -146,15 +145,6 @@ export function validateClient(metadata: unknown): ClientSchemaType {
 		clientMetadataInput.redirectUris = [];
 	}
 
-	if (!Value.Check(ClientSchema, clientMetadataInput)) {
-		throw new InvalidClientMetadata(
-			'client metadata validation error',
-			[...Value.Errors(ClientSchema, clientMetadataInput)]
-				.map(({ message, path }) => `${path} ${message}`.trim())
-				.join(', ')
-		);
-	}
-
 	const client = Object.create(clientPrototype);
 	Object.assign(client, pick(clientMetadataInput, ...BASE_METADATA_KEYS));
 	Object.assign(
@@ -168,14 +158,26 @@ export function validateClient(metadata: unknown): ClientSchemaType {
 		})
 	);
 
+	// TypeBox validates the *projected* (camelCased/dotted) client object — the real
+	// validated shape — not the raw snake_case input. This is what makes ClientSchema's
+	// camelCase literal unions and formats authoritative for the recognized metadata
+	// (whose keys are snake_case on input and never matched the camelCase schema keys).
+	// Runs before key-store construction so an invalid client never builds key stores.
+	if (!Value.Check(ClientSchema, client)) {
+		throw new InvalidClientMetadata(
+			'client metadata validation error',
+			[...Value.Errors(ClientSchema, client)]
+				.map(({ message, path }) => `${path} ${message}`.trim())
+				.join(', ')
+		);
+	}
+
 	buildAsymmetricKeyStore(client);
 	buildSymmetricKeyStore(client);
 
-	validateJWKS(client.jwks);
-
 	if (client.jwks) {
 		client.jwks.keys
-			.map(checkJWK)
+			.map(validateJWK)
 			.filter(Boolean)
 			.forEach(ClientKeyStore.prototype.add.bind(client.asymmetricKeyStore));
 	}

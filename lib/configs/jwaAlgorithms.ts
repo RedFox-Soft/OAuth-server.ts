@@ -91,6 +91,14 @@ export const requestObjectSigningAlgValues: signingAlgValues[] = [
 ];
 
 /*
+ * backchannelAuthenticationRequestSigningAlgValues
+ *
+ * description: JWS "alg" Algorithm values the authorization server supports to receive signed Backchannel Authentication Request Objects (`JAR`) with
+ */
+export const backchannelAuthenticationRequestSigningAlgValues: asymmetricSigningAlgType[] =
+	['RS256', 'PS256', 'ES256', 'Ed25519', 'EdDSA'];
+
+/*
  * idTokenEncryptionAlgValues
  *
  * description: JWE "alg" Algorithm values the authorization server supports for ID Token encryption

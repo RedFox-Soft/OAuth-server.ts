@@ -78,7 +78,7 @@ export default {
 			redirectUris: [],
 			token_endpoint_auth_method: 'none',
 			backchannel_token_delivery_mode: 'poll',
-			backchannel_authentication_request_signing_alg: 'ES256',
+			'requestObject.backChannelSigningAlg': 'ES256',
 			jwks_uri: 'https://rp.example.com/jwks'
 		},
 		{

@@ -8,6 +8,11 @@ export const RSASignAlg = [
 ] as const;
 export const ECSignAlg = ['ES256', 'ES384', 'ES512'] as const;
 export const OKPSignAlg = ['EdDSA', 'Ed25519'] as const;
+
+export const ECCurves = ['P-256', 'P-384', 'P-521'] as const;
+export const OKPCurves = ['Ed25519', 'X25519'] as const;
+export type ECCurveValues = (typeof ECCurves)[number];
+export type OKPCurveValues = (typeof OKPCurves)[number];
 export const signingAlgs = [
 	'HS256',
 	'HS384',

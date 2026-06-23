@@ -157,8 +157,8 @@ export default async function processRequestObject(
 	}
 
 	const prop = isBackchannelAuthentication
-		? 'backchannelAuthenticationRequestSigningAlg'
-		: 'requestObjectSigningAlg';
+		? 'requestObject.backChannelSigningAlg'
+		: 'requestObject.signingAlg';
 	if (!pushedRequestObject && client[prop] && alg !== client[prop]) {
 		throw new InvalidRequestObject(
 			'the preregistered alg must be used in request or request_uri'

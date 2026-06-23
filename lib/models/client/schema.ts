@@ -2,7 +2,6 @@ import { CLIENT_ATTRIBUTES } from '../../consts/index.ts';
 import { noVSCHAR } from '../../consts/client_attributes.ts';
 import { ApplicationConfig } from '../../configs/application.ts';
 
-import * as validUrl from '../../helpers/valid_url.ts';
 import { InvalidClientMetadata } from '../../helpers/errors.ts';
 import sectorIdentifier from '../../helpers/sector_identifier.ts';
 import instance from '../../helpers/weak_cache.ts';
@@ -11,21 +10,11 @@ import { pick } from '../../helpers/_/object.js';
 import omitBy from '../../helpers/_/omit_by.ts';
 import { needsSecret } from './secret.ts';
 import {
-	authorizationEncryptionAlgValues,
-	authorizationEncryptionEncValues,
 	authorizationSigningAlgValues,
 	clientAuthSigningAlgValues,
-	idTokenEncryptionAlgValues,
-	idTokenEncryptionEncValues,
 	idTokenSigningAlgValues,
-	introspectionEncryptionAlgValues,
-	introspectionEncryptionEncValues,
 	introspectionSigningAlgValues,
 	requestObjectEncryptionAlgValues,
-	requestObjectEncryptionEncValues,
-	requestObjectSigningAlgValues,
-	userinfoEncryptionAlgValues,
-	userinfoEncryptionEncValues,
 	userinfoSigningAlgValues
 } from 'lib/configs/jwaAlgorithms.js';
 import { validateRedirectUri } from '../../helpers/validateRedirectUri.js';
@@ -38,12 +27,9 @@ const needsJwks = {
 };
 const {
 	ARYS,
-	BOOL,
 	DEFAULT: DEFAULTS,
-	HTTPS_URI,
 	RECOGNIZED_METADATA: RECOGNIZED,
 	STRING,
-	WEB_URI,
 	WHEN
 } = CLIENT_ATTRIBUTES;
 
@@ -96,7 +82,9 @@ export default function getSchema(provider) {
 	}
 
 	if (features.requestObjects.enabled) {
-		RECOGNIZED_METADATA.push('request_object_signing_alg');
+		// request_object_signing_alg is no longer recognized snake metadata — the value
+		// is the canonical dotted `requestObject.signingAlg` base key (Model B), validated
+		// by TypeBox and read by consumers directly.
 		RECOGNIZED_METADATA.push('require_signed_request_object');
 		if (features.encryption.enabled) {
 			RECOGNIZED_METADATA.push('request_object_encryption_alg');
@@ -129,11 +117,9 @@ export default function getSchema(provider) {
 		RECOGNIZED_METADATA.push('backchannel_token_delivery_mode');
 		RECOGNIZED_METADATA.push('backchannel_user_code_parameter');
 		RECOGNIZED_METADATA.push('backchannel_client_notification_endpoint');
-		if (features.requestObjects.enabled) {
-			RECOGNIZED_METADATA.push(
-				'backchannel_authentication_request_signing_alg'
-			);
-		}
+		// backchannel_authentication_request_signing_alg is no longer recognized snake
+		// metadata — the value is the canonical dotted `requestObject.backChannelSigningAlg`
+		// base key (Model B), validated by TypeBox and read by consumers directly.
 	}
 
 	RECOGNIZED_METADATA.push('dpop_bound_access_tokens');
@@ -146,15 +132,12 @@ export default function getSchema(provider) {
 
 	const ENUM = {
 		default_acr_values: () => configuration.acrValues,
-		id_token_encrypted_response_alg: () => idTokenEncryptionAlgValues,
-		id_token_encrypted_response_enc: () => idTokenEncryptionEncValues,
 		id_token_signed_response_alg: () => idTokenSigningAlgValues,
-		request_object_signing_alg: () => requestObjectSigningAlgValues,
+		// request_object_signing_alg / backchannel_authentication_request_signing_alg are
+		// now validated by TypeBox literal unions on the canonical dotted keys
+		// (requestObject.signingAlg / requestObject.backChannelSigningAlg) — no runtime ENUM.
 		backchannel_token_delivery_mode: () => features.ciba.deliveryModes,
-		backchannel_authentication_request_signing_alg: () =>
-			requestObjectSigningAlgValues.filter((alg) => !alg.startsWith('HS')),
 		request_object_encryption_alg: () => requestObjectEncryptionAlgValues,
-		request_object_encryption_enc: () => requestObjectEncryptionEncValues,
 		authorization_details_types: () =>
 			Object.keys(features.richAuthorizationRequests.types),
 		token_endpoint_auth_method: (metadata) => {
@@ -190,18 +173,8 @@ export default function getSchema(provider) {
 					return [];
 			}
 		},
-		userinfo_encrypted_response_alg: () => userinfoEncryptionAlgValues,
-		userinfo_encrypted_response_enc: () => userinfoEncryptionEncValues,
 		userinfo_signed_response_alg: () => userinfoSigningAlgValues,
-		introspection_encrypted_response_alg: () =>
-			introspectionEncryptionAlgValues,
-		introspection_encrypted_response_enc: () =>
-			introspectionEncryptionEncValues,
 		introspection_signed_response_alg: () => introspectionSigningAlgValues,
-		authorization_encrypted_response_alg: () =>
-			authorizationEncryptionAlgValues,
-		authorization_encrypted_response_enc: () =>
-			authorizationEncryptionEncValues,
 		authorization_signed_response_alg: () => authorizationSigningAlgValues
 	};
 
@@ -214,14 +187,23 @@ export default function getSchema(provider) {
 				omitBy(pick(metadata, ...RECOGNIZED_METADATA), isUndefined)
 			);
 
+			// Canonical (Model B) request-object signing options live on the dotted
+			// base keys, not in RECOGNIZED_METADATA. Carry them onto the instance so the
+			// secret/JWKS requirement checks below can read them the same way they read
+			// recognized metadata; ensureStripUnrecognized() removes them again before
+			// the instance is projected onto the validated client.
+			this['requestObject.signingAlg'] = metadata['requestObject.signingAlg'];
+			this['requestObject.backChannelSigningAlg'] =
+				metadata['requestObject.backChannelSigningAlg'];
+
 			this.required();
 			this.baseKeys();
-			this.booleans();
 			this.whens();
 			this.arrays();
 			this.strings();
 			this.enums();
-			this.webUris();
+			// Web/HTTPS URL shapes and the non-negative-integer checks for
+			// default_max_age / client_secret_expires_at now live in ClientSchema (TypeBox).
 			this.scopes();
 			this.postLogoutRedirectUris();
 			validateRedirectUri(
@@ -230,18 +212,6 @@ export default function getSchema(provider) {
 			);
 			this.checkContacts();
 			this.jarPolicy();
-
-			// max_age and client_secret_expires_at format
-			['default_max_age', 'client_secret_expires_at'].forEach((prop) => {
-				if (this[prop] !== undefined) {
-					if (
-						!Number.isSafeInteger(this[prop]) ||
-						Math.sign(this[prop]) === -1
-					) {
-						this.invalidate(`${prop} must be a non-negative integer`);
-					}
-				}
-			});
 
 			const responseTypes = this.metadata.responseTypes;
 
@@ -406,37 +376,6 @@ export default function getSchema(provider) {
 				}
 			}
 
-			const responseModeValues = [
-				'query',
-				'form_post',
-				...(features.jwtResponseModes.enabled
-					? ['jwt', 'jwt.query', 'jwt.form_post']
-					: [])
-			];
-			// responseTypes/responseModes are restricted to a known set (mirroring the
-			// ClientSchema unions). grantTypes is intentionally open (ClientSchema
-			// permits any string), so it is only type-checked below, not enum-checked.
-			[
-				['responseTypes', ['code', 'none']],
-				['responseModes', responseModeValues]
-			].forEach(([prop, only]) => {
-				const value = m[prop];
-				if (value === undefined) {
-					return;
-				}
-				if (!Array.isArray(value)) {
-					this.invalidate(`${prop} must be an array`);
-				}
-				value.forEach((member) => {
-					if (typeof member !== 'string') {
-						this.invalidate(`${prop} must only contain strings`);
-					}
-				});
-				if (!value.every((member) => only.includes(member))) {
-					this.invalidate(`${prop} must be one of ${only.join(', ')}`);
-				}
-			});
-
 			// redirectUris: only reached when not mandatory (required() throws first
 			// for the missing/empty-string cases when responseTypes are present), so
 			// a non-array here (incl. null for grant-only clients) is a type error.
@@ -512,10 +451,8 @@ export default function getSchema(provider) {
 				['private_key_jwt', 'self_signed_tls_client_auth'].includes(
 					this.token_endpoint_auth_method
 				) ||
-				needsJwks.jws.test(this.request_object_signing_alg) ||
-				needsJwks.jws.test(
-					this.backchannel_authentication_request_signing_alg
-				) ||
+				needsJwks.jws.test(this['requestObject.signingAlg']) ||
+				needsJwks.jws.test(this['requestObject.backChannelSigningAlg']) ||
 				needsJwks.jwe.test(this.id_token_encrypted_response_alg) ||
 				needsJwks.jwe.test(this.userinfo_encrypted_response_alg) ||
 				needsJwks.jwe.test(this.introspection_encrypted_response_alg) ||
@@ -543,25 +480,6 @@ export default function getSchema(provider) {
 			});
 		}
 
-		webUris() {
-			WEB_URI.forEach((prop) => {
-				if (this[prop] !== undefined) {
-					const isAry = ARYS.includes(prop);
-					(isAry ? this[prop] : [this[prop]]).forEach((val) => {
-						const method = HTTPS_URI.includes(prop) ? 'isHttpsUri' : 'isWebUri';
-						const type = method === 'isWebUri' ? 'web' : 'https';
-						if (!validUrl[method](val)) {
-							this.invalidate(
-								isAry
-									? `${prop} must only contain ${type} uris`
-									: `${prop} must be a ${type} uri`
-							);
-						}
-					});
-				}
-			});
-		}
-
 		arrays() {
 			ARYS.forEach((prop) => {
 				if (this[prop] !== undefined) {
@@ -569,16 +487,6 @@ export default function getSchema(provider) {
 						this.invalidate(`${prop} must be an array`);
 					}
 					this[prop] = [...new Set(this[prop])];
-				}
-			});
-		}
-
-		booleans() {
-			BOOL.forEach((prop) => {
-				if (this[prop] !== undefined) {
-					if (typeof this[prop] !== 'boolean') {
-						this.invalidate(`${prop} must be a boolean`);
-					}
 				}
 			});
 		}

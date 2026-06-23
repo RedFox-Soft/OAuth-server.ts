@@ -41,7 +41,7 @@ export default {
 			clientId: 'client-with-HS-sig',
 			token_endpoint_auth_method: 'none',
 			clientSecret: 'secret',
-			request_object_signing_alg: 'HS256',
+			'requestObject.signingAlg': 'HS256',
 			grantTypes: [
 				'urn:ietf:params:oauth:grant-type:device_code',
 				'authorization_code'
@@ -53,7 +53,7 @@ export default {
 			client_secret_expires_at: 1,
 			token_endpoint_auth_method: 'none',
 			clientSecret: 'secret',
-			request_object_signing_alg: 'HS256',
+			'requestObject.signingAlg': 'HS256',
 			grantTypes: [
 				'urn:ietf:params:oauth:grant-type:device_code',
 				'authorization_code'

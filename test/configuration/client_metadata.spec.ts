@@ -101,15 +101,19 @@ describe('Client metadata validation', () => {
 				(err) => {
 					if (prop === 'redirectUris') {
 						expect(err.message).to.equal('invalid_redirect_uri');
+						if (protocols.length === 1 && protocols[0] === 'https') {
+							expect(err.error_description).to.equal(
+								`${prop} must be a https uri`
+							);
+						} else {
+							expect(err.error_description).to.equal(
+								`${prop} must be a web uri`
+							);
+						}
 					} else {
+						// URL shape is now enforced by ClientSchema (TypeBox format); the
+						// exact description is TypeBox's, so assert the error code only.
 						expect(err.message).to.equal('invalid_client_metadata');
-					}
-					if (protocols.length === 1 && protocols[0] === 'https') {
-						expect(err.error_description).to.equal(
-							`${prop} must be a https uri`
-						);
-					} else {
-						expect(err.error_description).to.equal(`${prop} must be a web uri`);
 					}
 					return true;
 				}
@@ -170,12 +174,9 @@ describe('Client metadata validation', () => {
 						configuration
 					),
 					(err) => {
-						if (prop === 'redirectUris') {
-							expect(err.message).to.equal('invalid_redirect_uri');
-						} else {
-							expect(err.message).to.equal('invalid_client_metadata');
-						}
-						expect(err.error_description).to.equal(`${prop} must be a boolean`);
+						// Boolean type is now enforced by ClientSchema (TypeBox); the exact
+						// description is TypeBox's, so assert the error code only.
+						expect(err.message).to.equal('invalid_client_metadata');
 						return true;
 					}
 				)
@@ -675,35 +676,41 @@ describe('Client metadata validation', () => {
 		});
 	});
 
-	describe('request_object_signing_alg', function () {
+	describe('requestObject.signingAlg', function () {
 		const configuration = {
 			features: {
 				requestObjects: { enabled: true }
 			}
 		};
-		mustBeString(
-			'request_object_signing_alg',
-			undefined,
-			undefined,
-			configuration
-		);
+		// Canonical dotted key (Model B), validated by a TypeBox literal union — so
+		// non-string / invalid values are rejected by the schema (the exact message is
+		// TypeBox's, no longer the engine's "must be a string" text).
+		[[], 123, true, null, false, {}, ''].forEach((value) => {
+			rejects(
+				'requestObject.signingAlg',
+				value,
+				undefined,
+				undefined,
+				configuration
+			);
+		});
 		['HS256', 'RS256', 'PS256', 'ES256', 'Ed25519', 'EdDSA'].forEach((alg) => {
 			allows(
-				'request_object_signing_alg',
+				'requestObject.signingAlg',
 				alg,
 				{ jwks: { keys: [sigKey] } },
 				configuration
 			);
 		});
 		rejects(
-			'request_object_signing_alg',
+			'requestObject.signingAlg',
 			'not-an-alg',
 			undefined,
 			undefined,
 			configuration
 		);
 		rejects(
-			'request_object_signing_alg',
+			'requestObject.signingAlg',
 			'none',
 			undefined,
 			undefined,
@@ -718,7 +725,19 @@ describe('Client metadata validation', () => {
 
 	describe('responseTypes', function () {
 		defaultsTo('responseTypes', ['code']);
-		mustBeArray('responseTypes');
+
+		// responseTypes structure (an array of the code/none enum) is enforced by the
+		// TypeBox ClientSchema, so a structurally invalid value is rejected with the
+		// generic schema validation error.
+		it('is rejected by the schema when not an array', () =>
+			assert.rejects(register({ responseTypes: 'string' }), (err) => {
+				expect(err.message).to.equal('invalid_client_metadata');
+				expect(err.error_description).to.equal(
+					'client metadata validation error'
+				);
+				return true;
+			}));
+
 		const responseTypes = ['code', 'none'];
 		responseTypes.forEach((value) => {
 			const grants = [];
@@ -743,7 +762,7 @@ describe('Client metadata validation', () => {
 			{ responseTypes }
 		);
 
-		rejects('responseTypes', [123], /must only contain strings$/);
+		rejects('responseTypes', [123], 'client metadata validation error');
 		rejects('responseTypes', [], /must contain members$/);
 		rejects('responseTypes', ['not-a-type']);
 		rejects('responseTypes', ['not-a-type', 'none']);
@@ -755,7 +774,18 @@ describe('Client metadata validation', () => {
 			expect(client.responseModeAllowed('fragment')).to.be.true;
 			expect(client.responseModeAllowed('form_post')).to.be.true;
 		});
-		mustBeArray('responseModes');
+
+		// responseModes structure (an array of the response_mode enum) is enforced by
+		// the TypeBox ClientSchema, so a structurally invalid value is rejected with
+		// the generic schema validation error.
+		it('is rejected by the schema when not an array', () =>
+			assert.rejects(register({ responseModes: 'string' }), (err) => {
+				expect(err.message).to.equal('invalid_client_metadata');
+				expect(err.error_description).to.equal(
+					'client metadata validation error'
+				);
+				return true;
+			}));
 
 		allows('responseModes', ['query', 'form_post']);
 		allows('responseModes', ['query']);
@@ -779,7 +809,7 @@ describe('Client metadata validation', () => {
 			features: { jwtResponseModes: { enabled: true } }
 		});
 
-		rejects('responseModes', [123], /must only contain strings$/);
+		rejects('responseModes', [123], 'client metadata validation error');
 		rejects('responseModes', [], /must contain members$/);
 		rejects('responseModes', ['not-a-mode']);
 		rejects('responseModes', ['not-a-mode']);
@@ -1812,68 +1842,66 @@ describe('Client metadata validation', () => {
 			);
 		});
 
-		describe('backchannel_authentication_request_signing_alg', function () {
+		describe('requestObject.backChannelSigningAlg', function () {
 			const withRequestObjects = merge({}, configuration, {
 				features: { requestObjects: { enabled: true } }
 			});
-			mustBeString(
-				'backchannel_authentication_request_signing_alg',
-				undefined,
-				metadata,
-				withRequestObjects
-			);
+			// Canonical dotted key (Model B), validated by a TypeBox literal union of the
+			// asymmetric algorithms; non-string / invalid values are rejected by the schema.
+			[[], 123, true, null, false, {}, ''].forEach((value) => {
+				rejects(
+					'requestObject.backChannelSigningAlg',
+					value,
+					undefined,
+					metadata,
+					withRequestObjects
+				);
+			});
 			['RS256', 'PS256', 'ES256', 'Ed25519', 'EdDSA'].forEach((alg) => {
 				allows(
-					'backchannel_authentication_request_signing_alg',
+					'requestObject.backChannelSigningAlg',
 					alg,
 					{ ...metadata, jwks: { keys: [sigKey] } },
 					withRequestObjects
 				);
 			});
 			rejects(
-				'backchannel_authentication_request_signing_alg',
+				'requestObject.backChannelSigningAlg',
 				'not-an-alg',
 				undefined,
 				metadata,
 				withRequestObjects
 			);
 			rejects(
-				'backchannel_authentication_request_signing_alg',
+				'requestObject.backChannelSigningAlg',
 				'none',
 				undefined,
 				metadata,
 				withRequestObjects
 			);
 			rejects(
-				'backchannel_authentication_request_signing_alg',
-				'none',
-				undefined,
-				metadata,
-				withRequestObjects
-			);
-			rejects(
-				'backchannel_authentication_request_signing_alg',
+				'requestObject.backChannelSigningAlg',
 				'HS256',
 				undefined,
 				metadata,
 				withRequestObjects
 			);
 			rejects(
-				'backchannel_authentication_request_signing_alg',
+				'requestObject.backChannelSigningAlg',
 				'HS384',
 				undefined,
 				metadata,
 				withRequestObjects
 			);
 			rejects(
-				'backchannel_authentication_request_signing_alg',
+				'requestObject.backChannelSigningAlg',
 				'HS512',
 				undefined,
 				metadata,
 				withRequestObjects
 			);
 			defaultsTo(
-				'backchannel_authentication_request_signing_alg',
+				'requestObject.backChannelSigningAlg',
 				undefined,
 				undefined,
 				withRequestObjects
@@ -2024,21 +2052,19 @@ describe('Client metadata validation', () => {
 			}
 		};
 
-		[false, Boolean, 'foo', 123, null, { kty: null }, { kty: '' }].forEach(
-			(value) => {
-				rejects(
-					'jwks',
-					{ keys: [value] },
-					'client JSON Web Key Set is invalid'
-				);
-			}
-		);
-		rejects('jwks', 'string', 'client JSON Web Key Set is invalid');
-		rejects('jwks', null, 'client JSON Web Key Set is invalid');
-		rejects('jwks', {}, 'client JSON Web Key Set is invalid');
-		rejects('jwks', 1, 'client JSON Web Key Set is invalid');
-		rejects('jwks', 0, 'client JSON Web Key Set is invalid');
-		rejects('jwks', true, 'client JSON Web Key Set is invalid');
+		[false, Boolean, 'foo', 123, null].forEach((value) => {
+			rejects('jwks', { keys: [value] }, 'client metadata validation error');
+		});
+
+		[{ kty: null }, { kty: '' }].forEach((value) => {
+			rejects('jwks', { keys: [value] }, 'client JSON Web Key Set is invalid');
+		});
+		rejects('jwks', 'string', 'client metadata validation error');
+		rejects('jwks', null, 'client metadata validation error');
+		rejects('jwks', {}, 'client metadata validation error');
+		rejects('jwks', 1, 'client metadata validation error');
+		rejects('jwks', 0, 'client metadata validation error');
+		rejects('jwks', true, 'client metadata validation error');
 		rejects(
 			'jwks',
 			{ keys: [privateKey] },
@@ -2073,8 +2099,8 @@ describe('Client metadata validation', () => {
 		);
 
 		for (const prop of [
-			'request_object_signing_alg',
-			'backchannel_authentication_request_signing_alg'
+			'requestObject.signingAlg',
+			'requestObject.backChannelSigningAlg'
 		]) {
 			rejects(
 				'jwks',

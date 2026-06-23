@@ -1,6 +1,9 @@
 import crypto from 'node:crypto';
 import { STATUS_CODES } from 'node:http';
 
+import { Type as t } from '@sinclair/typebox';
+import { Value } from '@sinclair/typebox/value';
+
 import KeyStore from '../../helpers/keystore.ts';
 import * as base64url from '../../helpers/base64url.ts';
 import epochTime from '../../helpers/epoch_time.ts';
@@ -14,62 +17,89 @@ import {
 	requestObjectEncryptionEncValues,
 	requestObjectSigningAlgValues
 } from '../../configs/jwaAlgorithms.js';
+import { ECCurves, OKPCurves } from '../../configs/jwaConsts.js';
 
-// intentionally ignore x5t#S256 so that they are left to be calculated by the library
-const EC_CURVES = new Set(['P-256', 'P-384', 'P-521']);
-const OKP_SUBTYPES = new Set(['Ed25519', 'X25519']);
+// NOTE: client JWKS validation here is intentionally the mirror image of the
+// server-side `verifyJWKs` (lib/configs/verifyJWKs.ts): these are PUBLIC keys
+// from a third party, so private components (`d`) are forbidden and `oct` is
+// rejected (symmetric keys live in the symmetric keystore), whereas verifyJWKs
+// validates the provider's own PRIVATE keys. Schemas are kept separate on
+// purpose — do not merge them. Extra/unknown members are deliberately tolerated
+// (open objects): `ClientKeyStore.add` later writes `x5t#S256` onto keys and
+// third-party JWKS commonly carry additional members.
+const EC_CURVES = new Set<string>(ECCurves);
+const OKP_SUBTYPES = new Set<string>(OKPCurves);
 
-export const validateJWKS = (jwks) => {
-	if (jwks !== undefined) {
-		if (!Array.isArray(jwks?.keys) || !jwks.keys.every(isPlainObject)) {
-			throw new InvalidClientMetadata('client JSON Web Key Set is invalid');
-		}
+// Shared optional members for any public client JWK. Objects are left open
+// (additionalProperties). The private component `d` is rejected separately in
+// checkJWK rather than via the schema, because TypeBox treats an optional
+// `Never` as a required-but-unsatisfiable property.
+const PublicBaseKey = t.Object({
+	kid: t.Optional(t.String({ minLength: 1 })),
+	alg: t.Optional(t.String({ minLength: 1 })),
+	use: t.Optional(t.String({ minLength: 1 })),
+	x5c: t.Optional(t.Array(t.String({ minLength: 1 })))
+});
+
+const RSAPubKey = t.Composite([
+	PublicBaseKey,
+	t.Object({
+		kty: t.Literal('RSA'),
+		e: t.String({ minLength: 1 }),
+		n: t.String({ minLength: 1 })
+	})
+]);
+
+const ECPubKey = t.Composite([
+	PublicBaseKey,
+	t.Object({
+		kty: t.Literal('EC'),
+		crv: t.Union(ECCurves.map((c) => t.Literal(c))),
+		x: t.String({ minLength: 1 }),
+		y: t.String({ minLength: 1 })
+	})
+]);
+
+const OKPPubKey = t.Composite([
+	PublicBaseKey,
+	t.Object({
+		kty: t.Literal('OKP'),
+		crv: t.Union(OKPCurves.map((c) => t.Literal(c))),
+		x: t.String({ minLength: 1 })
+	})
+]);
+
+export function validateJWK(jwk) {
+	if (!isPlainObject(jwk) || !(typeof jwk.kty === 'string' && jwk.kty)) {
+		throw new InvalidClientMetadata('client JSON Web Key Set is invalid');
 	}
-};
 
-export function checkJWK(jwk) {
-	try {
-		if (!isPlainObject(jwk)) throw new Error();
-		if (!(typeof jwk.kty === 'string' && jwk.kty)) throw new Error();
-
-		switch (jwk.kty) {
-			case 'EC':
-				if (!(typeof jwk.crv === 'string' && jwk.crv)) throw new Error();
-				if (!EC_CURVES.has(jwk.crv)) return undefined;
-				if (!(typeof jwk.x === 'string' && jwk.x)) throw new Error();
-				if (!(typeof jwk.y === 'string' && jwk.y)) throw new Error();
-				break;
-			case 'OKP':
-				if (!(typeof jwk.crv === 'string' && jwk.crv)) throw new Error();
-				if (!OKP_SUBTYPES.has(jwk.crv)) return undefined;
-				if (!(typeof jwk.x === 'string' && jwk.x)) throw new Error();
-				break;
-			case 'RSA':
-				if (!(typeof jwk.e === 'string' && jwk.e)) throw new Error();
-				if (!(typeof jwk.n === 'string' && jwk.n)) throw new Error();
-				break;
-			case 'oct':
-				break;
-			default:
-				return undefined;
+	let schema;
+	switch (jwk.kty) {
+		case 'RSA':
+			schema = RSAPubKey;
+			break;
+		case 'EC':
+		case 'OKP': {
+			if (!(typeof jwk.crv === 'string' && jwk.crv)) {
+				throw new InvalidClientMetadata('client JSON Web Key Set is invalid');
+			}
+			const curves = jwk.kty === 'EC' ? EC_CURVES : OKP_SUBTYPES;
+			// unsupported curve: skip the key rather than reject the whole set
+			if (!curves.has(jwk.crv)) return undefined;
+			schema = jwk.kty === 'EC' ? ECPubKey : OKPPubKey;
+			break;
 		}
+		case 'oct':
+			// symmetric keys do not belong in a client's asymmetric JWKS
+			throw new InvalidClientMetadata('client JSON Web Key Set is invalid');
+		default:
+			// unrecognized key type: skip it, leaving the rest of the set usable
+			return undefined;
+	}
 
-		if (!(jwk.d === undefined && jwk.kty !== 'oct')) throw new Error();
-		if (!(jwk.alg === undefined || (typeof jwk.alg === 'string' && jwk.alg)))
-			throw new Error();
-		if (!(jwk.kid === undefined || (typeof jwk.kid === 'string' && jwk.kid)))
-			throw new Error();
-		if (!(jwk.use === undefined || (typeof jwk.use === 'string' && jwk.use)))
-			throw new Error();
-		if (
-			!(
-				jwk.x5c === undefined ||
-				(Array.isArray(jwk.x5c) &&
-					jwk.x5c.every((x) => typeof x === 'string' && x))
-			)
-		)
-			throw new Error();
-	} catch {
+	// reject private keys: only public key material is accepted here
+	if (jwk.d !== undefined || !Value.Check(schema, jwk)) {
 		throw new InvalidClientMetadata('client JSON Web Key Set is invalid');
 	}
 
@@ -173,11 +203,17 @@ export class ClientKeyStore extends KeyStore {
 					);
 				}
 
-				validateJWKS(body);
+				if (body !== undefined) {
+					if (!Array.isArray(body?.keys) || !body.keys.every(isPlainObject)) {
+						throw new InvalidClientMetadata(
+							'client JSON Web Key Set is invalid'
+						);
+					}
+				}
 
 				this.clear();
 				body.keys
-					.map(checkJWK)
+					.map(validateJWK)
 					.filter(Boolean)
 					.forEach(ClientKeyStore.prototype.add.bind(this));
 
@@ -232,12 +268,12 @@ export function buildSymmetricKeyStore(client) {
 			'userinfoSignedResponseAlg',
 			'authorizationSignedResponseAlg',
 			'idTokenSignedResponseAlg',
-			'requestObjectSigningAlg'
+			'requestObject.signingAlg'
 		].forEach((prop) => {
 			algs.add(client[prop]);
 		});
 
-		if (!client.requestObjectSigningAlg) {
+		if (!client['requestObject.signingAlg']) {
 			requestObjectSigningAlgValues.forEach(Set.prototype.add.bind(algs));
 		}
 

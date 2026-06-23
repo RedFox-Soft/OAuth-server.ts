@@ -109,7 +109,7 @@ async function authorizationActionHandler(oidc) {
 	const cient = oidc.client;
 	const pushedAuthorizationRequest = await loadPushedAuthorizationRequest(oidc);
 	const requestOptions = {
-		clientAlg: cient.requestObjectSigningAlg,
+		clientAlg: cient['requestObject.signingAlg'],
 		trusted: false,
 		isPar: false
 	};
@@ -235,7 +235,7 @@ export const par = new Elysia()
 			const client = oidc.client;
 
 			await processRequestObject(authorizationRequest, oidc, {
-				clientAlg: client.requestObjectSigningAlg
+				clientAlg: client['requestObject.signingAlg']
 			});
 			checkResponseMode(oidc);
 			oneRedirectUriClients(oidc);

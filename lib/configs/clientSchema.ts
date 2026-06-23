@@ -1,6 +1,32 @@
-import { Type as t, type Static } from '@sinclair/typebox';
+import { Type as t, FormatRegistry, type Static } from '@sinclair/typebox';
+import * as validUrl from '../helpers/valid_url.ts';
+import {
+	authorizationEncryptionAlgValues,
+	authorizationEncryptionEncValues,
+	backchannelAuthenticationRequestSigningAlgValues,
+	idTokenEncryptionAlgValues,
+	idTokenEncryptionEncValues,
+	introspectionEncryptionAlgValues,
+	introspectionEncryptionEncValues,
+	requestObjectEncryptionEncValues,
+	requestObjectSigningAlgValues,
+	userinfoEncryptionAlgValues,
+	userinfoEncryptionEncValues
+} from './jwaAlgorithms.ts';
 
 export const vsCHAR = /[\x20-\x7E]/;
+
+// A closed set of allowed string values → a TypeBox literal union. Used for the
+// statically-known algorithm enumerations so the schema is the single source of
+// truth for them (the imperative engine no longer re-checks these).
+const literalUnion = (values: readonly string[]) =>
+	t.Union(values.map((value) => t.Literal(value)));
+
+// URL format checkers delegate to the existing validators so TypeBox enforces the
+// exact same semantics the engine's webUris() pass used — only the rejection message
+// changes. 'web-uri' allows http/https; 'https-uri' requires https.
+FormatRegistry.Set('web-uri', (value) => validUrl.isWebUri(value));
+FormatRegistry.Set('https-uri', (value) => validUrl.isHttpsUri(value));
 
 export const ClientSchema = t.Object({
 	/*
@@ -90,14 +116,22 @@ export const ClientSchema = t.Object({
 	 * description: The default signing algorithm for request objects.
 	 * If not set, the server will use the algorihm from JWT Token.
 	 */
-	'requestObject.signingAlg': t.Optional(t.String()),
+	'requestObject.signingAlg': t.Optional(
+		t.Union(requestObjectSigningAlgValues.map((alg) => t.Literal(alg)))
+	),
 	/*
 	 * requestObject.backChannelSigningAlg
 	 *
 	 * description: The default signing algorithm for request objects
 	 * when using backchannel authentication.
 	 */
-	'requestObject.backChannelSigningAlg': t.Optional(t.String()),
+	'requestObject.backChannelSigningAlg': t.Optional(
+		t.Union(
+			backchannelAuthenticationRequestSigningAlgValues.map((alg) =>
+				t.Literal(alg)
+			)
+		)
+	),
 	/*
 	 * consent.require
 	 *
@@ -115,50 +149,85 @@ export const ClientSchema = t.Object({
 	 */
 
 	// clientSecretExpiresAt: epoch seconds at which the secret expires (0 = never).
-	clientSecretExpiresAt: t.Optional(t.Number()),
+	// Bounded to MAX_SAFE_INTEGER to match the engine's former Number.isSafeInteger check.
+	clientSecretExpiresAt: t.Optional(
+		t.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })
+	),
+	// Informational client URLs (RFC 7591) — web URIs validated by TypeBox format.
+	clientUri: t.Optional(t.String({ format: 'web-uri' })),
+	logoUri: t.Optional(t.String({ format: 'web-uri' })),
+	policyUri: t.Optional(t.String({ format: 'web-uri' })),
+	tosUri: t.Optional(t.String({ format: 'web-uri' })),
+	// initiateLoginUri must be https (HTTPS_URI).
+	initiateLoginUri: t.Optional(t.String({ format: 'https-uri' })),
 	// tokenEndpointAuthMethod: the registered client authentication method.
 	tokenEndpointAuthMethod: t.Optional(t.String()),
 	// tokenEndpointAuthSigningAlg: signing alg for *_jwt client authentication.
 	tokenEndpointAuthSigningAlg: t.Optional(t.String()),
 	// jwks: inline JSON Web Key Set (left permissive — the schema engine performs
 	// the structural JWKS validation; this only contributes the type).
-	jwks: t.Optional(t.Any()),
+	jwks: t.Optional(
+		t.Object({
+			keys: t.Array(t.Object({}))
+		})
+	),
 	// jwksUri: remote JSON Web Key Set location.
-	jwksUri: t.Optional(t.String()),
-	// sectorIdentifierUri: pairwise sector identifier document location.
-	sectorIdentifierUri: t.Optional(t.String()),
+	jwksUri: t.Optional(t.String({ format: 'web-uri' })),
+	// sectorIdentifierUri: pairwise sector identifier document location (https).
+	sectorIdentifierUri: t.Optional(t.String({ format: 'https-uri' })),
 	// postLogoutRedirectUris: allowed RP-initiated logout redirect targets.
 	postLogoutRedirectUris: t.Optional(t.Array(t.String())),
-	// backchannelLogoutUri: back-channel logout notification endpoint.
-	backchannelLogoutUri: t.Optional(t.String()),
+	// backchannelLogoutUri: back-channel logout notification endpoint (web uri).
+	backchannelLogoutUri: t.Optional(t.String({ format: 'web-uri' })),
 	// backchannelLogoutSessionRequired: include sid in the logout token.
 	backchannelLogoutSessionRequired: t.Optional(t.Boolean()),
+	// requireAuthTime / backchannelUserCodeParameter: boolean client flags.
+	requireAuthTime: t.Optional(t.Boolean()),
+	backchannelUserCodeParameter: t.Optional(t.Boolean()),
 	// backchannelTokenDeliveryMode: CIBA delivery mode (poll/ping/push).
 	backchannelTokenDeliveryMode: t.Optional(t.String()),
-	// backchannelClientNotificationEndpoint: CIBA ping/push notification endpoint.
-	backchannelClientNotificationEndpoint: t.Optional(t.String()),
-	// backchannelAuthenticationRequestSigningAlg: CIBA request signing alg.
-	backchannelAuthenticationRequestSigningAlg: t.Optional(t.String()),
-	// idTokenSignedResponseAlg / *Encrypted*: ID Token JWT signing/encryption.
+	// backchannelClientNotificationEndpoint: CIBA ping/push notification endpoint (https).
+	backchannelClientNotificationEndpoint: t.Optional(
+		t.String({ format: 'https-uri' })
+	),
+	// (CIBA request signing alg is the canonical `requestObject.backChannelSigningAlg` above.)
+	// *SignedResponseAlg fields stay t.String(): their allowed sets are derived at
+	// startup from the configured JWKS (runtime), so the engine still validates them.
+	// The *Encrypted*Alg/Enc fields below have statically-known sets → TypeBox literal unions.
 	idTokenSignedResponseAlg: t.Optional(t.String()),
-	idTokenEncryptedResponseAlg: t.Optional(t.String()),
-	idTokenEncryptedResponseEnc: t.Optional(t.String()),
-	// userinfoSignedResponseAlg / *Encrypted*: UserInfo JWT signing/encryption.
+	idTokenEncryptedResponseAlg: t.Optional(
+		literalUnion(idTokenEncryptionAlgValues)
+	),
+	idTokenEncryptedResponseEnc: t.Optional(
+		literalUnion(idTokenEncryptionEncValues)
+	),
 	userinfoSignedResponseAlg: t.Optional(t.String()),
-	userinfoEncryptedResponseAlg: t.Optional(t.String()),
-	userinfoEncryptedResponseEnc: t.Optional(t.String()),
-	// introspectionSignedResponseAlg / *Encrypted*: introspection JWT signing/encryption.
+	userinfoEncryptedResponseAlg: t.Optional(
+		literalUnion(userinfoEncryptionAlgValues)
+	),
+	userinfoEncryptedResponseEnc: t.Optional(
+		literalUnion(userinfoEncryptionEncValues)
+	),
 	introspectionSignedResponseAlg: t.Optional(t.String()),
-	introspectionEncryptedResponseAlg: t.Optional(t.String()),
-	introspectionEncryptedResponseEnc: t.Optional(t.String()),
-	// authorizationSignedResponseAlg / *Encrypted*: JARM signing/encryption.
+	introspectionEncryptedResponseAlg: t.Optional(
+		literalUnion(introspectionEncryptionAlgValues)
+	),
+	introspectionEncryptedResponseEnc: t.Optional(
+		literalUnion(introspectionEncryptionEncValues)
+	),
 	authorizationSignedResponseAlg: t.Optional(t.String()),
-	authorizationEncryptedResponseAlg: t.Optional(t.String()),
-	authorizationEncryptedResponseEnc: t.Optional(t.String()),
-	// requestObjectSigningAlg / *Encryption*: request object JWT signing/encryption.
-	requestObjectSigningAlg: t.Optional(t.String()),
+	authorizationEncryptedResponseAlg: t.Optional(
+		literalUnion(authorizationEncryptionAlgValues)
+	),
+	authorizationEncryptedResponseEnc: t.Optional(
+		literalUnion(authorizationEncryptionEncValues)
+	),
+	// requestObjectEncryptionAlg stays t.String(): its set is JWKS-derived (runtime).
+	// requestObjectEncryptionEnc has a static set → TypeBox literal union.
 	requestObjectEncryptionAlg: t.Optional(t.String()),
-	requestObjectEncryptionEnc: t.Optional(t.String()),
+	requestObjectEncryptionEnc: t.Optional(
+		literalUnion(requestObjectEncryptionEncValues)
+	),
 	// requireSignedRequestObject: require signed request objects from this client.
 	requireSignedRequestObject: t.Optional(t.Boolean()),
 	// dpopBoundAccessTokens: require DPoP-bound access tokens.
@@ -173,8 +242,10 @@ export const ClientSchema = t.Object({
 	tlsClientAuthSanEmail: t.Optional(t.String()),
 	// useMtlsEndpointAliases: advertise/use the mTLS endpoint aliases.
 	useMtlsEndpointAliases: t.Optional(t.Boolean()),
-	// defaultMaxAge: default max authentication age in seconds.
-	defaultMaxAge: t.Optional(t.Number()),
+	// defaultMaxAge: default max authentication age in seconds (non-negative safe integer).
+	defaultMaxAge: t.Optional(
+		t.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })
+	),
 	// scope: space-delimited scope whitelist for the client.
 	scope: t.Optional(t.String()),
 	// authorizationDetailsTypes: allowed RAR authorization_details types.

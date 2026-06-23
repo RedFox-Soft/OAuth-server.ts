@@ -15,6 +15,37 @@ const FORBIDDEN = [
 	'client_id_issued_at'
 ];
 
+// Model B: the two request-object signing options are the canonical dotted keys
+// internally, but RFC 7591 Dynamic Client Registration uses snake_case on the wire.
+// Translate at this boundary only — snake→canonical on the incoming body, and
+// canonical→snake on the metadata() response — so the registration contract stays
+// standards-compliant while the rest of the server uses a single canonical name.
+const REQUEST_OBJECT_ALG_WIRE_MAP = {
+	request_object_signing_alg: 'requestObject.signingAlg',
+	backchannel_authentication_request_signing_alg:
+		'requestObject.backChannelSigningAlg'
+};
+
+function snakeToCanonical(body) {
+	for (const [snake, dotted] of Object.entries(REQUEST_OBJECT_ALG_WIRE_MAP)) {
+		if (snake in body) {
+			body[dotted] = body[snake];
+			delete body[snake];
+		}
+	}
+	return body;
+}
+
+function canonicalToSnake(metadata) {
+	for (const [snake, dotted] of Object.entries(REQUEST_OBJECT_ALG_WIRE_MAP)) {
+		if (dotted in metadata) {
+			metadata[snake] = metadata[dotted];
+			delete metadata[dotted];
+		}
+	}
+	return metadata;
+}
+
 async function setWWWAuthenticateHeader(ctx, next) {
 	try {
 		await next();
@@ -114,6 +145,7 @@ export const post = [
 			client_id: clientId,
 			client_id_issued_at: epochTime()
 		});
+		snakeToCanonical(properties);
 
 		const { Client } = provider;
 		const secretRequired = Client.needsSecret(properties);
@@ -143,7 +175,7 @@ export const post = [
 		const client = await addClient(provider, properties, { store: true, ctx });
 		ctx.oidc.entity('Client', client);
 
-		ctx.body = client.metadata();
+		ctx.body = canonicalToSnake(client.metadata());
 
 		if (rat) {
 			Object.assign(ctx.body, {
@@ -171,7 +203,7 @@ export const get = [
 			);
 		}
 
-		ctx.body = ctx.oidc.client.metadata();
+		ctx.body = canonicalToSnake(ctx.oidc.client.metadata());
 
 		Object.assign(ctx.body, {
 			registration_access_token: ctx.oidc.getAccessToken(),
@@ -231,13 +263,15 @@ export const put = [
 			);
 		}
 
-		const properties = omitBy(
-			{
-				client_id: ctx.oidc.client.clientId,
-				client_id_issued_at: ctx.oidc.client.clientIdIssuedAt,
-				...ctx.oidc.body
-			},
-			(value) => value === null || value === ''
+		const properties = snakeToCanonical(
+			omitBy(
+				{
+					client_id: ctx.oidc.client.clientId,
+					client_id_issued_at: ctx.oidc.client.clientIdIssuedAt,
+					...ctx.oidc.body
+				},
+				(value) => value === null || value === ''
+			)
 		);
 
 		const {
@@ -270,7 +304,7 @@ export const put = [
 
 		const client = await addClient(provider, properties, { store: true, ctx });
 
-		ctx.body = client.metadata();
+		ctx.body = canonicalToSnake(client.metadata());
 
 		Object.assign(ctx.body, {
 			registration_access_token: ctx.oidc.getAccessToken(),

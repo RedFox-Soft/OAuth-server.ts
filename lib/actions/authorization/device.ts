@@ -93,7 +93,7 @@ export const deviceAuth = new Elysia()
 				);
 			}
 			await processRequestObject(DeviceRequest, oidc, {
-				clientAlg: client.requestObjectSigningAlg
+				clientAlg: client['requestObject.signingAlg']
 			});
 			assignDefaults(oidc);
 			checkScope(oidc);
@@ -147,7 +147,7 @@ export const backchannelAuth = new Elysia()
 			}
 
 			processRequestObject(BacckchannelRequest, oidc, {
-				clientAlg: client.backchannelAuthenticationRequestSigningAlg
+				clientAlg: client['requestObject.backChannelSigningAlg']
 			});
 			cibaRequired;
 			assignDefaults;
