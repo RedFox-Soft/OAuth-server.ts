@@ -24,9 +24,51 @@ function Find-SpecifyRoot {
     }
 }
 
+# Resolve an explicit SPECIFY_INIT_DIR project override (the directory that
+# *contains* .specify/), for non-interactive / CI use -- e.g. running a Spec Kit
+# command against a member project from a monorepo root without cd.
+#
+# Precondition: $env:SPECIFY_INIT_DIR is set. Returns the validated project root,
+# or writes an error and exits 1. Strict by design: the path must exist and
+# contain .specify/, with no silent fallback. (An empty string is falsy, so the
+# caller's `if ($env:SPECIFY_INIT_DIR)` guard treats empty as unset.)
+#
+# This is the single resolver: bundled extensions inherit it by sourcing core
+# (e.g. the git extension's create-new-feature-branch) rather than duplicating it.
+function Resolve-SpecifyInitDir {
+    $initDir = $env:SPECIFY_INIT_DIR
+    # Normalize: relative paths resolve against the current directory.
+    if (-not [System.IO.Path]::IsPathRooted($initDir)) {
+        $initDir = Join-Path (Get-Location).Path $initDir
+    }
+    $resolved = Resolve-Path -LiteralPath $initDir -ErrorAction SilentlyContinue
+    # Resolve-Path also succeeds for files, so check the resolved path is a
+    # directory; otherwise a file value would slip through to the less accurate
+    # "not a Spec Kit project" error below.
+    if (-not $resolved -or -not (Test-Path -LiteralPath $resolved.Path -PathType Container)) {
+        [Console]::Error.WriteLine("ERROR: SPECIFY_INIT_DIR does not point to an existing directory: $($env:SPECIFY_INIT_DIR)")
+        exit 1
+    }
+    # Resolve-Path echoes back any trailing separator from the input; trim it so
+    # the returned root matches the bash resolver, whose `cd && pwd` never yields
+    # one. TrimEndingDirectorySeparator is a no-op on a bare root and on a path
+    # that already has no trailing separator.
+    $initRoot = [System.IO.Path]::TrimEndingDirectorySeparator($resolved.Path)
+    if (-not (Test-Path -LiteralPath (Join-Path $initRoot '.specify') -PathType Container)) {
+        [Console]::Error.WriteLine("ERROR: SPECIFY_INIT_DIR is not a Spec Kit project (no .specify/ directory): $initRoot")
+        exit 1
+    }
+    return $initRoot
+}
+
 # Get repository root, prioritizing .specify directory
 # This prevents using a parent repository when spec-kit is initialized in a subdirectory
 function Get-RepoRoot {
+    # Explicit project override wins (see Resolve-SpecifyInitDir).
+    if ($env:SPECIFY_INIT_DIR) {
+        return (Resolve-SpecifyInitDir)
+    }
+
     # First, look for .specify directory (spec-kit's own marker)
     $specifyRoot = Find-SpecifyRoot
     if ($specifyRoot) {
@@ -101,6 +143,13 @@ function Save-FeatureJson {
 }
 
 function Get-FeaturePathsEnv {
+    # Read-only callers (e.g. check-prerequisites.ps1 -PathsOnly) pass -NoPersist
+    # so pure path resolution never writes .specify/feature.json, which would
+    # dirty the working tree or overwrite a pinned value (issue #3025).
+    param(
+        [switch]$NoPersist
+    )
+
     $repoRoot = Get-RepoRoot
     $currentBranch = Get-CurrentBranch
 
@@ -115,8 +164,11 @@ function Get-FeaturePathsEnv {
         if (-not [System.IO.Path]::IsPathRooted($featureDir)) {
             $featureDir = Join-Path $repoRoot $featureDir
         }
-        # Persist to feature.json so future sessions without the env var still work
-        Save-FeatureJson -RepoRoot $repoRoot -FeatureDirectory $env:SPECIFY_FEATURE_DIRECTORY
+        # Persist to feature.json so future sessions without the env var still
+        # work - unless the caller opted out for read-only resolution (#3025).
+        if (-not $NoPersist) {
+            Save-FeatureJson -RepoRoot $repoRoot -FeatureDirectory $env:SPECIFY_FEATURE_DIRECTORY
+        }
     } elseif (Test-Path $featureJson) {
         $featureJsonRaw = Get-Content -LiteralPath $featureJson -Raw
         try {
@@ -167,7 +219,13 @@ function Test-FileExists {
 
 function Test-DirHasFiles {
     param([string]$Path, [string]$Description)
-    if ((Test-Path -Path $Path -PathType Container) -and (Get-ChildItem -Path $Path -ErrorAction SilentlyContinue | Where-Object { -not $_.PSIsContainer } | Select-Object -First 1)) {
+    # A directory counts as non-empty when Get-ChildItem returns any entry
+    # (files or subdirectories) -- matching the JSON contracts checks in
+    # check-prerequisites.ps1 / setup-tasks.ps1, and treating a directory whose
+    # only contents are subdirectories (e.g. contracts/v1/openapi.yaml) as
+    # non-empty like bash check_dir. Filtering out subdirectories would
+    # mis-report such a directory as empty.
+    if ((Test-Path -Path $Path -PathType Container) -and (Get-ChildItem -Path $Path -ErrorAction SilentlyContinue | Select-Object -First 1)) {
         Write-Output "  [OK] $Description"
         return $true
     } else {

@@ -573,7 +573,7 @@ describe('Pushed Request Object', async () => {
 	});
 
 	describe('with Request Objects', () => {
-		let key = null;
+		let key: CryptoKey | Uint8Array;
 		beforeAll(async function () {
 			const client = await Client.find('client');
 			key = await importJWK(
@@ -592,7 +592,7 @@ describe('Pushed Request Object', async () => {
 				expect(data).not.toHaveProperty('request_object_endpoint');
 				expect(data).toHaveProperty('pushed_authorization_request_endpoint');
 				expect(
-					data.request_object_signing_alg_values_supported
+					data?.request_object_signing_alg_values_supported
 				).not.toHaveLength(0);
 				expect(data).toHaveProperty('request_parameter_supported', true);
 				expect(data).toHaveProperty('request_uri_parameter_supported', false);
@@ -822,8 +822,8 @@ describe('Pushed Request Object', async () => {
 								}
 							);
 							expect(response.status).toBe(201);
-							expect(data.expires_in).toBeCloseTo(60, 1);
-							expect(data.request_uri).toMatch(
+							expect(data?.expires_in).toBeCloseTo(60, 1);
+							expect(data?.request_uri).toMatch(
 								/^urn:ietf:params:oauth:request_uri:(.+)$/
 							);
 							expect(spy).toHaveBeenCalledTimes(1);
@@ -986,8 +986,8 @@ describe('Pushed Request Object', async () => {
 									}
 								}
 							);
-							expect(error.status).toBe(400);
-							expect(error.value).toEqual({
+							expect(error?.status).toBe(400);
+							expect(error?.value).toEqual({
 								error: 'invalid_redirect_uri',
 								error_description:
 									"redirect_uri did not match any of the client's registered redirectUris"

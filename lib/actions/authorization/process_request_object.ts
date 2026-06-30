@@ -26,11 +26,15 @@ export function isEncryptedJWT(jwt: string): boolean {
 export default async function processRequestObject(
 	schema: TSchema,
 	oidc,
-	{ clientAlg }: { clientAlg?: string } = {}
+	{
+		clientAlg,
+		isPar = false,
+		trusted = false
+	}: { clientAlg?: string; isPar?: boolean; trusted?: boolean } = {}
 ) {
 	const { params, client, route } = oidc;
 
-	const pushedRequestObject = 'PushedAuthorizationRequest' in oidc.entities;
+	const pushedRequestObject = isPar;
 	const isBackchannelAuthentication = route === 'backchannel_authentication';
 	const { features } = instance(oidc.provider);
 
@@ -41,8 +45,6 @@ export default async function processRequestObject(
 	if (params.request === undefined) {
 		return;
 	}
-
-	let trusted = false; // signed or encrypted by client confidential material
 
 	if (features.encryption.enabled && isEncryptedJWT(params.request)) {
 		try {

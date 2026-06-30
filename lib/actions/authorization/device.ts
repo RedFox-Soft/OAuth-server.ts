@@ -92,9 +92,7 @@ export const deviceAuth = new Elysia()
 					`${deviceAuthGrantType} is not allowed for this client`
 				);
 			}
-			await processRequestObject(DeviceRequest, oidc, {
-				clientAlg: client['requestObject.signingAlg']
-			});
+			await processRequestObject(DeviceRequest, oidc);
 			assignDefaults(oidc);
 			checkScope(oidc);
 			checkOpenidScope(oidc);

@@ -106,16 +106,13 @@ async function authorizationActionHandler(oidc) {
 	const setCookies = await sessionHandler(oidc);
 	await checkClient(oidc);
 
-	const cient = oidc.client;
 	const pushedAuthorizationRequest = await loadPushedAuthorizationRequest(oidc);
 	const requestOptions = {
-		clientAlg: cient['requestObject.signingAlg'],
 		trusted: false,
 		isPar: false
 	};
 	if (pushedAuthorizationRequest) {
 		requestOptions.isPar = true;
-		requestOptions.clientAlg = undefined;
 		requestOptions.trusted = pushedAuthorizationRequest.trusted;
 	}
 	await processRequestObject(authorizationRequest, oidc, requestOptions);
@@ -234,9 +231,7 @@ export const par = new Elysia()
 			const { request } = oidc.params;
 			const client = oidc.client;
 
-			await processRequestObject(authorizationRequest, oidc, {
-				clientAlg: client['requestObject.signingAlg']
-			});
+			await processRequestObject(authorizationRequest, oidc);
 			checkResponseMode(oidc);
 			oneRedirectUriClients(oidc);
 			presence(oidc, 'response_type', 'redirect_uri');

@@ -56,8 +56,14 @@ EXAMPLES:
 # Source common functions
 . "$PSScriptRoot/common.ps1"
 
-# Get feature paths
-$paths = Get-FeaturePathsEnv
+# Get feature paths.
+# In -PathsOnly mode this is pure resolution, so pass -NoPersist to opt out of
+# the feature.json write side effect (issue #3025).
+if ($PathsOnly) {
+    $paths = Get-FeaturePathsEnv -NoPersist
+} else {
+    $paths = Get-FeaturePathsEnv
+}
 
 # If paths-only mode, output paths and exit (no validation)
 if ($PathsOnly) {
@@ -83,24 +89,24 @@ if ($PathsOnly) {
 
 # Validate required directories and files
 if (-not (Test-Path $paths.FEATURE_DIR -PathType Container)) {
-    Write-Output "ERROR: Feature directory not found: $($paths.FEATURE_DIR)"
+    [Console]::Error.WriteLine("ERROR: Feature directory not found: $($paths.FEATURE_DIR)")
     $specifyCommand = '/speckit-specify'
-    Write-Output "Run $specifyCommand first to create the feature structure."
+    [Console]::Error.WriteLine("Run $specifyCommand first to create the feature structure.")
     exit 1
 }
 
 if (-not (Test-Path $paths.IMPL_PLAN -PathType Leaf)) {
-    Write-Output "ERROR: plan.md not found in $($paths.FEATURE_DIR)"
+    [Console]::Error.WriteLine("ERROR: plan.md not found in $($paths.FEATURE_DIR)")
     $planCommand = '/speckit-plan'
-    Write-Output "Run $planCommand first to create the implementation plan."
+    [Console]::Error.WriteLine("Run $planCommand first to create the implementation plan.")
     exit 1
 }
 
 # Check for tasks.md if required
 if ($RequireTasks -and -not (Test-Path $paths.TASKS -PathType Leaf)) {
-    Write-Output "ERROR: tasks.md not found in $($paths.FEATURE_DIR)"
+    [Console]::Error.WriteLine("ERROR: tasks.md not found in $($paths.FEATURE_DIR)")
     $tasksCommand = '/speckit-tasks'
-    Write-Output "Run $tasksCommand first to create the task list."
+    [Console]::Error.WriteLine("Run $tasksCommand first to create the task list.")
     exit 1
 }
 
