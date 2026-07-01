@@ -8,6 +8,7 @@ import sinon from 'sinon';
 import * as JWT from '../../lib/helpers/jwt.ts';
 import bootstrap, { agent, jsonToFormUrlEncoded } from '../test_helper.js';
 import { provider } from 'lib/provider.js';
+import { ApplicationConfig } from 'lib/configs/application.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { ValidationError } from 'elysia';
 
@@ -27,7 +28,7 @@ describe('request parameter features', () => {
 			expect(data).toHaveProperty('request_parameter_supported', true);
 			expect(data).not.toHaveProperty('require_signed_request_object');
 
-			i(provider).features.requestObjects.requireSignedRequestObject = true;
+			ApplicationConfig['requestObjects.requireSignedRequestObject'] = true;
 
 			const { data: newData } =
 				await agent['.well-known']['openid-configuration'].get();
@@ -37,7 +38,7 @@ describe('request parameter features', () => {
 		});
 
 		afterEach(function () {
-			i(provider).features.requestObjects.requireSignedRequestObject = false;
+			ApplicationConfig['requestObjects.requireSignedRequestObject'] = false;
 		});
 	});
 

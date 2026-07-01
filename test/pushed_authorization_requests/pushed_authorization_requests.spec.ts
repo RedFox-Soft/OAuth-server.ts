@@ -16,6 +16,7 @@ import { importJWK, decodeProtectedHeader, decodeJwt } from 'jose';
 import * as JWT from '../../lib/helpers/jwt.ts';
 import bootstrap, { agent, jsonToFormUrlEncoded } from '../test_helper.js';
 import { provider } from 'lib/provider.js';
+import { ApplicationConfig } from 'lib/configs/application.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
@@ -34,6 +35,7 @@ describe('Pushed Request Object', async () => {
 	describe('w/o Request Objects', () => {
 		beforeEach(function () {
 			i(provider).features.requestObjects.enabled = false;
+			ApplicationConfig['requestObjects.enabled'] = false;
 		});
 
 		describe('discovery', () => {
@@ -582,6 +584,7 @@ describe('Pushed Request Object', async () => {
 		});
 		beforeEach(function () {
 			i(provider).features.requestObjects.enabled = true;
+			ApplicationConfig['requestObjects.enabled'] = true;
 		});
 
 		describe('discovery', () => {

@@ -33,7 +33,12 @@ merge(config.features, {
 });
 
 export const ApplicationConfig = {
-	'clientCredentials.enabled': true
+	'clientCredentials.enabled': true,
+	'mTLS.enabled': true,
+	'mTLS.certificateBoundAccessTokens': true,
+	'introspection.enabled': true,
+	'deviceFlow.enabled': true,
+	'ciba.enabled': true
 };
 
 export default {

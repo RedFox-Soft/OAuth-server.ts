@@ -13,6 +13,13 @@ merge(config.features, {
 	deviceFlow: { enabled: true }
 });
 
+// Discovery reads feature state from ApplicationConfig; mirror the flags enabled above.
+export const ApplicationConfig = {
+	'requestObjects.enabled': true,
+	'claimsParameter.enabled': true,
+	'deviceFlow.enabled': true
+};
+
 export default {
 	config,
 	clients: [

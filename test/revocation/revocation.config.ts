@@ -9,7 +9,9 @@ merge(config.features, {
 });
 
 export const ApplicationConfig = {
-	'clientCredentials.enabled': true
+	'clientCredentials.enabled': true,
+	// Discovery advertises the revocation endpoint based on ApplicationConfig.
+	'revocation.enabled': true
 };
 
 export default {

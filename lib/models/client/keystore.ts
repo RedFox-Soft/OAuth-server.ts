@@ -298,13 +298,11 @@ export function buildSymmetricKeyStore(client) {
 		algs.delete(undefined);
 
 		for (const alg of algs) {
-			if (
-				!(
-					alg.startsWith('HS') ||
-					/^A(\d{3})(?:GCM)?KW$/.test(alg) ||
-					/^A(\d{3})(?:GCM|CBC-HS(\d{3}))$/.test(alg)
-				)
-			) {
+			if (!(
+				alg.startsWith('HS') ||
+				/^A(\d{3})(?:GCM)?KW$/.test(alg) ||
+				/^A(\d{3})(?:GCM|CBC-HS(\d{3}))$/.test(alg)
+			)) {
 				algs.delete(alg);
 			}
 		}

@@ -12,9 +12,7 @@ import type { ModelAdapter } from '../types.js';
 import type { PayloadForModel } from '../modelTypes.js';
 
 type AdapterStoreValue<TModelName extends string> =
-	| PayloadForModel<TModelName>
-	| string
-	| string[];
+	PayloadForModel<TModelName> | string | string[];
 
 function getStringField(payload: unknown, field: string): string | undefined {
 	if (payload && typeof payload === 'object') {

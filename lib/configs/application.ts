@@ -323,7 +323,42 @@ export const ApplicationConfig = {
 	 *   Resource Server scopes don't belong here, see `features.resourceIndicators` for configuring
 	 *   those.
 	 */
-	scopes: ['openid', 'offline_access']
+	scopes: ['openid', 'offline_access'],
+
+	/*
+	 * claims
+	 *
+	 * description: Claims map used to derive `claims_supported` and claim-defined scopes for discovery.
+	 *   `{ claimName: null }` exposes a standalone claim; `{ scopeName: ['claim', ...] }` groups claims under a scope.
+	 */
+	claims: {
+		acr: null,
+		sid: null,
+		auth_time: null,
+		iss: null,
+		openid: ['sub']
+	},
+
+	/*
+	 * acrValues
+	 *
+	 * description: Authentication Context Class References the server supports; surfaced as `acr_values_supported`.
+	 */
+	acrValues: [],
+
+	/*
+	 * clientAuthMethods
+	 *
+	 * description: Supported client authentication methods; surfaced as `token_endpoint_auth_methods_supported`.
+	 *   mTLS methods are added on top when the corresponding mTLS options are enabled.
+	 */
+	clientAuthMethods: [
+		'client_secret_basic',
+		'client_secret_jwt',
+		'client_secret_post',
+		'private_key_jwt',
+		'none'
+	]
 };
 Object.assign(ApplicationConfig, await configStore.get());
 

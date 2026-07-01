@@ -10,7 +10,8 @@ merge(config.features, {
 });
 
 export const ApplicationConfig = {
-	'responseMode.jwt.enabled': true
+	'responseMode.jwt.enabled': true,
+	'encryption.enabled': true
 };
 
 export default {

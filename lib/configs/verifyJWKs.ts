@@ -82,9 +82,7 @@ type StaticECKey = Static<typeof ECKey>;
 type StaticOKPKey = Static<typeof OKPKey>;
 type preJWKS = StaticRSAKey | StaticECKey | StaticOKPKey;
 export type JWKS =
-	| (reqProp & StaticRSAKey)
-	| (reqProp & StaticECKey)
-	| (reqProp & StaticOKPKey);
+	(reqProp & StaticRSAKey) | (reqProp & StaticECKey) | (reqProp & StaticOKPKey);
 
 const ktyMap = {
 	RSA: RSAKey,

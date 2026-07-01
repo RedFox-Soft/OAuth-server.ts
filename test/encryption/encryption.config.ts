@@ -16,7 +16,12 @@ merge(config.features, {
 export const keypair = await generateKeyPair('RSA-OAEP');
 
 export const ApplicationConfig = {
-	'par.enabled': true
+	'par.enabled': true,
+	'requestObjects.enabled': true,
+	'encryption.enabled': true,
+	'introspection.enabled': true,
+	'jwtIntrospection.enabled': true,
+	'jwtUserinfo.enabled': true
 };
 
 export default {

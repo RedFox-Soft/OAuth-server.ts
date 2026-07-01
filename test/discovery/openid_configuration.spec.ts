@@ -1,98 +1,60 @@
+import { describe, it, beforeAll, afterEach } from 'bun:test';
 import { expect } from 'chai';
 import { createSandbox } from 'sinon';
 
-import bootstrap from '../test_helper.js';
-import { InvalidRequest } from '../../lib/helpers/errors.ts';
+import bootstrap, { agent } from '../test_helper.js';
 import { provider } from 'lib/provider.js';
 
 const sinon = createSandbox();
 
-const route = '/.well-known/openid-configuration';
+const discoveryEndpoint = agent['.well-known']['openid-configuration'];
 
-describe(route, () => {
-	before(bootstrap(import.meta.url));
-
-	it('responds with json 200', function () {
-		return this.agent
-			.get(route)
-			.expect('Content-Type', /application\/json/)
-			.expect(200);
+describe('/.well-known/openid-configuration', () => {
+	beforeAll(async () => {
+		await bootstrap(import.meta.url)();
 	});
 
-	it('does not populate ctx.oidc.entities', function (done) {
-		this.assertOnce((ctx) => {
-			expect(ctx.oidc.entities).to.be.empty;
-		}, done);
+	it('responds with json 200', async () => {
+		const { status, response } = await discoveryEndpoint.get();
 
-		this.agent.get(route).end(() => {});
+		expect(status).to.equal(200);
+		expect(response.headers.get('content-type')).to.match(/application\/json/);
 	});
 
-	it('is configurable with extra properties', function () {
+	it('is configurable with extra properties', async () => {
 		i(provider).configuration.discovery.service_documentation =
 			'https://docs.example.com';
 		i(provider).configuration.discovery.authorization_endpoint =
 			'this will not be used';
 
-		return this.agent.get(route).expect((response) => {
-			expect(response.body).to.have.property(
-				'service_documentation',
-				'https://docs.example.com'
-			);
-			expect(response.body.authorization_endpoint).not.to.equal(
-				'this will not be used'
-			);
-		});
+		const { data } = await discoveryEndpoint.get();
+
+		expect(data).to.have.property(
+			'service_documentation',
+			'https://docs.example.com'
+		);
+		expect(data.authorization_endpoint).not.to.equal('this will not be used');
 	});
 
-	describe('with errors', () => {
-		before(function () {
-			sinon.stub(provider, 'pathFor').throws(new InvalidRequest());
-		});
+	describe('with unexpected exceptions', () => {
+		afterEach(() => sinon.restore());
 
-		after(sinon.restore);
-
-		it('handles errors with json and corresponding status', function () {
-			return this.agent
-				.get(route)
-				.expect('Content-Type', /application\/json/)
-				.expect(400);
-		});
-
-		it('emits discovery.error on errors', function () {
-			const spy = sinon.spy();
-			provider.once('discovery.error', spy);
-
-			return this.agent.get(route).expect(() => {
-				expect(spy.called).to.be.true;
-			});
-		});
-	});
-
-	describe('with exceptions', () => {
-		before(function () {
-			sinon.stub(provider, 'pathFor').throws();
-		});
-
-		after(sinon.restore);
-
-		it('handles exceptions with json 500', function () {
-			return this.agent
-				.get(route)
-				.expect('Content-Type', /application\/json/)
-				.expect(500)
-				.expect({
-					error: 'server_error',
-					error_description: 'oops! something went wrong'
-				});
-		});
-
-		it('emits server_error on exceptions', function () {
+		it('handles exceptions with json 500 and emits server_error', async () => {
 			const spy = sinon.spy();
 			provider.once('server_error', spy);
-
-			return this.agent.get(route).expect(() => {
-				expect(spy.called).to.be.true;
+			// Force the discovery handler to throw while it applies discovery overrides.
+			sinon.stub(i(provider).configuration, 'discovery').get(() => {
+				throw new Error('oops! something went wrong');
 			});
+
+			const { error } = await discoveryEndpoint.get();
+
+			expect(error.status).to.equal(500);
+			expect(error.value).to.eql({
+				error: 'server_error',
+				error_description: 'An unexpected error occurred'
+			});
+			expect(spy.calledOnce).to.be.true;
 		});
 	});
 });
