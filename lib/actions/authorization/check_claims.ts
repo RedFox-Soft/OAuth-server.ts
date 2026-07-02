@@ -1,5 +1,6 @@
 import { InvalidRequest } from '../../helpers/errors.ts';
 import instance from '../../helpers/weak_cache.ts';
+import { ApplicationConfig } from 'lib/configs/application.js';
 
 /*
  * If claims parameter is provided and supported handles its validation
@@ -16,20 +17,19 @@ export default async function checkClaims(oidc) {
 	const { params } = oidc;
 
 	if (params.claims !== undefined) {
-		const { claimsParameter, userinfo } = instance(oidc.provider).features;
-
-		if (claimsParameter.enabled) {
+		if (ApplicationConfig['claimsParameter.enabled']) {
 			if (params.response_type === 'none') {
 				throw new InvalidRequest(
 					'claims parameter should not be combined with response_type none'
 				);
 			}
-			if (params.claims.userinfo && !userinfo.enabled) {
+			if (params.claims.userinfo && !ApplicationConfig['userinfo.enabled']) {
 				throw new InvalidRequest(
 					'claims.userinfo should not be used since userinfo endpoint is not supported'
 				);
 			}
 
+			const { claimsParameter } = instance(oidc.provider).features;
 			await claimsParameter.assertClaimsParameter?.(
 				oidc,
 				params.claims,

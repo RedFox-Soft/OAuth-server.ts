@@ -6,11 +6,7 @@ import { Grant } from 'lib/models/grant.js';
 const config = getConfig();
 
 merge(config.features, {
-	introspection: { enabled: true },
-	deviceFlow: { enabled: true },
-	requestObjects: { enabled: true },
 	ciba: {
-		enabled: true,
 		processLoginHint(ctx, loginHint) {
 			return loginHint;
 		},
@@ -33,7 +29,11 @@ export const ApplicationConfig = {
 	'par.enabled': true,
 	'dpop.enabled': true,
 	'dpop.nonceSecret': Buffer.alloc(32, 0),
-	'clientCredentials.enabled': true
+	'clientCredentials.enabled': true,
+	'introspection.enabled': true,
+	'deviceFlow.enabled': true,
+	'requestObjects.enabled': true,
+	'ciba.enabled': true
 };
 
 export default {

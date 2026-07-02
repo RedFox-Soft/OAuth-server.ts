@@ -2,7 +2,10 @@ import getConfig from '../default.config.js';
 
 const config = getConfig();
 
-config.features.deviceFlow = { enabled: true };
+export const ApplicationConfig = {
+	'deviceFlow.enabled': true
+};
+
 config.issueRefreshToken = (ctx, client) =>
 	client.grantTypeAllowed('refresh_token');
 

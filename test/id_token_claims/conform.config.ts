@@ -1,13 +1,16 @@
-import merge from 'lodash/merge.js';
-
 import getConfig from '../default.config.js';
 
 const config = getConfig();
 
-merge(config.features, {
-	claimsParameter: { enabled: true },
-	jwtUserinfo: { enabled: true }
-});
+config.extraTokenClaims = () => ({ foo: 'bar' });
+config.pairwiseIdentifier = () => 'pairwise-sub';
+
+export const ApplicationConfig = {
+	'registration.initialAccessToken': true,
+	'registration.policies': {
+		foo() {}
+	}
+};
 
 export default {
 	config,
@@ -15,11 +18,13 @@ export default {
 		{
 			clientId: 'client',
 			clientSecret: 'secret',
-			token_endpoint_auth_method: 'none',
-			grantTypes: ['authorization_code', 'refresh_token'],
-			responseTypes: ['code'],
+			redirectUris: ['https://client.example.com/cb']
+		},
+		{
+			clientId: 'pairwise',
+			clientSecret: 'secret',
 			redirectUris: ['https://client.example.com/cb'],
-			userinfo_signed_response_alg: 'HS256'
+			subjectType: 'pairwise'
 		}
 	]
 };

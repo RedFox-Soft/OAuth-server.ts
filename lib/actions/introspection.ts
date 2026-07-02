@@ -4,6 +4,7 @@ import { Elysia, t } from 'elysia';
 import { routeNames } from 'lib/consts/param_list.js';
 import { provider } from 'lib/provider.js';
 import { ISSUER } from 'lib/configs/env.js';
+import { ApplicationConfig } from 'lib/configs/application.js';
 import { IdToken } from 'lib/models/id_token.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { Client } from 'lib/models/client.js';
@@ -146,11 +147,7 @@ async function renderTokenResponse(oidc) {
 export const introspect = new Elysia().use(AuthPlugin).post(
 	routeNames.introspect,
 	async function ({ oidc, request }) {
-		const { configuration } = instance(provider);
-		const {
-			features: { jwtIntrospection }
-		} = configuration;
-		if (jwtIntrospection.enabled) {
+		if (ApplicationConfig['jwtIntrospection.enabled']) {
 			const { client } = oidc;
 
 			const {

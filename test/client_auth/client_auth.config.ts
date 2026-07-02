@@ -34,12 +34,15 @@ config.clientAuthMethods = [
 	'tls_client_auth',
 	'self_signed_tls_client_auth'
 ];
+export const ApplicationConfig = {
+	'introspection.enabled': true,
+	'mTLS.enabled': true,
+	'mTLS.selfSignedTlsClientAuth': true,
+	'mTLS.tlsClientAuth': true
+};
+
 merge(config.features, {
-	introspection: { enabled: true },
 	mTLS: {
-		enabled: true,
-		selfSignedTlsClientAuth: true,
-		tlsClientAuth: true,
 		getCertificate(ctx) {
 			try {
 				return new X509Certificate(

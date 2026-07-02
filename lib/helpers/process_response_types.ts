@@ -1,5 +1,6 @@
 import combinedScope from './combined_scope.ts';
 import instance from './weak_cache.ts';
+import { ApplicationConfig } from 'lib/configs/application.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';
 
 async function codeHandler(ctx) {
@@ -34,7 +35,7 @@ async function codeHandler(ctx) {
 		dpopJkt: ctx.oidc.params.dpop_jkt
 	});
 
-	if (richAuthorizationRequests.enabled) {
+	if (ApplicationConfig['richAuthorizationRequests.enabled']) {
 		code.payload.rar =
 			await richAuthorizationRequests.rarForAuthorizationCode(ctx);
 	}

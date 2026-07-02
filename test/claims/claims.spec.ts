@@ -10,6 +10,7 @@ import {
 } from 'bun:test';
 
 import { decode as decodeJWT } from '../../lib/helpers/jwt.ts';
+import { ApplicationConfig } from 'lib/configs/application.js';
 import bootstrap, { agent, jsonToFormUrlEncoded } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { provider } from 'lib/provider.js';
@@ -832,11 +833,11 @@ expire.setDate(expire.getDate() + 1);
 
 			describe('when userinfo is disabled', () => {
 				beforeEach(function () {
-					i(provider).features.userinfo.enabled = false;
+					ApplicationConfig['userinfo.enabled'] = false;
 				});
 
 				afterEach(function () {
-					i(provider).features.userinfo.enabled = true;
+					ApplicationConfig['userinfo.enabled'] = true;
 				});
 
 				it('should not accept userinfo as a property', async function () {

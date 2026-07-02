@@ -1,16 +1,11 @@
-import merge from 'lodash/merge.js';
-
 import getConfig from '../default.config.js';
 
 const config = getConfig();
 
-merge(config.features, {
-	encryption: { enabled: true }
-});
-
 export const ApplicationConfig = {
 	'introspection.enabled': true,
-	'clientCredentials.enabled': true
+	'clientCredentials.enabled': true,
+	'encryption.enabled': true
 };
 
 export default {

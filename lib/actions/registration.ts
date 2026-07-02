@@ -4,6 +4,7 @@ import { json as parseBody } from '../shared/selective_body.ts';
 import epochTime from '../helpers/epoch_time.ts';
 import { InvalidToken, InvalidRequest } from '../helpers/errors.ts';
 import instance from '../helpers/weak_cache.ts';
+import { ApplicationConfig } from 'lib/configs/application.js';
 import setWWWAuthenticate from '../helpers/set_www_authenticate.ts';
 import addClient from '../helpers/add_client.ts';
 import { Client } from 'lib/models/client.js';
@@ -94,7 +95,8 @@ export const post = [
 		const {
 			oidc: { provider }
 		} = ctx;
-		const { initialAccessToken } = instance(provider).features.registration;
+		const initialAccessToken =
+			ApplicationConfig['registration.initialAccessToken'];
 		switch (initialAccessToken && typeof initialAccessToken) {
 			case 'boolean': {
 				const iat = await provider.InitialAccessToken.find(
@@ -125,8 +127,10 @@ export const post = [
 		const {
 			oidc: { provider }
 		} = ctx;
-		const { idFactory, secretFactory, issueRegistrationAccessToken } =
+		const { idFactory, secretFactory } =
 			instance(provider).features.registration;
+		const issueRegistrationAccessToken =
+			ApplicationConfig['registration.issueRegistrationAccessToken'];
 		const properties = {};
 		const clientId = idFactory(ctx);
 
@@ -162,7 +166,7 @@ export const post = [
 
 		if (ctx.oidc.entities.InitialAccessToken?.policies) {
 			const { policies } = ctx.oidc.entities.InitialAccessToken;
-			const implementations = instance(provider).features.registration.policies;
+			const implementations = ApplicationConfig['registration.policies'];
 			for (const policy of policies) {
 				await implementations[policy](ctx, properties);
 			}
@@ -296,7 +300,7 @@ export const put = [
 
 		if (ctx.oidc.entities.RegistrationAccessToken.policies) {
 			const { policies } = ctx.oidc.entities.RegistrationAccessToken;
-			const implementations = instance(provider).features.registration.policies;
+			const implementations = ApplicationConfig['registration.policies'];
 			for (const policy of policies) {
 				await implementations[policy](ctx, properties);
 			}
@@ -313,11 +317,12 @@ export const put = [
 			})
 		});
 
-		const management = instance(provider).features.registrationManagement;
+		const rotateRegistrationAccessToken =
+			ApplicationConfig['registrationManagement.rotateRegistrationAccessToken'];
 		if (
-			management.rotateRegistrationAccessToken === true ||
-			(typeof management.rotateRegistrationAccessToken === 'function' &&
-				(await management.rotateRegistrationAccessToken(ctx)))
+			rotateRegistrationAccessToken === true ||
+			(typeof rotateRegistrationAccessToken === 'function' &&
+				(await rotateRegistrationAccessToken(ctx)))
 		) {
 			ctx.oidc.entity(
 				'RotatedRegistrationAccessToken',

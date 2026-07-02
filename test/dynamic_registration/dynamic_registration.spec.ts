@@ -4,6 +4,7 @@ import sinon from 'sinon';
 import bootstrap from '../test_helper.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { provider } from 'lib/provider.js';
+import { ApplicationConfig } from 'lib/configs/application.js';
 import { TestAdapter } from 'test/models.js';
 
 describe('registration features', () => {
@@ -65,13 +66,13 @@ describe('registration features', () => {
 
 		context('when issueRegistrationAccessToken is false', () => {
 			before(function () {
-				const config = i(provider).features.registration;
-				this.orig = config.issueRegistrationAccessToken;
-				config.issueRegistrationAccessToken = false;
+				this.orig =
+					ApplicationConfig['registration.issueRegistrationAccessToken'];
+				ApplicationConfig['registration.issueRegistrationAccessToken'] = false;
 			});
 
 			after(function () {
-				i(provider).features.registration.issueRegistrationAccessToken =
+				ApplicationConfig['registration.issueRegistrationAccessToken'] =
 					this.orig;
 			});
 
@@ -110,13 +111,14 @@ describe('registration features', () => {
 			'when issueRegistrationAccessToken is a function returning false',
 			() => {
 				before(function () {
-					const config = i(provider).features.registration;
-					this.orig = config.issueRegistrationAccessToken;
-					config.issueRegistrationAccessToken = () => false;
+					this.orig =
+						ApplicationConfig['registration.issueRegistrationAccessToken'];
+					ApplicationConfig['registration.issueRegistrationAccessToken'] = () =>
+						false;
 				});
 
 				after(function () {
-					i(provider).features.registration.issueRegistrationAccessToken =
+					ApplicationConfig['registration.issueRegistrationAccessToken'] =
 						this.orig;
 				});
 
@@ -156,13 +158,14 @@ describe('registration features', () => {
 			'when issueRegistrationAccessToken is a function returning true',
 			() => {
 				before(function () {
-					const config = i(provider).features.registration;
-					this.orig = config.issueRegistrationAccessToken;
-					config.issueRegistrationAccessToken = () => true;
+					this.orig =
+						ApplicationConfig['registration.issueRegistrationAccessToken'];
+					ApplicationConfig['registration.issueRegistrationAccessToken'] = () =>
+						true;
 				});
 
 				after(function () {
-					i(provider).features.registration.issueRegistrationAccessToken =
+					ApplicationConfig['registration.issueRegistrationAccessToken'] =
 						this.orig;
 				});
 
@@ -200,13 +203,13 @@ describe('registration features', () => {
 
 		context('when issueRegistrationAccessToken is true', () => {
 			before(function () {
-				const config = i(provider).features.registration;
-				this.orig = config.issueRegistrationAccessToken;
-				config.issueRegistrationAccessToken = true;
+				this.orig =
+					ApplicationConfig['registration.issueRegistrationAccessToken'];
+				ApplicationConfig['registration.issueRegistrationAccessToken'] = true;
 			});
 
 			after(function () {
-				i(provider).features.registration.issueRegistrationAccessToken =
+				ApplicationConfig['registration.issueRegistrationAccessToken'] =
 					this.orig;
 			});
 

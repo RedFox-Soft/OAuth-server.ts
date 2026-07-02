@@ -1,9 +1,19 @@
 import { isPlainObject, merge, pick } from './_/object.js';
-import set from './_/set.ts';
 import * as formatters from './formatters.ts';
 import getDefaults from './defaults.ts';
 import { STABLE, EXPERIMENTS } from './features.ts';
 import * as attention from './attention.ts';
+import { ApplicationConfig } from 'lib/configs/application.js';
+
+function toSet(name, value) {
+	if (value instanceof Set) {
+		return new Set(value);
+	}
+	if (!Array.isArray(value)) {
+		throw new TypeError(`${name} must be an Array or Set`);
+	}
+	return new Set(value);
+}
 
 function featuresTypeErrorCheck({ features }) {
 	for (const value of Object.values(features)) {
@@ -18,17 +28,34 @@ function featuresTypeErrorCheck({ features }) {
 class Configuration {
 	#defaults = getDefaults();
 
-	constructor(config) {
+	constructor(config = {}) {
 		Object.assign(
 			this,
 			merge({}, this.#defaults, pick(config, ...Object.keys(this.#defaults)))
 		);
 
+		// ApplicationConfig is the single source for the options it owns. The collection
+		// options default from it and may be overridden per-instance via the provider setup;
+		// they are copied (Set/clone) so the in-place processing below never mutates the shared
+		// ApplicationConfig. Feature flags and sub-options are NOT held on the provider — they
+		// are read directly and flat from ApplicationConfig at each use site (incl. the
+		// validations below).
+		this.scopes = toSet('scopes', config.scopes ?? ApplicationConfig.scopes);
+		this.acrValues = toSet(
+			'acrValues',
+			config.acrValues ?? ApplicationConfig.acrValues
+		);
+		this.clientAuthMethods = toSet(
+			'clientAuthMethods',
+			config.clientAuthMethods ?? ApplicationConfig.clientAuthMethods
+		);
+		this.claims = structuredClone(
+			merge({}, ApplicationConfig.claims, config.claims ?? {})
+		);
+
 		featuresTypeErrorCheck(this);
 
 		this.logDraftNotice();
-
-		this.ensureSets();
 
 		this.collectScopes();
 		this.collectPrompts();
@@ -48,15 +75,17 @@ class Configuration {
 	}
 
 	checkRichAuthorizationRequests() {
-		if (this.features.richAuthorizationRequests.enabled) {
-			if (!isPlainObject(this.features.richAuthorizationRequests.types)) {
+		if (ApplicationConfig['richAuthorizationRequests.enabled']) {
+			if (
+				!isPlainObject(ApplicationConfig['richAuthorizationRequests.types'])
+			) {
 				throw new TypeError(
 					'features.richAuthorizationRequests.types must be an object'
 				);
 			}
 
 			for (const [k, v] of Object.entries(
-				this.features.richAuthorizationRequests.types
+				ApplicationConfig['richAuthorizationRequests.types']
 			)) {
 				if (!isPlainObject(v)) {
 					throw new TypeError(
@@ -75,23 +104,6 @@ class Configuration {
 		}
 	}
 
-	ensureSets() {
-		for (const [obj, props] of [
-			[this, ['scopes', 'acrValues', 'clientAuthMethods']],
-			[this.features.ciba, ['deliveryModes']]
-		]) {
-			for (const prop of props) {
-				if (!(obj[prop] instanceof Set)) {
-					if (!Array.isArray(obj[prop])) {
-						throw new TypeError(`${prop} must be an Array or Set`);
-					}
-					const setValue = new Set(obj[prop]);
-					set(obj, prop, setValue);
-				}
-			}
-		}
-	}
-
 	collectGrantTypes() {
 		this.grantTypes = new Set(['authorization_code']);
 
@@ -102,11 +114,11 @@ class Configuration {
 			this.grantTypes.add('refresh_token');
 		}
 
-		if (this.features.deviceFlow.enabled) {
+		if (ApplicationConfig['deviceFlow.enabled']) {
 			this.grantTypes.add('urn:ietf:params:oauth:grant-type:device_code');
 		}
 
-		if (this.features.ciba.enabled) {
+		if (ApplicationConfig['ciba.enabled']) {
 			this.grantTypes.add('urn:openid:params:grant-type:ciba');
 		}
 	}
@@ -174,8 +186,8 @@ class Configuration {
 	}
 
 	checkCibaDeliveryModes() {
-		const modes = this.features.ciba.deliveryModes;
-		if (!modes.size) {
+		const modes = ApplicationConfig['ciba.deliveryModes'];
+		if (!modes.length) {
 			throw new TypeError('features.ciba.deliveryModes must not be empty');
 		}
 
@@ -189,23 +201,26 @@ class Configuration {
 	}
 
 	checkDependantFeatures() {
-		const { features } = this;
+		const config = ApplicationConfig;
 
-		if (features.jwtIntrospection.enabled && !features.introspection.enabled) {
+		if (
+			config['jwtIntrospection.enabled'] &&
+			!config['introspection.enabled']
+		) {
 			throw new TypeError(
 				'jwtIntrospection is only available in conjuction with introspection'
 			);
 		}
 
-		if (features.jwtUserinfo.enabled && !features.userinfo.enabled) {
+		if (config['jwtUserinfo.enabled'] && !config['userinfo.enabled']) {
 			throw new TypeError(
 				'jwtUserinfo is only available in conjuction with userinfo'
 			);
 		}
 
 		if (
-			features.registrationManagement.enabled &&
-			!features.registration.enabled
+			config['registrationManagement.enabled'] &&
+			!config['registration.enabled']
 		) {
 			throw new TypeError(
 				'registrationManagement is only available in conjuction with registration'
@@ -213,9 +228,9 @@ class Configuration {
 		}
 
 		if (
-			features.registration.enabled &&
-			features.registration.policies &&
-			!features.registration.initialAccessToken
+			config['registration.enabled'] &&
+			config['registration.policies'] &&
+			!config['registration.initialAccessToken']
 		) {
 			throw new TypeError(
 				'registration policies are only available in conjuction with adapter-backed initial access tokens'
@@ -223,8 +238,8 @@ class Configuration {
 		}
 
 		if (
-			features.richAuthorizationRequests.enabled &&
-			!features.resourceIndicators.enabled
+			config['richAuthorizationRequests.enabled'] &&
+			!config['resourceIndicators.enabled']
 		) {
 			throw new TypeError(
 				'richAuthorizationRequests is only available in conjuction with enabled resourceIndicators'
@@ -241,13 +256,16 @@ class Configuration {
 			'private_key_jwt'
 		]);
 
-		if (this.features.mTLS.enabled && this.features.mTLS.tlsClientAuth) {
+		if (
+			ApplicationConfig['mTLS.enabled'] &&
+			ApplicationConfig['mTLS.tlsClientAuth']
+		) {
 			authMethods.add('tls_client_auth');
 		}
 
 		if (
-			this.features.mTLS.enabled &&
-			this.features.mTLS.selfSignedTlsClientAuth
+			ApplicationConfig['mTLS.enabled'] &&
+			ApplicationConfig['mTLS.selfSignedTlsClientAuth']
 		) {
 			authMethods.add('self_signed_tls_client_auth');
 		}
@@ -264,15 +282,19 @@ class Configuration {
 	}
 
 	checkDeviceFlow() {
-		if (this.features.deviceFlow.enabled) {
-			if (this.features.deviceFlow.charset !== undefined) {
-				if (!['base-20', 'digits'].includes(this.features.deviceFlow.charset)) {
+		if (ApplicationConfig['deviceFlow.enabled']) {
+			if (ApplicationConfig['deviceFlow.charset'] !== undefined) {
+				if (
+					!['base-20', 'digits'].includes(
+						ApplicationConfig['deviceFlow.charset']
+					)
+				) {
 					throw new TypeError(
 						'only supported charsets are "base-20" and "digits"'
 					);
 				}
 			}
-			if (!/^[-* ]*$/.test(this.features.deviceFlow.mask)) {
+			if (!/^[-* ]*$/.test(ApplicationConfig['deviceFlow.mask'])) {
 				throw new TypeError(
 					'mask can only contain asterisk("*"), hyphen-minus("-") and space(" ") characters'
 				);
@@ -284,15 +306,14 @@ class Configuration {
 		const ENABLED_EXPERIMENTS = new Set();
 		let throwExperiment = false;
 
-		Object.entries(this.features).forEach(([flag, { enabled, ack }]) => {
-			const { features: recognizedFeatures } = getDefaults();
-			if (!(flag in recognizedFeatures)) {
-				throw new TypeError(`Unknown feature configuration: ${flag}`);
-			}
+		// Feature flags and their experiment acknowledgements live in ApplicationConfig
+		// (flat dotted keys). Only experimental features carry an `.ack` there, so iterate
+		// the known experiments and read their enabled/ack directly from ApplicationConfig.
+		for (const [flag, experimental] of EXPERIMENTS) {
+			const enabled = ApplicationConfig[`${flag}.enabled`];
+			const ack = ApplicationConfig[`${flag}.ack`];
 
-			const experimental = EXPERIMENTS.get(flag);
 			if (
-				experimental &&
 				enabled &&
 				!STABLE.has(flag) &&
 				(Array.isArray(experimental.version)
@@ -304,13 +325,7 @@ class Configuration {
 				}
 				ENABLED_EXPERIMENTS.add(flag);
 			}
-
-			if (enabled && !experimental && ack !== undefined) {
-				throw new TypeError(
-					`${flag} feature is now stable, the ack ${ack} is no longer valid. Check the stable feature's configuration for any breaking changes.`
-				);
-			}
-		});
+		}
 
 		if (ENABLED_EXPERIMENTS.size) {
 			attention.info(

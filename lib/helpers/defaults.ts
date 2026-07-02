@@ -40,43 +40,14 @@ import {
 	triggerAuthenticationDevice
 } from '../addon/ciba.ts';
 import { base as defaultPolicy } from './interaction_policy/index.ts';
-import { ApplicationConfig as config } from 'lib/configs/application.js';
 
 function makeDefaults() {
 	const defaults = {
-		/*
-		 * acrValues
-		 *
-		 * description: Array of strings, the Authentication Context Class References that the authorization server supports.
-		 */
-		acrValues: [],
-
-		/*
-		 * claims
-		 *
-		 * description: Describes the claims that the OpenID Provider MAY be able to supply values for.
-		 *
-		 * It is used to achieve two different things related to claims:
-		 * - which additional claims are available to RPs (configure as `{ claimName: null }`)
-		 * - which claims fall under what scope (configure `{ scopeName: ['claim', 'another-claim'] }`)
-		 *
-		 * see: [Configuring OpenID Connect 1.0 Standard Claims](https://github.com/panva/node-oidc-provider/discussions/1299)
-		 */
-		claims: {
-			acr: null,
-			sid: null,
-			auth_time: null,
-			iss: null,
-			openid: ['sub']
-		},
-
 		/*
 		 * clientBasedCORS
 		 *
 		 * description: Function used to check whether a given CORS request should be allowed
 		 *   based on the request's client.
-		 *
-		 * see: [Configuring Client Metadata-based CORS Origin allow list](https://github.com/panva/node-oidc-provider/discussions/1298)
 		 */
 		clientBasedCORS,
 
@@ -84,38 +55,7 @@ function makeDefaults() {
 		 * clients
 		 *
 		 * description: Array of objects representing client metadata. These clients are referred to as
-		 * static, they don't expire, never reload, are always available. In addition to these
-		 * clients the authorization server will use your adapter's `find` method when a non-static client_id is
-		 * encountered. If you only wish to support statically configured clients and
-		 * no dynamic registration then make it so that your adapter resolves client find calls with a
-		 * falsy value (e.g. `return Promise.resolve()`) and don't take unnecessary DB trips.
-		 *
-		 * Client's metadata is validated as defined by the respective specification they've been defined
-		 * in.
-		 *
-		 * example: Available Metadata
-		 *
-		 * client_name, client_uri, contacts,
-		 * default_acr_values, default_max_age, id_token_signed_response_alg,
-		 * initiate_login_uri, jwks, jwks_uri, logo_uri, policy_uri, post_logout_redirect_uris,
-		 * require_auth_time, scope, sector_identifier_uri,
-		 * token_endpoint_auth_method, tos_uri, userinfo_signed_response_alg
-		 *
-		 * <br/><br/>The following metadata is available but may not be recognized depending on your
-		 * provider's configuration.<br/><br/>
-		 *
-		 * authorization_encrypted_response_alg, authorization_encrypted_response_enc,
-		 * backchannel_logout_session_required, backchannel_logout_uri,
-		 * id_token_encrypted_response_alg,
-		 * id_token_encrypted_response_enc, introspection_encrypted_response_alg,
-		 * introspection_encrypted_response_enc, introspection_signed_response_alg,
-		 * request_object_encryption_alg, request_object_encryption_enc, request_object_signing_alg,
-		 * tls_client_auth_san_dns, tls_client_auth_san_email, tls_client_auth_san_ip,
-		 * tls_client_auth_san_uri, tls_client_auth_subject_dn,
-		 * tls_client_certificate_bound_access_tokens,
-		 * use_mtls_endpoint_aliases, token_endpoint_auth_signing_alg,
-		 * userinfo_encrypted_response_alg, userinfo_encrypted_response_enc
-		 *
+		 * static, they don't expire, never reload, are always available.
 		 */
 		clients: [],
 
@@ -123,31 +63,7 @@ function makeDefaults() {
 		 * clientDefaults
 		 *
 		 * description: Default client metadata to be assigned when unspecified by the client metadata,
-		 * e.g. during Dynamic Client Registration or for statically configured clients. The default value
-		 * does not represent all default values, but merely copies its subset. You can provide any used
-		 * client metadata property in this object.
-		 *
-		 * example: Changing the default client token_endpoint_auth_method
-		 *
-		 * To change the default client token_endpoint_auth_method configure `clientDefaults` to be an
-		 * object like so:
-		 *
-		 * ```js
-		 * {
-		 *   token_endpoint_auth_method: 'client_secret_post'
-		 * }
-		 * ```
-		 * example: Changing the default client response type to `code id_token`
-		 *
-		 * To change the default client configure `clientDefaults` to be an
-		 * object like so:
-		 *
-		 * ```js
-		 * {
-		 *   grant_types: ['authorization_code'],
-		 * }
-		 * ```
-		 *
+		 * e.g. during Dynamic Client Registration or for statically configured clients.
 		 */
 		clientDefaults: {
 			id_token_signed_response_alg: 'RS256',
@@ -158,15 +74,6 @@ function makeDefaults() {
 		 * conformIdTokenClaims
 		 *
 		 * title: ID Token only contains End-User claims when the requested `response_type` is `id_token`
-		 *
-		 * description: [`OIDC Core 1.0` - Requesting Claims using Scope Values](https://openid.net/specs/openid-connect-core-1_0-errata2.html#ScopeClaims)
-		 * defines that claims requested using the `scope` parameter are only returned from the UserInfo
-		 * Endpoint unless the `response_type` is `id_token`.
-		 *
-		 * Despite of this configuration the ID Token always includes claims requested using the `scope`
-		 * parameter when the userinfo endpoint is disabled, or when issuing an Access Token not applicable
-		 * for access to the userinfo endpoint.
-		 *
 		 */
 		conformIdTokenClaims: true,
 
@@ -174,9 +81,7 @@ function makeDefaults() {
 		 * loadExistingGrant
 		 *
 		 * description: Helper function used to load existing but also just in time pre-established Grants
-		 * to attempt to resolve an Authorization Request with. Default: loads a grant based on the
-		 * interaction result `consent.grantId` first, falls back to the existing grantId for the client
-		 * in the current session.
+		 * to attempt to resolve an Authorization Request with.
 		 */
 		loadExistingGrant,
 
@@ -205,583 +110,77 @@ function makeDefaults() {
 		/*
 		 * features
 		 *
-		 * description: Enable/disable features.
-		 *
-		 *   Some features may be experimental.
-		 *   Enabling those will produce a warning and you must
-		 *   be aware that breaking changes may occur and that those changes
-		 *   will be published as minor versions of oidc-provider. See the example below on how to
-		 *   acknowledge an experimental feature version (this will remove the warning) and ensure
-		 *   the Provider configuration will throw an error if a new version of oidc-provider includes
-		 *   breaking changes to this experimental feature.
+		 * description: Deployment-specific helper functions for each feature. Feature enable flags and
+		 *   sub-options are NOT here — they are owned by ApplicationConfig and read from it directly.
 		 */
 		features: {
 			/*
-			 * features.devInteractions
+			 * features.ciba.* — CIBA helper functions
 			 *
-			 * description: Development-ONLY out of the box interaction views bundled with the library allow
-			 * you to skip the boring frontend part while experimenting with oidc-provider. Enter any
-			 * username (will be used as sub claim value) and any password to proceed.
-			 *
-			 * Be sure to disable and replace this feature with your actual frontend flows and End-User
-			 * authentication flows as soon as possible. These views are not meant to ever be seen by actual
-			 * users.
-			 */
-			devInteractions: { enabled: config['devInteractions.enabled'] },
-
-			/*
-			 * features.backchannelLogout
-			 *
-			 * title: [`OIDC Back-Channel Logout 1.0`](https://openid.net/specs/openid-connect-backchannel-1_0-final.html)
-			 *
-			 * description: Enables Back-Channel Logout features.
-			 */
-			backchannelLogout: { enabled: config['backchannelLogout.enabled'] },
-
-			/*
-			 * features.ciba
-			 *
-			 * title: [OIDC Client Initiated Backchannel Authentication Flow (`CIBA`)](https://openid.net/specs/openid-client-initiated-backchannel-authentication-core-1_0-final.html)
-			 *
-			 * description: Enables Core `CIBA` Flow, when combined with `features.fapi` and `features.requestObjects.enabled` enables [Financial-grade API: Client Initiated Backchannel Authentication Profile - Implementer's Draft 01](https://openid.net/specs/openid-financial-api-ciba-ID1.html) as well.
-			 *
+			 * triggerAuthenticationDevice, validateBindingMessage, validateRequestContext,
+			 * processLoginHintToken, processLoginHint, verifyUserCode
 			 */
 			ciba: {
-				enabled: config['ciba.enabled'],
-
-				/*
-				 * features.ciba.deliveryModes
-				 *
-				 * description: Fine-tune the supported token delivery modes. Supported values are
-				 *   - `poll`
-				 *   - `ping`
-				 *
-				 */
-				deliveryModes: [...config['ciba.deliveryModes']],
-
-				/*
-				 * features.ciba.triggerAuthenticationDevice
-				 *
-				 * description: Helper function used to trigger the authentication and authorization on end-user's Authentication Device. It is called after
-				 * accepting the backchannel authentication request but before sending client back the response.
-				 *
-				 * When the end-user authenticates use `provider.backchannelResult()` to finish the Consumption Device login process.
-				 *
-				 * example: `provider.backchannelResult()` method
-				 *
-				 * `backchannelResult` is a method on the Provider prototype, it returns a `Promise` with no fulfillment value.
-				 *
-				 * ```js
-				 * import * as oidc from 'oidc-provider';
-				 * const provider = new oidc.Provider(...);
-				 * await provider.backchannelResult(...);
-				 * ```
-				 *
-				 * `backchannelResult(request, result[, options]);`
-				 * - `request` BackchannelAuthenticationRequest - BackchannelAuthenticationRequest instance.
-				 * - `result` Grant | OIDCProviderError - instance of a persisted Grant model or an OIDCProviderError (all exported by errors).
-				 * - `options.acr?`: string - Authentication Context Class Reference value that identifies the Authentication Context Class that the authentication performed satisfied.
-				 * - `options.amr?`: string[] - Identifiers for authentication methods used in the authentication.
-				 * - `options.authTime?`: number - Time when the End-User authentication occurred.
-				 *
-				 */
 				triggerAuthenticationDevice,
-
-				/*
-				 * features.ciba.validateBindingMessage
-				 *
-				 * description: Helper function used to process the binding_message parameter and throw if its not following the authorization server's policy.
-				 *
-				 * recommendation: Use `throw new errors.InvalidBindingMessage('validation error message')` when the binding_message is invalid.
-				 * recommendation: Use `return undefined` when a binding_message isn't required and wasn't provided.
-				 *
-				 */
 				validateBindingMessage,
-
-				/*
-				 * features.ciba.validateRequestContext
-				 *
-				 * description: Helper function used to process the request_context parameter and throw if its not following the authorization server's policy.
-				 *
-				 * recommendation: Use `throw new errors.InvalidRequest('validation error message')` when the request_context is required by policy and missing or
-				 * invalid.
-				 * recommendation: Use `return undefined` when a request_context isn't required and wasn't provided.
-				 *
-				 */
 				validateRequestContext,
-
-				/*
-				 * features.ciba.processLoginHintToken
-				 *
-				 * description: Helper function used to process the login_hint_token parameter and return the accountId value to use for processsing the request.
-				 *
-				 * recommendation: Use `throw new errors.ExpiredLoginHintToken('validation error message')` when login_hint_token is expired.
-				 * recommendation: Use `throw new errors.InvalidRequest('validation error message')` when login_hint_token is invalid.
-				 * recommendation: Use `return undefined` or when you can't determine the accountId from the login_hint.
-				 *
-				 */
 				processLoginHintToken,
-
-				/*
-				 * features.ciba.processLoginHint
-				 *
-				 * description: Helper function used to process the login_hint parameter and return the accountId value to use for processsing the request.
-				 *
-				 * recommendation: Use `throw new errors.InvalidRequest('validation error message')` when login_hint is invalid.
-				 * recommendation: Use `return undefined` or when you can't determine the accountId from the login_hint.
-				 *
-				 */
 				processLoginHint,
-
-				/*
-				 * features.ciba.verifyUserCode
-				 *
-				 * description: Helper function used to verify the user_code parameter value is present when required and verify its value.
-				 *
-				 * recommendation: Use `throw new errors.MissingUserCode('validation error message')` when user_code should have been provided but wasn't.
-				 * recommendation: Use `throw new errors.InvalidUserCode('validation error message')` when the provided user_code is invalid.
-				 * recommendation: Use `return undefined` when no user_code was provided and isn't required.
-				 *
-				 */
 				verifyUserCode
 			},
 
 			/*
-			 * features.mTLS
+			 * features.mTLS.* — Mutual TLS helper functions
 			 *
-			 * title: [`RFC8705`](https://www.rfc-editor.org/rfc/rfc8705.html) - OAuth 2.0 Mutual TLS Client Authentication and Certificate Bound Access Tokens (`MTLS`)
-			 *
-			 * description: Enables specific features from the Mutual TLS specification. The three main
-			 * features have their own specific setting in this feature's configuration object and
-			 * you must provide functions for resolving some of the functions which are deployment-specific.
-			 *
+			 * certificateAuthorized, certificateSubjectMatches
 			 */
 			mTLS: {
-				enabled: config['mTLS.enabled'],
-
-				/*
-				 * features.mTLS.certificateBoundAccessTokens
-				 *
-				 * description: Enables section 3 & 4 Mutual TLS Client Certificate-Bound Tokens by exposing
-				 * the client's `tls_client_certificate_bound_access_tokens` metadata property.
-				 */
-				certificateBoundAccessTokens:
-					config['mTLS.certificateBoundAccessTokens'],
-
-				/*
-				 * features.mTLS.selfSignedTlsClientAuth
-				 *
-				 * description: Enables section 2.2. Self-Signed Certificate Mutual TLS client authentication
-				 *   method `self_signed_tls_client_auth` for use in the server's `clientAuthMethods`
-				 *   configuration.
-				 */
-				selfSignedTlsClientAuth: config['mTLS.selfSignedTlsClientAuth'],
-
-				/*
-				 * features.mTLS.tlsClientAuth
-				 *
-				 * description: Enables section 2.1. PKI Mutual TLS client authentication method
-				 *   `tls_client_auth` for use in the server's `clientAuthMethods`
-				 *   configuration.
-				 */
-				tlsClientAuth: config['mTLS.tlsClientAuth'],
-
-				/*
-				 * features.mTLS.certificateAuthorized
-				 *
-				 * description: Function used to determine if the client certificate, used in the
-				 *   request, is verified and comes from a trusted CA for the client. Should return true/false.
-				 *   Only used for `tls_client_auth` client authentication method.
-				 */
 				certificateAuthorized,
-
-				/*
-				 * features.mTLS.certificateSubjectMatches
-				 *
-				 * description: Function used to determine if the client certificate, used in the
-				 *   request, subject matches the registered client property. Only used for `tls_client_auth`
-				 *   client authentication method.
-				 */
 				certificateSubjectMatches
 			},
 
 			/*
-			 * features.claimsParameter
-			 *
-			 * title: [`OIDC Core 1.0`](https://openid.net/specs/openid-connect-core-1_0-errata2.html#ClaimsParameter) - Requesting Claims using the "claims" Request Parameter
-			 *
-			 * description: Enables the use and validations of `claims` parameter as described in the
-			 * specification.
-			 *
+			 * features.claimsParameter.assertClaimsParameter
 			 */
 			claimsParameter: {
-				enabled: config['claimsParameter.enabled'],
-
-				/**
-				 * features.claimsParameter.assertClaimsParameter
-				 *
-				 * description: Helper function used to validate the claims parameter beyond what the OpenID Connect 1.0 specification requires.
-				 */
 				assertClaimsParameter
 			},
 
 			/*
-			 * features.deviceFlow
+			 * features.deviceFlow.* — Device Flow helper functions and HTML sources
 			 *
-			 * title: [`RFC8628`](https://www.rfc-editor.org/rfc/rfc8628.html) - OAuth 2.0 Device Authorization Grant (`Device Flow`)
-			 *
-			 * description: Enables Device Authorization Grant
+			 * deviceInfo, userCodeInputSource, userCodeConfirmSource, successSource
 			 */
 			deviceFlow: {
-				enabled: config['deviceFlow.enabled'],
-
-				/*
-				 * features.deviceFlow.charset
-				 *
-				 * description: alias for a character set of the generated user codes. Supported values are
-				 *   - `base-20` uses BCDFGHJKLMNPQRSTVWXZ
-				 *   - `digits` uses 0123456789
-				 */
-				charset: config['deviceFlow.charset'],
-
-				/*
-				 * features.deviceFlow.mask
-				 *
-				 * description: a string used as a template for the generated user codes, `*` characters will
-				 *   be replaced by random chars from the charset, `-`(dash) and ` ` (space) characters may be
-				 *   included for readability. See the RFC for details about minimal recommended entropy.
-				 */
-				mask: config['deviceFlow.mask'],
-
-				/*
-				 * features.deviceFlow.deviceInfo
-				 *
-				 * description: Function used to extract details from the device authorization endpoint
-				 *   request. This is then available during the end-user confirm screen and is supposed to
-				 *   aid the user confirm that the particular authorization initiated by the user from a
-				 *   device in their possession.
-				 */
 				deviceInfo,
-				/*
-				 * features.deviceFlow.userCodeInputSource
-				 *
-				 * description: HTML source rendered when device code feature renders an input prompt for the
-				 *   User-Agent.
-				 */
 				userCodeInputSource,
-
-				/*
-				 * features.deviceFlow.userCodeConfirmSource
-				 *
-				 * description: HTML source rendered when device code feature renders an a confirmation prompt for
-				 *   ther User-Agent.
-				 */
 				userCodeConfirmSource,
-
-				/*
-				 * features.deviceFlow.successSource
-				 *
-				 * description: HTML source rendered when device code feature renders a success page for the
-				 *   User-Agent.
-				 */
 				successSource
 			},
 
 			/*
-			 * features.encryption
-			 *
-			 * description: Enables encryption features such as receiving encrypted UserInfo responses,
-			 * encrypted ID Tokens and allow receiving encrypted Request Objects.
-			 */
-			encryption: { enabled: config['encryption.enabled'] },
-
-			/*
-			 * features.rpInitiatedLogout
-			 *
-			 * title: [`OIDC RP-Initiated Logout 1.0`](https://openid.net/specs/openid-connect-rpinitiated-1_0-final.html)
-			 *
-			 * description: Enables RP-Initiated Logout features
-			 */
-			rpInitiatedLogout: {
-				enabled: config['rpInitiatedLogout.enabled']
-			},
-
-			/*
-			 * features.introspection
-			 *
-			 * title: [`RFC7662`](https://www.rfc-editor.org/rfc/rfc7662.html) - OAuth 2.0 Token Introspection
-			 *
-			 * description: Enables Token Introspection for:
-			 *   - opaque access tokens
-			 *   - refresh tokens
-			 *
+			 * features.introspection.allowedPolicy
 			 */
 			introspection: {
-				enabled: config['introspection.enabled'],
-
-				/*
-				 * features.introspection.allowedPolicy
-				 *
-				 * description: Helper function used to determine whether the client/RS (client argument)
-				 *   is allowed to introspect the given token (token argument).
-				 */
 				allowedPolicy: introspectionAllowedPolicy
 			},
 
 			/*
-			 * features.jwtIntrospection
+			 * features.registration.* — Dynamic Client Registration helper functions
 			 *
-			 * title: [`RFC9701`](https://www.rfc-editor.org/rfc/rfc9701.html) - JWT Response for OAuth Token Introspection
-			 *
-			 * description: Enables JWT responses for Token Introspection features
-			 */
-			jwtIntrospection: { enabled: config['jwtIntrospection.enabled'] },
-
-			/*
-			 * features.jwtResponseModes
-			 *
-			 * title: [JWT Secured Authorization Response Mode (`JARM`)](https://openid.net/specs/oauth-v2-jarm-final.html)
-			 *
-			 * description: Enables JWT Secured Authorization Responses
-			 */
-			jwtResponseModes: { enabled: config['responseMode.jwt.enabled'] },
-
-			/*
-			 * features.registration
-			 *
-			 * title: [`Dynamic Client Registration 1.0`](https://openid.net/specs/openid-connect-registration-1_0-errata2.html) and [`RFC7591` - OAuth 2.0 Dynamic Client Registration Protocol](https://www.rfc-editor.org/rfc/rfc7591.html)
-			 *
-			 * description: Enables Dynamic Client Registration.
+			 * idFactory, secretFactory
 			 */
 			registration: {
-				enabled: config['registration.enabled'],
-
-				/*
-				 * features.registration.initialAccessToken
-				 *
-				 * description: Enables registration_endpoint to check a valid initial access token is
-				 *   provided as a bearer token during the registration call. Supported types are
-				 *   - `string` the string value will be checked as a static initial access token
-				 *   - `boolean` true/false to enable/disable adapter backed initial access tokens
-				 *
-				 * example: To add an adapter backed initial access token and retrive its value
-				 *
-				 * ```js
-				 * new (provider.InitialAccessToken)({}).save().then(console.log);
-				 * ```
-				 */
-				initialAccessToken: config['registration.initialAccessToken'],
-
-				/*
-				 * features.registration.policies
-				 *
-				 * description: define registration and registration management policies applied to client
-				 *   properties. Policies are sync/async functions that are assigned to an Initial Access
-				 *   Token that run before the regular client property validations are run. Multiple policies
-				 *   may be assigned to an Initial Access Token and by default the same policies will transfer
-				 *   over to the Registration Access Token. A policy may throw / reject and it may modify the
-				 *   properties object.
-				 *
-				 * example: To define registration and registration management policies
-				 *
-				 * To define policy functions configure `features.registration` to be an object like so:
-				 * ```js
-				 * {
-				 *   enabled: true,
-				 *   initialAccessToken: true, // to enable adapter-backed initial access tokens
-				 *   policies: {
-				 *     'my-policy': function (ctx, properties) {
-				 *       // @param ctx - koa request context
-				 *       // @param properties - the client properties which are about to be validated
-				 *
-				 *       // example of setting a default
-				 *       if (!('client_name' in properties)) {
-				 *         properties.client_name = generateRandomClientName();
-				 *       }
-				 *
-				 *       // example of forcing a value
-				 *       properties.userinfo_signed_response_alg = 'RS256';
-				 *
-				 *       // example of throwing a validation error
-				 *       if (someCondition(ctx, properties)) {
-				 *         throw new errors.InvalidClientMetadata('validation error message');
-				 *       }
-				 *     },
-				 *     'my-policy-2': async function (ctx, properties) {},
-				 *   },
-				 * }
-				 * ```
-				 *
-				 * An Initial Access Token with those policies being executed (one by one in that order) is
-				 * created like so
-				 * ```js
-				 * new (provider.InitialAccessToken)({ policies: ['my-policy', 'my-policy-2'] }).save().then(console.log);
-				 * ```
-				 *
-				 * recommendation: referenced policies must always be present when encountered on a token, an AssertionError
-				 * will be thrown inside the request context if it is not, resulting in a 500 Server Error.
-				 *
-				 * recommendation: the same policies will be assigned to the Registration Access Token after a successful
-				 * validation. If you wish to assign different policies to the Registration Access Token
-				 * ```js
-				 * // inside your final ran policy
-				 * ctx.oidc.entities.RegistrationAccessToken.policies = ['update-policy'];
-				 * ```
-				 */
-				policies: config['registration.policies'],
-
-				/*
-				 * features.registration.idFactory
-				 *
-				 * description: Function used to generate random client identifiers during dynamic
-				 *   client registration
-				 */
 				idFactory,
-
-				/*
-				 * features.registration.secretFactory
-				 *
-				 * description: Function used to generate random client secrets during dynamic
-				 *   client registration
-				 */
-				secretFactory,
-
-				/*
-				 * features.registration.issueRegistrationAccessToken
-				 *
-				 * description: Boolean or a function used to decide whether a registration access token will be
-				 * issued or not. Supported
-				 *   values are
-				 *   - `true` registration access tokens is issued
-				 *   - `false` registration access tokens is not issued
-				 *   - function returning true/false, true when token should be issued, false when it shouldn't
-				 *
-				 * example: To determine if a registration access token should be issued dynamically
-				 *
-				 * ```js
-				 * // @param ctx - koa request context
-				 * async issueRegistrationAccessToken(ctx) {
-				 *   return policyImplementation(ctx)
-				 * }
-				 * ```
-				 */
-				issueRegistrationAccessToken:
-					config['registration.issueRegistrationAccessToken']
+				secretFactory
 			},
 
 			/*
-			 * features.registrationManagement
+			 * features.richAuthorizationRequests.* — RAR transform helper functions
 			 *
-			 * title: [OAuth 2.0 Dynamic Client Registration Management Protocol](https://www.rfc-editor.org/rfc/rfc7592.html)
-			 *
-			 * description: Enables Update and Delete features described in the RFC
-			 */
-			registrationManagement: {
-				enabled: config['registrationManagement.enabled'],
-
-				/*
-				 * features.registrationManagement.rotateRegistrationAccessToken
-				 *
-				 * description: Enables registration access token rotation. The authorization server will discard the
-				 *   current Registration Access Token with a successful update and issue a new one, returning
-				 *   it to the client with the Registration Update Response. Supported
-				 *   values are
-				 *   - `false` registration access tokens are not rotated
-				 *   - `true` registration access tokens are rotated when used
-				 *   - function returning true/false, true when rotation should occur, false when it shouldn't
-				 * example: function use
-				 * ```js
-				 * {
-				 *   features: {
-				 *     registrationManagement: {
-				 *       enabled: true,
-				 *       async rotateRegistrationAccessToken(ctx) {
-				 *         // return tokenRecentlyRotated(ctx.oidc.entities.RegistrationAccessToken);
-				 *         // or
-				 *         // return customClientBasedPolicy(ctx.oidc.entities.Client);
-				 *       }
-				 *     }
-				 *   }
-				 * }
-				 * ```
-				 */
-				rotateRegistrationAccessToken:
-					config['registrationManagement.rotateRegistrationAccessToken']
-			},
-
-			/*
-			 * features.richAuthorizationRequests
-			 *
-			 * title: [`RFC9396`](https://www.rfc-editor.org/rfc/rfc9396.html) - OAuth 2.0 Rich Authorization Requests
-			 *
-			 * description: Enables the use of `authorization_details` parameter for the authorization and token
-			 *   endpoints to enable issuing Access Tokens with fine-grained authorization data.
-			 *   This is an experimental feature.
+			 * These must be provided by the deployment; the defaults throw via mustChange.
 			 */
 			richAuthorizationRequests: {
-				enabled: config['richAuthorizationRequests.enabled'],
-				ack: config['richAuthorizationRequests.ack'],
-				/**
-				 * features.richAuthorizationRequests.types
-				 *
-				 * description: Supported authorization details type identifiers.
-				 *
-				 * example: https://www.rfc-editor.org/rfc/rfc9396.html#appendix-A.3
-				 *
-				 * ```js
-				 * import { z } from 'zod'
-				 *
-				 * const TaxData = z
-				 *   .object({
-				 *     duration_of_access: z.number().int().positive(),
-				 *     locations: z
-				 *       .array(
-				 *         z.literal('https://taxservice.govehub.no.example.com'),
-				 *       )
-				 *       .length(1),
-				 *     actions: z
-				 *       .array(z.literal('read_tax_declaration'))
-				 *       .length(1),
-				 *     periods: z
-				 *       .array(
-				 *         z.coerce
-				 *           .number()
-				 *           .max(new Date().getFullYear() - 1)
-				 *           .min(1997),
-				 *       )
-				 *       .min(1),
-				 *     tax_payer_id: z.string().min(1),
-				 *   })
-				 *   .strict()
-				 *
-				 * const configuration = {
-				 *   features: {
-				 *     richAuthorizationRequests: {
-				 *       enabled: true,
-				 *       // ...
-				 *       types: {
-				 *         tax_data: {
-				 *           validate(ctx, detail, client) {
-				 *             const { success: valid, error } =
-				 *               TaxData.parse(detail)
-				 *             if (!valid) {
-				 *               throw new InvalidAuthorizationDetails()
-				 *             }
-				 *           },
-				 *         },
-				 *       },
-				 *     },
-				 *   },
-				 * }
-				 * ```
-				 */
-				types: { ...config['richAuthorizationRequests.types'] },
-				/*
-				 * features.richAuthorizationRequests.rarForAuthorizationCode
-				 *
-				 * description: Function used to transform the requested and granted RAR details that are then stored
-				 *   in the authorization code. Return array of details or undefined.
-				 */
 				rarForAuthorizationCode(_ctx) {
 					// decision points:
 					// - ctx.oidc.client
@@ -796,20 +195,7 @@ function makeDefaults() {
 						'features.richAuthorizationRequests.rarForAuthorizationCode not implemented'
 					);
 				},
-				/*
-				 * features.richAuthorizationRequests.rarForCodeResponse
-				 *
-				 * description: Function used to transform transform the requested and granted RAR details to be
-				 *   returned in the Access Token Response as authorization_details as well as assigned to the
-				 *   issued Access Token. Return array of details or undefined.
-				 */
 				rarForCodeResponse(_ctx, _resourceServer) {
-					// decision points:
-					// - ctx.oidc.client
-					// - resourceServer
-					// - ctx.oidc.authorizationCode.rar (previously returned from rarForAuthorizationCode)
-					// - ctx.oidc.params.authorization_details (unparsed authorization_details from the body params in the Access Token Request)
-					// - ctx.oidc.grant.rar (authorization_details granted)
 					mustChange(
 						'features.richAuthorizationRequests.rarForCodeResponse',
 						'transform the requested and granted RAR details to be returned in the Access Token Response as authorization_details as well as assigned to the issued Access Token'
@@ -818,20 +204,7 @@ function makeDefaults() {
 						'features.richAuthorizationRequests.rarForCodeResponse not implemented'
 					);
 				},
-				/*
-				 * features.richAuthorizationRequests.rarForRefreshTokenResponse
-				 *
-				 * description: Function used to transform transform the requested and granted RAR details to be
-				 *   returned in the Access Token Response as authorization_details as well as assigned to the
-				 *   issued Access Token. Return array of details or undefined.
-				 */
 				rarForRefreshTokenResponse(_ctx, _resourceServer) {
-					// decision points:
-					// - ctx.oidc.client
-					// - resourceServer
-					// - ctx.oidc.refreshToken.rar (previously returned from rarForAuthorizationCode and later assigned to the refresh token)
-					// - ctx.oidc.params.authorization_details (unparsed authorization_details from the body params in the Access Token Request)
-					// - ctx.oidc.grant.rar
 					mustChange(
 						'features.richAuthorizationRequests.rarForRefreshTokenResponse',
 						'transform the requested and granted RAR details to be returned in the Access Token Response as authorization_details as well as assigned to the issued Access Token'
@@ -840,19 +213,7 @@ function makeDefaults() {
 						'features.richAuthorizationRequests.rarForRefreshTokenResponse not implemented'
 					);
 				},
-				/*
-				 * features.richAuthorizationRequests.rarForIntrospectionResponse
-				 *
-				 * description: Function used to transform transform the requested and granted RAR details to be
-				 *   returned in the Access Token Response as authorization_details as well as assigned to the
-				 *   issued Access Token. Return array of details or undefined.
-				 */
 				rarForIntrospectionResponse(_ctx, _token) {
-					// decision points:
-					// - ctx.oidc.client
-					// - token.kind
-					// - token.rar
-					// - ctx.oidc.grant.rar
 					mustChange(
 						'features.richAuthorizationRequests.rarForIntrospectionResponse',
 						"transform the token's stored RAR details to be returned in the Introspection Response"
@@ -864,215 +225,22 @@ function makeDefaults() {
 			},
 
 			/*
-			 * features.resourceIndicators
+			 * features.resourceIndicators.* — Resource Indicators helper functions
 			 *
-			 * title: [`RFC8707`](https://www.rfc-editor.org/rfc/rfc8707.html) - Resource Indicators for OAuth 2.0
-			 *
-			 * description: Enables the use of `resource` parameter for the authorization and token
-			 *   endpoints to enable issuing Access Tokens for Resource Servers (APIs).
-			 *
-			 * - Multiple resource parameters may be present during Authorization Code Flow,
-			 * Device Authorization Grant, and Backchannel Authentication Requests,
-			 * but only a single audience for an Access Token is permitted.
-			 * - Authorization and Authentication Requests that result in an Access Token being issued by the
-			 * Authorization Endpoint must only contain a single resource (or one must be resolved using the
-			 * `defaultResource` helper).
-			 * - Client Credentials grant must only contain a single resource parameter.
-			 * - During Authorization Code / Refresh Token / Device Code / Backchannel Authentication Request
-			 * exchanges, if the exchanged code/token does not include the `'openid'` scope and only has a single
-			 * resource then the resource parameter may be omitted - an Access Token for the single resource is
-			 * returned.
-			 * - During Authorization Code / Refresh Token / Device Code / Backchannel Authentication Request
-			 * exchanges, if the exchanged code/token does not include the `'openid'` scope and has multiple
-			 * resources then the resource parameter must be provided (or one must be resolved using the
-			 * `defaultResource` helper).
-			 * An Access Token for the provided/resolved resource is returned.
-			 * - (with userinfo endpoint enabled and useGrantedResource helper returning falsy)
-			 * During Authorization Code / Refresh Token / Device Code
-			 * exchanges, if the exchanged code/token includes the `'openid'` scope and no resource
-			 * parameter is present - an Access Token for the UserInfo Endpoint is returned.
-			 * - (with userinfo endpoint enabled and useGrantedResource helper returning truthy)
-			 * During Authorization Code / Refresh Token / Device Code
-			 * exchanges, even if the exchanged code/token includes the `'openid'` scope and only has a single
-			 * resource then the resource parameter may be omitted - an Access Token for the single resource
-			 * is returned.
-			 * - (with userinfo endpoint disabled) During Authorization Code / Refresh Token / Device Code
-			 * exchanges, if the exchanged code/token includes the `'openid'` scope and only has a single
-			 * resource then the resource parameter may be omitted - an Access Token for the single resource
-			 * is returned.
-			 * - Issued Access Tokens always only contain scopes that are defined on the respective Resource
-			 * Server (returned from `features.resourceIndicators.getResourceServerInfo`).
+			 * defaultResource, useGrantedResource, getResourceServerInfo
 			 */
 			resourceIndicators: {
-				enabled: config['resourceIndicators.enabled'],
-
-				/*
-				 * features.resourceIndicators.defaultResource
-				 *
-				 * description: Function used to determine the default resource indicator for a request
-				 *   when none is provided by the client during the authorization request or when multiple
-				 *   are provided/resolved and only a single one is required during an Access Token Request.
-				 */
 				defaultResource,
-
-				/*
-				 * features.resourceIndicators.useGrantedResource
-				 *
-				 * description: Function used to determine if an already granted resource indicator
-				 *   should be used without being explicitly requested by the client during the Token Endpoint
-				 *   request.
-				 *
-				 * recommendation: Use `return true` when it's allowed for a client skip providing the "resource"
-				 *                 parameter at the Token Endpoint.
-				 * recommendation: Use `return false` (default) when it's required for a client to explitly
-				 *                 provide a "resource" parameter at the Token Endpoint or when other indication
-				 *                 dictates an Access Token for the UserInfo Endpoint should returned.
-				 */
 				useGrantedResource,
-
-				/*
-				 * features.resourceIndicators.getResourceServerInfo
-				 *
-				 * description: Function used to load information about a Resource Server (API) and check if the
-				 *   client is meant to request scopes for that particular resource.
-				 *
-				 * example: Resource Server (API) with two scopes, an expected audience value, an Access Token TTL and a JWT Access Token Format.
-				 * ```js
-				 * {
-				 *   scope: 'api:read api:write',
-				 *   audience: 'resource-server-audience-value',
-				 *   accessTokenTTL: 2 * 60 * 60, // 2 hours
-				 *   accessTokenFormat: 'jwt',
-				 *   jwt: {
-				 *     sign: { alg: 'ES256' },
-				 *   },
-				 * }
-				 * ```
-				 *
-				 * example: Resource Server (API) with two scopes and a symmetrically encrypted JWT Access Token Format.
-				 * ```js
-				 * {
-				 *   scope: 'api:read api:write',
-				 *   accessTokenFormat: 'jwt',
-				 *   jwt: {
-				 *     sign: false,
-				 *     encrypt: {
-				 *       alg: 'dir',
-				 *       enc: 'A128CBC-HS256',
-				 *       key: Buffer.from('f40dd9591646bebcb9c32aed02f5e610c2d15e1d38cde0c1fe14a55cf6bfe2d9', 'hex')
-				 *     },
-				 *   }
-				 * }
-				 * ```
-				 *
-				 * example: Resource Server Definition
-				 * ```js
-				 * {
-				 *   // REQUIRED
-				 *   // available scope values (space-delimited string)
-				 *   scope: string,
-				 *
-				 *   // OPTIONAL
-				 *   // "aud" (Audience) value to use
-				 *   // Default is the resource indicator value will be used as token audience
-				 *   audience?: string,
-				 *
-				 *   // OPTIONAL
-				 *   // Issued Token TTL
-				 *   accessTokenTTL?: number,
-				 *
-				 *   // Issued Token Format
-				 *   // Default is - opaque
-				 *   accessTokenFormat?: 'opaque' | 'jwt',
-				 *
-				 *   // JWT Access Token Format (when accessTokenFormat is 'jwt')
-				 *   // Default is `{ sign: { alg: 'RS256' }, encrypt: false }`
-				 *   // Tokens may be signed, signed and then encrypted, or just encrypted JWTs.
-				 *   jwt?: {
-				 *     // Tokens will be signed
-				 *     sign?:
-				 *      | {
-				 *          alg?: string, // 'PS256' | 'PS384' | 'PS512' | 'ES256' | 'ES384' | 'ES512' | 'Ed25519' | 'RS256' | 'RS384' | 'RS512' | 'EdDSA'
-				 *          kid?: string, // OPTIONAL `kid` to aid in signing key selection
-				 *        }
-				 *      | {
-				 *          alg: string, // 'HS256' | 'HS384' | 'HS512'
-				 *          key: CryptoKey | KeyObject | Buffer, // shared symmetric secret to sign the JWT token with
-				 *          kid?: string, // OPTIONAL `kid` JOSE Header Parameter to put in the token's JWS Header
-				 *        },
-				 *     // Tokens will be encrypted
-				 *     encrypt?: {
-				 *       alg: string, // 'dir' | 'RSA-OAEP' | 'RSA-OAEP-256' | 'RSA-OAEP-384' | 'RSA-OAEP-512' | 'ECDH-ES' | 'ECDH-ES+A128KW' | 'ECDH-ES+A192KW' | 'ECDH-ES+A256KW' | 'A128KW' | 'A192KW' | 'A256KW' | 'A128GCMKW' | 'A192GCMKW' | 'A256GCMKW'
-				 *       enc: string, // 'A128CBC-HS256' | 'A128GCM' | 'A192CBC-HS384' | 'A192GCM' | 'A256CBC-HS512' | 'A256GCM'
-				 *       key: CryptoKey | KeyObject | Buffer, // public key or shared symmetric secret to encrypt the JWT token with
-				 *       kid?: string, // OPTIONAL `kid` JOSE Header Parameter to put in the token's JWE Header
-				 *     }
-				 *   }
-				 * }
-				 * ```
-				 */
 				getResourceServerInfo
 			},
 
 			/*
-			 * features.requestObjects
-			 *
-			 * title: [`OIDC Core 1.0`](https://openid.net/specs/openid-connect-core-1_0-errata2.html#RequestObject) and [JWT Secured Authorization Request (`JAR`)](https://www.rfc-editor.org/rfc/rfc9101.html) - Request Object
-			 *
-			 * description: Enables the use and validations of the `request` parameter.
+			 * features.requestObjects.assertJwtClaimsAndHeader
 			 */
 			requestObjects: {
-				enabled: config['requestObjects.enabled'],
-
-				/*
-				 * features.requestObjects.requireSignedRequestObject
-				 *
-				 * description: Makes the use of signed request objects required for all authorization
-				 * requests as an authorization server policy.
-				 */
-				requireSignedRequestObject:
-					config['requestObjects.requireSignedRequestObject'],
-
-				/**
-				 * features.requestObjects.assertJwtClaimsAndHeader
-				 *
-				 * description: Helper function used to validate the Request Object JWT Claims Set and Header beyond
-				 * what the JAR specification requires.
-				 */
 				assertJwtClaimsAndHeader
-			},
-
-			/*
-			 * features.revocation
-			 *
-			 * title: [`RFC7009`](https://www.rfc-editor.org/rfc/rfc7009.html) - OAuth 2.0 Token Revocation
-			 *
-			 * description: Enables Token Revocation for:
-			 *   - opaque access tokens
-			 *   - refresh tokens
-			 *
-			 */
-			revocation: { enabled: config['revocation.enabled'] },
-
-			/*
-			 * features.userinfo
-			 *
-			 * title: [`OIDC Core 1.0`](https://openid.net/specs/openid-connect-core-1_0-errata2.html#UserInfo) - UserInfo Endpoint
-			 *
-			 * description: Enables the userinfo endpoint. Its use requires an opaque Access Token with at least
-			 * `openid` scope that's without a Resource Server audience.
-			 */
-			userinfo: { enabled: config['userinfo.enabled'] },
-
-			/*
-			 * features.jwtUserinfo
-			 *
-			 * title: [`OIDC Core 1.0`](https://openid.net/specs/openid-connect-core-1_0-errata2.html#UserInfo) - JWT UserInfo Endpoint Responses
-			 *
-			 * description: Enables the userinfo to optionally return signed and/or encrypted JWTs, also
-			 * enables the relevant client metadata for setting up signing and/or encryption.
-			 */
-			jwtUserinfo: { enabled: config['jwtUserinfo.enabled'] }
+			}
 		},
 
 		formats: {
@@ -1080,18 +248,6 @@ function makeDefaults() {
 			 * formats.customizers
 			 *
 			 * description: Customizer functions used before issuing a structured Access Token.
-			 *
-			 * example: To push additional headers and payload claims to a `jwt` format Access Token
-			 * ```js
-			 * {
-			 *   customizers: {
-			 *     async jwt(ctx, token, jwt) {
-			 *       jwt.header = { foo: 'bar' };
-			 *       jwt.payload.foo = 'bar';
-			 *     }
-			 *   }
-			 * }
-			 * ```
 			 */
 			customizers: {
 				jwt: undefined
@@ -1100,11 +256,8 @@ function makeDefaults() {
 
 		/*
 		 * expiresWithSession
-		 * description: Function used to decide whether the given authorization code, device code, or
-		 *   authorization-endpoint returned opaque access token be bound to the user session. This will be applied to all
-		 *   opaque tokens issued from the authorization code, device code, or subsequent refresh token use in the future.
-		 *   When artifacts are session-bound their originating session will be loaded by its `uid` every time they are encountered.
-		 *   Session bound artefacts will effectively get revoked if the end-user logs out.
+		 *
+		 * description: Function used to decide whether the given artifact should be bound to the user session.
 		 */
 		expiresWithSession,
 
@@ -1112,20 +265,6 @@ function makeDefaults() {
 		 * issueRefreshToken
 		 *
 		 * description: Function used to decide whether a refresh token will be issued or not
-		 *
-		 * example: To always issue a refresh tokens ...
-		 * ... if a client has the grant allowed and scope includes offline_access or the client is a
-		 * public web client doing code flow. Configure `issueRefreshToken` like so
-		 *
-		 * ```js
-		 * async issueRefreshToken(ctx, client, code) {
-		 *   if (!client.grantTypeAllowed('refresh_token')) {
-		 *     return false;
-		 *   }
-		 *
-		 *   return code.scopes.has('offline_access') || (client.applicationType === 'web' && client.clientAuthMethod === 'none');
-		 * }
-		 * ```
 		 */
 		issueRefreshToken,
 
@@ -1150,47 +289,12 @@ function makeDefaults() {
 		},
 
 		/*
-		 * scopes
-		 *
-		 * description: Array of additional scope values that the authorization server signals to support in the discovery
-		 *   endpoint. Only add scopes the authorization server has a corresponding resource for.
-		 *   Resource Server scopes don't belong here, see `features.resourceIndicators` for configuring
-		 *   those.
-		 */
-		scopes: ['openid', 'offline_access'],
-
-		/*
 		 * pairwiseIdentifier
 		 *
 		 * description: Function used by the authorization server when resolving pairwise ID Token and Userinfo sub claim
-		 *   values. See [`OIDC Core 1.0`](https://openid.net/specs/openid-connect-core-1_0-errata2.html#PairwiseAlg)
-		 * recommendation: Since this might be called several times in one request with the same arguments
-		 *   consider using memoization or otherwise caching the result based on account and client
-		 *   ids.
+		 *   values.
 		 */
 		pairwiseIdentifier,
-
-		/*
-		 * clientAuthMethods
-		 *
-		 * description: Array of supported Client Authentication methods
-		 * example: Supported values list
-		 * ```js
-		 * [
-		 *   'none',
-		 *   'client_secret_basic', 'client_secret_post',
-		 *   'client_secret_jwt', 'private_key_jwt',
-		 *   'tls_client_auth', 'self_signed_tls_client_auth', // these methods are only available when features.mTLS is configured
-		 * ]
-		 * ```
-		 */
-		clientAuthMethods: [
-			'client_secret_basic',
-			'client_secret_jwt',
-			'client_secret_post',
-			'private_key_jwt',
-			'none'
-		],
 
 		/*
 		 * renderError
@@ -1217,91 +321,20 @@ function makeDefaults() {
 		 * @nodefault
 		 */
 		interactions: {
-			/*
-			 * interactions.policy
-			 *
-			 * description: structure of Prompts and their checks formed by Prompt and Check class instances.
-			 *  The default you can get a fresh instance for and the classes are exported.
-			 *
-			 * example: default interaction policy description
-			 *
-			 * The default interaction policy consists of two available prompts, login and consent
-			 *
-			 * <br/><br/>
-			 *
-			 * - `login` does the following checks:
-			 *   - no_session - checks that there's an established session, an authenticated end-user
-			 *   - max_age - processes the max_age parameter (when the session's auth_time is too old it requires login)
-			 *   - id_token_hint - processes the id_token_hint parameter (when the end-user sub differs it requires login)
-			 *   - claims_id_token_sub_value - processes the claims parameter `sub` (when the `claims` parameter requested sub differs it requires login)
-			 *   - essential_acrs - processes the claims parameter `acr` (when the current acr is not amongst the `claims` parameter essential `acr.values` it requires login)
-			 *   - essential_acr - processes the claims parameter `acr` (when the current acr is not equal to the `claims` parameter essential `acr.value` it requires login)
-			 *
-			 * <br/><br/>
-			 *
-			 * - `consent` does the following checks:
-			 *   - native_client_prompt - native clients always require re-consent
-			 *   - op_scopes_missing - requires consent when the requested scope includes scope values previously not requested
-			 *   - op_claims_missing - requires consent when the requested claims parameter includes claims previously not requested
-			 *   - rs_scopes_missing - requires consent when the requested resource indicated scope values include scopes previously not requested
-			 *
-			 * <br/><br/>
-			 *
-			 * These checks are the best practice for various privacy and security reasons.
-			 *
-			 * example: disabling default consent checks
-			 *
-			 * You may be required to skip (silently accept) some of the consent checks, while it is
-			 * discouraged there are valid reasons to do that, for instance in some first-party scenarios or
-			 * going with pre-existing, previously granted, consents. To simply silenty "accept"
-			 * first-party/resource indicated scopes or pre-agreed upon claims use the `loadExistingGrant`
-			 * configuration helper function, in there you may just instantiate (and save!) a grant for the
-			 * current clientId and accountId values.
-			 *
-			 * example: modifying the default interaction policy
-			 * ```js
-			 * import { interactionPolicy } from 'oidc-provider';
-			 * const { Prompt, Check, base } = interactionPolicy;
-			 *
-			 * const basePolicy = base()
-			 *
-			 * // basePolicy.get(name) => returns a Prompt instance by its name
-			 * // basePolicy.remove(name) => removes a Prompt instance by its name
-			 * // basePolicy.add(prompt, index) => adds a Prompt instance to a specific index, default is add the prompt as the last one
-			 *
-			 * // prompt.checks.get(reason) => returns a Check instance by its reason
-			 * // prompt.checks.remove(reason) => removes a Check instance by its reason
-			 * // prompt.checks.add(check, index) => adds a Check instance to a specific index, default is add the check as the last one
-			 * ```
-			 */
 			policy: defaultPolicy()
 		},
 
 		/*
 		 * findAccount
 		 *
-		 * description: Function used to load an account and retrieve its available claims. The
-		 *   return value should be a Promise and #claims() can return a Promise too
+		 * description: Function used to load an account and retrieve its available claims.
 		 */
 		findAccount,
 
 		/*
 		 * rotateRefreshToken
 		 *
-		 * description: Configures if and how the authorization server rotates refresh tokens after they are used. Supported
-		 *   values are
-		 *   - `false` refresh tokens are not rotated and their initial expiration date is final
-		 *   - `true` refresh tokens are rotated when used, current token is marked as
-		 *     consumed and new one is issued with new TTL, when a consumed refresh token is
-		 *     encountered an error is returned instead and the whole token chain (grant) is revoked
-		 *   - `function` returning true/false, true when rotation should occur, false when it shouldn't
-		 *
-		 * <br/><br/>
-		 *
-		 * The default configuration value puts forth a sensible refresh token rotation policy
-		 *   - only allows refresh tokens to be rotated (have their TTL prolonged by issuing a new one) for one year
-		 *   - otherwise always rotate public client tokens that are not sender-constrained
-		 *   - otherwise only rotate tokens if they're being used close to their expiration (>= 70% TTL passed)
+		 * description: Configures if and how the authorization server rotates refresh tokens after they are used.
 		 */
 		rotateRefreshToken
 	};

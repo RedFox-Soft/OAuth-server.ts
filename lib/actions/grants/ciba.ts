@@ -3,6 +3,7 @@ import camelCase from '../../helpers/_/camel_case.ts';
 import * as errors from '../../helpers/errors.ts';
 import presence from '../../helpers/validate_presence.ts';
 import instance from '../../helpers/weak_cache.ts';
+import { ApplicationConfig } from 'lib/configs/application.js';
 import filterClaims from '../../helpers/filter_claims.ts';
 import revoke from '../../helpers/revoke.ts';
 import resolveResource from '../../helpers/resolve_resource.ts';
@@ -206,7 +207,11 @@ export const handler = async function cibaHandler(oidc, dPoP) {
 			}
 		});
 
-		if (conformIdTokenClaims && userinfo.enabled && !at.aud) {
+		if (
+			conformIdTokenClaims &&
+			ApplicationConfig['userinfo.enabled'] &&
+			!at.aud
+		) {
 			token.scope = 'openid';
 		} else {
 			token.scope = grant.getOIDCScopeFiltered(request.scopes);

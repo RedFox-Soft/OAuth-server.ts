@@ -1,8 +1,12 @@
 import cloneDeep from 'lodash/cloneDeep.js';
-import merge from 'lodash/merge.js';
 
-import config from './ciba.config.js';
+import config, {
+	ApplicationConfig as CibaApplicationConfig
+} from './ciba.config.js';
 
-export default merge(cloneDeep(config), {
-	config: { features: { requestObjects: { enabled: true } } }
-});
+export const ApplicationConfig = {
+	...CibaApplicationConfig,
+	'requestObjects.enabled': true
+};
+
+export default cloneDeep(config);

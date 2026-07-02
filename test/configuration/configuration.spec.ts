@@ -3,30 +3,12 @@ import { expect } from 'chai';
 import Configuration from '../../lib/helpers/configuration.ts';
 
 describe('Provider configuration', () => {
-	it('checks that a feature configuration property is valid', () => {
-		expect(() => {
-			new Configuration({
-				features: {
-					foo: {}
-				}
-			});
-		}).to.throw('Unknown feature configuration: foo');
-	});
-
-	it('checks that a stable feature does not have an ack', () => {
-		expect(() => {
-			new Configuration({
-				features: {
-					deviceFlow: {
-						enabled: true,
-						ack: 'draft-01'
-					}
-				}
-			});
-		}).to.throw(
-			"deviceFlow feature is now stable, the ack draft-01 is no longer valid. Check the stable feature's configuration for any breaking changes."
-		);
-	});
+	// NOTE: feature enable flags and experiment acknowledgements are owned by ApplicationConfig
+	// (flat dotted keys) and read from it directly — they are no longer carried on the nested
+	// provider `features` config. The former "Unknown feature configuration" and "stable feature
+	// ack no longer valid" checks validated that deprecated nested path and no longer apply.
+	// Nested `features` still carries helper-function overrides, so the boolean-shape guard below
+	// is retained.
 
 	it('checks that a feature configuration is not a boolean', () => {
 		expect(() => {

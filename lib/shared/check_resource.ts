@@ -1,5 +1,6 @@
 import instance from '../helpers/weak_cache.ts';
 import { InvalidTarget } from '../helpers/errors.ts';
+import { ApplicationConfig } from 'lib/configs/application.js';
 
 const filterStatics = (oidc) => {
 	if (oidc.params.scope && !oidc.params.resource) {
@@ -17,10 +18,10 @@ function emptyResource(params) {
 export default async function checkResource(oidc) {
 	const { params, provider, client, resourceServers } = oidc;
 
-	const { defaultResource, enabled, getResourceServerInfo } =
+	const { defaultResource, getResourceServerInfo } =
 		instance(provider).features.resourceIndicators;
 
-	if (!enabled) {
+	if (!ApplicationConfig['resourceIndicators.enabled']) {
 		filterStatics(oidc);
 		return;
 	}

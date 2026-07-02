@@ -2,8 +2,10 @@ import getConfig from '../default.config.js';
 
 const config = getConfig();
 
-config.features.ciba = { enabled: true };
-config.features.deviceFlow = { enabled: true };
+export const ApplicationConfig = {
+	'ciba.enabled': true,
+	'deviceFlow.enabled': true
+};
 
 export default {
 	config,

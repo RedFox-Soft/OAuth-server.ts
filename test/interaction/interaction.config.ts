@@ -1,14 +1,12 @@
-import merge from 'lodash/merge.js';
-
 import { Prompt, base } from '../../lib/helpers/interaction_policy/index.ts';
 import getConfig from '../default.config.js';
 import { type CheckPartial } from 'lib/helpers/interaction_policy/prompt.js';
 
 const config = getConfig();
 
-merge(config.features, {
-	rpInitiatedLogout: { enabled: false }
-});
+export const ApplicationConfig = {
+	'rpInitiatedLogout.enabled': false
+};
 
 const policy = base();
 

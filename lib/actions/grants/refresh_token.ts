@@ -6,6 +6,7 @@ import {
 } from '../../helpers/errors.ts';
 import presence from '../../helpers/validate_presence.ts';
 import instance from '../../helpers/weak_cache.ts';
+import { ApplicationConfig } from 'lib/configs/application.js';
 import revoke from '../../helpers/revoke.ts';
 import certificateThumbprint from '../../helpers/certificate_thumbprint.ts';
 import * as formatters from '../../helpers/formatters.ts';
@@ -243,7 +244,10 @@ export const handler = async function refreshTokenHandler(oidc, dPoP) {
 		at.payload.scope = grant.getOIDCScopeFiltered(scope);
 	}
 
-	if (richAuthorizationRequests.enabled && at.resourceServer) {
+	if (
+		ApplicationConfig['richAuthorizationRequests.enabled'] &&
+		at.resourceServer
+	) {
 		at.payload.rar = await richAuthorizationRequests.rarForRefreshTokenResponse(
 			{ oidc },
 			at.resourceServer
@@ -269,7 +273,11 @@ export const handler = async function refreshTokenHandler(oidc, dPoP) {
 			auth_time: refreshToken.payload.authTime
 		});
 
-		if (conformIdTokenClaims && userinfo.enabled && !at.payload.aud) {
+		if (
+			conformIdTokenClaims &&
+			ApplicationConfig['userinfo.enabled'] &&
+			!at.payload.aud
+		) {
 			token.scope = 'openid';
 		} else {
 			token.scope = grant.getOIDCScopeFiltered(scope);

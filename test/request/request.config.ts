@@ -6,11 +6,8 @@ const config = getConfig();
 
 merge(config.features, {
 	requestObjects: {
-		enabled: true,
 		requireUriRegistration: false
-	},
-	claimsParameter: { enabled: true },
-	deviceFlow: { enabled: true }
+	}
 });
 
 // Discovery reads feature state from ApplicationConfig; mirror the flags enabled above.

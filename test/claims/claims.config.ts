@@ -1,10 +1,11 @@
-import merge from 'lodash/merge.js';
-
 import getConfig from '../default.config.js';
 
 const config = getConfig();
 
-merge(config.features, { claimsParameter: { enabled: true } });
+export const ApplicationConfig = {
+	'claimsParameter.enabled': true
+};
+
 config.acrValues = ['0', '1', '2'];
 config.pairwiseIdentifier = (sub) => `${sub}-pairwise`;
 

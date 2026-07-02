@@ -1,15 +1,14 @@
-import merge from 'lodash/merge.js';
-
 import getConfig from '../default.config.js';
 
 const config = getConfig();
 
 delete config.claims;
 config.scopes = ['openid', 'offline_access', 'api:read'];
-merge(config.features, {
-	claimsParameter: { enabled: true },
-	deviceFlow: { enabled: true }
-});
+
+export const ApplicationConfig = {
+	'claimsParameter.enabled': true,
+	'deviceFlow.enabled': true
+};
 
 export default {
 	config,

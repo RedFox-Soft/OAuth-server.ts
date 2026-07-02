@@ -1,17 +1,12 @@
-import merge from 'lodash/merge.js';
-
 import getConfig from '../default.config.js';
 
 const config = getConfig();
 
-merge(config.features, {
-	introspection: { enabled: true },
-	revocation: { enabled: true },
-	deviceFlow: { enabled: true }
-});
-
 export const ApplicationConfig = {
-	'clientCredentials.enabled': true
+	'clientCredentials.enabled': true,
+	'introspection.enabled': true,
+	'revocation.enabled': true,
+	'deviceFlow.enabled': true
 };
 
 export default {

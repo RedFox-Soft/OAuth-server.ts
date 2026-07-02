@@ -6,6 +6,7 @@ import { expect } from 'chai';
 
 import bootstrap from '../test_helper.js';
 import provider, { errors } from '../../lib/index.ts';
+import { ApplicationConfig } from 'lib/configs/application.js';
 import { TestAdapter } from 'test/models.js';
 
 const sinon = createSandbox();
@@ -51,7 +52,7 @@ describe('client registration policies', () => {
 
 		it('runs the policies when a client is getting created', async function () {
 			const spy = sinon.spy(
-				i(provider).features.registration.policies,
+				ApplicationConfig['registration.policies'],
 				'empty-policy'
 			);
 			const value = await new provider.InitialAccessToken({
@@ -68,7 +69,7 @@ describe('client registration policies', () => {
 		});
 
 		it('allows for policies to set property defaults', async function () {
-			i(provider).features.registration.policies['set-default'] = (
+			ApplicationConfig['registration.policies']['set-default'] = (
 				ctx,
 				properties
 			) => {
@@ -110,7 +111,7 @@ describe('client registration policies', () => {
 		});
 
 		it('allows for policies to force property values', async function () {
-			i(provider).features.registration.policies['force-default'] = (
+			ApplicationConfig['registration.policies']['force-default'] = (
 				ctx,
 				properties
 			) => {
@@ -138,7 +139,7 @@ describe('client registration policies', () => {
 		});
 
 		it('allows for policies to validate property values', async function () {
-			i(provider).features.registration.policies['throw-error'] = () => {
+			ApplicationConfig['registration.policies']['throw-error'] = () => {
 				throw new errors.InvalidClientMetadata('foo');
 			};
 
@@ -181,7 +182,7 @@ describe('client registration policies', () => {
 		});
 
 		it('can be done to push different policies to rat', async function () {
-			i(provider).features.registration.policies['change-rat-policy'] = async (
+			ApplicationConfig['registration.policies']['change-rat-policy'] = async (
 				ctx
 			) => {
 				ctx.oidc.entities.RegistrationAccessToken.policies = ['empty-policy'];
@@ -342,7 +343,7 @@ describe('client registration policies', () => {
 				}
 			);
 			const spy = sinon.spy(
-				i(provider).features.registration.policies,
+				ApplicationConfig['registration.policies'],
 				'empty-policy'
 			);
 
@@ -357,7 +358,7 @@ describe('client registration policies', () => {
 		});
 
 		it('allows for policies to set property defaults', async function () {
-			i(provider).features.registration.policies['set-default'] = (
+			ApplicationConfig['registration.policies']['set-default'] = (
 				ctx,
 				properties
 			) => {
@@ -397,7 +398,7 @@ describe('client registration policies', () => {
 		});
 
 		it('allows for policies to force property values', async function () {
-			i(provider).features.registration.policies['force-value'] = (
+			ApplicationConfig['registration.policies']['force-value'] = (
 				ctx,
 				properties
 			) => {
@@ -425,7 +426,7 @@ describe('client registration policies', () => {
 		});
 
 		it('allows for policies to validate property values', async function () {
-			i(provider).features.registration.policies['throw-error'] = () => {
+			ApplicationConfig['registration.policies']['throw-error'] = () => {
 				throw new errors.InvalidClientMetadata('foo');
 			};
 			TestAdapter.for('RegistrationAccessToken').syncUpdate(

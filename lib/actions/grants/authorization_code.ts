@@ -1,6 +1,7 @@
 import { InvalidGrant } from '../../helpers/errors.ts';
 import presence from '../../helpers/validate_presence.ts';
 import instance from '../../helpers/weak_cache.ts';
+import { ApplicationConfig } from 'lib/configs/application.js';
 import { verifyPKCE } from '../../helpers/pkce.js';
 import revoke from '../../helpers/revoke.ts';
 import filterClaims from '../../helpers/filter_claims.ts';
@@ -167,7 +168,10 @@ export const handler = async function authorizationCodeHandler(oidc, dPoP) {
 		at.payload.scope = grant.getOIDCScopeFiltered(code.scopes);
 	}
 
-	if (richAuthorizationRequests.enabled && at.resourceServer) {
+	if (
+		ApplicationConfig['richAuthorizationRequests.enabled'] &&
+		at.resourceServer
+	) {
 		at.payload.rar = await richAuthorizationRequests.rarForCodeResponse(
 			{ oidc },
 			at.resourceServer
@@ -228,7 +232,11 @@ export const handler = async function authorizationCodeHandler(oidc, dPoP) {
 			auth_time: code.payload.authTime
 		});
 
-		if (conformIdTokenClaims && userinfo.enabled && !at.aud) {
+		if (
+			conformIdTokenClaims &&
+			ApplicationConfig['userinfo.enabled'] &&
+			!at.aud
+		) {
 			token.scope = 'openid';
 		} else {
 			token.scope = grant.getOIDCScopeFiltered(code.scopes);

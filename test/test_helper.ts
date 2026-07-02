@@ -39,22 +39,19 @@ process.env.NODE_ENV = process.env.NODE_ENV || 'test';
 
 globalThis.i = instance;
 
+// Feature enable flags and sub-options are owned by ApplicationConfig (flat dotted keys) and
+// read from it directly. Tests configure them by setting ApplicationConfig — via each config
+// file's `ApplicationConfig` export, or at runtime via `provider.enable(...)` / direct
+// assignment. There is no nested→flat translation here.
+const FEATURE_FLAG_PREFIX = { jwtResponseModes: 'responseMode.jwt' };
 Object.defineProperties(Object.getPrototypeOf(provider), {
 	enable: {
 		value(feature, options = {}) {
-			const config = i(this).features[feature];
-			if (!config) {
-				throw new Error(`invalid feature: ${feature}`);
+			const prefix = FEATURE_FLAG_PREFIX[feature] ?? feature;
+			ApplicationConfig[`${prefix}.enabled`] = true;
+			for (const [key, value] of Object.entries(options)) {
+				ApplicationConfig[`${prefix}.${key}`] = value;
 			}
-
-			Object.keys(options).forEach((key) => {
-				if (!(key in config)) {
-					throw new Error(`invalid option: ${key}`);
-				}
-			});
-
-			config.enabled = true;
-			Object.assign(config, options);
 
 			return this;
 		}

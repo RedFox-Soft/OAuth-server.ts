@@ -1,8 +1,9 @@
 import { InvalidTarget } from './errors.ts';
+import { ApplicationConfig } from 'lib/configs/application.js';
 
 export default async (ctx, model, config, scopes = model.scopes) => {
 	let resource;
-	if (config.resourceIndicators.enabled) {
+	if (ApplicationConfig['resourceIndicators.enabled']) {
 		switch (true) {
 			case !!ctx.oidc.params.resource:
 				resource = ctx.oidc.params.resource;
@@ -13,7 +14,7 @@ export default async (ctx, model, config, scopes = model.scopes) => {
 			case model.resource &&
 				!!(await config.resourceIndicators.useGrantedResource(ctx, model)):
 			case !ctx.oidc.params.resource &&
-				(!config.userinfo.enabled || !scopes.has('openid')):
+				(!ApplicationConfig['userinfo.enabled'] || !scopes.has('openid')):
 				resource = model.resource;
 				break;
 		}

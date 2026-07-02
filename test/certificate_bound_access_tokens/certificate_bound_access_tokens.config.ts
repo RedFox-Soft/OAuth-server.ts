@@ -6,14 +6,7 @@ import { Grant } from 'lib/models/grant.js';
 const config = getConfig();
 
 merge(config.features, {
-	mTLS: {
-		enabled: true,
-		certificateBoundAccessTokens: true
-	},
-	introspection: { enabled: true },
-	deviceFlow: { enabled: true },
 	ciba: {
-		enabled: true,
 		processLoginHint(ctx, loginHint) {
 			return loginHint;
 		},

@@ -9,6 +9,7 @@ import {
 import * as JWT from '../helpers/jwt.ts';
 import redirectUri from '../helpers/redirect_uri.ts';
 import instance from '../helpers/weak_cache.ts';
+import { ApplicationConfig } from 'lib/configs/application.js';
 import revoke from '../helpers/revoke.ts';
 import { IdToken } from 'lib/models/id_token.js';
 import { Client } from 'lib/models/client.js';
@@ -153,7 +154,7 @@ export const logoutConfirmAction = new Elysia()
 				features: { backchannelLogout }
 			} = instance(provider).configuration;
 
-			if (backchannelLogout.enabled) {
+			if (ApplicationConfig['backchannelLogout.enabled']) {
 				const clientIds = Object.keys(session.authorizations || {});
 
 				const back = [];

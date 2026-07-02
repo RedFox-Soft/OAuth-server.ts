@@ -3,15 +3,13 @@ import {
 	InvalidAuthorizationDetails,
 	InvalidRequest
 } from '../helpers/errors.ts';
-import instance from '../helpers/weak_cache.ts';
+import { ApplicationConfig } from 'lib/configs/application.js';
 
 export default async function checkRar(oidc) {
 	const { params, client } = oidc;
 
 	if (params.authorization_details !== undefined) {
-		const { richAuthorizationRequests } = instance(oidc.provider).features;
-
-		if (richAuthorizationRequests.enabled) {
+		if (ApplicationConfig['richAuthorizationRequests.enabled']) {
 			if (
 				params.response_type?.split(' ').includes('code') === false ||
 				params.response_type?.split(' ').includes('token') ||
@@ -57,7 +55,8 @@ export default async function checkRar(oidc) {
 					);
 				}
 
-				const config = richAuthorizationRequests.types[detail.type];
+				const config =
+					ApplicationConfig['richAuthorizationRequests.types'][detail.type];
 				if (!config) {
 					throw new InvalidAuthorizationDetails(
 						`unsupported authorization details type value (authorization details index ${i})`

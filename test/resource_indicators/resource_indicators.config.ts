@@ -11,10 +11,7 @@ merge(config, {
 		return true;
 	},
 	features: {
-		introspection: { enabled: true },
-		deviceFlow: { enabled: true },
 		ciba: {
-			enabled: true,
 			processLoginHint(ctx, loginHint) {
 				return loginHint;
 			},
@@ -41,7 +38,6 @@ merge(config, {
 			}
 		},
 		resourceIndicators: {
-			enabled: true,
 			async useGrantedResource(ctx) {
 				return ctx.oidc.body?.usegranted;
 			},
@@ -67,7 +63,11 @@ merge(config, {
 });
 
 export const ApplicationConfig = {
-	'clientCredentials.enabled': true
+	'clientCredentials.enabled': true,
+	'introspection.enabled': true,
+	'deviceFlow.enabled': true,
+	'ciba.enabled': true,
+	'resourceIndicators.enabled': true
 };
 
 export default {

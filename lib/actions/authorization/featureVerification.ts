@@ -1,34 +1,29 @@
 import { NotSupportedError } from 'lib/helpers/errors.js';
 import { ApplicationConfig as config } from 'lib/configs/application.js';
-import instance from 'lib/helpers/weak_cache.js';
-import { provider } from 'lib/provider.js';
 
 export function featureVerification(params: Record<string, unknown>) {
-	const {
-		features: {
-			claimsParameter,
-			resourceIndicators,
-			richAuthorizationRequests,
-			requestObjects
-		}
-	} = instance(provider).configuration;
-
 	if (!Object.keys(params.claims ?? {}).length) {
 		delete params.claims;
 	}
 
-	if (params.claims !== undefined && !claimsParameter.enabled) {
+	if (params.claims !== undefined && !config['claimsParameter.enabled']) {
 		throw new NotSupportedError('Claims Parameter is not supported');
-	} else if (params.resource !== undefined && !resourceIndicators.enabled) {
+	} else if (
+		params.resource !== undefined &&
+		!config['resourceIndicators.enabled']
+	) {
 		throw new NotSupportedError('Resource Indicators is not supported');
 	} else if (
 		params.authorization_details !== undefined &&
-		!richAuthorizationRequests.enabled
+		!config['richAuthorizationRequests.enabled']
 	) {
 		throw new NotSupportedError('Rich Authorization Requests is not supported');
 	} else if (params.dpop_jkt !== undefined && !config['dpop.enabled']) {
 		throw new NotSupportedError('DPoP JWK Thumbprint is not supported');
-	} else if (params.request !== undefined && !requestObjects.enabled) {
+	} else if (
+		params.request !== undefined &&
+		!config['requestObjects.enabled']
+	) {
 		throw new NotSupportedError('Request Object is not supported');
 	} else if (params.request_uri !== undefined && !config['par.enabled']) {
 		// For Authorization endpoint only

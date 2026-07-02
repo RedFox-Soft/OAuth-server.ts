@@ -40,6 +40,8 @@ describe('Client metadata validation', () => {
 		const initConfig = configuration
 			? merge(baseConfig(), cloneDeep(configuration))
 			: baseConfig();
+		// Owned options are expressed as flat dotted keys in each test's `configuration` and
+		// routed to ApplicationConfig (the single source); everything else is per-instance setup.
 		for (const key of Object.keys(initConfig)) {
 			if (key.includes('.')) {
 				ApplicationConfig[key] = initConfig[key];
@@ -389,12 +391,8 @@ describe('Client metadata validation', () => {
 
 	describe('require_signed_request_object', function () {
 		const configuration = (value = false, enabled = true) => ({
-			features: {
-				requestObjects: {
-					enabled,
-					requireSignedRequestObject: value
-				}
-			}
+			'requestObjects.enabled': enabled,
+			'requestObjects.requireSignedRequestObject': value
 		});
 		mustBeBoolean('require_signed_request_object', undefined, configuration());
 		defaultsTo(
@@ -633,7 +631,7 @@ describe('Client metadata validation', () => {
 	describe('post_logout_redirect_uris', function () {
 		defaultsTo('post_logout_redirect_uris', []);
 		defaultsTo('post_logout_redirect_uris', undefined, undefined, {
-			features: { rpInitiatedLogout: { enabled: false } }
+			'rpInitiatedLogout.enabled': false
 		});
 		mustBeArray('post_logout_redirect_uris', [{}, 'string', 123, true]);
 		rejects('post_logout_redirect_uris', [123], /must only contain strings$/);
@@ -678,9 +676,7 @@ describe('Client metadata validation', () => {
 
 	describe('requestObject.signingAlg', function () {
 		const configuration = {
-			features: {
-				requestObjects: { enabled: true }
-			}
+			'requestObjects.enabled': true
 		};
 		// Canonical dotted key (Model B), validated by a TypeBox literal union — so
 		// non-string / invalid values are rejected by the schema (the exact message is
@@ -800,13 +796,13 @@ describe('Client metadata validation', () => {
 		});
 
 		allows('responseModes', ['jwt'], undefined, {
-			features: { jwtResponseModes: { enabled: true } }
+			'responseMode.jwt.enabled': true
 		});
 		allows('responseModes', ['jwt.query'], undefined, {
-			features: { jwtResponseModes: { enabled: true } }
+			'responseMode.jwt.enabled': true
 		});
 		allows('responseModes', ['jwt.form_post'], undefined, {
-			features: { jwtResponseModes: { enabled: true } }
+			'responseMode.jwt.enabled': true
 		});
 
 		rejects('responseModes', [123], 'client metadata validation error');
@@ -839,13 +835,9 @@ describe('Client metadata validation', () => {
 				'client_secret_jwt',
 				'tls_client_auth'
 			],
-			features: {
-				mTLS: {
-					enabled: true,
-					selfSignedTlsClientAuth: true,
-					tlsClientAuth: true
-				}
-			}
+			'mTLS.enabled': true,
+			'mTLS.selfSignedTlsClientAuth': true,
+			'mTLS.tlsClientAuth': true
 		};
 
 		describe('token_endpoint_auth_method', function () {
@@ -999,7 +991,7 @@ describe('Client metadata validation', () => {
 	}
 
 	describe('userinfo_signed_response_alg', function () {
-		const configuration = { features: { jwtUserinfo: { enabled: true } } };
+		const configuration = { 'jwtUserinfo.enabled': true };
 		defaultsTo(
 			'userinfo_signed_response_alg',
 			undefined,
@@ -1032,16 +1024,14 @@ describe('Client metadata validation', () => {
 			undefined,
 			'userinfo_signed_response_alg is mandatory property when userinfo_encrypted_response_alg is provided',
 			{ userinfo_encrypted_response_alg: 'dir' },
-			merge({ features: { encryption: { enabled: true } } }, configuration)
+			merge({ 'encryption.enabled': true }, configuration)
 		);
 	});
 
 	describe('introspection_signed_response_alg', function () {
 		const configuration = {
-			features: {
-				introspection: { enabled: true },
-				jwtIntrospection: { enabled: true }
-			}
+			'introspection.enabled': true,
+			'jwtIntrospection.enabled': true
 		};
 		defaultsTo(
 			'introspection_signed_response_alg',
@@ -1078,7 +1068,7 @@ describe('Client metadata validation', () => {
 	});
 
 	describe('authorization_signed_response_alg', function () {
-		const configuration = { features: { jwtResponseModes: { enabled: true } } };
+		const configuration = { 'responseMode.jwt.enabled': true };
 		defaultsTo(
 			'authorization_signed_response_alg',
 			'RS256',
@@ -1115,13 +1105,11 @@ describe('Client metadata validation', () => {
 
 	describe('features.encryption', () => {
 		const configuration = {
-			features: {
-				encryption: { enabled: true },
-				introspection: { enabled: true },
-				jwtIntrospection: { enabled: true },
-				jwtResponseModes: { enabled: true },
-				jwtUserinfo: { enabled: true }
-			}
+			'encryption.enabled': true,
+			'introspection.enabled': true,
+			'jwtIntrospection.enabled': true,
+			'responseMode.jwt.enabled': true,
+			'jwtUserinfo.enabled': true
 		};
 
 		describe('id_token_encrypted_response_alg', function () {
@@ -1651,10 +1639,8 @@ describe('Client metadata validation', () => {
 
 	describe('features.encryption & features.request', () => {
 		const configuration = {
-			features: {
-				encryption: { enabled: true },
-				requestObjects: { enabled: true }
-			}
+			'encryption.enabled': true,
+			'requestObjects.enabled': true
 		};
 		describe('request_object_encryption_alg', function () {
 			defaultsTo('request_object_encryption_alg', undefined);
@@ -1783,9 +1769,8 @@ describe('Client metadata validation', () => {
 
 	describe('features.ciba', () => {
 		const configuration = {
-			features: {
-				ciba: { enabled: true, deliveryModes: ['ping', 'poll'] }
-			}
+			'ciba.enabled': true,
+			'ciba.deliveryModes': ['ping', 'poll']
 		};
 		const metadata = {
 			grantTypes: ['urn:openid:params:grant-type:ciba'],
@@ -1844,7 +1829,7 @@ describe('Client metadata validation', () => {
 
 		describe('requestObject.backChannelSigningAlg', function () {
 			const withRequestObjects = merge({}, configuration, {
-				features: { requestObjects: { enabled: true } }
+				'requestObjects.enabled': true
 			});
 			// Canonical dotted key (Model B), validated by a TypeBox literal union of the
 			// asymmetric algorithms; non-string / invalid values are rejected by the schema.
@@ -1955,7 +1940,7 @@ describe('Client metadata validation', () => {
 	});
 
 	describe('features.deviceFlow', () => {
-		const configuration = { features: { deviceFlow: { enabled: true } } };
+		const configuration = { 'deviceFlow.enabled': true };
 		const metadata = {
 			grantTypes: ['urn:ietf:params:oauth:grant-type:device_code'],
 			responseTypes: [],
@@ -2041,15 +2026,13 @@ describe('Client metadata validation', () => {
 
 	describe('jwks', function () {
 		const configuration = {
-			features: {
-				introspection: { enabled: true },
-				jwtIntrospection: { enabled: true },
-				revocation: { enabled: true },
-				encryption: { enabled: true },
-				jwtUserinfo: { enabled: true },
-				ciba: { enabled: true },
-				requestObjects: { enabled: true }
-			}
+			'introspection.enabled': true,
+			'jwtIntrospection.enabled': true,
+			'revocation.enabled': true,
+			'encryption.enabled': true,
+			'jwtUserinfo.enabled': true,
+			'ciba.enabled': true,
+			'requestObjects.enabled': true
 		};
 
 		[false, Boolean, 'foo', 123, null].forEach((value) => {
@@ -2150,9 +2133,7 @@ describe('Client metadata validation', () => {
 
 	describe('features.backchannelLogout', () => {
 		const configuration = {
-			features: {
-				backchannelLogout: { enabled: true }
-			}
+			'backchannelLogout.enabled': true
 		};
 
 		describe('backchannel_logout_uri', function () {
@@ -2184,11 +2165,10 @@ describe('Client metadata validation', () => {
 
 	{
 		const configuration = {
-			features: {
-				mTLS: { enabled: true, tlsClientAuth: true },
-				revocation: { enabled: true },
-				introspection: { enabled: true }
-			},
+			'mTLS.enabled': true,
+			'mTLS.tlsClientAuth': true,
+			'revocation.enabled': true,
+			'introspection.enabled': true,
 			clientAuthMethods: ['tls_client_auth', 'client_secret_basic']
 		};
 
@@ -2376,35 +2356,29 @@ describe('Client metadata validation', () => {
 		}));
 
 	describe('authorization_details_types', function () {
-		const features = {
-			richAuthorizationRequests: {
-				enabled: true,
-				types: {
-					foo: {
-						validate() {}
-					}
+		const rar = {
+			'richAuthorizationRequests.enabled': true,
+			'richAuthorizationRequests.types': {
+				foo: {
+					validate() {}
 				}
 			}
 		};
-		mustBeArray('authorization_details_types', undefined, { features });
-		defaultsTo('authorization_details_types', [], undefined, { features });
+		mustBeArray('authorization_details_types', undefined, rar);
+		defaultsTo('authorization_details_types', [], undefined, rar);
 		rejects(
 			'authorization_details_types',
 			[123],
 			/must only contain strings$/,
 			undefined,
-			{
-				features
-			}
+			rar
 		);
 		rejects(
 			'authorization_details_types',
 			['bar'],
 			/can only contain 'foo'$/,
 			undefined,
-			{
-				features
-			}
+			rar
 		);
 	});
 

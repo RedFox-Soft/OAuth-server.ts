@@ -2,7 +2,9 @@ import getConfig from '../default.config.js';
 
 const config = getConfig();
 
-config.features.encryption = { enabled: true };
+export const ApplicationConfig = {
+	'encryption.enabled': true
+};
 
 config.jwks = {
 	keys: [

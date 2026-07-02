@@ -1,8 +1,9 @@
 import getConfig from '../default.config.js';
 
 const config = getConfig();
-config.features = {
-	claimsParameter: { enabled: true }
+
+export const ApplicationConfig = {
+	'claimsParameter.enabled': true
 };
 
 export default {

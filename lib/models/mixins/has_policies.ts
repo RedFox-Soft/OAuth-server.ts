@@ -1,4 +1,4 @@
-import instance from '../../helpers/weak_cache.ts';
+import { ApplicationConfig } from 'lib/configs/application.js';
 
 function validate(provider, policies) {
 	if (!Array.isArray(policies)) {
@@ -11,7 +11,7 @@ function validate(provider, policies) {
 		if (typeof policy !== 'string') {
 			throw new TypeError('policies must be strings');
 		}
-		if (!instance(provider).features.registration.policies[policy]) {
+		if (!ApplicationConfig['registration.policies'][policy]) {
 			throw new TypeError(`policy ${policy} not configured`);
 		}
 	});

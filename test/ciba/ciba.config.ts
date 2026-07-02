@@ -9,12 +9,13 @@ const config = getConfig();
 
 export const emitter = new events.EventEmitter();
 
-config.features.encryption = {
-	enabled: true
+export const ApplicationConfig = {
+	'encryption.enabled': true,
+	'ciba.enabled': true,
+	'ciba.deliveryModes': ['poll', 'ping']
 };
+
 config.features.ciba = {
-	enabled: true,
-	deliveryModes: ['poll', 'ping'],
 	processLoginHint(ctx, loginHint) {
 		assert(ctx?.oidc);
 		assert(typeof loginHint === 'string');

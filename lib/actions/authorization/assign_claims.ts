@@ -1,5 +1,5 @@
 import { merge } from 'lib/helpers/_/object.js';
-import instance from '../../helpers/weak_cache.ts';
+import { ApplicationConfig } from 'lib/configs/application.js';
 
 /*
  * Merges requested claims with auth_time as requested if max_age is provided or require_auth_time
@@ -12,7 +12,7 @@ export default function assignClaims(oidc) {
 
 	if (
 		params.claims !== undefined &&
-		instance(oidc.provider).features.claimsParameter.enabled
+		ApplicationConfig['claimsParameter.enabled']
 	) {
 		oidc.claims = params.claims;
 	}

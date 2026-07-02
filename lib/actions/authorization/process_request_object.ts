@@ -7,6 +7,7 @@ import {
 } from '../../helpers/errors.ts';
 import { getSchemaValidator, TSchema, ValidationError } from 'elysia';
 import { ISSUER } from 'lib/configs/env.js';
+import { ApplicationConfig } from 'lib/configs/application.js';
 import { clockTolerance } from 'lib/configs/liveTime.js';
 import {
 	requestObjectEncryptionAlgValues,
@@ -46,7 +47,10 @@ export default async function processRequestObject(
 		return;
 	}
 
-	if (features.encryption.enabled && isEncryptedJWT(params.request)) {
+	if (
+		ApplicationConfig['encryption.enabled'] &&
+		isEncryptedJWT(params.request)
+	) {
 		try {
 			const header = JWT.header(params.request);
 

@@ -16,6 +16,7 @@ import {
 } from '../helpers/re_render_errors.ts';
 import { Elysia, t } from 'elysia';
 import { AuthorizationCookies, routeNames } from 'lib/consts/param_list.js';
+import { ApplicationConfig } from 'lib/configs/application.js';
 import interactions from './authorization/interactions.js';
 import loadGrant from './authorization/load_grant.js';
 import loadAccount from './authorization/load_account.js';
@@ -61,8 +62,9 @@ export const codeVerification = new Elysia()
 export const get = [
 	paramsMiddleware.bind(undefined, new Set(['user_code'])),
 	async function renderCodeVerification(ctx) {
-		const { charset, userCodeInputSource } = instance(ctx.oidc.provider)
-			.features.deviceFlow;
+		const { userCodeInputSource } = instance(ctx.oidc.provider).features
+			.deviceFlow;
+		const charset = ApplicationConfig['deviceFlow.charset'];
 
 		// TODO: generic xsrf middleware to remove this
 		const secret = crypto.randomBytes(24).toString('hex');
@@ -100,8 +102,9 @@ export const post = [
 	},
 
 	async function loadDeviceCodeByUserInput(ctx, next) {
-		const { userCodeConfirmSource, mask } = instance(ctx.oidc.provider).features
+		const { userCodeConfirmSource } = instance(ctx.oidc.provider).features
 			.deviceFlow;
+		const mask = ApplicationConfig['deviceFlow.mask'];
 		const { user_code: userCode, confirm, abort } = ctx.oidc.params;
 
 		if (!userCode) {

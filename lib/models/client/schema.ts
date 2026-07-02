@@ -38,7 +38,7 @@ function isUndefined(value) {
 }
 
 export default function getSchema(provider) {
-	const { configuration, features } = instance(provider);
+	const { configuration } = instance(provider);
 	const { scopes } = configuration;
 
 	const RECOGNIZED_METADATA = [...RECOGNIZED];
@@ -46,7 +46,10 @@ export default function getSchema(provider) {
 	const DEFAULT_CONFIGURATION = structuredClone(configuration.clientDefaults);
 	Object.assign(DEFAULT, DEFAULT_CONFIGURATION);
 
-	if (features.mTLS.enabled && features.mTLS.tlsClientAuth) {
+	if (
+		ApplicationConfig['mTLS.enabled'] &&
+		ApplicationConfig['mTLS.tlsClientAuth']
+	) {
 		RECOGNIZED_METADATA.push('tls_client_auth_subject_dn');
 		RECOGNIZED_METADATA.push('tls_client_auth_san_dns');
 		RECOGNIZED_METADATA.push('tls_client_auth_san_uri');
@@ -57,63 +60,66 @@ export default function getSchema(provider) {
 
 	RECOGNIZED_METADATA.push('token_endpoint_auth_signing_alg');
 
-	if (features.jwtUserinfo.enabled) {
+	if (ApplicationConfig['jwtUserinfo.enabled']) {
 		RECOGNIZED_METADATA.push('userinfo_signed_response_alg');
 	}
 
-	if (features.introspection.enabled) {
-		if (features.jwtIntrospection.enabled) {
+	if (ApplicationConfig['introspection.enabled']) {
+		if (ApplicationConfig['jwtIntrospection.enabled']) {
 			RECOGNIZED_METADATA.push('introspection_signed_response_alg');
 
-			if (features.encryption.enabled) {
+			if (ApplicationConfig['encryption.enabled']) {
 				RECOGNIZED_METADATA.push('introspection_encrypted_response_alg');
 				RECOGNIZED_METADATA.push('introspection_encrypted_response_enc');
 			}
 		}
 	}
 
-	if (features.rpInitiatedLogout.enabled) {
+	if (ApplicationConfig['rpInitiatedLogout.enabled']) {
 		RECOGNIZED_METADATA.push('post_logout_redirect_uris');
 	}
 
-	if (features.backchannelLogout.enabled) {
+	if (ApplicationConfig['backchannelLogout.enabled']) {
 		RECOGNIZED_METADATA.push('backchannel_logout_session_required');
 		RECOGNIZED_METADATA.push('backchannel_logout_uri');
 	}
 
-	if (features.requestObjects.enabled) {
+	if (ApplicationConfig['requestObjects.enabled']) {
 		// request_object_signing_alg is no longer recognized snake metadata — the value
 		// is the canonical dotted `requestObject.signingAlg` base key (Model B), validated
 		// by TypeBox and read by consumers directly.
 		RECOGNIZED_METADATA.push('require_signed_request_object');
-		if (features.encryption.enabled) {
+		if (ApplicationConfig['encryption.enabled']) {
 			RECOGNIZED_METADATA.push('request_object_encryption_alg');
 			RECOGNIZED_METADATA.push('request_object_encryption_enc');
 		}
 	}
 
-	if (features.encryption.enabled) {
+	if (ApplicationConfig['encryption.enabled']) {
 		RECOGNIZED_METADATA.push('id_token_encrypted_response_alg');
 		RECOGNIZED_METADATA.push('id_token_encrypted_response_enc');
-		if (features.jwtUserinfo.enabled) {
+		if (ApplicationConfig['jwtUserinfo.enabled']) {
 			RECOGNIZED_METADATA.push('userinfo_encrypted_response_alg');
 			RECOGNIZED_METADATA.push('userinfo_encrypted_response_enc');
 		}
 	}
 
-	if (features.jwtResponseModes.enabled) {
+	if (ApplicationConfig['responseMode.jwt.enabled']) {
 		RECOGNIZED_METADATA.push('authorization_signed_response_alg');
-		if (features.encryption.enabled) {
+		if (ApplicationConfig['encryption.enabled']) {
 			RECOGNIZED_METADATA.push('authorization_encrypted_response_alg');
 			RECOGNIZED_METADATA.push('authorization_encrypted_response_enc');
 		}
 	}
 
-	if (features.mTLS.enabled && features.mTLS.certificateBoundAccessTokens) {
+	if (
+		ApplicationConfig['mTLS.enabled'] &&
+		ApplicationConfig['mTLS.certificateBoundAccessTokens']
+	) {
 		RECOGNIZED_METADATA.push('tls_client_certificate_bound_access_tokens');
 	}
 
-	if (features.ciba.enabled) {
+	if (ApplicationConfig['ciba.enabled']) {
 		RECOGNIZED_METADATA.push('backchannel_token_delivery_mode');
 		RECOGNIZED_METADATA.push('backchannel_user_code_parameter');
 		RECOGNIZED_METADATA.push('backchannel_client_notification_endpoint');
@@ -124,7 +130,7 @@ export default function getSchema(provider) {
 
 	RECOGNIZED_METADATA.push('dpop_bound_access_tokens');
 
-	if (features.richAuthorizationRequests.enabled) {
+	if (ApplicationConfig['richAuthorizationRequests.enabled']) {
 		RECOGNIZED_METADATA.push('authorization_details_types');
 	}
 
@@ -136,10 +142,11 @@ export default function getSchema(provider) {
 		// request_object_signing_alg / backchannel_authentication_request_signing_alg are
 		// now validated by TypeBox literal unions on the canonical dotted keys
 		// (requestObject.signingAlg / requestObject.backChannelSigningAlg) — no runtime ENUM.
-		backchannel_token_delivery_mode: () => features.ciba.deliveryModes,
+		backchannel_token_delivery_mode: () =>
+			ApplicationConfig['ciba.deliveryModes'],
 		request_object_encryption_alg: () => requestObjectEncryptionAlgValues,
 		authorization_details_types: () =>
-			Object.keys(features.richAuthorizationRequests.types),
+			Object.keys(ApplicationConfig['richAuthorizationRequests.types']),
 		token_endpoint_auth_method: (metadata) => {
 			if (metadata.metadata.subjectType === 'pairwise') {
 				for (const grant of [
@@ -566,8 +573,8 @@ export default function getSchema(provider) {
 
 		jarPolicy() {
 			if (
-				features.requestObjects.enabled &&
-				features.requestObjects.requireSignedRequestObject
+				ApplicationConfig['requestObjects.enabled'] &&
+				ApplicationConfig['requestObjects.requireSignedRequestObject']
 			) {
 				this.require_signed_request_object = true;
 			}

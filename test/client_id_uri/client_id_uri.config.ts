@@ -5,15 +5,16 @@ import getConfig from '../default.config.js';
 
 const config = getConfig();
 
+export const ApplicationConfig = {
+	'registration.enabled': true,
+	'registrationManagement.enabled': true
+};
+
 merge(config.features, {
 	registration: {
-		enabled: true,
 		idFactory() {
 			return new URL(`https://repo.clients.com/path?id=${nanoid()}`).href;
 		}
-	},
-	registrationManagement: {
-		enabled: true
 	}
 });
 

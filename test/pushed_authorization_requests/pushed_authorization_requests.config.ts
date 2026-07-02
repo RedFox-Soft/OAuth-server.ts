@@ -1,15 +1,6 @@
-import merge from 'lodash/merge.js';
-
 import getConfig from '../default.config.js';
 
 const config = getConfig();
-
-merge(config.features, {
-	claimsParameter: {
-		enabled: true
-	},
-	requestObjects: { enabled: true }
-});
 
 function allowUnregisteredClient(suffix, metadata) {
 	return {
@@ -23,7 +14,9 @@ function allowUnregisteredClient(suffix, metadata) {
 }
 
 export const ApplicationConfig = {
-	'par.enabled': true
+	'par.enabled': true,
+	'claimsParameter.enabled': true,
+	'requestObjects.enabled': true
 };
 
 export default {
