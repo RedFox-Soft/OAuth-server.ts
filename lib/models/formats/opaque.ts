@@ -30,15 +30,48 @@ export abstract class Opaque {
 		payload?: BaseModelPayload;
 	}> {
 		const now = epochTime();
-		const payload = {
-			iat: now,
-			...this.payload
+		const ctor = this.constructor as unknown as {
+			filterStoredPayload?: boolean;
 		};
-		if (typeof payload.exp === 'undefined') {
+
+		// Token models derive their storage contract from their TypeBox schema (this.model):
+		// only fields declared in the schema are persisted and instance-only fields are transient.
+		// Non-token models (Session, Grant, Interaction, …) keep storing their whole payload.
+		if (!ctor.filterStoredPayload) {
+			const payload = {
+				iat: now,
+				...this.payload
+			};
+			if (typeof payload.exp === 'undefined') {
+				payload.exp = now + this.expiration;
+			}
+			return { value: this.id, payload };
+		}
+
+		// Intentionally a SHALLOW, top-level filter — do NOT replace with Value.Clean().
+		// Value.Clean recurses into nested object schemas and prunes their contents, and several
+		// persisted fields are deliberately freeform (claims: t.Object({}), rar: t.Array(t.Object({})),
+		// …). Clean would strip those down to {} and silently drop id_token/userinfo claims. We
+		// select the schema's top-level keys and copy each value verbatim so nested content is kept.
+		// Undefined values are omitted so absent optionals don't appear in storage.
+		const model = (
+			this as unknown as { model: { properties: Record<string, unknown> } }
+		).model;
+		const source = this.payload as Record<string, unknown>;
+		const payload: Record<string, unknown> = {};
+		for (const key of Object.keys(model.properties)) {
+			if (source[key] !== undefined) {
+				payload[key] = source[key];
+			}
+		}
+		if (payload.iat === undefined) {
+			payload.iat = now;
+		}
+		if (payload.exp === undefined) {
 			payload.exp = now + this.expiration;
 		}
 
-		return { value: this.id, payload };
+		return { value: this.id, payload: payload as BaseModelPayload };
 	}
 	static async verify(
 		stored: Record<string, unknown>,

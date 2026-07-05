@@ -43,6 +43,10 @@ export type GrantPayloadType = Static<typeof GrantPayload>;
 export class Grant extends BaseToken<GrantPayloadType> {
 	model = GrantPayload;
 
+	// Grant is a BaseToken for infrastructure reuse but is a persisted aggregate, not a token
+	// with a schema-defined storage contract — it must persist its whole payload.
+	static filterStoredPayload = false;
+
 	constructor(payload: Partial<GrantPayloadType> = {}) {
 		super(payload);
 		this.payload.createdAt ||= Date.now();

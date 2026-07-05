@@ -40,6 +40,9 @@ export class IdToken {
 	client: Client;
 	available: Record<string, unknown>;
 	extra: Record<string, unknown> = {};
+	scope?: string;
+	mask?: Record<string, unknown>;
+	rejected?: string[];
 
 	constructor(client: Client, available: Record<string, unknown> = {}) {
 		this.available = available;

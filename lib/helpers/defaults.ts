@@ -297,6 +297,14 @@ function makeDefaults() {
 		pairwiseIdentifier,
 
 		/*
+		 * extraTokenClaims
+		 *
+		 * description: Function used to add additional claims to Access Tokens and Client
+		 *   Credentials tokens. The return value is assigned to the token's `extra` property.
+		 */
+		extraTokenClaims: () => undefined,
+
+		/*
 		 * renderError
 		 *
 		 * description: Function used to present errors to the User-Agent

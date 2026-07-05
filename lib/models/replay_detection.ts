@@ -6,10 +6,6 @@ import type { BaseModelPayloadType } from './base_model.js';
 export type ReplayDetectionPayloadType = BaseModelPayloadType & { iss: string };
 
 export class ReplayDetection extends BaseModel {
-	static get IN_PAYLOAD() {
-		return [...super.IN_PAYLOAD, 'iss'];
-	}
-
 	static async unique(iss: string, jti: string, exp: number) {
 		const id = crypto.hash('sha256', `${iss}${jti}`, 'base64url');
 

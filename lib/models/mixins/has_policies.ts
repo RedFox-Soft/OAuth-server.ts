@@ -31,8 +31,4 @@ export default (provider) => (superclass) =>
 				validate(provider, result.policies);
 			return result;
 		}
-
-		static get IN_PAYLOAD() {
-			return [...super.IN_PAYLOAD, 'policies'];
-		}
 	};

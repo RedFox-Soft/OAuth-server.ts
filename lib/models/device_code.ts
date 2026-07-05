@@ -1,14 +1,34 @@
+import { Type as t, type Static } from '@sinclair/typebox';
 import constantEquals from '../helpers/constant_equals.ts';
-import { BaseToken } from './base_token.js';
-import type { BaseTokenPayloadType } from './base_token.js';
+import {
+	BaseToken,
+	BaseTokenPayload,
+	SessionBoundPayload
+} from './base_token.js';
 
 import apply from './mixins/apply.ts';
 import consumable from './mixins/consumable.ts';
-import { authPayload } from './mixins/stores_auth.js';
+import { authPayloadModel } from './mixins/stores_auth.js';
 
-export type DeviceCodePayloadType = BaseTokenPayloadType;
+const DeviceCodePayload = t.Composite([
+	BaseTokenPayload,
+	SessionBoundPayload,
+	authPayloadModel,
+	t.Object({
+		consumed: t.Boolean(),
+		error: t.Optional(t.String()),
+		errorDescription: t.Optional(t.String()),
+		params: t.Optional(t.Unknown()),
+		userCode: t.Optional(t.String()),
+		inFlight: t.Optional(t.Boolean()),
+		deviceInfo: t.Optional(t.Unknown())
+	})
+]);
+export type DeviceCodePayloadType = Static<typeof DeviceCodePayload>;
 
 export class DeviceCode extends apply([consumable, BaseToken]) {
+	model = DeviceCodePayload;
+
 	static async findByUserCode(userCode, { ignoreExpiration = false } = {}) {
 		const stored = await this.adapter.findByUserCode(userCode);
 		if (!stored) return;
@@ -24,16 +44,4 @@ export class DeviceCode extends apply([consumable, BaseToken]) {
 	}
 
 	static isSessionBound = true;
-	static get IN_PAYLOAD() {
-		return [
-			...super.IN_PAYLOAD,
-			...authPayload,
-			'error',
-			'errorDescription',
-			'params',
-			'userCode',
-			'inFlight',
-			'deviceInfo'
-		];
-	}
 }

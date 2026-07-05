@@ -11,15 +11,3 @@ export const authPayloadModel = t.Object({
 	scope: t.Optional(t.String()),
 	sid: t.Optional(t.String())
 });
-
-export const authPayload = [
-	'accountId',
-	'acr',
-	'amr',
-	'authTime',
-	'claims',
-	'nonce',
-	'resource',
-	'scope',
-	'sid'
-];

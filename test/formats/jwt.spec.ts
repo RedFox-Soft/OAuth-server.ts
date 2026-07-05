@@ -1,9 +1,15 @@
-import { strict as assert } from 'node:assert';
 import * as crypto from 'node:crypto';
 import * as util from 'node:util';
 
-import { createSandbox } from 'sinon';
-import { expect } from 'chai';
+import {
+	describe,
+	it,
+	beforeAll,
+	afterEach,
+	expect,
+	spyOn,
+	mock
+} from 'bun:test';
 import base64url from 'base64url';
 
 import ResourceServer from '../../lib/helpers/resource_server.ts';
@@ -16,17 +22,19 @@ import { Client } from 'lib/models/client.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { ClientCredentials } from 'lib/models/client_credentials.js';
 
-const sinon = createSandbox();
-
 const generateKeyPair = util.promisify(crypto.generateKeyPair);
 function decode(b64urljson) {
 	return JSON.parse(base64url.decode(b64urljson));
 }
 
 describe('jwt format', () => {
-	before(bootstrap(import.meta.url));
+	beforeAll(async () => {
+		await bootstrap(import.meta.url)();
+	});
+
 	afterEach(function () {
 		provider.removeAllListeners();
+		mock.restore();
 	});
 
 	const accountId = 'account';
@@ -98,10 +106,8 @@ describe('jwt format', () => {
 		resourceServer
 	};
 
-	afterEach(sinon.restore);
-
 	describe('Resource Server Configuration', () => {
-		it('can be used to specify the signing algorithm', async function () {
+		it('can be used to specify the signing algorithm', async () => {
 			const resourceServer = new ResourceServer(resource, {
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
@@ -119,10 +125,10 @@ describe('jwt format', () => {
 			const jwt = await token.save();
 
 			const header = decode(jwt.split('.')[0]);
-			expect(header).to.have.property('alg', 'PS256');
+			expect(header).toHaveProperty('alg', 'PS256');
 		});
 
-		it('uses the default idtokensigningalg by default (no jwt)', async function () {
+		it('uses the default idtokensigningalg by default (no jwt)', async () => {
 			const resourceServer = new ResourceServer(resource, {
 				accessTokenFormat: 'jwt',
 				audience: 'foo'
@@ -137,14 +143,14 @@ describe('jwt format', () => {
 			const jwt = await token.save();
 
 			const header = decode(jwt.split('.')[0]);
-			expect(header).to.have.property('alg', 'RS256');
-			expect(header).to.have.property(
+			expect(header).toHaveProperty('alg', 'RS256');
+			expect(header).toHaveProperty(
 				'kid',
 				i(provider).keystore.selectForSign({ alg: 'RS256' })[0].kid
 			);
 		});
 
-		it('uses the default idtokensigningalg by default (jwt)', async function () {
+		it('uses the default idtokensigningalg by default (jwt)', async () => {
 			const resourceServer = new ResourceServer(resource, {
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
@@ -160,14 +166,14 @@ describe('jwt format', () => {
 			const jwt = await token.save();
 
 			const header = decode(jwt.split('.')[0]);
-			expect(header).to.have.property('alg', 'RS256');
-			expect(header).to.have.property(
+			expect(header).toHaveProperty('alg', 'RS256');
+			expect(header).toHaveProperty(
 				'kid',
 				i(provider).keystore.selectForSign({ alg: 'RS256' })[0].kid
 			);
 		});
 
-		it('can be used to specify the signing algorithm to be HMAC (buffer)', async function () {
+		it('can be used to specify the signing algorithm to be HMAC (buffer)', async () => {
 			const resourceServer = new ResourceServer(resource, {
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
@@ -185,11 +191,11 @@ describe('jwt format', () => {
 			const jwt = await token.save();
 
 			const header = decode(jwt.split('.')[0]);
-			expect(header).to.have.property('alg', 'HS256');
-			expect(header).not.to.have.property('kid');
+			expect(header).toHaveProperty('alg', 'HS256');
+			expect(header).not.toHaveProperty('kid');
 		});
 
-		it('can be used to specify the signing algorithm to be HMAC (CryptoKey)', async function () {
+		it('can be used to specify the signing algorithm to be HMAC (CryptoKey)', async () => {
 			const resourceServer = new ResourceServer(resource, {
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
@@ -214,11 +220,11 @@ describe('jwt format', () => {
 			const jwt = await token.save();
 
 			const header = decode(jwt.split('.')[0]);
-			expect(header).to.have.property('alg', 'HS256');
-			expect(header).not.to.have.property('kid');
+			expect(header).toHaveProperty('alg', 'HS256');
+			expect(header).not.toHaveProperty('kid');
 		});
 
-		it('kid must be a string (sign)', async function () {
+		it('kid must be a string (sign)', async () => {
 			const resourceServer = new ResourceServer(resource, {
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
@@ -233,16 +239,12 @@ describe('jwt format', () => {
 				...fullPayload,
 				resourceServer
 			});
-			return assert.rejects(token.save(), (err) => {
-				expect(err).to.be.an('error');
-				expect(err.message).to.equal(
-					'jwt.sign.kid must be a string when provided'
-				);
-				return true;
-			});
+			await expect(token.save()).rejects.toThrow(
+				'jwt.sign.kid must be a string when provided'
+			);
 		});
 
-		it('kid must be a string (encrypt)', async function () {
+		it('kid must be a string (encrypt)', async () => {
 			const resourceServer = new ResourceServer(resource, {
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
@@ -262,16 +264,12 @@ describe('jwt format', () => {
 				...fullPayload,
 				resourceServer
 			});
-			return assert.rejects(token.save(), (err) => {
-				expect(err).to.be.an('error');
-				expect(err.message).to.equal(
-					'jwt.encrypt.kid must be a string when provided'
-				);
-				return true;
-			});
+			await expect(token.save()).rejects.toThrow(
+				'jwt.encrypt.kid must be a string when provided'
+			);
 		});
 
-		it('can be used to specify the signing algorithm to be HMAC (buffer w/ kid)', async function () {
+		it('can be used to specify the signing algorithm to be HMAC (buffer w/ kid)', async () => {
 			const resourceServer = new ResourceServer(resource, {
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
@@ -289,10 +287,10 @@ describe('jwt format', () => {
 			const jwt = await token.save();
 
 			const header = decode(jwt.split('.')[0]);
-			expect(header).to.have.property('kid', 'feb-2020');
+			expect(header).toHaveProperty('kid', 'feb-2020');
 		});
 
-		it('can be used to specify the signing algorithm to be HMAC (KeyObject)', async function () {
+		it('can be used to specify the signing algorithm to be HMAC (KeyObject)', async () => {
 			const resourceServer = new ResourceServer(resource, {
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
@@ -313,11 +311,11 @@ describe('jwt format', () => {
 			const jwt = await token.save();
 
 			const header = decode(jwt.split('.')[0]);
-			expect(header).to.have.property('alg', 'HS256');
-			expect(header).not.to.have.property('kid');
+			expect(header).toHaveProperty('alg', 'HS256');
+			expect(header).not.toHaveProperty('kid');
 		});
 
-		it('can be an encrypted JWT (Buffer)', async function () {
+		it('can be an encrypted JWT (Buffer)', async () => {
 			const resourceServer = new ResourceServer(resource, {
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
@@ -340,15 +338,15 @@ describe('jwt format', () => {
 			const jwt = await token.save();
 
 			const header = decode(jwt.split('.')[0]);
-			expect(header).to.have.property('alg', 'dir');
-			expect(header).to.have.property('enc', 'A128GCM');
-			expect(header).not.to.have.property('kid');
-			expect(header).to.have.property('typ', 'at+jwt');
-			expect(header).to.have.property('iss', ISSUER);
-			expect(header).to.have.property('aud', 'foo');
+			expect(header).toHaveProperty('alg', 'dir');
+			expect(header).toHaveProperty('enc', 'A128GCM');
+			expect(header).not.toHaveProperty('kid');
+			expect(header).toHaveProperty('typ', 'at+jwt');
+			expect(header).toHaveProperty('iss', ISSUER);
+			expect(header).toHaveProperty('aud', 'foo');
 		});
 
-		it('can be an encrypted JWT (KeyObject)', async function () {
+		it('can be an encrypted JWT (KeyObject)', async () => {
 			const resourceServer = new ResourceServer(resource, {
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
@@ -371,15 +369,15 @@ describe('jwt format', () => {
 			const jwt = await token.save();
 
 			const header = decode(jwt.split('.')[0]);
-			expect(header).to.have.property('alg', 'dir');
-			expect(header).to.have.property('enc', 'A128GCM');
-			expect(header).not.to.have.property('kid');
-			expect(header).to.have.property('typ', 'at+jwt');
-			expect(header).to.have.property('iss', ISSUER);
-			expect(header).to.have.property('aud', 'foo');
+			expect(header).toHaveProperty('alg', 'dir');
+			expect(header).toHaveProperty('enc', 'A128GCM');
+			expect(header).not.toHaveProperty('kid');
+			expect(header).toHaveProperty('typ', 'at+jwt');
+			expect(header).toHaveProperty('iss', ISSUER);
+			expect(header).toHaveProperty('aud', 'foo');
 		});
 
-		it('can be an encrypted JWT (CryptoKey)', async function () {
+		it('can be an encrypted JWT (CryptoKey)', async () => {
 			const resourceServer = new ResourceServer(resource, {
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
@@ -406,15 +404,15 @@ describe('jwt format', () => {
 			const jwt = await token.save();
 
 			const header = decode(jwt.split('.')[0]);
-			expect(header).to.have.property('alg', 'dir');
-			expect(header).to.have.property('enc', 'A128GCM');
-			expect(header).not.to.have.property('kid');
-			expect(header).to.have.property('typ', 'at+jwt');
-			expect(header).to.have.property('iss', ISSUER);
-			expect(header).to.have.property('aud', 'foo');
+			expect(header).toHaveProperty('alg', 'dir');
+			expect(header).toHaveProperty('enc', 'A128GCM');
+			expect(header).not.toHaveProperty('kid');
+			expect(header).toHaveProperty('typ', 'at+jwt');
+			expect(header).toHaveProperty('iss', ISSUER);
+			expect(header).toHaveProperty('aud', 'foo');
 		});
 
-		it('can be an encrypted JWT w/ kid', async function () {
+		it('can be an encrypted JWT w/ kid', async () => {
 			const resourceServer = new ResourceServer(resource, {
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
@@ -438,10 +436,10 @@ describe('jwt format', () => {
 			const jwt = await token.save();
 
 			const header = decode(jwt.split('.')[0]);
-			expect(header).to.have.property('kid', 'feb-2020');
+			expect(header).toHaveProperty('kid', 'feb-2020');
 		});
 
-		it('can be a nested JWT (explicit)', async function () {
+		it('can be a nested JWT (explicit)', async () => {
 			const resourceServer = new ResourceServer(resource, {
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
@@ -467,15 +465,15 @@ describe('jwt format', () => {
 			const jwt = await token.save();
 
 			const header = decode(jwt.split('.')[0]);
-			expect(header).to.have.property('alg', 'ECDH-ES');
-			expect(header).to.have.property('enc', 'A128GCM');
-			expect(header).to.have.property('cty', 'at+jwt');
-			expect(header).to.have.property('iss', ISSUER);
-			expect(header).to.have.property('aud', 'foo');
-			expect(header).not.to.have.property('kid');
+			expect(header).toHaveProperty('alg', 'ECDH-ES');
+			expect(header).toHaveProperty('enc', 'A128GCM');
+			expect(header).toHaveProperty('cty', 'at+jwt');
+			expect(header).toHaveProperty('iss', ISSUER);
+			expect(header).toHaveProperty('aud', 'foo');
+			expect(header).not.toHaveProperty('kid');
 		});
 
-		it('can be a nested JWT w/ kid', async function () {
+		it('can be a nested JWT w/ kid', async () => {
 			const resourceServer = new ResourceServer(resource, {
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
@@ -502,10 +500,10 @@ describe('jwt format', () => {
 			const jwt = await token.save();
 
 			const header = decode(jwt.split('.')[0]);
-			expect(header).to.have.property('kid', 'feb-2020');
+			expect(header).toHaveProperty('kid', 'feb-2020');
 		});
 
-		it('can be a nested JWT (implicit signing alg)', async function () {
+		it('can be a nested JWT (implicit signing alg)', async () => {
 			const resourceServer = new ResourceServer(resource, {
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
@@ -529,14 +527,14 @@ describe('jwt format', () => {
 			const jwt = await token.save();
 
 			const header = decode(jwt.split('.')[0]);
-			expect(header).to.have.property('alg', 'ECDH-ES');
-			expect(header).to.have.property('enc', 'A128GCM');
-			expect(header).to.have.property('cty', 'at+jwt');
-			expect(header).to.have.property('iss', ISSUER);
-			expect(header).to.have.property('aud', 'foo');
+			expect(header).toHaveProperty('alg', 'ECDH-ES');
+			expect(header).toHaveProperty('enc', 'A128GCM');
+			expect(header).toHaveProperty('cty', 'at+jwt');
+			expect(header).toHaveProperty('iss', ISSUER);
+			expect(header).toHaveProperty('aud', 'foo');
 		});
 
-		it('ensures "none" JWS algorithm cannot be used', async function () {
+		it('ensures "none" JWS algorithm cannot be used', async () => {
 			const resourceServer = new ResourceServer(resource, {
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
@@ -553,16 +551,12 @@ describe('jwt format', () => {
 				...fullPayload,
 				resourceServer
 			});
-			return assert.rejects(token.save(), (err) => {
-				expect(err).to.be.an('error');
-				expect(err.message).to.equal(
-					'JWT Access Tokens may not use JWS algorithm "none"'
-				);
-				return true;
-			});
+			await expect(token.save()).rejects.toThrow(
+				'JWT Access Tokens may not use JWS algorithm "none"'
+			);
 		});
 
-		it('ensures HMAC JWS algorithms get a key', async function () {
+		it('ensures HMAC JWS algorithms get a key', async () => {
 			const resourceServer = new ResourceServer(resource, {
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
@@ -579,16 +573,12 @@ describe('jwt format', () => {
 				...fullPayload,
 				resourceServer
 			});
-			return assert.rejects(token.save(), (err) => {
-				expect(err).to.be.an('error');
-				expect(err.message).to.equal(
-					'missing jwt.sign.key Resource Server configuration'
-				);
-				return true;
-			});
+			await expect(token.save()).rejects.toThrow(
+				'missing jwt.sign.key Resource Server configuration'
+			);
 		});
 
-		it('ensures HMAC JWS algorithms get a secret key (1/2)', async function () {
+		it('ensures HMAC JWS algorithms get a secret key (1/2)', async () => {
 			const resourceServer = new ResourceServer(resource, {
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
@@ -607,16 +597,12 @@ describe('jwt format', () => {
 				...fullPayload,
 				resourceServer
 			});
-			return assert.rejects(token.save(), (err) => {
-				expect(err).to.be.an('error');
-				expect(err.message).to.equal(
-					'jwt.sign.key Resource Server configuration must be a secret (symmetric) key'
-				);
-				return true;
-			});
+			await expect(token.save()).rejects.toThrow(
+				'jwt.sign.key Resource Server configuration must be a secret (symmetric) key'
+			);
 		});
 
-		it('ensures HMAC JWS algorithms get a secret key (1/2)', async function () {
+		it('ensures HMAC JWS algorithms get a secret key (2/2)', async () => {
 			const resourceServer = new ResourceServer(resource, {
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
@@ -635,16 +621,12 @@ describe('jwt format', () => {
 				...fullPayload,
 				resourceServer
 			});
-			return assert.rejects(token.save(), (err) => {
-				expect(err).to.be.an('error');
-				expect(err.message).to.equal(
-					'jwt.sign.key Resource Server configuration must be a secret (symmetric) key'
-				);
-				return true;
-			});
+			await expect(token.save()).rejects.toThrow(
+				'jwt.sign.key Resource Server configuration must be a secret (symmetric) key'
+			);
 		});
 
-		it('ensures Asymmetric JWS algorithms have a key in the provider keystore', async function () {
+		it('ensures Asymmetric JWS algorithms have a key in the provider keystore', async () => {
 			const resourceServer = new ResourceServer(resource, {
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
@@ -661,16 +643,12 @@ describe('jwt format', () => {
 				...fullPayload,
 				resourceServer
 			});
-			return assert.rejects(token.save(), (err) => {
-				expect(err).to.be.an('error');
-				expect(err.message).to.equal(
-					"resolved Resource Server jwt configuration has no corresponding key in the provider's keystore"
-				);
-				return true;
-			});
+			await expect(token.save()).rejects.toThrow(
+				"resolved Resource Server jwt configuration has no corresponding key in the provider's keystore"
+			);
 		});
 
-		it('ensures JWE key is public or secret', async function () {
+		it('ensures JWE key is public or secret', async () => {
 			const resourceServer = new ResourceServer(resource, {
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
@@ -690,16 +668,12 @@ describe('jwt format', () => {
 				...fullPayload,
 				resourceServer
 			});
-			return assert.rejects(token.save(), (err) => {
-				expect(err).to.be.an('error');
-				expect(err.message).to.equal(
-					'jwt.encrypt.key Resource Server configuration must be a secret (symmetric) or a public key'
-				);
-				return true;
-			});
+			await expect(token.save()).rejects.toThrow(
+				'jwt.encrypt.key Resource Server configuration must be a secret (symmetric) or a public key'
+			);
 		});
 
-		it('ensures Nested JWT when JWE encryption is a public one', async function () {
+		it('ensures Nested JWT when JWE encryption is a public one', async () => {
 			const resourceServer = new ResourceServer(resource, {
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
@@ -719,17 +693,13 @@ describe('jwt format', () => {
 				...fullPayload,
 				resourceServer
 			});
-			return assert.rejects(token.save(), (err) => {
-				expect(err).to.be.an('error');
-				expect(err.message).to.equal(
-					'missing jwt.sign Resource Server configuration'
-				);
-				return true;
-			});
+			await expect(token.save()).rejects.toThrow(
+				'missing jwt.sign Resource Server configuration'
+			);
 		});
 
 		for (const prop of ['alg', 'enc', 'key']) {
-			it(`ensures JWE Configuration has ${prop}`, async function () {
+			it(`ensures JWE Configuration has ${prop}`, async () => {
 				const resourceServer = new ResourceServer(resource, {
 					accessTokenFormat: 'jwt',
 					audience: 'foo',
@@ -750,34 +720,30 @@ describe('jwt format', () => {
 					...fullPayload,
 					resourceServer
 				});
-				return assert.rejects(token.save(), (err) => {
-					expect(err).to.be.an('error');
-					expect(err.message).to.equal(
-						`missing jwt.encrypt.${prop} Resource Server configuration`
-					);
-					return true;
-				});
+				await expect(token.save()).rejects.toThrow(
+					`missing jwt.encrypt.${prop} Resource Server configuration`
+				);
 			});
 		}
 	});
 
-	it('for AccessToken', async function () {
-		const upsert = sinon.spy(TestAdapter.for('AccessToken'), 'upsert');
+	it('for AccessToken', async () => {
+		const upsert = spyOn(TestAdapter.for('AccessToken'), 'upsert');
 		const client = await Client.find(clientId);
 		const token = new AccessToken({ client, ...fullPayload });
-		const issued = sinon.spy();
+		const issued = mock();
 		provider.on('access_token.issued', issued);
 		const jwt = await token.save();
 
-		sinon.assert.notCalled(upsert);
+		expect(upsert).not.toHaveBeenCalled();
 
-		const { jti } = issued.getCall(0).args[0];
+		const { jti } = issued.mock.calls[0][0];
 		const header = decode(jwt.split('.')[0]);
-		expect(header).to.have.property('typ', 'at+jwt');
+		expect(header).toHaveProperty('typ', 'at+jwt');
 		const { iat, exp, ...payload } = decode(jwt.split('.')[1]);
-		expect(iat).to.be.a('number');
-		expect(exp).to.be.a('number');
-		expect(payload).to.eql({
+		expect(iat).toBeTypeOf('number');
+		expect(exp).toBeTypeOf('number');
+		expect(payload).toEqual({
 			...extra,
 			aud,
 			client_id: clientId,
@@ -792,23 +758,23 @@ describe('jwt format', () => {
 		});
 	});
 
-	it('for pairwise AccessToken', async function () {
-		const upsert = sinon.spy(TestAdapter.for('AccessToken'), 'upsert');
+	it('for pairwise AccessToken', async () => {
+		const upsert = spyOn(TestAdapter.for('AccessToken'), 'upsert');
 		const client = await Client.find('pairwise');
 		const token = new AccessToken({ client, ...fullPayload });
-		const issued = sinon.spy();
+		const issued = mock();
 		provider.on('access_token.issued', issued);
 		const jwt = await token.save();
 
-		sinon.assert.notCalled(upsert);
+		expect(upsert).not.toHaveBeenCalled();
 
-		const { jti } = issued.getCall(0).args[0];
+		const { jti } = issued.mock.calls[0][0];
 		const header = decode(jwt.split('.')[0]);
-		expect(header).to.have.property('typ', 'at+jwt');
+		expect(header).toHaveProperty('typ', 'at+jwt');
 		const { iat, exp, ...payload } = decode(jwt.split('.')[1]);
-		expect(iat).to.be.a('number');
-		expect(exp).to.be.a('number');
-		expect(payload).to.eql({
+		expect(iat).toBeTypeOf('number');
+		expect(exp).toBeTypeOf('number');
+		expect(payload).toEqual({
 			...extra,
 			aud,
 			client_id: 'pairwise',
@@ -823,26 +789,26 @@ describe('jwt format', () => {
 		});
 	});
 
-	it('for ClientCredentials', async function () {
-		const upsert = sinon.spy(TestAdapter.for('ClientCredentials'), 'upsert');
+	it('for ClientCredentials', async () => {
+		const upsert = spyOn(TestAdapter.for('ClientCredentials'), 'upsert');
 		const client = await Client.find(clientId);
 		const token = new ClientCredentials({
 			client,
 			...fullPayload
 		});
-		const issued = sinon.spy();
+		const issued = mock();
 		provider.on('client_credentials.issued', issued);
 		const jwt = await token.save();
 
-		sinon.assert.notCalled(upsert);
+		expect(upsert).not.toHaveBeenCalled();
 
-		const { jti } = issued.getCall(0).args[0];
+		const { jti } = issued.mock.calls[0][0];
 		const header = decode(jwt.split('.')[0]);
-		expect(header).to.have.property('typ', 'at+jwt');
+		expect(header).toHaveProperty('typ', 'at+jwt');
 		const { iat, exp, ...payload } = decode(jwt.split('.')[1]);
-		expect(iat).to.be.a('number');
-		expect(exp).to.be.a('number');
-		expect(payload).to.eql({
+		expect(iat).toBeTypeOf('number');
+		expect(exp).toBeTypeOf('number');
+		expect(payload).toEqual({
 			...extra,
 			aud,
 			client_id: clientId,
@@ -862,7 +828,7 @@ describe('jwt format', () => {
 			i(provider).configuration.formats.customizers.jwt = undefined;
 		});
 
-		it('allows the payload to be extended', async function () {
+		it('allows the payload to be extended', async () => {
 			const client = await Client.find(clientId);
 			const accessToken = new AccessToken({
 				client,
@@ -870,9 +836,9 @@ describe('jwt format', () => {
 			});
 			accessToken.resourceServer = resourceServer;
 			i(provider).configuration.formats.customizers.jwt = (ctx, token, jwt) => {
-				expect(token).to.equal(accessToken);
-				expect(jwt).to.have.property('payload');
-				expect(jwt).to.have.property('header', undefined);
+				expect(token).toBe(accessToken);
+				expect(jwt).toHaveProperty('payload');
+				expect(jwt).toHaveProperty('header', undefined);
 				jwt.header = { customized: true, typ: 'foo' };
 				jwt.payload.customized = true;
 				jwt.payload.iss = 'foobar';
@@ -880,11 +846,11 @@ describe('jwt format', () => {
 
 			const jwt = await accessToken.save();
 			const header = decode(jwt.split('.')[0]);
-			expect(header).to.have.property('customized', true);
-			expect(header).to.have.property('typ', 'foo');
+			expect(header).toHaveProperty('customized', true);
+			expect(header).toHaveProperty('typ', 'foo');
 			const payload = decode(jwt.split('.')[1]);
-			expect(payload).to.have.property('customized', true);
-			expect(payload).to.have.property('iss', 'foobar');
+			expect(payload).toHaveProperty('customized', true);
+			expect(payload).toHaveProperty('iss', 'foobar');
 		});
 	});
 });

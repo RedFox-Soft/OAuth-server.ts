@@ -9,24 +9,35 @@ import { ttl } from '../configs/liveTime.js';
 import { jwt } from './formats/jwt.js';
 import { Session } from './session.js';
 import { InvalidTarget } from 'lib/helpers/errors.js';
+import instance from '../helpers/weak_cache.ts';
+import { provider } from 'lib/provider.js';
 
 export const BaseTokenPayload = t.Composite([
 	BaseModelPayload,
 	t.Object({
-		clientId: t.String(),
-
-		// Properties below are required to be set by bound session for session bound tokens, but are optional to allow for non-session bound tokens to be used with the same model
-		expiresWithSession: t.Optional(t.Boolean()),
-		sessionUid: t.Optional(t.String()),
-		accountId: t.Optional(t.String()),
-		grantId: t.Optional(t.String()),
-
-		// RFC 8707 Resource Indicators for OAuth 2.0 for Client-Credentional Grant and Access Tokens
-		aud: t.Optional(t.String())
+		clientId: t.String()
 	})
 ]);
 
-export type BaseTokenPayloadType = Static<typeof BaseTokenPayload>;
+// Session-binding fields. Composed only into session-bound token schemas (access,
+// authorization code, refresh, device, backchannel) — deliberately NOT part of the shared
+// BaseTokenPayload so tokens like ClientCredentials do not persist them.
+export const SessionBoundPayload = t.Object({
+	expiresWithSession: t.Optional(t.Boolean()),
+	sessionUid: t.Optional(t.String()),
+	accountId: t.Optional(t.String()),
+	grantId: t.Optional(t.String())
+});
+
+// RFC 8707 Resource Indicators — composed only into schemas that persist an audience
+// (access tokens and client credentials).
+export const AudiencePayload = t.Object({
+	aud: t.Optional(t.String())
+});
+
+export type BaseTokenPayloadType = Static<typeof BaseTokenPayload> &
+	Static<typeof SessionBoundPayload> &
+	Static<typeof AudiencePayload>;
 
 export class BaseToken<
 	T extends BaseTokenPayloadType = BaseTokenPayloadType
@@ -48,6 +59,8 @@ export class BaseToken<
 			this.expiresIn = expiresIn;
 		}
 	}
+
+	static filterStoredPayload = true;
 
 	set client(client) {
 		this.payload.clientId = client.clientId;
@@ -73,7 +86,23 @@ export class BaseToken<
 		}
 	}
 
+	get extra() {
+		return (this.payload as { extra?: unknown }).extra;
+	}
+
+	set extra(value) {
+		(this.payload as { extra?: unknown }).extra = value;
+	}
+
 	async save() {
+		const { extraTokenClaims } = instance(provider).configuration;
+		const model = (this as unknown as { model: { properties: object } }).model;
+		if (extraTokenClaims && 'extra' in model.properties) {
+			const extra = await extraTokenClaims(als.getStore(), this);
+			if (extra !== undefined) {
+				this.extra = extra;
+			}
+		}
 		return super.save(this.remainingTTL);
 	}
 

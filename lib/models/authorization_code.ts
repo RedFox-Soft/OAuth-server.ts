@@ -1,10 +1,15 @@
 import { Type as t, type Static } from '@sinclair/typebox';
-import { BaseToken, BaseTokenPayload } from './base_token.js';
+import {
+	BaseToken,
+	BaseTokenPayload,
+	SessionBoundPayload
+} from './base_token.js';
 import consumable from './mixins/consumable.js';
 import { authPayloadModel } from './mixins/stores_auth.js';
 
 const AuthorizationCodePayload = t.Composite([
 	BaseTokenPayload,
+	SessionBoundPayload,
 	authPayloadModel,
 	t.Object({
 		codeChallenge: t.Optional(t.String()),

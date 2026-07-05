@@ -122,9 +122,9 @@ async function userInfo({ headers, set }) {
 			await account.claims('userinfo', scope, claims, rejected)
 		);
 
-		token.payload.scope = scope;
-		token.payload.mask = claims;
-		token.payload.rejected = rejected;
+		token.scope = scope;
+		token.mask = claims;
+		token.rejected = rejected;
 
 		const body = await token.issue({
 			expiresAt: accessToken.exp,

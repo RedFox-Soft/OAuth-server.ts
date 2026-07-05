@@ -6,8 +6,6 @@ import { Opaque } from './formats/opaque.js';
 import { provider } from 'lib/provider.js';
 import { adapter } from 'lib/adapters/index.js';
 
-const IN_PAYLOAD = ['iat', 'exp', 'jti', 'kind'];
-
 export const BaseModelPayload = t.Object({
 	jti: t.Optional(t.String()),
 	kind: t.Optional(t.String()),
@@ -65,6 +63,10 @@ export class BaseModel<
 		return this.payload.jti;
 	}
 
+	get jti() {
+		return this.payload.jti;
+	}
+
 	set id(value) {
 		this.payload.jti = value;
 	}
@@ -83,10 +85,6 @@ export class BaseModel<
 
 	get adapter() {
 		return adapter(this.constructor.name);
-	}
-
-	static get IN_PAYLOAD() {
-		return IN_PAYLOAD;
 	}
 
 	static async find<A extends BaseModelPayloadType, T extends BaseModel<A>>(

@@ -1,5 +1,12 @@
-import { createSandbox } from 'sinon';
-import { expect } from 'chai';
+import {
+	describe,
+	it,
+	beforeAll,
+	afterEach,
+	expect,
+	spyOn,
+	mock
+} from 'bun:test';
 
 import epochTime from '../../lib/helpers/epoch_time.ts';
 import bootstrap from '../test_helper.js';
@@ -12,16 +19,11 @@ import { AuthorizationCode } from 'lib/models/authorization_code.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { ClientCredentials } from 'lib/models/client_credentials.js';
 
-const sinon = createSandbox();
-
-const {
-	spy,
-	match: { string, number },
-	assert
-} = sinon;
-
 describe('opaque storage', () => {
-	before(bootstrap(import.meta.url));
+	beforeAll(async () => {
+		await bootstrap(import.meta.url)();
+	});
+
 	const accountId = 'account';
 	const claims = {};
 	const clientId = 'client';
@@ -90,26 +92,28 @@ describe('opaque storage', () => {
 		dpopJkt
 	};
 
-	afterEach(sinon.restore);
+	afterEach(() => mock.restore());
 
-	it('for AccessToken', async function () {
+	it('for AccessToken', async () => {
 		const kind = 'AccessToken';
-		const upsert = spy(TestAdapter.for('AccessToken'), 'upsert');
+		const adapter = TestAdapter.for(kind);
+		const upsert = spyOn(adapter, 'upsert');
 		const client = await Client.find(clientId);
 		const token = new AccessToken({ client, ...fullPayload });
 		await token.save();
 
-		expect(upsert.getCall(0).args[0]).to.have.lengthOf(43);
-		assert.calledWith(upsert, string, {
+		const [jti, saved] = upsert.mock.calls[0];
+		expect(jti).toHaveLength(43);
+		expect(saved).toEqual({
 			accountId,
 			aud,
 			claims,
 			clientId,
-			exp: number,
+			exp: expect.any(Number),
 			grantId,
 			gty,
-			iat: number,
-			jti: upsert.getCall(0).args[0],
+			iat: expect.any(Number),
+			jti,
 			kind,
 			scope,
 			sid,
@@ -121,21 +125,22 @@ describe('opaque storage', () => {
 		});
 	});
 
-	it('for AccessToken extraTokenClaims gets assigned upon save()', async function () {
+	it('for AccessToken extraTokenClaims gets assigned upon save()', async () => {
 		const client = await Client.find(clientId);
 		const token = new AccessToken({
 			client,
 			...fullPayload,
 			extra: undefined
 		});
-		expect(token.extra).to.eql(undefined);
+		expect(token.extra).toEqual(undefined);
 		await token.save();
-		expect(token.extra).to.eql(extra);
+		expect(token.extra).toEqual(extra);
 	});
 
-	it('for AuthorizationCode', async function () {
+	it('for AuthorizationCode', async () => {
 		const kind = 'AuthorizationCode';
-		const upsert = spy(TestAdapter.for('AuthorizationCode'), 'upsert');
+		const adapter = TestAdapter.for(kind);
+		const upsert = spyOn(adapter, 'upsert');
 		const client = await Client.find(clientId);
 		const token = new AuthorizationCode({
 			client,
@@ -143,8 +148,9 @@ describe('opaque storage', () => {
 		});
 		await token.save();
 
-		expect(upsert.getCall(0).args[0]).to.have.lengthOf(43);
-		assert.calledWith(upsert, string, {
+		const [jti, saved] = upsert.mock.calls[0];
+		expect(jti).toHaveLength(43);
+		expect(saved).toEqual({
 			accountId,
 			acr,
 			amr,
@@ -154,10 +160,10 @@ describe('opaque storage', () => {
 			codeChallenge,
 			codeChallengeMethod,
 			consumed,
-			exp: number,
+			exp: expect.any(Number),
 			grantId,
-			iat: number,
-			jti: upsert.getCall(0).args[0],
+			iat: expect.any(Number),
+			jti,
 			kind,
 			nonce,
 			redirectUri,
@@ -170,15 +176,17 @@ describe('opaque storage', () => {
 		});
 	});
 
-	it('for DeviceCode', async function () {
+	it('for DeviceCode', async () => {
 		const kind = 'DeviceCode';
-		const upsert = spy(TestAdapter.for('DeviceCode'), 'upsert');
+		const adapter = TestAdapter.for(kind);
+		const upsert = spyOn(adapter, 'upsert');
 		const client = await Client.find(clientId);
 		const token = new DeviceCode({ client, ...fullPayload });
 		await token.save();
 
-		expect(upsert.getCall(0).args[0]).to.have.lengthOf(43);
-		assert.calledWith(upsert, string, {
+		const [jti, saved] = upsert.mock.calls[0];
+		expect(jti).toHaveLength(43);
+		expect(saved).toEqual({
 			accountId,
 			acr,
 			amr,
@@ -189,10 +197,10 @@ describe('opaque storage', () => {
 			deviceInfo,
 			error,
 			errorDescription,
-			exp: number,
+			exp: expect.any(Number),
 			grantId,
-			iat: number,
-			jti: upsert.getCall(0).args[0],
+			iat: expect.any(Number),
+			jti,
 			kind,
 			nonce,
 			params,
@@ -206,12 +214,10 @@ describe('opaque storage', () => {
 		});
 	});
 
-	it('for BackchannelAuthenticationRequest', async function () {
+	it('for BackchannelAuthenticationRequest', async () => {
 		const kind = 'BackchannelAuthenticationRequest';
-		const upsert = spy(
-			TestAdapter.for('BackchannelAuthenticationRequest'),
-			'upsert'
-		);
+		const adapter = TestAdapter.for(kind);
+		const upsert = spyOn(adapter, 'upsert');
 		const client = await Client.find(clientId);
 		const token = new provider.BackchannelAuthenticationRequest({
 			client,
@@ -219,8 +225,9 @@ describe('opaque storage', () => {
 		});
 		await token.save();
 
-		expect(upsert.getCall(0).args[0]).to.have.lengthOf(43);
-		assert.calledWith(upsert, string, {
+		const [jti, saved] = upsert.mock.calls[0];
+		expect(jti).toHaveLength(43);
+		expect(saved).toEqual({
 			accountId,
 			acr,
 			amr,
@@ -230,10 +237,10 @@ describe('opaque storage', () => {
 			consumed,
 			error,
 			errorDescription,
-			exp: number,
+			exp: expect.any(Number),
 			grantId,
-			iat: number,
-			jti: upsert.getCall(0).args[0],
+			iat: expect.any(Number),
+			jti,
 			kind,
 			nonce,
 			params,
@@ -245,15 +252,17 @@ describe('opaque storage', () => {
 		});
 	});
 
-	it('for RefreshToken', async function () {
+	it('for RefreshToken', async () => {
 		const kind = 'RefreshToken';
-		const upsert = spy(TestAdapter.for('RefreshToken'), 'upsert');
+		const adapter = TestAdapter.for(kind);
+		const upsert = spyOn(adapter, 'upsert');
 		const client = await Client.find(clientId);
 		const token = new RefreshToken({ client, ...fullPayload });
 		await token.save();
 
-		expect(upsert.getCall(0).args[0]).to.have.lengthOf(43);
-		assert.calledWith(upsert, string, {
+		const [jti, saved] = upsert.mock.calls[0];
+		expect(jti).toHaveLength(43);
+		expect(saved).toEqual({
 			accountId,
 			acr,
 			amr,
@@ -263,11 +272,11 @@ describe('opaque storage', () => {
 			rotations,
 			clientId,
 			consumed,
-			exp: number,
+			exp: expect.any(Number),
 			grantId,
 			gty,
-			iat: number,
-			jti: upsert.getCall(0).args[0],
+			iat: expect.any(Number),
+			jti,
 			kind,
 			nonce,
 			resource,
@@ -280,9 +289,10 @@ describe('opaque storage', () => {
 		});
 	});
 
-	it('for ClientCredentials', async function () {
+	it('for ClientCredentials', async () => {
 		const kind = 'ClientCredentials';
-		const upsert = spy(TestAdapter.for('ClientCredentials'), 'upsert');
+		const adapter = TestAdapter.for(kind);
+		const upsert = spyOn(adapter, 'upsert');
 		const client = await Client.find(clientId);
 		const token = new ClientCredentials({
 			client,
@@ -290,13 +300,14 @@ describe('opaque storage', () => {
 		});
 		await token.save();
 
-		expect(upsert.getCall(0).args[0]).to.have.lengthOf(43);
-		assert.calledWith(upsert, string, {
+		const [jti, saved] = upsert.mock.calls[0];
+		expect(jti).toHaveLength(43);
+		expect(saved).toEqual({
 			aud,
 			clientId,
-			exp: number,
-			iat: number,
-			jti: upsert.getCall(0).args[0],
+			exp: expect.any(Number),
+			iat: expect.any(Number),
+			jti,
 			kind,
 			scope,
 			'x5t#S256': s256,
@@ -305,40 +316,43 @@ describe('opaque storage', () => {
 		});
 	});
 
-	it('for ClientCredentials extraTokenClaims gets assigned upon save()', async function () {
+	it('for ClientCredentials extraTokenClaims gets assigned upon save()', async () => {
 		const client = await Client.find(clientId);
 		const token = new ClientCredentials({
 			client,
 			...fullPayload,
 			extra: undefined
 		});
-		expect(token.extra).to.eql(undefined);
+		expect(token.extra).toEqual(undefined);
 		await token.save();
-		expect(token.extra).to.eql(extra);
+		expect(token.extra).toEqual(extra);
 	});
 
-	it('for InitialAccessToken', async function () {
+	it('for InitialAccessToken', async () => {
 		const kind = 'InitialAccessToken';
-		const upsert = spy(TestAdapter.for('InitialAccessToken'), 'upsert');
+		const adapter = TestAdapter.for(kind);
+		const upsert = spyOn(adapter, 'upsert');
 		const token = new provider.InitialAccessToken({
 			expiresIn: 100,
 			...fullPayload
 		});
 		await token.save();
 
-		expect(upsert.getCall(0).args[0]).to.have.lengthOf(43);
-		assert.calledWith(upsert, string, {
-			exp: number,
-			iat: number,
-			jti: upsert.getCall(0).args[0],
+		const [jti, saved] = upsert.mock.calls[0];
+		expect(jti).toHaveLength(43);
+		expect(saved).toEqual({
+			exp: expect.any(Number),
+			iat: expect.any(Number),
+			jti,
 			kind,
 			policies
 		});
 	});
 
-	it('for RegistrationAccessToken', async function () {
+	it('for RegistrationAccessToken', async () => {
 		const kind = 'RegistrationAccessToken';
-		const upsert = spy(TestAdapter.for('RegistrationAccessToken'), 'upsert');
+		const adapter = TestAdapter.for(kind);
+		const upsert = spyOn(adapter, 'upsert');
 		const client = await Client.find(clientId);
 		const token = new provider.RegistrationAccessToken({
 			client,
@@ -347,14 +361,15 @@ describe('opaque storage', () => {
 		});
 		await token.save();
 
-		expect(upsert.getCall(0).args[0]).to.have.lengthOf(43);
-		assert.calledWith(upsert, string, {
+		const [jti, saved] = upsert.mock.calls[0];
+		expect(jti).toHaveLength(43);
+		expect(saved).toEqual({
 			clientId,
 			kind,
 			policies,
-			jti: upsert.getCall(0).args[0],
-			iat: number,
-			exp: number
+			jti,
+			iat: expect.any(Number),
+			exp: expect.any(Number)
 		});
 	});
 });

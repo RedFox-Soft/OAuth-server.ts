@@ -1,33 +1,47 @@
-/* eslint-disable prefer-const */
-
 import { parse as parseUrl } from 'node:url';
 
-import { expect } from 'chai';
+import {
+	describe,
+	it,
+	beforeAll,
+	afterAll,
+	expect,
+	spyOn,
+	mock
+} from 'bun:test';
 
-import bootstrap, { skipConsent } from '../test_helper.js';
+import bootstrap, { agent } from '../test_helper.js';
 import { decode as decodeJWT } from '../../lib/helpers/jwt.ts';
 import { provider } from 'lib/provider.js';
+import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
-const redirect_uri = 'https://client.example.com/cb';
 const scope = 'openid email offline_access';
-const client_id = 'client';
-const prompt = 'consent';
 
 describe('configuration conformIdTokenClaims=true', () => {
-	before(bootstrap(import.meta.url, { config: 'conform' }));
-	before(function () {
-		return this.login({
+	let setup = null;
+	let cookie = null;
+	beforeAll(async () => {
+		setup = await bootstrap(import.meta.url, { config: 'conform' })();
+		spyOn(OIDCContext.prototype, 'promptPending').mockReturnValue(false);
+		cookie = await setup.login({
 			scope,
 			claims: JSON.stringify({ id_token: { gender: null, email: null } }),
 			rejectedClaims: ['email_verified']
 		});
 	});
 
-	skipConsent();
+	afterAll(function () {
+		mock.restore();
+	});
 
 	describe('response_type=code', () => {
-		before(async function () {
+		let userinfo = null;
+		let userinfoSigned = null;
+		let tokenIdToken = null;
+		let refreshIdToken = null;
+
+		beforeAll(async () => {
 			const client = await provider.Client.find('client');
 
 			const claims = JSON.stringify({
@@ -38,94 +52,73 @@ describe('configuration conformIdTokenClaims=true', () => {
 			const auth = new AuthorizationRequest({
 				scope,
 				claims,
-				prompt
+				prompt: 'consent'
 			});
 
-			let id_token;
-			let refresh_token;
-			let code;
-			let access_token;
+			const authResponse = await agent.auth.get({
+				query: auth.params,
+				headers: { cookie }
+			});
+			expect(authResponse.status).toBe(303);
+			auth.validateClientLocation(authResponse.response);
 
 			const {
-				headers: { location }
-			} = await this.agent
-				.get('/auth')
-				.query(auth)
-				.expect(303)
-				.expect(auth.validateClientLocation);
+				query: { code }
+			} = parseUrl(authResponse.headers.get('location'), true);
 
-			({
-				query: { code, id_token, access_token }
-			} = parseUrl(location, true));
+			const tokenRes = await auth.getToken(code);
+			expect(tokenRes.status).toBe(200);
+			tokenIdToken = tokenRes.data.id_token;
+			const refresh_token = tokenRes.data.refresh_token;
 
-			this.authorization = { id_token };
-
-			({
-				body: { id_token, refresh_token }
-			} = await this.agent
-				.post('/token')
-				.send({
-					client_id,
-					code,
-					grant_type: 'authorization_code',
-					code_verifier: auth.code_verifier,
-					redirect_uri
-				})
-				.type('form')
-				.expect(200));
-
-			this.token = { id_token };
-
-			({
-				body: { id_token, access_token }
-			} = await this.agent
-				.post('/token')
-				.send({ client_id, grant_type: 'refresh_token', refresh_token })
-				.type('form')
-				.expect(200));
-
-			this.refresh = { id_token };
+			const refreshRes = await agent.token.post(
+				{
+					grant_type: 'refresh_token',
+					refresh_token
+				},
+				{ headers: AuthorizationRequest.basicAuthHeader('client', 'secret') }
+			);
+			expect(refreshRes.status).toBe(200);
+			refreshIdToken = refreshRes.data.id_token;
+			const access_token = refreshRes.data.access_token;
 
 			if (access_token) {
-				let userinfo;
 				delete client.userinfoSignedResponseAlg;
-				({ body: userinfo } = await this.agent
-					.get('/me')
-					.auth(access_token, { type: 'bearer' })
-					.expect(200));
-				this.userinfo = userinfo;
+				const uiRes = await agent.userinfo.get({
+					headers: { authorization: `Bearer ${access_token}` }
+				});
+				userinfo = uiRes.data;
 
 				client.userinfoSignedResponseAlg = 'HS256';
 				await provider.Client.find('client');
-				({ text: userinfo } = await this.agent
-					.get('/me')
-					.auth(access_token, { type: 'bearer' })
-					.expect(200));
-				this.userinfoSigned = userinfo;
+				const uiSignedRes = await agent.userinfo.get({
+					headers: { authorization: `Bearer ${access_token}` }
+				});
+				userinfoSigned = uiSignedRes.data;
 			}
 		});
 
 		it('userinfo has scope requested claims', function () {
-			expect(this.userinfo).to.contain.keys('email', 'gender');
-			expect(this.userinfo).not.to.contain.keys('email_verified');
+			expect(userinfo).toContainKeys(['email', 'gender']);
+			expect(userinfo).not.toContainKeys(['email_verified']);
 		});
 
 		it('signed userinfo has scope requested claims', function () {
-			const { payload } = decodeJWT(this.userinfoSigned);
-			expect(payload).to.contain.keys('email', 'gender');
-			expect(payload).not.to.contain.keys('email_verified');
+			const { payload } = decodeJWT(userinfoSigned);
+			expect(payload).toContainKeys(['email', 'gender']);
+			expect(payload).not.toContainKeys(['email_verified']);
 		});
 
 		it('token endpoint id_token does not have scope requested claims', function () {
-			const { payload } = decodeJWT(this.token.id_token);
-			expect(payload).to.contain.keys('gender', 'email');
-			expect(payload).not.to.contain.keys('email_verified');
+			const { payload } = decodeJWT(tokenIdToken);
+			expect(payload).toContainKeys(['gender', 'email']);
+			expect(payload).not.toContainKeys(['email_verified']);
 		});
 
 		it('refreshed id_token does not have scope requested claims', function () {
-			const { payload } = decodeJWT(this.refresh.id_token);
-			expect(payload).to.contain.keys('gender', 'email');
-			expect(payload).not.to.contain.keys('email_verified');
+			const { payload } = decodeJWT(refreshIdToken);
+			expect(payload).toContainKeys(['gender', 'email']);
+			expect(payload).not.toContainKeys(['email_verified']);
 		});
 	});
 });

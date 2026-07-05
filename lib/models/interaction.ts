@@ -69,22 +69,4 @@ export class Interaction extends BaseModel {
 		}
 		return this.save(this.exp - epochTime());
 	}
-
-	static get IN_PAYLOAD() {
-		return [
-			...super.IN_PAYLOAD,
-			'cookieID',
-			'session',
-			'params',
-			'prompt',
-			'result',
-			'returnTo',
-			'trusted',
-			'grantId',
-			'lastSubmission',
-			'deviceCode',
-			'cid',
-			'parJti'
-		];
-	}
 }

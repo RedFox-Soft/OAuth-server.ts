@@ -23,6 +23,7 @@ import { backchannelAuth, deviceAuth } from './actions/authorization/device.js';
 import { introspect } from './actions/introspection.js';
 import { logoutAction, logoutConfirmAction } from './actions/end_session.js';
 import { revocation } from './actions/revocation.js';
+import { jwks } from './actions/jwks.js';
 import { healthCheck } from './actions/health.js';
 import { InvalidDpopProof, UseDpopNonce } from './helpers/validate_dpop.js';
 
@@ -73,6 +74,7 @@ export const elysia = new Elysia({ strictPath: true, normalize: false })
 	.use(staticPlugin({ assets: 'public' }))
 	.use(nocache)
 	.use(discovery)
+	.use(jwks)
 	.use(authGet)
 	.use(authPost)
 	.use(deviceAuth)
