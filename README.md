@@ -29,7 +29,7 @@ OAuth-server.ts is a fully open-source, standards-compliant authorization server
 - **OAuth 2.0 flows** — Authorization Code, Client Credentials, and Refresh Token, including PKCE for public clients
 - **OpenID Connect** — Full OIDC Core 1.0 support with ID tokens, UserInfo endpoint, and discovery
 - **DPoP** — Sender-constrained access tokens via Demonstration of Proof-of-Possession ([RFC 9449](https://datatracker.ietf.org/doc/html/rfc9449))
-- **JWT tokens** — RS256-signed access and ID tokens with JWKS endpoint and key rotation
+- **JWT tokens** — RS256-signed access and ID tokens with JWKS endpoint and key rotation; signing keys are stored in the database and auto-generated on first run
 - **Token introspection & revocation** — RFC 7662 and RFC 7009 compliant endpoints
 - **Pushed Authorization Requests (PAR)** — RFC 9126 support
 - **Client registration** — Static and dynamic client registration with metadata validation
@@ -50,22 +50,35 @@ cd oauth-server-ts
 # Install dependencies
 bun install
 
-# Create .env — set MONGODB_URI, DATABASE_NAME, ISSUER, and JWKS
+# Create .env — set MONGODB_URI, DATABASE_NAME, and ISSUER
+
+# Provision the database schema (creates collections + an initial RS256 signing key)
+bun run db:setup
 
 # Start the server
 bun start
 ```
 
-The server starts on `http://localhost:3000` by default.
+The server starts on `http://localhost:3000` by default. Schema provisioning creates the initial
+signing key, so no key configuration is required. If the server ever starts against an empty key
+store it also generates and persists one automatically.
 
 ## Configuration
 
-| Variable        | Description                                     | Example                     |
-| --------------- | ----------------------------------------------- | --------------------------- |
-| `MONGODB_URI`   | MongoDB connection string                       | `mongodb://localhost:27017` |
-| `DATABASE_NAME` | Name of the database to use                     | `OAuth`                     |
-| `ISSUER`        | Canonical URL of your authorization server      | `https://auth.example.com`  |
-| `JWKS`          | JSON Web Key Set (RS256) used for token signing | `{"keys": [...]}`           |
+| Variable        | Description                                | Example                     |
+| --------------- | ------------------------------------------ | --------------------------- |
+| `MONGODB_URI`   | MongoDB connection string                  | `mongodb://localhost:27017` |
+| `DATABASE_NAME` | Name of the database to use                | `OAuth`                     |
+| `ISSUER`        | Canonical URL of your authorization server | `https://auth.example.com`  |
+
+### Signing keys
+
+Signing and decryption keys are stored in the database via the `jwksStore` adapter, not in an
+environment variable. The initial RS256 signing key is created when you provision the schema
+(`bun run db:setup`); the server also generates and persists one automatically if it starts against
+an empty store. On subsequent restarts the existing keys are reused. Keys are loaded once at startup
+— to rotate, update the store and reload the server. Additional keys (for example encryption keys)
+can be provisioned by populating the store.
 
 ## Docker
 

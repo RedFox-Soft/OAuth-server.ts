@@ -1,5 +1,5 @@
 import { getAlgorithm } from 'lib/configs/verifyJWKs.js';
-import { JWKS_KEYS } from './env.js';
+import { JWKS_KEYS } from './keys.js';
 import {
 	type asymmetricSigningAlgType,
 	type encryptionEncValues,

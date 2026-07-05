@@ -14,5 +14,6 @@ export const COLLECTIONS = [
 	'Session',
 	'Interaction',
 	'PushedAuthorizationRequest',
-	'BackchannelAuthenticationRequest'
+	'BackchannelAuthenticationRequest',
+	'jwks'
 ] as const;

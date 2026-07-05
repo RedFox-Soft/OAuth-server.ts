@@ -1,5 +1,6 @@
 import { MongoClient, ServerApiVersion } from 'mongodb';
 import { COLLECTIONS } from './collections';
+import { generateJWKS } from '../lib/helpers/jwks.js';
 
 if (!process.env.MONGODB_URI || !process.env.DATABASE_NAME) {
 	throw new Error(
@@ -52,11 +53,32 @@ for (const name of COLLECTIONS) {
 					}
 				]
 			: []),
-		{
-			key: { expiresAt: 1 },
-			expireAfterSeconds: 0
-		}
+		// Signing keys never expire; they are addressed by a unique kid.
+		...(name === 'jwks'
+			? [
+					{
+						key: { kid: 1 },
+						unique: true
+					}
+				]
+			: [
+					{
+						key: { expiresAt: 1 },
+						expireAfterSeconds: 0
+					}
+				])
 	]);
+}
+
+// Provision the initial signing key at schema-creation time so a freshly created database already
+// holds a persisted RS256 signing key. The runtime loader (lib/configs/keys.ts) keeps an equivalent
+// generate-on-empty fallback for the in-memory adapter and any un-provisioned store.
+const jwks = db.collection('jwks');
+if ((await jwks.countDocuments()) === 0) {
+	const {
+		keys: [key]
+	} = await generateJWKS('RS256');
+	await jwks.insertOne({ ...key, updatedAt: new Date() });
 }
 
 dbClient.close();

@@ -70,7 +70,7 @@ import { OIDCProviderError } from './helpers/errors.ts';
 import * as models from './models/index.ts';
 import { Client } from './models/client.js';
 import { IdToken } from './models/id_token.js';
-import { JWKS_KEYS } from './configs/env.js';
+import { JWKS_KEYS } from './configs/keys.js';
 import KeyStore from './helpers/keystore.js';
 import { Grant } from './models/grant.js';
 

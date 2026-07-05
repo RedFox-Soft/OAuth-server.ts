@@ -37,10 +37,15 @@ bun run watch           # watch-mode bundle for loginClient.tsx
 | Variable        | Required  | Description                                            |
 | --------------- | --------- | ------------------------------------------------------ |
 | `ISSUER`        | yes       | Canonical server URL (e.g. `https://auth.example.com`) |
-| `JWKS`          | yes       | JSON stringified JWKS with private RS256 keys          |
 | `MONGODB_URI`   | yes       | MongoDB connection string                              |
 | `DATABASE_NAME` | yes       | MongoDB database name                                  |
 | `NODE_ENV`      | test only | Set to `test` to use in-memory adapter                 |
+
+Signing/decryption keys are **not** an environment variable: they are stored via the `jwksStore`
+adapter and loaded once at startup. The initial RS256 key is provisioned during schema creation
+(`bun run db:setup` → `database/mongodb.ts`); the loader (`lib/configs/keys.ts`) also auto-generates
+and persists one if it finds an empty store (in-memory adapter, un-provisioned store). In tests,
+keys are seeded into the in-memory `jwksStore` by `test/preload.ts`.
 
 The test suite loads `.env.test` automatically via Bun.
 

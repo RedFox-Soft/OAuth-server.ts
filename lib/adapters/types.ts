@@ -47,10 +47,10 @@ export interface UserStoreConstructor {
 }
 
 export interface JWKSStoreInstance {
-	get(keyId: string): Promise<Record<string, JWKS> | null>;
-	set(keyId: string, key: Record<string, JWKS>): Promise<void>;
+	get(keyId: string): Promise<JWKS | null>;
+	set(keyId: string, key: JWKS): Promise<void>;
 	delete(keyId: string): Promise<void>;
-	getAll(): Promise<Array<Record<string, JWKS>>>;
+	getAll(): Promise<JWKS[]>;
 }
 
 export interface JWKSStoreConstructor {

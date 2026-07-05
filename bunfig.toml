@@ -1,4 +1,5 @@
 [test]
+preload = ["./test/preload.ts"]
 coverageSkipTestFiles = true
 pathIgnorePatterns = [
 	"test/backchannel_logout/backchannel_logout.spec.ts",
