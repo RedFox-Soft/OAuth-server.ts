@@ -2,6 +2,7 @@ import { pathToFileURL } from 'node:url';
 import * as path from 'node:path';
 
 import { dirname } from 'desm';
+import { beforeAll, afterAll } from 'bun:test';
 import { expect } from 'chai';
 
 import base64url from 'base64url';
@@ -61,6 +62,37 @@ Object.defineProperties(Object.getPrototypeOf(provider), {
 const jwt = (token) => JSON.parse(base64url.decode(token.split('.')[1])).jti;
 
 export const agent = treaty(elysia);
+
+// Faithful port of oidc-provider's test helper: the leading arguments are interaction-policy
+// check reasons that must be made to "pass" (i.e. never trigger a prompt) for the wrapped cases,
+// and the final argument is the callback that registers the nested describe/it cases. The named
+// checks are disabled around the block and restored afterwards.
+export function passInteractionChecks(...args: unknown[]) {
+	const fn = args[args.length - 1] as () => void;
+	const reasons = args.slice(0, -1) as string[];
+	const disabled: Array<{ check: { check: unknown }; original: unknown }> = [];
+
+	beforeAll(() => {
+		const { policy } = instance(provider).configuration.interactions;
+		for (const prompt of policy) {
+			for (const check of prompt.checks) {
+				if (reasons.includes(check.reason)) {
+					disabled.push({ check, original: check.check });
+					check.check = () => false;
+				}
+			}
+		}
+	});
+
+	afterAll(() => {
+		for (const { check, original } of disabled) {
+			check.check = original;
+		}
+		disabled.length = 0;
+	});
+
+	return fn();
+}
 
 export function jsonToFormUrlEncoded(json: Record<string, unknown>) {
 	const searchParams = new URLSearchParams();

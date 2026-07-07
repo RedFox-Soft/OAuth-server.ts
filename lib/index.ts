@@ -20,6 +20,7 @@ import { ui } from './interactions/index.js';
 import { discovery } from './actions/discovery.js';
 import { userinfo } from './actions/userinfo.js';
 import { backchannelAuth, deviceAuth } from './actions/authorization/device.js';
+import { codeVerification } from './actions/code_verification.js';
 import { introspect } from './actions/introspection.js';
 import { logoutAction, logoutConfirmAction } from './actions/end_session.js';
 import { revocation } from './actions/revocation.js';
@@ -78,6 +79,7 @@ export const elysia = new Elysia({ strictPath: true, normalize: false })
 	.use(authGet)
 	.use(authPost)
 	.use(deviceAuth)
+	.use(codeVerification)
 	.use(backchannelAuth)
 	.use(par)
 	.use(introspect)

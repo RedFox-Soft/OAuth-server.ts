@@ -4,12 +4,7 @@ import {
 	certificateAuthorized,
 	certificateSubjectMatches
 } from '../addon/mtls.ts';
-import {
-	deviceInfo,
-	userCodeInputSource,
-	userCodeConfirmSource,
-	successSource
-} from '../addon/interactions.ts';
+import { deviceInfo } from '../addon/interactions.ts';
 import { renderError } from '../addon/error.ts';
 import { introspectionAllowedPolicy } from '../addon/introspection.ts';
 import {
@@ -147,15 +142,13 @@ function makeDefaults() {
 			},
 
 			/*
-			 * features.deviceFlow.* — Device Flow helper functions and HTML sources
+			 * features.deviceFlow.* — Device Flow helper functions
 			 *
-			 * deviceInfo, userCodeInputSource, userCodeConfirmSource, successSource
+			 * The end-user HTML pages are default server-rendered views in lib/html/device.tsx;
+			 * they are not overridable source functions.
 			 */
 			deviceFlow: {
-				deviceInfo,
-				userCodeInputSource,
-				userCodeConfirmSource,
-				successSource
+				deviceInfo
 			},
 
 			/*

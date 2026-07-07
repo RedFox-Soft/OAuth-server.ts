@@ -1,8 +1,9 @@
 import instance from '../../helpers/weak_cache.ts';
 import combinedScope from '../../helpers/combined_scope.ts';
+import { deviceSuccessPage } from '../../html/device.js';
 
 export default async function deviceVerificationResponse(oidc) {
-	const { configuration, features } = instance(oidc.provider);
+	const { configuration } = instance(oidc.provider);
 	const code = oidc.deviceCode;
 
 	const scopeSet = combinedScope(
@@ -11,33 +12,33 @@ export default async function deviceVerificationResponse(oidc) {
 		oidc.resourceServers
 	);
 
-	Object.assign(code, {
-		accountId: oidc.session.accountId,
+	Object.assign(code.payload, {
+		accountId: oidc.session.payload.accountId,
 		acr: oidc.acr,
 		amr: oidc.amr,
 		authTime: oidc.session.authTime(),
 		claims: oidc.claims,
 		grantId: oidc.session.grantIdFor(oidc.client.clientId),
 		scope: [...scopeSet].join(' '),
-		sessionUid: oidc.session.uid,
+		sessionUid: oidc.session.payload.uid,
 		resource: Object.keys(oidc.resourceServers)
 	});
 
-	if (Object.keys(code.claims).length === 0) {
-		delete code.claims;
+	if (Object.keys(code.payload.claims).length === 0) {
+		delete code.payload.claims;
 	}
 
-	switch (code.resource.length) {
+	switch (code.payload.resource.length) {
 		case 0:
-			delete code.resource;
+			delete code.payload.resource;
 			break;
 		case 1:
-			[code.resource] = code.resource;
+			[code.payload.resource] = code.payload.resource;
 			break;
 	}
 
 	if (await configuration.expiresWithSession({ oidc }, code)) {
-		code.expiresWithSession = true;
+		code.payload.expiresWithSession = true;
 	} else {
 		oidc.session.authorizationFor(oidc.client.clientId).persistsLogout = true;
 	}
@@ -46,12 +47,12 @@ export default async function deviceVerificationResponse(oidc) {
 		oidc.client.includeSid() ||
 		(oidc.claims.id_token && 'sid' in oidc.claims.id_token)
 	) {
-		code.sid = oidc.session.sidFor(oidc.client.clientId);
+		code.payload.sid = oidc.session.sidFor(oidc.client.clientId);
 	}
 
 	await code.save();
 
-	await features.deviceFlow.successSource({ oidc });
-
 	oidc.provider.emit('authorization.success', { oidc });
+
+	return deviceSuccessPage({ client: oidc.client });
 }

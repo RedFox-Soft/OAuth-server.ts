@@ -19,8 +19,13 @@ import interactions from 'lib/actions/authorization/interactions.js';
 import {
 	AlreadyUsedError,
 	ExpiredError,
-	NotFoundError
+	NotFoundError,
+	AbortedError,
+	ReRenderError
 } from 'lib/helpers/re_render_errors.js';
+import { deviceInputPage } from 'lib/html/device.js';
+import deviceVerificationResponse from 'lib/actions/authorization/device_user_flow_response.js';
+import * as crypto from 'node:crypto';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { Session } from 'lib/models/session.js';
 import { DeviceCode } from 'lib/models/device_code.js';
@@ -187,37 +192,78 @@ export const ui = new Elysia()
 		resume(interaction, cookie)
 	)
 	.get('ui/:uid/device_resume', async ({ interaction, cookie }) => {
-		const ctx = { cookie, _matchedRouteName: 'ui.device_resume' };
-		ctx.oidc = new OIDCContext({}, {}, 'ui.device_resume');
-		ctx.oidc.cookie = cookie;
+		const oidc = new OIDCContext({}, {}, 'ui.device_resume');
+		oidc.cookie = cookie;
 
-		const setCookies = await sessionHandler(ctx.oidc);
+		const setCookies = await sessionHandler(oidc);
+		const action = oidc.urlFor('code_verification');
+		let code;
 
-		deviceUserFlowErrors;
-		await getResume(ctx.oidc, interaction);
-		cookie._interaction.remove();
+		try {
+			const confirmPage = await getResume(oidc, interaction);
+			if (confirmPage) {
+				// subject changed — logout confirmation self-submitting form
+				return confirmPage;
+			}
 
-		const code = await DeviceCode.find(interaction.deviceCode, {
-			ignoreExpiration: true,
-			ignoreSessionBinding: true
-		});
+			if (oidc.result?.error) {
+				throw new AccessDenied(undefined, oidc.result.error_description);
+			}
 
-		if (!code) {
-			throw new NotFoundError();
-		} else if (code.isExpired) {
-			throw new ExpiredError();
-		} else if (code.error || code.accountId) {
-			throw new AlreadyUsedError();
+			cookie._interaction.remove();
+
+			code = await DeviceCode.find(interaction.payload.deviceCode, {
+				ignoreExpiration: true,
+				ignoreSessionBinding: true
+			});
+
+			if (!code) {
+				throw new NotFoundError();
+			} else if (code.isExpired) {
+				throw new ExpiredError();
+			} else if (code.payload.error || code.payload.accountId) {
+				throw new AlreadyUsedError();
+			}
+			oidc.entity('DeviceCode', code);
+
+			await checkClient(oidc);
+			await checkResource(oidc);
+			provider.emit('interaction.ended');
+			assignClaims(oidc);
+			await loadAccount(oidc);
+			await loadGrant(oidc);
+			const destination = await interactions('device_resume', oidc);
+			await setCookies();
+
+			if (destination) {
+				return Response.redirect(destination, 303);
+			}
+
+			return await deviceVerificationResponse(oidc);
+		} catch (err) {
+			let renderErr = err;
+
+			if (!(err instanceof ReRenderError)) {
+				const errored =
+					code ||
+					(interaction.payload.deviceCode
+						? await DeviceCode.find(interaction.payload.deviceCode, {
+								ignoreExpiration: true,
+								ignoreSessionBinding: true
+							})
+						: undefined);
+				if (errored && err instanceof AccessDenied) {
+					Object.assign(errored.payload, {
+						error: 'access_denied',
+						errorDescription:
+							err.error_description ?? 'End-User aborted interaction'
+					});
+					await errored.save();
+					renderErr = new AbortedError();
+				}
+			}
+
+			const secret = crypto.randomBytes(24).toString('hex');
+			return deviceInputPage({ action, secret, err: renderErr });
 		}
-		ctx.oidc.entity('DeviceCode', code);
-
-		await checkClient(ctx.oidc);
-		await checkResource(ctx.oidc);
-		provider.emit('interaction.ended');
-		assignClaims(ctx.oidc);
-		await loadAccount(ctx.oidc);
-		await loadGrant(ctx.oidc);
-		await interactions('device_resume', ctx.oidc);
-		await setCookies();
-		deviceUserFlowResponse;
 	});

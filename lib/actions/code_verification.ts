@@ -1,20 +1,20 @@
 import * as crypto from 'node:crypto';
 
+import { Elysia, t } from 'elysia';
+
 import sessionHandler from '../shared/session.ts';
-import paramsMiddleware from '../shared/assemble_params.ts';
-import instance from '../helpers/weak_cache.ts';
 import { InvalidClient, InvalidRequest } from '../helpers/errors.ts';
-import * as formHtml from '../helpers/user_code_form.ts';
 import { formPost } from '../html/formPost.js';
+import { deviceInputPage, deviceConfirmPage } from '../html/device.js';
 import { normalize, denormalize } from '../helpers/user_codes.ts';
 import {
+	ReRenderError,
 	NoCodeError,
 	NotFoundError,
 	ExpiredError,
 	AlreadyUsedError,
 	AbortedError
 } from '../helpers/re_render_errors.ts';
-import { Elysia, t } from 'elysia';
 import { AuthorizationCookies, routeNames } from 'lib/consts/param_list.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import interactions from './authorization/interactions.js';
@@ -23,149 +23,159 @@ import loadAccount from './authorization/load_account.js';
 import assignClaims from './authorization/assign_claims.js';
 import checkResource from 'lib/shared/check_resource.js';
 import checkClient from './authorization/check_client.js';
-import deviceUserFlowErrors from './authorization/device_user_flow_errors.js';
-import deviceUserFlowResponse from './authorization/device_user_flow_response.js';
+import deviceVerificationResponse from './authorization/device_user_flow_response.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { Client } from 'lib/models/client.js';
 
-async function codeVerificationActionHandler(oidc) {
-	deviceUserFlowErrors;
-	await checkClient(oidc);
-	await checkResource(oidc);
-	assignClaims(oidc);
-	await loadAccount(oidc);
-	await loadGrant(oidc);
-	interactions('device_resume', oidc);
-	await deviceUserFlowResponse(oidc);
+// Renders (or re-renders) the user-code input page for an error. ReRenderErrors (bad/missing/
+// expired/used code, aborted interaction) are ordinary re-renders and do NOT emit an error event;
+// request/client errors DO emit `code_verification.error` and render at their own status.
+function renderInputError(oidc, err) {
+	const charset = ApplicationConfig['deviceFlow.charset'];
+	const secret =
+		oidc.session?.payload?.state?.secret ??
+		crypto.randomBytes(24).toString('hex');
+	const action = oidc.urlFor('code_verification');
+
+	if (!(err instanceof ReRenderError)) {
+		oidc.provider.emit('code_verification.error', err, oidc);
+	}
+
+	return deviceInputPage({ action, secret, charset, err });
 }
 
 export const codeVerification = new Elysia()
 	.guard({
-		cookies: AuthorizationCookies
+		cookie: AuthorizationCookies
 	})
 	.get(
 		routeNames.code_verification,
 		async ({ cookie, query }) => {
 			const oidc = new OIDCContext(query);
 			oidc.cookie = cookie;
-
 			const setCookies = await sessionHandler(oidc);
+
+			const charset = ApplicationConfig['deviceFlow.charset'];
+			const secret = crypto.randomBytes(24).toString('hex');
+			oidc.session.payload.state = { secret };
+
+			const action = oidc.urlFor('code_verification');
+			await setCookies();
+
+			if (query.user_code) {
+				return formPost(oidc, action, {
+					xsrf: secret,
+					user_code: query.user_code
+				});
+			}
+
+			return deviceInputPage({ action, secret, charset });
 		},
 		{
 			query: t.Object({
 				user_code: t.Optional(t.String())
 			})
 		}
-	);
+	)
+	.post(
+		routeNames.code_verification,
+		async ({ cookie, body }) => {
+			const oidc = new OIDCContext({});
+			oidc.cookie = cookie;
+			const setCookies = await sessionHandler(oidc);
 
-export const get = [
-	paramsMiddleware.bind(undefined, new Set(['user_code'])),
-	async function renderCodeVerification(ctx) {
-		const { userCodeInputSource } = instance(ctx.oidc.provider).features
-			.deviceFlow;
-		const charset = ApplicationConfig['deviceFlow.charset'];
+			try {
+				const { xsrf, user_code: userCode, confirm, abort } = body;
 
-		// TODO: generic xsrf middleware to remove this
-		const secret = crypto.randomBytes(24).toString('hex');
-		ctx.oidc.session.state = { secret };
+				if (!oidc.session.payload.state) {
+					throw new InvalidRequest('could not find device form details');
+				}
+				if (oidc.session.payload.state.secret !== xsrf) {
+					throw new InvalidRequest('xsrf token invalid');
+				}
 
-		const action = ctx.oidc.urlFor('code_verification');
-		if (ctx.oidc.params.user_code) {
-			formPost(ctx, action, {
-				xsrf: secret,
-				user_code: ctx.oidc.params.user_code
-			});
-		} else {
-			await userCodeInputSource(
-				ctx,
-				formHtml.input(action, secret, undefined, charset)
-			);
-		}
-	}
-];
+				if (!userCode) {
+					throw new NoCodeError();
+				}
 
-export const post = [
-	paramsMiddleware.bind(
-		undefined,
-		new Set(['xsrf', 'user_code', 'confirm', 'abort'])
-	),
+				const normalized = normalize(userCode);
+				const code = await DeviceCode.findByUserCode(normalized, {
+					ignoreExpiration: true
+				});
 
-	async function codeVerificationCSRF(ctx, next) {
-		if (!ctx.oidc.session.state) {
-			throw new InvalidRequest('could not find device form details');
-		}
-		if (ctx.oidc.session.state.secret !== ctx.oidc.params.xsrf) {
-			throw new InvalidRequest('xsrf token invalid');
-		}
-		await next();
-	},
+				if (!code) {
+					throw new NotFoundError(userCode);
+				}
+				if (code.isExpired) {
+					throw new ExpiredError(userCode);
+				}
+				if (
+					code.payload.error ||
+					code.payload.accountId ||
+					code.payload.inFlight
+				) {
+					throw new AlreadyUsedError(userCode);
+				}
 
-	async function loadDeviceCodeByUserInput(ctx, next) {
-		const { userCodeConfirmSource } = instance(ctx.oidc.provider).features
-			.deviceFlow;
-		const mask = ApplicationConfig['deviceFlow.mask'];
-		const { user_code: userCode, confirm, abort } = ctx.oidc.params;
+				oidc.entity('DeviceCode', code);
 
-		if (!userCode) {
-			throw new NoCodeError();
-		}
+				if (abort) {
+					Object.assign(code.payload, {
+						error: 'access_denied',
+						errorDescription: 'End-User aborted interaction'
+					});
+					await code.save();
+					throw new AbortedError();
+				}
 
-		const normalized = normalize(userCode);
-		const code = await DeviceCode.findByUserCode(normalized, {
-			ignoreExpiration: true
-		});
+				if (!confirm) {
+					const client = await Client.find(code.payload.clientId);
+					if (!client) {
+						throw new InvalidClient('client is invalid', 'client not found');
+					}
+					oidc.entity('Client', client);
 
-		if (!code) {
-			throw new NotFoundError(userCode);
-		}
+					const mask = ApplicationConfig['deviceFlow.mask'];
+					const action = oidc.urlFor('code_verification');
+					return deviceConfirmPage({
+						action,
+						secret: oidc.session.payload.state.secret,
+						userCode: denormalize(normalized, mask),
+						client
+					});
+				}
 
-		if (code.isExpired) {
-			throw new ExpiredError(userCode);
-		}
+				code.payload.inFlight = true;
+				await code.save();
+				oidc.session.payload.state = undefined;
 
-		if (code.error || code.accountId || code.inFlight) {
-			throw new AlreadyUsedError(userCode);
-		}
+				// confirm === yes: resolve the interaction against the authenticated session and
+				// either redirect to a required interaction (login/consent) or bind + render success.
+				oidc.params = { ...code.payload.params };
+				await checkClient(oidc);
+				await checkResource(oidc);
+				assignClaims(oidc);
+				await loadAccount(oidc);
+				await loadGrant(oidc);
+				const destination = await interactions('device_resume', oidc);
+				await setCookies();
 
-		ctx.oidc.entity('DeviceCode', code);
+				if (destination) {
+					return Response.redirect(destination, 303);
+				}
 
-		if (abort) {
-			Object.assign(code, {
-				error: 'access_denied',
-				errorDescription: 'End-User aborted interaction'
-			});
-
-			await code.save();
-			throw new AbortedError();
-		}
-
-		if (!confirm) {
-			const client = await Client.find(code.clientId);
-			if (!client) {
-				throw new InvalidClient('client is invalid', 'client not found');
+				return await deviceVerificationResponse(oidc);
+			} catch (err) {
+				return renderInputError(oidc, err);
 			}
-			ctx.oidc.entity('Client', client);
-
-			const action = ctx.oidc.urlFor('code_verification');
-			await userCodeConfirmSource(
-				ctx,
-				formHtml.confirm(action, ctx.oidc.session.state.secret, userCode),
-				client,
-				code.deviceInfo,
-				denormalize(normalized, mask)
-			);
-			return;
+		},
+		{
+			body: t.Object({
+				xsrf: t.Optional(t.String()),
+				user_code: t.Optional(t.String()),
+				confirm: t.Optional(t.String()),
+				abort: t.Optional(t.String())
+			})
 		}
-
-		code.inFlight = true;
-		await code.save();
-
-		await next();
-	},
-
-	function cleanup(ctx, next) {
-		ctx.oidc.session.state = undefined;
-		return next();
-	}
-];
+	);

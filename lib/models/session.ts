@@ -16,7 +16,20 @@ const SessionPayload = t.Composite([
 		amr: t.Optional(t.Array(t.String())),
 		acr: t.Optional(t.String()),
 		transient: t.Optional(t.Boolean()),
-		state: t.Optional(t.String()),
+		// `state` carries the CSRF secret plus interaction context (logout/device confirmation).
+		// It is an object across end_session, interaction resume, and the device flow; the schema
+		// must accept that object so a reloaded session does not silently drop it.
+		state: t.Optional(
+			t.Object(
+				{
+					secret: t.Optional(t.String()),
+					clientId: t.Optional(t.String()),
+					state: t.Optional(t.String()),
+					postLogoutRedirectUri: t.Optional(t.String())
+				},
+				{ additionalProperties: true }
+			)
+		),
 		authorizations: t.Optional(
 			t.Record(
 				t.String(),

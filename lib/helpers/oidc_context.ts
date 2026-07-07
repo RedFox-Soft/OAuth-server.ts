@@ -63,6 +63,14 @@ export class OIDCContext<T extends Record<string, unknown>> {
 			).toString();
 		}
 
+		if (name === 'code_verification') {
+			return new URL(routeNames.code_verification, ISSUER).toString();
+		}
+
+		if (name === 'device_resume') {
+			return new URL(`/ui/${opt.uid}/device_resume`, ISSUER).toString();
+		}
+
 		throw new Error(`unknown route name: ${name}`);
 	}
 

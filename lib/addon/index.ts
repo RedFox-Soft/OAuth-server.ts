@@ -2,12 +2,7 @@ export { assertJwtClientAuthClaimsAndHeader } from './default.js';
 export { shouldChange, mustChange } from './_warn.js';
 export { clientBasedCORS } from './cors.js';
 export { certificateAuthorized, certificateSubjectMatches } from './mtls.js';
-export {
-	deviceInfo,
-	userCodeInputSource,
-	userCodeConfirmSource,
-	successSource
-} from './interactions.js';
+export { deviceInfo } from './interactions.js';
 export { renderError } from './error.js';
 export { introspectionAllowedPolicy } from './introspection.js';
 export {
