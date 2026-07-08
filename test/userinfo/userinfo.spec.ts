@@ -15,6 +15,8 @@ import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
+import Configuration from 'lib/helpers/configuration.js';
+import { ApplicationConfig } from 'lib/configs/application.js';
 
 describe('UserInfo', () => {
 	let access_token: string;
@@ -54,15 +56,21 @@ describe('UserInfo', () => {
 
 	afterEach(() => mock.restore());
 
-	it.skip('jwtUserinfo can only be enabled with userinfo', () => {
-		expect(() => {
-			provider.init({
-				features: {
-					jwtUserinfo: { enabled: true },
-					userinfo: { enabled: false }
-				}
-			});
-		}).to.throw('jwtUserinfo is only available in conjuction with userinfo');
+	it('jwtUserinfo can only be enabled with userinfo', () => {
+		// Feature flags are read flat from ApplicationConfig; the dependency guard runs when a
+		// Configuration is constructed. Toggle the flags, assert the throw, then restore.
+		const prevJwtUserinfo = ApplicationConfig['jwtUserinfo.enabled'];
+		const prevUserinfo = ApplicationConfig['userinfo.enabled'];
+		ApplicationConfig['jwtUserinfo.enabled'] = true;
+		ApplicationConfig['userinfo.enabled'] = false;
+		try {
+			expect(() => new Configuration()).toThrow(
+				'jwtUserinfo is only available in conjuction with userinfo'
+			);
+		} finally {
+			ApplicationConfig['jwtUserinfo.enabled'] = prevJwtUserinfo;
+			ApplicationConfig['userinfo.enabled'] = prevUserinfo;
+		}
 	});
 
 	it('[get] returns 200 OK and user claims except the rejected ones', async function () {

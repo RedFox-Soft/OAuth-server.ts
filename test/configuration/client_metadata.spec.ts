@@ -1754,18 +1754,13 @@ describe('Client metadata validation', () => {
 		});
 	});
 
-	describe('features.pushedAuthorizationRequests', () => {
-		// QUARANTINED (codebase divergence): upstream's
-		// `require_pushed_authorization_requests` boolean client-metadata property
-		// and its provider forcing-flag are modelled differently here — the client
-		// property is `authorization.requirePushedAuthorizationRequests` (a dotted
-		// camelCase key validated by ClientSchema, not via the snake BOOL pass) and
-		// PAR is configured through the flat `par.*` keys. Its registration-time
-		// effect (allowing unregistered redirect URIs) is covered by the
-		// `redirectUris > PAR allowUnregisteredRedirectUris` cases above and by
-		// pushed_authorization_requests.spec.ts.
-		describe.skip('require_pushed_authorization_requests', function () {});
-	});
+	// features.pushedAuthorizationRequests: upstream's `require_pushed_authorization_requests`
+	// boolean client-metadata property is modelled differently here — the client property is
+	// `authorization.requirePushedAuthorizationRequests` (a dotted camelCase key validated by
+	// ClientSchema, not via the snake BOOL pass) and PAR is configured through the flat `par.*`
+	// keys. Its registration-time effect (allowing unregistered redirect URIs) is covered by the
+	// `redirectUris > PAR allowUnregisteredRedirectUris` cases above and by
+	// pushed_authorization_requests.spec.ts, so there is no separate empty suite here.
 
 	describe('features.ciba', () => {
 		const configuration = {

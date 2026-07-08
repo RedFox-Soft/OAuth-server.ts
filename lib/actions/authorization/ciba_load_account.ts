@@ -4,7 +4,7 @@ import instance from '../../helpers/weak_cache.ts';
 
 import checkIdTokenHint from './check_id_token_hint.ts';
 
-export default async function cibaLoadAccount(oidc, next) {
+export default async function cibaLoadAccount(oidc) {
 	const mechanisms = omitBy(
 		{
 			login_hint_token: oidc.params.login_hint_token,
@@ -65,6 +65,4 @@ export default async function cibaLoadAccount(oidc, next) {
 	oidc.entity('Account', account);
 
 	await ciba.verifyUserCode({ oidc }, account, value);
-
-	return next();
 }

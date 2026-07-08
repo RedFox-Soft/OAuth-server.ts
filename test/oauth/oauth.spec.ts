@@ -2,9 +2,11 @@ import { parse as parseUrl } from 'node:url';
 
 import sinon from 'sinon';
 import { expect } from 'chai';
+import { beforeAll, spyOn } from 'bun:test';
 import snakeCase from 'lodash/snakeCase.js';
 
-import bootstrap, { skipConsent } from '../test_helper.js';
+import bootstrap from '../test_helper.js';
+import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { provider } from 'lib/provider.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
@@ -178,7 +180,11 @@ describe('requests without the openid scope', () => {
 				});
 
 				describe('refresh token exchange', () => {
-					skipConsent();
+					beforeAll(() => {
+						spyOn(OIDCContext.prototype, 'promptPending').mockReturnValue(
+							false
+						);
+					});
 					const refreshScope = `${scope || ''} offline_access`.trim();
 
 					before(function () {

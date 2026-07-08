@@ -2,10 +2,8 @@ import map from 'lodash/map.js';
 import uniq from 'lodash/uniq.js';
 import { expect } from 'chai';
 
-import bootstrap, {
-	assertNoPendingInterceptors,
-	mock
-} from '../test_helper.js';
+import bootstrap from '../test_helper.js';
+import { assertNoPendingInterceptors, mock } from '../fetch_mock.js';
 import addClient from '../../lib/helpers/add_client.ts';
 import { Claims } from 'lib/helpers/claims.js';
 import { provider } from 'lib/provider.js';

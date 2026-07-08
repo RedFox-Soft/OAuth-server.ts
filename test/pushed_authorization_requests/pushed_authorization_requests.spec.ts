@@ -876,7 +876,7 @@ describe('Pushed Request Object', async () => {
 							expect(payload).toHaveProperty('response_type', 'code');
 						});
 
-						it.skip('requires the registered request object signing alg be used', async function () {
+						it('requires the registered request object signing alg be used', async function () {
 							const code_verifier = randomBytes(32).toString('base64');
 							const code_challenge = createHash('sha256')
 								.update(code_verifier)

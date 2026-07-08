@@ -41,7 +41,7 @@ export const handler = async function cibaHandler(oidc, dPoP) {
 		throw new InvalidGrant('backchannel authentication request not found');
 	}
 
-	if (request.clientId !== oidc.client.clientId) {
+	if (request.payload.clientId !== oidc.client.clientId) {
 		throw new InvalidGrant('client mismatch');
 	}
 
@@ -61,12 +61,12 @@ export const handler = async function cibaHandler(oidc, dPoP) {
 		throw new ExpiredToken('backchannel authentication request is expired');
 	}
 
-	if (!request.grantId && !request.error) {
+	if (!request.payload.grantId && !request.payload.error) {
 		throw new AuthorizationPending();
 	}
 
-	if (request.consumed) {
-		await revoke({ oidc }, request.grantId);
+	if (request.payload.consumed) {
+		await revoke({ oidc }, request.payload.grantId);
 		throw new InvalidGrant(
 			'backchannel authentication request already consumed'
 		);
@@ -74,18 +74,18 @@ export const handler = async function cibaHandler(oidc, dPoP) {
 
 	await request.consume();
 
-	if (request.error) {
-		const className = upperFirst(camelCase(request.error));
+	if (request.payload.error) {
+		const className = upperFirst(camelCase(request.payload.error));
 		if (errors[className]) {
-			throw new errors[className](request.errorDescription);
+			throw new errors[className](request.payload.errorDescription);
 		}
 		throw new errors.CustomOIDCProviderError(
-			request.error,
-			request.errorDescription
+			request.payload.error,
+			request.payload.errorDescription
 		);
 	}
 
-	const grant = await Grant.find(request.grantId, {
+	const grant = await Grant.find(request.payload.grantId, {
 		ignoreExpiration: true
 	});
 
@@ -97,14 +97,18 @@ export const handler = async function cibaHandler(oidc, dPoP) {
 		throw new InvalidGrant('grant is expired');
 	}
 
-	if (grant.clientId !== oidc.client.clientId) {
+	if (grant.payload.clientId !== oidc.client.clientId) {
 		throw new InvalidGrant('client mismatch');
 	}
 
 	oidc.entity('BackchannelAuthenticationRequest', request);
 	oidc.entity('Grant', grant);
 
-	const account = await findAccount({ oidc }, request.accountId, request);
+	const account = await findAccount(
+		{ oidc },
+		request.payload.accountId,
+		request
+	);
 
 	if (!account) {
 		throw new InvalidGrant(
@@ -112,7 +116,7 @@ export const handler = async function cibaHandler(oidc, dPoP) {
 		);
 	}
 
-	if (request.accountId !== grant.accountId) {
+	if (request.payload.accountId !== grant.payload.accountId) {
 		throw new InvalidGrant('accountId mismatch');
 	}
 
@@ -121,11 +125,11 @@ export const handler = async function cibaHandler(oidc, dPoP) {
 	const at = new AccessToken({
 		accountId: account.accountId,
 		client: oidc.client,
-		expiresWithSession: request.expiresWithSession,
-		grantId: request.grantId,
+		expiresWithSession: request.payload.expiresWithSession,
+		grantId: request.payload.grantId,
 		gty,
-		sessionUid: request.sessionUid,
-		sid: request.sid
+		sessionUid: request.payload.sessionUid,
+		sid: request.payload.sid
 	});
 
 	if (oidc.client.tlsClientCertificateBoundAccessTokens) {
@@ -153,7 +157,7 @@ export const handler = async function cibaHandler(oidc, dPoP) {
 		);
 		at.scope = grant.getResourceScopeFiltered(resource, request.scopes);
 	} else {
-		at.claims = request.claims;
+		at.claims = request.payload.claims;
 		at.scope = grant.getOIDCScopeFiltered(request.scopes);
 	}
 
@@ -164,29 +168,29 @@ export const handler = async function cibaHandler(oidc, dPoP) {
 	if (await issueRefreshToken({ oidc }, oidc.client, request)) {
 		const rt = new RefreshToken({
 			accountId: account.accountId,
-			acr: request.acr,
-			amr: request.amr,
-			authTime: request.authTime,
-			claims: request.claims,
+			acr: request.payload.acr,
+			amr: request.payload.amr,
+			authTime: request.payload.authTime,
+			claims: request.payload.claims,
 			client: oidc.client,
-			expiresWithSession: request.expiresWithSession,
-			grantId: request.grantId,
+			expiresWithSession: request.payload.expiresWithSession,
+			grantId: request.payload.grantId,
 			gty,
-			nonce: request.nonce,
-			resource: request.resource,
+			nonce: request.payload.nonce,
+			resource: request.payload.resource,
 			rotations: 0,
-			scope: request.scope,
-			sessionUid: request.sessionUid,
-			sid: request.sid
+			scope: request.payload.scope,
+			sessionUid: request.payload.sessionUid,
+			sid: request.payload.sid
 		});
 
 		if (oidc.client.clientAuthMethod === 'none') {
-			if (at.jkt) {
-				rt.jkt = at.jkt;
+			if (at.payload.jkt) {
+				rt.payload.jkt = at.payload.jkt;
 			}
 
-			if (at['x5t#S256']) {
-				rt['x5t#S256'] = at['x5t#S256'];
+			if (at.payload['x5t#S256']) {
+				rt.payload['x5t#S256'] = at.payload['x5t#S256'];
 			}
 		}
 
@@ -196,14 +200,19 @@ export const handler = async function cibaHandler(oidc, dPoP) {
 
 	let idToken;
 	if (request.scopes.has('openid')) {
-		const claims = filterClaims(request.claims, 'id_token', grant);
+		const claims = filterClaims(request.payload.claims, 'id_token', grant);
 		const rejected = grant.getRejectedOIDCClaims();
 		const token = new IdToken(oidc.client, {
-			...(await account.claims('id_token', request.scope, claims, rejected)),
+			...(await account.claims(
+				'id_token',
+				request.payload.scope,
+				claims,
+				rejected
+			)),
 			...{
-				acr: request.acr,
-				amr: request.amr,
-				auth_time: request.authTime
+				acr: request.payload.acr,
+				amr: request.payload.amr,
+				auth_time: request.payload.authTime
 			}
 		});
 
@@ -220,8 +229,8 @@ export const handler = async function cibaHandler(oidc, dPoP) {
 		token.mask = claims;
 		token.rejected = rejected;
 
-		token.set('nonce', request.nonce);
-		token.set('sid', request.sid);
+		token.set('nonce', request.payload.nonce);
+		token.set('sid', request.payload.sid);
 
 		idToken = await token.issue({ use: 'idtoken' });
 	}
@@ -231,7 +240,7 @@ export const handler = async function cibaHandler(oidc, dPoP) {
 		expires_in: at.expiration,
 		id_token: idToken,
 		refresh_token: refreshToken,
-		scope: request.scope ? at.scope : at.scope || undefined,
+		scope: request.payload.scope ? at.scope : at.payload.scope || undefined,
 		token_type: at.tokenType
 	};
 };

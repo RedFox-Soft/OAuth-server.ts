@@ -1,8 +1,10 @@
 import * as url from 'node:url';
 
 import { expect } from 'chai';
+import { beforeAll, spyOn } from 'bun:test';
 
-import bootstrap, { skipConsent } from '../test_helper.js';
+import bootstrap from '../test_helper.js';
+import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
@@ -25,7 +27,9 @@ function assignTokenResponseValues({ body }) {
 
 describe('session bound tokens behaviours', () => {
 	before(bootstrap(import.meta.url));
-	skipConsent();
+	beforeAll(() => {
+		spyOn(OIDCContext.prototype, 'promptPending').mockReturnValue(false);
+	});
 
 	beforeEach(function () {
 		return this.login({ scope: 'openid offline_access' });

@@ -15,6 +15,10 @@ import {
 import nanoid from '../../lib/helpers/nanoid.ts';
 import provider from '../../lib/index.ts';
 import bootstrap, { agent } from '../test_helper.js';
+import {
+	mock as mockHttp,
+	assertNoPendingInterceptors
+} from '../fetch_mock.js';
 import clientKey from '../client.sig.key.js';
 import * as JWT from '../../lib/helpers/jwt.ts';
 import { ISSUER } from 'lib/configs/env.js';
@@ -1216,7 +1220,7 @@ describe('client authentication options', () => {
 		});
 	});
 
-	describe.skip('tls_client_auth auth', () => {
+	describe('tls_client_auth auth', () => {
 		it('accepts the auth', async function () {
 			const { status, data } = await agent.token.post(
 				{
@@ -1235,113 +1239,126 @@ describe('client authentication options', () => {
 			expect(data).toEqual(tokenAuthSucceeded);
 		});
 
-		it('fails the auth when getCertificate() does not return a cert', function () {
-			return this.agent
-				.post(route)
-				.send({
-					client_id: 'client-pki-mtls',
-					grant_type: 'foo'
-				})
-				.type('form')
-				.expect(tokenAuthRejected);
+		it('fails the auth when getCertificate() does not return a cert', async function () {
+			const { error } = await agent.token.post({
+				client_id: 'client-pki-mtls',
+				grant_type: 'foo'
+			});
+			expect(error?.value).toEqual(tokenAuthRejected);
 		});
 
-		it('fails the auth when certificateAuthorized() fails', function () {
-			return this.agent
-				.post(route)
-				.set('x-ssl-client-cert', rsacrt.raw.toString('base64'))
-				.set('x-ssl-client-verify', 'FAILED: self signed certificate')
-				.set('x-ssl-client-san-dns', 'rp.example.com')
-				.send({
+		it('fails the auth when certificateAuthorized() fails', async function () {
+			const { error } = await agent.token.post(
+				{
 					client_id: 'client-pki-mtls',
 					grant_type: 'foo'
-				})
-				.type('form')
-				.expect(tokenAuthRejected);
+				},
+				{
+					headers: {
+						'x-ssl-client-cert': rsacrt.raw.toString('base64'),
+						'x-ssl-client-verify': 'FAILED: self signed certificate',
+						'x-ssl-client-san-dns': 'rp.example.com'
+					}
+				}
+			);
+			expect(error?.value).toEqual(tokenAuthRejected);
 		});
 
-		it('fails the auth when certificateSubjectMatches() return false', function () {
-			return this.agent
-				.post(route)
-				.set('x-ssl-client-cert', rsacrt.raw.toString('base64'))
-				.set('x-ssl-client-verify', 'SUCCESS')
-				.set('x-ssl-client-san-dns', 'foobarbaz')
-				.send({
+		it('fails the auth when certificateSubjectMatches() return false', async function () {
+			const { error } = await agent.token.post(
+				{
 					client_id: 'client-pki-mtls',
 					grant_type: 'foo'
-				})
-				.type('form')
-				.expect(tokenAuthRejected);
+				},
+				{
+					headers: {
+						'x-ssl-client-cert': rsacrt.raw.toString('base64'),
+						'x-ssl-client-verify': 'SUCCESS',
+						'x-ssl-client-san-dns': 'foobarbaz'
+					}
+				}
+			);
+			expect(error?.value).toEqual(tokenAuthRejected);
 		});
 	});
 
-	describe.skip('self_signed_tls_client_auth auth', () => {
-		it('accepts the auth [1/2]', function () {
-			return this.agent
-				.post(route)
-				.set('x-ssl-client-cert', rsacrt.raw.toString('base64'))
-				.send({
+	describe('self_signed_tls_client_auth auth', () => {
+		it('accepts the auth [1/2]', async function () {
+			const { status, data } = await agent.token.post(
+				{
 					client_id: 'client-self-signed-mtls',
 					grant_type: 'foo'
-				})
-				.type('form')
-				.expect(200)
-				.expect(tokenAuthSucceeded);
+				},
+				{
+					headers: {
+						'x-ssl-client-cert': rsacrt.raw.toString('base64')
+					}
+				}
+			);
+			expect(status).toBe(200);
+			expect(data).toEqual(tokenAuthSucceeded);
 		});
 
-		it('accepts the auth [2/2]', function () {
-			return this.agent
-				.post(route)
-				.set('x-ssl-client-cert', eccrt.raw.toString('base64'))
-				.send({
+		it('accepts the auth [2/2]', async function () {
+			const { status, data } = await agent.token.post(
+				{
 					client_id: 'client-self-signed-mtls',
 					grant_type: 'foo'
-				})
-				.type('form')
-				.expect(200)
-				.expect(tokenAuthSucceeded);
+				},
+				{
+					headers: {
+						'x-ssl-client-cert': eccrt.raw.toString('base64')
+					}
+				}
+			);
+			expect(status).toBe(200);
+			expect(data).toEqual(tokenAuthSucceeded);
 		});
 
-		it('fails the auth when x-ssl-client-cert is not passed by the proxy', function () {
-			return this.agent
-				.post(route)
-				.send({
-					client_id: 'client-self-signed-mtls',
-					grant_type: 'foo'
-				})
-				.type('form')
-				.expect(tokenAuthRejected);
+		it('fails the auth when x-ssl-client-cert is not passed by the proxy', async function () {
+			const { error } = await agent.token.post({
+				client_id: 'client-self-signed-mtls',
+				grant_type: 'foo'
+			});
+			expect(error?.value).toEqual(tokenAuthRejected);
 		});
 
-		it('fails the auth when x-ssl-client-cert does not match the registered ones', function () {
-			return this.agent
-				.post(route)
-				.set('x-ssl-client-cert', eccrt.raw.toString('base64'))
-				.send({
+		it('fails the auth when x-ssl-client-cert does not match the registered ones', async function () {
+			const { error } = await agent.token.post(
+				{
 					client_id: 'client-self-signed-mtls-rsa',
 					grant_type: 'foo'
-				})
-				.type('form')
-				.expect(tokenAuthRejected);
+				},
+				{
+					headers: {
+						'x-ssl-client-cert': eccrt.raw.toString('base64')
+					}
+				}
+			);
+			expect(error?.value).toEqual(tokenAuthRejected);
 		});
 
-		it('handles rotation of stale jwks', function () {
-			mock('https://client.example.com')
+		it('handles rotation of stale jwks', async function () {
+			mockHttp('https://client.example.com')
 				.intercept({
 					path: '/jwks'
 				})
 				.reply(200, JSON.stringify(mtlsKeys));
 
-			return this.agent
-				.post(route)
-				.set('x-ssl-client-cert', rsacrt.raw.toString('base64'))
-				.send({
+			const { status, data } = await agent.token.post(
+				{
 					client_id: 'client-self-signed-mtls-jwks_uri',
 					grant_type: 'foo'
-				})
-				.type('form')
-				.expect(200)
-				.expect(tokenAuthSucceeded);
+				},
+				{
+					headers: {
+						'x-ssl-client-cert': rsacrt.raw.toString('base64')
+					}
+				}
+			);
+			expect(status).toBe(200);
+			expect(data).toEqual(tokenAuthSucceeded);
+			assertNoPendingInterceptors();
 		});
 	});
 });

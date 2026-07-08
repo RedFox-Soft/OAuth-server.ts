@@ -20,7 +20,7 @@ import {
 
 import nanoid from '../../lib/helpers/nanoid.ts';
 import epochTime from '../../lib/helpers/epoch_time.ts';
-import bootstrap, { agent } from '../test_helper.js';
+import bootstrap, { agent, jsonToFormUrlEncoded } from '../test_helper.js';
 import * as base64url from '../../lib/helpers/base64url.ts';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { provider } from 'lib/provider.js';
@@ -710,51 +710,52 @@ describe('features.dPoP', async () => {
 		});
 	});
 
-	describe.skip('urn:openid:params:grant-type:ciba', () => {
+	describe('urn:openid:params:grant-type:ciba', () => {
+		let reqId;
 		beforeEach(async function () {
-			await this.agent
-				.post('/backchannel')
-				.auth('client', 'secret')
-				.send({
+			const { data } = await agent.backchannel.post(
+				jsonToFormUrlEncoded({
 					scope: 'openid offline_access',
 					login_hint: 'accountId'
-				})
-				.type('form')
-				.expect(200)
-				.expect(({ body: { auth_req_id: reqId } }) => {
-					this.reqId = reqId;
-				});
+				}),
+				{
+					headers: {
+						'content-type': 'application/x-www-form-urlencoded',
+						...AuthorizationRequest.basicAuthHeader('client', 'secret')
+					}
+				}
+			);
+			reqId = data.auth_req_id;
 		});
 
 		it('binds the access token to the jwk', async function () {
 			const spy = mock();
 			provider.once('grant.success', spy);
 
-			await this.agent
-				.post('/token')
-				.auth('client', 'secret')
-				.send({
+			const { status } = await agent.token.post(
+				{
 					grant_type: 'urn:openid:params:grant-type:ciba',
-					auth_req_id: this.reqId
-				})
-				.type('form')
-				.set(
-					'DPoP',
-					await DPoP(keypair, {
-						htu: `${ISSUER}/token`,
-						htm: 'POST'
-					})
-				)
-				.expect(200);
-
-			expect(spy).to.have.property('calledOnce', true);
+					auth_req_id: reqId
+				},
+				{
+					headers: {
+						...AuthorizationRequest.basicAuthHeader('client', 'secret'),
+						dpop: await DPoP(keypair, {
+							htu: `${ISSUER}/token`,
+							htm: 'POST'
+						})
+					}
+				}
+			);
+			expect(status).toBe(200);
+			expect(spy).toBeCalledTimes(1);
 			const {
 				oidc: {
-					entities: { AccessToken, RefreshToken }
+					entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 				}
-			} = spy.args[0][0];
-			expect(AccessToken).to.have.property('jkt', this.thumbprint);
-			expect(RefreshToken).not.to.have.property('jkt');
+			} = spy.mock.calls[0][0];
+			expect(accessToken.payload).toHaveProperty('jkt', thumbprint);
+			expect(refreshToken.payload).not.toHaveProperty('jkt');
 		});
 
 		it('binds the refresh token to the jwk for public clients', async function () {
@@ -763,43 +764,42 @@ describe('features.dPoP', async () => {
 
 			// changes the code to client-none
 			TestAdapter.for('BackchannelAuthenticationRequest').syncUpdate(
-				this.getTokenJti(this.reqId),
+				setup.getTokenJti(reqId),
 				{
 					clientId: 'client-none'
 				}
 			);
 			const { grantId } = TestAdapter.for(
 				'BackchannelAuthenticationRequest'
-			).syncFind(this.getTokenJti(this.reqId));
+			).syncFind(setup.getTokenJti(reqId));
 			TestAdapter.for('Grant').syncUpdate(grantId, {
 				clientId: 'client-none'
 			});
 
-			await this.agent
-				.post('/token')
-				.send({
+			const { status } = await agent.token.post(
+				{
 					client_id: 'client-none',
 					grant_type: 'urn:openid:params:grant-type:ciba',
-					auth_req_id: this.reqId
-				})
-				.type('form')
-				.set(
-					'DPoP',
-					await DPoP(keypair, {
-						htu: `${ISSUER}/token`,
-						htm: 'POST'
-					})
-				)
-				.expect(200);
-
-			expect(spy).to.have.property('calledOnce', true);
+					auth_req_id: reqId
+				},
+				{
+					headers: {
+						dpop: await DPoP(keypair, {
+							htu: `${ISSUER}/token`,
+							htm: 'POST'
+						})
+					}
+				}
+			);
+			expect(status).toBe(200);
+			expect(spy).toBeCalledTimes(1);
 			const {
 				oidc: {
-					entities: { AccessToken, RefreshToken }
+					entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 				}
-			} = spy.args[0][0];
-			expect(AccessToken).to.have.property('jkt', this.thumbprint);
-			expect(RefreshToken).to.have.property('jkt', this.thumbprint);
+			} = spy.mock.calls[0][0];
+			expect(accessToken.payload).toHaveProperty('jkt', thumbprint);
+			expect(refreshToken.payload).toHaveProperty('jkt', thumbprint);
 		});
 	});
 

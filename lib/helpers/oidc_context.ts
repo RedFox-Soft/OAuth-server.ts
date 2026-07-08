@@ -1,5 +1,3 @@
-import { X509Certificate } from 'node:crypto';
-
 import { InvalidHeaderAuthorization } from './errors.ts';
 import instance from './weak_cache.ts';
 import { routeNames } from '../consts/param_list.ts';
@@ -193,16 +191,12 @@ export class OIDCContext<T extends Record<string, unknown>> {
 		return this.entities.Grant;
 	}
 
+	get(name: string) {
+		return this.#headers[name.toLowerCase()];
+	}
+
 	getClientCertificate() {
-		const cert = this.#headers['x-client-cert'];
-		if (!cert) {
-			return;
-		}
-		try {
-			return new X509Certificate(Buffer.from(cert, 'base64'));
-		} catch {
-			return;
-		}
+		return instance(provider).features.mTLS.getCertificate(this);
 	}
 
 	getAccessToken({ acceptDPoP = false } = {}) {

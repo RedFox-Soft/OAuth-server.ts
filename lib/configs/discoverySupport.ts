@@ -217,7 +217,7 @@ export function calculateDiscovery() {
 }
 
 type OmitEnabled<T> = {
-	[K in keyof T as K extends `${infer _}enabled` ? K : never]: T[K];
+	[K in keyof T as K extends `${string}enabled` ? K : never]: T[K];
 };
 type DiscoveryKey = keyof ReturnType<typeof calculateDiscovery>;
 export type FeatureFlagKey = keyof OmitEnabled<typeof ApplicationConfig>;

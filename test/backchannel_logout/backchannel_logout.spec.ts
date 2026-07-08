@@ -5,11 +5,11 @@ import { createSandbox } from 'sinon';
 import { expect } from 'chai';
 import base64url from 'base64url';
 
-import bootstrap, {
-	skipConsent,
-	assertNoPendingInterceptors,
-	mock
-} from '../test_helper.js';
+import { beforeAll, spyOn } from 'bun:test';
+
+import bootstrap from '../test_helper.js';
+import { assertNoPendingInterceptors, mock } from '../fetch_mock.js';
+import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { provider } from 'lib/provider.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
@@ -137,7 +137,9 @@ describe('Back-Channel Logout 1.0', () => {
 			return this.login({ scope: 'openid offline_access' });
 		});
 
-		skipConsent();
+		beforeAll(() => {
+			spyOn(OIDCContext.prototype, 'promptPending').mockReturnValue(false);
+		});
 		let auth;
 
 		beforeEach(async function () {

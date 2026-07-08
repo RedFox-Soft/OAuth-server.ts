@@ -9,17 +9,17 @@ export default async function backchannelRequestResponse(oidc) {
 		claims: oidc.claims,
 		client: oidc.client,
 		nonce: oidc.params.nonce,
-		params: oidc.params.toPlainObject(),
+		params: { ...oidc.params },
 		resource: Object.keys(oidc.resourceServers),
 		scope: [...oidc.requestParamScopes].join(' ')
 	});
 
-	switch (request.resource.length) {
+	switch (request.payload.resource.length) {
 		case 0:
-			delete request.resource;
+			delete request.payload.resource;
 			break;
 		case 1:
-			[request.resource] = request.resource;
+			[request.payload.resource] = request.payload.resource;
 			break;
 	}
 

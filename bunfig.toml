@@ -2,20 +2,12 @@
 preload = ["./test/preload.ts"]
 coverageSkipTestFiles = true
 pathIgnorePatterns = [
-	"test/backchannel_logout/backchannel_logout.spec.ts",
-	"test/ciba/ciba.spec.ts",
 	"test/client_id_uri/client_id_uri.spec.ts",
-	"test/configuration/secure.spec.ts",
 	"test/cors/cors.spec.ts",
 	"test/cors/custom_cors.spec.ts",
 	"test/dynamic_registration/dynamic_registration.spec.ts",
-	"test/encryption/encryption.spec.ts",
 	"test/helpers/attention.spec.ts",
-	"test/oauth/oauth.spec.ts",
-	"test/pairwise/pairwise_clients.spec.ts",
 	"test/registration_management/registration_management.spec.ts",
 	"test/registration_policies/registration_policies.spec.ts",
-	"test/resource_indicators/resource_indicators.spec.ts",
-	"test/sessions/sessions.spec.ts",
-	"test/session_bound_tokens/session_bound_tokens.spec.ts"
+	"test/resource_indicators/resource_indicators.spec.ts"
 ]

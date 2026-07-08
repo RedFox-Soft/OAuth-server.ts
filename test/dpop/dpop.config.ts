@@ -15,8 +15,8 @@ merge(config.features, {
 		verifyUserCode() {},
 		async triggerAuthenticationDevice(ctx, request) {
 			const grant = new Grant({
-				clientId: request.clientId,
-				accountId: request.accountId
+				clientId: request.payload.clientId,
+				accountId: request.payload.accountId
 			});
 			grant.addOIDCScope(ctx.oidc.requestParamScopes);
 			await grant.save();

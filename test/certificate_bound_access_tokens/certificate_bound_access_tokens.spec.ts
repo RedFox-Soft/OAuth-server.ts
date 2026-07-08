@@ -12,7 +12,7 @@ import { X509Certificate } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import * as url from 'node:url';
 
-import bootstrap, { agent } from '../test_helper.js';
+import bootstrap, { agent, jsonToFormUrlEncoded } from '../test_helper.js';
 import { provider } from 'lib/provider.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
@@ -113,215 +113,222 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 		});
 	});
 
-	describe.skip('urn:ietf:params:oauth:grant-type:device_code', () => {
-		let cookie;
+	describe('urn:ietf:params:oauth:grant-type:device_code', () => {
+		let dc;
 		beforeAll(async function () {
-			cookie = await setup.login({ scope: 'openid offline_access' });
+			await setup.login({ scope: 'openid offline_access' });
 		});
 		beforeEach(async function () {
-			await this.agent
-				.post('/device/auth')
-				.auth('client', 'secret')
-				.send({ scope: 'openid' })
-				.type('form')
-				.expect(200)
-				.expect(({ body: { device_code: dc } }) => {
-					this.dc = dc;
-				});
+			const { data } = await agent.device.auth.post(
+				jsonToFormUrlEncoded({ scope: 'openid' }),
+				{
+					headers: {
+						'content-type': 'application/x-www-form-urlencoded',
+						...AuthorizationRequest.basicAuthHeader('client', 'secret')
+					}
+				}
+			);
+			dc = data.device_code;
 
-			TestAdapter.for('DeviceCode').syncUpdate(this.getTokenJti(this.dc), {
-				grantId: this.getGrantId('client'),
+			TestAdapter.for('DeviceCode').syncUpdate(setup.getTokenJti(dc), {
+				grantId: setup.getGrantId('client'),
 				scope: 'openid offline_access',
-				accountId: this.loggedInAccountId
+				accountId: setup.getAccountId()
 			});
 		});
 
 		it('binds the access token to the certificate', async function () {
-			const spy = sinon.spy();
+			const spy = mock();
 			provider.once('grant.success', spy);
 
-			await this.agent
-				.post('/token')
-				.auth('client', 'secret')
-				.send({
+			const { status } = await agent.token.post(
+				{
 					grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
-					device_code: this.dc
-				})
-				.type('form')
-				.set('x-ssl-client-cert', crt.raw.toString('base64'))
-				.expect(200);
-
-			expect(spy).to.have.property('calledOnce', true);
+					device_code: dc
+				},
+				{
+					headers: {
+						...AuthorizationRequest.basicAuthHeader('client', 'secret'),
+						'x-client-cert': crt.raw.toString('base64')
+					}
+				}
+			);
+			expect(status).toBe(200);
+			expect(spy).toBeCalledTimes(1);
 			const {
 				oidc: {
 					entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 				}
-			} = spy.args[0][0];
-			expect(accessToken).to.have.property('x5t#S256', expectedS256);
-			expect(refreshToken).not.to.have.property('x5t#S256');
+			} = spy.mock.calls[0][0];
+			expect(accessToken.payload).toHaveProperty('x5t#S256', expectedS256);
+			expect(refreshToken.payload).not.toHaveProperty('x5t#S256');
 		});
 
 		it('verifies the request made with mutual-TLS', async function () {
-			const spy = sinon.spy();
+			const spy = mock();
 			provider.once('grant.error', spy);
 
-			await this.agent
-				.post('/token')
-				.auth('client', 'secret')
-				.send({
+			const { error } = await agent.token.post(
+				{
 					grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
-					device_code: this.dc
-				})
-				.type('form')
-				.expect(400)
-				.expect({
-					error: 'invalid_grant',
-					error_description: 'grant request is invalid'
-				});
-
-			expect(spy).to.have.property('calledOnce', true);
-			expect(spy.args[0][1]).to.have.property(
+					device_code: dc
+				},
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+			expect(error.status).toBe(400);
+			expect(error.value).toEqual({
+				error: 'invalid_grant',
+				error_description: 'grant request is invalid'
+			});
+			expect(spy).toBeCalledTimes(1);
+			expect(spy.mock.calls[0][0]).toHaveProperty(
 				'error_detail',
 				'mutual TLS client certificate not provided'
 			);
 		});
 
 		it('binds the refresh token to the certificate for public clients', async function () {
-			const spy = sinon.spy();
+			const spy = mock();
 			provider.once('grant.success', spy);
 
-			// changes the code to client-none and
-			TestAdapter.for('DeviceCode').syncUpdate(this.getTokenJti(this.dc), {
+			// changes the code to client-none
+			TestAdapter.for('DeviceCode').syncUpdate(setup.getTokenJti(dc), {
 				clientId: 'client-none',
-				grantId: this.getGrantId('client-none'),
-				accountId: this.loggedInAccountId
+				grantId: setup.getGrantId('client-none'),
+				accountId: setup.getAccountId()
 			});
 
-			await this.agent
-				.post('/token')
-				.send({
+			const { status } = await agent.token.post(
+				{
 					client_id: 'client-none',
 					grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
-					device_code: this.dc
-				})
-				.type('form')
-				.set('x-ssl-client-cert', crt.raw.toString('base64'))
-				.expect(200);
-
-			expect(spy).to.have.property('calledOnce', true);
+					device_code: dc
+				},
+				{
+					headers: { 'x-client-cert': crt.raw.toString('base64') }
+				}
+			);
+			expect(status).toBe(200);
+			expect(spy).toBeCalledTimes(1);
 			const {
 				oidc: {
 					entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 				}
-			} = spy.args[0][0];
-			expect(accessToken).to.have.property('x5t#S256', expectedS256);
-			expect(refreshToken).to.have.property('x5t#S256', expectedS256);
+			} = spy.mock.calls[0][0];
+			expect(accessToken.payload).toHaveProperty('x5t#S256', expectedS256);
+			expect(refreshToken.payload).toHaveProperty('x5t#S256', expectedS256);
 		});
 	});
 
-	describe.skip('urn:openid:params:grant-type:ciba', () => {
+	describe('urn:openid:params:grant-type:ciba', () => {
+		let reqId;
 		beforeEach(async function () {
-			await this.agent
-				.post('/backchannel')
-				.auth('client', 'secret')
-				.send({
+			const { data } = await agent.backchannel.post(
+				jsonToFormUrlEncoded({
 					scope: 'openid offline_access',
 					login_hint: 'accountId'
-				})
-				.type('form')
-				.expect(200)
-				.expect(({ body: { auth_req_id: reqId } }) => {
-					this.reqId = reqId;
-				});
+				}),
+				{
+					headers: {
+						'content-type': 'application/x-www-form-urlencoded',
+						...AuthorizationRequest.basicAuthHeader('client', 'secret')
+					}
+				}
+			);
+			reqId = data.auth_req_id;
 		});
 
 		it('binds the access token to the certificate', async function () {
-			const spy = sinon.spy();
+			const spy = mock();
 			provider.once('grant.success', spy);
 
-			await this.agent
-				.post('/token')
-				.auth('client', 'secret')
-				.send({
+			const { status } = await agent.token.post(
+				{
 					grant_type: 'urn:openid:params:grant-type:ciba',
-					auth_req_id: this.reqId
-				})
-				.type('form')
-				.set('x-ssl-client-cert', crt.raw.toString('base64'))
-				.expect(200);
-
-			expect(spy).to.have.property('calledOnce', true);
+					auth_req_id: reqId
+				},
+				{
+					headers: {
+						...AuthorizationRequest.basicAuthHeader('client', 'secret'),
+						'x-client-cert': crt.raw.toString('base64')
+					}
+				}
+			);
+			expect(status).toBe(200);
+			expect(spy).toBeCalledTimes(1);
 			const {
 				oidc: {
 					entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 				}
-			} = spy.args[0][0];
-			expect(accessToken).to.have.property('x5t#S256', expectedS256);
-			expect(refreshToken).not.to.have.property('x5t#S256');
+			} = spy.mock.calls[0][0];
+			expect(accessToken.payload).toHaveProperty('x5t#S256', expectedS256);
+			expect(refreshToken.payload).not.toHaveProperty('x5t#S256');
 		});
 
 		it('verifies the request made with mutual-TLS', async function () {
-			const spy = sinon.spy();
+			const spy = mock();
 			provider.once('grant.error', spy);
 
-			await this.agent
-				.post('/token')
-				.auth('client', 'secret')
-				.send({
+			const { error } = await agent.token.post(
+				{
 					grant_type: 'urn:openid:params:grant-type:ciba',
-					auth_req_id: this.reqId
-				})
-				.type('form')
-				.expect(400)
-				.expect({
-					error: 'invalid_grant',
-					error_description: 'grant request is invalid'
-				});
-
-			expect(spy).to.have.property('calledOnce', true);
-			expect(spy.args[0][1]).to.have.property(
+					auth_req_id: reqId
+				},
+				{
+					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
+				}
+			);
+			expect(error.status).toBe(400);
+			expect(error.value).toEqual({
+				error: 'invalid_grant',
+				error_description: 'grant request is invalid'
+			});
+			expect(spy).toBeCalledTimes(1);
+			expect(spy.mock.calls[0][0]).toHaveProperty(
 				'error_detail',
 				'mutual TLS client certificate not provided'
 			);
 		});
 
 		it('binds the refresh token to the certificate for public clients', async function () {
-			const spy = sinon.spy();
+			const spy = mock();
 			provider.once('grant.success', spy);
 
 			// changes the code to client-none
 			TestAdapter.for('BackchannelAuthenticationRequest').syncUpdate(
-				this.getTokenJti(this.reqId),
+				setup.getTokenJti(reqId),
 				{
 					clientId: 'client-none'
 				}
 			);
 			const { grantId } = TestAdapter.for(
 				'BackchannelAuthenticationRequest'
-			).syncFind(this.getTokenJti(this.reqId));
+			).syncFind(setup.getTokenJti(reqId));
 			TestAdapter.for('Grant').syncUpdate(grantId, {
 				clientId: 'client-none'
 			});
 
-			await this.agent
-				.post('/token')
-				.send({
+			const { status } = await agent.token.post(
+				{
 					client_id: 'client-none',
 					grant_type: 'urn:openid:params:grant-type:ciba',
-					auth_req_id: this.reqId
-				})
-				.type('form')
-				.set('x-ssl-client-cert', crt.raw.toString('base64'))
-				.expect(200);
-
-			expect(spy).to.have.property('calledOnce', true);
+					auth_req_id: reqId
+				},
+				{
+					headers: { 'x-client-cert': crt.raw.toString('base64') }
+				}
+			);
+			expect(status).toBe(200);
+			expect(spy).toBeCalledTimes(1);
 			const {
 				oidc: {
 					entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 				}
-			} = spy.args[0][0];
-			expect(accessToken).to.have.property('x5t#S256', expectedS256);
-			expect(refreshToken).to.have.property('x5t#S256', expectedS256);
+			} = spy.mock.calls[0][0];
+			expect(accessToken.payload).toHaveProperty('x5t#S256', expectedS256);
+			expect(refreshToken.payload).toHaveProperty('x5t#S256', expectedS256);
 		});
 	});
 

@@ -13,6 +13,9 @@ describe('signatures', () => {
 		setup = await bootstrap(import.meta.url)();
 	});
 
+	// SKIP: symmetric (HS256) id_token signing is intentionally unsupported — Constitution VI
+	// mandates RS256-only JWT signing from the configured JWKS. Enabling this would require a
+	// documented deviation behind a named feature flag, which is out of scope for this feature.
 	describe.skip('when id_token_signed_response_alg=HS256', () => {
 		let cookie = null;
 

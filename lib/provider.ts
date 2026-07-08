@@ -180,7 +180,7 @@ class ProviderClass extends EventEmitter {
 			throw new TypeError('invalid "request" argument');
 		}
 
-		const client = await Client.find(request.clientId);
+		const client = await Client.find(request.payload.clientId);
 		if (!client) {
 			throw new Error('Client not found');
 		}
@@ -194,15 +194,15 @@ class ProviderClass extends EventEmitter {
 
 		switch (true) {
 			case result instanceof Grant:
-				if (request.clientId !== result.clientId) {
+				if (request.payload.clientId !== result.payload.clientId) {
 					throw new Error('client mismatch');
 				}
 
-				if (request.accountId !== result.accountId) {
+				if (request.payload.accountId !== result.payload.accountId) {
 					throw new Error('accountId mismatch');
 				}
 
-				Object.assign(request, {
+				Object.assign(request.payload, {
 					grantId: result.jti,
 					acr,
 					amr,
@@ -213,9 +213,9 @@ class ProviderClass extends EventEmitter {
 				});
 				break;
 			case result instanceof OIDCProviderError:
-				Object.assign(request, {
+				Object.assign(request.payload, {
 					error: result.error,
-					error_description: result.error_description
+					errorDescription: result.error_description
 				});
 				break;
 			default:

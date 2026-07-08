@@ -87,6 +87,7 @@ const mapErrorCode = {
 		'pushed_authorization_request.error',
 	[routeNames.authorization]: 'authorization.error',
 	[routeNames.device_authorization]: 'device_authorization.error',
+	[routeNames.backchannel_authentication]: 'backchannel_authentication.error',
 	[routeNames.introspect]: 'introspection.error',
 	[routeNames.userinfo]: 'userinfo.error',
 	[routeNames.end_session]: 'end_session.error',

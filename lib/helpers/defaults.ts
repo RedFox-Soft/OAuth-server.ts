@@ -1,6 +1,7 @@
 import { mustChange } from '../addon/_warn.ts';
 import { clientBasedCORS } from '../addon/cors.ts';
 import {
+	getCertificate,
 	certificateAuthorized,
 	certificateSubjectMatches
 } from '../addon/mtls.ts';
@@ -127,9 +128,10 @@ function makeDefaults() {
 			/*
 			 * features.mTLS.* — Mutual TLS helper functions
 			 *
-			 * certificateAuthorized, certificateSubjectMatches
+			 * getCertificate, certificateAuthorized, certificateSubjectMatches
 			 */
 			mTLS: {
+				getCertificate,
 				certificateAuthorized,
 				certificateSubjectMatches
 			},

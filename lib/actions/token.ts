@@ -1,6 +1,7 @@
 import { Elysia, t } from 'elysia';
 import { InvalidRequest } from '../helpers/errors.js';
 import {
+	cibaGrantParameters,
 	codeGrantParameters,
 	deviceCodeGrantParameters,
 	executeGrant,
@@ -47,7 +48,8 @@ export const tokenAction = new Elysia().use(AuthPlugin).post(
 			}),
 			t.Partial(codeGrantParameters),
 			t.Partial(refreshTokenGrantParameters),
-			t.Partial(deviceCodeGrantParameters)
+			t.Partial(deviceCodeGrantParameters),
+			t.Partial(cibaGrantParameters)
 		]),
 		headers: authHeaders
 		// NOTE: a typed `response` map cannot be added here yet. Declaring one forces Elysia to

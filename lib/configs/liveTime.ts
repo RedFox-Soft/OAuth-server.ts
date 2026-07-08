@@ -41,8 +41,9 @@ export const ttl = {
 		return 60; // 1 minute in seconds
 	},
 	BackchannelAuthenticationRequest(ctx, request, client) {
-		if (ctx?.oidc?.params.requested_expiry) {
-			return Math.min(10 * 60, +ctx.oidc.params.requested_expiry); // 10 minutes in seconds or requested_expiry, whichever is shorter
+		const requestedExpiry = request?.payload?.params?.requested_expiry;
+		if (requestedExpiry) {
+			return Math.min(10 * 60, +requestedExpiry); // 10 minutes in seconds or requested_expiry, whichever is shorter
 		}
 
 		return 10 * 60; // 10 minutes in seconds

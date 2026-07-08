@@ -1,6 +1,7 @@
 import presence from '../../helpers/validate_presence.ts';
+import { InvalidRequest } from '../../helpers/errors.ts';
 
-export default function oidcRequired(oidc, next) {
+export default function cibaRequired(oidc) {
 	const required = new Set(['scope']);
 
 	if (oidc.client.backchannelTokenDeliveryMode !== 'poll') {
@@ -9,5 +10,10 @@ export default function oidcRequired(oidc, next) {
 
 	presence(oidc, ...required);
 
-	return next();
+	if (
+		oidc.params.requested_expiry !== undefined &&
+		!(Number(oidc.params.requested_expiry) > 0)
+	) {
+		throw new InvalidRequest('invalid requested_expiry parameter value');
+	}
 }

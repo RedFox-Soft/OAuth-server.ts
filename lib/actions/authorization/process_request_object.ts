@@ -39,7 +39,12 @@ export default async function processRequestObject(
 	const isBackchannelAuthentication = route === 'backchannel_authentication';
 	const { features } = instance(oidc.provider);
 
-	if (params.request === undefined && client.requireSignedRequestObject) {
+	if (
+		params.request === undefined &&
+		(client.requireSignedRequestObject ||
+			(isBackchannelAuthentication &&
+				client['requestObject.backChannelSigningAlg']))
+	) {
 		throw new InvalidRequest('Request Object must be used by this client');
 	}
 

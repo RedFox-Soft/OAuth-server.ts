@@ -15,9 +15,9 @@ export async function backchannelPing(
 		client.backchannelTokenDeliveryMode !== 'ping' ||
 		!backchannelAuthenticationRequest ||
 		!backchannelAuthenticationRequest.jti ||
-		backchannelAuthenticationRequest.kind !==
+		backchannelAuthenticationRequest.payload.kind !==
 			'BackchannelAuthenticationRequest' ||
-		!backchannelAuthenticationRequest.params.client_notification_token
+		!backchannelAuthenticationRequest.payload.params.client_notification_token
 	) {
 		throw new TypeError();
 	}
@@ -25,7 +25,7 @@ export async function backchannelPing(
 	return fetch(new URL(client.backchannelClientNotificationEndpoint).href, {
 		method: 'POST',
 		headers: {
-			authorization: `Bearer ${backchannelAuthenticationRequest.params.client_notification_token}`,
+			authorization: `Bearer ${backchannelAuthenticationRequest.payload.params.client_notification_token}`,
 			'content-type': 'application/json'
 		},
 		body: JSON.stringify({
