@@ -228,6 +228,7 @@ export default async function processRequestObject(
 		oidc.trusted = Object.keys(request);
 	}
 
+	const decryptedRequest = params.request;
 	params.request = undefined;
 
 	const keys = new Set([...Object.keys(request), ...Object.keys(params)]);
@@ -248,4 +249,5 @@ export default async function processRequestObject(
 		params.dpop_jkt = oidc.entities.PushedAuthorizationRequest.payload.dpopJkt;
 		oidc.trusted?.push('dpop_jkt');
 	}
+	return decryptedRequest;
 }

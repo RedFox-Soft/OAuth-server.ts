@@ -1,6 +1,7 @@
+import { describe, it, beforeAll, afterEach, expect } from 'bun:test';
+
 import map from 'lodash/map.js';
 import uniq from 'lodash/uniq.js';
-import { expect } from 'chai';
 
 import bootstrap from '../test_helper.js';
 import { assertNoPendingInterceptors, mock } from '../fetch_mock.js';
@@ -9,56 +10,56 @@ import { Claims } from 'lib/helpers/claims.js';
 import { provider } from 'lib/provider.js';
 
 describe('pairwise features', () => {
-	before(bootstrap(import.meta.url));
+	beforeAll(bootstrap(import.meta.url));
 
 	afterEach(assertNoPendingInterceptors);
 
 	describe('pairwise client configuration', () => {
-		context('sector_identifier_uri is not provided', () => {
-			it('resolves the sector_identifier from one redirect_uri', function () {
+		describe('sector_identifier_uri is not provided', () => {
+			it('resolves the sector_identifier from one redirect_uri', () => {
 				return addClient(provider, {
-					client_id: 'client',
-					client_secret: 'secret',
-					redirect_uris: ['https://client.example.com/cb'],
+					clientId: 'client',
+					clientSecret: 'secret',
+					redirectUris: ['https://client.example.com/cb'],
 					subjectType: 'pairwise'
 				}).then((client) => {
-					expect(client.sectorIdentifier).to.be.ok;
-					expect(client.sectorIdentifier).to.eq('client.example.com');
+					expect(client.sectorIdentifier).toBeTruthy();
+					expect(client.sectorIdentifier).toBe('client.example.com');
 				});
 			});
 
-			it('resolves the sector_identifier if redirect_uris hosts are the same', function () {
+			it('resolves the sector_identifier if redirect_uris hosts are the same', () => {
 				return addClient(provider, {
-					client_id: 'client',
-					client_secret: 'secret',
-					redirect_uris: [
+					clientId: 'client',
+					clientSecret: 'secret',
+					redirectUris: [
 						'https://client.example.com/cb',
 						'https://client.example.com/forum/cb'
 					],
 					subjectType: 'pairwise'
 				}).then((client) => {
-					expect(client.sectorIdentifier).to.be.ok;
-					expect(client.sectorIdentifier).to.eq('client.example.com');
+					expect(client.sectorIdentifier).toBeTruthy();
+					expect(client.sectorIdentifier).toBe('client.example.com');
 				});
 			});
 
-			it('fails to validate when multiple redirect_uris hosts are provided', function () {
+			it('fails to validate when multiple redirect_uris hosts are provided', () => {
 				return addClient(provider, {
-					client_id: 'client',
-					client_secret: 'secret',
-					redirect_uris: [
+					clientId: 'client',
+					clientSecret: 'secret',
+					redirectUris: [
 						'https://client.example.com/cb',
 						'https://wrongsubdomain.example.com/forum/cb'
 					],
 					subjectType: 'pairwise'
 				}).then(
 					(client) => {
-						expect(client).not.to.be.ok;
+						expect(client).toBeFalsy();
 					},
 					(err) => {
-						expect(err).to.be.ok;
-						expect(err.message).to.eq('invalid_client_metadata');
-						expect(err.error_description).to.eq(
+						expect(err).toBeTruthy();
+						expect(err.message).toBe('invalid_client_metadata');
+						expect(err.error_description).toBe(
 							'sector_identifier_uri is mandatory property'
 						);
 					}
@@ -66,8 +67,8 @@ describe('pairwise features', () => {
 			});
 		});
 
-		context('sector_identifier_uri is provided', () => {
-			it('is not ignored even without subjectType=pairwise', function () {
+		describe('sector_identifier_uri is provided', () => {
+			it('is not ignored even without subjectType=pairwise', () => {
 				mock('https://foobar.example.com')
 					.intercept({
 						path: '/sector'
@@ -81,21 +82,21 @@ describe('pairwise features', () => {
 					);
 
 				return addClient(provider, {
-					client_id: 'client',
-					client_secret: 'secret',
-					redirect_uris: [
+					clientId: 'client',
+					clientSecret: 'secret',
+					redirectUris: [
 						'https://client.example.com/cb',
 						'https://another.example.com/forum/cb'
 					],
 					sector_identifier_uri: 'https://foobar.example.com/sector',
 					subjectType: 'public'
 				}).then((client) => {
-					expect(client).to.be.ok;
-					expect(client.sectorIdentifier).to.eq('foobar.example.com');
+					expect(client).toBeTruthy();
+					expect(client.sectorIdentifier).toBe('foobar.example.com');
 				});
 			});
 
-			it('validates the sector from the provided uri', function () {
+			it('validates the sector from the provided uri', () => {
 				mock('https://foobar.example.com')
 					.intercept({
 						path: '/sector'
@@ -109,21 +110,21 @@ describe('pairwise features', () => {
 					);
 
 				return addClient(provider, {
-					client_id: 'client',
-					client_secret: 'secret',
-					redirect_uris: [
+					clientId: 'client',
+					clientSecret: 'secret',
+					redirectUris: [
 						'https://client.example.com/cb',
 						'https://another.example.com/forum/cb'
 					],
 					sector_identifier_uri: 'https://foobar.example.com/sector',
 					subjectType: 'pairwise'
 				}).then((client) => {
-					expect(client).to.be.ok;
-					expect(client.sectorIdentifier).to.eq('foobar.example.com');
+					expect(client).toBeTruthy();
+					expect(client.sectorIdentifier).toBe('foobar.example.com');
 				});
 			});
 
-			it('validates the sector from the provided uri for static clients too', function () {
+			it('validates the sector from the provided uri for static clients too', () => {
 				mock('https://foobar.example.com')
 					.intercept({
 						path: '/sector'
@@ -138,17 +139,17 @@ describe('pairwise features', () => {
 
 				return provider.Client.find('client-static-with-sector').then(
 					(client) => {
-						expect(client).to.be.ok;
-						expect(client.sectorIdentifier).to.eq('foobar.example.com');
+						expect(client).toBeTruthy();
+						expect(client.sectorIdentifier).toBe('foobar.example.com');
 					}
 				);
 			});
 
-			it('must be an https uri', function () {
+			it('must be an https uri', () => {
 				return addClient(provider, {
-					client_id: 'client',
-					client_secret: 'secret',
-					redirect_uris: [
+					clientId: 'client',
+					clientSecret: 'secret',
+					redirectUris: [
 						'https://client.example.com/cb',
 						'https://another.example.com/forum/cb'
 					],
@@ -156,18 +157,23 @@ describe('pairwise features', () => {
 					subjectType: 'pairwise'
 				}).then(
 					(client) => {
-						expect(client).not.to.be.ok;
+						expect(client).toBeFalsy();
 					},
 					(err) => {
-						expect(err.message).to.equal('invalid_client_metadata');
-						expect(err.error_description).to.equal(
-							'sector_identifier_uri must be a https uri'
+						expect(err.message).toBe('invalid_client_metadata');
+						// The https-uri shape check moved to the TypeBox ClientSchema, which
+						// reports a generic error_description and the specifics in error_detail.
+						expect(err.error_description).toBe(
+							'client metadata validation error'
+						);
+						expect(err.error_detail).toContain(
+							"/sectorIdentifierUri Expected string to match 'https-uri' format"
 						);
 					}
 				);
 			});
 
-			it('validates all redirect_uris are in the uri', function () {
+			it('validates all redirect_uris are in the uri', () => {
 				mock('https://client.example.com')
 					.intercept({
 						path: '/sector'
@@ -181,9 +187,9 @@ describe('pairwise features', () => {
 					);
 
 				return addClient(provider, {
-					client_id: 'client',
-					client_secret: 'secret',
-					redirect_uris: [
+					clientId: 'client',
+					clientSecret: 'secret',
+					redirectUris: [
 						'https://client.example.com/cb',
 						'https://missing.example.com/forum/cb'
 					],
@@ -191,20 +197,20 @@ describe('pairwise features', () => {
 					subjectType: 'pairwise'
 				}).then(
 					(client) => {
-						expect(client).not.to.be.ok;
+						expect(client).toBeFalsy();
 					},
 					(err) => {
-						expect(err).to.be.ok;
-						expect(err.message).to.eq('invalid_client_metadata');
-						expect(err.error_description).to.eq(
-							'all registered redirect_uris must be included in the sector_identifier_uri response'
+						expect(err).toBeTruthy();
+						expect(err.message).toBe('invalid_client_metadata');
+						expect(err.error_description).toBe(
+							'all registered redirectUris must be included in the sector_identifier_uri response'
 						);
 					}
 				);
 			});
 
 			describe('features.ciba', () => {
-				it('validates jwks_uri is in the response', function () {
+				it('validates jwks_uri is in the response', () => {
 					mock('https://client.example.com')
 						.intercept({
 							path: '/sector'
@@ -228,12 +234,12 @@ describe('pairwise features', () => {
 						subjectType: 'pairwise'
 					}).then(
 						(client) => {
-							expect(client).not.to.be.ok;
+							expect(client).toBeFalsy();
 						},
 						(err) => {
-							expect(err).to.be.ok;
-							expect(err.message).to.eq('invalid_client_metadata');
-							expect(err.error_description).to.eq(
+							expect(err).toBeTruthy();
+							expect(err.message).toBe('invalid_client_metadata');
+							expect(err.error_description).toBe(
 								"client's jwks_uri must be included in the sector_identifier_uri response"
 							);
 						}
@@ -242,7 +248,7 @@ describe('pairwise features', () => {
 			});
 
 			describe('features.deviceFlow', () => {
-				it('validates jwks_uri is in the response', function () {
+				it('validates jwks_uri is in the response', () => {
 					mock('https://client.example.com')
 						.intercept({
 							path: '/sector'
@@ -265,12 +271,12 @@ describe('pairwise features', () => {
 						subjectType: 'pairwise'
 					}).then(
 						(client) => {
-							expect(client).not.to.be.ok;
+							expect(client).toBeFalsy();
 						},
 						(err) => {
-							expect(err).to.be.ok;
-							expect(err.message).to.eq('invalid_client_metadata');
-							expect(err.error_description).to.eq(
+							expect(err).toBeTruthy();
+							expect(err.message).toBe('invalid_client_metadata');
+							expect(err.error_description).toBe(
 								"client's jwks_uri must be included in the sector_identifier_uri response"
 							);
 						}
@@ -278,7 +284,7 @@ describe('pairwise features', () => {
 				});
 			});
 
-			it('validates the response is a json', function () {
+			it('validates the response is a json', () => {
 				mock('https://client.example.com')
 					.intercept({
 						path: '/sector'
@@ -286,9 +292,9 @@ describe('pairwise features', () => {
 					.reply(200, '{ not a valid json');
 
 				return addClient(provider, {
-					client_id: 'client',
-					client_secret: 'secret',
-					redirect_uris: [
+					clientId: 'client',
+					clientSecret: 'secret',
+					redirectUris: [
 						'https://client.example.com/cb',
 						'https://missing.example.com/forum/cb'
 					],
@@ -296,19 +302,19 @@ describe('pairwise features', () => {
 					subjectType: 'pairwise'
 				}).then(
 					(client) => {
-						expect(client).not.to.be.ok;
+						expect(client).toBeFalsy();
 					},
 					(err) => {
-						expect(err).to.be.ok;
-						expect(err.message).to.eq('invalid_client_metadata');
-						expect(err.error_description).to.eq(
+						expect(err).toBeTruthy();
+						expect(err.message).toBe('invalid_client_metadata');
+						expect(err.error_description).toBe(
 							'failed to parse sector_identifier_uri JSON response'
 						);
 					}
 				);
 			});
 
-			it('validates only accepts json array responses', function () {
+			it('validates only accepts json array responses', () => {
 				mock('https://client.example.com')
 					.intercept({
 						path: '/sector'
@@ -326,19 +332,19 @@ describe('pairwise features', () => {
 					subjectType: 'pairwise'
 				}).then(
 					(client) => {
-						expect(client).not.to.be.ok;
+						expect(client).toBeFalsy();
 					},
 					(err) => {
-						expect(err).to.be.ok;
-						expect(err.message).to.eq('invalid_client_metadata');
-						expect(err.error_description).to.eq(
+						expect(err).toBeTruthy();
+						expect(err.message).toBe('invalid_client_metadata');
+						expect(err.error_description).toBe(
 							'sector_identifier_uri must return single JSON array'
 						);
 					}
 				);
 			});
 
-			it('handles got lib errors', function () {
+			it('handles got lib errors', () => {
 				mock('https://client.example.com')
 					.intercept({
 						path: '/sector'
@@ -356,19 +362,19 @@ describe('pairwise features', () => {
 					subjectType: 'pairwise'
 				}).then(
 					(client) => {
-						expect(client).not.to.be.ok;
+						expect(client).toBeFalsy();
 					},
 					(err) => {
-						expect(err).to.be.ok;
-						expect(err.message).to.eq('invalid_client_metadata');
-						expect(err.error_description).to.eq(
+						expect(err).toBeTruthy();
+						expect(err.message).toBe('invalid_client_metadata');
+						expect(err.error_description).toBe(
 							'unexpected sector_identifier_uri response status code, expected 200 OK, got 500 Internal Server Error'
 						);
 					}
 				);
 			});
 
-			it('doesnt accepts 200s, rejects even on redirect', function () {
+			it('doesnt accepts 200s, rejects even on redirect', () => {
 				mock('https://client.example.com')
 					.intercept({
 						path: '/sector'
@@ -386,12 +392,12 @@ describe('pairwise features', () => {
 					subjectType: 'pairwise'
 				}).then(
 					(client) => {
-						expect(client).not.to.be.ok;
+						expect(client).toBeFalsy();
 					},
 					(err) => {
-						expect(err).to.be.ok;
-						expect(err.message).to.eq('invalid_client_metadata');
-						expect(err.error_description).to.eq(
+						expect(err).toBeTruthy();
+						expect(err.message).toBe('invalid_client_metadata');
+						expect(err.error_description).toBe(
 							'unexpected sector_identifier_uri response status code, expected 200 OK, got 201 Created'
 						);
 					}
@@ -403,39 +409,39 @@ describe('pairwise features', () => {
 	describe('pairwise client Subject calls', () => {
 		const clients = [];
 
-		before(function () {
+		beforeAll(() => {
 			return addClient(provider, {
-				client_id: 'clientOne',
-				client_secret: 'secret',
-				redirect_uris: ['https://clientone.com/cb'],
+				clientId: 'clientOne',
+				clientSecret: 'secret',
+				redirectUris: ['https://clientone.com/cb'],
 				subjectType: 'pairwise'
 			}).then((client) => {
 				clients.push(client);
 			});
 		});
 
-		before(function () {
+		beforeAll(() => {
 			return addClient(provider, {
-				client_id: 'clientTwo',
-				client_secret: 'secret',
-				redirect_uris: ['https://clienttwo.com/cb'],
+				clientId: 'clientTwo',
+				clientSecret: 'secret',
+				redirectUris: ['https://clienttwo.com/cb'],
 				subjectType: 'pairwise'
 			}).then((client) => {
 				clients.push(client);
 			});
 		});
 
-		before(function () {
+		beforeAll(() => {
 			return addClient(provider, {
-				client_id: 'clientThree',
-				client_secret: 'secret',
-				redirect_uris: ['https://clientthree.com/cb']
+				clientId: 'clientThree',
+				clientSecret: 'secret',
+				redirectUris: ['https://clientthree.com/cb']
 			}).then((client) => {
 				clients.push(client);
 			});
 		});
 
-		it('returns different subs', async function () {
+		it('returns different subs', async () => {
 			const subs = await Promise.all(
 				map(clients, async (client) => {
 					const claims = new Claims(client, { sub: 'accountId' });
@@ -446,9 +452,9 @@ describe('pairwise features', () => {
 				})
 			);
 
-			expect(subs).to.have.lengthOf(3);
-			expect(uniq(subs)).to.have.lengthOf(3);
-			expect(subs).to.contain('accountId');
+			expect(subs).toHaveLength(3);
+			expect(uniq(subs)).toHaveLength(3);
+			expect(subs).toContain('accountId');
 		});
 	});
 });

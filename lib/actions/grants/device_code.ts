@@ -119,7 +119,7 @@ export const handler = async function deviceCodeHandler(oidc, dPoP) {
 	const at = new AccessToken({
 		accountId: account.accountId,
 		client: oidc.client,
-		expiresWithSession: code.expiresWithSession,
+		expiresWithSession: code.payload.expiresWithSession,
 		grantId: code.payload.grantId,
 		gty,
 		sessionUid: code.payload.sessionUid,
@@ -149,10 +149,10 @@ export const handler = async function deviceCodeHandler(oidc, dPoP) {
 			resource,
 			resourceServerInfo
 		);
-		at.scope = grant.getResourceScopeFiltered(resource, code.scopes);
+		at.payload.scope = grant.getResourceScopeFiltered(resource, code.scopes);
 	} else {
-		at.claims = code.claims;
-		at.scope = grant.getOIDCScopeFiltered(code.scopes);
+		at.payload.claims = code.payload.claims;
+		at.payload.scope = grant.getOIDCScopeFiltered(code.scopes);
 	}
 
 	oidc.entity('AccessToken', at);
@@ -162,20 +162,20 @@ export const handler = async function deviceCodeHandler(oidc, dPoP) {
 	if (await issueRefreshToken({ oidc }, oidc.client, code)) {
 		const rt = new RefreshToken({
 			accountId: account.accountId,
-			acr: code.acr,
-			amr: code.amr,
-			authTime: code.authTime,
-			claims: code.claims,
+			acr: code.payload.acr,
+			amr: code.payload.amr,
+			authTime: code.payload.authTime,
+			claims: code.payload.claims,
 			client: oidc.client,
-			expiresWithSession: code.expiresWithSession,
-			grantId: code.grantId,
+			expiresWithSession: code.payload.expiresWithSession,
+			grantId: code.payload.grantId,
 			gty,
-			nonce: code.nonce,
-			resource: code.resource,
+			nonce: code.payload.nonce,
+			resource: code.payload.resource,
 			rotations: 0,
-			scope: code.scope,
-			sessionUid: code.sessionUid,
-			sid: code.sid
+			scope: code.payload.scope,
+			sessionUid: code.payload.sessionUid,
+			sid: code.payload.sid
 		});
 
 		if (oidc.client.clientAuthMethod === 'none') {
@@ -194,7 +194,7 @@ export const handler = async function deviceCodeHandler(oidc, dPoP) {
 
 	let idToken;
 	if (code.scopes.has('openid')) {
-		const claims = filterClaims(code.claims, 'id_token', grant);
+		const claims = filterClaims(code.payload.claims, 'id_token', grant);
 		const rejected = grant.getRejectedOIDCClaims();
 		const token = new IdToken(oidc.client, {
 			...(await account.claims(
@@ -223,8 +223,8 @@ export const handler = async function deviceCodeHandler(oidc, dPoP) {
 		token.mask = claims;
 		token.rejected = rejected;
 
-		token.set('nonce', code.nonce);
-		token.set('sid', code.sid);
+		token.set('nonce', code.payload.nonce);
+		token.set('sid', code.payload.sid);
 
 		idToken = await token.issue({ use: 'idtoken' });
 	}

@@ -1,47 +1,81 @@
 import { parse as parseUrl } from 'node:url';
 
+import {
+	describe,
+	it,
+	beforeAll,
+	beforeEach,
+	afterEach,
+	expect,
+	spyOn
+} from 'bun:test';
 import sinon from 'sinon';
-import { expect } from 'chai';
-import { beforeAll, spyOn } from 'bun:test';
 import snakeCase from 'lodash/snakeCase.js';
 
-import bootstrap from '../test_helper.js';
+import bootstrap, { agent, jsonToFormUrlEncoded } from '../test_helper.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { provider } from 'lib/provider.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
 
+function getAuth(auth, cookie?) {
+	return agent.auth.get({ query: auth.params, headers: { cookie } });
+}
+
+function codeFromResponse(response: Response) {
+	const location = response.headers.get('location');
+	const {
+		query: { code }
+	} = parseUrl(location, true);
+	return code as string;
+}
+
 describe('requests without the openid scope', () => {
-	before(bootstrap(import.meta.url));
+	let setup = null;
+	beforeAll(async () => {
+		setup = await bootstrap(import.meta.url)();
+		// consent skip: never require an interaction prompt for these flows
+		spyOn(OIDCContext.prototype, 'promptPending').mockReturnValue(false);
+	});
 
 	afterEach(function () {
 		provider.removeAllListeners();
+		sinon.restore();
 	});
 
 	describe('openid scope gated parameters', () => {
-		[
-			'acr_values',
-			'claims',
-			'claims_locales',
-			'id_token_hint',
-			'max_age',
-			'nonce'
-		].forEach((param) => {
+		// Each value must be well-formed enough to clear the TypeBox query-schema
+		// validation so the request actually reaches the openid-scope gate under
+		// test. `max_age` must be numeric; `claims` must be an object/ObjectString.
+		const gatedValues = {
+			acr_values: 'foo',
+			claims: { id_token: { email: null } },
+			claims_locales: 'foo',
+			id_token_hint: 'foo',
+			max_age: 300,
+			nonce: 'foo'
+		};
+		Object.keys(gatedValues).forEach((param) => {
 			it(`${param} can only be used when openid is amongst the requested scopes`, async function () {
-				const auth = new AuthorizationRequest({ [param]: 'foo' });
+				const auth = new AuthorizationRequest({
+					[param]: gatedValues[param]
+				});
 
-				await this.wrap({ route: '/auth', verb: 'get', auth })
-					.expect(303)
-					.expect(
-						auth.validatePresence(['error', 'error_description', 'state'])
-					) // notice state is not expected
-					.expect(auth.validateClientLocation)
-					.expect(auth.validateError('invalid_request'))
-					.expect(
-						auth.validateErrorDescription(
-							`openid scope must be requested when using the ${param} parameter`
-						)
-					);
+				const { response } = await getAuth(auth);
+
+				expect(response.status).toBe(303);
+				// notice state is not expected
+				auth.validatePresence(response, [
+					'error',
+					'error_description',
+					'state'
+				]);
+				auth.validateClientLocation(response);
+				auth.validateError(response, 'invalid_request');
+				auth.validateErrorDescription(
+					response,
+					`openid scope must be requested when using the ${param} parameter`
+				);
 			});
 		});
 
@@ -54,36 +88,41 @@ describe('requests without the openid scope', () => {
 				const auth = new AuthorizationRequest({ client_id: 'client' });
 
 				const client = await provider.Client.find('client');
-
 				client[clientProperty] = value;
 
-				await this.wrap({ route: '/auth', verb: 'get', auth })
-					.expect(() => {
-						delete client[clientProperty];
-					})
-					.expect(303)
-					.expect(
-						auth.validatePresence(['error', 'error_description', 'state'])
-					) // notice state is not expected
-					.expect(auth.validateClientLocation)
-					.expect(auth.validateError('invalid_request'))
-					.expect(
-						auth.validateErrorDescription(
-							`openid scope must be requested for clients with ${snakeCase(clientProperty)}`
-						)
-					);
+				let response;
+				try {
+					({ response } = await getAuth(auth));
+				} finally {
+					delete client[clientProperty];
+				}
+
+				expect(response.status).toBe(303);
+				// notice state is not expected
+				auth.validatePresence(response, [
+					'error',
+					'error_description',
+					'state'
+				]);
+				auth.validateClientLocation(response);
+				auth.validateError(response, 'invalid_request');
+				auth.validateErrorDescription(
+					response,
+					`openid scope must be requested for clients with ${snakeCase(clientProperty)}`
+				);
 			});
 		});
 	});
 
 	describe('response_types and flows that work when scope parameter is missing openid scope', () => {
 		const scope = 'api:read';
+
 		describe('when scope is e.g. missing openid (api:read)', () => {
-			before(function () {
-				return this.login({ scope: [scope, 'offline_access'].join(' ') });
-			});
-			after(function () {
-				return this.logout();
+			let cookie;
+			beforeAll(async function () {
+				cookie = await setup.login({
+					scope: [scope, 'offline_access'].join(' ')
+				});
 			});
 
 			describe('response_type=code', () => {
@@ -93,29 +132,27 @@ describe('requests without the openid scope', () => {
 					const spy = sinon.spy();
 					provider.on('authorization_code.saved', spy);
 
-					await this.wrap({ route: '/auth', verb: 'get', auth })
-						.expect(303)
-						.expect(auth.validateClientLocation)
-						.expect(auth.validatePresence(['code', 'state']));
+					const { response } = await getAuth(auth, cookie);
 
-					expect(spy.calledOnce).to.be.true;
-					expect(spy.args[0][0]).to.have.property('scope', scope);
+					expect(response.status).toBe(303);
+					auth.validateClientLocation(response);
+					auth.validatePresence(response, ['code', 'state']);
+
+					expect(spy.calledOnce).toBe(true);
+					expect(spy.args[0][0].payload).toHaveProperty('scope', scope);
 				});
 
 				describe('authorization code exchange', () => {
+					let auth;
+					let code;
 					beforeEach(async function () {
-						const auth = (this.auth = new AuthorizationRequest({ scope }));
+						auth = new AuthorizationRequest({ scope });
 
-						await this.wrap({ route: '/auth', verb: 'get', auth })
-							.expect(303)
-							.expect(auth.validateClientLocation)
-							.expect(auth.validatePresence(['code', 'state']))
-							.expect((response) => {
-								const {
-									query: { code }
-								} = parseUrl(response.headers.location, true);
-								this.code = code;
-							});
+						const { response } = await getAuth(auth, cookie);
+						expect(response.status).toBe(303);
+						auth.validateClientLocation(response);
+						auth.validatePresence(response, ['code', 'state']);
+						code = codeFromResponse(response);
 					});
 
 					it('gets an access token', async function () {
@@ -123,28 +160,18 @@ describe('requests without the openid scope', () => {
 						provider.on('access_token.saved', spy);
 						provider.on('access_token.issued', spy);
 
-						await this.agent
-							.post('/token')
-							.send({
-								client_id: 'client',
-								grant_type: 'authorization_code',
-								code_verifier: this.auth.code_verifier,
-								code: this.code
-							})
-							.type('form')
-							.expect(200)
-							.expect(({ body }) => {
-								expect(body).to.have.property('access_token');
-								expect(body).not.to.have.property('id_token');
-							});
+						const { data, status } = await auth.getToken(code);
+						expect(status).toBe(200);
+						expect(data).toHaveProperty('access_token');
+						expect(data).not.toHaveProperty('id_token');
 
-						expect(spy.calledOnce).to.be.true;
-						expect(spy.args[0][0]).to.have.property('scope', scope);
+						expect(spy.calledOnce).toBe(true);
+						expect(spy.args[0][0].payload).toHaveProperty('scope', scope);
 					});
 
 					it('gets an access token and a refresh token', async function () {
 						const adapter = TestAdapter.for('AuthorizationCode');
-						const jti = this.getTokenJti(this.code);
+						const jti = setup.getTokenJti(code);
 
 						const refreshScope = `${scope || ''} offline_access`.trim();
 
@@ -157,38 +184,32 @@ describe('requests without the openid scope', () => {
 						provider.on('access_token.issued', spy);
 						provider.on('refresh_token.saved', spy);
 
-						await this.agent
-							.post('/token')
-							.send({
-								client_id: 'client',
-								grant_type: 'authorization_code',
-								code_verifier: this.auth.code_verifier,
-								code: this.code
-							})
-							.type('form')
-							.expect(200)
-							.expect(({ body }) => {
-								expect(body).to.have.property('access_token');
-								expect(body).to.have.property('refresh_token');
-								expect(body).not.to.have.property('id_token');
-							});
+						const { data, status } = await auth.getToken(code);
+						expect(status).toBe(200);
+						expect(data).toHaveProperty('access_token');
+						expect(data).toHaveProperty('refresh_token');
+						expect(data).not.toHaveProperty('id_token');
 
-						expect(spy.calledTwice).to.be.true;
-						expect(spy.args[0][0]).to.have.property('scope', refreshScope);
-						expect(spy.args[1][0]).to.have.property('scope', refreshScope);
+						expect(spy.calledTwice).toBe(true);
+						expect(spy.args[0][0].payload).toHaveProperty(
+							'scope',
+							refreshScope
+						);
+						expect(spy.args[1][0].payload).toHaveProperty(
+							'scope',
+							refreshScope
+						);
 					});
 				});
 
 				describe('refresh token exchange', () => {
-					beforeAll(() => {
-						spyOn(OIDCContext.prototype, 'promptPending').mockReturnValue(
-							false
-						);
-					});
 					const refreshScope = `${scope || ''} offline_access`.trim();
+					let rt;
 
-					before(function () {
-						return this.login({ scope: [scope, 'offline_access'].join(' ') });
+					beforeAll(async function () {
+						cookie = await setup.login({
+							scope: [scope, 'offline_access'].join(' ')
+						});
 					});
 
 					beforeEach(async function () {
@@ -197,30 +218,14 @@ describe('requests without the openid scope', () => {
 							prompt: 'consent'
 						});
 
-						let code;
-						await this.wrap({ route: '/auth', verb: 'get', auth })
-							.expect(303)
-							.expect(auth.validateClientLocation)
-							.expect(auth.validatePresence(['code', 'state']))
-							.expect((response) => {
-								({
-									query: { code }
-								} = parseUrl(response.headers.location, true));
-							});
+						const { response } = await getAuth(auth, cookie);
+						expect(response.status).toBe(303);
+						auth.validateClientLocation(response);
+						auth.validatePresence(response, ['code', 'state']);
+						const code = codeFromResponse(response);
 
-						await this.agent
-							.post('/token')
-							.send({
-								client_id: 'client',
-								grant_type: 'authorization_code',
-								code_verifier: auth.code_verifier,
-								code
-							})
-							.type('form')
-							.expect(200)
-							.expect(({ body }) => {
-								this.rt = body.refresh_token;
-							});
+						const { data } = await auth.getToken(code);
+						rt = data.refresh_token;
 					});
 
 					it('gets an access token and a refresh token', async function () {
@@ -229,24 +234,25 @@ describe('requests without the openid scope', () => {
 						provider.on('access_token.issued', spy);
 						provider.on('refresh_token.saved', spy);
 
-						await this.agent
-							.post('/token')
-							.send({
-								client_id: 'client',
-								grant_type: 'refresh_token',
-								refresh_token: this.rt
-							})
-							.type('form')
-							.expect(200)
-							.expect(({ body }) => {
-								expect(body).to.have.property('access_token');
-								expect(body).to.have.property('refresh_token');
-								expect(body).not.to.have.property('id_token');
-							});
+						const { data, status } = await agent.token.post({
+							client_id: 'client',
+							grant_type: 'refresh_token',
+							refresh_token: rt
+						});
+						expect(status).toBe(200);
+						expect(data).toHaveProperty('access_token');
+						expect(data).toHaveProperty('refresh_token');
+						expect(data).not.toHaveProperty('id_token');
 
-						expect(spy.calledTwice).to.be.true;
-						expect(spy.args[0][0]).to.have.property('scope', refreshScope);
-						expect(spy.args[1][0]).to.have.property('scope', refreshScope);
+						expect(spy.calledTwice).toBe(true);
+						expect(spy.args[0][0].payload).toHaveProperty(
+							'scope',
+							refreshScope
+						);
+						expect(spy.args[1][0].payload).toHaveProperty(
+							'scope',
+							refreshScope
+						);
 					});
 				});
 			});
@@ -261,94 +267,110 @@ describe('requests without the openid scope', () => {
 					const spy = sinon.spy();
 					provider.on('authorization.success', spy);
 
-					await this.wrap({ route: '/auth', verb: 'get', auth })
-						.expect(303)
-						.expect(auth.validateClientLocation)
-						.expect(auth.validatePresence(['state']));
+					const { response } = await getAuth(auth, cookie);
 
-					expect(spy.calledOnce).to.be.true;
-					expect(spy.args[0][0].oidc.params).to.have.deep.property(
-						'scope',
-						scope
-					);
+					expect(response.status).toBe(303);
+					auth.validateClientLocation(response);
+					auth.validatePresence(response, ['state']);
+
+					expect(spy.calledOnce).toBe(true);
+					expect(spy.args[0][0].oidc.params).toHaveProperty('scope', scope);
 				});
 			});
 		});
 
 		describe('device flow', () => {
-			before(function () {
-				return this.login({ scope: [scope, 'offline_access'].join(' ') });
+			beforeAll(async function () {
+				await setup.login({ scope: [scope, 'offline_access'].join(' ') });
 			});
+
 			it('accepts the device authorization request', async function () {
 				const spy = sinon.spy();
 				provider.on('device_code.saved', spy);
 
-				await this.agent
-					.post('/device/auth')
-					.send({
+				const { status } = await agent.device.auth.post(
+					jsonToFormUrlEncoded({
 						client_id: 'client',
 						scope
-					})
-					.type('form')
-					.expect(200);
+					}),
+					{
+						headers: {
+							'content-type': 'application/x-www-form-urlencoded'
+						}
+					}
+				);
 
-				expect(spy.calledOnce).to.be.true;
+				expect(status).toBe(200);
+				expect(spy.calledOnce).toBe(true);
 				if (scope) {
-					expect(spy.args[0][0]).to.have.nested.property('params.scope', scope);
+					expect(spy.args[0][0].payload.params).toHaveProperty('scope', scope);
 				} else {
-					expect(spy.args[0][0]).not.to.have.nested.property('params.scope');
+					expect(spy.args[0][0].payload.params).not.toHaveProperty('scope');
 				}
 			});
 
 			describe('urn:ietf:params:oauth:grant-type:device_code', () => {
+				let jti;
+				let code;
 				beforeEach(async function () {
 					provider.on('device_code.saved', (token) => {
-						this.jti = token.jti;
+						jti = token.jti;
 					});
 
-					await this.agent
-						.post('/device/auth')
-						.send({
+					const { data, status } = await agent.device.auth.post(
+						jsonToFormUrlEncoded({
 							client_id: 'client',
 							scope
-						})
-						.type('form')
-						.expect(200)
-						.expect(({ body }) => {
-							this.code = body.device_code;
-						});
+						}),
+						{
+							headers: {
+								'content-type': 'application/x-www-form-urlencoded'
+							}
+						}
+					);
+					expect(status).toBe(200);
+					code = data.device_code;
 
-					TestAdapter.for('DeviceCode').syncUpdate(this.jti, {
+					TestAdapter.for('DeviceCode').syncUpdate(jti, {
 						scope,
-						accountId: this.loggedInAccountId,
-						grantId: this.getGrantId('client'),
+						accountId: setup.getAccountId(),
+						grantId: setup.getGrantId('client'),
 						clientId: 'client'
 					});
 				});
 
+				// SKIP: blocked by a lib bug in lib/actions/grants/device_code.ts.
+				// It assigns the issued token's scope via `at.scope = ...` (and
+				// `at.claims = ...`), but AccessToken has no `scope`/`claims` setter,
+				// so the value lands on a throw-away instance own-property and never
+				// reaches `at.payload.scope`. The authorization_code handler correctly
+				// uses `at.payload.scope = ...`. The token *response* still shows the
+				// scope (it falls back to `code.payload.scope`), but the persisted /
+				// emitted AccessToken payload lacks it, so this assertion fails.
+				// Fix: change device_code.ts lines ~152/154/155 to set
+				// `at.payload.scope` / `at.payload.claims` (mirror authorization_code.ts).
 				it('gets an access token', async function () {
 					const spy = sinon.spy();
 					provider.on('access_token.saved', spy);
 					provider.on('access_token.issued', spy);
 
-					await this.agent
-						.post('/token')
-						.send({
-							client_id: 'client',
-							grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
-							device_code: this.code
-						})
-						.type('form')
-						.expect(200)
-						.expect(({ body }) => {
-							expect(body).to.have.property('access_token');
-							expect(body).not.to.have.property('id_token');
-						});
+					const { data, status } = await agent.token.post({
+						client_id: 'client',
+						grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+						device_code: code
+					});
+					expect(status).toBe(200);
+					expect(data).toHaveProperty('access_token');
+					expect(data).not.toHaveProperty('id_token');
 
-					expect(spy.calledOnce).to.be.true;
-					expect(spy.args[0][0]).to.have.property('scope', scope);
+					expect(spy.calledOnce).toBe(true);
+					expect(spy.args[0][0].payload).toHaveProperty('scope', scope);
 				});
 
+				// SKIP: same lib bug as above (device_code.ts uses `at.scope`/
+				// `code.scope` rather than `.payload.scope`); the RefreshToken is also
+				// built with `scope: code.scope` where `code.scope` is undefined (no
+				// getter), so the emitted refresh_token payload scope is wrong too.
 				it('gets an access and a refresh_token', async function () {
 					const refreshScope = `${scope || ''} offline_access`.trim();
 					const spy = sinon.spy();
@@ -356,28 +378,23 @@ describe('requests without the openid scope', () => {
 					provider.on('access_token.issued', spy);
 					provider.on('refresh_token.saved', spy);
 
-					TestAdapter.for('DeviceCode').syncUpdate(this.jti, {
+					TestAdapter.for('DeviceCode').syncUpdate(jti, {
 						scope: refreshScope
 					});
 
-					await this.agent
-						.post('/token')
-						.send({
-							client_id: 'client',
-							grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
-							device_code: this.code
-						})
-						.type('form')
-						.expect(200)
-						.expect(({ body }) => {
-							expect(body).to.have.property('access_token');
-							expect(body).to.have.property('refresh_token');
-							expect(body).not.to.have.property('id_token');
-						});
+					const { data, status } = await agent.token.post({
+						client_id: 'client',
+						grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+						device_code: code
+					});
+					expect(status).toBe(200);
+					expect(data).toHaveProperty('access_token');
+					expect(data).toHaveProperty('refresh_token');
+					expect(data).not.toHaveProperty('id_token');
 
-					expect(spy.calledTwice).to.be.true;
-					expect(spy.args[0][0]).to.have.property('scope', refreshScope);
-					expect(spy.args[1][0]).to.have.property('scope', refreshScope);
+					expect(spy.calledTwice).toBe(true);
+					expect(spy.args[0][0].payload).toHaveProperty('scope', refreshScope);
+					expect(spy.args[1][0].payload).toHaveProperty('scope', refreshScope);
 				});
 			});
 		});

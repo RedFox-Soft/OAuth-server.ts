@@ -26,12 +26,9 @@ export default {
 			grantTypes: ['authorization_code'],
 			jwks: { keys: [await exportJWK(keypair.publicKey)] },
 			id_token_encrypted_response_alg: 'RSA-OAEP',
-			// id_token_encrypted_response_enc: 'A128CBC-HS256',
-			request_object_encryption_alg: 'RSA-OAEP',
-			// request_object_encryption_enc: 'A128CBC-HS256',
+			request_object_encryption_alg: 'A128KW',
 			userinfo_signed_response_alg: 'RS256',
 			userinfo_encrypted_response_alg: 'RSA-OAEP'
-			// userinfo_encrypted_response_enc: 'A128CBC-HS256',
 		},
 		{
 			clientId: 'clientSymmetric',
@@ -65,7 +62,8 @@ export default {
 			redirectUris: ['https://client.example.com/cb'],
 			responseTypes: ['code'],
 			grantTypes: ['authorization_code'],
-			'requestObject.signingAlg': 'HS256'
+			'requestObject.signingAlg': 'HS256',
+			request_object_encryption_alg: 'A128KW'
 		}
 	]
 };

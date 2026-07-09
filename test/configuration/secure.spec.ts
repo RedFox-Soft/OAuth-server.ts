@@ -1,39 +1,16 @@
-import sinon from 'sinon';
-import { expect } from 'chai';
+import { describe, it } from 'bun:test';
 
-import bootstrap from '../test_helper.js';
-import { provider } from 'lib/provider.js';
-
-describe('x-forwarded-proto trust', () => {
-	beforeEach(() => {
-		sinon.stub(console, 'warn').returns();
-	});
-
-	afterEach(() => console.warn.restore());
-
-	const acceptUnauthorized = { tls: { rejectUnauthorized: false } };
-
-	context('when trusted', () => {
-		before(bootstrap(import.meta.url, { protocol: 'https:' }));
-		it('is trusted when proxy=true is set on the koa app', async function () {
-			if (this.app) {
-				this.app.proxy = true;
-			} else {
-				provider.proxy = true;
-			}
-			await this.agent
-				.get('/.well-known/openid-configuration', acceptUnauthorized)
-				.set('x-forwarded-proto', 'https')
-				.expect(200)
-				.expect(/"authorization_endpoint":"https:/);
-
-			await this.agent
-				.get('/.well-known/openid-configuration', acceptUnauthorized)
-				.set('x-forwarded-proto', 'https')
-				.expect(200)
-				.expect(/"authorization_endpoint":"https:/);
-
-			expect(console.warn.called).to.be.false;
-		});
-	});
+// JUSTIFIED SKIP — obsolete contract.
+//
+// This suite verified koa-era `x-forwarded-proto` proxy trust: with `app.proxy = true`
+// (or `provider.proxy = true`) the discovery document was expected to flip its endpoint
+// URLs to `https:` based on the per-request `x-forwarded-proto` header.
+//
+// The Elysia rewrite has no such mechanism. Every discovery endpoint is derived from the
+// static `ISSUER` env var via `new URL(route, ISSUER)` (see lib/configs/discoverySupport.ts),
+// so the endpoint protocol is fixed at boot and never negotiated from proxy headers. There is
+// no `provider.proxy` / `app.proxy` flag and no `x-forwarded-proto` handling anywhere in lib/.
+// The behaviour under test cannot exist, so there is nothing to migrate.
+describe.skip('x-forwarded-proto trust (obsolete: issuer-derived endpoints, no proxy trust)', () => {
+	it('is trusted when proxy=true is set on the koa app', () => {});
 });

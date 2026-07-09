@@ -1,9 +1,7 @@
+import { describe, it, beforeAll, expect, spyOn } from 'bun:test';
 import * as url from 'node:url';
 
-import { expect } from 'chai';
-import { beforeAll, spyOn } from 'bun:test';
-
-import bootstrap from '../test_helper.js';
+import bootstrap, { agent } from '../test_helper.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
@@ -11,240 +9,202 @@ import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';
 import { AccessToken } from 'lib/models/access_token.js';
 
-function assignAuthorizationResponseValues({ headers: { location } }) {
+function codeFromResponse(response: Response) {
+	const location = response.headers.get('location');
+	if (!location) {
+		throw new Error('location header is missing');
+	}
 	const {
-		query: { access_token, code }
+		query: { code }
 	} = url.parse(location, true);
-
-	this.access_token = access_token;
-	this.code = code;
-}
-
-function assignTokenResponseValues({ body }) {
-	this.access_token = body.access_token;
-	this.refresh_token = body.refresh_token;
+	return code as string;
 }
 
 describe('session bound tokens behaviours', () => {
-	before(bootstrap(import.meta.url));
-	beforeAll(() => {
+	let setup = null;
+	beforeAll(async () => {
+		setup = await bootstrap(import.meta.url)();
+		// consent/prompt skip: keep the authorization request from bouncing to an interaction
 		spyOn(OIDCContext.prototype, 'promptPending').mockReturnValue(false);
 	});
 
-	beforeEach(function () {
-		return this.login({ scope: 'openid offline_access' });
-	});
-	after(function () {
-		return this.logout();
-	});
-
 	describe('authorization_code flow', () => {
-		it('"code" issues tokens bound to session', async function () {
-			const auth = (this.auth = new AuthorizationRequest({ scope: 'openid' }));
+		it('"code" issues tokens bound to session', async () => {
+			const cookie = await setup.login({ scope: 'openid offline_access' });
+			const auth = new AuthorizationRequest({ scope: 'openid' });
 
-			await this.agent
-				.get('/auth')
-				.query(auth)
-				.expect(303)
-				.expect(auth.validatePresence(['code', 'state']))
-				.expect(auth.validateState)
-				.expect(auth.validateClientLocation)
-				.expect(assignAuthorizationResponseValues.bind(this));
+			const { response } = await agent.auth.get({
+				query: auth.params,
+				headers: { cookie }
+			});
+			expect(response.status).toBe(303);
+			auth.validatePresence(response, ['code', 'state']);
+			auth.validateState(response);
+			auth.validateClientLocation(response);
+			const code = codeFromResponse(response);
 
-			const code = await AuthorizationCode.find(this.code);
-			expect(code).to.have.property('expiresWithSession', true);
+			const authorizationCode = await AuthorizationCode.find(code);
+			expect(authorizationCode.payload).toHaveProperty(
+				'expiresWithSession',
+				true
+			);
 
-			await this.agent
-				.post('/token')
-				.send({
-					client_id: 'client',
-					code: this.code,
-					grant_type: 'authorization_code',
-					code_verifier: this.auth.code_verifier
-				})
-				.type('form')
-				.expect(200)
-				.expect(assignTokenResponseValues.bind(this));
+			const { data } = await auth.getToken(code);
+			const access_token = data.access_token;
 
-			const token = await AccessToken.find(this.access_token);
-			expect(token).to.have.property('expiresWithSession', true);
+			const token = await AccessToken.find(access_token);
+			expect(token.payload).toHaveProperty('expiresWithSession', true);
 
-			await this.agent
-				.get('/me')
-				.auth(this.access_token, { type: 'bearer' })
-				.expect(200);
+			const authed = await agent.userinfo.get({
+				headers: { authorization: `Bearer ${access_token}` }
+			});
+			expect(authed.status).toBe(200);
 
-			await TestAdapter.for('Session').destroy(this.getSessionId());
+			await TestAdapter.for('Session').destroy(setup.getSessionId());
 
-			await this.agent
-				.get('/me')
-				.auth(this.access_token, { type: 'bearer' })
-				.expect(401);
+			const denied = await agent.userinfo.get({
+				headers: { authorization: `Bearer ${access_token}` }
+			});
+			expect(denied.status).toBe(401);
 		});
 
-		it('"code" with "online" refresh token', async function () {
-			const auth = (this.auth = new AuthorizationRequest({
+		it('"code" with "online" refresh token', async () => {
+			const cookie = await setup.login({ scope: 'openid offline_access' });
+			const auth = new AuthorizationRequest({
 				client_id: 'client-refresh',
 				scope: 'openid'
-			}));
+			});
 
-			await this.agent
-				.get('/auth')
-				.query(auth)
-				.expect(303)
-				.expect(auth.validatePresence(['code', 'state']))
-				.expect(auth.validateState)
-				.expect(auth.validateClientLocation)
-				.expect(assignAuthorizationResponseValues.bind(this));
+			const { response } = await agent.auth.get({
+				query: auth.params,
+				headers: { cookie }
+			});
+			expect(response.status).toBe(303);
+			auth.validatePresence(response, ['code', 'state']);
+			auth.validateState(response);
+			auth.validateClientLocation(response);
+			const code = codeFromResponse(response);
 
-			const code = await AuthorizationCode.find(this.code);
-			expect(code).to.have.property('expiresWithSession', true);
+			const authorizationCode = await AuthorizationCode.find(code);
+			expect(authorizationCode.payload).toHaveProperty(
+				'expiresWithSession',
+				true
+			);
 
-			await this.agent
-				.post('/token')
-				.send({
-					client_id: 'client-refresh',
-					code: this.code,
-					grant_type: 'authorization_code',
-					code_verifier: this.auth.code_verifier
-				})
-				.type('form')
-				.expect(200)
-				.expect(assignTokenResponseValues.bind(this));
+			const { data: tokenData } = await auth.getToken(code);
+			let access_token = tokenData.access_token;
+			let refresh_token = tokenData.refresh_token;
 
-			let refresh = await RefreshToken.find(this.refresh_token);
-			expect(refresh).to.have.property('expiresWithSession', true);
+			let refresh = await RefreshToken.find(refresh_token);
+			expect(refresh.payload).toHaveProperty('expiresWithSession', true);
 
-			const token = await AccessToken.find(this.access_token);
-			expect(token).to.have.property('expiresWithSession', true);
-			await this.agent
-				.get('/me')
-				.auth(this.access_token, { type: 'bearer' })
-				.expect(200);
+			let token = await AccessToken.find(access_token);
+			expect(token.payload).toHaveProperty('expiresWithSession', true);
 
-			await this.agent
-				.post('/token')
-				.send({
-					client_id: 'client-refresh',
-					refresh_token: this.refresh_token,
-					grant_type: 'refresh_token'
-				})
-				.type('form')
-				.expect(200)
-				.expect(assignTokenResponseValues.bind(this));
+			const authed = await agent.userinfo.get({
+				headers: { authorization: `Bearer ${access_token}` }
+			});
+			expect(authed.status).toBe(200);
 
-			refresh = await RefreshToken.find(this.refresh_token);
-			expect(refresh).to.have.property('expiresWithSession', true);
+			const { data: refreshed } = await agent.token.post({
+				client_id: 'client-refresh',
+				refresh_token,
+				grant_type: 'refresh_token'
+			});
+			access_token = refreshed.access_token;
+			refresh_token = refreshed.refresh_token;
 
-			{
-				const token = await AccessToken.find(this.access_token);
-				expect(token).to.have.property('expiresWithSession', true);
-			}
+			refresh = await RefreshToken.find(refresh_token);
+			expect(refresh.payload).toHaveProperty('expiresWithSession', true);
 
-			await TestAdapter.for('Session').destroy(this.getSessionId());
+			token = await AccessToken.find(access_token);
+			expect(token.payload).toHaveProperty('expiresWithSession', true);
 
-			await this.agent
-				.get('/me')
-				.auth(this.access_token, { type: 'bearer' })
-				.expect(401);
+			await TestAdapter.for('Session').destroy(setup.getSessionId());
 
-			await this.agent
-				.post('/token')
-				.send({
-					client_id: 'client-refresh',
-					refresh_token: this.refresh_token,
-					grant_type: 'refresh_token'
-				})
-				.type('form')
-				.expect(400)
-				.expect(assignTokenResponseValues.bind(this));
+			const denied = await agent.userinfo.get({
+				headers: { authorization: `Bearer ${access_token}` }
+			});
+			expect(denied.status).toBe(401);
+
+			const { response: rejected } = await agent.token.post({
+				client_id: 'client-refresh',
+				refresh_token,
+				grant_type: 'refresh_token'
+			});
+			expect(rejected.status).toBe(400);
 		});
 
-		it('"code" with offline_access refresh token isnt affected', async function () {
-			const auth = (this.auth = new AuthorizationRequest({
+		it('"code" with offline_access refresh token isnt affected', async () => {
+			const cookie = await setup.login({ scope: 'openid offline_access' });
+			const auth = new AuthorizationRequest({
 				client_id: 'client-offline',
 				scope: 'openid offline_access',
 				prompt: 'consent'
-			}));
+			});
 
-			await this.agent
-				.get('/auth')
-				.query(auth)
-				.expect(303)
-				.expect(auth.validatePresence(['code', 'state']))
-				.expect(auth.validateState)
-				.expect(auth.validateClientLocation)
-				.expect(assignAuthorizationResponseValues.bind(this));
+			const { response } = await agent.auth.get({
+				query: auth.params,
+				headers: { cookie }
+			});
+			expect(response.status).toBe(303);
+			auth.validatePresence(response, ['code', 'state']);
+			auth.validateState(response);
+			auth.validateClientLocation(response);
+			const code = codeFromResponse(response);
 
-			const code = await AuthorizationCode.find(this.code);
-			expect(code).not.to.have.property('expiresWithSession');
+			const authorizationCode = await AuthorizationCode.find(code);
+			expect(authorizationCode.payload).not.toHaveProperty(
+				'expiresWithSession'
+			);
 
-			await this.agent
-				.post('/token')
-				.send({
-					client_id: 'client-offline',
-					code: this.code,
-					grant_type: 'authorization_code',
-					code_verifier: this.auth.code_verifier
-				})
-				.type('form')
-				.expect(200)
-				.expect(assignTokenResponseValues.bind(this));
+			const { data: tokenData } = await auth.getToken(code);
+			let access_token = tokenData.access_token;
+			let refresh_token = tokenData.refresh_token;
 
-			let refresh = await RefreshToken.find(this.refresh_token);
-			expect(refresh).not.to.have.property('expiresWithSession');
+			let refresh = await RefreshToken.find(refresh_token);
+			expect(refresh.payload).not.toHaveProperty('expiresWithSession');
 
-			{
-				const token = await AccessToken.find(this.access_token);
-				expect(token).not.to.have.property('expiresWithSession');
-			}
+			let token = await AccessToken.find(access_token);
+			expect(token.payload).not.toHaveProperty('expiresWithSession');
 
-			await this.agent
-				.get('/me')
-				.auth(this.access_token, { type: 'bearer' })
-				.expect(200);
+			const authed = await agent.userinfo.get({
+				headers: { authorization: `Bearer ${access_token}` }
+			});
+			expect(authed.status).toBe(200);
 
-			await this.agent
-				.post('/token')
-				.send({
-					client_id: 'client-offline',
-					refresh_token: this.refresh_token,
-					grant_type: 'refresh_token'
-				})
-				.type('form')
-				.expect(200)
-				.expect(assignTokenResponseValues.bind(this));
+			const { data: refreshed } = await agent.token.post({
+				client_id: 'client-offline',
+				refresh_token,
+				grant_type: 'refresh_token'
+			});
+			access_token = refreshed.access_token;
+			refresh_token = refreshed.refresh_token;
 
-			const token = await AccessToken.find(this.access_token);
-			expect(token).not.to.have.property('expiresWithSession');
-			refresh = await RefreshToken.find(this.refresh_token);
-			expect(refresh).not.to.have.property('expiresWithSession');
+			token = await AccessToken.find(access_token);
+			expect(token.payload).not.toHaveProperty('expiresWithSession');
+			refresh = await RefreshToken.find(refresh_token);
+			expect(refresh.payload).not.toHaveProperty('expiresWithSession');
 
-			await TestAdapter.for('Session').destroy(this.getSessionId());
+			await TestAdapter.for('Session').destroy(setup.getSessionId());
 
-			await this.agent
-				.get('/me')
-				.auth(this.access_token, { type: 'bearer' })
-				.expect(200);
+			const stillAuthed = await agent.userinfo.get({
+				headers: { authorization: `Bearer ${access_token}` }
+			});
+			expect(stillAuthed.status).toBe(200);
 
-			await this.agent
-				.post('/token')
-				.send({
-					client_id: 'client-offline',
-					refresh_token: this.refresh_token,
-					grant_type: 'refresh_token'
-				})
-				.type('form')
-				.expect(200)
-				.expect(assignTokenResponseValues.bind(this));
+			const { data: refreshedAgain } = await agent.token.post({
+				client_id: 'client-offline',
+				refresh_token,
+				grant_type: 'refresh_token'
+			});
+			access_token = refreshedAgain.access_token;
+			refresh_token = refreshedAgain.refresh_token;
 
-			{
-				const token = await AccessToken.find(this.access_token);
-				expect(token).not.to.have.property('expiresWithSession');
-			}
-
-			refresh = await RefreshToken.find(this.refresh_token);
-			expect(refresh).not.to.have.property('expiresWithSession');
+			token = await AccessToken.find(access_token);
+			expect(token.payload).not.toHaveProperty('expiresWithSession');
+			refresh = await RefreshToken.find(refresh_token);
+			expect(refresh.payload).not.toHaveProperty('expiresWithSession');
 		});
 	});
 });

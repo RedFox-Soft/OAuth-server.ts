@@ -151,6 +151,14 @@ describe('devInteractions', async () => {
 		});
 	});
 
+	// SKIP: obsolete interaction contract. These blocks target oidc-provider's old devInteractions
+	// (abort/login/consent submitted to the interaction URL, login by `{login: accountId}`, consent
+	// by `{prompt: 'consent'}`, and manual Interaction-result construction). This codebase replaced
+	// that with a username/password userStore UI (POST /ui/:uid/login `{username,password}`, consent
+	// `{action:'allow'|'cancel'}`, resume at GET /ui/:uid/resume — see lib/interactions/index.ts).
+	// Current devInteractions rendering and auth-session validation are covered by the migrated
+	// `render login`/`render interaction` blocks above and by the device-flow spec; re-enabling
+	// these would mean authoring new tests for the new model, which is out of scope for migration.
 	describe.skip('navigate to abort', () => {
 		it('should abort an interaction with an error', async function () {
 			const auth = new AuthorizationRequest({
@@ -165,7 +173,7 @@ describe('devInteractions', async () => {
 			const [, , uid] = url.split('/');
 			const cookie = res.headers.get('set-cookie');
 
-			const { response, error } = await agent.ui[uid].consent.post(
+			const { response: aborted } = await agent.ui[uid].consent.post(
 				{
 					action: 'cancel'
 				},
@@ -176,18 +184,21 @@ describe('devInteractions', async () => {
 				}
 			);
 
-			expect(response.status).toBe(303);
+			expect(aborted.status).toBe(303);
 
-			return this.agent
-				.get(this.url.replace('interaction', 'auth'))
-				.expect(303)
-				.expect(auth.validateClientLocation)
-				.expect(auth.validateState)
-				.expect(auth.validateError('access_denied'))
-				.expect(auth.validateErrorDescription('End-User aborted interaction'));
+			const { response } = await agent.ui[uid].resume.get({
+				headers: {
+					cookie
+				}
+			});
+			expect(response.status).toBe(303);
+			auth.validateError(response, 'access_denied');
 		});
 	});
 
+	// SKIP: obsolete interaction contract — see the note on `navigate to abort`. Posts login as
+	// `{prompt:'login', login: accountId}` to the interaction URL; the current UI is a
+	// username/password userStore POST to /ui/:uid/login.
 	describe.skip('submit login', () => {
 		beforeEach(function () {
 			const auth = new AuthorizationRequest({
@@ -250,6 +261,9 @@ describe('devInteractions', async () => {
 		});
 	});
 
+	// SKIP: obsolete interaction contract — see the note on `navigate to abort`. Posts consent as
+	// `{prompt:'consent'}` to the interaction URL; the current UI takes `{action:'allow'|'cancel'}`
+	// at POST /ui/:uid/consent.
 	describe.skip('submit consent', () => {
 		beforeEach(function () {
 			const cookie = setup.login();
@@ -355,6 +369,9 @@ describe('devInteractions', async () => {
 	});
 });
 
+// SKIP: obsolete interaction contract — see the note on `navigate to abort`. Drives resume by
+// hand-constructing Interaction results and using supertest-agent internals (`this.agent._saveCookies`,
+// `this.suitePath`) that have no Eden equivalent; the current resume flow is GET /ui/:uid/resume.
 describe.skip('resume after consent', () => {
 	let setup = null;
 	beforeAll(async function () {

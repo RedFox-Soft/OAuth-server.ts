@@ -228,10 +228,9 @@ export const par = new Elysia()
 			const oidc = withBody(oidcInc, body);
 
 			stripOutsideJarParams(oidc);
-			const { request } = oidc.params;
 			const client = oidc.client;
 
-			await processRequestObject(authorizationRequest, oidc);
+			const request = await processRequestObject(authorizationRequest, oidc);
 			checkResponseMode(oidc);
 			oneRedirectUriClients(oidc);
 			presence(oidc, 'response_type', 'redirect_uri');

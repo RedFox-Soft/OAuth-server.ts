@@ -155,7 +155,7 @@ export const logoutConfirmAction = new Elysia()
 			} = instance(provider).configuration;
 
 			if (ApplicationConfig['backchannelLogout.enabled']) {
-				const clientIds = Object.keys(session.authorizations || {});
+				const clientIds = Object.keys(session.payload.authorizations || {});
 
 				const back = [];
 
@@ -165,7 +165,7 @@ export const logoutConfirmAction = new Elysia()
 						if (client) {
 							const sid = session.sidFor(client.clientId);
 							if (client.backchannelLogoutUri) {
-								const { accountId } = session;
+								const { accountId } = session.payload;
 								back.push(
 									client.backchannelLogout(accountId, sid).then(
 										() => {

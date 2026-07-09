@@ -155,10 +155,10 @@ export const handler = async function cibaHandler(oidc, dPoP) {
 			resource,
 			resourceServerInfo
 		);
-		at.scope = grant.getResourceScopeFiltered(resource, request.scopes);
+		at.payload.scope = grant.getResourceScopeFiltered(resource, request.scopes);
 	} else {
-		at.claims = request.payload.claims;
-		at.scope = grant.getOIDCScopeFiltered(request.scopes);
+		at.payload.claims = request.payload.claims;
+		at.payload.scope = grant.getOIDCScopeFiltered(request.scopes);
 	}
 
 	oidc.entity('AccessToken', at);
@@ -240,7 +240,7 @@ export const handler = async function cibaHandler(oidc, dPoP) {
 		expires_in: at.expiration,
 		id_token: idToken,
 		refresh_token: refreshToken,
-		scope: request.payload.scope ? at.scope : at.payload.scope || undefined,
+		scope: at.payload.scope || undefined,
 		token_type: at.tokenType
 	};
 };
