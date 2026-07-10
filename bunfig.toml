@@ -6,6 +6,5 @@ pathIgnorePatterns = [
 	"test/cors/cors.spec.ts",
 	"test/cors/custom_cors.spec.ts",
 	"test/helpers/attention.spec.ts",
-	"test/registration_policies/registration_policies.spec.ts",
-	"test/resource_indicators/resource_indicators.spec.ts"
+	"test/registration_policies/registration_policies.spec.ts"
 ]

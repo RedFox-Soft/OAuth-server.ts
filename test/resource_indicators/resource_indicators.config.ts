@@ -3,6 +3,7 @@ import merge from 'lodash/merge.js';
 import * as errors from '../../lib/helpers/errors.ts';
 import getConfig from '../default.config.js';
 import { Grant } from 'lib/models/grant.js';
+import { grantFlags } from './grant_flags.ts';
 
 const config = getConfig();
 
@@ -20,17 +21,17 @@ merge(config, {
 			verifyUserCode() {},
 			async triggerAuthenticationDevice(ctx, request) {
 				const grant = new Grant({
-					clientId: request.clientId,
-					accountId: request.accountId
+					clientId: request.payload.clientId,
+					accountId: request.payload.accountId
 				});
 				grant.addOIDCScope(ctx.oidc.requestParamScopes);
 
-				const resources = Array.isArray(request.resource)
-					? request.resource
-					: [request.resource];
+				const resources = Array.isArray(request.payload.resource)
+					? request.payload.resource
+					: [request.payload.resource];
 
 				for (const resource of resources) {
-					grant.addResourceScope(resource, request.scope);
+					grant.addResourceScope(resource, request.payload.scope);
 				}
 
 				await grant.save();
@@ -38,8 +39,8 @@ merge(config, {
 			}
 		},
 		resourceIndicators: {
-			async useGrantedResource(ctx) {
-				return ctx.oidc.body?.usegranted;
+			async useGrantedResource() {
+				return grantFlags.useGranted;
 			},
 			getResourceServerInfo(ctx, resource) {
 				if (resource.includes('wl')) {
@@ -51,8 +52,8 @@ merge(config, {
 
 				throw new errors.InvalidTarget();
 			},
-			defaultResource(ctx) {
-				if (ctx.oidc.body?.nodefault) {
+			defaultResource() {
+				if (grantFlags.noDefault) {
 					return undefined;
 				}
 

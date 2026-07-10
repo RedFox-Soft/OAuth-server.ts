@@ -122,7 +122,9 @@ export class BaseToken<
 
 	get resourceIndicators() {
 		return new Set(
-			Array.isArray(this.resource) ? this.resource : [this.resource]
+			Array.isArray(this.payload.resource)
+				? this.payload.resource
+				: [this.payload.resource]
 		);
 	}
 

@@ -363,7 +363,10 @@ describe('resume after consent', async () => {
 	// matching `_interaction` cookie. The web resume flow is GET /ui/:uid/resume (uid === 'resume');
 	// the interaction carries the stored authorization `params` plus the interaction `result`.
 	async function saveResume(params, result) {
-		const sess = new Interaction('resume', { uid: 'resume', cookieID: 'cookieID' });
+		const sess = new Interaction('resume', {
+			uid: 'resume',
+			cookieID: 'cookieID'
+		});
 		if (params) {
 			// clone: the resume pipeline mutates the stored params (e.g. defaulting `resource`),
 			// and we must not let that leak back into the AuthorizationRequest's own `params`.

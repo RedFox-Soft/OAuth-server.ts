@@ -8,14 +8,15 @@ export default async (ctx, model, config, scopes = model.scopes) => {
 			case !!ctx.oidc.params.resource:
 				resource = ctx.oidc.params.resource;
 				break;
-			case !model.resource:
-			case Array.isArray(model.resource) && model.resource.length === 0:
+			case !model.payload.resource:
+			case Array.isArray(model.payload.resource) &&
+				model.payload.resource.length === 0:
 				break;
-			case model.resource &&
+			case model.payload.resource &&
 				!!(await config.resourceIndicators.useGrantedResource(ctx, model)):
 			case !ctx.oidc.params.resource &&
 				(!ApplicationConfig['userinfo.enabled'] || !scopes.has('openid')):
-				resource = model.resource;
+				resource = model.payload.resource;
 				break;
 		}
 

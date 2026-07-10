@@ -34,6 +34,7 @@ import {
 } from '../../consts/param_list.ts';
 import sessionHandler from '../../shared/session.ts';
 import { noQueryDup } from 'lib/plugins/noQueryDup.js';
+import { coerceArrayParams } from 'lib/plugins/coerce_array_params.js';
 import { featureVerification } from './featureVerification.js';
 import { authorizationPKCE } from 'lib/helpers/pkce.js';
 import {
@@ -171,20 +172,8 @@ export const authGet = new Elysia()
 		}
 	);
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === 'object' && value !== null;
-}
-
 export const authPost = new Elysia()
-	.derive(({ body }) => {
-		if (
-			isRecord(body) &&
-			'ui_locales' in body &&
-			typeof body.ui_locales === 'string'
-		) {
-			body.ui_locales = [body.ui_locales];
-		}
-	})
+	.use(coerceArrayParams('ui_locales', 'resource'))
 	.guard({
 		body: AuthorizationParameters,
 		cookie: AuthorizationCookies

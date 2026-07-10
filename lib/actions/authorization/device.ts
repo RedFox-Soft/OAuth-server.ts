@@ -36,6 +36,7 @@ import { ApplicationConfig } from 'lib/configs/application.js';
 import { featureVerification } from './featureVerification.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { authHeaders, authParams } from 'lib/plugins/auth.js';
+import { coerceArrayParams } from 'lib/plugins/coerce_array_params.js';
 import {
 	BackchannelAuthenticationResponse,
 	DeviceAuthorizationResponse,
@@ -69,23 +70,11 @@ async function authentication(params, headers, oidc) {
 	}
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === 'object' && value !== null;
-}
-
 export const deviceAuth = new Elysia()
+	.use(coerceArrayParams('ui_locales', 'resource'))
 	.guard({
 		body: t.Composite([authParams, DeviceAuthorizationParameters]),
 		headers: authHeaders
-	})
-	.derive(({ body }) => {
-		if (
-			isRecord(body) &&
-			'ui_locales' in body &&
-			typeof body.ui_locales === 'string'
-		) {
-			body.ui_locales = [body.ui_locales];
-		}
 	})
 	.resolve(({ body }) => {
 		featureVerification(body);
@@ -127,6 +116,7 @@ export const deviceAuth = new Elysia()
 	);
 
 export const backchannelAuth = new Elysia()
+	.use(coerceArrayParams('ui_locales', 'resource'))
 	.guard({
 		// request_uri and registration are accepted by the schema so the handler can reject them
 		// with the OIDC-specified `<param>_not_supported` errors rather than a generic 422.
