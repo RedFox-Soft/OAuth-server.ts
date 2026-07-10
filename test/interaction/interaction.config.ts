@@ -26,6 +26,7 @@ policy.get('login').checks.push(check);
 
 class CustomPrompt extends Prompt {
 	name = 'custom';
+	requestable = true;
 }
 policy.add(new CustomPrompt());
 

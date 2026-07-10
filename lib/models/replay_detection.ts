@@ -1,11 +1,19 @@
 import crypto from 'node:crypto';
+import { Type as t, type Static } from '@sinclair/typebox';
 import epochTime from '../helpers/epoch_time.js';
-import { BaseModel } from './base_model.js';
-import type { BaseModelPayloadType } from './base_model.js';
+import { BaseModel, BaseModelPayload } from './base_model.js';
 
-export type ReplayDetectionPayloadType = BaseModelPayloadType & { iss: string };
+const ReplayDetectionPayload = t.Composite([
+	BaseModelPayload,
+	t.Object({
+		iss: t.String()
+	})
+]);
+export type ReplayDetectionPayloadType = Static<typeof ReplayDetectionPayload>;
 
-export class ReplayDetection extends BaseModel {
+export class ReplayDetection extends BaseModel<ReplayDetectionPayloadType> {
+	model = ReplayDetectionPayload;
+
 	static async unique(iss: string, jti: string, exp: number) {
 		const id = crypto.hash('sha256', `${iss}${jti}`, 'base64url');
 

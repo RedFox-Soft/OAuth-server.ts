@@ -17,6 +17,7 @@ import { Session } from 'lib/models/session.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { Interaction } from 'lib/models/interaction.js';
 import { Grant } from 'lib/models/grant.js';
+import { getUserStore } from 'lib/adapters/index.js';
 
 const expire = new Date();
 expire.setDate(expire.getDate() + 1);
@@ -151,29 +152,26 @@ describe('devInteractions', async () => {
 		});
 	});
 
-	// SKIP: obsolete interaction contract. These blocks target oidc-provider's old devInteractions
-	// (abort/login/consent submitted to the interaction URL, login by `{login: accountId}`, consent
-	// by `{prompt: 'consent'}`, and manual Interaction-result construction). This codebase replaced
-	// that with a username/password userStore UI (POST /ui/:uid/login `{username,password}`, consent
-	// `{action:'allow'|'cancel'}`, resume at GET /ui/:uid/resume — see lib/interactions/index.ts).
-	// Current devInteractions rendering and auth-session validation are covered by the migrated
-	// `render login`/`render interaction` blocks above and by the device-flow spec; re-enabling
-	// these would mean authoring new tests for the new model, which is out of scope for migration.
-	describe.skip('navigate to abort', () => {
-		it('should abort an interaction with an error', async function () {
+	describe('navigate to abort', () => {
+		it('rejects the request with access_denied when the End-User cancels consent', async function () {
+			const login = await setup.login();
 			const auth = new AuthorizationRequest({
-				scope: 'openid'
+				scope: 'openid',
+				prompt: 'consent'
 			});
 
 			const { response: res } = await agent.auth.get({
-				query: auth.params
+				query: auth.params,
+				headers: {
+					cookie: login
+				}
 			});
 
 			const url = res.headers.get('location');
 			const [, , uid] = url.split('/');
-			const cookie = res.headers.get('set-cookie');
+			const cookie = [res.headers.get('set-cookie'), login];
 
-			const { response: aborted } = await agent.ui[uid].consent.post(
+			const { response: aborted, error } = await agent.ui[uid].consent.post(
 				{
 					action: 'cancel'
 				},
@@ -184,590 +182,513 @@ describe('devInteractions', async () => {
 				}
 			);
 
-			expect(aborted.status).toBe(303);
-
-			const { response } = await agent.ui[uid].resume.get({
-				headers: {
-					cookie
-				}
+			expect(aborted.status).toBe(400);
+			expect(error.value).toEqual({
+				error: 'access_denied',
+				error_description: 'End-User denied consent'
 			});
-			expect(response.status).toBe(303);
-			auth.validateError(response, 'access_denied');
 		});
 	});
 
-	// SKIP: obsolete interaction contract — see the note on `navigate to abort`. Posts login as
-	// `{prompt:'login', login: accountId}` to the interaction URL; the current UI is a
-	// username/password userStore POST to /ui/:uid/login.
-	describe.skip('submit login', () => {
-		beforeEach(function () {
+	describe('submit login', () => {
+		let uid = null;
+		let cookie = null;
+
+		beforeEach(async function () {
 			const auth = new AuthorizationRequest({
 				scope: 'openid'
 			});
-
-			return this.agent
-				.get('/auth')
-				.query(auth)
-				.then((response) => {
-					this.url = response.headers.location;
-				});
+			const { response } = await agent.auth.get({
+				query: auth.params
+			});
+			const url = response.headers.get('location');
+			[, , uid] = url.split('/');
+			cookie = response.headers.get('set-cookie');
 		});
 
-		it('accepts the login and resumes auth', async function () {
-			let location;
-			await this.agent
-				.post(`${this.url}`)
-				.send({
-					prompt: 'login',
-					login: 'foobar'
-				})
-				.type('form')
-				.expect(303)
-				.expect('location', new RegExp(this.url.replace('interaction', 'auth')))
-				.expect(({ headers }) => {
-					({ location } = headers);
-				});
+		it('accepts valid credentials and resumes the authorization request', async function () {
+			const password = 'sup3rsecret';
+			const username = `${nanoid()}@example.com`;
+			await getUserStore().create(username, await Bun.password.hash(password));
 
-			await this.agent.get(new URL(location).pathname).expect(303);
-		});
-
-		it('checks that the account is a non empty string', async function () {
-			let location;
-			const spy = sinon.spy();
-			provider.once('server_error', spy);
-
-			await this.agent
-				.post(`${this.url}`)
-				.send({
-					prompt: 'login',
-					login: ''
-				})
-				.type('form')
-				.expect(303)
-				.expect('location', new RegExp(this.url.replace('interaction', 'auth')))
-				.expect(({ headers }) => {
-					({ location } = headers);
-				});
-
-			await this.agent.get(new URL(location).pathname).expect(500);
-
-			expect(spy).to.have.property('calledOnce', true);
-			const error = spy.firstCall.args[1];
-			expect(error).to.be.an.instanceof(TypeError);
-			expect(error).to.have.property(
-				'message',
-				'accountId must be a non-empty string, got: string'
+			const { response } = await agent.ui[uid].login.post(
+				{
+					username,
+					password
+				},
+				{
+					headers: {
+						cookie
+					}
+				}
 			);
+
+			// A successful login leaves the interaction and hands the flow back to the
+			// authorization pipeline (a redirect), rather than re-rendering the login form.
+			expect(response.status).toBe(303);
+			expect(response.headers.get('location')).toBeTruthy();
+		});
+
+		it('re-renders the login form with an error for an unknown user', async function () {
+			const { error } = await agent.ui[uid].login.post(
+				{
+					username: `${nanoid()}@example.com`,
+					password: 'whatever'
+				},
+				{
+					headers: {
+						cookie
+					}
+				}
+			);
+
+			expect(error.status).toBe(400);
+			expect(error.value).toContain('Invalid username or password');
+		});
+
+		it('re-renders the login form with an error for a wrong password', async function () {
+			const username = `${nanoid()}@example.com`;
+			await getUserStore().create(
+				username,
+				await Bun.password.hash('the-real-password')
+			);
+
+			const { error } = await agent.ui[uid].login.post(
+				{
+					username,
+					password: 'wrong-password'
+				},
+				{
+					headers: {
+						cookie
+					}
+				}
+			);
+
+			expect(error.status).toBe(400);
+			expect(error.value).toContain('Invalid username or password');
 		});
 	});
 
-	// SKIP: obsolete interaction contract — see the note on `navigate to abort`. Posts consent as
-	// `{prompt:'consent'}` to the interaction URL; the current UI takes `{action:'allow'|'cancel'}`
-	// at POST /ui/:uid/consent.
-	describe.skip('submit consent', () => {
-		beforeEach(function () {
-			const cookie = setup.login();
+	describe('submit consent', () => {
+		let uid = null;
+		let cookie = null;
+
+		beforeEach(async function () {
+			const login = await setup.login();
 			const auth = new AuthorizationRequest({
 				scope: 'openid',
 				prompt: 'consent'
 			});
 
-			return this.agent
-				.get('/auth')
-				.query(auth)
-				.then((response) => {
-					this.url = response.headers.location;
-				});
+			const { response } = await agent.auth.get({
+				query: auth.params,
+				headers: {
+					cookie: login
+				}
+			});
+			cookie = [response.headers.get('set-cookie'), ...login].join('; ');
+			const url = response.headers.get('location');
+			[, , uid] = url.split('/');
 		});
 
-		it('accepts the consent and resumes auth', async function () {
-			let location;
-			await this.agent
-				.post(`${this.url}`)
-				.send({
-					prompt: 'consent'
-				})
-				.type('form')
-				.expect(303)
-				.expect('location', new RegExp(this.url.replace('interaction', 'auth')))
-				.expect(({ headers }) => {
-					({ location } = headers);
-				});
+		it('accepts the consent and resumes the authorization request', async function () {
+			const { response } = await agent.ui[uid].consent.post(
+				{
+					action: 'allow'
+				},
+				{
+					headers: {
+						cookie
+					}
+				}
+			);
 
-			await this.agent.get(new URL(location).pathname).expect(303);
+			expect(response.status).toBe(303);
+			expect(response.headers.get('location')).toBeTruthy();
 		});
 
-		it('checks the session interaction came from still exists', async function () {
-			let location;
-			await this.agent
-				.post(`${this.url}`)
-				.send({
-					prompt: 'consent'
-				})
-				.type('form')
-				.expect(303)
-				.expect('location', new RegExp(this.url.replace('interaction', 'auth')))
-				.expect(({ headers }) => {
-					({ location } = headers);
-				});
-
-			const session = this.getSession({ instantiate: true });
+		it('checks that the authentication session is still there', async function () {
+			const session = setup.getLastSession();
 			await session.destroy();
 
-			await this.agent
-				.get(new URL(location).pathname)
-				.expect(400)
-				.expect('content-type', 'text/html; charset=utf-8')
-				.expect(/interaction session and authentication session mismatch/);
+			const { error } = await agent.ui[uid].consent.post(
+				{
+					action: 'allow'
+				},
+				{
+					headers: {
+						cookie
+					}
+				}
+			);
+			expect(error.status).toBe(400);
+			expect(error.value).toEqual({
+				error: 'invalid_request',
+				error_description: 'session not found'
+			});
 		});
 
-		it('checks the session interaction came from is still the one', async function () {
-			let location;
-			await this.agent
-				.post(`${this.url}`)
-				.send({
-					prompt: 'consent'
-				})
-				.type('form')
-				.expect(303)
-				.expect('location', new RegExp(this.url.replace('interaction', 'auth')))
-				.expect(({ headers }) => {
-					({ location } = headers);
-				});
+		it("checks that the authentication session's principal didn't change", async function () {
+			const session = setup.getLastSession();
+			session.payload.accountId = 'foobar';
+			await session.save();
 
-			await this.login();
-
-			await this.agent
-				.get(new URL(location).pathname)
-				.expect(400)
-				.expect('content-type', 'text/html; charset=utf-8')
-				.expect(/interaction session and authentication session mismatch/);
-		});
-
-		it('checks the session interaction came from is still the one', async function () {
-			let location;
-			await this.agent
-				.post(`${this.url}`)
-				.send({
-					prompt: 'consent'
-				})
-				.type('form')
-				.expect(303)
-				.expect('location', new RegExp(this.url.replace('interaction', 'auth')))
-				.expect(({ headers }) => {
-					({ location } = headers);
-				});
-
-			await this.login();
-
-			await this.agent
-				.get(new URL(location).pathname)
-				.expect(400)
-				.expect('content-type', 'text/html; charset=utf-8')
-				.expect(/interaction session and authentication session mismatch/);
+			const { error } = await agent.ui[uid].consent.post(
+				{
+					action: 'allow'
+				},
+				{
+					headers: {
+						cookie
+					}
+				}
+			);
+			expect(error.status).toBe(400);
+			expect(error.value).toEqual({
+				error: 'invalid_request',
+				error_description: 'session principal changed'
+			});
 		});
 	});
 });
 
-// SKIP: obsolete interaction contract — see the note on `navigate to abort`. Drives resume by
-// hand-constructing Interaction results and using supertest-agent internals (`this.agent._saveCookies`,
-// `this.suitePath`) that have no Eden equivalent; the current resume flow is GET /ui/:uid/resume.
-describe.skip('resume after consent', () => {
-	let setup = null;
-	beforeAll(async function () {
-		setup = await bootstrap(import.meta.url)();
-	});
-	beforeEach(function () {
+describe('resume after consent', async () => {
+	const setup = await bootstrap(import.meta.url)();
+	afterEach(function () {
 		sinon.restore();
 	});
 
-	function setupFunc(grant, result, sessionData) {
-		const cookies = [];
-
-		let session;
-		if (result?.login) {
-			session = new Session({ jti: 'sess', ...sessionData });
-		} else {
-			session = setup.getLastSession();
+	// Persists a `resume` interaction the way the authorization pipeline would have, then returns the
+	// matching `_interaction` cookie. The web resume flow is GET /ui/:uid/resume (uid === 'resume');
+	// the interaction carries the stored authorization `params` plus the interaction `result`.
+	async function saveResume(params, result) {
+		const sess = new Interaction('resume', { uid: 'resume', cookieID: 'cookieID' });
+		if (params) {
+			// clone: the resume pipeline mutates the stored params (e.g. defaulting `resource`),
+			// and we must not let that leak back into the AuthorizationRequest's own `params`.
+			Object.assign(sess.payload, { params: { ...params } });
 		}
-		const interaction = new Interaction('resume', {
-			uid: 'resume',
-			params: grant,
-			session
-		});
-
-		expect(grant).to.be.ok;
-
-		const cookie = `_interaction_resume=resume; path=${this.suitePath('/auth/resume')}; expires=${expire.toGMTString()}; httponly`;
-		cookies.push(cookie);
-
-		const sessionCookie = `_session=${session.jti || 'sess'}; path=/; expires=${expire.toGMTString()}; httponly`;
-		cookies.push(sessionCookie);
-
 		if (result) {
 			if (result.login && !result.login.ts) {
 				Object.assign(result.login, { ts: epochTime() });
 			}
-			Object.assign(interaction, { result });
+			Object.assign(sess.payload, { result });
 		}
-
-		this.agent._saveCookies.bind(this.agent)({
-			request: { url: ISSUER },
-			headers: { 'set-cookie': cookies }
-		});
-
-		return Promise.all([
-			interaction.save(30), // TODO: bother running the ttl helper?
-			session.save(30) // TODO: bother running the ttl helper?
-		]);
+		await sess.save(30);
+		return `_interaction=cookieID; path=/ui/resume/resume; expires=${expire.toGMTString()}; httponly`;
 	}
 
 	describe('general', () => {
-		beforeEach(async function () {
-			return setup.login();
-		});
+		it('needs the resume cookie to be present, else renders an err', async function () {
+			const { error } = await agent.ui['resume'].resume.get();
 
-		it('needs the resume cookie to be present, else renders an err', function () {
-			return this.agent
-				.get('/auth/resume')
-				.expect(400)
-				.expect(/authorization request has expired/);
+			expect(error.status).toBe(422);
+			expect(error.value).toEqual({
+				error: 'invalid_request',
+				error_description: 'Invalid interaction cookie'
+			});
 		});
 
 		it('needs to find the session to resume', async function () {
+			const session = await setup.login();
 			const auth = new AuthorizationRequest({
 				scope: 'openid'
 			});
 
-			await setupFunc.call(this, auth);
+			const cookie = await saveResume(auth.params);
 
 			sinon.stub(Interaction, 'find').resolves();
 
-			return this.agent
-				.get('/auth/resume')
-				.expect(400)
-				.expect(/interaction session not found/);
+			const { error } = await agent.ui['resume'].resume.get({
+				headers: {
+					cookie: [...session, cookie].join('; ')
+				}
+			});
+
+			expect(error.status).toBe(400);
+			expect(error.value).toEqual({
+				error: 'invalid_request',
+				error_description: 'interaction session not found'
+			});
 		});
 	});
 
 	describe('login results', () => {
-		it('should process newly established permanent sessions (default)', async function () {
-			sinon.stub(Grant.prototype, 'getOIDCScope').returns('openid');
+		it('should process a login result and resume to the client with a code', async function () {
+			const session = await setup.login();
 			const auth = new AuthorizationRequest({
 				response_type: 'code',
 				response_mode: 'query',
 				scope: 'openid'
 			});
 
-			await setupFunc.call(this, auth, {
+			const cookie = await saveResume(auth.params, {
 				login: {
-					accountId: nanoid()
+					accountId: setup.getAccountId()
 				}
 			});
 
-			return this.agent
-				.get('/auth/resume')
-				.expect(303)
-				.expect('set-cookie', /expires/) // expect a permanent cookie
-				.expect(auth.validateClientLocation)
-				.expect(auth.validateState)
-				.expect(auth.validatePresence(['code', 'state']))
-				.expect(() => {
-					expect(this.getSession()).to.be.ok.and.not.have.property('transient');
-				});
+			const { response } = await agent.ui['resume'].resume.get({
+				headers: {
+					cookie: [...session, cookie].join('; ')
+				}
+			});
+
+			expect(response.status).toBe(303);
+			auth.validateClientLocation(response);
+			auth.validateState(response);
+			auth.validatePresence(response, ['code', 'state']);
 		});
 
-		it('should process newly established permanent sessions (explicit)', async function () {
-			sinon.stub(Grant.prototype, 'getOIDCScope').returns('openid');
+		it('should process an explicitly permanent (remember) login result', async function () {
+			const session = await setup.login();
 			const auth = new AuthorizationRequest({
 				response_mode: 'query',
 				scope: 'openid'
 			});
 
-			await setupFunc.call(this, auth, {
+			const cookie = await saveResume(auth.params, {
 				login: {
-					accountId: nanoid(),
+					accountId: setup.getAccountId(),
 					remember: true
 				}
 			});
 
-			return this.agent
-				.get('/auth/resume')
-				.expect(303)
-				.expect('set-cookie', /expires/) // expect a permanent cookie
-				.expect(auth.validateClientLocation)
-				.expect(auth.validateState)
-				.expect(auth.validatePresence(['code', 'state']))
-				.expect(() => {
-					expect(this.getSession()).to.be.ok.and.not.have.property('transient');
-				});
+			const { response } = await agent.ui['resume'].resume.get({
+				headers: {
+					cookie: [...session, cookie].join('; ')
+				}
+			});
+
+			expect(response.status).toBe(303);
+			auth.validateClientLocation(response);
+			auth.validateState(response);
+			auth.validatePresence(response, ['code', 'state']);
 		});
 
-		it('should process newly established temporary sessions', async function () {
-			sinon.stub(Grant.prototype, 'getOIDCScope').returns('openid');
+		it('should process a transient (remember: false) login result', async function () {
+			const session = await setup.login();
 			const auth = new AuthorizationRequest({
 				response_mode: 'query',
 				scope: 'openid'
 			});
 
-			await setupFunc.call(this, auth, {
+			const cookie = await saveResume(auth.params, {
 				login: {
-					accountId: nanoid(),
+					accountId: setup.getAccountId(),
 					remember: false
 				}
 			});
 
-			return this.agent
-				.get('/auth/resume')
-				.expect(303)
-				.expect(auth.validateState)
-				.expect('set-cookie', /_session=((?!expires).)+/) // expect a transient session cookie
-				.expect(auth.validateClientLocation)
-				.expect(auth.validatePresence(['code', 'state']))
-				.expect(() => {
-					expect(this.getSession()).to.be.ok.and.have.property('transient');
-				});
+			const { response } = await agent.ui['resume'].resume.get({
+				headers: {
+					cookie: [...session, cookie].join('; ')
+				}
+			});
+
+			expect(response.status).toBe(303);
+			auth.validateClientLocation(response);
+			auth.validateState(response);
+			auth.validatePresence(response, ['code', 'state']);
 		});
 
 		it('should trigger logout when the session subject changes', async function () {
-			sinon.stub(Grant.prototype, 'getOIDCScope').returns('openid');
+			const session = await setup.login();
 			const auth = new AuthorizationRequest({
 				response_mode: 'query',
 				scope: 'openid'
 			});
 
-			await setupFunc.call(
-				this,
-				auth,
-				{
-					login: {
-						accountId: nanoid()
-					}
-				},
-				{
+			// the authenticated session belongs to a different subject than the login result
+			const cookie = await saveResume(auth.params, {
+				login: {
 					accountId: nanoid()
 				}
-			);
+			});
 
-			let state;
+			const { response, data } = await agent.ui['resume'].resume.get({
+				headers: {
+					cookie: [...session, cookie].join('; ')
+				}
+			});
 
-			await this.agent
-				.get('/auth/resume')
-				.expect(200)
-				.expect('content-type', 'text/html; charset=utf-8')
-				.expect(
-					/document.addEventListener\('DOMContentLoaded', function \(\) { document.forms\[0\].submit\(\) }\);/
-				)
-				.expect(/<input type="hidden" name="logout" value="yes"\/>/)
-				.expect(({ text }) => {
-					({ state } = this.getSession());
-					expect(state).to.have.property('clientId', 'client');
-					expect(state)
-						.to.have.property('postLogoutRedirectUri')
-						.that.matches(/\/auth\/resume$/);
-					expect(text).to.match(
-						new RegExp(
-							`input type="hidden" name="xsrf" value="${state.secret}"`
-						)
-					);
-				})
-				.expect(/<form method="post" action=".+\/session\/end\/confirm">/);
-
-			expect(await Interaction.find('resume')).to.be.ok;
-
-			await this.agent
-				.post('/session/end/confirm')
-				.send({
-					xsrf: state.secret,
-					logout: 'yes'
-				})
-				.type('form')
-				.expect(303)
-				.expect('location', /\/auth\/resume$/);
-
-			await this.agent
-				.get('/auth/resume')
-				.expect(303)
-				.expect(auth.validateClientLocation)
-				.expect(auth.validateState);
+			expect(response.status).toBe(200);
+			expect(response.headers.get('content-type')).toContain('text/html');
+			expect(data).toContain('name="logout"');
+			expect(data).toContain('/logout/confirm');
 		});
 	});
 
 	describe('custom interaction errors', () => {
-		describe('when prompt=none', () => {
-			beforeEach(function () {
-				return this.login();
-			});
-			it('custom interactions can fail too (prompt none)', async function () {
-				const auth = new AuthorizationRequest({
-					scope: 'openid',
-					triggerCustomFail: 'foo',
-					prompt: 'none'
-				});
-
-				return this.agent
-					.get('/auth')
-					.query(auth)
-					.expect(303)
-					.expect(auth.validateState)
-					.expect(auth.validateClientLocation)
-					.expect(auth.validateError('error_foo'))
-					.expect(auth.validateErrorDescription('error_description_foo'));
-			});
-		});
-
 		it('custom interactions can fail too', async function () {
+			const session = await setup.login();
 			const auth = new AuthorizationRequest({
 				scope: 'openid',
 				triggerCustomFail: 'foo'
 			});
 
-			await setupFunc.call(this, auth, {
+			const cookie = await saveResume(auth.params, {
 				login: {
-					accountId: nanoid(),
+					accountId: setup.getAccountId(),
 					remember: true
 				},
 				consent: {}
 			});
 
-			return this.agent
-				.get('/auth/resume')
-				.expect(303)
-				.expect(auth.validateInteractionRedirect)
-				.expect(auth.validateInteraction('login', 'reason_foo'));
+			const { response } = await agent.ui['resume'].resume.get({
+				headers: {
+					cookie: [...session, cookie].join('; ')
+				}
+			});
+
+			expect(response.status).toBe(303);
+			auth.validateInteractionRedirect(response);
+			auth.validateInteraction(response, 'login', 'reason_foo');
 		});
 	});
 
 	describe('interaction errors', () => {
 		it('should abort an interaction when given an error result object (no description)', async function () {
+			const session = await setup.login();
 			const auth = new AuthorizationRequest({
 				scope: 'openid'
 			});
 
-			await setupFunc.call(this, auth, {
+			const cookie = await saveResume(auth.params, {
 				error: 'access_denied'
 			});
 
-			return this.agent
-				.get('/auth/resume')
-				.expect(303)
-				.expect(auth.validateState)
-				.expect(auth.validatePresence(['error', 'state']))
-				.expect(auth.validateError('access_denied'));
+			const { response } = await agent.ui['resume'].resume.get({
+				headers: {
+					cookie: [...session, cookie].join('; ')
+				}
+			});
+
+			expect(response.status).toBe(303);
+			auth.validateState(response);
+			auth.validatePresence(response, ['error', 'state']);
+			auth.validateError(response, 'access_denied');
 		});
 
 		it('should abort an interaction when given an error result object (with state)', async function () {
+			const session = await setup.login();
 			const auth = new AuthorizationRequest({
 				scope: 'openid',
 				state: 'bf458-00aa3'
 			});
 
-			await setupFunc.call(this, auth, {
+			const cookie = await saveResume(auth.params, {
 				error: 'access_denied'
 			});
 
-			return this.agent
-				.get('/auth/resume')
-				.expect(303)
-				.expect(auth.validateState)
-				.expect(auth.validatePresence(['error', 'state']))
-				.expect(auth.validateError('access_denied'));
+			const { response } = await agent.ui['resume'].resume.get({
+				headers: {
+					cookie: [...session, cookie].join('; ')
+				}
+			});
+
+			expect(response.status).toBe(303);
+			auth.validateState(response);
+			auth.validatePresence(response, ['error', 'state']);
+			auth.validateError(response, 'access_denied');
 		});
 
 		it('should abort an interaction when given an error result object (with description)', async function () {
+			const session = await setup.login();
 			const auth = new AuthorizationRequest({
 				scope: 'openid'
 			});
 
-			await setupFunc.call(this, auth, {
+			const cookie = await saveResume(auth.params, {
 				error: 'access_denied',
 				error_description: 'scope out of reach'
 			});
 
-			return this.agent
-				.get('/auth/resume')
-				.expect(303)
-				.expect(auth.validateState)
-				.expect(auth.validateError('access_denied'))
-				.expect(auth.validateErrorDescription('scope out of reach'));
+			const { response } = await agent.ui['resume'].resume.get({
+				headers: {
+					cookie: [...session, cookie].join('; ')
+				}
+			});
+
+			expect(response.status).toBe(303);
+			auth.validateState(response);
+			auth.validateError(response, 'access_denied');
+			auth.validateErrorDescription(response, 'scope out of reach');
 		});
 
 		it('should abort an interaction when given an error result object (custom error)', async function () {
+			const session = await setup.login();
 			const auth = new AuthorizationRequest({
 				scope: 'openid'
 			});
 
-			await setupFunc.call(this, auth, {
+			const cookie = await saveResume(auth.params, {
 				error: 'custom_foo',
 				error_description: 'custom_foobar'
 			});
 
-			return this.agent
-				.get('/auth/resume')
-				.expect(303)
-				.expect(auth.validateState)
-				.expect(auth.validateError('custom_foo'))
-				.expect(auth.validateErrorDescription('custom_foobar'));
+			const { response } = await agent.ui['resume'].resume.get({
+				headers: {
+					cookie: [...session, cookie].join('; ')
+				}
+			});
+
+			expect(response.status).toBe(303);
+			auth.validateState(response);
+			auth.validateError(response, 'custom_foo');
+			auth.validateErrorDescription(response, 'custom_foobar');
 		});
 	});
 
 	describe('custom requestable prompts', () => {
-		beforeEach(function () {
-			return this.login();
-		});
-
 		it('should fail if they are not resolved', async function () {
+			const session = await setup.login();
 			const auth = new AuthorizationRequest({
 				scope: 'openid',
 				prompt: 'custom'
 			});
 
-			await setupFunc.call(this, auth, {});
+			const cookie = await saveResume(auth.params, {});
 
-			return this.agent
-				.get('/auth/resume')
-				.expect(303)
-				.expect(auth.validateInteractionRedirect)
-				.expect(auth.validateInteraction('custom', 'custom_prompt'));
+			const { response } = await agent.ui['resume'].resume.get({
+				headers: {
+					cookie: [...session, cookie].join('; ')
+				}
+			});
+
+			expect(response.status).toBe(303);
+			auth.validateInteractionRedirect(response);
+			auth.validateInteraction(response, 'custom', 'custom_prompt');
 		});
 	});
 
 	describe('custom unrequestable prompts', () => {
-		it('should prompt interaction', async function () {
-			const auth = new AuthorizationRequest({
-				triggerUnrequestable: 'foo',
-				response_mode: 'query',
-				scope: 'openid'
-			});
-
-			return this.agent
-				.get('/auth')
-				.query(auth)
-				.expect(303)
-				.expect(auth.validateInteractionRedirect)
-				.expect(auth.validateInteraction('unrequestable', 'un_foo'));
-		});
-
 		it('should fail if they are not satisfied', async function () {
+			const session = await setup.login();
 			const auth = new AuthorizationRequest({
 				triggerUnrequestable: 'foo',
 				response_mode: 'query',
 				scope: 'openid'
 			});
 
-			await setupFunc.call(this, auth, {
+			const cookie = await saveResume(auth.params, {
 				login: {
-					accountId: nanoid(),
+					accountId: setup.getAccountId(),
 					remember: true
 				},
 				consent: {}
 			});
 
-			return this.agent
-				.get('/auth/resume')
-				.expect(303)
-				.expect(auth.validateInteractionRedirect)
-				.expect(auth.validateInteraction('unrequestable', 'un_foo'));
+			const { response } = await agent.ui['resume'].resume.get({
+				headers: {
+					cookie: [...session, cookie].join('; ')
+				}
+			});
+
+			expect(response.status).toBe(303);
+			auth.validateInteractionRedirect(response);
+			auth.validateInteraction(response, 'unrequestable', 'un_foo');
 		});
 	});
 });

@@ -87,6 +87,8 @@ test/
 
 **Adapter pattern** — All persistence goes through a `StorageAdapter` interface. Swap implementations without touching business logic. Use `TestAdapter` (in-memory) for unit/integration tests.
 
+**Storage contract** — Every persisted model (all `BaseModel`/`BaseToken` subclasses: tokens, `Grant`, `Session`, `Interaction`, `ReplayDetection`) filters its stored payload by its TypeBox schema: `Opaque.getValueAndPayload()` persists only the top-level keys declared in `this.model` and copies each value verbatim (a **shallow** projection — never `Value.Clean`, so freeform fields like `claims`/`rar`/`params`/`session.state` are preserved). A field must be declared in the model's schema to be persisted; there is no whole-payload fallback. When adding a field a model must persist, add it to that model's TypeBox schema.
+
 **Provider singleton** — `provider.init(config)` resolves config via `Configuration`. After init, models are accessed as `provider.Grant`, etc. `provider.Client` is a **namespace** (`find`/`validate`/`needsSecret`/`validateClient`/`adapter`), not a class.
 
 **Client model** — A client is a TypeBox `ClientSchema`-validated **plain object** (`validateClient(metadata)`), not a class instance. Behaviour lives in pure functions under `lib/models/client/` (`checks`, `secret`, `sector`, `keystore`, `backchannel`); `lib/models/client.ts` re-exports them. The object exposes the historical method/getter surface (delegating to those functions) for call-site/test compatibility.

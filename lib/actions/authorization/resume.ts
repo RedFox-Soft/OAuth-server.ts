@@ -16,7 +16,7 @@ export default async function resumeAction(oidc, interaction) {
 
 	const { session } = oidc;
 
-	if (originSession?.uid && originSession.uid !== session.uid) {
+	if (originSession?.uid && originSession.uid !== session.payload.uid) {
 		throw new SessionNotFound(
 			'interaction session and authentication session mismatch'
 		);
@@ -24,12 +24,12 @@ export default async function resumeAction(oidc, interaction) {
 
 	if (
 		result?.login &&
-		session.accountId &&
-		session.accountId !== result.login.accountId
+		session.payload.accountId &&
+		session.payload.accountId !== result.login.accountId
 	) {
-		if (interaction.session?.uid) {
-			delete interaction.session.uid;
-			await interaction.save(interaction.exp - epochTime());
+		if (interaction.payload.session?.uid) {
+			delete interaction.payload.session.uid;
+			await interaction.save(interaction.payload.exp - epochTime());
 		}
 
 		const secret = nanoid();

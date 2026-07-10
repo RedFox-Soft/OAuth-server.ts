@@ -30,24 +30,10 @@ export abstract class Opaque {
 		payload?: typeof BaseModelPayload;
 	}> {
 		const now = epochTime();
-		const ctor = this.constructor as unknown as {
-			filterStoredPayload?: boolean;
-		};
 
-		// Token models derive their storage contract from their TypeBox schema (this.model):
-		// only fields declared in the schema are persisted and instance-only fields are transient.
-		// Non-token models (Session, Grant, Interaction, …) keep storing their whole payload.
-		if (!ctor.filterStoredPayload) {
-			const payload = {
-				iat: now,
-				...this.payload
-			};
-			if (typeof payload.exp === 'undefined') {
-				payload.exp = now + this.expiration;
-			}
-			return { value: this.id, payload };
-		}
-
+		// Every persisted model derives its storage contract from its TypeBox schema (this.model):
+		// only fields declared in the schema are persisted; instance-only fields are transient.
+		//
 		// Intentionally a SHALLOW, top-level filter — do NOT replace with Value.Clean().
 		// Value.Clean recurses into nested object schemas and prunes their contents, and several
 		// persisted fields are deliberately freeform (claims: t.Object({}), rar: t.Array(t.Object({})),

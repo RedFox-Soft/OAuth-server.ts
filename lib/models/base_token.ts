@@ -60,8 +60,6 @@ export class BaseToken<
 		}
 	}
 
-	static filterStoredPayload = true;
-
 	set client(client) {
 		this.payload.clientId = client.clientId;
 		this.#client = client;
