@@ -69,6 +69,13 @@ export class OIDCContext<T extends Record<string, unknown>> {
 			return new URL(`/ui/${opt.uid}/device_resume`, ISSUER).toString();
 		}
 
+		if (name === 'client') {
+			return new URL(
+				`${routeNames.registration}/${opt.clientId}`,
+				ISSUER
+			).toString();
+		}
+
 		throw new Error(`unknown route name: ${name}`);
 	}
 

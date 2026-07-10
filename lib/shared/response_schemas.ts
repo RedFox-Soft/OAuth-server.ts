@@ -82,6 +82,19 @@ export const UserinfoResponse = t.Union([
 	t.String()
 ]);
 
+// Dynamic Client Registration / Registration Management (RFC 7591/7592). Create/read/update return
+// the client metadata (snake_case) plus, when issued, registration_access_token/registration_client_uri;
+// the field set is dynamic per client, so this stays permissive. Delete returns 204 with no body (Void).
+export const RegistrationResponse = t.Union([
+	t.Object(
+		{
+			client_id: t.String()
+		},
+		{ additionalProperties: true }
+	),
+	t.Void()
+]);
+
 // Discovery metadata is a large dynamic object assembled from enabled features (runtime-validated).
 export const DiscoveryResponse = t.Object({}, { additionalProperties: true });
 

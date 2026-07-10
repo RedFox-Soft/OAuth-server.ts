@@ -5,13 +5,13 @@ import {
 	bitsOfOpaqueRandomness,
 	clockTolerance
 } from 'lib/configs/liveTime.js';
-import { BaseModelPayload } from '../base_model.js';
+import { type BaseModelPayload } from '../base_model.js';
 
 const bitsPerSymbol = Math.log2(64);
 const tokenLength = (i: number) => Math.ceil(i / bitsPerSymbol);
 
 export abstract class Opaque {
-	declare payload: BaseModelPayload;
+	declare payload: typeof BaseModelPayload;
 	abstract get id(): string;
 
 	get expiration() {
@@ -27,7 +27,7 @@ export abstract class Opaque {
 	}
 	async getValueAndPayload(): Promise<{
 		value: string;
-		payload?: BaseModelPayload;
+		payload?: typeof BaseModelPayload;
 	}> {
 		const now = epochTime();
 		const ctor = this.constructor as unknown as {
@@ -68,10 +68,17 @@ export abstract class Opaque {
 			payload.iat = now;
 		}
 		if (payload.exp === undefined) {
-			payload.exp = now + this.expiration;
+			// Non-expiring tokens (RegistrationAccessToken / InitialAccessToken with no
+			// configured TTL) have an undefined expiration; leave `exp` absent rather than
+			// writing `now + undefined` (NaN), which would fail the integer payload check on
+			// the next verify. Tokens with a finite TTL keep their computed expiry.
+			const expiration = this.expiration;
+			if (expiration !== undefined && Number.isFinite(expiration)) {
+				payload.exp = now + expiration;
+			}
 		}
 
-		return { value: this.id, payload: payload as BaseModelPayload };
+		return { value: this.id, payload: payload as typeof BaseModelPayload };
 	}
 	static async verify(
 		stored: Record<string, unknown>,

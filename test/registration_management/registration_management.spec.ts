@@ -1,468 +1,391 @@
-import omit from 'lodash/omit.js';
-import sinon from 'sinon';
-import { expect } from 'chai';
+import { describe, it, beforeAll, afterEach, expect, mock } from 'bun:test';
 
-import bootstrap from '../test_helper.js';
-import provider from '../../lib/index.ts';
+import bootstrap, { agent } from '../test_helper.js';
+import { provider } from 'lib/provider.js';
+import { ISSUER } from 'lib/configs/env.js';
+import { ApplicationConfig } from 'lib/configs/application.js';
+import Configuration from 'lib/helpers/configuration.js';
+
+const json = { 'content-type': 'application/json' };
+const bearer = (token) => ({ authorization: `Bearer ${token}` });
+
+const NOGO = [
+	'registration_access_token',
+	'registration_client_uri',
+	'client_secret_expires_at',
+	'client_id_issued_at'
+];
+
+function omit(obj, keys) {
+	const out = { ...obj };
+	for (const key of keys) delete out[key];
+	return out;
+}
+
+function updateProperties(client, props = {}) {
+	return Object.assign(omit(client, NOGO), props);
+}
+
+async function register(metadata = {}) {
+	const { data, status } = await agent.reg.post(
+		{ redirect_uris: ['https://client.example.com/cb'], ...metadata },
+		{ headers: json }
+	);
+	expect(status).toBe(201);
+	return data;
+}
+
+function body(res) {
+	return res.error?.value ?? res.data;
+}
+
+// Mirrors the suite's legacy `failWith`, adapted to the Eden agent and to RFC 6750:
+// the Bearer challenge with error/error_description is asserted on 401 responses (where
+// it is mandated), and the realm-only challenge on the 400 "no access token provided"
+// case; status + body error/error_description are always checked.
+function expectFail(res, code, error, error_description) {
+	expect(res.status).toBe(code);
+	expect(body(res)).toHaveProperty('error', error);
+	expect(body(res)).toHaveProperty('error_description', error_description);
+
+	const wwwAuth = res.headers?.get?.('www-authenticate');
+	if (code === 401) {
+		expect(wwwAuth).toContain(`Bearer realm="${ISSUER}"`);
+		expect(wwwAuth).toContain(`error="${error}"`);
+		expect(wwwAuth).toContain(`error_description="${error_description}"`);
+	} else if (error_description === 'no access token provided') {
+		expect(wwwAuth).toContain(`Bearer realm="${ISSUER}"`);
+		expect(wwwAuth).not.toContain('error=');
+	}
+}
 
 describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
-	before(bootstrap(import.meta.url));
+	beforeAll(async () => {
+		await bootstrap(import.meta.url)();
+	});
 
-	// setup does not have the provider;
-
-	function setup(metadata) {
-		const props = {
-			redirect_uris: ['https://client.example.com/cb'],
-			...metadata
-		};
-
-		return this.agent
-			.post('/reg')
-			.send(props)
-			.expect(201)
-			.then((res) => res.body);
-	}
+	afterEach(() => {
+		mock.restore();
+		provider.removeAllListeners('registration_update.success');
+		provider.removeAllListeners('registration_delete.success');
+		provider.removeAllListeners('registration_access_token.destroyed');
+		provider.removeAllListeners('registration_access_token.saved');
+	});
 
 	describe('feature flag', () => {
 		it('checks registration is also enabled', () => {
-			expect(() => {
-				new provider('http://localhost', {
-					features: {
-						registrationManagement: { enabled: true }
-					}
-				});
-			}).to.throw(
-				'registrationManagement is only available in conjuction with registration'
-			);
+			const origMgmt = ApplicationConfig['registrationManagement.enabled'];
+			const origReg = ApplicationConfig['registration.enabled'];
+			ApplicationConfig['registrationManagement.enabled'] = true;
+			ApplicationConfig['registration.enabled'] = false;
+			try {
+				expect(() => new Configuration({})).toThrow(
+					'registrationManagement is only available in conjuction with registration'
+				);
+			} finally {
+				ApplicationConfig['registrationManagement.enabled'] = origMgmt;
+				ApplicationConfig['registration.enabled'] = origReg;
+			}
 		});
 	});
 
 	describe('Client Update Request', () => {
-		const NOGO = [
-			'registration_access_token',
-			'registration_client_uri',
-			'client_secret_expires_at',
-			'client_id_issued_at'
-		];
-		function updateProperties(client, props) {
-			return Object.assign(omit(client, NOGO), props);
-		}
+		it('responds w/ 200 JSON and nocache headers', async () => {
+			const client = await register();
+			const res = await agent.reg({ clientId: client.client_id }).put(
+				updateProperties(client, {
+					redirect_uris: ['https://client.example.com/foobar/cb']
+				}),
+				{ headers: { ...json, ...bearer(client.registration_access_token) } }
+			);
 
-		it('responds w/ 200 JSON and nocache headers', async function () {
-			const client = await setup.call(this, {});
-			return this.agent
-				.put(`/reg/${client.client_id}`)
-				.auth(client.registration_access_token, { type: 'bearer' })
-				.send(
-					updateProperties(client, {
-						redirect_uris: ['https://client.example.com/foobar/cb']
-					})
-				)
-				.expect(200)
-				.expect('content-type', /application\/json/)
-				.expect('cache-control', 'no-store')
-				.expect((res) => {
-					expect(res.body).to.have.property(
-						'registration_access_token',
-						client.registration_access_token
-					);
-					expect(res.body).to.have.property(
-						'registration_client_uri',
-						client.registration_client_uri
-					);
-					expect(res.body).to.have.property(
-						'client_secret_expires_at',
-						client.client_secret_expires_at
-					);
-					expect(res.body).to.have.property(
-						'client_id_issued_at',
-						client.client_id_issued_at
-					);
-					expect(res.body.redirect_uris).to.eql([
-						'https://client.example.com/foobar/cb'
-					]);
+			expect(res.status).toBe(200);
+			expect(res.headers.get('content-type')).toMatch(/application\/json/);
+			expect(res.headers.get('cache-control')).toBe('no-store');
+			expect(res.data).toHaveProperty(
+				'registration_access_token',
+				client.registration_access_token
+			);
+			expect(res.data).toHaveProperty(
+				'registration_client_uri',
+				client.registration_client_uri
+			);
+			expect(res.data).toHaveProperty(
+				'client_secret_expires_at',
+				client.client_secret_expires_at
+			);
+			expect(res.data).toHaveProperty(
+				'client_id_issued_at',
+				client.client_id_issued_at
+			);
+			expect(res.data.redirect_uris).toEqual([
+				'https://client.example.com/foobar/cb'
+			]);
+		});
+
+		it('rejects calls with bad registration access token', async () => {
+			const client = await register();
+			const res = await agent
+				.reg({ clientId: client.client_id })
+				.put(updateProperties(client), { headers: bearer('foobarbaz') });
+			expectFail(res, 401, 'invalid_token', 'invalid token provided');
+		});
+
+		it('rejects calls with no registration access token', async () => {
+			const client = await register();
+			const res = await agent
+				.reg({ clientId: client.client_id })
+				.put(updateProperties(client), { headers: json });
+			expectFail(res, 400, 'invalid_request', 'no access token provided');
+		});
+
+		it('populates the Client and RegistrationAccessToken (returns the RAT + client_uri)', async () => {
+			const client = await register();
+			const res = await agent
+				.reg({ clientId: client.client_id })
+				.put(updateProperties(client), {
+					headers: { ...json, ...bearer(client.registration_access_token) }
 				});
+			expect(res.status).toBe(200);
+			expect(res.data).toHaveProperty(
+				'registration_access_token',
+				client.registration_access_token
+			);
+			expect(res.data).toHaveProperty('registration_client_uri');
 		});
 
-		it('rejects calls with bad registration access token', async function () {
-			const client = await setup.call(this, {});
-			return this.agent
-				.put(`/reg/${client.client_id}`)
-				.auth('foobarbaz', { type: 'bearer' })
-				.expect(this.failWith(401, 'invalid_token', 'invalid token provided'));
-		});
-
-		it('rejects calls with no registration access token', async function () {
-			const client = await setup.call(this, {});
-			return this.agent
-				.put(`/reg/${client.client_id}`)
-				.expect(
-					this.failWith(400, 'invalid_request', 'no access token provided')
-				);
-		});
-
-		it('populates ctx.oidc.entities', function (done) {
-			(async () => {
-				const client = await setup.call(this, {});
-				this.assertOnce((ctx) => {
-					expect(ctx.oidc.entities).to.have.keys(
-						'Client',
-						'RegistrationAccessToken'
-					);
-				}, done);
-				await this.agent
-					.put(`/reg/${client.client_id}`)
-					.auth(client.registration_access_token, { type: 'bearer' })
-					.send(updateProperties(client));
-			})().catch(done);
-		});
-
-		it('allows for properties to be deleted', async function () {
-			const client = await setup.call(this, {
-				userinfo_signed_response_alg: 'RS256'
-			});
-			return this.agent
-				.put(`/reg/${client.client_id}`)
-				.auth(client.registration_access_token, { type: 'bearer' })
-				.send(
-					updateProperties(client, {
-						userinfo_signed_response_alg: null
-					})
-				)
-				.expect(200)
-				.expect((res) => {
-					expect(res.body).not.to.have.property('userinfo_signed_response_alg');
+		it('allows for properties to be deleted', async () => {
+			const client = await register({ userinfo_signed_response_alg: 'RS256' });
+			const res = await agent
+				.reg({ clientId: client.client_id })
+				.put(updateProperties(client, { userinfo_signed_response_alg: null }), {
+					headers: { ...json, ...bearer(client.registration_access_token) }
 				});
+			expect(res.status).toBe(200);
+			expect(res.data).not.toHaveProperty('userinfo_signed_response_alg');
 		});
 
-		it('allows for properties to be deleted (not client_secret tho)', async function () {
-			const client = await setup.call(this, {});
-			return this.agent
-				.put(`/reg/${client.client_id}`)
-				.auth(client.registration_access_token, { type: 'bearer' })
-				.send(
-					updateProperties(client, {
-						client_secret: null
-					})
-				)
-				.expect(
-					this.failWith(
-						400,
-						'invalid_request',
-						"provided client_secret does not match the authenticated client's one"
-					)
-				);
+		it('allows for properties to be deleted (not client_secret tho)', async () => {
+			const client = await register();
+			const res = await agent
+				.reg({ clientId: client.client_id })
+				.put(updateProperties(client, { client_secret: null }), {
+					headers: { ...json, ...bearer(client.registration_access_token) }
+				});
+			expectFail(
+				res,
+				400,
+				'invalid_request',
+				"provided client_secret does not match the authenticated client's one"
+			);
 		});
 
-		it('allows for properties to be deleted by omission', async function () {
-			const client = await setup.call(this, {
-				userinfo_signed_response_alg: 'RS256'
-			});
+		it('allows for properties to be deleted by omission', async () => {
+			const client = await register({ userinfo_signed_response_alg: 'RS256' });
 			delete client.userinfo_signed_response_alg;
-			return this.agent
-				.put(`/reg/${client.client_id}`)
-				.auth(client.registration_access_token, { type: 'bearer' })
-				.send(updateProperties(client))
-				.expect(200)
-				.expect((res) => {
-					expect(res.body).not.to.have.property('userinfo_signed_response_alg');
+			const res = await agent
+				.reg({ clientId: client.client_id })
+				.put(updateProperties(client), {
+					headers: { ...json, ...bearer(client.registration_access_token) }
 				});
+			expect(res.status).toBe(200);
+			expect(res.data).not.toHaveProperty('userinfo_signed_response_alg');
 		});
 
-		it('provides a secret if suddently needed', async function () {
-			const client = await setup.call(this, {
+		it('provides a secret if suddently needed', async () => {
+			const client = await register({
 				token_endpoint_auth_method: 'none',
 				response_types: ['code'],
 				grant_types: ['authorization_code']
 			});
-			expect(client).not.to.have.property('client_secret');
-			return this.agent
-				.put(`/reg/${client.client_id}`)
-				.auth(client.registration_access_token, { type: 'bearer' })
-				.send(
-					updateProperties(client, {
-						response_types: ['code'],
-						grant_types: ['authorization_code'],
-						token_endpoint_auth_method: 'client_secret_basic'
-					})
-				)
-				.expect(200)
-				.expect((res) => {
-					expect(res.body).to.have.property('client_secret');
-					expect(res.body).to.have.property('client_secret_expires_at');
-				});
+			expect(client).not.toHaveProperty('client_secret');
+			const res = await agent.reg({ clientId: client.client_id }).put(
+				updateProperties(client, {
+					response_types: ['code'],
+					grant_types: ['authorization_code'],
+					token_endpoint_auth_method: 'client_secret_basic'
+				}),
+				{ headers: { ...json, ...bearer(client.registration_access_token) } }
+			);
+			expect(res.status).toBe(200);
+			expect(res.data).toHaveProperty('client_secret');
+			expect(res.data).toHaveProperty('client_secret_expires_at');
 		});
 
-		it('emits an event', async function () {
-			const client = await setup.call(this, {});
-			const spy = sinon.spy();
+		it('emits an event', async () => {
+			const client = await register();
+			const spy = mock();
 			provider.once('registration_update.success', spy);
-
-			return this.agent
-				.put(`/reg/${client.client_id}`)
-				.auth(client.registration_access_token, { type: 'bearer' })
-				.send(updateProperties(client))
-				.expect(200)
-				.expect(() => {
-					expect(spy.calledOnce).to.be.true;
+			const res = await agent
+				.reg({ clientId: client.client_id })
+				.put(updateProperties(client), {
+					headers: { ...json, ...bearer(client.registration_access_token) }
 				});
+			expect(res.status).toBe(200);
+			expect(spy).toHaveBeenCalledTimes(1);
 		});
 
-		it('must not contain registration_access_token', async function () {
-			const client = await setup.call(this, {});
-			// changing the redirect_uris;
-			return this.agent
-				.put(`/reg/${client.client_id}`)
-				.auth(client.registration_access_token, { type: 'bearer' })
-				.send(
+		for (const field of NOGO) {
+			it(`must not contain ${field}`, async () => {
+				const client = await register();
+				const res = await agent.reg({ clientId: client.client_id }).put(
 					updateProperties(client, {
 						redirect_uris: ['https://client.example.com/foobar/cb'],
-						registration_access_token: 'foobar'
-					})
-				)
-				.expect(
-					this.failWith(
-						400,
-						'invalid_request',
-						'request MUST NOT include the registration_access_token field'
-					)
+						[field]: 'foobar'
+					}),
+					{ headers: { ...json, ...bearer(client.registration_access_token) } }
 				);
-		});
-
-		it('must not contain registration_client_uri', async function () {
-			const client = await setup.call(this, {});
-			// changing the redirect_uris;
-			return this.agent
-				.put(`/reg/${client.client_id}`)
-				.auth(client.registration_access_token, { type: 'bearer' })
-				.send(
-					updateProperties(client, {
-						redirect_uris: ['https://client.example.com/foobar/cb'],
-						registration_client_uri: 'foobar'
-					})
-				)
-				.expect(
-					this.failWith(
-						400,
-						'invalid_request',
-						'request MUST NOT include the registration_client_uri field'
-					)
+				expectFail(
+					res,
+					400,
+					'invalid_request',
+					`request MUST NOT include the ${field} field`
 				);
-		});
-
-		it('must not contain client_secret_expires_at', async function () {
-			const client = await setup.call(this, {});
-			// changing the redirect_uris;
-			return this.agent
-				.put(`/reg/${client.client_id}`)
-				.auth(client.registration_access_token, { type: 'bearer' })
-				.send(
-					updateProperties(client, {
-						redirect_uris: ['https://client.example.com/foobar/cb'],
-						client_secret_expires_at: 'foobar'
-					})
-				)
-				.expect(
-					this.failWith(
-						400,
-						'invalid_request',
-						'request MUST NOT include the client_secret_expires_at field'
-					)
-				);
-		});
-
-		it('must not contain client_id_issued_at', async function () {
-			const client = await setup.call(this, {});
-			// changing the redirect_uris;
-			return this.agent
-				.put(`/reg/${client.client_id}`)
-				.auth(client.registration_access_token, { type: 'bearer' })
-				.send(
-					updateProperties(client, {
-						redirect_uris: ['https://client.example.com/foobar/cb'],
-						client_id_issued_at: 'foobar'
-					})
-				)
-				.expect(
-					this.failWith(
-						400,
-						'invalid_request',
-						'request MUST NOT include the client_id_issued_at field'
-					)
-				);
-		});
-
-		it('cannot update non-dynamic clients', async function () {
-			const rat = new provider.RegistrationAccessToken({
-				clientId: 'client'
 			});
-			const bearer = await rat.save();
+		}
+
+		it('cannot update non-dynamic clients', async () => {
+			const rat = new provider.RegistrationAccessToken({ clientId: 'client' });
+			const token = await rat.save();
 			const client = await provider.Client.find('client');
-			return this.agent
-				.put('/reg/client')
-				.auth(bearer, { type: 'bearer' })
-				.send(
-					updateProperties(client.metadata(), {
-						redirect_uris: ['https://client.example.com/foobar/cb']
-					})
-				)
-				.expect(
-					this.failWith(
-						403,
-						'invalid_request',
-						'client does not have permission to update its record'
-					)
-				);
+			const res = await agent.reg({ clientId: 'client' }).put(
+				updateProperties(client.metadata(), {
+					redirect_uris: ['https://client.example.com/foobar/cb'],
+					client_id: 'client'
+				}),
+				{ headers: { ...json, ...bearer(token) } }
+			);
+			expectFail(
+				res,
+				403,
+				'invalid_request',
+				'client does not have permission to update its record'
+			);
 		});
 
 		describe('rotateRegistrationAccessToken', () => {
-			before(function () {
-				const conf = i(provider).configuration;
-				conf.features.registrationManagement = {
-					enabled: true,
-					rotateRegistrationAccessToken: true
-				};
+			// Enabled through ApplicationConfig for this block; the sibling "after rotation"
+			// describe flips it back so the flag does not leak within the shared bootstrap.
+			beforeAll(() => {
+				ApplicationConfig[
+					'registrationManagement.rotateRegistrationAccessToken'
+				] = true;
 			});
 
-			after(function () {
-				const conf = i(provider).configuration;
-				conf.features.registrationManagement = { enabled: true };
-			});
-
-			it('destroys the old RegistrationAccessToken', async function () {
-				const client = await setup.call(this, {});
-				const spy = sinon.spy();
+			it('destroys the old RegistrationAccessToken', async () => {
+				const client = await register();
+				const spy = mock();
 				provider.once('registration_access_token.destroyed', spy);
-
-				return this.agent
-					.put(`/reg/${client.client_id}`)
-					.auth(client.registration_access_token, { type: 'bearer' })
-					.send(updateProperties(client))
-					.expect(200)
-					.expect(() => {
-						expect(spy.calledOnce).to.be.true;
+				const res = await agent
+					.reg({ clientId: client.client_id })
+					.put(updateProperties(client), {
+						headers: { ...json, ...bearer(client.registration_access_token) }
 					});
+				expect(res.status).toBe(200);
+				expect(spy).toHaveBeenCalledTimes(1);
 			});
 
-			it('populates ctx.oidc.entities with RotatedRegistrationAccessToken too', function (done) {
-				(async () => {
-					const client = await setup.call(this, {});
-					this.assertOnce((ctx) => {
-						expect(ctx.oidc.entities).to.contain.keys(
-							'RotatedRegistrationAccessToken',
-							'RegistrationAccessToken'
-						);
-						expect(ctx.oidc.entities.RotatedRegistrationAccessToken).not.to.eql(
-							ctx.oidc.entities.RegistrationAccessToken
-						);
-					}, done);
-					await this.agent
-						.put(`/reg/${client.client_id}`)
-						.auth(client.registration_access_token, { type: 'bearer' })
-						.send(updateProperties(client));
-				})().catch(done);
+			it('issues and returns a new, different RegistrationAccessToken', async () => {
+				const client = await register();
+				const saved = mock();
+				provider.once('registration_access_token.saved', saved);
+				const res = await agent
+					.reg({ clientId: client.client_id })
+					.put(updateProperties(client), {
+						headers: { ...json, ...bearer(client.registration_access_token) }
+					});
+				expect(res.status).toBe(200);
+				expect(saved).toHaveBeenCalledTimes(1);
+				expect(res.data.registration_access_token).not.toBe(
+					client.registration_access_token
+				);
+				// the newly saved token resolves to the same client
+				const rotated = await provider.RegistrationAccessToken.find(
+					res.data.registration_access_token
+				);
+				expect(rotated?.payload.clientId).toBe(client.client_id);
+			});
+		});
+
+		describe('after rotation (flag restored)', () => {
+			beforeAll(() => {
+				ApplicationConfig[
+					'registrationManagement.rotateRegistrationAccessToken'
+				] = false;
 			});
 
-			it('issues and returns new RegistrationAccessToken', async function () {
-				const client = await setup.call(this, {});
-				const spy = sinon.spy();
-				provider.once('registration_access_token.saved', spy);
-
-				return this.agent
-					.put(`/reg/${client.client_id}`)
-					.auth(client.registration_access_token, { type: 'bearer' })
-					.send(updateProperties(client))
-					.expect(200)
-					.expect((response) => {
-						expect(spy.calledOnce).to.be.true;
-						const args = spy.firstCall.args[0];
-						expect(args.clientId).to.equal(client.client_id);
-						expect(
-							this.getTokenJti(response.body.registration_access_token)
-						).to.equal(args.jti);
+			it('does not rotate when disabled', async () => {
+				const client = await register();
+				const res = await agent
+					.reg({ clientId: client.client_id })
+					.put(updateProperties(client), {
+						headers: { ...json, ...bearer(client.registration_access_token) }
 					});
+				expect(res.status).toBe(200);
+				expect(res.data.registration_access_token).toBe(
+					client.registration_access_token
+				);
 			});
 		});
 	});
 
 	describe('Client Delete Request', () => {
-		it('responds w/ empty 204 and nocache headers and removes the registration access token', async function () {
-			const client = await setup.call(this, {});
-			await this.agent
-				.del(`/reg/${client.client_id}`)
-				.auth(client.registration_access_token, { type: 'bearer' })
-				.expect('cache-control', 'no-store')
-				.expect('') // empty body
-				.expect(204);
+		it('responds w/ empty 204 and nocache headers and removes the registration access token', async () => {
+			const client = await register();
+			const res = await agent
+				.reg({ clientId: client.client_id })
+				.delete(undefined, {
+					headers: bearer(client.registration_access_token)
+				});
 
+			expect(res.status).toBe(204);
+			expect(res.headers.get('cache-control')).toBe('no-store');
 			expect(
 				await provider.RegistrationAccessToken.find(
 					client.registration_access_token
 				)
-			).to.be.undefined;
+			).toBeUndefined();
 		});
 
-		it('populates ctx.oidc.entities', function (done) {
-			(async () => {
-				const client = await setup.call(this, {});
-				this.assertOnce((ctx) => {
-					expect(ctx.oidc.entities).to.have.keys(
-						'Client',
-						'RegistrationAccessToken'
-					);
-				}, done);
-				await this.agent
-					.del(`/reg/${client.client_id}`)
-					.auth(client.registration_access_token, { type: 'bearer' });
-			})().catch(done);
-		});
-
-		it('emits an event', async function () {
-			const client = await setup.call(this, {});
-			const spy = sinon.spy();
+		it('emits an event', async () => {
+			const client = await register();
+			const spy = mock();
 			provider.once('registration_delete.success', spy);
-
-			return this.agent
-				.del(`/reg/${client.client_id}`)
-				.auth(client.registration_access_token, { type: 'bearer' })
-				.expect(204)
-				.expect(() => {
-					expect(spy.calledOnce).to.be.true;
+			const res = await agent
+				.reg({ clientId: client.client_id })
+				.delete(undefined, {
+					headers: bearer(client.registration_access_token)
 				});
+			expect(res.status).toBe(204);
+			expect(spy).toHaveBeenCalledTimes(1);
 		});
 
-		it('rejects calls with bad registration access token', async function () {
-			const client = await setup.call(this, {});
-			return this.agent
-				.del(`/reg/${client.client_id}`)
-				.auth('foobarbaz', { type: 'bearer' })
-				.expect(this.failWith(401, 'invalid_token', 'invalid token provided'));
+		it('rejects calls with bad registration access token', async () => {
+			const client = await register();
+			const res = await agent
+				.reg({ clientId: client.client_id })
+				.delete(undefined, { headers: bearer('foobarbaz') });
+			expectFail(res, 401, 'invalid_token', 'invalid token provided');
 		});
 
-		it('rejects calls with no registration access token', async function () {
-			const client = await setup.call(this, {});
-			return this.agent
-				.del(`/reg/${client.client_id}`)
-				.expect(
-					this.failWith(400, 'invalid_request', 'no access token provided')
-				);
+		it('rejects calls with no registration access token', async () => {
+			const client = await register();
+			const res = await agent.reg({ clientId: client.client_id }).delete();
+			expectFail(res, 400, 'invalid_request', 'no access token provided');
 		});
 
-		it('cannot delete non-dynamic clients', async function () {
-			const rat = new provider.RegistrationAccessToken({
-				clientId: 'client'
-			});
-			const bearer = await rat.save();
-			return this.agent
-				.del('/reg/client')
-				.auth(bearer, { type: 'bearer' })
-				.expect(
-					this.failWith(
-						403,
-						'invalid_request',
-						'client does not have permission to delete its record'
-					)
-				);
+		it('cannot delete non-dynamic clients', async () => {
+			const rat = new provider.RegistrationAccessToken({ clientId: 'client' });
+			const token = await rat.save();
+			const res = await agent
+				.reg({ clientId: 'client' })
+				.delete(undefined, { headers: bearer(token) });
+			expectFail(
+				res,
+				403,
+				'invalid_request',
+				'client does not have permission to delete its record'
+			);
 		});
 	});
 });
