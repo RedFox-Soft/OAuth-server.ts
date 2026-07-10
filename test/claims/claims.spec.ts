@@ -14,6 +14,8 @@ import { ApplicationConfig } from 'lib/configs/application.js';
 import bootstrap, { agent, jsonToFormUrlEncoded } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { provider } from 'lib/provider.js';
+import { Client } from 'lib/models/client.js';
+import { IdToken } from 'lib/models/id_token.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { Interaction } from 'lib/models/interaction.js';
 
@@ -94,12 +96,12 @@ expire.setDate(expire.getDate() + 1);
 
 		describe('with acr_values on the client', () => {
 			beforeEach(async function () {
-				const client = await provider.Client.find('client');
+				const client = await Client.find('client');
 				client.defaultAcrValues = ['1', '2'];
 			});
 
 			afterEach(async function () {
-				const client = await provider.Client.find('client');
+				const client = await Client.find('client');
 				delete client.defaultAcrValues;
 			});
 
@@ -544,8 +546,7 @@ expire.setDate(expire.getDate() + 1);
 				});
 
 				it('id_token_hint belongs to a user that is not currently logged in [1/3]', async function () {
-					const client = await provider.Client.find('client');
-					const { IdToken } = provider;
+					const client = await Client.find('client');
 					const idToken = new IdToken(client, {
 						sub: 'not-the-droid-you-are-looking-for'
 					});
@@ -577,8 +578,7 @@ expire.setDate(expire.getDate() + 1);
 				});
 
 				it('id_token_hint belongs to a user that is not currently logged in [2/3]', async function () {
-					const client = await provider.Client.find('client-pairwise');
-					const { IdToken } = provider;
+					const client = await Client.find('client-pairwise');
 					const idToken = new IdToken(client, {
 						sub: 'not-the-droid-you-are-looking-for'
 					});
@@ -611,8 +611,7 @@ expire.setDate(expire.getDate() + 1);
 				});
 
 				it('id_token_hint belongs to a user that is not currently logged in [3/3]', async function () {
-					const client = await provider.Client.find('client-pairwise');
-					const { IdToken } = provider;
+					const client = await Client.find('client-pairwise');
 					const idToken = new IdToken(client, {
 						sub: 'not-the-droid-you-are-looking-for'
 					});
@@ -640,8 +639,7 @@ expire.setDate(expire.getDate() + 1);
 				it('id_token_hint belongs to a user that is currently logged in [1/2]', async function () {
 					const cookie = await setup.login();
 					const session = setup.getSession();
-					const client = await provider.Client.find('client');
-					const { IdToken } = provider;
+					const client = await Client.find('client');
 					const idToken = new IdToken(client, { sub: session.accountId });
 
 					idToken.scope = 'openid';
@@ -663,8 +661,7 @@ expire.setDate(expire.getDate() + 1);
 				it('id_token_hint belongs to a user that is currently logged in [2/2]', async function () {
 					const cookie = await setup.login();
 					const session = setup.getSession();
-					const client = await provider.Client.find('client-pairwise');
-					const { IdToken } = provider;
+					const client = await Client.find('client-pairwise');
 					const idToken = new IdToken(client, { sub: session.accountId });
 
 					idToken.scope = 'openid';

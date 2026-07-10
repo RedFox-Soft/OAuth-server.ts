@@ -1044,7 +1044,7 @@ describe('client authentication options', () => {
 		it('rejects assertions when the secret is expired', async function () {
 			const key = await importJWK(
 				(
-					await provider.Client.find('secret-expired-jwt')
+					await Client.find('secret-expired-jwt')
 				).symmetricKeyStore.selectForSign({ alg: 'HS256' })[0]
 			);
 			const assertion = await JWT.sign(

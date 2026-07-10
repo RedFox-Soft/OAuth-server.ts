@@ -10,7 +10,9 @@ import resolveResource from '../../helpers/resolve_resource.ts';
 import { IdToken } from 'lib/models/id_token.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AccessToken } from 'lib/models/access_token.js';
+import { BackchannelAuthenticationRequest } from 'lib/models/backchannel_authentication_request.js';
 import { Grant } from 'lib/models/grant.js';
+import ResourceServer from 'lib/helpers/resource_server.js';
 
 const { AuthorizationPending, ExpiredToken, InvalidGrant } = errors;
 
@@ -32,7 +34,7 @@ export const handler = async function cibaHandler(oidc, dPoP) {
 		features: { userinfo, resourceIndicators }
 	} = instance(oidc.provider).configuration;
 
-	const request = await oidc.provider.BackchannelAuthenticationRequest.find(
+	const request = await BackchannelAuthenticationRequest.find(
 		oidc.params.auth_req_id,
 		{ ignoreExpiration: true }
 	);
@@ -151,7 +153,7 @@ export const handler = async function cibaHandler(oidc, dPoP) {
 			resource,
 			oidc.client
 		);
-		at.resourceServer = new oidc.provider.ResourceServer(
+		at.resourceServer = new ResourceServer(
 			resource,
 			resourceServerInfo
 		);

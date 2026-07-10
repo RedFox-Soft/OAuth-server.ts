@@ -12,7 +12,10 @@ import {
 import bootstrap, { agent } from '../test_helper.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { provider } from 'lib/provider.js';
+import { Client } from 'lib/models/client.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
+import { InitialAccessToken } from 'lib/models/initial_access_token.js';
+import { RegistrationAccessToken } from 'lib/models/registration_access_token.js';
 import { TestAdapter } from 'test/models.js';
 
 const json = { 'content-type': 'application/json' };
@@ -167,7 +170,7 @@ describe('registration features', () => {
 			expect(data).not.toHaveProperty('client_secret');
 			expect(data).not.toHaveProperty('client_secret_expires_at');
 
-			const client = await provider.Client.find(data.client_id);
+			const client = await Client.find(data.client_id);
 			expect(client).not.toHaveProperty('clientSecret');
 			expect(client).not.toHaveProperty('clientSecretExpiresAt');
 		});
@@ -226,7 +229,7 @@ describe('registration features', () => {
 				redirectUris: ['https://client.example.com/cb']
 			});
 
-			const client = await provider.Client.find('foobar');
+			const client = await Client.find('foobar');
 			expect(client).toBeTruthy();
 		});
 
@@ -298,20 +301,20 @@ describe('registration features', () => {
 				let token;
 				beforeAll(async () => {
 					provider.enable('registration', { initialAccessToken: true });
-					token = await new provider.InitialAccessToken({}).save();
+					token = await new InitialAccessToken({}).save();
 				});
 				afterAll(() => {
 					ApplicationConfig['registration.initialAccessToken'] = false;
 				});
 
 				it('allows the developers to insert new tokens with no expiration', async () => {
-					const v = await new provider.InitialAccessToken().save();
+					const v = await new InitialAccessToken().save();
 					const stored = TestAdapter.for('InitialAccessToken').syncFind(v);
 					expect(stored).not.toHaveProperty('exp');
 				});
 
 				it('allows the developers to insert new tokens with expiration', async () => {
-					const v = await new provider.InitialAccessToken({
+					const v = await new InitialAccessToken({
 						expiresIn: 24 * 60 * 60
 					}).save();
 					const stored = TestAdapter.for('InitialAccessToken').syncFind(v);
@@ -447,7 +450,7 @@ describe('registration features', () => {
 		});
 
 		it('cannot read non-dynamic clients', async () => {
-			const rat = new provider.RegistrationAccessToken({ clientId: 'client' });
+			const rat = new RegistrationAccessToken({ clientId: 'client' });
 			const bearerToken = await rat.save();
 			const res = await agent
 				.reg({ clientId: 'client' })

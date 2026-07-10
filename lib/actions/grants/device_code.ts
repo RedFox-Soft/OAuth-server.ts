@@ -12,6 +12,7 @@ import { DeviceCode } from 'lib/models/device_code.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Grant } from 'lib/models/grant.js';
+import ResourceServer from 'lib/helpers/resource_server.js';
 
 const { AuthorizationPending, ExpiredToken, InvalidGrant } = errors;
 
@@ -145,7 +146,7 @@ export const handler = async function deviceCodeHandler(oidc, dPoP) {
 			resource,
 			oidc.client
 		);
-		at.resourceServer = new oidc.provider.ResourceServer(
+		at.resourceServer = new ResourceServer(
 			resource,
 			resourceServerInfo
 		);

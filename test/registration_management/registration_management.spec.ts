@@ -2,8 +2,10 @@ import { describe, it, beforeAll, afterEach, expect, mock } from 'bun:test';
 
 import bootstrap, { agent } from '../test_helper.js';
 import { provider } from 'lib/provider.js';
+import { Client } from 'lib/models/client.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
+import { RegistrationAccessToken } from 'lib/models/registration_access_token.js';
 import Configuration from 'lib/helpers/configuration.js';
 
 const json = { 'content-type': 'application/json' };
@@ -245,9 +247,9 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 		}
 
 		it('cannot update non-dynamic clients', async () => {
-			const rat = new provider.RegistrationAccessToken({ clientId: 'client' });
+			const rat = new RegistrationAccessToken({ clientId: 'client' });
 			const token = await rat.save();
-			const client = await provider.Client.find('client');
+			const client = await Client.find('client');
 			const res = await agent.reg({ clientId: 'client' }).put(
 				updateProperties(client.metadata(), {
 					redirect_uris: ['https://client.example.com/foobar/cb'],
@@ -300,7 +302,7 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 					client.registration_access_token
 				);
 				// the newly saved token resolves to the same client
-				const rotated = await provider.RegistrationAccessToken.find(
+				const rotated = await RegistrationAccessToken.find(
 					res.data.registration_access_token
 				);
 				expect(rotated?.payload.clientId).toBe(client.client_id);
@@ -341,7 +343,7 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 			expect(res.status).toBe(204);
 			expect(res.headers.get('cache-control')).toBe('no-store');
 			expect(
-				await provider.RegistrationAccessToken.find(
+				await RegistrationAccessToken.find(
 					client.registration_access_token
 				)
 			).toBeUndefined();
@@ -375,7 +377,7 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 		});
 
 		it('cannot delete non-dynamic clients', async () => {
-			const rat = new provider.RegistrationAccessToken({ clientId: 'client' });
+			const rat = new RegistrationAccessToken({ clientId: 'client' });
 			const token = await rat.save();
 			const res = await agent
 				.reg({ clientId: 'client' })

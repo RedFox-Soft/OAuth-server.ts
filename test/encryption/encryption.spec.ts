@@ -151,13 +151,13 @@ describe('encryption', () => {
 
 				describe('userinfo signed - expired client secret', () => {
 					beforeAll(async () => {
-						const client = await provider.Client.find('client');
+						const client = await Client.find('client');
 						client.userinfoSignedResponseAlg = 'HS256';
 						client.clientSecretExpiresAt = 1;
 					});
 
 					afterAll(async () => {
-						const client = await provider.Client.find('client');
+						const client = await Client.find('client');
 						client.userinfoSignedResponseAlg = 'RS256';
 						client.clientSecretExpiresAt = 0;
 					});
@@ -177,13 +177,13 @@ describe('encryption', () => {
 
 				describe('userinfo symmetric encrypted - expired client secret', () => {
 					beforeAll(async () => {
-						const client = await provider.Client.find('client');
+						const client = await Client.find('client');
 						client.clientSecretExpiresAt = 1;
 						client.userinfoEncryptedResponseAlg = 'dir';
 					});
 
 					afterAll(async () => {
-						const client = await provider.Client.find('client');
+						const client = await Client.find('client');
 						client.clientSecretExpiresAt = 0;
 						client.userinfoEncryptedResponseAlg = 'RSA-OAEP';
 					});
@@ -278,7 +278,7 @@ describe('encryption', () => {
 			// unavailable in this environment.
 			describe('Pushed Request Object encryption', () => {
 				it('works signed', async () => {
-					const client = await provider.Client.find('client');
+					const client = await Client.find('client');
 					const [hsSecret] = client.symmetricKeyStore.selectForSign({
 						alg: 'HS256'
 					});
@@ -331,7 +331,7 @@ describe('encryption', () => {
 				});
 
 				it('works with signed by other than none when an alg is required', async () => {
-					const client = await provider.Client.find(
+					const client = await Client.find(
 						'clientRequestObjectSigningAlg'
 					);
 					const [hsSecret] = client.symmetricKeyStore.selectForSign({
@@ -394,7 +394,7 @@ describe('encryption', () => {
 			});
 
 			it('handles when no suitable encryption key is found', async () => {
-				const client = await provider.Client.find('client');
+				const client = await Client.find('client');
 
 				client.idTokenEncryptedResponseAlg = 'ECDH-ES';
 
@@ -423,7 +423,7 @@ describe('encryption', () => {
 				});
 
 				it('accepts symmetric encrypted Request Objects', async () => {
-					const client = await provider.Client.find('clientSymmetric');
+					const client = await Client.find('clientSymmetric');
 					const code_verifier = crypto.randomBytes(32).toString('base64url');
 					const signed = await JWT.sign(
 						{
@@ -474,7 +474,7 @@ describe('encryption', () => {
 				});
 
 				it('rejects symmetric encrypted request objects when secret is expired', async () => {
-					const client = await provider.Client.find('clientSymmetric-expired');
+					const client = await Client.find('clientSymmetric-expired');
 					const signed = await JWT.sign(
 						{
 							client_id: 'clientSymmetric-expired',
@@ -536,7 +536,7 @@ describe('encryption', () => {
 				});
 
 				it('accepts symmetric (dir) encrypted Request Objects', async () => {
-					const client = await provider.Client.find('clientSymmetric');
+					const client = await Client.find('clientSymmetric');
 					const code_verifier = crypto.randomBytes(32).toString('base64url');
 					const signed = await JWT.sign(
 						{
@@ -587,7 +587,7 @@ describe('encryption', () => {
 				});
 
 				it('rejects symmetric (dir) encrypted request objects when secret is expired', async () => {
-					const client = await provider.Client.find('clientSymmetric');
+					const client = await Client.find('clientSymmetric');
 					const signed = await JWT.sign(
 						{
 							client_id: 'clientSymmetric-expired',

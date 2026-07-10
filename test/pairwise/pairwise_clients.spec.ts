@@ -8,6 +8,7 @@ import { assertNoPendingInterceptors, mock } from '../fetch_mock.js';
 import addClient from '../../lib/helpers/add_client.ts';
 import { Claims } from 'lib/helpers/claims.js';
 import { provider } from 'lib/provider.js';
+import { Client } from 'lib/models/client.js';
 
 describe('pairwise features', () => {
 	beforeAll(bootstrap(import.meta.url));
@@ -137,7 +138,7 @@ describe('pairwise features', () => {
 						])
 					);
 
-				return provider.Client.find('client-static-with-sector').then(
+				return Client.find('client-static-with-sector').then(
 					(client) => {
 						expect(client).toBeTruthy();
 						expect(client.sectorIdentifier).toBe('foobar.example.com');

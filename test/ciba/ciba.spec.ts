@@ -17,6 +17,7 @@ import bootstrap, { agent, jsonToFormUrlEncoded } from '../test_helper.js';
 import { emitter } from './ciba.config.js';
 import { provider } from 'lib/provider.js';
 import { ISSUER } from 'lib/configs/env.js';
+import { BackchannelAuthenticationRequest } from 'lib/models/backchannel_authentication_request.js';
 import { Grant } from 'lib/models/grant.js';
 
 const form = { 'content-type': 'application/x-www-form-urlencoded' };
@@ -62,7 +63,7 @@ describe('features.ciba', () => {
 		describe('Provider.prototype.backchannelResult', () => {
 			it('"request" can be a string (BackchannelAuthenticationRequest jti)', async () => {
 				const result = new AccessDenied();
-				const request = new provider.BackchannelAuthenticationRequest({
+				const request = new BackchannelAuthenticationRequest({
 					clientId: 'client'
 				});
 				await request.save();
@@ -77,7 +78,7 @@ describe('features.ciba', () => {
 					clientId: 'client',
 					accountId: 'accountId'
 				});
-				const request = new provider.BackchannelAuthenticationRequest({
+				const request = new BackchannelAuthenticationRequest({
 					clientId: 'client',
 					accountId: 'accountId'
 				});
@@ -109,7 +110,7 @@ describe('features.ciba', () => {
 					clientId: 'client',
 					accountId: 'accountId'
 				});
-				const request = new provider.BackchannelAuthenticationRequest({
+				const request = new BackchannelAuthenticationRequest({
 					clientId: 'client',
 					accountId: 'accountId'
 				});
@@ -121,7 +122,7 @@ describe('features.ciba', () => {
 			});
 
 			it('"result" must be a supported type', async () => {
-				const request = new provider.BackchannelAuthenticationRequest({
+				const request = new BackchannelAuthenticationRequest({
 					clientId: 'client'
 				});
 
@@ -143,7 +144,7 @@ describe('features.ciba', () => {
 
 			it('request.clientId must be a valid client', async () => {
 				const result = new AccessDenied();
-				const request = new provider.BackchannelAuthenticationRequest({
+				const request = new BackchannelAuthenticationRequest({
 					clientId: 'notfound'
 				});
 				await expect(
@@ -156,7 +157,7 @@ describe('features.ciba', () => {
 					clientId: 'client',
 					accountId: 'accountId'
 				});
-				const request = new provider.BackchannelAuthenticationRequest({
+				const request = new BackchannelAuthenticationRequest({
 					clientId: 'client-ping',
 					accountId: 'accountId'
 				});
@@ -170,7 +171,7 @@ describe('features.ciba', () => {
 					clientId: 'client',
 					accountId: 'accountId'
 				});
-				const request = new provider.BackchannelAuthenticationRequest({
+				const request = new BackchannelAuthenticationRequest({
 					clientId: 'client',
 					accountId: 'accountId-2'
 				});
@@ -184,7 +185,7 @@ describe('features.ciba', () => {
 					clientId: 'client',
 					accountId: 'accountId'
 				});
-				const request = new provider.BackchannelAuthenticationRequest({
+				const request = new BackchannelAuthenticationRequest({
 					clientId: 'client',
 					accountId: 'accountId'
 				});
@@ -201,7 +202,7 @@ describe('features.ciba', () => {
 					clientId: 'client-ping',
 					accountId: 'accountId'
 				});
-				const request = new provider.BackchannelAuthenticationRequest({
+				const request = new BackchannelAuthenticationRequest({
 					clientId: 'client-ping',
 					accountId: 'accountId',
 					params: { client_notification_token: 'foo' }
@@ -218,7 +219,7 @@ describe('features.ciba', () => {
 					clientId: 'client-ping',
 					accountId: 'accountId'
 				});
-				const request = new provider.BackchannelAuthenticationRequest({
+				const request = new BackchannelAuthenticationRequest({
 					clientId: 'client-ping',
 					accountId: 'accountId',
 					params: { client_notification_token: 'foo' }
@@ -235,7 +236,7 @@ describe('features.ciba', () => {
 					clientId: 'client-ping',
 					accountId: 'accountId'
 				});
-				const request = new provider.BackchannelAuthenticationRequest({
+				const request = new BackchannelAuthenticationRequest({
 					clientId: 'client-ping',
 					accountId: 'accountId',
 					params: { client_notification_token: 'foo' }

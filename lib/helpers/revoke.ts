@@ -2,6 +2,7 @@ import { DeviceCode } from 'lib/models/device_code.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';
 import { AccessToken } from 'lib/models/access_token.js';
+import { BackchannelAuthenticationRequest } from 'lib/models/backchannel_authentication_request.js';
 import { provider } from 'lib/provider.js';
 
 export default async function revoke(ctx, grantId) {
@@ -24,7 +25,7 @@ export default async function revoke(ctx, grantId) {
 			authorizationCode ? AuthorizationCode : undefined,
 			deviceCode ? DeviceCode : undefined,
 			backchannelAuthenticationRequest
-				? provider.BackchannelAuthenticationRequest
+				? BackchannelAuthenticationRequest
 				: undefined
 		].map((model) => model?.revokeByGrantId(grantId))
 	);

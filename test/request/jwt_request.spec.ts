@@ -7,6 +7,7 @@ import { importJWK } from 'jose';
 import * as JWT from '../../lib/helpers/jwt.ts';
 import bootstrap, { agent, jsonToFormUrlEncoded } from '../test_helper.js';
 import { provider } from 'lib/provider.js';
+import { Client } from 'lib/models/client.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { ValidationError } from 'elysia';
@@ -304,7 +305,7 @@ describe('request parameter features', () => {
 			});
 
 			it('can accept Request Objects issued within acceptable system clock skew', async function () {
-				const client = await provider.Client.find('client-with-HS-sig');
+				const client = await Client.find('client-with-HS-sig');
 				let [key] = client.symmetricKeyStore.selectForSign({ alg: 'HS256' });
 				key = await importJWK(key);
 
@@ -322,7 +323,7 @@ describe('request parameter features', () => {
 			});
 
 			it('works with signed by an actual DSA', async function () {
-				const client = await provider.Client.find('client-with-HS-sig');
+				const client = await Client.find('client-with-HS-sig');
 				let [key] = client.symmetricKeyStore.selectForSign({ alg: 'HS256' });
 				key = await importJWK(key);
 
@@ -339,7 +340,7 @@ describe('request parameter features', () => {
 			});
 
 			it('rejects HMAC based requests when signed with an expired secret', async function () {
-				const client = await provider.Client.find('client-with-HS-sig-expired');
+				const client = await Client.find('client-with-HS-sig-expired');
 				let [key] = client.symmetricKeyStore.selectForSign({ alg: 'HS256' });
 				key = await importJWK(key);
 
@@ -659,7 +660,7 @@ describe('request parameter features', () => {
 			it('handles unrecognized parameters', async function () {
 				const spy = mock();
 				provider.once(errorEvt, spy);
-				const client = await provider.Client.find('client-with-HS-sig');
+				const client = await Client.find('client-with-HS-sig');
 				let [key] = client.symmetricKeyStore.selectForSign({ alg: 'HS256' });
 				key = await importJWK(key);
 

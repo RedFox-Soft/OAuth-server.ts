@@ -21,6 +21,7 @@ import {
 } from '../fetch_mock.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { provider } from 'lib/provider.js';
+import { Client } from 'lib/models/client.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
 // Decode a JWS compact serialization sent as `logout_token=<jwt>` in the POST body.
@@ -54,7 +55,7 @@ describe('Back-Channel Logout 1.0', () => {
 
 	describe('Client#backchannelLogout', () => {
 		it('triggers the call', async function () {
-			const client = await provider.Client.find('client');
+			const client = await Client.find('client');
 
 			mockHttp('https://client.example.com')
 				.intercept({
@@ -81,7 +82,7 @@ describe('Back-Channel Logout 1.0', () => {
 		});
 
 		it('omits sid when its not required', async function () {
-			const client = await provider.Client.find('no-sid');
+			const client = await Client.find('no-sid');
 
 			mockHttp('https://no-sid.example.com')
 				.intercept({
@@ -107,7 +108,7 @@ describe('Back-Channel Logout 1.0', () => {
 		});
 
 		it('handles non-200 OK responses', async function () {
-			const client = await provider.Client.find('no-sid');
+			const client = await Client.find('no-sid');
 
 			mockHttp('https://no-sid.example.com')
 				.intercept({
@@ -230,9 +231,9 @@ describe('Back-Channel Logout 1.0', () => {
 				clientId: 'client',
 				postLogoutRedirectUri: 'https://rp.example.com/'
 			};
-			const client = await provider.Client.find('client');
-			const client2 = await provider.Client.find('second-client');
-			const client3 = await provider.Client.find('no-sid');
+			const client = await Client.find('client');
+			const client2 = await Client.find('second-client');
+			const client3 = await Client.find('no-sid');
 
 			spyOn(client, 'backchannelLogout');
 			spyOn(client2, 'backchannelLogout');
@@ -286,8 +287,8 @@ describe('Back-Channel Logout 1.0', () => {
 				clientId: 'client',
 				postLogoutRedirectUri: 'https://rp.example.com/'
 			};
-			const client = await provider.Client.find('client');
-			const client2 = await provider.Client.find('second-client');
+			const client = await Client.find('client');
+			const client2 = await Client.find('second-client');
 
 			spyOn(client, 'backchannelLogout');
 			spyOn(client2, 'backchannelLogout');
@@ -317,9 +318,9 @@ describe('Back-Channel Logout 1.0', () => {
 				clientId: 'client',
 				postLogoutRedirectUri: 'https://rp.example.com/'
 			};
-			const client = await provider.Client.find('client');
-			const client2 = await provider.Client.find('second-client');
-			const client3 = await provider.Client.find('no-sid');
+			const client = await Client.find('client');
+			const client2 = await Client.find('second-client');
+			const client3 = await Client.find('no-sid');
 			delete client.backchannelLogoutUri;
 
 			spyOn(client, 'backchannelLogout');

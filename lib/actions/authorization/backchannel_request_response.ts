@@ -1,7 +1,7 @@
 import instance from '../../helpers/weak_cache.ts';
+import { BackchannelAuthenticationRequest } from '../../models/backchannel_authentication_request.js';
 
 export default async function backchannelRequestResponse(oidc) {
-	const { BackchannelAuthenticationRequest } = oidc.provider;
 	const { ciba } = instance(oidc.provider).features;
 
 	const request = new BackchannelAuthenticationRequest({

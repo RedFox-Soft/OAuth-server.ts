@@ -10,15 +10,15 @@ import { Client } from 'lib/models/client.js';
 // so the constructor API under test no longer exists. Kept disabled (not deleted) pending a rewrite
 // against the current provider surface; adapter selection is exercised via the live HTTP specs.
 describe.skip('provider instance', () => {
-	describe('provider.Client#find', () => {
+	describe('Client#find', () => {
 		it('ignores non-string inputs', async () => {
 			const provider = new provider('http://localhost');
-			expect(await provider.Client.find([])).toBeUndefined();
-			expect(await provider.Client.find(Buffer)).toBeUndefined();
-			expect(await provider.Client.find({})).toBeUndefined();
-			expect(await provider.Client.find(true)).toBeUndefined();
-			expect(await provider.Client.find(undefined)).toBeUndefined();
-			expect(await provider.Client.find(64)).toBeUndefined();
+			expect(await Client.find([])).toBeUndefined();
+			expect(await Client.find(Buffer)).toBeUndefined();
+			expect(await Client.find({})).toBeUndefined();
+			expect(await Client.find(true)).toBeUndefined();
+			expect(await Client.find(undefined)).toBeUndefined();
+			expect(await Client.find(64)).toBeUndefined();
 		});
 	});
 

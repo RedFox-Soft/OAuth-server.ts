@@ -5,7 +5,7 @@
 // (SC-004 — no class construction in lib/): `Client` below is a thin namespace
 // function carrying the former statics (`find`/`validate`/`needsSecret`/…) and
 // whose `.prototype` is the shared `clientPrototype`, so validated objects stay
-// `instanceof Client` and `spyOn(provider.Client, 'find')` keeps working.
+// `instanceof Client` and `spyOn(Client, 'find')` keeps working.
 
 import { adapter } from '../adapters/index.js';
 import { type ClientSchemaType } from '../configs/clientSchema.ts';
@@ -50,10 +50,9 @@ export { backchannelPing, backchannelLogout } from './client/backchannel.ts';
 // continue to resolve to the validated-object type.
 export type Client = ClientSchemaType;
 
-// Namespace function grouping the former static `Client` members. `provider.Client`
-// returns this; internal call sites use `Client.find`/`Client.needsSecret` exactly
-// as before, and `value instanceof Client` holds for validated objects because
-// `Client.prototype` is the shared `clientPrototype`.
+// Namespace function grouping the former static `Client` members. Call sites import
+// this directly and use `Client.find`/`Client.needsSecret`, and `value instanceof Client`
+// holds for validated objects because `Client.prototype` is the shared `clientPrototype`.
 export function Client(metadata: unknown) {
 	return validateClient(metadata);
 }

@@ -6,6 +6,8 @@ import { expect, mock, spyOn } from 'bun:test';
 import bootstrap from '../test_helper.js';
 import provider, { errors } from '../../lib/index.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
+import { InitialAccessToken } from 'lib/models/initial_access_token.js';
+import { RegistrationAccessToken } from 'lib/models/registration_access_token.js';
 import { TestAdapter } from 'test/models.js';
 
 describe('client registration policies', () => {
@@ -33,14 +35,14 @@ describe('client registration policies', () => {
 		it('allows policies to run to be stored on an InitialAccessToken', async function () {
 			const spy = mock();
 			provider.once('initial_access_token.saved', spy);
-			const value = await new provider.InitialAccessToken({
+			const value = await new InitialAccessToken({
 				policies: ['empty-policy']
 			}).save();
 
 			expect(spy).toHaveBeenCalled();
 			expect(spy.mock.calls[0][0]).toHaveProperty('policies', ['empty-policy']);
 
-			expect(await provider.InitialAccessToken.find(value)).toHaveProperty(
+			expect(await InitialAccessToken.find(value)).toHaveProperty(
 				'policies',
 				['empty-policy']
 			);
@@ -51,7 +53,7 @@ describe('client registration policies', () => {
 				ApplicationConfig['registration.policies'],
 				'empty-policy'
 			);
-			const value = await new provider.InitialAccessToken({
+			const value = await new InitialAccessToken({
 				policies: ['empty-policy']
 			}).save();
 
@@ -74,7 +76,7 @@ describe('client registration policies', () => {
 				}
 			};
 
-			const value = await new provider.InitialAccessToken({
+			const value = await new InitialAccessToken({
 				policies: ['set-default']
 			}).save();
 
@@ -108,7 +110,7 @@ describe('client registration policies', () => {
 				properties.id_token_signed_response_alg = 'HS256';
 			};
 
-			const value = await new provider.InitialAccessToken({
+			const value = await new InitialAccessToken({
 				policies: ['force-default']
 			}).save();
 
@@ -130,7 +132,7 @@ describe('client registration policies', () => {
 				throw new errors.InvalidClientMetadata('foo');
 			};
 
-			const value = await new provider.InitialAccessToken({
+			const value = await new InitialAccessToken({
 				policies: ['throw-error']
 			}).save();
 
@@ -149,7 +151,7 @@ describe('client registration policies', () => {
 		});
 
 		it('pushes the policy down to the registration access token', async function () {
-			const value = await new provider.InitialAccessToken({
+			const value = await new InitialAccessToken({
 				policies: ['empty-policy']
 			}).save();
 
@@ -173,7 +175,7 @@ describe('client registration policies', () => {
 				ctx.oidc.entities.RegistrationAccessToken.policies = ['empty-policy'];
 			};
 
-			const value = await new provider.InitialAccessToken({
+			const value = await new InitialAccessToken({
 				policies: ['change-rat-policy']
 			}).save();
 
@@ -192,13 +194,13 @@ describe('client registration policies', () => {
 
 		it('policies must be an array', async function () {
 			await assert.rejects(
-				new provider.InitialAccessToken({ policies: null }).save(),
+				new InitialAccessToken({ policies: null }).save(),
 				(err) => {
 					expect(err).toHaveProperty('message', 'policies must be an array');
 					return true;
 				}
 			);
-			const saved = await new provider.InitialAccessToken({
+			const saved = await new InitialAccessToken({
 				policies: undefined
 			}).save();
 			TestAdapter.for('InitialAccessToken').syncUpdate(
@@ -208,7 +210,7 @@ describe('client registration policies', () => {
 				}
 			);
 
-			return assert.rejects(provider.InitialAccessToken.find(saved), (err) => {
+			return assert.rejects(InitialAccessToken.find(saved), (err) => {
 				expect(err).toHaveProperty('message', 'policies must be an array');
 				return true;
 			});
@@ -216,13 +218,13 @@ describe('client registration policies', () => {
 
 		it('policies array must have members', async function () {
 			await assert.rejects(
-				new provider.InitialAccessToken({ policies: [] }).save(),
+				new InitialAccessToken({ policies: [] }).save(),
 				(err) => {
 					expect(err).toHaveProperty('message', 'policies must not be empty');
 					return true;
 				}
 			);
-			const saved = await new provider.InitialAccessToken({
+			const saved = await new InitialAccessToken({
 				policies: undefined
 			}).save();
 			TestAdapter.for('InitialAccessToken').syncUpdate(
@@ -232,7 +234,7 @@ describe('client registration policies', () => {
 				}
 			);
 
-			return assert.rejects(provider.InitialAccessToken.find(saved), (err) => {
+			return assert.rejects(InitialAccessToken.find(saved), (err) => {
 				expect(err).toHaveProperty('message', 'policies must not be empty');
 				return true;
 			});
@@ -240,13 +242,13 @@ describe('client registration policies', () => {
 
 		it('policies members must be strings', async function () {
 			await assert.rejects(
-				new provider.InitialAccessToken({ policies: [null] }).save(),
+				new InitialAccessToken({ policies: [null] }).save(),
 				(err) => {
 					expect(err).toHaveProperty('message', 'policies must be strings');
 					return true;
 				}
 			);
-			const saved = await new provider.InitialAccessToken({
+			const saved = await new InitialAccessToken({
 				policies: undefined
 			}).save();
 			TestAdapter.for('InitialAccessToken').syncUpdate(
@@ -256,7 +258,7 @@ describe('client registration policies', () => {
 				}
 			);
 
-			return assert.rejects(provider.InitialAccessToken.find(saved), (err) => {
+			return assert.rejects(InitialAccessToken.find(saved), (err) => {
 				expect(err).toHaveProperty('message', 'policies must be strings');
 				return true;
 			});
@@ -264,7 +266,7 @@ describe('client registration policies', () => {
 
 		it('policies members must be present in the provider configuration', async function () {
 			await assert.rejects(
-				new provider.InitialAccessToken({ policies: ['foo-bar'] }).save(),
+				new InitialAccessToken({ policies: ['foo-bar'] }).save(),
 				(err) => {
 					expect(err).toHaveProperty(
 						'message',
@@ -273,7 +275,7 @@ describe('client registration policies', () => {
 					return true;
 				}
 			);
-			const saved = await new provider.InitialAccessToken({
+			const saved = await new InitialAccessToken({
 				policies: undefined
 			}).save();
 			TestAdapter.for('InitialAccessToken').syncUpdate(
@@ -283,7 +285,7 @@ describe('client registration policies', () => {
 				}
 			);
 
-			return assert.rejects(provider.InitialAccessToken.find(saved), (err) => {
+			return assert.rejects(InitialAccessToken.find(saved), (err) => {
 				expect(err).toHaveProperty('message', 'policy foo-bar not configured');
 				return true;
 			});
@@ -292,7 +294,7 @@ describe('client registration policies', () => {
 
 	describe('Registration Management & RegistrationAccessToken', () => {
 		beforeEach(async function () {
-			const iat = await new provider.InitialAccessToken({}).save();
+			const iat = await new InitialAccessToken({}).save();
 			await this.agent
 				.post('/reg')
 				.auth(iat, { type: 'bearer' })
@@ -471,13 +473,13 @@ describe('client registration policies', () => {
 				]);
 
 				expect(
-					await provider.RegistrationAccessToken.find(value)
+					await RegistrationAccessToken.find(value)
 				).toHaveProperty('policies', ['empty-policy']);
 			});
 		});
 
 		it('policies must be an array', async function () {
-			const saved = await new provider.RegistrationAccessToken({
+			const saved = await new RegistrationAccessToken({
 				policies: undefined
 			}).save();
 			TestAdapter.for('RegistrationAccessToken').syncUpdate(
@@ -488,7 +490,7 @@ describe('client registration policies', () => {
 			);
 
 			return assert.rejects(
-				provider.RegistrationAccessToken.find(saved),
+				RegistrationAccessToken.find(saved),
 				(err) => {
 					expect(err).toHaveProperty('message', 'policies must be an array');
 					return true;
@@ -497,7 +499,7 @@ describe('client registration policies', () => {
 		});
 
 		it('policies array must have members', async function () {
-			const saved = await new provider.RegistrationAccessToken({
+			const saved = await new RegistrationAccessToken({
 				policies: undefined
 			}).save();
 			TestAdapter.for('RegistrationAccessToken').syncUpdate(
@@ -508,7 +510,7 @@ describe('client registration policies', () => {
 			);
 
 			return assert.rejects(
-				provider.RegistrationAccessToken.find(saved),
+				RegistrationAccessToken.find(saved),
 				(err) => {
 					expect(err).toHaveProperty('message', 'policies must not be empty');
 					return true;
@@ -517,7 +519,7 @@ describe('client registration policies', () => {
 		});
 
 		it('policies members must be strings', async function () {
-			const saved = await new provider.RegistrationAccessToken({
+			const saved = await new RegistrationAccessToken({
 				policies: undefined
 			}).save();
 			TestAdapter.for('RegistrationAccessToken').syncUpdate(
@@ -528,7 +530,7 @@ describe('client registration policies', () => {
 			);
 
 			return assert.rejects(
-				provider.RegistrationAccessToken.find(saved),
+				RegistrationAccessToken.find(saved),
 				(err) => {
 					expect(err).toHaveProperty('message', 'policies must be strings');
 					return true;
@@ -537,7 +539,7 @@ describe('client registration policies', () => {
 		});
 
 		it('policies members must be present in the provider configuration', async function () {
-			const saved = await new provider.RegistrationAccessToken({
+			const saved = await new RegistrationAccessToken({
 				policies: undefined
 			}).save();
 			TestAdapter.for('RegistrationAccessToken').syncUpdate(
@@ -548,7 +550,7 @@ describe('client registration policies', () => {
 			);
 
 			return assert.rejects(
-				provider.RegistrationAccessToken.find(saved),
+				RegistrationAccessToken.find(saved),
 				(err) => {
 					expect(err).toHaveProperty(
 						'message',

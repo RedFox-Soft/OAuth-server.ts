@@ -13,6 +13,7 @@ import {
 
 import timekeeper from 'timekeeper';
 import { provider } from 'lib/provider.js';
+import { Client } from 'lib/models/client.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
 import bootstrap, { agent } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
@@ -663,7 +664,7 @@ describe('grant_type=authorization_code', () => {
 	});
 
 	it('handles exceptions', async function () {
-		spyOn(provider.Client, 'find').mockRejectedValue(new Error());
+		spyOn(Client, 'find').mockRejectedValue(new Error());
 		const spy = mock();
 		provider.on('server_error', spy);
 

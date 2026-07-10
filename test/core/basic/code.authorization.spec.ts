@@ -15,6 +15,7 @@ import bootstrap, { agent, jsonToFormUrlEncoded } from '../../test_helper.js';
 import epochTime from '../../../lib/helpers/epoch_time.ts';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { provider } from 'lib/provider.js';
+import { Client } from 'lib/models/client.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 
 const route = '/auth';
@@ -303,7 +304,7 @@ describe('BASIC code', () => {
 			});
 
 			it('session is too old for this client', async function () {
-				const client = await provider.Client.find('client');
+				const client = await Client.find('client');
 				client.defaultMaxAge = 1800;
 
 				const session = setup.getSession();
@@ -499,12 +500,12 @@ describe('BASIC code', () => {
 
 			describe('when client has more then one redirect_uri', () => {
 				beforeEach(async function () {
-					const client = await provider.Client.find('client');
+					const client = await Client.find('client');
 					client.redirectUris.push('https://someOtherUri.com');
 				});
 
 				afterEach(async function () {
-					const client = await provider.Client.find('client');
+					const client = await Client.find('client');
 					client.redirectUris.pop();
 				});
 

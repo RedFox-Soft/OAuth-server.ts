@@ -13,6 +13,7 @@ import {
 import bootstrap, { agent } from '../test_helper.js';
 import { decode as decodeJWT } from '../../lib/helpers/jwt.ts';
 import { provider } from 'lib/provider.js';
+import { Client } from 'lib/models/client.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
@@ -42,7 +43,7 @@ describe('configuration conformIdTokenClaims=true', () => {
 		let refreshIdToken = null;
 
 		beforeAll(async () => {
-			const client = await provider.Client.find('client');
+			const client = await Client.find('client');
 
 			const claims = JSON.stringify({
 				id_token: { gender: null, email: null, email_verified: null },
@@ -90,7 +91,7 @@ describe('configuration conformIdTokenClaims=true', () => {
 				userinfo = uiRes.data;
 
 				client.userinfoSignedResponseAlg = 'HS256';
-				await provider.Client.find('client');
+				await Client.find('client');
 				const uiSignedRes = await agent.userinfo.get({
 					headers: { authorization: `Bearer ${access_token}` }
 				});

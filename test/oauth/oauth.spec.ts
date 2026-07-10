@@ -15,6 +15,7 @@ import snakeCase from 'lodash/snakeCase.js';
 import bootstrap, { agent, jsonToFormUrlEncoded } from '../test_helper.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { provider } from 'lib/provider.js';
+import { Client } from 'lib/models/client.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
 
@@ -91,7 +92,7 @@ describe('requests without the openid scope', () => {
 			it(`must be provided when client is configured with ${snakeCase(clientProperty)}`, async function () {
 				const auth = new AuthorizationRequest({ client_id: 'client' });
 
-				const client = await provider.Client.find('client');
+				const client = await Client.find('client');
 				client[clientProperty] = value;
 
 				let response;

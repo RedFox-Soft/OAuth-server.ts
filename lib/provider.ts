@@ -65,22 +65,14 @@ import Configuration from './helpers/configuration.ts';
 import * as instance from './helpers/weak_cache.ts';
 import initializeApp from './helpers/initialize_app.ts';
 import initializeClients from './helpers/initialize_clients.ts';
-import ResourceServer from './helpers/resource_server.ts';
 import { OIDCProviderError } from './helpers/errors.ts';
-import * as models from './models/index.ts';
+import { BackchannelAuthenticationRequest } from './models/backchannel_authentication_request.js';
 import { Client } from './models/client.js';
-import { IdToken } from './models/id_token.js';
 import { JWKS_KEYS } from './configs/keys.js';
 import KeyStore from './helpers/keystore.js';
 import { Grant } from './models/grant.js';
 
 class ProviderClass extends EventEmitter {
-	#BackchannelAuthenticationRequest;
-
-	#InitialAccessToken;
-
-	#RegistrationAccessToken;
-
 	#int = {};
 
 	constructor() {
@@ -170,13 +162,13 @@ class ProviderClass extends EventEmitter {
 		{ acr, amr, authTime, sessionUid, expiresWithSession, sid } = {}
 	) {
 		if (typeof request === 'string' && request) {
-			request = await this.BackchannelAuthenticationRequest.find(request, {
+			request = await BackchannelAuthenticationRequest.find(request, {
 				ignoreExpiration: true
 			});
 			if (!request) {
 				throw new Error('BackchannelAuthenticationRequest not found');
 			}
-		} else if (!(request instanceof this.BackchannelAuthenticationRequest)) {
+		} else if (!(request instanceof BackchannelAuthenticationRequest)) {
 			throw new TypeError('invalid "request" argument');
 		}
 
@@ -229,33 +221,6 @@ class ProviderClass extends EventEmitter {
 		}
 	}
 
-	get IdToken() {
-		return IdToken;
-	}
-
-	get Client() {
-		return Client;
-	}
-
-	get InitialAccessToken() {
-		this.#InitialAccessToken ||= models.getInitialAccessToken(this);
-		return this.#InitialAccessToken;
-	}
-
-	get RegistrationAccessToken() {
-		this.#RegistrationAccessToken ||= models.getRegistrationAccessToken(this);
-		return this.#RegistrationAccessToken;
-	}
-
-	get BackchannelAuthenticationRequest() {
-		this.#BackchannelAuthenticationRequest ||=
-			models.getBackchannelAuthenticationRequest(this);
-		return this.#BackchannelAuthenticationRequest;
-	}
-
-	get ResourceServer() {
-		return ResourceServer;
-	}
 }
 
 export const provider = new ProviderClass();

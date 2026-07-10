@@ -2,6 +2,7 @@ import {
 	describe,
 	it,
 	beforeAll,
+	afterAll,
 	afterEach,
 	expect,
 	spyOn,
@@ -10,6 +11,10 @@ import {
 
 import epochTime from '../../lib/helpers/epoch_time.ts';
 import bootstrap from '../test_helper.js';
+import { ApplicationConfig } from 'lib/configs/application.js';
+import { BackchannelAuthenticationRequest } from 'lib/models/backchannel_authentication_request.js';
+import { InitialAccessToken } from 'lib/models/initial_access_token.js';
+import { RegistrationAccessToken } from 'lib/models/registration_access_token.js';
 import { Client } from 'lib/models/client.js';
 import { TestAdapter } from 'test/models.js';
 import { provider } from 'lib/provider.js';
@@ -20,8 +25,15 @@ import { AccessToken } from 'lib/models/access_token.js';
 import { ClientCredentials } from 'lib/models/client_credentials.js';
 
 describe('opaque storage', () => {
+	// hasPolicies validates policies against ApplicationConfig on save/find (the same source
+	// registration.ts reads), so the throwaway ['foo'] policy below must be a configured one.
+	const originalPolicies = ApplicationConfig['registration.policies'];
 	beforeAll(async () => {
 		await bootstrap(import.meta.url)();
+		ApplicationConfig['registration.policies'] = { foo() {} };
+	});
+	afterAll(() => {
+		ApplicationConfig['registration.policies'] = originalPolicies;
 	});
 
 	const accountId = 'account';
@@ -219,7 +231,7 @@ describe('opaque storage', () => {
 		const adapter = TestAdapter.for(kind);
 		const upsert = spyOn(adapter, 'upsert');
 		const client = await Client.find(clientId);
-		const token = new provider.BackchannelAuthenticationRequest({
+		const token = new BackchannelAuthenticationRequest({
 			client,
 			...fullPayload
 		});
@@ -332,7 +344,7 @@ describe('opaque storage', () => {
 		const kind = 'InitialAccessToken';
 		const adapter = TestAdapter.for(kind);
 		const upsert = spyOn(adapter, 'upsert');
-		const token = new provider.InitialAccessToken({
+		const token = new InitialAccessToken({
 			expiresIn: 100,
 			...fullPayload
 		});
@@ -354,7 +366,7 @@ describe('opaque storage', () => {
 		const adapter = TestAdapter.for(kind);
 		const upsert = spyOn(adapter, 'upsert');
 		const client = await Client.find(clientId);
-		const token = new provider.RegistrationAccessToken({
+		const token = new RegistrationAccessToken({
 			client,
 			expiresIn: 100,
 			...fullPayload

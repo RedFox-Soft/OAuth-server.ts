@@ -4,7 +4,6 @@ import {
 	BaseTokenPayload,
 	SessionBoundPayload
 } from './base_token.js';
-import apply from './mixins/apply.ts';
 import consumable from './mixins/consumable.ts';
 import { authPayloadModel } from './mixins/stores_auth.js';
 
@@ -23,11 +22,7 @@ export type BackchannelAuthenticationRequestPayloadType = Static<
 	typeof BackchannelAuthenticationRequestPayload
 >;
 
-export default () =>
-	class BackchannelAuthenticationRequest extends apply([
-		consumable,
-		BaseToken
-	]) {
-		model = BackchannelAuthenticationRequestPayload;
-		static isSessionBound = true;
-	};
+export class BackchannelAuthenticationRequest extends consumable(BaseToken) {
+	model = BackchannelAuthenticationRequestPayload;
+	static isSessionBound = true;
+}

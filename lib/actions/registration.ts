@@ -8,6 +8,9 @@ import instance from '../helpers/weak_cache.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import addClient from '../helpers/add_client.ts';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
+import { Client } from 'lib/models/client.js';
+import { InitialAccessToken } from 'lib/models/initial_access_token.js';
+import { RegistrationAccessToken } from 'lib/models/registration_access_token.js';
 import { provider } from 'lib/provider.js';
 import { routeNames } from 'lib/consts/param_list.js';
 import { ISSUER } from 'lib/configs/env.js';
@@ -107,12 +110,12 @@ async function authenticate(
 	clientId: string,
 	token: string
 ) {
-	const regAccessToken = await provider.RegistrationAccessToken.find(token);
+	const regAccessToken = await RegistrationAccessToken.find(token);
 	if (!regAccessToken) {
 		throw new InvalidToken('token not found');
 	}
 
-	const client = await provider.Client.find(clientId);
+	const client = await Client.find(clientId);
 
 	// Token fields live under `.payload.*` (top-level accessors were removed with the
 	// IN_PAYLOAD refactor); `client.*` stays direct because the validated client is a plain
@@ -136,7 +139,7 @@ async function validateInitialAccessToken(
 		ApplicationConfig['registration.initialAccessToken'];
 	switch (initialAccessToken && typeof initialAccessToken) {
 		case 'boolean': {
-			const iat = await provider.InitialAccessToken.find(
+			const iat = await InitialAccessToken.find(
 				readBearer(token, undefined, false)
 			);
 			if (!iat) {
@@ -188,7 +191,7 @@ async function create({ body, headers, request, set }) {
 		(typeof issueRegistrationAccessToken === 'function' &&
 			issueRegistrationAccessToken({ oidc }))
 	) {
-		rat = new provider.RegistrationAccessToken({ clientId });
+		rat = new RegistrationAccessToken({ clientId });
 		oidc.entity('RegistrationAccessToken', rat);
 	}
 
@@ -198,7 +201,6 @@ async function create({ body, headers, request, set }) {
 	});
 	snakeToCanonical(properties);
 
-	const { Client } = provider;
 	const secretRequired = Client.needsSecret(properties);
 
 	if (secretRequired) {
@@ -325,7 +327,7 @@ async function update({ params, body, headers, set }) {
 	const { secretFactory } = instance(provider).features.registration;
 
 	const secretRequired =
-		!client.clientSecret && provider.Client.needsSecret(properties);
+		!client.clientSecret && Client.needsSecret(properties);
 
 	if (secretRequired) {
 		Object.assign(properties, {
@@ -366,7 +368,7 @@ async function update({ params, body, headers, set }) {
 			(await rotateRegistrationAccessToken({ oidc })))
 	) {
 		oidc.entity('RotatedRegistrationAccessToken', regAccessToken);
-		const rat = new provider.RegistrationAccessToken({
+		const rat = new RegistrationAccessToken({
 			client,
 			policies: regAccessToken.payload.policies
 		});
@@ -399,7 +401,7 @@ async function remove({ params, headers, set }) {
 		);
 	}
 
-	await provider.Client.adapter.destroy(client.clientId);
+	await Client.adapter.destroy(client.clientId);
 	await regAccessToken.destroy();
 
 	set.status = 204;
