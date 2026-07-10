@@ -1,4 +1,4 @@
-import { expect } from 'chai';
+import { expect } from 'bun:test';
 
 import bootstrap from '../test_helper.js';
 
@@ -42,9 +42,9 @@ describe('CORS setup', () => {
 			'/.well-known/openid-configuration',
 			'https://rp.example.com'
 		);
-		expect(status).to.eql(204);
-		expect(headers[ACAOrigin]).to.eql('https://example.com');
-		expect(headers).not.to.have.property(ACAMaxAge);
+		expect(status).toEqual(204);
+		expect(headers[ACAOrigin]).toEqual('https://example.com');
+		expect(headers).not.toHaveProperty(ACAMaxAge);
 
 		({ status, headers } = await req.call(
 			this,
@@ -52,8 +52,8 @@ describe('CORS setup', () => {
 			'/.well-known/openid-configuration',
 			'https://rp.example.com'
 		));
-		expect(status).to.eql(200);
-		expect(headers[ACAOrigin]).to.eql('https://example.com');
-		expect(headers).not.to.have.property(ACAMaxAge);
+		expect(status).toEqual(200);
+		expect(headers[ACAOrigin]).toEqual('https://example.com');
+		expect(headers).not.toHaveProperty(ACAMaxAge);
 	});
 });

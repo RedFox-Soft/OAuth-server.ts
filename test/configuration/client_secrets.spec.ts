@@ -1,6 +1,4 @@
-import { describe, it, beforeAll } from 'bun:test';
-
-import { expect } from 'chai';
+import { describe, it, beforeAll, expect } from 'bun:test';
 
 import bootstrap from '../test_helper.js';
 import { provider } from 'lib/provider.js';
@@ -15,6 +13,6 @@ describe('Client#add', () => {
 			provider.Client.needsSecret({
 				token_endpoint_auth_method: 'client_secret_basic'
 			})
-		).to.be.true;
+		).toBe(true);
 	});
 });

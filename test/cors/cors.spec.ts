@@ -1,4 +1,4 @@
-import { expect } from 'chai';
+import { expect } from 'bun:test';
 
 import bootstrap from '../test_helper.js';
 import { provider } from 'lib/provider.js';
@@ -41,8 +41,8 @@ function accessControlHeaders(headers) {
 }
 
 function assertCorsHeaders(headers, expected) {
-	expect(headers[Vary]).to.eql('Origin');
-	expect(accessControlHeaders(headers)).to.eql(expected);
+	expect(headers[Vary]).toEqual('Origin');
+	expect(accessControlHeaders(headers)).toEqual(expected);
 }
 
 describe('CORS setup', () => {
@@ -80,7 +80,7 @@ describe('CORS setup', () => {
 				'https://example.com',
 				['set', 'authorization', `Bearer ${this.token}`]
 			);
-			expect(status).to.eql(500);
+			expect(status).toEqual(500);
 			assertCorsHeaders(headers, {
 				[ACEHeaders]: 'WWW-Authenticate',
 				[ACAOrigin]: 'https://example.com'
@@ -95,7 +95,7 @@ describe('CORS setup', () => {
 			'/.well-known/openid-configuration',
 			'https://example.com'
 		);
-		expect(status).to.eql(200);
+		expect(status).toEqual(200);
 		assertCorsHeaders(headers, {
 			[ACAOrigin]: 'https://example.com'
 		});
@@ -108,7 +108,7 @@ describe('CORS setup', () => {
 			'/.well-known/openid-configuration',
 			'https://example.com'
 		);
-		expect(status).to.eql(204);
+		expect(status).toEqual(204);
 		assertCorsHeaders(headers, {
 			[ACAOrigin]: 'https://example.com',
 			[ACAMaxAge]: '3600',
@@ -124,7 +124,7 @@ describe('CORS setup', () => {
 			'/jwks',
 			'https://example.com'
 		);
-		expect(status).to.eql(200);
+		expect(status).toEqual(200);
 		assertCorsHeaders(headers, {
 			[ACAOrigin]: 'https://example.com'
 		});
@@ -137,7 +137,7 @@ describe('CORS setup', () => {
 			'/jwks',
 			'https://example.com'
 		);
-		expect(status).to.eql(204);
+		expect(status).toEqual(204);
 		assertCorsHeaders(headers, {
 			[ACAOrigin]: 'https://example.com',
 			[ACAMaxAge]: '3600',
@@ -166,7 +166,7 @@ describe('CORS setup', () => {
 				'https://example.com',
 				['set', 'authorization', `Bearer ${this.token}`]
 			);
-			expect(status).to.eql(200);
+			expect(status).toEqual(200);
 			assertCorsHeaders(headers, {
 				[ACEHeaders]: 'WWW-Authenticate',
 				[ACAOrigin]: 'https://example.com'
@@ -180,7 +180,7 @@ describe('CORS setup', () => {
 				'/me',
 				'https://example.com'
 			);
-			expect(status).to.eql(204);
+			expect(status).toEqual(204);
 			assertCorsHeaders(headers, {
 				[ACAOrigin]: 'https://example.com',
 				[ACAMaxAge]: '3600',
@@ -199,7 +199,7 @@ describe('CORS setup', () => {
 				['type', 'form'],
 				['send', { client_id: 'client', grant_type: 'client_credentials' }]
 			);
-			expect(status).to.eql(200);
+			expect(status).toEqual(200);
 			assertCorsHeaders(headers, {
 				[ACEHeaders]: 'WWW-Authenticate',
 				[ACAOrigin]: 'https://example.com'
@@ -216,7 +216,7 @@ describe('CORS setup', () => {
 				['type', 'form'],
 				['send', { client_id: 'client' }]
 			);
-			expect(status).to.eql(400);
+			expect(status).toEqual(400);
 			assertCorsHeaders(headers, {
 				[ACEHeaders]: 'WWW-Authenticate',
 				[ACAOrigin]: 'https://example.com'
@@ -230,7 +230,7 @@ describe('CORS setup', () => {
 				'/token',
 				'https://example.com'
 			);
-			expect(status).to.eql(204);
+			expect(status).toEqual(204);
 			assertCorsHeaders(headers, {
 				[ACAOrigin]: 'https://example.com',
 				[ACAMaxAge]: '3600',
@@ -249,7 +249,7 @@ describe('CORS setup', () => {
 				['type', 'form'],
 				['send', { client_id: 'client', token: 'foo' }]
 			);
-			expect(status).to.eql(200);
+			expect(status).toEqual(200);
 			assertCorsHeaders(headers, {
 				[ACEHeaders]: 'WWW-Authenticate',
 				[ACAOrigin]: 'https://example.com'
@@ -263,7 +263,7 @@ describe('CORS setup', () => {
 				'/token/revocation',
 				'https://example.com'
 			);
-			expect(status).to.eql(204);
+			expect(status).toEqual(204);
 			assertCorsHeaders(headers, {
 				[ACAOrigin]: 'https://example.com',
 				[ACAMaxAge]: '3600',
@@ -282,7 +282,7 @@ describe('CORS setup', () => {
 				['type', 'form'],
 				['send', { client_id: 'client', token: this.token }]
 			);
-			expect(status).to.eql(200);
+			expect(status).toEqual(200);
 			assertCorsHeaders(headers, {
 				[ACEHeaders]: 'WWW-Authenticate',
 				[ACAOrigin]: 'https://example.com'
@@ -299,7 +299,7 @@ describe('CORS setup', () => {
 				['type', 'form'],
 				['send', { client_id: 'client' }]
 			);
-			expect(status).to.eql(400);
+			expect(status).toEqual(400);
 			assertCorsHeaders(headers, {
 				[ACEHeaders]: 'WWW-Authenticate',
 				[ACAOrigin]: 'https://example.com'
@@ -313,7 +313,7 @@ describe('CORS setup', () => {
 				'/token/introspection',
 				'https://example.com'
 			);
-			expect(status).to.eql(204);
+			expect(status).toEqual(204);
 			assertCorsHeaders(headers, {
 				[ACAOrigin]: 'https://example.com',
 				[ACAMaxAge]: '3600',
@@ -332,7 +332,7 @@ describe('CORS setup', () => {
 				['type', 'form'],
 				['send', { client_id: 'client' }]
 			);
-			expect(status).to.eql(200);
+			expect(status).toEqual(200);
 			assertCorsHeaders(headers, {
 				[ACEHeaders]: 'WWW-Authenticate',
 				[ACAOrigin]: 'https://example.com'
@@ -349,7 +349,7 @@ describe('CORS setup', () => {
 				['type', 'form'],
 				['send', { client_id: 'client', max_age: '-1' }]
 			);
-			expect(status).to.eql(400);
+			expect(status).toEqual(400);
 			assertCorsHeaders(headers, {
 				[ACEHeaders]: 'WWW-Authenticate',
 				[ACAOrigin]: 'https://example.com'
@@ -363,7 +363,7 @@ describe('CORS setup', () => {
 				'/device/auth',
 				'https://example.com'
 			);
-			expect(status).to.eql(204);
+			expect(status).toEqual(204);
 			assertCorsHeaders(headers, {
 				[ACAOrigin]: 'https://example.com',
 				[ACAMaxAge]: '3600',
@@ -382,7 +382,7 @@ describe('CORS setup', () => {
 				'https://example.com',
 				['set', 'authorization', `Bearer ${this.token}`]
 			);
-			expect(status).to.eql(400);
+			expect(status).toEqual(400);
 			assertCorsHeaders(headers, {
 				// no Access-Control-Allow-Origin
 				[ACEHeaders]: 'WWW-Authenticate'
@@ -396,7 +396,7 @@ describe('CORS setup', () => {
 				'/me',
 				'https://example.com'
 			);
-			expect(status).to.eql(204);
+			expect(status).toEqual(204);
 			assertCorsHeaders(headers, {
 				[ACAOrigin]: 'https://example.com',
 				[ACAMaxAge]: '3600',
@@ -415,7 +415,7 @@ describe('CORS setup', () => {
 				['type', 'form'],
 				['send', { client_id: 'client', grant_type: 'client_credentials' }]
 			);
-			expect(status).to.eql(400);
+			expect(status).toEqual(400);
 			assertCorsHeaders(headers, {
 				// no Access-Control-Allow-Origin
 				[ACEHeaders]: 'WWW-Authenticate'
@@ -431,7 +431,7 @@ describe('CORS setup', () => {
 				['set', 'content-type', 'application/x-www-form-urlencoded'],
 				['type', 'form']
 			);
-			expect(status).to.eql(400);
+			expect(status).toEqual(400);
 			assertCorsHeaders(headers, {
 				[ACEHeaders]: 'WWW-Authenticate',
 				[ACAOrigin]: 'https://example.com'
@@ -445,7 +445,7 @@ describe('CORS setup', () => {
 				'/token',
 				'https://example.com'
 			);
-			expect(status).to.eql(204);
+			expect(status).toEqual(204);
 			assertCorsHeaders(headers, {
 				[ACAOrigin]: 'https://example.com',
 				[ACAMaxAge]: '3600',
@@ -464,7 +464,7 @@ describe('CORS setup', () => {
 				['type', 'form'],
 				['send', { client_id: 'client', token: 'foo' }]
 			);
-			expect(status).to.eql(400);
+			expect(status).toEqual(400);
 			assertCorsHeaders(headers, {
 				// no Access-Control-Allow-Origin
 				[ACEHeaders]: 'WWW-Authenticate'
@@ -478,7 +478,7 @@ describe('CORS setup', () => {
 				'/token/revocation',
 				'https://example.com'
 			);
-			expect(status).to.eql(204);
+			expect(status).toEqual(204);
 			assertCorsHeaders(headers, {
 				[ACAOrigin]: 'https://example.com',
 				[ACAMaxAge]: '3600',
@@ -497,7 +497,7 @@ describe('CORS setup', () => {
 				['type', 'form'],
 				['send', { client_id: 'client', token: this.token }]
 			);
-			expect(status).to.eql(400);
+			expect(status).toEqual(400);
 			assertCorsHeaders(headers, {
 				// no Access-Control-Allow-Origin
 				[ACEHeaders]: 'WWW-Authenticate'
@@ -513,7 +513,7 @@ describe('CORS setup', () => {
 				['set', 'content-type', 'application/x-www-form-urlencoded'],
 				['type', 'form']
 			);
-			expect(status).to.eql(400);
+			expect(status).toEqual(400);
 			assertCorsHeaders(headers, {
 				[ACEHeaders]: 'WWW-Authenticate',
 				[ACAOrigin]: 'https://example.com'
@@ -527,7 +527,7 @@ describe('CORS setup', () => {
 				'/token/introspection',
 				'https://example.com'
 			);
-			expect(status).to.eql(204);
+			expect(status).toEqual(204);
 			assertCorsHeaders(headers, {
 				[ACAOrigin]: 'https://example.com',
 				[ACAMaxAge]: '3600',
@@ -546,7 +546,7 @@ describe('CORS setup', () => {
 				['type', 'form'],
 				['send', { client_id: 'client' }]
 			);
-			expect(status).to.eql(400);
+			expect(status).toEqual(400);
 			assertCorsHeaders(headers, {
 				// no Access-Control-Allow-Origin
 				[ACEHeaders]: 'WWW-Authenticate'
@@ -562,7 +562,7 @@ describe('CORS setup', () => {
 				['set', 'content-type', 'application/x-www-form-urlencoded'],
 				['type', 'form']
 			);
-			expect(status).to.eql(400);
+			expect(status).toEqual(400);
 			assertCorsHeaders(headers, {
 				[ACEHeaders]: 'WWW-Authenticate',
 				[ACAOrigin]: 'https://example.com'
@@ -576,7 +576,7 @@ describe('CORS setup', () => {
 				'/device/auth',
 				'https://example.com'
 			);
-			expect(status).to.eql(204);
+			expect(status).toEqual(204);
 			assertCorsHeaders(headers, {
 				[ACAOrigin]: 'https://example.com',
 				[ACAMaxAge]: '3600',

@@ -1,5 +1,4 @@
-import { describe, it, beforeAll } from 'bun:test';
-import { expect } from 'chai';
+import { describe, it, beforeAll, expect } from 'bun:test';
 
 import bootstrap, { agent } from '../test_helper.js';
 
@@ -56,7 +55,7 @@ describe('discovery pruning', () => {
 
 		it('includes every feature-gated key and all always-present keys', async () => {
 			const { data } = await endpoint();
-			expect(data).to.contain.keys([...ALWAYS_PRESENT, ...FEATURE_GATED]);
+			expect(data).toContainKeys([...ALWAYS_PRESENT, ...FEATURE_GATED]);
 		});
 	});
 
@@ -67,15 +66,15 @@ describe('discovery pruning', () => {
 
 		it('drops every feature-gated key but keeps always-present keys', async () => {
 			const { data } = await endpoint();
-			expect(data).to.contain.keys(ALWAYS_PRESENT);
+			expect(data).toContainKeys(ALWAYS_PRESENT);
 			for (const key of FEATURE_GATED) {
-				expect(data).not.to.have.property(key);
+				expect(data).not.toHaveProperty(key);
 			}
 		});
 
 		it('preserves the meaningful request_uri_parameter_supported: false', async () => {
 			const { data } = await endpoint();
-			expect(data).to.have.property('request_uri_parameter_supported', false);
+			expect(data).toHaveProperty('request_uri_parameter_supported', false);
 		});
 	});
 
@@ -87,11 +86,11 @@ describe('discovery pruning', () => {
 		it('drops a key when any of its required features is disabled', async () => {
 			const { data } = await endpoint();
 			// userinfo + jwtUserinfo on -> signing present; encryption off -> encryption absent.
-			expect(data).to.have.property('userinfo_signing_alg_values_supported');
-			expect(data).not.to.have.property(
+			expect(data).toHaveProperty('userinfo_signing_alg_values_supported');
+			expect(data).not.toHaveProperty(
 				'userinfo_encryption_alg_values_supported'
 			);
-			expect(data).not.to.have.property(
+			expect(data).not.toHaveProperty(
 				'userinfo_encryption_enc_values_supported'
 			);
 		});

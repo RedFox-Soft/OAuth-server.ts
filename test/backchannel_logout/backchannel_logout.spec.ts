@@ -10,9 +10,9 @@ import {
 	beforeEach,
 	afterEach,
 	expect,
-	spyOn
+	spyOn,
+	mock
 } from 'bun:test';
-import { createSandbox } from 'sinon';
 
 import bootstrap, { agent } from '../test_helper.js';
 import {
@@ -22,8 +22,6 @@ import {
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { provider } from 'lib/provider.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
-
-const sinon = createSandbox();
 
 // Decode a JWS compact serialization sent as `logout_token=<jwt>` in the POST body.
 // The old test relied on RegExp.$1 side effects of chai's `.match`; bun's matchers don't set
@@ -45,10 +43,10 @@ describe('Back-Channel Logout 1.0', () => {
 	});
 
 	afterEach(() => {
-		// restore sinon first so a failed interceptor assertion can't leave spies wrapped for the
+		// restore spies first so a failed interceptor assertion can't leave spies wrapped for the
 		// next test; assertNoPendingInterceptors both verifies and restores the fetch mock.
 		try {
-			sinon.restore();
+			mock.restore();
 		} finally {
 			assertNoPendingInterceptors();
 		}
@@ -139,7 +137,9 @@ describe('Back-Channel Logout 1.0', () => {
 		let auth;
 		let code;
 
-		beforeAll(() => {
+		beforeEach(() => {
+			// Re-applied every test because the outer afterEach's mock.restore()
+			// clears it (sinon.restore() previously left this Bun spy untouched).
 			spyOn(OIDCContext.prototype, 'promptPending').mockReturnValue(false);
 		});
 
@@ -234,9 +234,9 @@ describe('Back-Channel Logout 1.0', () => {
 			const client2 = await provider.Client.find('second-client');
 			const client3 = await provider.Client.find('no-sid');
 
-			sinon.spy(client, 'backchannelLogout');
-			sinon.spy(client2, 'backchannelLogout');
-			sinon.spy(client3, 'backchannelLogout');
+			spyOn(client, 'backchannelLogout');
+			spyOn(client2, 'backchannelLogout');
+			spyOn(client3, 'backchannelLogout');
 
 			// A global logout POSTs a logout token to every visited client. Mock all three origins
 			// so no real outbound fetch escapes: `client` succeeds, the others fail (500) to drive
@@ -251,9 +251,9 @@ describe('Back-Channel Logout 1.0', () => {
 				.intercept({ path: '/backchannel_logout', method: 'POST' })
 				.reply(500);
 
-			const successSpy = sinon.spy();
+			const successSpy = mock();
 			provider.once('backchannel.success', successSpy);
-			const errorSpy = sinon.spy();
+			const errorSpy = mock();
 			provider.once('backchannel.error', errorSpy);
 
 			const { accountId } = session;
@@ -266,15 +266,15 @@ describe('Back-Channel Logout 1.0', () => {
 
 			{
 				const { sid } = session.authorizations.client;
-				expect(client.backchannelLogout.called).toBe(true);
-				expect(client.backchannelLogout.calledWith(accountId, sid)).toBe(true);
-				expect(successSpy.calledOnce).toBe(true);
+				expect(client.backchannelLogout).toHaveBeenCalled();
+				expect(client.backchannelLogout).toHaveBeenCalledWith(accountId, sid);
+				expect(successSpy).toHaveBeenCalledTimes(1);
 			}
 			{
 				const { sid } = session.authorizations['second-client'];
-				expect(client2.backchannelLogout.called).toBe(true);
-				expect(client2.backchannelLogout.calledWith(accountId, sid)).toBe(true);
-				expect(errorSpy.calledOnce).toBe(true);
+				expect(client2.backchannelLogout).toHaveBeenCalled();
+				expect(client2.backchannelLogout).toHaveBeenCalledWith(accountId, sid);
+				expect(errorSpy).toHaveBeenCalledTimes(1);
 			}
 		});
 
@@ -289,8 +289,8 @@ describe('Back-Channel Logout 1.0', () => {
 			const client = await provider.Client.find('client');
 			const client2 = await provider.Client.find('second-client');
 
-			sinon.spy(client, 'backchannelLogout');
-			sinon.spy(client2, 'backchannelLogout');
+			spyOn(client, 'backchannelLogout');
+			spyOn(client2, 'backchannelLogout');
 
 			const { accountId } = session;
 			const { sid } = session.authorizations.client;
@@ -305,9 +305,9 @@ describe('Back-Channel Logout 1.0', () => {
 			);
 			expect(response.status).toBe(303);
 
-			expect(client.backchannelLogout.called).toBe(true);
-			expect(client.backchannelLogout.calledWith(accountId, sid)).toBe(true);
-			expect(client2.backchannelLogout.called).toBe(false);
+			expect(client.backchannelLogout).toHaveBeenCalled();
+			expect(client.backchannelLogout).toHaveBeenCalledWith(accountId, sid);
+			expect(client2.backchannelLogout).not.toHaveBeenCalled();
 		});
 
 		// SKIPPED: same source bug as above (end_session.ts session.authorizations/accountId).
@@ -322,8 +322,8 @@ describe('Back-Channel Logout 1.0', () => {
 			const client3 = await provider.Client.find('no-sid');
 			delete client.backchannelLogoutUri;
 
-			sinon.spy(client, 'backchannelLogout');
-			sinon.spy(client2, 'backchannelLogout');
+			spyOn(client, 'backchannelLogout');
+			spyOn(client2, 'backchannelLogout');
 
 			// `client` no longer advertises a URI, so only the other visited clients are POSTed to;
 			// mock both so nothing escapes to the network.
@@ -340,8 +340,8 @@ describe('Back-Channel Logout 1.0', () => {
 			);
 			expect(response.status).toBe(303);
 
-			expect(client.backchannelLogout.called).toBe(false);
-			expect(client2.backchannelLogout.called).toBe(true);
+			expect(client.backchannelLogout).not.toHaveBeenCalled();
+			expect(client2.backchannelLogout).toHaveBeenCalled();
 		});
 	});
 });

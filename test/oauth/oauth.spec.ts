@@ -7,9 +7,9 @@ import {
 	beforeEach,
 	afterEach,
 	expect,
-	spyOn
+	spyOn,
+	mock
 } from 'bun:test';
-import sinon from 'sinon';
 import snakeCase from 'lodash/snakeCase.js';
 
 import bootstrap, { agent, jsonToFormUrlEncoded } from '../test_helper.js';
@@ -34,13 +34,17 @@ describe('requests without the openid scope', () => {
 	let setup = null;
 	beforeAll(async () => {
 		setup = await bootstrap(import.meta.url)();
-		// consent skip: never require an interaction prompt for these flows
+	});
+
+	beforeEach(function () {
+		// consent skip: never require an interaction prompt for these flows.
+		// Re-applied every test because afterEach's mock.restore() clears it.
 		spyOn(OIDCContext.prototype, 'promptPending').mockReturnValue(false);
 	});
 
 	afterEach(function () {
 		provider.removeAllListeners();
-		sinon.restore();
+		mock.restore();
 	});
 
 	describe('openid scope gated parameters', () => {
@@ -129,7 +133,7 @@ describe('requests without the openid scope', () => {
 				it('gets a code from the authorization endpoint', async function () {
 					const auth = new AuthorizationRequest({ scope });
 
-					const spy = sinon.spy();
+					const spy = mock();
 					provider.on('authorization_code.saved', spy);
 
 					const { response } = await getAuth(auth, cookie);
@@ -138,8 +142,8 @@ describe('requests without the openid scope', () => {
 					auth.validateClientLocation(response);
 					auth.validatePresence(response, ['code', 'state']);
 
-					expect(spy.calledOnce).toBe(true);
-					expect(spy.args[0][0].payload).toHaveProperty('scope', scope);
+					expect(spy).toHaveBeenCalledTimes(1);
+					expect(spy.mock.calls[0][0].payload).toHaveProperty('scope', scope);
 				});
 
 				describe('authorization code exchange', () => {
@@ -156,7 +160,7 @@ describe('requests without the openid scope', () => {
 					});
 
 					it('gets an access token', async function () {
-						const spy = sinon.spy();
+						const spy = mock();
 						provider.on('access_token.saved', spy);
 						provider.on('access_token.issued', spy);
 
@@ -165,8 +169,8 @@ describe('requests without the openid scope', () => {
 						expect(data).toHaveProperty('access_token');
 						expect(data).not.toHaveProperty('id_token');
 
-						expect(spy.calledOnce).toBe(true);
-						expect(spy.args[0][0].payload).toHaveProperty('scope', scope);
+						expect(spy).toHaveBeenCalledTimes(1);
+						expect(spy.mock.calls[0][0].payload).toHaveProperty('scope', scope);
 					});
 
 					it('gets an access token and a refresh token', async function () {
@@ -179,7 +183,7 @@ describe('requests without the openid scope', () => {
 							scope: refreshScope
 						});
 
-						const spy = sinon.spy();
+						const spy = mock();
 						provider.on('access_token.saved', spy);
 						provider.on('access_token.issued', spy);
 						provider.on('refresh_token.saved', spy);
@@ -190,12 +194,12 @@ describe('requests without the openid scope', () => {
 						expect(data).toHaveProperty('refresh_token');
 						expect(data).not.toHaveProperty('id_token');
 
-						expect(spy.calledTwice).toBe(true);
-						expect(spy.args[0][0].payload).toHaveProperty(
+						expect(spy).toHaveBeenCalledTimes(2);
+						expect(spy.mock.calls[0][0].payload).toHaveProperty(
 							'scope',
 							refreshScope
 						);
-						expect(spy.args[1][0].payload).toHaveProperty(
+						expect(spy.mock.calls[1][0].payload).toHaveProperty(
 							'scope',
 							refreshScope
 						);
@@ -229,7 +233,7 @@ describe('requests without the openid scope', () => {
 					});
 
 					it('gets an access token and a refresh token', async function () {
-						const spy = sinon.spy();
+						const spy = mock();
 						provider.on('access_token.saved', spy);
 						provider.on('access_token.issued', spy);
 						provider.on('refresh_token.saved', spy);
@@ -244,12 +248,12 @@ describe('requests without the openid scope', () => {
 						expect(data).toHaveProperty('refresh_token');
 						expect(data).not.toHaveProperty('id_token');
 
-						expect(spy.calledTwice).toBe(true);
-						expect(spy.args[0][0].payload).toHaveProperty(
+						expect(spy).toHaveBeenCalledTimes(2);
+						expect(spy.mock.calls[0][0].payload).toHaveProperty(
 							'scope',
 							refreshScope
 						);
-						expect(spy.args[1][0].payload).toHaveProperty(
+						expect(spy.mock.calls[1][0].payload).toHaveProperty(
 							'scope',
 							refreshScope
 						);
@@ -264,7 +268,7 @@ describe('requests without the openid scope', () => {
 						scope
 					});
 
-					const spy = sinon.spy();
+					const spy = mock();
 					provider.on('authorization.success', spy);
 
 					const { response } = await getAuth(auth, cookie);
@@ -273,8 +277,11 @@ describe('requests without the openid scope', () => {
 					auth.validateClientLocation(response);
 					auth.validatePresence(response, ['state']);
 
-					expect(spy.calledOnce).toBe(true);
-					expect(spy.args[0][0].oidc.params).toHaveProperty('scope', scope);
+					expect(spy).toHaveBeenCalledTimes(1);
+					expect(spy.mock.calls[0][0].oidc.params).toHaveProperty(
+						'scope',
+						scope
+					);
 				});
 			});
 		});
@@ -285,7 +292,7 @@ describe('requests without the openid scope', () => {
 			});
 
 			it('accepts the device authorization request', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.on('device_code.saved', spy);
 
 				const { status } = await agent.device.auth.post(
@@ -301,11 +308,16 @@ describe('requests without the openid scope', () => {
 				);
 
 				expect(status).toBe(200);
-				expect(spy.calledOnce).toBe(true);
+				expect(spy).toHaveBeenCalledTimes(1);
 				if (scope) {
-					expect(spy.args[0][0].payload.params).toHaveProperty('scope', scope);
+					expect(spy.mock.calls[0][0].payload.params).toHaveProperty(
+						'scope',
+						scope
+					);
 				} else {
-					expect(spy.args[0][0].payload.params).not.toHaveProperty('scope');
+					expect(spy.mock.calls[0][0].payload.params).not.toHaveProperty(
+						'scope'
+					);
 				}
 			});
 
@@ -350,7 +362,7 @@ describe('requests without the openid scope', () => {
 				// Fix: change device_code.ts lines ~152/154/155 to set
 				// `at.payload.scope` / `at.payload.claims` (mirror authorization_code.ts).
 				it('gets an access token', async function () {
-					const spy = sinon.spy();
+					const spy = mock();
 					provider.on('access_token.saved', spy);
 					provider.on('access_token.issued', spy);
 
@@ -363,8 +375,8 @@ describe('requests without the openid scope', () => {
 					expect(data).toHaveProperty('access_token');
 					expect(data).not.toHaveProperty('id_token');
 
-					expect(spy.calledOnce).toBe(true);
-					expect(spy.args[0][0].payload).toHaveProperty('scope', scope);
+					expect(spy).toHaveBeenCalledTimes(1);
+					expect(spy.mock.calls[0][0].payload).toHaveProperty('scope', scope);
 				});
 
 				// SKIP: same lib bug as above (device_code.ts uses `at.scope`/
@@ -373,7 +385,7 @@ describe('requests without the openid scope', () => {
 				// getter), so the emitted refresh_token payload scope is wrong too.
 				it('gets an access and a refresh_token', async function () {
 					const refreshScope = `${scope || ''} offline_access`.trim();
-					const spy = sinon.spy();
+					const spy = mock();
 					provider.on('access_token.saved', spy);
 					provider.on('access_token.issued', spy);
 					provider.on('refresh_token.saved', spy);
@@ -392,9 +404,15 @@ describe('requests without the openid scope', () => {
 					expect(data).toHaveProperty('refresh_token');
 					expect(data).not.toHaveProperty('id_token');
 
-					expect(spy.calledTwice).toBe(true);
-					expect(spy.args[0][0].payload).toHaveProperty('scope', refreshScope);
-					expect(spy.args[1][0].payload).toHaveProperty('scope', refreshScope);
+					expect(spy).toHaveBeenCalledTimes(2);
+					expect(spy.mock.calls[0][0].payload).toHaveProperty(
+						'scope',
+						refreshScope
+					);
+					expect(spy.mock.calls[1][0].payload).toHaveProperty(
+						'scope',
+						refreshScope
+					);
 				});
 			});
 		});

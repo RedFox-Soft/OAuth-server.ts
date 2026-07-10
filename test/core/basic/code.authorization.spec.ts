@@ -10,8 +10,6 @@ import {
 	mock
 } from 'bun:test';
 
-import sinon from 'sinon';
-
 import bootstrap, { agent, jsonToFormUrlEncoded } from '../../test_helper.js';
 import epochTime from '../../../lib/helpers/epoch_time.ts';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
@@ -30,7 +28,6 @@ describe('BASIC code', () => {
 
 	afterEach(function () {
 		mock.restore();
-		sinon.restore();
 	});
 
 	['get', 'post'].forEach((verb) => {
@@ -104,7 +101,7 @@ describe('BASIC code', () => {
 			});
 
 			it('ignores unsupported scopes', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once('authorization_code.saved', spy);
 				const auth = new AuthorizationRequest({
 					scope: 'openid and unsupported'
@@ -113,7 +110,7 @@ describe('BASIC code', () => {
 				const { response } = await authRequest(auth, { cookie });
 				expect(response.status).toBe(303);
 				auth.validateClientLocation(response);
-				expect(spy.firstCall.args[0].payload).toHaveProperty('scope', 'openid');
+				expect(spy.mock.calls[0][0].payload).toHaveProperty('scope', 'openid');
 			});
 
 			describe('ignoring the offline_access scope', () => {
@@ -122,7 +119,7 @@ describe('BASIC code', () => {
 				});
 
 				it('ignores the scope offline_access unless prompt consent is present', async function () {
-					const spy = sinon.spy();
+					const spy = mock();
 					provider.once('authorization_code.saved', spy);
 					const auth = new AuthorizationRequest({
 						scope: 'openid offline_access'
@@ -131,14 +128,14 @@ describe('BASIC code', () => {
 					const { response } = await authRequest(auth, { cookie });
 					expect(response.status).toBe(303);
 					auth.validateClientLocation(response);
-					expect(spy.firstCall.args[0].payload).toHaveProperty('scope');
-					expect(spy.firstCall.args[0].payload.scope).not.toContain(
+					expect(spy.mock.calls[0][0].payload).toHaveProperty('scope');
+					expect(spy.mock.calls[0][0].payload.scope).not.toContain(
 						'offline_access'
 					);
 				});
 
 				it('ignores the scope offline_access unless the client can do refresh_token exchange', async function () {
-					const spy = sinon.spy();
+					const spy = mock();
 					provider.once('authorization_code.saved', spy);
 					const auth = new AuthorizationRequest({
 						client_id: 'client-no-refresh',
@@ -149,8 +146,8 @@ describe('BASIC code', () => {
 					const { response } = await authRequest(auth, { cookie });
 					expect(response.status).toBe(303);
 					auth.validateClientLocation(response);
-					expect(spy.firstCall.args[0].payload).toHaveProperty('scope');
-					expect(spy.firstCall.args[0].payload.scope).not.toContain(
+					expect(spy.mock.calls[0][0].payload).toHaveProperty('scope');
+					expect(spy.mock.calls[0][0].payload.scope).not.toContain(
 						'offline_access'
 					);
 				});
@@ -170,7 +167,7 @@ describe('BASIC code', () => {
 
 			it('no account id was resolved and no interactions requested', async function () {
 				i(provider).configuration.interactions.policy = [];
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.on('authorization.error', spy);
 
 				const auth = new AuthorizationRequest({ scope });
@@ -181,8 +178,8 @@ describe('BASIC code', () => {
 				auth.validatePresence(response, ['error', 'state']);
 				auth.validateError(response, 'access_denied');
 
-				expect(spy.calledOnce).toBe(true);
-				expect(spy.args[0][0]).toHaveProperty(
+				expect(spy).toHaveBeenCalledTimes(1);
+				expect(spy.mock.calls[0][0]).toHaveProperty(
 					'error_detail',
 					'authorization request resolved without requesting interactions but no account id was resolved'
 				);
@@ -190,7 +187,7 @@ describe('BASIC code', () => {
 
 			it('no scope was resolved and no interactions requested', async function () {
 				i(provider).configuration.interactions.policy = [];
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.on('authorization.error', spy);
 
 				const cookie = await setup.login();
@@ -202,8 +199,8 @@ describe('BASIC code', () => {
 				auth.validatePresence(response, ['error', 'state']);
 				auth.validateError(response, 'access_denied');
 
-				expect(spy.calledOnce).toBe(true);
-				expect(spy.args[0][0]).toHaveProperty(
+				expect(spy).toHaveBeenCalledTimes(1);
+				expect(spy.mock.calls[0][0]).toHaveProperty(
 					'error_detail',
 					'authorization request resolved without requesting interactions but no scope was granted'
 				);
@@ -323,7 +320,7 @@ describe('BASIC code', () => {
 		describe(`${verb} ${route} errors`, () => {
 			it('dupe parameters are rejected and ignored in further processing', async function () {
 				// fake a query like this state=foo&state=foo
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
 					scope: ['openid', 'openid'],
@@ -333,7 +330,7 @@ describe('BASIC code', () => {
 
 				const { response } = await authRequest(auth);
 				expect(response.status).toBe(303);
-				expect(spy.calledOnce).toBeTrue();
+				expect(spy).toHaveBeenCalledTimes(1);
 				auth.validatePresence(response, ['error', 'error_description']);
 				auth.validateClientLocation(response);
 				auth.validateError(response, 'invalid_request');
@@ -354,7 +351,7 @@ describe('BASIC code', () => {
 			it('invalid response mode (not validated yet)', async function () {
 				// fake a query like this state=foo&state=foo to trigger
 				// a validation error prior to validating response mode
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
 					scope,
@@ -364,7 +361,7 @@ describe('BASIC code', () => {
 
 				const { response } = await authRequest(auth);
 				expect(response.status).toBe(303);
-				expect(spy.calledOnce).toBeTrue();
+				expect(spy).toHaveBeenCalledTimes(1);
 				auth.validatePresence(response, ['error', 'error_description']);
 				auth.validateClientLocation(response);
 				auth.validateError(response, 'invalid_request');
@@ -383,7 +380,7 @@ describe('BASIC code', () => {
 			});
 
 			it('response mode provided twice', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
 					scope,
@@ -393,7 +390,7 @@ describe('BASIC code', () => {
 
 				const { response } = await authRequest(auth);
 				expect(response.status).toBe(303);
-				expect(spy.calledOnce).toBeTrue();
+				expect(spy).toHaveBeenCalledTimes(1);
 				auth.validatePresence(response, ['error', 'error_description']);
 				auth.validateClientLocation(response);
 				auth.validateError(response, 'invalid_request');
@@ -412,7 +409,7 @@ describe('BASIC code', () => {
 			});
 
 			it('unregistered scope requested', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
 					client_id: 'client-limited-scope',
@@ -422,7 +419,7 @@ describe('BASIC code', () => {
 
 				const { response } = await authRequest(auth);
 				expect(response.status).toBe(303);
-				expect(spy.calledOnce).toBeTrue();
+				expect(spy).toHaveBeenCalledTimes(1);
 				auth.validatePresence(response, [
 					'error',
 					'error_description',
@@ -439,7 +436,7 @@ describe('BASIC code', () => {
 
 			['request', 'request_uri', 'registration'].forEach((param) => {
 				it(`not supported parameter ${param}`, async function () {
-					const spy = sinon.spy();
+					const spy = mock();
 					provider.once('authorization.error', spy);
 					const auth = new AuthorizationRequest({
 						response_type,
@@ -449,7 +446,7 @@ describe('BASIC code', () => {
 
 					const { response } = await authRequest(auth);
 					expect(response.status).toBe(303);
-					expect(spy.calledOnce).toBeTrue();
+					expect(spy).toHaveBeenCalledTimes(1);
 					auth.validatePresence(response, [
 						'error',
 						'error_description',
@@ -468,7 +465,7 @@ describe('BASIC code', () => {
 				});
 
 				it('missing mandatory parameter redirect_uri', async function () {
-					const emitSpy = sinon.spy();
+					const emitSpy = mock();
 					provider.once('authorization.error', emitSpy);
 					const auth = new AuthorizationRequest({ scope });
 					delete auth.params.redirect_uri;
@@ -478,7 +475,7 @@ describe('BASIC code', () => {
 					expect(response.headers.get('content-type')).toBe(
 						'text/html; charset=utf-8'
 					);
-					expect(emitSpy.calledOnce).toBe(true);
+					expect(emitSpy).toHaveBeenCalledTimes(1);
 				});
 
 				it('unless allowOmittingSingleRegisteredRedirectUri is true', async function () {
@@ -511,7 +508,7 @@ describe('BASIC code', () => {
 				});
 
 				it('missing mandatory parameter redirect_uri', async function () {
-					const emitSpy = sinon.spy();
+					const emitSpy = mock();
 					provider.once('authorization.error', emitSpy);
 					const auth = new AuthorizationRequest({ scope });
 					delete auth.params.redirect_uri;
@@ -521,19 +518,19 @@ describe('BASIC code', () => {
 					expect(response.headers.get('content-type')).toBe(
 						'text/html; charset=utf-8'
 					);
-					expect(emitSpy.calledOnce).toBe(true);
+					expect(emitSpy).toHaveBeenCalledTimes(1);
 				});
 			});
 
 			it('missing mandatory parameter response_type', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({ scope });
 				delete auth.params.response_type;
 
 				const { response } = await authRequest(auth);
 				expect(response.status).toBe(303);
-				expect(spy.calledOnce).toBeTrue();
+				expect(spy).toHaveBeenCalledTimes(1);
 				auth.validatePresence(response, [
 					'error',
 					'error_description',
@@ -549,7 +546,7 @@ describe('BASIC code', () => {
 			});
 
 			it('unsupported prompt', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
 					scope,
@@ -558,7 +555,7 @@ describe('BASIC code', () => {
 
 				const { response } = await authRequest(auth);
 				expect(response.status).toBe(303);
-				expect(spy.calledOnce).toBeTrue();
+				expect(spy).toHaveBeenCalledTimes(1);
 				auth.validatePresence(response, [
 					'error',
 					'error_description',
@@ -574,7 +571,7 @@ describe('BASIC code', () => {
 			});
 
 			it('supported but not requestable prompt', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
 					scope,
@@ -583,7 +580,7 @@ describe('BASIC code', () => {
 
 				const { response } = await authRequest(auth);
 				expect(response.status).toBe(303);
-				expect(spy.calledOnce).toBeTrue();
+				expect(spy).toHaveBeenCalledTimes(1);
 				auth.validatePresence(response, [
 					'error',
 					'error_description',
@@ -599,7 +596,7 @@ describe('BASIC code', () => {
 			});
 
 			it('bad prompt combination', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
 					scope,
@@ -608,7 +605,7 @@ describe('BASIC code', () => {
 
 				const { response } = await authRequest(auth);
 				expect(response.status).toBe(303);
-				expect(spy.calledOnce).toBeTrue();
+				expect(spy).toHaveBeenCalledTimes(1);
 				auth.validatePresence(response, [
 					'error',
 					'error_description',
@@ -661,7 +658,7 @@ describe('BASIC code', () => {
 
 			describe('section-4.1.2.1 RFC6749', () => {
 				it('validates redirect_uri ad acta [regular error]', async function () {
-					const spy = sinon.spy();
+					const spy = mock();
 					provider.on('authorization.error', spy);
 					const auth = new AuthorizationRequest({
 						// scope, => 'openid' required when id_token_hint is provided
@@ -673,13 +670,15 @@ describe('BASIC code', () => {
 						accept: 'text/html'
 					});
 					expect(error.status).toBe(400);
-					expect(spy.calledTwice).toBeTrue();
-					expect(
-						spy.firstCall.calledWithMatch({ message: 'invalid_request' })
-					).toBeTrue();
-					expect(
-						spy.secondCall.calledWithMatch({ message: 'invalid_redirect_uri' })
-					).toBeTrue();
+					expect(spy).toHaveBeenCalledTimes(2);
+					expect(spy.mock.calls[0][0]).toHaveProperty(
+						'message',
+						'invalid_request'
+					);
+					expect(spy.mock.calls[1][0]).toHaveProperty(
+						'message',
+						'invalid_redirect_uri'
+					);
 					expect(response.headers.get('content-type')).toBe(
 						'text/html; charset=utf-8'
 					);
@@ -690,11 +689,11 @@ describe('BASIC code', () => {
 				});
 
 				it('validates redirect_uri ad acta [server error]', async function () {
-					const authErrorSpy = sinon.spy();
-					const serverErrorSpy = sinon.spy();
+					const authErrorSpy = mock();
+					const serverErrorSpy = mock();
 					provider.once('authorization.error', authErrorSpy);
 					provider.once('server_error', serverErrorSpy);
-					sinon.stub(i(provider).responseModes, 'has').callsFake(() => {
+					spyOn(i(provider).responseModes, 'has').mockImplementation(() => {
 						throw new Error('foobar');
 					});
 					const auth = new AuthorizationRequest({
@@ -707,14 +706,16 @@ describe('BASIC code', () => {
 					});
 					expect(error.status).toBe(400);
 
-					expect(serverErrorSpy.calledOnce).toBeTrue();
-					expect(authErrorSpy.calledOnce).toBeTrue();
-					expect(
-						serverErrorSpy.calledWithMatch({ message: 'foobar' })
-					).toBeTrue();
-					expect(
-						authErrorSpy.calledWithMatch({ message: 'invalid_redirect_uri' })
-					).toBeTrue();
+					expect(serverErrorSpy).toHaveBeenCalledTimes(1);
+					expect(authErrorSpy).toHaveBeenCalledTimes(1);
+					expect(serverErrorSpy.mock.calls[0][0]).toHaveProperty(
+						'message',
+						'foobar'
+					);
+					expect(authErrorSpy.mock.calls[0][0]).toHaveProperty(
+						'message',
+						'invalid_redirect_uri'
+					);
 
 					expect(response.headers.get('content-type')).toBe(
 						'text/html; charset=utf-8'
@@ -727,7 +728,7 @@ describe('BASIC code', () => {
 			});
 
 			it('unsupported response_type', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
 					response_type: 'unsupported',
@@ -736,7 +737,7 @@ describe('BASIC code', () => {
 
 				const { response } = await authRequest(auth);
 				expect(response.status).toBe(303);
-				expect(spy.calledOnce).toBeTrue();
+				expect(spy).toHaveBeenCalledTimes(1);
 				auth.validatePresence(response, [
 					'error',
 					'error_description',
@@ -752,7 +753,7 @@ describe('BASIC code', () => {
 			});
 
 			it('invalid max_age (negative)', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
 					scope: 'openid',
@@ -761,7 +762,7 @@ describe('BASIC code', () => {
 
 				const { response } = await authRequest(auth);
 				expect(response.status).toBe(303);
-				expect(spy.calledOnce).toBeTrue();
+				expect(spy).toHaveBeenCalledTimes(1);
 				auth.validatePresence(response, [
 					'error',
 					'error_description',
@@ -777,7 +778,7 @@ describe('BASIC code', () => {
 			});
 
 			it('invalid max_age (MAX_SAFE_INTEGER)', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
 					response_type,
@@ -787,7 +788,7 @@ describe('BASIC code', () => {
 
 				const { response } = await authRequest(auth);
 				expect(response.status).toBe(303);
-				expect(spy.calledOnce).toBeTrue();
+				expect(spy).toHaveBeenCalledTimes(1);
 				auth.validatePresence(response, [
 					'error',
 					'error_description',
@@ -803,7 +804,7 @@ describe('BASIC code', () => {
 			});
 
 			it('restricted response_type', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
 					client_id: 'client-without-none',
@@ -813,7 +814,7 @@ describe('BASIC code', () => {
 
 				const { response } = await authRequest(auth);
 				expect(response.status).toBe(303);
-				expect(spy.calledOnce).toBeTrue();
+				expect(spy).toHaveBeenCalledTimes(1);
 				auth.validatePresence(response, [
 					'error',
 					'error_description',
@@ -829,7 +830,7 @@ describe('BASIC code', () => {
 			});
 
 			it('unsupported response type validation runs before oidc required params', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
 					response_type: 'id_token token',
@@ -839,7 +840,7 @@ describe('BASIC code', () => {
 
 				const { response } = await authRequest(auth);
 				expect(response.status).toBe(303);
-				expect(spy.calledOnce).toBeTrue();
+				expect(spy).toHaveBeenCalledTimes(1);
 				auth.validatePresence(response, [
 					'error',
 					'error_description',
@@ -855,7 +856,7 @@ describe('BASIC code', () => {
 			});
 
 			it('redirect_uri mismatch', async function () {
-				const emitSpy = sinon.spy();
+				const emitSpy = mock();
 				provider.once('authorization.error', emitSpy);
 				const auth = new AuthorizationRequest({
 					scope,
@@ -869,7 +870,7 @@ describe('BASIC code', () => {
 				expect(response.headers.get('content-type')).toBe(
 					'text/html; charset=utf-8'
 				);
-				expect(emitSpy.calledOnce).toBe(true);
+				expect(emitSpy).toHaveBeenCalledTimes(1);
 				expect(error.value).toContain('invalid_redirect_uri');
 				expect(error.value).toContain(
 					'redirect_uri did not match any of the client&#x27;s registered redirectUris'
@@ -877,7 +878,7 @@ describe('BASIC code', () => {
 			});
 
 			it('login state specific malformed id_token_hint', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once('authorization.error', spy);
 				const cookie = await setup.login();
 				const auth = new AuthorizationRequest({
@@ -886,7 +887,7 @@ describe('BASIC code', () => {
 				});
 				const { response } = await authRequest(auth, { cookie });
 				expect(response.status).toBe(303);
-				expect(spy.calledOnce).toBeTrue();
+				expect(spy).toHaveBeenCalledTimes(1);
 				auth.validatePresence(response, [
 					'error',
 					'error_description',

@@ -1,8 +1,7 @@
-import { describe, it } from 'bun:test';
+import { describe, it, expect } from 'bun:test';
 import { strict as assert } from 'node:assert';
 import * as util from 'node:util';
 
-import { expect } from 'chai';
 import merge from 'lodash/merge.js';
 import omit from 'lodash/omit.js';
 import cloneDeep from 'lodash/cloneDeep.js';
@@ -76,11 +75,11 @@ describe('Client metadata validation', () => {
 					register({ ...metadata, [prop]: value }, configuration),
 					(err) => {
 						if (prop === 'redirectUris') {
-							expect(err.message).to.equal('invalid_redirect_uri');
+							expect(err.message).toBe('invalid_redirect_uri');
 						} else {
-							expect(err.message).to.equal('invalid_client_metadata');
+							expect(err.message).toBe('invalid_client_metadata');
 						}
-						expect(err.error_description).to.equal(
+						expect(err.error_description).toBe(
 							`${prop} must be a non-empty string if provided`
 						);
 						return true;
@@ -102,20 +101,16 @@ describe('Client metadata validation', () => {
 				),
 				(err) => {
 					if (prop === 'redirectUris') {
-						expect(err.message).to.equal('invalid_redirect_uri');
+						expect(err.message).toBe('invalid_redirect_uri');
 						if (protocols.length === 1 && protocols[0] === 'https') {
-							expect(err.error_description).to.equal(
-								`${prop} must be a https uri`
-							);
+							expect(err.error_description).toBe(`${prop} must be a https uri`);
 						} else {
-							expect(err.error_description).to.equal(
-								`${prop} must be a web uri`
-							);
+							expect(err.error_description).toBe(`${prop} must be a web uri`);
 						}
 					} else {
 						// URL shape is now enforced by ClientSchema (TypeBox format); the
 						// exact description is TypeBox's, so assert the error code only.
-						expect(err.message).to.equal('invalid_client_metadata');
+						expect(err.message).toBe('invalid_client_metadata');
 					}
 					return true;
 				}
@@ -148,11 +143,11 @@ describe('Client metadata validation', () => {
 					),
 					(err) => {
 						if (prop === 'redirectUris') {
-							expect(err.message).to.equal('invalid_redirect_uri');
+							expect(err.message).toBe('invalid_redirect_uri');
 						} else {
-							expect(err.message).to.equal('invalid_client_metadata');
+							expect(err.message).toBe('invalid_client_metadata');
 						}
-						expect(err.error_description).to.equal(`${prop} must be an array`);
+						expect(err.error_description).toBe(`${prop} must be an array`);
 						return true;
 					}
 				)
@@ -178,7 +173,7 @@ describe('Client metadata validation', () => {
 					(err) => {
 						// Boolean type is now enforced by ClientSchema (TypeBox); the exact
 						// description is TypeBox's, so assert the error code only.
-						expect(err.message).to.equal('invalid_client_metadata');
+						expect(err.message).toBe('invalid_client_metadata');
 						return true;
 					}
 				)
@@ -202,9 +197,9 @@ describe('Client metadata validation', () => {
 		it(msg, () =>
 			register(metadata, configuration).then((client) => {
 				if (value === undefined) {
-					expect(client.metadata()).not.to.have.property(prop);
+					expect(client.metadata()).not.toHaveProperty(prop);
 				} else {
-					expect(client.metadata()).to.have.property(prop).and.eql(value);
+					expect(client.metadata()).toHaveProperty(prop, value);
 				}
 
 				if (additionalAssertion) {
@@ -232,13 +227,11 @@ describe('Client metadata validation', () => {
 					),
 					(err) => {
 						if (prop === 'redirectUris') {
-							expect(err.message).to.equal('invalid_redirect_uri');
+							expect(err.message).toBe('invalid_redirect_uri');
 						} else {
-							expect(err.message).to.equal('invalid_client_metadata');
+							expect(err.message).toBe('invalid_client_metadata');
 						}
-						expect(err.error_description).to.equal(
-							`${prop} is mandatory property`
-						);
+						expect(err.error_description).toBe(`${prop} is mandatory property`);
 						return true;
 					}
 				)
@@ -252,7 +245,7 @@ describe('Client metadata validation', () => {
 		metadata,
 		configuration,
 		assertion = (client) => {
-			expect(client.metadata()[prop]).to.eql(value);
+			expect(client.metadata()[prop]).toEqual(value);
 		}
 	) => {
 		let msg = util.format('passes %j', value);
@@ -287,14 +280,16 @@ describe('Client metadata validation', () => {
 				register({ ...metadata, [prop]: value }, configuration),
 				(err) => {
 					if (prop === 'redirectUris') {
-						expect(err.message).to.equal('invalid_redirect_uri');
+						expect(err.message).toBe('invalid_redirect_uri');
 					} else {
-						expect(err.message).to.equal('invalid_client_metadata');
+						expect(err.message).toBe('invalid_client_metadata');
 					}
 					if (description) {
-						expect(err.error_description).to[
-							description.exec ? 'match' : 'equal'
-						](description);
+						if (description.exec) {
+							expect(err.error_description).toMatch(description);
+						} else {
+							expect(err.error_description).toBe(description);
+						}
 					}
 					return true;
 				}
@@ -449,8 +444,8 @@ describe('Client metadata validation', () => {
 			assert.rejects(
 				register({ grantTypes: 123, responseTypes: [] }),
 				(err) => {
-					expect(err.message).to.equal('invalid_client_metadata');
-					expect(err.error_description).to.equal(
+					expect(err.message).toBe('invalid_client_metadata');
+					expect(err.error_description).toBe(
 						'client metadata validation error'
 					);
 					return true;
@@ -727,10 +722,8 @@ describe('Client metadata validation', () => {
 		// generic schema validation error.
 		it('is rejected by the schema when not an array', () =>
 			assert.rejects(register({ responseTypes: 'string' }), (err) => {
-				expect(err.message).to.equal('invalid_client_metadata');
-				expect(err.error_description).to.equal(
-					'client metadata validation error'
-				);
+				expect(err.message).toBe('invalid_client_metadata');
+				expect(err.error_description).toBe('client metadata validation error');
 				return true;
 			}));
 
@@ -766,9 +759,9 @@ describe('Client metadata validation', () => {
 
 	describe('responseModes', function () {
 		defaultsTo('responseModes', undefined, undefined, undefined, (client) => {
-			expect(client.responseModeAllowed('query')).to.be.true;
-			expect(client.responseModeAllowed('fragment')).to.be.true;
-			expect(client.responseModeAllowed('form_post')).to.be.true;
+			expect(client.responseModeAllowed('query')).toBe(true);
+			expect(client.responseModeAllowed('fragment')).toBe(true);
+			expect(client.responseModeAllowed('form_post')).toBe(true);
 		});
 
 		// responseModes structure (an array of the response_mode enum) is enforced by
@@ -776,10 +769,8 @@ describe('Client metadata validation', () => {
 		// the generic schema validation error.
 		it('is rejected by the schema when not an array', () =>
 			assert.rejects(register({ responseModes: 'string' }), (err) => {
-				expect(err.message).to.equal('invalid_client_metadata');
-				expect(err.error_description).to.equal(
-					'client metadata validation error'
-				);
+				expect(err.message).toBe('invalid_client_metadata');
+				expect(err.error_description).toBe('client metadata validation error');
 				return true;
 			}));
 
@@ -791,8 +782,8 @@ describe('Client metadata validation', () => {
 		// ClientSchema; responseModeAllowed still treats an absent list as
 		// allowing it (the `!== false` rule), exercised by the defaultsTo above.
 		allows('responseModes', ['query'], undefined, undefined, (client) => {
-			expect(client.responseModeAllowed('query')).to.be.true;
-			expect(client.responseModeAllowed('form_post')).to.be.false;
+			expect(client.responseModeAllowed('query')).toBe(true);
+			expect(client.responseModeAllowed('form_post')).toBe(false);
 		});
 
 		allows('responseModes', ['jwt'], undefined, {
@@ -1137,8 +1128,8 @@ describe('Client metadata validation', () => {
 						configuration
 					),
 					(err) => {
-						expect(err.message).to.equal('invalid_client_metadata');
-						expect(err.error_description).to.equal(
+						expect(err.message).toBe('invalid_client_metadata');
+						expect(err.error_description).toBe(
 							'id_token_encrypted_response_alg is mandatory property when id_token_encrypted_response_enc is provided'
 						);
 						return true;
@@ -1263,8 +1254,8 @@ describe('Client metadata validation', () => {
 						configuration
 					),
 					(err) => {
-						expect(err.message).to.equal('invalid_client_metadata');
-						expect(err.error_description).to.equal(
+						expect(err.message).toBe('invalid_client_metadata');
+						expect(err.error_description).toBe(
 							'userinfo_encrypted_response_alg is mandatory property when userinfo_encrypted_response_enc is provided'
 						);
 						return true;
@@ -1403,8 +1394,8 @@ describe('Client metadata validation', () => {
 						configuration
 					),
 					(err) => {
-						expect(err.message).to.equal('invalid_client_metadata');
-						expect(err.error_description).to.equal(
+						expect(err.message).toBe('invalid_client_metadata');
+						expect(err.error_description).toBe(
 							'introspection_encrypted_response_alg is mandatory property when introspection_encrypted_response_enc is provided'
 						);
 						return true;
@@ -1533,8 +1524,8 @@ describe('Client metadata validation', () => {
 						configuration
 					),
 					(err) => {
-						expect(err.message).to.equal('invalid_client_metadata');
-						expect(err.error_description).to.equal(
+						expect(err.message).toBe('invalid_client_metadata');
+						expect(err.error_description).toBe(
 							'authorization_encrypted_response_alg is mandatory property when authorization_encrypted_response_enc is provided'
 						);
 						return true;
@@ -1665,8 +1656,8 @@ describe('Client metadata validation', () => {
 						configuration
 					),
 					(err) => {
-						expect(err.message).to.equal('invalid_client_metadata');
-						expect(err.error_description).to.equal(
+						expect(err.message).toBe('invalid_client_metadata');
+						expect(err.error_description).toBe(
 							'request_object_encryption_alg is mandatory property when request_object_encryption_enc is provided'
 						);
 						return true;
@@ -1899,7 +1890,7 @@ describe('Client metadata validation', () => {
 			},
 			{ ...configuration, subjectTypes: ['pairwise', 'public'] },
 			(client) => {
-				expect(sectorIdentifier(client)).to.eql('rp.example.com');
+				expect(sectorIdentifier(client)).toEqual('rp.example.com');
 			}
 		);
 		isRequired(
@@ -1963,7 +1954,7 @@ describe('Client metadata validation', () => {
 			},
 			{ ...configuration, subjectTypes: ['pairwise', 'public'] },
 			(client) => {
-				expect(sectorIdentifier(client)).to.eql('rp.example.com');
+				expect(sectorIdentifier(client)).toEqual('rp.example.com');
 			}
 		);
 		isRequired(
@@ -2188,7 +2179,7 @@ describe('Client metadata validation', () => {
 				undefined,
 				configuration,
 				(client) => {
-					expect(client.metadata()['tls_client_auth_subject_dn']).to.eql(
+					expect(client.metadata()['tls_client_auth_subject_dn']).toEqual(
 						undefined
 					);
 				}
@@ -2216,7 +2207,7 @@ describe('Client metadata validation', () => {
 				undefined,
 				configuration,
 				(client) => {
-					expect(client.metadata()['tls_client_auth_san_dns']).to.eql(
+					expect(client.metadata()['tls_client_auth_san_dns']).toEqual(
 						undefined
 					);
 				}
@@ -2244,7 +2235,7 @@ describe('Client metadata validation', () => {
 				undefined,
 				configuration,
 				(client) => {
-					expect(client.metadata()['tls_client_auth_san_uri']).to.eql(
+					expect(client.metadata()['tls_client_auth_san_uri']).toEqual(
 						undefined
 					);
 				}
@@ -2272,7 +2263,9 @@ describe('Client metadata validation', () => {
 				undefined,
 				configuration,
 				(client) => {
-					expect(client.metadata()['tls_client_auth_san_ip']).to.eql(undefined);
+					expect(client.metadata()['tls_client_auth_san_ip']).toEqual(
+						undefined
+					);
 				}
 			);
 		});
@@ -2298,7 +2291,7 @@ describe('Client metadata validation', () => {
 				undefined,
 				configuration,
 				(client) => {
-					expect(client.metadata()['tls_client_auth_san_email']).to.eql(
+					expect(client.metadata()['tls_client_auth_san_email']).toEqual(
 						undefined
 					);
 				}
@@ -2316,7 +2309,7 @@ describe('Client metadata validation', () => {
 		register({
 			unrecognized: true
 		}).then((client) => {
-			expect(client).not.to.have.property('unrecognized');
+			expect(client).not.toHaveProperty('unrecognized');
 		}));
 
 	it('allows clients without grants, for introspection, revocation (RS clients)', () =>
@@ -2327,9 +2320,9 @@ describe('Client metadata validation', () => {
 			responseTypes: [],
 			grantTypes: []
 		}).then((client) => {
-			expect(client.grantTypes).to.be.empty;
-			expect(client.responseTypes).to.be.empty;
-			expect(client.redirectUris).to.be.empty;
+			expect(client.grantTypes).toHaveLength(0);
+			expect(client.responseTypes).toHaveLength(0);
+			expect(client.redirectUris).toHaveLength(0);
 		}));
 
 	it('allows clients only with client_credentials', () =>
@@ -2345,9 +2338,9 @@ describe('Client metadata validation', () => {
 				'clientCredentials.enabled': true
 			}
 		).then((client) => {
-			expect(client.grantTypes).not.to.be.empty;
-			expect(client.responseTypes).to.be.empty;
-			expect(client.redirectUris).to.be.empty;
+			expect(client.grantTypes).not.toHaveLength(0);
+			expect(client.responseTypes).toHaveLength(0);
+			expect(client.redirectUris).toHaveLength(0);
 		}));
 
 	describe('authorization_details_types', function () {
@@ -2389,15 +2382,15 @@ describe('Client metadata validation', () => {
 			},
 			{ subjectTypes: ['pairwise', 'public'] }
 		).then((client) => {
-			expect(client.grantTypes).to.be.empty;
-			expect(client.responseTypes).to.be.empty;
-			expect(client.redirectUris).to.be.empty;
-			expect(() => sectorIdentifier(client)).to.throw();
+			expect(client.grantTypes).toHaveLength(0);
+			expect(client.responseTypes).toHaveLength(0);
+			expect(client.redirectUris).toHaveLength(0);
+			expect(() => sectorIdentifier(client)).toThrow();
 			try {
 				sectorIdentifier(client);
 			} catch (err) {
-				expect(err.error).to.eql('invalid_client_metadata');
-				expect(err.error_description).to.eql(
+				expect(err.error).toEqual('invalid_client_metadata');
+				expect(err.error_description).toEqual(
 					'could not determine a sector identifier'
 				);
 			}

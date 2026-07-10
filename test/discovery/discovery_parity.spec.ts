@@ -1,5 +1,4 @@
-import { describe, it, beforeAll } from 'bun:test';
-import { expect } from 'chai';
+import { describe, it, beforeAll, expect } from 'bun:test';
 
 import bootstrap, { agent } from '../test_helper.js';
 import baseline from './__fixtures__/discovery-baseline.json';
@@ -23,7 +22,7 @@ describe('discovery parity', () => {
 	it('produces a document semantically identical to the pre-refactor baseline', async () => {
 		const { data } = await agent['.well-known']['openid-configuration'].get();
 
-		expect(normalize(data as Record<string, unknown>)).to.deep.equal(
+		expect(normalize(data as Record<string, unknown>)).toEqual(
 			normalize(baseline as Record<string, unknown>)
 		);
 	});

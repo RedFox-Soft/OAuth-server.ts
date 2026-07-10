@@ -1,12 +1,12 @@
-import sinon from 'sinon';
-
 import {
 	describe,
 	it,
 	beforeAll,
 	afterEach,
 	beforeEach,
-	expect
+	expect,
+	spyOn,
+	mock
 } from 'bun:test';
 import nanoid from '../../lib/helpers/nanoid.ts';
 import bootstrap, { agent } from '../test_helper.js';
@@ -25,7 +25,7 @@ expire.setDate(expire.getDate() + 1);
 describe('devInteractions', async () => {
 	const setup = await bootstrap(import.meta.url)();
 	afterEach(function () {
-		sinon.restore();
+		mock.restore();
 	});
 
 	describe('render login', () => {
@@ -70,7 +70,7 @@ describe('devInteractions', async () => {
 		});
 
 		it('"handles" not found interaction session', async function () {
-			sinon.stub(Interaction, 'find').resolves();
+			spyOn(Interaction, 'find').mockResolvedValue(undefined);
 
 			const { error } = await agent.ui[object.uid].login.get({
 				headers: {
@@ -356,7 +356,7 @@ describe('devInteractions', async () => {
 describe('resume after consent', async () => {
 	const setup = await bootstrap(import.meta.url)();
 	afterEach(function () {
-		sinon.restore();
+		mock.restore();
 	});
 
 	// Persists a `resume` interaction the way the authorization pipeline would have, then returns the
@@ -401,7 +401,7 @@ describe('resume after consent', async () => {
 
 			const cookie = await saveResume(auth.params);
 
-			sinon.stub(Interaction, 'find').resolves();
+			spyOn(Interaction, 'find').mockResolvedValue(undefined);
 
 			const { error } = await agent.ui['resume'].resume.get({
 				headers: {

@@ -1,4 +1,4 @@
-import { expect } from 'chai';
+import { expect } from 'bun:test';
 
 import bootstrap from '../test_helper.js';
 
@@ -21,9 +21,9 @@ describe('registration management with client_id as URI', () => {
 					response.body);
 
 				const parsed = new URL(registration_client_uri);
-				expect(parsed.search).to.be.empty;
+				expect(parsed.search).toHaveLength(0);
 				const i = parsed.pathname.indexOf('/reg/');
-				expect(parsed.pathname.slice(i + 5)).to.equal(
+				expect(parsed.pathname.slice(i + 5)).toBe(
 					encodeURIComponent(client_id)
 				);
 			});
@@ -37,9 +37,9 @@ describe('registration management with client_id as URI', () => {
 					response.body);
 
 				const parsed = new URL(registration_client_uri);
-				expect(parsed.search).to.be.empty;
+				expect(parsed.search).toHaveLength(0);
 				const i = parsed.pathname.indexOf('/reg/');
-				expect(parsed.pathname.slice(i + 5)).to.equal(
+				expect(parsed.pathname.slice(i + 5)).toBe(
 					encodeURIComponent(client_id)
 				);
 			});
@@ -57,9 +57,9 @@ describe('registration management with client_id as URI', () => {
 					response.body);
 
 				const parsed = new URL(registration_client_uri);
-				expect(parsed.search).to.be.empty;
+				expect(parsed.search).toHaveLength(0);
 				const i = parsed.pathname.indexOf('/reg/');
-				expect(parsed.pathname.slice(i + 5)).to.equal(
+				expect(parsed.pathname.slice(i + 5)).toBe(
 					encodeURIComponent(client_id)
 				);
 			});

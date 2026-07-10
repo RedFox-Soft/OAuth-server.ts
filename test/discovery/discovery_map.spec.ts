@@ -1,5 +1,4 @@
-import { describe, it, beforeAll } from 'bun:test';
-import { expect } from 'chai';
+import { describe, it, beforeAll, expect } from 'bun:test';
 
 import bootstrap, { agent } from '../test_helper.js';
 import { ApplicationConfig } from '../../lib/configs/application.js';
@@ -24,12 +23,12 @@ describe('discovery featuresKeyMap coverage', () => {
 		const gatedKeys = Object.keys(enabled).filter((key) => !(key in disabled));
 		const mapKeys = new Set(Object.values(featuresKeyMap).flat());
 
-		expect(gatedKeys.length).to.be.greaterThan(0);
+		expect(gatedKeys.length).toBeGreaterThan(0);
 		for (const key of gatedKeys) {
 			expect(
 				mapKeys.has(key as never),
 				`"${key}" disappeared when features were disabled but is not in featuresKeyMap`
-			).to.equal(true);
+			).toBe(true);
 		}
 	});
 });

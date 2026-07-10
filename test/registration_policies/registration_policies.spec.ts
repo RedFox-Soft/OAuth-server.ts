@@ -1,19 +1,16 @@
 import { strict as assert } from 'node:assert';
 import * as url from 'node:url';
 
-import { createSandbox } from 'sinon';
-import { expect } from 'chai';
+import { expect, mock, spyOn } from 'bun:test';
 
 import bootstrap from '../test_helper.js';
 import provider, { errors } from '../../lib/index.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { TestAdapter } from 'test/models.js';
 
-const sinon = createSandbox();
-
 describe('client registration policies', () => {
 	before(bootstrap(import.meta.url));
-	beforeEach(sinon.restore);
+	beforeEach(() => mock.restore());
 
 	describe('configuration', () => {
 		it('must only be enabled in conjuction with adapter-backed initial access tokens', () => {
@@ -26,7 +23,7 @@ describe('client registration policies', () => {
 						}
 					}
 				});
-			}).to.throw(
+			}).toThrow(
 				'registration policies are only available in conjuction with adapter-backed initial access tokens'
 			);
 		});
@@ -34,24 +31,23 @@ describe('client registration policies', () => {
 
 	describe('Registration & InitialAccessToken', () => {
 		it('allows policies to run to be stored on an InitialAccessToken', async function () {
-			const spy = sinon.spy();
+			const spy = mock();
 			provider.once('initial_access_token.saved', spy);
 			const value = await new provider.InitialAccessToken({
 				policies: ['empty-policy']
 			}).save();
 
-			expect(spy.called).to.be.true;
-			expect(spy.args[0][0]).to.have.deep.property('policies', [
-				'empty-policy'
-			]);
+			expect(spy).toHaveBeenCalled();
+			expect(spy.mock.calls[0][0]).toHaveProperty('policies', ['empty-policy']);
 
-			expect(
-				await provider.InitialAccessToken.find(value)
-			).to.have.deep.property('policies', ['empty-policy']);
+			expect(await provider.InitialAccessToken.find(value)).toHaveProperty(
+				'policies',
+				['empty-policy']
+			);
 		});
 
 		it('runs the policies when a client is getting created', async function () {
-			const spy = sinon.spy(
+			const spy = spyOn(
 				ApplicationConfig['registration.policies'],
 				'empty-policy'
 			);
@@ -65,7 +61,7 @@ describe('client registration policies', () => {
 				.send({ redirect_uris: ['https://rp.example.com/cb'] })
 				.expect(201);
 
-			expect(spy).to.have.property('calledOnce', true);
+			expect(spy).toHaveBeenCalledTimes(1);
 		});
 
 		it('allows for policies to set property defaults', async function () {
@@ -88,10 +84,7 @@ describe('client registration policies', () => {
 				.send({ redirect_uris: ['https://rp.example.com/cb'] })
 				.expect(201)
 				.expect(({ body }) => {
-					expect(body).to.have.property(
-						'id_token_signed_response_alg',
-						'HS256'
-					);
+					expect(body).toHaveProperty('id_token_signed_response_alg', 'HS256');
 				});
 
 			await this.agent
@@ -103,10 +96,7 @@ describe('client registration policies', () => {
 				})
 				.expect(201)
 				.expect(({ body }) => {
-					expect(body).to.have.property(
-						'id_token_signed_response_alg',
-						'PS256'
-					);
+					expect(body).toHaveProperty('id_token_signed_response_alg', 'PS256');
 				});
 		});
 
@@ -131,10 +121,7 @@ describe('client registration policies', () => {
 				})
 				.expect(201)
 				.expect(({ body }) => {
-					expect(body).to.have.property(
-						'id_token_signed_response_alg',
-						'HS256'
-					);
+					expect(body).toHaveProperty('id_token_signed_response_alg', 'HS256');
 				});
 		});
 
@@ -156,8 +143,8 @@ describe('client registration policies', () => {
 				})
 				.expect(400)
 				.expect(({ body }) => {
-					expect(body).to.have.property('error', 'invalid_client_metadata');
-					expect(body).to.have.property('error_description', 'foo');
+					expect(body).toHaveProperty('error', 'invalid_client_metadata');
+					expect(body).toHaveProperty('error_description', 'foo');
 				});
 		});
 
@@ -166,7 +153,7 @@ describe('client registration policies', () => {
 				policies: ['empty-policy']
 			}).save();
 
-			const spy = sinon.spy();
+			const spy = mock();
 			provider.once('registration_access_token.saved', spy);
 
 			await this.agent
@@ -175,10 +162,8 @@ describe('client registration policies', () => {
 				.send({ redirect_uris: ['https://rp.example.com/cb'] })
 				.expect(201);
 
-			expect(spy).to.have.property('calledOnce', true);
-			expect(spy.args[0][0]).to.have.deep.property('policies', [
-				'empty-policy'
-			]);
+			expect(spy).toHaveBeenCalledTimes(1);
+			expect(spy.mock.calls[0][0]).toHaveProperty('policies', ['empty-policy']);
 		});
 
 		it('can be done to push different policies to rat', async function () {
@@ -192,7 +177,7 @@ describe('client registration policies', () => {
 				policies: ['change-rat-policy']
 			}).save();
 
-			const spy = sinon.spy();
+			const spy = mock();
 			provider.once('registration_access_token.saved', spy);
 
 			await this.agent
@@ -201,17 +186,15 @@ describe('client registration policies', () => {
 				.send({ redirect_uris: ['https://rp.example.com/cb'] })
 				.expect(201);
 
-			expect(spy).to.have.property('calledOnce', true);
-			expect(spy.args[0][0]).to.have.deep.property('policies', [
-				'empty-policy'
-			]);
+			expect(spy).toHaveBeenCalledTimes(1);
+			expect(spy.mock.calls[0][0]).toHaveProperty('policies', ['empty-policy']);
 		});
 
 		it('policies must be an array', async function () {
 			await assert.rejects(
 				new provider.InitialAccessToken({ policies: null }).save(),
 				(err) => {
-					expect(err).to.have.property('message', 'policies must be an array');
+					expect(err).toHaveProperty('message', 'policies must be an array');
 					return true;
 				}
 			);
@@ -226,7 +209,7 @@ describe('client registration policies', () => {
 			);
 
 			return assert.rejects(provider.InitialAccessToken.find(saved), (err) => {
-				expect(err).to.have.property('message', 'policies must be an array');
+				expect(err).toHaveProperty('message', 'policies must be an array');
 				return true;
 			});
 		});
@@ -235,7 +218,7 @@ describe('client registration policies', () => {
 			await assert.rejects(
 				new provider.InitialAccessToken({ policies: [] }).save(),
 				(err) => {
-					expect(err).to.have.property('message', 'policies must not be empty');
+					expect(err).toHaveProperty('message', 'policies must not be empty');
 					return true;
 				}
 			);
@@ -250,7 +233,7 @@ describe('client registration policies', () => {
 			);
 
 			return assert.rejects(provider.InitialAccessToken.find(saved), (err) => {
-				expect(err).to.have.property('message', 'policies must not be empty');
+				expect(err).toHaveProperty('message', 'policies must not be empty');
 				return true;
 			});
 		});
@@ -259,7 +242,7 @@ describe('client registration policies', () => {
 			await assert.rejects(
 				new provider.InitialAccessToken({ policies: [null] }).save(),
 				(err) => {
-					expect(err).to.have.property('message', 'policies must be strings');
+					expect(err).toHaveProperty('message', 'policies must be strings');
 					return true;
 				}
 			);
@@ -274,7 +257,7 @@ describe('client registration policies', () => {
 			);
 
 			return assert.rejects(provider.InitialAccessToken.find(saved), (err) => {
-				expect(err).to.have.property('message', 'policies must be strings');
+				expect(err).toHaveProperty('message', 'policies must be strings');
 				return true;
 			});
 		});
@@ -283,7 +266,7 @@ describe('client registration policies', () => {
 			await assert.rejects(
 				new provider.InitialAccessToken({ policies: ['foo-bar'] }).save(),
 				(err) => {
-					expect(err).to.have.property(
+					expect(err).toHaveProperty(
 						'message',
 						'policy foo-bar not configured'
 					);
@@ -301,10 +284,7 @@ describe('client registration policies', () => {
 			);
 
 			return assert.rejects(provider.InitialAccessToken.find(saved), (err) => {
-				expect(err).to.have.property(
-					'message',
-					'policy foo-bar not configured'
-				);
+				expect(err).toHaveProperty('message', 'policy foo-bar not configured');
 				return true;
 			});
 		});
@@ -342,7 +322,7 @@ describe('client registration policies', () => {
 					policies: ['empty-policy']
 				}
 			);
-			const spy = sinon.spy(
+			const spy = spyOn(
 				ApplicationConfig['registration.policies'],
 				'empty-policy'
 			);
@@ -354,7 +334,7 @@ describe('client registration policies', () => {
 				.type('json')
 				.expect(200);
 
-			expect(spy).to.have.property('calledOnce', true);
+			expect(spy).toHaveBeenCalledTimes(1);
 		});
 
 		it('allows for policies to set property defaults', async function () {
@@ -380,7 +360,7 @@ describe('client registration policies', () => {
 				.type('json')
 				.expect(200)
 				.expect(({ body }) => {
-					expect(body).to.have.property('client_name', 'foobar');
+					expect(body).toHaveProperty('client_name', 'foobar');
 				});
 
 			await this.agent
@@ -393,7 +373,7 @@ describe('client registration policies', () => {
 				.type('json')
 				.expect(200)
 				.expect(({ body }) => {
-					expect(body).to.have.property('client_name', 'foobarbaz');
+					expect(body).toHaveProperty('client_name', 'foobarbaz');
 				});
 		});
 
@@ -421,7 +401,7 @@ describe('client registration policies', () => {
 				.type('json')
 				.expect(200)
 				.expect(({ body }) => {
-					expect(body).to.have.property('client_name', 'foobar');
+					expect(body).toHaveProperty('client_name', 'foobar');
 				});
 		});
 
@@ -443,8 +423,8 @@ describe('client registration policies', () => {
 				.type('json')
 				.expect(400)
 				.expect(({ body }) => {
-					expect(body).to.have.property('error', 'invalid_client_metadata');
-					expect(body).to.have.property('error_description', 'foo');
+					expect(body).toHaveProperty('error', 'invalid_client_metadata');
+					expect(body).toHaveProperty('error_description', 'foo');
 				});
 		});
 
@@ -471,7 +451,7 @@ describe('client registration policies', () => {
 					}
 				);
 
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once('registration_access_token.saved', spy);
 
 				let value;
@@ -485,14 +465,14 @@ describe('client registration policies', () => {
 						value = body.registration_access_token;
 					});
 
-				expect(spy.called).to.be.true;
-				expect(spy.args[0][0]).to.have.deep.property('policies', [
+				expect(spy).toHaveBeenCalled();
+				expect(spy.mock.calls[0][0]).toHaveProperty('policies', [
 					'empty-policy'
 				]);
 
 				expect(
 					await provider.RegistrationAccessToken.find(value)
-				).to.have.deep.property('policies', ['empty-policy']);
+				).toHaveProperty('policies', ['empty-policy']);
 			});
 		});
 
@@ -510,7 +490,7 @@ describe('client registration policies', () => {
 			return assert.rejects(
 				provider.RegistrationAccessToken.find(saved),
 				(err) => {
-					expect(err).to.have.property('message', 'policies must be an array');
+					expect(err).toHaveProperty('message', 'policies must be an array');
 					return true;
 				}
 			);
@@ -530,7 +510,7 @@ describe('client registration policies', () => {
 			return assert.rejects(
 				provider.RegistrationAccessToken.find(saved),
 				(err) => {
-					expect(err).to.have.property('message', 'policies must not be empty');
+					expect(err).toHaveProperty('message', 'policies must not be empty');
 					return true;
 				}
 			);
@@ -550,7 +530,7 @@ describe('client registration policies', () => {
 			return assert.rejects(
 				provider.RegistrationAccessToken.find(saved),
 				(err) => {
-					expect(err).to.have.property('message', 'policies must be strings');
+					expect(err).toHaveProperty('message', 'policies must be strings');
 					return true;
 				}
 			);
@@ -570,7 +550,7 @@ describe('client registration policies', () => {
 			return assert.rejects(
 				provider.RegistrationAccessToken.find(saved),
 				(err) => {
-					expect(err).to.have.property(
+					expect(err).toHaveProperty(
 						'message',
 						'policy foo-bar not configured'
 					);

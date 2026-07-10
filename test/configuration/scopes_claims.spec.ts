@@ -1,5 +1,4 @@
-import { expect } from 'chai';
-import { describe, it } from 'bun:test';
+import { describe, it, expect } from 'bun:test';
 import provider from '../../lib/index.ts';
 
 describe('custom claims', () => {
@@ -8,7 +7,7 @@ describe('custom claims', () => {
 			claims: { openid: ['foo'] }
 		});
 
-		expect(i(provider).configuration.claims.openid).to.eql({
+		expect(i(provider).configuration.claims.openid).toEqual({
 			sub: null,
 			foo: null
 		});
@@ -19,7 +18,7 @@ describe('custom claims', () => {
 			claims: { openid: { foo: null } }
 		});
 
-		expect(i(provider).configuration.claims.openid).to.eql({
+		expect(i(provider).configuration.claims.openid).toEqual({
 			sub: null,
 			foo: null
 		});
@@ -35,12 +34,12 @@ describe('custom claims', () => {
 			}
 		});
 
-		expect(i(provider).configuration.scopes).to.contain('insurance', 'payment');
+		expect(i(provider).configuration.scopes).toContain('insurance', 'payment');
 	});
 
 	it('removes the acr claim if no acrs are configured', () => {
 		provider.init({ acrValues: [] });
 
-		expect(i(provider).configuration.claimsSupported).not.to.contain('acr');
+		expect(i(provider).configuration.claimsSupported).not.toContain('acr');
 	});
 });

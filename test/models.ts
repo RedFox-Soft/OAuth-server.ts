@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
 
-import { expect } from 'chai';
+import { expect } from 'bun:test';
 
 import epochTime from '../lib/helpers/epoch_time.ts';
 import { MemoryAdapter, setStorage } from '../lib/adapters/memory/index.js';
@@ -56,8 +56,12 @@ export class TestAdapter extends MemoryAdapter {
 			this.model !== 'Client' &&
 			this.model !== 'Grant'
 		) {
-			expect(payload).to.have.property('exp').that.is.a('number').and.is.finite;
-			expect(payload.exp).to.be.closeTo(expiresIn + epochTime(), 1);
+			expect(payload).toHaveProperty('exp');
+			expect(payload.exp).toBeTypeOf('number');
+			expect(Number.isFinite(payload.exp)).toBe(true);
+			expect(
+				Math.abs(payload.exp - (expiresIn + epochTime()))
+			).toBeLessThanOrEqual(1);
 		}
 
 		return super.upsert(id, payload, expiresIn);

@@ -1,5 +1,4 @@
 import { strict as assert } from 'node:assert';
-import { expect } from 'chai';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 
@@ -13,40 +12,38 @@ describe.skip('provider instance', () => {
 	describe('provider.Client#find', () => {
 		it('ignores non-string inputs', async () => {
 			const provider = new provider('http://localhost');
-			expect(await provider.Client.find([])).to.be.undefined;
-			expect(await provider.Client.find(Buffer)).to.be.undefined;
-			expect(await provider.Client.find({})).to.be.undefined;
-			expect(await provider.Client.find(true)).to.be.undefined;
-			expect(await provider.Client.find(undefined)).to.be.undefined;
-			expect(await provider.Client.find(64)).to.be.undefined;
+			expect(await provider.Client.find([])).toBeUndefined();
+			expect(await provider.Client.find(Buffer)).toBeUndefined();
+			expect(await provider.Client.find({})).toBeUndefined();
+			expect(await provider.Client.find(true)).toBeUndefined();
+			expect(await provider.Client.find(undefined)).toBeUndefined();
+			expect(await provider.Client.find(64)).toBeUndefined();
 		});
 	});
 
 	describe('#urlFor', () => {
 		it('returns the route for unprefixed issuers', () => {
 			const provider = new provider('http://localhost');
-			expect(provider.urlFor('authorization')).to.equal(
-				'http://localhost/auth'
-			);
+			expect(provider.urlFor('authorization')).toBe('http://localhost/auth');
 		});
 
 		it('returns the route for prefixed issuers (1/2)', () => {
 			const provider = new provider('http://localhost/op/2.0');
-			expect(provider.urlFor('authorization')).to.equal(
+			expect(provider.urlFor('authorization')).toBe(
 				'http://localhost/op/2.0/auth'
 			);
 		});
 
 		it('returns the route for prefixed issuers (2/2)', () => {
 			const provider = new provider('http://localhost/op/2.0/');
-			expect(provider.urlFor('authorization')).to.equal(
+			expect(provider.urlFor('authorization')).toBe(
 				'http://localhost/op/2.0/auth'
 			);
 		});
 
 		it('passes the options', () => {
 			const provider = new provider('http://localhost');
-			expect(provider.urlFor('resume', { uid: 'foo' })).to.equal(
+			expect(provider.urlFor('resume', { uid: 'foo' })).toBe(
 				'http://localhost/auth/foo'
 			);
 		});

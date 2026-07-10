@@ -3,7 +3,6 @@ import { parse, URL } from 'node:url';
 
 import { describe, it, beforeAll, afterEach, expect, mock } from 'bun:test';
 import { importJWK } from 'jose';
-import sinon from 'sinon';
 
 import * as JWT from '../../lib/helpers/jwt.ts';
 import bootstrap, { agent, jsonToFormUrlEncoded } from '../test_helper.js';
@@ -198,7 +197,7 @@ describe('request parameter features', () => {
 	].forEach(([route, verb, authorizationRequest, errorEvt, successEvt]) => {
 		describe(`${route} ${verb} passing request parameters as JWTs`, () => {
 			it('does not use anything from the OAuth 2.0 parameters', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once('authorization.success', spy);
 
 				if (route === '/device/auth') {
@@ -219,12 +218,12 @@ describe('request parameter features', () => {
 					verb
 				});
 
-				expect(spy.calledOnce).toBeTrue();
-				expect(spy.args[0][0].oidc.params.ui_locales).toBeUndefined();
+				expect(spy).toHaveBeenCalledTimes(1);
+				expect(spy.mock.calls[0][0].oidc.params.ui_locales).toBeUndefined();
 			});
 
 			it('can contain max_age parameter as a number and it (and other params too) will be forced as string', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once(successEvt, spy);
 
 				await authorizationRequest('client', {
@@ -238,15 +237,13 @@ describe('request parameter features', () => {
 					verb
 				});
 
-				expect(
-					spy.calledWithMatch({
-						oidc: { params: { max_age: sinon.match.number } }
-					})
-				).toBeTrue();
+				expect(spy.mock.calls[0][0]).toMatchObject({
+					oidc: { params: { max_age: expect.any(Number) } }
+				});
 			});
 
 			it('can contain params as array and have them handled as dupes', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once(errorEvt, spy);
 
 				await authorizationRequest('client', {
@@ -260,12 +257,12 @@ describe('request parameter features', () => {
 					isError: true
 				});
 
-				expect(spy.calledOnce).toBeTrue();
-				expect(spy.args[0][0]).toBeInstanceOf(ValidationError);
+				expect(spy).toHaveBeenCalledTimes(1);
+				expect(spy.mock.calls[0][0]).toBeInstanceOf(ValidationError);
 			});
 
 			it('can contain claims parameter as JSON', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once(successEvt, spy);
 				const claims = JSON.stringify({ id_token: { email: null } });
 
@@ -280,13 +277,13 @@ describe('request parameter features', () => {
 					verb
 				});
 
-				expect(
-					spy.calledWithMatch({ oidc: { params: { claims } } })
-				).toBeTrue();
+				expect(spy.mock.calls[0][0]).toMatchObject({
+					oidc: { params: { claims } }
+				});
 			});
 
 			it('can contain claims parameter as object', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once(successEvt, spy);
 				const claims = { id_token: { email: null } };
 
@@ -301,11 +298,9 @@ describe('request parameter features', () => {
 					verb
 				});
 
-				expect(
-					spy.calledWithMatch({
-						oidc: { params: { claims } }
-					})
-				).toBeTrue();
+				expect(spy.mock.calls[0][0]).toMatchObject({
+					oidc: { params: { claims } }
+				});
 			});
 
 			it('can accept Request Objects issued within acceptable system clock skew', async function () {
@@ -348,7 +343,7 @@ describe('request parameter features', () => {
 				let [key] = client.symmetricKeyStore.selectForSign({ alg: 'HS256' });
 				key = await importJWK(key);
 
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once(errorEvt, spy);
 
 				await authorizationRequest('client-with-HS-sig-expired', {
@@ -363,19 +358,19 @@ describe('request parameter features', () => {
 					isError: true
 				});
 
-				expect(spy.calledOnce).toBeTrue();
-				expect(spy.args[0][0]).toHaveProperty(
+				expect(spy).toHaveBeenCalledTimes(1);
+				expect(spy.mock.calls[0][0]).toHaveProperty(
 					'message',
 					'invalid_request_object'
 				);
-				expect(spy.args[0][0]).toHaveProperty(
+				expect(spy.mock.calls[0][0]).toHaveProperty(
 					'error_description',
 					'could not validate the Request Object - the client secret used for its signature is expired'
 				);
 			});
 
 			it('doesnt allow request inception', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once(errorEvt, spy);
 
 				await authorizationRequest('client', {
@@ -390,12 +385,12 @@ describe('request parameter features', () => {
 					isError: true
 				});
 
-				expect(spy.calledOnce).toBeTrue();
-				expect(spy.args[0][0]).toBeInstanceOf(ValidationError);
+				expect(spy).toHaveBeenCalledTimes(1);
+				expect(spy.mock.calls[0][0]).toBeInstanceOf(ValidationError);
 			});
 
 			it('doesnt allow requestUri inception', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once(errorEvt, spy);
 
 				await authorizationRequest('client', {
@@ -410,8 +405,8 @@ describe('request parameter features', () => {
 					isError: true
 				});
 
-				expect(spy.calledOnce).toBeTrue();
-				expect(spy.args[0][0]).toBeInstanceOf(ValidationError);
+				expect(spy).toHaveBeenCalledTimes(1);
+				expect(spy.mock.calls[0][0]).toBeInstanceOf(ValidationError);
 			});
 
 			if (route !== '/device/auth') {
@@ -429,7 +424,7 @@ describe('request parameter features', () => {
 				});
 
 				it('checks the response mode from the request', async function () {
-					const spy = sinon.spy();
+					const spy = mock();
 					provider.once(errorEvt, spy);
 
 					await authorizationRequest('client', {
@@ -445,19 +440,19 @@ describe('request parameter features', () => {
 						isError: true
 					});
 
-					expect(spy.calledOnce).toBeTrue();
-					expect(spy.args[0][0]).toHaveProperty(
+					expect(spy).toHaveBeenCalledTimes(1);
+					expect(spy.mock.calls[0][0]).toHaveProperty(
 						'message',
 						'unsupported_response_mode'
 					);
-					expect(spy.args[0][0]).toHaveProperty(
+					expect(spy.mock.calls[0][0]).toHaveProperty(
 						'error_description',
 						'unsupported response_mode requested'
 					);
 				});
 
 				it('doesnt allow response_type to differ', async function () {
-					const spy = sinon.spy();
+					const spy = mock();
 					provider.once(errorEvt, spy);
 
 					await authorizationRequest('client', {
@@ -473,19 +468,19 @@ describe('request parameter features', () => {
 						isError: true
 					});
 
-					expect(spy.calledOnce).toBeTrue();
-					expect(spy.args[0][0]).toHaveProperty(
+					expect(spy).toHaveBeenCalledTimes(1);
+					expect(spy.mock.calls[0][0]).toHaveProperty(
 						'message',
 						'invalid_request_object'
 					);
-					expect(spy.args[0][0]).toHaveProperty(
+					expect(spy.mock.calls[0][0]).toHaveProperty(
 						'error_description',
 						'request response_type must equal the one in request parameters'
 					);
 				});
 
 				it('uses the state from the request even if its validations will fail', async function () {
-					const spy = sinon.spy();
+					const spy = mock();
 					provider.once(errorEvt, spy);
 
 					const { response } = await authorizationRequest('client', {
@@ -504,12 +499,12 @@ describe('request parameter features', () => {
 					const params = new URL(location).searchParams;
 					expect(params.get('state')).toBe('foobar');
 
-					expect(spy.calledOnce).toBeTrue();
-					expect(spy.args[0][0]).toHaveProperty(
+					expect(spy).toHaveBeenCalledTimes(1);
+					expect(spy.mock.calls[0][0]).toHaveProperty(
 						'message',
 						'invalid_request_object'
 					);
-					expect(spy.args[0][0]).toHaveProperty(
+					expect(spy.mock.calls[0][0]).toHaveProperty(
 						'error_description',
 						'request client_id must equal the one in request parameters'
 					);
@@ -517,7 +512,7 @@ describe('request parameter features', () => {
 			}
 
 			it('doesnt allow client_id to differ', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once(errorEvt, spy);
 
 				await authorizationRequest('client', {
@@ -533,19 +528,19 @@ describe('request parameter features', () => {
 					isError: true
 				});
 
-				expect(spy.calledOnce).toBeTrue();
-				expect(spy.args[0][0]).toHaveProperty(
+				expect(spy).toHaveBeenCalledTimes(1);
+				expect(spy.mock.calls[0][0]).toHaveProperty(
 					'message',
 					'invalid_request_object'
 				);
-				expect(spy.args[0][0]).toHaveProperty(
+				expect(spy.mock.calls[0][0]).toHaveProperty(
 					'error_description',
 					'request client_id must equal the one in request parameters'
 				);
 			});
 
 			it('handles invalid signed looklike jwts', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once(errorEvt, spy);
 
 				await authorizationRequest('client', {
@@ -557,19 +552,19 @@ describe('request parameter features', () => {
 					isError: true
 				});
 
-				expect(spy.calledOnce).toBeTrue();
-				expect(spy.args[0][0]).toHaveProperty(
+				expect(spy).toHaveBeenCalledTimes(1);
+				expect(spy.mock.calls[0][0]).toHaveProperty(
 					'message',
 					'invalid_request_object'
 				);
-				expect(spy.args[0][0]).toHaveProperty(
+				expect(spy.mock.calls[0][0]).toHaveProperty(
 					'error_description',
 					'could not parse Request Object'
 				);
 			});
 
 			it('doesnt allow clients with predefined alg to bypass this alg', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once(errorEvt, spy);
 
 				await authorizationRequest('client-with-HS-sig', {
@@ -581,19 +576,19 @@ describe('request parameter features', () => {
 					isError: true
 				});
 
-				expect(spy.calledOnce).toBeTrue();
-				expect(spy.args[0][0]).toHaveProperty(
+				expect(spy).toHaveBeenCalledTimes(1);
+				expect(spy.mock.calls[0][0]).toHaveProperty(
 					'message',
 					'invalid_request_object'
 				);
-				expect(spy.args[0][0]).toHaveProperty(
+				expect(spy.mock.calls[0][0]).toHaveProperty(
 					'error_description',
 					'the preregistered alg must be used in request or request_uri'
 				);
 			});
 
 			it('unsupported algs must not be used', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once(errorEvt, spy);
 
 				await authorizationRequest('client', {
@@ -606,19 +601,19 @@ describe('request parameter features', () => {
 					isError: true
 				});
 
-				expect(spy.calledOnce).toBeTrue();
-				expect(spy.args[0][0]).toHaveProperty(
+				expect(spy).toHaveBeenCalledTimes(1);
+				expect(spy.mock.calls[0][0]).toHaveProperty(
 					'message',
 					'invalid_request_object'
 				);
-				expect(spy.args[0][0]).toHaveProperty(
+				expect(spy.mock.calls[0][0]).toHaveProperty(
 					'error_description',
 					'unsupported signed request alg'
 				);
 			});
 
 			it('bad signatures will be rejected', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once(errorEvt, spy);
 
 				await authorizationRequest('client', {
@@ -630,19 +625,19 @@ describe('request parameter features', () => {
 					isError: true
 				});
 
-				expect(spy.calledOnce).toBeTrue();
-				expect(spy.args[0][0]).toHaveProperty(
+				expect(spy).toHaveBeenCalledTimes(1);
+				expect(spy.mock.calls[0][0]).toHaveProperty(
 					'message',
 					'invalid_request_object'
 				);
-				expect(spy.args[0][0]).toHaveProperty(
+				expect(spy.mock.calls[0][0]).toHaveProperty(
 					'error_description',
 					'could not validate Request Object'
 				);
 			});
 
 			it('rejects "registration" parameter part of the Request Object', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once(errorEvt, spy);
 
 				await authorizationRequest('client', {
@@ -657,12 +652,12 @@ describe('request parameter features', () => {
 					isError: true
 				});
 
-				expect(spy.calledOnce).toBeTrue();
-				expect(spy.args[0][0]).toBeInstanceOf(ValidationError);
+				expect(spy).toHaveBeenCalledTimes(1);
+				expect(spy.mock.calls[0][0]).toBeInstanceOf(ValidationError);
 			});
 
 			it('handles unrecognized parameters', async function () {
-				const spy = sinon.spy();
+				const spy = mock();
 				provider.once(errorEvt, spy);
 				const client = await provider.Client.find('client-with-HS-sig');
 				let [key] = client.symmetricKeyStore.selectForSign({ alg: 'HS256' });
@@ -679,8 +674,8 @@ describe('request parameter features', () => {
 					isError: true
 				});
 
-				expect(spy.calledOnce).toBeTrue();
-				expect(spy.args[0][0]).toBeInstanceOf(ValidationError);
+				expect(spy).toHaveBeenCalledTimes(1);
+				expect(spy.mock.calls[0][0]).toBeInstanceOf(ValidationError);
 			});
 		});
 	});

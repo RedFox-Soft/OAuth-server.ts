@@ -2,8 +2,7 @@ import { pathToFileURL } from 'node:url';
 import * as path from 'node:path';
 
 import { dirname } from 'desm';
-import { beforeAll, afterAll } from 'bun:test';
-import { expect } from 'chai';
+import { beforeAll, afterAll, expect } from 'bun:test';
 
 import base64url from 'base64url';
 import { treaty } from '@elysiajs/eden';
@@ -263,23 +262,22 @@ export default function testHelper(importMetaUrl, { config: base } = {}) {
 
 		function failWith(code, error, error_description, scope) {
 			return ({ status, body, headers: { 'www-authenticate': wwwAuth } }) => {
-				expect(status).to.eql(code);
-				expect(body).to.have.property('error', error);
-				expect(body).to.have.property('error_description', error_description);
-				expect(wwwAuth).to.match(new RegExp(`^Bearer realm="${ISSUER}"`));
-				let check = expect(wwwAuth);
-				if (error_description === 'no access token provided') {
-					check = check.not.to;
-				} else {
-					check = check.to;
-				}
-				check.match(new RegExp(`error="${error}"`));
-				check.match(
+				expect(status).toEqual(code);
+				expect(body).toHaveProperty('error', error);
+				expect(body).toHaveProperty('error_description', error_description);
+				expect(wwwAuth).toMatch(new RegExp(`^Bearer realm="${ISSUER}"`));
+				const present = error_description !== 'no access token provided';
+				const check = (re) => {
+					if (present) expect(wwwAuth).toMatch(re);
+					else expect(wwwAuth).not.toMatch(re);
+				};
+				check(new RegExp(`error="${error}"`));
+				check(
 					new RegExp(
 						`error_description="${error_description.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}"`
 					)
 				);
-				if (scope) check.match(new RegExp(`scope="${scope}"`));
+				if (scope) check(new RegExp(`scope="${scope}"`));
 			};
 		}
 

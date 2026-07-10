@@ -1,5 +1,12 @@
-import { describe, it, beforeAll, afterEach, expect } from 'bun:test';
-import sinon from 'sinon';
+import {
+	describe,
+	it,
+	beforeAll,
+	afterEach,
+	expect,
+	spyOn,
+	mock
+} from 'bun:test';
 
 import bootstrap, { agent } from '../test_helper.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
@@ -16,7 +23,7 @@ describe('session exp handling', () => {
 	});
 
 	afterEach(function () {
-		sinon.restore();
+		mock.restore();
 	});
 
 	function authRequest(auth, cookie) {
@@ -36,7 +43,7 @@ describe('session exp handling', () => {
 		const oldSessionId = setup.getSessionId();
 		session.exp = epochTime() - 300;
 
-		sinon.spy(TestAdapter.for('Session'), 'destroy');
+		spyOn(TestAdapter.for('Session'), 'destroy');
 		const auth = new AuthorizationRequest({ scope });
 
 		const { response } = await authRequest(auth, cookie);
@@ -55,7 +62,7 @@ describe('session exp handling', () => {
 			const session = setup.getSession();
 			session.exp = epochTime() - 5;
 
-			sinon.spy(TestAdapter.for('Session'), 'destroy');
+			spyOn(TestAdapter.for('Session'), 'destroy');
 
 			const auth = new AuthorizationRequest({ scope });
 
@@ -65,7 +72,7 @@ describe('session exp handling', () => {
 			auth.validateState(response);
 			auth.validateClientLocation(response);
 
-			expect(TestAdapter.for('Session').destroy.called).toBe(false);
+			expect(TestAdapter.for('Session').destroy).not.toHaveBeenCalled();
 		});
 
 		it('generates a new session id when an expired session is found by the adapter', async function () {
@@ -74,7 +81,7 @@ describe('session exp handling', () => {
 			session.exp = epochTime() - 10;
 			const oldSessionId = setup.getSessionId();
 
-			sinon.spy(TestAdapter.for('Session'), 'destroy');
+			spyOn(TestAdapter.for('Session'), 'destroy');
 
 			const auth = new AuthorizationRequest({ scope });
 

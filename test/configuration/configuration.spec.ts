@@ -1,5 +1,3 @@
-import { expect } from 'chai';
-
 import Configuration from '../../lib/helpers/configuration.ts';
 
 describe('Provider configuration', () => {
@@ -17,7 +15,7 @@ describe('Provider configuration', () => {
 					devInteractions: false
 				}
 			});
-		}).to.throw(
+		}).toThrow(
 			'Features are not enabled/disabled with a boolean value. See the documentation for more details.'
 		);
 		expect(() => {
@@ -26,7 +24,7 @@ describe('Provider configuration', () => {
 					devInteractions: true
 				}
 			});
-		}).to.throw(
+		}).toThrow(
 			'Features are not enabled/disabled with a boolean value. See the documentation for more details.'
 		);
 	});

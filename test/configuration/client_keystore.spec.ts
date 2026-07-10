@@ -1,8 +1,15 @@
-import { describe, it, beforeAll, afterEach, spyOn, mock } from 'bun:test';
+import {
+	describe,
+	it,
+	beforeAll,
+	afterEach,
+	spyOn,
+	mock,
+	expect
+} from 'bun:test';
 import { strict as assert } from 'node:assert';
 
 import moment from 'moment';
-import { expect } from 'chai';
 
 import * as JWT from '../../lib/helpers/jwt.ts';
 import epochTime from '../../lib/helpers/epoch_time.ts';
@@ -66,9 +73,10 @@ describe('client keystore refresh', () => {
 			client.asymmetricKeyStore.refresh()
 		]);
 
-		expect(globalThis.fetch.mock.calls).to.have.lengthOf(1);
-		expect(client.asymmetricKeyStore.selectForSign({ kty: 'EC' })).not.to.be
-			.empty;
+		expect(globalThis.fetch.mock.calls).toHaveLength(1);
+		expect(
+			client.asymmetricKeyStore.selectForSign({ kty: 'EC' })
+		).not.toHaveLength(0);
 	});
 
 	it('fails when private keys are encountered (and does only one request concurrently)', async function () {
@@ -88,17 +96,17 @@ describe('client keystore refresh', () => {
 		spyOn(client.asymmetricKeyStore, 'fresh').mockReturnValue(false);
 		return Promise.all([
 			assert.rejects(client.asymmetricKeyStore.refresh(), (err) => {
-				expect(err).to.be.an('error');
-				expect(err.message).to.equal('invalid_client_metadata');
-				expect(err.error_description).to.eql(
+				expect(err).toBeInstanceOf(Error);
+				expect(err.message).toBe('invalid_client_metadata');
+				expect(err.error_description).toEqual(
 					'client JSON Web Key Set failed to be refreshed'
 				);
 				return true;
 			}),
 			assert.rejects(client.asymmetricKeyStore.refresh(), (err) => {
-				expect(err).to.be.an('error');
-				expect(err.message).to.equal('invalid_client_metadata');
-				expect(err.error_description).to.eql(
+				expect(err).toBeInstanceOf(Error);
+				expect(err.message).toBe('invalid_client_metadata');
+				expect(err.error_description).toEqual(
 					'client JSON Web Key Set failed to be refreshed'
 				);
 				return true;
@@ -118,9 +126,9 @@ describe('client keystore refresh', () => {
 
 		spyOn(client.asymmetricKeyStore, 'fresh').mockReturnValue(false);
 		await client.asymmetricKeyStore.refresh();
-		expect(
-			client.asymmetricKeyStore.selectForSign({ kty: 'EC' })
-		).to.have.lengthOf(2);
+		expect(client.asymmetricKeyStore.selectForSign({ kty: 'EC' })).toHaveLength(
+			2
+		);
 	});
 
 	it('removes not found keys', async function () {
@@ -130,7 +138,9 @@ describe('client keystore refresh', () => {
 		spyOn(client.asymmetricKeyStore, 'fresh').mockReturnValue(false);
 		await client.asymmetricKeyStore.refresh();
 
-		expect(client.asymmetricKeyStore.selectForSign({ kty: 'EC' })).to.be.empty;
+		expect(client.asymmetricKeyStore.selectForSign({ kty: 'EC' })).toHaveLength(
+			0
+		);
 	});
 
 	it('only accepts 200s', async function () {
@@ -139,9 +149,9 @@ describe('client keystore refresh', () => {
 		const client = await provider.Client.find('client');
 		spyOn(client.asymmetricKeyStore, 'fresh').mockReturnValue(false);
 		return assert.rejects(client.asymmetricKeyStore.refresh(), (err) => {
-			expect(err).to.be.an('error');
-			expect(err.message).to.equal('invalid_client_metadata');
-			expect(err.error_description).to.eql(
+			expect(err).toBeInstanceOf(Error);
+			expect(err.message).toBe('invalid_client_metadata');
+			expect(err.error_description).toEqual(
 				'client JSON Web Key Set failed to be refreshed'
 			);
 			return true;
@@ -154,9 +164,9 @@ describe('client keystore refresh', () => {
 		const client = await provider.Client.find('client');
 		spyOn(client.asymmetricKeyStore, 'fresh').mockReturnValue(false);
 		return assert.rejects(client.asymmetricKeyStore.refresh(), (err) => {
-			expect(err).to.be.an('error');
-			expect(err.message).to.equal('invalid_client_metadata');
-			expect(err.error_description).to.eql(
+			expect(err).toBeInstanceOf(Error);
+			expect(err.message).toBe('invalid_client_metadata');
+			expect(err.error_description).toEqual(
 				'client JSON Web Key Set failed to be refreshed'
 			);
 			return true;
@@ -169,9 +179,9 @@ describe('client keystore refresh', () => {
 		const client = await provider.Client.find('client');
 		spyOn(client.asymmetricKeyStore, 'fresh').mockReturnValue(false);
 		return assert.rejects(client.asymmetricKeyStore.refresh(), (err) => {
-			expect(err).to.be.an('error');
-			expect(err.message).to.equal('invalid_client_metadata');
-			expect(err.error_description).to.eql(
+			expect(err).toBeInstanceOf(Error);
+			expect(err.message).toBe('invalid_client_metadata');
+			expect(err.error_description).toEqual(
 				'client JSON Web Key Set failed to be refreshed'
 			);
 			return true;
@@ -195,9 +205,9 @@ describe('client keystore refresh', () => {
 				return false;
 			});
 			await client.asymmetricKeyStore.refresh();
-			expect(client.asymmetricKeyStore.fresh()).to.be.true;
-			expect(client.asymmetricKeyStore.stale()).to.be.false;
-			expect(client.asymmetricKeyStore.freshUntil).to.equal(freshUntil);
+			expect(client.asymmetricKeyStore.fresh()).toBe(true);
+			expect(client.asymmetricKeyStore.stale()).toBe(false);
+			expect(client.asymmetricKeyStore.freshUntil).toBe(freshUntil);
 		});
 
 		it('ignores the cache-control one when expires is provided', async function () {
@@ -217,9 +227,9 @@ describe('client keystore refresh', () => {
 				return false;
 			});
 			await client.asymmetricKeyStore.refresh();
-			expect(client.asymmetricKeyStore.fresh()).to.be.true;
-			expect(client.asymmetricKeyStore.stale()).to.be.false;
-			expect(client.asymmetricKeyStore.freshUntil).to.equal(freshUntil);
+			expect(client.asymmetricKeyStore.fresh()).toBe(true);
+			expect(client.asymmetricKeyStore.stale()).toBe(false);
+			expect(client.asymmetricKeyStore.freshUntil).toBe(freshUntil);
 		});
 
 		it('uses the max-age if Cache-Control is missing', async function () {
@@ -237,9 +247,11 @@ describe('client keystore refresh', () => {
 				return false;
 			});
 			await client.asymmetricKeyStore.refresh();
-			expect(client.asymmetricKeyStore.fresh()).to.be.true;
-			expect(client.asymmetricKeyStore.stale()).to.be.false;
-			expect(client.asymmetricKeyStore.freshUntil).to.be.closeTo(freshUntil, 1);
+			expect(client.asymmetricKeyStore.fresh()).toBe(true);
+			expect(client.asymmetricKeyStore.stale()).toBe(false);
+			expect(
+				Math.abs(client.asymmetricKeyStore.freshUntil - freshUntil)
+			).toBeLessThanOrEqual(1);
 		});
 
 		it('falls back to 1 minute throttle if no caching header is found', async function () {
@@ -255,9 +267,11 @@ describe('client keystore refresh', () => {
 				return false;
 			});
 			await client.asymmetricKeyStore.refresh();
-			expect(client.asymmetricKeyStore.fresh()).to.be.true;
-			expect(client.asymmetricKeyStore.stale()).to.be.false;
-			expect(client.asymmetricKeyStore.freshUntil).to.be.closeTo(freshUntil, 1);
+			expect(client.asymmetricKeyStore.fresh()).toBe(true);
+			expect(client.asymmetricKeyStore.stale()).toBe(false);
+			expect(
+				Math.abs(client.asymmetricKeyStore.freshUntil - freshUntil)
+			).toBeLessThanOrEqual(1);
 		});
 	});
 
@@ -280,7 +294,7 @@ describe('client keystore refresh', () => {
 
 			const client = await provider.Client.find('client');
 			client.asymmetricKeyStore.freshUntil = epochTime() - 1;
-			expect(client.asymmetricKeyStore.stale()).to.be.true;
+			expect(client.asymmetricKeyStore.stale()).toBe(true);
 
 			const token = new IdToken(client, { foo: 'bar' });
 
