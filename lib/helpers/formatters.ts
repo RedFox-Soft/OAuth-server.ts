@@ -2,7 +2,7 @@ const conjunction = new Intl.ListFormat('en', { type: 'conjunction' });
 const disjunction = new Intl.ListFormat('en', { type: 'disjunction' });
 
 const formatter = {
-	format(iterable, { type }) {
+	format(iterable: Iterable<string>, { type }: { type: string }) {
 		if (type === 'conjunction') {
 			return conjunction.format(iterable);
 		}
@@ -11,14 +11,17 @@ const formatter = {
 	}
 };
 
-export function formatList(list, { type = 'conjunction' } = {}) {
+export function formatList(
+	list: string[],
+	{ type = 'conjunction' }: { type?: string } = {}
+) {
 	return formatter.format(
 		list.map((w) => `'${w}'`),
 		{ type }
 	);
 }
 
-export function pluralize(word, count) {
+export function pluralize(word: string, count: number) {
 	if (count === 1) {
 		return word;
 	}

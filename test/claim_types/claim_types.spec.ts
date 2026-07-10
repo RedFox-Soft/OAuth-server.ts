@@ -1,3 +1,4 @@
+import i from 'lib/helpers/weak_cache.js';
 import { describe, it, beforeAll, expect } from 'bun:test';
 import bootstrap, { agent } from '../test_helper.js';
 import { provider } from 'lib/provider.js';

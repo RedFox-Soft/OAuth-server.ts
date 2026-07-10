@@ -1,4 +1,4 @@
-export function encode(input, encoding = 'utf8') {
+export function encode(input: string, encoding: BufferEncoding = 'utf8') {
 	return Buffer.from(input, encoding).toString('base64url');
 }
 

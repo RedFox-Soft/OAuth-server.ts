@@ -1,3 +1,5 @@
+import { expect } from 'bun:test';
+import i from 'lib/helpers/weak_cache.js';
 import { describe, it, beforeAll, beforeEach } from 'bun:test';
 
 import bootstrap from '../test_helper.js';

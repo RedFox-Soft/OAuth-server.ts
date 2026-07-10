@@ -1,3 +1,4 @@
+import i from 'lib/helpers/weak_cache.js';
 import { describe, it, expect } from 'bun:test';
 import provider from '../../lib/index.ts';
 

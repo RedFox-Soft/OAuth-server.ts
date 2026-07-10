@@ -29,7 +29,10 @@ export type DeviceCodePayloadType = Static<typeof DeviceCodePayload>;
 export class DeviceCode extends apply([consumable, BaseToken]) {
 	model = DeviceCodePayload;
 
-	static async findByUserCode(userCode, { ignoreExpiration = false } = {}) {
+	static async findByUserCode(
+		userCode: string,
+		{ ignoreExpiration = false } = {}
+	) {
 		const stored = await this.adapter.findByUserCode(userCode);
 		if (!stored) return;
 		try {

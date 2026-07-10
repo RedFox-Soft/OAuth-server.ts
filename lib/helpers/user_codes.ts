@@ -5,7 +5,7 @@ const CHARSETS = {
 	digits: '0123456789'
 };
 
-export function generate(charset, mask) {
+export function generate(charset, mask: string) {
 	const length = mask.split('*').length - 1;
 	if (typeof CHARSETS[charset] !== 'function') {
 		CHARSETS[charset] = customAlphabet(CHARSETS[charset]);
@@ -23,7 +23,7 @@ export function generate(charset, mask) {
 		.join('');
 }
 
-export function denormalize(normalized, mask) {
+export function denormalize(normalized: string, mask: string) {
 	const chars = normalized.split('');
 	return mask
 		.split('')
@@ -37,7 +37,7 @@ export function denormalize(normalized, mask) {
 		.join('');
 }
 
-export function normalize(input) {
+export function normalize(input: string) {
 	return input
 		.replace(/[a-z]/g, (char) => char.toUpperCase())
 		.replace(/\W/g, () => '');

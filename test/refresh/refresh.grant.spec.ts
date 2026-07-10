@@ -1,3 +1,4 @@
+import i from 'lib/helpers/weak_cache.js';
 import { parse as parseUrl } from 'node:url';
 import {
 	describe,

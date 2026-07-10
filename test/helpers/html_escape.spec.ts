@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'bun:test';
 import htmlSafe from '../../lib/helpers/html_safe.ts';
 
 describe('htmlSafe helper', () => {

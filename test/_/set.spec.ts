@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'bun:test';
 import set from '../../lib/helpers/_/set.ts';
 
 describe('set', () => {

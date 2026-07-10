@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'bun:test';
 import defaults, { deep } from '../../lib/helpers/_/defaults.ts';
 
 describe('defaults', () => {

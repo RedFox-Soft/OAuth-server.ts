@@ -13,7 +13,7 @@ export type RegistrationAccessTokenPayloadType = Static<
 	typeof RegistrationAccessTokenPayload
 >;
 
-export default (provider) =>
+export default (provider: object) =>
 	class RegistrationAccessToken extends apply([
 		hasPolicies(provider),
 		BaseToken

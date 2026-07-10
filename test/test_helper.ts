@@ -46,7 +46,7 @@ globalThis.i = instance;
 const FEATURE_FLAG_PREFIX = { jwtResponseModes: 'responseMode.jwt' };
 Object.defineProperties(Object.getPrototypeOf(provider), {
 	enable: {
-		value(feature, options = {}) {
+		value(feature: string, options: Record<string, unknown> = {}) {
 			const prefix = FEATURE_FLAG_PREFIX[feature] ?? feature;
 			ApplicationConfig[`${prefix}.enabled`] = true;
 			for (const [key, value] of Object.entries(options)) {
@@ -58,7 +58,8 @@ Object.defineProperties(Object.getPrototypeOf(provider), {
 	}
 });
 
-const jwt = (token) => JSON.parse(base64url.decode(token.split('.')[1])).jti;
+const jwt = (token: string) =>
+	JSON.parse(base64url.decode(token.split('.')[1])).jti;
 
 export const agent = treaty(elysia);
 
@@ -105,7 +106,10 @@ export function jsonToFormUrlEncoded(json: Record<string, unknown>) {
 	return searchParams.toString();
 }
 
-export default function testHelper(importMetaUrl, { config: base } = {}) {
+export default function testHelper(
+	importMetaUrl: string,
+	{ config: base }: { config?: string } = {}
+) {
 	const dir = dirname(importMetaUrl);
 	base ??= path.basename(dir);
 
@@ -140,8 +144,8 @@ export default function testHelper(importMetaUrl, { config: base } = {}) {
 			...config
 		});
 
-		let lastSession;
-		let lastAccountId;
+		let lastSession: Session;
+		let lastAccountId: string;
 
 		async function login({
 			scope = 'openid',
@@ -234,8 +238,11 @@ export default function testHelper(importMetaUrl, { config: base } = {}) {
 			}
 		}
 
-		function assertOnce(ondone, done) {
-			async function removeAfterUse(ctx, next) {
+		function assertOnce(
+			ondone: (ctx: unknown) => void,
+			done: (err?: unknown) => void
+		) {
+			async function removeAfterUse(ctx: unknown, next: () => Promise<unknown>) {
 				await next().finally(() => {
 					provider.middleware.splice(
 						provider.middleware.indexOf(removeAfterUse),
@@ -252,7 +259,7 @@ export default function testHelper(importMetaUrl, { config: base } = {}) {
 			provider.use(removeAfterUse);
 		}
 
-		function getTokenJti(token) {
+		function getTokenJti(token: string) {
 			try {
 				return jwt(token);
 			} catch (err) {}
@@ -260,14 +267,27 @@ export default function testHelper(importMetaUrl, { config: base } = {}) {
 			return token; // opaque
 		}
 
-		function failWith(code, error, error_description, scope) {
-			return ({ status, body, headers: { 'www-authenticate': wwwAuth } }) => {
+		function failWith(
+			code: number,
+			error: string,
+			error_description: string,
+			scope?: string
+		) {
+			return ({
+				status,
+				body,
+				headers: { 'www-authenticate': wwwAuth }
+			}: {
+				status: number;
+				body: unknown;
+				headers: Record<string, string | undefined>;
+			}) => {
 				expect(status).toEqual(code);
 				expect(body).toHaveProperty('error', error);
 				expect(body).toHaveProperty('error_description', error_description);
 				expect(wwwAuth).toMatch(new RegExp(`^Bearer realm="${ISSUER}"`));
 				const present = error_description !== 'no access token provided';
-				const check = (re) => {
+				const check = (re: RegExp) => {
 					if (present) expect(wwwAuth).toMatch(re);
 					else expect(wwwAuth).not.toMatch(re);
 				};

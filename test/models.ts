@@ -15,19 +15,19 @@ setStorage(map);
 const testStorage = new Map();
 
 export class TestAdapter extends MemoryAdapter {
-	constructor(name) {
+	constructor(name: string) {
 		if (testStorage.has(name)) return testStorage.get(name);
 		super(name);
 		this.store = map;
 		testStorage.set(name, this);
 	}
 
-	static for(name) {
+	static for(name: string) {
 		if (testStorage.has(name)) return testStorage.get(name);
 		return new this(name);
 	}
 
-	get(key) {
+	get(key: string) {
 		return this.constructor.for(key);
 	}
 
@@ -39,17 +39,17 @@ export class TestAdapter extends MemoryAdapter {
 		map.clear();
 	}
 
-	syncFind(id) {
+	syncFind(id: string) {
 		return map.get(this.key(id)) || undefined;
 	}
 
-	syncUpdate(id, update) {
+	syncUpdate(id: string, update: object) {
 		const found = map.get(this.key(id));
 		if (!found) return;
 		Object.assign(found, update);
 	}
 
-	async upsert(id, payload, expiresIn) {
+	async upsert(id: string, payload, expiresIn: number) {
 		if (
 			this.model !== 'RegistrationAccessToken' &&
 			this.model !== 'InitialAccessToken' &&
@@ -69,7 +69,9 @@ export class TestAdapter extends MemoryAdapter {
 }
 
 export class Account {
-	constructor(id) {
+	accountId: string;
+
+	constructor(id: string) {
 		this.accountId = id;
 		testStorage.set(`Account:${this.accountId}`, this);
 	}
@@ -78,7 +80,7 @@ export class Account {
 		return testStorage;
 	}
 
-	claims(use, scope, claims, rejected) {
+	claims(use: string, scope: string, claims: object, rejected: string[]) {
 		assert.equal(typeof use, 'string');
 		assert.equal(typeof scope, 'string');
 		assert.equal(typeof claims, 'object');
@@ -115,7 +117,7 @@ export class Account {
 		};
 	}
 
-	static async findAccount(ctx, sub, token) {
+	static async findAccount(ctx: unknown, sub: string, token?: string) {
 		if (sub === 'notfound') {
 			return undefined;
 		}

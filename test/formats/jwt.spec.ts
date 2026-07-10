@@ -12,6 +12,8 @@ import {
 } from 'bun:test';
 import base64url from 'base64url';
 
+import i from 'lib/helpers/weak_cache.js';
+
 import ResourceServer from '../../lib/helpers/resource_server.ts';
 import epochTime from '../../lib/helpers/epoch_time.ts';
 import bootstrap from '../test_helper.js';

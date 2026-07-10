@@ -16,7 +16,7 @@ export type InitialAccessTokenPayloadType = Static<
 	typeof InitialAccessTokenPayload
 >;
 
-export default (provider) =>
+export default (provider: object) =>
 	class InitialAccessToken extends apply([hasPolicies(provider), BaseToken]) {
 		model = InitialAccessTokenPayload;
 	};

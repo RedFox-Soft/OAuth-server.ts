@@ -19,7 +19,20 @@ const {
 	JWSSignatureVerificationFailed
 } = errors;
 
-export async function sign(payload, key, alg, options = {}) {
+export async function sign(
+	payload: Record<string, unknown>,
+	key,
+	alg,
+	options: {
+		typ?: string;
+		fields?: Record<string, unknown>;
+		noIat?: boolean;
+		audience?: string;
+		expiresIn?: number;
+		issuer?: string;
+		subject?: string;
+	} = {}
+) {
 	const protectedHeader = {
 		alg,
 		typ: options.typ,
@@ -135,7 +148,18 @@ export function assertPayload(
 	}
 }
 
-export async function verify(jwt: string, keystore, options = {}) {
+export async function verify(
+	jwt: string,
+	keystore,
+	options: {
+		algorithm?: string;
+		clockTolerance?: number;
+		audience?: string;
+		ignoreExpiration?: boolean;
+		issuer?: string;
+		subject?: boolean;
+	} = {}
+) {
 	let verified;
 	let protectedHeader;
 	try {

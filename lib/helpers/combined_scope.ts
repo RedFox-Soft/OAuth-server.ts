@@ -1,4 +1,10 @@
-export default (grant, requestParamScopes, resourceServers) => {
+import { type Grant } from 'lib/models/grant.js';
+
+export default (
+	grant: Grant,
+	requestParamScopes: Set<string> | string[],
+	resourceServers: Record<string, { identifier(): string }>
+) => {
 	const combinedScope = new Set();
 
 	grant

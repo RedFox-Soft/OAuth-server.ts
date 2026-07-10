@@ -4,6 +4,7 @@
 	"scripts": {
 		"format": "prettier --write .",
 		"lint": "eslint lib test --fix",
+		"typecheck": "tsc --noEmit",
 		"build": "bun build --outdir=public --minify ./lib/interactions/loginClient.tsx",
 		"watch": "bun build --outdir=public --minify ./lib/interactions/loginClient.tsx --watch",
 		"db:setup": "bun database/mongodb.ts",

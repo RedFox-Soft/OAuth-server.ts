@@ -1,10 +1,10 @@
 const map = new WeakMap();
 
-export function get(ctx) {
+export function get(ctx: object) {
 	return map.get(ctx);
 }
 
-export function set(ctx, value) {
+export function set(ctx: object, value: unknown) {
 	return map.set(ctx, value);
 }
 

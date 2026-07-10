@@ -1,6 +1,6 @@
 import { isPlainObject } from './object.js';
 
-export default (object, path, value) => {
+export default (object, path: string, value: unknown) => {
 	const properties = path.split('.');
 	if (properties.includes('__proto__') || properties.includes('constructor')) {
 		throw new TypeError('__proto__ and constructor cannot be set');

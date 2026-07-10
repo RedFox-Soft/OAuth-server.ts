@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'bun:test';
 import constantEquals from '../../lib/helpers/constant_equals.ts';
 
 describe('constantEquals', () => {

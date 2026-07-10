@@ -5,6 +5,7 @@ export class OIDCProviderError extends Error {
 	allow_redirect = true;
 	error: string;
 	error_description = '';
+	error_detail?: string;
 	status = 400;
 
 	constructor(status: number, message: string) {
@@ -27,7 +28,7 @@ export class CustomOIDCProviderError extends OIDCProviderError {
 export class InvalidToken extends OIDCProviderError {
 	error_description = 'invalid token provided';
 
-	constructor(detail) {
+	constructor(detail?: string) {
 		super(401, 'invalid_token');
 		Error.captureStackTrace(this, this.constructor);
 		Object.assign(this, { error_detail: detail });
@@ -49,7 +50,7 @@ export class InvalidClientMetadata extends OIDCProviderError {
 }
 
 export class InvalidScope extends OIDCProviderError {
-	constructor(description, scope, detail) {
+	constructor(description: string, scope: unknown, detail?: string) {
 		super(400, 'invalid_scope');
 		Error.captureStackTrace(this, this.constructor);
 		Object.assign(this, {
@@ -73,7 +74,7 @@ export class InsufficientScope extends OIDCProviderError {
 }
 
 export class InvalidRequest extends OIDCProviderError {
-	constructor(description, code = 400, detail?: string) {
+	constructor(description?: string, code = 400, detail?: string) {
 		super(code, 'invalid_request');
 		Error.captureStackTrace(this, this.constructor);
 		Object.assign(this, {
@@ -111,7 +112,7 @@ export class SessionNotFound extends InvalidRequest {}
 export class InvalidClientAuth extends OIDCProviderError {
 	error_description = 'client authentication failed';
 
-	constructor(detail) {
+	constructor(detail?: string) {
 		super(401, 'invalid_client');
 		Error.captureStackTrace(this, this.constructor);
 		Object.assign(this, { error_detail: detail });
@@ -121,7 +122,7 @@ export class InvalidClientAuth extends OIDCProviderError {
 export class InvalidGrant extends OIDCProviderError {
 	error_description = 'grant request is invalid';
 
-	constructor(detail) {
+	constructor(detail?: string) {
 		super(400, 'invalid_grant');
 		Error.captureStackTrace(this, this.constructor);
 		Object.assign(this, { error_detail: detail });
@@ -140,7 +141,7 @@ export class InvalidRedirectUri extends OIDCProviderError {
 	}
 }
 
-function E(message, errorDescription) {
+function E(message: string, errorDescription?: string) {
 	const klassName = upperFirst(camelCase(message));
 	const klass = class extends OIDCProviderError {
 		error_description = errorDescription;

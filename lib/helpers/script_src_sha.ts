@@ -1,13 +1,15 @@
 import * as crypto from 'node:crypto';
 
-export default function pushScriptSrcSha(ctx, script) {
+export default function pushScriptSrcSha(ctx, script: string) {
 	const csp = ctx.response.get('Content-Security-Policy');
 	if (csp) {
-		const directives = csp.split(';').reduce((acc, directive) => {
-			const [name, ...values] = directive.trim().split(/\s+/g);
-			acc[name] = values;
-			return acc;
-		}, {});
+		const directives = csp
+			.split(';')
+			.reduce((acc: Record<string, string[]>, directive: string) => {
+				const [name, ...values] = directive.trim().split(/\s+/g);
+				acc[name] = values;
+				return acc;
+			}, {});
 
 		if (directives['script-src']) {
 			const digest = crypto.hash('sha256', script, 'base64');

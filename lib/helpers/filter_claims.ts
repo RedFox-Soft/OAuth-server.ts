@@ -1,4 +1,10 @@
-export default (source, target, grant) => {
+import { type Grant } from 'lib/models/grant.js';
+
+export default (
+	source: Record<string, Record<string, unknown>> | undefined,
+	target: string,
+	grant: Grant
+) => {
 	const claims = { ...source?.[target] };
 	const requested = Object.keys(claims);
 	const granted = new Set(grant.getOIDCClaimsFiltered(new Set(requested)));

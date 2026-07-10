@@ -4,12 +4,14 @@ import omitBy from './_/omit_by.ts';
 
 const cache = new WeakMap();
 
-export default function getParams(allowList) {
+export default function getParams(allowList: string[]) {
 	if (!cache.has(allowList)) {
 		assert(allowList, 'allowList must be present');
 
 		const klass = class Params {
-			constructor(params) {
+			[key: string]: unknown;
+
+			constructor(params: Record<string, unknown>) {
 				allowList.forEach((prop) => {
 					this[prop] = params[prop] || undefined;
 				});

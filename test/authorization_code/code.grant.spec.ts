@@ -1,3 +1,4 @@
+import i from 'lib/helpers/weak_cache.js';
 import url from 'node:url';
 import {
 	describe,

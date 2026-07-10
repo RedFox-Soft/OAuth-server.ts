@@ -1,4 +1,4 @@
-export default function htmlSafe(input) {
+export default function htmlSafe(input: unknown) {
 	if (typeof input === 'number' && Number.isFinite(input)) {
 		return `${input}`;
 	}

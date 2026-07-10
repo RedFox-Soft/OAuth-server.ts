@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'bun:test';
 import Configuration from '../../lib/helpers/configuration.ts';
 
 describe('Provider configuration', () => {

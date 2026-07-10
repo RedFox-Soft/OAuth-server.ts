@@ -54,7 +54,7 @@ export type Client = ClientSchemaType;
 // returns this; internal call sites use `Client.find`/`Client.needsSecret` exactly
 // as before, and `value instanceof Client` holds for validated objects because
 // `Client.prototype` is the shared `clientPrototype`.
-export function Client(metadata) {
+export function Client(metadata: unknown) {
 	return validateClient(metadata);
 }
 

@@ -176,7 +176,7 @@ function makeDefaults() {
 			 * These must be provided by the deployment; the defaults throw via mustChange.
 			 */
 			richAuthorizationRequests: {
-				rarForAuthorizationCode(_ctx) {
+				rarForAuthorizationCode(_ctx: unknown) {
 					// decision points:
 					// - ctx.oidc.client
 					// - ctx.oidc.resourceServers
@@ -190,7 +190,7 @@ function makeDefaults() {
 						'features.richAuthorizationRequests.rarForAuthorizationCode not implemented'
 					);
 				},
-				rarForCodeResponse(_ctx, _resourceServer) {
+				rarForCodeResponse(_ctx: unknown, _resourceServer: unknown) {
 					mustChange(
 						'features.richAuthorizationRequests.rarForCodeResponse',
 						'transform the requested and granted RAR details to be returned in the Access Token Response as authorization_details as well as assigned to the issued Access Token'
@@ -199,7 +199,7 @@ function makeDefaults() {
 						'features.richAuthorizationRequests.rarForCodeResponse not implemented'
 					);
 				},
-				rarForRefreshTokenResponse(_ctx, _resourceServer) {
+				rarForRefreshTokenResponse(_ctx: unknown, _resourceServer: unknown) {
 					mustChange(
 						'features.richAuthorizationRequests.rarForRefreshTokenResponse',
 						'transform the requested and granted RAR details to be returned in the Access Token Response as authorization_details as well as assigned to the issued Access Token'
@@ -208,7 +208,7 @@ function makeDefaults() {
 						'features.richAuthorizationRequests.rarForRefreshTokenResponse not implemented'
 					);
 				},
-				rarForIntrospectionResponse(_ctx, _token) {
+				rarForIntrospectionResponse(_ctx: unknown, _token: unknown) {
 					mustChange(
 						'features.richAuthorizationRequests.rarForIntrospectionResponse',
 						"transform the token's stored RAR details to be returned in the Introspection Response"

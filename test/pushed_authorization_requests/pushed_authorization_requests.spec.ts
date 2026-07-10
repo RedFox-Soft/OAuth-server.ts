@@ -1,3 +1,4 @@
+import i from 'lib/helpers/weak_cache.js';
 import { randomBytes, createHash } from 'node:crypto';
 import { parse as parseUrl } from 'node:url';
 
