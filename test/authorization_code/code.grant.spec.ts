@@ -8,10 +8,10 @@ import {
 	beforeEach,
 	expect,
 	spyOn,
-	mock
+	mock,
+	setSystemTime
 } from 'bun:test';
 
-import timekeeper from 'timekeeper';
 import { provider } from 'lib/provider.js';
 import { Client } from 'lib/models/client.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
@@ -28,7 +28,7 @@ describe('grant_type=authorization_code', () => {
 	});
 
 	afterEach(() => {
-		timekeeper.reset();
+		setSystemTime();
 		mock.restore();
 
 		provider.removeAllListeners('grant.success');
@@ -166,7 +166,7 @@ describe('grant_type=authorization_code', () => {
 			const { query } = url.parse(response.headers.get('location'), true);
 			const code = query.code;
 
-			timekeeper.travel(Date.now() + 10 * 1000);
+			setSystemTime(Date.now() + 10 * 1000);
 			const spy = mock();
 			provider.on('grant.error', spy);
 
@@ -459,7 +459,7 @@ describe('grant_type=authorization_code', () => {
 			const { query } = url.parse(response.headers.get('location'), true);
 			const code = query.code;
 
-			timekeeper.travel(Date.now() + 10 * 1000);
+			setSystemTime(Date.now() + 10 * 1000);
 			const spy = mock();
 			provider.on('grant.error', spy);
 

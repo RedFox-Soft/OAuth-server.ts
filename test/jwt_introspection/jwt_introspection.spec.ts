@@ -1,5 +1,4 @@
-import { describe, it, beforeAll, afterEach, expect } from 'bun:test';
-import timekeeper from 'timekeeper';
+import { describe, it, beforeAll, afterEach, expect, setSystemTime } from 'bun:test';
 
 import bootstrap, { agent } from '../test_helper.js';
 import * as JWT from '../../lib/helpers/jwt.ts';
@@ -16,7 +15,7 @@ describe('jwtIntrospection features', () => {
 		setup = await bootstrap(import.meta.url)();
 	});
 
-	afterEach(() => timekeeper.reset());
+	afterEach(() => setSystemTime());
 
 	describe('enriched discovery', () => {
 		it('shows the url now', async () => {
@@ -44,7 +43,7 @@ describe('jwtIntrospection features', () => {
 
 		it('returns the response as json when not negotiated to be a JWT', async () => {
 			const now = Date.now();
-			timekeeper.freeze(now);
+			setSystemTime(now);
 			const at = new AccessToken({
 				accountId: 'accountId',
 				grantId: setup.getGrantId(),
@@ -69,7 +68,7 @@ describe('jwtIntrospection features', () => {
 			const json = jsonRes.data;
 			const iat = json.iat;
 
-			timekeeper.travel(now + 10 * 1000);
+			setSystemTime(now + 10 * 1000);
 
 			const jwtRes = await agent.token.introspect.post(
 				{ token },
@@ -97,7 +96,7 @@ describe('jwtIntrospection features', () => {
 
 		it('returns the response as jwt (active: false)', async () => {
 			const now = Date.now();
-			timekeeper.freeze(now);
+			setSystemTime(now);
 
 			const jwtRes = await agent.token.introspect.post(
 				{ token: 'foobar' },

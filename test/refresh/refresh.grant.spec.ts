@@ -8,11 +8,11 @@ import {
 	beforeEach,
 	spyOn,
 	mock,
-	expect
+	expect,
+	setSystemTime
 } from 'bun:test';
 
 import base64url from 'base64url';
-import timekeeper from 'timekeeper';
 
 import bootstrap, { agent } from '../test_helper.js';
 import { provider } from 'lib/provider.js';
@@ -38,7 +38,7 @@ describe('grant_type=refresh_token', () => {
 
 	afterEach(() => {
 		provider.removeAllListeners();
-		timekeeper.reset();
+		setSystemTime();
 		mock.restore();
 	});
 
@@ -139,7 +139,7 @@ describe('grant_type=refresh_token', () => {
 
 	describe('validates', () => {
 		it('validates the refresh token is not expired', async function () {
-			timekeeper.travel(Date.now() + 10 * 1000);
+			setSystemTime(Date.now() + 10 * 1000);
 			const spy = mock();
 			provider.on('grant.error', spy);
 

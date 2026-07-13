@@ -6,9 +6,9 @@ import {
 	afterEach,
 	expect,
 	mock,
-	spyOn
+	spyOn,
+	setSystemTime
 } from 'bun:test';
-import timekeeper from 'timekeeper';
 
 import bootstrap, {
 	agent,
@@ -77,7 +77,7 @@ describe('POST code_verification endpoint w/o verification', () => {
 	});
 
 	afterEach(() => {
-		timekeeper.reset();
+		setSystemTime();
 		mock.restore();
 		provider.removeAllListeners('code_verification.error');
 	});
@@ -134,7 +134,7 @@ describe('POST code_verification endpoint w/o verification', () => {
 		provider.once('code_verification.error', errSpy);
 		await new DeviceCode({ clientId: 'client', userCode: 'FOOEXPIRED' }).save();
 
-		timekeeper.travel(Date.now() + (10 * 60 + 10) * 1000);
+		setSystemTime(Date.now() + (10 * 60 + 10) * 1000);
 		const { status, data } = await post({ xsrf, user_code: 'FOO-EXPIRED' });
 		expect(status).toBe(200);
 		expect(data).toContain('id="op.deviceInputForm"');
@@ -234,7 +234,7 @@ describe('POST code_verification endpoint w/ verification', () => {
 	});
 
 	afterEach(() => {
-		timekeeper.reset();
+		setSystemTime();
 		mock.restore();
 	});
 

@@ -110,7 +110,7 @@ Each feature area has:
 
 `test_helper.ts` bootstraps the provider with the right config before each suite. Use `bootstrap(import.meta)` at the top of a spec file.
 
-Time-sensitive tests use `timekeeper` to freeze/travel time.
+Time-sensitive tests use Bun's `setSystemTime` (from `bun:test`) to travel time; call `setSystemTime()` with no argument to reset.
 
 ---
 
