@@ -1,7 +1,5 @@
 import { format } from 'node:util';
 
-import { generate as tokenHash } from 'oidc-token-hash';
-
 import epochTime from '../helpers/epoch_time.js';
 import * as JWT from '../helpers/jwt.js';
 import { InvalidClientMetadata } from '../helpers/errors.ts';
@@ -12,8 +10,6 @@ import { type Client } from './client.js';
 import { Claims } from 'lib/helpers/claims.js';
 import { merge } from 'lib/helpers/_/object.js';
 import { clockTolerance, ttl } from 'lib/configs/liveTime.js';
-
-const hashes = ['at_hash', 'c_hash', 's_hash'];
 
 const messages = {
 	sig: {
@@ -161,14 +157,6 @@ export class IdToken {
 					use: 'sig'
 				});
 				key = instance(provider).keystore.getKeyObject(jwk);
-			}
-
-			if (use === 'idtoken') {
-				hashes.forEach((claim) => {
-					if (payload[claim]) {
-						payload[claim] = tokenHash(payload[claim], alg, jwk.crv);
-					}
-				});
 			}
 
 			if (jwk) {

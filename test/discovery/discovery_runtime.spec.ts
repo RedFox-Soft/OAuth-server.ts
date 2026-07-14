@@ -12,6 +12,7 @@ describe('discovery runtime mutability', () => {
 
 	afterAll(() => {
 		ApplicationConfig['deviceFlow.enabled'] = false;
+		ApplicationConfig['clientCredentials.enabled'] = false;
 		ApplicationConfig.scopes = ['openid', 'offline_access'];
 	});
 
@@ -33,6 +34,20 @@ describe('discovery runtime mutability', () => {
 		ApplicationConfig['deviceFlow.enabled'] = false;
 		const reverted = (await endpoint()).data as Record<string, unknown>;
 		expect(reverted).not.toHaveProperty('device_authorization_endpoint');
+	});
+
+	it('advertises client_credentials only while the feature flag is on', async () => {
+		ApplicationConfig['clientCredentials.enabled'] = false;
+		const before = (await endpoint()).data as Record<string, unknown>;
+		expect(before.grant_types_supported).not.toContain('client_credentials');
+
+		ApplicationConfig['clientCredentials.enabled'] = true;
+		const after = (await endpoint()).data as Record<string, unknown>;
+		expect(after.grant_types_supported).toContain('client_credentials');
+
+		ApplicationConfig['clientCredentials.enabled'] = false;
+		const reverted = (await endpoint()).data as Record<string, unknown>;
+		expect(reverted.grant_types_supported).not.toContain('client_credentials');
 	});
 
 	it('reflects a collection value changed at runtime', async () => {

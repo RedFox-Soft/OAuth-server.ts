@@ -21,7 +21,6 @@
 		"jsesc": "^3.1.0",
 		"mongodb": "^7.5.0",
 		"nanoid": "^6.0.0",
-		"oidc-token-hash": "^5.2.0",
 		"quick-lru": "^7.3.0",
 		"react": "^19.2.7",
 		"react-dom": "^19.2.7"
@@ -41,6 +40,6 @@
 		"openid-client": "^6.8.4",
 		"prettier": "^3.9.5",
 		"typescript": "^6.0.3",
-		"typescript-eslint": "^8.63.0"
+		"typescript-eslint": "^8.64.0"
 	}
 }

@@ -9,7 +9,6 @@ import {
 } from 'bun:test';
 import url from 'node:url';
 
-import provider from '../../lib/index.ts';
 import bootstrap, { agent } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { AccessToken } from 'lib/models/access_token.js';

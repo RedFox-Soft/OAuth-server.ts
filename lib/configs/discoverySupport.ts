@@ -49,6 +49,9 @@ function deriveGrantTypes(config: Config): string[] {
 	if (config.scopes.includes('offline_access')) {
 		grantTypes.add('refresh_token');
 	}
+	if (config['clientCredentials.enabled']) {
+		grantTypes.add('client_credentials');
+	}
 	if (config['deviceFlow.enabled']) {
 		grantTypes.add('urn:ietf:params:oauth:grant-type:device_code');
 	}

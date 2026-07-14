@@ -20,23 +20,28 @@ export const discovery = new Elysia().get(
 
 		// Compute the full candidate document from the live ApplicationConfig, then gate it.
 		const body: Record<string, unknown> = calculateDiscovery();
+		const keysToDelete = new Set<string>();
 
 		// Prune keys whose governing feature flag is disabled (multi-feature keys are listed
 		// under each flag, so any disabled flag removes them).
 		for (const flag of Object.keys(featuresKeyMap) as FeatureFlagKey[]) {
 			if (!ApplicationConfig[flag]) {
-				featuresKeyMap[flag]?.forEach((key) => {
-					delete body[key];
-				});
+				featuresKeyMap[flag]?.forEach((key) => keysToDelete.add(key));
 			}
 		}
 
 		// Drop keys left with a non-meaningful `false` value.
 		for (const key of Object.keys(body)) {
 			if (body[key] === false && !MEANINGFUL_FALSE.has(key)) {
-				delete body[key];
+				keysToDelete.add(key);
 			}
 		}
+
+		// Delete collected keys in a separate pass
+		keysToDelete.forEach((key) => {
+			// eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+			delete body[key];
+		});
 
 		// Operator-supplied discovery overrides are applied last and only fill missing keys.
 		defaults(body, configuration.discovery);

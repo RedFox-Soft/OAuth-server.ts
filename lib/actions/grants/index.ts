@@ -44,11 +44,17 @@ if (process.env.NODE_ENV === 'test') {
 	grantStore.set('foo', async () => ({ success: true }));
 }
 
+// Server-level feature flag gating each optional grant. Mirrors deriveGrantTypes in
+// lib/configs/discoverySupport.ts so token dispatch and discovery advertise the same set.
+const grantFeatureFlags = {
+	client_credentials: 'clientCredentials.enabled',
+	'urn:ietf:params:oauth:grant-type:device_code': 'deviceFlow.enabled',
+	'urn:openid:params:grant-type:ciba': 'ciba.enabled'
+} as const;
+
 export function hasGrant(grantType: string): boolean {
-	if (
-		!config['clientCredentials.enabled'] &&
-		grantType === 'client_credentials'
-	) {
+	const flag = grantFeatureFlags[grantType as keyof typeof grantFeatureFlags];
+	if (flag && !config[flag]) {
 		return false;
 	}
 
