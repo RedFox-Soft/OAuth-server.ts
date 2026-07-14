@@ -299,7 +299,7 @@ describe('client keystore refresh', () => {
 
 			const token = new IdToken(client, { foo: 'bar' });
 
-			await token.issue({ use: 'idtoken' });
+			await token.issue('idtoken');
 		});
 	});
 });

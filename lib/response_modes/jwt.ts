@@ -18,7 +18,7 @@ export default async function jwtResponseModes(ctx, redirectUri, payload) {
 	const token = new IdToken(ctx.oidc.client);
 	token.extra = payload;
 
-	const response = await token.issue({ use: 'authorization' });
+	const response = await token.issue('authorization');
 
 	return modes[mode](ctx, redirectUri, { response });
 }

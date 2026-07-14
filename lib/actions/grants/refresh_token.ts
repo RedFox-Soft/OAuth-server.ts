@@ -141,7 +141,7 @@ export const handler = async function refreshTokenHandler(oidc, dPoP) {
 	if (refreshToken.payload.consumed) {
 		await Promise.all([
 			refreshToken.destroy(),
-			revoke({ oidc }, refreshToken.payload.grantId)
+			revoke(oidc, refreshToken.payload.grantId)
 		]);
 		throw new InvalidGrant('refresh token already used');
 	}
@@ -289,7 +289,7 @@ export const handler = async function refreshTokenHandler(oidc, dPoP) {
 		token.set('nonce', refreshToken.payload.nonce);
 		token.set('sid', refreshToken.payload.sid);
 
-		idToken = await token.issue({ use: 'idtoken' });
+		idToken = await token.issue('idtoken');
 	}
 
 	return {

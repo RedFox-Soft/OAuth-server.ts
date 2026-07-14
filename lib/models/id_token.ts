@@ -32,6 +32,9 @@ const messages = {
 	}
 };
 
+export type IdTokenUse =
+	'idtoken' | 'logout' | 'userinfo' | 'introspection' | 'authorization';
+
 export class IdToken {
 	client: Client;
 	available: Record<string, unknown>;
@@ -59,7 +62,7 @@ export class IdToken {
 		return merge({}, await mask.result(), this.extra);
 	}
 
-	async issue({ use, expiresAt = null } = {}) {
+	async issue(use: IdTokenUse, { expiresAt }: { expiresAt?: number } = {}) {
 		const { client } = this;
 		const expiresIn = expiresAt ? expiresAt - epochTime() : undefined;
 		let alg;
@@ -134,8 +137,6 @@ export class IdToken {
 					enc: client.authorizationEncryptedResponseEnc
 				};
 				break;
-			default:
-				throw new TypeError('invalid use option');
 		}
 
 		const signed = await (async () => {
@@ -223,7 +224,7 @@ export class IdToken {
 		});
 	}
 
-	static async validate(jwt, client: Client) {
+	static async validate(jwt: string, client: Client) {
 		const alg = client.idTokenSignedResponseAlg;
 
 		let keyOrStore;

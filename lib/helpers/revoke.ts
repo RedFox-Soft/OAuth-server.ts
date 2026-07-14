@@ -4,11 +4,13 @@ import { AuthorizationCode } from 'lib/models/authorization_code.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { BackchannelAuthenticationRequest } from 'lib/models/backchannel_authentication_request.js';
 import { provider } from 'lib/provider.js';
+import type { OIDCContext } from './oidc_context.ts';
 
-export default async function revoke(ctx, grantId) {
-	const {
-		oidc: { client }
-	} = ctx;
+export default async function revoke(
+	oidc: OIDCContext<Record<string, unknown>>,
+	grantId: string
+) {
+	const { client } = oidc;
 	const refreshToken = client?.grantTypeAllowed('refresh_token');
 	const authorizationCode = client?.grantTypeAllowed('authorization_code');
 	const deviceCode = client?.grantTypeAllowed(
@@ -18,16 +20,16 @@ export default async function revoke(ctx, grantId) {
 		'urn:openid:params:grant-type:ciba'
 	);
 
-	await Promise.all(
-		[
-			AccessToken,
-			refreshToken ? RefreshToken : undefined,
-			authorizationCode ? AuthorizationCode : undefined,
-			deviceCode ? DeviceCode : undefined,
-			backchannelAuthenticationRequest
-				? BackchannelAuthenticationRequest
-				: undefined
-		].map((model) => model?.revokeByGrantId(grantId))
-	);
+	const models = [
+		AccessToken,
+		refreshToken ? RefreshToken : undefined,
+		authorizationCode ? AuthorizationCode : undefined,
+		deviceCode ? DeviceCode : undefined,
+		backchannelAuthenticationRequest
+			? BackchannelAuthenticationRequest
+			: undefined
+	];
+
+	await Promise.all(models.map((model) => model?.revokeByGrantId(grantId)));
 	provider.emit('grant.revoked', grantId);
 }

@@ -67,7 +67,7 @@ export const handler = async function deviceCodeHandler(oidc, dPoP) {
 	}
 
 	if (code.payload.consumed) {
-		await revoke({ oidc }, code.payload.grantId);
+		await revoke(oidc, code.payload.grantId);
 		throw new InvalidGrant('device code already consumed');
 	}
 
@@ -227,7 +227,7 @@ export const handler = async function deviceCodeHandler(oidc, dPoP) {
 		token.set('nonce', code.payload.nonce);
 		token.set('sid', code.payload.sid);
 
-		idToken = await token.issue({ use: 'idtoken' });
+		idToken = await token.issue('idtoken');
 	}
 
 	return {

@@ -172,7 +172,7 @@ export const introspect = new Elysia().use(AuthPlugin).post(
 					aud: body.aud
 				};
 
-				const jwt = await token.issue({ use: 'introspection' });
+				const jwt = await token.issue('introspection');
 				return new Response(jwt, {
 					headers: {
 						'Content-Type': 'application/token-introspection+jwt; charset=utf-8'

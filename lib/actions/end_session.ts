@@ -213,7 +213,7 @@ export const logoutConfirmAction = new Elysia()
 									grantId &&
 									!session.authorizationFor(clientId).persistsLogout
 								) {
-									await revoke({ oidc }, grantId);
+									await revoke(oidc, grantId);
 								}
 							}
 						)
@@ -228,7 +228,7 @@ export const logoutConfirmAction = new Elysia()
 					grantId &&
 					!session.authorizationFor(state.clientId).persistsLogout
 				) {
-					await revoke({ oidc }, grantId);
+					await revoke(oidc, grantId);
 					provider.emit('grant.revoked', { oidc }, grantId);
 				}
 				session.payload.state = undefined;

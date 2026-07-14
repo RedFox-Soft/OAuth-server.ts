@@ -552,7 +552,7 @@ expire.setDate(expire.getDate() + 1);
 					});
 
 					idToken.scope = 'openid';
-					const hint = await idToken.issue({ use: 'idtoken' });
+					const hint = await idToken.issue('idtoken');
 
 					const auth = new AuthorizationRequest({
 						scope: 'openid',
@@ -584,7 +584,7 @@ expire.setDate(expire.getDate() + 1);
 					});
 
 					idToken.scope = 'openid';
-					const hint = await idToken.issue({ use: 'idtoken' });
+					const hint = await idToken.issue('idtoken');
 
 					const auth = new AuthorizationRequest({
 						client_id: 'client-pairwise',
@@ -617,7 +617,7 @@ expire.setDate(expire.getDate() + 1);
 					});
 
 					idToken.scope = 'openid';
-					const hint = await idToken.issue({ use: 'idtoken' });
+					const hint = await idToken.issue('idtoken');
 
 					const auth = new AuthorizationRequest({
 						client_id: 'client-pairwise',
@@ -643,7 +643,7 @@ expire.setDate(expire.getDate() + 1);
 					const idToken = new IdToken(client, { sub: session.accountId });
 
 					idToken.scope = 'openid';
-					const hint = await idToken.issue({ use: 'idtoken' });
+					const hint = await idToken.issue('idtoken');
 
 					const auth = new AuthorizationRequest({
 						scope: 'openid',
@@ -665,7 +665,7 @@ expire.setDate(expire.getDate() + 1);
 					const idToken = new IdToken(client, { sub: session.accountId });
 
 					idToken.scope = 'openid';
-					const hint = await idToken.issue({ use: 'idtoken' });
+					const hint = await idToken.issue('idtoken');
 
 					const auth = new AuthorizationRequest({
 						client_id: 'client-pairwise',

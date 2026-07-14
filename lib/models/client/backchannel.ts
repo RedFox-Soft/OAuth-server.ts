@@ -61,7 +61,7 @@ export async function backchannelLogout(client, sub, sid) {
 			'content-type': 'application/x-www-form-urlencoded'
 		},
 		body: new URLSearchParams({
-			logout_token: await logoutToken.issue({ use: 'logout' })
+			logout_token: await logoutToken.issue('logout')
 		})
 	}).then((response) => {
 		const { status } = response;

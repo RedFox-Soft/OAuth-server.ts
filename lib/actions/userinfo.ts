@@ -126,9 +126,8 @@ async function userInfo({ headers, set }) {
 		token.mask = claims;
 		token.rejected = rejected;
 
-		const body = await token.issue({
-			expiresAt: accessToken.payload.exp,
-			use: 'userinfo'
+		const body = await token.issue('userinfo', {
+			expiresAt: accessToken.payload.exp
 		});
 		return new Response(body, {
 			headers: {

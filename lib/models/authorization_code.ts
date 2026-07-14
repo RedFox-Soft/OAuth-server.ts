@@ -24,9 +24,8 @@ export type AuthorizationCodePayloadType = Static<
 	typeof AuthorizationCodePayload
 >;
 
-export class AuthorizationCode extends consumable<AuthorizationCodePayloadType>(
-	BaseToken<AuthorizationCodePayloadType>
-) {
+export class AuthorizationCode extends consumable(BaseToken) {
+	declare payload: Omit<AuthorizationCodePayloadType, 'kind'> & { kind: string };
 	model = AuthorizationCodePayload;
 	static isSessionBound = true;
 }

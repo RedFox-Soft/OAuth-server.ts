@@ -68,7 +68,7 @@ export const handler = async function cibaHandler(oidc, dPoP) {
 	}
 
 	if (request.payload.consumed) {
-		await revoke({ oidc }, request.payload.grantId);
+		await revoke(oidc, request.payload.grantId);
 		throw new InvalidGrant(
 			'backchannel authentication request already consumed'
 		);
@@ -234,7 +234,7 @@ export const handler = async function cibaHandler(oidc, dPoP) {
 		token.set('nonce', request.payload.nonce);
 		token.set('sid', request.payload.sid);
 
-		idToken = await token.issue({ use: 'idtoken' });
+		idToken = await token.issue('idtoken');
 	}
 
 	return {

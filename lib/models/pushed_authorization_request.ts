@@ -16,10 +16,17 @@ export type PushedAuthorizationRequestPayloadType = Static<
 	typeof PushedAuthorizationRequestPayload
 >;
 
-export class PushedAuthorizationRequest extends consumable<PushedAuthorizationRequestPayloadType>(
-	BaseModel
-) {
+export class PushedAuthorizationRequest extends consumable(BaseModel) {
+	declare payload: PushedAuthorizationRequestPayloadType & { kind: string };
 	model = PushedAuthorizationRequestPayload;
+
+	constructor(
+		payload: Omit<PushedAuthorizationRequestPayloadType, 'consumed'> & {
+			consumed?: boolean;
+		}
+	) {
+		super(payload);
+	}
 
 	generateTokenId() {
 		return nanoid();
