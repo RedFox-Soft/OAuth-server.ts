@@ -1,72 +1,64 @@
-import { expect } from 'bun:test';
+import { describe, it, beforeAll, expect } from 'bun:test';
 
-import bootstrap from '../test_helper.js';
+import bootstrap, { agent } from '../test_helper.js';
+
+const json = { 'content-type': 'application/json' };
+const bearer = (token) => ({ authorization: `Bearer ${token}` });
+
+// The client_id here is a full URI (the config's idFactory returns one), so it is percent-encoded
+// into the /reg/:clientId path segment. registration_client_uri must therefore carry the encoded
+// client_id in its path and no query string.
+function expectUri(registration_client_uri, client_id) {
+	const parsed = new URL(registration_client_uri);
+	expect(parsed.search).toHaveLength(0);
+	const i = parsed.pathname.indexOf('/reg/');
+	expect(parsed.pathname.slice(i + 5)).toBe(encodeURIComponent(client_id));
+}
 
 describe('registration management with client_id as URI', () => {
-	before(() => bootstrap(import.meta.url));
+	beforeAll(async () => {
+		await bootstrap(import.meta.url);
+	});
 
-	it('returns client_id as a URI string', async function () {
-		let client_id;
-		let registration_client_uri;
-		let registration_access_token;
+	it('returns client_id as a URI string', async () => {
+		let res = await agent.reg.post(
+			{ redirect_uris: ['https://client.example.com/cb'] },
+			{ headers: json }
+		);
+		expect(res.status).toBe(201);
+		if (!res.data) throw new Error('expected response data');
 
-		await this.agent
-			.post('/reg')
-			.send({
-				redirect_uris: ['https://client.example.com/cb']
-			})
-			.expect(201)
-			.expect((response) => {
-				({ client_id, registration_access_token, registration_client_uri } =
-					response.body);
+		const { client_id } = res.data;
+		let { registration_access_token, registration_client_uri } = res.data;
+		expectUri(registration_client_uri, client_id);
 
-				const parsed = new URL(registration_client_uri);
-				expect(parsed.search).toHaveLength(0);
-				const i = parsed.pathname.indexOf('/reg/');
-				expect(parsed.pathname.slice(i + 5)).toBe(
-					encodeURIComponent(client_id)
-				);
-			});
+		// eden treaty does not encode dynamic path segments, and the client_id is a URI, so the
+		// value handed to the path param must itself be percent-encoded (Elysia decodes it back).
+		const clientId = encodeURIComponent(client_id);
 
-		await this.agent
-			.get(new URL(registration_client_uri).pathname)
-			.auth(registration_access_token, { type: 'bearer' })
-			.expect(200)
-			.expect((response) => {
-				({ registration_access_token, registration_client_uri } =
-					response.body);
+		res = await agent
+			.reg({ clientId })
+			.get({ headers: bearer(registration_access_token) });
+		expect(res.status).toBe(200);
+		if (!res.data) throw new Error('expected response data');
+		({ registration_access_token, registration_client_uri } = res.data);
+		expectUri(registration_client_uri, client_id);
 
-				const parsed = new URL(registration_client_uri);
-				expect(parsed.search).toHaveLength(0);
-				const i = parsed.pathname.indexOf('/reg/');
-				expect(parsed.pathname.slice(i + 5)).toBe(
-					encodeURIComponent(client_id)
-				);
-			});
-
-		await this.agent
-			.put(new URL(registration_client_uri).pathname)
-			.auth(registration_access_token, { type: 'bearer' })
-			.send({
+		res = await agent.reg({ clientId }).put(
+			{
 				client_id,
 				redirect_uris: ['https://client.example.com/cb2']
-			})
-			.expect(200)
-			.expect((response) => {
-				({ registration_access_token, registration_client_uri } =
-					response.body);
+			},
+			{ headers: { ...json, ...bearer(registration_access_token) } }
+		);
+		expect(res.status).toBe(200);
+		if (!res.data) throw new Error('expected response data');
+		({ registration_access_token, registration_client_uri } = res.data);
+		expectUri(registration_client_uri, client_id);
 
-				const parsed = new URL(registration_client_uri);
-				expect(parsed.search).toHaveLength(0);
-				const i = parsed.pathname.indexOf('/reg/');
-				expect(parsed.pathname.slice(i + 5)).toBe(
-					encodeURIComponent(client_id)
-				);
-			});
-
-		await this.agent
-			.delete(new URL(registration_client_uri).pathname)
-			.auth(registration_access_token, { type: 'bearer' })
-			.expect(204);
+		res = await agent
+			.reg({ clientId })
+			.delete(undefined, { headers: bearer(registration_access_token) });
+		expect(res.status).toBe(204);
 	});
 });

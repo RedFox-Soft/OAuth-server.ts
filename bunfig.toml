@@ -2,9 +2,7 @@
 preload = ["./test/preload.ts"]
 coverageSkipTestFiles = true
 pathIgnorePatterns = [
-	"test/client_id_uri/client_id_uri.spec.ts",
 	"test/cors/cors.spec.ts",
 	"test/cors/custom_cors.spec.ts",
-	"test/helpers/attention.spec.ts",
-	"test/registration_policies/registration_policies.spec.ts"
+	"test/helpers/attention.spec.ts"
 ]

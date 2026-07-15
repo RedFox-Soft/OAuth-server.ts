@@ -9,7 +9,7 @@ import { RegistrationAccessToken } from 'lib/models/registration_access_token.js
 import Configuration from 'lib/helpers/configuration.js';
 
 const json = { 'content-type': 'application/json' };
-const bearer = (token) => ({ authorization: `Bearer ${token}` });
+const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
 
 const NOGO = [
 	'registration_access_token',
@@ -34,6 +34,7 @@ async function register(metadata = {}) {
 		{ headers: json }
 	);
 	expect(status).toBe(201);
+	if (!data) throw new Error('expected response data');
 	return data;
 }
 

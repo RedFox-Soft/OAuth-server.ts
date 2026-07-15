@@ -71,7 +71,7 @@ export class OIDCContext<T extends Record<string, unknown>> {
 
 		if (name === 'client') {
 			return new URL(
-				`${routeNames.registration}/${opt.clientId}`,
+				`${routeNames.registration}/${encodeURIComponent(opt.clientId)}`,
 				ISSUER
 			).toString();
 		}
