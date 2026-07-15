@@ -1,21 +1,22 @@
 import * as url from 'node:url';
 import { describe, it, beforeAll, expect, mock } from 'bun:test';
 
-import bootstrap, { agent } from '../test_helper.js';
+import bootstrap, { agent, type Setup } from '../test_helper.js';
 import { decode } from '../../lib/helpers/jwt.ts';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { provider } from 'lib/provider.js';
 
 describe('configuration features.jwtResponseModes', () => {
-	let setup = null;
+	let setup: Setup;
 	beforeAll(async function () {
-		setup = await bootstrap(import.meta.url)();
+		setup = await bootstrap(import.meta.url);
 	});
 
 	describe('discovery', () => {
 		it('extends the well known config', async function () {
 			const { data } = await agent['.well-known']['openid-configuration'].get();
+			if (!data) throw new Error('expected response data');
 
 			expect(data).toHaveProperty('authorization_signing_alg_values_supported');
 			expect(data).toHaveProperty(

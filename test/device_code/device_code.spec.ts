@@ -6,7 +6,7 @@ import { ApplicationConfig } from 'lib/configs/application.js';
 
 describe('configuration features.deviceFlow', () => {
 	beforeAll(async () => {
-		await bootstrap(import.meta.url)();
+		await bootstrap(import.meta.url);
 	});
 
 	it('extends discovery', async () => {

@@ -4,7 +4,7 @@ import bootstrap, { agent } from '../test_helper.js';
 
 describe('configuration features.encryption', () => {
 	beforeAll(async () => {
-		await bootstrap(import.meta.url)();
+		await bootstrap(import.meta.url);
 	});
 
 	it('extends discovery', async () => {

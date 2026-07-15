@@ -31,7 +31,7 @@ function decode(b64urljson) {
 
 describe('jwt format', () => {
 	beforeAll(async () => {
-		await bootstrap(import.meta.url)();
+		await bootstrap(import.meta.url);
 	});
 
 	afterEach(function () {

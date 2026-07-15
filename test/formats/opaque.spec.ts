@@ -29,7 +29,7 @@ describe('opaque storage', () => {
 	// registration.ts reads), so the throwaway ['foo'] policy below must be a configured one.
 	const originalPolicies = ApplicationConfig['registration.policies'];
 	beforeAll(async () => {
-		await bootstrap(import.meta.url)();
+		await bootstrap(import.meta.url);
 		ApplicationConfig['registration.policies'] = { foo() {} };
 	});
 	afterAll(() => {

@@ -13,7 +13,8 @@ import {
 import bootstrap, {
 	agent,
 	jsonToFormUrlEncoded,
-	passInteractionChecks
+	passInteractionChecks,
+	type Setup
 } from '../test_helper.js';
 import { provider } from 'lib/provider.js';
 import { DeviceCode } from 'lib/models/device_code.js';
@@ -24,7 +25,7 @@ const form = 'application/x-www-form-urlencoded';
 
 describe('GET code_verification endpoint', () => {
 	beforeAll(async () => {
-		await bootstrap(import.meta.url)();
+		await bootstrap(import.meta.url);
 	});
 
 	describe('when accessed without user_code in query (verification_uri)', () => {
@@ -64,11 +65,11 @@ describe('GET code_verification endpoint', () => {
 });
 
 describe('POST code_verification endpoint w/o verification', () => {
-	let setup = null;
+	let setup: Setup;
 	const xsrf = 'foo';
 
 	beforeAll(async () => {
-		setup = await bootstrap(import.meta.url)();
+		setup = await bootstrap(import.meta.url);
 		await setup.login();
 	});
 
@@ -176,6 +177,7 @@ describe('POST code_verification endpoint w/o verification', () => {
 			xsrf,
 			user_code: 'FOO-NOT-FOUND-CLIENT'
 		});
+		if (!error) throw new Error('expected error response');
 		expect(error.status).toBe(400);
 		expect(error.value).toContain('id="op.deviceInputForm"');
 		expect(error.value).toContain(
@@ -191,6 +193,7 @@ describe('POST code_verification endpoint w/o verification', () => {
 
 		delete setup.getSession().state;
 		const { error } = await post({ xsrf, user_code: 'FOO-CSRF-1' });
+		if (!error) throw new Error('expected error response');
 		expect(error.status).toBe(400);
 		expect(error.value).toContain('id="op.deviceInputForm"');
 		expect(error.value).toContain(
@@ -208,6 +211,7 @@ describe('POST code_verification endpoint w/o verification', () => {
 			xsrf: 'invalid-csrf',
 			user_code: 'FOO-CSRF-FOO'
 		});
+		if (!error) throw new Error('expected error response');
 		expect(error.status).toBe(400);
 		expect(error.value).toContain('id="op.deviceInputForm"');
 		expect(error.value).toContain(
@@ -218,11 +222,11 @@ describe('POST code_verification endpoint w/o verification', () => {
 });
 
 describe('POST code_verification endpoint w/ verification', () => {
-	let setup = null;
+	let setup: Setup;
 	const xsrf = 'foo';
 
 	beforeAll(async () => {
-		setup = await bootstrap(import.meta.url)();
+		setup = await bootstrap(import.meta.url);
 		await setup.login({
 			scope: 'openid email',
 			rejectedClaims: ['email_verified']

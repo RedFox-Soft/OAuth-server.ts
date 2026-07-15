@@ -17,7 +17,7 @@ describe('grant_type=client_credentials w/ resourceIndicators', () => {
 	beforeAll(async function () {
 		await bootstrap(import.meta.url, {
 			config: 'client_credentials'
-		})();
+		});
 	});
 	afterEach(function () {
 		mock.restore();
@@ -51,6 +51,7 @@ describe('grant_type=client_credentials w/ resourceIndicators', () => {
 			'token_type',
 			'scope'
 		]);
+		if (!res.data) throw new Error('expected response data');
 		expect(res.data.scope).toBe('api:read');
 	});
 
@@ -82,6 +83,7 @@ describe('grant_type=client_credentials w/ resourceIndicators', () => {
 			'token_type',
 			'scope'
 		]);
+		if (!res.data) throw new Error('expected response data');
 		expect(res.data.scope).toBe('api:read');
 	});
 
@@ -103,6 +105,7 @@ describe('grant_type=client_credentials w/ resourceIndicators', () => {
 			'token_type',
 			'scope'
 		]);
+		if (!res.data) throw new Error('expected response data');
 		expect(res.data.scope).toBe('api:read');
 	});
 
@@ -117,6 +120,7 @@ describe('grant_type=client_credentials w/ resourceIndicators', () => {
 				headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 			}
 		);
+		if (!error) throw new Error('expected error response');
 		expect(error.status).toBe(400);
 		expect(error?.value).toEqual({
 			error: 'invalid_target',
@@ -135,6 +139,7 @@ describe('grant_type=client_credentials w/ resourceIndicators', () => {
 				headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 			}
 		);
+		if (!error) throw new Error('expected error response');
 		expect(error.status).toBe(422);
 		expect(error?.value).toEqual({
 			error: 'invalid_request',
@@ -154,6 +159,7 @@ describe('grant_type=client_credentials w/ resourceIndicators', () => {
 				headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 			}
 		);
+		if (!error) throw new Error('expected error response');
 		expect(error.status).toBe(422);
 		expect(error?.value).toEqual({
 			error: 'invalid_request',
@@ -176,6 +182,7 @@ describe('grant_type=client_credentials w/ resourceIndicators', () => {
 				headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 			}
 		);
+		if (!error) throw new Error('expected error response');
 		expect(error.status).toBe(400);
 		expect(error?.value).toEqual({
 			error: 'invalid_target',

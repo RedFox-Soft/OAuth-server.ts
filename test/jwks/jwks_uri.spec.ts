@@ -75,7 +75,7 @@ const noEncKeys = [
 describe('/jwks', () => {
 	describe('with encryption enabled', () => {
 		beforeAll(async () => {
-			await bootstrap(import.meta.url, { config: 'jwks-enc' })();
+			await bootstrap(import.meta.url, { config: 'jwks-enc' });
 		});
 
 		describe('when populated with signing keys', () => {
@@ -90,7 +90,7 @@ describe('/jwks', () => {
 
 	describe('with encryption disabled', () => {
 		beforeAll(async () => {
-			await bootstrap(import.meta.url, { config: 'jwks-noenc' })();
+			await bootstrap(import.meta.url, { config: 'jwks-noenc' });
 		});
 
 		describe('when populated with signing keys', () => {

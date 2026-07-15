@@ -14,7 +14,7 @@ import {
 
 import base64url from 'base64url';
 
-import bootstrap, { agent } from '../test_helper.js';
+import bootstrap, { agent, type Setup } from '../test_helper.js';
 import { provider } from 'lib/provider.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
@@ -26,9 +26,9 @@ function errorDetail(spy) {
 }
 
 describe('grant_type=refresh_token', () => {
-	let setup = null;
+	let setup: Setup;
 	beforeAll(async function () {
-		setup = await bootstrap(import.meta.url)();
+		setup = await bootstrap(import.meta.url);
 	});
 
 	beforeEach(() => {
@@ -65,6 +65,7 @@ describe('grant_type=refresh_token', () => {
 		} = parseUrl(auth.headers.get('location'), true);
 
 		const { data } = await authReq.getToken(code);
+		if (!data) throw new Error('expected response data');
 
 		expect(data).toHaveProperty('refresh_token');
 		const jti = setup.getTokenJti(data.refresh_token);
@@ -86,6 +87,7 @@ describe('grant_type=refresh_token', () => {
 				headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 			}
 		);
+		if (!data) throw new Error('expected response data');
 		expect(status).toBe(200);
 		expect(spy).toBeCalledTimes(1);
 		expect(data).toContainKeys([
@@ -152,6 +154,7 @@ describe('grant_type=refresh_token', () => {
 					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 				}
 			);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(spy).toBeCalledTimes(1);
 			expect(error.value).toEqual({
@@ -174,6 +177,7 @@ describe('grant_type=refresh_token', () => {
 					headers: AuthorizationRequest.basicAuthHeader('client2', 'secret')
 				}
 			);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(spy).toBeCalledTimes(1);
 			expect(errorDetail(spy)).toBe('client mismatch');
@@ -194,6 +198,7 @@ describe('grant_type=refresh_token', () => {
 					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 				}
 			);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(error.value).toEqual({
 				error: 'invalid_scope',
@@ -212,6 +217,7 @@ describe('grant_type=refresh_token', () => {
 					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 				}
 			);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(error.value).toEqual({
 				error: 'invalid_scope',
@@ -287,6 +293,7 @@ describe('grant_type=refresh_token', () => {
 					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 				}
 			);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(spy).toBeCalledTimes(1);
 			expect(errorDetail(spy)).toBe(
@@ -308,6 +315,7 @@ describe('grant_type=refresh_token', () => {
 				headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 			}
 		);
+		if (!error) throw new Error('expected error response');
 		expect(error.status).toBe(400);
 		expect(error.value).toEqual({
 			error: 'invalid_request',
@@ -329,6 +337,7 @@ describe('grant_type=refresh_token', () => {
 				headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 			}
 		);
+		if (!error) throw new Error('expected error response');
 		expect(error.status).toBe(400);
 		expect(spy).toBeCalledTimes(1);
 		expect(errorDetail(spy)).toBe('refresh token not found');
@@ -407,6 +416,7 @@ describe('grant_type=refresh_token', () => {
 					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 				}
 			);
+			if (!data) throw new Error('expected response data');
 			expect(status).toBe(200);
 			expect(consumeSpy).toBeCalledTimes(1);
 			expect(issueSpy).toBeCalled();
@@ -516,6 +526,7 @@ describe('grant_type=refresh_token', () => {
 					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 				}
 			);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(grantRevokeSpy).toBeCalledTimes(1);
 			expect(tokenDestroySpy).toBeCalledTimes(1);
@@ -588,6 +599,7 @@ describe('grant_type=refresh_token', () => {
 					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 				}
 			);
+			if (!data) throw new Error('expected response data');
 			expect(status).toBe(200);
 			expect(consumeSpy).toBeCalledTimes(1);
 			expect(issueSpy).toBeCalled();
@@ -695,6 +707,7 @@ describe('grant_type=refresh_token', () => {
 					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 				}
 			);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(grantRevokeSpy).toBeCalledTimes(1);
 			expect(tokenDestroySpy).toBeCalledTimes(1);
@@ -719,6 +732,7 @@ describe('grant_type=refresh_token', () => {
 					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 				}
 			);
+			if (!data) throw new Error('expected response data');
 			expect(status).toBe(200);
 			expect(data).toContainKeys([
 				'access_token',

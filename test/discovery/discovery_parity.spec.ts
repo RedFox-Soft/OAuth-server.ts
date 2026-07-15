@@ -16,7 +16,7 @@ function normalize(obj: Record<string, unknown>): Record<string, unknown> {
 
 describe('discovery parity', () => {
 	beforeAll(async () => {
-		await bootstrap(import.meta.url, { config: 'discovery_parity' })();
+		await bootstrap(import.meta.url, { config: 'discovery_parity' });
 	});
 
 	it('produces a document semantically identical to the pre-refactor baseline', async () => {

@@ -25,7 +25,7 @@ const ACAMaxAge = 'access-control-max-age';
 const ACAOrigin = 'access-control-allow-origin';
 
 describe('CORS setup', () => {
-	before(bootstrap(import.meta.url));
+	before(() => bootstrap(import.meta.url));
 
 	before(async function () {
 		provider.use(

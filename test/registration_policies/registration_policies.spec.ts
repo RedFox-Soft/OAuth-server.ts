@@ -11,7 +11,7 @@ import { RegistrationAccessToken } from 'lib/models/registration_access_token.js
 import { TestAdapter } from 'test/models.js';
 
 describe('client registration policies', () => {
-	before(bootstrap(import.meta.url));
+	before(() => bootstrap(import.meta.url));
 	beforeEach(() => mock.restore());
 
 	describe('configuration', () => {

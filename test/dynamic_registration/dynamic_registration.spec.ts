@@ -49,7 +49,7 @@ function reg(metadata = {}, headers = {}) {
 
 describe('registration features', () => {
 	beforeAll(async () => {
-		await bootstrap(import.meta.url)();
+		await bootstrap(import.meta.url);
 	});
 
 	afterEach(() => {
@@ -61,6 +61,7 @@ describe('registration features', () => {
 	describe('POST /reg', () => {
 		it('generates the id, secret that does not expire and reg access token and returns the defaulted values', async () => {
 			const { status, data } = await reg();
+			if (!data) throw new Error('expected response data');
 			expect(status).toBe(201);
 			expect(data).toHaveProperty('client_id');
 			expect(data).toHaveProperty('client_secret');
@@ -167,6 +168,7 @@ describe('registration features', () => {
 				client_secret: 'foo',
 				client_secret_expires_at: 123
 			});
+			if (!data) throw new Error('expected response data');
 			expect(data).not.toHaveProperty('client_secret');
 			expect(data).not.toHaveProperty('client_secret_expires_at');
 
@@ -366,6 +368,7 @@ describe('registration features', () => {
 		let token;
 		beforeAll(async () => {
 			const { data } = await reg();
+			if (!data) throw new Error('expected response data');
 			clientId = data.client_id;
 			token = data.registration_access_token;
 		});
@@ -385,6 +388,7 @@ describe('registration features', () => {
 				'client_secret_basic'
 			);
 			expect(res.data).toHaveProperty('require_auth_time', false);
+			if (!res.data) throw new Error('expected response data');
 			expect(res.data.grant_types).toEqual(['authorization_code']);
 			expect(res.data.response_types).toEqual(['code']);
 			expect(res.data).toHaveProperty(

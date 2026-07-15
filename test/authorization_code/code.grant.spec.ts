@@ -15,16 +15,16 @@ import {
 import { provider } from 'lib/provider.js';
 import { Client } from 'lib/models/client.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
-import bootstrap, { agent } from '../test_helper.js';
+import bootstrap, { agent, type Setup } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { TestAdapter } from 'test/models.js';
 import { ttl } from 'lib/configs/liveTime.js';
 
 describe('grant_type=authorization_code', () => {
-	let setup = null;
+	let setup: Setup;
 	beforeAll(async function () {
-		setup = await bootstrap(import.meta.url)();
+		setup = await bootstrap(import.meta.url);
 	});
 
 	afterEach(() => {
@@ -579,6 +579,7 @@ describe('grant_type=authorization_code', () => {
 					headers: auth.basicAuthHeader
 				}
 			);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(422);
 			expect(error.value).toHaveProperty('error', 'invalid_request');
 			expect(error.value).toHaveProperty(
@@ -602,6 +603,7 @@ describe('grant_type=authorization_code', () => {
 					headers: auth.basicAuthHeader
 				}
 			);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(error.value).toHaveProperty('error', 'invalid_request');
 			expect(error.value).toHaveProperty(
@@ -625,6 +627,7 @@ describe('grant_type=authorization_code', () => {
 					headers: auth.basicAuthHeader
 				}
 			);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(error.value).toHaveProperty('error', 'invalid_request');
 			expect(error.value).toHaveProperty(
@@ -652,6 +655,7 @@ describe('grant_type=authorization_code', () => {
 					headers: auth.basicAuthHeader
 				}
 			);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(spy).toBeCalledTimes(1);
 			expect(spy).toBeCalledWith(
@@ -682,6 +686,7 @@ describe('grant_type=authorization_code', () => {
 				headers: auth.basicAuthHeader
 			}
 		);
+		if (!error) throw new Error('expected error response');
 		expect(error.status).toBe(500);
 		expect(spy).toBeCalledTimes(1);
 		expect(error.value).toHaveProperty('error', 'server_error');

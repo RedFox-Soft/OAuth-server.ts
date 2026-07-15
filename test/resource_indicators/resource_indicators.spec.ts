@@ -1,7 +1,11 @@
 import { describe, it, beforeAll, afterEach, expect, mock } from 'bun:test';
 import { strict as assert } from 'node:assert';
 
-import bootstrap, { agent, jsonToFormUrlEncoded } from '../test_helper.js';
+import bootstrap, {
+	agent,
+	jsonToFormUrlEncoded,
+	type Setup
+} from '../test_helper.js';
 import { defaults } from '../../lib/helpers/defaults.ts';
 import { provider } from 'lib/provider.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
@@ -37,11 +41,11 @@ describe('features.resourceIndicators defaults', () => {
 });
 
 describe('features.resourceIndicators', () => {
-	let setup = null;
+	let setup: Setup;
 	let cookie = null;
 
 	beforeAll(async () => {
-		setup = await bootstrap(import.meta.url)();
+		setup = await bootstrap(import.meta.url);
 	});
 	afterEach(() => {
 		provider.removeAllListeners();
@@ -65,6 +69,7 @@ describe('features.resourceIndicators', () => {
 				scope: 'api:read',
 				resource: 'wl-not-a-uri'
 			});
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(422);
 			expect(error.value).toEqual({
 				error: 'invalid_request',
@@ -79,6 +84,7 @@ describe('features.resourceIndicators', () => {
 				scope: 'api:read',
 				resource: 'urn:wl:foo/bar#'
 			});
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(error.value).toEqual({
 				error: 'invalid_target',
@@ -380,6 +386,7 @@ describe('features.resourceIndicators', () => {
 				}),
 				{ headers: { 'content-type': form } }
 			);
+			if (!denied.error) throw new Error('expected error response');
 			expect(denied.error.status).toBe(400);
 			expect(denied.error.value).toEqual({
 				error: 'invalid_target',
@@ -670,6 +677,7 @@ describe('features.resourceIndicators', () => {
 				}),
 				{ headers: { 'content-type': form } }
 			);
+			if (!denied.error) throw new Error('expected error response');
 			expect(denied.error.status).toBe(400);
 			expect(denied.error.value).toEqual({
 				error: 'invalid_target',
@@ -881,6 +889,7 @@ describe('features.resourceIndicators', () => {
 			const { error } = await agent.userinfo.get({
 				headers: { authorization: `Bearer ${bearer}` }
 			});
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(401);
 			expect(error.value).toEqual({
 				error: 'invalid_token',

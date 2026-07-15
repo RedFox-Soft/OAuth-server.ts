@@ -8,7 +8,7 @@ const endpoint = () => agent['.well-known']['openid-configuration'].get();
 
 describe('discovery featuresKeyMap coverage', () => {
 	beforeAll(async () => {
-		await bootstrap(import.meta.url, { config: 'all_features' })();
+		await bootstrap(import.meta.url, { config: 'all_features' });
 	});
 
 	it('governs every feature-gated key through the map (no hidden handler branch)', async () => {

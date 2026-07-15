@@ -11,7 +11,7 @@ import {
 } from 'bun:test';
 import { parse as parseUrl } from 'node:url';
 
-import bootstrap, { agent } from '../test_helper.js';
+import bootstrap, { agent, type Setup } from '../test_helper.js';
 import * as JWT from '../../lib/helpers/jwt.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { provider } from 'lib/provider.js';
@@ -45,13 +45,14 @@ async function getIdToken(options = {}, cookie = '') {
 	} = parseUrl(response.headers.get('location'), true);
 
 	const { data } = await auth.getToken(code);
+	if (!data) throw new Error('expected response data');
 	return data.id_token;
 }
 
 describe('logout endpoint', () => {
-	let setup;
+	let setup: Setup;
 	beforeAll(async () => {
-		setup = await bootstrap(import.meta.url)();
+		setup = await bootstrap(import.meta.url);
 	});
 	afterEach(function () {
 		mock.restore();
@@ -473,6 +474,7 @@ describe('logout endpoint', () => {
 						}
 					}
 				);
+				if (!error) throw new Error('expected error response');
 				expect(error.status).toBe(422);
 				expect(error.value).toContain('Property &#x27;xsrf&#x27; is missing');
 			});

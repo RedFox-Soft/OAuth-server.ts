@@ -10,7 +10,11 @@ import {
 	generateKeyPair
 } from 'jose';
 
-import bootstrap, { agent, jsonToFormUrlEncoded } from '../test_helper.js';
+import bootstrap, {
+	agent,
+	jsonToFormUrlEncoded,
+	type Setup
+} from '../test_helper.js';
 import * as JWT from '../../lib/helpers/jwt.ts';
 
 import { keypair } from './encryption.config.js';
@@ -23,10 +27,10 @@ const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
 describe('encryption', () => {
-	let setup = null;
+	let setup: Setup;
 	let cookie;
 	beforeAll(async () => {
-		setup = await bootstrap(import.meta.url)();
+		setup = await bootstrap(import.meta.url);
 		cookie = await setup.login();
 	});
 
@@ -129,6 +133,7 @@ describe('encryption', () => {
 					const { data, response } = await agent.userinfo.get({
 						headers: { authorization: `Bearer ${access_token}` }
 					});
+					if (!data) throw new Error('expected response data');
 
 					expect(response.status).toBe(200);
 					expect(response.headers.get('content-type')).toMatch(
@@ -166,6 +171,7 @@ describe('encryption', () => {
 						const { error } = await agent.userinfo.get({
 							headers: { authorization: `Bearer ${access_token}` }
 						});
+						if (!error) throw new Error('expected error response');
 						expect(error.status).toBe(400);
 						expect(error.value).toEqual({
 							error: 'invalid_client',
@@ -192,6 +198,7 @@ describe('encryption', () => {
 						const { error } = await agent.userinfo.get({
 							headers: { authorization: `Bearer ${access_token}` }
 						});
+						if (!error) throw new Error('expected error response');
 						expect(error.status).toBe(400);
 						expect(error.value).toEqual({
 							error: 'invalid_client',
@@ -316,6 +323,7 @@ describe('encryption', () => {
 							}
 						}
 					);
+					if (!par) throw new Error('expected response data');
 
 					const { response } = await rawAuthRequest({
 						request_uri: par.request_uri,
@@ -331,9 +339,7 @@ describe('encryption', () => {
 				});
 
 				it('works with signed by other than none when an alg is required', async () => {
-					const client = await Client.find(
-						'clientRequestObjectSigningAlg'
-					);
+					const client = await Client.find('clientRequestObjectSigningAlg');
 					const [hsSecret] = client.symmetricKeyStore.selectForSign({
 						alg: 'HS256'
 					});
@@ -378,6 +384,7 @@ describe('encryption', () => {
 							}
 						}
 					);
+					if (!par) throw new Error('expected response data');
 
 					const { response } = await rawAuthRequest({
 						request_uri: par.request_uri,

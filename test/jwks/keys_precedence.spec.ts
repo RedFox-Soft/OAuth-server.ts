@@ -20,6 +20,7 @@ describe('JWKS source precedence and env isolation', () => {
 		});
 
 		const { data, status } = await agent.jwks.get();
+		if (!data) throw new Error('expected response data');
 		expect(status).toBe(200);
 		expect(data.keys.map((k) => k.kid)).toEqual([ecKey.kid]);
 	});
@@ -31,6 +32,7 @@ describe('JWKS source precedence and env isolation', () => {
 		provider.init({ adapter: TestAdapter, clients: [] });
 
 		const { data, status } = await agent.jwks.get();
+		if (!data) throw new Error('expected response data');
 		expect(status).toBe(200);
 		const publishedKids = data.keys.map((k) => k.kid).sort();
 		expect(publishedKids).toEqual(testSigningKeys.map((k) => k.kid).sort());

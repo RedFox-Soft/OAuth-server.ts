@@ -1,11 +1,11 @@
 import { describe, it, beforeAll, expect } from 'bun:test';
-import bootstrap, { agent } from '../test_helper.js';
+import bootstrap, { agent, type Setup } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
 describe('OAuth 2.0 Authorization Server Issuer Identification', () => {
-	let setup;
+	let setup: Setup;
 	beforeAll(async function () {
-		setup = await bootstrap(import.meta.url)();
+		setup = await bootstrap(import.meta.url);
 	});
 
 	it('enriched discovery shows the url now', async function () {

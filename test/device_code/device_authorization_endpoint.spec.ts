@@ -25,7 +25,7 @@ function post(body, headers = {}) {
 
 describe('device_authorization_endpoint', () => {
 	beforeAll(async () => {
-		await bootstrap(import.meta.url)();
+		await bootstrap(import.meta.url);
 	});
 
 	afterEach(() => {
@@ -40,6 +40,7 @@ describe('device_authorization_endpoint', () => {
 			provider.once('device_authorization.error', spy);
 
 			const { error } = await post({ client_id: 'client-not-allowed' });
+			if (!error) throw new Error('expected error response');
 
 			expect(error.status).toBe(400);
 			expect(error.value).toEqual({
@@ -55,6 +56,7 @@ describe('device_authorization_endpoint', () => {
 			provider.once('device_authorization.error', spy);
 
 			const { error } = await post({ client_id: 'not-found-client' });
+			if (!error) throw new Error('expected error response');
 
 			expect(error.status).toBe(401);
 			expect(spy).toBeCalledTimes(1);
@@ -75,6 +77,7 @@ describe('device_authorization_endpoint', () => {
 					client_id: 'client',
 					[param]: 'some'
 				});
+				if (!error) throw new Error('expected error response');
 
 				expect(error.status).toBeGreaterThanOrEqual(400);
 				expect(error.status).toBeLessThan(500);
@@ -91,6 +94,7 @@ describe('device_authorization_endpoint', () => {
 			scope: 'openid',
 			claims: JSON.stringify({ userinfo: { email: null } })
 		});
+		if (!data) throw new Error('expected response data');
 
 		expect(status).toBe(200);
 		expect(spy).toBeCalledTimes(1);

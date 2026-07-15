@@ -1,6 +1,13 @@
-import { describe, it, beforeAll, afterEach, expect, setSystemTime } from 'bun:test';
+import {
+	describe,
+	it,
+	beforeAll,
+	afterEach,
+	expect,
+	setSystemTime
+} from 'bun:test';
 
-import bootstrap, { agent } from '../test_helper.js';
+import bootstrap, { agent, type Setup } from '../test_helper.js';
 import * as JWT from '../../lib/helpers/jwt.ts';
 import { provider } from 'lib/provider.js';
 import { ISSUER } from 'lib/configs/env.js';
@@ -10,9 +17,9 @@ import { ApplicationConfig } from 'lib/configs/application.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
 describe('jwtIntrospection features', () => {
-	let setup = null;
+	let setup: Setup;
 	beforeAll(async () => {
-		setup = await bootstrap(import.meta.url)();
+		setup = await bootstrap(import.meta.url);
 	});
 
 	afterEach(() => setSystemTime());
@@ -66,6 +73,7 @@ describe('jwtIntrospection features', () => {
 				'application/json'
 			);
 			const json = jsonRes.data;
+			if (!json) throw new Error('expected response data');
 			const iat = json.iat;
 
 			setSystemTime(now + 10 * 1000);
@@ -140,6 +148,7 @@ describe('jwtIntrospection features', () => {
 			expect(res.response.headers.get('content-type')).toContain(
 				'application/json'
 			);
+			if (!res.error) throw new Error('expected error response');
 			expect(res.error.value).toEqual({
 				error: 'invalid_client',
 				error_description:
@@ -164,6 +173,7 @@ describe('jwtIntrospection features', () => {
 			expect(failRes.response.headers.get('content-type')).toContain(
 				'application/json'
 			);
+			if (!failRes.error) throw new Error('expected error response');
 			expect(failRes.error.value).toEqual({
 				error: 'invalid_request',
 				error_description:

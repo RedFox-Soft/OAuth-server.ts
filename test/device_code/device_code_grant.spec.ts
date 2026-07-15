@@ -9,7 +9,7 @@ import {
 } from 'bun:test';
 import base64url from 'base64url';
 
-import bootstrap, { agent } from '../test_helper.js';
+import bootstrap, { agent, type Setup } from '../test_helper.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
 import { provider } from 'lib/provider.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
@@ -38,11 +38,11 @@ function gtyOf(entity: BaseToken) {
 }
 
 describe('grant_type=urn:ietf:params:oauth:grant-type:device_code w/ conformIdTokenClaims=false', () => {
-	let setup = null;
+	let setup: Setup;
 	beforeAll(async () => {
 		setup = await bootstrap(import.meta.url, {
 			config: 'device_code_non_conform'
-		})();
+		});
 		await setup.login({
 			scope: 'openid profile offline_access',
 			accountId: 'sub'
@@ -71,6 +71,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code w/ conformIdTo
 			device_code: code,
 			grant_type
 		});
+		if (!data) throw new Error('expected response data');
 
 		expect(status).toBe(200);
 		expect(spy).toBeCalledTimes(1);
@@ -89,9 +90,9 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code w/ conformIdTo
 });
 
 describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
-	let setup = null;
+	let setup: Setup;
 	beforeAll(async () => {
-		setup = await bootstrap(import.meta.url)();
+		setup = await bootstrap(import.meta.url);
 		await setup.login({
 			scope: 'openid profile offline_access',
 			accountId: 'sub'
@@ -120,6 +121,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 			device_code: code,
 			grant_type
 		});
+		if (!data) throw new Error('expected response data');
 
 		expect(status).toBe(200);
 		expect(spy).toBeCalledTimes(1);
@@ -152,6 +154,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 			device_code: code,
 			grant_type
 		});
+		if (!data) throw new Error('expected response data');
 
 		expect(data.refresh_token).toBeUndefined();
 		const entities = entityMap(spy);
@@ -197,6 +200,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 				client_id: 'client',
 				grant_type
 			});
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(error.value).toEqual({
 				error: 'invalid_request',
@@ -213,6 +217,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 				device_code:
 					'eyJraW5kIjoiQXV0aG9yaXphdGlvbkNvZGUiLCJqdGkiOiIxNTU0M2RiYS0zYThmLTRiZWEtYmRjNi04NDQ2N2MwOWZjYTYiLCJpYXQiOjE0NjM2NTk2OTgsImV4cCI6MTQ2MzY1OTc1OCwiaXNzIjoiaHR0cHM6Ly9ndWFyZGVkLWNsaWZmcy04NjM1Lmhlcm9rdWFwcC5jb20vb3AifQ.qUTaR48lavULtmDWBcpwhcF9NXhP8xzc-643h3yWLEgIyxPzKINT-upNn-byflH7P7rQlzZ-9SJKSs72ZVqWWMNikUGgJo-XmLyersONQ8sVx7v0quo4CRXamwyXfz2gq76gFlv5mtsrWwCij1kUnSaFm_HhAcoDPzGtSqhsHNoz36KjdmC3R-m84reQk_LEGizUeV-OmsBWJs3gedPGYcRCvsnW9qa21B0yZO2-HT9VQYY68UIGucDKNvizFRmIgepDZ5PUtsvyPD0PQQ9UHiEZvICeArxPLE8t1xz-lukpTMn8vA_YJ0s7kD9HYJUwxiYIuLXwDUNpGhsegxdvbw'
 			});
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(spy).toBeCalledTimes(1);
 			expect(errorDetail(spy)).toBe('device code not found');
@@ -240,6 +245,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 				device_code: code,
 				grant_type
 			});
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(spy).toBeCalledTimes(1);
 			expect(errorDetail(spy)).toBe(
@@ -265,6 +271,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 				device_code: code,
 				grant_type
 			});
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(spy).toBeCalledTimes(1);
 			expect(errorDetail(spy)).toBe('client mismatch');
@@ -293,6 +300,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 					device_code: code,
 					grant_type
 				});
+				if (!error) throw new Error('expected error response');
 				expect(error.status).toBe(400);
 				expect(error.value).toEqual({
 					error: 'expired_token',
@@ -339,6 +347,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 				device_code: code,
 				grant_type
 			});
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(spy).toBeCalledTimes(1);
 			expect(errorDetail(spy)).toBe('device code already consumed');
@@ -358,6 +367,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 			device_code: code,
 			grant_type
 		});
+		if (!error) throw new Error('expected error response');
 		expect(error.status).toBe(400);
 		expect(error.value).toEqual({
 			error: 'authorization_pending',
@@ -380,6 +390,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 			device_code: code,
 			grant_type
 		});
+		if (!error) throw new Error('expected error response');
 		expect(error.status).toBe(400);
 		expect(error.value).toEqual({
 			error: 'foo',
@@ -404,6 +415,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 			device_code: code,
 			grant_type
 		});
+		if (!error) throw new Error('expected error response');
 		expect(error.status).toBe(400);
 		expect(error.value).toEqual({
 			error: 'access_denied',

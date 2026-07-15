@@ -8,7 +8,7 @@ import {
 	mock
 } from 'bun:test';
 
-import bootstrap, { agent } from '../test_helper.js';
+import bootstrap, { agent, type Setup } from '../test_helper.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
@@ -17,9 +17,9 @@ const route = '/auth';
 const scope = 'openid';
 
 describe('session exp handling', () => {
-	let setup = null;
+	let setup: Setup;
 	beforeAll(async function () {
-		setup = await bootstrap(import.meta.url)();
+		setup = await bootstrap(import.meta.url);
 	});
 
 	afterEach(function () {

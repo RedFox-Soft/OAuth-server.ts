@@ -46,7 +46,7 @@ function assertCorsHeaders(headers, expected) {
 }
 
 describe('CORS setup', () => {
-	before(bootstrap(import.meta.url));
+	before(() => bootstrap(import.meta.url));
 	before(function () {
 		return this.login();
 	});

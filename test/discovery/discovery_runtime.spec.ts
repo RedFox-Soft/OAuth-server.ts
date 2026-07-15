@@ -7,7 +7,7 @@ const endpoint = () => agent['.well-known']['openid-configuration'].get();
 
 describe('discovery runtime mutability', () => {
 	beforeAll(async () => {
-		await bootstrap(import.meta.url)();
+		await bootstrap(import.meta.url);
 	});
 
 	afterAll(() => {

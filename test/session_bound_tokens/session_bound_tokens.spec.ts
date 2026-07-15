@@ -1,7 +1,7 @@
 import { describe, it, beforeAll, expect, spyOn } from 'bun:test';
 import * as url from 'node:url';
 
-import bootstrap, { agent } from '../test_helper.js';
+import bootstrap, { agent, type Setup } from '../test_helper.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
@@ -21,9 +21,9 @@ function codeFromResponse(response: Response) {
 }
 
 describe('session bound tokens behaviours', () => {
-	let setup = null;
+	let setup: Setup;
 	beforeAll(async () => {
-		setup = await bootstrap(import.meta.url)();
+		setup = await bootstrap(import.meta.url);
 		// consent/prompt skip: keep the authorization request from bouncing to an interaction
 		spyOn(OIDCContext.prototype, 'promptPending').mockReturnValue(false);
 	});
@@ -50,6 +50,7 @@ describe('session bound tokens behaviours', () => {
 			);
 
 			const { data } = await auth.getToken(code);
+			if (!data) throw new Error('expected response data');
 			const access_token = data.access_token;
 
 			const token = await AccessToken.find(access_token);
@@ -92,6 +93,7 @@ describe('session bound tokens behaviours', () => {
 			);
 
 			const { data: tokenData } = await auth.getToken(code);
+			if (!tokenData) throw new Error('expected response data');
 			let access_token = tokenData.access_token;
 			let refresh_token = tokenData.refresh_token;
 
@@ -111,6 +113,7 @@ describe('session bound tokens behaviours', () => {
 				refresh_token,
 				grant_type: 'refresh_token'
 			});
+			if (!refreshed) throw new Error('expected response data');
 			access_token = refreshed.access_token;
 			refresh_token = refreshed.refresh_token;
 
@@ -159,6 +162,7 @@ describe('session bound tokens behaviours', () => {
 			);
 
 			const { data: tokenData } = await auth.getToken(code);
+			if (!tokenData) throw new Error('expected response data');
 			let access_token = tokenData.access_token;
 			let refresh_token = tokenData.refresh_token;
 
@@ -178,6 +182,7 @@ describe('session bound tokens behaviours', () => {
 				refresh_token,
 				grant_type: 'refresh_token'
 			});
+			if (!refreshed) throw new Error('expected response data');
 			access_token = refreshed.access_token;
 			refresh_token = refreshed.refresh_token;
 
@@ -198,6 +203,7 @@ describe('session bound tokens behaviours', () => {
 				refresh_token,
 				grant_type: 'refresh_token'
 			});
+			if (!refreshedAgain) throw new Error('expected response data');
 			access_token = refreshedAgain.access_token;
 			refresh_token = refreshedAgain.refresh_token;
 

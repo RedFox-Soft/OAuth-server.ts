@@ -51,7 +51,7 @@ const tokenAuthRejected = {
 
 describe('client authentication options', () => {
 	beforeAll(async function () {
-		await bootstrap(import.meta.url)();
+		await bootstrap(import.meta.url);
 	});
 
 	it('expects auth to be provided', async function () {
@@ -95,6 +95,7 @@ describe('client authentication options', () => {
 				client_id: 'client-none',
 				client_secret: 'foobar'
 			});
+			if (!error) throw new Error('expected error response');
 			expect(spy).toBeCalledTimes(1);
 			expect(spy).toBeCalledWith(
 				expect.objectContaining({
@@ -214,6 +215,7 @@ describe('client authentication options', () => {
 					}
 				}
 			);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(error.value).toEqual({
 				error: 'invalid_request',
@@ -233,6 +235,7 @@ describe('client authentication options', () => {
 					}
 				}
 			);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(error.value).toEqual({
 				error: 'invalid_request',
@@ -251,6 +254,7 @@ describe('client authentication options', () => {
 					}
 				}
 			);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(error.value).toEqual({
 				error: 'invalid_request',
@@ -269,6 +273,7 @@ describe('client authentication options', () => {
 					}
 				}
 			);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(error.value).toEqual({
 				error: 'invalid_request',
@@ -291,6 +296,7 @@ describe('client authentication options', () => {
 					)
 				}
 			);
+			if (!error) throw new Error('expected error response');
 			expect(spy).toBeCalledTimes(1);
 			expect(spy).toBeCalledWith(
 				expect.objectContaining({
@@ -315,6 +321,7 @@ describe('client authentication options', () => {
 					)
 				}
 			);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(error.value).toEqual({
 				error: 'invalid_request',
@@ -336,6 +343,7 @@ describe('client authentication options', () => {
 					)
 				}
 			);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(error.value).toEqual({
 				error: 'invalid_request',
@@ -353,6 +361,7 @@ describe('client authentication options', () => {
 					headers: AuthorizationRequest.basicAuthHeader('client-basic', '')
 				}
 			);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(error.value).toEqual({
 				error: 'invalid_request',
@@ -373,6 +382,7 @@ describe('client authentication options', () => {
 					)
 				}
 			);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(error.value).toEqual({
 				error: 'invalid_client',
@@ -412,6 +422,7 @@ describe('client authentication options', () => {
 				client_id: 'client-post',
 				client_secret: 'invalid'
 			});
+			if (!error) throw new Error('expected error response');
 			expect(spy).toBeCalledTimes(1);
 			expect(spy).toBeCalledWith(
 				expect.objectContaining({
@@ -431,6 +442,7 @@ describe('client authentication options', () => {
 				client_id: 'client-post',
 				client_secret: ''
 			});
+			if (!error) throw new Error('expected error response');
 			expect(spy).toBeCalledTimes(1);
 			expect(spy).toBeCalledWith(
 				expect.objectContaining({
@@ -448,6 +460,7 @@ describe('client authentication options', () => {
 				client_id: 'secret-expired-basic',
 				client_secret: 'secret'
 			});
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(error.value).toEqual({
 				error: 'invalid_client',
@@ -653,6 +666,7 @@ describe('client authentication options', () => {
 					)
 				}
 			);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(error.value).toEqual({
 				error: 'invalid_request',
@@ -681,6 +695,7 @@ describe('client authentication options', () => {
 					'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
 				client_secret: 'foo'
 			});
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(error.value).toEqual({
 				error: 'invalid_request',
@@ -698,6 +713,7 @@ describe('client authentication options', () => {
 				client_assertion_type:
 					'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
 			});
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(error.value).toEqual({
 				error: 'invalid_request',
@@ -730,6 +746,7 @@ describe('client authentication options', () => {
 				client_assertion_type:
 					'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
 			});
+			if (!error) throw new Error('expected error response');
 			expect(spy).toBeCalledTimes(1);
 			expect(spy).toBeCalledWith(
 				expect.objectContaining({
@@ -763,6 +780,7 @@ describe('client authentication options', () => {
 				client_assertion_type:
 					'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
 			});
+			if (!error) throw new Error('expected error response');
 			expect(spy).toBeCalledTimes(1);
 			expect(spy).toBeCalledWith(
 				expect.objectContaining({
@@ -797,6 +815,7 @@ describe('client authentication options', () => {
 				client_assertion_type:
 					'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
 			});
+			if (!error) throw new Error('expected error response');
 			expect(spy).toBeCalledTimes(1);
 			expect(spy).toBeCalledWith(
 				expect.objectContaining({
@@ -832,6 +851,7 @@ describe('client authentication options', () => {
 				client_assertion_type:
 					'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
 			});
+			if (!error) throw new Error('expected error response');
 			expect(spy).toBeCalledTimes(1);
 			expect(spy).toBeCalledWith(
 				expect.objectContaining({
@@ -867,6 +887,7 @@ describe('client authentication options', () => {
 				client_assertion_type:
 					'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
 			});
+			if (!error) throw new Error('expected error response');
 			expect(spy).toBeCalledTimes(1);
 			expect(spy).toBeCalledWith(
 				expect.objectContaining({
@@ -902,6 +923,7 @@ describe('client authentication options', () => {
 				client_assertion_type:
 					'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
 			});
+			if (!error) throw new Error('expected error response');
 			expect(spy).toBeCalledTimes(1);
 			expect(spy).toBeCalledWith(
 				expect.objectContaining({
@@ -931,6 +953,7 @@ describe('client authentication options', () => {
 				client_assertion_type:
 					'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
 			});
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(error.value).toEqual({
 				error: 'invalid_request',
@@ -958,6 +981,7 @@ describe('client authentication options', () => {
 				grant_type: 'client_credentials'
 				// client_assertion_type: 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
 			});
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(error.value).toEqual({
 				error: 'invalid_request',
@@ -985,6 +1009,7 @@ describe('client authentication options', () => {
 				grant_type: 'client_credentials',
 				client_assertion_type: 'urn:ietf:mycustom'
 			});
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(error.value).toEqual({
 				error: 'invalid_request',
@@ -1000,6 +1025,7 @@ describe('client authentication options', () => {
 				client_assertion_type:
 					'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
 			});
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(error.value).toEqual({
 				error: 'invalid_request',
@@ -1029,6 +1055,7 @@ describe('client authentication options', () => {
 				client_assertion_type:
 					'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
 			});
+			if (!error) throw new Error('expected error response');
 			expect(spy).toBeCalledTimes(1);
 			expect(spy).toBeCalledWith(
 				expect.objectContaining({
@@ -1065,6 +1092,7 @@ describe('client authentication options', () => {
 				client_assertion_type:
 					'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
 			});
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(error.value).toEqual({
 				error: 'invalid_client',
@@ -1106,6 +1134,7 @@ describe('client authentication options', () => {
 					client_assertion_type:
 						'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
 				});
+				if (!error) throw new Error('expected error response');
 				expect(spy).toBeCalledTimes(1);
 				expect(spy).toBeCalledWith(
 					expect.objectContaining({
@@ -1151,6 +1180,7 @@ describe('client authentication options', () => {
 					client_assertion_type:
 						'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
 				});
+				if (!error) throw new Error('expected error response');
 				expect(spy).toBeCalledTimes(1);
 				expect(spy).toBeCalledWith(
 					expect.objectContaining({

@@ -7,7 +7,7 @@ const browserAccept =
 
 describe('default error behavior', () => {
 	beforeAll(async () => {
-		await bootstrap(import.meta.url)();
+		await bootstrap(import.meta.url);
 	});
 
 	it('responds with json when no Accept header', async () => {

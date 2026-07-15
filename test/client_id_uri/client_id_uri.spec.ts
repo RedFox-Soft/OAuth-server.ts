@@ -3,7 +3,7 @@ import { expect } from 'bun:test';
 import bootstrap from '../test_helper.js';
 
 describe('registration management with client_id as URI', () => {
-	before(bootstrap(import.meta.url));
+	before(() => bootstrap(import.meta.url));
 
 	it('returns client_id as a URI string', async function () {
 		let client_id;

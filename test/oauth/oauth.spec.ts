@@ -12,7 +12,11 @@ import {
 } from 'bun:test';
 import snakeCase from 'lodash/snakeCase.js';
 
-import bootstrap, { agent, jsonToFormUrlEncoded } from '../test_helper.js';
+import bootstrap, {
+	agent,
+	jsonToFormUrlEncoded,
+	type Setup
+} from '../test_helper.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { provider } from 'lib/provider.js';
 import { Client } from 'lib/models/client.js';
@@ -32,9 +36,9 @@ function codeFromResponse(response: Response) {
 }
 
 describe('requests without the openid scope', () => {
-	let setup = null;
+	let setup: Setup;
 	beforeAll(async () => {
-		setup = await bootstrap(import.meta.url)();
+		setup = await bootstrap(import.meta.url);
 	});
 
 	beforeEach(function () {
@@ -230,6 +234,7 @@ describe('requests without the openid scope', () => {
 						const code = codeFromResponse(response);
 
 						const { data } = await auth.getToken(code);
+						if (!data) throw new Error('expected response data');
 						rt = data.refresh_token;
 					});
 
@@ -341,6 +346,7 @@ describe('requests without the openid scope', () => {
 							}
 						}
 					);
+					if (!data) throw new Error('expected response data');
 					expect(status).toBe(200);
 					code = data.device_code;
 

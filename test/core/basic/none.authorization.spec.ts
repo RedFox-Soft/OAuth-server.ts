@@ -1,14 +1,14 @@
 import { describe, it, beforeAll, expect, spyOn } from 'bun:test';
 
-import bootstrap, { agent } from '../../test_helper.js';
+import bootstrap, { agent, type Setup } from '../../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 
 describe('/auth response_type=none', () => {
-	let setup = null;
+	let setup: Setup;
 	let cookie: string | undefined = undefined;
 	beforeAll(async function () {
-		setup = await bootstrap(import.meta.url)();
+		setup = await bootstrap(import.meta.url);
 		cookie = await setup.login();
 	});
 

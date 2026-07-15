@@ -3,7 +3,7 @@ import bootstrap, { agent } from '../test_helper.js';
 
 describe('providing Bearer token', () => {
 	beforeAll(async () => {
-		await bootstrap(import.meta.url)();
+		await bootstrap(import.meta.url);
 	});
 
 	describe('invalid requests', () => {

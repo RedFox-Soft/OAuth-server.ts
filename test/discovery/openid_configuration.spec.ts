@@ -8,7 +8,7 @@ const discoveryEndpoint = agent['.well-known']['openid-configuration'];
 
 describe('/.well-known/openid-configuration', () => {
 	beforeAll(async () => {
-		await bootstrap(import.meta.url)();
+		await bootstrap(import.meta.url);
 	});
 
 	it('responds with json 200', async () => {
@@ -25,6 +25,7 @@ describe('/.well-known/openid-configuration', () => {
 			'this will not be used';
 
 		const { data } = await discoveryEndpoint.get();
+		if (!data) throw new Error('expected response data');
 
 		expect(data).toHaveProperty(
 			'service_documentation',
@@ -54,6 +55,7 @@ describe('/.well-known/openid-configuration', () => {
 
 			try {
 				const { error } = await discoveryEndpoint.get();
+				if (!error) throw new Error('expected error response');
 
 				expect(error.status).toBe(500);
 				expect(error.value).toEqual({

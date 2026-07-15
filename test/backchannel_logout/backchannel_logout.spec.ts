@@ -14,7 +14,7 @@ import {
 	mock
 } from 'bun:test';
 
-import bootstrap, { agent } from '../test_helper.js';
+import bootstrap, { agent, type Setup } from '../test_helper.js';
 import {
 	mock as mockHttp,
 	assertNoPendingInterceptors
@@ -38,9 +38,9 @@ function decodeLogoutToken(value: string) {
 }
 
 describe('Back-Channel Logout 1.0', () => {
-	let setup = null;
+	let setup: Setup;
 	beforeAll(async function () {
-		setup = await bootstrap(import.meta.url)();
+		setup = await bootstrap(import.meta.url);
 	});
 
 	afterEach(() => {
@@ -182,6 +182,7 @@ describe('Back-Channel Logout 1.0', () => {
 				},
 				{ headers: AuthorizationRequest.basicAuthHeader('client', 'secret') }
 			);
+			if (!data) throw new Error('expected response data');
 
 			const payload = JSON.parse(base64url.decode(data.id_token.split('.')[1]));
 			expect(typeof payload.sid).toBe('string');
@@ -201,6 +202,7 @@ describe('Back-Channel Logout 1.0', () => {
 				},
 				{ headers: basicAuth }
 			);
+			if (!acData) throw new Error('expected response data');
 
 			const { data: rtData } = await agent.token.post(
 				{
@@ -209,6 +211,7 @@ describe('Back-Channel Logout 1.0', () => {
 				},
 				{ headers: basicAuth }
 			);
+			if (!rtData) throw new Error('expected response data');
 
 			const payload = JSON.parse(
 				base64url.decode(rtData.id_token.split('.')[1])

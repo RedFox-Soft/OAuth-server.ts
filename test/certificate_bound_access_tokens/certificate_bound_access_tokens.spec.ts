@@ -12,7 +12,11 @@ import { X509Certificate } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import * as url from 'node:url';
 
-import bootstrap, { agent, jsonToFormUrlEncoded } from '../test_helper.js';
+import bootstrap, {
+	agent,
+	jsonToFormUrlEncoded,
+	type Setup
+} from '../test_helper.js';
 import { provider } from 'lib/provider.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
@@ -27,9 +31,9 @@ const crt = new X509Certificate(
 const expectedS256 = 'A4DtL2JmUMhAsvJj5tKyn64SqzmuXbMrJa0n761y5v0';
 
 describe('features.mTLS.certificateBoundAccessTokens', () => {
-	let setup;
+	let setup: Setup;
 	beforeAll(async function () {
-		setup = await bootstrap(import.meta.url)();
+		setup = await bootstrap(import.meta.url);
 		await setup.login();
 	});
 	afterEach(function () {
@@ -106,6 +110,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 				}
 			);
+			if (!data) throw new Error('expected response data');
 			expect(status).toBe(200);
 			expect(data).toHaveProperty('cnf');
 			expect(data).toHaveProperty('token_type', 'Bearer');
@@ -128,6 +133,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 					}
 				}
 			);
+			if (!data) throw new Error('expected response data');
 			dc = data.device_code;
 
 			TestAdapter.for('DeviceCode').syncUpdate(setup.getTokenJti(dc), {
@@ -177,6 +183,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 				}
 			);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(error.value).toEqual({
 				error: 'invalid_grant',
@@ -237,6 +244,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 					}
 				}
 			);
+			if (!data) throw new Error('expected response data');
 			reqId = data.auth_req_id;
 		});
 
@@ -280,6 +288,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 				}
 			);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(error.value).toEqual({
 				error: 'invalid_grant',
@@ -447,6 +456,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 						}
 					}
 				);
+				if (!error) throw new Error('expected error response');
 				expect(error.status).toBe(400);
 				expect(error.value).toEqual({
 					error: 'invalid_grant',
@@ -574,6 +584,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 					grant_type: 'refresh_token',
 					refresh_token
 				});
+				if (!error) throw new Error('expected error response');
 				expect(error.status).toBe(400);
 				expect(error.value).toEqual({
 					error: 'invalid_grant',
@@ -605,6 +616,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 						}
 					}
 				);
+				if (!error) throw new Error('expected error response');
 				expect(error.status).toBe(400);
 				expect(error.value).toEqual({
 					error: 'invalid_grant',
@@ -664,6 +676,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 					}
 				}
 			);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(error.value).toEqual({
 				error: 'invalid_grant',

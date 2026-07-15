@@ -11,7 +11,7 @@ import { provider } from 'lib/provider.js';
 import { Client } from 'lib/models/client.js';
 
 describe('pairwise features', () => {
-	beforeAll(bootstrap(import.meta.url));
+	beforeAll(() => bootstrap(import.meta.url));
 
 	afterEach(assertNoPendingInterceptors);
 

@@ -6,7 +6,7 @@ import { Client } from 'lib/models/client.js';
 
 describe('Client#add', () => {
 	beforeAll(async () => {
-		await bootstrap(import.meta.url, { config: 'client_secrets' })();
+		await bootstrap(import.meta.url, { config: 'client_secrets' });
 	});
 
 	it('client secret is mandatory if client auth needs it', () => {

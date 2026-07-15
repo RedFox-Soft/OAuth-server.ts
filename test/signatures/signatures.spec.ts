@@ -2,7 +2,7 @@ import { expect } from 'bun:test';
 import i from 'lib/helpers/weak_cache.js';
 import { describe, it, beforeAll, beforeEach } from 'bun:test';
 
-import bootstrap from '../test_helper.js';
+import bootstrap, { type Setup } from '../test_helper.js';
 import { decode } from '../../lib/helpers/jwt.ts';
 import epochTime from '../../lib/helpers/epoch_time.ts';
 import { provider } from 'lib/provider.js';
@@ -10,9 +10,9 @@ import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';
 
 describe('signatures', () => {
-	let setup = null;
+	let setup: Setup;
 	beforeAll(async function () {
-		setup = await bootstrap(import.meta.url)();
+		setup = await bootstrap(import.meta.url);
 	});
 
 	// SKIP: symmetric (HS256) id_token signing is intentionally unsupported — Constitution VI

@@ -18,7 +18,7 @@ import { OIDCContext } from 'lib/helpers/oidc_context.js';
 
 describe('revocation features', () => {
 	beforeAll(async function () {
-		await bootstrap(import.meta.url)();
+		await bootstrap(import.meta.url);
 	});
 	afterEach(function () {
 		mock.restore();
@@ -27,6 +27,7 @@ describe('revocation features', () => {
 	it('enriched discovery shows the url now', async function () {
 		const { data, status } =
 			await agent['.well-known']['openid-configuration'].get();
+		if (!data) throw new Error('expected response data');
 		expect(status).toBe(200);
 		expect(data.revocation_endpoint).toEndWith('/token/revocation');
 	});
@@ -151,6 +152,7 @@ describe('revocation features', () => {
 					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 				}
 			);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(500);
 			expect(error.value).toEqual({
 				error: 'server_error',
@@ -358,6 +360,7 @@ describe('revocation features', () => {
 					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 				}
 			);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(422);
 			expect(error.value).toEqual({
 				error: 'invalid_request',
@@ -409,6 +412,7 @@ describe('revocation features', () => {
 					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 				}
 			);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(error.value).toEqual({
 				error: 'invalid_request',

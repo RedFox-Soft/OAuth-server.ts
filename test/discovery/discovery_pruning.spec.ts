@@ -50,7 +50,7 @@ const FEATURE_GATED = [
 describe('discovery pruning', () => {
 	describe('all features enabled', () => {
 		beforeAll(async () => {
-			await bootstrap(import.meta.url, { config: 'all_features' })();
+			await bootstrap(import.meta.url, { config: 'all_features' });
 		});
 
 		it('includes every feature-gated key and all always-present keys', async () => {
@@ -61,7 +61,7 @@ describe('discovery pruning', () => {
 
 	describe('all optional features disabled', () => {
 		beforeAll(async () => {
-			await bootstrap(import.meta.url, { config: 'minimal' })();
+			await bootstrap(import.meta.url, { config: 'minimal' });
 		});
 
 		it('drops every feature-gated key but keeps always-present keys', async () => {
@@ -80,7 +80,7 @@ describe('discovery pruning', () => {
 
 	describe('multi-feature key gating', () => {
 		beforeAll(async () => {
-			await bootstrap(import.meta.url, { config: 'multi_feature' })();
+			await bootstrap(import.meta.url, { config: 'multi_feature' });
 		});
 
 		it('drops a key when any of its required features is disabled', async () => {

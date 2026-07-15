@@ -13,7 +13,7 @@ import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import nanoid from 'lib/helpers/nanoid.js';
 
 describe('FAPI 2.0 Final behaviours', async () => {
-	const setup = await bootstrap(import.meta.url, { config: 'fapi2' })();
+	const setup = await bootstrap(import.meta.url, { config: 'fapi2' });
 
 	describe('FAPI 2.0 Final Mode Authorization Request', () => {
 		it('requires pkjwt audience to be the issuer identifier', async function () {
@@ -40,6 +40,7 @@ describe('FAPI 2.0 Final behaviours', async () => {
 				code_challenge: crypto.hash('sha256', 'foo', 'base64url')
 			});
 			expect(res.status).toBe(401);
+			if (!res.error) throw new Error('expected error response');
 			expect(res.error.value).toEqual({
 				error: 'invalid_client',
 				error_description: 'client authentication failed'

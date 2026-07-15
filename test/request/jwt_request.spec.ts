@@ -5,7 +5,11 @@ import { describe, it, beforeAll, afterEach, expect, mock } from 'bun:test';
 import { importJWK } from 'jose';
 
 import * as JWT from '../../lib/helpers/jwt.ts';
-import bootstrap, { agent, jsonToFormUrlEncoded } from '../test_helper.js';
+import bootstrap, {
+	agent,
+	jsonToFormUrlEncoded,
+	type Setup
+} from '../test_helper.js';
 import { provider } from 'lib/provider.js';
 import { Client } from 'lib/models/client.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
@@ -13,9 +17,9 @@ import { ISSUER } from 'lib/configs/env.js';
 import { ValidationError } from 'elysia';
 
 describe('request parameter features', () => {
-	let setup = null;
+	let setup: Setup;
 	beforeAll(async function () {
-		setup = await bootstrap(import.meta.url)();
+		setup = await bootstrap(import.meta.url);
 	});
 
 	afterEach(function () {

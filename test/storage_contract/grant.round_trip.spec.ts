@@ -6,7 +6,7 @@ import { assertStoredMatchesSchema, storedPayloadFor } from './round_trip.js';
 
 describe('storage contract: Grant', () => {
 	beforeAll(async () => {
-		await bootstrap(import.meta.url)();
+		await bootstrap(import.meta.url);
 	});
 
 	it('persists the full aggregate (incl. accountId) and freeform sub-objects verbatim', async () => {

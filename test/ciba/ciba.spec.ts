@@ -31,7 +31,7 @@ function post(body, headers = {}) {
 describe('features.ciba', () => {
 	describe('w/o request objects', () => {
 		beforeAll(async () => {
-			await bootstrap(import.meta.url)();
+			await bootstrap(import.meta.url);
 		});
 
 		afterEach(() => {
@@ -42,6 +42,7 @@ describe('features.ciba', () => {
 		it('extends discovery', async () => {
 			const { status, data } =
 				await agent['.well-known']['openid-configuration'].get();
+			if (!data) throw new Error('expected response data');
 			expect(status).toBe(200);
 			expect(data).toHaveProperty('backchannel_authentication_endpoint');
 			expect(data.backchannel_authentication_endpoint).toMatch(
@@ -268,6 +269,7 @@ describe('features.ciba', () => {
 				expect(res.response.headers.get('content-type')).toMatch(
 					/application\/json/
 				);
+				if (!res.data) throw new Error('expected response data');
 				expect(Object.keys(res.data).sort()).toEqual(
 					['auth_req_id', 'expires_in'].sort()
 				);
@@ -295,6 +297,7 @@ describe('features.ciba', () => {
 					client_id: 'client',
 					requested_expiry: 300
 				});
+				if (!data) throw new Error('expected response data');
 				expect(typeof data.expires_in).toBe('number');
 				expect(data.expires_in).toBeLessThanOrEqual(300);
 			});
@@ -317,6 +320,7 @@ describe('features.ciba', () => {
 				expect(res.response.headers.get('content-type')).toMatch(
 					/application\/json/
 				);
+				if (!res.data) throw new Error('expected response data');
 				expect(Object.keys(res.data).sort()).toEqual(
 					['auth_req_id', 'expires_in'].sort()
 				);
@@ -401,6 +405,7 @@ describe('features.ciba', () => {
 					const { error } = await post({
 						client_id: 'client-not-allowed'
 					});
+					if (!error) throw new Error('expected error response');
 
 					expect(error.status).toBe(400);
 					expect(error.value).toEqual({
@@ -418,6 +423,7 @@ describe('features.ciba', () => {
 					const { error } = await post({
 						client_id: 'not-found-client'
 					});
+					if (!error) throw new Error('expected error response');
 
 					expect(error.status).toBe(401);
 					expect(error.value).toEqual({
@@ -435,6 +441,7 @@ describe('features.ciba', () => {
 				const { error } = await agent.backchannel.post({
 					client_id: 'client'
 				});
+				if (!error) throw new Error('expected error response');
 
 				expect(error.status).toBe(400);
 				expect(error.value).toEqual({
@@ -456,6 +463,7 @@ describe('features.ciba', () => {
 							scope: 'openid',
 							[param]: 'some'
 						});
+						if (!error) throw new Error('expected error response');
 
 						expect(error.status).toBe(400);
 						expect(error.value).toEqual({
@@ -474,6 +482,7 @@ describe('features.ciba', () => {
 						login_hint: 'notfound',
 						client_id: 'client'
 					});
+					if (!error) throw new Error('expected error response');
 
 					expect(error.status).toBe(400);
 					expect(error.value).toEqual({
@@ -492,6 +501,7 @@ describe('features.ciba', () => {
 						login_hint_token: 'notfound',
 						client_id: 'client'
 					});
+					if (!error) throw new Error('expected error response');
 
 					expect(error.status).toBe(400);
 					expect(error.value).toEqual({
@@ -508,6 +518,7 @@ describe('features.ciba', () => {
 					const { error } = await post({
 						client_id: 'client'
 					});
+					if (!error) throw new Error('expected error response');
 
 					expect(error.status).toBe(400);
 					expect(error.value).toEqual({
@@ -525,6 +536,7 @@ describe('features.ciba', () => {
 						client_id: 'client-ping',
 						scope: 'openid'
 					});
+					if (!error) throw new Error('expected error response');
 
 					expect(error.status).toBe(400);
 					expect(error.value).toEqual({
@@ -543,6 +555,7 @@ describe('features.ciba', () => {
 						client_id: 'client',
 						scope: 'foo'
 					});
+					if (!error) throw new Error('expected error response');
 
 					expect(error.status).toBe(400);
 					expect(error.value).toEqual({
@@ -561,6 +574,7 @@ describe('features.ciba', () => {
 						scope: 'openid',
 						requested_expiry: 0
 					});
+					if (!error) throw new Error('expected error response');
 
 					expect(error.status).toBe(400);
 					expect(error.value).toEqual({
@@ -578,6 +592,7 @@ describe('features.ciba', () => {
 						client_id: 'client',
 						scope: 'openid'
 					});
+					if (!error) throw new Error('expected error response');
 
 					expect(error.status).toBe(400);
 					expect(error.value).toEqual({
@@ -598,6 +613,7 @@ describe('features.ciba', () => {
 						login_hint_token: 'foo',
 						login_hint: 'foo'
 					});
+					if (!error) throw new Error('expected error response');
 
 					expect(error.status).toBe(400);
 					expect(error.value).toEqual({
@@ -613,7 +629,7 @@ describe('features.ciba', () => {
 
 	describe('with request objects', () => {
 		beforeAll(async () => {
-			await bootstrap(import.meta.url, { config: 'ciba_jar' })();
+			await bootstrap(import.meta.url, { config: 'ciba_jar' });
 		});
 
 		afterEach(() => {
@@ -623,6 +639,7 @@ describe('features.ciba', () => {
 
 		it('extends discovery', async () => {
 			const { data } = await agent['.well-known']['openid-configuration'].get();
+			if (!data) throw new Error('expected response data');
 			expect(
 				data.backchannel_authentication_request_signing_alg_values_supported
 			).toBeDefined();
@@ -643,6 +660,7 @@ describe('features.ciba', () => {
 							scope: 'openid',
 							[param]: 'some'
 						});
+						if (!error) throw new Error('expected error response');
 
 						expect(error.status).toBe(400);
 						expect(error.value).toEqual({
@@ -660,6 +678,7 @@ describe('features.ciba', () => {
 						client_id: 'client-signed',
 						scope: 'openid'
 					});
+					if (!error) throw new Error('expected error response');
 
 					expect(error.status).toBe(400);
 					expect(error.value).toEqual({
@@ -721,6 +740,7 @@ describe('features.ciba', () => {
 							.setAudience(ISSUER)
 							.sign(privateKey)
 					});
+					if (!error) throw new Error('expected error response');
 
 					expect(error.status).toBe(400);
 					expect(error.value).toEqual({
@@ -751,6 +771,7 @@ describe('features.ciba', () => {
 							.setAudience(ISSUER)
 							.sign(privateKey)
 					});
+					if (!error) throw new Error('expected error response');
 
 					expect(error.status).toBe(400);
 					expect(error.value).toEqual({
@@ -781,6 +802,7 @@ describe('features.ciba', () => {
 							.setAudience(ISSUER)
 							.sign(privateKey)
 					});
+					if (!error) throw new Error('expected error response');
 
 					expect(error.status).toBe(400);
 					expect(error.value).toEqual({
@@ -811,6 +833,7 @@ describe('features.ciba', () => {
 							.setAudience(ISSUER)
 							.sign(privateKey)
 					});
+					if (!error) throw new Error('expected error response');
 
 					expect(error.status).toBe(400);
 					expect(error.value).toEqual({
@@ -829,6 +852,7 @@ describe('features.ciba', () => {
 						scope: 'openid',
 						request: '....'
 					});
+					if (!error) throw new Error('expected error response');
 
 					expect(error.status).toBe(400);
 					expect(error.value).toEqual({

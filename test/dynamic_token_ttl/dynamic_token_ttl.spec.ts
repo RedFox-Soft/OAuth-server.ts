@@ -10,7 +10,7 @@ import {
 	expect
 } from 'bun:test';
 
-import bootstrap, { agent } from '../test_helper.js';
+import bootstrap, { agent, type Setup } from '../test_helper.js';
 import { IdToken } from 'lib/models/id_token.js';
 import { Client } from 'lib/models/client.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
@@ -24,9 +24,9 @@ import { AccessToken } from 'lib/models/access_token.js';
 import { ClientCredentials } from 'lib/models/client_credentials.js';
 
 describe('dynamic ttl', () => {
-	let setup = null;
+	let setup: Setup;
 	beforeAll(async function () {
-		setup = await bootstrap(import.meta.url)();
+		setup = await bootstrap(import.meta.url);
 	});
 
 	beforeEach(function () {
@@ -61,6 +61,7 @@ describe('dynamic ttl', () => {
 			scope: 'openid offline_access'
 		});
 		expect(device.response.status).toBe(200);
+		if (!device.data) throw new Error('expected response data');
 		expect(device.data.expires_in).toBe(123);
 		const device_code = device.data.device_code;
 
@@ -192,6 +193,7 @@ describe('dynamic ttl', () => {
 			redirect_uri: 'https://rp.example.com/cb'
 		});
 		expect(tokenRes.status).toBe(200);
+		if (!tokenRes.data) throw new Error('expected response data');
 		const refresh_token = tokenRes.data.refresh_token;
 
 		const idTokenSpy = spyOn(ttl, 'IdToken').mockReturnValue(123);

@@ -63,7 +63,7 @@ function expectFail(res, code, error, error_description) {
 
 describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 	beforeAll(async () => {
-		await bootstrap(import.meta.url)();
+		await bootstrap(import.meta.url);
 	});
 
 	afterEach(() => {
@@ -120,6 +120,7 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 				'client_id_issued_at',
 				client.client_id_issued_at
 			);
+			if (!res.data) throw new Error('expected response data');
 			expect(res.data.redirect_uris).toEqual([
 				'https://client.example.com/foobar/cb'
 			]);
@@ -298,6 +299,7 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 					});
 				expect(res.status).toBe(200);
 				expect(saved).toHaveBeenCalledTimes(1);
+				if (!res.data) throw new Error('expected response data');
 				expect(res.data.registration_access_token).not.toBe(
 					client.registration_access_token
 				);
@@ -324,6 +326,7 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 						headers: { ...json, ...bearer(client.registration_access_token) }
 					});
 				expect(res.status).toBe(200);
+				if (!res.data) throw new Error('expected response data');
 				expect(res.data.registration_access_token).toBe(
 					client.registration_access_token
 				);
@@ -343,9 +346,7 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 			expect(res.status).toBe(204);
 			expect(res.headers.get('cache-control')).toBe('no-store');
 			expect(
-				await RegistrationAccessToken.find(
-					client.registration_access_token
-				)
+				await RegistrationAccessToken.find(client.registration_access_token)
 			).toBeUndefined();
 		});
 

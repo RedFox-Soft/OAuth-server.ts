@@ -10,7 +10,7 @@ import {
 } from 'bun:test';
 
 import nanoid from '../../lib/helpers/nanoid.ts';
-import bootstrap, { agent, passInteractionChecks } from '../test_helper.js';
+import bootstrap, { agent, passInteractionChecks, type Setup } from '../test_helper.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
 import { generate } from '../../lib/helpers/user_codes.ts';
 import { Session } from 'lib/models/session.js';
@@ -19,7 +19,7 @@ import { DeviceCode } from 'lib/models/device_code.js';
 import { Interaction } from 'lib/models/interaction.js';
 import { Grant } from 'lib/models/grant.js';
 
-let setup = null;
+let setup: Setup;
 let uid;
 let userCode;
 
@@ -54,7 +54,7 @@ function get(cookie) {
 
 describe('device interaction resume /ui/:uid/device_resume', () => {
 	beforeAll(async () => {
-		setup = await bootstrap(import.meta.url)();
+		setup = await bootstrap(import.meta.url);
 	});
 
 	beforeEach(() => {

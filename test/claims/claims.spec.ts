@@ -11,7 +11,7 @@ import {
 
 import { decode as decodeJWT } from '../../lib/helpers/jwt.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
-import bootstrap, { agent, jsonToFormUrlEncoded } from '../test_helper.js';
+import bootstrap, { agent, jsonToFormUrlEncoded, type Setup } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { provider } from 'lib/provider.js';
 import { Client } from 'lib/models/client.js';
@@ -39,7 +39,7 @@ expire.setDate(expire.getDate() + 1);
 	}
 
 	describe(`claimsParameter via ${verb} ${route}`, () => {
-		let setup = null;
+		let setup: Setup;
 		async function getToken(auth, { cookie: cookieHeader } = {}) {
 			const cookie = cookieHeader || (await setup.login());
 			const authRes = await authRequest(auth, { cookie });
@@ -57,7 +57,7 @@ expire.setDate(expire.getDate() + 1);
 		}
 
 		beforeAll(async function () {
-			setup = await bootstrap(import.meta.url)();
+			setup = await bootstrap(import.meta.url);
 		});
 
 		it('specify id_token should return individual claims requested', async function () {

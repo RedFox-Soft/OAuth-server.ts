@@ -1,15 +1,15 @@
 import { parse as parseUrl } from 'node:url';
 import { describe, it, beforeAll, expect } from 'bun:test';
-import bootstrap, { agent } from '../test_helper.js';
+import bootstrap, { agent, type Setup } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';
 
 describe('PKCE RFC7636', () => {
-	let setup = null;
+	let setup: Setup;
 	let cookie = null;
 	beforeAll(async function () {
-		setup = await bootstrap(import.meta.url)();
+		setup = await bootstrap(import.meta.url);
 		cookie = await setup.login();
 	});
 
@@ -191,6 +191,7 @@ describe('PKCE RFC7636', () => {
 				grant_type: 'authorization_code',
 				redirect_uri: 'com.example.myapp:/localhost/cb'
 			});
+			if (!error) throw new Error('expected error response');
 			expect(error).toHaveProperty('status', 400);
 			expect(error.value).toHaveProperty('error', 'invalid_grant');
 		});
@@ -214,6 +215,7 @@ describe('PKCE RFC7636', () => {
 				redirect_uri: 'com.example.myapp:/localhost/cb',
 				code_verifier: '19Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM'
 			});
+			if (!error) throw new Error('expected error response');
 			expect(error).toHaveProperty('status', 400);
 			expect(error.value).toHaveProperty('error', 'invalid_grant');
 		});
@@ -237,6 +239,7 @@ describe('PKCE RFC7636', () => {
 				redirect_uri: 'com.example.myapp:/localhost/cb',
 				code_verifier: 'f'.repeat(42)
 			});
+			if (!error) throw new Error('expected error response');
 			expect(error).toHaveProperty('status', 422);
 			expect(error.value).toHaveProperty('error', 'invalid_request');
 			expect(error.value).toHaveProperty(
@@ -264,6 +267,7 @@ describe('PKCE RFC7636', () => {
 				redirect_uri: 'com.example.myapp:/localhost/cb',
 				code_verifier: 'f'.repeat(129)
 			});
+			if (!error) throw new Error('expected error response');
 			expect(error).toHaveProperty('status', 422);
 			expect(error.value).toHaveProperty('error', 'invalid_request');
 			expect(error.value).toHaveProperty(
@@ -291,6 +295,7 @@ describe('PKCE RFC7636', () => {
 				redirect_uri: 'com.example.myapp:/localhost/cb',
 				code_verifier: `${'f'.repeat(42)}&`
 			});
+			if (!error) throw new Error('expected error response');
 			expect(error).toHaveProperty('status', 422);
 			expect(error.value).toHaveProperty('error', 'invalid_request');
 			expect(error.value).toHaveProperty(

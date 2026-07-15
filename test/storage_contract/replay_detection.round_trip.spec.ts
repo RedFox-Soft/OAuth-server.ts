@@ -6,7 +6,7 @@ import { assertStoredMatchesSchema, storedPayloadFor } from './round_trip.js';
 
 describe('storage contract: ReplayDetection', () => {
 	beforeAll(async () => {
-		await bootstrap(import.meta.url)();
+		await bootstrap(import.meta.url);
 	});
 
 	it('persists exactly its schema-declared fields (incl. iss) and round-trips', async () => {

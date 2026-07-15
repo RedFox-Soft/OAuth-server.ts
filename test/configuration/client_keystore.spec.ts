@@ -46,7 +46,7 @@ function setResponse(
 // NOTE: these tests are to be run sequentially, picking one random won't pass
 describe('client keystore refresh', () => {
 	beforeAll(async function () {
-		await bootstrap(import.meta.url, { config: 'client_keystore' })();
+		await bootstrap(import.meta.url, { config: 'client_keystore' });
 
 		initializeClients.call(provider, [
 			{

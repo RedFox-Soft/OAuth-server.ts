@@ -10,7 +10,7 @@ import {
 	mock
 } from 'bun:test';
 
-import bootstrap, { agent } from '../test_helper.js';
+import bootstrap, { agent, type Setup } from '../test_helper.js';
 import { decode as decodeJWT } from '../../lib/helpers/jwt.ts';
 import { provider } from 'lib/provider.js';
 import { Client } from 'lib/models/client.js';
@@ -20,10 +20,10 @@ import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 const scope = 'openid email offline_access';
 
 describe('configuration conformIdTokenClaims=false', () => {
-	let setup = null;
+	let setup: Setup;
 	let cookie = null;
 	beforeAll(async () => {
-		setup = await bootstrap(import.meta.url, { config: 'non_conform' })();
+		setup = await bootstrap(import.meta.url, { config: 'non_conform' });
 		spyOn(OIDCContext.prototype, 'promptPending').mockReturnValue(false);
 		cookie = await setup.login({
 			scope,
@@ -62,6 +62,7 @@ describe('configuration conformIdTokenClaims=false', () => {
 
 			const tokenRes = await auth.getToken(code);
 			expect(tokenRes.status).toBe(200);
+			if (!tokenRes.data) throw new Error('expected response data');
 			tokenIdToken = tokenRes.data.id_token;
 			const refresh_token = tokenRes.data.refresh_token;
 
@@ -73,6 +74,7 @@ describe('configuration conformIdTokenClaims=false', () => {
 				{ headers: AuthorizationRequest.basicAuthHeader('client', 'secret') }
 			);
 			expect(refreshRes.status).toBe(200);
+			if (!refreshRes.data) throw new Error('expected response data');
 			refreshIdToken = refreshRes.data.id_token;
 			const access_token = refreshRes.data.access_token;
 

@@ -23,7 +23,7 @@ const expire = new Date();
 expire.setDate(expire.getDate() + 1);
 
 describe('devInteractions', async () => {
-	const setup = await bootstrap(import.meta.url)();
+	const setup = await bootstrap(import.meta.url);
 	afterEach(function () {
 		mock.restore();
 	});
@@ -354,7 +354,7 @@ describe('devInteractions', async () => {
 });
 
 describe('resume after consent', async () => {
-	const setup = await bootstrap(import.meta.url)();
+	const setup = await bootstrap(import.meta.url);
 	afterEach(function () {
 		mock.restore();
 	});

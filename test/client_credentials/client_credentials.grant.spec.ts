@@ -7,7 +7,7 @@ import { OIDCContext } from 'lib/helpers/oidc_context.js';
 
 describe('grant_type=client_credentials', () => {
 	beforeAll(async function () {
-		await bootstrap(import.meta.url)();
+		await bootstrap(import.meta.url);
 	});
 
 	it('provides a Bearer client credentials token', async function () {
@@ -64,6 +64,7 @@ describe('grant_type=client_credentials', () => {
 				headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 			}
 		);
+		if (!error) throw new Error('expected error response');
 		expect(error.status).toBe(400);
 		expect(error.value).toEqual({
 			error: 'invalid_scope',

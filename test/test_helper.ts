@@ -87,201 +87,203 @@ export function jsonToFormUrlEncoded(json: Record<string, unknown>) {
 	return searchParams.toString();
 }
 
-export default function (
+async function bootstrap(
 	importMetaUrl: string,
 	{ config: base }: { config?: string } = {}
 ) {
 	const dir = dirname(importMetaUrl);
 	base ??= path.basename(dir);
 
-	return async function () {
-		const conf = pathToFileURL(
-			path.format({ dir, base: `${base}.config.js` })
-		).toString();
-		const {
-			default: mod,
-			ApplicationConfig: app,
-			ClientDefaults: clientSettings
-		} = await import(conf);
-		const { config, client } = mod;
-		let { clients } = mod;
+	const conf = pathToFileURL(
+		path.format({ dir, base: `${base}.config.js` })
+	).toString();
+	const {
+		default: mod,
+		ApplicationConfig: app,
+		ClientDefaults: clientSettings
+	} = await import(conf);
+	const { config, client } = mod;
+	let { clients } = mod;
 
-		if (client && !clients) {
-			clients = [client];
-		}
-		AuthorizationRequest.clients = clients;
+	if (client && !clients) {
+		clients = [client];
+	}
+	AuthorizationRequest.clients = clients;
 
-		if (!config.findAccount) {
-			config.findAccount = Account.findAccount;
-		}
+	if (!config.findAccount) {
+		config.findAccount = Account.findAccount;
+	}
 
-		Object.assign(ApplicationConfig, applicationDefaultSettings, app || {});
-		Object.assign(ClientDefaults, clientDefaultSettings, clientSettings || {});
-		TestAdapter.clear();
+	Object.assign(ApplicationConfig, applicationDefaultSettings, app || {});
+	Object.assign(ClientDefaults, clientDefaultSettings, clientSettings || {});
+	TestAdapter.clear();
 
-		provider.init({
-			clients,
-			adapter: TestAdapter,
-			...config
-		});
+	provider.init({
+		clients,
+		adapter: TestAdapter,
+		...config
+	});
 
-		let lastSession: Session;
-		let lastAccountId: string;
+	let lastSession: Session;
+	let lastAccountId: string;
 
-		async function login({
-			scope = 'openid',
-			claims,
-			resources = {},
-			rejectedScopes = [],
-			rejectedClaims = [],
-			accountId = nanoid()
-		}: {
-			scope?: string;
-			claims?: {
-				id_token?: Record<string, unknown>;
-				userinfo?: Record<string, unknown>;
-			};
-			resources?: Record<string, string>;
-			rejectedScopes?: string[];
-			rejectedClaims?: string[];
-			accountId?: string;
-		} = {}) {
-			const sessionId = nanoid();
-			const loginTs = epochTime();
-			const expire = new Date();
-			expire.setDate(expire.getDate() + 1);
-			lastAccountId = accountId;
-
-			const session = new Session({
-				jti: sessionId,
-				loginTs,
-				accountId
-			});
-			lastSession = session;
-			const sessionCookie = `_session=${sessionId}; path=/; expires=${expire.toGMTString()}; httponly`;
-			const cookies = [sessionCookie];
-
-			session.payload.authorizations = {};
-			const oidc = new OIDCContext({ scope, claims });
-
-			if (oidc.params.claims && typeof oidc.params.claims !== 'string') {
-				oidc.params.claims = JSON.stringify(oidc.params.claims);
-			}
-
-			for (const cl of clients) {
-				const grant = new Grant({ clientId: cl.clientId, accountId });
-				grant.addOIDCScope(scope);
-				if (oidc.params.claims) {
-					grant.addOIDCClaims(
-						Object.keys(JSON.parse(oidc.params.claims).id_token || {})
-					);
-					grant.addOIDCClaims(
-						Object.keys(JSON.parse(oidc.params.claims).userinfo || {})
-					);
-				}
-				if (rejectedScopes.length) {
-					grant.rejectOIDCScope(rejectedScopes.join(' '));
-				}
-				if (rejectedClaims.length) {
-					grant.rejectOIDCClaims(rejectedClaims);
-				}
-
-				for (const [key, value] of Object.entries(resources)) {
-					grant.addResourceScope(key, value);
-				}
-
-				const grantId = await grant.save();
-				session.payload.authorizations[cl.clientId] = {
-					sid: nanoid(),
-					grantId
-				};
-			}
-
-			return Account.findAccount({}, accountId)
-				.then(session.save(ttl.Session))
-				.then(() => {
-					return cookies;
-				});
-		}
-
-		function getLastSession() {
-			return lastSession;
-		}
-
-		function getSessionId() {
-			return getLastSession().id;
-		}
-
-		function getSession(id?: string) {
-			const sessionId = id ?? getLastSession().id;
-			return TestAdapter.for('Session').syncFind(sessionId);
-		}
-
-		function getGrantId(clientId?: string) {
-			const session = getSession();
-
-			if (!clientId && client) clientId = client.clientId;
-			if (!clientId && clients) clientId = clients[0].clientId;
-			try {
-				return session.authorizations[clientId].grantId;
-			} catch (err) {
-				throw new Error('getGrantId() failed');
-			}
-		}
-
-		function getTokenJti(token: string) {
-			try {
-				return jwt(token);
-			} catch (err) {}
-
-			return token; // opaque
-		}
-
-		function failWith(
-			code: number,
-			error: string,
-			error_description: string,
-			scope?: string
-		) {
-			return ({
-				status,
-				body,
-				headers: { 'www-authenticate': wwwAuth }
-			}: {
-				status: number;
-				body: unknown;
-				headers: Record<string, string | undefined>;
-			}) => {
-				expect(status).toEqual(code);
-				expect(body).toHaveProperty('error', error);
-				expect(body).toHaveProperty('error_description', error_description);
-				expect(wwwAuth).toMatch(new RegExp(`^Bearer realm="${ISSUER}"`));
-				const present = error_description !== 'no access token provided';
-				const check = (re: RegExp) => {
-					if (present) expect(wwwAuth).toMatch(re);
-					else expect(wwwAuth).not.toMatch(re);
-				};
-				check(new RegExp(`error="${error}"`));
-				check(
-					new RegExp(
-						`error_description="${error_description.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}"`
-					)
-				);
-				if (scope) check(new RegExp(`scope="${scope}"`));
-			};
-		}
-
-		return {
-			failWith,
-			getLastSession,
-			getSession,
-			getAccountId() {
-				return lastAccountId;
-			},
-			getSessionId,
-			getGrantId,
-			getTokenJti,
-			login
+	async function login({
+		scope = 'openid',
+		claims,
+		resources = {},
+		rejectedScopes = [],
+		rejectedClaims = [],
+		accountId = nanoid()
+	}: {
+		scope?: string;
+		claims?: {
+			id_token?: Record<string, unknown>;
+			userinfo?: Record<string, unknown>;
 		};
+		resources?: Record<string, string>;
+		rejectedScopes?: string[];
+		rejectedClaims?: string[];
+		accountId?: string;
+	} = {}) {
+		const sessionId = nanoid();
+		const loginTs = epochTime();
+		const expire = new Date();
+		expire.setDate(expire.getDate() + 1);
+		lastAccountId = accountId;
+
+		const session = new Session({
+			jti: sessionId,
+			loginTs,
+			accountId
+		});
+		lastSession = session;
+		const sessionCookie = `_session=${sessionId}; path=/; expires=${expire.toGMTString()}; httponly`;
+		const cookies = [sessionCookie];
+
+		session.payload.authorizations = {};
+		const oidc = new OIDCContext({ scope, claims });
+
+		if (oidc.params.claims && typeof oidc.params.claims !== 'string') {
+			oidc.params.claims = JSON.stringify(oidc.params.claims);
+		}
+
+		for (const cl of clients) {
+			const grant = new Grant({ clientId: cl.clientId, accountId });
+			grant.addOIDCScope(scope);
+			if (oidc.params.claims) {
+				grant.addOIDCClaims(
+					Object.keys(JSON.parse(oidc.params.claims).id_token || {})
+				);
+				grant.addOIDCClaims(
+					Object.keys(JSON.parse(oidc.params.claims).userinfo || {})
+				);
+			}
+			if (rejectedScopes.length) {
+				grant.rejectOIDCScope(rejectedScopes.join(' '));
+			}
+			if (rejectedClaims.length) {
+				grant.rejectOIDCClaims(rejectedClaims);
+			}
+
+			for (const [key, value] of Object.entries(resources)) {
+				grant.addResourceScope(key, value);
+			}
+
+			const grantId = await grant.save();
+			session.payload.authorizations[cl.clientId] = {
+				sid: nanoid(),
+				grantId
+			};
+		}
+
+		return Account.findAccount({}, accountId)
+			.then(session.save(ttl.Session))
+			.then(() => {
+				return cookies;
+			});
+	}
+
+	function getLastSession() {
+		return lastSession;
+	}
+
+	function getSessionId() {
+		return getLastSession().id;
+	}
+
+	function getSession(id?: string) {
+		const sessionId = id ?? getLastSession().id;
+		return TestAdapter.for('Session').syncFind(sessionId);
+	}
+
+	function getGrantId(clientId?: string) {
+		const session = getSession();
+
+		if (!clientId && client) clientId = client.clientId;
+		if (!clientId && clients) clientId = clients[0].clientId;
+		try {
+			return session.authorizations[clientId].grantId;
+		} catch (err) {
+			throw new Error('getGrantId() failed');
+		}
+	}
+
+	function getTokenJti(token: string) {
+		try {
+			return jwt(token);
+		} catch (err) {}
+
+		return token; // opaque
+	}
+
+	function failWith(
+		code: number,
+		error: string,
+		error_description: string,
+		scope?: string
+	) {
+		return ({
+			status,
+			body,
+			headers: { 'www-authenticate': wwwAuth }
+		}: {
+			status: number;
+			body: unknown;
+			headers: Record<string, string | undefined>;
+		}) => {
+			expect(status).toEqual(code);
+			expect(body).toHaveProperty('error', error);
+			expect(body).toHaveProperty('error_description', error_description);
+			expect(wwwAuth).toMatch(new RegExp(`^Bearer realm="${ISSUER}"`));
+			const present = error_description !== 'no access token provided';
+			const check = (re: RegExp) => {
+				if (present) expect(wwwAuth).toMatch(re);
+				else expect(wwwAuth).not.toMatch(re);
+			};
+			check(new RegExp(`error="${error}"`));
+			check(
+				new RegExp(
+					`error_description="${error_description.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}"`
+				)
+			);
+			if (scope) check(new RegExp(`scope="${scope}"`));
+		};
+	}
+
+	return {
+		failWith,
+		getLastSession,
+		getSession,
+		getAccountId() {
+			return lastAccountId;
+		},
+		getSessionId,
+		getGrantId,
+		getTokenJti,
+		login
 	};
 }
+
+export default bootstrap;
+
+export type Setup = Awaited<ReturnType<typeof bootstrap>>;

@@ -11,7 +11,7 @@ import {
 
 describe('storage contract: Session', () => {
 	beforeAll(async () => {
-		await bootstrap(import.meta.url)();
+		await bootstrap(import.meta.url);
 	});
 
 	it('persists the full session (state + authorizations verbatim) and round-trips', async () => {

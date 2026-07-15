@@ -10,17 +10,17 @@ import {
 	setSystemTime
 } from 'bun:test';
 
-import bootstrap from '../test_helper.js';
+import bootstrap, { type Setup } from '../test_helper.js';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { TestAdapter } from 'test/models.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';
 
 describe('BaseToken', () => {
-	let setup = null;
+	let setup: Setup;
 	const adapter = TestAdapter.for('RefreshToken');
 	beforeAll(async function () {
-		setup = await bootstrap(import.meta.url)();
+		setup = await bootstrap(import.meta.url);
 	});
 
 	beforeEach(function () {

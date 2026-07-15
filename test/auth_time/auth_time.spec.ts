@@ -14,7 +14,7 @@ import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 
 describe('responds with a id_token containing auth_time', async () => {
-	const setup = await bootstrap(import.meta.url)();
+	const setup = await bootstrap(import.meta.url);
 	let cookie = '';
 	beforeAll(async function () {
 		cookie = await setup.login();
@@ -43,6 +43,7 @@ describe('responds with a id_token containing auth_time', async () => {
 		} = url.parse(response.headers.get('location'), true);
 
 		const { data } = await auth.getToken(code);
+		if (!data) throw new Error('expected response data');
 		return data.id_token;
 	}
 

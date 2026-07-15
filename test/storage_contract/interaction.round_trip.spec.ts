@@ -12,7 +12,7 @@ import {
 
 describe('storage contract: Interaction', () => {
 	beforeAll(async () => {
-		await bootstrap(import.meta.url)();
+		await bootstrap(import.meta.url);
 	});
 
 	it('persists every audited field verbatim, derives grantId, and drops the grant instance', async () => {

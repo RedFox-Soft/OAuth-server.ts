@@ -11,7 +11,11 @@ import {
 	mock
 } from 'bun:test';
 
-import bootstrap, { agent, jsonToFormUrlEncoded } from '../../test_helper.js';
+import bootstrap, {
+	agent,
+	jsonToFormUrlEncoded,
+	type Setup
+} from '../../test_helper.js';
 import epochTime from '../../../lib/helpers/epoch_time.ts';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { provider } from 'lib/provider.js';
@@ -23,9 +27,9 @@ const response_type = 'code';
 const scope = 'openid';
 
 describe('BASIC code', () => {
-	let setup = null;
+	let setup: Setup;
 	beforeAll(async function () {
-		setup = await bootstrap(import.meta.url)();
+		setup = await bootstrap(import.meta.url);
 	});
 
 	afterEach(function () {
@@ -630,6 +634,7 @@ describe('BASIC code', () => {
 				const { response, error } = await authRequest(auth, {
 					accept: 'text/html'
 				});
+				if (!error) throw new Error('expected error response');
 				expect(response.status).toBe(422);
 				expect(response.headers.get('content-type')).toBe(
 					'text/html; charset=utf-8'
@@ -651,6 +656,7 @@ describe('BASIC code', () => {
 				const { response, error } = await authRequest(auth, {
 					accept: 'text/html'
 				});
+				if (!error) throw new Error('expected error response');
 				expect(response.status).toBe(400);
 				expect(response.headers.get('content-type')).toBe(
 					'text/html; charset=utf-8'
@@ -671,6 +677,7 @@ describe('BASIC code', () => {
 					const { response, error } = await authRequest(auth, {
 						accept: 'text/html'
 					});
+					if (!error) throw new Error('expected error response');
 					expect(error.status).toBe(400);
 					expect(spy).toHaveBeenCalledTimes(2);
 					expect(spy.mock.calls[0][0]).toHaveProperty(
@@ -706,6 +713,7 @@ describe('BASIC code', () => {
 					const { response, error } = await authRequest(auth, {
 						accept: 'text/html'
 					});
+					if (!error) throw new Error('expected error response');
 					expect(error.status).toBe(400);
 
 					expect(serverErrorSpy).toHaveBeenCalledTimes(1);
@@ -868,6 +876,7 @@ describe('BASIC code', () => {
 				const { response, error } = await authRequest(auth, {
 					accept: 'text/html'
 				});
+				if (!error) throw new Error('expected error response');
 				expect(response.status).toBe(400);
 				expect(response.headers.get('content-type')).toBe(
 					'text/html; charset=utf-8'

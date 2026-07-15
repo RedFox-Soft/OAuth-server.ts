@@ -1,14 +1,14 @@
 import { strict as assert } from 'node:assert';
 import { describe, it, beforeAll, expect } from 'bun:test';
 
-import bootstrap from '../test_helper.js';
+import bootstrap, { type Setup } from '../test_helper.js';
 import addClient from '../../lib/helpers/add_client.ts';
 import provider from 'lib/index.js';
 
 describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
-	let setup = null;
+	let setup: Setup;
 	beforeAll(async function () {
-		setup = await bootstrap(import.meta.url)();
+		setup = await bootstrap(import.meta.url);
 	});
 
 	describe('changed native client validations', () => {

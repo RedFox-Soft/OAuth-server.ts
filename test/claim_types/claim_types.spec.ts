@@ -1,13 +1,13 @@
 import i from 'lib/helpers/weak_cache.js';
 import { describe, it, beforeAll, expect } from 'bun:test';
-import bootstrap, { agent } from '../test_helper.js';
+import bootstrap, { agent, type Setup } from '../test_helper.js';
 import { provider } from 'lib/provider.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
 describe('distributed and aggregated claims', () => {
-	let setup = null;
+	let setup: Setup;
 	beforeAll(async function () {
-		setup = await bootstrap(import.meta.url)();
+		setup = await bootstrap(import.meta.url);
 
 		i(provider).configuration.findAccount = async (ctx, id) => ({
 			accountId: id,
@@ -59,6 +59,7 @@ describe('distributed and aggregated claims', () => {
 					authorization: `Bearer ${access_token}`
 				}
 			});
+			if (!data) throw new Error('expected response data');
 
 			expect(data).toHaveProperty('nickname', 'foobar');
 			expect(data).not.toHaveProperty('given_name');

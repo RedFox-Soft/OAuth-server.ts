@@ -8,7 +8,7 @@ import {
 	mock
 } from 'bun:test';
 
-import bootstrap, { agent } from '../test_helper.js';
+import bootstrap, { agent, type Setup } from '../test_helper.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { provider } from 'lib/provider.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
@@ -20,9 +20,9 @@ import { AccessToken } from 'lib/models/access_token.js';
 import { ClientCredentials } from 'lib/models/client_credentials.js';
 
 describe('introspection features', () => {
-	let setup = null;
+	let setup: Setup;
 	beforeAll(async function () {
-		setup = await bootstrap(import.meta.url)();
+		setup = await bootstrap(import.meta.url);
 	});
 	afterEach(function () {
 		mock.restore();
@@ -62,6 +62,7 @@ describe('introspection features', () => {
 					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 				}
 			);
+			if (!data) throw new Error('expected response data');
 			expect(status).toBe(200);
 			expect(data).toContainKeys([
 				'client_id',
@@ -94,6 +95,7 @@ describe('introspection features', () => {
 					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 				}
 			);
+			if (!data) throw new Error('expected response data');
 			expect(status).toBe(200);
 
 			expect(data).toContainKeys(['client_id', 'scope', 'sub']);
@@ -115,6 +117,7 @@ describe('introspection features', () => {
 					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 				}
 			);
+			if (!data) throw new Error('expected response data');
 			expect(status).toBe(200);
 
 			expect(data).toContainKeys(['client_id', 'scope', 'sub']);
@@ -136,6 +139,7 @@ describe('introspection features', () => {
 					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 				}
 			);
+			if (!data) throw new Error('expected response data');
 			expect(status).toBe(200);
 
 			expect(data).toContainKeys(['client_id', 'scope', 'sub']);
@@ -300,6 +304,7 @@ describe('introspection features', () => {
 					)
 				}
 			);
+			if (!data) throw new Error('expected response data');
 			expect(status).toBe(200);
 			expect(data).toContainKeys(['client_id', 'scope', 'sub']);
 			expect(data.sub).not.toBe('accountId');
@@ -323,6 +328,7 @@ describe('introspection features', () => {
 					)
 				}
 			);
+			if (!data) throw new Error('expected response data');
 			expect(status).toBe(200);
 			expect(data).toContainKeys(['client_id', 'scope', 'sub']);
 			expect(data.sub).not.toBe('accountId');
@@ -345,6 +351,7 @@ describe('introspection features', () => {
 					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 				}
 			);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(422);
 			expect(error.value).toHaveProperty('error', 'invalid_request');
 			expect(error.value).toHaveProperty(

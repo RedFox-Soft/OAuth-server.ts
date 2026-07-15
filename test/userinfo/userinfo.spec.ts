@@ -20,7 +20,7 @@ import { ApplicationConfig } from 'lib/configs/application.js';
 describe('UserInfo', () => {
 	let access_token: string;
 	beforeAll(async () => {
-		const setup = await bootstrap(import.meta.url)();
+		const setup = await bootstrap(import.meta.url);
 		const cookie = await setup.login({
 			scope: 'openid email',
 			rejectedClaims: ['email_verified']

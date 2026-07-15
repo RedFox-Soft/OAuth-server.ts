@@ -67,7 +67,7 @@ async function DPoP(
 }
 
 describe('features.dPoP', async () => {
-	const setup = await bootstrap(import.meta.url)();
+	const setup = await bootstrap(import.meta.url);
 	const cookie = await setup.login({ scope: 'openid offline_access' });
 	const keypair = await generateKeyPair('ES256', { extractable: true });
 	const jwk = await exportJWK(keypair.publicKey);
@@ -116,6 +116,7 @@ describe('features.dPoP', async () => {
 				}
 			});
 			expect(bearer.status).toBe(401);
+			if (!bearer.error) throw new Error('expected error response');
 			expect(bearer.error.value).toEqual({
 				error: 'invalid_token',
 				error_description: 'invalid token provided'
@@ -131,6 +132,7 @@ describe('features.dPoP', async () => {
 				}
 			});
 			expect(dpopEmpty.status).toBe(401);
+			if (!dpopEmpty.error) throw new Error('expected error response');
 			expect(dpopEmpty.error.value).toEqual({
 				error: 'invalid_header_authorization',
 				error_description: '`DPoP` header not provided'
@@ -148,6 +150,7 @@ describe('features.dPoP', async () => {
 				}
 			});
 			expect(dpopRes.status).toBe(401);
+			if (!dpopRes.error) throw new Error('expected error response');
 			expect(dpopRes.error.value).toEqual({
 				error: 'invalid_header_authorization',
 				error_description:
@@ -196,6 +199,7 @@ describe('features.dPoP', async () => {
 								.sign(keypair.privateKey)
 						}
 					});
+					if (!error) throw new Error('expected error response');
 					expect(error.status).toBe(401);
 					expect(error.value).toEqual({
 						error: 'invalid_dpop_proof',
@@ -224,6 +228,7 @@ describe('features.dPoP', async () => {
 							dpop: `${base64url.encode(JSON.stringify({ jwk, typ: 'dpop+jwt', alg: value }))}.e30.`
 						}
 					});
+					if (!error) throw new Error('expected error response');
 					expect(error.status).toBe(401);
 					expect(error.value).toEqual({
 						error: 'invalid_dpop_proof',
@@ -261,6 +266,7 @@ describe('features.dPoP', async () => {
 								.sign(keypair.privateKey)
 						}
 					});
+					if (!error) throw new Error('expected error response');
 					expect(error.status).toBe(401);
 					expect(error.value).toEqual({
 						error: 'invalid_dpop_proof',
@@ -296,6 +302,7 @@ describe('features.dPoP', async () => {
 							.sign(keypair.privateKey)
 					}
 				});
+				if (!error) throw new Error('expected error response');
 				expect(error.status).toBe(401);
 				expect(error.value).toEqual({
 					error: 'invalid_dpop_proof',
@@ -330,6 +337,7 @@ describe('features.dPoP', async () => {
 							.sign(keypair.privateKey)
 					}
 				});
+				if (!error) throw new Error('expected error response');
 				expect(error.status).toBe(401);
 				expect(error.value).toEqual({
 					error: 'invalid_dpop_proof',
@@ -365,6 +373,7 @@ describe('features.dPoP', async () => {
 							.sign(keypair.privateKey)
 					}
 				});
+				if (!error) throw new Error('expected error response');
 				expect(error.status).toBe(401);
 				expect(error.value).toEqual({
 					error: 'invalid_dpop_proof',
@@ -396,6 +405,7 @@ describe('features.dPoP', async () => {
 							.sign(keypair.privateKey)
 					}
 				});
+				if (!error) throw new Error('expected error response');
 				expect(error.status).toBe(401);
 				expect(error.value).toEqual({
 					error: 'invalid_dpop_proof',
@@ -427,6 +437,7 @@ describe('features.dPoP', async () => {
 							.sign(keypair.privateKey)
 					}
 				});
+				if (!error) throw new Error('expected error response');
 				expect(error.status).toBe(401);
 				expect(error.value).toEqual({
 					error: 'invalid_dpop_proof',
@@ -469,6 +480,7 @@ describe('features.dPoP', async () => {
 										.sign(keypair.privateKey)
 								}
 							});
+							if (!error) throw new Error('expected error response');
 							expect(error.status).toBe(401);
 							expect(headers.get('www-authenticate')).toMatch(/^DPoP /);
 							expect(headers.get('www-authenticate')).toMatch(
@@ -612,6 +624,7 @@ describe('features.dPoP', async () => {
 					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 				}
 			);
+			if (!data) throw new Error('expected response data');
 			expect(status).toBe(200);
 			expect(data).toHaveProperty('active', true);
 			expect(data).toHaveProperty('token_type', 'DPoP');
@@ -631,6 +644,7 @@ describe('features.dPoP', async () => {
 				}
 			);
 			expect(code.status).toBe(200);
+			if (!code.data) throw new Error('expected response data');
 			device_code = code.data.device_code;
 
 			TestAdapter.for('DeviceCode').syncUpdate(setup.getTokenJti(device_code), {
@@ -725,6 +739,7 @@ describe('features.dPoP', async () => {
 					}
 				}
 			);
+			if (!data) throw new Error('expected response data');
 			reqId = data.auth_req_id;
 		});
 
@@ -846,6 +861,7 @@ describe('features.dPoP', async () => {
 				}
 			);
 			expect(res.status).toBe(400);
+			if (!res.error) throw new Error('expected error response');
 			expect(res.error.value).toEqual({
 				error: 'invalid_request',
 				error_description: 'DPoP proof key thumbprint does not match dpop_jkt'
@@ -874,6 +890,7 @@ describe('features.dPoP', async () => {
 				}
 			);
 			expect(par.status).toBe(201);
+			if (!par.data) throw new Error('expected response data');
 			const request_uri = par.data.request_uri;
 
 			const auth = new AuthorizationRequest({ request_uri });
@@ -926,6 +943,7 @@ describe('features.dPoP', async () => {
 				}
 			);
 			expect(par.status).toBe(201);
+			if (!par.data) throw new Error('expected response data');
 			const request_uri = par.data.request_uri;
 
 			const auth = new AuthorizationRequest({ request_uri });
@@ -1073,6 +1091,7 @@ describe('features.dPoP', async () => {
 						}
 					}
 				);
+				if (!error) throw new Error('expected error response');
 				expect(status).toBe(400);
 				expect(error.value).toEqual({
 					error: 'invalid_grant',
@@ -1101,6 +1120,7 @@ describe('features.dPoP', async () => {
 						headers: auth.basicAuthHeader
 					}
 				);
+				if (!error) throw new Error('expected error response');
 				expect(status).toBe(400);
 				expect(error.value).toEqual({
 					error: 'invalid_grant',
@@ -1148,6 +1168,7 @@ describe('features.dPoP', async () => {
 					}
 				);
 				expect(token.status).toBe(200);
+				if (!token.data) throw new Error('expected response data');
 				refresh_token = token.data.refresh_token;
 			});
 
@@ -1256,6 +1277,7 @@ describe('features.dPoP', async () => {
 					}
 				);
 				expect(res.status).toBe(200);
+				if (!res.data) throw new Error('expected response data');
 				refresh_token = res.data.refresh_token;
 			});
 
@@ -1313,6 +1335,7 @@ describe('features.dPoP', async () => {
 					}
 				);
 				expect(res.status).toBe(400);
+				if (!res.error) throw new Error('expected error response');
 				expect(res.error.value).toEqual({
 					error: 'invalid_grant',
 					error_description: 'grant request is invalid'
@@ -1364,6 +1387,7 @@ describe('features.dPoP', async () => {
 					}
 				}
 			);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(error.value).toEqual({
 				error: 'invalid_dpop_proof',
@@ -1384,6 +1408,7 @@ describe('features.dPoP', async () => {
 				}
 			});
 			expect(res.status).toBe(401);
+			if (!res.error) throw new Error('expected error response');
 			expect(res.error.value).toEqual({
 				error: 'use_dpop_nonce',
 				error_description: 'invalid nonce in DPoP proof'
@@ -1400,6 +1425,7 @@ describe('features.dPoP', async () => {
 				}
 			});
 			expect(userInfo.status).toBe(401);
+			if (!userInfo.error) throw new Error('expected error response');
 			expect(userInfo.error.value).toEqual({
 				error: 'invalid_token',
 				error_description: 'invalid token provided'
@@ -1421,6 +1447,7 @@ describe('features.dPoP', async () => {
 				}
 			);
 			expect(res.status).toBe(400);
+			if (!res.error) throw new Error('expected error response');
 			expect(res.error.value).toEqual({
 				error: 'use_dpop_nonce',
 				error_description: 'invalid nonce in DPoP proof'
@@ -1475,6 +1502,7 @@ describe('features.dPoP', async () => {
 			);
 			expect(res.status).toBe(400);
 			expect(res.headers.get('DPoP-Nonce')).toMatch(/^[\w-]{43}$/);
+			if (!res.error) throw new Error('expected error response');
 			expect(res.error.value).toEqual({
 				error: 'use_dpop_nonce',
 				error_description: 'nonce is required in the DPoP proof'
@@ -1511,6 +1539,7 @@ describe('features.dPoP', async () => {
 				}
 			});
 			expect(res.status).toBe(401);
+			if (!res.error) throw new Error('expected error response');
 			expect(res.error.value).toEqual({
 				error: 'use_dpop_nonce',
 				error_description: 'nonce is required in the DPoP proof'
@@ -1527,6 +1556,7 @@ describe('features.dPoP', async () => {
 				}
 			});
 			expect(userInfo.status).toBe(401);
+			if (!userInfo.error) throw new Error('expected error response');
 			expect(userInfo.error.value).toEqual({
 				error: 'invalid_token',
 				error_description: 'invalid token provided'
@@ -1548,6 +1578,7 @@ describe('features.dPoP', async () => {
 				}
 			);
 			expect(res.status).toBe(400);
+			if (!res.error) throw new Error('expected error response');
 			expect(res.error.value).toEqual({
 				error: 'use_dpop_nonce',
 				error_description: 'nonce is required in the DPoP proof'
