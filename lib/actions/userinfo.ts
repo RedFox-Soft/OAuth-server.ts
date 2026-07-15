@@ -159,8 +159,8 @@ export const userinfo = new Elysia()
 		})
 	})
 	.get(routeNames.userinfo, userInfo, {
-		response: { 200: UserinfoResponse, 401: OAuthError }
+		response: { 200: UserinfoResponse, 401: OAuthError, 403: OAuthError }
 	})
 	.post(routeNames.userinfo, userInfo, {
-		response: { 200: UserinfoResponse, 401: OAuthError }
+		response: { 200: UserinfoResponse, 401: OAuthError, 403: OAuthError }
 	});
