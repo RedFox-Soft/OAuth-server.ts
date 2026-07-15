@@ -18,13 +18,53 @@ export const OAuthError = t.Object({
 	iss: t.Optional(t.String())
 });
 
-// Token endpoint (RFC 6749 §5.1). Per-grant handlers resolve through `executeGrant`, whose return
-// type is `Response | Record<string, unknown>` (the grant handlers are not yet individually typed —
-// US2/US3 typing debt). Typing the success body as an open record keeps it assignable (no `any`,
-// no new compile error) while still runtime-accepting every grant's body; the named field set
-// (access_token, token_type, expires_in, scope, id_token, refresh_token) is documented in
-// contracts/endpoint-responses.md and can be tightened once grant returns are typed.
-export const TokenResponse = t.Record(t.String(), t.Unknown());
+// Token endpoint (RFC 6749 §5.1). The success body depends on grant_type:
+//   - client_credentials            → access token only (no id_token / refresh_token)
+//   - device_code, ciba             → + id_token, refresh_token
+//   - authorization_code, refresh_token → + id_token, refresh_token, authorization_details (RAR)
+// `additionalProperties` stays open (DPoP `cnf`, and other dynamic extras) so a real body never
+// 422s. Optional fields are declared nullable-ish (a grant may emit the key with `undefined`, e.g.
+// `scope: … || undefined`).
+
+// Common OAuth access-token response fields, shared by every grant.
+const accessTokenResponseFields = {
+	access_token: t.String(),
+	token_type: t.String(),
+	expires_in: t.Number(),
+	scope: t.Optional(t.String())
+};
+
+// client_credentials — access token, no id_token / refresh_token.
+export const ClientCredentialsTokenResponse = t.Object(accessTokenResponseFields, {
+	additionalProperties: true
+});
+
+// device_code / ciba — adds id_token + refresh_token.
+export const RefreshableTokenResponse = t.Object(
+	{
+		...accessTokenResponseFields,
+		id_token: t.Optional(t.String()),
+		refresh_token: t.Optional(t.String())
+	},
+	{ additionalProperties: true }
+);
+
+// authorization_code / refresh_token — additionally carries RAR authorization_details.
+export const AuthorizationCodeTokenResponse = t.Object(
+	{
+		...accessTokenResponseFields,
+		id_token: t.Optional(t.String()),
+		refresh_token: t.Optional(t.String()),
+		authorization_details: t.Optional(t.Array(t.Unknown()))
+	},
+	{ additionalProperties: true }
+);
+
+export const TokenResponse = t.Union([
+	AuthorizationCodeTokenResponse,
+	RefreshableTokenResponse,
+	ClientCredentialsTokenResponse
+]);
 
 // Introspection (RFC 7662) — JSON variant; the JWT variant returns a `Response` (bypasses schema).
 export const IntrospectionResponse = t.Union([

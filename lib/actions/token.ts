@@ -5,7 +5,7 @@ import {
 	codeGrantParameters,
 	deviceCodeGrantParameters,
 	executeGrant,
-	grantStore,
+	grantTypeSchema,
 	refreshTokenGrantParameters
 } from './grants/index.js';
 import { routeNames } from 'lib/consts/param_list.js';
@@ -15,8 +15,7 @@ import {
 	validateReplay
 } from 'lib/helpers/validate_dpop.js';
 import { AuthPlugin, authHeaders, authParams } from 'lib/plugins/auth.js';
-
-const grantTypes = Array.from(grantStore.keys());
+import { TokenResponse } from 'lib/shared/response_schemas.js';
 
 export const tokenAction = new Elysia().use(AuthPlugin).post(
 	routeNames.token,
@@ -41,23 +40,21 @@ export const tokenAction = new Elysia().use(AuthPlugin).post(
 			t.Object({
 				scope: t.Optional(t.String()),
 				resource: t.Optional(t.String({ format: 'uri' })),
-				grant_type: t.Union(
-					grantTypes.map((gt) => t.Literal(gt)),
-					{ error: 'invalid grant_type' }
-				)
+				// Literal union of the grant types the project supports (single source of truth in
+				// grants/index.ts). A proper literal union — not a `keys().map(t.Literal)` array,
+				// whose TypeBox static type collapses to `never` and makes the handler fail Elysia's
+				// InlineHandlerNonMacro check (which is what previously blocked the `response` map).
+				grant_type: grantTypeSchema
 			}),
 			t.Partial(codeGrantParameters),
 			t.Partial(refreshTokenGrantParameters),
 			t.Partial(deviceCodeGrantParameters),
 			t.Partial(cibaGrantParameters)
 		]),
-		headers: authHeaders
-		// NOTE: a typed `response` map cannot be added here yet. Declaring one forces Elysia to
-		// type-check this handler against the route's body schema, whose `grant_type` field is
-		// currently `never` (the `t.Union(grantTypes.map(t.Literal))` union collapses at the type
-		// level — a pre-existing body-typing bug, unrelated to US4). That makes the handler fail to
-		// satisfy `InlineHandlerNonMacro`. Once the `grant_type` union is typed (grant-handler
-		// typing, US2/US3 debt) the success body can be typed as an open record (`executeGrant`
-		// returns `Response | Record<string, unknown>`). See contracts/endpoint-responses.md.
+		headers: authHeaders,
+		// Success body varies by grant_type (access-token-only for client_credentials, +id_token/
+		// refresh_token for the code/device/ciba flows). Modelled as a grant-dependent union in
+		// TokenResponse. See contracts/endpoint-responses.md.
+		response: TokenResponse
 	}
 );

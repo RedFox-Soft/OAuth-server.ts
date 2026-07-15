@@ -39,25 +39,6 @@ process.env.NODE_ENV = process.env.NODE_ENV || 'test';
 
 globalThis.i = instance;
 
-// Feature enable flags and sub-options are owned by ApplicationConfig (flat dotted keys) and
-// read from it directly. Tests configure them by setting ApplicationConfig — via each config
-// file's `ApplicationConfig` export, or at runtime via `provider.enable(...)` / direct
-// assignment. There is no nested→flat translation here.
-const FEATURE_FLAG_PREFIX = { jwtResponseModes: 'responseMode.jwt' };
-Object.defineProperties(Object.getPrototypeOf(provider), {
-	enable: {
-		value(feature: string, options: Record<string, unknown> = {}) {
-			const prefix = FEATURE_FLAG_PREFIX[feature] ?? feature;
-			ApplicationConfig[`${prefix}.enabled`] = true;
-			for (const [key, value] of Object.entries(options)) {
-				ApplicationConfig[`${prefix}.${key}`] = value;
-			}
-
-			return this;
-		}
-	}
-});
-
 const jwt = (token: string) =>
 	JSON.parse(base64url.decode(token.split('.')[1])).jti;
 
@@ -106,7 +87,7 @@ export function jsonToFormUrlEncoded(json: Record<string, unknown>) {
 	return searchParams.toString();
 }
 
-export default function testHelper(
+export default function (
 	importMetaUrl: string,
 	{ config: base }: { config?: string } = {}
 ) {
@@ -154,6 +135,16 @@ export default function testHelper(
 			rejectedScopes = [],
 			rejectedClaims = [],
 			accountId = nanoid()
+		}: {
+			scope?: string;
+			claims?: {
+				id_token?: Record<string, unknown>;
+				userinfo?: Record<string, unknown>;
+			};
+			resources?: Record<string, string>;
+			rejectedScopes?: string[];
+			rejectedClaims?: string[];
+			accountId?: string;
 		} = {}) {
 			const sessionId = nanoid();
 			const loginTs = epochTime();
@@ -226,7 +217,7 @@ export default function testHelper(
 			return TestAdapter.for('Session').syncFind(sessionId);
 		}
 
-		function getGrantId(clientId) {
+		function getGrantId(clientId?: string) {
 			const session = getSession();
 
 			if (!clientId && client) clientId = client.clientId;
@@ -236,27 +227,6 @@ export default function testHelper(
 			} catch (err) {
 				throw new Error('getGrantId() failed');
 			}
-		}
-
-		function assertOnce(
-			ondone: (ctx: unknown) => void,
-			done: (err?: unknown) => void
-		) {
-			async function removeAfterUse(ctx: unknown, next: () => Promise<unknown>) {
-				await next().finally(() => {
-					provider.middleware.splice(
-						provider.middleware.indexOf(removeAfterUse),
-						1
-					);
-					try {
-						ondone(ctx);
-						done();
-					} catch (err) {
-						done(err);
-					}
-				});
-			}
-			provider.use(removeAfterUse);
 		}
 
 		function getTokenJti(token: string) {
@@ -302,7 +272,6 @@ export default function testHelper(
 		}
 
 		return {
-			assertOnce,
 			failWith,
 			getLastSession,
 			getSession,

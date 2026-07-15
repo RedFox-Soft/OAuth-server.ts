@@ -271,7 +271,7 @@ describe('registration features', () => {
 		describe('initial access tokens', () => {
 			describe('fix string one', () => {
 				beforeAll(() => {
-					provider.enable('registration', { initialAccessToken: 'foobar' });
+					ApplicationConfig['registration.initialAccessToken'] = 'foobar';
 				});
 				afterAll(() => {
 					ApplicationConfig['registration.initialAccessToken'] = false;
@@ -300,7 +300,7 @@ describe('registration features', () => {
 			describe('using a model', () => {
 				let token;
 				beforeAll(async () => {
-					provider.enable('registration', { initialAccessToken: true });
+					ApplicationConfig['registration.initialAccessToken'] = true;
 					token = await new InitialAccessToken({}).save();
 				});
 				afterAll(() => {

@@ -40,8 +40,6 @@ const eccrt = new X509Certificate(
 
 const route = '/token';
 
-const tokenAuthSucceeded = { success: true };
-
 const introspectionAuthSucceeded = {
 	active: false
 };
@@ -58,7 +56,7 @@ describe('client authentication options', () => {
 
 	it('expects auth to be provided', async function () {
 		const { error } = await agent.token.post({
-			grant_type: 'foo'
+			grant_type: 'client_credentials'
 		});
 		expect(error?.status).toBe(400);
 		expect(error?.value).toEqual({
@@ -69,7 +67,7 @@ describe('client authentication options', () => {
 
 	it('rejects when no client is found', async function () {
 		const { error } = await agent.token.post({
-			grant_type: 'foo',
+			grant_type: 'client_credentials',
 			client_id: 'client-not-found'
 		});
 		expect(error?.status).toBe(401);
@@ -82,18 +80,18 @@ describe('client authentication options', () => {
 	describe('none "auth"', () => {
 		it('accepts the "auth"', async function () {
 			const res = await agent.token.post({
-				grant_type: 'foo',
+				grant_type: 'client_credentials',
 				client_id: 'client-none'
 			});
 			expect(res.status).toBe(200);
-			expect(res.data).toEqual(tokenAuthSucceeded);
+			expect(res.data).toHaveProperty('access_token');
 		});
 
 		it('rejects the "auth" if secret was also provided', async function () {
 			const spy = mock();
 			provider.once('grant.error', spy);
 			const { status, error } = await agent.token.post({
-				grant_type: 'foo',
+				grant_type: 'client_credentials',
 				client_id: 'client-none',
 				client_secret: 'foobar'
 			});
@@ -113,7 +111,7 @@ describe('client authentication options', () => {
 		it('accepts the auth', async function () {
 			const { status, data } = await agent.token.post(
 				{
-					grant_type: 'foo'
+					grant_type: 'client_credentials'
 				},
 				{
 					headers: AuthorizationRequest.basicAuthHeader(
@@ -123,26 +121,26 @@ describe('client authentication options', () => {
 				}
 			);
 			expect(status).toBe(200);
-			expect(data).toEqual(tokenAuthSucceeded);
+			expect(data).toHaveProperty('access_token');
 		});
 
 		it('accepts the auth (but client configured with post)', async function () {
 			const { status, data } = await agent.token.post(
 				{
-					grant_type: 'foo'
+					grant_type: 'client_credentials'
 				},
 				{
 					headers: AuthorizationRequest.basicAuthHeader('client-post', 'secret')
 				}
 			);
 			expect(status).toBe(200);
-			expect(data).toEqual(tokenAuthSucceeded);
+			expect(data).toHaveProperty('access_token');
 		});
 
 		it('accepts the auth even with id in the body', async function () {
 			const { status, data } = await agent.token.post(
 				{
-					grant_type: 'foo',
+					grant_type: 'client_credentials',
 					client_id: 'client-basic'
 				},
 				{
@@ -153,13 +151,13 @@ describe('client authentication options', () => {
 				}
 			);
 			expect(status).toBe(200);
-			expect(data).toEqual(tokenAuthSucceeded);
+			expect(data).toHaveProperty('access_token');
 		});
 
 		it('rejects the auth when body id differs', async function () {
 			const { status, error } = await agent.token.post(
 				{
-					grant_type: 'foo',
+					grant_type: 'client_credentials',
 					client_id: 'client-basic-other'
 				},
 				{
@@ -179,20 +177,20 @@ describe('client authentication options', () => {
 		it('accepts the auth (https://tools.ietf.org/html/rfc6749#appendix-B)', async function () {
 			const { status, data } = await agent.token.post(
 				{
-					grant_type: 'foo'
+					grant_type: 'client_credentials'
 				},
 				{
 					headers: AuthorizationRequest.basicAuthHeader(' %&+', ' %&+')
 				}
 			);
 			expect(status).toBe(200);
-			expect(data).toEqual(tokenAuthSucceeded);
+			expect(data).toHaveProperty('access_token');
 		});
 
 		it('accepts the auth (https://tools.ietf.org/html/rfc6749#appendix-B again)', async function () {
 			const { status, data } = await agent.token.post(
 				{
-					grant_type: 'foo'
+					grant_type: 'client_credentials'
 				},
 				{
 					headers: AuthorizationRequest.basicAuthHeader(
@@ -202,13 +200,13 @@ describe('client authentication options', () => {
 				}
 			);
 			expect(status).toBe(200);
-			expect(data).toEqual(tokenAuthSucceeded);
+			expect(data).toHaveProperty('access_token');
 		});
 
 		it('rejects improperly encoded headers', async function () {
 			const { error } = await agent.token.post(
 				{
-					grant_type: 'foo'
+					grant_type: 'client_credentials'
 				},
 				{
 					headers: {
@@ -227,7 +225,7 @@ describe('client authentication options', () => {
 		it('validates the Basic scheme format (parts)', async function () {
 			const { error } = await agent.token.post(
 				{
-					grant_type: 'foo'
+					grant_type: 'client_credentials'
 				},
 				{
 					headers: {
@@ -245,7 +243,7 @@ describe('client authentication options', () => {
 		it('validates the Basic scheme format (Basic)', async function () {
 			const { error } = await agent.token.post(
 				{
-					grant_type: 'foo'
+					grant_type: 'client_credentials'
 				},
 				{
 					headers: {
@@ -263,7 +261,7 @@ describe('client authentication options', () => {
 		it('validates the Basic scheme format (no :)', async function () {
 			const { error } = await agent.token.post(
 				{
-					grant_type: 'foo'
+					grant_type: 'client_credentials'
 				},
 				{
 					headers: {
@@ -284,7 +282,7 @@ describe('client authentication options', () => {
 
 			const { error } = await agent.token.post(
 				{
-					grant_type: 'foo'
+					grant_type: 'client_credentials'
 				},
 				{
 					headers: AuthorizationRequest.basicAuthHeader(
@@ -306,7 +304,7 @@ describe('client authentication options', () => {
 		it('rejects double auth', async function () {
 			const { error } = await agent.token.post(
 				{
-					grant_type: 'foo',
+					grant_type: 'client_credentials',
 					client_id: 'client-basic',
 					client_secret: 'secret'
 				},
@@ -328,7 +326,7 @@ describe('client authentication options', () => {
 		it('rejects double auth (no client_id in body)', async function () {
 			const { error } = await agent.token.post(
 				{
-					grant_type: 'foo',
+					grant_type: 'client_credentials',
 					client_secret: 'secret'
 				},
 				{
@@ -349,7 +347,7 @@ describe('client authentication options', () => {
 		it('requires the client_secret to be sent', async function () {
 			const { error } = await agent.token.post(
 				{
-					grant_type: 'foo'
+					grant_type: 'client_credentials'
 				},
 				{
 					headers: AuthorizationRequest.basicAuthHeader('client-basic', '')
@@ -366,7 +364,7 @@ describe('client authentication options', () => {
 		it('rejects expired secrets', async function () {
 			const { error } = await agent.token.post(
 				{
-					grant_type: 'foo'
+					grant_type: 'client_credentials'
 				},
 				{
 					headers: AuthorizationRequest.basicAuthHeader(
@@ -387,22 +385,22 @@ describe('client authentication options', () => {
 	describe('client_secret_post auth', () => {
 		it('accepts the auth', async function () {
 			const { status, data } = await agent.token.post({
-				grant_type: 'foo',
+				grant_type: 'client_credentials',
 				client_id: 'client-post',
 				client_secret: 'secret'
 			});
 			expect(status).toBe(200);
-			expect(data).toEqual(tokenAuthSucceeded);
+			expect(data).toHaveProperty('access_token');
 		});
 
 		it('accepts the auth (but client configured with basic)', async function () {
 			const { status, data } = await agent.token.post({
-				grant_type: 'foo',
+				grant_type: 'client_credentials',
 				client_id: 'client-basic',
 				client_secret: 'secret'
 			});
 			expect(status).toBe(200);
-			expect(data).toEqual(tokenAuthSucceeded);
+			expect(data).toHaveProperty('access_token');
 		});
 
 		it('rejects invalid secrets', async function () {
@@ -410,7 +408,7 @@ describe('client authentication options', () => {
 			provider.once('grant.error', spy);
 
 			const { error } = await agent.token.post({
-				grant_type: 'foo',
+				grant_type: 'client_credentials',
 				client_id: 'client-post',
 				client_secret: 'invalid'
 			});
@@ -429,7 +427,7 @@ describe('client authentication options', () => {
 			provider.once('grant.error', spy);
 
 			const { error } = await agent.token.post({
-				grant_type: 'foo',
+				grant_type: 'client_credentials',
 				client_id: 'client-post',
 				client_secret: ''
 			});
@@ -446,7 +444,7 @@ describe('client authentication options', () => {
 
 		it('rejects expired secrets', async function () {
 			const { error } = await agent.token.post({
-				grant_type: 'foo',
+				grant_type: 'client_credentials',
 				client_id: 'secret-expired-basic',
 				client_secret: 'secret'
 			});
@@ -485,12 +483,12 @@ describe('client authentication options', () => {
 
 			const { status, data } = await agent.token.post({
 				client_assertion: assertion,
-				grant_type: 'foo',
+				grant_type: 'client_credentials',
 				client_assertion_type:
 					'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
 			});
 			expect(status).toBe(200);
-			expect(data).toEqual(tokenAuthSucceeded);
+			expect(data).toHaveProperty('access_token');
 		});
 
 		describe('additional audience values', () => {
@@ -509,12 +507,12 @@ describe('client authentication options', () => {
 
 				const { status, data } = await agent.token.post({
 					client_assertion: assertion,
-					grant_type: 'foo',
+					grant_type: 'client_credentials',
 					client_assertion_type:
 						'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
 				});
 				expect(status).toBe(200);
-				expect(data).toEqual(tokenAuthSucceeded);
+				expect(data).toHaveProperty('access_token');
 			});
 
 			it('accepts the auth when aud is the token endpoint', async function () {
@@ -533,12 +531,12 @@ describe('client authentication options', () => {
 
 					const { status, data } = await agent.token.post({
 						client_assertion: assertion,
-						grant_type: 'foo',
+						grant_type: 'client_credentials',
 						client_assertion_type:
 							'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
 					});
 					expect(status).toBe(200);
-					expect(data).toEqual(tokenAuthSucceeded);
+					expect(data).toHaveProperty('access_token');
 				}
 			});
 
@@ -615,7 +613,7 @@ describe('client authentication options', () => {
 			await agent.token.post({
 				client_id: 'client-none',
 				client_assertion: assertion,
-				grant_type: 'foo',
+				grant_type: 'client_credentials',
 				client_assertion_type:
 					'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
 			});
@@ -644,7 +642,7 @@ describe('client authentication options', () => {
 			const { error } = await agent.token.post(
 				{
 					client_assertion: assertion,
-					grant_type: 'foo',
+					grant_type: 'client_credentials',
 					client_assertion_type:
 						'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
 				},
@@ -678,7 +676,7 @@ describe('client authentication options', () => {
 
 			const { error } = await agent.token.post({
 				client_assertion: assertion,
-				grant_type: 'foo',
+				grant_type: 'client_credentials',
 				client_assertion_type:
 					'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
 				client_secret: 'foo'
@@ -696,7 +694,7 @@ describe('client authentication options', () => {
 				client_id: 'client-jwt-secret',
 				client_assertion:
 					'.eyJzdWIiOiJjbGllbnQtand0LXNlY3JldCIsImFsZyI6IkhTMjU2In0.',
-				grant_type: 'foo',
+				grant_type: 'client_credentials',
 				client_assertion_type:
 					'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
 			});
@@ -728,7 +726,7 @@ describe('client authentication options', () => {
 
 			const { error } = await agent.token.post({
 				client_assertion: assertion,
-				grant_type: 'foo',
+				grant_type: 'client_credentials',
 				client_assertion_type:
 					'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
 			});
@@ -761,7 +759,7 @@ describe('client authentication options', () => {
 
 			const { error } = await agent.token.post({
 				client_assertion: assertion,
-				grant_type: 'foo',
+				grant_type: 'client_credentials',
 				client_assertion_type:
 					'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
 			});
@@ -795,7 +793,7 @@ describe('client authentication options', () => {
 
 			const { error } = await agent.token.post({
 				client_assertion: assertion,
-				grant_type: 'foo',
+				grant_type: 'client_credentials',
 				client_assertion_type:
 					'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
 			});
@@ -830,7 +828,7 @@ describe('client authentication options', () => {
 
 			const { error } = await agent.token.post({
 				client_assertion: assertion,
-				grant_type: 'foo',
+				grant_type: 'client_credentials',
 				client_assertion_type:
 					'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
 			});
@@ -865,7 +863,7 @@ describe('client authentication options', () => {
 
 			const { error } = await agent.token.post({
 				client_assertion: assertion,
-				grant_type: 'foo',
+				grant_type: 'client_credentials',
 				client_assertion_type:
 					'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
 			});
@@ -900,7 +898,7 @@ describe('client authentication options', () => {
 
 			const { error } = await agent.token.post({
 				client_assertion: assertion,
-				grant_type: 'foo',
+				grant_type: 'client_credentials',
 				client_assertion_type:
 					'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
 			});
@@ -928,7 +926,7 @@ describe('client authentication options', () => {
 			);
 			const { error } = await agent.token.post({
 				client_assertion: assertion,
-				grant_type: 'foo',
+				grant_type: 'client_credentials',
 				client_id: 'mismatching-client-id',
 				client_assertion_type:
 					'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
@@ -957,7 +955,7 @@ describe('client authentication options', () => {
 			);
 			const { error } = await agent.token.post({
 				client_assertion: assertion,
-				grant_type: 'foo'
+				grant_type: 'client_credentials'
 				// client_assertion_type: 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
 			});
 			expect(error.status).toBe(400);
@@ -984,7 +982,7 @@ describe('client authentication options', () => {
 
 			const { error } = await agent.token.post({
 				client_assertion: assertion,
-				grant_type: 'foo',
+				grant_type: 'client_credentials',
 				client_assertion_type: 'urn:ietf:mycustom'
 			});
 			expect(error.status).toBe(400);
@@ -998,7 +996,7 @@ describe('client authentication options', () => {
 		it('rejects invalid assertions', async function () {
 			const { error } = await agent.token.post({
 				client_assertion: 'this.notatall.valid',
-				grant_type: 'foo',
+				grant_type: 'client_credentials',
 				client_assertion_type:
 					'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
 			});
@@ -1027,7 +1025,7 @@ describe('client authentication options', () => {
 			);
 			const { error } = await agent.token.post({
 				client_assertion: assertion,
-				grant_type: 'foo',
+				grant_type: 'client_credentials',
 				client_assertion_type:
 					'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
 			});
@@ -1063,7 +1061,7 @@ describe('client authentication options', () => {
 
 			const { error } = await agent.token.post({
 				client_assertion: assertion,
-				grant_type: 'foo',
+				grant_type: 'client_credentials',
 				client_assertion_type:
 					'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
 			});
@@ -1095,16 +1093,16 @@ describe('client authentication options', () => {
 
 				const { status, data } = await agent.token.post({
 					client_assertion: assertion,
-					grant_type: 'foo',
+					grant_type: 'client_credentials',
 					client_assertion_type:
 						'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
 				});
 				expect(status).toBe(200);
-				expect(data).toEqual(tokenAuthSucceeded);
+				expect(data).toHaveProperty('access_token');
 
 				const { error } = await agent.token.post({
 					client_assertion: assertion,
-					grant_type: 'foo',
+					grant_type: 'client_credentials',
 					client_assertion_type:
 						'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
 				});
@@ -1149,7 +1147,7 @@ describe('client authentication options', () => {
 
 				const { error } = await agent.token.post({
 					client_assertion: assertion,
-					grant_type: 'foo',
+					grant_type: 'client_credentials',
 					client_assertion_type:
 						'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
 				});
@@ -1185,12 +1183,12 @@ describe('client authentication options', () => {
 
 			const { status, data } = await agent.token.post({
 				client_assertion: assertion,
-				grant_type: 'foo',
+				grant_type: 'client_credentials',
 				client_assertion_type:
 					'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
 			});
 			expect(status).toBe(200);
-			expect(data).toEqual(tokenAuthSucceeded);
+			expect(data).toHaveProperty('access_token');
 		});
 
 		it('accepts client assertions issued within acceptable system clock skew', async function () {
@@ -1211,12 +1209,12 @@ describe('client authentication options', () => {
 
 			const { status, data } = await agent.token.post({
 				client_assertion: assertion,
-				grant_type: 'foo',
+				grant_type: 'client_credentials',
 				client_assertion_type:
 					'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
 			});
 			expect(status).toBe(200);
-			expect(data).toEqual(tokenAuthSucceeded);
+			expect(data).toHaveProperty('access_token');
 		});
 	});
 
@@ -1225,7 +1223,7 @@ describe('client authentication options', () => {
 			const { status, data } = await agent.token.post(
 				{
 					client_id: 'client-pki-mtls',
-					grant_type: 'foo'
+					grant_type: 'client_credentials'
 				},
 				{
 					headers: {
@@ -1236,13 +1234,13 @@ describe('client authentication options', () => {
 				}
 			);
 			expect(status).toBe(200);
-			expect(data).toEqual(tokenAuthSucceeded);
+			expect(data).toHaveProperty('access_token');
 		});
 
 		it('fails the auth when getCertificate() does not return a cert', async function () {
 			const { error } = await agent.token.post({
 				client_id: 'client-pki-mtls',
-				grant_type: 'foo'
+				grant_type: 'client_credentials'
 			});
 			expect(error?.value).toEqual(tokenAuthRejected);
 		});
@@ -1251,7 +1249,7 @@ describe('client authentication options', () => {
 			const { error } = await agent.token.post(
 				{
 					client_id: 'client-pki-mtls',
-					grant_type: 'foo'
+					grant_type: 'client_credentials'
 				},
 				{
 					headers: {
@@ -1268,7 +1266,7 @@ describe('client authentication options', () => {
 			const { error } = await agent.token.post(
 				{
 					client_id: 'client-pki-mtls',
-					grant_type: 'foo'
+					grant_type: 'client_credentials'
 				},
 				{
 					headers: {
@@ -1287,7 +1285,7 @@ describe('client authentication options', () => {
 			const { status, data } = await agent.token.post(
 				{
 					client_id: 'client-self-signed-mtls',
-					grant_type: 'foo'
+					grant_type: 'client_credentials'
 				},
 				{
 					headers: {
@@ -1296,14 +1294,14 @@ describe('client authentication options', () => {
 				}
 			);
 			expect(status).toBe(200);
-			expect(data).toEqual(tokenAuthSucceeded);
+			expect(data).toHaveProperty('access_token');
 		});
 
 		it('accepts the auth [2/2]', async function () {
 			const { status, data } = await agent.token.post(
 				{
 					client_id: 'client-self-signed-mtls',
-					grant_type: 'foo'
+					grant_type: 'client_credentials'
 				},
 				{
 					headers: {
@@ -1312,13 +1310,13 @@ describe('client authentication options', () => {
 				}
 			);
 			expect(status).toBe(200);
-			expect(data).toEqual(tokenAuthSucceeded);
+			expect(data).toHaveProperty('access_token');
 		});
 
 		it('fails the auth when x-ssl-client-cert is not passed by the proxy', async function () {
 			const { error } = await agent.token.post({
 				client_id: 'client-self-signed-mtls',
-				grant_type: 'foo'
+				grant_type: 'client_credentials'
 			});
 			expect(error?.value).toEqual(tokenAuthRejected);
 		});
@@ -1327,7 +1325,7 @@ describe('client authentication options', () => {
 			const { error } = await agent.token.post(
 				{
 					client_id: 'client-self-signed-mtls-rsa',
-					grant_type: 'foo'
+					grant_type: 'client_credentials'
 				},
 				{
 					headers: {
@@ -1348,7 +1346,7 @@ describe('client authentication options', () => {
 			const { status, data } = await agent.token.post(
 				{
 					client_id: 'client-self-signed-mtls-jwks_uri',
-					grant_type: 'foo'
+					grant_type: 'client_credentials'
 				},
 				{
 					headers: {
@@ -1357,7 +1355,7 @@ describe('client authentication options', () => {
 				}
 			);
 			expect(status).toBe(200);
-			expect(data).toEqual(tokenAuthSucceeded);
+			expect(data).toHaveProperty('access_token');
 			assertNoPendingInterceptors();
 		});
 	});

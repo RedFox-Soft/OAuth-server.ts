@@ -8,6 +8,7 @@ describe('providing Bearer token', () => {
 
 	describe('invalid requests', () => {
 		it('nothing provided', async function () {
+			// @ts-expect-error intentionally calling with no args to test the missing-token path
 			const { error } = await agent.userinfo.get();
 			if (!error) {
 				throw new Error('Have to be exception');

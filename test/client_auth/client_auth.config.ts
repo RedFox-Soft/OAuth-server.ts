@@ -36,6 +36,7 @@ config.clientAuthMethods = [
 ];
 export const ApplicationConfig = {
 	'introspection.enabled': true,
+	'clientCredentials.enabled': true,
 	'mTLS.enabled': true,
 	'mTLS.selfSignedTlsClientAuth': true,
 	'mTLS.tlsClientAuth': true
@@ -71,7 +72,7 @@ export default {
 			token_endpoint_auth_method: 'none',
 			clientId: 'client-none',
 			clientSecret: 'secret',
-			grantTypes: ['foo'],
+			grantTypes: ['client_credentials'],
 			responseTypes: [],
 			redirectUris: []
 		},
@@ -79,7 +80,7 @@ export default {
 			token_endpoint_auth_method: 'client_secret_basic',
 			clientId: 'client-basic',
 			clientSecret: 'secret',
-			grantTypes: ['foo'],
+			grantTypes: ['client_credentials'],
 			responseTypes: [],
 			redirectUris: []
 		},
@@ -87,7 +88,7 @@ export default {
 			token_endpoint_auth_method: 'client_secret_basic',
 			clientId: 'an:identifier',
 			clientSecret: 'some secure & non-standard secret',
-			grantTypes: ['foo'],
+			grantTypes: ['client_credentials'],
 			responseTypes: [],
 			redirectUris: []
 		},
@@ -95,7 +96,7 @@ export default {
 			token_endpoint_auth_method: 'client_secret_post',
 			clientId: 'client-post',
 			clientSecret: 'secret',
-			grantTypes: ['foo'],
+			grantTypes: ['client_credentials'],
 			responseTypes: [],
 			redirectUris: []
 		},
@@ -103,13 +104,13 @@ export default {
 			token_endpoint_auth_method: 'client_secret_jwt',
 			clientId: 'client-jwt-secret',
 			clientSecret: 'secret',
-			grantTypes: ['foo'],
+			grantTypes: ['client_credentials'],
 			responseTypes: [],
 			redirectUris: []
 		},
 		{
 			clientId: 'client-jwt-key',
-			grantTypes: ['foo'],
+			grantTypes: ['client_credentials'],
 			responseTypes: [],
 			redirectUris: [],
 			token_endpoint_auth_method: 'private_key_jwt',
@@ -119,7 +120,7 @@ export default {
 		},
 		{
 			clientId: 'client-pki-mtls',
-			grantTypes: ['foo'],
+			grantTypes: ['client_credentials'],
 			responseTypes: [],
 			redirectUris: [],
 			token_endpoint_auth_method: 'tls_client_auth',
@@ -127,7 +128,7 @@ export default {
 		},
 		{
 			clientId: 'client-self-signed-mtls',
-			grantTypes: ['foo'],
+			grantTypes: ['client_credentials'],
 			responseTypes: [],
 			redirectUris: [],
 			token_endpoint_auth_method: 'self_signed_tls_client_auth',
@@ -135,7 +136,7 @@ export default {
 		},
 		{
 			clientId: 'client-self-signed-mtls-rsa',
-			grantTypes: ['foo'],
+			grantTypes: ['client_credentials'],
 			responseTypes: [],
 			redirectUris: [],
 			token_endpoint_auth_method: 'self_signed_tls_client_auth',
@@ -143,7 +144,7 @@ export default {
 		},
 		{
 			clientId: 'client-self-signed-mtls-jwks_uri',
-			grantTypes: ['foo'],
+			grantTypes: ['client_credentials'],
 			responseTypes: [],
 			redirectUris: [],
 			token_endpoint_auth_method: 'self_signed_tls_client_auth',
@@ -152,7 +153,7 @@ export default {
 		{
 			clientId: 'secret-expired-basic',
 			clientSecret: 'secret',
-			grantTypes: ['foo'],
+			grantTypes: ['client_credentials'],
 			responseTypes: [],
 			redirectUris: [],
 			client_secret_expires_at: 1
@@ -161,7 +162,7 @@ export default {
 			clientId: 'secret-expired-jwt',
 			clientSecret: 'secret',
 			token_endpoint_auth_method: 'client_secret_jwt',
-			grantTypes: ['foo'],
+			grantTypes: ['client_credentials'],
 			responseTypes: [],
 			redirectUris: [],
 			client_secret_expires_at: 1
@@ -171,7 +172,7 @@ export default {
 			token_endpoint_auth_method: 'client_secret_basic',
 			clientId: ' %&+',
 			clientSecret: ' %&+',
-			grantTypes: ['foo'],
+			grantTypes: ['client_credentials'],
 			responseTypes: [],
 			redirectUris: []
 		}
