@@ -70,7 +70,7 @@ describe('devInteractions', async () => {
 		});
 
 		it('"handles" not found interaction session', async function () {
-			spyOn(Interaction, 'find').mockResolvedValue(undefined);
+			spyOn(Interaction, 'tryFind').mockResolvedValue(undefined);
 
 			const { error } = await agent.ui[object.uid].login.get({
 				headers: {
@@ -401,7 +401,7 @@ describe('resume after consent', async () => {
 
 			const cookie = await saveResume(auth.params);
 
-			spyOn(Interaction, 'find').mockResolvedValue(undefined);
+			spyOn(Interaction, 'tryFind').mockResolvedValue(undefined);
 
 			const { error } = await agent.ui['resume'].resume.get({
 				headers: {

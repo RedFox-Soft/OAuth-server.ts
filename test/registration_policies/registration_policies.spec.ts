@@ -42,10 +42,9 @@ describe('client registration policies', () => {
 			expect(spy).toHaveBeenCalled();
 			expect(spy.mock.calls[0][0]).toHaveProperty('policies', ['empty-policy']);
 
-			expect(await InitialAccessToken.find(value)).toHaveProperty(
-				'policies',
-				['empty-policy']
-			);
+			expect(await InitialAccessToken.find(value)).toHaveProperty('policies', [
+				'empty-policy'
+			]);
 		});
 
 		it('runs the policies when a client is getting created', async function () {
@@ -472,9 +471,10 @@ describe('client registration policies', () => {
 					'empty-policy'
 				]);
 
-				expect(
-					await RegistrationAccessToken.find(value)
-				).toHaveProperty('policies', ['empty-policy']);
+				expect(await RegistrationAccessToken.find(value)).toHaveProperty(
+					'policies',
+					['empty-policy']
+				);
 			});
 		});
 
@@ -489,13 +489,10 @@ describe('client registration policies', () => {
 				}
 			);
 
-			return assert.rejects(
-				RegistrationAccessToken.find(saved),
-				(err) => {
-					expect(err).toHaveProperty('message', 'policies must be an array');
-					return true;
-				}
-			);
+			return assert.rejects(RegistrationAccessToken.find(saved), (err) => {
+				expect(err).toHaveProperty('message', 'policies must be an array');
+				return true;
+			});
 		});
 
 		it('policies array must have members', async function () {
@@ -509,13 +506,10 @@ describe('client registration policies', () => {
 				}
 			);
 
-			return assert.rejects(
-				RegistrationAccessToken.find(saved),
-				(err) => {
-					expect(err).toHaveProperty('message', 'policies must not be empty');
-					return true;
-				}
-			);
+			return assert.rejects(RegistrationAccessToken.find(saved), (err) => {
+				expect(err).toHaveProperty('message', 'policies must not be empty');
+				return true;
+			});
 		});
 
 		it('policies members must be strings', async function () {
@@ -529,13 +523,10 @@ describe('client registration policies', () => {
 				}
 			);
 
-			return assert.rejects(
-				RegistrationAccessToken.find(saved),
-				(err) => {
-					expect(err).toHaveProperty('message', 'policies must be strings');
-					return true;
-				}
-			);
+			return assert.rejects(RegistrationAccessToken.find(saved), (err) => {
+				expect(err).toHaveProperty('message', 'policies must be strings');
+				return true;
+			});
 		});
 
 		it('policies members must be present in the provider configuration', async function () {
@@ -549,16 +540,10 @@ describe('client registration policies', () => {
 				}
 			);
 
-			return assert.rejects(
-				RegistrationAccessToken.find(saved),
-				(err) => {
-					expect(err).toHaveProperty(
-						'message',
-						'policy foo-bar not configured'
-					);
-					return true;
-				}
-			);
+			return assert.rejects(RegistrationAccessToken.find(saved), (err) => {
+				expect(err).toHaveProperty('message', 'policy foo-bar not configured');
+				return true;
+			});
 		});
 	});
 });

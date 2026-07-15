@@ -38,7 +38,10 @@ import { ApplicationConfig as config } from 'lib/configs/application.js';
 
 // Grant handlers always resolve to the grant-dependent token response body. No handler returns a
 // raw `Response`; the /token route relies on this so its `response` schema is TokenResponse.
-type GrantHandler = (oidc: unknown, dPoP: unknown) => Promise<TokenResponseBody>;
+type GrantHandler = (
+	oidc: unknown,
+	dPoP: unknown
+) => Promise<TokenResponseBody>;
 
 export const grantStore: Map<string, GrantHandler> = new Map([
 	['authorization_code', authorization_code.handler],

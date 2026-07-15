@@ -39,12 +39,10 @@ export const handler = async function authorizationCodeHandler(oidc, dPoP) {
 	presence(oidc, 'code', 'redirect_uri');
 
 	const code = await AuthorizationCode.find(oidc.params.code, {
-		ignoreExpiration: true
+		ignoreExpiration: true,
+		error: new InvalidGrant('authorization code not found')
 	});
 
-	if (!code) {
-		throw new InvalidGrant('authorization code not found');
-	}
 	if (code.payload.clientId !== oidc.client.clientId) {
 		throw new InvalidGrant('client mismatch');
 	}
@@ -58,12 +56,9 @@ export const handler = async function authorizationCodeHandler(oidc, dPoP) {
 	}
 
 	const grant = await Grant.find(code.payload.grantId, {
-		ignoreExpiration: true
+		ignoreExpiration: true,
+		error: new InvalidGrant('grant not found')
 	});
-
-	if (!grant) {
-		throw new InvalidGrant('grant not found');
-	}
 
 	if (grant.isExpired) {
 		throw new InvalidGrant('grant is expired');
@@ -159,10 +154,7 @@ export const handler = async function authorizationCodeHandler(oidc, dPoP) {
 			resource,
 			oidc.client
 		);
-		at.resourceServer = new ResourceServer(
-			resource,
-			resourceServerInfo
-		);
+		at.resourceServer = new ResourceServer(resource, resourceServerInfo);
 		at.payload.scope = grant.getResourceScopeFiltered(resource, code.scopes);
 	} else {
 		at.payload.claims = code.payload.claims;

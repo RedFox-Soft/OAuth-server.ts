@@ -130,10 +130,9 @@ export const codeVerification = new Elysia()
 				}
 
 				if (!confirm) {
-					const client = await Client.find(code.payload.clientId);
-					if (!client) {
-						throw new InvalidClient('client is invalid', 'client not found');
-					}
+					const client = await Client.find(code.payload.clientId, {
+						error: new InvalidClient('client is invalid', 'client not found')
+					});
 					oidc.entity('Client', client);
 
 					const mask = ApplicationConfig['deviceFlow.mask'];

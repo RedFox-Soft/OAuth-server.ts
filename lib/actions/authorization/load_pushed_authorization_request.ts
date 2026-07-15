@@ -33,9 +33,12 @@ export default async function loadPushedAuthorizationRequest(oidc) {
 
 	const [, id] = params.request_uri.split(PUSHED_REQUEST_URN);
 	const pushedAuthorizationRequest = await PushedAuthorizationRequest.find(id, {
-		ignoreExpiration: true
+		ignoreExpiration: true,
+		error: new InvalidRequestUri(
+			'request_uri is invalid, expired, or was already used'
+		)
 	});
-	if (!pushedAuthorizationRequest?.isValid) {
+	if (!pushedAuthorizationRequest.isValid) {
 		throw new InvalidRequestUri(
 			'request_uri is invalid, expired, or was already used'
 		);

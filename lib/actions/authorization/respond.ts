@@ -17,7 +17,7 @@ export default async function respond(oidc) {
 	let pushedAuthorizationRequest = oidc.entities.PushedAuthorizationRequest;
 
 	if (!pushedAuthorizationRequest && oidc.entities.Interaction?.parJti) {
-		pushedAuthorizationRequest = await PushedAuthorizationRequest.find(
+		pushedAuthorizationRequest = await PushedAuthorizationRequest.tryFind(
 			oidc.entities.Interaction.parJti,
 			{ ignoreExpiration: true }
 		);

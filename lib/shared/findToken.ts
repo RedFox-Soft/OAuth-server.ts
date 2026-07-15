@@ -10,16 +10,16 @@ const uriMapTypes: Record<string, string> = {
 
 const tokenTypes = {
 	access_token(token: string) {
-		return AccessToken.find(token);
+		return AccessToken.tryFind(token);
 	},
 	async client_credentials(token: string) {
 		if (!hasGrant('client_credentials')) {
 			return;
 		}
-		return ClientCredentials.find(token);
+		return ClientCredentials.tryFind(token);
 	},
 	refresh_token(token: string) {
-		return RefreshToken.find(token);
+		return RefreshToken.tryFind(token);
 	}
 };
 type TokenType = keyof typeof tokenTypes;

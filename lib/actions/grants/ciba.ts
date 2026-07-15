@@ -36,12 +36,11 @@ export const handler = async function cibaHandler(oidc, dPoP) {
 
 	const request = await BackchannelAuthenticationRequest.find(
 		oidc.params.auth_req_id,
-		{ ignoreExpiration: true }
+		{
+			ignoreExpiration: true,
+			error: new InvalidGrant('backchannel authentication request not found')
+		}
 	);
-
-	if (!request) {
-		throw new InvalidGrant('backchannel authentication request not found');
-	}
 
 	if (request.payload.clientId !== oidc.client.clientId) {
 		throw new InvalidGrant('client mismatch');
@@ -88,12 +87,9 @@ export const handler = async function cibaHandler(oidc, dPoP) {
 	}
 
 	const grant = await Grant.find(request.payload.grantId, {
-		ignoreExpiration: true
+		ignoreExpiration: true,
+		error: new InvalidGrant('grant not found')
 	});
-
-	if (!grant) {
-		throw new InvalidGrant('grant not found');
-	}
 
 	if (grant.isExpired) {
 		throw new InvalidGrant('grant is expired');
@@ -153,10 +149,7 @@ export const handler = async function cibaHandler(oidc, dPoP) {
 			resource,
 			oidc.client
 		);
-		at.resourceServer = new ResourceServer(
-			resource,
-			resourceServerInfo
-		);
+		at.resourceServer = new ResourceServer(resource, resourceServerInfo);
 		at.payload.scope = grant.getResourceScopeFiltered(resource, request.scopes);
 	} else {
 		at.payload.claims = request.payload.claims;

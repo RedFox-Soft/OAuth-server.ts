@@ -456,7 +456,7 @@ describe('introspection features', () => {
 		});
 
 		it('does not allow to introspect the uninstrospectable (in case adapter is implemented wrong)', async function () {
-			spyOn(AccessToken, 'find').mockReturnValue({
+			spyOn(AccessToken, 'tryFind').mockReturnValue({
 				payload: {
 					isValid: true,
 					kind: 'AuthorizationCode'

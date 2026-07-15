@@ -87,7 +87,7 @@ export class Session extends BaseModel<SessionPayloadType> {
 		let session;
 
 		if (cookieSessionId) {
-			session = await this.find(cookieSessionId);
+			session = await this.tryFind(cookieSessionId);
 			// underlying session was removed since we have a session id in cookie, let's assign an
 			// empty data so that session.new is not true and cookie will get written even if nothing
 			// gets written to it

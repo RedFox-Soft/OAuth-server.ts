@@ -126,10 +126,9 @@ export const ui = new Elysia()
 	})
 	.resolve(async ({ cookie, params }) => {
 		const cookieId = cookie._interaction.value;
-		const interaction = await Interaction.find(params.uid);
-		if (!interaction) {
-			throw new SessionNotFound('interaction session not found');
-		}
+		const interaction = await Interaction.find(params.uid, {
+			error: new SessionNotFound('interaction session not found')
+		});
 
 		if (interaction.payload.session?.uid) {
 			const session = await Session.findByUid(interaction.payload.session.uid);
@@ -240,12 +239,11 @@ export const ui = new Elysia()
 
 			code = await DeviceCode.find(interaction.payload.deviceCode, {
 				ignoreExpiration: true,
-				ignoreSessionBinding: true
+				ignoreSessionBinding: true,
+				error: new NotFoundError()
 			});
 
-			if (!code) {
-				throw new NotFoundError();
-			} else if (code.isExpired) {
+			if (code.isExpired) {
 				throw new ExpiredError();
 			} else if (code.payload.error || code.payload.accountId) {
 				throw new AlreadyUsedError();
@@ -273,7 +271,7 @@ export const ui = new Elysia()
 				const errored =
 					code ||
 					(interaction.payload.deviceCode
-						? await DeviceCode.find(interaction.payload.deviceCode, {
+						? await DeviceCode.tryFind(interaction.payload.deviceCode, {
 								ignoreExpiration: true,
 								ignoreSessionBinding: true
 							})

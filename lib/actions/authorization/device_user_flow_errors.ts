@@ -13,7 +13,7 @@ export default async function deviceUserFlowErrors(oidc, next) {
 			let code = oidc.deviceCode;
 
 			if (!code && oidc.entities.Interaction?.deviceCode) {
-				code = await DeviceCode.find(oidc.entities.Interaction.deviceCode, {
+				code = await DeviceCode.tryFind(oidc.entities.Interaction.deviceCode, {
 					ignoreExpiration: true,
 					ignoreSessionBinding: true
 				});

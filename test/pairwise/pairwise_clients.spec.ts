@@ -138,12 +138,10 @@ describe('pairwise features', () => {
 						])
 					);
 
-				return Client.find('client-static-with-sector').then(
-					(client) => {
-						expect(client).toBeTruthy();
-						expect(client.sectorIdentifier).toBe('foobar.example.com');
-					}
-				);
+				return Client.find('client-static-with-sector').then((client) => {
+					expect(client).toBeTruthy();
+					expect(client.sectorIdentifier).toBe('foobar.example.com');
+				});
 			});
 
 			it('must be an https uri', () => {

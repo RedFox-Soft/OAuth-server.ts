@@ -5,6 +5,7 @@ import epochTime from '../helpers/epoch_time.js';
 import { Opaque } from './formats/opaque.js';
 import { provider } from 'lib/provider.js';
 import { adapter } from 'lib/adapters/index.js';
+import { InvalidToken } from 'lib/helpers/errors.js';
 
 export const BaseModelPayload = t.Object({
 	jti: t.Optional(t.String()),
@@ -87,7 +88,12 @@ export class BaseModel<
 		return adapter(this.constructor.name);
 	}
 
-	static async find<A extends BaseModelPayloadType, T extends BaseModel<A>>(
+	// Default error thrown by the strict `find` on miss; overridable per model.
+	// `never[]` (not `any[]`) keeps this Principle-IV clean while accepting any
+	// zero/optional-arg OIDCProviderError subclass.
+	static notFoundError: new (...args: never[]) => Error = InvalidToken;
+
+	static async tryFind<A extends BaseModelPayloadType, T extends BaseModel<A>>(
 		this: new (payload: A) => T,
 		value: string,
 		{ ignoreExpiration = false } = {}
@@ -108,6 +114,18 @@ export class BaseModel<
 		} catch (err) {
 			return;
 		}
+	}
+
+	static async find<A extends BaseModelPayloadType, T extends BaseModel<A>>(
+		this: new (payload: A) => T,
+		value: string,
+		options?: { ignoreExpiration?: boolean; error?: Error }
+	): Promise<T> {
+		const item = await this.tryFind<A, T>(value, options);
+		if (!item) {
+			throw options?.error || new this.notFoundError();
+		}
+		return item;
 	}
 
 	emit(eventName: string) {

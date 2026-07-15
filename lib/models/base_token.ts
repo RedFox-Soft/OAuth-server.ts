@@ -149,17 +149,17 @@ export class BaseToken<
 	}
 
 	static isSessionBound = false;
-	static async find<A extends BaseModelPayloadType, T extends BaseModel<A>>(
+	static async tryFind<A extends BaseModelPayloadType, T extends BaseModel<A>>(
 		this: new (payload: A) => T,
 		value: string,
 		{ ignoreExpiration }?: { ignoreExpiration?: boolean | undefined }
 	): Promise<T | undefined>;
-	static async find<A extends BaseTokenPayloadType, T extends BaseToken<A>>(
+	static async tryFind<A extends BaseTokenPayloadType, T extends BaseToken<A>>(
 		this: new (payload: A) => T,
 		value: string,
 		{ ignoreExpiration = false, ignoreSessionBinding = false } = {}
 	): Promise<T | undefined> {
-		const token = await super.find<A, T>(value, {
+		const token = await super.tryFind<A, T>(value, {
 			ignoreExpiration
 		});
 		if (
@@ -191,6 +191,22 @@ export class BaseToken<
 		}
 
 		return token;
+	}
+
+	static async find<A extends BaseModelPayloadType, T extends BaseModel<A>>(
+		this: new (payload: A) => T,
+		value: string,
+		options?: {
+			ignoreExpiration?: boolean;
+			ignoreSessionBinding?: boolean;
+			error?: Error;
+		}
+	): Promise<T> {
+		const item = await this.tryFind<A, T>(value, options);
+		if (!item) {
+			throw options?.error || new this.notFoundError();
+		}
+		return item;
 	}
 
 	generateTokenId() {

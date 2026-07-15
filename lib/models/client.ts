@@ -14,9 +14,10 @@ import {
 	validateClient,
 	assertClientValid,
 	clientMetadata,
-	findClient
+	tryFindClient
 } from './client/validate.ts';
 import { needsSecret } from './client/secret.ts';
+import { InvalidClient } from '../helpers/errors.ts';
 
 export type { ClientSchemaType } from '../configs/clientSchema.ts';
 
@@ -24,7 +25,7 @@ export {
 	validateClient,
 	assertClientValid,
 	clientMetadata,
-	findClient
+	tryFindClient
 } from './client/validate.ts';
 
 export {
@@ -58,7 +59,17 @@ export function Client(metadata: unknown) {
 }
 
 Client.prototype = clientPrototype;
-Client.find = findClient;
+Client.tryFind = tryFindClient;
+// Strict lookup: resolve or throw. Default not-found error is invalid_client;
+// callers whose flow needs a different code pass `{ error }`.
+Client.find = async function find(id: string, options?: { error?: Error }) {
+	// Delegate through the property (not the imported binding) so spyOn(Client, 'tryFind') is honored.
+	const client = await Client.tryFind(id);
+	if (!client) {
+		throw options?.error || new InvalidClient('client not found');
+	}
+	return client;
+};
 Client.validate = assertClientValid;
 Client.validateClient = validateClient;
 Client.clientMetadata = clientMetadata;

@@ -163,25 +163,21 @@ class ProviderClass extends EventEmitter {
 	) {
 		if (typeof request === 'string' && request) {
 			request = await BackchannelAuthenticationRequest.find(request, {
-				ignoreExpiration: true
+				ignoreExpiration: true,
+				error: new Error('BackchannelAuthenticationRequest not found')
 			});
-			if (!request) {
-				throw new Error('BackchannelAuthenticationRequest not found');
-			}
 		} else if (!(request instanceof BackchannelAuthenticationRequest)) {
 			throw new TypeError('invalid "request" argument');
 		}
 
-		const client = await Client.find(request.payload.clientId);
-		if (!client) {
-			throw new Error('Client not found');
-		}
+		const client = await Client.find(request.payload.clientId, {
+			error: new Error('Client not found')
+		});
 
 		if (typeof result === 'string' && result) {
-			result = await Grant.find(result);
-			if (!result) {
-				throw new Error('Grant not found');
-			}
+			result = await Grant.find(result, {
+				error: new Error('Grant not found')
+			});
 		}
 
 		switch (true) {
@@ -220,7 +216,6 @@ class ProviderClass extends EventEmitter {
 			await client.backchannelPing(request);
 		}
 	}
-
 }
 
 export const provider = new ProviderClass();

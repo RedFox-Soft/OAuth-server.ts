@@ -32,12 +32,15 @@ export default function hasPolicies<TPayload extends PoliciesPayload>(
 			return super.save();
 		}
 
-		static async find<A extends BaseModelPayloadType, T extends BaseModel<A>>(
+		static async tryFind<
+			A extends BaseModelPayloadType,
+			T extends BaseModel<A>
+		>(
 			this: new (payload: A) => T,
 			value: string,
 			options?: { ignoreExpiration?: boolean }
 		): Promise<T | undefined> {
-			const result = await super.find<A, T>(value, options);
+			const result = await super.tryFind<A, T>(value, options);
 			const policies = (result?.payload as PoliciesPayload | undefined)
 				?.policies;
 			if (typeof policies !== 'undefined') {

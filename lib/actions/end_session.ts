@@ -66,13 +66,12 @@ export const logoutAction = new Elysia()
 						'client_id does not match the provided id_token_hint'
 					);
 				}
-				client = await Client.find(clientId);
-				if (!client) {
-					throw new InvalidClient(
+				client = await Client.find(clientId, {
+					error: new InvalidClient(
 						'unrecognized id_token_hint audience',
 						'client not found'
-					);
-				}
+					)
+				});
 				try {
 					await IdToken.validate(params.id_token_hint, client);
 				} catch (err) {
@@ -88,10 +87,9 @@ export const logoutAction = new Elysia()
 				}
 				oidc.entity('Client', client);
 			} else if (params.client_id) {
-				client = await Client.find(params.client_id);
-				if (!client) {
-					throw new InvalidClient('client is invalid', 'client not found');
-				}
+				client = await Client.find(params.client_id, {
+					error: new InvalidClient('client is invalid', 'client not found')
+				});
 				oidc.entity('Client', client);
 			}
 
@@ -161,7 +159,7 @@ export const logoutConfirmAction = new Elysia()
 
 				for (const clientId of clientIds) {
 					if (params.logout || clientId === state.clientId) {
-						const client = await Client.find(clientId);
+						const client = await Client.tryFind(clientId);
 						if (client) {
 							const sid = session.sidFor(client.clientId);
 							if (client.backchannelLogoutUri) {
@@ -198,7 +196,7 @@ export const logoutConfirmAction = new Elysia()
 			}
 
 			if (state.clientId) {
-				oidc.entity('Client', await Client.find(state.clientId));
+				oidc.entity('Client', await Client.tryFind(state.clientId));
 			}
 
 			if (body.logout) {

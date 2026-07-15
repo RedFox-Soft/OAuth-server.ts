@@ -17,7 +17,7 @@ export class ReplayDetection extends BaseModel<ReplayDetectionPayloadType> {
 	static async unique(iss: string, jti: string, exp: number) {
 		const id = crypto.hash('sha256', `${iss}${jti}`, 'base64url');
 
-		const found = await this.find(id);
+		const found = await this.tryFind(id);
 
 		if (found) {
 			return false;

@@ -73,10 +73,9 @@ const authorizationRequest = t.Composite([
 export async function isAllowRedirectUri(params) {
 	const oidc = new OIDCContext(params);
 
-	const client = await Client.find(params.client_id);
-	if (!client) {
-		throw new InvalidClient('client is invalid', 'client not found');
-	}
+	const client = await Client.find(params.client_id, {
+		error: new InvalidClient('client is invalid', 'client not found')
+	});
 	oidc.entity('Client', client);
 	try {
 		await processRequestObject(authorizationRequest, oidc);

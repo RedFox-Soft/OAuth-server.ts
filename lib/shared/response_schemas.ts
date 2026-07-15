@@ -35,9 +35,12 @@ const accessTokenResponseFields = {
 };
 
 // client_credentials — access token, no id_token / refresh_token.
-export const ClientCredentialsTokenResponse = t.Object(accessTokenResponseFields, {
-	additionalProperties: true
-});
+export const ClientCredentialsTokenResponse = t.Object(
+	accessTokenResponseFields,
+	{
+		additionalProperties: true
+	}
+);
 
 // device_code / ciba — adds id_token + refresh_token.
 export const RefreshableTokenResponse = t.Object(

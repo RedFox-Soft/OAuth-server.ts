@@ -141,7 +141,7 @@ describe('UserInfo', () => {
 		const at = await new AccessToken({
 			client: await Client.find('client')
 		}).save();
-		spyOn(Client, 'find').mockResolvedValue(undefined);
+		spyOn(Client, 'tryFind').mockResolvedValue(undefined);
 
 		const { error } = await agent.userinfo.get({
 			headers: {
@@ -163,7 +163,7 @@ describe('UserInfo', () => {
 			client: await Client.find('client'),
 			scope: 'openid'
 		}).save();
-		spyOn(Client, 'find').mockResolvedValue(undefined);
+		spyOn(Client, 'tryFind').mockResolvedValue(undefined);
 
 		const { error } = await agent.userinfo.get({
 			headers: {

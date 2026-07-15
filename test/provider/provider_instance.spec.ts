@@ -13,12 +13,12 @@ describe.skip('provider instance', () => {
 	describe('Client#find', () => {
 		it('ignores non-string inputs', async () => {
 			const provider = new provider('http://localhost');
-			expect(await Client.find([])).toBeUndefined();
-			expect(await Client.find(Buffer)).toBeUndefined();
-			expect(await Client.find({})).toBeUndefined();
-			expect(await Client.find(true)).toBeUndefined();
-			expect(await Client.find(undefined)).toBeUndefined();
-			expect(await Client.find(64)).toBeUndefined();
+			expect(await Client.tryFind([])).toBeUndefined();
+			expect(await Client.tryFind(Buffer)).toBeUndefined();
+			expect(await Client.tryFind({})).toBeUndefined();
+			expect(await Client.tryFind(true)).toBeUndefined();
+			expect(await Client.tryFind(undefined)).toBeUndefined();
+			expect(await Client.tryFind(64)).toBeUndefined();
 		});
 	});
 

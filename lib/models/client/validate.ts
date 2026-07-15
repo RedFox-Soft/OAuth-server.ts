@@ -196,8 +196,9 @@ export async function assertClientValid(metadata: unknown): Promise<void> {
 }
 
 // Resolve a client by id: static cache (noManage) → dynamic prop-hash cache →
-// adapter('Client'). Replaces the former static `Client.find(id)`.
-export async function findClient(
+// adapter('Client'). Nullable variant behind `Client.tryFind`; the strict
+// `Client.find` wraps this and throws on miss.
+export async function tryFindClient(
 	id: string
 ): Promise<ClientSchemaType | undefined> {
 	const { staticClients, dynamicClients } = instance(provider);

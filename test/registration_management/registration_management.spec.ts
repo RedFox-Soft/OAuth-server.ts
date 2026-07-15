@@ -346,7 +346,7 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 			expect(res.status).toBe(204);
 			expect(res.headers.get('cache-control')).toBe('no-store');
 			expect(
-				await RegistrationAccessToken.find(client.registration_access_token)
+				await RegistrationAccessToken.tryFind(client.registration_access_token)
 			).toBeUndefined();
 		});
 

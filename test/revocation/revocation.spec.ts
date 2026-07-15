@@ -139,7 +139,7 @@ describe('revocation features', () => {
 				scope: 'scope'
 			});
 
-			spyOn(AccessToken, 'find').mockRejectedValue(
+			spyOn(AccessToken, 'tryFind').mockRejectedValue(
 				new Error('something went wrong')
 			);
 			const token = await at.save();
@@ -422,7 +422,7 @@ describe('revocation features', () => {
 		});
 
 		it('does not allow to revoke the unrevokable (in case adapter is implemented wrong)', async function () {
-			spyOn(AccessToken, 'find').mockResolvedValue({
+			spyOn(AccessToken, 'tryFind').mockResolvedValue({
 				payload: { isValid: true, kind: 'AuthorizationCode' }
 			});
 

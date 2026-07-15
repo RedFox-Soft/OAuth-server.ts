@@ -41,10 +41,9 @@ async function userInfo({ headers, set }) {
 	}
 	setNonceHeader(set.headers, dPoP);
 
-	const accessToken = await AccessToken.find(accessTokenId);
-	if (!accessToken) {
-		throw new InvalidToken('access token not found');
-	}
+	const accessToken = await AccessToken.find(accessTokenId, {
+		error: new InvalidToken('access token not found')
+	});
 
 	const { scopes } = accessToken;
 	if (!scopes.size || !scopes.has('openid')) {
@@ -75,10 +74,9 @@ async function userInfo({ headers, set }) {
 		);
 	}
 
-	const client = await Client.find(accessToken.payload.clientId);
-	if (!client) {
-		throw new InvalidToken('associated client not found');
-	}
+	const client = await Client.find(accessToken.payload.clientId, {
+		error: new InvalidToken('associated client not found')
+	});
 
 	const account = await instance(provider).configuration.findAccount(
 		{ oidc },
@@ -91,12 +89,9 @@ async function userInfo({ headers, set }) {
 	}
 
 	const grant = await Grant.find(accessToken.payload.grantId, {
-		ignoreExpiration: true
+		ignoreExpiration: true,
+		error: new InvalidToken('grant not found')
 	});
-
-	if (!grant) {
-		throw new InvalidToken('grant not found');
-	}
 
 	if (grant.isExpired) {
 		throw new InvalidToken('grant is expired');

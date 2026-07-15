@@ -15,6 +15,8 @@ import { DeviceCode } from 'lib/models/device_code.js';
 import { TestAdapter } from 'test/models.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';
+import { Client } from 'lib/models/client.js';
+import { InvalidGrant } from 'lib/helpers/errors.js';
 
 describe('BaseToken', () => {
 	let setup: Setup;
@@ -39,7 +41,7 @@ describe('BaseToken', () => {
 		}).save();
 		const jti = setup.getTokenJti(token);
 		adapter.syncUpdate(jti, { jwt: 'foo' });
-		expect(await RefreshToken.find(token)).toBeUndefined();
+		expect(await RefreshToken.tryFind(token)).toBeUndefined();
 	});
 
 	it('handles expired tokens', async function () {
@@ -48,12 +50,12 @@ describe('BaseToken', () => {
 		}).save();
 		const jti = setup.getTokenJti(token);
 		adapter.syncUpdate(jti, { exp: 0 });
-		expect(await RefreshToken.find(token)).toBeUndefined();
+		expect(await RefreshToken.tryFind(token)).toBeUndefined();
 	});
 
 	it('handles invalid inputs', async function () {
 		for (const input of [true, Boolean, 1, Infinity, {}, [], new Set()]) {
-			const result = await RefreshToken.find(input);
+			const result = await RefreshToken.tryFind(input);
 			expect(result).toBeUndefined();
 		}
 	});
@@ -165,5 +167,47 @@ describe('BaseToken', () => {
 		return expect(DeviceCode.findByUserCode('123-456-789')).rejects.toThrow(
 			'adapter throw!'
 		);
+	});
+
+	describe('strict find / nullable tryFind', () => {
+		it('find returns the same item as tryFind on a hit (success-path parity)', async function () {
+			const value = await new RefreshToken({ grantId: 'foo' }).save();
+			const viaFind = await RefreshToken.find(value);
+			const viaTryFind = await RefreshToken.tryFind(value);
+			expect(viaTryFind).toBeDefined();
+			expect(viaFind.jti).toBe(viaTryFind!.jti);
+			expect(viaFind.payload).toEqual(viaTryFind!.payload);
+		});
+
+		it('find throws the model default (invalid_token) on miss', async function () {
+			return expect(RefreshToken.find('nonexistent')).rejects.toMatchObject({
+				error: 'invalid_token'
+			});
+		});
+
+		it('tryFind returns undefined on miss without throwing', async function () {
+			expect(await RefreshToken.tryFind('nonexistent')).toBeUndefined();
+		});
+
+		it('find throws a caller-supplied error instance verbatim', async function () {
+			const error = new InvalidGrant('refresh token not found');
+			return expect(RefreshToken.find('nonexistent', { error })).rejects.toBe(
+				error
+			);
+		});
+
+		it('honors both lookup options and the error override', async function () {
+			const error = new InvalidGrant('nope');
+			return expect(
+				RefreshToken.find('nonexistent', { ignoreExpiration: true, error })
+			).rejects.toBe(error);
+		});
+
+		it('Client.find throws invalid_client on miss; tryFind returns undefined', async function () {
+			await expect(Client.find('nonexistent')).rejects.toMatchObject({
+				error: 'invalid_client'
+			});
+			expect(await Client.tryFind('nonexistent')).toBeUndefined();
+		});
 	});
 });

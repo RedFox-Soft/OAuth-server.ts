@@ -110,12 +110,11 @@ async function authenticate(
 	clientId: string,
 	token: string
 ) {
-	const regAccessToken = await RegistrationAccessToken.find(token);
-	if (!regAccessToken) {
-		throw new InvalidToken('token not found');
-	}
+	const regAccessToken = await RegistrationAccessToken.find(token, {
+		error: new InvalidToken('token not found')
+	});
 
-	const client = await Client.find(clientId);
+	const client = await Client.tryFind(clientId);
 
 	// Token fields live under `.payload.*` (top-level accessors were removed with the
 	// IN_PAYLOAD refactor); `client.*` stays direct because the validated client is a plain
@@ -140,11 +139,9 @@ async function validateInitialAccessToken(
 	switch (initialAccessToken && typeof initialAccessToken) {
 		case 'boolean': {
 			const iat = await InitialAccessToken.find(
-				readBearer(token, undefined, false)
+				readBearer(token, undefined, false),
+				{ error: new InvalidToken('initial access token not found') }
 			);
-			if (!iat) {
-				throw new InvalidToken('initial access token not found');
-			}
 			oidc.entity('InitialAccessToken', iat);
 			break;
 		}
@@ -326,8 +323,7 @@ async function update({ params, body, headers, set }) {
 
 	const { secretFactory } = instance(provider).features.registration;
 
-	const secretRequired =
-		!client.clientSecret && Client.needsSecret(properties);
+	const secretRequired = !client.clientSecret && Client.needsSecret(properties);
 
 	if (secretRequired) {
 		Object.assign(properties, {

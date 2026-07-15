@@ -43,12 +43,9 @@ export const handler = async function refreshTokenHandler(oidc, dPoP) {
 
 	let refreshTokenValue = oidc.params.refresh_token;
 	let refreshToken = await RefreshToken.find(refreshTokenValue, {
-		ignoreExpiration: true
+		ignoreExpiration: true,
+		error: new InvalidGrant('refresh token not found')
 	});
-
-	if (!refreshToken) {
-		throw new InvalidGrant('refresh token not found');
-	}
 
 	if (refreshToken.payload.clientId !== client.clientId) {
 		throw new InvalidGrant('client mismatch');
@@ -81,12 +78,9 @@ export const handler = async function refreshTokenHandler(oidc, dPoP) {
 	}
 
 	const grant = await Grant.find(refreshToken.payload.grantId, {
-		ignoreExpiration: true
+		ignoreExpiration: true,
+		error: new InvalidGrant('grant not found')
 	});
-
-	if (!grant) {
-		throw new InvalidGrant('grant not found');
-	}
 
 	if (grant.isExpired) {
 		throw new InvalidGrant('grant is expired');
@@ -232,10 +226,7 @@ export const handler = async function refreshTokenHandler(oidc, dPoP) {
 			resource,
 			oidc.client
 		);
-		at.resourceServer = new ResourceServer(
-			resource,
-			resourceServerInfo
-		);
+		at.resourceServer = new ResourceServer(resource, resourceServerInfo);
 		at.payload.scope = grant.getResourceScopeFiltered(
 			resource,
 			[...scope].filter(Set.prototype.has.bind(at.resourceServer.scopes))

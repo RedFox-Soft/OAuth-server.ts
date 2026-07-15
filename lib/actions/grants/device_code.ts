@@ -35,12 +35,9 @@ export const handler = async function deviceCodeHandler(oidc, dPoP) {
 	} = instance(oidc.provider).configuration;
 
 	const code = await DeviceCode.find(oidc.params.device_code, {
-		ignoreExpiration: true
+		ignoreExpiration: true,
+		error: new InvalidGrant('device code not found')
 	});
-
-	if (!code) {
-		throw new InvalidGrant('device code not found');
-	}
 
 	if (code.payload.clientId !== oidc.client.clientId) {
 		throw new InvalidGrant('client mismatch');
@@ -85,12 +82,9 @@ export const handler = async function deviceCodeHandler(oidc, dPoP) {
 	}
 
 	const grant = await Grant.find(code.payload.grantId, {
-		ignoreExpiration: true
+		ignoreExpiration: true,
+		error: new InvalidGrant('grant not found')
 	});
-
-	if (!grant) {
-		throw new InvalidGrant('grant not found');
-	}
 
 	if (grant.isExpired) {
 		throw new InvalidGrant('grant is expired');
@@ -146,10 +140,7 @@ export const handler = async function deviceCodeHandler(oidc, dPoP) {
 			resource,
 			oidc.client
 		);
-		at.resourceServer = new ResourceServer(
-			resource,
-			resourceServerInfo
-		);
+		at.resourceServer = new ResourceServer(resource, resourceServerInfo);
 		at.payload.scope = grant.getResourceScopeFiltered(resource, code.scopes);
 	} else {
 		at.payload.claims = code.payload.claims;

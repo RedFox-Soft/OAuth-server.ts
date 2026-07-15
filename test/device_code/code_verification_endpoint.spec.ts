@@ -171,7 +171,7 @@ describe('POST code_verification endpoint w/o verification', () => {
 			clientId: 'client'
 		}).save();
 
-		spyOn(Client, 'find').mockResolvedValue(undefined);
+		spyOn(Client, 'tryFind').mockResolvedValue(undefined);
 
 		const { error } = await post({
 			xsrf,

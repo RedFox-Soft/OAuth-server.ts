@@ -10,7 +10,11 @@ import {
 } from 'bun:test';
 
 import nanoid from '../../lib/helpers/nanoid.ts';
-import bootstrap, { agent, passInteractionChecks, type Setup } from '../test_helper.js';
+import bootstrap, {
+	agent,
+	passInteractionChecks,
+	type Setup
+} from '../test_helper.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
 import { generate } from '../../lib/helpers/user_codes.ts';
 import { Session } from 'lib/models/session.js';
@@ -76,7 +80,7 @@ describe('device interaction resume /ui/:uid/device_resume', () => {
 					accountId
 				});
 
-				spyOn(DeviceCode, 'find').mockResolvedValue(undefined);
+				spyOn(DeviceCode, 'tryFind').mockResolvedValue(undefined);
 
 				const { data } = await get(cookie);
 				expect(data).toContain('id="op.deviceInputForm"');

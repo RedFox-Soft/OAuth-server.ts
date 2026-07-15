@@ -31,7 +31,7 @@ export async function loadExistingGrant(oidc) {
 		oidc.result?.consent?.grantId || oidc.session.grantIdFor(clientId);
 
 	if (grantId) {
-		return Grant.find(grantId);
+		return Grant.tryFind(grantId);
 	}
 	const accountId = oidc.account?.accountId;
 	if (oidc.client['consent.require'] === false && accountId) {

@@ -27,16 +27,16 @@ const JWT = 'application/token-introspection+jwt';
 
 const tokenTypes = {
 	access_token(token: string) {
-		return AccessToken.find(token);
+		return AccessToken.tryFind(token);
 	},
 	async client_credentials(token: string) {
 		if (!hasGrant('client_credentials')) {
 			return;
 		}
-		return ClientCredentials.find(token);
+		return ClientCredentials.tryFind(token);
 	},
 	refresh_token(token: string) {
-		return RefreshToken.find(token);
+		return RefreshToken.tryFind(token);
 	}
 };
 
@@ -73,7 +73,7 @@ async function renderTokenResponse(oidc) {
 	}
 
 	if (token.payload.grantId) {
-		const grant = await Grant.find(token.payload.grantId, {
+		const grant = await Grant.tryFind(token.payload.grantId, {
 			ignoreExpiration: true
 		});
 

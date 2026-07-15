@@ -11,7 +11,11 @@ import {
 
 import { decode as decodeJWT } from '../../lib/helpers/jwt.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
-import bootstrap, { agent, jsonToFormUrlEncoded, type Setup } from '../test_helper.js';
+import bootstrap, {
+	agent,
+	jsonToFormUrlEncoded,
+	type Setup
+} from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { provider } from 'lib/provider.js';
 import { Client } from 'lib/models/client.js';
