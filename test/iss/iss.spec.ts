@@ -19,7 +19,7 @@ describe('OAuth 2.0 Authorization Server Issuer Identification', () => {
 	});
 
 	describe('OAuth 2.0 Authorization Server Issuer Identifier in Authorization Response', async () => {
-		let cookie;
+		let cookie: string;
 		beforeAll(async function () {
 			cookie = await setup.login();
 		});

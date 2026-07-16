@@ -287,7 +287,7 @@ describe('devInteractions', async () => {
 					cookie: login
 				}
 			});
-			cookie = [response.headers.get('set-cookie'), ...login].join('; ');
+			cookie = [response.headers.get('set-cookie'), login].join('; ');
 			const url = response.headers.get('location');
 			[, , uid] = url.split('/');
 		});
@@ -405,7 +405,7 @@ describe('resume after consent', async () => {
 
 			const { error } = await agent.ui['resume'].resume.get({
 				headers: {
-					cookie: [...session, cookie].join('; ')
+					cookie: [session, cookie].join('; ')
 				}
 			});
 
@@ -434,7 +434,7 @@ describe('resume after consent', async () => {
 
 			const { response } = await agent.ui['resume'].resume.get({
 				headers: {
-					cookie: [...session, cookie].join('; ')
+					cookie: [session, cookie].join('; ')
 				}
 			});
 
@@ -460,7 +460,7 @@ describe('resume after consent', async () => {
 
 			const { response } = await agent.ui['resume'].resume.get({
 				headers: {
-					cookie: [...session, cookie].join('; ')
+					cookie: [session, cookie].join('; ')
 				}
 			});
 
@@ -486,7 +486,7 @@ describe('resume after consent', async () => {
 
 			const { response } = await agent.ui['resume'].resume.get({
 				headers: {
-					cookie: [...session, cookie].join('; ')
+					cookie: [session, cookie].join('; ')
 				}
 			});
 
@@ -512,7 +512,7 @@ describe('resume after consent', async () => {
 
 			const { response, data } = await agent.ui['resume'].resume.get({
 				headers: {
-					cookie: [...session, cookie].join('; ')
+					cookie: [session, cookie].join('; ')
 				}
 			});
 
@@ -541,7 +541,7 @@ describe('resume after consent', async () => {
 
 			const { response } = await agent.ui['resume'].resume.get({
 				headers: {
-					cookie: [...session, cookie].join('; ')
+					cookie: [session, cookie].join('; ')
 				}
 			});
 
@@ -564,7 +564,7 @@ describe('resume after consent', async () => {
 
 			const { response } = await agent.ui['resume'].resume.get({
 				headers: {
-					cookie: [...session, cookie].join('; ')
+					cookie: [session, cookie].join('; ')
 				}
 			});
 
@@ -587,7 +587,7 @@ describe('resume after consent', async () => {
 
 			const { response } = await agent.ui['resume'].resume.get({
 				headers: {
-					cookie: [...session, cookie].join('; ')
+					cookie: [session, cookie].join('; ')
 				}
 			});
 
@@ -610,7 +610,7 @@ describe('resume after consent', async () => {
 
 			const { response } = await agent.ui['resume'].resume.get({
 				headers: {
-					cookie: [...session, cookie].join('; ')
+					cookie: [session, cookie].join('; ')
 				}
 			});
 
@@ -633,7 +633,7 @@ describe('resume after consent', async () => {
 
 			const { response } = await agent.ui['resume'].resume.get({
 				headers: {
-					cookie: [...session, cookie].join('; ')
+					cookie: [session, cookie].join('; ')
 				}
 			});
 
@@ -656,7 +656,7 @@ describe('resume after consent', async () => {
 
 			const { response } = await agent.ui['resume'].resume.get({
 				headers: {
-					cookie: [...session, cookie].join('; ')
+					cookie: [session, cookie].join('; ')
 				}
 			});
 
@@ -685,7 +685,7 @@ describe('resume after consent', async () => {
 
 			const { response } = await agent.ui['resume'].resume.get({
 				headers: {
-					cookie: [...session, cookie].join('; ')
+					cookie: [session, cookie].join('; ')
 				}
 			});
 

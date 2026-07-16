@@ -20,7 +20,11 @@ import {
 
 import nanoid from '../../lib/helpers/nanoid.ts';
 import epochTime from '../../lib/helpers/epoch_time.ts';
-import bootstrap, { agent, jsonToFormUrlEncoded } from '../test_helper.js';
+import bootstrap, {
+	agent,
+	getHeader,
+	jsonToFormUrlEncoded
+} from '../test_helper.js';
 import * as base64url from '../../lib/helpers/base64url.ts';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { provider } from 'lib/provider.js';
@@ -32,7 +36,7 @@ import { AccessToken } from 'lib/models/access_token.js';
 import { DPoPNonces } from 'lib/helpers/dpop_nonces.js';
 import { ApplicationConfig as config } from 'lib/configs/application.js';
 
-function ath(accessToken) {
+function ath(accessToken: string) {
 	return hash('sha256', accessToken, 'base64url');
 }
 
@@ -121,10 +125,9 @@ describe('features.dPoP', async () => {
 				error: 'invalid_token',
 				error_description: 'invalid token provided'
 			});
-			expect(bearer.headers.get('www-authenticate')).toMatch(/^Bearer /);
-			expect(bearer.headers.get('www-authenticate')).toMatch(
-				/error="invalid_token"/
-			);
+			const bearerWwwAuth = getHeader(bearer.response, 'www-authenticate');
+			expect(bearerWwwAuth).toMatch(/^Bearer /);
+			expect(bearerWwwAuth).toMatch(/error="invalid_token"/);
 
 			const dpopEmpty = await agent.userinfo.get({
 				headers: {
@@ -137,10 +140,9 @@ describe('features.dPoP', async () => {
 				error: 'invalid_header_authorization',
 				error_description: '`DPoP` header not provided'
 			});
-			expect(dpopEmpty.headers.get('www-authenticate')).toMatch(/^DPoP /);
-			expect(dpopEmpty.headers.get('www-authenticate')).toMatch(
-				/algs="ES256 PS256"/
-			);
+			const dpopEmptyWwwAuth = getHeader(dpopEmpty.response, 'www-authenticate');
+			expect(dpopEmptyWwwAuth).toMatch(/^DPoP /);
+			expect(dpopEmptyWwwAuth).toMatch(/algs="ES256 PS256"/);
 
 			const dpopKey = await DPoP(keypair, { accessToken: dpop, htm: 'POST' });
 			const dpopRes = await agent.userinfo.get({
@@ -156,10 +158,9 @@ describe('features.dPoP', async () => {
 				error_description:
 					'authorization header scheme must be `DPoP` when DPoP is used'
 			});
-			expect(dpopRes.headers.get('www-authenticate')).toMatch(/^DPoP /);
-			expect(dpopRes.headers.get('www-authenticate')).toMatch(
-				/algs="ES256 PS256"/
-			);
+			const dpopResWwwAuth = getHeader(dpopRes.response, 'www-authenticate');
+			expect(dpopResWwwAuth).toMatch(/^DPoP /);
+			expect(dpopResWwwAuth).toMatch(/algs="ES256 PS256"/);
 		});
 
 		describe('validates the DPoP proof JWT is conform', () => {
@@ -187,7 +188,7 @@ describe('features.dPoP', async () => {
 				provider.on('userinfo.error', spy);
 
 				for (const value of ['JWT', 'secevent+jwt']) {
-					const { error, headers } = await agent.userinfo.get({
+					const { error, response } = await agent.userinfo.get({
 						headers: {
 							authorization: `DPoP ${access_token}`,
 							dpop: await new SignJWT({})
@@ -205,11 +206,11 @@ describe('features.dPoP', async () => {
 						error: 'invalid_dpop_proof',
 						error_description: 'invalid DPoP key binding'
 					});
-					expect(headers.get('www-authenticate')).toMatch(/^DPoP /);
-					expect(headers.get('www-authenticate')).toMatch(
+					expect(getHeader(response, 'www-authenticate')).toMatch(/^DPoP /);
+					expect(getHeader(response, 'www-authenticate')).toMatch(
 						/error="invalid_dpop_proof"/
 					);
-					expect(headers.get('www-authenticate')).toMatch(/algs="ES256 PS256"/);
+					expect(getHeader(response, 'www-authenticate')).toMatch(/algs="ES256 PS256"/);
 				}
 
 				for (const [err] of spy.mock.calls) {
@@ -222,7 +223,7 @@ describe('features.dPoP', async () => {
 				provider.on('userinfo.error', spy);
 
 				for (const value of [1, true, 'none', 'HS256', 'unsupported']) {
-					const { error, headers } = await agent.userinfo.get({
+					const { error, response } = await agent.userinfo.get({
 						headers: {
 							authorization: `DPoP ${access_token}`,
 							dpop: `${base64url.encode(JSON.stringify({ jwk, typ: 'dpop+jwt', alg: value }))}.e30.`
@@ -234,11 +235,11 @@ describe('features.dPoP', async () => {
 						error: 'invalid_dpop_proof',
 						error_description: 'invalid DPoP key binding'
 					});
-					expect(headers.get('www-authenticate')).toMatch(/^DPoP /);
-					expect(headers.get('www-authenticate')).toMatch(
+					expect(getHeader(response, 'www-authenticate')).toMatch(/^DPoP /);
+					expect(getHeader(response, 'www-authenticate')).toMatch(
 						/error="invalid_dpop_proof"/
 					);
-					expect(headers.get('www-authenticate')).toMatch(/algs="ES256 PS256"/);
+					expect(getHeader(response, 'www-authenticate')).toMatch(/algs="ES256 PS256"/);
 				}
 
 				for (const [err] of spy.mock.calls) {
@@ -254,7 +255,7 @@ describe('features.dPoP', async () => {
 				provider.on('userinfo.error', spy);
 
 				for (const value of [undefined, '', 1, true, null, 'foo', []]) {
-					const { error, headers } = await agent.userinfo.get({
+					const { error, response } = await agent.userinfo.get({
 						headers: {
 							authorization: `DPoP ${access_token}`,
 							dpop: await new SignJWT({})
@@ -272,11 +273,11 @@ describe('features.dPoP', async () => {
 						error: 'invalid_dpop_proof',
 						error_description: 'invalid DPoP key binding'
 					});
-					expect(headers.get('www-authenticate')).toMatch(/^DPoP /);
-					expect(headers.get('www-authenticate')).toMatch(
+					expect(getHeader(response, 'www-authenticate')).toMatch(/^DPoP /);
+					expect(getHeader(response, 'www-authenticate')).toMatch(
 						/error="invalid_dpop_proof"/
 					);
-					expect(headers.get('www-authenticate')).toMatch(/algs="ES256 PS256"/);
+					expect(getHeader(response, 'www-authenticate')).toMatch(/algs="ES256 PS256"/);
 				}
 
 				for (const [err] of spy.mock.calls) {
@@ -290,7 +291,7 @@ describe('features.dPoP', async () => {
 				const spy = mock();
 				provider.on('userinfo.error', spy);
 
-				const { error, headers } = await agent.userinfo.get({
+				const { error, response } = await agent.userinfo.get({
 					headers: {
 						authorization: `DPoP ${access_token}`,
 						dpop: await new SignJWT({})
@@ -308,11 +309,11 @@ describe('features.dPoP', async () => {
 					error: 'invalid_dpop_proof',
 					error_description: 'invalid DPoP key binding'
 				});
-				expect(headers.get('www-authenticate')).toMatch(/^DPoP /);
-				expect(headers.get('www-authenticate')).toMatch(
+				expect(getHeader(response, 'www-authenticate')).toMatch(/^DPoP /);
+				expect(getHeader(response, 'www-authenticate')).toMatch(
 					/error="invalid_dpop_proof"/
 				);
-				expect(headers.get('www-authenticate')).toMatch(/algs="ES256 PS256"/);
+				expect(getHeader(response, 'www-authenticate')).toMatch(/algs="ES256 PS256"/);
 
 				for (const [err] of spy.mock.calls) {
 					expect(err.error_detail).toBe(
@@ -325,7 +326,7 @@ describe('features.dPoP', async () => {
 				const spy = mock();
 				provider.on('userinfo.error', spy);
 
-				const { error, headers } = await agent.userinfo.get({
+				const { error, response } = await agent.userinfo.get({
 					headers: {
 						authorization: `DPoP ${access_token}`,
 						dpop: await new SignJWT({})
@@ -343,11 +344,11 @@ describe('features.dPoP', async () => {
 					error: 'invalid_dpop_proof',
 					error_description: 'invalid DPoP key binding'
 				});
-				expect(headers.get('www-authenticate')).toMatch(/^DPoP /);
-				expect(headers.get('www-authenticate')).toMatch(
+				expect(getHeader(response, 'www-authenticate')).toMatch(/^DPoP /);
+				expect(getHeader(response, 'www-authenticate')).toMatch(
 					/error="invalid_dpop_proof"/
 				);
-				expect(headers.get('www-authenticate')).toMatch(/algs="ES256 PS256"/);
+				expect(getHeader(response, 'www-authenticate')).toMatch(/algs="ES256 PS256"/);
 
 				for (const [err] of spy.mock.calls) {
 					expect(err.error_detail).toBe(
@@ -357,7 +358,7 @@ describe('features.dPoP', async () => {
 			});
 
 			it('missing jti', async function () {
-				const { error, headers } = await agent.userinfo.get({
+				const { error, response } = await agent.userinfo.get({
 					headers: {
 						authorization: `DPoP ${access_token}`,
 						dpop: await new SignJWT({
@@ -379,15 +380,15 @@ describe('features.dPoP', async () => {
 					error: 'invalid_dpop_proof',
 					error_description: 'DPoP proof must have a jti string property'
 				});
-				expect(headers.get('www-authenticate')).toMatch(/^DPoP /);
-				expect(headers.get('www-authenticate')).toMatch(
+				expect(getHeader(response, 'www-authenticate')).toMatch(/^DPoP /);
+				expect(getHeader(response, 'www-authenticate')).toMatch(
 					/error="invalid_dpop_proof"/
 				);
-				expect(headers.get('www-authenticate')).toMatch(/algs="ES256 PS256"/);
+				expect(getHeader(response, 'www-authenticate')).toMatch(/algs="ES256 PS256"/);
 			});
 
 			it('htm mismatch', async function () {
-				const { error, headers } = await agent.userinfo.get({
+				const { error, response } = await agent.userinfo.get({
 					headers: {
 						authorization: `DPoP ${access_token}`,
 						dpop: await new SignJWT({
@@ -411,15 +412,15 @@ describe('features.dPoP', async () => {
 					error: 'invalid_dpop_proof',
 					error_description: 'DPoP proof htm mismatch'
 				});
-				expect(headers.get('www-authenticate')).toMatch(/^DPoP /);
-				expect(headers.get('www-authenticate')).toMatch(
+				expect(getHeader(response, 'www-authenticate')).toMatch(/^DPoP /);
+				expect(getHeader(response, 'www-authenticate')).toMatch(
 					/error="invalid_dpop_proof"/
 				);
-				expect(headers.get('www-authenticate')).toMatch(/algs="ES256 PS256"/);
+				expect(getHeader(response, 'www-authenticate')).toMatch(/algs="ES256 PS256"/);
 			});
 
 			it('htu mismatch', async function () {
-				const { error, headers } = await agent.userinfo.get({
+				const { error, response } = await agent.userinfo.get({
 					headers: {
 						authorization: `DPoP ${access_token}`,
 						dpop: await new SignJWT({
@@ -443,11 +444,11 @@ describe('features.dPoP', async () => {
 					error: 'invalid_dpop_proof',
 					error_description: 'DPoP proof htu mismatch'
 				});
-				expect(headers.get('www-authenticate')).toMatch(/^DPoP /);
-				expect(headers.get('www-authenticate')).toMatch(
+				expect(getHeader(response, 'www-authenticate')).toMatch(/^DPoP /);
+				expect(getHeader(response, 'www-authenticate')).toMatch(
 					/error="invalid_dpop_proof"/
 				);
-				expect(headers.get('www-authenticate')).toMatch(/algs="ES256 PS256"/);
+				expect(getHeader(response, 'www-authenticate')).toMatch(/algs="ES256 PS256"/);
 			});
 
 			for (const enabled of [true, false]) {
@@ -462,7 +463,7 @@ describe('features.dPoP', async () => {
 
 					for (const offset of [301, -301]) {
 						it(`iat too ${offset > 0 ? 'far in the future' : 'old'}`, async function () {
-							const { error, headers } = await agent.userinfo.get({
+							const { error, response } = await agent.userinfo.get({
 								headers: {
 									authorization: `DPoP ${access_token}`,
 									dpop: await new SignJWT({
@@ -482,25 +483,27 @@ describe('features.dPoP', async () => {
 							});
 							if (!error) throw new Error('expected error response');
 							expect(error.status).toBe(401);
-							expect(headers.get('www-authenticate')).toMatch(/^DPoP /);
-							expect(headers.get('www-authenticate')).toMatch(
+							expect(getHeader(response, 'www-authenticate')).toMatch(/^DPoP /);
+							expect(getHeader(response, 'www-authenticate')).toMatch(
 								/DPoP proof iat is not recent enough/
 							);
-							expect(headers.get('www-authenticate')).toMatch(
+							expect(getHeader(response, 'www-authenticate')).toMatch(
 								/algs="ES256 PS256"/
 							);
 
 							if (enabled) {
-								expect(headers.get('dpop-nonce')).toMatch(/^[\w-]{43}$/);
-								expect(headers.get('www-authenticate')).toMatch(
+								expect(getHeader(response, 'dpop-nonce')).toMatch(
+									/^[\w-]{43}$/
+								);
+								expect(getHeader(response, 'www-authenticate')).toMatch(
 									/error="use_dpop_nonce"/
 								);
-								expect(headers.get('www-authenticate')).toMatch(
+								expect(getHeader(response, 'www-authenticate')).toMatch(
 									/use a DPoP nonce instead/
 								);
 							} else {
-								expect(headers.has('dpop-nonce')).toBe(false);
-								expect(headers.get('www-authenticate')).toMatch(
+								expect(response.headers.has('dpop-nonce')).toBe(false);
+								expect(getHeader(response, 'www-authenticate')).toMatch(
 									/error="invalid_dpop_proof"/
 								);
 							}
@@ -900,7 +903,7 @@ describe('features.dPoP', async () => {
 			});
 			expect(res.status).toBe(303);
 			auth.validateClientLocation(res);
-			const location = res.headers.get('location');
+			const location = getHeader(res.response, 'location');
 			const code = url.parse(location, true).query.code;
 
 			const { dpopJkt } = TestAdapter.for('AuthorizationCode').syncFind(code);
@@ -953,7 +956,7 @@ describe('features.dPoP', async () => {
 			});
 			expect(res.status).toBe(303);
 			auth.validateClientLocation(res);
-			const location = res.headers.get('location');
+			const location = getHeader(res.response, 'location');
 			const code = url.parse(location, true).query.code;
 
 			const { dpopJkt } = TestAdapter.for('AuthorizationCode').syncFind(code);
@@ -976,7 +979,7 @@ describe('features.dPoP', async () => {
 					headers: { cookie }
 				});
 				expect(res.status).toBe(303);
-				const location = res.headers.get('location');
+				const location = getHeader(res.response, 'location');
 				const parsed = url.parse(location, true);
 				code = parsed.query.code;
 			});
@@ -1029,7 +1032,7 @@ describe('features.dPoP', async () => {
 					headers: { cookie }
 				});
 				expect(res.status).toBe(303);
-				const location = res.headers.get('location');
+				const location = getHeader(res.response, 'location');
 				const parsed = url.parse(location, true);
 				code = parsed.query.code;
 			});
@@ -1146,7 +1149,7 @@ describe('features.dPoP', async () => {
 					headers: { cookie }
 				});
 				expect(res.status).toBe(303);
-				const location = res.headers.get('location');
+				const location = getHeader(res.response, 'location');
 				const parsed = url.parse(location, true);
 				const code = parsed.query.code;
 
@@ -1218,7 +1221,7 @@ describe('features.dPoP', async () => {
 				query: auth.params,
 				headers: { cookie }
 			});
-			const location = res.headers.get('location');
+			const location = getHeader(res.response, 'location');
 			const parsed = url.parse(location, true);
 			code = parsed.query.code;
 		});
@@ -1413,7 +1416,7 @@ describe('features.dPoP', async () => {
 				error: 'use_dpop_nonce',
 				error_description: 'invalid nonce in DPoP proof'
 			});
-			const nonce = res.headers.get('dpop-nonce');
+			const nonce = getHeader(res.response, 'dpop-nonce');
 
 			const userInfo = await agent.userinfo.get({
 				headers: {
@@ -1452,7 +1455,7 @@ describe('features.dPoP', async () => {
 				error: 'use_dpop_nonce',
 				error_description: 'invalid nonce in DPoP proof'
 			});
-			const nonce = res.headers.get('dpop-nonce');
+			const nonce = getHeader(res.response, 'dpop-nonce');
 
 			const token = await agent.token.post(
 				{ grant_type: 'client_credentials' },
@@ -1501,13 +1504,13 @@ describe('features.dPoP', async () => {
 				}
 			);
 			expect(res.status).toBe(400);
-			expect(res.headers.get('DPoP-Nonce')).toMatch(/^[\w-]{43}$/);
+			expect(getHeader(res.response, 'DPoP-Nonce')).toMatch(/^[\w-]{43}$/);
 			if (!res.error) throw new Error('expected error response');
 			expect(res.error.value).toEqual({
 				error: 'use_dpop_nonce',
 				error_description: 'nonce is required in the DPoP proof'
 			});
-			const nonce = res.headers.get('DPoP-Nonce');
+			const nonce = getHeader(res.response, 'DPoP-Nonce');
 
 			const par = await agent.par.post(
 				{
@@ -1528,7 +1531,7 @@ describe('features.dPoP', async () => {
 				}
 			);
 			expect(par.status).toBe(201);
-			expect(par.headers.get('dpop-nonce')).toBeEmpty();
+			expect(par.response.headers.get('dpop-nonce')).toBeEmpty();
 		});
 
 		it('@ userinfo', async function () {
@@ -1544,7 +1547,7 @@ describe('features.dPoP', async () => {
 				error: 'use_dpop_nonce',
 				error_description: 'nonce is required in the DPoP proof'
 			});
-			const nonce = res.headers.get('dpop-nonce');
+			const nonce = getHeader(res.response, 'dpop-nonce');
 
 			const userInfo = await agent.userinfo.get({
 				headers: {
@@ -1561,7 +1564,7 @@ describe('features.dPoP', async () => {
 				error: 'invalid_token',
 				error_description: 'invalid token provided'
 			});
-			expect(userInfo.headers.get('dpop-nonce')).toBeEmpty();
+			expect(userInfo.response.headers.get('dpop-nonce')).toBeEmpty();
 		});
 
 		it('@ token endpoint', async function () {
@@ -1583,7 +1586,7 @@ describe('features.dPoP', async () => {
 				error: 'use_dpop_nonce',
 				error_description: 'nonce is required in the DPoP proof'
 			});
-			const nonce = res.headers.get('dpop-nonce');
+			const nonce = getHeader(res.response, 'dpop-nonce');
 
 			const token = await agent.token.post(
 				{ grant_type: 'client_credentials' },
@@ -1599,7 +1602,7 @@ describe('features.dPoP', async () => {
 				}
 			);
 			expect(token.status).toBe(200);
-			expect(token.headers.get('dpop-nonce')).toBeEmpty();
+			expect(token.response.headers.get('dpop-nonce')).toBeEmpty();
 		});
 	});
 });

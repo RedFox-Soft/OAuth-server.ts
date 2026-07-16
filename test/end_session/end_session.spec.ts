@@ -11,7 +11,7 @@ import {
 } from 'bun:test';
 import { parse as parseUrl } from 'node:url';
 
-import bootstrap, { agent, type Setup } from '../test_helper.js';
+import bootstrap, { agent, getHeader, type Setup } from '../test_helper.js';
 import * as JWT from '../../lib/helpers/jwt.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { provider } from 'lib/provider.js';
@@ -66,7 +66,7 @@ describe('logout endpoint', () => {
 	});
 
 	describe('when logged in', () => {
-		let cookie;
+		let cookie: string;
 		let idToken;
 		beforeEach(async function () {
 			cookie = await setup.login();
@@ -555,7 +555,7 @@ describe('logout endpoint', () => {
 				expect(sessionAdapter.upsert).not.toHaveBeenCalled();
 				expect(sessionAdapter.destroy).toHaveBeenCalledWith(sessionId);
 				expect(
-					parseUrl(res.headers.get('location'), true).query
+					parseUrl(getHeader(res.response, 'location'), true).query
 				).not.toHaveProperty('client_id');
 				expect(authorizationCodeAdapter.revokeByGrantId).toHaveBeenCalledTimes(
 					1
@@ -594,8 +594,7 @@ describe('logout endpoint', () => {
 					}
 				);
 				expect(res.status).toBe(303);
-				const sessionID = res.headers
-					.get('set-cookie')
+				const sessionID = getHeader(res.response, 'set-cookie')
 					.split(';')[0]
 					.split('=')[1]
 					.trim();
@@ -626,8 +625,7 @@ describe('logout endpoint', () => {
 					}
 				);
 				expect(res.status).toBe(200);
-				const sessionID = res.headers
-					.get('set-cookie')
+				const sessionID = getHeader(res.response, 'set-cookie')
 					.split(';')[0]
 					.split('=')[1]
 					.trim();
@@ -656,7 +654,7 @@ describe('logout endpoint', () => {
 					}
 				);
 				expect(res.status).toBe(303);
-				expect(res.headers.get('location')).toBe(
+				expect(getHeader(res.response, 'location')).toBe(
 					'https://rp.example.com/?state=foobar'
 				);
 			});

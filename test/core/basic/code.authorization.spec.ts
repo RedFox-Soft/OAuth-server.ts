@@ -37,7 +37,10 @@ describe('BASIC code', () => {
 	});
 
 	['get', 'post'].forEach((verb) => {
-		function authRequest(auth, { cookie, accept } = {}) {
+		function authRequest(
+			auth: AuthorizationRequest,
+			{ cookie, accept }: { cookie?: string; accept?: string } = {}
+		) {
 			if (verb === 'get') {
 				return agent.auth.get({
 					query: auth.params,
@@ -58,7 +61,7 @@ describe('BASIC code', () => {
 		}
 
 		describe(`${verb} ${route} with session`, () => {
-			let cookie;
+			let cookie: string;
 			beforeAll(async function () {
 				cookie = await setup.login();
 			});
@@ -214,7 +217,7 @@ describe('BASIC code', () => {
 		});
 
 		describe(`${verb} ${route} interactions`, () => {
-			let cookie;
+			let cookie: string;
 			beforeEach(async function () {
 				cookie = await setup.login();
 			});

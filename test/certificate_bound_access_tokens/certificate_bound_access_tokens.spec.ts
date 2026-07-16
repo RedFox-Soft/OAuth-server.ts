@@ -14,6 +14,7 @@ import * as url from 'node:url';
 
 import bootstrap, {
 	agent,
+	getHeader,
 	jsonToFormUrlEncoded,
 	type Setup
 } from '../test_helper.js';
@@ -342,7 +343,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 	});
 
 	describe('authorization flow', () => {
-		let cookie;
+		let cookie: string;
 		let auth;
 		let code;
 		beforeAll(async function () {
@@ -361,7 +362,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 					cookie
 				}
 			});
-			const location = res.headers.get('location');
+			const location = getHeader(res.response, 'location');
 			({
 				query: { code }
 			} = url.parse(location, true));
@@ -473,7 +474,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 	});
 
 	describe('authorization flow (public client)', () => {
-		let cookie;
+		let cookie: string;
 		let auth;
 		let code;
 		beforeAll(async function () {
@@ -494,7 +495,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 					cookie
 				}
 			});
-			const location = res.headers.get('location');
+			const location = getHeader(res.response, 'location');
 			({
 				query: { code }
 			} = url.parse(location, true));

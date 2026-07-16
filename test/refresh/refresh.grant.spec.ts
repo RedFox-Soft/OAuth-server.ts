@@ -14,7 +14,7 @@ import {
 
 import base64url from 'base64url';
 
-import bootstrap, { agent, type Setup } from '../test_helper.js';
+import bootstrap, { agent, getHeader, type Setup } from '../test_helper.js';
 import { provider } from 'lib/provider.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
@@ -62,7 +62,7 @@ describe('grant_type=refresh_token', () => {
 		expect(auth.status).toBe(303);
 		const {
 			query: { code }
-		} = parseUrl(auth.headers.get('location'), true);
+		} = parseUrl(getHeader(auth.response, 'location'), true);
 
 		const { data } = await authReq.getToken(code);
 		if (!data) throw new Error('expected response data');

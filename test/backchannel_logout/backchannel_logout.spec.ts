@@ -134,7 +134,7 @@ describe('Back-Channel Logout 1.0', () => {
 	});
 
 	describe('end_session extension', () => {
-		let cookie;
+		let cookie: string;
 		let auth;
 		let code;
 

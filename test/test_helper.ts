@@ -75,6 +75,18 @@ export function passInteractionChecks(...args: unknown[]) {
 	return fn();
 }
 
+// eden treaty types the destructured `headers` as the loose `HeadersInit`
+// (`Headers | Record<string,string> | [string,string][] | undefined`), which has
+// no `.get()`. Read headers off the real `response` and assert presence so callers
+// get a non-null string back.
+export function getHeader(response: Response, name: string): string {
+	const value = response.headers.get(name);
+	if (value === null) {
+		throw new Error(`expected response header "${name}"`);
+	}
+	return value;
+}
+
 export function jsonToFormUrlEncoded(json: Record<string, unknown>) {
 	const searchParams = new URLSearchParams();
 	for (const [key, value] of Object.entries(json)) {
@@ -158,7 +170,6 @@ async function bootstrap(
 		});
 		lastSession = session;
 		const sessionCookie = `_session=${sessionId}; path=/; expires=${expire.toGMTString()}; httponly`;
-		const cookies = [sessionCookie];
 
 		session.payload.authorizations = {};
 		const oidc = new OIDCContext({ scope, claims });
@@ -199,7 +210,7 @@ async function bootstrap(
 		return Account.findAccount({}, accountId)
 			.then(session.save(ttl.Session))
 			.then(() => {
-				return cookies;
+				return sessionCookie;
 			});
 	}
 

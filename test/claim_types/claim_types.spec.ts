@@ -1,6 +1,6 @@
 import i from 'lib/helpers/weak_cache.js';
 import { describe, it, beforeAll, expect } from 'bun:test';
-import bootstrap, { agent, type Setup } from '../test_helper.js';
+import bootstrap, { agent, getHeader, type Setup } from '../test_helper.js';
 import { provider } from 'lib/provider.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
@@ -48,7 +48,7 @@ describe('distributed and aggregated claims', () => {
 				}
 			});
 			expect(authRes.status).toBe(303);
-			const location = authRes.headers.get('location');
+			const location = getHeader(authRes.response, 'location');
 			const code = new URL(location).searchParams.get('code');
 
 			const res = await auth.getToken(code);
@@ -85,7 +85,7 @@ describe('distributed and aggregated claims', () => {
 				}
 			});
 			expect(authRes.status).toBe(303);
-			const location = authRes.headers.get('location');
+			const location = getHeader(authRes.response, 'location');
 			const code = new URL(location).searchParams.get('code');
 
 			const res = await auth.getToken(code);

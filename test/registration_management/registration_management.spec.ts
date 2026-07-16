@@ -1,6 +1,6 @@
 import { describe, it, beforeAll, afterEach, expect, mock } from 'bun:test';
 
-import bootstrap, { agent } from '../test_helper.js';
+import bootstrap, { agent, getHeader } from '../test_helper.js';
 import { provider } from 'lib/provider.js';
 import { Client } from 'lib/models/client.js';
 import { ISSUER } from 'lib/configs/env.js';
@@ -103,8 +103,8 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 			);
 
 			expect(res.status).toBe(200);
-			expect(res.headers.get('content-type')).toMatch(/application\/json/);
-			expect(res.headers.get('cache-control')).toBe('no-store');
+			expect(getHeader(res.response, 'content-type')).toMatch(/application\/json/);
+			expect(getHeader(res.response, 'cache-control')).toBe('no-store');
 			expect(res.data).toHaveProperty(
 				'registration_access_token',
 				client.registration_access_token
@@ -345,7 +345,7 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 				});
 
 			expect(res.status).toBe(204);
-			expect(res.headers.get('cache-control')).toBe('no-store');
+			expect(getHeader(res.response, 'cache-control')).toBe('no-store');
 			expect(
 				await RegistrationAccessToken.tryFind(client.registration_access_token)
 			).toBeUndefined();

@@ -9,7 +9,7 @@ import {
 	spyOn
 } from 'bun:test';
 
-import bootstrap, { agent } from '../test_helper.js';
+import bootstrap, { agent, getHeader } from '../test_helper.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { provider } from 'lib/provider.js';
 import { Client } from 'lib/models/client.js';
@@ -202,7 +202,7 @@ describe('registration features', () => {
 
 		it('returns token-endpoint-like cache headers', async () => {
 			const res = await reg();
-			expect(res.headers.get('cache-control')).toBe('no-store');
+			expect(getHeader(res.response, 'cache-control')).toBe('no-store');
 		});
 
 		it('stores the client and emits an event', async () => {
@@ -376,7 +376,7 @@ describe('registration features', () => {
 		it('returns all available nonsecret metadata', async () => {
 			const res = await agent.reg({ clientId }).get({ headers: bearer(token) });
 			expect(res.status).toBe(200);
-			expect(res.headers.get('content-type')).toMatch(/application\/json/);
+			expect(getHeader(res.response, 'content-type')).toMatch(/application\/json/);
 			expect(res.data).toHaveProperty('client_id');
 			expect(res.data).toHaveProperty('client_secret');
 			expect(res.data).toHaveProperty('registration_access_token');
@@ -399,7 +399,7 @@ describe('registration features', () => {
 
 		it('returns token-endpoint-like cache headers', async () => {
 			const res = await agent.reg({ clientId }).get({ headers: bearer(token) });
-			expect(res.headers.get('cache-control')).toBe('no-store');
+			expect(getHeader(res.response, 'cache-control')).toBe('no-store');
 		});
 
 		it('validates client is a valid client', async () => {
@@ -447,7 +447,7 @@ describe('registration features', () => {
 			const res = await agent
 				.reg({ clientId: 'foobar' })
 				.get({ headers: bearer(token) });
-			expect(res.headers.get('cache-control')).toBe('no-store');
+			expect(getHeader(res.response, 'cache-control')).toBe('no-store');
 			expectFail(res, 401, 'invalid_token', 'invalid token provided');
 			expect(spy).toHaveBeenCalledTimes(1);
 			expect(spy.mock.calls[0][0].payload.clientId).toBe(clientId);

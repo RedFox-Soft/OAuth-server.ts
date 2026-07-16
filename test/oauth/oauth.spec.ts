@@ -127,7 +127,7 @@ describe('requests without the openid scope', () => {
 		const scope = 'api:read';
 
 		describe('when scope is e.g. missing openid (api:read)', () => {
-			let cookie;
+			let cookie: string;
 			beforeAll(async function () {
 				cookie = await setup.login({
 					scope: [scope, 'offline_access'].join(' ')

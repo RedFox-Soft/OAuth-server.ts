@@ -8,7 +8,7 @@ import {
 	mock
 } from 'bun:test';
 
-import bootstrap, { agent, type Setup } from '../test_helper.js';
+import bootstrap, { agent, getHeader, type Setup } from '../test_helper.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { provider } from 'lib/provider.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
@@ -335,13 +335,13 @@ describe('introspection features', () => {
 		});
 
 		it('returns token-endpoint-like cache headers', async function () {
-			const { headers } = await agent.token.introspect.post(
+			const { response } = await agent.token.introspect.post(
 				{},
 				{
 					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 				}
 			);
-			expect(headers.get('cache-control')).toBe('no-store');
+			expect(getHeader(response, 'cache-control')).toBe('no-store');
 		});
 
 		it('validates token param presence', async function () {

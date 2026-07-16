@@ -28,7 +28,7 @@ const decoder = new TextDecoder();
 
 describe('encryption', () => {
 	let setup: Setup;
-	let cookie;
+	let cookie: string;
 	beforeAll(async () => {
 		setup = await bootstrap(import.meta.url);
 		cookie = await setup.login();

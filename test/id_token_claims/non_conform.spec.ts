@@ -10,7 +10,7 @@ import {
 	mock
 } from 'bun:test';
 
-import bootstrap, { agent, type Setup } from '../test_helper.js';
+import bootstrap, { agent, getHeader, type Setup } from '../test_helper.js';
 import { decode as decodeJWT } from '../../lib/helpers/jwt.ts';
 import { provider } from 'lib/provider.js';
 import { Client } from 'lib/models/client.js';
@@ -58,7 +58,7 @@ describe('configuration conformIdTokenClaims=false', () => {
 
 			const {
 				query: { code }
-			} = parseUrl(authResponse.headers.get('location'), true);
+			} = parseUrl(getHeader(authResponse.response, 'location'), true);
 
 			const tokenRes = await auth.getToken(code);
 			expect(tokenRes.status).toBe(200);
