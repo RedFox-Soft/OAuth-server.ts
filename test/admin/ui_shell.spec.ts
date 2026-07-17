@@ -18,9 +18,10 @@ describe('admin UI shell', () => {
 		expect(res.response.headers.get('content-type')).toContain('text/html');
 		expect(html).toContain('window.PROPS');
 		expect(html).toContain('"needsSetup":true');
-		// The bundle is served by staticPlugin under the '/public' prefix; the
-		// script tag must point there or the SPA never hydrates (unstyled page).
-		expect(html).toContain('src="/public/admin.js"');
+		// The bundle is served by staticPlugin under the '/public' prefix (with an
+		// optional ?v= cache-buster); pointing elsewhere means the SPA never
+		// hydrates (unstyled page).
+		expect(html).toMatch(/src="\/public\/admin\.js(\?v=[^"]*)?"/);
 		expect(html).not.toContain('src="/admin.js"');
 	});
 });
