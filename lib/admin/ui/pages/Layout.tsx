@@ -75,7 +75,7 @@ export function Layout({ me }: { me: AdminContext | null }) {
 						gap: 12
 					}}
 				>
-					{me && <Typography.Text>{me.userId}</Typography.Text>}
+					{me && <Typography.Text>{me.email}</Typography.Text>}
 					<a onClick={logout}>
 						<LogoutOutlined /> Log out
 					</a>

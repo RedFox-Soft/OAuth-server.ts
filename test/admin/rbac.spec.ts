@@ -9,12 +9,14 @@ import type { Project } from 'lib/adapters/types.ts';
 
 const superAdmin: AdminContext = {
 	userId: 'u1',
+	email: 'super@x.io',
 	roles: ['super_admin'],
 	bucketId: 'admin',
 	managedProjectIds: []
 };
 const projectAdmin: AdminContext = {
 	userId: 'u2',
+	email: 'pa@x.io',
 	roles: ['project_admin'],
 	bucketId: 'admin',
 	managedProjectIds: ['p1']

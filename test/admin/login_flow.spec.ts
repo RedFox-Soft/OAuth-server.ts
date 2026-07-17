@@ -128,9 +128,15 @@ describe('admin OIDC login (BFF)', () => {
 			headers: { cookie: sessionCookie }
 		});
 		expect(me.status).toBe(200);
-		const meData = me.data as { roles: string[]; bucketId: string } | null;
+		const meData = me.data as {
+			roles: string[];
+			bucketId: string;
+			email: string;
+		} | null;
 		expect(meData?.roles).toContain('super_admin');
 		expect(meData?.bucketId).toBe(ADMIN_BUCKET_ID);
+		// The admin shell header renders the email (not the raw user id).
+		expect(meData?.email).toBe('root@x.io');
 	});
 
 	it('logout destroys the session', async () => {

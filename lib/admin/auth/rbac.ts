@@ -9,6 +9,7 @@ import { ADMIN_SESSION_COOKIE, ADMIN_SESSION_TTL_SECONDS } from '../consts.js';
 
 export interface AdminContext {
 	userId: string;
+	email: string;
 	roles: string[];
 	bucketId: string;
 	managedProjectIds: string[];
@@ -67,6 +68,7 @@ export const resolveAdmin = new Elysia({ name: 'admin-resolve' }).derive(
 		return {
 			admin: {
 				userId: user._id,
+				email: user.email,
 				roles: user.roles,
 				bucketId: session.bucketId,
 				managedProjectIds: managed.map((p) => p._id)
