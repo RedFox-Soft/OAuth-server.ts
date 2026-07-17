@@ -70,6 +70,7 @@ export interface Project {
 	type: 'admin' | 'regular';
 	managedBy: string[];
 	bucketId: string | null;
+	clientIds: string[];
 	createdAt: Date;
 	updatedAt: Date;
 }
@@ -82,6 +83,7 @@ export interface ProjectStoreInstance {
 		type?: 'admin' | 'regular';
 		managedBy?: string[];
 		bucketId?: string | null;
+		clientIds?: string[];
 	}): Promise<Project>;
 	find(id: string): Promise<Project | null>;
 	findBySlug(slug: string): Promise<Project | null>;
@@ -89,7 +91,7 @@ export interface ProjectStoreInstance {
 	listByManager(userId: string): Promise<Project[]>;
 	update(
 		id: string,
-		patch: Partial<Pick<Project, 'name' | 'managedBy' | 'bucketId'>>
+		patch: Partial<Pick<Project, 'name' | 'managedBy' | 'bucketId' | 'clientIds'>>
 	): Promise<Project | null>;
 	destroy(id: string): Promise<void>;
 	countByBucket(bucketId: string): Promise<number>;

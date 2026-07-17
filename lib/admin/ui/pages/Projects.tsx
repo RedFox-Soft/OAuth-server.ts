@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Table, Button, Modal, Form, Input, message } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import type { Project } from '../../../adapters/types.js';
+import { Clients } from './Clients.js';
 
 interface CreateProjectValues {
 	name: string;
@@ -14,6 +15,7 @@ export function Projects() {
 	const [open, setOpen] = useState(false);
 	const [creating, setCreating] = useState(false);
 	const [form] = Form.useForm<CreateProjectValues>();
+	const [openProject, setOpenProject] = useState<Project | null>(null);
 
 	async function load() {
 		setLoading(true);
@@ -52,6 +54,12 @@ export function Projects() {
 		}
 	}
 
+	if (openProject) {
+		return (
+			<Clients project={openProject} onBack={() => setOpenProject(null)} />
+		);
+	}
+
 	return (
 		<>
 			<div style={{ marginBottom: 16, textAlign: 'right' }}>
@@ -75,6 +83,14 @@ export function Projects() {
 						title: 'Managed by',
 						dataIndex: 'managedBy',
 						render: (managedBy: string[]) => managedBy.join(', ')
+					},
+					{
+						title: '',
+						render: (_: unknown, row: Project) => (
+							<Button size="small" onClick={() => setOpenProject(row)}>
+								Clients
+							</Button>
+						)
 					}
 				]}
 			/>

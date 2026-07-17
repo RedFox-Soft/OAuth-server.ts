@@ -30,4 +30,13 @@ describe('ProjectStore (memory)', () => {
 		await store.destroy(p._id);
 		expect(await store.find(p._id)).toBeNull();
 	});
+
+	it('defaults clientIds to [] and updates them', async () => {
+		const p = await store.create({ name: 'C', slug: `c-${Math.random()}` });
+		expect(p.clientIds).toEqual([]);
+		const updated = await store.update(p._id, { clientIds: ['abc'] });
+		expect(updated?.clientIds).toEqual(['abc']);
+		const reloaded = await store.find(p._id);
+		expect(reloaded?.clientIds).toEqual(['abc']);
+	});
 });

@@ -8,6 +8,7 @@ import {
 import { adminSetup, hasSuperAdmin } from './auth/setup.js';
 import { adminLogin } from './auth/login.js';
 import { projectRoutes } from './projects/routes.js';
+import { clientRoutes } from './clients/routes.js';
 import { adminUserRoutes } from './users/routes.js';
 import { bucketRoutes } from './buckets/routes.js';
 import { renderAdminShell } from './ui/serverRender.js';
@@ -41,5 +42,6 @@ export const adminApp = new Elysia({ name: 'admin' })
 		return ctx;
 	})
 	.use(projectRoutes)
+	.use(clientRoutes)
 	.use(adminUserRoutes)
 	.use(bucketRoutes);

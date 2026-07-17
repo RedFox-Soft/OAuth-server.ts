@@ -20,15 +20,24 @@ export async function ensureAdminSeed(): Promise<void> {
 	}
 
 	const projects = getProjectStore();
-	if (!(await projects.find(ADMIN_PROJECT_ID))) {
+	const existingAdminProject = await projects.find(ADMIN_PROJECT_ID);
+	if (!existingAdminProject) {
 		await projects.create({
 			_id: ADMIN_PROJECT_ID,
 			name: 'Administration',
 			slug: 'admin',
 			type: 'admin',
 			managedBy: [],
-			bucketId: ADMIN_BUCKET_ID
+			bucketId: ADMIN_BUCKET_ID,
+			clientIds: [ADMIN_CLIENT_ID]
 		});
+	} else {
+		const existingClientIds = existingAdminProject.clientIds ?? [];
+		if (!existingClientIds.includes(ADMIN_CLIENT_ID)) {
+			await projects.update(ADMIN_PROJECT_ID, {
+				clientIds: [...existingClientIds, ADMIN_CLIENT_ID]
+			});
+		}
 	}
 
 	if (!(await Client.tryFind(ADMIN_CLIENT_ID))) {

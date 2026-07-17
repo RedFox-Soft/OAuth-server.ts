@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from 'bun:test';
 
 import bootstrap from '../test_helper.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { getProjectStore, getBucketStore } from 'lib/adapters/index.ts';
+import { getProjectStore, getBucketStore, resetAdminMemoryStores } from 'lib/adapters/index.ts';
 import {
 	ADMIN_PROJECT_ID,
 	ADMIN_BUCKET_ID,
@@ -28,5 +28,28 @@ describe('ensureAdminSeed', () => {
 		const client = await Client.find(ADMIN_CLIENT_ID);
 		expect(client).toBeTruthy();
 		expect(client.tokenEndpointAuthMethod).toBe('none');
+	});
+
+	it('seeds the admin project with the panel client id', async () => {
+		await ensureAdminSeed();
+		const project = await getProjectStore().find(ADMIN_PROJECT_ID);
+		expect(project?.clientIds).toContain(ADMIN_CLIENT_ID);
+	});
+
+	it('backfills clientIds on an admin project that predates the field', async () => {
+		resetAdminMemoryStores();
+		const store = getProjectStore();
+		const p = await store.create({
+			_id: ADMIN_PROJECT_ID,
+			name: 'Administration',
+			slug: 'admin',
+			type: 'admin',
+			bucketId: ADMIN_BUCKET_ID
+		});
+		// Simulate a legacy document created before clientIds existed.
+		delete (p as { clientIds?: string[] }).clientIds;
+		await ensureAdminSeed();
+		const reloaded = await store.find(ADMIN_PROJECT_ID);
+		expect(reloaded?.clientIds).toContain(ADMIN_CLIENT_ID);
 	});
 });
