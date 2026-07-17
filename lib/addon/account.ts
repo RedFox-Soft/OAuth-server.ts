@@ -35,7 +35,12 @@ export async function loadExistingGrant(oidc) {
 	}
 	const accountId = oidc.account?.accountId;
 	if (oidc.client['consent.require'] === false && accountId) {
-		const grant = new Grant({ accountId, clientId });
+		// Mark the auto-created grant `trusted` (this is a consent-not-required
+		// client). A trusted grant's getOIDCScopeFiltered()/getResourceScopeFiltered()
+		// return the full requested scope set. Without it the grant has no scopes,
+		// so `interactions()` denies the request with access_denied ("no scope was
+		// granted"). `trusted` is persisted, so reloaded grants stay trusted too.
+		const grant = new Grant({ accountId, clientId, trusted: true });
 		await grant.save();
 		return grant;
 	}

@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import { ISSUER } from '../../configs/env.js';
 import { getUserStore, adminSessionStore } from '../../adapters/index.js';
 import { createAdminSession, sessionCookieAttributes } from './session.js';
+import { routeNames } from '../../consts/param_list.js';
 import {
 	ADMIN_CLIENT_ID,
 	ADMIN_BUCKET_ID,
@@ -30,7 +31,7 @@ export const adminLogin = new Elysia({ name: 'admin-login' })
 			path: '/admin',
 			maxAge: 600
 		});
-		const url = new URL(`${ISSUER}/authorize`);
+		const url = new URL(`${ISSUER}${routeNames.authorization}`);
 		url.search = new URLSearchParams({
 			client_id: ADMIN_CLIENT_ID,
 			response_type: 'code',
@@ -62,7 +63,7 @@ export const adminLogin = new Elysia({ name: 'admin-login' })
 				set.status = 400;
 				return { error: 'invalid_state', message: 'state mismatch' };
 			}
-			const res = await fetch(`${ISSUER}/token`, {
+			const res = await fetch(`${ISSUER}${routeNames.token}`, {
 				method: 'POST',
 				headers: { 'content-type': 'application/x-www-form-urlencoded' },
 				body: new URLSearchParams({
@@ -113,7 +114,16 @@ export const adminLogin = new Elysia({ name: 'admin-login' })
 			});
 			return redirect('/admin', 302);
 		},
-		{ query: t.Object({ code: t.String(), state: t.String() }) }
+		{
+			// The provider appends `iss` (RFC 9207 authorization-response issuer
+			// identifier) to the redirect; the app runs with `normalize: false`, so a
+			// strict { code, state } schema would 422 on the extra param. Accept it.
+			query: t.Object({
+				code: t.String(),
+				state: t.String(),
+				iss: t.Optional(t.String())
+			})
+		}
 	)
 	.post('/admin/api/logout', async ({ cookie }) => {
 		const id = cookie[ADMIN_SESSION_COOKIE]?.value as string | undefined;

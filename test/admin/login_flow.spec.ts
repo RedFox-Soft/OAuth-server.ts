@@ -11,6 +11,7 @@ import bootstrap, { agent, getHeader } from '../test_helper.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { getUserStore, resetAdminMemoryStores } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID } from 'lib/admin/consts.ts';
+import { routeNames } from 'lib/consts/param_list.ts';
 
 // Pull one `name=value` pair out of a Set-Cookie response header array.
 function cookiePair(setCookies: string[], name: string): string {
@@ -52,12 +53,14 @@ describe('admin OIDC login (BFF)', () => {
 		expect(res.status).toBe(401);
 	});
 
-	it('login redirects to /authorize with PKCE + state and sets admin_oauth', async () => {
+	it('login redirects to the OIDC authorization endpoint with PKCE + state and sets admin_oauth', async () => {
 		const res = await agent.admin.login.get();
 		expect(res.status).toBe(302);
 
 		const location = getHeader(res.response, 'location');
-		expect(location.startsWith('http://e.ly/authorize')).toBe(true);
+		// Must target the provider's real authorization route (routeNames.authorization,
+		// '/auth') — not a made-up '/authorize' path, which 404s and breaks login.
+		expect(new URL(location).pathname).toBe(routeNames.authorization);
 		const params = new URL(location).searchParams;
 		expect(params.get('client_id')).toBe('admin-panel');
 		expect(params.get('response_type')).toBe('code');
@@ -106,8 +109,11 @@ describe('admin OIDC login (BFF)', () => {
 			json: async () => ({ access_token: 'x', id_token: idToken })
 		})) as unknown as typeof fetch);
 
+		// Include `iss` — the provider appends the RFC 9207 issuer identifier to the
+		// authorization response redirect, and the callback query schema must accept
+		// it (a strict { code, state } schema 422s under `normalize: false`).
 		const cb = await agent.admin.callback.get({
-			query: { code: 'valid-code', state },
+			query: { code: 'valid-code', state, iss: 'http://e.ly' },
 			headers: { cookie: oauthCookie }
 		});
 		expect(cb.status).toBe(302);
