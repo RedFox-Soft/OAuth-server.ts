@@ -63,6 +63,15 @@ The server starts on `http://localhost:3000` by default. Schema provisioning cre
 signing key, so no key configuration is required. If the server ever starts against an empty key
 store it also generates and persists one automatically.
 
+### Admin panel provisioning
+
+`bun run db:setup` also provisions the admin panel: the reserved admin project, its "Administrators"
+user bucket, and the first-party `admin-panel` OAuth client. The seed is idempotent — **re-run
+`bun run db:setup` after upgrading an existing install** so the admin client/project/bucket exist.
+On first visit to `/admin`, a one-time setup screen creates the initial `super_admin`; the setup
+route is closed once any super_admin exists. The admin panel requires a MongoDB-backed deployment
+(the in-memory adapter does not persist seeded data across restarts).
+
 ## Configuration
 
 | Variable        | Description                                | Example                     |

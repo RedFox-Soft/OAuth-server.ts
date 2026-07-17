@@ -15,5 +15,8 @@ export const COLLECTIONS = [
 	'Interaction',
 	'PushedAuthorizationRequest',
 	'BackchannelAuthenticationRequest',
-	'jwks'
+	'jwks',
+	'projects',
+	'userBuckets',
+	'adminSession'
 ] as const;

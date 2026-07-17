@@ -5,8 +5,8 @@
 		"format": "prettier --write .",
 		"lint": "eslint lib test --fix",
 		"typecheck": "tsc --noEmit",
-		"build": "bun build --outdir=public --minify ./lib/interactions/loginClient.tsx",
-		"watch": "bun build --outdir=public --minify ./lib/interactions/loginClient.tsx --watch",
+		"build": "bun build --outdir=public --minify ./lib/interactions/loginClient.tsx && bun build --outfile=public/admin.js --minify ./lib/admin/ui/adminClient.tsx",
+		"watch": "bun build --outdir=public --minify ./lib/interactions/loginClient.tsx --watch & bun build --outfile=public/admin.js --minify ./lib/admin/ui/adminClient.tsx --watch",
 		"db:setup": "bun database/mongodb.ts",
 		"start": "bun lib/index.ts"
 	},

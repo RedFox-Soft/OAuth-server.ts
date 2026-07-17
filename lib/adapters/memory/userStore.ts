@@ -23,21 +23,41 @@ export class UserStore implements UserStoreInstance {
 		return null;
 	}
 
-	async create(email: string, password: string): Promise<void> {
-		if (this.users.has(email.toLowerCase())) {
+	async create(
+		email: string,
+		password: string,
+		roles: string[] = []
+	): Promise<User> {
+		if (await this.findByEmail(email)) {
 			throw new Error('User with this email already exists');
 		}
-		const _id = crypto.randomUUID();
-
-		this.users.set(_id, {
-			_id,
+		const now = new Date();
+		const user: User = {
+			_id: crypto.randomUUID(),
 			email,
 			verified: false,
 			password,
 			active: true,
-			createdAt: new Date(),
-			updatedAt: new Date(),
+			roles,
+			createdAt: now,
+			updatedAt: now,
 			lastLoginAt: null
-		});
+		};
+		this.users.set(user._id, user);
+		return user;
+	}
+
+	async list(): Promise<User[]> {
+		return [...this.users.values()];
+	}
+
+	async update(
+		_id: string,
+		patch: Partial<Pick<User, 'roles' | 'active' | 'password'>>
+	): Promise<User | null> {
+		const user = this.users.get(_id);
+		if (!user) return null;
+		Object.assign(user, patch, { updatedAt: new Date() });
+		return user;
 	}
 }

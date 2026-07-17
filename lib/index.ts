@@ -28,6 +28,7 @@ import { jwks } from './actions/jwks.js';
 import { registration } from './actions/registration.js';
 import { healthCheck } from './actions/health.js';
 import { InvalidDpopProof, UseDpopNonce } from './helpers/validate_dpop.js';
+import { adminApp } from './admin/index.js';
 
 export const elysia = new Elysia({ strictPath: true, normalize: false })
 	.error({
@@ -91,4 +92,5 @@ export const elysia = new Elysia({ strictPath: true, normalize: false })
 	.use(logoutConfirmAction)
 	.use(userinfo)
 	.use(ui)
+	.use(adminApp)
 	.listen(3000);

@@ -26,21 +26,48 @@ export class UserStore implements UserStoreInstance {
 		return result || null;
 	}
 
-	async create(email: string, password: string): Promise<void> {
+	async create(
+		email: string,
+		password: string,
+		roles: string[] = []
+	): Promise<User> {
 		const existingUser = await this.findByEmail(email);
 		if (existingUser) {
 			throw new Error('User with this email already exists');
 		}
-
-		await db.collection<User>(this.prefix + this.name).insertOne({
+		const now = new Date();
+		const user: User = {
 			_id: crypto.randomUUID().replaceAll('-', ''),
 			email: email.toLowerCase(),
 			verified: false,
 			password,
 			active: true,
-			createdAt: new Date(),
-			updatedAt: new Date(),
+			roles,
+			createdAt: now,
+			updatedAt: now,
 			lastLoginAt: null
-		});
+		};
+		await db.collection<User>(this.prefix + this.name).insertOne(user);
+		return user;
+	}
+
+	async list(): Promise<User[]> {
+		return db
+			.collection<User>(this.prefix + this.name)
+			.find()
+			.toArray();
+	}
+
+	async update(
+		_id: string,
+		patch: Partial<Pick<User, 'roles' | 'active' | 'password'>>
+	): Promise<User | null> {
+		return db
+			.collection<User>(this.prefix + this.name)
+			.findOneAndUpdate(
+				{ _id },
+				{ $set: { ...patch, updatedAt: new Date() } },
+				{ returnDocument: 'after' }
+			);
 	}
 }

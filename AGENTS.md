@@ -47,6 +47,12 @@ adapter and loaded once at startup. The initial RS256 key is provisioned during 
 and persists one if it finds an empty store (in-memory adapter, un-provisioned store). In tests,
 keys are seeded into the in-memory `jwksStore` by `test/preload.ts`.
 
+The same `bun run db:setup` step seeds the admin panel (reserved admin project + "Administrators"
+bucket + the first-party `admin-panel` OAuth client) via `database/mongodb.ts`. It is idempotent and
+must be re-run after upgrading an existing install. `lib/admin/seed.ts` (`ensureAdminSeed`) is the
+app-side equivalent used by tests; there is **no** boot-time seeding because `provider.init` is the
+downstream app's responsibility, so admin login requires a Mongo-backed, `db:setup`-provisioned deployment.
+
 The test suite loads `.env.test` automatically via Bun.
 
 ---
