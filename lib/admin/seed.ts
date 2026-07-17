@@ -19,6 +19,16 @@ export async function ensureAdminSeed(): Promise<void> {
 		});
 	}
 
+	if (!(await buckets.find('redfox'))) {
+		await buckets.create({
+			_id: 'redfox',
+			name: 'Default users',
+			managedBy: [],
+			roles: [],
+			authMethods: ['password']
+		});
+	}
+
 	const projects = getProjectStore();
 	const existingAdminProject = await projects.find(ADMIN_PROJECT_ID);
 	if (!existingAdminProject) {

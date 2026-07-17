@@ -40,12 +40,18 @@ export interface AdapterConfigStore {
 export interface UserStoreInstance {
 	find(id: string): Promise<User | null>;
 	findByEmail(email: string): Promise<User | null>;
-	create(email: string, password: string, roles?: string[]): Promise<User>;
+	create(
+		email: string,
+		password: string,
+		roles?: string[],
+		verified?: boolean
+	): Promise<User>;
 	list(): Promise<User[]>;
 	update(
 		id: string,
 		patch: Partial<Pick<User, 'roles' | 'active' | 'password'>>
 	): Promise<User | null>;
+	destroy(id: string): Promise<void>;
 }
 
 export interface UserStoreConstructor {
@@ -95,6 +101,7 @@ export interface ProjectStoreInstance {
 	): Promise<Project | null>;
 	destroy(id: string): Promise<void>;
 	countByBucket(bucketId: string): Promise<number>;
+	findByClientId(clientId: string): Promise<Project | null>;
 }
 
 export interface ProjectStoreConstructor {

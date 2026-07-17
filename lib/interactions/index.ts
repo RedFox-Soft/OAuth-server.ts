@@ -34,7 +34,7 @@ import { getUserStore } from 'lib/adapters/index.js';
 import { Grant } from 'lib/models/grant.js';
 import instance from 'lib/helpers/weak_cache.js';
 import { ISSUER } from 'lib/configs/env.js';
-import { ADMIN_CLIENT_ID, ADMIN_BUCKET_ID } from 'lib/admin/consts.js';
+import { resolveBucketForClient } from 'lib/admin/auth/resolveBucket.js';
 
 async function resume(interaction, cookie) {
 	const ctx = { cookie, _matchedRouteName: 'ui.resume' };
@@ -150,8 +150,7 @@ export const ui = new Elysia()
 			const clientId = (
 				interaction.payload.params as { client_id?: string } | undefined
 			)?.client_id;
-			const bucketId =
-				clientId === ADMIN_CLIENT_ID ? ADMIN_BUCKET_ID : undefined;
+			const bucketId = await resolveBucketForClient(clientId);
 			const userStore = getUserStore(bucketId);
 			const user = await userStore.findByEmail(body.username);
 			if (!user) {
@@ -162,6 +161,9 @@ export const ui = new Elysia()
 				user.password
 			);
 			if (!validPassword) {
+				return loginServer(uid, 'Invalid username or password');
+			}
+			if (!user.active) {
 				return loginServer(uid, 'Invalid username or password');
 			}
 			interaction.payload.result = {

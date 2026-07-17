@@ -52,4 +52,11 @@ describe('ensureAdminSeed', () => {
 		const reloaded = await store.find(ADMIN_PROJECT_ID);
 		expect(reloaded?.clientIds).toContain(ADMIN_CLIENT_ID);
 	});
+
+	it('seeds a manageable default (redfox) bucket', async () => {
+		await ensureAdminSeed();
+		const bucket = await getBucketStore().find('redfox');
+		expect(bucket?.name).toBe('Default users');
+		expect(bucket?.authMethods).toEqual(['password']);
+	});
 });

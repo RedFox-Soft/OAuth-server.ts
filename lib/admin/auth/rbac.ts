@@ -54,6 +54,21 @@ export function assertBucketAccess(
 	}
 }
 
+// Broader than assertBucketAccess: also grants access when the caller manages a
+// project whose bucketId is this bucket (so a project_admin can manage the users of
+// a bucket backing their project without owning the bucket). Used for reading a
+// bucket's detail and managing its end-users — NOT for editing the bucket entity.
+export async function assertBucketUserAccess(
+	admin: AdminContext,
+	bucket: UserBucket
+): Promise<void> {
+	if (admin.roles.includes('super_admin')) return;
+	if (bucket.managedBy.includes(admin.userId)) return;
+	const managed = await getProjectStore().listByManager(admin.userId);
+	if (managed.some((p) => p.bucketId === bucket._id)) return;
+	throw new AdminError(403, 'no access to this bucket');
+}
+
 export const resolveAdmin = new Elysia({ name: 'admin-resolve' }).derive(
 	{ as: 'scoped' },
 	async ({ cookie }): Promise<{ admin: AdminContext | null }> => {

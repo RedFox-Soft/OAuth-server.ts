@@ -8,7 +8,9 @@ import {
 	resolveAdmin,
 	type AdminContext
 } from '../auth/rbac.js';
-import { CreateBucketBody } from './schema.js';
+import { ADMIN_BUCKET_ID } from '../consts.js';
+import { loadBucketForUsers, loadBucketForEdit } from './access.js';
+import { CreateBucketBody, UpdateBucketBody } from './schema.js';
 
 export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 	.use(resolveAdmin)
@@ -21,9 +23,10 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 	.get('/admin/api/buckets', async ({ admin }) => {
 		const ctx = assertAuth(admin as AdminContext | null);
 		const store = getBucketStore();
-		return ctx.roles.includes('super_admin')
-			? store.list()
-			: store.listByManager(ctx.userId);
+		const all = ctx.roles.includes('super_admin')
+			? await store.list()
+			: await store.listByManager(ctx.userId);
+		return all.filter((b) => b._id !== ADMIN_BUCKET_ID);
 	})
 	.post(
 		'/admin/api/buckets',
@@ -39,6 +42,24 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			return bucket;
 		},
 		{ body: CreateBucketBody }
+	)
+	.get('/admin/api/buckets/:id', async ({ admin, params }) => {
+		const ctx = assertAuth(admin as AdminContext | null);
+		return loadBucketForUsers(ctx, params.id);
+	})
+	.patch(
+		'/admin/api/buckets/:id',
+		async ({ admin, params, body }) => {
+			const ctx = assertAuth(admin as AdminContext | null);
+			await loadBucketForEdit(ctx, params.id);
+			if (body.managedBy !== undefined) {
+				assertRole(ctx, 'super_admin');
+			}
+			const updated = await getBucketStore().update(params.id, body);
+			if (!updated) throw new AdminError(404, 'bucket not found');
+			return updated;
+		},
+		{ body: UpdateBucketBody }
 	)
 	.delete('/admin/api/buckets/:id', async ({ admin, params }) => {
 		const ctx = assertAuth(admin as AdminContext | null);

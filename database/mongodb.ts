@@ -116,6 +116,24 @@ await db.collection('userBuckets').updateOne(
 	},
 	{ upsert: true }
 );
+// The default ('redfox') bucket backs the pre-existing default user collection and
+// every client not assigned to a project (see resolveBucketForClient). Seeded here
+// so it is manageable in the admin Buckets UI. Mirrors ensureAdminSeed (lib/admin/seed.ts),
+// which db:setup does not call — this script owns the deployment seed.
+await db.collection('userBuckets').updateOne(
+	{ _id: 'redfox' },
+	{
+		$setOnInsert: {
+			name: 'Default users',
+			managedBy: [],
+			roles: [],
+			authMethods: ['password'],
+			createdAt: seedNow,
+			updatedAt: seedNow
+		}
+	},
+	{ upsert: true }
+);
 await db.collection('projects').updateOne(
 	{ _id: ADMIN_PROJECT_ID },
 	{

@@ -3,6 +3,7 @@ import { Layout as AntLayout, Menu, Typography } from 'antd';
 import type { MenuProps } from 'antd';
 import {
 	ProjectOutlined,
+	DatabaseOutlined,
 	TeamOutlined,
 	SettingOutlined,
 	KeyOutlined,
@@ -10,12 +11,13 @@ import {
 } from '@ant-design/icons';
 import type { AdminContext } from '../../auth/rbac.js';
 import { Projects } from './Projects.js';
+import { Buckets } from './Buckets.js';
 import { Admins } from './Admins.js';
 import { Stub } from './Stub.js';
 
 const { Sider, Header, Content } = AntLayout;
 
-type PageKey = 'projects' | 'admins' | 'settings' | 'keys';
+type PageKey = 'projects' | 'buckets' | 'admins' | 'settings' | 'keys';
 
 export function Layout({ me }: { me: AdminContext | null }) {
 	const roles = me?.roles ?? [];
@@ -24,6 +26,7 @@ export function Layout({ me }: { me: AdminContext | null }) {
 
 	const items: MenuProps['items'] = [
 		{ key: 'projects', icon: <ProjectOutlined />, label: 'Projects' },
+		{ key: 'buckets', icon: <DatabaseOutlined />, label: 'Buckets' },
 		...(isSuperAdmin
 			? [
 					{ key: 'admins', icon: <TeamOutlined />, label: 'Admins' },
@@ -40,14 +43,16 @@ export function Layout({ me }: { me: AdminContext | null }) {
 
 	function renderPage() {
 		switch (selected) {
+			case 'buckets':
+				return <Buckets isSuperAdmin={isSuperAdmin} />;
 			case 'admins':
-				return isSuperAdmin ? <Admins /> : <Projects />;
+				return isSuperAdmin ? <Admins /> : <Projects isSuperAdmin={isSuperAdmin} />;
 			case 'settings':
 				return <Stub title="Settings" />;
 			case 'keys':
 				return <Stub title="Keys" />;
 			default:
-				return <Projects />;
+				return <Projects isSuperAdmin={isSuperAdmin} />;
 		}
 	}
 

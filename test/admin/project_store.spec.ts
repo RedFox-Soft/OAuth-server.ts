@@ -39,4 +39,16 @@ describe('ProjectStore (memory)', () => {
 		const reloaded = await store.find(p._id);
 		expect(reloaded?.clientIds).toEqual(['abc']);
 	});
+
+	it('finds a project by one of its client ids', async () => {
+		const store = new ProjectStore();
+		const p = await store.create({
+			name: 'FB',
+			slug: `fb-${Math.random()}`,
+			clientIds: ['cid-123']
+		});
+		const found = await store.findByClientId('cid-123');
+		expect(found?._id).toBe(p._id);
+		expect(await store.findByClientId('nope')).toBeNull();
+	});
 });

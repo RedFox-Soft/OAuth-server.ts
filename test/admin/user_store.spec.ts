@@ -20,4 +20,11 @@ describe('UserStore (memory) roles', () => {
 		await store.update(u._id, { roles: ['project_admin'] });
 		expect((await store.find(u._id))?.roles).toEqual(['project_admin']);
 	});
+
+	it('hard-deletes a user', async () => {
+		const u = await store.create('del@x.io', 'hash');
+		expect(await store.find(u._id)).not.toBeNull();
+		await store.destroy(u._id);
+		expect(await store.find(u._id)).toBeNull();
+	});
 });

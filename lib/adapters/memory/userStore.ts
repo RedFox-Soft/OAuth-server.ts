@@ -26,7 +26,8 @@ export class UserStore implements UserStoreInstance {
 	async create(
 		email: string,
 		password: string,
-		roles: string[] = []
+		roles: string[] = [],
+		verified = false
 	): Promise<User> {
 		if (await this.findByEmail(email)) {
 			throw new Error('User with this email already exists');
@@ -35,7 +36,7 @@ export class UserStore implements UserStoreInstance {
 		const user: User = {
 			_id: crypto.randomUUID(),
 			email,
-			verified: false,
+			verified,
 			password,
 			active: true,
 			roles,
@@ -59,5 +60,9 @@ export class UserStore implements UserStoreInstance {
 		if (!user) return null;
 		Object.assign(user, patch, { updatedAt: new Date() });
 		return user;
+	}
+
+	async destroy(_id: string): Promise<void> {
+		this.users.delete(_id);
 	}
 }

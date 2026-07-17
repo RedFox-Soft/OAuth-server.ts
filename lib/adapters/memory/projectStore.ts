@@ -68,4 +68,11 @@ export class ProjectStore implements ProjectStoreInstance {
 		return [...this.projects.values()].filter((p) => p.bucketId === bucketId)
 			.length;
 	}
+
+	async findByClientId(clientId: string): Promise<Project | null> {
+		for (const p of this.projects.values()) {
+			if (p.clientIds.includes(clientId)) return p;
+		}
+		return null;
+	}
 }

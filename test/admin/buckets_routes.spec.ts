@@ -141,4 +141,110 @@ describe('buckets API', () => {
 			.delete(undefined, { headers: { cookie } });
 		expect(res.status).toBe(200);
 	});
+
+	it('gets and patches a bucket (name + roles)', async () => {
+		const cookie = await superCookie();
+		const created = await client.admin.api.buckets.post(
+			{ name: 'Editable', roles: ['viewer'] },
+			{ headers: { cookie } }
+		);
+		const bucket = created.data as UserBucket;
+		const got = await client.admin.api
+			.buckets({ id: bucket._id })
+			.get({ headers: { cookie } });
+		expect((got.data as UserBucket).name).toBe('Editable');
+		const patched = await client.admin.api
+			.buckets({ id: bucket._id })
+			.patch({ name: 'Renamed', roles: ['viewer', 'editor'] }, { headers: { cookie } });
+		expect((patched.data as UserBucket).name).toBe('Renamed');
+		expect((patched.data as UserBucket).roles).toEqual(['viewer', 'editor']);
+	});
+
+	it('lets a project_admin read a bucket backing a project they manage', async () => {
+		const su = await sessionCookieFor(['super_admin']);
+		const pa = await sessionCookieFor(['project_admin']);
+		// bucket NOT owned by pa (managedBy empty)
+		const created = await client.admin.api.buckets.post(
+			{ name: 'Backing' },
+			{ headers: { cookie: su.cookie } }
+		);
+		const bucket = created.data as UserBucket;
+		// a project pa manages points at it
+		const proj = await getProjectStore().create({
+			name: 'PB',
+			slug: `pb-${Math.random()}`,
+			managedBy: [pa.userId]
+		});
+		await getProjectStore().update(proj._id, { bucketId: bucket._id });
+		const got = await client.admin.api
+			.buckets({ id: bucket._id })
+			.get({ headers: { cookie: pa.cookie } });
+		expect(got.status).toBe(200);
+	});
+
+	it('forbids a project_admin from editing a bucket they only reach via a project', async () => {
+		const su = await sessionCookieFor(['super_admin']);
+		const pa = await sessionCookieFor(['project_admin']);
+		const created = await client.admin.api.buckets.post(
+			{ name: 'BackingRO' },
+			{ headers: { cookie: su.cookie } }
+		);
+		const bucket = created.data as UserBucket;
+		const proj = await getProjectStore().create({
+			name: 'PB2',
+			slug: `pb2-${Math.random()}`,
+			managedBy: [pa.userId]
+		});
+		await getProjectStore().update(proj._id, { bucketId: bucket._id });
+		const res = await client.admin.api
+			.buckets({ id: bucket._id })
+			.patch({ name: 'nope' }, { headers: { cookie: pa.cookie } });
+		expect(res.status).toBe(403);
+	});
+
+	it('rejects managing the reserved admin bucket', async () => {
+		const cookie = await superCookie();
+		const got = await client.admin.api
+			.buckets({ id: ADMIN_BUCKET_ID })
+			.get({ headers: { cookie } });
+		expect(got.status).toBe(403);
+		const list = await client.admin.api.buckets.get({ headers: { cookie } });
+		expect((list.data as UserBucket[]).some((b) => b._id === ADMIN_BUCKET_ID)).toBe(false);
+	});
+
+	it('lets a super_admin edit managedBy', async () => {
+		const su = await sessionCookieFor(['super_admin']);
+		const pa = await sessionCookieFor(['project_admin']);
+		const created = await client.admin.api.buckets.post(
+			{ name: 'MB' },
+			{ headers: { cookie: su.cookie } }
+		);
+		const bucket = created.data as UserBucket;
+		const res = await client.admin.api
+			.buckets({ id: bucket._id })
+			.patch({ managedBy: [pa.userId] }, { headers: { cookie: su.cookie } });
+		expect(res.status).toBe(200);
+		expect((res.data as UserBucket).managedBy).toEqual([pa.userId]);
+	});
+
+	it('blocks a bucket-owning project_admin from editing managedBy', async () => {
+		const su = await sessionCookieFor(['super_admin']);
+		const pa = await sessionCookieFor(['project_admin']);
+		// pa owns the bucket via managedBy → passes loadBucketForEdit (strict)
+		const created = await client.admin.api.buckets.post(
+			{ name: 'MBOwned', managedBy: [pa.userId] },
+			{ headers: { cookie: su.cookie } }
+		);
+		const bucket = created.data as UserBucket;
+		// can edit name (proves strict access passes)...
+		const ok = await client.admin.api
+			.buckets({ id: bucket._id })
+			.patch({ name: 'renamed' }, { headers: { cookie: pa.cookie } });
+		expect(ok.status).toBe(200);
+		// ...but not managedBy (super-only)
+		const denied = await client.admin.api
+			.buckets({ id: bucket._id })
+			.patch({ managedBy: [] }, { headers: { cookie: pa.cookie } });
+		expect(denied.status).toBe(403);
+	});
 });

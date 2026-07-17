@@ -64,4 +64,8 @@ export class ProjectStore implements ProjectStoreInstance {
 	async countByBucket(bucketId: string): Promise<number> {
 		return this.collection.countDocuments({ bucketId });
 	}
+
+	async findByClientId(clientId: string): Promise<Project | null> {
+		return this.collection.findOne({ clientIds: clientId });
+	}
 }

@@ -29,7 +29,8 @@ export class UserStore implements UserStoreInstance {
 	async create(
 		email: string,
 		password: string,
-		roles: string[] = []
+		roles: string[] = [],
+		verified = false
 	): Promise<User> {
 		const existingUser = await this.findByEmail(email);
 		if (existingUser) {
@@ -39,7 +40,7 @@ export class UserStore implements UserStoreInstance {
 		const user: User = {
 			_id: crypto.randomUUID().replaceAll('-', ''),
 			email: email.toLowerCase(),
-			verified: false,
+			verified,
 			password,
 			active: true,
 			roles,
@@ -69,5 +70,9 @@ export class UserStore implements UserStoreInstance {
 				{ $set: { ...patch, updatedAt: new Date() } },
 				{ returnDocument: 'after' }
 			);
+	}
+
+	async destroy(_id: string): Promise<void> {
+		await db.collection<User>(this.prefix + this.name).deleteOne({ _id });
 	}
 }

@@ -54,6 +54,11 @@ describe('interaction login bucket routing', () => {
 			'default-only@x.io',
 			await Bun.password.hash(PASSWORD)
 		);
+		const deactivated = await getUserStore().create(
+			'deactivated@x.io',
+			await Bun.password.hash(PASSWORD)
+		);
+		await getUserStore().update(deactivated._id, { active: false });
 	});
 
 	// A successful login hands the flow back to the authorization pipeline (a
@@ -72,5 +77,9 @@ describe('interaction login bucket routing', () => {
 
 	it('non-admin client rejects an admin-bucket user (wrong bucket)', async () => {
 		expect(await submitLogin('regular-app', 'admin-only@x.io')).toBe(400);
+	});
+
+	it('rejects a deactivated user (active:false)', async () => {
+		expect(await submitLogin('regular-app', 'deactivated@x.io')).toBe(400);
 	});
 });
