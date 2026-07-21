@@ -43,4 +43,20 @@ describe('settings catalog', () => {
 		const delivery = SETTINGS_CATALOG.find((d) => d.key === 'ciba.deliveryModes');
 		expect(delivery?.options).toEqual(['poll', 'ping']);
 	});
+
+	it('every dependsOn references a boolean catalog key in the same group', () => {
+		const byKey = new Map(SETTINGS_CATALOG.map((d) => [d.key, d]));
+		const details = SETTINGS_CATALOG.filter((d) => d.dependsOn);
+		expect(details.length).toBeGreaterThan(0);
+		for (const d of details) {
+			expect(
+				Object.prototype.hasOwnProperty.call(ApplicationConfig, d.dependsOn as string)
+			).toBe(true);
+			const parent = byKey.get(d.dependsOn as keyof typeof ApplicationConfig);
+			expect(parent).toBeDefined();
+			expect(parent?.type).toBe('boolean');
+			expect(parent?.group).toBe(d.group);
+			expect(parent?.dependsOn).toBeUndefined(); // parents are primaries
+		}
+	});
 });
