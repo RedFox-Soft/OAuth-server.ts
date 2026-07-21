@@ -13,6 +13,7 @@ import type { AdminContext } from '../../auth/rbac.js';
 import { Projects } from './Projects.js';
 import { Buckets } from './Buckets.js';
 import { Admins } from './Admins.js';
+import { Settings } from './Settings.js';
 import { Stub } from './Stub.js';
 
 const { Sider, Header, Content } = AntLayout;
@@ -48,7 +49,7 @@ export function Layout({ me }: { me: AdminContext | null }) {
 			case 'admins':
 				return isSuperAdmin ? <Admins /> : <Projects isSuperAdmin={isSuperAdmin} />;
 			case 'settings':
-				return <Stub title="Settings" />;
+				return isSuperAdmin ? <Settings /> : <Projects isSuperAdmin={isSuperAdmin} />;
 			case 'keys':
 				return <Stub title="Keys" />;
 			default:

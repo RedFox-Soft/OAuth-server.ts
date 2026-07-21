@@ -12,6 +12,7 @@ import { clientRoutes } from './clients/routes.js';
 import { adminUserRoutes } from './users/routes.js';
 import { bucketRoutes } from './buckets/routes.js';
 import { endUserRoutes } from './users-end/routes.js';
+import { settingsRoutes } from './settings/routes.js';
 import { renderAdminShell } from './ui/serverRender.js';
 
 export const adminApp = new Elysia({ name: 'admin' })
@@ -46,4 +47,5 @@ export const adminApp = new Elysia({ name: 'admin' })
 	.use(clientRoutes)
 	.use(adminUserRoutes)
 	.use(bucketRoutes)
-	.use(endUserRoutes);
+	.use(endUserRoutes)
+	.use(settingsRoutes);
