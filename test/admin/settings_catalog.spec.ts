@@ -5,9 +5,9 @@ import { ApplicationConfig } from 'lib/configs/application.ts';
 describe('settings catalog', () => {
 	it('every catalog key exists in ApplicationConfig', () => {
 		for (const d of SETTINGS_CATALOG) {
-			expect(Object.prototype.hasOwnProperty.call(ApplicationConfig, d.key)).toBe(
-				true
-			);
+			expect(
+				Object.prototype.hasOwnProperty.call(ApplicationConfig, d.key)
+			).toBe(true);
 		}
 	});
 
@@ -38,9 +38,13 @@ describe('settings catalog', () => {
 	});
 
 	it('declared enum/option values match the ApplicationConfig defaults domain', () => {
-		const charset = SETTINGS_CATALOG.find((d) => d.key === 'deviceFlow.charset');
+		const charset = SETTINGS_CATALOG.find(
+			(d) => d.key === 'deviceFlow.charset'
+		);
 		expect(charset?.options).toEqual(['base-20', 'digits']);
-		const delivery = SETTINGS_CATALOG.find((d) => d.key === 'ciba.deliveryModes');
+		const delivery = SETTINGS_CATALOG.find(
+			(d) => d.key === 'ciba.deliveryModes'
+		);
 		expect(delivery?.options).toEqual(['poll', 'ping']);
 	});
 
@@ -50,7 +54,10 @@ describe('settings catalog', () => {
 		expect(details.length).toBeGreaterThan(0);
 		for (const d of details) {
 			expect(
-				Object.prototype.hasOwnProperty.call(ApplicationConfig, d.dependsOn as string)
+				Object.prototype.hasOwnProperty.call(
+					ApplicationConfig,
+					d.dependsOn as string
+				)
 			).toBe(true);
 			const parent = byKey.get(d.dependsOn as keyof typeof ApplicationConfig);
 			expect(parent).toBeDefined();

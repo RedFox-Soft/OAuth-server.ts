@@ -32,9 +32,11 @@ import { DeviceCode } from 'lib/models/device_code.js';
 import { Interaction } from 'lib/models/interaction.js';
 import { getUserStore } from 'lib/adapters/index.js';
 import { Grant } from 'lib/models/grant.js';
+import { Client } from 'lib/models/client.js';
 import instance from 'lib/helpers/weak_cache.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { resolveBucketForClient } from 'lib/admin/auth/resolveBucket.js';
+import { buildConsentView, type PromptDetails } from './consentView.js';
 
 async function resume(interaction, cookie) {
 	const ctx = { cookie, _matchedRouteName: 'ui.resume' };
@@ -83,13 +85,17 @@ async function resume(interaction, cookie) {
 }
 
 async function createGrant(interaction) {
-	const { grantId } = interaction;
+	const grantId = interaction.payload.grantId;
+	const details = (interaction.payload.prompt?.details ?? {}) as PromptDetails;
+	const session = interaction.payload.session ?? {};
+	const params = interaction.payload.params ?? {};
+
 	let grant;
 	if (grantId) {
-		// we'll be modifying existing grant in existing session
+		// modify the existing grant (reuses what the user already granted)
 		grant = await Grant.find(grantId);
 	} else {
-		// we're establishing a new grant
+		// establish a new grant for this account/client
 		grant = new Grant({
 			accountId: session.accountId,
 			clientId: params.client_id
@@ -109,9 +115,13 @@ async function createGrant(interaction) {
 			grant.addResourceScope(indicator, scope.join(' '));
 		}
 	}
-	Object.assign(interaction.result, {
-		consent: { grantId: await grant.save() }
-	});
+
+	await grant.save();
+	// record the consent outcome the resume pipeline (loadExistingGrant) reads back
+	interaction.payload.result = {
+		...(interaction.payload.result ?? {}),
+		consent: { grantId: grant.id }
+	};
 }
 
 export const ui = new Elysia()
@@ -205,11 +215,31 @@ export const ui = new Elysia()
 			})
 		}
 	)
-	.get('ui/:uid/consent', async ({ params: { uid } }) => consentServer(uid))
+	.get('ui/:uid/consent', async ({ params: { uid }, interaction }) => {
+		const params = interaction.payload.params as
+			{ client_id?: string } | undefined;
+		const clientId = params?.client_id;
+		const client = clientId
+			? ((await Client.tryFind(clientId)) as
+					{ clientName?: string; client_name?: string } | undefined)
+			: undefined;
+		const clientName =
+			client?.clientName || client?.client_name || clientId || uid;
+		const details =
+			(interaction.payload.prompt as { details?: PromptDetails } | undefined)
+				?.details ?? {};
+		const account = (
+			interaction.payload.session as { accountId?: string } | undefined
+		)?.accountId;
+		return consentServer(
+			buildConsentView({ uid, clientName, account, details })
+		);
+	})
 	.post(
 		'ui/:uid/consent',
 		async ({ body, interaction, cookie }) => {
 			if (body.action === 'allow') {
+				await createGrant(interaction);
 				return resume(interaction, cookie);
 			}
 

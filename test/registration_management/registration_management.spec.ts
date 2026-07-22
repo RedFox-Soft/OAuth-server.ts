@@ -103,7 +103,9 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 			);
 
 			expect(res.status).toBe(200);
-			expect(getHeader(res.response, 'content-type')).toMatch(/application\/json/);
+			expect(getHeader(res.response, 'content-type')).toMatch(
+				/application\/json/
+			);
 			expect(getHeader(res.response, 'cache-control')).toBe('no-store');
 			expect(res.data).toHaveProperty(
 				'registration_access_token',

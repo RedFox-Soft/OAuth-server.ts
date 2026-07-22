@@ -1,15 +1,14 @@
 import React from 'react';
 import { Button, Card, Typography, Space } from 'antd';
+import type { ConsentView } from './consentView.js';
 
-const { Title, Paragraph } = Typography;
+const { Title, Paragraph, Text } = Typography;
 
-interface ConsentPageProps {
-	uid: string;
-	clientName: string;
-	scopes: string[];
-}
-
-export const ConsentPage: React.FC<ConsentPageProps> = ({ clientName }) => (
+export const ConsentPage: React.FC<ConsentView> = ({
+	clientName,
+	account,
+	permissions
+}) => (
 	<Space
 		orientation="vertical"
 		style={{
@@ -22,9 +21,36 @@ export const ConsentPage: React.FC<ConsentPageProps> = ({ clientName }) => (
 		<Card style={{ maxWidth: 400, width: '100%' }}>
 			<Title level={3}>Consent Required</Title>
 			<Paragraph>
-				<b>{clientName}</b> is requesting access to your account to get email
-				and profile information.
+				<b>{clientName}</b> is requesting access to your account.
 			</Paragraph>
+			{account ? (
+				<Paragraph>
+					Signed in as <Text code>{account}</Text>
+				</Paragraph>
+			) : null}
+			{permissions.length ? (
+				<>
+					<Paragraph>This will allow it to access:</Paragraph>
+					{permissions.map((group, groupIndex) => (
+						<div key={group.resourceIndicator ?? group.kind ?? groupIndex}>
+							{group.resourceIndicator ? (
+								<Paragraph style={{ marginBottom: 4 }}>
+									<b>{group.resourceIndicator}</b>
+								</Paragraph>
+							) : null}
+							<ul>
+								{group.items.map((item) => (
+									<li key={item.token}>
+										{item.label} (<Text code>{item.token}</Text>)
+									</li>
+								))}
+							</ul>
+						</div>
+					))}
+				</>
+			) : (
+				<Paragraph>No additional permissions are requested.</Paragraph>
+			)}
 			<form method="post">
 				<Space style={{ width: '100%', justifyContent: 'flex-end' }}>
 					<Button

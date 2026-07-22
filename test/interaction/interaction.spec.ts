@@ -1,7 +1,6 @@
 import {
 	describe,
 	it,
-	beforeAll,
 	afterEach,
 	beforeEach,
 	expect,
@@ -12,17 +11,20 @@ import nanoid from '../../lib/helpers/nanoid.ts';
 import bootstrap, { agent } from '../test_helper.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
-import { provider } from 'lib/index.js';
-import { Session } from 'lib/models/session.js';
-import { ISSUER } from 'lib/configs/env.js';
 import { Interaction } from 'lib/models/interaction.js';
-import { Grant } from 'lib/models/grant.js';
 import { getUserStore } from 'lib/adapters/index.js';
+import { TestAdapter } from 'test/models.js';
+
+function grantCount() {
+	return [...TestAdapter.for('Grant').store.keys()].filter((k) =>
+		k.startsWith('Grant:')
+	).length;
+}
 
 const expire = new Date();
 expire.setDate(expire.getDate() + 1);
 
-describe('devInteractions', async () => {
+describe('interaction UI', async () => {
 	const setup = await bootstrap(import.meta.url);
 	afterEach(function () {
 		mock.restore();
@@ -171,6 +173,7 @@ describe('devInteractions', async () => {
 			const [, , uid] = url.split('/');
 			const cookie = [res.headers.get('set-cookie'), login];
 
+			const before = grantCount();
 			const { response: aborted, error } = await agent.ui[uid].consent.post(
 				{
 					action: 'cancel'
@@ -187,6 +190,8 @@ describe('devInteractions', async () => {
 				error: 'access_denied',
 				error_description: 'End-User denied consent'
 			});
+			// SC-005: refusing consent issues no grant.
+			expect(grantCount()).toBe(before);
 		});
 	});
 
@@ -349,6 +354,67 @@ describe('devInteractions', async () => {
 				error: 'invalid_request',
 				error_description: 'session principal changed'
 			});
+		});
+	});
+
+	describe('consent details (US1)', () => {
+		let uid = null;
+		let cookie = null;
+		let auth = null;
+
+		beforeEach(async function () {
+			// grant only `openid` at login, then request more so `profile`/`email`
+			// are the missing scopes surfaced on the consent screen.
+			const login = await setup.login({ scope: 'openid' });
+			auth = new AuthorizationRequest({
+				response_type: 'code',
+				response_mode: 'query',
+				scope: 'openid profile email',
+				prompt: 'consent'
+			});
+
+			const { response } = await agent.auth.get({
+				query: auth.params,
+				headers: {
+					cookie: login
+				}
+			});
+			cookie = [response.headers.get('set-cookie'), login].join('; ');
+			const url = response.headers.get('location');
+			[, , uid] = url.split('/');
+		});
+
+		it('renders the real client name and the requested scopes', async function () {
+			const { data, status } = await agent.ui[uid].consent.get({
+				headers: {
+					cookie
+				}
+			});
+			expect(status).toBe(200);
+			expect(data).toContain('Test Client App');
+			expect(data).toContain('profile');
+			expect(data).toContain('email');
+		});
+
+		it('allow issues a grant for the requested scopes and resumes to the client', async function () {
+			const { response } = await agent.ui[uid].consent.post(
+				{
+					action: 'allow'
+				},
+				{
+					headers: {
+						cookie
+					}
+				}
+			);
+
+			expect(response.status).toBe(303);
+			const location = response.headers.get('location');
+			// consent resolved: control returns to the client with a code, not a
+			// re-prompt loop back to /ui/*.
+			expect(location).toContain('https://client.example.com/cb');
+			expect(location).toContain('code=');
+			expect(location).not.toContain('/ui/');
 		});
 	});
 });

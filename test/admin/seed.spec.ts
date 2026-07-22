@@ -2,7 +2,11 @@ import { describe, it, expect, beforeAll } from 'bun:test';
 
 import bootstrap from '../test_helper.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { getProjectStore, getBucketStore, resetAdminMemoryStores } from 'lib/adapters/index.ts';
+import {
+	getProjectStore,
+	getBucketStore,
+	resetAdminMemoryStores
+} from 'lib/adapters/index.ts';
 import {
 	ADMIN_PROJECT_ID,
 	ADMIN_BUCKET_ID,

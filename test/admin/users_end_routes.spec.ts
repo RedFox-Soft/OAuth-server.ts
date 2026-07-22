@@ -104,7 +104,9 @@ describe('end-user API', () => {
 		const { cookie } = await sessionCookieFor(['super_admin']);
 		const bucket = await makeBucket();
 		const body = { email: 'dup@x.io', password: 'supersecret' };
-		await client.admin.api.buckets({ id: bucket._id }).users.post(body, { headers: { cookie } });
+		await client.admin.api
+			.buckets({ id: bucket._id })
+			.users.post(body, { headers: { cookie } });
 		const res = await client.admin.api
 			.buckets({ id: bucket._id })
 			.users.post(body, { headers: { cookie } });
@@ -116,7 +118,10 @@ describe('end-user API', () => {
 		const bucket = await makeBucket();
 		const created = await client.admin.api
 			.buckets({ id: bucket._id })
-			.users.post({ email: 'pw@x.io', password: 'supersecret' }, { headers: { cookie } });
+			.users.post(
+				{ email: 'pw@x.io', password: 'supersecret' },
+				{ headers: { cookie } }
+			);
 		const uid = (created.data as Record<string, unknown>)._id as string;
 		const before = (await getUserStore(bucket._id).find(uid))?.password;
 		const res = await client.admin.api
@@ -139,7 +144,10 @@ describe('end-user API', () => {
 		await getProjectStore().update(proj._id, { bucketId: bucket._id });
 		const res = await client.admin.api
 			.buckets({ id: bucket._id })
-			.users.post({ email: 'via@x.io', password: 'supersecret' }, { headers: { cookie: pa.cookie } });
+			.users.post(
+				{ email: 'via@x.io', password: 'supersecret' },
+				{ headers: { cookie: pa.cookie } }
+			);
 		expect(res.status).toBe(201);
 	});
 

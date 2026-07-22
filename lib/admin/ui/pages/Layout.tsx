@@ -47,9 +47,17 @@ export function Layout({ me }: { me: AdminContext | null }) {
 			case 'buckets':
 				return <Buckets isSuperAdmin={isSuperAdmin} />;
 			case 'admins':
-				return isSuperAdmin ? <Admins /> : <Projects isSuperAdmin={isSuperAdmin} />;
+				return isSuperAdmin ? (
+					<Admins />
+				) : (
+					<Projects isSuperAdmin={isSuperAdmin} />
+				);
 			case 'settings':
-				return isSuperAdmin ? <Settings /> : <Projects isSuperAdmin={isSuperAdmin} />;
+				return isSuperAdmin ? (
+					<Settings />
+				) : (
+					<Projects isSuperAdmin={isSuperAdmin} />
+				);
 			case 'keys':
 				return <Stub title="Keys" />;
 			default:

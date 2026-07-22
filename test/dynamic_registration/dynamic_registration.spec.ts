@@ -376,7 +376,9 @@ describe('registration features', () => {
 		it('returns all available nonsecret metadata', async () => {
 			const res = await agent.reg({ clientId }).get({ headers: bearer(token) });
 			expect(res.status).toBe(200);
-			expect(getHeader(res.response, 'content-type')).toMatch(/application\/json/);
+			expect(getHeader(res.response, 'content-type')).toMatch(
+				/application\/json/
+			);
 			expect(res.data).toHaveProperty('client_id');
 			expect(res.data).toHaveProperty('client_secret');
 			expect(res.data).toHaveProperty('registration_access_token');

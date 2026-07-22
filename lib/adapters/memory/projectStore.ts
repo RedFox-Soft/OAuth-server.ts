@@ -52,7 +52,9 @@ export class ProjectStore implements ProjectStoreInstance {
 
 	async update(
 		id: string,
-		patch: Partial<Pick<Project, 'name' | 'managedBy' | 'bucketId' | 'clientIds'>>
+		patch: Partial<
+			Pick<Project, 'name' | 'managedBy' | 'bucketId' | 'clientIds'>
+		>
 	): Promise<Project | null> {
 		const p = this.projects.get(id);
 		if (!p) return null;

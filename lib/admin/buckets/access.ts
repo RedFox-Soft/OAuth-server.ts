@@ -10,7 +10,10 @@ import {
 
 function assertNotReserved(id: string): void {
 	if (id === ADMIN_BUCKET_ID) {
-		throw new AdminError(403, 'the admin bucket is managed via /admin/api/admins');
+		throw new AdminError(
+			403,
+			'the admin bucket is managed via /admin/api/admins'
+		);
 	}
 }
 

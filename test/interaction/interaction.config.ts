@@ -59,6 +59,7 @@ export default {
 	client: {
 		clientId: 'client',
 		clientSecret: 'secret',
+		client_name: 'Test Client App',
 		redirectUris: ['https://client.example.com/cb']
 	}
 };

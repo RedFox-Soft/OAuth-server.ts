@@ -33,13 +33,19 @@ function validateValue(descriptor: SettingDescriptor, value: unknown): void {
 			throw new AdminError(422, `${key} must be a string`);
 	} else if (type === 'enum') {
 		if (typeof value !== 'string' || !options?.includes(value))
-			throw new AdminError(422, `${key} must be one of: ${options?.join(', ')}`);
+			throw new AdminError(
+				422,
+				`${key} must be one of: ${options?.join(', ')}`
+			);
 	} else {
 		// string-array
 		if (!Array.isArray(value) || !value.every((v) => typeof v === 'string'))
 			throw new AdminError(422, `${key} must be an array of strings`);
 		if (options && !value.every((v) => options.includes(v as string)))
-			throw new AdminError(422, `${key} values must be among: ${options.join(', ')}`);
+			throw new AdminError(
+				422,
+				`${key} values must be among: ${options.join(', ')}`
+			);
 		if (key === 'scopes' && !value.includes('openid'))
 			throw new AdminError(422, 'scopes must include "openid"');
 	}
@@ -69,7 +75,10 @@ function validateEffectiveConfig(effective: Record<string, unknown>): void {
 	}
 
 	// mirrors Configuration#checkDependantFeatures (lib/helpers/configuration.ts)
-	if (effective['jwtIntrospection.enabled'] && !effective['introspection.enabled']) {
+	if (
+		effective['jwtIntrospection.enabled'] &&
+		!effective['introspection.enabled']
+	) {
 		throw new AdminError(
 			422,
 			'jwtIntrospection is only available in conjuction with introspection'
@@ -107,7 +116,10 @@ async function currentState() {
 	const changedKeys: string[] = [];
 	for (const d of SETTINGS_CATALOG) {
 		const run = running(d.key as string);
-		const desired = Object.prototype.hasOwnProperty.call(stored, d.key as string)
+		const desired = Object.prototype.hasOwnProperty.call(
+			stored,
+			d.key as string
+		)
 			? (stored as Record<string, unknown>)[d.key as string]
 			: run;
 		values[d.key as string] = desired;

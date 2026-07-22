@@ -97,7 +97,9 @@ export interface ProjectStoreInstance {
 	listByManager(userId: string): Promise<Project[]>;
 	update(
 		id: string,
-		patch: Partial<Pick<Project, 'name' | 'managedBy' | 'bucketId' | 'clientIds'>>
+		patch: Partial<
+			Pick<Project, 'name' | 'managedBy' | 'bucketId' | 'clientIds'>
+		>
 	): Promise<Project | null>;
 	destroy(id: string): Promise<void>;
 	countByBucket(bucketId: string): Promise<number>;

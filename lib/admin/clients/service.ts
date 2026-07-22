@@ -60,7 +60,8 @@ function toMetadata(input: CreateClientInput, clientId: string) {
 	if (input.clientName !== undefined) metadata.client_name = input.clientName;
 	if (input.scope !== undefined) metadata.scope = input.scope;
 	if (input.backchannelTokenDeliveryMode !== undefined) {
-		metadata.backchannel_token_delivery_mode = input.backchannelTokenDeliveryMode;
+		metadata.backchannel_token_delivery_mode =
+			input.backchannelTokenDeliveryMode;
 	}
 	if (input.backchannelClientNotificationEndpoint !== undefined) {
 		metadata.backchannel_client_notification_endpoint =
@@ -150,7 +151,8 @@ export async function updateClient(
 			existing.tokenEndpointAuthMethod ??
 			'none',
 		scope: patch.scope ?? existing.scope,
-		requireConsent: patch.requireConsent ?? (existing['consent.require'] !== false),
+		requireConsent:
+			patch.requireConsent ?? existing['consent.require'] !== false,
 		backchannelTokenDeliveryMode:
 			patch.backchannelTokenDeliveryMode ??
 			existing.backchannelTokenDeliveryMode,

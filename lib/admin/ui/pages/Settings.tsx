@@ -83,8 +83,7 @@ export function Settings() {
 				body: JSON.stringify(values)
 			});
 			const body = (await res.json().catch(() => null)) as
-				| (SettingsResponse & { message?: string })
-				| null;
+				(SettingsResponse & { message?: string }) | null;
 			if (!res.ok) {
 				message.error(body?.message || 'failed to save settings');
 				return;
@@ -132,7 +131,8 @@ export function Settings() {
 	const toggleRows = useMemo(
 		() =>
 			catalog.filter(
-				(d) => !d.dependsOn && d.type === 'boolean' && !detailGroups.has(d.group)
+				(d) =>
+					!d.dependsOn && d.type === 'boolean' && !detailGroups.has(d.group)
 			),
 		[catalog, detailGroups]
 	);
@@ -145,7 +145,9 @@ export function Settings() {
 		}
 		return order.map((group) => ({
 			group,
-			primary: catalog.find((d) => d.group === group && !d.dependsOn) as Descriptor,
+			primary: catalog.find(
+				(d) => d.group === group && !d.dependsOn
+			) as Descriptor,
 			details: catalog.filter((d) => d.group === group && d.dependsOn)
 		}));
 	}, [catalog, detailGroups]);
@@ -216,11 +218,25 @@ export function Settings() {
 
 	return (
 		<>
-			<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-				<Typography.Title level={4} style={{ margin: 0 }}>
+			<div
+				style={{
+					display: 'flex',
+					justifyContent: 'space-between',
+					alignItems: 'center',
+					marginBottom: 16
+				}}
+			>
+				<Typography.Title
+					level={4}
+					style={{ margin: 0 }}
+				>
 					Server settings
 				</Typography.Title>
-				<Button type="primary" loading={saving} onClick={save}>
+				<Button
+					type="primary"
+					loading={saving}
+					onClick={save}
+				>
 					Save
 				</Button>
 			</div>
@@ -234,7 +250,12 @@ export function Settings() {
 				/>
 			)}
 
-			<Card title="Features" size="small" style={{ marginBottom: 16 }} loading={loading}>
+			<Card
+				title="Features"
+				size="small"
+				style={{ marginBottom: 16 }}
+				loading={loading}
+			>
 				<Form layout="vertical">{toggleRows.map(field)}</Form>
 			</Card>
 
@@ -243,7 +264,9 @@ export function Settings() {
 				collapsible="icon"
 				activeKey={openGroups}
 				onChange={(keys) =>
-					setOpenGroups(Array.isArray(keys) ? (keys as string[]) : [keys as string])
+					setOpenGroups(
+						Array.isArray(keys) ? (keys as string[]) : [keys as string]
+					)
 				}
 				items={accordion.map(({ group, primary, details }) => {
 					const on = values[primary.key] === true;
@@ -252,7 +275,10 @@ export function Settings() {
 						label: (
 							<div>
 								<div>{primary.label}</div>
-								<Typography.Text type="secondary" style={{ fontSize: 12 }}>
+								<Typography.Text
+									type="secondary"
+									style={{ fontSize: 12 }}
+								>
 									{primary.description}
 								</Typography.Text>
 							</div>
@@ -279,7 +305,13 @@ export function Settings() {
 			/>
 
 			{otherGroups.map(({ group, items }) => (
-				<Card key={group} title={group} size="small" style={{ marginBottom: 16 }} loading={loading}>
+				<Card
+					key={group}
+					title={group}
+					size="small"
+					style={{ marginBottom: 16 }}
+					loading={loading}
+				>
 					<Form layout="vertical">{items.map(field)}</Form>
 				</Card>
 			))}

@@ -156,9 +156,10 @@ export function Clients({
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify(buildBody(values))
 		});
-		const body = (await res.json().catch(() => null)) as
-			| { message?: string; secret?: string }
-			| null;
+		const body = (await res.json().catch(() => null)) as {
+			message?: string;
+			secret?: string;
+		} | null;
 		if (!res.ok) {
 			message.error(body?.message || 'failed to create client');
 			return;
@@ -212,10 +213,9 @@ export function Clients({
 	}
 
 	async function onRotate(clientId: string) {
-		const res = await fetch(
-			`${base}/${encodeURIComponent(clientId)}/secret`,
-			{ method: 'POST' }
-		);
+		const res = await fetch(`${base}/${encodeURIComponent(clientId)}/secret`, {
+			method: 'POST'
+		});
 		const body = (await res.json().catch(() => null)) as {
 			secret?: string;
 		} | null;
@@ -228,14 +228,30 @@ export function Clients({
 
 	return (
 		<>
-			<Space style={{ marginBottom: 16, justifyContent: 'space-between', width: '100%' }}>
-				<Button icon={<ArrowLeftOutlined />} onClick={onBack}>
+			<Space
+				style={{
+					marginBottom: 16,
+					justifyContent: 'space-between',
+					width: '100%'
+				}}
+			>
+				<Button
+					icon={<ArrowLeftOutlined />}
+					onClick={onBack}
+				>
 					Projects
 				</Button>
-				<Typography.Title level={4} style={{ margin: 0 }}>
+				<Typography.Title
+					level={4}
+					style={{ margin: 0 }}
+				>
 					{project.name} — clients
 				</Typography.Title>
-				<Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal}>
+				<Button
+					type="primary"
+					icon={<PlusOutlined />}
+					onClick={openCreateModal}
+				>
 					New client
 				</Button>
 			</Space>
@@ -257,11 +273,17 @@ export function Clients({
 						title: 'Actions',
 						render: (_: unknown, row: ClientView) => (
 							<Space>
-								<Button size="small" onClick={() => openEditModal(row)}>
+								<Button
+									size="small"
+									onClick={() => openEditModal(row)}
+								>
 									Edit
 								</Button>
 								{row.tokenEndpointAuthMethod !== 'none' && (
-									<Button size="small" onClick={() => onRotate(row.clientId)}>
+									<Button
+										size="small"
+										onClick={() => onRotate(row.clientId)}
+									>
 										Rotate secret
 									</Button>
 								)}
@@ -269,7 +291,10 @@ export function Clients({
 									title="Delete this client?"
 									onConfirm={() => onDelete(row.clientId)}
 								>
-									<Button size="small" danger>
+									<Button
+										size="small"
+										danger
+									>
 										Delete
 									</Button>
 								</Popconfirm>
@@ -292,10 +317,16 @@ export function Clients({
 					onFinish={onSubmit}
 					initialValues={DEFAULT_VALUES}
 				>
-					<Form.Item name="clientName" label="Name">
+					<Form.Item
+						name="clientName"
+						label="Name"
+					>
 						<Input />
 					</Form.Item>
-					<Form.Item name="applicationType" label="Application type">
+					<Form.Item
+						name="applicationType"
+						label="Application type"
+					>
 						<Select
 							options={[
 								{ label: 'web', value: 'web' },
@@ -303,22 +334,47 @@ export function Clients({
 							]}
 						/>
 					</Form.Item>
-					<Form.Item name="grantTypes" label="Grant types" rules={[{ required: true }]}>
-						<Select mode="multiple" options={GRANT_OPTIONS} />
+					<Form.Item
+						name="grantTypes"
+						label="Grant types"
+						rules={[{ required: true }]}
+					>
+						<Select
+							mode="multiple"
+							options={GRANT_OPTIONS}
+						/>
 					</Form.Item>
-					<Form.Item name="tokenEndpointAuthMethod" label="Token endpoint auth">
+					<Form.Item
+						name="tokenEndpointAuthMethod"
+						label="Token endpoint auth"
+					>
 						<Select options={AUTH_OPTIONS} />
 					</Form.Item>
-					<Form.Item name="redirectUris" label="Redirect URIs (one per line)">
-						<Input.TextArea rows={3} placeholder="https://app.example.com/cb" />
+					<Form.Item
+						name="redirectUris"
+						label="Redirect URIs (one per line)"
+					>
+						<Input.TextArea
+							rows={3}
+							placeholder="https://app.example.com/cb"
+						/>
 					</Form.Item>
-					<Form.Item name="scope" label="Scope">
+					<Form.Item
+						name="scope"
+						label="Scope"
+					>
 						<Input placeholder="openid profile email" />
 					</Form.Item>
-					<Form.Item name="requireConsent" label="Require consent" valuePropName="checked">
+					<Form.Item
+						name="requireConsent"
+						label="Require consent"
+						valuePropName="checked"
+					>
 						<Switch />
 					</Form.Item>
-					<Form.Item shouldUpdate={(prev, cur) => prev.grantTypes !== cur.grantTypes}>
+					<Form.Item
+						shouldUpdate={(prev, cur) => prev.grantTypes !== cur.grantTypes}
+					>
 						{() => {
 							const grantTypes: string[] =
 								form.getFieldValue('grantTypes') ?? [];
@@ -354,7 +410,10 @@ export function Clients({
 				<Typography.Paragraph type="warning">
 					Copy this secret now — it will not be shown again.
 				</Typography.Paragraph>
-				<Typography.Paragraph copyable code>
+				<Typography.Paragraph
+					copyable
+					code
+				>
 					{secret}
 				</Typography.Paragraph>
 			</Modal>

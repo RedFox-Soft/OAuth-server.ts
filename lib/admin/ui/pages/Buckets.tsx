@@ -44,7 +44,9 @@ export function Buckets({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 				body: JSON.stringify(values)
 			});
 			if (!res.ok) {
-				const body = (await res.json().catch(() => null)) as { message?: string } | null;
+				const body = (await res.json().catch(() => null)) as {
+					message?: string;
+				} | null;
 				message.error(body?.message || 'failed to create bucket');
 				return;
 			}
@@ -77,7 +79,11 @@ export function Buckets({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 		<>
 			{isSuperAdmin && (
 				<div style={{ marginBottom: 16, textAlign: 'right' }}>
-					<Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
+					<Button
+						type="primary"
+						icon={<PlusOutlined />}
+						onClick={() => setOpen(true)}
+					>
 						New bucket
 					</Button>
 				</div>
@@ -91,7 +97,8 @@ export function Buckets({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 					{
 						title: 'Roles',
 						dataIndex: 'roles',
-						render: (roles: string[]) => roles.map((r) => <Tag key={r}>{r}</Tag>)
+						render: (roles: string[]) =>
+							roles.map((r) => <Tag key={r}>{r}</Tag>)
 					},
 					{
 						title: 'Projects',
@@ -100,7 +107,10 @@ export function Buckets({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 					{
 						title: '',
 						render: (_: unknown, row: UserBucket) => (
-							<Button size="small" onClick={() => setOpenBucketId(row._id)}>
+							<Button
+								size="small"
+								onClick={() => setOpenBucketId(row._id)}
+							>
 								Users
 							</Button>
 						)
@@ -115,12 +125,26 @@ export function Buckets({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 				confirmLoading={creating}
 				destroyOnHidden
 			>
-				<Form<CreateBucketValues> form={form} layout="vertical" onFinish={onCreate}>
-					<Form.Item name="name" label="Name" rules={[{ required: true }]}>
+				<Form<CreateBucketValues>
+					form={form}
+					layout="vertical"
+					onFinish={onCreate}
+				>
+					<Form.Item
+						name="name"
+						label="Name"
+						rules={[{ required: true }]}
+					>
 						<Input />
 					</Form.Item>
-					<Form.Item name="roles" label="Roles">
-						<Select mode="tags" placeholder="add role names" />
+					<Form.Item
+						name="roles"
+						label="Roles"
+					>
+						<Select
+							mode="tags"
+							placeholder="add role names"
+						/>
 					</Form.Item>
 				</Form>
 			</Modal>

@@ -48,7 +48,9 @@ export class ProjectStore implements ProjectStoreInstance {
 
 	async update(
 		id: string,
-		patch: Partial<Pick<Project, 'name' | 'managedBy' | 'bucketId' | 'clientIds'>>
+		patch: Partial<
+			Pick<Project, 'name' | 'managedBy' | 'bucketId' | 'clientIds'>
+		>
 	): Promise<Project | null> {
 		return this.collection.findOneAndUpdate(
 			{ _id: id },

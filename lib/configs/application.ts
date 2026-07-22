@@ -88,14 +88,6 @@ export const ApplicationConfig = {
 	'clientCredentials.enabled': false,
 
 	/*
-	 * features.devInteractions
-	 *
-	 * description: Development-ONLY out-of-the-box interaction views. Disable and replace with your
-	 * own frontend/authentication flows before production.
-	 */
-	'devInteractions.enabled': true,
-
-	/*
 	 * features.backchannelLogout
 	 *
 	 * title: [`OIDC Back-Channel Logout 1.0`](https://openid.net/specs/openid-connect-backchannel-1_0-final.html)

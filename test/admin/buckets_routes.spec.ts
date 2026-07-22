@@ -155,7 +155,10 @@ describe('buckets API', () => {
 		expect((got.data as UserBucket).name).toBe('Editable');
 		const patched = await client.admin.api
 			.buckets({ id: bucket._id })
-			.patch({ name: 'Renamed', roles: ['viewer', 'editor'] }, { headers: { cookie } });
+			.patch(
+				{ name: 'Renamed', roles: ['viewer', 'editor'] },
+				{ headers: { cookie } }
+			);
 		expect((patched.data as UserBucket).name).toBe('Renamed');
 		expect((patched.data as UserBucket).roles).toEqual(['viewer', 'editor']);
 	});
@@ -209,7 +212,9 @@ describe('buckets API', () => {
 			.get({ headers: { cookie } });
 		expect(got.status).toBe(403);
 		const list = await client.admin.api.buckets.get({ headers: { cookie } });
-		expect((list.data as UserBucket[]).some((b) => b._id === ADMIN_BUCKET_ID)).toBe(false);
+		expect(
+			(list.data as UserBucket[]).some((b) => b._id === ADMIN_BUCKET_ID)
+		).toBe(false);
 	});
 
 	it('lets a super_admin edit managedBy', async () => {

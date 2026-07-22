@@ -140,7 +140,10 @@ describe('features.dPoP', async () => {
 				error: 'invalid_header_authorization',
 				error_description: '`DPoP` header not provided'
 			});
-			const dpopEmptyWwwAuth = getHeader(dpopEmpty.response, 'www-authenticate');
+			const dpopEmptyWwwAuth = getHeader(
+				dpopEmpty.response,
+				'www-authenticate'
+			);
 			expect(dpopEmptyWwwAuth).toMatch(/^DPoP /);
 			expect(dpopEmptyWwwAuth).toMatch(/algs="ES256 PS256"/);
 
@@ -210,7 +213,9 @@ describe('features.dPoP', async () => {
 					expect(getHeader(response, 'www-authenticate')).toMatch(
 						/error="invalid_dpop_proof"/
 					);
-					expect(getHeader(response, 'www-authenticate')).toMatch(/algs="ES256 PS256"/);
+					expect(getHeader(response, 'www-authenticate')).toMatch(
+						/algs="ES256 PS256"/
+					);
 				}
 
 				for (const [err] of spy.mock.calls) {
@@ -239,7 +244,9 @@ describe('features.dPoP', async () => {
 					expect(getHeader(response, 'www-authenticate')).toMatch(
 						/error="invalid_dpop_proof"/
 					);
-					expect(getHeader(response, 'www-authenticate')).toMatch(/algs="ES256 PS256"/);
+					expect(getHeader(response, 'www-authenticate')).toMatch(
+						/algs="ES256 PS256"/
+					);
 				}
 
 				for (const [err] of spy.mock.calls) {
@@ -277,7 +284,9 @@ describe('features.dPoP', async () => {
 					expect(getHeader(response, 'www-authenticate')).toMatch(
 						/error="invalid_dpop_proof"/
 					);
-					expect(getHeader(response, 'www-authenticate')).toMatch(/algs="ES256 PS256"/);
+					expect(getHeader(response, 'www-authenticate')).toMatch(
+						/algs="ES256 PS256"/
+					);
 				}
 
 				for (const [err] of spy.mock.calls) {
@@ -313,7 +322,9 @@ describe('features.dPoP', async () => {
 				expect(getHeader(response, 'www-authenticate')).toMatch(
 					/error="invalid_dpop_proof"/
 				);
-				expect(getHeader(response, 'www-authenticate')).toMatch(/algs="ES256 PS256"/);
+				expect(getHeader(response, 'www-authenticate')).toMatch(
+					/algs="ES256 PS256"/
+				);
 
 				for (const [err] of spy.mock.calls) {
 					expect(err.error_detail).toBe(
@@ -348,7 +359,9 @@ describe('features.dPoP', async () => {
 				expect(getHeader(response, 'www-authenticate')).toMatch(
 					/error="invalid_dpop_proof"/
 				);
-				expect(getHeader(response, 'www-authenticate')).toMatch(/algs="ES256 PS256"/);
+				expect(getHeader(response, 'www-authenticate')).toMatch(
+					/algs="ES256 PS256"/
+				);
 
 				for (const [err] of spy.mock.calls) {
 					expect(err.error_detail).toBe(
@@ -384,7 +397,9 @@ describe('features.dPoP', async () => {
 				expect(getHeader(response, 'www-authenticate')).toMatch(
 					/error="invalid_dpop_proof"/
 				);
-				expect(getHeader(response, 'www-authenticate')).toMatch(/algs="ES256 PS256"/);
+				expect(getHeader(response, 'www-authenticate')).toMatch(
+					/algs="ES256 PS256"/
+				);
 			});
 
 			it('htm mismatch', async function () {
@@ -416,7 +431,9 @@ describe('features.dPoP', async () => {
 				expect(getHeader(response, 'www-authenticate')).toMatch(
 					/error="invalid_dpop_proof"/
 				);
-				expect(getHeader(response, 'www-authenticate')).toMatch(/algs="ES256 PS256"/);
+				expect(getHeader(response, 'www-authenticate')).toMatch(
+					/algs="ES256 PS256"/
+				);
 			});
 
 			it('htu mismatch', async function () {
@@ -448,7 +465,9 @@ describe('features.dPoP', async () => {
 				expect(getHeader(response, 'www-authenticate')).toMatch(
 					/error="invalid_dpop_proof"/
 				);
-				expect(getHeader(response, 'www-authenticate')).toMatch(/algs="ES256 PS256"/);
+				expect(getHeader(response, 'www-authenticate')).toMatch(
+					/algs="ES256 PS256"/
+				);
 			});
 
 			for (const enabled of [true, false]) {

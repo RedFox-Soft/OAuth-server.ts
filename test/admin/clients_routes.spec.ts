@@ -51,9 +51,7 @@ describe('clients API', () => {
 
 	it('rejects anonymous access', async () => {
 		const proj = await makeProject();
-		const res = await client.admin.api
-			.projects({ id: proj._id })
-			.clients.get();
+		const res = await client.admin.api.projects({ id: proj._id }).clients.get();
 		expect(res.status).toBe(401);
 	});
 
@@ -232,16 +230,14 @@ describe('clients API', () => {
 		expect(rotated.status).toBe(200);
 		expect((rotated.data as { secret: string }).secret).toBeTruthy();
 
-		const pub = await client.admin.api
-			.projects({ id: proj._id })
-			.clients.post(
-				{
-					grantTypes: ['authorization_code'],
-					redirectUris: ['https://pub.example.com/cb'],
-					tokenEndpointAuthMethod: 'none'
-				},
-				{ headers: { cookie } }
-			);
+		const pub = await client.admin.api.projects({ id: proj._id }).clients.post(
+			{
+				grantTypes: ['authorization_code'],
+				redirectUris: ['https://pub.example.com/cb'],
+				tokenEndpointAuthMethod: 'none'
+			},
+			{ headers: { cookie } }
+		);
 		const pubId = (pub.data as { clientId: string }).clientId;
 		const pubRotate = await client.admin.api
 			.projects({ id: proj._id })

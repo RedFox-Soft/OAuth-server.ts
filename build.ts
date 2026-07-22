@@ -10,10 +10,7 @@ const antdIconsSvgEsm: BunPlugin = {
 	name: 'antd-icons-svg-esm',
 	setup(build) {
 		build.onResolve({ filter: /@ant-design\/icons-svg\/lib\// }, (args) => ({
-			path: Bun.resolveSync(
-				args.path.replace('/lib/', '/es/'),
-				args.resolveDir
-			)
+			path: Bun.resolveSync(args.path.replace('/lib/', '/es/'), args.resolveDir)
 		}));
 	}
 };

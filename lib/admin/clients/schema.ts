@@ -19,9 +19,7 @@ const AUTH_METHODS = [
 
 export const CreateClientBody = t.Object({
 	clientName: t.Optional(t.String({ minLength: 1 })),
-	applicationType: t.Optional(
-		t.Union([t.Literal('web'), t.Literal('native')])
-	),
+	applicationType: t.Optional(t.Union([t.Literal('web'), t.Literal('native')])),
 	grantTypes: t.Array(t.Union(SUPPORTED_GRANT_TYPES.map((g) => t.Literal(g))), {
 		minItems: 1
 	}),
@@ -38,9 +36,7 @@ export const CreateClientBody = t.Object({
 
 export const UpdateClientBody = t.Object({
 	clientName: t.Optional(t.String({ minLength: 1 })),
-	applicationType: t.Optional(
-		t.Union([t.Literal('web'), t.Literal('native')])
-	),
+	applicationType: t.Optional(t.Union([t.Literal('web'), t.Literal('native')])),
 	grantTypes: t.Optional(
 		t.Array(t.Union(SUPPORTED_GRANT_TYPES.map((g) => t.Literal(g))), {
 			minItems: 1

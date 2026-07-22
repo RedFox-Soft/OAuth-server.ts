@@ -3,7 +3,11 @@ import { Elysia } from 'elysia';
 import { treaty } from '@elysiajs/eden';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { settingsRoutes } from 'lib/admin/settings/routes.ts';
-import { adminSessionStore, getUserStore, configStore } from 'lib/adapters/index.ts';
+import {
+	adminSessionStore,
+	getUserStore,
+	configStore
+} from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 
 const app = new Elysia().use(resolveAdmin).use(settingsRoutes);
@@ -56,13 +60,16 @@ describe('settings API', () => {
 		expect(body.catalog.length).toBeGreaterThan(0);
 		expect(body.restartRequired).toBe(false);
 		expect(body.changedKeys).toEqual([]);
-		expect(Object.prototype.hasOwnProperty.call(body.values, 'par.enabled')).toBe(true);
+		expect(
+			Object.prototype.hasOwnProperty.call(body.values, 'par.enabled')
+		).toBe(true);
 	});
 
 	it('PUT persists a change and reports restartRequired + changedKeys', async () => {
 		const cookie = await sessionCookieFor(['super_admin']);
-		const before = (await client.admin.api.settings.get({ headers: { cookie } }))
-			.data as SettingsResponse;
+		const before = (
+			await client.admin.api.settings.get({ headers: { cookie } })
+		).data as SettingsResponse;
 		const running = before.values['par.enabled'] as boolean;
 		const put = await client.admin.api.settings.put(
 			{ 'par.enabled': !running },
@@ -80,8 +87,14 @@ describe('settings API', () => {
 
 	it('preserves unedited stored overrides across a second PUT', async () => {
 		const cookie = await sessionCookieFor(['super_admin']);
-		await client.admin.api.settings.put({ 'par.enabled': true }, { headers: { cookie } });
-		await client.admin.api.settings.put({ 'revocation.enabled': true }, { headers: { cookie } });
+		await client.admin.api.settings.put(
+			{ 'par.enabled': true },
+			{ headers: { cookie } }
+		);
+		await client.admin.api.settings.put(
+			{ 'revocation.enabled': true },
+			{ headers: { cookie } }
+		);
 		const stored = (await configStore.get()) as Record<string, unknown>;
 		expect(stored['par.enabled']).toBe(true);
 		expect(stored['revocation.enabled']).toBe(true);

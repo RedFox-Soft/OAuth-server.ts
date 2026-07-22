@@ -42,7 +42,9 @@ hydrateRoot(
 						<ConsentPage
 							uid={calculateUid()}
 							clientName={''}
-							scopes={[]}
+							account={undefined}
+							permissions={[]}
+							{...props}
 						/>
 					);
 				case 'registration':

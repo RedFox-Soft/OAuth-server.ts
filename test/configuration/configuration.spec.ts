@@ -13,7 +13,7 @@ describe('Provider configuration', () => {
 		expect(() => {
 			new Configuration({
 				features: {
-					devInteractions: false
+					introspection: false
 				}
 			});
 		}).toThrow(
@@ -22,7 +22,7 @@ describe('Provider configuration', () => {
 		expect(() => {
 			new Configuration({
 				features: {
-					devInteractions: true
+					introspection: true
 				}
 			});
 		}).toThrow(

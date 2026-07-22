@@ -68,7 +68,10 @@ export function Projects({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 
 	if (openProject) {
 		return (
-			<Clients project={openProject} onBack={() => setOpenProject(null)} />
+			<Clients
+				project={openProject}
+				onBack={() => setOpenProject(null)}
+			/>
 		);
 	}
 
@@ -100,7 +103,10 @@ export function Projects({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 						title: '',
 						render: (_: unknown, row: Project) => (
 							<Space>
-								<Button size="small" onClick={() => setOpenProject(row)}>
+								<Button
+									size="small"
+									onClick={() => setOpenProject(row)}
+								>
 									Clients
 								</Button>
 								<Button

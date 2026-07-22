@@ -21,7 +21,10 @@ function assertRolesSubset(
 	if (!roles) return;
 	const bad = roles.filter((r) => !bucket.roles.includes(r));
 	if (bad.length) {
-		throw new AdminError(422, `roles not declared on bucket: ${bad.join(', ')}`);
+		throw new AdminError(
+			422,
+			`roles not declared on bucket: ${bad.join(', ')}`
+		);
 	}
 }
 

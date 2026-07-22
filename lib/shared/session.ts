@@ -13,7 +13,11 @@ export default async function sessionHandler(oidc) {
 		// first-time login was never saved, so session-bound artifacts (e.g. an
 		// authorization code with expiresWithSession) could never be validated at
 		// the token endpoint — Session.findByUid returned nothing.
-		if (cookie.value || oidc.session.payload.accountId || oidc.session.touched) {
+		if (
+			cookie.value ||
+			oidc.session.payload.accountId ||
+			oidc.session.touched
+		) {
 			await oidc.session.save();
 			cookie.set({
 				value: oidc.session.id,

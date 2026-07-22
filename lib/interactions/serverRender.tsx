@@ -3,6 +3,7 @@ import { StrictMode } from 'react';
 import { LoginPage } from './loginPage.js';
 import { ConsentPage } from './consentPage.js';
 import { RegistrationPage } from './registration.js';
+import type { ConsentView } from './consentView.js';
 
 const htmlTeamplate = Bun.file('./lib/interactions/htmlTeamplate.html');
 
@@ -50,20 +51,23 @@ export async function registrationServer(uid: string) {
 	});
 }
 
-export async function consentServer(uid: string) {
+export async function consentServer(view: ConsentView) {
 	let html = await htmlTeamplate.text();
-	html = html.replace('<!--app-title-->', 'Consent Page').replace(
-		'<!--app-html-->',
-		renderToString(
-			<StrictMode>
-				<ConsentPage
-					uid={uid}
-					clientName={''}
-					scopes={[]}
-				/>
-			</StrictMode>
+	html = html
+		.replace('<!--app-title-->', 'Consent Page')
+		.replace(
+			'<!--app-props-->',
+			// escape `<` so a client name / scope value can't break out of the script tag
+			`<script>window.PROPS=${JSON.stringify(view).replace(/</g, '\\u003c')}</script>`
 		)
-	);
+		.replace(
+			'<!--app-html-->',
+			renderToString(
+				<StrictMode>
+					<ConsentPage {...view} />
+				</StrictMode>
+			)
+		);
 	return new Response(html, {
 		headers: {
 			'Content-Type': 'text/html; charset=utf-8'

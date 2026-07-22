@@ -3,7 +3,6 @@ export const STABLE = new Set([
 	'ciba',
 	'claimsParameter',
 	'deviceFlow',
-	'devInteractions',
 	'dPoP',
 	'encryption',
 	'introspection',
