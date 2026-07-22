@@ -53,6 +53,15 @@ must be re-run after upgrading an existing install. `lib/admin/seed.ts` (`ensure
 app-side equivalent used by tests; there is **no** boot-time seeding because `provider.init` is the
 downstream app's responsibility, so admin login requires a Mongo-backed, `db:setup`-provisioned deployment.
 
+Super-admins manage the running instance through the admin control plane (`lib/admin/`, mounted under
+`/admin/api/*`): projects, clients, buckets, end-users, server settings, and **signing keys**
+(`lib/admin/jwks/` — view/generate/delete over `jwksStore`, persist-then-restart like settings; RSA
+generation only, private key material never returned; status is drift between `jwksStore` and the
+boot-time `JWKS_KEYS`). Every state-changing key action is written to an **append-only admin audit
+trail** (`adminAuditStore`, collection `adminAudit`, via `lib/admin/audit/record.ts`, audit-first
+before the mutation) capturing actor, action, target, and timestamp; the store exposes no
+update/delete so entries cannot be altered.
+
 The test suite loads `.env.test` automatically via Bun.
 
 ---

@@ -14,7 +14,7 @@ import { Projects } from './Projects.js';
 import { Buckets } from './Buckets.js';
 import { Admins } from './Admins.js';
 import { Settings } from './Settings.js';
-import { Stub } from './Stub.js';
+import { Keys } from './Keys.js';
 
 const { Sider, Header, Content } = AntLayout;
 
@@ -59,7 +59,11 @@ export function Layout({ me }: { me: AdminContext | null }) {
 					<Projects isSuperAdmin={isSuperAdmin} />
 				);
 			case 'keys':
-				return <Stub title="Keys" />;
+				return isSuperAdmin ? (
+					<Keys />
+				) : (
+					<Projects isSuperAdmin={isSuperAdmin} />
+				);
 			default:
 				return <Projects isSuperAdmin={isSuperAdmin} />;
 		}

@@ -75,12 +75,20 @@ for (const name of COLLECTIONS) {
 						unique: true
 					}
 				]
-			: [
-					{
-						key: { expiresAt: 1 },
-						expireAfterSeconds: 0
-					}
-				])
+			: // The admin audit trail is permanent (append-only): index by time for
+				// reads, with no TTL so entries are never auto-expired.
+				name === 'adminAudit'
+				? [
+						{
+							key: { timestamp: 1 }
+						}
+					]
+				: [
+						{
+							key: { expiresAt: 1 },
+							expireAfterSeconds: 0
+						}
+					])
 	]);
 }
 

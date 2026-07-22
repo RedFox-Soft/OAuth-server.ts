@@ -69,6 +69,33 @@ export interface JWKSStoreConstructor {
 	new (): JWKSStoreInstance;
 }
 
+export interface AdminAuditEntry {
+	_id: string;
+	actorId: string;
+	actorEmail: string;
+	action: string;
+	targetType: string;
+	targetId: string;
+	timestamp: Date;
+}
+
+// Append-only by construction: there is intentionally no update or delete method, so an
+// admin audit trail cannot be tampered with through the adapter (constitution: immutable
+// audit log for every state-changing administrative action).
+export interface AdminAuditStoreInstance {
+	record(
+		entry: Omit<AdminAuditEntry, '_id' | 'timestamp'>
+	): Promise<AdminAuditEntry>;
+	list(filter?: {
+		targetType?: string;
+		targetId?: string;
+	}): Promise<AdminAuditEntry[]>;
+}
+
+export interface AdminAuditStoreConstructor {
+	new (): AdminAuditStoreInstance;
+}
+
 export interface Project {
 	_id: string;
 	name: string;

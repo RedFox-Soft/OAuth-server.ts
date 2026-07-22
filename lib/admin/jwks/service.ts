@@ -1,0 +1,176 @@
+import { jwksStore } from '../../adapters/index.js';
+import instance from '../../helpers/weak_cache.js';
+import { provider } from '../../provider.js';
+import { generateJWKS } from '../../helpers/jwks.js';
+import { signingAlgs } from '../../configs/jwaConsts.js';
+import { type JWKS } from '../../configs/verifyJWKs.js';
+import { recordAdminAudit } from '../audit/record.js';
+import { AdminError, type AdminContext } from '../auth/rbac.js';
+
+// RSA signing algorithms offered for generation. Matches what generateJWKS produces; EC/OKP
+// and encryption-use keys are out of scope for SP-5 (they may still exist in the store if
+// provisioned out of band, and are displayed/removable).
+const SUPPORTED_ALGS = ['RS256', 'RS384', 'RS512'] as const;
+type SupportedAlg = (typeof SUPPORTED_ALGS)[number];
+
+const SIG_ALGS = new Set<string>(signingAlgs);
+
+export type KeyStatus = 'active' | 'pending activation' | 'pending removal';
+
+export interface KeyView {
+	kid: string;
+	kty: string;
+	alg?: string;
+	use?: string;
+	crv?: string;
+	e?: string;
+	n?: string;
+	x?: string;
+	y?: string;
+	x5c?: string[];
+	key_ops?: string[];
+	status: KeyStatus;
+}
+
+export interface JwksState {
+	keys: KeyView[];
+	restartRequired: boolean;
+	changedKeys: string[];
+	supportedAlgorithms: string[];
+}
+
+// The running provider's live internals: the in-memory keystore used to sign/verify, and the
+// public JWKS served at /jwks. Both are mutated in place when a key is hot-applied. instance()
+// is untyped (WeakMap); narrow to just what we touch here rather than use `any`.
+function runningProvider() {
+	return instance(provider) as {
+		keystore: { add(key: unknown): void };
+		jwks: { keys: Array<Record<string, unknown>> };
+	};
+}
+
+// A key counts as a signing key when its effective use is 'sig' — inferred from an explicit
+// `use`, else from a signing `alg`, else defaulting to 'sig' (mirrors the provider's own
+// inference and verifyJWKs). Used to enforce "at least one signing key must remain".
+function effectiveUse(key: JWKS): 'sig' | 'enc' {
+	if (key.use === 'sig' || key.use === 'enc') return key.use;
+	if (key.alg) return SIG_ALGS.has(key.alg) ? 'sig' : 'enc';
+	return 'sig';
+}
+
+function isSigningKey(key: JWKS): boolean {
+	return effectiveUse(key) === 'sig';
+}
+
+// Public, client-safe view of a key — an explicit allow-list (never a blocklist) so an
+// unforeseen private component (d/p/q/dp/dq/qi/oth) can never leak.
+function toPublicJwk(key: JWKS): Record<string, unknown> {
+	const source = key as Record<string, unknown>;
+	const pub: Record<string, unknown> = { kty: key.kty, kid: key.kid };
+	for (const field of ['alg', 'use', 'crv', 'e', 'n', 'x', 'y'] as const) {
+		if (typeof source[field] === 'string') pub[field] = source[field];
+	}
+	if (Array.isArray(source.x5c)) pub.x5c = source.x5c;
+	if (Array.isArray(source.key_ops)) pub.key_ops = source.key_ops;
+	return pub;
+}
+
+function project(key: JWKS, status: KeyStatus): KeyView {
+	// toPublicJwk already carries kid + kty (both required on KeyView); the widening is safe.
+	return { ...toPublicJwk(key), status } as unknown as KeyView;
+}
+
+// The keys the running provider currently serves at /jwks (the live set — reflects hot-applied
+// keys immediately). The desired set is the persisted jwksStore. Drift between the two drives
+// status and the restart-required indicator; because generation hot-applies, the only drift in
+// practice is a deleted key that is still live until the next restart (pending removal).
+export async function getJwksState(): Promise<JwksState> {
+	const desired = await jwksStore.getAll();
+	const running = runningProvider().jwks.keys as unknown as JWKS[];
+	const desiredKids = new Set(desired.map((k) => k.kid));
+	const runningKids = new Set(running.map((k) => k.kid));
+
+	const keys: KeyView[] = [];
+	const changedKeys: string[] = [];
+
+	for (const key of desired) {
+		if (runningKids.has(key.kid)) {
+			keys.push(project(key, 'active'));
+		} else {
+			keys.push(project(key, 'pending activation'));
+			changedKeys.push(key.kid);
+		}
+	}
+	for (const key of running) {
+		if (!desiredKids.has(key.kid)) {
+			keys.push(project(key, 'pending removal'));
+			changedKeys.push(key.kid);
+		}
+	}
+
+	return {
+		keys,
+		restartRequired: changedKeys.length > 0,
+		changedKeys,
+		supportedAlgorithms: [...SUPPORTED_ALGS]
+	};
+}
+
+// Generate a new RSA signing key, persist it, and hot-apply it to the running provider so it
+// is live immediately — no restart. Audit-first: the audit entry is written before any state
+// change, so a failed audit write aborts before a key is created. The key is added at the END
+// of the keystore, so the existing key keeps signing (publish-for-verification-only); a later
+// rotation makes the new key the signer by removing the old one.
+export async function generateKey(
+	ctx: AdminContext,
+	alg: unknown
+): Promise<JwksState> {
+	if (
+		typeof alg !== 'string' ||
+		!SUPPORTED_ALGS.includes(alg as SupportedAlg)
+	) {
+		throw new AdminError(
+			422,
+			`unsupported algorithm; expected one of: ${SUPPORTED_ALGS.join(', ')}`
+		);
+	}
+	const {
+		keys: [key]
+	} = await generateJWKS(alg as SupportedAlg);
+	// generateJWKS always assigns a kid; it is present at runtime.
+	const kid = key.kid as string;
+	await recordAdminAudit(ctx, 'jwks.generate', 'jwks', kid);
+	await jwksStore.set(kid, key as JWKS);
+
+	const running = runningProvider();
+	running.keystore.add(structuredClone(key));
+	running.jwks.keys.push(toPublicJwk(key as JWKS));
+
+	return getJwksState();
+}
+
+// Remove a key from the store. Refuses (404) a kid not present in the store, and (422) any
+// removal that would leave the desired set with no signing key. Audit-first, as above.
+//
+// Removal is NOT hot-applied: the running provider keeps serving and honoring the key until the
+// next restart (status: pending removal). Dropping a key from the live /jwks would break
+// verification of tokens already signed with it (constitution VI — rotation must not invalidate
+// valid tokens), so retirement stays a deliberate, restart-gated step.
+export async function deleteKey(
+	ctx: AdminContext,
+	kid: string
+): Promise<JwksState> {
+	const desired = await jwksStore.getAll();
+	if (!desired.some((k) => k.kid === kid)) {
+		throw new AdminError(404, `no such key: ${kid}`);
+	}
+	const remainingSigning = desired.filter(
+		(k) => k.kid !== kid && isSigningKey(k)
+	).length;
+	if (remainingSigning === 0) {
+		throw new AdminError(422, 'at least one signing key must remain');
+	}
+	await recordAdminAudit(ctx, 'jwks.delete', 'jwks', kid);
+	await jwksStore.delete(kid);
+	return getJwksState();
+}

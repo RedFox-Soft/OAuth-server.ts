@@ -5,10 +5,13 @@ import {
 	ProjectStore as MemoryProjectStore,
 	UserBucketStore as MemoryUserBucketStore,
 	AdminSessionStore as MemoryAdminSessionStore,
+	AdminAuditStore as MemoryAdminAuditStore,
 	configStore as memoryConfig
 } from './memory/index.js';
 import type {
 	AdapterConfigStore,
+	AdminAuditStoreConstructor,
+	AdminAuditStoreInstance,
 	AdminSessionStoreConstructor,
 	AdminSessionStoreInstance,
 	JWKSStoreConstructor,
@@ -31,6 +34,7 @@ let ProjectStoreClass: ProjectStoreConstructor = MemoryProjectStore;
 let BucketStoreClass: UserBucketStoreConstructor = MemoryUserBucketStore;
 let AdminSessionStoreClass: AdminSessionStoreConstructor =
 	MemoryAdminSessionStore;
+let AdminAuditStoreClass: AdminAuditStoreConstructor = MemoryAdminAuditStore;
 export let configStore: AdapterConfigStore = memoryConfig;
 
 if (process.env.MONGODB_URI) {
@@ -42,6 +46,7 @@ if (process.env.MONGODB_URI) {
 	ProjectStoreClass = mongodb.ProjectStore;
 	BucketStoreClass = mongodb.UserBucketStore;
 	AdminSessionStoreClass = mongodb.AdminSessionStore;
+	AdminAuditStoreClass = mongodb.AdminAuditStore;
 }
 
 if (process.env.NODE_ENV === 'test') {
@@ -51,6 +56,8 @@ if (process.env.NODE_ENV === 'test') {
 export const jwksStore: JWKSStoreInstance = new JWKSStoreClass();
 export const adminSessionStore: AdminSessionStoreInstance =
 	new AdminSessionStoreClass();
+export const adminAuditStore: AdminAuditStoreInstance =
+	new AdminAuditStoreClass();
 
 export const cache = new Map();
 export function adapter<TModelName extends string>(

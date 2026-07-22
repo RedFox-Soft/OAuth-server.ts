@@ -18,5 +18,6 @@ export const COLLECTIONS = [
 	'jwks',
 	'projects',
 	'userBuckets',
-	'adminSession'
+	'adminSession',
+	'adminAudit'
 ] as const;
