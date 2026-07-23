@@ -64,6 +64,7 @@ merge(config, {
 });
 
 export const ApplicationConfig = {
+	'authorization.allowOmittingSingleRegisteredRedirectUri': true,
 	'clientCredentials.enabled': true,
 	'introspection.enabled': true,
 	'deviceFlow.enabled': true,

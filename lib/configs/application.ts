@@ -2,6 +2,18 @@ import { configStore } from '../adapters/index.js';
 
 export const ApplicationConfig = {
 	/*
+	 * authorization.allowOmittingSingleRegisteredRedirectUri
+	 *
+	 * title: Allow omitting the redirect_uri parameter when only a single one is registered for a client.
+	 *
+	 * description: When enabled, an authorization request (and the authorization-code token exchange)
+	 * that omits redirect_uri is resolved to the client's sole registered redirect_uri. This is a
+	 * deviation from strict OAuth 2.1 (which expects redirect_uri present); it is isolated behind this
+	 * named flag and defaults to disabled (secure-by-default) so omission is an explicit opt-in.
+	 */
+	'authorization.allowOmittingSingleRegisteredRedirectUri': false,
+
+	/*
 	 * pushedAuthorizationRequests
 	 *
 	 * title: [`RFC9126`](https://www.rfc-editor.org/rfc/rfc9126.html) - OAuth 2.0 Pushed Authorization Requests (`PAR`)

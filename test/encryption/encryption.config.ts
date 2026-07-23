@@ -7,6 +7,7 @@ const config = getConfig();
 export const keypair = await generateKeyPair('RSA-OAEP');
 
 export const ApplicationConfig = {
+	'authorization.allowOmittingSingleRegisteredRedirectUri': true,
 	'par.enabled': true,
 	'requestObjects.enabled': true,
 	'encryption.enabled': true,

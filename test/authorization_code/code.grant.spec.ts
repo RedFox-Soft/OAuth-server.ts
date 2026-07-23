@@ -1,4 +1,3 @@
-import i from 'lib/helpers/weak_cache.js';
 import url from 'node:url';
 import {
 	describe,
@@ -13,6 +12,7 @@ import {
 } from 'bun:test';
 
 import { provider } from 'lib/provider.js';
+import { ApplicationConfig } from 'lib/configs/application.js';
 import { Client } from 'lib/models/client.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
 import bootstrap, { agent, type Setup } from '../test_helper.js';
@@ -334,12 +334,15 @@ describe('grant_type=authorization_code', () => {
 		let session = null;
 
 		afterEach(function () {
-			i(provider).configuration.allowOmittingSingleRegisteredRedirectUri =
-				false;
+			ApplicationConfig[
+				'authorization.allowOmittingSingleRegisteredRedirectUri'
+			] = false;
 		});
 
 		beforeEach(async function () {
-			i(provider).configuration.allowOmittingSingleRegisteredRedirectUri = true;
+			ApplicationConfig[
+				'authorization.allowOmittingSingleRegisteredRedirectUri'
+			] = true;
 			const cookie = await setup.login();
 			session = cookie;
 			auth = new AuthorizationRequest({

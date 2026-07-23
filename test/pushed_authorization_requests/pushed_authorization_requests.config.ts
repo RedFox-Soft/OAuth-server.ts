@@ -14,6 +14,7 @@ function allowUnregisteredClient(suffix, metadata) {
 }
 
 export const ApplicationConfig = {
+	'authorization.allowOmittingSingleRegisteredRedirectUri': true,
 	'par.enabled': true,
 	'claimsParameter.enabled': true,
 	'requestObjects.enabled': true

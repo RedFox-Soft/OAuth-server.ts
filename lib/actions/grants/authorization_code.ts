@@ -20,13 +20,14 @@ const gty = 'authorization_code';
 export const handler = async function authorizationCodeHandler(oidc, dPoP) {
 	const {
 		issueRefreshToken,
-		allowOmittingSingleRegisteredRedirectUri,
 		conformIdTokenClaims,
 		features: { userinfo, resourceIndicators, richAuthorizationRequests }
 	} = instance(oidc.provider).configuration;
 
 	if (
-		allowOmittingSingleRegisteredRedirectUri &&
+		ApplicationConfig[
+			'authorization.allowOmittingSingleRegisteredRedirectUri'
+		] &&
 		oidc.params.redirect_uri === undefined
 	) {
 		// It is permitted to omit the redirect_uri if only ONE is registered on the client

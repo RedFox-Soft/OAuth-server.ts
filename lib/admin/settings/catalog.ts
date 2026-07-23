@@ -25,6 +25,15 @@ const CLIENT_AUTH_METHODS = [
 // doc-comments in lib/configs/application.ts.
 export const SETTINGS_CATALOG: SettingDescriptor[] = [
 	{
+		key: 'authorization.allowOmittingSingleRegisteredRedirectUri',
+		group: 'Authorization',
+		label: 'Allow omitting a single registered redirect_uri',
+		type: 'boolean',
+		description:
+			'When a client has exactly one registered redirect_uri, allow authorization and token requests to omit redirect_uri and resolve it to that single value. Off by default (secure).'
+	},
+
+	{
 		key: 'par.enabled',
 		group: 'PAR',
 		label: 'Enable PAR (RFC 9126)',

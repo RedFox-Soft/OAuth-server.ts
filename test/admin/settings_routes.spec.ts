@@ -100,6 +100,36 @@ describe('settings API', () => {
 		expect(stored['revocation.enabled']).toBe(true);
 	});
 
+	it('persists authorization.allowOmittingSingleRegisteredRedirectUri (boolean) and round-trips', async () => {
+		const cookie = await sessionCookieFor(['super_admin']);
+		const put = await client.admin.api.settings.put(
+			{ 'authorization.allowOmittingSingleRegisteredRedirectUri': true },
+			{ headers: { cookie } }
+		);
+		expect(put.status).toBe(200);
+		const body = put.data as SettingsResponse;
+		expect(
+			body.values['authorization.allowOmittingSingleRegisteredRedirectUri']
+		).toBe(true);
+		expect(body.restartRequired).toBe(true);
+		expect(body.changedKeys).toContain(
+			'authorization.allowOmittingSingleRegisteredRedirectUri'
+		);
+		const stored = (await configStore.get()) as Record<string, unknown>;
+		expect(
+			stored['authorization.allowOmittingSingleRegisteredRedirectUri']
+		).toBe(true);
+	});
+
+	it('rejects a non-boolean authorization.allowOmittingSingleRegisteredRedirectUri with 422', async () => {
+		const cookie = await sessionCookieFor(['super_admin']);
+		const res = await client.admin.api.settings.put(
+			{ 'authorization.allowOmittingSingleRegisteredRedirectUri': 'yes' },
+			{ headers: { cookie } }
+		);
+		expect(res.status).toBe(422);
+	});
+
 	it('rejects an unknown key with 422', async () => {
 		const cookie = await sessionCookieFor(['super_admin']);
 		const res = await client.admin.api.settings.put(

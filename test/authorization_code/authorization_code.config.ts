@@ -2,8 +2,6 @@ import getConfig from '../default.config.js';
 
 const config = getConfig();
 
-config.allowOmittingSingleRegisteredRedirectUri = false;
-
 export default {
 	config,
 	clients: [

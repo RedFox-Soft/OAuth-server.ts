@@ -11,6 +11,7 @@ import {
 	mock
 } from 'bun:test';
 
+import { ApplicationConfig } from 'lib/configs/application.js';
 import bootstrap, {
 	agent,
 	jsonToFormUrlEncoded,
@@ -469,8 +470,9 @@ describe('BASIC code', () => {
 
 			describe('when client has a single redirect_uri', () => {
 				afterEach(function () {
-					i(provider).configuration.allowOmittingSingleRegisteredRedirectUri =
-						false;
+					ApplicationConfig[
+						'authorization.allowOmittingSingleRegisteredRedirectUri'
+					] = false;
 				});
 
 				it('missing mandatory parameter redirect_uri', async function () {
@@ -488,8 +490,9 @@ describe('BASIC code', () => {
 				});
 
 				it('unless allowOmittingSingleRegisteredRedirectUri is true', async function () {
-					i(provider).configuration.allowOmittingSingleRegisteredRedirectUri =
-						true;
+					ApplicationConfig[
+						'authorization.allowOmittingSingleRegisteredRedirectUri'
+					] = true;
 					const cookie = await setup.login();
 					const auth = new AuthorizationRequest({
 						client_id: 'client',

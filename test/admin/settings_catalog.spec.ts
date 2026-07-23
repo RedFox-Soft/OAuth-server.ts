@@ -23,6 +23,15 @@ describe('settings catalog', () => {
 		}
 	});
 
+	it('exposes authorization.allowOmittingSingleRegisteredRedirectUri as a boolean in the Authorization group', () => {
+		const d = SETTINGS_CATALOG.find(
+			(x) => x.key === 'authorization.allowOmittingSingleRegisteredRedirectUri'
+		);
+		expect(d).toBeDefined();
+		expect(d?.type).toBe('boolean');
+		expect(d?.group).toBe('Authorization');
+	});
+
 	it('excludes structured/function/Buffer keys', () => {
 		const keys = SETTINGS_CATALOG.map((d) => d.key);
 		for (const forbidden of [

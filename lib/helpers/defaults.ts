@@ -82,13 +82,6 @@ function makeDefaults() {
 		loadExistingGrant,
 
 		/*
-		 * allowOmittingSingleRegisteredRedirectUri
-		 *
-		 * title: Allow omitting the redirect_uri parameter when only a single one is registered for a client.
-		 */
-		allowOmittingSingleRegisteredRedirectUri: true,
-
-		/*
 		 * discovery
 		 *
 		 * description: Pass additional properties to this object to extend the discovery document

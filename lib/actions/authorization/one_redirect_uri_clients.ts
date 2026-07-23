@@ -1,13 +1,13 @@
-import instance from '../../helpers/weak_cache.ts';
+import { ApplicationConfig } from 'lib/configs/application.js';
 
 /*
  * If no redirect_uri is provided and client only pre-registered one unique value it is assumed
- * to be the requested redirect_uri and used as if it was explicitly provided;
+ * to be the requested redirect_uri and used as if it was explicitly provided; gated behind the
+ * named OAuth 2.1 deviation flag (off by default).
  */
 export default function oneRedirectUriClients(oidc) {
 	if (
-		!instance(oidc.provider).configuration
-			.allowOmittingSingleRegisteredRedirectUri
+		!ApplicationConfig['authorization.allowOmittingSingleRegisteredRedirectUri']
 	) {
 		return;
 	}

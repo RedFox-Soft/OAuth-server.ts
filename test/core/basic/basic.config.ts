@@ -4,8 +4,6 @@ import getConfig from '../../default.config.js';
 
 const config = getConfig();
 
-config.allowOmittingSingleRegisteredRedirectUri = false;
-
 const policy = base();
 
 const check: CheckPartial = {

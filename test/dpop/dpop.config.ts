@@ -26,6 +26,7 @@ merge(config.features, {
 });
 
 export const ApplicationConfig = {
+	'authorization.allowOmittingSingleRegisteredRedirectUri': true,
 	'par.enabled': true,
 	'dpop.enabled': true,
 	'dpop.nonceSecret': Buffer.alloc(32, 0),

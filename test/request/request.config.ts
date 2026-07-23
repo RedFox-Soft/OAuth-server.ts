@@ -12,6 +12,7 @@ merge(config.features, {
 
 // Discovery reads feature state from ApplicationConfig; mirror the flags enabled above.
 export const ApplicationConfig = {
+	'authorization.allowOmittingSingleRegisteredRedirectUri': true,
 	'requestObjects.enabled': true,
 	'claimsParameter.enabled': true,
 	'deviceFlow.enabled': true
