@@ -21,7 +21,7 @@ import {
 	useGrantedResource,
 	getResourceServerInfo
 } from '../addon/resources.ts';
-import { findAccount, loadExistingGrant } from '../addon/account.ts';
+import { loadExistingGrant } from '../addon/account.ts';
 import {
 	sectorIdentifierUriValidate,
 	assertClaimsParameter,
@@ -326,13 +326,6 @@ function makeDefaults() {
 		interactions: {
 			policy: defaultPolicy()
 		},
-
-		/*
-		 * findAccount
-		 *
-		 * description: Function used to load an account and retrieve its available claims.
-		 */
-		findAccount,
 
 		/*
 		 * rotateRefreshToken

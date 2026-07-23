@@ -14,6 +14,28 @@ export class UserStore implements UserStoreInstance {
 		return this.users.get(_id) || null;
 	}
 
+	// Test/dev seed: insert or overwrite a user with a caller-chosen id. Unlike
+	// create(), it neither allocates an id nor enforces email uniqueness, so the
+	// test harness can make the DB-backed findAccount resolve a session's
+	// accountId. Not part of UserStoreInstance; only the in-memory store has it.
+	seed(user: { _id: string } & Partial<Omit<User, '_id'>>): User {
+		const now = new Date();
+		const full: User = {
+			_id: user._id,
+			email: user.email ?? `${user._id}@example.com`,
+			verified: user.verified ?? true,
+			password: user.password ?? 'seeded',
+			active: user.active ?? true,
+			roles: user.roles ?? [],
+			createdAt: user.createdAt ?? now,
+			updatedAt: user.updatedAt ?? now,
+			lastLoginAt: user.lastLoginAt ?? null,
+			claims: user.claims
+		};
+		this.users.set(full._id, full);
+		return full;
+	}
+
 	async findByEmail(email: string): Promise<User | null> {
 		for (const user of this.users.values()) {
 			if (user.email.toLowerCase() === email.toLowerCase()) {

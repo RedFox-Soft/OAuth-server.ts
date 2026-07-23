@@ -6,6 +6,7 @@ import {
 } from '../../helpers/errors.ts';
 import presence from '../../helpers/validate_presence.ts';
 import instance from '../../helpers/weak_cache.ts';
+import { findAccount } from '../../addon/account.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import revoke from '../../helpers/revoke.ts';
 import certificateThumbprint from '../../helpers/certificate_thumbprint.ts';
@@ -33,7 +34,6 @@ export const handler = async function refreshTokenHandler(oidc, dPoP) {
 	presence(oidc, 'refresh_token');
 
 	const {
-		findAccount,
 		conformIdTokenClaims,
 		rotateRefreshToken,
 		features: { userinfo, resourceIndicators, richAuthorizationRequests }

@@ -1,26 +1,43 @@
 import { Grant } from '../models/grant.js';
+import { getUserStore } from '../adapters/index.js';
+import { resolveBucketForClient } from '../admin/auth/resolveBucket.js';
 
-export async function findAccount(ctx, sub, _token) {
-	// @param ctx - koa request context
-	// @param sub {string} - account identifier (subject)
-	// @param token - is a reference to the token used for which a given account is being loaded,
-	//   is undefined in scenarios where claims are returned from authorization endpoint
-	// const user = await getUserStore().find(sub);
+export async function findAccount(ctx, sub, _token?) {
+	// @param ctx - koa request context. Arrives as the OIDC context directly
+	//   (authorization load_account) or wrapped as { oidc } (grants, userinfo);
+	//   normalize both so the client can be read the same way everywhere.
+	// @param sub {string} - account identifier (subject); equals the user record _id.
+	// @param token - reference to the token the account is being loaded for;
+	//   undefined at the authorization endpoint.
+	const oidc = ctx?.oidc ?? ctx;
+
+	// Resolve the user bucket exactly as login does (resolveBucketForClient):
+	// prefer the live client, falling back to the token's client for the
+	// token/userinfo flows where `oidc.client` may not be populated.
+	const clientId = oidc?.client?.clientId ?? _token?.payload?.clientId;
+	const bucketId = await resolveBucketForClient(clientId);
+	const user = await getUserStore(bucketId).find(sub);
+
+	// A missing or deactivated user resolves to nothing so the calling flow
+	// rejects it. Active-status is therefore enforced at every account
+	// resolution, not only at login (a user deactivated after login can no
+	// longer mint tokens via refresh/device/CIBA).
+	if (!user || !user.active) {
+		return undefined;
+	}
 
 	return {
 		accountId: sub,
-		// @param use {string} - can either be "id_token" or "userinfo", depending on
-		//   where the specific claims are intended to be put in
-		// @param scope {string} - the intended scope, while oidc-provider will mask
-		//   claims depending on the scope automatically you might want to skip
-		//   loading some claims from external resources or through db projection etc. based on this
-		//   detail or not return them in ID Tokens but only UserInfo and so on
-		// @param claims {object} - the part of the claims authorization parameter for either
-		//   "id_token" or "userinfo" (depends on the "use" param)
-		// @param rejected {Array[String]} - claim names that were rejected by the end-user, you might
-		//   want to skip loading some claims from external resources or through db projection
+		// @param use {string} - "id_token" or "userinfo"; the provider masks the
+		//   returned claims by granted scope automatically. Any extra claims stored
+		//   on the record (profile, distributed/aggregated) are merged in.
 		async claims(_use, _scope, _claims, _rejected) {
-			return { sub };
+			return {
+				sub,
+				email: user.email,
+				email_verified: user.verified,
+				...user.claims
+			};
 		}
 	};
 }

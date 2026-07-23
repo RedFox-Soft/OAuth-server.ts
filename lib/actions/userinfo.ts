@@ -1,6 +1,6 @@
 import { Elysia, t } from 'elysia';
 import certificateThumbprint from '../helpers/certificate_thumbprint.ts';
-import instance from '../helpers/weak_cache.ts';
+import { findAccount } from '../addon/account.js';
 import filterClaims from '../helpers/filter_claims.ts';
 import {
 	dpopValidate,
@@ -15,7 +15,6 @@ import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { Claims } from 'lib/helpers/claims.js';
 import { IdToken } from 'lib/models/id_token.js';
 import { Client } from 'lib/models/client.js';
-import { provider } from 'lib/provider.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Grant } from 'lib/models/grant.js';
 import { OAuthError, UserinfoResponse } from 'lib/shared/response_schemas.js';
@@ -78,7 +77,7 @@ async function userInfo({ headers, set }) {
 		error: new InvalidToken('associated client not found')
 	});
 
-	const account = await instance(provider).configuration.findAccount(
+	const account = await findAccount(
 		{ oidc },
 		accessToken.payload.accountId,
 		accessToken

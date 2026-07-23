@@ -10,6 +10,10 @@ export interface User {
 	createdAt: Date;
 	updatedAt: Date;
 	lastLoginAt: Date | null;
+	// Optional extra OIDC claims sourced with the account (e.g. profile claims
+	// like given_name, or distributed/aggregated `_claim_names`/`_claim_sources`).
+	// Merged into the account's claims() output; the provider masks by scope.
+	claims?: Record<string, unknown>;
 }
 
 export interface ModelAdapter<TPayload = unknown> {

@@ -15,6 +15,7 @@ import {
 import base64url from 'base64url';
 
 import bootstrap, { agent, getHeader, type Setup } from '../test_helper.js';
+import { getUserStore } from 'lib/adapters/index.js';
 import { provider } from 'lib/provider.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
@@ -279,7 +280,9 @@ describe('grant_type=refresh_token', () => {
 		});
 
 		it('validates account is still there', async function () {
-			spyOn(i(provider).configuration, 'findAccount').mockResolvedValue(null);
+			// Simulate the account having been removed since the token was issued:
+			// the DB-backed findAccount now resolves nothing for this subject.
+			await getUserStore('redfox').destroy(setup.getAccountId());
 
 			const spy = mock();
 			provider.on('grant.error', spy);

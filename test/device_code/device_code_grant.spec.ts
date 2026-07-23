@@ -9,7 +9,14 @@ import {
 } from 'bun:test';
 import base64url from 'base64url';
 
-import bootstrap, { agent, type Setup } from '../test_helper.js';
+import bootstrap, {
+	agent,
+	seedAccount,
+	setSeedClaims,
+	type Setup
+} from '../test_helper.js';
+import { fullProfileClaims } from '../models.js';
+import { getUserStore } from 'lib/adapters/index.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
 import { provider } from 'lib/provider.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
@@ -43,6 +50,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code w/ conformIdTo
 		setup = await bootstrap(import.meta.url, {
 			config: 'device_code_non_conform'
 		});
+		setSeedClaims(fullProfileClaims);
 		await setup.login({
 			scope: 'openid profile offline_access',
 			accountId: 'sub'
@@ -225,9 +233,9 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 		});
 
 		it('validates account is still there', async () => {
-			spyOn(instance(provider).configuration, 'findAccount').mockResolvedValue(
-				undefined
-			);
+			// Simulate the account having been removed since the code was issued:
+			// the DB-backed findAccount now resolves nothing for this subject.
+			await getUserStore('redfox').destroy(setup.getAccountId());
 
 			const spy = mock();
 			provider.once('grant.error', spy);
@@ -252,6 +260,10 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 				'device code invalid (referenced account not found)'
 			);
 			expect(error.value).toHaveProperty('error', 'invalid_grant');
+
+			// This describe logs in once (beforeAll); restore the account so later
+			// tests (e.g. 'consumes the code') still resolve it.
+			seedAccount(setup.getAccountId());
 		});
 
 		it('code belongs to client', async () => {

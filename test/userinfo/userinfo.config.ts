@@ -2,16 +2,9 @@ import getConfig from '../default.config.js';
 
 const config = getConfig();
 
-config.findAccount = (ctx, id) => {
-	if (id === 'notfound') return undefined;
-	return {
-		accountId: id,
-		claims() {
-			return { sub: id, email: 'foo@example.com', email_verified: false };
-		}
-	};
-};
-
+// findAccount is the built-in DB-backed resolver (no longer a config option).
+// login() seeds a user with an email, so `openid email` requests resolve email
+// claims; the 'notfound' test uses an unseeded subject, which resolves to nothing.
 config.claims = {
 	email: ['email', 'email_verified']
 };

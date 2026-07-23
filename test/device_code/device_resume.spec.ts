@@ -13,6 +13,7 @@ import nanoid from '../../lib/helpers/nanoid.ts';
 import bootstrap, {
 	agent,
 	passInteractionChecks,
+	seedAccount,
 	type Setup
 } from '../test_helper.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
@@ -154,6 +155,9 @@ describe('device interaction resume /ui/:uid/device_resume', () => {
 			it('processes a newly established session and binds the code', async () => {
 				spyOn(Grant.prototype, 'getOIDCScope').mockReturnValue('openid');
 				const accountId = nanoid();
+				// Resuming binds the code to this account; the DB-backed findAccount
+				// must resolve it, so preload it into the store.
+				seedAccount(accountId);
 				const cookie = await buildResume({
 					auth: { scope: 'openid' },
 					result: { login: { accountId } },

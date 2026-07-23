@@ -1,6 +1,7 @@
 import { InvalidRequest, UnknownUserId } from '../../helpers/errors.ts';
 import omitBy from '../../helpers/_/omit_by.ts';
 import instance from '../../helpers/weak_cache.ts';
+import { findAccount } from '../../addon/account.js';
 
 import checkIdTokenHint from './check_id_token_hint.ts';
 
@@ -35,7 +36,7 @@ export default async function cibaLoadAccount(oidc) {
 		);
 	}
 
-	const { findAccount, features } = instance(oidc.provider).configuration;
+	const { features } = instance(oidc.provider).configuration;
 	const { ciba } = features;
 
 	let accountId;

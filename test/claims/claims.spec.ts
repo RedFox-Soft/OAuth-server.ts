@@ -14,8 +14,10 @@ import { ApplicationConfig } from 'lib/configs/application.js';
 import bootstrap, {
 	agent,
 	jsonToFormUrlEncoded,
+	setSeedClaims,
 	type Setup
 } from '../test_helper.js';
+import { fullProfileClaims } from '../models.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { provider } from 'lib/provider.js';
 import { Client } from 'lib/models/client.js';
@@ -62,6 +64,7 @@ expire.setDate(expire.getDate() + 1);
 
 		beforeAll(async function () {
 			setup = await bootstrap(import.meta.url);
+			setSeedClaims(fullProfileClaims);
 		});
 
 		it('specify id_token should return individual claims requested', async function () {

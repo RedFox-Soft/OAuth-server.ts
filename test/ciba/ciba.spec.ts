@@ -12,7 +12,11 @@ import { once } from 'node:events';
 import { generateKeyPair, SignJWT, exportJWK } from 'jose';
 
 import { AccessDenied } from '../../lib/helpers/errors.ts';
-import bootstrap, { agent, jsonToFormUrlEncoded } from '../test_helper.js';
+import bootstrap, {
+	agent,
+	jsonToFormUrlEncoded,
+	seedAccount
+} from '../test_helper.js';
 
 import { emitter } from './ciba.config.js';
 import { provider } from 'lib/provider.js';
@@ -32,6 +36,10 @@ describe('features.ciba', () => {
 	describe('w/o request objects', () => {
 		beforeAll(async () => {
 			await bootstrap(import.meta.url);
+			// CIBA resolves the account from login_hint/id_token_hint (no login()
+			// call), so preload the ids these tests use. 'notfound' is left unseeded.
+			seedAccount('accountId');
+			seedAccount('accountId-2');
 		});
 
 		afterEach(() => {
@@ -630,6 +638,8 @@ describe('features.ciba', () => {
 	describe('with request objects', () => {
 		beforeAll(async () => {
 			await bootstrap(import.meta.url, { config: 'ciba_jar' });
+			seedAccount('accountId');
+			seedAccount('accountId-2');
 		});
 
 		afterEach(() => {

@@ -1,7 +1,10 @@
-import i from 'lib/helpers/weak_cache.js';
 import { describe, it, beforeAll, expect } from 'bun:test';
-import bootstrap, { agent, getHeader, type Setup } from '../test_helper.js';
-import { provider } from 'lib/provider.js';
+import bootstrap, {
+	agent,
+	getHeader,
+	setSeedClaims,
+	type Setup
+} from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
 describe('distributed and aggregated claims', () => {
@@ -9,26 +12,22 @@ describe('distributed and aggregated claims', () => {
 	beforeAll(async function () {
 		setup = await bootstrap(import.meta.url);
 
-		i(provider).configuration.findAccount = async (ctx, id) => ({
-			accountId: id,
-			claims() {
-				return {
-					sub: id,
-					nickname: 'foobar',
-					_claim_names: {
-						given_name: 'src1',
-						family_name: 'src2',
-						email: 'notused'
-					},
-					_claim_sources: {
-						src1: {
-							endpoint: 'https://op.example.com/me',
-							access_token: 'distributed'
-						},
-						src2: { JWT: 'foo.bar.baz' },
-						notused: { JWT: 'foo.bar.baz' }
-					}
-				};
+		// Distributed/aggregated claims are seeded onto the account instead of
+		// injected via a findAccount override; the DB-backed resolver returns them.
+		setSeedClaims({
+			nickname: 'foobar',
+			_claim_names: {
+				given_name: 'src1',
+				family_name: 'src2',
+				email: 'notused'
+			},
+			_claim_sources: {
+				src1: {
+					endpoint: 'https://op.example.com/me',
+					access_token: 'distributed'
+				},
+				src2: { JWT: 'foo.bar.baz' },
+				notused: { JWT: 'foo.bar.baz' }
 			}
 		});
 	});

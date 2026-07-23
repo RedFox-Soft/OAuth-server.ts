@@ -8,6 +8,8 @@ export const ApplicationConfig = {
 
 config.acrValues = ['0', '1', '2'];
 config.pairwiseIdentifier = (sub) => `${sub}-pairwise`;
+// This suite asserts scope/claims-parameter masking over a FULL OIDC profile;
+// the spec seeds those claims onto the account via setSeedClaims(fullProfileClaims).
 
 export default {
 	config,

@@ -16,6 +16,7 @@ import { provider } from 'lib/provider.js';
 import { Client } from 'lib/models/client.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
 import bootstrap, { agent, type Setup } from '../test_helper.js';
+import { getUserStore } from 'lib/adapters/index.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { TestAdapter } from 'test/models.js';
@@ -268,9 +269,9 @@ describe('grant_type=authorization_code', () => {
 		});
 
 		it('validates account is still there', async function () {
-			spyOn(i(provider).configuration, 'findAccount').mockResolvedValue(
-				undefined
-			);
+			// Simulate the account having been removed since the code was issued:
+			// the DB-backed findAccount now resolves nothing for this subject.
+			await getUserStore('redfox').destroy(setup.getAccountId());
 
 			const spy = mock();
 			provider.on('grant.error', spy);
@@ -547,9 +548,9 @@ describe('grant_type=authorization_code', () => {
 		});
 
 		it('validates account is still there', async function () {
-			spyOn(i(provider).configuration, 'findAccount').mockResolvedValue(
-				undefined
-			);
+			// Simulate the account having been removed since the code was issued:
+			// the DB-backed findAccount now resolves nothing for this subject.
+			await getUserStore('redfox').destroy(setup.getAccountId());
 
 			const spy = mock();
 			provider.on('grant.error', spy);

@@ -3,6 +3,7 @@ import camelCase from '../../helpers/_/camel_case.ts';
 import * as errors from '../../helpers/errors.ts';
 import presence from '../../helpers/validate_presence.ts';
 import instance from '../../helpers/weak_cache.ts';
+import { findAccount } from '../../addon/account.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import filterClaims from '../../helpers/filter_claims.ts';
 import revoke from '../../helpers/revoke.ts';
@@ -28,7 +29,6 @@ export const handler = async function cibaHandler(oidc, dPoP) {
 	}
 
 	const {
-		findAccount,
 		issueRefreshToken,
 		conformIdTokenClaims,
 		features: { userinfo, resourceIndicators }

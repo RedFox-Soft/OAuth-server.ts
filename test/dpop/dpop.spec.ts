@@ -23,7 +23,8 @@ import epochTime from '../../lib/helpers/epoch_time.ts';
 import bootstrap, {
 	agent,
 	getHeader,
-	jsonToFormUrlEncoded
+	jsonToFormUrlEncoded,
+	seedAccount
 } from '../test_helper.js';
 import * as base64url from '../../lib/helpers/base64url.ts';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
@@ -72,6 +73,8 @@ async function DPoP(
 
 describe('features.dPoP', async () => {
 	const setup = await bootstrap(import.meta.url);
+	// The CIBA grant tests resolve login_hint 'accountId' without login().
+	seedAccount('accountId');
 	const cookie = await setup.login({ scope: 'openid offline_access' });
 	const keypair = await generateKeyPair('ES256', { extractable: true });
 	const jwk = await exportJWK(keypair.publicKey);

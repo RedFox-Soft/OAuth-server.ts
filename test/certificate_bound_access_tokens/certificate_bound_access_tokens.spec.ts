@@ -16,6 +16,7 @@ import bootstrap, {
 	agent,
 	getHeader,
 	jsonToFormUrlEncoded,
+	seedAccount,
 	type Setup
 } from '../test_helper.js';
 import { provider } from 'lib/provider.js';
@@ -35,6 +36,8 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 	let setup: Setup;
 	beforeAll(async function () {
 		setup = await bootstrap(import.meta.url);
+		// The CIBA grant tests resolve login_hint 'accountId' without login().
+		seedAccount('accountId');
 		await setup.login();
 	});
 	afterEach(function () {

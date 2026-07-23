@@ -10,7 +10,13 @@ import {
 	mock
 } from 'bun:test';
 
-import bootstrap, { agent, getHeader, type Setup } from '../test_helper.js';
+import bootstrap, {
+	agent,
+	getHeader,
+	setSeedClaims,
+	type Setup
+} from '../test_helper.js';
+import { fullProfileClaims } from '../models.js';
 import { decode as decodeJWT } from '../../lib/helpers/jwt.ts';
 import { provider } from 'lib/provider.js';
 import { Client } from 'lib/models/client.js';
@@ -24,6 +30,7 @@ describe('configuration conformIdTokenClaims=true', () => {
 	let cookie = null;
 	beforeAll(async () => {
 		setup = await bootstrap(import.meta.url, { config: 'conform' });
+		setSeedClaims(fullProfileClaims);
 		spyOn(OIDCContext.prototype, 'promptPending').mockReturnValue(false);
 		cookie = await setup.login({
 			scope,

@@ -4,6 +4,8 @@ const config = getConfig();
 
 config.extraTokenClaims = () => ({ foo: 'bar' });
 config.pairwiseIdentifier = () => 'pairwise-sub';
+// Asserts scope-requested profile claims (gender, email, …); the spec seeds them
+// onto the account via setSeedClaims(fullProfileClaims).
 
 export const ApplicationConfig = {
 	'claimsParameter.enabled': true,

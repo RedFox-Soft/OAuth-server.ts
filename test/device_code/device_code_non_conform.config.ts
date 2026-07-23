@@ -5,6 +5,8 @@ import config, { ApplicationConfig } from './device_code.config.js';
 const setup = cloneDeep(config);
 
 setup.config.conformIdTokenClaims = false;
+// conformIdTokenClaims=false puts scope-derived profile claims (given_name, …)
+// into the id_token; the spec seeds them via setSeedClaims(fullProfileClaims).
 
 // Re-export the base feature flags (deviceFlow.enabled, etc.) — the harness reads the
 // ApplicationConfig named export per config module, so without this the flags revert to

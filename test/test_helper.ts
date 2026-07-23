@@ -11,9 +11,18 @@ import nanoid from '../lib/helpers/nanoid.js';
 import epochTime from '../lib/helpers/epoch_time.js';
 import { provider, elysia } from '../lib/index.ts';
 import instance from '../lib/helpers/weak_cache.ts';
+import { getUserStore } from '../lib/adapters/index.ts';
+import type { User } from '../lib/adapters/types.ts';
 
-import { Account, TestAdapter } from './models.js';
+import { TestAdapter } from './models.js';
 import { AuthorizationRequest } from './AuthorizationRequest.js';
+
+// In test mode getUserStore() returns the in-memory UserStore, which exposes a
+// test-only `seed()` (see lib/adapters/memory/userStore.ts). The mongo store is
+// never constructed under NODE_ENV=test, so this cast is always sound here.
+type SeedableUserStore = ReturnType<typeof getUserStore> & {
+	seed(user: { _id: string } & Partial<Omit<User, '_id'>>): User;
+};
 
 import { ApplicationConfig } from '../lib/configs/application.js';
 import { ClientDefaults } from 'lib/configs/clientBase.js';
@@ -87,6 +96,30 @@ export function getHeader(response: Response, name: string): string {
 	return value;
 }
 
+// Preload a user into the in-memory store so the DB-backed findAccount resolves
+// `accountId`. Use in specs whose flow loads an account without going through
+// login() (e.g. CIBA login_hint, device_resume). Defaults: active + verified.
+export function seedAccount(
+	accountId: string,
+	overrides: Partial<Omit<User, '_id'>> = {},
+	bucket = 'redfox'
+): User {
+	return (getUserStore(bucket) as unknown as SeedableUserStore).seed({
+		_id: accountId,
+		active: true,
+		verified: true,
+		...overrides
+	});
+}
+
+// Extra OIDC claims that login()'s seeded user carries for the current spec.
+// Conformance suites that assert full-profile or distributed-claim masking call
+// setSeedClaims(...) in beforeAll (after bootstrap, which resets it to none).
+let seedClaims: Record<string, unknown> | undefined;
+export function setSeedClaims(claims: Record<string, unknown> | undefined) {
+	seedClaims = claims;
+}
+
 export function jsonToFormUrlEncoded(json: Record<string, unknown>) {
 	const searchParams = new URLSearchParams();
 	for (const [key, value] of Object.entries(json)) {
@@ -122,13 +155,12 @@ async function bootstrap(
 	}
 	AuthorizationRequest.clients = clients;
 
-	if (!config.findAccount) {
-		config.findAccount = Account.findAccount;
-	}
-
 	Object.assign(ApplicationConfig, applicationDefaultSettings, app || {});
 	Object.assign(ClientDefaults, clientDefaultSettings, clientSettings || {});
 	TestAdapter.clear();
+	// Each spec file starts with no extra seeded claims; claim-conformance specs
+	// opt in via setSeedClaims() after this bootstrap call.
+	seedClaims = undefined;
 
 	provider.init({
 		clients,
@@ -207,11 +239,13 @@ async function bootstrap(
 			};
 		}
 
-		return Account.findAccount({}, accountId)
-			.then(session.save(ttl.Session))
-			.then(() => {
-				return sessionCookie;
-			});
+		// Seed a user so the DB-backed findAccount resolves this session's accountId
+		// (the resolver reads getUserStore(bucket).find(sub)). Conformance clients
+		// resolve to the default 'redfox' bucket via resolveBucketForClient. Any
+		// spec-scoped extra claims (setSeedClaims) ride along on the record.
+		seedAccount(accountId, seedClaims ? { claims: seedClaims } : {});
+		await session.save(ttl.Session);
+		return sessionCookie;
 	}
 
 	function getLastSession() {
