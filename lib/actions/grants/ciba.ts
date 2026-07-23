@@ -102,11 +102,7 @@ export const handler = async function cibaHandler(oidc, dPoP) {
 	oidc.entity('BackchannelAuthenticationRequest', request);
 	oidc.entity('Grant', grant);
 
-	const account = await findAccount(
-		{ oidc },
-		request.payload.accountId,
-		request
-	);
+	const account = await findAccount(oidc, request.payload.accountId, request);
 
 	if (!account) {
 		throw new InvalidGrant(

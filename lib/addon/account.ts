@@ -2,14 +2,11 @@ import { Grant } from '../models/grant.js';
 import { getUserStore } from '../adapters/index.js';
 import { resolveBucketForClient } from '../admin/auth/resolveBucket.js';
 
-export async function findAccount(ctx, sub, _token?) {
-	// @param ctx - koa request context. Arrives as the OIDC context directly
-	//   (authorization load_account) or wrapped as { oidc } (grants, userinfo);
-	//   normalize both so the client can be read the same way everywhere.
+export async function findAccount(oidc, sub, _token?) {
+	// @param oidc - the OIDC context (ctx.oidc) for the current request.
 	// @param sub {string} - account identifier (subject); equals the user record _id.
 	// @param token - reference to the token the account is being loaded for;
 	//   undefined at the authorization endpoint.
-	const oidc = ctx?.oidc ?? ctx;
 
 	// Resolve the user bucket exactly as login does (resolveBucketForClient):
 	// prefer the live client, falling back to the token's client for the

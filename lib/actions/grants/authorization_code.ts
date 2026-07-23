@@ -100,7 +100,7 @@ export const handler = async function authorizationCodeHandler(oidc, dPoP) {
 	oidc.entity('AuthorizationCode', code);
 	oidc.entity('Grant', grant);
 
-	const account = await findAccount({ oidc }, code.payload.accountId, code);
+	const account = await findAccount(oidc, code.payload.accountId, code);
 
 	if (!account) {
 		throw new InvalidGrant(

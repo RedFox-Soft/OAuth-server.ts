@@ -115,7 +115,7 @@ export const handler = async function refreshTokenHandler(oidc, dPoP) {
 	oidc.entity('Grant', grant);
 
 	const account = await findAccount(
-		{ oidc },
+		oidc,
 		refreshToken.payload.accountId,
 		refreshToken
 	);

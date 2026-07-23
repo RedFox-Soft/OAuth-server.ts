@@ -78,7 +78,7 @@ async function userInfo({ headers, set }) {
 	});
 
 	const account = await findAccount(
-		{ oidc },
+		oidc,
 		accessToken.payload.accountId,
 		accessToken
 	);

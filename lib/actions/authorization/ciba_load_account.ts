@@ -59,7 +59,7 @@ export default async function cibaLoadAccount(oidc) {
 	if (!accountId) {
 		throw new UnknownUserId('could not identify end-user');
 	}
-	const account = await findAccount({ oidc }, accountId);
+	const account = await findAccount(oidc, accountId);
 	if (!account) {
 		throw new UnknownUserId('could not identify end-user');
 	}
