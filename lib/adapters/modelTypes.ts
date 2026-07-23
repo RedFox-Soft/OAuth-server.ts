@@ -11,6 +11,10 @@ import type { RefreshTokenPayload } from '../models/refresh_token.js';
 import type { RegistrationAccessTokenPayloadType } from '../models/registration_access_token.js';
 import type { ReplayDetectionPayloadType } from '../models/replay_detection.js';
 import type { SessionPayloadType } from '../models/session.js';
+import type {
+	VerificationChallengePayload,
+	VerificationResendPayload
+} from '../verification/types.js';
 
 export type { AccessTokenPayloadType } from '../models/access_token.js';
 export type { AuthorizationCodePayloadType } from '../models/authorization_code.js';
@@ -43,6 +47,8 @@ export interface ModelPayloadByName {
 	RegistrationAccessToken: RegistrationAccessTokenPayloadType;
 	ReplayDetection: ReplayDetectionPayloadType;
 	Session: SessionPayloadType;
+	VerificationChallenge: VerificationChallengePayload;
+	VerificationResend: VerificationResendPayload;
 }
 
 export type KnownModelName = keyof ModelPayloadByName;

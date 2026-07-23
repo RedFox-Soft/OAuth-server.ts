@@ -62,6 +62,23 @@ trail** (`adminAuditStore`, collection `adminAudit`, via `lib/admin/audit/record
 before the mutation) capturing actor, action, target, and timestamp; the store exposes no
 update/delete so entries cannot be altered.
 
+End-user onboarding is bucket-scoped. Each `UserBucket` carries `registrationOpen`,
+`emailVerificationRequired`, and `verificationMethod` (`'link' | 'code'`); defaults are open +
+verification-off, except the reserved admin bucket which seeds `registrationOpen: false` (set in
+**both** `lib/admin/seed.ts` and `database/mongodb.ts`). `POST ui/:uid/registration` resolves the
+bucket from the interaction's client (`resolveBucketForClient`), rejects when registration is
+closed, and — when verification is required — creates the user unverified and issues a challenge;
+`POST ui/:uid/login` refuses an unverified user in such a bucket. Email verification lives in
+`lib/verification/` (challenge issue/verify/resend over `adapter('VerificationChallenge')` +
+`adapter('VerificationResend')` with TTLs; link tokens are single-use, codes are 6 digits hashed
+at rest with an attempt cap, resends are cooldown + daily-capped) and `lib/mail/` (Nodemailer
+transport read live from a runtime `SmtpSettingsStore`, plus the standard template; under
+`NODE_ENV=test` the transport captures messages in memory instead of sending). The public,
+cookie-less verification endpoints (`GET /verify-email`, `GET|POST /verify-email/code`,
+`POST /verify-email/resend`) are a standalone group in `lib/routes/verification.ts`. SMTP transport
+is a super-admin runtime setting (`/admin/api/settings/smtp`, password write-only/masked, audited)
+— deliberately **not** in the boot-only `ApplicationConfig`, so changes apply without a restart.
+
 The test suite loads `.env.test` automatically via Bun.
 
 ---

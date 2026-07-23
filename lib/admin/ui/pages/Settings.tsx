@@ -44,6 +44,136 @@ function enabledDetailGroups(
 	});
 }
 
+interface SmtpView {
+	host: string;
+	port: number;
+	secure: boolean;
+	username: string;
+	password: string;
+	fromName: string;
+	fromEmail: string;
+	configured: boolean;
+}
+
+// Runtime SMTP transport used for verification emails. Separate from the boot-only
+// feature settings above: changes take effect immediately (no restart). The password is
+// write-only — the API returns a mask and accepts the mask back to mean "unchanged".
+function SmtpSettingsCard() {
+	const [form] = Form.useForm<SmtpView>();
+	const [loading, setLoading] = useState(true);
+	const [saving, setSaving] = useState(false);
+
+	async function load() {
+		setLoading(true);
+		try {
+			const res = await fetch('/admin/api/settings/smtp');
+			if (res.ok) form.setFieldsValue((await res.json()) as SmtpView);
+		} finally {
+			setLoading(false);
+		}
+	}
+	useEffect(() => {
+		load();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
+
+	async function save(values: SmtpView) {
+		setSaving(true);
+		try {
+			const res = await fetch('/admin/api/settings/smtp', {
+				method: 'PUT',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify(values)
+			});
+			const body = (await res.json().catch(() => null)) as
+				(SmtpView & { message?: string }) | null;
+			if (!res.ok) {
+				message.error(body?.message || 'failed to save SMTP settings');
+				return;
+			}
+			if (body) form.setFieldsValue(body);
+			message.success('SMTP settings saved');
+		} finally {
+			setSaving(false);
+		}
+	}
+
+	return (
+		<Card
+			title="Email (SMTP)"
+			size="small"
+			style={{ marginBottom: 16 }}
+			loading={loading}
+			extra={
+				<Button
+					type="primary"
+					loading={saving}
+					onClick={() => form.submit()}
+				>
+					Save
+				</Button>
+			}
+		>
+			<Form<SmtpView>
+				form={form}
+				layout="vertical"
+				onFinish={save}
+			>
+				<Form.Item
+					name="host"
+					label="Host"
+					rules={[{ required: true }]}
+				>
+					<Input placeholder="smtp.example.com" />
+				</Form.Item>
+				<Form.Item
+					name="port"
+					label="Port"
+					rules={[{ required: true }]}
+				>
+					<Input
+						type="number"
+						placeholder="587"
+					/>
+				</Form.Item>
+				<Form.Item
+					name="secure"
+					label="Use TLS on connect"
+					valuePropName="checked"
+				>
+					<Switch />
+				</Form.Item>
+				<Form.Item
+					name="username"
+					label="Username"
+				>
+					<Input autoComplete="off" />
+				</Form.Item>
+				<Form.Item
+					name="password"
+					label="Password"
+					help="Leave the masked value to keep the stored password."
+				>
+					<Input.Password autoComplete="new-password" />
+				</Form.Item>
+				<Form.Item
+					name="fromName"
+					label="Sender name"
+				>
+					<Input placeholder="Example" />
+				</Form.Item>
+				<Form.Item
+					name="fromEmail"
+					label="Sender email"
+					rules={[{ required: true, type: 'email' }]}
+				>
+					<Input placeholder="no-reply@example.com" />
+				</Form.Item>
+			</Form>
+		</Card>
+	);
+}
+
 export function Settings() {
 	const [catalog, setCatalog] = useState<Descriptor[]>([]);
 	const [values, setValues] = useState<Record<string, unknown>>({});
@@ -315,6 +445,8 @@ export function Settings() {
 					<Form layout="vertical">{items.map(field)}</Form>
 				</Card>
 			))}
+
+			<SmtpSettingsCard />
 		</>
 	);
 }

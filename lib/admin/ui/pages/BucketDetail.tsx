@@ -45,7 +45,13 @@ export function BucketDetail({
 	const [createForm] = Form.useForm<CreateValues>();
 	const [editForm] = Form.useForm<{ roles?: string[]; active: boolean }>();
 	const [pwForm] = Form.useForm<{ password: string }>();
-	const [bucketForm] = Form.useForm<{ name: string; roles?: string[] }>();
+	const [bucketForm] = Form.useForm<{
+		name: string;
+		roles?: string[];
+		registrationOpen?: boolean;
+		emailVerificationRequired?: boolean;
+		verificationMethod?: 'link' | 'code';
+	}>();
 
 	const roleOptions = (bucket?.roles ?? []).map((r) => ({
 		label: r,
@@ -131,7 +137,13 @@ export function BucketDetail({
 		await load();
 	}
 
-	async function onSaveBucket(values: { name: string; roles?: string[] }) {
+	async function onSaveBucket(values: {
+		name: string;
+		roles?: string[];
+		registrationOpen?: boolean;
+		emailVerificationRequired?: boolean;
+		verificationMethod?: 'link' | 'code';
+	}) {
 		const res = await fetch(base, {
 			method: 'PATCH',
 			headers: { 'content-type': 'application/json' },
@@ -171,7 +183,11 @@ export function BucketDetail({
 						onClick={() => {
 							bucketForm.setFieldsValue({
 								name: bucket?.name ?? '',
-								roles: bucket?.roles ?? []
+								roles: bucket?.roles ?? [],
+								registrationOpen: bucket?.registrationOpen ?? true,
+								emailVerificationRequired:
+									bucket?.emailVerificationRequired ?? false,
+								verificationMethod: bucket?.verificationMethod ?? 'link'
 							});
 							setBucketEditOpen(true);
 						}}
@@ -374,6 +390,34 @@ export function BucketDetail({
 						<Select
 							mode="tags"
 							placeholder="add role names"
+						/>
+					</Form.Item>
+					<Form.Item
+						name="registrationOpen"
+						label="Self-service registration open"
+						valuePropName="checked"
+						tooltip="Allow visitors to register accounts in this bucket"
+					>
+						<Switch />
+					</Form.Item>
+					<Form.Item
+						name="emailVerificationRequired"
+						label="Require email verification"
+						valuePropName="checked"
+						tooltip="New accounts must confirm their email before they can sign in"
+					>
+						<Switch />
+					</Form.Item>
+					<Form.Item
+						name="verificationMethod"
+						label="Verification method"
+						tooltip="How new registrants confirm their email"
+					>
+						<Select
+							options={[
+								{ label: 'Email link', value: 'link' },
+								{ label: '6-digit code', value: 'code' }
+							]}
 						/>
 					</Form.Item>
 				</Form>

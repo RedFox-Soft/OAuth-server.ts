@@ -54,7 +54,7 @@ export class UserStore implements UserStoreInstance {
 
 	async update(
 		_id: string,
-		patch: Partial<Pick<User, 'roles' | 'active' | 'password'>>
+		patch: Partial<Pick<User, 'roles' | 'active' | 'password' | 'verified'>>
 	): Promise<User | null> {
 		const user = this.users.get(_id);
 		if (!user) return null;

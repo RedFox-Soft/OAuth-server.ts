@@ -2,6 +2,18 @@ import { db } from './db.js';
 import type { UserBucket, UserBucketStoreInstance } from '../types.js';
 import nanoid from '../../helpers/nanoid.js';
 
+// Buckets created before the verification settings existed have no stored values;
+// project the safe defaults on read so callers always see the full shape.
+function withDefaults(bucket: UserBucket | null): UserBucket | null {
+	if (!bucket) return null;
+	return {
+		...bucket,
+		registrationOpen: bucket.registrationOpen ?? true,
+		emailVerificationRequired: bucket.emailVerificationRequired ?? false,
+		verificationMethod: bucket.verificationMethod ?? 'link'
+	};
+}
+
 export class UserBucketStore implements UserBucketStoreInstance {
 	private collection = db.collection<UserBucket>('userBuckets');
 
@@ -11,6 +23,9 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		managedBy?: string[];
 		roles?: string[];
 		authMethods?: string[];
+		registrationOpen?: boolean;
+		emailVerificationRequired?: boolean;
+		verificationMethod?: UserBucket['verificationMethod'];
 	}): Promise<UserBucket> {
 		const now = new Date();
 		const bucket: UserBucket = {
@@ -19,6 +34,9 @@ export class UserBucketStore implements UserBucketStoreInstance {
 			managedBy: data.managedBy ?? [],
 			roles: data.roles ?? [],
 			authMethods: data.authMethods ?? ['password'],
+			registrationOpen: data.registrationOpen ?? true,
+			emailVerificationRequired: data.emailVerificationRequired ?? false,
+			verificationMethod: data.verificationMethod ?? 'link',
 			createdAt: now,
 			updatedAt: now
 		};
@@ -27,27 +45,42 @@ export class UserBucketStore implements UserBucketStoreInstance {
 	}
 
 	async find(id: string): Promise<UserBucket | null> {
-		return this.collection.findOne({ _id: id });
+		return withDefaults(await this.collection.findOne({ _id: id }));
 	}
 
 	async list(): Promise<UserBucket[]> {
-		return this.collection.find().toArray();
+		return (await this.collection.find().toArray()).map(
+			(b) => withDefaults(b) as UserBucket
+		);
 	}
 
 	async listByManager(userId: string): Promise<UserBucket[]> {
-		return this.collection.find({ managedBy: userId }).toArray();
+		return (await this.collection.find({ managedBy: userId }).toArray()).map(
+			(b) => withDefaults(b) as UserBucket
+		);
 	}
 
 	async update(
 		id: string,
 		patch: Partial<
-			Pick<UserBucket, 'name' | 'managedBy' | 'roles' | 'authMethods'>
+			Pick<
+				UserBucket,
+				| 'name'
+				| 'managedBy'
+				| 'roles'
+				| 'authMethods'
+				| 'registrationOpen'
+				| 'emailVerificationRequired'
+				| 'verificationMethod'
+			>
 		>
 	): Promise<UserBucket | null> {
-		return this.collection.findOneAndUpdate(
-			{ _id: id },
-			{ $set: { ...patch, updatedAt: new Date() } },
-			{ returnDocument: 'after' }
+		return withDefaults(
+			await this.collection.findOneAndUpdate(
+				{ _id: id },
+				{ $set: { ...patch, updatedAt: new Date() } },
+				{ returnDocument: 'after' }
+			)
 		);
 	}
 

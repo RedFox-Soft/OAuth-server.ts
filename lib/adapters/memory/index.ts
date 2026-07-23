@@ -7,3 +7,4 @@ export { ProjectStore } from './projectStore.js';
 export { UserBucketStore } from './userBucketStore.js';
 export { AdminSessionStore } from './adminSessionStore.js';
 export { AdminAuditStore } from './adminAuditStore.js';
+export { SmtpSettingsStore } from './smtpSettingsStore.js';

@@ -15,7 +15,9 @@ export async function ensureAdminSeed(): Promise<void> {
 			name: 'Administrators',
 			managedBy: [],
 			roles: ['super_admin', 'project_admin'],
-			authMethods: ['password']
+			authMethods: ['password'],
+			// the reserved admin bucket never accepts self-service registration
+			registrationOpen: false
 		});
 	}
 

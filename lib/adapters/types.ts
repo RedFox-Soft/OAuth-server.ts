@@ -37,6 +37,29 @@ export interface AdapterConfigStore {
 	set(config: Record<string, unknown>): Promise<void>;
 }
 
+export interface SmtpSettings {
+	host: string;
+	port: number;
+	secure: boolean;
+	username: string;
+	// Stored as provided; never returned to clients (masked) and never logged.
+	password: string;
+	fromName: string;
+	fromEmail: string;
+}
+
+// Runtime, super-admin-editable SMTP transport config. Read live by the mailer on
+// every send so changes take effect without a provider restart (kept out of the
+// boot-only ApplicationConfig for that reason).
+export interface SmtpSettingsStoreInstance {
+	get(): Promise<SmtpSettings | null>;
+	set(settings: SmtpSettings): Promise<void>;
+}
+
+export interface SmtpSettingsStoreConstructor {
+	new (): SmtpSettingsStoreInstance;
+}
+
 export interface UserStoreInstance {
 	find(id: string): Promise<User | null>;
 	findByEmail(email: string): Promise<User | null>;
@@ -49,7 +72,7 @@ export interface UserStoreInstance {
 	list(): Promise<User[]>;
 	update(
 		id: string,
-		patch: Partial<Pick<User, 'roles' | 'active' | 'password'>>
+		patch: Partial<Pick<User, 'roles' | 'active' | 'password' | 'verified'>>
 	): Promise<User | null>;
 	destroy(id: string): Promise<void>;
 }
@@ -137,12 +160,22 @@ export interface ProjectStoreConstructor {
 	new (): ProjectStoreInstance;
 }
 
+export type VerificationMethod = 'link' | 'code';
+
 export interface UserBucket {
 	_id: string;
 	name: string;
 	managedBy: string[];
 	roles: string[];
 	authMethods: string[];
+	// Whether self-service registration is accepted for this bucket. The reserved
+	// admin bucket seeds this false; every other bucket defaults true.
+	registrationOpen: boolean;
+	// Whether a newly registered account must verify its email before it counts as
+	// verified (and, when required, before it can sign in).
+	emailVerificationRequired: boolean;
+	// Which proof the registrant uses when verification is required.
+	verificationMethod: VerificationMethod;
 	createdAt: Date;
 	updatedAt: Date;
 }
@@ -154,6 +187,9 @@ export interface UserBucketStoreInstance {
 		managedBy?: string[];
 		roles?: string[];
 		authMethods?: string[];
+		registrationOpen?: boolean;
+		emailVerificationRequired?: boolean;
+		verificationMethod?: VerificationMethod;
 	}): Promise<UserBucket>;
 	find(id: string): Promise<UserBucket | null>;
 	list(): Promise<UserBucket[]>;
@@ -161,7 +197,16 @@ export interface UserBucketStoreInstance {
 	update(
 		id: string,
 		patch: Partial<
-			Pick<UserBucket, 'name' | 'managedBy' | 'roles' | 'authMethods'>
+			Pick<
+				UserBucket,
+				| 'name'
+				| 'managedBy'
+				| 'roles'
+				| 'authMethods'
+				| 'registrationOpen'
+				| 'emailVerificationRequired'
+				| 'verificationMethod'
+			>
 		>
 	): Promise<UserBucket | null>;
 	destroy(id: string): Promise<void>;

@@ -10,6 +10,9 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		managedBy?: string[];
 		roles?: string[];
 		authMethods?: string[];
+		registrationOpen?: boolean;
+		emailVerificationRequired?: boolean;
+		verificationMethod?: UserBucket['verificationMethod'];
 	}): Promise<UserBucket> {
 		const now = new Date();
 		const bucket: UserBucket = {
@@ -18,6 +21,9 @@ export class UserBucketStore implements UserBucketStoreInstance {
 			managedBy: data.managedBy ?? [],
 			roles: data.roles ?? [],
 			authMethods: data.authMethods ?? ['password'],
+			registrationOpen: data.registrationOpen ?? true,
+			emailVerificationRequired: data.emailVerificationRequired ?? false,
+			verificationMethod: data.verificationMethod ?? 'link',
 			createdAt: now,
 			updatedAt: now
 		};
@@ -42,7 +48,16 @@ export class UserBucketStore implements UserBucketStoreInstance {
 	async update(
 		id: string,
 		patch: Partial<
-			Pick<UserBucket, 'name' | 'managedBy' | 'roles' | 'authMethods'>
+			Pick<
+				UserBucket,
+				| 'name'
+				| 'managedBy'
+				| 'roles'
+				| 'authMethods'
+				| 'registrationOpen'
+				| 'emailVerificationRequired'
+				| 'verificationMethod'
+			>
 		>
 	): Promise<UserBucket | null> {
 		const b = this.buckets.get(id);

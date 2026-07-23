@@ -9,6 +9,7 @@ import {
 	type AdminContext
 } from '../auth/rbac.js';
 import { ADMIN_BUCKET_ID } from '../consts.js';
+import { recordAdminAudit } from '../audit/record.js';
 import { loadBucketForUsers, loadBucketForEdit } from './access.js';
 import { CreateBucketBody, UpdateBucketBody } from './schema.js';
 
@@ -36,7 +37,10 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			const bucket = await getBucketStore().create({
 				name: body.name,
 				roles: body.roles ?? [],
-				managedBy: body.managedBy ?? [ctx.userId]
+				managedBy: body.managedBy ?? [ctx.userId],
+				registrationOpen: body.registrationOpen,
+				emailVerificationRequired: body.emailVerificationRequired,
+				verificationMethod: body.verificationMethod
 			});
 			set.status = 201;
 			return bucket;
@@ -54,6 +58,20 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			await loadBucketForEdit(ctx, params.id);
 			if (body.managedBy !== undefined) {
 				assertRole(ctx, 'super_admin');
+			}
+			// Audit-first: a registration/verification policy change is a state-changing
+			// admin action and must be recorded before it is applied.
+			const changesSettings =
+				body.registrationOpen !== undefined ||
+				body.emailVerificationRequired !== undefined ||
+				body.verificationMethod !== undefined;
+			if (changesSettings) {
+				await recordAdminAudit(
+					ctx,
+					'bucket.settings.update',
+					'UserBucket',
+					params.id
+				);
 			}
 			const updated = await getBucketStore().update(params.id, body);
 			if (!updated) throw new AdminError(404, 'bucket not found');

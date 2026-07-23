@@ -118,6 +118,10 @@ await db.collection('userBuckets').updateOne(
 			managedBy: [],
 			roles: ['super_admin', 'project_admin'],
 			authMethods: ['password'],
+			// the reserved admin bucket never accepts self-service registration
+			registrationOpen: false,
+			emailVerificationRequired: false,
+			verificationMethod: 'link',
 			createdAt: seedNow,
 			updatedAt: seedNow
 		}
@@ -136,6 +140,9 @@ await db.collection('userBuckets').updateOne(
 			managedBy: [],
 			roles: [],
 			authMethods: ['password'],
+			registrationOpen: true,
+			emailVerificationRequired: false,
+			verificationMethod: 'link',
 			createdAt: seedNow,
 			updatedAt: seedNow
 		}

@@ -6,6 +6,7 @@ import {
 	UserBucketStore as MemoryUserBucketStore,
 	AdminSessionStore as MemoryAdminSessionStore,
 	AdminAuditStore as MemoryAdminAuditStore,
+	SmtpSettingsStore as MemorySmtpSettingsStore,
 	configStore as memoryConfig
 } from './memory/index.js';
 import type {
@@ -21,6 +22,8 @@ import type {
 	PayloadForModel,
 	ProjectStoreConstructor,
 	ProjectStoreInstance,
+	SmtpSettingsStoreConstructor,
+	SmtpSettingsStoreInstance,
 	UserBucketStoreConstructor,
 	UserBucketStoreInstance,
 	UserStoreConstructor,
@@ -35,6 +38,8 @@ let BucketStoreClass: UserBucketStoreConstructor = MemoryUserBucketStore;
 let AdminSessionStoreClass: AdminSessionStoreConstructor =
 	MemoryAdminSessionStore;
 let AdminAuditStoreClass: AdminAuditStoreConstructor = MemoryAdminAuditStore;
+let SmtpSettingsStoreClass: SmtpSettingsStoreConstructor =
+	MemorySmtpSettingsStore;
 export let configStore: AdapterConfigStore = memoryConfig;
 
 if (process.env.MONGODB_URI) {
@@ -47,6 +52,7 @@ if (process.env.MONGODB_URI) {
 	BucketStoreClass = mongodb.UserBucketStore;
 	AdminSessionStoreClass = mongodb.AdminSessionStore;
 	AdminAuditStoreClass = mongodb.AdminAuditStore;
+	SmtpSettingsStoreClass = mongodb.SmtpSettingsStore;
 }
 
 if (process.env.NODE_ENV === 'test') {
@@ -97,6 +103,14 @@ export function getBucketStore(): UserBucketStoreInstance {
 		bucketStoreSingleton = new BucketStoreClass();
 	}
 	return bucketStoreSingleton;
+}
+
+let smtpSettingsStoreSingleton: SmtpSettingsStoreInstance | null = null;
+export function getSmtpSettingsStore(): SmtpSettingsStoreInstance {
+	if (!smtpSettingsStoreSingleton) {
+		smtpSettingsStoreSingleton = new SmtpSettingsStoreClass();
+	}
+	return smtpSettingsStoreSingleton;
 }
 
 // Test-only: drop the cached admin store singletons so a spec that requires a

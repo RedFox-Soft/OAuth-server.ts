@@ -30,7 +30,8 @@ import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { Session } from 'lib/models/session.js';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { Interaction } from 'lib/models/interaction.js';
-import { getUserStore } from 'lib/adapters/index.js';
+import { getUserStore, getBucketStore } from 'lib/adapters/index.js';
+import { issueAndSend } from 'lib/verification/challenge.js';
 import { Grant } from 'lib/models/grant.js';
 import { Client } from 'lib/models/client.js';
 import instance from 'lib/helpers/weak_cache.js';
@@ -176,6 +177,13 @@ export const ui = new Elysia()
 			if (!user.active) {
 				return loginServer(uid, 'Invalid username or password');
 			}
+			const loginBucket = await getBucketStore().find(bucketId);
+			if (loginBucket?.emailVerificationRequired && !user.verified) {
+				return loginServer(
+					uid,
+					'Please verify your email before signing in. Check your inbox for the verification message.'
+				);
+			}
 			interaction.payload.result = {
 				login: {
 					accountId: user._id,
@@ -197,14 +205,60 @@ export const ui = new Elysia()
 	)
 	.post(
 		'ui/:uid/registration',
-		async ({ body, params: { uid } }) => {
+		async ({ body, params: { uid }, interaction }) => {
+			const clientId = (
+				interaction.payload.params as { client_id?: string } | undefined
+			)?.client_id;
+			const bucketId = await resolveBucketForClient(clientId);
+			const bucket = await getBucketStore().find(bucketId);
+
+			// A closed bucket accepts no self-service sign-ups: no account, no email.
+			if (bucket && !bucket.registrationOpen) {
+				return new Response('Registration is closed for this application.', {
+					status: 403
+				});
+			}
+
 			if (body.password !== body.confirmPassword) {
 				return new Response('Passwords do not match', { status: 400 });
 			}
-			await getUserStore().create(
+
+			const store = getUserStore(bucketId);
+			const verificationRequired = bucket?.emailVerificationRequired ?? false;
+
+			// Non-committal on an existing address: behave like the accepted path without
+			// creating a duplicate or sending mail, so registration cannot be used to probe
+			// which emails are registered.
+			if (await store.findByEmail(body.email)) {
+				return Response.redirect(`/ui/${uid}/login`, 303);
+			}
+
+			const user = await store.create(
 				body.email,
-				await Bun.password.hash(body.password)
+				await Bun.password.hash(body.password),
+				[],
+				!verificationRequired
 			);
+
+			if (verificationRequired && bucket) {
+				try {
+					const { id, method } = await issueAndSend(user, bucket);
+					if (method === 'code') {
+						return Response.redirect(
+							`/verify-email/code?ref=${encodeURIComponent(id)}`,
+							303
+						);
+					}
+					return Response.redirect(`/ui/${uid}/login?notice=verify`, 303);
+				} catch {
+					// Delivery failed: the account exists but is unverified; invite a retry.
+					return new Response(
+						'We could not send your verification email. Please try again later.',
+						{ status: 502 }
+					);
+				}
+			}
+
 			return Response.redirect(`/ui/${uid}/login`, 303);
 		},
 		{
