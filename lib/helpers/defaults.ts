@@ -48,14 +48,6 @@ function makeDefaults() {
 		clientBasedCORS,
 
 		/*
-		 * clients
-		 *
-		 * description: Array of objects representing client metadata. These clients are referred to as
-		 * static, they don't expire, never reload, are always available.
-		 */
-		clients: [],
-
-		/*
 		 * clientDefaults
 		 *
 		 * description: Default client metadata to be assigned when unspecified by the client metadata,
