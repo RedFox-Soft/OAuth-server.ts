@@ -7,7 +7,6 @@ const ClientCredentialsPayload = t.Composite([
 	AudiencePayload,
 	t.Object({
 		scope: t.Optional(t.String()),
-		extra: t.Optional(t.Object({})),
 		'x5t#S256': t.Optional(t.String()),
 		jkt: t.Optional(t.String())
 	})

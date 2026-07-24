@@ -6,7 +6,6 @@ import {
 	certificateSubjectMatches
 } from '../addon/mtls.ts';
 import { deviceInfo } from '../addon/interactions.ts';
-import { renderError } from '../addon/error.ts';
 import { introspectionAllowedPolicy } from '../addon/introspection.ts';
 import {
 	idFactory,
@@ -223,17 +222,6 @@ function makeDefaults() {
 			}
 		},
 
-		formats: {
-			/*
-			 * formats.customizers
-			 *
-			 * description: Customizer functions used before issuing a structured Access Token.
-			 */
-			customizers: {
-				jwt: undefined
-			}
-		},
-
 		/*
 		 * expiresWithSession
 		 *
@@ -249,47 +237,12 @@ function makeDefaults() {
 		issueRefreshToken,
 
 		/*
-		 * routes
-		 *
-		 * description: Routing values used by the authorization server. Only provide routes starting with "/"
-		 */
-		routes: {
-			authorization: '/auth',
-			backchannel_authentication: '/backchannel',
-			code_verification: '/device',
-			device_authorization: '/device/auth',
-			end_session: '/session/end',
-			introspection: '/token/introspection',
-			jwks: '/jwks',
-			pushed_authorization_request: '/request',
-			registration: '/reg',
-			revocation: '/token/revocation',
-			token: '/token',
-			userinfo: '/me'
-		},
-
-		/*
 		 * pairwiseIdentifier
 		 *
 		 * description: Function used by the authorization server when resolving pairwise ID Token and Userinfo sub claim
 		 *   values.
 		 */
 		pairwiseIdentifier,
-
-		/*
-		 * extraTokenClaims
-		 *
-		 * description: Function used to add additional claims to Access Tokens and Client
-		 *   Credentials tokens. The return value is assigned to the token's `extra` property.
-		 */
-		extraTokenClaims: () => undefined,
-
-		/*
-		 * renderError
-		 *
-		 * description: Function used to present errors to the User-Agent
-		 */
-		renderError,
 
 		/*
 		 * sectorIdentifierUriValidate

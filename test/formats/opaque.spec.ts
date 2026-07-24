@@ -65,7 +65,6 @@ describe('opaque storage', () => {
 	const expiresWithSession = false;
 	const iiat = epochTime();
 	const rotations = 1;
-	const extra = { foo: 'bar' };
 	const dpopJkt = 'cbaZgHZazjgQq0Q2-Hy_o2-OCDpPu02S30lNhTsNU1Q';
 
 	// TODO: add Session and Interaction
@@ -99,7 +98,6 @@ describe('opaque storage', () => {
 		inFlight,
 		iiat,
 		rotations,
-		extra,
 		jkt: s256,
 		dpopJkt
 	};
@@ -132,21 +130,8 @@ describe('opaque storage', () => {
 			'x5t#S256': s256,
 			jkt: s256,
 			sessionUid,
-			expiresWithSession,
-			extra
+			expiresWithSession
 		});
-	});
-
-	it('for AccessToken extraTokenClaims gets assigned upon save()', async () => {
-		const client = await Client.find(clientId);
-		const token = new AccessToken({
-			client,
-			...fullPayload,
-			extra: undefined
-		});
-		expect(token.extra).toEqual(undefined);
-		await token.save();
-		expect(token.extra).toEqual(extra);
 	});
 
 	it('for AuthorizationCode', async () => {
@@ -323,21 +308,8 @@ describe('opaque storage', () => {
 			kind,
 			scope,
 			'x5t#S256': s256,
-			jkt: s256,
-			extra
+			jkt: s256
 		});
-	});
-
-	it('for ClientCredentials extraTokenClaims gets assigned upon save()', async () => {
-		const client = await Client.find(clientId);
-		const token = new ClientCredentials({
-			client,
-			...fullPayload,
-			extra: undefined
-		});
-		expect(token.extra).toEqual(undefined);
-		await token.save();
-		expect(token.extra).toEqual(extra);
 	});
 
 	it('for InitialAccessToken', async () => {

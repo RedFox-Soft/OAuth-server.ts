@@ -68,7 +68,6 @@ describe('jwt format', () => {
 	const expiresWithSession = false;
 	const iiat = epochTime();
 	const rotations = 1;
-	const extra = { foo: 'bar' };
 	const resourceServer = new ResourceServer(resource, {
 		accessTokenFormat: 'jwt',
 		audience: 'foo'
@@ -103,7 +102,6 @@ describe('jwt format', () => {
 		inFlight,
 		iiat,
 		rotations,
-		extra,
 		jkt: s256,
 		resourceServer
 	};
@@ -746,7 +744,6 @@ describe('jwt format', () => {
 		expect(iat).toBeTypeOf('number');
 		expect(exp).toBeTypeOf('number');
 		expect(payload).toEqual({
-			...extra,
 			aud,
 			client_id: clientId,
 			iss: ISSUER,
@@ -777,7 +774,6 @@ describe('jwt format', () => {
 		expect(iat).toBeTypeOf('number');
 		expect(exp).toBeTypeOf('number');
 		expect(payload).toEqual({
-			...extra,
 			aud,
 			client_id: 'pairwise',
 			iss: ISSUER,
@@ -811,7 +807,6 @@ describe('jwt format', () => {
 		expect(iat).toBeTypeOf('number');
 		expect(exp).toBeTypeOf('number');
 		expect(payload).toEqual({
-			...extra,
 			aud,
 			client_id: clientId,
 			sub: clientId,
@@ -822,37 +817,6 @@ describe('jwt format', () => {
 				'x5t#S256': s256,
 				jkt: s256
 			}
-		});
-	});
-
-	describe('customizers', () => {
-		afterEach(function () {
-			i(provider).configuration.formats.customizers.jwt = undefined;
-		});
-
-		it('allows the payload to be extended', async () => {
-			const client = await Client.find(clientId);
-			const accessToken = new AccessToken({
-				client,
-				...fullPayload
-			});
-			accessToken.resourceServer = resourceServer;
-			i(provider).configuration.formats.customizers.jwt = (ctx, token, jwt) => {
-				expect(token).toBe(accessToken);
-				expect(jwt).toHaveProperty('payload');
-				expect(jwt).toHaveProperty('header', undefined);
-				jwt.header = { customized: true, typ: 'foo' };
-				jwt.payload.customized = true;
-				jwt.payload.iss = 'foobar';
-			};
-
-			const jwt = await accessToken.save();
-			const header = decode(jwt.split('.')[0]);
-			expect(header).toHaveProperty('customized', true);
-			expect(header).toHaveProperty('typ', 'foo');
-			const payload = decode(jwt.split('.')[1]);
-			expect(payload).toHaveProperty('customized', true);
-			expect(payload).toHaveProperty('iss', 'foobar');
 		});
 	});
 });

@@ -14,7 +14,6 @@ const AccessTokenPayload = t.Composite([
 	t.Object({
 		rar: t.Optional(t.Object({})),
 		claims: t.Optional(t.Object({})),
-		extra: t.Optional(t.Object({})),
 		scope: t.Optional(t.String()),
 		sid: t.Optional(t.String()),
 		gty: t.Optional(t.String()),

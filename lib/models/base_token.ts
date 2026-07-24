@@ -9,8 +9,6 @@ import { ttl } from '../configs/liveTime.js';
 import { jwt } from './formats/jwt.js';
 import { Session } from './session.js';
 import { InvalidTarget } from 'lib/helpers/errors.js';
-import instance from '../helpers/weak_cache.ts';
-import { provider } from 'lib/provider.js';
 
 export const BaseTokenPayload = t.Composite([
 	BaseModelPayload,
@@ -84,23 +82,7 @@ export class BaseToken<
 		}
 	}
 
-	get extra() {
-		return (this.payload as { extra?: unknown }).extra;
-	}
-
-	set extra(value) {
-		(this.payload as { extra?: unknown }).extra = value;
-	}
-
 	async save() {
-		const { extraTokenClaims } = instance(provider).configuration;
-		const model = (this as unknown as { model: { properties: object } }).model;
-		if (extraTokenClaims && 'extra' in model.properties) {
-			const extra = await extraTokenClaims(als.getStore(), this);
-			if (extra !== undefined) {
-				this.extra = extra;
-			}
-		}
 		return super.save(this.remainingTTL);
 	}
 

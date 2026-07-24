@@ -5,7 +5,6 @@ import { testSigningKeys } from '../jwks/fixtures.js';
 
 const config = getConfig();
 
-config.extraTokenClaims = () => ({ foo: 'bar' });
 merge(config.features, {
 	registration: {
 		initialAccessToken: true,

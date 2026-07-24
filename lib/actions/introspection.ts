@@ -113,7 +113,6 @@ async function renderTokenResponse(oidc) {
 	}
 
 	Object.assign(body, {
-		...token.extra,
 		active: true,
 		client_id: token.payload.clientId,
 		exp: token.payload.exp,

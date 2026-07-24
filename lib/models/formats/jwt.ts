@@ -3,7 +3,6 @@ import * as crypto from 'node:crypto';
 import * as JWT from '../../helpers/jwt.ts';
 import instance from '../../helpers/weak_cache.ts';
 import nanoid from '../../helpers/nanoid.js';
-import als from '../../helpers/als.ts';
 import { provider } from 'lib/provider.js';
 import { ISSUER } from 'lib/configs/env.js';
 
@@ -120,7 +119,6 @@ export const jwt = {
 			clientId,
 			'x5t#S256': x5t,
 			jkt,
-			extra,
 			rar
 		} = payload;
 		let { accountId: sub } = payload;
@@ -137,7 +135,6 @@ export const jwt = {
 		}
 
 		const tokenPayload = {
-			...extra,
 			jti,
 			sub: sub || clientId,
 			iat,
@@ -161,11 +158,6 @@ export const jwt = {
 			header: undefined,
 			payload: tokenPayload
 		};
-
-		const customizer = instance(provider).configuration.formats.customizers.jwt;
-		if (customizer) {
-			await customizer(als.getStore(), this, structuredToken);
-		}
 
 		if (!structuredToken.payload.aud) {
 			throw new Error(
