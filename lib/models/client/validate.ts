@@ -35,10 +35,6 @@ import {
 	validateJWK
 } from './keystore.ts';
 
-// Marks a static client that has already been validated and cached, replacing
-// the former `cached instanceof Client` check (there is no class any more).
-const VALIDATED = Symbol('validatedStaticClient');
-
 // The base registration keys copied verbatim from the raw input. Frozen here so
 // expanding `ClientSchema` to describe the full validated-object type (the rest
 // of the metadata is produced by the schema engine and camelCased) cannot change
@@ -195,29 +191,17 @@ export async function assertClientValid(metadata: unknown): Promise<void> {
 	}
 }
 
-// Resolve a client by id: static cache (noManage) → dynamic prop-hash cache →
-// adapter('Client'). Nullable variant behind `Client.tryFind`; the strict
-// `Client.find` wraps this and throws on miss.
+// Resolve a client by id from adapter('Client') — the single source of client
+// identity. The adapter is read on every call so updates and deletes are always
+// reflected immediately (a stale-metadata window would violate FR-009 and the
+// security-first principle); the bounded, maxAge-limited clientCache only
+// memoizes the *validated* object, keyed by a hash of the stored properties, so
+// unchanged clients skip re-validation. Nullable variant behind `Client.tryFind`;
+// the strict `Client.find` wraps this and throws on miss.
 export async function tryFindClient(
 	id: string
 ): Promise<ClientSchemaType | undefined> {
-	const { staticClients, dynamicClients } = instance(provider);
-
-	if (staticClients.has(id)) {
-		const cached = staticClients.get(id);
-
-		if (!cached[VALIDATED]) {
-			const client = validateClient(cached);
-			if (client.sectorIdentifierUri !== undefined) {
-				await sectorValidate(provider, client);
-			}
-			Object.defineProperty(client, 'noManage', { value: true });
-			Object.defineProperty(client, VALIDATED, { value: true });
-			staticClients.set(id, client);
-		}
-
-		return staticClients.get(id);
-	}
+	const { clientCache } = instance(provider);
 
 	const properties = await adapter('Client').find(id);
 	if (!properties) {
@@ -229,11 +213,10 @@ export async function tryFindClient(
 		JSON.stringify(properties),
 		'base64url'
 	);
-	let client = dynamicClients.get(propHash);
-
+	let client = clientCache.get(propHash);
 	if (!client) {
 		client = await addClient(provider, properties, { store: false });
-		dynamicClients.set(propHash, client);
+		clientCache.set(propHash, client);
 	}
 
 	return client;

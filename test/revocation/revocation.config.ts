@@ -8,18 +8,19 @@ export const ApplicationConfig = {
 	'revocation.enabled': true
 };
 
+export const clients = [
+	{
+		clientId: 'client',
+		clientSecret: 'secret',
+		redirectUris: ['https://client.example.com/cb']
+	},
+	{
+		clientId: 'client2',
+		clientSecret: 'secret',
+		redirectUris: ['https://client2.example.com/cb']
+	}
+];
+
 export default {
-	config,
-	clients: [
-		{
-			clientId: 'client',
-			clientSecret: 'secret',
-			redirectUris: ['https://client.example.com/cb']
-		},
-		{
-			clientId: 'client2',
-			clientSecret: 'secret',
-			redirectUris: ['https://client2.example.com/cb']
-		}
-	]
+	config
 };

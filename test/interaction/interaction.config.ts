@@ -54,12 +54,13 @@ policy.add(new UnrequestablePrompt());
 
 config.interactions = { policy };
 
+export const client = {
+	clientId: 'client',
+	clientSecret: 'secret',
+	client_name: 'Test Client App',
+	redirectUris: ['https://client.example.com/cb']
+};
+
 export default {
-	config,
-	client: {
-		clientId: 'client',
-		clientSecret: 'secret',
-		client_name: 'Test Client App',
-		redirectUris: ['https://client.example.com/cb']
-	}
+	config
 };

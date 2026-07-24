@@ -250,7 +250,10 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 			});
 		}
 
-		it('cannot update non-dynamic clients', async () => {
+		it('can update any stored client given a valid registration access token', async () => {
+			// Clients are single-sourced from the adapter and uniformly manageable
+			// (there is no `noManage` static-client class any more); a valid RAT is
+			// the only gate.
 			const rat = new RegistrationAccessToken({ clientId: 'client' });
 			const token = await rat.save();
 			const client = await Client.find('client');
@@ -261,12 +264,11 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 				}),
 				{ headers: { ...json, ...bearer(token) } }
 			);
-			expectFail(
-				res,
-				403,
-				'invalid_request',
-				'client does not have permission to update its record'
-			);
+			expect(res.status).toBe(200);
+			if (!res.data) throw new Error('expected response data');
+			expect(res.data.redirect_uris).toEqual([
+				'https://client.example.com/foobar/cb'
+			]);
 		});
 
 		describe('rotateRegistrationAccessToken', () => {
@@ -380,18 +382,15 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 			expectFail(res, 400, 'invalid_request', 'no access token provided');
 		});
 
-		it('cannot delete non-dynamic clients', async () => {
+		it('can delete any stored client given a valid registration access token', async () => {
+			// All clients are manageable now (no `noManage` class); a valid RAT is
+			// the only gate.
 			const rat = new RegistrationAccessToken({ clientId: 'client' });
 			const token = await rat.save();
 			const res = await agent
 				.reg({ clientId: 'client' })
 				.delete(undefined, { headers: bearer(token) });
-			expectFail(
-				res,
-				403,
-				'invalid_request',
-				'client does not have permission to delete its record'
-			);
+			expect(res.status).toBe(204);
 		});
 	});
 });

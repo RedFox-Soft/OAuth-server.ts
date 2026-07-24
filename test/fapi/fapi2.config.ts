@@ -11,18 +11,19 @@ export const ApplicationConfig = {
 	'requestObjects.enabled': true
 };
 
-export default {
-	config,
-	clients: [
-		{
-			clientId: 'client',
-			token_endpoint_auth_method: 'private_key_jwt',
-			responseTypes: ['code'],
-			grantTypes: ['authorization_code'],
-			redirectUris: ['https://client.example.com/cb'],
-			jwks: {
-				keys: [await exportJWK(keypair.publicKey)]
-			}
+export const clients = [
+	{
+		clientId: 'client',
+		token_endpoint_auth_method: 'private_key_jwt',
+		responseTypes: ['code'],
+		grantTypes: ['authorization_code'],
+		redirectUris: ['https://client.example.com/cb'],
+		jwks: {
+			keys: [await exportJWK(keypair.publicKey)]
 		}
-	]
+	}
+];
+
+export default {
+	config
 };

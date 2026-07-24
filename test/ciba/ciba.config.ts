@@ -52,42 +52,43 @@ config.features.ciba = {
 	}
 };
 
+export const clients = [
+	{
+		clientId: 'client',
+		grantTypes: ['urn:openid:params:grant-type:ciba', 'refresh_token'],
+		responseTypes: [],
+		redirectUris: [],
+		token_endpoint_auth_method: 'none',
+		backchannel_token_delivery_mode: 'poll'
+	},
+	{
+		clientId: 'client-ping',
+		grantTypes: ['urn:openid:params:grant-type:ciba', 'refresh_token'],
+		responseTypes: [],
+		redirectUris: [],
+		token_endpoint_auth_method: 'none',
+		backchannel_client_notification_endpoint: 'https://rp.example.com/ping',
+		backchannel_token_delivery_mode: 'ping'
+	},
+	{
+		clientId: 'client-signed',
+		grantTypes: ['urn:openid:params:grant-type:ciba', 'refresh_token'],
+		responseTypes: [],
+		redirectUris: [],
+		token_endpoint_auth_method: 'none',
+		backchannel_token_delivery_mode: 'poll',
+		'requestObject.backChannelSigningAlg': 'ES256',
+		jwks_uri: 'https://rp.example.com/jwks'
+	},
+	{
+		clientId: 'client-not-allowed',
+		token_endpoint_auth_method: 'none',
+		grantTypes: [],
+		redirectUris: [],
+		responseTypes: []
+	}
+];
+
 export default {
-	config,
-	clients: [
-		{
-			clientId: 'client',
-			grantTypes: ['urn:openid:params:grant-type:ciba', 'refresh_token'],
-			responseTypes: [],
-			redirectUris: [],
-			token_endpoint_auth_method: 'none',
-			backchannel_token_delivery_mode: 'poll'
-		},
-		{
-			clientId: 'client-ping',
-			grantTypes: ['urn:openid:params:grant-type:ciba', 'refresh_token'],
-			responseTypes: [],
-			redirectUris: [],
-			token_endpoint_auth_method: 'none',
-			backchannel_client_notification_endpoint: 'https://rp.example.com/ping',
-			backchannel_token_delivery_mode: 'ping'
-		},
-		{
-			clientId: 'client-signed',
-			grantTypes: ['urn:openid:params:grant-type:ciba', 'refresh_token'],
-			responseTypes: [],
-			redirectUris: [],
-			token_endpoint_auth_method: 'none',
-			backchannel_token_delivery_mode: 'poll',
-			'requestObject.backChannelSigningAlg': 'ES256',
-			jwks_uri: 'https://rp.example.com/jwks'
-		},
-		{
-			clientId: 'client-not-allowed',
-			token_endpoint_auth_method: 'none',
-			grantTypes: [],
-			redirectUris: [],
-			responseTypes: []
-		}
-	]
+	config
 };

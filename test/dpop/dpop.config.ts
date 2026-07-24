@@ -37,35 +37,36 @@ export const ApplicationConfig = {
 	'ciba.enabled': true
 };
 
+export const clients = [
+	{
+		clientId: 'client',
+		clientSecret: 'secret',
+		grantTypes: [
+			'authorization_code',
+			'refresh_token',
+			'urn:ietf:params:oauth:grant-type:device_code',
+			'urn:openid:params:grant-type:ciba',
+			'client_credentials'
+		],
+		responseTypes: ['code'],
+		backchannel_token_delivery_mode: 'poll',
+		redirectUris: ['https://client.example.com/cb']
+	},
+	{
+		clientId: 'client-none',
+		grantTypes: [
+			'authorization_code',
+			'urn:ietf:params:oauth:grant-type:device_code',
+			'urn:openid:params:grant-type:ciba',
+			'refresh_token'
+		],
+		responseTypes: ['code'],
+		backchannel_token_delivery_mode: 'poll',
+		redirectUris: ['https://client.example.com/cb'],
+		token_endpoint_auth_method: 'none'
+	}
+];
+
 export default {
-	config,
-	clients: [
-		{
-			clientId: 'client',
-			clientSecret: 'secret',
-			grantTypes: [
-				'authorization_code',
-				'refresh_token',
-				'urn:ietf:params:oauth:grant-type:device_code',
-				'urn:openid:params:grant-type:ciba',
-				'client_credentials'
-			],
-			responseTypes: ['code'],
-			backchannel_token_delivery_mode: 'poll',
-			redirectUris: ['https://client.example.com/cb']
-		},
-		{
-			clientId: 'client-none',
-			grantTypes: [
-				'authorization_code',
-				'urn:ietf:params:oauth:grant-type:device_code',
-				'urn:openid:params:grant-type:ciba',
-				'refresh_token'
-			],
-			responseTypes: ['code'],
-			backchannel_token_delivery_mode: 'poll',
-			redirectUris: ['https://client.example.com/cb'],
-			token_endpoint_auth_method: 'none'
-		}
-	]
+	config
 };

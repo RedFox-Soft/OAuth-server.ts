@@ -32,13 +32,14 @@ export const ApplicationConfig = {
 	'clientCredentials.enabled': true
 };
 
+export const client = {
+	clientId: 'client',
+	clientSecret: 'secret',
+	grantTypes: ['client_credentials'],
+	responseTypes: [],
+	redirectUris: []
+};
+
 export default {
-	config,
-	client: {
-		clientId: 'client',
-		clientSecret: 'secret',
-		grantTypes: ['client_credentials'],
-		responseTypes: [],
-		redirectUris: []
-	}
+	config
 };

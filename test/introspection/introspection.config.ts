@@ -8,33 +8,34 @@ export const ApplicationConfig = {
 	'encryption.enabled': true
 };
 
+export const clients = [
+	{
+		clientId: 'client',
+		clientSecret: 'secret',
+		redirectUris: ['https://client.example.com/cb']
+	},
+	{
+		clientId: 'client-pairwise',
+		clientSecret: 'secret',
+		subjectType: 'pairwise',
+		redirectUris: ['https://client.example.com/cb']
+	},
+	{
+		clientId: 'client-introspection',
+		clientSecret: 'secret',
+		redirectUris: [],
+		responseTypes: [],
+		grantTypes: []
+	},
+	{
+		clientId: 'client-none',
+		token_endpoint_auth_method: 'none',
+		redirectUris: [],
+		grantTypes: [],
+		responseTypes: []
+	}
+];
+
 export default {
-	config,
-	clients: [
-		{
-			clientId: 'client',
-			clientSecret: 'secret',
-			redirectUris: ['https://client.example.com/cb']
-		},
-		{
-			clientId: 'client-pairwise',
-			clientSecret: 'secret',
-			subjectType: 'pairwise',
-			redirectUris: ['https://client.example.com/cb']
-		},
-		{
-			clientId: 'client-introspection',
-			clientSecret: 'secret',
-			redirectUris: [],
-			responseTypes: [],
-			grantTypes: []
-		},
-		{
-			clientId: 'client-none',
-			token_endpoint_auth_method: 'none',
-			redirectUris: [],
-			grantTypes: [],
-			responseTypes: []
-		}
-	]
+	config
 };

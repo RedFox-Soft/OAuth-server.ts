@@ -25,19 +25,20 @@ config.jwks = {
 	keys: [...baseKeys, { ...rsaMaterial, kid: 'ps256-test-key' }]
 };
 
+export const clients = [
+	{
+		clientId: 'client',
+		clientSecret: 'secret',
+		redirectUris: ['https://client.example.com/cb']
+	},
+	{
+		clientId: 'pairwise',
+		clientSecret: 'secret',
+		redirectUris: ['https://client.example.com/cb'],
+		subjectType: 'pairwise'
+	}
+];
+
 export default {
-	config,
-	clients: [
-		{
-			clientId: 'client',
-			clientSecret: 'secret',
-			redirectUris: ['https://client.example.com/cb']
-		},
-		{
-			clientId: 'pairwise',
-			clientSecret: 'secret',
-			redirectUris: ['https://client.example.com/cb'],
-			subjectType: 'pairwise'
-		}
-	]
+	config
 };

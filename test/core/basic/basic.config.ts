@@ -27,44 +27,45 @@ policy.add(new CustomPrompt());
 
 config.interactions = { policy };
 
+export const clients = [
+	{
+		clientId: 'client',
+		clientSecret: 'secret',
+		grantTypes: ['authorization_code', 'refresh_token'],
+		responseTypes: ['code', 'none'],
+		redirectUris: ['https://client.example.com/cb']
+	},
+	{
+		clientId: 'client-without-none',
+		clientSecret: 'secret',
+		grantTypes: ['authorization_code', 'refresh_token'],
+		responseTypes: ['code'],
+		redirectUris: ['https://client.example.com/cb']
+	},
+	{
+		clientId: 'client-no-refresh',
+		clientSecret: 'secret',
+		grantTypes: ['authorization_code'],
+		responseTypes: ['code', 'none'],
+		redirectUris: ['https://client.example.com/cb']
+	},
+	{
+		applicationType: 'native',
+		clientId: 'client-native',
+		clientSecret: 'secret',
+		grantTypes: ['authorization_code', 'refresh_token'],
+		responseTypes: ['code', 'none'],
+		redirectUris: ['com.example.app:/cb']
+	},
+	{
+		clientId: 'client-limited-scope',
+		clientSecret: 'secret',
+		redirectUris: ['https://client.example.com/cb'],
+		scope: 'openid',
+		grantTypes: ['authorization_code', 'refresh_token']
+	}
+];
+
 export default {
-	config,
-	clients: [
-		{
-			clientId: 'client',
-			clientSecret: 'secret',
-			grantTypes: ['authorization_code', 'refresh_token'],
-			responseTypes: ['code', 'none'],
-			redirectUris: ['https://client.example.com/cb']
-		},
-		{
-			clientId: 'client-without-none',
-			clientSecret: 'secret',
-			grantTypes: ['authorization_code', 'refresh_token'],
-			responseTypes: ['code'],
-			redirectUris: ['https://client.example.com/cb']
-		},
-		{
-			clientId: 'client-no-refresh',
-			clientSecret: 'secret',
-			grantTypes: ['authorization_code'],
-			responseTypes: ['code', 'none'],
-			redirectUris: ['https://client.example.com/cb']
-		},
-		{
-			applicationType: 'native',
-			clientId: 'client-native',
-			clientSecret: 'secret',
-			grantTypes: ['authorization_code', 'refresh_token'],
-			responseTypes: ['code', 'none'],
-			redirectUris: ['com.example.app:/cb']
-		},
-		{
-			clientId: 'client-limited-scope',
-			clientSecret: 'secret',
-			redirectUris: ['https://client.example.com/cb'],
-			scope: 'openid',
-			grantTypes: ['authorization_code', 'refresh_token']
-		}
-	]
+	config
 };

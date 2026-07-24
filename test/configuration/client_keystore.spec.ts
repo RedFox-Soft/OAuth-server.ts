@@ -13,10 +13,8 @@ import moment from 'moment';
 
 import * as JWT from '../../lib/helpers/jwt.ts';
 import epochTime from '../../lib/helpers/epoch_time.ts';
-import bootstrap from '../test_helper.js';
-import initializeClients from '../../lib/helpers/initialize_clients.ts';
+import bootstrap, { seedClient } from '../test_helper.js';
 import { IdToken } from 'lib/models/id_token.js';
-import { provider } from 'lib/provider.js';
 import { Client } from 'lib/models/client.js';
 
 const keys = [
@@ -48,17 +46,15 @@ describe('client keystore refresh', () => {
 	beforeAll(async function () {
 		await bootstrap(import.meta.url, { config: 'client_keystore' });
 
-		initializeClients.call(provider, [
-			{
-				clientId: 'client',
-				clientSecret: 'secret',
-				redirectUris: ['https://client.example.com/cb'],
-				jwks_uri: 'https://client.example.com/jwks',
-				id_token_signed_response_alg: 'HS256',
-				id_token_encrypted_response_alg: 'ECDH-ES',
-				id_token_encrypted_response_enc: 'A128CBC-HS256'
-			}
-		]);
+		seedClient({
+			clientId: 'client',
+			clientSecret: 'secret',
+			redirectUris: ['https://client.example.com/cb'],
+			jwks_uri: 'https://client.example.com/jwks',
+			id_token_signed_response_alg: 'HS256',
+			id_token_encrypted_response_alg: 'ECDH-ES',
+			id_token_encrypted_response_enc: 'A128CBC-HS256'
+		});
 	});
 
 	afterEach(() => {

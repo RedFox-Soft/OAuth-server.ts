@@ -11,7 +11,7 @@ import nanoid from '../lib/helpers/nanoid.js';
 import epochTime from '../lib/helpers/epoch_time.js';
 import { provider, elysia } from '../lib/index.ts';
 import instance from '../lib/helpers/weak_cache.ts';
-import { getUserStore } from '../lib/adapters/index.ts';
+import { adapter, getUserStore } from '../lib/adapters/index.ts';
 import type { User } from '../lib/adapters/types.ts';
 
 import { TestAdapter } from './models.js';
@@ -112,6 +112,22 @@ export function seedAccount(
 	});
 }
 
+// Seed an OAuth client into the Client store so `tryFindClient` resolves it from
+// the adapter — there is no static-clients config any more. Mirrors seedAccount.
+// Throws on a duplicate client_id so a misconfigured spec fails loudly rather than
+// silently overwriting an existing record. upsert's body is synchronous for the
+// in-memory adapter, so the record is present the moment this returns.
+export function seedClient(
+	metadata: { clientId: string } & Record<string, unknown>
+): void {
+	if (TestAdapter.for('Client').syncFind(metadata.clientId)) {
+		throw new Error(
+			`duplicate client_id '${metadata.clientId}' seeded into the Client store`
+		);
+	}
+	adapter('Client').upsert(metadata.clientId, metadata);
+}
+
 // Extra OIDC claims that login()'s seeded user carries for the current spec.
 // Conformance suites that assert full-profile or distributed-claim masking call
 // setSeedClaims(...) in beforeAll (after bootstrap, which resets it to none).
@@ -144,11 +160,13 @@ async function bootstrap(
 	).toString();
 	const {
 		default: mod,
+		clients: clientsExport,
+		client,
 		ApplicationConfig: app,
 		ClientDefaults: clientSettings
 	} = await import(conf);
-	const { config, client } = mod;
-	let { clients } = mod;
+	const { config } = mod;
+	let clients = clientsExport;
 
 	if (client && !clients) {
 		clients = [client];
@@ -163,10 +181,15 @@ async function bootstrap(
 	seedClaims = undefined;
 
 	provider.init({
-		clients,
 		adapter: TestAdapter,
 		...config
 	});
+
+	// Clients now live in the Client store (single source of truth); seed each
+	// exported client so tryFindClient resolves it from the adapter.
+	for (const cl of clients ?? []) {
+		seedClient(cl);
+	}
 
 	let lastSession: Session;
 	let lastAccountId: string;

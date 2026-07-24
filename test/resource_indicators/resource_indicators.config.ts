@@ -72,22 +72,23 @@ export const ApplicationConfig = {
 	'resourceIndicators.enabled': true
 };
 
+export const clients = [
+	{
+		clientId: 'client',
+		token_endpoint_auth_method: 'none',
+		redirectUris: ['https://client.example.com/cb'],
+		responseTypes: ['code'],
+		backchannel_token_delivery_mode: 'poll',
+		grantTypes: [
+			'refresh_token',
+			'client_credentials',
+			'authorization_code',
+			'urn:ietf:params:oauth:grant-type:device_code',
+			'urn:openid:params:grant-type:ciba'
+		]
+	}
+];
+
 export default {
-	config,
-	clients: [
-		{
-			clientId: 'client',
-			token_endpoint_auth_method: 'none',
-			redirectUris: ['https://client.example.com/cb'],
-			responseTypes: ['code'],
-			backchannel_token_delivery_mode: 'poll',
-			grantTypes: [
-				'refresh_token',
-				'client_credentials',
-				'authorization_code',
-				'urn:ietf:params:oauth:grant-type:device_code',
-				'urn:openid:params:grant-type:ciba'
-			]
-		}
-	]
+	config
 };

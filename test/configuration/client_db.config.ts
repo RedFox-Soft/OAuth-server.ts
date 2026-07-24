@@ -4,8 +4,10 @@ const config = getConfig();
 
 export const clients = [
 	{
-		clientId: 'client',
+		clientId: 'db-client',
 		clientSecret: 'secret',
+		grantTypes: ['authorization_code'],
+		responseTypes: ['code'],
 		redirectUris: ['https://client.example.com/cb']
 	}
 ];

@@ -455,18 +455,17 @@ describe('registration features', () => {
 			expect(spy.mock.calls[0][0].payload.clientId).toBe(clientId);
 		});
 
-		it('cannot read non-dynamic clients', async () => {
+		it('can read any stored client given a valid registration access token', async () => {
+			// All clients are single-sourced from the adapter and uniformly
+			// manageable; a valid RAT is the only gate (no `noManage` class).
 			const rat = new RegistrationAccessToken({ clientId: 'client' });
 			const bearerToken = await rat.save();
 			const res = await agent
 				.reg({ clientId: 'client' })
 				.get({ headers: bearer(bearerToken) });
-			expectFail(
-				res,
-				403,
-				'invalid_request',
-				'client does not have permission to read its record'
-			);
+			expect(res.status).toBe(200);
+			if (!res.data) throw new Error('expected response data');
+			expect(res.data.client_id).toBe('client');
 		});
 	});
 });

@@ -6,36 +6,37 @@ export const ApplicationConfig = {
 	'backchannelLogout.enabled': true
 };
 
+export const clients = [
+	{
+		clientId: 'client',
+		clientSecret: 'secret',
+		responseTypes: ['code'],
+		grantTypes: ['authorization_code', 'refresh_token'],
+		redirectUris: ['https://client.example.com/cb'],
+		backchannel_logout_uri: 'https://client.example.com/backchannel_logout',
+		backchannel_logout_session_required: true
+	},
+	{
+		clientId: 'second-client',
+		clientSecret: 'secret',
+		responseTypes: ['code'],
+		grantTypes: ['authorization_code', 'refresh_token'],
+		redirectUris: ['https://second-client.example.com/cb'],
+		backchannel_logout_uri:
+			'https://second-client.example.com/backchannel_logout',
+		backchannel_logout_session_required: true
+	},
+	{
+		clientId: 'no-sid',
+		clientSecret: 'secret',
+		responseTypes: ['code'],
+		grantTypes: ['authorization_code', 'refresh_token'],
+		redirectUris: ['https://no-sid.example.com/cb'],
+		backchannel_logout_uri: 'https://no-sid.example.com/backchannel_logout'
+		// backchannel_logout_session_required: false,
+	}
+];
+
 export default {
-	config,
-	clients: [
-		{
-			clientId: 'client',
-			clientSecret: 'secret',
-			responseTypes: ['code'],
-			grantTypes: ['authorization_code', 'refresh_token'],
-			redirectUris: ['https://client.example.com/cb'],
-			backchannel_logout_uri: 'https://client.example.com/backchannel_logout',
-			backchannel_logout_session_required: true
-		},
-		{
-			clientId: 'second-client',
-			clientSecret: 'secret',
-			responseTypes: ['code'],
-			grantTypes: ['authorization_code', 'refresh_token'],
-			redirectUris: ['https://second-client.example.com/cb'],
-			backchannel_logout_uri:
-				'https://second-client.example.com/backchannel_logout',
-			backchannel_logout_session_required: true
-		},
-		{
-			clientId: 'no-sid',
-			clientSecret: 'secret',
-			responseTypes: ['code'],
-			grantTypes: ['authorization_code', 'refresh_token'],
-			redirectUris: ['https://no-sid.example.com/cb'],
-			backchannel_logout_uri: 'https://no-sid.example.com/backchannel_logout'
-			// backchannel_logout_session_required: false,
-		}
-	]
+	config
 };

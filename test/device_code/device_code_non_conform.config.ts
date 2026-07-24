@@ -13,4 +13,7 @@ setup.config.conformIdTokenClaims = false;
 // defaults and the device_code grant would be gated off at the token endpoint.
 export { ApplicationConfig };
 
+// Clients are seeded from the `clients` named export; inherit the base set.
+export { clients } from './device_code.config.js';
+
 export default setup;

@@ -9,15 +9,16 @@ merge(config.features, {
 	revocation: { enabled: true }
 });
 
+export const clients = [
+	{
+		clientId: 'client',
+		responseTypes: ['code'],
+		grantTypes: ['authorization_code', 'refresh_token'],
+		redirectUris: ['https://rp.example.com/cb'],
+		token_endpoint_auth_method: 'none'
+	}
+];
+
 export default {
-	config,
-	clients: [
-		{
-			clientId: 'client',
-			responseTypes: ['code'],
-			grantTypes: ['authorization_code', 'refresh_token'],
-			redirectUris: ['https://rp.example.com/cb'],
-			token_endpoint_auth_method: 'none'
-		}
-	]
+	config
 };

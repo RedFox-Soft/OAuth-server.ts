@@ -64,7 +64,6 @@ function sigAlgForKey(key) {
 import Configuration from './helpers/configuration.ts';
 import * as instance from './helpers/weak_cache.ts';
 import initializeApp from './helpers/initialize_app.ts';
-import initializeClients from './helpers/initialize_clients.ts';
 import { OIDCProviderError } from './helpers/errors.ts';
 import { BackchannelAuthenticationRequest } from './models/backchannel_authentication_request.js';
 import { Client } from './models/client.js';
@@ -82,8 +81,11 @@ class ProviderClass extends EventEmitter {
 
 	init(setup) {
 		const configuration = new Configuration(setup);
-		this.#int.staticClients = new Map();
-		this.#int.dynamicClients = new QuickLRU({ maxSize: 100 });
+		// tryFindClient reads adapter('Client') on every resolution, so this cache
+		// is purely a validated-object memo keyed by a hash of the stored props;
+		// updates/deletes are always current. Size-bounded (LRU) — no time-based
+		// expiry, which would drop entries out from under in-flight resolutions.
+		this.#int.clientCache = new QuickLRU({ maxSize: 100 });
 
 		instance.set(this, this.#int);
 
@@ -130,7 +132,9 @@ class ProviderClass extends EventEmitter {
 
 		initializeApp.call(this);
 
-		initializeClients.call(this, configuration.clients);
+		// Clients are provisioned into adapter('Client'), not at bootstrap. A stray
+		// `clients` option is silently ignored (FR-003a) — dropped here so it never
+		// lingers on the configuration.
 		delete configuration.clients;
 		return this;
 	}

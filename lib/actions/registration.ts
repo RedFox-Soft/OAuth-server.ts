@@ -246,13 +246,6 @@ async function read({ params, headers, query, set }) {
 	const token = readBearer(headers.authorization, query, true);
 	const { client } = await authenticate(oidc, params.clientId, token);
 
-	if (client.noManage) {
-		throw new InvalidRequest(
-			'client does not have permission to read its record',
-			403
-		);
-	}
-
 	const responseBody: Body = canonicalToSnake(client.metadata());
 
 	Object.assign(responseBody, {
@@ -301,13 +294,6 @@ async function update({ params, body, headers, set }) {
 				"provided client_secret does not match the authenticated client's one"
 			);
 		}
-	}
-
-	if (client.noManage) {
-		throw new InvalidRequest(
-			'client does not have permission to update its record',
-			403
-		);
 	}
 
 	const properties = snakeToCanonical(
@@ -389,13 +375,6 @@ async function remove({ params, headers, set }) {
 		params.clientId,
 		token
 	);
-
-	if (client.noManage) {
-		throw new InvalidRequest(
-			'client does not have permission to delete its record',
-			403
-		);
-	}
 
 	await Client.adapter.destroy(client.clientId);
 	await regAccessToken.destroy();

@@ -20,26 +20,27 @@ export const ApplicationConfig = {
 	'requestObjects.enabled': true
 };
 
+export const clients = [
+	{
+		clientId: 'client',
+		clientSecret: 'secret',
+		redirectUris: ['https://rp.example.com/cb']
+	},
+	{
+		clientId: 'client-par-required',
+		clientSecret: 'secret',
+		redirectUris: ['https://rp.example.com/cb'],
+		'authorization.requirePushedAuthorizationRequests': true
+	},
+	{
+		clientId: 'client-alg-registered',
+		clientSecret: 'secret',
+		'requestObject.signingAlg': 'HS256',
+		redirectUris: ['https://rp.example.com/cb']
+	},
+	allowUnregisteredClient('public', { token_endpoint_auth_method: 'none' })
+];
+
 export default {
-	config,
-	clients: [
-		{
-			clientId: 'client',
-			clientSecret: 'secret',
-			redirectUris: ['https://rp.example.com/cb']
-		},
-		{
-			clientId: 'client-par-required',
-			clientSecret: 'secret',
-			redirectUris: ['https://rp.example.com/cb'],
-			'authorization.requirePushedAuthorizationRequests': true
-		},
-		{
-			clientId: 'client-alg-registered',
-			clientSecret: 'secret',
-			'requestObject.signingAlg': 'HS256',
-			redirectUris: ['https://rp.example.com/cb']
-		},
-		allowUnregisteredClient('public', { token_endpoint_auth_method: 'none' })
-	]
+	config
 };

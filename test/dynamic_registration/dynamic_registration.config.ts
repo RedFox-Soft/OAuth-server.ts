@@ -6,11 +6,12 @@ export const ApplicationConfig = {
 	'registration.enabled': true
 };
 
+export const client = {
+	clientId: 'client',
+	clientSecret: 'secret',
+	redirectUris: ['https://client.example.com/cb']
+};
+
 export default {
-	config,
-	client: {
-		clientId: 'client',
-		clientSecret: 'secret',
-		redirectUris: ['https://client.example.com/cb']
-	}
+	config
 };

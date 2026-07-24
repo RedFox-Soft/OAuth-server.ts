@@ -8,29 +8,30 @@ export const ApplicationConfig = {
 	'encryption.enabled': true
 };
 
+export const clients = [
+	{
+		clientId: 'client-signed',
+		clientSecret: 'secret',
+		introspection_signed_response_alg: 'RS256',
+		redirectUris: ['https://client.example.com/cb']
+	},
+	{
+		clientId: 'client-HS-expired',
+		clientSecret: 'secret',
+		client_secret_expires_at: 1,
+		token_endpoint_auth_method: 'none',
+		introspection_signed_response_alg: 'HS256',
+		redirectUris: ['https://client.example.com/cb']
+	},
+	{
+		clientId: 'client-encrypted',
+		clientSecret: 'secret',
+		token_endpoint_auth_method: 'none',
+		introspection_encrypted_response_alg: 'A128KW',
+		redirectUris: ['https://client.example.com/cb']
+	}
+];
+
 export default {
-	config,
-	clients: [
-		{
-			clientId: 'client-signed',
-			clientSecret: 'secret',
-			introspection_signed_response_alg: 'RS256',
-			redirectUris: ['https://client.example.com/cb']
-		},
-		{
-			clientId: 'client-HS-expired',
-			clientSecret: 'secret',
-			client_secret_expires_at: 1,
-			token_endpoint_auth_method: 'none',
-			introspection_signed_response_alg: 'HS256',
-			redirectUris: ['https://client.example.com/cb']
-		},
-		{
-			clientId: 'client-encrypted',
-			clientSecret: 'secret',
-			token_endpoint_auth_method: 'none',
-			introspection_encrypted_response_alg: 'A128KW',
-			redirectUris: ['https://client.example.com/cb']
-		}
-	]
+	config
 };

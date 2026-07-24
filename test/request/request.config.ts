@@ -18,52 +18,53 @@ export const ApplicationConfig = {
 	'deviceFlow.enabled': true
 };
 
+export const clients = [
+	{
+		clientId: 'client',
+		token_endpoint_auth_method: 'none',
+		clientSecret: 'secret',
+		grantTypes: [
+			'urn:ietf:params:oauth:grant-type:device_code',
+			'authorization_code'
+		],
+		redirectUris: ['https://client.example.com/cb']
+	},
+	{
+		clientId: 'client-requiredSignedRequestObject',
+		token_endpoint_auth_method: 'none',
+		require_signed_request_object: true,
+		clientSecret: 'secret',
+		grantTypes: [
+			'urn:ietf:params:oauth:grant-type:device_code',
+			'authorization_code'
+		],
+		redirectUris: ['https://client.example.com/cb']
+	},
+	{
+		clientId: 'client-with-HS-sig',
+		token_endpoint_auth_method: 'none',
+		clientSecret: 'secret',
+		'requestObject.signingAlg': 'HS256',
+		grantTypes: [
+			'urn:ietf:params:oauth:grant-type:device_code',
+			'authorization_code'
+		],
+		redirectUris: ['https://client.example.com/cb']
+	},
+	{
+		clientId: 'client-with-HS-sig-expired',
+		client_secret_expires_at: 1,
+		token_endpoint_auth_method: 'none',
+		clientSecret: 'secret',
+		'requestObject.signingAlg': 'HS256',
+		grantTypes: [
+			'urn:ietf:params:oauth:grant-type:device_code',
+			'authorization_code'
+		],
+		redirectUris: ['https://client.example.com/cb']
+	}
+];
+
 export default {
-	config,
-	clients: [
-		{
-			clientId: 'client',
-			token_endpoint_auth_method: 'none',
-			clientSecret: 'secret',
-			grantTypes: [
-				'urn:ietf:params:oauth:grant-type:device_code',
-				'authorization_code'
-			],
-			redirectUris: ['https://client.example.com/cb']
-		},
-		{
-			clientId: 'client-requiredSignedRequestObject',
-			token_endpoint_auth_method: 'none',
-			require_signed_request_object: true,
-			clientSecret: 'secret',
-			grantTypes: [
-				'urn:ietf:params:oauth:grant-type:device_code',
-				'authorization_code'
-			],
-			redirectUris: ['https://client.example.com/cb']
-		},
-		{
-			clientId: 'client-with-HS-sig',
-			token_endpoint_auth_method: 'none',
-			clientSecret: 'secret',
-			'requestObject.signingAlg': 'HS256',
-			grantTypes: [
-				'urn:ietf:params:oauth:grant-type:device_code',
-				'authorization_code'
-			],
-			redirectUris: ['https://client.example.com/cb']
-		},
-		{
-			clientId: 'client-with-HS-sig-expired',
-			client_secret_expires_at: 1,
-			token_endpoint_auth_method: 'none',
-			clientSecret: 'secret',
-			'requestObject.signingAlg': 'HS256',
-			grantTypes: [
-				'urn:ietf:params:oauth:grant-type:device_code',
-				'authorization_code'
-			],
-			redirectUris: ['https://client.example.com/cb']
-		}
-	]
+	config
 };

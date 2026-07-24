@@ -127,6 +127,8 @@ test/
 
 **Client model** — A client is a TypeBox `ClientSchema`-validated **plain object** (`validateClient(metadata)`), not a class instance. Behaviour lives in pure functions under `lib/models/client/` (`checks`, `secret`, `sector`, `keystore`, `backchannel`); `lib/models/client.ts` re-exports them. The object exposes the historical method/getter surface (delegating to those functions) for call-site/test compatibility.
 
+**Client provisioning** — Clients are **single-sourced from `adapter('Client')`**; there is no boot-time `clients` option (a stray one is silently ignored) and no in-memory static/dynamic client store. `tryFindClient` reads the adapter on every resolution (so updates/deletes are always current) and validates at resolution time, backed only by a size-bounded validated-object memo. Every client is uniformly manageable through the admin control plane and DCR (no `noManage` class). Provision clients via the admin API / DCR / DB seed; tests seed them with the harness's `seedClient`.
+
 **Interaction system** — Login/consent are React pages served by `/interaction/*` routes. Interaction result is POSTed back; the server resumes the authorization flow.
 
 **Error convention** — Throw an `OIDCProviderError` subclass (`lib/helpers/errors.ts`). The subclasses are registered with the Elysia app via `.error({...})` in `lib/index.ts`; a single shared app-level `onError` (`lib/shared/authorization_error_handler.ts`) formats every one (RFC 6749 §5.2 body, `WWW-Authenticate`, `DPoP-Nonce`, response-mode/JARM delivery, HTML variant) and endpoints declare per-route `response` schemas. The legacy Koa-style `shared/error_handler.ts` has been removed.
@@ -139,7 +141,7 @@ Tests use **Bun's native test runner** with **Chai** assertions and **Sinon** st
 
 Each feature area has:
 
-- `*.config.ts` — provider config for that feature (clients, scopes, features flags)
+- `*.config.ts` — provider config for that feature (scopes, feature flags); a **named** `export const clients = [...]` (or `export const client = {...}`), separate from the default export, is seeded into the `Client` store by the harness (not passed to `provider.init`). Configs that clone another config's default export must re-export its `clients`.
 - `*.spec.ts` — test cases using the Eden type-safe HTTP client
 
 `test_helper.ts` bootstraps the provider with the right config before each suite. Use `bootstrap(import.meta)` at the top of a spec file.

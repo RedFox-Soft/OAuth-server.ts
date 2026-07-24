@@ -16,55 +16,56 @@ export const ApplicationConfig = {
 	'jwtUserinfo.enabled': true
 };
 
+export const clients = [
+	{
+		clientId: 'client',
+		clientSecret: 'secret',
+		redirectUris: ['https://client.example.com/cb'],
+		responseTypes: ['code'],
+		grantTypes: ['authorization_code'],
+		jwks: { keys: [await exportJWK(keypair.publicKey)] },
+		id_token_encrypted_response_alg: 'RSA-OAEP',
+		request_object_encryption_alg: 'A128KW',
+		userinfo_signed_response_alg: 'RS256',
+		userinfo_encrypted_response_alg: 'RSA-OAEP'
+	},
+	{
+		clientId: 'clientSymmetric',
+		clientSecret: 'secret',
+		redirectUris: ['https://client.example.com/cb'],
+		token_endpoint_auth_method: 'none',
+		responseTypes: ['code'],
+		grantTypes: ['authorization_code'],
+		id_token_encrypted_response_alg: 'A128KW'
+	},
+	{
+		clientId: 'clientSymmetric-expired',
+		clientSecret: 'secret',
+		redirectUris: ['https://client.example.com/cb'],
+		responseTypes: ['code'],
+		grantTypes: ['authorization_code'],
+		client_secret_expires_at: 1,
+		id_token_encrypted_response_alg: 'A128KW'
+	},
+	{
+		clientId: 'clientSymmetric-dir',
+		clientSecret: 'secret',
+		redirectUris: ['https://client.example.com/cb'],
+		responseTypes: ['code'],
+		grantTypes: ['authorization_code'],
+		id_token_encrypted_response_alg: 'dir'
+	},
+	{
+		clientId: 'clientRequestObjectSigningAlg',
+		clientSecret: 'secret',
+		redirectUris: ['https://client.example.com/cb'],
+		responseTypes: ['code'],
+		grantTypes: ['authorization_code'],
+		'requestObject.signingAlg': 'HS256',
+		request_object_encryption_alg: 'A128KW'
+	}
+];
+
 export default {
-	config,
-	clients: [
-		{
-			clientId: 'client',
-			clientSecret: 'secret',
-			redirectUris: ['https://client.example.com/cb'],
-			responseTypes: ['code'],
-			grantTypes: ['authorization_code'],
-			jwks: { keys: [await exportJWK(keypair.publicKey)] },
-			id_token_encrypted_response_alg: 'RSA-OAEP',
-			request_object_encryption_alg: 'A128KW',
-			userinfo_signed_response_alg: 'RS256',
-			userinfo_encrypted_response_alg: 'RSA-OAEP'
-		},
-		{
-			clientId: 'clientSymmetric',
-			clientSecret: 'secret',
-			redirectUris: ['https://client.example.com/cb'],
-			token_endpoint_auth_method: 'none',
-			responseTypes: ['code'],
-			grantTypes: ['authorization_code'],
-			id_token_encrypted_response_alg: 'A128KW'
-		},
-		{
-			clientId: 'clientSymmetric-expired',
-			clientSecret: 'secret',
-			redirectUris: ['https://client.example.com/cb'],
-			responseTypes: ['code'],
-			grantTypes: ['authorization_code'],
-			client_secret_expires_at: 1,
-			id_token_encrypted_response_alg: 'A128KW'
-		},
-		{
-			clientId: 'clientSymmetric-dir',
-			clientSecret: 'secret',
-			redirectUris: ['https://client.example.com/cb'],
-			responseTypes: ['code'],
-			grantTypes: ['authorization_code'],
-			id_token_encrypted_response_alg: 'dir'
-		},
-		{
-			clientId: 'clientRequestObjectSigningAlg',
-			clientSecret: 'secret',
-			redirectUris: ['https://client.example.com/cb'],
-			responseTypes: ['code'],
-			grantTypes: ['authorization_code'],
-			'requestObject.signingAlg': 'HS256',
-			request_object_encryption_alg: 'A128KW'
-		}
-	]
+	config
 };
