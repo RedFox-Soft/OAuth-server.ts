@@ -1,5 +1,5 @@
 import { provider } from 'lib/provider.js';
-import instance from '../helpers/weak_cache.ts';
+import { responseModes } from 'lib/response_modes/index.js';
 import { OIDCProviderError } from '../helpers/errors.ts';
 import { getErrorHtmlResponse } from '../html/error.tsx';
 import { routeNames } from 'lib/consts/param_list.js';
@@ -182,10 +182,10 @@ async function authorizationErrorHandler({
 		iss: ISSUER
 	};
 	let mode = params.response_mode;
-	if (!instance(provider).responseModes.has(mode)) {
+	if (!responseModes.has(mode)) {
 		mode = 'query';
 	}
-	const handler = instance(provider).responseModes.get(mode);
+	const handler = responseModes.get(mode);
 	return await handler(
 		{ oidc: redirectObj.oidc },
 		redirectObj.redirect_uri,

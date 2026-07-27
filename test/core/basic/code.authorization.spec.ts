@@ -21,6 +21,10 @@ import bootstrap, {
 import epochTime from '../../../lib/helpers/epoch_time.ts';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { provider } from 'lib/provider.js';
+// Imported after lib/provider.js on purpose. response_modes reaches the model graph (via the jwt
+// handler -> id_token), so importing it first would start the model/provider import cycle from the
+// wrong end and leave base_token half-initialised. Safe to move once that cycle is gone.
+import { responseModes } from 'lib/response_modes/index.js';
 import { Client } from 'lib/models/client.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 
@@ -701,7 +705,7 @@ describe('BASIC code', () => {
 					const serverErrorSpy = mock();
 					provider.once('authorization.error', authErrorSpy);
 					provider.once('server_error', serverErrorSpy);
-					spyOn(i(provider).responseModes, 'has').mockImplementation(() => {
+					spyOn(responseModes, 'has').mockImplementation(() => {
 						throw new Error('foobar');
 					});
 					const auth = new AuthorizationRequest({

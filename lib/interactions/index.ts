@@ -34,7 +34,7 @@ import { getUserStore, getBucketStore } from 'lib/adapters/index.js';
 import { issueAndSend } from 'lib/verification/challenge.js';
 import { Grant } from 'lib/models/grant.js';
 import { Client } from 'lib/models/client.js';
-import instance from 'lib/helpers/weak_cache.js';
+import { responseModes } from 'lib/response_modes/index.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { resolveBucketForClient } from 'lib/admin/auth/resolveBucket.js';
 import { buildConsentView, type PromptDetails } from './consentView.js';
@@ -66,7 +66,7 @@ async function resume(interaction, cookie) {
 		};
 		await setCookies();
 		const mode = ctx.oidc.responseMode ?? 'query';
-		const handler = instance(provider).responseModes.get(mode);
+		const handler = responseModes.get(mode);
 		return await handler({ oidc: ctx.oidc }, ctx.oidc.params.redirect_uri, out);
 	}
 

@@ -1,5 +1,5 @@
-import instance from '../../helpers/weak_cache.ts';
 import { InvalidRequestUri } from '../../helpers/errors.ts';
+import { responseModes } from 'lib/response_modes/index.js';
 import processResponseTypes from '../../helpers/process_response_types.ts';
 import { PushedAuthorizationRequest } from 'lib/models/pushed_authorization_request.js';
 import { ISSUER } from 'lib/configs/env.js';
@@ -48,6 +48,6 @@ export default async function respond(oidc) {
 	// event payload kept `{ oidc }`-shaped: tests assert `args[0][0].oidc.params`
 	oidc.provider.emit('authorization.success', { oidc }, out);
 
-	const handler = instance(oidc.provider).responseModes.get(responseMode);
+	const handler = responseModes.get(responseMode);
 	return await handler({ oidc }, params.redirect_uri, out);
 }

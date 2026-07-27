@@ -61,7 +61,13 @@ function sigAlgForKey(key) {
 
 import Configuration from './helpers/configuration.ts';
 import * as instance from './helpers/weak_cache.ts';
-import initializeApp from './helpers/initialize_app.ts';
+// Load-order anchor, not a dependency of this module. The models and the provider are mutually
+// cyclic (base_token -> formats/jwt -> this module), and id_token happens to pull that graph in an
+// order where base_token finishes evaluating before grant.ts reads BaseTokenPayload from it.
+// provider.ts used to get this for free by importing initialize_app (-> response_modes/jwt ->
+// id_token) at this position; that import is gone, so the anchor is now explicit. Remove it only
+// together with the underlying model/provider cycle.
+import './models/id_token.js';
 import { OIDCProviderError } from './helpers/errors.ts';
 import { BackchannelAuthenticationRequest } from './models/backchannel_authentication_request.js';
 import { Client } from './models/client.js';
@@ -86,8 +92,6 @@ class ProviderClass extends EventEmitter {
 		instance.set(this, this.#int);
 
 		this.#int.configuration = configuration;
-
-		this.#int.responseModes = new Map();
 
 		const keystore = new KeyStore();
 		// Keys are loaded from the jwksStore adapter (see configs/keys.ts). To change them, write
@@ -123,20 +127,11 @@ class ProviderClass extends EventEmitter {
 		});
 		this.#int.jwks = { keys };
 
-		initializeApp.call(this);
-
 		return this;
 	}
 
 	urlFor(name, opt) {
 		return new URL(this.pathFor(name, opt), this.issuer).href;
-	}
-
-	registerResponseMode(name, handler) {
-		const { responseModes } = this.#int;
-		if (!responseModes.has(name)) {
-			responseModes.set(name, handler.bind(this));
-		}
 	}
 
 	pathFor(name, { mountPath = '', ...opts } = {}) {

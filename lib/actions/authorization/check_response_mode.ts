@@ -2,7 +2,7 @@ import {
 	InvalidRequest,
 	UnsupportedResponseMode
 } from '../../helpers/errors.ts';
-import instance from '../../helpers/weak_cache.ts';
+import { responseModes } from 'lib/response_modes/index.js';
 
 /*
  * Resolves and assigns params.response_mode if it was not explicitly requested. Validates id_token
@@ -13,7 +13,7 @@ export default function checkResponseMode(oidc) {
 
 	const mode = oidc.responseMode;
 
-	if (mode !== undefined && !instance(oidc.provider).responseModes.has(mode)) {
+	if (mode !== undefined && !responseModes.has(mode)) {
 		params.response_mode = undefined;
 		throw new UnsupportedResponseMode();
 	}
