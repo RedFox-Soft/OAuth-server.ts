@@ -100,6 +100,25 @@ describe('admin JWKS API — view (US1)', () => {
 		expect(body.supportedAlgorithms).toEqual(['RS256', 'RS384', 'RS512']);
 		assertNoPrivateMaterial(body.keys);
 	});
+
+	// The view reads the persisted store directly, so it sees keys exactly as an operator wrote
+	// them — a key provisioned out of band may carry only the members its schema requires. `use`
+	// is inferred from `alg` (as verifyJWKs does at boot) rather than reported as absent, so the
+	// admin view and /jwks agree about what the key is for.
+	it('infers `use` for a store key provisioned without one', async () => {
+		const { cookie } = await sessionCookieFor(['super_admin']);
+		const {
+			keys: [key]
+		} = await generateJWKS('RS256');
+		const { use, ...withoutUse } = key as JWKS;
+		expect(use).toBe('sig'); // guard: the fixture really did carry a `use` to strip
+		await jwksStore.set(key.kid as string, withoutUse as JWKS);
+
+		const res = await client.admin.api.jwks.get({ headers: { cookie } });
+		const body = res.data as JwksState;
+		const view = body.keys.find((k) => k.kid === key.kid);
+		expect(view?.use).toBe('sig');
+	});
 });
 
 describe('admin JWKS API — generate (US2)', () => {

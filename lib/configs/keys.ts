@@ -1,7 +1,6 @@
 import { jwksStore } from '../adapters/index.js';
 import { generateJWKS } from '../helpers/jwks.js';
 import { verifyJWKs, type JWKS } from './verifyJWKs.js';
-import { ApplicationConfig } from './application.js';
 import { loadKeys } from './keystore.js';
 import type { JWKSStoreInstance } from '../adapters/types.js';
 
@@ -43,11 +42,7 @@ export const JWKS_KEYS: JWKS[] = await resolveKeys(jwksStore);
 // Populate the live keystore and the published JWKS (configs/keystore.ts) from the loaded set. The
 // keys are module state, single-sourced from the store, exactly as ApplicationConfig is module
 // state single-sourced from the config store — neither is an input to the provider.
-function applyKeys(): void {
-	loadKeys(JWKS_KEYS, Boolean(ApplicationConfig['encryption.enabled']));
-}
-
-applyKeys();
+loadKeys(JWKS_KEYS);
 
 /*
  * reloadJWKSKeys
@@ -65,6 +60,6 @@ export async function reloadJWKSKeys(): Promise<JWKS[]> {
 	const fresh = await resolveKeys(jwksStore);
 	JWKS_KEYS.length = 0;
 	JWKS_KEYS.push(...fresh);
-	applyKeys();
+	loadKeys(JWKS_KEYS);
 	return JWKS_KEYS;
 }

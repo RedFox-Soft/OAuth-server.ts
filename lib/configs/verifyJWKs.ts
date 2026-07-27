@@ -80,7 +80,14 @@ type reqProp = {
 export type StaticRSAKey = Static<typeof RSAKey>;
 type StaticECKey = Static<typeof ECKey>;
 type StaticOKPKey = Static<typeof OKPKey>;
-type preJWKS = StaticRSAKey | StaticECKey | StaticOKPKey;
+
+/*
+ * A key that satisfies its per-kty schema but has not been through verifyJWKs' normalization, so
+ * `kid` and `use` may still be absent (`alg` is required by every schema above, and so is always
+ * present). This is the type of anything read straight out of the key store; `JWKS` is the same key
+ * once normalized, with both filled in.
+ */
+export type UnnormalizedJWK = StaticRSAKey | StaticECKey | StaticOKPKey;
 export type JWKS =
 	(reqProp & StaticRSAKey) | (reqProp & StaticECKey) | (reqProp & StaticOKPKey);
 
@@ -137,7 +144,7 @@ export function verifyJWKs(jwks: unknown): jwks is { keys: JWKS[] } {
 	return true;
 }
 
-const calculateKid = (jwk: preJWKS) => {
+const calculateKid = (jwk: UnnormalizedJWK) => {
 	let components;
 
 	switch (jwk.kty) {
