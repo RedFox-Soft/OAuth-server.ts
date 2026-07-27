@@ -16,6 +16,7 @@ import type { User } from '../lib/adapters/types.ts';
 
 import { TestAdapter } from './models.js';
 import { AuthorizationRequest } from './AuthorizationRequest.js';
+import { setAddonBaseline } from './addon_baseline.js';
 
 // In test mode getUserStore() returns the in-memory UserStore, which exposes a
 // test-only `seed()` (see lib/adapters/memory/userStore.ts). The mongo store is
@@ -163,7 +164,8 @@ async function bootstrap(
 		clients: clientsExport,
 		client,
 		ApplicationConfig: app,
-		ClientDefaults: clientSettings
+		ClientDefaults: clientSettings,
+		addons: addonOverrides
 	} = await import(conf);
 	const { config } = mod;
 	let clients = clientsExport;
@@ -172,6 +174,12 @@ async function bootstrap(
 		clients = [client];
 	}
 	AuthorizationRequest.clients = clients;
+
+	// Behavior functions are overridden through the addon registry, not the
+	// provider config. A *.config.ts declares them via a named `addons` export
+	// (a flat map of behaviour-function overrides); that becomes this spec's
+	// registry baseline (see test/addon_baseline.ts).
+	setAddonBaseline(addonOverrides);
 
 	Object.assign(ApplicationConfig, applicationDefaultSettings, app || {});
 	Object.assign(ClientDefaults, clientDefaultSettings, clientSettings || {});

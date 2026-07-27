@@ -2,7 +2,9 @@ import getConfig from '../default.config.js';
 
 const config = getConfig();
 
-config.pairwiseIdentifier = () => 'pairwise-sub';
+export const addons = {
+	pairwiseIdentifier: () => 'pairwise-sub'
+};
 // Asserts scope-requested profile claims (gender, email, …); the spec seeds them
 // onto the account via setSeedClaims(fullProfileClaims).
 

@@ -8,6 +8,7 @@ import { ApplicationConfig } from 'lib/configs/application.js';
 import filterClaims from '../../helpers/filter_claims.ts';
 import revoke from '../../helpers/revoke.ts';
 import resolveResource from '../../helpers/resolve_resource.ts';
+import { getResourceServerInfo, issueRefreshToken } from '../../addon/index.js';
 import { IdToken } from 'lib/models/id_token.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AccessToken } from 'lib/models/access_token.js';
@@ -28,11 +29,7 @@ export const handler = async function cibaHandler(oidc, dPoP) {
 		);
 	}
 
-	const {
-		issueRefreshToken,
-		conformIdTokenClaims,
-		features: { userinfo, resourceIndicators }
-	} = instance(oidc.provider).configuration;
+	const { conformIdTokenClaims } = instance(oidc.provider).configuration;
 
 	const request = await BackchannelAuthenticationRequest.find(
 		oidc.params.auth_req_id,
@@ -134,13 +131,10 @@ export const handler = async function cibaHandler(oidc, dPoP) {
 		at.setThumbprint('jkt', dPoP.thumbprint);
 	}
 
-	const resource = await resolveResource({ oidc }, request, {
-		userinfo,
-		resourceIndicators
-	});
+	const resource = await resolveResource({ oidc }, request);
 
 	if (resource) {
-		const resourceServerInfo = await resourceIndicators.getResourceServerInfo(
+		const resourceServerInfo = await getResourceServerInfo(
 			{ oidc },
 			resource,
 			oidc.client

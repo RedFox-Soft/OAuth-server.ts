@@ -1,51 +1,7 @@
-import { mustChange } from '../addon/_warn.ts';
-import { clientBasedCORS } from '../addon/cors.ts';
-import {
-	getCertificate,
-	certificateAuthorized,
-	certificateSubjectMatches
-} from '../addon/mtls.ts';
-import { deviceInfo } from '../addon/interactions.ts';
-import { introspectionAllowedPolicy } from '../addon/introspection.ts';
-import {
-	idFactory,
-	secretFactory,
-	expiresWithSession,
-	issueRefreshToken,
-	pairwiseIdentifier,
-	rotateRefreshToken
-} from '../addon/tokens.ts';
-import {
-	defaultResource,
-	useGrantedResource,
-	getResourceServerInfo
-} from '../addon/resources.ts';
-import { loadExistingGrant } from '../addon/account.ts';
-import {
-	sectorIdentifierUriValidate,
-	assertClaimsParameter,
-	assertJwtClaimsAndHeader
-} from '../addon/claims.ts';
-import {
-	processLoginHintToken,
-	processLoginHint,
-	verifyUserCode,
-	validateBindingMessage,
-	validateRequestContext,
-	triggerAuthenticationDevice
-} from '../addon/ciba.ts';
 import { base as defaultPolicy } from './interaction_policy/index.ts';
 
 function makeDefaults() {
 	const defaults = {
-		/*
-		 * clientBasedCORS
-		 *
-		 * description: Function used to check whether a given CORS request should be allowed
-		 *   based on the request's client.
-		 */
-		clientBasedCORS,
-
 		/*
 		 * clientDefaults
 		 *
@@ -65,14 +21,6 @@ function makeDefaults() {
 		conformIdTokenClaims: true,
 
 		/*
-		 * loadExistingGrant
-		 *
-		 * description: Helper function used to load existing but also just in time pre-established Grants
-		 * to attempt to resolve an Authorization Request with.
-		 */
-		loadExistingGrant,
-
-		/*
 		 * discovery
 		 *
 		 * description: Pass additional properties to this object to extend the discovery document
@@ -88,172 +36,6 @@ function makeDefaults() {
 		},
 
 		/*
-		 * features
-		 *
-		 * description: Deployment-specific helper functions for each feature. Feature enable flags and
-		 *   sub-options are NOT here — they are owned by ApplicationConfig and read from it directly.
-		 */
-		features: {
-			/*
-			 * features.ciba.* — CIBA helper functions
-			 *
-			 * triggerAuthenticationDevice, validateBindingMessage, validateRequestContext,
-			 * processLoginHintToken, processLoginHint, verifyUserCode
-			 */
-			ciba: {
-				triggerAuthenticationDevice,
-				validateBindingMessage,
-				validateRequestContext,
-				processLoginHintToken,
-				processLoginHint,
-				verifyUserCode
-			},
-
-			/*
-			 * features.mTLS.* — Mutual TLS helper functions
-			 *
-			 * getCertificate, certificateAuthorized, certificateSubjectMatches
-			 */
-			mTLS: {
-				getCertificate,
-				certificateAuthorized,
-				certificateSubjectMatches
-			},
-
-			/*
-			 * features.claimsParameter.assertClaimsParameter
-			 */
-			claimsParameter: {
-				assertClaimsParameter
-			},
-
-			/*
-			 * features.deviceFlow.* — Device Flow helper functions
-			 *
-			 * The end-user HTML pages are default server-rendered views in lib/html/device.tsx;
-			 * they are not overridable source functions.
-			 */
-			deviceFlow: {
-				deviceInfo
-			},
-
-			/*
-			 * features.introspection.allowedPolicy
-			 */
-			introspection: {
-				allowedPolicy: introspectionAllowedPolicy
-			},
-
-			/*
-			 * features.registration.* — Dynamic Client Registration helper functions
-			 *
-			 * idFactory, secretFactory
-			 */
-			registration: {
-				idFactory,
-				secretFactory
-			},
-
-			/*
-			 * features.richAuthorizationRequests.* — RAR transform helper functions
-			 *
-			 * These must be provided by the deployment; the defaults throw via mustChange.
-			 */
-			richAuthorizationRequests: {
-				rarForAuthorizationCode(_ctx: unknown) {
-					// decision points:
-					// - ctx.oidc.client
-					// - ctx.oidc.resourceServers
-					// - ctx.oidc.params.authorization_details (unparsed authorization_details from the authorization request)
-					// - ctx.oidc.grant.rar (authorization_details granted)
-					mustChange(
-						'features.richAuthorizationRequests.rarForAuthorizationCode',
-						'transform the requested and granted RAR details to be passed in the authorization code'
-					);
-					throw new Error(
-						'features.richAuthorizationRequests.rarForAuthorizationCode not implemented'
-					);
-				},
-				rarForCodeResponse(_ctx: unknown, _resourceServer: unknown) {
-					mustChange(
-						'features.richAuthorizationRequests.rarForCodeResponse',
-						'transform the requested and granted RAR details to be returned in the Access Token Response as authorization_details as well as assigned to the issued Access Token'
-					);
-					throw new Error(
-						'features.richAuthorizationRequests.rarForCodeResponse not implemented'
-					);
-				},
-				rarForRefreshTokenResponse(_ctx: unknown, _resourceServer: unknown) {
-					mustChange(
-						'features.richAuthorizationRequests.rarForRefreshTokenResponse',
-						'transform the requested and granted RAR details to be returned in the Access Token Response as authorization_details as well as assigned to the issued Access Token'
-					);
-					throw new Error(
-						'features.richAuthorizationRequests.rarForRefreshTokenResponse not implemented'
-					);
-				},
-				rarForIntrospectionResponse(_ctx: unknown, _token: unknown) {
-					mustChange(
-						'features.richAuthorizationRequests.rarForIntrospectionResponse',
-						"transform the token's stored RAR details to be returned in the Introspection Response"
-					);
-					throw new Error(
-						'features.richAuthorizationRequests.rarForIntrospectionResponse not implemented'
-					);
-				}
-			},
-
-			/*
-			 * features.resourceIndicators.* — Resource Indicators helper functions
-			 *
-			 * defaultResource, useGrantedResource, getResourceServerInfo
-			 */
-			resourceIndicators: {
-				defaultResource,
-				useGrantedResource,
-				getResourceServerInfo
-			},
-
-			/*
-			 * features.requestObjects.assertJwtClaimsAndHeader
-			 */
-			requestObjects: {
-				assertJwtClaimsAndHeader
-			}
-		},
-
-		/*
-		 * expiresWithSession
-		 *
-		 * description: Function used to decide whether the given artifact should be bound to the user session.
-		 */
-		expiresWithSession,
-
-		/*
-		 * issueRefreshToken
-		 *
-		 * description: Function used to decide whether a refresh token will be issued or not
-		 */
-		issueRefreshToken,
-
-		/*
-		 * pairwiseIdentifier
-		 *
-		 * description: Function used by the authorization server when resolving pairwise ID Token and Userinfo sub claim
-		 *   values.
-		 */
-		pairwiseIdentifier,
-
-		/*
-		 * sectorIdentifierUriValidate
-		 *
-		 * description: Function called to make a decision about whether sectorIdentifierUri of
-		 * a client being loaded, registered, or updated should be fetched and its contents
-		 * validated against the client metadata.
-		 */
-		sectorIdentifierUriValidate,
-
-		/*
 		 * interactions
 		 *
 		 * description: Holds the configuration for interaction policy and a URL to send end-users to
@@ -263,14 +45,7 @@ function makeDefaults() {
 		 */
 		interactions: {
 			policy: defaultPolicy()
-		},
-
-		/*
-		 * rotateRefreshToken
-		 *
-		 * description: Configures if and how the authorization server rotates refresh tokens after they are used.
-		 */
-		rotateRefreshToken
+		}
 	};
 
 	return defaults;

@@ -1,14 +1,9 @@
 import combinedScope from './combined_scope.ts';
-import instance from './weak_cache.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';
+import { expiresWithSession, rarForAuthorizationCode } from '../addon/index.js';
 
 async function codeHandler(ctx) {
-	const {
-		expiresWithSession,
-		features: { richAuthorizationRequests }
-	} = instance(ctx.oidc.provider).configuration;
-
 	const { grant } = ctx.oidc;
 
 	const scopeSet = combinedScope(
@@ -36,8 +31,7 @@ async function codeHandler(ctx) {
 	});
 
 	if (ApplicationConfig['richAuthorizationRequests.enabled']) {
-		code.payload.rar =
-			await richAuthorizationRequests.rarForAuthorizationCode(ctx);
+		code.payload.rar = await rarForAuthorizationCode(ctx);
 	}
 
 	if (Object.keys(code.payload.claims).length === 0) {

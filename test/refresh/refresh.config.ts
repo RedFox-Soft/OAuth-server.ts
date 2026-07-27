@@ -2,7 +2,9 @@ import getConfig from '../default.config.js';
 
 const config = getConfig();
 
-config.rotateRefreshToken = false;
+export const addons = {
+	rotateRefreshToken: () => false
+};
 
 export const clients = [
 	{

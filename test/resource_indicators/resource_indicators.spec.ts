@@ -6,7 +6,7 @@ import bootstrap, {
 	jsonToFormUrlEncoded,
 	type Setup
 } from '../test_helper.js';
-import { defaults } from '../../lib/helpers/defaults.ts';
+import * as resourceIndicators from '../../lib/addon/resources.js';
 import { provider } from 'lib/provider.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { AccessToken } from 'lib/models/access_token.js';
@@ -14,10 +14,6 @@ import { Client } from 'lib/models/client.js';
 import { grantFlags, resetGrantFlags } from './grant_flags.ts';
 
 const form = 'application/x-www-form-urlencoded';
-
-const {
-	features: { resourceIndicators }
-} = defaults;
 
 describe('features.resourceIndicators defaults', () => {
 	it('defaultResource', async () => {

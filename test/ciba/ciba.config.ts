@@ -15,7 +15,7 @@ export const ApplicationConfig = {
 	'ciba.deliveryModes': ['poll', 'ping']
 };
 
-config.features.ciba = {
+export const addons = {
 	processLoginHint(ctx, loginHint) {
 		assert(ctx?.oidc);
 		assert(typeof loginHint === 'string');

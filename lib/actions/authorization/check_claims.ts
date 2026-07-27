@@ -1,6 +1,6 @@
 import { InvalidRequest } from '../../helpers/errors.ts';
-import instance from '../../helpers/weak_cache.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
+import { assertClaimsParameter } from '../../addon/index.js';
 
 /*
  * If claims parameter is provided and supported handles its validation
@@ -29,12 +29,7 @@ export default async function checkClaims(oidc) {
 				);
 			}
 
-			const { claimsParameter } = instance(oidc.provider).features;
-			await claimsParameter.assertClaimsParameter?.(
-				oidc,
-				params.claims,
-				oidc.client
-			);
+			await assertClaimsParameter(oidc, params.claims, oidc.client);
 		}
 	}
 }

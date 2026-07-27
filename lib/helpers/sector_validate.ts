@@ -2,14 +2,14 @@ import { STATUS_CODES } from 'node:http';
 
 import { type ClientSchemaType } from '../configs/clientSchema.ts';
 
-import instance from './weak_cache.ts';
 import { InvalidClientMetadata } from './errors.ts';
+import { sectorIdentifierUriValidate } from '../addon/index.js';
 
 export default async function sectorValidate(
-	provider: object,
+	_provider: object,
 	client: ClientSchemaType
 ) {
-	if (!instance(provider).configuration.sectorIdentifierUriValidate(client)) {
+	if (!sectorIdentifierUriValidate(client)) {
 		return;
 	}
 

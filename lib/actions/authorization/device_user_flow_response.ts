@@ -1,9 +1,8 @@
-import instance from '../../helpers/weak_cache.ts';
 import combinedScope from '../../helpers/combined_scope.ts';
 import { deviceSuccessPage } from '../../html/device.js';
+import { expiresWithSession } from '../../addon/index.js';
 
 export default async function deviceVerificationResponse(oidc) {
-	const { configuration } = instance(oidc.provider);
 	const code = oidc.deviceCode;
 
 	const scopeSet = combinedScope(
@@ -37,7 +36,7 @@ export default async function deviceVerificationResponse(oidc) {
 			break;
 	}
 
-	if (await configuration.expiresWithSession({ oidc }, code)) {
+	if (await expiresWithSession({ oidc }, code)) {
 		code.payload.expiresWithSession = true;
 	} else {
 		oidc.session.authorizationFor(oidc.client.clientId).persistsLogout = true;

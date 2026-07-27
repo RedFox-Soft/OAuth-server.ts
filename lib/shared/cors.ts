@@ -1,9 +1,8 @@
 import { InvalidRequest } from '../helpers/errors.ts';
-import instance from '../helpers/weak_cache.ts';
+import { clientBasedCORS } from '../addon/index.js';
 
 function checkClientCORS(ctx, client) {
 	const origin = ctx.get('Origin');
-	const { clientBasedCORS } = instance(ctx.oidc.provider).configuration;
 
 	const allowed = clientBasedCORS(ctx, origin, client);
 

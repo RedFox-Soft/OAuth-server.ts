@@ -12,10 +12,14 @@ export async function secretFactory(_ctx) {
 	return crypto.randomBytes(64).toString('base64url');
 }
 
+// Decides whether the given artifact is bound to the end-user session; the
+// default binds everything except offline_access grants so they survive logout.
 export async function expiresWithSession(ctx, code) {
 	return !code.scopes.has('offline_access');
 }
 
+// Decides whether a refresh token is issued for this exchange (grant advertisement
+// is a separate concern owned by ApplicationConfig['refreshToken.enabled']).
 export async function issueRefreshToken(ctx, client, code) {
 	return (
 		client.grantTypeAllowed('refresh_token') &&
@@ -36,6 +40,8 @@ export async function pairwiseIdentifier(accountId, client) {
 		.digest('hex');
 }
 
+// Decides if and how a refresh token is rotated after use. Returns a Boolean;
+// the default rotates public-client and near-expiry tokens (capped at ~1 year).
 export function rotateRefreshToken(ctx) {
 	const { RefreshToken: refreshToken, Client: client } = ctx.oidc.entities;
 

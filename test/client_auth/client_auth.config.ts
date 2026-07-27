@@ -2,7 +2,6 @@ import { X509Certificate } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
 import cloneDeep from 'lodash/cloneDeep.js';
-import merge from 'lodash/merge.js';
 
 import key from '../client.sig.key.js';
 import getConfig from '../default.config.js';
@@ -42,28 +41,26 @@ export const ApplicationConfig = {
 	'mTLS.tlsClientAuth': true
 };
 
-merge(config.features, {
-	mTLS: {
-		getCertificate(ctx) {
-			try {
-				return new X509Certificate(
-					Buffer.from(ctx.get('x-ssl-client-cert'), 'base64')
-				);
-			} catch (e) {
-				return undefined;
-			}
-		},
-		certificateAuthorized(ctx) {
-			return ctx.get('x-ssl-client-verify') === 'SUCCESS';
-		},
-		certificateSubjectMatches(ctx, property, expected) {
-			return (
-				property === 'tls_client_auth_san_dns' &&
-				ctx.get('x-ssl-client-san-dns') === expected
+export const addons = {
+	getCertificate(ctx) {
+		try {
+			return new X509Certificate(
+				Buffer.from(ctx.get('x-ssl-client-cert'), 'base64')
 			);
+		} catch (e) {
+			return undefined;
 		}
+	},
+	certificateAuthorized(ctx) {
+		return ctx.get('x-ssl-client-verify') === 'SUCCESS';
+	},
+	certificateSubjectMatches(ctx, property, expected) {
+		return (
+			property === 'tls_client_auth_san_dns' &&
+			ctx.get('x-ssl-client-san-dns') === expected
+		);
 	}
-});
+};
 
 export const clients = [
 	{

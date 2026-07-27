@@ -1,11 +1,10 @@
 import { Grant } from 'lib/models/grant.js';
-import instance from '../../helpers/weak_cache.ts';
+import { loadExistingGrant } from '../../addon/index.js';
 
 /*
  * Load or establish a new Grant object when the user is known.
  */
 export default async function loadGrant(oidc) {
-	const { loadExistingGrant } = instance(oidc.provider).configuration;
 	if (oidc.account) {
 		let grant = await loadExistingGrant(oidc);
 		if (grant) {

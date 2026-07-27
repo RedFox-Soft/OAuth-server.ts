@@ -1,5 +1,3 @@
-import merge from 'lodash/merge.js';
-
 import * as errors from '../../lib/helpers/errors.ts';
 import getConfig from '../default.config.js';
 import { Grant } from 'lib/models/grant.js';
@@ -7,61 +5,55 @@ import { grantFlags } from './grant_flags.ts';
 
 const config = getConfig();
 
-merge(config, {
+export const addons = {
 	issueRefreshToken() {
 		return true;
 	},
-	features: {
-		ciba: {
-			processLoginHint(ctx, loginHint) {
-				return loginHint;
-			},
-			validateBindingMessage() {},
-			validateRequestContext() {},
-			verifyUserCode() {},
-			async triggerAuthenticationDevice(ctx, request) {
-				const grant = new Grant({
-					clientId: request.payload.clientId,
-					accountId: request.payload.accountId
-				});
-				grant.addOIDCScope(ctx.oidc.requestParamScopes);
+	processLoginHint(ctx, loginHint) {
+		return loginHint;
+	},
+	validateBindingMessage() {},
+	validateRequestContext() {},
+	verifyUserCode() {},
+	async triggerAuthenticationDevice(ctx, request) {
+		const grant = new Grant({
+			clientId: request.payload.clientId,
+			accountId: request.payload.accountId
+		});
+		grant.addOIDCScope(ctx.oidc.requestParamScopes);
 
-				const resources = Array.isArray(request.payload.resource)
-					? request.payload.resource
-					: [request.payload.resource];
+		const resources = Array.isArray(request.payload.resource)
+			? request.payload.resource
+			: [request.payload.resource];
 
-				for (const resource of resources) {
-					grant.addResourceScope(resource, request.payload.scope);
-				}
-
-				await grant.save();
-				return ctx.oidc.provider.backchannelResult(request, grant.jti);
-			}
-		},
-		resourceIndicators: {
-			async useGrantedResource() {
-				return grantFlags.useGranted;
-			},
-			getResourceServerInfo(ctx, resource) {
-				if (resource.includes('wl')) {
-					return {
-						audience: resource,
-						scope: 'api:read api:write'
-					};
-				}
-
-				throw new errors.InvalidTarget();
-			},
-			defaultResource() {
-				if (grantFlags.noDefault) {
-					return undefined;
-				}
-
-				return 'urn:wl:default';
-			}
+		for (const resource of resources) {
+			grant.addResourceScope(resource, request.payload.scope);
 		}
+
+		await grant.save();
+		return ctx.oidc.provider.backchannelResult(request, grant.jti);
+	},
+	async useGrantedResource() {
+		return grantFlags.useGranted;
+	},
+	getResourceServerInfo(ctx, resource) {
+		if (resource.includes('wl')) {
+			return {
+				audience: resource,
+				scope: 'api:read api:write'
+			};
+		}
+
+		throw new errors.InvalidTarget();
+	},
+	defaultResource() {
+		if (grantFlags.noDefault) {
+			return undefined;
+		}
+
+		return 'urn:wl:default';
 	}
-});
+};
 
 export const ApplicationConfig = {
 	'authorization.allowOmittingSingleRegisteredRedirectUri': true,
@@ -69,7 +61,11 @@ export const ApplicationConfig = {
 	'introspection.enabled': true,
 	'deviceFlow.enabled': true,
 	'ciba.enabled': true,
-	'resourceIndicators.enabled': true
+	'resourceIndicators.enabled': true,
+	// This suite issues refresh tokens (issueRefreshToken override returns true)
+	// without requesting offline_access, so advertise the grant explicitly now
+	// that it is no longer inferred from a customized issueRefreshToken (FR-016).
+	'refreshToken.enabled': true
 };
 
 export const clients = [

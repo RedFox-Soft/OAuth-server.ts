@@ -1,8 +1,11 @@
-import instance from '../helpers/weak_cache.ts';
 import { InvalidRequest } from '../helpers/errors.ts';
 import { Elysia, t } from 'elysia';
 import { routeNames } from 'lib/consts/param_list.js';
-import { provider } from 'lib/provider.js';
+import {
+	introspectionAllowedPolicy,
+	pairwiseIdentifier,
+	rarForIntrospectionResponse
+} from '../addon/index.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { IdToken } from 'lib/models/id_token.js';
@@ -42,15 +45,6 @@ const tokenTypes = {
 
 async function renderTokenResponse(oidc) {
 	const { params } = oidc;
-	const { configuration } = instance(provider);
-	const {
-		pairwiseIdentifier,
-		features: {
-			introspection: { allowedPolicy },
-			richAuthorizationRequests
-		}
-	} = configuration;
-
 	let token;
 
 	const methodToken = tokenTypes[params.token_type_hint];
@@ -95,7 +89,7 @@ async function renderTokenResponse(oidc) {
 		return { active: false };
 	}
 
-	if (!(await allowedPolicy({ oidc }, oidc.client, token))) {
+	if (!(await introspectionAllowedPolicy({ oidc }, oidc.client, token))) {
 		return { active: false };
 	}
 
@@ -122,10 +116,7 @@ async function renderTokenResponse(oidc) {
 		jti: token.payload.jti !== params.token ? token.payload.jti : undefined,
 		aud: token.payload.aud,
 		authorization_details: token.payload.rar
-			? await richAuthorizationRequests.rarForIntrospectionResponse(
-					{ oidc },
-					token
-				)
+			? await rarForIntrospectionResponse({ oidc }, token)
 			: undefined,
 		scope: token.payload.scope || undefined,
 		cnf: token.isSenderConstrained() ? {} : undefined,

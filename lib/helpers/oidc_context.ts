@@ -5,6 +5,7 @@ import { provider } from '../provider.js';
 import { isPlainObject } from './_/object.js';
 import { ApplicationConfig as config } from 'lib/configs/application.js';
 import { ISSUER } from 'lib/configs/env.js';
+import { getCertificate } from '../addon/index.js';
 
 export class OIDCContext<T extends Record<string, unknown>> {
 	#requestParamClaims = null;
@@ -30,10 +31,7 @@ export class OIDCContext<T extends Record<string, unknown>> {
 	}
 
 	isFapi() {
-		const {
-			features: { fapi }
-		} = instance(provider).configuration;
-		return fapi.enabled;
+		return config['fapi.enabled'];
 	}
 
 	get provider() {
@@ -203,7 +201,7 @@ export class OIDCContext<T extends Record<string, unknown>> {
 	}
 
 	getClientCertificate() {
-		return instance(provider).features.mTLS.getCertificate(this);
+		return getCertificate(this);
 	}
 
 	getAccessToken({ acceptDPoP = false } = {}) {

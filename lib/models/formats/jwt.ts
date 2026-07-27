@@ -5,6 +5,7 @@ import instance from '../../helpers/weak_cache.ts';
 import nanoid from '../../helpers/nanoid.js';
 import { provider } from 'lib/provider.js';
 import { ISSUER } from 'lib/configs/env.js';
+import { pairwiseIdentifier } from '../../addon/index.js';
 
 async function getResourceServerConfig(token) {
 	const { keystore, configuration } = instance(provider);
@@ -129,7 +130,6 @@ export const jwt = {
 				throw new TypeError('clientId and client mismatch');
 			}
 			if (client.subjectType === 'pairwise') {
-				const { pairwiseIdentifier } = instance(provider).configuration;
 				sub = await pairwiseIdentifier(sub, client);
 			}
 		}

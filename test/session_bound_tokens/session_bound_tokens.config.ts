@@ -6,8 +6,9 @@ export const ApplicationConfig = {
 	'deviceFlow.enabled': true
 };
 
-config.issueRefreshToken = (ctx, client) =>
-	client.grantTypeAllowed('refresh_token');
+export const addons = {
+	issueRefreshToken: (ctx, client) => client.grantTypeAllowed('refresh_token')
+};
 
 export const clients = [
 	{

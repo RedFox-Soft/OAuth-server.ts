@@ -15,16 +15,6 @@ function toSet(name, value) {
 	return new Set(value);
 }
 
-function featuresTypeErrorCheck({ features }) {
-	for (const value of Object.values(features)) {
-		if (typeof value === 'boolean') {
-			throw new TypeError(
-				'Features are not enabled/disabled with a boolean value. See the documentation for more details.'
-			);
-		}
-	}
-}
-
 class Configuration {
 	#defaults = getDefaults();
 
@@ -52,8 +42,6 @@ class Configuration {
 		this.claims = structuredClone(
 			merge({}, ApplicationConfig.claims, config.claims ?? {})
 		);
-
-		featuresTypeErrorCheck(this);
 
 		this.logDraftNotice();
 
@@ -109,7 +97,7 @@ class Configuration {
 
 		if (
 			this.scopes.has('offline_access') ||
-			this.issueRefreshToken !== this.#defaults.issueRefreshToken
+			ApplicationConfig['refreshToken.enabled']
 		) {
 			this.grantTypes.add('refresh_token');
 		}

@@ -1,4 +1,5 @@
 import i from 'lib/helpers/weak_cache.js';
+import { addons } from 'lib/addon/index.js';
 import { parse as parseUrl } from 'node:url';
 import {
 	describe,
@@ -352,11 +353,7 @@ describe('grant_type=refresh_token', () => {
 
 	describe('rotateRefreshToken=true', () => {
 		beforeEach(function () {
-			i(provider).configuration.rotateRefreshToken = true;
-		});
-
-		afterEach(function () {
-			i(provider).configuration.rotateRefreshToken = false;
+			addons.override({ rotateRefreshToken: () => true });
 		});
 
 		it('populates ctx.oidc.entities', async function () {
@@ -538,8 +535,7 @@ describe('grant_type=refresh_token', () => {
 
 	describe('rotateRefreshToken is a function (returns true)', () => {
 		beforeEach(function () {
-			const conf = i(provider).configuration;
-			spyOn(conf, 'rotateRefreshToken').mockReturnValue(true);
+			addons.override({ rotateRefreshToken: () => true });
 		});
 
 		it('populates ctx.oidc.entities', async function () {
@@ -719,8 +715,7 @@ describe('grant_type=refresh_token', () => {
 
 	describe('rotateRefreshToken is a function (returns false)', () => {
 		beforeEach(function () {
-			const conf = i(provider).configuration;
-			spyOn(conf, 'rotateRefreshToken').mockReturnValue(false);
+			addons.override({ rotateRefreshToken: () => false });
 		});
 
 		it('does not rotate', async function () {

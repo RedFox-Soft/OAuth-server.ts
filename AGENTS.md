@@ -95,7 +95,7 @@ lib/
   models/               ← AccessToken, RefreshToken, IdToken, Grant, Session, …
     client.ts           ← façade: validated plain-object client + pure-function exports
     client/             ← checks, secret, sector, keystore, backchannel, validate, schema
-  addon/                ← behavioural config-default functions (CORS, mTLS, claims, findAccount, …)
+  addon/                ← overridable behaviour functions (CORS, mTLS, claims, tokens, …); index.ts is the single import seam + override registry
   helpers/              ← JWT, crypto, claims, validation utilities
   adapters/             ← MongoDB adapter; TestAdapter (in-memory) for tests
   plugins/              ← Elysia plugins: noCache, noQueryDup, auth
@@ -115,7 +115,9 @@ test/
 
 **Action pipeline** — Each endpoint is a composed sequence of async functions that take the typed `OIDCContext` **directly as `oidc`** (the former `ctx = { oidc }` wrapper is gone). Helpers have `(oidc)` signatures and read `oidc.params`/`oidc.client`/`oidc.entities`/`oidc.cookie`/etc.; handlers **return** their typed response value (no `ctx.body`/`ctx.status` mutation). User-overridable config callbacks (findAccount, resourceIndicators.\*, interaction-policy `check(ctx)`, response-mode handlers) keep a `{ oidc }`-shaped argument as a public-API boundary; callers pass `{ oidc }` there. Event payloads that tests inspect (`authorization.success`, `registration_create.success`, `device_authorization.success`) stay `{ oidc }`-shaped.
 
-**Config** — `lib/configs/application.ts` is the **single source of truth for all flag/option DATA** (flat dotted keys, each with an inline description). Behavioural function defaults live in `lib/addon/`. `lib/helpers/configuration.ts` (`Configuration`) expands the flat data into the nested `features.*` shape, runs the validation/collection passes, and **owns** the resolved object `provider.ts` reads — there is no `globalConfiguration.ts`.
+**Config** — `lib/configs/application.ts` is the **single source of truth for all flag/option DATA** (flat dotted keys, each with an inline description). `lib/helpers/configuration.ts` (`Configuration`) runs the validation/collection passes and **owns** the resolved object `provider.ts` reads — there is no `globalConfiguration.ts`, and `lib/helpers/defaults.ts` now holds only literal data defaults (client defaults, conformIdTokenClaims, discovery, interaction policy).
+
+**Behaviour functions** — Overridable server behaviour (CORS, token issuance/rotation, resource-server info, CIBA/mTLS/RAR/registration helpers, …) is **single-sourced through `lib/addon/index.ts`**. Each function's default lives in its addon module; the index exposes a dynamic call-time accessor per function plus an `addons.override(partial)` / `addons.reset()` registry (`lib/addon/registry.ts`). Source modules import the accessor from the index — never off the merged configuration. Deployments and tests override via the registry (the test harness resets it after every test via `test/preload.ts`; `test/addon_baseline.ts` bridges a `*.config.ts`'s behaviour-fn overrides into a per-spec baseline). `findAccount` / `assertJwtClientAuthClaimsAndHeader` keep their existing direct imports.
 
 **Adapter pattern** — All persistence goes through a `StorageAdapter` interface. Swap implementations without touching business logic. Use `TestAdapter` (in-memory) for unit/integration tests.
 

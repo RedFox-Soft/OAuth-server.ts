@@ -13,7 +13,9 @@ merge(config.features, {
 		}
 	}
 });
-config.pairwiseIdentifier = () => 'pairwise-sub';
+export const addons = {
+	pairwiseIdentifier: () => 'pairwise-sub'
+};
 
 // Provide an additional, algorithm-unlocked RSA signing key so the JWT format tests can
 // exercise PS256 (the default RSA key is pinned to RS256). Scoped to this test's provider

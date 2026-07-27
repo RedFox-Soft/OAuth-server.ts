@@ -1,6 +1,7 @@
 import i from 'lib/helpers/weak_cache.js';
-import { describe, it, expect } from 'bun:test';
+import { describe, it, expect, afterEach } from 'bun:test';
 import provider from '../../lib/index.ts';
+import { ApplicationConfig } from 'lib/configs/application.js';
 
 describe('Provider declaring support for refresh_token grant type', () => {
 	it('is enabled by default', () => {
@@ -22,13 +23,15 @@ describe('Provider declaring support for refresh_token grant type', () => {
 		expect(i(provider).configuration.grantTypes).toContain('refresh_token');
 	});
 
-	it('is enabled when issueRefreshToken configuration function is configured', () => {
+	it('is enabled when the refreshToken.enabled flag is set', () => {
+		ApplicationConfig['refreshToken.enabled'] = true;
 		provider.init({
-			scopes: ['openid'],
-			issueRefreshToken() {
-				return true;
-			}
+			scopes: ['openid']
 		});
 		expect(i(provider).configuration.grantTypes).toContain('refresh_token');
+	});
+
+	afterEach(() => {
+		ApplicationConfig['refreshToken.enabled'] = false;
 	});
 });

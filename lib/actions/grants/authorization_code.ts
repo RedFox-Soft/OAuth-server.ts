@@ -8,6 +8,11 @@ import revoke from '../../helpers/revoke.ts';
 import filterClaims from '../../helpers/filter_claims.ts';
 import resolveResource from '../../helpers/resolve_resource.ts';
 import checkRar from '../../shared/check_rar.ts';
+import {
+	getResourceServerInfo,
+	issueRefreshToken,
+	rarForCodeResponse
+} from '../../addon/index.js';
 import { IdToken } from 'lib/models/id_token.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';
@@ -18,11 +23,7 @@ import ResourceServer from 'lib/helpers/resource_server.js';
 const gty = 'authorization_code';
 
 export const handler = async function authorizationCodeHandler(oidc, dPoP) {
-	const {
-		issueRefreshToken,
-		conformIdTokenClaims,
-		features: { userinfo, resourceIndicators, richAuthorizationRequests }
-	} = instance(oidc.provider).configuration;
+	const { conformIdTokenClaims } = instance(oidc.provider).configuration;
 
 	if (
 		ApplicationConfig[
@@ -144,13 +145,10 @@ export const handler = async function authorizationCodeHandler(oidc, dPoP) {
 	}
 
 	await checkRar(oidc);
-	const resource = await resolveResource({ oidc }, code, {
-		userinfo,
-		resourceIndicators
-	});
+	const resource = await resolveResource({ oidc }, code);
 
 	if (resource) {
-		const resourceServerInfo = await resourceIndicators.getResourceServerInfo(
+		const resourceServerInfo = await getResourceServerInfo(
 			{ oidc },
 			resource,
 			oidc.client
@@ -166,10 +164,7 @@ export const handler = async function authorizationCodeHandler(oidc, dPoP) {
 		ApplicationConfig['richAuthorizationRequests.enabled'] &&
 		at.resourceServer
 	) {
-		at.payload.rar = await richAuthorizationRequests.rarForCodeResponse(
-			{ oidc },
-			at.resourceServer
-		);
+		at.payload.rar = await rarForCodeResponse({ oidc }, at.resourceServer);
 	}
 
 	oidc.entity('AccessToken', at);

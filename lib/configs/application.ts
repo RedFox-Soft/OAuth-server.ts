@@ -100,6 +100,16 @@ export const ApplicationConfig = {
 	'clientCredentials.enabled': false,
 
 	/*
+	 * refreshToken
+	 *
+	 * description: Advertises `grant_type=refresh_token` even when the client is not
+	 *   requesting the `offline_access` scope. Issuance itself is governed by the
+	 *   `issueRefreshToken` addon; this flag only controls grant-type advertisement
+	 *   (it replaces the former `issueRefreshToken !== default` boot-time heuristic).
+	 */
+	'refreshToken.enabled': false,
+
+	/*
 	 * features.backchannelLogout
 	 *
 	 * title: [`OIDC Back-Channel Logout 1.0`](https://openid.net/specs/openid-connect-backchannel-1_0-final.html)

@@ -1,5 +1,5 @@
 import * as errors from '../../errors.ts';
-import instance from '../../weak_cache.ts';
+import { pairwiseIdentifier } from '../../../addon/index.js';
 import { Prompt } from '../prompt.js';
 
 class LoginPromt extends Prompt {
@@ -69,10 +69,7 @@ class LoginPromt extends Prompt {
 					return true;
 				}
 				if (oidc.client.subjectType === 'pairwise') {
-					sub = await instance(oidc.provider).configuration.pairwiseIdentifier(
-						sub,
-						oidc.client
-					);
+					sub = await pairwiseIdentifier(sub, oidc.client);
 				}
 				if (payload.sub !== sub) {
 					return true;
@@ -97,10 +94,7 @@ class LoginPromt extends Prompt {
 					return true;
 				}
 				if (oidc.client.subjectType === 'pairwise') {
-					sub = await instance(oidc.provider).configuration.pairwiseIdentifier(
-						sub,
-						oidc.client
-					);
+					sub = await pairwiseIdentifier(sub, oidc.client);
 				}
 				if (oidc.claims.id_token.sub.value !== sub) {
 					return true;

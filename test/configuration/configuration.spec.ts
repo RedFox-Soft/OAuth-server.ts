@@ -2,31 +2,19 @@ import { describe, it, expect } from 'bun:test';
 import Configuration from '../../lib/helpers/configuration.ts';
 
 describe('Provider configuration', () => {
-	// NOTE: feature enable flags and experiment acknowledgements are owned by ApplicationConfig
-	// (flat dotted keys) and read from it directly — they are no longer carried on the nested
-	// provider `features` config. The former "Unknown feature configuration" and "stable feature
-	// ack no longer valid" checks validated that deprecated nested path and no longer apply.
-	// Nested `features` still carries helper-function overrides, so the boolean-shape guard below
-	// is retained.
+	// Feature enable flags and experiment acknowledgements are owned by ApplicationConfig
+	// (flat dotted keys). Behavior-function overrides are owned by the addon registry.
+	// The nested `features` config object therefore no longer exists: any `features` key
+	// passed to the provider configuration is not merged and is silently ignored (it is not
+	// among the retained data defaults), so it neither takes effect nor throws.
 
-	it('checks that a feature configuration is not a boolean', () => {
+	it('ignores a nested features configuration object', () => {
 		expect(() => {
 			new Configuration({
 				features: {
 					introspection: false
 				}
 			});
-		}).toThrow(
-			'Features are not enabled/disabled with a boolean value. See the documentation for more details.'
-		);
-		expect(() => {
-			new Configuration({
-				features: {
-					introspection: true
-				}
-			});
-		}).toThrow(
-			'Features are not enabled/disabled with a boolean value. See the documentation for more details.'
-		);
+		}).not.toThrow();
 	});
 });

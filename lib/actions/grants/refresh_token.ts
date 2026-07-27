@@ -14,6 +14,11 @@ import * as formatters from '../../helpers/formatters.ts';
 import filterClaims from '../../helpers/filter_claims.ts';
 import resolveResource from '../../helpers/resolve_resource.ts';
 import checkRar from '../../shared/check_rar.ts';
+import {
+	getResourceServerInfo,
+	rotateRefreshToken,
+	rarForRefreshTokenResponse
+} from '../../addon/index.js';
 
 import { gty as cibaGty } from './ciba.ts';
 import { gty as deviceCodeGty } from './device_code.ts';
@@ -33,11 +38,7 @@ const gty = 'refresh_token';
 export const handler = async function refreshTokenHandler(oidc, dPoP) {
 	presence(oidc, 'refresh_token');
 
-	const {
-		conformIdTokenClaims,
-		rotateRefreshToken,
-		features: { userinfo, resourceIndicators, richAuthorizationRequests }
-	} = instance(oidc.provider).configuration;
+	const { conformIdTokenClaims } = instance(oidc.provider).configuration;
 
 	const { client } = oidc;
 
@@ -146,11 +147,7 @@ export const handler = async function refreshTokenHandler(oidc, dPoP) {
 		);
 	}
 
-	if (
-		rotateRefreshToken === true ||
-		(typeof rotateRefreshToken === 'function' &&
-			(await rotateRefreshToken({ oidc })))
-	) {
+	if (await rotateRefreshToken({ oidc })) {
 		await refreshToken.consume();
 		oidc.entity('RotatedRefreshToken', refreshToken);
 
@@ -216,12 +213,12 @@ export const handler = async function refreshTokenHandler(oidc, dPoP) {
 	const resource = await resolveResource(
 		{ oidc },
 		refreshToken,
-		{ userinfo, resourceIndicators },
+		undefined,
 		scope
 	);
 
 	if (resource) {
-		const resourceServerInfo = await resourceIndicators.getResourceServerInfo(
+		const resourceServerInfo = await getResourceServerInfo(
 			{ oidc },
 			resource,
 			oidc.client
@@ -240,7 +237,7 @@ export const handler = async function refreshTokenHandler(oidc, dPoP) {
 		ApplicationConfig['richAuthorizationRequests.enabled'] &&
 		at.resourceServer
 	) {
-		at.payload.rar = await richAuthorizationRequests.rarForRefreshTokenResponse(
+		at.payload.rar = await rarForRefreshTokenResponse(
 			{ oidc },
 			at.resourceServer
 		);

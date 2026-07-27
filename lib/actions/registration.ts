@@ -4,9 +4,9 @@ import omitBy from '../helpers/_/omit_by.ts';
 import constantEquals from '../helpers/constant_equals.ts';
 import epochTime from '../helpers/epoch_time.ts';
 import { InvalidToken, InvalidRequest } from '../helpers/errors.ts';
-import instance from '../helpers/weak_cache.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import addClient from '../helpers/add_client.ts';
+import { idFactory, secretFactory } from '../addon/index.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { Client } from 'lib/models/client.js';
 import { InitialAccessToken } from 'lib/models/initial_access_token.js';
@@ -175,7 +175,6 @@ async function create({ body, headers, request, set }) {
 
 	await validateInitialAccessToken(oidc, headers.authorization);
 
-	const { idFactory, secretFactory } = instance(provider).features.registration;
 	const issueRegistrationAccessToken =
 		ApplicationConfig['registration.issueRegistrationAccessToken'];
 	const properties: Body = {};
@@ -306,8 +305,6 @@ async function update({ params, body, headers, set }) {
 			(value) => value === null || value === ''
 		)
 	);
-
-	const { secretFactory } = instance(provider).features.registration;
 
 	const secretRequired = !client.clientSecret && Client.needsSecret(properties);
 

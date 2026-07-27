@@ -90,7 +90,6 @@ class ProviderClass extends EventEmitter {
 		instance.set(this, this.#int);
 
 		this.#int.configuration = configuration;
-		this.#int.features = configuration.features;
 
 		this.#int.responseModes = new Map();
 

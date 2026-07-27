@@ -1,5 +1,6 @@
 import * as JWT from '../../helpers/jwt.ts';
 import instance from '../../helpers/weak_cache.ts';
+import { assertJwtClaimsAndHeader } from '../../addon/index.js';
 import {
 	InvalidRequest,
 	InvalidRequestObject,
@@ -37,7 +38,6 @@ export default async function processRequestObject(
 
 	const pushedRequestObject = isPar;
 	const isBackchannelAuthentication = route === 'backchannel_authentication';
-	const { features } = instance(oidc.provider);
 
 	if (
 		params.request === undefined &&
@@ -191,7 +191,7 @@ export default async function processRequestObject(
 		);
 	}
 
-	await features.requestObjects.assertJwtClaimsAndHeader(
+	await assertJwtClaimsAndHeader(
 		oidc,
 		structuredClone(decoded.payload),
 		structuredClone(decoded.header),

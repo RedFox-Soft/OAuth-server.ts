@@ -1,6 +1,7 @@
 import instance from './weak_cache.ts';
 import { pick, isPlainObject, merge } from './_/object.js';
 import { provider } from 'lib/provider.js';
+import { pairwiseIdentifier } from '../addon/index.js';
 import { type Client } from 'lib/models/client.js';
 
 type ClaimsData = Record<string, unknown> & {
@@ -41,8 +42,7 @@ export class Claims {
 
 	async result() {
 		const { available } = this;
-		const { claimsSupported, pairwiseIdentifier } =
-			instance(provider).configuration;
+		const { claimsSupported } = instance(provider).configuration;
 		const include = Object.entries(this.filter)
 			.filter(
 				([key, value]) =>

@@ -1,29 +1,25 @@
-import merge from 'lodash/merge.js';
-
 import getConfig from '../default.config.js';
 import { Grant } from 'lib/models/grant.js';
 
 const config = getConfig();
 
-merge(config.features, {
-	ciba: {
-		processLoginHint(ctx, loginHint) {
-			return loginHint;
-		},
-		validateBindingMessage() {},
-		validateRequestContext() {},
-		verifyUserCode() {},
-		async triggerAuthenticationDevice(ctx, request) {
-			const grant = new Grant({
-				clientId: request.payload.clientId,
-				accountId: request.payload.accountId
-			});
-			grant.addOIDCScope(ctx.oidc.requestParamScopes);
-			await grant.save();
-			return ctx.oidc.provider.backchannelResult(request, grant.jti);
-		}
+export const addons = {
+	processLoginHint(ctx, loginHint) {
+		return loginHint;
+	},
+	validateBindingMessage() {},
+	validateRequestContext() {},
+	verifyUserCode() {},
+	async triggerAuthenticationDevice(ctx, request) {
+		const grant = new Grant({
+			clientId: request.payload.clientId,
+			accountId: request.payload.accountId
+		});
+		grant.addOIDCScope(ctx.oidc.requestParamScopes);
+		await grant.save();
+		return ctx.oidc.provider.backchannelResult(request, grant.jti);
 	}
-});
+};
 
 export const ApplicationConfig = {
 	'authorization.allowOmittingSingleRegisteredRedirectUri': true,

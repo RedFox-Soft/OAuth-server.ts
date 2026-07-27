@@ -1,13 +1,15 @@
 import { InvalidRequest, InvalidClientAuth } from '../helpers/errors.ts';
 import * as JWT from '../helpers/jwt.ts';
-import instance from '../helpers/weak_cache.ts';
 import certificateThumbprint from '../helpers/certificate_thumbprint.js';
 import { noVSCHAR } from '../consts/client_attributes.js';
 
 import { tokenJwtAuth } from './token_jwt_auth.js';
+import {
+	certificateAuthorized,
+	certificateSubjectMatches
+} from '../addon/index.js';
 import { Client } from 'lib/models/client.js';
 import { clientAuthSigningAlgValues } from 'lib/configs/jwaAlgorithms.js';
-import { provider } from 'lib/provider.js';
 import { type OIDCContext } from 'lib/helpers/oidc_context.js';
 import { type authParamsType } from 'lib/plugins/auth.js';
 
@@ -140,8 +142,6 @@ export async function tokenAuth(
 	headers: Record<string, string | undefined>,
 	oidc: OIDCContext<authParamsType>
 ) {
-	const { features } = instance(provider);
-
 	const auth = findClientId(params, headers?.authorization);
 
 	const client = await Client.find(auth.clientId, {
@@ -201,9 +201,6 @@ export async function tokenAuth(
 			break;
 
 		case 'tls_client_auth': {
-			const { certificateAuthorized, certificateSubjectMatches } =
-				features.mTLS;
-
 			const cert = oidc.getClientCertificate();
 			if (!cert) {
 				throw new InvalidClientAuth('client certificate was not provided');

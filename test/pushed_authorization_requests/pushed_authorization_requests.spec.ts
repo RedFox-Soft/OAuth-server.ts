@@ -1,4 +1,3 @@
-import i from 'lib/helpers/weak_cache.js';
 import { randomBytes, createHash } from 'node:crypto';
 import { parse as parseUrl } from 'node:url';
 
@@ -35,7 +34,6 @@ describe('Pushed Request Object', async () => {
 
 	describe('w/o Request Objects', () => {
 		beforeEach(function () {
-			i(provider).features.requestObjects.enabled = false;
 			ApplicationConfig['requestObjects.enabled'] = false;
 		});
 
@@ -585,7 +583,6 @@ describe('Pushed Request Object', async () => {
 			);
 		});
 		beforeEach(function () {
-			i(provider).features.requestObjects.enabled = true;
 			ApplicationConfig['requestObjects.enabled'] = true;
 		});
 

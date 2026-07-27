@@ -1,9 +1,7 @@
-import instance from '../../helpers/weak_cache.ts';
 import { BackchannelAuthenticationRequest } from '../../models/backchannel_authentication_request.js';
+import { triggerAuthenticationDevice } from '../../addon/index.js';
 
 export default async function backchannelRequestResponse(oidc) {
-	const { ciba } = instance(oidc.provider).features;
-
 	const request = new BackchannelAuthenticationRequest({
 		accountId: oidc.account.accountId,
 		claims: oidc.claims,
@@ -32,7 +30,7 @@ export default async function backchannelRequestResponse(oidc) {
 		auth_req_id: id
 	};
 
-	await ciba.triggerAuthenticationDevice(
+	await triggerAuthenticationDevice(
 		{ oidc },
 		request,
 		oidc.account,
