@@ -1,6 +1,9 @@
 import { Elysia } from 'elysia';
 import { ApplicationConfig } from '../../configs/application.js';
-import { validateConfiguration } from '../../configs/configuration.js';
+import {
+	validateConfiguration,
+	type ConfigurationInput
+} from '../../configs/configuration.js';
 import { configStore } from '../../adapters/index.js';
 import {
 	assertAuth,
@@ -64,7 +67,7 @@ function validateValue(descriptor: SettingDescriptor, value: unknown): void {
  * richAuthorizationRequests.types checks. validateConfiguration is a pure function of the config
  * handed to it, so the candidate can be checked without touching the live one.
  */
-function validateEffectiveConfig(effective: Record<string, unknown>): void {
+function validateEffectiveConfig(effective: ConfigurationInput): void {
 	try {
 		validateConfiguration(effective);
 	} catch (err) {

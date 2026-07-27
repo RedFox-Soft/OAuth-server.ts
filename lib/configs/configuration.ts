@@ -2,6 +2,10 @@ import { isPlainObject, merge } from '../helpers/_/object.js';
 import * as formatters from '../helpers/formatters.ts';
 import { STABLE, EXPERIMENTS } from '../helpers/features.ts';
 import * as attention from '../helpers/attention.ts';
+// Type-only, so it adds no runtime edge back to the module that calls this one. ApplicationConfig
+// declares every setting, which makes `typeof` it the exact type of what is being validated — a
+// misspelled flag read below is a compile error rather than a silently-undefined lookup.
+import type { ApplicationConfigType } from './application.js';
 
 /*
  * The server settings that cannot be read straight off ApplicationConfig: collections turned into
@@ -12,12 +16,26 @@ export interface Configuration {
 	scopes: Set<string>;
 	acrValues: Set<string>;
 	clientAuthMethods: Set<string>;
-	claims: Record<string, any>;
+	claims: ClaimsConfig;
 	grantTypes: Set<string>;
 	claimsSupported: Set<string>;
 }
 
-type Config = Record<string, any>;
+/*
+ * A configuration to validate: the live ApplicationConfig, or a candidate one destined for it.
+ *
+ * Deliberately ApplicationConfigType itself, with no index signature bolted on. An index signature
+ * would let this file read a setting that does not exist and get `undefined` — a check that silently
+ * never fires. Every static read below is therefore key-checked against the declared settings.
+ */
+export type ConfigurationInput = ApplicationConfigType;
+
+/*
+ * The claims map: claim name -> null for a standalone claim, and scope name -> either a list of
+ * claim names or a map of them. The list form is unpacked into the map form during validation, so
+ * entries are read back more loosely than they are written.
+ */
+type ClaimsConfig = Record<string, unknown>;
 
 function toSet(name: string, value: unknown): Set<string> {
 	if (value instanceof Set) {
@@ -29,7 +47,7 @@ function toSet(name: string, value: unknown): Set<string> {
 	return new Set(value);
 }
 
-function collectScopes(scopes: Set<string>, claims: Config) {
+function collectScopes(scopes: Set<string>, claims: ClaimsConfig) {
 	const claimDefinedScopes: string[] = [];
 	Object.entries(claims).forEach(([key, value]) => {
 		if (isPlainObject(value) || Array.isArray(value)) {
@@ -43,10 +61,10 @@ function collectScopes(scopes: Set<string>, claims: Config) {
 	});
 }
 
-function unpackArrayClaims(claims: Config) {
+function unpackArrayClaims(claims: ClaimsConfig) {
 	Object.entries(claims).forEach(([key, value]) => {
 		if (Array.isArray(value)) {
-			claims[key] = value.reduce((accumulator, claim) => {
+			claims[key] = value.reduce<Record<string, null>>((accumulator, claim) => {
 				const scope = accumulator;
 				scope[claim] = null;
 				return scope;
@@ -55,25 +73,34 @@ function unpackArrayClaims(claims: Config) {
 	});
 }
 
-function ensureOpenIdSub(claims: Config) {
-	if (!Object.keys(claims.openid).includes('sub')) {
-		claims.openid.sub = null;
+function ensureOpenIdSub(claims: ClaimsConfig) {
+	const { openid } = claims;
+	if (!isPlainObject(openid)) {
+		// Previously an incidental "Cannot convert undefined or null to object" from Object.keys.
+		// Same TypeError, but it names the setting at fault.
+		throw new TypeError(
+			'claims.openid must be an object or an array of claim names'
+		);
+	}
+	if (!Object.keys(openid).includes('sub')) {
+		openid.sub = null;
 	}
 }
 
-function removeAcrIfEmpty(acrValues: Set<string>, claims: Config) {
+function removeAcrIfEmpty(acrValues: Set<string>, claims: ClaimsConfig) {
 	if (!acrValues.size) {
 		delete claims.acr;
 	}
 }
 
-function collectClaims(scopes: Set<string>, claims: Config): Set<string> {
+function collectClaims(scopes: Set<string>, claims: ClaimsConfig): Set<string> {
 	const claimsSupported = new Set<string>();
 	scopes.forEach((scope) => {
-		if (scope in claims) {
-			Object.keys(claims[scope]).forEach(
-				Set.prototype.add.bind(claimsSupported)
-			);
+		// Only the scopes that define claims contribute names. A scope whose entry is `null` is a
+		// standalone claim, picked up by the pass below.
+		const defined = claims[scope];
+		if (isPlainObject(defined)) {
+			Object.keys(defined).forEach(Set.prototype.add.bind(claimsSupported));
 		}
 	});
 
@@ -84,7 +111,10 @@ function collectClaims(scopes: Set<string>, claims: Config): Set<string> {
 	return claimsSupported;
 }
 
-function collectGrantTypes(config: Config, scopes: Set<string>): Set<string> {
+function collectGrantTypes(
+	config: ConfigurationInput,
+	scopes: Set<string>
+): Set<string> {
 	const grantTypes = new Set(['authorization_code']);
 
 	if (scopes.has('offline_access') || config['refreshToken.enabled']) {
@@ -106,25 +136,25 @@ function collectGrantTypes(config: Config, scopes: Set<string>): Set<string> {
 	return grantTypes;
 }
 
-function checkRichAuthorizationRequests(config: Config) {
+function checkRichAuthorizationRequests(config: ConfigurationInput) {
 	if (config['richAuthorizationRequests.enabled']) {
-		if (!isPlainObject(config['richAuthorizationRequests.types'])) {
+		const types = config['richAuthorizationRequests.types'];
+		if (!isPlainObject(types)) {
 			throw new TypeError(
 				'features.richAuthorizationRequests.types must be an object'
 			);
 		}
 
-		for (const [k, v] of Object.entries<any>(
-			config['richAuthorizationRequests.types']
-		)) {
+		for (const [k, v] of Object.entries(types)) {
 			if (!isPlainObject(v)) {
 				throw new TypeError(
 					'features.richAuthorizationRequests.types attribute values must be objects'
 				);
 			}
+			const { validate } = v;
 			if (
-				typeof v.validate !== 'function' ||
-				!['Function', 'AsyncFunction'].includes(v.validate.constructor.name)
+				typeof validate !== 'function' ||
+				!['Function', 'AsyncFunction'].includes(validate.constructor.name)
 			) {
 				throw new TypeError(
 					`features.richAuthorizationRequests.types['${k}'].validate must be a function`
@@ -134,7 +164,7 @@ function checkRichAuthorizationRequests(config: Config) {
 	}
 }
 
-function checkCibaDeliveryModes(config: Config) {
+function checkCibaDeliveryModes(config: ConfigurationInput) {
 	const modes = config['ciba.deliveryModes'];
 	if (!modes.length) {
 		throw new TypeError('features.ciba.deliveryModes must not be empty');
@@ -149,7 +179,7 @@ function checkCibaDeliveryModes(config: Config) {
 	}
 }
 
-function checkDependantFeatures(config: Config) {
+function checkDependantFeatures(config: ConfigurationInput) {
 	if (config['jwtIntrospection.enabled'] && !config['introspection.enabled']) {
 		throw new TypeError(
 			'jwtIntrospection is only available in conjuction with introspection'
@@ -191,7 +221,10 @@ function checkDependantFeatures(config: Config) {
 	}
 }
 
-function checkAuthMethods(config: Config, clientAuthMethods: Set<string>) {
+function checkAuthMethods(
+	config: ConfigurationInput,
+	clientAuthMethods: Set<string>
+) {
 	const authMethods = new Set([
 		'none',
 		'client_secret_basic',
@@ -217,7 +250,7 @@ function checkAuthMethods(config: Config, clientAuthMethods: Set<string>) {
 	});
 }
 
-function checkDeviceFlow(config: Config) {
+function checkDeviceFlow(config: ConfigurationInput) {
 	if (config['deviceFlow.enabled']) {
 		if (config['deviceFlow.charset'] !== undefined) {
 			if (!['base-20', 'digits'].includes(config['deviceFlow.charset'])) {
@@ -234,24 +267,30 @@ function checkDeviceFlow(config: Config) {
 	}
 }
 
-function logDraftNotice(config: Config) {
+// The experiment record as EXPERIMENTS declares it, so the notice below cannot drift from it.
+type Experiment = NonNullable<ReturnType<typeof EXPERIMENTS.get>>;
+
+function logDraftNotice(config: ConfigurationInput) {
 	// Keyed by flag, holding the experiment itself: it is already in hand here, and re-looking it
 	// up below would produce a value the compiler cannot know is present.
-	const ENABLED_EXPERIMENTS = new Map<string, { name: string; version: any }>();
+	const ENABLED_EXPERIMENTS = new Map<string, Experiment>();
 	let throwExperiment = false;
 
-	// Feature flags and their experiment acknowledgements live in the config (flat dotted keys).
-	// Only experimental features carry an `.ack`, so iterate the known experiments and read their
-	// enabled/ack directly.
+	// The only dynamic read of the settings in this file: the flag names come from EXPERIMENTS, so
+	// they are composed at runtime and cannot be key-checked. Going through entries keeps the
+	// config's own type precise (no index signature to swallow a typo elsewhere) at the cost of
+	// these two values being `unknown` — hence the comparisons below rather than a lookup.
+	const dynamic = new Map<string, unknown>(Object.entries(config));
+
 	for (const [flag, experimental] of EXPERIMENTS) {
-		const enabled = config[`${flag}.enabled`];
-		const ack = config[`${flag}.ack`];
+		const enabled = dynamic.get(`${flag}.enabled`);
+		const ack = dynamic.get(`${flag}.ack`);
 
 		if (
 			enabled &&
 			!STABLE.has(flag) &&
 			(Array.isArray(experimental.version)
-				? !experimental.version.includes(ack)
+				? !experimental.version.some((version) => version === ack)
 				: ack !== experimental.version)
 		) {
 			if (typeof ack !== 'undefined') {
@@ -266,12 +305,13 @@ function logDraftNotice(config: Config) {
 			'The following experimental features are enabled and their implemented version not acknowledged'
 		);
 		ENABLED_EXPERIMENTS.forEach(({ name, version }) => {
-			if (Array.isArray(version)) {
-				version = version[version.length - 1];
-			}
+			// The acknowledgeable value is the newest version when several are accepted.
+			const latest = Array.isArray(version)
+				? version[version.length - 1]
+				: version;
 
 			attention.info(
-				`  - ${name} (Acknowledging this feature's implemented version can be done with the value '${version}')`
+				`  - ${name} (Acknowledging this feature's implemented version can be done with the value '${latest}')`
 			);
 		});
 		attention.info(
@@ -303,7 +343,9 @@ function logDraftNotice(config: Config) {
  *
  * `config.claims` is cloned before processing, so a caller's object is never mutated.
  */
-export function validateConfiguration(config: Config): Configuration {
+export function validateConfiguration(
+	config: ConfigurationInput
+): Configuration {
 	const scopes = toSet('scopes', config.scopes);
 	const acrValues = toSet('acrValues', config.acrValues);
 	const clientAuthMethods = toSet(

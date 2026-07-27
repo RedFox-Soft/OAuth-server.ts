@@ -26,7 +26,10 @@ export class Claims {
 		}
 		const { claims: claimConfig } = configuration;
 		value.split(' ').forEach((scope) => {
-			this.mask(claimConfig[scope]);
+			// A scope's entry is the map of claims it grants. Anything else — an unknown scope, or a
+			// name that is a standalone claim rather than a scope — grants none.
+			const granted = claimConfig[scope];
+			if (isPlainObject(granted)) this.mask(granted);
 		});
 		return this;
 	}
