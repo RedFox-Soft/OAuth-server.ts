@@ -1,8 +1,8 @@
-import i from 'lib/helpers/weak_cache.js';
 import { describe, it, beforeAll, afterEach, expect, mock } from 'bun:test';
 
 import bootstrap, { agent } from '../test_helper.js';
 import { provider } from 'lib/provider.js';
+import { ApplicationConfig } from 'lib/configs/application.js';
 
 const discoveryEndpoint = agent['.well-known']['openid-configuration'];
 
@@ -19,19 +19,26 @@ describe('/.well-known/openid-configuration', () => {
 	});
 
 	it('is configurable with extra properties', async () => {
-		i(provider).configuration.discovery.service_documentation =
+		const original = { ...ApplicationConfig.discovery };
+		ApplicationConfig.discovery.service_documentation =
 			'https://docs.example.com';
-		i(provider).configuration.discovery.authorization_endpoint =
+		ApplicationConfig.discovery.authorization_endpoint =
 			'this will not be used';
 
-		const { data } = await discoveryEndpoint.get();
-		if (!data) throw new Error('expected response data');
+		try {
+			const { data } = await discoveryEndpoint.get();
+			if (!data) throw new Error('expected response data');
 
-		expect(data).toHaveProperty(
-			'service_documentation',
-			'https://docs.example.com'
-		);
-		expect(data.authorization_endpoint).not.toBe('this will not be used');
+			expect(data).toHaveProperty(
+				'service_documentation',
+				'https://docs.example.com'
+			);
+			expect(data.authorization_endpoint).not.toBe('this will not be used');
+		} finally {
+			// ApplicationConfig is process-wide, so restore or the extensions leak into
+			// every later suite in the same run.
+			ApplicationConfig.discovery = original;
+		}
 	});
 
 	describe('with unexpected exceptions', () => {
@@ -44,7 +51,7 @@ describe('/.well-known/openid-configuration', () => {
 			// Force the discovery handler to throw while it applies discovery overrides.
 			// bun's spyOn can't stub an accessor, so override the getter directly and
 			// restore the original descriptor afterwards.
-			const config = i(provider).configuration;
+			const config = ApplicationConfig;
 			const original = Object.getOwnPropertyDescriptor(config, 'discovery');
 			Object.defineProperty(config, 'discovery', {
 				configurable: true,

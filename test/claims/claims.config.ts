@@ -3,10 +3,9 @@ import getConfig from '../default.config.js';
 const config = getConfig();
 
 export const ApplicationConfig = {
-	'claimsParameter.enabled': true
+	'claimsParameter.enabled': true,
+	acrValues: ['0', '1', '2']
 };
-
-config.acrValues = ['0', '1', '2'];
 
 export const addons = {
 	pairwiseIdentifier: (sub) => `${sub}-pairwise`

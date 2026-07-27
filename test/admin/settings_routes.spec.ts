@@ -4,6 +4,7 @@ import { treaty } from '@elysiajs/eden';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { settingsRoutes } from 'lib/admin/settings/routes.ts';
 import {
+	adminAuditStore,
 	adminSessionStore,
 	getUserStore,
 	configStore
@@ -13,7 +14,7 @@ import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 const app = new Elysia().use(resolveAdmin).use(settingsRoutes);
 const client = treaty(app);
 
-async function sessionCookieFor(roles: string[]) {
+async function sessionFor(roles: string[]) {
 	const user = await getUserStore(ADMIN_BUCKET_ID).create(
 		`${roles.join('-')}-${Math.random()}@x.io`,
 		'hash',
@@ -26,8 +27,19 @@ async function sessionCookieFor(roles: string[]) {
 		ttlSeconds: 60,
 		absoluteTtlSeconds: 3600
 	});
-	return `${ADMIN_SESSION_COOKIE}=${s._id}`;
+	return { cookie: `${ADMIN_SESSION_COOKIE}=${s._id}`, userId: user._id };
 }
+
+async function sessionCookieFor(roles: string[]) {
+	return (await sessionFor(roles)).cookie;
+}
+
+const SETTINGS_TARGET = 'ApplicationConfig';
+
+// The audit log is append-only, so assertions measure the delta around one request
+// rather than an absolute count.
+const settingsAudit = () =>
+	adminAuditStore.list({ targetType: SETTINGS_TARGET });
 
 interface SettingsResponse {
 	catalog: Array<{ key: string; type: string }>;
@@ -232,5 +244,109 @@ describe('settings API', () => {
 			{ headers: { cookie } }
 		);
 		expect(res.status).toBe(200);
+	});
+
+	// `discovery` is the distinctive case: unlike a nonexistent key, it DOES exist on
+	// ApplicationConfig — it is relocated there but deliberately given no descriptor, so the
+	// catalog gate is the only thing keeping it out of the admin surface.
+	it('never exposes the relocated-but-unlisted discovery key', async () => {
+		const cookie = await sessionCookieFor(['super_admin']);
+		const res = await client.admin.api.settings.get({ headers: { cookie } });
+		expect(res.status).toBe(200);
+		const body = res.data as SettingsResponse;
+		expect(body.catalog.map((d) => d.key)).not.toContain('discovery');
+		expect(Object.prototype.hasOwnProperty.call(body.values, 'discovery')).toBe(
+			false
+		);
+		expect(body.changedKeys).not.toContain('discovery');
+	});
+
+	it('rejects a PUT of the relocated-but-unlisted discovery key with 422', async () => {
+		const cookie = await sessionCookieFor(['super_admin']);
+		const res = await client.admin.api.settings.put(
+			{
+				discovery: { op_tos_uri: 'https://evil.example.com' }
+			} as unknown as Record<string, boolean>,
+			{ headers: { cookie } }
+		);
+		expect(res.status).toBe(422);
+		const stored = (await configStore.get()) as Record<string, unknown>;
+		expect(Object.prototype.hasOwnProperty.call(stored, 'discovery')).toBe(
+			false
+		);
+	});
+
+	it('persists nothing when a batch mixes a valid setting with discovery', async () => {
+		const cookie = await sessionCookieFor(['super_admin']);
+		const res = await client.admin.api.settings.put(
+			{
+				'revocation.enabled': true,
+				discovery: { op_tos_uri: 'https://evil.example.com' }
+			} as unknown as Record<string, boolean>,
+			{ headers: { cookie } }
+		);
+		expect(res.status).toBe(422);
+		// Atomic rejection: validation runs over every key before configStore.set().
+		const stored = (await configStore.get()) as Record<string, unknown>;
+		expect(Object.prototype.hasOwnProperty.call(stored, 'discovery')).toBe(
+			false
+		);
+		expect(
+			Object.prototype.hasOwnProperty.call(stored, 'revocation.enabled')
+		).toBe(false);
+	});
+
+	it('persists conformIdTokenClaims (boolean) and round-trips', async () => {
+		const cookie = await sessionCookieFor(['super_admin']);
+		const put = await client.admin.api.settings.put(
+			{ conformIdTokenClaims: false },
+			{ headers: { cookie } }
+		);
+		expect(put.status).toBe(200);
+		const body = put.data as SettingsResponse;
+		expect(body.values.conformIdTokenClaims).toBe(false);
+		expect(body.restartRequired).toBe(true);
+		expect(body.changedKeys).toContain('conformIdTokenClaims');
+		const stored = (await configStore.get()) as Record<string, unknown>;
+		expect(stored.conformIdTokenClaims).toBe(false);
+	});
+
+	it('rejects a non-boolean conformIdTokenClaims with 422', async () => {
+		const cookie = await sessionCookieFor(['super_admin']);
+		const res = await client.admin.api.settings.put(
+			{ conformIdTokenClaims: 'nope' } as unknown as Record<string, boolean>,
+			{ headers: { cookie } }
+		);
+		expect(res.status).toBe(422);
+	});
+
+	it('audits a successful PUT with the acting admin and the changed keys', async () => {
+		const { cookie, userId } = await sessionFor(['super_admin']);
+		const before = (await settingsAudit()).length;
+		const res = await client.admin.api.settings.put(
+			{ 'revocation.enabled': true, 'par.enabled': true },
+			{ headers: { cookie } }
+		);
+		expect(res.status).toBe(200);
+
+		const entries = await settingsAudit();
+		expect(entries.length).toBe(before + 1);
+		const entry = entries[entries.length - 1];
+		expect(entry.action).toBe('settings.update');
+		expect(entry.actorId).toBe(userId);
+		expect(entry.actorEmail).toBeTruthy();
+		// The entry schema has no metadata field, so the changed keys are the targetId.
+		expect(entry.targetId).toBe('par.enabled,revocation.enabled');
+	});
+
+	it('writes no audit entry when a PUT is rejected', async () => {
+		const cookie = await sessionCookieFor(['super_admin']);
+		const before = (await settingsAudit()).length;
+		const res = await client.admin.api.settings.put(
+			{ 'par.enabled': 'nope' } as unknown as Record<string, boolean>,
+			{ headers: { cookie } }
+		);
+		expect(res.status).toBe(422);
+		expect((await settingsAudit()).length).toBe(before);
 	});
 });

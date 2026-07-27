@@ -5,13 +5,12 @@ import instance from '../../helpers/weak_cache.ts';
 import nanoid from '../../helpers/nanoid.js';
 import { provider } from 'lib/provider.js';
 import { ISSUER } from 'lib/configs/env.js';
+import { ClientDefaults } from 'lib/configs/clientBase.js';
 import { pairwiseIdentifier } from '../../addon/index.js';
 
 async function getResourceServerConfig(token) {
-	const { keystore, configuration } = instance(provider);
-	const {
-		clientDefaults: { id_token_signed_response_alg: defaultAlg }
-	} = configuration;
+	const { keystore } = instance(provider);
+	const defaultAlg = ClientDefaults.idTokenSignedResponseAlg;
 
 	let sign;
 	let encrypt;

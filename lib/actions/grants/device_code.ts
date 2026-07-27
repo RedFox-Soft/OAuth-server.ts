@@ -2,7 +2,6 @@ import upperFirst from '../../helpers/_/upper_first.ts';
 import camelCase from '../../helpers/_/camel_case.ts';
 import * as errors from '../../helpers/errors.ts';
 import presence from '../../helpers/validate_presence.ts';
-import instance from '../../helpers/weak_cache.ts';
 import { findAccount } from '../../addon/account.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import filterClaims from '../../helpers/filter_claims.ts';
@@ -28,8 +27,6 @@ export const handler = async function deviceCodeHandler(oidc, dPoP) {
 			'authorization_details is unsupported for this grant_type'
 		);
 	}
-
-	const { conformIdTokenClaims } = instance(oidc.provider).configuration;
 
 	const code = await DeviceCode.find(oidc.params.device_code, {
 		ignoreExpiration: true,
@@ -197,7 +194,7 @@ export const handler = async function deviceCodeHandler(oidc, dPoP) {
 		});
 
 		if (
-			conformIdTokenClaims &&
+			ApplicationConfig.conformIdTokenClaims &&
 			ApplicationConfig['userinfo.enabled'] &&
 			!at.aud
 		) {

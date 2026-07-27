@@ -12,6 +12,7 @@ import {
 } from 'bun:test';
 
 import { ApplicationConfig } from 'lib/configs/application.js';
+import { addons } from 'lib/addon/registry.js';
 import bootstrap, {
 	agent,
 	jsonToFormUrlEncoded,
@@ -165,18 +166,10 @@ describe('BASIC code', () => {
 		});
 
 		describe(`${verb} ${route} interactions`, () => {
-			let policy = null;
-
-			beforeAll(function () {
-				policy = i(provider).configuration.interactions.policy;
-			});
-
-			afterAll(function () {
-				i(provider).configuration.interactions.policy = policy;
-			});
-
+			// An empty policy is registered through the addon seam; the global afterEach in
+			// test/preload.ts resets to this spec's baseline, so no manual restore is needed.
 			it('no account id was resolved and no interactions requested', async function () {
-				i(provider).configuration.interactions.policy = [];
+				addons.override({ interactionPolicy: () => [] });
 				const spy = mock();
 				provider.on('authorization.error', spy);
 
@@ -196,7 +189,7 @@ describe('BASIC code', () => {
 			});
 
 			it('no scope was resolved and no interactions requested', async function () {
-				i(provider).configuration.interactions.policy = [];
+				addons.override({ interactionPolicy: () => [] });
 				const spy = mock();
 				provider.on('authorization.error', spy);
 

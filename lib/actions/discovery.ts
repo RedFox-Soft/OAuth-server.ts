@@ -1,7 +1,5 @@
 import { Elysia } from 'elysia';
 import defaults from '../helpers/_/defaults.ts';
-import instance from '../helpers/weak_cache.ts';
-import { provider } from 'lib/index.js';
 import {
 	calculateDiscovery,
 	featuresKeyMap,
@@ -16,8 +14,6 @@ const MEANINGFUL_FALSE = new Set<string>(['request_uri_parameter_supported']);
 export const discovery = new Elysia().get(
 	'/.well-known/openid-configuration',
 	function () {
-		const { configuration } = instance(provider);
-
 		// Compute the full candidate document from the live ApplicationConfig, then gate it.
 		const body: Record<string, unknown> = calculateDiscovery();
 		const keysToDelete = new Set<string>();
@@ -44,7 +40,7 @@ export const discovery = new Elysia().get(
 		});
 
 		// Operator-supplied discovery overrides are applied last and only fill missing keys.
-		defaults(body, configuration.discovery);
+		defaults(body, ApplicationConfig.discovery);
 		return body;
 	},
 	{

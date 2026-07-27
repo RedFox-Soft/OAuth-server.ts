@@ -78,6 +78,11 @@ export const assertJwtClaimsAndHeader: typeof claimsMod.assertJwtClaimsAndHeader
 		)(...args);
 export const deviceInfo: typeof interactionsMod.deviceInfo = (...args) =>
 	resolve('deviceInfo', interactionsMod.deviceInfo)(...args);
+export const interactionPolicy: typeof interactionsMod.interactionPolicy = (
+	...args
+) => resolve('interactionPolicy', interactionsMod.interactionPolicy)(...args);
+// Not wrapped in resolve(): both already read through the override registry internally.
+export { interactionPolicyControl, supportedPrompts } from './interactions.js';
 export const introspectionAllowedPolicy: typeof introspectionMod.introspectionAllowedPolicy =
 	(...args) =>
 		resolve(

@@ -52,7 +52,11 @@ class UnrequestablePrompt extends Prompt {
 }
 policy.add(new UnrequestablePrompt());
 
-config.interactions = { policy };
+// The policy is overridable behavior, registered through the addon seam rather than passed
+// as provider configuration. bootstrap() makes this the spec's addon baseline.
+export const addons = {
+	interactionPolicy: () => policy
+};
 
 export const client = {
 	clientId: 'client',

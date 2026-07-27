@@ -14,6 +14,13 @@ import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { Interaction } from 'lib/models/interaction.js';
 import { getUserStore } from 'lib/adapters/index.js';
 import { TestAdapter } from 'test/models.js';
+import { addons } from 'lib/addon/registry.js';
+import {
+	interactionPolicy,
+	interactionPolicyControl,
+	supportedPrompts
+} from 'lib/addon/index.js';
+import { Prompt } from 'lib/helpers/interaction_policy/index.js';
 
 function grantCount() {
 	return [...TestAdapter.for('Grant').store.keys()].filter((k) =>
@@ -758,6 +765,78 @@ describe('resume after consent', async () => {
 			expect(response.status).toBe(303);
 			auth.validateInteractionRedirect(response);
 			auth.validateInteraction(response, 'unrequestable', 'un_foo');
+		});
+	});
+
+	// The policy moved onto the addon seam. These pin the three properties that make that
+	// safe: a stable instance, isolation of overrides, and isolation of in-place mutation.
+	describe('policy resolution through the addon seam', () => {
+		it('resolves to a stable instance', () => {
+			// Drop this spec's config-declared override so the shipped baseline is what
+			// resolves; the global afterEach restores the baseline.
+			addons.reset();
+			const first = interactionPolicy();
+			const second = interactionPolicy();
+			expect(second).toBe(first);
+			expect([...second].map((p) => p.name)).toEqual(
+				[...first].map((p) => p.name)
+			);
+		});
+
+		it('does not leak a per-test override into the next test', () => {
+			addons.override({ interactionPolicy: () => [] });
+			expect([...interactionPolicy()]).toHaveLength(0);
+		});
+
+		it('sees the spec baseline again, not the previous test override', () => {
+			expect([...interactionPolicy()].map((p) => p.name)).toContain('login');
+		});
+
+		it('does not leak an in-place mutation of a prompt check into the next test', () => {
+			addons.reset();
+			const login = interactionPolicy().get('login');
+			login.checks.push({
+				reason: 'leak_probe',
+				description: 'leak probe',
+				error: 'leak_probe',
+				check: () => false
+			});
+			expect(login.checks.some((c) => c.reason === 'leak_probe')).toBe(true);
+		});
+
+		it('sees unmutated checks again, proving the policy reset ran', () => {
+			addons.reset();
+			expect(
+				interactionPolicy()
+					.get('login')
+					.checks.some((c) => c.reason === 'leak_probe')
+			).toBe(false);
+		});
+
+		it('accepts a prompt added after provider initialisation as a supported value', () => {
+			addons.reset();
+			class LatePrompt extends Prompt {
+				name = 'late';
+				requestable = true;
+			}
+			interactionPolicyControl.add(new LatePrompt());
+
+			// Both consumers must agree: iterated by the decision path AND accepted by the
+			// request-parameter check. A snapshot taken at init would fail the second.
+			expect([...interactionPolicy()].map((p) => p.name)).toContain('late');
+			expect(supportedPrompts().has('late')).toBe(true);
+		});
+
+		it('excludes a non-requestable prompt from the supported values', () => {
+			addons.reset();
+			class QuietPrompt extends Prompt {
+				name = 'quiet';
+				requestable = false;
+			}
+			interactionPolicyControl.add(new QuietPrompt());
+
+			expect([...interactionPolicy()].map((p) => p.name)).toContain('quiet');
+			expect(supportedPrompts().has('quiet')).toBe(false);
 		});
 	});
 });

@@ -2,7 +2,7 @@ import { pathToFileURL } from 'node:url';
 import * as path from 'node:path';
 
 import { dirname } from 'desm';
-import { beforeAll, afterAll, expect } from 'bun:test';
+import { beforeEach, afterEach, expect } from 'bun:test';
 
 import base64url from 'base64url';
 import { treaty } from '@elysiajs/eden';
@@ -11,12 +11,17 @@ import nanoid from '../lib/helpers/nanoid.js';
 import epochTime from '../lib/helpers/epoch_time.js';
 import { provider, elysia } from '../lib/index.ts';
 import instance from '../lib/helpers/weak_cache.ts';
-import { adapter, getUserStore } from '../lib/adapters/index.ts';
+import { adapter, getUserStore, jwksStore } from '../lib/adapters/index.ts';
+import { reloadJWKSKeys } from '../lib/configs/keys.ts';
+import { verifyJWKs } from '../lib/configs/verifyJWKs.ts';
+import { testSigningKeys } from './jwks/fixtures.js';
+import sharedTestClaims from './default.config.js';
 import type { User } from '../lib/adapters/types.ts';
 
 import { TestAdapter } from './models.js';
 import { AuthorizationRequest } from './AuthorizationRequest.js';
 import { setAddonBaseline } from './addon_baseline.js';
+import { interactionPolicy } from '../lib/addon/index.js';
 
 // In test mode getUserStore() returns the in-memory UserStore, which exposes a
 // test-only `seed()` (see lib/adapters/memory/userStore.ts). The mongo store is
@@ -36,6 +41,31 @@ export { Grant } from 'lib/models/grant.js';
 
 const applicationDefaultSettings = { ...ApplicationConfig };
 const clientDefaultSettings = { ...ClientDefaults };
+const testClaims = sharedTestClaims().claims;
+
+/*
+ * seedJwks
+ *
+ * The provider's signing keys are single-sourced from the jwksStore adapter, exactly as clients are
+ * single-sourced from the Client store. So a spec that needs its own keys writes them to the store
+ * and reloads, rather than passing them to provider.init. Called for every spec so one spec's keys
+ * can never leak into the next.
+ */
+export async function seedJwks(keys: Array<Record<string, unknown>>) {
+	// verifyJWKs assigns a kid to any key that lacks one (RFC 7638 thumbprint). Doing it up front
+	// means the store key always equals key.kid, so clearing by kid is exact — storing a
+	// kid-less key would otherwise leave an entry keyed `undefined` that no cleanup can find.
+	const seeded = structuredClone(keys) as Array<Record<string, unknown>>;
+	verifyJWKs({ keys: seeded } as never);
+
+	for (const existing of await jwksStore.getAll()) {
+		await jwksStore.delete(existing.kid as string);
+	}
+	for (const key of seeded) {
+		await jwksStore.set(key.kid as string, key as never);
+	}
+	await reloadJWKSKeys();
+}
 
 const { info, warn } = console;
 console.info = function (...args) {
@@ -56,15 +86,19 @@ export const agent = treaty(elysia);
 
 // Faithful port of oidc-provider's test helper: the leading arguments are interaction-policy
 // check reasons that must be made to "pass" (i.e. never trigger a prompt) for the wrapped cases,
-// and the final argument is the callback that registers the nested describe/it cases. The named
-// checks are disabled around the block and restored afterwards.
+// and the final argument is the callback that registers the nested describe/it cases.
+//
+// Applied per test, not once in beforeAll: the global afterEach resets the interaction policy, so
+// a single beforeAll mutation would survive only until the first test finished.
 export function passInteractionChecks(...args: unknown[]) {
 	const fn = args[args.length - 1] as () => void;
 	const reasons = args.slice(0, -1) as string[];
 	const disabled: Array<{ check: { check: unknown }; original: unknown }> = [];
 
-	beforeAll(() => {
-		const { policy } = instance(provider).configuration.interactions;
+	beforeEach(() => {
+		// Resolved through the addon seam, which returns a stable instance — so the checks
+		// mutated here are the same objects the request path will iterate.
+		const policy = interactionPolicy();
 		for (const prompt of policy) {
 			for (const check of prompt.checks) {
 				if (reasons.includes(check.reason)) {
@@ -75,7 +109,7 @@ export function passInteractionChecks(...args: unknown[]) {
 		}
 	});
 
-	afterAll(() => {
+	afterEach(() => {
 		for (const { check, original } of disabled) {
 			check.check = original;
 		}
@@ -160,14 +194,13 @@ async function bootstrap(
 		path.format({ dir, base: `${base}.config.js` })
 	).toString();
 	const {
-		default: mod,
 		clients: clientsExport,
 		client,
 		ApplicationConfig: app,
 		ClientDefaults: clientSettings,
-		addons: addonOverrides
+		addons: addonOverrides,
+		jwks: jwksOverride
 	} = await import(conf);
-	const { config } = mod;
 	let clients = clientsExport;
 
 	if (client && !clients) {
@@ -182,16 +215,27 @@ async function bootstrap(
 	setAddonBaseline(addonOverrides);
 
 	Object.assign(ApplicationConfig, applicationDefaultSettings, app || {});
+	// Claims are a server setting now, not per-instance provider setup. Most specs want the
+	// shared OIDC test claim set on top of the production defaults; a spec opts out or replaces
+	// it by declaring `claims` in its own ApplicationConfig export (`{}` means production only).
+	ApplicationConfig.claims = {
+		...applicationDefaultSettings.claims,
+		...(app && Object.prototype.hasOwnProperty.call(app, 'claims')
+			? app.claims
+			: testClaims)
+	};
 	Object.assign(ClientDefaults, clientDefaultSettings, clientSettings || {});
+
 	TestAdapter.clear();
 	// Each spec file starts with no extra seeded claims; claim-conformance specs
 	// opt in via setSeedClaims() after this bootstrap call.
 	seedClaims = undefined;
 
-	provider.init({
-		adapter: TestAdapter,
-		...config
-	});
+	// Keys are seeded into the store (a spec's `jwks` named export, else the shared fixtures) and
+	// reloaded, so provider.init() needs no argument at all.
+	await seedJwks(jwksOverride?.keys ?? testSigningKeys);
+
+	provider.init();
 
 	// Clients now live in the Client store (single source of truth); seed each
 	// exported client so tryFindClient resolves it from the adapter.

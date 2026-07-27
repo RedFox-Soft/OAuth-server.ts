@@ -23,13 +23,13 @@ describe('configuration features.deviceFlow', () => {
 			ApplicationConfig['deviceFlow.enabled'] = true;
 
 			ApplicationConfig['deviceFlow.charset'] = 'digits';
-			expect(() => provider.init({})).not.toThrow();
+			expect(() => provider.init()).not.toThrow();
 
 			ApplicationConfig['deviceFlow.charset'] = 'base-20';
-			expect(() => provider.init({})).not.toThrow();
+			expect(() => provider.init()).not.toThrow();
 
 			ApplicationConfig['deviceFlow.charset'] = 'foo';
-			expect(() => provider.init({})).toThrow(
+			expect(() => provider.init()).toThrow(
 				'only supported charsets are "base-20" and "digits"'
 			);
 		} finally {
@@ -46,13 +46,13 @@ describe('configuration features.deviceFlow', () => {
 			ApplicationConfig['deviceFlow.charset'] = 'base-20';
 
 			ApplicationConfig['deviceFlow.mask'] = '*** *** ***';
-			expect(() => provider.init({})).not.toThrow();
+			expect(() => provider.init()).not.toThrow();
 
 			ApplicationConfig['deviceFlow.mask'] = '***-***-***';
-			expect(() => provider.init({})).not.toThrow();
+			expect(() => provider.init()).not.toThrow();
 
 			ApplicationConfig['deviceFlow.mask'] = '***.***.***';
-			expect(() => provider.init({})).toThrow(
+			expect(() => provider.init()).toThrow(
 				'mask can only contain asterisk("*"), hyphen-minus("-") and space(" ") characters'
 			);
 		} finally {

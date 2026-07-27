@@ -20,6 +20,7 @@ export interface AddonImplementations {
 	assertClaimsParameter: (typeof import('./claims.js'))['assertClaimsParameter'];
 	assertJwtClaimsAndHeader: (typeof import('./claims.js'))['assertJwtClaimsAndHeader'];
 	deviceInfo: (typeof import('./interactions.js'))['deviceInfo'];
+	interactionPolicy: (typeof import('./interactions.js'))['interactionPolicy'];
 	introspectionAllowedPolicy: (typeof import('./introspection.js'))['introspectionAllowedPolicy'];
 	getCertificate: (typeof import('./mtls.js'))['getCertificate'];
 	certificateAuthorized: (typeof import('./mtls.js'))['certificateAuthorized'];

@@ -1,7 +1,7 @@
 import upperFirst from '../../helpers/_/upper_first.ts';
 import camelCase from '../../helpers/_/camel_case.ts';
 import * as errors from '../../helpers/errors.ts';
-import instance from '../../helpers/weak_cache.ts';
+import { interactionPolicy } from '../../addon/index.js';
 import nanoid from '../../helpers/nanoid.ts';
 import omitBy from '../../helpers/_/omit_by.ts';
 import { cookieNames } from 'lib/consts/param_list.js';
@@ -13,7 +13,7 @@ export default async function interactions(resumeRouteName, oidc) {
 	let failedCheck;
 	let prompt;
 
-	const { policy } = instance(oidc.provider).configuration.interactions;
+	const policy = interactionPolicy();
 
 	for (const poly of policy) {
 		if (poly.name === 'consent' && client['consent.require'] === false) {

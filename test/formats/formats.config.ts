@@ -17,13 +17,14 @@ export const addons = {
 	pairwiseIdentifier: () => 'pairwise-sub'
 };
 
-// Provide an additional, algorithm-unlocked RSA signing key so the JWT format tests can
-// exercise PS256 (the default RSA key is pinned to RS256). Scoped to this test's provider
-// via configuration.jwks; the default keys are retained so RS256 resolution is unchanged.
+// Provide an additional PS256 RSA signing key so the JWT format tests can exercise PS256 (the
+// default RSA key is pinned to RS256). Seeded into the jwksStore for this spec by the harness;
+// the default keys are retained so RS256 resolution is unchanged. Every key in the store must
+// declare its `alg`, so this one is pinned to PS256 rather than left unspecified.
 const baseKeys = testSigningKeys;
-const { alg: _alg, use: _use, kid: _kid, ...rsaMaterial } = baseKeys[0];
-config.jwks = {
-	keys: [...baseKeys, { ...rsaMaterial, kid: 'ps256-test-key' }]
+const { use: _use, kid: _kid, ...rsaMaterial } = baseKeys[0];
+export const jwks = {
+	keys: [...baseKeys, { ...rsaMaterial, alg: 'PS256', kid: 'ps256-test-key' }]
 };
 
 export const clients = [

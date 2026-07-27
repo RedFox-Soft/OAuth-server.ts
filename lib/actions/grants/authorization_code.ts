@@ -1,6 +1,5 @@
 import { InvalidGrant } from '../../helpers/errors.ts';
 import presence from '../../helpers/validate_presence.ts';
-import instance from '../../helpers/weak_cache.ts';
 import { findAccount } from '../../addon/account.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { verifyPKCE } from '../../helpers/pkce.js';
@@ -23,8 +22,6 @@ import ResourceServer from 'lib/helpers/resource_server.js';
 const gty = 'authorization_code';
 
 export const handler = async function authorizationCodeHandler(oidc, dPoP) {
-	const { conformIdTokenClaims } = instance(oidc.provider).configuration;
-
 	if (
 		ApplicationConfig[
 			'authorization.allowOmittingSingleRegisteredRedirectUri'
@@ -222,7 +219,7 @@ export const handler = async function authorizationCodeHandler(oidc, dPoP) {
 		});
 
 		if (
-			conformIdTokenClaims &&
+			ApplicationConfig.conformIdTokenClaims &&
 			ApplicationConfig['userinfo.enabled'] &&
 			!at.aud
 		) {

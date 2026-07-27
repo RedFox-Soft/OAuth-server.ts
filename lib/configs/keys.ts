@@ -37,3 +37,21 @@ export async function resolveKeys(store: JWKSStoreInstance): Promise<JWKS[]> {
 }
 
 export const JWKS_KEYS: JWKS[] = await resolveKeys(jwksStore);
+
+/*
+ * reloadJWKSKeys
+ *
+ * description: Re-read the key set from the store — the same thing a restart does. The store is the
+ * single source for the server's keys (as the Client store is for clients), so changing keys means
+ * writing them there and reloading; there is no per-instance key input to the provider.
+ *
+ * The array is mutated in place so every module holding the exported reference sees the new keys.
+ * Algorithm sets derived once at module scope (see jwaAlgorithms.ts) stay boot-derived, matching
+ * the boot-only semantics of the rest of the configuration.
+ */
+export async function reloadJWKSKeys(): Promise<JWKS[]> {
+	const fresh = await resolveKeys(jwksStore);
+	JWKS_KEYS.length = 0;
+	JWKS_KEYS.push(...fresh);
+	return JWKS_KEYS;
+}

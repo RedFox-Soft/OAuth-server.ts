@@ -1,6 +1,7 @@
 import { CLIENT_ATTRIBUTES } from '../../consts/index.ts';
 import { noVSCHAR } from '../../consts/client_attributes.ts';
 import { ApplicationConfig } from '../../configs/application.ts';
+import { ClientDefaults } from '../../configs/clientBase.ts';
 
 import { InvalidClientMetadata } from '../../helpers/errors.ts';
 import sectorIdentifier from '../../helpers/sector_identifier.ts';
@@ -18,6 +19,25 @@ import {
 	userinfoSigningAlgValues
 } from 'lib/configs/jwaAlgorithms.js';
 import { validateRedirectUri } from '../../helpers/validateRedirectUri.js';
+
+// ClientDefaults is declared once, in camelCase (ClientSchema's convention). The recognised
+// metadata defaults below are keyed by wire-format name, so the two client defaults that
+// surface as OIDC metadata are translated here. Spelling only — the values stay declared in
+// lib/configs/clientBase.ts, so there is still exactly one declaration of each default.
+const WIRE_FORMAT_DEFAULT_KEYS = {
+	idTokenSignedResponseAlg: 'id_token_signed_response_alg',
+	tokenEndpointAuthMethod: 'token_endpoint_auth_method',
+	'requestObject.require': 'require_signed_request_object'
+} as const;
+
+function wireFormatClientDefaults() {
+	const translated: Record<string, unknown> = {};
+	for (const [camel, wire] of Object.entries(WIRE_FORMAT_DEFAULT_KEYS)) {
+		const value = ClientDefaults[camel as keyof typeof ClientDefaults];
+		if (value !== undefined) translated[wire] = value;
+	}
+	return translated;
+}
 
 const W3CEmailRegExp =
 	/^[a-zA-Z0-9.!#$%&’*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$/;
@@ -43,8 +63,7 @@ export default function getSchema(provider) {
 
 	const RECOGNIZED_METADATA = [...RECOGNIZED];
 	const DEFAULT = structuredClone(DEFAULTS);
-	const DEFAULT_CONFIGURATION = structuredClone(configuration.clientDefaults);
-	Object.assign(DEFAULT, DEFAULT_CONFIGURATION);
+	Object.assign(DEFAULT, wireFormatClientDefaults());
 
 	if (
 		ApplicationConfig['mTLS.enabled'] &&

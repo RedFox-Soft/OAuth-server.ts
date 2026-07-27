@@ -8,6 +8,7 @@ import {
 	resolveAdmin,
 	type AdminContext
 } from '../auth/rbac.js';
+import { recordAdminAudit } from '../audit/record.js';
 import { SETTINGS_CATALOG, type SettingDescriptor } from './catalog.js';
 import { UpdateSettingsBody } from './schema.js';
 
@@ -159,6 +160,14 @@ export const settingsRoutes = new Elysia({ name: 'admin-settings' })
 			const stored = (await configStore.get()) ?? {};
 			const merged = { ...stored, ...body };
 			validateEffectiveConfig({ ...ApplicationConfig, ...merged });
+			// Audit-first: the entry names the submitted keys because AdminAuditEntry has no
+			// metadata field, and a persisted change must never outlive a failed audit write.
+			await recordAdminAudit(
+				ctx,
+				'settings.update',
+				'ApplicationConfig',
+				Object.keys(body).sort().join(',')
+			);
 			await configStore.set(merged);
 			return currentState();
 		},

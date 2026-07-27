@@ -5,7 +5,7 @@ import { Client } from 'lib/models/client.js';
 
 // SKIP: this suite targets oidc-provider's removed constructor-based API — `new provider(issuer)`,
 // per-instance `provider.urlFor(...)`, and passing an `adapter` class/factory to the constructor.
-// This codebase exposes `provider` as a singleton bootstrapped via `provider.init(...)`/`setup`
+// This codebase exposes `provider` as a singleton bootstrapped via `provider.init()`
 // (see test_helper), with routing owned by Elysia and the adapter selected through configuration,
 // so the constructor API under test no longer exists. Kept disabled (not deleted) pending a rewrite
 // against the current provider surface; adapter selection is exercised via the live HTTP specs.

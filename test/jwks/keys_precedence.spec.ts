@@ -1,23 +1,26 @@
 import { describe, it, afterAll, expect } from 'bun:test';
 
-import { agent } from '../test_helper.js';
-import { provider } from 'lib/index.ts';
-import { TestAdapter } from '../models.js';
+import bootstrap, { agent, seedJwks } from '../test_helper.js';
 import { testSigningKeys } from './fixtures.js';
 
 const [, ecKey] = testSigningKeys;
 
-describe('JWKS source precedence and env isolation', () => {
-	afterAll(() => {
+// The former "uses setup.jwks over the store" case is gone with the capability it asserted: keys
+// are single-sourced from the jwksStore adapter (as clients are from the Client store), so there is
+// no per-instance key input left for the store to take precedence over. What remains worth pinning
+// is that the store — and only the store — decides the published set.
+describe('JWKS source is the store, and only the store', () => {
+	afterAll(async () => {
 		delete process.env.JWKS;
+		// Leave the shared fixture set behind for whatever runs next.
+		await seedJwks(testSigningKeys);
 	});
 
-	it('uses setup.jwks over the store when provided (FR-010)', async () => {
-		provider.init({
-			adapter: TestAdapter,
-			clients: [],
-			jwks: { keys: [ecKey] }
-		});
+	it('publishes exactly what the store holds', async () => {
+		await bootstrap(import.meta.url, { config: 'store' });
+		await seedJwks([ecKey]);
+		const { provider } = await import('lib/index.ts');
+		provider.init();
 
 		const { data, status } = await agent.jwks.get();
 		if (!data) throw new Error('expected response data');
@@ -28,8 +31,7 @@ describe('JWKS source precedence and env isolation', () => {
 	it('ignores a stale JWKS environment variable (FR-002)', async () => {
 		process.env.JWKS = '{"keys":[{"garbage":true}]}';
 
-		// No jwks in setup → falls back to the store-loaded JWKS_KEYS, not the env var.
-		provider.init({ adapter: TestAdapter, clients: [] });
+		await bootstrap(import.meta.url, { config: 'store' });
 
 		const { data, status } = await agent.jwks.get();
 		if (!data) throw new Error('expected response data');

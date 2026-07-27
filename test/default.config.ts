@@ -1,3 +1,7 @@
+// The shared OIDC claim set used across the test suite. No longer a provider setup object —
+// there is no per-instance provider configuration. bootstrap() merges `claims` onto
+// ApplicationConfig for every spec that does not declare its own, which keeps these test-only
+// claims out of the production discovery document.
 export default () => ({
 	claims: {
 		address: {
@@ -27,6 +31,5 @@ export default () => ({
 			website: null,
 			zoneinfo: null
 		}
-	},
-	features: {}
+	}
 });

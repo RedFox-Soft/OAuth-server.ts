@@ -32,10 +32,21 @@ describe('settings catalog', () => {
 		expect(d?.group).toBe('Authorization');
 	});
 
+	it('exposes conformIdTokenClaims as a boolean in the ID Token group', () => {
+		const d = SETTINGS_CATALOG.find((x) => x.key === 'conformIdTokenClaims');
+		expect(d).toBeDefined();
+		expect(d?.type).toBe('boolean');
+		expect(d?.group).toBe('ID Token');
+		expect(d?.dependsOn).toBeUndefined();
+	});
+
 	it('excludes structured/function/Buffer keys', () => {
 		const keys = SETTINGS_CATALOG.map((d) => d.key);
 		for (const forbidden of [
 			'claims',
+			// discovery lives on ApplicationConfig but is deliberately not operator-editable:
+			// it is relocated, not exposed. Absence from the catalog is the whole enforcement.
+			'discovery',
 			'registration.policies',
 			'registration.initialAccessToken',
 			'richAuthorizationRequests.types',

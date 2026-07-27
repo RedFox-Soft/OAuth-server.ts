@@ -40,7 +40,7 @@ describe('jwtIntrospection features', () => {
 			const original = ApplicationConfig['introspection.enabled'];
 			ApplicationConfig['introspection.enabled'] = false;
 			try {
-				expect(() => provider.init({})).toThrow(
+				expect(() => provider.init()).toThrow(
 					'jwtIntrospection is only available in conjuction with introspection'
 				);
 			} finally {

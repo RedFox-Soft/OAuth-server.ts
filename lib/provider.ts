@@ -76,11 +76,14 @@ class ProviderClass extends EventEmitter {
 
 	constructor() {
 		super();
-		this.init({});
+		this.init();
 	}
 
-	init(setup) {
-		const configuration = new Configuration(setup);
+	// No configuration argument: every option lives on ApplicationConfig, ClientDefaults, or the
+	// addon registry, and signing keys come from the jwksStore adapter — the same
+	// single-sourced-from-the-database model the Client store uses.
+	init() {
+		const configuration = new Configuration();
 		// tryFindClient reads adapter('Client') on every resolution, so this cache
 		// is purely a validated-object memo keyed by a hash of the stored props;
 		// updates/deletes are always current. Size-bounded (LRU) — no time-based
@@ -94,9 +97,9 @@ class ProviderClass extends EventEmitter {
 		this.#int.responseModes = new Map();
 
 		const keystore = new KeyStore();
-		// Honor a per-instance JWKS supplied via configuration; fall back to the environment keys.
-		const configuredKeys = setup?.jwks?.keys ?? JWKS_KEYS;
-		configuredKeys.forEach((key) => keystore.add(structuredClone(key)));
+		// Keys are loaded from the jwksStore adapter (see configs/keys.ts). To change them, write
+		// the store and reloadJWKSKeys() before re-initialising — there is no per-instance input.
+		JWKS_KEYS.forEach((key) => keystore.add(structuredClone(key)));
 
 		this.#int.keystore = keystore;
 		// Publish the public JWKS, normalizing each key: derive kid (RFC 7638 thumbprint) and use.
@@ -127,14 +130,8 @@ class ProviderClass extends EventEmitter {
 		});
 		this.#int.jwks = { keys };
 
-		delete configuration.jwks;
-
 		initializeApp.call(this);
 
-		// Clients are provisioned into adapter('Client'), not at bootstrap. A stray
-		// `clients` option is silently ignored (FR-003a) — dropped here so it never
-		// lingers on the configuration.
-		delete configuration.clients;
 		return this;
 	}
 

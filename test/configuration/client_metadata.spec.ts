@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'bun:test';
+import { describe, it, expect, afterEach } from 'bun:test';
 import { strict as assert } from 'node:assert';
 import * as util from 'node:util';
 
@@ -9,6 +9,7 @@ import cloneDeep from 'lodash/cloneDeep.js';
 import { provider } from 'lib/provider.js';
 import { InvalidClientMetadata } from 'lib/helpers/errors.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
+import { ClientDefaults } from 'lib/configs/clientBase.js';
 import sectorIdentifier from '../../lib/helpers/sector_identifier.ts';
 import keys, { stripPrivateJWKFields } from '../keys.js';
 import addClient from '../../lib/helpers/add_client.ts';
@@ -24,14 +25,19 @@ const privateKey = keys[0];
 // cannot leak into the next case.
 const baseConfig = () => ({
 	...getConfig(),
-	jwks: { keys },
 	adapter: TestAdapter
 });
 
-// Some features (PAR, client_credentials) are flat ApplicationConfig flags read
-// directly from the global rather than through provider.init's nested config, so
-// dotted keys in a test's `configuration` are routed there and reset each call.
+// ApplicationConfig is the single source for every server setting: feature flags as flat dotted
+// keys, plus these collection options. A test's `configuration` is routed there and reset each
+// call, since provider.init no longer takes configuration.
 const applicationDefaults = { ...ApplicationConfig };
+const COLLECTION_OPTIONS = new Set([
+	'acrValues',
+	'scopes',
+	'clientAuthMethods',
+	'claims'
+]);
 
 describe('Client metadata validation', () => {
 	function register(metadata, configuration) {
@@ -39,15 +45,18 @@ describe('Client metadata validation', () => {
 		const initConfig = configuration
 			? merge(baseConfig(), cloneDeep(configuration))
 			: baseConfig();
-		// Owned options are expressed as flat dotted keys in each test's `configuration` and
-		// routed to ApplicationConfig (the single source); everything else is per-instance setup.
 		for (const key of Object.keys(initConfig)) {
-			if (key.includes('.')) {
-				ApplicationConfig[key] = initConfig[key];
+			if (key.includes('.') || COLLECTION_OPTIONS.has(key)) {
+				// claims merge over the shipped map (Configuration used to do this when claims
+				// arrived as provider setup); everything else replaces.
+				ApplicationConfig[key] =
+					key === 'claims'
+						? merge({}, applicationDefaults.claims, initConfig.claims)
+						: initConfig[key];
 				delete initConfig[key];
 			}
 		}
-		provider.init(initConfig);
+		provider.init();
 
 		return addClient(provider, {
 			clientId: 'client',
@@ -416,9 +425,21 @@ describe('Client metadata validation', () => {
 			},
 			configuration(true)
 		);
-		defaultsTo('require_signed_request_object', true, undefined, {
-			...configuration(),
-			clientDefaults: { require_signed_request_object: true }
+		// Formerly driven by the `clientDefaults` provider option. That option is gone: the
+		// default now lives on ClientDefaults under its camelCase schema name and is
+		// translated to the wire-format name at the schema seam.
+		it('defaults to true when ClientDefaults sets requestObject.require', async () => {
+			const original = ClientDefaults['requestObject.require'];
+			ClientDefaults['requestObject.require'] = true;
+			try {
+				const client = await register(undefined, configuration());
+				expect(client.metadata()).toHaveProperty(
+					'require_signed_request_object',
+					true
+				);
+			} finally {
+				ClientDefaults['requestObject.require'] = original;
+			}
 		});
 	});
 
@@ -1934,8 +1955,7 @@ describe('Client metadata validation', () => {
 		};
 
 		defaultsTo('redirectUris', [], metadata, configuration);
-		// `clientDefaults` only overrides recognised (snake_case) metadata defaults;
-		// it does not apply to the camelCase base key `redirectUris` in this codebase.
+		// An explicit null is rejected rather than falling back to the ClientDefaults value.
 		rejects(
 			'redirectUris',
 			null,
@@ -2000,7 +2020,7 @@ describe('Client metadata validation', () => {
 		};
 
 		defaultsTo('redirectUris', [], metadata, configuration);
-		// `clientDefaults` does not override the camelCase base key `redirectUris`.
+		// An explicit null is rejected rather than falling back to the ClientDefaults value.
 		rejects(
 			'redirectUris',
 			null,
@@ -2396,24 +2416,46 @@ describe('Client metadata validation', () => {
 			}
 		}));
 
-	describe('clientDefaults configuration option allows for default client metadata to be changed', () => {
-		defaultsTo('token_endpoint_auth_method', 'client_secret_post', undefined, {
-			clientDefaults: {
-				token_endpoint_auth_method: 'client_secret_post'
-			}
+	// Client defaults are no longer a provider-configuration option: they are declared once on
+	// `ClientDefaults` in camelCase, and the two that surface as OIDC metadata are translated to
+	// their wire-format names at the schema seam. The former third case here asserted that
+	// `clientDefaults` did *not* reach camelCase base keys — with a single convention that
+	// distinction no longer exists, so it has been dropped rather than reinterpreted.
+	describe('ClientDefaults allows for default client metadata to be changed', () => {
+		const original = { ...ClientDefaults };
+		afterEach(() => {
+			// ClientDefaults is a process-wide singleton; restore so overrides never leak.
+			Object.assign(ClientDefaults, original);
 		});
-		defaultsTo('id_token_signed_response_alg', 'ES256', undefined, {
-			clientDefaults: {
-				id_token_signed_response_alg: 'ES256'
-			}
+
+		it('camelCase tokenEndpointAuthMethod drives the token_endpoint_auth_method default', async () => {
+			ClientDefaults.tokenEndpointAuthMethod = 'client_secret_post';
+			const client = await register();
+			expect(client.metadata()).toHaveProperty(
+				'token_endpoint_auth_method',
+				'client_secret_post'
+			);
 		});
-		// `grantTypes` is a camelCase base key; `clientDefaults` (which seeds the
-		// snake_case recognised-metadata defaults) does not change its default here.
-		defaultsTo('responseTypes', ['code'], undefined, {
-			clientDefaults: {
-				responseTypes: ['code'],
-				grantTypes: ['authorization_code']
-			}
+
+		it('camelCase idTokenSignedResponseAlg drives the id_token_signed_response_alg default', async () => {
+			ClientDefaults.idTokenSignedResponseAlg = 'ES256';
+			const client = await register();
+			expect(client.metadata()).toHaveProperty(
+				'id_token_signed_response_alg',
+				'ES256'
+			);
+		});
+
+		it('ships RS256 / client_secret_basic when nothing is overridden', async () => {
+			const client = await register();
+			expect(client.metadata()).toHaveProperty(
+				'id_token_signed_response_alg',
+				'RS256'
+			);
+			expect(client.metadata()).toHaveProperty(
+				'token_endpoint_auth_method',
+				'client_secret_basic'
+			);
 		});
 	});
 });

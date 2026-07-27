@@ -2,7 +2,7 @@
 
 ## What this project is
 
-A standards-compliant OAuth 2.0 / OpenID Connect authorization server written in TypeScript, running on [Bun](https://bun.sh/) + [Elysia](https://elysiajs.com/). It is designed as a library: downstream apps call `provider.init(config)` and mount the returned Elysia app.
+A standards-compliant OAuth 2.0 / OpenID Connect authorization server written in TypeScript, running on [Bun](https://bun.sh/) + [Elysia](https://elysiajs.com/). It is designed as a library: downstream apps call `provider.init()` and mount the returned Elysia app.
 
 Implemented specs: Authorization Code + PKCE, Client Credentials, Refresh Token, Device Flow, CIBA, PAR (RFC 9126), DPoP (RFC 9449), token introspection/revocation, dynamic client registration, OIDC Core 1.0.
 
@@ -50,8 +50,8 @@ keys are seeded into the in-memory `jwksStore` by `test/preload.ts`.
 The same `bun run db:setup` step seeds the admin panel (reserved admin project + "Administrators"
 bucket + the first-party `admin-panel` OAuth client) via `database/mongodb.ts`. It is idempotent and
 must be re-run after upgrading an existing install. `lib/admin/seed.ts` (`ensureAdminSeed`) is the
-app-side equivalent used by tests; there is **no** boot-time seeding because `provider.init` is the
-downstream app's responsibility, so admin login requires a Mongo-backed, `db:setup`-provisioned deployment.
+app-side equivalent used by tests; there is **no** boot-time seeding because calling `provider.init()`
+is the downstream app's responsibility, so admin login requires a Mongo-backed, `db:setup`-provisioned deployment.
 
 Super-admins manage the running instance through the admin control plane (`lib/admin/`, mounted under
 `/admin/api/*`): projects, clients, buckets, end-users, server settings, and **signing keys**
@@ -115,7 +115,13 @@ test/
 
 **Action pipeline** — Each endpoint is a composed sequence of async functions that take the typed `OIDCContext` **directly as `oidc`** (the former `ctx = { oidc }` wrapper is gone). Helpers have `(oidc)` signatures and read `oidc.params`/`oidc.client`/`oidc.entities`/`oidc.cookie`/etc.; handlers **return** their typed response value (no `ctx.body`/`ctx.status` mutation). User-overridable config callbacks (findAccount, resourceIndicators.\*, interaction-policy `check(ctx)`, response-mode handlers) keep a `{ oidc }`-shaped argument as a public-API boundary; callers pass `{ oidc }` there. Event payloads that tests inspect (`authorization.success`, `registration_create.success`, `device_authorization.success`) stay `{ oidc }`-shaped.
 
-**Config** — `lib/configs/application.ts` is the **single source of truth for all flag/option DATA** (flat dotted keys, each with an inline description). `lib/helpers/configuration.ts` (`Configuration`) runs the validation/collection passes and **owns** the resolved object `provider.ts` reads — there is no `globalConfiguration.ts`, and `lib/helpers/defaults.ts` now holds only literal data defaults (client defaults, conformIdTokenClaims, discovery, interaction policy).
+**Config** — every setting lives on exactly one of **three** surfaces, and there is no `lib/helpers/defaults.ts` and no `globalConfiguration.ts`:
+
+1. `lib/configs/application.ts` (`ApplicationConfig`) — **single source of truth for all server-wide flag/option DATA** (flat dotted feature keys plus `scopes`, `claims`, `acrValues`, `clientAuthMethods`, `conformIdTokenClaims`, `discovery`), each with an inline description. Boot-only: persisted via `configStore`, applied at module load, needs a restart.
+2. `lib/configs/clientBase.ts` (`ClientDefaults`) — what a client gets when it does not specify, in **camelCase only**. Consumers working in wire-format (snake_case) metadata names translate at their own seam (see the map in `lib/models/client/schema.ts`).
+3. `lib/addon/*` — overridable behavior, resolved through the override registry at call time, **including the interaction policy** (`interactionPolicy()` plus an `interactionPolicyControl` add/reset surface).
+
+`lib/helpers/configuration.ts` (`Configuration`) takes **no argument**: it reads `ApplicationConfig` and runs the validation/collection passes, and **owns** the resolved object `provider.ts` reads.
 
 **Behaviour functions** — Overridable server behaviour (CORS, token issuance/rotation, resource-server info, CIBA/mTLS/RAR/registration helpers, …) is **single-sourced through `lib/addon/index.ts`**. Each function's default lives in its addon module; the index exposes a dynamic call-time accessor per function plus an `addons.override(partial)` / `addons.reset()` registry (`lib/addon/registry.ts`). Source modules import the accessor from the index — never off the merged configuration. Deployments and tests override via the registry (the test harness resets it after every test via `test/preload.ts`; `test/addon_baseline.ts` bridges a `*.config.ts`'s behaviour-fn overrides into a per-spec baseline). `findAccount` / `assertJwtClientAuthClaimsAndHeader` keep their existing direct imports.
 
@@ -125,7 +131,7 @@ test/
 
 **Model lookup** — Every `BaseModel`/`BaseToken` subclass (and the `Client` namespace) exposes two static lookups. `tryFind(id, opts?)` returns the item or `undefined` — use it where absence is a valid, handled outcome. `find(id, opts?)` returns the item or **throws** — use it where the item is required, so no `undefined` check or non-null assertion is needed at the call site. `find` accepts an optional pre-constructed `{ error }` to throw on miss; without it, each model throws its own `static notFoundError` default (token hierarchy → `InvalidToken`, `Client` → `InvalidClient`). `find` delegates to `tryFind`, so both share identical verification/expiration/session-binding/policy semantics — only the not-found outcome differs. In tests, `spyOn(Model, 'tryFind')` to simulate a miss (mocking `find` would bypass the throw path).
 
-**Provider singleton** — `provider.init(config)` resolves config via `Configuration`. After init, models are accessed as `provider.Grant`, etc. `provider.Client` is a **namespace** (`find`/`tryFind`/`validate`/`needsSecret`/`validateClient`/`adapter`), not a class.
+**Provider singleton** — `provider.init()` resolves configuration via `Configuration`, which reads `ApplicationConfig`; it takes **no configuration argument**. The one input it still accepts is a per-instance `{ jwks: { keys } }`, used only by tests that need key material the store-backed path rejects (`verifyJWKs` requires an `alg`); do not add anything else to it. After init, models are accessed as `provider.Grant`, etc. `provider.Client` is a **namespace** (`find`/`tryFind`/`validate`/`needsSecret`/`validateClient`/`adapter`), not a class.
 
 **Client model** — A client is a TypeBox `ClientSchema`-validated **plain object** (`validateClient(metadata)`), not a class instance. Behaviour lives in pure functions under `lib/models/client/` (`checks`, `secret`, `sector`, `keystore`, `backchannel`); `lib/models/client.ts` re-exports them. The object exposes the historical method/getter surface (delegating to those functions) for call-site/test compatibility.
 
@@ -143,7 +149,7 @@ Tests use **Bun's native test runner** with **Chai** assertions and **Sinon** st
 
 Each feature area has:
 
-- `*.config.ts` — provider config for that feature (scopes, feature flags); a **named** `export const clients = [...]` (or `export const client = {...}`), separate from the default export, is seeded into the `Client` store by the harness (not passed to `provider.init`). Configs that clone another config's default export must re-export its `clients`.
+- `*.config.ts` — per-feature test settings, expressed entirely as **named exports** the harness applies (nothing is passed to `provider.init`): `ApplicationConfig` (feature flags and collection options incl. `claims` — omit it to get the shared test claim set, `claims: {}` to opt out), `ClientDefaults`, `addons` (behavior overrides incl. `interactionPolicy`), `jwks` (per-instance keys), and `clients` / `client` which are seeded into the `Client` store. Configs that clone another config must re-export its `clients`.
 - `*.spec.ts` — test cases using the Eden type-safe HTTP client
 
 `test_helper.ts` bootstraps the provider with the right config before each suite. Use `bootstrap(import.meta)` at the top of a spec file.

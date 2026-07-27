@@ -361,6 +361,31 @@ export const ApplicationConfig = {
 	acrValues: [],
 
 	/*
+	 * conformIdTokenClaims
+	 *
+	 * title: ID Token only contains End-User claims when the requested `response_type` is `id_token`
+	 */
+	conformIdTokenClaims: true,
+
+	/*
+	 * discovery
+	 *
+	 * description: Pass additional properties to this object to extend the discovery document.
+	 *   Relocated here as the single source for server-owned settings, but intentionally absent
+	 *   from the admin settings catalog: it is not operator-editable, so it is neither returned by
+	 *   nor writable through the settings API.
+	 */
+	discovery: {
+		claim_types_supported: ['normal'],
+		claims_locales_supported: undefined,
+		display_values_supported: undefined,
+		op_policy_uri: undefined,
+		op_tos_uri: undefined,
+		service_documentation: undefined,
+		ui_locales_supported: undefined
+	},
+
+	/*
 	 * clientAuthMethods
 	 *
 	 * description: Supported client authentication methods; surfaced as `token_endpoint_auth_methods_supported`.

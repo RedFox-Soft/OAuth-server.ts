@@ -5,7 +5,6 @@ import {
 	InvalidScope
 } from '../../helpers/errors.ts';
 import presence from '../../helpers/validate_presence.ts';
-import instance from '../../helpers/weak_cache.ts';
 import { findAccount } from '../../addon/account.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import revoke from '../../helpers/revoke.ts';
@@ -37,8 +36,6 @@ const gty = 'refresh_token';
 
 export const handler = async function refreshTokenHandler(oidc, dPoP) {
 	presence(oidc, 'refresh_token');
-
-	const { conformIdTokenClaims } = instance(oidc.provider).configuration;
 
 	const { client } = oidc;
 
@@ -263,7 +260,7 @@ export const handler = async function refreshTokenHandler(oidc, dPoP) {
 		});
 
 		if (
-			conformIdTokenClaims &&
+			ApplicationConfig.conformIdTokenClaims &&
 			ApplicationConfig['userinfo.enabled'] &&
 			!at.payload.aud
 		) {

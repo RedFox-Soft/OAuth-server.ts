@@ -6,7 +6,7 @@ export const ApplicationConfig = {
 	'encryption.enabled': false
 };
 
-config.jwks = {
+export const jwks = {
 	keys: [
 		{
 			e: 'AQAB',
@@ -17,7 +17,8 @@ config.jwks = {
 			dp: 'i160VG4EHCoZP2x4GQTjYC4BCLEwZsv_iZWtpRMyraz3dH1LDU4OLgTNRq_KcSKl6XYgVqZyNSDo4Hdt1mmJNVx3GxDv4gO4yphwpnUJ46CR61IYh-7n4XNExpqmv3gg7778-5EKWSQcmD-tZOjC5dSN81QtaT6gw4y0Fd5cCAc',
 			dq: 'TZ5iPHxPvl79fDmij-0zGynd0CUMTqcnsbdELN1uUnobqwPcmaZVqWKLYoRI5bcpGlAZP4eEOIXFZZMvxABZqriIJQtNfGno__YNZj8NCGMom5O8o4j6Z8fnbk8xsg-bSx_IsSk5Xf_9gqmR0ry6F6VhAkyfuPp90lFIan8exak',
 			qi: '5maXjtEVKJGlrQUnD6A8Wumf8AcvDTs5wqHt9s8zXGjmXneaQMOC9xUbzd5nvoX7JOOlqIqWXMTH0BVfRlLqyLU-ZsAGIhBXs7Sz0_Djeq7liRdsjZRbgukp_Egs68XPdVCB-to-R5JVfnrQaWvxqFZbz5OzoUS2JYwwBJvlS8Y',
-			kty: 'RSA'
+			kty: 'RSA',
+			alg: 'RS256'
 		},
 		{
 			e: 'AQAB',
@@ -36,7 +37,8 @@ config.jwks = {
 			x: '0pm-JC6KeQqFwxdTLsBdtnrT4hV6VDlv3AWE6BSyFSk',
 			y: 'ZvRmSa23_647WNcK_gkp5r8Jm4_9MnuyClguRYvu7Ik',
 			d: 'niQR1Er0ZrssEGQupuRWroxsn9rvgrgkcz8jR6dYg_o',
-			kty: 'EC'
+			kty: 'EC',
+			alg: 'ES256'
 		}
 	]
 };

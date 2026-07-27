@@ -3,35 +3,38 @@ import { describe, it, expect, afterEach } from 'bun:test';
 import provider from '../../lib/index.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 
+// Scopes are a server setting now, so grant-type derivation reads them from ApplicationConfig.
 describe('Provider declaring support for refresh_token grant type', () => {
+	const originalScopes = ApplicationConfig.scopes;
+
+	function initWithScopes(scopes: string[]) {
+		ApplicationConfig.scopes = scopes;
+		provider.init();
+	}
+
 	it('is enabled by default', () => {
 		provider.init();
 		expect(i(provider).configuration.grantTypes).toContain('refresh_token');
 	});
 
 	it('isnt enabled when offline_access isnt amongst the scopes', () => {
-		provider.init({
-			scopes: ['openid']
-		});
+		initWithScopes(['openid']);
 		expect(i(provider).configuration.grantTypes).not.toContain('refresh_token');
 	});
 
 	it('is enabled when offline_access isnt amongst the scopes', () => {
-		provider.init({
-			scopes: ['openid', 'offline_access']
-		});
+		initWithScopes(['openid', 'offline_access']);
 		expect(i(provider).configuration.grantTypes).toContain('refresh_token');
 	});
 
 	it('is enabled when the refreshToken.enabled flag is set', () => {
 		ApplicationConfig['refreshToken.enabled'] = true;
-		provider.init({
-			scopes: ['openid']
-		});
+		initWithScopes(['openid']);
 		expect(i(provider).configuration.grantTypes).toContain('refresh_token');
 	});
 
 	afterEach(() => {
 		ApplicationConfig['refreshToken.enabled'] = false;
+		ApplicationConfig.scopes = originalScopes;
 	});
 });

@@ -9,7 +9,9 @@ const encKeys = [
 		e: 'AQAB',
 		n: '2s3t1LBJxVpq0aD7GhZYUANkcIzmT6CFAEYe87xpyBUNiGMsLAmoNcyOSs5z3YYdkWCWuFETyr2n7hWN2tYNDR0TegYLdo_tUgvJlXYZRnFf7Jle8FLv2n9BGmFobrVRXoa5EjlccgbnwtibnN0XYDoTgSsoODsMsAsntnPTSQJ2XPmBNg8YlS-EAze7-3IZ_kYGa62bzdOCnTY3M8_HYvDGTLJeUrZfxasncQDVmbCxTWs8H6wKVx6OxwJmyDLFipzTtk9kPh6W37m0StKQcLDTzq3RYD9-o7Rj7qL6KXy6B_hbHP9aKK3Bd46-iYhfTP3ddU-wHJPWGGswr_PAow',
 		kty: 'RSA',
-		kid: 'cMzrEnOQwQCZ2wE0PdUYQN3H_ez6UiobsuNpkHp_UUo'
+		kid: 'cMzrEnOQwQCZ2wE0PdUYQN3H_ez6UiobsuNpkHp_UUo',
+		alg: 'RS256',
+		use: 'sig'
 	},
 	{
 		e: 'AQAB',
@@ -32,7 +34,9 @@ const encKeys = [
 		x: '0pm-JC6KeQqFwxdTLsBdtnrT4hV6VDlv3AWE6BSyFSk',
 		y: 'ZvRmSa23_647WNcK_gkp5r8Jm4_9MnuyClguRYvu7Ik',
 		kty: 'EC',
-		kid: 'e0E9_EexvEyoDYUwFH_mbP9FitPWB7JR5fYBIvzVbHA'
+		kid: 'e0E9_EexvEyoDYUwFH_mbP9FitPWB7JR5fYBIvzVbHA',
+		alg: 'ES256',
+		use: 'sig'
 	},
 	{
 		crv: 'P-256',
@@ -51,6 +55,7 @@ const noEncKeys = [
 		n: '2s3t1LBJxVpq0aD7GhZYUANkcIzmT6CFAEYe87xpyBUNiGMsLAmoNcyOSs5z3YYdkWCWuFETyr2n7hWN2tYNDR0TegYLdo_tUgvJlXYZRnFf7Jle8FLv2n9BGmFobrVRXoa5EjlccgbnwtibnN0XYDoTgSsoODsMsAsntnPTSQJ2XPmBNg8YlS-EAze7-3IZ_kYGa62bzdOCnTY3M8_HYvDGTLJeUrZfxasncQDVmbCxTWs8H6wKVx6OxwJmyDLFipzTtk9kPh6W37m0StKQcLDTzq3RYD9-o7Rj7qL6KXy6B_hbHP9aKK3Bd46-iYhfTP3ddU-wHJPWGGswr_PAow',
 		kty: 'RSA',
 		kid: 'cMzrEnOQwQCZ2wE0PdUYQN3H_ez6UiobsuNpkHp_UUo',
+		alg: 'RS256',
 		use: 'sig'
 	},
 	{

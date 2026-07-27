@@ -2,12 +2,13 @@ import getConfig from '../default.config.js';
 
 const config = getConfig();
 
-delete config.claims;
-config.scopes = ['openid', 'offline_access', 'api:read'];
-
 export const ApplicationConfig = {
 	'claimsParameter.enabled': true,
-	'deviceFlow.enabled': true
+	'deviceFlow.enabled': true,
+	scopes: ['openid', 'offline_access', 'api:read'],
+	// Explicitly empty: this OAuth-only suite opts out of the shared test claim set that
+	// bootstrap applies when a config declares no `claims` of its own.
+	claims: {}
 };
 
 export const client = {

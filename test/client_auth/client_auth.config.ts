@@ -24,21 +24,21 @@ const clientKey = {
 const rsaKeys = cloneDeep(mtlsKeys);
 rsaKeys.keys.splice(0, 1);
 
-config.clientAuthMethods = [
-	'none',
-	'client_secret_basic',
-	'client_secret_post',
-	'private_key_jwt',
-	'client_secret_jwt',
-	'tls_client_auth',
-	'self_signed_tls_client_auth'
-];
 export const ApplicationConfig = {
 	'introspection.enabled': true,
 	'clientCredentials.enabled': true,
 	'mTLS.enabled': true,
 	'mTLS.selfSignedTlsClientAuth': true,
-	'mTLS.tlsClientAuth': true
+	'mTLS.tlsClientAuth': true,
+	clientAuthMethods: [
+		'none',
+		'client_secret_basic',
+		'client_secret_post',
+		'private_key_jwt',
+		'client_secret_jwt',
+		'tls_client_auth',
+		'self_signed_tls_client_auth'
+	]
 };
 
 export const addons = {

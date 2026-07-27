@@ -25,7 +25,11 @@ class CustomPrompt extends Prompt {
 policy.get('login').checks.push(check);
 policy.add(new CustomPrompt());
 
-config.interactions = { policy };
+// The policy is overridable behavior, registered through the addon seam rather than passed
+// as provider configuration. bootstrap() makes this the spec's addon baseline.
+export const addons = {
+	interactionPolicy: () => policy
+};
 
 export const clients = [
 	{

@@ -1,6 +1,5 @@
-import { isPlainObject, merge, pick } from './_/object.js';
+import { isPlainObject, merge } from './_/object.js';
 import * as formatters from './formatters.ts';
-import getDefaults from './defaults.ts';
 import { STABLE, EXPERIMENTS } from './features.ts';
 import * as attention from './attention.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
@@ -16,37 +15,23 @@ function toSet(name, value) {
 }
 
 class Configuration {
-	#defaults = getDefaults();
-
-	constructor(config = {}) {
-		Object.assign(
-			this,
-			merge({}, this.#defaults, pick(config, ...Object.keys(this.#defaults)))
-		);
-
-		// ApplicationConfig is the single source for the options it owns. The collection
-		// options default from it and may be overridden per-instance via the provider setup;
-		// they are copied (Set/clone) so the in-place processing below never mutates the shared
-		// ApplicationConfig. Feature flags and sub-options are NOT held on the provider — they
-		// are read directly and flat from ApplicationConfig at each use site (incl. the
-		// validations below).
-		this.scopes = toSet('scopes', config.scopes ?? ApplicationConfig.scopes);
-		this.acrValues = toSet(
-			'acrValues',
-			config.acrValues ?? ApplicationConfig.acrValues
-		);
+	constructor() {
+		// ApplicationConfig is the single source for every option. There is no per-instance
+		// setup: the collection options are read from it and copied (Set/clone) so the in-place
+		// processing below never mutates the shared object. Feature flags and sub-options are
+		// NOT held on the provider — they are read directly and flat from ApplicationConfig at
+		// each use site (incl. the validations below).
+		this.scopes = toSet('scopes', ApplicationConfig.scopes);
+		this.acrValues = toSet('acrValues', ApplicationConfig.acrValues);
 		this.clientAuthMethods = toSet(
 			'clientAuthMethods',
-			config.clientAuthMethods ?? ApplicationConfig.clientAuthMethods
+			ApplicationConfig.clientAuthMethods
 		);
-		this.claims = structuredClone(
-			merge({}, ApplicationConfig.claims, config.claims ?? {})
-		);
+		this.claims = structuredClone(merge({}, ApplicationConfig.claims));
 
 		this.logDraftNotice();
 
 		this.collectScopes();
-		this.collectPrompts();
 		this.unpackArrayClaims();
 		this.ensureOpenIdSub();
 		this.removeAcrIfEmpty();
@@ -57,9 +42,6 @@ class Configuration {
 		this.checkAuthMethods();
 		this.checkCibaDeliveryModes();
 		this.checkRichAuthorizationRequests();
-
-		// release #defaults
-		this.#defaults = undefined;
 	}
 
 	checkRichAuthorizationRequests() {
@@ -125,15 +107,6 @@ class Configuration {
 		claimDefinedScopes.forEach((scope) => {
 			if (typeof scope === 'string' && !this.scopes.has(scope)) {
 				this.scopes.add(scope);
-			}
-		});
-	}
-
-	collectPrompts() {
-		this.prompts = new Set(['none']);
-		this.interactions.policy.forEach(({ name, requestable }) => {
-			if (requestable) {
-				this.prompts.add(name);
 			}
 		});
 	}

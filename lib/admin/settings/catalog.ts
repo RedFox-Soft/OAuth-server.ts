@@ -317,6 +317,15 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 	},
 
 	{
+		key: 'conformIdTokenClaims',
+		group: 'ID Token',
+		label: 'Conform ID Token claims',
+		type: 'boolean',
+		description:
+			'When on, an ID Token carries End-User claims only where the requested response_type is id_token. Turning it off includes scope-derived claims in ID Tokens issued from other response types. On by default (spec-conformant).'
+	},
+
+	{
 		key: 'scopes',
 		group: 'Discovery',
 		label: 'Supported scopes',

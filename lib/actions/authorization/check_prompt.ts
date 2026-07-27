@@ -1,5 +1,5 @@
 import { InvalidRequest } from '../../helpers/errors.ts';
-import instance from '../../helpers/weak_cache.ts';
+import { supportedPrompts } from '../../addon/index.js';
 
 /*
  * Checks that all requested prompts are supported and validates prompt none is not combined with
@@ -8,7 +8,9 @@ import instance from '../../helpers/weak_cache.ts';
 export default function checkPrompt(oidc) {
 	if (oidc.params.prompt !== undefined) {
 		const { prompts } = oidc;
-		const supported = instance(oidc.provider).configuration.prompts;
+		// Derived from the resolved policy per request, so a prompt registered after provider
+		// initialisation is accepted rather than rejected as unsupported.
+		const supported = supportedPrompts();
 
 		for (const prompt of prompts) {
 			if (!supported.has(prompt)) {
