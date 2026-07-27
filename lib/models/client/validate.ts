@@ -1,5 +1,7 @@
 import crypto from 'node:crypto';
 
+import QuickLRU from 'quick-lru';
+
 import mapKeys from '../../helpers/_/map_keys.ts';
 import snakeCase from '../../helpers/_/snake_case.ts';
 import camelCase from '../../helpers/_/camel_case.ts';
@@ -191,18 +193,20 @@ export async function assertClientValid(metadata: unknown): Promise<void> {
 	}
 }
 
+// Validation memo, owned by its only consumer below. Size-bounded (LRU) — no time-based expiry,
+// which would drop entries out from under in-flight resolutions.
+const clientCache = new QuickLRU<string, ClientSchemaType>({ maxSize: 100 });
+
 // Resolve a client by id from adapter('Client') — the single source of client
 // identity. The adapter is read on every call so updates and deletes are always
 // reflected immediately (a stale-metadata window would violate FR-009 and the
-// security-first principle); the bounded, maxAge-limited clientCache only
-// memoizes the *validated* object, keyed by a hash of the stored properties, so
-// unchanged clients skip re-validation. Nullable variant behind `Client.tryFind`;
-// the strict `Client.find` wraps this and throws on miss.
+// security-first principle); the memo above only holds the *validated* object,
+// keyed by a hash of the stored properties, so unchanged clients skip
+// re-validation. Nullable variant behind `Client.tryFind`; the strict
+// `Client.find` wraps this and throws on miss.
 export async function tryFindClient(
 	id: string
 ): Promise<ClientSchemaType | undefined> {
-	const { clientCache } = instance(provider);
-
 	const properties = await adapter('Client').find(id);
 	if (!properties) {
 		return;

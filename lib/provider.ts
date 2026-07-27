@@ -1,8 +1,6 @@
 import EventEmitter from 'node:events';
 import * as crypto from 'node:crypto';
 
-import QuickLRU from 'quick-lru';
-
 import { ApplicationConfig } from './configs/application.js';
 
 const SIG_ALGS = new Set([
@@ -84,11 +82,6 @@ class ProviderClass extends EventEmitter {
 	// single-sourced-from-the-database model the Client store uses.
 	init() {
 		const configuration = new Configuration();
-		// tryFindClient reads adapter('Client') on every resolution, so this cache
-		// is purely a validated-object memo keyed by a hash of the stored props;
-		// updates/deletes are always current. Size-bounded (LRU) — no time-based
-		// expiry, which would drop entries out from under in-flight resolutions.
-		this.#int.clientCache = new QuickLRU({ maxSize: 100 });
 
 		instance.set(this, this.#int);
 
