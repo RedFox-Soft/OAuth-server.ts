@@ -144,7 +144,13 @@ export function verifyJWKs(jwks: unknown): jwks is { keys: JWKS[] } {
 	return true;
 }
 
-const calculateKid = (jwk: UnnormalizedJWK) => {
+/*
+ * The key's RFC 7638 JWK thumbprint, over the required members for its kty (already in the
+ * lexicographic order the spec asks for). Used as the kid of any key that arrives without one —
+ * exported so the published-JWKS projection derives the *same* kid this normalization would, which
+ * is what lets the admin API compare a raw store key against the live set by kid.
+ */
+export const calculateKid = (jwk: UnnormalizedJWK) => {
 	let components;
 
 	switch (jwk.kty) {

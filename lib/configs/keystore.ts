@@ -1,8 +1,6 @@
-import * as crypto from 'node:crypto';
-
 import KeyStore from '../helpers/keystore.js';
 import { signingAlgs } from './jwaConsts.js';
-import type { UnnormalizedJWK } from './verifyJWKs.js';
+import { calculateKid, type UnnormalizedJWK } from './verifyJWKs.js';
 
 /*
  * The server's live key material — the in-memory keystore used to sign, verify, encrypt and
@@ -18,29 +16,28 @@ import type { UnnormalizedJWK } from './verifyJWKs.js';
  * Both exports are mutated in place and never reassigned, so every module holding the imported
  * reference sees the current keys. The admin JWKS API relies on this to hot-apply a new key.
  */
-export const keystore = new KeyStore();
-export const publicJWKS: { keys: Array<Record<string, unknown>> } = {
-	keys: []
+/*
+ * A key as published: normalized (`kid` and `use` always present) and carrying only client-safe
+ * members. Which of the type-specific members are set follows from `kty`.
+ */
+export type PublicJWK = {
+	kid: string;
+	kty: 'RSA' | 'EC' | 'OKP';
+	alg: string;
+	use: 'sig' | 'enc';
+	key_ops?: string[];
+	x5c?: string[];
+	crv?: string;
+	e?: string;
+	n?: string;
+	x?: string;
+	y?: string;
 };
 
-const SIG_ALGS = new Set<string>(signingAlgs);
+export const keystore = new KeyStore();
+export const publicJWKS: { keys: PublicJWK[] } = { keys: [] };
 
-// RFC 7638 JWK thumbprint over the required members (already in lexicographic order per kty).
-function jwkThumbprint(key: UnnormalizedJWK): string {
-	let members;
-	switch (key.kty) {
-		case 'RSA':
-			members = { e: key.e, kty: key.kty, n: key.n };
-			break;
-		case 'EC':
-			members = { crv: key.crv, kty: key.kty, x: key.x, y: key.y };
-			break;
-		case 'OKP':
-			members = { crv: key.crv, kty: key.kty, x: key.x };
-			break;
-	}
-	return crypto.hash('sha256', JSON.stringify(members), 'base64url');
-}
+const SIG_ALGS = new Set<string>(signingAlgs);
 
 /*
  * toPublicJwk
@@ -50,12 +47,13 @@ function jwkThumbprint(key: UnnormalizedJWK): string {
  * leak.
  *
  * Normalizes the two members verifyJWKs also fills in, for keys read straight from the store that
- * have not been through it: `kid` from the RFC 7638 thumbprint, and `use` from `alg` (which every
- * key schema requires, so it is always available to infer from).
+ * have not been through it: `kid` from the RFC 7638 thumbprint (via the same calculateKid that
+ * normalization uses, so both derive the same value), and `use` from `alg` (which every key schema
+ * requires, so it is always available to infer from).
  */
-export function toPublicJwk(key: UnnormalizedJWK): Record<string, unknown> {
+export function toPublicJwk(key: UnnormalizedJWK): PublicJWK {
 	const common = {
-		kid: key.kid ?? jwkThumbprint(key),
+		kid: key.kid ?? calculateKid(key),
 		alg: key.alg,
 		use: key.use ?? (SIG_ALGS.has(key.alg) ? 'sig' : 'enc'),
 		key_ops: key.key_ops ? [...key.key_ops] : undefined,

@@ -1,7 +1,11 @@
 import { jwksStore } from '../../adapters/index.js';
-import { keystore, publicJWKS, toPublicJwk } from '../../configs/keystore.js';
+import {
+	keystore,
+	publicJWKS,
+	toPublicJwk,
+	type PublicJWK
+} from '../../configs/keystore.js';
 import { generateJWKS } from '../../helpers/jwks.js';
-import { signingAlgs } from '../../configs/jwaConsts.js';
 import { type JWKS } from '../../configs/verifyJWKs.js';
 import { recordAdminAudit } from '../audit/record.js';
 import { AdminError, type AdminContext } from '../auth/rbac.js';
@@ -12,24 +16,12 @@ import { AdminError, type AdminContext } from '../auth/rbac.js';
 const SUPPORTED_ALGS = ['RS256', 'RS384', 'RS512'] as const;
 type SupportedAlg = (typeof SUPPORTED_ALGS)[number];
 
-const SIG_ALGS = new Set<string>(signingAlgs);
-
 export type KeyStatus = 'active' | 'pending activation' | 'pending removal';
 
-export interface KeyView {
-	kid: string;
-	kty: string;
-	alg?: string;
-	use?: string;
-	crv?: string;
-	e?: string;
-	n?: string;
-	x?: string;
-	y?: string;
-	x5c?: string[];
-	key_ops?: string[];
-	status: KeyStatus;
-}
+// The admin view of a key is the same client-safe projection the server publishes at /jwks
+// (configs/keystore.ts owns it): an explicit allow-list, never a blocklist, so an unforeseen
+// private component (d/p/q/dp/dq/qi/oth) can never leak into an admin response either.
+export type KeyView = PublicJWK & { status: KeyStatus };
 
 export interface JwksState {
 	keys: KeyView[];
@@ -38,25 +30,11 @@ export interface JwksState {
 	supportedAlgorithms: string[];
 }
 
-// A key counts as a signing key when its effective use is 'sig' — inferred from an explicit
-// `use`, else from a signing `alg`, else defaulting to 'sig' (mirrors the provider's own
-// inference and verifyJWKs). Used to enforce "at least one signing key must remain".
-function effectiveUse(key: JWKS): 'sig' | 'enc' {
-	if (key.use === 'sig' || key.use === 'enc') return key.use;
-	if (key.alg) return SIG_ALGS.has(key.alg) ? 'sig' : 'enc';
-	return 'sig';
-}
-
+// A key counts as a signing key by its published `use` — explicit, else inferred from `alg`, by
+// the one projection that owns that inference. Used to enforce "at least one signing key must
+// remain".
 function isSigningKey(key: JWKS): boolean {
-	return effectiveUse(key) === 'sig';
-}
-
-// The admin view of a key is the same client-safe projection the server publishes at /jwks
-// (configs/keystore.ts owns it): an explicit allow-list, never a blocklist, so an unforeseen private
-// component (d/p/q/dp/dq/qi/oth) can never leak into an admin response either.
-function project(key: JWKS, status: KeyStatus): KeyView {
-	// toPublicJwk already carries kid + kty (both required on KeyView); the widening is safe.
-	return { ...toPublicJwk(key), status } as unknown as KeyView;
+	return toPublicJwk(key).use === 'sig';
 }
 
 // The keys the server currently serves at /jwks (the live set — reflects hot-applied keys
@@ -64,8 +42,12 @@ function project(key: JWKS, status: KeyStatus): KeyView {
 // and the restart-required indicator; because generation hot-applies, the only drift in practice
 // is a deleted key that is still live until the next restart (pending removal).
 export async function getJwksState(): Promise<JwksState> {
-	const desired = await jwksStore.getAll();
-	const running = publicJWKS.keys as unknown as JWKS[];
+	// Both sides are projected before anything is compared. The live keys already are projections;
+	// the store's are raw, and a key an operator provisioned without a `kid` only gets one derived
+	// by the projection. Comparing raw kids would compare `undefined` against a real kid, so such a
+	// key could never match its live counterpart, and it would report `undefined` as a changed kid.
+	const desired = (await jwksStore.getAll()).map(toPublicJwk);
+	const running = publicJWKS.keys;
 	const desiredKids = new Set(desired.map((k) => k.kid));
 	const runningKids = new Set(running.map((k) => k.kid));
 
@@ -74,15 +56,15 @@ export async function getJwksState(): Promise<JwksState> {
 
 	for (const key of desired) {
 		if (runningKids.has(key.kid)) {
-			keys.push(project(key, 'active'));
+			keys.push({ ...key, status: 'active' });
 		} else {
-			keys.push(project(key, 'pending activation'));
+			keys.push({ ...key, status: 'pending activation' });
 			changedKeys.push(key.kid);
 		}
 	}
 	for (const key of running) {
 		if (!desiredKids.has(key.kid)) {
-			keys.push(project(key, 'pending removal'));
+			keys.push({ ...key, status: 'pending removal' });
 			changedKeys.push(key.kid);
 		}
 	}
@@ -140,6 +122,9 @@ export async function deleteKey(
 	kid: string
 ): Promise<JwksState> {
 	const desired = await jwksStore.getAll();
+	// Matched on the key's own `kid`, deliberately not the projected one: that field *is* the
+	// store's identity for a key (both adapters address keys by it), so a key carrying no `kid`
+	// is not addressable and must 404 rather than be reported deleted after a no-op.
 	if (!desired.some((k) => k.kid === kid)) {
 		throw new AdminError(404, `no such key: ${kid}`);
 	}

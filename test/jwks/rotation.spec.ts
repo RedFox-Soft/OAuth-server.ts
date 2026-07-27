@@ -50,7 +50,8 @@ describe('key rotation does not invalidate tokens signed by a remaining key (SC-
 		// Published set reflects the rotation: B and C present, A gone.
 		const publishedKids = publicJWKS.keys.map((k) => k.kid);
 		expect(publishedKids).toContain(ecB.kid);
-		expect(publishedKids).toContain(cKey.kid);
+		// generateJWKS always assigns a kid; it is present at runtime.
+		expect(publishedKids).toContain(cKey.kid as string);
 		expect(publishedKids).not.toContain(rsaA.kid);
 	});
 });

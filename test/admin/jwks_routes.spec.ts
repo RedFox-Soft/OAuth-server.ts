@@ -12,7 +12,7 @@ import {
 import { JWKS_KEYS } from 'lib/configs/keys.ts';
 import { keystore, publicJWKS } from 'lib/configs/keystore.ts';
 import { generateJWKS } from 'lib/helpers/jwks.ts';
-import { type JWKS } from 'lib/configs/verifyJWKs.ts';
+import { calculateKid, type JWKS } from 'lib/configs/verifyJWKs.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 
 const app = new Elysia().use(resolveAdmin).use(jwksRoutes);
@@ -118,6 +118,40 @@ describe('admin JWKS API — view (US1)', () => {
 		const body = res.data as JwksState;
 		const view = body.keys.find((k) => k.kid === key.kid);
 		expect(view?.use).toBe('sig');
+	});
+
+	// A key provisioned without a `kid` is reported under the RFC 7638 thumbprint the server would
+	// itself assign at boot. Every id in the response has to be that same derived kid: reporting
+	// the raw (absent) one would put `undefined` in changedKeys and leave the entry uncorrelatable
+	// with the key it describes.
+	it('reports a store key provisioned without a kid under its derived kid', async () => {
+		const { cookie } = await sessionCookieFor(['super_admin']);
+		const {
+			keys: [key]
+		} = await generateJWKS('RS256');
+		const { kid, ...withoutKid } = key as JWKS;
+		await jwksStore.set(kid, withoutKid as JWKS);
+
+		// Removed by the store key, not in resetStore: that deletes by each key's own `kid`, which
+		// this one does not have, so it would outlive the spec and leak into every later one.
+		try {
+			const res = await client.admin.api.jwks.get({ headers: { cookie } });
+			const body = res.data as JwksState;
+
+			// Not the store's map key — the thumbprint, which is what verifyJWKs would assign.
+			const derived = calculateKid(withoutKid as JWKS);
+			expect(derived).not.toBe(kid);
+
+			const view = body.keys.find((k) => k.kid === derived);
+			expect(view).toBeDefined();
+			// Not live until a restart normalizes it into the running set.
+			expect(view?.status).toBe('pending activation');
+			expect(body.changedKeys).toContain(derived);
+			expect(body.changedKeys.every((k) => typeof k === 'string')).toBe(true);
+			expect(body.keys.every((k) => typeof k.kid === 'string')).toBe(true);
+		} finally {
+			await jwksStore.delete(kid);
+		}
 	});
 });
 
