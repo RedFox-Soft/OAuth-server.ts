@@ -1,5 +1,5 @@
 import * as JWT from '../../helpers/jwt.ts';
-import instance from '../../helpers/weak_cache.ts';
+import { keystore } from 'lib/configs/keystore.js';
 import { assertJwtClaimsAndHeader } from '../../addon/index.js';
 import {
 	InvalidRequest,
@@ -75,10 +75,7 @@ export default async function processRequestObject(
 				decrypted = await JWT.decrypt(params.request, client.symmetricKeyStore);
 				trusted = true;
 			} else {
-				decrypted = await JWT.decrypt(
-					params.request,
-					instance(oidc.provider).keystore
-				);
+				decrypted = await JWT.decrypt(params.request, keystore);
 			}
 
 			params.request = decrypted.toString('utf8');

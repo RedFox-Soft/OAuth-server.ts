@@ -1,6 +1,8 @@
 import { jwksStore } from '../adapters/index.js';
 import { generateJWKS } from '../helpers/jwks.js';
 import { verifyJWKs, type JWKS } from './verifyJWKs.js';
+import { ApplicationConfig } from './application.js';
+import { loadKeys } from './keystore.js';
 import type { JWKSStoreInstance } from '../adapters/types.js';
 
 /*
@@ -38,6 +40,15 @@ export async function resolveKeys(store: JWKSStoreInstance): Promise<JWKS[]> {
 
 export const JWKS_KEYS: JWKS[] = await resolveKeys(jwksStore);
 
+// Populate the live keystore and the published JWKS (configs/keystore.ts) from the loaded set. The
+// keys are module state, single-sourced from the store, exactly as ApplicationConfig is module
+// state single-sourced from the config store — neither is an input to the provider.
+function applyKeys(): void {
+	loadKeys(JWKS_KEYS, Boolean(ApplicationConfig['encryption.enabled']));
+}
+
+applyKeys();
+
 /*
  * reloadJWKSKeys
  *
@@ -45,13 +56,15 @@ export const JWKS_KEYS: JWKS[] = await resolveKeys(jwksStore);
  * single source for the server's keys (as the Client store is for clients), so changing keys means
  * writing them there and reloading; there is no per-instance key input to the provider.
  *
- * The array is mutated in place so every module holding the exported reference sees the new keys.
- * Algorithm sets derived once at module scope (see jwaAlgorithms.ts) stay boot-derived, matching
- * the boot-only semantics of the rest of the configuration.
+ * JWKS_KEYS, the keystore and the published JWKS are all rebuilt in place, so every module holding
+ * one of the exported references sees the new keys. Algorithm sets derived once at module scope
+ * (see jwaAlgorithms.ts) stay boot-derived, matching the boot-only semantics of the rest of the
+ * configuration.
  */
 export async function reloadJWKSKeys(): Promise<JWKS[]> {
 	const fresh = await resolveKeys(jwksStore);
 	JWKS_KEYS.length = 0;
 	JWKS_KEYS.push(...fresh);
+	applyKeys();
 	return JWKS_KEYS;
 }

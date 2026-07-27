@@ -12,7 +12,7 @@ import {
 } from 'bun:test';
 import base64url from 'base64url';
 
-import i from 'lib/helpers/weak_cache.js';
+import { keystore } from 'lib/configs/keystore.js';
 
 import ResourceServer from '../../lib/helpers/resource_server.ts';
 import epochTime from '../../lib/helpers/epoch_time.ts';
@@ -146,7 +146,7 @@ describe('jwt format', () => {
 			expect(header).toHaveProperty('alg', 'RS256');
 			expect(header).toHaveProperty(
 				'kid',
-				i(provider).keystore.selectForSign({ alg: 'RS256' })[0].kid
+				keystore.selectForSign({ alg: 'RS256' })[0].kid
 			);
 		});
 
@@ -169,7 +169,7 @@ describe('jwt format', () => {
 			expect(header).toHaveProperty('alg', 'RS256');
 			expect(header).toHaveProperty(
 				'kid',
-				i(provider).keystore.selectForSign({ alg: 'RS256' })[0].kid
+				keystore.selectForSign({ alg: 'RS256' })[0].kid
 			);
 		});
 

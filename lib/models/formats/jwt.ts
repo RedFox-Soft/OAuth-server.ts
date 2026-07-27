@@ -1,15 +1,13 @@
 import * as crypto from 'node:crypto';
 
 import * as JWT from '../../helpers/jwt.ts';
-import instance from '../../helpers/weak_cache.ts';
 import nanoid from '../../helpers/nanoid.js';
-import { provider } from 'lib/provider.js';
+import { keystore } from 'lib/configs/keystore.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { ClientDefaults } from 'lib/configs/clientBase.js';
 import { pairwiseIdentifier } from '../../addon/index.js';
 
 async function getResourceServerConfig(token) {
-	const { keystore } = instance(provider);
 	const defaultAlg = ClientDefaults.idTokenSignedResponseAlg;
 
 	let sign;

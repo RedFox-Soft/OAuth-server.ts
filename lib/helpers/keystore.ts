@@ -72,7 +72,10 @@ class KeyStore {
 
 	#cachedPub;
 
-	constructor(keys = []) {
+	// Loosely typed on purpose: this store backs both the server's own keys and per-client key
+	// stores, whose members differ by key type (RSA/EC/OKP/oct). Without an annotation an empty
+	// default infers `never[]`, which makes every selector return `never`.
+	constructor(keys: Array<Record<string, any>> = []) {
 		this.#keys = keys;
 	}
 

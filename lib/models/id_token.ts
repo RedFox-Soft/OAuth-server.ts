@@ -3,9 +3,8 @@ import { format } from 'node:util';
 import epochTime from '../helpers/epoch_time.js';
 import * as JWT from '../helpers/jwt.js';
 import { InvalidClientMetadata } from '../helpers/errors.ts';
-import instance from '../helpers/weak_cache.ts';
 import { ISSUER } from 'lib/configs/env.js';
-import { provider } from 'lib/provider.js';
+import { keystore } from 'lib/configs/keystore.js';
 import { type Client } from './client.js';
 import { Claims } from 'lib/helpers/claims.js';
 import { merge } from 'lib/helpers/_/object.js';
@@ -153,11 +152,11 @@ export class IdToken {
 				[jwk] = client.symmetricKeyStore.selectForSign({ alg, use: 'sig' });
 				key = client.symmetricKeyStore.getKeyObject(jwk);
 			} else {
-				[jwk] = instance(provider).keystore.selectForSign({
+				[jwk] = keystore.selectForSign({
 					alg,
 					use: 'sig'
 				});
-				key = instance(provider).keystore.getKeyObject(jwk);
+				key = keystore.getKeyObject(jwk);
 			}
 
 			if (jwk) {
@@ -234,7 +233,7 @@ export class IdToken {
 			);
 			keyOrStore = client.symmetricKeyStore;
 		} else {
-			keyOrStore = instance(provider).keystore;
+			keyOrStore = keystore;
 		}
 
 		const opts = {

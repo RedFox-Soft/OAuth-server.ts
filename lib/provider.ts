@@ -1,68 +1,14 @@
 import EventEmitter from 'node:events';
-import * as crypto from 'node:crypto';
-
-import { ApplicationConfig } from './configs/application.js';
-
-const SIG_ALGS = new Set([
-	'RS256',
-	'RS384',
-	'RS512',
-	'PS256',
-	'PS384',
-	'PS512',
-	'ES256',
-	'ES256K',
-	'ES384',
-	'ES512',
-	'EdDSA',
-	'Ed25519',
-	'HS256',
-	'HS384',
-	'HS512'
-]);
-
-// RFC 7638 JWK thumbprint over the required members (already in lexicographic order per kty).
-function jwkThumbprint(key) {
-	let members;
-	switch (key.kty) {
-		case 'RSA':
-			members = { e: key.e, kty: key.kty, n: key.n };
-			break;
-		case 'EC':
-			members = { crv: key.crv, kty: key.kty, x: key.x, y: key.y };
-			break;
-		case 'OKP':
-			members = { crv: key.crv, kty: key.kty, x: key.x };
-			break;
-		default:
-			return undefined;
-	}
-	return crypto.hash('sha256', JSON.stringify(members), 'base64url');
-}
-
-function sigAlgForKey(key) {
-	if (key.kty === 'EC') {
-		switch (key.crv) {
-			case 'P-256':
-				return 'ES256';
-			case 'P-384':
-				return 'ES384';
-			case 'P-521':
-				return 'ES512';
-			default:
-				return undefined;
-		}
-	}
-	if (key.kty === 'OKP' && key.crv === 'Ed25519') {
-		return 'EdDSA';
-	}
-	return undefined;
-}
 
 import Configuration from './helpers/configuration.ts';
 import * as instance from './helpers/weak_cache.ts';
+// Side-effect import: reading the key store is asynchronous, so this module resolves the keys and
+// populates configs/keystore.ts (which the models import for signing) behind a top-level await.
+// The provider does not own the keys — it is the server's boot point, and every entry path
+// constructs it, which is what makes it the reliable place to guarantee they are loaded.
+import './configs/keys.js';
 // Load-order anchor, not a dependency of this module. The models and the provider are mutually
-// cyclic (base_token -> formats/jwt -> this module), and id_token happens to pull that graph in an
+// cyclic (base_token -> base_model -> this module), and id_token happens to pull that graph in an
 // order where base_token finishes evaluating before grant.ts reads BaseTokenPayload from it.
 // provider.ts used to get this for free by importing initialize_app (-> response_modes/jwt ->
 // id_token) at this position; that import is gone, so the anchor is now explicit. Remove it only
@@ -71,8 +17,6 @@ import './models/id_token.js';
 import { OIDCProviderError } from './helpers/errors.ts';
 import { BackchannelAuthenticationRequest } from './models/backchannel_authentication_request.js';
 import { Client } from './models/client.js';
-import { JWKS_KEYS } from './configs/keys.js';
-import KeyStore from './helpers/keystore.js';
 import { Grant } from './models/grant.js';
 
 class ProviderClass extends EventEmitter {
@@ -84,48 +28,15 @@ class ProviderClass extends EventEmitter {
 	}
 
 	// No configuration argument: every option lives on ApplicationConfig, ClientDefaults, or the
-	// addon registry, and signing keys come from the jwksStore adapter — the same
-	// single-sourced-from-the-database model the Client store uses.
+	// addon registry. Signing keys are not part of this either — the keystore and the published
+	// JWKS are module state on configs/keys.ts, single-sourced from the jwksStore adapter and
+	// rebuilt by reloadJWKSKeys(), the same way ApplicationConfig is module state.
 	init() {
 		const configuration = new Configuration();
 
 		instance.set(this, this.#int);
 
 		this.#int.configuration = configuration;
-
-		const keystore = new KeyStore();
-		// Keys are loaded from the jwksStore adapter (see configs/keys.ts). To change them, write
-		// the store and reloadJWKSKeys() before re-initialising — there is no per-instance input.
-		JWKS_KEYS.forEach((key) => keystore.add(structuredClone(key)));
-
-		this.#int.keystore = keystore;
-		// Publish the public JWKS, normalizing each key: derive kid (RFC 7638 thumbprint) and use.
-		// When encryption is disabled every key is signing-only (use: 'sig', with a concrete alg
-		// derived for EC/OKP); when enabled, use is only inferred from an explicit alg.
-		const encryptionEnabled = Boolean(ApplicationConfig['encryption.enabled']);
-		const keys = [...keystore].map((key) => {
-			let { alg, use } = key;
-			if (alg) {
-				use ??= SIG_ALGS.has(alg) ? 'sig' : 'enc';
-			} else if (!encryptionEnabled) {
-				use ??= 'sig';
-				alg ??= sigAlgForKey(key);
-			}
-			return {
-				kty: key.kty,
-				use,
-				key_ops: key.key_ops ? [...key.key_ops] : undefined,
-				kid: key.kid ?? jwkThumbprint(key),
-				alg,
-				crv: key.crv,
-				e: key.e,
-				n: key.n,
-				x: key.x,
-				x5c: key.x5c ? [...key.x5c] : undefined,
-				y: key.y
-			};
-		});
-		this.#int.jwks = { keys };
 
 		return this;
 	}

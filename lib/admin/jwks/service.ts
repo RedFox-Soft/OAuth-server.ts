@@ -1,6 +1,5 @@
 import { jwksStore } from '../../adapters/index.js';
-import instance from '../../helpers/weak_cache.js';
-import { provider } from '../../provider.js';
+import { keystore, publicJWKS, toPublicJwk } from '../../configs/keystore.js';
 import { generateJWKS } from '../../helpers/jwks.js';
 import { signingAlgs } from '../../configs/jwaConsts.js';
 import { type JWKS } from '../../configs/verifyJWKs.js';
@@ -39,16 +38,6 @@ export interface JwksState {
 	supportedAlgorithms: string[];
 }
 
-// The running provider's live internals: the in-memory keystore used to sign/verify, and the
-// public JWKS served at /jwks. Both are mutated in place when a key is hot-applied. instance()
-// is untyped (WeakMap); narrow to just what we touch here rather than use `any`.
-function runningProvider() {
-	return instance(provider) as {
-		keystore: { add(key: unknown): void };
-		jwks: { keys: Array<Record<string, unknown>> };
-	};
-}
-
 // A key counts as a signing key when its effective use is 'sig' — inferred from an explicit
 // `use`, else from a signing `alg`, else defaulting to 'sig' (mirrors the provider's own
 // inference and verifyJWKs). Used to enforce "at least one signing key must remain".
@@ -62,31 +51,21 @@ function isSigningKey(key: JWKS): boolean {
 	return effectiveUse(key) === 'sig';
 }
 
-// Public, client-safe view of a key — an explicit allow-list (never a blocklist) so an
-// unforeseen private component (d/p/q/dp/dq/qi/oth) can never leak.
-function toPublicJwk(key: JWKS): Record<string, unknown> {
-	const source = key as Record<string, unknown>;
-	const pub: Record<string, unknown> = { kty: key.kty, kid: key.kid };
-	for (const field of ['alg', 'use', 'crv', 'e', 'n', 'x', 'y'] as const) {
-		if (typeof source[field] === 'string') pub[field] = source[field];
-	}
-	if (Array.isArray(source.x5c)) pub.x5c = source.x5c;
-	if (Array.isArray(source.key_ops)) pub.key_ops = source.key_ops;
-	return pub;
-}
-
+// The admin view of a key is the same client-safe projection the server publishes at /jwks
+// (configs/keystore.ts owns it): an explicit allow-list, never a blocklist, so an unforeseen private
+// component (d/p/q/dp/dq/qi/oth) can never leak into an admin response either.
 function project(key: JWKS, status: KeyStatus): KeyView {
 	// toPublicJwk already carries kid + kty (both required on KeyView); the widening is safe.
 	return { ...toPublicJwk(key), status } as unknown as KeyView;
 }
 
-// The keys the running provider currently serves at /jwks (the live set — reflects hot-applied
-// keys immediately). The desired set is the persisted jwksStore. Drift between the two drives
-// status and the restart-required indicator; because generation hot-applies, the only drift in
-// practice is a deleted key that is still live until the next restart (pending removal).
+// The keys the server currently serves at /jwks (the live set — reflects hot-applied keys
+// immediately). The desired set is the persisted jwksStore. Drift between the two drives status
+// and the restart-required indicator; because generation hot-applies, the only drift in practice
+// is a deleted key that is still live until the next restart (pending removal).
 export async function getJwksState(): Promise<JwksState> {
 	const desired = await jwksStore.getAll();
-	const running = runningProvider().jwks.keys as unknown as JWKS[];
+	const running = publicJWKS.keys as unknown as JWKS[];
 	const desiredKids = new Set(desired.map((k) => k.kid));
 	const runningKids = new Set(running.map((k) => k.kid));
 
@@ -116,8 +95,8 @@ export async function getJwksState(): Promise<JwksState> {
 	};
 }
 
-// Generate a new RSA signing key, persist it, and hot-apply it to the running provider so it
-// is live immediately — no restart. Audit-first: the audit entry is written before any state
+// Generate a new RSA signing key, persist it, and hot-apply it to the live keystore so it is
+// usable immediately — no restart. Audit-first: the audit entry is written before any state
 // change, so a failed audit write aborts before a key is created. The key is added at the END
 // of the keystore, so the existing key keeps signing (publish-for-verification-only); a later
 // rotation makes the new key the signer by removing the old one.
@@ -142,9 +121,9 @@ export async function generateKey(
 	await recordAdminAudit(ctx, 'jwks.generate', 'jwks', kid);
 	await jwksStore.set(kid, key as JWKS);
 
-	const running = runningProvider();
-	running.keystore.add(structuredClone(key));
-	running.jwks.keys.push(toPublicJwk(key as JWKS));
+	// Mutated in place: every module holds the same imported keystore/publicJWKS reference.
+	keystore.add(structuredClone(key));
+	publicJWKS.keys.push(toPublicJwk(key as JWKS));
 
 	return getJwksState();
 }
@@ -152,8 +131,8 @@ export async function generateKey(
 // Remove a key from the store. Refuses (404) a kid not present in the store, and (422) any
 // removal that would leave the desired set with no signing key. Audit-first, as above.
 //
-// Removal is NOT hot-applied: the running provider keeps serving and honoring the key until the
-// next restart (status: pending removal). Dropping a key from the live /jwks would break
+// Removal is NOT hot-applied: the server keeps serving and honoring the key until the next
+// restart (status: pending removal). Dropping a key from the live /jwks would break
 // verification of tokens already signed with it (constitution VI — rotation must not invalidate
 // valid tokens), so retirement stays a deliberate, restart-gated step.
 export async function deleteKey(

@@ -10,10 +10,9 @@ import {
 	jwksStore
 } from 'lib/adapters/index.ts';
 import { JWKS_KEYS } from 'lib/configs/keys.ts';
+import { keystore, publicJWKS } from 'lib/configs/keystore.ts';
 import { generateJWKS } from 'lib/helpers/jwks.ts';
 import { type JWKS } from 'lib/configs/verifyJWKs.ts';
-import instance from 'lib/helpers/weak_cache.ts';
-import { provider } from 'lib/provider.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 
 const app = new Elysia().use(resolveAdmin).use(jwksRoutes);
@@ -60,23 +59,19 @@ function assertNoPrivateMaterial(keys: KeyView[]) {
 	}
 }
 
-// The running provider's live internals. Generation hot-applies keys into these, so tests must
-// restore them between runs alongside the persisted store.
-const runningInt = instance(provider) as {
-	keystore: { add(key: unknown): void; clear(): void };
-	jwks: { keys: Array<Record<string, unknown>> };
-};
-const BOOT_RUNNING = runningInt.jwks.keys.slice();
+// The server's live key material. Generation hot-applies keys into these, so tests must restore
+// them between runs alongside the persisted store.
+const BOOT_RUNNING = publicJWKS.keys.slice();
 
-// Restore both the persisted store and the running provider to the boot key set so desired ==
+// Restore both the persisted store and the live key material to the boot key set so desired ==
 // running: all keys `active`, no drift.
 async function resetStore() {
 	for (const k of await jwksStore.getAll()) await jwksStore.delete(k.kid);
 	for (const k of JWKS_KEYS) await jwksStore.set(k.kid, k);
-	runningInt.keystore.clear();
-	for (const k of JWKS_KEYS) runningInt.keystore.add(structuredClone(k));
-	runningInt.jwks.keys.length = 0;
-	runningInt.jwks.keys.push(...BOOT_RUNNING);
+	keystore.clear();
+	for (const k of JWKS_KEYS) keystore.add(structuredClone(k));
+	publicJWKS.keys.length = 0;
+	publicJWKS.keys.push(...BOOT_RUNNING);
 }
 
 describe('admin JWKS API — view (US1)', () => {
@@ -131,7 +126,7 @@ describe('admin JWKS API — generate (US2)', () => {
 		expect(body.changedKeys).not.toContain(created!.kid);
 		assertNoPrivateMaterial(body.keys);
 		// Served live at /jwks (present in the running published set).
-		expect(runningInt.jwks.keys.some((k) => k.kid === created!.kid)).toBe(true);
+		expect(publicJWKS.keys.some((k) => k.kid === created!.kid)).toBe(true);
 
 		const audit = await adminAuditStore.list({
 			targetType: 'jwks',
