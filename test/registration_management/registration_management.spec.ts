@@ -6,7 +6,7 @@ import { Client } from 'lib/models/client.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { RegistrationAccessToken } from 'lib/models/registration_access_token.js';
-import Configuration from 'lib/helpers/configuration.js';
+import { validateConfiguration } from 'lib/configs/configuration.js';
 
 const json = { 'content-type': 'application/json' };
 const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
@@ -77,18 +77,17 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 
 	describe('feature flag', () => {
 		it('checks registration is also enabled', () => {
-			const origMgmt = ApplicationConfig['registrationManagement.enabled'];
-			const origReg = ApplicationConfig['registration.enabled'];
-			ApplicationConfig['registrationManagement.enabled'] = true;
-			ApplicationConfig['registration.enabled'] = false;
-			try {
-				expect(() => new Configuration({})).toThrow(
-					'registrationManagement is only available in conjuction with registration'
-				);
-			} finally {
-				ApplicationConfig['registrationManagement.enabled'] = origMgmt;
-				ApplicationConfig['registration.enabled'] = origReg;
-			}
+			// Validation is a pure function of the config handed to it, so the invalid combination is
+			// checked on a copy rather than by mutating the live settings and restoring them.
+			expect(() =>
+				validateConfiguration({
+					...ApplicationConfig,
+					'registrationManagement.enabled': true,
+					'registration.enabled': false
+				})
+			).toThrow(
+				'registrationManagement is only available in conjuction with registration'
+			);
 		});
 	});
 

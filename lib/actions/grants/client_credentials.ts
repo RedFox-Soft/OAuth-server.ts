@@ -5,12 +5,13 @@ import {
 	InvalidScope,
 	InvalidRequest
 } from '../../helpers/errors.js';
+import { configuration } from 'lib/configs/application.js';
 import checkResource from '../../shared/check_resource.ts';
 import { ClientCredentials } from 'lib/models/client_credentials.js';
 
 export async function clientCredentials(oidc, dPoP) {
 	const { client } = oidc;
-	const { scopes: statics } = instance(oidc.provider).configuration;
+	const { scopes: statics } = configuration;
 
 	if (oidc.params.authorization_details) {
 		throw new InvalidRequest(

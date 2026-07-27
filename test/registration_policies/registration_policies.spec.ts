@@ -14,7 +14,7 @@ import {
 
 import bootstrap, { agent, type Setup } from '../test_helper.js';
 import provider, { errors } from '../../lib/index.ts';
-import Configuration from '../../lib/helpers/configuration.ts';
+import { validateConfiguration } from 'lib/configs/configuration.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { InitialAccessToken } from 'lib/models/initial_access_token.js';
 import { RegistrationAccessToken } from 'lib/models/registration_access_token.js';
@@ -38,17 +38,17 @@ describe('client registration policies', () => {
 
 	describe('configuration', () => {
 		it('must only be enabled in conjuction with adapter-backed initial access tokens', () => {
-			// Feature flags/sub-options are read flat from ApplicationConfig; flipping
-			// initialAccessToken off (registration.policies stays configured) trips the guard.
-			const prev = ApplicationConfig['registration.initialAccessToken'];
-			ApplicationConfig['registration.initialAccessToken'] = false;
-			try {
-				expect(() => new Configuration({})).toThrow(
-					'registration policies are only available in conjuction with adapter-backed initial access tokens'
-				);
-			} finally {
-				ApplicationConfig['registration.initialAccessToken'] = prev;
-			}
+			// Checked against a copy of the live settings with initialAccessToken off
+			// (registration.policies stays configured), which is what trips the guard. Validation is
+			// a pure function of that copy, so nothing has to be mutated and restored.
+			expect(() =>
+				validateConfiguration({
+					...ApplicationConfig,
+					'registration.initialAccessToken': false
+				})
+			).toThrow(
+				'registration policies are only available in conjuction with adapter-backed initial access tokens'
+			);
 		});
 	});
 

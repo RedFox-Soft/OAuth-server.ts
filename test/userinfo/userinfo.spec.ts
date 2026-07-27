@@ -14,7 +14,7 @@ import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
-import Configuration from 'lib/helpers/configuration.js';
+import { validateConfiguration } from 'lib/configs/configuration.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 
 describe('UserInfo', () => {
@@ -56,20 +56,16 @@ describe('UserInfo', () => {
 	afterEach(() => mock.restore());
 
 	it('jwtUserinfo can only be enabled with userinfo', () => {
-		// Feature flags are read flat from ApplicationConfig; the dependency guard runs when a
-		// Configuration is constructed. Toggle the flags, assert the throw, then restore.
-		const prevJwtUserinfo = ApplicationConfig['jwtUserinfo.enabled'];
-		const prevUserinfo = ApplicationConfig['userinfo.enabled'];
-		ApplicationConfig['jwtUserinfo.enabled'] = true;
-		ApplicationConfig['userinfo.enabled'] = false;
-		try {
-			expect(() => new Configuration()).toThrow(
-				'jwtUserinfo is only available in conjuction with userinfo'
-			);
-		} finally {
-			ApplicationConfig['jwtUserinfo.enabled'] = prevJwtUserinfo;
-			ApplicationConfig['userinfo.enabled'] = prevUserinfo;
-		}
+		// The dependency guard is part of configuration validation, a pure function of the config
+		// handed to it — so the invalid combination is checked directly, with no need to mutate the
+		// live ApplicationConfig and restore it afterwards.
+		expect(() =>
+			validateConfiguration({
+				...ApplicationConfig,
+				'jwtUserinfo.enabled': true,
+				'userinfo.enabled': false
+			})
+		).toThrow('jwtUserinfo is only available in conjuction with userinfo');
 	});
 
 	it('[get] returns 200 OK and user claims except the rejected ones', async function () {

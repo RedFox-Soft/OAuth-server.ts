@@ -13,7 +13,10 @@ import { provider } from 'lib/provider.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
-import { ApplicationConfig } from 'lib/configs/application.js';
+import {
+	ApplicationConfig,
+	reloadConfiguration
+} from 'lib/configs/application.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
 describe('jwtIntrospection features', () => {
@@ -40,7 +43,7 @@ describe('jwtIntrospection features', () => {
 			const original = ApplicationConfig['introspection.enabled'];
 			ApplicationConfig['introspection.enabled'] = false;
 			try {
-				expect(() => provider.init()).toThrow(
+				expect(() => reloadConfiguration()).toThrow(
 					'jwtIntrospection is only available in conjuction with introspection'
 				);
 			} finally {

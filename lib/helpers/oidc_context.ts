@@ -3,7 +3,10 @@ import instance from './weak_cache.ts';
 import { routeNames } from '../consts/param_list.ts';
 import { provider } from '../provider.js';
 import { isPlainObject } from './_/object.js';
-import { ApplicationConfig as config } from 'lib/configs/application.js';
+import {
+	ApplicationConfig as config,
+	configuration
+} from 'lib/configs/application.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { getCertificate } from '../addon/index.js';
 
@@ -98,7 +101,7 @@ export class OIDCContext<T extends Record<string, unknown>> {
 		if (this.params.claims) {
 			const { userinfo, id_token: idToken } = this.params.claims;
 
-			const claims = instance(provider).configuration.claimsSupported;
+			const claims = configuration.claimsSupported;
 			if (userinfo) {
 				Object.entries(userinfo).forEach(([claim, value]) => {
 					if (claims.has(claim) && (value === null || isPlainObject(value))) {
@@ -126,7 +129,7 @@ export class OIDCContext<T extends Record<string, unknown>> {
 	}
 
 	get requestParamOIDCScopes() {
-		const { scopes: oidcScopes } = instance(provider).configuration;
+		const { scopes: oidcScopes } = configuration;
 		return new Set(
 			this.params.scope?.split(' ').filter(Set.prototype.has.bind(oidcScopes))
 		);

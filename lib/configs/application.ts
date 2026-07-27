@@ -1,4 +1,5 @@
 import { configStore } from '../adapters/index.js';
+import { validateConfiguration, type Configuration } from './configuration.js';
 
 export const ApplicationConfig = {
 	/*
@@ -402,3 +403,30 @@ export const ApplicationConfig = {
 Object.assign(ApplicationConfig, await configStore.get());
 
 export type ApplicationConfigType = typeof ApplicationConfig;
+
+/*
+ * configuration
+ *
+ * The values derived from the settings above — collections as Sets, and the results of
+ * cross-referencing scopes against claims. Validated here, at the point the settings finish
+ * loading, so an unrunnable configuration fails at startup and no code can observe an
+ * unvalidated one. Read flat from ApplicationConfig for anything not listed here.
+ *
+ * Mutated in place by reloadConfiguration, never reassigned, so every module holding the imported
+ * reference sees the current values — the same rule the key material follows (configs/keystore.ts).
+ */
+export const configuration: Configuration =
+	validateConfiguration(ApplicationConfig);
+
+/*
+ * reloadConfiguration
+ *
+ * Re-derive after ApplicationConfig has been changed in place. The settings are boot-only in a
+ * deployment — they are persisted and applied by a restart — so this exists for the tests, which
+ * reconfigure the server per spec and would otherwise be reading values derived from the previous
+ * spec's settings.
+ */
+export function reloadConfiguration(): Configuration {
+	Object.assign(configuration, validateConfiguration(ApplicationConfig));
+	return configuration;
+}

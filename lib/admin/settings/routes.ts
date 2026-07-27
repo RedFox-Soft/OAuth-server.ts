@@ -1,5 +1,6 @@
 import { Elysia } from 'elysia';
 import { ApplicationConfig } from '../../configs/application.js';
+import { validateConfiguration } from '../../configs/configuration.js';
 import { configStore } from '../../adapters/index.js';
 import {
 	assertAuth,
@@ -52,62 +53,24 @@ function validateValue(descriptor: SettingDescriptor, value: unknown): void {
 	}
 }
 
-// Validate the EFFECTIVE config that would become live after a restart (ApplicationConfig
-// overridden by the merged stored+submitted overrides). Mirrors the invariants enforced at
-// boot in lib/helpers/configuration.ts (checkCibaDeliveryModes, checkDeviceFlow,
-// checkDependantFeatures) so a super_admin cannot persist a combination that would throw a
-// TypeError when the provider is constructed on next startup. Throws AdminError(422).
+/*
+ * Validate the EFFECTIVE config that would become live after a restart (ApplicationConfig
+ * overridden by the merged stored+submitted overrides), against the very invariants the server
+ * enforces when it boots — so a super_admin cannot persist a combination that would make the next
+ * startup throw.
+ *
+ * It calls the boot-time validator rather than restating its rules, which this used to do: a copy
+ * silently drifts, and that copy had already lost the deviceFlow.charset and
+ * richAuthorizationRequests.types checks. validateConfiguration is a pure function of the config
+ * handed to it, so the candidate can be checked without touching the live one.
+ */
 function validateEffectiveConfig(effective: Record<string, unknown>): void {
-	// mirrors Configuration#checkCibaDeliveryModes (lib/helpers/configuration.ts)
-	const deliveryModes = effective['ciba.deliveryModes'];
-	if (!Array.isArray(deliveryModes) || !deliveryModes.length) {
-		throw new AdminError(422, 'features.ciba.deliveryModes must not be empty');
-	}
-
-	// mirrors Configuration#checkDeviceFlow (lib/helpers/configuration.ts)
-	if (effective['deviceFlow.enabled']) {
-		const mask = effective['deviceFlow.mask'];
-		if (typeof mask !== 'string' || !/^[-* ]*$/.test(mask)) {
-			throw new AdminError(
-				422,
-				'mask can only contain asterisk("*"), hyphen-minus("-") and space(" ") characters'
-			);
-		}
-	}
-
-	// mirrors Configuration#checkDependantFeatures (lib/helpers/configuration.ts)
-	if (
-		effective['jwtIntrospection.enabled'] &&
-		!effective['introspection.enabled']
-	) {
-		throw new AdminError(
-			422,
-			'jwtIntrospection is only available in conjuction with introspection'
-		);
-	}
-	if (effective['jwtUserinfo.enabled'] && !effective['userinfo.enabled']) {
-		throw new AdminError(
-			422,
-			'jwtUserinfo is only available in conjuction with userinfo'
-		);
-	}
-	if (
-		effective['registrationManagement.enabled'] &&
-		!effective['registration.enabled']
-	) {
-		throw new AdminError(
-			422,
-			'registrationManagement is only available in conjuction with registration'
-		);
-	}
-	if (
-		effective['richAuthorizationRequests.enabled'] &&
-		!effective['resourceIndicators.enabled']
-	) {
-		throw new AdminError(
-			422,
-			'richAuthorizationRequests is only available in conjuction with enabled resourceIndicators'
-		);
+	try {
+		validateConfiguration(effective);
+	} catch (err) {
+		// Every failure it raises is a TypeError describing an unrunnable configuration, which is a
+		// rejected submission here, not a server fault.
+		throw new AdminError(422, err instanceof Error ? err.message : String(err));
 	}
 }
 

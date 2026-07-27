@@ -1,6 +1,5 @@
 import EventEmitter from 'node:events';
 
-import Configuration from './helpers/configuration.ts';
 import * as instance from './helpers/weak_cache.ts';
 // Side-effect import: reading the key store is asynchronous, so this module resolves the keys and
 // populates configs/keystore.ts (which the models import for signing) behind a top-level await.
@@ -22,23 +21,13 @@ import { Grant } from './models/grant.js';
 class ProviderClass extends EventEmitter {
 	#int = {};
 
+	// There is no init step. Every setting lives on ApplicationConfig (validated and derived from
+	// where it is loaded, in configs/application.ts), on ClientDefaults, or in the addon registry;
+	// signing keys are module state in configs/keystore.ts. Nothing is configured through the
+	// provider, so all its construction does is open the internals map the request path writes to.
 	constructor() {
 		super();
-		this.init();
-	}
-
-	// No configuration argument: every option lives on ApplicationConfig, ClientDefaults, or the
-	// addon registry. Signing keys are not part of this either — the keystore and the published
-	// JWKS are module state on configs/keys.ts, single-sourced from the jwksStore adapter and
-	// rebuilt by reloadJWKSKeys(), the same way ApplicationConfig is module state.
-	init() {
-		const configuration = new Configuration();
-
 		instance.set(this, this.#int);
-
-		this.#int.configuration = configuration;
-
-		return this;
 	}
 
 	urlFor(name, opt) {

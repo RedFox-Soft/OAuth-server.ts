@@ -27,7 +27,7 @@ type Config = typeof ApplicationConfig;
 
 // The collection-type discovery values are derived here from the live ApplicationConfig
 // so a runtime change is reflected on the next fetch. These rules intentionally mirror
-// lib/helpers/configuration.ts (collectScopes/collectClaims/collectGrantTypes/checkAuthMethods);
+// lib/configs/configuration.ts (collectScopes/collectClaims/collectGrantTypes/checkAuthMethods);
 // the parity fixture test guards against divergence.
 
 function deriveAcrValues(config: Config): string[] {

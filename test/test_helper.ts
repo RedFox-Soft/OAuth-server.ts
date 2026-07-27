@@ -30,7 +30,10 @@ type SeedableUserStore = ReturnType<typeof getUserStore> & {
 	seed(user: { _id: string } & Partial<Omit<User, '_id'>>): User;
 };
 
-import { ApplicationConfig } from '../lib/configs/application.js';
+import {
+	ApplicationConfig,
+	reloadConfiguration
+} from '../lib/configs/application.js';
 import { ClientDefaults } from 'lib/configs/clientBase.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { Session } from 'lib/models/session.js';
@@ -48,7 +51,7 @@ const testClaims = sharedTestClaims().claims;
  *
  * The provider's signing keys are single-sourced from the jwksStore adapter, exactly as clients are
  * single-sourced from the Client store. So a spec that needs its own keys writes them to the store
- * and reloads, rather than passing them to provider.init. Called for every spec so one spec's keys
+ * and reloads, rather than handing them to the provider. Called for every spec so one spec's keys
  * can never leak into the next.
  */
 export async function seedJwks(keys: Array<Record<string, unknown>>) {
@@ -240,10 +243,10 @@ async function bootstrap(
 	seedClaims = undefined;
 
 	// Keys are seeded into the store (a spec's `jwks` named export, else the shared fixtures) and
-	// reloaded, so provider.init() needs no argument at all.
+	// reloaded; the settings assigned above are re-validated and re-derived. There is no provider
+	// init step — nothing is configured through the provider.
 	await seedJwks(jwksOverride?.keys ?? testSigningKeys);
-
-	provider.init();
+	reloadConfiguration();
 
 	// Clients now live in the Client store (single source of truth); seed each
 	// exported client so tryFindClient resolves it from the adapter.

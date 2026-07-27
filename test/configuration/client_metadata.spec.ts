@@ -8,7 +8,10 @@ import cloneDeep from 'lodash/cloneDeep.js';
 
 import { provider } from 'lib/provider.js';
 import { InvalidClientMetadata } from 'lib/helpers/errors.js';
-import { ApplicationConfig } from 'lib/configs/application.js';
+import {
+	ApplicationConfig,
+	reloadConfiguration
+} from 'lib/configs/application.js';
 import { ClientDefaults } from 'lib/configs/clientBase.js';
 import sectorIdentifier from '../../lib/helpers/sector_identifier.ts';
 import keys, { stripPrivateJWKFields } from '../keys.js';
@@ -19,10 +22,10 @@ import getConfig from '../default.config.js';
 const sigKey = stripPrivateJWKFields(keys[0]);
 const privateKey = keys[0];
 
-// The provider is a process-wide singleton configured via `provider.init`
-// (there is no `new provider(url, config)` any more). Each `register` call
-// re-initialises it from a fresh base so per-test `configuration` overrides
-// cannot leak into the next case.
+// The provider is a process-wide singleton with no configuration of its own (there is no
+// `new provider(url, config)` any more, and no init step). Each `register` call re-derives the
+// server settings from a fresh base so per-test `configuration` overrides cannot leak into the
+// next case.
 const baseConfig = () => ({
 	...getConfig(),
 	adapter: TestAdapter
@@ -30,7 +33,7 @@ const baseConfig = () => ({
 
 // ApplicationConfig is the single source for every server setting: feature flags as flat dotted
 // keys, plus these collection options. A test's `configuration` is routed there and reset each
-// call, since provider.init no longer takes configuration.
+// call, then re-validated with reloadConfiguration().
 const applicationDefaults = { ...ApplicationConfig };
 const COLLECTION_OPTIONS = new Set([
 	'acrValues',
@@ -56,7 +59,7 @@ describe('Client metadata validation', () => {
 				delete initConfig[key];
 			}
 		}
-		provider.init();
+		reloadConfiguration();
 
 		return addClient(provider, {
 			clientId: 'client',

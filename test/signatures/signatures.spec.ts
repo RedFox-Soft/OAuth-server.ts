@@ -1,11 +1,11 @@
 import { expect } from 'bun:test';
-import i from 'lib/helpers/weak_cache.js';
 import { describe, it, beforeAll, beforeEach } from 'bun:test';
 
 import bootstrap, { type Setup } from '../test_helper.js';
 import { decode } from '../../lib/helpers/jwt.ts';
 import epochTime from '../../lib/helpers/epoch_time.ts';
 import { provider } from 'lib/provider.js';
+import { configuration } from 'lib/configs/application.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';
 
@@ -25,7 +25,9 @@ describe('signatures', () => {
 			cookie = await setup.login();
 			const ac = new AuthorizationCode({
 				accountId: setup.loggedInAccountId,
-				acr: i(provider).configuration.acrValues[0],
+				// acrValues is a Set, so it has to be spread to take the first value — indexing it
+				// yields undefined, which is what this used to pass.
+				acr: [...configuration.acrValues][0],
 				authTime: epochTime(),
 				clientId: 'client-sig-HS256',
 				grantId: setup.getGrantId('client-sig-HS256'),

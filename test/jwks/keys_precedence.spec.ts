@@ -18,9 +18,9 @@ describe('JWKS source is the store, and only the store', () => {
 
 	it('publishes exactly what the store holds', async () => {
 		await bootstrap(import.meta.url, { config: 'store' });
+		// seedJwks reloads the key set and rebuilds the published JWKS on its own; there is no
+		// provider step to re-run afterwards.
 		await seedJwks([ecKey]);
-		const { provider } = await import('lib/index.ts');
-		provider.init();
 
 		const { data, status } = await agent.jwks.get();
 		if (!data) throw new Error('expected response data');

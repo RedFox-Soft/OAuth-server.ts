@@ -2,7 +2,10 @@ import { describe, it, beforeAll, afterAll, expect } from 'bun:test';
 
 import bootstrap, { agent } from '../test_helper.js';
 import { provider } from 'lib/provider.js';
-import { ApplicationConfig } from 'lib/configs/application.js';
+import {
+	ApplicationConfig,
+	reloadConfiguration
+} from 'lib/configs/application.js';
 
 describe('configuration features.deviceFlow', () => {
 	beforeAll(async () => {
@@ -23,13 +26,13 @@ describe('configuration features.deviceFlow', () => {
 			ApplicationConfig['deviceFlow.enabled'] = true;
 
 			ApplicationConfig['deviceFlow.charset'] = 'digits';
-			expect(() => provider.init()).not.toThrow();
+			expect(() => reloadConfiguration()).not.toThrow();
 
 			ApplicationConfig['deviceFlow.charset'] = 'base-20';
-			expect(() => provider.init()).not.toThrow();
+			expect(() => reloadConfiguration()).not.toThrow();
 
 			ApplicationConfig['deviceFlow.charset'] = 'foo';
-			expect(() => provider.init()).toThrow(
+			expect(() => reloadConfiguration()).toThrow(
 				'only supported charsets are "base-20" and "digits"'
 			);
 		} finally {
@@ -46,13 +49,13 @@ describe('configuration features.deviceFlow', () => {
 			ApplicationConfig['deviceFlow.charset'] = 'base-20';
 
 			ApplicationConfig['deviceFlow.mask'] = '*** *** ***';
-			expect(() => provider.init()).not.toThrow();
+			expect(() => reloadConfiguration()).not.toThrow();
 
 			ApplicationConfig['deviceFlow.mask'] = '***-***-***';
-			expect(() => provider.init()).not.toThrow();
+			expect(() => reloadConfiguration()).not.toThrow();
 
 			ApplicationConfig['deviceFlow.mask'] = '***.***.***';
-			expect(() => provider.init()).toThrow(
+			expect(() => reloadConfiguration()).toThrow(
 				'mask can only contain asterisk("*"), hyphen-minus("-") and space(" ") characters'
 			);
 		} finally {

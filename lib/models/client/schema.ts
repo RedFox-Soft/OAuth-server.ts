@@ -1,6 +1,6 @@
 import { CLIENT_ATTRIBUTES } from '../../consts/index.ts';
 import { noVSCHAR } from '../../consts/client_attributes.ts';
-import { ApplicationConfig } from '../../configs/application.ts';
+import { ApplicationConfig, configuration } from '../../configs/application.ts';
 import { ClientDefaults } from '../../configs/clientBase.ts';
 
 import { InvalidClientMetadata } from '../../helpers/errors.ts';
@@ -58,7 +58,6 @@ function isUndefined(value) {
 }
 
 export default function getSchema(provider) {
-	const { configuration } = instance(provider);
 	const { scopes } = configuration;
 
 	const RECOGNIZED_METADATA = [...RECOGNIZED];
@@ -537,17 +536,14 @@ export default function getSchema(provider) {
 
 				if (this[prop] !== undefined) {
 					const isAry = ARYS.includes(prop);
-					let length;
-					let method;
-					if (only instanceof Set) {
-						({ size: length } = only);
-						method = 'has';
-					} else {
-						({ length } = only);
-						method = 'includes';
-					}
+					// An allowed set arrives as either a Set or an Array depending on the ENUM entry.
+					// Membership is asked through one predicate rather than by indexing whichever
+					// method name fits, so the union does not have to be indexed by a string.
+					const length = only instanceof Set ? only.size : only.length;
+					const allows = (value: string) =>
+						only instanceof Set ? only.has(value) : only.includes(value);
 
-					if (isAry && !this[prop].every((val) => only[method](val))) {
+					if (isAry && !this[prop].every((val) => allows(val))) {
 						if (length) {
 							this.invalidate(
 								`${prop} can only contain ${formatters.formatList([...only], { type: 'disjunction' })}`
@@ -555,7 +551,7 @@ export default function getSchema(provider) {
 						} else {
 							this.invalidate(`${prop} must be empty (no values are allowed)`);
 						}
-					} else if (!isAry && !only[method](this[prop])) {
+					} else if (!isAry && !allows(this[prop])) {
 						if (length) {
 							this.invalidate(
 								`${prop} must be ${formatters.formatList([...only], { type: 'disjunction' })}`
@@ -610,7 +606,7 @@ export default function getSchema(provider) {
 
 		scopes() {
 			if (this.scope) {
-				const parsed = new Set(this.scope.split(' '));
+				const parsed = new Set<string>(this.scope.split(' '));
 				parsed.forEach((scope) => {
 					if (!scopes.has(scope)) {
 						this.invalidate(

@@ -1,7 +1,10 @@
-import i from 'lib/helpers/weak_cache.js';
 import { describe, it, expect, afterEach } from 'bun:test';
 import provider from '../../lib/index.ts';
-import { ApplicationConfig } from 'lib/configs/application.js';
+import {
+	ApplicationConfig,
+	configuration,
+	reloadConfiguration
+} from 'lib/configs/application.js';
 
 // Scopes are a server setting now, so grant-type derivation reads them from ApplicationConfig.
 describe('Provider declaring support for refresh_token grant type', () => {
@@ -9,28 +12,28 @@ describe('Provider declaring support for refresh_token grant type', () => {
 
 	function initWithScopes(scopes: string[]) {
 		ApplicationConfig.scopes = scopes;
-		provider.init();
+		reloadConfiguration();
 	}
 
 	it('is enabled by default', () => {
-		provider.init();
-		expect(i(provider).configuration.grantTypes).toContain('refresh_token');
+		reloadConfiguration();
+		expect(configuration.grantTypes).toContain('refresh_token');
 	});
 
 	it('isnt enabled when offline_access isnt amongst the scopes', () => {
 		initWithScopes(['openid']);
-		expect(i(provider).configuration.grantTypes).not.toContain('refresh_token');
+		expect(configuration.grantTypes).not.toContain('refresh_token');
 	});
 
 	it('is enabled when offline_access isnt amongst the scopes', () => {
 		initWithScopes(['openid', 'offline_access']);
-		expect(i(provider).configuration.grantTypes).toContain('refresh_token');
+		expect(configuration.grantTypes).toContain('refresh_token');
 	});
 
 	it('is enabled when the refreshToken.enabled flag is set', () => {
 		ApplicationConfig['refreshToken.enabled'] = true;
 		initWithScopes(['openid']);
-		expect(i(provider).configuration.grantTypes).toContain('refresh_token');
+		expect(configuration.grantTypes).toContain('refresh_token');
 	});
 
 	afterEach(() => {

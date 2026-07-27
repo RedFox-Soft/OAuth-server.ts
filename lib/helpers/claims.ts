@@ -1,5 +1,6 @@
 import instance from './weak_cache.ts';
 import { pick, isPlainObject, merge } from './_/object.js';
+import { configuration } from 'lib/configs/application.js';
 import { provider } from 'lib/provider.js';
 import { pairwiseIdentifier } from '../addon/index.js';
 import { type Client } from 'lib/models/client.js';
@@ -23,7 +24,7 @@ export class Claims {
 		if (Object.keys(this.filter).length) {
 			throw new Error('scope cannot be assigned after mask has been set');
 		}
-		const { claims: claimConfig } = instance(provider).configuration;
+		const { claims: claimConfig } = configuration;
 		value.split(' ').forEach((scope) => {
 			this.mask(claimConfig[scope]);
 		});
@@ -42,7 +43,7 @@ export class Claims {
 
 	async result() {
 		const { available } = this;
-		const { claimsSupported } = instance(provider).configuration;
+		const { claimsSupported } = configuration;
 		const include = Object.entries(this.filter)
 			.filter(
 				([key, value]) =>

@@ -1,12 +1,12 @@
 import { InvalidScope } from '../../helpers/errors.ts';
-import instance from '../../helpers/weak_cache.ts';
+import { configuration } from 'lib/configs/application.js';
 
 /*
  * Validates that all requested scopes are supported by the provider, and that offline_access prompt
  * is requested together with consent prompt
  */
 export default function checkScope(oidc, isAuth = false) {
-	const { scopes: statics } = instance(oidc.provider).configuration;
+	const { scopes: statics } = configuration;
 	const { prompts, client } = oidc;
 
 	const scopes = [...new Set(oidc.params.scope?.split(' '))];
