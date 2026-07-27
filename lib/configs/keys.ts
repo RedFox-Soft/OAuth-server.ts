@@ -25,13 +25,13 @@ export async function resolveKeys(store: JWKSStoreInstance): Promise<JWKS[]> {
 		const {
 			keys: [generated]
 		} = await generateJWKS('RS256');
-		// generateJWKS always assigns a kid; it is present at runtime.
-		await store.set(generated.kid as string, generated as JWKS);
+		await store.set(generated.kid, generated);
 		keys = await store.getAll();
 	}
 
 	const jwks = { keys };
-	// Throws with a clear message on an invalid key set (unsupported type, missing field, dup kid).
+	// Throws with a clear message on an invalid key set (unsupported type, missing field, dup kid),
+	// and normalizes each key in place — which is what makes `jwks.keys` a `JWKS[]` from here on.
 	verifyJWKs(jwks);
 
 	return jwks.keys;

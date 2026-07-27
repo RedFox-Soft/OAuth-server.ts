@@ -1,4 +1,4 @@
-import type { JWKS } from 'lib/configs/verifyJWKs.ts';
+import type { UnnormalizedJWK } from 'lib/configs/verifyJWKs.ts';
 
 export interface User {
 	_id: string;
@@ -85,11 +85,19 @@ export interface UserStoreConstructor {
 	new (name?: string): UserStoreInstance;
 }
 
+/*
+ * The key store reads back what was persisted, so what it returns is `UnnormalizedJWK`, not `JWKS`:
+ * a key provisioned out of band may be missing `kid` or `use`, which only verifyJWKs fills in. The
+ * store used to claim `JWKS` — normalization it never performs — which is precisely how a bug that
+ * compared a stored key's absent `kid` against a live one went unnoticed by the compiler.
+ *
+ * `set` accepts either, since `JWKS` is the normalized form of the same key.
+ */
 export interface JWKSStoreInstance {
-	get(keyId: string): Promise<JWKS | null>;
-	set(keyId: string, key: JWKS): Promise<void>;
+	get(keyId: string): Promise<UnnormalizedJWK | null>;
+	set(keyId: string, key: UnnormalizedJWK): Promise<void>;
 	delete(keyId: string): Promise<void>;
-	getAll(): Promise<JWKS[]>;
+	getAll(): Promise<UnnormalizedJWK[]>;
 }
 
 export interface JWKSStoreConstructor {

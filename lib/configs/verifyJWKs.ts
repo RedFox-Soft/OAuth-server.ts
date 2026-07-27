@@ -101,7 +101,16 @@ function typeboxErrorMessage(error?: ValueError) {
 	return error?.schema.error ?? `${error?.path} ${error?.message}`;
 }
 
-export function verifyJWKs(jwks: unknown): jwks is { keys: JWKS[] } {
+/*
+ * Validate a JWK Set and normalize each key in place, filling in `use` (from `alg`) and `kid` (the
+ * RFC 7638 thumbprint) where absent. Throws on anything invalid.
+ *
+ * An assertion rather than a `jwks is ...` predicate: it throws instead of returning false, and
+ * every caller invokes it as a statement, where a predicate narrows nothing. As an assertion the
+ * caller's key set becomes `JWKS[]` — normalized, `kid`/`use` guaranteed — which is what the
+ * downstream code actually relies on and used to re-assert with a cast.
+ */
+export function verifyJWKs(jwks: unknown): asserts jwks is { keys: JWKS[] } {
 	if (
 		typeof jwks !== 'object' ||
 		jwks === null ||
@@ -140,8 +149,6 @@ export function verifyJWKs(jwks: unknown): jwks is { keys: JWKS[] } {
 		}
 		uniqueKid.add(key.kid);
 	}
-
-	return true;
 }
 
 /*

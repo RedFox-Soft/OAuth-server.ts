@@ -1,26 +1,29 @@
 import { db } from './db.js';
-import { type JWKS } from 'lib/configs/verifyJWKs.ts';
+import { type UnnormalizedJWK } from 'lib/configs/verifyJWKs.ts';
 import type { JWKSStoreInstance } from '../types.js';
 
 // Discard storage-only fields so callers only ever see plain JWK objects (contract parity with the
 // in-memory adapter). `_id`/`updatedAt` are MongoDB bookkeeping, not part of the JWK.
-function toJWK(doc: Record<string, unknown>): JWKS {
+//
+// The cast is the one unavoidable one here: a BSON document is untyped, so nothing but a read can
+// tell us what is in it. It claims only that the document is a schema-shaped JWK — not that it is
+// normalized — and verifyJWKs is what checks even that, on the way in to the key set.
+function toJWK(doc: Record<string, unknown>): UnnormalizedJWK {
 	const { _id, updatedAt, ...jwk } = doc;
-	// The stored document is a JWK plus bookkeeping; after stripping it is a JWKS by construction.
-	return jwk as JWKS;
+	return jwk as UnnormalizedJWK;
 }
 
 export class JWKSStore implements JWKSStoreInstance {
 	private collectionName = 'jwks';
 
-	async get(keyId: string): Promise<JWKS | null> {
+	async get(keyId: string): Promise<UnnormalizedJWK | null> {
 		const result = await db
 			.collection(this.collectionName)
 			.findOne({ kid: keyId });
 		return result ? toJWK(result) : null;
 	}
 
-	async set(keyId: string, key: JWKS): Promise<void> {
+	async set(keyId: string, key: UnnormalizedJWK): Promise<void> {
 		await db
 			.collection(this.collectionName)
 			.updateOne(
@@ -34,7 +37,7 @@ export class JWKSStore implements JWKSStoreInstance {
 		await db.collection(this.collectionName).deleteOne({ kid: keyId });
 	}
 
-	async getAll(): Promise<JWKS[]> {
+	async getAll(): Promise<UnnormalizedJWK[]> {
 		const result = await db.collection(this.collectionName).find({}).toArray();
 		return result.map(toJWK);
 	}

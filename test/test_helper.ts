@@ -13,7 +13,7 @@ import { provider, elysia } from '../lib/index.ts';
 import instance from '../lib/helpers/weak_cache.ts';
 import { adapter, getUserStore, jwksStore } from '../lib/adapters/index.ts';
 import { reloadJWKSKeys } from '../lib/configs/keys.ts';
-import { verifyJWKs } from '../lib/configs/verifyJWKs.ts';
+import { verifyJWKs, type UnnormalizedJWK } from '../lib/configs/verifyJWKs.ts';
 import { testSigningKeys } from './jwks/fixtures.js';
 import sharedTestClaims from './default.config.js';
 import type { User } from '../lib/adapters/types.ts';
@@ -55,14 +55,22 @@ export async function seedJwks(keys: Array<Record<string, unknown>>) {
 	// verifyJWKs assigns a kid to any key that lacks one (RFC 7638 thumbprint). Doing it up front
 	// means the store key always equals key.kid, so clearing by kid is exact — storing a
 	// kid-less key would otherwise leave an entry keyed `undefined` that no cleanup can find.
-	const seeded = structuredClone(keys) as Array<Record<string, unknown>>;
-	verifyJWKs({ keys: seeded } as never);
+	// It is an assertion, so `seeded.keys` is a normalized JWKS[] from here on.
+	const seeded = { keys: structuredClone(keys) as UnnormalizedJWK[] };
+	verifyJWKs(seeded);
 
 	for (const existing of await jwksStore.getAll()) {
-		await jwksStore.delete(existing.kid as string);
+		// A key with no kid is not addressable in a store keyed by kid, so it cannot be cleared and
+		// would leak into every later spec. Fail loudly instead — that leak has been diagnosed twice.
+		if (!existing.kid) {
+			throw new Error(
+				'the key store holds a key with no kid; it cannot be cleared by kid and would leak between specs'
+			);
+		}
+		await jwksStore.delete(existing.kid);
 	}
-	for (const key of seeded) {
-		await jwksStore.set(key.kid as string, key as never);
+	for (const key of seeded.keys) {
+		await jwksStore.set(key.kid, key);
 	}
 	await reloadJWKSKeys();
 }

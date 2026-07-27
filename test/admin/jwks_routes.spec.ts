@@ -12,7 +12,7 @@ import {
 import { JWKS_KEYS } from 'lib/configs/keys.ts';
 import { keystore, publicJWKS } from 'lib/configs/keystore.ts';
 import { generateJWKS } from 'lib/helpers/jwks.ts';
-import { calculateKid, type JWKS } from 'lib/configs/verifyJWKs.ts';
+import { calculateKid } from 'lib/configs/verifyJWKs.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 
 const app = new Elysia().use(resolveAdmin).use(jwksRoutes);
@@ -63,10 +63,25 @@ function assertNoPrivateMaterial(keys: KeyView[]) {
 // them between runs alongside the persisted store.
 const BOOT_RUNNING = publicJWKS.keys.slice();
 
+// The store is keyed by kid, so a key carrying none is not addressable and cannot be cleared here —
+// it would survive into every later spec. The case is real (a key provisioned out of band), so a
+// test that creates one has to remove it by the store key itself; this fails loudly rather than
+// leaking, which is a bug this suite has had to diagnose twice.
+async function clearStore() {
+	for (const k of await jwksStore.getAll()) {
+		if (!k.kid) {
+			throw new Error(
+				'key store holds a key with no kid; clear it by its store key'
+			);
+		}
+		await jwksStore.delete(k.kid);
+	}
+}
+
 // Restore both the persisted store and the live key material to the boot key set so desired ==
 // running: all keys `active`, no drift.
 async function resetStore() {
-	for (const k of await jwksStore.getAll()) await jwksStore.delete(k.kid);
+	await clearStore();
 	for (const k of JWKS_KEYS) await jwksStore.set(k.kid, k);
 	keystore.clear();
 	for (const k of JWKS_KEYS) keystore.add(structuredClone(k));
@@ -110,9 +125,9 @@ describe('admin JWKS API — view (US1)', () => {
 		const {
 			keys: [key]
 		} = await generateJWKS('RS256');
-		const { use, ...withoutUse } = key as JWKS;
+		const { use, ...withoutUse } = key;
 		expect(use).toBe('sig'); // guard: the fixture really did carry a `use` to strip
-		await jwksStore.set(key.kid as string, withoutUse as JWKS);
+		await jwksStore.set(key.kid, withoutUse);
 
 		const res = await client.admin.api.jwks.get({ headers: { cookie } });
 		const body = res.data as JwksState;
@@ -129,8 +144,8 @@ describe('admin JWKS API — view (US1)', () => {
 		const {
 			keys: [key]
 		} = await generateJWKS('RS256');
-		const { kid, ...withoutKid } = key as JWKS;
-		await jwksStore.set(kid, withoutKid as JWKS);
+		const { kid, ...withoutKid } = key;
+		await jwksStore.set(kid, withoutKid);
 
 		// Removed by the store key, not in resetStore: that deletes by each key's own `kid`, which
 		// this one does not have, so it would outlive the spec and leak into every later one.
@@ -139,7 +154,7 @@ describe('admin JWKS API — view (US1)', () => {
 			const body = res.data as JwksState;
 
 			// Not the store's map key — the thumbprint, which is what verifyJWKs would assign.
-			const derived = calculateKid(withoutKid as JWKS);
+			const derived = calculateKid(withoutKid);
 			expect(derived).not.toBe(kid);
 
 			const view = body.keys.find((k) => k.kid === derived);
@@ -221,8 +236,8 @@ describe('admin JWKS API — retire (US3)', () => {
 		const {
 			keys: [key]
 		} = await generateJWKS('RS256');
-		const kid = key.kid as string;
-		await jwksStore.set(kid, key as JWKS);
+		const { kid } = key;
+		await jwksStore.set(kid, key);
 		return kid;
 	}
 
@@ -263,7 +278,7 @@ describe('admin JWKS API — retire (US3)', () => {
 	it('refuses to remove the last signing key with 422', async () => {
 		const { cookie } = await sessionCookieFor(['super_admin']);
 		// Reduce the store to a single signing key so its removal would empty the set.
-		for (const k of await jwksStore.getAll()) await jwksStore.delete(k.kid);
+		await clearStore();
 		const soleKid = JWKS_KEYS[0].kid;
 		await jwksStore.set(soleKid, JWKS_KEYS[0]);
 		const res = await client.admin.api

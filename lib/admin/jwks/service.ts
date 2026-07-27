@@ -6,7 +6,7 @@ import {
 	type PublicJWK
 } from '../../configs/keystore.js';
 import { generateJWKS } from '../../helpers/jwks.js';
-import { type JWKS } from '../../configs/verifyJWKs.js';
+import { type UnnormalizedJWK } from '../../configs/verifyJWKs.js';
 import { recordAdminAudit } from '../audit/record.js';
 import { AdminError, type AdminContext } from '../auth/rbac.js';
 
@@ -33,7 +33,7 @@ export interface JwksState {
 // A key counts as a signing key by its published `use` — explicit, else inferred from `alg`, by
 // the one projection that owns that inference. Used to enforce "at least one signing key must
 // remain".
-function isSigningKey(key: JWKS): boolean {
+function isSigningKey(key: UnnormalizedJWK): boolean {
 	return toPublicJwk(key).use === 'sig';
 }
 
@@ -98,14 +98,13 @@ export async function generateKey(
 	const {
 		keys: [key]
 	} = await generateJWKS(alg as SupportedAlg);
-	// generateJWKS always assigns a kid; it is present at runtime.
-	const kid = key.kid as string;
+	const { kid } = key;
 	await recordAdminAudit(ctx, 'jwks.generate', 'jwks', kid);
-	await jwksStore.set(kid, key as JWKS);
+	await jwksStore.set(kid, key);
 
 	// Mutated in place: every module holds the same imported keystore/publicJWKS reference.
 	keystore.add(structuredClone(key));
-	publicJWKS.keys.push(toPublicJwk(key as JWKS));
+	publicJWKS.keys.push(toPublicJwk(key));
 
 	return getJwksState();
 }
