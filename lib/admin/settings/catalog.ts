@@ -10,6 +10,12 @@ export interface SettingDescriptor {
 	type: SettingType;
 	options?: string[];
 	dependsOn?: keyof typeof ApplicationConfig;
+	/*
+	 * The setting enables a feature implemented from a draft spec, so its behaviour can change in a
+	 * way a finalised one would not. Purely informational — it tells an operator what they are
+	 * turning on, and nothing in the server behaves differently because of it.
+	 */
+	experimental?: boolean;
 }
 
 const CLIENT_AUTH_METHODS = [
@@ -281,7 +287,9 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 		group: 'Rich Authorization Requests',
 		label: 'Enable RAR (RFC 9396)',
 		type: 'boolean',
-		description: 'Enables the authorization_details parameter.'
+		experimental: true,
+		description:
+			'Enables the authorization_details parameter. Implemented from a draft of the specification, so its behaviour may change between releases.'
 	},
 
 	{

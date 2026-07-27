@@ -50,11 +50,35 @@ describe('settings catalog', () => {
 			'registration.policies',
 			'registration.initialAccessToken',
 			'richAuthorizationRequests.types',
-			'richAuthorizationRequests.ack',
 			'dpop.nonceSecret'
 		]) {
 			expect(keys).not.toContain(forbidden);
 		}
+	});
+
+	// A draft-spec feature is surfaced as information on the setting that enables it. There is no
+	// acknowledgement setting and no boot-time notice: an operator sees the tag in the admin UI,
+	// and nothing about the server's behaviour depends on it.
+	it('marks a draft-spec feature experimental, and only informationally', () => {
+		const rar = SETTINGS_CATALOG.find(
+			(d) => d.key === 'richAuthorizationRequests.enabled'
+		);
+		expect(rar?.experimental).toBe(true);
+
+		// Nothing else claims to be experimental, so the tag stays meaningful.
+		const experimental = SETTINGS_CATALOG.filter((d) => d.experimental).map(
+			(d) => d.key
+		);
+		expect(experimental).toEqual(['richAuthorizationRequests.enabled']);
+
+		// The retired acknowledgement setting is gone from the settings themselves, not just hidden
+		// from the catalog.
+		expect(
+			Object.prototype.hasOwnProperty.call(
+				ApplicationConfig,
+				'richAuthorizationRequests.ack'
+			)
+		).toBe(false);
 	});
 
 	it('declared enum/option values match the ApplicationConfig defaults domain', () => {

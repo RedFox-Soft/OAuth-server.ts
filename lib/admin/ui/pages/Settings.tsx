@@ -8,6 +8,7 @@ import {
 	Input,
 	Select,
 	Switch,
+	Tag,
 	Typography,
 	message
 } from 'antd';
@@ -21,12 +22,25 @@ interface Descriptor {
 	type: SettingType;
 	options?: string[];
 	dependsOn?: string;
+	experimental?: boolean;
 }
 interface SettingsResponse {
 	catalog: Descriptor[];
 	values: Record<string, unknown>;
 	restartRequired: boolean;
 	changedKeys: string[];
+}
+
+// A setting's label, tagged when it enables a feature implemented from a draft spec — so an
+// operator sees that before turning it on. Shared by both places a label is rendered (the feature
+// toggles and the accordion headers), so one of them cannot quietly stop showing it.
+function settingLabel(d: Descriptor) {
+	if (!d.experimental) return d.label;
+	return (
+		<span>
+			{d.label} <Tag color="orange">experimental</Tag>
+		</span>
+	);
 }
 
 // The detail groups whose primary is currently enabled — used to seed which
@@ -337,7 +351,7 @@ export function Settings() {
 		return (
 			<Form.Item
 				key={d.key}
-				label={d.label}
+				label={settingLabel(d)}
 				help={d.description}
 				style={{ marginBottom: 16 }}
 			>
@@ -404,7 +418,7 @@ export function Settings() {
 						key: group,
 						label: (
 							<div>
-								<div>{primary.label}</div>
+								<div>{settingLabel(primary)}</div>
 								<Typography.Text
 									type="secondary"
 									style={{ fontSize: 12 }}

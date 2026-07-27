@@ -275,12 +275,6 @@ export const ApplicationConfig = {
 	 */
 	'richAuthorizationRequests.enabled': false,
 	/*
-	 * features.richAuthorizationRequests.ack
-	 *
-	 * description: Acknowledges the implemented draft/experiment version.
-	 */
-	'richAuthorizationRequests.ack': undefined,
-	/*
 	 * features.richAuthorizationRequests.types
 	 *
 	 * description: Supported authorization details type identifiers and their validators.

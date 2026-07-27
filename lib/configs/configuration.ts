@@ -1,7 +1,5 @@
 import { isPlainObject, merge } from '../helpers/_/object.js';
 import * as formatters from '../helpers/formatters.ts';
-import { STABLE, EXPERIMENTS } from '../helpers/features.ts';
-import * as attention from '../helpers/attention.ts';
 // Type-only, so it adds no runtime edge back to the module that calls this one. ApplicationConfig
 // declares every setting, which makes `typeof` it the exact type of what is being validated — a
 // misspelled flag read below is a compile error rather than a silently-undefined lookup.
@@ -267,74 +265,12 @@ function checkDeviceFlow(config: ConfigurationInput) {
 	}
 }
 
-// The experiment record as EXPERIMENTS declares it, so the notice below cannot drift from it.
-type Experiment = NonNullable<ReturnType<typeof EXPERIMENTS.get>>;
-
-function logDraftNotice(config: ConfigurationInput) {
-	// Keyed by flag, holding the experiment itself: it is already in hand here, and re-looking it
-	// up below would produce a value the compiler cannot know is present.
-	const ENABLED_EXPERIMENTS = new Map<string, Experiment>();
-	let throwExperiment = false;
-
-	// The only dynamic read of the settings in this file: the flag names come from EXPERIMENTS, so
-	// they are composed at runtime and cannot be key-checked. Going through entries keeps the
-	// config's own type precise (no index signature to swallow a typo elsewhere) at the cost of
-	// these two values being `unknown` — hence the comparisons below rather than a lookup.
-	const dynamic = new Map<string, unknown>(Object.entries(config));
-
-	for (const [flag, experimental] of EXPERIMENTS) {
-		const enabled = dynamic.get(`${flag}.enabled`);
-		const ack = dynamic.get(`${flag}.ack`);
-
-		if (
-			enabled &&
-			!STABLE.has(flag) &&
-			(Array.isArray(experimental.version)
-				? !experimental.version.some((version) => version === ack)
-				: ack !== experimental.version)
-		) {
-			if (typeof ack !== 'undefined') {
-				throwExperiment = true;
-			}
-			ENABLED_EXPERIMENTS.set(flag, experimental);
-		}
-	}
-
-	if (ENABLED_EXPERIMENTS.size) {
-		attention.info(
-			'The following experimental features are enabled and their implemented version not acknowledged'
-		);
-		ENABLED_EXPERIMENTS.forEach(({ name, version }) => {
-			// The acknowledgeable value is the newest version when several are accepted.
-			const latest = Array.isArray(version)
-				? version[version.length - 1]
-				: version;
-
-			attention.info(
-				`  - ${name} (Acknowledging this feature's implemented version can be done with the value '${latest}')`
-			);
-		});
-		attention.info(
-			'Breaking changes between experimental feature updates may occur and these will be published as MINOR semver oidc-provider updates.'
-		);
-		attention.info(
-			"You may disable this notice and be warned when breaking updates occur by acknowledging the current experiment's version. See the documentation for more details."
-		);
-
-		if (throwExperiment) {
-			throw new TypeError(
-				'An unacknowledged version of an experimental feature is included in this oidc-provider version.'
-			);
-		}
-	}
-}
-
 /*
  * validateConfiguration
  *
  * Check a server configuration and return the values derived from it. Throws a TypeError on any
- * combination the server cannot run with — an unsupported client auth method, a feature enabled
- * without the one it depends on, an unacknowledged experiment.
+ * combination the server cannot run with — an unsupported client auth method, or a feature enabled
+ * without the one it depends on.
  *
  * A pure function of the config passed in, deliberately: it neither reads nor writes the live
  * ApplicationConfig. That is what lets the admin settings API check a configuration it is *about*
@@ -354,10 +290,7 @@ export function validateConfiguration(
 	);
 	const claims = structuredClone(merge({}, config.claims));
 
-	// Order is significant: the claims processing below builds on the step before it, and the
-	// checks are ordered so the most fundamental misconfiguration is the one reported.
-	logDraftNotice(config);
-
+	// Order is significant: each claims pass below builds on the one before it.
 	collectScopes(scopes, claims);
 	unpackArrayClaims(claims);
 	ensureOpenIdSub(claims);
