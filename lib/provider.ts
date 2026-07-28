@@ -1,6 +1,5 @@
 import EventEmitter from 'node:events';
 
-import * as instance from './helpers/weak_cache.ts';
 // Side-effect import: reading the key store is asynchronous, so this module resolves the keys and
 // populates configs/keystore.ts (which the models import for signing) behind a top-level await.
 // The provider does not own the keys — it is the server's boot point, and every entry path
@@ -18,32 +17,12 @@ import { BackchannelAuthenticationRequest } from './models/backchannel_authentic
 import { Client } from './models/client.js';
 import { Grant } from './models/grant.js';
 
+// There is no init step and no construction step. Every setting lives on ApplicationConfig
+// (validated and derived from where it is loaded, in configs/application.ts), on ClientDefaults, or
+// in the addon registry; signing keys are module state in configs/keystore.ts. Nothing is
+// configured through the provider, so what remains is the event bus the actions emit on and the
+// CIBA result-delivery entry point below.
 class ProviderClass extends EventEmitter {
-	#int = {};
-
-	// There is no init step. Every setting lives on ApplicationConfig (validated and derived from
-	// where it is loaded, in configs/application.ts), on ClientDefaults, or in the addon registry;
-	// signing keys are module state in configs/keystore.ts. Nothing is configured through the
-	// provider, so all its construction does is open the internals map the request path writes to.
-	constructor() {
-		super();
-		instance.set(this, this.#int);
-	}
-
-	urlFor(name, opt) {
-		return new URL(this.pathFor(name, opt), this.issuer).href;
-	}
-
-	pathFor(name, { mountPath = '', ...opts } = {}) {
-		const routerUrl = this.#int.router.url(name, opts);
-
-		if (routerUrl instanceof Error) {
-			throw routerUrl;
-		}
-
-		return [mountPath, routerUrl].join('');
-	}
-
 	async backchannelResult(
 		request,
 		result,

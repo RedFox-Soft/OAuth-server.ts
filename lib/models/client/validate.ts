@@ -5,11 +5,10 @@ import QuickLRU from 'quick-lru';
 import mapKeys from '../../helpers/_/map_keys.ts';
 import snakeCase from '../../helpers/_/snake_case.ts';
 import camelCase from '../../helpers/_/camel_case.ts';
-import instance from '../../helpers/weak_cache.ts';
 import { pick } from '../../helpers/_/object.js';
 import { InvalidClientMetadata } from '../../helpers/errors.ts';
 import sectorValidate from '../../helpers/sector_validate.ts';
-import getSchema from './schema.ts';
+import getSchema, { buildRecognizedMetadata } from './schema.ts';
 import addClient from '../../helpers/add_client.ts';
 import { provider } from '../../provider.js';
 import { ClientDefaults } from '../../configs/clientBase.js';
@@ -62,9 +61,11 @@ const BASE_METADATA_KEYS = [
 export function clientMetadata(
 	client: ClientSchemaType
 ): Record<string, unknown> {
+	const recognized = buildRecognizedMetadata();
+
 	return mapKeys(client, (value, key) => {
 		const snaked = snakeCase(key);
-		if (!instance(provider).RECOGNIZED_METADATA.includes(snaked)) {
+		if (!recognized.includes(snaked)) {
 			return key;
 		}
 
@@ -128,7 +129,8 @@ export const clientPrototype = {
 // metadata camelCased, key stores built) or throw InvalidClientMetadata.
 // Replaces the former Client-class constructor validation path.
 export function validateClient(metadata: unknown): ClientSchemaType {
-	const Schema = getSchema(provider);
+	const Schema = getSchema();
+	const recognized = buildRecognizedMetadata();
 	const clientMetadataInput = {
 		...ClientDefaults,
 		...(metadata as object)
@@ -148,7 +150,7 @@ export function validateClient(metadata: unknown): ClientSchemaType {
 	Object.assign(
 		client,
 		mapKeys(schema, (value, key) => {
-			if (!instance(provider).RECOGNIZED_METADATA.includes(key)) {
+			if (!recognized.includes(key)) {
 				return key;
 			}
 

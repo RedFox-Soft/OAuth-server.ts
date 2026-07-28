@@ -1,4 +1,3 @@
-import i from 'lib/helpers/weak_cache.js';
 import { addons } from 'lib/addon/index.js';
 import { parse as parseUrl } from 'node:url';
 import {

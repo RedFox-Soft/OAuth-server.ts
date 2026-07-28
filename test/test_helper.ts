@@ -10,7 +10,6 @@ import { treaty } from '@elysiajs/eden';
 import nanoid from '../lib/helpers/nanoid.js';
 import epochTime from '../lib/helpers/epoch_time.js';
 import { provider, elysia } from '../lib/index.ts';
-import instance from '../lib/helpers/weak_cache.ts';
 import { adapter, getUserStore, jwksStore } from '../lib/adapters/index.ts';
 import { reloadJWKSKeys } from '../lib/configs/keys.ts';
 import { verifyJWKs, type UnnormalizedJWK } from '../lib/configs/verifyJWKs.ts';
@@ -87,8 +86,6 @@ console.warn = function (...args) {
 };
 
 process.env.NODE_ENV = process.env.NODE_ENV || 'test';
-
-globalThis.i = instance;
 
 const jwt = (token: string) =>
 	JSON.parse(base64url.decode(token.split('.')[1])).jti;

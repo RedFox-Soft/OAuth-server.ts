@@ -1,7 +1,5 @@
-import instance from './weak_cache.ts';
 import { pick, isPlainObject, merge } from './_/object.js';
 import { configuration } from 'lib/configs/application.js';
-import { provider } from 'lib/provider.js';
 import { pairwiseIdentifier } from '../addon/index.js';
 import { type Client } from 'lib/models/client.js';
 

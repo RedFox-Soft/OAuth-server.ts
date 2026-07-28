@@ -1,4 +1,3 @@
-import i from 'lib/helpers/weak_cache.js';
 import {
 	describe,
 	it,

@@ -1,5 +1,4 @@
 import { InvalidHeaderAuthorization } from './errors.ts';
-import instance from './weak_cache.ts';
 import { routeNames } from '../consts/param_list.ts';
 import { provider } from '../provider.js';
 import { isPlainObject } from './_/object.js';

@@ -1,4 +1,3 @@
-import instance from '../../helpers/weak_cache.ts';
 import {
 	InvalidGrant,
 	InvalidTarget,

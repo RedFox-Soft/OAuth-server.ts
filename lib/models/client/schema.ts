@@ -5,7 +5,6 @@ import { ClientDefaults } from '../../configs/clientBase.ts';
 
 import { InvalidClientMetadata } from '../../helpers/errors.ts';
 import sectorIdentifier from '../../helpers/sector_identifier.ts';
-import instance from '../../helpers/weak_cache.ts';
 import * as formatters from '../../helpers/formatters.ts';
 import { pick } from '../../helpers/_/object.js';
 import omitBy from '../../helpers/_/omit_by.ts';
@@ -57,12 +56,14 @@ function isUndefined(value) {
 	return value === undefined;
 }
 
-export default function getSchema(provider) {
-	const { scopes } = configuration;
-
+// The snake_case client metadata this deployment recognizes: the always-on base list plus the
+// keys the enabled features contribute. Derived from ApplicationConfig on every call rather than
+// frozen at module load, because the flags are mutable at runtime (the specs toggle them), and a
+// key recognized here is one the schema engine will read, camelCase onto the client, and echo back
+// out of `clientMetadata` — so a stale list would accept and advertise metadata for a disabled
+// feature. Callers that consult it per-key must hoist the call out of their loop.
+export function buildRecognizedMetadata() {
 	const RECOGNIZED_METADATA = [...RECOGNIZED];
-	const DEFAULT = structuredClone(DEFAULTS);
-	Object.assign(DEFAULT, wireFormatClientDefaults());
 
 	if (
 		ApplicationConfig['mTLS.enabled'] &&
@@ -152,7 +153,15 @@ export default function getSchema(provider) {
 		RECOGNIZED_METADATA.push('authorization_details_types');
 	}
 
-	instance(provider).RECOGNIZED_METADATA = RECOGNIZED_METADATA;
+	return RECOGNIZED_METADATA;
+}
+
+export default function getSchema() {
+	const { scopes } = configuration;
+
+	const RECOGNIZED_METADATA = buildRecognizedMetadata();
+	const DEFAULT = structuredClone(DEFAULTS);
+	Object.assign(DEFAULT, wireFormatClientDefaults());
 
 	const ENUM = {
 		default_acr_values: () => configuration.acrValues,

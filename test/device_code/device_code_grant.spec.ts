@@ -23,7 +23,6 @@ import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { TestAdapter } from 'test/models.js';
 import { ttl } from 'lib/configs/liveTime.js';
-import instance from 'lib/helpers/weak_cache.js';
 import { type BaseToken } from 'lib/models/base_token.ts';
 
 function errorDetail(spy) {
