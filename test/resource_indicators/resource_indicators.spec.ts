@@ -4,6 +4,7 @@ import { strict as assert } from 'node:assert';
 import bootstrap, {
 	agent,
 	jsonToFormUrlEncoded,
+	seedAccount,
 	type Setup
 } from '../test_helper.js';
 import * as resourceIndicators from '../../lib/addon/resources.js';
@@ -42,6 +43,10 @@ describe('features.resourceIndicators', () => {
 
 	beforeAll(async () => {
 		setup = await bootstrap(import.meta.url);
+		// The CIBA cases identify their end-user from `login_hint: 'accountId'`
+		// instead of the login() session, and findAccount resolves ids against the
+		// user store, so that id has to exist there.
+		seedAccount('accountId');
 	});
 	afterEach(() => {
 		provider.removeAllListeners();
