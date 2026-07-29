@@ -5,7 +5,7 @@ import bootstrap, { agent, type Setup } from '../test_helper.js';
 import { decode } from '../../lib/helpers/jwt.ts';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { ISSUER } from 'lib/configs/env.js';
-import { provider } from 'lib/provider.js';
+import { eventBus } from 'lib/event_bus.js';
 
 describe('configuration features.jwtResponseModes', () => {
 	let setup: Setup;
@@ -250,7 +250,7 @@ describe('configuration features.jwtResponseModes', () => {
 				});
 
 				const spy = mock();
-				provider.once('authorization.error', spy);
+				eventBus.once('authorization.error', spy);
 
 				const { status } = await agent.auth.get({
 					query: auth.params
@@ -261,7 +261,7 @@ describe('configuration features.jwtResponseModes', () => {
 
 			it('handles expired secrets', async function () {
 				const spy = mock();
-				provider.once('authorization.error', spy);
+				eventBus.once('authorization.error', spy);
 
 				const auth = new AuthorizationRequest({
 					response_mode: mode,

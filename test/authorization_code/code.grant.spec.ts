@@ -11,7 +11,7 @@ import {
 	setSystemTime
 } from 'bun:test';
 
-import { provider } from 'lib/provider.js';
+import { eventBus } from 'lib/event_bus.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { Client } from 'lib/models/client.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
@@ -32,9 +32,9 @@ describe('grant_type=authorization_code', () => {
 		setSystemTime();
 		mock.restore();
 
-		provider.removeAllListeners('grant.success');
-		provider.removeAllListeners('grant.error');
-		provider.removeAllListeners('server_error');
+		eventBus.removeAllListeners('grant.success');
+		eventBus.removeAllListeners('grant.error');
+		eventBus.removeAllListeners('server_error');
 	});
 
 	describe('with real tokens (1/3) - more than one redirectUris registered', () => {
@@ -68,7 +68,7 @@ describe('grant_type=authorization_code', () => {
 
 		it('Should return specific properties on token request', async function () {
 			const spy = mock();
-			provider.once('grant.success', spy);
+			eventBus.once('grant.success', spy);
 
 			const { data, response } = await auth.getToken(code);
 			expect(response.status).toBe(200);
@@ -169,7 +169,7 @@ describe('grant_type=authorization_code', () => {
 
 			setSystemTime(Date.now() + 10 * 1000);
 			const spy = mock();
-			provider.on('grant.error', spy);
+			eventBus.on('grant.error', spy);
 
 			const { error } = await auth.getToken(code);
 
@@ -186,8 +186,8 @@ describe('grant_type=authorization_code', () => {
 		it('validates code is not already used', async function () {
 			const grantErrorSpy = mock();
 			const grantRevokeSpy = mock();
-			provider.on('grant.error', grantErrorSpy);
-			provider.on('grant.revoked', grantRevokeSpy);
+			eventBus.on('grant.error', grantErrorSpy);
+			eventBus.on('grant.revoked', grantRevokeSpy);
 
 			codeStore.consumed = epochTime();
 
@@ -214,7 +214,7 @@ describe('grant_type=authorization_code', () => {
 
 		it('validates code belongs to client', async function () {
 			const spy = mock();
-			provider.on('grant.error', spy);
+			eventBus.on('grant.error', spy);
 			auth.clientId = 'client2';
 
 			const { error } = await auth.getToken(code);
@@ -242,7 +242,7 @@ describe('grant_type=authorization_code', () => {
 
 		it('validates used redirect_uri', async function () {
 			const spy = mock();
-			provider.on('grant.error', spy);
+			eventBus.on('grant.error', spy);
 
 			auth.params.redirect_uri = 'https://client.example.com/cb?thensome';
 			const { error } = await auth.getToken(code);
@@ -274,7 +274,7 @@ describe('grant_type=authorization_code', () => {
 			await getUserStore('redfox').destroy(setup.getAccountId());
 
 			const spy = mock();
-			provider.on('grant.error', spy);
+			eventBus.on('grant.error', spy);
 
 			const { error } = await auth.getToken(code);
 			expect(error.status).toBe(400);
@@ -313,7 +313,7 @@ describe('grant_type=authorization_code', () => {
 
 		it('validates redirect_uri presence', async function () {
 			const spy = mock();
-			provider.on('grant.error', spy);
+			eventBus.on('grant.error', spy);
 
 			auth.params.redirect_uri = undefined;
 			const { error } = await auth.getToken(code);
@@ -368,7 +368,7 @@ describe('grant_type=authorization_code', () => {
 
 		it('returns the right stuff', async function () {
 			const spy = mock();
-			provider.on('grant.success', spy);
+			eventBus.on('grant.success', spy);
 
 			const { data, response } = await auth.getToken(code);
 
@@ -465,7 +465,7 @@ describe('grant_type=authorization_code', () => {
 
 			setSystemTime(Date.now() + 10 * 1000);
 			const spy = mock();
-			provider.on('grant.error', spy);
+			eventBus.on('grant.error', spy);
 
 			const { error } = await auth.getToken(code);
 
@@ -482,8 +482,8 @@ describe('grant_type=authorization_code', () => {
 		it('validates code is not already used', async function () {
 			const grantErrorSpy = mock();
 			const grantRevokeSpy = mock();
-			provider.on('grant.error', grantErrorSpy);
-			provider.on('grant.revoked', grantRevokeSpy);
+			eventBus.on('grant.error', grantErrorSpy);
+			eventBus.on('grant.revoked', grantRevokeSpy);
 
 			codeStore.consumed = epochTime();
 
@@ -508,7 +508,7 @@ describe('grant_type=authorization_code', () => {
 
 		it('validates code belongs to client', async function () {
 			const spy = mock();
-			provider.on('grant.error', spy);
+			eventBus.on('grant.error', spy);
 
 			auth.clientId = 'client';
 			auth.redirect_uri = 'https://client.example.com/cb2';
@@ -536,7 +536,7 @@ describe('grant_type=authorization_code', () => {
 
 		it('validates used redirect_uri (should it be provided)', async function () {
 			const spy = mock();
-			provider.on('grant.error', spy);
+			eventBus.on('grant.error', spy);
 
 			auth.params.redirect_uri = 'https://client.example.com/cb?thensome';
 			const { error } = await auth.getToken(code);
@@ -556,7 +556,7 @@ describe('grant_type=authorization_code', () => {
 			await getUserStore('redfox').destroy(setup.getAccountId());
 
 			const spy = mock();
-			provider.on('grant.error', spy);
+			eventBus.on('grant.error', spy);
 
 			const { error } = await auth.getToken(code);
 			expect(error.status).toBe(400);
@@ -642,7 +642,7 @@ describe('grant_type=authorization_code', () => {
 
 		it('code being "found"', async function () {
 			const spy = mock();
-			provider.on('grant.error', spy);
+			eventBus.on('grant.error', spy);
 
 			const auth = new AuthorizationRequest({
 				client_id: 'client',
@@ -674,7 +674,7 @@ describe('grant_type=authorization_code', () => {
 	it('handles exceptions', async function () {
 		spyOn(Client, 'find').mockRejectedValue(new Error());
 		const spy = mock();
-		provider.on('server_error', spy);
+		eventBus.on('server_error', spy);
 
 		const auth = new AuthorizationRequest({
 			client_id: 'client',

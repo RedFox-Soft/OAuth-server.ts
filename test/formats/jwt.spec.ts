@@ -17,7 +17,7 @@ import { keystore } from 'lib/configs/keystore.js';
 import ResourceServer from '../../lib/helpers/resource_server.ts';
 import epochTime from '../../lib/helpers/epoch_time.ts';
 import bootstrap from '../test_helper.js';
-import { provider } from 'lib/provider.js';
+import { eventBus } from 'lib/event_bus.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { TestAdapter } from 'test/models.js';
 import { Client } from 'lib/models/client.js';
@@ -35,7 +35,7 @@ describe('jwt format', () => {
 	});
 
 	afterEach(function () {
-		provider.removeAllListeners();
+		eventBus.removeAllListeners();
 		mock.restore();
 	});
 
@@ -732,7 +732,7 @@ describe('jwt format', () => {
 		const client = await Client.find(clientId);
 		const token = new AccessToken({ client, ...fullPayload });
 		const issued = mock();
-		provider.on('access_token.issued', issued);
+		eventBus.on('access_token.issued', issued);
 		const jwt = await token.save();
 
 		expect(upsert).not.toHaveBeenCalled();
@@ -762,7 +762,7 @@ describe('jwt format', () => {
 		const client = await Client.find('pairwise');
 		const token = new AccessToken({ client, ...fullPayload });
 		const issued = mock();
-		provider.on('access_token.issued', issued);
+		eventBus.on('access_token.issued', issued);
 		const jwt = await token.save();
 
 		expect(upsert).not.toHaveBeenCalled();
@@ -795,7 +795,7 @@ describe('jwt format', () => {
 			...fullPayload
 		});
 		const issued = mock();
-		provider.on('client_credentials.issued', issued);
+		eventBus.on('client_credentials.issued', issued);
 		const jwt = await token.save();
 
 		expect(upsert).not.toHaveBeenCalled();

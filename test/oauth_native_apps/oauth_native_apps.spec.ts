@@ -3,7 +3,7 @@ import { describe, it, beforeAll, expect } from 'bun:test';
 
 import bootstrap, { type Setup } from '../test_helper.js';
 import addClient from '../../lib/helpers/add_client.ts';
-import provider from 'lib/index.js';
+import 'lib/index.js';
 
 describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
 	let setup: Setup;
@@ -14,7 +14,7 @@ describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
 	describe('changed native client validations', () => {
 		describe('Private-use URI Scheme Redirection', () => {
 			it('allows custom uri scheme uris with localhost', function () {
-				return addClient(provider, {
+				return addClient({
 					applicationType: 'native',
 					clientId: 'native-custom',
 					grantTypes: ['authorization_code'],
@@ -29,7 +29,7 @@ describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
 
 			it('rejects custom schemes without dots with reverse domain name scheme recommendation', function () {
 				return assert.rejects(
-					addClient(provider, {
+					addClient({
 						applicationType: 'native',
 						clientId: 'native-custom',
 						grantTypes: ['authorization_code'],
@@ -51,7 +51,7 @@ describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
 
 		describe('Claimed HTTPS URI Redirection', () => {
 			it('allows claimed https uris', function () {
-				return addClient(provider, {
+				return addClient({
 					applicationType: 'native',
 					clientId: 'native-custom',
 					grantTypes: ['authorization_code'],
@@ -63,7 +63,7 @@ describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
 
 			it('rejects https if using loopback uris', function () {
 				return assert.rejects(
-					addClient(provider, {
+					addClient({
 						applicationType: 'native',
 						clientId: 'native-custom',
 						grantTypes: ['authorization_code'],
@@ -85,7 +85,7 @@ describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
 
 		describe('Loopback Interface Redirection', () => {
 			it('catches invalid urls being passed in', function () {
-				return addClient(provider, {
+				return addClient({
 					applicationType: 'native',
 					clientId: 'native-custom',
 					grantTypes: ['authorization_code'],
@@ -100,7 +100,7 @@ describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
 			});
 
 			it('allows http protocol localhost loopback uris', function () {
-				return addClient(provider, {
+				return addClient({
 					applicationType: 'native',
 					clientId: 'native-custom',
 					grantTypes: ['authorization_code'],
@@ -116,7 +116,7 @@ describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
 			});
 
 			it('allows http protocol IPv4 loopback uris', function () {
-				return addClient(provider, {
+				return addClient({
 					applicationType: 'native',
 					clientId: 'native-custom',
 					grantTypes: ['authorization_code'],
@@ -132,7 +132,7 @@ describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
 			});
 
 			it('allows http protocol IPv6 loopback uris', function () {
-				return addClient(provider, {
+				return addClient({
 					applicationType: 'native',
 					clientId: 'native-custom',
 					grantTypes: ['authorization_code'],
@@ -149,7 +149,7 @@ describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
 
 			it('rejects http protocol uris not using loopback uris', function () {
 				return assert.rejects(
-					addClient(provider, {
+					addClient({
 						applicationType: 'native',
 						clientId: 'native-custom',
 						grantTypes: ['authorization_code'],

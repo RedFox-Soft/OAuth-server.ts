@@ -1,5 +1,6 @@
 import getConfig from '../default.config.js';
 import { Grant } from 'lib/models/grant.js';
+import { backchannelResult } from 'lib/actions/authorization/backchannel_result.js';
 
 const config = getConfig();
 
@@ -17,7 +18,7 @@ export const addons = {
 		});
 		grant.addOIDCScope(ctx.oidc.requestParamScopes);
 		await grant.save();
-		return ctx.oidc.provider.backchannelResult(request, grant.jti);
+		return backchannelResult(request, grant.jti);
 	}
 };
 

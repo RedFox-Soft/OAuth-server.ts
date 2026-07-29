@@ -5,10 +5,7 @@ import { type ClientSchemaType } from '../configs/clientSchema.ts';
 import { InvalidClientMetadata } from './errors.ts';
 import { sectorIdentifierUriValidate } from '../addon/index.js';
 
-export default async function sectorValidate(
-	_provider: object,
-	client: ClientSchemaType
-) {
+export default async function sectorValidate(client: ClientSchemaType) {
 	if (!sectorIdentifierUriValidate(client)) {
 		return;
 	}

@@ -1,6 +1,7 @@
 import * as errors from '../../lib/helpers/errors.ts';
 import getConfig from '../default.config.js';
 import { Grant } from 'lib/models/grant.js';
+import { backchannelResult } from 'lib/actions/authorization/backchannel_result.js';
 import { grantFlags } from './grant_flags.ts';
 
 const config = getConfig();
@@ -31,7 +32,7 @@ export const addons = {
 		}
 
 		await grant.save();
-		return ctx.oidc.provider.backchannelResult(request, grant.jti);
+		return backchannelResult(request, grant.jti);
 	},
 	async useGrantedResource() {
 		return grantFlags.useGranted;

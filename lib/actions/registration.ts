@@ -11,7 +11,7 @@ import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { Client } from 'lib/models/client.js';
 import { InitialAccessToken } from 'lib/models/initial_access_token.js';
 import { RegistrationAccessToken } from 'lib/models/registration_access_token.js';
-import { provider } from 'lib/provider.js';
+import { eventBus } from 'lib/event_bus.js';
 import { routeNames } from 'lib/consts/param_list.js';
 import { ISSUER } from 'lib/configs/env.js';
 import {
@@ -221,7 +221,7 @@ async function create({ body, headers, request, set }) {
 		}
 	}
 
-	const client = await addClient(provider, properties, { store: true });
+	const client = await addClient(properties, { store: true });
 	oidc.entity('Client', client);
 
 	const responseBody: Body = canonicalToSnake(client.metadata());
@@ -234,7 +234,7 @@ async function create({ body, headers, request, set }) {
 	}
 
 	set.status = 201;
-	provider.emit('registration_create.success', { oidc }, client);
+	eventBus.emit('registration_create.success', { oidc }, client);
 
 	return responseBody;
 }
@@ -328,7 +328,7 @@ async function update({ params, body, headers, set }) {
 		}
 	}
 
-	const nextClient = await addClient(provider, properties, { store: true });
+	const nextClient = await addClient(properties, { store: true });
 
 	const responseBody: Body = canonicalToSnake(nextClient.metadata());
 
@@ -358,7 +358,7 @@ async function update({ params, body, headers, set }) {
 		responseBody.registration_access_token = await rat.save();
 	}
 
-	provider.emit('registration_update.success', { oidc }, nextClient);
+	eventBus.emit('registration_update.success', { oidc }, nextClient);
 
 	return responseBody;
 }
@@ -377,7 +377,7 @@ async function remove({ params, headers, set }) {
 	await regAccessToken.destroy();
 
 	set.status = 204;
-	provider.emit('registration_delete.success', { oidc }, client);
+	eventBus.emit('registration_delete.success', { oidc }, client);
 }
 
 const OptionalBody = t.Optional(t.Record(t.String(), t.Unknown()));

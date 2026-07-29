@@ -10,7 +10,6 @@ import { InvalidClientMetadata } from '../../helpers/errors.ts';
 import sectorValidate from '../../helpers/sector_validate.ts';
 import getSchema, { buildRecognizedMetadata } from './schema.ts';
 import addClient from '../../helpers/add_client.ts';
-import { provider } from '../../provider.js';
 import { ClientDefaults } from '../../configs/clientBase.js';
 import {
 	ClientSchema,
@@ -191,7 +190,7 @@ export async function assertClientValid(metadata: unknown): Promise<void> {
 	const client = validateClient(metadata);
 
 	if (client.sectorIdentifierUri !== undefined) {
-		await sectorValidate(provider, client);
+		await sectorValidate(client);
 	}
 }
 
@@ -221,7 +220,7 @@ export async function tryFindClient(
 	);
 	let client = clientCache.get(propHash);
 	if (!client) {
-		client = await addClient(provider, properties, { store: false });
+		client = await addClient(properties, { store: false });
 		clientCache.set(propHash, client);
 	}
 

@@ -9,7 +9,6 @@ import {
 
 import bootstrap, { agent, type Setup } from '../test_helper.js';
 import * as JWT from '../../lib/helpers/jwt.ts';
-import { provider } from 'lib/provider.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';

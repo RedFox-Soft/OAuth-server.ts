@@ -28,7 +28,7 @@ describe('CORS setup', () => {
 	before(() => bootstrap(import.meta.url));
 
 	before(async function () {
-		provider.use(
+		eventBus.use(
 			cors({
 				origin: 'https://example.com'
 			})

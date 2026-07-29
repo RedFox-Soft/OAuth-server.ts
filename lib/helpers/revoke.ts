@@ -3,7 +3,7 @@ import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { BackchannelAuthenticationRequest } from 'lib/models/backchannel_authentication_request.js';
-import { provider } from 'lib/provider.js';
+import { eventBus } from 'lib/event_bus.js';
 import type { OIDCContext } from './oidc_context.ts';
 
 export default async function revoke(
@@ -31,5 +31,5 @@ export default async function revoke(
 	];
 
 	await Promise.all(models.map((model) => model?.revokeByGrantId(grantId)));
-	provider.emit('grant.revoked', grantId);
+	eventBus.emit('grant.revoked', grantId);
 }

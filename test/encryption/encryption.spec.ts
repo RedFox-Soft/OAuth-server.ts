@@ -18,7 +18,6 @@ import bootstrap, {
 import * as JWT from '../../lib/helpers/jwt.ts';
 
 import { keypair } from './encryption.config.js';
-import { provider } from 'lib/provider.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { Client } from 'lib/models/client.js';

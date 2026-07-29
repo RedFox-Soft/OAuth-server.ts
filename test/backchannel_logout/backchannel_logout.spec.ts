@@ -20,7 +20,7 @@ import {
 	assertNoPendingInterceptors
 } from '../fetch_mock.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
-import { provider } from 'lib/provider.js';
+import { eventBus } from 'lib/event_bus.js';
 import { Client } from 'lib/models/client.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
@@ -256,9 +256,9 @@ describe('Back-Channel Logout 1.0', () => {
 				.reply(500);
 
 			const successSpy = mock();
-			provider.once('backchannel.success', successSpy);
+			eventBus.once('backchannel.success', successSpy);
 			const errorSpy = mock();
-			provider.once('backchannel.error', errorSpy);
+			eventBus.once('backchannel.error', errorSpy);
 
 			const { accountId } = session;
 

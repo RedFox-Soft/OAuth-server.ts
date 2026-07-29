@@ -1,7 +1,7 @@
 import { beforeAll, describe, it, expect, mock, spyOn } from 'bun:test';
 
 import bootstrap, { agent } from '../test_helper.js';
-import { provider } from 'lib/provider.js';
+import { eventBus } from 'lib/event_bus.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 
@@ -12,7 +12,7 @@ describe('grant_type=client_credentials', () => {
 
 	it('provides a Bearer client credentials token', async function () {
 		const spy = mock();
-		provider.once('grant.success', spy);
+		eventBus.once('grant.success', spy);
 
 		const { status, data } = await agent.token.post(
 			{
@@ -32,8 +32,8 @@ describe('grant_type=client_credentials', () => {
 
 	it('ignores unsupported scopes', async function () {
 		const spy = mock();
-		provider.once('client_credentials.saved', spy);
-		provider.once('client_credentials.issued', spy);
+		eventBus.once('client_credentials.saved', spy);
+		eventBus.once('client_credentials.issued', spy);
 
 		const { status, data } = await agent.token.post(
 			{

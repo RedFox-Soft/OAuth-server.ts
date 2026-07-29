@@ -1,7 +1,7 @@
 import { describe, it, beforeAll, expect, mock, afterEach } from 'bun:test';
 import bootstrap, { agent, type Setup } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
-import provider from 'lib/index.js';
+import { eventBus } from 'lib/index.js';
 
 describe('/auth', () => {
 	let setup: Setup;
@@ -84,7 +84,7 @@ describe('/auth', () => {
 				});
 
 				const spy = mock();
-				provider.once('authorization.error', spy);
+				eventBus.once('authorization.error', spy);
 
 				const { response, error } = await authRequest(auth, true);
 				expect(response.status).toBe(400);

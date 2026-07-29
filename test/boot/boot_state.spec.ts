@@ -3,12 +3,6 @@ import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-// Not used here — the assertions all run in the child process. It loads the model/provider import
-// graph from the same end every other spec does; without it this file's position in the run order
-// lets the preload's addon import enter that graph first, which leaves base_token half-initialised
-// (see the load-order anchor in lib/provider.ts). Removable once that cycle is gone.
-import 'lib/provider.js';
-
 /*
  * What a freshly booted server has, before anything reloads or reconfigures it.
  *
@@ -31,7 +25,7 @@ import { pathToFileURL } from 'node:url';
 
 const at = (rel) => pathToFileURL(path.join(process.cwd(), rel)).href;
 
-await import(at('lib/provider.ts'));
+await import(at('lib/event_bus.ts'));
 const ks = await import(at('lib/configs/keystore.ts'));
 const app = await import(at('lib/configs/application.ts'));
 

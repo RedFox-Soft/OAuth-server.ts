@@ -7,6 +7,7 @@ import omitBy from '../../helpers/_/omit_by.ts';
 import { cookieNames } from 'lib/consts/param_list.js';
 import { ttl } from 'lib/configs/liveTime.js';
 import { Interaction } from 'lib/models/interaction.js';
+import { eventBus } from '../../event_bus.js';
 
 export default async function interactions(resumeRouteName, oidc) {
 	const client = oidc.client;
@@ -59,7 +60,7 @@ export default async function interactions(resumeRouteName, oidc) {
 			);
 		}
 
-		oidc.provider.emit('authorization.accepted', oidc);
+		eventBus.emit('authorization.accepted', oidc);
 		return;
 	}
 
@@ -105,7 +106,7 @@ export default async function interactions(resumeRouteName, oidc) {
 		maxAge: ttl.Interaction * 1000
 	});
 
-	oidc.provider.emit('interaction.started', prompt);
+	eventBus.emit('interaction.started', prompt);
 	const destination = `/ui/${uid}/${prompt.name}`;
 	return destination;
 }

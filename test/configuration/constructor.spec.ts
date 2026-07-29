@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'bun:test';
-import provider from '../../lib/index.ts';
+import '../../lib/index.ts';
 import {
 	ApplicationConfig,
 	reloadConfiguration

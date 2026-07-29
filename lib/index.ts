@@ -1,9 +1,12 @@
-import { provider } from './provider.ts';
+import { eventBus } from './event_bus.ts';
 import * as errors from './helpers/errors.ts';
 import * as interactionPolicy from './helpers/interaction_policy/index.ts';
+// The CIBA counterpart to the triggerAuthenticationDevice addon: exported here because completing a
+// backchannel request is something the deployment does, not the server.
+import { backchannelResult } from './actions/authorization/backchannel_result.ts';
 
-export default provider;
-export { errors, interactionPolicy, provider };
+export default eventBus;
+export { backchannelResult, errors, eventBus, interactionPolicy };
 
 import { Elysia } from 'elysia';
 import { staticPlugin } from '@elysiajs/static';

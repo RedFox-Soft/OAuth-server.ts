@@ -1,5 +1,5 @@
 import { Elysia, t } from 'elysia';
-import { provider } from 'lib/provider.js';
+import { eventBus } from 'lib/event_bus.js';
 import {
 	consentServer,
 	loginServer,
@@ -72,7 +72,7 @@ async function resume(interaction, cookie) {
 
 	await checkClient(ctx.oidc);
 	await checkResource(ctx.oidc);
-	provider.emit('interaction.ended');
+	eventBus.emit('interaction.ended');
 	assignClaims(ctx.oidc);
 	await loadAccount(ctx.oidc);
 	await loadGrant(ctx.oidc);
@@ -344,7 +344,7 @@ export const ui = new Elysia()
 
 			await checkClient(oidc);
 			await checkResource(oidc);
-			provider.emit('interaction.ended');
+			eventBus.emit('interaction.ended');
 			assignClaims(oidc);
 			await loadAccount(oidc);
 			await loadGrant(oidc);

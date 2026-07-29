@@ -15,7 +15,7 @@ import { importJWK, decodeProtectedHeader, decodeJwt } from 'jose';
 
 import * as JWT from '../../lib/helpers/jwt.ts';
 import bootstrap, { agent, jsonToFormUrlEncoded } from '../test_helper.js';
-import { provider } from 'lib/provider.js';
+import { eventBus } from 'lib/event_bus.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
@@ -307,9 +307,9 @@ describe('Pushed Request Object', async () => {
 
 						it('stores a request object and returns a uri', async function () {
 							const spy = mock();
-							provider.once('pushed_authorization_request.success', spy);
+							eventBus.once('pushed_authorization_request.success', spy);
 							const spy2 = mock((_par: PushedAuthorizationRequest) => {});
-							provider.once('pushed_authorization_request.saved', spy2);
+							eventBus.once('pushed_authorization_request.saved', spy2);
 
 							const code_verifier = randomBytes(32).toString('base64');
 							const code_challenge = createHash('sha256')
@@ -669,7 +669,7 @@ describe('Pushed Request Object', async () => {
 
 						it('stores a request object and returns a uri', async function () {
 							const spy = mock();
-							provider.once('pushed_authorization_request.success', spy);
+							eventBus.once('pushed_authorization_request.success', spy);
 							const code_verifier = randomBytes(32).toString('base64');
 							const code_challenge = createHash('sha256')
 								.update(code_verifier)
@@ -710,7 +710,7 @@ describe('Pushed Request Object', async () => {
 
 						it('Error when no expires_in is present', async function () {
 							const spy = mock();
-							provider.once('pushed_authorization_request.success', spy);
+							eventBus.once('pushed_authorization_request.success', spy);
 							const code_verifier = randomBytes(32).toString('base64');
 							const code_challenge = createHash('sha256')
 								.update(code_verifier)
@@ -750,7 +750,7 @@ describe('Pushed Request Object', async () => {
 
 						it('uses the expiration from JWT when below MAX_TTL', async function () {
 							const spy = mock();
-							provider.once('pushed_authorization_request.success', spy);
+							eventBus.once('pushed_authorization_request.success', spy);
 							const code_verifier = randomBytes(32).toString('base64');
 							const code_challenge = createHash('sha256')
 								.update(code_verifier)
@@ -791,7 +791,7 @@ describe('Pushed Request Object', async () => {
 
 						it('uses MAX_TTL when the expiration from JWT is above it', async function () {
 							const spy = mock((_e: unknown) => {});
-							provider.once('pushed_authorization_request.success', spy);
+							eventBus.once('pushed_authorization_request.success', spy);
 							const code_verifier = randomBytes(32).toString('base64');
 							const code_challenge = createHash('sha256')
 								.update(code_verifier)
@@ -834,7 +834,7 @@ describe('Pushed Request Object', async () => {
 
 						it('ignores regular parameters when passing a JAR request', async function () {
 							const spy = mock((_par: PushedAuthorizationRequest) => {});
-							provider.once('pushed_authorization_request.saved', spy);
+							eventBus.once('pushed_authorization_request.saved', spy);
 							const code_verifier = randomBytes(32).toString('base64');
 							const code_challenge = createHash('sha256')
 								.update(code_verifier)

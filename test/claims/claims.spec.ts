@@ -19,7 +19,6 @@ import bootstrap, {
 } from '../test_helper.js';
 import { fullProfileClaims } from '../models.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
-import { provider } from 'lib/provider.js';
 import { Client } from 'lib/models/client.js';
 import { IdToken } from 'lib/models/id_token.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';

@@ -11,7 +11,7 @@ import {
 
 import bootstrap, { agent, getHeader } from '../test_helper.js';
 import { ISSUER } from 'lib/configs/env.js';
-import { provider } from 'lib/provider.js';
+import { eventBus } from 'lib/event_bus.js';
 import { Client } from 'lib/models/client.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { InitialAccessToken } from 'lib/models/initial_access_token.js';
@@ -54,8 +54,8 @@ describe('registration features', () => {
 
 	afterEach(() => {
 		mock.restore();
-		provider.removeAllListeners('registration_create.success');
-		provider.removeAllListeners('registration_access_token.destroyed');
+		eventBus.removeAllListeners('registration_create.success');
+		eventBus.removeAllListeners('registration_access_token.destroyed');
 	});
 
 	describe('POST /reg', () => {
@@ -207,7 +207,7 @@ describe('registration features', () => {
 
 		it('stores the client and emits an event', async () => {
 			const spy = mock();
-			provider.once('registration_create.success', spy);
+			eventBus.once('registration_create.success', spy);
 			const adapter = TestAdapter.for('Client');
 			const upsert = spyOn(adapter, 'upsert');
 
@@ -444,7 +444,7 @@ describe('registration features', () => {
 
 		it('invalidates registration_access_token if used on the wrong client', async () => {
 			const spy = mock();
-			provider.once('registration_access_token.destroyed', spy);
+			eventBus.once('registration_access_token.destroyed', spy);
 
 			const res = await agent
 				.reg({ clientId: 'foobar' })

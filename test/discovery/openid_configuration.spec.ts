@@ -1,7 +1,7 @@
 import { describe, it, beforeAll, afterEach, expect, mock } from 'bun:test';
 
 import bootstrap, { agent } from '../test_helper.js';
-import { provider } from 'lib/provider.js';
+import { eventBus } from 'lib/event_bus.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 
 const discoveryEndpoint = agent['.well-known']['openid-configuration'];
@@ -46,7 +46,7 @@ describe('/.well-known/openid-configuration', () => {
 
 		it('handles exceptions with json 500 and emits server_error', async () => {
 			const spy = mock();
-			provider.once('server_error', spy);
+			eventBus.once('server_error', spy);
 
 			// Force the discovery handler to throw while it applies discovery overrides.
 			// bun's spyOn can't stub an accessor, so override the getter directly and

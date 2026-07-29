@@ -19,7 +19,7 @@ import bootstrap, {
 	seedAccount,
 	type Setup
 } from '../test_helper.js';
-import { provider } from 'lib/provider.js';
+import { eventBus } from 'lib/event_bus.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
 import { AccessToken } from 'lib/models/access_token.js';
@@ -149,7 +149,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 		it('binds the access token to the certificate', async function () {
 			const spy = mock();
-			provider.once('grant.success', spy);
+			eventBus.once('grant.success', spy);
 
 			const { status } = await agent.token.post(
 				{
@@ -176,7 +176,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 		it('verifies the request made with mutual-TLS', async function () {
 			const spy = mock();
-			provider.once('grant.error', spy);
+			eventBus.once('grant.error', spy);
 
 			const { error } = await agent.token.post(
 				{
@@ -202,7 +202,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 		it('binds the refresh token to the certificate for public clients', async function () {
 			const spy = mock();
-			provider.once('grant.success', spy);
+			eventBus.once('grant.success', spy);
 
 			// changes the code to client-none
 			TestAdapter.for('DeviceCode').syncUpdate(setup.getTokenJti(dc), {
@@ -254,7 +254,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 		it('binds the access token to the certificate', async function () {
 			const spy = mock();
-			provider.once('grant.success', spy);
+			eventBus.once('grant.success', spy);
 
 			const { status } = await agent.token.post(
 				{
@@ -281,7 +281,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 		it('verifies the request made with mutual-TLS', async function () {
 			const spy = mock();
-			provider.once('grant.error', spy);
+			eventBus.once('grant.error', spy);
 
 			const { error } = await agent.token.post(
 				{
@@ -307,7 +307,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 		it('binds the refresh token to the certificate for public clients', async function () {
 			const spy = mock();
-			provider.once('grant.success', spy);
+			eventBus.once('grant.success', spy);
 
 			// changes the code to client-none
 			TestAdapter.for('BackchannelAuthenticationRequest').syncUpdate(
@@ -374,7 +374,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 		describe('authorization_code', () => {
 			it('binds the access token to the certificate', async function () {
 				const spy = mock();
-				provider.once('grant.success', spy);
+				eventBus.once('grant.success', spy);
 				const { status } = await auth.getToken(code, {
 					headers: { 'x-client-cert': crt.raw.toString('base64') }
 				});
@@ -391,7 +391,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 			it('verifies the request made with mutual-TLS', async function () {
 				const spy = mock();
-				provider.once('grant.error', spy);
+				eventBus.once('grant.error', spy);
 
 				const { error } = await auth.getToken(code);
 				expect(error.status).toBe(400);
@@ -419,7 +419,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 			it('binds the access token to the certificate', async function () {
 				const spy = mock();
-				provider.once('grant.success', spy);
+				eventBus.once('grant.success', spy);
 
 				const { status } = await agent.token.post(
 					{
@@ -447,7 +447,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 			it('verifies the request made with mutual-TLS', async function () {
 				const spy = mock();
-				provider.once('grant.error', spy);
+				eventBus.once('grant.error', spy);
 
 				const { error } = await agent.token.post(
 					{
@@ -507,7 +507,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 		describe('authorization_code', () => {
 			it('binds the access token to the certificate', async function () {
 				const spy = mock();
-				provider.once('grant.success', spy);
+				eventBus.once('grant.success', spy);
 
 				const { status } = await auth.getToken(code, {
 					headers: { 'x-client-cert': crt.raw.toString('base64') }
@@ -525,7 +525,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 			it('verifies the request made with mutual-TLS', async function () {
 				const spy = mock();
-				provider.once('grant.error', spy);
+				eventBus.once('grant.error', spy);
 
 				const { error } = await auth.getToken(code);
 				expect(error.status).toBe(400);
@@ -553,7 +553,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 			it('binds the access token to the certificate', async function () {
 				const spy = mock();
-				provider.once('grant.success', spy);
+				eventBus.once('grant.success', spy);
 
 				const { status } = await agent.token.post(
 					{
@@ -581,7 +581,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 			it('verifies the request made with mutual-TLS', async function () {
 				const spy = mock();
-				provider.once('grant.error', spy);
+				eventBus.once('grant.error', spy);
 
 				const { error } = await agent.token.post({
 					client_id: 'client-none',
@@ -604,7 +604,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 			it('verifies the request made with mutual-TLS using the same cert', async function () {
 				const spy = mock();
-				provider.once('grant.error', spy);
+				eventBus.once('grant.error', spy);
 
 				const { error } = await agent.token.post(
 					{
@@ -639,7 +639,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 	describe('client_credentials', () => {
 		it('binds the access token to the certificate', async function () {
 			const spy = mock();
-			provider.once('grant.success', spy);
+			eventBus.once('grant.success', spy);
 
 			const { status } = await agent.token.post(
 				{
@@ -668,7 +668,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 		it('verifies the request was made with mutual-TLS', async function () {
 			const spy = mock();
-			provider.once('grant.error', spy);
+			eventBus.once('grant.error', spy);
 
 			const { error } = await agent.token.post(
 				{

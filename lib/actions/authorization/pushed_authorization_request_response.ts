@@ -6,7 +6,7 @@ import * as JWT from '../../helpers/jwt.ts';
 import { ISSUER } from 'lib/configs/env.js';
 import { nanoid } from 'nanoid';
 import { PushedAuthorizationRequest } from 'lib/models/pushed_authorization_request.js';
-import { provider } from 'lib/provider.ts';
+import { eventBus } from 'lib/event_bus.ts';
 
 const MAX_TTL = 60;
 
@@ -59,7 +59,7 @@ export default async function pushedAuthorizationRequestResponse(
 	oidc.entity('PushedAuthorizationRequest', requestObject);
 
 	// event payload kept `{ oidc }`-shaped (was `ctx`)
-	provider.emit('pushed_authorization_request.success', { oidc }, oidc.client);
+	eventBus.emit('pushed_authorization_request.success', { oidc }, oidc.client);
 	return new Response(
 		JSON.stringify({
 			expires_in: ttl,

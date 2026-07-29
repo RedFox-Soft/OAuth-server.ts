@@ -7,7 +7,6 @@ import bootstrap from '../test_helper.js';
 import { assertNoPendingInterceptors, mock } from '../fetch_mock.js';
 import addClient from '../../lib/helpers/add_client.ts';
 import { Claims } from 'lib/helpers/claims.js';
-import { provider } from 'lib/provider.js';
 import { Client } from 'lib/models/client.js';
 
 describe('pairwise features', () => {
@@ -18,7 +17,7 @@ describe('pairwise features', () => {
 	describe('pairwise client configuration', () => {
 		describe('sector_identifier_uri is not provided', () => {
 			it('resolves the sector_identifier from one redirect_uri', () => {
-				return addClient(provider, {
+				return addClient({
 					clientId: 'client',
 					clientSecret: 'secret',
 					redirectUris: ['https://client.example.com/cb'],
@@ -30,7 +29,7 @@ describe('pairwise features', () => {
 			});
 
 			it('resolves the sector_identifier if redirect_uris hosts are the same', () => {
-				return addClient(provider, {
+				return addClient({
 					clientId: 'client',
 					clientSecret: 'secret',
 					redirectUris: [
@@ -45,7 +44,7 @@ describe('pairwise features', () => {
 			});
 
 			it('fails to validate when multiple redirect_uris hosts are provided', () => {
-				return addClient(provider, {
+				return addClient({
 					clientId: 'client',
 					clientSecret: 'secret',
 					redirectUris: [
@@ -82,7 +81,7 @@ describe('pairwise features', () => {
 						])
 					);
 
-				return addClient(provider, {
+				return addClient({
 					clientId: 'client',
 					clientSecret: 'secret',
 					redirectUris: [
@@ -110,7 +109,7 @@ describe('pairwise features', () => {
 						])
 					);
 
-				return addClient(provider, {
+				return addClient({
 					clientId: 'client',
 					clientSecret: 'secret',
 					redirectUris: [
@@ -145,7 +144,7 @@ describe('pairwise features', () => {
 			});
 
 			it('must be an https uri', () => {
-				return addClient(provider, {
+				return addClient({
 					clientId: 'client',
 					clientSecret: 'secret',
 					redirectUris: [
@@ -185,7 +184,7 @@ describe('pairwise features', () => {
 						])
 					);
 
-				return addClient(provider, {
+				return addClient({
 					clientId: 'client',
 					clientSecret: 'secret',
 					redirectUris: [
@@ -222,7 +221,7 @@ describe('pairwise features', () => {
 							])
 						);
 
-					return addClient(provider, {
+					return addClient({
 						clientId: 'client',
 						responseTypes: [],
 						backchannel_token_delivery_mode: 'poll',
@@ -260,7 +259,7 @@ describe('pairwise features', () => {
 							])
 						);
 
-					return addClient(provider, {
+					return addClient({
 						clientId: 'client',
 						responseTypes: [],
 						grantTypes: ['urn:ietf:params:oauth:grant-type:device_code'],
@@ -290,7 +289,7 @@ describe('pairwise features', () => {
 					})
 					.reply(200, '{ not a valid json');
 
-				return addClient(provider, {
+				return addClient({
 					clientId: 'client',
 					clientSecret: 'secret',
 					redirectUris: [
@@ -320,7 +319,7 @@ describe('pairwise features', () => {
 					})
 					.reply(200, JSON.stringify('https://client.example.com/cb'));
 
-				return addClient(provider, {
+				return addClient({
 					clientId: 'client',
 					clientSecret: 'secret',
 					redirectUris: [
@@ -350,7 +349,7 @@ describe('pairwise features', () => {
 					})
 					.reply(500);
 
-				return addClient(provider, {
+				return addClient({
 					clientId: 'client',
 					clientSecret: 'secret',
 					redirectUris: [
@@ -380,7 +379,7 @@ describe('pairwise features', () => {
 					})
 					.reply(201, JSON.stringify('https://client.example.com/cb'));
 
-				return addClient(provider, {
+				return addClient({
 					clientId: 'client',
 					clientSecret: 'secret',
 					redirectUris: [
@@ -409,7 +408,7 @@ describe('pairwise features', () => {
 		const clients = [];
 
 		beforeAll(() => {
-			return addClient(provider, {
+			return addClient({
 				clientId: 'clientOne',
 				clientSecret: 'secret',
 				redirectUris: ['https://clientone.com/cb'],
@@ -420,7 +419,7 @@ describe('pairwise features', () => {
 		});
 
 		beforeAll(() => {
-			return addClient(provider, {
+			return addClient({
 				clientId: 'clientTwo',
 				clientSecret: 'secret',
 				redirectUris: ['https://clienttwo.com/cb'],
@@ -431,7 +430,7 @@ describe('pairwise features', () => {
 		});
 
 		beforeAll(() => {
-			return addClient(provider, {
+			return addClient({
 				clientId: 'clientThree',
 				clientSecret: 'secret',
 				redirectUris: ['https://clientthree.com/cb']

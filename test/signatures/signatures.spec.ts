@@ -4,7 +4,6 @@ import { describe, it, beforeAll, beforeEach } from 'bun:test';
 import bootstrap, { type Setup } from '../test_helper.js';
 import { decode } from '../../lib/helpers/jwt.ts';
 import epochTime from '../../lib/helpers/epoch_time.ts';
-import { provider } from 'lib/provider.js';
 import { configuration } from 'lib/configs/application.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';

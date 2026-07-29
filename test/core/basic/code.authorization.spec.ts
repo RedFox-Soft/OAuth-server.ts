@@ -19,7 +19,7 @@ import bootstrap, {
 } from '../../test_helper.js';
 import epochTime from '../../../lib/helpers/epoch_time.ts';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
-import { provider } from 'lib/provider.js';
+import { eventBus } from 'lib/event_bus.js';
 // Imported after lib/provider.js on purpose. response_modes reaches the model graph (via the jwt
 // handler -> id_token), so importing it first would start the model/provider import cycle from the
 // wrong end and leave base_token half-initialised. Safe to move once that cycle is gone.
@@ -116,7 +116,7 @@ describe('BASIC code', () => {
 
 			it('ignores unsupported scopes', async function () {
 				const spy = mock();
-				provider.once('authorization_code.saved', spy);
+				eventBus.once('authorization_code.saved', spy);
 				const auth = new AuthorizationRequest({
 					scope: 'openid and unsupported'
 				});
@@ -134,7 +134,7 @@ describe('BASIC code', () => {
 
 				it('ignores the scope offline_access unless prompt consent is present', async function () {
 					const spy = mock();
-					provider.once('authorization_code.saved', spy);
+					eventBus.once('authorization_code.saved', spy);
 					const auth = new AuthorizationRequest({
 						scope: 'openid offline_access'
 					});
@@ -150,7 +150,7 @@ describe('BASIC code', () => {
 
 				it('ignores the scope offline_access unless the client can do refresh_token exchange', async function () {
 					const spy = mock();
-					provider.once('authorization_code.saved', spy);
+					eventBus.once('authorization_code.saved', spy);
 					const auth = new AuthorizationRequest({
 						client_id: 'client-no-refresh',
 						prompt: 'consent',
@@ -174,7 +174,7 @@ describe('BASIC code', () => {
 			it('no account id was resolved and no interactions requested', async function () {
 				addons.override({ interactionPolicy: () => [] });
 				const spy = mock();
-				provider.on('authorization.error', spy);
+				eventBus.on('authorization.error', spy);
 
 				const auth = new AuthorizationRequest({ scope });
 				const { response } = await authRequest(auth);
@@ -194,7 +194,7 @@ describe('BASIC code', () => {
 			it('no scope was resolved and no interactions requested', async function () {
 				addons.override({ interactionPolicy: () => [] });
 				const spy = mock();
-				provider.on('authorization.error', spy);
+				eventBus.on('authorization.error', spy);
 
 				const cookie = await setup.login();
 				const auth = new AuthorizationRequest();
@@ -327,7 +327,7 @@ describe('BASIC code', () => {
 			it('dupe parameters are rejected and ignored in further processing', async function () {
 				// fake a query like this state=foo&state=foo
 				const spy = mock();
-				provider.once('authorization.error', spy);
+				eventBus.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
 					scope: ['openid', 'openid'],
 					state: ['foo', 'foo'],
@@ -358,7 +358,7 @@ describe('BASIC code', () => {
 				// fake a query like this state=foo&state=foo to trigger
 				// a validation error prior to validating response mode
 				const spy = mock();
-				provider.once('authorization.error', spy);
+				eventBus.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
 					scope,
 					state: ['foo', 'bar'],
@@ -387,7 +387,7 @@ describe('BASIC code', () => {
 
 			it('response mode provided twice', async function () {
 				const spy = mock();
-				provider.once('authorization.error', spy);
+				eventBus.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
 					scope,
 					response_mode: ['query', 'query']
@@ -416,7 +416,7 @@ describe('BASIC code', () => {
 
 			it('unregistered scope requested', async function () {
 				const spy = mock();
-				provider.once('authorization.error', spy);
+				eventBus.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
 					client_id: 'client-limited-scope',
 					prompt: 'consent',
@@ -443,7 +443,7 @@ describe('BASIC code', () => {
 			['request', 'request_uri', 'registration'].forEach((param) => {
 				it(`not supported parameter ${param}`, async function () {
 					const spy = mock();
-					provider.once('authorization.error', spy);
+					eventBus.once('authorization.error', spy);
 					const auth = new AuthorizationRequest({
 						response_type,
 						scope,
@@ -473,7 +473,7 @@ describe('BASIC code', () => {
 
 				it('missing mandatory parameter redirect_uri', async function () {
 					const emitSpy = mock();
-					provider.once('authorization.error', emitSpy);
+					eventBus.once('authorization.error', emitSpy);
 					const auth = new AuthorizationRequest({ scope });
 					delete auth.params.redirect_uri;
 
@@ -517,7 +517,7 @@ describe('BASIC code', () => {
 
 				it('missing mandatory parameter redirect_uri', async function () {
 					const emitSpy = mock();
-					provider.once('authorization.error', emitSpy);
+					eventBus.once('authorization.error', emitSpy);
 					const auth = new AuthorizationRequest({ scope });
 					delete auth.params.redirect_uri;
 
@@ -532,7 +532,7 @@ describe('BASIC code', () => {
 
 			it('missing mandatory parameter response_type', async function () {
 				const spy = mock();
-				provider.once('authorization.error', spy);
+				eventBus.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({ scope });
 				delete auth.params.response_type;
 
@@ -555,7 +555,7 @@ describe('BASIC code', () => {
 
 			it('unsupported prompt', async function () {
 				const spy = mock();
-				provider.once('authorization.error', spy);
+				eventBus.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
 					scope,
 					prompt: 'unsupported'
@@ -580,7 +580,7 @@ describe('BASIC code', () => {
 
 			it('supported but not requestable prompt', async function () {
 				const spy = mock();
-				provider.once('authorization.error', spy);
+				eventBus.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
 					scope,
 					prompt: 'unrequestable'
@@ -605,7 +605,7 @@ describe('BASIC code', () => {
 
 			it('bad prompt combination', async function () {
 				const spy = mock();
-				provider.once('authorization.error', spy);
+				eventBus.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
 					scope,
 					prompt: 'none login'
@@ -669,7 +669,7 @@ describe('BASIC code', () => {
 			describe('section-4.1.2.1 RFC6749', () => {
 				it('validates redirect_uri ad acta [regular error]', async function () {
 					const spy = mock();
-					provider.on('authorization.error', spy);
+					eventBus.on('authorization.error', spy);
 					const auth = new AuthorizationRequest({
 						// scope, => 'openid' required when id_token_hint is provided
 						id_token_hint: 'foo',
@@ -702,8 +702,8 @@ describe('BASIC code', () => {
 				it('validates redirect_uri ad acta [server error]', async function () {
 					const authErrorSpy = mock();
 					const serverErrorSpy = mock();
-					provider.once('authorization.error', authErrorSpy);
-					provider.once('server_error', serverErrorSpy);
+					eventBus.once('authorization.error', authErrorSpy);
+					eventBus.once('server_error', serverErrorSpy);
 					spyOn(responseModes, 'has').mockImplementation(() => {
 						throw new Error('foobar');
 					});
@@ -741,7 +741,7 @@ describe('BASIC code', () => {
 
 			it('unsupported response_type', async function () {
 				const spy = mock();
-				provider.once('authorization.error', spy);
+				eventBus.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
 					response_type: 'unsupported',
 					scope
@@ -766,7 +766,7 @@ describe('BASIC code', () => {
 
 			it('invalid max_age (negative)', async function () {
 				const spy = mock();
-				provider.once('authorization.error', spy);
+				eventBus.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
 					scope: 'openid',
 					max_age: -1
@@ -791,7 +791,7 @@ describe('BASIC code', () => {
 
 			it('invalid max_age (MAX_SAFE_INTEGER)', async function () {
 				const spy = mock();
-				provider.once('authorization.error', spy);
+				eventBus.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
 					response_type,
 					scope: 'openid',
@@ -817,7 +817,7 @@ describe('BASIC code', () => {
 
 			it('restricted response_type', async function () {
 				const spy = mock();
-				provider.once('authorization.error', spy);
+				eventBus.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
 					client_id: 'client-without-none',
 					response_type: 'none',
@@ -843,7 +843,7 @@ describe('BASIC code', () => {
 
 			it('unsupported response type validation runs before oidc required params', async function () {
 				const spy = mock();
-				provider.once('authorization.error', spy);
+				eventBus.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
 					response_type: 'id_token token',
 					nonce: undefined,
@@ -869,7 +869,7 @@ describe('BASIC code', () => {
 
 			it('redirect_uri mismatch', async function () {
 				const emitSpy = mock();
-				provider.once('authorization.error', emitSpy);
+				eventBus.once('authorization.error', emitSpy);
 				const auth = new AuthorizationRequest({
 					scope,
 					redirect_uri: 'https://client.example.com/cb/not/registered'
@@ -892,7 +892,7 @@ describe('BASIC code', () => {
 
 			it('login state specific malformed id_token_hint', async function () {
 				const spy = mock();
-				provider.once('authorization.error', spy);
+				eventBus.once('authorization.error', spy);
 				const cookie = await setup.login();
 				const auth = new AuthorizationRequest({
 					scope,

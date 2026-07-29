@@ -16,7 +16,7 @@ import base64url from 'base64url';
 
 import bootstrap, { agent, getHeader, type Setup } from '../test_helper.js';
 import { getUserStore } from 'lib/adapters/index.js';
-import { provider } from 'lib/provider.js';
+import { eventBus } from 'lib/event_bus.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
@@ -38,7 +38,7 @@ describe('grant_type=refresh_token', () => {
 	});
 
 	afterEach(() => {
-		provider.removeAllListeners();
+		eventBus.removeAllListeners();
 		setSystemTime();
 		mock.restore();
 	});
@@ -77,7 +77,7 @@ describe('grant_type=refresh_token', () => {
 
 	it('returns the right stuff', async function () {
 		const spy = mock();
-		provider.on('grant.success', spy);
+		eventBus.on('grant.success', spy);
 
 		const { data, status } = await agent.token.post(
 			{
@@ -144,7 +144,7 @@ describe('grant_type=refresh_token', () => {
 		it('validates the refresh token is not expired', async function () {
 			setSystemTime(Date.now() + 10 * 1000);
 			const spy = mock();
-			provider.on('grant.error', spy);
+			eventBus.on('grant.error', spy);
 
 			const { error } = await agent.token.post(
 				{
@@ -167,7 +167,7 @@ describe('grant_type=refresh_token', () => {
 
 		it('validates that token belongs to client', async function () {
 			const spy = mock();
-			provider.on('grant.error', spy);
+			eventBus.on('grant.error', spy);
 
 			const { error } = await agent.token.post(
 				{
@@ -228,8 +228,8 @@ describe('grant_type=refresh_token', () => {
 
 		it('scopes can get slimmer (1/2) - no openid scope, ID Token is not issued', async function () {
 			const spy = mock();
-			provider.on('access_token.saved', spy);
-			provider.on('access_token.issued', spy);
+			eventBus.on('access_token.saved', spy);
+			eventBus.on('access_token.issued', spy);
 
 			const { data, status } = await agent.token.post(
 				{
@@ -253,8 +253,8 @@ describe('grant_type=refresh_token', () => {
 
 		it('scopes can get slimmer (2/2) - openid scope is present, ID Token is issued', async function () {
 			const spy = mock();
-			provider.on('access_token.saved', spy);
-			provider.on('access_token.issued', spy);
+			eventBus.on('access_token.saved', spy);
+			eventBus.on('access_token.issued', spy);
 
 			const { data, status } = await agent.token.post(
 				{
@@ -285,7 +285,7 @@ describe('grant_type=refresh_token', () => {
 			await getUserStore('redfox').destroy(setup.getAccountId());
 
 			const spy = mock();
-			provider.on('grant.error', spy);
+			eventBus.on('grant.error', spy);
 
 			const { error } = await agent.token.post(
 				{
@@ -328,7 +328,7 @@ describe('grant_type=refresh_token', () => {
 
 	it('code being "found"', async function () {
 		const spy = mock();
-		provider.on('grant.error', spy);
+		eventBus.on('grant.error', spy);
 
 		const { error } = await agent.token.post(
 			{
@@ -403,8 +403,8 @@ describe('grant_type=refresh_token', () => {
 		it('issues a new refresh token and consumes the old one', async function () {
 			const consumeSpy = mock();
 			const issueSpy = mock();
-			provider.on('refresh_token.consumed', consumeSpy);
-			provider.on('refresh_token.saved', issueSpy);
+			eventBus.on('refresh_token.consumed', consumeSpy);
+			eventBus.on('refresh_token.saved', issueSpy);
 
 			const { data, status } = await agent.token.post(
 				{
@@ -438,10 +438,10 @@ describe('grant_type=refresh_token', () => {
 		it('the new refresh token has identical scope to the old one', async function () {
 			const consumeSpy = mock();
 			const issueSpy = mock();
-			provider.on('refresh_token.consumed', consumeSpy);
-			provider.on('refresh_token.saved', issueSpy);
-			provider.on('access_token.saved', issueSpy);
-			provider.on('access_token.issued', issueSpy);
+			eventBus.on('refresh_token.consumed', consumeSpy);
+			eventBus.on('refresh_token.saved', issueSpy);
+			eventBus.on('access_token.saved', issueSpy);
+			eventBus.on('access_token.issued', issueSpy);
 
 			const { status } = await agent.token.post(
 				{
@@ -468,10 +468,10 @@ describe('grant_type=refresh_token', () => {
 		it('the new refresh token has identical scope to the old one even if the access token is requested with less scopes', async function () {
 			const consumeSpy = mock();
 			const issueSpy = mock();
-			provider.on('refresh_token.consumed', consumeSpy);
-			provider.on('refresh_token.saved', issueSpy);
-			provider.on('access_token.saved', issueSpy);
-			provider.on('access_token.issued', issueSpy);
+			eventBus.on('refresh_token.consumed', consumeSpy);
+			eventBus.on('refresh_token.saved', issueSpy);
+			eventBus.on('access_token.saved', issueSpy);
+			eventBus.on('access_token.issued', issueSpy);
 
 			const { status } = await agent.token.post(
 				{
@@ -503,8 +503,8 @@ describe('grant_type=refresh_token', () => {
 		it('revokes the complete grant if the old token is used again', async function () {
 			const grantRevokeSpy = mock();
 			const tokenDestroySpy = mock();
-			provider.on('grant.revoked', grantRevokeSpy);
-			provider.on('refresh_token.destroyed', tokenDestroySpy);
+			eventBus.on('grant.revoked', grantRevokeSpy);
+			eventBus.on('refresh_token.destroyed', tokenDestroySpy);
 
 			await agent.token.post(
 				{
@@ -585,8 +585,8 @@ describe('grant_type=refresh_token', () => {
 		it('issues a new refresh token and consumes the old one', async function () {
 			const consumeSpy = mock();
 			const issueSpy = mock();
-			provider.on('refresh_token.consumed', consumeSpy);
-			provider.on('refresh_token.saved', issueSpy);
+			eventBus.on('refresh_token.consumed', consumeSpy);
+			eventBus.on('refresh_token.saved', issueSpy);
 
 			const { data, status } = await agent.token.post(
 				{
@@ -620,8 +620,8 @@ describe('grant_type=refresh_token', () => {
 		it('the new refresh token has identical scope to the old one', async function () {
 			const consumeSpy = mock();
 			const issueSpy = mock();
-			provider.on('refresh_token.consumed', consumeSpy);
-			provider.on('refresh_token.saved', issueSpy);
+			eventBus.on('refresh_token.consumed', consumeSpy);
+			eventBus.on('refresh_token.saved', issueSpy);
 
 			const { status } = await agent.token.post(
 				{
@@ -648,10 +648,10 @@ describe('grant_type=refresh_token', () => {
 		it('the new refresh token has identical scope to the old one even if the access token is requested with less scopes', async function () {
 			const consumeSpy = mock();
 			const issueSpy = mock();
-			provider.on('refresh_token.consumed', consumeSpy);
-			provider.on('refresh_token.saved', issueSpy);
-			provider.on('access_token.saved', issueSpy);
-			provider.on('access_token.issued', issueSpy);
+			eventBus.on('refresh_token.consumed', consumeSpy);
+			eventBus.on('refresh_token.saved', issueSpy);
+			eventBus.on('access_token.saved', issueSpy);
+			eventBus.on('access_token.issued', issueSpy);
 
 			const { status } = await agent.token.post(
 				{
@@ -683,8 +683,8 @@ describe('grant_type=refresh_token', () => {
 		it('revokes the complete grant if the old token is used again', async function () {
 			const grantRevokeSpy = mock();
 			const tokenDestroySpy = mock();
-			provider.on('grant.revoked', grantRevokeSpy);
-			provider.on('refresh_token.destroyed', tokenDestroySpy);
+			eventBus.on('grant.revoked', grantRevokeSpy);
+			eventBus.on('refresh_token.destroyed', tokenDestroySpy);
 
 			await agent.token.post(
 				{

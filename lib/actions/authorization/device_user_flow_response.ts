@@ -1,6 +1,7 @@
 import combinedScope from '../../helpers/combined_scope.ts';
 import { deviceSuccessPage } from '../../html/device.js';
 import { expiresWithSession } from '../../addon/index.js';
+import { eventBus } from '../../event_bus.js';
 
 export default async function deviceVerificationResponse(oidc) {
 	const code = oidc.deviceCode;
@@ -51,7 +52,7 @@ export default async function deviceVerificationResponse(oidc) {
 
 	await code.save();
 
-	oidc.provider.emit('authorization.success', { oidc });
+	eventBus.emit('authorization.success', { oidc });
 
 	return deviceSuccessPage({ client: oidc.client });
 }

@@ -10,7 +10,6 @@ import epochTime from '../../helpers/epoch_time.ts';
 import certificateThumbprint from '../../helpers/certificate_thumbprint.ts';
 import { InvalidClientMetadata } from '../../helpers/errors.ts';
 import { isPlainObject } from '../../helpers/_/object.js';
-import { provider } from '../../provider.js';
 import {
 	clientAuthSigningAlgValues,
 	requestObjectEncryptionAlgValues,
@@ -124,8 +123,6 @@ function deriveEncryptionKey(secret, length) {
 export class ClientKeyStore extends KeyStore {
 	#client;
 
-	#provider = provider;
-
 	constructor(clientInstance) {
 		super();
 
@@ -134,10 +131,6 @@ export class ClientKeyStore extends KeyStore {
 
 	get client() {
 		return this.#client;
-	}
-
-	get provider() {
-		return this.#provider;
 	}
 
 	get jwksUri() {

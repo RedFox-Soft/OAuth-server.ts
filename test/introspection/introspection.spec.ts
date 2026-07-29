@@ -10,7 +10,7 @@ import {
 
 import bootstrap, { agent, getHeader, type Setup } from '../test_helper.js';
 import { ISSUER } from 'lib/configs/env.js';
-import { provider } from 'lib/provider.js';
+import { eventBus } from 'lib/event_bus.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
@@ -390,7 +390,7 @@ describe('introspection features', () => {
 
 		it('emits on (i.e. auth) error', async function () {
 			const spy = mock();
-			provider.once('introspection.error', spy);
+			eventBus.once('introspection.error', spy);
 
 			const { status } = await agent.token.introspect.post(
 				{ token: 'invalid' },

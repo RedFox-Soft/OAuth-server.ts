@@ -3,7 +3,7 @@ import { Value } from '@sinclair/typebox/value';
 import snakeCase from '../helpers/_/snake_case.js';
 import epochTime from '../helpers/epoch_time.js';
 import { Opaque } from './formats/opaque.js';
-import { provider } from 'lib/provider.js';
+import { eventBus } from 'lib/event_bus.js';
 import { adapter } from 'lib/adapters/index.js';
 import { InvalidToken } from 'lib/helpers/errors.js';
 
@@ -130,7 +130,7 @@ export class BaseModel<
 
 	emit(eventName: string) {
 		const kind = this.constructor.name;
-		provider.emit(`${snakeCase(kind)}.${eventName}`, this);
+		eventBus.emit(`${snakeCase(kind)}.${eventName}`, this);
 	}
 
 	/*

@@ -12,7 +12,6 @@ import {
 
 import bootstrap, { agent, getHeader, type Setup } from '../test_helper.js';
 import { decode as decodeJWT } from '../../lib/helpers/jwt.ts';
-import { provider } from 'lib/provider.js';
 import { Client } from 'lib/models/client.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';

@@ -10,7 +10,7 @@ import bootstrap, {
 	jsonToFormUrlEncoded,
 	type Setup
 } from '../test_helper.js';
-import { provider } from 'lib/provider.js';
+import { eventBus } from 'lib/event_bus.js';
 import { Client } from 'lib/models/client.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { ISSUER } from 'lib/configs/env.js';
@@ -203,11 +203,11 @@ describe('request parameter features', () => {
 		describe(`${route} ${verb} passing request parameters as JWTs`, () => {
 			it('does not use anything from the OAuth 2.0 parameters', async function () {
 				const spy = mock();
-				provider.once('authorization.success', spy);
+				eventBus.once('authorization.success', spy);
 
 				if (route === '/device/auth') {
-					provider.once('device_authorization.success', ({ oidc }) => {
-						provider.emit('authorization.success', {
+					eventBus.once('device_authorization.success', ({ oidc }) => {
+						eventBus.emit('authorization.success', {
 							oidc: { params: oidc.entities.DeviceCode.payload.params }
 						});
 					});
@@ -229,7 +229,7 @@ describe('request parameter features', () => {
 
 			it('can contain max_age parameter as a number and it (and other params too) will be forced as string', async function () {
 				const spy = mock();
-				provider.once(successEvt, spy);
+				eventBus.once(successEvt, spy);
 
 				await authorizationRequest('client', {
 					jwtPayload: {
@@ -249,7 +249,7 @@ describe('request parameter features', () => {
 
 			it('can contain params as array and have them handled as dupes', async function () {
 				const spy = mock();
-				provider.once(errorEvt, spy);
+				eventBus.once(errorEvt, spy);
 
 				await authorizationRequest('client', {
 					jwtPayload: {
@@ -268,7 +268,7 @@ describe('request parameter features', () => {
 
 			it('can contain claims parameter as JSON', async function () {
 				const spy = mock();
-				provider.once(successEvt, spy);
+				eventBus.once(successEvt, spy);
 				const claims = JSON.stringify({ id_token: { email: null } });
 
 				await authorizationRequest('client', {
@@ -289,7 +289,7 @@ describe('request parameter features', () => {
 
 			it('can contain claims parameter as object', async function () {
 				const spy = mock();
-				provider.once(successEvt, spy);
+				eventBus.once(successEvt, spy);
 				const claims = { id_token: { email: null } };
 
 				await authorizationRequest('client', {
@@ -349,7 +349,7 @@ describe('request parameter features', () => {
 				key = await importJWK(key);
 
 				const spy = mock();
-				provider.once(errorEvt, spy);
+				eventBus.once(errorEvt, spy);
 
 				await authorizationRequest('client-with-HS-sig-expired', {
 					jwtPayload: {
@@ -376,7 +376,7 @@ describe('request parameter features', () => {
 
 			it('doesnt allow request inception', async function () {
 				const spy = mock();
-				provider.once(errorEvt, spy);
+				eventBus.once(errorEvt, spy);
 
 				await authorizationRequest('client', {
 					jwtPayload: {
@@ -396,7 +396,7 @@ describe('request parameter features', () => {
 
 			it('doesnt allow requestUri inception', async function () {
 				const spy = mock();
-				provider.once(errorEvt, spy);
+				eventBus.once(errorEvt, spy);
 
 				await authorizationRequest('client', {
 					jwtPayload: {
@@ -430,7 +430,7 @@ describe('request parameter features', () => {
 
 				it('checks the response mode from the request', async function () {
 					const spy = mock();
-					provider.once(errorEvt, spy);
+					eventBus.once(errorEvt, spy);
 
 					await authorizationRequest('client', {
 						jwtPayload: {
@@ -458,7 +458,7 @@ describe('request parameter features', () => {
 
 				it('doesnt allow response_type to differ', async function () {
 					const spy = mock();
-					provider.once(errorEvt, spy);
+					eventBus.once(errorEvt, spy);
 
 					await authorizationRequest('client', {
 						jwtPayload: {
@@ -486,7 +486,7 @@ describe('request parameter features', () => {
 
 				it('uses the state from the request even if its validations will fail', async function () {
 					const spy = mock();
-					provider.once(errorEvt, spy);
+					eventBus.once(errorEvt, spy);
 
 					const { response } = await authorizationRequest('client', {
 						jwtPayload: {
@@ -518,7 +518,7 @@ describe('request parameter features', () => {
 
 			it('doesnt allow client_id to differ', async function () {
 				const spy = mock();
-				provider.once(errorEvt, spy);
+				eventBus.once(errorEvt, spy);
 
 				await authorizationRequest('client', {
 					jwtPayload: {
@@ -546,7 +546,7 @@ describe('request parameter features', () => {
 
 			it('handles invalid signed looklike jwts', async function () {
 				const spy = mock();
-				provider.once(errorEvt, spy);
+				eventBus.once(errorEvt, spy);
 
 				await authorizationRequest('client', {
 					payload: {
@@ -570,7 +570,7 @@ describe('request parameter features', () => {
 
 			it('doesnt allow clients with predefined alg to bypass this alg', async function () {
 				const spy = mock();
-				provider.once(errorEvt, spy);
+				eventBus.once(errorEvt, spy);
 
 				await authorizationRequest('client-with-HS-sig', {
 					payload: {
@@ -594,7 +594,7 @@ describe('request parameter features', () => {
 
 			it('unsupported algs must not be used', async function () {
 				const spy = mock();
-				provider.once(errorEvt, spy);
+				eventBus.once(errorEvt, spy);
 
 				await authorizationRequest('client', {
 					payload: {
@@ -619,7 +619,7 @@ describe('request parameter features', () => {
 
 			it('bad signatures will be rejected', async function () {
 				const spy = mock();
-				provider.once(errorEvt, spy);
+				eventBus.once(errorEvt, spy);
 
 				await authorizationRequest('client', {
 					payload: {
@@ -643,7 +643,7 @@ describe('request parameter features', () => {
 
 			it('rejects "registration" parameter part of the Request Object', async function () {
 				const spy = mock();
-				provider.once(errorEvt, spy);
+				eventBus.once(errorEvt, spy);
 
 				await authorizationRequest('client', {
 					jwtPayload: {
@@ -663,7 +663,7 @@ describe('request parameter features', () => {
 
 			it('handles unrecognized parameters', async function () {
 				const spy = mock();
-				provider.once(errorEvt, spy);
+				eventBus.once(errorEvt, spy);
 				const client = await Client.find('client-with-HS-sig');
 				let [key] = client.symmetricKeyStore.selectForSign({ alg: 'HS256' });
 				key = await importJWK(key);

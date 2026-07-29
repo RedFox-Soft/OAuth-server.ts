@@ -1,4 +1,4 @@
-import { provider } from 'lib/provider.js';
+import { eventBus } from 'lib/event_bus.js';
 import { responseModes } from 'lib/response_modes/index.js';
 import { OIDCProviderError } from '../helpers/errors.ts';
 import { getErrorHtmlResponse } from '../html/error.tsx';
@@ -99,10 +99,10 @@ export async function errorHandler(obj: ErrorContext) {
 	const { set, route, code, request } = obj;
 	let { error } = obj;
 	if (set.status === 500) {
-		provider.emit('server_error', error);
+		eventBus.emit('server_error', error);
 	} else {
 		const key = mapErrorCode[route] ?? 'server_error';
-		provider.emit(key, error);
+		eventBus.emit(key, error);
 	}
 
 	if (route === routeNames.authorization && error.allow_redirect !== false) {
@@ -112,9 +112,9 @@ export async function errorHandler(obj: ErrorContext) {
 			if (e instanceof OIDCProviderError) {
 				error = e;
 				const key = mapErrorCode[route] ?? 'server_error';
-				provider.emit(key, error);
+				eventBus.emit(key, error);
 			} else {
-				provider.emit('server_error', e);
+				eventBus.emit('server_error', e);
 			}
 		}
 	}

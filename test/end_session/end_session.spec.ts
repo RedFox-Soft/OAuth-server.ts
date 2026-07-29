@@ -14,7 +14,7 @@ import { parse as parseUrl } from 'node:url';
 import bootstrap, { agent, getHeader, type Setup } from '../test_helper.js';
 import * as JWT from '../../lib/helpers/jwt.js';
 import { ISSUER } from 'lib/configs/env.js';
-import { provider } from 'lib/provider.js';
+import { eventBus } from 'lib/event_bus.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
 import { Client } from 'lib/models/client.js';
@@ -170,7 +170,7 @@ describe('logout endpoint', () => {
 				};
 
 				const spy = mock();
-				provider.once('end_session.error', spy);
+				eventBus.once('end_session.error', spy);
 				const { status } = await agent.logout.get({
 					query,
 					headers: {
@@ -199,7 +199,7 @@ describe('logout endpoint', () => {
 				};
 
 				const spy = mock();
-				provider.once('end_session.error', spy);
+				eventBus.once('end_session.error', spy);
 
 				const { status } = await agent.logout.get({
 					query,
@@ -243,7 +243,7 @@ describe('logout endpoint', () => {
 					};
 
 					const spy = mock();
-					provider.once('end_session.error', spy);
+					eventBus.once('end_session.error', spy);
 
 					const { status } = await agent.logout.get({
 						query,
@@ -346,7 +346,7 @@ describe('logout endpoint', () => {
 
 		it('validates post_logout_redirect_uri allowed on client', async function () {
 			const spy = mock();
-			provider.once('end_session.error', spy);
+			eventBus.once('end_session.error', spy);
 			const query = {
 				id_token_hint: idToken,
 				post_logout_redirect_uri: 'https://client.example.com/callback/logout'
@@ -373,7 +373,7 @@ describe('logout endpoint', () => {
 
 		it('rejects invalid JWTs', async function () {
 			const spy = mock();
-			provider.once('end_session.error', spy);
+			eventBus.once('end_session.error', spy);
 			const query = {
 				id_token_hint: 'not.a.jwt'
 			};
@@ -399,7 +399,7 @@ describe('logout endpoint', () => {
 
 		it('rejects JWTs with unrecognized client', async function () {
 			const spy = mock();
-			provider.once('end_session.error', spy);
+			eventBus.once('end_session.error', spy);
 			const query = {
 				id_token_hint: await JWT.sign(
 					{
@@ -432,7 +432,7 @@ describe('logout endpoint', () => {
 
 		it('rejects JWTs with bad signatures', async function () {
 			const spy = mock();
-			provider.once('end_session.error', spy);
+			eventBus.once('end_session.error', spy);
 			const query = {
 				id_token_hint: await JWT.sign(
 					{
@@ -481,7 +481,7 @@ describe('logout endpoint', () => {
 
 			it('checks session.state.secret (xsrf is right)', async function () {
 				const spy = mock();
-				provider.once('end_session_confirm.error', spy);
+				eventBus.once('end_session_confirm.error', spy);
 				setup.getSession().state = { secret: '123' };
 
 				const { status } = await agent.logout.confirm.post(

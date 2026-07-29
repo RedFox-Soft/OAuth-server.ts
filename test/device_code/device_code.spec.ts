@@ -1,7 +1,6 @@
 import { describe, it, beforeAll, afterAll, expect } from 'bun:test';
 
 import bootstrap, { agent } from '../test_helper.js';
-import { provider } from 'lib/provider.js';
 import {
 	ApplicationConfig,
 	reloadConfiguration

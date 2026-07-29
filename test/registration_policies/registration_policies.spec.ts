@@ -13,7 +13,7 @@ import {
 } from 'bun:test';
 
 import bootstrap, { agent, type Setup } from '../test_helper.js';
-import provider, { errors } from '../../lib/index.ts';
+import { eventBus, errors } from '../../lib/index.ts';
 import { validateConfiguration } from 'lib/configs/configuration.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { InitialAccessToken } from 'lib/models/initial_access_token.js';
@@ -32,8 +32,8 @@ describe('client registration policies', () => {
 	});
 	beforeEach(() => mock.restore());
 	afterEach(() => {
-		provider.removeAllListeners('initial_access_token.saved');
-		provider.removeAllListeners('registration_access_token.saved');
+		eventBus.removeAllListeners('initial_access_token.saved');
+		eventBus.removeAllListeners('registration_access_token.saved');
 	});
 
 	describe('configuration', () => {
@@ -55,7 +55,7 @@ describe('client registration policies', () => {
 	describe('Registration & InitialAccessToken', () => {
 		it('allows policies to run to be stored on an InitialAccessToken', async () => {
 			const spy = mock();
-			provider.once('initial_access_token.saved', spy);
+			eventBus.once('initial_access_token.saved', spy);
 			const value = await new InitialAccessToken({
 				policies: ['empty-policy']
 			}).save();
@@ -176,7 +176,7 @@ describe('client registration policies', () => {
 			}).save();
 
 			const spy = mock();
-			provider.once('registration_access_token.saved', spy);
+			eventBus.once('registration_access_token.saved', spy);
 
 			const res = await agent.reg.post(
 				{ redirect_uris: ['https://rp.example.com/cb'] },
@@ -206,7 +206,7 @@ describe('client registration policies', () => {
 			}).save();
 
 			const spy = mock();
-			provider.once('registration_access_token.saved', spy);
+			eventBus.once('registration_access_token.saved', spy);
 
 			const res = await agent.reg.post(
 				{ redirect_uris: ['https://rp.example.com/cb'] },
@@ -452,7 +452,7 @@ describe('client registration policies', () => {
 				);
 
 				const spy = mock();
-				provider.once('registration_access_token.saved', spy);
+				eventBus.once('registration_access_token.saved', spy);
 
 				const res = await agent
 					.reg({ clientId })

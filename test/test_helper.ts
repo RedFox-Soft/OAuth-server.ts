@@ -9,7 +9,7 @@ import { treaty } from '@elysiajs/eden';
 
 import nanoid from '../lib/helpers/nanoid.js';
 import epochTime from '../lib/helpers/epoch_time.js';
-import { provider, elysia } from '../lib/index.ts';
+import { elysia } from '../lib/index.ts';
 import { adapter, getUserStore, jwksStore } from '../lib/adapters/index.ts';
 import { reloadJWKSKeys } from '../lib/configs/keys.ts';
 import { verifyJWKs, type UnnormalizedJWK } from '../lib/configs/verifyJWKs.ts';

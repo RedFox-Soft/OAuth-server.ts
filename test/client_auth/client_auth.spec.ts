@@ -13,7 +13,7 @@ import {
 } from 'bun:test';
 
 import nanoid from '../../lib/helpers/nanoid.ts';
-import provider from '../../lib/index.ts';
+import { eventBus } from '../../lib/index.ts';
 import bootstrap, { agent } from '../test_helper.js';
 import {
 	mock as mockHttp,
@@ -89,7 +89,7 @@ describe('client authentication options', () => {
 
 		it('rejects the "auth" if secret was also provided', async function () {
 			const spy = mock();
-			provider.once('grant.error', spy);
+			eventBus.once('grant.error', spy);
 			const { status, error } = await agent.token.post({
 				grant_type: 'client_credentials',
 				client_id: 'client-none',
@@ -283,7 +283,7 @@ describe('client authentication options', () => {
 
 		it('rejects invalid secrets', async function () {
 			const spy = mock();
-			provider.once('grant.error', spy);
+			eventBus.once('grant.error', spy);
 
 			const { error } = await agent.token.post(
 				{
@@ -415,7 +415,7 @@ describe('client authentication options', () => {
 
 		it('rejects invalid secrets', async function () {
 			const spy = mock();
-			provider.once('grant.error', spy);
+			eventBus.once('grant.error', spy);
 
 			const { error } = await agent.token.post({
 				grant_type: 'client_credentials',
@@ -435,7 +435,7 @@ describe('client authentication options', () => {
 
 		it('requires the client_secret to be sent', async function () {
 			const spy = mock();
-			provider.once('grant.error', spy);
+			eventBus.once('grant.error', spy);
 
 			const { error } = await agent.token.post({
 				grant_type: 'client_credentials',
@@ -609,7 +609,7 @@ describe('client authentication options', () => {
 
 		it('rejects the auth if this is actually a none-client', async function () {
 			const spy = mock();
-			provider.once('grant.error', spy);
+			eventBus.once('grant.error', spy);
 
 			const assertion = await JWT.sign(
 				{
@@ -723,7 +723,7 @@ describe('client authentication options', () => {
 
 		it('exp must be set', async function () {
 			const spy = mock();
-			provider.once('grant.error', spy);
+			eventBus.once('grant.error', spy);
 
 			const assertion = await JWT.sign(
 				{
@@ -760,7 +760,7 @@ describe('client authentication options', () => {
 
 		it('aud must be set', async function () {
 			const spy = mock();
-			provider.once('grant.error', spy);
+			eventBus.once('grant.error', spy);
 			const assertion = await JWT.sign(
 				{
 					jti: nanoid(),
@@ -794,7 +794,7 @@ describe('client authentication options', () => {
 
 		it('jti must be set', async function () {
 			const spy = mock();
-			provider.once('grant.error', spy);
+			eventBus.once('grant.error', spy);
 			const assertion = await JWT.sign(
 				{
 					// jti: nanoid(),
@@ -829,7 +829,7 @@ describe('client authentication options', () => {
 
 		it('iss must be set', async function () {
 			const spy = mock();
-			provider.once('grant.error', spy);
+			eventBus.once('grant.error', spy);
 
 			const assertion = await JWT.sign(
 				{
@@ -865,7 +865,7 @@ describe('client authentication options', () => {
 
 		it('sub must be set', async function () {
 			const spy = mock();
-			provider.once('grant.error', spy);
+			eventBus.once('grant.error', spy);
 
 			const assertion = await JWT.sign(
 				{
@@ -901,7 +901,7 @@ describe('client authentication options', () => {
 
 		it('iss must be the client id', async function () {
 			const spy = mock();
-			provider.once('grant.error', spy);
+			eventBus.once('grant.error', spy);
 
 			const assertion = await JWT.sign(
 				{
@@ -1035,7 +1035,7 @@ describe('client authentication options', () => {
 
 		it('rejects valid format and signature but expired/invalid jwts', async function () {
 			const spy = mock();
-			provider.once('grant.error', spy);
+			eventBus.once('grant.error', spy);
 			const assertion = await JWT.sign(
 				{
 					jti: nanoid(),
@@ -1104,7 +1104,7 @@ describe('client authentication options', () => {
 		describe('JTI uniqueness', () => {
 			it('reused jtis must be rejected', async function () {
 				const spy = mock();
-				provider.once('grant.error', spy);
+				eventBus.once('grant.error', spy);
 				const assertion = await JWT.sign(
 					{
 						jti: nanoid(),
@@ -1158,7 +1158,7 @@ describe('client authentication options', () => {
 
 			it('rejects signatures with different algorithm', async function () {
 				const spy = mock();
-				provider.once('grant.error', spy);
+				eventBus.once('grant.error', spy);
 
 				const assertion = await JWT.sign(
 					{

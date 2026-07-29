@@ -17,7 +17,7 @@ import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import sessionHandler from '../shared/session.ts';
 import { logoutSuccess } from '../html/logoutSuccess.tsx';
 import { logout } from '../html/logout.tsx';
-import { provider } from '../provider.js';
+import { eventBus } from '../event_bus.js';
 import {
 	OAuthError,
 	RedirectOrHtmlResponse
@@ -162,7 +162,7 @@ export const logoutConfirmAction = new Elysia()
 								back.push(
 									client.backchannelLogout(accountId, sid).then(
 										() => {
-											oidc.provider.emit(
+											eventBus.emit(
 												'backchannel.success',
 												{ oidc },
 												client,
@@ -171,7 +171,7 @@ export const logoutConfirmAction = new Elysia()
 											);
 										},
 										(err) => {
-											oidc.provider.emit(
+											eventBus.emit(
 												'backchannel.error',
 												{ oidc },
 												err,
@@ -222,7 +222,7 @@ export const logoutConfirmAction = new Elysia()
 					!session.authorizationFor(state.clientId).persistsLogout
 				) {
 					await revoke(oidc, grantId);
-					provider.emit('grant.revoked', { oidc }, grantId);
+					eventBus.emit('grant.revoked', { oidc }, grantId);
 				}
 				session.payload.state = undefined;
 				if (session.payload.authorizations) {
@@ -231,7 +231,7 @@ export const logoutConfirmAction = new Elysia()
 				session.resetIdentifier();
 			}
 
-			provider.emit('end_session.success', { oidc });
+			eventBus.emit('end_session.success', { oidc });
 			await setCookies();
 
 			const usePostLogoutUri = state.postLogoutRedirectUri;

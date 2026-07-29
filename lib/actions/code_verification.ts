@@ -27,6 +27,7 @@ import deviceVerificationResponse from './authorization/device_user_flow_respons
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { Client } from 'lib/models/client.js';
+import { eventBus } from '../event_bus.js';
 
 // Renders (or re-renders) the user-code input page for an error. ReRenderErrors (bad/missing/
 // expired/used code, aborted interaction) are ordinary re-renders and do NOT emit an error event;
@@ -39,7 +40,7 @@ function renderInputError(oidc, err) {
 	const action = oidc.urlFor('code_verification');
 
 	if (!(err instanceof ReRenderError)) {
-		oidc.provider.emit('code_verification.error', err, oidc);
+		eventBus.emit('code_verification.error', err, oidc);
 	}
 
 	return deviceInputPage({ action, secret, charset, err });

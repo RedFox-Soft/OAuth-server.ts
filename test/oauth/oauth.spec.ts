@@ -18,7 +18,7 @@ import bootstrap, {
 	type Setup
 } from '../test_helper.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
-import { provider } from 'lib/provider.js';
+import { eventBus } from 'lib/event_bus.js';
 import { Client } from 'lib/models/client.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
@@ -48,7 +48,7 @@ describe('requests without the openid scope', () => {
 	});
 
 	afterEach(function () {
-		provider.removeAllListeners();
+		eventBus.removeAllListeners();
 		mock.restore();
 	});
 
@@ -139,7 +139,7 @@ describe('requests without the openid scope', () => {
 					const auth = new AuthorizationRequest({ scope });
 
 					const spy = mock();
-					provider.on('authorization_code.saved', spy);
+					eventBus.on('authorization_code.saved', spy);
 
 					const { response } = await getAuth(auth, cookie);
 
@@ -166,8 +166,8 @@ describe('requests without the openid scope', () => {
 
 					it('gets an access token', async function () {
 						const spy = mock();
-						provider.on('access_token.saved', spy);
-						provider.on('access_token.issued', spy);
+						eventBus.on('access_token.saved', spy);
+						eventBus.on('access_token.issued', spy);
 
 						const { data, status } = await auth.getToken(code);
 						expect(status).toBe(200);
@@ -189,9 +189,9 @@ describe('requests without the openid scope', () => {
 						});
 
 						const spy = mock();
-						provider.on('access_token.saved', spy);
-						provider.on('access_token.issued', spy);
-						provider.on('refresh_token.saved', spy);
+						eventBus.on('access_token.saved', spy);
+						eventBus.on('access_token.issued', spy);
+						eventBus.on('refresh_token.saved', spy);
 
 						const { data, status } = await auth.getToken(code);
 						expect(status).toBe(200);
@@ -240,9 +240,9 @@ describe('requests without the openid scope', () => {
 
 					it('gets an access token and a refresh token', async function () {
 						const spy = mock();
-						provider.on('access_token.saved', spy);
-						provider.on('access_token.issued', spy);
-						provider.on('refresh_token.saved', spy);
+						eventBus.on('access_token.saved', spy);
+						eventBus.on('access_token.issued', spy);
+						eventBus.on('refresh_token.saved', spy);
 
 						const { data, status } = await agent.token.post({
 							client_id: 'client',
@@ -275,7 +275,7 @@ describe('requests without the openid scope', () => {
 					});
 
 					const spy = mock();
-					provider.on('authorization.success', spy);
+					eventBus.on('authorization.success', spy);
 
 					const { response } = await getAuth(auth, cookie);
 
@@ -299,7 +299,7 @@ describe('requests without the openid scope', () => {
 
 			it('accepts the device authorization request', async function () {
 				const spy = mock();
-				provider.on('device_code.saved', spy);
+				eventBus.on('device_code.saved', spy);
 
 				const { status } = await agent.device.auth.post(
 					jsonToFormUrlEncoded({
@@ -331,7 +331,7 @@ describe('requests without the openid scope', () => {
 				let jti;
 				let code;
 				beforeEach(async function () {
-					provider.on('device_code.saved', (token) => {
+					eventBus.on('device_code.saved', (token) => {
 						jti = token.jti;
 					});
 
@@ -370,8 +370,8 @@ describe('requests without the openid scope', () => {
 				// `at.payload.scope` / `at.payload.claims` (mirror authorization_code.ts).
 				it('gets an access token', async function () {
 					const spy = mock();
-					provider.on('access_token.saved', spy);
-					provider.on('access_token.issued', spy);
+					eventBus.on('access_token.saved', spy);
+					eventBus.on('access_token.issued', spy);
 
 					const { data, status } = await agent.token.post({
 						client_id: 'client',
@@ -393,9 +393,9 @@ describe('requests without the openid scope', () => {
 				it('gets an access and a refresh_token', async function () {
 					const refreshScope = `${scope || ''} offline_access`.trim();
 					const spy = mock();
-					provider.on('access_token.saved', spy);
-					provider.on('access_token.issued', spy);
-					provider.on('refresh_token.saved', spy);
+					eventBus.on('access_token.saved', spy);
+					eventBus.on('access_token.issued', spy);
+					eventBus.on('refresh_token.saved', spy);
 
 					TestAdapter.for('DeviceCode').syncUpdate(jti, {
 						scope: refreshScope

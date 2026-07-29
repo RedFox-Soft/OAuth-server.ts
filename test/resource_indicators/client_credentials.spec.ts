@@ -9,7 +9,7 @@ import {
 } from 'bun:test';
 
 import bootstrap, { agent } from '../test_helper.js';
-import { provider } from 'lib/provider.js';
+import { eventBus } from 'lib/event_bus.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 
@@ -25,7 +25,7 @@ describe('grant_type=client_credentials w/ resourceIndicators', () => {
 
 	it('provides a Bearer client credentials opaque token', async function () {
 		const spy = mock();
-		provider.once('client_credentials.saved', spy);
+		eventBus.once('client_credentials.saved', spy);
 
 		const res = await agent.token.post(
 			{
@@ -57,7 +57,7 @@ describe('grant_type=client_credentials w/ resourceIndicators', () => {
 
 	it('provides a Bearer client credentials jwt token', async function () {
 		const spy = mock();
-		provider.once('client_credentials.issued', spy);
+		eventBus.once('client_credentials.issued', spy);
 
 		const res = await agent.token.post(
 			{
@@ -169,8 +169,8 @@ describe('grant_type=client_credentials w/ resourceIndicators', () => {
 
 	it('checks the policy and adds the resource', async function () {
 		const spy = mock();
-		provider.once('client_credentials.saved', spy);
-		provider.once('client_credentials.issued', spy);
+		eventBus.once('client_credentials.saved', spy);
+		eventBus.once('client_credentials.issued', spy);
 
 		const { error } = await agent.token.post(
 			{
@@ -208,8 +208,8 @@ describe('grant_type=client_credentials w/ resourceIndicators', () => {
 
 	it('also ignores resource unrecognized scopes', async function () {
 		const spy = mock();
-		provider.once('client_credentials.saved', spy);
-		provider.once('client_credentials.issued', spy);
+		eventBus.once('client_credentials.saved', spy);
+		eventBus.once('client_credentials.issued', spy);
 
 		const res = await agent.token.post(
 			{
@@ -230,8 +230,8 @@ describe('grant_type=client_credentials w/ resourceIndicators', () => {
 
 	it('applies the default resource', async function () {
 		const spy = mock();
-		provider.once('client_credentials.saved', spy);
-		provider.once('client_credentials.issued', spy);
+		eventBus.once('client_credentials.saved', spy);
+		eventBus.once('client_credentials.issued', spy);
 
 		const res = await agent.token.post(
 			{

@@ -2,6 +2,7 @@ import { ISSUER } from 'lib/configs/env.js';
 import { generate, normalize } from '../../helpers/user_codes.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { DeviceCode } from 'lib/models/device_code.js';
+import { eventBus } from '../../event_bus.js';
 
 export default async function deviceAuthorizationResponse(oidc, deviceInfo) {
 	const charset = ApplicationConfig['deviceFlow.charset'];
@@ -25,6 +26,6 @@ export default async function deviceAuthorizationResponse(oidc, deviceInfo) {
 	};
 
 	// event payload kept `{ oidc }`-shaped (was `ctx`)
-	oidc.provider.emit('device_authorization.success', { oidc }, body);
+	eventBus.emit('device_authorization.success', { oidc }, body);
 	return body;
 }

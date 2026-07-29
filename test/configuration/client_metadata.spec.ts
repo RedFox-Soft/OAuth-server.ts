@@ -6,7 +6,6 @@ import merge from 'lodash/merge.js';
 import omit from 'lodash/omit.js';
 import cloneDeep from 'lodash/cloneDeep.js';
 
-import { provider } from 'lib/provider.js';
 import { InvalidClientMetadata } from 'lib/helpers/errors.js';
 import {
 	ApplicationConfig,
@@ -61,7 +60,7 @@ describe('Client metadata validation', () => {
 		}
 		reloadConfiguration();
 
-		return addClient(provider, {
+		return addClient({
 			clientId: 'client',
 			clientSecret: 'secret',
 			redirectUris: ['https://client.example.com/cb'],

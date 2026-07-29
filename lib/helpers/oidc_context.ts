@@ -1,6 +1,6 @@
 import { InvalidHeaderAuthorization } from './errors.ts';
 import { routeNames } from '../consts/param_list.ts';
-import { provider } from '../provider.js';
+import { eventBus } from '../event_bus.js';
 import { isPlainObject } from './_/object.js';
 import {
 	ApplicationConfig as config,
@@ -36,10 +36,6 @@ export class OIDCContext<T extends Record<string, unknown>> {
 		return config['fapi.enabled'];
 	}
 
-	get provider() {
-		return provider;
-	}
-
 	entity(key, value) {
 		if (!this.entities) {
 			throw new Error('entities not initialized');
@@ -49,7 +45,7 @@ export class OIDCContext<T extends Record<string, unknown>> {
 		if (key === 'Client') {
 			// `this` is the oidc context (formerly the `ctx.oidc` payload); there is no
 			// `ctx` wrapper anymore, so emit the context itself as the event payload.
-			provider.emit('assign.client', this, value);
+			eventBus.emit('assign.client', this, value);
 		}
 	}
 

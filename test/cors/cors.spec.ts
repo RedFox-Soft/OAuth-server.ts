@@ -1,7 +1,7 @@
 import { expect } from 'bun:test';
 
 import bootstrap from '../test_helper.js';
-import { provider } from 'lib/provider.js';
+import { eventBus } from 'lib/event_bus.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 
@@ -63,16 +63,16 @@ describe('CORS setup', () => {
 
 	describe('error handling', () => {
 		before(function () {
-			this.default = i(provider).configuration.clientBasedCORS;
+			this.default = i(eventBus).configuration.clientBasedCORS;
 		});
 
 		after(function () {
-			const conf = i(provider).configuration;
+			const conf = i(eventBus).configuration;
 			conf.clientBasedCORS = this.default;
 		});
 
 		it('500s when clientBasedCORS returns non-boolean', async function () {
-			i(provider).configuration.clientBasedCORS = () => Promise.resolve(true);
+			i(eventBus).configuration.clientBasedCORS = () => Promise.resolve(true);
 			const { status, headers } = await req.call(
 				this,
 				'get',
@@ -148,13 +148,13 @@ describe('CORS setup', () => {
 
 	describe('with clientBasedCORS resolving to true', () => {
 		before(function () {
-			const conf = i(provider).configuration;
+			const conf = i(eventBus).configuration;
 			this.clientBasedCORS = conf.clientBasedCORS;
 			conf.clientBasedCORS = () => true;
 		});
 
 		after(function () {
-			const conf = i(provider).configuration;
+			const conf = i(eventBus).configuration;
 			conf.clientBasedCORS = this.clientBasedCORS;
 		});
 

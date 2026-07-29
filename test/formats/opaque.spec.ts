@@ -17,7 +17,6 @@ import { InitialAccessToken } from 'lib/models/initial_access_token.js';
 import { RegistrationAccessToken } from 'lib/models/registration_access_token.js';
 import { Client } from 'lib/models/client.js';
 import { TestAdapter } from 'test/models.js';
-import { provider } from 'lib/provider.js';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';

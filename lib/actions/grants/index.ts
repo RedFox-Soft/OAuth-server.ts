@@ -1,6 +1,6 @@
 import { t } from 'elysia';
 import { UnsupportedGrantType } from 'lib/helpers/errors.js';
-import { provider } from 'lib/provider.js';
+import { eventBus } from 'lib/event_bus.js';
 import { TokenResponse } from 'lib/shared/response_schemas.js';
 
 // Body every grant handler resolves to (RFC 6749 §5.1), varying by grant_type — see TokenResponse.
@@ -95,6 +95,6 @@ export async function executeGrant(
 	}
 	const res: TokenResponseBody = await grant(oidc, dPoP);
 	// event payload kept `{ oidc }`-shaped (was the `ctx` wrapper)
-	provider.emit('grant.success', { oidc });
+	eventBus.emit('grant.success', { oidc });
 	return res;
 }

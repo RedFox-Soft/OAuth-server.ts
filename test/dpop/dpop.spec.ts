@@ -28,7 +28,7 @@ import bootstrap, {
 } from '../test_helper.js';
 import * as base64url from '../../lib/helpers/base64url.ts';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
-import { provider } from 'lib/provider.js';
+import { eventBus } from 'lib/event_bus.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
@@ -186,12 +186,12 @@ describe('features.dPoP', async () => {
 			});
 
 			afterEach(function () {
-				provider.removeAllListeners('userinfo.error');
+				eventBus.removeAllListeners('userinfo.error');
 			});
 
 			it('invalid typ', async function () {
 				const spy = mock();
-				provider.on('userinfo.error', spy);
+				eventBus.on('userinfo.error', spy);
 
 				for (const value of ['JWT', 'secevent+jwt']) {
 					const { error, response } = await agent.userinfo.get({
@@ -228,7 +228,7 @@ describe('features.dPoP', async () => {
 
 			it('alg mismatch', async function () {
 				const spy = mock();
-				provider.on('userinfo.error', spy);
+				eventBus.on('userinfo.error', spy);
 
 				for (const value of [1, true, 'none', 'HS256', 'unsupported']) {
 					const { error, response } = await agent.userinfo.get({
@@ -262,7 +262,7 @@ describe('features.dPoP', async () => {
 
 			it('embedded jwk header', async function () {
 				const spy = mock();
-				provider.on('userinfo.error', spy);
+				eventBus.on('userinfo.error', spy);
 
 				for (const value of [undefined, '', 1, true, null, 'foo', []]) {
 					const { error, response } = await agent.userinfo.get({
@@ -301,7 +301,7 @@ describe('features.dPoP', async () => {
 
 			it('no private key in header', async function () {
 				const spy = mock();
-				provider.on('userinfo.error', spy);
+				eventBus.on('userinfo.error', spy);
 
 				const { error, response } = await agent.userinfo.get({
 					headers: {
@@ -338,7 +338,7 @@ describe('features.dPoP', async () => {
 
 			it('no symmetric key in header', async function () {
 				const spy = mock();
-				provider.on('userinfo.error', spy);
+				eventBus.on('userinfo.error', spy);
 
 				const { error, response } = await agent.userinfo.get({
 					headers: {
@@ -556,7 +556,7 @@ describe('features.dPoP', async () => {
 			expect(user.status).toBe(200);
 
 			let spy = mock();
-			provider.once('userinfo.error', spy);
+			eventBus.once('userinfo.error', spy);
 
 			let { error } = await agent.userinfo.get({
 				headers: {
@@ -577,7 +577,7 @@ describe('features.dPoP', async () => {
 			);
 
 			spy = mock();
-			provider.once('userinfo.error', spy);
+			eventBus.once('userinfo.error', spy);
 
 			({ error } = await agent.userinfo.get({
 				headers: {
@@ -612,7 +612,7 @@ describe('features.dPoP', async () => {
 			});
 
 			spy = mock();
-			provider.once('userinfo.error', spy);
+			eventBus.once('userinfo.error', spy);
 
 			({ error } = await agent.userinfo.get({
 				headers: {
@@ -681,7 +681,7 @@ describe('features.dPoP', async () => {
 
 		it('binds the access token to the jwk', async function () {
 			const spy = mock();
-			provider.once('grant.success', spy);
+			eventBus.once('grant.success', spy);
 
 			const res = await agent.token.post(
 				{
@@ -712,7 +712,7 @@ describe('features.dPoP', async () => {
 
 		it('binds the refresh token to the jwk for public clients', async function () {
 			const spy = mock();
-			provider.once('grant.success', spy);
+			eventBus.once('grant.success', spy);
 
 			// changes the code to client-none
 			TestAdapter.for('DeviceCode').syncUpdate(setup.getTokenJti(device_code), {
@@ -770,7 +770,7 @@ describe('features.dPoP', async () => {
 
 		it('binds the access token to the jwk', async function () {
 			const spy = mock();
-			provider.once('grant.success', spy);
+			eventBus.once('grant.success', spy);
 
 			const { status } = await agent.token.post(
 				{
@@ -800,7 +800,7 @@ describe('features.dPoP', async () => {
 
 		it('binds the refresh token to the jwk for public clients', async function () {
 			const spy = mock();
-			provider.once('grant.success', spy);
+			eventBus.once('grant.success', spy);
 
 			// changes the code to client-none
 			TestAdapter.for('BackchannelAuthenticationRequest').syncUpdate(
@@ -1008,7 +1008,7 @@ describe('features.dPoP', async () => {
 
 			it('authorization_code binds the access token to the jwk', async function () {
 				const spy = mock();
-				provider.once('grant.success', spy);
+				eventBus.once('grant.success', spy);
 
 				const res = await agent.token.post(
 					{
@@ -1061,7 +1061,7 @@ describe('features.dPoP', async () => {
 
 			it('authorization_code binds the access token to the jwk', async function () {
 				const spy = mock();
-				provider.once('grant.success', spy);
+				eventBus.once('grant.success', spy);
 
 				const res = await agent.token.post(
 					{
@@ -1094,7 +1094,7 @@ describe('features.dPoP', async () => {
 
 			it('authorization_code checks the dpop_jkt matches the proof jwk thumbprint', async function () {
 				const spy = mock();
-				provider.once('grant.error', spy);
+				eventBus.once('grant.error', spy);
 
 				const { error, status } = await agent.token.post(
 					{
@@ -1132,7 +1132,7 @@ describe('features.dPoP', async () => {
 
 			it('authorization_code requires dpop to be used when dpop_jkt was present', async function () {
 				const spy = mock();
-				provider.once('grant.error', spy);
+				eventBus.once('grant.error', spy);
 
 				const { error, status } = await agent.token.post(
 					{
@@ -1199,7 +1199,7 @@ describe('features.dPoP', async () => {
 
 			it('binds the access token to the jwk', async function () {
 				const spy = mock();
-				provider.once('grant.success', spy);
+				eventBus.once('grant.success', spy);
 
 				const res = await agent.token.post(
 					{
@@ -1250,7 +1250,7 @@ describe('features.dPoP', async () => {
 
 		it('authorization_code binds the access token to the jwk', async function () {
 			const spy = mock();
-			provider.once('grant.success', spy);
+			eventBus.once('grant.success', spy);
 
 			const res = await agent.token.post(
 				{
@@ -1308,7 +1308,7 @@ describe('features.dPoP', async () => {
 
 			it('binds the access token to the jwk', async function () {
 				const spy = mock();
-				provider.once('grant.success', spy);
+				eventBus.once('grant.success', spy);
 
 				const res = await agent.token.post(
 					{
@@ -1339,7 +1339,7 @@ describe('features.dPoP', async () => {
 
 			it('verifies the request made with the same cert jwk', async function () {
 				const spy = mock();
-				provider.once('grant.error', spy);
+				eventBus.once('grant.error', spy);
 
 				const res = await agent.token.post(
 					{
@@ -1376,7 +1376,7 @@ describe('features.dPoP', async () => {
 
 	it('client_credentials binds the access token to the jwk', async function () {
 		const spy = mock();
-		provider.once('grant.success', spy);
+		eventBus.once('grant.success', spy);
 
 		const res = await agent.token.post(
 			{ grant_type: 'client_credentials' },

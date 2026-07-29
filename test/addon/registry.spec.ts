@@ -7,7 +7,7 @@ import { setAddonBaseline } from '../addon_baseline.js';
 // cycle through formats/jwt.js -> provider that only resolves cleanly when the
 // provider is the entry point. Importing lib/provider first initializes the graph
 // in the right order (without starting the HTTP server that lib/index would).
-import '../../lib/provider.js';
+import '../../lib/event_bus.js';
 
 import {
 	addons,

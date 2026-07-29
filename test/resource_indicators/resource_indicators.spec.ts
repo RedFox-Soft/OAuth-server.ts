@@ -8,7 +8,7 @@ import bootstrap, {
 	type Setup
 } from '../test_helper.js';
 import * as resourceIndicators from '../../lib/addon/resources.js';
-import { provider } from 'lib/provider.js';
+import { eventBus } from 'lib/event_bus.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
@@ -49,7 +49,7 @@ describe('features.resourceIndicators', () => {
 		seedAccount('accountId');
 	});
 	afterEach(() => {
-		provider.removeAllListeners();
+		eventBus.removeAllListeners();
 		mock.restore();
 		resetGrantFlags();
 	});
@@ -108,7 +108,7 @@ describe('features.resourceIndicators', () => {
 		describe(`${verb} response_type includes code`, () => {
 			it('checks the policy and adds the resource', async () => {
 				const spy = mock();
-				provider.once('authorization_code.saved', spy);
+				eventBus.once('authorization_code.saved', spy);
 
 				const auth = new AuthorizationRequest({
 					resource: 'urn:not:allowed',
@@ -142,10 +142,10 @@ describe('features.resourceIndicators', () => {
 				expect(code.payload.resource).toBe('urn:wl:explicit');
 
 				const spy2 = mock();
-				provider.once('access_token.saved', spy2);
-				provider.once('access_token.issued', spy2);
+				eventBus.once('access_token.saved', spy2);
+				eventBus.once('access_token.issued', spy2);
 				const spy3 = mock();
-				provider.once('refresh_token.saved', spy3);
+				eventBus.once('refresh_token.saved', spy3);
 
 				res = await agent.token.post({
 					client_id: 'client',
@@ -164,10 +164,10 @@ describe('features.resourceIndicators', () => {
 				expect(rt.payload.resource).toBe('urn:wl:explicit');
 
 				const spy4 = mock();
-				provider.once('access_token.saved', spy4);
-				provider.once('access_token.issued', spy4);
+				eventBus.once('access_token.saved', spy4);
+				eventBus.once('access_token.issued', spy4);
 				const spy5 = mock();
-				provider.once('refresh_token.saved', spy5);
+				eventBus.once('refresh_token.saved', spy5);
 
 				res = await agent.token.post({
 					client_id: 'client',
@@ -187,7 +187,7 @@ describe('features.resourceIndicators', () => {
 
 			it('applies the default resource', async () => {
 				const spy = mock();
-				provider.once('authorization_code.saved', spy);
+				eventBus.once('authorization_code.saved', spy);
 
 				const auth = new AuthorizationRequest({
 					scope: 'api:read'
@@ -204,10 +204,10 @@ describe('features.resourceIndicators', () => {
 				expect(code.payload.resource).toBe('urn:wl:default');
 
 				const spy2 = mock();
-				provider.once('access_token.saved', spy2);
-				provider.once('access_token.issued', spy2);
+				eventBus.once('access_token.saved', spy2);
+				eventBus.once('access_token.issued', spy2);
 				const spy3 = mock();
-				provider.once('refresh_token.saved', spy3);
+				eventBus.once('refresh_token.saved', spy3);
 
 				res = await agent.token.post({
 					client_id: 'client',
@@ -226,10 +226,10 @@ describe('features.resourceIndicators', () => {
 				expect(rt.payload.resource).toBe('urn:wl:default');
 
 				const spy4 = mock();
-				provider.once('access_token.saved', spy4);
-				provider.once('access_token.issued', spy4);
+				eventBus.once('access_token.saved', spy4);
+				eventBus.once('access_token.issued', spy4);
 				const spy5 = mock();
-				provider.once('refresh_token.saved', spy5);
+				eventBus.once('refresh_token.saved', spy5);
 
 				res = await agent.token.post({
 					client_id: 'client',
@@ -251,7 +251,7 @@ describe('features.resourceIndicators', () => {
 				grantFlags.useGranted = true;
 
 				const spy = mock();
-				provider.once('authorization_code.saved', spy);
+				eventBus.once('authorization_code.saved', spy);
 
 				const auth = new AuthorizationRequest({
 					scope: 'openid api:read'
@@ -268,10 +268,10 @@ describe('features.resourceIndicators', () => {
 				expect(code.payload.resource).toBe('urn:wl:default');
 
 				const spy2 = mock();
-				provider.once('access_token.saved', spy2);
-				provider.once('access_token.issued', spy2);
+				eventBus.once('access_token.saved', spy2);
+				eventBus.once('access_token.issued', spy2);
 				const spy3 = mock();
-				provider.once('refresh_token.saved', spy3);
+				eventBus.once('refresh_token.saved', spy3);
 
 				res = await agent.token.post({
 					client_id: 'client',
@@ -290,10 +290,10 @@ describe('features.resourceIndicators', () => {
 				expect(rt.payload.resource).toBe('urn:wl:default');
 
 				const spy4 = mock();
-				provider.once('access_token.saved', spy4);
-				provider.once('access_token.issued', spy4);
+				eventBus.once('access_token.saved', spy4);
+				eventBus.once('access_token.issued', spy4);
 				const spy5 = mock();
-				provider.once('refresh_token.saved', spy5);
+				eventBus.once('refresh_token.saved', spy5);
 
 				res = await agent.token.post({
 					client_id: 'client',
@@ -313,7 +313,7 @@ describe('features.resourceIndicators', () => {
 
 			it('applies the explicit resource', async () => {
 				const spy = mock();
-				provider.once('authorization_code.saved', spy);
+				eventBus.once('authorization_code.saved', spy);
 
 				const auth = new AuthorizationRequest({
 					scope: 'openid api:read'
@@ -330,10 +330,10 @@ describe('features.resourceIndicators', () => {
 				expect(code.payload.resource).toBe('urn:wl:default');
 
 				const spy2 = mock();
-				provider.once('access_token.saved', spy2);
-				provider.once('access_token.issued', spy2);
+				eventBus.once('access_token.saved', spy2);
+				eventBus.once('access_token.issued', spy2);
 				const spy3 = mock();
-				provider.once('refresh_token.saved', spy3);
+				eventBus.once('refresh_token.saved', spy3);
 
 				res = await agent.token.post({
 					client_id: 'client',
@@ -353,10 +353,10 @@ describe('features.resourceIndicators', () => {
 				expect(rt.payload.resource).toBe('urn:wl:default');
 
 				const spy4 = mock();
-				provider.once('access_token.saved', spy4);
-				provider.once('access_token.issued', spy4);
+				eventBus.once('access_token.saved', spy4);
+				eventBus.once('access_token.issued', spy4);
 				const spy5 = mock();
-				provider.once('refresh_token.saved', spy5);
+				eventBus.once('refresh_token.saved', spy5);
 
 				res = await agent.token.post({
 					client_id: 'client',
@@ -419,10 +419,10 @@ describe('features.resourceIndicators', () => {
 			expect(confirm.status).toBe(200);
 
 			const spy = mock();
-			provider.once('access_token.saved', spy);
-			provider.once('access_token.issued', spy);
+			eventBus.once('access_token.saved', spy);
+			eventBus.once('access_token.issued', spy);
 			const spy2 = mock();
-			provider.once('refresh_token.saved', spy2);
+			eventBus.once('refresh_token.saved', spy2);
 
 			let res = await agent.token.post({
 				client_id: 'client',
@@ -440,10 +440,10 @@ describe('features.resourceIndicators', () => {
 			expect(rt.payload.resource).toBe('urn:wl:explicit');
 
 			const spy3 = mock();
-			provider.once('access_token.saved', spy3);
-			provider.once('access_token.issued', spy3);
+			eventBus.once('access_token.saved', spy3);
+			eventBus.once('access_token.issued', spy3);
 			const spy4 = mock();
-			provider.once('refresh_token.saved', spy4);
+			eventBus.once('refresh_token.saved', spy4);
 
 			res = await agent.token.post({
 				client_id: 'client',
@@ -486,10 +486,10 @@ describe('features.resourceIndicators', () => {
 			expect(confirm.status).toBe(200);
 
 			const spy = mock();
-			provider.once('access_token.saved', spy);
-			provider.once('access_token.issued', spy);
+			eventBus.once('access_token.saved', spy);
+			eventBus.once('access_token.issued', spy);
 			const spy2 = mock();
-			provider.once('refresh_token.saved', spy2);
+			eventBus.once('refresh_token.saved', spy2);
 
 			let res = await agent.token.post({
 				client_id: 'client',
@@ -507,10 +507,10 @@ describe('features.resourceIndicators', () => {
 			expect(rt.payload.resource).toBe('urn:wl:default');
 
 			const spy3 = mock();
-			provider.once('access_token.saved', spy3);
-			provider.once('access_token.issued', spy3);
+			eventBus.once('access_token.saved', spy3);
+			eventBus.once('access_token.issued', spy3);
 			const spy4 = mock();
-			provider.once('refresh_token.saved', spy4);
+			eventBus.once('refresh_token.saved', spy4);
 
 			res = await agent.token.post({
 				client_id: 'client',
@@ -555,10 +555,10 @@ describe('features.resourceIndicators', () => {
 			expect(confirm.status).toBe(200);
 
 			const spy = mock();
-			provider.once('access_token.saved', spy);
-			provider.once('access_token.issued', spy);
+			eventBus.once('access_token.saved', spy);
+			eventBus.once('access_token.issued', spy);
 			const spy2 = mock();
-			provider.once('refresh_token.saved', spy2);
+			eventBus.once('refresh_token.saved', spy2);
 
 			let res = await agent.token.post({
 				client_id: 'client',
@@ -576,10 +576,10 @@ describe('features.resourceIndicators', () => {
 			expect(rt.payload.resource).toBe('urn:wl:default');
 
 			const spy3 = mock();
-			provider.once('access_token.saved', spy3);
-			provider.once('access_token.issued', spy3);
+			eventBus.once('access_token.saved', spy3);
+			eventBus.once('access_token.issued', spy3);
 			const spy4 = mock();
-			provider.once('refresh_token.saved', spy4);
+			eventBus.once('refresh_token.saved', spy4);
 
 			res = await agent.token.post({
 				client_id: 'client',
@@ -622,10 +622,10 @@ describe('features.resourceIndicators', () => {
 			expect(confirm.status).toBe(200);
 
 			const spy = mock();
-			provider.once('access_token.saved', spy);
-			provider.once('access_token.issued', spy);
+			eventBus.once('access_token.saved', spy);
+			eventBus.once('access_token.issued', spy);
 			const spy2 = mock();
-			provider.once('refresh_token.saved', spy2);
+			eventBus.once('refresh_token.saved', spy2);
 
 			let res = await agent.token.post({
 				client_id: 'client',
@@ -644,10 +644,10 @@ describe('features.resourceIndicators', () => {
 			expect(rt.payload.resource).toBe('urn:wl:default');
 
 			const spy3 = mock();
-			provider.once('access_token.saved', spy3);
-			provider.once('access_token.issued', spy3);
+			eventBus.once('access_token.saved', spy3);
+			eventBus.once('access_token.issued', spy3);
 			const spy4 = mock();
-			provider.once('refresh_token.saved', spy4);
+			eventBus.once('refresh_token.saved', spy4);
 
 			res = await agent.token.post({
 				client_id: 'client',
@@ -698,10 +698,10 @@ describe('features.resourceIndicators', () => {
 			const { auth_req_id } = backchannel.data;
 
 			const spy = mock();
-			provider.once('access_token.saved', spy);
-			provider.once('access_token.issued', spy);
+			eventBus.once('access_token.saved', spy);
+			eventBus.once('access_token.issued', spy);
 			const spy2 = mock();
-			provider.once('refresh_token.saved', spy2);
+			eventBus.once('refresh_token.saved', spy2);
 
 			let res = await agent.token.post({
 				client_id: 'client',
@@ -720,10 +720,10 @@ describe('features.resourceIndicators', () => {
 			expect(rt.payload.resource).toBe('urn:wl:explicit');
 
 			const spy3 = mock();
-			provider.once('access_token.saved', spy3);
-			provider.once('access_token.issued', spy3);
+			eventBus.once('access_token.saved', spy3);
+			eventBus.once('access_token.issued', spy3);
 			const spy4 = mock();
-			provider.once('refresh_token.saved', spy4);
+			eventBus.once('refresh_token.saved', spy4);
 
 			res = await agent.token.post({
 				client_id: 'client',
@@ -757,10 +757,10 @@ describe('features.resourceIndicators', () => {
 			const { auth_req_id } = backchannel.data;
 
 			const spy = mock();
-			provider.once('access_token.saved', spy);
-			provider.once('access_token.issued', spy);
+			eventBus.once('access_token.saved', spy);
+			eventBus.once('access_token.issued', spy);
 			const spy2 = mock();
-			provider.once('refresh_token.saved', spy2);
+			eventBus.once('refresh_token.saved', spy2);
 
 			let res = await agent.token.post({
 				client_id: 'client',
@@ -778,10 +778,10 @@ describe('features.resourceIndicators', () => {
 			expect(rt.payload.resource).toBe('urn:wl:default');
 
 			const spy3 = mock();
-			provider.once('access_token.saved', spy3);
-			provider.once('access_token.issued', spy3);
+			eventBus.once('access_token.saved', spy3);
+			eventBus.once('access_token.issued', spy3);
 			const spy4 = mock();
-			provider.once('refresh_token.saved', spy4);
+			eventBus.once('refresh_token.saved', spy4);
 
 			res = await agent.token.post({
 				client_id: 'client',
@@ -812,10 +812,10 @@ describe('features.resourceIndicators', () => {
 			const { auth_req_id } = backchannel.data;
 
 			const spy = mock();
-			provider.once('access_token.saved', spy);
-			provider.once('access_token.issued', spy);
+			eventBus.once('access_token.saved', spy);
+			eventBus.once('access_token.issued', spy);
 			const spy2 = mock();
-			provider.once('refresh_token.saved', spy2);
+			eventBus.once('refresh_token.saved', spy2);
 
 			let res = await agent.token.post({
 				client_id: 'client',
@@ -833,10 +833,10 @@ describe('features.resourceIndicators', () => {
 			expect(rt.payload.resource).toBe('urn:wl:default');
 
 			const spy3 = mock();
-			provider.once('access_token.saved', spy3);
-			provider.once('access_token.issued', spy3);
+			eventBus.once('access_token.saved', spy3);
+			eventBus.once('access_token.issued', spy3);
 			const spy4 = mock();
-			provider.once('refresh_token.saved', spy4);
+			eventBus.once('refresh_token.saved', spy4);
 
 			res = await agent.token.post({
 				client_id: 'client',
@@ -885,7 +885,7 @@ describe('features.resourceIndicators', () => {
 			const bearer = await at.save();
 
 			const spy = mock();
-			provider.once('userinfo.error', spy);
+			eventBus.once('userinfo.error', spy);
 
 			const { error } = await agent.userinfo.get({
 				headers: { authorization: `Bearer ${bearer}` }

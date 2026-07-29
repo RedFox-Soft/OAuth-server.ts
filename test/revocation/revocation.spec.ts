@@ -8,7 +8,7 @@ import {
 	expect
 } from 'bun:test';
 import bootstrap, { agent } from '../test_helper.js';
-import { provider } from 'lib/provider.js';
+import { eventBus } from 'lib/event_bus.js';
 import { Client } from 'lib/models/client.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AccessToken } from 'lib/models/access_token.js';
@@ -395,7 +395,7 @@ describe('revocation features', () => {
 
 		it('does not revoke tokens of other clients', async function () {
 			const spy = mock();
-			provider.once('revocation.error', spy);
+			eventBus.once('revocation.error', spy);
 			const at = new AccessToken({
 				accountId: 'accountId',
 				grantId: 'foo',

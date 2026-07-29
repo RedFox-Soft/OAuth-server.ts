@@ -10,7 +10,7 @@ import {
 
 import bootstrap, { agent, jsonToFormUrlEncoded } from '../test_helper.js';
 import { normalize } from '../../lib/helpers/user_codes.ts';
-import { provider } from 'lib/provider.js';
+import { eventBus } from 'lib/event_bus.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
@@ -30,14 +30,14 @@ describe('device_authorization_endpoint', () => {
 
 	afterEach(() => {
 		mock.restore();
-		provider.removeAllListeners('device_authorization.error');
-		provider.removeAllListeners('device_authorization.success');
+		eventBus.removeAllListeners('device_authorization.error');
+		eventBus.removeAllListeners('device_authorization.success');
 	});
 
 	describe('client validation', () => {
 		it('only responds to clients with urn:ietf:params:oauth:grant-type:device_code enabled', async () => {
 			const spy = mock();
-			provider.once('device_authorization.error', spy);
+			eventBus.once('device_authorization.error', spy);
 
 			const { error } = await post({ client_id: 'client-not-allowed' });
 			if (!error) throw new Error('expected error response');
@@ -53,7 +53,7 @@ describe('device_authorization_endpoint', () => {
 
 		it('rejects invalid clients', async () => {
 			const spy = mock();
-			provider.once('device_authorization.error', spy);
+			eventBus.once('device_authorization.error', spy);
 
 			const { error } = await post({ client_id: 'not-found-client' });
 			if (!error) throw new Error('expected error response');
@@ -87,7 +87,7 @@ describe('device_authorization_endpoint', () => {
 
 	it('responds with json 200', async () => {
 		const spy = mock();
-		provider.once('device_authorization.success', spy);
+		eventBus.once('device_authorization.success', spy);
 
 		const { status, data } = await post({
 			client_id: 'client',

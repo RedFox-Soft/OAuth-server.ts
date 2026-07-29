@@ -18,7 +18,6 @@ import bootstrap, {
 } from '../test_helper.js';
 import { fullProfileClaims } from '../models.js';
 import { decode as decodeJWT } from '../../lib/helpers/jwt.ts';
-import { provider } from 'lib/provider.js';
 import { Client } from 'lib/models/client.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';

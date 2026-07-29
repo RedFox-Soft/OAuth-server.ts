@@ -18,7 +18,7 @@ import bootstrap, {
 import { fullProfileClaims } from '../models.js';
 import { getUserStore } from 'lib/adapters/index.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
-import { provider } from 'lib/provider.js';
+import { eventBus } from 'lib/event_bus.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { TestAdapter } from 'test/models.js';
@@ -57,13 +57,13 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code w/ conformIdTo
 	});
 	afterEach(() => {
 		mock.restore();
-		provider.removeAllListeners('grant.success');
-		provider.removeAllListeners('grant.error');
+		eventBus.removeAllListeners('grant.success');
+		eventBus.removeAllListeners('grant.error');
 	});
 
 	it('returns the right stuff', async () => {
 		const spy = mock();
-		provider.once('grant.success', spy);
+		eventBus.once('grant.success', spy);
 
 		const deviceCode = new DeviceCode({
 			accountId: 'sub',
@@ -107,13 +107,13 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 	});
 	afterEach(() => {
 		mock.restore();
-		provider.removeAllListeners('grant.success');
-		provider.removeAllListeners('grant.error');
+		eventBus.removeAllListeners('grant.success');
+		eventBus.removeAllListeners('grant.error');
 	});
 
 	it('returns the right stuff', async () => {
 		const spy = mock();
-		provider.once('grant.success', spy);
+		eventBus.once('grant.success', spy);
 
 		const deviceCode = new DeviceCode({
 			accountId: 'sub',
@@ -217,7 +217,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 
 		it('code being "found"', async () => {
 			const spy = mock();
-			provider.once('grant.error', spy);
+			eventBus.once('grant.error', spy);
 			const { error } = await agent.token.post({
 				client_id: 'client',
 				grant_type,
@@ -237,7 +237,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 			await getUserStore('redfox').destroy(setup.getAccountId());
 
 			const spy = mock();
-			provider.once('grant.error', spy);
+			eventBus.once('grant.error', spy);
 
 			const deviceCode = new DeviceCode({
 				accountId: 'sub',
@@ -267,7 +267,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 
 		it('code belongs to client', async () => {
 			const spy = mock();
-			provider.once('grant.error', spy);
+			eventBus.once('grant.error', spy);
 
 			const deviceCode = new DeviceCode({
 				accountId: 'sub',
@@ -342,7 +342,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 
 		it('validates code is not already used', async () => {
 			const spy = mock();
-			provider.once('grant.error', spy);
+			eventBus.once('grant.error', spy);
 
 			const deviceCode = new DeviceCode({
 				accountId: 'sub',
@@ -411,7 +411,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 
 	it('responds with a built-in error if one is resolved with', async () => {
 		const spy = mock();
-		provider.once('grant.error', spy);
+		eventBus.once('grant.error', spy);
 
 		const deviceCode = new DeviceCode({
 			scope: 'openid',

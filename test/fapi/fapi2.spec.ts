@@ -8,7 +8,7 @@ import epochTime from '../../lib/helpers/epoch_time.js';
 
 import { keypair } from './fapi2.config.js';
 import { ISSUER } from 'lib/configs/env.js';
-import { provider } from 'lib/provider.js';
+import { eventBus } from 'lib/event_bus.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import nanoid from 'lib/helpers/nanoid.js';
 
@@ -18,7 +18,7 @@ describe('FAPI 2.0 Final behaviours', async () => {
 	describe('FAPI 2.0 Final Mode Authorization Request', () => {
 		it('requires pkjwt audience to be the issuer identifier', async function () {
 			const spy = mock();
-			provider.on('pushed_authorization_request.error', spy);
+			eventBus.on('pushed_authorization_request.error', spy);
 
 			const res = await agent.par.post({
 				scope: 'openid',
