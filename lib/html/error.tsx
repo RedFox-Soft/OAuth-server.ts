@@ -33,6 +33,9 @@ export function getErrorHtmlResponse(
 ) {
 	const html = renderError(status, error, message);
 	return new Response(html, {
+		// Without this the Response defaults to 200, so an HTML-preferring caller was told "OK" for
+		// every error the server rendered as a page — including a not-found.
+		status,
 		headers: {
 			'Content-Type': 'text/html; charset=utf-8'
 		}

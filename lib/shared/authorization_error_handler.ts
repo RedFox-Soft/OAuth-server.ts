@@ -14,6 +14,7 @@ import { ISSUER } from 'lib/configs/env.js';
 import { dPoPSigningAlgValues } from 'lib/configs/jwaAlgorithms.js';
 import { UseDpopNonce } from 'lib/helpers/validate_dpop.js';
 import { DPoPNonces } from 'lib/helpers/dpop_nonces.js';
+import { FeatureDisabled } from 'lib/plugins/featureGate.js';
 
 function getFirstError(error: ValidationError) {
 	const firstError =
@@ -98,7 +99,21 @@ const mapErrorCode = {
 export async function errorHandler(obj: ErrorContext) {
 	const { set, route, code, request } = obj;
 	let { error } = obj;
-	if (set.status === 500) {
+	// Elysia's not-found carries its own status but does not assign set.status before onError runs, so
+	// the HTML branch below rendered every missing route as a 200 page titled "200". Applies to a
+	// feature-gate refusal and a genuinely unrouted request alike, which is what keeps the two
+	// indistinguishable.
+	if (code === 'NOT_FOUND') {
+		set.status = 404;
+	}
+
+	// A feature-gate refusal has already announced itself on its own channel. Reporting it again as a
+	// server_error would file deliberate, correct behaviour under the channel operators watch for
+	// genuine faults. The marker comes from the thrown error rather than the request path, so the
+	// gate's decision is not re-derived here.
+	if (error instanceof FeatureDisabled) {
+		// Announced already; emit nothing further.
+	} else if (set.status === 500) {
 		eventBus.emit('server_error', error);
 	} else {
 		const key = mapErrorCode[route] ?? 'server_error';

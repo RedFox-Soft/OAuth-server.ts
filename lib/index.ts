@@ -30,6 +30,7 @@ import { revocation } from './actions/revocation.js';
 import { jwks } from './actions/jwks.js';
 import { registration } from './actions/registration.js';
 import { healthCheck } from './actions/health.js';
+import { featureGate } from './plugins/featureGate.js';
 import { InvalidDpopProof, UseDpopNonce } from './helpers/validate_dpop.js';
 import { adminApp } from './admin/index.js';
 import { verificationRoutes } from './routes/verification.js';
@@ -80,6 +81,9 @@ export const elysia = new Elysia({ strictPath: true, normalize: false })
 	.use(healthCheck)
 	.use(staticPlugin({ assets: 'public' }))
 	.use(nocache)
+	// Must follow nocache: onRequest hooks run in registration order and a gate refusal throws,
+	// so gating first would skip the no-store headers every other response carries.
+	.use(featureGate)
 	.use(discovery)
 	.use(jwks)
 	.use(authGet)
