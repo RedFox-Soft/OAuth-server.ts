@@ -31,6 +31,7 @@ import { jwks } from './actions/jwks.js';
 import { registration } from './actions/registration.js';
 import { healthCheck } from './actions/health.js';
 import { featureGate } from './plugins/featureGate.js';
+import { corsPreflight } from './plugins/cors.js';
 import { InvalidDpopProof, UseDpopNonce } from './helpers/validate_dpop.js';
 import { adminApp } from './admin/index.js';
 import { verificationRoutes } from './routes/verification.js';
@@ -84,6 +85,10 @@ export const elysia = new Elysia({ strictPath: true, normalize: false })
 	// Must follow nocache: onRequest hooks run in registration order and a gate refusal throws,
 	// so gating first would skip the no-store headers every other response carries.
 	.use(featureGate)
+	// Must follow both: it answers preflights by short-circuiting, which ends the onRequest chain, so
+	// mounting it before nocache would omit no-store from the 204 and before featureGate would confirm
+	// an endpoint whose capability is switched off.
+	.use(corsPreflight)
 	.use(discovery)
 	.use(jwks)
 	.use(authGet)

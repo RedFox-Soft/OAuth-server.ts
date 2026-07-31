@@ -40,6 +40,28 @@ describe('settings catalog', () => {
 		expect(d?.dependsOn).toBeUndefined();
 	});
 
+	it('exposes cors.enabled as a boolean in its own group', () => {
+		const d = SETTINGS_CATALOG.find((x) => x.key === 'cors.enabled');
+		expect(d).toBeDefined();
+		expect(d?.type).toBe('boolean');
+		expect(d?.group).toBe('CORS');
+		// No parent flag: the switch stands alone, and closure otherwise comes from project data.
+		expect(d?.dependsOn).toBeUndefined();
+	});
+
+	/*
+	 * cors.maxAge was considered and dropped: it would be the first numeric key in ApplicationConfig and
+	 * SettingType has no `number` member, so it could only be written by editing serviceConfig directly
+	 * — the admin PUT filters by this catalog. Pinned so adding the key without a type is a test failure
+	 * rather than an unreachable setting.
+	 */
+	it('declares no numeric setting, and no cors.maxAge companion', () => {
+		expect(SETTINGS_CATALOG.map((d) => d.key)).not.toContain('cors.maxAge');
+		expect(
+			Object.prototype.hasOwnProperty.call(ApplicationConfig, 'cors.maxAge')
+		).toBe(false);
+	});
+
 	it('excludes structured/function/Buffer keys', () => {
 		const keys = SETTINGS_CATALOG.map((d) => d.key);
 		for (const forbidden of [

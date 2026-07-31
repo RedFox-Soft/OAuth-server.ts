@@ -293,6 +293,15 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 	},
 
 	{
+		key: 'cors.enabled',
+		group: 'CORS',
+		label: 'Enable cross-origin access for browser clients',
+		type: 'boolean',
+		description:
+			'Lets browser-based apps read responses from the metadata and key endpoints, and from the endpoints listed on a project’s browser origins. Closure normally comes from data — a project with no origins grants nothing — so this is an incident kill switch rather than the usual control.'
+	},
+
+	{
 		key: 'registration.enabled',
 		group: 'Registration',
 		label: 'Enable Dynamic Client Registration',

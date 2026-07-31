@@ -139,6 +139,12 @@ export interface Project {
 	managedBy: string[];
 	bucketId: string | null;
 	clientIds: string[];
+	/*
+	 * Web origins whose browser code may read cross-origin responses on behalf of this project's
+	 * clients. Operator-managed, empty by default — a project grants nothing until one is added.
+	 * Stored canonical and matched by exact equality (lib/helpers/cors_origin.ts).
+	 */
+	corsOrigins: string[];
 	createdAt: Date;
 	updatedAt: Date;
 }
@@ -152,6 +158,7 @@ export interface ProjectStoreInstance {
 		managedBy?: string[];
 		bucketId?: string | null;
 		clientIds?: string[];
+		corsOrigins?: string[];
 	}): Promise<Project>;
 	find(id: string): Promise<Project | null>;
 	findBySlug(slug: string): Promise<Project | null>;
@@ -160,7 +167,10 @@ export interface ProjectStoreInstance {
 	update(
 		id: string,
 		patch: Partial<
-			Pick<Project, 'name' | 'managedBy' | 'bucketId' | 'clientIds'>
+			Pick<
+				Project,
+				'name' | 'managedBy' | 'bucketId' | 'clientIds' | 'corsOrigins'
+			>
 		>
 	): Promise<Project | null>;
 	destroy(id: string): Promise<void>;

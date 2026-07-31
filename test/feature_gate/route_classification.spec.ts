@@ -6,6 +6,9 @@ import {
 	alwaysAvailablePrefixes,
 	alwaysAvailableRoutes,
 	classifyRoutePattern,
+	corsClassForPattern,
+	corsMethodsForPath,
+	corsRoutes,
 	gatedRoutes
 } from '../../lib/consts/route_classification.ts';
 
@@ -60,6 +63,69 @@ describe('route classification', () => {
 			.map((route) => `${key(route)} -> ${route.flag}`);
 
 		expect(unknown).toEqual([]);
+	});
+
+	// The CORS mirror of the checks above. A route that is readable cross-origin by accident is the
+	// failure this half exists to prevent, so the enumerated set is pinned exactly rather than merely
+	// checked for staleness.
+	describe('CORS classification', () => {
+		const CORS_ENABLED = [
+			'GET /.well-known/openid-configuration',
+			'GET /jwks',
+			'POST /token',
+			'GET /userinfo',
+			'POST /userinfo',
+			'POST /token/revocation',
+			'POST /par',
+			'POST /device/auth'
+		];
+
+		it('declares no entry for a route the server does not serve', () => {
+			const mountedKeys = new Set(mounted.map(key));
+
+			const stale = corsRoutes
+				.map((r) => key(r))
+				.filter((k) => !mountedKeys.has(k));
+
+			expect(stale).toEqual([]);
+		});
+
+		it('declares each route pattern only once', () => {
+			const declared = corsRoutes.map((r) => key(r));
+
+			expect(declared.length).toBe(new Set(declared).size);
+		});
+
+		it('exposes exactly the eight routes a browser may read cross-origin', () => {
+			const enabled = mounted
+				.filter(
+					(route) => corsClassForPattern(route.method, route.path) !== 'none'
+				)
+				.map(key);
+
+			expect(enabled.sort()).toEqual([...CORS_ENABLED].sort());
+		});
+
+		it('classifies every other mounted route as none', () => {
+			const enabled = new Set(CORS_ENABLED);
+
+			const leaked = mounted
+				.filter((route) => !enabled.has(key(route)))
+				.filter(
+					(route) => corsClassForPattern(route.method, route.path) !== 'none'
+				)
+				.map(key);
+
+			expect(leaked).toEqual([]);
+		});
+
+		// Preflight advertises Access-Control-Allow-Methods from this derivation, so a path that
+		// serves two methods must report both or a browser will refuse the one it omitted.
+		it('derives served methods from the same table', () => {
+			expect(corsMethodsForPath('/userinfo').sort()).toEqual(['GET', 'POST']);
+			expect(corsMethodsForPath('/token')).toEqual(['POST']);
+			expect(corsMethodsForPath('/auth')).toEqual([]);
+		});
 	});
 
 	it('covers the whole mounted surface between gated, individual and prefix entries', () => {

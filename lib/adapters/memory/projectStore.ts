@@ -12,6 +12,7 @@ export class ProjectStore implements ProjectStoreInstance {
 		managedBy?: string[];
 		bucketId?: string | null;
 		clientIds?: string[];
+		corsOrigins?: string[];
 	}): Promise<Project> {
 		const now = new Date();
 		const project: Project = {
@@ -22,6 +23,7 @@ export class ProjectStore implements ProjectStoreInstance {
 			managedBy: data.managedBy ?? [],
 			bucketId: data.bucketId ?? null,
 			clientIds: data.clientIds ?? [],
+			corsOrigins: data.corsOrigins ?? [],
 			createdAt: now,
 			updatedAt: now
 		};
@@ -53,7 +55,10 @@ export class ProjectStore implements ProjectStoreInstance {
 	async update(
 		id: string,
 		patch: Partial<
-			Pick<Project, 'name' | 'managedBy' | 'bucketId' | 'clientIds'>
+			Pick<
+				Project,
+				'name' | 'managedBy' | 'bucketId' | 'clientIds' | 'corsOrigins'
+			>
 		>
 	): Promise<Project | null> {
 		const p = this.projects.get(id);

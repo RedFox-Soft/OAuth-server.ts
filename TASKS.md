@@ -58,7 +58,7 @@ exact line numbers.
   flag listed above gets a spec test proving: flag off → endpoint unavailable; flag on → previous
   behavior intact. Full suite stays green.
 
-### 2. CORS policy design — Investigate
+### 2. CORS policy design — Investigate — **RESOLVED 2026-07-30**
 
 - **Context:** The server emits no `Access-Control-*` header and mounts no `OPTIONS` route on any
   endpoint. `lib/shared/cors.ts` is dead code (zero importers, Koa-shaped, references an undefined
@@ -66,22 +66,97 @@ exact line numbers.
   default deny-all) is unreachable. Browser-based clients therefore cannot call `/token`,
   `/userinfo`, `/jwks`, or discovery cross-origin. Both CORS test suites are ignored in
   `bunfig.toml`, so zero CORS assertions run.
-- **Deliverable (defines Expected result of task 3):** A decision note answering: (a) which
-  endpoint classes get open CORS (`/.well-known/*`, `/jwks` are the usual candidates) vs
-  client-based CORS (`/token`, `/userinfo`, `/device/auth`, `/reg`, revocation/introspection) vs
-  none (interaction UI, admin); (b) how an origin allow-list is stored per client (client metadata
-  field?) and how `clientBasedCORS` plugs in; (c) whether preflight is handled by an Elysia plugin
-  or per-route; (d) exact header set (`Vary: Origin`, `Max-Age`, exposed headers). Use the two
-  ignored suites (`test/cors/*.spec.ts`) as the behavioral reference for what the previous
-  implementation promised.
+- **Deliverable — done:** `docs/superpowers/specs/2026-07-30-cors-policy-design.md`. It records what
+  the specs actually require (OIDC Discovery §3/§4 SHOULD; the browser-based-apps BCP MUST, which
+  also forbids CORS on the authorization endpoint; RFC 9449 §7.1/§8 requiring `WWW-Authenticate`
+  **and** `DPoP-Nonce` in `Access-Control-Expose-Headers`) and the seven product decisions: route
+  classes (open / client-based / none), origins stored per **Project** as `corsOrigins`, a disallowed
+  origin loses the header without the request being rejected, hand-rolled Elysia plugins (no new
+  dependency), the `clientBasedCORS` addon deleted, a single `cors.enabled` config key, and an
+  admin surface of entity + stores + create/patch + one minimal SPA editor. It also amends tasks 4,
+  12, 21, 24 and 27 — see "Backlog impact" in the note.
 
-### 3. CORS implementation — Implement (depends on task 2)
+### 3. CORS implementation — ✅ Implemented
 
-- **Expected result:** Per the task-2 decision: CORS headers and `OPTIONS` preflight work on the
-  designated endpoints; `clientBasedCORS` addon is actually invoked and overridable via the addon
-  registry; `lib/shared/cors.ts` is deleted or rewritten as the real implementation; both
-  `test/cors/` suites are migrated to bun:test, removed from `bunfig.toml` ignore list, and pass;
-  no other endpoint gains CORS headers unintentionally (negative assertions included).
+- **Delivered by** `specs/011-cors-support`. All ten acceptance items below are in place: the
+  `corsRoutes` table under a two-way drift guard (74 routes → 2 open / 6 client-based / 66 none), the
+  three plugins in `lib/plugins/cors.ts`, the flag-aware preflight, the header contract,
+  `Project.corsOrigins` with one shared validator, both client-identification paths, `cors.enabled`,
+  the admin surface, and every removal. Suite: 2210 pass / 0 fail (was 1981).
+- **Findings worth carrying forward** (belong in the wiki alongside task 1's notes):
+  1. **The design note's `onBeforeHandle` was wrong**, and the plan corrected it to `onTransform`.
+     `AuthPlugin` authenticates in a `derive`, which runs in the transform queue and throws
+     `invalid_client` from there; body-schema 422s also precede `beforeHandle`. A header written at
+     `beforeHandle` would be missing from exactly the two responses a misconfigured browser app hits
+     most. Measured, not reasoned: `POST /token` with no body 401s from that derive.
+  2. `set.headers` **does** merge into a raw `Response` returned by a handler *and* into one returned
+     from an `onRequest` short-circuit. That is what lets `corsOpen` work on `jwks` (which builds its
+     own `Response`) and lets the preflight 204 inherit `no-store` from `nocache` with no duplicated
+     constant.
+  3. `OPTIONS` on a mounted path already 404s identically to an unrouted path, `no-store` included —
+     so the fall-through half of the no-leak contract held before any code was written.
+  4. `POST /admin/api/projects` forwarded only four fields to `store.create()`, silently dropping
+     `clientIds`. A schema-only addition would have accepted `corsOrigins` and discarded it. Fixed for
+     `corsOrigins`; the `clientIds` drop is still there (nothing sends it).
+  5. The in-memory project store is a process-wide singleton and `findByClientId` returns the *first*
+     match, so a project left behind by an earlier test inverts a later filtered-origin assertion into
+     a false pass. The suite tracks and destroys what it creates.
+- **Source of truth:** `docs/superpowers/specs/2026-07-30-cors-policy-design.md`. The summary below
+  is the acceptance surface; the note carries the rationale and the exact header contract.
+- **Expected result:**
+  1. **Classification.** A `corsRoutes` table in `lib/consts/route_classification.ts`, in Elysia
+     declaration form, classifying every mounted route as open (`GET
+/.well-known/openid-configuration`, `GET /jwks`), client-based (`POST /token`, `GET+POST
+/userinfo`, `POST /token/revocation`, `POST /par`, `POST /device/auth`) or none (everything
+     else, including `/auth`, `/reg*`, `/token/introspect`, `/backchannel`, `/logout*`, `/device`,
+     `/ui/*`, `/admin/*`, `/health`, `/public/*`).
+     `test/feature_gate/route_classification.spec.ts` is extended so an unclassified mounted route
+     fails the drift guard in both directions.
+  2. **Mechanism.** One new `lib/plugins/cors.ts`: `corsPreflight` (function plugin on `onRequest`,
+     mounted in `lib/index.ts` directly after `featureGate`), `corsOpen` (mounted inside `discovery`
+     and `jwks`), `corsClientBased(extractClientId)` (mounted inside `token`, `userinfo`,
+     `revocation`, `par`, `deviceAuth`, running in `onBeforeHandle` so the header survives onto
+     error responses). No new dependency — `@elysiajs/cors` is deliberately not adopted.
+  3. **Preflight must not leak flag state.** `corsPreflight` resolves the governing flag via
+     `gatedFlagForRequest(<Access-Control-Request-Method>, path)` and falls through to the ordinary
+     404 when it is off, because that helper matches exactly on `(method, path)` and would never
+     match an `OPTIONS`. A 204 on an endpoint that 404s every real request is the fingerprint
+     `lib/plugins/featureGate.ts:44-49` exists to prevent. The 204 carries the same
+     `Cache-Control: no-store` headers as every other response.
+  4. **Headers.** `Vary: Origin` on every touched response; echoed `Access-Control-Allow-Origin`
+     when allowed (never `*`, never `Access-Control-Allow-Credentials`); client-based responses also
+     carry `Access-Control-Expose-Headers: WWW-Authenticate, DPoP-Nonce`; preflight returns 204 with
+     the route's real methods, an echo of `Access-Control-Request-Headers`, and `Max-Age: 3600` (a
+     module constant, not config — see D6a in the note). An `OPTIONS` without
+     `Access-Control-Request-Method` is not a preflight and falls through to 404. Routes in the
+     "none" class get no `Vary: Origin` either.
+  5. **Allow-list.** `Project.corsOrigins: string[]` in `lib/adapters/types.ts` and both project
+     stores (default `[]`, patchable). One shared validator: `new URL(v)` parses, protocol is
+     `http:`/`https:`, `url.origin === v`, no wildcard/`*`/`null`, host lowercased, deduped;
+     matching is exact string equality. `projectStore.findByClientId` resolves the client's project;
+     Mongo gains an index on `projects.clientIds` (extends task 4).
+  6. **Client identification.** `body.client_id` → `Basic` username for the form endpoints; access
+     token → `payload.clientId` for `/userinfo`. `client_assertion`-only clients are not decoded
+     (documented). No identifiable client → no header, request unaffected.
+  7. **Config.** One key: `cors.enabled` (default `true`) in `ApplicationConfig` and the settings
+     catalog, read flat per request like `featureGate` does. `cors.enabled: false` suppresses all
+     emission and makes preflight fall through to 404. `cors.maxAge` is deliberately **not** a key
+     (it would be the first numeric one and the catalog has no `number` type — D6a).
+  8. **Admin.** `corsOrigins` accepted by `POST /admin/api/projects` and the existing `PATCH
+/admin/api/projects/:id` with the shared validation and the existing RBAC/admin-project guards,
+     plus one origins editor on `lib/admin/ui/pages/Projects.tsx`. Full project edit stays task 19;
+     auditing project mutations stays task 8.
+  9. **Removals.** `lib/shared/cors.ts`; `lib/addon/cors.ts` plus its `AddonImplementations` entry
+     and `lib/addon/index.ts` re-export; `test/cors/cors.config.ts`;
+     `test/cors/custom_cors.spec.ts` (**deleted, not migrated** — it asserts that a Koa `cors()`
+     middleware injected via `provider.use()` overrides the built-in handling, and neither exists);
+     both `test/cors/*` entries in `bunfig.toml`.
+  10. **Tests.** `test/cors/cors.spec.ts` rewritten for bun:test covering the 16 cases listed in the
+      design note — including the disallowed-origin case succeeding without a header, the
+      `/userinfo` DPoP-nonce 401 exposing both header names, the flag-off preflight 404, the
+      negative sweep over every "none"-class route, and `cors.enabled: false`. Plus the drift-guard
+      extension, a storage-contract round-trip for `corsOrigins` in both adapters, and admin route
+      validation/RBAC tests. Full suite green.
 
 ### 4. Complete `db:setup` provisioning — Implement
 
@@ -102,6 +177,9 @@ exact line numbers.
   runtime via the admin API, so index creation must live where user collections are created, not
   only in the setup script). Duplicate list entries removed. Script stays idempotent (re-run
   succeeds). A test or documented manual verification proves the collection/index inventory.
+- **Amended by task 2's decision note:** the inventory must also create an index on
+  `projects.clientIds` (no TTL) — `projectStore.findByClientId` becomes a per-request lookup on five
+  endpoints once client-based CORS lands.
 
 ### 5. DPoP nonce configuration safety — Implement
 
@@ -209,6 +287,8 @@ exact line numbers.
   sensible default is implementable (planning decision per feature), the default is implemented
   instead. The catalog marks such settings so the UI can explain why they are locked. Tests: each
   guarded flag rejected without overrides, accepted with overrides registered.
+- **Amended by task 2's decision note:** `clientBasedCORS` is not among the hooks needing a guard —
+  task 3 deletes the addon and replaces it with project-scoped origin data.
 
 ### 13. Protocol conformance batch — Implement
 
@@ -353,6 +433,9 @@ exact line numbers.
   password if a string secret) and `claims` are editable via the settings API/UI with proper
   validation; intentionally-omitted keys carry an explanatory note in the catalog module; a test
   pins the catalog-vs-ApplicationConfig key diff so future keys must be classified explicitly.
+- **Amended by task 2's decision note:** task 3 adds `cors.enabled` (catalogued there), so the
+  key-diff test must account for it. `cors.maxAge` was dropped because the catalog has no `number`
+  `SettingType`; if this task adds one, that key becomes a viable follow-up.
 
 ### 22. Admin session/grant/token visibility and revocation — Implement
 
@@ -394,6 +477,10 @@ exact line numbers.
   justification (target: empty apart from anything task 3 hasn't absorbed); each skipped file is
   migrated, rewritten against current APIs, or deleted with rationale in the commit message;
   orphan configs deleted or given specs. Suite count reflects reality (no silently-dead specs).
+- **Amended by task 2's decision note:** task 3 absorbs all three `test/cors/*` items —
+  `cors.spec.ts` rewritten, `custom_cors.spec.ts` deleted (its `provider.use()` + Koa `cors()`
+  premise no longer exists), `cors.config.ts` deleted. Only `test/helpers/attention.spec.ts` remains
+  here from the ignore list.
 
 ### 25. MongoDB adapter test strategy — Investigate
 
@@ -435,6 +522,8 @@ exact line numbers.
 - **Expected result:** Each listed item deleted, or kept with a written reason (override-seam
   documentation counts). Zero importers re-verified at deletion time (tasks 7/14 may have changed
   things). Full suite and lint green afterward.
+- **Amended by task 2's decision note:** `lib/shared/cors.ts` and `lib/addon/cors.ts` (plus its
+  `AddonImplementations` entry and `lib/addon/index.ts` re-export) are removed by task 3, not here.
 
 ### 28. Documentation sync — Implement
 
@@ -481,8 +570,8 @@ exact line numbers.
 
 ## Suggested order
 
-Quick wins first: **14** (bug batch) → **1** (flag gating) → **4** (db provisioning) → **5**
-(DPoP safety) → **11** (id_token verification). Then the investigation pair-ups: **2→3** (CORS),
+Quick wins first: **14** (bug batch) → ~~**1** (flag gating)~~ → **4** (db provisioning) → **5**
+(DPoP safety) → **11** (id_token verification). Then the investigation pair-ups: ~~**3** (CORS)~~,
 **9→10** (deletion), **6→7** (RAR). Then P1 remainder (**8**, **12**, **13**, **15**), P2 product
 work (**16**–**23**), and P3 (**24**–**30**) as capacity allows. Tasks 28 and 29 are safe to do
 anytime.

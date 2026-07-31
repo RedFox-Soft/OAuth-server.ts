@@ -2,6 +2,18 @@ import { db } from './db.js';
 import type { Project, ProjectStoreInstance } from '../types.js';
 import nanoid from '../../helpers/nanoid.js';
 
+/*
+ * Documents written before corsOrigins existed carry no such key, and there is no backfill: the field
+ * is defaulted on read so every consumer sees the declared `string[]` rather than `undefined`. Cheaper
+ * and safer than a migration for a field whose absence means "grants nothing" anyway.
+ */
+function withDefaults(project: Project | null): Project | null {
+	if (!project) {
+		return null;
+	}
+	return { ...project, corsOrigins: project.corsOrigins ?? [] };
+}
+
 export class ProjectStore implements ProjectStoreInstance {
 	private collection = db.collection<Project>('projects');
 
@@ -13,6 +25,7 @@ export class ProjectStore implements ProjectStoreInstance {
 		managedBy?: string[];
 		bucketId?: string | null;
 		clientIds?: string[];
+		corsOrigins?: string[];
 	}): Promise<Project> {
 		const now = new Date();
 		const project: Project = {
@@ -23,6 +36,7 @@ export class ProjectStore implements ProjectStoreInstance {
 			managedBy: data.managedBy ?? [],
 			bucketId: data.bucketId ?? null,
 			clientIds: data.clientIds ?? [],
+			corsOrigins: data.corsOrigins ?? [],
 			createdAt: now,
 			updatedAt: now
 		};
@@ -31,31 +45,38 @@ export class ProjectStore implements ProjectStoreInstance {
 	}
 
 	async find(id: string): Promise<Project | null> {
-		return this.collection.findOne({ _id: id });
+		return withDefaults(await this.collection.findOne({ _id: id }));
 	}
 
 	async findBySlug(slug: string): Promise<Project | null> {
-		return this.collection.findOne({ slug });
+		return withDefaults(await this.collection.findOne({ slug }));
 	}
 
 	async list(): Promise<Project[]> {
-		return this.collection.find().toArray();
+		const all = await this.collection.find().toArray();
+		return all.map((p) => withDefaults(p) as Project);
 	}
 
 	async listByManager(userId: string): Promise<Project[]> {
-		return this.collection.find({ managedBy: userId }).toArray();
+		const all = await this.collection.find({ managedBy: userId }).toArray();
+		return all.map((p) => withDefaults(p) as Project);
 	}
 
 	async update(
 		id: string,
 		patch: Partial<
-			Pick<Project, 'name' | 'managedBy' | 'bucketId' | 'clientIds'>
+			Pick<
+				Project,
+				'name' | 'managedBy' | 'bucketId' | 'clientIds' | 'corsOrigins'
+			>
 		>
 	): Promise<Project | null> {
-		return this.collection.findOneAndUpdate(
-			{ _id: id },
-			{ $set: { ...patch, updatedAt: new Date() } },
-			{ returnDocument: 'after' }
+		return withDefaults(
+			await this.collection.findOneAndUpdate(
+				{ _id: id },
+				{ $set: { ...patch, updatedAt: new Date() } },
+				{ returnDocument: 'after' }
+			)
 		);
 	}
 
@@ -67,7 +88,9 @@ export class ProjectStore implements ProjectStoreInstance {
 		return this.collection.countDocuments({ bucketId });
 	}
 
+	// On the request path for every browser-origin call to a client-based endpoint, hence the
+	// `clientIds` index provisioned in database/mongodb.ts.
 	async findByClientId(clientId: string): Promise<Project | null> {
-		return this.collection.findOne({ clientIds: clientId });
+		return withDefaults(await this.collection.findOne({ clientIds: clientId }));
 	}
 }

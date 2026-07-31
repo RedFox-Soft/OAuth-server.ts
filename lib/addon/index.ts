@@ -1,7 +1,6 @@
 import * as accountMod from './account.js';
 import * as cibaMod from './ciba.js';
 import * as claimsMod from './claims.js';
-import * as corsMod from './cors.js';
 import * as defaultMod from './default.js';
 import * as interactionsMod from './interactions.js';
 import * as introspectionMod from './introspection.js';
@@ -27,8 +26,6 @@ export const assertJwtClientAuthClaimsAndHeader: typeof defaultMod.assertJwtClie
 			'assertJwtClientAuthClaimsAndHeader',
 			defaultMod.assertJwtClientAuthClaimsAndHeader
 		)(...args);
-export const clientBasedCORS: typeof corsMod.clientBasedCORS = (...args) =>
-	resolve('clientBasedCORS', corsMod.clientBasedCORS)(...args);
 export const loadExistingGrant: typeof accountMod.loadExistingGrant = (
 	...args
 ) => resolve('loadExistingGrant', accountMod.loadExistingGrant)(...args);

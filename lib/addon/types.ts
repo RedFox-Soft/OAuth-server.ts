@@ -4,7 +4,6 @@
 // preload) without dragging in the model graph that the addon modules load.
 export interface AddonImplementations {
 	assertJwtClientAuthClaimsAndHeader: (typeof import('./default.js'))['assertJwtClientAuthClaimsAndHeader'];
-	clientBasedCORS: (typeof import('./cors.js'))['clientBasedCORS'];
 	loadExistingGrant: (typeof import('./account.js'))['loadExistingGrant'];
 	findAccount: (typeof import('./account.js'))['findAccount'];
 	expiresWithSession: (typeof import('./tokens.js'))['expiresWithSession'];

@@ -37,6 +37,7 @@ import { featureVerification } from './featureVerification.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { authHeaders, authParams } from 'lib/plugins/auth.js';
 import { coerceArrayParams } from 'lib/plugins/coerce_array_params.js';
+import { corsClientBased, formClientId } from 'lib/plugins/cors.js';
 import {
 	BackchannelAuthenticationResponse,
 	DeviceAuthorizationResponse,
@@ -70,7 +71,13 @@ async function authentication(params, headers, oidc) {
 	}
 }
 
+/*
+ * `deviceAuth` is the browser-facing half of this module; `backchannelAuth` below is not, and gets no
+ * CORS — CIBA is initiated by the client's own backend by construction. The hook precedes the guard so
+ * the header is written before body-schema validation can reject the request.
+ */
 export const deviceAuth = new Elysia()
+	.use(corsClientBased(formClientId))
 	.use(coerceArrayParams('ui_locales', 'resource'))
 	.guard({
 		body: t.Composite([authParams, DeviceAuthorizationParameters]),

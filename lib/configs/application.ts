@@ -282,6 +282,20 @@ export const ApplicationConfig = {
 	'richAuthorizationRequests.types': {},
 
 	/*
+	 * cors
+	 *
+	 * title: Cross-Origin Resource Sharing for browser-based clients
+	 *
+	 * description: Enables the CORS layer: public metadata endpoints answer any origin, and the
+	 * endpoints a browser app calls directly answer origins listed on the owning project's
+	 * `corsOrigins`. Defaults to enabled because closure is achieved by data — a project with no
+	 * origins grants nothing, so a fresh deployment is closed with this on. It exists as an incident
+	 * kill switch. There is deliberately no `cors.maxAge` companion: the preflight cache lifetime is
+	 * dictated by browser behaviour, not by deployment, and would be the first numeric key here.
+	 */
+	'cors.enabled': true,
+
+	/*
 	 * features.registration
 	 *
 	 * title: [`OIDC Dynamic Client Registration 1.0`](https://openid.net/specs/openid-connect-registration-1_0-final.html) and [`RFC7591`](https://www.rfc-editor.org/rfc/rfc7591.html) - OAuth 2.0 Dynamic Client Registration Protocol

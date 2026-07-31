@@ -18,6 +18,7 @@ import { Client } from 'lib/models/client.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Grant } from 'lib/models/grant.js';
 import { OAuthError, UserinfoResponse } from 'lib/shared/response_schemas.js';
+import { accessTokenClientId, corsClientBased } from 'lib/plugins/cors.js';
 
 async function userInfo({ headers, set }) {
 	const oidc = new OIDCContext({}, headers);
@@ -142,7 +143,14 @@ async function userInfo({ headers, set }) {
 	}
 }
 
+/*
+ * Mounted ahead of the guard: the header schema below 422s a request with no `authorization`, and that
+ * happens in the validation stage — after transform, before beforeHandle. Writing the CORS header at
+ * transform is what puts it on that 422 and on the 401 DPoP-nonce challenge, which a browser client
+ * must be able to read to perform its retry (RFC 9449 §7.1, §8).
+ */
 export const userinfo = new Elysia()
+	.use(corsClientBased(accessTokenClientId))
 	.guard({
 		schema: 'standalone',
 		headers: t.Object({

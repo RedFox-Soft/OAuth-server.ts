@@ -7,11 +7,14 @@ import {
 } from 'lib/configs/discoverySupport.js';
 import { ApplicationConfig } from '../configs/application.js';
 import { DiscoveryResponse, OAuthError } from 'lib/shared/response_schemas.js';
+import { corsOpen } from 'lib/plugins/cors.js';
 
 // Booleans whose `false` value is meaningful and must survive the falsy-value sweep.
 const MEANINGFUL_FALSE = new Set<string>(['request_uri_parameter_supported']);
 
-export const discovery = new Elysia().get(
+// corsOpen must precede the route: an Elysia hook only affects routes declared after it. A JavaScript
+// client cannot discover a deployment it is not allowed to read (OIDC Discovery 1.0 §4).
+export const discovery = new Elysia().use(corsOpen).get(
 	'/.well-known/openid-configuration',
 	function () {
 		// Compute the full candidate document from the live ApplicationConfig, then gate it.

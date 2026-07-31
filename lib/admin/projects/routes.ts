@@ -14,11 +14,34 @@ import {
 	UpdateProjectBody,
 	SetBucketBody
 } from './schema.js';
+import {
+	InvalidOriginError,
+	normalizeOrigins
+} from '../../helpers/cors_origin.js';
 
 async function loadProject(id: string) {
 	const project = await getProjectStore().find(id);
 	if (!project) throw new AdminError(404, 'project not found');
 	return project;
+}
+
+/*
+ * Normalizes a submitted origin list, or refuses the whole request. All-or-nothing on purpose: half a
+ * list is a configuration an operator did not ask for, and the browser-facing consequence of a silently
+ * dropped entry is an app that cannot reach the server.
+ */
+function validateCorsOrigins(origins: string[] | undefined) {
+	if (origins === undefined) {
+		return undefined;
+	}
+	try {
+		return normalizeOrigins(origins);
+	} catch (err) {
+		if (err instanceof InvalidOriginError) {
+			throw new AdminError(400, err.message);
+		}
+		throw err;
+	}
 }
 
 export const projectRoutes = new Elysia({ name: 'admin-projects' })
@@ -48,11 +71,14 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 			if (await store.findBySlug(body.slug)) {
 				throw new AdminError(409, 'slug already exists');
 			}
+			// Every accepted key must be forwarded explicitly: the store takes more than this handler
+			// passes, so a schema addition alone would accept a value and silently discard it.
 			const project = await store.create({
 				name: body.name,
 				slug: body.slug,
 				type: 'regular',
-				managedBy: body.managedBy ?? []
+				managedBy: body.managedBy ?? [],
+				corsOrigins: validateCorsOrigins(body.corsOrigins) ?? []
 			});
 			set.status = 201;
 			return project;
@@ -74,7 +100,11 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 				throw new AdminError(403, 'cannot modify admin project');
 			assertProjectAccess(ctx, project);
 			if (body.managedBy !== undefined) assertRole(ctx, 'super_admin');
-			return getProjectStore().update(params.id, body);
+			const corsOrigins = validateCorsOrigins(body.corsOrigins);
+			return getProjectStore().update(params.id, {
+				...body,
+				...(corsOrigins === undefined ? {} : { corsOrigins })
+			});
 		},
 		{ body: UpdateProjectBody }
 	)

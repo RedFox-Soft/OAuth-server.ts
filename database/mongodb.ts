@@ -64,6 +64,13 @@ for (const name of COLLECTIONS) {
 					{
 						key: { slug: 1 },
 						unique: true
+					},
+					// projectStore.findByClientId runs on every browser-origin request to a
+					// client-based CORS endpoint, so the lookup has to be a point read rather
+					// than a collection scan. Not unique: a client belongs to one project, but
+					// nothing in the schema enforces that here.
+					{
+						key: { clientIds: 1 }
 					}
 				]
 			: []),

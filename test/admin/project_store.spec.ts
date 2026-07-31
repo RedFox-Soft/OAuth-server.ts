@@ -40,6 +40,44 @@ describe('ProjectStore (memory)', () => {
 		expect(reloaded?.clientIds).toEqual(['abc']);
 	});
 
+	// The storage contract for corsOrigins. Both adapters implement the same interface; the mongo
+	// store additionally defaults the field on read for documents written before it existed.
+	it('defaults corsOrigins to [], accepts them on create, and round-trips an update', async () => {
+		const bare = await store.create({
+			name: 'Bare',
+			slug: `bare-${Math.random()}`
+		});
+		expect(bare.corsOrigins).toEqual([]);
+
+		const seeded = await store.create({
+			name: 'Seeded',
+			slug: `seeded-${Math.random()}`,
+			corsOrigins: ['https://app.example.com']
+		});
+		expect(seeded.corsOrigins).toEqual(['https://app.example.com']);
+		expect((await store.find(seeded._id))?.corsOrigins).toEqual([
+			'https://app.example.com'
+		]);
+
+		const updated = await store.update(seeded._id, {
+			corsOrigins: ['https://other.example.com', 'https://third.example.com']
+		});
+		expect(updated?.corsOrigins).toEqual([
+			'https://other.example.com',
+			'https://third.example.com'
+		]);
+		expect((await store.find(seeded._id))?.corsOrigins).toEqual([
+			'https://other.example.com',
+			'https://third.example.com'
+		]);
+
+		// Clearing is a first-class operation: an operator revoking browser access must not have to
+		// delete the project.
+		expect(
+			(await store.update(seeded._id, { corsOrigins: [] }))?.corsOrigins
+		).toEqual([]);
+	});
+
 	it('finds a project by one of its client ids', async () => {
 		const store = new ProjectStore();
 		const p = await store.create({

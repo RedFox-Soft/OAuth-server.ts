@@ -122,6 +122,95 @@ function matchesPrefix(path: string): boolean {
 	);
 }
 
+export type CorsClass = 'open' | 'client-based' | 'none';
+
+export interface CorsRoute {
+	readonly method: string;
+	readonly path: string;
+	readonly cors: CorsClass;
+}
+
+/*
+ * Which routes a browser may read cross-origin, and on whose authority. Same declaration form and
+ * same two-way drift guard as gatedRoutes above: only `open` and `client-based` are enumerated, and
+ * everything else is `none` — but the guard asserts the enumerated set is exactly these eight, so a
+ * new endpoint cannot become readable cross-origin without an explicit edit here.
+ *
+ * `open` echoes any Origin (the data is public to anyone who can issue a request). `client-based`
+ * echoes only an Origin listed on the project owning the calling client.
+ */
+export const corsRoutes: readonly CorsRoute[] = [
+	// OIDC Discovery 1.0 §4 and §3: a JavaScript client cannot know a deployment in advance, so it
+	// has to be able to fetch the metadata and the keys before it knows anything else.
+	{
+		method: 'GET',
+		path: '/.well-known/openid-configuration',
+		cors: 'open'
+	},
+	{ method: 'GET', path: routeNames.jwks, cors: 'open' },
+
+	{ method: 'POST', path: routeNames.token, cors: 'client-based' },
+	{ method: 'GET', path: routeNames.userinfo, cors: 'client-based' },
+	{ method: 'POST', path: routeNames.userinfo, cors: 'client-based' },
+	{ method: 'POST', path: routeNames.revocation, cors: 'client-based' },
+	{
+		method: 'POST',
+		path: routeNames.pushed_authorization_request,
+		cors: 'client-based'
+	},
+	{
+		method: 'POST',
+		path: routeNames.device_authorization,
+		cors: 'client-based'
+	}
+];
+
+/*
+ * Deliberate exclusions, recorded because Discovery §3's "and any other endpoints directly accessed
+ * by Clients" could be read to include them:
+ *
+ * - `/auth` — the browser-based-apps BCP forbids CORS here, and a browser reaches it by navigation.
+ * - `/reg` and `/reg/:clientId` — Discovery §3 names the DCR endpoint explicitly, but browser-side
+ *   dynamic registration is not a flow this product supports. Revisit if it ever is.
+ * - `/token/introspect` — called by resource servers, which are backends.
+ * - `/backchannel` — CIBA is initiated by the client's backend by construction.
+ * - `/device` (user-code verification) — reached by navigation, not by fetch.
+ */
+const corsClassByKey = new Map<string, CorsClass>(
+	corsRoutes.map((route) => [`${route.method} ${route.path}`, route.cors])
+);
+
+export function corsClassForPattern(method: string, path: string): CorsClass {
+	return corsClassByKey.get(`${method} ${path}`) ?? 'none';
+}
+
+/*
+ * The methods a CORS-enabled path actually serves, for the preflight's Access-Control-Allow-Methods.
+ * Derived from the same table rather than restated, so `/userinfo` cannot advertise a method it does
+ * not implement.
+ */
+export function corsMethodsForPath(path: string): string[] {
+	return corsRoutes
+		.filter((route) => route.path === path)
+		.map((route) => route.method);
+}
+
+/*
+ * Resolves an incoming request path to its CORS class, matching the way gatedFlagForRequest does
+ * (segment-wise, so a `:param` consumes exactly one segment). Returns the class and the declared
+ * pattern, because the preflight needs the pattern to look the served methods up.
+ */
+export function corsRouteForRequest(
+	pathname: string
+): { readonly path: string; readonly cors: CorsClass } | undefined {
+	for (const route of corsRoutes) {
+		if (patternMatchesPath(route.path, pathname)) {
+			return { path: route.path, cors: route.cors };
+		}
+	}
+	return undefined;
+}
+
 /*
  * Compares a route *pattern* (as Elysia declares it) against the table. Used by the drift guard,
  * which asks "is this mounted route classified?" — not by the request path, which needs

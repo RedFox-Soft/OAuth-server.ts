@@ -56,6 +56,7 @@ import {
 	AuthPlugin,
 	withBody
 } from 'lib/plugins/auth.js';
+import { corsClientBased, formClientId } from 'lib/plugins/cors.js';
 import {
 	OAuthError,
 	ParResponse,
@@ -198,7 +199,13 @@ export const authPost = new Elysia()
 		}
 	);
 
+/*
+ * Only `par` carries CORS in this module: a browser reaches /auth by navigation, and the
+ * browser-based-apps BCP forbids CORS there outright. The hook precedes AuthPlugin, which throws
+ * invalid_client from a `derive` in the transform queue.
+ */
 export const par = new Elysia()
+	.use(corsClientBased(formClientId))
 	.use(AuthPlugin)
 	.guard({
 		body: t.Composite([
