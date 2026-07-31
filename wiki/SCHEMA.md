@@ -23,12 +23,29 @@ Add additional types here as the wiki evolves.
 
 ## Tag taxonomy
 
-(Empty initially. Add tags here as you adopt them, with one-line descriptions. Keep this list small and disciplined — a wiki with 200 tags has effectively no tags.)
+Keep this list small and disciplined — a wiki with 200 tags has effectively no tags. Current set:
 
-Example structure:
-- `methodology` — pages about research or analytical methods.
-- `open-question` — pages or sections that flag unresolved questions.
-- `contested` — pages where sources contradict.
+- `architecture` — how the server is structured and why; module boundaries and their rationale.
+- `contract` — an invariant call sites must honour; getting it wrong is a bug, not a style choice.
+- `gotcha` — a rule whose violation fails silently or far from its cause.
+- `config` — settings, feature flags, and derived configuration.
+- `oauth` — behaviour specified by an OAuth 2.x RFC.
+- `oidc` — behaviour specified by OpenID Connect.
+
+## Sourcing rule for a codebase wiki
+
+This wiki's source is mutable code, not fixed documents, so the default "cite the raw file" rule is
+adapted:
+
+- Non-source pages carry `sources: [oauth-server-codebase]` and additionally cite exact
+  `file:line` locations inline for each substantive claim.
+- The source page records the commit it was verified at (`revision:` in its frontmatter). A claim is
+  checkable against that revision rather than taken on the wiki's word.
+- Prefer the code's own comments and commit messages as evidence. They record *why* a structure
+  exists — reasoning that cannot be re-derived from control flow — which is the highest-value
+  material this codebase offers.
+- Never promote an inference about what code probably does into a typed graph edge; typed edges need
+  a quotable line.
 
 ## Page sizing
 
@@ -86,13 +103,14 @@ When the wiki passes ~150 pages or `index.md` exceeds 300 lines, shard into `wik
 
 ## Retrieval
 
-- Search is section-level hybrid by default: `uv run --script skills/llm-wiki/scripts/wiki_search.py "query" --json`.
+- **Always invoke the bundled scripts through `wiki/bin/wiki.py`**, from the repo root: `python wiki/bin/wiki.py search "query" --json`. The scripts themselves live in the plugin cache under a versioned path, so hardcoded paths break on plugin upgrade; the launcher resolves the newest installed copy, passes the wiki directory, and forces UTF-8 output. Commands: `search`, `lint`, `stats`, `setup`, `graph-extract`, `graph-lint`, `graph-query`.
+- Search is section-level hybrid by default: `python wiki/bin/wiki.py search "query" --json`.
 - Semantic backend: local FastEmbed + sqlite-vec (`BAAI/bge-small-en-v1.5`, 384 dimensions). No wiki or query text leaves the machine.
 - First semantic use downloads model artifacts to `~/.cache/llm-wiki/fastembed/`; set `FASTEMBED_CACHE_PATH` to override the model cache.
-- Semantic setup verified: 2026-07-28
+- Semantic setup verified: 2026-07-31
 - `wiki/.wiki-cache/` holds regenerable retrieval artifacts: `search-index.json` (parse cache) and `embeddings.sqlite` (section metadata + sqlite-vec vectors). Safe to delete; never edit by hand; gitignored.
 - The vector index is content-hashed: only new or changed sections are re-embedded, deleted sections are removed, and model/schema changes rebuild it automatically.
-- Dependency-free lexical path: `python skills/llm-wiki/scripts/wiki_search.py "query" --no-embed` (direct Python bypasses PEP 723 dependency resolution). A missing or failed local backend also falls back to lexical search without failing the command.
+- Dependency-free lexical path: `python wiki/bin/wiki.py search "query" --no-embed`. Semantic search needs `uv` on PATH; without it the launcher fails loudly rather than silently degrading to lexical.
 
 ## Graph layer
 
@@ -103,11 +121,13 @@ The wiki has an optional compiled graph layer under `wiki/graph/`:
 - `wiki/graph/graph.sqlite` — generated. Gitignored by default.
 - `wiki/graph/graph.graphml` — generated. Track only if you want to diff it.
 
-Generation is reproducible from markdown via `scripts/wiki_graph_extract.py`. The graph can be deleted at any time and rebuilt without losing knowledge — markdown is canonical.
+Generation is reproducible from markdown via `python wiki/bin/wiki.py graph-extract`. The graph can be deleted at any time and rebuilt without losing knowledge — markdown is canonical.
 
 ## Workflow customizations
 
-(Empty initially. Document any deviations from the default ingest/query/lint workflows here.)
+- **Script invocation goes through `wiki/bin/wiki.py`.** Never call the plugin's scripts by path, and never call them with bare `python`: bare `python` skips the PEP 723 dependency block, which makes `wiki_search.py` fall back to lexical BM25 with only a warning and makes the graph scripts fail outright on missing PyYAML.
+- `/wiki:upgrade` rewrites this file from the plugin's `SCHEMA.md.template`, which hardcodes a `skills/llm-wiki/scripts/...` path that does not exist in this repo. After any upgrade, restore the two Retrieval bullets and this section.
+- This project is a codebase, not a research corpus. The wiki records durable knowledge about the OAuth/OIDC server — protocol decisions, subsystem contracts, hard-won gotchas. Transient planning artifacts (`TASKS.md`, `specs/`) are deliberately **not** wiki sources: they are scratch files that get deleted, and ingesting them would fill the wiki with claims whose sources vanish.
 
 ## User preferences
 

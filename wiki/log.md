@@ -10,3 +10,7 @@ Operations:
 - `shard` — an index was sharded.
 
 ---
+
+## [2026-07-31] schema | Fixed script invocation (wiki/bin/wiki.py launcher), recorded codebase-as-source and transient-artifact rules, added `subsystem` node type and `implements` predicate to the ontology.
+
+## [2026-07-31] ingest | OAuth server codebase (lib/) at commit 2125ad0 — first real ingest. Pilot pass: 1 source page + 5 pages on durable subsystem contracts (token payload access, client identity, account resolution, feature-flag gating, eventBus).

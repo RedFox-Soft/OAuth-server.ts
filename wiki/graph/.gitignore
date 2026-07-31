@@ -1,2 +1,4 @@
 graph.sqlite
 graph.graphml
+nodes.jsonl
+edges.jsonl

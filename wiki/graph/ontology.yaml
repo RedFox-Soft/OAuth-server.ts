@@ -33,6 +33,13 @@ node_types:
     maps_from:
       type: entity
       kind: organization
+  subsystem:
+    maps_from:
+      type: entity
+      kind: subsystem
+    # A module or coherent group of modules in this repository. Added because this
+    # wiki documents a codebase, so its entities are subsystems rather than people
+    # and companies.
   concept:
     maps_from:
       type: concept
@@ -102,9 +109,17 @@ predicates:
     object_types: [product, company, organization]
     requires_evidence: true
   depends_on:
-    subject_types: [product, concept]
-    object_types: [product, concept]
+    subject_types: [product, concept, subsystem]
+    object_types: [product, concept, subsystem]
     requires_evidence: true
+  implements:
+    subject_types: [subsystem, concept]
+    object_types: [concept]
+    requires_evidence: true
+    description: |
+      A subsystem or mechanism in this repository realises the named contract or
+      protocol behaviour. Evidence must be a quote from the code or its comments,
+      not an inference about what the code probably does.
   authored:
     subject_types: [person, organization]
     object_types: [paper, source]
