@@ -1,9 +1,10 @@
 import { db } from './db.js';
+import { STORE_AREAS } from '../../consts/storage_inventory.js';
 import type { AdminSession, AdminSessionStoreInstance } from '../types.js';
 import nanoid from '../../helpers/nanoid.js';
 
 export class AdminSessionStore implements AdminSessionStoreInstance {
-	private collection = db.collection<AdminSession>('adminSession');
+	private collection = db.collection<AdminSession>(STORE_AREAS.adminSession);
 
 	async create(data: {
 		userId: string;

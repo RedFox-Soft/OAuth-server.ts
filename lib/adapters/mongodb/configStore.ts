@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { ObjectId } from 'mongodb';
 import { db } from './db.js';
+import { STORE_AREAS } from '../../consts/storage_inventory.js';
 import type { AdapterConfigStore } from '../types.js';
 
 function stringTo24CharHex(str: string) {
@@ -10,7 +11,7 @@ function stringTo24CharHex(str: string) {
 
 class ConfigStore implements AdapterConfigStore {
 	static instance = new ConfigStore();
-	private collectionName = 'serviceConfig';
+	private collectionName: string = STORE_AREAS.serviceConfig;
 	private configId = new ObjectId(stringTo24CharHex('appConfig'));
 
 	async get(): Promise<Record<string, unknown> | null> {

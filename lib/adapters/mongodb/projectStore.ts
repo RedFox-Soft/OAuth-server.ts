@@ -1,4 +1,5 @@
 import { db } from './db.js';
+import { STORE_AREAS } from '../../consts/storage_inventory.js';
 import type { Project, ProjectStoreInstance } from '../types.js';
 import nanoid from '../../helpers/nanoid.js';
 
@@ -15,7 +16,7 @@ function withDefaults(project: Project | null): Project | null {
 }
 
 export class ProjectStore implements ProjectStoreInstance {
-	private collection = db.collection<Project>('projects');
+	private collection = db.collection<Project>(STORE_AREAS.projects);
 
 	async create(data: {
 		_id?: string;

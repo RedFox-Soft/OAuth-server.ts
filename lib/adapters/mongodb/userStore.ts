@@ -1,9 +1,9 @@
 import crypto from 'crypto';
 import { db } from './db.js';
+import { userAreaFor } from '../../consts/storage_inventory.js';
 import { type User, type UserStoreInstance } from '../types.js';
 
 export class UserStore implements UserStoreInstance {
-	private prefix = 'user_';
 	name = 'redfox';
 
 	constructor(name?: string) {
@@ -12,16 +12,22 @@ export class UserStore implements UserStoreInstance {
 		}
 	}
 
+	/* Composed through the inventory helper rather than concatenated here, so the `user_` prefix has
+	 * one definition shared with whatever provisions these collections. */
+	private get collectionName(): string {
+		return userAreaFor(this.name);
+	}
+
 	async find(_id: string): Promise<User | null> {
 		const result = await db
-			.collection<User>(this.prefix + this.name)
+			.collection<User>(this.collectionName)
 			.findOne({ _id });
 		return result || null;
 	}
 
 	async findByEmail(email: string): Promise<User | null> {
 		const result = await db
-			.collection<User>(this.prefix + this.name)
+			.collection<User>(this.collectionName)
 			.findOne({ email: email.toLowerCase() });
 		return result || null;
 	}
@@ -48,15 +54,12 @@ export class UserStore implements UserStoreInstance {
 			updatedAt: now,
 			lastLoginAt: null
 		};
-		await db.collection<User>(this.prefix + this.name).insertOne(user);
+		await db.collection<User>(this.collectionName).insertOne(user);
 		return user;
 	}
 
 	async list(): Promise<User[]> {
-		return db
-			.collection<User>(this.prefix + this.name)
-			.find()
-			.toArray();
+		return db.collection<User>(this.collectionName).find().toArray();
 	}
 
 	async update(
@@ -64,7 +67,7 @@ export class UserStore implements UserStoreInstance {
 		patch: Partial<Pick<User, 'roles' | 'active' | 'password' | 'verified'>>
 	): Promise<User | null> {
 		return db
-			.collection<User>(this.prefix + this.name)
+			.collection<User>(this.collectionName)
 			.findOneAndUpdate(
 				{ _id },
 				{ $set: { ...patch, updatedAt: new Date() } },
@@ -73,6 +76,6 @@ export class UserStore implements UserStoreInstance {
 	}
 
 	async destroy(_id: string): Promise<void> {
-		await db.collection<User>(this.prefix + this.name).deleteOne({ _id });
+		await db.collection<User>(this.collectionName).deleteOne({ _id });
 	}
 }

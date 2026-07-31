@@ -1,4 +1,6 @@
 import { db } from './db.js';
+import { STORE_AREAS } from '../../consts/storage_inventory.js';
+import { provisionUserArea } from './provision.js';
 import type { UserBucket, UserBucketStoreInstance } from '../types.js';
 import nanoid from '../../helpers/nanoid.js';
 
@@ -15,7 +17,7 @@ function withDefaults(bucket: UserBucket | null): UserBucket | null {
 }
 
 export class UserBucketStore implements UserBucketStoreInstance {
-	private collection = db.collection<UserBucket>('userBuckets');
+	private collection = db.collection<UserBucket>(STORE_AREAS.userBuckets);
 
 	async create(data: {
 		_id?: string;
@@ -41,6 +43,14 @@ export class UserBucketStore implements UserBucketStoreInstance {
 			updatedAt: now
 		};
 		await this.collection.insertOne(bucket);
+		/*
+		 * Provision the bucket's end-user collection now, while we know the bucket is new. Buckets are
+		 * created at runtime through the admin control plane, so leaving this to the operator routine
+		 * would mean every bucket created after deployment held its accounts in an unconstrained
+		 * collection — no unique email index, and therefore a registration race that can produce two
+		 * accounts on one address.
+		 */
+		await provisionUserArea(db, bucket._id);
 		return bucket;
 	}
 

@@ -1,5 +1,6 @@
 import { db } from './db.js';
 import { type UnnormalizedJWK } from 'lib/configs/verifyJWKs.ts';
+import { STORE_AREAS } from '../../consts/storage_inventory.js';
 import type { JWKSStoreInstance } from '../types.js';
 
 // Discard storage-only fields so callers only ever see plain JWK objects (contract parity with the
@@ -14,7 +15,7 @@ function toJWK(doc: Record<string, unknown>): UnnormalizedJWK {
 }
 
 export class JWKSStore implements JWKSStoreInstance {
-	private collectionName = 'jwks';
+	private collectionName: string = STORE_AREAS.jwks;
 
 	async get(keyId: string): Promise<UnnormalizedJWK | null> {
 		const result = await db

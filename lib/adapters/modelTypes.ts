@@ -1,3 +1,4 @@
+import type { ModelAreaName } from '../consts/storage_inventory.js';
 import type { AccessTokenPayloadType } from '../models/access_token.js';
 import type { AuthorizationCodePayloadType } from '../models/authorization_code.js';
 import type { BackchannelAuthenticationRequestPayloadType } from '../models/backchannel_authentication_request.js';
@@ -51,9 +52,40 @@ export interface ModelPayloadByName {
 	VerificationResend: VerificationResendPayload;
 }
 
-export type KnownModelName = keyof ModelPayloadByName;
+/*
+ * Derived from the provisioning inventory's runtime tuple rather than from `keyof
+ * ModelPayloadByName`, so the set of model areas has exactly one definition. The direction matters:
+ * a type erases at runtime, and the drift guard that keeps provisioning honest can only compare
+ * values — so the tuple is the source and this is the derivation.
+ */
+export type KnownModelName = ModelAreaName;
 
+/*
+ * Ties the payload map to that tuple in both directions. A model area with no payload type, or a
+ * payload type for an area no longer in the inventory, makes one of these non-`never` and fails to
+ * compile. A secondary net only — `bun run typecheck` is red repo-wide, so it gates nothing today;
+ * test/storage_contract/inventory_drift.spec.ts is the enforcement that runs.
+ */
+type PayloadTypesMissingFromMap = Exclude<
+	ModelAreaName,
+	keyof ModelPayloadByName
+>;
+type PayloadTypesNotInInventory = Exclude<
+	keyof ModelPayloadByName,
+	ModelAreaName
+>;
+export type ModelPayloadMapMatchesInventory = [
+	PayloadTypesMissingFromMap,
+	PayloadTypesNotInInventory
+] extends [never, never]
+	? true
+	: never;
+
+/*
+ * Indexed by `keyof ModelPayloadByName` rather than by KnownModelName so the lookup stays provably
+ * valid to the compiler; the assertion above is what guarantees the two key sets are the same.
+ */
 export type PayloadForModel<TModelName extends string> =
-	TModelName extends KnownModelName
+	TModelName extends keyof ModelPayloadByName
 		? ModelPayloadByName[TModelName]
 		: Record<string, unknown>;

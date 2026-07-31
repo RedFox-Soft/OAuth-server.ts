@@ -1,11 +1,12 @@
 import { db } from './db.js';
+import { STORE_AREAS } from '../../consts/storage_inventory.js';
 import type { AdminAuditEntry, AdminAuditStoreInstance } from '../types.js';
 import nanoid from '../../helpers/nanoid.js';
 
 // Append-only MongoDB admin audit log (collection `adminAudit`). Only inserts and reads —
 // no update/delete — so the trail is immutable through this adapter.
 export class AdminAuditStore implements AdminAuditStoreInstance {
-	private collection = db.collection<AdminAuditEntry>('adminAudit');
+	private collection = db.collection<AdminAuditEntry>(STORE_AREAS.adminAudit);
 
 	async record(
 		entry: Omit<AdminAuditEntry, '_id' | 'timestamp'>

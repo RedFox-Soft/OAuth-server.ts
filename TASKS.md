@@ -89,7 +89,7 @@ exact line numbers.
      `invalid_client` from there; body-schema 422s also precede `beforeHandle`. A header written at
      `beforeHandle` would be missing from exactly the two responses a misconfigured browser app hits
      most. Measured, not reasoned: `POST /token` with no body 401s from that derive.
-  2. `set.headers` **does** merge into a raw `Response` returned by a handler *and* into one returned
+  2. `set.headers` **does** merge into a raw `Response` returned by a handler _and_ into one returned
      from an `onRequest` short-circuit. That is what lets `corsOpen` work on `jwks` (which builds its
      own `Response`) and lets the preflight 204 inherit `no-store` from `nocache` with no duplicated
      constant.
@@ -98,7 +98,7 @@ exact line numbers.
   4. `POST /admin/api/projects` forwarded only four fields to `store.create()`, silently dropping
      `clientIds`. A schema-only addition would have accepted `corsOrigins` and discarded it. Fixed for
      `corsOrigins`; the `clientIds` drop is still there (nothing sends it).
-  5. The in-memory project store is a process-wide singleton and `findByClientId` returns the *first*
+  5. The in-memory project store is a process-wide singleton and `findByClientId` returns the _first_
      match, so a project left behind by an earlier test inverts a later filtered-origin assertion into
      a false pass. The suite tracks and destroys what it creates.
 - **Source of truth:** `docs/superpowers/specs/2026-07-30-cors-policy-design.md`. The summary below
@@ -158,8 +158,47 @@ exact line numbers.
       extension, a storage-contract round-trip for `corsOrigins` in both adapters, and admin route
       validation/RBAC tests. Full suite green.
 
-### 4. Complete `db:setup` provisioning — Implement
+### 4. Complete `db:setup` provisioning — ✅ Implemented
 
+- **Delivered by** `specs/012-db-setup-provisioning` (branch `012-db-setup-provisioning`). Mechanism:
+  a declared inventory (`lib/consts/storage_inventory.ts`) that every consumer reads — the operator
+  routine provisions from it, the seven MongoDB store classes take their collection names from it,
+  `KnownModelName` derives from its model tuple, and a two-way drift guard
+  (`test/storage_contract/inventory_drift.spec.ts`) fails the suite when it and the code disagree.
+  Same shape as `route_classification.ts` from task 1. Provisioned areas went 19 → 24 on a fresh
+  database (22 fixed + one per bucket); decisions live in pure helpers (`database/reconcile.ts`) so
+  they are testable without a datastore. Suite: 2251 pass / 0 fail (was 2210); typecheck unchanged at 2474.
+- **Findings worth carrying forward** (belong in the wiki alongside tasks 1 and 3):
+  1. **MongoDB's `create` is idempotent when the options match**, so `createCollection` returns ok for
+     a collection that already exists. Inferring "I created it" from the absence of a throw made every
+     re-run report all 24 collections as freshly created — contradicting the routine's own promise to
+     print only real work. Existence has to be asked (`listCollections`), not deduced. Found by
+     running the routine twice against a real database; pinned by a `Db`-stub regression test. This is
+     also the mechanism behind this task's original note that the duplicate list entries were
+     "harmless".
+  2. **The wrong TTL indexes were inert, not live bugs.** `Client`/`projects`/`userBuckets` never
+     write `expiresAt`, and MongoDB never expires a document lacking the indexed field. They are
+     dropped anyway because the failure mode if that ever changes is silent deletion of registered
+     OAuth clients — including via the known `upsert` bug that never `$unset`s a stale `expiresAt`.
+     Inert now, unrecoverable later.
+  3. **Dropping indexes must be scoped by capability, not by absence from the inventory.** An
+     unrecognised ordinary index may be an operator's deliberate addition; only expiry rules are safe
+     to remove (removing one cannot lose a record, and nothing here queries by an expiry field).
+     Verified in practice: a hand-added `payload.clientName_1` on `Client` survived reconciliation
+     while three stale TTL indexes were dropped.
+  4. **`ModelPayloadByName` is a type, so a runtime drift guard cannot read it.** The guard instead
+     scans `adapter('X')` literals across `lib/` and dynamically imports `lib/models/*.ts`, keeping
+     classes that inherit `BaseModel`'s static `adapter` accessor (which resolves the collection as
+     `adapter(this.name)`, so the class name _is_ the area name). Base classes are excluded
+     structurally — a base appears in another discovered class's prototype chain — so there is no
+     allow-list to maintain and `IdToken` is excluded correctly.
+  5. **`lib/adapters/mongodb/db.ts` connects at module scope** and throws without `MONGODB_URI`, which
+     the suite deliberately lacks. That single fact dictates where the inventory can live: anything
+     importing it transitively is unloadable under test, so the table sits in `lib/consts/` and
+     imports nothing.
+  6. **Seed before per-bucket provisioning.** The `admin` and `redfox` buckets are created by the
+     seed, so provisioning per-bucket areas first leaves a fresh deployment with zero user
+     collections — while still exiting 0.
 - **Context:** Verified empirically on a throwaway DB: after `bun run db:setup`, the collections
   `VerificationChallenge`, `VerificationResend`, and `serviceConfig` do not exist — they
   auto-create on first write **without TTL indexes**, so expired verification challenges and
@@ -179,7 +218,15 @@ exact line numbers.
   succeeds). A test or documented manual verification proves the collection/index inventory.
 - **Amended by task 2's decision note:** the inventory must also create an index on
   `projects.clientIds` (no TTL) — `projectStore.findByClientId` becomes a per-request lookup on five
-  endpoints once client-based CORS lands.
+  endpoints once client-based CORS lands. **Already provisioned by task 3**; it moved into the
+  inventory unchanged and is now covered by the drift guard rather than being new work.
+- **Verification:** the drift guard and the reconciliation/exit-code helpers are covered
+  automatically; the MongoDB path itself has no automated test, because Principle III keeps the suite
+  off real datastores and how mongo-backed tests should run is task 25's decision. It was instead
+  verified by hand against a throwaway database per
+  `specs/012-db-setup-provisioning/quickstart.md` — fresh inventory, idempotency, runtime bucket
+  provisioning, per-bucket uniqueness, reconciliation without record loss, and the duplicate-email
+  exit-1 path. That procedure is the seed for the automated equivalent once task 25 lands.
 
 ### 5. DPoP nonce configuration safety — Implement
 
@@ -494,6 +541,23 @@ exact line numbers.
   suites run against it (minimum: the existing `test/storage_contract/` round-trips + the store
   specs, parameterized over both adapters), and how divergences get pinned. Produces the spec
   input for the implementation task it defines.
+- **Measurements blocked on this task.** Task 4 (`specs/012-db-setup-provisioning`) established four
+  guarantees structurally — the constraint was verified present, the outcome never observed — because
+  each needs a datastore-backed test this investigation has to enable first. They are recorded here
+  because a note in `specs/` would not be found: that directory is gitignored. Whichever option this
+  task picks should be able to carry all four.
+  1. **Automatic reaping observed.** That expired verification challenges and resend counters actually
+     leave storage. The TTL indexes are provisioned and verified; the datastore's expiry task runs on
+     its own ~60s schedule, so this needs a timed test. (Task 4 SC-002.)
+  2. **Concurrent registrations.** That two simultaneous registrations of one address into one bucket
+     produce exactly one account. Verified today only as a sequential duplicate insert rejected by the
+     unique index. (Task 4 SC-003.)
+  3. **Sign-in cost independent of bucket size.** A benchmark over, say, 10 versus 100,000 accounts.
+     Only the existence of the `email` index is verified today. (Task 4 SC-004.)
+  4. **No implicitly-created storage area after exercising every capability.** Provision a database,
+     drive every server capability against the mongo adapter, then diff the collection list. Today only
+     the weaker half is verified: all 24 _declared_ areas exist after provisioning. This is the one that
+     would catch an area missing from the inventory altogether. (Task 4 SC-001.)
 
 ### 26. Typecheck remediation strategy — Investigate
 
@@ -570,7 +634,7 @@ exact line numbers.
 
 ## Suggested order
 
-Quick wins first: **14** (bug batch) → ~~**1** (flag gating)~~ → **4** (db provisioning) → **5**
+Quick wins first: **14** (bug batch) → ~~**1** (flag gating)~~ → ~~**4** (db provisioning)~~ → **5**
 (DPoP safety) → **11** (id_token verification). Then the investigation pair-ups: ~~**3** (CORS)~~,
 **9→10** (deletion), **6→7** (RAR). Then P1 remainder (**8**, **12**, **13**, **15**), P2 product
 work (**16**–**23**), and P3 (**24**–**30**) as capacity allows. Tasks 28 and 29 are safe to do
