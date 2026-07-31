@@ -126,7 +126,7 @@ Generation is reproducible from markdown via `python wiki/bin/wiki.py graph-extr
 ## Workflow customizations
 
 - **Script invocation goes through `wiki/bin/wiki.py`.** Never call the plugin's scripts by path, and never call them with bare `python`: bare `python` skips the PEP 723 dependency block, which makes `wiki_search.py` fall back to lexical BM25 with only a warning and makes the graph scripts fail outright on missing PyYAML.
-- `/wiki:upgrade` rewrites this file from the plugin's `SCHEMA.md.template`, which hardcodes a `skills/llm-wiki/scripts/...` path that does not exist in this repo. After any upgrade, restore the two Retrieval bullets and this section.
+- `/wiki:upgrade` does **not** overwrite this file — `init_wiki.py` skips every file that already exists and only reports which template marker sections are missing, leaving the merge to a human or the agent. The residual hazard is narrower: the plugin's `SCHEMA.md.template` still prints the `skills/llm-wiki/scripts/...` path, which does not exist in this repo, so if a future upgrade asks to merge a **Retrieval** section from the template, that broken path comes with it. Re-point any merged command at `wiki/bin/wiki.py`. Verified against plugin 3.0.0 on 2026-07-31.
 - This project is a codebase, not a research corpus. The wiki records durable knowledge about the OAuth/OIDC server — protocol decisions, subsystem contracts, hard-won gotchas. Transient planning artifacts (`TASKS.md`, `specs/`) are deliberately **not** wiki sources: they are scratch files that get deleted, and ingesting them would fill the wiki with claims whose sources vanish.
 
 ## User preferences

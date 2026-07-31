@@ -197,6 +197,8 @@ python wiki/bin/wiki.py search "query terms" --json   # add --no-embed for lexic
 
 Run every wiki script through `wiki/bin/wiki.py` (`search`, `lint`, `stats`, `setup`, `graph-extract`, `graph-lint`, `graph-query`) — it resolves the plugin's versioned script path, supplies the wiki directory, and forces UTF-8. Calling the plugin scripts directly with bare `python` silently downgrades search to lexical and breaks the graph scripts.
 
+Relational questions — what links to what, which pages depend on a subsystem, the path between two pages — can consult the compiled graph instead of reading pages: `python wiki/bin/wiki.py graph-query neighbors --node concept:<slug>` (also `edges`, `facts`, `path`). Rebuild it with `graph-extract` after an ingest that adds typed `graph.relationships`.
+
 To add a new source, follow the `llm-wiki` skill's ingest workflow: decide placement under `wiki/sources/`, `wiki/entities/`, `wiki/concepts/`, or `wiki/synthesis/`; identify touched pages and make surgical `str_replace` updates rather than rewrites; update the index; append a one-line entry to `wiki/log.md`.
 
 Scaling discipline: atomic pages (400-line soft cap, 800-line hard cap), sharded indexes past ~150 pages or 300 index lines, required YAML frontmatter on every page, `[[wikilinks]]` for every cross-reference.
