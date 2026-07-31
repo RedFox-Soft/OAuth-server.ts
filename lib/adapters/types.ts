@@ -64,6 +64,39 @@ export interface SmtpSettingsStoreConstructor {
 	new (): SmtpSettingsStoreInstance;
 }
 
+/*
+ * The server's DPoP nonce secret: one 32-byte value per deployment, provisioned by the server itself
+ * at startup and never supplied by an operator. Contract:
+ * specs/014-dpop-nonce-safety/contracts/nonce-secret-store.md.
+ *
+ * Two properties are load-bearing and neither is expressible in the signatures alone.
+ *
+ * `unknown` rather than `Buffer` is deliberate. This interface deliberately does NOT promise that a
+ * value reads back in the shape it was written: a buffer written to a document store returns as the
+ * driver's binary wrapper, and that mismatch — a value arriving in a shape the declared type calls
+ * impossible — is the whole defect this feature closes. Promising fidelity the storage layer cannot
+ * keep is how it arrived. Callers narrow with isUsableNonceSecret (configs/nonceSecret.ts).
+ *
+ * Both writes return the record AS READ BACK, not the candidate handed in. That is what makes the
+ * round-trip check structural rather than a step a caller can forget, and what hands a losing writer
+ * the winner's value from the very call that failed to take effect — so concurrent provisioning
+ * converges with no second code path.
+ *
+ * `null` means absent. Nothing here expires or deletes the record: serviceConfig is declared
+ * `reaped: null` in the storage inventory, pinned by test/storage_contract/inventory_expiry.spec.ts.
+ */
+export interface DPoPNonceSecretStoreInstance {
+	read(): Promise<unknown>;
+	/* Writes only if no record exists. On conflict the write does not take effect. */
+	create(secret: Buffer): Promise<unknown>;
+	/* Writes only if the stored value is still `observed`. On mismatch the write does not take effect. */
+	replace(observed: unknown, secret: Buffer): Promise<unknown>;
+}
+
+export interface DPoPNonceSecretStoreConstructor {
+	new (): DPoPNonceSecretStoreInstance;
+}
+
 export interface UserStoreInstance {
 	find(id: string): Promise<User | null>;
 	findByEmail(email: string): Promise<User | null>;

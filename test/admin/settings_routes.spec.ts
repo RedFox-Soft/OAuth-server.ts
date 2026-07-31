@@ -349,4 +349,77 @@ describe('settings API', () => {
 		expect(res.status).toBe(422);
 		expect((await settingsAudit()).length).toBe(before);
 	});
+
+	/*
+	 * The defect this feature was filed against, from the surface it was reachable from.
+	 *
+	 * Before spec 014, arming dpop.requireNonce was accepted and persisted with no nonce secret in
+	 * place, and after the restart that applied it every DPoP-bearing request answered 500. It is
+	 * accepted now for the opposite reason: the server provisions its own secret at startup, so the
+	 * prerequisite is already met and there is nothing left for an operator to get wrong.
+	 */
+	describe('DPoP nonce enforcement', () => {
+		it('accepts arming nonce enforcement, because the server holds its own secret', async () => {
+			const cookie = await sessionCookieFor(['super_admin']);
+
+			const res = await client.admin.api.settings.put(
+				{ 'dpop.enabled': true, 'dpop.requireNonce': true },
+				{ headers: { cookie } }
+			);
+
+			expect(res.status).toBe(200);
+			// Boot-only like every setting: persisted now, live after a restart.
+			expect((res.data as SettingsResponse).restartRequired).toBe(true);
+			expect((res.data as SettingsResponse).changedKeys).toContain(
+				'dpop.requireNonce'
+			);
+		});
+
+		it('refuses to accept the nonce secret as a setting', async () => {
+			const cookie = await sessionCookieFor(['super_admin']);
+
+			// Server-owned state, not an operator override. The catalog is the allow-list, and the
+			// secret is deliberately absent from it, so this is rejected as an unknown key rather than
+			// validated and stored.
+			const res = await client.admin.api.settings.put(
+				{ 'dpop.nonceSecret': Buffer.alloc(32, 0) } as unknown as Record<
+					string,
+					boolean
+				>,
+				{ headers: { cookie } }
+			);
+
+			expect(res.status).toBe(422);
+		});
+
+		it('never discloses the nonce secret through the settings surface', async () => {
+			const cookie = await sessionCookieFor(['super_admin']);
+
+			const res = await client.admin.api.settings.get({ headers: { cookie } });
+
+			expect(res.status).toBe(200);
+			const body = res.data as SettingsResponse;
+			expect(Object.keys(body.values)).not.toContain('dpop.nonceSecret');
+			expect(body.catalog.map((d) => d.key)).not.toContain('dpop.nonceSecret');
+			// Not merely absent from the keys: the value must not appear anywhere in the payload, in
+			// any encoding a serializer might have chosen for a Buffer.
+			expect(JSON.stringify(body)).not.toContain('nonceSecret');
+		});
+
+		it('refuses a batch whose merged result would not run, without partially applying it', async () => {
+			const cookie = await sessionCookieFor(['super_admin']);
+			const before = await configStore.get();
+
+			// jwtIntrospection without introspection is one of the invariants the boot validator
+			// enforces; pairing it with a valid DPoP change proves the whole batch is judged on its
+			// merged result rather than key by key.
+			const res = await client.admin.api.settings.put(
+				{ 'dpop.requireNonce': true, 'jwtIntrospection.enabled': true },
+				{ headers: { cookie } }
+			);
+
+			expect(res.status).toBe(422);
+			expect(await configStore.get()).toEqual(before);
+		});
+	});
 });

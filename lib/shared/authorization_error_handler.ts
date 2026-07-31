@@ -152,11 +152,9 @@ export async function errorHandler(obj: ErrorContext) {
 		}
 	}
 	if (isOIDError && error instanceof UseDpopNonce) {
-		const dPoPInstance = DPoPNonces.fabrica();
-		if (!dPoPInstance) {
-			throw new Error('dpop.nonceSecret configuration is missing');
-		}
-		set.headers['DPoP-Nonce'] = dPoPInstance.nextNonce();
+		// A use_dpop_nonce error is only useful with a nonce attached, and one can always be produced —
+		// so there is no longer a branch here that turns a recoverable protocol error into a 500.
+		set.headers['DPoP-Nonce'] = DPoPNonces.fabrica().nextNonce();
 	}
 
 	const accept = request.headers.get('accept') || '';

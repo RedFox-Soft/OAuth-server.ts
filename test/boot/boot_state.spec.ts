@@ -17,7 +17,11 @@ import * as path from 'node:path';
  * test harness, and look at what it ended up with. That is what justifies the subprocess.
  *
  * The child starts on an empty in-memory store (the preload's fixture keys are not in its process),
- * so it also covers the auto-provisioning fallback in resolveKeys.
+ * so it also covers the auto-provisioning fallback in resolveKeys — and, since spec 014, the same
+ * fallback for the DPoP nonce secret. The `stderr: ''` assertion below is load-bearing for that one:
+ * provisioning on an empty store is silent by design, and only a *replacement* says anything, so a
+ * clean boot that prints nothing is itself the evidence that the ordinary path took no shortcut
+ * through the noisy branch.
  */
 const BOOT_SCRIPT = `
 import * as path from 'node:path';
@@ -29,10 +33,14 @@ await import(at('lib/event_bus.ts'));
 const ks = await import(at('lib/configs/keystore.ts'));
 const app = await import(at('lib/configs/application.ts'));
 
+const nonceSecret = app.ApplicationConfig['dpop.nonceSecret'];
+
 process.stdout.write(JSON.stringify({
 	published: ks.publicJWKS.keys.length,
 	held: [...ks.keystore].length,
 	canSign: ks.keystore.selectForSign({ alg: 'RS256' }).length > 0,
+	nonceSecretIsBuffer: Buffer.isBuffer(nonceSecret),
+	nonceSecretBytes: Buffer.isBuffer(nonceSecret) ? nonceSecret.byteLength : null,
 	scopes: [...app.configuration.scopes],
 	grantTypes: [...app.configuration.grantTypes],
 	claimsSupported: [...app.configuration.claimsSupported],
@@ -88,6 +96,15 @@ describe('a freshly booted server, with no reload and no harness', () => {
 		expect(booted.held).toBeGreaterThan(0);
 		expect(booted.published).toBe(booted.held);
 		expect(booted.canSign).toBe(true);
+	});
+
+	it('holds a usable DPoP nonce secret', () => {
+		// Provisioned unconditionally, whether or not DPoP is enabled — which is what makes "armed to
+		// require a nonce it cannot produce" a state no started server can be in. Before spec 014 this
+		// was `undefined` on a default deployment, and turning on dpop.requireNonce made every
+		// DPoP-bearing request answer 500.
+		expect(booted.nonceSecretIsBuffer).toBe(true);
+		expect(booted.nonceSecretBytes).toBe(32);
 	});
 
 	it('has its settings validated and derived', () => {

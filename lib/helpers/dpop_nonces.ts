@@ -1,6 +1,7 @@
 import { hkdfSync } from 'node:crypto';
 import * as base64url from './base64url.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
+import { isUsableNonceSecret } from 'lib/configs/nonceSecret.js';
 
 function sixfourbeify(value: number): Uint8Array<ArrayBuffer> {
 	const buf = Buffer.alloc(8);
@@ -46,9 +47,14 @@ export class DPoPNonces {
 	#next: string;
 	#nextnext: string;
 
-	constructor(secret: Buffer) {
-		if (!Buffer.isBuffer(secret) || secret.byteLength !== 32) {
-			throw new TypeError('dpop.nonceSecret must be a 32-byte Buffer instance');
+	constructor(secret: Uint8Array | undefined) {
+		// The same predicate configs/configuration.ts validates with, so there is exactly one definition
+		// of a usable secret. Before spec 014 this check was the only one, and it ran here — on the
+		// request path, outside any try — which is how an unusable secret turned every DPoP-bearing
+		// request into a 500. It is kept as the definition of the constraint, not as a live guard:
+		// configs/nonceSecret.ts resolves a usable secret before the server serves anything.
+		if (!isUsableNonceSecret(secret)) {
+			throw new TypeError('dpop.nonceSecret must be 32 bytes of byte material');
 		}
 
 		this.#secret = Uint8Array.prototype.slice.call(secret);
@@ -93,12 +99,22 @@ export class DPoPNonces {
 		return result === 0;
 	}
 
-	static enabling = true;
 	static #singleton: DPoPNonces | undefined;
-	static fabrica(): DPoPNonces | undefined {
-		const nonceSecret = ApplicationConfig['dpop.nonceSecret'];
-		if (DPoPNonces.enabling && nonceSecret !== undefined) {
-			return (DPoPNonces.#singleton ??= new DPoPNonces(nonceSecret));
-		}
+
+	/*
+	 * Always returns a generator. That is the whole of what spec 014 changed here, and it is what let
+	 * four `throw new Error('dpop.nonceSecret configuration is missing')` sites be deleted rather than
+	 * merely tidied: a caller cannot handle an absent generator wrongly if there is no absent case to
+	 * handle. configs/nonceSecret.ts resolves a usable secret before the server serves anything, so
+	 * the only remaining check is the constructor's, kept as the definition of the constraint.
+	 *
+	 * The `enabling` static that used to gate this is gone. It existed so a test could fabricate a
+	 * server with DPoP on and no nonce generator — a state no deployment can now be in, so a test
+	 * asserting behaviour for it was asserting a fiction.
+	 */
+	static fabrica(): DPoPNonces {
+		return (DPoPNonces.#singleton ??= new DPoPNonces(
+			ApplicationConfig['dpop.nonceSecret']
+		));
 	}
 }

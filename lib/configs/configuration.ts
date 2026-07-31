@@ -4,6 +4,9 @@ import * as formatters from '../helpers/formatters.ts';
 // declares every setting, which makes `typeof` it the exact type of what is being validated — a
 // misspelled flag read below is a compile error rather than a silently-undefined lookup.
 import type { ApplicationConfigType } from './application.js';
+// A value import, but of a module that pulls in nothing but node:crypto and a type — so it adds no
+// runtime edge back to application.js either.
+import { isUsableNonceSecret } from './nonceSecret.js';
 
 /*
  * The server settings that cannot be read straight off ApplicationConfig: collections turned into
@@ -216,6 +219,41 @@ function checkDependantFeatures(config: ConfigurationInput) {
 		throw new TypeError(
 			'richAuthorizationRequests is only available in conjuction with enabled resourceIndicators'
 		);
+	}
+
+	checkDpopNonces(config);
+}
+
+/*
+ * The two DPoP nonce invariants.
+ *
+ * Neither can fire during a healthy boot: configs/application.ts provisions a usable secret before it
+ * calls this function, so by the time a configuration is validated the secret is already there. They
+ * are here so the guarantee does not rest on that ordering holding forever. This is a pure function of
+ * its argument, which means a test can hand it the state a running server cannot reach — and if
+ * provisioning is ever reordered, moved, or made conditional, the boot fails here with a message
+ * naming the setting instead of every DPoP request failing with an internal error.
+ *
+ * That was the defect: `dpop.requireNonce` was reachable from the admin UI, nothing cross-checked it
+ * against the secret, and the result was a 500 on every request carrying a DPoP proof.
+ *
+ * Deliberately absent: a rule against requiring a nonce while `dpop.enabled` is false. With DPoP off
+ * no proof is examined, so the requirement is inert and cannot fail.
+ */
+function checkDpopNonces(config: ConfigurationInput) {
+	const secret = config['dpop.nonceSecret'];
+
+	if (config['dpop.requireNonce'] && config['dpop.enabled'] && !secret) {
+		throw new TypeError(
+			'dpop.requireNonce needs a dpop.nonceSecret: the server cannot demand a nonce it has no ' +
+				'secret to derive one from'
+		);
+	}
+
+	// Checked whether or not a nonce is required, because the nonce generator is built for every
+	// DPoP-bearing request: an unusable secret breaks all DPoP traffic, not only the nonce path.
+	if (secret !== undefined && !isUsableNonceSecret(secret)) {
+		throw new TypeError('dpop.nonceSecret must be a 32-byte Buffer instance');
 	}
 }
 

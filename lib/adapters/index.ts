@@ -7,6 +7,7 @@ import {
 	AdminSessionStore as MemoryAdminSessionStore,
 	AdminAuditStore as MemoryAdminAuditStore,
 	SmtpSettingsStore as MemorySmtpSettingsStore,
+	DPoPNonceSecretStore as MemoryDPoPNonceSecretStore,
 	configStore as memoryConfig
 } from './memory/index.js';
 import type {
@@ -15,6 +16,8 @@ import type {
 	AdminAuditStoreInstance,
 	AdminSessionStoreConstructor,
 	AdminSessionStoreInstance,
+	DPoPNonceSecretStoreConstructor,
+	DPoPNonceSecretStoreInstance,
 	JWKSStoreConstructor,
 	JWKSStoreInstance,
 	ModelAdapter,
@@ -40,6 +43,8 @@ let AdminSessionStoreClass: AdminSessionStoreConstructor =
 let AdminAuditStoreClass: AdminAuditStoreConstructor = MemoryAdminAuditStore;
 let SmtpSettingsStoreClass: SmtpSettingsStoreConstructor =
 	MemorySmtpSettingsStore;
+let DPoPNonceSecretStoreClass: DPoPNonceSecretStoreConstructor =
+	MemoryDPoPNonceSecretStore;
 export let configStore: AdapterConfigStore = memoryConfig;
 
 if (process.env.MONGODB_URI) {
@@ -53,6 +58,7 @@ if (process.env.MONGODB_URI) {
 	AdminSessionStoreClass = mongodb.AdminSessionStore;
 	AdminAuditStoreClass = mongodb.AdminAuditStore;
 	SmtpSettingsStoreClass = mongodb.SmtpSettingsStore;
+	DPoPNonceSecretStoreClass = mongodb.DPoPNonceSecretStore;
 }
 
 if (process.env.NODE_ENV === 'test') {
@@ -64,6 +70,10 @@ export const adminSessionStore: AdminSessionStoreInstance =
 	new AdminSessionStoreClass();
 export const adminAuditStore: AdminAuditStoreInstance =
 	new AdminAuditStoreClass();
+/* Eagerly constructed like the stores above, because configs/application.ts resolves the nonce secret
+ * at module scope — before any request — and a lazy getter would only defer that by one call. */
+export const dpopNonceSecretStore: DPoPNonceSecretStoreInstance =
+	new DPoPNonceSecretStoreClass();
 
 export const cache = new Map();
 export function adapter<TModelName extends string>(

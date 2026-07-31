@@ -1,5 +1,6 @@
-import { configStore } from '../adapters/index.js';
+import { configStore, dpopNonceSecretStore } from '../adapters/index.js';
 import { validateConfiguration, type Configuration } from './configuration.js';
+import { resolveNonceSecret } from './nonceSecret.js';
 
 export const ApplicationConfig = {
 	/*
@@ -42,10 +43,24 @@ export const ApplicationConfig = {
 	/**
 	 * features.dPoP.nonceSecret
 	 *
-	 * description: A secret value used for generating server-provided DPoP nonces.
-	 * Must be a 32-byte length Buffer instance when provided.
+	 * description: The secret every server-provided DPoP nonce is derived from. A 32-byte Buffer.
+	 *
+	 * Server-owned state, not an operator setting: it is deliberately absent from the admin settings
+	 * catalog, and since the settings API filters submissions against that catalog, no operator can
+	 * reach it. The server provisions one at startup when its store holds none (configs/nonceSecret.ts),
+	 * so this is `undefined` only in the instant before that resolution runs — never while serving.
+	 *
+	 * An in-process bootstrap may supply one, which is the only way a value arrives from outside, and
+	 * is how the test suite pins a fixed secret. A supplied value that is not 32 bytes is ignored in
+	 * favour of the stored one rather than being fatal.
+	 *
+	 * The widening is needed because the initial value is `undefined` while the resolved value is byte
+	 * material; TypeScript infers the literal's type from the initialiser alone, and there is no way to
+	 * annotate one property of an object literal in place. `Uint8Array` rather than `Buffer` for the
+	 * reason given on isUsableNonceSecret: a Buffer is one, and a structured clone of this object
+	 * downgrades it to one.
 	 */
-	'dpop.nonceSecret': undefined,
+	'dpop.nonceSecret': undefined as Uint8Array | undefined,
 	/**
 	 * features.dPoP.requireNonce
 	 *
@@ -409,6 +424,20 @@ export const ApplicationConfig = {
 	]
 };
 Object.assign(ApplicationConfig, await configStore.get());
+
+/*
+ * Resolved here, between loading the persisted settings and validating them, and the position is the
+ * point. The validator below rejects "nonces required with no usable secret"; if that rule could ever
+ * run before this line, it would fail a perfectly healthy boot. Two consecutive statements in one
+ * module make the ordering a fact rather than a property of the import graph — which is why this is
+ * not a side-effect import from event_bus.ts, the way signing keys are anchored.
+ *
+ * Every entry path imports this module, so nothing can serve a request before this has completed.
+ */
+ApplicationConfig['dpop.nonceSecret'] = await resolveNonceSecret(
+	dpopNonceSecretStore,
+	ApplicationConfig['dpop.nonceSecret']
+);
 
 export type ApplicationConfigType = typeof ApplicationConfig;
 

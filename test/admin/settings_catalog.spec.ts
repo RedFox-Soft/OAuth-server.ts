@@ -1,8 +1,27 @@
 import { describe, it, expect } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { SETTINGS_CATALOG } from 'lib/admin/settings/catalog.ts';
 import { ApplicationConfig } from 'lib/configs/application.ts';
 
 describe('settings catalog', () => {
+	/*
+	 * The nonce secret's absence from the catalog is what makes it unreachable from the admin API,
+	 * which filters submissions against this list. The absence is already pinned below; this pins the
+	 * *reason* being written down next to it, so a later reader finds a decision rather than a hole
+	 * they might helpfully fill in. Reading the module's source is the only way to assert a comment
+	 * exists — the same technique test/storage_contract/inventory_drift.spec.ts uses on lib sources.
+	 */
+	it('records in the module why the DPoP nonce secret is not an operator setting', () => {
+		const source = readFileSync(
+			resolve(import.meta.dir, '../../lib/admin/settings/catalog.ts'),
+			'utf8'
+		);
+
+		expect(source).toContain('dpop.nonceSecret');
+		expect(source).toMatch(/server-provisioned|server-owned/);
+	});
+
 	it('every catalog key exists in ApplicationConfig', () => {
 		for (const d of SETTINGS_CATALOG) {
 			expect(

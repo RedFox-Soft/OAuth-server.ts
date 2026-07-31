@@ -64,13 +64,27 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 		description:
 			'Sender-constrains tokens via application-layer proof-of-possession.'
 	},
+	/*
+	 * `dpop.nonceSecret` is deliberately absent, and this is the record of why.
+	 *
+	 * It is server-provisioned state, not an operator setting: the server generates a 32-byte secret at
+	 * startup when its store holds none, and replaces a stored one that reads back unusable
+	 * (configs/nonceSecret.ts). An operator never supplies, sees, or rotates it — so there is nothing
+	 * here to edit, and its absence from this catalog is what makes the settings API unable to reach it.
+	 * Pinned in both directions by test/admin/settings_catalog.spec.ts.
+	 *
+	 * Turning the setting below on therefore has no prerequisite an operator can fail to meet. Before
+	 * this was true, arming it with no secret in place was accepted and answered every DPoP-bearing
+	 * request with a 500 after the next restart.
+	 */
 	{
 		key: 'dpop.requireNonce',
 		group: 'DPoP',
 		label: 'Require DPoP nonce',
 		type: 'boolean',
 		dependsOn: 'dpop.enabled',
-		description: 'Requires a server-provided DPoP nonce.'
+		description:
+			'Requires a server-provided DPoP nonce. The secret the nonces are derived from is managed by the server; there is nothing to supply.'
 	},
 	{
 		key: 'dpop.allowReplay',

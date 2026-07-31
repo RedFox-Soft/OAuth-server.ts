@@ -45,9 +45,6 @@ export async function dpopValidate(
 
 	const dPoPInstance = DPoPNonces.fabrica();
 	const requireNonce = config['dpop.requireNonce'];
-	if (requireNonce && !dPoPInstance) {
-		throw new Error('dpop.nonceSecret configuration is missing');
-	}
 
 	let payload: JWTPayload;
 	let protectedHeader: JWTHeaderParameters;
@@ -73,15 +70,14 @@ export async function dpopValidate(
 			const now = epochTime();
 			const diff = Math.abs(now - payload.iat);
 			if (diff > DPOP_OK_WINDOW) {
-				if (dPoPInstance) {
-					throw new UseDpopNonce(
-						'DPoP proof iat is not recent enough, use a DPoP nonce instead'
-					);
-				}
-				throw new InvalidDpopProof('DPoP proof iat is not recent enough');
+				// A nonce can always be offered now, so this is always the recoverable answer. It used to
+				// fall back to a flat invalid_dpop_proof when the server had no nonce secret, which told a
+				// client its proof was bad when the truth was that the server could not help it — spec 014
+				// removed that branch along with the state that produced it.
+				throw new UseDpopNonce(
+					'DPoP proof iat is not recent enough, use a DPoP nonce instead'
+				);
 			}
-		} else if (!dPoPInstance) {
-			throw new InvalidDpopProof('DPoP nonces are not supported');
 		}
 
 		if (payload.htm !== method) {
@@ -122,7 +118,7 @@ export async function dpopValidate(
 		throw new UseDpopNonce('nonce is required in the DPoP proof');
 	}
 
-	if (payload.nonce && !dPoPInstance?.checkNonce(payload.nonce)) {
+	if (payload.nonce && !dPoPInstance.checkNonce(payload.nonce)) {
 		throw new UseDpopNonce('invalid nonce in DPoP proof');
 	}
 
@@ -152,9 +148,6 @@ export function setNonceHeader(
 	}
 
 	const dPoPInstance = DPoPNonces.fabrica();
-	if (!dPoPInstance) {
-		throw new Error('dpop.nonceSecret configuration is missing');
-	}
 	if (dPoP.nonce !== dPoPInstance.nextNonce()) {
 		headers['DPoP-Nonce'] = dPoPInstance.nextNonce();
 	}

@@ -71,9 +71,12 @@ export const STORE_AREAS = {
 	userBuckets: 'userBuckets',
 	adminSession: 'adminSession',
 	adminAudit: 'adminAudit',
-	/* One area, two writers: configStore keeps the persisted ApplicationConfig and
-	 * SmtpSettingsStore the SMTP credentials, as two singleton documents distinguished only by a
-	 * derived ObjectId. One inventory entry, therefore, not two. */
+	/* One area, three writers: configStore keeps the persisted ApplicationConfig, SmtpSettingsStore
+	 * the SMTP credentials, and DPoPNonceSecretStore the server's nonce secret, as three singleton
+	 * documents distinguished only by a derived ObjectId. One inventory entry, therefore, not three.
+	 * The nonce secret joined them rather than claiming an area of its own because this area is
+	 * already declared permanent (`reaped: null` below): a secret that expired on its own would be
+	 * silently regenerated at the next startup, churning every client's nonces for no visible reason. */
 	serviceConfig: 'serviceConfig'
 } as const;
 

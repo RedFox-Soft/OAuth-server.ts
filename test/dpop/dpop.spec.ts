@@ -34,7 +34,6 @@ import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
 import { Client } from 'lib/models/client.js';
 import { AccessToken } from 'lib/models/access_token.js';
-import { DPoPNonces } from 'lib/helpers/dpop_nonces.js';
 import { ApplicationConfig as config } from 'lib/configs/application.js';
 
 function ath(accessToken: string) {
@@ -473,64 +472,54 @@ describe('features.dPoP', async () => {
 				);
 			});
 
-			for (const enabled of [true, false]) {
-				describe(`with DPoP-Nonces ${enabled ? 'enabled' : 'disabled'}`, () => {
-					beforeEach(function () {
-						DPoPNonces.enabling = enabled;
+			/*
+			 * This used to run twice, over `DPoPNonces.enabling` — a static that let a test fabricate a
+			 * server with DPoP on and no nonce generator, and assert that such a server answered a
+			 * too-old proof with a flat invalid_dpop_proof and no nonce header.
+			 *
+			 * Spec 014 removed both the static and that state: a server provisions its own nonce secret
+			 * at startup, so a generator always exists and a nonce can always be offered. The branch the
+			 * disabled half exercised is gone from lib/, so keeping the assertion would have meant a
+			 * passing test describing a server this one cannot be. What survives is the recoverable
+			 * answer, which is now the only answer.
+			 */
+			for (const offset of [301, -301]) {
+				it(`iat too ${offset > 0 ? 'far in the future' : 'old'}`, async function () {
+					const { error, response } = await agent.userinfo.get({
+						headers: {
+							authorization: `DPoP ${access_token}`,
+							dpop: await new SignJWT({
+								htm: 'GET',
+								htu: `${ISSUER}/userinfo`,
+								ath
+							})
+								.setProtectedHeader({
+									alg: 'ES256',
+									typ: 'dpop+jwt',
+									jwk
+								})
+								.setIssuedAt(epochTime() - 301)
+								.setJti(randomUUID())
+								.sign(keypair.privateKey)
+						}
 					});
+					if (!error) throw new Error('expected error response');
+					expect(error.status).toBe(401);
+					expect(getHeader(response, 'www-authenticate')).toMatch(/^DPoP /);
+					expect(getHeader(response, 'www-authenticate')).toMatch(
+						/DPoP proof iat is not recent enough/
+					);
+					expect(getHeader(response, 'www-authenticate')).toMatch(
+						/algs="ES256 PS256"/
+					);
 
-					afterEach(function () {
-						DPoPNonces.enabling = true;
-					});
-
-					for (const offset of [301, -301]) {
-						it(`iat too ${offset > 0 ? 'far in the future' : 'old'}`, async function () {
-							const { error, response } = await agent.userinfo.get({
-								headers: {
-									authorization: `DPoP ${access_token}`,
-									dpop: await new SignJWT({
-										htm: 'GET',
-										htu: `${ISSUER}/userinfo`,
-										ath
-									})
-										.setProtectedHeader({
-											alg: 'ES256',
-											typ: 'dpop+jwt',
-											jwk
-										})
-										.setIssuedAt(epochTime() - 301)
-										.setJti(randomUUID())
-										.sign(keypair.privateKey)
-								}
-							});
-							if (!error) throw new Error('expected error response');
-							expect(error.status).toBe(401);
-							expect(getHeader(response, 'www-authenticate')).toMatch(/^DPoP /);
-							expect(getHeader(response, 'www-authenticate')).toMatch(
-								/DPoP proof iat is not recent enough/
-							);
-							expect(getHeader(response, 'www-authenticate')).toMatch(
-								/algs="ES256 PS256"/
-							);
-
-							if (enabled) {
-								expect(getHeader(response, 'dpop-nonce')).toMatch(
-									/^[\w-]{43}$/
-								);
-								expect(getHeader(response, 'www-authenticate')).toMatch(
-									/error="use_dpop_nonce"/
-								);
-								expect(getHeader(response, 'www-authenticate')).toMatch(
-									/use a DPoP nonce instead/
-								);
-							} else {
-								expect(response.headers.has('dpop-nonce')).toBe(false);
-								expect(getHeader(response, 'www-authenticate')).toMatch(
-									/error="invalid_dpop_proof"/
-								);
-							}
-						});
-					}
+					expect(getHeader(response, 'dpop-nonce')).toMatch(/^[\w-]{43}$/);
+					expect(getHeader(response, 'www-authenticate')).toMatch(
+						/error="use_dpop_nonce"/
+					);
+					expect(getHeader(response, 'www-authenticate')).toMatch(
+						/use a DPoP nonce instead/
+					);
 				});
 			}
 		});
@@ -1625,6 +1614,102 @@ describe('features.dPoP', async () => {
 			);
 			expect(token.status).toBe(200);
 			expect(token.response.headers.get('dpop-nonce')).toBeEmpty();
+		});
+	});
+
+	/*
+	 * No configuration answers a DPoP-bearing request with a server fault — spec 014, SC-001.
+	 *
+	 * The defect: `dpop.requireNonce` was reachable from the admin UI and nothing cross-checked it
+	 * against `dpop.nonceSecret`, so arming it on a default deployment made every request carrying a
+	 * DPoP proof throw a bare Error and answer 500. Not a protocol error a client could act on — an
+	 * internal one, on live traffic, with nothing said at the moment the setting was accepted.
+	 *
+	 * The matrix varies only what a deployment can actually vary. The secret is deliberately NOT a
+	 * dimension here: a started server always holds a usable one (configs/nonceSecret.ts provisions it
+	 * before anything is served, asserted in test/boot/boot_state.spec.ts), and no operator surface can
+	 * unset it — the settings catalog omits it, so the settings API rejects it as an unknown key. The
+	 * secret's own absent/unusable/valid states are exercised where they are actually reachable, at
+	 * resolution time, in test/configuration/nonce_secret_resolve.spec.ts.
+	 */
+	describe('no configuration yields a server fault', () => {
+		let access_token: string;
+
+		beforeEach(async () => {
+			const at = new AccessToken({
+				accountId: setup.getAccountId(),
+				grantId: setup.getGrantId(),
+				client: await Client.find('client'),
+				scope: 'openid'
+			});
+			at.setThumbprint('jkt', thumbprint);
+			access_token = await at.save();
+		});
+
+		afterEach(() => {
+			config['dpop.enabled'] = true;
+			config['dpop.requireNonce'] = false;
+		});
+
+		it('holds a usable nonce secret at runtime, without one being configured by hand', () => {
+			// The bridge between the boot guarantee and everything below it: the matrix is only
+			// meaningful because this is true of every running server.
+			const secret = config['dpop.nonceSecret'];
+			expect(secret instanceof Uint8Array).toBe(true);
+			expect(secret?.byteLength).toBe(32);
+		});
+
+		for (const enabled of [true, false]) {
+			for (const requireNonce of [true, false]) {
+				it(`answers a protocol error, never a 5xx (enabled=${enabled}, requireNonce=${requireNonce})`, async () => {
+					config['dpop.enabled'] = enabled;
+					config['dpop.requireNonce'] = requireNonce;
+
+					// A nonce-less proof: the shape that used to throw when nonces were required.
+					const res = await agent.userinfo.get({
+						headers: {
+							authorization: `DPoP ${access_token}`,
+							dpop: await DPoP(keypair, { accessToken: access_token })
+						}
+					});
+
+					expect(res.status).toBeLessThan(500);
+					if (res.status >= 400) {
+						// Every failure names itself in the OAuth error vocabulary rather than surfacing an
+						// internal fault.
+						expect(getHeader(res.response, 'www-authenticate')).toMatch(
+							/error="[a-z_]+"/
+						);
+					}
+				});
+			}
+		}
+
+		it('answers the combination that used to 500 with a usable nonce, and succeeds on retry', async () => {
+			config['dpop.enabled'] = true;
+			config['dpop.requireNonce'] = true;
+
+			const first = await agent.userinfo.get({
+				headers: {
+					authorization: `DPoP ${access_token}`,
+					dpop: await DPoP(keypair, { accessToken: access_token })
+				}
+			});
+
+			expect(first.status).toBe(401);
+			const nonce = getHeader(first.response, 'dpop-nonce');
+			expect(nonce).toMatch(/^[\w-]{43}$/);
+
+			// The whole point of the error: it is recoverable. A client that retries with the nonce it
+			// was handed gets through, which is what makes arming the setting safe rather than fatal.
+			const retry = await agent.userinfo.get({
+				headers: {
+					authorization: `DPoP ${access_token}`,
+					dpop: await DPoP(keypair, { accessToken: access_token, nonce })
+				}
+			});
+
+			expect(retry.status).toBe(200);
 		});
 	});
 });
