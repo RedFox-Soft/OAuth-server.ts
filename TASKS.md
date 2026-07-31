@@ -244,7 +244,7 @@ exact line numbers.
   reach the bare-`Error` throw. Tests cover: invalid combo rejected at boot and via admin PUT;
   valid combo → nonce flow works.
 
-### 6. Rich Authorization Requests product scope — Investigate
+### 6. Rich Authorization Requests product scope — Investigate — **RESOLVED 2026-07-31**
 
 - **Context:** RAR is enable-able from the admin UI but cannot work end-to-end: the consent page
   drops `authorization_details` (`lib/interactions/consentView.ts:26-30` omits the `rar` key the
@@ -253,20 +253,74 @@ exact line numbers.
   is function-valued so it cannot be configured via the admin API (empty `{}` → every
   `authorization_details` value rejected at `lib/shared/check_rar.ts:62`). The only RAR-rendering
   code in the repo is in the dead legacy template `lib/views/interaction.ts:42-46`.
-- **Deliverable (defines Expected result of task 7):** Decide: (a) is RAR a supported product
-  feature (implement consent rendering + grant persistence + workable default hooks + a
-  serializable type-config format) or a code-extension-only feature (then hide/guard the admin
-  toggle per task 12 and document the extension contract); (b) if supported, define the
-  `authorization_details` type-configuration format an admin can express, and the consent-screen
-  UX for displaying details.
+- **Also found — the implementation tracks a draft, not the published RFC.** The admin catalog still
+  says so (`experimental: true`, "Implemented from a draft of the specification",
+  `lib/admin/settings/catalog.ts:285-293`); RFC 9396 has been final since May 2023. Divergences from
+  the published text: `authorization_details` is refused on the device-authorization and CIBA
+  channels that §3 names explicitly; it is absent from the `/token` body schema
+  (`lib/actions/token.ts:45-59`) although §6 defines it as a token-request parameter, which makes the
+  four grant-level rejections unreachable dead code and their `invalid_request` the wrong code for
+  §6's `invalid_authorization_details`; §5's unknown-field rejection cannot be expressed because no
+  type descriptor declares a field set; and `lib/configs/configuration.ts:212-218` invents a
+  dependency on `resourceIndicators` that the RFC does not have. Two bugs: RAR over PAR or a signed
+  request object **always** fails, because PAR stores the parameter parsed
+  (`pushed_authorization_request_response.ts:36-38`), nothing re-stringifies it, and `checkRar`
+  `JSON.parse`s an array into `"[object Object]"`; and the `rar` model schemas disagree (array on the
+  code and Grant, object on the access token, bare unknown on the refresh token).
+- **Deliverable — done:** `docs/superpowers/specs/2026-07-31-rar-conformance-design.md`. It records
+  the §-by-§ audit against final RFC 9396 and nine decisions: RAR is a **supported** feature (D1)
+  scoped to the **authorization-code and refresh-token flows** (D2); `richAuthorizationRequests.types`
+  becomes a **serializable per-type descriptor** — label, per-common-field `required`/`allowed`,
+  `allowUnknownFields` — with the code-registered `validate` demoted to an optional escape hatch (D3);
+  enabling the flag with zero types fails validation at boot and on admin `PUT` (D4); `checkRar`
+  accepts both the string and array shapes (D5); consent **displays all** requested details and
+  grants them wholesale, with no per-detail selection (D6); the four addon hooks get **working
+  generic defaults** (D7); the `resourceIndicators` coupling is kept and documented (D8); and the
+  deviations are written down rather than left implicit (D9). It also amends tasks 12, 27 and 29 and
+  adds task 31 — see "Backlog impact" in the note.
 
-### 7. Rich Authorization Requests end-to-end — Implement (depends on task 6)
+### 7. Rich Authorization Requests end-to-end — Implement (task 6 resolved)
 
-- **Expected result:** Whatever task 6 decides, made true in code and proven by functional tests
-  that send `authorization_details` through the authorization-code flow (today zero tests do).
-  Definition of done if "supported": consent page displays details, approved details persist on
-  the Grant via `addRar`, token issuance honors them, admin can configure types. Definition of
-  done if "extension-only": toggle guarded, contract documented, dead paths removed.
+- **Expected result** (per task 6's decision note, which is the spec input — read it first):
+  `authorization_details` works end to end on the authorization-code and refresh-token flows,
+  conformant to **final RFC 9396** within the boundary D2 sets. Definition of done:
+  - **Types are configurable as data.** `richAuthorizationRequests.types` holds a JSON descriptor per
+    type (`label`, optional `fields` constraints over the five §2 common fields,
+    `allowUnknownFields` defaulting to `false`). `checkRichAuthorizationRequests`
+    (`lib/configs/configuration.ts:137-162`) validates descriptor shape instead of requiring a
+    `validate` function, and rejects an empty map when the flag is on. A new `json` catalog entry
+    exposes the map to the admin API through the existing `validateEffectiveConfig` path.
+  - **Request validation is §5-conformant.** `checkRar` accepts the parameter as a JSON string _or_
+    an already-parsed array (fixes the PAR / request-object bug), enforces the descriptor's
+    required/allowed values, rejects unknown fields unless `allowUnknownFields`, and raises
+    `invalid_authorization_details` for every type-and-field violation, and **normalizes** — the
+    parsed array is written back to `oidc.params.authorization_details` so every downstream consumer
+    sees one shape and the consent prompt's second `JSON.parse`
+    (`lib/helpers/interaction_policy/prompts/consent.ts:133`) goes away. The dead `response_type`
+    branch goes; the `none` rejection stays.
+  - **Consent shows and stores the details.** `PromptDetails` carries `rar`; `buildConsentView` emits
+    a `'rar-detail'` permission group per detail (descriptor label + one item per present common
+    field, raw type as the fallback label), labels passed in by the caller so the module stays
+    config-free; `createGrant` calls `grant.addRar` for each entry; `addRar` is idempotent by
+    sorted-key structural comparison with **no string normalization** (§12); and `rar_prompt` fires
+    only when a requested detail is not already granted, so repeat authorizations stop re-prompting.
+  - **The hooks have real defaults.** `rarForAuthorizationCode` = requested ∩ granted;
+    `rarForCodeResponse` / `rarForRefreshTokenResponse` = the stored details filtered to the resource
+    server by `locations` (a detail without `locations` is kept);
+    `rarForIntrospectionResponse` = the token's details unchanged. No `mustChange`, no throw; the
+    override registry still wins.
+  - **Corrections.** `rar` is an array schema on the access token and refresh token; the catalog
+    entry drops `experimental` and the draft sentence and cites RFC 9396 as published (update
+    `test/admin/settings_catalog.spec.ts:85-88` with it); the `types` docstring describes the
+    descriptor.
+  - **Tests** (today zero send `authorization_details`): full code flow through consent to token
+    response, JWT claim and introspection; the same over **PAR** and a **signed request object**;
+    refresh-token flow with per-resource-server filtering; the §5 error cases;
+    no-duplicate-on-re-consent and no-re-prompt-when-granted; boot and admin-`PUT` rejection of the
+    flag with no types and of malformed descriptors; a registered code validator still running; and
+    device/CIBA/`client_credentials` still refusing the parameter, pinning D2's boundary.
+  - **Out of scope, by D2:** the §3 device and CIBA channels and the §6 token-request parameter —
+    task 31.
 
 ---
 
@@ -336,6 +390,12 @@ exact line numbers.
   guarded flag rejected without overrides, accepted with overrides registered.
 - **Amended by task 2's decision note:** `clientBasedCORS` is not among the hooks needing a guard —
   task 3 deletes the addon and replaces it with project-scoped origin data.
+- **Amended by task 6's decision note:** `richAuthorizationRequests.enabled` is not among the flags
+  needing a hook-presence guard either — task 7 gives all four `lib/addon/rar.ts` hooks working
+  defaults (decision D7), so no override is required to enable the feature. It needs a _different_
+  guard, which task 7 also delivers: enabling the flag with an empty
+  `richAuthorizationRequests.types` map fails validation (D4). Remaining flags for this task:
+  `ciba.enabled`, `resourceIndicators.enabled`, `mTLS.*`.
 
 ### 13. Protocol conformance batch — Implement
 
@@ -386,6 +446,38 @@ exact line numbers.
   restarts and hosts. Existing-deployment migration note written (subs WILL change once when
   moving off hostname — call it out in CHANGELOG). Test: two provider boots produce identical
   pairwise subs for the same account+client.
+
+### 31. RAR on the device, CIBA and token-endpoint channels — Implement (added by task 6; depends on task 7)
+
+- **Numbering is append-only:** this task belongs to P1 but takes the next free number so the
+  existing references (including "Suggested order") stay valid.
+- **Context:** Task 7 deliberately scopes RAR to the authorization-code and refresh-token flows
+  (decision D2), leaving two documented gaps against final RFC 9396. §3 says
+  `authorization_details` "can be used to specify authorization requirements in all places where the
+  `scope` parameter is used", naming device authorization (RFC 8628) and backchannel authentication
+  (CIBA) explicitly, but `unsupportedRar` (`lib/actions/authorization/unsupported_rar.ts`, mounted at
+  `lib/actions/authorization/device.ts:20`) and `lib/actions/grants/ciba.ts:25-28` refuse both. §6
+  defines the parameter on the **token request** — the AS checks that the underlying grant
+  (`authorization_code`, `refresh_token`) or, for `client_credentials`, the client's policy permits
+  the requested details, and otherwise refuses with `invalid_authorization_details` — but the
+  parameter is absent from the `/token` body schema (`lib/actions/token.ts:45-59`), so the four
+  grant-level checks are unreachable and each raises `invalid_request` rather than the code §6
+  mandates.
+- **Expected result:** `authorization_details` is carried end to end on the device-authorization and
+  CIBA channels, reusing task 7's descriptor validation, consent view model and grant persistence
+  across those channels' own consent surfaces (device code verification, CIBA's backchannel
+  authorization). `authorization_details` is accepted on the `/token` request for
+  `authorization_code`, `refresh_token` and `client_credentials`, checked against the grant's stored
+  details (or, for `client_credentials`, a client policy this task defines) using §12's RFC 8259
+  comparison rules with no normalization, and refused with `invalid_authorization_details` otherwise.
+  `unsupportedRar` is deleted. Update task 7's deviation table in
+  `docs/superpowers/specs/2026-07-31-rar-conformance-design.md` as each row is closed. Note the
+  strict token body schema: adding a parameter there is a deliberate exception to the "standard
+  parameters only" rule, so record why. Tests: details requested through the device flow and through
+  CIBA reach the issued token; a token request asking for details outside the grant is refused with
+  the correct code; `client_credentials` with a permitting and a non-permitting client policy.
+  **Consider splitting** — the two channels and the token parameter are independent enough for
+  separate Spec Kit cycles if the first one runs long.
 
 ---
 
@@ -588,6 +680,10 @@ exact line numbers.
   things). Full suite and lint green afterward.
 - **Amended by task 2's decision note:** `lib/shared/cors.ts` and `lib/addon/cors.ts` (plus its
   `AddonImplementations` entry and `lib/addon/index.ts` re-export) are removed by task 3, not here.
+- **Amended by task 6's decision note:** the RAR block in the legacy template
+  (`lib/views/interaction.ts:42-46`) is the repository's only extant RAR-rendering code, but task 7
+  supersedes it with a `'rar-detail'` group in the consent view. Deleting the template here loses no
+  function — this is recorded so the block is not mistaken for live behaviour worth preserving.
 
 ### 28. Documentation sync — Implement
 
@@ -636,6 +732,7 @@ exact line numbers.
 
 Quick wins first: **14** (bug batch) → ~~**1** (flag gating)~~ → ~~**4** (db provisioning)~~ → **5**
 (DPoP safety) → **11** (id_token verification). Then the investigation pair-ups: ~~**3** (CORS)~~,
-**9→10** (deletion), **6→7** (RAR). Then P1 remainder (**8**, **12**, **13**, **15**), P2 product
-work (**16**–**23**), and P3 (**24**–**30**) as capacity allows. Tasks 28 and 29 are safe to do
-anytime.
+**9→10** (deletion), ~~**6**~~**→7** (RAR). Then P1 remainder (**8**, **12**, **13**, **15**), P2
+product work (**16**–**23**), and P3 (**24**–**30**) as capacity allows. Tasks 28 and 29 are safe to
+do anytime. **31** (RAR's remaining channels) is P1 but sits behind **7**; it is the lowest-urgency
+P1 item, since nothing reaches those channels today.
