@@ -264,17 +264,12 @@ describe('projects API', () => {
 				slug: `partial-${Math.random().toString(36).slice(2)}`
 			});
 
-			const res = await client.admin.api
-				.projects({ id: project._id })
-				.patch(
-					{
-						corsOrigins: [
-							'https://good.example.com',
-							'https://bad.example.com/'
-						]
-					},
-					{ headers: { cookie } }
-				);
+			const res = await client.admin.api.projects({ id: project._id }).patch(
+				{
+					corsOrigins: ['https://good.example.com', 'https://bad.example.com/']
+				},
+				{ headers: { cookie } }
+			);
 
 			expect(res.status).toBe(400);
 			expect((await getProjectStore().find(project._id))?.corsOrigins).toEqual(

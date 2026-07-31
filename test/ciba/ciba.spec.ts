@@ -78,9 +78,9 @@ describe('features.ciba', () => {
 				});
 				await request.save();
 				await backchannelResult(request.jti, result);
-				await expect(
-					backchannelResult('notfound', result)
-				).rejects.toThrow('BackchannelAuthenticationRequest not found');
+				await expect(backchannelResult('notfound', result)).rejects.toThrow(
+					'BackchannelAuthenticationRequest not found'
+				);
 			});
 
 			it('"request" can be a BackchannelAuthenticationRequest instance', async () => {
@@ -109,9 +109,9 @@ describe('features.ciba', () => {
 					new Set(),
 					new Error()
 				]) {
-					await expect(
-						backchannelResult(request, result)
-					).rejects.toThrow('invalid "request" argument');
+					await expect(backchannelResult(request, result)).rejects.toThrow(
+						'invalid "request" argument'
+					);
 				}
 			});
 
@@ -126,9 +126,9 @@ describe('features.ciba', () => {
 				});
 				await result.save();
 				await backchannelResult(request, result.jti);
-				await expect(
-					backchannelResult(request, 'notfound')
-				).rejects.toThrow('Grant not found');
+				await expect(backchannelResult(request, 'notfound')).rejects.toThrow(
+					'Grant not found'
+				);
 			});
 
 			it('"result" must be a supported type', async () => {
@@ -146,9 +146,9 @@ describe('features.ciba', () => {
 					new Set(),
 					new Error()
 				]) {
-					await expect(
-						backchannelResult(request, result)
-					).rejects.toThrow('invalid "result" argument');
+					await expect(backchannelResult(request, result)).rejects.toThrow(
+						'invalid "result" argument'
+					);
 				}
 			});
 
@@ -157,9 +157,9 @@ describe('features.ciba', () => {
 				const request = new BackchannelAuthenticationRequest({
 					clientId: 'notfound'
 				});
-				await expect(
-					backchannelResult(request, result)
-				).rejects.toThrow('Client not found');
+				await expect(backchannelResult(request, result)).rejects.toThrow(
+					'Client not found'
+				);
 			});
 
 			it('request.clientId must match result.clientId', async () => {
@@ -171,9 +171,9 @@ describe('features.ciba', () => {
 					clientId: 'client-ping',
 					accountId: 'accountId'
 				});
-				await expect(
-					backchannelResult(request, result)
-				).rejects.toThrow('client mismatch');
+				await expect(backchannelResult(request, result)).rejects.toThrow(
+					'client mismatch'
+				);
 			});
 
 			it('request.accountId must match result.accountId', async () => {
@@ -185,9 +185,9 @@ describe('features.ciba', () => {
 					clientId: 'client',
 					accountId: 'accountId-2'
 				});
-				await expect(
-					backchannelResult(request, result)
-				).rejects.toThrow('accountId mismatch');
+				await expect(backchannelResult(request, result)).rejects.toThrow(
+					'accountId mismatch'
+				);
 			});
 
 			it('saves the "request"', async () => {
@@ -251,9 +251,7 @@ describe('features.ciba', () => {
 					accountId: 'accountId',
 					params: { client_notification_token: 'foo' }
 				});
-				await expect(
-					backchannelResult(request, result)
-				).rejects.toThrow(
+				await expect(backchannelResult(request, result)).rejects.toThrow(
 					'expected 204 No Content from https://rp.example.com/ping, got: 400 Bad Request'
 				);
 			});
