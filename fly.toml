@@ -8,6 +8,20 @@ primary_region = 'arn'
 
 [build]
 
+# Provision the datastore before any new Machine serves traffic. Without this the reserved admin
+# project/bucket/client are never seeded (database/mongodb.ts), so `GET /admin/login` redirects to
+# `/auth` with a client_id no Client document matches and the admin plane is unreachable — while the
+# first-run setup page at `GET /admin` still works, which makes it look like a login bug. It also
+# provisions the TTL and unique-email indexes that collections would otherwise auto-create without.
+#
+# Runs on a temporary Machine with the app's env, once per deploy attempt, and aborts the deploy on a
+# non-zero exit — which db:setup returns when a declared constraint is not in force.
+#
+# Requires MONGODB_URI, DATABASE_NAME and ISSUER to be set (ISSUER is read for the admin client's
+# redirect_uri). Set MONGODB_URI with `fly secrets set`; the other two are not secret.
+[deploy]
+  release_command = 'bun run db:setup'
+
 [http_service]
   internal_port = 3000
   force_https = true
@@ -15,6 +29,19 @@ primary_region = 'arn'
   auto_start_machines = true
   min_machines_running = 0
   processes = ['app']
+
+# Boot does a MongoDB connection and a keystore load at module scope, so a machine that cannot reach
+# the datastore exits instead of serving. Without a check the proxy cannot tell that apart from a
+# healthy machine and routes to it anyway. The grace period covers a cold start, since
+# auto_start_machines wakes machines from stopped.
+[[http_service.checks]]
+  method = 'GET'
+  path = '/health'
+  interval = '30s'
+  timeout = '5s'
+  grace_period = '15s'
+  # Documented safeguard against force_https turning the check into a 301 the proxy reads as a failure.
+  headers = { X-Forwarded-Proto = 'https' }
 
 [[vm]]
   memory = '1gb'

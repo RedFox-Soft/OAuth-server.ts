@@ -16,7 +16,7 @@ FROM base AS build
 
 # Install node modules
 COPY bun.lock package.json ./
-RUN bun install
+RUN bun install --frozen-lockfile
 
 # Copy application code
 COPY . .
@@ -24,9 +24,12 @@ COPY . .
 # Build application
 RUN bun run build
 
-# Remove development dependencies
+# Remove development dependencies. `--ci` is not a bun flag — bun ignores it silently and exits 0,
+# so the previous form reinstalled devDependencies and pruned nothing. Verified safe: nothing under
+# lib/ or database/ imports a devDependency, so the server and the db:setup release command both run
+# on the production set alone.
 RUN rm -rf node_modules && \
-    bun install --ci
+    bun install --production --frozen-lockfile
 
 
 # Final stage for app image
