@@ -48,6 +48,7 @@ interface ClientView {
 	requireConsent: boolean;
 	backchannelTokenDeliveryMode?: 'poll' | 'ping' | 'push';
 	backchannelClientNotificationEndpoint?: string;
+	authorizationDetailsTypes?: string[];
 }
 interface FormValues {
 	clientName?: string;
@@ -59,6 +60,7 @@ interface FormValues {
 	requireConsent: boolean;
 	backchannelTokenDeliveryMode?: 'poll' | 'ping' | 'push';
 	backchannelClientNotificationEndpoint?: string;
+	authorizationDetailsTypes?: string[];
 }
 
 const DEFAULT_VALUES: FormValues = {
@@ -117,6 +119,7 @@ export function Clients({
 			redirectUris: (row.redirectUris ?? []).join('\n'),
 			scope: row.scope,
 			requireConsent: row.requireConsent,
+			authorizationDetailsTypes: row.authorizationDetailsTypes,
 			backchannelTokenDeliveryMode: row.backchannelTokenDeliveryMode,
 			backchannelClientNotificationEndpoint:
 				row.backchannelClientNotificationEndpoint
@@ -136,6 +139,9 @@ export function Clients({
 				.filter(Boolean),
 			scope: values.scope,
 			requireConsent: values.requireConsent,
+			...(values.authorizationDetailsTypes?.length
+				? { authorizationDetailsTypes: values.authorizationDetailsTypes }
+				: {}),
 			...(values.backchannelTokenDeliveryMode
 				? {
 						backchannelTokenDeliveryMode: values.backchannelTokenDeliveryMode
@@ -371,6 +377,20 @@ export function Clients({
 						valuePropName="checked"
 					>
 						<Switch />
+					</Form.Item>
+					{/*
+					 * Free-form tags rather than a picker over the configured types: the server validates
+					 * each value against them and reports its own message, and gating this field on the
+					 * feature flag here would restate a server rule in a second place.
+					 */}
+					<Form.Item
+						name="authorizationDetailsTypes"
+						label="Authorization details types (RAR)"
+					>
+						<Select
+							mode="tags"
+							placeholder="https://scheme.example/payment"
+						/>
 					</Form.Item>
 					<Form.Item
 						shouldUpdate={(prev, cur) => prev.grantTypes !== cur.grantTypes}

@@ -32,18 +32,34 @@ export const ConsentPage: React.FC<ConsentView> = ({
 				<>
 					<Paragraph>This will allow it to access:</Paragraph>
 					{permissions.map((group, groupIndex) => (
-						<div key={group.resourceIndicator ?? group.kind ?? groupIndex}>
+						// The index is part of the key because several 'rar-detail' groups share a kind
+						// and carry no resource indicator, so kind alone collides across them.
+						<div
+							key={`${group.kind}:${group.resourceIndicator ?? group.type ?? ''}:${groupIndex}`}
+						>
 							{group.resourceIndicator ? (
 								<Paragraph style={{ marginBottom: 4 }}>
 									<b>{group.resourceIndicator}</b>
 								</Paragraph>
 							) : null}
+							{group.kind === 'rar-detail' ? (
+								<Paragraph style={{ marginBottom: 4 }}>
+									<b>{group.label}</b>
+								</Paragraph>
+							) : null}
 							<ul>
-								{group.items.map((item) => (
-									<li key={item.token}>
-										{item.label} (<Text code>{item.token}</Text>)
-									</li>
-								))}
+								{group.items.map((item) =>
+									// A rich detail's item is a field and its values, not a token plus an
+									// explanation — rendering it in the scope shape reads backwards
+									// ("read, write (actions)").
+									group.kind === 'rar-detail' ? (
+										<li key={item.token}>{item.label}</li>
+									) : (
+										<li key={item.token}>
+											{item.label} (<Text code>{item.token}</Text>)
+										</li>
+									)
+								)}
 							</ul>
 						</div>
 					))}

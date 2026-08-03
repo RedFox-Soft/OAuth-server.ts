@@ -17,6 +17,7 @@ export interface AdminClientView {
 	requireConsent: boolean;
 	backchannelTokenDeliveryMode?: string;
 	backchannelClientNotificationEndpoint?: string;
+	authorizationDetailsTypes?: string[];
 }
 
 export interface CreateClientInput {
@@ -30,6 +31,7 @@ export interface CreateClientInput {
 	requireConsent?: boolean;
 	backchannelTokenDeliveryMode?: string;
 	backchannelClientNotificationEndpoint?: string;
+	authorizationDetailsTypes?: string[];
 }
 
 export type UpdateClientInput = Partial<CreateClientInput>;
@@ -67,6 +69,15 @@ function toMetadata(input: CreateClientInput, clientId: string) {
 		metadata.backchannel_client_notification_endpoint =
 			input.backchannelClientNotificationEndpoint;
 	}
+	/*
+	 * Forwarded explicitly: this builder is an allow-list, so a field added to the request schema alone
+	 * is accepted by the route and then silently discarded here — the same defect the projects route had
+	 * with `clientIds`. validateClient recognizes this metadata only when the feature is enabled and
+	 * validates each value against the configured types, so no gate is restated here.
+	 */
+	if (input.authorizationDetailsTypes !== undefined) {
+		metadata.authorization_details_types = input.authorizationDetailsTypes;
+	}
 	return metadata;
 }
 
@@ -82,6 +93,7 @@ function toView(client: {
 	scope?: string;
 	backchannelTokenDeliveryMode?: string;
 	backchannelClientNotificationEndpoint?: string;
+	authorizationDetailsTypes?: string[];
 	['consent.require']?: boolean;
 }): AdminClientView {
 	return {
@@ -97,7 +109,8 @@ function toView(client: {
 		requireConsent: client['consent.require'] !== false,
 		backchannelTokenDeliveryMode: client.backchannelTokenDeliveryMode,
 		backchannelClientNotificationEndpoint:
-			client.backchannelClientNotificationEndpoint
+			client.backchannelClientNotificationEndpoint,
+		authorizationDetailsTypes: client.authorizationDetailsTypes
 	};
 }
 
@@ -158,7 +171,9 @@ export async function updateClient(
 			existing.backchannelTokenDeliveryMode,
 		backchannelClientNotificationEndpoint:
 			patch.backchannelClientNotificationEndpoint ??
-			existing.backchannelClientNotificationEndpoint
+			existing.backchannelClientNotificationEndpoint,
+		authorizationDetailsTypes:
+			patch.authorizationDetailsTypes ?? existing.authorizationDetailsTypes
 	};
 	const metadata = toMetadata(merged, clientId);
 	// Mirror createClient's secret logic on the merged (post-patch) metadata, not

@@ -12,7 +12,7 @@ const AccessTokenPayload = t.Composite([
 	SessionBoundPayload,
 	AudiencePayload,
 	t.Object({
-		rar: t.Optional(t.Object({})),
+		rar: t.Optional(t.Array(t.Object({}, { additionalProperties: true }))),
 		claims: t.Optional(t.Object({})),
 		scope: t.Optional(t.String()),
 		sid: t.Optional(t.String()),

@@ -1,51 +1,82 @@
-import { mustChange } from './_warn.ts';
+/*
+ * Rich Authorization Request transforms. These implement the generic reading of RFC 9396 §7 ("The AS
+ * MUST also return the authorization_details as granted by the resource owner and assigned to the
+ * respective access token") and §9 (for a resource server, the details "filtered to the specific
+ * audience"). Neither is domain-specific, so neither needs a deployment to supply it — a hook that
+ * throws is not a default. The override registry still wins for deployments that need their own
+ * shaping.
+ */
 
-// Rich Authorization Request transforms. These have no meaningful default: a
-// deployment enabling RAR must define how requested/granted authorization_details
-// are shaped for the code, token responses, and introspection. The defaults warn
-// via mustChange and refuse to run so a missing implementation fails loudly.
+// Structural, and only as wide as these four functions actually read. Authorization details are
+// arbitrary client JSON, so they stay `unknown` and are narrowed where they are inspected.
+interface RarResourceServer {
+	identifier(): string;
+}
 
-export function rarForAuthorizationCode(_ctx) {
-	// decision points:
-	// - ctx.oidc.client
-	// - ctx.oidc.resourceServers
-	// - ctx.oidc.params.authorization_details (unparsed authorization_details from the authorization request)
-	// - ctx.oidc.grant.rar (authorization_details granted)
-	mustChange(
-		'features.richAuthorizationRequests.rarForAuthorizationCode',
-		'transform the requested and granted RAR details to be passed in the authorization code'
-	);
-	throw new Error(
-		'features.richAuthorizationRequests.rarForAuthorizationCode not implemented'
+interface RarCtx {
+	oidc: {
+		params: { authorization_details?: unknown };
+		grant?: { getRarFiltered(requested: unknown): unknown[] };
+		entities: {
+			AuthorizationCode?: { payload: { rar?: unknown } };
+			RefreshToken?: { payload: { rar?: unknown } };
+		};
+	};
+}
+
+/*
+ * A detail carrying no `locations` is KEPT rather than dropped: `locations` is optional in §2, so its
+ * absence means the detail is not location-scoped, not that it applies nowhere.
+ */
+function filterToResourceServer(
+	rar: unknown,
+	resourceServer: RarResourceServer | undefined
+) {
+	if (!Array.isArray(rar)) {
+		return [];
+	}
+
+	const identifier = resourceServer?.identifier();
+	return rar.filter((detail) => {
+		const locations = (detail as { locations?: unknown })?.locations;
+		if (!Array.isArray(locations)) {
+			return true;
+		}
+		return locations.includes(identifier);
+	});
+}
+
+export function rarForAuthorizationCode(ctx: RarCtx) {
+	// The requested details intersected with what the resource owner granted. Grant#getRarFiltered
+	// owns the trusted-grant case, so an override of this function cannot lose it.
+	return ctx.oidc.grant?.getRarFiltered(ctx.oidc.params.authorization_details);
+}
+
+export function rarForCodeResponse(
+	ctx: RarCtx,
+	resourceServer: RarResourceServer
+) {
+	return filterToResourceServer(
+		ctx.oidc.entities.AuthorizationCode?.payload.rar,
+		resourceServer
 	);
 }
 
-export function rarForCodeResponse(_ctx, _resourceServer) {
-	mustChange(
-		'features.richAuthorizationRequests.rarForCodeResponse',
-		'transform the requested and granted RAR details to be returned in the Access Token Response as authorization_details as well as assigned to the issued Access Token'
-	);
-	throw new Error(
-		'features.richAuthorizationRequests.rarForCodeResponse not implemented'
-	);
-}
-
-export function rarForRefreshTokenResponse(_ctx, _resourceServer) {
-	mustChange(
-		'features.richAuthorizationRequests.rarForRefreshTokenResponse',
-		'transform the requested and granted RAR details to be returned in the Access Token Response as authorization_details as well as assigned to the issued Access Token'
-	);
-	throw new Error(
-		'features.richAuthorizationRequests.rarForRefreshTokenResponse not implemented'
+export function rarForRefreshTokenResponse(
+	ctx: RarCtx,
+	resourceServer: RarResourceServer
+) {
+	return filterToResourceServer(
+		ctx.oidc.entities.RefreshToken?.payload.rar,
+		resourceServer
 	);
 }
 
-export function rarForIntrospectionResponse(_ctx, _token) {
-	mustChange(
-		'features.richAuthorizationRequests.rarForIntrospectionResponse',
-		"transform the token's stored RAR details to be returned in the Introspection Response"
-	);
-	throw new Error(
-		'features.richAuthorizationRequests.rarForIntrospectionResponse not implemented'
-	);
+export function rarForIntrospectionResponse(
+	_ctx: RarCtx,
+	token: { payload: { rar?: unknown } }
+) {
+	// The resource server is the intended audience of an introspection response, so its details are
+	// returned unchanged.
+	return token.payload.rar;
 }

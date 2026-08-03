@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'bun:test';
+import { describe, it, expect, afterEach, beforeEach } from 'bun:test';
 import {
 	createClient,
 	getClientView,
@@ -130,6 +130,102 @@ describe('admin client service', () => {
 			expect(view.backchannelTokenDeliveryMode).toBe('poll');
 			const reloaded = await getClientView(view.clientId);
 			expect(reloaded?.backchannelTokenDeliveryMode).toBe('poll');
+		});
+	});
+
+	/*
+	 * The per-client permitted RAR types. FR-012 requires every client to opt in explicitly (the client
+	 * metadata defaults to []), so without this on the admin surface no client an operator creates could
+	 * ever use the feature — the same operator dead end the feature removes at the configuration level.
+	 *
+	 * These tests exist mainly to catch the silent-drop trap: toMetadata is an explicit allow-list, so a
+	 * field added to the request schema alone is accepted by the route and then discarded here, and
+	 * toView must read it back or it never surfaces.
+	 */
+	describe('authorizationDetailsTypes', () => {
+		const PAYMENT = 'https://scheme.example/payment';
+
+		beforeEach(() => {
+			ApplicationConfig['richAuthorizationRequests.enabled'] = true;
+			ApplicationConfig['richAuthorizationRequests.types'] = {
+				[PAYMENT]: { label: 'Initiate a payment' }
+			};
+		});
+
+		afterEach(() => {
+			ApplicationConfig['richAuthorizationRequests.enabled'] = false;
+			ApplicationConfig['richAuthorizationRequests.types'] = {};
+		});
+
+		it('persists the field on create and reads it back', async () => {
+			const { view } = await createClient({
+				clientName: 'RAR client',
+				grantTypes: ['authorization_code'],
+				redirectUris: ['https://rar-create.example.com/cb'],
+				tokenEndpointAuthMethod: 'none',
+				authorizationDetailsTypes: [PAYMENT]
+			});
+
+			expect(view.authorizationDetailsTypes).toEqual([PAYMENT]);
+			const reloaded = await getClientView(view.clientId);
+			expect(reloaded?.authorizationDetailsTypes).toEqual([PAYMENT]);
+		});
+
+		it('updates the field and preserves it across an unrelated patch', async () => {
+			const { view } = await createClient({
+				clientName: 'RAR update',
+				grantTypes: ['authorization_code'],
+				redirectUris: ['https://rar-update.example.com/cb'],
+				tokenEndpointAuthMethod: 'none'
+			});
+			expect(view.authorizationDetailsTypes ?? []).toEqual([]);
+
+			const updated = await updateClient(view.clientId, {
+				authorizationDetailsTypes: [PAYMENT]
+			});
+			expect(updated.authorizationDetailsTypes).toEqual([PAYMENT]);
+
+			const afterUnrelated = await updateClient(view.clientId, {
+				clientName: 'Renamed'
+			});
+			expect(afterUnrelated.authorizationDetailsTypes).toEqual([PAYMENT]);
+		});
+
+		// Delegated validation: the type must be one the server is configured to accept.
+		it('refuses a type that is not configured', async () => {
+			await expect(
+				createClient({
+					clientName: 'RAR bad type',
+					grantTypes: ['authorization_code'],
+					redirectUris: ['https://rar-bad.example.com/cb'],
+					tokenEndpointAuthMethod: 'none',
+					authorizationDetailsTypes: ['https://scheme.example/nope']
+				})
+			).rejects.toThrow();
+		});
+
+		/*
+		 * With the feature disabled the metadata is not recognized at all, and the client schema drops
+		 * unrecognized metadata rather than refusing it — the standard dynamic-registration treatment,
+		 * which the admin surface inherits because validation is delegated rather than restated. So the
+		 * field is accepted and ignored, not rejected. Pinned because "accepted" reads as "stored" to
+		 * an operator, and it is the one rough edge of delegating here.
+		 */
+		it('ignores the field when the feature is disabled, rather than refusing it', async () => {
+			ApplicationConfig['richAuthorizationRequests.enabled'] = false;
+			ApplicationConfig['richAuthorizationRequests.types'] = {};
+
+			const { view } = await createClient({
+				clientName: 'RAR off',
+				grantTypes: ['authorization_code'],
+				redirectUris: ['https://rar-off.example.com/cb'],
+				tokenEndpointAuthMethod: 'none',
+				authorizationDetailsTypes: [PAYMENT]
+			});
+
+			expect(view.authorizationDetailsTypes).toBeUndefined();
+			const reloaded = await getClientView(view.clientId);
+			expect(reloaded?.authorizationDetailsTypes).toBeUndefined();
 		});
 	});
 });

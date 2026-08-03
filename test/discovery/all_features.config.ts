@@ -20,6 +20,11 @@ export const ApplicationConfig = {
 	'mTLS.selfSignedTlsClientAuth': true,
 	'ciba.enabled': true,
 	'richAuthorizationRequests.enabled': true,
+	// Enabling the feature with no types now fails validation: with an empty map every request is
+	// refused, which is never what an operator meant (decision D4).
+	'richAuthorizationRequests.types': {
+		'https://scheme.example/payment': { label: 'Initiate a payment' }
+	},
 	'encryption.enabled': true,
 	'requestObjects.enabled': true,
 	'requestObjects.requireSignedRequestObject': true,

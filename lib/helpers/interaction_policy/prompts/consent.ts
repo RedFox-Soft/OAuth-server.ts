@@ -1,8 +1,10 @@
 import { Prompt } from '../prompt.js';
+import { canonicalKey, canonicalKeySet } from '../../rar_canonical.js';
 
 const missingOIDCScope = Symbol();
 const missingOIDCClaims = Symbol();
 const missingResourceScopes = Symbol();
+const missingRar = Symbol();
 
 class ConsentPromt extends Prompt {
 	name = 'consent';
@@ -120,18 +122,35 @@ class ConsentPromt extends Prompt {
 		{
 			reason: 'rar_prompt',
 			description: 'authorization_details were requested',
+			/*
+			 * One determination, used twice: it decides whether to interrupt and it *is* what the
+			 * consent page shows. RFC 9396 §6.1 sanctions comparing against what was already granted —
+			 * "an AS can use the same processing techniques as used in granting the request in the first
+			 * place to determine if a resource owner needs to authorize the request" — so a repeat
+			 * authorization for details already on the grant no longer re-prompts.
+			 *
+			 * No JSON.parse here: checkRar normalizes the parameter to an array before this runs.
+			 */
 			check: (ctx) => {
 				const { oidc } = ctx;
 
-				if (oidc.params.authorization_details && !oidc.result?.consent) {
-					return true;
+				if (!oidc.params.authorization_details || oidc.result?.consent) {
+					return false;
 				}
 
-				return false;
+				const granted = canonicalKeySet(oidc.grant?.payload.rar);
+				const missing = (oidc.params.authorization_details as unknown[]).filter(
+					(detail: unknown) => !granted.has(canonicalKey(detail))
+				);
+
+				if (!missing.length) {
+					return false;
+				}
+
+				ctx.oidc[missingRar] = missing;
+				return true;
 			},
-			details: ({ oidc }) => ({
-				rar: JSON.parse(oidc.params.authorization_details)
-			})
+			details: ({ oidc }) => ({ rar: oidc[missingRar] })
 		}
 	];
 }

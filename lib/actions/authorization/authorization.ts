@@ -34,7 +34,10 @@ import {
 } from '../../consts/param_list.ts';
 import sessionHandler from '../../shared/session.ts';
 import { noQueryDup } from 'lib/plugins/noQueryDup.js';
-import { coerceArrayParams } from 'lib/plugins/coerce_array_params.js';
+import {
+	coerceArrayParams,
+	parseJsonParams
+} from 'lib/plugins/coerce_array_params.js';
 import { featureVerification } from './featureVerification.js';
 import { authorizationPKCE } from 'lib/helpers/pkce.js';
 import {
@@ -174,6 +177,7 @@ export const authGet = new Elysia()
 
 export const authPost = new Elysia()
 	.use(coerceArrayParams('ui_locales', 'resource'))
+	.use(parseJsonParams('authorization_details'))
 	.guard({
 		body: AuthorizationParameters,
 		cookie: AuthorizationCookies
@@ -206,6 +210,7 @@ export const authPost = new Elysia()
  */
 export const par = new Elysia()
 	.use(corsClientBased(formClientId))
+	.use(parseJsonParams('authorization_details'))
 	.use(AuthPlugin)
 	.guard({
 		body: t.Composite([

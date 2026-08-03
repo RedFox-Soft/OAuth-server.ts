@@ -1,6 +1,7 @@
 import { Type as t, type Static } from '@sinclair/typebox';
 import { BaseToken, BaseTokenPayload } from './base_token.js';
 import consent from 'lib/helpers/interaction_policy/prompts/consent.js';
+import { canonicalKey, canonicalKeySet } from 'lib/helpers/rar_canonical.js';
 
 const NON_REJECTABLE_CLAIMS = new Set([
 	'sub',
@@ -36,7 +37,7 @@ const GrantPayload = t.Composite([
 				)
 			})
 		),
-		rar: t.Optional(t.Array(t.Unknown()))
+		rar: t.Optional(t.Array(t.Object({}, { additionalProperties: true })))
 	})
 ]);
 export type GrantPayloadType = Static<typeof GrantPayload>;
@@ -286,8 +287,36 @@ export class Grant extends BaseToken<GrantPayloadType> {
 		return granted.concat(rejected);
 	}
 
+	/*
+	 * Idempotent by structural identity: without this, every re-consent appends a duplicate and the
+	 * grant grows without bound for as long as the client keeps asking.
+	 */
 	addRar(detail) {
 		this.payload.rar ||= [];
+		const key = canonicalKey(detail);
+		if (this.payload.rar.some((granted) => canonicalKey(granted) === key)) {
+			return;
+		}
 		this.payload.rar.push(detail);
+	}
+
+	/*
+	 * The sibling of getOIDCScopeFiltered/getResourceScopeFiltered/getOIDCClaimsFiltered, and trusted
+	 * for the same reason they are: a client that does not require consent skips the consent prompt
+	 * whole, so nothing is ever recorded on its grant. Without this arm such a client would request
+	 * authorization details and silently receive none.
+	 *
+	 * It lives on the model rather than in the overridable rarForAuthorizationCode default so that a
+	 * deployment shaping its own details cannot lose trusted-client handling.
+	 */
+	getRarFiltered(requested: unknown) {
+		if (!Array.isArray(requested)) {
+			return [];
+		}
+		if (this.payload.trusted) {
+			return requested;
+		}
+		const granted = canonicalKeySet(this.payload.rar);
+		return requested.filter((detail) => granted.has(canonicalKey(detail)));
 	}
 }

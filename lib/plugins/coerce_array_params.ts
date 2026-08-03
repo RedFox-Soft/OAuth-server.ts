@@ -32,3 +32,37 @@ export function coerceArrayParams(...keys: string[]) {
 		coerce(query);
 	});
 }
+
+/**
+ * Elysia plugin: parse the named parameters from a JSON string to their real value before schema
+ * validation.
+ *
+ * The sibling of coerceArrayParams for a parameter whose wire form is a JSON *document* rather than a
+ * repeated field — `authorization_details` (RFC 9396 §2). A query value is coerced by Elysia's own
+ * parser, but a form-encoded body is not: the string is walked character by character and arrives as
+ * one object per character, with no error, so a strict array schema accepts complete nonsense. Since
+ * PAR is form-encoded, that silently corrupted every pushed rich authorization request.
+ *
+ * A value that is already parsed (PAR replay, a request object) is left untouched, and a string that
+ * is not valid JSON is left as-is so the route's own validation reports it rather than this plugin.
+ */
+export function parseJsonParams(...keys: string[]) {
+	const parse = (target: unknown) => {
+		if (!isRecord(target)) return;
+		for (const key of keys) {
+			const value = target[key];
+			if (typeof value !== 'string') continue;
+			try {
+				target[key] = JSON.parse(value);
+			} catch {
+				// Left as a string: the schema refuses it and the error handler maps that to
+				// invalid_request, which is the right answer for an unparseable request parameter.
+			}
+		}
+	};
+
+	return new Elysia().onTransform({ as: 'scoped' }, ({ body, query }) => {
+		parse(body);
+		parse(query);
+	});
+}

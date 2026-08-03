@@ -228,8 +228,48 @@ exact line numbers.
   provisioning, per-bucket uniqueness, reconciliation without record loss, and the duplicate-email
   exit-1 path. That procedure is the seed for the automated equivalent once task 25 lands.
 
-### 5. DPoP nonce configuration safety — Implement
+### 5. DPoP nonce configuration safety — ✅ Implemented (one manual verification outstanding)
 
+- **Delivered by** `specs/014-dpop-nonce-safety` (commit `670c7f2`, on `main`). The approach chosen at
+  planning was the second of the three candidates the Expected result listed: the server
+  **provisions its own 32-byte secret** at startup, unconditionally and before serving traffic, so no
+  operator ever handles secret material and the broken combination is unrepresentable rather than merely
+  detected. Mechanism: one resolver (`lib/configs/nonceSecret.ts`, a sibling of `keys.ts`), a store class
+  per adapter over the **existing** `serviceConfig` area (no new collection, no inventory entry), two
+  invariants in the shared validator, and the removal of four bare-`Error` sites plus a test-only static
+  seam. A stored secret that reads back unusable is replaced and the write is read back to confirm the
+  round trip; startup fails in exactly one case — a replacement that also reads back unusable, which is a
+  broken persistence layer and is reported as one.
+- **Findings worth carrying forward:**
+  1. **Provisioning is unconditional, and that is what closes the defect.** Gating it on
+     `dpop.enabled` or `dpop.requireNonce` would leave the arming path exactly as reachable; the state has
+     to be impossible to hold, not merely refused when noticed. The cost is one unused secret on
+     deployments that never enable DPoP.
+  2. **An unusable stored secret is replaced, not refused — deliberately asymmetric with signing keys.**
+     An invalid key set refuses to boot because silently replacing a signing key invalidates every issued
+     token; a nonce secret derives short-lived values, so replacing it costs each client one retry through
+     a path the RFC already requires to work. The second reason is decisive: the admin plane is served by
+     the same process, so a server that will not boot cannot be repaired through any supported surface.
+  3. **Both store writes return the value as read back.** That makes the round-trip check structural
+     rather than a follow-up read, and it hands a losing writer the winner's value — so instances starting
+     together converge instead of each serving nonces the others reject. Conditional write, first writer
+     wins.
+  4. **The same concurrent-provisioning race exists for signing keys**, where divergence is materially
+     worse than a retry loop. Not addressed there; recorded so the omission is a scoping decision.
+  5. **The two validator rules can never fire on a healthy boot** — provisioning runs first — and are
+     retained anyway, tested by handing the pure validator a configuration a running server cannot reach.
+     If provisioning is ever reordered or made conditional, boot fails with a message naming the setting
+     instead of every DPoP request failing internally.
+- **Outstanding — `T037`, the manual datastore procedure, was not executed.** This environment has no
+  throwaway MongoDB (no local `mongod`, no Docker, no `mongosh`; the only `MONGODB_URI` present is not
+  disposable, and steps 4–5 are destructive by design). So the **MongoDB store class has no coverage at
+  all** — it cannot be imported under test — and its binary round trip through the driver, its
+  duplicate-key conflict signal, and its value-matching `replace` filter are verified **by reading only**.
+  The stub-store tests prove the resolver reacts correctly _when_ storage misbehaves; they cannot prove
+  whether this driver does. Quickstart step 3 is the one that matters most, because it is the only place
+  the driver's binary round trip can be observed — and that is exactly the failure FR-002a exists to
+  survive. Procedure: `specs/014-dpop-nonce-safety/quickstart.md`. This is the same gap task 25 exists to
+  close for every mongo-backed path.
 - **Context:** `dpop.requireNonce` is in the admin settings catalog but `dpop.nonceSecret` is not
   (`lib/admin/settings/catalog.ts:68-74`), and `validateConfiguration` neither cross-checks the
   pair nor enforces the documented "32-byte Buffer" constraint (`lib/configs/application.ts:46`).
@@ -279,8 +319,46 @@ exact line numbers.
   deviations are written down rather than left implicit (D9). It also amends tasks 12, 27 and 29 and
   adds task 31 — see "Backlog impact" in the note.
 
-### 7. Rich Authorization Requests end-to-end — Implement (task 6 resolved)
+### 7. Rich Authorization Requests end-to-end — ✅ Implemented
 
+- **Delivered by** `specs/015-rar-end-to-end` (commit `c9a70dd`, on `main`). All six acceptance areas
+  below are in place: descriptor-as-data configuration with the empty-map guard, §5-conformant
+  validation with normalization, consent rendering plus idempotent grant persistence, working defaults
+  for all four hooks, the corrections, and a `test/rar/` suite that is the first anywhere to send
+  `authorization_details`. Suite: 2366 pass / 0 fail (was 2302); `lib/` typecheck improved 820 → 812.
+- **Findings worth carrying forward** (added to `wiki/concepts/rich-authorization-requests.md`):
+  1. **A declared TypeBox shape on a request parameter is a runtime coercion contract, not
+     documentation.** `authorization_details` was typed `t.Array(t.Object({}))`, and Elysia coerces a
+     JSON query value against that schema _and strips undeclared properties_ — so every detail arrived
+     as `{}` with its `type` gone, before any validation ran. RAR could not have worked whatever
+     `checkRar` did, and no amount of reading the parser would have shown it. Measured, not reasoned.
+     `t.Array(t.Unknown())` — the obvious loosening, and the shape the Grant model used — is worse: it
+     splits the raw JSON string on its commas.
+  2. **Form-encoded bodies do not coerce JSON at all.** A JSON string in a form body arrives as one
+     object per _character_, with status 200 and no error. PAR is form-encoded, so every pushed rich
+     request was silently corrupt. Fixed by `parseJsonParams` in `lib/plugins/coerce_array_params.ts`,
+     the sibling of the existing `coerceArrayParams` — which exists for exactly this class of quirk, and
+     is the precedent to reach for next time a parameter's wire form fights its schema.
+  3. **Fixing the parser alone would have made things worse.** `pushed_authorization_request_response.ts`
+     ran `JSON.parse` on the value; that line was unreachable only because `checkRar` threw first, so
+     accepting arrays turned a clean 4xx into an unhandled 500. The two changes had to land together.
+  4. **`Value.Check` runs in the `BaseModel` constructor only, and never cleans.** So a wrong payload
+     schema on a field assigned _after_ construction is inert — until something constructs the model with
+     the field present, at which point it is a hard `TypeError`. Same shape as task 4's inert TTL
+     indexes: harmless now, unrecoverable later.
+  5. **Two live bugs found by the first test to exercise their paths**, both outside RAR:
+     `introspectionAllowedPolicy` read the removed top-level `token.clientId`, so **any public client
+     introspecting its own token received `active: false`**; and `loadExistingGrant` froze `trusted` at
+     grant-creation time, so a returning End-User of a consent-not-required client silently under-granted
+     scopes, claims _and_ details. Both are the `.payload.*` / stale-derivation classes already recorded
+     in the knowledge base — worth re-reading before trusting any addon default.
+  6. **The feature's remaining hole is operational, not protocol.** Details reach a token only when a
+     resource server resolves, which needs a `getResourceServerInfo` override whose default throws. A
+     deployment without one grants details at consent that no token carries, with no error anywhere. It
+     is D8's coupling seen from the operator's side, pinned by a test, and the guard belongs to task 12.
+- **Source of truth:** `docs/superpowers/specs/2026-07-31-rar-conformance-design.md`, whose deviation
+  table now carries the two consequences discovered during implementation. The summary below is the
+  acceptance surface.
 - **Expected result** (per task 6's decision note, which is the spec input — read it first):
   `authorization_details` works end to end on the authorization-code and refresh-token flows,
   conformant to **final RFC 9396** within the boundary D2 sets. Definition of done:
@@ -393,7 +471,7 @@ exact line numbers.
 - **Amended by task 6's decision note:** `richAuthorizationRequests.enabled` is not among the flags
   needing a hook-presence guard either — task 7 gives all four `lib/addon/rar.ts` hooks working
   defaults (decision D7), so no override is required to enable the feature. It needs a _different_
-  guard, which task 7 also delivers: enabling the flag with an empty
+  guard, which task 7 has now delivered: enabling the flag with an empty
   `richAuthorizationRequests.types` map fails validation (D4). Remaining flags for this task:
   `ciba.enabled`, `resourceIndicators.enabled`, `mTLS.*`.
 
@@ -447,7 +525,7 @@ exact line numbers.
   moving off hostname — call it out in CHANGELOG). Test: two provider boots produce identical
   pairwise subs for the same account+client.
 
-### 31. RAR on the device, CIBA and token-endpoint channels — Implement (added by task 6; depends on task 7)
+### 31. RAR on the device, CIBA and token-endpoint channels — Implement (added by task 6; task 7 landed, so unblocked)
 
 - **Numbering is append-only:** this task belongs to P1 but takes the next free number so the
   existing references (including "Suggested order") stay valid.
@@ -511,7 +589,7 @@ exact line numbers.
   4. The decorative "Sign in with Google" button and the dead "Forgot password" link are removed
      until their features exist (tasks 18 and 16 respectively re-add them for real).
   5. Consent page is all-or-nothing scope display — verify (and test) that `missingOIDCClaims`
-     and `missingResourceScopes` actually render; RAR display is task 7's scope.
+     and `missingResourceScopes` actually render; RAR display shipped with task 7.
 
 ### 18. Social login / federation — Investigate
 
@@ -565,9 +643,10 @@ exact line numbers.
   lands — and it is a prerequisite for `registration.policies` per
   `lib/configs/configuration.ts:202-210`) and `claims` (drives `claims_supported` and
   claim-backed scopes; omitted without the documented-intentional note `discovery` has).
-  `dpop.nonceSecret` is task 5. Function-valued keys (`registration.policies`,
-  `richAuthorizationRequests.types`) are legitimately non-serializable — document why they are
-  absent instead of leaving it implicit.
+  `dpop.nonceSecret` is **settled by task 5**: it is server-provisioned state rather than an operator
+  setting, so its absence is deliberate and the reason is now recorded in the catalog module (a test pins
+  that the note exists). Remaining function-valued key: `registration.policies` — legitimately
+  non-serializable, so document why it is absent instead of leaving it implicit.
 - **Expected result:** `registration.initialAccessToken` (write-only/masked like the SMTP
   password if a string secret) and `claims` are editable via the settings API/UI with proper
   validation; intentionally-omitted keys carry an explanatory note in the catalog module; a test
@@ -575,6 +654,12 @@ exact line numbers.
 - **Amended by task 2's decision note:** task 3 adds `cors.enabled` (catalogued there), so the
   key-diff test must account for it. `cors.maxAge` was dropped because the catalog has no `number`
   `SettingType`; if this task adds one, that key becomes a viable follow-up.
+- **Amended by task 7:** `richAuthorizationRequests.types` is no longer function-valued and is **now a
+  catalog key** — it became a serializable descriptor map behind the new `json` `SettingType`, and the
+  key-diff test reclassifies it from "excluded structured key" to an exposed one. Two consequences for
+  this task: the diff must account for it, and the `json` precedent means a structured key is no longer
+  automatically un-catalogable — `claims` should be reconsidered against it rather than assumed exposed
+  as some flatter shape. Adding a `number` type for `cors.maxAge` remains untouched by this.
 
 ### 22. Admin session/grant/token visibility and revocation — Implement
 
@@ -666,13 +751,14 @@ exact line numbers.
 ### 27. Dead code removal — Implement
 
 - **Context (verified zero importers / unreachable):** entire `lib/views/` directory (3 legacy
-  template files — note `interaction.ts:42-46` is the repo's only RAR rendering; coordinate with
-  task 7 before deleting), `lib/admin/ui/pages/Stub.tsx`, `lib/helpers/params.ts`,
+  template files — `interaction.ts:42-46` was the repo's only RAR rendering, and task 7 has superseded
+  it with the `'rar-detail'` consent group, so deleting it now loses no function), `lib/admin/ui/pages/Stub.tsx`, `lib/helpers/params.ts`,
   `lib/helpers/set_www_authenticate.ts` (superseded by inline code in
   `authorization_error_handler.ts`), `lib/helpers/_/pick_by.ts`, `lib/helpers/script_src_sha.ts`
   (only call commented out — task 14 item 3 decides its fate first), `provider.urlFor/pathFor`
   (`lib/provider.ts:33-45` — reads never-assigned fields, would throw if called),
-  `lib/models/grant.ts` `addRar` (task 7 decides), empty-body addon asserts
+  ~~`lib/models/grant.ts` `addRar`~~ (**kept** — task 7 made it the live consent-persistence path),
+  empty-body addon asserts
   (`lib/addon/claims.ts:9-13` `assertClaimsParameter`, `lib/addon/default.ts:13-22` — verify
   whether empty-by-design as override seams; if so, document instead of delete).
 - **Expected result:** Each listed item deleted, or kept with a written reason (override-seam
@@ -730,9 +816,10 @@ exact line numbers.
 
 ## Suggested order
 
-Quick wins first: **14** (bug batch) → ~~**1** (flag gating)~~ → ~~**4** (db provisioning)~~ → **5**
-(DPoP safety) → **11** (id_token verification). Then the investigation pair-ups: ~~**3** (CORS)~~,
-**9→10** (deletion), ~~**6**~~**→7** (RAR). Then P1 remainder (**8**, **12**, **13**, **15**), P2
+Quick wins first: **14** (bug batch) → ~~**1** (flag gating)~~ → ~~**4** (db provisioning)~~ →
+~~**5** (DPoP safety)~~ → **11** (id_token verification). Then the investigation pair-ups: ~~**3** (CORS)~~,
+**9→10** (deletion), ~~**6→7**~~ (RAR). Then P1 remainder (**8**, **12**, **13**, **15**), P2
 product work (**16**–**23**), and P3 (**24**–**30**) as capacity allows. Tasks 28 and 29 are safe to
-do anytime. **31** (RAR's remaining channels) is P1 but sits behind **7**; it is the lowest-urgency
-P1 item, since nothing reaches those channels today.
+do anytime. **31** (RAR's remaining channels) is P1 and **now unblocked** — task 7 landed the descriptor
+validation, consent view model and grant persistence it reuses — but it remains the lowest-urgency P1
+item, since nothing reaches those channels today.

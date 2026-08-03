@@ -1,6 +1,13 @@
 import { ApplicationConfig } from '../../configs/application.js';
 
-export type SettingType = 'boolean' | 'string' | 'enum' | 'string-array';
+export type SettingType =
+	| 'boolean'
+	| 'string'
+	| 'enum'
+	| 'string-array'
+	// A structured JSON value edited as text. The route validates only that it is an object; its real
+	// rules belong to validateConfiguration, so boot and the admin PUT cannot disagree.
+	| 'json';
 
 export interface SettingDescriptor {
 	key: keyof typeof ApplicationConfig;
@@ -14,6 +21,10 @@ export interface SettingDescriptor {
 	 * The setting enables a feature implemented from a draft spec, so its behaviour can change in a
 	 * way a finalised one would not. Purely informational — it tells an operator what they are
 	 * turning on, and nothing in the server behaves differently because of it.
+	 *
+	 * No entry sets this today: RAR was the last one, and it now tracks published RFC 9396. Kept
+	 * because it is catalog vocabulary rather than dead code — the next feature tracked from a draft
+	 * needs it, and this comment is the only place the concept is explained.
 	 */
 	experimental?: boolean;
 }
@@ -301,9 +312,17 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 		group: 'Rich Authorization Requests',
 		label: 'Enable RAR (RFC 9396)',
 		type: 'boolean',
-		experimental: true,
 		description:
-			'Enables the authorization_details parameter. Implemented from a draft of the specification, so its behaviour may change between releases.'
+			'Enables the authorization_details parameter, per RFC 9396 (published May 2023). Requires at least one authorization details type below, and requires Resource Indicators — details are only assigned to an access token bound to a resource server.'
+	},
+	{
+		key: 'richAuthorizationRequests.types',
+		group: 'Rich Authorization Requests',
+		label: 'Authorization details types',
+		type: 'json',
+		dependsOn: 'richAuthorizationRequests.enabled',
+		description:
+			'The authorization details types this server accepts, as a map of type identifier to a descriptor: {"https://scheme.example/payment":{"label":"Initiate a payment","fields":{"actions":{"required":true,"allowed":["initiate"]}},"allowUnknownFields":false}}. `label` is what the consent screen shows. Constraints may only name the RFC 9396 §2 common fields (actions, locations, datatypes, privileges, identifier); `identifier` is single-valued so it takes `required` only. Unknown fields are refused unless a type opts in.'
 	},
 
 	{

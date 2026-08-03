@@ -31,11 +31,10 @@ export default async function pushedAuthorizationRequestResponse(
 		dpopJkt = thumbprint || oidc.params.dpop_jkt;
 	} else {
 		ttl = MAX_TTL;
+		// authorization_details is already an array here — the request parser coerces it and checkRar
+		// normalizes it. Parsing it again stringified the array to "[object Object]" and threw, which
+		// only stayed invisible because checkRar used to reject the array before this line ran.
 		const payload = { ...oidc.params };
-
-		if (payload.authorization_details) {
-			payload.authorization_details = JSON.parse(payload.authorization_details);
-		}
 
 		request = new UnsecuredJWT(payload)
 			.setJti(nanoid())

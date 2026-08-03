@@ -292,7 +292,27 @@ export const ApplicationConfig = {
 	/*
 	 * features.richAuthorizationRequests.types
 	 *
-	 * description: Supported authorization details type identifiers and their validators.
+	 * description: The authorization details types this server accepts, as a map of type identifier to
+	 * a serializable descriptor:
+	 *
+	 *   {
+	 *     'https://scheme.example/payment': {
+	 *       label: 'Initiate a payment',            // required — what the consent screen shows
+	 *       fields: {                               // optional constraints on the RFC 9396 §2 fields
+	 *         actions: { required: true, allowed: ['initiate', 'status'] },
+	 *         locations: {}, datatypes: {}, privileges: {},
+	 *         identifier: { required: false }       // single-valued: no `allowed`
+	 *       },
+	 *       allowUnknownFields: false               // default — §5 requires refusing unknown fields
+	 *     }
+	 *   }
+	 *
+	 * The identifier is opaque: §2.1 leaves it to the server and recommends a collision-resistant
+	 * namespace such as a URI. Every member is JSON, so the map round-trips through storage and the
+	 * admin settings API. A per-type `validate` function may still be supplied in an in-process
+	 * bootstrap as an escape hatch for semantics a descriptor cannot express; it is optional, and a
+	 * rejection from it surfaces as `invalid_authorization_details`. Enabling the feature with an empty
+	 * map fails validation, because every request would then be refused.
 	 */
 	'richAuthorizationRequests.types': {},
 

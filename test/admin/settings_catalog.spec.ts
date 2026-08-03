@@ -37,7 +37,9 @@ describe('settings catalog', () => {
 			seen.add(d.key);
 			expect(d.group.length).toBeGreaterThan(0);
 			expect(d.label.length).toBeGreaterThan(0);
-			expect(['boolean', 'string', 'enum', 'string-array']).toContain(d.type);
+			expect(['boolean', 'string', 'enum', 'string-array', 'json']).toContain(
+				d.type
+			);
 			if (d.type === 'enum') expect(Array.isArray(d.options)).toBe(true);
 		}
 	});
@@ -90,27 +92,46 @@ describe('settings catalog', () => {
 			'discovery',
 			'registration.policies',
 			'registration.initialAccessToken',
-			'richAuthorizationRequests.types',
 			'dpop.nonceSecret'
 		]) {
 			expect(keys).not.toContain(forbidden);
 		}
 	});
 
-	// A draft-spec feature is surfaced as information on the setting that enables it. There is no
-	// acknowledgement setting and no boot-time notice: an operator sees the tag in the admin UI,
-	// and nothing about the server's behaviour depends on it.
-	it('marks a draft-spec feature experimental, and only informationally', () => {
+	/*
+	 * richAuthorizationRequests.types was on the forbidden list above while it was function-valued —
+	 * which is exactly why the feature could not be configured by an operator at all. It is now a
+	 * serializable descriptor map, so it is exposed deliberately, as the catalog's first `json` entry.
+	 * Classified explicitly rather than simply dropped from the list, so the key-diff guarantee stays
+	 * enforced instead of quietly weakening.
+	 */
+	it('exposes richAuthorizationRequests.types as a structured json setting', () => {
+		const types = SETTINGS_CATALOG.find(
+			(d) => d.key === 'richAuthorizationRequests.types'
+		);
+		expect(types?.type).toBe('json');
+		expect(types?.dependsOn).toBe('richAuthorizationRequests.enabled');
+	});
+
+	/*
+	 * RAR was the last entry marked experimental, and it tracked a draft. RFC 9396 has been published
+	 * since May 2023 and the implementation now conforms to it within a recorded boundary, so the tag
+	 * and the "behaviour may change" sentence are gone. The `experimental` field itself is kept as
+	 * catalog vocabulary for the next feature tracked from a draft — this test pins that nothing claims
+	 * it today, so the tag cannot rot back into place unnoticed.
+	 */
+	it('claims no draft-spec feature, and cites the published RFC for RAR', () => {
 		const rar = SETTINGS_CATALOG.find(
 			(d) => d.key === 'richAuthorizationRequests.enabled'
 		);
-		expect(rar?.experimental).toBe(true);
+		expect(rar?.experimental).toBeUndefined();
+		expect(rar?.description).toContain('RFC 9396');
+		expect(rar?.description).not.toContain('draft');
 
-		// Nothing else claims to be experimental, so the tag stays meaningful.
 		const experimental = SETTINGS_CATALOG.filter((d) => d.experimental).map(
 			(d) => d.key
 		);
-		expect(experimental).toEqual(['richAuthorizationRequests.enabled']);
+		expect(experimental).toEqual([]);
 
 		// The retired acknowledgement setting is gone from the settings themselves, not just hidden
 		// from the catalog.

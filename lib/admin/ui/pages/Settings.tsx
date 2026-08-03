@@ -13,7 +13,45 @@ import {
 	message
 } from 'antd';
 
-type SettingType = 'boolean' | 'string' | 'enum' | 'string-array';
+// Mirrors SettingType in lib/admin/settings/catalog.ts. A type added there without a branch in
+// `control()` below falls through to the plain text input, which cannot edit a structured value.
+type SettingType = 'boolean' | 'string' | 'enum' | 'string-array' | 'json';
+
+function JsonField({
+	value,
+	onChange
+}: {
+	value: unknown;
+	onChange: (parsed: unknown) => void;
+}) {
+	const [text, setText] = useState(() => JSON.stringify(value ?? {}, null, 2));
+	const [invalid, setInvalid] = useState(false);
+
+	return (
+		<div style={{ maxWidth: 520 }}>
+			<Input.TextArea
+				autoSize={{ minRows: 4, maxRows: 18 }}
+				status={invalid ? 'error' : undefined}
+				value={text}
+				onChange={(e) => {
+					const next = e.target.value;
+					setText(next);
+					try {
+						onChange(JSON.parse(next));
+						setInvalid(false);
+					} catch {
+						// Held locally until it parses: submitting a half-typed document would be refused by
+						// the server for a reason the operator is in the middle of fixing.
+						setInvalid(true);
+					}
+				}}
+			/>
+			{invalid ? (
+				<Typography.Text type="danger">Not valid JSON yet</Typography.Text>
+			) : null}
+		</div>
+	);
+}
 interface Descriptor {
 	key: string;
 	group: string;
@@ -335,6 +373,19 @@ export function Settings() {
 					value={(value as string[]) ?? []}
 					options={(d.options ?? []).map((o) => ({ label: o, value: o }))}
 					onChange={(v) => setValue(d.key, v)}
+				/>
+			);
+		}
+		if (d.type === 'json') {
+			/*
+			 * Edited as text and parsed on change, keeping the last valid parse as the value. The server
+			 * is the authority on whether the structure is acceptable — a bespoke form per structured
+			 * setting would restate rules that already live in validateConfiguration.
+			 */
+			return (
+				<JsonField
+					value={value}
+					onChange={(parsed) => setValue(d.key, parsed)}
 				/>
 			);
 		}

@@ -16,7 +16,7 @@ const AuthorizationCodePayload = t.Composite([
 		codeChallengeMethod: t.Optional(t.Literal('S256')),
 		redirectUri: t.Optional(t.String({ format: 'uri' })),
 		dpopJkt: t.Optional(t.String()),
-		rar: t.Optional(t.Array(t.Object({}))),
+		rar: t.Optional(t.Array(t.Object({}, { additionalProperties: true }))),
 		consumed: t.Boolean()
 	})
 ]);

@@ -45,7 +45,19 @@ export async function loadExistingGrant(oidc) {
 		oidc.result?.consent?.grantId || oidc.session.grantIdFor(clientId);
 
 	if (grantId) {
-		return Grant.tryFind(grantId);
+		const existing = await Grant.tryFind(grantId);
+		/*
+		 * A grant established before the client stopped requiring consent is persisted with
+		 * `trusted: false`, and every filtered getter then narrows to what that grant happens to hold —
+		 * so a returning End-User of a consent-not-required client would silently receive fewer scopes,
+		 * claims and authorization details than were requested. Trust is a property of the client, so it
+		 * is re-derived here rather than frozen at the moment the grant was created. Not persisted: the
+		 * derivation is free on every load, and writing on every authorization is not.
+		 */
+		if (existing && oidc.client['consent.require'] === false) {
+			existing.payload.trusted = true;
+		}
+		return existing;
 	}
 	const accountId = oidc.account?.accountId;
 	if (oidc.client['consent.require'] === false && accountId) {

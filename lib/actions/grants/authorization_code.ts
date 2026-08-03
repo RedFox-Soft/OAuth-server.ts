@@ -141,6 +141,12 @@ export const handler = async function authorizationCodeHandler(oidc, dPoP) {
 		at.setThumbprint('jkt', dPoP.thumbprint);
 	}
 
+	/*
+	 * A no-op today: authorization_details is absent from the strict /token body schema, so the
+	 * parameter can never be present here and the grant-level checks written for RFC 9396 §6 are
+	 * unreachable. Kept as the seam §6 support plugs into rather than deleted and re-added — see
+	 * specs/015-rar-end-to-end/research.md R19.
+	 */
 	await checkRar(oidc);
 	const resource = await resolveResource({ oidc }, code);
 
@@ -157,11 +163,17 @@ export const handler = async function authorizationCodeHandler(oidc, dPoP) {
 		at.payload.scope = grant.getOIDCScopeFiltered(code.scopes);
 	}
 
+	// Absent rather than empty: a token that carries no details must not advertise the member at all,
+	// so a request that asked for none is indistinguishable from one on a server with RAR off.
 	if (
 		ApplicationConfig['richAuthorizationRequests.enabled'] &&
-		at.resourceServer
+		at.resourceServer &&
+		code.payload.rar
 	) {
-		at.payload.rar = await rarForCodeResponse({ oidc }, at.resourceServer);
+		const rar = await rarForCodeResponse({ oidc }, at.resourceServer);
+		if (rar?.length) {
+			at.payload.rar = rar;
+		}
 	}
 
 	oidc.entity('AccessToken', at);

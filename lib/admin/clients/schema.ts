@@ -31,7 +31,12 @@ export const CreateClientBody = t.Object({
 	backchannelTokenDeliveryMode: t.Optional(
 		t.Union([t.Literal('poll'), t.Literal('ping'), t.Literal('push')])
 	),
-	backchannelClientNotificationEndpoint: t.Optional(t.String())
+	backchannelClientNotificationEndpoint: t.Optional(t.String()),
+	// Per-client permitted RAR types (RFC 9396 §10.5). Without this on the admin surface no client an
+	// operator creates could ever use the feature: the client metadata defaults to [], so every client
+	// must opt in explicitly. Validation is delegated to validateClient, which recognizes the metadata
+	// only when the feature is enabled and checks each value against the configured types.
+	authorizationDetailsTypes: t.Optional(t.Array(t.String()))
 });
 
 export const UpdateClientBody = t.Object({
@@ -52,5 +57,6 @@ export const UpdateClientBody = t.Object({
 	backchannelTokenDeliveryMode: t.Optional(
 		t.Union([t.Literal('poll'), t.Literal('ping'), t.Literal('push')])
 	),
-	backchannelClientNotificationEndpoint: t.Optional(t.String())
+	backchannelClientNotificationEndpoint: t.Optional(t.String()),
+	authorizationDetailsTypes: t.Optional(t.Array(t.String()))
 });

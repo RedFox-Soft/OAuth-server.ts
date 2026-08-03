@@ -17,7 +17,7 @@ const RefreshTokenSchema = t.Composite([
 	t.Object({
 		iiat: t.Number(),
 		gty: t.String(),
-		rar: t.Optional(t.Unknown()),
+		rar: t.Optional(t.Array(t.Object({}, { additionalProperties: true }))),
 		rotations: t.Optional(t.Number()),
 		consumed: t.Boolean(),
 		'x5t#S256': t.Optional(t.String()),

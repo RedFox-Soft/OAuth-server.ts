@@ -30,8 +30,21 @@ async function codeHandler(ctx) {
 		dpopJkt: ctx.oidc.params.dpop_jkt
 	});
 
-	if (ApplicationConfig['richAuthorizationRequests.enabled']) {
+	/*
+	 * Gated on the parameter, not on the flag alone. Running the shaping seam for every authorization
+	 * request on a RAR-enabled deployment is what turned a flipped flag into a fault on requests that
+	 * carried nothing for it to do. Empty is deleted rather than stored for the same reason `claims` is
+	 * below: an empty array would surface as `"authorization_details": []` on responses to clients that
+	 * never asked, and the introspection guard tests truthiness, where [] is truthy.
+	 */
+	if (
+		ApplicationConfig['richAuthorizationRequests.enabled'] &&
+		ctx.oidc.params.authorization_details
+	) {
 		code.payload.rar = await rarForAuthorizationCode(ctx);
+		if (!code.payload.rar?.length) {
+			delete code.payload.rar;
+		}
 	}
 
 	if (Object.keys(code.payload.claims).length === 0) {

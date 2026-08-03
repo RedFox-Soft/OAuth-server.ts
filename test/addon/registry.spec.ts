@@ -51,10 +51,22 @@ describe('addon override registry', () => {
 		});
 	});
 
-	it('preserves must-override refusal: an un-overridden RAR transform throws', () => {
-		expect(() => rarForCodeResponse({}, {})).toThrow(
-			'features.richAuthorizationRequests.rarForCodeResponse not implemented'
-		);
+	/*
+	 * The RAR transforms used to refuse to run at all, which is what made
+	 * richAuthorizationRequests.enabled a switch that could 500 the server from the settings page. They
+	 * now have working generic defaults (RFC 9396 §7/§9), so the assertion here is the opposite one: an
+	 * un-overridden transform resolves and returns a value. The override precedence it is really
+	 * guarding is covered by the cases above.
+	 */
+	it('resolves a working default for an un-overridden RAR transform', () => {
+		const ctx = {
+			oidc: {
+				entities: { AuthorizationCode: { payload: { rar: [{ type: 'a' }] } } }
+			}
+		};
+		expect(rarForCodeResponse(ctx, { identifier: () => 'urn:rs' })).toEqual([
+			{ type: 'a' }
+		]);
 	});
 
 	it('restores the default after an explicit reset', () => {

@@ -38,6 +38,7 @@ import { responseModes } from 'lib/response_modes/index.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { resolveBucketForClient } from 'lib/admin/auth/resolveBucket.js';
 import { buildConsentView, type PromptDetails } from './consentView.js';
+import { ApplicationConfig } from 'lib/configs/application.js';
 
 async function resume(interaction, cookie) {
 	const ctx = { cookie, _matchedRouteName: 'ui.resume' };
@@ -114,6 +115,14 @@ async function createGrant(interaction) {
 			details.missingResourceScopes
 		)) {
 			grant.addResourceScope(indicator, scope.join(' '));
+		}
+	}
+	// The arm whose absence kept grant.rar permanently empty, and with it the shaping seams' principal
+	// input. `details.rar` is the not-yet-granted subset, so this plus what the grant already held is
+	// every requested detail.
+	if (details.rar) {
+		for (const detail of details.rar) {
+			grant.addRar(detail);
 		}
 	}
 
@@ -285,8 +294,18 @@ export const ui = new Elysia()
 		const account = (
 			interaction.payload.session as { accountId?: string } | undefined
 		)?.accountId;
+		// The view builder reads no configuration, so the type → label map is resolved here and
+		// handed in.
+		const rarLabels = Object.fromEntries(
+			Object.entries(
+				ApplicationConfig['richAuthorizationRequests.types'] ?? {}
+			).map(([type, descriptor]) => [
+				type,
+				(descriptor as { label?: string })?.label ?? type
+			])
+		);
 		return consentServer(
-			buildConsentView({ uid, clientName, account, details })
+			buildConsentView({ uid, clientName, account, details, rarLabels })
 		);
 	})
 	.post(

@@ -137,6 +137,17 @@ function collectGrantTypes(
 	return grantTypes;
 }
 
+// The five common data fields RFC 9396 §2 defines. `identifier` is single-valued, so a descriptor
+// can only mark it required — fixing a permitted set of per-resource identifiers restricts nothing.
+const RAR_LIST_FIELDS = ['actions', 'locations', 'datatypes', 'privileges'];
+const RAR_COMMON_FIELDS = [...RAR_LIST_FIELDS, 'identifier'];
+
+/*
+ * A type descriptor is pure JSON so the whole map round-trips through configStore and the admin PUT;
+ * the former shape was `{ validate: fn }`, which a catalog entry can never carry, and that is why the
+ * feature was unconfigurable. A code-registered `validate` survives as an optional escape hatch for
+ * semantics data cannot express.
+ */
 function checkRichAuthorizationRequests(config: ConfigurationInput) {
 	if (config['richAuthorizationRequests.enabled']) {
 		const types = config['richAuthorizationRequests.types'];
@@ -146,16 +157,88 @@ function checkRichAuthorizationRequests(config: ConfigurationInput) {
 			);
 		}
 
+		// With no types every authorization_details value is rejected before any hook runs, so the
+		// combination is never what an operator meant.
+		if (!Object.keys(types).length) {
+			throw new TypeError(
+				'features.richAuthorizationRequests.types must declare at least one type when richAuthorizationRequests is enabled'
+			);
+		}
+
 		for (const [k, v] of Object.entries(types)) {
 			if (!isPlainObject(v)) {
 				throw new TypeError(
 					'features.richAuthorizationRequests.types attribute values must be objects'
 				);
 			}
+
+			if (typeof v.label !== 'string' || !v.label.length) {
+				throw new TypeError(
+					`features.richAuthorizationRequests.types['${k}'].label must be a non-empty string`
+				);
+			}
+
+			if (v.fields !== undefined) {
+				if (!isPlainObject(v.fields)) {
+					throw new TypeError(
+						`features.richAuthorizationRequests.types['${k}'].fields must be an object`
+					);
+				}
+
+				for (const [field, constraint] of Object.entries(v.fields)) {
+					if (!RAR_COMMON_FIELDS.includes(field)) {
+						throw new TypeError(
+							`features.richAuthorizationRequests.types['${k}'].fields must only constrain ${RAR_COMMON_FIELDS.join(', ')}`
+						);
+					}
+					if (!isPlainObject(constraint)) {
+						throw new TypeError(
+							`features.richAuthorizationRequests.types['${k}'].fields['${field}'] must be an object`
+						);
+					}
+					if (
+						constraint.required !== undefined &&
+						typeof constraint.required !== 'boolean'
+					) {
+						throw new TypeError(
+							`features.richAuthorizationRequests.types['${k}'].fields['${field}'].required must be a boolean`
+						);
+					}
+					if (constraint.allowed !== undefined) {
+						if (!RAR_LIST_FIELDS.includes(field)) {
+							throw new TypeError(
+								`features.richAuthorizationRequests.types['${k}'].fields['${field}'] must not declare allowed values`
+							);
+						}
+						if (
+							!Array.isArray(constraint.allowed) ||
+							!constraint.allowed.length ||
+							constraint.allowed.some(
+								(value) => typeof value !== 'string' || !value.length
+							)
+						) {
+							throw new TypeError(
+								`features.richAuthorizationRequests.types['${k}'].fields['${field}'].allowed must be a non-empty array of non-empty strings`
+							);
+						}
+					}
+				}
+			}
+
+			if (
+				v.allowUnknownFields !== undefined &&
+				typeof v.allowUnknownFields !== 'boolean'
+			) {
+				throw new TypeError(
+					`features.richAuthorizationRequests.types['${k}'].allowUnknownFields must be a boolean`
+				);
+			}
+
 			const { validate } = v;
 			if (
-				typeof validate !== 'function' ||
-				!['Function', 'AsyncFunction'].includes(validate.constructor.name)
+				validate !== undefined &&
+				(typeof validate !== 'function' ||
+					!['Function', 'AsyncFunction'].includes(validate.constructor.name))
 			) {
 				throw new TypeError(
 					`features.richAuthorizationRequests.types['${k}'].validate must be a function`

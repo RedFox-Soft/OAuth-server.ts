@@ -2366,11 +2366,13 @@ describe('Client metadata validation', () => {
 		}));
 
 	describe('authorization_details_types', function () {
+		// A type is a serializable descriptor now, and `label` is required — the former `{ validate }`
+		// shape could never have been an operator setting, which is why the feature was unconfigurable.
 		const rar = {
 			'richAuthorizationRequests.enabled': true,
 			'richAuthorizationRequests.types': {
 				foo: {
-					validate() {}
+					label: 'Foo'
 				}
 			}
 		};

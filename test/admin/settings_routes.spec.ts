@@ -142,6 +142,109 @@ describe('settings API', () => {
 		expect(res.status).toBe(422);
 	});
 
+	/*
+	 * The RAR type map: the catalog's first structured (`json`) setting, and the reason the feature was
+	 * previously unconfigurable — the key used to be function-valued, so no catalog entry could carry it.
+	 * The rules here are not restated by the route: validateEffectiveConfig delegates to
+	 * validateConfiguration, so these are the same rules that gate a boot (see
+	 * test/configuration/rar_types.spec.ts).
+	 */
+	describe('richAuthorizationRequests.types (json setting)', () => {
+		const types = {
+			'https://scheme.example/payment': {
+				label: 'Initiate a payment',
+				fields: { actions: { required: true, allowed: ['initiate'] } }
+			}
+		};
+
+		it('persists a descriptor map and round-trips it unchanged', async () => {
+			const cookie = await sessionCookieFor(['super_admin']);
+			const put = await client.admin.api.settings.put(
+				{
+					'richAuthorizationRequests.enabled': true,
+					'richAuthorizationRequests.types': types
+				},
+				{ headers: { cookie } }
+			);
+
+			expect(put.status).toBe(200);
+			const body = put.data as SettingsResponse;
+			expect(body.values['richAuthorizationRequests.types']).toEqual(types);
+			const stored = (await configStore.get()) as Record<string, unknown>;
+			expect(stored['richAuthorizationRequests.types']).toEqual(types);
+		});
+
+		it('refuses enabling the feature with no types, leaving storage untouched', async () => {
+			const cookie = await sessionCookieFor(['super_admin']);
+			const before = await configStore.get();
+
+			const res = await client.admin.api.settings.put(
+				{
+					'richAuthorizationRequests.enabled': true,
+					'richAuthorizationRequests.types': {}
+				},
+				{ headers: { cookie } }
+			);
+
+			expect(res.status).toBe(422);
+			expect(await configStore.get()).toEqual(before);
+		});
+
+		it('refuses a malformed descriptor, leaving storage untouched', async () => {
+			const cookie = await sessionCookieFor(['super_admin']);
+			const before = await configStore.get();
+
+			for (const bad of [
+				{ 'urn:t': {} },
+				{ 'urn:t': { label: 'T', fields: { nope: {} } } },
+				{ 'urn:t': { label: 'T', allowUnknownFields: 'yes' } }
+			]) {
+				const res = await client.admin.api.settings.put(
+					{
+						'richAuthorizationRequests.enabled': true,
+						'richAuthorizationRequests.types': bad
+					},
+					{ headers: { cookie } }
+				);
+				expect(res.status).toBe(422);
+			}
+
+			expect(await configStore.get()).toEqual(before);
+		});
+
+		it('refuses a value that is not a JSON object at all', async () => {
+			const cookie = await sessionCookieFor(['super_admin']);
+			for (const bad of [[], 'nope', 5]) {
+				const res = await client.admin.api.settings.put(
+					{ 'richAuthorizationRequests.types': bad },
+					{ headers: { cookie } }
+				);
+				expect(res.status).toBe(422);
+			}
+		});
+
+		/*
+		 * FR-004: judged on the resulting configuration as a whole. A batch that arms the feature next to
+		 * an unrunnable companion is refused whole, so the valid half is not half-applied.
+		 */
+		it('refuses the whole batch when one setting makes it unrunnable', async () => {
+			const cookie = await sessionCookieFor(['super_admin']);
+			const before = await configStore.get();
+
+			const res = await client.admin.api.settings.put(
+				{
+					'par.enabled': true,
+					'richAuthorizationRequests.enabled': true,
+					'richAuthorizationRequests.types': {}
+				},
+				{ headers: { cookie } }
+			);
+
+			expect(res.status).toBe(422);
+			expect(await configStore.get()).toEqual(before);
+		});
+	});
+
 	it('rejects an unknown key with 422', async () => {
 		const cookie = await sessionCookieFor(['super_admin']);
 		const res = await client.admin.api.settings.put(

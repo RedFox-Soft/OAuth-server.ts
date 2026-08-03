@@ -206,6 +206,12 @@ export const handler = async function refreshTokenHandler(oidc, dPoP) {
 	const scope = oidc.params.scope
 		? oidc.requestParamScopes
 		: refreshToken.scopes;
+	/*
+	 * A no-op today: authorization_details is absent from the strict /token body schema, so the
+	 * parameter can never be present here and the grant-level checks written for RFC 9396 §6 are
+	 * unreachable. Kept as the seam §6 support plugs into rather than deleted and re-added — see
+	 * specs/015-rar-end-to-end/research.md R19.
+	 */
 	await checkRar(oidc);
 	const resource = await resolveResource(
 		{ oidc },
@@ -230,14 +236,16 @@ export const handler = async function refreshTokenHandler(oidc, dPoP) {
 		at.payload.scope = grant.getOIDCScopeFiltered(scope);
 	}
 
+	// Absent rather than empty — see the same guard on the authorization_code grant.
 	if (
 		ApplicationConfig['richAuthorizationRequests.enabled'] &&
-		at.resourceServer
+		at.resourceServer &&
+		refreshToken.payload.rar
 	) {
-		at.payload.rar = await rarForRefreshTokenResponse(
-			{ oidc },
-			at.resourceServer
-		);
+		const rar = await rarForRefreshTokenResponse({ oidc }, at.resourceServer);
+		if (rar?.length) {
+			at.payload.rar = rar;
+		}
 	}
 
 	oidc.entity('AccessToken', at);
