@@ -37,7 +37,8 @@ async function sessionCookieFor(roles: string[]) {
 const SETTINGS_TARGET = 'ApplicationConfig';
 
 // The audit log is append-only, so assertions measure the delta around one request
-// rather than an absolute count.
+// rather than an absolute count. `total` rather than `entries.length`: a page is bounded, so a
+// length would silently stop growing once the shared in-memory trail passes one page.
 const settingsAudit = () =>
 	adminAuditStore.list({ targetType: SETTINGS_TARGET });
 
@@ -425,32 +426,35 @@ describe('settings API', () => {
 
 	it('audits a successful PUT with the acting admin and the changed keys', async () => {
 		const { cookie, userId } = await sessionFor(['super_admin']);
-		const before = (await settingsAudit()).length;
+		const before = (await settingsAudit()).total;
 		const res = await client.admin.api.settings.put(
 			{ 'revocation.enabled': true, 'par.enabled': true },
 			{ headers: { cookie } }
 		);
 		expect(res.status).toBe(200);
 
-		const entries = await settingsAudit();
-		expect(entries.length).toBe(before + 1);
-		const entry = entries[entries.length - 1];
+		const { entries, total } = await settingsAudit();
+		expect(total).toBe(before + 1);
+		// Newest first, so the entry this request wrote is the head of the page.
+		const entry = entries[0];
 		expect(entry.action).toBe('settings.update');
 		expect(entry.actorId).toBe(userId);
 		expect(entry.actorEmail).toBeTruthy();
-		// The entry schema has no metadata field, so the changed keys are the targetId.
-		expect(entry.targetId).toBe('par.enabled,revocation.enabled');
+		// The changed keys are field names, and the target is the settings document itself. They used to
+		// be crammed into targetId, which had to stand in for a field the entry did not have.
+		expect(entry.targetId).toBe('settings');
+		expect(entry.attributes).toEqual(['par.enabled', 'revocation.enabled']);
 	});
 
 	it('writes no audit entry when a PUT is rejected', async () => {
 		const cookie = await sessionCookieFor(['super_admin']);
-		const before = (await settingsAudit()).length;
+		const before = (await settingsAudit()).total;
 		const res = await client.admin.api.settings.put(
 			{ 'par.enabled': 'nope' } as unknown as Record<string, boolean>,
 			{ headers: { cookie } }
 		);
 		expect(res.status).toBe(422);
-		expect((await settingsAudit()).length).toBe(before);
+		expect((await settingsAudit()).total).toBe(before);
 	});
 
 	/*

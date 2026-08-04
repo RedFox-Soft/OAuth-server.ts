@@ -69,11 +69,33 @@ describe('bucket verification settings API', () => {
 		expect(after.emailVerificationRequired).toBe(true);
 		expect(after.verificationMethod).toBe('code');
 
-		const audit = await adminAuditStore.list({
+		const { entries } = await adminAuditStore.list({
 			targetType: 'UserBucket',
 			targetId: bucket._id
 		});
-		expect(audit.some((a) => a.action === 'bucket.settings.update')).toBe(true);
+		expect(entries.some((a) => a.action === 'bucket.update')).toBe(true);
+	});
+
+	// This entry used to be written only when a registration or verification field was present, so a
+	// rename left no trace — while still being an exercised privilege over a bucket.
+	it('audits an update that touches no verification field', async () => {
+		const cookie = await superCookie();
+		const created = await client.admin.api.buckets.post(
+			{ name: 'Rename me' },
+			{ headers: { cookie } }
+		);
+		const bucket = created.data as UserBucket;
+
+		const patched = await client.admin.api
+			.buckets({ id: bucket._id })
+			.patch({ name: 'Renamed' }, { headers: { cookie } });
+		expect(patched.status).toBe(200);
+
+		const { entries } = await adminAuditStore.list({
+			targetId: bucket._id,
+			action: 'bucket.update'
+		});
+		expect(entries).toHaveLength(1);
 	});
 
 	it('rejects an invalid verification method', async () => {

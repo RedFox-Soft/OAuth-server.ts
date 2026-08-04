@@ -18,6 +18,8 @@ import {
 	InvalidOriginError,
 	normalizeOrigins
 } from '../../helpers/cors_origin.js';
+import { recordAdminAudit } from '../audit/record.js';
+import nanoid from '../../helpers/nanoid.js';
 
 async function loadProject(id: string) {
 	const project = await getProjectStore().find(id);
@@ -71,9 +73,13 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 			if (await store.findBySlug(body.slug)) {
 				throw new AdminError(409, 'slug already exists');
 			}
+			// Allocated here so the audit entry can name the project that is about to exist.
+			const projectId = nanoid();
+			await recordAdminAudit(ctx, 'project.create', projectId);
 			// Every accepted key must be forwarded explicitly: the store takes more than this handler
 			// passes, so a schema addition alone would accept a value and silently discard it.
 			const project = await store.create({
+				_id: projectId,
 				name: body.name,
 				slug: body.slug,
 				type: 'regular',
@@ -101,6 +107,11 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 			assertProjectAccess(ctx, project);
 			if (body.managedBy !== undefined) assertRole(ctx, 'super_admin');
 			const corsOrigins = validateCorsOrigins(body.corsOrigins);
+			// After origin validation: an entry for a request that was about to be refused as malformed
+			// would describe a change nobody attempted.
+			await recordAdminAudit(ctx, 'project.update', params.id, {
+				attributes: Object.keys(body)
+			});
 			return getProjectStore().update(params.id, {
 				...body,
 				...(corsOrigins === undefined ? {} : { corsOrigins })
@@ -114,6 +125,7 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 		const project = await loadProject(params.id);
 		if (project.type === 'admin')
 			throw new AdminError(403, 'cannot delete admin project');
+		await recordAdminAudit(ctx, 'project.delete', params.id);
 		await getProjectStore().destroy(params.id);
 		return { ok: true };
 	})
@@ -126,6 +138,11 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 			const bucket = await getBucketStore().find(body.bucketId);
 			if (!bucket) throw new AdminError(404, 'bucket not found');
 			assertBucketAccess(ctx, bucket);
+			// The project is the entity being changed; which bucket it was pointed at is a submitted
+			// field, so it is recorded as a field name rather than a value.
+			await recordAdminAudit(ctx, 'project.bucket.assign', params.id, {
+				attributes: Object.keys(body)
+			});
 			return getProjectStore().update(params.id, { bucketId: body.bucketId });
 		},
 		{ body: SetBucketBody }

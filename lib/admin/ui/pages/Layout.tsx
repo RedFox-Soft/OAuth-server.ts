@@ -7,6 +7,7 @@ import {
 	TeamOutlined,
 	SettingOutlined,
 	KeyOutlined,
+	FileSearchOutlined,
 	LogoutOutlined
 } from '@ant-design/icons';
 import type { AdminContext } from '../../auth/rbac.js';
@@ -15,10 +16,12 @@ import { Buckets } from './Buckets.js';
 import { Admins } from './Admins.js';
 import { Settings } from './Settings.js';
 import { Keys } from './Keys.js';
+import { Audit } from './Audit.js';
 
 const { Sider, Header, Content } = AntLayout;
 
-type PageKey = 'projects' | 'buckets' | 'admins' | 'settings' | 'keys';
+type PageKey =
+	'projects' | 'buckets' | 'admins' | 'settings' | 'keys' | 'audit';
 
 export function Layout({ me }: { me: AdminContext | null }) {
 	const roles = me?.roles ?? [];
@@ -32,7 +35,8 @@ export function Layout({ me }: { me: AdminContext | null }) {
 			? [
 					{ key: 'admins', icon: <TeamOutlined />, label: 'Admins' },
 					{ key: 'settings', icon: <SettingOutlined />, label: 'Settings' },
-					{ key: 'keys', icon: <KeyOutlined />, label: 'Keys' }
+					{ key: 'keys', icon: <KeyOutlined />, label: 'Keys' },
+					{ key: 'audit', icon: <FileSearchOutlined />, label: 'Audit' }
 				]
 			: [])
 	];
@@ -61,6 +65,14 @@ export function Layout({ me }: { me: AdminContext | null }) {
 			case 'keys':
 				return isSuperAdmin ? (
 					<Keys />
+				) : (
+					<Projects isSuperAdmin={isSuperAdmin} />
+				);
+			// The API refuses a non-super-admin anyway; falling back here keeps the SPA from rendering a
+			// page that could only ever show an error.
+			case 'audit':
+				return isSuperAdmin ? (
+					<Audit />
 				) : (
 					<Projects isSuperAdmin={isSuperAdmin} />
 				);

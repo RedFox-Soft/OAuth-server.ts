@@ -9,6 +9,8 @@ import {
 } from '../auth/rbac.js';
 import { ADMIN_BUCKET_ID } from '../consts.js';
 import { CreateAdminBody, UpdateAdminBody } from './schema.js';
+import { recordAdminAudit } from '../audit/record.js';
+import nanoid from '../../helpers/nanoid.js';
 
 const store = () => getUserStore(ADMIN_BUCKET_ID);
 
@@ -56,7 +58,17 @@ export const adminUserRoutes = new Elysia({ name: 'admin-users' })
 				throw new AdminError(409, 'email already exists');
 			}
 			const hash = await Bun.password.hash(body.password);
-			const user = await store().create(body.email, hash, body.roles);
+			// Allocated here so the entry names the account that is about to exist. After the uniqueness
+			// check, so a refused duplicate leaves no entry describing an account nobody created.
+			const userId = nanoid();
+			await recordAdminAudit(ctx, 'admin.create', userId);
+			const user = await store().create(
+				body.email,
+				hash,
+				body.roles,
+				false,
+				userId
+			);
 			set.status = 201;
 			const { password: _password, ...safe } = user;
 			return safe;
@@ -74,6 +86,11 @@ export const adminUserRoutes = new Elysia({ name: 'admin-users' })
 			) {
 				throw new AdminError(409, 'cannot remove the last active super_admin');
 			}
+			// After the last-super-admin guard: an entry for a request that guard refused would record a
+			// role change that never happened.
+			await recordAdminAudit(ctx, 'admin.update', params.id, {
+				attributes: Object.keys(body)
+			});
 			const updated = await store().update(params.id, body);
 			if (!updated) throw new AdminError(404, 'admin not found');
 			const { password: _password, ...safe } = updated;
@@ -92,6 +109,8 @@ export const adminUserRoutes = new Elysia({ name: 'admin-users' })
 		) {
 			throw new AdminError(409, 'cannot remove the last active super_admin');
 		}
+		// `admin.deactivate`, not a delete: the row survives with active:false.
+		await recordAdminAudit(ctx, 'admin.deactivate', params.id);
 		const updated = await store().update(params.id, { active: false });
 		if (!updated) throw new AdminError(404, 'admin not found');
 		return { ok: true };

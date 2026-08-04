@@ -184,9 +184,29 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 	 * `expiresAt` to `absoluteExpiresAt`, so it can never outlive the hard cap.
 	 */
 	storeArea(STORE_AREAS.adminSession, EXPIRES_AT),
-	/* Append-only and permanent: the constitution requires an immutable admin audit trail. Indexed by
-	 * time for reads, with no expiry so an entry is never removed. */
-	storeArea(STORE_AREAS.adminAudit, null, [{ key: { timestamp: 1 } }]),
+	/*
+	 * Append-only and permanent: the constitution requires an immutable admin audit trail, so no expiry
+	 * on any of these — an entry is never removed.
+	 *
+	 * One index per shape the read surface actually queries. `{ timestamp, _id }` serves the total
+	 * newest-first ordering: MongoDB traverses an index in either direction, so no descending twin is
+	 * needed, and the `_id` tiebreaker is what keeps paging from dropping a row when two actions share a
+	 * timestamp. The other four exist because the trail grows without bound while the filters must stay
+	 * point lookups — including `actorEmail`, whose own index is what keeps the actor filter's second
+	 * `$or` arm off a collection scan.
+	 *
+	 * Deployments provisioned before this feature also carry a bare `{ timestamp: 1 }` index, now a
+	 * redundant prefix of the first entry below. Reconciliation does not drop it, deliberately: only
+	 * expiry rules are safe to remove, since an unrecognised ordinary index may be an operator's.
+	 */
+	storeArea(STORE_AREAS.adminAudit, null, [
+		{ key: { timestamp: 1, _id: 1 } },
+		{ key: { actorId: 1, timestamp: 1 } },
+		{ key: { actorEmail: 1, timestamp: 1 } },
+		{ key: { action: 1, timestamp: 1 } },
+		{ key: { targetType: 1, targetId: 1, timestamp: 1 } },
+		{ key: { targetScope: 1, timestamp: 1 } }
+	]),
 	storeArea(STORE_AREAS.serviceConfig, null),
 
 	perBucketArea

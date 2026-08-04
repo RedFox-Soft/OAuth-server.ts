@@ -21,6 +21,11 @@ export interface AdminClientView {
 }
 
 export interface CreateClientInput {
+	/*
+	 * Supplied when the caller has already allocated the id — which the admin route does, because the
+	 * client's audit entry must name it before the client exists. Generated here otherwise.
+	 */
+	clientId?: string;
 	clientName?: string;
 	applicationType?: 'web' | 'native';
 	grantTypes: string[];
@@ -125,7 +130,7 @@ async function validateAndStore(metadata: Record<string, unknown>) {
 export async function createClient(
 	input: CreateClientInput
 ): Promise<{ view: AdminClientView; secret?: string }> {
-	const clientId = nanoid();
+	const clientId = input.clientId ?? nanoid();
 	const metadata = toMetadata(input, clientId);
 	let secret: string | undefined;
 	if (Client.needsSecret(metadata)) {

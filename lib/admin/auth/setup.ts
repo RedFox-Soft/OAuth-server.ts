@@ -1,6 +1,8 @@
 import { Elysia, t } from 'elysia';
 import { getUserStore } from '../../adapters/index.js';
 import { ADMIN_BUCKET_ID } from '../consts.js';
+import { recordBootstrapAudit } from '../audit/record.js';
+import nanoid from '../../helpers/nanoid.js';
 
 export async function hasSuperAdmin(): Promise<boolean> {
 	const users = await getUserStore(ADMIN_BUCKET_ID).list();
@@ -25,9 +27,20 @@ export const adminSetup = new Elysia({ name: 'admin-setup' })
 				return { error: 'already_initialized', message: 'setup is closed' };
 			}
 			const hash = await Bun.password.hash(body.password);
-			await getUserStore(ADMIN_BUCKET_ID).create(body.email, hash, [
-				'super_admin'
-			]);
+			/*
+			 * Audit-first, like every other state-changing admin action — which means the id has to be
+			 * allocated here rather than by the store, since the entry must name the account that is
+			 * about to exist. There is no session to attribute: the bootstrap actor stands in.
+			 */
+			const userId = nanoid();
+			await recordBootstrapAudit('setup.bootstrap', userId);
+			await getUserStore(ADMIN_BUCKET_ID).create(
+				body.email,
+				hash,
+				['super_admin'],
+				false,
+				userId
+			);
 			set.status = 201;
 			return { ok: true };
 		},

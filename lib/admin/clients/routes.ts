@@ -17,6 +17,8 @@ import {
 	rotateSecret,
 	deleteClientRecord
 } from './service.js';
+import { recordAdminAudit } from '../audit/record.js';
+import nanoid from '../../helpers/nanoid.js';
 
 // Load a REGULAR project the caller may access, or throw. Client management never
 // applies to the reserved admin project.
@@ -65,7 +67,11 @@ export const clientRoutes = new Elysia({ name: 'admin-clients' })
 		async ({ admin, params, body, set }) => {
 			const ctx = assertAuth(admin as AdminContext | null);
 			const project = await loadManageableProject(ctx, params.id);
-			const { view, secret } = await createClient(body);
+			// Allocated here so the entry names the client that is about to exist. One entry for the
+			// request, even though it also attaches the client to its project.
+			const clientId = nanoid();
+			await recordAdminAudit(ctx, 'client.create', clientId);
+			const { view, secret } = await createClient({ ...body, clientId });
 			await getProjectStore().update(params.id, {
 				clientIds: [...project.clientIds, view.clientId]
 			});
@@ -91,6 +97,9 @@ export const clientRoutes = new Elysia({ name: 'admin-clients' })
 			const ctx = assertAuth(admin as AdminContext | null);
 			const project = await loadManageableProject(ctx, params.id);
 			assertOwnsClient(project, params.clientId);
+			await recordAdminAudit(ctx, 'client.update', params.clientId, {
+				attributes: Object.keys(body)
+			});
 			return updateClient(params.clientId, body);
 		},
 		{ body: UpdateClientBody }
@@ -101,6 +110,8 @@ export const clientRoutes = new Elysia({ name: 'admin-clients' })
 			const ctx = assertAuth(admin as AdminContext | null);
 			const project = await loadManageableProject(ctx, params.id);
 			assertOwnsClient(project, params.clientId);
+			// The rotation is the recorded fact; the secret itself never enters the trail.
+			await recordAdminAudit(ctx, 'client.secret.rotate', params.clientId);
 			const secret = await rotateSecret(params.clientId);
 			return { clientId: params.clientId, secret };
 		}
@@ -111,6 +122,7 @@ export const clientRoutes = new Elysia({ name: 'admin-clients' })
 			const ctx = assertAuth(admin as AdminContext | null);
 			const project = await loadManageableProject(ctx, params.id);
 			assertOwnsClient(project, params.clientId);
+			await recordAdminAudit(ctx, 'client.delete', params.clientId);
 			await deleteClientRecord(params.clientId);
 			await getProjectStore().update(params.id, {
 				clientIds: project.clientIds.filter((c) => c !== params.clientId)

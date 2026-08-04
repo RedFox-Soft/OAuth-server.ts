@@ -95,16 +95,25 @@ describe('storage inventory: expiry', () => {
 	});
 
 	// The admin audit trail is required to be immutable, so this one is worth its own assertion
-	// rather than resting on the list above.
-	it('leaves the admin audit trail permanent and time-indexed', () => {
+	// rather than resting on the list above. Each index serves one shape the read surface queries;
+	// what matters here is that not one of them can remove an entry.
+	it('leaves the admin audit trail permanent and indexed for every read shape', () => {
 		const audit = areaNamed('adminAudit');
 		const specs = indexesFor(audit);
 
 		expect(audit.reaped).toBeNull();
-		expect(specs).toEqual([{ key: { timestamp: 1 } }]);
+		expect(specs).toEqual([
+			{ key: { timestamp: 1, _id: 1 } },
+			{ key: { actorId: 1, timestamp: 1 } },
+			{ key: { actorEmail: 1, timestamp: 1 } },
+			{ key: { action: 1, timestamp: 1 } },
+			{ key: { targetType: 1, targetId: 1, timestamp: 1 } },
+			{ key: { targetScope: 1, timestamp: 1 } }
+		]);
 		expect(
 			specs.some((spec) => spec.expireAfterSeconds !== undefined)
 		).toBeFalse();
+		expect(specs.some((spec) => spec.unique === true)).toBeFalse();
 	});
 });
 

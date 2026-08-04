@@ -100,11 +100,17 @@ export interface DPoPNonceSecretStoreConstructor {
 export interface UserStoreInstance {
 	find(id: string): Promise<User | null>;
 	findByEmail(email: string): Promise<User | null>;
+	/*
+	 * `id` lets the caller allocate the identifier before the record exists, which is what makes
+	 * audit-first possible for a creation: the audit entry must name the real id and must be written
+	 * before the account is created. Omitted, each adapter generates one as it always did.
+	 */
 	create(
 		email: string,
 		password: string,
 		roles?: string[],
-		verified?: boolean
+		verified?: boolean,
+		id?: string
 	): Promise<User>;
 	list(): Promise<User[]>;
 	update(
@@ -144,7 +150,43 @@ export interface AdminAuditEntry {
 	action: string;
 	targetType: string;
 	targetId: string;
+	/*
+	 * The container within which `targetId` resolves — in practice a bucket id, set only by the
+	 * end-user operations. Kept separate from `targetId` rather than fused into it so exact-match
+	 * retrieval on a bare target identifier keeps working. Absent where the target resolves alone.
+	 *
+	 * Written as a string or omitted; read back as a string or `null`, so a consumer never has to tell
+	 * "absent" from "not applicable".
+	 */
+	targetScope?: string | null;
+	/*
+	 * Names of the fields the request set — never their values, so no secret can reach the trail
+	 * through this field. Optional because entries written before it existed do not carry it, and the
+	 * trail is immutable: there is no backfill, only a read-side default.
+	 */
+	attributes?: string[];
 	timestamp: Date;
+}
+
+export interface AdminAuditQuery {
+	// Matches actorId OR actorEmail: a reviewer reads emails, but a deleted admin's entries are
+	// findable only by id, and the caller should not have to know which they are holding.
+	actor?: string;
+	action?: string;
+	targetType?: string;
+	targetId?: string;
+	targetScope?: string;
+	/* Inclusive bounds on `timestamp`; either is valid alone. */
+	from?: Date;
+	to?: Date;
+	limit?: number;
+	offset?: number;
+}
+
+export interface AdminAuditPage {
+	entries: AdminAuditEntry[];
+	// Records matching the filters, independent of limit/offset — the reader needs a page count.
+	total: number;
 }
 
 // Append-only by construction: there is intentionally no update or delete method, so an
@@ -154,10 +196,11 @@ export interface AdminAuditStoreInstance {
 	record(
 		entry: Omit<AdminAuditEntry, '_id' | 'timestamp'>
 	): Promise<AdminAuditEntry>;
-	list(filter?: {
-		targetType?: string;
-		targetId?: string;
-	}): Promise<AdminAuditEntry[]>;
+	/*
+	 * Newest first, ordered by (timestamp desc, _id desc). The `_id` tiebreaker makes the order total,
+	 * which is what stops paging from dropping or repeating an entry when timestamps collide.
+	 */
+	list(query?: AdminAuditQuery): Promise<AdminAuditPage>;
 }
 
 export interface AdminAuditStoreConstructor {

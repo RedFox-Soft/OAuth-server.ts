@@ -145,7 +145,8 @@ exact line numbers.
   8. **Admin.** `corsOrigins` accepted by `POST /admin/api/projects` and the existing `PATCH
 /admin/api/projects/:id` with the shared validation and the existing RBAC/admin-project guards,
      plus one origins editor on `lib/admin/ui/pages/Projects.tsx`. Full project edit stays task 19;
-     auditing project mutations stays task 8.
+     auditing project mutations stays task 8 — **now delivered**: `project.update` records the submitted
+     field names, so a `corsOrigins` change is already audited.
   9. **Removals.** `lib/shared/cors.ts`; `lib/addon/cors.ts` plus its `AddonImplementations` entry
      and `lib/addon/index.ts` re-export; `test/cors/cors.config.ts`;
      `test/cors/custom_cors.spec.ts` (**deleted, not migrated** — it asserts that a Koa `cors()`
@@ -404,20 +405,69 @@ exact line numbers.
 
 ## P1 — Security & conformance
 
-### 8. Admin audit completeness and readability — Implement
+### 8. Admin audit completeness and readability — ✅ Implemented
 
-- **Context:** The constitution note (`lib/admin/audit/record.ts:5-8`) promises an immutable audit
-  log for **every** admin action, but `recordAdminAudit` has exactly 5 call sites (bucket policy
-  branch, JWKS ×2, settings, SMTP). Unaudited: project create/update/delete/bucket-assign, client
-  create/update/delete/secret-rotate, admin create/update/deactivate, end-user
-  create/update/password-reset/delete, bucket create/delete, first-run setup. The trail is also
-  write-only: `adminAuditStore.list()` exists in both adapters (`lib/adapters/types.ts:124-127`)
-  but no route or UI reads it.
-- **Expected result:** Every state-changing admin route writes an audit record (audit-first, as
-  the existing call sites do) capturing actor, action, target, timestamp. A read surface exists:
-  `GET /admin/api/audit` (paginated, filterable by actor/action/target, super-admin only) plus an
-  admin SPA page listing it. Tests assert an audit record for each mutating route and cover the
-  read API's authz.
+- **Delivered by** `specs/016-admin-audit-completeness`. Mechanism: a declarative table
+  (`lib/consts/admin_audit_routes.ts`) enumerating all 23 state-changing admin routes with their action
+  name and target type, made **load-bearing** rather than documentary — `recordAdminAudit` takes an
+  `AuditAction` (the union of the table's action values) and resolves `targetType` from the table, so an
+  unlisted action cannot compile and a target type cannot be mistyped — plus a two-way drift guard
+  (`test/admin/audit_route_classification.spec.ts`) that fails when a mounted mutating admin route has no
+  entry or an entry names an unmounted route. Same shape as `route_classification.ts` (task 1) and
+  `storage_inventory.ts` (task 4). Coverage went 4 fully-audited routes (+1 branch-conditional) → 23 of
+  23; the read surface is `GET /admin/api/audit` (super-admin, newest-first, offset-paged, filterable by
+  actor/action/target/scope/time window) with an `Audit` page in the admin SPA. Suite: 2446 pass / 0 fail
+  (was 2366); `lib/` typecheck unchanged at 812.
+- **Findings worth carrying forward** (filed as `wiki/concepts/admin-audit-trail.md`):
+  1. **Audit-first and authorization-first are both required, and the order is not interchangeable.** The
+     obvious cleanup — move 23 call sites into one route-level plugin so nobody can forget — is unsafe
+     here: the admin handlers authorize in their own bodies, so an `onBeforeHandle` plugin records
+     entries for callers who are not yet known to be authorized. Into an append-only, never-expiring
+     collection, that is an unauthenticated write path into permanent storage, i.e. trail poisoning and
+     unbounded growth reachable by anyone who can reach `/admin/api/*`. Completeness is bought with a
+     table and a guard instead; the write stays inside the handler, after authorization.
+  2. **An entry therefore means "an authorized actor reached the point of applying this change", not
+     "the change took effect".** A not-found, a uniqueness conflict or the last-super-admin guard can
+     follow a written entry. Recording effects instead would need either a second write per operation or
+     giving up the guarantee that nothing changes unrecorded; the trail states the caveat where it is
+     read rather than pretending otherwise.
+  3. **Elysia strips undeclared query parameters before validation**, so `additionalProperties: false` on
+     a query schema cannot refuse one — the check has to read the raw URL. Measured, not reasoned. It
+     matters disproportionately here: a mistyped filter that is silently dropped answers with the
+     _unfiltered_ trail, a wrong answer wearing a 200 on the one surface whose purpose is to be trusted.
+     Same family as task 7's finding that a declared parameter schema is a coercion contract.
+  4. **Creations had to allocate their own identifier** for audit-first to hold without a per-operation
+     exception. Two of the four stores already accepted an optional `_id`; `UserStoreInstance.create` and
+     `createClient` gained one. The alternative — record after the insert — creates exactly one class of
+     mutation that can be applied unrecorded.
+  5. **A per-bucket target does not resolve on its own.** An `EndUser` entry naming only a user id
+     cannot be turned into an account, or even an email, without searching every bucket, because those
+     users live in `user_<bucket>` collections. The bucket is recorded in its own `targetScope` field
+     rather than fused into `targetId`, so exact-match retrieval on a bare user id keeps working.
+  6. **Two action names were wrong as originally specified.** `DELETE /admin/api/admins/:id` deactivates
+     (`active: false`) and keeps the row, so it records `admin.deactivate` — a trail that says "delete"
+     is a false statement an investigator acts on. And `bucket.settings.update` fired only when a
+     registration/verification field was present, so a rename or a manager reassignment left no trace;
+     it is now `bucket.update`, recorded unconditionally, with the changed field names in `attributes`.
+     Historical entries keep the old name and stay filterable, because the action filter matches
+     recorded values rather than a fixed enum.
+  7. **Field names, never values** makes secret-freedom structural instead of a redaction rule a future
+     call site can forget. A mail-settings change records `password` as a _name_; `enduser.password.reset`
+     records no names at all, because the action already says everything.
+  8. **The route census in the spec was wrong** (18 of 18 → 23 of 23). 18 is the number of routes with
+     _no_ record; the surface is 24 mutating admin routes, 23 audited and `POST /admin/api/logout`
+     deliberately excluded as session lifecycle. Caught during planning by enumerating handlers, and
+     confirmed by the drift guard, which pins both counts.
+- **Verification gap, unclosed:** the MongoDB `adminAuditStore` rewrite — `$or` actor filter, timestamp
+  range, `sort`/`skip`/`limit`, `countDocuments`, six declared indexes — has **no automated coverage**,
+  because `MONGODB_URI` is deliberately absent under test (Principle III). The store contract is pinned
+  against the in-memory adapter (`test/storage_contract/admin_audit.round_trip.spec.ts`, 19 clauses) and
+  the MongoDB class is verified by reading only. `specs/016-admin-audit-completeness/quickstart.md` § 4 is
+  the manual procedure; it was **not executed** — same constraint task 5 recorded, and what task 25 exists
+  to fix.
+- **Original context (for history):** `recordAdminAudit` had exactly 5 call sites (bucket policy branch,
+  JWKS ×2, settings, SMTP), and the trail was write-only — `adminAuditStore.list()` existed in both
+  adapters but no route or UI read it.
 
 ### 9. Deletion integrity semantics — Investigate
 
@@ -671,7 +721,8 @@ exact line numbers.
   timestamps) and revoke them (grant revocation cascades to its tokens via the task-9/10-aligned
   semantics). Per admin: list own sessions, revoke others ("sign out everywhere"). Store
   interfaces gain the needed list methods in **both** adapters with storage-contract tests. All
-  mutations audited (task 8 pattern).
+  mutations audited (task 8 pattern — and each new mutating route must be added to
+  `lib/consts/admin_audit_routes.ts`, or task 8's drift guard fails the suite by design).
 
 ### 23. JWKS management: non-RSA keys — Implement
 
@@ -818,7 +869,7 @@ exact line numbers.
 
 Quick wins first: **14** (bug batch) → ~~**1** (flag gating)~~ → ~~**4** (db provisioning)~~ →
 ~~**5** (DPoP safety)~~ → **11** (id_token verification). Then the investigation pair-ups: ~~**3** (CORS)~~,
-**9→10** (deletion), ~~**6→7**~~ (RAR). Then P1 remainder (**8**, **12**, **13**, **15**), P2
+**9→10** (deletion), ~~**6→7**~~ (RAR). Then P1 remainder (~~**8**~~, **12**, **13**, **15**), P2
 product work (**16**–**23**), and P3 (**24**–**30**) as capacity allows. Tasks 28 and 29 are safe to
 do anytime. **31** (RAR's remaining channels) is P1 and **now unblocked** — task 7 landed the descriptor
 validation, consent view model and grant persistence it reuses — but it remains the lowest-urgency P1

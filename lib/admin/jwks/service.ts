@@ -99,7 +99,7 @@ export async function generateKey(
 		keys: [key]
 	} = await generateJWKS(alg as SupportedAlg);
 	const { kid } = key;
-	await recordAdminAudit(ctx, 'jwks.generate', 'jwks', kid);
+	await recordAdminAudit(ctx, 'jwks.generate', kid);
 	await jwksStore.set(kid, key);
 
 	// Mutated in place: every module holds the same imported keystore/publicJWKS reference.
@@ -133,7 +133,7 @@ export async function deleteKey(
 	if (remainingSigning === 0) {
 		throw new AdminError(422, 'at least one signing key must remain');
 	}
-	await recordAdminAudit(ctx, 'jwks.delete', 'jwks', kid);
+	await recordAdminAudit(ctx, 'jwks.delete', kid);
 	await jwksStore.delete(kid);
 	return getJwksState();
 }

@@ -15,6 +15,7 @@ import { endUserRoutes } from './users-end/routes.js';
 import { settingsRoutes } from './settings/routes.js';
 import { smtpSettingsRoutes } from './settings/smtp/routes.js';
 import { jwksRoutes } from './jwks/routes.js';
+import { auditRoutes } from './audit/routes.js';
 import { renderAdminShell } from './ui/serverRender.js';
 
 export const adminApp = new Elysia({ name: 'admin' })
@@ -52,4 +53,5 @@ export const adminApp = new Elysia({ name: 'admin' })
 	.use(endUserRoutes)
 	.use(settingsRoutes)
 	.use(smtpSettingsRoutes)
-	.use(jwksRoutes);
+	.use(jwksRoutes)
+	.use(auditRoutes);

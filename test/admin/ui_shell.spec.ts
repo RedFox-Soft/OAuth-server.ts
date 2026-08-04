@@ -24,4 +24,19 @@ describe('admin UI shell', () => {
 		expect(html).toMatch(/src="\/public\/admin\.js(\?v=[^"]*)?"/);
 		expect(html).not.toContain('src="/admin.js"');
 	});
+
+	/*
+	 * The audit page is a super-admin surface, and the SPA decides what to render from `me.roles` in
+	 * the injected props. The shell can only be checked this far here; the API's own refusal for a
+	 * non-super-admin is pinned in audit_routes.spec.ts, which is where it actually matters.
+	 */
+	it('serves the audit trail only to a super administrator', async () => {
+		const forbidden = await agent.admin.api.audit.get({ query: {} });
+		expect(forbidden.status).toBe(401);
+
+		const bundle = await agent.public['admin.js'].get();
+		const source = bundle.data as unknown as string;
+		expect(source).toContain('Audit trail');
+		expect(source).toContain('/admin/api/audit');
+	});
 });

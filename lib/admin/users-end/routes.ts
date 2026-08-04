@@ -13,6 +13,8 @@ import {
 	UpdateEndUserBody,
 	ResetPasswordBody
 } from './schema.js';
+import { recordAdminAudit } from '../audit/record.js';
+import nanoid from '../../helpers/nanoid.js';
 
 function assertRolesSubset(
 	roles: string[] | undefined,
@@ -58,7 +60,19 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 				throw new AdminError(409, 'email already exists');
 			}
 			const hash = await Bun.password.hash(body.password);
-			const user = await store.create(body.email, hash, body.roles ?? [], true);
+			// Allocated here so the entry names the account that is about to exist. The bucket travels as
+			// the scope: these users live in per-bucket storage, so an id alone resolves to nobody.
+			const userId = nanoid();
+			await recordAdminAudit(ctx, 'enduser.create', userId, {
+				targetScope: params.id
+			});
+			const user = await store.create(
+				body.email,
+				hash,
+				body.roles ?? [],
+				true,
+				userId
+			);
 			set.status = 201;
 			return strip(user);
 		},
@@ -70,6 +84,10 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 			const ctx = assertAuth(admin as AdminContext | null);
 			const bucket = await loadBucketForUsers(ctx, params.id);
 			assertRolesSubset(body.roles, bucket);
+			await recordAdminAudit(ctx, 'enduser.update', params.uid, {
+				targetScope: params.id,
+				attributes: Object.keys(body)
+			});
 			const updated = await getUserStore(params.id).update(params.uid, body);
 			if (!updated) throw new AdminError(404, 'user not found');
 			return strip(updated);
@@ -82,6 +100,11 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 			const ctx = assertAuth(admin as AdminContext | null);
 			await loadBucketForUsers(ctx, params.id);
 			const hash = await Bun.password.hash(body.password);
+			// The reset is the recorded fact. No attribute names either: naming the field would say
+			// nothing the action does not, and the value must never be near the trail.
+			await recordAdminAudit(ctx, 'enduser.password.reset', params.uid, {
+				targetScope: params.id
+			});
 			const updated = await getUserStore(params.id).update(params.uid, {
 				password: hash
 			});
@@ -97,6 +120,9 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 		if (!(await store.find(params.uid))) {
 			throw new AdminError(404, 'user not found');
 		}
+		await recordAdminAudit(ctx, 'enduser.delete', params.uid, {
+			targetScope: params.id
+		});
 		await store.destroy(params.uid);
 		return { ok: true };
 	});

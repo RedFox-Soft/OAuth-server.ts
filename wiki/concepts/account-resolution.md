@@ -71,5 +71,7 @@ supplying overrides.
 
 - [[client-identity-from-database]] — the client id fed into bucket resolution.
 - [[token-payload-access-contract]] — why the token is read through `.payload`.
+- [[admin-audit-trail]] — per-bucket storage is why an audited end-user action records its bucket
+  alongside the user id.
 
 Verified against [[oauth-server-codebase]] at commit `2125ad0`.

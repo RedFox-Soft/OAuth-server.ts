@@ -61,8 +61,10 @@ describe('SMTP settings API', () => {
 		expect(data.password).toBe(SMTP_PASSWORD_MASK);
 		expect(data.configured).toBe(true);
 
-		const audit = await adminAuditStore.list({ targetType: 'SmtpSettings' });
-		expect(audit.some((a) => a.action === 'smtp.settings.update')).toBe(true);
+		const { entries } = await adminAuditStore.list({
+			targetType: 'SmtpSettings'
+		});
+		expect(entries.some((a) => a.action === 'smtp.settings.update')).toBe(true);
 	});
 
 	it('keeps the stored password when the masked sentinel is submitted', async () => {

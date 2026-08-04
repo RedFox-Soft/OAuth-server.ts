@@ -9,6 +9,7 @@ import {
 	type AdminContext
 } from '../../auth/rbac.js';
 import { recordAdminAudit } from '../../audit/record.js';
+import { SMTP_TARGET_ID } from '../../../consts/admin_audit_routes.js';
 import { UpdateSmtpBody, SMTP_PASSWORD_MASK } from './schema.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -74,12 +75,10 @@ export const smtpSettingsRoutes = new Elysia({ name: 'admin-settings-smtp' })
 					? body.password
 					: (existing?.password ?? '');
 
-			await recordAdminAudit(
-				ctx,
-				'smtp.settings.update',
-				'SmtpSettings',
-				'smtp'
-			);
+			// Field names only — that a password was among them is useful; its value must never be here.
+			await recordAdminAudit(ctx, 'smtp.settings.update', SMTP_TARGET_ID, {
+				attributes: Object.keys(body)
+			});
 			await store.set({
 				host: body.host,
 				port: body.port,

@@ -36,7 +36,8 @@ export class UserStore implements UserStoreInstance {
 		email: string,
 		password: string,
 		roles: string[] = [],
-		verified = false
+		verified = false,
+		id?: string
 	): Promise<User> {
 		const existingUser = await this.findByEmail(email);
 		if (existingUser) {
@@ -44,7 +45,9 @@ export class UserStore implements UserStoreInstance {
 		}
 		const now = new Date();
 		const user: User = {
-			_id: crypto.randomUUID().replaceAll('-', ''),
+			// Caller-supplied when the account's audit entry has to name the id before the account
+			// exists; generated here otherwise, as it always was.
+			_id: id ?? crypto.randomUUID().replaceAll('-', ''),
 			email: email.toLowerCase(),
 			verified,
 			password,

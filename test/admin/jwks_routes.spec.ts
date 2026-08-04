@@ -196,7 +196,7 @@ describe('admin JWKS API — generate (US2)', () => {
 		// Served live at /jwks (present in the running published set).
 		expect(publicJWKS.keys.some((k) => k.kid === created!.kid)).toBe(true);
 
-		const audit = await adminAuditStore.list({
+		const { entries: audit } = await adminAuditStore.list({
 			targetType: 'jwks',
 			targetId: created!.kid
 		});
@@ -251,7 +251,7 @@ describe('admin JWKS API — retire (US3)', () => {
 		const body = res.data as JwksState;
 		expect(body.keys.some((k) => k.kid === seededKid)).toBe(false);
 
-		const audit = await adminAuditStore.list({
+		const { entries: audit } = await adminAuditStore.list({
 			targetType: 'jwks',
 			targetId: seededKid
 		});

@@ -49,14 +49,17 @@ export class UserStore implements UserStoreInstance {
 		email: string,
 		password: string,
 		roles: string[] = [],
-		verified = false
+		verified = false,
+		id?: string
 	): Promise<User> {
 		if (await this.findByEmail(email)) {
 			throw new Error('User with this email already exists');
 		}
 		const now = new Date();
 		const user: User = {
-			_id: crypto.randomUUID(),
+			// Caller-supplied when the account's audit entry has to name the id before the account
+			// exists; generated here otherwise, as it always was.
+			_id: id ?? crypto.randomUUID(),
 			email,
 			verified,
 			password,

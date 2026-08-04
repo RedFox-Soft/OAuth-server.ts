@@ -91,5 +91,7 @@ classes serve both the gate and cross-origin policy.
 
 - [[event-bus]] — where refusals and other lifecycle signals are emitted.
 - [[client-identity-from-database]] — the registration endpoints this gate protects.
+- [[admin-audit-trail]] — reuses this page's declarative-table-plus-two-way-drift-guard pattern for
+  audit coverage.
 
 Verified against [[oauth-server-codebase]] at commit `2125ad0`.

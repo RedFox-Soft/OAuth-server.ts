@@ -10,6 +10,7 @@ import {
 } from '../auth/rbac.js';
 import { ADMIN_BUCKET_ID } from '../consts.js';
 import { recordAdminAudit } from '../audit/record.js';
+import nanoid from '../../helpers/nanoid.js';
 import { loadBucketForUsers, loadBucketForEdit } from './access.js';
 import { CreateBucketBody, UpdateBucketBody } from './schema.js';
 
@@ -34,7 +35,12 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 		async ({ admin, body, set }) => {
 			const ctx = assertAuth(admin as AdminContext | null);
 			assertRole(ctx, 'super_admin');
+			// The id is allocated here, not by the store, so the audit entry can name the bucket that is
+			// about to exist — audit-first has nothing to point at otherwise.
+			const bucketId = nanoid();
+			await recordAdminAudit(ctx, 'bucket.create', bucketId);
 			const bucket = await getBucketStore().create({
+				_id: bucketId,
 				name: body.name,
 				roles: body.roles ?? [],
 				managedBy: body.managedBy ?? [ctx.userId],
@@ -59,20 +65,14 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			if (body.managedBy !== undefined) {
 				assertRole(ctx, 'super_admin');
 			}
-			// Audit-first: a registration/verification policy change is a state-changing
-			// admin action and must be recorded before it is applied.
-			const changesSettings =
-				body.registrationOpen !== undefined ||
-				body.emailVerificationRequired !== undefined ||
-				body.verificationMethod !== undefined;
-			if (changesSettings) {
-				await recordAdminAudit(
-					ctx,
-					'bucket.settings.update',
-					'UserBucket',
-					params.id
-				);
-			}
+			/*
+			 * Recorded whatever the request changed. This used to fire only for a registration or
+			 * verification field, so renaming a bucket or reassigning its managers left no trace at all
+			 * — while still being an exercised privilege over who can administer a bucket's users.
+			 */
+			await recordAdminAudit(ctx, 'bucket.update', params.id, {
+				attributes: Object.keys(body)
+			});
 			const updated = await getBucketStore().update(params.id, body);
 			if (!updated) throw new AdminError(404, 'bucket not found');
 			return updated;
@@ -87,6 +87,9 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 		if ((await getProjectStore().countByBucket(params.id)) > 0) {
 			throw new AdminError(409, 'bucket is assigned to one or more projects');
 		}
+		// After the guards, before the deletion: an entry for a request the 409 refused would describe
+		// a deletion that was never even attempted.
+		await recordAdminAudit(ctx, 'bucket.delete', params.id);
 		await getBucketStore().destroy(params.id);
 		return { ok: true };
 	});
