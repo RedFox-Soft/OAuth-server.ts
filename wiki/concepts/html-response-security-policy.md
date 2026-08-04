@@ -92,3 +92,5 @@ If you ever hand-roll a policy for a page, remember that a hash without `'unsafe
   rule that a rendered error must carry a real status rather than defaulting to 200.
 - [[admin-console-signin]] — the console shell is the heaviest inline-script page here.
 - [[first-run-setup-had-two-surfaces]] — removed alongside this work.
+- [[interaction-page-families]] — the two families whose every page goes through this constructor, and the
+  rendered-error status rule applied to the registration refusals.

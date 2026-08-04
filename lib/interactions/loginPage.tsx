@@ -2,8 +2,8 @@ import { Form, Input, Button, Checkbox, Flex, Card } from 'antd';
 import {
 	UserOutlined,
 	LockOutlined,
-	GoogleOutlined,
-	ExclamationCircleOutlined
+	ExclamationCircleOutlined,
+	InfoCircleOutlined
 } from '@ant-design/icons';
 import {
 	buildUILoginPath,
@@ -13,10 +13,12 @@ import {
 
 export function LoginPage({
 	uid,
-	errorMessage
+	errorMessage,
+	notice
 }: {
 	uid: string;
 	errorMessage?: string;
+	notice?: string;
 }) {
 	return (
 		<Flex
@@ -52,6 +54,33 @@ export function LoginPage({
 						document.forms.namedItem('login')?.submit();
 					}}
 				>
+					{/*
+					 * Informational, not a failure — different colours and a different icon from the error
+					 * block below, so which of the two this is never depends on reading the text. The two
+					 * are mutually exclusive by construction in loginServer.
+					 */}
+					{notice && (
+						<Form.Item>
+							<div
+								style={{
+									padding: '12px 16px',
+									borderRadius: '6px',
+									border: '1px solid #91caff',
+									backgroundColor: '#e6f4ff',
+									display: 'flex',
+									alignItems: 'center',
+									gap: '8px'
+								}}
+							>
+								<span style={{ color: '#0958d9', fontSize: '14px' }}>
+									<InfoCircleOutlined />
+								</span>
+								<span style={{ color: '#0958d9', fontSize: '14px' }}>
+									{notice}
+								</span>
+							</div>
+						</Form.Item>
+					)}
 					{errorMessage && (
 						<Form.Item>
 							<div
@@ -94,14 +123,6 @@ export function LoginPage({
 							type="password"
 							placeholder="Password"
 						/>
-					</Form.Item>
-					<Form.Item>
-						<Button
-							block
-							icon={<GoogleOutlined />}
-						>
-							Sign in with Google
-						</Button>
 					</Form.Item>
 					<Form.Item>
 						<Flex

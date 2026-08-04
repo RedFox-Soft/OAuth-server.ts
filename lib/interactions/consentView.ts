@@ -12,9 +12,11 @@ export interface PermissionItem {
 export interface PermissionGroup {
 	kind: 'oidc-scope' | 'oidc-claim' | 'resource-scope' | 'rar-detail';
 	resourceIndicator?: string;
-	// 'rar-detail' only: the raw RFC 9396 type identifier and the operator's label for it.
+	// 'rar-detail' only: the raw RFC 9396 type identifier.
 	type?: string;
-	label?: string;
+	// Every group carries a heading. Required, not optional: a group the End-User cannot name is a list
+	// of tokens they are being asked to approve on trust.
+	label: string;
 	items: PermissionItem[];
 }
 
@@ -53,6 +55,18 @@ function scopeItems(tokens: string[]): PermissionItem[] {
 		label: OIDC_SCOPE_LABELS[token] ?? token
 	}));
 }
+
+/*
+ * Group headings, in the same spirit as the scope labels above: presentation vocabulary, not
+ * configuration. Without them the four kinds arrive as one undifferentiated bullet list, and "who I am"
+ * reads the same as "what an API may do on my behalf".
+ */
+const GROUP_HEADINGS = {
+	'oidc-scope': 'Your identity information',
+	'oidc-claim': 'Specific details about you'
+} as const;
+
+const resourceHeading = (indicator: string) => `Access to ${indicator}`;
 
 // The five common data fields are fixed by RFC 9396 §2, so these labels are presentation vocabulary
 // like OIDC_SCOPE_LABELS above — not configuration, and not something an operator declares.
@@ -98,6 +112,7 @@ export function buildConsentView(args: {
 	if (details.missingOIDCScope?.length) {
 		permissions.push({
 			kind: 'oidc-scope',
+			label: GROUP_HEADINGS['oidc-scope'],
 			items: scopeItems(details.missingOIDCScope)
 		});
 	}
@@ -105,6 +120,7 @@ export function buildConsentView(args: {
 	if (details.missingOIDCClaims?.length) {
 		permissions.push({
 			kind: 'oidc-claim',
+			label: GROUP_HEADINGS['oidc-claim'],
 			items: details.missingOIDCClaims.map((token) => ({ token, label: token }))
 		});
 	}
@@ -117,6 +133,9 @@ export function buildConsentView(args: {
 				permissions.push({
 					kind: 'resource-scope',
 					resourceIndicator: indicator,
+					// The heading names the resource, so the page no longer prints the indicator on a
+					// line of its own above it.
+					label: resourceHeading(indicator),
 					items: scopes.map((token) => ({ token, label: token }))
 				});
 			}

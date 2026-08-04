@@ -4,20 +4,7 @@
 // antd shell — the same reasoning verifyPages.tsx records, and the reason the request form joins them
 // rather than matching the login page it is reached from.
 
-import { htmlResponse } from '../html/csp.js';
-
-function esc(value: string): string {
-	return value
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;');
-}
-
-function page(title: string, bodyHtml: string, status = 200): Response {
-	const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>${esc(title)}</title></head><body style="font-family: Arial, Helvetica, sans-serif; background:#f0f2f5; margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;"><div style="background:#fff; padding:32px; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.1); width:400px; text-align:center;">${bodyHtml}</div></body></html>`;
-	return htmlResponse(html, { status });
-}
+import { esc, page } from './plainPage.js';
 
 const input =
 	'width:100%; box-sizing:border-box; padding:10px; margin-bottom:12px; border:1px solid #d9d9d9; border-radius:6px;';

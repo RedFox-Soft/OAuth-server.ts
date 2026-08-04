@@ -48,7 +48,15 @@ hydrateRoot(
 						/>
 					);
 				case 'registration':
-					return <RegistrationPage uid={calculateUid()} />;
+					// Spreading props is not parity for its own sake: a message the server rendered into
+					// this page is erased the moment React hydrates from props that never carried it, in
+					// the browser only and with nothing logged anywhere.
+					return (
+						<RegistrationPage
+							uid={calculateUid()}
+							{...props}
+						/>
+					);
 			}
 		})()}
 	</StrictMode>

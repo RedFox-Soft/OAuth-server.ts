@@ -44,6 +44,12 @@ import { responseModes } from 'lib/response_modes/index.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { resolveBucketForClient } from 'lib/admin/auth/resolveBucket.js';
 import { buildConsentView, type PromptDetails } from './consentView.js';
+import { NOTICE_VERIFY, resolveNotice } from './notices.js';
+import {
+	registrationClosedPage,
+	registrationSendFailedPage
+} from './registrationPages.js';
+import { buildUILoginPath } from './buildUIPath.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 
 async function resume(interaction, cookie) {
@@ -169,7 +175,17 @@ export const ui = new Elysia()
 
 		return { interaction };
 	})
-	.get('ui/:uid/login', async ({ params: { uid } }) => loginServer(uid))
+	/*
+	 * `notice` is typed as an optional string rather than a literal union on purpose: a value the server
+	 * did not mint must render the ordinary login page, and a union would answer 422 instead — which is
+	 * what a stale bookmark or an old email link would hit.
+	 */
+	.get(
+		'ui/:uid/login',
+		async ({ params: { uid }, query }) =>
+			loginServer(uid, { notice: resolveNotice(query.notice) }),
+		{ query: t.Object({ notice: t.Optional(t.String()) }) }
+	)
 	.post(
 		'ui/:uid/login',
 		async ({ body, params: { uid }, interaction, cookie }) => {
@@ -180,24 +196,30 @@ export const ui = new Elysia()
 			const userStore = getUserStore(bucketId);
 			const user = await userStore.findByEmail(body.username);
 			if (!user) {
-				return loginServer(uid, 'Invalid username or password');
+				return loginServer(uid, {
+					errorMessage: 'Invalid username or password'
+				});
 			}
 			const validPassword = await Bun.password.verify(
 				body.password,
 				user.password
 			);
 			if (!validPassword) {
-				return loginServer(uid, 'Invalid username or password');
+				return loginServer(uid, {
+					errorMessage: 'Invalid username or password'
+				});
 			}
 			if (!user.active) {
-				return loginServer(uid, 'Invalid username or password');
+				return loginServer(uid, {
+					errorMessage: 'Invalid username or password'
+				});
 			}
 			const loginBucket = await getBucketStore().find(bucketId);
 			if (loginBucket?.emailVerificationRequired && !user.verified) {
-				return loginServer(
-					uid,
-					'Please verify your email before signing in. Check your inbox for the verification message.'
-				);
+				return loginServer(uid, {
+					errorMessage:
+						'Please verify your email before signing in. Check your inbox for the verification message.'
+				});
 			}
 			interaction.payload.result = {
 				login: {
@@ -250,9 +272,22 @@ export const ui = new Elysia()
 			})
 		}
 	)
-	.get('ui/:uid/registration', async ({ params: { uid } }) =>
-		registrationServer(uid)
-	)
+	/*
+	 * The bucket is resolved on the GET as well as the POST: a form that can only be refused on
+	 * submission is a dead end dressed as an invitation, and the two extra reads are point lookups.
+	 */
+	.get('ui/:uid/registration', async ({ params: { uid }, interaction }) => {
+		const clientId = (
+			interaction.payload.params as { client_id?: string } | undefined
+		)?.client_id;
+		const bucket = await getBucketStore().find(
+			await resolveBucketForClient(clientId)
+		);
+		if (bucket && !bucket.registrationOpen) {
+			return registrationClosedPage();
+		}
+		return registrationServer(uid);
+	})
 	.post(
 		'ui/:uid/registration',
 		async ({ body, params: { uid }, interaction }) => {
@@ -264,13 +299,16 @@ export const ui = new Elysia()
 
 			// A closed bucket accepts no self-service sign-ups: no account, no email.
 			if (bucket && !bucket.registrationOpen) {
-				return new Response('Registration is closed for this application.', {
-					status: 403
-				});
+				return registrationClosedPage();
 			}
 
+			// The user's own form comes back with their address still in it. Neither password is echoed,
+			// into the markup or the props.
 			if (body.password !== body.confirmPassword) {
-				return new Response('Passwords do not match', { status: 400 });
+				return registrationServer(uid, {
+					errorMessage: 'Passwords do not match',
+					email: body.email
+				});
 			}
 
 			const store = getUserStore(bucketId);
@@ -299,13 +337,10 @@ export const ui = new Elysia()
 							303
 						);
 					}
-					return Response.redirect(`/ui/${uid}/login?notice=verify`, 303);
+					return Response.redirect(buildUILoginPath(uid, NOTICE_VERIFY), 303);
 				} catch {
 					// Delivery failed: the account exists but is unverified; invite a retry.
-					return new Response(
-						'We could not send your verification email. Please try again later.',
-						{ status: 502 }
-					);
+					return registrationSendFailedPage();
 				}
 			}
 

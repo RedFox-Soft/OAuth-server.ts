@@ -116,7 +116,10 @@ describe('content security policy: every rendered page', () => {
 	const pages: Array<[string, () => Response | Promise<Response>]> = [
 		['error', () => getErrorHtmlResponse(400, 'invalid_request', 'nope')],
 		['sign-in', () => loginServer('uid-1')],
-		['sign-in with an error', () => loginServer('uid-1', 'wrong password')],
+		[
+			'sign-in with an error',
+			() => loginServer('uid-1', { errorMessage: 'wrong password' })
+		],
 		['registration', () => registrationServer('uid-1')],
 		[
 			'consent',

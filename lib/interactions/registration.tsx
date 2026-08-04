@@ -1,8 +1,20 @@
-import { LockOutlined, MailOutlined } from '@ant-design/icons';
+import {
+	LockOutlined,
+	MailOutlined,
+	ExclamationCircleOutlined
+} from '@ant-design/icons';
 import { Button, Card, Flex, Form, Input } from 'antd';
 import { buildUILoginPath, buildUIRegistrationPath } from './buildUIPath.js';
 
-export function RegistrationPage({ uid }: { uid: string }) {
+export function RegistrationPage({
+	uid,
+	errorMessage,
+	email
+}: {
+	uid: string;
+	errorMessage?: string;
+	email?: string;
+}) {
 	return (
 		<Flex
 			justify="center"
@@ -33,10 +45,34 @@ export function RegistrationPage({ uid }: { uid: string }) {
 					name="registration"
 					method="post"
 					action={buildUIRegistrationPath(uid)}
+					// The address the user just typed comes back with the page; the two passwords never do.
+					initialValues={email ? { email } : undefined}
 					onFinish={() => {
 						document.forms.namedItem('registration')?.submit();
 					}}
 				>
+					{errorMessage && (
+						<Form.Item>
+							<div
+								style={{
+									padding: '12px 16px',
+									borderRadius: '6px',
+									border: '1px solid #ffccc7',
+									backgroundColor: '#fff2f0',
+									display: 'flex',
+									alignItems: 'center',
+									gap: '8px'
+								}}
+							>
+								<span style={{ color: '#ff4d4f', fontSize: '14px' }}>
+									<ExclamationCircleOutlined />
+								</span>
+								<span style={{ color: '#ff4d4f', fontSize: '14px' }}>
+									{errorMessage}
+								</span>
+							</div>
+						</Form.Item>
+					)}
 					<Form.Item
 						name="email"
 						rules={[

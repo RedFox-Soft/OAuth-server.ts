@@ -136,3 +136,6 @@ resends cannot lock a user out of a password reset.
   sanctioned way to build HTML; `test/csp/csp.spec.ts` fails the suite otherwise.
 - [[feature-flag-gating]] — the reset pages join the unconditional `/ui` and `/verify-email` prefixes in the
   route classification table, which accounts for the whole mounted surface.
+- [[interaction-page-families]] — this flow's pages are the plain family's second user; its `page()` shell
+  was extracted to `plainPage.tsx` when a third arrived, and the "Forgot password" link this feature made
+  real is why § 17's request to delete it was refused.

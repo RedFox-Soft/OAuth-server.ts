@@ -37,22 +37,26 @@ export const ConsentPage: React.FC<ConsentView> = ({
 						<div
 							key={`${group.kind}:${group.resourceIndicator ?? group.type ?? ''}:${groupIndex}`}
 						>
-							{group.resourceIndicator ? (
-								<Paragraph style={{ marginBottom: 4 }}>
-									<b>{group.resourceIndicator}</b>
-								</Paragraph>
-							) : null}
-							{group.kind === 'rar-detail' ? (
-								<Paragraph style={{ marginBottom: 4 }}>
-									<b>{group.label}</b>
-								</Paragraph>
-							) : null}
+							{/*
+							 * One heading per group, whatever the kind. A resource's heading names the
+							 * resource, so the indicator is no longer printed on a line of its own above
+							 * it.
+							 */}
+							<Paragraph style={{ marginBottom: 4 }}>
+								<b>{group.label}</b>
+							</Paragraph>
 							<ul>
 								{group.items.map((item) =>
-									// A rich detail's item is a field and its values, not a token plus an
-									// explanation — rendering it in the scope shape reads backwards
-									// ("read, write (actions)").
-									group.kind === 'rar-detail' ? (
+									/*
+									 * A rich detail's item is a field and its values, not a token plus an
+									 * explanation — rendering it in the scope shape reads backwards
+									 * ("read, write (actions)"). Everywhere else the token earns its
+									 * parentheses only when the label says something the token does not:
+									 * a claim, a resource scope and a scope with no friendly label all
+									 * carry their own token as their label, and printing it twice
+									 * ("email (email)") is noise.
+									 */
+									group.kind === 'rar-detail' || item.label === item.token ? (
 										<li key={item.token}>{item.label}</li>
 									) : (
 										<li key={item.token}>

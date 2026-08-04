@@ -956,22 +956,68 @@ exact line numbers.
   would govern registration and the operator route too); no "your password was changed" notification; no
   change-password-while-signed-in surface; no admin view of outstanding reset secrets (tasks 19–22).
 
-### 17. Interaction UI fixes batch — Implement
+### 17. Interaction UI fixes batch — ✅ Implemented
 
-- **Context / Expected results (one spec):**
-  1. Post-registration redirect `/ui/:uid/login?notice=verify` is never rendered — the GET login
-     route ignores the query and `loginServer` only accepts an error message
-     (`lib/interactions/index.ts:252,157`, `serverRender.tsx:10`) → user sees a "check your inbox"
-     notice after registering into a verification-required bucket.
-  2. Registration failures return bare `text/plain` (403 closed / 400 password mismatch / 502)
-     (`lib/interactions/index.ts:217-258`) → styled pages or inline form errors, consistent with
-     the login page's error rendering.
-  3. `registrationServer` never substitutes `<!--app-props-->` (`serverRender.tsx:37-52`), unlike
-     login/consent → hydration props injected the same way as the other pages.
-  4. The decorative "Sign in with Google" button and the dead "Forgot password" link are removed
-     until their features exist (tasks 18 and 16 respectively re-add them for real).
-  5. Consent page is all-or-nothing scope display — verify (and test) that `missingOIDCClaims`
-     and `missingResourceScopes` actually render; RAR display shipped with task 7.
+- **Delivered by** `specs/021-interaction-ui-fixes`. Suite: 2619 pass / 0 fail (was 2594); typecheck
+  unchanged at 2587 errors (measured before and after — the 11 this feature briefly added were its own and
+  were fixed). Every item's status code is unchanged, which is what let the five guard suites
+  (`interaction`, `email_verification`, `password_reset`, `rar`, `csp`) pass with no assertion edited.
+- **What each of the five items turned out to be:**
+  1. **The notice** was a producer/consumer mismatch, not a missing message: the registration redirect has
+     carried `?notice=verify` since it was written and nothing ever read it. `lib/interactions/notices.ts`
+     now holds a closed, server-owned vocabulary; `buildUILoginPath(uid, notice?)` makes producer and
+     consumer share `NOTICE_VERIFY`; `loginServer` takes `{ errorMessage?, notice? }` and suppresses a
+     notice whenever there is an error, so exclusivity is a property of the renderer rather than a promise
+     made at five call sites. The query is typed `t.Optional(t.String())` deliberately — a literal union
+     would answer 422 for the stale bookmarks and old email links that are exactly what arrives unknown.
+  2. **The three refusals** are now rendered pages at the same 403 / 400 / 502. The split follows the page
+     families: a closed bucket and a failed send are terminal messages and go plain
+     (`registrationPages.tsx`); the password mismatch comes back as the user's own form with their address
+     still in it and both password boxes empty, which only the hydrated family can do.
+  3. **Items 2 and 3 were one piece of work.** `registrationServer` substituting no props was not cosmetic
+     parity: React hydration rebuilds the tree from props, so a message rendered into that page would have
+     been erased in the browser only, with nothing logged. Filed as the `gotcha` in
+     `wiki/concepts/interaction-page-families.md`.
+  4. **Only half of item 4 was still true.** The Google button and its icon import are gone. The "Forgot
+     password" link was **kept**: task 16 landed first and made it a working destination that
+     `test/password_reset/reset.spec.ts:275` asserts, so deleting it would have removed a feature and
+     broken a passing test. Recorded as spec FR-023 — the one place this cycle contradicts the task text.
+  5. **Item 5 was a readability defect, not only a coverage gap.** All four kinds did render, but only OIDC
+     scopes carried friendly labels, so a claim printed as `email (email)`, a resource scope as
+     `read (read)`, and a custom scope as `billing (billing)`; claims had no heading at all. Every group now
+     carries a heading built in `consentView.ts` beside the vocabulary already there, and the page prints a
+     token only when `label !== token` — one comparison that fixes claims, resource scopes and custom
+     scopes together. What approving records is untouched.
+- **Beyond the item text:** a registration **form** requested for a closed bucket now returns the same 403
+  page as a submission to it (spec FR-009). A styled refusal reachable only by filling in a form that
+  cannot succeed is half a fix.
+- **One refactor, on its third user:** the byte-identical `esc`/`page` shell in `verifyPages.tsx` and
+  `resetPages.tsx` moved to `lib/interactions/plainPage.tsx`. The guard was task 16's: the affected suites
+  had to pass **unedited**, and they do.
+- **Findings worth carrying forward** (filed as `wiki/concepts/interaction-page-families.md`, cross-linked
+  from `html-response-security-policy` and `self-service-password-reset`):
+  1. **A hydrated page whose props are not substituted erases its own server-rendered content** — in the
+     browser only, with nothing logged and nothing a server-side body assertion can see. Both halves of the
+     contract (substitute `<!--app-props-->`, spread props in `loginClient.tsx`) are one change.
+  2. **`initialValues` does reach the server-rendered HTML** as a real `value` attribute, so a re-rendered
+     antd form can preserve a submitted field without an uncontrolled input. The planned fallback was not
+     needed. Assert on the field, not on the document: the props script repeats every value, so a
+     body-wide `toContain` passes on an empty form.
+  3. **`visible(html)` must strip `<script>` contents, not just tags**, when counting what a page says —
+     otherwise the hydration props are counted as page text.
+  4. **A test config's client `scope` is validated against the AS's own scope set**, so a resource server's
+     scopes cannot be listed there (`invalid_client_metadata`); they travel on the request. And seeding
+     `resources` in `setup.login` _grants_ those resource scopes, so the consent prompt then reports
+     nothing missing.
+  5. **`test/csp/csp.spec.ts` was a fifth caller of `loginServer`** passing a positional string. It kept
+     passing after the signature change while silently no longer rendering an error page — the one guard
+     suite edit in this feature, a call-site update with no assertion touched.
+- **Out of scope, recorded:** federation (task 18 must decide first — this only removes the button that
+  pretended otherwise); suppressing the login page's "Register now!" link for a closed bucket (per-bucket
+  presentation, tasks 19–21); a friendly-label catalogue for every claim and resource scope; localisation;
+  password-strength checking on registration (task 16 recorded the same reasoning); the manual browser
+  walk-through, whose post-hydration steps need a live server with SMTP that this environment has not got —
+  everything else in `quickstart.md` is covered by the suite.
 
 ### 18. Social login / federation — Investigate
 
@@ -1209,7 +1255,7 @@ Quick wins first: **14** (bug batch) → ~~**1** (flag gating)~~ → ~~**4** (db
 ~~**5** (DPoP safety)~~ → ~~**11** (id_token verification)~~. Then the investigation pair-ups: ~~**3** (CORS)~~,
 ~~**9**~~**→10** (deletion — task 9 resolved 2026-08-04, so **10** is next up and carries a full
 acceptance surface), ~~**6→7**~~ (RAR). Then P1 remainder (~~**8**~~, **12**, **13**, **15**), P2
-product work (**16**–**23**), and P3 (**24**–**30**) as capacity allows. Tasks 28 and 29 are safe to
+product work (~~**16**~~, ~~**17**~~, **18**–**23**), and P3 (**24**–**30**) as capacity allows. Tasks 28 and 29 are safe to
 do anytime. **31** (RAR's remaining channels) is P1 and **now unblocked** — task 7 landed the descriptor
 validation, consent view model and grant persistence it reuses — but it remains the lowest-urgency P1
 item, since nothing reaches those channels today.
