@@ -121,5 +121,7 @@ indistinguishable from "nothing happened", the one answer an audit trail must ne
 - [[rich-authorization-requests]] — the other place a framework's schema handling behaved differently
   than reading it suggested.
 - [[client-identity-from-database]] — client records are what several of these operations mutate.
+- [[admin-console-signin]] — how the actor named in every entry is established, and the same
+  authorization-before-write reasoning applied to an unauthenticated route.
 
 Verified against [[oauth-server-codebase]] as changed by `specs/016-admin-audit-completeness`.

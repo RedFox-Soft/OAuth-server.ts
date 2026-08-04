@@ -12,6 +12,7 @@ import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { getUserStore, resetAdminMemoryStores } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID } from 'lib/admin/consts.ts';
 import { routeNames } from 'lib/consts/param_list.ts';
+import { mintAdminIdToken } from './id_token_fixture.ts';
 
 // Pull one `name=value` pair out of a Set-Cookie response header array.
 function cookiePair(setCookies: string[], name: string): string {
@@ -93,17 +94,17 @@ describe('admin OIDC login (BFF)', () => {
 			login.response.headers.getSetCookie(),
 			'admin_oauth'
 		);
-		const state = new URL(
-			getHeader(login.response, 'location')
-		).searchParams.get('state') as string;
+		const params = new URL(getHeader(login.response, 'location')).searchParams;
+		const state = params.get('state') as string;
 
 		// Stub the internal token exchange: ISSUER points at a fake host in tests,
 		// so the callback's fetch(`${ISSUER}/token`) can never reach a real server.
-		// The callback only base64url-decodes the id_token payload for `sub`.
-		const payload = Buffer.from(JSON.stringify({ sub: superAdminId })).toString(
-			'base64url'
-		);
-		const idToken = `header.${payload}.sig`;
+		// The token itself is genuinely signed by the live keystore and carries this
+		// attempt's nonce — the callback verifies both.
+		const idToken = await mintAdminIdToken({
+			sub: superAdminId,
+			nonce: params.get('nonce') ?? undefined
+		});
 		fetchSpy = spyOn(globalThis, 'fetch').mockImplementation((async () => ({
 			ok: true,
 			json: async () => ({ access_token: 'x', id_token: idToken })
@@ -145,14 +146,13 @@ describe('admin OIDC login (BFF)', () => {
 			login.response.headers.getSetCookie(),
 			'admin_oauth'
 		);
-		const state = new URL(
-			getHeader(login.response, 'location')
-		).searchParams.get('state') as string;
+		const params = new URL(getHeader(login.response, 'location')).searchParams;
+		const state = params.get('state') as string;
 
-		const payload = Buffer.from(JSON.stringify({ sub: superAdminId })).toString(
-			'base64url'
-		);
-		const idToken = `header.${payload}.sig`;
+		const idToken = await mintAdminIdToken({
+			sub: superAdminId,
+			nonce: params.get('nonce') ?? undefined
+		});
 		fetchSpy = spyOn(globalThis, 'fetch').mockImplementation((async () => ({
 			ok: true,
 			json: async () => ({ access_token: 'x', id_token: idToken })

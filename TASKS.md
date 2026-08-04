@@ -546,7 +546,7 @@ exact line numbers.
      `VerificationChallenge`. Declared `none`: `InitialAccessToken` (deliberately not client-bound,
      `lib/models/initial_access_token.ts:6-7`), `PushedAuthorizationRequest` (the client id is inside the
      opaque `request` string), `ReplayDetection` (`iss`/`jti`, belongs to no principal),
-     `VerificationResend` (its id *is* `${bucketId}:${email}`, so the cascade destroys it by computed id —
+     `VerificationResend` (its id _is_ `${bucketId}:${email}`, so the cascade destroys it by computed id —
      addressed, not scanned), `Client` itself, and every store / per-bucket area.
   2. **Drift guard, both directions.** `test/storage_contract/inventory_drift.spec.ts` fails when an area
      declares no ownership, when a declared field is absent from that model's payload schema, and when a
@@ -623,16 +623,68 @@ exact line numbers.
   Mongo class by reading, and write the manual procedure into the spec's `quickstart.md` as tasks 5, 8 and 4
   did. Task 25 is what closes the class.
 
-### 11. Verify the admin BFF id_token signature — Implement
+### 11. Verify the admin BFF id_token signature — ✅ Implemented
 
-- **Context:** `lib/admin/auth/login.ts:86-96` base64-decodes the id_token payload without
-  signature verification — a documented first-party shortcut with an explicit "MUST be replaced
-  with full signature verification" comment. The local JWKS is available in-process
-  (`lib/configs/keystore.ts`).
-- **Expected result:** The callback verifies the id_token signature (and `iss`, `aud`, `exp`,
-  `nonce` if present) against the live local keystore before trusting `sub`. Invalid/tampered
-  tokens → 401, no admin session created. Tests cover: valid token logs in; tampered
-  payload/signature rejected; token signed by a foreign key rejected.
+- **Delivered by** `specs/017-admin-idtoken-verification`. Mechanism: one new module
+  (`lib/admin/auth/verifyIdToken.ts`) that proves the token against the live in-process keystore before
+  any claim is read, and returns only `sub` — so the caller cannot start trusting a second claim. The
+  signature and registered-claim work is **delegated to the engine the repo already has**, `verify()` in
+  `lib/helpers/jwt.ts` (the same one `IdToken.validate` uses), wired with the algorithm pinned to the
+  admin client's registered `idTokenSignedResponseAlg` and expiry enforced. Four relying-party checks
+  that engine does not make live in the new module: `azp` on multi-audience tokens, future `iat`,
+  presence/shape, and a `nonce` that each sign-in now requests and requires back. Every failure answers
+  with one identical `401 invalid_id_token`; the failed check goes only to a new
+  `admin.login.error` event-bus emit (the admin plane's first emitter). Suite: 2473 pass / 0 fail (was
+  2446); `lib/` typecheck unchanged at 812, `test/` 1764 → 1763.
+- **Findings worth carrying forward** (filed as `wiki/concepts/admin-console-signin.md`):
+  1. **The vulnerability was live, and the red gate proved it rather than arguing it.** With the tests
+     written and the old code in place, forged tokens answered **HTTP 302 with an admin session
+     created** — 18 of 20 cases failed, and the two that passed were the positive ones, which the old
+     code satisfied by accepting anything. Worth doing in that order: a refusal matrix written against
+     a verifying implementation would never have shown what the shortcut actually granted.
+  2. **`assertPayload` skips the future-`iat` check on every token that has an `exp`.** The guard is
+     `iat !== undefined && exp === undefined && iat > now + tolerance` (`lib/helpers/jwt.ts:118-124`),
+     and an ID token always carries `exp` — so that branch never runs on one. Any relying party in this
+     codebase that wants the check must make it itself. Same shape as task 4's inert TTL indexes and
+     task 7's inert payload schema: correct-looking, and never executed.
+  3. **`idTokenSigningAlgValues` is not an allow-list**, twice over: it is `['HS256', ...alg.sign]`
+     (`lib/configs/jwaAlgorithms.ts:31`), so it _contains a symmetric algorithm_, and it is computed at
+     module load from the boot-time `JWKS_KEYS` snapshot, so it goes stale when the admin JWKS API
+     hot-applies a key of a new type. The tight source is the client's registered
+     `idTokenSignedResponseAlg` — the same field `lib/models/id_token.ts:227` reads when it signs, so
+     issuer and verifier cannot disagree. Read it through `Client.tryFind`, never off the stored
+     payload: a stored client record mixes camelCase and snake_case spellings (`lib/admin/seed.ts`
+     writes `grantTypes` beside `token_endpoint_auth_method`) and only `validateClient` normalizes.
+  4. **This server emits no `azp` anywhere** (`grep -rn azp lib/ test/` is empty). Implementing OIDC
+     Core 3.1.3.7 rule 4 faithfully therefore means a multi-audience ID token is _always_ refused. That
+     is correct — it is not a token this server issues to the console — but it is written as the rule
+     rather than as "reject arrays", so it stays right if `azp` is ever emitted. Recorded so the
+     refusal is not later mistaken for a bug.
+  5. **`IdToken.validate` could not be reused, and parameterizing it would have been worse.** It wraps
+     the same engine with `ignoreExpiration: true` — right for an `id_token_hint` at logout, fatal for a
+     sign-in. Two callers of one engine beat one function with two meanings and a security-relevant
+     default one argument away from every existing call site.
+  6. **jose's `JWK` is an interface, so it is not assignable to `Record<string, unknown>`** —
+     TypeScript grants an implicit index signature to anonymous object types only. `test/keys.ts`
+     returned `exportJWK`'s value directly, which is why every consumer had to cast to reach the
+     `Record`-shaped key plumbing (`KeyStore`'s members, `seedJwks`' parameter). Fixed at that one
+     boundary (`return { ...jwk, alg }`), which removed the casts from consumers rather than adding
+     another. The general rule: convert where a third-party type meets the repo's vocabulary, once.
+- **Deviations from the spec, both deliberate and argued in
+  `specs/017-admin-idtoken-verification/research.md`:** FR-006 asked for a zero clock-skew allowance and
+  the implementation uses the repo's single configured `clockTolerance` (a second, contradictory
+  tolerance constant is a maintenance trap, and 10 s on a minutes-long token buys an attacker nothing —
+  what the requirement was protecting comes from `ignoreExpiration: false`); and FR-003's "algorithms
+  this server supports" is narrowed to the client's _registered_ algorithm, per finding 3.
+- **No verification debt.** Unlike tasks 5 and 8, nothing here touches a MongoDB path — the key
+  material is in-process and the tests run the in-memory adapter — so the automated suite covers 100 %
+  of the change and no quickstart step went unexecuted. The fail-first check
+  (`specs/017-admin-idtoken-verification/quickstart.md` § 2) is recorded as run: with the caller
+  reverted, 25 of 32 cases fail.
+- **Original context (for history):** `lib/admin/auth/login.ts:86-96` base64-decoded the id_token
+  payload without signature verification — a documented first-party shortcut with an explicit "MUST be
+  replaced with full signature verification" comment. The local JWKS was available in-process
+  (`lib/configs/keystore.ts`) the whole time.
 
 ### 12. Guard feature toggles that require code overrides — Implement
 
@@ -1011,7 +1063,7 @@ exact line numbers.
 ## Suggested order
 
 Quick wins first: **14** (bug batch) → ~~**1** (flag gating)~~ → ~~**4** (db provisioning)~~ →
-~~**5** (DPoP safety)~~ → **11** (id_token verification). Then the investigation pair-ups: ~~**3** (CORS)~~,
+~~**5** (DPoP safety)~~ → ~~**11** (id_token verification)~~. Then the investigation pair-ups: ~~**3** (CORS)~~,
 ~~**9**~~**→10** (deletion — task 9 resolved 2026-08-04, so **10** is next up and carries a full
 acceptance surface), ~~**6→7**~~ (RAR). Then P1 remainder (~~**8**~~, **12**, **13**, **15**), P2
 product work (**16**–**23**), and P3 (**24**–**30**) as capacity allows. Tasks 28 and 29 are safe to

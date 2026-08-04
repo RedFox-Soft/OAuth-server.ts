@@ -3,6 +3,8 @@ import crypto from 'node:crypto';
 import { ISSUER } from '../../configs/env.js';
 import { getUserStore, adminSessionStore } from '../../adapters/index.js';
 import { createAdminSession, sessionCookieAttributes } from './session.js';
+import { IdTokenRejected, verifyAdminIdToken } from './verifyIdToken.js';
+import { eventBus } from '../../event_bus.js';
 import { routeNames } from '../../consts/param_list.js';
 import {
 	ADMIN_CLIENT_ID,
@@ -23,8 +25,12 @@ export const adminLogin = new Elysia({ name: 'admin-login' })
 			crypto.createHash('sha256').update(verifier).digest()
 		);
 		const state = base64url(crypto.randomBytes(16));
+		// Freshness, not CSRF: `state` binds the callback to the browser that started the
+		// flow, `nonce` binds the identity token to this attempt — so a genuine token
+		// captured from another sign-in cannot be replayed into this one.
+		const nonce = base64url(crypto.randomBytes(32));
 		cookie.admin_oauth.set({
-			value: JSON.stringify({ verifier, state }),
+			value: JSON.stringify({ verifier, state, nonce }),
 			httpOnly: true,
 			sameSite: 'lax',
 			secure: true,
@@ -38,6 +44,7 @@ export const adminLogin = new Elysia({ name: 'admin-login' })
 			redirect_uri: REDIRECT_URI,
 			scope: 'openid',
 			state,
+			nonce,
 			code_challenge: challenge,
 			code_challenge_method: 'S256'
 		}).toString();
@@ -47,7 +54,7 @@ export const adminLogin = new Elysia({ name: 'admin-login' })
 		'/admin/callback',
 		async ({ query, cookie, redirect, set }) => {
 			// Elysia auto-parses JSON-looking cookie values into objects on read,
-			// so the stored `{ verifier, state }` may arrive already deserialised.
+			// so the stored `{ verifier, state, nonce }` may arrive already deserialised.
 			const rawSaved = cookie.admin_oauth.value as unknown;
 			const saved =
 				rawSaved === undefined || rawSaved === null || rawSaved === ''
@@ -57,6 +64,7 @@ export const adminLogin = new Elysia({ name: 'admin-login' })
 							: rawSaved) as {
 							verifier: string;
 							state: string;
+							nonce: string;
 						});
 			cookie.admin_oauth.remove();
 			if (!saved || saved.state !== query.state) {
@@ -80,20 +88,28 @@ export const adminLogin = new Elysia({ name: 'admin-login' })
 			}
 			const tokens = (await res.json()) as {
 				access_token: string;
-				id_token: string;
+				id_token?: string;
 				refresh_token?: string;
 			};
-			// Deliberate first-party BFF shortcut: this id_token was just minted by
-			// THIS same server and obtained via the PKCE-bound code exchange above, so
-			// we trust it and only base64url-decode the payload to read `sub` — no
-			// signature verification. This MUST be replaced with full signature
-			// verification (e.g. via the local JWKS) if the token exchange ever
-			// becomes cross-origin or the token can originate from an untrusted party.
-			const sub = (
-				JSON.parse(
-					Buffer.from(tokens.id_token.split('.')[1], 'base64url').toString()
-				) as { sub: string }
-			).sub;
+
+			let sub: string;
+			try {
+				sub = await verifyAdminIdToken(tokens.id_token, {
+					nonce: saved.nonce
+				});
+			} catch (err) {
+				// One response for every cause: which check failed is not something a caller
+				// gets to probe for. The reason goes to the event bus instead, where a
+				// deployment can subscribe to it — and not to the console, because this route
+				// is unauthenticated and an attacker-triggerable log write is a vector of its
+				// own.
+				eventBus.emit('admin.login.error', {
+					reason: err instanceof IdTokenRejected ? err.reason : 'unverifiable'
+				});
+				set.status = 401;
+				return { error: 'invalid_id_token', message: 'login failed' };
+			}
+
 			const user = await getUserStore(ADMIN_BUCKET_ID).find(sub);
 			if (!user || !user.active) {
 				set.status = 403;
