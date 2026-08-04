@@ -3,6 +3,7 @@ import { createCache, extractStyle, StyleProvider } from '@ant-design/cssinjs';
 import { Button, Form } from 'antd';
 import { Card, Flex } from 'antd';
 import { routeNames } from 'lib/consts/param_list.js';
+import { htmlResponse } from './csp.js';
 
 const cache = createCache();
 function renderLogoutForm(secret: string) {
@@ -84,9 +85,5 @@ export function logout(secret: string) {
   <style>${styleText}</style>
 </head><body>${renderToStaticMarkup(form)}</body></html>`;
 
-	return new Response(html, {
-		headers: {
-			'Content-Type': 'text/html; charset=utf-8'
-		}
-	});
+	return htmlResponse(html);
 }

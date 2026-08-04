@@ -1,5 +1,5 @@
-import pushInlineSha from '../helpers/script_src_sha.js';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { htmlResponse } from './csp.js';
 
 function renderForm(action: string, inputs: Record<string, string>) {
 	const formInputs = Object.entries(inputs).map(([key, value]) => (
@@ -30,10 +30,17 @@ function renderForm(action: string, inputs: Record<string, string>) {
 	);
 }
 
-export function formPost(ctx, action: string, inputs: Record<string, string>) {
+/*
+ * `_ctx` is unused but cannot be dropped: response-mode handlers share one dispatch signature with
+ * `query` and `jwt` (see lib/actions/authorization/respond.ts).
+ */
+export function formPost(
+	_ctx: unknown,
+	action: string,
+	inputs: Record<string, string>
+) {
 	const form = renderForm(action, inputs);
 	const script = `document.forms[0].submit();`;
-	//const csp = pushInlineSha(ctx, script);
 
 	const html = `<!DOCTYPE html>
 <html><head>
@@ -41,9 +48,5 @@ export function formPost(ctx, action: string, inputs: Record<string, string>) {
   <script type="module">${script}</script>
 </head><body>${renderToStaticMarkup(form)}</body></html>`;
 
-	return new Response(html, {
-		headers: {
-			'Content-Type': 'text/html; charset=utf-8'
-		}
-	});
+	return htmlResponse(html);
 }

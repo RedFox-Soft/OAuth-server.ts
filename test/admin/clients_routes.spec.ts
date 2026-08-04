@@ -4,6 +4,11 @@ import { treaty } from '@elysiajs/eden';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { projectRoutes } from 'lib/admin/projects/routes.ts';
 import { clientRoutes } from 'lib/admin/clients/routes.ts';
+import {
+	CreateClientBody,
+	UpdateClientBody
+} from 'lib/admin/clients/schema.ts';
+import { ApplicationConfig } from 'lib/configs/application.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
 	adminSessionStore,
@@ -115,6 +120,63 @@ describe('clients API', () => {
 				{ headers: { cookie } }
 			);
 		expect(res.status).toBe(422);
+	});
+
+	/*
+	 * The editor used to offer a CIBA delivery mode of 'push'. Nothing implements it — the flow handles
+	 * 'poll' and 'ping' only — and configuration validation refuses any mode outside those two, so an
+	 * operator who picked it got their client rejected with no explanation of why an offered choice was
+	 * not a choice.
+	 *
+	 * Asserted against the request schema itself rather than over HTTP, deliberately: a POST carrying
+	 * 'push' is refused either way (client-metadata validation derives its allowed values from
+	 * ciba.deliveryModes, which never contains 'push'), so an HTTP assertion would pass before and
+	 * after and prove nothing. What changed is which set the operator is *offered*, and that set is
+	 * this schema — the same list the console's Select mirrors.
+	 */
+	it('offers only the delivery modes the server implements', () => {
+		const offered = (
+			schema: typeof CreateClientBody | typeof UpdateClientBody
+		) =>
+			(
+				schema.properties.backchannelTokenDeliveryMode as {
+					anyOf: Array<{ const: string }>;
+				}
+			).anyOf.map((member) => member.const);
+
+		expect(offered(CreateClientBody)).toEqual(['poll', 'ping']);
+		expect(offered(UpdateClientBody)).toEqual(['poll', 'ping']);
+	});
+
+	it('still accepts the two delivery modes the server does implement', async () => {
+		const { cookie } = await sessionCookieFor(['super_admin']);
+		const proj = await makeProject();
+		ApplicationConfig['ciba.enabled'] = true;
+		ApplicationConfig['ciba.deliveryModes'] = ['poll', 'ping'];
+		try {
+			for (const mode of ['poll', 'ping'] as const) {
+				const res = await client.admin.api
+					.projects({ id: proj._id })
+					.clients.post(
+						{
+							grantTypes: ['urn:openid:params:grant-type:ciba'],
+							tokenEndpointAuthMethod: 'client_secret_basic',
+							backchannelTokenDeliveryMode: mode,
+							...(mode === 'ping'
+								? {
+										backchannelClientNotificationEndpoint:
+											'https://rp.example.com/ciba'
+									}
+								: undefined)
+						},
+						{ headers: { cookie } }
+					);
+				expect(res.status).not.toBe(422);
+			}
+		} finally {
+			ApplicationConfig['ciba.enabled'] = false;
+			ApplicationConfig['ciba.deliveryModes'] = ['poll'];
+		}
 	});
 
 	it('scopes project_admin to managed projects and 404s cross-project reads', async () => {

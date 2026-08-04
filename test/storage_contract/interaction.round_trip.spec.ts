@@ -29,7 +29,6 @@ describe('storage contract: Interaction', () => {
 		});
 
 		const interaction = new Interaction('interaction-1', {
-			returnTo: 'https://op.example.com/auth/interaction-1',
 			prompt: { name: 'consent', reasons: ['op_scopes_missing'] },
 			cookieID: 'cookie-1',
 			lastSubmission: { login: { accountId: 'account-1' } },

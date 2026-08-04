@@ -4,6 +4,7 @@ import { StrictMode } from 'react';
 import type { AdminContext } from '../auth/rbac.js';
 import { Layout } from './pages/Layout.js';
 import { Setup } from './pages/Setup.js';
+import { htmlResponse } from '../../html/csp.js';
 
 const template = Bun.file('./lib/admin/ui/htmlTemplate.html');
 
@@ -27,11 +28,11 @@ export async function renderAdminShell(props: {
 	if (version) {
 		html = html.replace('/public/admin.js', `/public/admin.js?v=${version}`);
 	}
+	// Hashed for the page's content security policy, so the authorization is derived from the script
+	// that is actually served rather than restated beside it.
+	const propsScript = `window.PROPS=${JSON.stringify(props).replace(/</g, '\\u003c')}`;
 	html = html
-		.replace(
-			'<!--app-props-->',
-			`<script>window.PROPS=${JSON.stringify(props)}</script>`
-		)
+		.replace('<!--app-props-->', `<script>${propsScript}</script>`)
 		.replace(
 			'<!--app-html-->',
 			renderToString(
@@ -40,7 +41,5 @@ export async function renderAdminShell(props: {
 				</StrictMode>
 			)
 		);
-	return new Response(html, {
-		headers: { 'content-type': 'text/html; charset=utf-8' }
-	});
+	return htmlResponse(html);
 }

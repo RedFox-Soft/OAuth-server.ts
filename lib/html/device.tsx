@@ -7,10 +7,9 @@ import {
 	input as inputForm,
 	confirm as confirmForm
 } from '../helpers/user_code_form.ts';
+import { htmlResponse } from './csp.js';
 
 const { Title, Paragraph, Text } = Typography;
-
-const htmlHeaders = { 'Content-Type': 'text/html; charset=utf-8' };
 
 // Renders an antd component tree to a self-contained HTML document. antd's cssinjs styles are
 // extracted inline (no external stylesheet / web font); a small `.red` rule preserves the exact
@@ -114,10 +113,7 @@ export function deviceInputPage({
 		</CenteredCard>
 	);
 
-	return new Response(html, {
-		status: err ? (err.status ?? 400) : 200,
-		headers: htmlHeaders
-	});
+	return htmlResponse(html, { status: err ? (err.status ?? 400) : 200 });
 }
 
 export function deviceConfirmPage({
@@ -182,7 +178,7 @@ export function deviceConfirmPage({
 		</CenteredCard>
 	);
 
-	return new Response(html, { headers: htmlHeaders });
+	return htmlResponse(html);
 }
 
 export function deviceSuccessPage({
@@ -208,5 +204,5 @@ export function deviceSuccessPage({
 		</CenteredCard>
 	);
 
-	return new Response(html, { headers: htmlHeaders });
+	return htmlResponse(html);
 }

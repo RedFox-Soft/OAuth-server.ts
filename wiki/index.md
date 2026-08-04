@@ -23,6 +23,8 @@ When this file exceeds ~300 lines or the wiki passes ~150 pages, shard into `wik
 - [[admin-console-signin]] — the console is a relying party on its own issuer and must verify the ID token; the advertised alg list contains `HS256` and is a boot snapshot, `assertPayload` skips future-`iat` whenever `exp` is present, and no `azp` is ever emitted.
 - [[client-identity-from-database]] — `adapter('Client')` is the single source of client identity; the adapter is read every call and the LRU memo caches only validated objects, keyed by property hash.
 - [[feature-flag-gating]] — flat dotted keys on `ApplicationConfig`, boot-only derived `configuration`, and the `onRequest` gate that makes a disabled endpoint answer as unserved.
+- [[first-run-setup-had-two-surfaces]] — `GET /admin` is the only bootstrap surface; the deleted `/admin/setup` twin pointed at an unserved bundle and rendered a blank page nothing linked to.
+- [[html-response-security-policy]] — one constructor builds every HTML response and hashes its own inline scripts; a global lifecycle plugin was measured and misses the error page and the named admin instance.
 - [[rich-authorization-requests]] — `authorization_details` end to end on the code and refresh flows; the declared parameter schema is a runtime coercion contract, and details reach a token only when a resource server resolves.
 - [[token-payload-access-contract]] — model state lives under `.payload.*`; reading a bare field yields `undefined` silently, and payload schemas are composed per token type.
 

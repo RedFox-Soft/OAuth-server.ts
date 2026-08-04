@@ -728,9 +728,69 @@ exact line numbers.
      gating; this item makes sure discovery/`registration_client_uri` behavior matches the flag).
 - **Expected result:** All four items fixed with spec tests; discovery baseline fixtures updated.
 
-### 14. Small verified bug-fix batch — Implement
+### 14. Small verified bug-fix batch — ✅ Implemented
 
-- **Context / Expected results (one spec, independent one-to-few-line fixes, each with a test):**
+- **Delivered by** `specs/018-small-bugfix-batch`. Suite: 2506 pass / 0 fail (was 2473); typecheck
+  2574 total / 808 in `lib/` (was 2575 / 812); lint 176 (was 178) with none in this batch's files.
+- **Two items turned out not to be what they looked like:**
+  1. **Item 1 was a duplicate surface, not a broken link.** `GET /admin` already server-renders the
+     same first-run `<Setup />` screen — with props, a cache-busted bundle and a favicon — while
+     `GET /admin/setup` hand-wrote a page pointing at an unserved address and was referenced
+     **nowhere** in `lib/`, `test/` or the SPA. Repairing the address would have left two setup
+     surfaces, the worse one needing its own security policy. The route is deleted; `POST
+/admin/api/setup` and `hasSuperAdmin` are untouched. No `route_classification.ts` edit was needed
+     (`/admin` is covered by an always-available prefix).
+  2. **Item 3 grew into the feature.** The commented-out hash call was the smaller half: the server
+     emitted **no** `Content-Security-Policy` anywhere, and `lib/helpers/script_src_sha.ts` was not
+     merely dead but Koa-shaped (`ctx.response.get`), so uncommenting it would have thrown. Resolved
+     as a server-wide policy through a single HTML response constructor (`lib/html/csp.ts`), which
+     all nine construction sites now use, under a two-way drift guard. **The constructor derives the
+     policy from the document it is handed** — inline script hashes, inline handler hashes,
+     `form-action`, and whether the page may be framed — so no page declares anything and a hash
+     cannot drift from the script it authorizes. Every call site is `htmlResponse(html)` or
+     `htmlResponse(html, { status })`.
+- **Findings worth carrying forward** (filed in `wiki/`):
+  1. **A lifecycle plugin cannot cover every page here — measured, not assumed.** The plugin form was
+     built (`mapResponse({ as: 'global' })`, deriving the whole policy from the served document) and
+     run. `{ as: 'global' }` **does** reach mounted sub-apps — spec 011's per-sub-app mounting was a
+     consequence of its callback-shaped plugins being deliberately local, not a framework limit — but
+     it never fires for a response built by `onError` (the rendered error page) and did not fire for
+     the **named** `adminApp` instance (the console shell). The named-instance gap survived mounting
+     the plugin inside `adminApp` and survived removing the plugin's `name` to rule out dedup. The
+     decisive argument is the failure mode: a page that skips the plugin renders perfectly with no
+     policy, whereas "is there exactly one place that builds a `text/html` response?" is a question a
+     test can answer. Full write-up: `specs/018-small-bugfix-batch/research.md` M9.
+  2. **There is exactly one inline event handler in the whole server** — `onfocus` on the device
+     user-code input (`lib/helpers/user_code_form.ts:15`). CSP blocks those by default and the failure
+     is **silent**: the page still renders, it just stops selecting a pre-filled code. It is
+     authorized with `'unsafe-hashes'` plus the handler's hash rather than deleted; the constructor
+     reads the attribute out of the document, so that file needed no change.
+  3. **Deriving `form-action` from a document has one trap**: the device pages build an
+     ISSUER-_absolute_ action, so "absolute means foreign origin" would name this server as a foreign
+     target **and** drop `frame-ancestors` from a page carrying a real form. Compare against
+     `new URL(ISSUER).origin`. Pinned by a test.
+  4. **`crypto.hash(alg, data, enc)` exists on this Bun** — verified by running it, because its only
+     previous caller was dead code that may never have executed.
+  5. **`frame-ancestors 'none'` is wrong for the `form_post` page.** Silent authentication renders it
+     inside the client's iframe; frame-busting it would break that flow for no benefit, since the page
+     carries no interactive UI. Its protection is `form-action`, pinned to the callback origin.
+- **Deviations from the spec, argued in `specs/018-small-bugfix-batch/research.md`:** FR-001 asked for
+  the setup page's bundle address to be corrected and the page is deleted instead (D6); FR-006 asked
+  that every page forbid framing and the auto-submit page is excepted (D4). FR-008's "no unused
+  parameter" is satisfied by renaming `formPost`'s first argument to `_ctx` — the response-mode
+  dispatch signature is shared with `query` and `jwt`, so it cannot be dropped (D8).
+- **Verification debt, stated plainly.** Two gaps, neither hidden:
+  1. **The browser pass has not been run.** `specs/018-small-bugfix-batch/quickstart.md` § 4 is the
+     only evidence that a real browser enforces the policy without breaking a page (SC-003); the suite
+     proves the structural half — every inline script served is hash-authorized by the header served
+     with it. **Run § 4 before deploying.**
+  2. **Items 1 and 5 have no dedicated fail-first test**, by explicit instruction not to write tests
+     against deleted code. Both were confirmed red before implementation and are covered indirectly:
+     the console still serving the setup screen (`test/admin/ui_shell.spec.ts`) and the two resume
+     journeys plus the storage contract (187 cases across `test/interaction`, `test/device_code`,
+     `test/end_session`, `test/storage_contract`).
+- **Original context (for history) — expected results (one spec, independent one-to-few-line fixes,
+  each with a test):**
   1. `GET /admin/setup` references `/admin.js`; the bundle is served at `/public/admin.js`
      (`lib/admin/auth/setup.ts:16`) → setup page actually hydrates.
   2. `interaction.returnTo` persists an unmounted URL `/auth/{uid}`

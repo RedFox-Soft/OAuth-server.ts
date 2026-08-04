@@ -1,13 +1,36 @@
+import { ComponentProps } from 'react';
 import { Result } from 'antd';
 import { createCache, extractStyle, StyleProvider } from '@ant-design/cssinjs';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { htmlResponse } from './csp.js';
+
+type ResultStatus = ComponentProps<typeof Result>['status'];
+
+/*
+ * The illustration used to be `status === 500 ? '500' : '403'`, which drew a not-found — the most
+ * common rendered error there is — as an access refusal, sending operators after a permissions
+ * problem that did not exist. Anything without dedicated artwork gets the generic error icon rather
+ * than borrowing artwork that names a cause which did not occur.
+ */
+function illustrationFor(status: number): ResultStatus {
+	if (status === 404) {
+		return '404';
+	}
+	if (status === 403) {
+		return '403';
+	}
+	if (status >= 500) {
+		return '500';
+	}
+	return 'error';
+}
 
 const cache = createCache();
 function renderError(status: number, title: string, subTitle: string) {
 	const html = renderToStaticMarkup(
 		<StyleProvider cache={cache}>
 			<Result
-				status={status === 500 ? '500' : '403'}
+				status={illustrationFor(status)}
 				title={status.toString()}
 				subTitle={subTitle}
 			/>
@@ -32,12 +55,7 @@ export function getErrorHtmlResponse(
 	message: string
 ) {
 	const html = renderError(status, error, message);
-	return new Response(html, {
-		// Without this the Response defaults to 200, so an HTML-preferring caller was told "OK" for
-		// every error the server rendered as a page — including a not-found.
-		status,
-		headers: {
-			'Content-Type': 'text/html; charset=utf-8'
-		}
-	});
+	// Without an explicit status the Response defaults to 200, so an HTML-preferring caller was told
+	// "OK" for every error the server rendered as a page — including a not-found.
+	return htmlResponse(html, { status });
 }

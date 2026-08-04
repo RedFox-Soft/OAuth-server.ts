@@ -31,10 +31,10 @@ const AUTH_OPTIONS = [
 	{ label: 'client_secret_post', value: 'client_secret_post' }
 ];
 const CIBA_GRANT_TYPE = 'urn:openid:params:grant-type:ciba';
+// Mirrors the request schema's union, which is the server's real answer on what it will accept.
 const CIBA_DELIVERY_MODE_OPTIONS = [
 	{ label: 'poll', value: 'poll' },
-	{ label: 'ping', value: 'ping' },
-	{ label: 'push', value: 'push' }
+	{ label: 'ping', value: 'ping' }
 ];
 
 interface ClientView {
@@ -46,7 +46,7 @@ interface ClientView {
 	redirectUris: string[];
 	scope?: string;
 	requireConsent: boolean;
-	backchannelTokenDeliveryMode?: 'poll' | 'ping' | 'push';
+	backchannelTokenDeliveryMode?: 'poll' | 'ping';
 	backchannelClientNotificationEndpoint?: string;
 	authorizationDetailsTypes?: string[];
 }
@@ -58,7 +58,7 @@ interface FormValues {
 	redirectUris?: string;
 	scope?: string;
 	requireConsent: boolean;
-	backchannelTokenDeliveryMode?: 'poll' | 'ping' | 'push';
+	backchannelTokenDeliveryMode?: 'poll' | 'ping';
 	backchannelClientNotificationEndpoint?: string;
 	authorizationDetailsTypes?: string[];
 }

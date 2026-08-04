@@ -49,20 +49,16 @@ export class OIDCContext<T extends Record<string, unknown>> {
 		}
 	}
 
+	/*
+	 * The 'resume' and 'device_resume' names are deliberately absent. Their only caller built the
+	 * interaction record's `returnTo`, which nothing ever read — and 'resume' produced
+	 * `${ISSUER}/auth/{uid}`, an address this server does not mount. The destinations the browser
+	 * actually follows are built where they are used: /ui/{uid}/{prompt} in the interactions pipeline
+	 * and /ui/{uid}/resume in the resume action.
+	 */
 	urlFor(name, opt) {
-		if (name === 'resume') {
-			return new URL(
-				`${routeNames.authorization}/${opt.uid}`,
-				ISSUER
-			).toString();
-		}
-
 		if (name === 'code_verification') {
 			return new URL(routeNames.code_verification, ISSUER).toString();
-		}
-
-		if (name === 'device_resume') {
-			return new URL(`/ui/${opt.uid}/device_resume`, ISSUER).toString();
 		}
 
 		if (name === 'client') {

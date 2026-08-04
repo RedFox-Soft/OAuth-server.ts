@@ -2,6 +2,8 @@
 // from a link in an email (possibly a different browser/session), so they are plain,
 // self-contained HTML with no dependency on the OIDC interaction cookie or the antd shell.
 
+import { htmlResponse } from '../html/csp.js';
+
 function esc(value: string): string {
 	return value
 		.replace(/&/g, '&amp;')
@@ -12,10 +14,7 @@ function esc(value: string): string {
 
 function page(title: string, bodyHtml: string, status = 200): Response {
 	const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>${esc(title)}</title></head><body style="font-family: Arial, Helvetica, sans-serif; background:#f0f2f5; margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;"><div style="background:#fff; padding:32px; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.1); width:400px; text-align:center;">${bodyHtml}</div></body></html>`;
-	return new Response(html, {
-		status,
-		headers: { 'Content-Type': 'text/html; charset=utf-8' }
-	});
+	return htmlResponse(html, { status });
 }
 
 export function verifySuccessPage(): Response {

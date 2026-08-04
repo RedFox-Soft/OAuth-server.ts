@@ -11,7 +11,6 @@ import { BaseModel, BaseModelPayload } from './base_model.js';
 const InteractionPayload = t.Composite([
 	BaseModelPayload,
 	t.Object({
-		returnTo: t.Optional(t.String()),
 		prompt: t.Optional(t.Unknown()),
 		cookieID: t.Optional(t.String()),
 		lastSubmission: t.Optional(t.Unknown()),

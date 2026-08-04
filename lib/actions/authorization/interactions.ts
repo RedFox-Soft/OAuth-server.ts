@@ -9,7 +9,7 @@ import { ttl } from 'lib/configs/liveTime.js';
 import { Interaction } from 'lib/models/interaction.js';
 import { eventBus } from '../../event_bus.js';
 
-export default async function interactions(resumeRouteName, oidc) {
+export default async function interactions(oidc) {
 	const client = oidc.client;
 	let failedCheck;
 	let prompt;
@@ -79,9 +79,7 @@ export default async function interactions(resumeRouteName, oidc) {
 	const uid = nanoid();
 	const cookieID = nanoid();
 
-	const returnTo = oidc.urlFor(resumeRouteName, { uid });
 	const interactionSession = new Interaction(uid, {
-		returnTo,
 		prompt,
 		cookieID,
 		lastSubmission: oidc.result,

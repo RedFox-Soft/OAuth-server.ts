@@ -77,7 +77,7 @@ async function resume(interaction, cookie) {
 	assignClaims(ctx.oidc);
 	await loadAccount(ctx.oidc);
 	await loadGrant(ctx.oidc);
-	const redirectUri = await interactions('resume', ctx.oidc);
+	const redirectUri = await interactions(ctx.oidc);
 	if (redirectUri) {
 		await setCookies();
 		return Response.redirect(redirectUri, 303);
@@ -367,7 +367,7 @@ export const ui = new Elysia()
 			assignClaims(oidc);
 			await loadAccount(oidc);
 			await loadGrant(oidc);
-			const destination = await interactions('device_resume', oidc);
+			const destination = await interactions(oidc);
 			await setCookies();
 
 			if (destination) {

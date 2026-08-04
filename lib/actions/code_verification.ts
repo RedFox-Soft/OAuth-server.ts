@@ -158,7 +158,7 @@ export const codeVerification = new Elysia()
 				assignClaims(oidc);
 				await loadAccount(oidc);
 				await loadGrant(oidc);
-				const destination = await interactions('device_resume', oidc);
+				const destination = await interactions(oidc);
 				await setCookies();
 
 				if (destination) {

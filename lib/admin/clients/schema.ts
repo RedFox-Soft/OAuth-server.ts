@@ -29,7 +29,10 @@ export const CreateClientBody = t.Object({
 	scope: t.Optional(t.String()),
 	requireConsent: t.Optional(t.Boolean()),
 	backchannelTokenDeliveryMode: t.Optional(
-		t.Union([t.Literal('poll'), t.Literal('ping'), t.Literal('push')])
+		// 'push' is deliberately absent: nothing implements it (the backchannel result handler knows
+		// 'ping', the CIBA request check knows 'poll') and checkCibaDeliveryModes refuses any mode
+		// outside those two, so offering it could only ever produce a rejected client.
+		t.Union([t.Literal('poll'), t.Literal('ping')])
 	),
 	backchannelClientNotificationEndpoint: t.Optional(t.String()),
 	// Per-client permitted RAR types (RFC 9396 §10.5). Without this on the admin surface no client an
@@ -55,7 +58,10 @@ export const UpdateClientBody = t.Object({
 	scope: t.Optional(t.String()),
 	requireConsent: t.Optional(t.Boolean()),
 	backchannelTokenDeliveryMode: t.Optional(
-		t.Union([t.Literal('poll'), t.Literal('ping'), t.Literal('push')])
+		// 'push' is deliberately absent: nothing implements it (the backchannel result handler knows
+		// 'ping', the CIBA request check knows 'poll') and checkCibaDeliveryModes refuses any mode
+		// outside those two, so offering it could only ever produce a rejected client.
+		t.Union([t.Literal('poll'), t.Literal('ping')])
 	),
 	backchannelClientNotificationEndpoint: t.Optional(t.String()),
 	authorizationDetailsTypes: t.Optional(t.Array(t.String()))

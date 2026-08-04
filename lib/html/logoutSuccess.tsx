@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createCache, extractStyle, StyleProvider } from '@ant-design/cssinjs';
 import { Card, Flex } from 'antd';
+import { htmlResponse } from './csp.js';
 
 const cache = createCache();
 function renderLogoutForm() {
@@ -49,9 +50,5 @@ export function logoutSuccess() {
   <style>${styleText}</style>
 </head><body>${renderToStaticMarkup(form)}</body></html>`;
 
-	return new Response(html, {
-		headers: {
-			'Content-Type': 'text/html; charset=utf-8'
-		}
-	});
+	return htmlResponse(html);
 }

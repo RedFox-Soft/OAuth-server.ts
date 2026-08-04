@@ -4,17 +4,20 @@ import { LoginPage } from './loginPage.js';
 import { ConsentPage } from './consentPage.js';
 import { RegistrationPage } from './registration.js';
 import type { ConsentView } from './consentView.js';
+import { htmlResponse } from '../html/csp.js';
 
 const htmlTeamplate = Bun.file('./lib/interactions/htmlTeamplate.html');
+
+// escape `<` so a client name / scope value can't break out of the script tag
+function propsScript(props: unknown): string {
+	return `<script>window.PROPS=${JSON.stringify(props).replace(/</g, '\\u003c')}</script>`;
+}
 
 export async function loginServer(uid: string, errorMessage?: string) {
 	let html = await htmlTeamplate.text();
 	html = html
 		.replace('<!--app-title-->', 'Login Page')
-		.replace(
-			'<!--app-props-->',
-			`<script>window.PROPS=${JSON.stringify({ uid, errorMessage })}</script>`
-		)
+		.replace('<!--app-props-->', propsScript({ uid, errorMessage }))
 		.replace(
 			'<!--app-html-->',
 			renderToString(
@@ -26,12 +29,7 @@ export async function loginServer(uid: string, errorMessage?: string) {
 				</StrictMode>
 			)
 		);
-	return new Response(html, {
-		status: errorMessage ? 400 : 200,
-		headers: {
-			'Content-Type': 'text/html; charset=utf-8'
-		}
-	});
+	return htmlResponse(html, { status: errorMessage ? 400 : 200 });
 }
 
 export async function registrationServer(uid: string) {
@@ -44,22 +42,16 @@ export async function registrationServer(uid: string) {
 			</StrictMode>
 		)
 	);
-	return new Response(html, {
-		headers: {
-			'Content-Type': 'text/html; charset=utf-8'
-		}
-	});
+	// No props script yet — the registration page's hydration props are backlog task 17's work. The
+	// policy is derived from the document, so adding one needs no change here.
+	return htmlResponse(html);
 }
 
 export async function consentServer(view: ConsentView) {
 	let html = await htmlTeamplate.text();
 	html = html
 		.replace('<!--app-title-->', 'Consent Page')
-		.replace(
-			'<!--app-props-->',
-			// escape `<` so a client name / scope value can't break out of the script tag
-			`<script>window.PROPS=${JSON.stringify(view).replace(/</g, '\\u003c')}</script>`
-		)
+		.replace('<!--app-props-->', propsScript(view))
 		.replace(
 			'<!--app-html-->',
 			renderToString(
@@ -68,9 +60,5 @@ export async function consentServer(view: ConsentView) {
 				</StrictMode>
 			)
 		);
-	return new Response(html, {
-		headers: {
-			'Content-Type': 'text/html; charset=utf-8'
-		}
-	});
+	return htmlResponse(html);
 }
