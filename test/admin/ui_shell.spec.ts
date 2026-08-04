@@ -1,6 +1,27 @@
 import { describe, it, expect, beforeAll } from 'bun:test';
 import bootstrap, { agent } from '../test_helper.ts';
-import { resetAdminMemoryStores } from 'lib/adapters/index.ts';
+import {
+	adminSessionStore,
+	getUserStore,
+	resetAdminMemoryStores
+} from 'lib/adapters/index.ts';
+import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+
+async function cookieFor(roles: string[]): Promise<string> {
+	const user = await getUserStore(ADMIN_BUCKET_ID).create(
+		`shell-${roles.join('-')}-${Date.now()}@x.io`,
+		'hash',
+		roles
+	);
+	const session = await adminSessionStore.create({
+		userId: user._id,
+		bucketId: ADMIN_BUCKET_ID,
+		tokens: {},
+		ttlSeconds: 60,
+		absoluteTtlSeconds: 3600
+	});
+	return `${ADMIN_SESSION_COOKIE}=${session._id}`;
+}
 
 describe('admin UI shell', () => {
 	beforeAll(async () => {
@@ -26,17 +47,29 @@ describe('admin UI shell', () => {
 	});
 
 	/*
-	 * The audit page is a super-admin surface, and the SPA decides what to render from `me.roles` in
-	 * the injected props. The shell can only be checked this far here; the API's own refusal for a
-	 * non-super-admin is pinned in audit_routes.spec.ts, which is where it actually matters.
+	 * The audit page is a super-admin surface. renderAdminShell server-renders <Layout me={...}>, so
+	 * the role gate on the nav entry is observable in the shell HTML without a built bundle — the
+	 * bundle is deliberately absent under test (serverRender.bundleVersion falls back for exactly
+	 * that reason), so asserting on public/admin.js only ever passed on a locally built artifact.
+	 *
+	 * The sessions are minted here rather than in beforeAll because the first test above must see an
+	 * admin bucket with no super_admin in it.
+	 *
+	 * This covers the nav gate only; the API's own refusal for a non-super-admin is pinned in
+	 * audit_routes.spec.ts, which is where it actually matters.
 	 */
-	it('serves the audit trail only to a super administrator', async () => {
+	it('offers the audit trail in the shell only to a super administrator', async () => {
 		const forbidden = await agent.admin.api.audit.get({ query: {} });
 		expect(forbidden.status).toBe(401);
 
-		const bundle = await agent.public['admin.js'].get();
-		const source = bundle.data as unknown as string;
-		expect(source).toContain('Audit trail');
-		expect(source).toContain('/admin/api/audit');
+		const superAdmin = await agent.admin.get({
+			headers: { cookie: await cookieFor(['super_admin']) }
+		});
+		expect(superAdmin.data as unknown as string).toContain('Audit');
+
+		const projectAdmin = await agent.admin.get({
+			headers: { cookie: await cookieFor(['project_admin']) }
+		});
+		expect(projectAdmin.data as unknown as string).not.toContain('Audit');
 	});
 });
