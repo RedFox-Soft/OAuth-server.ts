@@ -7,7 +7,7 @@ import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { BaseModel, BaseModelPayload } from './base_model.js';
 import { ttl } from 'lib/configs/liveTime.js';
 
-const SessionPayload = t.Composite([
+export const SessionPayload = t.Composite([
 	BaseModelPayload,
 	t.Object({
 		uid: t.String(),

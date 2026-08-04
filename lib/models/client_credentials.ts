@@ -2,7 +2,7 @@ import { Type as t, type Static } from '@sinclair/typebox';
 import constrained from './mixins/is_sender_constrained.js';
 import { BaseToken, BaseTokenPayload, AudiencePayload } from './base_token.js';
 
-const ClientCredentialsPayload = t.Composite([
+export const ClientCredentialsPayload = t.Composite([
 	BaseTokenPayload,
 	AudiencePayload,
 	t.Object({

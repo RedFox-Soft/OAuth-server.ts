@@ -1,10 +1,15 @@
 import { Elysia } from 'elysia';
-import { getBucketStore, getProjectStore } from '../../adapters/index.js';
+import {
+	getBucketStore,
+	getProjectStore,
+	getUserStore
+} from '../../adapters/index.js';
 import {
 	assertAuth,
 	assertRole,
 	assertBucketAccess,
 	AdminError,
+	adminErrorBody,
 	resolveAdmin,
 	type AdminContext
 } from '../auth/rbac.js';
@@ -19,7 +24,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 	.onError(({ error, set }) => {
 		if (error instanceof AdminError) {
 			set.status = error.status;
-			return { error: 'admin_error', message: error.message };
+			return adminErrorBody(error);
 		}
 	})
 	.get('/admin/api/buckets', async ({ admin }) => {
@@ -87,9 +92,26 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 		if ((await getProjectStore().countByBucket(params.id)) > 0) {
 			throw new AdminError(409, 'bucket is assigned to one or more projects');
 		}
+		/*
+		 * Guarded rather than cascaded, like a project: its users are accounts the operator can see and
+		 * name. `list()` does not filter, which is what makes a deactivated account count — deactivation is
+		 * a sign-in decision, not absence, and the account is still there to be destroyed. Only the count
+		 * is reported: a bucket can hold thousands of accounts and their identifiers are not the caller's
+		 * business.
+		 */
+		const store = getUserStore(params.id);
+		const held = (await store.list()).length;
+		if (held > 0) {
+			throw new AdminError(409, 'bucket still holds end-users', {
+				blockers: [{ kind: 'enduser', count: held }]
+			});
+		}
 		// After the guards, before the deletion: an entry for a request the 409 refused would describe
 		// a deletion that was never even attempted.
 		await recordAdminAudit(ctx, 'bucket.delete', params.id);
 		await getBucketStore().destroy(params.id);
+		/* The half that was missing: without this a deleted bucket left its `user_<bucket>` area behind
+		 * for good, indexes and all. Safe here and only here, because the guard above proved it empty. */
+		await store.destroyArea();
 		return { ok: true };
 	});

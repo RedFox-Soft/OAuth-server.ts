@@ -76,6 +76,7 @@ getter; the getter exists for the historical call sites.
 
 ## Related
 
+- [[deletion-and-revocation]] — a deleted client cannot authenticate on the next request, while every token it issued kept working until the cascade existed.
 - [[token-payload-access-contract]] — models keep state under `.payload`; validated clients do not.
 - [[account-resolution]] — maps a client id to the user bucket a subject is resolved from.
 - [[feature-flag-gating]] — the registration endpoints that create clients are flag-gated.

@@ -254,8 +254,12 @@ export function BucketDetail({
 								>
 									Reset password
 								</Button>
+								{/* The consequence, stated: deleting an account also ends the sessions and tokens
+								    it is currently using, which is the half an operator cannot see from here. */}
 								<Popconfirm
 									title="Delete this user?"
+									description="Their sign-in sessions, consents and every issued token are destroyed immediately — they are signed out everywhere."
+									okText="Delete and sign out"
 									onConfirm={() => onDelete(row._id)}
 								>
 									<Button

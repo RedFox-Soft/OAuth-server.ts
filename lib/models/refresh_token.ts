@@ -10,7 +10,7 @@ import consumable from './mixins/consumable.js';
 import constrained from './mixins/is_sender_constrained.js';
 import { authPayloadModel } from './mixins/stores_auth.js';
 
-const RefreshTokenSchema = t.Composite([
+export const RefreshTokenSchema = t.Composite([
 	BaseTokenPayload,
 	SessionBoundPayload,
 	authPayloadModel,

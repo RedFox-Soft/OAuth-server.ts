@@ -4,6 +4,7 @@ import {
 	assertAuth,
 	assertRole,
 	AdminError,
+	adminErrorBody,
 	resolveAdmin,
 	type AdminContext
 } from '../auth/rbac.js';
@@ -41,7 +42,7 @@ export const adminUserRoutes = new Elysia({ name: 'admin-users' })
 	.onError(({ error, set }) => {
 		if (error instanceof AdminError) {
 			set.status = error.status;
-			return { error: 'admin_error', message: error.message };
+			return adminErrorBody(error);
 		}
 	})
 	.get('/admin/api/admins', async ({ admin }) => {

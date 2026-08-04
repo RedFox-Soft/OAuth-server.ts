@@ -12,6 +12,12 @@ export interface MemoryStore<TValue = unknown> {
 		options?: StorageOptions
 	): unknown;
 	delete(key: string): boolean;
+	/*
+	 * Required by MemoryAdapter.destroyByOwner: sweeping a principal's records means finding them, and
+	 * a get/set/delete-only store cannot be searched. Satisfied without adaptation by both
+	 * implementors — QuickLRU and the plain Map the test harness installs via setStorage.
+	 */
+	keys(): IterableIterator<string>;
 }
 
 let storage: MemoryStore<unknown> = new QuickLRU<string, unknown>({

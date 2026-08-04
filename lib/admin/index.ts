@@ -3,6 +3,7 @@ import {
 	resolveAdmin,
 	assertAuth,
 	AdminError,
+	adminErrorBody,
 	type AdminContext
 } from './auth/rbac.js';
 import { adminSetup, hasSuperAdmin } from './auth/setup.js';
@@ -22,7 +23,7 @@ export const adminApp = new Elysia({ name: 'admin' })
 	.onError(({ code, error, set }) => {
 		if (error instanceof AdminError) {
 			set.status = error.status;
-			return { error: 'admin_error', message: error.message };
+			return adminErrorBody(error);
 		}
 		// Keep admin responses in the admin `{ error, message }` shape instead of
 		// letting request-validation errors fall through to the global OAuth

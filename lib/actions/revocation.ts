@@ -41,7 +41,7 @@ export const revocation = new Elysia()
 				token.payload.kind === 'RefreshToken' ||
 				token.payload.kind === 'AccessToken'
 			) {
-				await revoke(oidc, token.payload.grantId);
+				await revoke(token.payload.grantId);
 			}
 		},
 		{

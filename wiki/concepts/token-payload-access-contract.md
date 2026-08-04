@@ -74,6 +74,8 @@ persists.
 
 ## Related
 
+- [[deletion-and-revocation]] — owner fields live under `.payload.*`, which is what an owner sweep queries.
+- [[model-graph-import-order]] — the same `base_token` cycle, seen from the import side.
 - [[account-resolution]] — reads `_token.payload.clientId` to resolve the user bucket.
 - [[client-identity-from-database]] — the validated-client object this contract does *not* apply to.
 - [[event-bus]] — why `base_token` → `base_model` → event bus module cycles matter for initialisation.

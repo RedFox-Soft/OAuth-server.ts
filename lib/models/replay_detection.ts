@@ -3,7 +3,7 @@ import { Type as t, type Static } from '@sinclair/typebox';
 import epochTime from '../helpers/epoch_time.js';
 import { BaseModel, BaseModelPayload } from './base_model.js';
 
-const ReplayDetectionPayload = t.Composite([
+export const ReplayDetectionPayload = t.Composite([
 	BaseModelPayload,
 	t.Object({
 		iss: t.String()

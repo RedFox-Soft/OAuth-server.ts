@@ -8,7 +8,7 @@ import { BaseModel, BaseModelPayload } from './base_model.js';
 // object because the constructor reduces the Session model to a plain subset. `grant` is
 // deliberately NOT declared: the constructor derives `grantId` from the Grant instance and nothing
 // reads the instance back, so filtering drops it rather than persisting a live model instance.
-const InteractionPayload = t.Composite([
+export const InteractionPayload = t.Composite([
 	BaseModelPayload,
 	t.Object({
 		prompt: t.Optional(t.Unknown()),

@@ -9,7 +9,7 @@ import {
 import consumable from './mixins/consumable.ts';
 import { authPayloadModel } from './mixins/stores_auth.js';
 
-const DeviceCodePayload = t.Composite([
+export const DeviceCodePayload = t.Composite([
 	BaseTokenPayload,
 	SessionBoundPayload,
 	authPayloadModel,

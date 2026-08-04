@@ -7,7 +7,7 @@ import {
 	AudiencePayload
 } from './base_token.js';
 
-const AccessTokenPayload = t.Composite([
+export const AccessTokenPayload = t.Composite([
 	BaseTokenPayload,
 	SessionBoundPayload,
 	AudiencePayload,

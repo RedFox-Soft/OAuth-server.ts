@@ -116,6 +116,8 @@ indistinguishable from "nothing happened", the one answer an audit trail must ne
 
 ## Related
 
+- [[deletion-and-revocation]] — a cascade is an effect of the already-recorded delete, and per-area counts stay out of the trail because a count is a value.
+- [[admin-plane-error-shape]] — the other admin-plane contract a standalone mount cannot verify.
 - [[feature-flag-gating]] — the declarative-table-plus-drift-guard pattern this reuses.
 - [[account-resolution]] — per-bucket user storage, which is why `targetScope` exists.
 - [[rich-authorization-requests]] — the other place a framework's schema handling behaved differently

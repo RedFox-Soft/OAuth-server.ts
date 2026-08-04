@@ -81,4 +81,12 @@ export class UserStore implements UserStoreInstance {
 	async destroy(_id: string): Promise<void> {
 		await db.collection<User>(this.collectionName).deleteOne({ _id });
 	}
+
+	/*
+	 * Dropping the collection is what closes the left-behind-collection hole: a deleted bucket used to
+	 * leave `user_<bucket>` in the database for good, indexes and all.
+	 */
+	async destroyArea(): Promise<void> {
+		await db.collection<User>(this.collectionName).drop();
+	}
 }

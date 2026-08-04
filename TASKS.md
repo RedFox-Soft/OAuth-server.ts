@@ -531,9 +531,38 @@ exact line numbers.
      and only for a principal that no longer exists. Worth writing down because "revoke" reads as
      "remove everything" and the code has always disagreed.
 
-### 10. Deletion integrity implementation — Implement (task 9 resolved, so unblocked)
+### 10. Deletion integrity implementation — ✅ Implemented
 
-- **Source of truth:** `docs/superpowers/specs/2026-08-04-deletion-integrity-design.md` carries the
+- **Delivered by** `specs/019-deletion-integrity`. Mechanism: ownership is an `owners` block on every
+  entry in `lib/consts/storage_inventory.ts`, and one engine (`lib/helpers/cascade.ts`) filters that table
+  — no deletion path names a storage area, and `indexesFor()` derives an owner index from the same
+  declaration, so a swept field is always an indexed field. Enabled by one new adapter method
+  (`destroyByOwner(field, value)` → count, on both adapters), `keys()` on `MemoryStore`, and
+  `destroyArea()` on `UserStoreInstance`. `revokeByGrantId` is now per-collection on **both** adapters,
+  and `revoke()` takes `grantId` alone. Containers guard (project → 409 while any `clientIds` entry
+  resolves; bucket → 409 while any user exists, deactivated included, then drops `user_<bucket>`);
+  principals cascade. 409 bodies carry `blockers`, cascades return per-area `destroyed`, partial failures
+  answer 500 with `failedAreas`. Audit unchanged. Knowledge filed as `wiki/concepts/`
+  [[deletion-and-revocation]], [[model-graph-import-order]] and [[admin-plane-error-shape]].
+- **Three findings worth carrying beyond the task body**, each now recorded in the wiki:
+  1. **The admin plane's error shape never reached callers in the real server.** Every admin route group
+     has its own `onError`, but `lib/index.ts` registers the OAuth handler on the root app _before_
+     mounting `adminApp`, and Elysia's first returning handler wins — so every admin API error arrived as
+     `{ error: 'server_error', error_description: … }` with `message` gone. Invisible because all of
+     `test/admin/` mounts the routes standalone. Fixed with an `adminPlane` marker the root handler stands
+     aside for, and pinned against the composed app.
+  2. **`lib/models/` has an import cycle** that throws a TDZ `ReferenceError` on a cold entry;
+     `inventory_drift.spec.ts` only passes because `test/preload.ts`'s `afterEach` warms the graph before
+     its _second_ test. Left as-is, documented.
+  3. **`DATABASE_NAME`, not the URI path, selects the MongoDB database** (`lib/adapters/mongodb/db.ts`),
+     so a manual procedure that only exports `MONGODB_URI` writes into whatever database was already
+     configured. Learned by doing it.
+- **Verification gap, now narrower than expected:** the MongoDB half was exercised directly against a
+  local server in a dropped-afterwards scratch database — owner indexes provisioned per the declaration,
+  `destroyByOwner`'s counts / own-collection-only / idempotence, per-collection `revokeByGrantId`, and
+  `destroyArea` dropping `user_<bucket>`. What remains manual is only the HTTP-level walkthrough
+  (`quickstart.md` §§ 4.2–4.5), which needs a running server. Task 25 still owns the class.
+- **Original acceptance surface, kept for the record.** `docs/superpowers/specs/2026-08-04-deletion-integrity-design.md` carries the
   rationale; that path is gitignored, so the acceptance surface below is the canonical record. Read
   task 9's decisions first.
 - **Expected result:** No deleted principal can authenticate or use an existing token afterwards, and no

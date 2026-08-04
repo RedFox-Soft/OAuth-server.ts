@@ -118,11 +118,14 @@ describe('toExistingIndexes', () => {
 });
 
 describe('missingIndexes', () => {
+	// Session's declared set is its own uid index, the owner index derived from `owners.account`, and
+	// the expiry index derived from `reaped` — in that order, which is the order indexesFor() composes.
 	it('reports every declared index on an unprovisioned area', () => {
 		const missing = missingIndexes(areaNamed('Session'), [idIndex]);
 
 		expect(missing).toEqual([
 			{ key: { 'payload.uid': 1 }, unique: true },
+			{ key: { 'payload.accountId': 1 } },
 			{ key: { expiresAt: 1 }, expireAfterSeconds: 0 }
 		]);
 	});
@@ -131,6 +134,7 @@ describe('missingIndexes', () => {
 		const existing: ExistingIndex[] = [
 			idIndex,
 			{ name: 'payload.uid_1', key: { 'payload.uid': 1 }, unique: true },
+			{ name: 'payload.accountId_1', key: { 'payload.accountId': 1 } },
 			expiresAtIndex
 		];
 

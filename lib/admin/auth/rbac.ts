@@ -15,12 +15,62 @@ export interface AdminContext {
 	managedProjectIds: string[];
 }
 
+/*
+ * What a refused container deletion reports. Machine-readable on purpose: the console's confirmation
+ * dialog and an MCP agent both need to list the consequences without parsing prose.
+ *
+ * `ids` is present for clients and absent for end-users, which is a privacy decision rather than an
+ * omission — a project's clients are objects the operator administers, while a bucket may hold thousands
+ * of accounts whose identities are not the caller's business.
+ */
+export interface DeletionBlocker {
+	readonly kind: 'client' | 'enduser';
+	readonly count: number;
+	readonly ids?: readonly string[];
+}
+
 export class AdminError extends Error {
+	/*
+	 * Read by the root error handler (lib/shared/authorization_error_handler.ts) to stand aside and let
+	 * the admin plane answer in its own shape. A marker on the error, not a path check, so an admin error
+	 * raised from anywhere is still an admin error.
+	 */
+	readonly adminPlane = true;
 	status: number;
-	constructor(status: number, message: string) {
+	blockers?: readonly DeletionBlocker[];
+	/* Areas whose sweep failed after the principal was already destroyed. Drives the 500 body. */
+	failedAreas?: readonly string[];
+	constructor(
+		status: number,
+		message: string,
+		extra?: {
+			blockers?: readonly DeletionBlocker[];
+			failedAreas?: readonly string[];
+		}
+	) {
 		super(message);
 		this.status = status;
+		this.blockers = extra?.blockers;
+		this.failedAreas = extra?.failedAreas;
 	}
+}
+
+/*
+ * The response body for an AdminError. One place, because the eight admin route groups each own an
+ * onError and a field added to only some of them is a contract that differs by URL.
+ */
+export function adminErrorBody(error: AdminError): {
+	error: 'admin_error';
+	message: string;
+	blockers?: readonly DeletionBlocker[];
+	failedAreas?: readonly string[];
+} {
+	return {
+		error: 'admin_error',
+		message: error.message,
+		...(error.blockers ? { blockers: error.blockers } : {}),
+		...(error.failedAreas ? { failedAreas: error.failedAreas } : {})
+	};
 }
 
 export function assertAuth(admin: AdminContext | null): AdminContext {

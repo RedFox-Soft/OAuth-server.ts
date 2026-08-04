@@ -19,6 +19,23 @@ export interface IndexSpec {
 	readonly expireAfterSeconds?: number;
 }
 
+/*
+ * Which payload field names the principal an area's records belong to. One deletion engine reads this
+ * for every area (lib/helpers/cascade.ts), so no call site enumerates collections: a cascade that was
+ * hand-written per entity fails silently the first time an area is added, and two of the areas swept
+ * here — ClientCredentials, which carries no grantId at all, and RegistrationAccessToken, which may be
+ * issued with no expiry — are exactly the ones an author forgets.
+ *
+ * `reason` is required when nothing is owned and forbidden otherwise, so "no owner" is always a written
+ * decision rather than a blank field. Same rule `reaped: null` follows, enforced the same way by
+ * test/storage_contract/inventory_drift.spec.ts.
+ */
+export interface OwnerFields {
+	readonly account: string | null;
+	readonly client: string | null;
+	readonly reason?: string;
+}
+
 export interface StorageArea {
 	readonly name: string;
 	readonly kind: AreaKind;
@@ -29,7 +46,12 @@ export interface StorageArea {
 	 * reaping by omission. `null` here has to be a decision someone wrote down.
 	 */
 	readonly reaped: string | null;
-	/* Indexes other than the expiry one, which indexesFor() derives from `reaped`. */
+	readonly owners: OwnerFields;
+	/*
+	 * Indexes other than the expiry one, which indexesFor() derives from `reaped`, and the owner ones,
+	 * which it derives from `owners` — so a field the cascade sweeps is always a field the datastore can
+	 * find without a scan.
+	 */
 	readonly indexes: readonly IndexSpec[];
 }
 
@@ -97,17 +119,32 @@ const EXPIRES_AT = 'expiresAt';
  */
 const grantId: IndexSpec = { key: { 'payload.grantId': 1 } };
 
+/* Ownership shorthands. Named rather than inlined so the table below reads as a matrix. */
+const byAccountAndClient: OwnerFields = {
+	account: 'accountId',
+	client: 'clientId'
+};
+const byAccount: OwnerFields = { account: 'accountId', client: null };
+const byClient: OwnerFields = { account: null, client: 'clientId' };
+const unowned = (reason: string): OwnerFields => ({
+	account: null,
+	client: null,
+	reason
+});
+
 const modelArea = (
 	name: ModelAreaName,
 	reaped: string | null,
+	owners: OwnerFields,
 	indexes: readonly IndexSpec[] = []
-): StorageArea => ({ name, kind: 'model', reaped, indexes });
+): StorageArea => ({ name, kind: 'model', reaped, owners, indexes });
 
 const storeArea = (
 	name: StoreAreaName,
 	reaped: string | null,
+	owners: OwnerFields,
 	indexes: readonly IndexSpec[] = []
-): StorageArea => ({ name, kind: 'store', reaped, indexes });
+): StorageArea => ({ name, kind: 'store', reaped, owners, indexes });
 
 /*
  * The templated per-bucket area. `name` holds the prefix rather than a real collection name; the
@@ -123,13 +160,20 @@ const perBucketArea: StorageArea = {
 	name: USER_AREA_PREFIX,
 	kind: 'perBucket',
 	reaped: null,
+	/* Holds the end-user principals themselves; destroyed with its bucket, never swept by owner. */
+	owners: unowned('holds the account records a cascade sweeps on behalf of'),
 	indexes: [{ key: { email: 1 }, unique: true }]
 };
 
 export const STORAGE_INVENTORY: readonly StorageArea[] = [
-	modelArea('AccessToken', EXPIRES_AT, [grantId]),
-	modelArea('AuthorizationCode', EXPIRES_AT, [grantId]),
-	modelArea('BackchannelAuthenticationRequest', EXPIRES_AT, [grantId]),
+	modelArea('AccessToken', EXPIRES_AT, byAccountAndClient, [grantId]),
+	modelArea('AuthorizationCode', EXPIRES_AT, byAccountAndClient, [grantId]),
+	modelArea(
+		'BackchannelAuthenticationRequest',
+		EXPIRES_AT,
+		byAccountAndClient,
+		[grantId]
+	),
 	/*
 	 * The one model area that is never reaped. Clients are upserted with no TTL argument
 	 * (lib/admin/clients/service.ts), so an expiry index here would match nothing today — and would
@@ -137,25 +181,61 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 	 * which MongoAdapter.upsert can leave behind because it never $unsets a stale one. Inert now,
 	 * unrecoverable later; that asymmetry is why this is explicit rather than inherited.
 	 */
-	modelArea('Client', null),
-	modelArea('ClientCredentials', EXPIRES_AT),
-	modelArea('DeviceCode', EXPIRES_AT, [
+	modelArea(
+		'Client',
+		null,
+		unowned('a client is itself a principal, not owned by one')
+	),
+	/*
+	 * Client-owned and reachable by no other route: a client-credentials token carries no grantId at
+	 * all, so collecting grant ids and revoking by them misses this area entirely. Sweeping by owner
+	 * field is what reaches it.
+	 */
+	modelArea('ClientCredentials', EXPIRES_AT, byClient),
+	modelArea('DeviceCode', EXPIRES_AT, byAccountAndClient, [
 		grantId,
 		{ key: { 'payload.userCode': 1 }, unique: true }
 	]),
-	modelArea('Grant', EXPIRES_AT),
+	/*
+	 * The consent record. Only a principal cascade destroys these — protocol revocation deliberately
+	 * leaves them alive, because revoking a token is not withdrawing consent.
+	 */
+	modelArea('Grant', EXPIRES_AT, byAccountAndClient),
 	/*
 	 * InitialAccessToken and RegistrationAccessToken may be issued without an expiry. They keep the
 	 * index regardless: MongoDB never expires a document that lacks the indexed field, so a
 	 * non-expiring token simply survives, which is the intended behaviour.
 	 */
-	modelArea('InitialAccessToken', EXPIRES_AT),
-	modelArea('Interaction', EXPIRES_AT),
-	modelArea('PushedAuthorizationRequest', EXPIRES_AT),
-	modelArea('RefreshToken', EXPIRES_AT, [grantId]),
-	modelArea('RegistrationAccessToken', EXPIRES_AT),
-	modelArea('ReplayDetection', EXPIRES_AT),
-	modelArea('Session', EXPIRES_AT, [
+	modelArea(
+		'InitialAccessToken',
+		EXPIRES_AT,
+		unowned('deliberately not client-bound; the schema omits clientId')
+	),
+	modelArea('Interaction', EXPIRES_AT, byAccount),
+	modelArea(
+		'PushedAuthorizationRequest',
+		EXPIRES_AT,
+		unowned(
+			'the client id lives inside the opaque `request` string, not in a field'
+		)
+	),
+	modelArea('RefreshToken', EXPIRES_AT, byAccountAndClient, [grantId]),
+	/*
+	 * Swept first by the client cascade: this is the only swept area whose records may be issued with no
+	 * expiry, so it is the only residue a partial failure would leave unbounded.
+	 */
+	modelArea('RegistrationAccessToken', EXPIRES_AT, byClient),
+	modelArea(
+		'ReplayDetection',
+		EXPIRES_AT,
+		unowned('keyed by iss/jti; belongs to no principal')
+	),
+	/*
+	 * Account-owned only. `authorizations` nests a clientId per entry, but no index reaches into a
+	 * sub-document and the entry is inert once its grant is destroyed, so client deletion deliberately
+	 * leaves it (see lib/helpers/cascade.ts).
+	 */
+	modelArea('Session', EXPIRES_AT, byAccount, [
 		{ key: { 'payload.uid': 1 }, unique: true }
 	]),
 	/*
@@ -164,26 +244,60 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 	 * challenges accumulated forever and a stale resend window could keep refusing a legitimate
 	 * resend. This pair is the defect the inventory exists to close.
 	 */
-	modelArea('VerificationChallenge', EXPIRES_AT),
-	modelArea('VerificationResend', EXPIRES_AT),
+	/*
+	 * Swept by accountId alone. `bucketId` would narrow nothing — an accountId is a nanoid, unique
+	 * across every bucket — and asking for it would cost a two-field sweep on the adapter forever.
+	 */
+	modelArea('VerificationChallenge', EXPIRES_AT, byAccount),
+	/*
+	 * Its id *is* `${bucketId}:${email}`, so the account cascade destroys it by computed id rather than
+	 * by scanning. That is also why the cascade must read the user's email before destroying the account
+	 * row: nothing else records it, and the obvious ordering skips this record with no error anywhere.
+	 */
+	modelArea(
+		'VerificationResend',
+		EXPIRES_AT,
+		unowned('addressed by the computed id `${bucketId}:${email}`, never swept')
+	),
 
 	/* Signing keys never expire; they are addressed by a unique kid. */
-	storeArea(STORE_AREAS.jwks, null, [{ key: { kid: 1 }, unique: true }]),
+	storeArea(
+		STORE_AREAS.jwks,
+		null,
+		unowned('server signing keys; no principal owns them'),
+		[{ key: { kid: 1 }, unique: true }]
+	),
 	/*
 	 * `clientIds` is not unique — a client belongs to one project, but nothing in the schema enforces
 	 * that. It is indexed because projectStore.findByClientId runs on every browser-origin request to
 	 * a client-based CORS endpoint, so the lookup has to be a point read rather than a scan.
 	 */
-	storeArea(STORE_AREAS.projects, null, [
-		{ key: { slug: 1 }, unique: true },
-		{ key: { clientIds: 1 } }
-	]),
-	storeArea(STORE_AREAS.userBuckets, null),
+	storeArea(
+		STORE_AREAS.projects,
+		null,
+		unowned(
+			'a container: guarded against deletion while occupied, never cascaded'
+		),
+		[{ key: { slug: 1 }, unique: true }, { key: { clientIds: 1 } }]
+	),
+	storeArea(
+		STORE_AREAS.userBuckets,
+		null,
+		unowned(
+			'a container: guarded against deletion while occupied, never cascaded'
+		)
+	),
 	/*
 	 * Safe to reap on `expiresAt` despite the two expiry fields: touch() clamps the sliding
 	 * `expiresAt` to `absoluteExpiresAt`, so it can never outlive the hard cap.
 	 */
-	storeArea(STORE_AREAS.adminSession, EXPIRES_AT),
+	storeArea(
+		STORE_AREAS.adminSession,
+		EXPIRES_AT,
+		unowned(
+			'operator sessions, out of scope: admin deletion deactivates, and revoking their sessions is a separate concern'
+		)
+	),
 	/*
 	 * Append-only and permanent: the constitution requires an immutable admin audit trail, so no expiry
 	 * on any of these — an entry is never removed.
@@ -199,15 +313,26 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 	 * redundant prefix of the first entry below. Reconciliation does not drop it, deliberately: only
 	 * expiry rules are safe to remove, since an unrecognised ordinary index may be an operator's.
 	 */
-	storeArea(STORE_AREAS.adminAudit, null, [
-		{ key: { timestamp: 1, _id: 1 } },
-		{ key: { actorId: 1, timestamp: 1 } },
-		{ key: { actorEmail: 1, timestamp: 1 } },
-		{ key: { action: 1, timestamp: 1 } },
-		{ key: { targetType: 1, targetId: 1, timestamp: 1 } },
-		{ key: { targetScope: 1, timestamp: 1 } }
-	]),
-	storeArea(STORE_AREAS.serviceConfig, null),
+	storeArea(
+		STORE_AREAS.adminAudit,
+		null,
+		unowned(
+			'append-only and immutable by constitution: no cascade may ever reach the trail'
+		),
+		[
+			{ key: { timestamp: 1, _id: 1 } },
+			{ key: { actorId: 1, timestamp: 1 } },
+			{ key: { actorEmail: 1, timestamp: 1 } },
+			{ key: { action: 1, timestamp: 1 } },
+			{ key: { targetType: 1, targetId: 1, timestamp: 1 } },
+			{ key: { targetScope: 1, timestamp: 1 } }
+		]
+	),
+	storeArea(
+		STORE_AREAS.serviceConfig,
+		null,
+		unowned('server configuration; no principal owns it')
+	),
 
 	perBucketArea
 ];
@@ -219,15 +344,37 @@ export const FIXED_AREAS: readonly StorageArea[] = STORAGE_INVENTORY.filter(
 	(area) => area.kind !== 'perBucket'
 );
 
+/* The fields a cascade sweeps an area by, in declaration order. */
+export function ownerFieldsOf(area: StorageArea): string[] {
+	return [area.owners.account, area.owners.client].filter(
+		(field): field is string => field !== null
+	);
+}
+
 /*
- * Every index an area should carry, expiry index included. The single place the expiry index is
- * derived, so the provisioning routine and the reconciliation comparison cannot disagree about what
- * "correct" means for an area.
+ * Every index an area should carry: its own, one per declared owner field, and the expiry index. The
+ * single place the derived ones are computed, so the provisioning routine and the reconciliation
+ * comparison cannot disagree about what "correct" means for an area — and so a field the deletion
+ * cascade sweeps by is always a field the datastore can find without a collection scan. Deriving beats
+ * hand-declaring for the same reason the ownership table does: an owner field added without its index
+ * would work, slowly, and announce nothing.
  */
 export function indexesFor(area: StorageArea): IndexSpec[] {
-	return area.reaped === null
-		? [...area.indexes]
-		: [...area.indexes, { key: { [area.reaped]: 1 }, expireAfterSeconds: 0 }];
+	return [
+		...area.indexes,
+		...ownerFieldsOf(area).map((field) => singleKeyIndex(`payload.${field}`)),
+		...(area.reaped === null
+			? []
+			: [{ ...singleKeyIndex(area.reaped), expireAfterSeconds: 0 }])
+	];
+}
+
+/* Built through a typed local rather than an object literal with a computed key, which widens `1` to
+ * `number` and stops matching IndexSpec. */
+function singleKeyIndex(field: string): IndexSpec {
+	const key: Record<string, 1> = {};
+	key[field] = 1;
+	return { key };
 }
 
 /* The concrete area for one bucket: the per-bucket index declarations under a real collection name. */

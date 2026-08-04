@@ -67,6 +67,17 @@ export class MongoAdapter<
 		await this.coll().deleteMany({ 'payload.grantId': grantId });
 	}
 
+	async destroyByOwner(field: string, value: string) {
+		/*
+		 * `field` is a declared inventory value, never caller input, and the drift guard proves each one
+		 * is a plain identifier — so this interpolation cannot produce an operator or a dotted path.
+		 */
+		const result = await this.coll().deleteMany({
+			[`payload.${field}`]: value
+		});
+		return result.deletedCount;
+	}
+
 	async consume(_id: string) {
 		await this.coll().findOneAndUpdate(
 			{ _id },

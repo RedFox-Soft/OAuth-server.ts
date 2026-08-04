@@ -7,7 +7,7 @@ import {
 import consumable from './mixins/consumable.js';
 import { authPayloadModel } from './mixins/stores_auth.js';
 
-const AuthorizationCodePayload = t.Composite([
+export const AuthorizationCodePayload = t.Composite([
 	BaseTokenPayload,
 	SessionBoundPayload,
 	authPayloadModel,

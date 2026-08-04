@@ -24,6 +24,17 @@ export interface ModelAdapter<TPayload = unknown> {
 	destroy(id: string): Promise<void>;
 	revokeByGrantId(grantId: string): Promise<void>;
 	consume(id: string): Promise<void>;
+	/*
+	 * Destroys every record in *this* area whose `field` equals `value`, returning how many went. The
+	 * one way to reach a principal's records: nothing else can enumerate by owner, and a grant walk
+	 * misses ClientCredentials (no grantId) and RegistrationAccessToken (no expiry) entirely.
+	 *
+	 * `field` always comes from lib/consts/storage_inventory.ts, never from a caller — which, with the
+	 * identifier check the drift guard applies to the table, is what keeps a `$`-prefixed or dotted name
+	 * from ever reaching a query. Field first in the signature so a value passed where a field belongs
+	 * cannot silently work.
+	 */
+	destroyByOwner(field: string, value: string): Promise<number>;
 }
 
 export interface ModelAdapterConstructor {
@@ -118,6 +129,12 @@ export interface UserStoreInstance {
 		patch: Partial<Pick<User, 'roles' | 'active' | 'password' | 'verified'>>
 	): Promise<User | null>;
 	destroy(id: string): Promise<void>;
+	/*
+	 * Destroys the area itself, called when its bucket is deleted — the half of bucket deletion that was
+	 * missing, which left a `user_<bucket>` collection behind for good. Only reached after the occupancy
+	 * guard has passed, so it never destroys a non-empty area.
+	 */
+	destroyArea(): Promise<void>;
 }
 
 export interface UserStoreConstructor {

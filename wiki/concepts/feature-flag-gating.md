@@ -89,6 +89,8 @@ classes serve both the gate and cross-origin policy.
 
 ## Related
 
+- [[deletion-and-revocation]] — the fourth use of this page's table-plus-drift-guard pattern, for storage ownership.
+- [[admin-plane-error-shape]] — `FeatureDisabled` is the precedent for recognising an error by a marker rather than a route.
 - [[event-bus]] — where refusals and other lifecycle signals are emitted.
 - [[client-identity-from-database]] — the registration endpoints this gate protects.
 - [[admin-audit-trail]] — reuses this page's declarative-table-plus-two-way-drift-guard pattern for

@@ -90,7 +90,7 @@ export const handler = async function authorizationCodeHandler(oidc, dPoP) {
 	}
 
 	if (code.payload.consumed) {
-		await revoke(oidc, code.payload.grantId);
+		await revoke(code.payload.grantId);
 		throw new InvalidGrant('authorization code already consumed');
 	}
 

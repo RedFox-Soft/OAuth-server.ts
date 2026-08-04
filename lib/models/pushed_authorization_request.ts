@@ -3,7 +3,7 @@ import consumable from './mixins/consumable.js';
 import { BaseModel, BaseModelPayload } from './base_model.js';
 import nanoid from 'lib/helpers/nanoid.js';
 
-const PushedAuthorizationRequestPayload = t.Composite([
+export const PushedAuthorizationRequestPayload = t.Composite([
 	BaseModelPayload,
 	t.Object({
 		request: t.String(),

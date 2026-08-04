@@ -90,4 +90,12 @@ export class UserStore implements UserStoreInstance {
 	async destroy(_id: string): Promise<void> {
 		this.users.delete(_id);
 	}
+
+	/*
+	 * Not a no-op just because there is no collection to drop: this store is cached per bucket id
+	 * (getUserStore), so a bucket re-created under a deleted bucket's id would inherit its users.
+	 */
+	async destroyArea(): Promise<void> {
+		this.users.clear();
+	}
 }

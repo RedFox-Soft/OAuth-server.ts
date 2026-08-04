@@ -9,6 +9,12 @@ import {
 	STORAGE_INVENTORY,
 	STORE_AREAS
 } from 'lib/consts/storage_inventory.js';
+import { grantable } from 'lib/adapters/memory/helpers.js';
+import {
+	OWNER_FIELDS,
+	PAYLOAD_SCHEMAS,
+	SCHEMA_EXEMPT_AREAS
+} from './payload_schemas.js';
 
 // The two-way drift guard over the provisioning inventory — the storage counterpart of
 // test/feature_gate/route_classification.spec.ts.
@@ -183,5 +189,121 @@ describe('storage inventory drift', () => {
 
 		expect(perBucket.length).toBe(1);
 		expect(FIXED_AREAS.length).toBe(STORAGE_INVENTORY.length - 1);
+	});
+});
+
+// The ownership half of the guard — specs/019-deletion-integrity/contracts/cascade-engine.md, G1..G7.
+//
+// The failure this exists to prevent is a storage area the server writes to that no deletion cascade
+// ever visits: its records outlive the principal they belong to, and nothing says so. A hand-written
+// cascade per entity fails exactly this way, silently, the first time an area is added — which is why
+// ownership is declared as data and read from one place.
+//
+// Fields are compared against each area's TypeBox schema properties, never against its source text:
+// lib/models/session.ts declares `clientId` inside its nested `authorizations` object, so a text scan
+// reports Session as client-owned when its top-level payload has no such field.
+
+const IDENTIFIER = /^[A-Za-z][A-Za-z0-9_]*$/;
+
+describe('storage ownership drift', () => {
+	it('declares ownership for every storage area', () => {
+		const undeclared = STORAGE_INVENTORY.filter((area) => !area.owners).map(
+			(area) => area.name
+		);
+
+		expect(undeclared).toEqual([]);
+	});
+
+	// `reason` is required exactly when nothing is owned, so "no owner" is always a decision someone
+	// wrote down rather than a field left blank — the same rule `reaped: null` already follows.
+	it('states a reason exactly when an area owns nothing', () => {
+		const wrong = STORAGE_INVENTORY.filter((area) => {
+			const owned = area.owners.account !== null || area.owners.client !== null;
+			const reasoned = (area.owners.reason ?? '').trim().length > 0;
+			return owned === reasoned;
+		}).map((area) => area.name);
+
+		expect(wrong).toEqual([]);
+	});
+
+	// Field names reach MongoDB as `payload.<field>`. Constraining them to plain identifiers is what
+	// makes it structurally impossible for a `$`-prefixed or dotted value to be interpreted as an
+	// operator or a path.
+	it('declares only plain identifiers as owner field names', () => {
+		const malformed = STORAGE_INVENTORY.flatMap((area) =>
+			[area.owners.account, area.owners.client]
+				.filter((field): field is string => field !== null)
+				.filter((field) => !IDENTIFIER.test(field))
+				.map((field) => `${area.name}.${field}`)
+		);
+
+		expect(malformed).toEqual([]);
+	});
+
+	it('declares only fields the area payload schema carries', () => {
+		const missing = STORAGE_INVENTORY.flatMap((area) => {
+			const schema = PAYLOAD_SCHEMAS[area.name];
+			if (!schema) return [];
+			return [area.owners.account, area.owners.client]
+				.filter((field): field is string => field !== null)
+				.filter((field) => !(field in schema.properties))
+				.map((field) => `${area.name}.${field}`);
+		});
+
+		expect(missing).toEqual([]);
+	});
+
+	// The reverse direction, and the half that rots silently: a payload that gained an owner field the
+	// table does not declare is an owned record no cascade sweeps.
+	it('declares every owner field the payload schemas carry', () => {
+		const undeclared = STORAGE_INVENTORY.flatMap((area) => {
+			const schema = PAYLOAD_SCHEMAS[area.name];
+			if (!schema || SCHEMA_EXEMPT_AREAS.has(area.name)) return [];
+			return OWNER_FIELDS.filter(
+				(field) =>
+					field in schema.properties &&
+					area.owners.account !== field &&
+					area.owners.client !== field
+			).map((field) => `${area.name}.${field}`);
+		});
+
+		expect(undeclared).toEqual([]);
+	});
+
+	// Guards the two checks above: without this, an area with no registered schema silently skips both.
+	it('registers a payload schema for every model area but the exempt ones', () => {
+		const unregistered = MODEL_AREAS.filter(
+			(area) => !SCHEMA_EXEMPT_AREAS.has(area) && !(area in PAYLOAD_SCHEMAS)
+		);
+		const stale = Object.keys(PAYLOAD_SCHEMAS).filter(
+			(area) => !MODEL_AREAS.includes(area as (typeof MODEL_AREAS)[number])
+		);
+
+		expect(unregistered).toEqual([]);
+		expect(stale).toEqual([]);
+	});
+
+	// The cascade engine resolves a sweep through `adapter()`, which only serves model areas, so it
+	// filters to those. This is what stops that filter from ever quietly dropping an owned area.
+	it('declares owners only on model areas', () => {
+		const misplaced = STORAGE_INVENTORY.filter(
+			(area) =>
+				area.kind !== 'model' &&
+				(area.owners.account !== null || area.owners.client !== null)
+		).map((area) => `${area.name} (${area.kind})`);
+
+		expect(misplaced).toEqual([]);
+	});
+
+	// `grantable` decides which areas the in-memory adapter indexes under `grant:<id>`, and the
+	// `payload.grantId` index specs decide which areas MongoDB can revoke by grant. Two enumerations of
+	// one fact; this keeps them equal. (revoke() is the third — single-sourcing all three means deriving
+	// an index from a declaration, deferred deliberately: see research D8.)
+	it('keeps the memory grant index aligned with the grant-indexed areas', () => {
+		const grantIndexed = STORAGE_INVENTORY.filter((area) =>
+			area.indexes.some((index) => 'payload.grantId' in index.key)
+		).map((area) => area.name);
+
+		expect([...grantable].sort()).toEqual(grantIndexed.sort());
 	});
 });

@@ -293,8 +293,13 @@ export function Clients({
 										Rotate secret
 									</Button>
 								)}
+								{/* States the consequence rather than asking for confirmation of an unstated one:
+								    deleting a client destroys every credential it ever issued, and the invisible
+								    half of that is what an operator cannot otherwise see. */}
 								<Popconfirm
 									title="Delete this client?"
+									description="Its access, refresh and machine-to-machine tokens, pending codes, consent records and its own registration credential are all destroyed immediately."
+									okText="Delete and revoke"
 									onConfirm={() => onDelete(row.clientId)}
 								>
 									<Button

@@ -5,6 +5,7 @@ import {
 	assertAuth,
 	assertProjectAccess,
 	AdminError,
+	adminErrorBody,
 	resolveAdmin,
 	type AdminContext
 } from '../auth/rbac.js';
@@ -18,6 +19,7 @@ import {
 	deleteClientRecord
 } from './service.js';
 import { recordAdminAudit } from '../audit/record.js';
+import { cascadeForClient } from '../../helpers/cascade.js';
 import nanoid from '../../helpers/nanoid.js';
 
 // Load a REGULAR project the caller may access, or throw. Client management never
@@ -44,7 +46,7 @@ export const clientRoutes = new Elysia({ name: 'admin-clients' })
 	.onError(({ error, set }) => {
 		if (error instanceof AdminError) {
 			set.status = error.status;
-			return { error: 'admin_error', message: error.message };
+			return adminErrorBody(error);
 		}
 		// Client metadata validation failure → 422.
 		if (error instanceof InvalidClientMetadata) {
@@ -127,6 +129,23 @@ export const clientRoutes = new Elysia({ name: 'admin-clients' })
 			await getProjectStore().update(params.id, {
 				clientIds: project.clientIds.filter((c) => c !== params.clientId)
 			});
-			return { ok: true };
+			/*
+			 * Audit, then destroy the principal, then cascade — and "destroy the principal" is both the
+			 * record delete and the unlink above, so the sweep runs after both rather than between them:
+			 * the client is not gone from the admin plane until neither half of it remains.
+			 *
+			 * A sweep that fails partway is answered, not rolled back. The client is already gone, so a
+			 * repeated DELETE answers 404, and the residue is bounded by each area's own TTL because the
+			 * one area that can outlive a failure is swept first. Closing the door first is the point.
+			 */
+			const cascade = await cascadeForClient(params.clientId);
+			if (cascade.failedAreas.length > 0) {
+				throw new AdminError(
+					500,
+					`client deleted, but its records survive in: ${cascade.failedAreas.join(', ')}`,
+					{ failedAreas: cascade.failedAreas }
+				);
+			}
+			return { ok: true, destroyed: cascade.destroyed };
 		}
 	);

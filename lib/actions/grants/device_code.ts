@@ -58,7 +58,7 @@ export const handler = async function deviceCodeHandler(oidc, dPoP) {
 	}
 
 	if (code.payload.consumed) {
-		await revoke(oidc, code.payload.grantId);
+		await revoke(code.payload.grantId);
 		throw new InvalidGrant('device code already consumed');
 	}
 

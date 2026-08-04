@@ -3,6 +3,7 @@ import {
 	assertAuth,
 	assertRole,
 	AdminError,
+	adminErrorBody,
 	resolveAdmin,
 	type AdminContext
 } from '../auth/rbac.js';
@@ -16,7 +17,7 @@ export const jwksRoutes = new Elysia({ name: 'admin-jwks' })
 	.onError(({ error, set }) => {
 		if (error instanceof AdminError) {
 			set.status = error.status;
-			return { error: 'admin_error', message: error.message };
+			return adminErrorBody(error);
 		}
 	})
 	.get('/admin/api/jwks', async ({ admin }) => {

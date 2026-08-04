@@ -7,7 +7,7 @@ import {
 import consumable from './mixins/consumable.ts';
 import { authPayloadModel } from './mixins/stores_auth.js';
 
-const BackchannelAuthenticationRequestPayload = t.Composite([
+export const BackchannelAuthenticationRequestPayload = t.Composite([
 	BaseTokenPayload,
 	SessionBoundPayload,
 	authPayloadModel,

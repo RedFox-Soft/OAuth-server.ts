@@ -111,13 +111,62 @@ export class MemoryAdapter<
 		});
 	}
 
+	/*
+	 * Per-collection, matching MongoAdapter: deletes only the keys bearing this model's own prefix and
+	 * leaves the rest of the index for the other models to claim. Before, this deleted every key under
+	 * `grant:<id>` and dropped the index, so the first of revoke()'s five calls wiped all five areas and
+	 * the other four no-op'd against a missing index — the same method meaning two different things per
+	 * adapter. No migration is needed: the index has always stored full model-prefixed keys.
+	 */
 	async revokeByGrantId(grantId: string) {
 		const grantKey = grantKeyFor(grantId);
 		const storage = getStorage<AdapterStoreValue<TModelName>>();
 		const grant = storage.get<string[]>(grantKey);
-		if (grant) {
-			grant.forEach((token: string) => storage.delete(token));
-			storage.delete(grantKey);
+		if (!grant) {
+			return;
 		}
+
+		const prefix = `${this.model}:`;
+		const remaining: string[] = [];
+		for (const key of grant) {
+			if (key.startsWith(prefix)) {
+				storage.delete(key);
+			} else {
+				remaining.push(key);
+			}
+		}
+
+		if (remaining.length === 0) {
+			storage.delete(grantKey);
+		} else {
+			storage.set<string[]>(grantKey, remaining);
+		}
+	}
+
+	async destroyByOwner(field: string, value: string) {
+		const storage = getStorage<AdapterStoreValue<TModelName>>();
+		const prefix = `${this.model}:`;
+		/*
+		 * Snapshot before deleting: iterating a store while removing from it is undefined, and the Set
+		 * also collapses the duplicate a QuickLRU can yield from its two internal caches.
+		 */
+		const keys = new Set(storage.keys());
+
+		let destroyed = 0;
+		for (const key of keys) {
+			if (!key.startsWith(prefix)) {
+				continue;
+			}
+			const stored = storage.get<PayloadForModel<TModelName>>(key);
+			/* Expired but not yet evicted — already gone as far as any reader is concerned. */
+			if (!stored) {
+				continue;
+			}
+			if (getStringField(stored, field) === value) {
+				storage.delete(key);
+				destroyed += 1;
+			}
+		}
+		return destroyed;
 	}
 }

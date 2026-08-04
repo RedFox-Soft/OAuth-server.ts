@@ -4,6 +4,7 @@ import type { UserBucket } from '../../adapters/types.js';
 import {
 	assertAuth,
 	AdminError,
+	adminErrorBody,
 	resolveAdmin,
 	type AdminContext
 } from '../auth/rbac.js';
@@ -14,6 +15,7 @@ import {
 	ResetPasswordBody
 } from './schema.js';
 import { recordAdminAudit } from '../audit/record.js';
+import { cascadeForAccount } from '../../helpers/cascade.js';
 import nanoid from '../../helpers/nanoid.js';
 
 function assertRolesSubset(
@@ -40,7 +42,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 	.onError(({ error, set }) => {
 		if (error instanceof AdminError) {
 			set.status = error.status;
-			return { error: 'admin_error', message: error.message };
+			return adminErrorBody(error);
 		}
 	})
 	.get('/admin/api/buckets/:id/users', async ({ admin, params }) => {
@@ -117,12 +119,28 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 		const ctx = assertAuth(admin as AdminContext | null);
 		await loadBucketForUsers(ctx, params.id);
 		const store = getUserStore(params.id);
-		if (!(await store.find(params.uid))) {
+		const user = await store.find(params.uid);
+		if (!user) {
 			throw new AdminError(404, 'user not found');
 		}
+		/*
+		 * The email is read here, before the row goes, because VerificationResend is addressed by
+		 * `${bucketId}:${email}` and nothing else records it. Destroy first and that record is
+		 * unreachable — skipped in silence, with no error anywhere to notice.
+		 */
+		const resendId = user.email ? `${params.id}:${user.email}` : null;
 		await recordAdminAudit(ctx, 'enduser.delete', params.uid, {
 			targetScope: params.id
 		});
 		await store.destroy(params.uid);
-		return { ok: true };
+		/* Audit, then destroy the principal, then cascade; a failed sweep is reported, never rolled back. */
+		const cascade = await cascadeForAccount(params.uid, resendId);
+		if (cascade.failedAreas.length > 0) {
+			throw new AdminError(
+				500,
+				`user deleted, but their records survive in: ${cascade.failedAreas.join(', ')}`,
+				{ failedAreas: cascade.failedAreas }
+			);
+		}
+		return { ok: true, destroyed: cascade.destroyed };
 	});

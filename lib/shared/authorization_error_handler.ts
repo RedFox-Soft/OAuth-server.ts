@@ -96,9 +96,31 @@ const mapErrorCode = {
 	[routeNames.revocation]: 'revocation.error'
 };
 
+/*
+ * An error raised by the administrative control plane, recognised by a marker on the error rather than
+ * by the request path — the same choice the FeatureDisabled branch below explains.
+ *
+ * Duck-typed on purpose: importing AdminError would pull the admin graph into the protocol error path,
+ * for a check that only needs to know whose error this is.
+ */
+function isAdminPlaneError(error: unknown): boolean {
+	return typeof error === 'object' && error !== null && 'adminPlane' in error;
+}
+
 export async function errorHandler(obj: ErrorContext) {
 	const { set, route, code, request } = obj;
 	let { error } = obj;
+
+	/*
+	 * The admin plane answers in its own shape (`{ error: 'admin_error', message, … }`) and has its own
+	 * onError to do it. This handler is registered on the root app before adminApp is mounted, so without
+	 * this exit it answered first and every admin API error reached the caller as an OAuth
+	 * `server_error` body — correct status, wrong shape, message gone. Returning nothing hands the error
+	 * to the admin group's handler, which is the one that knows what to say.
+	 */
+	if (isAdminPlaneError(error)) {
+		return;
+	}
 	// Elysia's not-found carries its own status but does not assign set.status before onError runs, so
 	// the HTML branch below rendered every missing route as a 200 page titled "200". Applies to a
 	// feature-gate refusal and a genuinely unrouted request alike, which is what keeps the two

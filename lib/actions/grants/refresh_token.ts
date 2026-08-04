@@ -133,7 +133,7 @@ export const handler = async function refreshTokenHandler(oidc, dPoP) {
 	if (refreshToken.payload.consumed) {
 		await Promise.all([
 			refreshToken.destroy(),
-			revoke(oidc, refreshToken.payload.grantId)
+			revoke(refreshToken.payload.grantId)
 		]);
 		throw new InvalidGrant('refresh token already used');
 	}

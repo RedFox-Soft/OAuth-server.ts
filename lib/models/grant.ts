@@ -12,7 +12,7 @@ const NON_REJECTABLE_CLAIMS = new Set([
 	'iss'
 ]);
 
-const GrantPayload = t.Composite([
+export const GrantPayload = t.Composite([
 	BaseTokenPayload,
 	t.Object({
 		accountId: t.Optional(t.String()),

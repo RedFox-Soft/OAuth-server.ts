@@ -6,6 +6,7 @@ import {
 	assertProjectAccess,
 	assertBucketAccess,
 	AdminError,
+	adminErrorBody,
 	resolveAdmin,
 	type AdminContext
 } from '../auth/rbac.js';
@@ -19,6 +20,7 @@ import {
 	normalizeOrigins
 } from '../../helpers/cors_origin.js';
 import { recordAdminAudit } from '../audit/record.js';
+import { Client } from '../../models/client.js';
 import nanoid from '../../helpers/nanoid.js';
 
 async function loadProject(id: string) {
@@ -51,7 +53,7 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 	.onError(({ error, set }) => {
 		if (error instanceof AdminError) {
 			set.status = error.status;
-			return { error: 'admin_error', message: error.message };
+			return adminErrorBody(error);
 		}
 	})
 	.get('/admin/api/projects', async ({ admin }) => {
@@ -125,6 +127,28 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 		const project = await loadProject(params.id);
 		if (project.type === 'admin')
 			throw new AdminError(403, 'cannot delete admin project');
+		/*
+		 * A project is guarded rather than cascaded: its clients are things the operator can see and name,
+		 * so refusing says exactly what is in the way and leaves one audit entry per client actually
+		 * destroyed. Only ids that still *resolve* block — an id left behind after its client vanished
+		 * must never make a project permanently undeletable — and a refused request prunes nothing,
+		 * because a conflict changes nothing at all.
+		 *
+		 * An assigned bucket is deliberately not a blocker: buckets are shared and outlive projects.
+		 */
+		const held = (
+			await Promise.all(
+				project.clientIds.map(async (clientId) =>
+					(await Client.tryFind(clientId)) ? clientId : null
+				)
+			)
+		).filter((clientId): clientId is string => clientId !== null);
+		if (held.length > 0) {
+			throw new AdminError(409, 'project still holds clients', {
+				blockers: [{ kind: 'client', count: held.length, ids: held }]
+			});
+		}
+		// After the guard: an entry for a request the 409 refused would describe a deletion never attempted.
 		await recordAdminAudit(ctx, 'project.delete', params.id);
 		await getProjectStore().destroy(params.id);
 		return { ok: true };
