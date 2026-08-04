@@ -32,6 +32,12 @@ import { DeviceCode } from 'lib/models/device_code.js';
 import { Interaction } from 'lib/models/interaction.js';
 import { getUserStore, getBucketStore } from 'lib/adapters/index.js';
 import { issueAndSend } from 'lib/verification/challenge.js';
+import { request as requestPasswordReset } from 'lib/password_reset/challenge.js';
+import {
+	resetRequestPage,
+	resetRequestAcceptedPage,
+	resetRateLimitedPage
+} from './resetPages.js';
 import { Grant } from 'lib/models/grant.js';
 import { Client } from 'lib/models/client.js';
 import { responseModes } from 'lib/response_modes/index.js';
@@ -206,6 +212,41 @@ export const ui = new Elysia()
 				username: t.String(),
 				password: t.String(),
 				remember: t.Optional(t.Literal('on'))
+			})
+		}
+	)
+	.get('ui/:uid/forgot-password', async ({ params: { uid } }) =>
+		resetRequestPage(uid)
+	)
+	.post(
+		'ui/:uid/forgot-password',
+		async ({ body, params: { uid }, interaction }) => {
+			const clientId = (
+				interaction.payload.params as { client_id?: string } | undefined
+			)?.client_id;
+			/*
+			 * The bucket comes from the client that started this interaction, never from the request. A
+			 * `client_id` taken from the form would let anyone aim the lookup at any bucket, which turns a
+			 * reset form into a cross-bucket address prober.
+			 */
+			const bucketId = await resolveBucketForClient(clientId);
+			const outcome = await requestPasswordReset(body.email, bucketId);
+
+			if (!outcome.ok) {
+				return resetRateLimitedPage(
+					outcome.reason === 'cooldown'
+						? 'Please wait a moment before requesting another reset email.'
+						: 'You have requested too many reset emails today. Please try again later.'
+				);
+			}
+
+			// One page for every accepted outcome — sent or not. A response that varied would answer "does
+			// this address have an account here?" for anyone who asked.
+			return resetRequestAcceptedPage();
+		},
+		{
+			body: t.Object({
+				email: t.String()
 			})
 		}
 	)

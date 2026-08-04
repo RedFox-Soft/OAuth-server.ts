@@ -124,17 +124,18 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 			throw new AdminError(404, 'user not found');
 		}
 		/*
-		 * The email is read here, before the row goes, because VerificationResend is addressed by
-		 * `${bucketId}:${email}` and nothing else records it. Destroy first and that record is
-		 * unreachable — skipped in silence, with no error anywhere to notice.
+		 * The email is read here, before the row goes, because the email-scoped areas (VerificationResend,
+		 * PasswordResetThrottle) are addressed by `${bucketId}:${email}` and nothing else records it.
+		 * Destroy first and those records are unreachable — skipped in silence, with no error anywhere to
+		 * notice.
 		 */
-		const resendId = user.email ? `${params.id}:${user.email}` : null;
+		const emailScopedId = user.email ? `${params.id}:${user.email}` : null;
 		await recordAdminAudit(ctx, 'enduser.delete', params.uid, {
 			targetScope: params.id
 		});
 		await store.destroy(params.uid);
 		/* Audit, then destroy the principal, then cascade; a failed sweep is reported, never rolled back. */
-		const cascade = await cascadeForAccount(params.uid, resendId);
+		const cascade = await cascadeForAccount(params.uid, emailScopedId);
 		if (cascade.failedAreas.length > 0) {
 			throw new AdminError(
 				500,

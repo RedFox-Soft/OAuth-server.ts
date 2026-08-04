@@ -65,6 +65,12 @@ destroy, then cascade — skips that record, leaves no error anywhere, and looks
 does not assert it specifically. `cascadeForAccount` takes the already-computed id rather than the bucket
 and account precisely so the ordering is visible in its signature.
 
+This turned out to be a pattern rather than a one-off. `PasswordResetThrottle`
+([[self-service-password-reset]]) is keyed identically, so the parameter was renamed from
+`verificationResendId` to `emailScopedId` and the engine now destroys that id across a small list of
+email-scoped areas — the area names staying in the engine, as every other area name does. A second
+parameter per area would have duplicated the ordering hazard; the third such area needs no signature change.
+
 ## `revokeByGrantId` meant two different things per adapter
 
 - **Mongo**: `deleteMany({'payload.grantId': id})` — only its own collection.

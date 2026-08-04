@@ -9,3 +9,7 @@ export function buildUILoginPath(uid: string) {
 export function buildUIRegistrationPath(uid: string) {
 	return buildUIPath(uid, 'registration');
 }
+
+export function buildUIForgotPasswordPath(uid: string) {
+	return buildUIPath(uid, 'forgot-password');
+}

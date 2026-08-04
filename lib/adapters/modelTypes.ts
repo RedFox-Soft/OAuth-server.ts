@@ -7,6 +7,10 @@ import type { DeviceCodePayloadType } from '../models/device_code.js';
 import type { GrantPayloadType } from '../models/grant.js';
 import type { InitialAccessTokenPayloadType } from '../models/initial_access_token.js';
 import type { InteractionPayloadType } from '../models/interaction.js';
+import type {
+	PasswordResetChallengePayload,
+	PasswordResetThrottlePayload
+} from '../password_reset/types.js';
 import type { PushedAuthorizationRequestPayloadType } from '../models/pushed_authorization_request.js';
 import type { RefreshTokenPayload } from '../models/refresh_token.js';
 import type { RegistrationAccessTokenPayloadType } from '../models/registration_access_token.js';
@@ -43,6 +47,8 @@ export interface ModelPayloadByName {
 	Grant: GrantPayloadType;
 	InitialAccessToken: InitialAccessTokenPayloadType;
 	Interaction: InteractionPayloadType;
+	PasswordResetChallenge: PasswordResetChallengePayload;
+	PasswordResetThrottle: PasswordResetThrottlePayload;
 	PushedAuthorizationRequest: PushedAuthorizationRequestPayloadType;
 	RefreshToken: RefreshTokenPayload;
 	RegistrationAccessToken: RegistrationAccessTokenPayloadType;

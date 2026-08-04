@@ -35,6 +35,7 @@ import { corsPreflight } from './plugins/cors.js';
 import { InvalidDpopProof, UseDpopNonce } from './helpers/validate_dpop.js';
 import { adminApp } from './admin/index.js';
 import { verificationRoutes } from './routes/verification.js';
+import { passwordResetRoutes } from './routes/password_reset.js';
 
 export const elysia = new Elysia({ strictPath: true, normalize: false })
 	.error({
@@ -106,5 +107,6 @@ export const elysia = new Elysia({ strictPath: true, normalize: false })
 	.use(userinfo)
 	.use(ui)
 	.use(verificationRoutes)
+	.use(passwordResetRoutes)
 	.use(adminApp)
 	.listen(3000);

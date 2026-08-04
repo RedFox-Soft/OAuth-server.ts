@@ -1,5 +1,5 @@
 import { adapter } from 'lib/adapters/index.js';
-import { STORAGE_INVENTORY } from 'lib/consts/storage_inventory.js';
+import { STORAGE_INVENTORY, areaNamed } from 'lib/consts/storage_inventory.js';
 
 /*
  * The one deletion cascade. Every area it touches comes from the ownership declaration in
@@ -31,6 +31,14 @@ export interface CascadeResult {
  * rather than hopeful.
  */
 const UNBOUNDED_AREA = 'RegistrationAccessToken';
+
+/*
+ * Areas addressed by the computed id `${bucketId}:${email}` rather than found by an owner field. They are
+ * listed here, in the engine, for the same reason every other area name is: a call site that named them
+ * would be a call site to forget when a third one arrives. Both are keyed identically, which is why one
+ * computed id serves both — see cascadeForAccount on why the caller must compute it first.
+ */
+const EMAIL_SCOPED_AREAS = ['VerificationResend', 'PasswordResetThrottle'];
 
 interface AreaSweep {
 	readonly area: string;
@@ -84,6 +92,34 @@ function merge(...results: readonly CascadeResult[]): CascadeResult {
 	};
 }
 
+/*
+ * Every sign-in session belonging to this account, and nothing else — what a password reset owes the user
+ * whose credential just changed.
+ *
+ * Lives here rather than at the call site so the swept field still comes from the declaration and the area
+ * name stays with the two others this module already knows. It is deliberately neither a narrowed
+ * cascadeForAccount nor something cascadeForAccount is rebuilt on: a deletion sweeps everything the
+ * principal owns, a reset sweeps sessions, and conflating the two is how a password change would start
+ * destroying consent records.
+ */
+export async function endSessionsForAccount(
+	accountId: string
+): Promise<CascadeResult> {
+	const area = areaNamed('Session');
+	const field = area.owners.account;
+	if (field === null) {
+		/* Unreachable while the inventory declares Session account-owned; a loud stop beats a silent no-op. */
+		throw new Error('the Session area declares no account owner to sweep by');
+	}
+
+	return runSweeps([
+		{
+			area: area.name,
+			run: () => adapter(area.name).destroyByOwner(field, accountId)
+		}
+	]);
+}
+
 /* Every record naming this client as its owner, across every area that declares a client owner. */
 export async function cascadeForClient(
 	clientId: string
@@ -101,33 +137,34 @@ export async function cascadeForClient(
 }
 
 /*
- * Every record naming this account as its owner, plus the one record that is addressed rather than
- * scanned.
+ * Every record naming this account as its owner, plus the records that are addressed rather than scanned.
  *
- * `verificationResendId` is `${bucketId}:${email}` and must be computed by the caller *before* it
- * destroys the account row — nothing else records the email, so the obvious ordering (destroy, then
- * cascade) skips that record and raises no error anywhere. Taking the already-computed id, rather than
- * the bucket and the account, is what makes that ordering visible in the signature: this function cannot
- * be called correctly after the account is gone.
+ * `emailScopedId` is `${bucketId}:${email}` and must be computed by the caller *before* it destroys the
+ * account row — nothing else records the email, so the obvious ordering (destroy, then cascade) skips those
+ * records and raises no error anywhere. Taking the already-computed id, rather than the bucket and the
+ * account, is what makes that ordering visible in the signature: this function cannot be called correctly
+ * after the account is gone.
  */
 export async function cascadeForAccount(
 	accountId: string,
-	verificationResendId: string | null
+	emailScopedId: string | null
 ): Promise<CascadeResult> {
 	const sweeps: AreaSweep[] = ownerSweeps('account', accountId);
 
-	if (verificationResendId !== null) {
-		sweeps.push({
-			area: 'VerificationResend',
-			run: async () => {
-				const store = adapter('VerificationResend');
-				/* Read first only so the count is honest; destroy is a no-op on a missing id either way. */
-				const existing = await store.find(verificationResendId);
-				if (!existing) return 0;
-				await store.destroy(verificationResendId);
-				return 1;
-			}
-		});
+	if (emailScopedId !== null) {
+		for (const area of EMAIL_SCOPED_AREAS) {
+			sweeps.push({
+				area,
+				run: async () => {
+					const store = adapter(area);
+					/* Read first only so the count is honest; destroy is a no-op on a missing id either way. */
+					const existing = await store.find(emailScopedId);
+					if (!existing) return 0;
+					await store.destroy(emailScopedId);
+					return 1;
+				}
+			});
+		}
 	}
 
 	return runSweeps(sweeps);

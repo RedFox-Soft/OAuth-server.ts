@@ -5,7 +5,11 @@ import {
 	GoogleOutlined,
 	ExclamationCircleOutlined
 } from '@ant-design/icons';
-import { buildUILoginPath, buildUIRegistrationPath } from './buildUIPath.js';
+import {
+	buildUILoginPath,
+	buildUIRegistrationPath,
+	buildUIForgotPasswordPath
+} from './buildUIPath.js';
 
 export function LoginPage({
 	uid,
@@ -111,7 +115,7 @@ export function LoginPage({
 							>
 								<Checkbox name="remember">Remember me</Checkbox>
 							</Form.Item>
-							<a href="">Forgot password</a>
+							<a href={buildUIForgotPasswordPath(uid)}>Forgot password</a>
 						</Flex>
 					</Form.Item>
 

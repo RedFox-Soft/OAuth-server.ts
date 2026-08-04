@@ -7,6 +7,11 @@ import type {
 } from '../adapters/types.js';
 import { ISSUER } from '../configs/env.js';
 import epochTime from '../helpers/epoch_time.js';
+import {
+	rateRefusal,
+	nextRateFields,
+	type RateBounds
+} from '../helpers/rate_window.js';
 import { sendVerificationEmail } from '../mail/send.js';
 import {
 	LINK_TTL_SECONDS,
@@ -53,26 +58,14 @@ export function verifyUrlFor(token: string): string {
 	return `${ISSUER}/verify-email?token=${encodeURIComponent(token)}`;
 }
 
-// Compute the resend rate-limit fields for the next send. When `bump` is set, this send
-// counts against the cooldown/daily-cap window (resend path); otherwise the counters are
-// carried over unchanged (initial registration send).
-function nextRateFields(prior: ResendRecord | undefined, bump: boolean) {
-	const now = epochTime();
-	if (!bump) {
-		return {
-			lastSentAt: prior?.lastSentAt ?? 0,
-			dayCount: prior?.dayCount ?? 0,
-			windowStart: prior?.windowStart ?? now
-		};
-	}
-	const windowExpired =
-		!prior || now - prior.windowStart >= RESEND_WINDOW_SECONDS;
-	return {
-		lastSentAt: now,
-		dayCount: windowExpired ? 1 : prior.dayCount + 1,
-		windowStart: windowExpired ? now : prior.windowStart
-	};
-}
+// This flow's bounds for the shared window arithmetic (lib/helpers/rate_window.ts). The arithmetic is
+// shared with the password-reset request because it is a security rule; the numbers stay here because the
+// two flows limit different things.
+const RESEND_BOUNDS: RateBounds = {
+	cooldownSeconds: RESEND_COOLDOWN_SECONDS,
+	cap: RESEND_DAILY_CAP,
+	windowSeconds: RESEND_WINDOW_SECONDS
+};
 
 // Issue a fresh challenge for the account, superseding any outstanding one, and deliver
 // the verification email. Throws if delivery fails. Returns the challenge id (the link
@@ -109,7 +102,12 @@ export async function issueAndSend(
 		ttl
 	);
 
-	const rate = nextRateFields(prior, opts.bumpRate ?? false);
+	const rate = nextRateFields(
+		prior,
+		epochTime(),
+		RESEND_BOUNDS,
+		opts.bumpRate ?? false
+	);
 	await resends().upsert(
 		key,
 		{ ...rate, challengeId: id, exp: epochTime() + RESEND_WINDOW_SECONDS },
@@ -195,15 +193,9 @@ export async function resend(ref: string): Promise<ResendOutcome> {
 	const { bucketId, accountId, email } = challenge;
 	const prior = (await resends().find(resendKey(bucketId, email))) as
 		ResendRecord | undefined;
-	const now = epochTime();
-	if (prior) {
-		if (now - prior.lastSentAt < RESEND_COOLDOWN_SECONDS) {
-			return { ok: false, reason: 'cooldown' };
-		}
-		const windowActive = now - prior.windowStart < RESEND_WINDOW_SECONDS;
-		if (windowActive && prior.dayCount >= RESEND_DAILY_CAP) {
-			return { ok: false, reason: 'daily' };
-		}
+	const refusal = rateRefusal(prior, epochTime(), RESEND_BOUNDS);
+	if (refusal) {
+		return { ok: false, reason: refusal };
 	}
 
 	const bucket = await getBucketStore().find(bucketId);

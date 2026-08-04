@@ -71,6 +71,8 @@ export const MODEL_AREAS = [
 	'Grant',
 	'InitialAccessToken',
 	'Interaction',
+	'PasswordResetChallenge',
+	'PasswordResetThrottle',
 	'PushedAuthorizationRequest',
 	'RefreshToken',
 	'RegistrationAccessToken',
@@ -212,6 +214,23 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 		unowned('deliberately not client-bound; the schema omits clientId')
 	),
 	modelArea('Interaction', EXPIRES_AT, byAccount),
+	/*
+	 * The self-service password reset's two areas. The challenge is account-owned rather than merely
+	 * expiring: an outstanding secret can take the account over, so it must not outlive the account it
+	 * names — sweeping it is the declaration, not code somewhere else. Its record id is a digest of the
+	 * emailed token, so an id here reveals nothing and the ownership index is the only way in.
+	 */
+	modelArea('PasswordResetChallenge', EXPIRES_AT, byAccount),
+	/*
+	 * Request counters, addressed by `${bucketId}:${email}` exactly as VerificationResend is — which is
+	 * what lets the account cascade destroy both from the one id it computes before the account row goes.
+	 * Owns nothing: it exists for an address, which may have no account yet or any more.
+	 */
+	modelArea(
+		'PasswordResetThrottle',
+		EXPIRES_AT,
+		unowned('addressed by the computed id `${bucketId}:${email}`, never swept')
+	),
 	modelArea(
 		'PushedAuthorizationRequest',
 		EXPIRES_AT,

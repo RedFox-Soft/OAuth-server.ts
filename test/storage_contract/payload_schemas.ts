@@ -22,6 +22,10 @@ import { DeviceCodePayload } from 'lib/models/device_code.js';
 import { GrantPayload } from 'lib/models/grant.js';
 import { InitialAccessTokenPayload } from 'lib/models/initial_access_token.js';
 import { InteractionPayload } from 'lib/models/interaction.js';
+import {
+	PasswordResetChallengePayload,
+	PasswordResetThrottlePayload
+} from 'lib/password_reset/types.js';
 import { PushedAuthorizationRequestPayload } from 'lib/models/pushed_authorization_request.js';
 import { RefreshTokenSchema } from 'lib/models/refresh_token.js';
 import { RegistrationAccessTokenPayload } from 'lib/models/registration_access_token.js';
@@ -45,6 +49,8 @@ export const PAYLOAD_SCHEMAS: Readonly<Record<string, ReadableSchema>> = {
 	Grant: GrantPayload,
 	InitialAccessToken: InitialAccessTokenPayload,
 	Interaction: InteractionPayload,
+	PasswordResetChallenge: PasswordResetChallengePayload,
+	PasswordResetThrottle: PasswordResetThrottlePayload,
 	PushedAuthorizationRequest: PushedAuthorizationRequestPayload,
 	RefreshToken: RefreshTokenSchema,
 	RegistrationAccessToken: RegistrationAccessTokenPayload,

@@ -112,6 +112,9 @@ export const alwaysAvailableRoutes: readonly AlwaysAvailableRoute[] = [
 export const alwaysAvailablePrefixes: readonly string[] = [
 	'/ui',
 	'/verify-email',
+	// Self-service password reset. Part of the end-user interaction surface, which is unconditional by
+	// design: a user locked out of their account cannot be asked to wait for a capability toggle.
+	'/reset-password',
 	'/admin',
 	'/public'
 ];

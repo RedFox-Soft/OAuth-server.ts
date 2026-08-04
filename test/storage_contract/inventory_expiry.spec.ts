@@ -26,6 +26,8 @@ const REAPED_ON_EXPIRES_AT = [
 	'Grant',
 	'InitialAccessToken',
 	'Interaction',
+	'PasswordResetChallenge',
+	'PasswordResetThrottle',
 	'PushedAuthorizationRequest',
 	'RefreshToken',
 	'RegistrationAccessToken',

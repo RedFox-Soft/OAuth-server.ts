@@ -197,6 +197,43 @@ describe('deletion cascade: end-user', () => {
 		expect(await adapter('VerificationResend').find(resendId)).toBeUndefined();
 	});
 
+	/*
+	 * The reset secret is owner-swept like any other account-owned area; its throttle counters are the
+	 * second record addressed by `${bucketId}:${email}` rather than found, so it fails the same silent way
+	 * scenario 6 does if the id is computed after the account row is gone. Asserted separately for that
+	 * reason (specs/020-enduser-password-reset, contracts/storage-and-cascade.md S2).
+	 */
+	it('destroys an outstanding password reset secret and its counters', async () => {
+		const { bucketId, uid, email } = await endUser();
+		const ttl = 300;
+		await adapter('PasswordResetChallenge').upsert(
+			`prc-${uid}`,
+			{ accountId: uid, bucketId, email, exp: epochTime() + ttl } as never,
+			ttl
+		);
+		const throttleId = `${bucketId}:${email}`;
+		await adapter('PasswordResetThrottle').upsert(
+			throttleId,
+			{
+				lastSentAt: epochTime(),
+				dayCount: 1,
+				windowStart: epochTime(),
+				exp: epochTime() + ttl
+			} as never,
+			ttl
+		);
+
+		const res = await deleteUser(bucketId, uid);
+		expect(res.status).toBe(200);
+
+		expect(
+			await adapter('PasswordResetChallenge').find(`prc-${uid}`)
+		).toBeUndefined();
+		expect(
+			await adapter('PasswordResetThrottle').find(throttleId)
+		).toBeUndefined();
+	});
+
 	it('leaves an account in another bucket untouched (scenario 7)', async () => {
 		const mine = await endUser();
 		const theirs = await endUser();

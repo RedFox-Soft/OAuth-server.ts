@@ -1,5 +1,6 @@
 import type { VerificationMethod } from '../adapters/types.js';
 import { deliver } from './mailer.js';
+import { passwordResetEmail } from './templates/password_reset.js';
 import {
 	verificationLinkEmail,
 	verificationCodeEmail
@@ -25,4 +26,23 @@ export async function sendVerificationEmail(params: SendParams): Promise<void> {
 			? verificationCodeEmail({ appName, code: code ?? '' })
 			: verificationLinkEmail({ appName, verifyUrl: verifyUrl ?? '' });
 	await deliver({ to: email, ...message });
+}
+
+interface ResetSendParams {
+	email: string;
+	appName: string;
+	// Fully-qualified https URL carrying the single-use reset token.
+	resetUrl: string;
+}
+
+/*
+ * Renders and delivers the password-reset email. Throws on delivery failure like its verification
+ * counterpart — but the reset caller deliberately swallows that throw, because a visible send failure
+ * would only ever be visible for an address that *does* have an account (FR-006).
+ */
+export async function sendPasswordResetEmail(
+	params: ResetSendParams
+): Promise<void> {
+	const { email, appName, resetUrl } = params;
+	await deliver({ to: email, ...passwordResetEmail({ appName, resetUrl }) });
 }

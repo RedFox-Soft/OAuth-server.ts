@@ -884,23 +884,77 @@ exact line numbers.
 
 ## P2 — Incomplete product surfaces
 
-### 16. End-user password reset — Implement
+### 16. End-user password reset — ✅ Implemented
 
-- **Context:** No route, page, template, token store, or admin-independent path exists; the login
-  page's "Forgot password" is a dead `href=""` (`lib/interactions/loginPage.tsx:114`). The email
-  infrastructure (SMTP settings, `lib/mail/`, verification-challenge patterns with TTL + attempt
-  caps + resend cooldowns in `lib/verification/`) is a ready template.
-- **Expected result:** Self-service reset: request form (from the login page link) → single-use,
-  TTL'd, hashed-at-rest token emailed via the existing mail transport → reset form → password
-  updated, sessions for that user invalidated (coordinate with task 9/10 semantics), audit-free
-  (user-initiated) but rate-limited like verification resends. Bucket-scoped (respects
-  `resolveBucketForClient`). New collection provisioned with TTL (extends task 4 inventory).
-  Tests cover the happy path, expiry, reuse, rate limits, and unverified/inactive users.
-- **Amended by task 9's decision note:** "sessions for that user invalidated" resolves to
-  `destroyByOwner('accountId', …)` over the `Session` area — task 10's cascade engine reused, not a
-  second invalidation path. The new reset-token area must also declare its ownership in
-  `storage_inventory.ts` (`accountId` if it carries one, otherwise an explicit `none` with a reason),
-  or task 10's drift guard fails the suite by design.
+- **Delivered by** `specs/020-enduser-password-reset`. Suite: 2594 pass / 0 fail (was 2556); typecheck
+  unchanged at 2587 errors (measured before and after; the four this feature briefly added were its own and
+  were fixed). Mechanism: a new `lib/password_reset/` module mirroring `lib/verification/` file for file
+  (`consts` / `types` / `challenge`), two declared storage areas, one plain page family
+  (`lib/interactions/resetPages.tsx`), a request form inside the interaction
+  (`GET|POST /ui/:uid/forgot-password`, so the bucket comes from the client that started the request and
+  never from a form field) and standalone consumption pages (`GET|POST /reset-password`, reached from an
+  inbox with no cookie). The login page's dead `href=""` is now live.
+- **Where it deliberately diverges from the verification flow it otherwise copies** — each because a reset
+  secret _changes a credential_ where a verification secret only _proves an address_:
+  1. **The record cannot reproduce the emailed secret.** Id is `sha256hex(token)`; the token is in no field.
+     (A verification challenge's record id _is_ its token.)
+  2. **Expiry is compared in `load()`, not left to the store.** Mongo's TTL monitor deletes lazily, so an
+     "expired" record is still findable for a minute or more.
+  3. **A GET never consumes** — mail clients and scanners prefetch links; only the POST spends the secret,
+     and it destroys the record before the account update so a replay loses the race.
+  4. **The reserved admin bucket is refused** (spec FR-004a, added during planning by the Constitution
+     Check — see deviations below).
+- **Session invalidation** resolves as task 9's decision D5 required: `endSessionsForAccount` in
+  `lib/helpers/cascade.ts` sweeps the `Session` area by its _declared_ owner field, reusing task 10's engine
+  rather than adding a second invalidation path. It runs after the password update, and a failed sweep is
+  logged and reported while the user is still told the truth — the password did change.
+- **Storage:** `PasswordResetChallenge` (`byAccount`, so the account cascade sweeps it with no new code) and
+  `PasswordResetThrottle` (`unowned`, addressed by `${bucketId}:${email}`). Both provisioned by derivation
+  from the task 4 inventory; both in the task 10 ownership table under its drift guard.
+- **Findings worth carrying forward** (filed as `wiki/concepts/self-service-password-reset.md`, with the
+  computed-id note added to `wiki/concepts/deletion-and-revocation.md`):
+  1. **The verification flow trusts store eviction for expiry.** `verifyLink`/`verifyCode` never compare
+     `challenge.exp` to now, so on MongoDB an expired verification link keeps working until the TTL monitor
+     gets round to it. Harmless enough for address-proof — which is why it was left alone here — but it must
+     not be copied into a third flow that cannot afford it. Same shape as task 4's inert TTL indexes and
+     task 7's inert payload schema: correct-looking, never executed.
+  2. **`resolveBucketForClient` maps the reserved console client to the admin bucket**, so _every_ end-user
+     surface mounted under `/ui` is operator-reachable unless it says otherwise. This feature is the first
+     that had to say otherwise; the next one will too.
+  3. **The account cascade's computed-id parameter was a pattern, not a one-off.** A second area keyed by
+     `${bucketId}:${email}` made the name `verificationResendId` a lie. It is now `emailScopedId` and the
+     engine sweeps a small list of email-scoped areas, so the third such area needs no signature change.
+  4. **`TestAdapter.upsert` asserts that a written `exp` matches the TTL it was given**, so an inconsistent
+     record cannot be forged through the front door — the harness working as intended. Ageing a live record
+     with `TestAdapter.for(...).syncUpdate(id, { exp: … })` is both the house pattern and a _better_ model of
+     the lazy-sweep state.
+  5. **The Eden client hands back no readable body for some non-2xx HTML responses** (`data` is null and
+     `error.value` is undefined for the 429s here), and `response.text()` throws `ERR_BODY_ALREADY_USED`
+     because the client already read it. Comparing rendered refusal pages needs
+     `elysia.handle(new Request(...))`.
+- **Deviations from the spec as written:**
+  1. **FR-004a added during planning** (not in the original spec): a request resolving to the reserved admin
+     bucket sends no mail and returns the standard accepted page. An end-user reset records no audit entry by
+     design, and the constitution requires every administrative change to be attributable — so an unaudited
+     path to console credentials was not acceptable. Operator resets stay in the audited
+     `enduser.password.reset` route, which is untouched.
+  2. **The rate-limit arithmetic was extracted and shared.** `lib/helpers/rate_window.ts` now holds
+     `rateRefusal`/`nextRateFields`, used by both flows with their own bounds, areas and counters. This
+     touched working code, so the guard was that `test/email_verification/*` had to pass **unedited** — it
+     does. Every reset request spends the window; verification's initial registration send still does not.
+  3. **A completed reset marks the address verified.** Receiving the secret proves what the verification
+     challenge proves, and without it an unverified account is a permanent dead end (sign-in is gated on
+     `verified`, and re-registration is non-committal about an existing address).
+  4. **Link only, no 6-digit code variant**, even though buckets carry a `verificationMethod`: a short
+     numeric code is a weaker secret and this action is takeover-capable.
+  5. **Not run: the manual quickstart walk-through** (quickstart.md steps 1–10). It needs a live server with
+     SMTP configured, which this environment has not got; the same behaviour is covered by the suite, except
+     the two steps that only a real mailbox can show (the delivered message's rendering, and the wording of
+     the two 429 pages in a browser).
+- **Out of scope, recorded:** tokens/refresh tokens/grants are not revoked by a reset (task 9's D5 bounded
+  this deliberately); no password-strength or breach checking (the repo has none anywhere, and adding it
+  would govern registration and the operator route too); no "your password was changed" notification; no
+  change-password-while-signed-in surface; no admin view of outstanding reset secrets (tasks 19–22).
 
 ### 17. Interaction UI fixes batch — Implement
 
