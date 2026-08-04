@@ -469,27 +469,159 @@ exact line numbers.
   JWKS ×2, settings, SMTP), and the trail was write-only — `adminAuditStore.list()` existed in both
   adapters but no route or UI read it.
 
-### 9. Deletion integrity semantics — Investigate
+### 9. Deletion integrity semantics — Investigate — **RESOLVED 2026-08-04**
 
 - **Context:** No cascade or guard exists on any delete: project delete leaves its clients in the
-  DB **still able to authenticate at `/token`** (`lib/admin/projects/routes.ts:87`); client delete
-  revokes no grants/sessions/tokens (`lib/admin/clients/service.ts:193-195`); end-user delete
-  keeps their sessions/grants/tokens (`lib/admin/users-end/routes.ts:100`); bucket delete leaves
-  the `user_<bucket>` collection behind.
-- **Deliverable (defines Expected result of task 10):** For each entity (project, client, bucket,
-  end-user), decide: block deletion while dependents exist vs cascade (and exactly what cascades:
-  clients? grants? sessions? tokens? collections?), and what the admin UI shows (confirmation
-  listing consequences). Note the token model: revocation by grantId exists
-  (`lib/helpers/revoke.ts`), and mind the memory-vs-mongo `revokeByGrantId` divergence
-  (`lib/adapters/memory/memoryAdapter.ts:93-122` global vs `lib/adapters/mongodb/mongoAdapter.ts:66-68`
-  per-collection) — the decision doc must say which semantics is correct so task 10 can align both.
+  DB **still able to authenticate at `/token`** (`lib/admin/projects/routes.ts:122`); client delete
+  revokes no grants/sessions/tokens (`lib/admin/clients/service.ts:213-215`); end-user delete
+  keeps their sessions/grants/tokens (`lib/admin/users-end/routes.ts:116`); bucket delete leaves
+  the `user_<bucket>` collection behind. Two structural facts constrain any fix: **nothing can
+  enumerate by owner** (no method lists grants or sessions by `accountId`/`clientId`; Mongo could
+  query `payload.accountId`, but the in-memory store is a `QuickLRU` behind a `get`/`set`/`delete`-only
+  interface with no iteration — `lib/adapters/memory/storage.ts:7-15`), and **`revokeByGrantId` means
+  two different things per adapter** (`lib/adapters/memory/memoryAdapter.ts:114-122` deletes every
+  model's keys tracked under `grant:<id>` and drops the index, so the first of `revoke()`'s five calls
+  wipes everything and the other four no-op; `lib/adapters/mongodb/mongoAdapter.ts:66-68` deletes only
+  within the calling model's collection).
+- **Deliverable — done:** `docs/superpowers/specs/2026-08-04-deletion-integrity-design.md`, and — because
+  `docs/superpowers/` is gitignored — the full definition of done in task 10 below, which is the
+  canonical record. Six decisions:
+  1. **D1 — containers guard, principals cascade.** Project and bucket refuse deletion with 409 while
+     they hold clients / users; client and end-user cascade. The line is drawn by **visibility**: an
+     operator can see and name a project's clients, so refusing tells them exactly what they are about
+     to destroy and keeps one audit entry per entity destroyed; nobody can be asked to enumerate the
+     tokens a client issued, least of all during an incident response. Follows the precedent the
+     existing bucket-vs-project guard already set.
+  2. **D2 — ownership is declared in `lib/consts/storage_inventory.ts`** and one engine reads that
+     table; no call site names an area. Same shape as `route_classification.ts` (task 1),
+     `admin_audit_routes.ts` (task 8) and the inventory itself (task 4), under the same two-way drift
+     guard. A hand-written cascade per entity is cheaper and fails silently the first time an area is
+     added — the exact failure mode the inventory closed for provisioning.
+  3. **D3 — `revokeByGrantId` is per-collection** (Mongo's semantics), and `revoke()` stops filtering
+     by `client.grantTypeAllowed`. A per-model adapter method that deletes another model's records is a
+     contract its name and receiver both deny, and the global variant would force `MongoAdapter` to know
+     the five grantable collection names — knowledge that now lives in the inventory.
+  4. **D4 — order is audit → destroy the principal → cascade**, with the partial-failure cost accepted
+     and bounded rather than engineered around.
+  5. **D5 — three things are deliberately left behind**, each with a reason: `Session.authorizations[clientId]`,
+     admin sessions, and bucket-scoping of the account sweep.
+  6. **D6 — the operator surface** is a machine-readable 409 body plus the two confirmation dialogs that
+     already exist; no new audit actions.
+- **Findings worth carrying forward** (belong in `wiki/concepts/` alongside tasks 1, 3, 4, 7 and 8 —
+  no existing note covers deletion or revocation):
+  1. **Client deletion already takes effect immediately, and that is easy to misread as safe.**
+     `tryFindClient` reads `adapter('Client')` on every call and the validation memo is keyed by a hash
+     of the stored properties (`lib/models/client/validate.ts:208-228`), so a deleted client cannot
+     authenticate — while every token it ever issued keeps working to its own TTL. The visible half of
+     the problem is fixed and the invisible half is not.
+  2. **Two areas make a grant-walk cascade wrong, not merely slower.** `ClientCredentials` carries no
+     `grantId` at all, so collecting grant ids and calling `revokeByGrantId` misses it entirely; and
+     `RegistrationAccessToken` may be issued with no expiry, so what it leaves behind is not bounded by
+     a TTL. Sweeping by owner field reaches both. This is the concrete reason D2's table beats
+     hand-enumeration — both areas are easy to forget and neither announces itself.
+  3. **`accountId` is optional on `BaseTokenPayload` and `clientId` is required**
+     (`lib/models/base_token.ts:16,26`), which is what puts six areas in both ownership columns and
+     `ClientCredentials`/`RegistrationAccessToken` in the client column only. Ownership is a property of
+     each payload schema, so the drift guard can check it against the schemas rather than trust the table.
+  4. **`revoke()`'s grant-type filter is the mechanism of a live Mongo-only hole.** Narrow a client's
+     grant types after issuance and its refresh tokens survive revocation on Mongo — and not on memory,
+     where the first call wipes everything regardless. The filter only ever saved four no-op deletes.
+  5. **Protocol revocation deliberately does not destroy the `Grant` record.** The grant is the consent
+     record; revoking tokens is not withdrawing consent. Only the deletion cascade destroys grant rows,
+     and only for a principal that no longer exists. Worth writing down because "revoke" reads as
+     "remove everything" and the code has always disagreed.
 
-### 10. Deletion integrity implementation — Implement (depends on task 9)
+### 10. Deletion integrity implementation — Implement (task 9 resolved, so unblocked)
 
-- **Expected result:** The decided semantics implemented for all four entities; the
-  `revokeByGrantId` adapter divergence resolved to the decided behavior with a storage-contract
-  test pinning it; no deleted principal can authenticate or use existing tokens afterward
-  (negative tests: deleted project's client at `/token`, deleted user's refresh token, etc.).
+- **Source of truth:** `docs/superpowers/specs/2026-08-04-deletion-integrity-design.md` carries the
+  rationale; that path is gitignored, so the acceptance surface below is the canonical record. Read
+  task 9's decisions first.
+- **Expected result:** No deleted principal can authenticate or use an existing token afterwards, and no
+  container can be deleted while it still holds something an operator named. Definition of done:
+  1. **Ownership declared as data.** Every entry in `lib/consts/storage_inventory.ts` declares the payload
+     field naming its owning account, the field naming its owning client, or an explicit `none` **with a
+     reason**. As the schemas stand: `accountId` + `clientId` on `AccessToken`, `AuthorizationCode`,
+     `BackchannelAuthenticationRequest`, `DeviceCode`, `Grant`, `RefreshToken`; `clientId` only on
+     `ClientCredentials` and `RegistrationAccessToken`; `accountId` only on `Session`, `Interaction`,
+     `VerificationChallenge`. Declared `none`: `InitialAccessToken` (deliberately not client-bound,
+     `lib/models/initial_access_token.ts:6-7`), `PushedAuthorizationRequest` (the client id is inside the
+     opaque `request` string), `ReplayDetection` (`iss`/`jti`, belongs to no principal),
+     `VerificationResend` (its id *is* `${bucketId}:${email}`, so the cascade destroys it by computed id —
+     addressed, not scanned), `Client` itself, and every store / per-bucket area.
+  2. **Drift guard, both directions.** `test/storage_contract/inventory_drift.spec.ts` fails when an area
+     declares no ownership, when a declared field is absent from that model's payload schema, and when a
+     payload schema carries `accountId`/`clientId` the table does not declare. Field names are validated as
+     plain identifiers (no `$`-prefixed or dotted values reach a Mongo query).
+  3. **One new adapter method.** `destroyByOwner(field, value): Promise<number>` on `ModelAdapter`, in both
+     adapters — Mongo `deleteMany({ 'payload.<field>': value })` with an index per swept owner field added
+     to the inventory (extends task 4); memory scans keys under its own model prefix, which requires adding
+     `keys()` to the `MemoryStore` interface (`lib/adapters/memory/storage.ts`) and to any test double that
+     implements it. Field names come from the table, never from a caller. Stale `grant:`/`sessionUid:` index
+     entries left dangling by an owner sweep are harmless (`delete` on a missing key is a no-op;
+     `findByUid` resolves an id whose payload is gone and returns undefined) — pin that, do not fix it.
+  4. **One cascade engine**, reading the table: `destroyByOwner` across every area declaring the relevant
+     owner field, plus `VerificationResend` by computed id for the account case. Returns per-area counts.
+     `RegistrationAccessToken` is swept **first** — it is the only swept area that can outlive a failure,
+     because everything else carries an `expiresAt` TTL. **The account cascade must capture the user's
+     email before the account row is destroyed**: `VerificationResend`'s id is `${bucketId}:${email}` and
+     nothing else records it, so the obvious ordering silently skips that record with no error anywhere.
+  5. **`revokeByGrantId` aligned to per-collection semantics.** Memory drops only keys bearing its own model
+     prefix and leaves the `grant:<id>` index for the other models; a storage-contract test pins that
+     calling it on one model does not touch another's records, in both adapters. `lib/helpers/revoke.ts`
+     drops the `client.grantTypeAllowed` filter, always sweeps all five grantable areas, and takes `grantId`
+     alone (it no longer needs `oidc`) — update its six callers. Protocol revocation still leaves the
+     `Grant` row alive; only the cascade destroys grant rows.
+  6. **Guards.** `DELETE /admin/api/projects/:id` → 409 while it holds clients that still **resolve** via
+     `Client.tryFind` (an unresolvable id in `clientIds` must not make a project permanently undeletable,
+     and is not pruned on a refused request — a refused request changes nothing). An assigned bucket is
+     **not** a blocker. `DELETE /admin/api/buckets/:id` keeps the
+     existing `countByBucket` guard and adds 409 while any user exists in `user_<bucket>` — **including
+     `active: false` accounts**, since deactivation is a login decision, not absence. On success it drops the
+     now-empty per-bucket area (Mongo only; nothing to drop on memory), which is what closes the
+     left-behind-collection hole.
+  7. **Cascades.** `DELETE /admin/api/projects/:id/clients/:clientId` and
+     `DELETE /admin/api/buckets/:id/users/:uid` run the engine in the order audit → destroy the principal →
+     cascade, where "destroy the principal" includes the client route's existing unlink from
+     `project.clientIds` (the client is not gone from the admin plane until both have happened, so the
+     cascade runs after the unlink, not between the two). A cascade that fails partway answers 500 naming
+     the areas that failed; a repeated `DELETE` answering 404 is the accepted cost of closing the door
+     first, and the residue is bounded by each area's TTL given item 4's ordering. Record that reasoning
+     where the order is coded.
+  8. **HTTP contract.** 409 bodies carry `blockers: [{ kind, count, ids? }]` — `kind` is `'client'` or
+     `'enduser'` — alongside the existing
+     `AdminError` shape (`{ error: 'admin_error', message }`), so task 19's dialogs can list consequences
+     without parsing prose. Client ids are listed; end-user blockers report a **count only** — a bucket can
+     hold thousands of accounts and their ids are not the caller's business. Successful cascades return
+     per-area counts.
+  9. **Audit unchanged.** No new actions and no change to `lib/consts/admin_audit_routes.ts`: the cascade is
+     an effect of the already-recorded `client.delete` / `enduser.delete`. Per-area counts stay **out** of the
+     trail — task 8's "field names, never values" rule is what makes secret-freedom structural, and a count
+     is a value.
+  10. **UI, narrowly.** Only the two confirmation dialogs that already exist are upgraded to state what the
+      cascade destroys: `lib/admin/ui/pages/Clients.tsx:296` and `lib/admin/ui/pages/BucketDetail.tsx:257`.
+      Project and bucket delete buttons do not exist yet; their blocker-listing dialogs belong to task 19,
+      which consumes item 8's contract. Building them here would duplicate task 19's work on the same pages.
+  11. **Deliberately not done**, each recorded in code rather than left implicit:
+      `Session.authorizations[clientId]` is not cleaned on client delete (no index reaches into a
+      sub-document, and the entry is inert — `lib/models/base_token.ts:171` compares the token's `grantId`
+      against `session.grantIdFor(clientId)`, which now resolves to a destroyed grant); admin sessions
+      (`adminSession`) are out of scope, since admin deletion deactivates (task 8 finding 6) and admin
+      session revocation is task 22; and the account sweep is not bucket-scoped, because `accountId` is a
+      `nanoid` and tokens record no bucket (`VerificationChallenge` is filtered by `bucketId` where the
+      cascade has it).
+  12. **Tests.** Storage-contract: `destroyByOwner` round-trips per owner field, and the per-collection
+      `revokeByGrantId` pin. Protocol negatives: deleted user's refresh token → `invalid_grant`; deleted
+      client's access token → 401 at `/userinfo` and `active: false` at introspection; deleted client's
+      `client_credentials` token inactive; deleted client's registration access token → 401 at
+      `PUT /reg/:clientId`; deleted user's session no longer authorizes. Admin routes: project with live
+      clients → 409 with blockers, then deletes once emptied; project with only stale client ids deletes;
+      bucket with users (including a deactivated one) → 409, then deletes and drops the area; cascade count
+      bodies. Plus the drift guard in both directions. Full suite green.
+- **Verification gap, expected:** the MongoDB half — `destroyByOwner`'s `deleteMany`, the new indexes, and
+  dropping the per-bucket collection — cannot be covered automatically, because `MONGODB_URI` is
+  deliberately absent under test (Principle III). Pin the contract against the in-memory adapter, verify the
+  Mongo class by reading, and write the manual procedure into the spec's `quickstart.md` as tasks 5, 8 and 4
+  did. Task 25 is what closes the class.
 
 ### 11. Verify the admin BFF id_token signature — Implement
 
@@ -623,6 +755,11 @@ exact line numbers.
   (user-initiated) but rate-limited like verification resends. Bucket-scoped (respects
   `resolveBucketForClient`). New collection provisioned with TTL (extends task 4 inventory).
   Tests cover the happy path, expiry, reuse, rate limits, and unverified/inactive users.
+- **Amended by task 9's decision note:** "sessions for that user invalidated" resolves to
+  `destroyByOwner('accountId', …)` over the `Session` area — task 10's cascade engine reused, not a
+  second invalidation path. The new reset-token area must also declare its ownership in
+  `storage_inventory.ts` (`accountId` if it carries one, otherwise an explicit `none` with a reason),
+  or task 10's drift guard fails the suite by design.
 
 ### 17. Interaction UI fixes batch — Implement
 
@@ -723,6 +860,12 @@ exact line numbers.
   interfaces gain the needed list methods in **both** adapters with storage-contract tests. All
   mutations audited (task 8 pattern — and each new mutating route must be added to
   `lib/consts/admin_audit_routes.ts`, or task 8's drift guard fails the suite by design).
+- **Amended by task 9's decision note:** "the task-9/10-aligned semantics" resolves to D3 — revocation is
+  per-collection and `revoke()` always sweeps all five grantable areas, with no grant-type filter. The
+  list-by-user surface this task needs is the **read half** of task 10's `destroyByOwner`: both walk the
+  same ownership declarations in `storage_inventory.ts`, so build on that table rather than a second
+  enumeration path. Deleting an admin still deactivates rather than deletes, which is why task 10 leaves
+  `adminSession` alone and this task owns it.
 
 ### 23. JWKS management: non-RSA keys — Implement
 
@@ -869,7 +1012,8 @@ exact line numbers.
 
 Quick wins first: **14** (bug batch) → ~~**1** (flag gating)~~ → ~~**4** (db provisioning)~~ →
 ~~**5** (DPoP safety)~~ → **11** (id_token verification). Then the investigation pair-ups: ~~**3** (CORS)~~,
-**9→10** (deletion), ~~**6→7**~~ (RAR). Then P1 remainder (~~**8**~~, **12**, **13**, **15**), P2
+~~**9**~~**→10** (deletion — task 9 resolved 2026-08-04, so **10** is next up and carries a full
+acceptance surface), ~~**6→7**~~ (RAR). Then P1 remainder (~~**8**~~, **12**, **13**, **15**), P2
 product work (**16**–**23**), and P3 (**24**–**30**) as capacity allows. Tasks 28 and 29 are safe to
 do anytime. **31** (RAR's remaining channels) is P1 and **now unblocked** — task 7 landed the descriptor
 validation, consent view model and grant persistence it reuses — but it remains the lowest-urgency P1
