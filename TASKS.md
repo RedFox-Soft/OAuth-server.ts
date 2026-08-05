@@ -880,6 +880,101 @@ exact line numbers.
   **Consider splitting** — the two channels and the token parameter are independent enough for
   separate Spec Kit cycles if the first one runs long.
 
+### 32. Compiled antd CSS for the hydrated pages, and a derived `script-src` — Implement
+
+- **Numbering is append-only:** belongs to P1, takes the next free number.
+- **Design:** `docs/superpowers/specs/2026-08-05-compiled-antd-css-and-derived-script-src-design.md`
+  (untracked tree — the decisions and the definition of done are restated here so nothing depends on
+  it). Two independent parts sharing one subject; either ships without the other.
+- **Context, part A.** `lib/html/csp.ts` derives every directive from the served document except
+  `script-src`, which always begins with `'self'` whether or not the page references a script. The
+  error page — the highest-volume rendered page here, reached by every malformed request from every
+  misconfigured client, and the one whose body carries request-derived text — therefore permits
+  same-origin script execution it has no use for.
+- **Context, part B.** Measured against the installed antd 6.5.1: the login/consent/registration
+  pages and the admin console arrive server-rendered but **unstyled**, and stay so until ~1 MB of JS
+  parses and cssinjs generates 246,494 B of CSS in the browser. antd 6 offers
+  `ConfigProvider theme={{ zeroRuntime: true }}` plus a precompiled `antd/dist/antd.css`
+  (1,005,591 B / 109,545 B gzip). Verified against the installed copy, not the docs alone:
+  `config-provider/index.js:345` → `theme/util/genStyleUtils.js:23-30`. It is a **runtime** flag —
+  it prevents style generation, it does **not** shrink the JS bundle. No bundle reduction is claimed.
+- **Expected result, part A.** `script-src` is derived from three sources: `<script src>` (relative
+  or at `new URL(ISSUER).origin` → `'self'`; a foreign origin named explicitly, the same comparison
+  `foreignFormTargets` makes and for the same reason the device pages demonstrate), inline script
+  bodies → hashes, inline `on*=` handlers → `'unsafe-hashes'` plus hashes. **Yielding nothing means
+  `script-src 'none'`.** Outcome: `'none'` on the error page, both logout pages, all four
+  verification pages, the registration refusals, the password-reset pages, and device
+  confirmation/success; `'unsafe-hashes'` + hash only on device code entry (the lone `onfocus`,
+  `lib/helpers/user_code_form.ts:15`); a bare hash on the `form_post` callback; `'self'` + hash only
+  on login/consent/registration and the admin shell. `test/csp/csp.spec.ts`'s blanket
+  `toContain("'self'")` becomes conditional — `'self'` iff a same-origin `<script src>` is present,
+  `'none'` iff no script and no handler, `'none'` never accompanied by another value — plus a named
+  assertion that `getErrorHtmlResponse(...)` yields `script-src 'none'`. The `no page escapes the
+  constructor` guard is unchanged.
+- **Expected result, part B.** The two **hydrated** families only —
+  `lib/interactions/{htmlTeamplate.html,serverRender.tsx,loginClient.tsx}` and
+  `lib/admin/ui/{htmlTemplate.html,serverRender.tsx,adminClient.tsx}` — link one precompiled
+  stylesheet and run under `zeroRuntime`. `build.ts` copies `antd/dist/{antd,reset}.css` into
+  `public/` (both added to `.gitignore` beside the bundles). `style-src` is **unchanged** and the two
+  templates keep their three-line `<style>` blocks: an earlier draft moved them to a checked-in
+  `public/app.css` to drop `'unsafe-inline'`, which was wrong — the hydrated page trees carry 62
+  `style={{…}}` props (`lib/interactions/{loginPage,consentPage,registration}.tsx` plus ten pages
+  under `lib/admin/ui/pages/`), each rendering a `style="…"` attribute, so those documents require
+  `'unsafe-inline'` regardless. A ten-line `style-src-elem`/`style-src-attr` split *would* close the
+  `<style>`-block half by hashing it the way part A hashes scripts; it is written up under "Optional,
+  not specified" in the design and is deliberately excluded here. One shared
+  `lib/html/zeroRuntimeProvider.tsx` owns the flag and is used by all four entry points, so a server
+  render and its client hydrate cannot disagree — if they do, one side generates styles the other
+  does not and hydration diverges. **The terminal pages are deliberately excluded**
+  (`lib/html/{error,logout,logoutSuccess,device}.tsx` keep `extractStyle` and their inline
+  `<style>`): they inline 4,360–10,500 B gzip and are read once, so a render-blocking 109 KB
+  stylesheet on a cold cache is worse for them and would make them depend on `/public` being built.
+  Full `antd.css` rather than a `static-style-extract` include-list: the trim saves ~85 KB on a
+  once-cached file against a component that appears only in an unrendered state coming out unstyled
+  with no runtime fallback, no error, and no test that can catch it.
+- **Fix in passing.** `lib/admin/ui/serverRender.tsx:14` cache-busts `admin.js` by mtime because
+  `staticPlugin` serves `public/` with a long `max-age`; `lib/interactions/serverRender.tsx` does
+  **not**, so a rebuilt `loginClient.js` can be served stale. Extract `assetVersion(path)` to a
+  shared module and use it for every asset both renderers reference.
+- **Done when:** full suite green including the rewritten `test/csp/csp.spec.ts`; no hydration
+  mismatch on login, login-with-error, consent, registration, admin console, admin setup; **no
+  `<style>` element injected into `<head>` after hydration** on any of them (the assertion that
+  proves `zeroRuntime` took rather than being silently ignored — without it every page can pay for
+  its styles twice while appearing to work); visual parity on those pages plus the three states never
+  server-rendered and the reason full `antd.css` is shipped (the admin's `theme="dark"` `Menu`, an
+  open `Modal`, an open `Select`); `style-src` byte-identical to today on every page — this part
+  changes what the browser has to *do*, not what it is allowed to do; login page transfer size
+  recorded before and after. `wiki/concepts/html-response-security-policy.md` updated for the
+  `script-src 'none'` case and for the fact that the hydrated pages no longer inject styles at
+  runtime, which is the stated reason its `style-src` paragraph gives for `'unsafe-inline'` — that
+  reason is now only half true, and the surviving half is the 62 `style=` attributes.
+- **Deliberately out of scope**, decided 2026-08-05, recorded so they are not rediscovered as
+  oversights: `splitting: true` in `build.ts` (only an operator loads both bundles — login → console;
+  end users load `loginClient.js` alone); **reworking CSP into an Elysia plugin** (built and measured
+  in spec 018 research.md M9 and rejected — `mapResponse({ as: 'global' })` never fires for an
+  `onError`-built response, i.e. the error page, nor for the named `adminApp`, and both fail silently
+  with a perfect page and no policy; it would re-open the very gap part A hardens, for no new
+  capability — see `wiki/concepts/html-response-security-policy.md`); purging `style=` attributes
+  from the plain interaction pages (largest mechanical diff available for the weakest directive —
+  `style-src 'unsafe-inline'` only matters once an attacker already has HTML injection, at which
+  point part A is what saves you); trimming `antd.css`. Two findings spun out as tasks 33 and 34.
+
+### 33. Security headers on non-HTML responses — Implement
+
+- **Numbering is append-only:** belongs to P1, takes the next free number.
+- **Context:** `lib/html/csp.ts`'s `htmlResponse` covers every rendered page, but nothing covers the
+  JSON surfaces. `/token`, `/userinfo`, discovery and the whole admin API carry no
+  `X-Content-Type-Options`, no `Referrer-Policy`, and no CSP. Found while scoping task 32 and
+  deliberately kept out of it — this is plugin-shaped work on a different surface, and bundling it
+  would have dragged the rejected CSP-as-a-plugin rework back in with it.
+- **Expected result:** A callback-shaped plugin in the `lib/plugins/noCache.ts` form (not a named
+  Elysia instance — see the `cors.ts:33` rationale) setting `X-Content-Type-Options: nosniff`,
+  `Referrer-Policy: no-referrer` and a locked-down `default-src 'none'; frame-ancestors 'none'` on
+  non-HTML responses. It must not touch a response `htmlResponse` built, so the HTML policy keeps one
+  writer. Note that this flips `test/csp/csp.spec.ts`'s `leaves protocol responses alone`, which
+  currently asserts discovery carries **no** CSP header — that assertion becomes "carries the
+  non-HTML policy, not a page policy".
+
 ---
 
 ## P2 — Incomplete product surfaces
@@ -1406,6 +1501,24 @@ IdP-initiated login; localisation of the new pages, consistent with every intera
   session management is legacy — modern guidance leans on back-channel logout, which already
   works).
 
+### 34. Why the sign-in bundle costs 1 MB — Investigate
+
+- **Numbering is append-only:** belongs to P3, takes the next free number.
+- **Context:** `public/loginClient.js` is 1,019,378 B minified for three pages built from
+  `Form`/`Input`/`Button`/`Card`/`Checkbox`/`Flex`/`Typography`/`Alert`, and `public/admin.js` is
+  1,611,374 B. `lib/interactions/{loginPage,registration}.tsx` import named icons from
+  `@ant-design/icons` — a barrel of thousands of modules — reached through the custom resolve plugin
+  at `build.ts:9`, which redirects `@ant-design/icons-svg/lib/*` to `es/*` for an unrelated CJS
+  interop reason. Whether Bun tree-shakes that barrel is unknown and was never measured. Surfaced
+  while scoping task 32, which established that antd's `zeroRuntime` mode does **not** reduce bundle
+  size — so this is the remaining lever, and the only one that touches end-user bytes rather than
+  operator bytes.
+- **Deliverable:** A measurement, then a decision. Report each entry's size broken down by source
+  (`bun build --analyze` or equivalent), the delta from importing icons by direct path instead of
+  from the barrel, and the delta from `splitting: true` (deferred from task 32 for being
+  operator-only). If a change wins, it becomes the expected result of a follow-up implementation
+  task; if nothing wins, record the numbers here so the question is not reopened by guesswork.
+
 ---
 
 ## Suggested order
@@ -1418,3 +1531,8 @@ product work (~~**16**~~, ~~**17**~~, **18**–**23**), and P3 (**24**–**30**)
 do anytime. **31** (RAR's remaining channels) is P1 and **now unblocked** — task 7 landed the descriptor
 validation, consent view model and grant persistence it reuses — but it remains the lowest-urgency P1
 item, since nothing reaches those channels today.
+
+**32** is next up and splits cleanly: part A (`script-src 'none'` on the script-free pages) is the
+cheapest security change in this file — one function in `lib/html/csp.ts` plus test updates, with no
+dependency on part B — so do it first and ship it alone if part B runs long. **33** and **34** were
+spun out of scoping **32** and neither blocks anything.
