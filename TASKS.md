@@ -880,17 +880,18 @@ exact line numbers.
   **Consider splitting** — the two channels and the token parameter are independent enough for
   separate Spec Kit cycles if the first one runs long.
 
-### 32. Compiled antd CSS for the hydrated pages, and a derived `script-src` — Implement
+### 32. Compiled antd CSS for the hydrated pages, and a fully derived script/style policy — Implement
 
 - **Numbering is append-only:** belongs to P1, takes the next free number.
 - **Design:** `docs/superpowers/specs/2026-08-05-compiled-antd-css-and-derived-script-src-design.md`
   (untracked tree — the decisions and the definition of done are restated here so nothing depends on
   it). Two independent parts sharing one subject; either ships without the other.
-- **Context, part A.** `lib/html/csp.ts` derives every directive from the served document except
-  `script-src`, which always begins with `'self'` whether or not the page references a script. The
-  error page — the highest-volume rendered page here, reached by every malformed request from every
-  misconfigured client, and the one whose body carries request-derived text — therefore permits
-  same-origin script execution it has no use for.
+- **Context, part A.** `lib/html/csp.ts` derives every directive from the served document except two.
+  `script-src` always begins with `'self'` whether or not the page references a script, and
+  `style-src 'self' 'unsafe-inline'` is declared flat for every page. The error page — the
+  highest-volume rendered page here, reached by every malformed request from every misconfigured
+  client, and the one whose body carries request-derived text — therefore permits same-origin script
+  execution and arbitrary inline stylesheets it has no use for.
 - **Context, part B.** Measured against the installed antd 6.5.1: the login/consent/registration
   pages and the admin console arrive server-rendered but **unstyled**, and stay so until ~1 MB of JS
   parses and cssinjs generates 246,494 B of CSS in the browser. antd 6 offers
@@ -906,23 +907,41 @@ exact line numbers.
   verification pages, the registration refusals, the password-reset pages, and device
   confirmation/success; `'unsafe-hashes'` + hash only on device code entry (the lone `onfocus`,
   `lib/helpers/user_code_form.ts:15`); a bare hash on the `form_post` callback; `'self'` + hash only
-  on login/consent/registration and the admin shell. `test/csp/csp.spec.ts`'s blanket
+  on login/consent/registration and the admin shell. **`style-src` splits into the CSP3 pair**, both
+  derived from the same document, with `style-src` retained unchanged as the pre-CSP3 fallback so
+  nothing regresses where the narrowing is not understood. `style-src-attr` is `'unsafe-inline'` iff
+  the rendered markup contains a `style="…"` attribute — the weak form, and it stays on most pages.
+  `style-src-elem` is the half worth closing, since a `<style>` block restyles the whole document and
+  can exfiltrate input values by attribute selector: when the document references **no** external
+  script, nothing can run and nothing can inject later, so the document is the complete truth and the
+  directive is `'self'` (if a stylesheet is linked) plus a `'sha256-…'` per `<style>` body, hashed by
+  the same `hash()` scripts use; when it **does** reference one, `'unsafe-inline'` is kept because the
+  bundle may inject. **That second case is load-bearing, not caution:** `@ant-design/icons` calls
+  `useInsertStyles` on every icon render (`es/components/Icon.js:27`, `IconBase.js:14`) through its own
+  `cssUtils`, a package independent of antd — `zeroRuntime` does not stop it, part B does not remove
+  it, and it cannot be hashed because it does not exist when the document is built. All four hydrated
+  pages import icons; hashing their blocks and stopping there strips the styling off every icon on the
+  sign-in page with nothing but a console violation to show for it. `test/csp/csp.spec.ts`'s blanket
   `toContain("'self'")` becomes conditional — `'self'` iff a same-origin `<script src>` is present,
-  `'none'` iff no script and no handler, `'none'` never accompanied by another value — plus a named
-  assertion that `getErrorHtmlResponse(...)` yields `script-src 'none'`. The `no page escapes the
-  constructor` guard is unchanged.
+  `'none'` iff no script and no handler, `'none'` never accompanied by another value — the walk gains
+  the equivalent style assertions (including `style-src-elem` carrying `'unsafe-inline'` **iff** the
+  document references an external script, asserted in both directions), and two named assertions pin
+  the point of the change: `getErrorHtmlResponse(...)` yields `script-src 'none'` and a
+  `style-src-elem` free of `'unsafe-inline'`, while `renderAdminShell(...)` and `loginServer(...)`
+  **keep** `style-src-elem 'unsafe-inline'` with `useInsertStyles` named in a comment as the reason —
+  without which a later tidy-up removes it and breaks every icon. `expectPolicyCoversItsOwnScripts`
+  wants renaming; it no longer covers only scripts. The `no page escapes the constructor` guard is
+  unchanged.
 - **Expected result, part B.** The two **hydrated** families only —
   `lib/interactions/{htmlTeamplate.html,serverRender.tsx,loginClient.tsx}` and
   `lib/admin/ui/{htmlTemplate.html,serverRender.tsx,adminClient.tsx}` — link one precompiled
   stylesheet and run under `zeroRuntime`. `build.ts` copies `antd/dist/{antd,reset}.css` into
-  `public/` (both added to `.gitignore` beside the bundles). `style-src` is **unchanged** and the two
-  templates keep their three-line `<style>` blocks: an earlier draft moved them to a checked-in
-  `public/app.css` to drop `'unsafe-inline'`, which was wrong — the hydrated page trees carry 62
+  `public/` (both added to `.gitignore` beside the bundles). The two templates keep their three-line
+  `<style>` blocks: an earlier draft moved them to a checked-in `public/app.css` on the theory that it
+  would drop `'unsafe-inline'`, which was wrong twice over — the hydrated page trees carry 62
   `style={{…}}` props (`lib/interactions/{loginPage,consentPage,registration}.tsx` plus ten pages
-  under `lib/admin/ui/pages/`), each rendering a `style="…"` attribute, so those documents require
-  `'unsafe-inline'` regardless. A ten-line `style-src-elem`/`style-src-attr` split *would* close the
-  `<style>`-block half by hashing it the way part A hashes scripts; it is written up under "Optional,
-  not specified" in the design and is deliberately excluded here. One shared
+  under `lib/admin/ui/pages/`) so `style-src-attr` needs it regardless, and the icons injection above
+  means `style-src-elem` does too. The file would have bought nothing. One shared
   `lib/html/zeroRuntimeProvider.tsx` owns the flag and is used by all four entry points, so a server
   render and its client hydrate cannot disagree — if they do, one side generates styles the other
   does not and hydration diverges. **The terminal pages are deliberately excluded**
@@ -937,17 +956,22 @@ exact line numbers.
   **not**, so a rebuilt `loginClient.js` can be served stale. Extract `assetVersion(path)` to a
   shared module and use it for every asset both renderers reference.
 - **Done when:** full suite green including the rewritten `test/csp/csp.spec.ts`; no hydration
-  mismatch on login, login-with-error, consent, registration, admin console, admin setup; **no
-  `<style>` element injected into `<head>` after hydration** on any of them (the assertion that
-  proves `zeroRuntime` took rather than being silently ignored — without it every page can pay for
-  its styles twice while appearing to work); visual parity on those pages plus the three states never
-  server-rendered and the reason full `antd.css` is shipped (the admin's `theme="dark"` `Menu`, an
-  open `Modal`, an open `Select`); `style-src` byte-identical to today on every page — this part
-  changes what the browser has to *do*, not what it is allowed to do; login page transfer size
-  recorded before and after. `wiki/concepts/html-response-security-policy.md` updated for the
-  `script-src 'none'` case and for the fact that the hydrated pages no longer inject styles at
-  runtime, which is the stated reason its `style-src` paragraph gives for `'unsafe-inline'` — that
-  reason is now only half true, and the surviving half is the 62 `style=` attributes.
+  mismatch on login, login-with-error, consent, registration, admin console, admin setup; **no antd
+  cssinjs `<style>` element injected into `<head>` after hydration** on any of them — matched by the
+  `data-css-hash` attribute antd emits, which is the assertion that proves `zeroRuntime` took rather
+  than being silently ignored (without it every page can pay for its styles twice while appearing to
+  work). Note it is **not** "no `<style>` at all": `@ant-design/icons` injects one on every one of
+  these pages and will continue to, so asserting the absolute fails and sends the implementer chasing
+  antd. Visual parity on those pages, icons included, plus the three states never server-rendered and
+  the reason full `antd.css` is shipped (the admin's `theme="dark"` `Menu`, an open `Modal`, an open
+  `Select`); login page transfer size recorded before and after.
+  `wiki/concepts/html-response-security-policy.md` rewritten in two places: the `script-src 'none'`
+  case is new, and its "Two deliberate looseness points" section justifies `style-src 'unsafe-inline'`
+  by cssinjs runtime injection plus hand-written `<style>` blocks — after this work the first clause is
+  false and the second no longer forces `'unsafe-inline'` because such blocks are hashed, while the two
+  reasons that do survive go unmentioned today (the 62 `style=` attributes, and the icons injection,
+  which is invisible in the source of every page it affects and belongs in the same gotcha class as the
+  `onfocus` handler that page already documents).
 - **Deliberately out of scope**, decided 2026-08-05, recorded so they are not rediscovered as
   oversights: `splitting: true` in `build.ts` (only an operator loads both bundles — login → console;
   end users load `loginClient.js` alone); **reworking CSP into an Elysia plugin** (built and measured
@@ -1532,7 +1556,7 @@ do anytime. **31** (RAR's remaining channels) is P1 and **now unblocked** — ta
 validation, consent view model and grant persistence it reuses — but it remains the lowest-urgency P1
 item, since nothing reaches those channels today.
 
-**32** is next up and splits cleanly: part A (`script-src 'none'` on the script-free pages) is the
-cheapest security change in this file — one function in `lib/html/csp.ts` plus test updates, with no
-dependency on part B — so do it first and ship it alone if part B runs long. **33** and **34** were
-spun out of scoping **32** and neither blocks anything.
+**32** is next up and splits cleanly: part A (`script-src 'none'` and a hashed `style-src-elem` on the
+script-free pages) is the cheapest security change in this file — `lib/html/csp.ts` plus test updates,
+with no dependency on part B — so do it first and ship it alone if part B runs long. **33** and **34**
+were spun out of scoping **32** and neither blocks anything.
