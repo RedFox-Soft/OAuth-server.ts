@@ -1019,15 +1019,174 @@ exact line numbers.
   walk-through, whose post-hydration steps need a live server with SMTP that this environment has not got —
   everything else in `quickstart.md` is covered by the suite.
 
-### 18. Social login / federation — Investigate
+### 18. Social login / federation — Investigate — DECIDED 2026-08-05
 
-- **Context:** No federation code exists anywhere in `lib/` (the Google button was decorative).
-  Spec 001 explicitly declared social login out of scope, so this needs a product decision, not
-  just code. `UserBucket.authMethods` exists but is never read (`lib/adapters/types.ts:182`).
-- **Deliverable:** Decide whether federation enters the roadmap; if yes, define providers (OIDC
-  generic? Google first?), the account-linking model (federated identity ↔ bucket user), per-bucket
-  enablement via `authMethods`, and the interaction-UI flow. That document becomes the spec input
-  for a future implementation task.
+- **Context:** No federation code exists anywhere in `lib/` (the Google button was decorative and
+  spec 021 deleted it). Spec 001 declared social login out of scope, so this needed a product
+  decision, not just code. `UserBucket.authMethods` turned out to be more dormant than the task text
+  said: it is not merely unread — `CreateBucketBody`/`UpdateBucketBody`
+  (`lib/admin/buckets/schema.ts`) omit it entirely, so it cannot be set through the admin plane at
+  all. Both adapters default it to `['password']` and both seeds write that literal.
+- **Decision: federation enters the roadmap.** Generic OIDC only, configured **per bucket** with the
+  upstream credentials on the bucket document, linking only on a trusted verified email, and upstream
+  tokens discarded. The reasoning and every rejected alternative are in
+  `docs/superpowers/specs/2026-08-05-social-federation-login-design.md` (gitignored — this entry is
+  the committed record). What follows is the Expected result of the Implement task.
+
+#### The finding that dictates the route layout
+
+The interaction cookie is `path: /ui/${uid}` (`lib/actions/authorization/interactions.ts:101-105`)
+and `sameSite: 'strict'` (`lib/consts/param_list.ts:136-141`). So a fixed `/federation/callback`
+cannot read it (wrong path), and even at the right path it would not receive it (the return leg from
+the IdP is a cross-site top-level navigation, which does not send a `strict` cookie — why the admin
+console's own `admin_oauth` cookie is `lax`). The callback URL must nevertheless be fixed, because
+IdPs match `redirect_uri` by exact string and `uid` changes every interaction. Resolved by three hops
+and **no new cookie**: `GET /ui/:uid/federation/:providerId/start` → fixed `GET /federation/callback`
+(resolves everything from a DB record) → same-site redirect to `GET /ui/:uid/federation/complete?ref=…`
+(strict cookie arrives, `resume()` runs). The DB record does the job the admin console's cookie does,
+because here a cookie provably does not survive the round trip.
+
+#### Expected result — bucket settings
+
+- **`UserBucket.authMethods` is dropped** (field, both adapters, both seeds, their tests) and replaced
+  by **`passwordLogin: boolean`, default `true`**. Federation availability is derived, never declared:
+  `federation.some(p => p.enabled)`, so a provider is enabled in exactly one place. Both stores default
+  the new field on read, so a bucket document written before the change keeps the behaviour it had.
+- **`passwordLogin: false`** ⇒ the login page renders no password form, and `POST /ui/:uid/login`,
+  both `/ui/:uid/registration` methods and both `/ui/:uid/forgot-password` methods answer 403 as
+  password-only doors.
+- **`federation: FederationProvider[]`, default `[]`** on the bucket, credentials included.
+- **`registrationOpen` keeps its current behaviour and gains a documented narrowing:** it governs the
+  password registration form **only**. Federated provisioning is the per-provider knob below — which is
+  what lets a bucket close password sign-ups while still accepting "anyone from our corporate IdP".
+- `emailVerificationRequired` / `verificationMethod` still apply to a federated sign-in whose
+  assertion is not trusted-verified.
+
+#### Expected result — per-provider settings (eleven fields)
+
+| Field | Default | Why it is a setting |
+| --- | --- | --- |
+| `id` | — | slug `^[a-z0-9-]{1,32}$`, unique in the bucket; appears in the start URL |
+| `displayName` | — | the button label |
+| `enabled` | `true` | kill switch that keeps the credentials |
+| `issuer` | — | `https:` URL; discovery source, validated at write time |
+| `clientId` | — | upstream client identifier |
+| `clientSecret` | — | write-only, masked on read, never in the audit trail |
+| `scopes` | `['openid','email','profile']` | IdPs differ on which scope yields an email |
+| `emailTrusted` | `false` | the linking trust decision — per IdP, because Google verifies addresses and a corporate Keycloak may not |
+| `provisioning` | `'jit'` | `'jit'` \| `'existing_only'` |
+| `allowedEmailDomains` | `[]` (any) | without it an enabled Google button provisions the entire internet — the classic misconfiguration of this feature |
+| `emailClaim` | `'email'` | the one load-bearing mapping (no email ⇒ neither link nor provision); corporate IdPs use `upn` |
+
+Fixed, not configurable: `sub` is the subject, `email_verified` is read from that claim only, and
+`name`/`given_name`/`family_name`/`picture`/`locale` are copied into `User.claims` when present. A
+remapping table for claims nobody has asked to remap is surface with no requirement behind it.
+
+#### Expected result — sign-in decision order
+
+`(providerId, sub)` linked → sign in. Else the email from `emailClaim`; **no email → refuse**; domain
+not in a non-empty `allowedEmailDomains` → refuse. Existing account with that email → link **only if**
+`emailTrusted && email_verified`, otherwise 403 "sign in with your password" (no second account, no
+silent takeover). No account → `provisioning` decides; a JIT account is created with
+`verified = emailTrusted && email_verified`, `roles: []`, and **no usable password** — the hash of 32
+random bytes that are discarded immediately, not a sentinel string someone could eventually type, so
+password login fails until a self-service reset — then meets the same `emailVerificationRequired && !verified`
+refusal the password path applies (`lib/interactions/index.ts:218-223`) — issuing the existing
+`issueAndSend` challenge rather than a second verification flow. `active === false` refuses on every
+branch. **Upstream access and refresh tokens are discarded** once the ID token verifies; nothing calls
+an upstream API, so keeping them would only be a secret to leak.
+
+#### Expected result — storage
+
+- **`User.federated: { providerId, sub, linkedAt }[]`** in the per-bucket area. Deletion integrity is
+  then free: the account cascade destroys the row and bucket deletion destroys the area (spec 019).
+- `PER_BUCKET_AREA` gains a **non-unique** multikey index `{ 'federated.providerId': 1, 'federated.sub': 1 }`.
+  Uniqueness of `(providerId, sub)` is enforced **in code**, deliberately: a unique multikey index
+  indexes every password-only account as `{null,null}` and collides on the second one, so it would
+  need `partialFilterExpression`, which `IndexSpec` (`lib/consts/storage_inventory.ts:16-20`) does not
+  model — extending it and its two-way drift guard is a larger change than this feature earns. The
+  residual race yields a duplicate entry naming the same account, not a cross-account leak.
+- **New model area `FederationState`**, TTL 600 s, declared `unowned` with the written reason that it
+  names no principal yet. Its `_id` is `sha256(state)` so the live state value is never at rest
+  (`PasswordResetChallenge` precedent). After the callback it is destroyed and a **single-use handoff**
+  record is written in the same area under a fresh `ref`, TTL 120 s, carrying
+  `{ interactionUid, accountId }`; `complete` consumes it and refuses a `ref` whose `interactionUid` ≠
+  the path `uid`.
+- **`ApplicationConfig['federation.enabled']`**, default `false`, boot-only, gated through the existing
+  `onRequest` mechanism: off ⇒ no `/federation/*` route is served and no button renders.
+
+#### Expected result — admin plane and protocol details
+
+- `GET/POST /admin/api/buckets/:id/federation`, `PATCH/DELETE /admin/api/buckets/:id/federation/:providerId`
+  (bucket-manager reachable via `assertBucketAccess`, as the end-user routes are), plus
+  `GET/DELETE /admin/api/buckets/:id/users/:userId/identities` so an operator can see and remove links.
+  Audit-first with `attributes: Object.keys(body)` — field names, never values. `clientSecret` reads
+  back as a mask, exactly as the SMTP password does.
+- `issuer` is validated at write time by fetching `/.well-known/openid-configuration` and requiring
+  its own `issuer` to equal the submitted value: a misconfiguration is worth catching then, not at a
+  user's first sign-in.
+- The reserved admin bucket keeps `passwordLogin: true` (not editable) and refuses federation writes
+  with 403, as it already refuses password reset.
+- PKCE is sent only when discovery advertises `S256`; token-endpoint auth is chosen from
+  `token_endpoint_auth_methods_supported` (basic, then post) — no knob, the IdP declares it. ID-token
+  verification requires `iss`, `aud` ∋ `clientId`, live `exp`, the stored `nonce`, a present `sub`, and
+  a signature from `jwks_uri`; `alg: none` and any algorithm outside the intersection of the IdP's
+  advertised list and ours are refused. Discovery and JWKS are cached with a TTL and a bounded size,
+  JWKS refetched once on an unknown `kid`. `iss` on the callback is accepted and ignored (RFC 9207).
+- Provider buttons are plain `<a href>` links to the start route, not inline script, so the content
+  security policy is untouched. The login page is the hydrated family, so the buttons must arrive as
+  props — a message or list rendered without them is erased in the browser only
+  (`wiki/concepts/interaction-page-families.md`).
+- Every failure is a rendered page: IdP `access_denied` → the login page with an error (200); unknown
+  or replayed `state`/`ref`, `ref` under the wrong `uid`, unverifiable ID token, missing email → 400
+  plain; unreachable discovery/token/JWKS → 502 plain; disallowed domain, refused link,
+  `existing_only`, inactive account → 403 plain; verification required → 303 to the login page with
+  the existing `NOTICE_VERIFY`. The ID-token failure reason goes to the event bus, not the response
+  (`lib/admin/auth/login.ts:100-111` precedent).
+
+#### Expected result — invariants and tests
+
+Invariants: `passwordLogin: false` is refused unless the bucket has an enabled provider, and so is
+disabling or deleting the last enabled provider in that state (a bucket nobody can sign into must not
+be reachable through the admin API); provider `id` unique and slug-shaped; `issuer` `https:` and
+self-consistent; `scopes` ∋ `openid`; `allowedEmailDomains` lowercase bare domains matched
+case-insensitively.
+
+Tests are integration-level through the Eden client against the in-memory adapter, with a stub
+upstream IdP on the existing `test/fetch_mock.ts` harness (discovery, `jwks_uri`, token endpoint,
+ID tokens signed by the test keystore). Required cases: existing link; trusted-verified link;
+untrusted/unverified collision refused with nothing written; JIT provisioning; `existing_only`;
+`allowedEmailDomains` exclusion; `emailClaim: 'upn'`; `passwordLogin: false` closing all three
+password doors; the last-provider invariant; `enabled: false`; `federation.enabled: false`; each
+protocol failure from the table; admin audit naming fields and never the secret; the admin bucket
+refusals; user deletion removing links and bucket deletion taking the area; and the storage-contract
+drift guard passing with the new area and index declared. The admin provider-create tests need the
+fetch stub as well, because write-time issuer validation makes creation depend on reaching the
+discovery document — including the case where the document's `issuer` disagrees with the submitted
+value, which must be refused.
+
+#### Sequencing for the Implement task
+
+One cohesive feature, two natural halves that can ship in order: **(1)** bucket schema + sign-in flow
+— `passwordLogin` replacing `authMethods`, the `federation` field and its validation,
+`FederationState`, the three routes, ID-token verification, linking and provisioning, the failure
+pages, the login-page buttons; testable end to end with providers seeded straight into the bucket
+store. **(2)** admin plane — provider CRUD and identities routes with their audit entries and masking,
+then the SPA surfaces (bucket detail gains a providers section, user detail gains linked identities).
+Splitting there keeps each half's tests independent: the first needs no admin route, the second
+exercises routes whose behaviour the first already pinned. This is a plan-ordering note, not a
+decomposition into two specs.
+
+#### Out of scope, recorded
+
+`amr`/`acr` claims (no consumer, and they need `Session` + ID-token plumbing); OAuth2-only providers
+(GitHub/Facebook — no `id_token`, so identity comes from a profile call with per-provider mapping and
+a provider-specific answer to "is this email verified?", a second verification model that belongs to
+its own task); upstream single logout and session monitoring; per-provider role mapping; provider
+icons (a remote image on the login page is a CSP decision, and a label distinguishes the buttons); an
+admin "test connection" action (write-time issuer validation already proves reachability); end-user
+self-service unlinking and any end-user account page (there is no such surface in this server yet);
+IdP-initiated login; localisation of the new pages, consistent with every interaction page today.
 
 ### 19. Admin UI completion — Implement
 
