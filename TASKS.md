@@ -899,6 +899,18 @@ exact line numbers.
   (1,005,591 B / 109,545 B gzip). Verified against the installed copy, not the docs alone:
   `config-provider/index.js:345` → `theme/util/genStyleUtils.js:23-30`. It is a **runtime** flag —
   it prevents style generation, it does **not** shrink the JS bundle. No bundle reduction is claimed.
+- **Corrected 2026-08-05 after the final review: the gzip figure is not what ships.**
+  `staticPlugin({ assets: 'public' })` does not compress and this repo has no compression middleware.
+  Verified by request — with `Accept-Encoding: gzip, deflate, br`, which every browser sends, the
+  response carries no `Content-Encoding` and transfers the full **1,005,591 B**. Read in served bytes:
+  the terminal-page exclusion is *strengthened* (the error page inlines 19,213 B against 1,005,591 B
+  had it linked the sheet), but the four hydrated pages now block first paint on ~1 MB of CSS they
+  previously never downloaded, against no FOUC, ~246,494 B less in-browser generation, and one sheet
+  shared by both families and cached 86,400 s. **Part B is a trade, not a pure win, as it ships
+  today.** Compression is deferred to an external plugin (decided 2026-08-05, out of scope here);
+  once it exists the gzip figures apply again and the trade becomes the one this task scoped. Also
+  unmet and recorded rather than left to be found: the login page's *total* transfer size before and
+  after was never captured, only per-asset sizes.
 - **Expected result, part A.** `script-src` is derived from three sources: `<script src>` (relative
   or at `new URL(ISSUER).origin` → `'self'`; a foreign origin named explicitly, the same comparison
   `foreignFormTargets` makes and for the same reason the device pages demonstrate), inline script
@@ -957,12 +969,20 @@ exact line numbers.
   shared module and use it for every asset both renderers reference.
 - **Done when:** full suite green including the rewritten `test/csp/csp.spec.ts`; no hydration
   mismatch on login, login-with-error, consent, registration, admin console, admin setup; **no antd
-  cssinjs `<style>` element injected into `<head>` after hydration** on any of them — matched by the
-  `data-css-hash` attribute antd emits, which is the assertion that proves `zeroRuntime` took rather
-  than being silently ignored (without it every page can pay for its styles twice while appearing to
-  work). Note it is **not** "no `<style>` at all": `@ant-design/icons` injects one on every one of
-  these pages and will continue to, so asserting the absolute fails and sends the implementer chasing
-  antd. Visual parity on those pages, icons included, plus the three states never server-rendered and
+  cssinjs *component-style* element injected into `<head>` after hydration** on any of them, which is
+  what proves `zeroRuntime` took rather than being silently ignored (without it every page can pay for
+  its component styles twice while appearing to work). **Corrected 2026-08-05 after the browser pass:
+  this originally demanded zero `data-css-hash` tags, which is unreachable on antd 6.5.1 — the
+  criterion was wrong, not the code.** Measured on `/admin`: 7 tags, 17,540 B, all CSS
+  custom-property token blocks duplicating definitions already in the served `antd.css` under the
+  identical `.css-var-_R_0_` scope. In `@ant-design/cssinjs-utils/es/util/genStyleUtils.js`,
+  `genComponentStyleHook` (line 98) reads `zeroRuntime` and short-circuits — that is the ~246 KB win —
+  while `genCSSVarRegister` (lines 62-96) never consults it, and `genStyleHooks` (line 25) calls both
+  per component. Pinning `cssVar.key` changed nothing; `StyleProvider`'s `layer` gates an unrelated
+  icon path. Achievable floor: runtime CSS generation ~246,494 B → 17,540 B (~93%), variables only,
+  no component rules. Separately it is **not** "no `<style>` at all": `@ant-design/icons` injects one
+  on every one of these pages and will continue to.
+  Visual parity on those pages, icons included, plus the three states never server-rendered and
   the reason full `antd.css` is shipped (the admin's `theme="dark"` `Menu`, an open `Modal`, an open
   `Select`); login page transfer size recorded before and after.
   `wiki/concepts/html-response-security-policy.md` rewritten in two places: the `script-src 'none'`
@@ -1542,6 +1562,47 @@ IdP-initiated login; localisation of the new pages, consistent with every intera
   from the barrel, and the delta from `splitting: true` (deferred from task 32 for being
   operator-only). If a change wins, it becomes the expected result of a follow-up implementation
   task; if nothing wins, record the numbers here so the question is not reopened by guesswork.
+
+### 35. The server cannot boot against MongoDB — Implement
+
+- **Numbering is append-only:** belongs to P0 (it blocks local development entirely), takes the next
+  free number.
+- **Context:** Found 2026-08-05 while running task 32's browser verification. `bun lib/index.ts`
+  against a real MongoDB throws at `lib/configs/nonceSecret.ts:98`: *"the DPoP nonce secret does not
+  survive a storage round trip: a freshly written 32-byte secret read back in an unusable shape. The
+  storage layer cannot carry binary values intact."* The check is doing its job — `resolveNonceSecret`
+  writes a 32-byte secret, reads back what storage actually holds, and refuses to serve DPoP requests
+  it cannot answer. What fails is the Mongo adapter's handling of binary values. Unrelated to task 32
+  (`nonceSecret.ts` is in no part of that branch); verification had to be done on the in-memory
+  adapter instead (`MONGODB_URI=` empty selects it, `lib/adapters/index.ts:50`).
+- **Expected result:** A 32-byte `Uint8Array`/`Buffer` written through the Mongo `DPoPNonceSecret`
+  store reads back in a usable shape, so the server boots against MongoDB. A spec test asserting the
+  binary round trip at the adapter level, not only at `resolveNonceSecret`. Check whether other
+  binary-valued fields go through the same path — the comment at `nonceSecret.ts:60-66` notes the
+  refusal is deliberately loud rather than fatal for a *configured* value, so a silent corruption
+  elsewhere is the shape to look for. This is also the first hard evidence for the "Mongo adapter
+  coverage" gap the roadmap has carried abstractly.
+
+### 36. Static assets are served uncompressed, and may not revalidate — Investigate
+
+- **Numbering is append-only:** belongs to P2, takes the next free number.
+- **Context:** Found 2026-08-05 by task 32's final review and confirmed by request.
+  `staticPlugin({ assets: 'public' })` (`lib/index.ts:84`) does **not** compress: with
+  `Accept-Encoding: gzip, deflate, br`, the response carries no `Content-Encoding` and transfers the
+  full 1,005,591 B of `antd.css`. There is no compression middleware in the repo. This is what turned
+  task 32's part B from the win it was scoped as into a trade — the design priced that file at its
+  109,545 B gzip size. It also applies to `loginClient.js` (1,019,629 B), `admin.js` (1,611,613 B) and
+  every JSON response the protocol serves. Separately and unconfirmed: a conditional request carrying
+  the correct `If-None-Match` was answered **200 with the full body** rather than 304, and the etag is
+  emitted unquoted (`K9WnLSEFPtxrTmRQOAiPqQ==` rather than `"…"`), which may itself explain the miss —
+  if real, the full megabyte re-downloads whenever the 86,400 s `max-age` expires even when nothing
+  changed.
+- **Deliverable:** A decision on where compression belongs. The operator's stated intent (2026-08-05)
+  is an external plugin rather than application middleware, so this may be deployment configuration
+  (`fly.toml`) rather than code — in which case record that and close it. If it lands in the app,
+  measure the before/after on the four hydrated pages and finally satisfy task 32's unmet acceptance
+  criterion 5 (login page total transfer size, which was never captured — only per-asset sizes).
+  Confirm or dismiss the 304 behaviour separately; it is cheap to test and independent of compression.
 
 ---
 

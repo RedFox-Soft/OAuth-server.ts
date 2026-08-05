@@ -4,7 +4,7 @@ title: "The two interaction page families"
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-04
-updated: 2026-08-04
+updated: 2026-08-05
 graph:
   node_type: concept
   relationships:
@@ -92,6 +92,39 @@ The login page takes a `notice` identifier and resolves it through a closed, ser
 The `?notice=verify` redirect existed, unread, from the day registration was written: the producer used a
 string literal and no consumer was ever added. Producer and consumer now share `NOTICE_VERIFY` through
 `buildUILoginPath(uid, notice?)`, which is the actual fix — the message is the symptom.
+
+## zeroRuntime does not reach zero
+
+The antd shell links a precompiled `antd.css`/`reset.css` and sets `theme={{ zeroRuntime: true }}`
+(`lib/html/zeroRuntime.tsx`) instead of letting antd's cssinjs generate ~246 KB of CSS at runtime. That
+flag genuinely eliminates the bulk of it — but not all of it, and not because of a misconfiguration.
+
+`zeroRuntime` only gates `genComponentStyleHook` in `@ant-design/cssinjs-utils` (the hashed per-component
+rule sets antd.css now supplies). A second, separate hook in the same module, `genCSSVarRegister`, injects
+the small `--ant-xxx` custom-property block every cssVar-mode component needs its classes to resolve — and
+it calls `useCSSVarRegister` **unconditionally**; it never reads `zeroRuntime` at all
+(`node_modules/@ant-design/cssinjs-utils/es/util/genStyleUtils.js:62-97` versus the check at `:120-125` of
+the same file, which exists only in `genComponentStyleHook`). Measured floor on `/admin`: 7
+`style[data-css-hash]` tags, 17,540 B, injected after hydration regardless.
+
+Two fixes were tried and both are dead ends, not just untried:
+
+- **Pinning `cssVar.key`** (`theme.cssVar.key`) only renames the scope class the runtime writes on
+  elements. Confirmed empirically in a live hydration check: the tag count and byte count were unchanged
+  whether the key was left to default (`useId`) or pinned to an arbitrary literal. The antd.css shipped by
+  the npm package already contains matching-looking scope classes (`_R_0_`, `_R_29f_`, `_R_39f_`) purely
+  by useId coincidence — they are never actually read, since the runtime always injects its own live copy
+  under whatever key is active, and styling was correct even under a deliberately non-matching key.
+- **`StyleProvider`'s `layer` prop** feeds `!!layer` into `memoIconContextValue.zeroRuntime` in
+  `node_modules/antd/es/config-provider/index.js:338-346` — a value consumed only by `IconStyle`
+  (`@ant-design/icons`' own, unrelated style-injection mechanism). It is never read anywhere near
+  `genCSSVarRegister`. Adopting `layer` would also require re-linking `antd.css` under a CSS `@layer`
+  for no effect on this floor.
+
+No theme prop in antd 6.5.1 suppresses `genCSSVarRegister`. The floor scales with the distinct
+cssVar-participating components a given page actually mounts (Typography, Input, Form, Button, Card on
+`/admin`), so it is not identical across pages, but it is never zero for a page that renders form
+controls.
 
 ## Related
 

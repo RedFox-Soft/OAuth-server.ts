@@ -4,6 +4,7 @@ import { Button, Form } from 'antd';
 import { Card, Flex } from 'antd';
 import { routeNames } from 'lib/consts/param_list.js';
 import { htmlResponse } from './csp.js';
+import { versionedAsset } from './versionedAsset.js';
 
 const cache = createCache();
 function renderLogoutForm(secret: string) {
@@ -28,7 +29,7 @@ function renderLogoutForm(secret: string) {
 				>
 					<div style={{ textAlign: 'center', marginBottom: 24 }}>
 						<img
-							src="/public/logo.svg"
+							src={versionedAsset('logo.svg')}
 							alt="Logo"
 							style={{ width: 120 }}
 						/>

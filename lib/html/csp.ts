@@ -32,6 +32,21 @@ function ownOrigin(): string | undefined {
 }
 
 /*
+ * One rule, three attributes. A relative URL, or an absolute one at this server's origin, is
+ * `'self'`; anything else is named explicitly. Written once because a change to it — an unparseable
+ * form — must not have to be found in three places.
+ */
+function resolveOrigin(raw: string, self: string | undefined): string {
+	try {
+		const { origin } = new URL(raw);
+		return origin === self ? "'self'" : origin;
+	} catch {
+		// Relative — this server.
+		return "'self'";
+	}
+}
+
+/*
  * Inline <script> blocks that carry a body rather than a src. Their hashes go into `script-src`; the
  * blanket 'unsafe-inline' is never used, which is the whole point of hashing them.
  */
@@ -57,6 +72,78 @@ function inlineHandlers(html: string): string[] {
 }
 
 /*
+ * Where this document's external scripts come from. A relative src, or an absolute one at this
+ * server's origin, is `'self'`; a foreign origin is named explicitly — the same comparison
+ * `foreignFormTargets` makes below, and wrong for the same reason if simplified to "absolute means
+ * foreign".
+ *
+ * Naming foreign origins is not speculative generality. Until now `'self'` was unconditional, so a
+ * page that added a CDN script was blocked with no error anywhere; deriving the origin closes that
+ * silent failure symmetrically with `form-action`.
+ */
+function scriptOrigins(html: string): string[] {
+	const self = ownOrigin();
+	const sources = new Set<string>();
+
+	for (const [, attributes] of html.matchAll(/<script([^>]*)>/g)) {
+		const src = /\ssrc="([^"]*)"/.exec(attributes)?.[1];
+		if (!src) {
+			continue;
+		}
+		sources.add(resolveOrigin(src, self));
+	}
+
+	return [...sources];
+}
+
+/*
+ * Stylesheets this document links. Same origin treatment as `scriptOrigins`.
+ */
+function stylesheetOrigins(html: string): string[] {
+	const self = ownOrigin();
+	const sources = new Set<string>();
+
+	for (const [, attributes] of html.matchAll(/<link([^>]*)>/g)) {
+		if (!/\srel="stylesheet"/.test(attributes)) {
+			continue;
+		}
+		const href = /\shref="([^"]*)"/.exec(attributes)?.[1];
+		if (!href) {
+			continue;
+		}
+		sources.add(resolveOrigin(href, self));
+	}
+
+	return [...sources];
+}
+
+/*
+ * Inline <style> blocks that carry a body. Hashed exactly as inline scripts are — a block is the
+ * form worth constraining, since it restyles the whole document and can exfiltrate input values by
+ * attribute selector.
+ */
+function inlineStyleBlocks(html: string): string[] {
+	const found: string[] = [];
+	for (const [, , body] of html.matchAll(
+		/<style([^>]*)>([\s\S]*?)<\/style>/g
+	)) {
+		if (body.trim()) {
+			found.push(body);
+		}
+	}
+	return found;
+}
+
+/*
+ * Whether any element carries a style attribute. A false positive here — the pattern appearing inside
+ * a hashed script's JSON, say — only loosens `style-src-attr` to what it already was, so the error
+ * direction is the safe one. A false negative would stop a page styling itself.
+ */
+function hasStyleAttribute(html: string): boolean {
+	return /\sstyle="/.test(html);
+}
+
+/*
  * Where this document's forms actually post. Anything relative, or absolute at this server's own
  * origin, is `'self'`; a foreign origin is named explicitly.
  *
@@ -69,15 +156,10 @@ function foreignFormTargets(html: string): string[] {
 	const foreign = new Set<string>();
 
 	for (const [, action] of html.matchAll(/<form[^>]*\saction="([^"]*)"/g)) {
-		let origin: string;
-		try {
-			origin = new URL(action).origin;
-		} catch {
-			// Relative — this server.
-			continue;
-		}
-		if (origin !== self) {
-			foreign.add(origin);
+		// A relative or same-origin action resolves to 'self', which contributes nothing here.
+		const resolved = resolveOrigin(action, self);
+		if (resolved !== "'self'") {
+			foreign.add(resolved);
 		}
 	}
 
@@ -85,7 +167,8 @@ function foreignFormTargets(html: string): string[] {
 }
 
 export function contentSecurityPolicyFor(html: string): string {
-	const scriptSrc = ["'self'", ...inlineScripts(html).map(hash)];
+	const scripts = scriptOrigins(html);
+	const scriptSrc = [...scripts, ...inlineScripts(html).map(hash)];
 
 	const handlers = inlineHandlers(html);
 	if (handlers.length) {
@@ -94,18 +177,43 @@ export function contentSecurityPolicyFor(html: string): string {
 
 	const foreignTargets = foreignFormTargets(html);
 
+	/*
+	 * The gate here is external scripts specifically, not "code that runs after the document is
+	 * served" — the form_post auto-submit page and the device input page both run inline code after
+	 * serving (a module script, an onfocus handler), and both are hashed rather than excepted, because
+	 * that code is itself in the document. An external script is different: it is a linked bundle whose
+	 * post-serve behaviour the document cannot describe — specifically @ant-design/icons'
+	 * useInsertStyles, which injects a block that does not exist yet and therefore cannot be hashed. A
+	 * document with no external script keeps its <style> blocks as the whole truth, so they can be
+	 * hashed instead of falling back to `'unsafe-inline'`. See test/csp/csp.spec.ts, "keeps
+	 * 'unsafe-inline' … wherever a bundle can inject" — removing it takes the styling off every icon on
+	 * the sign-in page and reports nothing but a console violation.
+	 */
+	const styleSrcElem = [
+		...stylesheetOrigins(html),
+		...(scripts.length
+			? ["'unsafe-inline'"]
+			: inlineStyleBlocks(html).map(hash))
+	];
+
 	const directives = [
 		"default-src 'none'",
 		"base-uri 'none'",
 		"object-src 'none'",
-		`script-src ${scriptSrc.join(' ')}`,
 		/*
-		 * The one deliberately loose directive. antd's cssinjs injects styles into the document at
-		 * runtime after hydration, and the page templates carry hand-written <style> blocks. A nonce
-		 * would work — ConfigProvider accepts csp={{ nonce }} — but it would have to reach the client
-		 * bundle, and it constrains styling rather than script execution.
+		 * Nothing to authorize means authorize nothing. `'none'` is only correct when it stands alone —
+		 * beside a hash or an origin it is meaningless — so it is the empty case, never appended.
+		 */
+		`script-src ${scriptSrc.length ? scriptSrc.join(' ') : "'none'"}`,
+		/*
+		 * Retained unnarrowed for browsers without the CSP3 -elem/-attr pair, which supersedes it
+		 * wherever it is understood. Narrowing this one too would block style attributes on those
+		 * browsers instead of merely failing to harden them.
 		 */
 		"style-src 'self' 'unsafe-inline'",
+		`style-src-elem ${styleSrcElem.length ? styleSrcElem.join(' ') : "'none'"}`,
+		// The weak form: an attribute decorates the one element it is already attached to.
+		`style-src-attr ${hasStyleAttribute(html) ? "'unsafe-inline'" : "'none'"}`,
 		"img-src 'self' data:",
 		"font-src 'self'",
 		"connect-src 'self'",

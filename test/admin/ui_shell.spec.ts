@@ -49,8 +49,8 @@ describe('admin UI shell', () => {
 	/*
 	 * The audit page is a super-admin surface. renderAdminShell server-renders <Layout me={...}>, so
 	 * the role gate on the nav entry is observable in the shell HTML without a built bundle — the
-	 * bundle is deliberately absent under test (serverRender.bundleVersion falls back for exactly
-	 * that reason), so asserting on public/admin.js only ever passed on a locally built artifact.
+	 * bundle is deliberately absent under test (versionedAsset falls back for exactly that reason),
+	 * so asserting on public/admin.js only ever passed on a locally built artifact.
 	 *
 	 * The sessions are minted here rather than in beforeAll because the first test above must see an
 	 * admin bucket with no super_admin in it.

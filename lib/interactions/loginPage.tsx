@@ -10,6 +10,7 @@ import {
 	buildUIRegistrationPath,
 	buildUIForgotPasswordPath
 } from './buildUIPath.js';
+import { versionedAsset } from '../html/versionedAsset.js';
 
 export function LoginPage({
 	uid,
@@ -40,7 +41,7 @@ export function LoginPage({
 			>
 				<div style={{ textAlign: 'center', marginBottom: 24 }}>
 					<img
-						src="/public/logo.svg"
+						src={versionedAsset('logo.svg')}
 						alt="Logo"
 						style={{ width: 120 }}
 					/>

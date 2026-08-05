@@ -20,6 +20,17 @@ const targets: Array<{ entry: string; name: string }> = [
 	{ entry: './lib/admin/ui/adminClient.tsx', name: 'admin.[ext]' }
 ];
 
+/*
+ * antd 6 generates every component's CSS at runtime unless `zeroRuntime` is set, in which case the
+ * page must link a precompiled stylesheet instead. Both files ship inside the package; copying rather
+ * than serving from node_modules keeps `staticPlugin({ assets: 'public' })` as the one thing that
+ * serves assets.
+ */
+const stylesheets: Array<{ from: string; to: string }> = [
+	{ from: 'node_modules/antd/dist/reset.css', to: './public/reset.css' },
+	{ from: 'node_modules/antd/dist/antd.css', to: './public/antd.css' }
+];
+
 async function buildAll() {
 	for (const { entry, name } of targets) {
 		const result = await Bun.build({
@@ -34,6 +45,17 @@ async function buildAll() {
 			throw new AggregateError(result.logs, `build failed: ${entry}`);
 		}
 		console.log(`built ${entry} → public/${name.replace('[ext]', 'js')}`);
+	}
+
+	for (const { from, to } of stylesheets) {
+		const source = Bun.file(from);
+		if (!(await source.exists())) {
+			throw new Error(
+				`missing ${from} — antd must ship the stylesheets zeroRuntime mode requires`
+			);
+		}
+		await Bun.write(to, source);
+		console.log(`copied ${from} → ${to}`);
 	}
 }
 

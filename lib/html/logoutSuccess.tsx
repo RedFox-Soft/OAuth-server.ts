@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { createCache, extractStyle, StyleProvider } from '@ant-design/cssinjs';
 import { Card, Flex } from 'antd';
 import { htmlResponse } from './csp.js';
+import { versionedAsset } from './versionedAsset.js';
 
 const cache = createCache();
 function renderLogoutForm() {
@@ -26,7 +27,7 @@ function renderLogoutForm() {
 				>
 					<div style={{ textAlign: 'center', marginBottom: 24 }}>
 						<img
-							src="/public/logo.svg"
+							src={versionedAsset('logo.svg')}
 							alt="Logo"
 							style={{ width: 120 }}
 						/>

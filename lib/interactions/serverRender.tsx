@@ -5,12 +5,24 @@ import { ConsentPage } from './consentPage.js';
 import { RegistrationPage } from './registration.js';
 import type { ConsentView } from './consentView.js';
 import { htmlResponse } from '../html/csp.js';
+import { versionedAsset } from '../html/versionedAsset.js';
+import { ZeroRuntime } from '../html/zeroRuntime.js';
 
 const htmlTeamplate = Bun.file('./lib/interactions/htmlTeamplate.html');
 
 // escape `<` so a client name / scope value can't break out of the script tag
 function propsScript(props: unknown): string {
 	return `<script>window.PROPS=${JSON.stringify(props).replace(/</g, '\\u003c')}</script>`;
+}
+
+/*
+ * reset before components, so antd's reset does not override component styles.
+ */
+function styleLinks(): string {
+	return [
+		`<link rel="stylesheet" href="${versionedAsset('reset.css')}" />`,
+		`<link rel="stylesheet" href="${versionedAsset('antd.css')}" />`
+	].join('');
 }
 
 export async function loginServer(
@@ -24,17 +36,22 @@ export async function loginServer(
 
 	let html = await htmlTeamplate.text();
 	html = html
+		.replace('/public/loginClient.js', versionedAsset('loginClient.js'))
+		.replace('/public/favicon.ico', versionedAsset('favicon.ico'))
 		.replace('<!--app-title-->', 'Login Page')
+		.replace('<!--app-styles-->', styleLinks())
 		.replace('<!--app-props-->', propsScript({ uid, errorMessage, notice }))
 		.replace(
 			'<!--app-html-->',
 			renderToString(
 				<StrictMode>
-					<LoginPage
-						uid={uid}
-						errorMessage={errorMessage}
-						notice={notice}
-					/>
+					<ZeroRuntime>
+						<LoginPage
+							uid={uid}
+							errorMessage={errorMessage}
+							notice={notice}
+						/>
+					</ZeroRuntime>
 				</StrictMode>
 			)
 		);
@@ -50,7 +67,10 @@ export async function registrationServer(
 
 	let html = await htmlTeamplate.text();
 	html = html
+		.replace('/public/loginClient.js', versionedAsset('loginClient.js'))
+		.replace('/public/favicon.ico', versionedAsset('favicon.ico'))
 		.replace('<!--app-title-->', 'Registration Page')
+		.replace('<!--app-styles-->', styleLinks())
 		// The props are what the hydrated tree is built from: without them React replaces the
 		// server-rendered page with one that never heard about the error, silently and in the browser
 		// only.
@@ -59,11 +79,13 @@ export async function registrationServer(
 			'<!--app-html-->',
 			renderToString(
 				<StrictMode>
-					<RegistrationPage
-						uid={uid}
-						errorMessage={errorMessage}
-						email={email}
-					/>
+					<ZeroRuntime>
+						<RegistrationPage
+							uid={uid}
+							errorMessage={errorMessage}
+							email={email}
+						/>
+					</ZeroRuntime>
 				</StrictMode>
 			)
 		);
@@ -74,13 +96,18 @@ export async function registrationServer(
 export async function consentServer(view: ConsentView) {
 	let html = await htmlTeamplate.text();
 	html = html
+		.replace('/public/loginClient.js', versionedAsset('loginClient.js'))
+		.replace('/public/favicon.ico', versionedAsset('favicon.ico'))
 		.replace('<!--app-title-->', 'Consent Page')
+		.replace('<!--app-styles-->', styleLinks())
 		.replace('<!--app-props-->', propsScript(view))
 		.replace(
 			'<!--app-html-->',
 			renderToString(
 				<StrictMode>
-					<ConsentPage {...view} />
+					<ZeroRuntime>
+						<ConsentPage {...view} />
+					</ZeroRuntime>
 				</StrictMode>
 			)
 		);

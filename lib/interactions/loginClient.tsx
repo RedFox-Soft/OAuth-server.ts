@@ -3,6 +3,7 @@ import { StrictMode } from 'react';
 import { LoginPage } from './loginPage.tsx';
 import { ConsentPage } from './consentPage.tsx';
 import { RegistrationPage } from './registration.tsx';
+import { ZeroRuntime } from '../html/zeroRuntime.js';
 
 declare global {
 	interface Window {
@@ -24,40 +25,48 @@ function pageName() {
 
 const props = window.PROPS || {};
 
+// The template renders this; if it is missing, the document is not the one this bundle is for, and
+// saying so beats failing somewhere inside React.
+const root = document.getElementById('root');
+if (!root) {
+	throw new Error('#root is missing from the document');
+}
+
 hydrateRoot(
-	// @ts-expect-error root which already exists
-	document.getElementById('root'),
+	root,
 	<StrictMode>
-		{(() => {
-			switch (pageName()) {
-				case 'login':
-					return (
-						<LoginPage
-							uid={calculateUid()}
-							{...props}
-						/>
-					);
-				case 'consent':
-					return (
-						<ConsentPage
-							uid={calculateUid()}
-							clientName={''}
-							account={undefined}
-							permissions={[]}
-							{...props}
-						/>
-					);
-				case 'registration':
-					// Spreading props is not parity for its own sake: a message the server rendered into
-					// this page is erased the moment React hydrates from props that never carried it, in
-					// the browser only and with nothing logged anywhere.
-					return (
-						<RegistrationPage
-							uid={calculateUid()}
-							{...props}
-						/>
-					);
-			}
-		})()}
+		<ZeroRuntime>
+			{(() => {
+				switch (pageName()) {
+					case 'login':
+						return (
+							<LoginPage
+								uid={calculateUid()}
+								{...props}
+							/>
+						);
+					case 'consent':
+						return (
+							<ConsentPage
+								uid={calculateUid()}
+								clientName={''}
+								account={undefined}
+								permissions={[]}
+								{...props}
+							/>
+						);
+					case 'registration':
+						// Spreading props is not parity for its own sake: a message the server rendered into
+						// this page is erased the moment React hydrates from props that never carried it, in
+						// the browser only and with nothing logged anywhere.
+						return (
+							<RegistrationPage
+								uid={calculateUid()}
+								{...props}
+							/>
+						);
+				}
+			})()}
+		</ZeroRuntime>
 	</StrictMode>
 );

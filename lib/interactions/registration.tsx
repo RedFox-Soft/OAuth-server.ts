@@ -5,6 +5,7 @@ import {
 } from '@ant-design/icons';
 import { Button, Card, Flex, Form, Input } from 'antd';
 import { buildUILoginPath, buildUIRegistrationPath } from './buildUIPath.js';
+import { versionedAsset } from '../html/versionedAsset.js';
 
 export function RegistrationPage({
 	uid,
@@ -35,7 +36,7 @@ export function RegistrationPage({
 			>
 				<div style={{ textAlign: 'center', marginBottom: 24 }}>
 					<img
-						src="/public/logo.svg"
+						src={versionedAsset('logo.svg')}
 						alt="Logo"
 						style={{ width: 120 }}
 					/>
