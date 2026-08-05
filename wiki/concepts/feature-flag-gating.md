@@ -76,7 +76,8 @@ registration switched off. See [[client-identity-from-database]] for what such a
 ## The route table and its drift guard
 
 `lib/consts/route_classification.ts` declares every mounted route as either gated by a named flag
-(15 routes) or explicitly always-available (59). Two mechanisms keep it honest:
+(18 routes) or explicitly always-available (6 individually, plus five whole prefixes). Two mechanisms
+keep it honest:
 
 - `flag` is typed as `keyof ApplicationConfigType`, so a renamed flag is a compile error rather than
   a silently disabled endpoint.
@@ -87,6 +88,16 @@ Paths are written in Elysia's declaration form so they compare directly against 
 sourced from `routeNames` wherever one exists. `lib/plugins/cors.ts` reads the same table, so route
 classes serve both the gate and cross-origin policy.
 
+**A gated route may sit under an always-available prefix.** `gatedRoutes` is consulted *before*
+`alwaysAvailablePrefixes` in both `classifyRoutePattern` and `gatedFlagForRequest`, which is what lets the
+three federated sign-in legs be gated despite living under `/ui` — the first routes to do so. The prefix's
+own rationale survives: with the flag off there is no provider control and nothing a user could have
+started, so these are paths that do not exist rather than paths closed mid-flow.
+
+That overlap broke an assumption in the drift guard, which asserted `gated + alwaysAvailable + prefixed ===
+mounted` — a **sum**, valid only while the three sets are disjoint. It is now a union comparison, which
+still fails on an unclassified route and additionally fails on a declared route the server does not serve.
+
 ## Related
 
 - [[deletion-and-revocation]] — the fourth use of this page's table-plus-drift-guard pattern, for storage ownership.
@@ -95,5 +106,7 @@ classes serve both the gate and cross-origin policy.
 - [[client-identity-from-database]] — the registration endpoints this gate protects.
 - [[admin-audit-trail]] — reuses this page's declarative-table-plus-two-way-drift-guard pattern for
   audit coverage.
+- [[upstream-federation]] — the first gated routes under a prefix, and why the routes that *configure* the
+  capability are deliberately left ungated.
 
 Verified against [[oauth-server-codebase]] at commit `2125ad0`.

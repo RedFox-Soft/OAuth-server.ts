@@ -331,6 +331,25 @@ export const ApplicationConfig = {
 	'cors.enabled': true,
 
 	/*
+	 * federation
+	 *
+	 * title: Upstream OIDC federation — let end users sign in through an external identity provider
+	 *
+	 * description: Enables per-bucket federated sign-in: a bucket may carry generic OIDC providers, and
+	 * its login page offers them alongside (or instead of) the password form. This server acts as a
+	 * relying party on the upstream provider — OIDC Core/Discovery 1.0 with PKCE where the provider
+	 * advertises it — and discards the upstream's access and refresh tokens once the identity assertion
+	 * verifies.
+	 *
+	 * Defaults to disabled because it is the only feature here that lets an outside party's assertion
+	 * produce a session on this server: off, no `/federation/*` route is served and no provider control
+	 * renders, whatever any bucket holds. The routes that *configure* providers are deliberately not
+	 * gated by this, so an operator can prepare a provider before switching it on — and can still delete
+	 * one on a deployment that has just switched it off.
+	 */
+	'federation.enabled': false,
+
+	/*
 	 * features.registration
 	 *
 	 * title: [`OIDC Dynamic Client Registration 1.0`](https://openid.net/specs/openid-connect-registration-1_0-final.html) and [`RFC7591`](https://www.rfc-editor.org/rfc/rfc7591.html) - OAuth 2.0 Dynamic Client Registration Protocol

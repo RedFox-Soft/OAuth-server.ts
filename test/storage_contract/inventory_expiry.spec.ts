@@ -23,6 +23,10 @@ const REAPED_ON_EXPIRES_AT = [
 	'BackchannelAuthenticationRequest',
 	'ClientCredentials',
 	'DeviceCode',
+	// Both stages of a federated sign-in's round-trip record are short-lived by design (600s, then 120s
+	// for the handoff), so this area must reap. A round-trip record that outlived its interaction would
+	// be a spendable sign-in.
+	'FederationState',
 	'Grant',
 	'InitialAccessToken',
 	'Interaction',
@@ -130,7 +134,16 @@ describe('storage inventory: per-bucket user areas', () => {
 
 		expect(area.name).toBe('user_abc');
 		expect(area.reaped).toBeNull();
-		expect(indexesFor(area)).toEqual([{ key: { email: 1 }, unique: true }]);
+		/*
+		 * Kept as an exact list, not a containment check: the point of asserting the whole set is that an
+		 * index added by accident fails here. The second entry resolves an account from the upstream
+		 * identity it holds and is deliberately non-unique — see the comment on the declaration for why
+		 * uniqueness lives in code instead.
+		 */
+		expect(indexesFor(area)).toEqual([
+			{ key: { email: 1 }, unique: true },
+			{ key: { 'federated.providerId': 1, 'federated.sub': 1 } }
+		]);
 	});
 
 	// Uniqueness is per collection, so per bucket. Two buckets holding the same address is legitimate;

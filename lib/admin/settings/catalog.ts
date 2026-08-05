@@ -334,6 +334,20 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 			'Lets browser-based apps read responses from the metadata and key endpoints, and from the endpoints listed on a project’s browser origins. Closure normally comes from data — a project with no origins grants nothing — so this is an incident kill switch rather than the usual control.'
 	},
 
+	/*
+	 * The switch stands alone: which providers exist, and whether any is enabled, is per-bucket data
+	 * reached through the bucket's own routes rather than a setting here. Catalogued because a feature an
+	 * operator cannot turn on without editing the database is not a feature they have.
+	 */
+	{
+		key: 'federation.enabled',
+		group: 'Federation',
+		label: 'Enable sign-in through an upstream identity provider',
+		type: 'boolean',
+		description:
+			'Lets a user bucket offer sign-in through external OpenID Providers configured on that bucket, alongside or instead of its password form. Off by default: this is the only capability that lets an outside party’s assertion produce a session here, and with it off no federation route is served and no provider button renders, whatever a bucket holds. Configuring providers stays available either way, so a provider can be prepared before switching this on and removed after switching it off. Applied at startup.'
+	},
+
 	{
 		key: 'registration.enabled',
 		group: 'Registration',

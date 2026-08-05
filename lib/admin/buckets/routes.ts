@@ -17,6 +17,10 @@ import { ADMIN_BUCKET_ID } from '../consts.js';
 import { recordAdminAudit } from '../audit/record.js';
 import nanoid from '../../helpers/nanoid.js';
 import { loadBucketForUsers, loadBucketForEdit } from './access.js';
+import {
+	assertSomeWayToSignIn,
+	prospectiveBucket
+} from '../federation/validate.js';
 import { CreateBucketBody, UpdateBucketBody } from './schema.js';
 
 export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
@@ -40,6 +44,14 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 		async ({ admin, body, set }) => {
 			const ctx = assertAuth(admin as AdminContext | null);
 			assertRole(ctx, 'super_admin');
+			/*
+			 * A new bucket cannot be created unreachable. Providers are added through their own routes, so at
+			 * creation there are none — which makes `passwordLogin: false` here always a lockout.
+			 */
+			assertSomeWayToSignIn({
+				passwordLogin: body.passwordLogin !== false,
+				federation: []
+			});
 			// The id is allocated here, not by the store, so the audit entry can name the bucket that is
 			// about to exist — audit-first has nothing to point at otherwise.
 			const bucketId = nanoid();
@@ -49,6 +61,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 				name: body.name,
 				roles: body.roles ?? [],
 				managedBy: body.managedBy ?? [ctx.userId],
+				passwordLogin: body.passwordLogin,
 				registrationOpen: body.registrationOpen,
 				emailVerificationRequired: body.emailVerificationRequired,
 				verificationMethod: body.verificationMethod
@@ -66,10 +79,16 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 		'/admin/api/buckets/:id',
 		async ({ admin, params, body }) => {
 			const ctx = assertAuth(admin as AdminContext | null);
-			await loadBucketForEdit(ctx, params.id);
+			const bucket = await loadBucketForEdit(ctx, params.id);
 			if (body.managedBy !== undefined) {
 				assertRole(ctx, 'super_admin');
 			}
+			/*
+			 * Checked before the audit entry and the write: an entry describing a change a 409 refused would
+			 * state that an operator closed a bucket's password door when they did not. The provider routes
+			 * enforce the same rule from the other direction, through the same function.
+			 */
+			assertSomeWayToSignIn(prospectiveBucket(bucket, body));
 			/*
 			 * Recorded whatever the request changed. This used to fire only for a registration or
 			 * verification field, so renaming a bucket or reassigning its managers left no trace at all

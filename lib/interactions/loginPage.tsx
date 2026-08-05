@@ -8,18 +8,24 @@ import {
 import {
 	buildUILoginPath,
 	buildUIRegistrationPath,
-	buildUIForgotPasswordPath
+	buildUIForgotPasswordPath,
+	buildUIFederationStartPath
 } from './buildUIPath.js';
 import { versionedAsset } from '../html/versionedAsset.js';
 
 export function LoginPage({
 	uid,
 	errorMessage,
-	notice
+	notice,
+	passwordLogin = true,
+	providers = []
 }: {
 	uid: string;
 	errorMessage?: string;
 	notice?: string;
+	/* Defaulted so the component renders the password page for any caller that says nothing. */
+	passwordLogin?: boolean;
+	providers?: { id: string; displayName: string }[];
 }) {
 	return (
 		<Flex
@@ -104,54 +110,108 @@ export function LoginPage({
 							</div>
 						</Form.Item>
 					)}
-					<Form.Item
-						name="username"
-						rules={[{ required: true, message: 'Please input your Username!' }]}
-					>
-						<Input
-							name="username"
-							prefix={<UserOutlined />}
-							placeholder="Username"
-						/>
-					</Form.Item>
-					<Form.Item
-						name="password"
-						rules={[{ required: true, message: 'Please input your Password!' }]}
-					>
-						<Input
-							name="password"
-							prefix={<LockOutlined />}
-							type="password"
-							placeholder="Password"
-						/>
-					</Form.Item>
-					<Form.Item>
-						<Flex
-							justify="space-between"
-							align="center"
-						>
+					{/*
+					 * Everything a password needs, and nothing when the bucket has none. The fields, the
+					 * "remember me", the submit, the reset link and the registration link all go together:
+					 * each one leads somewhere that answers 403 on a federated-only bucket, so leaving any of
+					 * them would be an invitation to a dead end.
+					 */}
+					{passwordLogin && (
+						<>
 							<Form.Item
-								name="remember"
-								valuePropName="checked"
-								noStyle
+								name="username"
+								rules={[
+									{ required: true, message: 'Please input your Username!' }
+								]}
 							>
-								<Checkbox name="remember">Remember me</Checkbox>
+								<Input
+									name="username"
+									prefix={<UserOutlined />}
+									placeholder="Username"
+								/>
 							</Form.Item>
-							<a href={buildUIForgotPasswordPath(uid)}>Forgot password</a>
-						</Flex>
-					</Form.Item>
+							<Form.Item
+								name="password"
+								rules={[
+									{ required: true, message: 'Please input your Password!' }
+								]}
+							>
+								<Input
+									name="password"
+									prefix={<LockOutlined />}
+									type="password"
+									placeholder="Password"
+								/>
+							</Form.Item>
+							<Form.Item>
+								<Flex
+									justify="space-between"
+									align="center"
+								>
+									<Form.Item
+										name="remember"
+										valuePropName="checked"
+										noStyle
+									>
+										<Checkbox name="remember">Remember me</Checkbox>
+									</Form.Item>
+									<a href={buildUIForgotPasswordPath(uid)}>Forgot password</a>
+								</Flex>
+							</Form.Item>
 
-					<Form.Item>
-						<Button
-							block
-							type="primary"
-							htmlType="submit"
-						>
-							Log in
-						</Button>
-						or <a href={buildUIRegistrationPath(uid)}>Register now!</a>
-					</Form.Item>
+							<Form.Item>
+								<Button
+									block
+									type="primary"
+									htmlType="submit"
+								>
+									Log in
+								</Button>
+								or <a href={buildUIRegistrationPath(uid)}>Register now!</a>
+							</Form.Item>
+						</>
+					)}
 				</Form>
+				{/*
+				 * Plain anchors, not buttons with handlers: leg one of the flow is a navigation, so this adds
+				 * no script and no inline handler and the page's derived content security policy is unchanged.
+				 * Outside the <Form> because submitting the form is not what these do.
+				 */}
+				{providers.length > 0 && (
+					<Flex
+						vertical
+						gap={8}
+					>
+						{passwordLogin && (
+							<div
+								style={{
+									color: '#8c8c8c',
+									fontSize: '12px',
+									textAlign: 'center'
+								}}
+							>
+								or continue with
+							</div>
+						)}
+						{providers.map((provider) => (
+							<a
+								key={provider.id}
+								href={buildUIFederationStartPath(uid, provider.id)}
+								style={{
+									display: 'block',
+									padding: '8px 16px',
+									border: '1px solid #d9d9d9',
+									borderRadius: '6px',
+									textAlign: 'center',
+									color: '#1f1f1f',
+									textDecoration: 'none'
+								}}
+							>
+								Sign in with {provider.displayName}
+							</a>
+						))}
+					</Flex>
+				)}
 			</Card>
 		</Flex>
 	);

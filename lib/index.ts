@@ -36,6 +36,8 @@ import { InvalidDpopProof, UseDpopNonce } from './helpers/validate_dpop.js';
 import { adminApp } from './admin/index.js';
 import { verificationRoutes } from './routes/verification.js';
 import { passwordResetRoutes } from './routes/password_reset.js';
+/* Its own top-level instance because it cannot satisfy the `ui` guard: see lib/federation/routes.ts. */
+import { federationRoutes } from './federation/routes.js';
 
 export const elysia = new Elysia({ strictPath: true, normalize: false })
 	.error({
@@ -108,5 +110,6 @@ export const elysia = new Elysia({ strictPath: true, normalize: false })
 	.use(ui)
 	.use(verificationRoutes)
 	.use(passwordResetRoutes)
+	.use(federationRoutes)
 	.use(adminApp)
 	.listen(3000);

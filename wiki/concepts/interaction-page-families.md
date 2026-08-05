@@ -48,6 +48,15 @@ document arrives; then hydration replaces the tree with what the component rende
 received, and server-rendered content vanishes. Nothing logs. No test that reads the server's response body
 can see it. The page still "works".
 
+The login page joined the list of pages this matters for when federation gave it `passwordLogin` and
+`providers`: buttons rendered from the bucket but absent from the props would appear and then vanish.
+
+**And a page in this family cannot be rendered at a URL outside its own route.** `loginClient.tsx` derives
+both the page name and the interaction id from `window.location.pathname`, so a login document served at
+`/federation/callback` hydrates into an empty root. That is why a declined federated sign-in *redirects* to
+the login path carrying a notice identifier rather than rendering the login page where it stands — see
+[[upstream-federation]].
+
 `registrationServer` substituted no props and `loginClient`'s `registration` arm passed only `uid` — from
 the page's introduction until spec 021. Harmless while that page had nothing to say, which is exactly why
 it survived: the defect was invisible until someone rendered a message into it. If you add a message to a
@@ -136,3 +145,5 @@ controls.
   a heading and stopped printing a token whose label is the token.
 - [[feature-flag-gating]] — the other place a deployment's configuration decides what an end user is
   allowed to reach.
+- [[upstream-federation]] — added the login page's provider controls (plain anchors, so the policy is
+  unchanged), the `federation_aborted` notice, and the terminal pages for every federated refusal.

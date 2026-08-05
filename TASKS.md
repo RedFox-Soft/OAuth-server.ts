@@ -903,13 +903,13 @@ exact line numbers.
   `staticPlugin({ assets: 'public' })` does not compress and this repo has no compression middleware.
   Verified by request — with `Accept-Encoding: gzip, deflate, br`, which every browser sends, the
   response carries no `Content-Encoding` and transfers the full **1,005,591 B**. Read in served bytes:
-  the terminal-page exclusion is *strengthened* (the error page inlines 19,213 B against 1,005,591 B
+  the terminal-page exclusion is _strengthened_ (the error page inlines 19,213 B against 1,005,591 B
   had it linked the sheet), but the four hydrated pages now block first paint on ~1 MB of CSS they
   previously never downloaded, against no FOUC, ~246,494 B less in-browser generation, and one sheet
   shared by both families and cached 86,400 s. **Part B is a trade, not a pure win, as it ships
   today.** Compression is deferred to an external plugin (decided 2026-08-05, out of scope here);
   once it exists the gzip figures apply again and the trade becomes the one this task scoped. Also
-  unmet and recorded rather than left to be found: the login page's *total* transfer size before and
+  unmet and recorded rather than left to be found: the login page's _total_ transfer size before and
   after was never captured, only per-asset sizes.
 - **Expected result, part A.** `script-src` is derived from three sources: `<script src>` (relative
   or at `new URL(ISSUER).origin` → `'self'`; a foreign origin named explicitly, the same comparison
@@ -969,7 +969,7 @@ exact line numbers.
   shared module and use it for every asset both renderers reference.
 - **Done when:** full suite green including the rewritten `test/csp/csp.spec.ts`; no hydration
   mismatch on login, login-with-error, consent, registration, admin console, admin setup; **no antd
-  cssinjs *component-style* element injected into `<head>` after hydration** on any of them, which is
+  cssinjs _component-style_ element injected into `<head>` after hydration** on any of them, which is
   what proves `zeroRuntime` took rather than being silently ignored (without it every page can pay for
   its component styles twice while appearing to work). **Corrected 2026-08-05 after the browser pass:
   this originally demanded zero `data-css-hash` tags, which is unreachable on antd 6.5.1 — the
@@ -1158,8 +1158,55 @@ exact line numbers.
   walk-through, whose post-hydration steps need a live server with SMTP that this environment has not got —
   everything else in `quickstart.md` is covered by the suite.
 
-### 18. Social login / federation — Investigate — DECIDED 2026-08-05
+### 18. Social login / federation — ✅ Implemented
 
+- **Delivered by** `specs/022-oidc-federation-login`. Suite: 2722 pass / 0 fail (was 2630 at the commit
+  this branched from — note the recorded baseline of 2620 predated the three CSP/antd-CSS commits that
+  landed mid-planning); typecheck unchanged at 2587 errors. Mechanism: a new `lib/federation/` subsystem
+  (discovery, a bounded map of jose `RemoteJWKSet`s, ID-token verification, the two-stage round-trip record,
+  the outbound legs, the decision ladder, the terminal pages, the callback route), `lib/admin/federation/`
+  for the management plane, one new model area, two new `UserBucket` fields replacing the dead
+  `authMethods`, one new `User` field with a per-bucket index, and 92 new tests across five files.
+- **The shape, and why it is not a preference.** Three hops. The interaction cookie is `path: /ui/${uid}`
+  and `sameSite: 'strict'`, while an upstream matches `redirect_uri` by exact string — so the callback
+  provably cannot read that cookie, and everything it needs comes from a record found by `sha256(state)`.
+  Hop 2 → 3 is a **relative** redirect, which is what restores the cookie. Documented in
+  `wiki/concepts/upstream-federation.md`.
+- **Divergences from the Expected result below, each argued where the decision lives:**
+  1. **The round-trip area is declared `byAccount`, not `unowned`.** The reverse ownership check in
+     `test/storage_contract/inventory_drift.spec.ts` fails any area whose payload carries `accountId`
+     without declaring it, and the handoff stage carries one by design — so `unowned` was a red suite, not
+     a choice. Owning it is also better: a deleted account's outstanding handoff is swept, which
+     `test/storage_contract/federated_links.spec.ts` pins. (research D5)
+  2. **The handoff record's id is a digest of its `ref`**, as the state record's is of its `state`. § 18 was
+     explicit about one and silent about the other; a `ref` in a URL is exactly as capturable. (research D6)
+  3. **The management routes are not feature-gated** — promoted into the spec as FR-035a after
+     `/speckit-analyze` found it contradicted FR-035 as written. A deployment that switches federation off
+     must still be able to _delete_ a provider it stopped trusting.
+  4. **A declined sign-in redirects to the login page** rather than rendering it at the callback URL. The
+     client bundle derives the page and the interaction id from `window.location.pathname`, so a login
+     document served at `/federation/callback` hydrates into an empty root — browser-only, nothing logged.
+     It carries a new server-owned notice identifier, which also keeps the provider's `error_description`
+     off the page.
+  5. **A masked `clientSecret` means "keep"**, following the SMTP settings precedent, where the plan had
+     called for refusing it with a 422. Identical safety (the mask is never stored) and one less rule for
+     the console; refusing would have made this the only place in the product where a masked secret
+     behaves differently.
+- **Two framework findings worth keeping.** A guarded route's `params` schema is **merged**, not overridden:
+  under `normalize: false`, a two-parameter route beneath a guard declaring one answers **422 without
+  reaching the handler**, so `providerId` had to be declared optional on the `ui` guard itself. And a gated
+  route _may_ sit under an always-available prefix, because `gatedRoutes` is consulted first — these are the
+  first such routes, and the overlap turned the classification guard's coverage _sum_ into a union
+  comparison.
+- **Test edits:** seven spots across six files, every one either an `authMethods` assertion following the
+  field it names or a declarative enumeration this feature legitimately extends (the reaped-areas list, two
+  per-bucket index fixtures, the audited-route counts, the coverage assertion). No assertion was weakened;
+  two were strengthened. The predicted `csp.spec.ts` edit turned out unnecessary. Listed with arguments in
+  `specs/022-oidc-federation-login/baseline.md`.
+- **Not done, and why:** the browser-only steps of that spec's `quickstart.md` § 3 — hydration of the
+  provider controls, the password-form removal after hydration, and a real provider's extra callback
+  parameters. They need a live server and a real upstream IdP, which this environment has not got. The
+  server-side halves are covered; what a browser then does with them is not.
 - **Context:** No federation code exists anywhere in `lib/` (the Google button was decorative and
   spec 021 deleted it). Spec 001 declared social login out of scope, so this needed a product
   decision, not just code. `UserBucket.authMethods` turned out to be more dormant than the task text
@@ -1203,19 +1250,19 @@ because here a cookie provably does not survive the round trip.
 
 #### Expected result — per-provider settings (eleven fields)
 
-| Field | Default | Why it is a setting |
-| --- | --- | --- |
-| `id` | — | slug `^[a-z0-9-]{1,32}$`, unique in the bucket; appears in the start URL |
-| `displayName` | — | the button label |
-| `enabled` | `true` | kill switch that keeps the credentials |
-| `issuer` | — | `https:` URL; discovery source, validated at write time |
-| `clientId` | — | upstream client identifier |
-| `clientSecret` | — | write-only, masked on read, never in the audit trail |
-| `scopes` | `['openid','email','profile']` | IdPs differ on which scope yields an email |
-| `emailTrusted` | `false` | the linking trust decision — per IdP, because Google verifies addresses and a corporate Keycloak may not |
-| `provisioning` | `'jit'` | `'jit'` \| `'existing_only'` |
-| `allowedEmailDomains` | `[]` (any) | without it an enabled Google button provisions the entire internet — the classic misconfiguration of this feature |
-| `emailClaim` | `'email'` | the one load-bearing mapping (no email ⇒ neither link nor provision); corporate IdPs use `upn` |
+| Field                 | Default                        | Why it is a setting                                                                                               |
+| --------------------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| `id`                  | —                              | slug `^[a-z0-9-]{1,32}$`, unique in the bucket; appears in the start URL                                          |
+| `displayName`         | —                              | the button label                                                                                                  |
+| `enabled`             | `true`                         | kill switch that keeps the credentials                                                                            |
+| `issuer`              | —                              | `https:` URL; discovery source, validated at write time                                                           |
+| `clientId`            | —                              | upstream client identifier                                                                                        |
+| `clientSecret`        | —                              | write-only, masked on read, never in the audit trail                                                              |
+| `scopes`              | `['openid','email','profile']` | IdPs differ on which scope yields an email                                                                        |
+| `emailTrusted`        | `false`                        | the linking trust decision — per IdP, because Google verifies addresses and a corporate Keycloak may not          |
+| `provisioning`        | `'jit'`                        | `'jit'` \| `'existing_only'`                                                                                      |
+| `allowedEmailDomains` | `[]` (any)                     | without it an enabled Google button provisions the entire internet — the classic misconfiguration of this feature |
+| `emailClaim`          | `'email'`                      | the one load-bearing mapping (no email ⇒ neither link nor provision); corporate IdPs use `upn`                    |
 
 Fixed, not configurable: `sub` is the subject, `email_verified` is read from that claim only, and
 `name`/`given_name`/`family_name`/`picture`/`locale` are copied into `User.claims` when present. A
@@ -1568,9 +1615,9 @@ IdP-initiated login; localisation of the new pages, consistent with every intera
 - **Numbering is append-only:** belongs to P0 (it blocks local development entirely), takes the next
   free number.
 - **Context:** Found 2026-08-05 while running task 32's browser verification. `bun lib/index.ts`
-  against a real MongoDB throws at `lib/configs/nonceSecret.ts:98`: *"the DPoP nonce secret does not
+  against a real MongoDB throws at `lib/configs/nonceSecret.ts:98`: _"the DPoP nonce secret does not
   survive a storage round trip: a freshly written 32-byte secret read back in an unusable shape. The
-  storage layer cannot carry binary values intact."* The check is doing its job — `resolveNonceSecret`
+  storage layer cannot carry binary values intact."_ The check is doing its job — `resolveNonceSecret`
   writes a 32-byte secret, reads back what storage actually holds, and refuses to serve DPoP requests
   it cannot answer. What fails is the Mongo adapter's handling of binary values. Unrelated to task 32
   (`nonceSecret.ts` is in no part of that branch); verification had to be done on the in-memory
@@ -1579,7 +1626,7 @@ IdP-initiated login; localisation of the new pages, consistent with every intera
   store reads back in a usable shape, so the server boots against MongoDB. A spec test asserting the
   binary round trip at the adapter level, not only at `resolveNonceSecret`. Check whether other
   binary-valued fields go through the same path — the comment at `nonceSecret.ts:60-66` notes the
-  refusal is deliberately loud rather than fatal for a *configured* value, so a silent corruption
+  refusal is deliberately loud rather than fatal for a _configured_ value, so a silent corruption
   elsewhere is the shape to look for. This is also the first hard evidence for the "Mongo adapter
   coverage" gap the roadmap has carried abstractly.
 

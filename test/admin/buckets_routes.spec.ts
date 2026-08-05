@@ -48,7 +48,10 @@ describe('buckets API', () => {
 		);
 		expect(res.status).toBe(201);
 		const created = res.data as UserBucket | undefined;
-		expect(created?.authMethods).toEqual(['password']);
+		// Was `authMethods: ['password']`, a field nothing read. The coverage moves to the setting that
+		// replaced it: a new bucket accepts passwords and holds no upstream providers.
+		expect(created?.passwordLogin).toBe(true);
+		expect(created?.federation).toEqual([]);
 	});
 
 	it('refuses to delete a bucket still referenced by a project', async () => {

@@ -27,12 +27,24 @@ function styleLinks(): string {
 
 export async function loginServer(
 	uid: string,
-	options: { errorMessage?: string; notice?: string } = {}
+	options: {
+		errorMessage?: string;
+		notice?: string;
+		/*
+		 * What this bucket offers. Both default to the password-only page a caller that knows nothing about
+		 * federation would expect, so an omitted option cannot silently strip a working sign-in form — the
+		 * failure mode a required parameter would have introduced across every existing call site.
+		 */
+		passwordLogin?: boolean;
+		providers?: { id: string; displayName: string }[];
+	} = {}
 ) {
 	const { errorMessage } = options;
 	// Exclusivity is a property of this function rather than a promise made at each call site: a rejected
 	// submission must never be accompanied by the notice the page was reached with.
 	const notice = errorMessage ? undefined : options.notice;
+	const passwordLogin = options.passwordLogin !== false;
+	const providers = options.providers ?? [];
 
 	let html = await htmlTeamplate.text();
 	html = html
@@ -40,7 +52,16 @@ export async function loginServer(
 		.replace('/public/favicon.ico', versionedAsset('favicon.ico'))
 		.replace('<!--app-title-->', 'Login Page')
 		.replace('<!--app-styles-->', styleLinks())
-		.replace('<!--app-props-->', propsScript({ uid, errorMessage, notice }))
+		/*
+		 * The props are half of this change, not a detail of it. This page hydrates, so React rebuilds the
+		 * tree from `window.PROPS` — provider buttons rendered here but absent there vanish in a browser,
+		 * silently, with nothing logged and no server-side test able to see it. That is exactly how the
+		 * registration page's missing props survived from its introduction until spec 021.
+		 */
+		.replace(
+			'<!--app-props-->',
+			propsScript({ uid, errorMessage, notice, passwordLogin, providers })
+		)
 		.replace(
 			'<!--app-html-->',
 			renderToString(
@@ -50,6 +71,8 @@ export async function loginServer(
 							uid={uid}
 							errorMessage={errorMessage}
 							notice={notice}
+							passwordLogin={passwordLogin}
+							providers={providers}
 						/>
 					</ZeroRuntime>
 				</StrictMode>

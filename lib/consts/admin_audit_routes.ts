@@ -134,9 +134,9 @@ const routes = [
 	},
 
 	/*
-	 * The four end-user rows are the only ones that also record `targetScope` (the bucket): their users
-	 * live in per-bucket storage, so a bare user id cannot be resolved to an account — not even to an
-	 * email — without knowing which bucket to look in.
+	 * These end-user rows also record `targetScope` (the bucket): their users live in per-bucket storage, so
+	 * a bare user id cannot be resolved to an account — not even to an email — without knowing which bucket
+	 * to look in. `federation.identity.delete` below is the fifth row of this kind.
 	 */
 	{
 		action: 'enduser.create',
@@ -160,6 +160,44 @@ const routes = [
 		action: 'enduser.delete',
 		method: 'DELETE',
 		path: '/admin/api/buckets/:id/users/:uid',
+		targetType: 'EndUser'
+	},
+
+	/*
+	 * Upstream federation providers. `targetType` is the bucket, because a provider has no identity outside
+	 * the bucket it belongs to — it is an element of that bucket's document, and an entry naming only
+	 * `acme-sso` would not say whose.
+	 *
+	 * Not gated by `federation.enabled`, unlike the end-user legs: a deployment that switched federation off
+	 * must still be able to delete a provider it no longer trusts, and that deletion must still be recorded.
+	 */
+	{
+		action: 'federation.provider.create',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/federation',
+		targetType: 'UserBucket'
+	},
+	{
+		action: 'federation.provider.update',
+		method: 'PATCH',
+		path: '/admin/api/buckets/:id/federation/:providerId',
+		targetType: 'UserBucket'
+	},
+	{
+		action: 'federation.provider.delete',
+		method: 'DELETE',
+		path: '/admin/api/buckets/:id/federation/:providerId',
+		targetType: 'UserBucket'
+	},
+	/*
+	 * Severing one account's upstream identity. An end-user target, so it carries `targetScope` — the fifth
+	 * row to do so, for the same reason as the other four: these users live in per-bucket storage, and a bare
+	 * user id resolves to nobody, not even to an email, without knowing which bucket to look in.
+	 */
+	{
+		action: 'federation.identity.delete',
+		method: 'DELETE',
+		path: '/admin/api/buckets/:id/users/:uid/identities/:providerId',
 		targetType: 'EndUser'
 	},
 

@@ -167,7 +167,11 @@ await db.collection(STORE_AREAS.userBuckets).updateOne(
 			name: 'Administrators',
 			managedBy: [],
 			roles: ['super_admin', 'project_admin'],
-			authMethods: ['password'],
+			// The reserved admin bucket keeps password login and accepts no providers — see
+			// lib/admin/seed.ts, which this mirrors. Changing one seed and not the other is how a seed
+			// change silently no-ops in production: db:setup runs this file, never that one.
+			passwordLogin: true,
+			federation: [],
 			// the reserved admin bucket never accepts self-service registration
 			registrationOpen: false,
 			emailVerificationRequired: false,
@@ -189,7 +193,8 @@ await db.collection(STORE_AREAS.userBuckets).updateOne(
 			name: 'Default users',
 			managedBy: [],
 			roles: [],
-			authMethods: ['password'],
+			passwordLogin: true,
+			federation: [],
 			registrationOpen: true,
 			emailVerificationRequired: false,
 			verificationMethod: 'link',

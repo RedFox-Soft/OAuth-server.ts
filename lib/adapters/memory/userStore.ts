@@ -30,7 +30,10 @@ export class UserStore implements UserStoreInstance {
 			createdAt: user.createdAt ?? now,
 			updatedAt: user.updatedAt ?? now,
 			lastLoginAt: user.lastLoginAt ?? null,
-			claims: user.claims
+			claims: user.claims,
+			// Seeding a link is how a federation spec sets up "this account already signed in through that
+			// provider once" without driving a whole round trip to establish it.
+			federated: user.federated
 		};
 		this.users.set(full._id, full);
 		return full;
@@ -39,6 +42,28 @@ export class UserStore implements UserStoreInstance {
 	async findByEmail(email: string): Promise<User | null> {
 		for (const user of this.users.values()) {
 			if (user.email.toLowerCase() === email.toLowerCase()) {
+				return user;
+			}
+		}
+		return null;
+	}
+
+	/*
+	 * The upstream-identity lookup. A scan here and a point read in MongoDB, which is what the per-bucket
+	 * `{ 'federated.providerId': 1, 'federated.sub': 1 }` index exists for.
+	 *
+	 * Both values are compared exactly: `sub` is an opaque identifier chosen by the upstream provider, so
+	 * case-folding or trimming it would merge two subjects the IdP considers distinct.
+	 */
+	async findByFederatedIdentity(
+		providerId: string,
+		sub: string
+	): Promise<User | null> {
+		for (const user of this.users.values()) {
+			const linked = user.federated?.some(
+				(link) => link.providerId === providerId && link.sub === sub
+			);
+			if (linked) {
 				return user;
 			}
 		}
@@ -79,7 +104,12 @@ export class UserStore implements UserStoreInstance {
 
 	async update(
 		_id: string,
-		patch: Partial<Pick<User, 'roles' | 'active' | 'password' | 'verified'>>
+		patch: Partial<
+			Pick<
+				User,
+				'roles' | 'active' | 'password' | 'verified' | 'claims' | 'federated'
+			>
+		>
 	): Promise<User | null> {
 		const user = this.users.get(_id);
 		if (!user) return null;

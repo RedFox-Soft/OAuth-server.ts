@@ -12,6 +12,7 @@ import { projectRoutes } from './projects/routes.js';
 import { clientRoutes } from './clients/routes.js';
 import { adminUserRoutes } from './users/routes.js';
 import { bucketRoutes } from './buckets/routes.js';
+import { federationAdminRoutes } from './federation/routes.js';
 import { endUserRoutes } from './users-end/routes.js';
 import { settingsRoutes } from './settings/routes.js';
 import { smtpSettingsRoutes } from './settings/smtp/routes.js';
@@ -51,6 +52,7 @@ export const adminApp = new Elysia({ name: 'admin' })
 	.use(clientRoutes)
 	.use(adminUserRoutes)
 	.use(bucketRoutes)
+	.use(federationAdminRoutes)
 	.use(endUserRoutes)
 	.use(settingsRoutes)
 	.use(smtpSettingsRoutes)

@@ -61,6 +61,9 @@ describe('ensureAdminSeed', () => {
 		await ensureAdminSeed();
 		const bucket = await getBucketStore().find('redfox');
 		expect(bucket?.name).toBe('Default users');
-		expect(bucket?.authMethods).toEqual(['password']);
+		// Was `authMethods: ['password']`. The seeded default bucket must remain signable-into by password
+		// and hold no upstream providers — the shape every deployment starts from.
+		expect(bucket?.passwordLogin).toBe(true);
+		expect(bucket?.federation).toEqual([]);
 	});
 });

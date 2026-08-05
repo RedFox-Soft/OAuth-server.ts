@@ -19,6 +19,7 @@ import { AuthorizationCodePayload } from 'lib/models/authorization_code.js';
 import { BackchannelAuthenticationRequestPayload } from 'lib/models/backchannel_authentication_request.js';
 import { ClientCredentialsPayload } from 'lib/models/client_credentials.js';
 import { DeviceCodePayload } from 'lib/models/device_code.js';
+import { FederationStatePayload } from 'lib/federation/types.js';
 import { GrantPayload } from 'lib/models/grant.js';
 import { InitialAccessTokenPayload } from 'lib/models/initial_access_token.js';
 import { InteractionPayload } from 'lib/models/interaction.js';
@@ -46,6 +47,7 @@ export const PAYLOAD_SCHEMAS: Readonly<Record<string, ReadableSchema>> = {
 	BackchannelAuthenticationRequest: BackchannelAuthenticationRequestPayload,
 	ClientCredentials: ClientCredentialsPayload,
 	DeviceCode: DeviceCodePayload,
+	FederationState: FederationStatePayload,
 	Grant: GrantPayload,
 	InitialAccessToken: InitialAccessTokenPayload,
 	Interaction: InteractionPayload,

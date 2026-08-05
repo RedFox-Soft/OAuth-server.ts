@@ -15,7 +15,10 @@ export async function ensureAdminSeed(): Promise<void> {
 			name: 'Administrators',
 			managedBy: [],
 			roles: ['super_admin', 'project_admin'],
-			authMethods: ['password'],
+			// The reserved admin bucket keeps password login and accepts no providers: the console is a
+			// relying party on this server's own issuer, and a second identity source for operators is a
+			// separate decision. Both the bucket PATCH and the provider routes refuse it.
+			passwordLogin: true,
 			// the reserved admin bucket never accepts self-service registration
 			registrationOpen: false
 		});
@@ -26,8 +29,7 @@ export async function ensureAdminSeed(): Promise<void> {
 			_id: 'redfox',
 			name: 'Default users',
 			managedBy: [],
-			roles: [],
-			authMethods: ['password']
+			roles: []
 		});
 	}
 

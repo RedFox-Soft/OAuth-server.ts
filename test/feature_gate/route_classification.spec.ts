@@ -128,6 +128,17 @@ describe('route classification', () => {
 		});
 	});
 
+	/*
+	 * Every mounted route is accounted for by at least one mechanism, and no mechanism names a route that is
+	 * not mounted.
+	 *
+	 * Compared as a union rather than as a sum of the three sizes, which is what this asserted until the
+	 * federated sign-in arrived. A sum assumes the three are disjoint, and they are not: the federation legs
+	 * are gated *and* sit under the always-available `/ui` prefix, which is legitimate — gatedRoutes is
+	 * consulted first, so the gate wins — and made the arithmetic overcount by exactly those two routes.
+	 * The union form still fails on an unclassified route, which is the failure this test exists for, and it
+	 * additionally fails on a declared route the server does not serve.
+	 */
 	it('covers the whole mounted surface between gated, individual and prefix entries', () => {
 		const prefixed = mounted.filter((route) =>
 			alwaysAvailablePrefixes.some(
@@ -135,8 +146,14 @@ describe('route classification', () => {
 			)
 		);
 
-		expect(
-			gatedRoutes.length + alwaysAvailableRoutes.length + prefixed.length
-		).toBe(mounted.length);
+		const classified = new Set([
+			...gatedRoutes.map(key),
+			...alwaysAvailableRoutes.map(key),
+			...prefixed.map(key)
+		]);
+		const mountedKeys = new Set(mounted.map(key));
+
+		expect([...mountedKeys].filter((k) => !classified.has(k))).toEqual([]);
+		expect([...classified].filter((k) => !mountedKeys.has(k))).toEqual([]);
 	});
 });

@@ -4,6 +4,7 @@ import type { AuthorizationCodePayloadType } from '../models/authorization_code.
 import type { BackchannelAuthenticationRequestPayloadType } from '../models/backchannel_authentication_request.js';
 import type { ClientCredentialsPayload } from '../models/client_credentials.js';
 import type { DeviceCodePayloadType } from '../models/device_code.js';
+import type { FederationStatePayload } from '../federation/types.js';
 import type { GrantPayloadType } from '../models/grant.js';
 import type { InitialAccessTokenPayloadType } from '../models/initial_access_token.js';
 import type { InteractionPayloadType } from '../models/interaction.js';
@@ -44,6 +45,7 @@ export interface ModelPayloadByName {
 	Client: Record<string, unknown>;
 	ClientCredentials: ClientCredentialsPayload;
 	DeviceCode: DeviceCodePayloadType;
+	FederationState: FederationStatePayload;
 	Grant: GrantPayloadType;
 	InitialAccessToken: InitialAccessTokenPayloadType;
 	Interaction: InteractionPayloadType;

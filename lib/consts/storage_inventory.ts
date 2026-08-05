@@ -68,6 +68,7 @@ export const MODEL_AREAS = [
 	'Client',
 	'ClientCredentials',
 	'DeviceCode',
+	'FederationState',
 	'Grant',
 	'InitialAccessToken',
 	'Interaction',
@@ -164,7 +165,25 @@ const perBucketArea: StorageArea = {
 	reaped: null,
 	/* Holds the end-user principals themselves; destroyed with its bucket, never swept by owner. */
 	owners: unowned('holds the account records a cascade sweeps on behalf of'),
-	indexes: [{ key: { email: 1 }, unique: true }]
+	indexes: [
+		{ key: { email: 1 }, unique: true },
+		/*
+		 * Resolves an account from the upstream identity it holds (UserStore.findByFederatedIdentity).
+		 *
+		 * Non-unique on purpose, and this is a recorded compromise rather than an oversight. A unique
+		 * multikey index would index every password-only account as {null, null} and collide on the second
+		 * one, so real uniqueness would need a partialFilterExpression — which IndexSpec above does not
+		 * model, and extending it would mean extending the provisioning routine and the two-way
+		 * reconciliation comparison with it. Uniqueness of (providerId, sub) is therefore enforced in code
+		 * at link time. The residual race is a concurrent double-link, whose outcome is a duplicate entry
+		 * naming the *same* account — never two accounts sharing an identity, because the lookup is by the
+		 * pair.
+		 *
+		 * Bare field names, not `payload.*`: this area is written by UserStore directly rather than through
+		 * the model adapter, so its documents have no `payload` wrapper.
+		 */
+		{ key: { 'federated.providerId': 1, 'federated.sub': 1 } }
+	]
 };
 
 export const STORAGE_INVENTORY: readonly StorageArea[] = [
@@ -198,6 +217,22 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 		grantId,
 		{ key: { 'payload.userCode': 1 }, unique: true }
 	]),
+	/*
+	 * The federated sign-in's round-trip record: one area holding two stages, because the interaction
+	 * cookie provably cannot survive the trip to an upstream IdP (path-scoped and sameSite: 'strict',
+	 * against a fixed callback reached by a cross-site navigation). Stage one is keyed by sha256(state)
+	 * and holds the exchange context; stage two replaces it under sha256(ref) and holds only the
+	 * interaction and the account it resolved to. Neither live identifier is ever a field.
+	 *
+	 * Account-owned, and that is a departure from what the backlog entry for this feature anticipated
+	 * ("unowned, because it names no principal yet"). The stage-two payload carries `accountId`, and the
+	 * reverse ownership check in test/storage_contract/inventory_drift.spec.ts fails any area whose
+	 * payload holds an owner field the table does not declare — correctly, since such a record is one no
+	 * cascade sweeps. Declaring it owned is also the better property: an outstanding handoff naming a
+	 * deleted account dies with it. Stage-one records carry no `accountId`, so no sweep matches them and
+	 * they simply expire, which is the true statement `unowned` was reaching for.
+	 */
+	modelArea('FederationState', EXPIRES_AT, byAccount),
 	/*
 	 * The consent record. Only a principal cascade destroys these — protocol revocation deliberately
 	 * leaves them alive, because revoking a token is not withdrawing consent.

@@ -7,9 +7,12 @@ describe('UserBucketStore (memory)', () => {
 		store = new UserBucketStore();
 	});
 
-	it('creates with default authMethods and finds', async () => {
+	it('creates with default sign-in settings and finds', async () => {
 		const b = await store.create({ name: 'Dev users', managedBy: ['u1'] });
-		expect(b.authMethods).toEqual(['password']);
+		// Replaces the former `authMethods: ['password']` assertion. `passwordLogin` must default true and
+		// not merely be absent: it is read as a boolean, and undefined would close the password door.
+		expect(b.passwordLogin).toBe(true);
+		expect(b.federation).toEqual([]);
 		expect(await store.find(b._id)).toMatchObject({ name: 'Dev users' });
 	});
 

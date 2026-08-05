@@ -32,6 +32,22 @@ export class UserStore implements UserStoreInstance {
 		return result || null;
 	}
 
+	/*
+	 * A point read on the per-bucket area's `{ 'federated.providerId': 1, 'federated.sub': 1 }` index.
+	 * Both keys are inside one array element, so they must be matched with $elemMatch: two independent
+	 * dotted conditions would also match an account holding provider A with one subject and provider B
+	 * with another — which is a different account resolving as this identity.
+	 */
+	async findByFederatedIdentity(
+		providerId: string,
+		sub: string
+	): Promise<User | null> {
+		const result = await db
+			.collection<User>(this.collectionName)
+			.findOne({ federated: { $elemMatch: { providerId, sub } } });
+		return result || null;
+	}
+
 	async create(
 		email: string,
 		password: string,
@@ -67,7 +83,12 @@ export class UserStore implements UserStoreInstance {
 
 	async update(
 		_id: string,
-		patch: Partial<Pick<User, 'roles' | 'active' | 'password' | 'verified'>>
+		patch: Partial<
+			Pick<
+				User,
+				'roles' | 'active' | 'password' | 'verified' | 'claims' | 'federated'
+			>
+		>
 	): Promise<User | null> {
 		return db
 			.collection<User>(this.collectionName)

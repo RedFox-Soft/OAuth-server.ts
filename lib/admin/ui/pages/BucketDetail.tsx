@@ -15,6 +15,8 @@ import {
 } from 'antd';
 import { ArrowLeftOutlined, PlusOutlined } from '@ant-design/icons';
 import type { UserBucket, User } from '../../../adapters/types.js';
+import { FederationPanel } from './FederationPanel.js';
+import { UserIdentities } from './UserIdentities.js';
 
 type EndUser = Omit<User, 'password'>;
 
@@ -40,6 +42,7 @@ export function BucketDetail({
 	const [createOpen, setCreateOpen] = useState(false);
 	const [editOpen, setEditOpen] = useState(false);
 	const [pwUser, setPwUser] = useState<EndUser | null>(null);
+	const [identitiesUser, setIdentitiesUser] = useState<EndUser | null>(null);
 	const [bucketEditOpen, setBucketEditOpen] = useState(false);
 	const [saving, setSaving] = useState(false);
 	const [createForm] = Form.useForm<CreateValues>();
@@ -48,6 +51,7 @@ export function BucketDetail({
 	const [bucketForm] = Form.useForm<{
 		name: string;
 		roles?: string[];
+		passwordLogin?: boolean;
 		registrationOpen?: boolean;
 		emailVerificationRequired?: boolean;
 		verificationMethod?: 'link' | 'code';
@@ -140,6 +144,7 @@ export function BucketDetail({
 	async function onSaveBucket(values: {
 		name: string;
 		roles?: string[];
+		passwordLogin?: boolean;
 		registrationOpen?: boolean;
 		emailVerificationRequired?: boolean;
 		verificationMethod?: 'link' | 'code';
@@ -150,7 +155,15 @@ export function BucketDetail({
 			body: JSON.stringify(values)
 		});
 		if (!res.ok) {
-			message.error('failed to update bucket');
+			/*
+			 * The server's own reason, not a generic sentence. Turning password sign-in off on a bucket with no
+			 * enabled provider is refused with an explanation of what to do first, and replacing that with
+			 * "failed to update bucket" would leave an operator guessing at a rule the server already stated.
+			 */
+			const detail = (await res.json().catch(() => null)) as {
+				message?: string;
+			} | null;
+			message.error(detail?.message ?? 'failed to update bucket');
 			return;
 		}
 		setBucketEditOpen(false);
@@ -182,6 +195,7 @@ export function BucketDetail({
 					<Button
 						onClick={() => {
 							bucketForm.setFieldsValue({
+								passwordLogin: bucket?.passwordLogin !== false,
 								name: bucket?.name ?? '',
 								roles: bucket?.roles ?? [],
 								registrationOpen: bucket?.registrationOpen ?? true,
@@ -254,6 +268,12 @@ export function BucketDetail({
 								>
 									Reset password
 								</Button>
+								<Button
+									size="small"
+									onClick={() => setIdentitiesUser(row)}
+								>
+									Identities
+								</Button>
 								{/* The consequence, stated: deleting an account also ends the sessions and tokens
 								    it is currently using, which is the half an operator cannot see from here. */}
 								<Popconfirm
@@ -273,6 +293,19 @@ export function BucketDetail({
 						)
 					}
 				]}
+			/>
+
+			<FederationPanel
+				bucketId={bucketId}
+				// The bucket's own settings depend on this list, so a change here refreshes what the
+				// password-sign-in switch is validated against.
+				onChanged={() => void load()}
+			/>
+
+			<UserIdentities
+				bucketId={bucketId}
+				user={identitiesUser}
+				onClose={() => setIdentitiesUser(null)}
 			/>
 
 			<Modal
@@ -395,6 +428,14 @@ export function BucketDetail({
 							mode="tags"
 							placeholder="add role names"
 						/>
+					</Form.Item>
+					<Form.Item
+						name="passwordLogin"
+						label="Accept email and password sign-in"
+						valuePropName="checked"
+						tooltip="Turn off for a bucket whose users must come from an identity provider. Refused unless this bucket has an enabled provider."
+					>
+						<Switch />
 					</Form.Item>
 					<Form.Item
 						name="registrationOpen"

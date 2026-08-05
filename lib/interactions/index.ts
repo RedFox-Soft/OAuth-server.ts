@@ -1,5 +1,19 @@
-import { Elysia, t } from 'elysia';
+// Aliased: this module already imports a `NotFoundError` from helpers/re_render_errors.js, which is the
+// device-flow re-render error and a different thing entirely. Elysia's is the one that produces the same
+// answer the server gives for a path it does not serve, which is what an unknown provider must look like.
+import { Elysia, NotFoundError as UnservedPath, t } from 'elysia';
 import { eventBus } from 'lib/event_bus.js';
+import { DiscoveryError, discover } from 'lib/federation/discovery.js';
+import { authorizationUrl, supportsPkce } from 'lib/federation/flow.js';
+import { findEnabledProvider } from 'lib/federation/providers.js';
+import { consumeHandoff, openPending } from 'lib/federation/state.js';
+import {
+	federationExpiredPage,
+	federationInactivePage,
+	federationUpstreamPage,
+	passwordLoginClosedPage
+} from 'lib/federation/pages.js';
+import { loginOptionsForClient } from './loginOptions.js';
 import {
 	consentServer,
 	loginServer,
@@ -146,10 +160,50 @@ async function createGrant(interaction) {
 	};
 }
 
+/*
+ * The password-only doors of a federated-only bucket.
+ *
+ * Returned as a page rather than checked inline at five call sites, so "closed means closed everywhere" is
+ * one function. Each caller invokes it **before** any other check — including registration's deliberately
+ * non-committal handling of an address that already exists: with the door shut there is nothing to be
+ * non-committal about, and the refusal reveals a bucket setting rather than anything about an account.
+ */
+async function passwordDoorClosed(
+	clientId: string | undefined,
+	uid: string
+): Promise<Response | undefined> {
+	const bucket = await getBucketStore().find(
+		await resolveBucketForClient(clientId)
+	);
+	// `=== false` exactly: absent means available, which is what a bucket predating the field must get.
+	return bucket?.passwordLogin === false
+		? passwordLoginClosedPage(uid)
+		: undefined;
+}
+
+/* The client that began an interaction — the only trustworthy route to a bucket. */
+function clientIdOf(interaction: {
+	payload: { params?: unknown };
+}): string | undefined {
+	return (interaction.payload.params as { client_id?: string } | undefined)
+		?.client_id;
+}
+
 export const ui = new Elysia()
 	.guard({
 		params: t.Object({
-			uid: t.String()
+			uid: t.String(),
+			/*
+			 * Declared on the shared guard, not merely on the one route that has it in its path, because the
+			 * app runs `normalize: false`: an undeclared path parameter is *refused* rather than stripped, and
+			 * the guard's schema is merged with the route's rather than replaced by it. A route-level
+			 * declaration alone answers 422 with "Property 'providerId' should not be provided" and never
+			 * reaches the handler — measured (specs/022-oidc-federation-login/research.md D2).
+			 *
+			 * Optional, so the routes that do not take one are unaffected: a request can only carry it if its
+			 * matched path declares it.
+			 */
+			providerId: t.Optional(t.String())
 		}),
 		cookie: t.Cookie({
 			_interaction: t.String({
@@ -182,16 +236,31 @@ export const ui = new Elysia()
 	 */
 	.get(
 		'ui/:uid/login',
-		async ({ params: { uid }, query }) =>
-			loginServer(uid, { notice: resolveNotice(query.notice) }),
+		async ({ params: { uid }, query, interaction }) => {
+			/*
+			 * The bucket is resolved on the GET as well as the POST, exactly as the registration route already
+			 * does: what this page offers — a password form, provider buttons, or only the latter — is a
+			 * property of the bucket, and a page that offered what the POST would refuse is a dead end dressed
+			 * as an invitation.
+			 */
+			const clientId = (
+				interaction.payload.params as { client_id?: string } | undefined
+			)?.client_id;
+			return loginServer(uid, {
+				notice: resolveNotice(query.notice),
+				...(await loginOptionsForClient(clientId))
+			});
+		},
 		{ query: t.Object({ notice: t.Optional(t.String()) }) }
 	)
 	.post(
 		'ui/:uid/login',
 		async ({ body, params: { uid }, interaction, cookie }) => {
-			const clientId = (
-				interaction.payload.params as { client_id?: string } | undefined
-			)?.client_id;
+			const clientId = clientIdOf(interaction);
+			// Before the lookup, so this cannot be used to probe which addresses exist.
+			const closed = await passwordDoorClosed(clientId, uid);
+			if (closed) return closed;
+
 			const bucketId = await resolveBucketForClient(clientId);
 			const userStore = getUserStore(bucketId);
 			const user = await userStore.findByEmail(body.username);
@@ -237,15 +306,133 @@ export const ui = new Elysia()
 			})
 		}
 	)
-	.get('ui/:uid/forgot-password', async ({ params: { uid } }) =>
-		resetRequestPage(uid)
-	)
-	.post(
-		'ui/:uid/forgot-password',
-		async ({ body, params: { uid }, interaction }) => {
+	/*
+	 * Leg one of a federated sign-in. Declares its own `params` schema, and that is load-bearing rather than
+	 * tidy: the guard above declares only `uid`, and a two-parameter route under it answers **422 without
+	 * ever reaching the handler** — measured, not assumed (specs/022-oidc-federation-login/research.md D2).
+	 * The same family as Elysia's query handling on the audit route: a declared schema on a request parameter
+	 * describes what the framework will do with the value, and an undeclared one is not merely ignored.
+	 */
+	.get(
+		'ui/:uid/federation/:providerId/start',
+		async ({ params: { uid, providerId }, interaction }) => {
 			const clientId = (
 				interaction.payload.params as { client_id?: string } | undefined
 			)?.client_id;
+			// The bucket comes from the client that began the interaction, never from the request: a bucket
+			// taken from a parameter would let anyone aim this at any tenant's provider.
+			const bucketId = await resolveBucketForClient(clientId);
+			const bucket = await getBucketStore().find(bucketId);
+			/*
+			 * `providerId` is optional in the merged params type because the shared guard declares it that way
+			 * (it has to — see the guard). This path always supplies it, so the check is narrowing rather than
+			 * logic; asserting instead would be claiming a guarantee the type does not carry, and answering as
+			 * unserved is the correct response either way.
+			 */
+			const provider = providerId
+				? findEnabledProvider(bucket, providerId)
+				: undefined;
+
+			// Unknown, disabled, or another bucket's — answered as unserved, so a probe learns nothing about
+			// which providers a bucket holds.
+			if (!provider) {
+				throw new UnservedPath();
+			}
+
+			let metadata;
+			try {
+				metadata = await discover(provider.issuer);
+			} catch (err) {
+				if (err instanceof DiscoveryError) {
+					eventBus.emit('federation.upstream.error', {
+						providerId: provider.id,
+						reason: err.reason
+					});
+					return federationUpstreamPage();
+				}
+				throw err;
+			}
+
+			const secrets = await openPending({
+				interactionUid: uid,
+				bucketId,
+				providerId: provider.id,
+				withPkce: supportsPkce(metadata)
+			});
+
+			return Response.redirect(
+				authorizationUrl(provider, metadata, secrets),
+				303
+			);
+		},
+		{ params: t.Object({ uid: t.String(), providerId: t.String() }) }
+	)
+	/*
+	 * Leg three: back inside the interaction, where the strict cookie applies again because leg two
+	 * redirected same-site. From here on the flow is identical to a password sign-in by construction — the
+	 * same `result.login` and the same `resume()`.
+	 */
+	.get(
+		'ui/:uid/federation/complete',
+		async ({ params: { uid }, query, interaction, cookie }) => {
+			const handoff = await consumeHandoff(query.ref, uid);
+			if (!handoff?.accountId) {
+				return federationExpiredPage();
+			}
+
+			const clientId = (
+				interaction.payload.params as { client_id?: string } | undefined
+			)?.client_id;
+			const bucketId = await resolveBucketForClient(clientId);
+			const user = await getUserStore(bucketId).find(handoff.accountId);
+			// Re-read rather than trusted from the record: an account frozen between hops must not sign in.
+			if (!user || !user.active) {
+				return federationInactivePage();
+			}
+
+			const bucket = await getBucketStore().find(bucketId);
+			if (bucket?.emailVerificationRequired && !user.verified) {
+				/*
+				 * The same refusal a password sign-in meets, reusing the same challenge and the same notice
+				 * spec 021 made real. A second verification flow would be two answers to a settled question.
+				 */
+				try {
+					const { id, method } = await issueAndSend(user, bucket);
+					if (method === 'code') {
+						return Response.redirect(
+							`/verify-email/code?ref=${encodeURIComponent(id)}`,
+							303
+						);
+					}
+				} catch {
+					return federationUpstreamPage();
+				}
+				return Response.redirect(buildUILoginPath(uid, NOTICE_VERIFY), 303);
+			}
+
+			interaction.payload.result = {
+				// No `transient`: there is no "remember me" on a federated sign-in.
+				login: { accountId: user._id }
+			};
+			return resume(interaction, cookie);
+		},
+		{
+			params: t.Object({ uid: t.String() }),
+			query: t.Object({ ref: t.String() })
+		}
+	)
+	.get('ui/:uid/forgot-password', async ({ params: { uid }, interaction }) => {
+		const closed = await passwordDoorClosed(clientIdOf(interaction), uid);
+		// There is no password to reset, so offering the form would be a dead end dressed as help.
+		return closed ?? resetRequestPage(uid);
+	})
+	.post(
+		'ui/:uid/forgot-password',
+		async ({ body, params: { uid }, interaction }) => {
+			const clientId = clientIdOf(interaction);
+			const closed = await passwordDoorClosed(clientId, uid);
+			if (closed) return closed;
+
 			/*
 			 * The bucket comes from the client that started this interaction, never from the request. A
 			 * `client_id` taken from the form would let anyone aim the lookup at any bucket, which turns a
@@ -277,9 +464,10 @@ export const ui = new Elysia()
 	 * submission is a dead end dressed as an invitation, and the two extra reads are point lookups.
 	 */
 	.get('ui/:uid/registration', async ({ params: { uid }, interaction }) => {
-		const clientId = (
-			interaction.payload.params as { client_id?: string } | undefined
-		)?.client_id;
+		const clientId = clientIdOf(interaction);
+		const closed = await passwordDoorClosed(clientId, uid);
+		if (closed) return closed;
+
 		const bucket = await getBucketStore().find(
 			await resolveBucketForClient(clientId)
 		);
@@ -291,9 +479,11 @@ export const ui = new Elysia()
 	.post(
 		'ui/:uid/registration',
 		async ({ body, params: { uid }, interaction }) => {
-			const clientId = (
-				interaction.payload.params as { client_id?: string } | undefined
-			)?.client_id;
+			const clientId = clientIdOf(interaction);
+			// Ahead of the non-committal existing-address handling below, deliberately.
+			const closed = await passwordDoorClosed(clientId, uid);
+			if (closed) return closed;
+
 			const bucketId = await resolveBucketForClient(clientId);
 			const bucket = await getBucketStore().find(bucketId);
 

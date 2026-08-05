@@ -1,4 +1,8 @@
 import type { UnnormalizedJWK } from 'lib/configs/verifyJWKs.ts';
+import type {
+	FederatedIdentity,
+	FederationProvider
+} from '../federation/types.js';
 
 export interface User {
 	_id: string;
@@ -14,6 +18,13 @@ export interface User {
 	// like given_name, or distributed/aggregated `_claim_names`/`_claim_sources`).
 	// Merged into the account's claims() output; the provider masks by scope.
 	claims?: Record<string, unknown>;
+	/*
+	 * Upstream identities this account holds, at most one per (providerId, sub) within the bucket.
+	 * Embedded rather than given an area of its own, which is what makes deletion integrity free: the
+	 * account cascade destroys this row and bucket deletion destroys the whole area, so no cascade arm
+	 * needs to know the field exists.
+	 */
+	federated?: FederatedIdentity[];
 }
 
 export interface ModelAdapter<TPayload = unknown> {
@@ -123,10 +134,34 @@ export interface UserStoreInstance {
 		verified?: boolean,
 		id?: string
 	): Promise<User>;
+	/*
+	 * Resolve an account by the upstream identity it holds. A point read in MongoDB, served by the
+	 * per-bucket area's `{ 'federated.providerId': 1, 'federated.sub': 1 }` index.
+	 *
+	 * Uniqueness of the pair is enforced in code at link time rather than by that index, deliberately: a
+	 * unique multikey index would index every password-only account as {null, null} and collide on the
+	 * second one, so it would need a partialFilterExpression, which IndexSpec does not model. The residual
+	 * race yields a duplicate entry naming the *same* account, never two accounts sharing an identity —
+	 * which is why this returns one account rather than an array.
+	 */
+	findByFederatedIdentity(
+		providerId: string,
+		sub: string
+	): Promise<User | null>;
 	list(): Promise<User[]>;
+	/*
+	 * `claims` and `federated` are patchable because a just-in-time provisioned account is created and
+	 * then completed: create() takes positional arguments and neither value is always present, so widening
+	 * the patch beats a sixth and seventh parameter at every existing call site.
+	 */
 	update(
 		id: string,
-		patch: Partial<Pick<User, 'roles' | 'active' | 'password' | 'verified'>>
+		patch: Partial<
+			Pick<
+				User,
+				'roles' | 'active' | 'password' | 'verified' | 'claims' | 'federated'
+			>
+		>
 	): Promise<User | null>;
 	destroy(id: string): Promise<void>;
 	/*
@@ -282,9 +317,27 @@ export interface UserBucket {
 	name: string;
 	managedBy: string[];
 	roles: string[];
-	authMethods: string[];
+	/*
+	 * Whether this bucket accepts an email and a password at all. Replaces `authMethods`, which was a
+	 * dead field: nothing read it, and the admin bodies omitted it entirely, so no operator could set it.
+	 *
+	 * `false` means the login page renders no password form and every password-only door — sign-in,
+	 * both registration methods, both forgot-password methods — answers 403. Defaulted `true` on read in
+	 * both adapters, so a bucket document written before this field existed keeps the behaviour it had.
+	 *
+	 * Federation availability is deliberately NOT the mirror of this: it is derived from
+	 * `federation.some((p) => p.enabled)`, so a provider is enabled in exactly one place. Two fields that
+	 * both claim to say whether federation works is the shape that disagrees after the first edit.
+	 */
+	passwordLogin: boolean;
+	/* This bucket's upstream providers, credentials included. Managed only through their own routes. */
+	federation: FederationProvider[];
 	// Whether self-service registration is accepted for this bucket. The reserved
 	// admin bucket seeds this false; every other bucket defaults true.
+	//
+	// Governs the PASSWORD registration form only. Federated provisioning is the
+	// per-provider `provisioning` knob — which is what lets a bucket close password
+	// sign-ups while still accepting anyone from its corporate IdP.
 	registrationOpen: boolean;
 	// Whether a newly registered account must verify its email before it counts as
 	// verified (and, when required, before it can sign in).
@@ -301,7 +354,8 @@ export interface UserBucketStoreInstance {
 		name: string;
 		managedBy?: string[];
 		roles?: string[];
-		authMethods?: string[];
+		passwordLogin?: boolean;
+		federation?: FederationProvider[];
 		registrationOpen?: boolean;
 		emailVerificationRequired?: boolean;
 		verificationMethod?: VerificationMethod;
@@ -317,7 +371,8 @@ export interface UserBucketStoreInstance {
 				| 'name'
 				| 'managedBy'
 				| 'roles'
-				| 'authMethods'
+				| 'passwordLogin'
+				| 'federation'
 				| 'registrationOpen'
 				| 'emailVerificationRequired'
 				| 'verificationMethod'

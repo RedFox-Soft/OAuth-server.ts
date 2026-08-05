@@ -58,8 +58,13 @@ describe('admin audit route classification', () => {
 		// exclusion list is indistinguishable from one that was never audited.
 		expect(excludedAdminRoutes.map(key)).toEqual(['POST /admin/api/logout']);
 
-		expect(auditedAdminRoutes).toHaveLength(23);
-		expect(mounted).toHaveLength(24);
+		/*
+		 * Counted exactly, and the numbers grow with the table: 23 + the four federation rows (three provider
+		 * operations and one identity severance). A count that drifted upward silently would let an audited
+		 * route be swapped for an unaudited one without either total changing.
+		 */
+		expect(auditedAdminRoutes).toHaveLength(27);
+		expect(mounted).toHaveLength(28);
 	});
 
 	it('declares each route pattern only once', () => {

@@ -2,6 +2,7 @@ import { db } from './db.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
 import { provisionUserArea } from './provision.js';
 import type { UserBucket, UserBucketStoreInstance } from '../types.js';
+import type { FederationProvider } from '../../federation/types.js';
 import nanoid from '../../helpers/nanoid.js';
 
 // Buckets created before the verification settings existed have no stored values;
@@ -12,7 +13,12 @@ function withDefaults(bucket: UserBucket | null): UserBucket | null {
 		...bucket,
 		registrationOpen: bucket.registrationOpen ?? true,
 		emailVerificationRequired: bucket.emailVerificationRequired ?? false,
-		verificationMethod: bucket.verificationMethod ?? 'link'
+		verificationMethod: bucket.verificationMethod ?? 'link',
+		// Every bucket written before federation existed accepted passwords and held no providers, and
+		// must keep doing so. `passwordLogin` in particular cannot be left undefined: it is read as a
+		// boolean, and undefined is falsy, which would close the password door on every existing bucket.
+		passwordLogin: bucket.passwordLogin ?? true,
+		federation: bucket.federation ?? []
 	};
 }
 
@@ -24,7 +30,8 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		name: string;
 		managedBy?: string[];
 		roles?: string[];
-		authMethods?: string[];
+		passwordLogin?: boolean;
+		federation?: FederationProvider[];
 		registrationOpen?: boolean;
 		emailVerificationRequired?: boolean;
 		verificationMethod?: UserBucket['verificationMethod'];
@@ -35,7 +42,8 @@ export class UserBucketStore implements UserBucketStoreInstance {
 			name: data.name,
 			managedBy: data.managedBy ?? [],
 			roles: data.roles ?? [],
-			authMethods: data.authMethods ?? ['password'],
+			passwordLogin: data.passwordLogin ?? true,
+			federation: data.federation ?? [],
 			registrationOpen: data.registrationOpen ?? true,
 			emailVerificationRequired: data.emailVerificationRequired ?? false,
 			verificationMethod: data.verificationMethod ?? 'link',
@@ -78,7 +86,8 @@ export class UserBucketStore implements UserBucketStoreInstance {
 				| 'name'
 				| 'managedBy'
 				| 'roles'
-				| 'authMethods'
+				| 'passwordLogin'
+				| 'federation'
 				| 'registrationOpen'
 				| 'emailVerificationRequired'
 				| 'verificationMethod'

@@ -87,6 +87,34 @@ export const gatedRoutes: readonly GatedRoute[] = [
 		method: 'POST',
 		path: routeNames.backchannel_authentication,
 		flag: 'ciba.enabled'
+	},
+	/*
+	 * The three end-user legs of a federated sign-in — and the first gated routes to sit under `/ui`.
+	 *
+	 * That works because this table is consulted *before* alwaysAvailablePrefixes in both consumers
+	 * (classifyRoutePattern and gatedFlagForRequest below). The prefix's comment — that the interaction
+	 * surface is unconditional because a locked-out user cannot be asked to wait for a toggle — survives
+	 * intact: with this flag off there is no provider button and nothing a user could have started, so these
+	 * are paths that do not exist rather than paths closed mid-flow.
+	 *
+	 * The routes that *configure* providers are deliberately not here. They stay classified by the `/admin`
+	 * prefix, so a provider can be prepared before the capability is switched on — and, the case that
+	 * decides it, can still be deleted by a deployment that has just switched it off.
+	 */
+	{
+		method: 'GET',
+		path: '/ui/:uid/federation/:providerId/start',
+		flag: 'federation.enabled'
+	},
+	{
+		method: 'GET',
+		path: '/ui/:uid/federation/complete',
+		flag: 'federation.enabled'
+	},
+	{
+		method: 'GET',
+		path: '/federation/callback',
+		flag: 'federation.enabled'
 	}
 ];
 

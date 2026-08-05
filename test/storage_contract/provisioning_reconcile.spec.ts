@@ -149,9 +149,18 @@ describe('missingIndexes', () => {
 	// A non-unique index where a unique one is declared does not satisfy the declaration — this is the
 	// case an existing deployment hits if it ever gained a plain email index by hand.
 	it('treats an index with the wrong options as missing', () => {
+		/*
+		 * The area's other declared index is present and correct here, so what this asserts stays exactly
+		 * what it says: the email index is reported missing because its *options* differ, not because the
+		 * fixture is short an index.
+		 */
 		const existing: ExistingIndex[] = [
 			idIndex,
-			{ name: 'email_1', key: { email: 1 } }
+			{ name: 'email_1', key: { email: 1 } },
+			{
+				name: 'federated.providerId_1_federated.sub_1',
+				key: { 'federated.providerId': 1, 'federated.sub': 1 }
+			}
 		];
 
 		expect(missingIndexes(areaForBucket('abc'), existing)).toEqual([
@@ -244,9 +253,18 @@ describe('staleExpiryIndexes', () => {
 	});
 
 	it('leaves a per-bucket user area alone when it is correctly constrained', () => {
+		/*
+		 * "Correctly constrained" is the full declared set, so this fixture grows with the declaration —
+		 * the federated-identity index joined it when federation landed. Listing one index short would
+		 * make the assertion claim reconciliation is idle on an area that is in fact missing an index.
+		 */
 		const existing: ExistingIndex[] = [
 			idIndex,
-			{ name: 'email_1', key: { email: 1 }, unique: true }
+			{ name: 'email_1', key: { email: 1 }, unique: true },
+			{
+				name: 'federated.providerId_1_federated.sub_1',
+				key: { 'federated.providerId': 1, 'federated.sub': 1 }
+			}
 		];
 
 		expect(staleExpiryIndexes(areaForBucket('abc'), existing)).toEqual([]);

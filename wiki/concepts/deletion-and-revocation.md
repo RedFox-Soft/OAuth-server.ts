@@ -128,6 +128,14 @@ principal gone, answers `500` with `failedAreas`, and a repeated `DELETE` answer
 accepted cost of closing the door first, and the residue is bounded by each area's TTL *because* the one
 unbounded area goes first.
 
+## Federated links need no cascade arm
+
+An account's upstream identities are embedded on its user row (`User.federated`), so destroying the row
+destroys them, and destroying a bucket's area destroys every row in it. No arm of the cascade mentions the
+field, and none needs to — which is the reason the alternative, a links area of its own, was rejected. The
+one thing the cascade *does* reach explicitly is an outstanding federated handoff, and only because the
+`FederationState` area declares `accountId` as its owner. See [[upstream-federation]].
+
 ## Related
 
 - [[client-identity-from-database]] — why a deleted client cannot authenticate on the very next request.
@@ -137,3 +145,5 @@ unbounded area goes first.
 - [[token-payload-access-contract]] — owner fields live under `.payload.*`, which is what the sweep
   queries.
 - [[admin-plane-error-shape]] — how the 409 body reaches the caller intact.
+- [[upstream-federation]] — embedded links, and the round-trip area whose ownership declaration is what
+  makes a mid-flight handoff sweepable.

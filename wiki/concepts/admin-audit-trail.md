@@ -13,7 +13,7 @@ graph:
 
 Every state-changing action in the administrative control plane writes exactly one append-only record
 naming who did it, what they did, which entity it affected and when. The constitution requires this of
-*every* admin action, human- or MCP-initiated, and 23 mounted routes are subject to it. The trail is
+*every* admin action, human- or MCP-initiated, and 27 mounted routes are subject to it. The trail is
 permanent: the storage area declares no expiry, the store interface exposes no update or delete, and no
 product surface offers either (`lib/adapters/types.ts`, `lib/consts/storage_inventory.ts`).
 
@@ -43,7 +43,7 @@ read a refused request as a completed one.
 
 ## The table is load-bearing
 
-`lib/consts/admin_audit_routes.ts` enumerates all 23 audited routes with their action name and target
+`lib/consts/admin_audit_routes.ts` enumerates all 27 audited routes with their action name and target
 type, plus the single deliberate exclusion (`POST /admin/api/logout` — session lifecycle, not a change
 to a managed entity). It is not documentation:
 
@@ -90,8 +90,9 @@ End-user records carry `targetScope` — the bucket id — because those users l
 collections and `getUserStore(bucketId)` needs the bucket to resolve anyone. Without it an `EndUser`
 entry names an opaque id that cannot be turned into an account, or even an email, without searching
 every bucket. It is a separate field rather than a composite `targetId` so exact-match retrieval on a
-bare user id keeps working. These four routes are the only ones that set it; see
-[[account-resolution]] for how per-bucket user storage works.
+bare user id keeps working. These routes are the only ones that set it — four end-user operations plus
+`federation.identity.delete`, which severs one account's upstream link; see [[account-resolution]] for how
+per-bucket user storage works.
 
 ## Gotcha: Elysia strips undeclared query parameters before validation
 
@@ -125,5 +126,7 @@ indistinguishable from "nothing happened", the one answer an audit trail must ne
 - [[client-identity-from-database]] — client records are what several of these operations mutate.
 - [[admin-console-signin]] — how the actor named in every entry is established, and the same
   authorization-before-write reasoning applied to an unauthenticated route.
+- [[upstream-federation]] — the four rows it added, and why a provider's `targetType` is the bucket that
+  holds it rather than the provider itself.
 
 Verified against [[oauth-server-codebase]] as changed by `specs/016-admin-audit-completeness`.
