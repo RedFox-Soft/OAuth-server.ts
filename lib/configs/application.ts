@@ -1,6 +1,11 @@
-import { configStore, dpopNonceSecretStore } from '../adapters/index.js';
+import {
+	configStore,
+	dpopNonceSecretStore,
+	pairwiseSaltStore
+} from '../adapters/index.js';
 import { validateConfiguration, type Configuration } from './configuration.js';
 import { resolveNonceSecret } from './nonceSecret.js';
+import { initPairwiseSalt } from './pairwiseSalt.js';
 
 export const ApplicationConfig = {
 	/*
@@ -477,6 +482,20 @@ ApplicationConfig['dpop.nonceSecret'] = await resolveNonceSecret(
 	dpopNonceSecretStore,
 	ApplicationConfig['dpop.nonceSecret']
 );
+
+/*
+ * The pairwise salt is resolved here for the ordering reason above, but it is deliberately NOT an
+ * ApplicationConfig key. The nonce secret is one because the validator below cross-checks it against
+ * dpop.requireNonce; nothing validates the salt against another setting, so a key would buy nothing
+ * and cost the catalogue exclusion, the settings-merge exclusion and the test that pins its absence.
+ * It lives as module state in configs/pairwiseSalt.ts, the way signing keys live in configs/keys.ts.
+ *
+ * Driven from here rather than resolved inside that module because its consumer, addon/tokens.ts, is a
+ * leaf the model graph imports: a store import there would close a cycle back into a module still
+ * evaluating. So the store is handed in, and this line is what guarantees the salt is settled before
+ * any request — every entry path imports this module.
+ */
+await initPairwiseSalt(pairwiseSaltStore);
 
 export type ApplicationConfigType = typeof ApplicationConfig;
 

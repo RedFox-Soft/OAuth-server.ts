@@ -7,7 +7,7 @@ import {
 	AdminSessionStore as MemoryAdminSessionStore,
 	AdminAuditStore as MemoryAdminAuditStore,
 	SmtpSettingsStore as MemorySmtpSettingsStore,
-	DPoPNonceSecretStore as MemoryDPoPNonceSecretStore,
+	SingletonSecretStore as MemorySingletonSecretStore,
 	configStore as memoryConfig
 } from './memory/index.js';
 import type {
@@ -16,8 +16,6 @@ import type {
 	AdminAuditStoreInstance,
 	AdminSessionStoreConstructor,
 	AdminSessionStoreInstance,
-	DPoPNonceSecretStoreConstructor,
-	DPoPNonceSecretStoreInstance,
 	JWKSStoreConstructor,
 	JWKSStoreInstance,
 	ModelAdapter,
@@ -25,6 +23,8 @@ import type {
 	PayloadForModel,
 	ProjectStoreConstructor,
 	ProjectStoreInstance,
+	SecretStoreConstructor,
+	SecretStoreInstance,
 	SmtpSettingsStoreConstructor,
 	SmtpSettingsStoreInstance,
 	UserBucketStoreConstructor,
@@ -43,8 +43,7 @@ let AdminSessionStoreClass: AdminSessionStoreConstructor =
 let AdminAuditStoreClass: AdminAuditStoreConstructor = MemoryAdminAuditStore;
 let SmtpSettingsStoreClass: SmtpSettingsStoreConstructor =
 	MemorySmtpSettingsStore;
-let DPoPNonceSecretStoreClass: DPoPNonceSecretStoreConstructor =
-	MemoryDPoPNonceSecretStore;
+let SecretStoreClass: SecretStoreConstructor = MemorySingletonSecretStore;
 export let configStore: AdapterConfigStore = memoryConfig;
 
 if (process.env.MONGODB_URI) {
@@ -58,7 +57,7 @@ if (process.env.MONGODB_URI) {
 	AdminSessionStoreClass = mongodb.AdminSessionStore;
 	AdminAuditStoreClass = mongodb.AdminAuditStore;
 	SmtpSettingsStoreClass = mongodb.SmtpSettingsStore;
-	DPoPNonceSecretStoreClass = mongodb.DPoPNonceSecretStore;
+	SecretStoreClass = mongodb.SingletonSecretStore;
 }
 
 if (process.env.NODE_ENV === 'test') {
@@ -70,10 +69,19 @@ export const adminSessionStore: AdminSessionStoreInstance =
 	new AdminSessionStoreClass();
 export const adminAuditStore: AdminAuditStoreInstance =
 	new AdminAuditStoreClass();
-/* Eagerly constructed like the stores above, because configs/application.ts resolves the nonce secret
- * at module scope — before any request — and a lazy getter would only defer that by one call. */
-export const dpopNonceSecretStore: DPoPNonceSecretStoreInstance =
-	new DPoPNonceSecretStoreClass();
+/* Eagerly constructed like the stores above, because both secrets are resolved at module scope —
+ * configs/application.ts for the nonce secret, configs/pairwiseSalt.ts for the salt — before any
+ * request, and a lazy getter would only defer that by one call.
+ *
+ * Two instances of one class, and the string is the whole distinction: it derives the document each
+ * owns inside the shared serviceConfig area. Changing either string orphans that secret and silently
+ * provisions a new one, which for the salt means reassigning every relying party's account key. */
+export const dpopNonceSecretStore: SecretStoreInstance = new SecretStoreClass(
+	'dpopNonceSecret'
+);
+export const pairwiseSaltStore: SecretStoreInstance = new SecretStoreClass(
+	'pairwiseSalt'
+);
 
 export const cache = new Map();
 export function adapter<TModelName extends string>(

@@ -1,19 +1,29 @@
 # Implementation Gap Backlog
 
-Derived from the code-level gap analysis of 2026-07-28 (all specs 001–009 and admin SP-1..5 are
-implemented; these tasks close the gaps found in the code itself). Health baseline at the time of
-analysis: `bun test` green (1981 pass / 0 fail), `bun run typecheck` red (2633 errors: 836 lib,
-1797 test).
+Derived from the code-level gap analysis of 2026-07-28 (all specs 001–009 and admin SP-1..5 were
+implemented; these tasks close the gaps found in the code itself).
 
-**How to work this list.** Each task is sized for one Spec Kit cycle: feed the task body to
+**Status verified against the code on 2026-08-23.** Completed entries below are compressed to a
+delivered-by record plus what still matters (outstanding debts, decisions that bind open tasks,
+findings not filed elsewhere); their full retrospectives live in this file's git history and, where
+noted, in the tracked knowledge base at `wiki/` (read `wiki/SCHEMA.md` first). `specs/` and
+`docs/superpowers/` are **gitignored**, so where a design note is cited by path, the decisions
+restated here are the committed record.
+
+**How to work this list.** Each open task is sized for one Spec Kit cycle: feed the task body to
 `/speckit-specify`, then clarify → plan → tasks → implement. Tasks marked **Investigate** exist
 because the expected result is a product/design decision that must be made first — their
-deliverable is a written decision (a research note under `specs/` or an update to this file) that
-becomes the "Expected result" of the follow-up implementation task. Do not start an implementation
-task whose dependency is unresolved. Check a task off only after the full suite passes.
+deliverable is a written decision that becomes the "Expected result" of the follow-up
+implementation task. Do not start an implementation task whose dependency is unresolved. Check a
+task off only after the full suite passes.
 
 Evidence pointers are given as `path:line` at the time of analysis; re-verify before relying on
-exact line numbers.
+exact line numbers. Numbering is append-only — a new task takes the next free number regardless of
+its priority band, so references stay valid.
+
+Health baseline 2026-08-23: `bun test` 2757 pass / 3 skip / 0 fail (167 files); `bun run typecheck`
+red by design (~2601 errors — task 26 owns the strategy; `lib/` contributes none of the 14 added by
+task 15, which are all in new spec files and of the classes that task already owns).
 
 ---
 
@@ -21,385 +31,131 @@ exact line numbers.
 
 ### 1. Enforce feature flags on protocol endpoints — ✅ Implemented
 
-- **Delivered by** `specs/010-feature-flag-gating` (branch `010-feature-flag-gating`). Mechanism: a
-  single `onRequest` gate (`lib/plugins/featureGate.ts`) driven by a declarative table
-  (`lib/consts/route_classification.ts`) that classifies all 74 mounted routes as gated-by-flag (15)
-  or explicitly always-available (59); a two-way drift guard fails the suite if any route is
-  unclassified. Per-request flag evaluation, not boot-time mounting — the test suite drives one
-  long-lived instance and flips settings between cases.
-- **Findings worth carrying forward** (belong in `docs/wiki/` as a troubleshooting note once task 29
-  initializes it):
-  1. `POST /token` is always available while `POST /token/introspect` and `POST /token/revocation`
-     are gated. Any prefix-style match on `/token` takes down every grant flow, and it presents as a
-     token bug rather than a gate bug. Matching must be exact on (method, path).
-  2. An HTML-preferring request to an unserved path used to answer **HTTP 200** with a page titled
-     `200`, because `getErrorHtmlResponse` built its `Response` without a status. Corrected here for
-     gated and unserved paths alike — see the note on task 14 item 4 below.
-  3. A gate placed on `onRequest` must be mounted **after** the `nocache` plugin: `onRequest` hooks
-     run in registration order and a throw short-circuits the chain, so gating first omits the
-     `Cache-Control: no-store` every other response carries — a one-header fingerprint separating
-     "disabled" from "absent".
-  4. `test/fapi/fapi2.config.ts` drove `POST /par` without enabling `par.enabled`; it passed only
-     because of this very defect. FAPI 2.0 mandates PAR, so the omission was always wrong.
-- **Context:** Every route is mounted unconditionally (`lib/index.ts:77-97`) and no handler checks
-  its own flag. With default (`false`) flags, these stay fully functional and only vanish from
-  discovery: `POST /par` (`par.enabled` — its only check keys off `request_uri`, which the PAR body
-  schema omits, so it is unreachable), `POST /token/introspect` (`introspection.enabled`),
-  `POST /token/revocation` (`revocation.enabled` — never read on the request path), `POST /reg`
-  (`registration.enabled` — **open client registration on a default deployment**), `PUT/DELETE
-/reg/:clientId` (`registrationManagement.enabled`), `GET /logout` + `POST /logout/confirm`
-  (`rpInitiatedLogout.enabled`), `GET/POST /userinfo` (`userinfo.enabled`). Device flow and CIBA
-  front-channel (`lib/actions/authorization/device.ts:89,169`, `lib/actions/code_verification.ts`)
-  check only client metadata, never `deviceFlow.enabled` / `ciba.enabled`.
-- **Expected result:** A request to any endpoint whose governing flag is `false` is rejected the
-  same way a nonexistent route is (HTTP 404; config is boot-only, so conditional mounting at boot
-  is acceptable — the plan phase picks the mechanism). Device/CIBA front-channel endpoints check
-  the server flag before client metadata. Discovery output is unchanged (already correct). Every
-  flag listed above gets a spec test proving: flag off → endpoint unavailable; flag on → previous
-  behavior intact. Full suite stays green.
+- **Delivered by** `specs/010-feature-flag-gating`. One `onRequest` gate
+  (`lib/plugins/featureGate.ts`) driven by a declarative route table
+  (`lib/consts/route_classification.ts`, all 74 routes classified, two-way drift guard). Per-request
+  flag evaluation, exact `(method, path)` matching.
+- **Findings (one-liners):** matching must be exact — a prefix match on `/token` takes down every
+  grant flow; HTML error responses used to answer 200 (fixed for gated and unserved paths); the gate
+  must mount **after** `nocache` or disabled paths lose the `no-store` fingerprint;
+  `test/fapi/fapi2.config.ts` drove `/par` without `par.enabled` and passed only because of this
+  defect. Knowledge base: `wiki/concepts/feature-flag-gating.md`.
 
 ### 2. CORS policy design — Investigate — **RESOLVED 2026-07-30**
 
-- **Context:** The server emits no `Access-Control-*` header and mounts no `OPTIONS` route on any
-  endpoint. `lib/shared/cors.ts` is dead code (zero importers, Koa-shaped, references an undefined
-  `cors` identifier — it would throw if called). The `clientBasedCORS` addon (`lib/addon/cors.ts`,
-  default deny-all) is unreachable. Browser-based clients therefore cannot call `/token`,
-  `/userinfo`, `/jwks`, or discovery cross-origin. Both CORS test suites are ignored in
-  `bunfig.toml`, so zero CORS assertions run.
-- **Deliverable — done:** `docs/superpowers/specs/2026-07-30-cors-policy-design.md`. It records what
-  the specs actually require (OIDC Discovery §3/§4 SHOULD; the browser-based-apps BCP MUST, which
-  also forbids CORS on the authorization endpoint; RFC 9449 §7.1/§8 requiring `WWW-Authenticate`
-  **and** `DPoP-Nonce` in `Access-Control-Expose-Headers`) and the seven product decisions: route
-  classes (open / client-based / none), origins stored per **Project** as `corsOrigins`, a disallowed
-  origin loses the header without the request being rejected, hand-rolled Elysia plugins (no new
-  dependency), the `clientBasedCORS` addon deleted, a single `cors.enabled` config key, and an
-  admin surface of entity + stores + create/patch + one minimal SPA editor. It also amends tasks 4,
-  12, 21, 24 and 27 — see "Backlog impact" in the note.
+- **Deliverable:** `docs/superpowers/specs/2026-07-30-cors-policy-design.md` (gitignored; decisions
+  restated in task 3's record). Route classes open / client-based / none; origins stored per
+  **Project** as `corsOrigins`; a disallowed origin loses the header without the request being
+  rejected; hand-rolled Elysia plugins; the `clientBasedCORS` addon deleted; one `cors.enabled`
+  config key; admin surface of entity + stores + create/patch + one minimal SPA editor. Amendments
+  were applied to tasks 4, 12, 21, 24, 27.
 
 ### 3. CORS implementation — ✅ Implemented
 
-- **Delivered by** `specs/011-cors-support`. All ten acceptance items below are in place: the
-  `corsRoutes` table under a two-way drift guard (74 routes → 2 open / 6 client-based / 66 none), the
-  three plugins in `lib/plugins/cors.ts`, the flag-aware preflight, the header contract,
-  `Project.corsOrigins` with one shared validator, both client-identification paths, `cors.enabled`,
-  the admin surface, and every removal. Suite: 2210 pass / 0 fail (was 1981).
-- **Findings worth carrying forward** (belong in the wiki alongside task 1's notes):
-  1. **The design note's `onBeforeHandle` was wrong**, and the plan corrected it to `onTransform`.
-     `AuthPlugin` authenticates in a `derive`, which runs in the transform queue and throws
-     `invalid_client` from there; body-schema 422s also precede `beforeHandle`. A header written at
-     `beforeHandle` would be missing from exactly the two responses a misconfigured browser app hits
-     most. Measured, not reasoned: `POST /token` with no body 401s from that derive.
-  2. `set.headers` **does** merge into a raw `Response` returned by a handler _and_ into one returned
-     from an `onRequest` short-circuit. That is what lets `corsOpen` work on `jwks` (which builds its
-     own `Response`) and lets the preflight 204 inherit `no-store` from `nocache` with no duplicated
-     constant.
-  3. `OPTIONS` on a mounted path already 404s identically to an unrouted path, `no-store` included —
-     so the fall-through half of the no-leak contract held before any code was written.
-  4. `POST /admin/api/projects` forwarded only four fields to `store.create()`, silently dropping
-     `clientIds`. A schema-only addition would have accepted `corsOrigins` and discarded it. Fixed for
-     `corsOrigins`; the `clientIds` drop is still there (nothing sends it).
-  5. The in-memory project store is a process-wide singleton and `findByClientId` returns the _first_
-     match, so a project left behind by an earlier test inverts a later filtered-origin assertion into
-     a false pass. The suite tracks and destroys what it creates.
-- **Source of truth:** `docs/superpowers/specs/2026-07-30-cors-policy-design.md`. The summary below
-  is the acceptance surface; the note carries the rationale and the exact header contract.
-- **Expected result:**
-  1. **Classification.** A `corsRoutes` table in `lib/consts/route_classification.ts`, in Elysia
-     declaration form, classifying every mounted route as open (`GET
-/.well-known/openid-configuration`, `GET /jwks`), client-based (`POST /token`, `GET+POST
-/userinfo`, `POST /token/revocation`, `POST /par`, `POST /device/auth`) or none (everything
-     else, including `/auth`, `/reg*`, `/token/introspect`, `/backchannel`, `/logout*`, `/device`,
-     `/ui/*`, `/admin/*`, `/health`, `/public/*`).
-     `test/feature_gate/route_classification.spec.ts` is extended so an unclassified mounted route
-     fails the drift guard in both directions.
-  2. **Mechanism.** One new `lib/plugins/cors.ts`: `corsPreflight` (function plugin on `onRequest`,
-     mounted in `lib/index.ts` directly after `featureGate`), `corsOpen` (mounted inside `discovery`
-     and `jwks`), `corsClientBased(extractClientId)` (mounted inside `token`, `userinfo`,
-     `revocation`, `par`, `deviceAuth`, running in `onBeforeHandle` so the header survives onto
-     error responses). No new dependency — `@elysiajs/cors` is deliberately not adopted.
-  3. **Preflight must not leak flag state.** `corsPreflight` resolves the governing flag via
-     `gatedFlagForRequest(<Access-Control-Request-Method>, path)` and falls through to the ordinary
-     404 when it is off, because that helper matches exactly on `(method, path)` and would never
-     match an `OPTIONS`. A 204 on an endpoint that 404s every real request is the fingerprint
-     `lib/plugins/featureGate.ts:44-49` exists to prevent. The 204 carries the same
-     `Cache-Control: no-store` headers as every other response.
-  4. **Headers.** `Vary: Origin` on every touched response; echoed `Access-Control-Allow-Origin`
-     when allowed (never `*`, never `Access-Control-Allow-Credentials`); client-based responses also
-     carry `Access-Control-Expose-Headers: WWW-Authenticate, DPoP-Nonce`; preflight returns 204 with
-     the route's real methods, an echo of `Access-Control-Request-Headers`, and `Max-Age: 3600` (a
-     module constant, not config — see D6a in the note). An `OPTIONS` without
-     `Access-Control-Request-Method` is not a preflight and falls through to 404. Routes in the
-     "none" class get no `Vary: Origin` either.
-  5. **Allow-list.** `Project.corsOrigins: string[]` in `lib/adapters/types.ts` and both project
-     stores (default `[]`, patchable). One shared validator: `new URL(v)` parses, protocol is
-     `http:`/`https:`, `url.origin === v`, no wildcard/`*`/`null`, host lowercased, deduped;
-     matching is exact string equality. `projectStore.findByClientId` resolves the client's project;
-     Mongo gains an index on `projects.clientIds` (extends task 4).
-  6. **Client identification.** `body.client_id` → `Basic` username for the form endpoints; access
-     token → `payload.clientId` for `/userinfo`. `client_assertion`-only clients are not decoded
-     (documented). No identifiable client → no header, request unaffected.
-  7. **Config.** One key: `cors.enabled` (default `true`) in `ApplicationConfig` and the settings
-     catalog, read flat per request like `featureGate` does. `cors.enabled: false` suppresses all
-     emission and makes preflight fall through to 404. `cors.maxAge` is deliberately **not** a key
-     (it would be the first numeric one and the catalog has no `number` type — D6a).
-  8. **Admin.** `corsOrigins` accepted by `POST /admin/api/projects` and the existing `PATCH
-/admin/api/projects/:id` with the shared validation and the existing RBAC/admin-project guards,
-     plus one origins editor on `lib/admin/ui/pages/Projects.tsx`. Full project edit stays task 19;
-     auditing project mutations stays task 8 — **now delivered**: `project.update` records the submitted
-     field names, so a `corsOrigins` change is already audited.
-  9. **Removals.** `lib/shared/cors.ts`; `lib/addon/cors.ts` plus its `AddonImplementations` entry
-     and `lib/addon/index.ts` re-export; `test/cors/cors.config.ts`;
-     `test/cors/custom_cors.spec.ts` (**deleted, not migrated** — it asserts that a Koa `cors()`
-     middleware injected via `provider.use()` overrides the built-in handling, and neither exists);
-     both `test/cors/*` entries in `bunfig.toml`.
-  10. **Tests.** `test/cors/cors.spec.ts` rewritten for bun:test covering the 16 cases listed in the
-      design note — including the disallowed-origin case succeeding without a header, the
-      `/userinfo` DPoP-nonce 401 exposing both header names, the flag-off preflight 404, the
-      negative sweep over every "none"-class route, and `cors.enabled: false`. Plus the drift-guard
-      extension, a storage-contract round-trip for `corsOrigins` in both adapters, and admin route
-      validation/RBAC tests. Full suite green.
+- **Delivered by** `specs/011-cors-support`. `corsRoutes` table under the two-way drift guard
+  (74 routes → 2 open / 6 client-based / 66 none); three plugins in `lib/plugins/cors.ts`
+  (`corsPreflight` on `onRequest`, `corsOpen`, `corsClientBased` — header written at `onTransform`);
+  flag-aware preflight that falls through to 404 rather than leaking flag state; `Vary: Origin`,
+  echoed origin (never `*`, no credentials), `Access-Control-Expose-Headers: WWW-Authenticate,
+DPoP-Nonce` on client-based routes; `Project.corsOrigins` with one shared validator in both
+  stores; `cors.enabled` catalogued; `lib/shared/cors.ts` / `lib/addon/cors.ts` /
+  `test/cors/custom_cors.spec.ts` deleted, `test/cors/cors.spec.ts` rewritten and un-ignored.
+  Suite: 2210 pass (was 1981).
+- **Findings (not filed in the wiki — this is the record):** the design's `onBeforeHandle` was
+  wrong, corrected to `onTransform` — `AuthPlugin` authenticates in a `derive` (transform queue) and
+  body-schema 422s precede `beforeHandle`, so the header would have been missing from exactly the
+  two responses a misconfigured browser app hits most; `set.headers` merges into a raw `Response`
+  returned by a handler and from an `onRequest` short-circuit (what lets `corsOpen` work on `jwks`
+  and the preflight 204 inherit `no-store`); `OPTIONS` on a mounted path already 404'd identically
+  to an unrouted one, so the no-leak fall-through held before any code was written;
+  `POST /admin/api/projects` forwarded only four fields to `store.create()` and silently dropped
+  `clientIds` — fixed for `corsOrigins`, **the `clientIds` drop is still there** (nothing sends it;
+  candidate for task 19); the in-memory project store is a process-wide singleton and
+  `findByClientId` returns the first match, so suites must destroy what they create.
 
 ### 4. Complete `db:setup` provisioning — ✅ Implemented
 
-- **Delivered by** `specs/012-db-setup-provisioning` (branch `012-db-setup-provisioning`). Mechanism:
-  a declared inventory (`lib/consts/storage_inventory.ts`) that every consumer reads — the operator
-  routine provisions from it, the seven MongoDB store classes take their collection names from it,
-  `KnownModelName` derives from its model tuple, and a two-way drift guard
-  (`test/storage_contract/inventory_drift.spec.ts`) fails the suite when it and the code disagree.
-  Same shape as `route_classification.ts` from task 1. Provisioned areas went 19 → 24 on a fresh
-  database (22 fixed + one per bucket); decisions live in pure helpers (`database/reconcile.ts`) so
-  they are testable without a datastore. Suite: 2251 pass / 0 fail (was 2210); typecheck unchanged at 2474.
-- **Findings worth carrying forward** (belong in the wiki alongside tasks 1 and 3):
-  1. **MongoDB's `create` is idempotent when the options match**, so `createCollection` returns ok for
-     a collection that already exists. Inferring "I created it" from the absence of a throw made every
-     re-run report all 24 collections as freshly created — contradicting the routine's own promise to
-     print only real work. Existence has to be asked (`listCollections`), not deduced. Found by
-     running the routine twice against a real database; pinned by a `Db`-stub regression test. This is
-     also the mechanism behind this task's original note that the duplicate list entries were
-     "harmless".
-  2. **The wrong TTL indexes were inert, not live bugs.** `Client`/`projects`/`userBuckets` never
-     write `expiresAt`, and MongoDB never expires a document lacking the indexed field. They are
-     dropped anyway because the failure mode if that ever changes is silent deletion of registered
-     OAuth clients — including via the known `upsert` bug that never `$unset`s a stale `expiresAt`.
-     Inert now, unrecoverable later.
-  3. **Dropping indexes must be scoped by capability, not by absence from the inventory.** An
-     unrecognised ordinary index may be an operator's deliberate addition; only expiry rules are safe
-     to remove (removing one cannot lose a record, and nothing here queries by an expiry field).
-     Verified in practice: a hand-added `payload.clientName_1` on `Client` survived reconciliation
-     while three stale TTL indexes were dropped.
-  4. **`ModelPayloadByName` is a type, so a runtime drift guard cannot read it.** The guard instead
-     scans `adapter('X')` literals across `lib/` and dynamically imports `lib/models/*.ts`, keeping
-     classes that inherit `BaseModel`'s static `adapter` accessor (which resolves the collection as
-     `adapter(this.name)`, so the class name _is_ the area name). Base classes are excluded
-     structurally — a base appears in another discovered class's prototype chain — so there is no
-     allow-list to maintain and `IdToken` is excluded correctly.
-  5. **`lib/adapters/mongodb/db.ts` connects at module scope** and throws without `MONGODB_URI`, which
-     the suite deliberately lacks. That single fact dictates where the inventory can live: anything
-     importing it transitively is unloadable under test, so the table sits in `lib/consts/` and
-     imports nothing.
-  6. **Seed before per-bucket provisioning.** The `admin` and `redfox` buckets are created by the
-     seed, so provisioning per-bucket areas first leaves a fresh deployment with zero user
-     collections — while still exiting 0.
-- **Context:** Verified empirically on a throwaway DB: after `bun run db:setup`, the collections
-  `VerificationChallenge`, `VerificationResend`, and `serviceConfig` do not exist — they
-  auto-create on first write **without TTL indexes**, so expired verification challenges and
-  resend rate-limit records are never reaped in production (`lib/verification/challenge.ts:24,28`,
-  `lib/adapters/mongodb/configStore.ts:13`). Per-bucket `user_<bucket>` collections have **no
-  unique index on `email`** (duplicate check in `lib/adapters/mongodb/userStore.ts:35-38` is racy;
-  `findByEmail` is an unindexed scan on every login). Also: `database/collections.ts` lists
-  `DeviceCode` and `BackchannelAuthenticationRequest` twice (harmless — MongoDB tolerates
-  re-create, verified — but fix the hygiene), and the TTL-index `else` branch applies `expiresAt`
-  TTLs to collections that never carry that field (audit the per-collection index mapping).
-- **Expected result:** `bun run db:setup` provisions every collection the code uses, with correct
-  per-collection indexes: TTL on `VerificationChallenge`/`VerificationResend`, no TTL on
-  `serviceConfig`/`Client`/`projects`/`userBuckets`, unique `email` index created for user
-  collections (including a hook so newly created buckets get it — bucket creation happens at
-  runtime via the admin API, so index creation must live where user collections are created, not
-  only in the setup script). Duplicate list entries removed. Script stays idempotent (re-run
-  succeeds). A test or documented manual verification proves the collection/index inventory.
-- **Amended by task 2's decision note:** the inventory must also create an index on
-  `projects.clientIds` (no TTL) — `projectStore.findByClientId` becomes a per-request lookup on five
-  endpoints once client-based CORS lands. **Already provisioned by task 3**; it moved into the
-  inventory unchanged and is now covered by the drift guard rather than being new work.
-- **Verification:** the drift guard and the reconciliation/exit-code helpers are covered
-  automatically; the MongoDB path itself has no automated test, because Principle III keeps the suite
-  off real datastores and how mongo-backed tests should run is task 25's decision. It was instead
-  verified by hand against a throwaway database per
-  `specs/012-db-setup-provisioning/quickstart.md` — fresh inventory, idempotency, runtime bucket
-  provisioning, per-bucket uniqueness, reconciliation without record loss, and the duplicate-email
-  exit-1 path. That procedure is the seed for the automated equivalent once task 25 lands.
+- **Delivered by** `specs/012-db-setup-provisioning`. A declared inventory
+  (`lib/consts/storage_inventory.ts`) every consumer reads — the operator routine provisions from
+  it, the seven Mongo store classes take collection names from it, `KnownModelName` derives from it,
+  and `test/storage_contract/inventory_drift.spec.ts` fails on any disagreement. Provisioned areas
+  19 → 24 on a fresh database; decisions live in pure helpers (`database/reconcile.ts`). Suite:
+  2251 pass.
+- **Findings (not filed in the wiki — this is the record):** MongoDB's `create` is idempotent when
+  options match, so existence must be asked via `listCollections`, not deduced from the absence of a
+  throw; the wrong TTL indexes were inert, not live bugs (Mongo never expires a document lacking the
+  indexed field) but were dropped because a future `expiresAt` write would silently delete clients;
+  index dropping is scoped by capability — only expiry rules are safe to remove, operator-added
+  ordinary indexes survive; the runtime drift guard scans `adapter('X')` literals and dynamically
+  imports `lib/models/*.ts` because `ModelPayloadByName` is a type; `lib/adapters/mongodb/db.ts`
+  connects at module scope and throws without `MONGODB_URI`, which dictates that the inventory lives
+  in `lib/consts/` and imports nothing; seed before per-bucket provisioning or a fresh deployment
+  ends with zero user collections while exiting 0.
+- **Verification debt:** the MongoDB path itself has no automated test (Principle III keeps the
+  suite off real datastores); verified by hand per `specs/012-db-setup-provisioning/quickstart.md`.
+  Four structural-only guarantees are recorded in task 25, which owns the class.
 
-### 5. DPoP nonce configuration safety — ✅ Implemented (one manual verification outstanding)
+### 5. DPoP nonce configuration safety — ✅ Implemented
 
-- **Delivered by** `specs/014-dpop-nonce-safety` (commit `670c7f2`, on `main`). The approach chosen at
-  planning was the second of the three candidates the Expected result listed: the server
-  **provisions its own 32-byte secret** at startup, unconditionally and before serving traffic, so no
-  operator ever handles secret material and the broken combination is unrepresentable rather than merely
-  detected. Mechanism: one resolver (`lib/configs/nonceSecret.ts`, a sibling of `keys.ts`), a store class
-  per adapter over the **existing** `serviceConfig` area (no new collection, no inventory entry), two
-  invariants in the shared validator, and the removal of four bare-`Error` sites plus a test-only static
-  seam. A stored secret that reads back unusable is replaced and the write is read back to confirm the
-  round trip; startup fails in exactly one case — a replacement that also reads back unusable, which is a
-  broken persistence layer and is reported as one.
-- **Findings worth carrying forward:**
-  1. **Provisioning is unconditional, and that is what closes the defect.** Gating it on
-     `dpop.enabled` or `dpop.requireNonce` would leave the arming path exactly as reachable; the state has
-     to be impossible to hold, not merely refused when noticed. The cost is one unused secret on
-     deployments that never enable DPoP.
-  2. **An unusable stored secret is replaced, not refused — deliberately asymmetric with signing keys.**
-     An invalid key set refuses to boot because silently replacing a signing key invalidates every issued
-     token; a nonce secret derives short-lived values, so replacing it costs each client one retry through
-     a path the RFC already requires to work. The second reason is decisive: the admin plane is served by
-     the same process, so a server that will not boot cannot be repaired through any supported surface.
-  3. **Both store writes return the value as read back.** That makes the round-trip check structural
-     rather than a follow-up read, and it hands a losing writer the winner's value — so instances starting
-     together converge instead of each serving nonces the others reject. Conditional write, first writer
-     wins.
-  4. **The same concurrent-provisioning race exists for signing keys**, where divergence is materially
-     worse than a retry loop. Not addressed there; recorded so the omission is a scoping decision.
-  5. **The two validator rules can never fire on a healthy boot** — provisioning runs first — and are
-     retained anyway, tested by handing the pure validator a configuration a running server cannot reach.
-     If provisioning is ever reordered or made conditional, boot fails with a message naming the setting
-     instead of every DPoP request failing internally.
-- **Outstanding — `T037`, the manual datastore procedure, was not executed.** This environment has no
-  throwaway MongoDB (no local `mongod`, no Docker, no `mongosh`; the only `MONGODB_URI` present is not
-  disposable, and steps 4–5 are destructive by design). So the **MongoDB store class has no coverage at
-  all** — it cannot be imported under test — and its binary round trip through the driver, its
-  duplicate-key conflict signal, and its value-matching `replace` filter are verified **by reading only**.
-  The stub-store tests prove the resolver reacts correctly _when_ storage misbehaves; they cannot prove
-  whether this driver does. Quickstart step 3 is the one that matters most, because it is the only place
-  the driver's binary round trip can be observed — and that is exactly the failure FR-002a exists to
-  survive. Procedure: `specs/014-dpop-nonce-safety/quickstart.md`. This is the same gap task 25 exists to
-  close for every mongo-backed path.
-- **Context:** `dpop.requireNonce` is in the admin settings catalog but `dpop.nonceSecret` is not
-  (`lib/admin/settings/catalog.ts:68-74`), and `validateConfiguration` neither cross-checks the
-  pair nor enforces the documented "32-byte Buffer" constraint (`lib/configs/application.ts:46`).
-  Result: an admin can enable `requireNonce` with no secret; every DPoP request then throws a bare
-  `Error` → 500 (`lib/helpers/validate_dpop.ts:48-50,156`).
-- **Expected result:** `validateConfiguration` rejects `dpop.requireNonce: true` (and
-  `dpop.allowReplay` if it needs the secret) when `dpop.nonceSecret` is absent/invalid, and
-  validates the 32-byte constraint — so both boot and the admin `PUT /admin/api/settings` (which
-  validates candidates with the same function) refuse the broken combination with a clear message.
-  Decide during planning how the secret is supplied (env, generated-and-persisted like signing
-  keys, or write-only catalog entry like the SMTP password) and implement it. No request path can
-  reach the bare-`Error` throw. Tests cover: invalid combo rejected at boot and via admin PUT;
-  valid combo → nonce flow works.
+- **Delivered by** `specs/014-dpop-nonce-safety` (commit `670c7f2`). The server **provisions its own
+  32-byte secret** at startup, unconditionally, before serving traffic — the broken
+  requireNonce-without-secret state is unrepresentable rather than detected. One resolver
+  (`lib/configs/nonceSecret.ts`), a store class per adapter over the existing `serviceConfig` area,
+  two never-firing-on-healthy-boot validator invariants retained as tripwires, four bare-`Error`
+  sites removed. An unusable stored secret is replaced, not refused (deliberately asymmetric with
+  signing keys — the admin plane is served by the same process, so a server that will not boot
+  cannot be repaired); conditional write, first writer wins, so concurrent instances converge.
+- **Outstanding note, closed 2026-08-23:** the entry originally recorded that the MongoDB store
+  class was verified by reading only and quickstart step 3 (the driver's binary round trip) was
+  never executed. **That exact failure materialized:** the driver returned a BSON `Binary` the
+  resolver rejects, so the server could not boot against MongoDB at all — found by task 32's browser
+  verification, recorded as task 35, fixed in `71d9b53`. An adapter-level automated test is still
+  missing; task 25 owns the class. Knowledge base: the concurrent-provisioning race also exists for
+  signing keys, where divergence is worse — recorded as a scoping decision, not an oversight.
 
 ### 6. Rich Authorization Requests product scope — Investigate — **RESOLVED 2026-07-31**
 
-- **Context:** RAR is enable-able from the admin UI but cannot work end-to-end: the consent page
-  drops `authorization_details` (`lib/interactions/consentView.ts:26-30` omits the `rar` key the
-  consent prompt emits), `grant.addRar` has zero callers (`lib/models/grant.ts:289-292`), all four
-  addon hooks throw 'not implemented' (`lib/addon/rar.ts`), and `richAuthorizationRequests.types`
-  is function-valued so it cannot be configured via the admin API (empty `{}` → every
-  `authorization_details` value rejected at `lib/shared/check_rar.ts:62`). The only RAR-rendering
-  code in the repo is in the dead legacy template `lib/views/interaction.ts:42-46`.
-- **Also found — the implementation tracks a draft, not the published RFC.** The admin catalog still
-  says so (`experimental: true`, "Implemented from a draft of the specification",
-  `lib/admin/settings/catalog.ts:285-293`); RFC 9396 has been final since May 2023. Divergences from
-  the published text: `authorization_details` is refused on the device-authorization and CIBA
-  channels that §3 names explicitly; it is absent from the `/token` body schema
-  (`lib/actions/token.ts:45-59`) although §6 defines it as a token-request parameter, which makes the
-  four grant-level rejections unreachable dead code and their `invalid_request` the wrong code for
-  §6's `invalid_authorization_details`; §5's unknown-field rejection cannot be expressed because no
-  type descriptor declares a field set; and `lib/configs/configuration.ts:212-218` invents a
-  dependency on `resourceIndicators` that the RFC does not have. Two bugs: RAR over PAR or a signed
-  request object **always** fails, because PAR stores the parameter parsed
-  (`pushed_authorization_request_response.ts:36-38`), nothing re-stringifies it, and `checkRar`
-  `JSON.parse`s an array into `"[object Object]"`; and the `rar` model schemas disagree (array on the
-  code and Grant, object on the access token, bare unknown on the refresh token).
-- **Deliverable — done:** `docs/superpowers/specs/2026-07-31-rar-conformance-design.md`. It records
-  the §-by-§ audit against final RFC 9396 and nine decisions: RAR is a **supported** feature (D1)
-  scoped to the **authorization-code and refresh-token flows** (D2); `richAuthorizationRequests.types`
-  becomes a **serializable per-type descriptor** — label, per-common-field `required`/`allowed`,
-  `allowUnknownFields` — with the code-registered `validate` demoted to an optional escape hatch (D3);
-  enabling the flag with zero types fails validation at boot and on admin `PUT` (D4); `checkRar`
-  accepts both the string and array shapes (D5); consent **displays all** requested details and
-  grants them wholesale, with no per-detail selection (D6); the four addon hooks get **working
-  generic defaults** (D7); the `resourceIndicators` coupling is kept and documented (D8); and the
-  deviations are written down rather than left implicit (D9). It also amends tasks 12, 27 and 29 and
-  adds task 31 — see "Backlog impact" in the note.
+- **Deliverable:** `docs/superpowers/specs/2026-07-31-rar-conformance-design.md` (gitignored;
+  §-by-§ audit against final RFC 9396). Nine decisions, the binding ones: RAR is a **supported**
+  feature (D1) scoped to the authorization-code and refresh-token flows (D2);
+  `richAuthorizationRequests.types` becomes a serializable per-type descriptor with the
+  code-registered `validate` as an optional escape hatch (D3); enabling the flag with zero types
+  fails validation (D4); consent displays all requested details and grants them wholesale (D6); the
+  four addon hooks get working generic defaults (D7); the `resourceIndicators` coupling is kept and
+  documented (D8). Also found: the old implementation tracked a draft, not the RFC; RAR over PAR or
+  a signed request object always failed; the `rar` model schemas disagreed. Amendments were applied
+  to tasks 12, 21, 27; task 31 was added for the remaining channels.
 
 ### 7. Rich Authorization Requests end-to-end — ✅ Implemented
 
-- **Delivered by** `specs/015-rar-end-to-end` (commit `c9a70dd`, on `main`). All six acceptance areas
-  below are in place: descriptor-as-data configuration with the empty-map guard, §5-conformant
-  validation with normalization, consent rendering plus idempotent grant persistence, working defaults
-  for all four hooks, the corrections, and a `test/rar/` suite that is the first anywhere to send
-  `authorization_details`. Suite: 2366 pass / 0 fail (was 2302); `lib/` typecheck improved 820 → 812.
-- **Findings worth carrying forward** (added to `wiki/concepts/rich-authorization-requests.md`):
-  1. **A declared TypeBox shape on a request parameter is a runtime coercion contract, not
-     documentation.** `authorization_details` was typed `t.Array(t.Object({}))`, and Elysia coerces a
-     JSON query value against that schema _and strips undeclared properties_ — so every detail arrived
-     as `{}` with its `type` gone, before any validation ran. RAR could not have worked whatever
-     `checkRar` did, and no amount of reading the parser would have shown it. Measured, not reasoned.
-     `t.Array(t.Unknown())` — the obvious loosening, and the shape the Grant model used — is worse: it
-     splits the raw JSON string on its commas.
-  2. **Form-encoded bodies do not coerce JSON at all.** A JSON string in a form body arrives as one
-     object per _character_, with status 200 and no error. PAR is form-encoded, so every pushed rich
-     request was silently corrupt. Fixed by `parseJsonParams` in `lib/plugins/coerce_array_params.ts`,
-     the sibling of the existing `coerceArrayParams` — which exists for exactly this class of quirk, and
-     is the precedent to reach for next time a parameter's wire form fights its schema.
-  3. **Fixing the parser alone would have made things worse.** `pushed_authorization_request_response.ts`
-     ran `JSON.parse` on the value; that line was unreachable only because `checkRar` threw first, so
-     accepting arrays turned a clean 4xx into an unhandled 500. The two changes had to land together.
-  4. **`Value.Check` runs in the `BaseModel` constructor only, and never cleans.** So a wrong payload
-     schema on a field assigned _after_ construction is inert — until something constructs the model with
-     the field present, at which point it is a hard `TypeError`. Same shape as task 4's inert TTL
-     indexes: harmless now, unrecoverable later.
-  5. **Two live bugs found by the first test to exercise their paths**, both outside RAR:
-     `introspectionAllowedPolicy` read the removed top-level `token.clientId`, so **any public client
-     introspecting its own token received `active: false`**; and `loadExistingGrant` froze `trusted` at
-     grant-creation time, so a returning End-User of a consent-not-required client silently under-granted
-     scopes, claims _and_ details. Both are the `.payload.*` / stale-derivation classes already recorded
-     in the knowledge base — worth re-reading before trusting any addon default.
-  6. **The feature's remaining hole is operational, not protocol.** Details reach a token only when a
-     resource server resolves, which needs a `getResourceServerInfo` override whose default throws. A
-     deployment without one grants details at consent that no token carries, with no error anywhere. It
-     is D8's coupling seen from the operator's side, pinned by a test, and the guard belongs to task 12.
-- **Source of truth:** `docs/superpowers/specs/2026-07-31-rar-conformance-design.md`, whose deviation
-  table now carries the two consequences discovered during implementation. The summary below is the
-  acceptance surface.
-- **Expected result** (per task 6's decision note, which is the spec input — read it first):
-  `authorization_details` works end to end on the authorization-code and refresh-token flows,
-  conformant to **final RFC 9396** within the boundary D2 sets. Definition of done:
-  - **Types are configurable as data.** `richAuthorizationRequests.types` holds a JSON descriptor per
-    type (`label`, optional `fields` constraints over the five §2 common fields,
-    `allowUnknownFields` defaulting to `false`). `checkRichAuthorizationRequests`
-    (`lib/configs/configuration.ts:137-162`) validates descriptor shape instead of requiring a
-    `validate` function, and rejects an empty map when the flag is on. A new `json` catalog entry
-    exposes the map to the admin API through the existing `validateEffectiveConfig` path.
-  - **Request validation is §5-conformant.** `checkRar` accepts the parameter as a JSON string _or_
-    an already-parsed array (fixes the PAR / request-object bug), enforces the descriptor's
-    required/allowed values, rejects unknown fields unless `allowUnknownFields`, and raises
-    `invalid_authorization_details` for every type-and-field violation, and **normalizes** — the
-    parsed array is written back to `oidc.params.authorization_details` so every downstream consumer
-    sees one shape and the consent prompt's second `JSON.parse`
-    (`lib/helpers/interaction_policy/prompts/consent.ts:133`) goes away. The dead `response_type`
-    branch goes; the `none` rejection stays.
-  - **Consent shows and stores the details.** `PromptDetails` carries `rar`; `buildConsentView` emits
-    a `'rar-detail'` permission group per detail (descriptor label + one item per present common
-    field, raw type as the fallback label), labels passed in by the caller so the module stays
-    config-free; `createGrant` calls `grant.addRar` for each entry; `addRar` is idempotent by
-    sorted-key structural comparison with **no string normalization** (§12); and `rar_prompt` fires
-    only when a requested detail is not already granted, so repeat authorizations stop re-prompting.
-  - **The hooks have real defaults.** `rarForAuthorizationCode` = requested ∩ granted;
-    `rarForCodeResponse` / `rarForRefreshTokenResponse` = the stored details filtered to the resource
-    server by `locations` (a detail without `locations` is kept);
-    `rarForIntrospectionResponse` = the token's details unchanged. No `mustChange`, no throw; the
-    override registry still wins.
-  - **Corrections.** `rar` is an array schema on the access token and refresh token; the catalog
-    entry drops `experimental` and the draft sentence and cites RFC 9396 as published (update
-    `test/admin/settings_catalog.spec.ts:85-88` with it); the `types` docstring describes the
-    descriptor.
-  - **Tests** (today zero send `authorization_details`): full code flow through consent to token
-    response, JWT claim and introspection; the same over **PAR** and a **signed request object**;
-    refresh-token flow with per-resource-server filtering; the §5 error cases;
-    no-duplicate-on-re-consent and no-re-prompt-when-granted; boot and admin-`PUT` rejection of the
-    flag with no types and of malformed descriptors; a registered code validator still running; and
-    device/CIBA/`client_credentials` still refusing the parameter, pinning D2's boundary.
-  - **Out of scope, by D2:** the §3 device and CIBA channels and the §6 token-request parameter —
-    task 31.
+- **Delivered by** `specs/015-rar-end-to-end` (commit `c9a70dd`). Descriptor-as-data configuration
+  behind a new `json` catalog `SettingType`, §5-conformant validation with normalization (string and
+  array shapes both accepted — fixes the PAR/JAR bug), consent rendering (`'rar-detail'` groups)
+  plus idempotent `grant.addRar` persistence, working defaults for all four hooks, and `test/rar/`
+  — the first suite anywhere to send `authorization_details`. Suite: 2366 pass.
+- **Findings:** filed in `wiki/concepts/rich-authorization-requests.md` — including the two that
+  generalize: a declared TypeBox shape on a request parameter is a runtime **coercion contract**
+  (Elysia stripped every detail to `{}` before validation ran), and form-encoded bodies do not
+  coerce JSON at all (PAR bodies arrived as one object per character; fixed by `parseJsonParams` in
+  `lib/plugins/coerce_array_params.ts`). Two live bugs found outside RAR by the new tests: public
+  clients introspecting their own token got `active: false` (stale `token.clientId` read), and
+  `loadExistingGrant` froze `trusted` at grant-creation time.
+- **Operational hole, deliberate:** details reach a token only when a resource server resolves,
+  which needs a `getResourceServerInfo` override whose default throws — pinned by a test; the guard
+  belongs to task 12.
+
+### 35. The server cannot boot against MongoDB — ✅ Implemented
+
+- (P0; found 2026-08-05 during task 32's browser verification, recorded as task 35.)
+- **Delivered by** commit `71d9b53` (2026-08-23). BSON has no Buffer type, so the 32-byte nonce
+  secret written by `lib/configs/nonceSecret.ts` came back as a driver `Binary` — the one shape the
+  resolver rejects — and every boot against MongoDB died in `roundTripFailure`. Fixed by unwrapping
+  in `lib/adapters/mongodb/dpopNonceSecretStore.ts`'s `read()`, where the driver's representation
+  choice belongs; the resolver's guard stays a check on the material. It is the only binary writer
+  in the Mongo adapter, so no sibling store shares the defect.
+- **Residual:** the expected result asked for an adapter-level automated round-trip test; that is
+  impossible under the current no-datastore test policy and is owned by task 25 (this incident is
+  that task's first hard evidence). The fix itself was verified by hand against a real MongoDB.
 
 ---
 
@@ -407,321 +163,90 @@ exact line numbers.
 
 ### 8. Admin audit completeness and readability — ✅ Implemented
 
-- **Delivered by** `specs/016-admin-audit-completeness`. Mechanism: a declarative table
-  (`lib/consts/admin_audit_routes.ts`) enumerating all 23 state-changing admin routes with their action
-  name and target type, made **load-bearing** rather than documentary — `recordAdminAudit` takes an
-  `AuditAction` (the union of the table's action values) and resolves `targetType` from the table, so an
-  unlisted action cannot compile and a target type cannot be mistyped — plus a two-way drift guard
-  (`test/admin/audit_route_classification.spec.ts`) that fails when a mounted mutating admin route has no
-  entry or an entry names an unmounted route. Same shape as `route_classification.ts` (task 1) and
-  `storage_inventory.ts` (task 4). Coverage went 4 fully-audited routes (+1 branch-conditional) → 23 of
-  23; the read surface is `GET /admin/api/audit` (super-admin, newest-first, offset-paged, filterable by
-  actor/action/target/scope/time window) with an `Audit` page in the admin SPA. Suite: 2446 pass / 0 fail
-  (was 2366); `lib/` typecheck unchanged at 812.
-- **Findings worth carrying forward** (filed as `wiki/concepts/admin-audit-trail.md`):
-  1. **Audit-first and authorization-first are both required, and the order is not interchangeable.** The
-     obvious cleanup — move 23 call sites into one route-level plugin so nobody can forget — is unsafe
-     here: the admin handlers authorize in their own bodies, so an `onBeforeHandle` plugin records
-     entries for callers who are not yet known to be authorized. Into an append-only, never-expiring
-     collection, that is an unauthenticated write path into permanent storage, i.e. trail poisoning and
-     unbounded growth reachable by anyone who can reach `/admin/api/*`. Completeness is bought with a
-     table and a guard instead; the write stays inside the handler, after authorization.
-  2. **An entry therefore means "an authorized actor reached the point of applying this change", not
-     "the change took effect".** A not-found, a uniqueness conflict or the last-super-admin guard can
-     follow a written entry. Recording effects instead would need either a second write per operation or
-     giving up the guarantee that nothing changes unrecorded; the trail states the caveat where it is
-     read rather than pretending otherwise.
-  3. **Elysia strips undeclared query parameters before validation**, so `additionalProperties: false` on
-     a query schema cannot refuse one — the check has to read the raw URL. Measured, not reasoned. It
-     matters disproportionately here: a mistyped filter that is silently dropped answers with the
-     _unfiltered_ trail, a wrong answer wearing a 200 on the one surface whose purpose is to be trusted.
-     Same family as task 7's finding that a declared parameter schema is a coercion contract.
-  4. **Creations had to allocate their own identifier** for audit-first to hold without a per-operation
-     exception. Two of the four stores already accepted an optional `_id`; `UserStoreInstance.create` and
-     `createClient` gained one. The alternative — record after the insert — creates exactly one class of
-     mutation that can be applied unrecorded.
-  5. **A per-bucket target does not resolve on its own.** An `EndUser` entry naming only a user id
-     cannot be turned into an account, or even an email, without searching every bucket, because those
-     users live in `user_<bucket>` collections. The bucket is recorded in its own `targetScope` field
-     rather than fused into `targetId`, so exact-match retrieval on a bare user id keeps working.
-  6. **Two action names were wrong as originally specified.** `DELETE /admin/api/admins/:id` deactivates
-     (`active: false`) and keeps the row, so it records `admin.deactivate` — a trail that says "delete"
-     is a false statement an investigator acts on. And `bucket.settings.update` fired only when a
-     registration/verification field was present, so a rename or a manager reassignment left no trace;
-     it is now `bucket.update`, recorded unconditionally, with the changed field names in `attributes`.
-     Historical entries keep the old name and stay filterable, because the action filter matches
-     recorded values rather than a fixed enum.
-  7. **Field names, never values** makes secret-freedom structural instead of a redaction rule a future
-     call site can forget. A mail-settings change records `password` as a _name_; `enduser.password.reset`
-     records no names at all, because the action already says everything.
-  8. **The route census in the spec was wrong** (18 of 18 → 23 of 23). 18 is the number of routes with
-     _no_ record; the surface is 24 mutating admin routes, 23 audited and `POST /admin/api/logout`
-     deliberately excluded as session lifecycle. Caught during planning by enumerating handlers, and
-     confirmed by the drift guard, which pins both counts.
-- **Verification gap, unclosed:** the MongoDB `adminAuditStore` rewrite — `$or` actor filter, timestamp
-  range, `sort`/`skip`/`limit`, `countDocuments`, six declared indexes — has **no automated coverage**,
-  because `MONGODB_URI` is deliberately absent under test (Principle III). The store contract is pinned
-  against the in-memory adapter (`test/storage_contract/admin_audit.round_trip.spec.ts`, 19 clauses) and
-  the MongoDB class is verified by reading only. `specs/016-admin-audit-completeness/quickstart.md` § 4 is
-  the manual procedure; it was **not executed** — same constraint task 5 recorded, and what task 25 exists
-  to fix.
-- **Original context (for history):** `recordAdminAudit` had exactly 5 call sites (bucket policy branch,
-  JWKS ×2, settings, SMTP), and the trail was write-only — `adminAuditStore.list()` existed in both
-  adapters but no route or UI read it.
+- **Delivered by** `specs/016-admin-audit-completeness`. A load-bearing declarative table
+  (`lib/consts/admin_audit_routes.ts`, 23 of 23 mutating admin routes + one deliberate exclusion)
+  with a two-way drift guard; `recordAdminAudit` takes an `AuditAction` typed from the table; read
+  surface `GET /admin/api/audit` (super-admin, filterable, offset-paged) plus an `Audit` SPA page.
+  Coverage went 4 routes (+1 conditional) → 23/23. Suite: 2446 pass.
+- **Findings:** filed in `wiki/concepts/admin-audit-trail.md` — the binding ones: audit-first and
+  authorization-first are both required, so the write stays inside the handler (a route-level plugin
+  would record unauthenticated callers into permanent storage); an entry means "an authorized actor
+  reached the point of applying this change", not "the change took effect"; Elysia strips undeclared
+  query parameters before validation, so refusing one means reading the raw URL; field names, never
+  values.
+- **Verification debt:** the MongoDB `adminAuditStore` rewrite (filters, sort/skip/limit, six
+  indexes) has no automated coverage; contract pinned against the in-memory adapter; manual
+  procedure `specs/016-admin-audit-completeness/quickstart.md` § 4 was **not executed**. Task 25
+  owns the class.
 
 ### 9. Deletion integrity semantics — Investigate — **RESOLVED 2026-08-04**
 
-- **Context:** No cascade or guard exists on any delete: project delete leaves its clients in the
-  DB **still able to authenticate at `/token`** (`lib/admin/projects/routes.ts:122`); client delete
-  revokes no grants/sessions/tokens (`lib/admin/clients/service.ts:213-215`); end-user delete
-  keeps their sessions/grants/tokens (`lib/admin/users-end/routes.ts:116`); bucket delete leaves
-  the `user_<bucket>` collection behind. Two structural facts constrain any fix: **nothing can
-  enumerate by owner** (no method lists grants or sessions by `accountId`/`clientId`; Mongo could
-  query `payload.accountId`, but the in-memory store is a `QuickLRU` behind a `get`/`set`/`delete`-only
-  interface with no iteration — `lib/adapters/memory/storage.ts:7-15`), and **`revokeByGrantId` means
-  two different things per adapter** (`lib/adapters/memory/memoryAdapter.ts:114-122` deletes every
-  model's keys tracked under `grant:<id>` and drops the index, so the first of `revoke()`'s five calls
-  wipes everything and the other four no-op; `lib/adapters/mongodb/mongoAdapter.ts:66-68` deletes only
-  within the calling model's collection).
-- **Deliverable — done:** `docs/superpowers/specs/2026-08-04-deletion-integrity-design.md`, and — because
-  `docs/superpowers/` is gitignored — the full definition of done in task 10 below, which is the
-  canonical record. Six decisions:
-  1. **D1 — containers guard, principals cascade.** Project and bucket refuse deletion with 409 while
-     they hold clients / users; client and end-user cascade. The line is drawn by **visibility**: an
-     operator can see and name a project's clients, so refusing tells them exactly what they are about
-     to destroy and keeps one audit entry per entity destroyed; nobody can be asked to enumerate the
-     tokens a client issued, least of all during an incident response. Follows the precedent the
-     existing bucket-vs-project guard already set.
-  2. **D2 — ownership is declared in `lib/consts/storage_inventory.ts`** and one engine reads that
-     table; no call site names an area. Same shape as `route_classification.ts` (task 1),
-     `admin_audit_routes.ts` (task 8) and the inventory itself (task 4), under the same two-way drift
-     guard. A hand-written cascade per entity is cheaper and fails silently the first time an area is
-     added — the exact failure mode the inventory closed for provisioning.
-  3. **D3 — `revokeByGrantId` is per-collection** (Mongo's semantics), and `revoke()` stops filtering
-     by `client.grantTypeAllowed`. A per-model adapter method that deletes another model's records is a
-     contract its name and receiver both deny, and the global variant would force `MongoAdapter` to know
-     the five grantable collection names — knowledge that now lives in the inventory.
-  4. **D4 — order is audit → destroy the principal → cascade**, with the partial-failure cost accepted
-     and bounded rather than engineered around.
-  5. **D5 — three things are deliberately left behind**, each with a reason: `Session.authorizations[clientId]`,
-     admin sessions, and bucket-scoping of the account sweep.
-  6. **D6 — the operator surface** is a machine-readable 409 body plus the two confirmation dialogs that
-     already exist; no new audit actions.
-- **Findings worth carrying forward** (belong in `wiki/concepts/` alongside tasks 1, 3, 4, 7 and 8 —
-  no existing note covers deletion or revocation):
-  1. **Client deletion already takes effect immediately, and that is easy to misread as safe.**
-     `tryFindClient` reads `adapter('Client')` on every call and the validation memo is keyed by a hash
-     of the stored properties (`lib/models/client/validate.ts:208-228`), so a deleted client cannot
-     authenticate — while every token it ever issued keeps working to its own TTL. The visible half of
-     the problem is fixed and the invisible half is not.
-  2. **Two areas make a grant-walk cascade wrong, not merely slower.** `ClientCredentials` carries no
-     `grantId` at all, so collecting grant ids and calling `revokeByGrantId` misses it entirely; and
-     `RegistrationAccessToken` may be issued with no expiry, so what it leaves behind is not bounded by
-     a TTL. Sweeping by owner field reaches both. This is the concrete reason D2's table beats
-     hand-enumeration — both areas are easy to forget and neither announces itself.
-  3. **`accountId` is optional on `BaseTokenPayload` and `clientId` is required**
-     (`lib/models/base_token.ts:16,26`), which is what puts six areas in both ownership columns and
-     `ClientCredentials`/`RegistrationAccessToken` in the client column only. Ownership is a property of
-     each payload schema, so the drift guard can check it against the schemas rather than trust the table.
-  4. **`revoke()`'s grant-type filter is the mechanism of a live Mongo-only hole.** Narrow a client's
-     grant types after issuance and its refresh tokens survive revocation on Mongo — and not on memory,
-     where the first call wipes everything regardless. The filter only ever saved four no-op deletes.
-  5. **Protocol revocation deliberately does not destroy the `Grant` record.** The grant is the consent
-     record; revoking tokens is not withdrawing consent. Only the deletion cascade destroys grant rows,
-     and only for a principal that no longer exists. Worth writing down because "revoke" reads as
-     "remove everything" and the code has always disagreed.
+- **Deliverable:** `docs/superpowers/specs/2026-08-04-deletion-integrity-design.md` (gitignored —
+  the decisions here are the committed record). Six decisions:
+  1. **D1 — containers guard, principals cascade.** Project and bucket refuse deletion with 409
+     while they hold clients / users; client and end-user cascade. The line is visibility.
+  2. **D2 — ownership is declared in `lib/consts/storage_inventory.ts`**; one engine reads the
+     table; no call site names an area.
+  3. **D3 — `revokeByGrantId` is per-collection** (Mongo's semantics) on both adapters, and
+     `revoke()` stops filtering by `client.grantTypeAllowed` — always sweeps all five grantable
+     areas.
+  4. **D4 — order is audit → destroy the principal → cascade**, partial-failure cost accepted and
+     bounded.
+  5. **D5 — deliberately left behind:** `Session.authorizations[clientId]`, admin sessions
+     (task 22 owns them), bucket-scoping of the account sweep.
+  6. **D6 — operator surface:** machine-readable 409 body + the existing confirmation dialogs; no
+     new audit actions.
+- **Findings:** filed in `wiki/concepts/deletion-and-revocation.md` — including: client deletion
+  already took effect immediately while every issued token kept working (the visible half fixed,
+  the invisible half not); `ClientCredentials` carries no `grantId` and `RegistrationAccessToken`
+  may never expire, which is why owner-field sweeps beat grant walks; protocol revocation
+  deliberately does not destroy the `Grant` record (consent ≠ tokens).
 
 ### 10. Deletion integrity implementation — ✅ Implemented
 
-- **Delivered by** `specs/019-deletion-integrity`. Mechanism: ownership is an `owners` block on every
-  entry in `lib/consts/storage_inventory.ts`, and one engine (`lib/helpers/cascade.ts`) filters that table
-  — no deletion path names a storage area, and `indexesFor()` derives an owner index from the same
-  declaration, so a swept field is always an indexed field. Enabled by one new adapter method
-  (`destroyByOwner(field, value)` → count, on both adapters), `keys()` on `MemoryStore`, and
-  `destroyArea()` on `UserStoreInstance`. `revokeByGrantId` is now per-collection on **both** adapters,
-  and `revoke()` takes `grantId` alone. Containers guard (project → 409 while any `clientIds` entry
-  resolves; bucket → 409 while any user exists, deactivated included, then drops `user_<bucket>`);
-  principals cascade. 409 bodies carry `blockers`, cascades return per-area `destroyed`, partial failures
-  answer 500 with `failedAreas`. Audit unchanged. Knowledge filed as `wiki/concepts/`
-  [[deletion-and-revocation]], [[model-graph-import-order]] and [[admin-plane-error-shape]].
-- **Three findings worth carrying beyond the task body**, each now recorded in the wiki:
-  1. **The admin plane's error shape never reached callers in the real server.** Every admin route group
-     has its own `onError`, but `lib/index.ts` registers the OAuth handler on the root app _before_
-     mounting `adminApp`, and Elysia's first returning handler wins — so every admin API error arrived as
-     `{ error: 'server_error', error_description: … }` with `message` gone. Invisible because all of
-     `test/admin/` mounts the routes standalone. Fixed with an `adminPlane` marker the root handler stands
-     aside for, and pinned against the composed app.
-  2. **`lib/models/` has an import cycle** that throws a TDZ `ReferenceError` on a cold entry;
-     `inventory_drift.spec.ts` only passes because `test/preload.ts`'s `afterEach` warms the graph before
-     its _second_ test. Left as-is, documented.
-  3. **`DATABASE_NAME`, not the URI path, selects the MongoDB database** (`lib/adapters/mongodb/db.ts`),
-     so a manual procedure that only exports `MONGODB_URI` writes into whatever database was already
-     configured. Learned by doing it.
-- **Verification gap, now narrower than expected:** the MongoDB half was exercised directly against a
-  local server in a dropped-afterwards scratch database — owner indexes provisioned per the declaration,
-  `destroyByOwner`'s counts / own-collection-only / idempotence, per-collection `revokeByGrantId`, and
-  `destroyArea` dropping `user_<bucket>`. What remains manual is only the HTTP-level walkthrough
-  (`quickstart.md` §§ 4.2–4.5), which needs a running server. Task 25 still owns the class.
-- **Original acceptance surface, kept for the record.** `docs/superpowers/specs/2026-08-04-deletion-integrity-design.md` carries the
-  rationale; that path is gitignored, so the acceptance surface below is the canonical record. Read
-  task 9's decisions first.
-- **Expected result:** No deleted principal can authenticate or use an existing token afterwards, and no
-  container can be deleted while it still holds something an operator named. Definition of done:
-  1. **Ownership declared as data.** Every entry in `lib/consts/storage_inventory.ts` declares the payload
-     field naming its owning account, the field naming its owning client, or an explicit `none` **with a
-     reason**. As the schemas stand: `accountId` + `clientId` on `AccessToken`, `AuthorizationCode`,
-     `BackchannelAuthenticationRequest`, `DeviceCode`, `Grant`, `RefreshToken`; `clientId` only on
-     `ClientCredentials` and `RegistrationAccessToken`; `accountId` only on `Session`, `Interaction`,
-     `VerificationChallenge`. Declared `none`: `InitialAccessToken` (deliberately not client-bound,
-     `lib/models/initial_access_token.ts:6-7`), `PushedAuthorizationRequest` (the client id is inside the
-     opaque `request` string), `ReplayDetection` (`iss`/`jti`, belongs to no principal),
-     `VerificationResend` (its id _is_ `${bucketId}:${email}`, so the cascade destroys it by computed id —
-     addressed, not scanned), `Client` itself, and every store / per-bucket area.
-  2. **Drift guard, both directions.** `test/storage_contract/inventory_drift.spec.ts` fails when an area
-     declares no ownership, when a declared field is absent from that model's payload schema, and when a
-     payload schema carries `accountId`/`clientId` the table does not declare. Field names are validated as
-     plain identifiers (no `$`-prefixed or dotted values reach a Mongo query).
-  3. **One new adapter method.** `destroyByOwner(field, value): Promise<number>` on `ModelAdapter`, in both
-     adapters — Mongo `deleteMany({ 'payload.<field>': value })` with an index per swept owner field added
-     to the inventory (extends task 4); memory scans keys under its own model prefix, which requires adding
-     `keys()` to the `MemoryStore` interface (`lib/adapters/memory/storage.ts`) and to any test double that
-     implements it. Field names come from the table, never from a caller. Stale `grant:`/`sessionUid:` index
-     entries left dangling by an owner sweep are harmless (`delete` on a missing key is a no-op;
-     `findByUid` resolves an id whose payload is gone and returns undefined) — pin that, do not fix it.
-  4. **One cascade engine**, reading the table: `destroyByOwner` across every area declaring the relevant
-     owner field, plus `VerificationResend` by computed id for the account case. Returns per-area counts.
-     `RegistrationAccessToken` is swept **first** — it is the only swept area that can outlive a failure,
-     because everything else carries an `expiresAt` TTL. **The account cascade must capture the user's
-     email before the account row is destroyed**: `VerificationResend`'s id is `${bucketId}:${email}` and
-     nothing else records it, so the obvious ordering silently skips that record with no error anywhere.
-  5. **`revokeByGrantId` aligned to per-collection semantics.** Memory drops only keys bearing its own model
-     prefix and leaves the `grant:<id>` index for the other models; a storage-contract test pins that
-     calling it on one model does not touch another's records, in both adapters. `lib/helpers/revoke.ts`
-     drops the `client.grantTypeAllowed` filter, always sweeps all five grantable areas, and takes `grantId`
-     alone (it no longer needs `oidc`) — update its six callers. Protocol revocation still leaves the
-     `Grant` row alive; only the cascade destroys grant rows.
-  6. **Guards.** `DELETE /admin/api/projects/:id` → 409 while it holds clients that still **resolve** via
-     `Client.tryFind` (an unresolvable id in `clientIds` must not make a project permanently undeletable,
-     and is not pruned on a refused request — a refused request changes nothing). An assigned bucket is
-     **not** a blocker. `DELETE /admin/api/buckets/:id` keeps the
-     existing `countByBucket` guard and adds 409 while any user exists in `user_<bucket>` — **including
-     `active: false` accounts**, since deactivation is a login decision, not absence. On success it drops the
-     now-empty per-bucket area (Mongo only; nothing to drop on memory), which is what closes the
-     left-behind-collection hole.
-  7. **Cascades.** `DELETE /admin/api/projects/:id/clients/:clientId` and
-     `DELETE /admin/api/buckets/:id/users/:uid` run the engine in the order audit → destroy the principal →
-     cascade, where "destroy the principal" includes the client route's existing unlink from
-     `project.clientIds` (the client is not gone from the admin plane until both have happened, so the
-     cascade runs after the unlink, not between the two). A cascade that fails partway answers 500 naming
-     the areas that failed; a repeated `DELETE` answering 404 is the accepted cost of closing the door
-     first, and the residue is bounded by each area's TTL given item 4's ordering. Record that reasoning
-     where the order is coded.
-  8. **HTTP contract.** 409 bodies carry `blockers: [{ kind, count, ids? }]` — `kind` is `'client'` or
-     `'enduser'` — alongside the existing
-     `AdminError` shape (`{ error: 'admin_error', message }`), so task 19's dialogs can list consequences
-     without parsing prose. Client ids are listed; end-user blockers report a **count only** — a bucket can
-     hold thousands of accounts and their ids are not the caller's business. Successful cascades return
-     per-area counts.
-  9. **Audit unchanged.** No new actions and no change to `lib/consts/admin_audit_routes.ts`: the cascade is
-     an effect of the already-recorded `client.delete` / `enduser.delete`. Per-area counts stay **out** of the
-     trail — task 8's "field names, never values" rule is what makes secret-freedom structural, and a count
-     is a value.
-  10. **UI, narrowly.** Only the two confirmation dialogs that already exist are upgraded to state what the
-      cascade destroys: `lib/admin/ui/pages/Clients.tsx:296` and `lib/admin/ui/pages/BucketDetail.tsx:257`.
-      Project and bucket delete buttons do not exist yet; their blocker-listing dialogs belong to task 19,
-      which consumes item 8's contract. Building them here would duplicate task 19's work on the same pages.
-  11. **Deliberately not done**, each recorded in code rather than left implicit:
-      `Session.authorizations[clientId]` is not cleaned on client delete (no index reaches into a
-      sub-document, and the entry is inert — `lib/models/base_token.ts:171` compares the token's `grantId`
-      against `session.grantIdFor(clientId)`, which now resolves to a destroyed grant); admin sessions
-      (`adminSession`) are out of scope, since admin deletion deactivates (task 8 finding 6) and admin
-      session revocation is task 22; and the account sweep is not bucket-scoped, because `accountId` is a
-      `nanoid` and tokens record no bucket (`VerificationChallenge` is filtered by `bucketId` where the
-      cascade has it).
-  12. **Tests.** Storage-contract: `destroyByOwner` round-trips per owner field, and the per-collection
-      `revokeByGrantId` pin. Protocol negatives: deleted user's refresh token → `invalid_grant`; deleted
-      client's access token → 401 at `/userinfo` and `active: false` at introspection; deleted client's
-      `client_credentials` token inactive; deleted client's registration access token → 401 at
-      `PUT /reg/:clientId`; deleted user's session no longer authorizes. Admin routes: project with live
-      clients → 409 with blockers, then deletes once emptied; project with only stale client ids deletes;
-      bucket with users (including a deactivated one) → 409, then deletes and drops the area; cascade count
-      bodies. Plus the drift guard in both directions. Full suite green.
-- **Verification gap, expected:** the MongoDB half — `destroyByOwner`'s `deleteMany`, the new indexes, and
-  dropping the per-bucket collection — cannot be covered automatically, because `MONGODB_URI` is
-  deliberately absent under test (Principle III). Pin the contract against the in-memory adapter, verify the
-  Mongo class by reading, and write the manual procedure into the spec's `quickstart.md` as tasks 5, 8 and 4
-  did. Task 25 is what closes the class.
+- **Delivered by** `specs/019-deletion-integrity` (commit `84da0e2`). Ownership as an `owners`
+  block per inventory entry; one cascade engine (`lib/helpers/cascade.ts`); `destroyByOwner(field,
+value)` on both adapters with owner indexes derived from the same declaration; per-collection
+  `revokeByGrantId` on both adapters; guards (project 409 while `clientIds` resolve, bucket 409
+  while any user exists, then drops `user_<bucket>`); cascades for client and end-user deletes.
+  Knowledge filed in `wiki/concepts/` deletion-and-revocation, model-graph-import-order,
+  admin-plane-error-shape.
+- **Contract that task 19 consumes:** 409 bodies carry `blockers: [{ kind, count, ids? }]`
+  (`kind` `'client'` lists ids; `'enduser'` reports count only) beside the `AdminError` shape;
+  successful cascades return per-area `destroyed` counts; partial failures answer 500 with
+  `failedAreas`.
+- **Findings beyond the wiki notes:** the admin plane's own error shape never reached callers in
+  the composed server (root `onError` won; fixed with an `adminPlane` marker and pinned against the
+  composed app); `lib/models/` has an import cycle that throws a TDZ `ReferenceError` on a cold
+  entry — documented, not fixed; `DATABASE_NAME`, not the URI path, selects the Mongo database.
+- **Verification:** the MongoDB half was exercised directly against a local server in a scratch
+  database; only the HTTP-level walkthrough (`quickstart.md` §§ 4.2–4.5) remains manual. Task 25
+  owns the class.
 
 ### 11. Verify the admin BFF id_token signature — ✅ Implemented
 
-- **Delivered by** `specs/017-admin-idtoken-verification`. Mechanism: one new module
-  (`lib/admin/auth/verifyIdToken.ts`) that proves the token against the live in-process keystore before
-  any claim is read, and returns only `sub` — so the caller cannot start trusting a second claim. The
-  signature and registered-claim work is **delegated to the engine the repo already has**, `verify()` in
-  `lib/helpers/jwt.ts` (the same one `IdToken.validate` uses), wired with the algorithm pinned to the
-  admin client's registered `idTokenSignedResponseAlg` and expiry enforced. Four relying-party checks
-  that engine does not make live in the new module: `azp` on multi-audience tokens, future `iat`,
-  presence/shape, and a `nonce` that each sign-in now requests and requires back. Every failure answers
-  with one identical `401 invalid_id_token`; the failed check goes only to a new
-  `admin.login.error` event-bus emit (the admin plane's first emitter). Suite: 2473 pass / 0 fail (was
-  2446); `lib/` typecheck unchanged at 812, `test/` 1764 → 1763.
-- **Findings worth carrying forward** (filed as `wiki/concepts/admin-console-signin.md`):
-  1. **The vulnerability was live, and the red gate proved it rather than arguing it.** With the tests
-     written and the old code in place, forged tokens answered **HTTP 302 with an admin session
-     created** — 18 of 20 cases failed, and the two that passed were the positive ones, which the old
-     code satisfied by accepting anything. Worth doing in that order: a refusal matrix written against
-     a verifying implementation would never have shown what the shortcut actually granted.
-  2. **`assertPayload` skips the future-`iat` check on every token that has an `exp`.** The guard is
-     `iat !== undefined && exp === undefined && iat > now + tolerance` (`lib/helpers/jwt.ts:118-124`),
-     and an ID token always carries `exp` — so that branch never runs on one. Any relying party in this
-     codebase that wants the check must make it itself. Same shape as task 4's inert TTL indexes and
-     task 7's inert payload schema: correct-looking, and never executed.
-  3. **`idTokenSigningAlgValues` is not an allow-list**, twice over: it is `['HS256', ...alg.sign]`
-     (`lib/configs/jwaAlgorithms.ts:31`), so it _contains a symmetric algorithm_, and it is computed at
-     module load from the boot-time `JWKS_KEYS` snapshot, so it goes stale when the admin JWKS API
-     hot-applies a key of a new type. The tight source is the client's registered
-     `idTokenSignedResponseAlg` — the same field `lib/models/id_token.ts:227` reads when it signs, so
-     issuer and verifier cannot disagree. Read it through `Client.tryFind`, never off the stored
-     payload: a stored client record mixes camelCase and snake_case spellings (`lib/admin/seed.ts`
-     writes `grantTypes` beside `token_endpoint_auth_method`) and only `validateClient` normalizes.
-  4. **This server emits no `azp` anywhere** (`grep -rn azp lib/ test/` is empty). Implementing OIDC
-     Core 3.1.3.7 rule 4 faithfully therefore means a multi-audience ID token is _always_ refused. That
-     is correct — it is not a token this server issues to the console — but it is written as the rule
-     rather than as "reject arrays", so it stays right if `azp` is ever emitted. Recorded so the
-     refusal is not later mistaken for a bug.
-  5. **`IdToken.validate` could not be reused, and parameterizing it would have been worse.** It wraps
-     the same engine with `ignoreExpiration: true` — right for an `id_token_hint` at logout, fatal for a
-     sign-in. Two callers of one engine beat one function with two meanings and a security-relevant
-     default one argument away from every existing call site.
-  6. **jose's `JWK` is an interface, so it is not assignable to `Record<string, unknown>`** —
-     TypeScript grants an implicit index signature to anonymous object types only. `test/keys.ts`
-     returned `exportJWK`'s value directly, which is why every consumer had to cast to reach the
-     `Record`-shaped key plumbing (`KeyStore`'s members, `seedJwks`' parameter). Fixed at that one
-     boundary (`return { ...jwk, alg }`), which removed the casts from consumers rather than adding
-     another. The general rule: convert where a third-party type meets the repo's vocabulary, once.
-- **Deviations from the spec, both deliberate and argued in
-  `specs/017-admin-idtoken-verification/research.md`:** FR-006 asked for a zero clock-skew allowance and
-  the implementation uses the repo's single configured `clockTolerance` (a second, contradictory
-  tolerance constant is a maintenance trap, and 10 s on a minutes-long token buys an attacker nothing —
-  what the requirement was protecting comes from `ignoreExpiration: false`); and FR-003's "algorithms
-  this server supports" is narrowed to the client's _registered_ algorithm, per finding 3.
-- **No verification debt.** Unlike tasks 5 and 8, nothing here touches a MongoDB path — the key
-  material is in-process and the tests run the in-memory adapter — so the automated suite covers 100 %
-  of the change and no quickstart step went unexecuted. The fail-first check
-  (`specs/017-admin-idtoken-verification/quickstart.md` § 2) is recorded as run: with the caller
-  reverted, 25 of 32 cases fail.
-- **Original context (for history):** `lib/admin/auth/login.ts:86-96` base64-decoded the id_token
-  payload without signature verification — a documented first-party shortcut with an explicit "MUST be
-  replaced with full signature verification" comment. The local JWKS was available in-process
-  (`lib/configs/keystore.ts`) the whole time.
+- **Delivered by** `specs/017-admin-idtoken-verification` (commit `e7da8c1`). One module
+  (`lib/admin/auth/verifyIdToken.ts`) proving the token against the live keystore before any claim
+  is read, returning only `sub`; signature/registered-claim work delegated to `verify()` in
+  `lib/helpers/jwt.ts` with the algorithm pinned to the admin client's registered
+  `idTokenSignedResponseAlg`; four relying-party checks added (`azp` on multi-audience, future
+  `iat`, presence/shape, per-sign-in `nonce`); every failure answers one identical
+  `401 invalid_id_token`, the reason goes to a new `admin.login.error` event. Fail-first check run:
+  with the old code, forged tokens got HTTP 302 + admin session. Suite: 2473 pass. No verification
+  debt — nothing touches a MongoDB path.
+- **Findings:** filed in `wiki/concepts/admin-console-signin.md` — including: `assertPayload` skips
+  the future-`iat` check on any token carrying `exp` (so every relying party must make it itself),
+  and `idTokenSigningAlgValues` is not an allow-list (contains HS256, and goes stale when the admin
+  JWKS API hot-applies a new key type — read the client's registered alg instead).
+- **Deviations, argued in the spec's research.md:** repo-wide `clockTolerance` instead of FR-006's
+  zero-skew; FR-003's "algorithms this server supports" narrowed to the client's registered one.
 
 ### 12. Guard feature toggles that require code overrides — Implement
 
 - **Context:** The admin settings catalog exposes toggles whose default addon hooks throw or
   misbehave, so a super-admin can 500 the server from the UI: `ciba.enabled` (5 hooks throw,
-  `lib/addon/ciba.ts`), `richAuthorizationRequests.enabled` (4 hooks throw, `lib/addon/rar.ts`),
-  `resourceIndicators.enabled` (default `getResourceServerInfo` throws `InvalidTarget`,
-  `lib/addon/resources.ts:27-31` — and it defaults to **true**), `mTLS.*`
+  `lib/addon/ciba.ts`), `resourceIndicators.enabled` (default `getResourceServerInfo` throws
+  `InvalidTarget`, `lib/addon/resources.ts:27-31` — and it defaults to **true**), `mTLS.*`
   (`certificateAuthorized`/`certificateSubjectMatches` throw, `lib/addon/mtls.ts:22-40`). The
   override registry (`lib/addon/registry.ts`) is code-only.
 - **Expected result:** Enabling any feature whose required hooks are still the throwing defaults
@@ -730,13 +255,13 @@ exact line numbers.
   instead. The catalog marks such settings so the UI can explain why they are locked. Tests: each
   guarded flag rejected without overrides, accepted with overrides registered.
 - **Amended by task 2's decision note:** `clientBasedCORS` is not among the hooks needing a guard —
-  task 3 deletes the addon and replaces it with project-scoped origin data.
+  task 3 deleted the addon and replaced it with project-scoped origin data.
 - **Amended by task 6's decision note:** `richAuthorizationRequests.enabled` is not among the flags
-  needing a hook-presence guard either — task 7 gives all four `lib/addon/rar.ts` hooks working
-  defaults (decision D7), so no override is required to enable the feature. It needs a _different_
-  guard, which task 7 has now delivered: enabling the flag with an empty
-  `richAuthorizationRequests.types` map fails validation (D4). Remaining flags for this task:
-  `ciba.enabled`, `resourceIndicators.enabled`, `mTLS.*`.
+  needing a hook-presence guard either — task 7 gave all four `lib/addon/rar.ts` hooks working
+  defaults (D7) and delivered its different guard (empty `types` map fails validation, D4).
+  Remaining flags for this task: `ciba.enabled`, `resourceIndicators.enabled`, `mTLS.*`. Task 7
+  also pinned the operational hole this task's `resourceIndicators` guard closes: details granted at
+  consent silently reach no token when `getResourceServerInfo` is the throwing default.
 
 ### 13. Protocol conformance batch — Implement
 
@@ -753,105 +278,86 @@ exact line numbers.
      read is that one line) — either make it real (gate the grant, advertise it, catalog it) or
      remove it; both sides must derive from one source afterward, with a parity test stronger than
      the current single-fixture check.
-  4. **`registrationManagement.enabled`:** currently affects nothing (task 1 gives it endpoint
-     gating; this item makes sure discovery/`registration_client_uri` behavior matches the flag).
+  4. **`registrationManagement.enabled`:** currently affects nothing beyond task 1's endpoint
+     gating (this item makes sure discovery/`registration_client_uri` behavior matches the flag).
 - **Expected result:** All four items fixed with spec tests; discovery baseline fixtures updated.
 
 ### 14. Small verified bug-fix batch — ✅ Implemented
 
-- **Delivered by** `specs/018-small-bugfix-batch`. Suite: 2506 pass / 0 fail (was 2473); typecheck
-  2574 total / 808 in `lib/` (was 2575 / 812); lint 176 (was 178) with none in this batch's files.
-- **Two items turned out not to be what they looked like:**
-  1. **Item 1 was a duplicate surface, not a broken link.** `GET /admin` already server-renders the
-     same first-run `<Setup />` screen — with props, a cache-busted bundle and a favicon — while
-     `GET /admin/setup` hand-wrote a page pointing at an unserved address and was referenced
-     **nowhere** in `lib/`, `test/` or the SPA. Repairing the address would have left two setup
-     surfaces, the worse one needing its own security policy. The route is deleted; `POST
-/admin/api/setup` and `hasSuperAdmin` are untouched. No `route_classification.ts` edit was needed
-     (`/admin` is covered by an always-available prefix).
-  2. **Item 3 grew into the feature.** The commented-out hash call was the smaller half: the server
-     emitted **no** `Content-Security-Policy` anywhere, and `lib/helpers/script_src_sha.ts` was not
-     merely dead but Koa-shaped (`ctx.response.get`), so uncommenting it would have thrown. Resolved
-     as a server-wide policy through a single HTML response constructor (`lib/html/csp.ts`), which
-     all nine construction sites now use, under a two-way drift guard. **The constructor derives the
-     policy from the document it is handed** — inline script hashes, inline handler hashes,
-     `form-action`, and whether the page may be framed — so no page declares anything and a hash
-     cannot drift from the script it authorizes. Every call site is `htmlResponse(html)` or
-     `htmlResponse(html, { status })`.
-- **Findings worth carrying forward** (filed in `wiki/`):
-  1. **A lifecycle plugin cannot cover every page here — measured, not assumed.** The plugin form was
-     built (`mapResponse({ as: 'global' })`, deriving the whole policy from the served document) and
-     run. `{ as: 'global' }` **does** reach mounted sub-apps — spec 011's per-sub-app mounting was a
-     consequence of its callback-shaped plugins being deliberately local, not a framework limit — but
-     it never fires for a response built by `onError` (the rendered error page) and did not fire for
-     the **named** `adminApp` instance (the console shell). The named-instance gap survived mounting
-     the plugin inside `adminApp` and survived removing the plugin's `name` to rule out dedup. The
-     decisive argument is the failure mode: a page that skips the plugin renders perfectly with no
-     policy, whereas "is there exactly one place that builds a `text/html` response?" is a question a
-     test can answer. Full write-up: `specs/018-small-bugfix-batch/research.md` M9.
-  2. **There is exactly one inline event handler in the whole server** — `onfocus` on the device
-     user-code input (`lib/helpers/user_code_form.ts:15`). CSP blocks those by default and the failure
-     is **silent**: the page still renders, it just stops selecting a pre-filled code. It is
-     authorized with `'unsafe-hashes'` plus the handler's hash rather than deleted; the constructor
-     reads the attribute out of the document, so that file needed no change.
-  3. **Deriving `form-action` from a document has one trap**: the device pages build an
-     ISSUER-_absolute_ action, so "absolute means foreign origin" would name this server as a foreign
-     target **and** drop `frame-ancestors` from a page carrying a real form. Compare against
-     `new URL(ISSUER).origin`. Pinned by a test.
-  4. **`crypto.hash(alg, data, enc)` exists on this Bun** — verified by running it, because its only
-     previous caller was dead code that may never have executed.
-  5. **`frame-ancestors 'none'` is wrong for the `form_post` page.** Silent authentication renders it
-     inside the client's iframe; frame-busting it would break that flow for no benefit, since the page
-     carries no interactive UI. Its protection is `form-action`, pinned to the callback origin.
-- **Deviations from the spec, argued in `specs/018-small-bugfix-batch/research.md`:** FR-001 asked for
-  the setup page's bundle address to be corrected and the page is deleted instead (D6); FR-006 asked
-  that every page forbid framing and the auto-submit page is excepted (D4). FR-008's "no unused
-  parameter" is satisfied by renaming `formPost`'s first argument to `_ctx` — the response-mode
-  dispatch signature is shared with `query` and `jwt`, so it cannot be dropped (D8).
-- **Verification debt, stated plainly.** Two gaps, neither hidden:
-  1. **The browser pass has not been run.** `specs/018-small-bugfix-batch/quickstart.md` § 4 is the
-     only evidence that a real browser enforces the policy without breaking a page (SC-003); the suite
-     proves the structural half — every inline script served is hash-authorized by the header served
-     with it. **Run § 4 before deploying.**
-  2. **Items 1 and 5 have no dedicated fail-first test**, by explicit instruction not to write tests
-     against deleted code. Both were confirmed red before implementation and are covered indirectly:
-     the console still serving the setup screen (`test/admin/ui_shell.spec.ts`) and the two resume
-     journeys plus the storage contract (187 cases across `test/interaction`, `test/device_code`,
-     `test/end_session`, `test/storage_contract`).
-- **Original context (for history) — expected results (one spec, independent one-to-few-line fixes,
-  each with a test):**
-  1. `GET /admin/setup` references `/admin.js`; the bundle is served at `/public/admin.js`
-     (`lib/admin/auth/setup.ts:16`) → setup page actually hydrates.
-  2. `interaction.returnTo` persists an unmounted URL `/auth/{uid}`
-     (`lib/helpers/oidc_context.ts:57-63`); the real resume route is `/ui/:uid/resume` → stored
-     value matches a mounted route (or the dead field is removed — nothing reads it today).
-  3. `form_post` response mode ships an inline `<script>` with the CSP-hash call commented out
-     (`lib/html/formPost.tsx:36`, `lib/helpers/script_src_sha.ts` otherwise dead) → hash emitted
-     in CSP header, or the helper deleted with a decided CSP story.
-  4. Error page shows the 403 illustration for every non-500 status (`lib/html/error.tsx:10`) →
-     status-appropriate rendering. **Partly done by task 1:** the response now carries the real
-     status (it defaulted to 200, so every HTML-rendered error answered `200 OK`), and
-     `errorHandler` assigns 404 for `NOT_FOUND`. What remains for this item is only the
-     _illustration_ choice — `renderError` still passes `'403'` for every non-500 status. Verified
-     no existing test asserted the old 200.
-  5. Admin client schema offers CIBA delivery mode `'push'` which config validation rejects and
-     nothing implements (`lib/admin/clients/schema.ts:32,53`) → option removed.
+- **Delivered by** `specs/018-small-bugfix-batch` (commit `74cc208`). Suite: 2506 pass. Two items
+  were not what they looked like: `GET /admin/setup` was a duplicate surface, not a broken link —
+  deleted (`GET /admin` already server-renders the same screen properly); and the commented-out CSP
+  hash call grew into the feature — the server emitted **no** `Content-Security-Policy` anywhere, so
+  it became a server-wide policy through a single HTML response constructor (`lib/html/csp.ts`,
+  all nine construction sites, two-way drift guard) that derives the policy from the document it is
+  handed. The other items: `interaction.returnTo` fixed, error page status/illustration fixed,
+  CIBA `'push'` removed from the admin schema.
+- **Findings:** filed in `wiki/concepts/html-response-security-policy.md` and
+  `first-run-setup-had-two-surfaces.md` — the binding one: a CSP lifecycle plugin was built,
+  measured and rejected (`mapResponse({ as: 'global' })` never fires for an `onError`-built
+  response nor the named `adminApp`, and fails silently with a perfect page and no policy — see
+  spec 018 research.md M9); the single-constructor + drift-guard shape is deliberate. There is
+  exactly one inline event handler in the whole server (device user-code `onfocus`), authorized via
+  `'unsafe-hashes'`.
+- **Verification debt, since closed:** the browser pass (quickstart § 4) was run as part of
+  task 32's verification on 2026-08-05 — which is also what found task 35.
 
-### 15. Pairwise identifier salt — Implement
+### 15. Pairwise identifier salt — ✅ Implemented
 
-- **Context:** `pairwiseIdentifier` salts with `os.hostname()` (`lib/addon/tokens.ts:30-41`); its
-  own warning says dev-only. Hostname changes (container reschedules, horizontal scaling) silently
-  change every pairwise `sub`, breaking RP account linkage.
-- **Expected result:** The salt comes from persistent server state (generated once and stored,
-  like signing keys/`serviceConfig` — planning picks the store) so pairwise subs are stable across
-  restarts and hosts. Existing-deployment migration note written (subs WILL change once when
-  moving off hostname — call it out in CHANGELOG). Test: two provider boots produce identical
-  pairwise subs for the same account+client.
+- **Delivered by** `specs/023-pairwise-identifier-salt` (branch `023-pairwise-identifier-salt`).
+  The salt is 32 bytes of server state resolved once at startup (`lib/configs/pairwiseSalt.ts`),
+  stored as a fourth singleton in the existing `serviceConfig` area. `os.hostname()` and the
+  dev-only `mustChange` warning are gone. Suite 2722 → 2757 pass, 0 fail.
+- **Two decisions that bind future work:**
+  1. **Fail closed, narrowly — never replace.** An unusable stored salt is left exactly as found;
+     the server starts, serves every non-pairwise client, and refuses requests needing a pairwise
+     `sub` with `temporarily_unavailable` (thrown from the default `pairwiseIdentifier`, so all four
+     emit sites are covered by one guard). This deliberately splits task 5's behaviour: keep "always
+     start" (the admin plane is served by this same process), drop "replace" (a replaced nonce
+     secret costs one client retry; a replaced salt permanently breaks every RP's account linkage,
+     and task 35's defect class recurs on _every_ read — so a replacing resolver would reassign
+     every pairwise identifier on every restart while reporting a healthy boot).
+  2. **Module state, not an `ApplicationConfig` key.** The nonce secret is a config key only because
+     the validator cross-checks it against `dpop.requireNonce`; nothing cross-checks the salt, so a
+     key would buy nothing and cost the catalogue exclusion, the settings-merge exclusion and a test
+     pinning its absence. Resolution is _driven_ from `configs/application.ts` (store passed in)
+     because the consumer, `addon/tokens.ts`, is a leaf the model graph imports — a store import
+     there closes a cycle into a module still evaluating.
+- **One store class per adapter, two instances.** `DPoPNonceSecretStore` became
+  `SingletonSecretStore`, parameterized by document name (`'dpopNonceSecret'` / `'pairwiseSalt'`,
+  derived into the `_id` exactly as before, so no existing deployment's nonce secret moves). Rather
+  than copy ~90 lines of non-obvious mechanics — duplicate-key-as-conflict-signal, conditional
+  replace, and task 35's `Binary` unwrap — per document per adapter. Task 5's resolver and
+  storage-contract specs passed **with zero assertion changes**, which is what makes the refactor
+  defensible; only imports and type names moved.
+- **Migration note for existing deployments** (deliberately _not_ in `CHANGELOG.md` — no release
+  exists yet; move it there when one does): **pairwise `sub` values change exactly once**, when this
+  version first starts. Only clients registered `subjectType: 'pairwise'` are affected; `public`
+  clients are untouched. Affected relying parties will treat returning users as new accounts unless
+  they re-link, so coordinate with any that key durable data off `sub`. After that one change the
+  identifiers never move again — including across restarts, reschedules and scale-out, which is what
+  was broken. **The salt now lives in the datastore**, so losing the datastore permanently loses
+  every pairwise identifier, the same exposure the signing keys already carry.
+- **Two findings from implementation, both worth keeping:**
+  1. **The back-channel logout "defect" was not one.** Clarification recorded that logout tokens
+     carry the raw account id to pairwise clients, from reading `end_session.ts:163` plus a grep of
+     `id_token.ts` that found no derivation. Wrong: `IdToken.payload()` builds claims through
+     `Claims.result()`, which derives the pairwise `sub`. The pseudonym has always gone out. Grepping
+     the file where a behaviour _should_ live and reading silence as absence is the mistake; a
+     regression test now pins it (`test/pairwise/pairwise_logout.spec.ts`), since the derivation
+     sitting a layer away is exactly what made it look missing.
+  2. **The refusal lands at the token endpoint, not the authorization endpoint.** The authorization
+     endpoint issues a code without needing a subject identifier, so it succeeds; refusing there
+     would mean deriving an identifier nobody asked for just to fail early.
+- **Residual:** the live MongoDB restart check (quickstart §5) was **not** run — it needs writes to a
+  real datastore. What _was_ verified without one: the BSON round trip that produced task 35
+  (a `Buffer` deserialises as `Binary`, fails the predicate, and `read()`'s unwrap restores
+  byte-identical usable material). The remaining gap is boot → record `sub` → restart → same `sub`
+  against a real deployment. Task 25 owns the class.
 
-### 31. RAR on the device, CIBA and token-endpoint channels — Implement (added by task 6; task 7 landed, so unblocked)
+### 31. RAR on the device, CIBA and token-endpoint channels — Implement
 
-- **Numbering is append-only:** this task belongs to P1 but takes the next free number so the
-  existing references (including "Suggested order") stay valid.
+- (P1; added by task 6's decision note; task 7 landed, so unblocked.)
 - **Context:** Task 7 deliberately scopes RAR to the authorization-code and refresh-token flows
   (decision D2), leaving two documented gaps against final RFC 9396. §3 says
   `authorization_details` "can be used to specify authorization requirements in all places where the
@@ -880,137 +386,42 @@ exact line numbers.
   **Consider splitting** — the two channels and the token parameter are independent enough for
   separate Spec Kit cycles if the first one runs long.
 
-### 32. Compiled antd CSS for the hydrated pages, and a fully derived script/style policy — Implement
+### 32. Compiled antd CSS for the hydrated pages, and a fully derived script/style policy — ✅ Implemented
 
-- **Numbering is append-only:** belongs to P1, takes the next free number.
-- **Design:** `docs/superpowers/specs/2026-08-05-compiled-antd-css-and-derived-script-src-design.md`
-  (untracked tree — the decisions and the definition of done are restated here so nothing depends on
-  it). Two independent parts sharing one subject; either ships without the other.
-- **Context, part A.** `lib/html/csp.ts` derives every directive from the served document except two.
-  `script-src` always begins with `'self'` whether or not the page references a script, and
-  `style-src 'self' 'unsafe-inline'` is declared flat for every page. The error page — the
-  highest-volume rendered page here, reached by every malformed request from every misconfigured
-  client, and the one whose body carries request-derived text — therefore permits same-origin script
-  execution and arbitrary inline stylesheets it has no use for.
-- **Context, part B.** Measured against the installed antd 6.5.1: the login/consent/registration
-  pages and the admin console arrive server-rendered but **unstyled**, and stay so until ~1 MB of JS
-  parses and cssinjs generates 246,494 B of CSS in the browser. antd 6 offers
-  `ConfigProvider theme={{ zeroRuntime: true }}` plus a precompiled `antd/dist/antd.css`
-  (1,005,591 B / 109,545 B gzip). Verified against the installed copy, not the docs alone:
-  `config-provider/index.js:345` → `theme/util/genStyleUtils.js:23-30`. It is a **runtime** flag —
-  it prevents style generation, it does **not** shrink the JS bundle. No bundle reduction is claimed.
-- **Corrected 2026-08-05 after the final review: the gzip figure is not what ships.**
-  `staticPlugin({ assets: 'public' })` does not compress and this repo has no compression middleware.
-  Verified by request — with `Accept-Encoding: gzip, deflate, br`, which every browser sends, the
-  response carries no `Content-Encoding` and transfers the full **1,005,591 B**. Read in served bytes:
-  the terminal-page exclusion is _strengthened_ (the error page inlines 19,213 B against 1,005,591 B
-  had it linked the sheet), but the four hydrated pages now block first paint on ~1 MB of CSS they
-  previously never downloaded, against no FOUC, ~246,494 B less in-browser generation, and one sheet
-  shared by both families and cached 86,400 s. **Part B is a trade, not a pure win, as it ships
-  today.** Compression is deferred to an external plugin (decided 2026-08-05, out of scope here);
-  once it exists the gzip figures apply again and the trade becomes the one this task scoped. Also
-  unmet and recorded rather than left to be found: the login page's _total_ transfer size before and
-  after was never captured, only per-asset sizes.
-- **Expected result, part A.** `script-src` is derived from three sources: `<script src>` (relative
-  or at `new URL(ISSUER).origin` → `'self'`; a foreign origin named explicitly, the same comparison
-  `foreignFormTargets` makes and for the same reason the device pages demonstrate), inline script
-  bodies → hashes, inline `on*=` handlers → `'unsafe-hashes'` plus hashes. **Yielding nothing means
-  `script-src 'none'`.** Outcome: `'none'` on the error page, both logout pages, all four
-  verification pages, the registration refusals, the password-reset pages, and device
-  confirmation/success; `'unsafe-hashes'` + hash only on device code entry (the lone `onfocus`,
-  `lib/helpers/user_code_form.ts:15`); a bare hash on the `form_post` callback; `'self'` + hash only
-  on login/consent/registration and the admin shell. **`style-src` splits into the CSP3 pair**, both
-  derived from the same document, with `style-src` retained unchanged as the pre-CSP3 fallback so
-  nothing regresses where the narrowing is not understood. `style-src-attr` is `'unsafe-inline'` iff
-  the rendered markup contains a `style="…"` attribute — the weak form, and it stays on most pages.
-  `style-src-elem` is the half worth closing, since a `<style>` block restyles the whole document and
-  can exfiltrate input values by attribute selector: when the document references **no** external
-  script, nothing can run and nothing can inject later, so the document is the complete truth and the
-  directive is `'self'` (if a stylesheet is linked) plus a `'sha256-…'` per `<style>` body, hashed by
-  the same `hash()` scripts use; when it **does** reference one, `'unsafe-inline'` is kept because the
-  bundle may inject. **That second case is load-bearing, not caution:** `@ant-design/icons` calls
-  `useInsertStyles` on every icon render (`es/components/Icon.js:27`, `IconBase.js:14`) through its own
-  `cssUtils`, a package independent of antd — `zeroRuntime` does not stop it, part B does not remove
-  it, and it cannot be hashed because it does not exist when the document is built. All four hydrated
-  pages import icons; hashing their blocks and stopping there strips the styling off every icon on the
-  sign-in page with nothing but a console violation to show for it. `test/csp/csp.spec.ts`'s blanket
-  `toContain("'self'")` becomes conditional — `'self'` iff a same-origin `<script src>` is present,
-  `'none'` iff no script and no handler, `'none'` never accompanied by another value — the walk gains
-  the equivalent style assertions (including `style-src-elem` carrying `'unsafe-inline'` **iff** the
-  document references an external script, asserted in both directions), and two named assertions pin
-  the point of the change: `getErrorHtmlResponse(...)` yields `script-src 'none'` and a
-  `style-src-elem` free of `'unsafe-inline'`, while `renderAdminShell(...)` and `loginServer(...)`
-  **keep** `style-src-elem 'unsafe-inline'` with `useInsertStyles` named in a comment as the reason —
-  without which a later tidy-up removes it and breaks every icon. `expectPolicyCoversItsOwnScripts`
-  wants renaming; it no longer covers only scripts. The `no page escapes the constructor` guard is
-  unchanged.
-- **Expected result, part B.** The two **hydrated** families only —
-  `lib/interactions/{htmlTeamplate.html,serverRender.tsx,loginClient.tsx}` and
-  `lib/admin/ui/{htmlTemplate.html,serverRender.tsx,adminClient.tsx}` — link one precompiled
-  stylesheet and run under `zeroRuntime`. `build.ts` copies `antd/dist/{antd,reset}.css` into
-  `public/` (both added to `.gitignore` beside the bundles). The two templates keep their three-line
-  `<style>` blocks: an earlier draft moved them to a checked-in `public/app.css` on the theory that it
-  would drop `'unsafe-inline'`, which was wrong twice over — the hydrated page trees carry 62
-  `style={{…}}` props (`lib/interactions/{loginPage,consentPage,registration}.tsx` plus ten pages
-  under `lib/admin/ui/pages/`) so `style-src-attr` needs it regardless, and the icons injection above
-  means `style-src-elem` does too. The file would have bought nothing. One shared
-  `lib/html/zeroRuntimeProvider.tsx` owns the flag and is used by all four entry points, so a server
-  render and its client hydrate cannot disagree — if they do, one side generates styles the other
-  does not and hydration diverges. **The terminal pages are deliberately excluded**
-  (`lib/html/{error,logout,logoutSuccess,device}.tsx` keep `extractStyle` and their inline
-  `<style>`): they inline 4,360–10,500 B gzip and are read once, so a render-blocking 109 KB
-  stylesheet on a cold cache is worse for them and would make them depend on `/public` being built.
-  Full `antd.css` rather than a `static-style-extract` include-list: the trim saves ~85 KB on a
-  once-cached file against a component that appears only in an unrendered state coming out unstyled
-  with no runtime fallback, no error, and no test that can catch it.
-- **Fix in passing.** `lib/admin/ui/serverRender.tsx:14` cache-busts `admin.js` by mtime because
-  `staticPlugin` serves `public/` with a long `max-age`; `lib/interactions/serverRender.tsx` does
-  **not**, so a rebuilt `loginClient.js` can be served stale. Extract `assetVersion(path)` to a
-  shared module and use it for every asset both renderers reference.
-- **Done when:** full suite green including the rewritten `test/csp/csp.spec.ts`; no hydration
-  mismatch on login, login-with-error, consent, registration, admin console, admin setup; **no antd
-  cssinjs _component-style_ element injected into `<head>` after hydration** on any of them, which is
-  what proves `zeroRuntime` took rather than being silently ignored (without it every page can pay for
-  its component styles twice while appearing to work). **Corrected 2026-08-05 after the browser pass:
-  this originally demanded zero `data-css-hash` tags, which is unreachable on antd 6.5.1 — the
-  criterion was wrong, not the code.** Measured on `/admin`: 7 tags, 17,540 B, all CSS
-  custom-property token blocks duplicating definitions already in the served `antd.css` under the
-  identical `.css-var-_R_0_` scope. In `@ant-design/cssinjs-utils/es/util/genStyleUtils.js`,
-  `genComponentStyleHook` (line 98) reads `zeroRuntime` and short-circuits — that is the ~246 KB win —
-  while `genCSSVarRegister` (lines 62-96) never consults it, and `genStyleHooks` (line 25) calls both
-  per component. Pinning `cssVar.key` changed nothing; `StyleProvider`'s `layer` gates an unrelated
-  icon path. Achievable floor: runtime CSS generation ~246,494 B → 17,540 B (~93%), variables only,
-  no component rules. Separately it is **not** "no `<style>` at all": `@ant-design/icons` injects one
-  on every one of these pages and will continue to.
-  Visual parity on those pages, icons included, plus the three states never server-rendered and
-  the reason full `antd.css` is shipped (the admin's `theme="dark"` `Menu`, an open `Modal`, an open
-  `Select`); login page transfer size recorded before and after.
-  `wiki/concepts/html-response-security-policy.md` rewritten in two places: the `script-src 'none'`
-  case is new, and its "Two deliberate looseness points" section justifies `style-src 'unsafe-inline'`
-  by cssinjs runtime injection plus hand-written `<style>` blocks — after this work the first clause is
-  false and the second no longer forces `'unsafe-inline'` because such blocks are hashed, while the two
-  reasons that do survive go unmentioned today (the 62 `style=` attributes, and the icons injection,
-  which is invisible in the source of every page it affects and belongs in the same gotcha class as the
-  `onfocus` handler that page already documents).
-- **Deliberately out of scope**, decided 2026-08-05, recorded so they are not rediscovered as
-  oversights: `splitting: true` in `build.ts` (only an operator loads both bundles — login → console;
-  end users load `loginClient.js` alone); **reworking CSP into an Elysia plugin** (built and measured
-  in spec 018 research.md M9 and rejected — `mapResponse({ as: 'global' })` never fires for an
-  `onError`-built response, i.e. the error page, nor for the named `adminApp`, and both fail silently
-  with a perfect page and no policy; it would re-open the very gap part A hardens, for no new
-  capability — see `wiki/concepts/html-response-security-policy.md`); purging `style=` attributes
-  from the plain interaction pages (largest mechanical diff available for the weakest directive —
-  `style-src 'unsafe-inline'` only matters once an attacker already has HTML injection, at which
-  point part A is what saves you); trimming `antd.css`. Two findings spun out as tasks 33 and 34.
+- **Delivered by** commit `1a4628d` (2026-08-05; design note
+  `docs/superpowers/specs/2026-08-05-compiled-antd-css-and-derived-script-src-design.md`,
+  gitignored). Both parts landed together:
+  - **Part A:** `lib/html/csp.ts` now derives `script-src` from the document (`'self'` only when a
+    same-origin `<script src>` exists; `'none'` when no script and no handler — the error page, both
+    logout pages, the four verification pages, the registration refusals, the password-reset pages,
+    device confirmation), and splits `style-src` into the CSP3 pair: `style-src-elem` hashes inline
+    `<style>` bodies on script-free documents and keeps `'unsafe-inline'` on bundle-shipping pages
+    **because `@ant-design/icons` calls `useInsertStyles` on every icon render** — pinned by a test
+    with the reason named, so a later tidy-up does not strip icon styling. Flat `style-src` retained
+    as the pre-CSP3 fallback. Verified live over HTTP on a real 400 and a 404.
+  - **Part B:** the two hydrated families (interaction pages, admin console) link precompiled
+    `antd/dist/antd.css` copied to `public/` by `build.ts` and run under `zeroRuntime` via one shared
+    `lib/html/zeroRuntime.tsx`; terminal pages deliberately keep inline styles. Runtime CSS
+    generation ~246 KB → ~17.5 KB (cssinjs CSS-variable registers ignore `zeroRuntime` — the
+    original "zero `data-css-hash` tags" criterion was wrong, corrected 2026-08-05). Fix in
+    passing: shared `lib/html/versionedAsset.ts` cache-busts both bundles.
+  - Tests: `test/csp/csp.spec.ts` rewritten (+256 lines), `test/html/compiledStylesheets.spec.ts`,
+    `test/html/versionedAsset.spec.ts`. Wiki updated: `html-response-security-policy.md`,
+    `interaction-page-families.md`.
+- **Known trade, recorded when found:** the stylesheet ships **uncompressed** (1,005,591 B —
+  `staticPlugin` does not compress and the repo has no compression middleware), so part B is a trade
+  until compression exists; that, the possibly-broken 304 revalidation, and the never-captured
+  login-page total transfer size are task 36. Bundle size itself is task 34. The non-HTML security
+  headers finding spun out as task 33.
 
 ### 33. Security headers on non-HTML responses — Implement
 
-- **Numbering is append-only:** belongs to P1, takes the next free number.
+- (P1; spun out of scoping task 32.)
 - **Context:** `lib/html/csp.ts`'s `htmlResponse` covers every rendered page, but nothing covers the
   JSON surfaces. `/token`, `/userinfo`, discovery and the whole admin API carry no
-  `X-Content-Type-Options`, no `Referrer-Policy`, and no CSP. Found while scoping task 32 and
-  deliberately kept out of it — this is plugin-shaped work on a different surface, and bundling it
-  would have dragged the rejected CSP-as-a-plugin rework back in with it.
+  `X-Content-Type-Options`, no `Referrer-Policy`, and no CSP. Deliberately kept out of task 32 —
+  this is plugin-shaped work on a different surface, and bundling it would have dragged the rejected
+  CSP-as-a-plugin rework back in with it.
 - **Expected result:** A callback-shaped plugin in the `lib/plugins/noCache.ts` form (not a named
   Elysia instance — see the `cors.ts:33` rationale) setting `X-Content-Type-Options: nosniff`,
   `Referrer-Policy: no-referrer` and a locked-down `default-src 'none'; frame-ancestors 'none'` on
@@ -1025,370 +436,89 @@ exact line numbers.
 
 ### 16. End-user password reset — ✅ Implemented
 
-- **Delivered by** `specs/020-enduser-password-reset`. Suite: 2594 pass / 0 fail (was 2556); typecheck
-  unchanged at 2587 errors (measured before and after; the four this feature briefly added were its own and
-  were fixed). Mechanism: a new `lib/password_reset/` module mirroring `lib/verification/` file for file
-  (`consts` / `types` / `challenge`), two declared storage areas, one plain page family
-  (`lib/interactions/resetPages.tsx`), a request form inside the interaction
-  (`GET|POST /ui/:uid/forgot-password`, so the bucket comes from the client that started the request and
-  never from a form field) and standalone consumption pages (`GET|POST /reset-password`, reached from an
-  inbox with no cookie). The login page's dead `href=""` is now live.
-- **Where it deliberately diverges from the verification flow it otherwise copies** — each because a reset
-  secret _changes a credential_ where a verification secret only _proves an address_:
-  1. **The record cannot reproduce the emailed secret.** Id is `sha256hex(token)`; the token is in no field.
-     (A verification challenge's record id _is_ its token.)
-  2. **Expiry is compared in `load()`, not left to the store.** Mongo's TTL monitor deletes lazily, so an
-     "expired" record is still findable for a minute or more.
-  3. **A GET never consumes** — mail clients and scanners prefetch links; only the POST spends the secret,
-     and it destroys the record before the account update so a replay loses the race.
-  4. **The reserved admin bucket is refused** (spec FR-004a, added during planning by the Constitution
-     Check — see deviations below).
-- **Session invalidation** resolves as task 9's decision D5 required: `endSessionsForAccount` in
-  `lib/helpers/cascade.ts` sweeps the `Session` area by its _declared_ owner field, reusing task 10's engine
-  rather than adding a second invalidation path. It runs after the password update, and a failed sweep is
-  logged and reported while the user is still told the truth — the password did change.
-- **Storage:** `PasswordResetChallenge` (`byAccount`, so the account cascade sweeps it with no new code) and
-  `PasswordResetThrottle` (`unowned`, addressed by `${bucketId}:${email}`). Both provisioned by derivation
-  from the task 4 inventory; both in the task 10 ownership table under its drift guard.
-- **Findings worth carrying forward** (filed as `wiki/concepts/self-service-password-reset.md`, with the
-  computed-id note added to `wiki/concepts/deletion-and-revocation.md`):
-  1. **The verification flow trusts store eviction for expiry.** `verifyLink`/`verifyCode` never compare
-     `challenge.exp` to now, so on MongoDB an expired verification link keeps working until the TTL monitor
-     gets round to it. Harmless enough for address-proof — which is why it was left alone here — but it must
-     not be copied into a third flow that cannot afford it. Same shape as task 4's inert TTL indexes and
-     task 7's inert payload schema: correct-looking, never executed.
-  2. **`resolveBucketForClient` maps the reserved console client to the admin bucket**, so _every_ end-user
-     surface mounted under `/ui` is operator-reachable unless it says otherwise. This feature is the first
-     that had to say otherwise; the next one will too.
-  3. **The account cascade's computed-id parameter was a pattern, not a one-off.** A second area keyed by
-     `${bucketId}:${email}` made the name `verificationResendId` a lie. It is now `emailScopedId` and the
-     engine sweeps a small list of email-scoped areas, so the third such area needs no signature change.
-  4. **`TestAdapter.upsert` asserts that a written `exp` matches the TTL it was given**, so an inconsistent
-     record cannot be forged through the front door — the harness working as intended. Ageing a live record
-     with `TestAdapter.for(...).syncUpdate(id, { exp: … })` is both the house pattern and a _better_ model of
-     the lazy-sweep state.
-  5. **The Eden client hands back no readable body for some non-2xx HTML responses** (`data` is null and
-     `error.value` is undefined for the 429s here), and `response.text()` throws `ERR_BODY_ALREADY_USED`
-     because the client already read it. Comparing rendered refusal pages needs
-     `elysia.handle(new Request(...))`.
-- **Deviations from the spec as written:**
-  1. **FR-004a added during planning** (not in the original spec): a request resolving to the reserved admin
-     bucket sends no mail and returns the standard accepted page. An end-user reset records no audit entry by
-     design, and the constitution requires every administrative change to be attributable — so an unaudited
-     path to console credentials was not acceptable. Operator resets stay in the audited
-     `enduser.password.reset` route, which is untouched.
-  2. **The rate-limit arithmetic was extracted and shared.** `lib/helpers/rate_window.ts` now holds
-     `rateRefusal`/`nextRateFields`, used by both flows with their own bounds, areas and counters. This
-     touched working code, so the guard was that `test/email_verification/*` had to pass **unedited** — it
-     does. Every reset request spends the window; verification's initial registration send still does not.
-  3. **A completed reset marks the address verified.** Receiving the secret proves what the verification
-     challenge proves, and without it an unverified account is a permanent dead end (sign-in is gated on
-     `verified`, and re-registration is non-committal about an existing address).
-  4. **Link only, no 6-digit code variant**, even though buckets carry a `verificationMethod`: a short
-     numeric code is a weaker secret and this action is takeover-capable.
-  5. **Not run: the manual quickstart walk-through** (quickstart.md steps 1–10). It needs a live server with
-     SMTP configured, which this environment has not got; the same behaviour is covered by the suite, except
-     the two steps that only a real mailbox can show (the delivered message's rendering, and the wording of
-     the two 429 pages in a browser).
-- **Out of scope, recorded:** tokens/refresh tokens/grants are not revoked by a reset (task 9's D5 bounded
-  this deliberately); no password-strength or breach checking (the repo has none anywhere, and adding it
-  would govern registration and the operator route too); no "your password was changed" notification; no
-  change-password-while-signed-in surface; no admin view of outstanding reset secrets (tasks 19–22).
+- **Delivered by** `specs/020-enduser-password-reset` (commit `ba720ff`). A `lib/password_reset/`
+  module mirroring `lib/verification/`; request form inside the interaction
+  (`GET|POST /ui/:uid/forgot-password`, bucket resolved from the client, never a form field);
+  standalone consumption pages (`GET|POST /reset-password`, cookie-less); two declared storage areas
+  (`PasswordResetChallenge` `byAccount`, `PasswordResetThrottle` unowned/computed-id) under the
+  task 4/10 inventory and drift guards; the login page's dead link is live. Session invalidation
+  reuses task 10's cascade engine (`endSessionsForAccount`). Suite: 2594 pass.
+- **Deliberate divergences from the verification flow it copies** (a reset secret changes a
+  credential; a verification secret only proves an address): record id is `sha256hex(token)`, never
+  the token; expiry compared in `load()`, not left to lazy TTL eviction; a GET never consumes the
+  secret (mail scanners prefetch) — only the POST spends it, destroying the record before the
+  update; the reserved admin bucket is refused (FR-004a, added by the Constitution Check — an
+  unaudited path to console credentials was not acceptable); link only, no 6-digit variant; a
+  completed reset marks the address verified.
+- **Findings:** filed in `wiki/concepts/self-service-password-reset.md` (and the computed-id note in
+  `deletion-and-revocation.md`) — including: the verification flow trusts store eviction for expiry,
+  so an expired verification link keeps working until Mongo's TTL monitor runs — left alone there,
+  but not to be copied into a third flow; `resolveBucketForClient` maps the console client to the
+  admin bucket, so every `/ui` surface is operator-reachable unless it says otherwise.
+- **Not run:** the manual quickstart walkthrough (needs live SMTP); covered by the suite except
+  message rendering and the two 429 pages in a browser.
 
 ### 17. Interaction UI fixes batch — ✅ Implemented
 
-- **Delivered by** `specs/021-interaction-ui-fixes`. Suite: 2619 pass / 0 fail (was 2594); typecheck
-  unchanged at 2587 errors (measured before and after — the 11 this feature briefly added were its own and
-  were fixed). Every item's status code is unchanged, which is what let the five guard suites
-  (`interaction`, `email_verification`, `password_reset`, `rar`, `csp`) pass with no assertion edited.
-- **What each of the five items turned out to be:**
-  1. **The notice** was a producer/consumer mismatch, not a missing message: the registration redirect has
-     carried `?notice=verify` since it was written and nothing ever read it. `lib/interactions/notices.ts`
-     now holds a closed, server-owned vocabulary; `buildUILoginPath(uid, notice?)` makes producer and
-     consumer share `NOTICE_VERIFY`; `loginServer` takes `{ errorMessage?, notice? }` and suppresses a
-     notice whenever there is an error, so exclusivity is a property of the renderer rather than a promise
-     made at five call sites. The query is typed `t.Optional(t.String())` deliberately — a literal union
-     would answer 422 for the stale bookmarks and old email links that are exactly what arrives unknown.
-  2. **The three refusals** are now rendered pages at the same 403 / 400 / 502. The split follows the page
-     families: a closed bucket and a failed send are terminal messages and go plain
-     (`registrationPages.tsx`); the password mismatch comes back as the user's own form with their address
-     still in it and both password boxes empty, which only the hydrated family can do.
-  3. **Items 2 and 3 were one piece of work.** `registrationServer` substituting no props was not cosmetic
-     parity: React hydration rebuilds the tree from props, so a message rendered into that page would have
-     been erased in the browser only, with nothing logged. Filed as the `gotcha` in
-     `wiki/concepts/interaction-page-families.md`.
-  4. **Only half of item 4 was still true.** The Google button and its icon import are gone. The "Forgot
-     password" link was **kept**: task 16 landed first and made it a working destination that
-     `test/password_reset/reset.spec.ts:275` asserts, so deleting it would have removed a feature and
-     broken a passing test. Recorded as spec FR-023 — the one place this cycle contradicts the task text.
-  5. **Item 5 was a readability defect, not only a coverage gap.** All four kinds did render, but only OIDC
-     scopes carried friendly labels, so a claim printed as `email (email)`, a resource scope as
-     `read (read)`, and a custom scope as `billing (billing)`; claims had no heading at all. Every group now
-     carries a heading built in `consentView.ts` beside the vocabulary already there, and the page prints a
-     token only when `label !== token` — one comparison that fixes claims, resource scopes and custom
-     scopes together. What approving records is untouched.
-- **Beyond the item text:** a registration **form** requested for a closed bucket now returns the same 403
-  page as a submission to it (spec FR-009). A styled refusal reachable only by filling in a form that
-  cannot succeed is half a fix.
-- **One refactor, on its third user:** the byte-identical `esc`/`page` shell in `verifyPages.tsx` and
-  `resetPages.tsx` moved to `lib/interactions/plainPage.tsx`. The guard was task 16's: the affected suites
-  had to pass **unedited**, and they do.
-- **Findings worth carrying forward** (filed as `wiki/concepts/interaction-page-families.md`, cross-linked
-  from `html-response-security-policy` and `self-service-password-reset`):
-  1. **A hydrated page whose props are not substituted erases its own server-rendered content** — in the
-     browser only, with nothing logged and nothing a server-side body assertion can see. Both halves of the
-     contract (substitute `<!--app-props-->`, spread props in `loginClient.tsx`) are one change.
-  2. **`initialValues` does reach the server-rendered HTML** as a real `value` attribute, so a re-rendered
-     antd form can preserve a submitted field without an uncontrolled input. The planned fallback was not
-     needed. Assert on the field, not on the document: the props script repeats every value, so a
-     body-wide `toContain` passes on an empty form.
-  3. **`visible(html)` must strip `<script>` contents, not just tags**, when counting what a page says —
-     otherwise the hydration props are counted as page text.
-  4. **A test config's client `scope` is validated against the AS's own scope set**, so a resource server's
-     scopes cannot be listed there (`invalid_client_metadata`); they travel on the request. And seeding
-     `resources` in `setup.login` _grants_ those resource scopes, so the consent prompt then reports
-     nothing missing.
-  5. **`test/csp/csp.spec.ts` was a fifth caller of `loginServer`** passing a positional string. It kept
-     passing after the signature change while silently no longer rendering an error page — the one guard
-     suite edit in this feature, a call-site update with no assertion touched.
-- **Out of scope, recorded:** federation (task 18 must decide first — this only removes the button that
-  pretended otherwise); suppressing the login page's "Register now!" link for a closed bucket (per-bucket
-  presentation, tasks 19–21); a friendly-label catalogue for every claim and resource scope; localisation;
-  password-strength checking on registration (task 16 recorded the same reasoning); the manual browser
-  walk-through, whose post-hydration steps need a live server with SMTP that this environment has not got —
-  everything else in `quickstart.md` is covered by the suite.
+- **Delivered by** `specs/021-interaction-ui-fixes` (commit `6618e91`). The `?notice=verify`
+  producer/consumer mismatch fixed via a closed notice vocabulary (`lib/interactions/notices.ts`);
+  the three registration refusals are rendered pages at the same status codes (mismatch comes back
+  as the user's own form with the address preserved); `registrationServer` now substitutes props
+  (items 2+3 were one piece of work — an unsubstituted hydrated page erases its own server-rendered
+  content, browser-only, nothing logged); the decorative Google button deleted, the
+  "Forgot password" link **kept** (task 16 landed first and made it real — FR-023, the one place
+  this cycle contradicts the original task text); consent groups all got headings and friendly-label
+  handling. Shared plain-page shell extracted to `lib/interactions/plainPage.tsx`. Suite: 2619 pass.
+- **Findings:** filed in `wiki/concepts/interaction-page-families.md`.
 
 ### 18. Social login / federation — ✅ Implemented
 
-- **Delivered by** `specs/022-oidc-federation-login`. Suite: 2722 pass / 0 fail (was 2630 at the commit
-  this branched from — note the recorded baseline of 2620 predated the three CSP/antd-CSS commits that
-  landed mid-planning); typecheck unchanged at 2587 errors. Mechanism: a new `lib/federation/` subsystem
-  (discovery, a bounded map of jose `RemoteJWKSet`s, ID-token verification, the two-stage round-trip record,
-  the outbound legs, the decision ladder, the terminal pages, the callback route), `lib/admin/federation/`
-  for the management plane, one new model area, two new `UserBucket` fields replacing the dead
-  `authMethods`, one new `User` field with a per-bucket index, and 92 new tests across five files.
-- **The shape, and why it is not a preference.** Three hops. The interaction cookie is `path: /ui/${uid}`
-  and `sameSite: 'strict'`, while an upstream matches `redirect_uri` by exact string — so the callback
-  provably cannot read that cookie, and everything it needs comes from a record found by `sha256(state)`.
-  Hop 2 → 3 is a **relative** redirect, which is what restores the cookie. Documented in
+- **Decision (Investigate half, 2026-08-05):** federation entered the roadmap as **generic OIDC
+  only, configured per bucket** with upstream credentials on the bucket document, linking only on a
+  trusted verified email, upstream tokens discarded once the ID token verifies. Design note
+  `docs/superpowers/specs/2026-08-05-social-federation-login-design.md` (gitignored).
+- **Delivered by** `specs/022-oidc-federation-login` (commit `246b400`). A `lib/federation/`
+  subsystem (discovery + bounded `RemoteJWKSet` cache, ID-token verification, two-stage round-trip
+  record, decision ladder, terminal pages, callback route), `lib/admin/federation/` management
+  plane with audit + masked `clientSecret` + write-time issuer validation,
+  `UserBucket.passwordLogin`/`federation` replacing the dead `authMethods`, `User.federated` links
+  with per-bucket index, `FederationState` model area, `federation.enabled` flag through the task 1
+  gate, 92 new tests. Suite: 2722 pass.
+- **The load-bearing shape:** three hops and no new cookie — the interaction cookie is
+  `path: /ui/${uid}` + `sameSite: 'strict'`, so a fixed `/federation/callback` provably cannot read
+  it; everything is resolved from a DB record found by `sha256(state)`, and hop 2 → 3 is a
+  **relative** redirect, which is what restores the cookie. Documented in
   `wiki/concepts/upstream-federation.md`.
-- **Divergences from the Expected result below, each argued where the decision lives:**
-  1. **The round-trip area is declared `byAccount`, not `unowned`.** The reverse ownership check in
-     `test/storage_contract/inventory_drift.spec.ts` fails any area whose payload carries `accountId`
-     without declaring it, and the handoff stage carries one by design — so `unowned` was a red suite, not
-     a choice. Owning it is also better: a deleted account's outstanding handoff is swept, which
-     `test/storage_contract/federated_links.spec.ts` pins. (research D5)
-  2. **The handoff record's id is a digest of its `ref`**, as the state record's is of its `state`. § 18 was
-     explicit about one and silent about the other; a `ref` in a URL is exactly as capturable. (research D6)
-  3. **The management routes are not feature-gated** — promoted into the spec as FR-035a after
-     `/speckit-analyze` found it contradicted FR-035 as written. A deployment that switches federation off
-     must still be able to _delete_ a provider it stopped trusting.
-  4. **A declined sign-in redirects to the login page** rather than rendering it at the callback URL. The
-     client bundle derives the page and the interaction id from `window.location.pathname`, so a login
-     document served at `/federation/callback` hydrates into an empty root — browser-only, nothing logged.
-     It carries a new server-owned notice identifier, which also keeps the provider's `error_description`
-     off the page.
-  5. **A masked `clientSecret` means "keep"**, following the SMTP settings precedent, where the plan had
-     called for refusing it with a 422. Identical safety (the mask is never stored) and one less rule for
-     the console; refusing would have made this the only place in the product where a masked secret
-     behaves differently.
-- **Two framework findings worth keeping.** A guarded route's `params` schema is **merged**, not overridden:
-  under `normalize: false`, a two-parameter route beneath a guard declaring one answers **422 without
-  reaching the handler**, so `providerId` had to be declared optional on the `ui` guard itself. And a gated
-  route _may_ sit under an always-available prefix, because `gatedRoutes` is consulted first — these are the
-  first such routes, and the overlap turned the classification guard's coverage _sum_ into a union
-  comparison.
-- **Test edits:** seven spots across six files, every one either an `authMethods` assertion following the
-  field it names or a declarative enumeration this feature legitimately extends (the reaped-areas list, two
-  per-bucket index fixtures, the audited-route counts, the coverage assertion). No assertion was weakened;
-  two were strengthened. The predicted `csp.spec.ts` edit turned out unnecessary. Listed with arguments in
-  `specs/022-oidc-federation-login/baseline.md`.
-- **Not done, and why:** the browser-only steps of that spec's `quickstart.md` § 3 — hydration of the
-  provider controls, the password-form removal after hydration, and a real provider's extra callback
-  parameters. They need a live server and a real upstream IdP, which this environment has not got. The
-  server-side halves are covered; what a browser then does with them is not.
-- **Context:** No federation code exists anywhere in `lib/` (the Google button was decorative and
-  spec 021 deleted it). Spec 001 declared social login out of scope, so this needed a product
-  decision, not just code. `UserBucket.authMethods` turned out to be more dormant than the task text
-  said: it is not merely unread — `CreateBucketBody`/`UpdateBucketBody`
-  (`lib/admin/buckets/schema.ts`) omit it entirely, so it cannot be set through the admin plane at
-  all. Both adapters default it to `['password']` and both seeds write that literal.
-- **Decision: federation enters the roadmap.** Generic OIDC only, configured **per bucket** with the
-  upstream credentials on the bucket document, linking only on a trusted verified email, and upstream
-  tokens discarded. The reasoning and every rejected alternative are in
-  `docs/superpowers/specs/2026-08-05-social-federation-login-design.md` (gitignored — this entry is
-  the committed record). What follows is the Expected result of the Implement task.
-
-#### The finding that dictates the route layout
-
-The interaction cookie is `path: /ui/${uid}` (`lib/actions/authorization/interactions.ts:101-105`)
-and `sameSite: 'strict'` (`lib/consts/param_list.ts:136-141`). So a fixed `/federation/callback`
-cannot read it (wrong path), and even at the right path it would not receive it (the return leg from
-the IdP is a cross-site top-level navigation, which does not send a `strict` cookie — why the admin
-console's own `admin_oauth` cookie is `lax`). The callback URL must nevertheless be fixed, because
-IdPs match `redirect_uri` by exact string and `uid` changes every interaction. Resolved by three hops
-and **no new cookie**: `GET /ui/:uid/federation/:providerId/start` → fixed `GET /federation/callback`
-(resolves everything from a DB record) → same-site redirect to `GET /ui/:uid/federation/complete?ref=…`
-(strict cookie arrives, `resume()` runs). The DB record does the job the admin console's cookie does,
-because here a cookie provably does not survive the round trip.
-
-#### Expected result — bucket settings
-
-- **`UserBucket.authMethods` is dropped** (field, both adapters, both seeds, their tests) and replaced
-  by **`passwordLogin: boolean`, default `true`**. Federation availability is derived, never declared:
-  `federation.some(p => p.enabled)`, so a provider is enabled in exactly one place. Both stores default
-  the new field on read, so a bucket document written before the change keeps the behaviour it had.
-- **`passwordLogin: false`** ⇒ the login page renders no password form, and `POST /ui/:uid/login`,
-  both `/ui/:uid/registration` methods and both `/ui/:uid/forgot-password` methods answer 403 as
-  password-only doors.
-- **`federation: FederationProvider[]`, default `[]`** on the bucket, credentials included.
-- **`registrationOpen` keeps its current behaviour and gains a documented narrowing:** it governs the
-  password registration form **only**. Federated provisioning is the per-provider knob below — which is
-  what lets a bucket close password sign-ups while still accepting "anyone from our corporate IdP".
-- `emailVerificationRequired` / `verificationMethod` still apply to a federated sign-in whose
-  assertion is not trusted-verified.
-
-#### Expected result — per-provider settings (eleven fields)
-
-| Field                 | Default                        | Why it is a setting                                                                                               |
-| --------------------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| `id`                  | —                              | slug `^[a-z0-9-]{1,32}$`, unique in the bucket; appears in the start URL                                          |
-| `displayName`         | —                              | the button label                                                                                                  |
-| `enabled`             | `true`                         | kill switch that keeps the credentials                                                                            |
-| `issuer`              | —                              | `https:` URL; discovery source, validated at write time                                                           |
-| `clientId`            | —                              | upstream client identifier                                                                                        |
-| `clientSecret`        | —                              | write-only, masked on read, never in the audit trail                                                              |
-| `scopes`              | `['openid','email','profile']` | IdPs differ on which scope yields an email                                                                        |
-| `emailTrusted`        | `false`                        | the linking trust decision — per IdP, because Google verifies addresses and a corporate Keycloak may not          |
-| `provisioning`        | `'jit'`                        | `'jit'` \| `'existing_only'`                                                                                      |
-| `allowedEmailDomains` | `[]` (any)                     | without it an enabled Google button provisions the entire internet — the classic misconfiguration of this feature |
-| `emailClaim`          | `'email'`                      | the one load-bearing mapping (no email ⇒ neither link nor provision); corporate IdPs use `upn`                    |
-
-Fixed, not configurable: `sub` is the subject, `email_verified` is read from that claim only, and
-`name`/`given_name`/`family_name`/`picture`/`locale` are copied into `User.claims` when present. A
-remapping table for claims nobody has asked to remap is surface with no requirement behind it.
-
-#### Expected result — sign-in decision order
-
-`(providerId, sub)` linked → sign in. Else the email from `emailClaim`; **no email → refuse**; domain
-not in a non-empty `allowedEmailDomains` → refuse. Existing account with that email → link **only if**
-`emailTrusted && email_verified`, otherwise 403 "sign in with your password" (no second account, no
-silent takeover). No account → `provisioning` decides; a JIT account is created with
-`verified = emailTrusted && email_verified`, `roles: []`, and **no usable password** — the hash of 32
-random bytes that are discarded immediately, not a sentinel string someone could eventually type, so
-password login fails until a self-service reset — then meets the same `emailVerificationRequired && !verified`
-refusal the password path applies (`lib/interactions/index.ts:218-223`) — issuing the existing
-`issueAndSend` challenge rather than a second verification flow. `active === false` refuses on every
-branch. **Upstream access and refresh tokens are discarded** once the ID token verifies; nothing calls
-an upstream API, so keeping them would only be a secret to leak.
-
-#### Expected result — storage
-
-- **`User.federated: { providerId, sub, linkedAt }[]`** in the per-bucket area. Deletion integrity is
-  then free: the account cascade destroys the row and bucket deletion destroys the area (spec 019).
-- `PER_BUCKET_AREA` gains a **non-unique** multikey index `{ 'federated.providerId': 1, 'federated.sub': 1 }`.
-  Uniqueness of `(providerId, sub)` is enforced **in code**, deliberately: a unique multikey index
-  indexes every password-only account as `{null,null}` and collides on the second one, so it would
-  need `partialFilterExpression`, which `IndexSpec` (`lib/consts/storage_inventory.ts:16-20`) does not
-  model — extending it and its two-way drift guard is a larger change than this feature earns. The
-  residual race yields a duplicate entry naming the same account, not a cross-account leak.
-- **New model area `FederationState`**, TTL 600 s, declared `unowned` with the written reason that it
-  names no principal yet. Its `_id` is `sha256(state)` so the live state value is never at rest
-  (`PasswordResetChallenge` precedent). After the callback it is destroyed and a **single-use handoff**
-  record is written in the same area under a fresh `ref`, TTL 120 s, carrying
-  `{ interactionUid, accountId }`; `complete` consumes it and refuses a `ref` whose `interactionUid` ≠
-  the path `uid`.
-- **`ApplicationConfig['federation.enabled']`**, default `false`, boot-only, gated through the existing
-  `onRequest` mechanism: off ⇒ no `/federation/*` route is served and no button renders.
-
-#### Expected result — admin plane and protocol details
-
-- `GET/POST /admin/api/buckets/:id/federation`, `PATCH/DELETE /admin/api/buckets/:id/federation/:providerId`
-  (bucket-manager reachable via `assertBucketAccess`, as the end-user routes are), plus
-  `GET/DELETE /admin/api/buckets/:id/users/:userId/identities` so an operator can see and remove links.
-  Audit-first with `attributes: Object.keys(body)` — field names, never values. `clientSecret` reads
-  back as a mask, exactly as the SMTP password does.
-- `issuer` is validated at write time by fetching `/.well-known/openid-configuration` and requiring
-  its own `issuer` to equal the submitted value: a misconfiguration is worth catching then, not at a
-  user's first sign-in.
-- The reserved admin bucket keeps `passwordLogin: true` (not editable) and refuses federation writes
-  with 403, as it already refuses password reset.
-- PKCE is sent only when discovery advertises `S256`; token-endpoint auth is chosen from
-  `token_endpoint_auth_methods_supported` (basic, then post) — no knob, the IdP declares it. ID-token
-  verification requires `iss`, `aud` ∋ `clientId`, live `exp`, the stored `nonce`, a present `sub`, and
-  a signature from `jwks_uri`; `alg: none` and any algorithm outside the intersection of the IdP's
-  advertised list and ours are refused. Discovery and JWKS are cached with a TTL and a bounded size,
-  JWKS refetched once on an unknown `kid`. `iss` on the callback is accepted and ignored (RFC 9207).
-- Provider buttons are plain `<a href>` links to the start route, not inline script, so the content
-  security policy is untouched. The login page is the hydrated family, so the buttons must arrive as
-  props — a message or list rendered without them is erased in the browser only
-  (`wiki/concepts/interaction-page-families.md`).
-- Every failure is a rendered page: IdP `access_denied` → the login page with an error (200); unknown
-  or replayed `state`/`ref`, `ref` under the wrong `uid`, unverifiable ID token, missing email → 400
-  plain; unreachable discovery/token/JWKS → 502 plain; disallowed domain, refused link,
-  `existing_only`, inactive account → 403 plain; verification required → 303 to the login page with
-  the existing `NOTICE_VERIFY`. The ID-token failure reason goes to the event bus, not the response
-  (`lib/admin/auth/login.ts:100-111` precedent).
-
-#### Expected result — invariants and tests
-
-Invariants: `passwordLogin: false` is refused unless the bucket has an enabled provider, and so is
-disabling or deleting the last enabled provider in that state (a bucket nobody can sign into must not
-be reachable through the admin API); provider `id` unique and slug-shaped; `issuer` `https:` and
-self-consistent; `scopes` ∋ `openid`; `allowedEmailDomains` lowercase bare domains matched
-case-insensitively.
-
-Tests are integration-level through the Eden client against the in-memory adapter, with a stub
-upstream IdP on the existing `test/fetch_mock.ts` harness (discovery, `jwks_uri`, token endpoint,
-ID tokens signed by the test keystore). Required cases: existing link; trusted-verified link;
-untrusted/unverified collision refused with nothing written; JIT provisioning; `existing_only`;
-`allowedEmailDomains` exclusion; `emailClaim: 'upn'`; `passwordLogin: false` closing all three
-password doors; the last-provider invariant; `enabled: false`; `federation.enabled: false`; each
-protocol failure from the table; admin audit naming fields and never the secret; the admin bucket
-refusals; user deletion removing links and bucket deletion taking the area; and the storage-contract
-drift guard passing with the new area and index declared. The admin provider-create tests need the
-fetch stub as well, because write-time issuer validation makes creation depend on reaching the
-discovery document — including the case where the document's `issuer` disagrees with the submitted
-value, which must be refused.
-
-#### Sequencing for the Implement task
-
-One cohesive feature, two natural halves that can ship in order: **(1)** bucket schema + sign-in flow
-— `passwordLogin` replacing `authMethods`, the `federation` field and its validation,
-`FederationState`, the three routes, ID-token verification, linking and provisioning, the failure
-pages, the login-page buttons; testable end to end with providers seeded straight into the bucket
-store. **(2)** admin plane — provider CRUD and identities routes with their audit entries and masking,
-then the SPA surfaces (bucket detail gains a providers section, user detail gains linked identities).
-Splitting there keeps each half's tests independent: the first needs no admin route, the second
-exercises routes whose behaviour the first already pinned. This is a plan-ordering note, not a
-decomposition into two specs.
-
-#### Out of scope, recorded
-
-`amr`/`acr` claims (no consumer, and they need `Session` + ID-token plumbing); OAuth2-only providers
-(GitHub/Facebook — no `id_token`, so identity comes from a profile call with per-provider mapping and
-a provider-specific answer to "is this email verified?", a second verification model that belongs to
-its own task); upstream single logout and session monitoring; per-provider role mapping; provider
-icons (a remote image on the login page is a CSP decision, and a label distinguishes the buttons); an
-admin "test connection" action (write-time issuer validation already proves reachability); end-user
-self-service unlinking and any end-user account page (there is no such surface in this server yet);
-IdP-initiated login; localisation of the new pages, consistent with every interaction page today.
+- **Divergences from the design as written, argued where the decision lives:** the round-trip area
+  is `byAccount`, not `unowned` (the reverse ownership drift guard forced it, and a deleted
+  account's outstanding handoff is swept); the handoff `ref` is stored as a digest like `state`;
+  the management routes are **not** feature-gated (FR-035a — a deployment that switches federation
+  off must still be able to delete a provider); a declined sign-in redirects to the login page
+  rather than rendering at the callback URL (hydration derives the page from
+  `window.location.pathname`); a masked `clientSecret` means "keep", following the SMTP precedent.
+- **Framework findings:** a guarded route's `params` schema is merged, not overridden (an
+  undeclared second parameter 422s before the handler); a gated route may sit under an
+  always-available prefix because `gatedRoutes` is consulted first.
+- **Not done:** the browser-only quickstart steps (hydrated provider controls, password-form
+  removal after hydration, a real upstream IdP's extra callback parameters).
 
 ### 19. Admin UI completion — Implement
 
 - **Context:** Backend routes exist with no UI reaching them, creating dead ends:
   `PATCH/DELETE /admin/api/projects/:id` and `PUT /admin/api/projects/:id/bucket` are unreachable
-  (`lib/admin/ui/pages/Projects.tsx` lists/creates only) — and since the "Users" button is
-  `disabled={!row.bucketId}`, **a newly created project can never be given a bucket through the
-  UI**; admins page is list+create only (no roles/deactivate UI, and no password change for admins
-  at all — `UpdateAdminBody` lacks `password` while end-users have a reset route);
-  `DELETE /admin/api/buckets/:id` has no UI; bucket `managedBy` accepted by API but not editable;
-  `restartRequired` is displayed but no restart action exists anywhere.
+  (`lib/admin/ui/pages/Projects.tsx` lists/creates only, plus task 3's origins editor) — and since
+  the "Users" button is `disabled={!row.bucketId}`, **a newly created project can never be given a
+  bucket through the UI**; admins page is list+create only (no roles/deactivate UI, and no password
+  change for admins at all — `UpdateAdminBody` lacks `password` while end-users have a reset
+  route); `DELETE /admin/api/buckets/:id` has no UI; bucket `managedBy` accepted by API but not
+  editable; `restartRequired` is displayed but no restart action exists anywhere. Known related
+  defect from task 3: `POST /admin/api/projects` silently drops `clientIds` (nothing sends it yet).
 - **Expected result:** Project edit/delete/bucket-assign flows in the SPA (unblocking the Users
   dead end); admin management UI (roles, deactivate, guarded by the existing last-super-admin
   rule) plus an admin password-change path (self-service at minimum — schema + route + UI);
-  bucket delete and `managedBy` editing in the UI. For restart: this task only adds an explicit
-  "restart required" affordance explaining the manual step — an actual restart trigger is
+  bucket delete and `managedBy` editing in the UI. Delete dialogs consume task 10's `blockers`
+  contract (409 bodies list client ids / end-user counts). For restart: this task only adds an
+  explicit "restart required" affordance explaining the manual step — an actual restart trigger is
   deployment-specific and stays out of scope unless a later investigation adds it. UI changes
   covered by route-level tests; SPA pages at least smoke-rendered.
 
@@ -1411,57 +541,80 @@ IdP-initiated login; localisation of the new pages, consistent with every intera
 
 ### 21. Settings catalog completeness — Implement
 
-- **Context:** Catalog covers 39 of 58 `ApplicationConfig` keys. Functional omissions:
-  `registration.initialAccessToken` (the only lever that closes open registration once task 1
-  lands — and it is a prerequisite for `registration.policies` per
+- **Context:** Catalog covers a subset of `ApplicationConfig` keys. Functional omissions:
+  `registration.initialAccessToken` (the only lever that closes open registration now task 1
+  gates the endpoint — and a prerequisite for `registration.policies` per
   `lib/configs/configuration.ts:202-210`) and `claims` (drives `claims_supported` and
   claim-backed scopes; omitted without the documented-intentional note `discovery` has).
-  `dpop.nonceSecret` is **settled by task 5**: it is server-provisioned state rather than an operator
-  setting, so its absence is deliberate and the reason is now recorded in the catalog module (a test pins
-  that the note exists). Remaining function-valued key: `registration.policies` — legitimately
-  non-serializable, so document why it is absent instead of leaving it implicit.
+  `dpop.nonceSecret` is **settled by task 5**: server-provisioned state, deliberately absent, reason
+  recorded in the catalog module (a test pins the note). Remaining function-valued key:
+  `registration.policies` — legitimately non-serializable, so document why it is absent.
 - **Expected result:** `registration.initialAccessToken` (write-only/masked like the SMTP
   password if a string secret) and `claims` are editable via the settings API/UI with proper
   validation; intentionally-omitted keys carry an explanatory note in the catalog module; a test
   pins the catalog-vs-ApplicationConfig key diff so future keys must be classified explicitly.
-- **Amended by task 2's decision note:** task 3 adds `cors.enabled` (catalogued there), so the
+- **Amended by task 2's decision note:** task 3 added `cors.enabled` (catalogued there), so the
   key-diff test must account for it. `cors.maxAge` was dropped because the catalog has no `number`
   `SettingType`; if this task adds one, that key becomes a viable follow-up.
-- **Amended by task 7:** `richAuthorizationRequests.types` is no longer function-valued and is **now a
-  catalog key** — it became a serializable descriptor map behind the new `json` `SettingType`, and the
-  key-diff test reclassifies it from "excluded structured key" to an exposed one. Two consequences for
-  this task: the diff must account for it, and the `json` precedent means a structured key is no longer
-  automatically un-catalogable — `claims` should be reconsidered against it rather than assumed exposed
-  as some flatter shape. Adding a `number` type for `cors.maxAge` remains untouched by this.
+- **Amended by task 7:** `richAuthorizationRequests.types` is no longer function-valued and is **now
+  a catalog key** — a serializable descriptor map behind the new `json` `SettingType`. Two
+  consequences: the diff must account for it, and a structured key is no longer automatically
+  un-catalogable — `claims` should be reconsidered against the `json` precedent rather than assumed
+  exposed as some flatter shape.
+- **Amended by task 18:** `federation.enabled` is now catalogued too; per-provider federation
+  settings live on the bucket document, not in `ApplicationConfig`.
 
 ### 22. Admin session/grant/token visibility and revocation — Implement
 
 - **Context:** `lib/admin/` has zero references to `Grant`, `Session`, `AccessToken`,
-  `RefreshToken`, or `helpers/revoke`. No admin can see or revoke an end-user's sessions, grants,
-  or tokens; `AdminSessionStoreInstance` has no list-by-user, so admins can't manage their own
-  other sessions either.
+  `RefreshToken`, or `helpers/revoke` (outside incidental substrings). No admin can see or revoke an
+  end-user's sessions, grants, or tokens; `AdminSessionStoreInstance` has no list-by-user, so
+  admins can't manage their own other sessions either.
 - **Expected result:** Per end-user: list active sessions and grants (with client, scopes,
   timestamps) and revoke them (grant revocation cascades to its tokens via the task-9/10-aligned
   semantics). Per admin: list own sessions, revoke others ("sign out everywhere"). Store
   interfaces gain the needed list methods in **both** adapters with storage-contract tests. All
   mutations audited (task 8 pattern — and each new mutating route must be added to
   `lib/consts/admin_audit_routes.ts`, or task 8's drift guard fails the suite by design).
-- **Amended by task 9's decision note:** "the task-9/10-aligned semantics" resolves to D3 — revocation is
-  per-collection and `revoke()` always sweeps all five grantable areas, with no grant-type filter. The
-  list-by-user surface this task needs is the **read half** of task 10's `destroyByOwner`: both walk the
-  same ownership declarations in `storage_inventory.ts`, so build on that table rather than a second
-  enumeration path. Deleting an admin still deactivates rather than deletes, which is why task 10 leaves
-  `adminSession` alone and this task owns it.
+- **Amended by task 9's decision note:** "the task-9/10-aligned semantics" resolves to D3 —
+  revocation is per-collection and `revoke()` always sweeps all five grantable areas, with no
+  grant-type filter. The list-by-user surface this task needs is the **read half** of task 10's
+  `destroyByOwner`: both walk the same ownership declarations in `storage_inventory.ts`, so build
+  on that table rather than a second enumeration path. Deleting an admin still deactivates rather
+  than deletes, which is why task 10 leaves `adminSession` alone and this task owns it.
 
 ### 23. JWKS management: non-RSA keys — Implement
 
-- **Context:** Admin key generation is RSA-only (`lib/admin/jwks/service.ts:15`), while the
+- **Context:** Admin key generation is RSA-only (`lib/admin/jwks/service.ts:16`), while the
   configured algorithm surface and test keystore include ES256/EdDSA. No encryption-use keys can
   be provisioned via the admin API.
 - **Expected result:** Admin JWKS API can generate EC (ES256) and OKP (EdDSA) signing keys, and
   the key list/status/delete/audit behavior covers them identically to RSA. Planning decides
   whether encryption-use keys are in scope now or documented as follow-up. Tests mirror the
-  existing RSA route specs for each new type.
+  existing RSA route specs for each new type. Note task 11's finding: `idTokenSigningAlgValues` is
+  computed at module load from the boot-time snapshot and goes stale on hot-applied new key types —
+  this task must not widen that hole.
+
+### 36. Static assets are served uncompressed, and may not revalidate — Investigate
+
+- (P2; found 2026-08-05 by task 32's final review and confirmed by request.)
+- **Context:** `staticPlugin({ assets: 'public' })` (`lib/index.ts:84`) does **not** compress: with
+  `Accept-Encoding: gzip, deflate, br`, the response carries no `Content-Encoding` and transfers the
+  full 1,005,591 B of `antd.css`. There is no compression middleware in the repo. This is what
+  turned task 32's part B from the win it was scoped as into a trade — the design priced that file
+  at its 109,545 B gzip size. It also applies to `loginClient.js` (~1 MB), `admin.js` (~1.6 MB) and
+  every JSON response the protocol serves. Separately and unconfirmed: a conditional request
+  carrying the correct `If-None-Match` was answered **200 with the full body** rather than 304, and
+  the etag is emitted unquoted (`K9WnLSEFPtxrTmRQOAiPqQ==` rather than `"…"`), which may itself
+  explain the miss — if real, the full megabyte re-downloads whenever the 86,400 s `max-age`
+  expires even when nothing changed.
+- **Deliverable:** A decision on where compression belongs. The operator's stated intent
+  (2026-08-05) is an external plugin rather than application middleware, so this may be deployment
+  configuration (`fly.toml`) rather than code — in which case record that and close it. If it lands
+  in the app, measure the before/after on the four hydrated pages and finally satisfy task 32's
+  unmet acceptance criterion (login page total transfer size, which was never captured — only
+  per-asset sizes). Confirm or dismiss the 304 behaviour separately; it is cheap to test and
+  independent of compression.
 
 ---
 
@@ -1469,60 +622,64 @@ IdP-initiated login; localisation of the new pages, consistent with every intera
 
 ### 24. Migrate ignored and skipped test suites — Implement
 
-- **Context:** `bunfig.toml` ignores `test/cors/cors.spec.ts`, `test/cors/custom_cors.spec.ts`
-  (both handled by task 3) and `test/helpers/attention.spec.ts` (uses Mocha's `context()`).
-  Additionally never running: `test/provider/provider_instance.spec.ts` (whole file
-  `describe.skip`, targets a removed constructor API — likely delete or rewrite),
-  `test/configuration/secure.spec.ts` (`describe.skip`, obsolete `x-forwarded-proto` trust —
-  decide delete vs revive), one intentional skip in `test/signatures/signatures.spec.ts` (HS256,
-  keep). Dead orphan configs: `test/cors/cors.config.ts` (task 3), `test/routing/routing.config.ts`
-  (no spec at all), `test/provider/set_session.config.ts`.
-- **Expected result:** `bunfig.toml` ignore list contains only entries with a written
-  justification (target: empty apart from anything task 3 hasn't absorbed); each skipped file is
-  migrated, rewritten against current APIs, or deleted with rationale in the commit message;
-  orphan configs deleted or given specs. Suite count reflects reality (no silently-dead specs).
-- **Amended by task 2's decision note:** task 3 absorbs all three `test/cors/*` items —
-  `cors.spec.ts` rewritten, `custom_cors.spec.ts` deleted (its `provider.use()` + Koa `cors()`
-  premise no longer exists), `cors.config.ts` deleted. Only `test/helpers/attention.spec.ts` remains
-  here from the ignore list.
+- **Context (re-verified 2026-08-23):** `bunfig.toml`'s ignore list is down to one entry —
+  `test/helpers/attention.spec.ts` (uses Mocha's `context()`); the `test/cors/*` entries were
+  absorbed by task 3 as its amendment predicted. Additionally never running:
+  `test/provider/provider_instance.spec.ts` (whole file `describe.skip`, targets a removed
+  constructor API — likely delete or rewrite), `test/configuration/secure.spec.ts`
+  (`describe.skip`, obsolete `x-forwarded-proto` trust — decide delete vs revive), one intentional
+  skip in `test/signatures/signatures.spec.ts` (HS256, keep). Dead orphan configs:
+  `test/routing/routing.config.ts` (no spec at all), `test/provider/set_session.config.ts`.
+- **Expected result:** `bunfig.toml` ignore list is empty (or every entry carries a written
+  justification); each skipped file is migrated, rewritten against current APIs, or deleted with
+  rationale in the commit message; orphan configs deleted or given specs. Suite count reflects
+  reality (no silently-dead specs).
 
 ### 25. MongoDB adapter test strategy — Investigate
 
-- **Context:** The production storage backend (`lib/adapters/mongodb/`, all 11 files) has zero
-  test coverage — tests always run the in-memory adapter (`lib/adapters/index.ts:58-60`;
-  `MONGODB_URI` never set under test). Known behavioral divergences already found:
-  `revokeByGrantId` scope (see task 9), email lowercasing on insert (mongo) vs as-supplied
-  (memory), `upsert` never `$unset`s a stale `expiresAt`.
+- **Context:** The production storage backend (`lib/adapters/mongodb/`) has zero automated test
+  coverage — tests always run the in-memory adapter (`lib/adapters/index.ts`; `MONGODB_URI` never
+  set under test). Known behavioral divergences already found: email lowercasing on insert (mongo)
+  vs as-supplied (memory), `upsert` never `$unset`s a stale `expiresAt`. **The predicted failure
+  class has now materialized once:** the Mongo `DPoPNonceSecret` store returned a BSON `Binary` the
+  resolver rejects, so the server could not boot against MongoDB at all — shipped unnoticed
+  precisely because the store contract spec covers the memory implementation alone (task 35, fixed
+  in `71d9b53`).
 - **Deliverable:** A decision note: how mongo-backed tests run (real local mongod in CI /
   testcontainers / a dedicated `bun test` project with `MONGODB_URI` + cleanup strategy), which
   suites run against it (minimum: the existing `test/storage_contract/` round-trips + the store
-  specs, parameterized over both adapters), and how divergences get pinned. Produces the spec
-  input for the implementation task it defines.
-- **Measurements blocked on this task.** Task 4 (`specs/012-db-setup-provisioning`) established four
-  guarantees structurally — the constraint was verified present, the outcome never observed — because
-  each needs a datastore-backed test this investigation has to enable first. They are recorded here
-  because a note in `specs/` would not be found: that directory is gitignored. Whichever option this
-  task picks should be able to carry all four.
-  1. **Automatic reaping observed.** That expired verification challenges and resend counters actually
-     leave storage. The TTL indexes are provisioned and verified; the datastore's expiry task runs on
-     its own ~60s schedule, so this needs a timed test. (Task 4 SC-002.)
-  2. **Concurrent registrations.** That two simultaneous registrations of one address into one bucket
-     produce exactly one account. Verified today only as a sequential duplicate insert rejected by the
-     unique index. (Task 4 SC-003.)
-  3. **Sign-in cost independent of bucket size.** A benchmark over, say, 10 versus 100,000 accounts.
-     Only the existence of the `email` index is verified today. (Task 4 SC-004.)
-  4. **No implicitly-created storage area after exercising every capability.** Provision a database,
-     drive every server capability against the mongo adapter, then diff the collection list. Today only
-     the weaker half is verified: all 24 _declared_ areas exist after provisioning. This is the one that
-     would catch an area missing from the inventory altogether. (Task 4 SC-001.)
+  specs, parameterized over both adapters — the DPoP nonce secret binary round trip explicitly
+  included), and how divergences get pinned. Produces the spec input for the implementation task it
+  defines.
+- **Measurements blocked on this task** (from task 4 / `specs/012-db-setup-provisioning`, recorded
+  here because `specs/` is gitignored — whichever option this task picks should carry all four):
+  1. **Automatic reaping observed** — expired verification challenges/resend counters actually
+     leave storage (TTL monitor runs on its own ~60s schedule, so a timed test). (SC-002)
+  2. **Concurrent registrations** — two simultaneous registrations of one address produce exactly
+     one account (today only a sequential duplicate insert is verified). (SC-003)
+  3. **Sign-in cost independent of bucket size** — benchmark 10 vs 100,000 accounts; only the
+     `email` index's existence is verified today. (SC-004)
+  4. **No implicitly-created storage area after exercising every capability** — provision, drive
+     every capability against the mongo adapter, diff the collection list; the one that would catch
+     an area missing from the inventory altogether. (SC-001)
+     Also outstanding from later tasks: the Mongo `adminAuditStore` list/filter/index behavior
+     (task 8) and the HTTP-level deletion walkthrough (task 10, quickstart §§ 4.2–4.5).
+- **The stake grew with task 15** (2026-08-23): the class that materialized this task's predicted
+  failure — the Mongo singleton secret store — now holds **two** instances, the DPoP nonce secret
+  and the pairwise identifier salt, and the salt's failure mode is worse than the nonce secret's (a
+  server that refuses pairwise clients, rather than one client retry). Still verified by reading plus
+  a database-free BSON round-trip probe; the boot → restart → same-`sub` check against a real
+  deployment remains unrun. Whichever option this task picks, the salt's round trip belongs in the
+  same parameterized set as the nonce secret's.
 
 ### 26. Typecheck remediation strategy — Investigate
 
-- **Context:** `bun run typecheck` (`tsc --noEmit`) fails with 2633 errors: 836 in `lib/`
-  (overwhelmingly implicit-`any` — known accepted debt from the non-aggressive typing approach),
-  1797 in `test/`. Worst offenders: `lib/models/client/schema.ts` (89),
-  `test/configuration/client_metadata.spec.ts` (243). Because the command fails wholesale, it
-  gates nothing and new type errors land unnoticed.
+- **Context:** `bun run typecheck` (`tsc --noEmit`) fails repo-wide by design — ~2587 errors as of
+  2026-08-05 (was 2633 at the original analysis; `lib/` ~808, overwhelmingly implicit-`any` — known
+  accepted debt from the non-aggressive typing approach; the rest in `test/`). Worst offenders:
+  `lib/models/client/schema.ts` (89), `test/configuration/client_metadata.spec.ts` (243). Because
+  the command fails wholesale, it gates nothing and new type errors land unnoticed — each completed
+  task has been measuring before/after by hand to prove it added none.
 - **Deliverable:** A decision note choosing the path to a _useful_ typecheck signal: e.g. a
   ratchet (error-count budget file enforced in CI), a scoped `tsconfig.typecheck.json` that is
   green today and grows, or a phased burn-down plan with per-directory milestones. Includes the
@@ -1531,140 +688,102 @@ IdP-initiated login; localisation of the new pages, consistent with every intera
 ### 27. Dead code removal — Implement
 
 - **Context (verified zero importers / unreachable):** entire `lib/views/` directory (3 legacy
-  template files — `interaction.ts:42-46` was the repo's only RAR rendering, and task 7 has superseded
-  it with the `'rar-detail'` consent group, so deleting it now loses no function), `lib/admin/ui/pages/Stub.tsx`, `lib/helpers/params.ts`,
-  `lib/helpers/set_www_authenticate.ts` (superseded by inline code in
-  `authorization_error_handler.ts`), `lib/helpers/_/pick_by.ts`, `lib/helpers/script_src_sha.ts`
-  (only call commented out — task 14 item 3 decides its fate first), `provider.urlFor/pathFor`
-  (`lib/provider.ts:33-45` — reads never-assigned fields, would throw if called),
-  ~~`lib/models/grant.ts` `addRar`~~ (**kept** — task 7 made it the live consent-persistence path),
-  empty-body addon asserts
-  (`lib/addon/claims.ts:9-13` `assertClaimsParameter`, `lib/addon/default.ts:13-22` — verify
-  whether empty-by-design as override seams; if so, document instead of delete).
+  template files — `interaction.ts:42-46` was the repo's only RAR rendering, and task 7 has
+  superseded it with the `'rar-detail'` consent group, so deleting it loses no function),
+  `lib/admin/ui/pages/Stub.tsx`, `lib/helpers/params.ts`, `lib/helpers/set_www_authenticate.ts`
+  (superseded by inline code in `authorization_error_handler.ts`), `lib/helpers/_/pick_by.ts`,
+  `provider.urlFor/pathFor` (`lib/provider.ts:33-45` — reads never-assigned fields, would throw if
+  called), empty-body addon asserts (`lib/addon/claims.ts:9-13` `assertClaimsParameter`,
+  `lib/addon/default.ts:13-22` — verify whether empty-by-design as override seams; if so, document
+  instead of delete).
+- **Already handled elsewhere:** `lib/shared/cors.ts` and `lib/addon/cors.ts` were removed by
+  task 3; `lib/helpers/script_src_sha.ts` was superseded by task 14's CSP constructor (verify it is
+  gone or delete it here); `grant.addRar` is **kept** — task 7 made it the live consent-persistence
+  path.
 - **Expected result:** Each listed item deleted, or kept with a written reason (override-seam
-  documentation counts). Zero importers re-verified at deletion time (tasks 7/14 may have changed
-  things). Full suite and lint green afterward.
-- **Amended by task 2's decision note:** `lib/shared/cors.ts` and `lib/addon/cors.ts` (plus its
-  `AddonImplementations` entry and `lib/addon/index.ts` re-export) are removed by task 3, not here.
-- **Amended by task 6's decision note:** the RAR block in the legacy template
-  (`lib/views/interaction.ts:42-46`) is the repository's only extant RAR-rendering code, but task 7
-  supersedes it with a `'rar-detail'` group in the consent view. Deleting the template here loses no
-  function — this is recorded so the block is not mistaken for live behaviour worth preserving.
+  documentation counts). Zero importers re-verified at deletion time. Full suite and lint green
+  afterward.
 
 ### 28. Documentation sync — Implement
 
-- **Context:** `README.md` endpoint table has 6 of 11 rows wrong (real paths: `/auth`, `/par`,
-  `/reg`, `/token/introspect`, `/token/revocation`, `/logout`; userinfo is GET+POST); Features
-  claims "Static and dynamic client registration" (static clients were removed — clients are
-  DB-backed via admin API/DCR/seed); Features/Standards omit implemented capabilities (Device
-  Flow RFC 8628, CIBA, JARM, RAR RFC 9396, mTLS RFC 8705, Resource Indicators RFC 8707,
-  RFC 8414, RFC 9207 `iss`, RFC 7592) and the admin control plane. `AGENTS.md:140` says
-  interaction routes are `/interaction/*`; they are `/ui/:uid/*`. Housekeeping: check off the 24
-  stale checkboxes in `specs/004-findaccount-direct-db/tasks.md` (work landed in `ab8eb01`,
-  `88e3ae5`).
+- **Context (re-verified 2026-08-23 — still wrong):** `README.md` endpoint table has 6 of 11 rows
+  wrong (real paths: `/auth`, `/par`, `/reg`, `/token/introspect`, `/token/revocation`, `/logout`;
+  userinfo is GET+POST); Features claims "Static and dynamic client registration" (static clients
+  were removed — clients are DB-backed via admin API/DCR/seed); Features/Standards omit implemented
+  capabilities (Device Flow RFC 8628, CIBA, JARM, RAR RFC 9396, mTLS RFC 8705, Resource Indicators
+  RFC 8707, RFC 8414, RFC 9207 `iss`, RFC 7592, DPoP nonces, upstream OIDC federation, email
+  verification, password reset) and the admin control plane. `AGENTS.md` says interaction routes are
+  `/interaction/*`; they are `/ui/:uid/*`. Housekeeping: check off the 24 stale checkboxes in
+  `specs/004-findaccount-direct-db/tasks.md` (work landed in `ab8eb01`, `88e3ae5`) — note `specs/`
+  is untracked, so this is local hygiene only.
 - **Expected result:** README endpoint table matches mounted routes exactly (source of truth:
   `lib/consts/param_list.ts`); Features/Standards list what is actually implemented, with
-  flag-gated features marked as opt-in; AGENTS.md route reference corrected; spec-004 checkboxes
-  checked. No code changes.
+  flag-gated features marked as opt-in; AGENTS.md route reference corrected. No code changes.
 
-### 29. Initialize the `docs/wiki/` knowledge base — Implement
+### 29. Knowledge-base location decision — Investigate (re-scoped 2026-08-23)
 
-- **Context:** The org standard requires a git-tracked `docs/wiki/`; it does not exist. Spec
-  tasks 005-T017 and 006-T018 already called for capturing the redirect_uri-omission business
-  rule and the DB-single-sourced-clients architecture there.
-- **Expected result:** `docs/README.md` + `docs/wiki/` + `Index.md` scaffolded per the docs-wiki
-  skill conventions (frontmatter, naming, wikilinks, `## Related` sections), seeded with at
-  minimum: the config three-surface architecture note, the clients-from-DB note, the
-  redirect_uri-omission business rule, the addon override-registry contract (including which
-  hooks throw by default — feeds task 12), and a troubleshooting note for the CORS/flag-gating
-  findings of this analysis. Every note linked from `Index.md`.
+- **Original task** ("initialize `docs/wiki/`") is **overtaken by events**: the knowledge base
+  materialized instead as the git-tracked llm-wiki at `wiki/` (`wiki/SCHEMA.md` + 15+ concept pages
+  — feature-flag-gating, client-identity-from-database, admin-audit-trail, deletion-and-revocation,
+  html-response-security-policy, interaction-page-families, upstream-federation,
+  rich-authorization-requests, self-service-password-reset, admin-console-signin, and more), which
+  the completed tasks above actively file into. Much of the originally planned seed content already
+  exists there.
+- **What remains to decide:** the org standard (and this repo's SessionStart hook) asserts a
+  `docs/wiki/` knowledge base with different conventions (docs-wiki skill: Business Rules /
+  Troubleshooting / Integrations / Overview categories, `Index.md` wikilinks). Either adopt `wiki/`
+  as this repo's canonical KB and align the hook/org expectation, or scaffold `docs/wiki/` per the
+  standard and define the relationship between the two. Also still unfiled anywhere tracked except
+  this file's git history: tasks 3 and 4's retrospective findings (CORS mechanism gotchas, storage
+  provisioning gotchas) — wherever the decision lands, file those two.
 
 ### 30. Missing OIDC surfaces roadmap — Investigate
 
 - **Context:** Entirely absent, with traces suggesting past intent: OIDC Session Management /
-  `check_session_iframe` (stale docstring at `lib/actions/authorization/respond.ts:10-11`
-  references an OP iframe cookie that is never written) and Front-Channel Logout (no discovery
-  keys, no client metadata). `request_uri`-by-reference is deliberately unsupported and correctly
-  advertised — leave it.
+  `check_session_iframe` (stale docstring at `lib/actions/authorization/respond.ts:13` references an
+  OP iframe cookie that is never written) and Front-Channel Logout (no discovery keys, no client
+  metadata). `request_uri`-by-reference is deliberately unsupported and correctly advertised —
+  leave it.
 - **Deliverable:** A decision note: implement, or explicitly declare unsupported. If declared
-  unsupported: remove the stale docstring and record the decision in `docs/wiki/` (task 29). If
-  implementing: a spec input defining scope (front-channel logout is the likelier candidate;
+  unsupported: remove the stale docstring and record the decision in the knowledge base (task 29).
+  If implementing: a spec input defining scope (front-channel logout is the likelier candidate;
   session management is legacy — modern guidance leans on back-channel logout, which already
   works).
 
 ### 34. Why the sign-in bundle costs 1 MB — Investigate
 
-- **Numbering is append-only:** belongs to P3, takes the next free number.
-- **Context:** `public/loginClient.js` is 1,019,378 B minified for three pages built from
+- (P3; surfaced while scoping task 32, which established that `zeroRuntime` does **not** reduce
+  bundle size — so this is the remaining lever, and the only one that touches end-user bytes rather
+  than operator bytes.)
+- **Context:** `public/loginClient.js` is ~1 MB minified for three pages built from
   `Form`/`Input`/`Button`/`Card`/`Checkbox`/`Flex`/`Typography`/`Alert`, and `public/admin.js` is
-  1,611,374 B. `lib/interactions/{loginPage,registration}.tsx` import named icons from
-  `@ant-design/icons` — a barrel of thousands of modules — reached through the custom resolve plugin
-  at `build.ts:9`, which redirects `@ant-design/icons-svg/lib/*` to `es/*` for an unrelated CJS
-  interop reason. Whether Bun tree-shakes that barrel is unknown and was never measured. Surfaced
-  while scoping task 32, which established that antd's `zeroRuntime` mode does **not** reduce bundle
-  size — so this is the remaining lever, and the only one that touches end-user bytes rather than
-  operator bytes.
+  ~1.6 MB. `lib/interactions/{loginPage,registration}.tsx` import named icons from
+  `@ant-design/icons` — a barrel of thousands of modules — reached through the custom resolve
+  plugin at `build.ts`, which redirects `@ant-design/icons-svg/lib/*` to `es/*` for a CJS interop
+  reason. Whether Bun tree-shakes that barrel is unknown and was never measured.
 - **Deliverable:** A measurement, then a decision. Report each entry's size broken down by source
   (`bun build --analyze` or equivalent), the delta from importing icons by direct path instead of
   from the barrel, and the delta from `splitting: true` (deferred from task 32 for being
   operator-only). If a change wins, it becomes the expected result of a follow-up implementation
   task; if nothing wins, record the numbers here so the question is not reopened by guesswork.
 
-### 35. The server cannot boot against MongoDB — Implement
-
-- **Numbering is append-only:** belongs to P0 (it blocks local development entirely), takes the next
-  free number.
-- **Context:** Found 2026-08-05 while running task 32's browser verification. `bun lib/index.ts`
-  against a real MongoDB throws at `lib/configs/nonceSecret.ts:98`: _"the DPoP nonce secret does not
-  survive a storage round trip: a freshly written 32-byte secret read back in an unusable shape. The
-  storage layer cannot carry binary values intact."_ The check is doing its job — `resolveNonceSecret`
-  writes a 32-byte secret, reads back what storage actually holds, and refuses to serve DPoP requests
-  it cannot answer. What fails is the Mongo adapter's handling of binary values. Unrelated to task 32
-  (`nonceSecret.ts` is in no part of that branch); verification had to be done on the in-memory
-  adapter instead (`MONGODB_URI=` empty selects it, `lib/adapters/index.ts:50`).
-- **Expected result:** A 32-byte `Uint8Array`/`Buffer` written through the Mongo `DPoPNonceSecret`
-  store reads back in a usable shape, so the server boots against MongoDB. A spec test asserting the
-  binary round trip at the adapter level, not only at `resolveNonceSecret`. Check whether other
-  binary-valued fields go through the same path — the comment at `nonceSecret.ts:60-66` notes the
-  refusal is deliberately loud rather than fatal for a _configured_ value, so a silent corruption
-  elsewhere is the shape to look for. This is also the first hard evidence for the "Mongo adapter
-  coverage" gap the roadmap has carried abstractly.
-
-### 36. Static assets are served uncompressed, and may not revalidate — Investigate
-
-- **Numbering is append-only:** belongs to P2, takes the next free number.
-- **Context:** Found 2026-08-05 by task 32's final review and confirmed by request.
-  `staticPlugin({ assets: 'public' })` (`lib/index.ts:84`) does **not** compress: with
-  `Accept-Encoding: gzip, deflate, br`, the response carries no `Content-Encoding` and transfers the
-  full 1,005,591 B of `antd.css`. There is no compression middleware in the repo. This is what turned
-  task 32's part B from the win it was scoped as into a trade — the design priced that file at its
-  109,545 B gzip size. It also applies to `loginClient.js` (1,019,629 B), `admin.js` (1,611,613 B) and
-  every JSON response the protocol serves. Separately and unconfirmed: a conditional request carrying
-  the correct `If-None-Match` was answered **200 with the full body** rather than 304, and the etag is
-  emitted unquoted (`K9WnLSEFPtxrTmRQOAiPqQ==` rather than `"…"`), which may itself explain the miss —
-  if real, the full megabyte re-downloads whenever the 86,400 s `max-age` expires even when nothing
-  changed.
-- **Deliverable:** A decision on where compression belongs. The operator's stated intent (2026-08-05)
-  is an external plugin rather than application middleware, so this may be deployment configuration
-  (`fly.toml`) rather than code — in which case record that and close it. If it lands in the app,
-  measure the before/after on the four hydrated pages and finally satisfy task 32's unmet acceptance
-  criterion 5 (login page total transfer size, which was never captured — only per-asset sizes).
-  Confirm or dismiss the 304 behaviour separately; it is cheap to test and independent of compression.
-
 ---
 
 ## Suggested order
 
-Quick wins first: **14** (bug batch) → ~~**1** (flag gating)~~ → ~~**4** (db provisioning)~~ →
-~~**5** (DPoP safety)~~ → ~~**11** (id_token verification)~~. Then the investigation pair-ups: ~~**3** (CORS)~~,
-~~**9**~~**→10** (deletion — task 9 resolved 2026-08-04, so **10** is next up and carries a full
-acceptance surface), ~~**6→7**~~ (RAR). Then P1 remainder (~~**8**~~, **12**, **13**, **15**), P2
-product work (~~**16**~~, ~~**17**~~, **18**–**23**), and P3 (**24**–**30**) as capacity allows. Tasks 28 and 29 are safe to
-do anytime. **31** (RAR's remaining channels) is P1 and **now unblocked** — task 7 landed the descriptor
-validation, consent view model and grant persistence it reuses — but it remains the lowest-urgency P1
-item, since nothing reaches those channels today.
+Everything through the original P0 band is done, plus 8–11, 14, 16–18, 32 and 35. What remains,
+in rough order of value:
 
-**32** is next up and splits cleanly: part A (`script-src 'none'` and a hashed `style-src-elem` on the
-script-free pages) is the cheapest security change in this file — `lib/html/csp.ts` plus test updates,
-with no dependency on part B — so do it first and ship it alone if part B runs long. **33** and **34**
-were spun out of scoping **32** and neither blocks anything.
+- **33** (non-HTML security headers) — the cheapest open item; spun out of 32 with the mechanism
+  already decided.
+- **12** (guard the throwing toggles) → **13** (protocol conformance batch) → **15** (pairwise
+  salt, with tasks 5/35 as the direct precedent).
+- P2 product work: **19** (admin UI completion — consumes task 10's blockers contract) → **20**
+  (client schema breadth) → **21** (settings catalog) → **22** (session/grant visibility) → **23**
+  (non-RSA JWKS); **36** (compression/304) is a small investigation that mostly needs a deployment
+  decision.
+- **31** (RAR's remaining channels) is P1 by band but lowest-urgency — nothing reaches those
+  channels today.
+- Debt: **25** (MongoDB adapter test strategy — now carrying a materialized failure as evidence) is
+  the highest-leverage investigation; **24**, **26**, **27**, **34** as capacity allows. **28**
+  (docs sync) and **29** (KB location decision) are safe anytime.

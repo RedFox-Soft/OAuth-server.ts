@@ -5,8 +5,8 @@ import {
 	isUsableNonceSecret,
 	resolveNonceSecret
 } from 'lib/configs/nonceSecret.ts';
-import type { DPoPNonceSecretStoreInstance } from 'lib/adapters/types.ts';
-import { DPoPNonceSecretStore } from 'lib/adapters/memory/dpopNonceSecretStore.ts';
+import type { SecretStoreInstance } from 'lib/adapters/types.ts';
+import { SingletonSecretStore } from 'lib/adapters/memory/singletonSecretStore.ts';
 import { DPoPNonces } from 'lib/helpers/dpop_nonces.ts';
 
 // The narrowing predicate and the generator — specs/014-dpop-nonce-safety/data-model.md.
@@ -79,7 +79,7 @@ describe('nonce secret: generation', () => {
  */
 
 // Records what it was asked to do, so a test can assert storage was NOT touched as well as that it was.
-class StubStore implements DPoPNonceSecretStoreInstance {
+class StubStore implements SecretStoreInstance {
 	created = 0;
 	replaced = 0;
 
@@ -219,7 +219,7 @@ describe('nonce secret: startup resolution', () => {
  */
 describe('nonce secret: persistence across restarts', () => {
 	it('resolves to the same bytes every time, which is what a restart does', async () => {
-		const store = new DPoPNonceSecretStore();
+		const store = new SingletonSecretStore('dpopNonceSecret');
 
 		const first = await resolveNonceSecret(store, undefined);
 		// A second resolution against the same store is exactly what the next boot performs.
@@ -232,7 +232,7 @@ describe('nonce secret: persistence across restarts', () => {
 		// SC-006 stated in the terms that actually matter to a client: a nonce handed out before a
 		// restart still verifies after it. Two generators built from one secret stand in for the two
 		// sides of a restart — the generator is process state, the secret is not.
-		const store = new DPoPNonceSecretStore();
+		const store = new SingletonSecretStore('dpopNonceSecret');
 		const secret = await resolveNonceSecret(store, undefined);
 
 		const before = new DPoPNonces(secret);
@@ -254,7 +254,7 @@ describe('nonce secret: persistence across restarts', () => {
 
 describe('nonce secret: concurrent provisioning', () => {
 	it('converges on one secret when two instances start against an empty store', async () => {
-		const store = new DPoPNonceSecretStore();
+		const store = new SingletonSecretStore('dpopNonceSecret');
 		const warn = quiet();
 
 		const [first, second] = await Promise.all([
@@ -272,7 +272,7 @@ describe('nonce secret: concurrent provisioning', () => {
 	});
 
 	it('converges when two instances both find an unusable stored secret', async () => {
-		const store = new DPoPNonceSecretStore();
+		const store = new SingletonSecretStore('dpopNonceSecret');
 		await store.create(Buffer.alloc(32, 9));
 		// Force the stored value into an unusable shape, the way a storage round trip would.
 		await store.replace(await store.read(), mangled() as unknown as Buffer);

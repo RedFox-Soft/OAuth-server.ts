@@ -80,5 +80,6 @@ getter; the getter exists for the historical call sites.
 - [[token-payload-access-contract]] — models keep state under `.payload`; validated clients do not.
 - [[account-resolution]] — maps a client id to the user bucket a subject is resolved from.
 - [[feature-flag-gating]] — the registration endpoints that create clients are flag-gated.
+- [[pairwise-identifier-salt]] — a pairwise client's sector identifier, read from this record, is the first input to the pseudonym every relying party keys its accounts on.
 
 Verified against [[oauth-server-codebase]] at commit `2125ad0`.

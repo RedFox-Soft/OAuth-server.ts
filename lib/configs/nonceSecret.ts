@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import type { DPoPNonceSecretStoreInstance } from '../adapters/types.js';
+import type { SecretStoreInstance } from '../adapters/types.js';
 
 /*
  * The server's DPoP nonce secret, resolved once at startup — the sibling of configs/keys.ts, which
@@ -65,7 +65,7 @@ function roundTripFailure(): Error {
  * cannot be repaired through any supported surface. It is loud instead of fatal.
  */
 export async function resolveNonceSecret(
-	store: DPoPNonceSecretStoreInstance,
+	store: SecretStoreInstance,
 	configured: unknown
 ): Promise<Uint8Array> {
 	if (isUsableNonceSecret(configured)) {

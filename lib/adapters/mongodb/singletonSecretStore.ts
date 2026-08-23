@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import { Binary, ObjectId } from 'mongodb';
 import { db } from './db.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
-import type { DPoPNonceSecretStoreInstance } from '../types.js';
+import type { SecretStoreInstance } from '../types.js';
 
 function stringTo24CharHex(str: string) {
 	const hash = crypto.createHash('sha256').update(str).digest('hex');
@@ -19,25 +19,31 @@ function isDuplicateKey(err: unknown): boolean {
 	);
 }
 
-export class DPoPNonceSecretStore implements DPoPNonceSecretStoreInstance {
-	/* Third writer of the area — see the note on STORE_AREAS.serviceConfig. The three singleton
-	 * documents are told apart only by their derived ObjectIds, which is why the inventory carries
-	 * one entry for all of them. */
+export class SingletonSecretStore implements SecretStoreInstance {
+	/* Writer of the shared area — see the note on STORE_AREAS.serviceConfig. The singleton documents
+	 * are told apart only by their derived ObjectIds, which is why the inventory carries one entry for
+	 * all of them, and why the document's name is the one thing an instance needs to know. */
 	private collectionName: string = STORE_AREAS.serviceConfig;
-	private secretId = new ObjectId(stringTo24CharHex('dpopNonceSecret'));
+	private secretId: ObjectId;
+
+	constructor(documentName: string) {
+		this.secretId = new ObjectId(stringTo24CharHex(documentName));
+	}
 
 	/*
 	 * Unwrapping the driver's wrapper is what makes the round trip survivable. A Buffer goes in, but
-	 * BSON has no Buffer, so a `Binary` comes back — the exact shape configs/nonceSecret.ts rejects,
-	 * since a Binary is not a Uint8Array and derives no nonces. Left wrapped, every boot read an
-	 * unusable secret, replaced it, read the replacement back equally unusable, and refused to start.
+	 * BSON has no Buffer, so a `Binary` comes back — the exact shape the callers' predicates reject,
+	 * since a Binary is not a Uint8Array. Left wrapped, every boot read an unusable secret, replaced
+	 * it, read the replacement back equally unusable, and refused to start (task 35). The pairwise salt
+	 * shares this class precisely so that lesson cannot be missed a second time: a copied class is a
+	 * second place to remember it.
 	 *
 	 * Translating out of the wrapper is the adapter's job, not the caller's guard: the wrapper is this
 	 * driver's representation choice, and the guard stays a check on the material rather than a
 	 * catalogue of storage encodings. So any subtype is unwrapped, not just the default one written
 	 * here — `value()` yields bytes either way, and the caller's length check is what judges them —
-	 * while a non-binary value passes through untouched, for the caller to repair rather than have
-	 * coerced into merely looking usable.
+	 * while a non-binary value passes through untouched, for the caller to repair or refuse rather than
+	 * have coerced into merely looking usable.
 	 */
 	async read(): Promise<unknown> {
 		const result = await db

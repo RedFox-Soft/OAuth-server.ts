@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
 
-import { DPoPNonceSecretStore } from 'lib/adapters/memory/dpopNonceSecretStore.ts';
+import { SingletonSecretStore } from 'lib/adapters/memory/singletonSecretStore.ts';
 
 // The nonce-secret store contract — specs/014-dpop-nonce-safety/contracts/nonce-secret-store.md.
 //
@@ -21,11 +21,11 @@ import { DPoPNonceSecretStore } from 'lib/adapters/memory/dpopNonceSecretStore.t
 
 const bytes = (fill: number): Buffer => Buffer.alloc(32, fill);
 
-describe('DPoPNonceSecretStore (memory)', () => {
-	let store: DPoPNonceSecretStore;
+describe('SingletonSecretStore (memory): DPoP nonce secret instance', () => {
+	let store: SingletonSecretStore;
 
 	beforeEach(() => {
-		store = new DPoPNonceSecretStore();
+		store = new SingletonSecretStore('dpopNonceSecret');
 	});
 
 	it('reads nothing from an empty store', async () => {

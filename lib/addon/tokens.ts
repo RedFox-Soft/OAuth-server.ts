@@ -1,8 +1,8 @@
 import crypto from 'node:crypto';
-import os from 'node:os';
 
-import { mustChange } from './_warn.ts';
 import nanoid from '../helpers/nanoid.ts';
+import { pairwiseSalt } from '../configs/pairwiseSalt.ts';
+import { TemporarilyUnavailable } from '../helpers/errors.ts';
 
 export function idFactory(_ctx) {
 	return nanoid();
@@ -27,16 +27,43 @@ export async function issueRefreshToken(ctx, client, code) {
 	);
 }
 
+/*
+ * The pseudonym a relying party receives instead of the account's own identifier, scoped to the
+ * client's sector. It is that relying party's account key, so it has to be reproducible for as long
+ * as the account exists — across restarts, hosts and instances.
+ *
+ * The salt used to be `os.hostname()`, which made it reproducible for as long as one container lived.
+ * It now comes from persistent server state (configs/pairwiseSalt.ts), resolved once at startup.
+ *
+ * When there is no usable salt the request is refused rather than answered with a freshly derived
+ * identifier. That asymmetry is the point: an identifier derived from a salt the server cannot
+ * reproduce is worse than no identifier at all, because the relying party would store it and treat
+ * the same person as a new account on the next restart. Refusing here covers every surface at once —
+ * ID token, userinfo, introspection, interaction prompts and back-channel logout all reach the
+ * derivation through this one function.
+ */
 export async function pairwiseIdentifier(accountId, client) {
-	mustChange(
-		'pairwiseIdentifier',
-		'provide an implementation for pairwise identifiers, the default one uses `os.hostname()` as salt and is therefore not fit for anything else than development'
-	);
+	const salt = pairwiseSalt();
+
+	if (salt === null) {
+		// Per refusal, not just once at startup: the startup line scrolls away, and this is the only
+		// place that knows a real request was turned down because of it.
+		console.warn(
+			`refusing a pairwise identifier for client ${client.clientId}: the server has no usable ` +
+				'pairwise salt, so any sub it derived now would change on the next restart. Repair the ' +
+				'stored salt; every non-pairwise client is unaffected.'
+		);
+		throw new TemporarilyUnavailable(
+			'the request cannot be served at this time',
+			'no usable pairwise identifier salt; see the startup warning from configs/pairwiseSalt.ts'
+		);
+	}
+
 	return crypto
 		.createHash('sha256')
 		.update(client.sectorIdentifier)
 		.update(accountId)
-		.update(os.hostname()) // put your own unique salt here, or implement other mechanism
+		.update(salt)
 		.digest('hex');
 }
 

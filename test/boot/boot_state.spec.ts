@@ -18,10 +18,14 @@ import * as path from 'node:path';
  *
  * The child starts on an empty in-memory store (the preload's fixture keys are not in its process),
  * so it also covers the auto-provisioning fallback in resolveKeys — and, since spec 014, the same
- * fallback for the DPoP nonce secret. The `stderr: ''` assertion below is load-bearing for that one:
- * provisioning on an empty store is silent by design, and only a *replacement* says anything, so a
- * clean boot that prints nothing is itself the evidence that the ordinary path took no shortcut
- * through the noisy branch.
+ * fallback for the DPoP nonce secret and, since spec 023, the pairwise identifier salt. The
+ * `stderr: ''` assertion below is load-bearing for both, and for one more thing since spec 023: the
+ * salt's default implementation used to emit a mustChange warning on every derivation, calling itself
+ * unfit for anything but development. A silent boot is what proves that is gone.
+ *
+ * It is load-bearing for the provisioning fallbacks because provisioning on an empty store is silent
+ * by design, and only an unusable value says anything — so a clean boot that prints nothing is itself
+ * the evidence that the ordinary path took no shortcut through the noisy branch.
  */
 const BOOT_SCRIPT = `
 import * as path from 'node:path';
@@ -32,8 +36,10 @@ const at = (rel) => pathToFileURL(path.join(process.cwd(), rel)).href;
 await import(at('lib/event_bus.ts'));
 const ks = await import(at('lib/configs/keystore.ts'));
 const app = await import(at('lib/configs/application.ts'));
+const ps = await import(at('lib/configs/pairwiseSalt.ts'));
 
 const nonceSecret = app.ApplicationConfig['dpop.nonceSecret'];
+const salt = ps.pairwiseSalt();
 
 process.stdout.write(JSON.stringify({
 	published: ks.publicJWKS.keys.length,
@@ -41,6 +47,8 @@ process.stdout.write(JSON.stringify({
 	canSign: ks.keystore.selectForSign({ alg: 'RS256' }).length > 0,
 	nonceSecretIsBuffer: Buffer.isBuffer(nonceSecret),
 	nonceSecretBytes: Buffer.isBuffer(nonceSecret) ? nonceSecret.byteLength : null,
+	pairwiseSaltUsable: ps.isUsablePairwiseSalt(salt),
+	pairwiseSaltBytes: salt === null ? null : salt.byteLength,
 	scopes: [...app.configuration.scopes],
 	grantTypes: [...app.configuration.grantTypes],
 	claimsSupported: [...app.configuration.claimsSupported],
@@ -105,6 +113,15 @@ describe('a freshly booted server, with no reload and no harness', () => {
 		// DPoP-bearing request answer 500.
 		expect(booted.nonceSecretIsBuffer).toBe(true);
 		expect(booted.nonceSecretBytes).toBe(32);
+	});
+
+	it('holds a usable pairwise identifier salt', () => {
+		// Provisioned unconditionally too, and for a sharper reason than the nonce secret's: before
+		// spec 023 the salt was `os.hostname()`, so a booted server always "had" one and it was
+		// different on every host. There was no state to observe and nothing to assert — which is
+		// precisely why nothing caught it.
+		expect(booted.pairwiseSaltUsable).toBe(true);
+		expect(booted.pairwiseSaltBytes).toBe(32);
 	});
 
 	it('has its settings validated and derived', () => {
