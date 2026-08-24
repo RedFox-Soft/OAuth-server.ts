@@ -465,7 +465,22 @@ export const ApplicationConfig = {
 		'client_secret_post',
 		'private_key_jwt',
 		'none'
-	]
+	],
+
+	/*
+	 * mcp.enabled
+	 *
+	 * title: Administrative MCP control plane
+	 *
+	 * description: Serves the administrative control plane to an AI agent over MCP at `/mcp`, as an
+	 *   OAuth 2.1 protected resource of this server. Every operation runs through the same admin
+	 *   routes, authorization and audit trail the console uses.
+	 *
+	 * Off by default, unlike every other capability here that defaults on. The switch hands an agent
+	 *   the authority of the administrator who authorized it, so a deployment should reach for it
+	 *   deliberately rather than inherit it from an upgrade.
+	 */
+	'mcp.enabled': false
 };
 Object.assign(ApplicationConfig, await configStore.get());
 

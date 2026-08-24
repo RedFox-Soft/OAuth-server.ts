@@ -39,7 +39,13 @@ const REAPED_ON_EXPIRES_AT = [
 	'Session',
 	'VerificationChallenge',
 	'VerificationResend',
-	'adminSession'
+	'adminSession',
+	/*
+	 * Confirmations for the MCP control plane's high-consequence operations. Reaped, and the expiry is
+	 * the control rather than housekeeping: a confirmation that outlived its window could be redeemed
+	 * against state that has since changed, which is the failure the two-step gate exists to prevent.
+	 */
+	'mcpConfirmation'
 ];
 
 const PERMANENT = [

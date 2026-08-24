@@ -59,7 +59,17 @@ export function recordAdminAudit(
 		actorEmail: ctx.email,
 		action,
 		targetId,
-		detail
+		detail,
+		/*
+		 * Present only when the action arrived through the MCP control plane, carrying the agent's OAuth
+		 * client. The actor stays the administrator — the constitution requires an agent's action to be
+		 * attributable to the agent *and* the authorizing principal, and recording the agent alongside
+		 * them is what satisfies both without redefining what `actorId` means.
+		 *
+		 * Absence means the console, which is why nothing needs backfilling for the entries written
+		 * before agents existed.
+		 */
+		viaClientId: ctx.viaClientId
 	});
 }
 
@@ -88,6 +98,7 @@ async function write(input: {
 	action: AuditAction;
 	targetId: string;
 	detail: AuditDetail;
+	viaClientId?: string;
 }): Promise<AdminAuditEntry> {
 	try {
 		return await adminAuditStore.record({
@@ -102,7 +113,15 @@ async function write(input: {
 			// Sorted so two requests setting the same fields in a different order read identically.
 			...(input.detail.attributes === undefined
 				? {}
-				: { attributes: [...input.detail.attributes].sort() })
+				: { attributes: [...input.detail.attributes].sort() }),
+			/*
+			 * `viaSurface` is stored rather than inferred from `viaClientId`, because inferring "this was
+			 * an agent" from a client id would make every reader carry a list of which client ids are
+			 * agents — and that list changes.
+			 */
+			...(input.viaClientId === undefined
+				? {}
+				: { viaClientId: input.viaClientId, viaSurface: 'mcp' as const })
 		});
 	} catch (err) {
 		/*

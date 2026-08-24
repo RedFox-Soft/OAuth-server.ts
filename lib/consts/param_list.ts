@@ -120,6 +120,13 @@ export const routeNames = {
 	end_session_confirm: '/logout/confirm',
 	introspect: '/token/introspect',
 	jwks: '/jwks',
+	mcp: '/mcp',
+	/*
+	 * RFC 9728 protected resource metadata for the MCP endpoint above. The well-known path is
+	 * path-aware: the resource's own path is appended, so a resource at `/mcp` publishes at
+	 * `/.well-known/oauth-protected-resource/mcp` rather than at the bare well-known root.
+	 */
+	mcp_metadata: '/.well-known/oauth-protected-resource/mcp',
 	pushed_authorization_request: '/par',
 	registration: '/reg',
 	revocation: '/token/revocation',

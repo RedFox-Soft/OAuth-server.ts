@@ -6,6 +6,7 @@ import {
 	UserBucketStore as MemoryUserBucketStore,
 	AdminSessionStore as MemoryAdminSessionStore,
 	AdminAuditStore as MemoryAdminAuditStore,
+	McpConfirmationStore as MemoryMcpConfirmationStore,
 	SmtpSettingsStore as MemorySmtpSettingsStore,
 	SingletonSecretStore as MemorySingletonSecretStore,
 	configStore as memoryConfig
@@ -17,6 +18,8 @@ import type {
 	AdminSessionStoreConstructor,
 	AdminSessionStoreInstance,
 	JWKSStoreConstructor,
+	McpConfirmationStoreConstructor,
+	McpConfirmationStoreInstance,
 	JWKSStoreInstance,
 	ModelAdapter,
 	ModelAdapterConstructor,
@@ -41,6 +44,8 @@ let BucketStoreClass: UserBucketStoreConstructor = MemoryUserBucketStore;
 let AdminSessionStoreClass: AdminSessionStoreConstructor =
 	MemoryAdminSessionStore;
 let AdminAuditStoreClass: AdminAuditStoreConstructor = MemoryAdminAuditStore;
+let McpConfirmationStoreClass: McpConfirmationStoreConstructor =
+	MemoryMcpConfirmationStore;
 let SmtpSettingsStoreClass: SmtpSettingsStoreConstructor =
 	MemorySmtpSettingsStore;
 let SecretStoreClass: SecretStoreConstructor = MemorySingletonSecretStore;
@@ -56,6 +61,7 @@ if (process.env.MONGODB_URI) {
 	BucketStoreClass = mongodb.UserBucketStore;
 	AdminSessionStoreClass = mongodb.AdminSessionStore;
 	AdminAuditStoreClass = mongodb.AdminAuditStore;
+	McpConfirmationStoreClass = mongodb.McpConfirmationStore;
 	SmtpSettingsStoreClass = mongodb.SmtpSettingsStore;
 	SecretStoreClass = mongodb.SingletonSecretStore;
 }
@@ -69,6 +75,8 @@ export const adminSessionStore: AdminSessionStoreInstance =
 	new AdminSessionStoreClass();
 export const adminAuditStore: AdminAuditStoreInstance =
 	new AdminAuditStoreClass();
+export const mcpConfirmationStore: McpConfirmationStoreInstance =
+	new McpConfirmationStoreClass();
 /* Eagerly constructed like the stores above, because both secrets are resolved at module scope —
  * configs/application.ts for the nonce secret, configs/pairwiseSalt.ts for the salt — before any
  * request, and a lazy getter would only defer that by one call.

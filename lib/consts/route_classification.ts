@@ -88,6 +88,24 @@ export const gatedRoutes: readonly GatedRoute[] = [
 		path: routeNames.backchannel_authentication,
 		flag: 'ciba.enabled'
 	},
+
+	/*
+	 * The administrative MCP control plane, and the only gated routes whose subject is the admin plane
+	 * rather than the OAuth surface.
+	 *
+	 * `/mcp` is gated rather than listed as always-available because the capability it exposes is
+	 * administrative authority for an AI agent, and a deployment that has not switched it on must not
+	 * serve it at all. Its metadata document is gated with it: RFC 9728 metadata describing an endpoint
+	 * that is not served would advertise a resource a client then cannot reach, and leaving the document
+	 * up while the endpoint is down is exactly the one-response fingerprint featureGate exists to avoid.
+	 *
+	 * Note these sit outside `/admin`, which is an alwaysAvailablePrefixes entry — the console itself is
+	 * unconditional, and that asymmetry is deliberate: switching MCP off must not take the console with
+	 * it (FR-030, FR-036).
+	 */
+	{ method: 'POST', path: routeNames.mcp, flag: 'mcp.enabled' },
+	{ method: 'GET', path: routeNames.mcp, flag: 'mcp.enabled' },
+	{ method: 'GET', path: routeNames.mcp_metadata, flag: 'mcp.enabled' },
 	/*
 	 * The three end-user legs of a federated sign-in — and the first gated routes to sit under `/ui`.
 	 *

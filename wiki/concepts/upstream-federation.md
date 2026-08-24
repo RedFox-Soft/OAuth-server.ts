@@ -137,6 +137,31 @@ Verification failures answer one uninformative page; the reason goes to the even
 this route is unauthenticated, so an attacker-triggerable log write is a vector of its own. The reasoning is
 [[admin-console-signin]]'s, and it applies here with more force: anyone who can follow a redirect reaches it.
 
+## The masked secret leaked for a year through the bucket routes
+
+`lib/admin/federation/service.ts` states the rule and means it: a provider's `clientSecret` is
+write-only, replaced by `SECRET_MASK` "on every read, for every role including super-admin". `present()`
+and `presentAll()` are where that happens, and the federation routes have always used them.
+
+The bucket routes did not. A `UserBucket` *contains* its `federation` array, and
+`GET /admin/api/buckets` and `GET /admin/api/buckets/:id` returned the document whole — so every
+configured provider's client secret went out in plaintext to any authenticated administrator, and the
+console's own Buckets page has been receiving them. The exposure was wider than super-admin:
+`bucket_get` authorizes with `loadBucketForUsers`, the *broader* check, so a manager of a project merely
+backed by the bucket got the secrets too.
+
+Fixed by masking in every bucket projection (`presentBucket` in `lib/admin/buckets/routes.ts`, applied
+to list, get, create and update). The shape of the bug is worth remembering more than the fix: an
+invariant enforced by a module's own presenter does not survive another module returning the document
+that module's data lives inside. Anywhere a nested entity carries a secret, the *containing* entity's
+reads need the same presenter.
+
+Found by the MCP surface's secrecy sweep, which iterates every published read rather than the ones
+somebody thought to check — see [[admin-mcp-control-plane]]. Two of that sweep's own cases had first to
+be fixed for the same class of reason: they asserted a secret was absent while the seed that should have
+stored it had silently failed, so the assertion passed on nothing. A negative assertion needs proof its
+subject exists.
+
 ## Related
 
 - [[interaction-page-families]] — the two families every page here belongs to, and the hydration contract the
@@ -148,5 +173,6 @@ this route is unauthenticated, so an attacker-triggerable log write is a vector 
 - [[self-service-password-reset]] — the digest-keyed-record rule this reuses, and the only route by which a
   provisioned account acquires a usable password.
 - [[admin-console-signin]] — the same relying-party discipline pointed at this server's own issuer.
+- [[admin-mcp-control-plane]] — the agent surface whose secrecy sweep found the bucket-route leak above.
 
 Verified against [[oauth-server-codebase]] as changed by `specs/022-oidc-federation-login`.

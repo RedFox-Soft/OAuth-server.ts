@@ -1,41 +1,24 @@
 import { Elysia } from 'elysia';
-import {
-	resolveAdmin,
-	assertAuth,
-	AdminError,
-	adminErrorBody,
-	type AdminContext
-} from './auth/rbac.js';
-import { adminSetup, hasSuperAdmin } from './auth/setup.js';
-import { adminLogin } from './auth/login.js';
-import { projectRoutes } from './projects/routes.js';
-import { clientRoutes } from './clients/routes.js';
-import { adminUserRoutes } from './users/routes.js';
-import { bucketRoutes } from './buckets/routes.js';
-import { federationAdminRoutes } from './federation/routes.js';
-import { endUserRoutes } from './users-end/routes.js';
-import { settingsRoutes } from './settings/routes.js';
-import { smtpSettingsRoutes } from './settings/smtp/routes.js';
-import { jwksRoutes } from './jwks/routes.js';
-import { auditRoutes } from './audit/routes.js';
+import { AdminError, adminErrorBody, resolveAdmin } from './auth/rbac.js';
+import { hasSuperAdmin } from './auth/setup.js';
+import { adminApiRoutes } from './routes.js';
 import { renderAdminShell } from './ui/serverRender.js';
 
+/*
+ * The console: the admin API plus the HTML shell that drives it.
+ *
+ * The API itself lives in ./routes.ts, because the MCP control plane mounts the same route set to
+ * re-dispatch agent tool calls into it — one definition, so a route cannot exist for one surface and
+ * not the other, and the MCP parity guard has something exact to compare against.
+ */
 export const adminApp = new Elysia({ name: 'admin' })
-	.onError(({ code, error, set }) => {
+	.onError(({ error, set }) => {
 		if (error instanceof AdminError) {
 			set.status = error.status;
 			return adminErrorBody(error);
 		}
-		// Keep admin responses in the admin `{ error, message }` shape instead of
-		// letting request-validation errors fall through to the global OAuth
-		// (RFC 6749) error handler used by the protocol routes.
-		if (code === 'VALIDATION') {
-			set.status = 422;
-			return { error: 'invalid_request', message: error.message };
-		}
 	})
-	.use(adminSetup)
-	.use(adminLogin)
+	.use(adminApiRoutes)
 	.use(resolveAdmin)
 	.get('/admin', async ({ admin, redirect }) => {
 		if (!(await hasSuperAdmin())) {
@@ -43,18 +26,4 @@ export const adminApp = new Elysia({ name: 'admin' })
 		}
 		if (!admin) return redirect('/admin/login', 302);
 		return renderAdminShell({ needsSetup: false, me: admin });
-	})
-	.get('/admin/api/me', ({ admin }) => {
-		const ctx = assertAuth(admin as AdminContext | null);
-		return ctx;
-	})
-	.use(projectRoutes)
-	.use(clientRoutes)
-	.use(adminUserRoutes)
-	.use(bucketRoutes)
-	.use(federationAdminRoutes)
-	.use(endUserRoutes)
-	.use(settingsRoutes)
-	.use(smtpSettingsRoutes)
-	.use(jwksRoutes)
-	.use(auditRoutes);
+	});

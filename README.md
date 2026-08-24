@@ -98,19 +98,53 @@ docker run -p 3000:3000 --env-file .env oauth-server-ts
 
 ## Endpoints
 
-| Endpoint                                 | Description                         |
-| ---------------------------------------- | ----------------------------------- |
-| `GET  /.well-known/openid-configuration` | OpenID Connect discovery document   |
-| `GET  /jwks`                             | JSON Web Key Set                    |
-| `GET/POST /authorize`                    | Authorization endpoint              |
-| `POST /token`                            | Token endpoint                      |
-| `GET  /userinfo`                         | UserInfo endpoint                   |
-| `POST /introspect`                       | Token introspection                 |
-| `POST /revoke`                           | Token revocation                    |
-| `POST /register`                         | Dynamic client registration         |
-| `GET/POST /session/end`                  | End session (logout)                |
-| `POST /device/auth`                      | Device authorization                |
-| `POST /request`                          | Pushed Authorization Requests (PAR) |
+| Endpoint                                 | Description                              |
+| ---------------------------------------- | ---------------------------------------- |
+| `GET  /.well-known/openid-configuration` | OpenID Connect discovery document        |
+| `GET  /jwks`                             | JSON Web Key Set                         |
+| `GET/POST /authorize`                    | Authorization endpoint                   |
+| `POST /token`                            | Token endpoint                           |
+| `GET  /userinfo`                         | UserInfo endpoint                        |
+| `POST /introspect`                       | Token introspection                      |
+| `POST /revoke`                           | Token revocation                         |
+| `POST /register`                         | Dynamic client registration              |
+| `GET/POST /session/end`                  | End session (logout)                     |
+| `POST /device/auth`                      | Device authorization                     |
+| `POST /request`                          | Pushed Authorization Requests (PAR)      |
+| `GET  /admin`                            | Administration console                   |
+| `POST /mcp`                              | Administration over MCP (off by default) |
+
+## Administration
+
+The server administers itself. `GET /admin` is a console for projects, OAuth clients,
+administrators, user buckets, end-users, upstream identity providers, settings, signing keys and an
+append-only audit trail. Administrators sign in through an OpenID Connect flow against this server's
+own issuer, so there is no second password store.
+
+### Administration from an AI agent (MCP)
+
+The same management API is available to an AI agent over the Model Context Protocol, as an OAuth 2.1
+protected resource of this server. It is **off by default** — the capability hands an agent the
+authority of the administrator who authorized it, so a deployment should switch it on deliberately:
+
+1. In the console, **Settings → Administration → Enable the administrative MCP control plane**, then
+   restart (settings apply at boot).
+2. Point your MCP client at `https://your-server/mcp` with client id **`admin-mcp`** and resource
+   `https://your-server/mcp`.
+
+An agent then acts as the administrator who signed in, with exactly that account's permissions. Every
+change it makes runs through the same routes, the same checks and the same audit trail as the console's,
+and each audit entry names both the operator and the agent.
+
+Two things it deliberately cannot do: **delete a project** and **delete a user bucket**. Those destroy a
+container of clients or of accounts with nothing left afterwards to inspect, so they stay console-only.
+Everything else destructive takes two steps — the agent describes what would change and you confirm that
+specific operation.
+
+> **Compatibility note.** The `client_id` above is not optional. An administrator's account lives in the
+> reserved admin bucket, and a dynamically registered client is not routed there — so an MCP client that
+> only supports Dynamic Client Registration, with no way to configure a `client_id`, cannot use this
+> surface yet.
 
 ## Implemented Standards
 

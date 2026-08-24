@@ -96,6 +96,8 @@ export const STORE_AREAS = {
 	userBuckets: 'userBuckets',
 	adminSession: 'adminSession',
 	adminAudit: 'adminAudit',
+	/* Pending confirmations for the MCP control plane's high-consequence operations. */
+	mcpConfirmation: 'mcpConfirmation',
 	/* One area, four writers: configStore keeps the persisted ApplicationConfig, SmtpSettingsStore the
 	 * SMTP credentials, and two SingletonSecretStore instances the server's DPoP nonce secret and its
 	 * pairwise identifier salt — singleton documents distinguished only by a derived ObjectId. One
@@ -346,6 +348,27 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 	 * Safe to reap on `expiresAt` despite the two expiry fields: touch() clamps the sliding
 	 * `expiresAt` to `absoluteExpiresAt`, so it can never outlive the hard cap.
 	 */
+	/*
+	 * The MCP control plane's confirmation tokens: one record per described-but-not-yet-performed
+	 * high-consequence operation.
+	 *
+	 * Reaped on `expiresAt`, and the TTL is the point rather than housekeeping — a confirmation that
+	 * outlived its window could be redeemed against state that has since changed, which is the failure
+	 * the two-step gate exists to prevent. Redemption deletes the record before dispatching, so the
+	 * reaper only ever collects confirmations nobody used.
+	 *
+	 * Unowned: a record names the administrator who was shown the description, but it is a few minutes
+	 * of transient protocol state, not a possession. Sweeping it on principal deletion would buy
+	 * nothing the TTL does not already do, and the principal's own deletion invalidates every
+	 * confirmation it holds anyway, because redemption re-resolves the principal.
+	 */
+	storeArea(
+		STORE_AREAS.mcpConfirmation,
+		EXPIRES_AT,
+		unowned(
+			'transient confirmation state, reaped by TTL; a stale record cannot be redeemed because redemption re-resolves the principal'
+		)
+	),
 	storeArea(
 		STORE_AREAS.adminSession,
 		EXPIRES_AT,

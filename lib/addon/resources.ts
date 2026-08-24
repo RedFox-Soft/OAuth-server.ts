@@ -1,5 +1,6 @@
 import { mustChange } from './_warn.ts';
 import * as errors from '../helpers/errors.ts';
+import { MCP_RESOURCE_SERVER, isMcpResource } from '../mcp/resource_server.js';
 
 export async function defaultResource(ctx, client, oneOf) {
 	// @param ctx - koa request context
@@ -20,10 +21,26 @@ export async function useGrantedResource(_ctx, _model) {
 	return false;
 }
 
-export async function getResourceServerInfo(_ctx, _resourceIndicator, _client) {
+export async function getResourceServerInfo(_ctx, resourceIndicator, _client) {
 	// @param ctx - koa request context
 	// @param resourceIndicator - resource indicator value either requested or resolved by the defaultResource helper.
 	// @param client - client making the request
+
+	/*
+	 * This server's own MCP endpoint is answered here rather than left to a deployment, because it is
+	 * not a deployment's resource: it identifies an endpoint this server serves, and an operator who
+	 * could configure it could only get it wrong. Without this arm the stub below would throw for
+	 * `resource=<issuer>/mcp`, so no audience-bound token could be minted and the administrative MCP
+	 * surface would be unreachable until someone wrote an override — a configuration burden that would
+	 * also make self-hosted and cloud-managed deployments differ.
+	 *
+	 * A deployment override still wins for every other indicator, because the registry resolves this
+	 * whole function; only the MCP identifier is claimed.
+	 */
+	if (isMcpResource(resourceIndicator)) {
+		return MCP_RESOURCE_SERVER;
+	}
+
 	mustChange(
 		'features.resourceIndicators.getResourceServerInfo',
 		'to provide details about the Resource Server identified by the Resource Indicator'

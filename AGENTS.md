@@ -2,9 +2,15 @@
 
 ## What this project is
 
-A standards-compliant OAuth 2.0 / OpenID Connect authorization server written in TypeScript, running on [Bun](https://bun.sh/) + [Elysia](https://elysiajs.com/). It is designed as a library: downstream apps import the `elysia` app and mount it. There is no init step — importing the provider is what boots it.
+A standards-compliant OAuth 2.1 / OpenID Connect authorization server written in TypeScript, running on [Bun](https://bun.sh/) + [Elysia](https://elysiajs.com/). Downstream apps import the `elysia` app and mount it; there is no init step — importing is what boots it.
 
-Implemented specs: Authorization Code + PKCE, Client Credentials, Refresh Token, Device Flow, CIBA, PAR (RFC 9126), DPoP (RFC 9449), token introspection/revocation, dynamic client registration, OIDC Core 1.0.
+It is three surfaces on one core, and knowing which one you are in matters more than anything else in this file:
+
+1. **The protocol surface** — the OAuth/OIDC endpoints. Implemented: Authorization Code + PKCE, Client Credentials, Refresh Token, Device Flow, CIBA, PAR (RFC 9126), DPoP (RFC 9449), Resource Indicators (RFC 8707), token introspection/revocation, dynamic client registration, OIDC Core 1.0.
+2. **The administrative control plane** (`lib/admin/`) — a management API and a server-rendered console for projects, OAuth clients, administrators, user buckets, end-users, upstream federation providers, settings, SMTP, signing keys and an immutable audit trail. Reachable at `/admin`, authenticated by an OIDC flow against this server's own issuer.
+3. **The MCP control plane** (`lib/mcp/`) — the same management API, served to an AI agent at `POST /mcp` as an OAuth 2.1 protected resource. Off by default (`mcp.enabled`).
+
+The third exists because the constitution requires an agent to be able to do what a human operator can, with no privileged back door. It is built as a _consumer_ of the second: a tool rebuilds the HTTP request the console would have sent and dispatches it into the real admin routes in-process, so the permission checks, validation, invariants and audit write are the console's own code rather than a copy kept in step by review. If you are adding an administrative operation, add it to the admin routes; the parity guard will then tell you to publish it, exclude it, or explain yourself.
 
 ---
 
@@ -104,6 +110,15 @@ lib/
   response_modes/       ← query, fragment, form_post, JWT response modes
   shared/               ← CORS, session, authorization_error_handler (shared onError), resource validation
   configs/              ← application.ts (single source of config DATA), algorithm lists, token lifetimes, env
+  admin/                ← the administrative control plane
+    routes.ts           ← THE admin API route set; mounted by both the console and lib/mcp/dispatch.ts
+    index.ts            ← the console: routes.ts plus the HTML shell (imports React/antd — expensive)
+    auth/rbac.ts        ← resolveAdmin: session cookie OR an MCP-audience bearer token → one AdminContext
+    audit/              ← append-only trail; written before the mutation, inside the handler
+  mcp/                  ← the MCP control plane (agent-facing)
+    catalogue.ts        ← THE published tool set: load-bearing table, drift-guarded both ways
+    dispatch.ts         ← rebuilds the admin HTTP request and handles it in-process
+    confirm.ts          ← the two-call gate on high-consequence operations
 database/               ← MongoDB collection definitions + TTL index setup
 test/
   test_helper.ts        ← bootstrap: loads *.config.ts per feature, wires adapter + provider
@@ -165,6 +180,27 @@ Time-sensitive tests use Bun's `setSystemTime` (from `bun:test`) to travel time;
 3. Add a feature flag in `lib/configs/` if it should be opt-in.
 4. Add a MongoDB collection (with TTL index) in `database/` if the grant needs persistence.
 5. Write tests under `test/<name>/` with a matching `*.config.ts`.
+
+## Adding an administrative operation
+
+The admin routes are the definition; the MCP surface follows from them.
+
+1. Add the route to a group under `lib/admin/<group>/routes.ts`, with its body schema in the group's
+   `schema.ts` — **not** inline, because `lib/mcp/catalogue.ts` imports schema modules and must never
+   import a route module (a route module reaches the adapters and from there a db module that connects
+   at import time).
+2. If it mutates, add it to `lib/consts/admin_audit_routes.ts` and call `recordAdminAudit` inside the
+   handler, after authorization. `test/admin/audit_route_classification.spec.ts` fails otherwise.
+3. Decide the agent's access and record it in `lib/mcp/catalogue.ts`: publish it as a tool, or name it
+   in `excludedConsoleOperations` with the reason. `test/mcp/catalogue_drift.spec.ts` fails until you do
+   one or the other — that is the point of the table.
+4. Classify a destructive or instance-wide operation as `high`, and it is gated automatically.
+   `test/mcp/confirmation_matrix.spec.ts` covers it the moment it is classified.
+5. Run `bun test test/mcp/ test/admin/`. The guards that will complain at you — parity, audit
+   classification, argument-name collisions, the secrecy sweep — are doing the job they were written for.
+
+See `wiki/concepts/admin-mcp-control-plane.md` before changing anything in `lib/mcp/`; it records four
+traps that each cost a debugging session.
 
 ## Adding a new endpoint
 

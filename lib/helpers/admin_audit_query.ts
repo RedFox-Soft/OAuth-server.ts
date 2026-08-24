@@ -71,6 +71,23 @@ export function matchesAuditQuery(
 	) {
 		return false;
 	}
+	/*
+	 * A console entry stores no surface at all, so 'console' cannot be an equality match — it is the
+	 * absence. Written as a translation rather than a comparison because the alternative was to
+	 * backfill every historical entry, and the trail is append-only.
+	 */
+	if (query.viaSurface !== undefined) {
+		const surface = entry.viaSurface ?? 'console';
+		if (surface !== query.viaSurface) {
+			return false;
+		}
+	}
+	if (
+		query.viaClientId !== undefined &&
+		entry.viaClientId !== query.viaClientId
+	) {
+		return false;
+	}
 	// Inclusive bounds, each usable alone. Order between them is not policed here — a backwards window
 	// is refused at the route, which is the only layer that can tell a caller why.
 	if (query.from !== undefined && entry.timestamp < query.from) {

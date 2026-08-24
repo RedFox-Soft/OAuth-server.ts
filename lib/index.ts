@@ -34,6 +34,7 @@ import { featureGate } from './plugins/featureGate.js';
 import { corsPreflight } from './plugins/cors.js';
 import { InvalidDpopProof, UseDpopNonce } from './helpers/validate_dpop.js';
 import { adminApp } from './admin/index.js';
+import { mcpApp } from './mcp/index.js';
 import { verificationRoutes } from './routes/verification.js';
 import { passwordResetRoutes } from './routes/password_reset.js';
 /* Its own top-level instance because it cannot satisfy the `ui` guard: see lib/federation/routes.ts. */
@@ -112,4 +113,5 @@ export const elysia = new Elysia({ strictPath: true, normalize: false })
 	.use(passwordResetRoutes)
 	.use(federationRoutes)
 	.use(adminApp)
+	.use(mcpApp)
 	.listen(3000);

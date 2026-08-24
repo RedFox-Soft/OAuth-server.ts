@@ -228,6 +228,20 @@ export interface AdminAuditEntry {
 	 * trail is immutable: there is no backfill, only a read-side default.
 	 */
 	attributes?: string[];
+	/*
+	 * The agent that performed the action, and the surface it arrived on. Written together or not at
+	 * all; absent means the console.
+	 *
+	 * Optional for the reason `attributes` above is optional and says so: the trail is append-only,
+	 * there is no backfill, only a read-side default. A required field would invalidate every entry
+	 * written before agents existed.
+	 *
+	 * The actor stays the administrator. These record *who else* was involved, never instead of them,
+	 * which is what lets the constitution's "attributable to the agent and the authorizing principal"
+	 * hold without redefining an existing field.
+	 */
+	viaClientId?: string | null;
+	viaSurface?: 'mcp' | null;
 	timestamp: Date;
 }
 
@@ -239,6 +253,13 @@ export interface AdminAuditQuery {
 	targetType?: string;
 	targetId?: string;
 	targetScope?: string;
+	/*
+	 * Which surface the action arrived on. `'mcp'` selects agent-initiated actions; `'console'` selects
+	 * the rest, which store the field absent rather than set — so the filter translates rather than
+	 * compares. `matchesAuditQuery` does that translation, once, for both adapters.
+	 */
+	viaSurface?: string;
+	viaClientId?: string;
 	/* Inclusive bounds on `timestamp`; either is valid alone. */
 	from?: Date;
 	to?: Date;
@@ -268,6 +289,57 @@ export interface AdminAuditStoreInstance {
 
 export interface AdminAuditStoreConstructor {
 	new (): AdminAuditStoreInstance;
+}
+
+/*
+ * A described-but-not-yet-performed high-consequence MCP operation, and the operator's approval of it.
+ *
+ * Single-use and expiring, both enforced by this record's existence: redemption deletes it, so a token
+ * cannot be spent twice, and the TTL index reaps what nobody confirmed. A self-contained signed token
+ * would need no storage but could be neither revoked nor spent once.
+ */
+export interface McpConfirmation {
+	_id: string;
+	/* The tool the token authorizes. A token for one tool never authorizes another. */
+	tool: string;
+	/*
+	 * Canonical target identity — the resolved path parameters, joined. Human-readable on purpose: it
+	 * appears in the refusal when a confirmation is presented for the wrong target.
+	 */
+	targetKey: string;
+	/*
+	 * SHA-256 over the canonicalised arguments. What makes "the parameters differ from what was
+	 * described" checkable rather than aspirational.
+	 */
+	argumentsHash: string;
+	/* One operator's confirmation must not authorize another's call. */
+	principalId: string;
+	/* Nor one agent's a different agent's. */
+	viaClientId: string;
+	/* The description the operator was shown, retained so a redemption can be checked against it. */
+	report: Record<string, unknown>;
+	createdAt: Date;
+	expiresAt: Date;
+}
+
+export interface McpConfirmationStoreInstance {
+	issue(
+		data: Omit<McpConfirmation, '_id' | 'createdAt' | 'expiresAt'> & {
+			ttlSeconds: number;
+		}
+	): Promise<McpConfirmation>;
+	/*
+	 * Deletes and returns the record in one step, so a concurrent second redemption of the same token
+	 * finds nothing. Returns null when the token is unknown, already spent, or expired — the caller
+	 * cannot tell those apart, and does not need to.
+	 */
+	redeem(id: string): Promise<McpConfirmation | null>;
+	/* Test seam: the count of live confirmations. No product surface lists them. */
+	count(): Promise<number>;
+}
+
+export interface McpConfirmationStoreConstructor {
+	new (): McpConfirmationStoreInstance;
 }
 
 export interface Project {

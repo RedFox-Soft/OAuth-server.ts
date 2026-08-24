@@ -6,6 +6,7 @@ import {
 	ADMIN_BUCKET_ID,
 	ADMIN_CLIENT_ID
 } from './consts.js';
+import { ADMIN_MCP_CLIENT_ID } from '../mcp/consts.js';
 
 export async function ensureAdminSeed(): Promise<void> {
 	const buckets = getBucketStore();
@@ -43,15 +44,44 @@ export async function ensureAdminSeed(): Promise<void> {
 			type: 'admin',
 			managedBy: [],
 			bucketId: ADMIN_BUCKET_ID,
-			clientIds: [ADMIN_CLIENT_ID]
+			clientIds: [ADMIN_CLIENT_ID, ADMIN_MCP_CLIENT_ID]
 		});
 	} else {
 		const existingClientIds = existingAdminProject.clientIds ?? [];
-		if (!existingClientIds.includes(ADMIN_CLIENT_ID)) {
+		const missing = [ADMIN_CLIENT_ID, ADMIN_MCP_CLIENT_ID].filter(
+			(id) => !existingClientIds.includes(id)
+		);
+		if (missing.length > 0) {
 			await projects.update(ADMIN_PROJECT_ID, {
-				clientIds: [...existingClientIds, ADMIN_CLIENT_ID]
+				clientIds: [...existingClientIds, ...missing]
 			});
 		}
+	}
+
+	/*
+	 * The reserved MCP agent client. Public with mandatory PKCE, so nothing secret needs distributing,
+	 * and it lives in the admin project because that is what routes it to the administrator bucket:
+	 * `resolveBucketForClient` sends a client there only if it is the reserved console client or belongs
+	 * to a project whose bucket is the admin bucket. A dynamically registered client falls through to
+	 * the default bucket and cannot authenticate an administrator at all.
+	 *
+	 * Loopback redirect URIs, which is what a local MCP client can actually receive a code on. The port
+	 * is unpredictable, so the standard three are registered; OAuth 2.1 allows a loopback port to vary.
+	 */
+	if (!(await Client.tryFind(ADMIN_MCP_CLIENT_ID))) {
+		await adapter('Client').upsert(ADMIN_MCP_CLIENT_ID, {
+			clientId: ADMIN_MCP_CLIENT_ID,
+			applicationType: 'native',
+			grantTypes: ['authorization_code', 'refresh_token'],
+			responseTypes: ['code'],
+			redirectUris: [
+				'http://127.0.0.1:33418/callback',
+				'http://localhost:33418/callback',
+				'http://127.0.0.1/callback'
+			],
+			token_endpoint_auth_method: 'none',
+			'consent.require': true
+		});
 	}
 
 	if (!(await Client.tryFind(ADMIN_CLIENT_ID))) {

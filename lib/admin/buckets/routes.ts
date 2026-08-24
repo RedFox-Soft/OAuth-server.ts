@@ -13,6 +13,8 @@ import {
 	resolveAdmin,
 	type AdminContext
 } from '../auth/rbac.js';
+import type { UserBucket } from '../../adapters/types.js';
+import { presentAll } from '../federation/service.js';
 import { ADMIN_BUCKET_ID } from '../consts.js';
 import { recordAdminAudit } from '../audit/record.js';
 import nanoid from '../../helpers/nanoid.js';
@@ -22,6 +24,25 @@ import {
 	prospectiveBucket
 } from '../federation/validate.js';
 import { CreateBucketBody, UpdateBucketBody } from './schema.js';
+
+/*
+ * A bucket as a reader may see it: identical except that every configured provider's `clientSecret` is
+ * masked.
+ *
+ * `lib/admin/federation/service.ts` states the rule these routes were breaking — the secret is
+ * write-only, masked "on every read, for every role including super-admin". It held on the federation
+ * routes and not here, because a bucket document *contains* its providers and these handlers returned it
+ * whole. So `GET /admin/api/buckets` handed every provider secret to any authenticated administrator, and
+ * `GET /admin/api/buckets/:id` handed a bucket's secrets to anyone with the broader
+ * `loadBucketForUsers` access — a project manager, not only the bucket's own.
+ *
+ * Found by the MCP surface's secrecy sweep (test/mcp/secrecy.spec.ts), which is why that sweep iterates
+ * every published read rather than the ones somebody thought to check.
+ */
+function presentBucket<T extends Pick<UserBucket, 'federation'>>(bucket: T): T {
+	if (!bucket.federation?.length) return bucket;
+	return { ...bucket, federation: presentAll(bucket) as T['federation'] };
+}
 
 export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 	.use(resolveAdmin)
@@ -37,7 +58,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 		const all = ctx.roles.includes('super_admin')
 			? await store.list()
 			: await store.listByManager(ctx.userId);
-		return all.filter((b) => b._id !== ADMIN_BUCKET_ID);
+		return all.filter((b) => b._id !== ADMIN_BUCKET_ID).map(presentBucket);
 	})
 	.post(
 		'/admin/api/buckets',
@@ -67,13 +88,13 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 				verificationMethod: body.verificationMethod
 			});
 			set.status = 201;
-			return bucket;
+			return presentBucket(bucket);
 		},
 		{ body: CreateBucketBody }
 	)
 	.get('/admin/api/buckets/:id', async ({ admin, params }) => {
 		const ctx = assertAuth(admin as AdminContext | null);
-		return loadBucketForUsers(ctx, params.id);
+		return presentBucket(await loadBucketForUsers(ctx, params.id));
 	})
 	.patch(
 		'/admin/api/buckets/:id',
@@ -99,7 +120,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			});
 			const updated = await getBucketStore().update(params.id, body);
 			if (!updated) throw new AdminError(404, 'bucket not found');
-			return updated;
+			return updated && presentBucket(updated);
 		},
 		{ body: UpdateBucketBody }
 	)

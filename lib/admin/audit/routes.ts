@@ -13,31 +13,7 @@ import {
 	AUDIT_PAGE_DEFAULT_LIMIT,
 	AUDIT_PAGE_MAX_LIMIT
 } from '../../helpers/admin_audit_query.js';
-
-/* Everything arrives as a string, since these are query parameters. */
-const AuditQuery = t.Object({
-	actor: t.Optional(t.String()),
-	action: t.Optional(t.String()),
-	targetType: t.Optional(t.String()),
-	targetId: t.Optional(t.String()),
-	targetScope: t.Optional(t.String()),
-	from: t.Optional(t.String()),
-	to: t.Optional(t.String()),
-	page: t.Optional(t.String()),
-	pageSize: t.Optional(t.String())
-});
-
-const ALLOWED_PARAMS = new Set([
-	'actor',
-	'action',
-	'targetType',
-	'targetId',
-	'targetScope',
-	'from',
-	'to',
-	'page',
-	'pageSize'
-]);
+import { AuditQuery, ALLOWED_AUDIT_PARAMS } from './schema.js';
 
 /*
  * Checked against the raw URL, not the validated `query` object, and this is not belt-and-braces:
@@ -50,7 +26,7 @@ const ALLOWED_PARAMS = new Set([
  */
 function assertNoUnknownParams(url: string): void {
 	const unknown = [...new URL(url).searchParams.keys()].filter(
-		(name) => !ALLOWED_PARAMS.has(name)
+		(name) => !ALLOWED_AUDIT_PARAMS.has(name)
 	);
 	if (unknown.length > 0) {
 		throw new AdminError(
@@ -133,6 +109,12 @@ export const auditRoutes = new Elysia({ name: 'admin-audit' })
 				...(query.targetScope === undefined
 					? {}
 					: { targetScope: query.targetScope }),
+				...(query.viaSurface === undefined
+					? {}
+					: { viaSurface: query.viaSurface }),
+				...(query.viaClientId === undefined
+					? {}
+					: { viaClientId: query.viaClientId }),
 				...(from === undefined ? {} : { from }),
 				...(to === undefined ? {} : { to }),
 				limit: pageSize,

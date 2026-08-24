@@ -348,6 +348,20 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 			'Lets a user bucket offer sign-in through external OpenID Providers configured on that bucket, alongside or instead of its password form. Off by default: this is the only capability that lets an outside party’s assertion produce a session here, and with it off no federation route is served and no provider button renders, whatever a bucket holds. Configuring providers stays available either way, so a provider can be prepared before switching this on and removed after switching it off. Applied at startup.'
 	},
 
+	/*
+	 * The one capability whose subject is this console rather than the OAuth surface: it decides
+	 * whether an AI agent may administer the instance. Grouped on its own so it cannot be mistaken
+	 * for a protocol feature toggled during conformance work.
+	 */
+	{
+		key: 'mcp.enabled',
+		group: 'Administration',
+		label: 'Enable the administrative MCP control plane',
+		type: 'boolean',
+		description:
+			'Serves this control plane to an AI agent over MCP at /mcp, as an OAuth 2.1 protected resource of this server. An agent acts as the administrator who authorized it and gets exactly that account’s permissions: every operation runs through the same routes, the same checks and the same audit trail as the console, and each entry records both the operator and the agent. Deleting a project or a user bucket is withheld from agents entirely and stays console-only. Off by default — with it off, neither /mcp nor its metadata document is served. Applied at startup.'
+	},
+
 	{
 		key: 'registration.enabled',
 		group: 'Registration',

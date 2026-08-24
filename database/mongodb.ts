@@ -27,6 +27,7 @@ import {
 	ADMIN_BUCKET_ID,
 	ADMIN_CLIENT_ID
 } from '../lib/admin/consts.js';
+import { ADMIN_MCP_CLIENT_ID } from '../lib/mcp/consts.js';
 
 if (!process.env.MONGODB_URI || !process.env.DATABASE_NAME) {
 	throw new Error(
@@ -213,11 +214,25 @@ await db.collection(STORE_AREAS.projects).updateOne(
 			type: 'admin',
 			managedBy: [],
 			bucketId: ADMIN_BUCKET_ID,
+			clientIds: [ADMIN_CLIENT_ID, ADMIN_MCP_CLIENT_ID],
 			createdAt: seedNow,
 			updatedAt: seedNow
 		}
 	},
 	{ upsert: true }
+);
+/*
+ * An existing deployment's admin project predates the MCP agent client, and `$setOnInsert` above will
+ * not touch it — so the id is added explicitly. Without it the client exists but belongs to no project,
+ * `resolveBucketForClient` routes it to the default bucket, and an administrator cannot sign an agent in.
+ */
+await db.collection(STORE_AREAS.projects).updateOne(
+	{ _id: ADMIN_PROJECT_ID },
+	{
+		$addToSet: {
+			clientIds: { $each: [ADMIN_CLIENT_ID, ADMIN_MCP_CLIENT_ID] }
+		}
+	}
 );
 /*
  * The seed writes straight to the model area, since a one-shot script has no adapter instance.
@@ -238,6 +253,36 @@ await db.collection(CLIENT_AREA).updateOne(
 				redirectUris: [`${ISSUER}/admin/callback`],
 				token_endpoint_auth_method: 'none',
 				'consent.require': false
+			}
+		}
+	},
+	{ upsert: true }
+);
+
+/*
+ * The reserved MCP agent client. Kept in step with `ensureAdminSeed` deliberately: that function is
+ * test-only, this script is what a real deployment runs, and a change made to one and not the other
+ * silently no-ops in production while the suite stays green.
+ *
+ * Public with mandatory PKCE, so there is no secret to distribute, and native/loopback redirect URIs
+ * because that is what a local MCP client can receive a code on.
+ */
+await db.collection(CLIENT_AREA).updateOne(
+	{ _id: ADMIN_MCP_CLIENT_ID },
+	{
+		$setOnInsert: {
+			payload: {
+				clientId: ADMIN_MCP_CLIENT_ID,
+				applicationType: 'native',
+				grantTypes: ['authorization_code', 'refresh_token'],
+				responseTypes: ['code'],
+				redirectUris: [
+					'http://127.0.0.1:33418/callback',
+					'http://localhost:33418/callback',
+					'http://127.0.0.1/callback'
+				],
+				token_endpoint_auth_method: 'none',
+				'consent.require': true
 			}
 		}
 	},

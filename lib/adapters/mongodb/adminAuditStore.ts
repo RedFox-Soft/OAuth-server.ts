@@ -35,6 +35,22 @@ function toFilter(query: AdminAuditQuery): Filter<AdminAuditEntry> {
 	if (query.targetScope !== undefined) {
 		filter.targetScope = query.targetScope;
 	}
+	if (query.viaSurface !== undefined) {
+		/*
+		 * A console entry stores no surface at all, so 'console' is the *absence* of the field, not a
+		 * value to match. MongoDB's `null` equality matches both a missing field and an explicit null,
+		 * which is exactly the memory adapter's `entry.viaSurface ?? 'console'`. Written out here because
+		 * this is the seam where the two implementations would otherwise disagree, and the audit trail is
+		 * the one surface whose whole purpose is to be trusted about what happened.
+		 */
+		filter.viaSurface =
+			query.viaSurface === 'console'
+				? null
+				: (query.viaSurface as AdminAuditEntry['viaSurface']);
+	}
+	if (query.viaClientId !== undefined) {
+		filter.viaClientId = query.viaClientId;
+	}
 	if (query.from !== undefined || query.to !== undefined) {
 		// Inclusive both ends, matching the memory adapter. Order between the bounds is not policed
 		// here — the route refuses a backwards window, where the caller can be told why.

@@ -10,11 +10,12 @@ import { type UnnormalizedJWK } from '../../configs/verifyJWKs.js';
 import { recordAdminAudit } from '../audit/record.js';
 import { AdminError, type AdminContext } from '../auth/rbac.js';
 
-// RSA signing algorithms offered for generation. Matches what generateJWKS produces; EC/OKP
-// and encryption-use keys are out of scope for SP-5 (they may still exist in the store if
-// provisioned out of band, and are displayed/removable).
-const SUPPORTED_ALGS = ['RS256', 'RS384', 'RS512'] as const;
-type SupportedAlg = (typeof SUPPORTED_ALGS)[number];
+// The generation allow-list now lives in ./schema.ts, so the MCP tool catalogue can describe the
+// same set without importing this module (which reaches the adapters, and from there a db module
+// that connects at import time). Re-exported here because callers of the service used to read it.
+import { SUPPORTED_ALGS, type SupportedAlg } from './schema.js';
+
+export { SUPPORTED_ALGS, type SupportedAlg };
 
 export type KeyStatus = 'active' | 'pending activation' | 'pending removal';
 
