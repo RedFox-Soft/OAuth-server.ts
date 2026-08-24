@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'bun:test';
 import { fromJsonSchema } from '@modelcontextprotocol/server';
+import { t } from 'elysia';
 
 import {
 	CreateProjectBody,
@@ -14,6 +15,7 @@ import {
 	CreateClientBody,
 	UpdateClientBody
 } from 'lib/admin/clients/schema.ts';
+import { mcpCatalogue } from 'lib/mcp/catalogue.ts';
 
 /*
  * T004. The feature's schema story (research.md D2) is that a tool's input schema IS the TypeBox
@@ -87,6 +89,63 @@ describe('TypeBox admin schemas bridge into MCP tool schemas', () => {
 			verificationMethod: 'carrier-pigeon'
 		}) as { issues?: unknown[] };
 		expect((bad.issues ?? []).length).toBeGreaterThan(0);
+	});
+
+	/*
+	 * The claim above — "TypeBox emits plain JSON Schema" — is only true of TypeBox. Elysia's `t`
+	 * overrides some of its constructors with *decoders* that coerce a string into the target type, and
+	 * those render a union branch carrying a format from Elysia's own registry: `t.Integer()` emits
+	 * `{ type: 'string', format: 'integer', default: 0 }`, `t.Numeric()` `format: 'numeric'`, and so on.
+	 *
+	 * Nothing in Elysia minds. Ajv, compiling the same object as the tool's input schema inside
+	 * `fromJsonSchema`, logs `unknown format "integer" ignored in schema at path
+	 * "#/properties/port/anyOf/0"` on every boot — and the agent reading that schema is told the field
+	 * accepts a string with a default it does not have. `smtp_settings_update` shipped that way.
+	 *
+	 * Asserted over the published catalogue rather than over one schema, so the next admin body that
+	 * reaches for `t.Integer()` fails here instead of at a reader's console.
+	 */
+	it('publishes no schema carrying an Elysia coercion format', () => {
+		// elysia/dist/type-system/format.js — the formats Elysia adds to TypeBox's registry.
+		const coercionFormats = [
+			'numeric',
+			'integer',
+			'boolean',
+			'ObjectString',
+			'ArrayString'
+		];
+
+		function offencesIn(node: unknown, path: string): string[] {
+			if (Array.isArray(node)) {
+				return node.flatMap((item, i) => offencesIn(item, `${path}/${i}`));
+			}
+			if (typeof node !== 'object' || node === null) return [];
+
+			const here: string[] = [];
+			if (
+				'format' in node &&
+				typeof node.format === 'string' &&
+				coercionFormats.includes(node.format)
+			) {
+				here.push(`${path} format=${node.format}`);
+			}
+			if ('elysiaMeta' in node) here.push(`${path} elysiaMeta`);
+
+			return Object.entries(node).reduce(
+				(found, [key, value]) =>
+					found.concat(offencesIn(value, `${path}/${key}`)),
+				here
+			);
+		}
+
+		const offences = mcpCatalogue.flatMap((tool) => [
+			...offencesIn(tool.bodySchema, `${tool.tool}:body`),
+			...offencesIn(tool.querySchema, `${tool.tool}:query`)
+		]);
+		expect(offences).toBeArrayOfSize(0);
+
+		// Not vacuous: what the walk looks for is exactly what a coercing constructor still emits.
+		expect(offencesIn(t.Integer(), 'sample')).not.toBeArrayOfSize(0);
 	});
 
 	// Optionality must survive too: TypeBox marks optional fields by omission from `required`,

@@ -54,7 +54,7 @@ It imports schema modules and never route modules — a route module reaches the
 Tool input schemas *are* the TypeBox objects the routes validate against, so the schema an agent reads
 cannot drift from the schema the route enforces. That decided against Zod, the SDK's documented default.
 
-## Four traps this cost us
+## Five traps this cost us
 
 **One flat argument object cannot hold two things called `id`.** A tool takes a single flat object, so
 `federation_provider_create` — `POST /admin/api/buckets/:id/federation`, whose body carries the
@@ -73,6 +73,20 @@ otherwise shadow a path segment.
 time, so every exchange — `initialize` included — answered an opaque JSON-RPC `-32603`. The SDK provides
 `parsedBody` for exactly this; `lib/mcp/index.ts` passes Elysia's parsed value. Isolating the SDK
 handler from the Elysia route is what located it.
+
+**Elysia's `t` is not TypeBox, and publishing the difference is visible.** `t.Integer()` is a *decoder*,
+not an integer: `elysia/dist/type-system/index.js:96` renders it as
+`anyOf: [{ type: 'string', format: 'integer', default: 0 }, { type: 'integer' }]` so a form field arriving
+as `"587"` still validates. Harmless inside Elysia, whose registry declares that format — but the same
+object is the tool's published input schema (`lib/mcp/server.ts:230`), where Ajv compiles it and logs
+`unknown format "integer" ignored in schema at path "#/properties/port/anyOf/0"` twice at every boot, and
+where an agent reads a `default: 0` the field does not have. `smtp_settings_update` was the only offender.
+Fixed at the source rather than translated at the boundary: `lib/admin/settings/smtp/schema.ts:26` declares
+`t.Number({ multipleOf: 1 })`, plain JSON Schema meaning the same thing (TypeBox's real `Type.Integer` is
+not reachable through Elysia's `t`). The console then has to send a number — antd's `<Input type="number">`
+submits a *string*, and leaning on the coercion was what hid that; it is an `InputNumber` now
+(`lib/admin/ui/pages/Settings.tsx:192`). `test/mcp/schema_bridge.spec.ts:108` walks every published schema
+for a coercion format, so the next `t.Integer()` in an admin body fails a test instead of logging at boot.
 
 **`resolveAdmin` must import the model graph lazily.** Teaching it a second credential type meant
 reaching `AccessToken`, and `lib/models/` has an import cycle that dies cold — see

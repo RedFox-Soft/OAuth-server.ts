@@ -6,6 +6,7 @@ import {
 	Collapse,
 	Form,
 	Input,
+	InputNumber,
 	Select,
 	Switch,
 	Tag,
@@ -183,9 +184,17 @@ function SmtpSettingsCard() {
 					label="Port"
 					rules={[{ required: true }]}
 				>
-					<Input
-						type="number"
+					{/*
+					 * `InputNumber`, not `<Input type="number">`: the latter is still a text input and
+					 * submits "587" as a string, which the body schema refuses. See the note on `port` in
+					 * lib/admin/settings/smtp/schema.ts.
+					 */}
+					<InputNumber
+						min={1}
+						max={65535}
+						step={1}
 						placeholder="587"
+						style={{ width: '100%' }}
 					/>
 				</Form.Item>
 				<Form.Item
