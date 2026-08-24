@@ -79,6 +79,14 @@ reaching `AccessToken`, and `lib/models/` has an import cycle that dies cold —
 [[model-graph-import-order]]. A static import put that cycle in the chain of all ten admin route
 groups and took the whole admin suite down. The import inside the derive is deliberate.
 
+The refusal it wraps is narrow on purpose. The bearer arm answers one `admin: null` for every
+*authorization* cause, so a caller cannot probe which check failed — but a bare `catch` also turned a
+storage outage into "not authenticated", sending an operator to debug a credential while the database was
+down, and the cookie arm beside it would have answered 500 for the same fault. Only `McpUnauthorized` is
+a refusal; anything else is rethrown, so both credential types report an outage identically. A DPoP nonce
+challenge is among the rethrown: it is a protocol step telling the caller to retry with a nonce, and
+flattening it leaves a compliant client nowhere to go.
+
 ## Authorization is the audience boundary
 
 A token reaches `/mcp` only if this server minted it for `MCP_RESOURCE` (`${ISSUER}/mcp`). The converse
@@ -109,12 +117,29 @@ registered as refusing tools either, because a registered tool appears in `tools
 behaves; the server's `instructions` carry the explanation, read from the exclusion table so the two
 cannot disagree.
 
+The table distinguishes two kinds of absence, and the distinction is what makes that claim true.
+`withheld` entries are operations an agent could perform and an operator has decided it may not;
+`inapplicable` ones have no meaning for an agent at all — there is no browser session to end, and nobody
+to authorize first-run setup. Only the `withheld` ones reach the instructions, and they reach them by
+being filtered out of the table rather than named a second time. Naming them literally is the bug this
+replaced: the list read `['project_delete', 'bucket_delete']` directly beneath a comment claiming it
+could not disagree with the table, so a third withholding would have been refused correctly when
+guessed and silently missing from the announcement that exists so an agent need not guess.
+
 The other eleven destructive operations take two calls: describe, then confirm. The confirmation binds
 five ways — tool, target, arguments hash, administrator, agent — and each is a real case. Arguments,
 because a target-only binding would miss a password reset confirmed for one value and submitted with
 another. Administrator separately from agent, because one operator's confirmation must not be spendable
 by another working through the same agent. The record is deleted *before* the bindings are compared, so
 a token presented for the wrong operation is consumed rather than left to probe with.
+
+Neither identity may fall back to a placeholder, and both once did. `principalId` defaulted to `''` when
+`whoami` failed and `viaClientId` to `''` when `authInfo` carried no client — either turns that binding
+into a wildcard, so two callers whose id could not be read would match each other's confirmations. A
+binding that degrades to "matches anything" is worse than no binding, because it still looks enforced.
+Both now refuse the call. Both facts also come from a **single** `whoami` dispatch: as two, a role
+revoked between them would pass the role check and then bind a confirmation the perform step must
+refuse.
 
 The describe step writes no audit entry, which follows from what an entry means here (see
 [[admin-audit-trail]]): it attests that an authorized actor reached the point of applying a change.

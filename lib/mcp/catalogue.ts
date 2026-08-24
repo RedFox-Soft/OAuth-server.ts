@@ -632,34 +632,54 @@ export interface ExcludedConsoleOperation {
 	readonly method: AuditedMethod | 'GET';
 	readonly path: string;
 	readonly reason: string;
+	/*
+	 * Why the operation is absent, and the two are not interchangeable.
+	 *
+	 * `inapplicable` operations have no meaning for an agent — there is no browser session to end, and
+	 * nobody to authorize first-run setup. An agent has nothing to be told about them.
+	 *
+	 * `withheld` operations are ones an agent could perform and an operator has decided it may not. The
+	 * server's instructions announce exactly these, so the agent can say where to do them instead rather
+	 * than discovering the absence by guessing a tool name. Deriving that list from this field is what
+	 * makes a fifth entry reach the instructions by adding it here, and nowhere else.
+	 */
+	readonly absence: 'withheld' | 'inapplicable';
 }
 
 export const excludedConsoleOperations: readonly ExcludedConsoleOperation[] = [
 	{
 		method: 'POST',
 		path: '/admin/api/setup',
+		absence: 'inapplicable',
 		reason:
 			'First-run setup runs when no administrator exists yet, so there is nobody who could authorize an agent to perform it. Console-only.'
 	},
 	{
 		method: 'POST',
 		path: '/admin/api/logout',
+		absence: 'inapplicable',
 		reason:
 			'Ends a browser session, which an agent connection does not have. Session lifecycle, not a change to a managed entity.'
 	},
 	{
 		method: 'DELETE',
 		path: '/admin/api/projects/:id',
+		absence: 'withheld',
 		reason:
 			'Deleting a project destroys a container of clients with nothing left afterwards to inspect or restore. Withheld from agents by operator decision — delete it in the admin console instead.'
 	},
 	{
 		method: 'DELETE',
 		path: '/admin/api/buckets/:id',
+		absence: 'withheld',
 		reason:
 			'Deleting a user bucket destroys a container of end-user accounts with nothing left afterwards to inspect or restore. Withheld from agents by operator decision — delete it in the admin console instead.'
 	}
 ];
+
+/* The operations an agent must be told about, in the order the table declares them. */
+export const withheldConsoleOperations: readonly ExcludedConsoleOperation[] =
+	excludedConsoleOperations.filter((e) => e.absence === 'withheld');
 
 const byTool = new Map<string, McpTool>(catalogue.map((e) => [e.tool, e]));
 

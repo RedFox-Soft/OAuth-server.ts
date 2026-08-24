@@ -4,7 +4,12 @@ import {
 	type McpRequestContext
 } from '@modelcontextprotocol/server';
 
-import { mcpCatalogue, pathArgName, type McpTool } from './catalogue.js';
+import {
+	mcpCatalogue,
+	pathArgName,
+	withheldConsoleOperations,
+	type McpTool
+} from './catalogue.js';
 import { dispatchTool } from './dispatch.js';
 import { annotationsFor, toOutcome, withheldOutcome } from './result.js';
 import {
@@ -140,59 +145,59 @@ function consequenceReport(
 }
 
 /*
- * Whether the caller holds the role the tool documents, asked of the real admin plane.
+ * Who the admin plane says the caller is, asked once per gated call.
  *
- * Dispatches `GET /admin/api/me`, so the roles compared are the ones `resolveAdmin` resolved for this
- * request — not a copy this module keeps. It exists so the describe step can refuse an operation the
- * caller could never perform, rather than handing out a confirmation that is certain to fail (FR-017).
+ * Dispatches `GET /admin/api/me`, so the identity and roles are the ones `resolveAdmin` resolved for
+ * this request — not a copy this module keeps. Both facts come from the one dispatch deliberately: the
+ * role check and the principal binding were two separate `whoami` round-trips, which cost twice as much
+ * and, worse, could disagree — a role revoked between them would pass the check and then bind a
+ * confirmation to a caller the perform step will refuse.
+ *
+ * `null` on any failure, and callers must treat it as a refusal. An earlier version returned `''` for a
+ * missing principal, which silently turned the confirmation's principal binding into a wildcard: two
+ * callers whose lookup failed would both bind to `''`, so one operator's confirmation could be redeemed
+ * by another. A binding that degrades to "matches anything" is worse than no binding, because it still
+ * looks enforced.
+ */
+interface ResolvedCaller {
+	readonly userId: string;
+	readonly roles: readonly string[];
+}
+
+async function resolveCaller(
+	credential: McpCredential
+): Promise<ResolvedCaller | null> {
+	const me = mcpCatalogue.find((t) => t.tool === 'whoami');
+	// Fail closed. Unreachable while the drift guard requires `whoami` in the catalogue, but a lookup whose
+	// fallback is "allow" is the wrong default to leave in a security path.
+	if (!me) return null;
+	const outcome = toOutcome(await dispatchTool(me, {}, credential));
+	if (!outcome.ok) return null;
+	const data = outcome.data as { userId?: string; roles?: string[] } | null;
+	const userId = data?.userId;
+	if (typeof userId !== 'string' || userId.length === 0) return null;
+	return { userId, roles: data?.roles ?? [] };
+}
+
+/*
+ * Whether the caller holds the role the tool documents. It exists so the describe step can refuse an
+ * operation the caller could never perform, rather than handing out a confirmation that is certain to
+ * fail (FR-017).
  *
  * It covers the role gate only. Finer-grained refusals — a project or bucket the caller does not manage
  * — need the entity itself and surface at the perform step, from the handler that owns the rule. That
  * is a worse message one step later, never a weaker check: nothing is performed without a confirmation
  * that the real route then authorizes for itself.
  */
-async function holdsRequiredRole(
-	tool: McpTool,
-	credential: McpCredential
-): Promise<boolean> {
+function holdsRequiredRole(tool: McpTool, caller: ResolvedCaller): boolean {
 	if (!tool.requiredRole) return true;
-	const me = mcpCatalogue.find((t) => t.tool === 'whoami');
-	// Fail closed. Unreachable while the drift guard requires `whoami` in the catalogue, but a check whose
-	// fallback is "allow" is the wrong default to leave in a security path.
-	if (!me) return false;
-	const outcome = toOutcome(await dispatchTool(me, {}, credential));
-	if (!outcome.ok) return false;
-	const roles = (outcome.data as { roles?: string[] } | null)?.roles ?? [];
-	return roles.includes(tool.requiredRole);
+	return caller.roles.includes(tool.requiredRole);
 }
 
 /*
- * The administrator a confirmation belongs to, asked of the admin plane rather than taken from the
- * token's client id.
- *
- * The distinction matters: `authInfo.clientId` is the *agent*, and binding a confirmation to the agent
- * alone would let one operator confirm an operation another operator then performs through the same
- * agent. The binding needs both, so the principal is resolved from `whoami` — the same route, the same
- * `resolveAdmin`, the same answer the operation itself will authorize against.
+ * What a caller sees when either half of the confirmation's identity — the authorizing administrator or
+ * the agent acting for them — cannot be established. Refuses rather than proceeding unbound.
  */
-async function principalIdFor(
-	credential: McpCredential
-): Promise<string | null> {
-	const me = mcpCatalogue.find((t) => t.tool === 'whoami');
-	if (!me) return null;
-	const outcome = toOutcome(await dispatchTool(me, {}, credential));
-	if (!outcome.ok) return null;
-	const userId = (outcome.data as { userId?: string } | null)?.userId;
-	/*
-	 * `null`, never the empty string. An earlier version returned '' on failure, which silently turned
-	 * the principal binding into a wildcard: two callers whose lookup failed would both bind to '', so one
-	 * operator's confirmation could be redeemed by another. A binding that degrades to "matches anything"
-	 * is worse than no binding, because it still looks enforced.
-	 */
-	return typeof userId === 'string' && userId.length > 0 ? userId : null;
-}
-
-/* What a caller sees when the principal cannot be established. Refuses rather than proceeding unbound. */
 const UNRESOLVED_PRINCIPAL = {
 	content: [
 		{
@@ -279,22 +284,27 @@ export function buildMcpServer(ctx: McpRequestContext): McpServer {
 
 				if (tool.consequence === 'high') {
 					/*
-					 * `principalId` is filled in per call below, from whoami. It is the administrator, and
-					 * `viaClientId` is the agent; conflating them would let one operator's confirmation be
-					 * spent by another operator working through the same agent.
+					 * `principalId` is the administrator and `viaClientId` is the agent. Both are required,
+					 * and neither may fall back to a placeholder: conflating them would let one operator's
+					 * confirmation be spent by another working through the same agent, and defaulting either
+					 * to `''` would make it match any caller whose id could not be read.
 					 */
+					const viaClientId = ctx.authInfo?.clientId;
+					const caller = await resolveCaller(credential);
+					if (!caller || !viaClientId) return UNRESOLVED_PRINCIPAL;
+
 					const request = {
 						tool,
 						args,
-						principalId: '',
-						viaClientId: ctx.authInfo?.clientId ?? '',
+						principalId: caller.userId,
+						viaClientId,
 						report: consequenceReport(tool, args)
 					};
 
 					if (typeof presented !== 'string' || presented.length === 0) {
 						// Call one: describe, change nothing, and hand back a token bound to exactly this
 						// operation. No audit entry — the trail records actions applied, and this applies none.
-						if (!(await holdsRequiredRole(tool, credential))) {
+						if (!holdsRequiredRole(tool, caller)) {
 							return {
 								content: [
 									{
@@ -311,13 +321,7 @@ export function buildMcpServer(ctx: McpRequestContext): McpServer {
 							};
 						}
 
-						const principalId = await principalIdFor(credential);
-						if (principalId === null) return UNRESOLVED_PRINCIPAL;
-
-						const issued = await issueConfirmation({
-							...request,
-							principalId
-						});
+						const issued = await issueConfirmation(request);
 						return {
 							content: [
 								{
@@ -335,13 +339,7 @@ export function buildMcpServer(ctx: McpRequestContext): McpServer {
 					}
 
 					// Call two: spend the token, or refuse. Every binding must match.
-					const principalId = await principalIdFor(credential);
-					if (principalId === null) return UNRESOLVED_PRINCIPAL;
-
-					const redemption = await redeemConfirmation(presented, {
-						...request,
-						principalId
-					});
+					const redemption = await redeemConfirmation(presented, request);
 					if (!redemption.ok) {
 						return {
 							content: [
@@ -421,18 +419,25 @@ export function buildMcpServer(ctx: McpRequestContext): McpServer {
  * existing — and the text is read from the catalogue's exclusion table, so it cannot disagree with it.
  */
 function buildInstructions(): string {
-	const withheld = ['project_delete', 'bucket_delete']
-		.map((name) => withheldOutcome(name))
-		.filter((w): w is NonNullable<typeof w> => w !== undefined)
-		.map((w) => `- ${w.message}`)
+	/*
+	 * Both the list and the count come off the table. An earlier version named `project_delete` and
+	 * `bucket_delete` literally, directly under a comment claiming the text could not disagree with the
+	 * exclusion table — it could: a third withheld operation would have been added to the table, refused
+	 * correctly when guessed, and silently left out of the announcement that exists so an agent does not
+	 * have to guess. `inapplicable` entries stay out; see `absence` on the table for why.
+	 */
+	const withheld = withheldConsoleOperations
+		.map((operation) => `- ${operation.reason}`)
 		.join('\n');
+	const n = withheldConsoleOperations.length;
+	const count = n === 1 ? '1 operation that is' : `${n} operations that are`;
 
 	return [
 		`Administrative control plane for this OAuth 2.1 / OpenID Connect server (${MCP_RESOURCE}).`,
 		'',
 		'You act as the administrator who authorized this connection, with exactly their permissions. Every change is recorded in an immutable audit trail naming both them and this agent.',
 		'',
-		'Two operations the admin console can perform are deliberately unavailable here. Do not attempt them, and if asked, say plainly that they must be done in the admin console:',
+		`The admin console can perform ${count} deliberately unavailable here. Do not attempt them, and if asked, say plainly that they must be done in the admin console:`,
 		withheld,
 		'',
 		'Reading what such a deletion would involve IS available — a project reports the clients that block it, and a bucket reports how many end-users it holds.'

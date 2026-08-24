@@ -4,6 +4,7 @@ import { Elysia } from 'elysia';
 import {
 	mcpCatalogue,
 	excludedConsoleOperations,
+	withheldConsoleOperations,
 	pathArgName
 } from 'lib/mcp/catalogue.ts';
 import { auditedAdminRoutes } from 'lib/consts/admin_audit_routes.ts';
@@ -74,6 +75,23 @@ describe('MCP tool catalogue', () => {
 		const excluded = new Set(excludedConsoleOperations.map(key));
 		expect(excluded.has('DELETE /admin/api/projects/:id')).toBe(true);
 		expect(excluded.has('DELETE /admin/api/buckets/:id')).toBe(true);
+	});
+
+	// The server's instructions announce the withheld operations and not the inapplicable ones, and it
+	// builds that announcement from this field. Pinned so the two container deletions cannot quietly
+	// drop out of what the agent is told, which is the only way it can answer "do it in the console"
+	// instead of guessing a tool name (FR-034).
+	it('marks the two container deletions withheld, and the rest inapplicable', () => {
+		const withheld = withheldConsoleOperations.map(key);
+		expect(withheld).toEqual([
+			'DELETE /admin/api/projects/:id',
+			'DELETE /admin/api/buckets/:id'
+		]);
+		expect(
+			excludedConsoleOperations
+				.filter((e) => e.absence === 'inapplicable')
+				.map(key)
+		).toEqual(['POST /admin/api/setup', 'POST /admin/api/logout']);
 	});
 
 	it('classifies exactly eleven tools as high-consequence', () => {

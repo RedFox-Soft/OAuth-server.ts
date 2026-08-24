@@ -3,6 +3,7 @@ import { Elysia } from 'elysia';
 import { adminApiRoutes } from '../admin/routes.js';
 import { ISSUER } from '../configs/env.js';
 import { pathArgName, type McpTool } from './catalogue.js';
+import { CONFIRMATION_ARG } from './confirm.js';
 
 /*
  * The one way an agent's tool call reaches the control plane: build the HTTP request the console would
@@ -79,7 +80,7 @@ function buildBody(
 		...Object.keys(
 			(tool.querySchema?.properties ?? {}) as Record<string, unknown>
 		),
-		'confirmationToken'
+		CONFIRMATION_ARG
 	]);
 	const body: Record<string, unknown> = {};
 	for (const [k, v] of Object.entries(args)) {

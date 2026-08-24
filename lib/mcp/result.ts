@@ -36,6 +36,15 @@ export type ToolOutcome = ToolSuccess | ToolFailure;
 
 const BY_STATUS: Record<number, Reason> = {
 	400: 'invalid_request',
+	/*
+	 * The admin plane answers 401 when `resolveAdmin` resolves no context, and that is reachable here
+	 * rather than theoretical: the token is re-validated on every dispatch, so one revoked, expired or
+	 * whose account was deactivated mid-session fails between one tool call and the next. Reported as
+	 * `forbidden` — the enum's truthful neighbour — because falling through to `server_error` told the
+	 * agent this server had broken when in fact its credential had, which is the one thing it could
+	 * have acted on.
+	 */
+	401: 'forbidden',
 	403: 'forbidden',
 	404: 'not_found',
 	409: 'conflict',

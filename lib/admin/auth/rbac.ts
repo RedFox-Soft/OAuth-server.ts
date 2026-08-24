@@ -191,20 +191,25 @@ export const resolveAdmin = new Elysia({ name: 'admin-resolve' }).derive(
 		if (!headers.authorization || !ApplicationConfig['mcp.enabled']) {
 			return { admin: null };
 		}
+		/*
+		 * Imported lazily, and this is load-bearing rather than tidiness. `lib/mcp/principal.ts`
+		 * reaches `lib/models/access_token.ts`, and `lib/models/` contains an import cycle that dies
+		 * with `Cannot access 'BaseTokenPayload' before initialization` when the graph is entered
+		 * cold (see wiki/concepts/model-graph-import-order.md). A static import here would put that
+		 * cycle in the import chain of every admin route group — rbac.ts is imported by all ten — so
+		 * merely loading `projectRoutes` would crash. Measured: it took the whole admin suite down.
+		 *
+		 * By the time a request is served the graph is warm, and the module cache makes this a map
+		 * lookup after the first call. Same remedy, for the same reason, as the lazy import in
+		 * test/preload.ts. Outside the try, so a module that fails to load is a fault and not a
+		 * silent refusal.
+		 */
+		const { resolveMcpPrincipal, McpUnauthorized } = await import(
+			'../../mcp/principal.js'
+		);
+
+
 		try {
-			/*
-			 * Imported lazily, and this is load-bearing rather than tidiness. `lib/mcp/principal.ts`
-			 * reaches `lib/models/access_token.ts`, and `lib/models/` contains an import cycle that dies
-			 * with `Cannot access 'BaseTokenPayload' before initialization` when the graph is entered
-			 * cold (see wiki/concepts/model-graph-import-order.md). A static import here would put that
-			 * cycle in the import chain of every admin route group — rbac.ts is imported by all ten — so
-			 * merely loading `projectRoutes` would crash. Measured: it took the whole admin suite down.
-			 *
-			 * By the time a request is served the graph is warm, and the module cache makes this a map
-			 * lookup after the first call. Same remedy, for the same reason, as the lazy import in
-			 * test/preload.ts.
-			 */
-			const { resolveMcpPrincipal } = await import('../../mcp/principal.js');
 			const principal = await resolveMcpPrincipal(headers, request.method);
 			return {
 				admin: await contextFor(
@@ -213,10 +218,28 @@ export const resolveAdmin = new Elysia({ name: 'admin-resolve' }).derive(
 					principal.clientId
 				)
 			};
-		} catch {
-			// One answer for every cause. Which check failed is not something a caller gets to probe
-			// for, and the MCP entry point reports the reason on the event bus instead.
-			return { admin: null };
+		} catch (err) {
+			/*
+			 * One answer for every *authorization* cause. Which check failed is not something a caller
+			 * gets to probe for, and the MCP entry point reports the reason on the event bus instead.
+			 *
+			 * Only for that class, though. A bare `catch` here also turned a storage outage into "not
+			 * authenticated", which sends an operator to debug their credential while the database is
+			 * down — and the cookie arm above, whose lookups are not wrapped at all, would have answered
+			 * 500 for the same fault. Anything that is not a refusal is rethrown, so both credential
+			 * types report an outage the same way.
+			 *
+			 * That includes a DPoP nonce challenge, which `resolveMcpPrincipal` raises deliberately: it is
+			 * a protocol step telling the caller to retry with a nonce, and flattening it here would leave
+			 * a compliant client no way to proceed. Rethrown, so the server's error handler renders it as
+			 * it does for every other DPoP-protected endpoint. `UseDpopNonce` is not named explicitly
+			 * because `validate_dpop.ts` reaches the model graph — importing it here is exactly the cold
+			 * cycle the lazy import above exists to avoid — and "not a refusal, so rethrow" covers it.
+			 */
+			if (err instanceof McpUnauthorized) {
+				return { admin: null };
+			}
+			throw err;
 		}
 	}
 );
