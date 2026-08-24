@@ -41,8 +41,13 @@ import { Grant } from 'lib/models/grant.js';
 import { ISSUER } from 'lib/configs/env.js';
 export { Grant } from 'lib/models/grant.js';
 
-const applicationDefaultSettings = { ...ApplicationConfig };
-const clientDefaultSettings = { ...ClientDefaults };
+// Deep copies, and each bootstrap re-applies a fresh deep copy of them. A shallow snapshot shares
+// every nested value (`discovery`, `claims`, `scopes`, `clientAuthMethods`, ...) with the live
+// config, so one spec mutating a nested object in place poisons the baseline itself and the
+// mutation is re-applied by every later bootstrap — a leak no per-spec `finally` restore can undo,
+// because restoring the *reference* leaves the mutated object sitting in the baseline.
+const applicationDefaultSettings = structuredClone(ApplicationConfig);
+const clientDefaultSettings = structuredClone(ClientDefaults);
 const testClaims = sharedTestClaims().claims;
 
 /*
@@ -222,17 +227,25 @@ async function bootstrap(
 	// registry baseline (see test/addon_baseline.ts).
 	setAddonBaseline(addonOverrides);
 
-	Object.assign(ApplicationConfig, applicationDefaultSettings, app || {});
+	Object.assign(
+		ApplicationConfig,
+		structuredClone(applicationDefaultSettings),
+		app || {}
+	);
 	// Claims are a server setting now, not per-instance provider setup. Most specs want the
 	// shared OIDC test claim set on top of the production defaults; a spec opts out or replaces
 	// it by declaring `claims` in its own ApplicationConfig export (`{}` means production only).
 	ApplicationConfig.claims = {
-		...applicationDefaultSettings.claims,
+		...structuredClone(applicationDefaultSettings.claims),
 		...(app && Object.prototype.hasOwnProperty.call(app, 'claims')
 			? app.claims
 			: testClaims)
 	};
-	Object.assign(ClientDefaults, clientDefaultSettings, clientSettings || {});
+	Object.assign(
+		ClientDefaults,
+		structuredClone(clientDefaultSettings),
+		clientSettings || {}
+	);
 
 	TestAdapter.clear();
 	// Each spec file starts with no extra seeded claims; claim-conformance specs
