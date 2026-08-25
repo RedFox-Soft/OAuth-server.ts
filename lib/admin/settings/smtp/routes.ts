@@ -75,12 +75,7 @@ export const smtpSettingsRoutes = new Elysia({ name: 'admin-settings-smtp' })
 				body.password && body.password !== SMTP_PASSWORD_MASK
 					? body.password
 					: (existing?.password ?? '');
-
-			// Field names only — that a password was among them is useful; its value must never be here.
-			await recordAdminAudit(ctx, 'smtp.settings.update', SMTP_TARGET_ID, {
-				attributes: Object.keys(body)
-			});
-			await store.set({
+			const next = {
 				host: body.host,
 				port: body.port,
 				secure: body.secure,
@@ -88,7 +83,28 @@ export const smtpSettingsRoutes = new Elysia({ name: 'admin-settings-smtp' })
 				password,
 				fromName: body.fromName,
 				fromEmail: body.fromEmail
+			};
+
+			/*
+			 * The card is a full replace, so all seven fields arrive on every save. Recording all seven
+			 * every time says nothing about what an operator actually did, so the entry names only the
+			 * fields whose value moved, and a submission that moves nothing is not an event to record at
+			 * all. With no stored record there is nothing configured yet, so then every field is a change.
+			 * The password is unaffected by any of this: the mask resolves to the stored secret above, so
+			 * keeping it is simply not a change, and only ever its name reaches the trail.
+			 */
+			const changed = existing
+				? (Object.keys(next) as Array<keyof typeof next>).filter(
+						(k) => next[k] !== existing[k]
+					)
+				: Object.keys(next);
+			if (changed.length === 0) return present(existing);
+
+			// Field names only — that a password was among them is useful; its value must never be here.
+			await recordAdminAudit(ctx, 'smtp.settings.update', SMTP_TARGET_ID, {
+				attributes: changed
 			});
+			await store.set(next);
 			return present(await store.get());
 		},
 		{ body: UpdateSmtpBody }

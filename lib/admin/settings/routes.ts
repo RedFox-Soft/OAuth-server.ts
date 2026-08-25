@@ -90,8 +90,12 @@ function validateEffectiveConfig(effective: ConfigurationInput): void {
 	}
 }
 
-async function currentState() {
-	const stored = (await configStore.get()) ?? {};
+/*
+ * The state a given overrides document describes: the desired value per catalog key, and which of
+ * those differ from what this process is running. Pure in `stored`, so the PUT can derive the
+ * effective values it diffs a submission against without reading the store twice.
+ */
+function stateFor(stored: Record<string, unknown>) {
 	const values: Record<string, unknown> = {};
 	const changedKeys: string[] = [];
 	for (const d of SETTINGS_CATALOG) {
@@ -100,7 +104,7 @@ async function currentState() {
 			stored,
 			d.key as string
 		)
-			? (stored as Record<string, unknown>)[d.key as string]
+			? stored[d.key as string]
 			: run;
 		values[d.key as string] = desired;
 		if (!sameValue(desired, run)) changedKeys.push(d.key as string);
@@ -111,6 +115,34 @@ async function currentState() {
 		restartRequired: changedKeys.length > 0,
 		changedKeys
 	};
+}
+
+async function currentState() {
+	return stateFor(((await configStore.get()) ?? {}) as Record<string, unknown>);
+}
+
+/*
+ * The submitted keys whose value actually differs from the one in force (the stored override if there
+ * is one, otherwise what this process is running).
+ *
+ * The console submits the whole catalog on every Save, so without this a single toggle named every
+ * setting in the audit trail — a record that says "everything changed" is not a record of anything —
+ * and pinned an override for every key into the store, which quietly took the env and the defaults out
+ * of the loop for keys nobody had ever edited.
+ *
+ * A key the catalog does not know has no value in force to compare against, so it is always kept and
+ * left to validateValue to refuse: dropping it here would turn an unknown setting into a silent no-op.
+ */
+function realChanges(
+	body: Record<string, unknown>,
+	inForce: Record<string, unknown>
+): Record<string, unknown> {
+	const changes: Record<string, unknown> = {};
+	for (const [key, value] of Object.entries(body)) {
+		if (CATALOG_BY_KEY.has(key) && sameValue(value, inForce[key])) continue;
+		changes[key] = value;
+	}
+	return changes;
 }
 
 export const settingsRoutes = new Elysia({ name: 'admin-settings' })
@@ -131,19 +163,32 @@ export const settingsRoutes = new Elysia({ name: 'admin-settings' })
 		async ({ admin, body }) => {
 			const ctx = assertAuth(admin as AdminContext | null);
 			assertRole(ctx, 'super_admin');
-			for (const [key, value] of Object.entries(body)) {
+			const stored = ((await configStore.get()) ?? {}) as Record<
+				string,
+				unknown
+			>;
+			const current = stateFor(stored);
+			const changes = realChanges(body, current.values);
+			// Only what is really changing is validated. A value already in force has been accepted once
+			// already (or came from the environment), so restating it must not be able to refuse an edit
+			// somewhere else in the same submission.
+			for (const [key, value] of Object.entries(changes)) {
 				const descriptor = CATALOG_BY_KEY.get(key);
 				if (!descriptor) throw new AdminError(422, `unknown setting: ${key}`);
 				validateValue(descriptor, value);
 			}
-			const stored = (await configStore.get()) ?? {};
-			const merged = { ...stored, ...body };
+			// Nothing to apply, so there is nothing to record: an entry here would claim a change that
+			// never happened, on the one surface whose whole purpose is to be trusted about what did.
+			if (Object.keys(changes).length === 0) return current;
+			const merged = { ...stored, ...changes };
+			// Still judged on the whole merged result, not on the changed keys alone: the invariants are
+			// cross-key, so a change can only be understood next to the settings it has to agree with.
 			validateEffectiveConfig({ ...ApplicationConfig, ...merged });
 			// Audit-first: a persisted change must never outlive a failed audit write. The submitted keys
 			// used to travel in `targetId`, which had to stand in for a field the entry did not have; the
 			// target is now the settings document itself.
 			await recordAdminAudit(ctx, 'settings.update', SETTINGS_TARGET_ID, {
-				attributes: Object.keys(body)
+				attributes: Object.keys(changes)
 			});
 			await configStore.set(merged);
 			return currentState();

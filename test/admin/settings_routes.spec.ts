@@ -458,6 +458,92 @@ describe('settings API', () => {
 	});
 
 	/*
+	 * The defect these four were filed against. The console submits the whole catalogue on every Save,
+	 * so an entry naming every setting was the normal case — and a record that says "everything
+	 * changed" cannot say what an operator actually did.
+	 */
+	it('audits only the edited key when the whole catalogue is submitted', async () => {
+		const cookie = await sessionCookieFor(['super_admin']);
+		const before = (await settingsAudit()).total;
+		const state = (await client.admin.api.settings.get({ headers: { cookie } }))
+			.data as SettingsResponse;
+		const edited = {
+			...state.values,
+			'par.enabled': !state.values['par.enabled']
+		};
+
+		const res = await client.admin.api.settings.put(
+			edited as unknown as Record<string, boolean>,
+			{ headers: { cookie } }
+		);
+
+		expect(res.status).toBe(200);
+		const { entries, total } = await settingsAudit();
+		expect(total).toBe(before + 1);
+		expect(entries[0]!.attributes).toEqual(['par.enabled']);
+		// The store keeps an override for the edited key only. Pinning all of them took the environment
+		// and the defaults out of the loop at the next boot for keys nobody had ever edited.
+		expect(Object.keys((await configStore.get()) as object)).toEqual([
+			'par.enabled'
+		]);
+	});
+
+	it('records nothing and persists nothing when no value actually changes', async () => {
+		const cookie = await sessionCookieFor(['super_admin']);
+		const state = (await client.admin.api.settings.get({ headers: { cookie } }))
+			.data as SettingsResponse;
+		const before = (await settingsAudit()).total;
+
+		const res = await client.admin.api.settings.put(
+			state.values as unknown as Record<string, boolean>,
+			{ headers: { cookie } }
+		);
+
+		expect(res.status).toBe(200);
+		expect((res.data as SettingsResponse).changedKeys).toEqual([]);
+		expect((await settingsAudit()).total).toBe(before);
+		expect(await configStore.get()).toEqual({});
+	});
+
+	it('treats re-saving what a successful save returned as no change at all', async () => {
+		const cookie = await sessionCookieFor(['super_admin']);
+		const applied = (
+			await client.admin.api.settings.put(
+				{ 'par.enabled': true },
+				{ headers: { cookie } }
+			)
+		).data as SettingsResponse;
+		const before = (await settingsAudit()).total;
+
+		const again = await client.admin.api.settings.put(
+			applied.values as unknown as Record<string, boolean>,
+			{ headers: { cookie } }
+		);
+
+		expect(again.status).toBe(200);
+		expect((await settingsAudit()).total).toBe(before);
+		expect(await configStore.get()).toEqual({ 'par.enabled': true });
+	});
+
+	it('still refuses an unknown key inside an otherwise unchanged body', async () => {
+		const cookie = await sessionCookieFor(['super_admin']);
+		const state = (await client.admin.api.settings.get({ headers: { cookie } }))
+			.data as SettingsResponse;
+
+		// An unknown key has no value in force to be compared against, so it must never be filtered out
+		// as "unchanged" and answered with a 200 that applied nothing.
+		const res = await client.admin.api.settings.put(
+			{ ...state.values, 'dpop.nonceSecret': 'no' } as unknown as Record<
+				string,
+				boolean
+			>,
+			{ headers: { cookie } }
+		);
+
+		expect(res.status).toBe(422);
+	});
+
+	/*
 	 * The defect this feature was filed against, from the surface it was reachable from.
 	 *
 	 * Before spec 014, arming dpop.requireNonce was accepted and persisted with no nonce secret in

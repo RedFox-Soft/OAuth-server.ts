@@ -18,6 +18,8 @@ import {
 	getUserStore,
 	getProjectStore,
 	getBucketStore,
+	getSmtpSettingsStore,
+	configStore,
 	resetAdminMemoryStores
 } from 'lib/adapters/index.ts';
 import type { AdminAuditEntry } from 'lib/adapters/types.ts';
@@ -643,6 +645,9 @@ describe('admin audit coverage: keys and settings', () => {
 	 */
 	it('records a settings update, naming the settings document and the submitted keys', async () => {
 		const { cookie, userId } = await superCookie();
+		// Only what really changes is recorded, so the overrides an earlier spec in this process left
+		// behind would otherwise decide which keys this entry names — and spec order differs by OS.
+		await configStore.set({});
 		const before = (await adminAuditStore.list({ action: 'settings.update' }))
 			.total;
 
@@ -668,6 +673,17 @@ describe('admin audit coverage: keys and settings', () => {
 
 	it('records a mail settings update, without the password', async () => {
 		const { cookie, userId } = await superCookie();
+		// A known baseline that shares no field with the submission below, so the entry names all seven
+		// because all seven moved — not because whatever this process already held happened to differ.
+		await getSmtpSettingsStore().set({
+			host: 'old.example.com',
+			port: 25,
+			secure: true,
+			username: 'old-mailer',
+			password: 'the previous password',
+			fromName: 'Previously',
+			fromEmail: 'old@example.com'
+		});
 		const before = (await adminAuditStore.list({ targetId: SMTP_TARGET_ID }))
 			.total;
 

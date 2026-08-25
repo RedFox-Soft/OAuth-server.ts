@@ -4,7 +4,7 @@ title: "Feature flags and endpoint gating"
 tags: [config, architecture, oauth, contract]
 sources: [oauth-server-codebase]
 created: 2026-07-31
-updated: 2026-07-31
+updated: 2026-08-25
 graph:
   node_type: concept
   relationships:
@@ -34,6 +34,18 @@ a flag and defaulted off, secure-by-default.
 
 Defaults are overlaid with persisted settings at module scope
 (`application.ts`, `Object.assign(ApplicationConfig, await configStore.get())`).
+
+**The overrides document holds only the keys an operator has actually changed**, and this is a
+property worth defending rather than an accident. `PUT /admin/api/settings` compares each submitted
+key against the value in force — the stored override if there is one, otherwise what the process is
+running — and merges only the differences (`lib/admin/settings/routes.ts`, `realChanges`). It used to
+merge the body verbatim, and because the console submits the whole catalogue on every Save
+(`lib/admin/ui/pages/Settings.tsx`), one toggle pinned an override for *every* flag. Nothing broke
+that day: the pinned values equalled what was already running. The cost arrives at the next boot,
+where `Object.assign` above lets those overrides win over the environment and the defaults for keys
+nobody ever edited — so changing an env var stops having any effect, silently, on a deployment whose
+operator has no reason to suspect the settings page. There is deliberately no delete path, so a key
+that gets pinned stays pinned.
 
 ## Derived configuration is validated once, at load
 

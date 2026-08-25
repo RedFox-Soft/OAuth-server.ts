@@ -4,7 +4,7 @@ title: 'The admin audit trail'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-03
-updated: 2026-08-03
+updated: 2026-08-25
 graph:
   node_type: concept
 ---
@@ -75,6 +75,33 @@ Two naming rules worth keeping:
   registration or verification field was present — so renaming a bucket or reassigning its managers left
   no trace. Historical entries keep the old name and stay filterable, because the action filter matches
   recorded values rather than a fixed enum.
+
+## Only the names that moved, and nothing at all when nothing moved
+
+`attributes` names the fields whose value actually **changed**, not the fields a request happened to
+carry. The distinction is invisible on a hand-built request and decisive on a real one: both settings
+surfaces are full replaces — the server-settings page submits the whole catalogue on every Save
+(`lib/admin/ui/pages/Settings.tsx`) and the mail card all seven of its fields — so recording the
+submitted keys meant almost every entry said *everything changed*, which is indistinguishable from
+saying nothing. Both routes now diff the submission against the values in force and record only the
+difference (`lib/admin/settings/routes.ts`, `lib/admin/settings/smtp/routes.ts`).
+
+A submission that changes nothing is therefore **not an event**: no entry, no write, a 200 carrying
+the current state. This does not weaken the completeness rule above — an entry still precedes every
+mutation — it narrows what counts as one. The trail is a record of changes, and an entry for a change
+that never happened is a false statement an investigator acts on, the same reasoning behind
+`admin.deactivate` not being called `admin.delete`.
+
+Three consequences to keep in mind:
+
+- A key the catalogue does not know has no value in force to be compared against, so it is never
+  filtered as "unchanged" — it stays in the submission and `validateValue` refuses it. Dropping it
+  would turn an unknown setting into a silent 200 that applied nothing.
+- The mail password is unaffected by design: the masked sentinel resolves to the stored secret before
+  the comparison, so keeping it simply is not a change, and only ever its *name* can reach the trail.
+- Tests that pin an entry's field list must establish their own baseline (`configStore.set({})`, a
+  seeded SMTP record). Otherwise overrides left by an earlier spec in the same process decide which
+  keys the entry names — and spec order differs by OS, so the failure is CI-only.
 
 ## Creations allocate their id before recording
 

@@ -70,6 +70,12 @@ interface SettingsResponse {
 	changedKeys: string[];
 }
 
+// Same equality the server uses to decide what really changed (lib/admin/settings/routes.ts), and it
+// has to be: a `string-array` or `json` setting is a fresh object on every edit, so an identity
+// comparison would report every one of them as dirty the moment the page loads.
+const sameValue = (a: unknown, b: unknown): boolean =>
+	JSON.stringify(a) === JSON.stringify(b);
+
 // A setting's label, tagged when it enables a feature implemented from a draft spec — so an
 // operator sees that before turning it on. Shared by both places a label is rendered (the feature
 // toggles and the accordion headers), so one of them cannot quietly stop showing it.
@@ -238,6 +244,9 @@ function SmtpSettingsCard() {
 export function Settings() {
 	const [catalog, setCatalog] = useState<Descriptor[]>([]);
 	const [values, setValues] = useState<Record<string, unknown>>({});
+	// What the server last told us it holds. Save submits the difference against this, so one edited
+	// toggle reaches the API — and the audit trail — as one field rather than the whole catalogue.
+	const [baseline, setBaseline] = useState<Record<string, unknown>>({});
 	const [restartRequired, setRestartRequired] = useState(false);
 	const [changedKeys, setChangedKeys] = useState<string[]>([]);
 	const [loading, setLoading] = useState(true);
@@ -247,6 +256,7 @@ export function Settings() {
 	function apply(body: SettingsResponse) {
 		setCatalog(body.catalog);
 		setValues(body.values);
+		setBaseline(body.values);
 		setRestartRequired(body.restartRequired);
 		setChangedKeys(body.changedKeys);
 		setOpenGroups(enabledDetailGroups(body.catalog, body.values));
@@ -265,13 +275,25 @@ export function Settings() {
 		load();
 	}, []);
 
+	// The keys this page has actually edited since the last load or save.
+	const dirtyKeys = useMemo(
+		() => Object.keys(values).filter((k) => !sameValue(values[k], baseline[k])),
+		[values, baseline]
+	);
+
 	async function save() {
+		if (dirtyKeys.length === 0) {
+			message.info('no changes to save');
+			return;
+		}
 		setSaving(true);
 		try {
+			const changes: Record<string, unknown> = {};
+			for (const key of dirtyKeys) changes[key] = values[key];
 			const res = await fetch('/admin/api/settings', {
 				method: 'PUT',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify(values)
+				body: JSON.stringify(changes)
 			});
 			const body = (await res.json().catch(() => null)) as
 				(SettingsResponse & { message?: string }) | null;
@@ -439,6 +461,7 @@ export function Settings() {
 				<Button
 					type="primary"
 					loading={saving}
+					disabled={dirtyKeys.length === 0}
 					onClick={save}
 				>
 					Save

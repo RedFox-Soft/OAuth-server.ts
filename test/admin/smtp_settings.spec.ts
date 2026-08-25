@@ -79,6 +79,45 @@ describe('SMTP settings API', () => {
 		expect(stored?.fromName).toBe('Renamed');
 	});
 
+	// The card is a full replace, so it submits all seven fields whatever the operator touched. The
+	// trail has to describe the edit, not the form.
+	it('names only the field that moved, and never the kept password', async () => {
+		const cookie = await cookieFor(['super_admin']);
+		await client.admin.api.settings.smtp.put(VALID, { headers: { cookie } });
+
+		const res = await client.admin.api.settings.smtp.put(
+			{ ...VALID, password: SMTP_PASSWORD_MASK, fromName: 'Renamed' },
+			{ headers: { cookie } }
+		);
+
+		expect(res.status).toBe(200);
+		const { entries } = await adminAuditStore.list({
+			targetType: 'SmtpSettings'
+		});
+		expect(entries[0]?.attributes).toEqual(['fromName']);
+	});
+
+	it('records nothing when a resubmitted form changes no field', async () => {
+		const cookie = await cookieFor(['super_admin']);
+		await client.admin.api.settings.smtp.put(VALID, { headers: { cookie } });
+		const before = (await adminAuditStore.list({ targetType: 'SmtpSettings' }))
+			.total;
+
+		// Exactly what the card sends after a load and an immediate Save: every field as stored, with
+		// the password masked.
+		const again = await client.admin.api.settings.smtp.put(
+			{ ...VALID, password: SMTP_PASSWORD_MASK },
+			{ headers: { cookie } }
+		);
+
+		expect(again.status).toBe(200);
+		expect(
+			(await adminAuditStore.list({ targetType: 'SmtpSettings' })).total
+		).toBe(before);
+		// Still answered with the stored settings, so the page it refreshes stays correct.
+		expect((again.data as Record<string, unknown>).host).toBe(VALID.host);
+	});
+
 	it('rejects non-super-admins', async () => {
 		const cookie = await cookieFor(['project_admin']);
 		const get = await client.admin.api.settings.smtp.get({
