@@ -320,6 +320,34 @@ describe('interaction UI', async () => {
 			expect(response.headers.get('location')).toBeTruthy();
 		});
 
+		/*
+		 * The production shape the rest of this file cannot reach. `loadGrant` hands the Interaction
+		 * constructor a Grant *instance*, and the constructor copies its id onto the interaction
+		 * (lib/models/interaction.ts) — but nothing stores that grant until consent is given. So on a
+		 * first authorization the interaction names a grant that is not in storage, `createGrant` takes
+		 * its `grantId` branch, and `Grant.find` throws its notFoundError — which base_model declares as
+		 * InvalidToken, so approving consent answers `401 invalid token provided`.
+		 *
+		 * The suite never saw it because the harness always has a stored grant to point at
+		 * (`setup.getGrantId()` reads one straight out of the session), so the id always resolved. Every
+		 * client whose consent is genuinely required — the reserved MCP agent is one — hits this on the
+		 * very first sign-in and can never get past it.
+		 */
+		it('accepts consent when the interaction names a grant that was never stored', async function () {
+			const interaction = await Interaction.find(uid);
+			interaction.payload.grantId = nanoid();
+			await interaction.save(300);
+			const before = grantCount();
+
+			const { response } = await agent.ui[uid].consent.post(
+				{ action: 'allow' },
+				{ headers: { cookie } }
+			);
+
+			expect(response.status).toBe(303);
+			expect(grantCount()).toBe(before + 1);
+		});
+
 		it('checks that the authentication session is still there', async function () {
 			const session = setup.getLastSession();
 			await session.destroy();

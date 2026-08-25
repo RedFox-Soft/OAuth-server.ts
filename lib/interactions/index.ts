@@ -118,17 +118,27 @@ async function createGrant(interaction) {
 	const session = interaction.payload.session ?? {};
 	const params = interaction.payload.params ?? {};
 
-	let grant;
-	if (grantId) {
-		// modify the existing grant (reuses what the user already granted)
-		grant = await Grant.find(grantId);
-	} else {
+	/*
+	 * `tryFind`, because the interaction's grantId is a hint and not proof that a grant was stored. The
+	 * Interaction constructor copies the id off whatever Grant instance the authorization pipeline put
+	 * in the context (lib/models/interaction.ts), and `loadGrant` puts an *unsaved* one there whenever
+	 * the account has no grant for this client yet — nothing persists it until the line below. So on a
+	 * first consent the id names nothing, and `find` would raise its notFoundError at the instant the
+	 * user clicks approve. base_model declares that error as InvalidToken, so the refusal read
+	 * `401 invalid token provided` — a message about credentials for what is actually a missing record,
+	 * on a request that carries no token at all.
+	 *
+	 * A grantId that resolves to nothing is the same state as no grantId: there is no prior consent to
+	 * extend, so a new grant is established and its id is what the resume pipeline reads back below.
+	 */
+	const stored = grantId ? await Grant.tryFind(grantId) : undefined;
+	const grant =
+		stored ??
 		// establish a new grant for this account/client
-		grant = new Grant({
+		new Grant({
 			accountId: session.accountId,
 			clientId: params.client_id
 		});
-	}
 
 	if (details.missingOIDCScope) {
 		grant.addOIDCScope(details.missingOIDCScope.join(' '));

@@ -46,6 +46,69 @@ describe('client pure functions', () => {
 			);
 		});
 
+		/*
+		 * RFC 8252 §7.3: a native client receives its code on an ephemeral loopback port it cannot
+		 * know at registration time, so the authorization server must allow any port at request time
+		 * and compare the rest exactly. `lib/admin/seed.ts` already registers the reserved MCP agent
+		 * on this assumption ("the port is unpredictable ... OAuth 2.1 allows a loopback port to
+		 * vary"), and a real MCP client picks a different port on every attempt — 3118, then 46937.
+		 */
+		describe('loopback redirect URIs at request time (RFC 8252 §7.3)', () => {
+			const native = {
+				applicationType: 'native',
+				redirectUris: [
+					'http://127.0.0.1:33418/callback',
+					'http://localhost:33418/callback',
+					'http://127.0.0.1/callback'
+				]
+			};
+
+			it('allows any port on a registered loopback host', () => {
+				expect(
+					redirectUriAllowed(native, 'http://127.0.0.1:46937/callback')
+				).toBe(true);
+				expect(
+					redirectUriAllowed(native, 'http://localhost:46937/callback')
+				).toBe(true);
+			});
+
+			it('compares the path exactly, port aside', () => {
+				expect(
+					redirectUriAllowed(native, 'http://127.0.0.1:46937/stolen')
+				).toBe(false);
+			});
+
+			it('does not make a non-loopback host interchangeable', () => {
+				expect(
+					redirectUriAllowed(native, 'http://rp.example.com:46937/callback')
+				).toBe(false);
+			});
+
+			it('does not extend the licence to https loopback URIs', () => {
+				expect(
+					redirectUriAllowed(
+						{
+							applicationType: 'native',
+							redirectUris: ['https://127.0.0.1:33418/callback']
+						},
+						'https://127.0.0.1:46937/callback'
+					)
+				).toBe(false);
+			});
+
+			it('leaves a web client on exact matching', () => {
+				expect(
+					redirectUriAllowed(
+						{
+							applicationType: 'web',
+							redirectUris: ['http://localhost:33418/callback']
+						},
+						'http://localhost:46937/callback'
+					)
+				).toBe(false);
+			});
+		});
+
 		it('responseModeAllowed treats an absent list as "allowed"', () => {
 			expect(responseModeAllowed(client, 'query')).toBe(true);
 			expect(responseModeAllowed({ responseModes: ['query'] }, 'query')).toBe(
