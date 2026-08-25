@@ -166,7 +166,25 @@ function foreignFormTargets(html: string): string[] {
 	return [...foreign];
 }
 
-export function contentSecurityPolicyFor(html: string): string {
+/*
+ * `handOffTo` is the pending authorization request's `redirect_uri`, and it is needed because
+ * `form-action` governs a form submission's whole redirect chain, not just the URL in the action
+ * attribute. An interaction page posts to itself; the response is a redirect that ends at the client's
+ * callback. With a policy of `'self'` alone the browser refuses that final hop — after the server has
+ * already recorded the consent and issued the code — and reports the same-origin action as the
+ * violation, which sends the reader looking in the wrong place entirely.
+ *
+ * Naming the client's origin here is the same judgement the auto-submit callback page already makes:
+ * this page may hand off to the client it names, and to nothing else. The address was validated against
+ * the client's registration long before the page was rendered.
+ *
+ * A callback on this server's own origin resolves to `'self'` and so adds nothing — which is why the
+ * admin console never met this, and why nothing changes for it now.
+ */
+export function contentSecurityPolicyFor(
+	html: string,
+	handOffTo?: string
+): string {
 	const scripts = scriptOrigins(html);
 	const scriptSrc = [...scripts, ...inlineScripts(html).map(hash)];
 
@@ -176,6 +194,18 @@ export function contentSecurityPolicyFor(html: string): string {
 	}
 
 	const foreignTargets = foreignFormTargets(html);
+
+	/*
+	 * `'self'` is stated rather than implied here: this page's own form still posts to this origin, and a
+	 * directive is a whole allow-list — naming only the hand-off would block the submission itself.
+	 * Resolved through the same rule the attributes use, so a same-origin callback collapses to `'self'`
+	 * and leaves the policy exactly as it was.
+	 */
+	const handOff = handOffTo ? resolveOrigin(handOffTo, ownOrigin()) : "'self'";
+	const formTargets =
+		handOff === "'self'"
+			? foreignTargets
+			: [...new Set(["'self'", ...foreignTargets, handOff])];
 
 	/*
 	 * The gate here is external scripts specifically, not "code that runs after the document is
@@ -217,7 +247,7 @@ export function contentSecurityPolicyFor(html: string): string {
 		"img-src 'self' data:",
 		"font-src 'self'",
 		"connect-src 'self'",
-		`form-action ${foreignTargets.length ? foreignTargets.join(' ') : "'self'"}`
+		`form-action ${formTargets.length ? formTargets.join(' ') : "'self'"}`
 	];
 
 	/*
@@ -241,14 +271,19 @@ export function contentSecurityPolicyFor(html: string): string {
  */
 export function htmlResponse(
 	html: string,
-	init: { status?: number; headers?: Record<string, string> } = {}
+	init: {
+		status?: number;
+		headers?: Record<string, string>;
+		/* The pending authorization request's redirect_uri — see contentSecurityPolicyFor. */
+		handOffTo?: string;
+	} = {}
 ): Response {
 	return new Response(html, {
 		status: init.status,
 		headers: {
 			...init.headers,
 			'Content-Type': 'text/html; charset=utf-8',
-			'Content-Security-Policy': contentSecurityPolicyFor(html)
+			'Content-Security-Policy': contentSecurityPolicyFor(html, init.handOffTo)
 		}
 	});
 }

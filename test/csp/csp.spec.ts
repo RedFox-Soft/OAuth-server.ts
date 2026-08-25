@@ -321,6 +321,33 @@ describe('content security policy: every rendered page', () => {
 	});
 
 	/*
+	 * A page rendered inside an interaction posts to itself, and the response to that post is a
+	 * redirect chain that ends at the client's redirect_uri. Chrome enforces `form-action` against
+	 * every hop of a form submission's redirect chain, not just its initial target, so a policy of
+	 * `'self'` alone blocks the hand-off — the browser reports the same-origin action as the
+	 * violation, which reads as nonsense until you know the block happened downstream.
+	 *
+	 * Verified in Chromium: consent was recorded and a code was issued server-side, and the browser
+	 * still refused to leave the page. The console client never hit it because its callback is on this
+	 * server's own origin; a native client's loopback callback never is.
+	 */
+	it('lets a page inside an interaction hand off to the client that started it', async () => {
+		const consent = directives(
+			await loginServer('uid-1', {
+				handOffTo: 'http://localhost:39548/callback'
+			})
+		);
+		expect(consent.get('form-action')).toBe("'self' http://localhost:39548");
+	});
+
+	it('adds nothing when the pending client is on this origin', async () => {
+		const sameOrigin = directives(
+			await loginServer('uid-1', { handOffTo: `${ISSUER}/admin/callback` })
+		);
+		expect(sameOrigin.get('form-action')).toBe("'self'");
+	});
+
+	/*
 	 * The trap in deriving form-action from the document: the device pages build an ISSUER-absolute
 	 * action, so a naive "absolute means foreign" reading would name this server as a foreign origin
 	 * and — worse — drop frame-ancestors from a page that has a real form on it.

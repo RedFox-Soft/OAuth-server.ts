@@ -199,6 +199,18 @@ function clientIdOf(interaction: {
 		?.client_id;
 }
 
+/*
+ * Where the pending authorization request hands off once this interaction resolves. Every page rendered
+ * inside an interaction needs it: the browser checks that address against the policy of the document
+ * whose form was submitted, because the submission's redirect chain ends there — see lib/html/csp.ts.
+ */
+function redirectUriOf(interaction: {
+	payload: { params?: unknown };
+}): string | undefined {
+	return (interaction.payload.params as { redirect_uri?: string } | undefined)
+		?.redirect_uri;
+}
+
 export const ui = new Elysia()
 	.guard({
 		params: t.Object({
@@ -258,6 +270,7 @@ export const ui = new Elysia()
 			)?.client_id;
 			return loginServer(uid, {
 				notice: resolveNotice(query.notice),
+				handOffTo: redirectUriOf(interaction),
 				...(await loginOptionsForClient(clientId))
 			});
 		},
@@ -276,7 +289,8 @@ export const ui = new Elysia()
 			const user = await userStore.findByEmail(body.username);
 			if (!user) {
 				return loginServer(uid, {
-					errorMessage: 'Invalid username or password'
+					errorMessage: 'Invalid username or password',
+					handOffTo: redirectUriOf(interaction)
 				});
 			}
 			const validPassword = await Bun.password.verify(
@@ -285,19 +299,22 @@ export const ui = new Elysia()
 			);
 			if (!validPassword) {
 				return loginServer(uid, {
-					errorMessage: 'Invalid username or password'
+					errorMessage: 'Invalid username or password',
+					handOffTo: redirectUriOf(interaction)
 				});
 			}
 			if (!user.active) {
 				return loginServer(uid, {
-					errorMessage: 'Invalid username or password'
+					errorMessage: 'Invalid username or password',
+					handOffTo: redirectUriOf(interaction)
 				});
 			}
 			const loginBucket = await getBucketStore().find(bucketId);
 			if (loginBucket?.emailVerificationRequired && !user.verified) {
 				return loginServer(uid, {
 					errorMessage:
-						'Please verify your email before signing in. Check your inbox for the verification message.'
+						'Please verify your email before signing in. Check your inbox for the verification message.',
+					handOffTo: redirectUriOf(interaction)
 				});
 			}
 			interaction.payload.result = {
@@ -484,7 +501,7 @@ export const ui = new Elysia()
 		if (bucket && !bucket.registrationOpen) {
 			return registrationClosedPage();
 		}
-		return registrationServer(uid);
+		return registrationServer(uid, { handOffTo: redirectUriOf(interaction) });
 	})
 	.post(
 		'ui/:uid/registration',
@@ -507,7 +524,8 @@ export const ui = new Elysia()
 			if (body.password !== body.confirmPassword) {
 				return registrationServer(uid, {
 					errorMessage: 'Passwords do not match',
-					email: body.email
+					email: body.email,
+					handOffTo: redirectUriOf(interaction)
 				});
 			}
 
@@ -581,7 +599,8 @@ export const ui = new Elysia()
 			])
 		);
 		return consentServer(
-			buildConsentView({ uid, clientName, account, details, rarLabels })
+			buildConsentView({ uid, clientName, account, details, rarLabels }),
+			{ handOffTo: redirectUriOf(interaction) }
 		);
 	})
 	.post(

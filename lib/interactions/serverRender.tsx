@@ -37,6 +37,13 @@ export async function loginServer(
 		 */
 		passwordLogin?: boolean;
 		providers?: { id: string; displayName: string }[];
+		/*
+		 * The pending authorization request's redirect_uri, which reaches this page's
+		 * Content-Security-Policy. `form-action` has to name it: the page posts to itself, and the
+		 * response to that post redirects to the client — a hop the browser checks against the policy of
+		 * the document the form was submitted from.
+		 */
+		handOffTo?: string;
 	} = {}
 ) {
 	const { errorMessage } = options;
@@ -79,12 +86,15 @@ export async function loginServer(
 			)
 		);
 	// A notice is not a failure: only the error re-render answers 400.
-	return htmlResponse(html, { status: errorMessage ? 400 : 200 });
+	return htmlResponse(html, {
+		status: errorMessage ? 400 : 200,
+		handOffTo: options.handOffTo
+	});
 }
 
 export async function registrationServer(
 	uid: string,
-	options: { errorMessage?: string; email?: string } = {}
+	options: { errorMessage?: string; email?: string; handOffTo?: string } = {}
 ) {
 	const { errorMessage, email } = options;
 
@@ -113,10 +123,16 @@ export async function registrationServer(
 			)
 		);
 	// Neither submitted password reaches this document — not the markup, not the props (spec FR-011).
-	return htmlResponse(html, { status: errorMessage ? 400 : 200 });
+	return htmlResponse(html, {
+		status: errorMessage ? 400 : 200,
+		handOffTo: options.handOffTo
+	});
 }
 
-export async function consentServer(view: ConsentView) {
+export async function consentServer(
+	view: ConsentView,
+	options: { handOffTo?: string } = {}
+) {
 	let html = await htmlTeamplate.text();
 	html = html
 		.replace('/public/loginClient.js', versionedAsset('loginClient.js'))
@@ -134,5 +150,5 @@ export async function consentServer(view: ConsentView) {
 				</StrictMode>
 			)
 		);
-	return htmlResponse(html);
+	return htmlResponse(html, { handOffTo: options.handOffTo });
 }

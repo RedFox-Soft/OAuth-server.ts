@@ -63,4 +63,5 @@ a workaround.
 
 - [[admin-mcp-control-plane]] — the surface that could not be signed in to while this was missing.
 - [[first-consent-grant-id]] — the next failure in the same chain, once the redirect matched.
+- [[form-action-redirect-chain]] — the one after that: the browser refusing the hand-off this rule now permits.
 - [[pkce-verifier-length]] — the failure before it, at the token endpoint.
