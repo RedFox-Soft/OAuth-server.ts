@@ -4,9 +4,7 @@ import { findAccount } from '../addon/account.js';
 import filterClaims from '../helpers/filter_claims.ts';
 import {
 	dpopValidate,
-	InvalidDpopProof,
 	setNonceHeader,
-	UseDpopNonce,
 	validateReplay
 } from '../helpers/validate_dpop.js';
 import { InvalidToken, InsufficientScope } from '../helpers/errors.ts';
@@ -26,19 +24,16 @@ async function userInfo({ headers, set }) {
 	const accessTokenId = oidc.getAccessToken({
 		acceptDPoP: true
 	});
-	let dPoP: Awaited<ReturnType<typeof dpopValidate>>;
-	try {
-		dPoP = await dpopValidate(headers.dpop, {
-			accessTokenId,
-			method: 'GET',
-			route: routeNames.userinfo
-		});
-	} catch (err) {
-		if (err instanceof UseDpopNonce || err instanceof InvalidDpopProof) {
-			err.status = 401;
-		}
-		throw err;
-	}
+	/*
+	 * No catch to re-status the failure: a DPoP error raised at a resource server answers 401 rather
+	 * than the authorization server's 400 (RFC 9449 §7.1), and the error handler makes that correction
+	 * from the route it was raised on.
+	 */
+	const dPoP = await dpopValidate(headers.dpop, {
+		accessTokenId,
+		method: 'GET',
+		route: routeNames.userinfo
+	});
 	setNonceHeader(set.headers, dPoP);
 
 	const accessToken = await AccessToken.find(accessTokenId, {

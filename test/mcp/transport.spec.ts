@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeAll, beforeEach } from 'bun:test';
+import { describe, it, expect, beforeAll, beforeEach, mock } from 'bun:test';
 
 import bootstrap from '../test_helper.js';
+import { eventBus } from 'lib/event_bus.js';
 import { elysia } from 'lib/index.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
@@ -115,6 +116,34 @@ describe('MCP transport', () => {
 		expect(challenge).toContain('resource_metadata=');
 		// Nothing about instance state, and no hint which check failed.
 		expect(JSON.stringify(payload)).not.toContain('audience');
+		// The body an MCP client can actually read, not a framework validation report.
+		expect(payload.jsonrpc).toBe('2.0');
+		expect(payload.error?.code).toBe(-32001);
+	});
+
+	/*
+	 * A missing `authorization` is refused by the route's header schema, so the refusal starts life as
+	 * a validation error and reaches the challenge only because the shared error handler hands `/mcp`
+	 * validation down to this app's own onError. Both halves of that are asserted: the reason lands on
+	 * the MCP channel, and nothing lands on the generic one — the handler's `mapErrorCode` has no
+	 * `/mcp` entry, so an emit on the way past would file every credential-less call as a fault.
+	 */
+	it('reports a credential-less call on the MCP channel and not as a server_error', async () => {
+		const refused = mock();
+		const faults = mock();
+		eventBus.on('mcp.auth.error', refused);
+		eventBus.on('server_error', faults);
+
+		try {
+			const { status } = await mcp('tools/list', {});
+			expect(status).toBe(401);
+			expect(refused).toHaveBeenCalledTimes(1);
+			expect(refused.mock.calls[0]?.[0]).toEqual({ reason: 'no_credential' });
+			expect(faults).not.toHaveBeenCalled();
+		} finally {
+			eventBus.off('mcp.auth.error', refused);
+			eventBus.off('server_error', faults);
+		}
 	});
 
 	it('refuses a token minted for another audience', async () => {

@@ -29,6 +29,12 @@ export interface McpPrincipal {
  * the admin console's callback, which routes its reason to the event bus instead of the response.
  */
 export type RejectionReason =
+	/*
+	 * Raised by the callers, not by the resolver: `/mcp` refuses a credential-less request in its
+	 * header schema and the admin plane falls through to its anonymous arm, so neither one ever reaches
+	 * `resolveMcpPrincipal` without a credential. It stays in the vocabulary because it is still a
+	 * reason that reaches the `mcp.auth.error` channel.
+	 */
 	| 'no_credential'
 	| 'malformed_credential'
 	| 'unknown_token'
@@ -45,11 +51,37 @@ export class McpUnauthorized extends Error {
 }
 
 /*
+ * The credential headers this resolver reads, and the only ones it is entitled to.
+ *
+ * `authorization` is required, matching the `/mcp` route schema that produces it. Both callers already
+ * establish that before they get here — the route refuses a credential-less request during validation,
+ * and the admin plane returns its anonymous context — so an optional field would have described a case
+ * neither one can present, and left the resolver a dead branch to carry.
+ *
+ * `dpop` is optional because sender-constrained tokens are opt-in; `dpopValidate` reads its absence.
+ *
+ * A type alias rather than an interface on purpose — an alias carries the implicit index signature
+ * `OIDCContext` needs when this is passed straight through to it.
+ */
+export type McpCredentialHeaders = {
+	authorization: string;
+	dpop?: string;
+};
+
+/*
+ * The method a DPoP proof was created for. `dpopValidate` binds a proof to one method and one URL and
+ * understands only these two, which is the whole set `/mcp` serves.
+ */
+export type ProofMethod = 'GET' | 'POST';
+
+/*
  * Resolves the bearer (or DPoP-bound) credential on an MCP request to the administrator it authorizes.
  *
- * The order is deliberate and each step is load-bearing:
+ * That a credential is present at all is the caller's to establish, and the parameter type says so.
+ * From there the order is deliberate and each step is load-bearing:
  *
- *  1. A credential is present at all.
+ *  1. The credential parses into a token id — `getAccessToken` owns the Bearer/DPoP grammar and reads
+ *     `dpop.enabled` to decide it.
  *  2. The token exists and has not expired or been revoked — `AccessToken.find` covers all three,
  *     since a revoked or expired token is simply not there.
  *  3. `aud` is exactly MCP_RESOURCE. This is the confused-deputy guard resource indicators exist for:
@@ -80,17 +112,15 @@ export class McpUnauthorized extends Error {
  * than a latent surprise. `dpop.enabled` is off by default.
  */
 export async function resolveMcpPrincipal(
-	headers: Record<string, string | undefined>,
+	headers: McpCredentialHeaders,
 	/*
-	 * The method the credential is being presented on. `/mcp` serves GET and POST; the admin plane also
-	 * resolves tokens on PUT, PATCH and DELETE, so the parameter accepts them and narrows below.
+	 * The method the proof was created for, not necessarily the one the request arrived on. `/mcp`
+	 * serves exactly these two and passes the literal its route registered; the admin plane resolves
+	 * tokens on verbs no proof is ever made for and collapses them before calling — see the limitation
+	 * note above for why that collapse is the caller's to make.
 	 */
-	method: string = 'POST'
+	method: ProofMethod = 'POST'
 ): Promise<McpPrincipal> {
-	if (!headers.authorization) {
-		throw new McpUnauthorized('no_credential');
-	}
-
 	const oidc = new OIDCContext({}, headers);
 	let accessTokenId: string;
 	try {
@@ -101,14 +131,11 @@ export async function resolveMcpPrincipal(
 
 	let dPoP: Awaited<ReturnType<typeof dpopValidate>>;
 	try {
-		/*
-		 * `dpopValidate` binds a proof to a method and a route, and only understands GET and POST. A proof
-		 * is only ever created for the `/mcp` request itself, so anything else is treated as POST — see the
-		 * limitation note on this function.
-		 */
+		// Bound to `/mcp` rather than to the request's own route: a proof is only ever created for the
+		// `/mcp` request itself — see the limitation note on this function.
 		dPoP = await dpopValidate(headers.dpop, {
 			accessTokenId,
-			method: method === 'GET' ? 'GET' : 'POST',
+			method,
 			route: MCP_ROUTE
 		});
 	} catch (err) {

@@ -188,7 +188,10 @@ export const resolveAdmin = new Elysia({ name: 'admin-resolve' }).derive(
 		 * Gated on the capability being switched on, so a deployment running with `mcp.enabled` off
 		 * accepts no bearer credential on the admin plane at all.
 		 */
-		if (!headers.authorization || !ApplicationConfig['mcp.enabled']) {
+		// Bound to a local so the narrowing survives into the call below: `headers` is a bag of
+		// `string | undefined`, and `resolveMcpPrincipal` asks for a credential it can count on.
+		const authorization = headers.authorization;
+		if (!authorization || !ApplicationConfig['mcp.enabled']) {
 			return { admin: null };
 		}
 		/*
@@ -208,9 +211,21 @@ export const resolveAdmin = new Elysia({ name: 'admin-resolve' }).derive(
 			'../../mcp/principal.js'
 		);
 
+		/*
+		 * A DPoP proof binds to one method, and the client only ever made one for its `/mcp` request.
+		 * The admin plane resolves the same credential on verbs no proof exists for — PUT, PATCH,
+		 * DELETE — so they are presented as the POST they were proved against, and a GET stays a GET.
+		 *
+		 * The collapse lives here rather than inside the resolver because this is the only caller that
+		 * has an arbitrary verb to collapse: `/mcp` passes the literal its route registered.
+		 */
+		const proofMethod = request.method === 'GET' ? 'GET' : 'POST';
 
 		try {
-			const principal = await resolveMcpPrincipal(headers, request.method);
+			const principal = await resolveMcpPrincipal(
+				{ authorization, dpop: headers.dpop },
+				proofMethod
+			);
 			return {
 				admin: await contextFor(
 					principal.accountId,

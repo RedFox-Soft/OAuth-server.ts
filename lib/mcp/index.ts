@@ -1,11 +1,16 @@
-import { Elysia } from 'elysia';
+import { Elysia, t, type Context } from 'elysia';
 import { createMcpHandler } from '@modelcontextprotocol/server';
 
 import { ISSUER } from '../configs/env.js';
 import { eventBus } from '../event_bus.js';
 import { UseDpopNonce } from '../helpers/validate_dpop.js';
 import { buildMcpServer } from './server.js';
-import { McpUnauthorized, resolveMcpPrincipal } from './principal.js';
+import {
+	McpUnauthorized,
+	resolveMcpPrincipal,
+	type ProofMethod,
+	type RejectionReason
+} from './principal.js';
 import { MCP_METADATA_ROUTE, MCP_RESOURCE, MCP_ROUTE } from './consts.js';
 
 /*
@@ -21,18 +26,44 @@ import { MCP_METADATA_ROUTE, MCP_RESOURCE, MCP_ROUTE } from './consts.js';
  * because `featureGate` refuses on `onRequest` before any of this runs.
  */
 
-/* The slice of Elysia's handler context these two routes use. */
-interface McpRouteContext {
-	request: Request;
-	/*
-	 * Elysia has already parsed the JSON body by the time a handler runs, which consumes
-	 * `request.body`. The SDK cannot read the stream a second time, so it must be handed the parsed
-	 * value through `parsedBody` — the option the SDK provides for exactly this situation. Without it
-	 * every request answers a JSON-RPC internal error, which is how this was found.
-	 */
-	body: unknown;
-	set: { status?: number | string; headers: Record<string, string> };
-}
+/*
+ * The only request headers this layer reads.
+ *
+ * `authorization` is required, so a credential-less call is refused in the validation stage and never
+ * reaches `serve`. Its absence is not a shape this route has an answer for, and saying so in the schema
+ * is what makes that true rather than a convention the handler has to keep. What the schema cannot do
+ * is *render* the refusal: Elysia answers a failed header check with a 422 carrying no
+ * `WWW-Authenticate`, and that challenge is the only thing telling an unauthenticated MCP client where
+ * to obtain a token. The `onError` at the bottom turns it back into the one 401 every other rejection
+ * produces.
+ *
+ * Only the presence of a credential is asserted here, not its grammar. `OIDCContext.getAccessToken`
+ * owns Bearer-versus-DPoP, and it reads `dpop.enabled` to do it — restating that as a pattern would put
+ * a second, config-blind copy of the rule in the request path.
+ *
+ * `dpop` stays optional because it genuinely is: sender-constrained tokens are opt-in, and
+ * `dpopValidate` decides what a missing proof means from the token's own `jkt`.
+ *
+ * Everything Streamable HTTP itself needs — `accept`, `content-type`, `mcp-session-id`,
+ * `mcp-protocol-version` — is deliberately absent. The SDK validates those against the transport
+ * specification and answers a JSON-RPC error when they are wrong; a 422 from this layer would replace
+ * that with a shape no MCP client understands.
+ *
+ * Header schemas admit additional properties by default and Elysia lower-cases every key, so declaring
+ * this both documents the contract and gives `serve` the header record `resolveMcpPrincipal` wants
+ * without copying `request.headers` by hand.
+ */
+const mcpHeaders = t.Object({
+	authorization: t.String({ minLength: 1 }),
+	dpop: t.Optional(t.String())
+});
+
+/*
+ * Elysia's own context, narrowed by that schema rather than restated. `body` stays `unknown`: the
+ * payload is JSON-RPC, which the SDK parses and validates, and a schema here would reject the batches
+ * and notifications it accepts.
+ */
+type McpContext = Context<{ headers: typeof mcpHeaders.static; body: unknown }>;
 
 const issuer = ISSUER.replace(/\/$/, '');
 
@@ -72,7 +103,16 @@ const handler = createMcpHandler((ctx) => buildMcpServer(ctx));
  * `WWW-Authenticate` carries `resource_metadata` so a client that arrives without a token can discover
  * where to get one, which is what the MCP specification asks for.
  */
-function challenge(set: McpRouteContext['set']) {
+/*
+ * Where the reason for a refusal goes, and the only place it goes. Typed against the resolver's own
+ * vocabulary so the two callers below cannot invent a reason between them — plus `unknown`, for a
+ * failure that was not a refusal at all and so has no `RejectionReason` to report.
+ */
+function report(reason: RejectionReason | 'unknown') {
+	eventBus.emit('mcp.auth.error', { reason });
+}
+
+function challenge(set: McpContext['set']) {
 	set.status = 401;
 	set.headers['www-authenticate'] =
 		`Bearer resource_metadata="${issuer}${MCP_METADATA_ROUTE}", error="invalid_token"`;
@@ -88,17 +128,17 @@ function challenge(set: McpRouteContext['set']) {
  * one `.all`, because the feature-gate classification table declares them individually and its drift
  * guard compares (method, path) pairs exactly — an `ALL` route would match neither entry.
  */
-async function serve({ request, body, set }: McpRouteContext) {
-	const headers: Record<string, string | undefined> = {};
-	request.headers.forEach((value, key) => {
-		headers[key.toLowerCase()] = value;
-	});
-
+async function serve(
+	{ request, body, headers, set }: McpContext,
+	/*
+	 * Taken from the route that registered this handler rather than read back off `request.method`. A
+	 * DPoP proof is bound to one method, and the two routes below are the whole set `/mcp` serves — so
+	 * the value is known at registration and there is nothing to narrow at runtime.
+	 */
+	method: ProofMethod
+) {
 	let principal;
 	try {
-		// `/mcp` serves only these two methods (both declared in the gate table), so anything else
-		// never reaches here. Narrowed because dpopValidate binds the proof to the method.
-		const method = request.method === 'GET' ? 'GET' : 'POST';
 		principal = await resolveMcpPrincipal(headers, method);
 	} catch (err) {
 		if (err instanceof UseDpopNonce) {
@@ -107,17 +147,22 @@ async function serve({ request, body, set }: McpRouteContext) {
 			 * with a nonce and must be able to see that. Rethrown so the server's own error handler
 			 * renders it, exactly as every other DPoP-protected endpoint does — flattening it into
 			 * the generic 401 would leave a compliant client with no way to proceed.
+			 *
+			 * It answers 401 rather than the authorization server's 400 because `/mcp` is a resource
+			 * server (RFC 9449 §7.1). That correction is the error handler's, keyed on the route, so
+			 * nothing here has to reach into the error to make it.
 			 */
-			err.status = 401;
 			throw err;
 		}
-		eventBus.emit('mcp.auth.error', {
-			reason: err instanceof McpUnauthorized ? err.reason : 'unknown'
-		});
+		report(err instanceof McpUnauthorized ? err.reason : 'unknown');
 		return challenge(set);
 	}
 
 	/*
+	 * `parsedBody`, because Elysia has already read the JSON by the time a handler runs and the SDK
+	 * cannot consume `request.body` a second time. Without it every request answers a JSON-RPC
+	 * internal error, which is how this was found.
+	 *
 	 * `authInfo` is strictly pass-through in the SDK — it never derives identity from headers and
 	 * performs no verification of its own. That division is the right one: the token was verified
 	 * above, by this server, against its own storage.
@@ -134,11 +179,22 @@ async function serve({ request, body, set }: McpRouteContext) {
 }
 
 export const mcpApp = new Elysia({ name: 'mcp' })
-	.get(MCP_METADATA_ROUTE, () => metadata)
 	/*
-	 * Elysia's handler context is much wider than these two routes read; `McpRouteContext` names the
-	 * slice they use, and the cast is the narrowing. Annotating `serve` with the full inferred context
-	 * would tie this module to Elysia's generic plumbing for no benefit.
+	 * The header schema's refusal, rendered as the same 401 every other rejection produces. Validation
+	 * runs before `beforeHandle` and throws rather than returning, so this is the only stage that can
+	 * still reach it — and the root error handler recognises `/mcp` and returns nothing precisely to
+	 * hand it down here, the way it already does for the admin plane.
+	 *
+	 * `no_credential` is exact rather than a guess: `authorization` is the one required field, so an
+	 * absent or empty header is the only way validation fails. A credential that is present but
+	 * unusable fails later, inside `resolveMcpPrincipal`, which reports its own reason.
 	 */
-	.post(MCP_ROUTE, (ctx) => serve(ctx as unknown as McpRouteContext))
-	.get(MCP_ROUTE, (ctx) => serve(ctx as unknown as McpRouteContext));
+	.onError(({ code, set }) => {
+		if (code === 'VALIDATION') {
+			report('no_credential');
+			return challenge(set);
+		}
+	})
+	.get(MCP_METADATA_ROUTE, () => metadata)
+	.post(MCP_ROUTE, (ctx) => serve(ctx, 'POST'), { headers: mcpHeaders })
+	.get(MCP_ROUTE, (ctx) => serve(ctx, 'GET'), { headers: mcpHeaders });

@@ -12,7 +12,7 @@ import {
 import { isAllowRedirectUri } from 'lib/actions/authorization/authorization.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { dPoPSigningAlgValues } from 'lib/configs/jwaAlgorithms.js';
-import { UseDpopNonce } from 'lib/helpers/validate_dpop.js';
+import { InvalidDpopProof, UseDpopNonce } from 'lib/helpers/validate_dpop.js';
 import { DPoPNonces } from 'lib/helpers/dpop_nonces.js';
 import { FeatureDisabled } from 'lib/plugins/featureGate.js';
 
@@ -107,6 +107,35 @@ function isAdminPlaneError(error: unknown): boolean {
 	return typeof error === 'object' && error !== null && 'adminPlane' in error;
 }
 
+/*
+ * The routes that answer as an OAuth *resource server* rather than as the authorization server.
+ *
+ * RFC 9449 splits the DPoP failure status along exactly that line: the authorization server reports it
+ * as a 400 with the error in the body (§8.2), a resource server as a 401 with the error in
+ * `WWW-Authenticate` (§7.1) — and only the 401 gets the challenge header written below. Both DPoP
+ * errors carry the 400, because that is where the bulk of DPoP traffic lands.
+ */
+const dpopProtectedResources = new Set<string>([
+	routeNames.userinfo,
+	routeNames.mcp
+]);
+
+/*
+ * The status this error answers with, corrected for where it was raised.
+ *
+ * Both protected resources used to make this correction themselves, by assigning `err.status = 401` in
+ * a catch around `dpopValidate` before rethrowing. Deciding it here instead means a resource cannot be
+ * added without it, and the error object is no longer mutated on its way through.
+ */
+function statusFor(error: OIDCProviderError, route: string) {
+	const isDpopFailure =
+		error instanceof UseDpopNonce || error instanceof InvalidDpopProof;
+	if (isDpopFailure && dpopProtectedResources.has(route)) {
+		return 401;
+	}
+	return error.status;
+}
+
 export async function errorHandler(obj: ErrorContext) {
 	const { set, route, code, request } = obj;
 	let { error } = obj;
@@ -119,6 +148,24 @@ export async function errorHandler(obj: ErrorContext) {
 	 * to the admin group's handler, which is the one that knows what to say.
 	 */
 	if (isAdminPlaneError(error)) {
+		return;
+	}
+
+	/*
+	 * `/mcp` renders its own refusals, and its `authorization` header schema means one of them arrives
+	 * as a validation error rather than as something thrown — so this exit is keyed on the route, where
+	 * the admin one above could use a marker on the error.
+	 *
+	 * It has to be an exit. An unauthenticated MCP client discovers where to get a token from the
+	 * `WWW-Authenticate` challenge on that route's 401, and the 422 this handler would otherwise
+	 * produce carries neither the header nor the JSON-RPC body an MCP client can read. Returning
+	 * nothing hands the error to the MCP app's own onError, which answers with both.
+	 *
+	 * Ahead of the emit below deliberately: an MCP refusal reports its reason on `mcp.auth.error` and
+	 * nowhere else, and `mapErrorCode` has no `/mcp` entry — so emitting here would file every
+	 * credential-less call under `server_error`.
+	 */
+	if (code === 'VALIDATION' && route === routeNames.mcp) {
 		return;
 	}
 	// Elysia's not-found carries its own status but does not assign set.status before onError runs, so
@@ -157,15 +204,16 @@ export async function errorHandler(obj: ErrorContext) {
 	}
 
 	const isOIDError = error instanceof OIDCProviderError;
+	const status = isOIDError ? statusFor(error, route) : set.status;
 	if (isOIDError) {
-		set.status = error.status;
+		set.status = status;
 	}
 	if (code === 'UNKNOWN' && !isOIDError) {
 		console.error('Unknown error', error);
 	}
 
 	const errorObj = getObjFromError(code, error);
-	if (isOIDError && error.status === 401) {
+	if (isOIDError && status === 401) {
 		const auth = request.headers.get('authorization')?.toLowerCase() ?? '';
 		const isDpop = !!request.headers.get('dpop');
 		const authError = getWWWAuthenticate(auth, isDpop, errorObj);
