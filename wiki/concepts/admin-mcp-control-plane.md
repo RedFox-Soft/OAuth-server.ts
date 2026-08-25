@@ -179,3 +179,4 @@ the server does not serve, and there is no set to vary.
 - [[model-graph-import-order]] — the cycle that forces the lazy import in `resolveAdmin`.
 - [[feature-flag-gating]] — how `mcp.enabled` makes a disabled endpoint indistinguishable from an absent one.
 - [[upstream-federation]] — the provider secrets the bucket routes were leaking until this feature's secrecy sweep found it.
+- [[pkce-verifier-length]] — the token-endpoint bound that stopped a real MCP client signing in, and surfaced here as this page's own opaque 401.

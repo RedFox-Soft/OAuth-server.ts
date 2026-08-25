@@ -244,7 +244,7 @@ describe('PKCE RFC7636', () => {
 			expect(error.value).toHaveProperty('error', 'invalid_request');
 			expect(error.value).toHaveProperty(
 				'error_description',
-				"Expected string to match '^[A-Za-z0-9_-]{43}$'"
+				"Expected string to match '^[A-Za-z0-9_-]{43,128}$'"
 			);
 		});
 
@@ -272,7 +272,7 @@ describe('PKCE RFC7636', () => {
 			expect(error.value).toHaveProperty('error', 'invalid_request');
 			expect(error.value).toHaveProperty(
 				'error_description',
-				"Expected string to match '^[A-Za-z0-9_-]{43}$'"
+				"Expected string to match '^[A-Za-z0-9_-]{43,128}$'"
 			);
 		});
 
@@ -300,7 +300,7 @@ describe('PKCE RFC7636', () => {
 			expect(error.value).toHaveProperty('error', 'invalid_request');
 			expect(error.value).toHaveProperty(
 				'error_description',
-				"Expected string to match '^[A-Za-z0-9_-]{43}$'"
+				"Expected string to match '^[A-Za-z0-9_-]{43,128}$'"
 			);
 		});
 
@@ -322,6 +322,37 @@ describe('PKCE RFC7636', () => {
 				grant_type: 'authorization_code',
 				redirect_uri: 'com.example.myapp:/localhost/cb',
 				code_verifier: 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk'
+			});
+			expect(response).toHaveProperty('status', 200);
+		});
+
+		/*
+		 * RFC 7636 §4.1 sizes the verifier at 43 to 128 characters, and a client is free to use any
+		 * length in that range — the challenge stays 43 characters because it is a SHA-256 digest, so
+		 * the challenge's exact length says nothing about the verifier's. This server's own clients
+		 * (lib/admin/auth/login.ts) all derive theirs from 32 random bytes, which is exactly 43, which
+		 * is how a 43-only pattern on the verifier survived: every request the suite and the console
+		 * ever made happened to sit at the bottom of the legal range.
+		 */
+		it('accepts a verifier longer than 43 characters', async function () {
+			const authCode = new AuthorizationCode({
+				accountId: setup.getAccountId(),
+				grantId: setup.getGrantId(),
+				scope: 'openid',
+				clientId: 'client',
+				codeChallenge: 'xVG5eiB_6FRCMQVWqdqKi5Y9fPxYgTL_WxcIYYaQQoI',
+				codeChallengeMethod: 'S256',
+				redirectUri: 'com.example.myapp:/localhost/cb'
+			});
+			const code = await authCode.save();
+
+			const { response } = await agent.token.post({
+				client_id: 'client',
+				code,
+				grant_type: 'authorization_code',
+				redirect_uri: 'com.example.myapp:/localhost/cb',
+				code_verifier:
+					'KsL9LbSq8HAS9Aiwd5MtGVtnXwcj0D5ccRCKr2rhRlNW5BPvi4mra89UGcgb7_O7VpYklHwQ_x8vlNw0pdUz7A'
 			});
 			expect(response).toHaveProperty('status', 200);
 		});
