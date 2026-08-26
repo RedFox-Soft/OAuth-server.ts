@@ -6,6 +6,7 @@ import {
 	UserBucketStore as MemoryUserBucketStore,
 	AdminSessionStore as MemoryAdminSessionStore,
 	AdminAuditStore as MemoryAdminAuditStore,
+	ErrorStore as MemoryErrorStore,
 	McpConfirmationStore as MemoryMcpConfirmationStore,
 	SmtpSettingsStore as MemorySmtpSettingsStore,
 	SingletonSecretStore as MemorySingletonSecretStore,
@@ -15,6 +16,8 @@ import type {
 	AdapterConfigStore,
 	AdminAuditStoreConstructor,
 	AdminAuditStoreInstance,
+	ErrorStoreConstructor,
+	ErrorStoreInstance,
 	AdminSessionStoreConstructor,
 	AdminSessionStoreInstance,
 	JWKSStoreConstructor,
@@ -44,6 +47,7 @@ let BucketStoreClass: UserBucketStoreConstructor = MemoryUserBucketStore;
 let AdminSessionStoreClass: AdminSessionStoreConstructor =
 	MemoryAdminSessionStore;
 let AdminAuditStoreClass: AdminAuditStoreConstructor = MemoryAdminAuditStore;
+let ErrorStoreClass: ErrorStoreConstructor = MemoryErrorStore;
 let McpConfirmationStoreClass: McpConfirmationStoreConstructor =
 	MemoryMcpConfirmationStore;
 let SmtpSettingsStoreClass: SmtpSettingsStoreConstructor =
@@ -61,6 +65,7 @@ if (process.env.MONGODB_URI) {
 	BucketStoreClass = mongodb.UserBucketStore;
 	AdminSessionStoreClass = mongodb.AdminSessionStore;
 	AdminAuditStoreClass = mongodb.AdminAuditStore;
+	ErrorStoreClass = mongodb.ErrorStore;
 	McpConfirmationStoreClass = mongodb.McpConfirmationStore;
 	SmtpSettingsStoreClass = mongodb.SmtpSettingsStore;
 	SecretStoreClass = mongodb.SingletonSecretStore;
@@ -77,6 +82,7 @@ export const adminAuditStore: AdminAuditStoreInstance =
 	new AdminAuditStoreClass();
 export const mcpConfirmationStore: McpConfirmationStoreInstance =
 	new McpConfirmationStoreClass();
+export const errorStore: ErrorStoreInstance = new ErrorStoreClass();
 /* Eagerly constructed like the stores above, because both secrets are resolved at module scope —
  * configs/application.ts for the nonce secret, configs/pairwiseSalt.ts for the salt — before any
  * request, and a lazy getter would only defer that by one call.
@@ -89,6 +95,20 @@ export const dpopNonceSecretStore: SecretStoreInstance = new SecretStoreClass(
 );
 export const pairwiseSaltStore: SecretStoreInstance = new SecretStoreClass(
 	'pairwiseSalt'
+);
+
+/*
+ * Keys the anonymized form of a caller's origin in the error store. A per-deployment secret, because
+ * the requirement has two halves that pull against each other: the stored value must not be reversible
+ * to the address, and two requests from one origin must still land on the same value. An unkeyed hash
+ * of an address space that small is reversible by enumeration; a per-record salt would break the
+ * second half.
+ *
+ * Shares the serviceConfig area's permanence for the reason the salt beside it does: a regenerated key
+ * would silently stop correlating, and every record written before it would read as a different origin.
+ */
+export const errorOriginSaltStore: SecretStoreInstance = new SecretStoreClass(
+	'errorOriginSalt'
 );
 
 export const cache = new Map();

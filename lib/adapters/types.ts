@@ -342,6 +342,191 @@ export interface McpConfirmationStoreConstructor {
 	new (): McpConfirmationStoreInstance;
 }
 
+/* Which plane raised a fault. Drives the surface filter, and is captured, never inferred. */
+export type ErrorSurface = 'oauth' | 'admin' | 'mcp' | 'interaction';
+
+/* How much of the caller's address a record keeps. See errorStore.originCaptureLevel. */
+export type OriginCaptureLevel = 'omitted' | 'anonymized' | 'full';
+
+/*
+ * Where in the server a fault arose. Parsed rather than stored as a raw stack: an interpolated error
+ * message is the likeliest way a request value reaches this record by accident, so nothing keeps a
+ * verbatim stack.
+ */
+export interface ErrorOrigin {
+	file: string;
+	line: number | null;
+	frame: string;
+}
+
+/*
+ * One occurrence of a fault. Immutable once written — there is no path through any surface that edits
+ * one, which is why the store interface below offers no update.
+ */
+export interface ErrorRecord {
+	/* The opaque identifier handed to the caller, and the only thing they can report back. */
+	reference: string;
+	at: Date;
+	/*
+	 * `null` throughout means "not known" and is written explicitly rather than inferred — an
+	 * unauthenticated malformed request genuinely has no client, and guessing one would make the record
+	 * lie about who was involved.
+	 */
+	clientId: string | null;
+	actor: { id: string; email: string } | null;
+	scope: string | null;
+	requestId: string | null;
+	/*
+	 * The caller's origin at the configured level. `'not-captured'` is distinct from `null`: the first
+	 * says the operator chose not to look, the second that there was nothing to see. A reader must not
+	 * have to tell those apart by consulting the configuration.
+	 */
+	origin: string | null | 'not-captured';
+	userAgent: string | null;
+	/*
+	 * Names of the fields the request carried — never their values, so no secret can reach the store
+	 * through this field. Same rule, and the same reason, as AdminAuditEntry.attributes.
+	 */
+	submittedFields: string[];
+}
+
+/*
+ * A distinct fault, and the unit both the caps and the reader work in. One row per fingerprint, so a
+ * fault repeating a thousand times reads as one problem with a magnitude.
+ */
+export interface ErrorGroup {
+	_id: string;
+	fingerprint: string;
+	errorCode: string;
+	status: number;
+	surface: ErrorSurface;
+	/*
+	 * Elysia's declaration form (`/admin/api/clients/:id`), never the concrete URL — a concrete path
+	 * would split one fault into one group per identifier.
+	 */
+	route: string;
+	method: string;
+	origin: ErrorOrigin;
+	message: string;
+	/* Exact, always. The sample cap bounds retained detail, never the tally. */
+	occurrences: number;
+	firstSeenAt: Date;
+	lastSeenAt: Date;
+	/* Advanced on every occurrence, so a fault that is still happening does not age out mid-life. */
+	expiresAt: Date;
+	samples: ErrorRecord[];
+}
+
+/* What the capture path hands the store: one occurrence, already redacted and fingerprinted. */
+export interface ErrorOccurrence {
+	fingerprint: string;
+	errorCode: string;
+	status: number;
+	surface: ErrorSurface;
+	route: string;
+	method: string;
+	origin: ErrorOrigin;
+	message: string;
+	record: ErrorRecord;
+}
+
+export interface ErrorStoreQuery {
+	errorCode?: string;
+	route?: string;
+	surface?: string;
+	status?: number;
+	clientId?: string;
+	/*
+	 * Matches actor id OR actor email, like AdminAuditQuery.actor: a reviewer reads emails, but a
+	 * deleted administrator's records are findable only by id, and the caller should not have to know
+	 * which they are holding.
+	 */
+	actor?: string;
+	reference?: string;
+	/* Inclusive bounds on lastSeenAt; either is valid alone. */
+	from?: Date;
+	to?: Date;
+	limit?: number;
+	offset?: number;
+}
+
+export interface ErrorGroupPage {
+	groups: ErrorGroup[];
+	/* Groups matching the filters, independent of limit/offset — the reader needs a page count. */
+	total: number;
+	/*
+	 * Failures the queue could not accept since this process started. Non-zero means the page below is
+	 * missing faults that really happened, which is a caveat a diagnostic surface must state about
+	 * itself rather than leave an operator to assume completeness.
+	 */
+	dropped: number;
+}
+
+export interface ErrorSummaryBucket {
+	key: string;
+	count: number;
+}
+
+export interface ErrorSummary {
+	/* Occurrences, not group rows: one fault seen 900 times must outrank nine seen once. */
+	total: number;
+	byErrorCode: ErrorSummaryBucket[];
+	byRoute: ErrorSummaryBucket[];
+	dropped: number;
+}
+
+export interface ErrorPurgeEstimate {
+	groups: number;
+	occurrences: number;
+}
+
+/*
+ * The diagnostic record of server faults. Deliberately offers no update and no per-record delete: an
+ * occurrence is immutable, and only a purge removes, and only whole groups.
+ *
+ * `record()` never rejects to its caller — unlike AdminAuditStoreInstance, which does so that an
+ * unaudited mutation is refused. The trade is the opposite here: a fault that cannot be stored must
+ * not become a second fault the caller sees.
+ */
+/*
+ * The bounds a write enforces, passed in rather than read by the store.
+ *
+ * An adapter cannot import ApplicationConfig — configs/application.ts imports the adapter registry, so
+ * reading config here would close a cycle. Passing them per write also matches how featureGate reads
+ * flags flat per request: settings are applied by restart in a deployment, but the test suite drives one
+ * long-lived instance and flips them between cases.
+ */
+export interface ErrorStoreBounds {
+	retentionDays: number;
+	maxGroups: number;
+	samplesPerGroup: number;
+}
+
+export interface ErrorStoreInstance {
+	record(
+		occurrence: ErrorOccurrence,
+		bounds: ErrorStoreBounds
+	): Promise<ErrorGroup | undefined>;
+	/* Newest first by (lastSeenAt desc, _id desc) — a total order, so paging cannot skip or repeat. */
+	list(query?: ErrorStoreQuery): Promise<ErrorGroupPage>;
+	get(id: string): Promise<ErrorGroup | undefined>;
+	/*
+	 * Returns undefined when no such reference exists, so the caller can say "no such record" rather
+	 * than showing an empty page the operator has to interpret.
+	 */
+	findByReference(
+		reference: string
+	): Promise<{ group: ErrorGroup; sample: ErrorRecord } | undefined>;
+	summarize(query?: ErrorStoreQuery): Promise<ErrorSummary>;
+	previewPurge(query: ErrorStoreQuery): Promise<ErrorPurgeEstimate>;
+	/* Returns how many groups went, which is what the audit trail records. */
+	purge(query: ErrorStoreQuery): Promise<number>;
+}
+
+export interface ErrorStoreConstructor {
+	new (): ErrorStoreInstance;
+}
+
 export interface Project {
 	_id: string;
 	name: string;

@@ -8,6 +8,7 @@ import {
 	SettingOutlined,
 	KeyOutlined,
 	FileSearchOutlined,
+	BugOutlined,
 	LogoutOutlined
 } from '@ant-design/icons';
 import type { AdminContext } from '../../auth/rbac.js';
@@ -17,11 +18,12 @@ import { Admins } from './Admins.js';
 import { Settings } from './Settings.js';
 import { Keys } from './Keys.js';
 import { Audit } from './Audit.js';
+import { Errors } from './Errors.js';
 
 const { Sider, Header, Content } = AntLayout;
 
 type PageKey =
-	'projects' | 'buckets' | 'admins' | 'settings' | 'keys' | 'audit';
+	'projects' | 'buckets' | 'admins' | 'settings' | 'keys' | 'audit' | 'errors';
 
 export function Layout({ me }: { me: AdminContext | null }) {
 	const roles = me?.roles ?? [];
@@ -36,7 +38,8 @@ export function Layout({ me }: { me: AdminContext | null }) {
 					{ key: 'admins', icon: <TeamOutlined />, label: 'Admins' },
 					{ key: 'settings', icon: <SettingOutlined />, label: 'Settings' },
 					{ key: 'keys', icon: <KeyOutlined />, label: 'Keys' },
-					{ key: 'audit', icon: <FileSearchOutlined />, label: 'Audit' }
+					{ key: 'audit', icon: <FileSearchOutlined />, label: 'Audit' },
+					{ key: 'errors', icon: <BugOutlined />, label: 'Faults' }
 				]
 			: [])
 	];
@@ -73,6 +76,12 @@ export function Layout({ me }: { me: AdminContext | null }) {
 			case 'audit':
 				return isSuperAdmin ? (
 					<Audit />
+				) : (
+					<Projects isSuperAdmin={isSuperAdmin} />
+				);
+			case 'errors':
+				return isSuperAdmin ? (
+					<Errors />
 				) : (
 					<Projects isSuperAdmin={isSuperAdmin} />
 				);

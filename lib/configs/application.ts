@@ -480,7 +480,78 @@ export const ApplicationConfig = {
 	 *   the authority of the administrator who authorized it, so a deployment should reach for it
 	 *   deliberately rather than inherit it from an upgrade.
 	 */
-	'mcp.enabled': false
+	'mcp.enabled': false,
+
+	/*
+	 * errorStore.enabled
+	 *
+	 * title: Server error store — record unexpected internal faults for later analysis
+	 *
+	 * description: Records every unexpected internal fault to durable storage, so a failure can be
+	 *   diagnosed after it happened instead of only while it is happening. Routine client rejections
+	 *   (a bad grant, a wrong password, an expired code) are correct behaviour and are never recorded:
+	 *   every entry in the store is a defect.
+	 *
+	 * Off by default. With it off nothing is written and none of the `/admin/api/errors` paths are
+	 *   served — they answer exactly as a path this server does not have.
+	 */
+	'errorStore.enabled': false,
+	/*
+	 * errorStore.retentionDays
+	 *
+	 * description: How long a recorded fault is kept. A group's expiry is advanced on every occurrence,
+	 *   so a fault that is still happening does not age out mid-life.
+	 */
+	'errorStore.retentionDays': 30,
+	/*
+	 * errorStore.maxGroups
+	 *
+	 * description: How many distinct faults are retained. When the bound is reached the *least recently
+	 *   seen* group is evicted — never the oldest by creation, which would discard a long-running fault
+	 *   in favour of one that happened once this morning.
+	 */
+	'errorStore.maxGroups': 10000,
+	/*
+	 * errorStore.samplesPerGroup
+	 *
+	 * description: How many full occurrences are kept per distinct fault. The occurrence *count* stays
+	 *   exact however many samples are discarded: this bounds the detail retained, never the tally.
+	 */
+	'errorStore.samplesPerGroup': 10,
+	/*
+	 * errorStore.queueDepth
+	 *
+	 * description: How many records may await writing. Recording never delays a response, so a fault is
+	 *   queued rather than written inline — and this is therefore also the stated loss bound: a process
+	 *   killed abruptly can lose at most this many records, and a full queue counts what it could not
+	 *   accept rather than blocking the request or failing silently.
+	 */
+	'errorStore.queueDepth': 500,
+	/*
+	 * errorStore.originCaptureLevel
+	 *
+	 * description: How much of the caller's network origin a record keeps, because an address is
+	 *   personal data: `omitted` stores none and says so, `anonymized` stores a value that cannot be
+	 *   reversed to the address but is still equal for two requests from the same origin, and `full`
+	 *   stores the address.
+	 *
+	 * One key with one default in every deployment, rather than a value derived from the deployment
+	 *   mode: the two modes must differ by configuration, never by a branch in logic. A
+	 *   compliance-bound deployment lowers it; one tracing abuse raises it.
+	 */
+	'errorStore.originCaptureLevel': 'anonymized'
+
+	/*
+	 * There is deliberately no `errorStore.mcpPurgeEnabled`.
+	 *
+	 * The specification asked for agent purging to be an operator opt-in. It cannot be one, and a setting
+	 * that did nothing would be worse than its absence: the published MCP operation set is invariant under
+	 * capability switches, which `test/mcp/capability_invariance.spec.ts` asserts twice over — on the tool
+	 * list under every flag combination, and on `lib/mcp/server.ts` containing no flag read at all.
+	 *
+	 * Purging is therefore withheld from agents outright, alongside project and bucket deletion. The
+	 * exclusion table in `lib/mcp/catalogue.ts` records the same reasoning at the point it takes effect.
+	 */
 };
 Object.assign(ApplicationConfig, await configStore.get());
 

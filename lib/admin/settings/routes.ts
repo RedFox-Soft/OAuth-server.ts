@@ -38,6 +38,14 @@ function validateValue(descriptor: SettingDescriptor, value: unknown): void {
 	} else if (type === 'string') {
 		if (typeof value !== 'string')
 			throw new AdminError(422, `${key} must be a string`);
+	} else if (type === 'number') {
+		/*
+		 * Type only. The bound itself — positive, integral — belongs to validateConfiguration, which
+		 * validateEffectiveConfig calls below, for the reason the `json` branch gives: restating a rule
+		 * here is the drift this module's own comment warns about.
+		 */
+		if (typeof value !== 'number' || !Number.isFinite(value))
+			throw new AdminError(422, `${key} must be a number`);
 	} else if (type === 'enum') {
 		if (typeof value !== 'string' || !options?.includes(value))
 			throw new AdminError(

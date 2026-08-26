@@ -68,6 +68,16 @@ trail** (`adminAuditStore`, collection `adminAudit`, via `lib/admin/audit/record
 before the mutation) capturing actor, action, target, and timestamp; the store exposes no
 update/delete so entries cannot be altered.
 
+Unexpected internal faults are recorded to a **server error store** (`lib/error_store/`, area
+`errorStore`, read at `/admin/api/errors`, super-admin only). Only defects are recorded — routine client
+rejections are correct behaviour and never appear. Three things about it are load-bearing and easy to
+get wrong: there are **two capture sites** (the global handler stands aside on the `adminPlane` marker,
+so `adminApp`'s own `onError` records 5xx `AdminError`s); recording never blocks a response and never
+fails a request, so a store failure degrades to the console and a full queue is _counted_; and the read
+surface is deliberately **not** flag-gated, because the admin operation set is invariant under capability
+switches — `errorStore.enabled` governs writes and is reported as `recording` in the payload. Agent
+purging is withheld outright for the same reason; `error_purge_preview` is published instead.
+
 End-user onboarding is bucket-scoped. Each `UserBucket` carries `registrationOpen`,
 `emailVerificationRequired`, and `verificationMethod` (`'link' | 'code'`); defaults are open +
 verification-off, except the reserved admin bucket which seeds `registrationOpen: false` (set in

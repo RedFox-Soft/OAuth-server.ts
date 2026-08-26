@@ -134,6 +134,21 @@ export const gatedRoutes: readonly GatedRoute[] = [
 		path: '/federation/callback',
 		flag: 'federation.enabled'
 	}
+
+	/*
+	 * The error store's read surface is deliberately NOT here, though `errorStore.enabled` exists and it
+	 * would be mechanically possible: gatedFlagForRequest consults only this table, so an exact `/admin`
+	 * entry would win over the alwaysAvailablePrefixes entry.
+	 *
+	 * It must not, because the admin operation set is invariant under capability switches — the policy
+	 * this table's `/admin` prefix encodes and `test/mcp/capability_invariance.spec.ts` enforces. Gating
+	 * an admin path also splits the console from the agent surface, which re-dispatches into the same
+	 * routes without this plugin: the console would see 404 while the agent saw 403 for the same call.
+	 *
+	 * So the capability is expressed in the payload instead. The route answers, and says whether
+	 * recording is on — which is what keeps "nothing is being recorded" distinguishable from "nothing has
+	 * failed" without hiding the endpoint.
+	 */
 ];
 
 /*

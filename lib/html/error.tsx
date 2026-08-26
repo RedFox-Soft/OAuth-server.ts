@@ -26,13 +26,26 @@ function illustrationFor(status: number): ResultStatus {
 }
 
 const cache = createCache();
-function renderError(status: number, title: string, subTitle: string) {
+function renderError(
+	status: number,
+	title: string,
+	subTitle: string,
+	reference?: string
+) {
+	/*
+	 * The reference is rendered as plain text beside the message, and only when the fault was recorded.
+	 * It is the whole point of showing a person an error page rather than a status code: they can quote
+	 * it to an operator, who resolves it to the one record. It discloses nothing — the identifier is
+	 * random and carries no state.
+	 */
 	const html = renderToStaticMarkup(
 		<StyleProvider cache={cache}>
 			<Result
 				status={illustrationFor(status)}
 				title={status.toString()}
-				subTitle={subTitle}
+				subTitle={
+					reference ? `${subTitle} (reference: ${reference})` : subTitle
+				}
 			/>
 		</StyleProvider>
 	);
@@ -52,9 +65,10 @@ function renderError(status: number, title: string, subTitle: string) {
 export function getErrorHtmlResponse(
 	status: number,
 	error: string,
-	message: string
+	message: string,
+	reference?: string
 ) {
-	const html = renderError(status, error, message);
+	const html = renderError(status, error, message, reference);
 	// Without an explicit status the Response defaults to 200, so an HTML-preferring caller was told
 	// "OK" for every error the server rendered as a page — including a not-found.
 	return htmlResponse(html, { status });

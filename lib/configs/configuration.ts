@@ -369,6 +369,39 @@ function checkAuthMethods(
 	});
 }
 
+const ORIGIN_CAPTURE_LEVELS = ['omitted', 'anonymized', 'full'];
+
+/*
+ * The error store's bounds, checked whether or not the capability is on.
+ *
+ * Unconditional deliberately, unlike checkDeviceFlow below: the bounds are what stop a switched-on
+ * store from growing without limit, so a deployment must not be able to persist a nonsensical one
+ * while the feature is off and have it take effect on the restart that enables it.
+ */
+function checkErrorStore(config: ConfigurationInput) {
+	const bounds = [
+		'errorStore.retentionDays',
+		'errorStore.maxGroups',
+		'errorStore.samplesPerGroup',
+		'errorStore.queueDepth'
+	] as const;
+
+	for (const key of bounds) {
+		const value = config[key];
+		if (!Number.isInteger(value) || value < 1) {
+			throw new TypeError(`${key} must be a positive integer`);
+		}
+	}
+
+	if (
+		!ORIGIN_CAPTURE_LEVELS.includes(config['errorStore.originCaptureLevel'])
+	) {
+		throw new TypeError(
+			`errorStore.originCaptureLevel must be one of ${formatters.formatList([...ORIGIN_CAPTURE_LEVELS])}`
+		);
+	}
+}
+
 function checkDeviceFlow(config: ConfigurationInput) {
 	if (config['deviceFlow.enabled']) {
 		if (config['deviceFlow.charset'] !== undefined) {
@@ -424,6 +457,7 @@ export function validateConfiguration(
 	checkAuthMethods(config, clientAuthMethods);
 	checkCibaDeliveryModes(config);
 	checkRichAuthorizationRequests(config);
+	checkErrorStore(config);
 
 	return {
 		scopes,

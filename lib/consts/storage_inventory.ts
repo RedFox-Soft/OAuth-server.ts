@@ -98,6 +98,8 @@ export const STORE_AREAS = {
 	adminAudit: 'adminAudit',
 	/* Pending confirmations for the MCP control plane's high-consequence operations. */
 	mcpConfirmation: 'mcpConfirmation',
+	/* Recorded internal server faults, grouped by fingerprint. */
+	errorStore: 'errorStore',
 	/* One area, four writers: configStore keeps the persisted ApplicationConfig, SmtpSettingsStore the
 	 * SMTP credentials, and two SingletonSecretStore instances the server's DPoP nonce secret and its
 	 * pairwise identifier salt — singleton documents distinguished only by a derived ObjectId. One
@@ -404,6 +406,42 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 			{ key: { action: 1, timestamp: 1 } },
 			{ key: { targetType: 1, targetId: 1, timestamp: 1 } },
 			{ key: { targetScope: 1, timestamp: 1 } }
+		]
+	),
+	/*
+	 * The one area with an expiry field that is *advanced* rather than fixed at write: a group's
+	 * `expiresAt` moves forward on every occurrence, so the retention window runs from the last time a
+	 * fault was seen, not the first. A fault that has been happening for six weeks is the last thing
+	 * that should age out.
+	 *
+	 * Unowned, and the reason is not a formality. A record naming a client is *about* that client's
+	 * request; it is not the client's data. Deleting a client must not erase the evidence of the faults
+	 * its requests caused, so no cascade arm may ever reach this area.
+	 */
+	storeArea(
+		STORE_AREAS.errorStore,
+		'expiresAt',
+		unowned(
+			'diagnostic evidence of a server fault; deleting the subject must not erase what happened'
+		),
+		/*
+		 * Ascending throughout, though every read is newest-first: the listing sort is the exact reverse
+		 * of `{ lastSeenAt, _id }`, which MongoDB serves by walking the same index backwards. Same
+		 * arrangement, for the same reason, as the adminAudit area's `{ timestamp: 1, _id: 1 }`.
+		 *
+		 * The `_id` tiebreaker is what makes the order total. Two faults recorded in the same
+		 * millisecond is ordinary here rather than a corner case — a storm is one of the things this
+		 * store exists to show — and without the tiebreaker paging would drop or repeat a group.
+		 */
+		[
+			{ key: { fingerprint: 1 }, unique: true },
+			{ key: { lastSeenAt: 1, _id: 1 } },
+			{ key: { errorCode: 1, lastSeenAt: 1 } },
+			{ key: { route: 1, lastSeenAt: 1 } },
+			{ key: { surface: 1, lastSeenAt: 1 } },
+			{ key: { status: 1, lastSeenAt: 1 } },
+			{ key: { 'samples.clientId': 1, lastSeenAt: 1 } },
+			{ key: { 'samples.reference': 1 } }
 		]
 	),
 	storeArea(

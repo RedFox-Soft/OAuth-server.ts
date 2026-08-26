@@ -14,6 +14,7 @@ import { settingsRoutes } from './settings/routes.js';
 import { smtpSettingsRoutes } from './settings/smtp/routes.js';
 import { jwksRoutes } from './jwks/routes.js';
 import { auditRoutes } from './audit/routes.js';
+import { errorRoutes } from './errors/routes.js';
 
 /*
  * Every route of the administrative control plane except the console's own HTML shell.
@@ -61,4 +62,5 @@ export const adminApiRoutes = new Elysia({ name: 'admin-api' })
 	.use(settingsRoutes)
 	.use(smtpSettingsRoutes)
 	.use(jwksRoutes)
-	.use(auditRoutes);
+	.use(auditRoutes)
+	.use(errorRoutes);

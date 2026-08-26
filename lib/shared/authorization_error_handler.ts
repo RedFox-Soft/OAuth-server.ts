@@ -15,6 +15,39 @@ import { dPoPSigningAlgValues } from 'lib/configs/jwaAlgorithms.js';
 import { InvalidDpopProof, UseDpopNonce } from 'lib/helpers/validate_dpop.js';
 import { DPoPNonces } from 'lib/helpers/dpop_nonces.js';
 import { FeatureDisabled } from 'lib/plugins/featureGate.js';
+import { captureFault } from 'lib/error_store/capture.js';
+import { fieldNamesOf } from 'lib/error_store/redact.js';
+import type { ErrorSurface } from 'lib/adapters/types.js';
+
+/*
+ * Which plane a fault arose on, from the route it arrived at.
+ *
+ * Captured rather than inferred later: a reader filtering by surface is asking "is this the protocol or
+ * the interaction pages?", and re-deriving that from a stored route string would mean the answer could
+ * drift from the route table it was derived from.
+ *
+ * `/admin` is here even though the handler stands aside for admin-plane errors, and the distinction is
+ * worth stating because it is easy to get backwards: the early exit keys on the `adminPlane` *marker*,
+ * which only a deliberate AdminError carries. An unexpected fault inside an admin route carries no
+ * marker, so it arrives here like any other — and this is the only place it can be filed under the
+ * plane it actually came from. The admin group's own handler records the AdminErrors that do exit.
+ */
+function surfaceFor(route: string): ErrorSurface {
+	if (route === routeNames.mcp || route === routeNames.mcp_metadata) {
+		return 'mcp';
+	}
+	if (route.startsWith('/admin')) {
+		return 'admin';
+	}
+	if (
+		route.startsWith('/ui') ||
+		route.startsWith('/verify-email') ||
+		route.startsWith('/reset-password')
+	) {
+		return 'interaction';
+	}
+	return 'oauth';
+}
 
 function getFirstError(error: ValidationError) {
 	const firstError =
@@ -212,7 +245,49 @@ export async function errorHandler(obj: ErrorContext) {
 		console.error('Unknown error', error);
 	}
 
+	/*
+	 * Recorded here rather than beside the `server_error` emit above, because only now is the status
+	 * final: statusFor corrects a DPoP failure's status by where it was raised, and a fault must be
+	 * filed under the status the caller actually received.
+	 *
+	 * The 500 test is what keeps routine rejections out of the store. A FeatureDisabled refusal cannot
+	 * reach this branch — it carries its own 404 — so the deliberate-behaviour exclusion the emit above
+	 * documents holds here for free rather than needing a second check.
+	 */
+	/*
+	 * Narrowed once, because `set.status` is a number *or* one of Elysia's status names: comparing a name
+	 * against 500 yields false rather than an error, so an un-narrowed test would silently record nothing
+	 * on exactly the responses this store exists for. Everything in this codebase assigns numbers, so a
+	 * non-number means "not a status we can classify" and is left unrecorded rather than guessed at.
+	 */
+	const numericStatus = typeof status === 'number' ? status : undefined;
+	const reference =
+		numericStatus !== undefined && numericStatus >= 500
+			? captureFault({
+					surface: surfaceFor(route),
+					route,
+					method: request.method,
+					status: numericStatus,
+					errorCode: 'server_error',
+					error,
+					headers: request.headers,
+					submittedFields: fieldNamesOf(obj.query)
+				})
+			: undefined;
+
 	const errorObj = getObjFromError(code, error);
+	/*
+	 * Attached only where a record exists, so every reference a caller can report resolves to one and
+	 * none dangles. An additional member on the error body, which RFC 6749 §5.2 does not close — and it
+	 * is opaque, so a spec-compliant client that ignores it loses nothing and one that surfaces it gives
+	 * its operator something to quote.
+	 *
+	 * A separate object rather than a mutation, so the WWW-Authenticate challenge below is built from
+	 * the unadorned error: a diagnostic handle has no business in an auth challenge header.
+	 */
+	const body = reference
+		? { ...errorObj, error_reference: reference }
+		: errorObj;
 	if (isOIDError && status === 401) {
 		const auth = request.headers.get('authorization')?.toLowerCase() ?? '';
 		const isDpop = !!request.headers.get('dpop');
@@ -232,10 +307,11 @@ export async function errorHandler(obj: ErrorContext) {
 		return getErrorHtmlResponse(
 			set.status,
 			errorObj.error,
-			errorObj.error_description
+			errorObj.error_description,
+			reference
 		);
 	}
-	return errorObj;
+	return body;
 }
 
 async function authorizationErrorHandler({

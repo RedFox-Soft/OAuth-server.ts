@@ -109,6 +109,7 @@ const BODIES: Record<string, Record<string, unknown>> = {
 		password: 'a new password that is long enough'
 	},
 	jwks_generate: { alg: 'RS256' },
+
 	settings_update: { 'dpop.requireNonce': true },
 	smtp_settings_update: {
 		host: 'smtp.example.com',
@@ -214,7 +215,7 @@ describe('every high-consequence tool is gated', () => {
 		const gated = mcpCatalogue.filter(
 			(t) => t.consequence === 'ordinary' || t.consequence === 'read'
 		);
-		expect(gated.length).toBe(39 - 11);
+		expect(gated.length).toBe(44 - 11);
 		for (const tool of gated) {
 			expect(tool.consequence, tool.tool).not.toBe('high');
 		}

@@ -25,6 +25,7 @@ import { UpdateSettingsBody } from '../admin/settings/schema.js';
 import { UpdateSmtpBody } from '../admin/settings/smtp/schema.js';
 import { GenerateKeyBody } from '../admin/jwks/schema.js';
 import { AuditQuery } from '../admin/audit/schema.js';
+import { ErrorQuery, ErrorSummaryQuery } from '../admin/errors/schema.js';
 
 /*
  * THE published surface of the administrative MCP control plane: one entry per tool, mapped to the one
@@ -286,6 +287,71 @@ const catalogue = [
 		pathParams: [],
 		summary:
 			'The administrative audit trail, newest first, filterable by actor, action, target, surface and time window. Filter `viaSurface=mcp` for actions taken through an agent. An entry means an authorized actor reached the point of applying a change, not that the change took effect.'
+	},
+	{
+		tool: 'error_list',
+		method: 'GET',
+		path: '/admin/api/errors',
+		action: null,
+		consequence: 'read',
+		requiredRole: 'super_admin',
+		bodySchema: null,
+		querySchema: ErrorQuery,
+		pathParams: [],
+		summary:
+			'Recorded internal server faults, newest first, one entry per distinct fault with an exact occurrence count. Filterable by error code, route, surface, status, client, actor and time window. Only defects are recorded — routine client rejections such as a bad grant or a wrong password never appear. A non-zero `dropped` means recording fell behind and the list is incomplete.'
+	},
+	{
+		tool: 'error_summary',
+		method: 'GET',
+		path: '/admin/api/errors/summary',
+		action: null,
+		consequence: 'read',
+		requiredRole: 'super_admin',
+		bodySchema: null,
+		querySchema: ErrorSummaryQuery,
+		pathParams: [],
+		summary:
+			'How much is failing over a time window, broken down by error code and by endpoint, most frequent first. Counts sum occurrences rather than distinct faults, so one fault seen 900 times outranks nine seen once. Takes a window only — use error_list to filter by client, actor, status or surface.'
+	},
+	{
+		tool: 'error_purge_preview',
+		method: 'GET',
+		path: '/admin/api/errors/purge-preview',
+		action: null,
+		consequence: 'read',
+		requiredRole: 'super_admin',
+		bodySchema: null,
+		querySchema: ErrorQuery,
+		pathParams: [],
+		summary:
+			'How many recorded faults, and how many occurrences, a purge with these filters would remove. Reads only — nothing is deleted. Available whether or not this deployment lets an agent perform the purge itself, because reading the consequence of a deletion is not destructive.'
+	},
+	{
+		tool: 'error_by_reference',
+		method: 'GET',
+		path: '/admin/api/errors/reference/:reference',
+		action: null,
+		consequence: 'read',
+		requiredRole: 'super_admin',
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['reference'],
+		summary:
+			'Resolve the reference identifier a caller reported (it looks like err_XXXXXXXXXXXXXXXX) to the one fault it belongs to, and which occurrence it was. Answers not-found rather than an empty result, so a mistyped reference is distinguishable from a record that has aged out.'
+	},
+	{
+		tool: 'error_get',
+		method: 'GET',
+		path: '/admin/api/errors/:id',
+		action: null,
+		consequence: 'read',
+		requiredRole: 'super_admin',
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			'One recorded fault with its retained samples: where it arose, how often, when first and last seen. Samples are capped, so a very frequent fault keeps its earliest and its most recent occurrences while the count stays exact. No credential value is ever stored, so none can be read here.'
 	},
 
 	/* ------------------------------------------------ writes: projects (3) */
@@ -674,6 +740,26 @@ export const excludedConsoleOperations: readonly ExcludedConsoleOperation[] = [
 		absence: 'withheld',
 		reason:
 			'Deleting a user bucket destroys a container of end-user accounts with nothing left afterwards to inspect or restore. Withheld from agents by operator decision — delete it in the admin console instead.'
+	},
+	/*
+	 * Purging recorded faults.
+	 *
+	 * Withheld outright, like the two container deletions above, and NOT as an operator-configurable
+	 * opt-in — which is what the specification asked for. It cannot be: the published operation set is
+	 * invariant under capability switches, asserted twice over by
+	 * `test/mcp/capability_invariance.spec.ts` (once on the tool list under every flag combination, once
+	 * on this module's own source containing no flag read). A conditionally registered tool fails both,
+	 * and a tool that reads the flag in its body fails the second by construction.
+	 *
+	 * So an agent may see what a purge would remove and never perform one. That is a real reduction
+	 * against the specification, recorded here rather than in a comment claiming the opt-in exists.
+	 */
+	{
+		method: 'DELETE',
+		path: '/admin/api/errors',
+		absence: 'withheld',
+		reason:
+			'Purging recorded faults destroys the only account of what went wrong, and cannot be undone. Withheld from agents — purge them in the admin console instead. Use error_purge_preview to see what a purge would remove.'
 	}
 ];
 
@@ -698,7 +784,8 @@ export function excludedOperationFor(
 		project_delete: '/admin/api/projects/:id',
 		bucket_delete: '/admin/api/buckets/:id',
 		setup_bootstrap: '/admin/api/setup',
-		logout: '/admin/api/logout'
+		logout: '/admin/api/logout',
+		error_purge: '/admin/api/errors'
 	};
 	const path = guesses[name];
 	return path

@@ -37,9 +37,14 @@ describe('settings catalog', () => {
 			seen.add(d.key);
 			expect(d.group.length).toBeGreaterThan(0);
 			expect(d.label.length).toBeGreaterThan(0);
-			expect(['boolean', 'string', 'enum', 'string-array', 'json']).toContain(
-				d.type
-			);
+			expect([
+				'boolean',
+				'string',
+				'enum',
+				'number',
+				'string-array',
+				'json'
+			]).toContain(d.type);
 			if (d.type === 'enum') expect(Array.isArray(d.options)).toBe(true);
 		}
 	});

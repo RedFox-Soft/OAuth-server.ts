@@ -45,7 +45,14 @@ const REAPED_ON_EXPIRES_AT = [
 	 * the control rather than housekeeping: a confirmation that outlived its window could be redeemed
 	 * against state that has since changed, which is the failure the two-step gate exists to prevent.
 	 */
-	'mcpConfirmation'
+	'mcpConfirmation',
+	/*
+	 * Recorded server faults. The only area whose expiry is *advanced* rather than set once: a group's
+	 * `expiresAt` moves forward on every occurrence, so the retention window runs from when a fault was
+	 * last seen. Reaping on first-seen would delete the longest-running faults first, which is exactly
+	 * backwards for the one area whose purpose is to show what keeps breaking.
+	 */
+	'errorStore'
 ];
 
 const PERMANENT = [

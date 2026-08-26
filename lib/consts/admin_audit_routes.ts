@@ -225,6 +225,19 @@ const routes = [
 		method: 'PUT',
 		path: '/admin/api/settings/smtp',
 		targetType: 'SmtpSettings'
+	},
+
+	/*
+	 * Purging recorded faults. Audited even though what it destroys is diagnostic rather than
+	 * operational: it is an irreversible deletion an administrator chose, and the trail is the only place
+	 * that survives it. The count of what went is recorded separately — the trail has no update path, so
+	 * the entry written before the purge can only ever state an intention.
+	 */
+	{
+		action: 'error.purge',
+		method: 'DELETE',
+		path: '/admin/api/errors',
+		targetType: 'ErrorRecord'
 	}
 ] as const satisfies readonly AuditedAdminRoute[];
 

@@ -4,6 +4,7 @@ export type SettingType =
 	| 'boolean'
 	| 'string'
 	| 'enum'
+	| 'number'
 	| 'string-array'
 	// A structured JSON value edited as text. The route validates only that it is an object; its real
 	// rules belong to validateConfiguration, so boot and the admin PUT cannot disagree.
@@ -360,6 +361,61 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 		type: 'boolean',
 		description:
 			'Serves this control plane to an AI agent over MCP at /mcp, as an OAuth 2.1 protected resource of this server. An agent acts as the administrator who authorized it and gets exactly that account’s permissions: every operation runs through the same routes, the same checks and the same audit trail as the console, and each entry records both the operator and the agent. Deleting a project or a user bucket is withheld from agents entirely and stays console-only. Off by default — with it off, neither /mcp nor its metadata document is served. Applied at startup.'
+	},
+
+	{
+		key: 'errorStore.enabled',
+		group: 'Error Store',
+		label: 'Record internal server faults',
+		type: 'boolean',
+		description:
+			'Keeps a durable record of unexpected internal faults so a failure can be diagnosed after it happened rather than only while it is happening. Routine client rejections — a bad grant, a wrong password, an expired code — are correct behaviour and are never recorded, so every entry is a defect. Off by default; with it off nothing is written and the /admin/api/errors paths are not served at all.'
+	},
+	{
+		key: 'errorStore.retentionDays',
+		group: 'Error Store',
+		label: 'Retention window (days)',
+		type: 'number',
+		dependsOn: 'errorStore.enabled',
+		description:
+			'How long a recorded fault is kept. The window runs from when the fault was last seen, not when it was first seen, so a fault that is still happening does not age out mid-life.'
+	},
+	{
+		key: 'errorStore.maxGroups',
+		group: 'Error Store',
+		label: 'Maximum distinct faults retained',
+		type: 'number',
+		dependsOn: 'errorStore.enabled',
+		description:
+			'How many distinct faults are kept. At the limit the least recently seen fault is evicted — never the oldest by creation, which would discard a long-running problem in favour of one that happened once this morning.'
+	},
+	{
+		key: 'errorStore.samplesPerGroup',
+		group: 'Error Store',
+		label: 'Occurrences kept per fault',
+		type: 'number',
+		dependsOn: 'errorStore.enabled',
+		description:
+			'How many full occurrences are retained for each distinct fault: the earliest, plus the most recent ones. The occurrence count stays exact however many are discarded — this bounds the detail kept, never the tally.'
+	},
+	{
+		key: 'errorStore.queueDepth',
+		group: 'Error Store',
+		label: 'Pending write queue depth',
+		type: 'number',
+		dependsOn: 'errorStore.enabled',
+		description:
+			'How many records may await writing. Recording never delays a response, so faults are queued rather than written inline — which makes this also the loss bound: an abruptly killed process can lose at most this many records, and a full queue counts what it could not accept so an operator can see that recording fell behind.'
+	},
+	{
+		key: 'errorStore.originCaptureLevel',
+		group: 'Error Store',
+		label: 'Caller address detail',
+		type: 'enum',
+		options: ['omitted', 'anonymized', 'full'],
+		dependsOn: 'errorStore.enabled',
+		description:
+			'How much of the caller’s network address a record keeps, because an address is personal data. "omitted" stores none and says so; "anonymized" stores a value that cannot be reversed to the address but is still the same for two requests from one origin, so a single misbehaving deployment is still identifiable; "full" stores the address. Defaults to anonymized.'
 	},
 
 	{

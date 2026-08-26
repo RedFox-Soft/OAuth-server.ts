@@ -29,16 +29,16 @@ const mountedApi = mounted.routes
 	.map((r) => ({ method: r.method, path: r.path }));
 
 describe('MCP tool catalogue', () => {
-	it('publishes 39 tools: 15 reads and 24 writes', () => {
-		expect(mcpCatalogue.length).toBe(39);
-		expect(mcpCatalogue.filter((t) => t.method === 'GET').length).toBe(15);
+	it('publishes 44 tools: 20 reads and 24 writes', () => {
+		expect(mcpCatalogue.length).toBe(44);
+		expect(mcpCatalogue.filter((t) => t.method === 'GET').length).toBe(20);
 		expect(mcpCatalogue.filter((t) => t.method !== 'GET').length).toBe(24);
 	});
 
 	it('names exactly four exclusions', () => {
 		// A fifth exclusion is a product decision, not a refactor: it must fail here until the
 		// specification is updated to account for it.
-		expect(excludedConsoleOperations.length).toBe(4);
+		expect(excludedConsoleOperations.length).toBe(5);
 	});
 
 	it('accounts for every mounted /admin/api route, in both directions', () => {
@@ -85,7 +85,8 @@ describe('MCP tool catalogue', () => {
 		const withheld = withheldConsoleOperations.map(key);
 		expect(withheld).toEqual([
 			'DELETE /admin/api/projects/:id',
-			'DELETE /admin/api/buckets/:id'
+			'DELETE /admin/api/buckets/:id',
+			'DELETE /admin/api/errors'
 		]);
 		expect(
 			excludedConsoleOperations

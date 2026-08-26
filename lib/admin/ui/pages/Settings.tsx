@@ -16,7 +16,8 @@ import {
 
 // Mirrors SettingType in lib/admin/settings/catalog.ts. A type added there without a branch in
 // `control()` below falls through to the plain text input, which cannot edit a structured value.
-type SettingType = 'boolean' | 'string' | 'enum' | 'string-array' | 'json';
+type SettingType =
+	'boolean' | 'string' | 'enum' | 'number' | 'string-array' | 'json';
 
 function JsonField({
 	value,
@@ -383,6 +384,17 @@ export function Settings() {
 				<Switch
 					checked={value === true}
 					onChange={(checked) => setValue(d.key, checked)}
+				/>
+			);
+		}
+		if (d.type === 'number') {
+			return (
+				<InputNumber
+					style={{ maxWidth: 200 }}
+					min={1}
+					step={1}
+					value={value as number}
+					onChange={(v) => setValue(d.key, v)}
 				/>
 			);
 		}
