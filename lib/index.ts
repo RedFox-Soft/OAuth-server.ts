@@ -13,6 +13,7 @@ import { staticPlugin } from '@elysiajs/static';
 
 import { errorHandler } from './shared/authorization_error_handler.js';
 import { nocache } from './plugins/noCache.js';
+import { securityHeaders } from './plugins/securityHeaders.js';
 import {
 	authGet,
 	authPost,
@@ -86,8 +87,10 @@ export const elysia = new Elysia({ strictPath: true, normalize: false })
 	.use(healthCheck)
 	.use(staticPlugin({ assets: 'public' }))
 	.use(nocache)
-	// Must follow nocache: onRequest hooks run in registration order and a gate refusal throws,
-	// so gating first would skip the no-store headers every other response carries.
+	.use(securityHeaders)
+	// Must follow nocache and securityHeaders: onRequest hooks run in registration order and a gate
+	// refusal throws, so gating first would skip the no-store and hardening headers every other
+	// response carries.
 	.use(featureGate)
 	// Must follow both: it answers preflights by short-circuiting, which ends the onRequest chain, so
 	// mounting it before nocache would omit no-store from the 204 and before featureGate would confirm

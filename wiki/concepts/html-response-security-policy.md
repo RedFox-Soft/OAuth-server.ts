@@ -136,6 +136,12 @@ failure is near-silent — the icons render, unstyled, with one console violatio
 
 ## Related
 
+- [[non-html-response-hardening]] — the companion half. Since spec 026 a protocol response is no
+  longer policy-free: it carries `default-src 'none'; frame-ancestors 'none'` from an `onRequest`
+  plugin. That plugin writes the locked policy unconditionally and pages override it *because* this
+  constructor sets the header on the `Response` it builds — so the single-writer property documented
+  above is now load-bearing for that feature too, and the `text/html` scan below can be failed by a
+  comment.
 - [[feature-flag-gating]] — the other two-way drift guard in this codebase, and the origin of the
   rule that a rendered error must carry a real status rather than defaulting to 200.
 - [[admin-console-signin]] — the console shell is the heaviest inline-script page here.

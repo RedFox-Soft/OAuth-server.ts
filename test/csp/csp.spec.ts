@@ -505,10 +505,22 @@ describe('content security policy: over the HTTP layer', () => {
 		await expectPolicyCoversItsOwnResources(res);
 	});
 
-	it('leaves protocol responses alone', async () => {
+	/*
+	 * Until spec 026 a protocol response carried no policy at all, and this asserted exactly that.
+	 * It now carries the non-page policy from lib/plugins/securityHeaders.ts — but what this case is
+	 * really guarding is unchanged and is the second assertion: the *page* constructor must not be
+	 * reaching responses it did not build. Asserting only the presence of the locked literal would
+	 * drop that half silently.
+	 */
+	it('gives protocol responses the non-page policy, not a page policy', async () => {
 		const { response } =
 			await agent['.well-known']['openid-configuration'].get();
-		expect(response.headers.get('content-security-policy')).toBeNull();
+		expect(response.headers.get('content-security-policy')).toBe(
+			"default-src 'none'; frame-ancestors 'none'"
+		);
+		expect(response.headers.get('content-security-policy')).not.toContain(
+			'script-src'
+		);
 	});
 });
 

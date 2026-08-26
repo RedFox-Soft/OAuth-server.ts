@@ -13,6 +13,10 @@ directories; full retrospectives live in `TASKS.md`'s git history and the knowle
 
 - CORS support: preflight handling, open CORS on discovery/JWKS, client-based CORS on the token
   family driven by a per-project `corsOrigins` allow-list, `cors.enabled` setting (spec 011)
+- Hardening headers on every response that is not a rendered page — `nosniff`, `no-referrer`, and a
+  content policy of `default-src 'none'` plus `frame-ancestors 'none'` — across the protocol
+  endpoints, the admin API, MCP and the static surface, including responses built by the error
+  pipeline. Rendered pages keep their own derived policy (spec 026)
 - Content-Security-Policy on every rendered page, derived per document — `script-src 'none'` on
   script-free pages, hashed inline styles; hydrated pages use precompiled antd CSS under
   `zeroRuntime` (specs 018/032, `74cc208`, `1a4628d`)

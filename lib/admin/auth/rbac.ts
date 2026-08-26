@@ -207,9 +207,8 @@ export const resolveAdmin = new Elysia({ name: 'admin-resolve' }).derive(
 		 * test/preload.ts. Outside the try, so a module that fails to load is a fault and not a
 		 * silent refusal.
 		 */
-		const { resolveMcpPrincipal, McpUnauthorized } = await import(
-			'../../mcp/principal.js'
-		);
+		const { resolveMcpPrincipal, McpUnauthorized } =
+			await import('../../mcp/principal.js');
 
 		/*
 		 * A DPoP proof binds to one method, and the client only ever made one for its `/mcp` request.

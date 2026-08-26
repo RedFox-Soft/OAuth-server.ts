@@ -95,24 +95,6 @@ red by design (2622 errors — task 26 owns the strategy).
   **Consider splitting** — the two channels and the token parameter are independent enough for
   separate Spec Kit cycles if the first one runs long.
 
-### 33. Security headers on non-HTML responses — Implement
-
-- (P1; spun out of the CSP work — spec 018 / `1a4628d`.)
-- **Context:** `lib/html/csp.ts`'s `htmlResponse` covers every rendered page, but nothing covers the
-  JSON surfaces. `/token`, `/userinfo`, discovery and the whole admin API carry no
-  `X-Content-Type-Options`, no `Referrer-Policy`, and no CSP. Deliberately kept out of the CSP work —
-  this is plugin-shaped work on a different surface, and bundling it would have dragged the rejected
-  CSP-as-a-plugin rework back in with it (that rework was built, measured and rejected:
-  `mapResponse({ as: 'global' })` never fires for an `onError`-built response nor the named
-  `adminApp`, failing silently — see `wiki/concepts/html-response-security-policy.md`).
-- **Expected result:** A callback-shaped plugin in the `lib/plugins/noCache.ts` form (not a named
-  Elysia instance — see the `cors.ts:33` rationale) setting `X-Content-Type-Options: nosniff`,
-  `Referrer-Policy: no-referrer` and a locked-down `default-src 'none'; frame-ancestors 'none'` on
-  non-HTML responses. It must not touch a response `htmlResponse` built, so the HTML policy keeps one
-  writer. Note that this flips `test/csp/csp.spec.ts`'s `leaves protocol responses alone`, which
-  currently asserts discovery carries **no** CSP header — that assertion becomes "carries the
-  non-HTML policy, not a page policy".
-
 ---
 
 ## P2 — Incomplete product surfaces
@@ -131,7 +113,7 @@ red by design (2622 errors — task 26 owns the strategy).
   yet).
 - **Amended by spec 024 (admin MCP control plane):** operators can now reach project
   update/bucket-assign and admin update/deactivate through an AI agent at `POST /mcp`, so the
-  *operator* dead end is relieved — but this task's subject is the SPA, and every UI gap above
+  _operator_ dead end is relieved — but this task's subject is the SPA, and every UI gap above
   still stands (the MCP surface also has no admin password change, which remains missing
   everywhere).
 - **Expected result:** Project edit/delete/bucket-assign flows in the SPA (unblocking the Users
@@ -412,7 +394,6 @@ red by design (2622 errors — task 26 owns the strategy).
 
 ## Suggested order
 
-- **33** (non-HTML security headers) — the cheapest open item; the mechanism is already decided.
 - **12** (guard the throwing toggles) → **13** (protocol conformance batch).
 - Debt with production evidence: **37** (storage encoding contract) — no database, no barriers, and
   it closes the class that actually broke production; **38** (fidelity suite) is the large one and
