@@ -135,3 +135,6 @@ worth having precisely because the derivation sits a layer away from the notific
 - [[account-resolution]] — the account id that is the derivation's second input.
 - [[token-payload-access-contract]] — the `payload.*` discipline that `end_session.ts` reads the
   account id through.
+- [[mongodb-test-fidelity]] — the salt shares its store class with the DPoP nonce secret, and that
+  class is the one whose BSON round trip broke unnoticed; the two-tier strategy exists to make the
+  same lesson unlearnable a second time.

@@ -1,15 +1,27 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 2.0.0 → 2.1.0 (MINOR — Principle I & II expanded, Security expanded)
+Version change: 2.1.0 → 2.2.0 (MINOR — Principle III materially expanded)
 Modified principles:
-  I. Standards Compliance — expanded scope from OAuth 2.0 to OAuth 2.1 (mandatory PKCE
-    for all clients, no Implicit or Resource Owner Password grants, exact redirect-URI
-    matching, refresh-token rotation).
-  II. Multi-Mode Deployment & MCP Integration — clarified MCP as an administrative
-    CONTROL PLANE: AI agents manage the instance (create/modify clients, users, scopes,
-    settings) via MCP, not merely authenticate through it.
-Added sections: none (Security Requirements expanded with admin-plane controls)
+  III. Adapter Pattern for Persistence — the adapter rule is unchanged; the testing clause
+    is narrowed from "no real database calls in the test suite" to "no real database calls
+    in the DEFAULT test run", with an explicit, bounded carve-out for a separately-invoked
+    storage-fidelity suite.
+Rationale (Governance §1):
+  The absolute form of the rule was written to keep the suite fast and hermetic, and it did.
+  It also meant the production storage backend (lib/adapters/mongodb/) carried zero automated
+  coverage, and the cost came due: the Mongo singleton secret store returned a BSON `Binary`
+  where its callers required bytes, so the server could not boot against MongoDB at all. The
+  defect shipped because the store contract spec covers the in-memory implementation alone
+  (backlog task 35, fixed in 71d9b53). The same class now holds a second secret — the pairwise
+  identifier salt — whose failure mode is worse: a server that refuses every pairwise client.
+  Four success criteria of specs/012-db-setup-provisioning (SC-001..004) are also unmeasurable
+  under the absolute rule, because each asserts a server behaviour — TTL reaping, unique-index
+  concurrency, index-backed lookup cost, and the provisioned collection set — that no in-memory
+  double can exhibit. The carve-out is bounded so the property that made the rule valuable
+  survives: the merge gate stays hermetic, and only what a database-free test provably cannot
+  cover is allowed to require one.
+Added sections: none
 Removed sections: none
 Templates requiring updates:
   ✅ plan-template.md — no structural change needed; Constitution Check defers to this file.
@@ -18,6 +30,7 @@ Templates requiring updates:
 Follow-up TODOs:
   ⚠ AGENTS.md — describes the project as a "library" (OAuth 2.0) and omits the admin
     control plane + MCP; MUST be updated to match Principles I & II (per Governance §3).
+    Tracked as backlog task 28.
 -->
 
 # OAuth-server.ts Constitution
@@ -57,8 +70,18 @@ explicit allow-list, never the entire internal surface.
 
 All storage access MUST go through the `StorageAdapter` interface. Business logic MUST
 NOT reference MongoDB, SQL, or any specific database technology. New storage requirements
-MUST be expressed as new adapter interface methods. The in-memory `TestAdapter` MUST be
-the sole adapter used in automated tests — no real database calls in the test suite.
+MUST be expressed as new adapter interface methods.
+
+The **default test run** — `bun test`, which is the merge gate — MUST use the in-memory
+`TestAdapter` as its sole adapter and MUST make no real database calls.
+
+A **storage-fidelity suite** MAY use a real database, under three binding conditions. It
+MUST be invoked separately and MUST NOT be reachable from the default run. It MUST be
+confined to properties an in-memory double cannot exhibit — server-side value encoding,
+index constraints, expiry, concurrency, and the provisioned collection set; coverage a
+database-free test can provide MUST NOT be moved into it. And every behavioural divergence
+it finds between two adapters MUST be resolved either by converging them or by declaring
+the difference with a written reason, never by tolerating it silently.
 
 ### IV. Type Safety
 
@@ -149,4 +172,4 @@ requires deviating from a principle, the deviation MUST be documented in the PR
 description and, if the exception is long-lived, reflected as an amendment here.
 Runtime development guidance is maintained in `AGENTS.md`.
 
-**Version**: 2.1.0 | **Ratified**: 2026-06-19 | **Last Amended**: 2026-06-19
+**Version**: 2.2.0 | **Ratified**: 2026-06-19 | **Last Amended**: 2026-08-26
