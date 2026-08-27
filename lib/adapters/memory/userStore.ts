@@ -33,7 +33,11 @@ export class UserStore implements UserStoreInstance {
 			claims: user.claims,
 			// Seeding a link is how a federation spec sets up "this account already signed in through that
 			// provider once" without driving a whole round trip to establish it.
-			federated: user.federated
+			federated: user.federated,
+			// And seeding an enrolment is how a spec sets up "this account already holds an
+			// authenticator" without driving the enrolment flow — which is what lets the operator-side
+			// specs (clearing an enrolment) run without the interaction-side ones existing.
+			totp: user.totp
 		};
 		this.users.set(full._id, full);
 		return full;
@@ -114,6 +118,14 @@ export class UserStore implements UserStoreInstance {
 		const user = this.users.get(_id);
 		if (!user) return null;
 		Object.assign(user, patch, { updatedAt: new Date() });
+		// Converged with the MongoDB store, which translates the same shape into `$unset`: a key present
+		// with an undefined value means remove the field, not store an undefined one. Leaving the key
+		// behind here would make the two adapters disagree about what a cleared enrolment looks like.
+		for (const [field, value] of Object.entries(patch)) {
+			if (value === undefined) {
+				delete user[field as keyof User];
+			}
+		}
 		return user;
 	}
 

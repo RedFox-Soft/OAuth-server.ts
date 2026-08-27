@@ -190,8 +190,7 @@ export const adminLogin = new Elysia({ name: 'admin-login' })
 		cookie[ADMIN_SESSION_COOKIE].set(expiredSessionCookieAttributes());
 
 		const providerSessionId = cookie[cookieNames.session]?.value as
-			| string
-			| undefined;
+			string | undefined;
 		if (providerSessionId) {
 			const session = await findSession(providerSessionId);
 			if (session) await destroyProviderSession(session);

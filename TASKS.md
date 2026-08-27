@@ -95,6 +95,29 @@ red by design (2622 errors — task 26 owns the strategy).
   **Consider splitting** — the two channels and the token parameter are independent enough for
   separate Spec Kit cycles if the first one runs long.
 
+### 39. Brute-force protection on the password sign-in door — Implement
+
+- (P1; found 2026-08-27 during the production-readiness review — nothing in the repo throttles the
+  login door.)
+- **Context:** `POST /ui/:uid/login` (`lib/interactions/index.ts:294`) runs `findByEmail` →
+  `Bun.password.verify` with no failed-attempt tracking, no cooldown, no lockout — unlimited
+  credential-stuffing against any known address, and each guess costs the server a full argon2
+  verify on a `shared-cpu-1x` machine, so the same door doubles as a cheap CPU-exhaustion vector.
+  Every sibling secret surface is already protected (verification codes cap at 5 attempts,
+  `lib/verification/consts.ts:12`; resends and password-reset requests are cooldown + daily-capped
+  via `lib/helpers/rate_window.ts`), which makes the untouched login door an anomaly, not a policy.
+- **Expected result:** Failed password attempts are tracked per `${bucketId}:${email}` (the
+  established computed-id shape — a new unowned throttle area in the storage inventory, added to
+  the email-scoped cascade list in `lib/helpers/cascade.ts:41`) with a cooldown after N consecutive
+  failures; a successful sign-in clears the counter; a throttled attempt renders the login page
+  with the existing neutral message posture (never revealing whether the account exists or whether
+  the password was right). Planning decides: N and the cooldown curve; whether an IP dimension is
+  worth adding behind Fly's proxy (`Fly-Client-IP`) or per-identity throttling suffices; and
+  whether `/token` client-secret authentication deserves the same treatment (note the constant-time
+  compare already there). Tests: N failures → cooldown refusal even with the correct password until
+  expiry; success resets the counter; other accounts and buckets unaffected; drift guards pass with
+  the new area declared.
+
 ---
 
 ## P2 — Incomplete product surfaces
@@ -394,6 +417,8 @@ red by design (2622 errors — task 26 owns the strategy).
 
 ## Suggested order
 
+- **39** (login brute-force protection) — the last open item an attacker, rather than an operator,
+  can reach; the throttle primitives it needs already exist.
 - **12** (guard the throwing toggles) → **13** (protocol conformance batch).
 - Debt with production evidence: **37** (storage encoding contract) — no database, no barriers, and
   it closes the class that actually broke production; **38** (fidelity suite) is the large one and

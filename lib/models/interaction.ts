@@ -22,6 +22,25 @@ export const InteractionPayload = t.Composite([
 		cid: t.Optional(t.String()),
 		deviceCode: t.Optional(t.String()),
 		parJti: t.Optional(t.String()),
+		/*
+		 * A sign-in that has passed the password and not yet the second factor. Declared rather than
+		 * folded into the freeform `lastSubmission`, because a state that gates authentication should be
+		 * visible in the model instead of inferred from an unknown blob.
+		 *
+		 * Its presence is what stops the sign-in completing: the login POST writes this *instead of*
+		 * `result` when the bucket requires a code, and only the code POST turns it into a `result`.
+		 * Living on the interaction gives it the interaction's own TTL, so a half-finished sign-in
+		 * expires with the attempt it belongs to and needs no expiry logic of its own.
+		 */
+		secondFactor: t.Optional(
+			t.Object({
+				accountId: t.String(),
+				/* The "remember me" choice, carried across the code step so it is not lost. */
+				transient: t.Optional(t.Boolean()),
+				/* Wrong codes in this attempt. The per-account window lives in the TotpAttempt area. */
+				attempts: t.Number()
+			})
+		),
 		result: t.Optional(t.Unknown())
 	})
 ]);

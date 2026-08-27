@@ -157,6 +157,12 @@ const routes = [
 		targetType: 'EndUser'
 	},
 	{
+		action: 'enduser.totp.clear',
+		method: 'DELETE',
+		path: '/admin/api/buckets/:id/users/:uid/totp',
+		targetType: 'EndUser'
+	},
+	{
 		action: 'enduser.delete',
 		method: 'DELETE',
 		path: '/admin/api/buckets/:id/users/:uid',

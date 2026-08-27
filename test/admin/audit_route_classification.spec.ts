@@ -60,11 +60,12 @@ describe('admin audit route classification', () => {
 
 		/*
 		 * Counted exactly, and the numbers grow with the table: 23 + the four federation rows (three provider
-		 * operations and one identity severance) + the error-store purge. A count that drifted upward
-		 * silently would let an audited route be swapped for an unaudited one without either total changing.
+		 * operations and one identity severance) + the error-store purge + clearing an end-user's
+		 * authenticator. A count that drifted upward silently would let an audited route be swapped for an
+		 * unaudited one without either total changing.
 		 */
-		expect(auditedAdminRoutes).toHaveLength(28);
-		expect(mounted).toHaveLength(29);
+		expect(auditedAdminRoutes).toHaveLength(29);
+		expect(mounted).toHaveLength(30);
 	});
 
 	it('declares each route pattern only once', () => {

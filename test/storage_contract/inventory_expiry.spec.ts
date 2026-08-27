@@ -37,6 +37,14 @@ const REAPED_ON_EXPIRES_AT = [
 	'RegistrationAccessToken',
 	'ReplayDetection',
 	'Session',
+	/*
+	 * The second factor's two areas, and expiry is the control in both rather than housekeeping. An
+	 * enrolment offer that outlived its window would leave a secret nobody proved sitting against a
+	 * live account; a failure window that never expired would lock an account out for good on ten
+	 * mistyped digits.
+	 */
+	'TotpAttempt',
+	'TotpEnrollment',
 	'VerificationChallenge',
 	'VerificationResend',
 	'adminSession',

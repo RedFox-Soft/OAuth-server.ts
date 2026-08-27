@@ -29,10 +29,10 @@ const mountedApi = mounted.routes
 	.map((r) => ({ method: r.method, path: r.path }));
 
 describe('MCP tool catalogue', () => {
-	it('publishes 44 tools: 20 reads and 24 writes', () => {
-		expect(mcpCatalogue.length).toBe(44);
+	it('publishes 45 tools: 20 reads and 25 writes', () => {
+		expect(mcpCatalogue.length).toBe(45);
 		expect(mcpCatalogue.filter((t) => t.method === 'GET').length).toBe(20);
-		expect(mcpCatalogue.filter((t) => t.method !== 'GET').length).toBe(24);
+		expect(mcpCatalogue.filter((t) => t.method !== 'GET').length).toBe(25);
 	});
 
 	it('names exactly four exclusions', () => {

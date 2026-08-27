@@ -25,6 +25,33 @@ export interface User {
 	 * needs to know the field exists.
 	 */
 	federated?: FederatedIdentity[];
+	/*
+	 * This account's authenticator, when it has one. Present ⇔ enrolled: there is deliberately no
+	 * separate `enrolled` boolean, because two fields claiming to say the same thing disagree after
+	 * the first edit. A secret that has been offered but not yet proved lives in the TotpEnrollment
+	 * area and never here.
+	 *
+	 * Embedded rather than given an area of its own, for exactly the reason `federated` is: the
+	 * account cascade destroys this row and bucket deletion destroys the whole area, so no cascade
+	 * arm needs to know the field exists.
+	 *
+	 * `secret` is recoverable by construction — TOTP verification is symmetric, so it cannot be
+	 * hashed the way a password is. It is therefore barred from every read surface instead:
+	 * `presentUser` in lib/admin/users-end/routes.ts removes it from every administrative read, and
+	 * test/mcp/secrecy.spec.ts sweeps every published read to keep that true. Nothing outside
+	 * lib/totp/ reads it.
+	 */
+	totp?: {
+		/* Base32, RFC 4648 §6. */
+		secret: string;
+		enrolledAt: Date;
+		/*
+		 * The time step of the most recently accepted code. A submitted code whose step is at or below
+		 * this is refused, which is what stops a code observed in flight being replayed for the rest of
+		 * its ~90-second acceptance band.
+		 */
+		lastStep: number;
+	};
 }
 
 export interface ModelAdapter<TPayload = unknown> {
@@ -170,7 +197,14 @@ export interface UserStoreInstance {
 		patch: Partial<
 			Pick<
 				User,
-				'roles' | 'active' | 'password' | 'verified' | 'claims' | 'federated'
+				| 'roles'
+				| 'active'
+				| 'password'
+				| 'verified'
+				| 'claims'
+				| 'federated'
+				/* Set when an enrolment is confirmed, and set back to undefined when an operator clears one. */
+				| 'totp'
 			>
 		>
 	): Promise<User | null>;
@@ -612,6 +646,25 @@ export interface UserBucket {
 	emailVerificationRequired: boolean;
 	// Which proof the registrant uses when verification is required.
 	verificationMethod: VerificationMethod;
+	/*
+	 * Whether a **password** sign-in to this bucket must also carry a one-time code from an
+	 * authenticator app. Defaulted `false` on read in both adapters, so a bucket document written
+	 * before this field existed keeps the behaviour it had.
+	 *
+	 * A boolean beside `passwordLogin` rather than an enum replacing it, deliberately. An enum
+	 * `'password' | 'password_totp'` would be a second field claiming to say whether the password
+	 * door is open — precisely the shape `passwordLogin` above warns about, and it disagrees with
+	 * `passwordLogin` the first time somebody edits one and not the other. As a boolean the two
+	 * compose: `passwordLogin` says whether the door exists, this says whether it needs two keys.
+	 *
+	 * Governs the password door only. Federated sign-in is never gated by it — the upstream provider
+	 * owns its own factor policy, exactly as `passwordLogin` governs password doors and federation
+	 * availability is derived per provider.
+	 *
+	 * Permitted, and inert, while `passwordLogin` is false. The admin route says so rather than
+	 * refusing: an operator recording intent ahead of opening the door is doing something reasonable.
+	 */
+	totpRequired: boolean;
 	createdAt: Date;
 	updatedAt: Date;
 }
@@ -627,6 +680,7 @@ export interface UserBucketStoreInstance {
 		registrationOpen?: boolean;
 		emailVerificationRequired?: boolean;
 		verificationMethod?: VerificationMethod;
+		totpRequired?: boolean;
 	}): Promise<UserBucket>;
 	find(id: string): Promise<UserBucket | null>;
 	list(): Promise<UserBucket[]>;
@@ -644,6 +698,7 @@ export interface UserBucketStoreInstance {
 				| 'registrationOpen'
 				| 'emailVerificationRequired'
 				| 'verificationMethod'
+				| 'totpRequired'
 			>
 		>
 	): Promise<UserBucket | null>;

@@ -86,17 +86,39 @@ export class UserStore implements UserStoreInstance {
 		patch: Partial<
 			Pick<
 				User,
-				'roles' | 'active' | 'password' | 'verified' | 'claims' | 'federated'
+				| 'roles'
+				| 'active'
+				| 'password'
+				| 'verified'
+				| 'claims'
+				| 'federated'
+				| 'totp'
 			>
 		>
 	): Promise<User | null> {
-		return db
-			.collection<User>(this.collectionName)
-			.findOneAndUpdate(
-				{ _id },
-				{ $set: { ...patch, updatedAt: new Date() } },
-				{ returnDocument: 'after' }
-			);
+		/*
+		 * A key present with an undefined value means "remove this field", and `$set` cannot say that:
+		 * the driver drops undefined values by default, so clearing an enrolment through `$set` would
+		 * silently leave the secret in place — the account would still verify against an authenticator
+		 * the operator believes they revoked, with nothing failing anywhere to reveal it. Splitting the
+		 * patch is what makes `update(id, { totp: undefined })` mean what its one caller intends.
+		 */
+		const set: Record<string, unknown> = { updatedAt: new Date() };
+		const unset: Record<string, ''> = {};
+		for (const [field, value] of Object.entries(patch)) {
+			if (value === undefined) {
+				unset[field] = '';
+			} else {
+				set[field] = value;
+			}
+		}
+
+		return db.collection<User>(this.collectionName).findOneAndUpdate(
+			{ _id },
+			// An empty $unset is rejected by MongoDB, so the operator only appears when it has work.
+			Object.keys(unset).length ? { $set: set, $unset: unset } : { $set: set },
+			{ returnDocument: 'after' }
+		);
 	}
 
 	async destroy(_id: string): Promise<void> {
