@@ -81,8 +81,23 @@ export async function verifyForAccount(
 	 * Advancing `lastStep` is what makes FR-018 true, and it is the easiest part of this to lose: with
 	 * verification implemented as a pure predicate, a code observed in flight stays usable for the whole
 	 * remaining drift band.
+	 *
+	 * Which is also why the write is checked rather than fired and forgotten. `update` returns null only
+	 * when the row has gone — deleted between the read above and here — and reporting success on that
+	 * would do two wrong things at once: sign a person in as an account that no longer exists, and
+	 * report a verification whose replay guard never moved.
+	 *
+	 * `not_enrolled` rather than a reason of its own, because it is true and because the caller already
+	 * routes it somewhere terminating: the enrolment GET looks the account up, does not find it either,
+	 * and sends them back to the login door.
 	 */
-	await store.update(accountId, { totp: { ...user.totp, lastStep: step } });
+	const advanced = await store.update(accountId, {
+		totp: { ...user.totp, lastStep: step }
+	});
+	if (!advanced) {
+		return { ok: false, reason: 'not_enrolled' };
+	}
+
 	await attempts().destroy(key);
 	return { ok: true };
 }

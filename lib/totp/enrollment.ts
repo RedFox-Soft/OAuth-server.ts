@@ -102,13 +102,15 @@ export async function offer(
 }
 
 export type ConfirmOutcome =
-	{ ok: true } | { ok: false; reason: 'expired' | 'invalid' };
+	{ ok: true } | { ok: false; reason: 'expired' | 'invalid' | 'gone' };
 
 /*
  * Turn a proved secret into the account's enrolment.
  *
- * `expired` is distinguished from `invalid` for the caller alone — one routes to a fresh secret, the
- * other re-renders the page that is already on screen. Both reach the person as the same words.
+ * The three refusals are distinguished for the caller alone, because each needs a different next
+ * page: `expired` routes to a fresh secret, `invalid` re-renders the page already on screen, and
+ * `gone` sends them back to the login door. Only the first two reach a person, and they reach them
+ * as the same words.
  */
 export async function confirm(
 	uid: string,
@@ -130,9 +132,26 @@ export async function confirm(
 	 * spent, and a person who submits it once more within the same 30 seconds — a double-submitted form,
 	 * or someone who watched them type it — must not be able to use it to sign in.
 	 */
-	await getUserStore(pending.bucketId).update(pending.accountId, {
-		totp: { secret: pending.secret, enrolledAt: new Date(), lastStep: step }
-	});
+	const enrolled = await getUserStore(pending.bucketId).update(
+		pending.accountId,
+		{
+			totp: { secret: pending.secret, enrolledAt: new Date(), lastStep: step }
+		}
+	);
+	/*
+	 * The write is the enrolment; reporting success without it would hand the caller a completed
+	 * second factor for an account that holds none — and, because the caller then writes
+	 * `result.login`, sign a person in as an account that no longer exists. `update` returns null for
+	 * exactly one reason: the row is gone, deleted between the offer and this confirmation.
+	 *
+	 * The pending record goes either way. There is nothing left to enrol into, so leaving it would
+	 * only keep a live secret addressed to a dead account until its TTL caught up.
+	 */
+	if (!enrolled) {
+		await enrollments().destroy(uid);
+		return { ok: false, reason: 'gone' };
+	}
+
 	await enrollments().destroy(uid);
 	return { ok: true };
 }

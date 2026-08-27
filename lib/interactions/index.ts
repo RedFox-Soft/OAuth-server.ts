@@ -95,9 +95,17 @@ function persistInteraction(interaction: {
 	payload: { exp?: number };
 	save(ttl: number): Promise<unknown>;
 }): Promise<unknown> {
-	return interaction.save(
-		(interaction.payload.exp ?? epochTime()) - epochTime()
-	);
+	const remaining = (interaction.payload.exp ?? epochTime()) - epochTime();
+	/*
+	 * Clamped, because both ends of the unclamped range write the wrong thing through
+	 * MongoAdapter.upsert: a TTL of exactly 0 is falsy there, so no `expiresAt` is written at all and
+	 * an interaction that should be seconds from death is instead left non-expiring; a negative one
+	 * back-dates `expiresAt` and kills the record mid-request. Both are reachable in the same narrow
+	 * window — an interaction that expires between the resolve step reading it and a handler saving it,
+	 * or one whose `exp` is somehow absent. One second is the same floor lib/totp/verify.ts uses when
+	 * it re-writes an attempt window for the same reason.
+	 */
+	return interaction.save(Math.max(1, remaining));
 }
 import { ApplicationConfig } from 'lib/configs/application.js';
 
@@ -558,6 +566,14 @@ export const ui = new Elysia()
 			const outcome = await confirmEnrollment(uid, body.code);
 
 			if (!outcome.ok) {
+				/*
+				 * The account went away between the offer and this submission. Not the enrolment page
+				 * again — there is nothing to enrol — and not an error banner either, which would invite
+				 * them to keep typing codes at a row that no longer exists.
+				 */
+				if (outcome.reason === 'gone') {
+					return Response.redirect(buildUILoginPath(uid), 303);
+				}
 				if (outcome.reason === 'expired') {
 					// A fresh secret rather than a dead form: the GET mints one.
 					return Response.redirect(buildUIPath(uid, 'totp/enroll'), 303);

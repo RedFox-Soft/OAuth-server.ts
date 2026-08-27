@@ -281,6 +281,30 @@ describe('enrolment at registration (US2)', () => {
 		expect(secretFrom(reoffered.text)).not.toBe(secret);
 	});
 
+	/*
+	 * Same race on the enrolment side. Confirming must not report success against a deleted row: the
+	 * caller would write `result.login` and sign someone in as an account that holds no authenticator
+	 * and, in fact, does not exist.
+	 */
+	it('refuses to enrol an account that vanished before the code was confirmed', async () => {
+		const email = `vanishing-enrol-${Math.random()}@x.io`;
+		const { uid, cookie } = await register('totp-required-app', email);
+		const page = await getPage(`/ui/${uid}/totp/enroll`, cookie);
+		const secret = secretFrom(page.text);
+
+		const user = await getUserStore(requiredBucketId).findByEmail(email);
+		await getUserStore(requiredBucketId).destroy(user!._id);
+
+		const res = await postForm(`/ui/${uid}/totp/enroll`, cookie, {
+			code: codeFor(secret)
+		});
+
+		expect(res.setCookie ?? '').not.toContain('_session=');
+		expect(res.location).toBe(`/ui/${uid}/login`);
+		// The pending secret is not left addressed to a row that no longer exists.
+		expect(await adapter('TotpEnrollment').find(uid)).toBeUndefined();
+	});
+
 	it('sends someone with no half-finished sign-in back to the login page', async () => {
 		const { uid, cookie } = await startInteraction('totp-required-app');
 		const page = await getPage(`/ui/${uid}/totp/enroll`, cookie);

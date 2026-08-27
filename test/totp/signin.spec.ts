@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'bun:test';
+import { describe, it, expect, beforeAll, spyOn } from 'bun:test';
 import bootstrap, { agent, getHeader } from '../test_helper.ts';
 import { AuthorizationRequest } from '../AuthorizationRequest.ts';
 import {
@@ -17,6 +17,7 @@ import {
 	MAX_ATTEMPTS_PER_INTERACTION
 } from 'lib/totp/consts.ts';
 import epochTime from 'lib/helpers/epoch_time.ts';
+import { TestAdapter } from 'test/models.js';
 
 const PASSWORD = 'correct horse battery';
 const SECRET = encodeBase32(Buffer.from('12345678901234567890', 'ascii'));
@@ -302,6 +303,61 @@ describe('second factor at sign-in (US3)', () => {
 			`${requiredBucketId}:${user._id}`
 		);
 		expect(record).toBeDefined();
+		/*
+		 * A longer budget than the 5s default, and not because anything here is slow by accident: driving
+		 * the cap means ACCOUNT_FAILURE_CAP full sign-ins, each paying for a real argon2 verification. It
+		 * ran at ~2.1s of the default budget when written, which is close enough to the edge that another
+		 * account in the in-memory store, or a loaded machine, tips it over — a flake that says nothing
+		 * about the throttle.
+		 */
+	}, 30_000);
+
+	/* The account is deleted between the password and the code — an operator acting mid-sign-in. */
+	it('refuses when the account is gone by the time the code arrives', async () => {
+		const email = `vanishing-${Math.random()}@x.io`;
+		const user = await seedEnrolled(requiredBucketId, email);
+		const { uid, cookie } = await passwordStep('totp-required-app', email);
+
+		await getUserStore(requiredBucketId).destroy(user._id);
+
+		const res = await postForm(`/ui/${uid}/totp`, cookie, {
+			code: currentCode()
+		});
+
+		expect(res.setCookie ?? '').not.toContain('_session=');
+		// Routed onward to enrolment, which finds no account either and returns them to the login door.
+		expect(res.location).toBe(`/ui/${uid}/totp/enroll`);
+
+		const next = await getPage(`/ui/${uid}/totp/enroll`, cookie);
+		expect(next.location).toBe(`/ui/${uid}/login`);
+	});
+
+	/*
+	 * The narrower race the one above cannot reach: the row survives the read at the top of
+	 * verifyForAccount and is gone by the write that advances `lastStep`. Only a failed write can
+	 * express it, so the write is what this drives.
+	 *
+	 * Worth its own test rather than trusting the deletion case, because the two take different exits —
+	 * that one returns before ever verifying a code, so it would pass with the guard deleted.
+	 */
+	it('refuses when the replay guard cannot be advanced', async () => {
+		const email = `no-advance-${Math.random()}@x.io`;
+		await seedEnrolled(requiredBucketId, email);
+		const { uid, cookie } = await passwordStep('totp-required-app', email);
+
+		const store = getUserStore(requiredBucketId);
+		const update = spyOn(store, 'update').mockResolvedValueOnce(null);
+		try {
+			const res = await postForm(`/ui/${uid}/totp`, cookie, {
+				code: currentCode()
+			});
+			expect(update).toHaveBeenCalled();
+			// Not signed in on a verification whose replay guard never moved.
+			expect(res.setCookie ?? '').not.toContain('_session=');
+			expect(res.location).toBe(`/ui/${uid}/totp/enroll`);
+		} finally {
+			update.mockRestore();
+		}
 	});
 
 	it('sends someone with no half-finished sign-in back to the login page', async () => {
@@ -318,6 +374,45 @@ describe('second factor at sign-in (US3)', () => {
 		});
 		expect(res.status).toBe(303);
 		expect(res.location).toContain(`/ui/${uid}/login`);
+	});
+
+	/*
+	 * A wrong code re-saves the interaction to bump its attempt counter, and that save must never be
+	 * handed a non-positive lifetime. The consequence lives in MongoAdapter.upsert, where `expiresIn`
+	 * is tested for truthiness: a TTL of 0 writes no `expiresAt` at all and leaves an interaction that
+	 * should be seconds from death non-expiring, while a negative one back-dates it.
+	 *
+	 * The TTL is asserted rather than its effect, deliberately. The effect is MongoAdapter's, and the
+	 * TestAdapter does not share it — it stores the record either way, so an assertion on what was
+	 * stored passes with the clamp removed and proves nothing. What both adapters do share is the
+	 * argument, so that is what this pins.
+	 */
+	it('never saves an interaction with a non-positive lifetime', async () => {
+		const email = `at-expiry-${Math.random()}@x.io`;
+		await seedEnrolled(requiredBucketId, email);
+		const { uid, cookie } = await passwordStep('totp-required-app', email);
+
+		// Exactly at expiry: the unclamped arithmetic yields 0.
+		TestAdapter.for('Interaction').syncUpdate(uid, { exp: epochTime() });
+
+		const store = adapter('Interaction');
+		const ttls: unknown[] = [];
+		const upsert = spyOn(store, 'upsert').mockImplementation(
+			async (id: string, payload: unknown, expiresIn?: number) => {
+				ttls.push(expiresIn);
+			}
+		);
+		try {
+			await postForm(`/ui/${uid}/totp`, cookie, { code: '000001' });
+		} finally {
+			upsert.mockRestore();
+		}
+
+		expect(ttls.length).toBeGreaterThan(0);
+		for (const ttl of ttls) {
+			expect(typeof ttl).toBe('number');
+			expect(ttl as number).toBeGreaterThanOrEqual(1);
+		}
 	});
 
 	it('refuses the code page without the interaction cookie', async () => {
