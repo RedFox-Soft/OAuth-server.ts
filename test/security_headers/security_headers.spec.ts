@@ -1,4 +1,12 @@
-import { describe, it, beforeEach, expect } from 'bun:test';
+import {
+	describe,
+	it,
+	beforeAll,
+	beforeEach,
+	afterAll,
+	expect
+} from 'bun:test';
+import { unlink } from 'node:fs/promises';
 
 import bootstrap, {
 	agent,
@@ -448,12 +456,42 @@ describe('security headers: every mounted route', () => {
  * whose declared type the browser is free to second-guess is where MIME confusion lands.
  */
 describe('security headers: the static surface', () => {
+	/*
+	 * The served bundles under public/ — admin.js, reset.css and the rest — are build output: written
+	 * by `bun run build`, gitignored, and absent from a fresh checkout. The Dockerfile builds before it
+	 * starts the server; the CI job runs `bun test` straight after `bun install` and never does, which
+	 * is the state test/html/versionedAsset.spec.ts documents as normal. Naming those files here read
+	 * as covered locally and 404'd in CI.
+	 *
+	 * What is under test is how the static handler assembles a response for a stylesheet and for a
+	 * script — not which bundle sits behind it — so the suite lays down its own assets and depends on
+	 * no build having run. staticPlugin is dynamic outside NODE_ENV=production: it stats per request,
+	 * so a file written after mount is served.
+	 */
+	const fixtures = [
+		{ path: 'public/security-headers-fixture.css', body: 'a{color:#000}\n' },
+		{
+			path: 'public/security-headers-fixture.js',
+			body: 'export const covered = true;\n'
+		}
+	];
+
+	beforeAll(async () => {
+		for (const { path, body } of fixtures) await Bun.write(path, body);
+	});
+
+	afterAll(async () => {
+		for (const { path } of fixtures) await unlink(path).catch(() => {});
+	});
+
 	beforeEach(async () => {
 		await bootstrap(import.meta.url);
 	});
 
 	it('covers a served stylesheet', async () => {
-		const res = await send('/public/reset.css', { method: 'GET' });
+		const res = await send('/public/security-headers-fixture.css', {
+			method: 'GET'
+		});
 
 		expect(res.status).toBe(200);
 		expect(res.headers.get('content-type')).toContain('text/css');
@@ -461,7 +499,9 @@ describe('security headers: the static surface', () => {
 	});
 
 	it('covers a served script bundle', async () => {
-		const res = await send('/public/admin.js', { method: 'GET' });
+		const res = await send('/public/security-headers-fixture.js', {
+			method: 'GET'
+		});
 
 		expect(res.status).toBe(200);
 		expectNonPageProfile(res);
@@ -479,16 +519,16 @@ describe('security headers: the static surface', () => {
 	 * assembled separately from the 200.
 	 */
 	it('covers a not-modified revalidation', async () => {
-		const first = await send('/public/reset.css', { method: 'GET' });
+		const asset = '/public/security-headers-fixture.css';
+		const first = await send(asset, { method: 'GET' });
 		const etag = first.headers.get('etag');
 		const lastModified = first.headers.get('last-modified');
 
-		if (!etag && !lastModified) {
-			// Nothing to revalidate against; the 200 above already carries the assertion.
-			return;
-		}
+		// Not a skip: the fixture above is served, so one of the two validators is always present.
+		// Against an unbuilt bundle this branch used to swallow the case into a vacuous pass.
+		expect(etag ?? lastModified).toBeTruthy();
 
-		const res = await send('/public/reset.css', {
+		const res = await send(asset, {
 			method: 'GET',
 			headers: etag
 				? { 'if-none-match': etag }
