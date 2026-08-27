@@ -9,6 +9,25 @@ import { ttl } from 'lib/configs/liveTime.js';
 import { Interaction } from 'lib/models/interaction.js';
 import { eventBus } from '../../event_bus.js';
 
+/*
+ * The interaction cookie's identity, owned next to the code that writes it.
+ *
+ * `(name, domain, path)` identifies a cookie, so the path is part of what has to be restated to clear
+ * one — and `cookie.remove()` takes its path from the route's cookie schema, which compiles to `/`,
+ * never from the cookie being cleared. Every clear therefore addressed a *different* cookie than the
+ * one written here, so this cookie was never actually cleared in a browser. Deriving the clearing
+ * attributes from the path that sets it is what keeps the two from drifting apart again; see
+ * wiki/concepts/cookie-path-scoping.md.
+ */
+export const interactionCookiePath = (uid: string) => `/ui/${uid}`;
+
+export const expiredInteractionCookie = (uid: string) => ({
+	value: '',
+	path: interactionCookiePath(uid),
+	maxAge: 0,
+	expires: new Date(0)
+});
+
 export default async function interactions(oidc) {
 	const client = oidc.client;
 	let failedCheck;
@@ -100,8 +119,10 @@ export default async function interactions(oidc) {
 
 	oidc.cookie[cookieNames.interaction].set({
 		value: cookieID,
-		path: `/ui/${uid}`,
-		maxAge: ttl.Interaction * 1000
+		path: interactionCookiePath(uid),
+		// Seconds, not milliseconds: the `* 1000` this carried handed the cookie a ~41-day lifetime for
+		// a one-hour interaction (ttl.Interaction is already seconds).
+		maxAge: ttl.Interaction
 	});
 
 	eventBus.emit('interaction.started', prompt);

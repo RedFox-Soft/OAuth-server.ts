@@ -139,10 +139,29 @@ export const cookieNames = {
 	session: '_session'
 };
 
+/*
+ * The attributes both end-user cookies are written with, wherever they are written.
+ *
+ * Shared rather than inlined because there is more than one cookie schema naming these cookies: the
+ * `/ui/*` guard (lib/interactions/index.ts) declares its own `t.Cookie`, and Elysia merges a schema's
+ * option object into every `cookie.set()` on the routes it guards — so a second literal is a second
+ * policy. It drifted exactly that way: the `/ui` schema carried no options at all, and the login POST
+ * writes `_session` through it, which is the moment the *authenticated* cookie is first issued.
+ *
+ * `secure` is the actual defense against the cookie travelling in cleartext; a proxy-level HTTPS
+ * redirect (fly.toml `force_https`) only mitigates it. Matches the admin cookie's posture in
+ * lib/admin/auth/session.ts.
+ */
+export const endUserCookieAttributes = {
+	httpOnly: true,
+	sameSite: 'strict',
+	secure: true
+} as const;
+
 export const AuthorizationCookies = t.Cookie(
 	{
 		_interaction: t.Optional(t.String()),
 		_session: t.Optional(t.String())
 	},
-	{ httpOnly: true, sameSite: 'strict' }
+	endUserCookieAttributes
 );

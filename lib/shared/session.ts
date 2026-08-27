@@ -1,5 +1,5 @@
 import { Session } from 'lib/models/session.js';
-import { cookieNames } from '../consts/param_list.js';
+import { cookieNames, endUserCookieAttributes } from '../consts/param_list.js';
 
 /*
  * The session cookie's path, written explicitly on every set.
@@ -18,6 +18,10 @@ export const SESSION_COOKIE_PATH = '/';
  */
 export function expiredSessionCookie() {
 	return {
+		// Restated rather than inherited from the route's cookie schema: this clear is also issued from
+		// the admin console's sign-out (lib/admin/auth/login.ts), whose cookie jar carries none of the
+		// end-user defaults.
+		...endUserCookieAttributes,
 		value: '',
 		path: SESSION_COOKIE_PATH,
 		maxAge: 0,

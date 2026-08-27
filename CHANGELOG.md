@@ -69,12 +69,20 @@ directories; full retrospectives live in `TASKS.md`'s git history and the knowle
   session as well as the console's own, and clears both cookies with the `Path` they were set with
   (Elysia's `cookie.remove()` omits `Path`, so the browser defaulted it to the request's directory
   and cleared a different cookie)
+- The interaction cookie is cleared at its own path and expires with the interaction: the clear went
+  out with `Path=/` while the cookie lives at `/ui/<uid>` (a different cookie, so a browser kept it),
+  and its `Max-Age` was set in milliseconds -- a ~41-day lifetime for a one-hour interaction
 - Small-batch fixes: duplicate first-run admin setup surface removed, error pages carry the real
   status and illustration, stale `interaction.returnTo` corrected, unimplemented CIBA `push` mode
   removed from the admin schema (spec 018)
 
 ### Security
 
+- The end-user cookies (`_session`, `_interaction`) carry `Secure` -- and the `/ui/*` responses,
+  which is where the authenticated `_session` is first written, now carry the full
+  `HttpOnly; SameSite=Strict; Secure` set instead of no attributes at all: that route family
+  declared a second, option-less cookie schema, so a `Set-Cookie` from it inherited nothing.
+  Both schemas now build from one `endUserCookieAttributes` owner
 - The admin console verifies its id_token's signature (plus `nonce`, expiry, audience) against the
   live keystore before trusting it — previously a documented decode-only shortcut (spec 017)
 - The DPoP nonce secret is self-provisioned at startup, making the requireNonce-without-secret 500

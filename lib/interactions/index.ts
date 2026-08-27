@@ -29,7 +29,10 @@ import checkResource from 'lib/shared/check_resource.js';
 import assignClaims from 'lib/actions/authorization/assign_claims.js';
 import loadAccount from 'lib/actions/authorization/load_account.js';
 import loadGrant from 'lib/actions/authorization/load_grant.js';
-import interactions from 'lib/actions/authorization/interactions.js';
+import interactions, {
+	expiredInteractionCookie
+} from 'lib/actions/authorization/interactions.js';
+import { endUserCookieAttributes } from 'lib/consts/param_list.js';
 import {
 	AlreadyUsedError,
 	ExpiredError,
@@ -76,7 +79,7 @@ async function resume(interaction, cookie) {
 	if (confirmPage) {
 		return confirmPage;
 	}
-	cookie._interaction.remove();
+	cookie._interaction.set(expiredInteractionCookie(interaction.uid as string));
 
 	// An interaction that resolved with an error result aborts the authorization request and
 	// redirects the User-Agent back to the client with that error (mirrors device_resume and the
@@ -227,11 +230,22 @@ export const ui = new Elysia()
 			 */
 			providerId: t.Optional(t.String())
 		}),
-		cookie: t.Cookie({
-			_interaction: t.String({
-				error: 'Invalid interaction cookie'
-			})
-		})
+		/*
+		 * The attribute set is shared with the authorization routes' schema rather than restated, because
+		 * Elysia merges a schema's options into every `cookie.set()` on the routes it guards and this
+		 * family writes `_session` too: `resume()` runs the session handler on *this* jar, so the login
+		 * POST is where the authenticated cookie is first issued. Declared with no options, it went out
+		 * with no `HttpOnly`, no `SameSite` and no `Secure` — the weakest write of the cookie decided what
+		 * the browser stored.
+		 */
+		cookie: t.Cookie(
+			{
+				_interaction: t.String({
+					error: 'Invalid interaction cookie'
+				})
+			},
+			endUserCookieAttributes
+		)
 	})
 	.resolve(async ({ cookie, params }) => {
 		const cookieId = cookie._interaction.value;
@@ -641,7 +655,9 @@ export const ui = new Elysia()
 				throw new AccessDenied(undefined, oidc.result.error_description);
 			}
 
-			cookie._interaction.remove();
+			cookie._interaction.set(
+				expiredInteractionCookie(interaction.uid as string)
+			);
 
 			code = await DeviceCode.find(interaction.payload.deviceCode, {
 				ignoreExpiration: true,

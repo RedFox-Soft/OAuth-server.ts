@@ -240,6 +240,12 @@ describe('admin OIDC login (BFF)', () => {
 		expect(providerCleared).toBeDefined();
 		expect(providerCleared).toMatch(/Path=\/(;|$)/);
 		expect(providerCleared).toMatch(/Max-Age=0|Expires=Thu, 01 Jan 1970/i);
+		// This route's cookie jar carries none of the end-user schema's defaults, so the clearing
+		// attributes have to come from `expiredSessionCookie()` itself -- which is why it spreads
+		// `endUserCookieAttributes` rather than listing only value/path/expiry.
+		expect(providerCleared).toContain('HttpOnly');
+		expect(providerCleared).toContain('Secure');
+		expect(providerCleared).toContain('SameSite=Strict');
 	});
 
 	it('logout destroys the provider session, not just the console session', async () => {
