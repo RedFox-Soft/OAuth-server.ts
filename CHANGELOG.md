@@ -11,6 +11,12 @@ directories; full retrospectives live in `TASKS.md`'s git history and the knowle
 
 ### Added
 
+- TOTP second factor per user bucket: `totpRequired` makes a password sign-in also require a
+  six-digit authenticator code, with enrolment at registration and at the first sign-in of an
+  existing account, RFC 4226/6238 implemented in-repo against the published test vectors, replay and
+  two-tier throttling, `amr: ['pwd','otp']` on the ID token, and operator recovery via
+  `DELETE /admin/api/buckets/:id/users/:uid/totp` (audited, ends sessions, exposed to MCP as
+  `bucket_user_totp_clear`). Federated sign-in is not gated (spec 027)
 - CORS support: preflight handling, open CORS on discovery/JWKS, client-based CORS on the token
   family driven by a per-project `corsOrigins` allow-list, `cors.enabled` setting (spec 011)
 - Hardening headers on every response that is not a rendered page — `nosniff`, `no-referrer`, and a

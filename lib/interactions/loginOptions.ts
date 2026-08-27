@@ -14,6 +14,16 @@ import { resolveBucketForClient } from '../admin/auth/resolveBucket.js';
 
 export interface LoginOptions {
 	passwordLogin: boolean;
+	/*
+	 * Whether a password sign-in to this bucket must also carry a one-time code. Resolved here with
+	 * everything else the password door needs, for the reason above: the login POST, the registration
+	 * POST and both enrolment routes all ask this question, and a second lookup path is exactly the
+	 * drift this module exists to prevent.
+	 *
+	 * Deliberately not rendered on the login page. Advertising the requirement before the password is
+	 * known would say something about the accounts in this bucket to anyone who asks.
+	 */
+	totpRequired: boolean;
 	/* Only what the page renders: an id to build the link from and a label to show. Never the credentials. */
 	providers: { id: string; displayName: string }[];
 }
@@ -26,6 +36,10 @@ export async function loginOptionsForBucket(
 		// Defaulted true for a bucket that predates the field, which the stores also do on read — belt and
 		// braces here because a falsy value would silently close the password door.
 		passwordLogin: bucket?.passwordLogin !== false,
+		// `=== true` exactly, the mirror of the line above: absent means not required, which is what a
+		// bucket predating the field must get, and what makes an unreadable bucket fail open on this
+		// rather than locking everyone out of a bucket nobody configured.
+		totpRequired: bucket?.totpRequired === true,
 		providers: enabledProviders(bucket).map((provider) => ({
 			id: provider.id,
 			displayName: provider.displayName

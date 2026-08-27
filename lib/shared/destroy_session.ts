@@ -26,13 +26,7 @@ export async function backchannelLogoutFor(
 				back.push(
 					client.backchannelLogout(accountId, sid).then(
 						() => {
-							eventBus.emit(
-								'backchannel.success',
-								ctx,
-								client,
-								accountId,
-								sid
-							);
+							eventBus.emit('backchannel.success', ctx, client, accountId, sid);
 						},
 						(err) => {
 							eventBus.emit(

@@ -18,7 +18,10 @@ function withDefaults(bucket: UserBucket | null): UserBucket | null {
 		// must keep doing so. `passwordLogin` in particular cannot be left undefined: it is read as a
 		// boolean, and undefined is falsy, which would close the password door on every existing bucket.
 		passwordLogin: bucket.passwordLogin ?? true,
-		federation: bucket.federation ?? []
+		federation: bucket.federation ?? [],
+		// Undefined is falsy, and "not required" is the right reading for a bucket written before the
+		// second factor existed — the mirror of the passwordLogin default above.
+		totpRequired: bucket.totpRequired ?? false
 	};
 }
 
@@ -35,6 +38,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		registrationOpen?: boolean;
 		emailVerificationRequired?: boolean;
 		verificationMethod?: UserBucket['verificationMethod'];
+		totpRequired?: boolean;
 	}): Promise<UserBucket> {
 		const now = new Date();
 		const bucket: UserBucket = {
@@ -47,6 +51,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 			registrationOpen: data.registrationOpen ?? true,
 			emailVerificationRequired: data.emailVerificationRequired ?? false,
 			verificationMethod: data.verificationMethod ?? 'link',
+			totpRequired: data.totpRequired ?? false,
 			createdAt: now,
 			updatedAt: now
 		};
@@ -91,6 +96,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 				| 'registrationOpen'
 				| 'emailVerificationRequired'
 				| 'verificationMethod'
+				| 'totpRequired'
 			>
 		>
 	): Promise<UserBucket | null> {

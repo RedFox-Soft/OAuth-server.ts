@@ -10,6 +10,7 @@ import {
 	Space,
 	Tag,
 	Typography,
+	Tooltip,
 	Popconfirm,
 	message
 } from 'antd';
@@ -18,7 +19,16 @@ import type { UserBucket, User } from '../../../adapters/types.js';
 import { FederationPanel } from './FederationPanel.js';
 import { UserIdentities } from './UserIdentities.js';
 
-type EndUser = Omit<User, 'password'>;
+/*
+ * What the API actually returns, which is not the stored record: `presentUser` removes the password
+ * hash and the authenticator secret, and substitutes the two derived facts an operator may see. Typed
+ * from that shape rather than from `User` so the console cannot accidentally reference a field the
+ * server does not send.
+ */
+type EndUser = Omit<User, 'password' | 'totp'> & {
+	totpEnrolled: boolean;
+	totpEnrolledAt: string | null;
+};
 
 interface CreateValues {
 	email: string;
@@ -55,6 +65,7 @@ export function BucketDetail({
 		registrationOpen?: boolean;
 		emailVerificationRequired?: boolean;
 		verificationMethod?: 'link' | 'code';
+		totpRequired?: boolean;
 	}>();
 
 	const roleOptions = (bucket?.roles ?? []).map((r) => ({
@@ -141,6 +152,23 @@ export function BucketDetail({
 		await load();
 	}
 
+	async function onClearTotp(uid: string) {
+		const res = await fetch(`${base}/users/${uid}/totp`, { method: 'DELETE' });
+		if (!res.ok) {
+			// The server's own reason where it gives one — a partial session sweep says which areas
+			// survived, and replacing that with a generic sentence would hide the half that matters.
+			const detail = (await res.json().catch(() => null)) as {
+				message?: string;
+			} | null;
+			message.error(detail?.message ?? 'failed to clear the authenticator');
+			return;
+		}
+		message.success(
+			'authenticator cleared — they will set up a new one at their next sign-in'
+		);
+		await load();
+	}
+
 	async function onSaveBucket(values: {
 		name: string;
 		roles?: string[];
@@ -148,6 +176,7 @@ export function BucketDetail({
 		registrationOpen?: boolean;
 		emailVerificationRequired?: boolean;
 		verificationMethod?: 'link' | 'code';
+		totpRequired?: boolean;
 	}) {
 		const res = await fetch(base, {
 			method: 'PATCH',
@@ -201,7 +230,8 @@ export function BucketDetail({
 								registrationOpen: bucket?.registrationOpen ?? true,
 								emailVerificationRequired:
 									bucket?.emailVerificationRequired ?? false,
-								verificationMethod: bucket?.verificationMethod ?? 'link'
+								verificationMethod: bucket?.verificationMethod ?? 'link',
+								totpRequired: bucket?.totpRequired ?? false
 							});
 							setBucketEditOpen(true);
 						}}
@@ -246,6 +276,26 @@ export function BucketDetail({
 						render: (v: boolean) => (v ? 'yes' : 'no')
 					},
 					{
+						// Whether there is an authenticator, and since when. Never the secret behind it —
+						// the server does not send it, to any role.
+						title: 'Authenticator',
+						dataIndex: 'totpEnrolled',
+						render: (enrolled: boolean, row: EndUser) =>
+							enrolled ? (
+								<Tooltip
+									title={
+										row.totpEnrolledAt
+											? `Enrolled ${new Date(row.totpEnrolledAt).toLocaleString()}`
+											: 'Enrolled'
+									}
+								>
+									<Tag color="green">enrolled</Tag>
+								</Tooltip>
+							) : (
+								<Tag>none</Tag>
+							)
+					},
+					{
 						title: 'Actions',
 						render: (_: unknown, row: EndUser) => (
 							<Space>
@@ -274,6 +324,19 @@ export function BucketDetail({
 								>
 									Identities
 								</Button>
+								{/* Offered only where there is something to clear, and stating the two
+								    consequences an operator cannot see from here: the old codes stop working,
+								    and the person is signed out everywhere. */}
+								{row.totpEnrolled && (
+									<Popconfirm
+										title="Clear this authenticator?"
+										description="Their current authenticator stops working immediately and they are signed out everywhere. They set up a new one at their next sign-in."
+										okText="Clear and sign out"
+										onConfirm={() => onClearTotp(row._id)}
+									>
+										<Button size="small">Clear authenticator</Button>
+									</Popconfirm>
+								)}
 								{/* The consequence, stated: deleting an account also ends the sessions and tokens
 								    it is currently using, which is the half an operator cannot see from here. */}
 								<Popconfirm
@@ -436,6 +499,19 @@ export function BucketDetail({
 						tooltip="Turn off for a bucket whose users must come from an identity provider. Refused unless this bucket has an enabled provider."
 					>
 						<Switch />
+					</Form.Item>
+					{/*
+					 * Disabled rather than hidden when password sign-in is off: the setting still exists and
+					 * still means something, and hiding it would leave an operator wondering where it went.
+					 * The server accepts it either way and returns the same explanation.
+					 */}
+					<Form.Item
+						name="totpRequired"
+						label="Require an authenticator app"
+						valuePropName="checked"
+						tooltip="Password sign-ins to this bucket must also carry a 6-digit code. Anyone without an authenticator sets one up at their next sign-in. Federated sign-in is not affected — the identity provider owns that policy."
+					>
+						<Switch disabled={bucket?.passwordLogin === false} />
 					</Form.Item>
 					<Form.Item
 						name="registrationOpen"

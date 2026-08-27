@@ -18,6 +18,10 @@ import type { RegistrationAccessTokenPayloadType } from '../models/registration_
 import type { ReplayDetectionPayloadType } from '../models/replay_detection.js';
 import type { SessionPayloadType } from '../models/session.js';
 import type {
+	TotpAttemptPayload,
+	TotpEnrollmentPayload
+} from '../totp/types.js';
+import type {
 	VerificationChallengePayload,
 	VerificationResendPayload
 } from '../verification/types.js';
@@ -56,6 +60,8 @@ export interface ModelPayloadByName {
 	RegistrationAccessToken: RegistrationAccessTokenPayloadType;
 	ReplayDetection: ReplayDetectionPayloadType;
 	Session: SessionPayloadType;
+	TotpAttempt: TotpAttemptPayload;
+	TotpEnrollment: TotpEnrollmentPayload;
 	VerificationChallenge: VerificationChallengePayload;
 	VerificationResend: VerificationResendPayload;
 }

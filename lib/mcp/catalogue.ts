@@ -500,7 +500,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: [],
 		summary:
-			'Create a user bucket. A bucket cannot be created unreachable: at creation it has no providers, so password login cannot be switched off.'
+			'Create a user bucket. A bucket cannot be created unreachable: at creation it has no providers, so password login cannot be switched off. `totpRequired` makes a password sign-in also require a one-time code from an authenticator app; it governs password sign-in only and never gates a federated one.'
 	},
 	{
 		tool: 'bucket_update',
@@ -513,7 +513,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"Change a bucket's name, roles, managers, or its registration and verification settings. Editing the bucket entity needs manager access to the bucket itself, not merely to a project it backs."
+			"Change a bucket's name, roles, managers, or its registration, verification and second-factor settings. Editing the bucket entity needs manager access to the bucket itself, not merely to a project it backs. `totpRequired` governs password sign-in only — it is accepted but inert while `passwordLogin` is off, and it never gates a federated sign-in, so it is not a way to secure a bucket that signs in through an upstream provider."
 	},
 
 	/* ----------------------------------------------- writes: end-users (4) */
@@ -541,6 +541,24 @@ const catalogue = [
 		pathParams: ['id', 'uid'],
 		summary:
 			"Change an end-user's email, roles, active state, or claims. Deactivating is a sign-in decision, not a deletion."
+	},
+	{
+		tool: 'bucket_user_totp_clear',
+		method: 'DELETE',
+		path: '/admin/api/buckets/:id/users/:uid/totp',
+		action: 'enduser.totp.clear',
+		/*
+		 * Ordinary rather than gated. The confirmation gate is for what cannot be undone; this is the
+		 * undoing — the state it repairs is a person locked out of their own account, and its cost is one
+		 * re-enrolment at their next sign-in.
+		 */
+		consequence: 'ordinary',
+		requiredRole: null,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'uid'],
+		summary:
+			"Clear an end-user's authenticator enrolment. Their existing authenticator stops working at once and their sessions end; they set a new one up at their next sign-in. Use when someone has lost the device holding their codes. Their password, grants and tokens are untouched."
 	},
 	{
 		tool: 'bucket_user_password_reset',

@@ -17,8 +17,15 @@ import { loginOptionsForClient } from './loginOptions.js';
 import {
 	consentServer,
 	loginServer,
-	registrationServer
+	registrationServer,
+	totpServer
 } from './serverRender.js';
+import { verifyForAccount } from 'lib/totp/verify.js';
+import {
+	confirm as confirmEnrollment,
+	offer as offerEnrollment
+} from 'lib/totp/enrollment.js';
+import { MAX_ATTEMPTS_PER_INTERACTION } from 'lib/totp/consts.js';
 import { AccessDenied, SessionNotFound } from 'lib/helpers/errors.js';
 import epochTime from '../helpers/epoch_time.js';
 import sessionHandler from 'lib/shared/session.js';
@@ -66,7 +73,40 @@ import {
 	registrationClosedPage,
 	registrationSendFailedPage
 } from './registrationPages.js';
-import { buildUILoginPath } from './buildUIPath.js';
+import { buildUILoginPath, buildUIPath } from './buildUIPath.js';
+
+/*
+ * The single answer to every failed code, whatever went wrong: a guess, a replay, an expired step, or a
+ * throttle. Written once so no future branch can accidentally be more informative than the others —
+ * which is the only way an attacker learns anything here.
+ */
+const INVALID_CODE = 'Invalid code';
+
+/*
+ * Save an interaction without changing when it expires.
+ *
+ * Not `interaction.persist()`, which reads for exactly this and cannot work: its guard tests
+ * `this.exp`, while the value lives at `this.payload.exp` (lib/models/base_model.ts), so it throws
+ * `persist can only be called on previously persisted Interactions` for every interaction that has in
+ * fact been persisted. It had no callers before this, which is why nothing noticed. Written the way
+ * lib/actions/authorization/resume.ts already writes it.
+ */
+function persistInteraction(interaction: {
+	payload: { exp?: number };
+	save(ttl: number): Promise<unknown>;
+}): Promise<unknown> {
+	const remaining = (interaction.payload.exp ?? epochTime()) - epochTime();
+	/*
+	 * Clamped, because both ends of the unclamped range write the wrong thing through
+	 * MongoAdapter.upsert: a TTL of exactly 0 is falsy there, so no `expiresAt` is written at all and
+	 * an interaction that should be seconds from death is instead left non-expiring; a negative one
+	 * back-dates `expiresAt` and kills the record mid-request. Both are reachable in the same narrow
+	 * window — an interaction that expires between the resolve step reading it and a handler saving it,
+	 * or one whose `exp` is somehow absent. One second is the same floor lib/totp/verify.ts uses when
+	 * it re-writes an attempt window for the same reason.
+	 */
+	return interaction.save(Math.max(1, remaining));
+}
 import { ApplicationConfig } from 'lib/configs/application.js';
 
 async function resume(interaction, cookie) {
@@ -331,6 +371,36 @@ export const ui = new Elysia()
 					handOffTo: redirectUriOf(interaction)
 				});
 			}
+			/*
+			 * Last, after every refusal above. The order is the point: an inactive or unverified account
+			 * is turned away exactly as it was, so the second factor never becomes the step at which an
+			 * account reveals that it exists.
+			 */
+			const { totpRequired } = await loginOptionsForClient(clientId);
+			if (totpRequired) {
+				/*
+				 * `result` is deliberately NOT written here. That is the whole of "a correct password
+				 * alone establishes nothing": no session is created, no token is issued, and the
+				 * authorization request stays where it is until a code arrives.
+				 */
+				interaction.payload.secondFactor = {
+					accountId: user._id,
+					transient: body.remember === 'on',
+					attempts: 0
+				};
+				await persistInteraction(interaction);
+				/*
+				 * A redirect rather than a render, and that is forced rather than stylistic:
+				 * loginClient.tsx reads the page name out of window.location.pathname, so a code page
+				 * served at the login path hydrates into an empty root. The federated decline path
+				 * redirects for the same reason.
+				 */
+				return Response.redirect(
+					buildUIPath(uid, user.totp ? 'totp' : 'totp/enroll'),
+					303
+				);
+			}
+
 			interaction.payload.result = {
 				login: {
 					accountId: user._id,
@@ -346,6 +416,206 @@ export const ui = new Elysia()
 				remember: t.Optional(t.Literal('on'))
 			})
 		}
+	)
+	/*
+	 * The code step. Reached only with a `secondFactor` on the interaction, which is to say only after a
+	 * password this server accepted — there is no way to arrive here by guessing a URL.
+	 */
+	.get('ui/:uid/totp', async ({ params: { uid }, interaction }) => {
+		const pending = interaction.payload.secondFactor;
+		if (!pending) {
+			return Response.redirect(buildUILoginPath(uid), 303);
+		}
+		const bucketId = await resolveBucketForClient(clientIdOf(interaction));
+		const user = await getUserStore(bucketId).find(pending.accountId);
+		// Enrolment cleared between the password and now: send them to set one up rather than ask for a
+		// code from an authenticator they no longer have.
+		if (!user?.totp) {
+			return Response.redirect(buildUIPath(uid, 'totp/enroll'), 303);
+		}
+		return totpServer(uid, {
+			mode: 'verify',
+			handOffTo: redirectUriOf(interaction)
+		});
+	})
+	.post(
+		'ui/:uid/totp',
+		async ({ body, params: { uid }, interaction, cookie }) => {
+			const pending = interaction.payload.secondFactor;
+			if (!pending) {
+				return Response.redirect(buildUILoginPath(uid), 303);
+			}
+
+			const bucketId = await resolveBucketForClient(clientIdOf(interaction));
+			const refuse = () =>
+				totpServer(uid, {
+					mode: 'verify',
+					errorMessage: INVALID_CODE,
+					handOffTo: redirectUriOf(interaction)
+				});
+
+			if (pending.attempts >= MAX_ATTEMPTS_PER_INTERACTION) {
+				return refuse();
+			}
+
+			const outcome = await verifyForAccount(
+				bucketId,
+				pending.accountId,
+				body.code
+			);
+
+			if (!outcome.ok) {
+				if (outcome.reason === 'not_enrolled') {
+					return Response.redirect(buildUIPath(uid, 'totp/enroll'), 303);
+				}
+				interaction.payload.secondFactor = {
+					...pending,
+					attempts: pending.attempts + 1
+				};
+				await persistInteraction(interaction);
+				/*
+				 * One answer for every failure — wrong, replayed, and throttled alike. A distinct "too many
+				 * attempts" would confirm to someone guessing that the account is real and that their
+				 * guesses are landing, which is the whole of what they wanted to learn.
+				 */
+				return refuse();
+			}
+
+			interaction.payload.result = {
+				login: {
+					accountId: pending.accountId,
+					transient: pending.transient,
+					/*
+					 * Both values are registered in RFC 8176. This is what tells a relying party two factors
+					 * were used: resume.ts reads `amr` off the login result onto the session, and the ID
+					 * token takes it from there. A password-only sign-in is left carrying no `amr` at all,
+					 * so "otp is present" is the test, and nothing changes for a bucket that does not
+					 * require the factor.
+					 */
+					amr: ['pwd', 'otp']
+				}
+			};
+			delete interaction.payload.secondFactor;
+			return resume(interaction, cookie);
+		},
+		{ body: t.Object({ code: t.String() }) }
+	)
+	/*
+	 * The enrolment step, reached from two directions — a registration into a requiring bucket, and a
+	 * password sign-in by an account that holds no authenticator yet. One flow, because they are the
+	 * same act: neither the registrant nor the existing account has a second factor, and both need one
+	 * before their sign-in can complete.
+	 */
+	.get('ui/:uid/totp/enroll', async ({ params: { uid }, interaction }) => {
+		const pending = interaction.payload.secondFactor;
+		if (!pending) {
+			return Response.redirect(buildUILoginPath(uid), 303);
+		}
+
+		const clientId = clientIdOf(interaction);
+		const bucketId = await resolveBucketForClient(clientId);
+		const { totpRequired } = await loginOptionsForClient(clientId);
+		// Lowered while this person was mid-flow: there is nothing left to enrol for.
+		if (!totpRequired) {
+			return Response.redirect(buildUILoginPath(uid), 303);
+		}
+
+		const user = await getUserStore(bucketId).find(pending.accountId);
+		if (!user) {
+			return Response.redirect(buildUILoginPath(uid), 303);
+		}
+		if (user.totp) {
+			return Response.redirect(buildUIPath(uid, 'totp'), 303);
+		}
+
+		const bucket = await getBucketStore().find(bucketId);
+		const { otpauthUri, secretText } = await offerEnrollment(
+			uid,
+			user._id,
+			bucketId,
+			{ email: user.email, label: bucket?.name || 'the application' }
+		);
+
+		return totpServer(uid, {
+			mode: 'enroll',
+			otpauthUri,
+			secretText,
+			handOffTo: redirectUriOf(interaction)
+		});
+	})
+	.post(
+		'ui/:uid/totp/enroll',
+		async ({ body, params: { uid }, interaction, cookie }) => {
+			const pending = interaction.payload.secondFactor;
+			if (!pending) {
+				return Response.redirect(buildUILoginPath(uid), 303);
+			}
+
+			const clientId = clientIdOf(interaction);
+			const bucketId = await resolveBucketForClient(clientId);
+
+			/*
+			 * The per-interaction cap and no account window. The pending secret already expires on its
+			 * own, and an account-wide lockout here would let a stranger who knows an email stop a real
+			 * person from ever enrolling — the throttle would become the attack.
+			 */
+			if (pending.attempts >= MAX_ATTEMPTS_PER_INTERACTION) {
+				return Response.redirect(buildUIPath(uid, 'totp/enroll'), 303);
+			}
+
+			const outcome = await confirmEnrollment(uid, body.code);
+
+			if (!outcome.ok) {
+				/*
+				 * The account went away between the offer and this submission. Not the enrolment page
+				 * again — there is nothing to enrol — and not an error banner either, which would invite
+				 * them to keep typing codes at a row that no longer exists.
+				 */
+				if (outcome.reason === 'gone') {
+					return Response.redirect(buildUILoginPath(uid), 303);
+				}
+				if (outcome.reason === 'expired') {
+					// A fresh secret rather than a dead form: the GET mints one.
+					return Response.redirect(buildUIPath(uid, 'totp/enroll'), 303);
+				}
+				interaction.payload.secondFactor = {
+					...pending,
+					attempts: pending.attempts + 1
+				};
+				await persistInteraction(interaction);
+
+				const user = await getUserStore(bucketId).find(pending.accountId);
+				const bucket = await getBucketStore().find(bucketId);
+				// Re-offering through the same function is what puts the SAME secret back on the page.
+				const { otpauthUri, secretText } = await offerEnrollment(
+					uid,
+					pending.accountId,
+					bucketId,
+					{
+						email: user?.email ?? '',
+						label: bucket?.name || 'the application'
+					}
+				);
+				return totpServer(uid, {
+					mode: 'enroll',
+					errorMessage: INVALID_CODE,
+					otpauthUri,
+					secretText,
+					handOffTo: redirectUriOf(interaction)
+				});
+			}
+
+			interaction.payload.result = {
+				login: {
+					accountId: pending.accountId,
+					transient: pending.transient,
+					amr: ['pwd', 'otp']
+				}
+			};
+			delete interaction.payload.secondFactor;
+			return resume(interaction, cookie);
+		},
+		{ body: t.Object({ code: t.String() }) }
 	)
 	/*
 	 * Leg one of a federated sign-in. Declares its own `params` schema, and that is load-bearing rather than
@@ -574,6 +844,21 @@ export const ui = new Elysia()
 					// Delivery failed: the account exists but is unverified; invite a retry.
 					return registrationSendFailedPage();
 				}
+			}
+
+			/*
+			 * After the verification handling above, so the two requirements compose rather than one
+			 * replacing the other: a bucket that wants both sends the registrant to prove their address
+			 * now, and meets the authenticator at their first sign-in.
+			 */
+			if (bucket?.totpRequired) {
+				interaction.payload.secondFactor = {
+					accountId: user._id,
+					transient: false,
+					attempts: 0
+				};
+				await persistInteraction(interaction);
+				return Response.redirect(buildUIPath(uid, 'totp/enroll'), 303);
 			}
 
 			return Response.redirect(`/ui/${uid}/login`, 303);

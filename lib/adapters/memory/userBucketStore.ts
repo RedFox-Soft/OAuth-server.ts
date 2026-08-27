@@ -15,6 +15,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		registrationOpen?: boolean;
 		emailVerificationRequired?: boolean;
 		verificationMethod?: UserBucket['verificationMethod'];
+		totpRequired?: boolean;
 	}): Promise<UserBucket> {
 		const now = new Date();
 		const bucket: UserBucket = {
@@ -30,6 +31,9 @@ export class UserBucketStore implements UserBucketStoreInstance {
 			registrationOpen: data.registrationOpen ?? true,
 			emailVerificationRequired: data.emailVerificationRequired ?? false,
 			verificationMethod: data.verificationMethod ?? 'link',
+			// Off unless asked for: turning it on is a decision an operator makes, never one a
+			// default makes for them.
+			totpRequired: data.totpRequired ?? false,
 			createdAt: now,
 			updatedAt: now
 		};
@@ -45,6 +49,9 @@ export class UserBucketStore implements UserBucketStoreInstance {
 	private withDefaults(bucket: UserBucket): UserBucket {
 		bucket.passwordLogin ??= true;
 		bucket.federation ??= [];
+		// Same reasoning in the other direction: undefined is falsy, and reading it as "not required"
+		// is exactly right for a bucket written before the second factor existed.
+		bucket.totpRequired ??= false;
 		return bucket;
 	}
 
@@ -76,6 +83,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 				| 'registrationOpen'
 				| 'emailVerificationRequired'
 				| 'verificationMethod'
+				| 'totpRequired'
 			>
 		>
 	): Promise<UserBucket | null> {

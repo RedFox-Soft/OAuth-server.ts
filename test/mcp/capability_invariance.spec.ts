@@ -159,7 +159,7 @@ describe('published operation set is capability-invariant', () => {
 		}
 
 		const [first, ...rest] = [...seen.values()];
-		expect(first.length).toBe(44);
+		expect(first.length).toBe(45);
 		for (const [label, names] of [...seen.entries()].slice(1)) {
 			expect(names, `tool list changed under: ${label}`).toEqual(first);
 		}

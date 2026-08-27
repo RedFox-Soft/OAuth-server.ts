@@ -3,6 +3,7 @@ import { StrictMode } from 'react';
 import { LoginPage } from './loginPage.js';
 import { ConsentPage } from './consentPage.js';
 import { RegistrationPage } from './registration.js';
+import { TotpPage } from './totpPage.js';
 import type { ConsentView } from './consentView.js';
 import { htmlResponse } from '../html/csp.js';
 import { versionedAsset } from '../html/versionedAsset.js';
@@ -123,6 +124,64 @@ export async function registrationServer(
 			)
 		);
 	// Neither submitted password reaches this document — not the markup, not the props (spec FR-011).
+	return htmlResponse(html, {
+		status: errorMessage ? 400 : 200,
+		handOffTo: options.handOffTo
+	});
+}
+
+export async function totpServer(
+	uid: string,
+	options: {
+		mode: 'verify' | 'enroll';
+		errorMessage?: string;
+		otpauthUri?: string;
+		secretText?: string;
+		handOffTo?: string;
+	}
+) {
+	const { mode, errorMessage, otpauthUri, secretText } = options;
+
+	let html = await htmlTeamplate.text();
+	html = html
+		.replace('/public/loginClient.js', versionedAsset('loginClient.js'))
+		.replace('/public/favicon.ico', versionedAsset('favicon.ico'))
+		.replace(
+			'<!--app-title-->',
+			mode === 'enroll' ? 'Set Up Authenticator' : 'Two-Step Verification'
+		)
+		.replace('<!--app-styles-->', styleLinks())
+		/*
+		 * `mode` must be here as well as in the render. It decides whether the page shows a QR at all, so
+		 * a props script that omitted it would hydrate the enrolment page into the code page — the QR and
+		 * the secret vanishing the moment React takes over, in a browser only, with nothing logged.
+		 */
+		.replace(
+			'<!--app-props-->',
+			propsScript({ uid, mode, errorMessage, otpauthUri, secretText })
+		)
+		.replace(
+			'<!--app-html-->',
+			renderToString(
+				<StrictMode>
+					<ZeroRuntime>
+						<TotpPage
+							uid={uid}
+							mode={mode}
+							errorMessage={errorMessage}
+							otpauthUri={otpauthUri}
+							secretText={secretText}
+						/>
+					</ZeroRuntime>
+				</StrictMode>
+			)
+		);
+	/*
+	 * The submitted code never comes back with the page, in the markup or the props — the same rule the
+	 * registration page follows for a password. The enrolment secret does reach the document, which is
+	 * unavoidable: enrolment is the act of showing it. It goes no further, and `Cache-Control: no-store`
+	 * on every response is what keeps it from being written down on the way.
+	 */
 	return htmlResponse(html, {
 		status: errorMessage ? 400 : 200,
 		handOffTo: options.handOffTo

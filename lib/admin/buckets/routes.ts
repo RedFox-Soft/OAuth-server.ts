@@ -44,6 +44,26 @@ function presentBucket<T extends Pick<UserBucket, 'federation'>>(bucket: T): T {
 	return { ...bucket, federation: presentAll(bucket) as T['federation'] };
 }
 
+/*
+ * A second factor on a bucket that accepts no passwords is inert, not wrong: the requirement governs
+ * the password door, and there is no password door. Recording the intended posture before opening one
+ * is a reasonable order to do things in, so this says so rather than refusing — a 422 here would make
+ * an operator turn password login on, set the flag, and turn it back off to express what they meant.
+ *
+ * Only on the write paths. A read that carried it would repeat the same sentence on every poll of a
+ * federation-only bucket, which trains an operator to ignore it.
+ */
+function withInertTotpAdvisory<
+	T extends Pick<UserBucket, 'totpRequired' | 'passwordLogin'>
+>(bucket: T): T | (T & { advisory: string }) {
+	if (!bucket.totpRequired || bucket.passwordLogin !== false) return bucket;
+	return {
+		...bucket,
+		advisory:
+			'totpRequired has no effect while passwordLogin is off — it governs password sign-in, and federated sign-in is never gated by it'
+	};
+}
+
 export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 	.use(resolveAdmin)
 	.onError(({ error, set }) => {
@@ -85,9 +105,12 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 				passwordLogin: body.passwordLogin,
 				registrationOpen: body.registrationOpen,
 				emailVerificationRequired: body.emailVerificationRequired,
-				verificationMethod: body.verificationMethod
+				verificationMethod: body.verificationMethod,
+				totpRequired: body.totpRequired
 			});
 			set.status = 201;
+			// No advisory is reachable here: the guard above proves a new bucket accepts passwords, so
+			// the requirement can never be inert at creation.
 			return presentBucket(bucket);
 		},
 		{ body: CreateBucketBody }
@@ -120,7 +143,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			});
 			const updated = await getBucketStore().update(params.id, body);
 			if (!updated) throw new AdminError(404, 'bucket not found');
-			return updated && presentBucket(updated);
+			return withInertTotpAdvisory(presentBucket(updated));
 		},
 		{ body: UpdateBucketBody }
 	)

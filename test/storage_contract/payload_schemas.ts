@@ -36,6 +36,7 @@ import {
 	VerificationChallengePayload,
 	VerificationResendPayload
 } from 'lib/verification/types.js';
+import { TotpAttemptPayload, TotpEnrollmentPayload } from 'lib/totp/types.js';
 
 export interface ReadableSchema {
 	readonly properties: Record<string, unknown>;
@@ -58,6 +59,8 @@ export const PAYLOAD_SCHEMAS: Readonly<Record<string, ReadableSchema>> = {
 	RegistrationAccessToken: RegistrationAccessTokenPayload,
 	ReplayDetection: ReplayDetectionPayload,
 	Session: SessionPayload,
+	TotpAttempt: TotpAttemptPayload,
+	TotpEnrollment: TotpEnrollmentPayload,
 	VerificationChallenge: VerificationChallengePayload,
 	VerificationResend: VerificationResendPayload
 };

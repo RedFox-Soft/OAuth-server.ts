@@ -14,7 +14,8 @@ export const CreateBucketBody = t.Object({
 	passwordLogin: t.Optional(t.Boolean()),
 	registrationOpen: t.Optional(t.Boolean()),
 	emailVerificationRequired: t.Optional(t.Boolean()),
-	verificationMethod: t.Optional(VerificationMethod)
+	verificationMethod: t.Optional(VerificationMethod),
+	totpRequired: t.Optional(t.Boolean())
 });
 
 export const UpdateBucketBody = t.Object({
@@ -24,5 +25,11 @@ export const UpdateBucketBody = t.Object({
 	passwordLogin: t.Optional(t.Boolean()),
 	registrationOpen: t.Optional(t.Boolean()),
 	emailVerificationRequired: t.Optional(t.Boolean()),
-	verificationMethod: t.Optional(VerificationMethod)
+	verificationMethod: t.Optional(VerificationMethod),
+	/*
+	 * Governs the password door only — a federated sign-in is never gated by it, because the upstream
+	 * provider owns its own factor policy. Accepted while `passwordLogin` is off, where it is inert;
+	 * the route says so rather than refusing.
+	 */
+	totpRequired: t.Optional(t.Boolean())
 });

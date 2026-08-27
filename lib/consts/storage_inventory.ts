@@ -79,6 +79,8 @@ export const MODEL_AREAS = [
 	'RegistrationAccessToken',
 	'ReplayDetection',
 	'Session',
+	'TotpAttempt',
+	'TotpEnrollment',
 	'VerificationChallenge',
 	'VerificationResend'
 ] as const;
@@ -297,6 +299,24 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 	modelArea('Session', EXPIRES_AT, byAccount, [
 		{ key: { 'payload.uid': 1 }, unique: true }
 	]),
+	/*
+	 * The second factor's two areas, both account-owned, and neither is owned by convention.
+	 *
+	 * Their payloads name `accountId`, and the reverse ownership check in
+	 * test/storage_contract/inventory_drift.spec.ts fails any area whose payload holds an owner field
+	 * this table does not declare — the finding already recorded for FederationState above, and correct
+	 * for the same reason: such a record is one no cascade sweeps.
+	 *
+	 * Declaring them owned is also the better property in both cases. An outstanding enrolment offer
+	 * naming a deleted account dies with it rather than sitting on a secret for nobody, and a deleted
+	 * account's lockout window does not survive to greet an account later created under a reused id.
+	 *
+	 * Point-read by id in both cases — the enrolment by the interaction uid, the window by
+	 * `${bucketId}:${accountId}` — so neither needs an index beyond the expiry and owner ones
+	 * indexesFor() derives.
+	 */
+	modelArea('TotpAttempt', EXPIRES_AT, byAccount),
+	modelArea('TotpEnrollment', EXPIRES_AT, byAccount),
 	/*
 	 * Verification challenges and resend counters are written with a TTL and were never provisioned,
 	 * so before this table they auto-created on first write with no expiry index at all: expired
