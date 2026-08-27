@@ -1,6 +1,30 @@
 import { Session } from 'lib/models/session.js';
 import { cookieNames } from '../consts/param_list.js';
 
+/*
+ * The session cookie's path, written explicitly on every set.
+ *
+ * Left implicit, the browser applies RFC 6265's default-path — the directory of the *request* URI —
+ * so the same cookie name landed on `/` when written from `/auth` and on `/logout` when written
+ * from `/logout/confirm`. Two cookies under one name, and the clearing one at sign-out was not the
+ * one the browser kept sending back. Naming the path makes `_session` a single cookie wherever it
+ * is written, which is what makes destroying it observable to the browser.
+ */
+export const SESSION_COOKIE_PATH = '/';
+
+/*
+ * Clearing a cookie only removes it when the attributes identify the *same* cookie, so this is
+ * derived from the one path constant above rather than restating it at each call site.
+ */
+export function expiredSessionCookie() {
+	return {
+		value: '',
+		path: SESSION_COOKIE_PATH,
+		maxAge: 0,
+		expires: new Date(0)
+	};
+}
+
 export default async function sessionHandler(oidc) {
 	oidc.session = await Session.get(oidc);
 
@@ -21,6 +45,7 @@ export default async function sessionHandler(oidc) {
 			await oidc.session.save();
 			cookie.set({
 				value: oidc.session.id,
+				path: SESSION_COOKIE_PATH,
 				expires: new Date(oidc.session.payload.exp * 1000)
 			});
 		}

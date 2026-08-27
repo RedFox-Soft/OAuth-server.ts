@@ -65,6 +65,10 @@ directories; full retrospectives live in `TASKS.md`'s git history and the knowle
 - Native clients can complete an interactive sign-in (`ba5629d`)
 - Interaction pages can hand off to a foreign callback under the CSP (`271d518`)
 - The settings audit records only the fields a save actually changed (`b630c73`)
+- Logging out of the admin console actually signs the operator out: it now ends the provider
+  session as well as the console's own, and clears both cookies with the `Path` they were set with
+  (Elysia's `cookie.remove()` omits `Path`, so the browser defaulted it to the request's directory
+  and cleared a different cookie)
 - Small-batch fixes: duplicate first-run admin setup surface removed, error pages carry the real
   status and illustration, stale `interaction.returnTo` corrected, unimplemented CIBA `push` mode
   removed from the admin schema (spec 018)

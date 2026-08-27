@@ -2,10 +2,17 @@ import { Elysia, t } from 'elysia';
 import crypto from 'node:crypto';
 import { ISSUER } from '../../configs/env.js';
 import { getUserStore, adminSessionStore } from '../../adapters/index.js';
-import { createAdminSession, sessionCookieAttributes } from './session.js';
+import {
+	createAdminSession,
+	sessionCookieAttributes,
+	expiredSessionCookieAttributes
+} from './session.js';
 import { IdTokenRejected, verifyAdminIdToken } from './verifyIdToken.js';
 import { eventBus } from '../../event_bus.js';
-import { routeNames } from '../../consts/param_list.js';
+import { cookieNames, routeNames } from '../../consts/param_list.js';
+import { Session } from '../../models/session.js';
+import { expiredSessionCookie } from '../../shared/session.js';
+import { destroyProviderSession } from '../../shared/destroy_session.js';
 import {
 	ADMIN_CLIENT_ID,
 	ADMIN_BUCKET_ID,
@@ -13,6 +20,23 @@ import {
 } from '../consts.js';
 
 const REDIRECT_URI = `${ISSUER}/admin/callback`;
+
+/*
+ * `Session.tryFind` is inherited from `BaseModel`, whose `this` constraint does not admit
+ * `Session`'s own constructor (its payload parameter is `Partial`), and `Session` does not satisfy
+ * `BaseModel<SessionPayloadType>` because `BaseModel.save` is typed to return `string | undefined`.
+ * Both are pre-existing gaps in the model layer, so the lookup is narrowed at this one call site
+ * rather than the model layer widened to accommodate it.
+ */
+function findSession(value: string): Promise<Session | undefined> {
+	// Called as a method, deliberately: `tryFind` reaches for `this.adapter`, so detaching it
+	// from `Session` leaves the lookup with no adapter at all.
+	return (
+		Session as unknown as {
+			tryFind(v: string): Promise<Session | undefined>;
+		}
+	).tryFind(value);
+}
 
 function base64url(buf: Buffer) {
 	return buf.toString('base64url');
@@ -141,9 +165,38 @@ export const adminLogin = new Elysia({ name: 'admin-login' })
 			})
 		}
 	)
+	/*
+	 * Signing out of the console ends *both* sessions, server-side, in this one request.
+	 *
+	 * Destroying only the console's own session row left the provider session — a separate cookie,
+	 * at a separate path — still carrying `accountId`. The console is a relying party on its own
+	 * issuer, and the admin client is registered with consent not required, so the next visit to
+	 * `/admin/login` sailed through `/auth` with no interaction and minted a fresh console session.
+	 * Logout looked like it worked and changed nothing.
+	 *
+	 * Ending the provider session here rather than redirecting the browser through the RP-initiated
+	 * `/logout` endpoint keeps sign-out working when an operator turns `rpInitiatedLogout.enabled`
+	 * off, and spares the operator a confirmation interstitial on a button they already clicked.
+	 * The cost is deliberate and worth stating: the provider session is global to the browser, so
+	 * this signs that browser out of every relying party it had an SSO session with — which is what
+	 * `destroyProviderSession` already means everywhere else it is used.
+	 *
+	 * Both cookies are cleared unconditionally, even when their store row has already gone, so a
+	 * stale browser cookie can never outlive the record it points at.
+	 */
 	.post('/admin/api/logout', async ({ cookie }) => {
 		const id = cookie[ADMIN_SESSION_COOKIE]?.value as string | undefined;
 		if (id) await adminSessionStore.destroy(id);
-		cookie[ADMIN_SESSION_COOKIE].remove();
+		cookie[ADMIN_SESSION_COOKIE].set(expiredSessionCookieAttributes());
+
+		const providerSessionId = cookie[cookieNames.session]?.value as
+			| string
+			| undefined;
+		if (providerSessionId) {
+			const session = await findSession(providerSessionId);
+			if (session) await destroyProviderSession(session);
+		}
+		cookie[cookieNames.session].set(expiredSessionCookie());
+
 		return { ok: true };
 	});

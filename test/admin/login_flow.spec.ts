@@ -12,6 +12,7 @@ import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { getUserStore, resetAdminMemoryStores } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID } from 'lib/admin/consts.ts';
 import { routeNames } from 'lib/consts/param_list.ts';
+import { Session } from 'lib/models/session.ts';
 import { mintAdminIdToken } from './id_token_fixture.ts';
 
 // Pull one `name=value` pair out of a Set-Cookie response header array.
@@ -23,6 +24,34 @@ function cookiePair(setCookies: string[], name: string): string {
 
 let superAdminId: string;
 let fetchSpy: Mock<typeof fetch> | undefined;
+
+// Run the console's OIDC sign-in end to end and hand back its `_admin_session` cookie pair.
+// The token exchange is stubbed (ISSUER points at a fake host under test) but the identity
+// token is genuinely signed by the live keystore and carries this attempt's nonce.
+async function signIn(): Promise<string> {
+	const login = await agent.admin.login.get();
+	const oauthCookie = cookiePair(
+		login.response.headers.getSetCookie(),
+		'admin_oauth'
+	);
+	const params = new URL(getHeader(login.response, 'location')).searchParams;
+	const state = params.get('state') as string;
+
+	const idToken = await mintAdminIdToken({
+		sub: superAdminId,
+		nonce: params.get('nonce') ?? undefined
+	});
+	fetchSpy = spyOn(globalThis, 'fetch').mockImplementation((async () => ({
+		ok: true,
+		json: async () => ({ access_token: 'x', id_token: idToken })
+	})) as unknown as typeof fetch);
+
+	const cb = await agent.admin.callback.get({
+		query: { code: 'valid-code', state },
+		headers: { cookie: oauthCookie }
+	});
+	return cookiePair(cb.response.headers.getSetCookie(), '_admin_session');
+}
 
 describe('admin OIDC login (BFF)', () => {
 	beforeAll(async () => {
@@ -181,5 +210,60 @@ describe('admin OIDC login (BFF)', () => {
 			headers: { cookie: sessionCookie }
 		});
 		expect(after.status).toBe(401);
+	});
+
+	/*
+	 * The test above re-sends the same cookie string by hand, so it can only observe the store
+	 * being emptied — it is blind to whether the browser was ever told to drop the cookie, and to
+	 * the provider session that actually decides whether the next visit re-authenticates. Both of
+	 * those were broken. These cover them.
+	 */
+	it('logout clears both cookies with the attributes they were set with', async () => {
+		const sessionCookie = await signIn();
+
+		const out = await agent.admin.api.logout.post(undefined, {
+			headers: { cookie: sessionCookie }
+		});
+		expect(out.status).toBe(200);
+
+		const cleared = out.response.headers.getSetCookie();
+
+		// `Path` must match the cookie that is live in the browser. Omit it and the browser
+		// applies the default-path of the request URI — `/admin/api` — which names a different
+		// cookie, so the real `_admin_session` (`Path=/admin`) survives the sign-out untouched.
+		const adminCleared = cleared.find((c) => c.startsWith('_admin_session='));
+		expect(adminCleared).toBeDefined();
+		expect(adminCleared).toContain('Path=/admin');
+		expect(adminCleared).toMatch(/Max-Age=0|Expires=Thu, 01 Jan 1970/i);
+
+		const providerCleared = cleared.find((c) => c.startsWith('_session='));
+		expect(providerCleared).toBeDefined();
+		expect(providerCleared).toMatch(/Path=\/(;|$)/);
+		expect(providerCleared).toMatch(/Max-Age=0|Expires=Thu, 01 Jan 1970/i);
+	});
+
+	it('logout destroys the provider session, not just the console session', async () => {
+		const sessionCookie = await signIn();
+
+		// A live provider session for the same operator — the thing that, left alone, let
+		// `/admin/login` walk straight back through `/auth` and mint a new console session.
+		const providerSession = new Session({ uid: 'logout-spec' });
+		providerSession.loginAccount({ accountId: superAdminId });
+		await providerSession.save();
+		const providerSessionId = providerSession.id as string;
+		expect(await Session.tryFind(providerSessionId)).toBeDefined();
+
+		const out = await agent.admin.api.logout.post(undefined, {
+			headers: { cookie: `${sessionCookie}; _session=${providerSessionId}` }
+		});
+		expect(out.status).toBe(200);
+
+		expect(await Session.tryFind(providerSessionId)).toBeUndefined();
+	});
+
+	it('logout is idempotent when nothing is signed in', async () => {
+		const out = await agent.admin.api.logout.post(undefined, {});
+		expect(out.status).toBe(200);
+		expect(out.data).toEqual({ ok: true });
 	});
 });

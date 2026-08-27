@@ -4,7 +4,7 @@ title: 'Admin console sign-in'
 tags: [architecture, contract, gotcha, oidc]
 sources: [oauth-server-codebase]
 created: 2026-08-04
-updated: 2026-08-04
+updated: 2026-08-27
 graph:
   node_type: concept
 ---
@@ -97,6 +97,33 @@ the same reasoning that keeps the audit trail's writes behind authorization
 ([[admin-audit-trail]]), one severity tier down. Sign-in is also **not** audited, for the same reason
 `POST /admin/api/logout` is not: session lifecycle, not a state-changing administrative action.
 
+## Signing out must end two sessions, not one
+
+The console holds a session of its own (`_admin_session`, a BFF row) *and* is the subject of a
+provider session (`_session`). Destroying only the first is indistinguishable from doing nothing:
+`/admin/login` redirects to `/auth`, the `no_session` check
+(`lib/helpers/interaction_policy/prompts/login.ts`) sees `accountId` still on the provider session
+and returns `false`, and the console client is seeded with `'consent.require': false`
+(`lib/admin/seed.ts`) — so `/auth` issues a code with no interaction at all and the operator is back
+inside the panel with a fresh session. Being a relying party on your own issuer cuts both ways: it
+is what makes sign-in verifiable, and what makes sign-out incomplete unless it is deliberate.
+
+`POST /admin/api/logout` therefore destroys both, server-side, in one request
+(`lib/admin/auth/login.ts`), reusing `destroyProviderSession` (`lib/shared/destroy_session.ts`) —
+the same teardown the end-session `logout=true` branch runs, so backchannel logout and grant
+revocation are not quietly skipped on this path.
+
+It does **not** redirect the browser through the RP-initiated `/logout` endpoint, and the two
+reasons are worth keeping: that route is gated on `rpInitiatedLogout.enabled`, so an operator
+toggling a protocol feature would silently disable console sign-out; and it answers with a
+"Do you want to sign-out?" confirmation page (`lib/html/logout.tsx`), a second click on a button the
+operator has already pressed. The registered `post_logout_redirect_uris` such a redirect would need
+is consequently still empty, and deliberately so.
+
+The cost is real and is the point: the provider session is global to the browser, so leaving the
+console signs that browser out of every relying party it had an SSO session with. That is what
+ending a provider session means everywhere else in this codebase.
+
 ## Freshness is requested, not merely checked
 
 The console generates a single-use `nonce` alongside the PKCE verifier and CSRF `state`, stores all
@@ -129,6 +156,7 @@ repository's vocabulary, once.
 - [[client-identity-from-database]] — why the admin client's metadata must be read through the model.
 - [[token-payload-access-contract]] — the neighbouring class of bug: a claim read from the wrong place.
 - [[event-bus]] — the diagnostic channel refusals are reported on.
+- [[cookie-path-scoping]] — why the sign-out cookie was cleared under the wrong path, and never removed.
 - [[feature-flag-gating]] — the other place a one-header or one-status difference was the whole
   fingerprint.
 

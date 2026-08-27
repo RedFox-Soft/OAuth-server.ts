@@ -14,7 +14,11 @@ import { IdToken } from 'lib/models/id_token.js';
 import { Client } from 'lib/models/client.js';
 import { AuthorizationCookies, routeNames } from 'lib/consts/param_list.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
-import sessionHandler from '../shared/session.ts';
+import sessionHandler, { expiredSessionCookie } from '../shared/session.ts';
+import {
+	backchannelLogoutFor,
+	destroyProviderSession
+} from '../shared/destroy_session.ts';
 import { logoutSuccess } from '../html/logoutSuccess.tsx';
 import { logout } from '../html/logout.tsx';
 import { eventBus } from '../event_bus.js';
@@ -144,50 +148,18 @@ export const logoutConfirmAction = new Elysia()
 				throw new InvalidRequest('xsrf token invalid');
 			}
 
-			const { session, params } = oidc;
+			const { session } = oidc;
 			const { state } = session.payload;
 
-			if (ApplicationConfig['backchannelLogout.enabled']) {
-				const clientIds = Object.keys(session.payload.authorizations || {});
-
-				const back = [];
-
-				for (const clientId of clientIds) {
-					if (params.logout || clientId === state.clientId) {
-						const client = await Client.tryFind(clientId);
-						if (client) {
-							const sid = session.sidFor(client.clientId);
-							if (client.backchannelLogoutUri) {
-								const { accountId } = session.payload;
-								back.push(
-									client.backchannelLogout(accountId, sid).then(
-										() => {
-											eventBus.emit(
-												'backchannel.success',
-												{ oidc },
-												client,
-												accountId,
-												sid
-											);
-										},
-										(err) => {
-											eventBus.emit(
-												'backchannel.error',
-												{ oidc },
-												err,
-												client,
-												accountId,
-												sid
-											);
-										}
-									)
-								);
-							}
-						}
-					}
-				}
-
-				await Promise.all(back);
+			// A partial sign-out still tells the one client being signed out. A full sign-out tells
+			// every client in the session, which `destroyProviderSession` handles as part of the
+			// teardown it shares with the admin console's server-side logout.
+			if (
+				!body.logout &&
+				state.clientId &&
+				ApplicationConfig['backchannelLogout.enabled']
+			) {
+				await backchannelLogoutFor(session, [state.clientId], { oidc });
 			}
 
 			if (state.clientId) {
@@ -195,26 +167,8 @@ export const logoutConfirmAction = new Elysia()
 			}
 
 			if (body.logout) {
-				if (session.payload.authorizations) {
-					await Promise.all(
-						Object.entries(session.payload.authorizations).map(
-							async ([clientId, { grantId }]) => {
-								// Drop the grants without offline_access
-								// Note: tokens that don't get dropped due to offline_access having being added
-								// later will still not work, as such they will be orphaned until their TTL hits
-								if (
-									grantId &&
-									!session.authorizationFor(clientId).persistsLogout
-								) {
-									await revoke(grantId);
-								}
-							}
-						)
-					);
-				}
-
-				await session.destroy();
-				cookie._session.remove();
+				await destroyProviderSession(session, { oidc });
+				cookie._session.set(expiredSessionCookie());
 			} else if (state.clientId) {
 				const grantId = session.grantIdFor(state.clientId);
 				if (

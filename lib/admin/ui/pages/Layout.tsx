@@ -45,8 +45,14 @@ export function Layout({ me }: { me: AdminContext | null }) {
 	];
 
 	async function logout() {
-		await fetch('/admin/api/logout', { method: 'POST' });
-		window.location.href = '/admin/login';
+		// Navigate even if the request failed. Leaving the operator on a panel they believe they
+		// have left is the worse of the two outcomes: the sign-in redirect re-checks the session
+		// either way, so a failed logout surfaces as being asked to sign in again.
+		try {
+			await fetch('/admin/api/logout', { method: 'POST' });
+		} finally {
+			window.location.href = '/admin/login';
+		}
 	}
 
 	function renderPage() {
