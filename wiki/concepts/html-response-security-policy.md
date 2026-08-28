@@ -4,7 +4,7 @@ title: "Rendered pages and their content security policy"
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-04
-updated: 2026-08-04
+updated: 2026-08-28
 graph:
   node_type: concept
   relationships:
@@ -105,6 +105,22 @@ The `form_post` auto-submit page (`lib/html/formPost.tsx`) omits `frame-ancestor
 authentication (`prompt=none` in a hidden iframe) with `response_mode=form_post` renders that page
 inside the client's frame, so frame-busting it breaks the flow. It has no interactive UI to hijack;
 its protection is `form-action`, pinned to the callback's origin.
+
+**Since spec 029 that exception governs two headers, not one.** `htmlResponse` also emits the legacy
+`X-Frame-Options: DENY` on every page whose policy denies framing — and omits it on this one. Both come
+from a single evaluation: `pagePolicy` returns `{ policy, deniesFraming }`, and `deniesFraming` is the
+same `!foreignTargets.length` that gates the `frame-ancestors` directive. They cannot drift apart
+because nothing keeps them in agreement; there is one decision.
+
+**Do not move `X-Frame-Options` to the blanket plugin.** It is not a stylistic split. The plugin writes
+to `set.headers` from a pre-routing `onRequest`, and a returned `Response` can *override* a name that
+merge also carries but has no way to *remove* one — so this page could not take the header back. Nor
+could it override with something permissive: `ALLOW-FROM` is dead in every current engine and
+`ALLOWALL` was never standard. A blanket `DENY` therefore has exactly one outcome here — silent
+authentication stops working for every relying party that uses it, unpatchable downstream. The named
+case in `test/csp/csp.spec.ts` ("frame-busts every page except the auto-submit callback") asserts the
+absence, and `expectNonPageProfile` asserts the header never appears on a data response, which is where
+a blanket emission would first show up.
 
 ## Gotcha: the lone inline event handler
 

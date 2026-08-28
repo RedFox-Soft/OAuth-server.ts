@@ -60,6 +60,42 @@ function postForm(path: string, body: Record<string, unknown>) {
 	});
 }
 
+/*
+ * The browser-feature policy's two judgement calls, asserted rather than left to a comment.
+ *
+ * `expectSharedHeaders` already pins the whole header to one exact string, so these cases add no
+ * coverage of the *value* — what they add is the *reason*, at the place a future change would break it.
+ * A developer adding `clipboard-write=()` for completeness gets a named failure explaining why five
+ * secret-copy surfaces depend on that feature staying permitted, instead of a diff on an opaque
+ * one-line constant that looks like it was assembled carelessly.
+ */
+describe('security headers: the browser-feature policy', () => {
+	beforeEach(async () => {
+		await bootstrap(import.meta.url);
+	});
+
+	it('denies the high-privilege features outright', async () => {
+		const res = await send(routeNames.discovery, { method: 'GET' });
+		const policy = res.headers.get('permissions-policy') ?? '';
+
+		for (const feature of ['camera', 'microphone', 'geolocation', 'payment']) {
+			expect(policy, `${feature} must be denied`).toContain(`${feature}=()`);
+		}
+	});
+
+	/*
+	 * antd's `copyable` calls navigator.clipboard.writeText first and only falls back to the deprecated
+	 * document.execCommand('copy') when that throws. Denying the feature would break nothing today and
+	 * would strand the TOTP enrolment secret — plus the client secret and two audit fields in the
+	 * console — on the deprecated path, to fail whenever a browser drops it.
+	 */
+	it('leaves clipboard-write permitted, or the TOTP secret loses its copy button', async () => {
+		const res = await send(routeNames.discovery, { method: 'GET' });
+
+		expect(res.headers.get('permissions-policy')).not.toContain('clipboard');
+	});
+});
+
 describe('security headers: protocol surfaces', () => {
 	let setup: Setup;
 

@@ -11,6 +11,24 @@ of the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- The last three security headers issue #2 asked for (issues #10 and #2, spec 029).
+  `Strict-Transport-Security: max-age=63072000; includeSubDomains` and a `Permissions-Policy` denying
+  seventeen high-privilege browser features now ride on every response, from the same pre-routing hook
+  that already carried `nosniff`, `Referrer-Policy` and the non-page content policy — so they reach the
+  error pipeline, the named admin instance and static assets, which after-the-fact response hooks miss
+  silently. `preload` is deliberately omitted and the reason recorded: the deployment host is already
+  preloaded through the whole `dev` TLD, submission needs an apex domain this deployment does not own,
+  and the effect is global and slow to undo — a self-hoster's choice to add at their own edge. HSTS is
+  emitted unconditionally, including over plaintext, because TLS terminates at the proxy so the hop RFC
+  6797 governs is HTTPS, and the alternatives are either spoofable (`X-Forwarded-Proto`) or invisible
+  to the merge gate. `clipboard-write` is **not** denied, and a named test enforces that: antd's
+  `copyable` reaches for `navigator.clipboard.writeText` first, so denying it would have stranded five
+  secret-copy surfaces — the TOTP enrolment secret among them — on the deprecated `execCommand` path.
+  The legacy `X-Frame-Options: DENY` is emitted by `htmlResponse` on rendered pages only, derived from
+  the same single evaluation as `frame-ancestors` and therefore absent on the one deliberately framable
+  page, the `form_post` hand-off; a blanket emission was not merely inelegant but unimplementable,
+  since a returned `Response` can override a merged header but never remove one and the header has no
+  permissive value, so it would have broken silent authentication with no downstream fix
 - Per-origin request rate limiting (issue #1). An origin that spends its allowance inside a window is
   refused with `429` and a `Retry-After`, before the endpoint does any work. Allowances are tiered by
   route class rather than blanket — strict on the unauthenticated and expensive surface, loose on

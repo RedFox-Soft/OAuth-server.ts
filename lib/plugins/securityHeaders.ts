@@ -46,5 +46,63 @@ export const securityHeaders = (app: Elysia) => {
 		 */
 		set.headers['Content-Security-Policy'] =
 			"default-src 'none'; frame-ancestors 'none'";
+		/*
+		 * Two years, because that is what the browser preload programmes require and taking the higher
+		 * of the two common figures costs nothing — the value never has to be revisited if the preload
+		 * decision below is ever reversed.
+		 *
+		 * WHY unconditionally, including over plaintext. RFC 6797 §7.2 says a host MUST NOT send this
+		 * over non-secure transport, and read literally that argues for a branch here. There is none,
+		 * for two reasons. In production the hop the RFC governs — server to user agent — *is* HTTPS:
+		 * TLS terminates at the platform proxy (fly.toml, `force_https`), so the plaintext this process
+		 * sees on its internal port is an artefact of termination, not the transport the browser
+		 * experiences. And in development the header is inert by §8.1, which requires the user agent to
+		 * ignore it when it does arrive over plaintext — so nobody working on http://localhost can be
+		 * locked out by it.
+		 *
+		 * Both alternatives are worse, which is the part worth remembering before "fixing" this.
+		 * Deriving the scheme behind the proxy means trusting `X-Forwarded-Proto` — client-supplied and
+		 * spoofable — to decide a security header, which inverts the intent. Gating on the ISSUER scheme
+		 * instead is unspoofable but hides the header from the entire merge gate, because .env.test sets
+		 * `ISSUER=http://e.ly`: the suite would assert nothing and the loss would be silent.
+		 *
+		 * WHY no `preload`. It is a deliberate omission, not an oversight. The deployment host is
+		 * already preloaded by virtue of the whole `dev` TLD being on the browser lists, so the token
+		 * would be inert here; submission is accepted only for an apex domain this deployment does not
+		 * control; and the effect is global, hits every subdomain of whoever does deploy at an apex, and
+		 * is slow to undo. That makes it a self-hoster's choice to add at their own edge.
+		 * specs/029-hsts-permissions-framing/research.md M2-M4 has the measurements.
+		 */
+		set.headers['Strict-Transport-Security'] =
+			'max-age=63072000; includeSubDomains';
+		/*
+		 * `()` is the empty allow-list: the feature is denied to every origin including this one. That
+		 * is the right strength here because no page this server renders uses any of them — a policy
+		 * narrowed to `(self)` would be indistinguishable from one nobody ever narrowed.
+		 *
+		 * WHY `clipboard-write` is NOT in this list, and must not be added. Five surfaces copy a value
+		 * to the clipboard, one of them an end-user page: the TOTP enrolment secret
+		 * (lib/interactions/totpPage.tsx), plus the client secret, two audit fields and an error
+		 * payload in the console. They all go through antd's `copyable`, and antd
+		 * (node_modules/antd/es/_util/copy.js) tries `navigator.clipboard.writeText` FIRST, falling back
+		 * to the deprecated `document.execCommand('copy')` only on a caught failure. Denying the feature
+		 * would therefore break nothing visible today — it would quietly move all five onto the
+		 * deprecated path and fail on the browser release that finally removes it, long after this
+		 * change and nowhere near it. Not worth one directive.
+		 *
+		 * `publickey-credentials-get` IS denied, with eyes open: there is no WebAuthn anywhere in the
+		 * server today. A future passkey feature must remove it. That one is safe to deny now precisely
+		 * because its failure mode is loud — a rejected promise, not a silent downgrade.
+		 *
+		 * WHY not the maximal list. Every extra name people reach for — ambient-light-sensor, battery,
+		 * document-domain, execution-while-*, keyboard-map, navigation-override, sync-xhr, web-share —
+		 * is removed from the spec, never shipped, or unrecognised by current engines. An unrecognised
+		 * feature denies nothing and logs a warning on every page load, and console noise is not free
+		 * here: it is where the @ant-design/icons style-injection violation hides (see
+		 * wiki/concepts/html-response-security-policy.md). Real noise for zero protection is a bad
+		 * trade. specs/029-hsts-permissions-framing/research.md M5.
+		 */
+		set.headers['Permissions-Policy'] =
+			'accelerometer=(), autoplay=(), camera=(), display-capture=(), encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), screen-wake-lock=(), usb=(), xr-spatial-tracking=()';
 	});
 };

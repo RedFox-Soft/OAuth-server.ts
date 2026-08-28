@@ -181,10 +181,17 @@ function foreignFormTargets(html: string): string[] {
  * A callback on this server's own origin resolves to `'self'` and so adds nothing — which is why the
  * admin console never met this, and why nothing changes for it now.
  */
-export function contentSecurityPolicyFor(
+/*
+ * The policy and the framing verdict come out together because `htmlResponse` needs both and they must
+ * not be decided twice. `X-Frame-Options` is the legacy fallback for `frame-ancestors`, so the two have
+ * to agree on every page — including, and especially, on the one page that is deliberately framable.
+ * Returning the verdict makes that agreement structural: there is one evaluation, so there is nothing
+ * to keep in sync.
+ */
+function pagePolicy(
 	html: string,
 	handOffTo?: string
-): string {
+): { policy: string; deniesFraming: boolean } {
 	const scripts = scriptOrigins(html);
 	const scriptSrc = [...scripts, ...inlineScripts(html).map(hash)];
 
@@ -257,17 +264,45 @@ export function contentSecurityPolicyFor(
 	 * frame-busting it would break the flow for no benefit — it carries no interactive UI to hijack,
 	 * and its protection is the form-action above, pinned to the callback's origin.
 	 */
-	if (!foreignTargets.length) {
+	const deniesFraming = !foreignTargets.length;
+	if (deniesFraming) {
 		directives.push("frame-ancestors 'none'");
 	}
 
-	return directives.join('; ');
+	return { policy: directives.join('; '), deniesFraming };
 }
 
 /*
- * Sets the content type and the derived policy, and nothing else. `Cache-Control: no-store`
- * deliberately stays with the nocache plugin, which writes it on every response — duplicating it
- * here would give one header two sources.
+ * Kept as the exported shape because the policy string is what every caller and every test wants; the
+ * framing verdict is only `htmlResponse`'s business.
+ */
+export function contentSecurityPolicyFor(
+	html: string,
+	handOffTo?: string
+): string {
+	return pagePolicy(html, handOffTo).policy;
+}
+
+/*
+ * Sets the content type, the derived policy and the legacy framing fallback, and nothing else.
+ * `Cache-Control: no-store` deliberately stays with the nocache plugin, which writes it on every
+ * response — duplicating it here would give one header two sources.
+ *
+ * WHY `X-Frame-Options` is written here and not in lib/plugins/securityHeaders.ts with the rest of the
+ * blanket profile. Not taste — a blanket emission is unimplementable. The plugin writes to
+ * `set.headers` from a pre-routing hook, and a returned Response can *override* a name that merge also
+ * carries but has no way to *remove* one. So the auto-submit hand-off page, which must not be
+ * frame-busted, could not take the header back; and there is no permissive value to override it with
+ * either, since ALLOW-FROM is dead in every current engine and ALLOWALL was never standard. A blanket
+ * DENY therefore has exactly one outcome on that page: silent authentication (prompt=none in a hidden
+ * iframe with response_mode=form_post) stops working, with nothing downstream able to fix it.
+ *
+ * So it is derived, from the same single evaluation as `frame-ancestors` — see `pagePolicy`. The two
+ * cannot disagree because nothing keeps them in agreement; there is one decision.
+ *
+ * Non-page responses carry no `X-Frame-Options` at all, deliberately: their locked policy already has
+ * `frame-ancestors 'none'`, and a framed JSON body has no interactive surface to hijack. The full
+ * reasoning, with the measurements, is specs/029-hsts-permissions-framing/research.md M6, M7 and M10.
  */
 export function htmlResponse(
 	html: string,
@@ -278,12 +313,15 @@ export function htmlResponse(
 		handOffTo?: string;
 	} = {}
 ): Response {
+	const { policy, deniesFraming } = pagePolicy(html, init.handOffTo);
+
 	return new Response(html, {
 		status: init.status,
 		headers: {
 			...init.headers,
 			'Content-Type': 'text/html; charset=utf-8',
-			'Content-Security-Policy': contentSecurityPolicyFor(html, init.handOffTo)
+			'Content-Security-Policy': policy,
+			...(deniesFraming ? { 'X-Frame-Options': 'DENY' } : {})
 		}
 	});
 }

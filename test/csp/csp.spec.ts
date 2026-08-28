@@ -296,16 +296,31 @@ describe('content security policy: every rendered page', () => {
 
 	it('frame-busts every page except the auto-submit callback', async () => {
 		for (const [name, render] of pages) {
-			const csp = directives(await render());
+			const res = await render();
+			const csp = directives(res);
+			/*
+			 * X-Frame-Options is the legacy fallback for engines that never learned `frame-ancestors`,
+			 * so the two must agree on every page — and the interesting half of that is the agreement on
+			 * the page that is deliberately framable, asserted below. They cannot drift, because both
+			 * come from one evaluation in lib/html/csp.ts; this case is what would catch it if someone
+			 * gave the legacy header a second source.
+			 */
 			if (name === 'auto-submit callback') {
 				/*
 				 * Deliberate: silent authentication (prompt=none in a hidden iframe) with
 				 * response_mode=form_post renders this page inside the client's frame. There is no
 				 * interactive UI on it to hijack.
+				 *
+				 * The legacy header must be ABSENT here, not permissive: there is no value that means
+				 * "framing allowed" — ALLOW-FROM is dead in every current engine and ALLOWALL was never
+				 * standard — so a blanket DENY emitted upstream could not be undone on this page, and
+				 * silent authentication would break with no way to patch it downstream.
 				 */
 				expect(csp.has('frame-ancestors')).toBe(false);
+				expect(res.headers.has('x-frame-options')).toBe(false);
 			} else {
 				expect(csp.get('frame-ancestors')).toBe("'none'");
+				expect(res.headers.get('x-frame-options')).toBe('DENY');
 			}
 		}
 	});

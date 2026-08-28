@@ -4,7 +4,7 @@ title: 'Hardening headers on responses that are not pages'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-26
-updated: 2026-08-26
+updated: 2026-08-28
 graph:
   node_type: concept
   relationships:
@@ -24,11 +24,19 @@ graph:
 
 # Hardening headers on responses that are not pages
 
-Since `specs/026-non-html-security-headers`, every response this server emits carries
-`X-Content-Type-Options: nosniff` and `Referrer-Policy: no-referrer`, and every response that is
-**not** a rendered page also carries `Content-Security-Policy: default-src 'none'; frame-ancestors
-'none'`. One `onRequest` hook writes all three: `securityHeaders` in `lib/plugins/securityHeaders.ts`,
-registered once in `lib/index.ts:90`.
+Every response this server emits carries four headers, and every response that is **not** a rendered
+page carries a fifth:
+
+| Header | Value | Since |
+| --- | --- | --- |
+| `X-Content-Type-Options` | `nosniff` | spec 026 |
+| `Referrer-Policy` | `no-referrer` | spec 026 |
+| `Strict-Transport-Security` | `max-age=63072000; includeSubDomains` | spec 029 |
+| `Permissions-Policy` | 17 features denied — see below | spec 029 |
+| `Content-Security-Policy` | `default-src 'none'; frame-ancestors 'none'` *(non-page only)* | spec 026 |
+
+One `onRequest` hook writes all five: `securityHeaders` in `lib/plugins/securityHeaders.ts`, registered
+once in `lib/index.ts:92`.
 
 This is the companion to [[html-response-security-policy]], which owns the *page* policy. Between
 them the rule is complete: a page gets the policy derived from its own document, everything else gets
@@ -77,12 +85,73 @@ The fix is to reword the comment, **not** to add the file to the allow-list. An 
 a comment stays in force the day someone adds real markup to that file — which is precisely the
 failure the guard exists to prevent.
 
+## Gotcha: HSTS is emitted over plaintext too, and that is not a bug
+
+RFC 6797 §7.2 says a host MUST NOT send `Strict-Transport-Security` over non-secure transport, so the
+unconditional write looks wrong. It is not, and the branch must not be added back.
+
+In production the hop the RFC governs — server to user agent — **is** HTTPS. TLS terminates at the Fly
+proxy (`fly.toml`, `force_https`), so the plaintext this process sees on its internal port is an
+artefact of termination, not what the browser experiences. In development the header is inert by RFC
+6797 §8.1, which requires the user agent to *ignore* it when it does arrive over plaintext — nobody on
+`http://localhost` can be locked out by it.
+
+Both alternatives are worse. Deriving the scheme behind the proxy means trusting `X-Forwarded-Proto`,
+which is client-supplied and spoofable, to decide a security header. Gating on the `ISSUER` scheme is
+unspoofable but hides the header from the entire merge gate, because `.env.test` sets
+`ISSUER=http://e.ly` — the suite would assert nothing and the loss would be silent.
+
+**`preload` is deliberately omitted.** Not an oversight: the deployment host is already preloaded by
+virtue of the whole `dev` TLD being on the browser lists (verified against `hstspreload.org`, which
+reports `preloadedDomain: "dev"`), so the token would be inert here; submission is accepted only for an
+apex domain this deployment does not control; and the effect is global, reaches every subdomain of
+whoever *does* deploy at an apex, and is slow to undo. A self-hoster who wants it adds one token at
+their own edge. There is no `runbooks/` page for this, so it is recorded here.
+
+## Gotcha: `clipboard-write` is missing from `Permissions-Policy` on purpose
+
+The policy denies 17 features outright — `accelerometer`, `autoplay`, `camera`, `display-capture`,
+`encrypted-media`, `fullscreen`, `geolocation`, `gyroscope`, `magnetometer`, `microphone`, `midi`,
+`payment`, `picture-in-picture`, `publickey-credentials-get`, `screen-wake-lock`, `usb`,
+`xr-spatial-tracking` — each with the empty allow-list `()`, which denies the feature even to this
+origin. That is the right strength because no page here uses any of them.
+
+`clipboard-write` is **not** on that list and must not be added. Five surfaces copy a value to the
+clipboard, one of them an end-user page: the TOTP enrolment secret (`lib/interactions/totpPage.tsx`),
+plus the client secret and two audit fields and an error payload in the console. All go through antd's
+`copyable`, and antd (`node_modules/antd/es/_util/copy.js`) tries `navigator.clipboard.writeText`
+**first**, falling back to the deprecated `document.execCommand('copy')` only on a caught failure.
+Denying the feature would break nothing visible today and would strand all five on the deprecated path,
+to fail on the browser release that finally removes it — long after the change and nowhere near it.
+`test/security_headers/security_headers.spec.ts` asserts the absence by name so the reasoning is
+enforced rather than merely written down.
+
+`publickey-credentials-get` **is** denied, with eyes open: there is no WebAuthn in the server today,
+and a future passkey feature must remove the directive. Safe to deny now precisely because its failure
+mode is loud — a rejected promise, not a silent downgrade.
+
+The maximal list was rejected. `ambient-light-sensor`, `battery`, `document-domain`,
+`execution-while-*`, `keyboard-map`, `navigation-override`, `sync-xhr`, `web-share` are each removed
+from the spec, never shipped, or unrecognised by current engines — and an unrecognised feature denies
+nothing while logging a warning on **every page load**. Console noise is not free here: it is where the
+`@ant-design/icons` style-injection violation hides (see [[html-response-security-policy]]).
+
 ## What is deliberately not here
 
-`Strict-Transport-Security` (deployment concern), `X-Frame-Options` (superseded by `frame-ancestors`;
-adding it would be a compatibility shim, which Principle VII forbids), and the
-`Cross-Origin-Opener/Embedder/Resource-Policy` family (would change cross-origin behaviour that spec
-011 settled deliberately).
+**`X-Frame-Options` is not written by this plugin** — but it does now exist, on rendered pages only,
+written by `htmlResponse`. That split is forced, not stylistic: the auto-submit `form_post` hand-off
+page must stay framable, a returned `Response` can override a merged header name but never remove one,
+and `X-Frame-Options` has no permissive value to override with (`ALLOW-FROM` is dead, `ALLOWALL` was
+never standard). A blanket `DENY` here would break silent authentication with nothing downstream able
+to fix it. See [[html-response-security-policy]].
+
+Non-page responses therefore carry no `X-Frame-Options`, deliberately: their locked policy already has
+`frame-ancestors 'none'`, and a framed JSON body has no interactive surface to hijack.
+`expectNonPageProfile` asserts that absence, so a future blanket emission fails the suite here before
+it breaks the hand-off page there.
+
+Still absent: the `Cross-Origin-Opener/Embedder/Resource-Policy` family, which would change
+cross-origin behaviour that spec 011 settled deliberately.
 
 ## Related
 

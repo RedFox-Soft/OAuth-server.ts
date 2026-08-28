@@ -9,11 +9,21 @@ import { expect } from 'bun:test';
 export const NOSNIFF = 'nosniff';
 export const REFERRER_POLICY = 'no-referrer';
 export const NON_PAGE_POLICY = "default-src 'none'; frame-ancestors 'none'";
+export const STRICT_TRANSPORT = 'max-age=63072000; includeSubDomains';
+/*
+ * Restated as one string rather than assembled from a list, for the same reason as the rest of this
+ * file: a joined list here would pass whatever the implementation joined, including a shorter one.
+ * `clipboard-write` is absent on purpose — see lib/plugins/securityHeaders.ts.
+ */
+export const PERMISSIONS_POLICY =
+	'accelerometer=(), autoplay=(), camera=(), display-capture=(), encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), screen-wake-lock=(), usb=(), xr-spatial-tracking=()';
 
 const PROFILE_NAMES = [
 	'x-content-type-options',
 	'referrer-policy',
-	'content-security-policy'
+	'content-security-policy',
+	'strict-transport-security',
+	'permissions-policy'
 ];
 
 /*
@@ -39,14 +49,23 @@ function expectSharedHeaders(res: Response): void {
 	}
 	expect(res.headers.get('x-content-type-options')).toBe(NOSNIFF);
 	expect(res.headers.get('referrer-policy')).toBe(REFERRER_POLICY);
+	expect(res.headers.get('strict-transport-security')).toBe(STRICT_TRANSPORT);
+	expect(res.headers.get('permissions-policy')).toBe(PERMISSIONS_POLICY);
 }
 
 /*
  * A response that is not a rendered page: the locked policy, exactly.
+ *
+ * No `X-Frame-Options`, and that absence is asserted rather than merely unmentioned. The legacy header
+ * covers rendered documents only: a framed JSON body has no UI to hijack, and the locked policy above
+ * already carries `frame-ancestors 'none'`. More to the point, a blanket emission is what would break
+ * the one deliberately framable page — so if this ever starts arriving on a data response, the header
+ * has acquired a second writer and the hand-off page is already broken.
  */
 export function expectNonPageProfile(res: Response): void {
 	expectSharedHeaders(res);
 	expect(res.headers.get('content-security-policy')).toBe(NON_PAGE_POLICY);
+	expect(res.headers.has('x-frame-options')).toBe(false);
 }
 
 /*
@@ -77,4 +96,22 @@ export function expectPageProfile(res: Response): void {
 	const policy = res.headers.get('content-security-policy');
 	expect(policy).not.toBe(NON_PAGE_POLICY);
 	expect(policy).toContain('script-src');
+	/*
+	 * The legacy framing header, asserted as the invariant rather than as a value: present and DENY
+	 * exactly when this page's own policy denies framing, absent when it does not.
+	 *
+	 * Hardcoding DENY would pass today and be wrong. `expectProfileByKind` feeds the exhaustive route
+	 * sweep, which classifies a response as a page by content type alone and must not guess; a bare
+	 * probe cannot currently produce the one framable page (that needs a registered client, a live
+	 * authorization request and response_mode=form_post), so the stricter assertion would sit green
+	 * until the day something reached that page — and then fail the *correct* behaviour. Deriving the
+	 * expectation from the same rule the implementation guarantees is right in both worlds.
+	 */
+	const deniesFraming = (policy ?? '').includes("frame-ancestors 'none'");
+	if (deniesFraming) {
+		expectExactlyOnce(res, 'x-frame-options');
+		expect(res.headers.get('x-frame-options')).toBe('DENY');
+	} else {
+		expect(res.headers.has('x-frame-options')).toBe(false);
+	}
 }
