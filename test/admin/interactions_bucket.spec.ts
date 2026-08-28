@@ -2,7 +2,11 @@ import { describe, it, expect, beforeAll } from 'bun:test';
 import bootstrap, { agent, getHeader } from '../test_helper.ts';
 import { AuthorizationRequest } from '../AuthorizationRequest.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { getUserStore, resetAdminMemoryStores } from 'lib/adapters/index.ts';
+import {
+	getBucketStore,
+	getUserStore,
+	resetAdminMemoryStores
+} from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID } from 'lib/admin/consts.ts';
 
 // These specs prove the additive client -> bucket routing added to
@@ -81,5 +85,60 @@ describe('interaction login bucket routing', () => {
 
 	it('rejects a deactivated user (active:false)', async () => {
 		expect(await submitLogin('regular-app', 'deactivated@x.io')).toBe(400);
+	});
+
+	/*
+	 * The reserved admin bucket is never email-verification-gated, and this is a lockout guard rather
+	 * than a preference. Both paths that create an administrator write `verified: false` — the admins
+	 * route and the first-run bootstrap — and no verification mail is ever sent for this bucket, because
+	 * `issueAndSend` is only reached from the self-service registration route, which this bucket
+	 * refuses. So the flag being true here means every administrator is refused at the door with no way
+	 * to clear it short of editing the database.
+	 *
+	 * Unreachable through the admin API today, which is exactly why it is pinned at the point of
+	 * enforcement instead: the flag only has to become settable once for a console to be bricked.
+	 */
+	it('never gates the admin bucket on email verification', async () => {
+		const unverified = await getUserStore(ADMIN_BUCKET_ID).create(
+			'unverified-admin@x.io',
+			await Bun.password.hash(PASSWORD),
+			['project_admin']
+		);
+		expect(unverified.verified).toBe(false);
+
+		await getBucketStore().update(ADMIN_BUCKET_ID, {
+			emailVerificationRequired: true
+		});
+		try {
+			expect(await submitLogin('admin-panel', 'unverified-admin@x.io')).toBe(
+				303
+			);
+		} finally {
+			await getBucketStore().update(ADMIN_BUCKET_ID, {
+				emailVerificationRequired: false
+			});
+		}
+	});
+
+	// The same flag still gates an ordinary bucket, so the exemption is the admin bucket's alone.
+	it('still gates an ordinary bucket on email verification', async () => {
+		const user = await getUserStore().create(
+			'unverified-regular@x.io',
+			await Bun.password.hash(PASSWORD)
+		);
+		expect(user.verified).toBe(false);
+
+		await getBucketStore().update('redfox', {
+			emailVerificationRequired: true
+		});
+		try {
+			expect(await submitLogin('regular-app', 'unverified-regular@x.io')).toBe(
+				400
+			);
+		} finally {
+			await getBucketStore().update('redfox', {
+				emailVerificationRequired: false
+			});
+		}
 	});
 });

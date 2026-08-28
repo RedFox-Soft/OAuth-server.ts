@@ -10,7 +10,11 @@ import {
 	SetBucketBody
 } from '../admin/projects/schema.js';
 import { CreateClientBody, UpdateClientBody } from '../admin/clients/schema.js';
-import { CreateAdminBody, UpdateAdminBody } from '../admin/users/schema.js';
+import {
+	AdminSettingsBody,
+	CreateAdminBody,
+	UpdateAdminBody
+} from '../admin/users/schema.js';
 import { CreateBucketBody, UpdateBucketBody } from '../admin/buckets/schema.js';
 import {
 	CreateEndUserBody,
@@ -171,6 +175,19 @@ const catalogue = [
 		querySchema: null,
 		pathParams: [],
 		summary: 'The administrator accounts of this instance, with their roles.'
+	},
+	{
+		tool: 'admin_settings_read',
+		method: 'GET',
+		path: '/admin/api/admins/settings',
+		action: null,
+		consequence: 'read',
+		requiredRole: 'super_admin',
+		bodySchema: null,
+		querySchema: null,
+		pathParams: [],
+		summary:
+			"The sign-in policy of the administrator bucket itself. `totpRequired` says whether signing in to the console also needs a one-time code from an authenticator app. The bucket's other settings are deliberately not exposed."
 	},
 	{
 		tool: 'bucket_list',
@@ -449,7 +466,25 @@ const catalogue = [
 			'Permanently delete an OAuth client and revoke what was issued to it. Irreversible.'
 	},
 
-	/* -------------------------------------------- writes: administrators (3) */
+	/* -------------------------------------------- writes: administrators (4) */
+	{
+		tool: 'admin_settings_update',
+		method: 'PATCH',
+		path: '/admin/api/admins/settings',
+		action: 'admin.settings.update',
+		/*
+		 * Ordinary. Turning the second factor on locks nobody out — an administrator without an
+		 * authenticator is taken through enrolment at their next sign-in — and turning it off is not
+		 * destructive either, since enrolments are retained.
+		 */
+		consequence: 'ordinary',
+		requiredRole: 'super_admin',
+		bodySchema: AdminSettingsBody,
+		querySchema: null,
+		pathParams: [],
+		summary:
+			"Require a one-time authenticator code for signing in to the administration console, on top of the password. Applies to every administrator; anyone without an authenticator sets one up at their next sign-in, so nobody is locked out. This also covers an agent obtaining a token interactively through the console's own client, so expect to supply a code."
+	},
 	{
 		tool: 'admin_create',
 		method: 'POST',

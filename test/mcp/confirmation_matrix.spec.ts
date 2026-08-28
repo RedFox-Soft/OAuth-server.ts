@@ -215,7 +215,7 @@ describe('every high-consequence tool is gated', () => {
 		const gated = mcpCatalogue.filter(
 			(t) => t.consequence === 'ordinary' || t.consequence === 'read'
 		);
-		expect(gated.length).toBe(45 - 11);
+		expect(gated.length).toBe(47 - 11);
 		for (const tool of gated) {
 			expect(tool.consequence, tool.tool).not.toBe('high');
 		}

@@ -25,8 +25,9 @@ word for it.
 
 ## Why the codebase is the source rather than the planning documents
 
-`TASKS.md` and `specs/` describe intended work, not the server that exists: they are scratch
-artifacts that get deleted or rewritten, and `specs/` is not committed. Ingesting them would fill
+GitHub issues and `specs/` describe intended work, not the server that exists: issues get closed
+or rewritten, and `specs/` is not committed (the former `TASKS.md` backlog was retired into issues
+on 2026-08-27). Ingesting them would fill
 the wiki with claims whose sources vanish — the silent-corruption failure mode. Only committed
 code and committed documentation are treated as ingestable here.
 

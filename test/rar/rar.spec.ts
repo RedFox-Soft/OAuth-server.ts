@@ -453,7 +453,7 @@ describe('features.richAuthorizationRequests', () => {
 		/*
 		 * Pins research R22's documented hole: delivery is gated on a resolved resource server, so a
 		 * deployment with no resource-server resolver grants details that no token carries. It is a
-		 * recorded consequence of D8, not a surprise, and the guard belongs to backlog task 12.
+		 * recorded consequence of D8, not a surprise, and the guard belongs to GitHub issue #6.
 		 */
 		it('grants details but carries them on no token without a resource server', async () => {
 			const auth = new AuthorizationRequest({

@@ -118,6 +118,40 @@ existing split where `passwordLogin` governs password doors and federation is en
 A password reset neither clears nor bypasses an enrolment: a reset proves an address, and the next
 sign-in still asks for a code.
 
+## The administrator bucket needs its own door
+
+The console signs in through this same flow — `resolveBucketForClient` maps the reserved console
+client straight to the admin bucket — so enforcement works there for free. Reaching the *setting* does
+not: `assertNotReserved` (`lib/admin/buckets/access.ts`) refuses the admin bucket on both
+`loadBucketForEdit` and `loadBucketForUsers`, and its 403 names `/admin/api/admins` as where that
+bucket is managed. Until `GET`/`PATCH /admin/api/admins/settings` existed, that promise had nothing
+behind it and administrators could not be put behind a second factor at all.
+
+**That endpoint carries `totpRequired` and nothing else, and the exclusions are the design.** The
+bucket has nine settings; one of them is a console brick:
+
+`emailVerificationRequired` must never be true for this bucket. Both paths that create an
+administrator write `verified: false` — `POST /admin/api/admins` and the first-run bootstrap
+(`lib/admin/auth/setup.ts`) — and no verification mail is ever sent here, because `issueAndSend` is
+reached only from the self-service registration route, which this bucket refuses. Setting it would
+refuse every administrator at the door with no way to clear it short of editing the database. It is
+now pinned at the point of enforcement (`verificationGates` in `lib/interactions/index.ts`) rather
+than left to the schema, because the flag only has to become settable once.
+
+The rest fail on their own merits. `passwordLogin: false` is a permanent lockout — this bucket accepts
+no providers, and `assertSomeWayToSignIn` looks for an *enabled provider*, so it would not catch it.
+`registrationOpen: true` would let anyone who can reach `/admin/login` create a row in the reserved
+bucket through the ordinary registration page. `roles` is inert: nothing constrains an
+administrator's roles against it. `managedBy` is meaningless where access is by role, `federation` is
+refused by its own routes and is a separate decision, and `name` is cosmetic — though no longer
+invisible, since it is the issuer label an authenticator app displays.
+
+Turning it on locks nobody out: an administrator without an authenticator meets enrolment at their
+next sign-in, the same path that brings any existing account under the requirement. It does also
+cover an agent obtaining a token through the console's own client, which is stated in the tool
+summary rather than exempted — an exemption there would be a hole in exactly the surface the
+constitution says must not have one.
+
 ## Two things found on the way
 
 `Interaction.persist()` cannot work and never could: its guard tests `this.exp` while the value lives at
@@ -139,6 +173,8 @@ failing anywhere to reveal it.
   in code rather than trusting MongoDB's lazy TTL monitor.
 - [[admin-audit-trail]] — entries carry field *names* and never values, which is why clearing an
   enrolment records the act and nothing else.
+- [[admin-console-signin]] — the console is a relying party on this server's own issuer, which is why
+  putting the admin bucket behind a second factor needed no new enforcement, only a way to say so.
 - [[feature-flag-gating]] — this is bucket state rather than a feature flag, and deliberately so.
 - [[html-response-security-policy]] — both new pages build through `htmlResponse`; the QR is inline SVG
   and needs no directive.

@@ -67,6 +67,7 @@ import { Client } from 'lib/models/client.js';
 import { responseModes } from 'lib/response_modes/index.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { resolveBucketForClient } from 'lib/admin/auth/resolveBucket.js';
+import { ADMIN_BUCKET_ID } from 'lib/admin/consts.js';
 import { buildConsentView, type PromptDetails } from './consentView.js';
 import { NOTICE_VERIFY, resolveNotice } from './notices.js';
 import {
@@ -234,6 +235,34 @@ async function passwordDoorClosed(
 		: undefined;
 }
 
+/*
+ * Whether this bucket refuses an unverified account at the door.
+ *
+ * The reserved admin bucket never does, and that is a lockout guard rather than a preference. Both
+ * paths that create an administrator write `verified: false` — `POST /admin/api/admins` and the
+ * first-run bootstrap — and no verification mail is ever sent for this bucket, because `issueAndSend`
+ * is reached only from the self-service registration route, which this bucket refuses. So the flag
+ * being true here would refuse every administrator with nothing they could do about it, and no way
+ * back short of editing the database.
+ *
+ * The same shape lib/password_reset/challenge.ts uses to keep the reserved bucket out of the
+ * self-service reset, and for a related reason: an end-user flow that assumes a mailbox does not
+ * apply to a bucket whose accounts are provisioned by other operators.
+ *
+ * Written as a predicate rather than inline because the federation callback asks the same question a
+ * few hundred lines below. It does not use this yet — the admin bucket accepts no providers, so that
+ * path is unreachable for it — but the seed calls a second operator identity source "a separate
+ * decision", and on the day that decision is made this is the thing that should already be there.
+ */
+function verificationGates(
+	bucket: { emailVerificationRequired?: boolean } | null,
+	bucketId: string
+): boolean {
+	return (
+		bucket?.emailVerificationRequired === true && bucketId !== ADMIN_BUCKET_ID
+	);
+}
+
 /* The client that began an interaction — the only trustworthy route to a bucket. */
 function clientIdOf(interaction: {
 	payload: { params?: unknown };
@@ -364,7 +393,7 @@ export const ui = new Elysia()
 				});
 			}
 			const loginBucket = await getBucketStore().find(bucketId);
-			if (loginBucket?.emailVerificationRequired && !user.verified) {
+			if (verificationGates(loginBucket, bucketId) && !user.verified) {
 				return loginServer(uid, {
 					errorMessage:
 						'Please verify your email before signing in. Check your inbox for the verification message.',

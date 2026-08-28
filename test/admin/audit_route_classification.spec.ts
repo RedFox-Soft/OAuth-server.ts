@@ -61,11 +61,15 @@ describe('admin audit route classification', () => {
 		/*
 		 * Counted exactly, and the numbers grow with the table: 23 + the four federation rows (three provider
 		 * operations and one identity severance) + the error-store purge + clearing an end-user's
-		 * authenticator. A count that drifted upward silently would let an audited route be swapped for an
-		 * unaudited one without either total changing.
+		 * authenticator + the admin bucket's own sign-in policy. A count that drifted upward silently
+		 * would let an audited route be swapped for an unaudited one without either total changing.
+		 *
+		 * `mounted` stays exactly one ahead, and always the same one: `POST /admin/api/logout`, the
+		 * deliberate exclusion named above. It filters to MUTATING methods, so the settings *read* that
+		 * shipped alongside the PATCH does not appear in either total.
 		 */
-		expect(auditedAdminRoutes).toHaveLength(29);
-		expect(mounted).toHaveLength(30);
+		expect(auditedAdminRoutes).toHaveLength(30);
+		expect(mounted).toHaveLength(31);
 	});
 
 	it('declares each route pattern only once', () => {
