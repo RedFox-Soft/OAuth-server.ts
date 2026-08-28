@@ -221,7 +221,7 @@ describe('in-process re-dispatch into the admin routes', () => {
 	// Q6. The route inventory the drift guard (T006) will compare against.
 	it('exposes the mounted route set for the drift guard', () => {
 		const api = composed.routes.filter((r) => r.path.startsWith('/admin/api'));
-		expect(api.length).toBe(41);
+		expect(api.length).toBe(43);
 
 		// The three /admin/api routes NOT in any route plugin. Two are excluded from MCP anyway;
 		// `GET /admin/api/me` is not, and the whoami tool needs it — so it must be extracted from

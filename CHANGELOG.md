@@ -11,6 +11,12 @@ of the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- The administration console can be put behind the second factor. A new settings resource under
+  `/admin/api/admins` carries the reserved admin bucket's `totpRequired` — audited as
+  `admin.settings.update`, exposed to MCP as `admin_settings_read` and `admin_settings_update`, with
+  a switch on the Admins page. The generic bucket routes still refuse that bucket; this is the
+  surface their 403 already pointed at. Nobody is locked out by turning it on: an administrator
+  without an authenticator enrols at their next sign-in
 - TOTP second factor per user bucket: `totpRequired` makes a password sign-in also require a
   six-digit authenticator code, with enrolment at registration and at the first sign-in of an
   existing account, RFC 4226/6238 implemented in-repo against the published test vectors, replay and
@@ -84,6 +90,11 @@ of the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Security
 
+- The reserved admin bucket can no longer be gated on email verification. Both paths that create an
+  administrator write `verified: false` and no verification mail is ever sent for that bucket, so the
+  flag would have refused every administrator at the door with no way back short of editing the
+  database. It was unreachable through the API rather than prevented; it is now refused at the point
+  of enforcement
 - The end-user cookies (`_session`, `_interaction`) carry `Secure` -- and the `/ui/*` responses,
   which is where the authenticated `_session` is first written, now carry the full
   `HttpOnly; SameSite=Strict; Secure` set instead of no attributes at all: that route family

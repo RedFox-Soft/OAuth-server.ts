@@ -1,5 +1,5 @@
 import { Elysia } from 'elysia';
-import { getUserStore } from '../../adapters/index.js';
+import { getBucketStore, getUserStore } from '../../adapters/index.js';
 import {
 	assertAuth,
 	assertRole,
@@ -9,11 +9,26 @@ import {
 	type AdminContext
 } from '../auth/rbac.js';
 import { ADMIN_BUCKET_ID } from '../consts.js';
-import { CreateAdminBody, UpdateAdminBody } from './schema.js';
+import {
+	AdminSettingsBody,
+	CreateAdminBody,
+	UpdateAdminBody
+} from './schema.js';
 import { recordAdminAudit } from '../audit/record.js';
 import nanoid from '../../helpers/nanoid.js';
 
 const store = () => getUserStore(ADMIN_BUCKET_ID);
+
+/*
+ * The reserved bucket record. Seeded by ensureAdminSeed and never deletable, so a miss here is a
+ * broken deployment rather than a caller's mistake — said plainly instead of collapsing to a default
+ * that would report "no second factor required" for a bucket nobody could find.
+ */
+async function adminBucket() {
+	const bucket = await getBucketStore().find(ADMIN_BUCKET_ID);
+	if (!bucket) throw new AdminError(500, 'the admin bucket is missing');
+	return bucket;
+}
 
 // Count how many active super_admins would remain if the target admin's roles /
 // active flag were changed as described. Used to prevent removing the last active
@@ -50,6 +65,42 @@ export const adminUserRoutes = new Elysia({ name: 'admin-users' })
 		assertRole(ctx, 'super_admin');
 		return (await store().list()).map(({ password: _password, ...u }) => u);
 	})
+	/*
+	 * The reserved admin bucket's own policy, which the generic bucket routes refuse to touch — their
+	 * 403 names this namespace as the place it lives, and until now that promise had nothing behind it.
+	 *
+	 * Both halves are declared before `/admin/api/admins/:id`, because `:id` matches a single segment
+	 * and `settings` is one: a request here must not be read as "the administrator whose id is
+	 * `settings`". The ordering is the guard, and test/admin/admin_settings.spec.ts pins the outcome
+	 * rather than trusting the router's precedence to stay as it is.
+	 */
+	.get('/admin/api/admins/settings', async ({ admin }) => {
+		const ctx = assertAuth(admin as AdminContext | null);
+		assertRole(ctx, 'super_admin');
+		return { totpRequired: (await adminBucket()).totpRequired === true };
+	})
+	.patch(
+		'/admin/api/admins/settings',
+		async ({ admin, body }) => {
+			const ctx = assertAuth(admin as AdminContext | null);
+			assertRole(ctx, 'super_admin');
+			// Audit-first, like every other state-changing admin action. Field names, never values.
+			await recordAdminAudit(ctx, 'admin.settings.update', ADMIN_BUCKET_ID, {
+				attributes: Object.keys(body)
+			});
+			const updated = await getBucketStore().update(ADMIN_BUCKET_ID, {
+				totpRequired: body.totpRequired
+			});
+			if (!updated) throw new AdminError(404, 'admin bucket not found');
+			/*
+			 * Nobody is locked out by turning this on: an administrator with no authenticator is taken
+			 * through enrolment at their next sign-in, which is the same path that brings any existing
+			 * account under the requirement.
+			 */
+			return { totpRequired: updated.totpRequired === true };
+		},
+		{ body: AdminSettingsBody }
+	)
 	.post(
 		'/admin/api/admins',
 		async ({ admin, body, set }) => {

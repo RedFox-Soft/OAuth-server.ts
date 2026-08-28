@@ -86,6 +86,16 @@ const routes = [
 	},
 
 	{
+		/*
+		 * The reserved admin bucket's own policy. `targetType` is the bucket rather than an
+		 * administrator: the change is to the bucket record, and it applies to every operator in it.
+		 */
+		action: 'admin.settings.update',
+		method: 'PATCH',
+		path: '/admin/api/admins/settings',
+		targetType: 'UserBucket'
+	},
+	{
 		action: 'admin.create',
 		method: 'POST',
 		path: '/admin/api/admins',
