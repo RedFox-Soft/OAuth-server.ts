@@ -2,6 +2,6 @@
 preload = ["./test/preload.ts"]
 coverageSkipTestFiles = true
 # Only entry left: test/helpers/attention.spec.ts uses Mocha's `context()` and has no bun:test
-# equivalent yet — it is migrated by backlog task 24. The former test/cors/* entries are gone: that
+# equivalent yet — it is migrated by GitHub issue #17. The former test/cors/* entries are gone: that
 # suite is rewritten against the delivered CORS contract and runs.
 pathIgnorePatterns = ["test/helpers/attention.spec.ts"]

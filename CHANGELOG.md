@@ -4,8 +4,8 @@ All notable changes to this project are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). No release has
 been cut yet — everything below is unreleased. Spec numbers refer to the (untracked) `specs/`
-directories; full retrospectives live in `TASKS.md`'s git history and the knowledge base at
-`wiki/`.
+directories; open work is tracked as GitHub issues; full retrospectives live in the git history
+of the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 

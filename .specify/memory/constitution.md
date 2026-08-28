@@ -30,7 +30,7 @@ Templates requiring updates:
 Follow-up TODOs:
   ⚠ AGENTS.md — describes the project as a "library" (OAuth 2.0) and omits the admin
     control plane + MCP; MUST be updated to match Principles I & II (per Governance §3).
-    Tracked as backlog task 28.
+    Tracked as GitHub issue #20.
 -->
 
 # OAuth-server.ts Constitution
