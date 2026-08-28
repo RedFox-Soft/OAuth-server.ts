@@ -103,8 +103,8 @@ The test suite loads `.env.test` automatically via Bun.
 
 ```
 lib/
-  index.ts              ← library entry: exports provider, elysia, errors
-  provider.ts           ← ProviderClass (EventEmitter); holds config, models, key store
+  index.ts              ← library entry: exports elysia, errors, eventBus, interactionPolicy
+  event_bus.ts          ← the process-wide EventEmitter (default export of index.ts)
   actions/              ← per-endpoint request handlers (operate on `oidc`, the OIDCContext)
     authorization/      ← authorization endpoint pipeline (validate → interact → respond)
     grants/             ← grant type handlers (auth_code, refresh_token, device, ciba)
@@ -116,9 +116,8 @@ lib/
   adapters/             ← MongoDB adapter; TestAdapter (in-memory) for tests
   plugins/              ← Elysia plugins: noCache, noQueryDup, auth
   interactions/         ← Login/consent UI endpoints (React + Ant Design)
-  views/                ← React components rendered server-side for interaction pages
   response_modes/       ← query, fragment, form_post, JWT response modes
-  shared/               ← CORS, session, authorization_error_handler (shared onError), resource validation
+  shared/               ← session, authorization_error_handler (shared onError), token auth, resource validation
   configs/              ← application.ts (single source of config DATA), algorithm lists, token lifetimes, env
   admin/                ← the administrative control plane
     routes.ts           ← THE admin API route set; mounted by both the console and lib/mcp/dispatch.ts

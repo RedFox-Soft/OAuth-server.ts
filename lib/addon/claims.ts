@@ -6,11 +6,13 @@ export function sectorIdentifierUriValidate(_client) {
 	return true;
 }
 
-export async function assertClaimsParameter(_ctx, _claims, _client) {
-	// @param ctx - koa request context
-	// @param claims - parsed claims parameter
-	// @param client - the Client instance
-}
+// An override seam, not an unimplemented stub: the empty body is the default. The
+// server's own structural validation of the claims parameter lives in the caller
+// (lib/actions/authorization/check_claims.ts), which invokes this on every
+// authorization request carrying `claims` while claimsParameter.enabled is set. The
+// hook exists so a deployment can layer its own policy on top, via
+// addons.override({ assertClaimsParameter }). Throw to reject; resolve to accept.
+export async function assertClaimsParameter(_ctx, _claims, _client) {}
 
 export async function assertJwtClaimsAndHeader(oidc, claims, _header, _client) {
 	// @param oidc - the per-request oidc context

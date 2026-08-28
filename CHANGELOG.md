@@ -100,6 +100,19 @@ of the retired `TASKS.md` and in the knowledge base at `wiki/`.
   styled pages, consent permissions carry headings and friendly labels, decorative Google button
   removed (spec 021)
 
+### Removed
+
+- Seven unreferenced modules deleted (issue #19, spec 030): the whole `lib/views/` directory of legacy
+  interaction templates — safe because spec 015's `'rar-detail'` consent group had taken over the RAR
+  rendering that was its one unique job — plus the `Stub.tsx` admin placeholder, `helpers/params.ts`,
+  `helpers/set_www_authenticate.ts` and `helpers/_/pick_by.ts`. The two addon functions the issue
+  suspected of being dead are **kept**: `assertClaimsParameter` and
+  `assertJwtClientAuthClaimsAndHeader` are live override seams reached through the call-time registry
+  in `lib/addon/index.ts`, so an empty body is their default rather than an abandoned stub, and each
+  now carries a comment saying so. `AGENTS.md`'s source-tree map lost three stale entries it had kept
+  describing — `views/`, the long-deleted `provider.ts`, and CORS under `shared/`. Test counts, type-error
+  count and lint findings all held at their pre-change values.
+
 ### Fixed
 
 - The server could not boot against MongoDB: the DPoP nonce secret came back from the driver as a

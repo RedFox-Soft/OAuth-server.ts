@@ -120,5 +120,7 @@ still fails on an unclassified route and additionally fails on a declared route 
   audit coverage.
 - [[upstream-federation]] — the first gated routes under a prefix, and why the routes that *configure* the
   capability are deliberately left ungated.
+- [[override-seams-vs-dead-code]] — the other reason a code path looks unreachable without being dead:
+  a flag decides whether it runs, a registry decides *what* runs there.
 
 Verified against [[oauth-server-codebase]] at commit `2125ad0`.
