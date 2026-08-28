@@ -89,6 +89,57 @@ an empty store. On subsequent restarts the existing keys are reused. Keys are lo
 — to rotate, update the store and reload the server. Additional keys (for example encryption keys)
 can be provisioned by populating the store.
 
+### Rate limiting
+
+Requests are counted per calling origin and refused with `429` once an origin exceeds its allowance
+inside a window. The refusal happens before the endpoint does any work, and carries `Retry-After`
+with the seconds remaining; the body is the standard OAuth error shape, the admin plane's own shape,
+or an HTML page, depending on which surface was addressed. No `RateLimit-*` headers are emitted —
+they would tell a caller probing for the threshold exactly where it is.
+
+Allowances are tiered by route class rather than being one blanket number, because a limit tight
+enough to protect the token endpoint would refuse the console's asset burst:
+
+| Class      | Applies to                                                                                                                         | Default       |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------- |
+| `strict`   | Token, authorization, dynamic registration, PAR, device, CIBA, and every end-user door that checks a secret or sends mail          | 60 / 60s      |
+| `ordinary` | Everything not otherwise classified — userinfo, introspection, revocation, the admin API, MCP, the rest of the interaction screens | 300 / 60s     |
+| `public`   | Static assets, discovery metadata, the key set, and every cross-origin preflight                                                   | 1200 / 60s    |
+| exempt     | `GET /health` only — a refused liveness probe would take the machine out of the load balancer                                      | never counted |
+
+All of it is settable from the admin console under **Settings → Rate limiting**, or directly on
+`ApplicationConfig`. Changes apply at the next restart, like every other server setting.
+
+| Setting                       | Default | Notes                                    |
+| ----------------------------- | ------- | ---------------------------------------- |
+| `rateLimit.enabled`           | `true`  | Incident kill switch                     |
+| `rateLimit.trustedProxy`      | `true`  | See below — no universally safe value    |
+| `rateLimit.maxTrackedOrigins` | `10000` | Per class; caps the limiter's own memory |
+| `rateLimit.strict.max`        | `60`    | With `.windowSeconds`, default `60`      |
+| `rateLimit.ordinary.max`      | `300`   | With `.windowSeconds`, default `60`      |
+| `rateLimit.public.max`        | `1200`  | With `.windowSeconds`, default `60`      |
+
+The server refuses to start if any of these is not a positive integer, rather than serving with
+limiting silently absent or silently total.
+
+**`rateLimit.trustedProxy` is the one setting with a wrong answer in each direction.** Leave it on
+when anything sits in front of this server (the shipped `fly.toml` does): with it off, every caller
+arrives as the proxy's own address, so the whole internet shares one allowance and all traffic is
+refused within seconds. Turn it off when the server is directly exposed: with it on, any caller can
+set `Fly-Client-IP` to a fresh value per request and is never limited.
+
+**Two properties to know before relying on this.** Counting is per instance and held in memory, so
+with N machines serving concurrently the effective allowance is N times the configured value, and an
+instance restart clears every counter. This is a resource protection — it bounds what one source can
+cost the server — and not a security boundary. The limits that must hold absolutely are the
+per-identity throttles: verification codes cap at five attempts, and resends and password-reset
+requests are cooldown- and daily-capped, independently of anything here.
+
+**Tuning.** Raise `strict.max` if a legitimate server-to-server integration behind one address, or
+many users behind one corporate NAT, start seeing refusals. Raise `public.max` if the admin console
+stutters while loading. Lower `maxTrackedOrigins` under memory pressure. Set `rateLimit.enabled` to
+`false` and restart to switch the whole thing off during an incident.
+
 ## Docker
 
 ```bash

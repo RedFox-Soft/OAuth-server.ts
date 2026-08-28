@@ -9,7 +9,10 @@ import {
 	corsClassForPattern,
 	corsMethodsForPath,
 	corsRoutes,
-	gatedRoutes
+	gatedRoutes,
+	rateClassForPattern,
+	rateClassForRequest,
+	rateRoutes
 } from '../../lib/consts/route_classification.ts';
 
 // The two-way drift guard. Behavioural specs prove the 15 known gated endpoints refuse correctly;
@@ -125,6 +128,166 @@ describe('route classification', () => {
 			expect(corsMethodsForPath('/userinfo').sort()).toEqual(['GET', 'POST']);
 			expect(corsMethodsForPath('/token')).toEqual(['POST']);
 			expect(corsMethodsForPath('/auth')).toEqual([]);
+		});
+	});
+
+	/*
+	 * The rate-limit mirror of the two above. Unlike the feature gate, an unclassified route here is not
+	 * an error — it falls to `ordinary` and is still limited, because defaulting to unlimited would make
+	 * forgetting this table equivalent to opting out of protection.
+	 *
+	 * That default is exactly why the three enumerated classes are pinned as exact sets rather than merely
+	 * checked for staleness. The failure this half exists to catch is a new expensive endpoint being
+	 * mounted and landing in `ordinary` unnoticed, or a cheap one being widened to `public` — neither of
+	 * which any behavioural spec would report, because both still answer correctly.
+	 */
+	describe('rate limit classification', () => {
+		// Unauthenticated, or expensive, or both: everything an attacker can make the server do real work
+		// for without first proving anything.
+		const STRICT = [
+			'POST /token',
+			'GET /auth',
+			'POST /auth',
+			'POST /par',
+			'POST /reg',
+			'POST /backchannel',
+			'POST /device/auth',
+			'GET /device',
+			'POST /device',
+			'POST /ui/:uid/login',
+			'POST /ui/:uid/registration',
+			'POST /ui/:uid/forgot-password',
+			'POST /ui/:uid/totp',
+			'POST /ui/:uid/totp/enroll',
+			'POST /verify-email/code',
+			'POST /verify-email/resend',
+			'POST /reset-password',
+			// Unauthenticated by construction — it is how the first super-admin comes to exist.
+			'POST /admin/api/setup'
+		];
+
+		// Cheap, public, and read by every client before it knows anything else about the deployment.
+		const PUBLIC = [
+			'GET /.well-known/openid-configuration',
+			'GET /.well-known/oauth-protected-resource/mcp',
+			'GET /jwks',
+			'GET /public/*'
+		];
+
+		// The platform probes this every 30s. A refused health check takes the machine out of the proxy.
+		const EXEMPT = ['GET /health'];
+
+		it('declares no entry for a route the server does not serve', () => {
+			const mountedKeys = new Set(mounted.map(key));
+
+			const stale = rateRoutes
+				.map((r) => key(r))
+				.filter((k) => !mountedKeys.has(k));
+
+			expect(stale).toEqual([]);
+		});
+
+		it('declares each route pattern only once', () => {
+			const declared = rateRoutes.map((r) => key(r));
+
+			expect(declared.length).toBe(new Set(declared).size);
+		});
+
+		it('applies the strict allowance to exactly the expensive unauthenticated surface', () => {
+			const strict = mounted
+				.filter(
+					(route) => rateClassForPattern(route.method, route.path) === 'strict'
+				)
+				.map(key);
+
+			expect(strict.sort()).toEqual([...STRICT].sort());
+		});
+
+		it('applies the loose allowance to exactly the cheap public surface', () => {
+			const loose = mounted
+				.filter(
+					(route) => rateClassForPattern(route.method, route.path) === 'public'
+				)
+				.map(key);
+
+			expect(loose.sort()).toEqual([...PUBLIC].sort());
+		});
+
+		it('exempts exactly the liveness probe', () => {
+			const exempt = mounted
+				.filter(
+					(route) => rateClassForPattern(route.method, route.path) === 'exempt'
+				)
+				.map(key);
+
+			expect(exempt.sort()).toEqual([...EXEMPT].sort());
+		});
+
+		it('classifies every other mounted route as ordinary', () => {
+			const enumerated = new Set([...STRICT, ...PUBLIC, ...EXEMPT]);
+
+			const misfiled = mounted
+				.filter((route) => !enumerated.has(key(route)))
+				.filter(
+					(route) =>
+						rateClassForPattern(route.method, route.path) !== 'ordinary'
+				)
+				.map(key);
+
+			expect(misfiled).toEqual([]);
+		});
+
+		it('resolves every mounted route to a class, with none left undeclared', () => {
+			const unresolved = mounted
+				.filter(
+					(route) => rateClassForPattern(route.method, route.path) === undefined
+				)
+				.map(key);
+
+			expect(unresolved).toEqual([]);
+		});
+
+		/*
+		 * The request-level resolver, which the pattern-level one above cannot stand in for: a request
+		 * arrives as `/public/app.js`, not as the `/public/*` pattern, and preflights never reach the
+		 * route table at all.
+		 */
+		describe('resolving an incoming request', () => {
+			it('reads a static asset path through the prefix rather than the pattern', () => {
+				expect(rateClassForRequest('GET', '/public/admin.js')).toBe('public');
+				expect(rateClassForRequest('GET', '/public/nested/app.css')).toBe(
+					'public'
+				);
+			});
+
+			it('matches a :param pattern segment-wise', () => {
+				expect(rateClassForRequest('POST', '/ui/abc123/login')).toBe('strict');
+				expect(rateClassForRequest('GET', '/ui/abc123/consent')).toBe(
+					'ordinary'
+				);
+			});
+
+			// A preflight is answered before routing and costs almost nothing. Charging it to the strict
+			// class would halve a browser client's real allowance and refuse it for requests it never sent.
+			it('treats every preflight as public, whatever it is preflighting', () => {
+				expect(rateClassForRequest('OPTIONS', '/token')).toBe('public');
+				expect(rateClassForRequest('OPTIONS', '/ui/abc123/login')).toBe(
+					'public'
+				);
+				expect(rateClassForRequest('OPTIONS', '/anything-at-all')).toBe(
+					'public'
+				);
+			});
+
+			it('falls back to ordinary for a path no entry names', () => {
+				expect(rateClassForRequest('GET', '/_not_a_mounted_route')).toBe(
+					'ordinary'
+				);
+			});
+
+			it('does not let a prefix entry swallow a deeper unrelated path', () => {
+				expect(rateClassForRequest('GET', '/publicity')).toBe('ordinary');
+			});
 		});
 	});
 

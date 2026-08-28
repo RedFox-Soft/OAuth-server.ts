@@ -275,6 +275,161 @@ export function corsRouteForRequest(
 	return undefined;
 }
 
+export type RateClass = 'strict' | 'ordinary' | 'public' | 'exempt';
+
+export interface RateRoute {
+	readonly method: string;
+	readonly path: string;
+	readonly rate: RateClass;
+}
+
+export interface RatePrefix {
+	readonly prefix: string;
+	readonly rate: RateClass;
+}
+
+/*
+ * How much traffic one origin may direct at a route before the per-origin limiter refuses it. The
+ * third classification dimension over this same route set, declared the same way as the two above and
+ * under the same two-way drift guard.
+ *
+ * WHY tiers rather than one blanket number. A single allowance tight enough to protect the token
+ * endpoint refuses the admin console's asset burst; one loose enough for the assets barely protects
+ * the token endpoint. The two cannot be reconciled by choosing a middle value — they are two different
+ * questions about two different costs.
+ *
+ * WHY `ordinary` is the default rather than an unclassified-route failure, which is the opposite of
+ * what gatedRoutes does. A route nobody classified must still be *limited*: making omission mean
+ * "unlimited" would turn forgetting this table into opting out of protection, silently. The drift
+ * guard still pins the three enumerated classes exactly, so the decision cannot be skipped — it just
+ * fails in the direction of more protection rather than less.
+ *
+ * Only the non-ordinary routes are enumerated, for the same reason corsRoutes enumerates only the two
+ * permissive classes: the list that must be read carefully is the short one.
+ */
+export const rateRoutes: readonly RateRoute[] = [
+	/*
+	 * The platform probes this every 30 seconds (fly.toml). A refused health check is read by the proxy
+	 * as an unhealthy machine and takes it out of rotation — the limiter causing the outage it exists to
+	 * prevent. Exempt rather than merely generous, because no allowance is high enough to be safe here.
+	 */
+	{ method: 'GET', path: '/health', rate: 'exempt' },
+
+	/*
+	 * Strict: unauthenticated, or expensive, or both. Everything an attacker can make the server do real
+	 * work for without first proving anything — a signature, a password hash, an account write.
+	 */
+	{ method: 'POST', path: routeNames.token, rate: 'strict' },
+	{ method: 'GET', path: routeNames.authorization, rate: 'strict' },
+	{ method: 'POST', path: routeNames.authorization, rate: 'strict' },
+	{
+		method: 'POST',
+		path: routeNames.pushed_authorization_request,
+		rate: 'strict'
+	},
+	{ method: 'POST', path: routeNames.registration, rate: 'strict' },
+	{
+		method: 'POST',
+		path: routeNames.backchannel_authentication,
+		rate: 'strict'
+	},
+	{ method: 'POST', path: routeNames.device_authorization, rate: 'strict' },
+	// User-code verification: a short, human-typed code is guessable by volume alone.
+	{ method: 'GET', path: routeNames.code_verification, rate: 'strict' },
+	{ method: 'POST', path: routeNames.code_verification, rate: 'strict' },
+	// Every end-user door that verifies a secret or sends mail. Each already carries a per-identity
+	// throttle; this is the origin-level layer in front of it, and neither replaces the other.
+	{ method: 'POST', path: '/ui/:uid/login', rate: 'strict' },
+	{ method: 'POST', path: '/ui/:uid/registration', rate: 'strict' },
+	{ method: 'POST', path: '/ui/:uid/forgot-password', rate: 'strict' },
+	{ method: 'POST', path: '/ui/:uid/totp', rate: 'strict' },
+	{ method: 'POST', path: '/ui/:uid/totp/enroll', rate: 'strict' },
+	{ method: 'POST', path: '/verify-email/code', rate: 'strict' },
+	{ method: 'POST', path: '/verify-email/resend', rate: 'strict' },
+	{ method: 'POST', path: '/reset-password', rate: 'strict' },
+	/*
+	 * The only admin route that is not ordinary. It is unauthenticated by construction — it is how the
+	 * first super-admin comes to exist — so it is the one admin door an attacker can knock on freely.
+	 */
+	{ method: 'POST', path: '/admin/api/setup', rate: 'strict' },
+
+	/*
+	 * Public: cheap, cacheable, and fetched by every client before it knows anything else about the
+	 * deployment. Limiting these tightly would break discovery for a whole NAT before it protected
+	 * anything — the response is a static document either way.
+	 */
+	{
+		method: 'GET',
+		path: '/.well-known/openid-configuration',
+		rate: 'public'
+	},
+	{ method: 'GET', path: routeNames.mcp_metadata, rate: 'public' },
+	{ method: 'GET', path: routeNames.jwks, rate: 'public' },
+	{ method: 'GET', path: '/public/*', rate: 'public' }
+];
+
+/*
+ * Prefix rules for the request-level resolver. `/public/*` is one mounted route but arrives as
+ * `/public/admin.js`, and patternMatchesPath compares segment-wise against `:param` — it has no
+ * wildcard case, deliberately. A prefix entry is how a wildcard mount is resolved without teaching
+ * that function a second matching language.
+ */
+export const ratePrefixes: readonly RatePrefix[] = [
+	{ prefix: '/public', rate: 'public' }
+];
+
+const rateClassByKey = new Map<string, RateClass>(
+	rateRoutes.map((route) => [`${route.method} ${route.path}`, route.rate])
+);
+
+/*
+ * Compares a route *pattern* against the table, for the drift guard. Never returns undefined: an
+ * unenumerated route is `ordinary`, which is the whole point of the default documented above.
+ */
+export function rateClassForPattern(method: string, path: string): RateClass {
+	const exact = rateClassByKey.get(`${method} ${path}`);
+	if (exact !== undefined) {
+		return exact;
+	}
+	for (const entry of ratePrefixes) {
+		if (path === entry.prefix || path.startsWith(`${entry.prefix}/`)) {
+			return entry.rate;
+		}
+	}
+	return 'ordinary';
+}
+
+/*
+ * Resolves an incoming request to its allowance class. Called on every request ahead of routing, so it
+ * stays allocation-light and returns on the first match.
+ */
+export function rateClassForRequest(
+	method: string,
+	pathname: string
+): RateClass {
+	/*
+	 * Checked before the table, and on the method alone. A preflight never reaches the route table —
+	 * corsPreflight answers it by short-circuiting onRequest — and it costs almost nothing to answer.
+	 * Charging one to the class of the request it precedes would halve a browser client's real
+	 * allowance and refuse it for requests it never actually sent.
+	 */
+	if (method === 'OPTIONS') {
+		return 'public';
+	}
+
+	for (const route of rateRoutes) {
+		if (route.method === method && patternMatchesPath(route.path, pathname)) {
+			return route.rate;
+		}
+	}
+	for (const entry of ratePrefixes) {
+		if (pathname === entry.prefix || pathname.startsWith(`${entry.prefix}/`)) {
+			return entry.rate;
+		}
+	}
+	return 'ordinary';
+}
+
 /*
  * Compares a route *pattern* (as Elysia declares it) against the table. Used by the drift guard,
  * which asks "is this mounted route classified?" — not by the request path, which needs

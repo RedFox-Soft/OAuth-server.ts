@@ -208,3 +208,51 @@ export const UnsupportedResponseMode = E(
 	'unsupported_response_mode',
 	'unsupported response_mode requested'
 );
+
+/*
+ * A per-origin rate-limit refusal, raised from the onRequest hook (lib/plugins/rateLimit.ts) before
+ * routing, client authentication or body parsing.
+ *
+ * WHY `temporarily_unavailable`. It is the closest registered OAuth code (RFC 6749 4.1.2.1). The
+ * closed code list in 5.2 governs the 400 error response, not a 429 transport-level refusal, so
+ * reusing it here is not a conformance deviation — and inventing an unregistered code would be.
+ *
+ * WHY `allow_redirect = false`, which is the load-bearing line in this class. The base class defaults
+ * it to true, and lib/shared/authorization_error_handler.ts turns any redirectable error raised on
+ * /auth into a redirect back to the client. For a rate-limit refusal that would be wrong twice over:
+ * building the redirect means resolving and validating redirect_uri first, which is exactly the work
+ * the refusal exists to avoid doing, and it would hand an attacker a redirect for free on an endpoint
+ * they have already been told to stop calling.
+ *
+ * `retryAfterSeconds` and `rateClass` are carried for the handler and the log. Nothing else is: no
+ * counter value, no allowance, no account or client identity — a refusal discloses that a limit was
+ * reached and nothing further.
+ */
+export class RateLimited extends OIDCProviderError {
+	allow_redirect = false;
+	readonly retryAfterSeconds: number;
+	readonly rateClass: string;
+
+	constructor(
+		retryAfterSeconds: number,
+		rateClass: string,
+		adminPlane = false
+	) {
+		super(429, 'temporarily_unavailable');
+		Error.captureStackTrace(this, this.constructor);
+		this.retryAfterSeconds = retryAfterSeconds;
+		this.rateClass = rateClass;
+		Object.assign(this, {
+			error_description: `too many requests, retry after ${retryAfterSeconds} seconds`
+		});
+		/*
+		 * Assigned only when true, never as `adminPlane = false`. The root handler stands aside on the
+		 * *presence* of the property (`'adminPlane' in error`), so a field declared and left false would
+		 * route every refusal on every surface into the admin plane's handler — which answers for none of
+		 * them but /admin.
+		 */
+		if (adminPlane) {
+			Object.assign(this, { adminPlane: true });
+		}
+	}
+}

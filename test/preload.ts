@@ -11,6 +11,7 @@ for (const key of testSigningKeys) {
 }
 
 let policyControl: { reset(): void } | undefined;
+let rateLimiter: { resetRateLimiter(): void } | undefined;
 
 // Global isolation hook: after every test, reset the addon override registry to
 // the current spec's baseline (the overrides its *.config.ts declared, applied
@@ -29,4 +30,17 @@ afterEach(async () => {
 	policyControl ??= (await import('../lib/addon/interactions.js'))
 		.interactionPolicyControl;
 	policyControl.reset();
+
+	/*
+	 * The rate limiter's counters are module state, so nothing else in this suite clears them — and a
+	 * spec that runs enough requests through one origin starts seeing 429s in whatever file happens to
+	 * cross the allowance first. Reset here rather than in bootstrap() because the specs that trip it
+	 * are the ones calling bootstrap in `beforeAll`, where a per-file reset comes too late; and because
+	 * the specs that would otherwise have to remember are the ones with no interest in rate limiting.
+	 *
+	 * Lazily imported for the same reason the policy above is: this file runs ahead of every spec, and
+	 * the plugin reaches ApplicationConfig and from there the adapter graph.
+	 */
+	rateLimiter ??= await import('../lib/plugins/rateLimit.js');
+	rateLimiter.resetRateLimiter();
 });

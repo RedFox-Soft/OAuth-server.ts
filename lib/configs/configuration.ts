@@ -263,6 +263,36 @@ function checkCibaDeliveryModes(config: ConfigurationInput) {
 	}
 }
 
+/*
+ * The rate limiter's numbers, checked at boot because both ways of getting them wrong fail silently at
+ * runtime: a non-positive allowance refuses every request, and a non-positive window makes every
+ * request look like the first of a new one. Neither throws and neither logs, so a server misconfigured
+ * either way looks healthy until someone reads the traffic.
+ *
+ * Checked even when the limiter is switched off. Skipping them for a disabled limiter would accept a
+ * value at the moment it is written and refuse to boot months later, when an operator turns the
+ * capability on and has no reason to connect the two events.
+ */
+function checkRateLimit(config: ConfigurationInput) {
+	const positiveIntegers = [
+		'rateLimit.maxTrackedOrigins',
+		'rateLimit.strict.max',
+		'rateLimit.strict.windowSeconds',
+		'rateLimit.ordinary.max',
+		'rateLimit.ordinary.windowSeconds',
+		'rateLimit.public.max',
+		'rateLimit.public.windowSeconds'
+	] as const;
+
+	for (const key of positiveIntegers) {
+		const value = config[key];
+		if (!Number.isSafeInteger(value) || (value as number) < 1) {
+			// The key is named because an operator reading a failed boot has seven of these to choose from.
+			throw new TypeError(`${key} must be a positive integer`);
+		}
+	}
+}
+
 function checkDependantFeatures(config: ConfigurationInput) {
 	if (config['jwtIntrospection.enabled'] && !config['introspection.enabled']) {
 		throw new TypeError(
@@ -458,6 +488,7 @@ export function validateConfiguration(
 	checkCibaDeliveryModes(config);
 	checkRichAuthorizationRequests(config);
 	checkErrorStore(config);
+	checkRateLimit(config);
 
 	return {
 		scopes,

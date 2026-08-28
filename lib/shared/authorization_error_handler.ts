@@ -15,6 +15,7 @@ import { dPoPSigningAlgValues } from 'lib/configs/jwaAlgorithms.js';
 import { InvalidDpopProof, UseDpopNonce } from 'lib/helpers/validate_dpop.js';
 import { DPoPNonces } from 'lib/helpers/dpop_nonces.js';
 import { FeatureDisabled } from 'lib/plugins/featureGate.js';
+import { RateLimited } from 'lib/helpers/errors.js';
 import { captureFault } from 'lib/error_store/capture.js';
 import { fieldNamesOf } from 'lib/error_store/redact.js';
 import type { ErrorSurface } from 'lib/adapters/types.js';
@@ -180,6 +181,32 @@ export async function errorHandler(obj: ErrorContext) {
 	 * `server_error` body — correct status, wrong shape, message gone. Returning nothing hands the error
 	 * to the admin group's handler, which is the one that knows what to say.
 	 */
+	/*
+	 * A per-origin rate-limit refusal, handled here and ahead of every exit below — including the admin
+	 * stand-aside — because it is raised from an onRequest hook, before Elysia dispatches into any
+	 * mounted sub-instance. Standing aside for it would hand it to a handler that never runs: adminApp's
+	 * onError is not reached by a throw the root instance made before routing, and the caller receives
+	 * Elysia's bare fallback (the error's message as plain text, no headers, no shape). Measured, not
+	 * assumed — that is exactly what the console got before this block existed.
+	 *
+	 * Retry-After is the one number a refused caller legitimately needs, and the only one they get.
+	 * There are deliberately no RateLimit-* headers: the draft set would disclose the allowance, the
+	 * remaining count and the window to anyone probing for the threshold.
+	 */
+	if (error instanceof RateLimited) {
+		set.status = 429;
+		set.headers['Retry-After'] = String(error.retryAfterSeconds);
+		/*
+		 * The marker the limiter sets for a console path. Read here to choose the body rather than to
+		 * trigger the stand-aside below — the console reads `message`, and answering it in the OAuth
+		 * shape would be the right status with the wrong body and the reason gone. Every other surface,
+		 * `/mcp` included, falls through to the OAuth body and the HTML branch further down.
+		 */
+		if (isAdminPlaneError(error)) {
+			return { error: 'admin_error', message: error.error_description };
+		}
+	}
+
 	if (isAdminPlaneError(error)) {
 		return;
 	}
@@ -213,8 +240,17 @@ export async function errorHandler(obj: ErrorContext) {
 	// server_error would file deliberate, correct behaviour under the channel operators watch for
 	// genuine faults. The marker comes from the thrown error rather than the request path, so the
 	// gate's decision is not re-derived here.
-	if (error instanceof FeatureDisabled) {
-		// Announced already; emit nothing further.
+	if (error instanceof FeatureDisabled || error instanceof RateLimited) {
+		/*
+		 * Announced already; emit nothing further.
+		 *
+		 * A rate-limit refusal joins the gate refusal here for the same reason and needs its own test
+		 * rather than inheriting the gate's: it carries a 429, so neither the `set.status === 500` branch
+		 * nor anything else below would have caught it, and it would have fallen to the `else` and been
+		 * filed on `server_error` — deliberate, correct behaviour reported as a fault, on the one channel
+		 * an operator cannot afford to learn to ignore. The error store needs no matching exclusion: it
+		 * captures at status >= 500, so a 429 is already outside it.
+		 */
 	} else if (set.status === 500) {
 		eventBus.emit('server_error', error);
 	} else {

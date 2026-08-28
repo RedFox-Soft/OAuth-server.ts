@@ -32,6 +32,7 @@ import { jwks } from './actions/jwks.js';
 import { registration } from './actions/registration.js';
 import { healthCheck } from './actions/health.js';
 import { featureGate } from './plugins/featureGate.js';
+import { rateLimit } from './plugins/rateLimit.js';
 import { corsPreflight } from './plugins/cors.js';
 import { InvalidDpopProof, UseDpopNonce } from './helpers/validate_dpop.js';
 import { adminApp } from './admin/index.js';
@@ -81,13 +82,21 @@ export const elysia = new Elysia({ strictPath: true, normalize: false })
 		unsupported_grant_type: errors.UnsupportedGrantType,
 		unsupported_response_mode: errors.UnsupportedResponseMode,
 		use_dpop_nonce: UseDpopNonce,
-		invalid_dpop_proof: InvalidDpopProof
+		invalid_dpop_proof: InvalidDpopProof,
+		rate_limited: errors.RateLimited
 	})
 	.onError(errorHandler)
 	.use(healthCheck)
 	.use(staticPlugin({ assets: 'public' }))
 	.use(nocache)
 	.use(securityHeaders)
+	// Must follow nocache and securityHeaders for the same reason featureGate does, and must PRECEDE
+	// featureGate — which is the ordering that looks like a performance detail and is actually a
+	// correctness one. Were the gate to run first, a capability-disabled endpoint would answer 404
+	// without ever being counted, while an unserved path would be counted and answer 429 under load:
+	// the two become distinguishable, which is precisely the fingerprint featureGate exists to
+	// eliminate. Counted first, both answer identically in both states.
+	.use(rateLimit)
 	// Must follow nocache and securityHeaders: onRequest hooks run in registration order and a gate
 	// refusal throws, so gating first would skip the no-store and hardening headers every other
 	// response carries.

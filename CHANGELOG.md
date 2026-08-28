@@ -11,6 +11,19 @@ of the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- Per-origin request rate limiting (issue #1). An origin that spends its allowance inside a window is
+  refused with `429` and a `Retry-After`, before the endpoint does any work. Allowances are tiered by
+  route class rather than blanket — strict on the unauthenticated and expensive surface, loose on
+  static assets and discovery, the liveness probe exempt — declared as a third dimension on the route
+  table under the same two-way drift guard as the feature gate and CORS. Counting is per instance and
+  never persisted, so no storage area is added; the price is that the effective allowance multiplies
+  by concurrent machine count and clears on restart, which is why this is a resource protection and
+  not a security boundary. The per-identity throttles are unchanged, and the login door's brute-force
+  protection remains issue #9. Nine `rateLimit.*` settings, editable from the console; invalid values
+  refuse the boot rather than serving with limiting silently absent. `elysia-rate-limit` was evaluated
+  and not adopted: its single static `errorResponse` cannot produce this server's three channel
+  shapes, and its default refunds requests whose handler threw — which is every failed credential
+  guess
 - The administration console can be put behind the second factor. A new settings resource under
   `/admin/api/admins` carries the reserved admin bucket's `totpRequired` — audited as
   `admin.settings.update`, exposed to MCP as `admin_settings_read` and `admin_settings_update`, with

@@ -335,6 +335,85 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 			'Lets browser-based apps read responses from the metadata and key endpoints, and from the endpoints listed on a project’s browser origins. Closure normally comes from data — a project with no origins grants nothing — so this is an incident kill switch rather than the usual control.'
 	},
 
+	{
+		key: 'rateLimit.enabled',
+		group: 'Rate limiting',
+		label: 'Refuse a calling origin that exceeds its request allowance',
+		type: 'boolean',
+		description:
+			'Refuses requests from one origin past its allowance inside a window, before the endpoint does any work. Allowances are tiered by route class, so the token endpoint and a static asset are not held to the same number. On by default; turn it off as an incident kill switch if it starts refusing traffic it should not. Applied at startup.'
+	},
+	{
+		key: 'rateLimit.trustedProxy',
+		group: 'Rate limiting',
+		label: 'Take the caller’s address from the proxy headers',
+		type: 'boolean',
+		dependsOn: 'rateLimit.enabled',
+		description:
+			'Whether Fly-Client-IP, the first hop of X-Forwarded-For, or X-Real-IP names the caller. This one has a wrong answer in each direction. Leave it ON when a proxy or load balancer sits in front of this server: with it off, every caller arrives as the proxy’s address, so the whole internet shares one allowance and all traffic is refused within seconds. Turn it OFF only when the server is directly exposed: with it on, any caller can set the header to a fresh value per request and is never limited. Defaults to on, matching the shipped deployment.'
+	},
+	{
+		key: 'rateLimit.maxTrackedOrigins',
+		group: 'Rate limiting',
+		label: 'Origins remembered per route class',
+		type: 'number',
+		dependsOn: 'rateLimit.enabled',
+		description:
+			'How many distinct origins each class tracks at once, capping the limiter’s own memory. Bounded on purpose: the key comes from the caller, so an unbounded tally would itself become the memory-exhaustion vector this feature exists to prevent. Past the bound the least recently seen origin is forgotten and gets a fresh allowance. Lower it on a small machine.'
+	},
+	{
+		key: 'rateLimit.strict.max',
+		group: 'Rate limiting',
+		label: 'Strict allowance — requests per window',
+		type: 'number',
+		dependsOn: 'rateLimit.enabled',
+		description:
+			'Applies to the unauthenticated and expensive surface: token issuance, authorization, dynamic registration, device and CIBA, and every end-user door that checks a secret or sends mail. Raise it if a legitimate server-to-server integration behind a single address, or many users behind one corporate NAT, start seeing refusals.'
+	},
+	{
+		key: 'rateLimit.strict.windowSeconds',
+		group: 'Rate limiting',
+		label: 'Strict allowance — window length in seconds',
+		type: 'number',
+		dependsOn: 'rateLimit.enabled',
+		description:
+			'The period the strict allowance is measured over. A caller timing requests around the boundary can send close to twice the allowance across two adjacent windows; that is normal for this kind of limit and not a defect.'
+	},
+	{
+		key: 'rateLimit.ordinary.max',
+		group: 'Rate limiting',
+		label: 'Ordinary allowance — requests per window',
+		type: 'number',
+		dependsOn: 'rateLimit.enabled',
+		description:
+			'Applies to everything not classified strict or public: userinfo, introspection, revocation, the administration API, the MCP surface, and the rest of the end-user screens. Any endpoint added without an explicit classification lands here, so it is sized for a mixed session rather than for one endpoint.'
+	},
+	{
+		key: 'rateLimit.ordinary.windowSeconds',
+		group: 'Rate limiting',
+		label: 'Ordinary allowance — window length in seconds',
+		type: 'number',
+		dependsOn: 'rateLimit.enabled',
+		description: 'The period the ordinary allowance is measured over.'
+	},
+	{
+		key: 'rateLimit.public.max',
+		group: 'Rate limiting',
+		label: 'Public allowance — requests per window',
+		type: 'number',
+		dependsOn: 'rateLimit.enabled',
+		description:
+			'Applies to the cheap public surface — static assets, the discovery document, the key set — and to every cross-origin preflight. Sized to clear the administration console’s full page-and-asset load from one address. Raise it if the console stutters while loading.'
+	},
+	{
+		key: 'rateLimit.public.windowSeconds',
+		group: 'Rate limiting',
+		label: 'Public allowance — window length in seconds',
+		type: 'number',
+		dependsOn: 'rateLimit.enabled',
+		description: 'The period the public allowance is measured over.'
+	},
+
 	/*
 	 * The switch stands alone: which providers exist, and whether any is enabled, is per-bucket data
 	 * reached through the bucket's own routes rather than a setting here. Catalogued because a feature an

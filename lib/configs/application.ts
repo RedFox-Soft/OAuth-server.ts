@@ -336,6 +336,80 @@ export const ApplicationConfig = {
 	'cors.enabled': true,
 
 	/*
+	 * rateLimit
+	 *
+	 * title: Per-origin request rate limiting
+	 *
+	 * description: Refuses requests from a calling origin that exceeds its allowance inside a window,
+	 * before the endpoint does any work. Allowances are tiered by route class rather than blanket: a
+	 * number tight enough to protect the token endpoint would refuse the admin console's asset burst.
+	 * Defaults to enabled — an authorization server reachable from the internet with no volume limit at
+	 * all is the condition this exists to end — and the switch is here as an incident kill switch.
+	 *
+	 * Counting is per instance and held in memory, never persisted. Two consequences the operator
+	 * documentation states rather than hides: with N machines serving concurrently the effective
+	 * allowance is N times the configured value, and an instance restart clears every counter it held.
+	 * This is therefore a resource protection, not a security boundary — the properties that must hold
+	 * absolutely live in the per-identity throttles (lib/helpers/rate_window.ts, verification attempt
+	 * caps), which this leaves untouched.
+	 */
+	'rateLimit.enabled': true,
+	/*
+	 * rateLimit.trustedProxy
+	 *
+	 * description: Whether the forwarded-origin headers (Fly-Client-IP, then the first hop of
+	 * X-Forwarded-For, then X-Real-IP) name the caller. This is the one setting here with a wrong answer
+	 * in each direction, so it is stated rather than defaulted silently: true while directly exposed
+	 * lets any caller rotate the header per request and never be limited; false while behind a proxy
+	 * puts the entire internet into one bucket and refuses everyone within seconds. Defaults to true to
+	 * match the shipped fly.toml — the failure it risks is bypass, and the opposite default risks a
+	 * total outage on the deployment this repository actually ships.
+	 */
+	'rateLimit.trustedProxy': true,
+	/*
+	 * rateLimit.maxTrackedOrigins
+	 *
+	 * description: How many origins each route class remembers at once. Bounded because the key is
+	 * client-supplied: an unbounded counter map is itself the memory-exhaustion vector the limiter was
+	 * added to prevent, and on a 1 GB machine that is strictly worse than having no limiter. When the
+	 * bound is reached the least recently seen origin is evicted and gets a fresh allowance, which fails
+	 * open under an address-rotation flood the limiter cannot stop anyway, and never fails closed
+	 * against honest traffic.
+	 */
+	'rateLimit.maxTrackedOrigins': 10000,
+	/*
+	 * rateLimit.strict.*
+	 *
+	 * description: The allowance for the unauthenticated and expensive surface — token issuance,
+	 * authorization, dynamic registration, device and CIBA, and every end-user door that verifies a
+	 * secret or sends mail. Set at the issue's own sixty per minute rather than tighter: a confidential
+	 * client's backend behind one address doing legitimate token exchanges is the false-refusal case
+	 * that matters, and sixty a minute still stops a flood cold, since a flood is thousands a second.
+	 */
+	'rateLimit.strict.max': 60,
+	'rateLimit.strict.windowSeconds': 60,
+	/*
+	 * rateLimit.ordinary.*
+	 *
+	 * description: The allowance for everything not otherwise classified — userinfo, introspection,
+	 * revocation, the admin plane, the MCP surface, and the rest of the interaction screens. This is the
+	 * class an unclassified route falls into, so it is sized for a mixed browser-and-backend session
+	 * rather than for any one endpoint.
+	 */
+	'rateLimit.ordinary.max': 300,
+	'rateLimit.ordinary.windowSeconds': 60,
+	/*
+	 * rateLimit.public.*
+	 *
+	 * description: The allowance for the cheap public surface — static assets, discovery metadata, the
+	 * key set — and for every preflight, whatever it precedes. Sized to clear the admin console's full
+	 * page-and-asset load comfortably: these responses are static documents, so limiting them tightly
+	 * would break discovery for a whole NAT before it protected anything.
+	 */
+	'rateLimit.public.max': 1200,
+	'rateLimit.public.windowSeconds': 60,
+
+	/*
 	 * federation
 	 *
 	 * title: Upstream OIDC federation — let end users sign in through an external identity provider
