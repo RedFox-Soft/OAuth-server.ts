@@ -81,6 +81,22 @@ of the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Changed
 
+- `README.md` and `AGENTS.md` now describe the server that exists (issue #20, spec 031). The endpoint
+  table was wrong on six of eleven rows — `/authorize`, `/introspect`, `/revoke`, `/register`,
+  `/session/end` and `/request` are really `/auth`, `/token/introspect`, `/token/revocation`, `/reg`,
+  `/logout` and `/par` — and was missing twelve routes and every method on `/userinfo` but `GET`. It is
+  now derived from `lib/consts/route_classification.ts`, which pairs each route with its governing flag
+  and is already guarded both ways against `elysia.routes`, and it is split by availability because 23
+  of the 28 feature flags default off and a disabled endpoint is deliberately indistinguishable from
+  one that does not exist. Five Features bullets had presented opt-in capabilities as shipping
+  defaults, Client Credentials and Refresh Token among them; the Features list now separates what a
+  default install serves from what a deployment switches on, and drops the claim of static client
+  registration, which was removed when clients became DB-backed. The Standards table gained eleven
+  implemented specifications plus a flag column, and admits CIBA, JARM and OAuth 2.1, which its
+  RFC-only shape had excluded. `AGENTS.md` had pointed contributors and agents at `/interaction/*`
+  routes; login and consent are served under `/ui/:uid/*`. Two claims the issue asked for were dropped
+  after checking the code: RFC 8414 is not implemented, and no `/.well-known/oauth-authorization-server`
+  is served
 - **BREAKING:** feature flags now gate their endpoints — a disabled feature's routes answer 404
   instead of staying silently live (spec 010)
 - **BREAKING:** deletion means what it reads as — projects/buckets refuse deletion while non-empty

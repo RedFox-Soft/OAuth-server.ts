@@ -28,9 +28,16 @@ Templates requiring updates:
   ✅ spec-template.md — aligned.
   ✅ tasks-template.md — aligned.
 Follow-up TODOs:
-  ⚠ AGENTS.md — describes the project as a "library" (OAuth 2.0) and omits the admin
-    control plane + MCP; MUST be updated to match Principles I & II (per Governance §3).
-    Tracked as GitHub issue #20.
+  ✅ AGENTS.md — RESOLVED (issue #20, spec 031). The TODO recorded that AGENTS.md described the
+    project as a "library" (OAuth 2.0) and omitted the admin control plane + MCP. Verified
+    2026-08-28: its "What this project is" section already opens with "a standards-compliant
+    OAuth 2.1 / OpenID Connect authorization server" and enumerates all three surfaces — the
+    protocol endpoints, the administrative control plane (lib/admin/) and the MCP control plane
+    (lib/mcp/, "Off by default (mcp.enabled)") — including why the third is built as a consumer
+    of the second. Principles I & II are satisfied. The one defect that remained was unrelated
+    to this TODO's subject: the "Interaction system" note pointed at `/interaction/*` routes,
+    which have never been mounted; login/consent are served under `/ui/:uid/*`. Corrected in the
+    same spec.
 -->
 
 # OAuth-server.ts Constitution
