@@ -5,6 +5,7 @@ import {
 	ProjectOutlined,
 	DatabaseOutlined,
 	TeamOutlined,
+	ApartmentOutlined,
 	SettingOutlined,
 	KeyOutlined,
 	FileSearchOutlined,
@@ -12,6 +13,8 @@ import {
 	LogoutOutlined
 } from '@ant-design/icons';
 import type { AdminContext } from '../../auth/rbac.js';
+import { Groups } from './Groups.js';
+import { ScopeSwitcher } from './ScopeSwitcher.js';
 import { Projects } from './Projects.js';
 import { Buckets } from './Buckets.js';
 import { Admins } from './Admins.js';
@@ -23,22 +26,35 @@ import { Errors } from './Errors.js';
 const { Sider, Header, Content } = AntLayout;
 
 type PageKey =
-	'projects' | 'buckets' | 'admins' | 'settings' | 'keys' | 'audit' | 'errors';
+	| 'projects'
+	| 'buckets'
+	| 'groups'
+	| 'admins'
+	| 'settings'
+	| 'keys'
+	| 'audit'
+	| 'errors';
 
 export function Layout({ me }: { me: AdminContext | null }) {
 	const roles = me?.roles ?? [];
 	const isSuperAdmin = roles.includes('super_admin');
 	const [selected, setSelected] = useState<PageKey>('projects');
 
+	/*
+	 * Offered ⇔ permitted, in both directions. The create actions below are no longer role-gated, and
+	 * Audit has moved out of the super-admin block because it is scope-filtered rather than refused: a
+	 * group reads its own history. What remains super-admin-only is the instance itself.
+	 */
 	const items: MenuProps['items'] = [
 		{ key: 'projects', icon: <ProjectOutlined />, label: 'Projects' },
 		{ key: 'buckets', icon: <DatabaseOutlined />, label: 'Buckets' },
+		{ key: 'groups', icon: <ApartmentOutlined />, label: 'Groups' },
+		{ key: 'audit', icon: <FileSearchOutlined />, label: 'Audit' },
 		...(isSuperAdmin
 			? [
 					{ key: 'admins', icon: <TeamOutlined />, label: 'Admins' },
 					{ key: 'settings', icon: <SettingOutlined />, label: 'Settings' },
 					{ key: 'keys', icon: <KeyOutlined />, label: 'Keys' },
-					{ key: 'audit', icon: <FileSearchOutlined />, label: 'Audit' },
 					{ key: 'errors', icon: <BugOutlined />, label: 'Faults' }
 				]
 			: [])
@@ -77,14 +93,17 @@ export function Layout({ me }: { me: AdminContext | null }) {
 				) : (
 					<Projects isSuperAdmin={isSuperAdmin} />
 				);
-			// The API refuses a non-super-admin anyway; falling back here keeps the SPA from rendering a
-			// page that could only ever show an error.
-			case 'audit':
-				return isSuperAdmin ? (
-					<Audit />
-				) : (
-					<Projects isSuperAdmin={isSuperAdmin} />
+			case 'groups':
+				return (
+					<Groups
+						isSuperAdmin={isSuperAdmin}
+						currentUserId={me?.userId ?? null}
+					/>
 				);
+			// Scope-filtered rather than refused: every administrator reads the trail of the groups they
+			// belong to, so this no longer falls back to Projects for a non-super-admin.
+			case 'audit':
+				return <Audit />;
 			case 'errors':
 				return isSuperAdmin ? (
 					<Errors />
@@ -120,6 +139,7 @@ export function Layout({ me }: { me: AdminContext | null }) {
 						gap: 12
 					}}
 				>
+					<ScopeSwitcher />
 					{me && <Typography.Text>{me.email}</Typography.Text>}
 					<a onClick={logout}>
 						<LogoutOutlined /> Log out

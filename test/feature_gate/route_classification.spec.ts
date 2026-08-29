@@ -162,8 +162,10 @@ describe('route classification', () => {
 			'POST /verify-email/code',
 			'POST /verify-email/resend',
 			'POST /reset-password',
-			// Unauthenticated by construction — it is how the first super-admin comes to exist.
-			'POST /admin/api/setup'
+			// Unauthenticated by construction — one is how the first super-admin comes to exist, the other
+			// is how somebody invited into a group accepts. Both perform an account write.
+			'POST /admin/api/setup',
+			'POST /admin/api/invitations/accept'
 		];
 
 		// Cheap, public, and read by every client before it knows anything else about the deployment.

@@ -11,6 +11,7 @@ describe('AdminSessionStore (memory)', () => {
 		const s = await store.create({
 			userId: 'u1',
 			bucketId: 'admin',
+			activeGroupId: 'g1',
 			tokens: { idToken: 'x' },
 			ttlSeconds: 60,
 			absoluteTtlSeconds: 3600
@@ -29,6 +30,7 @@ describe('AdminSessionStore (memory)', () => {
 		const s = await store.create({
 			userId: 'u1',
 			bucketId: 'admin',
+			activeGroupId: 'g1',
 			tokens: {},
 			ttlSeconds: -1,
 			absoluteTtlSeconds: 3600

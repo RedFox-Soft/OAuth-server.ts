@@ -11,8 +11,13 @@ import {
 	getBucketStore,
 	getProjectStore
 } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import {
+	ADMIN_BUCKET_ID,
+	ADMIN_SESSION_COOKIE,
+	UNASSIGNED_GROUP_ID
+} from 'lib/admin/consts.ts';
 import type { UserBucket } from 'lib/adapters/types.ts';
+import { sessionFor, personalGroupId } from '../admin_session.ts';
 
 const app = new Elysia().use(resolveAdmin).use(bucketRoutes).use(endUserRoutes);
 const client = treaty(app);
@@ -23,21 +28,18 @@ async function sessionCookieFor(roles: string[]) {
 		'hash',
 		roles
 	);
-	const s = await adminSessionStore.create({
-		userId: user._id,
-		bucketId: ADMIN_BUCKET_ID,
-		tokens: {},
-		ttlSeconds: 60,
-		absoluteTtlSeconds: 3600
-	});
+	const s = await sessionFor(user);
 	return { cookie: `${ADMIN_SESSION_COOKIE}=${s._id}`, userId: user._id };
 }
 
-async function makeBucket(roles: string[] = [], managedBy: string[] = []) {
+async function makeBucket(
+	roles: string[] = [],
+	ownerGroupId = UNASSIGNED_GROUP_ID
+) {
 	return getBucketStore().create({
 		name: `b-${Math.random()}`,
 		roles,
-		managedBy
+		ownerGroupId
 	});
 }
 
@@ -139,7 +141,7 @@ describe('end-user API', () => {
 		const proj = await getProjectStore().create({
 			name: 'PM',
 			slug: `pm-${Math.random()}`,
-			managedBy: [pa.userId]
+			ownerGroupId: await personalGroupId(pa.userId)
 		});
 		await getProjectStore().update(proj._id, { bucketId: bucket._id });
 		const res = await client.admin.api

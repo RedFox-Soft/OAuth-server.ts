@@ -11,7 +11,7 @@ import {
 	adminAuditStore,
 	mcpConfirmationStore
 } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID } from 'lib/admin/consts.ts';
+import { ADMIN_BUCKET_ID, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import {
 	ADMIN_MCP_CLIENT_ID,
 	MCP_RESOURCE,
@@ -106,7 +106,7 @@ async function projectWithClient(token: string) {
 	const project = await getProjectStore().create({
 		name: 'Conf',
 		slug: `conf-${Math.floor(Math.random() * 1e6)}`,
-		managedBy: []
+		ownerGroupId: UNASSIGNED_GROUP_ID
 	});
 	const created = await rpc(
 		call('client_create', {
@@ -134,9 +134,9 @@ describe('MCP confirmation gate', () => {
 		await ensureAdminSeed();
 	});
 
-	it('classifies eleven tools as high-consequence and declares the argument on each', () => {
+	it('classifies twelve tools as high-consequence and declares the argument on each', () => {
 		const high = mcpCatalogue.filter((t) => t.consequence === 'high');
-		expect(high.length).toBe(11);
+		expect(high.length).toBe(12);
 	});
 
 	it('describes instead of acting, and changes nothing', async () => {

@@ -2,6 +2,8 @@ import {
 	MemoryAdapter,
 	JWKSStore as MemoryJWKS,
 	UserStore as MemoryUser,
+	GroupStore as MemoryGroupStore,
+	GroupInvitationStore as MemoryGroupInvitationStore,
 	ProjectStore as MemoryProjectStore,
 	UserBucketStore as MemoryUserBucketStore,
 	AdminSessionStore as MemoryAdminSessionStore,
@@ -18,6 +20,10 @@ import type {
 	AdminAuditStoreInstance,
 	ErrorStoreConstructor,
 	ErrorStoreInstance,
+	GroupStoreConstructor,
+	GroupStoreInstance,
+	GroupInvitationStoreConstructor,
+	GroupInvitationStoreInstance,
 	AdminSessionStoreConstructor,
 	AdminSessionStoreInstance,
 	JWKSStoreConstructor,
@@ -42,6 +48,9 @@ import type {
 let Adapter: ModelAdapterConstructor = MemoryAdapter;
 let UserStore: UserStoreConstructor = MemoryUser;
 let JWKSStoreClass: JWKSStoreConstructor = MemoryJWKS;
+let GroupStoreClass: GroupStoreConstructor = MemoryGroupStore;
+let GroupInvitationStoreClass: GroupInvitationStoreConstructor =
+	MemoryGroupInvitationStore;
 let ProjectStoreClass: ProjectStoreConstructor = MemoryProjectStore;
 let BucketStoreClass: UserBucketStoreConstructor = MemoryUserBucketStore;
 let AdminSessionStoreClass: AdminSessionStoreConstructor =
@@ -61,6 +70,8 @@ if (process.env.MONGODB_URI) {
 	configStore = mongodb.configStore;
 	UserStore = mongodb.UserStore;
 	JWKSStoreClass = mongodb.JWKSStore;
+	GroupStoreClass = mongodb.GroupStore;
+	GroupInvitationStoreClass = mongodb.GroupInvitationStore;
 	ProjectStoreClass = mongodb.ProjectStore;
 	BucketStoreClass = mongodb.UserBucketStore;
 	AdminSessionStoreClass = mongodb.AdminSessionStore;
@@ -135,6 +146,22 @@ export function getUserStore(area = 'redfox'): UserStoreInstance {
 	return userStores.get(area) as UserStoreInstance;
 }
 
+let groupStoreSingleton: GroupStoreInstance | null = null;
+export function getGroupStore(): GroupStoreInstance {
+	if (!groupStoreSingleton) {
+		groupStoreSingleton = new GroupStoreClass();
+	}
+	return groupStoreSingleton;
+}
+
+let groupInvitationStoreSingleton: GroupInvitationStoreInstance | null = null;
+export function getGroupInvitationStore(): GroupInvitationStoreInstance {
+	if (!groupInvitationStoreSingleton) {
+		groupInvitationStoreSingleton = new GroupInvitationStoreClass();
+	}
+	return groupInvitationStoreSingleton;
+}
+
 let projectStoreSingleton: ProjectStoreInstance | null = null;
 export function getProjectStore(): ProjectStoreInstance {
 	if (!projectStoreSingleton) {
@@ -168,4 +195,6 @@ export function resetAdminMemoryStores(): void {
 	userStores.clear();
 	projectStoreSingleton = null;
 	bucketStoreSingleton = null;
+	groupStoreSingleton = null;
+	groupInvitationStoreSingleton = null;
 }

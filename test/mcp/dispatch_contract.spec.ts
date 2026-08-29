@@ -18,7 +18,12 @@ import {
 	getUserStore,
 	getProjectStore
 } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import {
+	ADMIN_BUCKET_ID,
+	ADMIN_SESSION_COOKIE,
+	UNASSIGNED_GROUP_ID
+} from 'lib/admin/consts.ts';
+import { sessionFor } from '../admin_session.ts';
 
 /*
  * The dispatch contract: what a composition of the admin route plugins does and does not carry.
@@ -71,13 +76,7 @@ async function sessionCookieFor(roles: string[]) {
 		'hash',
 		roles
 	);
-	const s = await adminSessionStore.create({
-		userId: user._id,
-		bucketId: ADMIN_BUCKET_ID,
-		tokens: {},
-		ttlSeconds: 60,
-		absoluteTtlSeconds: 3600
-	});
+	const s = await sessionFor(user);
 	return { cookie: `${ADMIN_SESSION_COOKIE}=${s._id}`, userId: user._id };
 }
 
@@ -152,7 +151,7 @@ describe('in-process re-dispatch into the admin routes', () => {
 		const proj = await getProjectStore().create({
 			name: 'Spike',
 			slug: `spike-${Math.random()}`.replace(/[^a-z0-9-]/g, ''),
-			managedBy: []
+			ownerGroupId: UNASSIGNED_GROUP_ID
 		});
 		const created = await post(
 			composed,

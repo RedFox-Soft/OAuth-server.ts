@@ -11,8 +11,13 @@ import {
 	getUserStore,
 	resetAdminMemoryStores
 } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import {
+	ADMIN_BUCKET_ID,
+	ADMIN_SESSION_COOKIE,
+	UNASSIGNED_GROUP_ID
+} from 'lib/admin/consts.ts';
 import type { FederationProvider } from 'lib/federation/types.ts';
+import { sessionFor } from '../admin_session.ts';
 
 /*
  * A bucket nobody can sign into must not be reachable through the management API.
@@ -31,13 +36,7 @@ async function superCookie() {
 		'hash',
 		['super_admin']
 	);
-	const session = await adminSessionStore.create({
-		userId: user._id,
-		bucketId: ADMIN_BUCKET_ID,
-		tokens: {},
-		ttlSeconds: 60,
-		absoluteTtlSeconds: 3600
-	});
+	const session = await sessionFor(user);
 	return `${ADMIN_SESSION_COOKIE}=${session._id}`;
 }
 
@@ -68,7 +67,10 @@ describe('a bucket must keep some way to sign in', () => {
 
 	it('refuses to switch password sign-in off when no provider is enabled', async () => {
 		const cookie = await superCookie();
-		const bucket = await getBucketStore().create({ name: 'no-providers' });
+		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: 'no-providers'
+		});
 
 		const res = await client.admin.api
 			.buckets({ id: bucket._id })
@@ -82,6 +84,7 @@ describe('a bucket must keep some way to sign in', () => {
 	it('refuses when the only provider present is disabled', async () => {
 		const cookie = await superCookie();
 		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'disabled-provider',
 			federation: [provider({ enabled: false })]
 		});
@@ -97,6 +100,7 @@ describe('a bucket must keep some way to sign in', () => {
 	it('allows it once an enabled provider exists', async () => {
 		const cookie = await superCookie();
 		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'federated',
 			federation: [provider()]
 		});
@@ -114,6 +118,7 @@ describe('a bucket must keep some way to sign in', () => {
 	it('lets a federated-only bucket turn password sign-in back on', async () => {
 		const cookie = await superCookie();
 		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'reopening',
 			passwordLogin: false,
 			federation: [provider()]

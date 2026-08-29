@@ -8,7 +8,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 	async create(data: {
 		_id?: string;
 		name: string;
-		managedBy?: string[];
+		ownerGroupId: string;
 		roles?: string[];
 		passwordLogin?: boolean;
 		federation?: FederationProvider[];
@@ -21,7 +21,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		const bucket: UserBucket = {
 			_id: data._id ?? nanoid(),
 			name: data.name,
-			managedBy: data.managedBy ?? [],
+			ownerGroupId: data.ownerGroupId,
 			roles: data.roles ?? [],
 			// A bucket accepts passwords unless someone says otherwise, and holds no providers until one is
 			// configured. Defaulted here and on read, so a document written before these fields existed
@@ -64,9 +64,9 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		return [...this.buckets.values()].map((b) => this.withDefaults(b));
 	}
 
-	async listByManager(userId: string): Promise<UserBucket[]> {
+	async listByGroup(groupId: string): Promise<UserBucket[]> {
 		return [...this.buckets.values()]
-			.filter((b) => b.managedBy.includes(userId))
+			.filter((b) => b.ownerGroupId === groupId)
 			.map((b) => this.withDefaults(b));
 	}
 
@@ -76,7 +76,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 			Pick<
 				UserBucket,
 				| 'name'
-				| 'managedBy'
+				| 'ownerGroupId'
 				| 'roles'
 				| 'passwordLogin'
 				| 'federation'

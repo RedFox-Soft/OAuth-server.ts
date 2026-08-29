@@ -1,5 +1,6 @@
 import type { VerificationMethod } from '../adapters/types.js';
 import { deliver } from './mailer.js';
+import { groupInvitationEmail } from './templates/group_invitation.js';
 import { passwordResetEmail } from './templates/password_reset.js';
 import {
 	verificationLinkEmail,
@@ -45,4 +46,25 @@ export async function sendPasswordResetEmail(
 ): Promise<void> {
 	const { email, appName, resetUrl } = params;
 	await deliver({ to: email, ...passwordResetEmail({ appName, resetUrl }) });
+}
+
+/*
+ * Delivers an invitation into an administrative group.
+ *
+ * Throws on delivery failure, and the caller does NOT swallow it — the opposite of the password-reset
+ * caller above. There the throw is hidden because a visible failure would only ever be visible for an
+ * address that has an account, which is an enumeration oracle. Here the sender is an authenticated
+ * owner inviting somebody deliberately: they need to know the mail did not go, and there is nothing
+ * to leak, because they already chose the address.
+ */
+export async function sendGroupInvitationEmail(params: {
+	email: string;
+	appName: string;
+	groupName: string;
+	invitedByEmail: string;
+	acceptUrl: string;
+	createsAccount: boolean;
+}): Promise<void> {
+	const { email, ...rest } = params;
+	await deliver({ to: email, ...groupInvitationEmail(rest) });
 }

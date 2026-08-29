@@ -257,6 +257,22 @@ export interface AdminAuditEntry {
 	 */
 	targetScope?: string | null;
 	/*
+	 * The group this entry belongs to, and the only thing a group-scoped read selects on.
+	 *
+	 * Deliberately NOT folded into `targetScope`, which already means "the bucket within which
+	 * `targetId` resolves". One field meaning two things depending on `targetType` is unreadable, and
+	 * it would break the exact-match retrieval `targetScope` exists as a separate field to preserve.
+	 *
+	 * Absent for instance-wide actions — settings, keys, JWKS, administrator accounts, the error store,
+	 * first-run setup — which belong to no group and stay super-administrator-only. Optional for the
+	 * reason `attributes` is: the trail is append-only, so there is no backfill, only a read-side
+	 * default.
+	 *
+	 * Written at the time of the action and never re-derived from `targetId`, so an entry outlives the
+	 * container it describes: a group can still see what happened to something that is gone.
+	 */
+	ownerGroupId?: string | null;
+	/*
 	 * Names of the fields the request set — never their values, so no secret can reach the trail
 	 * through this field. Optional because entries written before it existed do not carry it, and the
 	 * trail is immutable: there is no backfill, only a read-side default.
@@ -287,6 +303,15 @@ export interface AdminAuditQuery {
 	targetType?: string;
 	targetId?: string;
 	targetScope?: string;
+	/*
+	 * Restricts the read to entries belonging to these groups. Set by the handler from the caller's
+	 * own memberships and NEVER parsed from the query string — it is the authorization boundary of the
+	 * audit read, and a caller-supplied value would be a request to see another tenant's trail.
+	 *
+	 * An empty array selects nothing, which is the correct answer for an administrator who belongs to
+	 * no group. `undefined` means unrestricted and is reachable only for a super administrator.
+	 */
+	ownerGroupIds?: string[];
 	/*
 	 * Which surface the action arrived on. `'mcp'` selects agent-initiated actions; `'console'` selects
 	 * the rest, which store the field absent rather than set — so the filter translates rather than
@@ -561,12 +586,121 @@ export interface ErrorStoreConstructor {
 	new (): ErrorStoreInstance;
 }
 
+/*
+ * How an administrator belongs to a group. `owner` decides who else is in it and whether the group may
+ * be deleted; `member` is equal to an owner over everything the group owns and has no say over
+ * membership. The distinction is a property of the membership, not a role on the account — the same
+ * administrator is an owner of one group and a plain member of another — which is why it cannot live
+ * on the user record beside `roles`.
+ */
+export interface GroupMember {
+	userId: string;
+	role: 'owner' | 'member';
+}
+
+/*
+ * The owner of every project and user bucket, and the only thing that grants access to one.
+ *
+ * Replaces the per-container `managedBy: string[]` it was built from. That arrangement could not
+ * express a tenant: a container was reachable by the people named on it, so it died with the account
+ * that made it, and a second person needed an operator to name them on every container individually.
+ *
+ * `kind` distinguishes three cases that differ only in their invariants, never in how access is
+ * resolved — every access decision anywhere is "does the caller belong to the group that owns this".
+ *   - `personal` is created with an account and presented by the console as "Personal". Undeletable,
+ *     and its administrator is a permanent owner. It may still gain members, at which point it is an
+ *     ordinary shared group — which is what makes sharing personal work an addition rather than a
+ *     transfer.
+ *   - `regular` is a company or a team.
+ *   - `system` is the reserved `unassigned` holding group, which has no members and is exempt from the
+ *     at-least-one-owner rule.
+ */
+export interface Group {
+	_id: string;
+	name: string;
+	kind: 'personal' | 'regular' | 'system';
+	members: GroupMember[];
+	/*
+	 * Set only by the ownership migration, on the groups it generated from a multi-manager container.
+	 * Drives a console prompt asking a super administrator to confirm the grouping. Carries no
+	 * authorization meaning whatever its value — a group that nobody reviews still works.
+	 */
+	needsReview: boolean;
+	createdAt: Date;
+	updatedAt: Date;
+}
+
+export interface GroupStoreInstance {
+	create(data: {
+		_id?: string;
+		name: string;
+		kind?: Group['kind'];
+		members?: GroupMember[];
+		needsReview?: boolean;
+	}): Promise<Group>;
+	find(id: string): Promise<Group | null>;
+	list(): Promise<Group[]>;
+	/* Runs on every admin request, for both credential types. Indexed on `members.userId`. */
+	listByMember(userId: string): Promise<Group[]>;
+	findPersonalFor(userId: string): Promise<Group | null>;
+	update(
+		id: string,
+		patch: Partial<Pick<Group, 'name' | 'members' | 'needsReview'>>
+	): Promise<Group | null>;
+	destroy(id: string): Promise<void>;
+}
+
+export interface GroupStoreConstructor {
+	new (): GroupStoreInstance;
+}
+
+/*
+ * A pending offer of membership in a group.
+ *
+ * The token is mailed and never stored: only its hash is kept, the same shape
+ * `lib/password_reset/challenge.ts` uses, so a database read cannot yield a usable invitation.
+ */
+export interface GroupInvitation {
+	_id: string;
+	groupId: string;
+	email: string;
+	role: GroupMember['role'];
+	invitedBy: string;
+	tokenHash: string;
+	expiresAt: Date;
+	acceptedAt: Date | null;
+	createdAt: Date;
+}
+
+export interface GroupInvitationStoreInstance {
+	create(data: {
+		_id?: string;
+		groupId: string;
+		email: string;
+		role: GroupMember['role'];
+		invitedBy: string;
+		tokenHash: string;
+		ttlSeconds: number;
+	}): Promise<GroupInvitation>;
+	find(id: string): Promise<GroupInvitation | null>;
+	findByTokenHash(tokenHash: string): Promise<GroupInvitation | null>;
+	listByGroup(groupId: string): Promise<GroupInvitation[]>;
+	markAccepted(id: string): Promise<void>;
+	destroy(id: string): Promise<void>;
+	destroyByGroup(groupId: string): Promise<void>;
+}
+
+export interface GroupInvitationStoreConstructor {
+	new (): GroupInvitationStoreInstance;
+}
+
 export interface Project {
 	_id: string;
 	name: string;
 	slug: string;
 	type: 'admin' | 'regular';
-	managedBy: string[];
+	/* The group that owns this project. Every access decision resolves through it. */
+	ownerGroupId: string;
 	bucketId: string | null;
 	clientIds: string[];
 	/*
@@ -585,7 +719,7 @@ export interface ProjectStoreInstance {
 		name: string;
 		slug: string;
 		type?: 'admin' | 'regular';
-		managedBy?: string[];
+		ownerGroupId: string;
 		bucketId?: string | null;
 		clientIds?: string[];
 		corsOrigins?: string[];
@@ -593,13 +727,13 @@ export interface ProjectStoreInstance {
 	find(id: string): Promise<Project | null>;
 	findBySlug(slug: string): Promise<Project | null>;
 	list(): Promise<Project[]>;
-	listByManager(userId: string): Promise<Project[]>;
+	listByGroup(groupId: string): Promise<Project[]>;
 	update(
 		id: string,
 		patch: Partial<
 			Pick<
 				Project,
-				'name' | 'managedBy' | 'bucketId' | 'clientIds' | 'corsOrigins'
+				'name' | 'ownerGroupId' | 'bucketId' | 'clientIds' | 'corsOrigins'
 			>
 		>
 	): Promise<Project | null>;
@@ -617,7 +751,8 @@ export type VerificationMethod = 'link' | 'code';
 export interface UserBucket {
 	_id: string;
 	name: string;
-	managedBy: string[];
+	/* The group that owns this bucket. Every access decision resolves through it. */
+	ownerGroupId: string;
 	roles: string[];
 	/*
 	 * Whether this bucket accepts an email and a password at all. Replaces `authMethods`, which was a
@@ -673,7 +808,7 @@ export interface UserBucketStoreInstance {
 	create(data: {
 		_id?: string;
 		name: string;
-		managedBy?: string[];
+		ownerGroupId: string;
 		roles?: string[];
 		passwordLogin?: boolean;
 		federation?: FederationProvider[];
@@ -684,14 +819,14 @@ export interface UserBucketStoreInstance {
 	}): Promise<UserBucket>;
 	find(id: string): Promise<UserBucket | null>;
 	list(): Promise<UserBucket[]>;
-	listByManager(userId: string): Promise<UserBucket[]>;
+	listByGroup(groupId: string): Promise<UserBucket[]>;
 	update(
 		id: string,
 		patch: Partial<
 			Pick<
 				UserBucket,
 				| 'name'
-				| 'managedBy'
+				| 'ownerGroupId'
 				| 'roles'
 				| 'passwordLogin'
 				| 'federation'
@@ -713,6 +848,14 @@ export interface AdminSession {
 	_id: string;
 	userId: string;
 	bucketId: string;
+	/*
+	 * The group the console is currently pointed at: what is listed, and where a new container is
+	 * created. Server-held rather than caller-asserted, because it is read on an authorization
+	 * boundary — a client-supplied scope would name a group the caller may since have been removed
+	 * from. Re-validated against live membership on every request, falling back to the personal group
+	 * rather than erroring, so a removed member keeps a usable console.
+	 */
+	activeGroupId: string;
 	tokens: { accessToken?: string; idToken?: string; refreshToken?: string };
 	createdAt: Date;
 	expiresAt: Date;
@@ -723,12 +866,15 @@ export interface AdminSessionStoreInstance {
 	create(data: {
 		userId: string;
 		bucketId: string;
+		activeGroupId: string;
 		tokens: AdminSession['tokens'];
 		ttlSeconds: number;
 		absoluteTtlSeconds: number;
 	}): Promise<AdminSession>;
 	find(id: string): Promise<AdminSession | null>;
 	touch(id: string, ttlSeconds: number): Promise<void>;
+	/* Records a scope switch. Separate from `touch` so switching does not silently extend a session. */
+	setActiveGroup(id: string, groupId: string): Promise<void>;
 	destroy(id: string): Promise<void>;
 }
 

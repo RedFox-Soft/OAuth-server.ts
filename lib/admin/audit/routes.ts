@@ -3,7 +3,6 @@ import { adminAuditStore } from '../../adapters/index.js';
 import type { AdminAuditQuery } from '../../adapters/types.js';
 import {
 	assertAuth,
-	assertRole,
 	AdminError,
 	adminErrorBody,
 	resolveAdmin,
@@ -77,8 +76,24 @@ export const auditRoutes = new Elysia({ name: 'admin-audit' })
 		'/admin/api/audit',
 		async ({ admin, query, request }) => {
 			const ctx = assertAuth(admin as AdminContext | null);
-			assertRole(ctx, 'super_admin');
 			assertNoUnknownParams(request.url);
+			/*
+			 * No role gate. A group reads its own history — "who deleted our client" is a question a tenant
+			 * must be able to answer without opening a ticket with the operator, which is the whole point of
+			 * self-service.
+			 *
+			 * The restriction is computed here, from the caller's own memberships, and never read from the
+			 * query string. It is the tenant boundary of this surface: a caller-supplied group id would be a
+			 * request to read somebody else's trail. An administrator in no group gets an empty array, which
+			 * selects nothing — the correct answer, and the opposite of what an omitted restriction would do.
+			 *
+			 * `undefined` for a super administrator means unrestricted, which is the only way instance-wide
+			 * entries (settings, keys, administrator accounts) are readable at all: they belong to no group,
+			 * so no group restriction can ever match them.
+			 */
+			const ownerGroupIds = ctx.roles.includes('super_admin')
+				? undefined
+				: ctx.memberships.map((m) => m.groupId);
 
 			const from = parseBound(query.from, 'from');
 			const to = parseBound(query.to, 'to');
@@ -117,6 +132,7 @@ export const auditRoutes = new Elysia({ name: 'admin-audit' })
 					: { viaClientId: query.viaClientId }),
 				...(from === undefined ? {} : { from }),
 				...(to === undefined ? {} : { to }),
+				...(ownerGroupIds === undefined ? {} : { ownerGroupIds }),
 				limit: pageSize,
 				offset: (page - 1) * pageSize
 			};

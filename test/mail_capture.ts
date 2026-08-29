@@ -32,3 +32,20 @@ export function extractCode(email: OutgoingEmail): string | undefined {
 	const match = email.text.match(/\b(\d{6})\b/);
 	return match?.[1];
 }
+
+// Pull the group-invitation link out of a captured email body, for the same reason the two above read
+// the text part: it carries the bare URL with no markup to unpick.
+export function extractInvitationUrl(email: OutgoingEmail): string | undefined {
+	const match = email.text.match(/https?:\/\/\S*\/admin\/accept-invitation\S*/);
+	return match?.[0];
+}
+
+// The token an invitation link carries, which is what the accept route takes.
+export function extractInvitationToken(
+	email: OutgoingEmail
+): string | undefined {
+	const url = extractInvitationUrl(email);
+	return url
+		? (new URL(url).searchParams.get('token') ?? undefined)
+		: undefined;
+}

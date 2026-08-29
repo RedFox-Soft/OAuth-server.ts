@@ -8,7 +8,7 @@ describe('UserBucketStore (memory)', () => {
 	});
 
 	it('creates with default sign-in settings and finds', async () => {
-		const b = await store.create({ name: 'Dev users', managedBy: ['u1'] });
+		const b = await store.create({ name: 'Dev users', ownerGroupId: 'g1' });
 		// Replaces the former `authMethods: ['password']` assertion. `passwordLogin` must default true and
 		// not merely be absent: it is read as a boolean, and undefined would close the password door.
 		expect(b.passwordLogin).toBe(true);
@@ -16,9 +16,9 @@ describe('UserBucketStore (memory)', () => {
 		expect(await store.find(b._id)).toMatchObject({ name: 'Dev users' });
 	});
 
-	it('lists by manager and updates roles', async () => {
-		const b = await store.create({ name: 'Dev', managedBy: ['u1'] });
-		expect(await store.listByManager('u1')).toHaveLength(1);
+	it('lists by owning group and updates roles', async () => {
+		const b = await store.create({ name: 'Dev', ownerGroupId: 'g1' });
+		expect(await store.listByGroup('g1')).toHaveLength(1);
 		await store.update(b._id, { roles: ['viewer', 'editor'] });
 		expect((await store.find(b._id))?.roles).toEqual(['viewer', 'editor']);
 	});

@@ -29,16 +29,16 @@ const mountedApi = mounted.routes
 	.map((r) => ({ method: r.method, path: r.path }));
 
 describe('MCP tool catalogue', () => {
-	it('publishes 47 tools: 21 reads and 26 writes', () => {
-		expect(mcpCatalogue.length).toBe(47);
-		expect(mcpCatalogue.filter((t) => t.method === 'GET').length).toBe(21);
-		expect(mcpCatalogue.filter((t) => t.method !== 'GET').length).toBe(26);
+	it('publishes 59 tools: 25 reads and 34 writes', () => {
+		expect(mcpCatalogue.length).toBe(59);
+		expect(mcpCatalogue.filter((t) => t.method === 'GET').length).toBe(25);
+		expect(mcpCatalogue.filter((t) => t.method !== 'GET').length).toBe(34);
 	});
 
-	it('names exactly four exclusions', () => {
+	it('names exactly six exclusions', () => {
 		// A fifth exclusion is a product decision, not a refactor: it must fail here until the
 		// specification is updated to account for it.
-		expect(excludedConsoleOperations.length).toBe(5);
+		expect(excludedConsoleOperations.length).toBe(7);
 	});
 
 	it('accounts for every mounted /admin/api route, in both directions', () => {
@@ -81,24 +81,31 @@ describe('MCP tool catalogue', () => {
 	// builds that announcement from this field. Pinned so the two container deletions cannot quietly
 	// drop out of what the agent is told, which is the only way it can answer "do it in the console"
 	// instead of guessing a tool name (FR-034).
-	it('marks the two container deletions withheld, and the rest inapplicable', () => {
+	it('marks the three container deletions withheld, and the rest inapplicable', () => {
 		const withheld = withheldConsoleOperations.map(key);
+		// A group joined the two containers it owns: destroying one leaves nothing behind to inspect,
+		// and takes with it the only thing that granted anyone access to what it held.
 		expect(withheld).toEqual([
 			'DELETE /admin/api/projects/:id',
 			'DELETE /admin/api/buckets/:id',
+			'DELETE /admin/api/groups/:id',
 			'DELETE /admin/api/errors'
 		]);
 		expect(
 			excludedConsoleOperations
 				.filter((e) => e.absence === 'inapplicable')
 				.map(key)
-		).toEqual(['POST /admin/api/setup', 'POST /admin/api/logout']);
+		).toEqual([
+			'POST /admin/api/setup',
+			'POST /admin/api/invitations/accept',
+			'POST /admin/api/logout'
+		]);
 	});
 
-	it('classifies exactly eleven tools as high-consequence', () => {
+	it('classifies exactly twelve tools as high-consequence', () => {
 		// Pinned as a count so FR-014's enumeration and this table cannot drift apart.
 		const high = mcpCatalogue.filter((t) => t.consequence === 'high');
-		expect(high.length).toBe(11);
+		expect(high.length).toBe(12);
 		expect(high.map((t) => t.tool).sort()).toEqual([
 			'admin_deactivate',
 			'bucket_user_delete',
@@ -107,6 +114,7 @@ describe('MCP tool catalogue', () => {
 			'client_secret_rotate',
 			'federation_identity_delete',
 			'federation_provider_delete',
+			'group_member_remove',
 			'jwks_delete',
 			'jwks_generate',
 			'settings_update',

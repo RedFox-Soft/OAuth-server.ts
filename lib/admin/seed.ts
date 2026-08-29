@@ -1,20 +1,44 @@
-import { getProjectStore, getBucketStore, adapter } from '../adapters/index.js';
+import {
+	getProjectStore,
+	getBucketStore,
+	getGroupStore,
+	adapter
+} from '../adapters/index.js';
 import { Client } from '../models/client.js';
 import { ISSUER } from '../configs/env.js';
 import {
 	ADMIN_PROJECT_ID,
 	ADMIN_BUCKET_ID,
-	ADMIN_CLIENT_ID
+	ADMIN_CLIENT_ID,
+	UNASSIGNED_GROUP_ID
 } from './consts.js';
 import { ADMIN_MCP_CLIENT_ID } from '../mcp/consts.js';
 
 export async function ensureAdminSeed(): Promise<void> {
+	/*
+	 * The holding group for containers no administrator managed. Seeded before anything that could own
+	 * a container, because the reserved admin project and bucket are given it as a formality: they sit
+	 * outside the group model and every route touching them refuses before ownership is consulted.
+	 *
+	 * Kept in step with database/mongodb.ts, which is the real deployment seed — this one is test-only,
+	 * and a change to just one of them silently no-ops in production.
+	 */
+	const groups = getGroupStore();
+	if (!(await groups.find(UNASSIGNED_GROUP_ID))) {
+		await groups.create({
+			_id: UNASSIGNED_GROUP_ID,
+			name: 'Unassigned',
+			kind: 'system',
+			members: []
+		});
+	}
+
 	const buckets = getBucketStore();
 	if (!(await buckets.find(ADMIN_BUCKET_ID))) {
 		await buckets.create({
 			_id: ADMIN_BUCKET_ID,
 			name: 'Administrators',
-			managedBy: [],
+			ownerGroupId: UNASSIGNED_GROUP_ID,
 			roles: ['super_admin', 'project_admin'],
 			// The reserved admin bucket keeps password login and accepts no providers: the console is a
 			// relying party on this server's own issuer, and a second identity source for operators is a
@@ -29,7 +53,7 @@ export async function ensureAdminSeed(): Promise<void> {
 		await buckets.create({
 			_id: 'redfox',
 			name: 'Default users',
-			managedBy: [],
+			ownerGroupId: UNASSIGNED_GROUP_ID,
 			roles: []
 		});
 	}
@@ -42,7 +66,7 @@ export async function ensureAdminSeed(): Promise<void> {
 			name: 'Administration',
 			slug: 'admin',
 			type: 'admin',
-			managedBy: [],
+			ownerGroupId: UNASSIGNED_GROUP_ID,
 			bucketId: ADMIN_BUCKET_ID,
 			clientIds: [ADMIN_CLIENT_ID, ADMIN_MCP_CLIENT_ID]
 		});

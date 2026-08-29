@@ -118,6 +118,81 @@ const routes = [
 		targetType: 'AdminUser'
 	},
 
+	/*
+	 * Groups: the owner of every project and bucket, and therefore the thing that decides who may reach
+	 * one. Membership changes are audited as carefully as container changes, because adding somebody to
+	 * a group grants them everything it owns in a single call.
+	 */
+	{
+		action: 'group.create',
+		method: 'POST',
+		path: '/admin/api/groups',
+		targetType: 'Group'
+	},
+	{
+		action: 'group.update',
+		method: 'PATCH',
+		path: '/admin/api/groups/:id',
+		targetType: 'Group'
+	},
+	{
+		action: 'group.delete',
+		method: 'DELETE',
+		path: '/admin/api/groups/:id',
+		targetType: 'Group'
+	},
+	{
+		action: 'group.member.add',
+		method: 'POST',
+		path: '/admin/api/groups/:id/members',
+		targetType: 'Group'
+	},
+	{
+		action: 'group.member.update',
+		method: 'PATCH',
+		path: '/admin/api/groups/:id/members/:userId',
+		targetType: 'Group'
+	},
+	{
+		action: 'group.member.remove',
+		method: 'DELETE',
+		path: '/admin/api/groups/:id/members/:userId',
+		targetType: 'Group'
+	},
+	/*
+	 * Which group an administrator is acting in. Audited because it is the answer to "what was this
+	 * person looking at when they did that" — without it, a trail of container changes cannot be read
+	 * back against the scope they were made from.
+	 */
+	/*
+	 * Invitations. `invitation.accept` is the only audited action whose actor is not an administrator
+	 * acting on the plane: the invitee is not signed in when they accept, so the entry names the account
+	 * that has just come into existence.
+	 */
+	{
+		action: 'invitation.create',
+		method: 'POST',
+		path: '/admin/api/groups/:id/invitations',
+		targetType: 'Group'
+	},
+	{
+		action: 'invitation.revoke',
+		method: 'DELETE',
+		path: '/admin/api/groups/:id/invitations/:inviteId',
+		targetType: 'Group'
+	},
+	{
+		action: 'invitation.accept',
+		method: 'POST',
+		path: '/admin/api/invitations/accept',
+		targetType: 'Group'
+	},
+	{
+		action: 'scope.switch',
+		method: 'PUT',
+		path: '/admin/api/scope',
+		targetType: 'Group'
+	},
 	{
 		action: 'bucket.create',
 		method: 'POST',

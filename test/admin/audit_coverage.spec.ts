@@ -23,7 +23,12 @@ import {
 	resetAdminMemoryStores
 } from 'lib/adapters/index.ts';
 import type { AdminAuditEntry } from 'lib/adapters/types.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import {
+	ADMIN_BUCKET_ID,
+	ADMIN_SESSION_COOKIE,
+	UNASSIGNED_GROUP_ID
+} from 'lib/admin/consts.ts';
+import { sessionFor } from '../admin_session.ts';
 import {
 	BOOTSTRAP_ACTOR,
 	SETTINGS_TARGET_ID,
@@ -66,13 +71,7 @@ async function superCookie() {
 		'hash',
 		['super_admin']
 	);
-	const session = await adminSessionStore.create({
-		userId: user._id,
-		bucketId: ADMIN_BUCKET_ID,
-		tokens: {},
-		ttlSeconds: 60,
-		absoluteTtlSeconds: 3600
-	});
+	const session = await sessionFor(user);
 	return {
 		cookie: `${ADMIN_SESSION_COOKIE}=${session._id}`,
 		userId: user._id,
@@ -119,11 +118,18 @@ function expectEntry(
 }
 
 async function makeProject() {
-	return getProjectStore().create({ name: 'P', slug: unique('p') });
+	return getProjectStore().create({
+		ownerGroupId: UNASSIGNED_GROUP_ID,
+		name: 'P',
+		slug: unique('p')
+	});
 }
 
 async function makeBucket() {
-	return getBucketStore().create({ name: 'B' });
+	return getBucketStore().create({
+		ownerGroupId: UNASSIGNED_GROUP_ID,
+		name: 'B'
+	});
 }
 
 const CLIENT_BODY = {
@@ -455,20 +461,25 @@ describe('admin audit coverage: buckets', () => {
 		});
 	});
 
-	it('records a manager reassignment', async () => {
+	/*
+	 * Was 'records a manager reassignment'. Managers are no longer a field on a bucket — the group that
+	 * owns it decides access — so the coverage moves to the rename that replaced it. What matters is
+	 * unchanged: an update to the bucket entity leaves an entry naming the fields it touched.
+	 */
+	it('records a bucket rename', async () => {
 		const { cookie, userId } = await superCookie();
 		const bucket = await makeBucket();
 
 		const res = await client.admin.api
 			.buckets({ id: bucket._id })
-			.patch({ managedBy: [userId] }, { headers: { cookie } });
+			.patch({ name: 'Renamed' }, { headers: { cookie } });
 		expect(res.status).toBe(200);
 
 		expectEntry(await soleEntry(bucket._id), {
 			action: 'bucket.update',
 			targetType: 'UserBucket',
 			actorId: userId,
-			attributes: ['managedBy']
+			attributes: ['name']
 		});
 	});
 

@@ -18,8 +18,13 @@ import {
 	getUserStore
 } from 'lib/adapters/index.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import {
+	ADMIN_BUCKET_ID,
+	ADMIN_SESSION_COOKIE,
+	UNASSIGNED_GROUP_ID
+} from 'lib/admin/consts.ts';
 import { updateClient } from 'lib/admin/clients/service.ts';
+import { sessionFor } from '../admin_session.ts';
 
 // User Story 1 — deleting a client destroys everything it issued.
 //
@@ -77,19 +82,14 @@ describe('deletion cascade: client', () => {
 			'hash',
 			['super_admin']
 		);
-		const session = await adminSessionStore.create({
-			userId: user._id,
-			bucketId: ADMIN_BUCKET_ID,
-			tokens: {},
-			ttlSeconds: 60,
-			absoluteTtlSeconds: 3600
-		});
+		const session = await sessionFor(user);
 		return `${ADMIN_SESSION_COOKIE}=${session._id}`;
 	}
 
 	async function deleteClient(clientId: string) {
 		const cookie = await superAdminCookie();
 		const project = await getProjectStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'P',
 			slug: `p-${Math.random()}`,
 			clientIds: [clientId]

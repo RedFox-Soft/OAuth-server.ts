@@ -11,7 +11,11 @@ import {
 	getBucketStore,
 	adminSessionStore
 } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import {
+	ADMIN_BUCKET_ID,
+	ADMIN_SESSION_COOKIE,
+	UNASSIGNED_GROUP_ID
+} from 'lib/admin/consts.ts';
 import {
 	ADMIN_MCP_CLIENT_ID,
 	MCP_RESOURCE,
@@ -19,6 +23,7 @@ import {
 } from 'lib/mcp/consts.ts';
 import { mcpCatalogue, pathArgName } from 'lib/mcp/catalogue.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
+import { sessionFor, personalGroupId } from '../admin_session.ts';
 
 /*
  * SC-006: no agent-initiated operation succeeds with permissions the same account would not have in the
@@ -83,13 +88,7 @@ async function principal(roles: string[]) {
 	});
 	at.setAudience(MCP_RESOURCE);
 	const token = (await at.save()) as unknown as string;
-	const session = await adminSessionStore.create({
-		userId: user._id,
-		bucketId: ADMIN_BUCKET_ID,
-		tokens: {},
-		ttlSeconds: 60,
-		absoluteTtlSeconds: 3600
-	});
+	const session = await sessionFor(user);
 	await rpc(
 		{
 			jsonrpc: '2.0',
@@ -171,12 +170,12 @@ describe('agent permissions match the console, per role', () => {
 		const mine = await getProjectStore().create({
 			name: 'Mine',
 			slug: `mine-${Math.floor(Math.random() * 1e6)}`,
-			managedBy: [user._id]
+			ownerGroupId: await personalGroupId(user._id)
 		});
 		const theirs = await getProjectStore().create({
 			name: 'Theirs',
 			slug: `theirs-${Math.floor(Math.random() * 1e6)}`,
-			managedBy: []
+			ownerGroupId: UNASSIGNED_GROUP_ID
 		});
 
 		const listed = await rpc(call('project_list', {}), token);
@@ -202,11 +201,14 @@ describe('agent permissions match the console, per role', () => {
 	it('grants bucket-user access to a project manager but not bucket-entity access', async () => {
 		const { token, user } = await principal(['project_admin']);
 
-		const bucket = await getBucketStore().create({ name: 'Backing' });
+		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: 'Backing'
+		});
 		await getProjectStore().create({
 			name: 'Backed',
 			slug: `backed-${Math.floor(Math.random() * 1e6)}`,
-			managedBy: [user._id],
+			ownerGroupId: await personalGroupId(user._id),
 			bucketId: bucket._id
 		});
 
@@ -269,8 +271,13 @@ describe('agent permissions match the console, per role', () => {
 	it('cannot escalate by asking a different tool for the same thing', async () => {
 		const { token } = await principal(['project_admin']);
 
-		// The audit trail is super-admin only. No other published read may return it.
-		expect(await viaAgent('audit_list', {}, token)).toBe('forbidden');
+		/*
+		 * The audit trail is no longer super-admin only: it is scope-filtered, so a project administrator
+		 * reads it and sees only their own groups' entries. What must stay unreachable is the instance's
+		 * own surfaces below — and the tenant isolation of the trail itself, which
+		 * test/admin/audit_group_scope.spec.ts asserts directly rather than through a status code.
+		 */
+		expect(await viaAgent('audit_list', {}, token)).toBe('ok');
 		expect(await viaAgent('admin_list', {}, token)).toBe('forbidden');
 		expect(await viaAgent('settings_get', {}, token)).toBe('forbidden');
 		expect(await viaAgent('jwks_list', {}, token)).toBe('forbidden');

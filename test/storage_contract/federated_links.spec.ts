@@ -6,6 +6,7 @@ import epochTime from 'lib/helpers/epoch_time.js';
 import { getBucketStore, getUserStore } from 'lib/adapters/index.js';
 import { cascadeForAccount } from 'lib/helpers/cascade.js';
 import { openHandoff } from 'lib/federation/state.js';
+import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 
 /*
  * What each deletion reaches.
@@ -27,7 +28,10 @@ describe('federated links and deletion', () => {
 	});
 
 	it('takes an account’s links with the account, leaving nothing a sign-in could resolve', async () => {
-		const bucket = await getBucketStore().create({ name: 'deletion' });
+		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: 'deletion'
+		});
 		const store = getUserStore(bucket._id);
 		const user = await store.create('linked@acme.test', 'hash', [], true);
 		await store.update(user._id, { federated: [LINK] });
@@ -47,7 +51,10 @@ describe('federated links and deletion', () => {
 	});
 
 	it('sweeps an outstanding handoff naming a deleted account', async () => {
-		const bucket = await getBucketStore().create({ name: 'handoff-sweep' });
+		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: 'handoff-sweep'
+		});
 		const store = getUserStore(bucket._id);
 		const user = await store.create('inflight@acme.test', 'hash', [], true);
 
@@ -68,7 +75,10 @@ describe('federated links and deletion', () => {
 	});
 
 	it('leaves the per-bucket area empty once its accounts are gone', async () => {
-		const bucket = await getBucketStore().create({ name: 'area' });
+		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: 'area'
+		});
 		const store = getUserStore(bucket._id);
 		const user = await store.create('last@acme.test', 'hash', [], true);
 		await store.update(user._id, { federated: [LINK] });

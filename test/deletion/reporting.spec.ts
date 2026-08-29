@@ -12,7 +12,12 @@ import {
 	getUserStore
 } from 'lib/adapters/index.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import {
+	ADMIN_BUCKET_ID,
+	ADMIN_SESSION_COOKIE,
+	UNASSIGNED_GROUP_ID
+} from 'lib/admin/consts.ts';
+import { sessionFor } from '../admin_session.ts';
 
 // User Story 4 — an operator can see the consequences, before and after.
 //
@@ -41,13 +46,7 @@ describe('deletion reporting', () => {
 			'hash',
 			['super_admin']
 		);
-		const session = await adminSessionStore.create({
-			userId: admin._id,
-			bucketId: ADMIN_BUCKET_ID,
-			tokens: {},
-			ttlSeconds: 60,
-			absoluteTtlSeconds: 3600
-		});
+		const session = await sessionFor(admin);
 		return `${ADMIN_SESSION_COOKIE}=${session._id}`;
 	}
 
@@ -81,6 +80,7 @@ describe('deletion reporting', () => {
 		const first = await liveClient();
 		const second = await liveClient();
 		const project = await getProjectStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'P',
 			slug: `p-${Math.random()}`,
 			clientIds: [first, 'ghost', second]
@@ -104,7 +104,7 @@ describe('deletion reporting', () => {
 		const bucket = await getBucketStore().create({
 			name: `b-${Math.random()}`,
 			roles: [],
-			managedBy: []
+			ownerGroupId: UNASSIGNED_GROUP_ID
 		});
 		const store = getUserStore(bucket._id);
 		const one = await store.create('one@example.com', 'hash');
@@ -146,6 +146,7 @@ describe('deletion reporting', () => {
 		}).save();
 
 		const project = await getProjectStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'P',
 			slug: `p-${Math.random()}`,
 			clientIds: [clientId]
@@ -170,7 +171,7 @@ describe('deletion reporting', () => {
 		const bucket = await getBucketStore().create({
 			name: `b-${Math.random()}`,
 			roles: [],
-			managedBy: []
+			ownerGroupId: UNASSIGNED_GROUP_ID
 		});
 		const user = await getUserStore(bucket._id).create(
 			'counted@example.com',
@@ -217,6 +218,7 @@ describe('deletion reporting', () => {
 		);
 		try {
 			const project = await getProjectStore().create({
+				ownerGroupId: UNASSIGNED_GROUP_ID,
 				name: 'P',
 				slug: `p-${Math.random()}`,
 				clientIds: [clientId]

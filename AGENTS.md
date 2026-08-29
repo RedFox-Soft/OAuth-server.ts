@@ -68,6 +68,8 @@ trail** (`adminAuditStore`, collection `adminAudit`, via `lib/admin/audit/record
 before the mutation) capturing actor, action, target, and timestamp; the store exposes no
 update/delete so entries cannot be altered.
 
+**Ownership is by group, not by named manager.** Every project and user bucket carries `ownerGroupId`, and belonging to that group is the only thing that grants access to it — there is no per-container `managedBy` list, and no second ownership mechanism. Each administrator gets a `personal` group with their account (the console labels it "Personal"); a `regular` group is a company or team; the reserved `unassigned` system group holds containers no administrator managed. Within a group, `owner` and `member` are properties of the _membership_, not roles on the account: `assertGroupOwner` gates who is in the group and whether it may be deleted, while `assertRole` still gates the instance. `contextFor` resolves memberships on every request, so a removal takes effect on the next call. The console's active scope lives on the session (`AdminSession.activeGroupId`) and is re-validated against live membership each request. A project administrator creates projects, buckets and groups, invites people by email, and reads the audit trail for their own groups; the instance itself — settings, keys, SMTP, administrator accounts, the error store — stays super-admin-only. See `wiki/concepts/group-ownership.md`.
+
 Unexpected internal faults are recorded to a **server error store** (`lib/error_store/`, area
 `errorStore`, read at `/admin/api/errors`, super-admin only). Only defects are recorded — routine client
 rejections are correct behaviour and never appear. Three things about it are load-bearing and easy to

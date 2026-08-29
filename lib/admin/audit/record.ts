@@ -12,6 +12,15 @@ export interface AuditDetail {
 	attributes?: string[];
 	/* The container the target id resolves within, in practice a bucket. */
 	targetScope?: string;
+	/*
+	 * The group this entry belongs to, and the only thing a group-scoped read selects on.
+	 *
+	 * Passed explicitly rather than taken from the acting administrator's active scope, because the two
+	 * differ exactly where it matters: a super administrator acts on any group's container while their
+	 * own scope is empty, and an entry attributed to their scope would vanish from the trail the owning
+	 * group can read. Omitted for an instance-wide action, which belongs to no group.
+	 */
+	ownerGroupId?: string;
 }
 
 /*
@@ -110,6 +119,9 @@ async function write(input: {
 			...(input.detail.targetScope === undefined
 				? {}
 				: { targetScope: input.detail.targetScope }),
+			...(input.detail.ownerGroupId === undefined
+				? {}
+				: { ownerGroupId: input.detail.ownerGroupId }),
 			// Sorted so two requests setting the same fields in a different order read identically.
 			...(input.detail.attributes === undefined
 				? {}

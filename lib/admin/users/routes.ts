@@ -16,6 +16,7 @@ import {
 } from './schema.js';
 import { recordAdminAudit } from '../audit/record.js';
 import nanoid from '../../helpers/nanoid.js';
+import { ensurePersonalGroup } from '../groups/personal.js';
 
 const store = () => getUserStore(ADMIN_BUCKET_ID);
 
@@ -121,6 +122,9 @@ export const adminUserRoutes = new Elysia({ name: 'admin-users' })
 				false,
 				userId
 			);
+			// Every administrator owns exactly one personal group, created with the account: it is the
+			// scope their console opens in, and without it they would sign in pointed at nothing.
+			await ensurePersonalGroup(user._id, user.email);
 			set.status = 201;
 			const { password: _password, ...safe } = user;
 			return safe;

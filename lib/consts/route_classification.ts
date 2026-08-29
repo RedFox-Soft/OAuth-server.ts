@@ -348,10 +348,15 @@ export const rateRoutes: readonly RateRoute[] = [
 	{ method: 'POST', path: '/verify-email/resend', rate: 'strict' },
 	{ method: 'POST', path: '/reset-password', rate: 'strict' },
 	/*
-	 * The only admin route that is not ordinary. It is unauthenticated by construction — it is how the
-	 * first super-admin comes to exist — so it is the one admin door an attacker can knock on freely.
+	 * The two admin routes that are not ordinary. Both are unauthenticated by construction — one is how
+	 * the first super-admin comes to exist, the other is how somebody invited into a group accepts —
+	 * so they are the admin doors an attacker can knock on freely.
+	 *
+	 * The invitation token is 256 bits of randomness looked up by digest, so guessing one is not the
+	 * threat; the cost of the account write behind it is, and that is what an origin limit bounds.
 	 */
 	{ method: 'POST', path: '/admin/api/setup', rate: 'strict' },
+	{ method: 'POST', path: '/admin/api/invitations/accept', rate: 'strict' },
 
 	/*
 	 * Public: cheap, cacheable, and fetched by every client before it knows anything else about the

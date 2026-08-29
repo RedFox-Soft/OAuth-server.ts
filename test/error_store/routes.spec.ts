@@ -12,6 +12,7 @@ import {
 } from 'lib/adapters/index.ts';
 import type { ErrorOccurrence } from 'lib/adapters/types.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { sessionFor } from '../admin_session.ts';
 
 /*
  * The read surface — specs/025-server-error-store/contracts/admin-api.md.
@@ -35,13 +36,7 @@ async function cookieFor(roles: string[]) {
 		'hash',
 		roles
 	);
-	const session = await adminSessionStore.create({
-		userId: user._id,
-		bucketId: ADMIN_BUCKET_ID,
-		tokens: {},
-		ttlSeconds: 60,
-		absoluteTtlSeconds: 3600
-	});
+	const session = await sessionFor(user);
 	return `${ADMIN_SESSION_COOKIE}=${session._id}`;
 }
 

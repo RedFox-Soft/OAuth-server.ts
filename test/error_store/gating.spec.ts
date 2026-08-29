@@ -13,6 +13,7 @@ import {
 } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { flushForTest, resetQueue } from 'lib/error_store/queue.ts';
+import { sessionFor } from '../admin_session.ts';
 
 /*
  * What the capability switch does, and — as importantly — what it deliberately does NOT do.
@@ -43,13 +44,7 @@ async function superCookie() {
 		'hash',
 		['super_admin']
 	);
-	const session = await adminSessionStore.create({
-		userId: user._id,
-		bucketId: ADMIN_BUCKET_ID,
-		tokens: {},
-		ttlSeconds: 60,
-		absoluteTtlSeconds: 3600
-	});
+	const session = await sessionFor(user);
 	return `${ADMIN_SESSION_COOKIE}=${session._id}`;
 }
 

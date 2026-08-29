@@ -97,6 +97,10 @@ export const STORE_AREAS = {
 	jwks: 'jwks',
 	projects: 'projects',
 	userBuckets: 'userBuckets',
+	/* The owner of every project and user bucket, and the only thing that grants access to one. */
+	groups: 'groups',
+	/* Pending invitations into a group. Single-use, and reaped on their own expiry. */
+	groupInvitations: 'groupInvitations',
 	adminSession: 'adminSession',
 	adminAudit: 'adminAudit',
 	/* Pending confirmations for the MCP control plane's high-consequence operations. */
@@ -378,14 +382,52 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 		unowned(
 			'a container: guarded against deletion while occupied, never cascaded'
 		),
-		[{ key: { slug: 1 }, unique: true }, { key: { clientIds: 1 } }]
+		[
+			{ key: { slug: 1 }, unique: true },
+			{ key: { clientIds: 1 } },
+			{ key: { ownerGroupId: 1 } }
+		]
 	),
 	storeArea(
 		STORE_AREAS.userBuckets,
 		null,
 		unowned(
 			'a container: guarded against deletion while occupied, never cascaded'
-		)
+		),
+		[{ key: { ownerGroupId: 1 } }]
+	),
+	/*
+	 * Groups own every project and user bucket, so `members.userId` is read on every admin request —
+	 * `contextFor` resolves the caller's memberships there, where it previously scanned projects by
+	 * manager. Indexed for that reason, not for reporting.
+	 *
+	 * Permanent, and unowned by an account or a client: destroying an administrator must not destroy a
+	 * group other people belong to, and a group outliving its last member is prevented by a route
+	 * invariant rather than by a cascade.
+	 */
+	storeArea(
+		STORE_AREAS.groups,
+		null,
+		unowned(
+			'a container of containers: an administrator is removed from it, never cascaded through it'
+		),
+		[{ key: { 'members.userId': 1 } }, { key: { kind: 1 } }]
+	),
+	/*
+	 * Reaped on `expiresAt`, and the TTL is the point rather than housekeeping: an invitation that
+	 * outlived its expiry is a standing offer of access to a group, which is the one thing an
+	 * invitation must never become.
+	 */
+	storeArea(
+		STORE_AREAS.groupInvitations,
+		EXPIRES_AT,
+		/*
+		 * Unowned despite carrying `invitedBy`. Owner fields drive the account cascade, which sweeps
+		 * *model* areas; declaring one here would claim a sweep that does not reach this area, and the
+		 * drift guard refuses exactly that. Expiry is what bounds an invitation's life instead, which is
+		 * the stronger guarantee anyway: it lapses whether or not the inviter is ever deleted.
+		 */
+		unowned('reaped on expiry; an invitation outlives no account by design')
 	),
 	/*
 	 * Safe to reap on `expiresAt` despite the two expiry fields: touch() clamps the sliding
@@ -446,7 +488,13 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 			{ key: { actorEmail: 1, timestamp: 1 } },
 			{ key: { action: 1, timestamp: 1 } },
 			{ key: { targetType: 1, targetId: 1, timestamp: 1 } },
-			{ key: { targetScope: 1, timestamp: 1 } }
+			{ key: { targetScope: 1, timestamp: 1 } },
+			/*
+			 * The group-scoped read, which is every audit read a project administrator makes: their
+			 * groups' entries, newest first. Compound rather than a bare `ownerGroupId` because the
+			 * restriction and the ordering are never applied apart.
+			 */
+			{ key: { ownerGroupId: 1, timestamp: 1 } }
 		]
 	),
 	/*

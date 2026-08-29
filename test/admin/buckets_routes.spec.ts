@@ -9,8 +9,13 @@ import {
 	getUserStore,
 	getProjectStore
 } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import {
+	ADMIN_BUCKET_ID,
+	ADMIN_SESSION_COOKIE,
+	UNASSIGNED_GROUP_ID
+} from 'lib/admin/consts.ts';
 import type { UserBucket } from 'lib/adapters/types.ts';
+import { sessionFor, personalGroupId } from '../admin_session.ts';
 
 const app = new Elysia().use(resolveAdmin).use(bucketRoutes);
 const client = treaty(app);
@@ -21,13 +26,7 @@ async function sessionCookieFor(roles: string[]) {
 		'hash',
 		roles
 	);
-	const s = await adminSessionStore.create({
-		userId: user._id,
-		bucketId: ADMIN_BUCKET_ID,
-		tokens: {},
-		ttlSeconds: 60,
-		absoluteTtlSeconds: 3600
-	});
+	const s = await sessionFor(user);
 	return { cookie: `${ADMIN_SESSION_COOKIE}=${s._id}`, userId: user._id };
 }
 
@@ -61,7 +60,11 @@ describe('buckets API', () => {
 			{ headers: { cookie } }
 		);
 		const bucket = res1.data as UserBucket;
-		const project = await getProjectStore().create({ name: 'P', slug: 'p' });
+		const project = await getProjectStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: 'P',
+			slug: 'p'
+		});
 		await getProjectStore().update(project._id, { bucketId: bucket._id });
 		const res = await client.admin.api
 			.buckets({ id: bucket._id })
@@ -76,9 +79,11 @@ describe('buckets API', () => {
 			{ name: 'Bucket A' },
 			{ headers: { cookie } }
 		);
+		// Owned by another tenant, created as that administrator: ownership follows the active scope
+		// of whoever creates it and is not a field a request can set.
 		const b = await client.admin.api.buckets.post(
-			{ name: 'Bucket B', managedBy: [otherPa.userId] },
-			{ headers: { cookie } }
+			{ name: 'Bucket B' },
+			{ headers: { cookie: otherPa.cookie } }
 		);
 		const bucketA = a.data as UserBucket;
 		const bucketB = b.data as UserBucket;
@@ -89,17 +94,16 @@ describe('buckets API', () => {
 		expect(ids).toContain(bucketB._id);
 	});
 
-	it('project_admin GET /admin/api/buckets returns only buckets they manage', async () => {
-		const superSession = await sessionCookieFor(['super_admin']);
+	it('project_admin GET /admin/api/buckets returns only their own group’s', async () => {
 		const pa = await sessionCookieFor(['project_admin']);
 		const otherPa = await sessionCookieFor(['project_admin']);
 		const mine = await client.admin.api.buckets.post(
-			{ name: 'Mine', managedBy: [pa.userId] },
-			{ headers: { cookie: superSession.cookie } }
+			{ name: 'Mine' },
+			{ headers: { cookie: pa.cookie } }
 		);
 		await client.admin.api.buckets.post(
-			{ name: 'Other', managedBy: [otherPa.userId] },
-			{ headers: { cookie: superSession.cookie } }
+			{ name: 'Other' },
+			{ headers: { cookie: otherPa.cookie } }
 		);
 		const bucketMine = mine.data as UserBucket;
 		const list = await client.admin.api.buckets.get({
@@ -109,13 +113,20 @@ describe('buckets API', () => {
 		expect(buckets.map((bucket) => bucket._id)).toEqual([bucketMine._id]);
 	});
 
-	it('project_admin cannot create a bucket', async () => {
+	/*
+	 * The reported defect, now asserted the other way round. This test was named "project_admin cannot
+	 * create a bucket" and passed because the route answered 403 to an action the console still offered.
+	 */
+	it('project_admin creates a bucket into their own group', async () => {
 		const pa = await sessionCookieFor(['project_admin']);
 		const res = await client.admin.api.buckets.post(
-			{ name: 'Denied' },
+			{ name: 'Allowed' },
 			{ headers: { cookie: pa.cookie } }
 		);
-		expect(res.status).toBe(403);
+		expect(res.status).toBe(201);
+		expect((res.data as UserBucket).ownerGroupId).toBe(
+			await personalGroupId(pa.userId)
+		);
 	});
 
 	it('denies delete of an unreferenced bucket to a project_admin who does not manage it', async () => {
@@ -177,9 +188,9 @@ describe('buckets API', () => {
 		const bucket = created.data as UserBucket;
 		// a project pa manages points at it
 		const proj = await getProjectStore().create({
+			ownerGroupId: await personalGroupId(pa.userId),
 			name: 'PB',
-			slug: `pb-${Math.random()}`,
-			managedBy: [pa.userId]
+			slug: `pb-${Math.random()}`
 		});
 		await getProjectStore().update(proj._id, { bucketId: bucket._id });
 		const got = await client.admin.api
@@ -199,7 +210,7 @@ describe('buckets API', () => {
 		const proj = await getProjectStore().create({
 			name: 'PB2',
 			slug: `pb2-${Math.random()}`,
-			managedBy: [pa.userId]
+			ownerGroupId: await personalGroupId(pa.userId)
 		});
 		await getProjectStore().update(proj._id, { bucketId: bucket._id });
 		const res = await client.admin.api
@@ -220,39 +231,44 @@ describe('buckets API', () => {
 		).toBe(false);
 	});
 
-	it('lets a super_admin edit managedBy', async () => {
+	/*
+	 * Replaces the pair that asserted who could edit `managedBy`. Ownership is no longer a mutable field
+	 * on the container at all — it is not in the update body — so the property worth pinning is that a
+	 * PATCH cannot move a bucket between tenants, whoever sends it.
+	 */
+	it('never moves a bucket between groups through an update', async () => {
 		const su = await sessionCookieFor(['super_admin']);
 		const pa = await sessionCookieFor(['project_admin']);
 		const created = await client.admin.api.buckets.post(
 			{ name: 'MB' },
-			{ headers: { cookie: su.cookie } }
+			{ headers: { cookie: pa.cookie } }
 		);
 		const bucket = created.data as UserBucket;
-		const res = await client.admin.api
+		const before = bucket.ownerGroupId;
+
+		const res = await client.admin.api.buckets({ id: bucket._id }).patch(
+			// Submitted as an unknown field; the schema does not accept it.
+			{ name: 'MB renamed', ownerGroupId: 'somewhere-else' } as never,
+			{ headers: { cookie: su.cookie } }
+		);
+
+		expect([200, 422]).toContain(res.status);
+		const after = await client.admin.api
 			.buckets({ id: bucket._id })
-			.patch({ managedBy: [pa.userId] }, { headers: { cookie: su.cookie } });
-		expect(res.status).toBe(200);
-		expect((res.data as UserBucket).managedBy).toEqual([pa.userId]);
+			.get({ headers: { cookie: su.cookie } });
+		expect((after.data as UserBucket).ownerGroupId).toBe(before);
 	});
 
-	it('blocks a bucket-owning project_admin from editing managedBy', async () => {
-		const su = await sessionCookieFor(['super_admin']);
+	it('lets a group member rename a bucket their group owns', async () => {
 		const pa = await sessionCookieFor(['project_admin']);
-		// pa owns the bucket via managedBy → passes loadBucketForEdit (strict)
 		const created = await client.admin.api.buckets.post(
-			{ name: 'MBOwned', managedBy: [pa.userId] },
-			{ headers: { cookie: su.cookie } }
+			{ name: 'MBOwned' },
+			{ headers: { cookie: pa.cookie } }
 		);
 		const bucket = created.data as UserBucket;
-		// can edit name (proves strict access passes)...
 		const ok = await client.admin.api
 			.buckets({ id: bucket._id })
 			.patch({ name: 'renamed' }, { headers: { cookie: pa.cookie } });
 		expect(ok.status).toBe(200);
-		// ...but not managedBy (super-only)
-		const denied = await client.admin.api
-			.buckets({ id: bucket._id })
-			.patch({ managedBy: [] }, { headers: { cookie: pa.cookie } });
-		expect(denied.status).toBe(403);
 	});
 });

@@ -72,6 +72,24 @@ export function matchesAuditQuery(
 		return false;
 	}
 	/*
+	 * The authorization boundary of the audit read, not a filter a caller supplies: the handler sets it
+	 * from the caller's own memberships. An empty array therefore selects nothing rather than
+	 * everything, which is the correct answer for an administrator who belongs to no group — the
+	 * opposite reading would hand them the whole trail.
+	 *
+	 * An entry with no group is instance-wide (settings, keys, administrator accounts) and belongs to
+	 * no tenant, so it never satisfies a group restriction.
+	 */
+	if (query.ownerGroupIds !== undefined) {
+		if (
+			entry.ownerGroupId === undefined ||
+			entry.ownerGroupId === null ||
+			!query.ownerGroupIds.includes(entry.ownerGroupId)
+		) {
+			return false;
+		}
+	}
+	/*
 	 * A console entry stores no surface at all, so 'console' cannot be an equality match — it is the
 	 * absence. Written as a translation rather than a comparison because the alternative was to
 	 * backfill every historical entry, and the trail is append-only.

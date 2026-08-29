@@ -10,8 +10,13 @@ import {
 	getUserStore
 } from 'lib/adapters/index.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import {
+	ADMIN_BUCKET_ID,
+	ADMIN_SESSION_COOKIE,
+	UNASSIGNED_GROUP_ID
+} from 'lib/admin/consts.ts';
 import { userAreaFor } from 'lib/consts/storage_inventory.js';
+import { sessionFor } from '../admin_session.ts';
 
 // User Story 3 — a container refuses deletion while it still holds something.
 //
@@ -37,13 +42,7 @@ describe('deletion guards: containers', () => {
 			'hash',
 			['super_admin']
 		);
-		const session = await adminSessionStore.create({
-			userId: admin._id,
-			bucketId: ADMIN_BUCKET_ID,
-			tokens: {},
-			ttlSeconds: 60,
-			absoluteTtlSeconds: 3600
-		});
+		const session = await sessionFor(admin);
 		return `${ADMIN_SESSION_COOKIE}=${session._id}`;
 	}
 
@@ -61,6 +60,7 @@ describe('deletion guards: containers', () => {
 
 	async function project(clientIds: string[], bucketId?: string) {
 		return getProjectStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'P',
 			slug: `p-${Math.random()}`,
 			clientIds,
@@ -72,7 +72,7 @@ describe('deletion guards: containers', () => {
 		return getBucketStore().create({
 			name: `b-${Math.random()}`,
 			roles: [],
-			managedBy: []
+			ownerGroupId: UNASSIGNED_GROUP_ID
 		});
 	}
 

@@ -3,6 +3,7 @@ import { getUserStore } from '../../adapters/index.js';
 import { ADMIN_BUCKET_ID } from '../consts.js';
 import { recordBootstrapAudit } from '../audit/record.js';
 import nanoid from '../../helpers/nanoid.js';
+import { ensurePersonalGroup } from '../groups/personal.js';
 
 export async function hasSuperAdmin(): Promise<boolean> {
 	const users = await getUserStore(ADMIN_BUCKET_ID).list();
@@ -30,13 +31,16 @@ export const adminSetup = new Elysia({ name: 'admin-setup' }).post(
 		 */
 		const userId = nanoid();
 		await recordBootstrapAudit('setup.bootstrap', userId);
-		await getUserStore(ADMIN_BUCKET_ID).create(
+		const user = await getUserStore(ADMIN_BUCKET_ID).create(
 			body.email,
 			hash,
 			['super_admin'],
 			false,
 			userId
 		);
+		// The bootstrap administrator gets a personal group like any other, so first-run setup and the
+		// admin-create route leave an account in the same shape.
+		await ensurePersonalGroup(user._id, user.email);
 		set.status = 201;
 		return { ok: true };
 	},

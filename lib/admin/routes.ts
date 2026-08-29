@@ -4,6 +4,9 @@ import { AdminError, adminErrorBody, resolveAdmin } from './auth/rbac.js';
 import { adminSetup } from './auth/setup.js';
 import { adminLogin } from './auth/login.js';
 import { meRoutes } from './me.js';
+import { groupRoutes } from './groups/routes.js';
+import { invitationAcceptRoutes } from './groups/accept.js';
+import { scopeRoutes } from './scope/routes.js';
 import { projectRoutes } from './projects/routes.js';
 import { clientRoutes } from './clients/routes.js';
 import { adminUserRoutes } from './users/routes.js';
@@ -53,6 +56,9 @@ export const adminApiRoutes = new Elysia({ name: 'admin-api' })
 	.use(adminLogin)
 	.use(resolveAdmin)
 	.use(meRoutes)
+	.use(groupRoutes)
+	.use(invitationAcceptRoutes)
+	.use(scopeRoutes)
 	.use(projectRoutes)
 	.use(clientRoutes)
 	.use(adminUserRoutes)

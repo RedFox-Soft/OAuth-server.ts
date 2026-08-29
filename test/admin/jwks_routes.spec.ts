@@ -14,6 +14,7 @@ import { keystore, publicJWKS } from 'lib/configs/keystore.ts';
 import { generateJWKS } from 'lib/helpers/jwks.ts';
 import { calculateKid } from 'lib/configs/verifyJWKs.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { sessionFor } from '../admin_session.ts';
 
 const app = new Elysia().use(resolveAdmin).use(jwksRoutes);
 const client = treaty(app);
@@ -41,13 +42,7 @@ async function sessionCookieFor(roles: string[]) {
 		'hash',
 		roles
 	);
-	const s = await adminSessionStore.create({
-		userId: user._id,
-		bucketId: ADMIN_BUCKET_ID,
-		tokens: {},
-		ttlSeconds: 60,
-		absoluteTtlSeconds: 3600
-	});
+	const s = await sessionFor(user);
 	return { cookie: `${ADMIN_SESSION_COOKIE}=${s._id}`, userId: user._id };
 }
 

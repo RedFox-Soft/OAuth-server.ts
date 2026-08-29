@@ -142,7 +142,10 @@ describe('missingIndexes', () => {
 	});
 
 	it('reports nothing for an area that declares no index', () => {
-		expect(missingIndexes(areaNamed('userBuckets'), [idIndex])).toEqual([]);
+		// `userBuckets` used to stand here and no longer can: it declares an `ownerGroupId` index now
+		// that groups own containers. `serviceConfig` replaces it — permanent, like `Client`, so no
+		// expiry index is derived for it either.
+		expect(missingIndexes(areaNamed('serviceConfig'), [idIndex])).toEqual([]);
 		expect(missingIndexes(areaNamed('Client'), [idIndex])).toEqual([]);
 	});
 

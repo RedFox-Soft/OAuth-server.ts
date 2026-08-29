@@ -29,6 +29,14 @@ import { UpdateSettingsBody } from '../admin/settings/schema.js';
 import { UpdateSmtpBody } from '../admin/settings/smtp/schema.js';
 import { GenerateKeyBody } from '../admin/jwks/schema.js';
 import { AuditQuery } from '../admin/audit/schema.js';
+import {
+	CreateGroupBody,
+	UpdateGroupBody,
+	AddMemberBody,
+	UpdateMemberBody,
+	CreateInvitationBody
+} from '../admin/groups/schema.js';
+import { SwitchScopeBody } from '../admin/scope/schema.js';
 import { ErrorQuery, ErrorSummaryQuery } from '../admin/errors/schema.js';
 
 /*
@@ -190,6 +198,58 @@ const catalogue = [
 			"The sign-in policy of the administrator bucket itself. `totpRequired` says whether signing in to the console also needs a one-time code from an authenticator app. The bucket's other settings are deliberately not exposed."
 	},
 	{
+		tool: 'group_list',
+		method: 'GET',
+		path: '/admin/api/groups',
+		action: null,
+		consequence: 'read',
+		requiredRole: null,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: [],
+		summary:
+			'The groups this administrator belongs to. A group owns projects and user buckets, and belonging to it is what grants access to them.'
+	},
+	{
+		tool: 'group_get',
+		method: 'GET',
+		path: '/admin/api/groups/:id',
+		action: null,
+		consequence: 'read',
+		requiredRole: null,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			'One group: its name, kind, and the administrators in it with their membership kind. A plain member may read this; only an owner may change it.'
+	},
+	{
+		tool: 'group_invitation_list',
+		method: 'GET',
+		path: '/admin/api/groups/:id/invitations',
+		action: null,
+		consequence: 'read',
+		requiredRole: null,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			'Pending invitations into a group. Never returns an invitation token — a token exists only in the mail it was sent in.'
+	},
+	{
+		tool: 'scope_get',
+		method: 'GET',
+		path: '/admin/api/scope',
+		action: null,
+		consequence: 'read',
+		requiredRole: null,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: [],
+		summary:
+			"The console's active group and the groups available to switch to. An agent has no console session: name a group per call instead of switching."
+	},
+	{
 		tool: 'bucket_list',
 		method: 'GET',
 		path: '/admin/api/buckets',
@@ -298,12 +358,17 @@ const catalogue = [
 		path: '/admin/api/audit',
 		action: null,
 		consequence: 'read',
-		requiredRole: 'super_admin',
+		/*
+		 * Scope-filtered rather than role-gated, which is why this is `null` and not `super_admin`. The
+		 * route serves everyone: an administrator sees the trail of the groups they belong to, a super
+		 * administrator sees the instance. Naming a role here would be a claim the handler does not make.
+		 */
+		requiredRole: null,
 		bodySchema: null,
 		querySchema: AuditQuery,
 		pathParams: [],
 		summary:
-			'The administrative audit trail, newest first, filterable by actor, action, target, surface and time window. Filter `viaSurface=mcp` for actions taken through an agent. An entry means an authorized actor reached the point of applying a change, not that the change took effect.'
+			'The administrative audit trail for the groups this administrator belongs to, newest first, filterable by actor, action, target, surface and time window. A super administrator sees the whole instance, including actions that belong to no group. Filter `viaSurface=mcp` for actions taken through an agent. An entry means an authorized actor reached the point of applying a change, not that the change took effect.'
 	},
 	{
 		tool: 'error_list',
@@ -524,6 +589,109 @@ const catalogue = [
 	},
 
 	/* ------------------------------------------------- writes: buckets (2) */
+	{
+		tool: 'group_create',
+		method: 'POST',
+		path: '/admin/api/groups',
+		action: 'group.create',
+		consequence: 'ordinary',
+		requiredRole: null,
+		bodySchema: CreateGroupBody,
+		querySchema: null,
+		pathParams: [],
+		summary:
+			'Create a group. The administrator this agent acts for becomes its first owner — a group with no owner would be unreachable the instant it existed.'
+	},
+	{
+		tool: 'group_update',
+		method: 'PATCH',
+		path: '/admin/api/groups/:id',
+		action: 'group.update',
+		consequence: 'ordinary',
+		requiredRole: null,
+		bodySchema: UpdateGroupBody,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			'Rename a group, or clear the review flag the ownership migration set on it. Requires being an owner of that group, which is a membership kind rather than an instance role.'
+	},
+	{
+		tool: 'group_member_add',
+		method: 'POST',
+		path: '/admin/api/groups/:id/members',
+		action: 'group.member.add',
+		consequence: 'ordinary',
+		requiredRole: null,
+		bodySchema: AddMemberBody,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			'Add an existing administrator to a group as an owner or a plain member. This grants them everything the group owns, in one call. Owner-only.'
+	},
+	{
+		tool: 'group_member_update',
+		method: 'PATCH',
+		path: '/admin/api/groups/:id/members/:userId',
+		action: 'group.member.update',
+		consequence: 'ordinary',
+		requiredRole: null,
+		bodySchema: UpdateMemberBody,
+		querySchema: null,
+		pathParams: ['id', 'userId'],
+		summary:
+			'Promote a member to owner or demote an owner to member. The last owner can be neither demoted nor removed. Owner-only.'
+	},
+	{
+		tool: 'group_member_remove',
+		method: 'DELETE',
+		path: '/admin/api/groups/:id/members/:userId',
+		action: 'group.member.remove',
+		consequence: 'high',
+		requiredRole: null,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'userId'],
+		summary:
+			'Remove an administrator from a group. They lose access to every project, bucket and end-user the group owns, on their very next request. The last owner cannot be removed. Owner-only.'
+	},
+	{
+		tool: 'group_invite',
+		method: 'POST',
+		path: '/admin/api/groups/:id/invitations',
+		action: 'invitation.create',
+		consequence: 'ordinary',
+		requiredRole: null,
+		bodySchema: CreateInvitationBody,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			'Invite somebody into a group by email, as an owner or a plain member. Creates an administrator account for them when they accept, if the address has none. Owner-only.'
+	},
+	{
+		tool: 'group_invitation_revoke',
+		method: 'DELETE',
+		path: '/admin/api/groups/:id/invitations/:inviteId',
+		action: 'invitation.revoke',
+		consequence: 'ordinary',
+		requiredRole: null,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'inviteId'],
+		summary: 'Withdraw a pending invitation before it is accepted. Owner-only.'
+	},
+	{
+		tool: 'scope_switch',
+		method: 'PUT',
+		path: '/admin/api/scope',
+		action: 'scope.switch',
+		consequence: 'ordinary',
+		requiredRole: null,
+		bodySchema: SwitchScopeBody,
+		querySchema: null,
+		pathParams: [],
+		summary:
+			"Switch the console session's active group. An agent has no console session, so this refuses for an agent — name the group in each call instead."
+	},
 	{
 		tool: 'bucket_create',
 		method: 'POST',
@@ -775,6 +943,13 @@ export const excludedConsoleOperations: readonly ExcludedConsoleOperation[] = [
 	},
 	{
 		method: 'POST',
+		path: '/admin/api/invitations/accept',
+		absence: 'inapplicable',
+		reason:
+			'Unauthenticated, and completed by the invited person following a link in their own mail. There is no agent principal to accept as — the same reason first-run setup is inapplicable.'
+	},
+	{
+		method: 'POST',
 		path: '/admin/api/logout',
 		absence: 'inapplicable',
 		reason:
@@ -793,6 +968,13 @@ export const excludedConsoleOperations: readonly ExcludedConsoleOperation[] = [
 		absence: 'withheld',
 		reason:
 			'Deleting a user bucket destroys a container of end-user accounts with nothing left afterwards to inspect or restore. Withheld from agents by operator decision — delete it in the admin console instead.'
+	},
+	{
+		method: 'DELETE',
+		path: '/admin/api/groups/:id',
+		absence: 'withheld',
+		reason:
+			'Deleting a group destroys the owner of whatever it held, and with it the only thing that granted anyone access — the same class as the two container deletions above. Withheld from agents by operator decision; delete it in the admin console instead.'
 	},
 	/*
 	 * Purging recorded faults.
@@ -834,6 +1016,7 @@ export function excludedOperationFor(
 	 * the refusal can say *why* and name the console rather than answering a bare "no such tool".
 	 */
 	const guesses: Record<string, string> = {
+		group_delete: '/admin/api/groups/:id',
 		project_delete: '/admin/api/projects/:id',
 		bucket_delete: '/admin/api/buckets/:id',
 		setup_bootstrap: '/admin/api/setup',

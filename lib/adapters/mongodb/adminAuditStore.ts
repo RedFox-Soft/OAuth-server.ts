@@ -35,6 +35,17 @@ function toFilter(query: AdminAuditQuery): Filter<AdminAuditEntry> {
 	if (query.targetScope !== undefined) {
 		filter.targetScope = query.targetScope;
 	}
+	/*
+	 * Applied here, where the entries are selected, rather than by filtering a wider result afterwards.
+	 * This is the tenant boundary of the audit read: a restriction imposed after the fact is one a bug
+	 * can skip while still answering 200.
+	 *
+	 * `$in` over an empty array matches nothing, which is the intended reading — see the note in
+	 * matchesAuditQuery, which both adapters have to agree with.
+	 */
+	if (query.ownerGroupIds !== undefined) {
+		filter.ownerGroupId = { $in: query.ownerGroupIds };
+	}
 	if (query.viaSurface !== undefined) {
 		/*
 		 * A console entry stores no surface at all, so 'console' is the *absence* of the field, not a

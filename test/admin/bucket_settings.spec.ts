@@ -11,6 +11,7 @@ import {
 } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import type { UserBucket } from 'lib/adapters/types.ts';
+import { sessionFor } from '../admin_session.ts';
 
 const app = new Elysia().use(resolveAdmin).use(bucketRoutes);
 const client = treaty(app);
@@ -21,13 +22,7 @@ async function superCookie() {
 		'hash',
 		['super_admin']
 	);
-	const s = await adminSessionStore.create({
-		userId: user._id,
-		bucketId: ADMIN_BUCKET_ID,
-		tokens: {},
-		ttlSeconds: 60,
-		absoluteTtlSeconds: 3600
-	});
+	const s = await sessionFor(user);
 	return `${ADMIN_SESSION_COOKIE}=${s._id}`;
 }
 

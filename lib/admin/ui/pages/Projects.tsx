@@ -196,15 +196,15 @@ export function Projects({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 				rowKey="_id"
 				loading={loading}
 				dataSource={projects}
+				locale={{
+					emptyText:
+						'No projects in this scope yet. Create one to register OAuth clients against — use the scope switcher above to work in a different group.'
+				}}
 				columns={[
 					{ title: 'Name', dataIndex: 'name' },
 					{ title: 'Slug', dataIndex: 'slug' },
 					{ title: 'Bucket', dataIndex: 'bucketId' },
-					{
-						title: 'Managed by',
-						dataIndex: 'managedBy',
-						render: (managedBy: string[]) => managedBy.join(', ')
-					},
+
 					{
 						title: 'Browser origins',
 						dataIndex: 'corsOrigins',

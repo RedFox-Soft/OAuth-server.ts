@@ -7,6 +7,7 @@ import {
 	resetAdminMemoryStores
 } from 'lib/adapters/index.ts';
 import { ttl } from 'lib/configs/liveTime.ts';
+import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 
 const CLIENT_ID = 'ui-open-app';
 const PASSWORD = 'correct horse battery';
@@ -84,10 +85,12 @@ describe('end-user cookie attributes', () => {
 		await bootstrap(import.meta.url, { config: 'pages' });
 		resetAdminMemoryStores();
 		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'Cookie Attributes Bucket',
 			emailVerificationRequired: false
 		});
 		const project = await getProjectStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'Cookie Attributes',
 			slug: `cookie-attrs-${Math.random()}`
 		});

@@ -11,6 +11,7 @@ import { elysia } from 'lib/index.ts';
 import { decodeBase32 } from 'lib/totp/base32.ts';
 import { hotp, stepFor } from 'lib/totp/code.ts';
 import epochTime from 'lib/helpers/epoch_time.ts';
+import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 
 const PASSWORD = 'correct horse battery';
 
@@ -94,11 +95,13 @@ describe('bringing existing accounts under the requirement (US4)', () => {
 		await bootstrap(import.meta.url, { config: 'totp' });
 		resetAdminMemoryStores();
 		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'Migrating',
 			totpRequired: false
 		});
 		bucketId = bucket._id;
 		const project = await getProjectStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'Migrating',
 			slug: `migrate-${Math.random()}`
 		});

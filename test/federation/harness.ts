@@ -5,6 +5,7 @@ import { elysia } from 'lib/index.js';
 import { TestAdapter } from 'test/models.js';
 import type { FederationProvider } from 'lib/federation/types.js';
 import type { idpStub } from './idp_stub.js';
+import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 
 /*
  * Shared scaffolding for the federation suites. Extracted when the second spec arrived rather than copied,
@@ -41,10 +42,12 @@ export async function seedBucket(
 	fields: Record<string, unknown>
 ): Promise<string> {
 	const bucket = await getBucketStore().create({
+		ownerGroupId: UNASSIGNED_GROUP_ID,
 		name: `bucket-${clientId}`,
 		...fields
 	});
 	const project = await getProjectStore().create({
+		ownerGroupId: UNASSIGNED_GROUP_ID,
 		name: `project-${clientId}`,
 		slug: `${clientId}-${Math.random()}`
 	});

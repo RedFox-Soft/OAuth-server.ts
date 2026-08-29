@@ -25,6 +25,7 @@ import {
 } from './harness.ts';
 import { AuthorizationRequest } from '../AuthorizationRequest.ts';
 import { agent, getHeader } from '../test_helper.ts';
+import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 
 /*
  * A bucket that only accepts federated sign-in.
@@ -216,7 +217,10 @@ describe('a bucket that only accepts federated sign-in', () => {
 	});
 
 	it('reads back password login as available for a bucket stored without the field', async () => {
-		const bucket = await getBucketStore().create({ name: 'legacy' });
+		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: 'legacy'
+		});
 		// The store defaults it on read as well as on create, because `undefined` is falsy and would have
 		// closed the password door on every bucket that predates the field.
 		expect(bucket.passwordLogin).toBe(true);

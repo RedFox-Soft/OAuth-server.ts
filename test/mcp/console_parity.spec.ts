@@ -11,7 +11,11 @@ import {
 	getBucketStore,
 	adminSessionStore
 } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import {
+	ADMIN_BUCKET_ID,
+	ADMIN_SESSION_COOKIE,
+	UNASSIGNED_GROUP_ID
+} from 'lib/admin/consts.ts';
 import {
 	ADMIN_MCP_CLIENT_ID,
 	MCP_RESOURCE,
@@ -19,6 +23,7 @@ import {
 } from 'lib/mcp/consts.ts';
 import { mcpCatalogue, pathArgName } from 'lib/mcp/catalogue.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
+import { sessionFor, personalGroupId } from '../admin_session.ts';
 
 /*
  * SC-002 / FR-025: an operator reading the agent's answer and the console side by side sees the same
@@ -73,13 +78,7 @@ async function principal() {
 	});
 	at.setAudience(MCP_RESOURCE);
 	const token = (await at.save()) as unknown as string;
-	const session = await adminSessionStore.create({
-		userId: user._id,
-		bucketId: ADMIN_BUCKET_ID,
-		tokens: {},
-		ttlSeconds: 60,
-		absoluteTtlSeconds: 3600
-	});
+	const session = await sessionFor(user);
 	await rpc(
 		{
 			jsonrpc: '2.0',
@@ -135,9 +134,12 @@ describe('agent answers match the console, field for field', () => {
 		const project = await getProjectStore().create({
 			name: 'Parity',
 			slug: `par-${Math.floor(Math.random() * 1e6)}`,
-			managedBy: [user._id]
+			ownerGroupId: await personalGroupId(user._id)
 		});
-		const bucket = await getBucketStore().create({ name: 'Parity bucket' });
+		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: 'Parity bucket'
+		});
 		const created = await rpc(
 			{
 				jsonrpc: '2.0',
@@ -257,19 +259,13 @@ describe('agent answers match the console, field for field', () => {
 		});
 		at.setAudience(MCP_RESOURCE);
 		const token = (await at.save()) as unknown as string;
-		const session = await adminSessionStore.create({
-			userId: user._id,
-			bucketId: ADMIN_BUCKET_ID,
-			tokens: {},
-			ttlSeconds: 60,
-			absoluteTtlSeconds: 3600
-		});
+		const session = await sessionFor(user);
 		const cookie = `${ADMIN_SESSION_COOKIE}=${session._id}`;
 
 		const theirs = await getProjectStore().create({
 			name: 'Not theirs',
 			slug: `nt-${Math.floor(Math.random() * 1e6)}`,
-			managedBy: []
+			ownerGroupId: UNASSIGNED_GROUP_ID
 		});
 
 		const httpRes = await elysia.handle(

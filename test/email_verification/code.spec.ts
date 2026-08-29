@@ -13,6 +13,7 @@ import {
 	lastEmail,
 	extractCode
 } from '../mail_capture.ts';
+import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 
 const CLIENT_ID = 'verify-code-app';
 const PASSWORD = 'correct horse battery';
@@ -53,12 +54,14 @@ describe('email verification — code method', () => {
 		await bootstrap(import.meta.url, { config: 'code' });
 		resetAdminMemoryStores();
 		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'Verify Code Bucket',
 			emailVerificationRequired: true,
 			verificationMethod: 'code'
 		});
 		bucketId = bucket._id;
 		const project = await getProjectStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'Verify Code',
 			slug: `verify-code-${Math.random()}`
 		});

@@ -20,7 +20,11 @@ import {
 	extractResetUrl
 } from '../mail_capture.ts';
 import { adminAuditStore } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, ADMIN_CLIENT_ID } from 'lib/admin/consts.ts';
+import {
+	ADMIN_BUCKET_ID,
+	ADMIN_CLIENT_ID,
+	UNASSIGNED_GROUP_ID
+} from 'lib/admin/consts.ts';
 import { REQUEST_COOLDOWN_SECONDS } from 'lib/password_reset/consts.ts';
 import { throttleKey as throttleKeyFor } from 'lib/login_throttle/throttle.ts';
 import { elysia } from 'lib/index.ts';
@@ -157,9 +161,13 @@ beforeAll(async () => {
 	resetAdminMemoryStores();
 	// A dedicated bucket reached by CLIENT_ID through a project, so these specs never touch the shared
 	// 'redfox' bucket that the second client falls through to.
-	const bucket = await getBucketStore().create({ name: 'Reset Bucket' });
+	const bucket = await getBucketStore().create({
+		ownerGroupId: UNASSIGNED_GROUP_ID,
+		name: 'Reset Bucket'
+	});
 	bucketId = bucket._id;
 	const project = await getProjectStore().create({
+		ownerGroupId: UNASSIGNED_GROUP_ID,
 		name: 'Reset',
 		slug: `reset-${Math.random()}`
 	});
@@ -169,11 +177,13 @@ beforeAll(async () => {
 	});
 
 	const other = await getBucketStore().create({
+		ownerGroupId: UNASSIGNED_GROUP_ID,
 		name: 'Reset Other Bucket',
 		emailVerificationRequired: true
 	});
 	otherBucketId = other._id;
 	const otherProject = await getProjectStore().create({
+		ownerGroupId: UNASSIGNED_GROUP_ID,
 		name: 'Reset Other',
 		slug: `reset-other-${Math.random()}`
 	});

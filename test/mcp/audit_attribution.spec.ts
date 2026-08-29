@@ -17,6 +17,7 @@ import {
 	MCP_ROUTE
 } from 'lib/mcp/consts.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
+import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 
 /*
  * Agent attribution in the audit trail.
@@ -90,6 +91,7 @@ async function cookieFor(userId: string) {
 	const s = await adminSessionStore.create({
 		userId,
 		bucketId: ADMIN_BUCKET_ID,
+		activeGroupId: UNASSIGNED_GROUP_ID,
 		tokens: {},
 		ttlSeconds: 60,
 		absoluteTtlSeconds: 3600

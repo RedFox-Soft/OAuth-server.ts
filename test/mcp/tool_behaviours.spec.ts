@@ -11,7 +11,7 @@ import {
 	adminAuditStore,
 	resetAdminMemoryStores
 } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID } from 'lib/admin/consts.ts';
+import { ADMIN_BUCKET_ID, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import {
 	ADMIN_MCP_CLIENT_ID,
 	MCP_RESOURCE,
@@ -132,7 +132,7 @@ describe('individual tool behaviours', () => {
 		const project = await getProjectStore().create({
 			name: 'Beh',
 			slug: `beh-${Math.floor(Math.random() * 1e6)}`,
-			managedBy: []
+			ownerGroupId: UNASSIGNED_GROUP_ID
 		});
 		const created = await rpc(
 			call('client_create', {
@@ -172,7 +172,7 @@ describe('individual tool behaviours', () => {
 		const project = await getProjectStore().create({
 			name: 'Rot',
 			slug: `rot-${Math.floor(Math.random() * 1e6)}`,
-			managedBy: []
+			ownerGroupId: UNASSIGNED_GROUP_ID
 		});
 		const created = await rpc(
 			call('client_create', {

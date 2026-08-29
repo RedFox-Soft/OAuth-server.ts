@@ -1,7 +1,11 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { resolveBucketForClient } from 'lib/admin/auth/resolveBucket.ts';
 import { getProjectStore, resetAdminMemoryStores } from 'lib/adapters/index.ts';
-import { ADMIN_CLIENT_ID, ADMIN_BUCKET_ID } from 'lib/admin/consts.ts';
+import {
+	ADMIN_CLIENT_ID,
+	ADMIN_BUCKET_ID,
+	UNASSIGNED_GROUP_ID
+} from 'lib/admin/consts.ts';
 
 describe('resolveBucketForClient', () => {
 	beforeEach(() => {
@@ -14,6 +18,7 @@ describe('resolveBucketForClient', () => {
 
 	it('routes an assigned client to its project bucket', async () => {
 		await getProjectStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'P',
 			slug: `p-${Math.random()}`,
 			bucketId: 'devs',

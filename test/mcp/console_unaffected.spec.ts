@@ -10,8 +10,13 @@ import {
 	adminSessionStore,
 	adminAuditStore
 } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import {
+	ADMIN_BUCKET_ID,
+	ADMIN_SESSION_COOKIE,
+	UNASSIGNED_GROUP_ID
+} from 'lib/admin/consts.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
+import { sessionFor } from '../admin_session.ts';
 
 /*
  * FR-036: the console keeps both container deletions in full, and nothing about the agent surface
@@ -31,13 +36,7 @@ async function cookieFor(roles: string[]) {
 		'hash',
 		roles
 	);
-	const s = await adminSessionStore.create({
-		userId: user._id,
-		bucketId: ADMIN_BUCKET_ID,
-		tokens: {},
-		ttlSeconds: 60,
-		absoluteTtlSeconds: 3600
-	});
+	const s = await sessionFor(user);
 	return { cookie: `${ADMIN_SESSION_COOKIE}=${s._id}`, user };
 }
 
@@ -81,7 +80,7 @@ describe.each([
 		const project = await getProjectStore().create({
 			name: 'Deletable',
 			slug: slug(),
-			managedBy: []
+			ownerGroupId: UNASSIGNED_GROUP_ID
 		});
 
 		const res = await admin(`/admin/api/projects/${project._id}`, {
@@ -115,7 +114,7 @@ describe.each([
 		const project = await getProjectStore().create({
 			name: 'Populated',
 			slug: slug(),
-			managedBy: []
+			ownerGroupId: UNASSIGNED_GROUP_ID
 		});
 		const created = await admin(`/admin/api/projects/${project._id}/clients`, {
 			method: 'POST',
@@ -154,7 +153,9 @@ describe.each([
 		expect(me.email).toBe(user.email);
 		expect(me.roles).toEqual(['super_admin']);
 		expect(me.bucketId).toBe(ADMIN_BUCKET_ID);
-		expect(me.managedProjectIds).toBeArray();
+		// `managedProjectIds` was replaced by group memberships when ownership moved to groups.
+		expect(me.memberships).toBeArray();
+		expect(me.activeGroupId).toBeString();
 		// The agent marker must be absent for a console session, or every audit entry it writes would
 		// claim an agent was involved.
 		expect(me.viaClientId).toBeUndefined();

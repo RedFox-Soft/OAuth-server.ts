@@ -125,20 +125,26 @@ RFC 9728 metadata is **path-aware**: a resource at `/mcp` publishes at
 
 ## What agents may not do
 
-Deleting a project and deleting a user bucket are withheld — not confirmation-gated, absent. They are
-the only operations that destroy a container with nothing left afterwards to inspect. They are not
+Deleting a project, a user bucket, or a **group** is withheld — not confirmation-gated, absent. These
+are the operations that destroy a container with nothing left afterwards to inspect; a group joined
+them when ownership moved to groups ([[group-ownership]]), and for a sharper version of the same
+reason — destroying one takes with it the only thing that granted anyone access to what it held.
+Widening the project-administrator role deliberately did not widen this list. They are not
 registered as refusing tools either, because a registered tool appears in `tools/list` however it
 behaves; the server's `instructions` carry the explanation, read from the exclusion table so the two
 cannot disagree.
 
 The table distinguishes two kinds of absence, and the distinction is what makes that claim true.
 `withheld` entries are operations an agent could perform and an operator has decided it may not;
-`inapplicable` ones have no meaning for an agent at all — there is no browser session to end, and nobody
-to authorize first-run setup. Only the `withheld` ones reach the instructions, and they reach them by
+`inapplicable` ones have no meaning for an agent at all — there is no browser session to end, nobody to
+authorize first-run setup, and no agent principal to accept a group invitation as, since acceptance is
+a person following a link in their own mail. Only the `withheld` ones reach the instructions, and they reach them by
 being filtered out of the table rather than named a second time. Naming them literally is the bug this
 replaced: the list read `['project_delete', 'bucket_delete']` directly beneath a comment claiming it
 could not disagree with the table, so a third withholding would have been refused correctly when
-guessed and silently missing from the announcement that exists so an agent need not guess.
+guessed and silently missing from the announcement that exists so an agent need not guess. That third
+withholding has since arrived — `group_delete` — and cost only a table row, which is the arrangement
+working as intended.
 
 The other eleven destructive operations take two calls: describe, then confirm. The confirmation binds
 five ways — tool, target, arguments hash, administrator, agent — and each is a real case. Arguments,
@@ -182,3 +188,4 @@ the server does not serve, and there is no set to vary.
 - [[pkce-verifier-length]] — the token-endpoint bound that stopped a real MCP client signing in, and surfaced here as this page's own opaque 401.
 - [[loopback-redirect-port-matching]] — why this client's ephemeral callback port was refused before consent.
 - [[first-consent-grant-id]] — why approving consent for this client answered 401 until the grantId was resolved with tryFind.
+- [[group-ownership]] — the ownership model the group tools administer, and why `group_delete` joined the withheld list rather than the confirmation-gated one.

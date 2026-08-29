@@ -9,6 +9,7 @@ import {
 } from 'lib/adapters/index.ts';
 import { elysia } from 'lib/index.ts';
 import { sentEmails, resetSentEmails } from '../mail_capture.ts';
+import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 
 const PASSWORD = 'correct horse battery';
 
@@ -27,8 +28,13 @@ async function seedBucket(
 	clientId: string,
 	fields: Record<string, unknown>
 ): Promise<string> {
-	const bucket = await getBucketStore().create({ name, ...fields });
+	const bucket = await getBucketStore().create({
+		ownerGroupId: UNASSIGNED_GROUP_ID,
+		name,
+		...fields
+	});
 	const project = await getProjectStore().create({
+		ownerGroupId: UNASSIGNED_GROUP_ID,
 		name,
 		slug: `${clientId}-${Math.random()}`
 	});

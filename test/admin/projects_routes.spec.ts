@@ -13,9 +13,11 @@ import {
 import {
 	ADMIN_BUCKET_ID,
 	ADMIN_PROJECT_ID,
-	ADMIN_SESSION_COOKIE
+	ADMIN_SESSION_COOKIE,
+	UNASSIGNED_GROUP_ID
 } from 'lib/admin/consts.ts';
 import type { Project } from 'lib/adapters/types.ts';
+import { sessionFor, personalGroupId } from '../admin_session.ts';
 
 const app = new Elysia().use(resolveAdmin).use(projectRoutes);
 const client = treaty(app);
@@ -26,13 +28,7 @@ async function sessionCookieFor(roles: string[]) {
 		'hash',
 		roles
 	);
-	const s = await adminSessionStore.create({
-		userId: user._id,
-		bucketId: ADMIN_BUCKET_ID,
-		tokens: {},
-		ttlSeconds: 60,
-		absoluteTtlSeconds: 3600
-	});
+	const s = await sessionFor(user);
 	return { cookie: `${ADMIN_SESSION_COOKIE}=${s._id}`, userId: user._id };
 }
 
@@ -58,33 +54,50 @@ describe('projects API', () => {
 		expect(projects?.some((p) => p.slug === 'acme')).toBe(true);
 	});
 
-	it('project_admin sees only managed projects and cannot create', async () => {
+	/*
+	 * Rewritten for group ownership. It used to assert that a project_admin "cannot create" — the very
+	 * refusal this feature removes — and that they see projects a super_admin named them on. Both halves
+	 * now read the other way: they create their own, and see their own group's.
+	 */
+	it('project_admin creates into their own group and sees only that group', async () => {
 		const superSession = await sessionCookieFor(['super_admin']);
 		const pa = await sessionCookieFor(['project_admin']);
-		await client.admin.api.projects.post(
-			{ name: 'Mine', slug: 'mine', managedBy: [pa.userId] },
-			{ headers: { cookie: superSession.cookie } }
+
+		const mine = await client.admin.api.projects.post(
+			{ name: 'Mine', slug: 'mine' },
+			{ headers: { cookie: pa.cookie } }
 		);
-		await client.admin.api.projects.post(
-			{ name: 'Other', slug: 'other' },
-			{ headers: { cookie: superSession.cookie } }
+		expect(mine.status).toBe(201);
+		expect((mine.data as Project).ownerGroupId).toBe(
+			await personalGroupId(pa.userId)
 		);
+
+		// A project belonging to nobody's group: created by a super admin, whose active scope is empty.
+		await getProjectStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: 'Other',
+			slug: 'other'
+		});
+
 		const list = await client.admin.api.projects.get({
 			headers: { cookie: pa.cookie }
 		});
 		const projects = list.data as Project[] | undefined;
 		expect(projects?.map((p) => p.slug)).toEqual(['mine']);
-		const denied = await client.admin.api.projects.post(
-			{ name: 'X', slug: 'x' },
-			{ headers: { cookie: pa.cookie } }
+
+		// The super admin still sees both.
+		const all = await client.admin.api.projects.get({
+			headers: { cookie: superSession.cookie }
+		});
+		expect((all.data as Project[]).map((p) => p.slug).sort()).toContain(
+			'other'
 		);
-		expect(denied.status).toBe(403);
 	});
 
 	it('never lists the admin project, even for a manager of it', async () => {
 		const pa = await sessionCookieFor(['project_admin']);
 		await getProjectStore().update(ADMIN_PROJECT_ID, {
-			managedBy: [pa.userId]
+			ownerGroupId: await personalGroupId(pa.userId)
 		});
 		const list = await client.admin.api.projects.get({
 			headers: { cookie: pa.cookie }
@@ -109,25 +122,30 @@ describe('projects API', () => {
 		const proj = await getProjectStore().create({
 			name: 'PA Project',
 			slug: `pa-${Math.random()}`,
-			managedBy: [pa.userId]
+			ownerGroupId: await personalGroupId(pa.userId)
 		});
 		// Bucket managed by someone else — the project_admin must not attach it.
 		const bucket = await getBucketStore().create({
 			name: 'Foreign bucket',
-			managedBy: ['someone-else']
+			ownerGroupId: 'a-group-nobody-here-belongs-to'
 		});
 		const denied = await client.admin.api
 			.projects({ id: proj._id })
 			.bucket.put({ bucketId: bucket._id }, { headers: { cookie: pa.cookie } });
 		expect(denied.status).toBe(403);
-		// super_admin can assign any bucket.
-		const ok = await client.admin.api
+		/*
+		 * A super administrator is refused too, and for a different reason: a project and the bucket
+		 * backing it must belong to the same group. That is a coherence rule about the data, not a
+		 * statement about authority, so instance-wide power does not lift it — joining them would leave
+		 * this project's end-users administered by a group with no access to the project.
+		 */
+		const crossGroup = await client.admin.api
 			.projects({ id: proj._id })
 			.bucket.put(
 				{ bucketId: bucket._id },
 				{ headers: { cookie: superSession.cookie } }
 			);
-		expect(ok.status).toBe(200);
+		expect(crossGroup.status).toBe(409);
 	});
 
 	/*
@@ -169,6 +187,7 @@ describe('projects API', () => {
 		it('replaces the list on patch, and clears it with an empty array', async () => {
 			const { cookie } = await sessionCookieFor(['super_admin']);
 			const project = await getProjectStore().create({
+				ownerGroupId: UNASSIGNED_GROUP_ID,
 				name: 'Patch me',
 				slug: `patch-${Math.random().toString(36).slice(2)}`,
 				corsOrigins: ['https://old.example.com']
@@ -194,6 +213,7 @@ describe('projects API', () => {
 		it('leaves the list untouched when the key is omitted', async () => {
 			const { cookie } = await sessionCookieFor(['super_admin']);
 			const project = await getProjectStore().create({
+				ownerGroupId: UNASSIGNED_GROUP_ID,
 				name: 'Rename only',
 				slug: `rename-${Math.random().toString(36).slice(2)}`,
 				corsOrigins: ['https://keep.example.com']
@@ -237,6 +257,7 @@ describe('projects API', () => {
 		])('rejects %s (%s) and names the value', async (origin) => {
 			const { cookie } = await sessionCookieFor(['super_admin']);
 			const project = await getProjectStore().create({
+				ownerGroupId: UNASSIGNED_GROUP_ID,
 				name: 'Guarded',
 				slug: `guard-${Math.random().toString(36).slice(2)}`,
 				corsOrigins: ['https://kept.example.com']
@@ -260,6 +281,7 @@ describe('projects API', () => {
 		it('rejects the whole list when only one entry is invalid', async () => {
 			const { cookie } = await sessionCookieFor(['super_admin']);
 			const project = await getProjectStore().create({
+				ownerGroupId: UNASSIGNED_GROUP_ID,
 				name: 'Partial',
 				slug: `partial-${Math.random().toString(36).slice(2)}`
 			});
@@ -279,6 +301,7 @@ describe('projects API', () => {
 
 		it('refuses an unauthenticated caller', async () => {
 			const project = await getProjectStore().create({
+				ownerGroupId: UNASSIGNED_GROUP_ID,
 				name: 'Anon',
 				slug: `anon-${Math.random().toString(36).slice(2)}`
 			});
@@ -295,7 +318,7 @@ describe('projects API', () => {
 			const project = await getProjectStore().create({
 				name: 'Foreign',
 				slug: `foreign-${Math.random().toString(36).slice(2)}`,
-				managedBy: ['someone-else']
+				ownerGroupId: 'a-group-nobody-here-belongs-to'
 			});
 
 			const res = await client.admin.api
@@ -311,9 +334,9 @@ describe('projects API', () => {
 		it('lets a project_admin who manages the project set origins', async () => {
 			const pa = await sessionCookieFor(['project_admin']);
 			const project = await getProjectStore().create({
+				ownerGroupId: await personalGroupId(pa.userId),
 				name: 'Mine',
-				slug: `mine-${Math.random().toString(36).slice(2)}`,
-				managedBy: [pa.userId]
+				slug: `mine-${Math.random().toString(36).slice(2)}`
 			});
 
 			const res = await client.admin.api

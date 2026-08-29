@@ -159,5 +159,7 @@ repository's vocabulary, once.
 - [[cookie-path-scoping]] — why the sign-out cookie was cleared under the wrong path, and never removed.
 - [[feature-flag-gating]] — the other place a one-header or one-status difference was the whole
   fingerprint.
+- [[group-ownership]] — the session this establishes now also carries the console's active scope,
+  server-held because it sits on an authorization boundary.
 
 Verified against [[oauth-server-codebase]] as changed by `specs/017-admin-idtoken-verification`.

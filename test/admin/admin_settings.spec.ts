@@ -11,6 +11,7 @@ import {
 	getUserStore
 } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { sessionFor } from '../admin_session.ts';
 
 /*
  * `normalize: false` because that is how lib/index.ts constructs the real app, and this suite has an
@@ -32,13 +33,7 @@ async function sessionCookieFor(roles: string[]) {
 		'hash',
 		roles
 	);
-	const session = await adminSessionStore.create({
-		userId: user._id,
-		bucketId: ADMIN_BUCKET_ID,
-		tokens: {},
-		ttlSeconds: 60,
-		absoluteTtlSeconds: 3600
-	});
+	const session = await sessionFor(user);
 	return { cookie: `${ADMIN_SESSION_COOKIE}=${session._id}`, userId: user._id };
 }
 

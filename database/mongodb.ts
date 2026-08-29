@@ -1,8 +1,10 @@
 import { MongoClient, ServerApiVersion } from 'mongodb';
+import { planOwnershipMigration } from '../lib/admin/groups/migration.js';
 import {
 	FIXED_AREAS,
 	STORE_AREAS,
 	areaForBucket,
+	userAreaFor,
 	type IndexSpec,
 	type ModelAreaName,
 	type StorageArea
@@ -25,7 +27,8 @@ import { ISSUER } from '../lib/configs/env.js';
 import {
 	ADMIN_PROJECT_ID,
 	ADMIN_BUCKET_ID,
-	ADMIN_CLIENT_ID
+	ADMIN_CLIENT_ID,
+	UNASSIGNED_GROUP_ID
 } from '../lib/admin/consts.js';
 import { ADMIN_MCP_CLIENT_ID } from '../lib/mcp/consts.js';
 
@@ -161,12 +164,31 @@ if ((await jwks.countDocuments()) === 0) {
 // (lib/adapters/mongodb/mongoAdapter.ts): `{ _id, payload }`, with no `expiresAt`
 // since this client never expires.
 const seedNow = new Date();
+/*
+ * The holding group for containers no administrator managed. Seeded before the reserved project and
+ * bucket, which are given it as a formality: both sit outside the group model and every route touching
+ * them refuses before ownership is consulted. Mirrors lib/admin/seed.ts, which is the test-only seed.
+ */
+await db.collection(STORE_AREAS.groups).updateOne(
+	{ _id: UNASSIGNED_GROUP_ID },
+	{
+		$setOnInsert: {
+			name: 'Unassigned',
+			kind: 'system',
+			members: [],
+			needsReview: false,
+			createdAt: seedNow,
+			updatedAt: seedNow
+		}
+	},
+	{ upsert: true }
+);
 await db.collection(STORE_AREAS.userBuckets).updateOne(
 	{ _id: ADMIN_BUCKET_ID },
 	{
 		$setOnInsert: {
 			name: 'Administrators',
-			managedBy: [],
+			ownerGroupId: UNASSIGNED_GROUP_ID,
 			roles: ['super_admin', 'project_admin'],
 			// The reserved admin bucket keeps password login and accepts no providers — see
 			// lib/admin/seed.ts, which this mirrors. Changing one seed and not the other is how a seed
@@ -192,7 +214,7 @@ await db.collection(STORE_AREAS.userBuckets).updateOne(
 	{
 		$setOnInsert: {
 			name: 'Default users',
-			managedBy: [],
+			ownerGroupId: UNASSIGNED_GROUP_ID,
 			roles: [],
 			passwordLogin: true,
 			federation: [],
@@ -212,7 +234,7 @@ await db.collection(STORE_AREAS.projects).updateOne(
 			name: 'Administration',
 			slug: 'admin',
 			type: 'admin',
-			managedBy: [],
+			ownerGroupId: UNASSIGNED_GROUP_ID,
 			bucketId: ADMIN_BUCKET_ID,
 			clientIds: [ADMIN_CLIENT_ID, ADMIN_MCP_CLIENT_ID],
 			createdAt: seedNow,
@@ -342,6 +364,104 @@ for (const bucket of buckets) {
 		note: ` for bucket ${bucket._id}`
 	});
 	summary.bucketsProcessed += 1;
+}
+
+/*
+ * The ownership migration: `managedBy` to `ownerGroupId`.
+ *
+ * Idempotent, and only ever touches documents that still carry the old field, so a second `db:setup`
+ * run is a no-op rather than a reshuffle. The mapping rule itself lives in
+ * lib/admin/groups/migration.ts and is tested in the default suite - see the comment there for why
+ * identical manager sets, and not merely overlapping ones, are what share a group.
+ */
+const legacyProjects = await db
+	.collection(STORE_AREAS.projects)
+	.find({ managedBy: { $exists: true }, _id: { $ne: ADMIN_PROJECT_ID } })
+	.toArray();
+const legacyBuckets = await db
+	.collection(STORE_AREAS.userBuckets)
+	.find({ managedBy: { $exists: true }, _id: { $ne: ADMIN_BUCKET_ID } })
+	.toArray();
+
+if (legacyProjects.length > 0 || legacyBuckets.length > 0) {
+	/*
+	 * Personal groups first: rule 1 of the mapping sends a single-manager container to one, so they
+	 * have to exist before the plan can be applied.
+	 */
+	const admins = await db
+		.collection(userAreaFor(ADMIN_BUCKET_ID))
+		.find({})
+		.toArray();
+	const personalGroupIdFor = new Map<string, string>();
+	for (const account of admins) {
+		const existing = await db
+			.collection(STORE_AREAS.groups)
+			.findOne({ kind: 'personal', 'members.userId': account._id });
+		if (existing) {
+			personalGroupIdFor.set(String(account._id), String(existing._id));
+			continue;
+		}
+		const id = `personal-${String(account._id)}`;
+		await db.collection(STORE_AREAS.groups).insertOne({
+			_id: id,
+			name: String(account.email ?? account._id),
+			kind: 'personal',
+			members: [{ userId: String(account._id), role: 'owner' }],
+			needsReview: false,
+			createdAt: seedNow,
+			updatedAt: seedNow
+		});
+		personalGroupIdFor.set(String(account._id), id);
+	}
+
+	const containers = [...legacyProjects, ...legacyBuckets].map((doc) => ({
+		_id: String(doc._id),
+		managedBy: (doc.managedBy as string[] | undefined) ?? []
+	}));
+	const plan = planOwnershipMigration(containers, personalGroupIdFor);
+
+	for (const group of plan.groupsToCreate) {
+		await db.collection(STORE_AREAS.groups).updateOne(
+			{ _id: group.id },
+			{
+				$setOnInsert: {
+					name: group.name,
+					kind: group.kind,
+					members: group.members,
+					needsReview: group.needsReview,
+					createdAt: seedNow,
+					updatedAt: seedNow
+				}
+			},
+			{ upsert: true }
+		);
+	}
+
+	/*
+	 * The `$unset` rides in the same update as the `$set`, so a container never exists carrying both
+	 * fields. Two fields both claiming to say who may reach a container is the shape that disagrees
+	 * after the first edit - and leaving one behind is the shim Principle VII forbids.
+	 */
+	for (const area of [STORE_AREAS.projects, STORE_AREAS.userBuckets]) {
+		const docs = area === STORE_AREAS.projects ? legacyProjects : legacyBuckets;
+		for (const doc of docs) {
+			const ownerGroupId = plan.assignments.get(String(doc._id));
+			if (!ownerGroupId) continue;
+			await db.collection(area).updateOne(
+				{ _id: doc._id },
+				{
+					$set: { ownerGroupId, updatedAt: seedNow },
+					$unset: { managedBy: '' }
+				}
+			);
+		}
+	}
+
+	console.log(
+		`
+ownership migration: ${containers.length} container(s) moved to groups, ` +
+			`${plan.groupsToCreate.length} group(s) generated for multi-manager containers`
+	);
 }
 
 console.log(

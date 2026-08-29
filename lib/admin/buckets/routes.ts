@@ -6,7 +6,7 @@ import {
 } from '../../adapters/index.js';
 import {
 	assertAuth,
-	assertRole,
+	assertActiveGroup,
 	assertBucketAccess,
 	AdminError,
 	adminErrorBody,
@@ -75,16 +75,35 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 	.get('/admin/api/buckets', async ({ admin }) => {
 		const ctx = assertAuth(admin as AdminContext | null);
 		const store = getBucketStore();
-		const all = ctx.roles.includes('super_admin')
-			? await store.list()
-			: await store.listByManager(ctx.userId);
+		/*
+		 * Listing has to agree with access, or the console shows an administrator fewer buckets than it
+		 * will let them open. `assertBucketUserAccess` admits a bucket backing a project the caller's
+		 * group owns, so the list has to admit it too — it did not before this feature, and a bucket you
+		 * could administer but never see was the result.
+		 */
+		let all;
+		if (ctx.roles.includes('super_admin')) {
+			all = await store.list();
+		} else {
+			const owned = await store.listByGroup(ctx.activeGroupId);
+			const projects = await getProjectStore().listByGroup(ctx.activeGroupId);
+			const backing = projects
+				.map((p) => p.bucketId)
+				.filter((id): id is string => id !== null);
+			const missing = backing.filter((id) => !owned.some((b) => b._id === id));
+			const extra = (
+				await Promise.all(missing.map((id) => store.find(id)))
+			).filter((b): b is NonNullable<typeof b> => b !== null);
+			all = [...owned, ...extra];
+		}
 		return all.filter((b) => b._id !== ADMIN_BUCKET_ID).map(presentBucket);
 	})
 	.post(
 		'/admin/api/buckets',
 		async ({ admin, body, set }) => {
 			const ctx = assertAuth(admin as AdminContext | null);
-			assertRole(ctx, 'super_admin');
+			// No role gate: the authority is membership of the group the bucket will belong to.
+			const ownerGroupId = assertActiveGroup(ctx);
 			/*
 			 * A new bucket cannot be created unreachable. Providers are added through their own routes, so at
 			 * creation there are none — which makes `passwordLogin: false` here always a lockout.
@@ -96,12 +115,12 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			// The id is allocated here, not by the store, so the audit entry can name the bucket that is
 			// about to exist — audit-first has nothing to point at otherwise.
 			const bucketId = nanoid();
-			await recordAdminAudit(ctx, 'bucket.create', bucketId);
+			await recordAdminAudit(ctx, 'bucket.create', bucketId, { ownerGroupId });
 			const bucket = await getBucketStore().create({
 				_id: bucketId,
 				name: body.name,
 				roles: body.roles ?? [],
-				managedBy: body.managedBy ?? [ctx.userId],
+				ownerGroupId,
 				passwordLogin: body.passwordLogin,
 				registrationOpen: body.registrationOpen,
 				emailVerificationRequired: body.emailVerificationRequired,
@@ -124,9 +143,6 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 		async ({ admin, params, body }) => {
 			const ctx = assertAuth(admin as AdminContext | null);
 			const bucket = await loadBucketForEdit(ctx, params.id);
-			if (body.managedBy !== undefined) {
-				assertRole(ctx, 'super_admin');
-			}
 			/*
 			 * Checked before the audit entry and the write: an entry describing a change a 409 refused would
 			 * state that an operator closed a bucket's password door when they did not. The provider routes
@@ -139,7 +155,8 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			 * — while still being an exercised privilege over who can administer a bucket's users.
 			 */
 			await recordAdminAudit(ctx, 'bucket.update', params.id, {
-				attributes: Object.keys(body)
+				attributes: Object.keys(body),
+				ownerGroupId: bucket.ownerGroupId
 			});
 			const updated = await getBucketStore().update(params.id, body);
 			if (!updated) throw new AdminError(404, 'bucket not found');

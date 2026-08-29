@@ -2,14 +2,16 @@ import { Elysia } from 'elysia';
 import {
 	adminSessionStore,
 	getUserStore,
-	getProjectStore
+	getProjectStore,
+	getGroupStore
 } from '../../adapters/index.js';
-import type { Project, UserBucket } from '../../adapters/types.js';
+import type { Group, Project, UserBucket } from '../../adapters/types.js';
 import { ApplicationConfig } from '../../configs/application.js';
 import {
 	ADMIN_BUCKET_ID,
 	ADMIN_SESSION_COOKIE,
-	ADMIN_SESSION_TTL_SECONDS
+	ADMIN_SESSION_TTL_SECONDS,
+	UNASSIGNED_GROUP_ID
 } from '../consts.js';
 
 export interface AdminContext {
@@ -17,7 +19,21 @@ export interface AdminContext {
 	email: string;
 	roles: string[];
 	bucketId: string;
-	managedProjectIds: string[];
+	/*
+	 * Every group this administrator belongs to, and how. Replaces `managedProjectIds`, which named
+	 * containers rather than the thing that grants access to them — and so could not answer "may this
+	 * person add somebody to this tenant", which is not a question about any one container.
+	 *
+	 * Re-read on every request rather than cached at sign-in, so removing somebody from a group takes
+	 * effect on their next call rather than at their next sign-in.
+	 */
+	memberships: { groupId: string; role: 'owner' | 'member' }[];
+	/*
+	 * The group this request acts in: what is listed, and where a new container is created. Resolved
+	 * from the session and validated against `memberships` above, so it always names a group the caller
+	 * still belongs to.
+	 */
+	activeGroupId: string;
 	/*
 	 * Set only when the request arrived through the MCP control plane rather than the console, and
 	 * carries the agent's OAuth client id. Read by `recordAdminAudit`, which records it alongside the
@@ -98,12 +114,66 @@ export function assertRole(admin: AdminContext, role: string): void {
 	}
 }
 
+/*
+ * Does the caller belong to this group at all? The single question every container access resolves to
+ * — a container is reached through the group that owns it, never by being named on the container.
+ *
+ * A super administrator bypasses, as they did before: their authority is instance-wide and is what
+ * makes support and recovery possible for a group whose last owner has gone.
+ */
+export function assertGroupMember(admin: AdminContext, groupId: string): void {
+	if (admin.roles.includes('super_admin')) return;
+	if (!admin.memberships.some((m) => m.groupId === groupId)) {
+		throw new AdminError(403, 'no access to this group');
+	}
+}
+
+/*
+ * Owner-only operations: who is in the group, and whether the group may be deleted. Deliberately
+ * refuses by *membership kind* rather than by instance role — the same administrator owns one group
+ * and is a plain member of another, so this can never be expressed as a role on the account.
+ */
+export function assertGroupOwner(admin: AdminContext, groupId: string): void {
+	if (admin.roles.includes('super_admin')) return;
+	const membership = admin.memberships.find((m) => m.groupId === groupId);
+	if (!membership || membership.role !== 'owner') {
+		throw new AdminError(403, 'group owner required');
+	}
+}
+
+/*
+ * The group a creation lands in.
+ *
+ * A super administrator belongs to no group by virtue of the role, so they arrive with an empty active
+ * scope. Rather than refuse them, their containers go to the reserved `unassigned` group — which is
+ * exactly what `managedBy: []` already meant: reachable by super administrators and nobody else. That
+ * keeps instance-level provisioning working as it always did, and keeps the migration's rule for an
+ * empty manager list and this rule the same rule.
+ *
+ * A project administrator always has one, because a personal group is created with the account. The
+ * refusal below is therefore a broken deployment rather than a caller's mistake, and says so instead
+ * of silently dropping the container somewhere.
+ */
+export function assertActiveGroup(admin: AdminContext): string {
+	if (admin.activeGroupId) return admin.activeGroupId;
+	if (admin.roles.includes('super_admin')) return UNASSIGNED_GROUP_ID;
+	throw new AdminError(
+		500,
+		'no active group: this administrator has no personal group'
+	);
+}
+
 export function assertProjectAccess(
 	admin: AdminContext,
 	project: Project
 ): void {
 	if (admin.roles.includes('super_admin')) return;
-	if (project.type === 'admin' || !project.managedBy.includes(admin.userId)) {
+	// Checked before ownership: the reserved admin project is outside the group model entirely, so a
+	// membership can never be the thing that grants access to it.
+	if (project.type === 'admin') {
+		throw new AdminError(403, 'no access to this project');
+	}
+	if (!admin.memberships.some((m) => m.groupId === project.ownerGroupId)) {
 		throw new AdminError(403, 'no access to this project');
 	}
 }
@@ -113,47 +183,88 @@ export function assertBucketAccess(
 	bucket: UserBucket
 ): void {
 	if (admin.roles.includes('super_admin')) return;
-	if (!bucket.managedBy.includes(admin.userId)) {
+	if (!admin.memberships.some((m) => m.groupId === bucket.ownerGroupId)) {
 		throw new AdminError(403, 'no access to this bucket');
 	}
 }
 
-// Broader than assertBucketAccess: also grants access when the caller manages a
-// project whose bucketId is this bucket (so a project_admin can manage the users of
-// a bucket backing their project without owning the bucket). Used for reading a
-// bucket's detail and managing its end-users — NOT for editing the bucket entity.
+/*
+ * Broader than assertBucketAccess: also grants access when the caller's group owns a project whose
+ * bucketId is this bucket, so an administrator can manage the end-users of a bucket backing their
+ * project without their group owning the bucket itself. Used for reading a bucket's detail and
+ * managing its end-users — NOT for editing the bucket entity.
+ *
+ * The distinction survives the move to groups unchanged; only what "the caller's" means has changed.
+ */
 export async function assertBucketUserAccess(
 	admin: AdminContext,
 	bucket: UserBucket
 ): Promise<void> {
 	if (admin.roles.includes('super_admin')) return;
-	if (bucket.managedBy.includes(admin.userId)) return;
-	const managed = await getProjectStore().listByManager(admin.userId);
-	if (managed.some((p) => p.bucketId === bucket._id)) return;
+	if (admin.memberships.some((m) => m.groupId === bucket.ownerGroupId)) return;
+	const store = getProjectStore();
+	for (const membership of admin.memberships) {
+		const projects = await store.listByGroup(membership.groupId);
+		if (projects.some((p) => p.bucketId === bucket._id)) return;
+	}
 	throw new AdminError(403, 'no access to this bucket');
 }
 
 /*
- * Builds the context from an account, re-reading roles and managed projects. Shared by both credential
- * types below so neither can resolve a different authority from the same account — the whole point of
- * the MCP surface being an additional front door rather than a second, more permissive one.
+ * Builds the context from an account, re-reading roles and group memberships. Shared by both
+ * credential types below so neither can resolve a different authority from the same account — the
+ * whole point of the MCP surface being an additional front door rather than a second, more permissive
+ * one.
+ *
+ * One indexed lookup, as before: `listByMember` replaces the `listByManager` project scan it used to
+ * run here, so the per-request cost is unchanged.
  */
 async function contextFor(
 	userId: string,
 	bucketId: string,
-	viaClientId?: string
+	viaClientId?: string,
+	sessionGroupId?: string
 ): Promise<AdminContext | null> {
 	const user = await getUserStore(bucketId).find(userId);
 	if (!user || !user.active) return null;
-	const managed = await getProjectStore().listByManager(user._id);
+	const groups = await getGroupStore().listByMember(user._id);
+	const memberships = groups.map((g) => ({
+		groupId: g._id,
+		role: (g.members.find((m) => m.userId === user._id)?.role ?? 'member') as
+			'owner' | 'member'
+	}));
 	return {
 		userId: user._id,
 		email: user.email,
 		roles: user.roles,
 		bucketId,
-		managedProjectIds: managed.map((p) => p._id),
+		memberships,
+		activeGroupId: resolveActiveGroup(memberships, groups, sessionGroupId),
 		...(viaClientId ? { viaClientId } : {})
 	};
+}
+
+/*
+ * Which group this request acts in.
+ *
+ * The session's choice wins only while the caller still belongs to it. When it does not — removed from
+ * the group a moment ago, or an agent that named nothing — the answer is the personal group rather
+ * than an error: an administrator whose membership was revoked mid-session should find their console
+ * showing their own work, not a broken scope they cannot navigate out of.
+ *
+ * The final fallback covers a super administrator, who belongs to no group by virtue of the role and
+ * so has no personal group in `groups` unless they are a member of one.
+ */
+function resolveActiveGroup(
+	memberships: { groupId: string; role: 'owner' | 'member' }[],
+	groups: Group[],
+	sessionGroupId?: string
+): string {
+	if (sessionGroupId && memberships.some((m) => m.groupId === sessionGroupId)) {
+		return sessionGroupId;
+	}
+	const personal = groups.find((g) => g.kind === 'personal');
+	return personal?._id ?? memberships[0]?.groupId ?? '';
 }
 
 export const resolveAdmin = new Elysia({ name: 'admin-resolve' }).derive(
@@ -167,7 +278,12 @@ export const resolveAdmin = new Elysia({ name: 'admin-resolve' }).derive(
 		if (sessionId) {
 			const session = await adminSessionStore.find(sessionId);
 			if (!session) return { admin: null };
-			const admin = await contextFor(session.userId, session.bucketId);
+			const admin = await contextFor(
+				session.userId,
+				session.bucketId,
+				undefined,
+				session.activeGroupId
+			);
 			if (!admin) return { admin: null };
 			await adminSessionStore.touch(sessionId, ADMIN_SESSION_TTL_SECONDS);
 			return { admin };

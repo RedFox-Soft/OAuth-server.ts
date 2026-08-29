@@ -12,7 +12,12 @@ import {
 	getProjectStore,
 	getBucketStore
 } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import {
+	ADMIN_BUCKET_ID,
+	ADMIN_SESSION_COOKIE,
+	UNASSIGNED_GROUP_ID
+} from 'lib/admin/consts.ts';
+import { sessionFor } from '../admin_session.ts';
 
 /*
  * What an operator sees when the trail itself refuses a write, and what the deployment does about it.
@@ -39,13 +44,7 @@ async function superCookie() {
 		'hash',
 		['super_admin']
 	);
-	const session = await adminSessionStore.create({
-		userId: user._id,
-		bucketId: ADMIN_BUCKET_ID,
-		tokens: {},
-		ttlSeconds: 60,
-		absoluteTtlSeconds: 3600
-	});
+	const session = await sessionFor(user);
 	return `${ADMIN_SESSION_COOKIE}=${session._id}`;
 }
 
@@ -110,6 +109,7 @@ describe('admin audit write failure', () => {
 	it('refuses an update and changes nothing', async () => {
 		const cookie = await superCookie();
 		const project = await getProjectStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'Original',
 			slug: unique('p')
 		});
@@ -124,7 +124,10 @@ describe('admin audit write failure', () => {
 
 	it('refuses a deletion and deletes nothing', async () => {
 		const cookie = await superCookie();
-		const bucket = await getBucketStore().create({ name: 'Survives' });
+		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: 'Survives'
+		});
 
 		const res = await client.admin.api
 			.buckets({ id: bucket._id })

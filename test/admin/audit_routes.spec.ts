@@ -11,6 +11,7 @@ import {
 } from 'lib/adapters/index.ts';
 import type { AdminAuditEntry } from 'lib/adapters/types.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { sessionFor } from '../admin_session.ts';
 
 /*
  * The read surface — specs/016-admin-audit-completeness/contracts/admin-audit-api.md.
@@ -42,13 +43,7 @@ async function cookieFor(roles: string[]) {
 		'hash',
 		roles
 	);
-	const session = await adminSessionStore.create({
-		userId: user._id,
-		bucketId: ADMIN_BUCKET_ID,
-		tokens: {},
-		ttlSeconds: 60,
-		absoluteTtlSeconds: 3600
-	});
+	const session = await sessionFor(user);
 	return {
 		cookie: `${ADMIN_SESSION_COOKIE}=${session._id}`,
 		userId: user._id,
@@ -95,7 +90,12 @@ describe('GET /admin/api/audit', () => {
 			expect(JSON.stringify(res.error?.value ?? res.data)).not.toContain(scope);
 		});
 
-		it('refuses an administrator who is not a super administrator', async () => {
+		/*
+		 * Was 'refuses an administrator who is not a super administrator'. A project administrator now
+		 * reads their own groups' history — but sees nothing belonging to anyone else, which is the
+		 * property that actually mattered in the old test and is asserted directly here.
+		 */
+		it('serves a project administrator only their own groups’ entries', async () => {
 			const scope = unique('scope');
 			await seed(scope);
 			const { cookie } = await cookieFor(['project_admin']);
@@ -105,8 +105,9 @@ describe('GET /admin/api/audit', () => {
 				headers: { cookie }
 			});
 
-			expect(res.status).toBe(403);
-			expect(JSON.stringify(res.error?.value ?? res.data)).not.toContain(scope);
+			expect(res.status).toBe(200);
+			// The seeded entry belongs to no group of theirs, so it must not appear.
+			expect(JSON.stringify(res.data)).not.toContain(scope);
 		});
 
 		it('serves a super administrator', async () => {

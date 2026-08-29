@@ -9,6 +9,7 @@ import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { adminSessionStore, getUserStore } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { flushForTest, resetQueue } from 'lib/error_store/queue.ts';
+import { sessionFor } from '../admin_session.ts';
 
 /*
  * US3 — matching a caller's complaint to a record.
@@ -33,13 +34,7 @@ async function superCookie() {
 		'hash',
 		['super_admin']
 	);
-	const session = await adminSessionStore.create({
-		userId: user._id,
-		bucketId: ADMIN_BUCKET_ID,
-		tokens: {},
-		ttlSeconds: 60,
-		absoluteTtlSeconds: 3600
-	});
+	const session = await sessionFor(user);
 	return `${ADMIN_SESSION_COOKIE}=${session._id}`;
 }
 
@@ -119,13 +114,7 @@ describe('error reference lookup', () => {
 			'hash',
 			['project_admin']
 		);
-		const session = await adminSessionStore.create({
-			userId: user._id,
-			bucketId: ADMIN_BUCKET_ID,
-			tokens: {},
-			ttlSeconds: 60,
-			absoluteTtlSeconds: 3600
-		});
+		const session = await sessionFor(user);
 		const refused = await lookup(
 			'err_AAAAAAAAAAAAAAAA',
 			`${ADMIN_SESSION_COOKIE}=${session._id}`

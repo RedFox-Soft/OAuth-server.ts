@@ -12,10 +12,15 @@ import {
 	getUserStore,
 	resetAdminMemoryStores
 } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import {
+	ADMIN_BUCKET_ID,
+	ADMIN_SESSION_COOKIE,
+	UNASSIGNED_GROUP_ID
+} from 'lib/admin/consts.ts';
 import { SECRET_MASK } from 'lib/federation/consts.ts';
 import { mock } from '../fetch_mock.ts';
 import { idpStub } from '../federation/idp_stub.ts';
+import { sessionFor } from '../admin_session.ts';
 
 /*
  * Configuring providers, and severing an account's link to one.
@@ -34,13 +39,7 @@ async function cookieFor(roles: string[]) {
 		'hash',
 		roles
 	);
-	const session = await adminSessionStore.create({
-		userId: user._id,
-		bucketId: ADMIN_BUCKET_ID,
-		tokens: {},
-		ttlSeconds: 60,
-		absoluteTtlSeconds: 3600
-	});
+	const session = await sessionFor(user);
 	return { cookie: `${ADMIN_SESSION_COOKIE}=${session._id}`, user };
 }
 
@@ -67,7 +66,10 @@ describe('provider management', () => {
 		const { cookie } = await cookieFor(['super_admin']);
 		const idp = await idpStub('https://idp-admin-create.test');
 		idp.expectDiscovery();
-		const bucket = await getBucketStore().create({ name: 'b' });
+		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: 'b'
+		});
 
 		const res = await client.admin.api
 			.buckets({ id: bucket._id })
@@ -94,7 +96,10 @@ describe('provider management', () => {
 		const { cookie } = await cookieFor(['super_admin']);
 		const idp = await idpStub('https://idp-admin-read.test');
 		idp.expectDiscovery();
-		const bucket = await getBucketStore().create({ name: 'b' });
+		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: 'b'
+		});
 		await client.admin.api
 			.buckets({ id: bucket._id })
 			.federation.post(body(idp.origin), { headers: { cookie } });
@@ -113,7 +118,10 @@ describe('provider management', () => {
 		const { cookie } = await cookieFor(['super_admin']);
 		const idp = await idpStub('https://idp-admin-keep.test');
 		idp.expectDiscovery();
-		const bucket = await getBucketStore().create({ name: 'b' });
+		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: 'b'
+		});
 		await client.admin.api
 			.buckets({ id: bucket._id })
 			.federation.post(body(idp.origin), { headers: { cookie } });
@@ -146,7 +154,10 @@ describe('provider management', () => {
 		const { cookie } = await cookieFor(['super_admin']);
 		const idp = await idpStub('https://idp-admin-rotate.test');
 		idp.expectDiscovery();
-		const bucket = await getBucketStore().create({ name: 'b' });
+		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: 'b'
+		});
 		await client.admin.api
 			.buckets({ id: bucket._id })
 			.federation.post(body(idp.origin), { headers: { cookie } });
@@ -164,7 +175,10 @@ describe('provider management', () => {
 		const { cookie } = await cookieFor(['super_admin']);
 		const idp = await idpStub('https://idp-admin-audit.test');
 		idp.expectDiscovery();
-		const bucket = await getBucketStore().create({ name: 'b' });
+		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: 'b'
+		});
 
 		await client.admin.api
 			.buckets({ id: bucket._id })
@@ -190,7 +204,10 @@ describe('provider management', () => {
 		const { cookie } = await cookieFor(['super_admin']);
 		const idp = await idpStub('https://idp-admin-delete.test');
 		idp.expectDiscovery();
-		const bucket = await getBucketStore().create({ name: 'b' });
+		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: 'b'
+		});
 		await client.admin.api
 			.buckets({ id: bucket._id })
 			.federation.post(body(idp.origin), { headers: { cookie } });
@@ -213,7 +230,10 @@ describe('provider management', () => {
 		const { cookie } = await cookieFor(['super_admin']);
 		const idp = await idpStub('https://idp-admin-down.test');
 		idp.expectDiscoveryFailure(500);
-		const bucket = await getBucketStore().create({ name: 'b' });
+		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: 'b'
+		});
 
 		const res = await client.admin.api
 			.buckets({ id: bucket._id })
@@ -231,7 +251,10 @@ describe('provider management', () => {
 			issuer: 'https://somebody-else.test'
 		});
 		idp.expectDiscovery();
-		const bucket = await getBucketStore().create({ name: 'b' });
+		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: 'b'
+		});
 
 		const res = await client.admin.api
 			.buckets({ id: bucket._id })
@@ -243,7 +266,10 @@ describe('provider management', () => {
 
 	it('refuses a non-https issuer without reaching for it', async () => {
 		const { cookie } = await cookieFor(['super_admin']);
-		const bucket = await getBucketStore().create({ name: 'b' });
+		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: 'b'
+		});
 
 		const res = await client.admin.api
 			.buckets({ id: bucket._id })
@@ -256,7 +282,10 @@ describe('provider management', () => {
 	it('refuses a malformed id, a duplicate id, missing openid, and a bad domain', async () => {
 		const { cookie } = await cookieFor(['super_admin']);
 		const idp = await idpStub('https://idp-admin-validate.test');
-		const bucket = await getBucketStore().create({ name: 'b' });
+		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: 'b'
+		});
 
 		const badId = await client.admin.api
 			.buckets({ id: bucket._id })
@@ -298,7 +327,10 @@ describe('provider management', () => {
 		const { cookie } = await cookieFor(['super_admin']);
 		const idp = await idpStub('https://idp-admin-lockout.test');
 		idp.expectDiscovery();
-		const bucket = await getBucketStore().create({ name: 'b' });
+		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: 'b'
+		});
 		await client.admin.api
 			.buckets({ id: bucket._id })
 			.federation.post(body(idp.origin), { headers: { cookie } });
@@ -325,8 +357,14 @@ describe('provider management', () => {
 		const { cookie } = await cookieFor(['super_admin']);
 		const idp = await idpStub('https://idp-admin-shared.test');
 		idp.expectDiscovery();
-		const a = await getBucketStore().create({ name: 'a' });
-		const b = await getBucketStore().create({ name: 'b' });
+		const a = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: 'a'
+		});
+		const b = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: 'b'
+		});
 
 		await client.admin.api
 			.buckets({ id: a._id })
@@ -373,7 +411,7 @@ describe('provider management', () => {
 		const idp = await idpStub('https://idp-admin-outsider.test');
 		const bucket = await getBucketStore().create({
 			name: 'someone-elses',
-			managedBy: ['another-admin']
+			ownerGroupId: 'a-group-nobody-here-belongs-to'
 		});
 
 		const res = await client.admin.api
@@ -411,7 +449,10 @@ describe("an account's upstream identities", () => {
 
 	it('lists which providers an account is linked to', async () => {
 		const { cookie } = await cookieFor(['super_admin']);
-		const bucket = await getBucketStore().create({ name: 'b' });
+		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: 'b'
+		});
 		const user = await seedLinkedUser(bucket._id);
 
 		const res = await client.admin.api
@@ -429,7 +470,10 @@ describe("an account's upstream identities", () => {
 
 	it('severs a link, records it with the bucket as scope, and leaves the account', async () => {
 		const { cookie } = await cookieFor(['super_admin']);
-		const bucket = await getBucketStore().create({ name: 'b' });
+		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: 'b'
+		});
 		const user = await seedLinkedUser(bucket._id);
 
 		const res = await client.admin.api
@@ -456,7 +500,10 @@ describe("an account's upstream identities", () => {
 
 	it('answers 404 for a link the account does not hold', async () => {
 		const { cookie } = await cookieFor(['super_admin']);
-		const bucket = await getBucketStore().create({ name: 'b' });
+		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: 'b'
+		});
 		const user = await seedLinkedUser(bucket._id);
 
 		const res = await client.admin.api
@@ -478,7 +525,7 @@ describe("an account's upstream identities", () => {
 		const { cookie } = await cookieFor(['project_admin']);
 		const bucket = await getBucketStore().create({
 			name: 'someone-elses',
-			managedBy: ['another-admin']
+			ownerGroupId: 'a-group-nobody-here-belongs-to'
 		});
 		const user = await seedLinkedUser(bucket._id);
 

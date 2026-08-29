@@ -31,7 +31,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 	async create(data: {
 		_id?: string;
 		name: string;
-		managedBy?: string[];
+		ownerGroupId: string;
 		roles?: string[];
 		passwordLogin?: boolean;
 		federation?: FederationProvider[];
@@ -44,7 +44,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		const bucket: UserBucket = {
 			_id: data._id ?? nanoid(),
 			name: data.name,
-			managedBy: data.managedBy ?? [],
+			ownerGroupId: data.ownerGroupId,
 			roles: data.roles ?? [],
 			passwordLogin: data.passwordLogin ?? true,
 			federation: data.federation ?? [],
@@ -77,10 +77,10 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		);
 	}
 
-	async listByManager(userId: string): Promise<UserBucket[]> {
-		return (await this.collection.find({ managedBy: userId }).toArray()).map(
-			(b) => withDefaults(b) as UserBucket
-		);
+	async listByGroup(groupId: string): Promise<UserBucket[]> {
+		return (
+			await this.collection.find({ ownerGroupId: groupId }).toArray()
+		).map((b) => withDefaults(b) as UserBucket);
 	}
 
 	async update(
@@ -89,7 +89,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 			Pick<
 				UserBucket,
 				| 'name'
-				| 'managedBy'
+				| 'ownerGroupId'
 				| 'roles'
 				| 'passwordLogin'
 				| 'federation'

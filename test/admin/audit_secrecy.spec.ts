@@ -16,7 +16,12 @@ import {
 	getProjectStore,
 	getBucketStore
 } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import {
+	ADMIN_BUCKET_ID,
+	ADMIN_SESSION_COOKIE,
+	UNASSIGNED_GROUP_ID
+} from 'lib/admin/consts.ts';
+import { sessionFor } from '../admin_session.ts';
 
 /*
  * No secret value may reach the trail — from any operation, in any field.
@@ -51,13 +56,7 @@ async function superCookie() {
 		'hash',
 		['super_admin']
 	);
-	const session = await adminSessionStore.create({
-		userId: user._id,
-		bucketId: ADMIN_BUCKET_ID,
-		tokens: {},
-		ttlSeconds: 60,
-		absoluteTtlSeconds: 3600
-	});
+	const session = await sessionFor(user);
 	return `${ADMIN_SESSION_COOKIE}=${session._id}`;
 }
 
@@ -77,6 +76,7 @@ describe('admin audit secrecy', () => {
 	it('records a client secret rotation without the secret', async () => {
 		const cookie = await superCookie();
 		const project = await getProjectStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'P',
 			slug: unique('p')
 		});
@@ -106,7 +106,10 @@ describe('admin audit secrecy', () => {
 
 	it('records an end-user password reset without the password', async () => {
 		const cookie = await superCookie();
-		const bucket = await getBucketStore().create({ name: 'B' });
+		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: 'B'
+		});
 		const target = await getUserStore(bucket._id).create(
 			`${unique('end')}@x.io`,
 			'hash'
@@ -127,7 +130,10 @@ describe('admin audit secrecy', () => {
 
 	it('records an end-user creation without the password', async () => {
 		const cookie = await superCookie();
-		const bucket = await getBucketStore().create({ name: 'B' });
+		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: 'B'
+		});
 
 		const created = (
 			await client.admin.api
@@ -183,6 +189,7 @@ describe('admin audit secrecy', () => {
 	it('records a client creation without the generated secret', async () => {
 		const cookie = await superCookie();
 		const project = await getProjectStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'P',
 			slug: unique('p')
 		});

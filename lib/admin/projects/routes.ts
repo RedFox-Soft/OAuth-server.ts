@@ -1,8 +1,9 @@
 import { Elysia } from 'elysia';
 import { getProjectStore, getBucketStore } from '../../adapters/index.js';
+import type { Project } from '../../adapters/types.js';
 import {
 	assertAuth,
-	assertRole,
+	assertActiveGroup,
 	assertProjectAccess,
 	assertBucketAccess,
 	AdminError,
@@ -23,9 +24,27 @@ import { recordAdminAudit } from '../audit/record.js';
 import { Client } from '../../models/client.js';
 import nanoid from '../../helpers/nanoid.js';
 
-async function loadProject(id: string) {
+/*
+ * Loads a project the caller is allowed to see, refusing identically whether it is missing or simply
+ * theirs to not reach.
+ *
+ * The two used to differ — 404 for a project that does not exist, 403 for one owned by another group —
+ * which handed an outsider an existence oracle: walk ids, and the status tells you which are real.
+ * Harmless while a project id was only ever handed out by an operator; not harmless once any
+ * administrator can create projects and every id belongs to somebody else's tenant.
+ *
+ * A super administrator still gets 404, because their authority is instance-wide: there is no tenant
+ * they could be probing, and collapsing the two would only make a real "wrong id" harder to diagnose.
+ */
+async function loadProject(admin: AdminContext, id: string): Promise<Project> {
 	const project = await getProjectStore().find(id);
-	if (!project) throw new AdminError(404, 'project not found');
+	if (!project) {
+		if (admin.roles.includes('super_admin')) {
+			throw new AdminError(404, 'project not found');
+		}
+		throw new AdminError(403, 'no access to this project');
+	}
+	assertProjectAccess(admin, project);
 	return project;
 }
 
@@ -59,9 +78,14 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 	.get('/admin/api/projects', async ({ admin }) => {
 		const ctx = assertAuth(admin as AdminContext | null);
 		const store = getProjectStore();
+		/*
+		 * Scope-filtered, not role-gated. A super administrator sees the instance; everyone else sees the
+		 * group their console is pointed at — not every group they belong to, because the console has one
+		 * active scope and a list mixing two tenants is the thing scope switching exists to prevent.
+		 */
 		const all = ctx.roles.includes('super_admin')
 			? (await store.list()).filter((p) => p.type === 'regular')
-			: (await store.listByManager(ctx.userId)).filter(
+			: (await store.listByGroup(ctx.activeGroupId)).filter(
 					(p) => p.type === 'regular'
 				);
 		return all;
@@ -70,14 +94,21 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 		'/admin/api/projects',
 		async ({ admin, body, set }) => {
 			const ctx = assertAuth(admin as AdminContext | null);
-			assertRole(ctx, 'super_admin');
+			/*
+			 * No role gate. Creating a project is what a project administrator signs in to do, and the
+			 * authority that matters is membership of the group it will belong to — checked below, on the
+			 * scope the caller is actually in.
+			 */
+			const ownerGroupId = assertActiveGroup(ctx);
 			const store = getProjectStore();
 			if (await store.findBySlug(body.slug)) {
 				throw new AdminError(409, 'slug already exists');
 			}
 			// Allocated here so the audit entry can name the project that is about to exist.
 			const projectId = nanoid();
-			await recordAdminAudit(ctx, 'project.create', projectId);
+			await recordAdminAudit(ctx, 'project.create', projectId, {
+				ownerGroupId
+			});
 			// Every accepted key must be forwarded explicitly: the store takes more than this handler
 			// passes, so a schema addition alone would accept a value and silently discard it.
 			const project = await store.create({
@@ -85,7 +116,7 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 				name: body.name,
 				slug: body.slug,
 				type: 'regular',
-				managedBy: body.managedBy ?? [],
+				ownerGroupId,
 				corsOrigins: validateCorsOrigins(body.corsOrigins) ?? []
 			});
 			set.status = 201;
@@ -95,24 +126,21 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 	)
 	.get('/admin/api/projects/:id', async ({ admin, params }) => {
 		const ctx = assertAuth(admin as AdminContext | null);
-		const project = await loadProject(params.id);
-		assertProjectAccess(ctx, project);
-		return project;
+		return loadProject(ctx, params.id);
 	})
 	.patch(
 		'/admin/api/projects/:id',
 		async ({ admin, params, body }) => {
 			const ctx = assertAuth(admin as AdminContext | null);
-			const project = await loadProject(params.id);
+			const project = await loadProject(ctx, params.id);
 			if (project.type === 'admin')
 				throw new AdminError(403, 'cannot modify admin project');
-			assertProjectAccess(ctx, project);
-			if (body.managedBy !== undefined) assertRole(ctx, 'super_admin');
 			const corsOrigins = validateCorsOrigins(body.corsOrigins);
 			// After origin validation: an entry for a request that was about to be refused as malformed
 			// would describe a change nobody attempted.
 			await recordAdminAudit(ctx, 'project.update', params.id, {
-				attributes: Object.keys(body)
+				attributes: Object.keys(body),
+				ownerGroupId: project.ownerGroupId
 			});
 			return getProjectStore().update(params.id, {
 				...body,
@@ -123,10 +151,14 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 	)
 	.delete('/admin/api/projects/:id', async ({ admin, params }) => {
 		const ctx = assertAuth(admin as AdminContext | null);
-		assertRole(ctx, 'super_admin');
-		const project = await loadProject(params.id);
+		const project = await loadProject(ctx, params.id);
 		if (project.type === 'admin')
 			throw new AdminError(403, 'cannot delete admin project');
+		/*
+		 * Ownership, not role: a group deletes what it owns. The client-blocker refusal below is what
+		 * actually protects the contents, and it is unchanged — widening who may ask did not widen what
+		 * may be destroyed.
+		 */
 		/*
 		 * A project is guarded rather than cascaded: its clients are things the operator can see and name,
 		 * so refusing says exactly what is in the way and leaves one audit entry per client actually
@@ -149,7 +181,9 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 			});
 		}
 		// After the guard: an entry for a request the 409 refused would describe a deletion never attempted.
-		await recordAdminAudit(ctx, 'project.delete', params.id);
+		await recordAdminAudit(ctx, 'project.delete', params.id, {
+			ownerGroupId: project.ownerGroupId
+		});
 		await getProjectStore().destroy(params.id);
 		return { ok: true };
 	})
@@ -157,15 +191,27 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 		'/admin/api/projects/:id/bucket',
 		async ({ admin, params, body }) => {
 			const ctx = assertAuth(admin as AdminContext | null);
-			const project = await loadProject(params.id);
-			assertProjectAccess(ctx, project);
+			const project = await loadProject(ctx, params.id);
 			const bucket = await getBucketStore().find(body.bucketId);
 			if (!bucket) throw new AdminError(404, 'bucket not found');
 			assertBucketAccess(ctx, bucket);
+			/*
+			 * A project and the bucket backing it must belong to the same group. Both access checks above
+			 * can pass for an administrator who belongs to two groups — one owning the project, the other
+			 * the bucket — and letting that through would build a tenant whose end-users live in somebody
+			 * else's scope, reachable by people with no access to the project at all.
+			 */
+			if (bucket.ownerGroupId !== project.ownerGroupId) {
+				throw new AdminError(
+					409,
+					'project and bucket must belong to the same group'
+				);
+			}
 			// The project is the entity being changed; which bucket it was pointed at is a submitted
 			// field, so it is recorded as a field name rather than a value.
 			await recordAdminAudit(ctx, 'project.bucket.assign', params.id, {
-				attributes: Object.keys(body)
+				attributes: Object.keys(body),
+				ownerGroupId: project.ownerGroupId
 			});
 			return getProjectStore().update(params.id, { bucketId: body.bucketId });
 		},

@@ -12,6 +12,7 @@ import {
 } from 'lib/adapters/index.ts';
 import type { ErrorOccurrence } from 'lib/adapters/types.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { sessionFor } from '../admin_session.ts';
 
 /*
  * The analysis surface — US2. What makes a pile of records answer a question.
@@ -36,13 +37,7 @@ async function superCookie() {
 		'hash',
 		['super_admin']
 	);
-	const session = await adminSessionStore.create({
-		userId: user._id,
-		bucketId: ADMIN_BUCKET_ID,
-		tokens: {},
-		ttlSeconds: 60,
-		absoluteTtlSeconds: 3600
-	});
+	const session = await sessionFor(user);
 	return `${ADMIN_SESSION_COOKIE}=${session._id}`;
 }
 
@@ -106,13 +101,7 @@ describe('error store analysis', () => {
 				'hash',
 				['project_admin']
 			);
-			const session = await adminSessionStore.create({
-				userId: user._id,
-				bucketId: ADMIN_BUCKET_ID,
-				tokens: {},
-				ttlSeconds: 60,
-				absoluteTtlSeconds: 3600
-			});
+			const session = await sessionFor(user);
 			const response = await get(
 				'/admin/api/errors/summary',
 				`${ADMIN_SESSION_COOKIE}=${session._id}`

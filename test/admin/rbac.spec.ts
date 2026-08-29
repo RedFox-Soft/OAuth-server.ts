@@ -12,22 +12,27 @@ const superAdmin: AdminContext = {
 	email: 'super@x.io',
 	roles: ['super_admin'],
 	bucketId: 'admin',
-	managedProjectIds: []
+	// A super administrator belongs to no group by virtue of the role; their reach is instance-wide.
+	memberships: [],
+	activeGroupId: ''
 };
 const projectAdmin: AdminContext = {
 	userId: 'u2',
 	email: 'pa@x.io',
 	roles: ['project_admin'],
 	bucketId: 'admin',
-	managedProjectIds: ['p1']
+	memberships: [{ groupId: 'g1', role: 'owner' as const }],
+	activeGroupId: 'g1'
 };
 const project = (over: Partial<Project>): Project => ({
 	_id: 'p1',
 	name: 'Acme',
 	slug: 'acme',
 	type: 'regular',
-	managedBy: ['u2'],
+	ownerGroupId: 'g1',
 	bucketId: null,
+	clientIds: [],
+	corsOrigins: [],
 	createdAt: new Date(),
 	updatedAt: new Date(),
 	...over
@@ -44,7 +49,7 @@ describe('RBAC guards', () => {
 		}
 	});
 
-	it('project admin can access managed regular project', () => {
+	it('project admin can access a project their group owns', () => {
 		expect(() => assertProjectAccess(projectAdmin, project({}))).not.toThrow();
 	});
 
@@ -52,7 +57,7 @@ describe('RBAC guards', () => {
 		try {
 			assertProjectAccess(
 				projectAdmin,
-				project({ type: 'admin', managedBy: ['u2'] })
+				project({ type: 'admin', ownerGroupId: 'g1' })
 			);
 			throw new Error('should have thrown');
 		} catch (e) {
@@ -62,7 +67,10 @@ describe('RBAC guards', () => {
 
 	it('super admin can access any project', () => {
 		expect(() =>
-			assertProjectAccess(superAdmin, project({ type: 'admin', managedBy: [] }))
+			assertProjectAccess(
+				superAdmin,
+				project({ type: 'admin', ownerGroupId: 'g9' })
+			)
 		).not.toThrow();
 	});
 });

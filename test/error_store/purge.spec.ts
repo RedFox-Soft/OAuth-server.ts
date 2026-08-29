@@ -13,6 +13,7 @@ import {
 } from 'lib/adapters/index.ts';
 import type { ErrorOccurrence } from 'lib/adapters/types.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { sessionFor } from '../admin_session.ts';
 
 /*
  * US4 — the purge, and what the trail says about it.
@@ -39,13 +40,7 @@ async function superCookie() {
 		'hash',
 		['super_admin']
 	);
-	const session = await adminSessionStore.create({
-		userId: user._id,
-		bucketId: ADMIN_BUCKET_ID,
-		tokens: {},
-		ttlSeconds: 60,
-		absoluteTtlSeconds: 3600
-	});
+	const session = await sessionFor(user);
 	return `${ADMIN_SESSION_COOKIE}=${session._id}`;
 }
 
@@ -189,13 +184,7 @@ describe('error store purge', () => {
 				'hash',
 				['project_admin']
 			);
-			const session = await adminSessionStore.create({
-				userId: user._id,
-				bucketId: ADMIN_BUCKET_ID,
-				tokens: {},
-				ttlSeconds: 60,
-				absoluteTtlSeconds: 3600
-			});
+			const session = await sessionFor(user);
 			const refused = await call(
 				'DELETE',
 				'/admin/api/errors?route=/x',

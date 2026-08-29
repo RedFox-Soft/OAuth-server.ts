@@ -8,6 +8,18 @@ import {
 	type AdminContext
 } from '../auth/rbac.js';
 
+/*
+ * What a missing bucket answers.
+ *
+ * A caller without instance-wide authority gets the same refusal for a bucket that does not exist as
+ * for one owned by another group, so walking ids reveals nothing about which are real. A super
+ * administrator still gets 404, because there is no tenant they could be probing and a plain "not
+ * found" is what actually helps them.
+ */
+function notFoundStatus(admin: AdminContext): number {
+	return admin.roles.includes('super_admin') ? 404 : 403;
+}
+
 function assertNotReserved(id: string): void {
 	if (id === ADMIN_BUCKET_ID) {
 		throw new AdminError(
@@ -24,7 +36,8 @@ export async function loadBucketForUsers(
 ): Promise<UserBucket> {
 	assertNotReserved(id);
 	const bucket = await getBucketStore().find(id);
-	if (!bucket) throw new AdminError(404, 'bucket not found');
+	if (!bucket)
+		throw new AdminError(notFoundStatus(admin), 'no access to this bucket');
 	await assertBucketUserAccess(admin, bucket);
 	return bucket;
 }
@@ -36,7 +49,8 @@ export async function loadBucketForEdit(
 ): Promise<UserBucket> {
 	assertNotReserved(id);
 	const bucket = await getBucketStore().find(id);
-	if (!bucket) throw new AdminError(404, 'bucket not found');
+	if (!bucket)
+		throw new AdminError(notFoundStatus(admin), 'no access to this bucket');
 	assertBucketAccess(admin, bucket);
 	return bucket;
 }

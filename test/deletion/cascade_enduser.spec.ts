@@ -14,9 +14,14 @@ import {
 	getUserStore
 } from 'lib/adapters/index.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import {
+	ADMIN_BUCKET_ID,
+	ADMIN_SESSION_COOKIE,
+	UNASSIGNED_GROUP_ID
+} from 'lib/admin/consts.ts';
 import epochTime from 'lib/helpers/epoch_time.js';
 import { throttleKey as loginThrottleKey } from 'lib/login_throttle/throttle.ts';
+import { sessionFor } from '../admin_session.ts';
 
 // User Story 2 — deleting an end-user ends their access everywhere.
 //
@@ -42,13 +47,7 @@ describe('deletion cascade: end-user', () => {
 			'hash',
 			['super_admin']
 		);
-		const session = await adminSessionStore.create({
-			userId: admin._id,
-			bucketId: ADMIN_BUCKET_ID,
-			tokens: {},
-			ttlSeconds: 60,
-			absoluteTtlSeconds: 3600
-		});
+		const session = await sessionFor(admin);
 		return `${ADMIN_SESSION_COOKIE}=${session._id}`;
 	}
 
@@ -57,7 +56,7 @@ describe('deletion cascade: end-user', () => {
 		const bucket = await getBucketStore().create({
 			name: `b-${Math.random()}`,
 			roles: [],
-			managedBy: []
+			ownerGroupId: UNASSIGNED_GROUP_ID
 		});
 		const user = await getUserStore(bucket._id).create(email, 'hash');
 		return { bucketId: bucket._id, uid: user._id, email };

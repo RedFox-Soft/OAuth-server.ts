@@ -10,13 +10,18 @@ import {
 	getProjectStore,
 	adminSessionStore
 } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import {
+	ADMIN_BUCKET_ID,
+	ADMIN_SESSION_COOKIE,
+	UNASSIGNED_GROUP_ID
+} from 'lib/admin/consts.ts';
 import {
 	ADMIN_MCP_CLIENT_ID,
 	MCP_RESOURCE,
 	MCP_ROUTE
 } from 'lib/mcp/consts.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
+import { sessionFor } from '../admin_session.ts';
 
 /*
  * plan.md's performance goal: a tool call within 2× the admin route it wraps, and no regression on the
@@ -69,13 +74,7 @@ async function setup() {
 	});
 	at.setAudience(MCP_RESOURCE);
 	const token = (await at.save()) as unknown as string;
-	const session = await adminSessionStore.create({
-		userId: user._id,
-		bucketId: ADMIN_BUCKET_ID,
-		tokens: {},
-		ttlSeconds: 60,
-		absoluteTtlSeconds: 3600
-	});
+	const session = await sessionFor(user);
 	await rpc(
 		{
 			jsonrpc: '2.0',
@@ -122,7 +121,7 @@ describe('tool call latency', () => {
 			await getProjectStore().create({
 				name: `Load ${i}`,
 				slug: `load-${i}-${Math.floor(Math.random() * 1e6)}`,
-				managedBy: []
+				ownerGroupId: UNASSIGNED_GROUP_ID
 			});
 		}
 

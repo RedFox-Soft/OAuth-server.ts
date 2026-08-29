@@ -13,6 +13,7 @@ import {
 	ADMIN_CLIENT_ID
 } from 'lib/admin/consts.ts';
 import { Client } from 'lib/models/client.ts';
+import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 
 describe('ensureAdminSeed', () => {
 	beforeAll(async () => {
@@ -44,6 +45,7 @@ describe('ensureAdminSeed', () => {
 		resetAdminMemoryStores();
 		const store = getProjectStore();
 		const p = await store.create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
 			_id: ADMIN_PROJECT_ID,
 			name: 'Administration',
 			slug: 'admin',

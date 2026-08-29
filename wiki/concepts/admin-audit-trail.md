@@ -135,7 +135,16 @@ request parameter describes what the framework will *do* with the value, not wha
 
 ## Reading the trail
 
-`GET /admin/api/audit` is super-admin only, newest-first, offset-paged, and filterable by actor (id
+`GET /admin/api/audit` is **group-scoped rather than super-admin only** — it was the latter until
+ownership moved to groups ([[group-ownership]]). An administrator reads the trail of the groups they
+belong to; a super administrator reads the instance, which is the only way entries belonging to no
+group — settings, keys, administrator accounts — are readable at all. The restriction is computed from
+the caller's own memberships and applied where entries are *selected*, never parsed from the query
+string: it is the tenant boundary of this surface, so a caller-supplied group id would be a request to
+read somebody else's trail. `ownerGroupId` is written at the time of the action and never re-derived
+from `targetId`, so an entry outlives the container it describes.
+
+The read is newest-first, offset-paged, and filterable by actor (id
 **or** email), action, target type, target id, scope and an inclusive time window. Ordering is
 `(timestamp desc, _id desc)`: `_id` is unique, so the order is total, which is what stops a page
 boundary from dropping or repeating an entry when two actions land in the same millisecond. A backwards
@@ -148,6 +157,8 @@ indistinguishable from "nothing happened", the one answer an audit trail must ne
 - [[admin-plane-error-shape]] — the other admin-plane contract a standalone mount cannot verify.
 - [[feature-flag-gating]] — the declarative-table-plus-drift-guard pattern this reuses.
 - [[account-resolution]] — per-bucket user storage, which is why `targetScope` exists.
+- [[group-ownership]] — the group that owns a container, which is what the read is now scoped by, and
+  why `ownerGroupId` is a separate field from `targetScope` rather than an overload of it.
 - [[rich-authorization-requests]] — the other place a framework's schema handling behaved differently
   than reading it suggested.
 - [[client-identity-from-database]] — client records are what several of these operations mutate.

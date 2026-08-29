@@ -12,6 +12,7 @@ import { corsRoutes } from 'lib/consts/route_classification.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { elysia } from 'lib/index.js';
 import { expectUnservedEquivalent, send } from '../feature_gate/helpers.js';
+import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 
 /*
  * The CORS contract suite. Contract of record:
@@ -94,6 +95,7 @@ export async function seedProjectWithOrigins(
 	corsOrigins: string[]
 ) {
 	const project = await getProjectStore().create({
+		ownerGroupId: UNASSIGNED_GROUP_ID,
 		name: 'CORS project',
 		slug: `cors-${Math.random().toString(36).slice(2)}`,
 		clientIds,

@@ -9,7 +9,7 @@ export class ProjectStore implements ProjectStoreInstance {
 		name: string;
 		slug: string;
 		type?: 'admin' | 'regular';
-		managedBy?: string[];
+		ownerGroupId: string;
 		bucketId?: string | null;
 		clientIds?: string[];
 		corsOrigins?: string[];
@@ -20,7 +20,7 @@ export class ProjectStore implements ProjectStoreInstance {
 			name: data.name,
 			slug: data.slug,
 			type: data.type ?? 'regular',
-			managedBy: data.managedBy ?? [],
+			ownerGroupId: data.ownerGroupId,
 			bucketId: data.bucketId ?? null,
 			clientIds: data.clientIds ?? [],
 			corsOrigins: data.corsOrigins ?? [],
@@ -46,9 +46,9 @@ export class ProjectStore implements ProjectStoreInstance {
 		return [...this.projects.values()];
 	}
 
-	async listByManager(userId: string): Promise<Project[]> {
-		return [...this.projects.values()].filter((p) =>
-			p.managedBy.includes(userId)
+	async listByGroup(groupId: string): Promise<Project[]> {
+		return [...this.projects.values()].filter(
+			(p) => p.ownerGroupId === groupId
 		);
 	}
 
@@ -57,7 +57,7 @@ export class ProjectStore implements ProjectStoreInstance {
 		patch: Partial<
 			Pick<
 				Project,
-				'name' | 'managedBy' | 'bucketId' | 'clientIds' | 'corsOrigins'
+				'name' | 'ownerGroupId' | 'bucketId' | 'clientIds' | 'corsOrigins'
 			>
 		>
 	): Promise<Project | null> {

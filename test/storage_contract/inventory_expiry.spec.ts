@@ -28,6 +28,12 @@ const REAPED_ON_EXPIRES_AT = [
 	// be a spendable sign-in.
 	'FederationState',
 	'Grant',
+	/*
+	 * Pending invitations into a group. Expiry is the control rather than housekeeping: an invitation
+	 * that outlived its window would be a standing offer of access to everything a group owns, and the
+	 * one thing an invitation must never become is permanent.
+	 */
+	'groupInvitations',
 	'InitialAccessToken',
 	'Interaction',
 	/*
@@ -74,6 +80,11 @@ const PERMANENT = [
 	'jwks',
 	'projects',
 	'userBuckets',
+	/*
+	 * Groups own every project and bucket, so an expiring group would silently orphan whatever it
+	 * owned — permanent for the same reason the two container areas beside it are.
+	 */
+	'groups',
 	'adminAudit',
 	'serviceConfig',
 	USER_AREA_PREFIX
@@ -141,7 +152,8 @@ describe('storage inventory: expiry', () => {
 			{ key: { actorEmail: 1, timestamp: 1 } },
 			{ key: { action: 1, timestamp: 1 } },
 			{ key: { targetType: 1, targetId: 1, timestamp: 1 } },
-			{ key: { targetScope: 1, timestamp: 1 } }
+			{ key: { targetScope: 1, timestamp: 1 } },
+			{ key: { ownerGroupId: 1, timestamp: 1 } }
 		]);
 		expect(
 			specs.some((spec) => spec.expireAfterSeconds !== undefined)

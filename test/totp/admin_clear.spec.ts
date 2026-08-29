@@ -11,11 +11,16 @@ import {
 	getBucketStore,
 	getUserStore
 } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import {
+	ADMIN_BUCKET_ID,
+	ADMIN_SESSION_COOKIE,
+	UNASSIGNED_GROUP_ID
+} from 'lib/admin/consts.ts';
 import { encodeBase32 } from 'lib/totp/base32.ts';
 import { attemptKey } from 'lib/totp/verify.ts';
 import epochTime from 'lib/helpers/epoch_time.ts';
 import type { User } from 'lib/adapters/types.ts';
+import { sessionFor, personalGroupId } from '../admin_session.ts';
 
 const app = new Elysia().use(resolveAdmin).use(endUserRoutes);
 const client = treaty(app);
@@ -31,13 +36,7 @@ async function sessionCookieFor(roles: string[]) {
 		'hash',
 		roles
 	);
-	const session = await adminSessionStore.create({
-		userId: user._id,
-		bucketId: ADMIN_BUCKET_ID,
-		tokens: {},
-		ttlSeconds: 60,
-		absoluteTtlSeconds: 3600
-	});
+	const session = await sessionFor(user);
 	return { cookie: `${ADMIN_SESSION_COOKIE}=${session._id}`, userId: user._id };
 }
 
@@ -62,7 +61,7 @@ describe('clearing a lost authenticator (US5)', () => {
 		admin = await sessionCookieFor(['super_admin']);
 		const bucket = await getBucketStore().create({
 			name: unique('Recovery'),
-			managedBy: [admin.userId],
+			ownerGroupId: await personalGroupId(admin.userId),
 			totpRequired: true
 		});
 		bucketId = bucket._id;

@@ -92,6 +92,10 @@ export function Buckets({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 				rowKey="_id"
 				loading={loading}
 				dataSource={buckets}
+				locale={{
+					emptyText:
+						'No user buckets in this scope yet. A bucket holds the end-user accounts a project authenticates.'
+				}}
 				columns={[
 					{ title: 'Name', dataIndex: 'name' },
 					{

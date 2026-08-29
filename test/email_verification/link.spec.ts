@@ -13,6 +13,7 @@ import {
 	lastEmail,
 	extractVerifyUrl
 } from '../mail_capture.ts';
+import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 
 const CLIENT_ID = 'verify-link-app';
 const PASSWORD = 'correct horse battery';
@@ -62,12 +63,14 @@ describe('email verification — link method', () => {
 		// A dedicated bucket (link method, verification required) reached by CLIENT_ID
 		// through a project, so these specs never touch the shared 'redfox' bucket.
 		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'Verify Link Bucket',
 			emailVerificationRequired: true,
 			verificationMethod: 'link'
 		});
 		bucketId = bucket._id;
 		const project = await getProjectStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'Verify Link',
 			slug: `verify-link-${Math.random()}`
 		});
@@ -138,10 +141,12 @@ describe('registration gating', () => {
 
 	it('rejects registration when the bucket is closed — no account, no email', async () => {
 		const closed = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'Closed Bucket',
 			registrationOpen: false
 		});
 		const project = await getProjectStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'Closed',
 			slug: `closed-${Math.random()}`
 		});
@@ -171,10 +176,12 @@ describe('registration gating', () => {
 
 	it('creates a verified account with no email when verification is off', async () => {
 		const off = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'No Verify Bucket',
 			emailVerificationRequired: false
 		});
 		const project = await getProjectStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'Off',
 			slug: `off-${Math.random()}`
 		});

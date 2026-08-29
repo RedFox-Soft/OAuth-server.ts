@@ -11,8 +11,13 @@ import {
 	getProjectStore,
 	getUserStore
 } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import {
+	ADMIN_BUCKET_ID,
+	ADMIN_SESSION_COOKIE,
+	UNASSIGNED_GROUP_ID
+} from 'lib/admin/consts.ts';
 import type { UserBucket } from 'lib/adapters/types.ts';
+import { sessionFor, personalGroupId } from '../admin_session.ts';
 
 const app = new Elysia().use(resolveAdmin).use(bucketRoutes);
 const client = treaty(app);
@@ -26,13 +31,7 @@ async function sessionCookieFor(roles: string[]) {
 		'hash',
 		roles
 	);
-	const session = await adminSessionStore.create({
-		userId: user._id,
-		bucketId: ADMIN_BUCKET_ID,
-		tokens: {},
-		ttlSeconds: 60,
-		absoluteTtlSeconds: 3600
-	});
+	const session = await sessionFor(user);
 	return { cookie: `${ADMIN_SESSION_COOKIE}=${session._id}`, userId: user._id };
 }
 
@@ -59,7 +58,10 @@ describe('bucket sign-in method setting', () => {
 	// same shape closed the password door on every existing bucket once before. The read must default.
 	it('reads a bucket that predates the field as not requiring it', async () => {
 		const cookie = await superCookie();
-		const bucket = await getBucketStore().create({ name: unique('Legacy') });
+		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: unique('Legacy')
+		});
 
 		// The in-memory store hands back the live record, so this is the stored document losing a field.
 		delete (bucket as Partial<UserBucket>).totpRequired;
@@ -273,12 +275,12 @@ describe('bucket sign-in method setting', () => {
 		const manager = await sessionCookieFor(['project_admin']);
 		const bucket = await getBucketStore().create({
 			name: unique('Managed'),
-			managedBy: [manager.userId]
+			ownerGroupId: await personalGroupId(manager.userId)
 		});
 		const project = await getProjectStore().create({
 			name: unique('Proj'),
 			slug: unique('proj'),
-			managedBy: [manager.userId]
+			ownerGroupId: await personalGroupId(manager.userId)
 		});
 		await getProjectStore().update(project._id, { bucketId: bucket._id });
 

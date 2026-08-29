@@ -14,6 +14,7 @@ import { hotp, stepFor } from 'lib/totp/code.ts';
 import epochTime from 'lib/helpers/epoch_time.ts';
 import { resetSentEmails, sentEmails } from '../mail_capture.ts';
 import { TestAdapter } from 'test/models.js';
+import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 
 const PASSWORD = 'correct horse battery';
 const INVALID_CODE = 'Invalid code';
@@ -27,8 +28,13 @@ async function seedBucket(
 	clientId: string,
 	fields: Record<string, unknown>
 ): Promise<string> {
-	const bucket = await getBucketStore().create({ name, ...fields });
+	const bucket = await getBucketStore().create({
+		ownerGroupId: UNASSIGNED_GROUP_ID,
+		name,
+		...fields
+	});
 	const project = await getProjectStore().create({
+		ownerGroupId: UNASSIGNED_GROUP_ID,
 		name,
 		slug: `${clientId}-${Math.random()}`
 	});

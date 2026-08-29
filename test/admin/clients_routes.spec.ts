@@ -15,11 +15,13 @@ import {
 	getUserStore,
 	getProjectStore
 } from 'lib/adapters/index.ts';
+import { sessionFor, personalGroupId } from '../admin_session.ts';
 import {
 	ADMIN_BUCKET_ID,
 	ADMIN_PROJECT_ID,
 	ADMIN_CLIENT_ID,
-	ADMIN_SESSION_COOKIE
+	ADMIN_SESSION_COOKIE,
+	UNASSIGNED_GROUP_ID
 } from 'lib/admin/consts.ts';
 
 const app = new Elysia().use(resolveAdmin).use(projectRoutes).use(clientRoutes);
@@ -31,21 +33,16 @@ async function sessionCookieFor(roles: string[]) {
 		'hash',
 		roles
 	);
-	const s = await adminSessionStore.create({
-		userId: user._id,
-		bucketId: ADMIN_BUCKET_ID,
-		tokens: {},
-		ttlSeconds: 60,
-		absoluteTtlSeconds: 3600
-	});
+	const s = await sessionFor(user);
 	return { cookie: `${ADMIN_SESSION_COOKIE}=${s._id}`, userId: user._id };
 }
 
-async function makeProject(managedBy: string[] = []) {
+async function makeProject(ownerGroupId = UNASSIGNED_GROUP_ID) {
 	return getProjectStore().create({
+		ownerGroupId: UNASSIGNED_GROUP_ID,
 		name: 'P',
 		slug: `p-${Math.random()}`,
-		managedBy
+		ownerGroupId
 	});
 }
 
@@ -182,7 +179,7 @@ describe('clients API', () => {
 	it('scopes project_admin to managed projects and 404s cross-project reads', async () => {
 		const su = await sessionCookieFor(['super_admin']);
 		const pa = await sessionCookieFor(['project_admin']);
-		const mine = await makeProject([pa.userId]);
+		const mine = await makeProject(await personalGroupId(pa.userId));
 		const other = await makeProject();
 		// create a client in `other` as super_admin
 		const created = await client.admin.api

@@ -27,6 +27,7 @@ import {
 	alwaysAvailableRoutes
 } from 'lib/consts/route_classification.js';
 
+import { sessionFor } from '../admin_session.ts';
 import {
 	expectNonPageProfile,
 	expectPageProfile,
@@ -343,13 +344,7 @@ describe('security headers: the administrative control plane', () => {
 			'hash',
 			['super_admin']
 		);
-		const session = await adminSessionStore.create({
-			userId: user._id,
-			bucketId: ADMIN_BUCKET_ID,
-			tokens: {},
-			ttlSeconds: 60,
-			absoluteTtlSeconds: 3600
-		});
+		const session = await sessionFor(user);
 		return `${ADMIN_SESSION_COOKIE}=${session._id}`;
 	}
 

@@ -74,4 +74,5 @@ supplying overrides.
 - [[admin-audit-trail]] — per-bucket storage is why an audited end-user action records its bucket
   alongside the user id.
 
+- [[group-ownership]] — which administrators may administer a bucket's end-users, now resolved through the group that owns it.
 Verified against [[oauth-server-codebase]] at commit `2125ad0`.

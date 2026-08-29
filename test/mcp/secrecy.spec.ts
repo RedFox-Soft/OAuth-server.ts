@@ -17,7 +17,7 @@ import {
 	getProjectStore,
 	adminAuditStore
 } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID } from 'lib/admin/consts.ts';
+import { ADMIN_BUCKET_ID, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import {
 	ADMIN_MCP_CLIENT_ID,
 	MCP_RESOURCE,
@@ -138,7 +138,7 @@ async function seedSecretHolders(token: string) {
 	const project = await getProjectStore().create({
 		name: 'Secrets',
 		slug: `sec-${Math.floor(Math.random() * 1e6)}`,
-		managedBy: []
+		ownerGroupId: UNASSIGNED_GROUP_ID
 	});
 
 	// A confidential client, whose secret is generated server-side and shown exactly once.

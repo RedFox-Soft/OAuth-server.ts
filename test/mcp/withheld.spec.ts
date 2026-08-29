@@ -10,7 +10,7 @@ import {
 	getProjectStore,
 	getBucketStore
 } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID } from 'lib/admin/consts.ts';
+import { ADMIN_BUCKET_ID, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import {
 	ADMIN_MCP_CLIENT_ID,
 	MCP_RESOURCE,
@@ -141,7 +141,7 @@ describe('withheld container deletions', () => {
 		const project = await getProjectStore().create({
 			name: 'Survivor',
 			slug: `wh-${Math.floor(Math.random() * 1e6)}`,
-			managedBy: []
+			ownerGroupId: UNASSIGNED_GROUP_ID
 		});
 
 		// Plainly, then again, then under a name an agent might invent.
@@ -181,7 +181,7 @@ describe('withheld container deletions', () => {
 		const project = await getProjectStore().create({
 			name: 'Partly',
 			slug: `wh-${Math.floor(Math.random() * 1e6)}`,
-			managedBy: []
+			ownerGroupId: UNASSIGNED_GROUP_ID
 		});
 
 		// A withheld step buried between two that should succeed.
@@ -212,7 +212,7 @@ describe('withheld container deletions', () => {
 		const project = await getProjectStore().create({
 			name: 'Blocked',
 			slug: `wh-${Math.floor(Math.random() * 1e6)}`,
-			managedBy: []
+			ownerGroupId: UNASSIGNED_GROUP_ID
 		});
 		const created = await rpc(
 			call('client_create', {
@@ -271,7 +271,7 @@ describe('withheld container deletions', () => {
 		const project = await getProjectStore().create({
 			name: 'Emptied',
 			slug: `wh-${Math.floor(Math.random() * 1e6)}`,
-			managedBy: []
+			ownerGroupId: UNASSIGNED_GROUP_ID
 		});
 		const created = await rpc(
 			call('client_create', {

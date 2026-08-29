@@ -9,6 +9,7 @@ export class AdminSessionStore implements AdminSessionStoreInstance {
 	async create(data: {
 		userId: string;
 		bucketId: string;
+		activeGroupId: string;
 		tokens: AdminSession['tokens'];
 		ttlSeconds: number;
 		absoluteTtlSeconds: number;
@@ -18,6 +19,7 @@ export class AdminSessionStore implements AdminSessionStoreInstance {
 			_id: nanoid(),
 			userId: data.userId,
 			bucketId: data.bucketId,
+			activeGroupId: data.activeGroupId,
 			tokens: data.tokens,
 			createdAt: now,
 			expiresAt: new Date(now.getTime() + data.ttlSeconds * 1000),
@@ -49,6 +51,13 @@ export class AdminSessionStore implements AdminSessionStoreInstance {
 				? s.absoluteExpiresAt
 				: next;
 		await this.collection.updateOne({ _id: id }, { $set: { expiresAt } });
+	}
+
+	async setActiveGroup(id: string, groupId: string): Promise<void> {
+		await this.collection.updateOne(
+			{ _id: id },
+			{ $set: { activeGroupId: groupId } }
+		);
 	}
 
 	async destroy(id: string): Promise<void> {
