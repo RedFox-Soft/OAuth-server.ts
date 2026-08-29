@@ -89,7 +89,17 @@ export class UserStore implements UserStoreInstance {
 			// Caller-supplied when the account's audit entry has to name the id before the account
 			// exists; generated here otherwise, as it always was.
 			_id: id ?? crypto.randomUUID(),
-			email,
+			/*
+			 * Normalised on write, matching the MongoDB store. The two disagreed until now — that one
+			 * lower-cases here, this one kept whatever case it was given — and because `findByEmail`
+			 * lower-cases both sides, sign-in behaved identically and the difference stayed invisible.
+			 * It was not invisible to anything reading the *stored* value: the end-user delete route
+			 * built its email-scoped cascade id from `user.email`, so under this adapter a mixed-case
+			 * account's throttle and resend records were skipped, in silence, with the cascade
+			 * reporting success. Constitution III.3 requires such a divergence to be converged or
+			 * declared; this is the convergence.
+			 */
+			email: email.toLowerCase(),
 			verified,
 			password,
 			active: true,
