@@ -35,10 +35,15 @@ const UNBOUNDED_AREA = 'RegistrationAccessToken';
 /*
  * Areas addressed by the computed id `${bucketId}:${email}` rather than found by an owner field. They are
  * listed here, in the engine, for the same reason every other area name is: a call site that named them
- * would be a call site to forget when a third one arrives. Both are keyed identically, which is why one
- * computed id serves both — see cascadeForAccount on why the caller must compute it first.
+ * would be a call site to forget when a third one arrives — which it since has. All three are keyed
+ * identically, by lib/helpers/email_scoped_id.ts, which is why one computed id serves them all; see
+ * cascadeForAccount on why the caller must compute it first.
  */
-const EMAIL_SCOPED_AREAS = ['VerificationResend', 'PasswordResetThrottle'];
+const EMAIL_SCOPED_AREAS = [
+	'VerificationResend',
+	'PasswordResetThrottle',
+	'LoginThrottle'
+];
 
 interface AreaSweep {
 	readonly area: string;

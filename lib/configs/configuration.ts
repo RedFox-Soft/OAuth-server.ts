@@ -7,6 +7,10 @@ import type { ApplicationConfigType } from './application.js';
 // A value import, but of a module that pulls in nothing but node:crypto and a type — so it adds no
 // runtime edge back to application.js either.
 import { isUsableNonceSecret } from './nonceSecret.js';
+// Same reasoning: lib/login_throttle/consts.ts imports nothing at all, so this is a leaf edge. The
+// bound is read from there rather than restated here so the throttle's own module and the validator
+// that guards it cannot disagree about how long a counter lives.
+import { LOGIN_RETENTION_SECONDS } from '../login_throttle/consts.js';
 
 /*
  * The server settings that cannot be read straight off ApplicationConfig: collections turned into
@@ -293,6 +297,54 @@ function checkRateLimit(config: ConfigurationInput) {
 	}
 }
 
+/*
+ * The login throttle's numbers, checked at boot for the reason checkRateLimit states — a bad value
+ * here fails silently at runtime — plus one this feature adds: the range is what stands in for the
+ * `enabled` switch it deliberately does not have. A cap of a million is a disabled throttle spelled
+ * differently, so the bounds are the ones inside which the protection still means something.
+ *
+ * The ceiling is bounded above by the counter's retention (24h, LOGIN_RETENTION_SECONDS): the record
+ * must outlive its own window or the escalation never happens, and enforcing that here is what keeps
+ * an operator from having to maintain two numbers in the right order.
+ */
+function checkLoginThrottle(config: ConfigurationInput) {
+	const cap = config['loginThrottle.failureCap'];
+	const window = config['loginThrottle.windowSeconds'];
+	const ceiling = config['loginThrottle.windowCeilingSeconds'];
+
+	if (!Number.isSafeInteger(cap) || (cap as number) < 1) {
+		throw new TypeError('loginThrottle.failureCap must be a positive integer');
+	}
+	/*
+	 * NIST SP 800-63B §5.2.2 puts the limit at no more than 100 consecutive failed attempts. A value
+	 * above it is refused rather than warned about: it would leave the door answering guesses at a rate
+	 * the throttle exists to end, while every test still passed.
+	 */
+	if ((cap as number) > 100) {
+		throw new TypeError(
+			'loginThrottle.failureCap must be at most 100 — a higher cap does not throttle'
+		);
+	}
+	if (!Number.isSafeInteger(window) || (window as number) < 60) {
+		throw new TypeError(
+			'loginThrottle.windowSeconds must be an integer of at least 60'
+		);
+	}
+	if (
+		!Number.isSafeInteger(ceiling) ||
+		(ceiling as number) < (window as number)
+	) {
+		throw new TypeError(
+			'loginThrottle.windowCeilingSeconds must be an integer no smaller than loginThrottle.windowSeconds'
+		);
+	}
+	if ((ceiling as number) > LOGIN_RETENTION_SECONDS) {
+		throw new TypeError(
+			`loginThrottle.windowCeilingSeconds must be at most ${LOGIN_RETENTION_SECONDS} — a window longer than a counter's retention would reopen the door by reaping the counter`
+		);
+	}
+}
+
 function checkDependantFeatures(config: ConfigurationInput) {
 	if (config['jwtIntrospection.enabled'] && !config['introspection.enabled']) {
 		throw new TypeError(
@@ -489,6 +541,7 @@ export function validateConfiguration(
 	checkRichAuthorizationRequests(config);
 	checkErrorStore(config);
 	checkRateLimit(config);
+	checkLoginThrottle(config);
 
 	return {
 		scopes,

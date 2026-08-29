@@ -6,6 +6,7 @@ import type {
 	VerificationMethod
 } from '../adapters/types.js';
 import { ISSUER } from '../configs/env.js';
+import { emailScopedId } from '../helpers/email_scoped_id.js';
 import epochTime from '../helpers/epoch_time.js';
 import {
 	rateRefusal,
@@ -34,7 +35,7 @@ function resends() {
 }
 
 export function resendKey(bucketId: string, email: string): string {
-	return `${bucketId}:${email.toLowerCase()}`;
+	return emailScopedId(bucketId, email);
 }
 
 function ttlFor(method: VerificationMethod): number {

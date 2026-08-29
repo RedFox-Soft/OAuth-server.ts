@@ -19,6 +19,7 @@ import {
 	cascadeForAccount,
 	endSessionsForAccount
 } from '../../helpers/cascade.js';
+import { emailScopedId } from '../../helpers/email_scoped_id.js';
 import { clearAttempts } from '../../totp/verify.js';
 import nanoid from '../../helpers/nanoid.js';
 
@@ -194,18 +195,23 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 			throw new AdminError(404, 'user not found');
 		}
 		/*
-		 * The email is read here, before the row goes, because the email-scoped areas (VerificationResend,
-		 * PasswordResetThrottle) are addressed by `${bucketId}:${email}` and nothing else records it.
-		 * Destroy first and those records are unreachable — skipped in silence, with no error anywhere to
-		 * notice.
+		 * The email is read here, before the row goes, because the email-scoped areas
+		 * (VerificationResend, PasswordResetThrottle, LoginThrottle) are addressed by
+		 * `${bucketId}:${email}` and nothing else records it. Destroy first and those records are
+		 * unreachable — skipped in silence, with no error anywhere to notice.
+		 *
+		 * Built through the shared helper rather than inline: this line spelled the id itself and left
+		 * out the `toLowerCase()` every writer applies, so under the in-memory adapter — which, unlike
+		 * MongoDB's, stores the address as given — a mixed-case account's records were missed here and
+		 * the cascade reported success.
 		 */
-		const emailScopedId = user.email ? `${params.id}:${user.email}` : null;
+		const scopedId = user.email ? emailScopedId(params.id, user.email) : null;
 		await recordAdminAudit(ctx, 'enduser.delete', params.uid, {
 			targetScope: params.id
 		});
 		await store.destroy(params.uid);
 		/* Audit, then destroy the principal, then cascade; a failed sweep is reported, never rolled back. */
-		const cascade = await cascadeForAccount(params.uid, emailScopedId);
+		const cascade = await cascadeForAccount(params.uid, scopedId);
 		if (cascade.failedAreas.length > 0) {
 			throw new AdminError(
 				500,

@@ -5,7 +5,9 @@ import type { User, UserBucket } from '../adapters/types.js';
 import { ADMIN_BUCKET_ID } from '../admin/consts.js';
 import { ISSUER } from '../configs/env.js';
 import { endSessionsForAccount } from '../helpers/cascade.js';
+import { emailScopedId } from '../helpers/email_scoped_id.js';
 import epochTime from '../helpers/epoch_time.js';
+import { clearFailures } from '../login_throttle/throttle.js';
 import {
 	nextRateFields,
 	rateRefusal,
@@ -28,9 +30,9 @@ function throttles() {
 	return adapter('PasswordResetThrottle');
 }
 
-/* Both email-scoped records share this shape so one computed id serves the deletion cascade (D9). */
+/* Every email-scoped record shares this shape so one computed id serves the deletion cascade (D9). */
 export function throttleKey(bucketId: string, email: string): string {
-	return `${bucketId}:${email.toLowerCase()}`;
+	return emailScopedId(bucketId, email);
 }
 
 // This flow's bounds for the shared window arithmetic. Separate counters from the verification resend, so
@@ -245,6 +247,20 @@ export async function consume(
 		password: await Bun.password.hash(password),
 		verified: true
 	});
+
+	/*
+	 * The sign-in door's failure counter goes too, and this is the whole of why the login throttle needs
+	 * no email step of its own. Escalating lockouts are only safe while the honest user holds a route back
+	 * that an attacker guessing passwords does not, and consuming this secret is exactly that route: it
+	 * proves control of the address on file. A user who cannot wait out an hour-long lockout resets
+	 * instead and is signing in immediately.
+	 *
+	 * Here rather than at the *request*, and the distinction is load-bearing: asking for a reset proves
+	 * nothing, so clearing there would hand anyone who knows an address a way to wipe the counter that is
+	 * holding them off. Placed after the update for the same reason the sweep below is — nothing is
+	 * released for a password change that did not land.
+	 */
+	await clearFailures(challenge.bucketId, challenge.email);
 
 	/*
 	 * After the update, never before: a session must not be destroyed for a password change that then failed

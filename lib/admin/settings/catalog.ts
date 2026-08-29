@@ -415,6 +415,38 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 	},
 
 	/*
+	 * Three numbers and no switch. `dependsOn` is deliberately unset on all three: there is nothing to
+	 * depend on, because the throttle has no `enabled` key — it is a security boundary, and an
+	 * incident kill switch for it is a switch that reopens the vulnerability. Out-of-range values are
+	 * refused by the same validator the server boots through, so the console cannot save a setting the
+	 * server would not start with.
+	 */
+	{
+		key: 'loginThrottle.failureCap',
+		group: 'Login throttle',
+		label: 'Failed password attempts allowed per window',
+		type: 'number',
+		description:
+			'How many wrong passwords one address may submit before the sign-in door shuts for that address. Once shut it refuses every attempt, including one with the correct password, until the window ends — and the refusal looks exactly like an ordinary wrong password, so it tells an attacker nothing. Raising this hands a guessing attack proportionally more tries; lowering it locks out people who mistype. Matches the verification code’s attempt cap by default. Applied at startup.'
+	},
+	{
+		key: 'loginThrottle.windowSeconds',
+		group: 'Login throttle',
+		label: 'First lockout length in seconds',
+		type: 'number',
+		description:
+			'How long the door stays shut the first time an address runs out of attempts, and the length each further lockout doubles from. This is also the shortest wait an honest user who trips the throttle will face, so it is the number to lower if legitimate lockouts are the complaint. A bucket that requires a one-time code stays at this length however often it is tripped, because a guessed password there does not sign anyone in. Applied at startup.'
+	},
+	{
+		key: 'loginThrottle.windowCeilingSeconds',
+		group: 'Login throttle',
+		label: 'Longest lockout length in seconds',
+		type: 'number',
+		description:
+			'The longest the door will ever shut, however many times one address has run out of attempts. With the defaults the lockouts run 15 → 30 → 60 minutes, which holds a sustained attack to roughly 120 guesses a day. Cannot be shorter than the first lockout, and cannot exceed 24 hours — beyond that the counter would be forgotten before its own lockout ended, which would reopen the door. Someone locked out this long can still get straight back in by completing a password reset. Applied at startup.'
+	},
+
+	/*
 	 * The switch stands alone: which providers exist, and whether any is enabled, is per-bucket data
 	 * reached through the bucket's own routes rather than a setting here. Catalogued because a feature an
 	 * operator cannot turn on without editing the database is not a feature they have.

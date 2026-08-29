@@ -23,6 +23,7 @@ import { FederationStatePayload } from 'lib/federation/types.js';
 import { GrantPayload } from 'lib/models/grant.js';
 import { InitialAccessTokenPayload } from 'lib/models/initial_access_token.js';
 import { InteractionPayload } from 'lib/models/interaction.js';
+import { LoginThrottlePayload } from 'lib/login_throttle/types.js';
 import {
 	PasswordResetChallengePayload,
 	PasswordResetThrottlePayload
@@ -52,6 +53,7 @@ export const PAYLOAD_SCHEMAS: Readonly<Record<string, ReadableSchema>> = {
 	Grant: GrantPayload,
 	InitialAccessToken: InitialAccessTokenPayload,
 	Interaction: InteractionPayload,
+	LoginThrottle: LoginThrottlePayload,
 	PasswordResetChallenge: PasswordResetChallengePayload,
 	PasswordResetThrottle: PasswordResetThrottlePayload,
 	PushedAuthorizationRequest: PushedAuthorizationRequestPayload,

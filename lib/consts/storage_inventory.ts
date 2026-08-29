@@ -72,6 +72,7 @@ export const MODEL_AREAS = [
 	'Grant',
 	'InitialAccessToken',
 	'Interaction',
+	'LoginThrottle',
 	'PasswordResetChallenge',
 	'PasswordResetThrottle',
 	'PushedAuthorizationRequest',
@@ -256,6 +257,26 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 		unowned('deliberately not client-bound; the schema omits clientId')
 	),
 	modelArea('Interaction', EXPIRES_AT, byAccount),
+	/*
+	 * The password sign-in door's failure counters, addressed by `${bucketId}:${email}` exactly as the
+	 * two areas below and VerificationResend are — which is what lets the account cascade destroy all
+	 * three from the one id it computes before the account row goes.
+	 *
+	 * Unowned, and unlike its siblings that is a *requirement* rather than a consequence: a counter is
+	 * written for any address submitted to an open password door, including one that resolves to no
+	 * account, so that the presence of a record and the behaviour of the door never reveal whether an
+	 * address is registered. There is frequently no principal to own it. Note the reading this inverts —
+	 * a PasswordResetThrottle record is written only when mail is actually sent, so its existence does
+	 * imply an account; a record here means only that somebody typed that address.
+	 *
+	 * Reaped, and the expiry is the control rather than housekeeping: the record carries the escalation
+	 * step, so one that never expired would hold an address at the longest cooldown for good.
+	 */
+	modelArea(
+		'LoginThrottle',
+		EXPIRES_AT,
+		unowned('addressed by the computed id `${bucketId}:${email}`, never swept')
+	),
 	/*
 	 * The self-service password reset's two areas. The challenge is account-owned rather than merely
 	 * expiring: an outstanding secret can take the account over, so it must not outlive the account it

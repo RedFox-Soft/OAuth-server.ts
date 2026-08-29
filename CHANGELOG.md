@@ -11,6 +11,44 @@ of the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- Brute-force protection on the password sign-in door (issue #9, spec 032). `POST /ui/:uid/login`
+  accepted unlimited guesses against any address, each one buying a full password hash on a
+  shared-CPU machine — so the door was both a credential-stuffing opportunity and a cheap
+  CPU-exhaustion vector, and the only unbounded secret surface left in the server. Failed attempts
+  are now counted per `${bucketId}:${email}` in a new `LoginThrottle` area; at the cap the door shuts
+  for that address and refuses everything — **including the correct password** — until the window
+  ends, and each further exhaustion shuts it for longer, doubling 15 → 30 → 60 minutes. That holds a
+  sustained attack to roughly 120 guesses a day against unlimited before, and a refused attempt does
+  no lookup and no hashing, so the CPU half of the issue closes with the guessing half.
+  The refusal is the door's existing invalid-credentials page, produced by the _same expression_ the
+  two ordinary failure paths use rather than a copy of the wording, and failures are counted for
+  addresses that resolve to no account — so neither the response nor the existence of a counter is
+  evidence that an address is registered. Two things clear a counter, and both are proofs an attacker
+  guessing passwords does not hold: a password that verifies, and a **completed** password reset.
+  The second is why no "enter the code from your email" step was built — consuming the emailed secret
+  already proves control of the address, through a flow that has its own cooldown and cap, while a
+  dedicated step would have been an account-existence oracle, an email-bombing vector, a hard mail
+  dependency for sign-in, and unavailable to the one bucket with no reset at all. Requesting a reset
+  clears nothing.
+  Three decisions are worth reading the code for. The record's retention (24h from the last failure)
+  must **outlive** its own lockout window or the escalation silently never happens — a counter reaped
+  when the door reopens restores the opening allowance, so an attacker who waits is never escalated;
+  the boot validator enforces the ordering. The escalation ceiling is the first window wherever the
+  bucket sets `totpRequired`, read from the bucket's policy and never from its identity, because a
+  guessed password is not a sign-in there while the lockout it risks — the admin console, which has no
+  self-service reset — is the one nobody can undo. And the counter's key is built by one new
+  `emailScopedId` helper stating its rule as parity with `findByEmail`'s normalization: a key built
+  from the raw submission would have given a 16-letter address 65,536 independent counters, and every
+  test written in lower case would still have passed. That helper replaced three copies of the
+  expression and one inlined fourth in the end-user delete route which had dropped its `toLowerCase()`
+  — under the in-memory adapter, whose user store does not normalise what it stores, that line was
+  already missing the email-scoped records of mixed-case accounts and reporting success.
+  Bounds are `loginThrottle.failureCap`, `.windowSeconds` and `.windowCeilingSeconds`, super-admin
+  editable and boot-only. There is deliberately no `loginThrottle.enabled`: unlike the per-origin
+  limiter this is persisted, holds across restarts and machines, and is therefore a security boundary
+  rather than a resource protection — a kill switch for it is a switch that reopens the vulnerability,
+  so the validator bounds the numbers to a range in which the protection still means something instead.
+
 - The last three security headers issue #2 asked for (issues #10 and #2, spec 029).
   `Strict-Transport-Security: max-age=63072000; includeSubDomains` and a `Permissions-Policy` denying
   seventeen high-privilege browser features now ride on every response, from the same pre-routing hook

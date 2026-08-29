@@ -44,6 +44,7 @@ install versus what you switch on deliberately — the distinction is load-beari
 - **TOTP second factor** — per-bucket, optionally enforced for the admin console ([RFC 6238](https://datatracker.ietf.org/doc/html/rfc6238))
 - **Pairwise subject identifiers** — per-sector `sub` values, salted from the database
 - **Per-origin rate limiting** — tiered by route class, on by default
+- **Sign-in brute-force throttle** — persisted per-address failure counters with escalating lockouts, and no way to tell a throttled refusal from a wrong password
 - **Security headers** — HSTS, `Permissions-Policy`, framing and content-type protections
 - **CORS closed by data** — an origin is readable only if it is listed on the project owning the calling client
 - **Pluggable storage** — adapter architecture with MongoDB and in-memory implementations
@@ -176,13 +177,51 @@ set `Fly-Client-IP` to a fresh value per request and is never limited.
 with N machines serving concurrently the effective allowance is N times the configured value, and an
 instance restart clears every counter. This is a resource protection — it bounds what one source can
 cost the server — and not a security boundary. The limits that must hold absolutely are the
-per-identity throttles: verification codes cap at five attempts, and resends and password-reset
-requests are cooldown- and daily-capped, independently of anything here.
+per-identity throttles: verification codes cap at five attempts, resends and password-reset requests
+are cooldown- and daily-capped, and the password sign-in door has the brute-force throttle below —
+all independently of anything here.
 
 **Tuning.** Raise `strict.max` if a legitimate server-to-server integration behind one address, or
 many users behind one corporate NAT, start seeing refusals. Raise `public.max` if the admin console
 stutters while loading. Lower `maxTrackedOrigins` under memory pressure. Set `rateLimit.enabled` to
 `false` and restart to switch the whole thing off during an incident.
+
+### Sign-in brute-force throttle
+
+Failed password attempts are counted per bucket and address. Once an address reaches the cap, the
+sign-in door is shut for that address and refuses every further attempt — **including one carrying
+the correct password** — until the window ends. Each further exhaustion shuts it for longer, doubling
+to the ceiling: 15 → 30 → 60 minutes by default, which holds a sustained attack to roughly 120
+guesses a day. The counter is forgotten after 24 hours without a failure.
+
+The refusal is the ordinary "invalid username or password" page. It never says that a throttle
+exists, how many attempts remain, or when the door reopens, because saying any of it would tell an
+attacker that the address they are guessing is real. For the same reason attempts are counted for
+addresses that have no account at all — a counter's existence means somebody typed that address,
+nothing more. And because the refusal happens before the account lookup, a refused attempt costs no
+password hashing: a flood against one address stops being a CPU cost as well as stopping being a
+guessing opportunity.
+
+Unlike the per-origin limiter above, these counters are **persisted**, so the limit holds across
+restarts and across every machine serving concurrently. That is what makes this a security boundary
+rather than a resource protection — and why there is deliberately no switch to turn it off.
+
+| Setting                              | Default | Notes                                                  |
+| ------------------------------------ | ------- | ------------------------------------------------------ |
+| `loginThrottle.failureCap`           | `5`     | Attempts per window; at most `100`                     |
+| `loginThrottle.windowSeconds`        | `900`   | First lockout, and the base the curve doubles from     |
+| `loginThrottle.windowCeilingSeconds` | `3600`  | Longest lockout; never below the first, never over 24h |
+
+Two counters are cleared immediately rather than waiting out the window: a password that verifies,
+and a **completed** password reset. The second is the escape hatch — consuming the emailed secret
+proves control of the address, which is exactly what an attacker guessing passwords does not have —
+so a locked-out user is never stuck waiting. Merely _requesting_ a reset clears nothing.
+
+**A bucket that requires a one-time code stays at the first window** however often it is tripped: a
+guessed password there does not sign anyone in, so the deeper lockouts buy little. This matters most
+for the reserved administrator bucket, whose operators sign in through this same door and have no
+self-service reset to escape with — their worst case is a 15-minute wait, and the way to make that
+door properly hard is to require the second factor on it (**Settings → Administrators**).
 
 ## Docker
 

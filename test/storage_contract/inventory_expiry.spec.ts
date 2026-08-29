@@ -30,6 +30,12 @@ const REAPED_ON_EXPIRES_AT = [
 	'Grant',
 	'InitialAccessToken',
 	'Interaction',
+	/*
+	 * The password door's failure counters. Expiry is the control rather than housekeeping: the record
+	 * carries the escalation step, so one that never expired would hold an address at the longest
+	 * cooldown for good — and would keep counting failures from months ago against it.
+	 */
+	'LoginThrottle',
 	'PasswordResetChallenge',
 	'PasswordResetThrottle',
 	'PushedAuthorizationRequest',

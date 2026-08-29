@@ -8,6 +8,7 @@ import type { FederationStatePayload } from '../federation/types.js';
 import type { GrantPayloadType } from '../models/grant.js';
 import type { InitialAccessTokenPayloadType } from '../models/initial_access_token.js';
 import type { InteractionPayloadType } from '../models/interaction.js';
+import type { LoginThrottlePayload } from '../login_throttle/types.js';
 import type {
 	PasswordResetChallengePayload,
 	PasswordResetThrottlePayload
@@ -53,6 +54,7 @@ export interface ModelPayloadByName {
 	Grant: GrantPayloadType;
 	InitialAccessToken: InitialAccessTokenPayloadType;
 	Interaction: InteractionPayloadType;
+	LoginThrottle: LoginThrottlePayload;
 	PasswordResetChallenge: PasswordResetChallengePayload;
 	PasswordResetThrottle: PasswordResetThrottlePayload;
 	PushedAuthorizationRequest: PushedAuthorizationRequestPayloadType;

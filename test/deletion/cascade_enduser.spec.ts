@@ -16,6 +16,7 @@ import {
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import epochTime from 'lib/helpers/epoch_time.js';
+import { throttleKey as loginThrottleKey } from 'lib/login_throttle/throttle.ts';
 
 // User Story 2 — deleting an end-user ends their access everywhere.
 //
@@ -232,6 +233,73 @@ describe('deletion cascade: end-user', () => {
 		expect(
 			await adapter('PasswordResetThrottle').find(throttleId)
 		).toBeUndefined();
+	});
+
+	/*
+	 * The third area addressed by `${bucketId}:${email}` rather than found by an owner field
+	 * (specs/032-login-brute-force). Seeded through the same helper the server uses, so a change to how
+	 * the id is spelled cannot pass here while failing in production.
+	 */
+	it("destroys the sign-in door's failure counter", async () => {
+		const { bucketId, uid, email } = await endUser();
+		const ttl = 300;
+		const key = loginThrottleKey(bucketId, email);
+		await adapter('LoginThrottle').upsert(
+			key,
+			{
+				failures: 3,
+				windowStart: epochTime(),
+				step: 1,
+				exp: epochTime() + ttl
+			} as never,
+			ttl
+		);
+
+		const res = await deleteUser(bucketId, uid);
+		expect(res.status).toBe(200);
+
+		expect(await adapter('LoginThrottle').find(key)).toBeUndefined();
+	});
+
+	/*
+	 * The casing case, and it is not academic. The two adapters disagree about what they *store*: the
+	 * MongoDB user store lower-cases an address on create, the in-memory one keeps it as given. So a
+	 * cascade id built from the stored value — which this route did, inline, before the shared helper —
+	 * misses every email-scoped record for a mixed-case account under one adapter and not the other,
+	 * silently, reporting success. All three areas are asserted together because they share the one id.
+	 */
+	it('destroys the email-scoped records of a mixed-case account', async () => {
+		const { bucketId, uid, email } = await endUser(
+			`MiXeD-${Math.random()}@Example.COM`
+		);
+		const ttl = 300;
+		const key = loginThrottleKey(bucketId, email);
+		await adapter('LoginThrottle').upsert(
+			key,
+			{
+				failures: 1,
+				windowStart: epochTime(),
+				step: 0,
+				exp: epochTime() + ttl
+			} as never,
+			ttl
+		);
+		await adapter('VerificationResend').upsert(
+			key,
+			{
+				lastSentAt: epochTime(),
+				dayCount: 1,
+				windowStart: epochTime(),
+				exp: epochTime() + ttl
+			} as never,
+			ttl
+		);
+
+		const res = await deleteUser(bucketId, uid);
+		expect(res.status).toBe(200);
+
+		expect(await adapter('LoginThrottle').find(key)).toBeUndefined();
+		expect(await adapter('VerificationResend').find(key)).toBeUndefined();
 	});
 
 	it('leaves an account in another bucket untouched (scenario 7)', async () => {

@@ -410,6 +410,61 @@ export const ApplicationConfig = {
 	'rateLimit.public.windowSeconds': 60,
 
 	/*
+	 * loginThrottle
+	 *
+	 * title: Brute-force throttle on the password sign-in door
+	 *
+	 * description: Counts failed password attempts per bucket-and-address pair and shuts that door once
+	 * the cap is reached, refusing every further attempt — including one carrying the correct password —
+	 * until the window elapses. Each further exhaustion shuts it for longer, doubling to the ceiling.
+	 * The refusal is the ordinary "invalid username or password" page: it reveals neither the throttle
+	 * nor whether the address exists, and it costs no password hashing, so a flood against one address
+	 * stops being a CPU cost as well as stopping being a guessing opportunity.
+	 *
+	 * Unlike `rateLimit` this is persisted through the adapter, so it holds across restarts and across
+	 * concurrently serving machines. That is the difference between a resource protection and a
+	 * security boundary, and it is why THERE IS DELIBERATELY NO `loginThrottle.enabled`: an incident
+	 * kill switch here is a switch that returns the server to the vulnerability. The keys below are
+	 * bounded to a range in which the protection still means something (lib/configs/configuration.ts)
+	 * instead of accepting a value that disables it.
+	 *
+	 * A counter is cleared by a verifying password, and by a *completed* password reset — consuming the
+	 * emailed secret proves control of the address, which is the escape an attacker guessing passwords
+	 * does not have. A bucket that requires a second factor stays at the first window however often it
+	 * is exhausted: a guessed password there is not a sign-in, and the reserved admin bucket has no
+	 * self-service reset to escape with.
+	 */
+
+	/*
+	 * loginThrottle.failureCap
+	 *
+	 * description: Failed password attempts tolerated per window for one address. Matches the
+	 * verification code's attempt cap, so the server has one answer to "how many tries does a secret
+	 * get". Raising it hands an attacker proportionally more guesses per window; lowering it locks out
+	 * users who mistype. Capped at 100 because that is where the protection stops being one.
+	 */
+	'loginThrottle.failureCap': 5,
+	/*
+	 * loginThrottle.windowSeconds
+	 *
+	 * description: How long the door stays shut the first time an address exhausts the cap, and the
+	 * base the escalation doubles from. Also the flat window for a bucket that requires a second
+	 * factor. This doubles as an honest user's shortest lockout, so it is the number to lower if
+	 * legitimate lockouts are the complaint.
+	 */
+	'loginThrottle.windowSeconds': 900,
+	/*
+	 * loginThrottle.windowCeilingSeconds
+	 *
+	 * description: The longest the door will shut, however many windows an address has exhausted. With
+	 * the defaults the curve is 15 → 30 → 60 minutes, holding a sustained attacker to about 120 guesses
+	 * a day. This is also an honest user's worst case if they cannot use a password reset, which is why
+	 * it is not larger: the counter's own retention (24h from the last failure) bounds it from above,
+	 * and the validator refuses a ceiling below the first window.
+	 */
+	'loginThrottle.windowCeilingSeconds': 3600,
+
+	/*
 	 * federation
 	 *
 	 * title: Upstream OIDC federation — let end users sign in through an external identity provider

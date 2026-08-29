@@ -13,7 +13,15 @@ import {
 	federationUpstreamPage,
 	passwordLoginClosedPage
 } from 'lib/federation/pages.js';
-import { loginOptionsForClient } from './loginOptions.js';
+import {
+	loginOptionsForBucket,
+	loginOptionsForClient
+} from './loginOptions.js';
+import {
+	clearFailures,
+	isThrottled,
+	recordFailure
+} from '../login_throttle/throttle.js';
 import {
 	consentServer,
 	loginServer,
@@ -368,29 +376,65 @@ export const ui = new Elysia()
 			if (closed) return closed;
 
 			const bucketId = await resolveBucketForClient(clientId);
-			const userStore = getUserStore(bucketId);
-			const user = await userStore.findByEmail(body.username);
-			if (!user) {
-				return loginServer(uid, {
+			/*
+			 * Resolved once, and used twice: the throttle needs to know whether a password alone can
+			 * complete a sign-in here, and the second-factor step below needs the same answer. Reading it
+			 * once is not only cheaper — two lookups are two chances to disagree about one bucket.
+			 */
+			const loginOptions = await loginOptionsForBucket(bucketId);
+
+			/*
+			 * The one refusal this door gives. Every path that turns a sign-in away shares this expression
+			 * rather than repeating its wording, which is what keeps them byte-identical: an unknown
+			 * address, a wrong password, a deactivated account and a throttled attempt must be
+			 * indistinguishable, and a copy of the string is a copy that can drift.
+			 */
+			const refuse = () =>
+				loginServer(uid, {
 					errorMessage: 'Invalid username or password',
 					handOffTo: redirectUriOf(interaction)
 				});
+
+			/*
+			 * Before the account lookup and before any verification, so a refused attempt costs neither —
+			 * which is what stops this door doubling as a CPU-exhaustion vector, since every guess against
+			 * a known address used to buy a full password hash. Placed after passwordDoorClosed because a
+			 * bucket with no password door has nothing to throttle.
+			 */
+			if (
+				await isThrottled(bucketId, body.username, loginOptions.totpRequired)
+			) {
+				/* The address is deliberately not carried: an operator needs to see which population is
+				 * under attack, not a log they could read names out of. */
+				eventBus.emit('login_throttled', { bucketId });
+				return refuse();
+			}
+
+			const userStore = getUserStore(bucketId);
+			const user = await userStore.findByEmail(body.username);
+			if (!user) {
+				// Counted for an address with no account too, so the counter's existence — and any future
+				// divergence in this refusal — can never be read as evidence that an account exists.
+				await recordFailure(bucketId, body.username);
+				return refuse();
 			}
 			const validPassword = await Bun.password.verify(
 				body.password,
 				user.password
 			);
 			if (!validPassword) {
-				return loginServer(uid, {
-					errorMessage: 'Invalid username or password',
-					handOffTo: redirectUriOf(interaction)
-				});
+				await recordFailure(bucketId, body.username);
+				return refuse();
 			}
+			/*
+			 * The credential was proved, so it is not being guessed — cleared here, above the remaining
+			 * gates rather than beside the success at the bottom, so that an account refused for being
+			 * inactive or unverified clears it too. One call site instead of four, and the property holds
+			 * by position rather than by remembering to repeat it.
+			 */
+			await clearFailures(bucketId, body.username);
 			if (!user.active) {
-				return loginServer(uid, {
-					errorMessage: 'Invalid username or password',
-					handOffTo: redirectUriOf(interaction)
-				});
+				return refuse();
 			}
 			const loginBucket = await getBucketStore().find(bucketId);
 			if (verificationGates(loginBucket, bucketId) && !user.verified) {
@@ -405,7 +449,7 @@ export const ui = new Elysia()
 			 * is turned away exactly as it was, so the second factor never becomes the step at which an
 			 * account reveals that it exists.
 			 */
-			const { totpRequired } = await loginOptionsForClient(clientId);
+			const { totpRequired } = loginOptions;
 			if (totpRequired) {
 				/*
 				 * `result` is deliberately NOT written here. That is the whole of "a correct password

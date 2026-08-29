@@ -22,6 +22,7 @@ import {
 import { adminAuditStore } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID, ADMIN_CLIENT_ID } from 'lib/admin/consts.ts';
 import { REQUEST_COOLDOWN_SECONDS } from 'lib/password_reset/consts.ts';
+import { throttleKey as throttleKeyFor } from 'lib/login_throttle/throttle.ts';
 import { elysia } from 'lib/index.ts';
 
 const CLIENT_ID = 'reset-app';
@@ -447,6 +448,54 @@ describe('password reset — sessions (US3)', () => {
 
 		expect(await adapter('Session').find(session.id)).toBeUndefined();
 		expect(await adapter('Session').findByUid(session.uid)).toBeUndefined();
+	});
+
+	/*
+	 * The escape hatch the login throttle relies on instead of an email step of its own
+	 * (specs/032-login-brute-force, FR-026). A completed reset proves control of the address on file,
+	 * which is what an attacker guessing passwords does not have — so it, and only it, clears the
+	 * sign-in door's failure counter.
+	 */
+	it('clears a standing sign-in lockout (spec 032, FR-026)', async () => {
+		const email = 'session-lockedout@x.io';
+		await seedUser(email);
+		const key = throttleKeyFor(bucketId, email);
+		await adapter('LoginThrottle').upsert(
+			key,
+			{
+				failures: 99,
+				windowStart: epochTime(),
+				step: 2,
+				exp: epochTime() + 3600
+			},
+			3600
+		);
+
+		await resetFor(email);
+
+		expect(await adapter('LoginThrottle').find(key)).toBeUndefined();
+	});
+
+	it('does not clear a lockout for merely asking for a reset', async () => {
+		// Requesting proves nothing: anyone who knows an address can do it, so it must not be a way to
+		// wipe the counter that is holding them off.
+		const email = 'session-stillocked@x.io';
+		await seedUser(email);
+		const key = throttleKeyFor(bucketId, email);
+		await adapter('LoginThrottle').upsert(
+			key,
+			{
+				failures: 99,
+				windowStart: epochTime(),
+				step: 2,
+				exp: epochTime() + 3600
+			},
+			3600
+		);
+
+		await requestReset(email);
+
+		expect(await adapter('LoginThrottle').find(key)).toBeDefined();
 	});
 
 	it('leaves another user signed in (scenario 2)', async () => {
