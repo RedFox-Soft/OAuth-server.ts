@@ -4,7 +4,10 @@
 [CmdletBinding()]
 param(
     [switch]$Json,
-    [switch]$Help
+    [switch]$Help,
+    # Capture extra positional arguments to match Bash/Python behavior.
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [string[]]$RemainingArgs
 )
 
 $ErrorActionPreference = 'Stop'
@@ -21,7 +24,11 @@ if ($Help) {
 . "$PSScriptRoot/common.ps1"
 
 # Get all paths and variables from common functions
-$paths = Get-FeaturePathsEnv
+$paths = Get-FeaturePathsEnv -ReturnNullOnError
+if (-not $paths) {
+    [Console]::Error.WriteLine("ERROR: Failed to resolve feature paths")
+    exit 1
+}
 
 # Ensure the feature directory exists
 New-Item -ItemType Directory -Path $paths.FEATURE_DIR -Force | Out-Null
@@ -34,10 +41,8 @@ if (Test-Path $paths.IMPL_PLAN -PathType Leaf) {
         Write-Output "Plan already exists at $($paths.IMPL_PLAN), skipping template copy"
     }
 } else {
-    $template = Resolve-Template -TemplateName 'plan-template' -RepoRoot $paths.REPO_ROOT
-    if ($template -and (Test-Path $template)) {
-        # Read the template content and write it to the implementation plan file with UTF-8 encoding without BOM
-        $content = [System.IO.File]::ReadAllText($template)
+    $content = Resolve-TemplateContent -TemplateName 'plan-template' -RepoRoot $paths.REPO_ROOT
+    if ($null -ne $content) {
         $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
         [System.IO.File]::WriteAllText($paths.IMPL_PLAN, $content, $utf8NoBom)
         # Emit the copy status like the bash twin (setup-plan.sh); route to stderr
@@ -63,7 +68,7 @@ if (Test-Path $paths.IMPL_PLAN -PathType Leaf) {
 
 # Output results
 if ($Json) {
-    $result = [PSCustomObject]@{ 
+    $result = [PSCustomObject]@{
         FEATURE_SPEC = $paths.FEATURE_SPEC
         IMPL_PLAN = $paths.IMPL_PLAN
         SPECS_DIR = $paths.FEATURE_DIR
