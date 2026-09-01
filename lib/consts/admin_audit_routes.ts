@@ -160,11 +160,6 @@ const routes = [
 		targetType: 'Group'
 	},
 	/*
-	 * Which group an administrator is acting in. Audited because it is the answer to "what was this
-	 * person looking at when they did that" — without it, a trail of container changes cannot be read
-	 * back against the scope they were made from.
-	 */
-	/*
 	 * Invitations. `invitation.accept` is the only audited action whose actor is not an administrator
 	 * acting on the plane: the invitee is not signed in when they accept, so the entry names the account
 	 * that has just come into existence.
@@ -187,12 +182,7 @@ const routes = [
 		path: '/admin/api/invitations/accept',
 		targetType: 'Group'
 	},
-	{
-		action: 'scope.switch',
-		method: 'PUT',
-		path: '/admin/api/scope',
-		targetType: 'Group'
-	},
+
 	{
 		action: 'bucket.create',
 		method: 'POST',
@@ -341,13 +331,27 @@ export type AuditTargetType = (typeof routes)[number]['targetType'];
  * Mutating admin routes that deliberately write no audit entry. Enumerated rather than defaulted, so
  * excluding one is a reviewable edit and the drift guard can pin the set exactly.
  *
+ * Both write to the caller's own session and to nothing else, which is the shared reason: the trail is
+ * a record of changes to managed entities, and an entry for something that changed none of them is a
+ * row an investigator has to read past. Neither exclusion is surfaced to a caller, so the reason lives
+ * here rather than as a field.
+ *
  * `POST /admin/api/logout` ends the caller's own session: session lifecycle, not a change to a managed
  * entity. Authentication-event logging would be its own feature.
+ *
+ * `PUT /admin/api/scope` points the console at one of the groups the caller already belongs to. It
+ * grants nothing — a member can only switch to a group they are in, and a super administrator reaches
+ * every container without switching — so there is no access event to record. The question an entry
+ * would have answered, which scope a change was made from, is already answered by `ownerGroupId` on
+ * that change's own entry, recorded at the time and never re-derived.
  */
 export const excludedAdminRoutes: readonly {
 	readonly method: AuditedMethod;
 	readonly path: string;
-}[] = [{ method: 'POST', path: '/admin/api/logout' }];
+}[] = [
+	{ method: 'POST', path: '/admin/api/logout' },
+	{ method: 'PUT', path: '/admin/api/scope' }
+];
 
 /*
  * Actor recorded for first-run setup, which has no session to attribute. Distinguishable from every

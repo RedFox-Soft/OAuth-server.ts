@@ -36,7 +36,6 @@ import {
 	UpdateMemberBody,
 	CreateInvitationBody
 } from '../admin/groups/schema.js';
-import { SwitchScopeBody } from '../admin/scope/schema.js';
 import { ErrorQuery, ErrorSummaryQuery } from '../admin/errors/schema.js';
 
 /*
@@ -680,19 +679,6 @@ const catalogue = [
 		summary: 'Withdraw a pending invitation before it is accepted. Owner-only.'
 	},
 	{
-		tool: 'scope_switch',
-		method: 'PUT',
-		path: '/admin/api/scope',
-		action: 'scope.switch',
-		consequence: 'ordinary',
-		requiredRole: null,
-		bodySchema: SwitchScopeBody,
-		querySchema: null,
-		pathParams: [],
-		summary:
-			"Switch the console session's active group. An agent has no console session, so this refuses for an agent — name the group in each call instead."
-	},
-	{
 		tool: 'bucket_create',
 		method: 'POST',
 		path: '/admin/api/buckets',
@@ -956,6 +942,13 @@ export const excludedConsoleOperations: readonly ExcludedConsoleOperation[] = [
 			'Ends a browser session, which an agent connection does not have. Session lifecycle, not a change to a managed entity.'
 	},
 	{
+		method: 'PUT',
+		path: '/admin/api/scope',
+		absence: 'inapplicable',
+		reason:
+			'Points a browser console at one of the groups it may administer, and an agent connection has no session to hold that choice. Name the group in each call instead.'
+	},
+	{
 		method: 'DELETE',
 		path: '/admin/api/projects/:id',
 		absence: 'withheld',
@@ -1021,6 +1014,7 @@ export function excludedOperationFor(
 		bucket_delete: '/admin/api/buckets/:id',
 		setup_bootstrap: '/admin/api/setup',
 		logout: '/admin/api/logout',
+		scope_switch: '/admin/api/scope',
 		error_purge: '/admin/api/errors'
 	};
 	const path = guesses[name];

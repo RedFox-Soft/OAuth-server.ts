@@ -4,7 +4,7 @@ title: 'The admin audit trail'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-03
-updated: 2026-08-25
+updated: 2026-08-31
 graph:
   node_type: concept
 ---
@@ -44,8 +44,18 @@ read a refused request as a completed one.
 ## The table is load-bearing
 
 `lib/consts/admin_audit_routes.ts` enumerates all 27 audited routes with their action name and target
-type, plus the single deliberate exclusion (`POST /admin/api/logout` — session lifecycle, not a change
-to a managed entity). It is not documentation:
+type, plus the two deliberate exclusions. Both write to the caller's own session and to nothing else,
+which is the shared reason — the trail is a record of changes to managed entities, so an entry for
+something that changed none of them is a row an investigator has to read past:
+
+- `POST /admin/api/logout` — session lifecycle. Authentication-event logging would be its own feature.
+- `PUT /admin/api/scope` — points the console at one of the groups the caller already belongs to. It
+  grants nothing, since a member can only switch to a group they are in and a super administrator
+  reaches every container without switching, so there is no access event to record. The question an
+  entry would have answered — which scope a change was made from — is already answered by
+  `ownerGroupId` on that change's own entry. See [[group-ownership]].
+
+It is not documentation:
 
 - `recordAdminAudit` takes an `AuditAction` — the union of the table's `action` values — so an action
   the table does not declare cannot compile at the call site.

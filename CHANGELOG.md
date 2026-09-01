@@ -119,6 +119,13 @@ of the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Changed
 
+- Switching the console's active scope no longer writes to the audit trail. `PUT /admin/api/scope`
+  changes `AdminSession.activeGroupId` and nothing else, and grants no access a member did not already
+  have — while which scope a change was made from is already carried by `ownerGroupId` on that change's
+  own entry. It joins `POST /admin/api/logout` in `excludedAdminRoutes`, whose reason already described
+  it: session lifecycle, not a change to a managed entity. `scope_switch` is withdrawn from the agent
+  surface with it, as `inapplicable` — an agent has no console session, so the tool could only ever
+  answer 400
 - `README.md` and `AGENTS.md` now describe the server that exists (issue #20, spec 031). The endpoint
   table was wrong on six of eleven rows — `/authorize`, `/introspect`, `/revoke`, `/register`,
   `/session/end` and `/request` are really `/auth`, `/token/introspect`, `/token/revocation`, `/reg`,

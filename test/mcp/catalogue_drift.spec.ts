@@ -29,16 +29,16 @@ const mountedApi = mounted.routes
 	.map((r) => ({ method: r.method, path: r.path }));
 
 describe('MCP tool catalogue', () => {
-	it('publishes 59 tools: 25 reads and 34 writes', () => {
-		expect(mcpCatalogue.length).toBe(59);
+	it('publishes 58 tools: 25 reads and 33 writes', () => {
+		expect(mcpCatalogue.length).toBe(58);
 		expect(mcpCatalogue.filter((t) => t.method === 'GET').length).toBe(25);
-		expect(mcpCatalogue.filter((t) => t.method !== 'GET').length).toBe(34);
+		expect(mcpCatalogue.filter((t) => t.method !== 'GET').length).toBe(33);
 	});
 
-	it('names exactly six exclusions', () => {
-		// A fifth exclusion is a product decision, not a refactor: it must fail here until the
+	it('names exactly eight exclusions', () => {
+		// A further exclusion is a product decision, not a refactor: it must fail here until the
 		// specification is updated to account for it.
-		expect(excludedConsoleOperations.length).toBe(7);
+		expect(excludedConsoleOperations.length).toBe(8);
 	});
 
 	it('accounts for every mounted /admin/api route, in both directions', () => {
@@ -98,7 +98,8 @@ describe('MCP tool catalogue', () => {
 		).toEqual([
 			'POST /admin/api/setup',
 			'POST /admin/api/invitations/accept',
-			'POST /admin/api/logout'
+			'POST /admin/api/logout',
+			'PUT /admin/api/scope'
 		]);
 	});
 

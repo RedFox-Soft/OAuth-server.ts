@@ -53,25 +53,29 @@ describe('admin audit route classification', () => {
 		expect(stale).toEqual([]);
 	});
 
-	it('audits every mutating admin route except the one deliberate exclusion', () => {
+	it('audits every mutating admin route except the two deliberate exclusions', () => {
 		// Pinned exactly rather than merely checked for staleness: an operation quietly moved into the
 		// exclusion list is indistinguishable from one that was never audited.
-		expect(excludedAdminRoutes.map(key)).toEqual(['POST /admin/api/logout']);
+		expect(excludedAdminRoutes.map(key)).toEqual([
+			'POST /admin/api/logout',
+			'PUT /admin/api/scope'
+		]);
 
 		/*
 		 * Counted exactly, and the numbers grow with the table: 23 + the four federation rows (three provider
 		 * operations and one identity severance) + the error-store purge + clearing an end-user's
-		 * authenticator + the admin bucket's own sign-in policy + the seven group rows (three on the group
-		 * itself, three on its membership, one for switching the active scope) + the three invitation
+		 * authenticator + the admin bucket's own sign-in policy + the six group rows (three on the group
+		 * itself, three on its membership) + the three invitation
 		 * rows (issue, revoke, accept). A count that drifted
 		 * upward silently would let an audited route be swapped for an unaudited one without either
 		 * total changing.
 		 *
-		 * `mounted` stays exactly one ahead, and always the same one: `POST /admin/api/logout`, the
-		 * deliberate exclusion named above. It filters to MUTATING methods, so the settings *read* that
+		 * `mounted` stays exactly two ahead, and always the same two: the deliberate exclusions named
+		 * above, `POST /admin/api/logout` and `PUT /admin/api/scope`, both of which change the caller's own
+		 * session and no managed entity. It filters to MUTATING methods, so the settings *read* that
 		 * shipped alongside the PATCH does not appear in either total.
 		 */
-		expect(auditedAdminRoutes).toHaveLength(40);
+		expect(auditedAdminRoutes).toHaveLength(39);
 		expect(mounted).toHaveLength(41);
 	});
 

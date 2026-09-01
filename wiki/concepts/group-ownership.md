@@ -4,7 +4,7 @@ title: 'Group ownership of projects and buckets'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-29
-updated: 2026-08-29
+updated: 2026-08-31
 graph:
   node_type: concept
 ---
@@ -66,9 +66,20 @@ boundary — a client-supplied scope could name a group the caller has since bee
 re-validated against live membership on every request and falls back to the personal group, so a
 removed member keeps a usable console instead of being stranded in a scope they cannot navigate out of.
 
-An agent has no session. `scope_switch` therefore refuses for an agent, and the create tools take an
-explicit `groupId` validated against the acting administrator's memberships — the one place the agent
-surface's request shape differs from the console's, and it differs in the safe direction.
+Switching writes **no audit entry**. `PUT /admin/api/scope` is one of the two routes
+`excludedAdminRoutes` names, alongside logout, and for the same reason: the session is the only thing it
+changes. It also grants nothing — a member can only switch to a group they are already in, and a super
+administrator reaches every container without switching — so there is no access event to record. Which
+scope a change was made from is answered by `ownerGroupId` on that change's own entry rather than by a
+separate row, which is the better record anyway: a switch entry names only the group switched *to*.
+See [[admin-audit-trail]].
+
+An agent has no session, so there is nothing for it to switch. `PUT /admin/api/scope` is therefore not
+published as a tool at all — it is named in `excludedConsoleOperations` as `inapplicable`, the same
+category as logout and first-run setup, so an agent is not offered an operation it has no principal
+for. The create tools instead take an explicit `groupId` validated against the acting administrator's
+memberships — the one place the agent surface's request shape differs from the console's, and it
+differs in the safe direction.
 
 ## Gotchas
 

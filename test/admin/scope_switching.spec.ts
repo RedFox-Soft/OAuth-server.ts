@@ -6,7 +6,7 @@ import { groupRoutes } from 'lib/admin/groups/routes.ts';
 import { scopeRoutes } from 'lib/admin/scope/routes.ts';
 import { projectRoutes } from 'lib/admin/projects/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { getUserStore } from 'lib/adapters/index.ts';
+import { adminAuditStore, getUserStore } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import type { Group, Project } from 'lib/adapters/types.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
@@ -129,6 +129,37 @@ describe('active scope', () => {
 			await client.admin.api.scope.get({ headers: { cookie: a.cookie } })
 		).data as ScopeView;
 		expect(later.activeGroupId).toBe(group._id);
+	});
+
+	/*
+	 * Pinned as a negative because the decision is the kind that gets quietly reversed: `PUT
+	 * /admin/api/scope` is one of the two routes `excludedAdminRoutes` names, and re-adding a
+	 * `recordAdminAudit` call to the handler must fail here rather than only widen the trail. The switch
+	 * changes the session and nothing else, and grants no access to record — which scope a change was
+	 * made from is carried by `ownerGroupId` on that change's own entry.
+	 *
+	 * Scoped to the destination group's id rather than a total, because `group.create` above legitimately
+	 * writes an entry against that same id: the assertion is that *switching* added nothing to it.
+	 */
+	it('writes no audit entry for the switch itself', async () => {
+		const a = await admin();
+		const group = (
+			await client.admin.api.groups.post(
+				{ name: 'Acme' },
+				{ headers: { cookie: a.cookie } }
+			)
+		).data as Group;
+
+		const before = (await adminAuditStore.list({ targetId: group._id })).total;
+
+		await client.admin.api.scope.put(
+			{ groupId: group._id },
+			{ headers: { cookie: a.cookie } }
+		);
+
+		const after = await adminAuditStore.list({ targetId: group._id });
+		expect(after.total).toBe(before);
+		expect(after.entries.map((e) => e.action)).not.toContain('scope.switch');
 	});
 
 	it('refuses a switch to a group the caller does not belong to', async () => {

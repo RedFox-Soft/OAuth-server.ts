@@ -201,7 +201,9 @@ The admin routes are the definition; the MCP surface follows from them.
    import a route module (a route module reaches the adapters and from there a db module that connects
    at import time).
 2. If it mutates, add it to `lib/consts/admin_audit_routes.ts` and call `recordAdminAudit` inside the
-   handler, after authorization. `test/admin/audit_route_classification.spec.ts` fails otherwise.
+   handler, after authorization. `test/admin/audit_route_classification.spec.ts` fails otherwise. The
+   only escape is `excludedAdminRoutes`, and it is narrow: a route that changes the caller's own session
+   and no managed entity (logout, the scope switch). Anything that touches a managed entity is audited.
 3. Decide the agent's access and record it in `lib/mcp/catalogue.ts`: publish it as a tool, or name it
    in `excludedConsoleOperations` with the reason. `test/mcp/catalogue_drift.spec.ts` fails until you do
    one or the other — that is the point of the table.

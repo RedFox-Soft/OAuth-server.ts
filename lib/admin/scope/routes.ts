@@ -8,16 +8,19 @@ import {
 	type AdminContext
 } from '../auth/rbac.js';
 import { ADMIN_SESSION_COOKIE } from '../consts.js';
-import { recordAdminAudit } from '../audit/record.js';
 import { SwitchScopeBody } from './schema.js';
 
 /*
  * The console's active scope: which group is being administered right now.
  *
  * Its own route group rather than part of `me.ts`, for two reasons. `me.ts` is re-dispatched by the
- * MCP `whoami` tool and must stay a pure read, while switching is a state change that is audited. And
- * an agent has no session to switch, so it names its group per call instead — keeping the two on
- * separate routes is what stops the agent surface growing a session it does not have.
+ * MCP `whoami` tool and must stay a pure read, while switching writes to the session. And an agent has
+ * no session to switch, so it names its group per call instead — keeping the two on separate routes is
+ * what stops the agent surface growing a session it does not have.
+ *
+ * Switching writes no audit entry, and is one of the two routes `excludedAdminRoutes` names for it: the
+ * session is the only thing it changes, and which scope a change was made from is already recorded as
+ * `ownerGroupId` on that change's own entry.
  */
 export const scopeRoutes = new Elysia({ name: 'admin-scope' })
 	.use(resolveAdmin)
@@ -72,9 +75,11 @@ export const scopeRoutes = new Elysia({ name: 'admin-scope' })
 				string | undefined;
 			if (!sessionId) {
 				/*
-				 * Reachable only through the agent surface, which authenticates with a bearer token and has
-				 * no session to write the choice to. Said plainly rather than answering 200 to a switch that
-				 * did not happen — an agent names its group per call instead.
+				 * Reachable only by a bearer-token caller, which has no session to write the choice to. No
+				 * MCP tool dispatches here — `PUT /admin/api/scope` is named in `excludedConsoleOperations`
+				 * as inapplicable — but the admin API resolves both credential types, so a token holder can
+				 * still call the route directly. Said plainly rather than answering 200 to a switch that did
+				 * not happen; an agent names its group per call instead.
 				 */
 				throw new AdminError(
 					400,
@@ -82,9 +87,6 @@ export const scopeRoutes = new Elysia({ name: 'admin-scope' })
 				);
 			}
 
-			await recordAdminAudit(ctx, 'scope.switch', body.groupId, {
-				ownerGroupId: body.groupId
-			});
 			await adminSessionStore.setActiveGroup(sessionId, body.groupId);
 			return { activeGroupId: body.groupId };
 		},
