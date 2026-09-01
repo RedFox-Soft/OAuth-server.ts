@@ -11,6 +11,7 @@ import {
 	type ProofMethod,
 	type RejectionReason
 } from './principal.js';
+import { withheldOutcome } from './result.js';
 import { MCP_METADATA_ROUTE, MCP_RESOURCE, MCP_ROUTE } from './consts.js';
 
 /*
@@ -124,6 +125,61 @@ function challenge(set: McpContext['set']) {
 }
 
 /*
+ * The refusal for an operation an agent names but this surface does not publish.
+ *
+ * `tools/call` on an unregistered name is the SDK's own `Tool <name> not found`: correct as protocol
+ * and useless as guidance, because it makes an operation withheld by operator decision
+ * indistinguishable from a typo — so an agent retries or gives up instead of saying where the work can
+ * be done. The text comes from `excludedConsoleOperations` by way of `withheldOutcome`, so the message
+ * an agent reads and the table that decides absence cannot disagree.
+ *
+ * It has to be answered here, and the two nearer places were both tried in the design. A registered
+ * tool cannot do it: a registered tool appears in `tools/list` however it behaves, which would present
+ * a withheld operation as available. Nor can a tool *callback* — the SDK resolves the name against its
+ * registry and throws before any callback runs, which is why `withheldOutcome`'s call inside the
+ * registration loop can only ever fire for a name that is registered, and therefore never fires.
+ *
+ * Deliberately narrow. Anything that is not a single `tools/call` object carrying an id falls through
+ * to the SDK untouched — a batch, a notification, a shape this does not recognise — so the transport
+ * keeps its own handling of them rather than gaining a second, thinner implementation of it. Reached
+ * only after the credential resolves, so the exclusion table is not readable by an anonymous caller.
+ */
+function absentToolRefusal(body: unknown): object | undefined {
+	if (!body || typeof body !== 'object' || Array.isArray(body)) return undefined;
+
+	const message = body as {
+		method?: unknown;
+		id?: unknown;
+		params?: unknown;
+	};
+	if (message.method !== 'tools/call') return undefined;
+	// A notification carries no id and takes no response at all.
+	if (message.id === undefined || message.id === null) return undefined;
+	if (!message.params || typeof message.params !== 'object') return undefined;
+
+	const name = (message.params as { name?: unknown }).name;
+	if (typeof name !== 'string') return undefined;
+
+	const outcome = withheldOutcome(name);
+	if (!outcome) return undefined;
+
+	/*
+	 * A JSON-RPC *result* whose payload is a failed tool call, not a JSON-RPC error: the call was
+	 * well-formed and the answer is about the operation, which is the same shape every other refusal on
+	 * this surface takes (`toOutcome`), and the shape an agent already knows how to read.
+	 */
+	return {
+		jsonrpc: '2.0',
+		id: message.id,
+		result: {
+			content: [{ type: 'text', text: outcome.message }],
+			structuredContent: { ...outcome },
+			isError: true
+		}
+	};
+}
+
+/*
  * POST carries JSON-RPC; GET opens the server-initiated stream. Registered as two routes rather than
  * one `.all`, because the feature-gate classification table declares them individually and its drift
  * guard compares (method, path) pairs exactly — an `ALL` route would match neither entry.
@@ -157,6 +213,14 @@ async function serve(
 		report(err instanceof McpUnauthorized ? err.reason : 'unknown');
 		return challenge(set);
 	}
+
+	/*
+	 * Before the SDK, because the SDK's answer for a name it does not know is a bare not-found and the
+	 * reason an operation is absent lives in the exclusion table. After the credential above, so an
+	 * anonymous caller learns nothing about what the table holds.
+	 */
+	const refusal = absentToolRefusal(body);
+	if (refusal) return refusal;
 
 	/*
 	 * `parsedBody`, because Elysia has already read the JSON by the time a handler runs and the SDK

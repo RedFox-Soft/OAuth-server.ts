@@ -4,7 +4,7 @@ title: 'The administrative MCP control plane'
 tags: [architecture, contract, gotcha, config]
 sources: [oauth-server-codebase]
 created: 2026-08-24
-updated: 2026-08-24
+updated: 2026-08-31
 graph:
   node_type: concept
 ---
@@ -133,6 +133,19 @@ Widening the project-administrator role deliberately did not widen this list. Th
 registered as refusing tools either, because a registered tool appears in `tools/list` however it
 behaves; the server's `instructions` carry the explanation, read from the exclusion table so the two
 cannot disagree.
+
+**Refusing one by name happens in the transport, and for a while did not happen at all.**
+`withheldOutcome` (`lib/mcp/result.ts`) turns a name into the exclusion's own reason, and the call
+that was supposed to deliver it sat inside the tool registration loop in `lib/mcp/server.ts` — where
+it can only run for a name that *is* registered, which an excluded operation never is. The SDK
+resolves `tools/call` against its registry and throws `Tool <name> not found` before any callback
+runs, so every guessed name got the bare not-found and the whole `guesses` map was unreachable. The
+check now also runs in `absentToolRefusal` (`lib/mcp/index.ts`), before the request reaches the SDK
+and after the credential resolves, answering a JSON-RPC *result* carrying a failed tool call rather
+than a JSON-RPC error — the shape every other refusal here takes. It matches only a single
+`tools/call` object carrying an id; a batch or an unrecognised shape falls through, so the transport
+keeps one implementation of JSON-RPC rather than two. A genuine typo still gets the SDK's not-found,
+which is the point of matching narrowly: a mistake must not be dressed up as a policy decision.
 
 The table distinguishes two kinds of absence, and the distinction is what makes that claim true.
 `withheld` entries are operations an agent could perform and an operator has decided it may not;

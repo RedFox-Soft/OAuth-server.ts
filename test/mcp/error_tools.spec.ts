@@ -191,16 +191,26 @@ describe('error store tools over MCP', () => {
 		/*
 		 * Not callable at all, which is the stronger form: a withheld operation is absent from the
 		 * published surface rather than registered as a tool that refuses, because a registered tool
-		 * appears in `tools/list` however it behaves. The transport therefore answers "not found" — and the
-		 * knowledge an operator needs (that it is withheld, and where to do it instead) lives in the server
-		 * instructions, asserted below, rather than in this error.
+		 * appears in `tools/list` however it behaves.
+		 *
+		 * The answer used to be the SDK's bare `not found`, on the reasoning that the knowledge an
+		 * operator needs lives in the server instructions (asserted below) rather than in this error. It
+		 * still lives there, and now reaches a caller who names the tool anyway: the transport recognises
+		 * the name against the exclusion table and returns that entry's own reason, so an agent that
+		 * guessed is told it is withheld and where to do it instead, rather than being left to read a
+		 * not-found as a typo. Absence from `tools/list` is unchanged and asserted separately.
 		 */
 		it('is not callable at all while withheld', async () => {
 			const { token } = await agentFor(['super_admin']);
 			const result = await rpc(call('error_purge', { route: '/x' }), token);
 
-			expect(result.error?.message ?? '').toContain('not found');
-			expect(result.result).toBeUndefined();
+			expect(result.result?.isError).toBe(true);
+			expect(result.result?.structuredContent?.reason).toBe(
+				'not_available_here'
+			);
+			expect(result.result?.structuredContent?.message).toContain('console');
+			// Still an answer about the operation, never a performed purge.
+			expect(result.result?.structuredContent?.ok).toBe(false);
 		});
 
 		// Reading the consequence of a deletion is not destructive, so it stays available either way.

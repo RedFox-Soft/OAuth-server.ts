@@ -16,7 +16,10 @@ import {
 	MCP_RESOURCE,
 	MCP_ROUTE
 } from 'lib/mcp/consts.ts';
-import { mcpCatalogue } from 'lib/mcp/catalogue.ts';
+import {
+	excludedConsoleOperations,
+	mcpCatalogue
+} from 'lib/mcp/catalogue.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 
 /*
@@ -309,5 +312,54 @@ describe('withheld container deletions', () => {
 		);
 		expect(refused.result?.isError ?? refused.error !== undefined).toBe(true);
 		expect(await getProjectStore().find(project._id)).not.toBeNull();
+	});
+
+	/*
+	 * FR-034's actual delivery. The instructions announce the withheld operations, but an agent that
+	 * guesses a tool name never reads them again — and the SDK's answer for a name it does not know is a
+	 * bare `Tool <name> not found`, which reads as a typo rather than as a decision. These three cases
+	 * pin the refusal that replaces it, and pin that it replaced nothing else.
+	 */
+	describe('naming an operation the surface does not publish', () => {
+		it('answers a withheld operation with the reason the exclusion table holds', async () => {
+			const { token } = await superAdmin();
+
+			const refused = await rpc(call('project_delete', { id: 'anything' }), token);
+
+			const expected = excludedConsoleOperations.find(
+				(e) => e.path === '/admin/api/projects/:id' && e.method === 'DELETE'
+			);
+			expect(refused.result?.isError).toBe(true);
+			expect(refused.result?.structuredContent?.reason).toBe(
+				'not_available_here'
+			);
+			// The very string the table holds, not a paraphrase of it: that is the property FR-034 wants.
+			expect(refused.result?.structuredContent?.message).toBe(expected!.reason);
+			expect(refused.result?.content?.[0]?.text).toBe(expected!.reason);
+		});
+
+		it('answers an inapplicable operation the same way', async () => {
+			const { token } = await superAdmin();
+
+			// An agent has no console session to point at a group, so the operation is absent rather than
+			// withheld — but an agent that guesses the name still deserves to be told which it is.
+			const refused = await rpc(call('scope_switch', { groupId: 'g' }), token);
+
+			expect(refused.result?.isError).toBe(true);
+			expect(refused.result?.structuredContent?.message).toMatch(/console/i);
+		});
+
+		it('leaves a genuine unknown name to the SDK', async () => {
+			const { token } = await superAdmin();
+
+			// Not in the exclusion table, so nothing here should claim to explain it. The point of the
+			// narrow match: a typo must not be dressed up as a policy decision.
+			const typo = await rpc(call('projct_delete', { id: 'anything' }), token);
+
+			expect(typo.result?.structuredContent?.reason).not.toBe(
+				'not_available_here'
+			);
+			expect(typo.result?.isError ?? typo.error !== undefined).toBe(true);
+		});
 	});
 });

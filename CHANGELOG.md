@@ -176,6 +176,12 @@ of the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- An agent naming an operation the MCP surface withholds now hears why, instead of `Tool <name> not
+  found`. The refusal text existed and never ran: the call that delivered it sat in the tool
+  registration loop, where it can only fire for a name that *is* registered, and an excluded operation
+  never is. It now also runs in the transport, before the SDK and after the credential, answering a
+  failed tool call rather than a JSON-RPC error. A genuine typo still gets the SDK's not-found, so a
+  mistake is not dressed up as a policy decision
 - The server could not boot against MongoDB: the DPoP nonce secret came back from the driver as a
   BSON `Binary` and failed its own round-trip check (`71d9b53`)
 - PKCE accepts the full RFC 7636 verifier length range (43–128), not only 43 (`6dce3f7`)
