@@ -160,3 +160,5 @@ cross-origin behaviour that spec 011 settled deliberately.
 - [[feature-flag-gating]] — the `onRequest` gate that this plugin must be registered *before*, so a
   refusal still carries the headers.
 - [[interaction-page-families]] — the pages whose policies must stay untouched.
+- [[elysia-lifecycle]] — the plugin subsystem this hook belongs to, and the mount order in
+  `lib/index.ts` that the registration-order constraint makes load-bearing.

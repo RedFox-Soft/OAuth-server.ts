@@ -107,7 +107,7 @@ When the wiki passes ~150 pages or `index.md` exceeds 300 lines, shard into `wik
 - Search is section-level hybrid by default: `python wiki/bin/wiki.py search "query" --json`.
 - Semantic backend: local FastEmbed + sqlite-vec (`BAAI/bge-small-en-v1.5`, 384 dimensions). No wiki or query text leaves the machine.
 - First semantic use downloads model artifacts to `~/.cache/llm-wiki/fastembed/`; set `FASTEMBED_CACHE_PATH` to override the model cache.
-- Semantic setup verified: 2026-07-31
+- Semantic setup verified: 2026-09-01
 - `wiki/.wiki-cache/` holds regenerable retrieval artifacts: `search-index.json` (parse cache) and `embeddings.sqlite` (section metadata + sqlite-vec vectors). Safe to delete; never edit by hand; gitignored.
 - The vector index is content-hashed: only new or changed sections are re-embedded, deleted sections are removed, and model/schema changes rebuild it automatically.
 - Dependency-free lexical path: `python wiki/bin/wiki.py search "query" --no-embed`. Semantic search needs `uv` on PATH; without it the launcher fails loudly rather than silently degrading to lexical.
@@ -126,7 +126,7 @@ Generation is reproducible from markdown via `python wiki/bin/wiki.py graph-extr
 ## Workflow customizations
 
 - **Script invocation goes through `wiki/bin/wiki.py`.** Never call the plugin's scripts by path, and never call them with bare `python`: bare `python` skips the PEP 723 dependency block, which makes `wiki_search.py` fall back to lexical BM25 with only a warning and makes the graph scripts fail outright on missing PyYAML.
-- `/wiki:upgrade` does **not** overwrite this file — `init_wiki.py` skips every file that already exists and only reports which template marker sections are missing, leaving the merge to a human or the agent. The residual hazard is narrower: the plugin's `SCHEMA.md.template` still prints the `skills/llm-wiki/scripts/...` path, which does not exist in this repo, so if a future upgrade asks to merge a **Retrieval** section from the template, that broken path comes with it. Re-point any merged command at `wiki/bin/wiki.py`. Verified against plugin 3.0.0 on 2026-07-31.
+- `/wiki:upgrade` does **not** overwrite this file — `init_wiki.py` skips every file that already exists and only reports which template marker sections are missing, leaving the merge to a human or the agent. The residual hazard is narrower: the plugin's `SCHEMA.md.template` still prints the `skills/llm-wiki/scripts/...` path, which does not exist in this repo, so if a future upgrade asks to merge a **Retrieval** section from the template, that broken path comes with it. Re-point any merged command at `wiki/bin/wiki.py`. Verified against plugin 3.0.0 on 2026-09-01.
 - This project is a codebase, not a research corpus. The wiki records durable knowledge about the OAuth/OIDC server — protocol decisions, subsystem contracts, hard-won gotchas. Transient planning artifacts (`TASKS.md`, `specs/`) are deliberately **not** wiki sources: they are scratch files that get deleted, and ingesting them would fill the wiki with claims whose sources vanish.
 
 ## User preferences

@@ -92,5 +92,7 @@ colliding symbol as a tripwire across the change.
   importers proved nothing loaded it; only the supersession proved nothing needed it.
 - [[html-response-security-policy]] — the CSP constructor that superseded `script_src_sha.ts`,
   another entry that had already been handled by the time the sweep ran.
+- [[addon-registry]] — the seam itself: the call-time `resolve()` map, and the accessor layer that
+  makes an importer census read the implementation modules as unused.
 - [[model-graph-import-order]] — the other place where indirection through a registry defeats a
   naive import-graph reading.

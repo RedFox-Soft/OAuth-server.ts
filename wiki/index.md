@@ -14,7 +14,11 @@ When this file exceeds ~300 lines or the wiki passes ~150 pages, shard into `wik
 
 ## Entities
 
+- [[addon-registry]] — the single call-time seam for replaceable behaviour; type-only imports keep it free of the model graph, and source modules import the accessor, not the implementation.
+- [[admin-console]] — the admin API plus the HTML shell that drives it, split so the MCP plane can mount the same route set; two error handlers, one bootstrap surface, and a shell too expensive for an agent to import.
+- [[elysia-lifecycle]] — the callback-shaped cross-cutting hooks and the mount order that makes them correct; registration order is a correctness constraint, and each plugin argues its own lifecycle stage.
 - [[event-bus]] — the lifecycle `EventEmitter` that used to be the provider; a leaf module that must import no model, and imports the key store for its side effect.
+- [[html-rendering]] — the one constructor every HTML response passes through, deliberately not a lifecycle plugin; the framing verdict rides along with the derived policy.
 
 ## Concepts
 

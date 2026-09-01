@@ -112,6 +112,21 @@ predicates:
     subject_types: [product, concept, subsystem]
     object_types: [product, concept, subsystem]
     requires_evidence: true
+  complements:
+    subject_types: [concept, subsystem]
+    object_types: [concept, subsystem]
+    requires_evidence: true
+    description: |
+      Two mechanisms that cover adjacent halves of one concern; neither
+      requires the other to function.
+  constrained_by:
+    subject_types: [concept, subsystem]
+    object_types: [concept, subsystem]
+    requires_evidence: true
+    description: |
+      The subject's behaviour is bounded by a contract it does not own.
+      Weaker than depends_on: the subject works, but only within limits
+      the object sets.
   implements:
     subject_types: [subsystem, concept]
     object_types: [concept]
