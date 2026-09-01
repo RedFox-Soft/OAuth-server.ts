@@ -4,7 +4,7 @@ title: "Per-origin rate limiting"
 tags: [architecture, config, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-28
-updated: 2026-08-28
+updated: 2026-09-01
 graph:
   node_type: concept
   relationships:
@@ -96,8 +96,10 @@ The price, stated in the README rather than hidden: with N machines serving conc
 effective allowance is N times the configured value, and a restart clears every counter. **This is a
 resource protection, not a security boundary.** The limits that must hold absolutely live in the
 per-identity throttles — the verification attempt cap and the cooldown/daily-cap arithmetic in
-`lib/helpers/rate_window.ts` — which this feature leaves untouched and does not duplicate. Issue #9
-(login-door brute force) remains separately necessary for the same reason.
+`lib/helpers/rate_window.ts` — which this feature leaves untouched and does not duplicate. The
+login-door brute-force throttle was separately necessary for the same reason, and has since shipped:
+see [[login-door-throttle]], which counts per `${bucketId}:${email}` rather than per origin and so
+survives the rotation this feature deliberately fails open under.
 
 ## Classification, and why `ordinary` is the default
 
@@ -118,8 +120,14 @@ The store is module state, so nothing in the suite clears it by default, and onc
 accumulate on the unattributed bucket, unrelated specs start seeing `429`s in whichever file happens
 to cross the allowance first — 1039 failures, on the first full run after mounting. The reset lives
 in `test/preload.ts`'s global `afterEach`, not in `bootstrap()`: the specs that trip it are the ones
-calling `bootstrap` in `beforeAll`, where a per-file reset comes too late. See
-[[bun-beforeeach-describe-scope]] for the related scoping rule.
+calling `bootstrap` in `beforeAll`, where a per-file reset comes too late.
+
+The counters are not the only store shaped this way. The same preload seeds `jwksStore` with three
+signing keys once, at process start, and that one is *never* reset — so a spec that deletes a key
+changes what every later file sees, and a "delete the last signing key" case has to reduce the store
+itself rather than assume it starts at one. The hazard is the module state, not the hook: a
+top-level `beforeEach` does fire for `describe`-nested tests (checked against bun 1.4.0, in both
+declaration orders), so per-file placement is not what rescues these.
 
 ## Related
 

@@ -4,7 +4,7 @@ title: 'The TOTP second factor'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-27
-updated: 2026-08-27
+updated: 2026-09-01
 graph:
   node_type: concept
   relationships:
@@ -176,6 +176,8 @@ failing anywhere to reveal it.
 - [[admin-console-signin]] — the console is a relying party on this server's own issuer, which is why
   putting the admin bucket behind a second factor needed no new enforcement, only a way to say so.
 - [[feature-flag-gating]] — this is bucket state rather than a feature flag, and deliberately so.
+- [[login-door-throttle]] — the code step's throttle, moved one door earlier onto the password; the
+  ceiling there reads this bucket's second-factor setting rather than the bucket's id.
 - [[html-response-security-policy]] — both new pages build through `htmlResponse`; the QR is inline SVG
   and needs no directive.
 - [[token-payload-access-contract]] — `amr` reaches the ID token via `session.payload.amr`.

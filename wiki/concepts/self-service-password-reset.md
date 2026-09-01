@@ -4,7 +4,7 @@ title: 'Self-service password reset'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-04
-updated: 2026-08-04
+updated: 2026-09-01
 graph:
   node_type: concept
 ---
@@ -128,6 +128,8 @@ resends cannot lock a user out of a password reset.
 
 - [[deletion-and-revocation]] — the ownership table and cascade engine this reuses; the computed-id parameter
   now covers two areas because of this feature.
+- [[login-door-throttle]] — this flow is the escape hatch from a shut door, and the distinction that
+  matters there is request vs complete.
 - [[account-resolution]] — `active` is enforced at every resolution, which is why a deactivated account gets
   no reset mail and a live secret stops working the moment the account is frozen.
 - [[admin-audit-trail]] — why an anonymous, actorless flow must not write to the trail, and why the operator
