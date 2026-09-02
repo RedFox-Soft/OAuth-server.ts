@@ -5,14 +5,19 @@ import {
 } from 'lib/admin/settings/catalog.ts';
 import { ApplicationConfig } from 'lib/configs/application.ts';
 import { windowFor } from 'lib/login_throttle/consts.ts';
+import { generate } from 'lib/helpers/user_codes.ts';
 import {
+	buildMask,
 	cascadeOff,
 	dirtyKeys,
 	domainsWithDirty,
+	groupSizeOptions,
 	groupsFor,
 	humanDuration,
 	isRowEnabled,
+	maskStrengthBits,
 	matches,
+	parseMask,
 	pendingChanges,
 	riskyChanges,
 	sameValue,
@@ -259,6 +264,113 @@ describe('settings model', () => {
 				{ first: false }
 			);
 			expect(riskyChanges(changes)).toEqual([]);
+		});
+	});
+
+	describe('mask shape', () => {
+		it('reads the shipped mask back as its two decisions', () => {
+			expect(parseMask(ApplicationConfig['deviceFlow.mask'])).toEqual({
+				length: 8,
+				separator: 'hyphen',
+				groupSize: 4
+			});
+		});
+
+		/*
+		 * The property that matters: everything the control can build reads back. The first version of
+		 * `buildMask` broke it by emitting "***-*" for a group size that does not divide the length, and
+		 * this loop is what caught it.
+		 */
+		it('round-trips every shape the editor can offer', () => {
+			for (const separator of ['none', 'hyphen', 'space'] as const) {
+				for (const length of [1, 4, 6, 8, 9, 12, 13]) {
+					for (const groupSize of [0, ...groupSizeOptions(length)]) {
+						const mask = buildMask({ length, separator, groupSize });
+						// Whatever it built must be a mask the server accepts.
+						expect(mask).toMatch(/^[-* ]+$/);
+						expect(mask).toContain('*');
+
+						const read = parseMask(mask);
+						expect(read?.length).toBe(length);
+						if (separator !== 'none' && groupSize > 1) {
+							expect(read?.separator).toBe(separator);
+							expect(read?.groupSize).toBe(groupSize);
+						}
+					}
+				}
+			}
+		});
+
+		/*
+		 * A group size that cannot divide the length is not silently turned into uneven groups; the
+		 * separator is dropped instead. The control only offers divisors, so this is the guard rather
+		 * than the path — but a shape can also arrive from a mask an operator typed by hand.
+		 */
+		it('drops the separator rather than emitting a short last group', () => {
+			expect(buildMask({ length: 4, separator: 'hyphen', groupSize: 3 })).toBe(
+				'****'
+			);
+			expect(buildMask({ length: 8, separator: 'hyphen', groupSize: 4 })).toBe(
+				'****-****'
+			);
+			expect(buildMask({ length: 9, separator: 'space', groupSize: 3 })).toBe(
+				'*** *** ***'
+			);
+		});
+
+		it('offers only group sizes that divide the length', () => {
+			expect(groupSizeOptions(8)).toEqual([2, 4]);
+			expect(groupSizeOptions(9)).toEqual([3]);
+			expect(groupSizeOptions(12)).toEqual([2, 3, 4, 6]);
+			// A prime length, or a very short one, has no sensible grouping at all.
+			expect(groupSizeOptions(13)).toEqual([]);
+			expect(groupSizeOptions(1)).toEqual([]);
+		});
+
+		/*
+		 * A mask the form cannot draw must not be silently redrawn. Returning null is what lets the
+		 * control fall back to editing the template as text, rather than rewriting a valid
+		 * configuration into the nearest shape it happens to support.
+		 */
+		it('declines to represent a mask the editor cannot draw', () => {
+			expect(parseMask('***-**')).toBeNull(); // uneven groups
+			expect(parseMask('**-** **')).toBeNull(); // both separators
+			expect(parseMask('**--**')).toBeNull(); // empty group
+			expect(parseMask('---')).toBeNull(); // no random part at all
+			expect(parseMask('ab**')).toBeNull(); // characters the server refuses
+			expect(parseMask(undefined)).toBeNull();
+		});
+
+		/*
+		 * Cross-checked against the real generator: a mask this control produces must yield a code of
+		 * exactly the promised number of random characters, or the strength figure beside it is a
+		 * fiction.
+		 */
+		it('produces masks whose generated codes match the promised length', () => {
+			for (const shape of [
+				{ length: 8, separator: 'hyphen', groupSize: 4 } as const,
+				{ length: 9, separator: 'space', groupSize: 3 } as const,
+				{ length: 6, separator: 'none', groupSize: 0 } as const
+			]) {
+				const mask = buildMask(shape);
+				const code = generate('base-20', mask);
+				expect(code.replace(/[- ]/g, '')).toHaveLength(shape.length);
+				expect(code).not.toBe(mask);
+			}
+		});
+
+		it('states strength in bits from the length and the charset', () => {
+			// 8 characters of a 20-symbol alphabet: 8 × log2(20) ≈ 34.6 bits.
+			expect(maskStrengthBits('****-****', 'base-20')).toBeCloseTo(34.6, 1);
+			// The same code in digits is markedly weaker, which is the point of showing it.
+			expect(maskStrengthBits('****-****', 'digits')).toBeCloseTo(26.6, 1);
+			expect(maskStrengthBits('****', 'base-20')).toBeCloseTo(17.3, 1);
+		});
+
+		it('states no strength for a mask or charset it cannot read', () => {
+			expect(maskStrengthBits('---', 'base-20')).toBeNull();
+			expect(maskStrengthBits('****', 'klingon')).toBeNull();
+			expect(maskStrengthBits(undefined, 'base-20')).toBeNull();
 		});
 	});
 

@@ -1,6 +1,32 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Input, InputNumber, Select, Switch, Typography } from 'antd';
 import type { Descriptor, Values } from './model.js';
+import { MaskField } from './MaskField.js';
+
+interface BespokeProps {
+	values: Values;
+	disabled: boolean;
+	onChange: (key: string, value: unknown) => void;
+}
+
+/*
+ * The settings whose own control replaces the one their type would give them.
+ *
+ * Keyed by key and gathered here rather than branched inside `Control`, which exists to know nothing
+ * about individual settings. Each entry earns its place by encoding a rule the generic control
+ * cannot: the type says "a string" or "an object", and what the operator is actually choosing is
+ * something narrower that a plain field lets them get wrong and only learn about from a 422.
+ */
+const BESPOKE: Record<string, (props: BespokeProps) => ReactNode> = {
+	'deviceFlow.mask': ({ values, disabled, onChange }) => (
+		<MaskField
+			value={values['deviceFlow.mask']}
+			charset={values['deviceFlow.charset']}
+			disabled={disabled}
+			onChange={(mask) => onChange('deviceFlow.mask', mask)}
+		/>
+	)
+};
 
 /*
  * A structured JSON value, edited as text and parsed on change, keeping the last valid parse as the
@@ -65,6 +91,9 @@ export function Control({
 	disabled: boolean;
 	onChange: (key: string, value: unknown) => void;
 }) {
+	const bespoke = BESPOKE[d.key];
+	if (bespoke) return bespoke({ values, disabled, onChange });
+
 	const value = values[d.key];
 	const set = (v: unknown) => onChange(d.key, v);
 
@@ -144,6 +173,9 @@ export function Control({
 	);
 }
 
-/* Whether this setting's control wants a line of its own rather than the right-hand column. */
+/*
+ * Whether this setting's control wants a line of its own rather than the right-hand column. The
+ * bespoke controls are all taller than a single field, so they take the full width by definition.
+ */
 export const isWideControl = (d: Descriptor) =>
-	d.type === 'json' || d.type === 'string-array';
+	d.type === 'json' || d.type === 'string-array' || d.key in BESPOKE;
