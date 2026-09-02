@@ -26,13 +26,19 @@ if [[ ! -f "$EXT_CONFIG" ]]; then
   exit 0
 fi
 
-# Locate a suitable Python interpreter (python3, then python).
+# Locate a suitable Python interpreter (python3, then python, then the py launcher).
+# Every candidate must actually report Python 3 before it is accepted: on Windows,
+# `python3` is normally a 0-byte App Execution Alias that resolves on PATH but only
+# prints a Microsoft Store advert, so presence alone proves nothing.
 _python=""
-if command -v python3 >/dev/null 2>&1; then
-  _python="python3"
-elif command -v python >/dev/null 2>&1 && python --version 2>&1 | grep -q "^Python 3"; then
-  _python="python"
-fi
+for _candidate in python3 python py; do
+  command -v "$_candidate" >/dev/null 2>&1 || continue
+  if "$_candidate" --version 2>&1 | grep -q "^Python 3"; then
+    _python="$_candidate"
+    break
+  fi
+done
+unset _candidate
 
 if [[ -z "$_python" ]]; then
   echo "agent-context: Python 3 not found on PATH; skipping update." >&2
@@ -43,6 +49,14 @@ fi
 # context_file, context_markers.start, context_markers.end
 if ! _raw_opts="$("$_python" - "$EXT_CONFIG" <<'PY'
 import sys
+
+# A Windows Python writes stdout in text mode and turns every \n into \r\n, which would
+# leave a trailing CR on each value and yield paths like 'AGENTS.md<CR>'.
+try:
+    sys.stdout.reconfigure(newline="\n")
+except AttributeError:
+    pass
+
 try:
     import yaml
 except ImportError:
@@ -84,7 +98,9 @@ fi
 
 _opts_lines=()
 while IFS= read -r _line || [[ -n "$_line" ]]; do
-  _opts_lines+=("$_line")
+  # Backstop for the CR the parser guards against: its reconfigure() is a silent no-op
+  # on a Python too old to support it.
+  _opts_lines+=("${_line%$'\r'}")
 done < <(printf '%s\n' "$_raw_opts")
 if (( ${#_opts_lines[@]} < 3 )); then
   echo "agent-context: malformed config parser output; expected 3 lines (context_file, marker_start, marker_end), got ${#_opts_lines[@]}; skipping update." >&2
@@ -122,23 +138,54 @@ unset _cf_parts _seg
 
 PLAN_PATH="${1:-}"
 if [[ -z "$PLAN_PATH" ]]; then
-  # Pick the most recently modified plan.md one level deep (specs/<feature>/plan.md).
-  # Use find + sort by modification time to avoid ls/head fragility with
-  # spaces in paths or SIGPIPE from pipefail.
-  _plan_abs="$("$_python" - "$PROJECT_ROOT" <<'PY'
-import sys, os
+  # Resolve the plan for the current feature, falling back to the most recently modified
+  # plan.md one level deep (specs/<feature>/plan.md) -- see the parser below for the rule.
+  # Done in Python rather than ls/head to avoid fragility with spaces in paths and
+  # SIGPIPE under pipefail.
+  _plan_rel="$("$_python" - "$PROJECT_ROOT" <<'PY'
+import json
+import sys
 from pathlib import Path
-specs = Path(sys.argv[1]) / "specs"
+
+try:
+    sys.stdout.reconfigure(newline="\n")
+except AttributeError:
+    pass
+
+root = Path(sys.argv[1])
+
+# `.specify/feature.json` names the feature this checkout is on, so it wins outright:
+# when it names a feature that has no plan yet, the honest answer is "no plan", not some
+# other feature's plan. Scanning for the most recently modified plan is only for when the
+# current feature is genuinely unknown.
+feature_json = root / ".specify" / "feature.json"
+if feature_json.is_file():
+    try:
+        with feature_json.open("r", encoding="utf-8") as fh:
+            feature_dir = json.load(fh).get("feature_directory") or ""
+    except Exception:
+        feature_dir = ""
+    if isinstance(feature_dir, str) and feature_dir.strip():
+        candidate = root / feature_dir.strip().replace("\\", "/") / "plan.md"
+        if candidate.is_file():
+            # Relative + POSIX so the caller's prefix strip is a no-op and the path
+            # stays usable when root is a Windows path under Git Bash.
+            print(candidate.relative_to(root).as_posix())
+        else:
+            print("")
+        raise SystemExit(0)
+
 plans = sorted(
-    specs.glob("*/plan.md"),
+    (root / "specs").glob("*/plan.md"),
     key=lambda p: p.stat().st_mtime,
     reverse=True,
 )
-print(plans[0] if plans else "")
+print(plans[0].relative_to(root).as_posix() if plans else "")
 PY
 )"
-  if [[ -n "$_plan_abs" ]]; then
-    PLAN_PATH="${_plan_abs#"$PROJECT_ROOT/"}"
+  _plan_rel="${_plan_rel%$'\r'}"
+  if [[ -n "$_plan_rel" ]]; then
+    PLAN_PATH="$_plan_rel"
   fi
 fi
 

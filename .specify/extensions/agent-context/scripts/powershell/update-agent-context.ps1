@@ -52,6 +52,50 @@ function Test-ConfigObject {
     return $false
 }
 
+function ConvertFrom-MinimalYaml {
+    # Handles the `key: value` subset (one nesting level) that this extension's config
+    # uses -- deliberately not a general YAML parser. It exists so the PowerShell path
+    # depends on neither the powershell-yaml module nor an external Python 3 + PyYAML,
+    # both of which are routinely absent on Windows.
+    param(
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Text
+    )
+
+    $root = [ordered]@{}
+    $parentKey = $null
+
+    foreach ($rawLine in ($Text -split "`r?`n")) {
+        if ($rawLine -match '^\s*(#|$)') {
+            continue
+        }
+        if ($rawLine -notmatch '^(\s*)([^:]+?)\s*:\s*(.*)$') {
+            continue
+        }
+
+        $indent = $Matches[1].Length
+        $key    = $Matches[2].Trim()
+        $value  = $Matches[3].Trim()
+
+        if (($value -match "^'(.*)'$") -or ($value -match '^"(.*)"$')) {
+            $value = $Matches[1]
+        }
+
+        if ($indent -eq 0) {
+            if ($value -eq '') {
+                $parentKey = $key
+                $root[$key] = [ordered]@{}
+            } else {
+                $parentKey = $null
+                $root[$key] = $value
+            }
+        } elseif ($parentKey -and ($root[$parentKey] -is [System.Collections.IDictionary])) {
+            $root[$parentKey][$key] = $value
+        }
+    }
+
+    return $root
+}
+
 $ErrorActionPreference = 'Stop'
 $DefaultStart = '<!-- SPECKIT START -->'
 $DefaultEnd   = '<!-- SPECKIT END -->'
@@ -63,70 +107,38 @@ if (-not (Test-Path -LiteralPath $ExtConfig)) {
     exit 0
 }
 
+$ConfigText = $null
+try {
+    $ConfigText = Get-Content -LiteralPath $ExtConfig -Raw -ErrorAction Stop
+} catch {
+    Write-Warning "agent-context: unable to read $ExtConfig ($($_.Exception.Message)); skipping update."
+    exit 0
+}
+
 $Options = $null
 if (Get-Command ConvertFrom-Yaml -ErrorAction SilentlyContinue) {
     try {
-        $Options = Get-Content -LiteralPath $ExtConfig -Raw | ConvertFrom-Yaml -ErrorAction Stop
+        $Options = $ConfigText | ConvertFrom-Yaml -ErrorAction Stop
     } catch {
-        # fall through to Python fallback
+        # fall through to the built-in reader
     }
 }
 
 if ($null -eq $Options) {
-    # ConvertFrom-Yaml unavailable or failed; fall back to Python+PyYAML.
-    $pythonCmd = $null
-    foreach ($candidate in @('python3', 'python')) {
-        if (Get-Command $candidate -ErrorAction SilentlyContinue) {
-            # Verify it is Python 3
-            $verOut = & $candidate --version 2>&1
-            if ($verOut -match 'Python 3') {
-                $pythonCmd = $candidate
-                break
-            }
-        }
+    # No powershell-yaml module. Parse in-process rather than shelling out to Python:
+    # Windows PowerShell 5.1 mangles a multi-line `-c` argument on its way to a native
+    # executable, and `python3` on Windows is usually a 0-byte Store alias that only
+    # prints an advert -- so the former Python fallback could not work here at all.
+    try {
+        $Options = ConvertFrom-MinimalYaml -Text $ConfigText
+    } catch {
+        $Options = $null
     }
+}
 
-    if ($pythonCmd) {
-        try {
-            $jsonOut = & $pythonCmd -c @'
-import json
-import sys
-try:
-    import yaml
-except ImportError:
-    print(
-        "agent-context: PyYAML is required to parse extension config; cannot update context.",
-        file=sys.stderr,
-    )
-    sys.exit(2)
-
-try:
-    with open(sys.argv[1], "r", encoding="utf-8") as fh:
-        data = yaml.safe_load(fh)
-except Exception as exc:
-    print(
-        f"agent-context: unable to parse {sys.argv[1]} ({exc}); cannot update context.",
-        file=sys.stderr,
-    )
-    sys.exit(2)
-
-if not isinstance(data, dict):
-    data = {}
-
-print(json.dumps(data))
-'@ $ExtConfig
-            if ($LASTEXITCODE -eq 0 -and $jsonOut) {
-                $Options = $jsonOut | ConvertFrom-Json -ErrorAction Stop
-            }
-        } catch {
-            $Options = $null
-        }
-    }
-
-    if (-not $Options) {
-        Write-Warning "agent-context: unable to parse $ExtConfig; skipping update."
-        exit 0
-    }
+if (-not $Options) {
+    Write-Warning "agent-context: unable to parse $ExtConfig; skipping update."
+    exit 0
 }
 
 if (-not (Test-ConfigObject -Object $Options)) {
@@ -165,7 +177,31 @@ if ($cm) {
     }
 }
 
+# Resolve which plan the managed section should point at. `.specify/feature.json` names
+# the feature this checkout is on, so it wins outright: when it names a feature that has
+# no plan yet, the honest answer is "no plan", not some other feature's plan. Scanning for
+# the most recently modified plan is only for when the current feature is genuinely unknown.
+$FeatureKnown = $false
 if (-not $PlanPath) {
+    $FeatureJson = Join-Path $ProjectRoot '.specify/feature.json'
+    if (Test-Path -LiteralPath $FeatureJson) {
+        try {
+            $Feature = Get-Content -LiteralPath $FeatureJson -Raw | ConvertFrom-Json -ErrorAction Stop
+            $FeatureDir = Get-ConfigValue -Object $Feature -Key 'feature_directory'
+            if ($FeatureDir -is [string] -and $FeatureDir.Trim()) {
+                $FeatureDir = $FeatureDir.Trim().Replace('\', '/').TrimEnd('/')
+                $FeatureKnown = $true
+                if (Test-Path -LiteralPath (Join-Path $ProjectRoot "$FeatureDir/plan.md")) {
+                    $PlanPath = "$FeatureDir/plan.md"
+                }
+            }
+        } catch {
+            # Unreadable pointer: treat the current feature as unknown and scan instead.
+        }
+    }
+}
+
+if (-not $PlanPath -and -not $FeatureKnown) {
     # Discover plan.md exactly one level deep (specs/<feature>/plan.md),
     # matching the bash glob specs/*/plan.md. Wrap in try/catch so access errors under
     # $ErrorActionPreference = 'Stop' don't abort the script.
@@ -177,7 +213,15 @@ if (-not $PlanPath) {
             Sort-Object LastWriteTime -Descending |
             Select-Object -First 1
         if ($candidate) {
-            $PlanPath = [System.IO.Path]::GetRelativePath($ProjectRoot, $candidate.FullName).Replace('\','/')
+            # Not [System.IO.Path]::GetRelativePath -- absent from the .NET Framework behind
+            # Windows PowerShell 5.1, where it threw into the catch below and silently
+            # dropped the plan path. The candidate is always under $ProjectRoot by construction.
+            $Prefix = $ProjectRoot.TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
+            if ($candidate.FullName.StartsWith($Prefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+                $PlanPath = $candidate.FullName.Substring($Prefix.Length).Replace('\', '/')
+            } else {
+                $PlanPath = $candidate.FullName.Replace('\', '/')
+            }
         }
     } catch {
         # Non-fatal: continue without a plan path.

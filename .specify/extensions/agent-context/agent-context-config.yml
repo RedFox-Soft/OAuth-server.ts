@@ -1,4 +1,7 @@
-context_file: CLAUDE.md
+# This repo keeps its agent guidance in AGENTS.md (see the constitution's Development
+# Workflow section); there is no CLAUDE.md to manage. `specify integration install`
+# may reset this to CLAUDE.md -- point it back here if it does.
+context_file: AGENTS.md
 context_markers:
   start: <!-- SPECKIT START -->
   end: <!-- SPECKIT END -->

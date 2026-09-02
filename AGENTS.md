@@ -253,3 +253,8 @@ To add a new source, follow the `llm-wiki` skill's ingest workflow: decide place
 Scaling discipline: atomic pages (400-line soft cap, 800-line hard cap), sharded indexes past ~150 pages or 300 index lines, required YAML frontmatter on every page, `[[wikilinks]]` for every cross-reference.
 
 Full conventions live in `wiki/SCHEMA.md`. Treat it as authoritative when it disagrees with this summary.
+
+<!-- SPECKIT START -->
+For additional context about technologies to be used, project structure,
+shell commands, and other important information, read the current plan
+<!-- SPECKIT END -->
