@@ -299,6 +299,144 @@ export function maskStrengthBits(
 	return Math.round(shape.length * Math.log2(size) * 10) / 10;
 }
 
+/*
+ * The authorization details types this server accepts, as something a form can edit.
+ *
+ * The stored value is a map of type identifier to a descriptor, and the descriptor's shape is fully
+ * enumerable: a required label, optional constraints on the five common fields RFC 9396 §2 defines,
+ * and a flag for unknown fields. That is why this is worth a form at all — the raw JSON textarea it
+ * replaces let an operator name a field that does not exist, or put `allowed` on `identifier` where
+ * it is refused, and learn about it from a 422 after saving.
+ *
+ * Two rules are enforced by *construction* here rather than restated: the field names come from a
+ * fixed list, and `allowed` is only offered for the four list-valued fields. The remaining value
+ * rules — a non-empty label, at least one type — are reported by `rarTypeIssues`, which is a
+ * restatement and is therefore cross-checked against `validateConfiguration` itself in
+ * test/admin/ui_settings_model.spec.ts. The server stays the authority; the form only aims to agree
+ * with it early enough to be useful.
+ *
+ * `identifier` is single-valued, so a descriptor can only mark it required — fixing a permitted set
+ * of per-resource identifiers would restrict nothing.
+ */
+export const RAR_LIST_FIELDS = [
+	'actions',
+	'locations',
+	'datatypes',
+	'privileges'
+] as const;
+export const RAR_FIELDS = [...RAR_LIST_FIELDS, 'identifier'] as const;
+
+export type RarListField = (typeof RAR_LIST_FIELDS)[number];
+export type RarField = (typeof RAR_FIELDS)[number];
+
+export interface RarConstraint {
+	required?: boolean;
+	allowed?: string[];
+}
+
+/* One type, as the editor holds it: the map key lifted into the record so a list can be reordered. */
+export interface RarType {
+	id: string;
+	label: string;
+	fields: Partial<Record<RarField, RarConstraint>>;
+	allowUnknownFields: boolean;
+}
+
+const isRecord = (v: unknown): v is Record<string, unknown> =>
+	typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/*
+ * Read the stored map into an ordered list. Unknown descriptor keys and unknown field names are
+ * dropped rather than preserved: they are values the server refuses, so carrying them through the
+ * editor would let it save something it cannot describe.
+ */
+export function parseRarTypes(value: unknown): RarType[] {
+	if (!isRecord(value)) return [];
+	return Object.entries(value).map(([id, raw]) => {
+		const v = isRecord(raw) ? raw : {};
+		const fields: Partial<Record<RarField, RarConstraint>> = {};
+		if (isRecord(v.fields)) {
+			for (const name of RAR_FIELDS) {
+				const c = v.fields[name];
+				if (!isRecord(c)) continue;
+				const constraint: RarConstraint = {};
+				if (typeof c.required === 'boolean') constraint.required = c.required;
+				if (
+					Array.isArray(c.allowed) &&
+					(RAR_LIST_FIELDS as readonly string[]).includes(name)
+				) {
+					constraint.allowed = c.allowed.filter(
+						(a): a is string => typeof a === 'string'
+					);
+				}
+				fields[name] = constraint;
+			}
+		}
+		return {
+			id,
+			label: typeof v.label === 'string' ? v.label : '',
+			fields,
+			allowUnknownFields: v.allowUnknownFields === true
+		};
+	});
+}
+
+/*
+ * Back to the stored map. Empty optionals are omitted rather than written as empty objects: the
+ * difference is invisible to the server but not to the review drawer, which would otherwise report a
+ * change every time the editor was opened and closed.
+ */
+export function buildRarTypes(types: RarType[]): Record<string, unknown> {
+	const out: Record<string, unknown> = {};
+	for (const t of types) {
+		const descriptor: Record<string, unknown> = { label: t.label };
+		const fields: Record<string, unknown> = {};
+		for (const name of RAR_FIELDS) {
+			const c = t.fields[name];
+			if (!c) continue;
+			const constraint: Record<string, unknown> = {};
+			if (c.required !== undefined) constraint.required = c.required;
+			if (c.allowed?.length) constraint.allowed = [...c.allowed];
+			fields[name] = constraint;
+		}
+		if (Object.keys(fields).length) descriptor.fields = fields;
+		if (t.allowUnknownFields) descriptor.allowUnknownFields = true;
+		out[t.id] = descriptor;
+	}
+	return out;
+}
+
+/*
+ * What the server would refuse, reported while it can still be fixed. A restatement by necessity,
+ * held to the real validator by test rather than by hope.
+ */
+export function rarTypeIssues(types: RarType[], enabled: boolean): string[] {
+	const issues: string[] = [];
+	if (enabled && types.length === 0) {
+		issues.push('At least one type is needed while the feature is on.');
+	}
+	const seen = new Set<string>();
+	for (const t of types) {
+		const name = t.id.trim() === '' ? '(unnamed type)' : t.id;
+		if (t.id.trim() === '') issues.push('A type needs an identifier.');
+		else if (seen.has(t.id))
+			issues.push(`Two types share the identifier ${t.id}.`);
+		seen.add(t.id);
+		if (t.label.trim() === '') {
+			issues.push(
+				`${name} needs a label — it is what the consent screen shows.`
+			);
+		}
+		for (const field of RAR_LIST_FIELDS) {
+			const allowed = t.fields[field]?.allowed;
+			if (allowed && allowed.some((a) => a.trim() === '')) {
+				issues.push(`${name}: ${field} has an empty permitted value.`);
+			}
+		}
+	}
+	return issues;
+}
+
 export interface ThrottleRate {
 	guessesPerDay: number;
 	cap: number;

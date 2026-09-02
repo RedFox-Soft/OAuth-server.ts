@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Input, InputNumber, Select, Switch, Typography } from 'antd';
 import type { Descriptor, Values } from './model.js';
 import { MaskField } from './MaskField.js';
+import { RarTypesField } from './RarTypesField.js';
 
 interface BespokeProps {
 	values: Values;
@@ -24,6 +25,14 @@ const BESPOKE: Record<string, (props: BespokeProps) => ReactNode> = {
 			charset={values['deviceFlow.charset']}
 			disabled={disabled}
 			onChange={(mask) => onChange('deviceFlow.mask', mask)}
+		/>
+	),
+	'richAuthorizationRequests.types': ({ values, disabled, onChange }) => (
+		<RarTypesField
+			value={values['richAuthorizationRequests.types']}
+			enabled={values['richAuthorizationRequests.enabled'] === true}
+			disabled={disabled}
+			onChange={(types) => onChange('richAuthorizationRequests.types', types)}
 		/>
 	)
 };

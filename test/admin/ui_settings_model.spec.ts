@@ -6,6 +6,7 @@ import {
 import { ApplicationConfig } from 'lib/configs/application.ts';
 import { windowFor } from 'lib/login_throttle/consts.ts';
 import { generate } from 'lib/helpers/user_codes.ts';
+import { validateConfiguration } from 'lib/configs/configuration.ts';
 import {
 	buildMask,
 	cascadeOff,
@@ -18,11 +19,15 @@ import {
 	maskStrengthBits,
 	matches,
 	parseMask,
+	parseRarTypes,
+	buildRarTypes,
+	rarTypeIssues,
 	pendingChanges,
 	riskyChanges,
 	sameValue,
 	throttleRate,
 	type Descriptor,
+	type RarType,
 	type DomainMeta,
 	type Values
 } from 'lib/admin/ui/settings/model.ts';
@@ -371,6 +376,147 @@ describe('settings model', () => {
 			expect(maskStrengthBits('---', 'base-20')).toBeNull();
 			expect(maskStrengthBits('****', 'klingon')).toBeNull();
 			expect(maskStrengthBits(undefined, 'base-20')).toBeNull();
+		});
+	});
+
+	describe('RAR types', () => {
+		const type = (over: Partial<RarType> = {}): RarType => ({
+			id: 'https://scheme.example/payment',
+			label: 'Initiate a payment',
+			fields: {},
+			allowUnknownFields: false,
+			...over
+		});
+
+		it('round-trips the shape the catalog documents', () => {
+			const stored = {
+				'https://scheme.example/payment': {
+					label: 'Initiate a payment',
+					fields: { actions: { required: true, allowed: ['initiate'] } },
+					allowUnknownFields: false
+				}
+			};
+			const parsed = parseRarTypes(stored);
+			expect(parsed).toHaveLength(1);
+			expect(parsed[0]?.label).toBe('Initiate a payment');
+			expect(parsed[0]?.fields.actions).toEqual({
+				required: true,
+				allowed: ['initiate']
+			});
+			// allowUnknownFields false is omitted on the way back, which the server treats the same.
+			expect(buildRarTypes(parsed)).toEqual({
+				'https://scheme.example/payment': {
+					label: 'Initiate a payment',
+					fields: { actions: { required: true, allowed: ['initiate'] } }
+				}
+			});
+		});
+
+		/*
+		 * Enforced by construction, not by validation: `identifier` is single-valued, so the editor
+		 * cannot express a permitted set for it and a stored one is dropped on read. This is the rule the
+		 * raw textarea let an operator break and only learn about from a 422.
+		 */
+		it('cannot carry permitted values on the single-valued field', () => {
+			const parsed = parseRarTypes({
+				t: {
+					label: 'T',
+					fields: { identifier: { required: true, allowed: ['x'] } }
+				}
+			});
+			expect(parsed[0]?.fields.identifier).toEqual({ required: true });
+			expect(buildRarTypes(parsed)).toEqual({
+				t: { label: 'T', fields: { identifier: { required: true } } }
+			});
+		});
+
+		it('drops a field name the server does not define', () => {
+			const parsed = parseRarTypes({
+				t: { label: 'T', fields: { actions: {}, nonsense: { required: true } } }
+			});
+			expect(Object.keys(parsed[0]?.fields ?? {})).toEqual(['actions']);
+		});
+
+		/*
+		 * The important test in this block, and the reason `rarTypeIssues` is allowed to exist at all.
+		 *
+		 * It restates rules that live in validateConfiguration, which this repo's own comments warn
+		 * against — so the restatement is pinned to the original in both directions: a draft the editor
+		 * calls clean must be one the server accepts, and a draft it complains about must be one the
+		 * server refuses. If either side changes, this fails instead of the console quietly disagreeing
+		 * with the validator.
+		 */
+		const accepts = (draft: RarType[]) => () =>
+			validateConfiguration({
+				...ApplicationConfig,
+				'resourceIndicators.enabled': true,
+				'richAuthorizationRequests.enabled': true,
+				'richAuthorizationRequests.types': buildRarTypes(draft)
+			});
+
+		/*
+		 * The invariant that matters, and the only one asserted in this direction: a draft the editor
+		 * calls clean must be one the server accepts. Break it and an operator gets a 422 from a form
+		 * showing no complaint, which is worse than the raw textarea it replaces — at least that one
+		 * never claimed to know.
+		 */
+		it('never calls a draft clean that validateConfiguration would refuse', () => {
+			const clean: RarType[][] = [
+				[type()],
+				[
+					type({
+						fields: { actions: { required: true, allowed: ['initiate'] } }
+					})
+				],
+				[type({ fields: { identifier: { required: true } } })],
+				[type({ fields: { locations: { allowed: ['https://api.example'] } } })],
+				[type({ allowUnknownFields: true })],
+				[type(), type({ id: 'https://scheme.example/other', label: 'Other' })]
+			];
+
+			for (const draft of clean) {
+				expect(rarTypeIssues(draft, true)).toEqual([]);
+				expect(accepts(draft)).not.toThrow();
+			}
+		});
+
+		it('complains about the drafts the server refuses', () => {
+			for (const draft of [
+				[],
+				[type({ label: '' })],
+				[type({ fields: { actions: { allowed: [''] } } })]
+			]) {
+				expect(rarTypeIssues(draft, true)).not.toEqual([]);
+				expect(accepts(draft)).toThrow();
+			}
+		});
+
+		/*
+		 * Where the editor is deliberately stricter than the server, enumerated rather than left to be
+		 * discovered. The server's rule is `label.length`, so a label of spaces satisfies it — and then
+		 * the consent screen shows a blank where the name of the thing being authorized should be. The
+		 * form says so; the asymmetry is recorded here so a later reader does not "fix" it in either
+		 * direction by accident.
+		 *
+		 * Whether the validator itself should refuse a blank-looking label is a separate question about
+		 * server behaviour, deliberately not answered here.
+		 */
+		it('is stricter than the server about a label of only spaces', () => {
+			const draft = [type({ label: '   ' })];
+			expect(rarTypeIssues(draft, true)).not.toEqual([]);
+			expect(accepts(draft)).not.toThrow();
+		});
+
+		it('asks for a type only while the feature is on', () => {
+			expect(rarTypeIssues([], true)).not.toEqual([]);
+			expect(rarTypeIssues([], false)).toEqual([]);
+		});
+
+		it('catches a duplicate identifier the map would silently collapse', () => {
+			const issues = rarTypeIssues([type(), type()], true);
+			expect(issues.join(' ')).toMatch(/share the identifier/);
+			// And it really would collapse: two entries, one key.
+			expect(Object.keys(buildRarTypes([type(), type()]))).toHaveLength(1);
 		});
 	});
 
