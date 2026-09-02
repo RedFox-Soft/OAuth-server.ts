@@ -1,5 +1,6 @@
 {
 	"name": "oauth-server-ts",
+	"version": "0.1.0",
 	"type": "module",
 	"scripts": {
 		"format": "prettier --write .",
@@ -15,6 +16,7 @@
 		"@ant-design/icons": "^6.3.2",
 		"@elysiajs/static": "^1.4.10",
 		"@modelcontextprotocol/server": "^2.0.0",
+		"@sentry/bun": "10.73.0",
 		"antd": "^6.5.1",
 		"debug": "^4.4.3",
 		"elysia": "^1.4.29",

@@ -8,6 +8,7 @@ import { faultMessage, fingerprintOf, parseOrigin } from './fingerprint.js';
 import { mintReference } from './reference.js';
 import { buildRecord, type CaptureSubject } from './redact.js';
 import { enqueue, installShutdownDrain } from './queue.js';
+import { reportFault } from '../sentry/dispatch.js';
 
 /*
  * The one place a fault becomes a record.
@@ -85,21 +86,33 @@ export function captureFault(input: CaptureInput): string | undefined {
 		 */
 		void buildRecord(input, reference, level)
 			.then((record) => {
-				enqueue(
-					{
-						fingerprint,
-						errorCode: input.errorCode,
-						status: input.status,
-						surface: input.surface,
-						route: input.route,
-						method: input.method,
-						origin,
-						message: faultMessage(input.error),
-						record
-					},
-					bounds,
-					queueDepth
-				);
+				const occurrence = {
+					fingerprint,
+					errorCode: input.errorCode,
+					status: input.status,
+					surface: input.surface,
+					route: input.route,
+					method: input.method,
+					origin,
+					message: faultMessage(input.error),
+					record
+				};
+				enqueue(occurrence, bounds, queueDepth);
+				/*
+				 * The single point at which a recorded fault also becomes an outbound event, and it is
+				 * here rather than anywhere else on purpose. This is the one place that has already
+				 * decided the fault is a defect — the callers of captureFault gate on a 5xx status, so the
+				 * classification is final by the time it runs — which is precisely what an SDK's automatic
+				 * capture cannot know, because it fires before the status exists.
+				 *
+				 * After enqueue, never before: the local record is the event's source and the thing an
+				 * operator navigates to from the alert, so reporting can only ever be an additional
+				 * destination for a fault already accepted for writing.
+				 *
+				 * Guarded by the same `capturing` flag as the rest of this function, so a fault raised
+				 * inside reporting cannot come back around.
+				 */
+				reportFault(occurrence);
 			})
 			.catch((error) => {
 				// Assembling a record failed, which is not the caller's problem and must not become an

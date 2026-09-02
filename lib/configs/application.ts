@@ -668,7 +668,7 @@ export const ApplicationConfig = {
 	 *   mode: the two modes must differ by configuration, never by a branch in logic. A
 	 *   compliance-bound deployment lowers it; one tracing abuse raises it.
 	 */
-	'errorStore.originCaptureLevel': 'anonymized'
+	'errorStore.originCaptureLevel': 'anonymized',
 
 	/*
 	 * There is deliberately no `errorStore.mcpPurgeEnabled`.
@@ -680,6 +680,53 @@ export const ApplicationConfig = {
 	 *
 	 * Purging is therefore withheld from agents outright, alongside project and bucket deletion. The
 	 * exclusion table in `lib/mcp/catalogue.ts` records the same reasoning at the point it takes effect.
+	 */
+
+	/*
+	 * sentry.enabled
+	 *
+	 * title: Sentry integration — report recorded faults to an external monitoring project
+	 *
+	 * description: Sends every fault the error store records to an operator-supplied Sentry project,
+	 *   so a failure raises an alert instead of waiting to be found in the console. This is an
+	 *   additional destination, never an alternative: a fault is recorded locally first and the
+	 *   outbound event is derived from that record, which is why switching this on requires
+	 *   `errorStore.enabled`.
+	 *
+	 * Off by default. With it off no client is created and nothing leaves this server.
+	 */
+	'sentry.enabled': false,
+	/*
+	 * sentry.dsn
+	 *
+	 * description: The ingestion credential of the receiving Sentry project.
+	 *
+	 * Deliberately absent from the settings catalog, so no read surface can return it: the generic
+	 *   `/admin/api/settings` projection is built by iterating that catalog, and its PUT refuses any
+	 *   key the catalog does not describe. It is written and read only through
+	 *   `/admin/api/settings/sentry`, which reports whether one is stored and never what it is —
+	 *   the same treatment `dpop.nonceSecret` gets, and for the same reason.
+	 *
+	 * Stored in plaintext, unlike a client secret. This is a credential this server *presents*, not
+	 *   one it verifies, so a hash would make it useless; it sits beside the private signing keys the
+	 *   datastore already holds.
+	 */
+	'sentry.dsn': ''
+	/*
+	 * There are deliberately no `sentry.environment` or `sentry.release` settings.
+	 *
+	 * Both are properties of the deployment rather than decisions an operator makes: the environment
+	 *   is NODE_ENV and the release is this package's version, both already declared by the
+	 *   deployment. They were operator-entered once and should not have been — a release label kept by
+	 *   hand goes stale on the first deploy nobody remembers to edit, and a stale label is worse than
+	 *   none because it sends an investigation to a build that never ran. See sentry/labels.ts.
+	 */
+	/*
+	 * There is deliberately no `sentry.queueDepth` either.
+	 *
+	 * The outbound queue is bounded — it has to be — but the bound is a constant in sentry/dispatch.ts
+	 *   rather than a setting, and that file records why: it limits loss of the *second* copy of a
+	 *   fault, not the only one, and there is no question an operator could answer to choose a value.
 	 */
 };
 Object.assign(ApplicationConfig, await configStore.get());

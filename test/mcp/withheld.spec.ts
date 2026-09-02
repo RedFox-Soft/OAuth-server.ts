@@ -16,10 +16,7 @@ import {
 	MCP_RESOURCE,
 	MCP_ROUTE
 } from 'lib/mcp/consts.ts';
-import {
-	excludedConsoleOperations,
-	mcpCatalogue
-} from 'lib/mcp/catalogue.ts';
+import { excludedConsoleOperations, mcpCatalogue } from 'lib/mcp/catalogue.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 
 /*
@@ -324,7 +321,10 @@ describe('withheld container deletions', () => {
 		it('answers a withheld operation with the reason the exclusion table holds', async () => {
 			const { token } = await superAdmin();
 
-			const refused = await rpc(call('project_delete', { id: 'anything' }), token);
+			const refused = await rpc(
+				call('project_delete', { id: 'anything' }),
+				token
+			);
 
 			const expected = excludedConsoleOperations.find(
 				(e) => e.path === '/admin/api/projects/:id' && e.method === 'DELETE'

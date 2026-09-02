@@ -119,6 +119,10 @@ const BODIES: Record<string, Record<string, unknown>> = {
 		password: 'irrelevant to this test',
 		fromName: 'Ops',
 		fromEmail: 'ops@example.com'
+	},
+	sentry_settings_update: {
+		enabled: false,
+		dsn: ''
 	}
 };
 
@@ -134,10 +138,10 @@ describe('every high-consequence tool is gated', () => {
 		await ensureAdminSeed();
 	});
 
-	it('finds the twelve the specification names', () => {
+	it('finds the thirteen the specification names', () => {
 		// If this number moves, FR-014 and the catalogue have to move with it — and the matrix below
 		// grows automatically rather than needing a new case written by hand.
-		expect(HIGH.length).toBe(12);
+		expect(HIGH.length).toBe(13);
 	});
 
 	it.each(HIGH.map((t) => [t.tool, t] as const))(
@@ -215,7 +219,7 @@ describe('every high-consequence tool is gated', () => {
 		const gated = mcpCatalogue.filter(
 			(t) => t.consequence === 'ordinary' || t.consequence === 'read'
 		);
-		expect(gated.length).toBe(58 - 12);
+		expect(gated.length).toBe(60 - 13);
 		for (const tool of gated) {
 			expect(tool.consequence, tool.tool).not.toBe('high');
 		}

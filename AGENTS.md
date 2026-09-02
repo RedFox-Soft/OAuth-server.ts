@@ -68,7 +68,7 @@ trail** (`adminAuditStore`, collection `adminAudit`, via `lib/admin/audit/record
 before the mutation) capturing actor, action, target, and timestamp; the store exposes no
 update/delete so entries cannot be altered.
 
-**Ownership is by group, not by named manager.** Every project and user bucket carries `ownerGroupId`, and belonging to that group is the only thing that grants access to it — there is no per-container `managedBy` list, and no second ownership mechanism. Each administrator gets a `personal` group with their account (the console labels it "Personal", or "Personal — owner@email" for somebody else's, via `lib/admin/ui/groupLabel.ts`, and the Groups table does not list personal groups at all); a `regular` group is a company or team; the reserved `unassigned` system group, displayed as "System", holds containers no administrator managed. Within a group, `owner` and `member` are properties of the _membership_, not roles on the account: `assertGroupOwner` gates who is in the group and whether it may be deleted, while `assertRole` still gates the instance. `contextFor` resolves memberships on every request, so a removal takes effect on the next call. The console's active scope lives on the session (`AdminSession.activeGroupId`) and is re-validated against live membership each request; a super administrator may switch into any group *except* another administrator's personal group, and their choice is honoured without a membership so it survives the next request. A project administrator creates projects, buckets and groups, invites people by email, and reads the audit trail for their own groups; the instance itself — settings, keys, SMTP, administrator accounts, the error store — stays super-admin-only. See `wiki/concepts/group-ownership.md`.
+**Ownership is by group, not by named manager.** Every project and user bucket carries `ownerGroupId`, and belonging to that group is the only thing that grants access to it — there is no per-container `managedBy` list, and no second ownership mechanism. Each administrator gets a `personal` group with their account (the console labels it "Personal", or "Personal — owner@email" for somebody else's, via `lib/admin/ui/groupLabel.ts`, and the Groups table does not list personal groups at all); a `regular` group is a company or team; the reserved `unassigned` system group, displayed as "System", holds containers no administrator managed. Within a group, `owner` and `member` are properties of the _membership_, not roles on the account: `assertGroupOwner` gates who is in the group and whether it may be deleted, while `assertRole` still gates the instance. `contextFor` resolves memberships on every request, so a removal takes effect on the next call. The console's active scope lives on the session (`AdminSession.activeGroupId`) and is re-validated against live membership each request; a super administrator may switch into any group _except_ another administrator's personal group, and their choice is honoured without a membership so it survives the next request. A project administrator creates projects, buckets and groups, invites people by email, and reads the audit trail for their own groups; the instance itself — settings, keys, SMTP, administrator accounts, the error store — stays super-admin-only. See `wiki/concepts/group-ownership.md`.
 
 Unexpected internal faults are recorded to a **server error store** (`lib/error_store/`, area
 `errorStore`, read at `/admin/api/errors`, super-admin only). Only defects are recorded — routine client
@@ -130,6 +130,8 @@ lib/
     catalogue.ts        ← THE published tool set: load-bearing table, drift-guarded both ways
     dispatch.ts         ← rebuilds the admin HTTP request and handles it in-process
     confirm.ts          ← the two-call gate on high-consequence operations
+  error_store/          ← the one place a fault becomes a record (capture.ts is the choke point)
+  sentry/               ← optional outbound reporting; registers NO Elysia hook (see below)
 database/               ← MongoDB collection definitions + TTL index setup
 test/
   test_helper.ts        ← bootstrap: loads *.config.ts per feature, wires adapter + provider
@@ -138,6 +140,8 @@ test/
 ```
 
 ### Key patterns
+
+**Sentry reporting is off the request path** — `lib/sentry/` mounts nothing into Elysia: no plugin, no lifecycle hook, no `wrap`. A fault reaches it after the fact, from the single call inside `captureFault`'s record continuation in `lib/error_store/capture.ts`, which runs only once the fault is already classified as a defect (its callers gate on `status >= 500`) and already accepted for local recording. That shape is load-bearing, not stylistic: it is what keeps responses byte-identical, adds no latency, and stops routine protocol rejections being reported as faults. The official `@sentry/elysia` plugin does the opposite on all three counts and is deliberately not a dependency — `wiki/concepts/sentry-plugin-not-used.md` records why, and four specs in `test/sentry/` hold it.
 
 **Action pipeline** — Each endpoint is a composed sequence of async functions that take the typed `OIDCContext` **directly as `oidc`** (the former `ctx = { oidc }` wrapper is gone). Helpers have `(oidc)` signatures and read `oidc.params`/`oidc.client`/`oidc.entities`/`oidc.cookie`/etc.; handlers **return** their typed response value (no `ctx.body`/`ctx.status` mutation). User-overridable config callbacks (findAccount, resourceIndicators.\*, interaction-policy `check(ctx)`, response-mode handlers) keep a `{ oidc }`-shaped argument as a public-API boundary; callers pass `{ oidc }` there. Event payloads that tests inspect (`authorization.success`, `registration_create.success`, `device_authorization.success`) stay `{ oidc }`-shaped.
 
@@ -255,6 +259,7 @@ Scaling discipline: atomic pages (400-line soft cap, 800-line hard cap), sharded
 Full conventions live in `wiki/SCHEMA.md`. Treat it as authoritative when it disagrees with this summary.
 
 <!-- SPECKIT START -->
+
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
 <!-- SPECKIT END -->

@@ -307,6 +307,12 @@ const routes = [
 		path: '/admin/api/settings/smtp',
 		targetType: 'SmtpSettings'
 	},
+	{
+		action: 'sentry.settings.update',
+		method: 'PUT',
+		path: '/admin/api/settings/sentry',
+		targetType: 'ApplicationConfig'
+	},
 
 	/*
 	 * Purging recorded faults. Audited even though what it destroys is diagnostic rather than
@@ -360,9 +366,10 @@ export const excludedAdminRoutes: readonly {
  */
 export const BOOTSTRAP_ACTOR = 'system:bootstrap';
 
-/* Target ids of the two singleton configuration documents, which have no entity id of their own. */
+/* Target ids of the singleton configuration documents, which have no entity id of their own. */
 export const SETTINGS_TARGET_ID = 'settings';
 export const SMTP_TARGET_ID = 'smtp';
+export const SENTRY_TARGET_ID = 'sentry';
 
 /*
  * `<entity>[.<aspect>].<verb>`, lowercase. Pinned by the drift guard so the trail can be filtered by

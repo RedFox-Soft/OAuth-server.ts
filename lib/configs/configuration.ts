@@ -11,6 +11,11 @@ import { isUsableNonceSecret } from './nonceSecret.js';
 // bound is read from there rather than restated here so the throttle's own module and the validator
 // that guards it cannot disagree about how long a counter lives.
 import { LOGIN_RETENTION_SECONDS } from '../login_throttle/consts.js';
+// The SDK's own DSN parser, so "the operator supplied a usable credential" and "the client can be
+// built from it" cannot disagree. Pure and total — it returns undefined rather than throwing on a
+// malformed value — and reused rather than restated for the reason the two imports above give: a
+// second copy of the rule drifts from the one that actually decides.
+import { dsnFromString } from '@sentry/core';
 
 /*
  * The server settings that cannot be read straight off ApplicationConfig: collections turned into
@@ -484,6 +489,43 @@ function checkErrorStore(config: ConfigurationInput) {
 	}
 }
 
+/*
+ * The Sentry integration: its bound unconditionally, its prerequisites only when it is on.
+ *
+ * The split matches checkErrorStore's reasoning. The queue depth is what stops a switched-on
+ * integration from growing without limit, so it is refused whether or not reporting is enabled —
+ * otherwise a nonsensical depth could be persisted while off and take effect on the restart that
+ * enables it. The prerequisites are conditional because a credential prepared before the switch is
+ * thrown is a normal sequence, and refusing it would make the setting impossible to stage.
+ *
+ * Both messages name what is missing rather than merely reporting that something is. An operator who
+ * has just enabled this and restarted into a refusal needs to be told which of the two things to go
+ * and fix.
+ */
+function checkSentry(config: ConfigurationInput) {
+	if (!config['sentry.enabled']) {
+		return;
+	}
+
+	const dsn = config['sentry.dsn'].trim();
+	if (!dsn || !dsnFromString(dsn)) {
+		throw new TypeError(
+			'sentry.enabled requires a usable sentry.dsn — the ingestion credential of the receiving project'
+		);
+	}
+
+	/*
+	 * The invariant that makes "a failure never leaves without also being recorded" unexpressible
+	 * rather than merely forbidden: the outbound event is projected from the internal record, so
+	 * reporting with no store is not a degraded mode, it is a state with no event source at all.
+	 */
+	if (!config['errorStore.enabled']) {
+		throw new TypeError(
+			'sentry.enabled requires errorStore.enabled — outbound reporting is an additional destination for a recorded fault, never an alternative to recording it'
+		);
+	}
+}
+
 function checkDeviceFlow(config: ConfigurationInput) {
 	if (config['deviceFlow.enabled']) {
 		if (config['deviceFlow.charset'] !== undefined) {
@@ -540,6 +582,7 @@ export function validateConfiguration(
 	checkCibaDeliveryModes(config);
 	checkRichAuthorizationRequests(config);
 	checkErrorStore(config);
+	checkSentry(config);
 	checkRateLimit(config);
 	checkLoginThrottle(config);
 

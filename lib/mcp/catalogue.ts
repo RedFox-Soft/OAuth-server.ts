@@ -27,6 +27,7 @@ import {
 } from '../admin/federation/schema.js';
 import { UpdateSettingsBody } from '../admin/settings/schema.js';
 import { UpdateSmtpBody } from '../admin/settings/smtp/schema.js';
+import { UpdateSentryBody } from '../admin/settings/sentry/schema.js';
 import { GenerateKeyBody } from '../admin/jwks/schema.js';
 import { AuditQuery } from '../admin/audit/schema.js';
 import {
@@ -105,7 +106,7 @@ export function pathArgName(tool: McpTool, param: string): string {
 }
 
 const catalogue = [
-	/* ---------------------------------------------------------------- reads (15) */
+	/* ---------------------------------------------------------------- reads (16) */
 	{
 		tool: 'whoami',
 		method: 'GET',
@@ -337,6 +338,19 @@ const catalogue = [
 		pathParams: [],
 		summary:
 			'The outbound mail settings. The password is never returned, only whether one is set.'
+	},
+	{
+		tool: 'sentry_settings_get',
+		method: 'GET',
+		path: '/admin/api/settings/sentry',
+		action: null,
+		consequence: 'read',
+		requiredRole: 'super_admin',
+		bodySchema: null,
+		querySchema: null,
+		pathParams: [],
+		summary:
+			'The Sentry integration settings. The ingestion credential is never returned, only whether one is set.'
 	},
 	{
 		tool: 'jwks_list',
@@ -860,7 +874,7 @@ const catalogue = [
 			'Delete a signing key. Refused if it would leave no signing key. Tokens already signed with it stop verifying once it is gone.'
 	},
 
-	/* ------------------------------------------------ writes: settings (2) */
+	/* ------------------------------------------------ writes: settings (3) */
 	{
 		tool: 'settings_update',
 		method: 'PUT',
@@ -886,6 +900,19 @@ const catalogue = [
 		pathParams: [],
 		summary:
 			'Change the outbound mail settings. The password is write-only: it can be set but never read back.'
+	},
+	{
+		tool: 'sentry_settings_update',
+		method: 'PUT',
+		path: '/admin/api/settings/sentry',
+		action: 'sentry.settings.update',
+		consequence: 'high',
+		requiredRole: 'super_admin',
+		bodySchema: UpdateSentryBody,
+		querySchema: null,
+		pathParams: [],
+		summary:
+			'Change where recorded faults are reported. The ingestion credential is write-only: it can be set but never read back, and sending the mask keeps the stored one. Enabling this requires the error store, because the outbound event is built from the internal record. Applies after a restart.'
 	}
 ] as const satisfies readonly McpTool[];
 

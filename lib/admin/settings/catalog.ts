@@ -529,6 +529,43 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 			'How much of the caller’s network address a record keeps, because an address is personal data. "omitted" stores none and says so; "anonymized" stores a value that cannot be reversed to the address but is still the same for two requests from one origin, so a single misbehaving deployment is still identifiable; "full" stores the address. Defaults to anonymized.'
 	},
 
+	/*
+	 * `sentry.dsn` is deliberately absent, and this is the record of why.
+	 *
+	 * It is the ingestion credential of the receiving project, and this catalog is the read surface:
+	 * `stateFor` builds the settings response by iterating these descriptors, so a key described here
+	 * is a key returned to the console. The credential is write-only by requirement — a read reports
+	 * whether one is stored and never what it is — so it is served by /admin/api/settings/sentry
+	 * instead, and the generic PUT refuses it for free because it has no descriptor to validate
+	 * against. Same technique, and same reason, as `dpop.nonceSecret` above.
+	 */
+	{
+		key: 'sentry.enabled',
+		group: 'Error Store',
+		label: 'Report recorded faults to Sentry',
+		type: 'boolean',
+		/*
+		 * In the Error Store group rather than one of its own, because reporting genuinely requires
+		 * recording — the outbound event is projected from the internal record, so there is nothing to
+		 * report without one. Grouping it here makes `dependsOn` express that: the console cannot offer
+		 * the toggle until the store is on, which is the order checkSentry enforces anyway. Filed under
+		 * its own heading it read as an independent capability, and the first thing an operator learned
+		 * otherwise was a refusal on save.
+		 */
+		dependsOn: 'errorStore.enabled',
+		description:
+			'Sends every fault the error store records to an external Sentry project, so a failure raises an alert instead of waiting to be found here. This is an additional destination, never an alternative: the fault is recorded locally first and the outbound event is built from that record, which is why this cannot be switched on unless the error store is. Only the endpoint, the kind of failure and the reference are sent — never a request URL, header, cookie, body, or any end-user identity. Off by default; requires the ingestion credential below. Applied at startup.'
+	},
+	/*
+	 * `sentry.environment`, `sentry.release` and `sentry.queueDepth` are deliberately absent too, for
+	 * a different reason than the credential: they are not secret, they are simply not the operator's
+	 * to choose. The first two are facts about the deployment (NODE_ENV, the package version), so a
+	 * field for either would only let the console and the deployment disagree. The queue depth is a
+	 * rail against a pathological burst rather than a throughput knob, and there is no question an
+	 * operator could answer to set it — sentry/dispatch.ts holds it as a constant and records why.
+	 * The card reports all three read-only.
+	 */
+
 	{
 		key: 'registration.enabled',
 		group: 'Registration',

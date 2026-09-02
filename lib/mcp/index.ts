@@ -145,7 +145,8 @@ function challenge(set: McpContext['set']) {
  * only after the credential resolves, so the exclusion table is not readable by an anonymous caller.
  */
 function absentToolRefusal(body: unknown): object | undefined {
-	if (!body || typeof body !== 'object' || Array.isArray(body)) return undefined;
+	if (!body || typeof body !== 'object' || Array.isArray(body))
+		return undefined;
 
 	const message = body as {
 		method?: unknown;

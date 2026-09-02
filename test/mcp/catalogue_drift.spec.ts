@@ -29,10 +29,10 @@ const mountedApi = mounted.routes
 	.map((r) => ({ method: r.method, path: r.path }));
 
 describe('MCP tool catalogue', () => {
-	it('publishes 58 tools: 25 reads and 33 writes', () => {
-		expect(mcpCatalogue.length).toBe(58);
-		expect(mcpCatalogue.filter((t) => t.method === 'GET').length).toBe(25);
-		expect(mcpCatalogue.filter((t) => t.method !== 'GET').length).toBe(33);
+	it('publishes 60 tools: 26 reads and 34 writes', () => {
+		expect(mcpCatalogue.length).toBe(60);
+		expect(mcpCatalogue.filter((t) => t.method === 'GET').length).toBe(26);
+		expect(mcpCatalogue.filter((t) => t.method !== 'GET').length).toBe(34);
 	});
 
 	it('names exactly eight exclusions', () => {
@@ -103,10 +103,10 @@ describe('MCP tool catalogue', () => {
 		]);
 	});
 
-	it('classifies exactly twelve tools as high-consequence', () => {
+	it('classifies exactly thirteen tools as high-consequence', () => {
 		// Pinned as a count so FR-014's enumeration and this table cannot drift apart.
 		const high = mcpCatalogue.filter((t) => t.consequence === 'high');
-		expect(high.length).toBe(12);
+		expect(high.length).toBe(13);
 		expect(high.map((t) => t.tool).sort()).toEqual([
 			'admin_deactivate',
 			'bucket_user_delete',
@@ -118,6 +118,7 @@ describe('MCP tool catalogue', () => {
 			'group_member_remove',
 			'jwks_delete',
 			'jwks_generate',
+			'sentry_settings_update',
 			'settings_update',
 			'smtp_settings_update'
 		]);

@@ -41,6 +41,21 @@ import { verificationRoutes } from './routes/verification.js';
 import { passwordResetRoutes } from './routes/password_reset.js';
 /* Its own top-level instance because it cannot satisfy the `ui` guard: see lib/federation/routes.ts. */
 import { federationRoutes } from './federation/routes.js';
+import { initSentry } from './sentry/client.js';
+import { reportStartupFailure } from './sentry/startup.js';
+
+/*
+ * Armed before the app is built, and deliberately not as a plugin.
+ *
+ * Nothing about the integration is mounted into Elysia: it registers no lifecycle hook, adds no
+ * header, and sees no request. Faults reach it after the fact, from the one place the error store
+ * records them. That is what keeps responses byte-identical and adds no latency — there is no code
+ * on the request path to do either.
+ *
+ * It is armed here rather than lazily so that a fault raised while the routes below are being
+ * constructed still has somewhere to go.
+ */
+initSentry();
 
 export const elysia = new Elysia({ strictPath: true, normalize: false })
 	.error({
@@ -125,5 +140,29 @@ export const elysia = new Elysia({ strictPath: true, normalize: false })
 	.use(passwordResetRoutes)
 	.use(federationRoutes)
 	.use(adminApp)
-	.use(mcpApp)
-	.listen(3000);
+	.use(mcpApp);
+
+/*
+ * Binding the port, and the one startup failure this module can report.
+ *
+ * The error is re-thrown, so what an operator sees on a failed boot is exactly what they saw before
+ * this feature existed — the report is an addition to that, never a replacement for it, and nothing
+ * here swallows or delays the failure beyond the reporter's own bounded flush.
+ *
+ * Deliberately not a process-level `uncaughtException` handler, which would have caught more. Adding
+ * one stops the runtime terminating on an uncaught error, so the server would survive a boot failure
+ * it used to die on — a change to startup behaviour the requirement forbids, traded for a wider net.
+ *
+ * The limit is worth stating: a failure raised while this module's *imports* evaluate — an
+ * unusable configuration, an unreachable datastore — happens before this line and cannot be reported
+ * from here. Those still surface only in the process output, as they always have.
+ */
+try {
+	elysia.listen(3000);
+} catch (error) {
+	await reportStartupFailure(
+		error instanceof Error ? error.name : 'unknown',
+		'listen'
+	);
+	throw error;
+}

@@ -11,6 +11,43 @@ of the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- Optional Sentry reporting for recorded faults (spec 034). The error store already kept a durable
+  record of every unexpected internal fault, but nothing told anyone one had happened — an operator
+  learned about a failure by going to look for it. With `sentry.enabled` on and an ingestion
+  credential configured, each fault the store records is also reported to the operator's own Sentry
+  project, carrying the endpoint, the kind of failure, the client it is attributable to and the same
+  `error_reference` the caller received, so an alert leads straight back to the full internal record.
+  The environment and release labels are read from what the deployment already declares — `NODE_ENV`
+  and the `package.json` version — rather than typed into the console, because a label maintained by
+  hand is stale from the next deploy onwards, and a stale release label sends an investigation to a
+  build that never ran. No new environment variable was introduced for it; the console shows the
+  resolved values read-only instead.
+
+  Off by default, one instance-wide destination, super-admin only, and it requires the error store:
+  the outbound event is projected _from_ the internal record, so reporting is an additional
+  destination and never an alternative to recording. The ingestion credential is write-only through
+  the admin surface — a read reports only whether one is stored, and the audit trail records that it
+  changed without recording its value.
+
+  The **official `@sentry/elysia` plugin is deliberately not used**, and that is the substance of the
+  work. Reading its source (v10.73.0) showed three disqualifying behaviours: its capture predicate
+  reads the response status and reports when it is still `undefined`, so routine `invalid_grant` /
+  `invalid_client` rejections — the normal traffic of a token endpoint — would ship as unhandled
+  faults; it attaches the full request URL and headers unconditionally, which on `/authorize` means
+  `state`, `code_challenge`, `id_token_hint`, `login_hint`, `request_uri` and on an error redirect
+  `code`, plus `Authorization` and `DPoP`; and it writes `sentry-trace`/`baggage` onto every response
+  while opening spans across all nine Elysia lifecycle phases. Instead `@sentry/bun` is used directly
+  with `defaultIntegrations: false` and no integrations, as an envelope-and-transport layer only.
+  `lib/sentry/` registers no Elysia hook at all, so there is no code on the request path to add a
+  header, add latency, or fail; the event is assembled from a named list of permitted fields
+  (excluding `actor` and `userAgent`) rather than by scrubbing a captured request, and dispatch
+  happens from exactly one place — inside `captureFault`'s record continuation, which runs only after
+  the fault is classified and locally recorded. Outbound volume is bounded by `sentry.queueDepth`
+  with counted drops, so an error storm cannot amplify into the monitoring channel. The default test
+  run performs no outbound delivery yet can inspect exactly what would have been sent, which is what
+  makes the data-protection guarantees assertions rather than review opinions.
+  `wiki/concepts/sentry-plugin-not-used.md` records the reasoning; `test/sentry/` holds it.
+
 - Brute-force protection on the password sign-in door (issue #9, spec 032). `POST /ui/:uid/login`
   accepted unlimited guesses against any address, each one buying a full password hash on a
   shared-CPU machine — so the door was both a credential-stuffing opportunity and a cheap
@@ -122,7 +159,7 @@ of the retired `TASKS.md` and in the knowledge base at `wiki/`.
 - Groups read as themselves in the admin console, and a personal group is nobody else's to work in.
   Four things were wrong at once, all of them about the same list. Every personal group displayed as
   the bare word "Personal" — including in a super administrator's list, where N administrators
-  produced N identical rows and the owner's email that is *stored* as the group's name was thrown
+  produced N identical rows and the owner's email that is _stored_ as the group's name was thrown
   away by both display sites. Personal groups appeared in the Groups table at all, which is a page
   about the teams work is shared with. `GET /admin/api/scope` offered a super administrator every
   group on the instance, other people's personal groups among them, and `PUT` accepted them — so the
@@ -206,8 +243,8 @@ of the retired `TASKS.md` and in the knowledge base at `wiki/`.
   administrator's personal group
 
 - An agent naming an operation the MCP surface withholds now hears why, instead of `Tool <name> not
-  found`. The refusal text existed and never ran: the call that delivered it sat in the tool
-  registration loop, where it can only fire for a name that *is* registered, and an excluded operation
+found`. The refusal text existed and never ran: the call that delivered it sat in the tool
+  registration loop, where it can only fire for a name that _is_ registered, and an excluded operation
   never is. It now also runs in the transport, before the SDK and after the credential, answering a
   failed tool call rather than a JSON-RPC error. A genuine typo still gets the SDK's not-found, so a
   mistake is not dressed up as a policy decision

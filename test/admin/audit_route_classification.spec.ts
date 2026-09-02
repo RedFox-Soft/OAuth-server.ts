@@ -75,8 +75,8 @@ describe('admin audit route classification', () => {
 		 * session and no managed entity. It filters to MUTATING methods, so the settings *read* that
 		 * shipped alongside the PATCH does not appear in either total.
 		 */
-		expect(auditedAdminRoutes).toHaveLength(39);
-		expect(mounted).toHaveLength(41);
+		expect(auditedAdminRoutes).toHaveLength(40);
+		expect(mounted).toHaveLength(42);
 	});
 
 	it('declares each route pattern only once', () => {
