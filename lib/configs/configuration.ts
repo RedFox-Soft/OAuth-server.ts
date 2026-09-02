@@ -540,6 +540,25 @@ function checkDeviceFlow(config: ConfigurationInput) {
 				'mask can only contain asterisk("*"), hyphen-minus("-") and space(" ") characters'
 			);
 		}
+		/*
+		 * At least one asterisk, because the asterisks are the whole of the code's entropy.
+		 *
+		 * `generate` (helpers/user_codes.ts) substitutes a random character for each `*` and copies
+		 * every other character through verbatim, so a mask with none — "", "-", "---", all of which
+		 * satisfy the character check above — makes the "generated" code the mask itself, identical for
+		 * every device that ever pairs. The user code exists so that approving a pairing requires
+		 * possession of something the approver was shown; with no random part, guessing it is not an
+		 * attack but a reading of the configuration.
+		 *
+		 * A floor and not a policy: how many asterisks are enough is a judgement an operator makes, and
+		 * the console shows the resulting entropy so they can make it. Zero is not a weak answer to
+		 * that question, it is the absence of a code.
+		 */
+		if (!config['deviceFlow.mask'].includes('*')) {
+			throw new TypeError(
+				'mask must contain at least one asterisk("*") — the asterisks are the only random part of a user code, so a mask without one issues the same code to every device'
+			);
+		}
 	}
 }
 

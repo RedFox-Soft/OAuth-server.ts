@@ -345,6 +345,23 @@ describe('settings API', () => {
 		expect(res.status).toBe(422);
 	});
 
+	/*
+	 * The console was the reachable path to a device flow with no user code at all: '---' contains
+	 * only permitted characters, so the character check accepted it, and `generate` then copied it
+	 * through unchanged as the "generated" code for every pairing. Refused here as well as at boot,
+	 * because this is the route a super-admin actually uses.
+	 */
+	it('rejects a deviceFlow.mask with no asterisk with 422', async () => {
+		const cookie = await sessionCookieFor(['super_admin']);
+		for (const mask of ['---', '', '-  -']) {
+			const res = await client.admin.api.settings.put(
+				{ 'deviceFlow.enabled': true, 'deviceFlow.mask': mask },
+				{ headers: { cookie } }
+			);
+			expect(res.status).toBe(422);
+		}
+	});
+
 	it('accepts a valid deviceFlow.mask while deviceFlow is enabled', async () => {
 		const cookie = await sessionCookieFor(['super_admin']);
 		const res = await client.admin.api.settings.put(
