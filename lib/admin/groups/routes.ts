@@ -65,7 +65,7 @@ async function loadGroup(admin: AdminContext, id: string): Promise<Group> {
  */
 function assertMutableMembership(group: Group): void {
 	if (group.kind === 'system') {
-		throw new AdminError(403, 'the unassigned group is not a tenant');
+		throw new AdminError(403, 'the System group is not a tenant');
 	}
 }
 
@@ -75,7 +75,7 @@ function assertDeletable(group: Group): void {
 			403,
 			group.kind === 'personal'
 				? 'a personal group cannot be deleted'
-				: 'the unassigned group cannot be deleted'
+				: 'the System group cannot be deleted'
 		);
 	}
 }

@@ -119,6 +119,26 @@ of the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Changed
 
+- Groups read as themselves in the admin console, and a personal group is nobody else's to work in.
+  Four things were wrong at once, all of them about the same list. Every personal group displayed as
+  the bare word "Personal" — including in a super administrator's list, where N administrators
+  produced N identical rows and the owner's email that is *stored* as the group's name was thrown
+  away by both display sites. Personal groups appeared in the Groups table at all, which is a page
+  about the teams work is shared with. `GET /admin/api/scope` offered a super administrator every
+  group on the instance, other people's personal groups among them, and `PUT` accepted them — so the
+  console could be pointed at one person's own workspace by somebody who was never in it. And the
+  reserved holding group was called "Unassigned", which reads like a data-quality problem rather than
+  the name of the one group that is not a tenant.
+  It is now: **System** (`SYSTEM_GROUP_NAME`, `$set` by the deployment seed so an existing database is
+  renamed too, and preferred over the stored name by the console so it does not wait on `db:setup`);
+  no personal rows in the Groups table; and one `groupLabel` helper shared by the table and the scope
+  switcher, rendering "Personal" for your own and "Personal — owner@email" for a personal group you
+  were added to. Both scope routes now apply the same carve-out — the list never offers what the
+  switch would refuse — and all three of the switch's refusals still say one thing, so it cannot be
+  used to learn which ids are real or which of them are personal. Whether a personal group is your
+  own is answered by the server from `members[0]`, the only place that can answer it: a shared
+  personal group may promote a second owner, and `findPersonalFor` matches any personal group you are
+  a member of
 - Switching the console's active scope no longer writes to the audit trail. `PUT /admin/api/scope`
   changes `AdminSession.activeGroupId` and nothing else, and grants no access a member did not already
   have — while which scope a change was made from is already carried by `ownerGroupId` on that change's
@@ -175,6 +195,15 @@ of the retired `TASKS.md` and in the knowledge base at `wiki/`.
   count and lint findings all held at their pre-change values.
 
 ### Fixed
+
+- A super administrator's scope switch is no longer accepted and then silently discarded.
+  `resolveActiveGroup` (`lib/admin/auth/rbac.ts`) re-validated the session's choice against membership
+  alone, with no exception for the role that is allowed to switch without one — so a super
+  administrator switching into a group answered 200, and on the very next request their active scope
+  resolved to empty and `assertActiveGroup` sent everything they created to the `unassigned` holding
+  group while the console went on showing the group they picked. Their choice is now honoured after
+  one re-read of the group, which also refuses it if the group has since been deleted or is an
+  administrator's personal group
 
 - An agent naming an operation the MCP surface withholds now hears why, instead of `Tool <name> not
   found`. The refusal text existed and never ran: the call that delivered it sat in the tool

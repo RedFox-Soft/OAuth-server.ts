@@ -5,6 +5,7 @@ import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
 	getProjectStore,
 	getBucketStore,
+	getGroupStore,
 	resetAdminMemoryStores
 } from 'lib/adapters/index.ts';
 import {
@@ -13,7 +14,7 @@ import {
 	ADMIN_CLIENT_ID
 } from 'lib/admin/consts.ts';
 import { Client } from 'lib/models/client.ts';
-import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID, SYSTEM_GROUP_NAME } from 'lib/admin/consts.ts';
 
 describe('ensureAdminSeed', () => {
 	beforeAll(async () => {
@@ -57,6 +58,21 @@ describe('ensureAdminSeed', () => {
 		await ensureAdminSeed();
 		const reloaded = await store.find(ADMIN_PROJECT_ID);
 		expect(reloaded?.clientIds).toContain(ADMIN_CLIENT_ID);
+	});
+
+	/*
+	 * The holding group everything else in the seed is given as its owner, asserted here because nothing
+	 * else did: its name is what the console shows a super administrator, and it is one of the pair of
+	 * values that has to stay in step with database/mongodb.ts.
+	 */
+	it('seeds the reserved holding group under the shared system name', async () => {
+		await ensureAdminSeed();
+		const group = await getGroupStore().find(UNASSIGNED_GROUP_ID);
+		expect(group).toMatchObject({
+			kind: 'system',
+			name: SYSTEM_GROUP_NAME,
+			members: []
+		});
 	});
 
 	it('seeds a manageable default (redfox) bucket', async () => {

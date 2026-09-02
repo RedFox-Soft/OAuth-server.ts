@@ -9,6 +9,13 @@ export const ADMIN_BUCKET_ID = 'admin';
  * so containers in exactly this state already exist.
  */
 export const UNASSIGNED_GROUP_ID = 'unassigned';
+/*
+ * What the console calls that group. Held here rather than only in the two seeds because the console
+ * labels a system group from this constant too: a database seeded before the name changed keeps its
+ * stored "Unassigned" until db:setup runs again, and the operator should not see the older name in the
+ * meantime. The id stays `unassigned` — renaming it would be a data migration for no visible gain.
+ */
+export const SYSTEM_GROUP_NAME = 'System';
 export const ADMIN_CLIENT_ID = 'admin-panel';
 export const ADMIN_SESSION_COOKIE = '_admin_session';
 

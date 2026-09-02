@@ -239,7 +239,12 @@ async function contextFor(
 		roles: user.roles,
 		bucketId,
 		memberships,
-		activeGroupId: resolveActiveGroup(memberships, groups, sessionGroupId),
+		activeGroupId: await resolveActiveGroup(
+			user.roles,
+			memberships,
+			groups,
+			sessionGroupId
+		),
 		...(viaClientId ? { viaClientId } : {})
 	};
 }
@@ -252,16 +257,29 @@ async function contextFor(
  * than an error: an administrator whose membership was revoked mid-session should find their console
  * showing their own work, not a broken scope they cannot navigate out of.
  *
- * The final fallback covers a super administrator, who belongs to no group by virtue of the role and
- * so has no personal group in `groups` unless they are a member of one.
+ * A super administrator is the exception, because for them "belongs to it" is not the question the
+ * switch asked: `PUT /admin/api/scope` lets them into any group except an administrator's personal one,
+ * and a choice it accepted has to survive the next request. Without this, their switch was accepted and
+ * then quietly discarded, and everything they created afterwards landed in the holding group instead of
+ * the scope the console was showing them. Re-checked rather than trusted: the group may have been
+ * deleted, or have been a personal group when the session was older than this rule.
+ *
+ * The final fallback covers a super administrator with no choice made, who belongs to no group by virtue
+ * of the role and so has no personal group in `groups` unless they are a member of one.
  */
-function resolveActiveGroup(
+async function resolveActiveGroup(
+	roles: string[],
 	memberships: { groupId: string; role: 'owner' | 'member' }[],
 	groups: Group[],
 	sessionGroupId?: string
-): string {
+): Promise<string> {
 	if (sessionGroupId && memberships.some((m) => m.groupId === sessionGroupId)) {
 		return sessionGroupId;
+	}
+	// One indexed read, and only for a super administrator whose scope is a group they are not in.
+	if (sessionGroupId && roles.includes('super_admin')) {
+		const chosen = await getGroupStore().find(sessionGroupId);
+		if (chosen && chosen.kind !== 'personal') return chosen._id;
 	}
 	const personal = groups.find((g) => g.kind === 'personal');
 	return personal?._id ?? memberships[0]?.groupId ?? '';

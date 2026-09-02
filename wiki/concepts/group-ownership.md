@@ -26,13 +26,20 @@ console offered the buttons anyway, producing a permission error for an action t
 `Group.kind` distinguishes three cases that differ only in their invariants, never in how access is
 resolved (`lib/adapters/types.ts`):
 
-- `personal` — created with an administrator's account and presented by the console as "Personal".
-  Undeletable, its administrator a permanent owner. It *may* gain further members, at which point it
-  is an ordinary shared group. That is what makes sharing personal work an addition rather than a
-  transfer, and it is why there is no second owner kind for "a user owns this".
+- `personal` — created with an administrator's account. Undeletable, its administrator a permanent
+  owner. It *may* gain further members, at which point it is an ordinary shared group. That is what
+  makes sharing personal work an addition rather than a transfer, and it is why there is no second
+  owner kind for "a user owns this". Sharing one is an API operation: the Groups table does not list
+  personal groups, and the members editor is reached only for the groups it lists.
+  Its stored `name` is its owner's email, and the console never shows that name to the owner —
+  `groupLabel` (`lib/admin/ui/groupLabel.ts`) renders "Personal" for your own and
+  "Personal — owner@email" for anyone else's. Two display sites labelling this differently is how a
+  super administrator ended up reading a list of identical "Personal" rows.
 - `regular` — a company or a team.
-- `system` — the reserved `unassigned` holding group (`UNASSIGNED_GROUP_ID` in `lib/admin/consts.ts`).
-  No members, exempt from the at-least-one-owner rule, reachable only by super administrators.
+- `system` — the reserved `unassigned` holding group (`UNASSIGNED_GROUP_ID` in `lib/admin/consts.ts`),
+  displayed as **System** (`SYSTEM_GROUP_NAME`, which `groupLabel` prefers over the stored name so a
+  database seeded before the rename does not show the old one). No members, exempt from the
+  at-least-one-owner rule, reachable only by super administrators.
 
 `assertActiveGroup` (`lib/admin/auth/rbac.ts`) returns `unassigned` for a super administrator, who
 belongs to no group by virtue of the role. That is deliberate and keeps one rule: it is exactly what
@@ -65,6 +72,15 @@ container is created. Server-held rather than caller-asserted, because it sits o
 boundary — a client-supplied scope could name a group the caller has since been removed from. It is
 re-validated against live membership on every request and falls back to the personal group, so a
 removed member keeps a usable console instead of being stranded in a scope they cannot navigate out of.
+
+A super administrator is the one exception to that re-validation, and it cuts both ways. They may
+switch into any group they do not belong to — instance-wide authority has to be able to create into a
+scope, and support a group whose owners have gone — so `resolveActiveGroup` honours their choice after
+re-reading the group, rather than discarding it and silently sending their next creation to
+`unassigned`. What they may *not* switch into is another administrator's `personal` group: it is one
+person's own workspace, not a tenant needing support. Both routes in `lib/admin/scope/routes.ts` apply
+that carve-out — the list never offers what the switch would refuse — and all three of the switch's
+refusals share one message, so it cannot be used to learn which group ids exist or which are personal.
 
 Switching writes **no audit entry**. `PUT /admin/api/scope` is one of the two routes
 `excludedAdminRoutes` names, alongside logout, and for the same reason: the session is the only thing it
@@ -110,7 +126,10 @@ silently dropped is the specific hazard on this surface.
 
 **Two seeds, one change.** `ensureAdminSeed` (`lib/admin/seed.ts`) is test-only; `database/mongodb.ts`
 is the real deployment seed. Both create the bootstrap administrator, so both must create its personal
-group and the reserved `unassigned` group. Changing only one silently no-ops in production.
+group and the reserved `unassigned` group. Changing only one silently no-ops in production. The
+holding group's *name* is the exception to "idempotent means insert-only": the deployment seed `$set`s
+it from `SYSTEM_GROUP_NAME` on every run, because a label carrying no behaviour should be corrected in
+a database that already has the document rather than only in fresh ones.
 
 ## The migration
 

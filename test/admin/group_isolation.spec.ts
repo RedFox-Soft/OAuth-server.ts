@@ -43,11 +43,11 @@ function slug(prefix: string): string {
 	return `${prefix}-${Math.random().toString(36).slice(2)}`;
 }
 
-async function tenant(label: string) {
+async function tenant(label: string, roles = ['project_admin']) {
 	const user = await getUserStore(ADMIN_BUCKET_ID).create(
 		`${label}-${Math.random()}@x.io`,
 		'hash',
-		['project_admin']
+		roles
 	);
 	const session = await sessionFor(user);
 	return {
@@ -290,5 +290,31 @@ describe('group isolation', () => {
 				.get({ headers: { cookie: b.cookie } });
 			expect((after.data as Project).ownerGroupId).toBe(b.groupId);
 		});
+	});
+
+	/*
+	 * The one limit that also binds a super administrator. Their bypass exists so support and recovery
+	 * are possible — reading a foreign container, or taking over a group whose owners have gone. Acting
+	 * *as* somebody's personal group is neither, and it is the scope where nothing has been shared with
+	 * anyone: asked here rather than only in the scope spec because this is the file that asks whether a
+	 * boundary holds against the caller who can cross every other one.
+	 */
+	it("refuses even a super administrator the scope of somebody's personal group", async () => {
+		const root = await tenant('root', ['super_admin']);
+		const a = await tenant('a');
+
+		const res = await client.admin.api.scope.put(
+			{ groupId: a.groupId },
+			{ headers: { cookie: root.cookie } }
+		);
+		expect(res.status).toBe(403);
+
+		// And the same for a group that does not exist, so the refusal cannot be read as "this one is
+		// personal" — the switcher does not offer it either way.
+		const invented = await client.admin.api.scope.put(
+			{ groupId: 'no-such-group' },
+			{ headers: { cookie: root.cookie } }
+		);
+		expect(invented.status).toBe(403);
 	});
 });

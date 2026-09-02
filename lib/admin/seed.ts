@@ -10,7 +10,8 @@ import {
 	ADMIN_PROJECT_ID,
 	ADMIN_BUCKET_ID,
 	ADMIN_CLIENT_ID,
-	UNASSIGNED_GROUP_ID
+	UNASSIGNED_GROUP_ID,
+	SYSTEM_GROUP_NAME
 } from './consts.js';
 import { ADMIN_MCP_CLIENT_ID } from '../mcp/consts.js';
 
@@ -27,7 +28,7 @@ export async function ensureAdminSeed(): Promise<void> {
 	if (!(await groups.find(UNASSIGNED_GROUP_ID))) {
 		await groups.create({
 			_id: UNASSIGNED_GROUP_ID,
-			name: 'Unassigned',
+			name: SYSTEM_GROUP_NAME,
 			kind: 'system',
 			members: []
 		});

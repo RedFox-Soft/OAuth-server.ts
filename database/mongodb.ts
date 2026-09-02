@@ -28,7 +28,8 @@ import {
 	ADMIN_PROJECT_ID,
 	ADMIN_BUCKET_ID,
 	ADMIN_CLIENT_ID,
-	UNASSIGNED_GROUP_ID
+	UNASSIGNED_GROUP_ID,
+	SYSTEM_GROUP_NAME
 } from '../lib/admin/consts.js';
 import { ADMIN_MCP_CLIENT_ID } from '../lib/mcp/consts.js';
 
@@ -172,8 +173,12 @@ const seedNow = new Date();
 await db.collection(STORE_AREAS.groups).updateOne(
 	{ _id: UNASSIGNED_GROUP_ID },
 	{
+		// `$set` rather than `$setOnInsert` for the name alone, so a database seeded under the group's
+		// older name is renamed by the next db:setup instead of keeping it forever. It is a label with no
+		// behaviour attached — nothing resolves this group by name — and $set/$setOnInsert may not both
+		// name the same field.
+		$set: { name: SYSTEM_GROUP_NAME },
 		$setOnInsert: {
-			name: 'Unassigned',
 			kind: 'system',
 			members: [],
 			needsReview: false,

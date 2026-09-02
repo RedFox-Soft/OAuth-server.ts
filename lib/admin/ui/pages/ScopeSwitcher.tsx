@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Select, Typography } from 'antd';
+import { groupLabel } from '../groupLabel.js';
 
 export interface ScopeOption {
 	id: string;
 	name: string;
 	kind: 'personal' | 'regular' | 'system';
 	role: 'owner' | 'member' | null;
+	// Whether a personal group is the caller's own. Answered by the server, which is the only side that
+	// can: a shared personal group may have promoted a second owner, so `role` does not settle it.
+	own: boolean;
 }
 
 interface ScopeView {
@@ -46,9 +50,9 @@ export function ScopeSwitcher() {
 		}
 	}
 
-	// A super administrator belongs to no group, so there is nothing to switch between and the control
-	// would only offer a choice that changes nothing they can see.
-	if (!scope || scope.available.length === 0) return null;
+	// Nothing to switch between: one scope, which the server has already picked. A super administrator
+	// is never in this case — the system group is always among the choices.
+	if (!scope || scope.available.length < 2) return null;
 
 	return (
 		<>
@@ -60,9 +64,7 @@ export function ScopeSwitcher() {
 				style={{ minWidth: 200 }}
 				options={scope.available.map((g) => ({
 					value: g.id,
-					// A personal group is labelled for what it is rather than by its name, which is the
-					// administrator's own email and reads oddly in a list of companies.
-					label: g.kind === 'personal' ? 'Personal' : g.name
+					label: groupLabel(g)
 				}))}
 			/>
 		</>

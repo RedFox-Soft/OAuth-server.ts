@@ -7,7 +7,11 @@ import { scopeRoutes } from 'lib/admin/scope/routes.ts';
 import { projectRoutes } from 'lib/admin/projects/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { adminAuditStore, getUserStore } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import {
+	ADMIN_BUCKET_ID,
+	ADMIN_SESSION_COOKIE,
+	UNASSIGNED_GROUP_ID
+} from 'lib/admin/consts.ts';
 import type { Group, Project } from 'lib/adapters/types.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
 
@@ -37,7 +41,13 @@ async function admin(roles: string[] = ['project_admin']) {
 
 type ScopeView = {
 	activeGroupId: string;
-	available: { id: string; name: string; kind: string; role: string | null }[];
+	available: {
+		id: string;
+		name: string;
+		kind: string;
+		role: string | null;
+		own: boolean;
+	}[];
 };
 
 describe('active scope', () => {
@@ -184,6 +194,106 @@ describe('active scope', () => {
 		);
 		// Identical to the refusal above: a switch must not reveal which group ids are real.
 		expect(invented.status).toBe(403);
+	});
+
+	/*
+	 * A personal group is the one scope instance-wide authority does not reach. A super administrator can
+	 * already read every container in it; what they may not do is point their console at somebody's own
+	 * workspace and act as it — the switcher must not offer it, and the switch must refuse it even when
+	 * the id is supplied by hand.
+	 */
+	it("never offers or accepts another administrator's personal group, even to a super administrator", async () => {
+		const root = await admin(['super_admin']);
+		const other = await admin();
+		const theirs = await personalGroupId(other.userId);
+		const shared = (
+			await client.admin.api.groups.post(
+				{ name: 'Acme' },
+				{ headers: { cookie: other.cookie } }
+			)
+		).data as Group;
+
+		const scope = (
+			await client.admin.api.scope.get({ headers: { cookie: root.cookie } })
+		).data as ScopeView;
+
+		// Not a filter on personal groups as such: the super administrator's own is still there.
+		expect(scope.available.map((g) => g.id)).toContain(
+			await personalGroupId(root.userId)
+		);
+		expect(scope.available.map((g) => g.id)).not.toContain(theirs);
+		// Everything else the instance holds still is, including a group they do not belong to.
+		expect(scope.available.map((g) => g.id)).toContain(shared._id);
+		expect(scope.available.map((g) => g.id)).toContain(UNASSIGNED_GROUP_ID);
+
+		const denied = await client.admin.api.scope.put(
+			{ groupId: theirs },
+			{ headers: { cookie: root.cookie } }
+		);
+		expect(denied.status).toBe(403);
+	});
+
+	/*
+	 * The other half of that rule: a super administrator's switch into a group they do not belong to is
+	 * accepted, and has to still be the active scope on the next request. Pinned because it was not —
+	 * `resolveActiveGroup` re-validated against membership alone, so the choice was taken and then
+	 * discarded, and the creation below landed in the holding group while the console showed the group.
+	 */
+	it('keeps a super administrator in a group they do not belong to', async () => {
+		const root = await admin(['super_admin']);
+		const other = await admin();
+		const theirs = (
+			await client.admin.api.groups.post(
+				{ name: 'Acme' },
+				{ headers: { cookie: other.cookie } }
+			)
+		).data as Group;
+
+		const switched = await client.admin.api.scope.put(
+			{ groupId: theirs._id },
+			{ headers: { cookie: root.cookie } }
+		);
+		expect(switched.status).toBe(200);
+
+		const later = (
+			await client.admin.api.scope.get({ headers: { cookie: root.cookie } })
+		).data as ScopeView;
+		expect(later.activeGroupId).toBe(theirs._id);
+
+		const project = (
+			await client.admin.api.projects.post(
+				{ name: 'Company', slug: slug('c') },
+				{ headers: { cookie: root.cookie } }
+			)
+		).data as Project;
+		expect(project.ownerGroupId).toBe(theirs._id);
+	});
+
+	/*
+	 * Which personal group is the caller's own — what decides whether the console names its owner.
+	 *
+	 * Both ids are read before the share, deliberately: `findPersonalFor` matches any personal group the
+	 * account is a member of, so once the member has been added to somebody else's it can answer with
+	 * either. That ambiguity is the reason `own` is computed from `members[0]` rather than membership.
+	 */
+	it("marks only the caller's own personal group as theirs", async () => {
+		const owner = await admin();
+		const member = await admin();
+		const theirs = await personalGroupId(owner.userId);
+		const mine = await personalGroupId(member.userId);
+		await client.admin.api
+			.groups({ id: theirs })
+			.members.post(
+				{ userId: member.userId, role: 'member' },
+				{ headers: { cookie: owner.cookie } }
+			);
+
+		const scope = (
+			await client.admin.api.scope.get({ headers: { cookie: member.cookie } })
+		).data as ScopeView;
+
+		expect(scope.available.find((g) => g.id === theirs)?.own).toBe(false);
+		expect(scope.available.find((g) => g.id === mine)?.own).toBe(true);
 	});
 
 	/*

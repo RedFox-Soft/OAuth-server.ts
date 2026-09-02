@@ -10,10 +10,10 @@ import {
 	Space,
 	Table,
 	Tag,
-	Typography,
 	message
 } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
+import { groupLabel } from '../groupLabel.js';
 
 interface GroupMember {
 	userId: string;
@@ -259,7 +259,8 @@ export function Groups({
 		await load();
 	}
 
-	const needingReview = groups.filter((g) => g.needsReview);
+	const visible = groups.filter((g) => g.kind !== 'personal');
+	const needingReview = visible.filter((g) => g.needsReview);
 
 	return (
 		<>
@@ -284,21 +285,26 @@ export function Groups({
 			<Table<Group>
 				rowKey="_id"
 				loading={loading}
-				dataSource={groups}
+				/*
+				 * Personal groups are left out: this page is about the teams work is shared with, and a
+				 * personal group is not one — it is the scope an administrator's own work already sits in,
+				 * reachable from the scope switcher. Listed, they said nothing useful to their own owner and
+				 * gave a super administrator one indistinguishable row per administrator on the instance.
+				 *
+				 * Filtered here rather than in `GET /admin/api/groups`, which is also the MCP `group_list`
+				 * tool and the answer to "which groups does this account belong to". Hiding a row is a
+				 * decision about this table, not about what the account may see.
+				 */
+				dataSource={visible}
 				locale={{
 					emptyText:
-						'No groups yet. Create one to share projects and user buckets with colleagues — everything you make on your own stays in your personal scope.'
+						'No groups yet. Create one to share projects and user buckets with colleagues — everything you make on your own stays in your personal scope, which is not listed here.'
 				}}
 				columns={[
 					{
 						title: 'Name',
 						dataIndex: 'name',
-						render: (name: string, g: Group) =>
-							g.kind === 'personal' ? (
-								<Typography.Text>Personal</Typography.Text>
-							) : (
-								name
-							)
+						render: (_: string, g: Group) => groupLabel(g)
 					},
 					{
 						title: 'Kind',
@@ -358,8 +364,9 @@ export function Groups({
 					group={editing}
 					admins={admins}
 					/*
-					 * A personal group is editable too: sharing personal work is adding a member, not moving
-					 * anything. Only the reserved holding group is not a tenant.
+					 * Kept keyed on kind rather than assuming a regular group, even though this table no
+					 * longer lists personal ones: a personal group is still shareable through the API, and
+					 * what refuses membership edits is being the reserved holding group, nothing else.
 					 */
 					canEdit={isOwner(editing) && editing.kind !== 'system'}
 					onClose={() => setEditing(null)}
