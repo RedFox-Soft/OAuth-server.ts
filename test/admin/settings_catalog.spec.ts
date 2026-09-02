@@ -22,6 +22,40 @@ describe('settings catalog', () => {
 		expect(source).toMatch(/server-provisioned|server-owned/);
 	});
 
+	/*
+	 * The DPoP replay switch: in the settings, out of the catalog, and both halves matter.
+	 *
+	 * Demoted by the settings audit of 2026-09-02 as the one entry of sixty-two with no question an
+	 * operator could answer — it only ever removes a check, and its two real callers (a conformance
+	 * suite, someone repeating a request while diagnosing) configure it at startup. Absence from this
+	 * catalog is the whole enforcement: the admin PUT filters submissions against it, so a key with no
+	 * descriptor cannot be written through the console or the MCP surface.
+	 *
+	 * The second assertion is the one that would fail on an over-eager cleanup. Deleting the key from
+	 * ApplicationConfig as well would take validate_dpop.ts's check with it and leave the conformance
+	 * escape hatch unreachable without a code change — the boot-configuration tier exists precisely to
+	 * avoid that, so it is asserted rather than assumed.
+	 */
+	it('keeps the DPoP replay switch out of the catalog but in the settings', () => {
+		const source = readFileSync(
+			resolve(import.meta.dir, '../../lib/admin/settings/catalog.ts'),
+			'utf8'
+		);
+
+		expect(SETTINGS_CATALOG.map((d) => d.key)).not.toContain(
+			'dpop.allowReplay'
+		);
+		expect(
+			Object.prototype.hasOwnProperty.call(
+				ApplicationConfig,
+				'dpop.allowReplay'
+			)
+		).toBe(true);
+		// And the reason is written down next to where it used to be, as with every other omission.
+		expect(source).toContain('dpop.allowReplay');
+		expect(source).toMatch(/no question an operator could answer/);
+	});
+
 	it('every catalog key exists in ApplicationConfig', () => {
 		for (const d of SETTINGS_CATALOG) {
 			expect(

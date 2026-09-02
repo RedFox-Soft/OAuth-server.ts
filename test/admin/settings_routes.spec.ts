@@ -38,7 +38,8 @@ const settingsAudit = () =>
 	adminAuditStore.list({ targetType: SETTINGS_TARGET });
 
 interface SettingsResponse {
-	catalog: Array<{ key: string; type: string }>;
+	catalog: Array<{ key: string; type: string; domain: string }>;
+	domains: Array<{ id: string; label: string; blurb: string }>;
 	values: Record<string, unknown>;
 	restartRequired: boolean;
 	changedKeys: string[];
@@ -71,6 +72,32 @@ describe('settings API', () => {
 		expect(
 			Object.prototype.hasOwnProperty.call(body.values, 'par.enabled')
 		).toBe(true);
+	});
+
+	/*
+	 * The console renders one pane per domain and files each setting onto one by its `domain`, so both
+	 * halves have to arrive together. Served rather than compiled into the browser bundle: a second
+	 * copy of the list there could name a pane the catalog never fills, or miss one it does, and
+	 * nothing would catch either — the settings would simply be unreachable in the UI while remaining
+	 * reachable through this endpoint.
+	 */
+	it('GET serves the panes the console navigates by, and files every setting onto one', async () => {
+		const cookie = await sessionCookieFor(['super_admin']);
+		const res = await client.admin.api.settings.get({ headers: { cookie } });
+		const body = res.data as SettingsResponse;
+
+		expect(body.domains.length).toBeGreaterThan(0);
+		for (const domain of body.domains) {
+			expect(domain.id.length).toBeGreaterThan(0);
+			expect(domain.label.length).toBeGreaterThan(0);
+			expect(domain.blurb.length).toBeGreaterThan(0);
+		}
+
+		const ids = body.domains.map((d) => d.id);
+		for (const d of body.catalog) expect(ids).toContain(d.domain);
+		// And no pane arrives empty, which would render as a dead entry in the sub-nav.
+		const occupied = new Set(body.catalog.map((d) => d.domain));
+		expect(ids.filter((id) => !occupied.has(id))).toEqual([]);
 	});
 
 	it('PUT persists a change and reports restartRequired + changedKeys', async () => {

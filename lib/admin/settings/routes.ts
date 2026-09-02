@@ -15,7 +15,11 @@ import {
 } from '../auth/rbac.js';
 import { recordAdminAudit } from '../audit/record.js';
 import { SETTINGS_TARGET_ID } from '../../consts/admin_audit_routes.js';
-import { SETTINGS_CATALOG, type SettingDescriptor } from './catalog.js';
+import {
+	SETTINGS_CATALOG,
+	SETTING_DOMAINS,
+	type SettingDescriptor
+} from './catalog.js';
 import { UpdateSettingsBody } from './schema.js';
 
 const CATALOG_BY_KEY = new Map<string, SettingDescriptor>(
@@ -119,6 +123,13 @@ function stateFor(stored: Record<string, unknown>) {
 	}
 	return {
 		catalog: SETTINGS_CATALOG,
+		/*
+		 * The panes, served rather than hardcoded in the console. Both ends need the same list — the
+		 * catalog files each setting onto a domain, the console renders one pane per domain — and a
+		 * second copy in the browser bundle could name a pane the catalog never fills, or miss one it
+		 * does, with nothing to catch either.
+		 */
+		domains: SETTING_DOMAINS,
 		values,
 		restartRequired: changedKeys.length > 0,
 		changedKeys
