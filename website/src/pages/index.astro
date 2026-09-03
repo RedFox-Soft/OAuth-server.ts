@@ -1,15 +1,324 @@
 ---
-// website/src/pages/index.astro — replaced by Task 6; exists so `/` builds.
+import { Code } from '@astrojs/starlight/components';
+import Site from '../layouts/Site.astro';
+import ScreenshotFigure from '../components/ScreenshotFigure.astro';
+import Button from '../components/ui/Button.astro';
+import Card from '../components/ui/Card.astro';
+import Badge from '../components/ui/Badge.astro';
+import Section from '../components/ui/Section.astro';
+import Eyebrow from '../components/ui/Eyebrow.astro';
+
+const jsonLd = {
+	'@context': 'https://schema.org',
+	'@type': 'SoftwareApplication',
+	name: 'OAuth-server.ts',
+	alternateName: 'FoxAuth',
+	applicationCategory: 'SecurityApplication',
+	operatingSystem: 'Docker, Linux, macOS, Windows',
+	url: 'https://foxauth.dev',
+	downloadUrl: 'https://github.com/RedFox-Soft/OAuth-server.ts',
+	license: 'https://foxauth.dev/license/',
+	offers: {
+		'@type': 'Offer',
+		price: '0',
+		priceCurrency: 'USD',
+		description: 'Self-hosted'
+	}
+};
+
+const quickstart = `curl -O https://raw.githubusercontent.com/RedFox-Soft/OAuth-server.ts/main/docker-compose.yml
+docker compose up
+# open http://localhost:3000/admin`;
+
+const audiences = [
+	{
+		title: 'For TypeScript teams',
+		body: 'Bun and Elysia, one command to run, and 31 named seams you replace with your own function instead of forking.',
+		points: [
+			'Runs on Bun; the HTTP layer is Elysia',
+			'MongoDB in production, in-memory for tests',
+			'31 override seams, resolved at call time'
+		]
+	},
+	{
+		title: 'For AI-agent builders',
+		body: 'The only authorization server an agent administers over MCP, through the console’s own code — never a second, privileged path.',
+		points: [
+			'60 MCP tools, off until you set mcp.enabled',
+			'Two-call confirmation on destructive operations',
+			'RFC 9728 protected-resource metadata'
+		]
+	},
+	{
+		title: 'For regulated industries',
+		body: 'The banking-grade profiles are implemented, not on a roadmap: turn on the flag your regulator asks for.',
+		points: [
+			'FAPI, DPoP, PAR, mTLS, CIBA, RAR, JARM',
+			'Append-only admin audit trail',
+			'Per-identity brute-force throttle'
+		]
+	}
+];
+
+const steps = [
+	{
+		n: '1',
+		title: 'Run the server',
+		body: 'Docker Compose starts MongoDB, provisions the schema and seeds the admin console.',
+		href: '/docs/get-started/docker-compose/'
+	},
+	{
+		n: '2',
+		title: 'Register a client',
+		body: 'Create a project and its first OAuth client in the console, with exact redirect URIs.',
+		href: '/docs/get-started/first-client/'
+	},
+	{
+		n: '3',
+		title: 'Get a token',
+		body: 'Walk the Authorization Code flow with PKCE and read the claims out of the ID token.',
+		href: '/docs/get-started/first-token/'
+	}
+];
+
+/* The README's "Implemented Standards" table, in its order. */
+const standards = [
+	{
+		label: 'OAuth 2.1',
+		href: 'https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1'
+	},
+	{ label: 'RFC 6749', href: 'https://datatracker.ietf.org/doc/html/rfc6749' },
+	{ label: 'RFC 7636', href: 'https://datatracker.ietf.org/doc/html/rfc7636' },
+	{ label: 'RFC 7519', href: 'https://datatracker.ietf.org/doc/html/rfc7519' },
+	{ label: 'RFC 7517', href: 'https://datatracker.ietf.org/doc/html/rfc7517' },
+	{
+		label: 'OIDC Core 1.0',
+		href: 'https://openid.net/specs/openid-connect-core-1_0.html'
+	},
+	{
+		label: 'OIDC Discovery 1.0',
+		href: 'https://openid.net/specs/openid-connect-discovery-1_0.html'
+	},
+	{ label: 'RFC 9207', href: 'https://datatracker.ietf.org/doc/html/rfc9207' },
+	{ label: 'RFC 8707', href: 'https://datatracker.ietf.org/doc/html/rfc8707' },
+	{ label: 'RFC 7009', href: 'https://datatracker.ietf.org/doc/html/rfc7009' },
+	{ label: 'RFC 7662', href: 'https://datatracker.ietf.org/doc/html/rfc7662' },
+	{ label: 'RFC 9701', href: 'https://datatracker.ietf.org/doc/html/rfc9701' },
+	{ label: 'RFC 9126', href: 'https://datatracker.ietf.org/doc/html/rfc9126' },
+	{ label: 'RFC 9449', href: 'https://datatracker.ietf.org/doc/html/rfc9449' },
+	{ label: 'RFC 7591', href: 'https://datatracker.ietf.org/doc/html/rfc7591' },
+	{ label: 'RFC 7592', href: 'https://datatracker.ietf.org/doc/html/rfc7592' },
+	{ label: 'RFC 8628', href: 'https://datatracker.ietf.org/doc/html/rfc8628' },
+	{ label: 'RFC 8705', href: 'https://datatracker.ietf.org/doc/html/rfc8705' },
+	{ label: 'RFC 9396', href: 'https://datatracker.ietf.org/doc/html/rfc9396' },
+	{ label: 'RFC 9728', href: 'https://datatracker.ietf.org/doc/html/rfc9728' },
+	{
+		label: 'CIBA',
+		href: 'https://openid.net/specs/openid-client-initiated-backchannel-authentication-core-1_0.html'
+	},
+	{ label: 'JARM', href: 'https://openid.net/specs/oauth-v2-jarm.html' }
+];
+
+const transcript = `agent  → settings_update { "key": "deviceFlow.enabled", "value": false }
+server ← Confirmation required. This disables a grant for every client on
+         the instance. Call again with confirm: "settings_update:9f31c2".
+agent  → settings_update { "key": "deviceFlow.enabled", "value": false,
+                           "confirm": "settings_update:9f31c2" }
+server ← Applied at the next restart. Audit entry 0f2a written:
+         actor agent:ops-bot, action settings.update, target deviceFlow.enabled.`;
 ---
 
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<title>FoxAuth</title>
-	</head>
-	<body>
-		<h1>FoxAuth</h1>
-		<p>Source-available OAuth 2.1 and OpenID Connect authorization server.</p>
-		<a href="/docs/">Documentation</a>
-	</body>
-</html>
+<Site
+	title="FoxAuth — the authorization server for the agent era"
+	description="FoxAuth is built on OAuth-server.ts, a source-available OAuth 2.1 / OpenID Connect server you run yourself, with a built-in admin console and administration over MCP."
+	jsonLd={jsonLd}
+>
+	<Section>
+		<div class="grid items-start gap-12 lg:grid-cols-2">
+			<div>
+				<Eyebrow>OAuth 2.1 · OpenID Connect · MCP</Eyebrow>
+				<h1 class="text-4xl font-[650] leading-[1.15] tracking-tight text-balance sm:text-5xl">
+					The authorization server for the agent era.
+				</h1>
+				<p class="mt-5 max-w-prose text-lg text-gray-600 dark:text-gray-400">
+					FoxAuth is built on OAuth-server.ts, a source-available OAuth 2.1 / OpenID Connect
+					server you run yourself — with a built-in admin console, banking-grade profiles, and
+					administration over MCP for AI agents.
+				</p>
+				<div class="mt-8 flex flex-wrap gap-3">
+					<Button href="/docs/get-started/docker-compose/" size="lg">Get started</Button>
+					<Button
+						href="https://github.com/RedFox-Soft/OAuth-server.ts"
+						variant="secondary"
+						size="lg">View on GitHub</Button
+					>
+				</div>
+				<p class="mt-6 flex flex-wrap items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+					<Badge tone="accent">20+ RFCs</Badge>
+					<Badge tone="neutral">Bun + Elysia</Badge>
+					<Badge tone="neutral">FSL-1.1-ALv2</Badge>
+				</p>
+			</div>
+			<div class="flex flex-col gap-6">
+				<Code lang="bash" title="Two commands and a browser tab" code={quickstart} />
+				<ScreenshotFigure
+					name="admin-project-clients"
+					alt="The FoxAuth admin console listing the OAuth clients of a project."
+					caption="The built-in console: projects, clients, buckets, users, keys and an append-only audit trail."
+				/>
+			</div>
+		</div>
+	</Section>
+
+	<Section tone="muted">
+		<Eyebrow>Who runs it</Eyebrow>
+		<h2 class="text-3xl font-[650] tracking-tight text-balance">
+			Three teams, one server.
+		</h2>
+		<p class="mt-3 max-w-prose text-gray-600 dark:text-gray-400">
+			The same binary, the same admin API. What changes is which flags you set.
+		</p>
+		<div class="mt-10 grid gap-6 lg:grid-cols-3">
+			{
+				audiences.map((audience) => (
+					<Card href="/features/">
+						<h3 class="text-lg font-[650] tracking-tight">{audience.title}</h3>
+						<p class="mt-2 text-sm text-gray-600 dark:text-gray-400">{audience.body}</p>
+						<ul class="mt-4 flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+							{audience.points.map((point) => (
+								<li class="flex gap-2">
+									<span aria-hidden="true" class="text-accent-700 dark:text-accent-200">
+										→
+									</span>
+									<span>{point}</span>
+								</li>
+							))}
+						</ul>
+						<p class="mt-4 text-sm font-medium text-accent-700 dark:text-accent-200">
+							See all features
+						</p>
+					</Card>
+				))
+			}
+		</div>
+	</Section>
+
+	<Section>
+		<Eyebrow>Quick start</Eyebrow>
+		<h2 class="text-3xl font-[650] tracking-tight text-balance">
+			A token in five minutes.
+		</h2>
+		<p class="mt-3 max-w-prose text-gray-600 dark:text-gray-400">
+			No sign-up, no tenant, no API key. Three pages end with a token in your terminal.
+		</p>
+		<div class="mt-10 grid gap-6 lg:grid-cols-3">
+			{
+				steps.map((step) => (
+					<Card href={step.href}>
+						<p
+							class="font-mono text-sm font-medium text-accent-700 dark:text-accent-200"
+							aria-hidden="true"
+						>
+							{step.n}
+						</p>
+						<h3 class="mt-2 text-lg font-[650] tracking-tight">{step.title}</h3>
+						<p class="mt-2 text-sm text-gray-600 dark:text-gray-400">{step.body}</p>
+					</Card>
+				))
+			}
+		</div>
+	</Section>
+
+	<Section tone="muted">
+		<Eyebrow>Standards</Eyebrow>
+		<h2 class="text-3xl font-[650] tracking-tight text-balance">
+			Twenty-two specifications, implemented.
+		</h2>
+		<p class="mt-3 max-w-prose text-gray-600 dark:text-gray-400">
+			Every entry below is code in the repository, with tests. Each links to the spec it
+			implements; the Reference names the flag that governs it.
+		</p>
+		<ul class="mt-8 flex flex-wrap gap-2">
+			{
+				standards.map((standard) => (
+					<li>
+						<a
+							href={standard.href}
+							class="inline-flex items-center rounded-control border border-gray-200 bg-white px-3 py-1.5 font-mono text-xs text-gray-700 no-underline transition-colors hover:border-accent-500 hover:text-accent-700 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-300 dark:hover:text-accent-200"
+						>
+							{standard.label}
+						</a>
+					</li>
+				))
+			}
+		</ul>
+		<p class="mt-6">
+			<Button href="/docs/reference/endpoints/" variant="secondary">
+				Endpoint reference
+			</Button>
+		</p>
+	</Section>
+
+	<Section>
+		<div class="grid items-start gap-12 lg:grid-cols-2">
+			<div>
+				<Eyebrow>Administration over MCP</Eyebrow>
+				<h2 class="text-3xl font-[650] tracking-tight text-balance">
+					An agent operates it, under the same rules you do.
+				</h2>
+				<p class="mt-4 max-w-prose text-gray-600 dark:text-gray-400">
+					Turn on <code class="font-mono text-sm">mcp.enabled</code> and the management API is
+					served to an AI agent at <code class="font-mono text-sm">POST /mcp</code> as an OAuth
+					2.1 protected resource. Each of the 60 tools rebuilds the request the console would
+					have sent and runs the console's own permission checks, validation and audit write —
+					so there is no privileged back door to keep in step.
+				</p>
+				<p class="mt-4 max-w-prose text-gray-600 dark:text-gray-400">
+					Destructive and instance-wide operations need two calls: the first returns a
+					confirmation token, the second carries it. It is off by default.
+				</p>
+				<p class="mt-6">
+					<Button href="/docs/reference/mcp-tools/" variant="secondary">
+						All 60 MCP tools
+					</Button>
+				</p>
+			</div>
+			<pre
+				class="overflow-x-auto rounded-frame border border-gray-200 bg-gray-50 p-5 font-mono text-xs leading-relaxed text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">{transcript}</pre>
+		</div>
+	</Section>
+
+	<Section tone="muted" narrow>
+		<Eyebrow>Licensing</Eyebrow>
+		<h2 class="text-3xl font-[650] tracking-tight text-balance">
+			Source-available, honestly.
+		</h2>
+		<p class="mt-4 text-gray-600 dark:text-gray-400">
+			The code is public and you may read, modify, self-host and redistribute it — for anything
+			except offering it to others as a competing hosted service. Two years after each version
+			ships, that version converts to the Apache License 2.0.
+		</p>
+		<p class="mt-6">
+			<Button href="/license/" variant="secondary">Read the license</Button>
+		</p>
+	</Section>
+
+	<Section>
+		<div class="rounded-card border border-accent-200 bg-accent-50 p-8 dark:border-accent-900 dark:bg-gray-900 md:p-12">
+			<Eyebrow>Start</Eyebrow>
+			<h2 class="text-3xl font-[650] tracking-tight text-balance">
+				Run it yourself this afternoon.
+			</h2>
+			<p class="mt-3 max-w-prose text-gray-600 dark:text-gray-400">
+				Self-hosting is free and complete. The managed instance is next.
+			</p>
+			<div class="mt-8 flex flex-wrap gap-3">
+				<Button href="/docs/get-started/docker-compose/" size="lg">Get started</Button>
+				<Button href="/docs/" variant="secondary" size="lg">Read the docs</Button>
+				<Button href="/pricing/#cloud" variant="ghost" size="lg">
+					Join the cloud waitlist
+				</Button>
+			</div>
+		</div>
+	</Section>
+</Site>

@@ -1,0 +1,49 @@
+---
+import { getCollection } from 'astro:content';
+import Site from '../../layouts/Site.astro';
+import Card from '../../components/ui/Card.astro';
+import Section from '../../components/ui/Section.astro';
+import Eyebrow from '../../components/ui/Eyebrow.astro';
+
+/*
+ * The header and footer both link "Compare"; without this index that link has nowhere to go once
+ * there is more than one comparison. It lists the collection, so a new .mdx file appears here.
+ */
+const entries = (await getCollection('compare')).sort((a, b) =>
+	a.data.competitor.localeCompare(b.data.competitor)
+);
+---
+
+<Site
+	title="Compare — FoxAuth"
+	description="How FoxAuth compares with Keycloak and Auth0 on hosting, protocol coverage, administration and licensing — dated, and sourced from their own documentation."
+>
+	<Section narrow>
+		<Eyebrow>Compare</Eyebrow>
+		<h1 class="text-4xl font-[650] leading-[1.15] tracking-tight text-balance">
+			Checked against their own documentation.
+		</h1>
+		<p class="mt-5 text-lg text-gray-600 dark:text-gray-400">
+			Each comparison lists the pages we read and the date we read them. Where a product's
+			documentation did not answer a question, the row says "not documented" instead of guessing.
+		</p>
+	</Section>
+
+	<Section tone="muted">
+		<div class="grid gap-6 sm:grid-cols-2">
+			{
+				entries.map((entry) => (
+					<Card href={`/compare/${entry.id}/`}>
+						<h2 class="text-lg font-[650] tracking-tight">{entry.data.title}</h2>
+						<p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+							{entry.data.description}
+						</p>
+						<p class="mt-4 text-xs text-gray-500 dark:text-gray-400">
+							Last checked {entry.data.lastChecked} · {entry.data.sources.length} sources
+						</p>
+					</Card>
+				))
+			}
+		</div>
+	</Section>
+</Site>

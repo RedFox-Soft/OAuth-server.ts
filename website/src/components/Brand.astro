@@ -5,12 +5,19 @@ interface Props {
 	size?: number;
 	wordmark?: boolean;
 	href?: string;
+	/*
+	 * Accessible name for the link. The mark carries alt="" because the wordmark next to it is the
+	 * name; with wordmark={false} the link would otherwise have no accessible name at all, so a
+	 * caller using the mark alone must pass one.
+	 */
+	label?: string;
 }
-const { size = 32, wordmark = true, href = '/' } = Astro.props;
+const { size = 32, wordmark = true, href = '/', label } = Astro.props;
 ---
 
 <a
 	href={href}
+	aria-label={label}
 	class="inline-flex items-center gap-[0.5em] no-underline"
 	style={`font-size:${size * 0.7}px`}
 >

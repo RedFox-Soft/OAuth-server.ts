@@ -23,9 +23,13 @@ export default defineConfig({
 				}
 			],
 			customCss: ['./src/styles/global.css'],
+			// src/pages/404.astro is the site's one not-found page, so Starlight's own 404 route is a
+			// duplicate static route — Astro warns today and says it becomes a hard error later.
+			disable404Route: true,
 			// Everything excluded here is a src/pages/**/*.astro route rather than docs-collection
-			// Markdown/MDX: the six Reference pages, and the three root documents rendered from the
-			// repository's own CHANGELOG/SECURITY/LICENSE. starlight-links-validator only instruments
+			// Markdown/MDX: the six Reference pages, the three root documents rendered from the
+			// repository's own CHANGELOG/SECURITY/LICENSE, and the marketing pages (features,
+			// pricing, compare, contact). starlight-links-validator only instruments
 			// the markdown/MDX processor, so it never has heading data for such a route and
 			// unconditionally reports InvalidLinkToCustomPage for a link to one, whether or not the
 			// target exists — see validateLink() in starlight-links-validator/libs/validation.ts.
@@ -37,7 +41,11 @@ export default defineConfig({
 						'/docs/reference/**',
 						'/changelog/',
 						'/security/',
-						'/license/'
+						'/license/',
+						'/features/',
+						'/pricing/',
+						'/compare/**',
+						'/contact/'
 					]
 				}),
 				starlightLlmsTxt()

@@ -1,0 +1,159 @@
+---
+import Site from '../layouts/Site.astro';
+import WaitlistForm from '../components/WaitlistForm.astro';
+import ContactForm from '../components/ContactForm.astro';
+import Button from '../components/ui/Button.astro';
+import Card from '../components/ui/Card.astro';
+import Badge from '../components/ui/Badge.astro';
+import Section from '../components/ui/Section.astro';
+import Eyebrow from '../components/ui/Eyebrow.astro';
+
+const selfHosted = [
+	'Every feature — there are no editions',
+	'Unlimited users, clients, projects and tokens',
+	'Source-available under FSL-1.1-ALv2',
+	'Community support on GitHub issues'
+];
+const cloud = [
+	'Managed instance on your own domain',
+	'Backups and upgrades handled',
+	'An SLA and a support address',
+	'Your data stays in the region you pick'
+];
+const enterprise = [
+	'You self-host; we back you up',
+	'Response-time SLA on defects',
+	'Security advisories ahead of public disclosure',
+	'Architecture review and priority fixes'
+];
+
+const faq = [
+	{
+		q: 'Is it open?',
+		a: 'It is source-available, under FSL-1.1-ALv2. You may read, modify, self-host and redistribute the code, and build a business around it — the one thing you may not do is offer it to others as a competing hosted service. Two years after each version ships, that version converts to the Apache License 2.0, so the restriction expires on a published schedule rather than at our discretion.'
+	},
+	{
+		q: 'Can I run it in production today?',
+		a: 'Yes, self-hosted. The version is 0.x, which means the HTTP surface and the admin API may still change between minor releases; read the changelog before upgrading and re-run the setup script afterwards. The protocol endpoints follow the specs, so your clients are written against the RFC, not against us.'
+	},
+	{
+		q: 'What does the cloud waitlist commit me to?',
+		a: 'Nothing. We keep your address, mail you once when the managed instance opens, and delete it if you ask. There is no pricing to agree to yet.'
+	},
+	{
+		q: 'Do you offer consulting?',
+		a: 'Yes — integration work, threat modelling and profile conformance for regulated deployments. Tell us the shape of the deployment and we will say whether we are the right people.'
+	}
+];
+---
+
+<Site
+	title="Pricing — FoxAuth"
+	description="Self-hosting FoxAuth is free and complete. A managed cloud instance is coming, and an enterprise support contract is available for self-hosted deployments."
+>
+	<Section narrow>
+		<Eyebrow>Pricing</Eyebrow>
+		<h1 class="text-4xl font-[650] leading-[1.15] tracking-tight text-balance">
+			Free to run. Paid only if you want us on the hook.
+		</h1>
+		<p class="mt-5 text-lg text-gray-600 dark:text-gray-400">
+			There is one build of the server and it has every feature. You pay for a managed instance
+			or for a support contract — never for a flag.
+		</p>
+	</Section>
+
+	<Section tone="muted">
+		<div class="grid items-start gap-6 lg:grid-cols-3">
+			<Card>
+				<Badge tone="accent">Available now</Badge>
+				<h2 class="mt-4 text-xl font-[650] tracking-tight">Self-hosted</h2>
+				<p class="mt-2 text-3xl font-[650] tracking-tight">Free</p>
+				<p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+					Your infrastructure, your database, no account with us.
+				</p>
+				<ul class="mt-5 flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+					{
+						selfHosted.map((item) => (
+							<li class="flex gap-2">
+								<span aria-hidden="true" class="text-accent-700 dark:text-accent-200">
+									→
+								</span>
+								<span>{item}</span>
+							</li>
+						))
+					}
+				</ul>
+				<p class="mt-6">
+					<Button href="/docs/get-started/docker-compose/">Get started</Button>
+				</p>
+			</Card>
+
+			<Card id="cloud" tone="accent">
+				<Badge tone="neutral">Coming soon</Badge>
+				<h2 class="mt-4 text-xl font-[650] tracking-tight">FoxAuth Cloud</h2>
+				<p class="mt-2 text-3xl font-[650] tracking-tight">Not priced yet</p>
+				<p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+					The same server, run by the people who wrote it.
+				</p>
+				<ul class="mt-5 flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+					{
+						cloud.map((item) => (
+							<li class="flex gap-2">
+								<span aria-hidden="true" class="text-accent-700 dark:text-accent-200">
+									→
+								</span>
+								<span>{item}</span>
+							</li>
+						))
+					}
+				</ul>
+				<div class="mt-6"><WaitlistForm /></div>
+			</Card>
+
+			<Card>
+				<Badge tone="neutral">By agreement</Badge>
+				<h2 class="mt-4 text-xl font-[650] tracking-tight">Enterprise</h2>
+				<p class="mt-2 text-3xl font-[650] tracking-tight">Let’s talk</p>
+				<p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+					Self-hosted, with a support contract behind it.
+				</p>
+				<ul class="mt-5 flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+					{
+						enterprise.map((item) => (
+							<li class="flex gap-2">
+								<span aria-hidden="true" class="text-accent-700 dark:text-accent-200">
+									→
+								</span>
+								<span>{item}</span>
+							</li>
+						))
+					}
+				</ul>
+				<div class="mt-6"><ContactForm subject="Enterprise" /></div>
+			</Card>
+		</div>
+	</Section>
+
+	<Section narrow>
+		<Eyebrow>Questions</Eyebrow>
+		<h2 class="text-3xl font-[650] tracking-tight text-balance">
+			The four we are asked every time.
+		</h2>
+		<div class="mt-8 flex flex-col gap-3">
+			{
+				faq.map((item) => (
+					<details
+						class="rounded-card border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900"
+					>
+						<summary class="cursor-pointer font-[650] tracking-tight">{item.q}</summary>
+						<p class="mt-3 text-sm text-gray-600 dark:text-gray-400">{item.a}</p>
+					</details>
+				))
+			}
+		</div>
+		<p class="mt-8 flex flex-wrap gap-3">
+			<Button href="/license/" variant="secondary">Read the license</Button>
+			<Button href="/contact/" variant="ghost">Contact us</Button>
+		</p>
+	</Section>
+</Site>

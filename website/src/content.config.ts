@@ -16,5 +16,20 @@ export const collections = {
 	root: defineCollection({
 		loader: glob({ base: '..', pattern: ['CHANGELOG.md', 'SECURITY.md'] }),
 		schema: z.object({}).passthrough()
+	}),
+	/*
+	 * The comparison pages. `sources` is required and non-empty by intent: every claim about another
+	 * product has to be checkable against a page we actually read, and `lastChecked` dates that
+	 * reading, because their products move.
+	 */
+	compare: defineCollection({
+		loader: glob({ base: './src/content/compare', pattern: '**/*.mdx' }),
+		schema: z.object({
+			title: z.string(),
+			competitor: z.string(),
+			description: z.string(),
+			lastChecked: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+			sources: z.array(z.string().url())
+		})
 	})
 };

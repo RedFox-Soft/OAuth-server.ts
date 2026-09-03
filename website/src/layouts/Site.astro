@@ -1,25 +1,33 @@
 ---
-/*
- * TEMPORARY layout — Task 6 replaces it with the real site chrome. It exists now because the root
- * document pages and the styleguide need a page shell before that lands.
- */
+import '../styles/global.css';
+import Seo from '../components/Seo.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+
 interface Props {
 	title: string;
 	description: string;
+	image?: string;
+	jsonLd?: Record<string, unknown>;
 	noindex?: boolean;
 }
-const { title, description, noindex = false } = Astro.props;
+const { title, description, image, jsonLd, noindex } = Astro.props;
 ---
 
-<html lang="en">
+<!doctype html>
+<html lang="en" class="scroll-smooth">
 	<head>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<title>{title}</title>
-		<meta name="description" content={description} />
-		{noindex && <meta name="robots" content="noindex" />}
+		<Seo
+			title={title}
+			description={description}
+			image={image}
+			jsonLd={jsonLd}
+			noindex={noindex}
+		/>
 	</head>
-	<body>
-		<slot />
+	<body class="bg-white text-gray-900 antialiased dark:bg-gray-950 dark:text-gray-100">
+		<Header />
+		<main><slot /></main>
+		<Footer />
 	</body>
 </html>

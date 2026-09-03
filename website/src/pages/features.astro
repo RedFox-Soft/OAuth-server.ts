@@ -1,0 +1,370 @@
+---
+import Site from '../layouts/Site.astro';
+import FeatureGrid from '../components/FeatureGrid.astro';
+import type { Feature } from '../components/FeatureGrid.astro';
+import Button from '../components/ui/Button.astro';
+import Section from '../components/ui/Section.astro';
+import Eyebrow from '../components/ui/Eyebrow.astro';
+
+const rfc = (n: string) => ({
+	label: `RFC ${n}`,
+	href: `https://datatracker.ietf.org/doc/html/rfc${n}`
+});
+
+const groups: {
+	id: string;
+	heading: string;
+	title: string;
+	blurb: string;
+	items: Feature[];
+}[] = [
+	{
+		id: 'protocol',
+		heading: 'Protocol',
+		title: 'Every grant an OAuth 2.1 client can ask for.',
+		blurb:
+			'The grants and endpoints. Authorization Code with PKCE and OpenID Connect are always on; the rest wait for a flag.',
+		items: [
+			{
+				title: 'Authorization Code with PKCE',
+				body: 'PKCE is mandatory for every client, public or confidential, as OAuth 2.1 requires. Redirect URIs match exactly.',
+				spec: rfc('7636')
+			},
+			{
+				title: 'OpenID Connect Core 1.0',
+				body: 'ID tokens, the UserInfo endpoint and discovery, with the standard claim set and pairwise subjects.',
+				spec: {
+					label: 'OIDC Core 1.0',
+					href: 'https://openid.net/specs/openid-connect-core-1_0.html'
+				}
+			},
+			{
+				title: 'Issuer identification',
+				body: 'Every authorization response carries iss, so a client cannot be tricked into accepting another issuer’s code.',
+				spec: rfc('9207')
+			},
+			{
+				title: 'Resource Indicators',
+				body: 'Audience-restrict a token with the resource parameter, and validate it at the resource server.',
+				flag: 'resourceIndicators.enabled',
+				spec: rfc('8707')
+			},
+			{
+				title: 'Client Credentials grant',
+				body: 'Machine-to-machine tokens with no end-user, scoped per client.',
+				flag: 'clientCredentials.enabled'
+			},
+			{
+				title: 'Refresh Token grant',
+				body: 'Long-lived sessions with rotation on every use and replay detection.',
+				flag: 'refreshToken.enabled'
+			},
+			{
+				title: 'Device Authorization Grant',
+				body: 'Sign in on a TV or a CLI by typing a user code on another device.',
+				flag: 'deviceFlow.enabled',
+				spec: rfc('8628')
+			},
+			{
+				title: 'CIBA',
+				body: 'Client-initiated backchannel authentication: the client asks, the user approves out of band.',
+				flag: 'ciba.enabled',
+				spec: {
+					label: 'CIBA Core 1.0',
+					href: 'https://openid.net/specs/openid-client-initiated-backchannel-authentication-core-1_0.html'
+				}
+			},
+			{
+				title: 'Pushed Authorization Requests',
+				body: 'The client posts the request to the server first and sends only a request_uri through the browser.',
+				flag: 'par.enabled',
+				spec: rfc('9126')
+			},
+			{
+				title: 'Request objects',
+				body: 'Signed request and request_uri parameters, so the authorization request itself is integrity-protected.',
+				flag: 'requestObjects.enabled'
+			},
+			{
+				title: 'JARM',
+				body: 'JWT-secured authorization responses, signed and optionally encrypted.',
+				flag: 'responseMode.jwt.enabled',
+				spec: {
+					label: 'JARM',
+					href: 'https://openid.net/specs/oauth-v2-jarm.html'
+				}
+			},
+			{
+				title: 'Rich Authorization Requests',
+				body: 'Fine-grained authorization_details instead of a scope string, for payments and similar.',
+				flag: 'richAuthorizationRequests.enabled',
+				spec: rfc('9396')
+			},
+			{
+				title: 'Token introspection',
+				body: 'Resource servers ask the issuer whether a token is still active, and what it carries.',
+				flag: 'introspection.enabled',
+				spec: rfc('7662')
+			},
+			{
+				title: 'JWT introspection responses',
+				body: 'Signed introspection responses, for a resource server that must prove what it was told.',
+				flag: 'jwtIntrospection.enabled',
+				spec: rfc('9701')
+			},
+			{
+				title: 'Token revocation',
+				body: 'A client retires an access or refresh token it no longer needs.',
+				flag: 'revocation.enabled',
+				spec: rfc('7009')
+			},
+			{
+				title: 'Signed UserInfo responses',
+				body: 'Return UserInfo as a signed JWT rather than plain JSON.',
+				flag: 'jwtUserinfo.enabled'
+			},
+			{
+				title: 'The claims parameter',
+				body: 'Per-request claim selection, including essential claims and the acr request.',
+				flag: 'claimsParameter.enabled'
+			},
+			{
+				title: 'RP-initiated logout',
+				body: 'End the session from the client, with a confirmation step so a link cannot log a user out silently.',
+				flag: 'rpInitiatedLogout.enabled'
+			},
+			{
+				title: 'Backchannel logout',
+				body: 'Notify every client of a session that ended, server to server.',
+				flag: 'backchannelLogout.enabled'
+			}
+		]
+	},
+	{
+		id: 'security',
+		heading: 'Security',
+		title: 'Sender constraint, and defences that are already on.',
+		blurb:
+			'The banking-grade profiles are flags, not editions. The rest of this list is on from the first start.',
+		items: [
+			{
+				title: 'DPoP',
+				body: 'Sender-constrained access and refresh tokens, including server nonces, so a stolen token is not enough.',
+				flag: 'dpop.enabled',
+				spec: rfc('9449')
+			},
+			{
+				title: 'mTLS client authentication',
+				body: 'Client certificates for authentication and certificate-bound access tokens.',
+				flag: 'mTLS.enabled',
+				spec: rfc('8705')
+			},
+			{
+				title: 'FAPI profile behaviours',
+				body: 'The stricter checks the Financial-grade API profiles require, as one switch.',
+				flag: 'fapi.enabled'
+			},
+			{
+				title: 'Token and response encryption',
+				body: 'Encrypted ID tokens, UserInfo and JARM responses using the client’s registered keys.',
+				flag: 'encryption.enabled'
+			},
+			{
+				title: 'TOTP second factor',
+				body: 'Per-bucket time-based one-time passwords, optionally enforced for the admin console.',
+				spec: rfc('6238')
+			},
+			{
+				title: 'Pairwise subject identifiers',
+				body: 'A different sub per sector, salted from the database, so two relying parties cannot correlate a user.'
+			},
+			{
+				title: 'Sign-in brute-force throttle',
+				body: 'Persisted per-identity failure counters with escalating lockouts. A throttled refusal looks exactly like a wrong password.'
+			},
+			{
+				title: 'Per-origin rate limiting',
+				body: 'Tiered by route class and on by default, with the trusted-proxy hop configurable.',
+				flag: 'rateLimit.enabled'
+			},
+			{
+				title: 'CORS closed by data',
+				body: 'An origin is readable only if it is listed on the project that owns the calling client — not by a wildcard setting.',
+				flag: 'cors.enabled'
+			},
+			{
+				title: 'Security headers',
+				body: 'HSTS, Permissions-Policy, framing and content-type protections on every response.'
+			},
+			{
+				title: 'Scope-based access control',
+				body: 'Per-client scope enforcement, checked at the authorization endpoint and again at the token endpoint.'
+			}
+		]
+	},
+	{
+		id: 'administration',
+		heading: 'Administration',
+		title: 'One management API, three front doors.',
+		blurb:
+			'The console, the HTTP API and the MCP tools dispatch into the same routes, so the checks and the audit write cannot drift.',
+		items: [
+			{
+				title: 'Administration console',
+				body: 'Projects, OAuth clients, administrators, user buckets, end-users, upstream providers, settings, SMTP and signing keys.'
+			},
+			{
+				title: 'Append-only audit trail',
+				body: 'Every state-changing admin action records actor, action, target and time — written before the mutation, with no update or delete path.'
+			},
+			{
+				title: 'Administration over MCP',
+				body: '60 tools served to an AI agent at POST /mcp as an OAuth 2.1 protected resource, with two-call confirmation on high-consequence operations.',
+				flag: 'mcp.enabled',
+				spec: rfc('9728')
+			},
+			{
+				title: 'Dynamic client registration',
+				body: 'Clients register themselves, subject to the project’s policy.',
+				flag: 'registration.enabled',
+				spec: rfc('7591')
+			},
+			{
+				title: 'Registration management',
+				body: 'Read, update and delete a registration with its registration access token.',
+				flag: 'registrationManagement.enabled',
+				spec: rfc('7592')
+			},
+			{
+				title: 'Database-backed clients',
+				body: 'Clients live in the server’s own store, created through the console, the API, dynamic registration or the setup script. There is no static client file.'
+			},
+			{
+				title: 'Group ownership',
+				body: 'Projects and user buckets are owned by a group; membership is the only thing that grants access, re-resolved on every request.'
+			},
+			{
+				title: 'End-user self-service',
+				body: 'Email verification and password reset per bucket, each with attempt caps, cooldowns and single-use links.'
+			},
+			{
+				title: 'Upstream OIDC federation',
+				body: 'Let end-users sign in through an external provider, configured per project.',
+				flag: 'federation.enabled'
+			},
+			{
+				title: 'Signing key management',
+				body: 'View, generate and delete keys over the key store; a generated key is applied to the live keystore and published at /jwks.'
+			}
+		]
+	},
+	{
+		id: 'extensibility',
+		heading: 'Extensibility',
+		title: 'Change behaviour without forking.',
+		blurb: 'Named seams and one adapter interface, so your changes survive an upgrade.',
+		items: [
+			{
+				title: '31 override seams',
+				body: 'Account lookup, interaction policy, refresh-token rotation, resource resolution, pairwise identifiers, RAR handling and more, replaced at call time.'
+			},
+			{
+				title: 'Pluggable storage',
+				body: 'Every persisted model goes through one adapter interface. MongoDB and in-memory implementations ship.'
+			},
+			{
+				title: 'Mountable Elysia app',
+				body: 'Import the app and mount it in your own Bun service. There is no init step — importing is what boots it.'
+			},
+			{
+				title: 'Built-in login and consent UI',
+				body: 'React and Ant Design screens you can theme, or replace through the interaction policy.'
+			}
+		]
+	},
+	{
+		id: 'operations',
+		heading: 'Operations',
+		title: 'What you need when something is wrong.',
+		blurb: 'Ship it, watch it, and find out why a request failed.',
+		items: [
+			{
+				title: 'Published container image',
+				body: 'ghcr.io/redfox-soft/oauth-server-ts, tagged per release and latest, with a Compose file that provisions the schema.'
+			},
+			{
+				title: 'Server error store',
+				body: 'Internal faults are recorded and readable in the console. Routine client rejections are correct behaviour and never appear.',
+				flag: 'errorStore.enabled'
+			},
+			{
+				title: 'Optional Sentry reporting',
+				body: 'Reporting sits off the request path entirely: a fault reaches it only after it is classified as a defect, so responses are unchanged.',
+				flag: 'sentry.enabled'
+			},
+			{
+				title: 'Settings you can read',
+				body: 'Every server-wide setting is documented with its type, default and consequence, and edited in the console.'
+			},
+			{
+				title: 'Machine-readable reference',
+				body: 'The endpoint, settings, admin API, MCP tool and environment references are generated from the code itself.'
+			}
+		]
+	}
+];
+---
+
+<Site
+	title="Features — FoxAuth"
+	description="Every grant, profile and control OAuth-server.ts implements: OAuth 2.1 with PKCE, DPoP, PAR, FAPI, CIBA, mTLS, an admin console with an audit trail, and 60 MCP tools."
+>
+	<Section narrow>
+		<Eyebrow>Features</Eyebrow>
+		<h1 class="text-4xl font-[650] leading-[1.15] tracking-tight text-balance">
+			Everything is in the box. Most of it is switched off.
+		</h1>
+		<p class="mt-5 text-lg text-gray-600 dark:text-gray-400">
+			FoxAuth ships one server with no feature editions. Authorization Code with PKCE and
+			OpenID Connect run from the first start; the rest wait behind a named flag, so your attack
+			surface is the set of features you actually asked for.
+		</p>
+		<p class="mt-5 text-gray-600 dark:text-gray-400">
+			Each flag below links to its entry in the Settings reference, which is generated from the
+			code and names the default and the consequence.
+		</p>
+		<div class="mt-8 flex flex-wrap gap-3">
+			<Button href="/docs/get-started/docker-compose/">Get started</Button>
+			<Button href="/docs/reference/settings/" variant="secondary">
+				Settings reference
+			</Button>
+		</div>
+	</Section>
+
+	{
+		groups.map((group, i) => (
+			<Section id={group.id} tone={i % 2 === 0 ? 'muted' : 'default'}>
+				<Eyebrow>{group.heading}</Eyebrow>
+				<h2 class="text-3xl font-[650] tracking-tight text-balance">{group.title}</h2>
+				<p class="mt-3 max-w-prose text-gray-600 dark:text-gray-400">{group.blurb}</p>
+				<div class="mt-10">
+					<FeatureGrid items={group.items} />
+				</div>
+			</Section>
+		))
+	}
+
+	<Section narrow>
+		<Eyebrow>Next</Eyebrow>
+		<h2 class="text-3xl font-[650] tracking-tight text-balance">
+			Compare it with what you run today.
+		</h2>
+		<p class="mt-3 text-gray-600 dark:text-gray-400">
+			We keep a factual, dated comparison against the servers teams usually weigh this against.
+		</p>
+		<div class="mt-8 flex flex-wrap gap-3">
+			<Button href="/compare/">Compare</Button>
+			<Button href="/pricing/" variant="secondary">Pricing</Button>
+		</div>
+	</Section>
+</Site>

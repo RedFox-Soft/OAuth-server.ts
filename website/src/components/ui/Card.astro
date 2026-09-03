@@ -2,8 +2,10 @@
 interface Props {
 	href?: string;
 	tone?: 'default' | 'accent';
+	/* Anchor target, so a card can be linked to directly (e.g. /pricing/#cloud). */
+	id?: string;
 }
-const { href, tone = 'default' } = Astro.props;
+const { href, tone = 'default', id } = Astro.props;
 const Tag = href ? 'a' : 'div';
 const tones = {
 	default: 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900',
@@ -13,6 +15,7 @@ const tones = {
 
 <Tag
 	href={href}
+	id={id}
 	class:list={[
 		'block rounded-card border p-6 no-underline transition-colors',
 		tones[tone],

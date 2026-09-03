@@ -1,0 +1,83 @@
+---
+import Brand from './Brand.astro';
+import { loadVersion } from '../data/version';
+
+const v = loadVersion();
+const columns = [
+	{
+		heading: 'Product',
+		links: [
+			{ href: '/features/', label: 'Features' },
+			{ href: '/pricing/', label: 'Pricing' },
+			{ href: '/compare/', label: 'Compare' }
+		]
+	},
+	{
+		heading: 'Docs',
+		links: [
+			{ href: '/docs/get-started/docker-compose/', label: 'Get started' },
+			{ href: '/docs/deploy/docker-compose/', label: 'Deploy' },
+			{ href: '/docs/reference/settings/', label: 'Reference' }
+		]
+	},
+	{
+		heading: 'Project',
+		links: [
+			{ href: 'https://github.com/RedFox-Soft/OAuth-server.ts', label: 'GitHub' },
+			{ href: '/changelog/', label: 'Changelog' },
+			{ href: '/security/', label: 'Security' },
+			{ href: '/license/', label: 'License' }
+		]
+	},
+	{
+		heading: 'Contact',
+		links: [
+			{ href: '/contact/', label: 'Contact us' },
+			{ href: 'mailto:hello@foxauth.dev', label: 'hello@foxauth.dev' }
+		]
+	}
+];
+---
+
+<footer class="border-t border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900">
+	<div class="mx-auto max-w-6xl px-6 py-12">
+		<div class="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+			{
+				columns.map((column) => (
+					<div>
+						<h2 class="mb-3 text-sm font-[650] text-gray-900 dark:text-gray-100">
+							{column.heading}
+						</h2>
+						<ul class="flex flex-col gap-2">
+							{column.links.map((link) => (
+								<li>
+									<a
+										href={link.href}
+										class="text-sm text-gray-600 transition-colors hover:text-accent-700 dark:text-gray-400 dark:hover:text-accent-200"
+									>
+										{link.label}
+									</a>
+								</li>
+							))}
+						</ul>
+					</div>
+				))
+			}
+		</div>
+
+		<div
+			class="mt-10 flex flex-col gap-4 border-t border-gray-200 pt-6 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between"
+		>
+			<Brand size={24} />
+			<div class="text-sm text-gray-600 dark:text-gray-400">
+				<p>
+					FoxAuth is built on OAuth-server.ts, a source-available OAuth 2.1 / OpenID Connect
+					server.
+				</p>
+				<p class="mt-1">
+					Site version {v.version}{v.unreleased ? ' (unreleased)' : ''}
+				</p>
+			</div>
+		</div>
+	</div>
+</footer>

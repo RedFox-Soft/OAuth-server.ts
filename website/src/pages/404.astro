@@ -1,0 +1,28 @@
+---
+import Site from '../layouts/Site.astro';
+import Button from '../components/ui/Button.astro';
+import Section from '../components/ui/Section.astro';
+import Eyebrow from '../components/ui/Eyebrow.astro';
+---
+
+<Site
+	title="Page not found — FoxAuth"
+	description="That page does not exist. Start from the home page or the documentation."
+	noindex
+>
+	<Section narrow>
+		<Eyebrow>404</Eyebrow>
+		<h1 class="text-4xl font-[650] leading-[1.15] tracking-tight text-balance">
+			Page not found.
+		</h1>
+		<p class="mt-5 text-lg text-gray-600 dark:text-gray-400">
+			The link is wrong or the page has moved. The documentation search finds most things faster
+			than guessing a URL.
+		</p>
+		<div class="mt-8 flex flex-wrap gap-3">
+			<Button href="/">Home</Button>
+			<Button href="/docs/" variant="secondary">Documentation</Button>
+			<Button href="/docs/reference/endpoints/" variant="ghost">Endpoint reference</Button>
+		</div>
+	</Section>
+</Site>

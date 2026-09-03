@@ -1,0 +1,56 @@
+---
+import SubmitButton from './ui/SubmitButton.astro';
+
+interface Props {
+	/* Prefills Formspree's _subject, and the mailto subject in the unconfigured fallback. */
+	subject?: string;
+}
+const { subject = 'FoxAuth enquiry' } = Astro.props;
+const formId = import.meta.env.PUBLIC_FORMSPREE_CONTACT;
+const fieldClass =
+	'w-full rounded-control border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100';
+---
+
+{
+	formId ? (
+		<form method="POST" action={`https://formspree.io/f/${formId}`} class="flex flex-col gap-3">
+			<input type="hidden" name="_subject" value={subject} />
+			<input type="text" name="_gotcha" tabindex="-1" autocomplete="off" class="hidden" />
+			<label class="flex flex-col gap-1 text-sm font-medium">
+				Work email
+				<input
+					type="email"
+					name="email"
+					required
+					autocomplete="email"
+					placeholder="you@company.com"
+					class={fieldClass}
+				/>
+			</label>
+			<label class="flex flex-col gap-1 text-sm font-medium">
+				What do you need?
+				<textarea
+					name="message"
+					required
+					rows="4"
+					placeholder="Deployment shape, timeline, the guarantees you need."
+					class={fieldClass}></textarea>
+			</label>
+			<SubmitButton>Send</SubmitButton>
+			<p class="text-xs text-gray-600 dark:text-gray-400">
+				We reply from a person, usually within two working days.
+			</p>
+		</form>
+	) : (
+		<p class="text-sm text-gray-600 dark:text-gray-400">
+			Email us at{' '}
+			<a
+				href={`mailto:hello@foxauth.dev?subject=${encodeURIComponent(subject)}`}
+				class="font-medium text-accent-700 dark:text-accent-200"
+			>
+				hello@foxauth.dev
+			</a>{' '}
+			with your deployment shape and the guarantees you need. We reply within two working days.
+		</p>
+	)
+}

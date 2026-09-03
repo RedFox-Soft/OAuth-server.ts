@@ -1,0 +1,63 @@
+---
+import Card from './ui/Card.astro';
+import Badge from './ui/Badge.astro';
+import { loadExport } from '../data/export';
+
+export interface Feature {
+	title: string;
+	body: string;
+	/* An ApplicationConfig flag key; rendered as a badge linking to its Reference entry. */
+	flag?: string;
+	/* An RFC or spec link for the claim the card makes. */
+	spec?: { label: string; href: string };
+}
+
+interface Props {
+	items: Feature[];
+	columns?: 2 | 3;
+}
+const { items, columns = 3 } = Astro.props;
+
+/*
+ * The Reference renders one anchor per exported setting, so a flag badge only links when the
+ * generated export actually carries that key. A few README flags are absent from it; those render
+ * as a plain badge rather than as a link into nothing.
+ */
+const settingKeys = new Set(loadExport().settings.entries.map((entry) => entry.key));
+---
+
+<div
+	class:list={[
+		'grid gap-6 sm:grid-cols-2',
+		columns === 3 ? 'lg:grid-cols-3' : 'lg:grid-cols-2'
+	]}
+>
+	{
+		items.map((item) => (
+			<Card>
+				<h3 class="text-base font-[650] tracking-tight">{item.title}</h3>
+				<p class="mt-2 text-sm text-gray-600 dark:text-gray-400">{item.body}</p>
+				{(item.flag || item.spec) && (
+					<p class="mt-3 flex flex-wrap items-center gap-2">
+						{item.flag &&
+							(settingKeys.has(item.flag) ? (
+								<a href={`/docs/reference/settings/#${item.flag}`} class="no-underline">
+									<Badge tone="flag">{item.flag}</Badge>
+								</a>
+							) : (
+								<Badge tone="flag">{item.flag}</Badge>
+							))}
+						{item.spec && (
+							<a
+								href={item.spec.href}
+								class="text-xs font-medium text-accent-700 dark:text-accent-200"
+							>
+								{item.spec.label}
+							</a>
+						)}
+					</p>
+				)}
+			</Card>
+		))
+	}
+</div>

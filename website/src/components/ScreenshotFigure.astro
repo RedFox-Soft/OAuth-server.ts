@@ -1,0 +1,40 @@
+---
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+/*
+ * The screenshots are generated (website/public/screenshots/ is gitignored and produced by
+ * scripts/capture.ts). A page references one by name and the figure simply disappears when the
+ * file is absent, so a build without the capture step still succeeds — rather than shipping a
+ * broken <img>. Same cwd assumption as data/version.ts: every documented command runs in website/.
+ */
+interface Props {
+	name: string;
+	alt: string;
+	caption?: string;
+	width?: number;
+	height?: number;
+}
+const { name, alt, caption, width = 1440, height = 900 } = Astro.props;
+const src = `/screenshots/${name}.png`;
+const present = existsSync(resolve(process.cwd(), 'public', `screenshots/${name}.png`));
+---
+
+{
+	present && (
+		<figure class="m-0">
+			<img
+				src={src}
+				alt={alt}
+				width={width}
+				height={height}
+				loading="lazy"
+				decoding="async"
+				class="w-full rounded-frame border border-gray-200 bg-white dark:border-gray-700"
+			/>
+			{caption && (
+				<figcaption class="mt-2 text-sm text-gray-600 dark:text-gray-400">{caption}</figcaption>
+			)}
+		</figure>
+	)
+}

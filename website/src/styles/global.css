@@ -13,6 +13,25 @@
 @import '@fontsource-variable/inter';
 @import '@fontsource-variable/jetbrains-mono';
 
+/*
+ * @astrojs/starlight-tailwind redefines the `dark` variant as `[data-theme=dark]`, which is right
+ * for the docs: Starlight's inline script always stamps `data-theme` on <html>. The marketing pages
+ * carry no client JavaScript and so never stamp it, which would leave every `dark:` utility on them
+ * dead. This restores prefers-color-scheme as the fallback while keeping the attribute
+ * authoritative — the `:not([data-theme=light])` guard is what stops the media query overriding a
+ * reader's explicit "light" choice inside the docs.
+ */
+@custom-variant dark {
+	&:where([data-theme='dark'], [data-theme='dark'] *) {
+		@slot;
+	}
+	@media (prefers-color-scheme: dark) {
+		&:where(:not([data-theme='light'], [data-theme='light'] *)) {
+			@slot;
+		}
+	}
+}
+
 @theme {
 	--font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
 	--font-mono:

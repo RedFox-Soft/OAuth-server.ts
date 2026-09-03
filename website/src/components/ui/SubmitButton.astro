@@ -1,0 +1,17 @@
+---
+/*
+ * Button.astro is an <a>. The two Formspree forms need a real <button type="submit">, and the two
+ * must look identical, so the class strings are kept in step by hand until Button grows an
+ * optional `type` prop.
+ */
+interface Props {
+	size?: 'md' | 'lg';
+}
+const { size = 'md' } = Astro.props;
+const base =
+	'inline-flex items-center justify-center gap-2 rounded-control font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500';
+const sizes = { md: 'h-10 px-4 text-sm', lg: 'h-12 px-6 text-base' };
+const primary = 'bg-accent-500 text-gray-950 hover:bg-accent-400 active:bg-accent-600';
+---
+
+<button type="submit" class:list={[base, sizes[size], primary]}><slot /></button>

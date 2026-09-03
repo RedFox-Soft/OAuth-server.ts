@@ -1,0 +1,79 @@
+---
+import { getCollection, render, type CollectionEntry } from 'astro:content';
+import type { GetStaticPaths } from 'astro';
+import Site from '../../layouts/Site.astro';
+import Button from '../../components/ui/Button.astro';
+import Section from '../../components/ui/Section.astro';
+import Eyebrow from '../../components/ui/Eyebrow.astro';
+
+export const getStaticPaths: GetStaticPaths = async () => {
+	const entries = await getCollection('compare');
+	return entries.map((entry) => ({ params: { slug: entry.id }, props: { entry } }));
+};
+
+interface Props {
+	entry: CollectionEntry<'compare'>;
+}
+const { entry } = Astro.props as Props;
+const { Content } = await render(entry);
+const { title, competitor, description, lastChecked, sources } = entry.data;
+---
+
+<Site title={`${title} — FoxAuth`} description={description}>
+	<Section narrow>
+		<Eyebrow>Compare</Eyebrow>
+		<h1 class="text-4xl font-[650] leading-[1.15] tracking-tight text-balance">{title}</h1>
+		<p class="mt-5 text-lg text-gray-600 dark:text-gray-400">{description}</p>
+		<p
+			class="mt-6 rounded-card border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400"
+		>
+			Last checked {lastChecked} against the linked sources. {competitor} changes; where its
+			documentation did not say, this page says so rather than guessing. Found something out of
+			date? Tell us at{' '}
+			<a
+				href="mailto:hello@foxauth.dev?subject=Comparison%20correction"
+				class="font-medium text-accent-700 dark:text-accent-200">hello@foxauth.dev</a
+			>.
+		</p>
+	</Section>
+
+	<Section narrow tone="muted">
+		<div class="compare-body prose max-w-none dark:prose-invert">
+			<Content />
+		</div>
+	</Section>
+
+	<Section narrow>
+		<Eyebrow>Sources</Eyebrow>
+		<h2 class="text-2xl font-[650] tracking-tight">What we read</h2>
+		<ul class="mt-4 flex flex-col gap-2">
+			{
+				sources.map((source) => (
+					<li>
+						<a
+							href={source}
+							class="break-all text-sm text-accent-700 dark:text-accent-200"
+							rel="nofollow noopener"
+						>
+							{source}
+						</a>
+					</li>
+				))
+			}
+		</ul>
+		<div class="mt-8 flex flex-wrap gap-3">
+			<Button href="/docs/get-started/docker-compose/">Try it yourself</Button>
+			<Button href="/features/" variant="secondary">All features</Button>
+		</div>
+	</Section>
+</Site>
+
+<style>
+	/* The comparison table is three wide columns; it scrolls in its own box rather than making
+	   the page scroll sideways on a phone. */
+	.compare-body :global(table) {
+		display: block;
+		max-width: 100%;
+		overflow-x: auto;
+	}
+</style>

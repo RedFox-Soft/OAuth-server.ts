@@ -53,7 +53,8 @@ const typeScale = [
 	description="FoxAuth design system reference — palette, type, components."
 	noindex
 >
-	<main class="bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100">
+	<!-- A div, not a <main>: Site.astro now supplies the page's single <main> landmark. -->
+	<div class="bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100">
 		<Section>
 			<Eyebrow>Internal</Eyebrow>
 			<h1 class="mb-2 text-4xl font-[650] tracking-tight text-balance">
@@ -252,5 +253,5 @@ grant_type=client_credentials`}</code></pre>
 				code={`curl -s https://auth.example.com/.well-known/openid-configuration | jq .issuer`}
 			/>
 		</Section>
-	</main>
+	</div>
 </Site>
