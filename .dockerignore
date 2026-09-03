@@ -137,3 +137,6 @@ dist
 
 # Unit tests
 test/
+
+# The website is built by its own workflow and never ships in the server image.
+website/

@@ -148,3 +148,11 @@ public/loginClient.js
 public/admin.js
 public/antd.css
 public/reset.css
+
+# Website build inputs and outputs (generated at build time, never committed)
+website/node_modules/
+website/dist/
+website/.astro/
+website/generated/
+website/public/screenshots/
+website/public/og/

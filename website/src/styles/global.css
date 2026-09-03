@@ -1,0 +1,24 @@
+/* Order matters: Starlight's own layer must sit between Tailwind's base and theme layers, or its
+   component styles lose to the utilities. This is the layering @astrojs/starlight-tailwind documents. */
+@layer base, starlight, theme, components, utilities;
+
+@import '@astrojs/starlight-tailwind';
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+
+@theme {
+	--color-accent-50: oklch(0.97 0.02 40);
+	--color-accent-200: oklch(0.88 0.08 40);
+	--color-accent-600: oklch(0.6 0.19 40);
+	--color-accent-900: oklch(0.35 0.12 40);
+	--color-accent-950: oklch(0.25 0.08 40);
+	--color-gray-100: oklch(0.96 0.005 260);
+	--color-gray-200: oklch(0.92 0.006 260);
+	--color-gray-300: oklch(0.85 0.008 260);
+	--color-gray-400: oklch(0.65 0.01 260);
+	--color-gray-500: oklch(0.5 0.012 260);
+	--color-gray-700: oklch(0.35 0.015 260);
+	--color-gray-800: oklch(0.27 0.015 260);
+	--color-gray-900: oklch(0.2 0.015 260);
+	--color-gray-950: oklch(0.15 0.012 260);
+}

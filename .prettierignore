@@ -15,3 +15,8 @@ node_modules
 package-lock.json
 # llm-wiki
 wiki/
+
+website/dist
+website/.astro
+website/generated
+website/bun.lock
