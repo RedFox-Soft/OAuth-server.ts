@@ -226,6 +226,35 @@ traps that each cost a debugging session.
 3. Expose it in the OIDC discovery document (`lib/actions/discovery.ts`).
 4. Protect it with the `auth` plugin if it requires client authentication.
 
+## The website
+
+`website/` is the public site (foxauth.dev): marketing pages plus Starlight documentation under
+`/docs`. It is an independent Astro project — its own `package.json` and lockfile, no Bun workspace —
+that treats this repository as its data source. `.github/workflows/site.yml` builds and deploys it to
+GitHub Pages on every push to `main` that touches the site or its inputs.
+
+Three rules keep it honest:
+
+1. **Reference pages are generated, never written.** `cd website && bun run generate` runs
+   `scripts/docs_export.ts` and writes `website/generated/`; the pages under
+   `website/src/pages/docs/reference/` render from that JSON through a zod schema
+   (`website/src/data/export.ts`) that fails the build when a field the pages need is missing. To
+   document a new setting, describe it in `lib/admin/settings/catalog.ts`; to document a new route,
+   classify it in `lib/consts/route_classification.ts`. There is nothing to edit on the site.
+2. **Nothing generated is committed.** `website/generated/`, `website/public/screenshots/` and
+   `website/public/og/` are gitignored. Screenshots are captured by `website/scripts/capture.ts`,
+   which boots the server in-process on the in-memory adapter and drives the console with Playwright.
+   `SITE_SKIP_CAPTURE=1 bun run build` skips them for a fast local build.
+3. **Root documents are rendered, not copied.** `/changelog/`, `/security/` and `/license/` read
+   `CHANGELOG.md`, `SECURITY.md`, `LICENSE` and `NOTICE` from the repository root at build time.
+
+Hand-written docs live in `website/src/content/docs/docs/<section>/*.mdx` (Starlight autogenerates
+the sidebar per section; `sidebar.order` in frontmatter orders pages). The links validator fails the
+build on a broken internal link, but it cannot see links into `website/src/pages` — the Reference
+pages and the other `src/pages` routes — so a renamed route under `src/pages` must be grepped for
+manually. The site has no test suite by decision: `cd website && bun run check
+&& bun run build` is the verification, and the root `bun test` never touches `website/`.
+
 ---
 
 ## Code style rules

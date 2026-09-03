@@ -13,7 +13,9 @@
   </p>
 
   <p>
+    <a href="https://foxauth.dev">Website</a> ·
     <a href="https://datatracker.ietf.org/doc/html/rfc6749">OAuth 2.0</a> ·
+    <a href="https://foxauth.dev/docs/">Docs</a> ·
     <a href="https://openid.net/specs/openid-connect-core-1_0.html">OpenID Connect</a> ·
     <a href="https://bun.sh/">Bun</a> ·
     <a href="LICENSE">FSL-1.1-ALv2 License</a>
@@ -237,7 +239,7 @@ so a locked-out user is never stuck waiting. Merely _requesting_ a reset clears 
 guessed password there does not sign anyone in, so the deeper lockouts buy little. This matters most
 for the reserved administrator bucket, whose operators sign in through this same door and have no
 self-service reset to escape with — their worst case is a 15-minute wait, and the way to make that
-door properly hard is to require the second factor on it (**Settings → Administrators**).
+door properly hard is to require the second factor on it (**Admins → Require an authenticator app**).
 
 ## Docker
 
@@ -332,6 +334,10 @@ The server administers itself. `GET /admin` is a console for projects, OAuth cli
 administrators, user buckets, end-users, upstream identity providers, settings, signing keys and an
 append-only audit trail. Administrators sign in through an OpenID Connect flow against this server's
 own issuer, so there is no second password store.
+
+<p align="center">
+  <img src="https://foxauth.dev/screenshots/admin-project-clients.png" alt="The administration console: a project's OAuth clients" width="900" />
+</p>
 
 ### Administration from an AI agent (MCP)
 

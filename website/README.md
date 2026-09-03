@@ -1,49 +1,58 @@
-# Starlight Starter Kit: Basics
+# foxauth.dev
 
-[![Built with Starlight](https://astro.badg.es/v2/built-with-starlight/tiny.svg)](https://starlight.astro.build)
+The public site for OAuth-server.ts: marketing pages plus Starlight documentation under `/docs`. It
+is a separate, source-available Astro project — its own `package.json` and lockfile, no Bun
+workspace — that treats the repository root as its data source. See the "The website" section in the
+root [`AGENTS.md`](../AGENTS.md) for how the two are wired together.
 
-```
-bun create astro@latest -- --template starlight
-```
+## Prerequisites
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
+- [Bun](https://bun.sh/), and a `bun install` run **at the repository root** (the site's generator
+  scripts import from `lib/`).
+- `bun install` inside `website/` as well, for the site's own dependencies.
+- `bunx playwright install chromium`, once, for the screenshot/OG capture script.
 
-## 🚀 Project Structure
+## Developing
 
-Inside of your Astro + Starlight project, you'll see the following folders and files:
-
-```
-.
-├── public/
-├── src/
-│   ├── assets/
-│   ├── content/
-│   │   └── docs/
-│   └── content.config.ts
-├── astro.config.mjs
-├── package.json
-└── tsconfig.json
+```bash
+bun run generate   # writes website/generated/ from the root repo; run before dev, and after it changes
+bun run dev        # serves whatever is currently in generated/
 ```
 
-Starlight looks for `.md` or `.mdx` files in the `src/content/docs/` directory. Each file is exposed as a route based on its file name.
+`bun run dev` does not regenerate anything itself — rerun `bun run generate` after changing a setting
+catalog, a route classification, or anything else the export reads.
 
-Images can be added to `src/assets/` and embedded in Markdown with a relative link.
+## Building
 
-Static assets, like favicons, can be placed in the `public/` directory.
+```bash
+SITE_SKIP_CAPTURE=1 bun run build   # fast local build: skips screenshots and OG images
+bun run build                       # full build: also runs scripts/capture.ts (needs chromium)
+```
 
-## 🧞 Commands
+## Checking
 
-All commands are run from the root of the project, from a terminal:
+```bash
+bun run check   # astro check; the site has no test suite by decision
+```
 
-| Command               | Action                                           |
-| :-------------------- | :----------------------------------------------- |
-| `bun install`         | Installs dependencies                            |
-| `bun dev`             | Starts local dev server at `localhost:4321`      |
-| `bun build`           | Build your production site to `./dist/`          |
-| `bun preview`         | Preview your build locally, before deploying     |
-| `bun astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `bun astro -- --help` | Get help using the Astro CLI                     |
+There is no `website` step in the root `bun test` run — the two are independent.
 
-## 👀 Want to learn more?
+## Configuration
 
-Check out [Starlight’s docs](https://starlight.astro.build/), read [the Astro documentation](https://docs.astro.build), or jump into the [Astro Discord server](https://astro.build/chat).
+Copy `.env.example` to `.env` and fill in what you need. Every variable is optional: with none set,
+forms fall back to a `mailto:` link and no analytics script is emitted.
+
+## Where content lives
+
+- Hand-written docs: `src/content/docs/docs/<section>/*.mdx` (Starlight autogenerates the sidebar per
+  section; order pages with `sidebar.order` in frontmatter).
+- Comparison pages: `src/content/compare/*.mdx`.
+- Everything else (home, features, pricing, changelog, …): `src/pages/*.astro`.
+- Reference docs are generated, never hand-written: they render from `generated/docs-export.json`
+  (produced by `bun run generate`) through the schema in `src/data/export.ts`. To change what they
+  say, change the source in the root repo — `lib/admin/settings/catalog.ts` for settings,
+  `lib/consts/route_classification.ts` for routes — and regenerate.
+
+Nothing generated is committed: `generated/`, `public/screenshots/` and `public/og/` are gitignored,
+and `/changelog/`, `/security/` and `/license/` read `CHANGELOG.md`, `SECURITY.md`, `LICENSE` and
+`NOTICE` from the repository root at build time rather than copying them in.
