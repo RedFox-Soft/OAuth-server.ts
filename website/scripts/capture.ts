@@ -37,6 +37,29 @@ const OG_OUT = resolve(import.meta.dir, '../public/og');
  */
 process.chdir(resolve(import.meta.dir, '../..'));
 
+/*
+ * lib/index.ts listens on :3000 as a side effect of import, and on Windows a second listener binds
+ * to an already-bound port silently instead of failing with EADDRINUSE. Without this check the
+ * capture would seed a developer's real, Mongo-backed dev server with demo data instead of the
+ * in-memory instance it thinks it booted.
+ */
+async function assertPortFree(): Promise<void> {
+	let alreadyServing: boolean;
+	try {
+		await fetch(`${ORIGIN}/health`);
+		alreadyServing = true;
+	} catch {
+		// A connection error is the expected state (nothing listening yet).
+		alreadyServing = false;
+	}
+	if (alreadyServing) {
+		throw new Error(
+			'port 3000 is already serving — stop the local server before running the capture'
+		);
+	}
+}
+await assertPortFree();
+
 // Dynamic imports so the environment above is in place before lib/ evaluates.
 await import('../../lib/index.ts'); // listens on :3000
 const { ensureAdminSeed } = await import('../../lib/admin/seed.ts');
@@ -319,6 +342,7 @@ try {
 	});
 	console.log('og: default.png');
 } finally {
-	await browser.close();
+	// A close failure must not mask the original error thrown from the try block above.
+	await browser.close().catch(() => {});
 }
 process.exit(0);

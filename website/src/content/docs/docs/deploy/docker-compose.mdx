@@ -15,13 +15,13 @@ changes make it something you can leave running.
 ```yaml
 services:
   setup:
-    image: ghcr.io/redfox-soft/oauth-server-ts:0.1.0
+    image: ghcr.io/redfox-soft/oauth-server-ts:<version>
     command: ['bun', 'run', 'db:setup']
     env_file: .env
     restart: 'no'
 
   oauth:
-    image: ghcr.io/redfox-soft/oauth-server-ts:0.1.0
+    image: ghcr.io/redfox-soft/oauth-server-ts:<version>
     ports:
       - '127.0.0.1:3000:3000'
     env_file: .env
@@ -44,7 +44,10 @@ DATABASE_NAME=OAuth
 **Pin the image tag.** Images are published to `ghcr.io/redfox-soft/oauth-server-ts` on every
 release, tagged with the version and with `latest`. `latest` means a `docker compose pull` can move
 you across a release you have not read the changelog for. Name the version instead, and change it
-deliberately — that is also what makes the [upgrade](/docs/deploy/upgrade/) a reviewable diff.
+deliberately — that is also what makes the [upgrade](/docs/deploy/upgrade/) a reviewable diff. The
+published tags are listed on the
+[GitHub releases page](https://github.com/RedFox-Soft/OAuth-server.ts/releases) and on the
+[container package page](https://github.com/RedFox-Soft/OAuth-server.ts/pkgs/container/oauth-server-ts).
 
 **Use a database you back up.** The Get started file runs `mongo:8` on a local named volume, which
 is convenient and has no backups. Either point `MONGODB_URI` at a managed instance —

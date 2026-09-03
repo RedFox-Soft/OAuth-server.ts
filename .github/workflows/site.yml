@@ -5,6 +5,8 @@ name: Site
 # main, filtered to the files that can change what the site shows. lib/** is deliberately not
 # blanket-listed so a server-only change does not redeploy the site — only the specific tables the
 # docs export reads and the specific UI the capture script screenshots are listed below.
+# public/logo.svg is listed because lib/interactions/loginPage.tsx renders it and the capture's
+# sign-in.png (used in first-token.mdx) shows it.
 on:
   push:
     branches: [main]
@@ -21,6 +23,7 @@ on:
       - 'lib/admin/ui/**'
       - 'lib/interactions/**'
       - 'public/logo.svg'
+      - 'build.ts'
       - 'CHANGELOG.md'
       - 'SECURITY.md'
       - 'LICENSE'
@@ -36,11 +39,13 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  # Cancelling a live deploy is worse than queueing the next one.
+  cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -54,6 +59,9 @@ jobs:
       - name: Install the server (the export and the capture boot it)
         run: bun install --frozen-lockfile
 
+      - name: Bundle the console and sign-in screens (the capture screenshots them)
+        run: bun run build
+
       - name: Install the site
         working-directory: website
         run: bun install --frozen-lockfile
@@ -65,6 +73,10 @@ jobs:
       - name: Build the site
         working-directory: website
         run: bun run build
+        env:
+          PUBLIC_FORMSPREE_WAITLIST: ${{ vars.PUBLIC_FORMSPREE_WAITLIST }}
+          PUBLIC_FORMSPREE_CONTACT: ${{ vars.PUBLIC_FORMSPREE_CONTACT }}
+          PUBLIC_PLAUSIBLE_DOMAIN: ${{ vars.PUBLIC_PLAUSIBLE_DOMAIN }}
 
       - uses: actions/configure-pages@v5
 

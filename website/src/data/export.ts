@@ -4,9 +4,9 @@ import { z } from 'astro/zod';
 
 /*
  * The Reference section renders only from this file. The schema is deliberately strict about the
- * fields the pages use and permissive (passthrough) about the rest, so a new field in the export
- * does not break the site while a missing or renamed field the pages depend on fails the build with
- * a named path rather than an empty page.
+ * fields the pages use and permissive (loose) about the rest, so a new field in the export does not
+ * break the site while a missing or renamed field the pages depend on fails the build with a named
+ * path rather than an empty page.
  */
 const Setting = z
 	.object({
@@ -24,7 +24,7 @@ const Setting = z
 		experimental: z.boolean().optional(),
 		value: z.unknown()
 	})
-	.passthrough();
+	.loose();
 
 const Endpoint = z.object({
 	method: z.string(),
@@ -45,7 +45,7 @@ const McpTool = z
 		bodySchema: z.record(z.string(), z.unknown()).nullable(),
 		querySchema: z.record(z.string(), z.unknown()).nullable()
 	})
-	.passthrough();
+	.loose();
 
 export const DocsExportSchema = z.object({
 	schemaVersion: z.literal(1),

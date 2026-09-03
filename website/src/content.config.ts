@@ -15,7 +15,7 @@ export const collections = {
 	 */
 	root: defineCollection({
 		loader: glob({ base: '..', pattern: ['CHANGELOG.md', 'SECURITY.md'] }),
-		schema: z.object({}).passthrough()
+		schema: z.looseObject({})
 	}),
 	/*
 	 * The comparison pages. `sources` is required and non-empty by intent: every claim about another

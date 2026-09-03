@@ -15,13 +15,13 @@ const value = JSON.stringify(setting.value);
 	<p class="mt-1 font-medium">{setting.label}</p>
 	<p class="mt-1 text-sm text-gray-700 dark:text-gray-300">{setting.summary}</p>
 	<dl class="mt-2 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
-		<dt class="text-gray-500">Type</dt>
+		<dt class="text-gray-500 dark:text-gray-400">Type</dt>
 		<dd>{setting.type}{setting.unit ? ` (${setting.unit})` : ''}</dd>
-		<dt class="text-gray-500">Default</dt>
+		<dt class="text-gray-500 dark:text-gray-400">Default</dt>
 		<dd><code>{value}</code></dd>
-		{setting.options && (<><dt class="text-gray-500">Options</dt><dd>{setting.options.join(', ')}</dd></>)}
-		{setting.dependsOn && (<><dt class="text-gray-500">Requires</dt><dd><code>{setting.dependsOn}</code></dd></>)}
-		{setting.risk && (<><dt class="text-gray-500">Risk</dt><dd>Changing this has a security consequence; the console asks for confirmation.</dd></>)}
+		{setting.options && (<><dt class="text-gray-500 dark:text-gray-400">Options</dt><dd>{setting.options.join(', ')}</dd></>)}
+		{setting.dependsOn && (<><dt class="text-gray-500 dark:text-gray-400">Requires</dt><dd><code>{setting.dependsOn}</code></dd></>)}
+		{setting.risk && (<><dt class="text-gray-500 dark:text-gray-400">Risk</dt><dd>Changing this has a security consequence; the console asks for confirmation.</dd></>)}
 	</dl>
 	<details class="mt-2 text-sm">
 		<summary>Details</summary>

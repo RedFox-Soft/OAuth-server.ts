@@ -24,7 +24,7 @@ of one of these.
 | `accent-400`  | `#f97e3a`                                                                                 | primary button hover                                                           |
 | `accent-500`  | `#f05a23`                                                                                 | **logo orange** — primary buttons, links, focus rings                          |
 | `accent-600`  | `#d94a1c`                                                                                 | primary button active/pressed                                                  |
-| `accent-700`  | `#c3461d`                                                                                 | **logo rust** — pressed states, headings on peach                              |
+| `accent-700`  | `#c3461d`                                                                                 | **logo rust** — headings on peach, small orange text in light mode             |
 | `accent-800`  | `#9a3617`                                                                                 |                                                                                |
 | `accent-900`  | `#7a2c14`                                                                                 | dark accent text                                                               |
 | `accent-950`  | `#431508`                                                                                 |                                                                                |

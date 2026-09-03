@@ -26,7 +26,10 @@ stringData:
 
 Only `MONGODB_URI` is a credential; keeping all three together is simply one `envFrom` instead of
 two. Each variable is described in the
-[environment variables reference](/docs/reference/environment/).
+[environment variables reference](/docs/reference/environment/). The published image tags are
+listed on the [GitHub releases page](https://github.com/RedFox-Soft/OAuth-server.ts/releases) and
+on the
+[container package page](https://github.com/RedFox-Soft/OAuth-server.ts/pkgs/container/oauth-server-ts).
 
 ## Provisioning Job
 
@@ -42,7 +45,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: setup
-          image: ghcr.io/redfox-soft/oauth-server-ts:0.1.0
+          image: ghcr.io/redfox-soft/oauth-server-ts:<version>
           command: ['bun', 'run', 'db:setup']
           envFrom:
             - secretRef:
@@ -82,7 +85,7 @@ spec:
     spec:
       containers:
         - name: oauth-server
-          image: ghcr.io/redfox-soft/oauth-server-ts:0.1.0
+          image: ghcr.io/redfox-soft/oauth-server-ts:<version>
           ports:
             - containerPort: 3000
           envFrom:

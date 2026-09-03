@@ -70,10 +70,11 @@ switch on **Require an authenticator app**.
 
 Signing in then needs a six-digit code as well as a password. Nobody is locked out by turning it on:
 administrators without an authenticator enrol one at their next sign-in. That includes an agent
-signing in through the console's own client, since it uses the same door.
+signing in with the reserved `admin-mcp` client that `database/mongodb.ts` seeds, since it uses the
+same door.
 
-This matters more than it looks. Failed password attempts are counted per bucket and address, and an
-address that reaches the cap is refused for a while — but a bucket that requires a one-time code
+This matters more than it looks. Failed password attempts are counted per bucket and e-mail address,
+and an address that reaches the cap is refused for a while — but a bucket that requires a one-time code
 deliberately stays at the first lockout window however often it is tripped, because a guessed
 password there does not sign anyone in. Administrators also have no self-service password reset to
 escape a lockout with. The way to make that door properly hard is the second factor, not the

@@ -244,7 +244,10 @@ Three rules keep it honest:
 2. **Nothing generated is committed.** `website/generated/`, `website/public/screenshots/` and
    `website/public/og/` are gitignored. Screenshots are captured by `website/scripts/capture.ts`,
    which boots the server in-process on the in-memory adapter and drives the console with Playwright.
-   `SITE_SKIP_CAPTURE=1 bun run build` skips them for a fast local build.
+   The capture drives the hydrated console, so the root `bun run build` — which produces the
+   gitignored `public/*.js` bundles — must have run first or the capture times out on a blank page;
+   the workflow does this for you, and locally it means `bun run build` at the repository root once,
+   or `SITE_SKIP_CAPTURE=1 bun run build` to skip the capture for a fast local build.
 3. **Root documents are rendered, not copied.** `/changelog/`, `/security/` and `/license/` read
    `CHANGELOG.md`, `SECURITY.md`, `LICENSE` and `NOTICE` from the repository root at build time.
 
