@@ -21,9 +21,9 @@ of one of these.
 | `accent-100`  | `#ffe4d6`                                                                                 | hover tints                                                                    |
 | `accent-200`  | `#ffc688`                                                                                 | **logo peach** — soft highlights, dark-mode link colour                        |
 | `accent-300`  | `#ffa661`                                                                                 |                                                                                |
-| `accent-400`  | `#f97e3a`                                                                                 |                                                                                |
+| `accent-400`  | `#f97e3a`                                                                                 | primary button hover                                                           |
 | `accent-500`  | `#f05a23`                                                                                 | **logo orange** — primary buttons, links, focus rings                          |
-| `accent-600`  | `#d94a1c`                                                                                 | button hover                                                                   |
+| `accent-600`  | `#d94a1c`                                                                                 | primary button active/pressed                                                  |
 | `accent-700`  | `#c3461d`                                                                                 | **logo rust** — pressed states, headings on peach                              |
 | `accent-800`  | `#9a3617`                                                                                 |                                                                                |
 | `accent-900`  | `#7a2c14`                                                                                 | dark accent text                                                               |
@@ -33,7 +33,14 @@ of one of these.
 **Contrast rules.** Body text `gray-900` on white / `gray-100` on `gray-950`;
 orange `accent-500` is used for text only at ≥ 18 px or bold (it is 3.4:1 on
 white — not enough for small body text); small orange text uses `accent-700`
-in light mode and `accent-200` in dark mode.
+in light mode and `accent-200` in dark mode. The primary button is the one
+place text sits directly on the accent scale at body size: its label is
+`gray-950` in both light and dark mode, never `white` — white on `accent-500`
+is only 3.4:1, below AA for 14–16 px text. `gray-950` on the button's rest
+(`accent-500`, 5.5:1) and hover (`accent-400`, 7.2:1) backgrounds clears AA
+comfortably; on the active/pressed background (`accent-600`, 4.4:1) it is
+marginally under the 4.5:1 threshold — a known gap, tracked rather than
+hidden, because the pressed state is brief and low-emphasis.
 
 ## Typography
 
@@ -52,17 +59,19 @@ desktop / 64 px mobile; content max-width 72 rem, prose 42 rem.
 ## The mark
 
 Minimum 24 px; clear space equal to the ear height; never recoloured, never on
-`accent-500` (rust shading disappears) — on orange surfaces use the
-white-knockout version is _not_ available, so use a white card behind it.
+`accent-500` (the rust shading disappears). There is no knockout version; on
+an orange surface place the mark inside a white card.
 
 Wordmark "FoxAuth" in Inter 650, set 0.9× the mark's cap height, gap 0.5× mark
 width; the "Fox" and "Auth" are one word, no space, no camel-case colouring.
 
 ## Dark mode
 
-Backgrounds `gray-950`/`gray-900`, text `gray-100`, links `accent-200`,
-primary button stays `accent-500` with `gray-950` text. Screenshots keep
-their own light frame with a 1 px `gray-700` border.
+Backgrounds `gray-950`/`gray-900`, text `gray-100`, links `accent-200`. The
+primary button is unchanged from light mode: `accent-500`/`accent-400`
+hover/`accent-600` active backgrounds with `gray-950` text — the same pairing
+works in both themes, so there is no dark-mode override for it. Screenshots
+keep their own light frame with a 1 px `gray-700` border.
 
 ## Motion
 
