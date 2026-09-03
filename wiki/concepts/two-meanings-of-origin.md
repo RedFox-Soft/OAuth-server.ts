@@ -7,6 +7,13 @@ created: 2026-09-02
 updated: 2026-09-02
 graph:
   node_type: concept
+  relationships:
+    - predicate: depends_on
+      object: concept:error-store-capture-sites
+      source: oauth-server-codebase
+      evidence: "The outbound field is the internal record's own value, copied and not re-derived — lib/sentry/event.ts:70: 'codeLocation: occurrence.origin,'."
+      confidence: high
+      status: current
 ---
 
 # The two meanings of origin
@@ -80,3 +87,5 @@ this server deliberately does not send. `test/sentry/dispatch.spec.ts` fails if 
 - [[error-store-capture-sites]] — where the occurrences these events are projected from come from
 - [[error-store-is-not-flag-gated]] — the read surface, and why its flag governs less than it looks
 - [[admin-plane-error-shape]] — the other consumer of the same records
+- [[sentry-plugin-not-used]] — why the event is built by hand from the record at all, instead of by
+  the official plugin that would have sent the request itself

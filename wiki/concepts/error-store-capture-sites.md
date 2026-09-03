@@ -7,6 +7,13 @@ created: 2026-08-26
 updated: 2026-08-26
 graph:
   node_type: concept
+  relationships:
+    - predicate: constrained_by
+      object: concept:admin-plane-error-shape
+      source: oauth-server-codebase
+      evidence: "The second capture site exists only because the global handler stands aside on a marker — lib/shared/authorization_error_handler.ts:141: 'return typeof error === object && error !== null && adminPlane in error'."
+      confidence: high
+      status: current
 ---
 
 # Error store capture sites
@@ -53,3 +60,5 @@ That coupling is structural: `captureFault` returns the reference only when it r
 - [[admin-audit-trail]] — the other append-only record, and the opposite trade on write failure
 - [[two-meanings-of-origin]] — what happens to a captured occurrence on the way out, and the field
   name that means two different things
+- [[sentry-plugin-not-used]] — the one outbound dispatch hangs off the record continuation here, and
+  the `status >= 500` gate above it is what the framework's own plugin gets wrong

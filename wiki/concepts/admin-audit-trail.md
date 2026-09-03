@@ -7,6 +7,19 @@ created: 2026-08-03
 updated: 2026-08-31
 graph:
   node_type: concept
+  relationships:
+    - predicate: depends_on
+      object: concept:admin-console-signin
+      source: oauth-server-codebase
+      evidence: "lib/admin/audit/record.ts:67 names the actor from the resolved admin context and nowhere else: 'actorId: ctx.userId, actorEmail: ctx.email'."
+      confidence: high
+      status: current
+    - predicate: constrained_by
+      object: concept:group-ownership
+      source: oauth-server-codebase
+      evidence: "lib/admin/audit/routes.ts:94 scopes the read by owning group rather than by role alone: 'const ownerGroupIds = ctx.roles.includes(...super_admin...)', spread into the query at line 135."
+      confidence: high
+      status: current
 ---
 
 # The admin audit trail

@@ -122,5 +122,7 @@ still fails on an unclassified route and additionally fails on a declared route 
   capability are deliberately left ungated.
 - [[override-seams-vs-dead-code]] — the other reason a code path looks unreachable without being dead:
   a flag decides whether it runs, a registry decides *what* runs there.
+- [[settings-console-descriptor]] — the surface these flags are edited through, and why a key's
+  absence from the catalog is what removes it from the console and the agent surface alike.
 
 Verified against [[oauth-server-codebase]] at commit `2125ad0`.

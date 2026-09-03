@@ -4,7 +4,7 @@ title: 'Signing in through somebody else’s identity provider'
 tags: [architecture, contract, gotcha, oidc]
 sources: [oauth-server-codebase]
 created: 2026-08-05
-updated: 2026-08-05
+updated: 2026-08-24
 graph:
   node_type: concept
   relationships:

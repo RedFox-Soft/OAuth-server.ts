@@ -3,7 +3,7 @@ type: entity
 kind: subsystem
 title: "Admin console (lib/admin/)"
 aliases: [adminApp, admin console, control plane, lib/admin]
-tags: [architecture, admin, gotcha]
+tags: [architecture, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-01
 updated: 2026-09-01
@@ -107,3 +107,5 @@ decided by [[group-ownership]], not by a per-container manager list.
 - [[first-run-setup-had-two-surfaces]] — the deleted bootstrap twin.
 - [[error-store-capture-sites]] — the two places a fault is recorded.
 - [[html-rendering]] — the shell's page constructor.
+- [[settings-console-descriptor]] — the settings pane, whose panes and cards are read from the
+  catalog so the page holds no second list of settings.

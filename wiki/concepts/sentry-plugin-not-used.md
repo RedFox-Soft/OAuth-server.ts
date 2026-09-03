@@ -1,12 +1,25 @@
 ---
 type: concept
 title: 'Why the official Sentry Elysia plugin is not used'
-tags: [architecture, gotcha, security, contract]
+tags: [architecture, gotcha, contract]
 sources: [oauth-server-codebase, sentry-elysia-10.73.0]
 created: 2026-09-02
 updated: 2026-09-02
 graph:
   node_type: concept
+  relationships:
+    - predicate: depends_on
+      object: concept:error-store-capture-sites
+      source: oauth-server-codebase
+      evidence: "The integration hangs off the error store, not the framework: lib/error_store/capture.ts:11 imports 'reportFault' from ../sentry/dispatch.js and calls it once, at line 115, inside the record continuation."
+      confidence: high
+      status: current
+    - predicate: constrained_by
+      object: concept:feature-flag-gating
+      source: oauth-server-codebase
+      evidence: "lib/sentry/dispatch.ts:266 refuses at the dispatch point rather than at a route: 'if (!ApplicationConfig[...sentry.enabled...]) {'."
+      confidence: high
+      status: current
 ---
 
 # Why the official Sentry Elysia plugin is not used
@@ -16,8 +29,8 @@ the official plugin for the framework this server runs on, and it is one line. I
 here, and this page exists because that decision is invisible in the code that replaced it —
 `lib/sentry/` simply never imports it, which looks like an oversight rather than a conclusion.
 
-The plugin's source was read at version **10.73.0**. Three of its behaviours each break a
-requirement, and only the first is configurable.
+The plugin's source was read at version **10.73.0** ([[sentry-elysia-10.73.0]]). Three of its
+behaviours each break a requirement, and only the first is configurable.
 
 ## 1. It classifies a fault before the response status exists
 

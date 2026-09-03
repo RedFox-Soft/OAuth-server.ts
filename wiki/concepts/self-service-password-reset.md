@@ -7,6 +7,13 @@ created: 2026-08-04
 updated: 2026-09-01
 graph:
   node_type: concept
+  relationships:
+    - predicate: depends_on
+      object: concept:deletion-and-revocation
+      source: oauth-server-codebase
+      evidence: "The session sweep after a reset reads the ownership table rather than naming a collection — lib/helpers/cascade.ts:113: 'const area = areaNamed(...Session...); const field = area.owners.account;'."
+      confidence: high
+      status: current
 ---
 
 # Self-service password reset

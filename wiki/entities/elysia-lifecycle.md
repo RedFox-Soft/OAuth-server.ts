@@ -3,7 +3,7 @@ type: entity
 kind: subsystem
 title: "Elysia lifecycle plugins (lib/plugins/)"
 aliases: [plugins, onRequest, lifecycle hooks, lib/plugins]
-tags: [architecture, security, gotcha]
+tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-01
 updated: 2026-09-01

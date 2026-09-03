@@ -3,7 +3,7 @@ type: entity
 kind: subsystem
 title: "HTML rendering (lib/html/)"
 aliases: [htmlResponse, csp, lib/html]
-tags: [architecture, security, gotcha]
+tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-01
 updated: 2026-09-01

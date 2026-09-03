@@ -120,6 +120,8 @@ the introspection guard tests truthiness — where `[]` is truthy.
 - [[token-payload-access-contract]] — the contract whose violation made public-client introspection
   return `active: false` for every token.
 - [[client-identity-from-database]] — where `authorization_details_types` is stored and validated.
+- [[settings-console-descriptor]] — the types editor that enumerates these rules instead of
+  reporting them as a 422 after the save.
 
 Verified against [[oauth-server-codebase]] at commit `5ce224a` plus the `specs/015-rar-end-to-end`
 implementation.

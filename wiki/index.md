@@ -11,6 +11,7 @@ When this file exceeds ~300 lines or the wiki passes ~150 pages, shard into `wik
 ## Sources
 
 - [[oauth-server-codebase]] — the tracked `lib/` source tree, read at commit `2125ad0`; the source of record for every page below.
+- [[sentry-elysia-10.73.0]] — the official Sentry Elysia plugin, read at version `10.73.0` and rejected rather than installed; authoritative about the plugin and nothing about this server.
 
 ## Entities
 
@@ -55,6 +56,8 @@ When this file exceeds ~300 lines or the wiki passes ~150 pages, shard into `wik
 - [[token-payload-access-contract]] — model state lives under `.payload.*`; reading a bare field yields `undefined` silently, and payload schemas are composed per token type.
 - [[two-meanings-of-origin]] — `origin` names the caller's network address on the record and the code location on the occurrence, so the outbound event carries both under different names and must never merge them; the location is sendable only because no stack is kept, the permitted list is enforced one level deep, and grouping cannot be disturbed because a client fingerprint suppresses the destination's algorithm entirely.
 - [[totp-second-factor]] — one bucket boolean turns a password door into a two-key one; the algorithm is in-repo because the RFCs publish test vectors, and four placements of state buy deletion integrity, expiry, un-guessable enrolment and a throttle that survives a new interaction for free.
+- [[settings-console-descriptor]] — the console's panes, summaries, units and risk marks are fields on the catalog descriptor, so the page holds no second list of settings; the demotion criterion is "is there a question an operator could answer to set it", and a key's absence from the catalog is what removes it from both the console and the agent surface.
+- [[user-code-mask-entropy]] — the asterisks in `deviceFlow.mask` are the whole of a user code's entropy, so a mask with none issued the same code to every device and passed a character check that never asked for shape; the floor is zero-vs-nonzero because how many is enough is an operator's judgement, and the check is scoped to the flow being enabled without leaving a hole.
 
 ## Synthesis
 

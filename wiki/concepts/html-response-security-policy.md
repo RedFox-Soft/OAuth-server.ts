@@ -164,3 +164,5 @@ failure is near-silent — the icons render, unstyled, with one console violatio
 - [[first-run-setup-had-two-surfaces]] — removed alongside this work.
 - [[interaction-page-families]] — the two families whose every page goes through this constructor, and the
   rendered-error status rule applied to the registration refusals.
+- [[user-code-mask-entropy]] — the other thing that input's value depends on: the mask template that
+  decides whether the code typed into it is random at all.

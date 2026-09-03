@@ -4,7 +4,7 @@ title: 'Deletion and revocation'
 tags: [architecture, contract, gotcha, oauth]
 sources: [oauth-server-codebase]
 created: 2026-08-04
-updated: 2026-08-04
+updated: 2026-08-05
 graph:
   node_type: concept
 ---

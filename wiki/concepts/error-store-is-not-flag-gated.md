@@ -7,6 +7,13 @@ created: 2026-08-26
 updated: 2026-08-26
 graph:
   node_type: concept
+  relationships:
+    - predicate: constrained_by
+      object: concept:admin-mcp-control-plane
+      source: oauth-server-codebase
+      evidence: "lib/consts/route_classification.ts:139 states the omission as a decision, not an oversight: 'The error store read surface is deliberately NOT here, though errorStore.enabled exists and it would be mechanically possible'. lib/mcp/catalogue.ts:1017 withholds the purge instead."
+      confidence: high
+      status: current
 ---
 
 # The error store is not flag-gated (and the agent purge cannot be)

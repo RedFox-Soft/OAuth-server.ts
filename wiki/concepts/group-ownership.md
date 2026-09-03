@@ -4,9 +4,16 @@ title: 'Group ownership of projects and buckets'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-29
-updated: 2026-08-31
+updated: 2026-09-02
 graph:
   node_type: concept
+  relationships:
+    - predicate: depends_on
+      object: concept:admin-console-signin
+      source: oauth-server-codebase
+      evidence: "The active scope is a property of the session established at sign-in — lib/admin/auth/rbac.ts:242: 'activeGroupId: await resolveActiveGroup(', re-resolved on every request rather than trusted from the cookie."
+      confidence: high
+      status: current
 ---
 
 # Group ownership of projects and buckets

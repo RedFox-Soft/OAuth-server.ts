@@ -3,7 +3,7 @@ type: entity
 kind: subsystem
 title: "Addon override registry (lib/addon/)"
 aliases: [addons, override registry, resolve, lib/addon]
-tags: [architecture, testing, gotcha]
+tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-01
 updated: 2026-09-01
@@ -16,6 +16,12 @@ graph:
       object: concept:override-seams-vs-dead-code
       source: oauth-server-codebase
       evidence: "The override seam. Deployments and tests replace behavior here; source modules never read these functions off the merged configuration."
+      confidence: high
+      status: current
+    - predicate: constrained_by
+      object: concept:model-graph-import-order
+      source: oauth-server-codebase
+      evidence: "lib/addon/types.ts:2 states the reason for the type-only signatures: 'Uses type-only typeof import(...) so this module pulls in NO runtime code' — which is what lets the test preload import the registry without loading the model graph."
       confidence: high
       status: current
 ---

@@ -32,6 +32,19 @@ Keep this list small and disciplined — a wiki with 200 tags has effectively no
 - `oauth` — behaviour specified by an OAuth 2.x RFC.
 - `oidc` — behaviour specified by OpenID Connect.
 
+Three tags were in use on 2026-09-03 and are deliberately **not** in the list above. The reason is
+the same for all three, and it is recorded here so a later ingest does not quietly re-add them:
+
+- `security` — on an authorization server nearly every page qualifies, and it had reached three of
+  the roughly fifteen that do. **A tag carried by a minority of the pages it fits is worse than no
+  tag**, because a filtered query comes back quietly incomplete rather than empty. `contract` and
+  `gotcha` already separate the pages where getting it wrong is a defect.
+- `testing` and `admin` — one use each, in areas with many untagged pages of exactly the same kind.
+
+The rule that follows: a tag earns a place only if it is applied to *every* page it fits, and only
+if it does not fit most of the wiki. When a genuine cluster does appear, add the tag here **and**
+apply it to the whole cluster in the same pass.
+
 ## Sourcing rule for a codebase wiki
 
 This wiki's source is mutable code, not fixed documents, so the default "cite the raw file" rule is
@@ -46,6 +59,11 @@ adapted:
   material this codebase offers.
 - Never promote an inference about what code probably does into a typed graph edge; typed edges need
   a quotable line.
+- An **external** published source — a dependency read but not installed, such as
+  [[sentry-elysia-10.73.0]] — pins a **version** in place of `revision:`, and carries it in the page
+  title so a claim cannot be silently reattributed to a later release. `raw:` is null for one of
+  these: there is no vendored tree in this repository to cite, and the version is what makes the
+  reading reproducible.
 
 ## Page sizing
 
