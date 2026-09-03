@@ -23,8 +23,11 @@ configuration beyond the one value discussed below.
    curl -O https://raw.githubusercontent.com/RedFox-Soft/OAuth-server.ts/main/docker-compose.yml
    ```
 
-2. Decide the `ISSUER` value now — see the warning below — and edit it in `docker-compose.yml` if
-   `http://localhost:3000` is not where a browser will reach this server.
+2. Decide the `ISSUER` value now — see the warning below. If `http://localhost:3000` is not where a
+   browser will reach this server, edit it in **both** `environment:` blocks of
+   `docker-compose.yml`, the `setup` service's and the `oauth` service's. Changing only one leaves
+   the seeded redirect URI and the advertised issuer disagreeing, which is exactly the mismatch the
+   warning below cannot be repaired out of.
 
 3. Start everything:
 

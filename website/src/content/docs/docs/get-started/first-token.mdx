@@ -57,8 +57,11 @@ which capabilities are enabled, so it is the honest answer to "what does this de
 
    (All on one line, without the indentation.) `state` is yours to check on the way back; `nonce` is
    echoed into the ID token so you can tie it to this request. `scope=openid` is what makes this an
-   OpenID Connect request and produces an ID token — add `offline_access` if you want a refresh
-   token.
+   OpenID Connect request and produces an ID token. A refresh token additionally needs
+   `offline_access` in the scope **and** `prompt=consent` in this URL **and** `refresh_token` among
+   the client's grant types — a console-created client has only `authorization_code` by default. If
+   any of the three is missing the scope is dropped silently, with no error: you get a token
+   response with no `refresh_token` in it.
 
 3. **Sign in and consent.** The server redirects to its own interaction screens: a sign-in form for
    the bucket this client's project points at, then a consent screen listing the scopes (consent is
