@@ -6,6 +6,7 @@ sidebar:
 ---
 
 import { Steps, Aside } from '@astrojs/starlight/components';
+import ScreenshotFigure from '../../../../components/ScreenshotFigure.astro';
 
 This is one full Authorization Code + PKCE round trip against a local deployment, done by hand. It
 is the flow every client library implements, and doing it once by hand makes debugging one much
@@ -123,6 +124,20 @@ which capabilities are enabled, so it is the honest answer to "what does this de
    What comes back is governed by the scopes granted and by the claims configured on the server.
 
 </Steps>
+
+The two screens step 3 passes through, on a default deployment:
+
+<ScreenshotFigure
+	name="sign-in"
+	alt="The server's sign-in screen: a username field, a password field, remember-me and a log-in button."
+	caption="The sign-in screen, served for the bucket the client's project points at."
+/>
+
+<ScreenshotFigure
+	name="consent"
+	alt="The consent screen naming the client and listing the scopes it is asking for."
+	caption="The consent screen lists what was asked for. `offline_access` appears only when the request also carries `prompt=consent`."
+/>
 
 ## On by default, or behind a flag
 

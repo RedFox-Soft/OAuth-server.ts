@@ -6,6 +6,7 @@ sidebar:
 ---
 
 import { Steps, Aside } from '@astrojs/starlight/components';
+import ScreenshotFigure from '../../../../components/ScreenshotFigure.astro';
 
 A client is an application that asks this server for tokens. Clients live inside projects, projects
 belong to groups, and a project points at the user bucket its clients sign users in from. That is
@@ -40,6 +41,12 @@ four concepts, but they nest, so the console walks them in order.
    URIs.
 
 </Steps>
+
+<ScreenshotFigure
+	name="admin-project-clients"
+	alt="A project's clients table in the admin console, showing a public PKCE client and a confidential one."
+	caption="A project's clients: the generated client id, the application type and the token endpoint auth method that decides whether it has a secret."
+/>
 
 ## Public or confidential
 

@@ -6,6 +6,7 @@ sidebar:
 ---
 
 import { Steps, Aside } from '@astrojs/starlight/components';
+import ScreenshotFigure from '../../../../components/ScreenshotFigure.astro';
 
 The server administers itself. There is no seeded password to look up in a log and no
 `create-admin` command — the first administrator is created from the browser, once.
@@ -38,6 +39,12 @@ it cannot be, since no account exists yet — so provision the first administrat
 the deployment comes up, and do not leave a reachable, un-provisioned instance sitting around.
 
 </Aside>
+
+<ScreenshotFigure
+	name="admin-projects"
+	alt="The admin console after sign-in, listing the projects in the current group scope."
+	caption="What a signed-in administrator lands on: the projects of the group the scope switcher is pointed at."
+/>
 
 ## Administrators sign in through this server's own issuer
 
