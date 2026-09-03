@@ -1,5 +1,5 @@
 ---
-import SubmitButton from './ui/SubmitButton.astro';
+import Button from './ui/Button.astro';
 
 interface Props {
 	/* Prefills Formspree's _subject, and the mailto subject in the unconfigured fallback. */
@@ -36,7 +36,7 @@ const fieldClass =
 					placeholder="Deployment shape, timeline, the guarantees you need."
 					class={fieldClass}></textarea>
 			</label>
-			<SubmitButton>Send</SubmitButton>
+			<Button type="submit">Send</Button>
 			<p class="text-xs text-gray-600 dark:text-gray-400">
 				We reply from a person, usually within two working days.
 			</p>

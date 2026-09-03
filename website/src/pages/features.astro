@@ -1,6 +1,7 @@
 ---
 import Site from '../layouts/Site.astro';
 import FeatureGrid from '../components/FeatureGrid.astro';
+import ScreenshotFigure from '../components/ScreenshotFigure.astro';
 import type { Feature } from '../components/FeatureGrid.astro';
 import Button from '../components/ui/Button.astro';
 import Section from '../components/ui/Section.astro';
@@ -23,7 +24,7 @@ const groups: {
 		heading: 'Protocol',
 		title: 'Every grant an OAuth 2.1 client can ask for.',
 		blurb:
-			'The grants and endpoints. Authorization Code with PKCE and OpenID Connect are always on; the rest wait for a flag.',
+			'The grants and endpoints. Authorization Code with PKCE and OpenID Connect are always on; most of the rest wait for a flag.',
 		items: [
 			{
 				title: 'Authorization Code with PKCE',
@@ -45,7 +46,7 @@ const groups: {
 			},
 			{
 				title: 'Resource Indicators',
-				body: 'Audience-restrict a token with the resource parameter, and validate it at the resource server.',
+				body: 'Audience-restrict a token with the resource parameter, and validate it at the resource server. On by default.',
 				flag: 'resourceIndicators.enabled',
 				spec: rfc('8707')
 			},
@@ -56,7 +57,7 @@ const groups: {
 			},
 			{
 				title: 'Refresh Token grant',
-				body: 'Long-lived sessions with rotation on every use and replay detection.',
+				body: 'Long-lived sessions with rotation and reuse detection — a replayed token revokes the whole grant.',
 				flag: 'refreshToken.enabled'
 			},
 			{
@@ -130,7 +131,7 @@ const groups: {
 			},
 			{
 				title: 'RP-initiated logout',
-				body: 'End the session from the client, with a confirmation step so a link cannot log a user out silently.',
+				body: 'End the session from the client, with a confirmation step so a link cannot log a user out silently. On by default.',
 				flag: 'rpInitiatedLogout.enabled'
 			},
 			{
@@ -326,8 +327,9 @@ const groups: {
 		</h1>
 		<p class="mt-5 text-lg text-gray-600 dark:text-gray-400">
 			FoxAuth ships one server with no feature editions. Authorization Code with PKCE and
-			OpenID Connect run from the first start; the rest wait behind a named flag, so your attack
-			surface is the set of features you actually asked for.
+			OpenID Connect run from the first start, and most of the rest wait behind a named flag — so
+			your attack surface is the set of features you actually asked for. Each card says which of
+			the two it is.
 		</p>
 		<p class="mt-5 text-gray-600 dark:text-gray-400">
 			Each flag below links to its entry in the Settings reference, which is generated from the
@@ -350,6 +352,24 @@ const groups: {
 				<div class="mt-10">
 					<FeatureGrid items={group.items} />
 				</div>
+				{group.id === 'security' && (
+					<div class="mt-10">
+						<ScreenshotFigure
+							name="admin-audit-trail"
+							alt="The admin audit trail listing actor, action, target and timestamp for each change."
+							caption="The audit trail. Entries are written before the mutation and the store exposes no update or delete, so an entry cannot be altered after the fact."
+						/>
+					</div>
+				)}
+				{group.id === 'administration' && (
+					<div class="mt-10">
+						<ScreenshotFigure
+							name="admin-settings-grants"
+							alt="The admin console settings pane showing the grant-type flags and their current values."
+							caption="Settings, one pane per domain. A flag here is the same key the Reference documents; changes are validated as a whole configuration before they are saved."
+						/>
+					</div>
+				)}
 			</Section>
 		))
 	}

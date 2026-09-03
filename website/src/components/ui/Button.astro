@@ -1,10 +1,19 @@
 ---
 interface Props {
-	href: string;
+	/* A link button. Omit it (and pass `type`) for a form control. */
+	href?: string;
 	variant?: 'primary' | 'secondary' | 'ghost';
 	size?: 'md' | 'lg';
+	/*
+	 * Renders a <button> instead of an <a>, so the marketing forms submit with the same styling
+	 * rather than a second copy of these class strings. Exactly one of `href` / `type` applies:
+	 * `type` wins if both are given.
+	 */
+	type?: 'button' | 'submit';
 }
-const { href, variant = 'primary', size = 'md' } = Astro.props;
+const { href, variant = 'primary', size = 'md', type } = Astro.props;
+const asButton = type !== undefined || href === undefined;
+const Tag = asButton ? 'button' : 'a';
 const base =
 	'inline-flex items-center justify-center gap-2 rounded-control font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500';
 const sizes = { md: 'h-10 px-4 text-sm', lg: 'h-12 px-6 text-base' };
@@ -18,4 +27,8 @@ const variants = {
 };
 ---
 
-<a href={href} class:list={[base, sizes[size], variants[variant]]}><slot /></a>
+<Tag
+	href={asButton ? undefined : href}
+	type={asButton ? (type ?? 'button') : undefined}
+	class:list={[base, sizes[size], variants[variant]]}><slot /></Tag
+>

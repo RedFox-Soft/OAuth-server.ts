@@ -1,5 +1,5 @@
 ---
-import SubmitButton from './ui/SubmitButton.astro';
+import Button from './ui/Button.astro';
 
 /*
  * Formspree when the form id is configured, a mailto link otherwise. The fallback matters: the site
@@ -28,7 +28,7 @@ const fieldClass =
 					class={fieldClass}
 				/>
 			</label>
-			<SubmitButton>Join the waitlist</SubmitButton>
+			<Button type="submit">Join the waitlist</Button>
 			<p class="text-xs text-gray-600 dark:text-gray-400">
 				One email when the cloud opens. Nothing else, and no commitment.
 			</p>

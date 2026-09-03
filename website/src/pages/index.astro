@@ -119,13 +119,23 @@ const standards = [
 	{ label: 'JARM', href: 'https://openid.net/specs/oauth-v2-jarm.html' }
 ];
 
-const transcript = `agent  → settings_update { "key": "deviceFlow.enabled", "value": false }
-server ← Confirmation required. This disables a grant for every client on
-         the instance. Call again with confirm: "settings_update:9f31c2".
-agent  → settings_update { "key": "deviceFlow.enabled", "value": false,
-                           "confirm": "settings_update:9f31c2" }
-server ← Applied at the next restart. Audit entry 0f2a written:
-         actor agent:ops-bot, action settings.update, target deviceFlow.enabled.`;
+const transcript = `agent  → settings_update { "deviceFlow.enabled": false }
+
+server ← Nothing has been changed. Change server settings. The merged
+         configuration is validated first …
+
+         Target: settings_update
+         To proceed, call settings_update again with
+         confirmationToken="<token from the first call>".
+         It is valid once, until 2026-09-03T14:12:04.000Z.
+
+agent  → settings_update { "deviceFlow.enabled": false,
+                           "confirmationToken": "<token from the first call>" }
+
+server ← { "restartRequired": true,
+           "changedKeys": ["deviceFlow.enabled"], … }
+
+         Audit: actor agent:ops-bot, action settings.update.`;
 ---
 
 <Site
@@ -154,7 +164,7 @@ server ← Applied at the next restart. Audit entry 0f2a written:
 					>
 				</div>
 				<p class="mt-6 flex flex-wrap items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-					<Badge tone="accent">20+ RFCs</Badge>
+					<Badge tone="accent">22 specifications</Badge>
 					<Badge tone="neutral">Bun + Elysia</Badge>
 					<Badge tone="neutral">FSL-1.1-ALv2</Badge>
 				</p>
@@ -242,11 +252,8 @@ server ← Applied at the next restart. Audit entry 0f2a written:
 			{
 				standards.map((standard) => (
 					<li>
-						<a
-							href={standard.href}
-							class="inline-flex items-center rounded-control border border-gray-200 bg-white px-3 py-1.5 font-mono text-xs text-gray-700 no-underline transition-colors hover:border-accent-500 hover:text-accent-700 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-300 dark:hover:text-accent-200"
-						>
-							{standard.label}
+						<a href={standard.href} class="no-underline">
+							<Badge tone="neutral">{standard.label}</Badge>
 						</a>
 					</li>
 				))
@@ -284,7 +291,7 @@ server ← Applied at the next restart. Audit entry 0f2a written:
 				</p>
 			</div>
 			<pre
-				class="overflow-x-auto rounded-frame border border-gray-200 bg-gray-50 p-5 font-mono text-xs leading-relaxed text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">{transcript}</pre>
+				class="overflow-x-auto rounded-card border border-gray-200 bg-gray-50 p-5 font-mono text-xs leading-relaxed text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">{transcript}</pre>
 		</div>
 	</Section>
 
@@ -304,7 +311,7 @@ server ← Applied at the next restart. Audit entry 0f2a written:
 	</Section>
 
 	<Section>
-		<div class="rounded-card border border-accent-200 bg-accent-50 p-8 dark:border-accent-900 dark:bg-gray-900 md:p-12">
+		<Card tone="accent" padding="lg">
 			<Eyebrow>Start</Eyebrow>
 			<h2 class="text-3xl font-[650] tracking-tight text-balance">
 				Run it yourself this afternoon.
@@ -319,6 +326,6 @@ server ← Applied at the next restart. Audit entry 0f2a written:
 					Join the cloud waitlist
 				</Button>
 			</div>
-		</div>
+		</Card>
 	</Section>
 </Site>
