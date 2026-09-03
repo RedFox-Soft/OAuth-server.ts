@@ -112,6 +112,12 @@ export function loadExport(): DocsExport {
 			`generated/docs-export.json is missing or unreadable — run \`bun run generate\` (${String(error)})`
 		);
 	}
-	cached = DocsExportSchema.parse(raw);
+	try {
+		cached = DocsExportSchema.parse(raw);
+	} catch (error) {
+		throw new Error(
+			`generated/docs-export.json is malformed — run \`bun run generate\`: ${String(error)}`
+		);
+	}
 	return cached;
 }

@@ -17,5 +17,19 @@ export function loadVersion(): VersionInfo {
 	// dist/.prerender/chunks/, which breaks a path relative to the source file's own location.
 	// Every documented invocation (dev/check/build/preview) runs with cwd = website/.
 	const file = resolve(process.cwd(), 'generated/version.json');
-	return VersionSchema.parse(JSON.parse(readFileSync(file, 'utf8')));
+	let raw: unknown;
+	try {
+		raw = JSON.parse(readFileSync(file, 'utf8'));
+	} catch (error) {
+		throw new Error(
+			`generated/version.json is missing or unreadable — run \`bun run generate\` (${String(error)})`
+		);
+	}
+	try {
+		return VersionSchema.parse(raw);
+	} catch (error) {
+		throw new Error(
+			`generated/version.json is malformed — run \`bun run generate\`: ${String(error)}`
+		);
+	}
 }
