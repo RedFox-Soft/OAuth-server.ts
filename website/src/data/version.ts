@@ -13,6 +13,9 @@ const VersionSchema = z.object({
 export type VersionInfo = z.infer<typeof VersionSchema>;
 
 export function loadVersion(): VersionInfo {
-	const file = resolve(import.meta.dirname, '../../generated/version.json');
+	// Not import.meta.dirname: the SSR/prerender bundler relocates this module into
+	// dist/.prerender/chunks/, which breaks a path relative to the source file's own location.
+	// Every documented invocation (dev/check/build/preview) runs with cwd = website/.
+	const file = resolve(process.cwd(), 'generated/version.json');
 	return VersionSchema.parse(JSON.parse(readFileSync(file, 'utf8')));
 }

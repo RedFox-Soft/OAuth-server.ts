@@ -1,0 +1,20 @@
+---
+import { Aside } from '@astrojs/starlight/components';
+import { loadVersion } from '../../data/version';
+
+const v = loadVersion();
+---
+
+{
+	v.unreleased ? (
+		<Aside type="caution" title={`Documents unreleased changes (${v.version}, commit ${v.commit})`}>
+			This page is generated from the <code>main</code> branch. The published image
+			<code>ghcr.io/redfox-soft/oauth-server-ts:latest</code> is {v.lastTag ?? 'not yet released'}
+			and may not have everything listed here.
+		</Aside>
+	) : (
+		<Aside type="note" title={`Documents ${v.lastTag}`}>
+			Generated from the source of release {v.lastTag}.
+		</Aside>
+	)
+}

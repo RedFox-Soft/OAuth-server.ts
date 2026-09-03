@@ -1,0 +1,11 @@
+---
+import { Code } from '@astrojs/starlight/components';
+
+interface Props {
+	title: string;
+	schema: Record<string, unknown> | null;
+}
+const { title, schema } = Astro.props;
+---
+
+{schema && <Code lang="json" title={title} code={JSON.stringify(schema, null, 2)} />}

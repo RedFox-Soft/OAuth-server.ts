@@ -1,0 +1,40 @@
+---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import UnreleasedNotice from '../../../components/reference/UnreleasedNotice.astro';
+import { loadExport } from '../../../data/export';
+
+const { adminApi, mcp } = loadExport();
+// The MCP catalogue carries the one-line summary for every operation an agent may perform; the
+// audit table names every mutation. Joining them gives the admin API reference without a third table.
+const summaryFor = new Map(mcp.tools.map((t) => [`${t.method} ${t.path}`, t.summary]));
+const reads = mcp.tools.filter((t) => t.method === 'GET');
+const headings = [
+	{ depth: 2, slug: 'reads', text: 'Reads' },
+	{ depth: 2, slug: 'mutations', text: 'Mutations (audited)' },
+	{ depth: 2, slug: 'console-only', text: 'Console-only operations' }
+];
+---
+
+<StarlightPage
+	frontmatter={{
+		title: 'Admin API',
+		description: 'The management API behind the console and the MCP control plane: reads, audited mutations and console-only operations.'
+	}}
+	headings={headings}
+>
+	<UnreleasedNotice />
+	<p>Mounted under <code>/admin/api</code>. Authenticated by the console session cookie or by an MCP-audience bearer token; both resolve to the same administrator context and the same permission checks.</p>
+	<h2 id="reads">Reads</h2>
+	<table>
+		<thead><tr><th>Route</th><th>What it returns</th></tr></thead>
+		<tbody>{reads.map((t) => <tr><td><code>{t.method} {t.path}</code></td><td>{t.summary}</td></tr>)}</tbody>
+	</table>
+	<h2 id="mutations">Mutations (audited)</h2>
+	<p>Every route below writes an append-only audit entry naming the actor, the action and the target before the change is made.</p>
+	<table>
+		<thead><tr><th>Route</th><th>Audit action</th><th>Target</th><th>Summary</th></tr></thead>
+		<tbody>{adminApi.audited.map((r) => <tr><td><code>{r.method} {r.path}</code></td><td><code>{r.action}</code></td><td>{r.targetType}</td><td>{summaryFor.get(`${r.method} ${r.path}`) ?? 'Console-only; see below.'}</td></tr>)}</tbody>
+	</table>
+	<h2 id="console-only">Console-only operations</h2>
+	<ul>{mcp.excluded.map((e) => <li><code>{e.method} {e.path}</code> — {e.reason}</li>)}</ul>
+</StarlightPage>

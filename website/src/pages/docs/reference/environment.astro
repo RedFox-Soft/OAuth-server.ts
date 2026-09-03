@@ -1,0 +1,21 @@
+---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import UnreleasedNotice from '../../../components/reference/UnreleasedNotice.astro';
+import { loadExport } from '../../../data/export';
+
+const { environment } = loadExport();
+---
+
+<StarlightPage
+	frontmatter={{
+		title: 'Environment variables',
+		description: 'The only process environment the server reads. Everything else is a setting in the database.'
+	}}
+>
+	<UnreleasedNotice />
+	<table>
+		<thead><tr><th>Variable</th><th>Requirement</th><th>Description</th><th>Example</th></tr></thead>
+		<tbody>{environment.map((v) => <tr><td><code>{v.name}</code></td><td>{v.requirement}</td><td>{v.description}</td><td>{v.example ? <code>{v.example}</code> : ''}</td></tr>)}</tbody>
+	</table>
+	<p>Signing keys, SMTP, the DPoP nonce secret and the pairwise salt are <em>not</em> environment variables: they live in the database and are provisioned by <code>bun run db:setup</code> or generated on first boot.</p>
+</StarlightPage>

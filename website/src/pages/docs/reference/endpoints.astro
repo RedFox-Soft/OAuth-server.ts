@@ -1,0 +1,46 @@
+---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import UnreleasedNotice from '../../../components/reference/UnreleasedNotice.astro';
+import { loadExport } from '../../../data/export';
+
+const { endpoints, alwaysAvailablePrefixes } = loadExport();
+const always = endpoints.filter((e) => e.flag === null);
+const gated = endpoints.filter((e) => e.flag !== null);
+const headings = [
+	{ depth: 2, slug: 'always-available', text: 'Always available' },
+	{ depth: 2, slug: 'flag-governed', text: 'Governed by a flag' },
+	{ depth: 2, slug: 'route-families', text: 'Route families' },
+	{ depth: 2, slug: 'classes', text: 'CORS and rate classes' }
+];
+---
+
+<StarlightPage
+	frontmatter={{
+		title: 'Endpoints',
+		description: 'Every protocol endpoint with the flag that serves it, its CORS class and its rate-limit class.'
+	}}
+	headings={headings}
+>
+	<UnreleasedNotice />
+	<h2 id="always-available">Always available</h2>
+	<table>
+		<thead><tr><th>Method</th><th>Path</th><th>CORS</th><th>Rate class</th></tr></thead>
+		<tbody>
+			{always.map((e) => <tr><td><code>{e.method}</code></td><td><code>{e.path}</code></td><td>{e.cors}</td><td>{e.rate}</td></tr>)}
+		</tbody>
+	</table>
+	<h2 id="flag-governed">Governed by a flag</h2>
+	<p>A flag that is off means the route is not served: the response is indistinguishable from a path the server does not have.</p>
+	<table>
+		<thead><tr><th>Method</th><th>Path</th><th>Flag</th><th>CORS</th><th>Rate class</th></tr></thead>
+		<tbody>
+			{gated.map((e) => <tr><td><code>{e.method}</code></td><td><code>{e.path}</code></td><td><a href={`/docs/reference/settings/#${e.flag}`}><code>{e.flag}</code></a></td><td>{e.cors}</td><td>{e.rate}</td></tr>)}
+		</tbody>
+	</table>
+	<h2 id="route-families">Route families</h2>
+	<p>Whole subtrees that are unconditional by design, reached by redirect or through the console:</p>
+	<ul>{alwaysAvailablePrefixes.map((p) => <li><code>{p}/…</code></li>)}</ul>
+	<h2 id="classes">CORS and rate classes</h2>
+	<p><strong>CORS</strong>: <code>open</code> echoes any Origin; <code>client-based</code> echoes only an Origin listed on the project that owns the calling client; <code>none</code> is not readable cross-origin.</p>
+	<p><strong>Rate</strong>: <code>strict</code>, <code>ordinary</code> and <code>public</code> are the three per-origin allowances (defaults 60, 300 and 1200 requests per minute); <code>exempt</code> is never counted.</p>
+</StarlightPage>

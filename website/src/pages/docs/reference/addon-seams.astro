@@ -1,0 +1,25 @@
+---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import { Code } from '@astrojs/starlight/components';
+import UnreleasedNotice from '../../../components/reference/UnreleasedNotice.astro';
+import { loadExport } from '../../../data/export';
+
+const { addonSeams } = loadExport();
+const example = `import { addons } from 'oauth-server-ts/lib/addon/index.js';
+
+addons.override({
+	findAccount: async (oidc, id) => myDirectory.lookup(id)
+});`;
+---
+
+<StarlightPage
+	frontmatter={{
+		title: 'Addon seams',
+		description: 'The behaviour functions a deployment may replace at call time through the override registry.'
+	}}
+>
+	<UnreleasedNotice />
+	<p>Each seam has a default in <code>lib/addon/</code> and is resolved through the override registry every time it is called, so an override registered at bootstrap takes effect regardless of module load order.</p>
+	<Code lang="ts" title="Overriding a seam" code={example} />
+	<ul>{addonSeams.map((s) => <li><code>{s}</code></li>)}</ul>
+</StarlightPage>

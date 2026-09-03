@@ -19,10 +19,13 @@ export default defineConfig({
 				}
 			],
 			customCss: ['./src/styles/global.css'],
-			// The docs landing page (this task) links to Reference (Task 3) and to Get started /
-			// Deploy (Task 4), none of which exist yet. The brief only calls for excluding
-			// /docs/reference/**; widened here so `bun run build` succeeds before those tasks land.
-			// Task 3 removes the reference exclude; Task 4 should remove the other two.
+			// The docs landing page links to Get started / Deploy (Task 4), which don't exist yet.
+			// /docs/reference/** stays excluded permanently, not just until this task lands: the six
+			// Reference pages are src/pages/**/*.astro routes, not docs-collection Markdown/MDX, so
+			// starlight-links-validator never has heading data for them (it only instruments the
+			// markdown/MDX processor) and unconditionally reports InvalidLinkToCustomPage for a link
+			// to any such route, whether or not the target exists — see validateLink() in
+			// starlight-links-validator/libs/validation.ts. Task 4 should remove the other two.
 			plugins: [
 				starlightLinksValidator({
 					exclude: [

@@ -1,0 +1,38 @@
+---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import SettingCard from '../../../components/reference/SettingCard.astro';
+import UnreleasedNotice from '../../../components/reference/UnreleasedNotice.astro';
+import { loadExport } from '../../../data/export';
+
+const { settings } = loadExport();
+const byDomain = settings.domains.map((domain) => ({
+	domain,
+	entries: settings.entries.filter((e) => e.domain === domain.id)
+}));
+const headings = settings.domains.map((d) => ({ depth: 2, slug: d.id, text: d.label }));
+---
+
+<StarlightPage
+	frontmatter={{
+		title: 'Settings',
+		description:
+			'Every server setting, grouped the way the console groups them, with its default and the flag it depends on.'
+	}}
+	headings={headings}
+>
+	<UnreleasedNotice />
+	<p>
+		Settings are edited in the console under <strong>Settings</strong> or on
+		<code>ApplicationConfig</code>, and apply at the next restart. A flag that is off means the
+		capability's endpoint is not served at all.
+	</p>
+	{
+		byDomain.map(({ domain, entries }) => (
+			<section>
+				<h2 id={domain.id}>{domain.label}</h2>
+				<p>{domain.blurb}</p>
+				{entries.map((setting) => <SettingCard setting={setting} />)}
+			</section>
+		))
+	}
+</StarlightPage>

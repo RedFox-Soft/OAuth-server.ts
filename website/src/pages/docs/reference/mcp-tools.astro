@@ -1,0 +1,39 @@
+---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import SchemaBlock from '../../../components/reference/SchemaBlock.astro';
+import UnreleasedNotice from '../../../components/reference/UnreleasedNotice.astro';
+import { loadExport } from '../../../data/export';
+
+const { mcp } = loadExport();
+const groups = [
+	{ id: 'read', label: 'Reads', tools: mcp.tools.filter((t) => t.consequence === 'read') },
+	{ id: 'ordinary', label: 'Ordinary writes', tools: mcp.tools.filter((t) => t.consequence === 'ordinary') },
+	{ id: 'high', label: 'High-consequence writes (two-call confirmation)', tools: mcp.tools.filter((t) => t.consequence === 'high') }
+];
+const headings = groups.map((g) => ({ depth: 2, slug: g.id, text: g.label }));
+---
+
+<StarlightPage
+	frontmatter={{
+		title: 'MCP tools',
+		description: 'Every tool the administrative MCP control plane publishes, with its consequence class and input schema.'
+	}}
+	headings={headings}
+>
+	<UnreleasedNotice />
+	<p>Served at <code>POST /mcp</code> when <a href="/docs/reference/settings/#mcp.enabled"><code>mcp.enabled</code></a> is on. Each tool re-dispatches into the admin route it names, so it runs the console's own checks and writes the console's own audit entry. High-consequence tools require a second call confirming the specific operation.</p>
+	{groups.map((g) => (
+		<section>
+			<h2 id={g.id}>{g.label}</h2>
+			{g.tools.map((t) => (
+				<article id={t.tool}>
+					<h3><code>{t.tool}</code></h3>
+					<p>{t.summary}</p>
+					<p><small>Route <code>{t.method} {t.path}</code>{t.action ? <> · audit action <code>{t.action}</code></> : null}</small></p>
+					<SchemaBlock title="Input (body)" schema={t.bodySchema} />
+					<SchemaBlock title="Input (query)" schema={t.querySchema} />
+				</article>
+			))}
+		</section>
+	))}
+</StarlightPage>

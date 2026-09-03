@@ -100,7 +100,10 @@ let cached: DocsExport | undefined;
 
 export function loadExport(): DocsExport {
 	if (cached) return cached;
-	const file = resolve(import.meta.dirname, '../../generated/docs-export.json');
+	// Not import.meta.dirname: the SSR/prerender bundler relocates this module into
+	// dist/.prerender/chunks/, which breaks a path relative to the source file's own location.
+	// Every documented invocation (dev/check/build/preview) runs with cwd = website/.
+	const file = resolve(process.cwd(), 'generated/docs-export.json');
 	let raw: unknown;
 	try {
 		raw = JSON.parse(readFileSync(file, 'utf8'));
