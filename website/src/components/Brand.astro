@@ -1,0 +1,25 @@
+---
+/* The mark + "FoxAuth" wordmark lock-up. See DESIGN.md — "The mark". */
+interface Props {
+	/* Pixel height of the mark; the wordmark scales with it. */
+	size?: number;
+	wordmark?: boolean;
+	href?: string;
+}
+const { size = 32, wordmark = true, href = '/' } = Astro.props;
+---
+
+<a
+	href={href}
+	class="inline-flex items-center gap-[0.5em] no-underline"
+	style={`font-size:${size * 0.7}px`}
+>
+	<img src="/logo.svg" alt="" width={size} height={size} class="block" />
+	{
+		wordmark && (
+			<span class="font-sans font-[650] tracking-tight text-gray-900 dark:text-gray-100">
+				FoxAuth
+			</span>
+		)
+	}
+</a>

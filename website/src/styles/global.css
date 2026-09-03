@@ -10,19 +10,48 @@
    the repository's own Markdown and so carry no per-element classes of their own. */
 @plugin '@tailwindcss/typography';
 
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/jetbrains-mono';
+
 @theme {
-	--color-accent-50: oklch(0.97 0.02 40);
-	--color-accent-200: oklch(0.88 0.08 40);
-	--color-accent-600: oklch(0.6 0.19 40);
-	--color-accent-900: oklch(0.35 0.12 40);
-	--color-accent-950: oklch(0.25 0.08 40);
-	--color-gray-100: oklch(0.96 0.005 260);
-	--color-gray-200: oklch(0.92 0.006 260);
-	--color-gray-300: oklch(0.85 0.008 260);
-	--color-gray-400: oklch(0.65 0.01 260);
-	--color-gray-500: oklch(0.5 0.012 260);
-	--color-gray-700: oklch(0.35 0.015 260);
-	--color-gray-800: oklch(0.27 0.015 260);
-	--color-gray-900: oklch(0.2 0.015 260);
-	--color-gray-950: oklch(0.15 0.012 260);
+	--font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+	--font-mono:
+		'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+	/* The fox: #f05a23 orange, #c3461d rust, #ffc688 peach. Scale built around those three. */
+	--color-accent-50: #fff4ee;
+	--color-accent-100: #ffe4d6;
+	--color-accent-200: #ffc688;
+	--color-accent-300: #ffa661;
+	--color-accent-400: #f97e3a;
+	--color-accent-500: #f05a23;
+	--color-accent-600: #d94a1c;
+	--color-accent-700: #c3461d;
+	--color-accent-800: #9a3617;
+	--color-accent-900: #7a2c14;
+	--color-accent-950: #431508;
+
+	/* Warm neutrals (hue ≈ 40°, chroma ≈ 0.01) so the orange never sits on a cold grey. */
+	--color-gray-50: #faf8f6;
+	--color-gray-100: #f3f0ed;
+	--color-gray-200: #e6e1dc;
+	--color-gray-300: #d1cac3;
+	--color-gray-400: #a39a91;
+	--color-gray-500: #7a716a;
+	--color-gray-600: #5d554f;
+	--color-gray-700: #453f3a;
+	--color-gray-800: #2e2a26;
+	--color-gray-900: #1f1c19;
+	--color-gray-950: #14120f;
+
+	--radius-control: 0.5rem;
+	--radius-card: 0.75rem;
+	--radius-frame: 1rem;
+}
+
+/* Starlight reads its own variables; @astrojs/starlight-tailwind maps accent-200/600/900/950 and
+   gray-100…900 onto them, so the docs and the marketing pages share one palette by construction. */
+:root {
+	--sl-font: var(--font-sans);
+	--sl-font-mono: var(--font-mono);
 }

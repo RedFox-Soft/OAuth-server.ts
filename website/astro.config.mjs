@@ -3,10 +3,14 @@ import starlight from '@astrojs/starlight';
 import starlightLinksValidator from 'starlight-links-validator';
 import starlightLlmsTxt from 'starlight-llms-txt';
 import tailwindcss from '@tailwindcss/vite';
+import sitemap from '@astrojs/sitemap';
 
 export default defineConfig({
 	site: 'https://foxauth.dev',
 	integrations: [
+		// Explicit so the styleguide (noindex, review-only) can be filtered out. Starlight detects
+		// an existing sitemap integration and does not add its own second one.
+		sitemap({ filter: (page) => !page.includes('/styleguide/') }),
 		starlight({
 			title: 'FoxAuth',
 			description:

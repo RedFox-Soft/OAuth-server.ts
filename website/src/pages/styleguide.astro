@@ -1,0 +1,256 @@
+---
+// Review-only page: shows the whole design system in one place. Not linked from anywhere,
+// excluded from the sitemap (astro.config.mjs) and marked noindex.
+import { Code } from '@astrojs/starlight/components';
+import Site from '../layouts/Site.astro';
+import Brand from '../components/Brand.astro';
+import Button from '../components/ui/Button.astro';
+import Card from '../components/ui/Card.astro';
+import Badge from '../components/ui/Badge.astro';
+import Section from '../components/ui/Section.astro';
+import Eyebrow from '../components/ui/Eyebrow.astro';
+
+const accentSwatches = [
+	['accent-50', '#fff4ee'],
+	['accent-100', '#ffe4d6'],
+	['accent-200', '#ffc688'],
+	['accent-300', '#ffa661'],
+	['accent-400', '#f97e3a'],
+	['accent-500', '#f05a23'],
+	['accent-600', '#d94a1c'],
+	['accent-700', '#c3461d'],
+	['accent-800', '#9a3617'],
+	['accent-900', '#7a2c14'],
+	['accent-950', '#431508']
+];
+const graySwatches = [
+	['gray-50', '#faf8f6'],
+	['gray-100', '#f3f0ed'],
+	['gray-200', '#e6e1dc'],
+	['gray-300', '#d1cac3'],
+	['gray-400', '#a39a91'],
+	['gray-500', '#7a716a'],
+	['gray-600', '#5d554f'],
+	['gray-700', '#453f3a'],
+	['gray-800', '#2e2a26'],
+	['gray-900', '#1f1c19'],
+	['gray-950', '#14120f']
+];
+const typeScale = [
+	['14px / text-sm', 'text-sm'],
+	['16px / text-base', 'text-base'],
+	['18px / text-lg', 'text-lg'],
+	['20px / text-xl', 'text-xl'],
+	['24px / text-2xl', 'text-2xl'],
+	['30px / text-3xl', 'text-3xl'],
+	['38px / text-4xl', 'text-4xl'],
+	['48px / text-5xl', 'text-5xl']
+];
+---
+
+<Site
+	title="Styleguide"
+	description="FoxAuth design system reference — palette, type, components."
+	noindex
+>
+	<main class="bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100">
+		<Section>
+			<Eyebrow>Internal</Eyebrow>
+			<h1 class="mb-2 text-4xl font-[650] tracking-tight text-balance">
+				FoxAuth styleguide
+			</h1>
+			<p class="max-w-prose text-gray-600 dark:text-gray-400">
+				Every token and primitive from <code>DESIGN.md</code> on one page, for review.
+				Switch your OS colour scheme to review dark mode.
+			</p>
+		</Section>
+
+		<Section tone="muted">
+			<h2 class="mb-6 text-2xl font-[650] tracking-tight">Palette</h2>
+			<h3 class="mb-3 text-lg font-[650]">Accent</h3>
+			<div class="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4 md:grid-cols-6">
+				{
+					accentSwatches.map(([token, hex]) => (
+						<div class="overflow-hidden rounded-card border border-gray-200 dark:border-gray-700">
+							<div class="h-16" style={`background:${hex}`} />
+							<div class="p-2 text-xs">
+								<div class="font-medium">{token}</div>
+								<div class="text-gray-500 dark:text-gray-400">{hex}</div>
+							</div>
+						</div>
+					))
+				}
+			</div>
+			<h3 class="mb-3 text-lg font-[650]">Gray</h3>
+			<div class="grid grid-cols-2 gap-4 sm:grid-cols-4 md:grid-cols-6">
+				{
+					graySwatches.map(([token, hex]) => (
+						<div class="overflow-hidden rounded-card border border-gray-200 dark:border-gray-700">
+							<div class="h-16" style={`background:${hex}`} />
+							<div class="p-2 text-xs">
+								<div class="font-medium">{token}</div>
+								<div class="text-gray-500 dark:text-gray-400">{hex}</div>
+							</div>
+						</div>
+					))
+				}
+			</div>
+		</Section>
+
+		<Section>
+			<h2 class="mb-6 text-2xl font-[650] tracking-tight">Brand</h2>
+			<div class="grid gap-6 sm:grid-cols-3">
+				<div class="flex flex-col items-start gap-4 rounded-card border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
+					<p class="text-xs text-gray-500 dark:text-gray-400">On white</p>
+					<Brand size={24} />
+					<Brand size={32} />
+					<Brand size={48} />
+				</div>
+				<div class="flex flex-col items-start gap-4 rounded-card border border-gray-700 bg-gray-950 p-6">
+					<p class="text-xs text-gray-400">On gray-950</p>
+					<Brand size={24} />
+					<Brand size={32} />
+					<Brand size={48} />
+				</div>
+				<div class="flex flex-col items-start gap-4 rounded-card border border-accent-700 bg-accent-500 p-6">
+					<p class="text-xs text-white">
+						On accent-500 (white card behind the mark — never recoloured)
+					</p>
+					<div class="rounded-card bg-white p-4">
+						<Brand size={32} />
+					</div>
+				</div>
+			</div>
+		</Section>
+
+		<Section tone="muted">
+			<h2 class="mb-6 text-2xl font-[650] tracking-tight">Type scale</h2>
+			<div class="flex flex-col gap-4">
+				{
+					typeScale.map(([label, cls]) => (
+						<div class="flex items-baseline gap-4 border-b border-gray-200 pb-3 dark:border-gray-700">
+							<span class="w-40 shrink-0 font-mono text-xs text-gray-500 dark:text-gray-400">
+								{label}
+							</span>
+							<span class:list={[cls, 'font-[650] tracking-tight text-balance']}>
+								The quick fox gets past the gate
+							</span>
+						</div>
+					))
+				}
+			</div>
+		</Section>
+
+		<Section>
+			<h2 class="mb-6 text-2xl font-[650] tracking-tight">Buttons</h2>
+			<div class="flex flex-col gap-6">
+				{
+					(['primary', 'secondary', 'ghost'] as const).map((variant) => (
+						<div class="flex flex-wrap items-center gap-4">
+							<span class="w-24 shrink-0 font-mono text-xs text-gray-500 dark:text-gray-400">
+								{variant}
+							</span>
+							<Button href="#" variant={variant} size="md">
+								Medium
+							</Button>
+							<Button href="#" variant={variant} size="lg">
+								Large
+							</Button>
+						</div>
+					))
+				}
+			</div>
+		</Section>
+
+		<Section tone="muted">
+			<h2 class="mb-6 text-2xl font-[650] tracking-tight">Cards</h2>
+			<div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+				<Card tone="default">
+					<p class="font-medium">Default card</p>
+					<p class="text-sm text-gray-600 dark:text-gray-400">No href, no hover border.</p>
+				</Card>
+				<Card tone="accent">
+					<p class="font-medium">Accent card</p>
+					<p class="text-sm text-gray-600 dark:text-gray-400">No href, tinted background.</p>
+				</Card>
+				<Card tone="default" href="#">
+					<p class="font-medium">Default card, linked</p>
+					<p class="text-sm text-gray-600 dark:text-gray-400">Hover the border.</p>
+				</Card>
+				<Card tone="accent" href="#">
+					<p class="font-medium">Accent card, linked</p>
+					<p class="text-sm text-gray-600 dark:text-gray-400">Hover the border.</p>
+				</Card>
+			</div>
+		</Section>
+
+		<Section>
+			<h2 class="mb-6 text-2xl font-[650] tracking-tight">Badges</h2>
+			<div class="flex flex-wrap items-center gap-3">
+				<Badge tone="neutral">neutral</Badge>
+				<Badge tone="accent">accent</Badge>
+				<Badge tone="flag">FLAG</Badge>
+			</div>
+		</Section>
+
+		<Section tone="muted">
+			<h2 class="mb-6 text-2xl font-[650] tracking-tight">Section tones</h2>
+			<p class="text-gray-600 dark:text-gray-400">
+				This block is itself a <code>tone="muted"</code> section (<code>bg-gray-50</code> /
+				<code>dark:bg-gray-900</code>); the block above it is <code>tone="default"</code>.
+			</p>
+		</Section>
+
+		<Section>
+			<h2 class="mb-6 text-2xl font-[650] tracking-tight">Prose sample</h2>
+			<div class="prose dark:prose-invert">
+				<h3>A heading inside prose</h3>
+				<p>
+					Body copy sits at <code>gray-900</code> on white and <code>gray-100</code> on
+					<code>gray-950</code>. Inline <code>code</code> uses JetBrains Mono Variable.
+				</p>
+				<ul>
+					<li>Authorization Code + PKCE</li>
+					<li>Client Credentials</li>
+					<li>Device Flow</li>
+				</ul>
+				<table>
+					<thead>
+						<tr>
+							<th>Grant</th>
+							<th>RFC</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td>Authorization Code</td>
+							<td>6749</td>
+						</tr>
+						<tr>
+							<td>DPoP</td>
+							<td>9449</td>
+						</tr>
+					</tbody>
+				</table>
+				<pre><code>{`POST /token HTTP/1.1
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=client_credentials`}</code></pre>
+			</div>
+		</Section>
+
+		<Section tone="muted">
+			<h2 class="mb-4 text-2xl font-[650] tracking-tight">
+				Starlight <code>&lt;Code&gt;</code> block
+			</h2>
+			<p class="mb-4 text-gray-600 dark:text-gray-400">
+				Confirms docs code styling (Expressive Code) matches the marketing pages.
+			</p>
+			<Code
+				lang="bash"
+				title="terminal"
+				code={`curl -s https://auth.example.com/.well-known/openid-configuration | jq .issuer`}
+			/>
+		</Section>
+	</main>
+</Site>

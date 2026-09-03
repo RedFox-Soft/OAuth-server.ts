@@ -1,0 +1,17 @@
+---
+interface Props {
+	id?: string;
+	tone?: 'default' | 'muted';
+	narrow?: boolean;
+}
+const { id, tone = 'default', narrow = false } = Astro.props;
+---
+
+<section
+	id={id}
+	class:list={['py-16 md:py-24', tone === 'muted' && 'bg-gray-50 dark:bg-gray-900']}
+>
+	<div class:list={['mx-auto px-6', narrow ? 'max-w-3xl' : 'max-w-6xl']}>
+		<slot />
+	</div>
+</section>
