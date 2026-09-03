@@ -1,7 +1,17 @@
-import { defineCollection, z } from 'astro:content';
+import { defineCollection } from 'astro:content';
+import { z } from 'astro/zod';
 import { glob } from 'astro/loaders';
 import { docsLoader } from '@astrojs/starlight/loaders';
 import { docsSchema } from '@astrojs/starlight/schema';
+
+/*
+ * `yes` built in · `flag` available but switched on, previewed or paid for · `no` not available ·
+ * `unknown` the documentation did not say · `na` the question does not apply to this product.
+ */
+const CompareCell = z.object({
+	status: z.enum(['yes', 'flag', 'no', 'unknown', 'na']),
+	text: z.string()
+});
 
 export const collections = {
 	docs: defineCollection({ loader: docsLoader(), schema: docsSchema() }),
@@ -29,7 +39,33 @@ export const collections = {
 			competitor: z.string(),
 			description: z.string(),
 			lastChecked: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-			sources: z.array(z.string().url())
+			sources: z.array(z.string().url()),
+			/* One sentence a reader can act on before reading a single row. */
+			bottomLine: z.string(),
+			chooseThem: z.array(z.string()).min(1),
+			chooseUs: z.array(z.string()).min(1),
+			/*
+			 * The table as data rather than Markdown, so every row must carry a verdict and a reason —
+			 * a comparison that only lists facts leaves the reader to do the comparing.
+			 */
+			groups: z
+				.array(
+					z.object({
+						label: z.string(),
+						rows: z.array(
+							z.object({
+								dimension: z.string(),
+								us: CompareCell,
+								them: CompareCell,
+								verdict: z.enum(['us', 'them', 'even', 'different']),
+								why: z.string(),
+								/* What the competitor's documentation literally says; kept for verifiability. */
+								note: z.string().optional()
+							})
+						)
+					})
+				)
+				.min(1)
 		})
 	})
 };

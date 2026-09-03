@@ -3,8 +3,10 @@ import { getCollection, render, type CollectionEntry } from 'astro:content';
 import type { GetStaticPaths } from 'astro';
 import Site from '../../layouts/Site.astro';
 import Button from '../../components/ui/Button.astro';
+import Card from '../../components/ui/Card.astro';
 import Section from '../../components/ui/Section.astro';
 import Eyebrow from '../../components/ui/Eyebrow.astro';
+import CompareTable from '../../components/CompareTable.astro';
 
 export const getStaticPaths: GetStaticPaths = async () => {
 	const entries = await getCollection('compare');
@@ -16,7 +18,17 @@ interface Props {
 }
 const { entry } = Astro.props as Props;
 const { Content } = await render(entry);
-const { title, competitor, description, lastChecked, sources } = entry.data;
+const {
+	title,
+	competitor,
+	description,
+	lastChecked,
+	sources,
+	bottomLine,
+	chooseThem,
+	chooseUs,
+	groups
+} = entry.data;
 ---
 
 <Site title={`${title} — FoxAuth`} description={description}>
@@ -37,8 +49,55 @@ const { title, competitor, description, lastChecked, sources } = entry.data;
 		</p>
 	</Section>
 
+	<Section tone="muted">
+		<Eyebrow>The short answer</Eyebrow>
+		<p class="max-w-3xl text-xl leading-snug font-[650] tracking-tight text-balance">
+			{bottomLine}
+		</p>
+		<div class="mt-8 grid gap-6 md:grid-cols-2">
+			<Card>
+				<h2 class="text-lg font-[650] tracking-tight">Choose {competitor} if…</h2>
+				<ul class="mt-3 flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+					{
+						chooseThem.map((item) => (
+							<li class="flex gap-2">
+								<span class="text-gray-400 dark:text-gray-500" aria-hidden="true">
+									→
+								</span>
+								<span>{item}</span>
+							</li>
+						))
+					}
+				</ul>
+			</Card>
+			<Card tone="accent">
+				<h2 class="text-lg font-[650] tracking-tight">Choose FoxAuth if…</h2>
+				<ul class="mt-3 flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+					{
+						chooseUs.map((item) => (
+							<li class="flex gap-2">
+								<span class="text-accent-700 dark:text-accent-200" aria-hidden="true">
+									→
+								</span>
+								<span>{item}</span>
+							</li>
+						))
+					}
+				</ul>
+			</Card>
+		</div>
+	</Section>
+
+	<Section>
+		<Eyebrow>Side by side</Eyebrow>
+		<h2 class="mb-6 text-2xl font-[650] tracking-tight">
+			Every row has a verdict and the reason for it
+		</h2>
+		<CompareTable competitor={competitor} groups={groups} />
+	</Section>
+
 	<Section narrow tone="muted">
-		<div class="compare-body prose max-w-none dark:prose-invert">
+		<div class="prose max-w-none dark:prose-invert">
 			<Content />
 		</div>
 	</Section>
@@ -67,13 +126,3 @@ const { title, competitor, description, lastChecked, sources } = entry.data;
 		</div>
 	</Section>
 </Site>
-
-<style>
-	/* The comparison table is three wide columns; it scrolls in its own box rather than making
-	   the page scroll sideways on a phone. */
-	.compare-body :global(table) {
-		display: block;
-		max-width: 100%;
-		overflow-x: auto;
-	}
-</style>

@@ -38,6 +38,9 @@ const entries = (await getCollection('compare')).sort((a, b) =>
 						<p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
 							{entry.data.description}
 						</p>
+						<p class="mt-3 text-sm font-medium text-gray-900 dark:text-gray-100">
+							{entry.data.bottomLine}
+						</p>
 						<p class="mt-4 text-xs text-gray-500 dark:text-gray-400">
 							Last checked {entry.data.lastChecked} · {entry.data.sources.length} sources
 						</p>

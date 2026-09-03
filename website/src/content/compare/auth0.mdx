@@ -15,47 +15,240 @@ sources:
   - https://auth0.com/docs/api/management/v2
   - https://auth0.com/docs/get-started/auth0-mcp-server
   - https://auth0.com/pricing
+bottomLine: 'Pick Auth0 if you want identity as a service this week, with social connections and certified FAPI you can hand to a reviewer. Pick FoxAuth if the data must live in your own database, your per-user bill is the problem, or you need the banking-grade profiles without an Enterprise add-on.'
+chooseThem:
+  - 'You do not want to run a database or a container, ever.'
+  - 'You need social and enterprise connections working this week.'
+  - 'You want certified FAPI conformance and a support organisation with a status page.'
+  - 'Your identity budget is smaller than the cost of an engineer keeping a server healthy.'
+chooseUs:
+  - 'Your cost grows with your user count and you would rather it grew with your infrastructure.'
+  - 'A regulator or a contract requires identity data to stay in your own database.'
+  - 'You need DPoP, PAR, CIBA or mTLS without an Enterprise plan and an add-on.'
+  - 'You want an AI agent administering the instance through the same audited path a human uses.'
+groups:
+  - label: Getting started and operations
+    rows:
+      - dimension: Hosting model
+        us:
+          {
+            status: yes,
+            text: 'Self-hosted container, or imported as a library.'
+          }
+        them:
+          {
+            status: yes,
+            text: 'Managed multi-tenant cloud, or Private Cloud on AWS or Azure. Self-hosting is not documented.'
+          }
+        verdict: different
+        why: 'Run it yourself, or have it run for you. Every other row follows from this one.'
+        note: 'Private Cloud is described as "A dedicated, managed cloud service".'
+      - dimension: Runtime and code
+        us:
+          {
+            status: yes,
+            text: 'TypeScript on Bun. The whole server is code you can read and fork.'
+          }
+        them:
+          {
+            status: na,
+            text: "Auth0's runtime. Customisation is through Actions, not the server."
+          }
+        verdict: different
+        why: 'One is software you own; the other is a service you configure.'
+      - dimension: Where the data lives
+        us: { status: yes, text: 'Your own MongoDB.' }
+        them:
+          {
+            status: no,
+            text: "Auth0's store. Customer-operated storage is not documented."
+          }
+        verdict: us
+        why: 'Identity data stays in a database you control.'
+      - dimension: Social and enterprise connections
+        us:
+          {
+            status: flag,
+            text: 'Upstream OIDC federation per user bucket, behind federation.enabled.'
+          }
+        them:
+          {
+            status: yes,
+            text: 'A catalogue of social and enterprise connections out of the box.'
+          }
+        verdict: them
+        why: "Auth0's connection catalogue is far broader."
+      - dimension: Operations burden
+        us:
+          {
+            status: flag,
+            text: 'You run a database and a container, and you apply upgrades.'
+          }
+        them:
+          {
+            status: yes,
+            text: "None. Uptime, upgrades and scaling are Auth0's."
+          }
+        verdict: them
+        why: 'If you cannot operate a database, choose the managed service.'
+      - dimension: Maturity
+        us: { status: flag, text: 'Version 0.x.' }
+        them:
+          {
+            status: yes,
+            text: 'Established product, support organisation, status page, years of certifications.'
+          }
+        verdict: them
+        why: 'The honest asymmetry.'
+  - label: Protocol coverage
+    rows:
+      - dimension: PKCE for every client (OAuth 2.1)
+        us:
+          {
+            status: yes,
+            text: 'Mandatory for every client. Exact redirect matching; no Implicit or password grant.'
+          }
+        them:
+          {
+            status: flag,
+            text: 'Documented for public clients. A requirement for every client is not documented.'
+          }
+        verdict: us
+        why: 'OAuth 2.1 behaviour is the default.'
+        note: 'PKCE is documented for "applications that cannot store a client secret, such as native or single-page apps".'
+      - dimension: DPoP (RFC 9449)
+        us:
+          {
+            status: flag,
+            text: 'Including server nonces, behind dpop.enabled.'
+          }
+        them:
+          {
+            status: flag,
+            text: 'Supported, enabled per resource server; a nonce is required.'
+          }
+        verdict: even
+        why: 'Both implement it with nonces.'
+        note: '"Auth0 supports mTLS sender constraining and Demonstrating Proof-of-Possession (DPoP)" and "requires your DPoP HTTP header to have a nonce value".'
+      - dimension: Pushed Authorization Requests (RFC 9126)
+        us: { status: flag, text: 'Behind par.enabled, in every install.' }
+        them:
+          {
+            status: flag,
+            text: 'Enterprise Plan with the Highly Regulated Identity add-on.'
+          }
+        verdict: us
+        why: 'Included, not an Enterprise add-on.'
+        note: '"you must have an Enterprise Plan with the Highly Regulated Identity add-on".'
+      - dimension: FAPI profiles
+        us:
+          {
+            status: flag,
+            text: 'Profile behaviours behind fapi.enabled. No conformance certification.'
+          }
+        them:
+          {
+            status: yes,
+            text: 'Certified FAPI provider; FAPI 1 Advanced compliance on the Enterprise Plan with the add-on.'
+          }
+        verdict: them
+        why: 'A certification you can hand to a reviewer.'
+        note: '"Auth0 is a certified FAPI provider."'
+      - dimension: CIBA
+        us: { status: flag, text: 'Behind ciba.enabled, in every install.' }
+        them:
+          {
+            status: flag,
+            text: 'Enterprise Plan or an add-on; email notifications need a paid add-on.'
+          }
+        verdict: us
+        why: 'Included in every install.'
+      - dimension: mTLS (RFC 8705)
+        us:
+          {
+            status: flag,
+            text: 'Client authentication and certificate-bound tokens, behind mTLS.enabled.'
+          }
+        them:
+          {
+            status: flag,
+            text: 'Enterprise Plan with the Highly Regulated Identity add-on.'
+          }
+        verdict: us
+        why: 'Included, not an Enterprise add-on.'
+      - dimension: Dynamic client registration
+        us:
+          {
+            status: flag,
+            text: 'RFC 7591 and RFC 7592 management, each behind its own flag, any grant type.'
+          }
+        them:
+          {
+            status: flag,
+            text: 'Disabled for all tenants by default; third-party clients only, authorization_code and refresh_token only, rate-limited.'
+          }
+        verdict: us
+        why: 'Full RFC 7591 and 7592 without the restrictions.'
+  - label: Administration and agents
+    rows:
+      - dimension: Admin console and API
+        us:
+          {
+            status: yes,
+            text: 'Built-in console and the same management API behind it.'
+          }
+        them:
+          {
+            status: yes,
+            text: 'The Dashboard, and a Management API that covers everything the Dashboard does.'
+          }
+        verdict: even
+        why: 'Both give you a UI and an API for the same operations.'
+        note: '"anything that can be done through the Auth0 Dashboard can also be done through this API".'
+      - dimension: Administration by an AI agent (MCP)
+        us:
+          {
+            status: flag,
+            text: "The server itself is the MCP resource: 60 tools, the console's own checks and audit trail, two-call confirmation. Behind mcp.enabled."
+          }
+        them:
+          {
+            status: yes,
+            text: 'A separate Auth0 MCP Server that calls the Management API, authenticated with the Device Authorization flow.'
+          }
+        verdict: even
+        why: "Both exist. Ours runs inside the server through the console's code path; theirs is a separate component in front of the API."
+        note: 'The Auth0 MCP Server "connects AI agents to your Auth0 tenant".'
+  - label: Licence and cost
+    rows:
+      - dimension: Licence
+        us:
+          {
+            status: yes,
+            text: 'FSL-1.1-ALv2, source-available; each release becomes Apache 2.0 after two years.'
+          }
+        them:
+          {
+            status: na,
+            text: 'A proprietary service; no source licence applies.'
+          }
+        verdict: different
+        why: 'Source you can read and fork, versus a service agreement.'
+      - dimension: Pricing model
+        us:
+          {
+            status: yes,
+            text: 'Free to self-host, every feature included. Support by agreement.'
+          }
+        them:
+          {
+            status: flag,
+            text: 'Free up to 25,000 monthly active users, then per-MAU plans; regulated-industry features need Enterprise and an add-on.'
+          }
+        verdict: different
+        why: 'A fixed infrastructure cost versus a bill that grows with your users.'
+        note: 'Plans are "priced by Monthly Active Users (MAUs) and differ between B2C and B2B"; the free plan covers "Up to 25,000 monthly active users".'
 ---
-
-Auth0 is a managed service. That is the difference every other row follows from: you do not
-operate it, and you do not choose which parts of it you run.
-
-The rows below are what its own documentation says, on the date in the banner above. Where a page
-did not answer the question, the row says "not documented" rather than guessing.
-
-## Side by side
-
-| Dimension                                 | FoxAuth (OAuth-server.ts)                                                                                                             | Auth0                                                                                                                                                                                         |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Hosting model                             | Self-hosted. Container image `ghcr.io/redfox-soft/oauth-server-ts`, or importable as a library.                                       | Managed. A multi-tenant public cloud, or Private Cloud on AWS or Azure described as "A dedicated, managed cloud service". Self-hosting on your own infrastructure is not documented.          |
-| Language / runtime                        | TypeScript on Bun; the HTTP layer is Elysia. The whole server is code you can read and fork.                                          | Not applicable — the runtime is Auth0's. Customisation is through Actions rather than through the server itself.                                                                              |
-| Admin UI                                  | Built-in console for projects, clients, administrators, user buckets, end-users, upstream providers, settings, SMTP and signing keys. | The Auth0 Dashboard. The Management API docs note that "anything that can be done through the Auth0 Dashboard can also be done through this API".                                             |
-| Admin API for agents (MCP)                | 60 MCP tools served by the server itself at `POST /mcp`, with RFC 9728 metadata and two-call confirmation. Off until `mcp.enabled`.   | An Auth0 MCP Server is documented; it "connects AI agents to your Auth0 tenant", calls the Management API, and authenticates with the "OAuth 2.0 Device Authorization Flow".                  |
-| OAuth 2.1 defaults (PKCE for all clients) | PKCE is mandatory for every client, public or confidential. Exact redirect matching; no Implicit or password grant.                   | PKCE is documented for public clients — "applications that cannot store a client secret, such as native or single-page apps". A requirement for every client is not documented.               |
-| DPoP                                      | RFC 9449 including server nonces, behind `dpop.enabled`.                                                                              | Supported: "Auth0 supports mTLS sender constraining and Demonstrating Proof-of-Possession (DPoP)", enabled per resource server. Auth0 "requires your DPoP HTTP header to have a nonce value". |
-| PAR                                       | RFC 9126, behind `par.enabled`.                                                                                                       | Supported, based on RFC 9126. Part of Highly Regulated Identity: "you must have an Enterprise Plan with the Highly Regulated Identity add-on".                                                |
-| FAPI                                      | FAPI profile behaviours behind `fapi.enabled`. We make no conformance-certification claim.                                            | "Auth0 is a certified FAPI provider." Highly Regulated Identity documents "FAPI 1 Advanced Security profile compliance", on the Enterprise Plan with that add-on.                             |
-| CIBA                                      | Behind `ciba.enabled`.                                                                                                                | Supported: "you must have an Enterprise Plan or an appropriate add-on". Mobile push is available on Enterprise plans; email notifications need a paid add-on.                                 |
-| mTLS                                      | RFC 8705 client authentication and certificate-bound tokens, behind `mTLS.enabled`.                                                   | mTLS for OAuth is part of Highly Regulated Identity, on the Enterprise Plan with that add-on.                                                                                                 |
-| Dynamic registration                      | RFC 7591 behind `registration.enabled`, RFC 7592 management behind `registrationManagement.enabled`.                                  | Supported per the OIDC spec, but "disabled for all tenants" by default; registered clients are third-party, support only `authorization_code` and `refresh_token`, and are rate-limited.      |
-| Storage                                   | MongoDB you operate, or in-memory for tests, behind one adapter interface.                                                            | Auth0's own store. Customer-operated storage is not documented; the Private Cloud options are Auth0-managed deployments.                                                                      |
-| License                                   | FSL-1.1-ALv2 — source-available, converting to Apache 2.0 two years after each release.                                               | Not applicable. No source license is documented for the service.                                                                                                                              |
-| Pricing model                             | Free to self-host, every feature included. A support contract is by agreement.                                                        | Free, Essentials, Professional and Enterprise plans, "priced by Monthly Active Users (MAUs) and differ between B2C and B2B". The free plan covers "Up to 25,000 monthly active users".        |
-
-## Where each one fits
-
-**Auth0 is the safer default if** you do not want to run a database, you need social and enterprise
-connections working this week, you want certified FAPI conformance you can hand to a reviewer, or
-your identity budget is smaller than the cost of an engineer keeping a server healthy.
-
-**FoxAuth is the better fit if** your cost grows with your user count and you would rather it grew
-with your infrastructure, if a regulator or a contract requires the data to stay in your own
-database, if you need the banking-grade profiles without an Enterprise add-on, or if you want an AI
-agent administering the instance through the same audited path a human uses.
-
-The honest asymmetry: Auth0 is a product with a support organisation, a status page and years of
-certifications. FoxAuth is a server at version 0.x. If you cannot operate a database and a
-container, choose the managed service — ours is not ready.
 
 ## Migrating
 

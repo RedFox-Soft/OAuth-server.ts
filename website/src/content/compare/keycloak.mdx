@@ -1,7 +1,7 @@
 ---
 title: FoxAuth compared with Keycloak
 competitor: Keycloak
-description: Both are servers you run yourself. They differ in runtime, storage, administration surface and how much of the protocol is on by default.
+description: Both are servers you run yourself. They differ in runtime, storage, scope and how much of the protocol is on by default.
 lastChecked: '2026-09-03'
 sources:
   - https://www.keycloak.org/securing-apps/oidc-layers
@@ -12,49 +12,208 @@ sources:
   - https://www.keycloak.org/getting-started/getting-started-docker
   - https://www.keycloak.org/documentation
   - https://github.com/keycloak/keycloak
+bottomLine: 'Pick Keycloak if you need SAML, LDAP federation or certified FAPI today. Pick FoxAuth if your team writes TypeScript, wants OAuth 2.1 behaviour as the default, or wants an AI agent administering the server through the same audited path a human uses.'
+chooseThem:
+  - 'You need SAML as well as OpenID Connect.'
+  - 'You want LDAP or Active Directory user federation, realms, or policy-based fine-grained authorization.'
+  - 'You already run the JVM and a relational database, and a compliance reviewer recognises the name.'
+  - 'You need extensive FAPI documentation and profiles (Open Finance Brasil, Australian CDR) today.'
+chooseUs:
+  - 'Your team writes TypeScript and would rather read the server than wrap it.'
+  - 'You want PKCE for every client, exact redirect matching and no Implicit grant as the default, not per-client configuration.'
+  - "You want an AI agent to administer the instance through the console's own permission checks and audit trail."
+  - 'You run MongoDB, or you want a server small enough to mount inside your own Bun service.'
+groups:
+  - label: Getting started and operations
+    rows:
+      - dimension: Hosting model
+        us:
+          {
+            status: yes,
+            text: 'Self-hosted container, or imported as a library into your own Bun service.'
+          }
+        them:
+          {
+            status: yes,
+            text: 'Self-hosted container; start-dev mode for a first look.'
+          }
+        verdict: even
+        why: 'Both run where you put them.'
+      - dimension: Runtime and stack
+        us:
+          { status: yes, text: 'TypeScript on Bun; the HTTP layer is Elysia.' }
+        them: { status: yes, text: 'Java on Quarkus.' }
+        verdict: different
+        why: 'Pick the one your team can read and debug at 2 a.m.'
+        note: 'The docs state that "Keycloak uses the Quarkus framework and a re-augmentation/mutable-jar approach under the covers".'
+      - dimension: Storage
+        us:
+          {
+            status: yes,
+            text: 'MongoDB in production, in-memory for tests, one adapter interface.'
+          }
+        them:
+          {
+            status: yes,
+            text: 'PostgreSQL, MySQL, MariaDB, Oracle, SQL Server, Aurora, Azure SQL.'
+          }
+        verdict: them
+        why: 'Keycloak speaks the relational databases most teams already operate.'
+        note: 'dev-file and dev-mem are "not suitable for production use-cases".'
+      - dimension: Scope beyond OAuth and OIDC
+        us:
+          {
+            status: no,
+            text: 'OAuth 2.1, OpenID Connect and upstream OIDC federation. No SAML, no LDAP.'
+          }
+        them:
+          {
+            status: yes,
+            text: 'SAML, LDAP and Kerberos federation, realms, fine-grained authorization services.'
+          }
+        verdict: them
+        why: 'If SAML or LDAP is on your list, this is not a close call.'
+      - dimension: Maturity
+        us:
+          {
+            status: flag,
+            text: 'Version 0.x. No production track record to point at yet.'
+          }
+        them:
+          {
+            status: yes,
+            text: 'Long-established, large ecosystem of adapters and themes.'
+          }
+        verdict: them
+        why: 'Years of production use count.'
+  - label: Protocol coverage
+    rows:
+      - dimension: PKCE for every client (OAuth 2.1)
+        us:
+          {
+            status: yes,
+            text: 'Mandatory for every client, public or confidential. No Implicit or password grant.'
+          }
+        them:
+          {
+            status: flag,
+            text: 'Supported; S256 enforced under the FAPI profiles. A server-wide default is not documented.'
+          }
+        verdict: us
+        why: 'OAuth 2.1 behaviour is the default, not something you configure per client.'
+        note: 'Referenced as "RFC 7637 Proof Key for Code Exchange (PKCE)" (their numbering; the RFC is 7636).'
+      - dimension: DPoP (RFC 9449)
+        us:
+          {
+            status: flag,
+            text: 'Including server nonces, behind dpop.enabled.'
+          }
+        them: { status: flag, text: 'Documented as a preview feature.' }
+        verdict: us
+        why: 'Shipped rather than previewed; both need switching on.'
+        note: 'Described as "a preview feature" that "binds an access token and a refresh token together with the public part of a client''s key pair".'
+      - dimension: Pushed Authorization Requests (RFC 9126)
+        us: { status: flag, text: 'Behind par.enabled.' }
+        them:
+          {
+            status: yes,
+            text: 'Supported, documented alongside the FAPI client profiles.'
+          }
+        verdict: even
+        why: 'Both implement it.'
+      - dimension: FAPI profiles
+        us:
+          {
+            status: flag,
+            text: 'Profile behaviours behind fapi.enabled. No conformance certification.'
+          }
+        them:
+          {
+            status: yes,
+            text: 'FAPI 1 Baseline and Advanced, FAPI CIBA, FAPI 2.0 Security Profile and Message Signing, Open Finance Brasil, Australian CDR.'
+          }
+        verdict: them
+        why: "Keycloak's FAPI coverage and documentation are far ahead of ours."
+      - dimension: CIBA
+        us: { status: flag, text: 'Behind ciba.enabled.' }
+        them: { status: yes, text: 'Supported.' }
+        verdict: even
+        why: 'Both implement it.'
+      - dimension: mTLS (RFC 8705)
+        us:
+          {
+            status: flag,
+            text: 'Client authentication and certificate-bound tokens, behind mTLS.enabled.'
+          }
+        them:
+          {
+            status: yes,
+            text: 'Certificate-bound access tokens, documented in the FAPI material.'
+          }
+        verdict: even
+        why: 'Both implement it.'
+      - dimension: Dynamic client registration
+        us:
+          {
+            status: flag,
+            text: 'RFC 7591, plus RFC 7592 management, each behind its own flag.'
+          }
+        them: { status: yes, text: 'Supported.' }
+        verdict: even
+        why: 'Both implement it.'
+  - label: Administration and agents
+    rows:
+      - dimension: Admin console
+        us:
+          {
+            status: yes,
+            text: 'Projects, clients, administrators, user buckets, end-users, upstream providers, settings, SMTP, signing keys.'
+          }
+        them:
+          {
+            status: yes,
+            text: 'Admin Console for realms and most administrative tasks.'
+          }
+        verdict: even
+        why: "Both have one; Keycloak's covers a broader product."
+      - dimension: Administration by an AI agent (MCP)
+        us:
+          {
+            status: flag,
+            text: '60 MCP tools served by the server itself, two-call confirmation for destructive operations, behind mcp.enabled.'
+          }
+        them:
+          {
+            status: unknown,
+            text: 'No MCP guide in the documentation index; administration is the Admin REST API.'
+          }
+        verdict: us
+        why: "An agent runs the console's own code path, checks and audit trail; there is no second privileged API to keep in step."
+  - label: Licence and cost
+    rows:
+      - dimension: Licence
+        us:
+          {
+            status: yes,
+            text: 'FSL-1.1-ALv2, source-available; each release becomes Apache 2.0 after two years.'
+          }
+        them: { status: yes, text: 'Apache License 2.0.' }
+        verdict: them
+        why: 'Apache 2.0 today is the more permissive licence.'
+      - dimension: Cost
+        us:
+          {
+            status: yes,
+            text: 'Free to self-host, every feature included. Support by agreement.'
+          }
+        them:
+          {
+            status: yes,
+            text: 'Free. No pricing is published on keycloak.org.'
+          }
+        verdict: even
+        why: 'Both cost what running them costs.'
 ---
-
-Keycloak is the server most teams weigh a self-hosted OAuth 2.1 deployment against. It is
-older, broader — it also does SAML, realms, user federation and fine-grained authorization
-services — and it runs on a different stack.
-
-The rows below are what its own documentation says, on the date in the banner above. Where a
-page did not answer the question, the row says "not documented" rather than guessing.
-
-## Side by side
-
-| Dimension                                 | FoxAuth (OAuth-server.ts)                                                                                                             | Keycloak                                                                                                                                                                                                                             |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Hosting model                             | Self-hosted. Container image `ghcr.io/redfox-soft/oauth-server-ts`. A managed instance is not available yet.                          | Self-hosted. Container image `quay.io/keycloak/keycloak`, started with `start-dev` for a first look.                                                                                                                                 |
-| Language / runtime                        | TypeScript on Bun; the HTTP layer is Elysia. Importable as a library and mountable in your own Bun service.                           | Java. The docs state that "Keycloak uses the Quarkus framework and a re-augmentation/mutable-jar approach under the covers".                                                                                                         |
-| Admin UI                                  | Built-in console for projects, clients, administrators, user buckets, end-users, upstream providers, settings, SMTP and signing keys. | Admin Console: "You configure realms and perform most administrative tasks in the Keycloak Admin Console."                                                                                                                           |
-| Admin API for agents (MCP)                | 60 MCP tools at `POST /mcp`, as an OAuth 2.1 protected resource with RFC 9728 metadata. Off until `mcp.enabled` is set.               | Not documented. The documentation index lists no MCP guide; administration is exposed as the Admin REST API instead.                                                                                                                 |
-| OAuth 2.1 defaults (PKCE for all clients) | PKCE is mandatory for every client, public or confidential. Redirect URIs match exactly; there is no Implicit or password grant.      | PKCE is supported, referenced as "RFC 7637 Proof Key for Code Exchange (PKCE)" (their numbering; the RFC is 7636), with S256 enforced under the FAPI profiles. A server-wide default requiring it of every client is not documented. |
-| DPoP                                      | RFC 9449 including server nonces, behind `dpop.enabled`.                                                                              | Documented as "a preview feature" that "binds an access token and a refresh token together with the public part of a client's key pair".                                                                                             |
-| PAR                                       | RFC 9126, behind `par.enabled`.                                                                                                       | Supported; documented alongside the FAPI client profiles that recommend it.                                                                                                                                                          |
-| FAPI                                      | FAPI profile behaviours behind `fapi.enabled`. We make no conformance-certification claim.                                            | Documents FAPI 1.0 Baseline and Advanced, FAPI CIBA, "FAPI 2.0 Security Profile (Final)", "FAPI 2.0 Message Signing (Final)", Open Finance Brasil and the Australia Consumer Data Right profile.                                     |
-| CIBA                                      | Behind `ciba.enabled`.                                                                                                                | Supported: "OpenID Connect Client Initiated Backchannel Authentication Flow".                                                                                                                                                        |
-| mTLS                                      | RFC 8705 client authentication and certificate-bound tokens, behind `mTLS.enabled`.                                                   | Certificate-bound access tokens are documented in the FAPI compliance material.                                                                                                                                                      |
-| Dynamic registration                      | RFC 7591 behind `registration.enabled`, RFC 7592 management behind `registrationManagement.enabled`.                                  | Supported: "OpenID Connect Dynamic Client Registration".                                                                                                                                                                             |
-| Storage                                   | MongoDB in production, in-memory for tests, behind one adapter interface.                                                             | Relational: MariaDB, Microsoft SQL Server, MySQL, Oracle and PostgreSQL, plus Amazon Aurora PostgreSQL and Azure SQL. `dev-file` and `dev-mem` are "not suitable for production use-cases".                                          |
-| License                                   | FSL-1.1-ALv2 — source-available, converting to Apache 2.0 two years after each release.                                               | "Apache License, Version 2.0".                                                                                                                                                                                                       |
-| Pricing model                             | Free to self-host, every feature included. A support contract is by agreement.                                                        | No pricing is published on keycloak.org.                                                                                                                                                                                             |
-
-## Where each one fits
-
-**Keycloak is the safer default if** you need SAML as well as OIDC, you already run the JVM and a
-relational database, you want the realm and user-federation model, or a compliance reviewer
-recognises the name. Its FAPI documentation is more extensive than ours, and its ecosystem of
-adapters and themes is much larger.
-
-**FoxAuth is the better fit if** your team writes TypeScript and would rather read the server than
-wrap it, if you want an AI agent to administer the instance through the same permission checks and
-audit trail a human uses, or if you want OAuth 2.1 behaviour — PKCE everywhere, exact redirect
-matching, no Implicit grant — as the default rather than as per-client configuration.
-
-The scope difference cuts both ways. FoxAuth does not do SAML, LDAP user federation or
-policy-based fine-grained authorization; it does OAuth 2.1 and OpenID Connect, plus upstream OIDC
-federation. If your list of requirements includes the first three, this is not a close call.
 
 ## Migrating
 
