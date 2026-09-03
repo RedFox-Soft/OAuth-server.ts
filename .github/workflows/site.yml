@@ -1,0 +1,83 @@
+name: Site
+
+# The website builds from the same commit as the code: its Reference section is generated from the
+# server's own tables and its screenshots from a server booted in the build. So it deploys on push to
+# main, filtered to the files that can change what the site shows. lib/** is deliberately not
+# blanket-listed so a server-only change does not redeploy the site — only the specific tables the
+# docs export reads and the specific UI the capture script screenshots are listed below.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'website/**'
+      - 'scripts/docs_export.ts'
+      - 'lib/docs_export/**'
+      - 'lib/admin/settings/catalog.ts'
+      - 'lib/configs/application.ts'
+      - 'lib/mcp/catalogue.ts'
+      - 'lib/admin/**/schema.ts'
+      - 'lib/consts/**'
+      - 'lib/addon/seams.ts'
+      - 'lib/admin/ui/**'
+      - 'lib/interactions/**'
+      - 'public/logo.svg'
+      - 'CHANGELOG.md'
+      - 'SECURITY.md'
+      - 'LICENSE'
+      - 'NOTICE'
+      - 'package.json'
+      - '.github/workflows/site.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # version.ts needs the tags to decide whether main is ahead of a release.
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install the server (the export and the capture boot it)
+        run: bun install --frozen-lockfile
+
+      - name: Install the site
+        working-directory: website
+        run: bun install --frozen-lockfile
+
+      - name: Install Playwright's browser
+        working-directory: website
+        run: bunx playwright install --with-deps chromium
+
+      - name: Build the site
+        working-directory: website
+        run: bun run build
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: website/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
