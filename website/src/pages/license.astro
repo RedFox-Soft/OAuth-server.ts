@@ -1,0 +1,62 @@
+---
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { marked } from 'marked';
+import Site from '../layouts/Site.astro';
+
+/*
+ * Read rather than imported through the `root` collection: the glob loader dispatches on file
+ * extension and silently skips extensionless files, and LICENSE has no extension. NOTICE is plain
+ * text and is shown verbatim.
+ *
+ * Paths resolve from cwd, not import.meta.dirname, for the reason src/data/version.ts records: the
+ * prerender bundler relocates modules, which breaks a path relative to a source file's own location.
+ * Every documented invocation (dev/check/build/preview) runs with cwd = website/.
+ */
+function readRoot(name: string): string {
+	const file = resolve(process.cwd(), '..', name);
+	try {
+		return readFileSync(file, 'utf8');
+	} catch (error) {
+		throw new Error(`${name} not found at the repository root (${String(error)})`);
+	}
+}
+
+const license = await marked.parse(readRoot('LICENSE'));
+const notice = readRoot('NOTICE');
+---
+
+<Site
+	title="License"
+	description="OAuth-server.ts is source-available under the Functional Source License 1.1 with Apache 2.0 as its future license."
+>
+	<section class="prose mx-auto max-w-3xl px-4 pt-12 dark:prose-invert">
+		<h1>License</h1>
+		<p>
+			OAuth-server.ts is <strong>source-available</strong> under the Functional Source License,
+			version 1.1, with the Apache License 2.0 as its future license (<code>FSL-1.1-ALv2</code>).
+		</p>
+		<ul>
+			<li>
+				You may read, modify, self-host and redistribute it for your own use, for education, for
+				research, and to provide professional services around it.
+			</li>
+			<li>You may not offer it to others as a competing hosted service.</li>
+			<li>
+				Two years after each version is released, that version becomes available under the Apache
+				License 2.0.
+			</li>
+		</ul>
+		<p>
+			The full terms follow. The project began as a fork of node-oidc-provider (MIT); its notice is
+			reproduced after the license.
+		</p>
+	</section>
+	<article class="prose mx-auto max-w-3xl px-4 pb-12 dark:prose-invert">
+		<hr />
+		<Fragment set:html={license} />
+		<hr />
+		<h2>Notice</h2>
+		<pre>{notice}</pre>
+	</article>
+</Site>

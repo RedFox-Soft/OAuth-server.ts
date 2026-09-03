@@ -1,0 +1,102 @@
+---
+title: Deploy with Docker Compose
+description: A production-leaning Compose file — pinned tags, a database you back up, and a TLS proxy in front.
+sidebar:
+  order: 2
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+The [Compose file in Get started](/docs/get-started/docker-compose/) is built for a first look. Four
+changes make it something you can leave running.
+
+## The file
+
+```yaml
+services:
+  setup:
+    image: ghcr.io/redfox-soft/oauth-server-ts:0.1.0
+    command: ['bun', 'run', 'db:setup']
+    env_file: .env
+    restart: 'no'
+
+  oauth:
+    image: ghcr.io/redfox-soft/oauth-server-ts:0.1.0
+    ports:
+      - '127.0.0.1:3000:3000'
+    env_file: .env
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+    restart: unless-stopped
+```
+
+with a `.env` beside it:
+
+```ini
+ISSUER=https://auth.example.com
+MONGODB_URI=mongodb+srv://user:password@cluster.example.mongodb.net
+DATABASE_NAME=OAuth
+```
+
+## What changed, and why
+
+**Pin the image tag.** Images are published to `ghcr.io/redfox-soft/oauth-server-ts` on every
+release, tagged with the version and with `latest`. `latest` means a `docker compose pull` can move
+you across a release you have not read the changelog for. Name the version instead, and change it
+deliberately — that is also what makes the [upgrade](/docs/deploy/upgrade/) a reviewable diff.
+
+**Use a database you back up.** The Get started file runs `mongo:8` on a local named volume, which
+is convenient and has no backups. Either point `MONGODB_URI` at a managed instance —
+[MongoDB Atlas](/docs/deploy/mongodb-atlas/) — or keep the local `mongo` service and treat the
+volume as the production data it is:
+
+```yaml
+mongo:
+  image: mongo:8
+  volumes:
+    - mongo-data:/data/db
+  healthcheck:
+    test:
+      ['CMD', 'mongosh', '--quiet', '--eval', 'db.runCommand({ ping: 1 }).ok']
+    interval: 5s
+    timeout: 5s
+    retries: 12
+  restart: unless-stopped
+```
+
+with `depends_on: { mongo: { condition: service_healthy } }` on the `setup` service, and a scheduled
+`mongodump` against the volume. Everything a deployment cannot lose is in that database: end-user
+accounts, clients, the audit trail, and the signing keys.
+
+**`restart: unless-stopped` on the server, `restart: 'no'` on setup.** The `setup` service is a
+one-shot that must exit; restarting it would loop. The server should come back after a host reboot
+or a crash — remember that a Machine which cannot reach the datastore exits at boot rather than
+serving, so a restart policy is how it recovers when the database comes back.
+
+**Bind the port to loopback and put a proxy in front.** `'127.0.0.1:3000:3000'` keeps the plaintext
+port off the network. TLS terminates in the proxy, and `ISSUER` is the public `https` URL —
+[Behind a reverse proxy](/docs/deploy/reverse-proxy/) has the nginx and Caddy blocks and the one
+setting you must get right there.
+
+<Aside type="caution" title="ISSUER is final before the first start">
+
+The `setup` service derives the console client's redirect URI from `ISSUER` the first time it runs,
+and a later change is not repaired by re-running it. Put the final public URL in `.env` before the
+first `docker compose up`.
+
+</Aside>
+
+## Upgrading
+
+Change the tag and bring it up again:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+`setup` re-runs on every `up`, which is intended: it is idempotent, and it is what applies a new
+release's collections, indexes and seed changes. The server waits for it to complete successfully
+before starting. The full checklist, including what a restart does and does not carry over, is in
+[Upgrading](/docs/deploy/upgrade/).

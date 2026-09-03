@@ -1,0 +1,140 @@
+---
+title: Get your first token
+description: An Authorization Code plus PKCE walk-through with curl, from the challenge to a decoded ID token and a UserInfo call.
+sidebar:
+  order: 5
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+This is one full Authorization Code + PKCE round trip against a local deployment, done by hand. It
+is the flow every client library implements, and doing it once by hand makes debugging one much
+easier.
+
+The examples assume `ISSUER=http://localhost:3000` and a public client with the id `demo` whose
+registered redirect URI is `http://localhost:8080/callback`. Substitute your own from
+[Register your first client](/docs/get-started/first-client/).
+
+<Aside type="note">
+
+The endpoint paths below are this server's defaults. Do not hard-code them in a real client — read
+`GET /.well-known/openid-configuration` and use what it advertises. That document also reflects
+which capabilities are enabled, so it is the honest answer to "what does this deployment support".
+
+</Aside>
+
+<Steps>
+
+1. **Generate a verifier and its challenge.** PKCE is mandatory for every `response_type=code`
+   request here, and `S256` is the only accepted method.
+
+   ```ts
+   // save as pkce.ts, run with: bun pkce.ts
+   const verifier = Buffer.from(
+   	crypto.getRandomValues(new Uint8Array(32))
+   ).toString('base64url');
+   const challenge = new Bun.CryptoHasher('sha256')
+   	.update(verifier)
+   	.digest('base64url');
+   console.log({ verifier, challenge });
+   ```
+
+   Keep the verifier; you will send it to the token endpoint in step 4.
+
+2. **Send the browser to the authorization endpoint.** Build the URL with your challenge:
+
+   ```
+   http://localhost:3000/auth
+     ?response_type=code
+     &client_id=demo
+     &redirect_uri=http%3A%2F%2Flocalhost%3A8080%2Fcallback
+     &scope=openid
+     &state=8f2c1d
+     &nonce=b41e07
+     &code_challenge=<challenge>
+     &code_challenge_method=S256
+   ```
+
+   (All on one line, without the indentation.) `state` is yours to check on the way back; `nonce` is
+   echoed into the ID token so you can tie it to this request. `scope=openid` is what makes this an
+   OpenID Connect request and produces an ID token — add `offline_access` if you want a refresh
+   token.
+
+3. **Sign in and consent.** The server redirects to its own interaction screens: a sign-in form for
+   the bucket this client's project points at, then a consent screen listing the scopes (consent is
+   on by default for a new client). Approving both sends the browser to
+
+   ```
+   http://localhost:8080/callback?code=<code>&state=8f2c1d&iss=http%3A%2F%2Flocalhost%3A3000
+   ```
+
+   Nothing needs to be listening on port 8080 — copy the `code` out of the browser's address bar.
+   Check that `state` came back unchanged, and that `iss` is your issuer.
+
+4. **Exchange the code at the token endpoint.** The code is single-use and lives 60 seconds, so do
+   this promptly — if you take longer, start again at step 2:
+
+   ```bash
+   curl -s http://localhost:3000/token \
+     -H 'Content-Type: application/x-www-form-urlencoded' \
+     -d grant_type=authorization_code \
+     -d code=<code> \
+     -d client_id=demo \
+     -d redirect_uri=http://localhost:8080/callback \
+     -d code_verifier=<verifier>
+   ```
+
+   `redirect_uri` must be byte-identical to the one in step 2 — the grant compares it against the
+   value recorded on the code and refuses a mismatch. For a confidential client, drop `client_id`
+   from the body and authenticate instead: `-u demo:<secret>` for `client_secret_basic`, or
+   `-d client_id=demo -d client_secret=<secret>` for `client_secret_post`.
+
+   The response is the standard token response:
+
+   ```json
+   {
+   	"access_token": "…",
+   	"token_type": "Bearer",
+   	"expires_in": 3600,
+   	"id_token": "…",
+   	"scope": "openid"
+   }
+   ```
+
+5. **Decode the ID token.** It is a signed JWT; the payload is the middle segment, base64url:
+
+   ```bash
+   echo '<id_token>' | cut -d. -f2 | tr '_-' '/+' | base64 -d 2>/dev/null | jq .
+   ```
+
+   Check `iss` against your `ISSUER`, `aud` against your client id, and `nonce` against step 2. A
+   real client verifies the signature as well, against a key from `GET /jwks` selected by the
+   token's `kid`.
+
+6. **Call the UserInfo endpoint** with the access token:
+
+   ```bash
+   curl -s http://localhost:3000/userinfo -H 'Authorization: Bearer <access_token>' | jq .
+   ```
+
+   What comes back is governed by the scopes granted and by the claims configured on the server.
+
+</Steps>
+
+## On by default, or behind a flag
+
+Most endpoints are governed by a feature flag, and **a flag that is off means the endpoint is not
+served at all** — the refusal is deliberately indistinguishable from a path the server does not
+have. So a `404` on one of these is a configuration answer, not a defect:
+
+- **Always available**, with no flag: `/health`, `/.well-known/openid-configuration`,
+  `/.well-known/security.txt`, `/jwks`, `/auth` and `/token`. Everything in this walk-through except
+  step 6 is in this group.
+- **On unless you turn it off**: `/userinfo` (`userinfo.enabled`) and RP-initiated logout
+  (`rpInitiatedLogout.enabled`).
+- **Off until you turn it on**: pushed authorization requests, introspection, revocation, dynamic
+  client registration, the device flow, CIBA and the MCP control plane.
+
+The full table, with the flag that governs each endpoint, is the
+[endpoints reference](/docs/reference/endpoints/); the flags themselves are in the
+[settings reference](/docs/reference/settings/). Settings apply at the next restart.

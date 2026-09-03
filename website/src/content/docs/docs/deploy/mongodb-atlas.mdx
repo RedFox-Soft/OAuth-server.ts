@@ -1,0 +1,99 @@
+---
+title: MongoDB Atlas
+description: The connection string, where the database name goes, network access, and what provisioning creates.
+sidebar:
+  order: 5
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+Everything this server cannot lose lives in MongoDB: end-user accounts, clients, projects, buckets,
+sessions, the append-only audit trail, and the signing keys. A managed instance is the shortest path
+to having that backed up.
+
+<Steps>
+
+1. **Create a cluster** in Atlas, in the region closest to where the server runs.
+
+2. **Create a database user** with read/write access, and copy the connection string Atlas offers
+   for it. It looks like:
+
+   ```
+   mongodb+srv://user:password@cluster.example.mongodb.net/?retryWrites=true&w=majority
+   ```
+
+3. **Allow the application's egress addresses** under Network Access. See the note below.
+
+4. **Set the two variables** — the connection string as `MONGODB_URI` and the database name
+   separately as `DATABASE_NAME`:
+
+   ```bash
+   fly secrets set MONGODB_URI='mongodb+srv://user:password@cluster.example.mongodb.net/?retryWrites=true&w=majority'
+   ```
+
+   ```ini
+   DATABASE_NAME=OAuth
+   ```
+
+5. **Provision the schema** against the cluster, once, before the server serves traffic:
+
+   ```bash
+   MONGODB_URI='mongodb+srv://…' DATABASE_NAME=OAuth ISSUER=https://auth.example.com bun run db:setup
+   ```
+
+   On Fly this is the `release_command` and you do not run it by hand; on Kubernetes it is the
+   provisioning Job; under Compose it is the `setup` service.
+
+</Steps>
+
+<Aside type="caution" title="The database name is not in the URI path">
+
+`DATABASE_NAME` is a separate variable, and it is the one the server uses. A database named in the
+connection string's path is not what gets read — so
+`mongodb+srv://…/mydb` with `DATABASE_NAME=OAuth` writes to `OAuth`, which is a confusing way to
+discover the rule. Leave the path empty and set the name in `DATABASE_NAME`.
+
+</Aside>
+
+## Network access
+
+Atlas denies every address by default. Add the addresses the server's egress actually uses:
+
+- **Fly.io**: Machines egress from shared addresses that are not stable per app. Either use Atlas
+  Private Endpoints / peering, or allow the outbound addresses Fly documents for your region — and
+  if you resort to `0.0.0.0/0`, understand that the database user's password is then the only thing
+  protecting the data, so it must be long, unique, and rotated when anyone with a copy leaves.
+- **Kubernetes**: allow the cluster's NAT gateway addresses.
+- **A single VM**: allow its public address.
+
+Prefer a private connection over an allow-list wherever the platform offers one.
+
+## What provisioning creates
+
+`bun run db:setup` is the only thing that should be creating structure in this database:
+
+- one collection per storage area the server writes to;
+- the **TTL indexes** that expire tokens, authorization codes, sessions, interactions and
+  verification challenges — Atlas runs the TTL monitor, so expiry is the database's job once the
+  index exists, and a deployment whose indexes were never created accumulates dead documents
+  forever;
+- the unique e-mail index on each bucket's end-user collection;
+- the initial RS256 signing key;
+- the admin panel seed (reserved project, "Administrators" bucket, the `admin-panel` and
+  `admin-mcp` clients, the system group, the default `redfox` bucket).
+
+It also drops stale expiry indexes on collections that no longer write the field they indexed. It is
+idempotent, and it exits non-zero when a constraint it declares is not in force — for example a
+unique index it could not build because the existing data violates it. Treat that exit code as a
+failed deploy.
+
+## Backups
+
+Atlas takes scheduled snapshots; enable them, set a retention period, and — the part people skip —
+restore one into a throwaway cluster once, so you know the restore works and how long it takes.
+
+Two things worth knowing about a restore. The **signing keys** come back with the snapshot, so
+tokens issued before it still verify; restoring a database without them would invalidate every
+live token and every session. And the **audit trail** is append-only by design, with no update or
+delete exposed anywhere in the API — a restore that rolls it back is the one way entries disappear,
+which is worth stating in whatever your compliance story is.

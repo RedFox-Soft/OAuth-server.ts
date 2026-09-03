@@ -1,0 +1,157 @@
+---
+title: Deploy on Kubernetes
+description: A Deployment, a Service, a provisioning Job that must finish first, and the one caveat about scaling replicas.
+sidebar:
+  order: 3
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+There is no shipped chart. The manifests below are the minimum that reflects how the server actually
+boots: a Job that provisions the database before the Deployment rolls, a readiness probe on
+`/health`, and configuration out of a Secret.
+
+## Secret
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: oauth-server
+stringData:
+  MONGODB_URI: mongodb+srv://user:password@cluster.example.mongodb.net
+  ISSUER: https://auth.example.com
+  DATABASE_NAME: OAuth
+```
+
+Only `MONGODB_URI` is a credential; keeping all three together is simply one `envFrom` instead of
+two. Each variable is described in the
+[environment variables reference](/docs/reference/environment/).
+
+## Provisioning Job
+
+```yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: oauth-server-setup-0-1-0
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: setup
+          image: ghcr.io/redfox-soft/oauth-server-ts:0.1.0
+          command: ['bun', 'run', 'db:setup']
+          envFrom:
+            - secretRef:
+                name: oauth-server
+```
+
+Run this to completion **before** rolling the Deployment, and gate the rollout on it — an
+`argocd.argoproj.io/hook: PreSync` annotation, a Helm `pre-install,pre-upgrade` hook, or simply
+`kubectl wait --for=condition=complete job/oauth-server-setup-0-1-0` in your pipeline.
+
+The reason is the same one that puts `release_command` in the shipped `fly.toml`: without the
+reserved admin project, bucket and client the seed creates, `GET /admin/login` redirects to `/auth`
+with a `client_id` no client matches and the console is unreachable, while the first-run setup page
+still answers — which reads as a login bug rather than a missing seed. The Job also provisions the
+TTL and unique-e-mail indexes the collections would otherwise be created without.
+
+`db:setup` is idempotent, so re-running it is safe; it exits non-zero when a constraint it declares
+is not in force, so a failed Job is a real signal and should stop the rollout. Name the Job after
+the release (as above) so each upgrade runs its own.
+
+## Deployment and Service
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oauth-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: oauth-server
+  template:
+    metadata:
+      labels:
+        app: oauth-server
+    spec:
+      containers:
+        - name: oauth-server
+          image: ghcr.io/redfox-soft/oauth-server-ts:0.1.0
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - secretRef:
+                name: oauth-server
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: oauth-server
+spec:
+  selector:
+    app: oauth-server
+  ports:
+    - port: 80
+      targetPort: 3000
+```
+
+`/health` is the right probe target for two reasons: it is served unconditionally, with no feature
+flag behind it, and it is the one route the rate limiter never counts — a refused liveness probe
+would take the pod out of the endpoints list. A pod that cannot reach MongoDB exits at boot instead
+of serving, so a probe failure genuinely means "not serving".
+
+Terminate TLS at the Ingress and set `ISSUER` to the public `https` URL; the
+[reverse proxy page](/docs/deploy/reverse-proxy/) applies to an Ingress controller exactly as it
+does to nginx, including the `rateLimit.trustedProxy` decision.
+
+<Aside type="caution" title="Rate limiting is per instance">
+
+From the project's README: counting is per instance and held in memory, so **with N machines serving
+concurrently the effective allowance is N times the configured value**, and an instance restart
+clears every counter. It is a resource protection — it bounds what one source can cost the server —
+and not a security boundary.
+
+So `replicas: 3` with `rateLimit.strict.max` at its default of 60 per minute means an origin can
+reach roughly 180 requests a minute against the token endpoint. Divide the configured maxima by the
+replica count if the aggregate number is what you care about, and re-check it when you scale.
+
+What does hold absolutely regardless of replica count are the per-identity throttles, because their
+counters are persisted: verification codes cap at five attempts, resends and password-reset requests
+are cooldown- and daily-capped, and the password sign-in door has its own brute-force throttle.
+Those are the security boundaries, and they are unaffected by how many pods you run.
+
+</Aside>
+
+## Scaling notes
+
+- Sessions, tokens, codes and interactions live in MongoDB, not in process memory, so more than one
+  replica is fine as far as the protocol is concerned.
+- Signing keys are loaded once at startup from the database. Generating one in the console
+  hot-applies it to the replica that served that request only, so the others must be restarted or
+  they will disagree about what `/jwks` advertises. The console's key page reports exactly this
+  drift, between the stored key set and the one the process booted with.
+- Server settings are read at boot too. A settings change applies on the next rollout —
+  `kubectl rollout restart deployment/oauth-server`.

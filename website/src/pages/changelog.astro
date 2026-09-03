@@ -1,0 +1,21 @@
+---
+import { getEntry, render } from 'astro:content';
+import Site from '../layouts/Site.astro';
+import { loadVersion } from '../data/version';
+
+const entry = await getEntry('root', 'changelog');
+if (!entry) throw new Error('CHANGELOG.md not found at the repository root');
+const { Content } = await render(entry);
+const v = loadVersion();
+---
+
+<Site title="Changelog" description="Every notable change to OAuth-server.ts, by version.">
+	<article class="prose mx-auto max-w-3xl px-4 py-12 dark:prose-invert">
+		<p class="text-sm text-gray-500">
+			Site built from {v.unreleased ? `unreleased commit ${v.commit}` : v.lastTag}. Releases: <a
+				href="https://github.com/RedFox-Soft/OAuth-server.ts/releases">GitHub</a
+			>.
+		</p>
+		<Content />
+	</article>
+</Site>

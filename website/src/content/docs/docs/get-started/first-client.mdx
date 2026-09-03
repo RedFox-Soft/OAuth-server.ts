@@ -1,0 +1,115 @@
+---
+title: Register your first client
+description: Groups, projects and clients in the console, public versus confidential, and how a client decides which users it signs in.
+sidebar:
+  order: 4
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+A client is an application that asks this server for tokens. Clients live inside projects, projects
+belong to groups, and a project points at the user bucket its clients sign users in from. That is
+four concepts, but they nest, so the console walks them in order.
+
+## Groups, projects, buckets
+
+- A **group** owns things. Every project and every user bucket carries an owning group, and
+  belonging to that group is the only thing that grants access to it — there is no separate list of
+  named managers. Each administrator already has a **Personal** group, which is a fine place for a
+  first client; a **regular** group is a company or a team you share with colleagues.
+- A **project** is a set of clients that belong to one application or one product, plus the bucket
+  its users come from.
+- A **user bucket** is a population of end-users: their accounts, and the policy for how they
+  register and verify themselves.
+
+<Steps>
+
+1. **Choose a scope.** The scope switcher at the top of the console decides which group you are
+   working in. Leave it on **Personal**, or create a group under **Groups** if this belongs to a
+   team. (Personal groups are deliberately not listed in the Groups table — every administrator has
+   one.)
+
+2. **Create a bucket** under **Buckets**, unless you want to use the default `redfox` bucket. Give
+   it a name; the registration and verification policy can be set now or later.
+
+3. **Create a project** under **Projects**. It takes a name and a slug (lower-case letters, digits
+   and hyphens). Then open it and set its **Bucket** to the bucket from the previous step.
+
+4. **Create a client** under the project's **Clients**. Pick the application type and the token
+   endpoint authentication method — the next section is about that choice — and enter the redirect
+   URIs.
+
+</Steps>
+
+## Public or confidential
+
+The choice is the **token endpoint auth method**, and it follows from whether your application can
+keep a secret:
+
+| Method                 | Use for                                                                    | Credential                                   |
+| ---------------------- | -------------------------------------------------------------------------- | -------------------------------------------- |
+| `none` (public / PKCE) | Browser SPAs, mobile and desktop apps, CLIs — anything shipped to the user | None. PKCE is the proof.                     |
+| `client_secret_basic`  | Server-side web applications and back-end services                         | A secret, sent in the `Authorization` header |
+| `client_secret_post`   | The same, where a client library can only put credentials in the form body | A secret, sent as a form field               |
+
+PKCE is not optional here for either kind. Every authorization request with `response_type=code` is
+refused without a `code_challenge`, and `S256` is the only accepted method — a request carrying
+`plain` is rejected, and discovery advertises `S256` alone. A public client with no secret is
+therefore not a weaker client; the code it receives is useless to anyone who did not generate the
+verifier.
+
+<Aside type="caution" title="The secret is shown once">
+
+When a confidential client is created — or when you rotate its secret from the clients table — the
+value appears in a dialog with "Copy this secret now — it will not be shown again." It is not
+recoverable afterwards; the way back is a rotation, which invalidates the old one.
+
+</Aside>
+
+## Redirect URIs match exactly
+
+A redirect URI must be registered, and a request's `redirect_uri` is compared against the registered
+set **as written**: scheme, host, port, path and query all have to match. `https://app.example.com/cb`
+and `https://app.example.com/cb/` are two different URIs.
+
+There is exactly one liberty, the one RFC 8252 §7.3 requires: a client whose application type is
+**native** redirecting to `http:` on a loopback host may use any port. Everything else still matches
+exactly. It is deliberately narrow —
+
+- native clients only; a web client's redirect is a real host it controls, so nothing about it is
+  ephemeral;
+- `http:` on a loopback host only; a claimed-`https` or private-scheme redirect stays exact;
+- and `localhost` and `127.0.0.1` are **not** treated as interchangeable. Register both forms if
+  your client might use either.
+
+What stays open is a local port race — another process on the user's machine could bind the port and
+receive the code. PKCE is what closes it, which is why it is mandatory.
+
+## Which users a client signs in
+
+Login routing is a property of the project, not of the client:
+
+1. the reserved console client always goes to the administrator bucket;
+2. a client assigned to a project goes to **that project's bucket**;
+3. anything else — an unassigned or dynamically registered client — goes to the default `redfox`
+   bucket.
+
+So a client with no project signs users in from the default bucket, which is rarely what you want.
+Set the project's bucket.
+
+The bucket is also where onboarding policy lives, not the client: whether registration is open
+(`registrationOpen`), whether a new account must verify its e-mail
+(`emailVerificationRequired`), whether that happens by link or by six-digit code
+(`verificationMethod`), whether password sign-in is offered at all (`passwordLogin`), and whether an
+authenticator app is required (`totpRequired`). Two clients in the same project share all of it,
+because they share the accounts.
+
+<Aside type="note">
+
+Consent is on by default (`consent.require` defaults to `true` for a new client), so the first
+authorization request will show a consent screen. The reserved console client is the exception —
+it is first-party and skips it.
+
+</Aside>
+
+Next: [get your first token](/docs/get-started/first-token/).

@@ -6,6 +6,10 @@
 @import 'tailwindcss/theme.css' layer(theme);
 @import 'tailwindcss/utilities.css' layer(utilities);
 
+/* `prose` for the root documents (changelog, security policy, license), which are rendered from
+   the repository's own Markdown and so carry no per-element classes of their own. */
+@plugin '@tailwindcss/typography';
+
 @theme {
 	--color-accent-50: oklch(0.97 0.02 40);
 	--color-accent-200: oklch(0.88 0.08 40);

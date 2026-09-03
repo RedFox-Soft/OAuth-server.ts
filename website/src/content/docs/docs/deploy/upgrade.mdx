@@ -1,0 +1,95 @@
+---
+title: Upgrading
+description: Read the changelog, move the tag, re-run db:setup, restart — and what each of those four steps is actually for.
+sidebar:
+  order: 6
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+An upgrade is four steps, and skipping the third is the one that produces a deployment that looks
+fine and is subtly broken.
+
+<Steps>
+
+1. **Read the changelog.** [The changelog](/changelog/) is kept per release; every entry that needs
+   an operator action says so. Releases are also on
+   [GitHub](https://github.com/RedFox-Soft/OAuth-server.ts/releases).
+
+2. **Move to the new version.** Change the pinned image tag, or pull the new git tag and rebuild:
+
+   ```bash
+   git fetch --tags
+   git checkout v0.1.0
+   bun install
+   bun run build
+   ```
+
+3. **Re-run the provisioning step** against the same database:
+
+   ```bash
+   bun run db:setup
+   ```
+
+4. **Restart the server.**
+
+</Steps>
+
+## Why step 3 is not optional
+
+`db:setup` is the only thing that applies a release's structural changes, and it is idempotent — it
+upserts, so running it against an already-current database changes nothing. What a release can add:
+
+- **New collections**, for a capability that did not exist before.
+- **New indexes** — including TTL indexes. A collection that MongoDB auto-creates on first write has
+  no TTL index, so documents that were meant to expire simply do not, and nothing complains. It also
+  drops stale expiry indexes that a release has stopped writing the field for.
+- **Seed changes.** When a release changes the admin seed — a new reserved client, a new field on
+  the administrator bucket, a group the ownership model now expects — `db:setup` is what applies it.
+  The reserved `admin-mcp` agent client arrived exactly this way, and the script carries an explicit
+  `$addToSet` for it because `$setOnInsert` would not touch a project that already existed.
+
+`db:setup` exits non-zero when a constraint it declares is not in force, so make it a gate rather
+than a fire-and-forget: the shipped `fly.toml` runs it as `release_command` and Fly aborts the deploy
+on failure; the Compose files run it as a `setup` service the server `depends_on` with
+`service_completed_successfully`; on Kubernetes it is a Job you wait for.
+
+<Aside type="caution">
+
+Re-running `db:setup` does **not** repair a changed `ISSUER`. The console client's redirect URI is
+written once, with `$setOnInsert`, when the client is first created. If the public URL of a
+deployment has to change, plan for fixing that client's redirect URI through the console (or the
+admin API) as part of the change.
+
+</Aside>
+
+## What a restart carries, and what it does not
+
+- **Server settings are boot-only.** Everything on `ApplicationConfig` — every feature flag, every
+  rate-limit number — is read from the config store and applied at module load. A change you made
+  in the console last week takes effect at this restart, which makes an upgrade a good moment to
+  re-read the [settings reference](/docs/reference/settings/) for anything the release added. The
+  console says as much when you save.
+- **Signing keys persist in the database**, through the `jwksStore` adapter, and are loaded once at
+  startup. An upgrade neither rotates nor invalidates them: tokens issued before it still verify,
+  and `/jwks` serves the same key set. Keys are not environment configuration and there is nothing
+  to carry across by hand.
+- **SMTP settings are the exception** to boot-only: they are read live from the settings store, so
+  they apply without a restart.
+- **Tokens, sessions and grants survive**, since they live in MongoDB. Users are not signed out by
+  an upgrade.
+
+## After the restart
+
+```bash
+curl -sf https://auth.example.com/health
+curl -s https://auth.example.com/.well-known/openid-configuration | jq -r .issuer
+```
+
+The second is the check worth automating — the shipped deploy workflow does exactly this, because
+the advertised issuer is the one value a deploy can get wrong in a way nothing else catches.
+
+Then open `/admin` and sign in. That single act exercises the seed, the console client, the
+administrator bucket and the authorization code flow at once, so if it works, the upgrade landed.
+Super administrators should also glance at **Faults**: only genuine defects are recorded there —
+routine client rejections never are — so anything new after an upgrade is worth reading.

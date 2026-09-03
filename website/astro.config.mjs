@@ -19,19 +19,21 @@ export default defineConfig({
 				}
 			],
 			customCss: ['./src/styles/global.css'],
-			// The docs landing page links to Get started / Deploy (Task 4), which don't exist yet.
-			// /docs/reference/** stays excluded permanently, not just until this task lands: the six
-			// Reference pages are src/pages/**/*.astro routes, not docs-collection Markdown/MDX, so
-			// starlight-links-validator never has heading data for them (it only instruments the
-			// markdown/MDX processor) and unconditionally reports InvalidLinkToCustomPage for a link
-			// to any such route, whether or not the target exists — see validateLink() in
-			// starlight-links-validator/libs/validation.ts. Task 4 should remove the other two.
+			// Everything excluded here is a src/pages/**/*.astro route rather than docs-collection
+			// Markdown/MDX: the six Reference pages, and the three root documents rendered from the
+			// repository's own CHANGELOG/SECURITY/LICENSE. starlight-links-validator only instruments
+			// the markdown/MDX processor, so it never has heading data for such a route and
+			// unconditionally reports InvalidLinkToCustomPage for a link to one, whether or not the
+			// target exists — see validateLink() in starlight-links-validator/libs/validation.ts.
+			// The exclusion is permanent for that reason, not a placeholder. Docs-collection links
+			// (/docs/get-started/**, /docs/deploy/**) are validated normally.
 			plugins: [
 				starlightLinksValidator({
 					exclude: [
 						'/docs/reference/**',
-						'/docs/get-started/**',
-						'/docs/deploy/**'
+						'/changelog/',
+						'/security/',
+						'/license/'
 					]
 				}),
 				starlightLlmsTxt()

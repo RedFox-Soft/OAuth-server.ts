@@ -1,0 +1,25 @@
+---
+/*
+ * TEMPORARY layout — Task 6 replaces it with the real site chrome. It exists now because the root
+ * document pages and the styleguide need a page shell before that lands.
+ */
+interface Props {
+	title: string;
+	description: string;
+	noindex?: boolean;
+}
+const { title, description, noindex = false } = Astro.props;
+---
+
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>{title}</title>
+		<meta name="description" content={description} />
+		{noindex && <meta name="robots" content="noindex" />}
+	</head>
+	<body>
+		<slot />
+	</body>
+</html>

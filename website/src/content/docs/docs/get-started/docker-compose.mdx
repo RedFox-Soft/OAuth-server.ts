@@ -1,0 +1,84 @@
+---
+title: Run with Docker Compose
+description: Start MongoDB, provision the schema and serve the authorization server with one command.
+sidebar:
+  order: 1
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+The fastest way to see a working authorization server is the Compose file the repository ships. It
+brings up three services — MongoDB, a one-shot provisioning step, and the server — and needs no
+configuration beyond the one value discussed below.
+
+**Prerequisites:** Docker with Compose v2 (`docker compose`, not the older `docker-compose`).
+
+## Bring it up
+
+<Steps>
+
+1. Fetch the Compose file:
+
+   ```bash
+   curl -O https://raw.githubusercontent.com/RedFox-Soft/OAuth-server.ts/main/docker-compose.yml
+   ```
+
+2. Decide the `ISSUER` value now — see the warning below — and edit it in `docker-compose.yml` if
+   `http://localhost:3000` is not where a browser will reach this server.
+
+3. Start everything:
+
+   ```bash
+   docker compose up
+   ```
+
+4. Open the console at `http://localhost:3000/admin`. The first visit shows a one-time setup screen
+   that creates the initial super administrator.
+
+</Steps>
+
+## What the three services do
+
+| Service | Image                                        | Role                                                                                                              |
+| ------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `mongo` | `mongo:8`                                    | The datastore, on a named `mongo-data` volume, with a `mongosh` ping healthcheck the other services wait for      |
+| `setup` | `ghcr.io/redfox-soft/oauth-server-ts:latest` | Runs `bun run db:setup` once and exits: collections, indexes, the initial RS256 signing key, the admin panel seed |
+| `oauth` | `ghcr.io/redfox-soft/oauth-server-ts:latest` | The server itself on port 3000, started only after `setup` completes successfully                                 |
+
+The ordering is load-bearing rather than tidy. Without the reserved admin project, bucket and
+`admin-panel` client that `setup` seeds, the console's sign-in redirects to a client no `Client`
+document matches — and the first-run setup page still works, which makes it look like a login bug.
+`setup` is idempotent, so re-running `docker compose up` after pulling a newer image is also the
+upgrade path.
+
+<Aside type="caution" title="Set ISSUER before the first docker compose up">
+
+`ISSUER` must be the URL a browser reaches the server at, and it must be final **before** the first
+`up`. The seeded admin client's redirect URI is derived from it once, with `$setOnInsert`, and a
+later change is not repaired by re-running `db:setup`.
+
+If you have already started with the wrong value, the workaround is to delete the datastore and
+start again:
+
+```bash
+docker compose down -v   # removes the mongo-data volume
+# edit ISSUER in docker-compose.yml
+docker compose up
+```
+
+Note that this destroys every account, client and signing key in that volume, so it is a first-day
+fix and not an operational one. On a deployment that already has data, seed a correctly named client
+through the console instead.
+
+</Aside>
+
+## Where to go next
+
+- The console: `http://localhost:3000/admin` — [create the first administrator](/docs/get-started/first-admin/).
+- The discovery document, which is the authoritative list of endpoint URLs for a client library:
+  `http://localhost:3000/.well-known/openid-configuration`.
+- The key set: `http://localhost:3000/jwks`.
+- A liveness probe that is never rate-limited: `http://localhost:3000/health`.
+
+For a production-leaning Compose file — pinned tags, an external database, a TLS proxy in front —
+see [Deploy with Docker Compose](/docs/deploy/docker-compose/).

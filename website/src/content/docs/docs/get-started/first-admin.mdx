@@ -1,0 +1,90 @@
+---
+title: Create the first administrator
+description: The one-time setup screen, how administrator sign-in works, and the second factor to turn on before anything else.
+sidebar:
+  order: 3
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+The server administers itself. There is no seeded password to look up in a log and no
+`create-admin` command — the first administrator is created from the browser, once.
+
+<Steps>
+
+1. Open `/admin` on a freshly provisioned deployment, for example
+   `http://localhost:3000/admin`.
+
+2. The **Create the first super admin** screen asks for an e-mail address and a password of at
+   least twelve characters. The account goes into the reserved "Administrators" user bucket with
+   the `super_admin` role, and gets a personal group like any other administrator.
+
+3. Submit, then sign in with those credentials.
+
+</Steps>
+
+The setup route closes as soon as any `super_admin` exists — it answers `409 already_initialized`
+from then on. `/admin` becomes a sign-in, and further administrators are created from inside the
+console under **Admins**: an e-mail address, a password of at least twelve characters, and one or
+both of the `super_admin` and `project_admin` roles. (Group membership, separately, is offered by
+e-mail invitation.) If you reach a setup screen on a deployment that is supposed to have
+administrators, that is worth investigating: it means the account collection this server reads
+holds none.
+
+<Aside type="caution">
+
+`/admin` is a login screen open to the internet. Nothing about the first-run flow is authenticated —
+it cannot be, since no account exists yet — so provision the first administrator immediately after
+the deployment comes up, and do not leave a reachable, un-provisioned instance sitting around.
+
+</Aside>
+
+## Administrators sign in through this server's own issuer
+
+Signing in to the console is an OpenID Connect authorization code flow against the very server the
+console administers, using the first-party `admin-panel` client that `db:setup` seeds. There is no
+second password store and no admin-only credential path: an administrator is an end-user in the
+reserved administrator bucket, holding a role that the admin API checks.
+
+Two consequences follow, and both come up in practice:
+
+- The seeded client's redirect URI is `$ISSUER/admin/callback`, written once when the client is
+  first inserted. If `ISSUER` changed after the seed, sign-in redirects to a URI the client does not
+  have and fails; re-running `db:setup` does not repair it. See the
+  [Compose guide's warning](/docs/get-started/docker-compose/) for what to do about it.
+- The console cannot be reached without the seed. If `db:setup` never ran, `/admin/login` redirects
+  to `/auth` with a `client_id` no client matches.
+
+## Turn on the second factor
+
+The administrator bucket is a password door on the public internet, so require an authenticator app
+on it before you do anything else. In the console, go to **Admins** (super administrators only) and
+switch on **Require an authenticator app**.
+
+Signing in then needs a six-digit code as well as a password. Nobody is locked out by turning it on:
+administrators without an authenticator enrol one at their next sign-in. That includes an agent
+signing in through the console's own client, since it uses the same door.
+
+This matters more than it looks. Failed password attempts are counted per bucket and address, and an
+address that reaches the cap is refused for a while — but a bucket that requires a one-time code
+deliberately stays at the first lockout window however often it is tripped, because a guessed
+password there does not sign anyone in. Administrators also have no self-service password reset to
+escape a lockout with. The way to make that door properly hard is the second factor, not the
+throttle. The throttle's own settings are `loginThrottle.failureCap`,
+`loginThrottle.windowSeconds` and `loginThrottle.windowCeilingSeconds` in the
+[settings reference](/docs/reference/settings/#loginThrottle.failureCap).
+
+## What an administrator can reach
+
+The console's super-admin surface covers the instance itself: server settings, signing keys, SMTP,
+administrator accounts and the fault store. A project administrator creates projects, buckets and
+groups, invites people into their groups by e-mail, and reads the audit trail for their own
+groups. Ownership is by group: belonging to a container's owning group is what grants access to
+it.
+
+Every state-changing action — the console's and an agent's alike — is written to an append-only
+audit trail before the mutation, naming the actor, the action and the target. The store exposes no
+update or delete.
+
+If you found a security problem rather than a configuration one, the project's disclosure policy and
+contact are on the [security page](/security/).

@@ -1,0 +1,96 @@
+---
+title: Run from source
+description: Clone the repository, provision the database and start the server with Bun.
+sidebar:
+  order: 2
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+Running from source is the path for development, for reading the code alongside a live server, and
+for any deployment that wants to build its own image.
+
+**Prerequisites:** [Bun](https://bun.sh/) v1.3 or newer, and a MongoDB instance you can reach.
+
+<Steps>
+
+1. Clone and install:
+
+   ```bash
+   git clone https://github.com/RedFox-Soft/OAuth-server.ts.git
+   cd OAuth-server.ts
+   bun install
+   ```
+
+2. Create a `.env` file with the three required variables:
+
+   ```ini
+   ISSUER=http://localhost:3000
+   MONGODB_URI=mongodb://localhost:27017
+   DATABASE_NAME=OAuth
+   ```
+
+   Bun loads `.env` automatically; nothing else needs configuring. Each variable is described in the
+   [environment variables reference](/docs/reference/environment/). `ISSUER` is the canonical public
+   URL of this server: the `iss` of every token, the base of every endpoint in discovery, and the
+   redirect target of the admin console client — so set it to its final value before the next step.
+
+3. Provision the database:
+
+   ```bash
+   bun run db:setup
+   ```
+
+4. Bundle the console and the sign-in screens into `public/`:
+
+   ```bash
+   bun run build
+   ```
+
+5. Start the server:
+
+   ```bash
+   bun start
+   ```
+
+   It listens on port 3000. Open `http://localhost:3000/admin` for the console, or
+   `http://localhost:3000/.well-known/openid-configuration` for the discovery document.
+
+</Steps>
+
+## What `bun run db:setup` provisions
+
+`db:setup` runs `database/mongodb.ts` against `MONGODB_URI` / `DATABASE_NAME` and is the one step
+that turns an empty database into a working deployment:
+
+- **Collections**, one per storage area the server writes to.
+- **Indexes**: the TTL indexes that expire tokens, codes, sessions and interactions, and the unique
+  e-mail index on each bucket's end-user collection. It also drops stale expiry indexes left on
+  collections that no longer write the field.
+- **The initial RS256 signing key**, persisted through the `jwksStore` adapter — which is why keys
+  are not an environment variable here. (If the server ever starts against an empty key store it
+  generates and persists one itself.)
+- **The admin panel seed**: the reserved admin project, its "Administrators" user bucket with
+  registration closed, the first-party `admin-panel` OAuth client whose redirect URI is
+  `$ISSUER/admin/callback`, the reserved `admin-mcp` agent client, the system group that holds
+  containers no administrator manages, and the default `redfox` end-user bucket.
+
+It is **idempotent**: every write is an upsert or a create-if-absent, so running it again changes
+nothing that already exists. Re-run it after upgrading an existing install — a release that adds a
+collection, an index or a seeded document applies it here and nowhere else.
+
+<Aside type="note">
+
+`db:setup` exits non-zero when a constraint it declares is not in force — a unique index it could
+not create because the data already violates it, for instance. A deployment pipeline should treat
+that as a failed deploy rather than a warning; the shipped `fly.toml` does exactly that.
+
+</Aside>
+
+## Notes
+
+- The admin console needs a MongoDB-backed deployment. Setting `NODE_ENV=test` swaps in the
+  in-memory adapter, which does not persist the seed across restarts.
+- Server settings are read at boot from the config store and applied at module load, so a change in
+  the console takes effect at the next restart. Every one of them is listed in the
+  [settings reference](/docs/reference/settings/).
