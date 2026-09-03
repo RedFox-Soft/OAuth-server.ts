@@ -302,4 +302,83 @@ describe('sentry redaction', () => {
 		expect(tags.route).toBe('/redact-pattern/:id');
 		expect(serialized()).not.toContain('ZZobjectidZZ');
 	});
+
+	/*
+	 * The code location is now sent, so these three assertions are the ones standing between "we tell
+	 * an operator where it broke" and "we told a third party what a caller posted".
+	 *
+	 * A stack is the vehicle, because a stack's first line is the error message and an interpolated
+	 * message is the likeliest way a token or a secret reaches a diagnostic record by accident. The
+	 * store never keeps one; this proves none was reconstructed on the way out either.
+	 */
+	it('carries a code location but never a stack', async () => {
+		await provoke('/redact-frames', new Request('http://e.ly/redact-frames'));
+		const [event] = capturedEvents();
+		const fault = (event.contexts as Record<string, Record<string, unknown>>)
+			.fault;
+
+		expect(fault.codeLocation).toBeDefined();
+
+		/*
+		 * `source.ts:line:col` is a frame's signature, and nothing this server sends carries a column —
+		 * the projected location has a line and stops there. Matching on it catches a stack arriving by
+		 * any route: a raw `error.stack`, a serialized Error, a frame string assembled here.
+		 *
+		 * Anchored on the file extension rather than on `:\d+:\d+` alone, which a bare time of day
+		 * satisfies — the envelope header's own `sent_at` contains `19:34:19`.
+		 */
+		expect(serialized()).not.toMatch(/\.[cm]?[jt]s:\d+:\d+/);
+		expect(serialized()).not.toContain('deliberate fault\n');
+	});
+
+	/*
+	 * The message is permitted and the location is permitted; the message inside the location is not.
+	 * That is the one combination that would mean the parser had stopped stripping it, and it would be
+	 * invisible from the outside — the event would look conformant and read plausibly.
+	 */
+	it('never carries the fault message inside the code location', async () => {
+		const app = new Elysia()
+			.onError(errorHandler)
+			.get('/redact-in-frame', () => {
+				throw new Error(`fault touching ${SENTINELS.password}`);
+			});
+		await app.handle(new Request('http://e.ly/redact-in-frame'));
+		await flushForTest();
+		await flushSentry();
+
+		const [event] = capturedEvents();
+		const fault = (event.contexts as Record<string, Record<string, unknown>>)
+			.fault;
+		expect(JSON.stringify(fault.codeLocation)).not.toContain(
+			SENTINELS.password
+		);
+		expect(JSON.stringify(fault.codeLocation)).not.toContain('fault touching');
+	});
+
+	/*
+	 * Tags are what an operator filters on, which makes them the one place unbounded cardinality
+	 * actually costs something. Every value here must come from the route pattern, the classification,
+	 * the code location, the reference or the client — never from request content.
+	 */
+	it('carries no request value in any searchable tag', async () => {
+		const app = new Elysia()
+			.onError(errorHandler)
+			.get('/redact-tags/:id', () => {
+				throw new Error(`deliberate fault for ${SENTINELS.state}`);
+			});
+		await app.handle(
+			new Request(
+				`http://e.ly/redact-tags/ZZtagpathZZ?state=${SENTINELS.state}`
+			)
+		);
+		await flushForTest();
+		await flushSentry();
+
+		const tags = capturedEvents()[0].tags as Record<string, string>;
+		const values = JSON.stringify(Object.values(tags));
+		expect(values).not.toContain('ZZtagpathZZ');
+		expect(values).not.toContain(SENTINELS.state);
+		/* The message may vary per occurrence, so it must not have reached a tag either. */
+		expect(values).not.toContain('deliberate fault');
+	});
 });

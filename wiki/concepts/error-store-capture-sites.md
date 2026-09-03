@@ -51,3 +51,5 @@ That coupling is structural: `captureFault` returns the reference only when it r
 - [[error-store-is-not-flag-gated]] — why the read surface is not gated despite having a flag
 - [[feature-flag-gating]] — the mechanism the error store deliberately does not use
 - [[admin-audit-trail]] — the other append-only record, and the opposite trade on write failure
+- [[two-meanings-of-origin]] — what happens to a captured occurrence on the way out, and the field
+  name that means two different things

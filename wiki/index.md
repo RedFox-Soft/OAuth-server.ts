@@ -53,6 +53,7 @@ When this file exceeds ~300 lines or the wiki passes ~150 pages, shard into `wik
 - [[upstream-federation]] — a bucket may accept sign-in through external OIDC providers; the flow is three hops because the interaction cookie provably cannot survive the trip to an upstream, both round-trip records are keyed by a digest of the value they never store, and linking to an existing account needs operator trust *and* a verified assertion.
 - [[rich-authorization-requests]] — `authorization_details` end to end on the code and refresh flows; the declared parameter schema is a runtime coercion contract, and details reach a token only when a resource server resolves.
 - [[token-payload-access-contract]] — model state lives under `.payload.*`; reading a bare field yields `undefined` silently, and payload schemas are composed per token type.
+- [[two-meanings-of-origin]] — `origin` names the caller's network address on the record and the code location on the occurrence, so the outbound event carries both under different names and must never merge them; the location is sendable only because no stack is kept, the permitted list is enforced one level deep, and grouping cannot be disturbed because a client fingerprint suppresses the destination's algorithm entirely.
 - [[totp-second-factor]] — one bucket boolean turns a password door into a two-key one; the algorithm is in-repo because the RFCs publish test vectors, and four placements of state buy deletion integrity, expiry, un-guessable enrolment and a throttle that survives a new interaction for free.
 
 ## Synthesis

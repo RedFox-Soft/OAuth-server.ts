@@ -1,4 +1,4 @@
-import type { ErrorSurface } from '../adapters/types.js';
+import type { ErrorOrigin, ErrorSurface } from '../adapters/types.js';
 
 /*
  * What may leave this server toward Sentry, named exhaustively.
@@ -24,7 +24,20 @@ export interface SentryFailureEvent {
 	fingerprint: string;
 	reference: string;
 	clientId: string | null;
+	/*
+	 * The caller's NETWORK address, at whatever level the store applied — not a code location, despite
+	 * `ErrorOccurrence.origin` internally being exactly that. The two are one rename away from being
+	 * confused, and confusing them is the worst outcome available here: this field already ships, so
+	 * repurposing it would leave an operator's saved filters working and quietly meaning something
+	 * else. `codeLocation` below is the code one. Neither name may migrate onto the other.
+	 */
 	origin: string | null | 'not-captured';
+	/*
+	 * Where in the server the fault arose, copied from the record rather than derived. The record
+	 * parses it out of the stack with the message discarded, so it is the one form of "where" that is
+	 * already known to carry no request data — which is why this is sendable and a raw stack is not.
+	 */
+	codeLocation: ErrorOrigin;
 	/* Names only — never values. */
 	submittedFields: string[];
 	environment: string;
@@ -51,11 +64,26 @@ export const PERMITTED_EVENT_KEYS = [
 	'reference',
 	'clientId',
 	'origin',
+	'codeLocation',
 	'submittedFields',
 	'environment',
 	'instance',
 	'release'
 ] as const satisfies readonly (keyof SentryFailureEvent)[];
+
+/*
+ * The same enumeration one level down, because permission that stops at a boundary is not permission.
+ *
+ * `codeLocation` is the only field on the event with an interior, and an interior the outer check
+ * cannot see is exactly where a request identifier would end up being added a year from now — shipped
+ * to a third party with no test failing. Enumerating it makes that addition a decision someone has to
+ * make on purpose, which is the same bargain the outer list strikes.
+ */
+export const PERMITTED_LOCATION_KEYS = [
+	'file',
+	'line',
+	'frame'
+] as const satisfies readonly (keyof ErrorOrigin)[];
 
 /*
  * A startup failure, reported before the error store exists.

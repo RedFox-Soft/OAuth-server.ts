@@ -11,6 +11,19 @@ of the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- Reported faults now name where in the server they happened (spec 035). An operator paged about a
+  failure could see which endpoint broke but not which line broke it, and had to open the internal
+  console and look the reference up to find out — while every fault on one endpoint arrived under a
+  byte-identical title, so a list of alerts could not be scanned at all. A reported fault now carries
+  the code location the internal record already held, is titled with the diagnostic message rather
+  than a synthetic endpoint string, and is located by a second line built from the method, the route
+  pattern and that code location. The file is also a searchable tag, so an operator can ask what is
+  failing in one part of the server rather than only inspecting one fault at a time. Grouping is
+  untouched: the store's own key is still the only thing the destination groups on, and it already
+  incorporated the code location. Nothing else was widened — the location joined the explicit list of
+  permitted outbound fields, which is now enforced one level deeper so a value added inside it later
+  cannot ship unnoticed, and a raw stack, an error object, or a frame still carrying the failure
+  message remain unsendable.
 - Optional Sentry reporting for recorded faults (spec 034). The error store already kept a durable
   record of every unexpected internal fault, but nothing told anyone one had happened — an operator
   learned about a failure by going to look for it. With `sentry.enabled` on and an ingestion

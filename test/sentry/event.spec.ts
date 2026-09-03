@@ -1,8 +1,12 @@
 import { describe, it, expect } from 'bun:test';
 
 import type { ErrorOccurrence, ErrorRecord } from 'lib/adapters/types.ts';
-import { projectFault } from 'lib/sentry/event.ts';
-import { PERMITTED_EVENT_KEYS } from 'lib/sentry/types.ts';
+import { projectFault, unpermittedKeys } from 'lib/sentry/event.ts';
+import {
+	PERMITTED_EVENT_KEYS,
+	PERMITTED_LOCATION_KEYS,
+	type SentryFailureEvent
+} from 'lib/sentry/types.ts';
 
 /*
  * The projection, tested as a closed shape.
@@ -96,13 +100,25 @@ describe('sentry event projection', () => {
 	});
 
 	/*
-	 * The code location lives on the occurrence and is deliberately not projected: it is not on the
-	 * permitted list. Pinned so that adding it becomes a decision someone makes on purpose.
+	 * Copied, not rebuilt. A projection that reformatted the location could widen it — an untruncated
+	 * path, a re-derived frame — and the whole point of taking the record's value is that the record's
+	 * value is the one already known to carry no request data.
 	 */
-	it('does not project the internal code location', () => {
+	it('projects the internal code location verbatim', () => {
 		const event = projectFault(occurrence, labels);
-		expect(JSON.stringify(event)).not.toContain('tokenAction');
-		expect(JSON.stringify(event)).not.toContain('lib/actions/token.ts');
+		expect(event.codeLocation).toEqual(occurrence.origin);
+	});
+
+	/*
+	 * The inner list, asserted the same way as the outer one and for the same reason. Without this the
+	 * permitted-key guarantee would stop at `codeLocation`'s boundary, and a field added inside it
+	 * later would reach a third party with nothing failing.
+	 */
+	it('projects exactly the permitted location key set', () => {
+		const event = projectFault(occurrence, labels);
+		expect(Object.keys(event.codeLocation).sort()).toEqual(
+			[...PERMITTED_LOCATION_KEYS].sort()
+		);
 	});
 
 	/* The network origin passes through at whatever level the store already applied, never widened. */
@@ -138,5 +154,86 @@ describe('sentry event projection', () => {
 		const event = projectFault(occurrence, { ...labels, release: '2026.09' });
 		expect(event.release).toBe('2026.09');
 		expect(Object.keys(event).sort()).toEqual([...PERMITTED_EVENT_KEYS].sort());
+	});
+});
+
+/*
+ * The guard, exercised directly rather than only through the projection.
+ *
+ * The projection cannot produce a forbidden key, so going through it would prove nothing about the
+ * guard — every case below has to be constructed by hand, which is exactly the situation the guard
+ * exists for: an event that came from somewhere other than `projectFault`.
+ */
+describe('sentry permitted-key guard', () => {
+	it('accepts a conformant event', () => {
+		expect(unpermittedKeys(projectFault(occurrence, labels))).toEqual([]);
+	});
+
+	it('names a forbidden top-level field', () => {
+		const event = {
+			...projectFault(occurrence, labels),
+			userAgent: 'Mozilla/5.0'
+		} as unknown as SentryFailureEvent;
+		expect(unpermittedKeys(event)).toEqual(['userAgent']);
+	});
+
+	/*
+	 * The case the inner list was added for. A subset check at the top level would pass this event
+	 * happily, because `codeLocation` is itself permitted — the offence is inside it.
+	 */
+	it('names a forbidden field inside the code location', () => {
+		const event = {
+			...projectFault(occurrence, labels),
+			codeLocation: {
+				file: 'lib/actions/token.ts',
+				line: 42,
+				frame: 'tokenAction',
+				requestId: 'req-1'
+			}
+		} as unknown as SentryFailureEvent;
+		expect(unpermittedKeys(event)).toEqual(['codeLocation.requestId']);
+	});
+
+	it('reports the offending path, not just the offending name', () => {
+		const event = {
+			...projectFault(occurrence, labels),
+			codeLocation: { file: 'f', line: 1, frame: 'x', stack: 'at ...' }
+		} as unknown as SentryFailureEvent;
+		/* `codeLocation.stack`, never a bare `stack` — the reader needs to know where to look. */
+		expect(unpermittedKeys(event)).toEqual(['codeLocation.stack']);
+	});
+
+	/*
+	 * Absent is an offence, not a pass. An event without a location did not come from the projection,
+	 * and unknown provenance is the thing being refused.
+	 */
+	it('refuses an event whose code location is missing', () => {
+		const { codeLocation: _dropped, ...rest } = projectFault(
+			occurrence,
+			labels
+		);
+		expect(unpermittedKeys(rest as SentryFailureEvent)).toEqual([
+			'codeLocation'
+		]);
+	});
+
+	it('refuses an event whose code location is not an object', () => {
+		const event = {
+			...projectFault(occurrence, labels),
+			codeLocation: 'lib/actions/token.ts:42'
+		} as unknown as SentryFailureEvent;
+		expect(unpermittedKeys(event)).toEqual(['codeLocation']);
+	});
+
+	it('reports offences at both levels together', () => {
+		const event = {
+			...projectFault(occurrence, labels),
+			actor: { id: 'user-1' },
+			codeLocation: { file: 'f', line: 1, frame: 'x', secret: 'shh' }
+		} as unknown as SentryFailureEvent;
+		expect(unpermittedKeys(event).sort()).toEqual([
+			'actor',
+			'codeLocation.secret'
+		]);
 	});
 });

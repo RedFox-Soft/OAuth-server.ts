@@ -96,20 +96,76 @@ async function drainOnce(): Promise<void> {
 }
 
 /*
+ * The line an operator reads beneath the headline, and the reason two faults on one endpoint can be
+ * told apart at a glance.
+ *
+ * Built from the method, the route pattern and the code location, and from nothing else — so it is
+ * identical for every occurrence in a group. That determinism is what makes it readable as an
+ * identity: the headline moves with the message, this does not. A concrete path here would produce
+ * one line per identifier that ever hit the endpoint, which is the failure the route *pattern* exists
+ * to avoid.
+ *
+ * Degrades rather than disappearing, because the faults hardest to place are the ones an operator
+ * most needs to be able to read.
+ */
+function locatorOf(event: SentryFailureEvent): string {
+	const endpoint = `${event.method} ${event.route}`;
+	const { file, line, frame } = event.codeLocation;
+
+	if (file === 'unknown') {
+		return `${endpoint} (unknown)`;
+	}
+
+	const at = line === null ? file : `${file}:${line}`;
+	/*
+	 * The parser sets `frame` to the file when it could not read a function name. Printing it anyway
+	 * would present a filename as a function that exists in the source — a false claim about the code,
+	 * and a confusing one to act on.
+	 */
+	return frame === file
+		? `${endpoint} (${at})`
+		: `${endpoint} ${frame} (${at})`;
+}
+
+/*
+ * The title. The diagnostic message, which is what actually distinguishes one fault from another.
+ *
+ * It used to be `errorCode method route`, identical for every fault on an endpoint, while the message
+ * sat in a context object nobody reads without opening the alert. The message may interpolate request
+ * values and so may vary between occurrences of one group; that is tolerable here and nowhere else,
+ * because grouping is pinned by the fingerprint and because the message already left this server as
+ * `contexts.fault.detail`. It is not licence to put anything further from the request in this string.
+ */
+function headlineOf(event: SentryFailureEvent): string {
+	const detail = event.message.trim();
+	/*
+	 * A blank message would leave nothing at all to read, which is worse than the identical titles
+	 * this replaced. Falls back to the format that shipped before.
+	 */
+	return detail
+		? `${event.errorCode}: ${detail}`
+		: `${event.errorCode} ${event.method} ${event.route}`;
+}
+
+/*
  * Hands one event to the SDK.
  *
  * The mapping is the contract. `fingerprint` is set so Sentry groups exactly as the store does, the
  * searchable identifiers become tags, and everything else rides in one context object. The `request`
  * slot is never populated — the SDK offers one, and leaving it empty is what keeps the request URL,
  * headers and body out of the event.
+ *
+ * `message` and `transaction` are inputs to nothing but presentation: a client-supplied `fingerprint`
+ * with no `{{ default }}` suppresses the destination's own grouping algorithm entirely, so how these
+ * two read cannot split a group, merge two, or reorder anything.
  */
 function send(event: SentryFailureEvent): void {
 	captureEvent({
-		message: `${event.errorCode} ${event.method} ${event.route}`,
+		message: headlineOf(event),
 		level: 'error',
 		timestamp: event.at.getTime() / 1000,
 		fingerprint: [event.fingerprint],
-		transaction: `${event.method} ${event.route}`,
+		transaction: locatorOf(event),
 		environment: event.environment,
 		server_name: event.instance,
 		...(event.release ? { release: event.release } : {}),
@@ -120,6 +176,15 @@ function send(event: SentryFailureEvent): void {
 			route: event.route,
 			method: event.method,
 			status: String(event.status),
+			/*
+			 * The file alone, so an operator can ask "what is wrong in this part of the server?" — the
+			 * question a per-fault view cannot answer. Sent verbatim, including the literal 'unknown',
+			 * because an absent tag would leave unplaceable faults unfilterable as a set.
+			 *
+			 * Not the line or the function. A tag's cost is cardinality, filtering to one line is what
+			 * the group already is, and both stay readable in the locator and the fault context.
+			 */
+			codeFile: event.codeLocation.file,
 			/* Omitted rather than sent as the string "null" when the fault has no client. */
 			...(event.clientId ? { clientId: event.clientId } : {})
 		},
@@ -127,6 +192,13 @@ function send(event: SentryFailureEvent): void {
 			fault: {
 				detail: event.message,
 				origin: event.origin,
+				/*
+				 * Structured, not the rendered string the transaction carries. The two are for different
+				 * jobs: the transaction is scanned in a list, this is read while acting on one fault, and
+				 * a reader following it back to source wants the line as a number rather than as text
+				 * they have to pick out of a sentence.
+				 */
+				codeLocation: event.codeLocation,
 				submittedFields: event.submittedFields
 			}
 		}
