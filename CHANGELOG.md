@@ -2,12 +2,18 @@
 
 All notable changes to this project are documented here.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). No release has
-been cut yet — everything below is unreleased. Spec numbers refer to the (untracked) `specs/`
-directories; open work is tracked as GitHub issues; full retrospectives live in the git history
-of the retired `TASKS.md` and in the knowledge base at `wiki/`.
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow
+[Semantic Versioning](https://semver.org/). Spec numbers refer to the (untracked) `specs/`
+directories; open work is tracked as GitHub issues; full retrospectives live in the git history of
+the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
+
+_Nothing yet._
+
+## [0.1.0] - 2026-09-03
+
+The first tagged release: everything the server accumulated before a version number existed.
 
 ### Added
 
@@ -294,3 +300,6 @@ found`. The refusal text existed and never ran: the call that delivered it sat i
   live keystore before trusting it — previously a documented decode-only shortcut (spec 017)
 - The DPoP nonce secret is self-provisioned at startup, making the requireNonce-without-secret 500
   state unrepresentable (spec 014)
+
+[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/RedFox-Soft/OAuth-server.ts/releases/tag/v0.1.0

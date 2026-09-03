@@ -1,0 +1,52 @@
+# Quick Start: MongoDB, a one-shot schema provisioning step, and the server.
+#
+#   docker compose up
+#   open http://localhost:3000/admin
+#
+# The setup service runs `bun run db:setup` and exits. It must finish before the server starts:
+# without the reserved admin project, bucket and client it seeds, the console's sign-in redirects to
+# a client that does not exist (fly.toml records the same ordering for the same reason). It is
+# idempotent, so re-running `docker compose up` after pulling a newer image is the upgrade path.
+#
+# ISSUER must be the URL a browser reaches the server at. Set it to its final public URL BEFORE the
+# first `docker compose up`: the seeded admin client's redirect URI is derived from it once, and a
+# later change is not repaired by re-running setup (the workaround is deleting the mongo-data volume).
+services:
+  mongo:
+    image: mongo:8
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test:
+        ['CMD', 'mongosh', '--quiet', '--eval', 'db.runCommand({ ping: 1 }).ok']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  setup:
+    image: ghcr.io/redfox-soft/oauth-server-ts:latest
+    command: ['bun', 'run', 'db:setup']
+    environment:
+      ISSUER: http://localhost:3000
+      MONGODB_URI: mongodb://mongo:27017
+      DATABASE_NAME: OAuth
+    depends_on:
+      mongo:
+        condition: service_healthy
+    restart: 'no'
+
+  oauth:
+    image: ghcr.io/redfox-soft/oauth-server-ts:latest
+    ports:
+      - '3000:3000'
+    environment:
+      ISSUER: http://localhost:3000
+      MONGODB_URI: mongodb://mongo:27017
+      DATABASE_NAME: OAuth
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  mongo-data:

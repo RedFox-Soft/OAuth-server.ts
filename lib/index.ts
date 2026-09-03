@@ -31,6 +31,7 @@ import { revocation } from './actions/revocation.js';
 import { jwks } from './actions/jwks.js';
 import { registration } from './actions/registration.js';
 import { healthCheck } from './actions/health.js';
+import { securityTxt } from './actions/security_txt.js';
 import { featureGate } from './plugins/featureGate.js';
 import { rateLimit } from './plugins/rateLimit.js';
 import { corsPreflight } from './plugins/cors.js';
@@ -102,6 +103,7 @@ export const elysia = new Elysia({ strictPath: true, normalize: false })
 	})
 	.onError(errorHandler)
 	.use(healthCheck)
+	.use(securityTxt)
 	.use(staticPlugin({ assets: 'public' }))
 	.use(nocache)
 	.use(securityHeaders)

@@ -158,6 +158,9 @@ export const gatedRoutes: readonly GatedRoute[] = [
  */
 export const alwaysAvailableRoutes: readonly AlwaysAvailableRoute[] = [
 	{ method: 'GET', path: '/health' },
+	// RFC 9116 disclosure contact. Unconditional for the same reason discovery is: a researcher who
+	// has found something must be able to read where to send it whatever the deployment has switched on.
+	{ method: 'GET', path: '/.well-known/security.txt' },
 	{ method: 'GET', path: '/.well-known/openid-configuration' },
 	{ method: 'GET', path: routeNames.jwks },
 	{ method: 'GET', path: routeNames.authorization },
@@ -368,6 +371,7 @@ export const rateRoutes: readonly RateRoute[] = [
 		path: '/.well-known/openid-configuration',
 		rate: 'public'
 	},
+	{ method: 'GET', path: '/.well-known/security.txt', rate: 'public' },
 	{ method: 'GET', path: routeNames.mcp_metadata, rate: 'public' },
 	{ method: 'GET', path: routeNames.jwks, rate: 'public' },
 	{ method: 'GET', path: '/public/*', rate: 'public' }

@@ -1,7 +1,7 @@
 <div align="center">
   <img src="public/logo.svg" alt="OAuth-server.ts logo" width="120" />
   <h1>OAuth-server.ts</h1>
-  <p><strong>Open-source OAuth 2.0 and OpenID Connect authorization server — built with Bun and TypeScript.</strong></p>
+  <p><strong>Source-available OAuth 2.0 and OpenID Connect authorization server — built with Bun and TypeScript.</strong></p>
 
   <p>
     <a href="https://github.com/RedFox-Soft/OAuth-server.ts/actions/workflows/ci.yml">
@@ -16,13 +16,13 @@
     <a href="https://datatracker.ietf.org/doc/html/rfc6749">OAuth 2.0</a> ·
     <a href="https://openid.net/specs/openid-connect-core-1_0.html">OpenID Connect</a> ·
     <a href="https://bun.sh/">Bun</a> ·
-    <a href="LICENSE">MIT License</a>
+    <a href="LICENSE">FSL-1.1-ALv2 License</a>
   </p>
 </div>
 
 ---
 
-OAuth-server.ts is a fully open-source, standards-compliant authorization server written in TypeScript and powered by [Bun](https://bun.sh/) and [Elysia](https://elysiajs.com/). It implements OAuth 2.0 and OpenID Connect from the ground up, giving you complete control over your identity infrastructure — with no vendor lock-in.
+OAuth-server.ts is a source-available (FSL-1.1-ALv2), standards-compliant authorization server written in TypeScript and powered by [Bun](https://bun.sh/) and [Elysia](https://elysiajs.com/). It implements OAuth 2.0 and OpenID Connect from the ground up, giving you complete control over your identity infrastructure — with no vendor lock-in.
 
 ## Features
 
@@ -85,28 +85,44 @@ Implemented, and off until the flag is set. Set them in the console under **Sett
 
 ## Quick Start
 
+### With Docker Compose
+
+**Prerequisites:** Docker with Compose v2.
+
+```bash
+curl -O https://raw.githubusercontent.com/RedFox-Soft/OAuth-server.ts/main/docker-compose.yml
+docker compose up
+```
+
+That starts MongoDB, provisions the schema and the admin panel (an idempotent one-shot step), and
+serves the server at `http://localhost:3000`. Open `http://localhost:3000/admin` — the first visit
+shows a one-time setup screen that creates the initial super administrator. Discovery is at
+`http://localhost:3000/.well-known/openid-configuration`. Set `ISSUER` in `docker-compose.yml` to its
+final public URL before this first `docker compose up`: the seeded admin client's redirect URI is
+derived from it once, and a later change is not repaired by re-running setup.
+
+Images are published to `ghcr.io/redfox-soft/oauth-server-ts` on every release, tagged with the
+version and `latest`. To upgrade, pull and run `docker compose up` again; the setup step re-runs and
+is safe to repeat.
+
+### From source
+
 **Prerequisites:** [Bun](https://bun.sh/) v1.3+ and a running MongoDB instance.
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-org/oauth-server-ts.git
-cd oauth-server-ts
-
-# Install dependencies
+git clone https://github.com/RedFox-Soft/OAuth-server.ts.git
+cd OAuth-server.ts
 bun install
 
-# Create .env — set MONGODB_URI, DATABASE_NAME, and ISSUER
+# Create .env — set MONGODB_URI, DATABASE_NAME, and ISSUER (see Configuration)
 
-# Provision the database schema (creates collections + an initial RS256 signing key)
-bun run db:setup
-
-# Start the server
-bun start
+bun run db:setup   # collections, indexes, initial RS256 signing key, admin panel seed
+bun run build      # bundles the console and sign-in screens into public/
+bun start          # http://localhost:3000
 ```
 
-The server starts on `http://localhost:3000` by default. Schema provisioning creates the initial
-signing key, so no key configuration is required. If the server ever starts against an empty key
-store it also generates and persists one automatically.
+Schema provisioning creates the initial signing key, so no key configuration is required. If the
+server ever starts against an empty key store it also generates and persists one automatically.
 
 ### Admin panel provisioning
 
@@ -225,6 +241,16 @@ door properly hard is to require the second factor on it (**Settings → Adminis
 
 ## Docker
 
+Published image:
+
+```bash
+docker pull ghcr.io/redfox-soft/oauth-server-ts:latest
+docker run -p 3000:3000 --env-file .env ghcr.io/redfox-soft/oauth-server-ts:latest
+```
+
+Run `bun run db:setup` against the same database once before the first start (the Compose file
+above does this for you). To build locally instead:
+
 ```bash
 docker build -t oauth-server-ts .
 docker run -p 3000:3000 --env-file .env oauth-server-ts
@@ -244,6 +270,7 @@ flag before suspecting a defect. Flags are set in the admin console under **Sett
 | ---------------------------------------- | ------------------------------------------------------------------------- |
 | `GET  /health`                           | Liveness probe                                                            |
 | `GET  /.well-known/openid-configuration` | OpenID Connect discovery document (contents reflect enabled capabilities) |
+| `GET  /.well-known/security.txt`         | Security contact and disclosure policy (RFC 9116)                         |
 | `GET  /jwks`                             | JSON Web Key Set                                                          |
 | `GET, POST /auth`                        | Authorization endpoint                                                    |
 | `POST /token`                            | Token endpoint                                                            |
@@ -367,4 +394,10 @@ Contributions are welcome! Please open an issue or pull request. For significant
 
 ## License
 
-[MIT](LICENSE)
+OAuth-server.ts is licensed under the [Functional Source License, Version 1.1, ALv2 Future
+License](LICENSE) (`FSL-1.1-ALv2`) — the same license Sentry uses. In short: you may use, modify,
+self-host and redistribute it for any purpose except offering it to others as a competing hosted
+service, and each version converts to the Apache License 2.0 two years after its release.
+
+This project began in April 2025 as a fork of [node-oidc-provider](https://github.com/panva/node-oidc-provider)
+by Filip Skokan, distributed under the MIT License. Its notice is preserved in [NOTICE](NOTICE).

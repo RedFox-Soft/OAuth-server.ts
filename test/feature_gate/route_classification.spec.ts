@@ -172,6 +172,7 @@ describe('route classification', () => {
 		const PUBLIC = [
 			'GET /.well-known/openid-configuration',
 			'GET /.well-known/oauth-protected-resource/mcp',
+			'GET /.well-known/security.txt',
 			'GET /jwks',
 			'GET /public/*'
 		];

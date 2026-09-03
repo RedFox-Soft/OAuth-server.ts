@@ -2,6 +2,31 @@
 	"name": "oauth-server-ts",
 	"version": "0.1.0",
 	"type": "module",
+	"license": "FSL-1.1-ALv2",
+	"description": "Source-available OAuth 2.1 and OpenID Connect authorization server on Bun, with a built-in admin console and administration over MCP for AI agents.",
+	"homepage": "https://foxauth.dev",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/RedFox-Soft/OAuth-server.ts.git"
+	},
+	"bugs": {
+		"url": "https://github.com/RedFox-Soft/OAuth-server.ts/issues"
+	},
+	"keywords": [
+		"oauth2",
+		"oauth-2.1",
+		"oidc",
+		"openid-connect",
+		"authorization-server",
+		"identity-provider",
+		"pkce",
+		"dpop",
+		"fapi",
+		"mcp",
+		"bun",
+		"elysia",
+		"typescript"
+	],
 	"scripts": {
 		"format": "prettier --write .",
 		"lint": "eslint lib test --fix",
@@ -9,6 +34,7 @@
 		"build": "bun build.ts",
 		"watch": "bun build.ts --watch",
 		"db:setup": "bun database/mongodb.ts",
+		"docs:export": "bun scripts/docs_export.ts",
 		"start": "bun lib/index.ts"
 	},
 	"dependencies": {
