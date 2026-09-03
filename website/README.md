@@ -22,6 +22,10 @@ bun run dev        # serves whatever is currently in generated/
 `bun run dev` does not regenerate anything itself — rerun `bun run generate` after changing a setting
 catalog, a route classification, or anything else the export reads.
 
+Astro 7's `astro dev` runs as a background daemon: the command returns at once and prints the URL
+(`http://localhost:4321/`). `bunx astro dev logs` tails it, `bunx astro dev status` shows it,
+`bunx astro dev stop` stops it. The server listens on both `127.0.0.1` and `::1`.
+
 ## Building
 
 ```bash

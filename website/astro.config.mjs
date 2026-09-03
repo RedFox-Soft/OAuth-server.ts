@@ -7,6 +7,10 @@ import sitemap from '@astrojs/sitemap';
 
 export default defineConfig({
 	site: 'https://foxauth.dev',
+	// Dev only (the build is static). Vite binds the first address `localhost` resolves to, which on
+	// Node ≥ 17 is `::1` alone — a browser or proxy that resolves localhost to 127.0.0.1 then gets
+	// "connection refused". `true` listens on both families.
+	server: { host: true },
 	integrations: [
 		// Explicit so the styleguide (noindex, review-only) can be filtered out. Starlight detects
 		// an existing sitemap integration and does not add its own second one.
