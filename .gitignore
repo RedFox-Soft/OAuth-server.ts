@@ -156,3 +156,6 @@ website/.astro/
 website/generated/
 website/public/screenshots/
 website/public/og/
+
+# Playwright MCP session output (review screenshots, snapshots)
+.playwright-mcp/

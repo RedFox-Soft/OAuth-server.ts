@@ -24,6 +24,7 @@ const ADMIN = {
 };
 const USER_PASSWORD = 'AcmeDemo-2026!';
 const VIEWPORT = { width: 1440, height: 900 } as const;
+const ADMIN_HEIGHT = 640;
 const OUT = resolve(import.meta.dir, '../public/screenshots');
 const OG_OUT = resolve(import.meta.dir, '../public/og');
 
@@ -167,6 +168,24 @@ async function seed(
 		grantTypes: ['client_credentials'],
 		tokenEndpointAuthMethod: 'client_secret_basic'
 	});
+	// Two more so the clients table reads as a real project rather than a two-row demo.
+	await api(ctx, 'POST', `/admin/api/projects/${project._id}/clients`, {
+		clientName: 'acme-mobile',
+		applicationType: 'native',
+		grantTypes: ['authorization_code', 'refresh_token'],
+		redirectUris: ['com.acme.app:/callback', 'http://127.0.0.1/callback'],
+		tokenEndpointAuthMethod: 'none'
+	});
+	await api(ctx, 'POST', `/admin/api/projects/${project._id}/clients`, {
+		clientName: 'acme-cli',
+		applicationType: 'native',
+		grantTypes: [
+			'urn:ietf:params:oauth:grant-type:device_code',
+			'refresh_token'
+		],
+		redirectUris: [],
+		tokenEndpointAuthMethod: 'none'
+	});
 	for (const email of [
 		'dana.rivera@example.com',
 		'sam.okafor@example.com',
@@ -228,10 +247,17 @@ async function shoot(page: Page, name: string): Promise<void> {
 	 * is for the ones that have not started yet when the click returns.
 	 */
 	await page.waitForTimeout(400);
+	/*
+	 * The console's lists are short in a demo, so at the full 1440×900 viewport the lower half of an
+	 * admin capture is empty canvas. Clipping the admin shots keeps the sidebar and table and drops
+	 * the white space; the end-user screens are centred and keep the full viewport.
+	 */
+	const height = name.startsWith('admin-') ? ADMIN_HEIGHT : VIEWPORT.height;
 	await page.screenshot({
 		path: resolve(OUT, `${name}.png`),
 		type: 'png',
-		animations: 'disabled'
+		animations: 'disabled',
+		clip: { x: 0, y: 0, width: VIEWPORT.width, height }
 	});
 	console.log(`screenshot: ${name}.png`);
 }

@@ -1,5 +1,5 @@
 ---
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 /*
@@ -12,12 +12,16 @@ interface Props {
 	name: string;
 	alt: string;
 	caption?: string;
-	width?: number;
-	height?: number;
 }
-const { name, alt, caption, width = 1440, height = 900 } = Astro.props;
+const { name, alt, caption } = Astro.props;
 const src = `/screenshots/${name}.png`;
-const present = existsSync(resolve(process.cwd(), 'public', `screenshots/${name}.png`));
+const file = resolve(process.cwd(), 'public', `screenshots/${name}.png`);
+const present = existsSync(file);
+// Read from the PNG header (IHDR: width and height are big-endian u32 at bytes 16 and 20) so the
+// intrinsic size follows whatever the capture produced and the browser reserves the right space.
+const header = present ? readFileSync(file).subarray(0, 24) : undefined;
+const width = header ? header.readUInt32BE(16) : 1440;
+const height = header ? header.readUInt32BE(20) : 900;
 ---
 
 {

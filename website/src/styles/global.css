@@ -10,6 +10,67 @@
    the repository's own Markdown and so carry no per-element classes of their own. */
 @plugin '@tailwindcss/typography';
 
+/*
+ * Tailwind's preflight is deliberately not imported: Starlight ships its own base styles and the two
+ * fight over the docs pages. The marketing pages have no base of their own, though, and the browser
+ * defaults showed through — blue underlined links (buttons included), bulleted nav and footer lists,
+ * heading margins. This is the subset of preflight those pages need, scoped to the marketing layout
+ * (`html[data-layout='site']`) so a Starlight page never sees it. `:where()` keeps specificity flat
+ * so every utility class still wins by layer order.
+ */
+@layer base {
+	html[data-layout='site'] {
+		-webkit-text-size-adjust: 100%;
+		tab-size: 4;
+	}
+	html[data-layout='site'] :where(*, ::before, ::after) {
+		box-sizing: border-box;
+		margin: 0;
+		padding: 0;
+		border: 0 solid;
+	}
+	html[data-layout='site'] :where(a) {
+		color: inherit;
+		text-decoration: inherit;
+	}
+	html[data-layout='site'] :where(h1, h2, h3, h4, h5, h6) {
+		font-size: inherit;
+		font-weight: inherit;
+	}
+	html[data-layout='site'] :where(ol, ul, menu) {
+		list-style: none;
+	}
+	html[data-layout='site'] :where(img, svg, video, canvas) {
+		display: block;
+		max-width: 100%;
+		height: auto;
+	}
+	html[data-layout='site'] :where(button, input, select, textarea) {
+		font: inherit;
+		color: inherit;
+		letter-spacing: inherit;
+		background-color: transparent;
+		border-radius: 0;
+	}
+	html[data-layout='site'] :where(code, kbd, samp, pre) {
+		font-family: var(--font-mono);
+		font-size: 1em;
+	}
+	html[data-layout='site'] :where(table) {
+		border-collapse: collapse;
+		border-color: inherit;
+		text-indent: 0;
+	}
+	html[data-layout='site'] :where(hr) {
+		height: 0;
+		color: inherit;
+		border-top-width: 1px;
+	}
+	html[data-layout='site'] :where(summary) {
+		display: list-item;
+	}
+}
+
 @import '@fontsource-variable/inter';
 @import '@fontsource-variable/jetbrains-mono';
 
