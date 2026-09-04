@@ -26,6 +26,20 @@ const mockedOrigins = new Set<string>();
 const realFetch = globalThis.fetch;
 let fetchSpy: ReturnType<typeof spyOn> | undefined;
 
+/*
+ * Marks the `fetch` this module installed. Everything above is module state, which outlives a spec
+ * file — but the patch on `globalThis.fetch` does not, because Bun restores it at the file boundary.
+ * A spec that registers an interceptor and ends without `mock.restore()` therefore leaves `fetchSpy`
+ * set while nothing is intercepting, and a `??=` guard on that handle would skip reinstalling and
+ * let the next file's requests reach the real network. Ask the live global what it is instead.
+ */
+const INSTALLED = Symbol.for('test.fetchMock.installed');
+type MaybeInstalled = typeof globalThis.fetch & { [INSTALLED]?: true };
+
+function isInstalled(): boolean {
+	return (globalThis.fetch as MaybeInstalled)[INSTALLED] === true;
+}
+
 async function dispatchFetch(
 	input: RequestInfo | URL,
 	init?: RequestInit
@@ -83,7 +97,10 @@ async function dispatchFetch(
 }
 
 export function mock(origin: string) {
-	fetchSpy ??= spyOn(globalThis, 'fetch').mockImplementation(dispatchFetch);
+	if (!isInstalled()) {
+		fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(dispatchFetch);
+		(globalThis.fetch as MaybeInstalled)[INSTALLED] = true;
+	}
 	mockedOrigins.add(origin);
 	return {
 		intercept(opts: {
