@@ -6,24 +6,14 @@ import Card from '../components/ui/Card.astro';
 import Badge from '../components/ui/Badge.astro';
 import Section from '../components/ui/Section.astro';
 import Eyebrow from '../components/ui/Eyebrow.astro';
+import { organization, softwareApplication } from '../data/structured.ts';
 
-const jsonLd = {
-	'@context': 'https://schema.org',
-	'@type': 'SoftwareApplication',
-	name: 'OAuth-server.ts',
-	alternateName: 'FoxAuth',
-	applicationCategory: 'SecurityApplication',
-	operatingSystem: 'Docker, Linux, macOS, Windows',
-	url: 'https://foxauth.dev',
-	downloadUrl: 'https://github.com/RedFox-Soft/OAuth-server.ts',
-	license: 'https://foxauth.dev/license/',
-	offers: {
-		'@type': 'Offer',
-		price: '0',
-		priceCurrency: 'USD',
-		description: 'Self-hosted'
-	}
-};
+/*
+ * `license` is the abbreviation this page visibly shows in its badge row, not a URL: the guardrail
+ * checks that every human-readable string a block claims also appears in the rendered text, so a
+ * structured claim and the visible copy cannot drift apart unnoticed.
+ */
+const jsonLd = [organization(), softwareApplication({ license: 'FSL-1.1-ALv2' })];
 
 const quickstart = `curl -O https://raw.githubusercontent.com/RedFox-Soft/OAuth-server.ts/main/docker-compose.yml
 docker compose up
@@ -139,7 +129,7 @@ server ← { "restartRequired": true,
 
 <Site
 	title="FoxAuth — the authorization server for the agent era"
-	description="FoxAuth is built on OAuth-server.ts, a source-available OAuth 2.1 / OpenID Connect server you run yourself, with a built-in admin console and administration over MCP."
+	description="A source-available OAuth 2.1 and OpenID Connect server you run yourself, with a built-in admin console and administration over MCP for AI agents."
 	jsonLd={jsonLd}
 >
 	<Section>
@@ -153,6 +143,15 @@ server ← { "restartRequired": true,
 					FoxAuth is built on OAuth-server.ts, a source-available OAuth 2.1 / OpenID Connect
 					server you run yourself — with a built-in admin console, banking-grade profiles, and
 					administration over MCP for AI agents.
+				</p>
+				<!-- The opening has to stand alone: it is the first screen a search visitor sees,
+				     and the passage an assistant quotes when asked what this project is. What it is,
+				     who runs it and how it is licensed, before any scrolling. -->
+				<p class="mt-3 max-w-prose text-lg text-gray-600 dark:text-gray-400">
+					It is for engineering teams who need identity inside their own infrastructure, and
+					for anyone building agents that must administer it. Self-hosting is free and complete
+					under the Functional Source License (<code>FSL-1.1-ALv2</code>), which becomes Apache
+					2.0 two years after each release.
 				</p>
 				<div class="mt-8 flex flex-wrap gap-3">
 					<Button href="/docs/get-started/docker-compose/" size="lg">Get started</Button>

@@ -4,14 +4,17 @@ import Seo from '../components/Seo.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 
+import type { JsonLd } from '../data/structured.ts';
+
 interface Props {
 	title: string;
 	description: string;
 	image?: string;
-	jsonLd?: Record<string, unknown>;
+	jsonLd?: JsonLd | JsonLd[];
 	noindex?: boolean;
+	breadcrumbLeaf?: string;
 }
-const { title, description, image, jsonLd, noindex } = Astro.props;
+const { title, description, image, jsonLd, noindex, breadcrumbLeaf } = Astro.props;
 ---
 
 <!doctype html>
@@ -23,6 +26,7 @@ const { title, description, image, jsonLd, noindex } = Astro.props;
 			image={image}
 			jsonLd={jsonLd}
 			noindex={noindex}
+			breadcrumbLeaf={breadcrumbLeaf}
 		/>
 	</head>
 	<body class="bg-white text-gray-900 antialiased dark:bg-gray-950 dark:text-gray-100">

@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://foxauth.dev/sitemap-index.xml

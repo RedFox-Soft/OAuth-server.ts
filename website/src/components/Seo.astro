@@ -2,50 +2,164 @@
 /*
  * Every <head> tag that is not page content. One component so a new marketing page cannot ship
  * without a canonical URL, an OG image and the analytics decision.
+ *
+ * The indexing decision is not made here: it comes from the non-indexable list in data/seo.ts,
+ * which astro.config.mjs reads for the sitemap filter and scripts/seo/verify.ts checks the built
+ * output against. Before that, a page could say "noindex" here while the sitemap advertised it.
  */
+import { cardSlug, isIndexable, normaliseRoute } from '../data/seo.ts';
+import { breadcrumbList, crumbsFor, type JsonLd } from '../data/structured.ts';
+import { lastModified } from '../../scripts/seo/lastmod.ts';
+import { sourcesFor } from '../../scripts/seo/sources.ts';
+
 interface Props {
 	title: string;
 	description: string;
 	image?: string;
-	jsonLd?: Record<string, unknown>;
-	/* The styleguide and other review-only pages: kept out of search results. */
+	/* One block or several; breadcrumbs are added automatically below the top level. */
+	jsonLd?: JsonLd | JsonLd[];
+	/* Overrides the shared list — only for a page kept out of search for a reason of its own. */
 	noindex?: boolean;
+	/* The visible heading, used as the breadcrumb leaf so it matches what the page shows. */
+	breadcrumbLeaf?: string;
 }
-const {
-	title,
-	description,
-	image = '/og/default.png',
-	jsonLd,
-	noindex = false
-} = Astro.props;
-const canonical = new URL(Astro.url.pathname, Astro.site);
-const ogImage = new URL(image, Astro.site);
+const { title, description, image, jsonLd, noindex, breadcrumbLeaf } = Astro.props;
+
+const route = normaliseRoute(Astro.url.pathname);
+const canonical = new URL(route, Astro.site);
+const hidden = noindex ?? !isIndexable(route);
+
+/*
+ * The per-page card, referenced unconditionally: scripts/seo/cards.ts renders one for every page
+ * after the build, when the route set is known. Cards are generated and never committed, so a build
+ * with the capture skipped has none — scripts/seo/verify.ts reports the image rule as skipped there
+ * rather than passing it silently.
+ */
+const ogImage = new URL(image ?? `/og/${cardSlug(route)}.png`, Astro.site);
+
+const { sourceFile, dataSources } = sourcesFor(route);
+const lastmod = lastModified(sourceFile, dataSources);
+
+const blocks: JsonLd[] = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
+const crumbs = crumbsFor(route, breadcrumbLeaf ?? title);
+if (crumbs.length > 1) blocks.push(breadcrumbList(crumbs));
+
 const plausible = import.meta.env.PUBLIC_PLAUSIBLE_DOMAIN;
 ---
 
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<meta name="color-scheme" content="light dark" />
+<meta
+	name="viewport"
+	content="width=device-width, initial-scale=1"
+/>
+<meta
+	name="color-scheme"
+	content="light dark"
+/>
 <title>{title}</title>
-<meta name="description" content={description} />
-<link rel="canonical" href={canonical.href} />
-{noindex && <meta name="robots" content="noindex" />}
-<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-<link rel="icon" href="/favicon.ico" sizes="32x32" />
-<link rel="sitemap" href="/sitemap-index.xml" />
-<meta property="og:type" content="website" />
-<meta property="og:site_name" content="FoxAuth" />
-<meta property="og:title" content={title} />
-<meta property="og:description" content={description} />
-<meta property="og:url" content={canonical.href} />
-<meta property="og:image" content={ogImage.href} />
-<meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:title" content={title} />
-<meta name="twitter:description" content={description} />
-<meta name="twitter:image" content={ogImage.href} />
-{jsonLd && <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />}
+<meta
+	name="description"
+	content={description}
+/>
+<link
+	rel="canonical"
+	href={canonical.href}
+/>
+{
+	hidden && (
+		<meta
+			name="robots"
+			content="noindex"
+		/>
+	)
+}
+{
+	lastmod && (
+		<meta
+			name="last-modified"
+			content={lastmod}
+		/>
+	)
+}
+<link
+	rel="icon"
+	href="/favicon.svg"
+	type="image/svg+xml"
+/>
+<link
+	rel="icon"
+	href="/favicon.ico"
+	sizes="32x32"
+/>
+<link
+	rel="sitemap"
+	href="/sitemap-index.xml"
+/>
+{
+	!hidden && (
+		<link
+			rel="alternate"
+			type="text/markdown"
+			href={`${route === '/' ? '/index' : route.replace(/\/$/, '')}.md`}
+		/>
+	)
+}
+<meta
+	property="og:type"
+	content="website"
+/>
+<meta
+	property="og:site_name"
+	content="FoxAuth"
+/>
+<meta
+	property="og:title"
+	content={title}
+/>
+<meta
+	property="og:description"
+	content={description}
+/>
+<meta
+	property="og:url"
+	content={canonical.href}
+/>
+<meta
+	property="og:image"
+	content={ogImage.href}
+/>
+<meta
+	name="twitter:card"
+	content="summary_large_image"
+/>
+<meta
+	name="twitter:title"
+	content={title}
+/>
+<meta
+	name="twitter:description"
+	content={description}
+/>
+<meta
+	name="twitter:image"
+	content={ogImage.href}
+/>
+{
+	blocks.map((block) => (
+		<script
+			is:inline
+			type="application/ld+json"
+			set:html={JSON.stringify(block)}
+		/>
+	))
+}
 {
 	plausible && (
-		<script is:inline defer data-domain={plausible} src="https://plausible.io/js/script.js" />
+		<script
+			is:inline
+			defer
+			data-domain={plausible}
+			src="https://plausible.io/js/script.js"
+		/>
 	)
 }

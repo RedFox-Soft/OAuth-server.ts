@@ -233,7 +233,7 @@ traps that each cost a debugging session.
 that treats this repository as its data source. `.github/workflows/site.yml` builds and deploys it to
 GitHub Pages on every push to `main` that touches the site or its inputs.
 
-Three rules keep it honest:
+Four rules keep it honest:
 
 1. **Reference pages are generated, never written.** `cd website && bun run generate` runs
    `scripts/docs_export.ts` and writes `website/generated/`; the pages under
@@ -247,9 +247,23 @@ Three rules keep it honest:
    The capture drives the hydrated console, so the root `bun run build` — which produces the
    gitignored `public/*.js` bundles — must have run first or the capture times out on a blank page;
    the workflow does this for you, and locally it means `bun run build` at the repository root once,
-   or `SITE_SKIP_CAPTURE=1 bun run build` to skip the capture for a fast local build.
+   or `SITE_SKIP_CAPTURE=1 bun run build` to skip the capture for a fast local build. The same flag
+   also skips the social cards, and `robots.txt`, both sitemaps, `llms.txt`, the Markdown alternates
+   and the cards are all written into `dist/` after the build rather than kept in `public/`.
 3. **Root documents are rendered, not copied.** `/changelog/`, `/security/` and `/license/` read
    `CHANGELOG.md`, `SECURITY.md`, `LICENSE` and `NOTICE` from the repository root at build time.
+4. **One page record, checked against what shipped.** `website/scripts/postbuild.ts` runs after
+   `astro build`, parses every emitted page into one `PageRecord` (`scripts/seo/collect.ts`), and
+   hands that same set to every generator — the image sitemap, `llms.txt`, the `.md` alternates, the
+   social cards — and then to `scripts/seo/verify.ts`, which fails the build on any of twenty rules
+   naming the page and the rule. Two consequences worth knowing before editing anything here.
+   First, **every indexing decision lives in `website/src/data/seo.ts`**: the non-indexable list, the
+   title and description bands, the route→section map and the AI-crawler allowlist. `Seo.astro` and
+   the sitemap filter in `astro.config.mjs` both read it, because they used to disagree — a page
+   could say `noindex` while the sitemap advertised it. Second, docs pages never reach `Seo.astro`;
+   Starlight builds its own head, so `src/components/StarlightHead.astro` adds what it omits. A new
+   page needs a unique title (15–60 chars) and description (70–160), a section in the map, and a
+   link from somewhere reachable within three hops of the home page, or the build stops.
 
 Hand-written docs live in `website/src/content/docs/docs/<section>/*.mdx` (Starlight autogenerates
 the sidebar per section; `sidebar.order` in frontmatter orders pages). The links validator fails the

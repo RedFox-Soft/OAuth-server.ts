@@ -5,7 +5,8 @@
 	"scripts": {
 		"dev": "astro dev",
 		"generate": "bun scripts/generate.ts",
-		"build": "bun run generate && astro build",
+		"seo": "bun scripts/postbuild.ts",
+		"build": "bun run generate && astro build && bun run seo",
 		"preview": "astro preview",
 		"check": "astro check"
 	},

@@ -9,7 +9,20 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+
+- site: search and AI discoverability, enforced by the build (spec 036). Every page now carries a
+  checked title and summary, a per-page `lastmod` from git, structured data and its own social card —
+  documentation pages included, which had none of it because Starlight builds its own head. For
+  assistants, `/llms.txt` lists every page where it listed none, `/llms-full.txt` covers the
+  marketing and comparison pages it previously omitted, each page is available as Markdown at its
+  address plus `.md`, and `robots.txt` names ten AI crawlers with the source and date each was
+  checked against. Screenshots are declared in an image sitemap.
+
+  Indexing is now one decision in `website/src/data/seo.ts` — the styleguide used to be excluded by a
+  `noindex` in one file and an unrelated string match in another — and twenty rules check the shipped
+  HTML, failing the build with the page and the rule. Two defects it caught on its first run are
+  fixed: the licence page had two top-level headings, and the settings reference skipped a level.
 
 ## [0.1.0] - 2026-09-03
 

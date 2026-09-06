@@ -358,15 +358,8 @@ try {
 	await userPage.waitForURL(/\/ui\/[^/]+\/consent/);
 	await shoot(userPage, 'consent');
 
-	// Open Graph image from a local HTML template — the same browser, no extra tooling.
-	const ogPage = await ctx.newPage();
-	await ogPage.setViewportSize({ width: 1200, height: 630 });
-	await ogPage.goto(`file://${resolve(import.meta.dir, 'og-template.html')}`);
-	await ogPage.screenshot({
-		path: resolve(OG_OUT, 'default.png'),
-		type: 'png'
-	});
-	console.log('og: default.png');
+	// The Open Graph cards are rendered by scripts/seo/cards.ts after the build instead: one per
+	// page, and the page set does not exist until Astro has emitted it.
 } finally {
 	// A close failure must not mask the original error thrown from the try block above.
 	await browser.close().catch(() => {});

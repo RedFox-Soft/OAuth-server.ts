@@ -4,17 +4,40 @@ import starlightLinksValidator from 'starlight-links-validator';
 import starlightLlmsTxt from 'starlight-llms-txt';
 import tailwindcss from '@tailwindcss/vite';
 import sitemap from '@astrojs/sitemap';
+import { SITE_ORIGIN, isIndexable, normaliseRoute } from './src/data/seo.ts';
+import { lastModified } from './scripts/seo/lastmod.ts';
+import { sourcesFor } from './scripts/seo/sources.ts';
 
 export default defineConfig({
-	site: 'https://foxauth.dev',
+	site: SITE_ORIGIN,
 	// Dev only (the build is static). Vite binds the first address `localhost` resolves to, which on
 	// Node ≥ 17 is `::1` alone — a browser or proxy that resolves localhost to 127.0.0.1 then gets
 	// "connection refused". `true` listens on both families.
 	server: { host: true },
 	integrations: [
-		// Explicit so the styleguide (noindex, review-only) can be filtered out. Starlight detects
-		// an existing sitemap integration and does not add its own second one.
-		sitemap({ filter: (page) => !page.includes('/styleguide/') }),
+		// Explicit so pages kept out of search can be filtered out, and so Starlight does not add a
+		// second sitemap of its own. The filter reads the same non-indexable list src/data/seo.ts
+		// gives Seo.astro: before that, a page was told "noindex" in one file and advertised in the
+		// sitemap by a separate string match in this one, with nothing keeping the two in step.
+		//
+		// `serialize` supplies a per-page lastmod from git. The integration's global `lastmod` option
+		// would stamp one date on every entry, which tells a crawler nothing except to stop trusting
+		// the field. `changefreq` and `priority` are deliberately absent — Google ignores both.
+		//
+		// customSitemaps carries the image sitemap, which scripts/seo/image_sitemap.ts writes after
+		// the build. It cannot be produced here: the integration's SitemapItem type is a Pick that
+		// excludes `img`, so returning image entries from serialize would need a type assertion.
+		sitemap({
+			filter: (page) => isIndexable(new URL(page).pathname),
+			customSitemaps: [`${SITE_ORIGIN}/sitemap-images.xml`],
+			namespaces: { image: true, news: false, video: false, xhtml: false },
+			serialize: (item) => {
+				const route = normaliseRoute(new URL(item.url).pathname);
+				const { sourceFile, dataSources } = sourcesFor(route);
+				const lastmod = lastModified(sourceFile, dataSources);
+				return lastmod ? { ...item, lastmod } : item;
+			}
+		}),
 		starlight({
 			title: 'FoxAuth',
 			description:
@@ -27,6 +50,10 @@ export default defineConfig({
 				}
 			],
 			customCss: ['./src/styles/global.css'],
+			// Starlight renders its own <head>, so docs pages never reach Seo.astro. The override
+			// renders Starlight's head unchanged and adds only what it leaves out: the social card,
+			// the structured data, the last-modified signal and the Markdown alternate.
+			components: { Head: './src/components/StarlightHead.astro' },
 			// src/pages/404.astro is the site's one not-found page, so Starlight's own 404 route is a
 			// duplicate static route — Astro warns today and says it becomes a hard error later.
 			disable404Route: true,

@@ -1,0 +1,66 @@
+---
+/*
+ * Starlight builds its own <head>, so the documentation pages never pass through Seo.astro. Left
+ * alone they shipped with no social card, no structured data, no last-modified signal and no link
+ * to their Markdown alternate — a third of the site missing what the rest carries.
+ *
+ * This override renders Starlight's head unchanged and adds only what it omits, so canonical, title
+ * and description stay Starlight's business and there is no second component competing to set them.
+ */
+import Default from '@astrojs/starlight/components/Head.astro';
+import { cardSlug, normaliseRoute } from '../data/seo.ts';
+import { breadcrumbList, crumbsFor, techArticle, type JsonLd } from '../data/structured.ts';
+import { lastModified } from '../../scripts/seo/lastmod.ts';
+import { sourcesFor } from '../../scripts/seo/sources.ts';
+
+const { entry } = Astro.locals.starlightRoute;
+const route = normaliseRoute(Astro.url.pathname);
+const canonical = new URL(route, Astro.site).href;
+
+const ogImage = new URL(`/og/${cardSlug(route)}.png`, Astro.site).href;
+
+const { sourceFile, dataSources } = sourcesFor(route);
+const lastmod = lastModified(sourceFile, dataSources);
+
+const title = entry.data.title;
+const description = entry.data.description ?? '';
+
+const blocks: JsonLd[] = [
+	techArticle({ headline: title, description, canonical, dateModified: lastmod })
+];
+const crumbs = crumbsFor(route, title);
+if (crumbs.length > 1) blocks.push(breadcrumbList(crumbs));
+---
+
+<Default><slot /></Default>
+
+<meta
+	property="og:image"
+	content={ogImage}
+/>
+<meta
+	name="twitter:image"
+	content={ogImage}
+/>
+{
+	lastmod && (
+		<meta
+			name="last-modified"
+			content={lastmod}
+		/>
+	)
+}
+<link
+	rel="alternate"
+	type="text/markdown"
+	href={`${route.replace(/\/$/, '')}.md`}
+/>
+{
+	blocks.map((block) => (
+		<script
+			is:inline
+			type="application/ld+json"
+			set:html={JSON.stringify(block)}
+		/>
+	))
+}

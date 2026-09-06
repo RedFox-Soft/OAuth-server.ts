@@ -7,6 +7,8 @@ import Card from '../../components/ui/Card.astro';
 import Section from '../../components/ui/Section.astro';
 import Eyebrow from '../../components/ui/Eyebrow.astro';
 import CompareTable from '../../components/CompareTable.astro';
+import { SITE_ORIGIN } from '../../data/seo.ts';
+import { techArticle } from '../../data/structured.ts';
 
 export const getStaticPaths: GetStaticPaths = async () => {
 	const entries = await getCollection('compare');
@@ -29,9 +31,28 @@ const {
 	chooseUs,
 	groups
 } = entry.data;
+
+/*
+ * The comparison pages are articles making dated, sourced claims about another product, so
+ * they carry the same TechArticle the documentation does — `headline` is the visible h1,
+ * because the guardrail checks every claimed string against the rendered text.
+ */
+const jsonLd = [
+	techArticle({
+		headline: title,
+		description,
+		canonical: new URL(`/compare/${entry.id}/`, SITE_ORIGIN).href,
+		dateModified: lastChecked
+	})
+];
 ---
 
-<Site title={`${title} — FoxAuth`} description={description}>
+<Site
+	title={`${title} — FoxAuth`}
+	description={description}
+	jsonLd={jsonLd}
+	breadcrumbLeaf={title}
+>
 	<Section narrow>
 		<Eyebrow>Compare</Eyebrow>
 		<h1 class="text-4xl font-[650] leading-[1.15] tracking-tight text-balance">{title}</h1>

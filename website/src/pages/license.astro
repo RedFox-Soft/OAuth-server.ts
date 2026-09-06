@@ -22,12 +22,21 @@ function readRoot(name: string): string {
 	}
 }
 
-const license = await marked.parse(readRoot('LICENSE'));
+const rendered = await marked.parse(readRoot('LICENSE'));
+/*
+ * LICENSE.md opens with its own <h1>, and this page already has one. Demoting the rendered
+ * document by a level keeps exactly one top-level heading and an outline that does not skip —
+ * descending order so a heading is not shifted twice.
+ */
+const license = [5, 4, 3, 2, 1].reduce(
+	(html, level) => html.replaceAll(`<h${level}`, `<h${level + 1}`).replaceAll(`</h${level}>`, `</h${level + 1}>`),
+	rendered
+);
 const notice = readRoot('NOTICE');
 ---
 
 <Site
-	title="License"
+	title="License — FSL-1.1-ALv2, and what you may do"
 	description="OAuth-server.ts is source-available under the Functional Source License 1.1 with Apache 2.0 as its future license."
 >
 	<section class="prose mx-auto max-w-3xl px-4 pt-12 dark:prose-invert">
