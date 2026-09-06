@@ -589,6 +589,7 @@ describe('CORS', () => {
 
 		const CORS_ENABLED = [
 			['GET', '/.well-known/openid-configuration', 'GET'],
+			['GET', '/.well-known/oauth-authorization-server', 'GET'],
 			['GET', '/jwks', 'GET'],
 			['POST', '/token', 'POST'],
 			['GET', '/userinfo', 'GET, POST'],

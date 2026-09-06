@@ -11,6 +11,28 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- protocol: authorization server metadata at `GET /.well-known/oauth-authorization-server`
+  ([RFC 8414](https://datatracker.ietf.org/doc/html/rfc8414), spec 038, issue #30). A plain OAuth 2.1
+  client that is not an OpenID Connect relying party looks for this path and no other, so until now
+  it could not discover a deployment at all — the endpoint URLs had to be configured by hand, one
+  path away from where the server was already publishing them. Served unconditionally, readable from
+  any origin and in the public rate class, for the reason the OIDC document is: metadata a client
+  cannot read is metadata it cannot use.
+
+  The document is pruned rather than a copy. Both documents come from one builder, so they cannot
+  disagree on a shared member, but the OAuth one drops the fourteen members whose subject matter is
+  OpenID Connect — the userinfo endpoint and its algorithms, ID token algorithms, subject types, ACR
+  values, the claims members, RP-initiated logout and back-channel logout. Membership is decided by
+  the registering specification, never by presence in the IANA registry: RFC 8414 invites other
+  specifications into that registry and OIDC Discovery accepted, so all 51 members are registered
+  there and the obvious check would have admitted the exact document the pruning exists to avoid.
+  Twelve members an OpenID specification registered are kept anyway, because an OAuth-registered
+  member is unreadable without them — request-object algorithms beside RFC 9101's
+  `require_signed_request_object`, the CIBA endpoint beside the CIBA grant in
+  `grant_types_supported`, the JARM algorithms beside the `jwt` response modes. Each records that
+  anchor as data, and a guard fails naming the member if the anchor is removed or reclassified, so
+  the justification cannot outlive what it depends on.
+
 - site: the SEO guardrail now checks that structured data is *present*, not only that it is correct
   (spec 037). It could tell whether a description was well-formed and truthful but not that one
   should exist, which is how the comparison pages shipped with no article markup past twenty passing

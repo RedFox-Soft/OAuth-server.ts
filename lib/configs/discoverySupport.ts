@@ -225,6 +225,164 @@ type OmitEnabled<T> = {
 type DiscoveryKey = keyof ReturnType<typeof calculateDiscovery>;
 export type FeatureFlagKey = keyof OmitEnabled<typeof ApplicationConfig>;
 
+/*
+ * Which of the two metadata documents a member belongs to, and why.
+ *
+ * The reason is a field rather than a comment because the reason is the contestable part. Membership
+ * is decided by the REGISTERING SPECIFICATION, never by presence in the IANA OAuth Authorization
+ * Server Metadata registry: RFC 8414 §2 invites other specifications into that registry and OpenID
+ * Connect Discovery accepted, so every member below is registered there and the check would pass
+ * vacuously for all of them.
+ *
+ * `coherentWith` marks the twelve members that an OpenID specification registered but that an
+ * OAuth-registered member cannot be acted on without — advertising a requirement for signed request
+ * objects while naming no signing algorithm, or a CIBA grant with no endpoint to reach it, is not a
+ * usable document. The guard in test/discovery/metadata_classification.spec.ts checks those targets
+ * still exist and are themselves `both`, so the justification cannot outlive what it depends on.
+ */
+export type MetadataAudience =
+	| { audience: 'oidc' }
+	| { audience: 'both'; registeredBy: string }
+	| { audience: 'both'; coherentWith: DiscoveryKey };
+
+export const metadataClassification: Record<DiscoveryKey, MetadataAudience> = {
+	// RFC 8414 base registry.
+	issuer: { audience: 'both', registeredBy: 'RFC 8414' },
+	authorization_endpoint: { audience: 'both', registeredBy: 'RFC 8414' },
+	token_endpoint: { audience: 'both', registeredBy: 'RFC 8414' },
+	jwks_uri: { audience: 'both', registeredBy: 'RFC 8414' },
+	registration_endpoint: { audience: 'both', registeredBy: 'RFC 8414' },
+	revocation_endpoint: { audience: 'both', registeredBy: 'RFC 8414' },
+	introspection_endpoint: { audience: 'both', registeredBy: 'RFC 8414' },
+	device_authorization_endpoint: { audience: 'both', registeredBy: 'RFC 8414' },
+	scopes_supported: { audience: 'both', registeredBy: 'RFC 8414' },
+	grant_types_supported: { audience: 'both', registeredBy: 'RFC 8414' },
+	response_types_supported: { audience: 'both', registeredBy: 'RFC 8414' },
+	response_modes_supported: { audience: 'both', registeredBy: 'RFC 8414' },
+	token_endpoint_auth_methods_supported: {
+		audience: 'both',
+		registeredBy: 'RFC 8414'
+	},
+	token_endpoint_auth_signing_alg_values_supported: {
+		audience: 'both',
+		registeredBy: 'RFC 8414'
+	},
+	code_challenge_methods_supported: {
+		audience: 'both',
+		registeredBy: 'RFC 8414'
+	},
+
+	// Registered by another IETF OAuth RFC.
+	pushed_authorization_request_endpoint: {
+		audience: 'both',
+		registeredBy: 'RFC 9126'
+	},
+	require_pushed_authorization_requests: {
+		audience: 'both',
+		registeredBy: 'RFC 9126'
+	},
+	dpop_signing_alg_values_supported: {
+		audience: 'both',
+		registeredBy: 'RFC 9449'
+	},
+	authorization_response_iss_parameter_supported: {
+		audience: 'both',
+		registeredBy: 'RFC 9207'
+	},
+	tls_client_certificate_bound_access_tokens: {
+		audience: 'both',
+		registeredBy: 'RFC 8705'
+	},
+	authorization_details_types_supported: {
+		audience: 'both',
+		registeredBy: 'RFC 9396'
+	},
+	require_signed_request_object: { audience: 'both', registeredBy: 'RFC 9101' },
+	introspection_signing_alg_values_supported: {
+		audience: 'both',
+		registeredBy: 'RFC 9701'
+	},
+	introspection_encryption_alg_values_supported: {
+		audience: 'both',
+		registeredBy: 'RFC 9701'
+	},
+	introspection_encryption_enc_values_supported: {
+		audience: 'both',
+		registeredBy: 'RFC 9701'
+	},
+
+	// JWT-secured authorization requests: OIDC Discovery registered these, but RFC 9101 makes the
+	// facility an OAuth one and registers require_signed_request_object itself.
+	request_parameter_supported: {
+		audience: 'both',
+		coherentWith: 'require_signed_request_object'
+	},
+	request_uri_parameter_supported: {
+		audience: 'both',
+		coherentWith: 'require_signed_request_object'
+	},
+	request_object_signing_alg_values_supported: {
+		audience: 'both',
+		coherentWith: 'require_signed_request_object'
+	},
+	request_object_encryption_alg_values_supported: {
+		audience: 'both',
+		coherentWith: 'require_signed_request_object'
+	},
+	request_object_encryption_enc_values_supported: {
+		audience: 'both',
+		coherentWith: 'require_signed_request_object'
+	},
+
+	// CIBA is an OpenID Foundation specification, but grant_types_supported advertises its grant.
+	backchannel_authentication_endpoint: {
+		audience: 'both',
+		coherentWith: 'grant_types_supported'
+	},
+	backchannel_token_delivery_modes_supported: {
+		audience: 'both',
+		coherentWith: 'grant_types_supported'
+	},
+	backchannel_user_code_parameter_supported: {
+		audience: 'both',
+		coherentWith: 'grant_types_supported'
+	},
+	backchannel_authentication_request_signing_alg_values_supported: {
+		audience: 'both',
+		coherentWith: 'grant_types_supported'
+	},
+
+	// JARM is an OpenID Foundation specification, but response_modes_supported lists its jwt forms.
+	authorization_signing_alg_values_supported: {
+		audience: 'both',
+		coherentWith: 'response_modes_supported'
+	},
+	authorization_encryption_alg_values_supported: {
+		audience: 'both',
+		coherentWith: 'response_modes_supported'
+	},
+	authorization_encryption_enc_values_supported: {
+		audience: 'both',
+		coherentWith: 'response_modes_supported'
+	},
+
+	// OpenID Connect only: no OAuth-registered member this server emits refers to any of these.
+	userinfo_endpoint: { audience: 'oidc' },
+	userinfo_signing_alg_values_supported: { audience: 'oidc' },
+	userinfo_encryption_alg_values_supported: { audience: 'oidc' },
+	userinfo_encryption_enc_values_supported: { audience: 'oidc' },
+	id_token_signing_alg_values_supported: { audience: 'oidc' },
+	id_token_encryption_alg_values_supported: { audience: 'oidc' },
+	id_token_encryption_enc_values_supported: { audience: 'oidc' },
+	subject_types_supported: { audience: 'oidc' },
+	acr_values_supported: { audience: 'oidc' },
+	claims_supported: { audience: 'oidc' },
+	claims_parameter_supported: { audience: 'oidc' },
+	end_session_endpoint: { audience: 'oidc' },
+	backchannel_logout_supported: { audience: 'oidc' },
+	backchannel_logout_session_supported: { audience: 'oidc' }
+};
+
 export const featuresKeyMap: Partial<Record<FeatureFlagKey, DiscoveryKey[]>> = {
 	'par.enabled': [
 		'pushed_authorization_request_endpoint',

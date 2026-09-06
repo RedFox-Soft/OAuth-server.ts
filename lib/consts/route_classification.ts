@@ -162,6 +162,10 @@ export const alwaysAvailableRoutes: readonly AlwaysAvailableRoute[] = [
 	// has found something must be able to read where to send it whatever the deployment has switched on.
 	{ method: 'GET', path: '/.well-known/security.txt' },
 	{ method: 'GET', path: '/.well-known/openid-configuration' },
+	// RFC 8414 §5 anticipates a server publishing both metadata documents. Unconditional for the
+	// reason discovery is: a plain OAuth client cannot determine what a deployment supports without
+	// reading it, and it is the only document such a client knows to ask for.
+	{ method: 'GET', path: '/.well-known/oauth-authorization-server' },
 	{ method: 'GET', path: routeNames.jwks },
 	{ method: 'GET', path: routeNames.authorization },
 	{ method: 'POST', path: routeNames.authorization },
@@ -212,6 +216,13 @@ export const corsRoutes: readonly CorsRoute[] = [
 	{
 		method: 'GET',
 		path: '/.well-known/openid-configuration',
+		cors: 'open'
+	},
+	// RFC 8414 §3: same argument, different document. A browser client discovering a deployment it
+	// was not built against reaches this path first of all.
+	{
+		method: 'GET',
+		path: '/.well-known/oauth-authorization-server',
 		cors: 'open'
 	},
 	{ method: 'GET', path: routeNames.jwks, cors: 'open' },
@@ -369,6 +380,11 @@ export const rateRoutes: readonly RateRoute[] = [
 	{
 		method: 'GET',
 		path: '/.well-known/openid-configuration',
+		rate: 'public'
+	},
+	{
+		method: 'GET',
+		path: '/.well-known/oauth-authorization-server',
 		rate: 'public'
 	},
 	{ method: 'GET', path: '/.well-known/security.txt', rate: 'public' },

@@ -74,6 +74,7 @@ describe('route classification', () => {
 	describe('CORS classification', () => {
 		const CORS_ENABLED = [
 			'GET /.well-known/openid-configuration',
+			'GET /.well-known/oauth-authorization-server',
 			'GET /jwks',
 			'POST /token',
 			'GET /userinfo',
@@ -99,7 +100,7 @@ describe('route classification', () => {
 			expect(declared.length).toBe(new Set(declared).size);
 		});
 
-		it('exposes exactly the eight routes a browser may read cross-origin', () => {
+		it('exposes exactly the nine routes a browser may read cross-origin', () => {
 			const enabled = mounted
 				.filter(
 					(route) => corsClassForPattern(route.method, route.path) !== 'none'
@@ -171,6 +172,7 @@ describe('route classification', () => {
 		// Cheap, public, and read by every client before it knows anything else about the deployment.
 		const PUBLIC = [
 			'GET /.well-known/openid-configuration',
+			'GET /.well-known/oauth-authorization-server',
 			'GET /.well-known/oauth-protected-resource/mcp',
 			'GET /.well-known/security.txt',
 			'GET /jwks',

@@ -270,14 +270,15 @@ flag before suspecting a defect. Flags are set in the admin console under **Sett
 
 ### Always available
 
-| Endpoint                                 | Description                                                               |
-| ---------------------------------------- | ------------------------------------------------------------------------- |
-| `GET  /health`                           | Liveness probe                                                            |
-| `GET  /.well-known/openid-configuration` | OpenID Connect discovery document (contents reflect enabled capabilities) |
-| `GET  /.well-known/security.txt`         | Security contact and disclosure policy (RFC 9116)                         |
-| `GET  /jwks`                             | JSON Web Key Set                                                          |
-| `GET, POST /auth`                        | Authorization endpoint                                                    |
-| `POST /token`                            | Token endpoint                                                            |
+| Endpoint                                       | Description                                                                                                               |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `GET  /health`                                 | Liveness probe                                                                                                            |
+| `GET  /.well-known/openid-configuration`       | OpenID Connect discovery document (contents reflect enabled capabilities)                                                 |
+| `GET  /.well-known/oauth-authorization-server` | Authorization server metadata for plain OAuth clients (RFC 8414); the same document minus the OpenID-Connect-only members |
+| `GET  /.well-known/security.txt`               | Security contact and disclosure policy (RFC 9116)                                                                         |
+| `GET  /jwks`                                   | JSON Web Key Set                                                                                                          |
+| `GET, POST /auth`                              | Authorization endpoint                                                                                                    |
+| `POST /token`                                  | Token endpoint                                                                                                            |
 
 ### Enabled by default
 
@@ -380,6 +381,7 @@ The **Flag** column names the capability's governing flag; `—` means always on
 | [RFC 7517](https://datatracker.ietf.org/doc/html/rfc7517)                                         | JSON Web Key (JWK)                                                                                                   | —                                   |
 | [OIDC Core 1.0](https://openid.net/specs/openid-connect-core-1_0.html)                            | OpenID Connect Core                                                                                                  | —                                   |
 | [OIDC Discovery 1.0](https://openid.net/specs/openid-connect-discovery-1_0.html)                  | OpenID Connect Discovery                                                                                             | —                                   |
+| [RFC 8414](https://datatracker.ietf.org/doc/html/rfc8414)                                         | OAuth 2.0 Authorization Server Metadata                                                                              | —                                   |
 | [RFC 9207](https://datatracker.ietf.org/doc/html/rfc9207)                                         | Authorization Server Issuer Identification                                                                           | —                                   |
 | [RFC 8707](https://datatracker.ietf.org/doc/html/rfc8707)                                         | Resource Indicators                                                                                                  | `resourceIndicators.enabled`        |
 | [RFC 7009](https://datatracker.ietf.org/doc/html/rfc7009)                                         | OAuth 2.0 Token Revocation                                                                                           | `revocation.enabled`                |
