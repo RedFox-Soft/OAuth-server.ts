@@ -367,7 +367,7 @@ describe('features.dPoP', async () => {
 
 				for (const [err] of spy.mock.calls) {
 					expect(err.error_detail).toBe(
-						'"jwk" (JSON Web Key) Header Parameter must be a public key'
+						'Invalid or unsupported JWK "alg" (Algorithm) Parameter value'
 					);
 				}
 			});
