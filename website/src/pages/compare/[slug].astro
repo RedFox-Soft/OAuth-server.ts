@@ -7,8 +7,10 @@ import Card from '../../components/ui/Card.astro';
 import Section from '../../components/ui/Section.astro';
 import Eyebrow from '../../components/ui/Eyebrow.astro';
 import CompareTable from '../../components/CompareTable.astro';
+import FaqSection from '../../components/FaqSection.astro';
 import { SITE_ORIGIN } from '../../data/seo.ts';
-import { techArticle } from '../../data/structured.ts';
+import { faqPage, techArticle } from '../../data/structured.ts';
+import { ageInDays, isStale } from '../../../scripts/seo/freshness.ts';
 
 export const getStaticPaths: GetStaticPaths = async () => {
 	const entries = await getCollection('compare');
@@ -27,6 +29,7 @@ const {
 	lastChecked,
 	sources,
 	bottomLine,
+	faq,
 	chooseThem,
 	chooseUs,
 	groups
@@ -45,6 +48,20 @@ const jsonLd = [
 		dateModified: lastChecked
 	})
 ];
+/*
+ * Built from the very array FaqSection renders below, so the two cannot disagree — and the
+ * guardrail's overclaim rule proves it, because every answer here must appear in the rendered text.
+ */
+if (faq && faq.length > 0) jsonLd.push(faqPage(faq));
+
+/*
+ * Past the freshness limit the page says so, to the reader, in place of the usual line. The
+ * build also warns, but build logs are read by nobody — a notice on a page being used to win
+ * comparisons is the version of this signal that actually gets acted on, and in the meantime
+ * the reader is told the truth about how old the claims are.
+ */
+const staleDays = ageInDays(lastChecked);
+const stale = isStale(lastChecked);
 ---
 
 <Site
@@ -58,11 +75,25 @@ const jsonLd = [
 		<h1 class="text-4xl font-[650] leading-[1.15] tracking-tight text-balance">{title}</h1>
 		<p class="mt-5 text-lg text-gray-600 dark:text-gray-400">{description}</p>
 		<p
-			class="mt-6 rounded-card border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400"
+			class:list={[
+				'mt-6 rounded-card border p-4 text-sm',
+				stale
+					? 'border-accent-300 bg-accent-50 text-gray-700 dark:border-accent-700 dark:bg-accent-950 dark:text-gray-200'
+					: 'border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400'
+			]}
 		>
-			Last checked {lastChecked} against the linked sources. {competitor} changes; where its
-			documentation did not say, this page says so rather than guessing. Found something out of
-			date? Tell us at{' '}
+			{
+				stale ? (
+					<Fragment>
+						<strong>Due for review.</strong> Last checked {lastChecked} — {staleDays} days ago.
+						Claims about {competitor} may have gone out of date since.{' '}
+					</Fragment>
+				) : (
+					<Fragment>Last checked {lastChecked} against the linked sources. </Fragment>
+				)
+			}
+			{competitor} changes; where its documentation did not say, this page says so rather than
+			guessing. Found something out of date? Tell us at{' '}
 			<a
 				href="mailto:hello@foxauth.dev?subject=Comparison%20correction"
 				class="font-medium text-accent-700 dark:text-accent-200">hello@foxauth.dev</a
@@ -122,6 +153,18 @@ const jsonLd = [
 			<Content />
 		</div>
 	</Section>
+
+	{
+		faq && faq.length > 0 && (
+			<Section narrow>
+				<Eyebrow>Questions</Eyebrow>
+				<h2 class="text-3xl font-[650] tracking-tight text-balance">
+					What people ask before they switch
+				</h2>
+				<FaqSection items={faq} class="mt-8" />
+			</Section>
+		)
+	}
 
 	<Section narrow>
 		<Eyebrow>Sources</Eyebrow>

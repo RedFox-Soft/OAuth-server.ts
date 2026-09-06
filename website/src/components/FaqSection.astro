@@ -1,0 +1,33 @@
+---
+/*
+ * The visible half of a question set. The machine-readable half is built from the same array by the
+ * caller, so the two cannot drift — and spec 036's structured-overclaim rule fails the build if they
+ * ever do, because it requires every answer a structured description claims to appear in the page's
+ * rendered text.
+ *
+ * The one way to break that: render this conditionally while emitting the markup unconditionally.
+ * That is exactly what the rule catches, which is the check earning its keep.
+ */
+import type { QuestionAnswer } from '../data/faq.ts';
+
+interface Props {
+	items: readonly QuestionAnswer[];
+	class?: string;
+}
+const { items, class: className } = Astro.props;
+---
+
+{
+	items.length > 0 && (
+		<div class:list={['flex flex-col gap-3', className]}>
+			{items.map((item) => (
+				<details class="rounded-card border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
+					<summary class="cursor-pointer font-[650] tracking-tight">
+						{item.question}
+					</summary>
+					<p class="mt-3 text-sm text-gray-600 dark:text-gray-400">{item.answer}</p>
+				</details>
+			))}
+		</div>
+	)
+}

@@ -6,6 +6,7 @@ import { collectPages } from './seo/collect.ts';
 import { writeImageSitemap } from './seo/image_sitemap.ts';
 import { writeLlmsFiles } from './seo/llms.ts';
 import { writeMarkdownAlternates } from './seo/markdown.ts';
+import { freshnessReport, freshnessWarning } from './seo/freshness.ts';
 import { report, verify } from './seo/verify.ts';
 
 /*
@@ -73,6 +74,20 @@ async function main(): Promise<void> {
 	});
 
 	for (const note of result.skipped) console.log(`seo: skipped ${note}`);
+
+	/*
+	 * Reported, never enforced. Staleness is the passage of time rather than a mistake anyone
+	 * made, and failing a build on it would block work unrelated to the page — so this prints
+	 * and the build carries on. The page's own notice is the signal that actually gets acted on.
+	 */
+	const freshness = freshnessReport(pages);
+	const warning = freshnessWarning(freshness);
+	if (warning) console.warn(warning);
+	else if (freshness.length > 0) {
+		console.log(
+			`seo: ${freshness.length} comparisons, all within the freshness limit`
+		);
+	}
 
 	if (result.violations.length > 0) {
 		console.error(

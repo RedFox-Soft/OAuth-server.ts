@@ -255,15 +255,25 @@ Four rules keep it honest:
 4. **One page record, checked against what shipped.** `website/scripts/postbuild.ts` runs after
    `astro build`, parses every emitted page into one `PageRecord` (`scripts/seo/collect.ts`), and
    hands that same set to every generator — the image sitemap, `llms.txt`, the `.md` alternates, the
-   social cards — and then to `scripts/seo/verify.ts`, which fails the build on any of twenty rules
-   naming the page and the rule. Two consequences worth knowing before editing anything here.
+   social cards — and then to `scripts/seo/verify.ts`, which fails the build on any of twenty-two
+   rules naming the page and the rule. Three consequences worth knowing before editing anything here.
    First, **every indexing decision lives in `website/src/data/seo.ts`**: the non-indexable list, the
-   title and description bands, the route→section map and the AI-crawler allowlist. `Seo.astro` and
-   the sitemap filter in `astro.config.mjs` both read it, because they used to disagree — a page
-   could say `noindex` while the sitemap advertised it. Second, docs pages never reach `Seo.astro`;
-   Starlight builds its own head, so `src/components/StarlightHead.astro` adds what it omits. A new
-   page needs a unique title (15–60 chars) and description (70–160), a section in the map, and a
-   link from somewhere reachable within three hops of the home page, or the build stops.
+   title and description bands, the route→section map, the AI-crawler allowlist and
+   `STRUCTURED_COVERAGE`. `Seo.astro` and the sitemap filter in `astro.config.mjs` both read it,
+   because they used to disagree — a page could say `noindex` while the sitemap advertised it.
+   Second, docs pages never reach `Seo.astro`; Starlight builds its own head, so
+   `src/components/StarlightHead.astro` adds what it omits. Third, the rules check both that
+   structured data is *correct* and that it is *present*: `STRUCTURED_COVERAGE` says what each kind
+   of page must carry, and a route matching no entry fails as `unclassified-page-type` — added after
+   the comparison pages shipped with no article markup past twenty passing rules.
+
+   So a new page needs a unique title (15–60 chars) and description (70–160), a section in the map,
+   a `STRUCTURED_COVERAGE` entry (`requires: []` is fine, but the `reason` is not optional), and a
+   link from somewhere reachable within three hops of the home page, or the build stops. Question
+   sets are data — one array feeds both `FaqSection.astro` and `faqPage()`, so the visible and
+   machine-readable forms cannot drift, and the overclaim rule proves it. Comparison pages carry
+   `lastChecked`; past `FRESHNESS_LIMIT_DAYS` the build warns and the page shows a "due for review"
+   notice, but the build still passes — staleness is the passage of time, not a mistake to block on.
 
 Hand-written docs live in `website/src/content/docs/docs/<section>/*.mdx` (Starlight autogenerates
 the sidebar per section; `sidebar.order` in frontmatter orders pages). The links validator fails the

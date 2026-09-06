@@ -1,0 +1,176 @@
+---
+title: FoxAuth compared with Ory Hydra
+competitor: Ory Hydra
+description: Ory Hydra is an OAuth 2.0 and OpenID Connect server that delegates login to an app you write. FoxAuth ships the login, consent and admin surfaces with it.
+lastChecked: '2026-09-06'
+sources:
+  - https://github.com/ory/hydra
+  - https://www.ory.com/docs/hydra/self-hosted/quickstart
+  - https://www.ory.com/docs/oauth2-oidc/device-authorization
+bottomLine: 'Pick Ory Hydra if you already have an identity system and want a hardened, Apache-licensed OAuth server in front of it. Pick FoxAuth if you do not want to build a login and consent application before you can issue your first token.'
+chooseThem:
+  - 'You already run your own user store and login UI, and want an OAuth server that stays out of it.'
+  - 'You need a permissive Apache-2.0 licence with no source-available restriction.'
+  - 'You want Go, or a relational database you already operate.'
+  - 'You want the option of a commercially supported build from the vendor.'
+chooseUs:
+  - 'You want users, login, consent, registration and an admin console in the box rather than as a project to build.'
+  - 'You need DPoP, PAR, CIBA, mTLS, RAR or JARM, none of which Ory documents for Hydra.'
+  - 'Your team writes TypeScript and would rather extend named seams than run a Go service.'
+  - 'You want an AI agent administering the instance through the same audited path a human uses.'
+faq:
+  - question: 'What is the difference between FoxAuth and Ory Hydra?'
+    answer: 'Ory Hydra is an OAuth 2.0 and OpenID Connect server that does not manage identities: its quickstart has you run a separate login and consent application alongside it, and Ory sells Kratos as the identity system to pair with it. FoxAuth is both halves in one server — it stores end users in buckets, serves the login, consent and registration screens, and issues the tokens. If you already have an identity system, Hydra''s split is an advantage; if you do not, it is a second project.'
+  - question: 'Does Ory Hydra support DPoP, PAR or FAPI?'
+    answer: 'Ory''s own documentation for Hydra does not document DPoP, PAR, CIBA, mTLS or FAPI, which is why this page records them as not documented rather than as absent — community threads discuss them, but a claim that is not in the product documentation is not one this page will make. FoxAuth implements DPoP (RFC 9449), PAR (RFC 9126), mTLS (RFC 8705), CIBA, RAR (RFC 9396) and JARM, each behind a feature flag on the instance you run.'
+  - question: 'Is Ory Hydra more production-ready than FoxAuth?'
+    answer: 'Yes, on the evidence of deployment history. Ory Hydra has been in production use for years, is Apache-2.0 licensed with no source-available restriction, and has a commercial support option from the vendor. FoxAuth is at a 0.1.0 release, which means its HTTP surface and admin API may still change between minor versions. That is a real difference and it is the strongest argument for choosing Hydra.'
+  - question: 'Can I migrate from Ory Hydra to FoxAuth?'
+    answer: 'OAuth clients port over — both servers speak the same protocol, so a client changes its issuer URL and client id and keeps working. The larger piece of work is the opposite of a migration: the login and consent application you wrote for Hydra becomes unnecessary, because FoxAuth serves those screens itself, and the users it authenticated have to be moved into a FoxAuth user bucket.'
+groups:
+  - label: What you get in the box
+    rows:
+      - dimension: Scope
+        us:
+          {
+            status: yes,
+            text: 'OAuth 2.1 and OIDC server, plus end users, login, consent, registration and an admin console.'
+          }
+        them:
+          {
+            status: flag,
+            text: 'OAuth 2.0 and OIDC server. Login and consent are a separate application you provide.'
+          }
+        verdict: us
+        why: 'Hydra is deliberately not an identity provider; with FoxAuth there is no second application to build.'
+        note: 'The quickstart runs Hydra alongside "an exemplary User Login & Consent App".'
+      - dimension: User storage
+        us:
+          {
+            status: yes,
+            text: 'End users live in buckets, managed through the console or the management API.'
+          }
+        them:
+          {
+            status: no,
+            text: 'No user store. Ory positions Kratos as the identity system to pair with Hydra.'
+          }
+        verdict: different
+        why: 'If you already have an identity system, Hydra staying out of it is the point.'
+      - dimension: Runtime and stack
+        us: { status: yes, text: 'TypeScript on Bun; the HTTP layer is Elysia.' }
+        them: { status: yes, text: 'Go.' }
+        verdict: different
+        why: 'Pick the one your team can read and debug under pressure.'
+        note: 'The repository states Hydra is "Written in Go".'
+      - dimension: Storage
+        us:
+          {
+            status: yes,
+            text: 'MongoDB in production, in-memory for tests, behind one adapter interface.'
+          }
+        them: { status: yes, text: 'PostgreSQL, MySQL and SQLite.' }
+        verdict: them
+        why: 'Hydra speaks the relational databases most teams already operate.'
+  - label: Protocol coverage
+    rows:
+      - dimension: Core OAuth and OIDC
+        us:
+          {
+            status: yes,
+            text: 'OAuth 2.1 with PKCE mandatory for every client, OIDC Core and Discovery.'
+          }
+        them:
+          {
+            status: yes,
+            text: 'RFC 6749 with PKCE, OIDC Core, Discovery, and front- and back-channel logout.'
+          }
+        verdict: even
+        why: 'Both are complete against the core specifications; Hydra additionally documents front- and back-channel logout.'
+      - dimension: Device flow
+        us: { status: yes, text: 'RFC 8628, behind a feature flag.' }
+        them: { status: yes, text: 'RFC 8628, documented with a configuration guide.' }
+        verdict: even
+        why: 'Both implement it.'
+        note: 'Ory documents the device authorization grant separately from the repository README.'
+      - dimension: Sender-constrained tokens
+        us: { status: yes, text: 'DPoP (RFC 9449) and mTLS (RFC 8705).' }
+        them: { status: unknown, text: 'Not documented for Hydra.' }
+        verdict: us
+        why: 'This is the clearest protocol gap between the two, and the reason to weigh FoxAuth for a regulated deployment.'
+      - dimension: 'PAR, CIBA, RAR and JARM'
+        us:
+          {
+            status: yes,
+            text: 'PAR (RFC 9126), CIBA, RAR (RFC 9396) and JARM, each behind a flag.'
+          }
+        them: { status: unknown, text: 'Not documented for Hydra.' }
+        verdict: us
+        why: 'The banking-grade profiles are implemented here rather than on a roadmap.'
+      - dimension: Dynamic client registration
+        us: { status: yes, text: 'RFC 7591 and RFC 7592.' }
+        them: { status: yes, text: 'RFC 7591, RFC 7592 and OIDC Dynamic Client Registration.' }
+        verdict: even
+        why: 'Both register clients dynamically.'
+  - label: Administration and licensing
+    rows:
+      - dimension: Admin console
+        us:
+          {
+            status: yes,
+            text: 'A server-rendered console for projects, clients, users, settings, keys and an append-only audit trail.'
+          }
+        them:
+          {
+            status: flag,
+            text: 'Administration is through the API and CLI; Ory Network is the vendor-hosted console.'
+          }
+        verdict: us
+        why: 'Self-hosted Hydra is administered by API; FoxAuth ships the console with the server.'
+      - dimension: Administration by an AI agent
+        us:
+          {
+            status: yes,
+            text: 'MCP control plane over the console''s own routes, audited and confirmation-gated. Off by default.'
+          }
+        them: { status: unknown, text: 'Not documented.' }
+        verdict: us
+        why: 'The agent path here is the console''s code rather than a second privileged API.'
+      - dimension: Licence
+        us: { status: flag, text: 'FSL-1.1-ALv2: source-available, converting to Apache 2.0 after two years.' }
+        them: { status: yes, text: 'Apache-2.0.' }
+        verdict: them
+        why: 'Apache-2.0 carries no competing-service restriction; FSL does until each version converts.'
+        note: 'Ory offers "support for self-hosted Ory software through the Ory Enterprise License (OEL)".'
+      - dimension: Maturity
+        us: { status: flag, text: '0.1.0. The HTTP surface and admin API may still change between minor releases.' }
+        them: { status: yes, text: 'Years of production deployment behind it.' }
+        verdict: them
+        why: 'This is the strongest single argument for Hydra and this page will not soften it.'
+---
+
+## Where the two genuinely differ
+
+The comparison is not really about protocol coverage, though that is where the table shows the
+widest gaps. It is about how much of an identity system you already have.
+
+Ory Hydra is an OAuth and OpenID Connect server that deliberately does not manage users. Its
+quickstart runs a separate login and consent application beside it, and Ory sells a second product,
+Kratos, as the identity system to pair with it. That split is a virtue when you already have a user
+store and a login page you trust: Hydra issues tokens against your authentication decisions and
+stays out of everything else.
+
+FoxAuth makes the opposite bet. End users live in buckets on the server, the login, consent and
+registration screens are served by it, and the admin console manages all of it — so the first token
+is issued without writing an application first.
+
+## What the protocol table does and does not say
+
+Where this page records a capability as "not documented", that is exactly what it means: Ory's own
+documentation for Hydra does not describe DPoP, PAR, CIBA, mTLS or FAPI support. There are community
+issues and discussions about several of them, and the underlying `fosite` library has implemented
+some. None of that is product documentation, and this page does not make claims a vendor has not
+made about their own product.
+
+If you need sender-constrained tokens or the banking-grade profiles today, that gap is the reason to
+look at FoxAuth. If you do not, it is not.

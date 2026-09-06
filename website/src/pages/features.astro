@@ -5,6 +5,7 @@ import ScreenshotFigure from '../components/ScreenshotFigure.astro';
 import type { Feature } from '../components/FeatureGrid.astro';
 import Button from '../components/ui/Button.astro';
 import Section from '../components/ui/Section.astro';
+import CompareLinks from '../components/CompareLinks.astro';
 import Eyebrow from '../components/ui/Eyebrow.astro';
 
 const rfc = (n: string) => ({
@@ -382,8 +383,9 @@ const groups: {
 		<p class="mt-3 text-gray-600 dark:text-gray-400">
 			We keep a factual, dated comparison against the servers teams usually weigh this against.
 		</p>
+		<CompareLinks class="mt-3" />
 		<div class="mt-8 flex flex-wrap gap-3">
-			<Button href="/compare/">Compare</Button>
+			<Button href="/compare/">All comparisons</Button>
 			<Button href="/pricing/" variant="secondary">Pricing</Button>
 		</div>
 	</Section>

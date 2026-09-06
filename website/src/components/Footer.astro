@@ -1,15 +1,28 @@
 ---
+import { getCollection } from 'astro:content';
 import Brand from './Brand.astro';
 import { loadVersion } from '../data/version';
 
 const v = loadVersion();
+
+/*
+ * The comparisons are listed individually rather than behind one "Compare" link. They target the
+ * queries with the most commercial intent on the site and had a single inbound link each; naming
+ * them here gives every one a site-wide link whose anchor text is the product a reader is searching
+ * for. Read from the collection, so a new comparison appears without editing this file.
+ */
+const comparisons = (await getCollection('compare'))
+	.sort((a, b) => a.data.competitor.localeCompare(b.data.competitor))
+	.map((entry) => ({ href: `/compare/${entry.id}/`, label: entry.data.competitor }));
+
 const columns = [
 	{
 		heading: 'Product',
 		links: [
 			{ href: '/features/', label: 'Features' },
 			{ href: '/pricing/', label: 'Pricing' },
-			{ href: '/compare/', label: 'Compare' }
+			{ href: '/compare/', label: 'Compare' },
+			...comparisons
 		]
 	},
 	{
@@ -26,7 +39,8 @@ const columns = [
 			{ href: 'https://github.com/RedFox-Soft/OAuth-server.ts', label: 'GitHub' },
 			{ href: '/changelog/', label: 'Changelog' },
 			{ href: '/security/', label: 'Security' },
-			{ href: '/license/', label: 'License' }
+			{ href: '/license/', label: 'License' },
+			{ href: '/llms.txt', label: 'For LLMs (llms.txt)' }
 		]
 	},
 	{

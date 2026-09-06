@@ -29,6 +29,47 @@ const entries = (await getCollection('compare')).sort((a, b) =>
 		</p>
 	</Section>
 
+	<Section narrow tone="muted">
+		<Eyebrow>The short version</Eyebrow>
+		<h2 class="text-3xl font-[650] tracking-tight text-balance">
+			Three questions decide it, and none of them is a feature count.
+		</h2>
+		<div class="mt-6 flex max-w-3xl flex-col gap-4 text-gray-600 dark:text-gray-400">
+			<p>
+				<strong class="text-gray-900 dark:text-gray-100">Where does the data live?</strong> This
+				is the question that settles most of them. A managed service holds your users on its
+				infrastructure and bills you for them; FoxAuth holds them in a database you run and bills
+				you for nothing. If a regulator, a contract or a procurement review requires identity
+				data to stay in your own estate, the decision is already made and the rest of this page
+				is detail.
+			</p>
+			<p>
+				<strong class="text-gray-900 dark:text-gray-100">What does the bill grow with?</strong>{' '}
+				Hosted identity is priced per monthly active user, which is cheap while you are small and
+				is the reason most teams start looking. Self-hosting moves that cost to infrastructure
+				and to the engineering time that keeps a server healthy — a smaller bill at scale, and a
+				real one.
+			</p>
+			<p>
+				<strong class="text-gray-900 dark:text-gray-100">
+					What does your team already run?
+				</strong>{' '}
+				A team fluent in the JVM with a relational database has a shorter path to Keycloak than
+				to anything else, whatever the protocol tables say. A team writing TypeScript has the
+				opposite. Operational familiarity beats a feature comparison more often than anyone
+				admits in a comparison table.
+			</p>
+			<p>
+				Where FoxAuth is genuinely behind, the pages say so plainly: it has no SAML support and
+				none planned, it is at a <code>0.x</code> release with an HTTP surface that may still
+				change between minor versions, and it has none of the production hardening years of
+				deployment buys. Where it is ahead — the banking-grade profiles without a plan tier, and
+				an AI agent administering the instance through the same audited path a human uses — the
+				rows say that too.
+			</p>
+		</div>
+	</Section>
+
 	<Section tone="muted">
 		<div class="grid gap-6 sm:grid-cols-2">
 			{

@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -33,6 +34,28 @@ export class MissingGitHistory extends Error {
 
 const cache = new Map<string, string | undefined>();
 
+/*
+ * A file git has never seen has no commit date, and a page cannot be built until it is committed —
+ * which would mean a contributor writing a new page could not get a green build until they had
+ * committed it. For an *untracked* file the filesystem mtime is not a guess: it is genuinely when
+ * the file was last written.
+ *
+ * The check is `ls-files --error-unmatch` rather than "git returned nothing", deliberately. A
+ * shallow clone also returns nothing, and there the mtime is the checkout time — the exact wrong
+ * answer this module exists to refuse. Tracked file with no history still fails loudly.
+ */
+function isUntracked(relativePath: string): boolean {
+	try {
+		execFileSync('git', ['ls-files', '--error-unmatch', '--', relativePath], {
+			cwd: ROOT,
+			stdio: 'ignore'
+		});
+		return false;
+	} catch {
+		return true;
+	}
+}
+
 function commitDate(relativePath: string): string | undefined {
 	if (cache.has(relativePath)) return cache.get(relativePath);
 
@@ -50,6 +73,13 @@ function commitDate(relativePath: string): string | undefined {
 		value = out === '' ? undefined : out;
 	} catch {
 		value = undefined;
+	}
+
+	if (value === undefined && isUntracked(relativePath)) {
+		const stats = statSync(resolve(ROOT, relativePath), {
+			throwIfNoEntry: false
+		});
+		value = stats?.mtime.toISOString();
 	}
 
 	cache.set(relativePath, value);

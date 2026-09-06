@@ -37,7 +37,17 @@ export const GET: APIRoute = () => {
 		}
 	}
 
-	lines.push(`Sitemap: ${SITE_ORIGIN}/sitemap-index.xml`, '');
+	/*
+	 * `Sitemap:` is part of the robots exclusion standard; the llms.txt line is a convention and
+	 * a crawler has to already be looking for it. It is named here because it costs nothing, and
+	 * linked from the footer as well, because a convention alone is not discovery.
+	 */
+	lines.push(
+		`Sitemap: ${SITE_ORIGIN}/sitemap-index.xml`,
+		`# Machine-readable index of every page: ${SITE_ORIGIN}/llms.txt`,
+		`# Full text of the site: ${SITE_ORIGIN}/llms-full.txt`,
+		''
+	);
 
 	return new Response(lines.join('\n'), {
 		headers: { 'Content-Type': 'text/plain; charset=utf-8' }

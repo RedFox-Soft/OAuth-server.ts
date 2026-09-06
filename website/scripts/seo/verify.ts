@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import {
 	DESCRIPTION_BAND,
 	TITLE_BAND,
+	coverageFor,
 	isIndexable,
 	normaliseRoute,
 	sectionFor
@@ -199,20 +200,14 @@ export function verify(input: VerifyInput): VerifyOutput {
 				page.route,
 				'indexable but absent from the sitemap'
 			);
-		if (!llms.has(page.route))
+		if (!llms.has(page.route) && sectionFor(page.route) !== undefined) {
 			fail('sitemap-parity', page.route, 'indexable but absent from llms.txt');
+		}
 		if (page.lastmod === undefined) {
 			fail(
 				'missing-lastmod',
 				page.route,
 				`no git date for ${page.sourceFile ?? '(unresolved source)'}`
-			);
-		}
-		if (sectionFor(page.route) === undefined) {
-			fail(
-				'sitemap-parity',
-				page.route,
-				'matches no section in src/data/seo.ts'
 			);
 		}
 	}
@@ -225,6 +220,41 @@ export function verify(input: VerifyInput): VerifyOutput {
 				route,
 				'listed in the sitemap but not a built page'
 			);
+	}
+
+	/*
+	 * --- structured-data coverage ---------------------------------------------------------------
+	 * The rules below check that what a page carries is well-formed and truthful. These two check
+	 * that it carries anything at all, which is the half that was missing when the comparison pages
+	 * shipped with no article markup and every rule passed.
+	 */
+	for (const page of indexable) {
+		if (sectionFor(page.route) === undefined) {
+			fail(
+				'unclassified-page-type',
+				page.route,
+				'matches no section in SECTION_PREFIXES — classify it in src/data/seo.ts'
+			);
+		}
+		const entry = coverageFor(page.route);
+		if (!entry) {
+			fail(
+				'unclassified-page-type',
+				page.route,
+				'matches no entry in STRUCTURED_COVERAGE — classify it in src/data/seo.ts'
+			);
+			continue;
+		}
+		const present = new Set(page.structured.map((block) => block.type));
+		for (const required of entry.requires) {
+			if (!present.has(required)) {
+				fail(
+					'structured-coverage',
+					page.route,
+					`requires ${required}, which the page does not carry (${entry.reason})`
+				);
+			}
+		}
 	}
 
 	// --- structured data ------------------------------------------------------------------------

@@ -26,6 +26,15 @@ chooseUs:
   - 'A regulator or a contract requires identity data to stay in your own database.'
   - 'You need DPoP, PAR, CIBA or mTLS without an Enterprise plan and an add-on.'
   - 'You want an AI agent administering the instance through the same audited path a human uses.'
+faq:
+  - question: 'Can I migrate from Auth0 to FoxAuth?'
+    answer: 'Users, clients and their metadata port over: FoxAuth stores end users in buckets you provision through the admin console or the management API, and OAuth clients can be created there or by dynamic client registration. What does not port is anything written in Auth0''s own extension model — Rules, Actions and Hooks have no equivalent and are rewritten as override seams, of which FoxAuth exposes 31 resolved at call time. Budget the migration by how much logic lives in Actions, not by how many users you have.'
+  - question: 'Does FoxAuth support social logins like Google and GitHub?'
+    answer: 'Through upstream OIDC federation, configured per user bucket, so an end user signs in at their own identity provider and returns with a token FoxAuth issues. That covers any provider speaking OpenID Connect. It is not the catalogue of pre-built connections Auth0 ships, and setting one up means registering a client with that provider yourself.'
+  - question: 'Is FoxAuth cheaper than Auth0?'
+    answer: 'The bill is a different shape rather than uniformly smaller. FoxAuth is free to self-host under FSL-1.1-ALv2 and costs you a database, a container and the engineering time to keep them healthy, so the cost grows with infrastructure rather than with monthly active users. Auth0 bills per monthly active user, which is cheaper at small scale and is the thing teams usually come to us about at large scale.'
+  - question: 'Do I get FAPI, DPoP and PAR without an enterprise plan?'
+    answer: 'Yes. FoxAuth implements DPoP (RFC 9449), PAR (RFC 9126), mTLS (RFC 8705), CIBA, RAR (RFC 9396) and JARM, and every one is a feature flag on the instance you run rather than a plan tier or an add-on. They are off by default and turned on per deployment.'
 groups:
   - label: Getting started and operations
     rows:

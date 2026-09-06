@@ -14,8 +14,10 @@
 
   <p>
     <a href="https://foxauth.dev">Website</a> ·
-    <a href="https://datatracker.ietf.org/doc/html/rfc6749">OAuth 2.0</a> ·
+    <a href="https://foxauth.dev/features/">Features</a> ·
     <a href="https://foxauth.dev/docs/">Docs</a> ·
+    <a href="https://foxauth.dev/compare/">Compare</a> ·
+    <a href="https://datatracker.ietf.org/doc/html/rfc6749">OAuth 2.0</a> ·
     <a href="https://openid.net/specs/openid-connect-core-1_0.html">OpenID Connect</a> ·
     <a href="https://bun.sh/">Bun</a> ·
     <a href="LICENSE">FSL-1.1-ALv2 License</a>

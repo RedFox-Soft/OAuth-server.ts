@@ -11,6 +11,25 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- site: the SEO guardrail now checks that structured data is *present*, not only that it is correct
+  (spec 037). It could tell whether a description was well-formed and truthful but not that one
+  should exist, which is how the comparison pages shipped with no article markup past twenty passing
+  rules. `STRUCTURED_COVERAGE` says what each kind of page must carry, an unclassified route fails
+  the build naming the file to edit, and both were shown failing before being trusted.
+
+  Around that: the comparison pages went from one inbound link each to twelve, anchored on the
+  competitor's name and derived from the collection so a new one appears everywhere on arrival; the
+  pricing and comparison pages publish their questions and answers as structured data from the same
+  array the page renders, so the two cannot drift and the existing overclaim rule proves it; the
+  documentation index grew from 30 words to a real orientation page and the comparison index gained
+  a prose summary; and `llms.txt`, generated in the previous release and pointed at by nothing, is
+  now named in `robots.txt` and linked from the footer. Claims about other products are reported as
+  due for review after 180 days, in the build log and on the page itself — without failing a build,
+  because staleness is the passage of time rather than a mistake to block on. Three comparisons
+  were added — Ory Hydra, Zitadel and authentik — each researched against that product's own
+  documentation, recording a capability their documentation does not describe as not documented
+  rather than as absent.
+
 - site: search and AI discoverability, enforced by the build (spec 036). Every page now carries a
   checked title and summary, a per-page `lastmod` from git, structured data and its own social card —
   documentation pages included, which had none of it because Starlight builds its own head. For

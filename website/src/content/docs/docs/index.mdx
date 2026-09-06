@@ -1,6 +1,72 @@
 ---
 title: Documentation
-description: How to run, integrate and administer OAuth-server.ts, the engine behind FoxAuth.
+description: How to run, integrate and administer OAuth-server.ts — the engine behind FoxAuth — from a first container to a production deployment.
 ---
 
-FoxAuth is built on **OAuth-server.ts**, a source-available OAuth 2.1 / OpenID Connect server. Start with [Get started](/docs/get-started/docker-compose/), then [Deploy](/docs/deploy/fly/), and use the [Reference](/docs/reference/settings/) for every setting, endpoint and tool.
+FoxAuth is built on **OAuth-server.ts**, a source-available OAuth 2.1 and OpenID Connect
+authorization server you run yourself. This documentation covers three jobs: getting a server
+running, connecting an application to it, and operating it once real users depend on it. Pick the
+one you are doing now.
+
+## Getting it running
+
+Start with [Run with Docker Compose](/docs/get-started/docker-compose/) — one command starts
+MongoDB, provisions the schema and serves the authorization server, which is the fastest way to see
+a working instance. If you would rather work against the source, [Run from
+source](/docs/get-started/from-source/) clones the repository and starts it with Bun.
+
+Either way the next step is [Create the first administrator](/docs/get-started/first-admin/): a
+fresh database has no accounts, and the one-time setup screen is how the first one is made. Turn on
+the second factor there before anything else.
+
+## Connecting an application
+
+An application talks to the server as an **OAuth client**, and a client has to exist before it can
+ask for a token. [Register your first client](/docs/get-started/first-client/) covers the pieces
+that trip people up — the difference between a public and a confidential client, why redirect URIs
+are matched exactly rather than by pattern, and how a client decides which set of users it signs in.
+
+Then [Get your first token](/docs/get-started/first-token/) walks the Authorization Code flow with
+PKCE end to end using `curl`, from the code challenge to a decoded ID token and a UserInfo call.
+PKCE is mandatory for every client, not only public ones — that is OAuth 2.1, and it is the most
+common surprise for anyone arriving from an OAuth 2.0 server.
+
+## Running it in production
+
+[Deploy](/docs/deploy/fly/) covers the targets people actually use: [Fly.io](/docs/deploy/fly/),
+[Kubernetes](/docs/deploy/kubernetes/), [Docker Compose](/docs/deploy/docker-compose/) on a single
+host, and [MongoDB Atlas](/docs/deploy/mongodb-atlas/) for the database. Whichever you choose,
+[Behind a reverse proxy](/docs/deploy/reverse-proxy/) matters: the issuer URL must be an `https://`
+address and must match what clients were configured with, and a proxy that rewrites headers without
+being told to is the usual cause of tokens that validate locally and fail in production.
+
+Read [Upgrading](/docs/deploy/upgrade/) before you move between versions. The server is at a `0.x`
+release, which means the HTTP surface and the admin API may still change between minor versions;
+the changelog says what moved, and the setup script has to be re-run afterwards so new collections
+and indexes exist.
+
+## Looking something up
+
+The Reference section is generated from the server's own source on every build, so it describes the
+release the site was built from rather than a hand-maintained copy:
+
+- **[Settings](/docs/reference/settings/)** — every server-wide flag and option, what it does, and
+  whether changing it needs a restart.
+- **[Endpoints](/docs/reference/endpoints/)** — every route the server serves, which feature flag
+  governs it, and its CORS and rate-limit class.
+- **[Admin API](/docs/reference/admin-api/)** — the management API behind the console.
+- **[MCP tools](/docs/reference/mcp-tools/)** — the operations an AI agent may perform, which is a
+  deliberate allow-list rather than the whole admin surface.
+- **[Addon seams](/docs/reference/addon-seams/)** — the named functions you replace with your own
+  instead of forking.
+- **[Environment variables](/docs/reference/environment/)** — what has to be set before the server
+  will start.
+
+## What this server is not
+
+It speaks OAuth 2.1 and OpenID Connect, and nothing else. There is no SAML support and none planned.
+The Implicit and Resource Owner Password Credentials grants are not implemented, because OAuth 2.1
+removes them — if an application depends on either, it needs changing before it can use this server.
+
+If you are still deciding whether to run it at all, the [comparisons](/compare/) put it beside the
+servers teams usually weigh it against, with the date each claim was checked.

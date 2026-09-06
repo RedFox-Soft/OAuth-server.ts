@@ -23,6 +23,15 @@ chooseUs:
   - 'You want PKCE for every client, exact redirect matching and no Implicit grant as the default, not per-client configuration.'
   - "You want an AI agent to administer the instance through the console's own permission checks and audit trail."
   - 'You run MongoDB, or you want a server small enough to mount inside your own Bun service.'
+faq:
+  - question: 'Can I migrate from Keycloak to FoxAuth?'
+    answer: 'Clients and users move without much trouble — both are OpenID Connect servers, so a client written against Keycloak''s token endpoint works against FoxAuth''s once the issuer and the client id change. The work is in what Keycloak calls realms, mappers and authentication flows: FoxAuth models tenancy as projects and user buckets, and custom behaviour as 31 named override seams in TypeScript rather than as SPI implementations in Java.'
+  - question: 'Is FoxAuth lighter to run than Keycloak?'
+    answer: 'It is a Bun process and a MongoDB database, which is a smaller operational surface than a JVM application server and a relational schema, and it starts in under a second rather than tens of seconds. That is a real difference in memory and startup, not in what the protocol endpoints do. Keycloak has years more production hardening behind it, and that is worth weighing against a 0.x release.'
+  - question: 'Does FoxAuth support SAML?'
+    answer: 'No. FoxAuth implements OAuth 2.1 and OpenID Connect only, and there is no SAML support planned. If an application in your estate can only speak SAML, FoxAuth cannot serve it and Keycloak can — that is a reason to stay where you are.'
+  - question: 'Can an AI agent administer FoxAuth?'
+    answer: 'Yes, over MCP, and it is the same code path a human administrator uses rather than a separate privileged API. Every agent action runs through the console''s own routes, permission checks and validation, lands in the append-only audit trail attributed to the agent, and destructive operations require a second confirming call. It is off until you set mcp.enabled.'
 groups:
   - label: Getting started and operations
     rows:

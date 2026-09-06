@@ -65,7 +65,24 @@ export const collections = {
 						)
 					})
 				)
-				.min(1)
+				.min(1),
+			/*
+			 * The questions this comparison provokes, answered. One array feeds both the visible
+			 * section and the machine-readable description, so the two cannot disagree — and the
+			 * guardrail's existing overclaim rule proves it on every build by requiring every
+			 * answer to appear in the rendered text. Optional so a page can ship before its
+			 * questions are written.
+			 */
+			faq: z
+				.array(
+					z.object({
+						/* In the words a reader would use, not assembled from search terms. */
+						question: z.string().min(1),
+						/* Must stay true and comprehensible quoted alone, without its question. */
+						answer: z.string().min(1)
+					})
+				)
+				.optional()
 		})
 	})
 };

@@ -26,16 +26,6 @@ const SITE_SUMMARY =
 	'Source-available OAuth 2.1 and OpenID Connect authorization server, built on OAuth-server.ts. ' +
 	'Self-hosted or cloud-managed, with an admin console and an MCP control plane an AI agent can drive.';
 
-export class UnclassifiedRoute extends Error {
-	constructor(route: string) {
-		super(
-			`Route ${route} matches no section in src/data/seo.ts.\n` +
-				'Classify it there — an unclassified page is one nobody will notice is missing from the index.'
-		);
-		this.name = 'UnclassifiedRoute';
-	}
-}
-
 /** Titles carry a " — FoxAuth" suffix for search results; the index has the site name already. */
 function label(title: string): string {
 	return title.replace(/\s+[—–|]\s+FoxAuth\s*$/, '').trim();
@@ -46,7 +36,14 @@ export function indexEntries(pages: PageRecord[]): LlmsEntry[] {
 	for (const page of pages) {
 		if (!page.indexable) continue;
 		const section = sectionFor(page.route);
-		if (!section) throw new UnclassifiedRoute(page.route);
+		/*
+		 * Skipped rather than thrown on. This module used to throw here, which meant an
+		 * unclassified route died with a stack trace before verify.ts could report it — one
+		 * condition guarded in two places, the earlier one failing on the first offender instead
+		 * of collecting them all. verify.ts's unclassified-page-type rule owns it now and reports
+		 * it in the same format as every other violation.
+		 */
+		if (!section) continue;
 		entries.push({
 			url: page.canonical,
 			label: label(page.title),

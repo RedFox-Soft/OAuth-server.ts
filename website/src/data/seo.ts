@@ -59,6 +59,116 @@ export const SECTION_ORDER: readonly SectionName[] = [
 	'Project'
 ];
 
+export type StructuredType =
+	| 'Organization'
+	| 'SoftwareApplication'
+	| 'TechArticle'
+	| 'FAQPage'
+	| 'BreadcrumbList';
+
+/*
+ * What each kind of page must describe about itself.
+ *
+ * The guardrail could already tell whether a structured description was well-formed and truthful; it
+ * had no way to say one should exist. That is how the comparison pages shipped with no article
+ * markup while twenty rules passed. This table is the missing half, and it is deliberately shaped
+ * like SECTION_PREFIXES above — longest prefix wins, an unmatched route is a build failure — so a
+ * contributor meets one idea twice rather than two ideas once.
+ *
+ * `requires: []` is a decision, which is why `reason` is mandatory: a page that needs nothing has to
+ * say so, or "nobody classified this" and "this needs nothing" become indistinguishable.
+ *
+ * BreadcrumbList is not listed. Seo.astro adds it to every route below the top level automatically,
+ * so requiring it per entry would be twenty copies of one fact.
+ */
+export interface CoverageEntry {
+	prefix: string;
+	requires: readonly StructuredType[];
+	reason: string;
+	/*
+	 * Match this route exactly rather than as a prefix. Needed wherever a section index sits at the
+	 * same path as the pages beneath it — /compare/ lists comparisons and is not itself one — and
+	 * for `/`, which would otherwise be a catch-all that silently absorbed every unclassified route
+	 * and made the unclassified-page-type rule unreachable.
+	 */
+	exact?: true;
+}
+
+export const STRUCTURED_COVERAGE: readonly CoverageEntry[] = [
+	{
+		prefix: '/compare/',
+		exact: true,
+		requires: [],
+		reason:
+			'An index listing the comparisons; the assessments are the pages beneath it.'
+	},
+	{
+		prefix: '/compare/',
+		requires: ['TechArticle', 'FAQPage'],
+		reason:
+			'A dated, sourced assessment of another product is an article, and was the page type that shipped without one.'
+	},
+	{
+		prefix: '/docs/',
+		requires: ['TechArticle'],
+		reason:
+			'Technical documentation; Starlight pages get it from StarlightHead.astro.'
+	},
+	{
+		prefix: '/pricing/',
+		requires: ['FAQPage'],
+		reason:
+			'The licensing and cost questions readers actually ask; no structured price, which would outlive the terms it describes.'
+	},
+	{
+		prefix: '/features/',
+		requires: [],
+		reason:
+			'A capability list, not an article. SoftwareApplication lives on the home page so one page owns the product identity.'
+	},
+	{
+		prefix: '/contact/',
+		requires: [],
+		reason:
+			'A form and two addresses; nothing to describe that the page does not already say.'
+	},
+	{
+		prefix: '/changelog/',
+		requires: [],
+		reason:
+			'Rendered from the repository CHANGELOG; a release list is not an article about a subject.'
+	},
+	{
+		prefix: '/security/',
+		requires: [],
+		reason:
+			'Rendered from the repository SECURITY policy, same reasoning as the changelog.'
+	},
+	{
+		prefix: '/license/',
+		requires: [],
+		reason: 'Rendered from the repository LICENSE and NOTICE, same reasoning.'
+	},
+	{
+		prefix: '/',
+		exact: true,
+		requires: ['Organization', 'SoftwareApplication'],
+		reason: 'The one page that says who publishes this and what the product is.'
+	}
+];
+
+/*
+ * How long a claim about somebody else's product is trusted before it is reported as due for
+ * re-checking. Long enough that a well-maintained page is not nagged, short enough that a claim
+ * about a fast-moving product does not go a year unchecked.
+ *
+ * Passing this limit never fails a build: a build that fails because time passed blocks work
+ * unrelated to the stale page, and the fix a hurried contributor reaches for is to delete the check.
+ * It warns during the build and shows a notice on the page itself, which is the signal with teeth —
+ * nobody leaves a "due for review" banner on a page they use to win comparisons.
+ */
+export const FRESHNESS_LIMIT_DAYS = 180;
+
 /*
  * A built path in the one form the whole feature compares against: leading and trailing slash.
  * Astro emits most routes as `<name>/index.html` but the not-found page as a bare `404.html`, so
@@ -81,6 +191,19 @@ export function cardSlug(route: string): string {
 export function isIndexable(route: string): boolean {
 	const normalised = normaliseRoute(route);
 	return !NON_INDEXABLE_ROUTES.some((prefix) => normalised.startsWith(prefix));
+}
+
+/** Longest matching prefix, or undefined for a route nobody classified — which is a build failure. */
+export function coverageFor(route: string): CoverageEntry | undefined {
+	const normalised = normaliseRoute(route);
+	const exact = STRUCTURED_COVERAGE.find(
+		(entry) => entry.exact && entry.prefix === normalised
+	);
+	if (exact) return exact;
+	return [...STRUCTURED_COVERAGE]
+		.filter((entry) => !entry.exact)
+		.sort((a, b) => b.prefix.length - a.prefix.length)
+		.find((entry) => normalised.startsWith(entry.prefix));
 }
 
 export function sectionFor(route: string): SectionName | undefined {
