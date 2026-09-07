@@ -13,9 +13,16 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    # Dependabot and fork pull requests run without the repository's Actions secrets, so the Codecov
+    # token is empty there and the upload is rejected before it starts. Mapping the secret to a
+    # job-level variable is what makes it testable at all: the `secrets` context is not available in
+    # a step `if`, but `env` is.
+    env:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
@@ -29,9 +36,12 @@ jobs:
         run: bun test --coverage --coverage-reporter=lcov
 
       - name: Upload coverage report to Codecov
+        # Skipped rather than failed when there is no token to upload with, so a dependency bump is
+        # judged on its tests. Coverage is still recorded on every push to main, where the secret is.
+        if: env.CODECOV_TOKEN != ''
         uses: codecov/codecov-action@v5
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+          token: ${{ env.CODECOV_TOKEN }}
           slug: RedFox-Soft/OAuth-server.ts
           files: coverage/lcov.info
           fail_ci_if_error: true
