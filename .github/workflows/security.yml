@@ -1,0 +1,140 @@
+name: Security
+
+# The scanning behind the Assurance section of SECURITY.md. Four independent checks, each of which
+# lands its result somewhere a reader can see without asking us: CodeQL and the image scan upload to
+# code scanning, the dependency audit fails the run, dependency review annotates the pull request.
+#
+# The weekly run exists because a scan that only fires on a push goes quiet the moment the code does,
+# and a new advisory against an unchanged dependency is the common case, not the exception.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  codeql:
+    name: CodeQL (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        # `actions` scans the workflows themselves: expression injection, untrusted checkout, secrets
+        # in the wrong place. The deploy and release workflows hold the production and registry
+        # credentials, so they are in scope for the same reason lib/ is.
+        language: [javascript-typescript, actions]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          # The extended suite trades a few more low-precision results for the queries an
+          # authorization server actually wants: weak crypto, insecure randomness, hard-coded
+          # credentials, incomplete URL checks.
+          queries: security-extended
+
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:${{ matrix.language }}
+
+  dependencies:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # Two lockfiles, two audits. The website is an independent Bun project (its own package.json
+      # and lockfile) and ships a build pipeline that runs a browser, so it is not exempt.
+      - name: Install the server
+        run: bun install --frozen-lockfile
+
+      - name: Audit the server's dependencies
+        run: bun audit --audit-level=high
+
+      - name: Install the site
+        working-directory: website
+        run: bun install --frozen-lockfile
+
+      - name: Audit the site's dependencies
+        working-directory: website
+        run: bun audit --audit-level=high
+
+  dependency-review:
+    name: Dependency review
+    # Only a pull request has a base to diff against.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # Reviews what the pull request adds — new packages and actions with known advisories or a
+      # licence we cannot ship — rather than what is already there; `bun audit` above covers that.
+      - uses: actions/dependency-review-action@v5
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure
+
+  container:
+    name: Container image scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # The same Dockerfile release.yml publishes from, built the same way, so the scan describes the
+      # image people run rather than a lookalike. Loaded into the local daemon and never pushed.
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          push: false
+          tags: oauth-server-ts:scan
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Findings go to code scanning, where they stay visible and dated, instead of failing the run:
+      # most of what an image scan finds is in the base image, and a fix for that is a rebuild once
+      # upstream ships one, not a change to this repository. Unfixed advisories are omitted for the
+      # same reason — there is nothing for a reader of the alert to do about them yet.
+      - uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: oauth-server-ts:scan
+          format: sarif
+          output: trivy-image.sarif
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '0'
+
+      - uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-image.sarif
+          category: trivy-image

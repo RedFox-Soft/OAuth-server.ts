@@ -45,6 +45,16 @@ release, which means the HTTP surface and the admin API may still change between
 the changelog says what moved, and the setup script has to be re-run afterwards so new collections
 and indexes exist.
 
+## Deciding whether to trust it
+
+An authorization server is the front door of everything behind it, so before you put one in front of
+real users you are entitled to ask what it defends against and how anyone knows. The
+[threat model](/docs/security/threat-model/) answers the first question: the assets, the attackers,
+and for each threat the control in the code and the test that holds it, along with the limitations
+that are true today. [Security assurance](/docs/security/assurance/) answers the second: the
+scanning that runs on every push and every week, where each result is published, and what has not
+been done yet. Reporting a vulnerability is covered by the [security policy](/security/).
+
 ## Looking something up
 
 The Reference section is generated from the server's own source on every build, so it describes the

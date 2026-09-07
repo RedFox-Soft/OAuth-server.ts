@@ -91,6 +91,10 @@ export default defineConfig({
 					items: [{ autogenerate: { directory: 'docs/deploy' } }]
 				},
 				{
+					label: 'Security',
+					items: [{ autogenerate: { directory: 'docs/security' } }]
+				},
+				{
 					label: 'Reference',
 					items: [
 						{ label: 'Settings', link: '/docs/reference/settings/' },

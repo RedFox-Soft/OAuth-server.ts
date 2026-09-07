@@ -11,6 +11,19 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- security: published evidence behind SECURITY.md, which until now was a policy with nothing standing
+  behind it. A written [threat model](https://foxauth.dev/docs/security/threat-model/) names the
+  assets, trust boundaries and attackers (RFC 9700 §3) and, for each threat, the control in the code
+  and the test that holds it — including the limitations that are true today (secrets unencrypted at
+  rest, CSRF resting on `SameSite=Strict`, the image running as root), because a threat model that
+  lists only the good news is not one to plan around. A `Security` workflow runs CodeQL (TypeScript
+  and the workflows themselves), `bun audit` on both lockfiles failing on high, dependency review on
+  pull requests and a Trivy scan of the built image, on every push and weekly; a `Scorecard` workflow
+  publishes an OpenSSF Scorecard; a Dependabot configuration keeps the lockfiles and actions current.
+  An [assurance page](https://foxauth.dev/docs/security/assurance/) says where each result is read
+  and states plainly what does not exist: no external audit, no paid bounty, no OpenID Foundation
+  certification. SECURITY.md gained the same section and the README the badges.
+
 - protocol: authorization server metadata at `GET /.well-known/oauth-authorization-server`
   ([RFC 8414](https://datatracker.ietf.org/doc/html/rfc8414), spec 038, issue #30). A plain OAuth 2.1
   client that is not an OpenID Connect relying party looks for this path and no other, so until now

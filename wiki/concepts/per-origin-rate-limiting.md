@@ -139,3 +139,5 @@ declaration orders), so per-file placement is not what rescues these.
 - [[deletion-and-revocation]] — why a storage-free feature touches none of it.
 - [[admin-plane-error-shape]] — the shape the console refusal has to match, and the stand-aside this
   feature had to be sequenced ahead of.
+- [[security-assurance-evidence]] — the public threat model leans on this page's "resource protection,
+  not a security boundary" distinction in its Known limitations.

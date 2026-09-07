@@ -1,0 +1,95 @@
+---
+title: Security assurance
+description: What stands behind the security claims — the scanning that runs on every push and every week, where each result is published, and what has not been done yet.
+sidebar:
+  order: 2
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+The [threat model](/docs/security/threat-model/) says what the server defends against and points at
+the code. This page says what checks the code without anyone remembering to, where you can read
+each result yourself, and, in plain words, what this project has not yet done. A security page
+that lists only the good news is not one you can trust, so the last section is not optional.
+
+## Continuous checks
+
+Everything in this table runs from
+[`.github/workflows/security.yml`](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/.github/workflows/security.yml)
+on every push to `main`, on every pull request and every Monday. The weekly run matters more than it
+looks: a scan that only fires on a push goes quiet the moment the code does, and a new advisory
+against an unchanged dependency is the common case.
+
+| Check                           | What it covers                                                                                                                                                                                      | What happens on a finding                                                                                                                              | Where to read it                                                                                                 |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| CodeQL, extended security suite | Every TypeScript and JavaScript file in the repository, the website and tests included, and the GitHub Actions workflows themselves, including the ones holding the deploy and registry credentials | An alert in the repository's code scanning list; a pull request is annotated inline                                                                    | [Workflow runs](https://github.com/RedFox-Soft/OAuth-server.ts/actions/workflows/security.yml), the Security tab |
+| Dependency audit (`bun audit`)  | Both lockfiles: the server's and the website's, against the GitHub Advisory Database                                                                                                                | The run fails on any advisory of high or critical severity, which blocks the pull request                                                              | The run log, which is public                                                                                     |
+| Dependency review               | Every package and action a pull request adds                                                                                                                                                        | The run fails on a high-severity advisory or a disallowed licence and comments on the pull request                                                     | The pull request                                                                                                 |
+| Container image scan (Trivy)    | The image built from the repository's own `Dockerfile`, the same way the release workflow builds it                                                                                                 | Critical and high findings with an available fix are uploaded to code scanning; unfixed ones are omitted because there is nothing to do about them yet | The Security tab, category `trivy-image`                                                                         |
+
+<Aside
+	type="caution"
+	title="Why the image scan does not fail the build"
+>
+	Almost everything an image scan finds is in the base image, and the remedy is
+	a rebuild once upstream ships a fix, not a change to this repository. A red
+	build that nobody can turn green teaches people to ignore red builds. The
+	finding is published instead, dated, where it stays visible until the rebuild
+	clears it.
+</Aside>
+
+## OpenSSF Scorecard
+
+[`.github/workflows/scorecard.yml`](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/.github/workflows/scorecard.yml)
+runs the [OpenSSF Scorecard](https://scorecard.dev/) weekly and on every push to `main`, and
+publishes the result to
+[scorecard.dev](https://scorecard.dev/viewer/?uri=github.com/RedFox-Soft/OAuth-server.ts). The
+checks are somebody else's: branch protection, whether actions and dependencies are pinned, whether
+a fuzzer exists, whether releases are signed, how quickly vulnerabilities are addressed. A low score
+on a check is information, not something to hide; the report is linked from the README badge so
+that it is the first thing a reader sees rather than the last.
+
+## Repository protections
+
+Turned on in the repository's settings, and visible to anyone who looks:
+
+- **Secret scanning with push protection**, so a committed credential is refused before it lands.
+- **Dependabot alerts and security updates**, and a
+  [Dependabot configuration](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/.github/dependabot.yml)
+  that also keeps the routine versions of both lockfiles and every action current on a weekly
+  cadence.
+- **Private vulnerability reporting**, so a researcher who prefers not to email can
+  [open a private advisory](https://github.com/RedFox-Soft/OAuth-server.ts/security/advisories/new)
+  instead. Either path reaches the same people, with the response times the
+  [security policy](/security/) commits to.
+
+## The test suite
+
+The controls in the threat model are held by tests, and the suite runs on every push and every pull
+request in [`ci.yml`](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/.github/workflows/ci.yml),
+with coverage published to [Codecov](https://codecov.io/gh/RedFox-Soft/OAuth-server.ts). Several
+of those tests exist only to stop a control from quietly going away: one fails when a state-changing
+admin route is not in the audit table, one when an admin operation is neither published to the MCP
+tool list nor explicitly excluded with a reason, one when anything that looks like a secret reaches
+an audit entry or an MCP response. They are the reason the threat model can name a test in its
+evidence column and mean it.
+
+Every deployment also serves a machine-readable security contact at `/.well-known/security.txt`
+([RFC 9116](https://www.rfc-editor.org/rfc/rfc9116)), pointing at the policy and the reporting
+address.
+
+## What has not been done
+
+Stated plainly, because a reader deciding whether to run this in front of real users needs the
+whole picture.
+
+- **No external audit.** No third party has been paid to assess this code. When one is, the report
+  is published on the [security policy page](/security/) in full, findings included.
+- **No paid bug bounty.** A confirmed report earns credit in the release notes and our thanks, not
+  money. The scope and safe harbour in the security policy are the whole programme.
+- **No OpenID Foundation certification.** The conformance suite has not been run against a release.
+  Standards compliance is asserted by this project's own tests until it has.
+- **No fuzzing, no signed releases, no reproducible build.** Scorecard will say so; it is right.
+
+The list gets shorter as things are done, and never by deletion alone: an item leaves it by moving to
+one of the sections above with a link to the evidence.

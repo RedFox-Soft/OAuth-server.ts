@@ -10,6 +10,12 @@
     <a href="https://codecov.io/gh/RedFox-Soft/OAuth-server.ts">
       <img src="https://codecov.io/gh/RedFox-Soft/OAuth-server.ts/branch/main/graph/badge.svg" alt="Coverage status" />
     </a>
+    <a href="https://github.com/RedFox-Soft/OAuth-server.ts/actions/workflows/security.yml">
+      <img src="https://github.com/RedFox-Soft/OAuth-server.ts/actions/workflows/security.yml/badge.svg" alt="Security scanning status" />
+    </a>
+    <a href="https://scorecard.dev/viewer/?uri=github.com/RedFox-Soft/OAuth-server.ts">
+      <img src="https://api.scorecard.dev/projects/github.com/RedFox-Soft/OAuth-server.ts/badge" alt="OpenSSF Scorecard" />
+    </a>
   </p>
 
   <p>
@@ -397,6 +403,19 @@ The **Flag** column names the capability's governing flag; `—` means always on
 | [RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728)                                         | OAuth 2.0 Protected Resource Metadata                                                                                | `mcp.enabled`                       |
 | [CIBA](https://openid.net/specs/openid-client-initiated-backchannel-authentication-core-1_0.html) | Client-Initiated Backchannel Authentication                                                                          | `ciba.enabled`                      |
 | [JARM](https://openid.net/specs/oauth-v2-jarm.html)                                               | JWT-Secured Authorization Response Mode                                                                              | `responseMode.jwt.enabled`          |
+
+## Security
+
+Report a vulnerability to **security@foxauth.dev** or through
+[private vulnerability reporting](https://github.com/RedFox-Soft/OAuth-server.ts/security/advisories/new);
+[SECURITY.md](SECURITY.md) has the scope, the response times and the safe harbour.
+
+The same file says what stands behind the code: a published
+[threat model](https://foxauth.dev/docs/security/threat-model/), CodeQL, dependency and container
+scanning on every push and every week ([what runs and where to read it](https://foxauth.dev/docs/security/assurance/)),
+and an [OpenSSF Scorecard](https://scorecard.dev/viewer/?uri=github.com/RedFox-Soft/OAuth-server.ts).
+It also says what does not exist yet — no external audit, no paid bounty, no OpenID Foundation
+certification — because a security page that only lists the good news is not one you can trust.
 
 ## Contributing
 

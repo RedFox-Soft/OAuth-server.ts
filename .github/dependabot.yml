@@ -1,0 +1,24 @@
+# Keeps the three things the Security workflow scans from going stale between scans: the two Bun
+# lockfiles and the actions the workflows themselves run. Security updates for known advisories are
+# separate and already enabled in the repository settings; this is the routine cadence.
+version: 2
+updates:
+  - package-ecosystem: bun
+    directories:
+      - '/'
+      - '/website'
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    # One pull request per lockfile for routine bumps; an advisory still gets its own.
+    groups:
+      dependencies:
+        patterns: ['*']
+        update-types: ['minor', 'patch']
+
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday

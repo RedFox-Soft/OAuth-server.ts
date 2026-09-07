@@ -42,6 +42,42 @@ needed to demonstrate the issue, no disruption of other users, no public disclos
 is available or ninety days have passed, whichever comes first — will not lead to legal action
 from us.
 
+## Assurance
+
+What this project can show for its security, and what it cannot yet. Both lists are kept honest on
+purpose: a claim here that the repository does not back is itself a defect, and you may report it.
+
+What exists:
+
+- **A published threat model** — [foxauth.dev/docs/security/threat-model](https://foxauth.dev/docs/security/threat-model/)
+  names the assets, the trust boundaries and the attackers this server is built against, and for
+  each threat the control in this repository that answers it and the test that holds the control.
+- **Automated scanning on every push, every pull request and every week** — the
+  [Security workflow](https://github.com/RedFox-Soft/OAuth-server.ts/actions/workflows/security.yml)
+  runs CodeQL over the TypeScript and over the workflows themselves, audits both Bun lockfiles and
+  fails on a high or critical advisory, reviews the dependencies a pull request adds, and scans the
+  published container image. Run logs are public; findings land in the repository's code scanning
+  alerts. [foxauth.dev/docs/security/assurance](https://foxauth.dev/docs/security/assurance/)
+  describes each check and where to read its result.
+- **An OpenSSF Scorecard**, published weekly by the
+  [Scorecard workflow](https://github.com/RedFox-Soft/OAuth-server.ts/actions/workflows/scorecard.yml)
+  and readable at
+  [scorecard.dev](https://scorecard.dev/viewer/?uri=github.com/RedFox-Soft/OAuth-server.ts) — an
+  assessment of the repository's practices by checks we do not write.
+- **Repository protections** — secret scanning with push protection, Dependabot alerts and security
+  updates, and
+  [private vulnerability reporting](https://github.com/RedFox-Soft/OAuth-server.ts/security/advisories/new)
+  as an alternative to the email above.
+
+What does not exist yet:
+
+- **No external audit.** No third party has been paid to assess this code. When one is, the report
+  is published on this page in full, findings included.
+- **No paid bug bounty.** A confirmed report earns credit in the release notes and our thanks, not
+  money. The scope and safe harbour above are the whole programme.
+- **No OpenID Foundation certification.** The conformance suite has not been run against a release;
+  standards compliance is asserted by this project's own test suite until it has.
+
 ## What operators should know
 
 The contact above is the project's. A self-hosted deployment advertises it at

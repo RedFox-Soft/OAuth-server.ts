@@ -1,0 +1,200 @@
+---
+title: Threat model for OAuth-server.ts
+description: The assets, trust boundaries and attackers this authorization server is built against, and for each threat the control in the code and the test that holds it.
+sidebar:
+  order: 1
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+An authorization server is the front door of every application behind it, so the question "what is
+this defended against, and how do you know" deserves a written answer rather than a list of RFC
+numbers. This page is that answer. It follows the structure of the OAuth 2.0 Security Best Current
+Practice ([RFC 9700](https://www.rfc-editor.org/rfc/rfc9700)) and the older threat catalogue
+([RFC 6819](https://www.rfc-editor.org/rfc/rfc6819)): name the attackers, name what they want, and
+for each threat point at the control and at the test that would fail if the control were removed.
+
+Every control below links to its source in the repository. Where a test holds the control, the test
+is named. Where a control does **not** exist, the section titled [Known limitations](#known-limitations)
+says so, because a threat model that lists only the good news is not one you can plan around.
+
+<Aside
+	type="note"
+	title="How to read the evidence"
+>
+	Links point at the `main` branch, so a line may have moved since this page was
+	written. The file and the test name are the stable part. If a link no longer
+	shows what the sentence claims, that is a documentation defect — report it
+	like any other.
+</Aside>
+
+## Scope
+
+In scope is everything in the repository: the protocol endpoints, the end-user screens, the
+administration console and its API, the MCP control plane, the storage adapters and the container
+image. Out of scope is what the [security policy](/security/) excludes: denial of service by volume,
+findings that presuppose a compromised administrator account or a compromised database, and reports
+against dependencies with no demonstrated effect on this server.
+
+## Assets
+
+What an attacker would want, roughly in order of blast radius.
+
+| Asset                                              | Where it lives                                                              | Why it matters                                                                      |
+| -------------------------------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Signing keys                                       | the `jwksStore` collection                                                  | Whoever holds a private key mints tokens every relying party trusts                 |
+| Client secrets, registration access tokens         | the `Client` collection                                                     | A stolen confidential-client secret impersonates that client to the token endpoint  |
+| Refresh tokens, authorization codes, access tokens | token collections, all with TTL indexes                                     | Direct access to a user's resources; a refresh token for as long as the grant lives |
+| End-user and administrator credentials             | argon2id hashes on the user record; TOTP secrets                            | Account takeover, and for administrators, control of the instance                   |
+| Sessions and interaction state                     | the `_session`, `_interaction` and admin cookies, opaque ids into the store | Riding an authenticated session without the credential                              |
+| DPoP nonce secret, pairwise subject salt           | singleton secret documents                                                  | Forging nonces; correlating users across relying parties                            |
+| Configuration and the audit trail                  | `configStore`, `adminAudit`                                                 | Turning off a control silently; rewriting the record of who did what                |
+| SMTP credentials, upstream provider client secrets | settings and federation documents                                           | Sending mail as the instance; impersonating it to an upstream identity provider     |
+
+## Trust boundaries
+
+```
+Internet --TLS--> reverse proxy --> OAuth-server.ts --> MongoDB
+                  (terminates TLS,        |
+                   sets X-Forwarded-For)  +--> upstream identity providers (OIDC)
+                                          +--> SMTP relay
+                                          +--> Sentry (optional, allow-listed event shape)
+AI agent --bearer token, aud = MCP -----> |
+```
+
+The server assumes TLS is terminated in front of it and that the issuer is an `https://` URL. It
+trusts `X-Forwarded-For` and its relatives **only** when `rateLimit.trustedProxy` says so
+([rateLimit.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/plugins/rateLimit.ts));
+otherwise every request shares one origin bucket, which fails safe rather than letting a client
+choose its own address. The database is inside the boundary: a party who can read it can read
+secrets, which is why a compromised database is out of scope and why the operator section below
+is not optional.
+
+## Attackers
+
+Following RFC 9700 §3, the server is built against:
+
+- **A web attacker** who controls their own domain and can get a user's browser to visit it. They
+  can register a client, run a relying party, and send any request a browser can be made to send.
+- **A network attacker** between the user and the proxy, or between the proxy and an upstream
+  provider. TLS is assumed to hold; what the model covers is what remains when it does.
+- **A malicious or compromised client**, including one legitimately registered by an attacker,
+  trying to obtain tokens for another client or another user.
+- **A malicious or compromised resource server** replaying tokens it was shown.
+- **An AI agent** acting on the MCP control plane with a token meant for something else, or a
+  prompt-injected agent asked to do something destructive with the permissions it legitimately has.
+
+Not modelled: malware in the user's own browser or device, a compromised administrator account, a
+compromised database, and attackers with volume alone.
+
+## Threats and controls
+
+Each row is a threat, the control, and the evidence. Tests live under
+[`test/`](https://github.com/RedFox-Soft/OAuth-server.ts/tree/main/test) and run on every push.
+
+### Authorization endpoint
+
+| Threat                                                | Control                                                                                                                                                                                                                                                 | Evidence                                                                                                                                                                                                                                                      |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Authorization code interception (RFC 9700 §4.5)       | PKCE is required of every client, public or confidential, and only `S256` is accepted; `plain` is refused                                                                                                                                               | [pkce.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/helpers/pkce.ts), `test/pkce/pkce.spec.ts`                                                                                                                                             |
+| Redirect to an attacker-controlled URI (§4.1)         | Redirect URIs match by exact string; the only exception is the loopback port of a native client per RFC 8252 §7.3. No wildcards exist. Fragments, non-loopback `http` for native clients and non-reverse-DNS custom schemes are refused at registration | [checks.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/models/client/checks.ts), [validateRedirectUri.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/helpers/validateRedirectUri.ts), `test/helpers/redirect_uri.spec.ts` |
+| Mix-up attacks (§4.4)                                 | Every authorization response carries `iss` (RFC 9207); the OIDC callback of the admin console checks it                                                                                                                                                 | [authorization/](https://github.com/RedFox-Soft/OAuth-server.ts/tree/main/lib/actions/authorization), [login.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/admin/auth/login.ts)                                                            |
+| Code replay                                           | A code is consumed on first use; a second presentation revokes the whole grant, not only the code                                                                                                                                                       | [authorization_code.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/actions/grants/authorization_code.ts), `test/authorization_code/code.grant.spec.ts`                                                                                      |
+| Code bound to the wrong party                         | The exchange checks client, redirect URI, account and grant expiry; codes live sixty seconds                                                                                                                                                            | [liveTime.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/configs/liveTime.ts)                                                                                                                                                               |
+| Cross-site request forgery on the interaction screens | Interaction and session cookies are `HttpOnly; Secure; SameSite=Strict`; the device-code and end-session confirmations additionally carry a per-session token                                                                                           | [param_list.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/consts/param_list.ts), `test/sessions/sessions.spec.ts`, `test/end_session/end_session.spec.ts`                                                                                  |
+| Open redirect after logout                            | `post_logout_redirect_uri` must be registered on the client or the parameter is refused                                                                                                                                                                 | [end_session.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/actions/end_session.ts)                                                                                                                                                         |
+| Clickjacking of the consent screen                    | Every HTML page ships `frame-ancestors 'none'` and `X-Frame-Options: DENY`; inline scripts are allowed by hash only, never by `'unsafe-inline'`                                                                                                         | [csp.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/html/csp.ts), `test/csp/csp.spec.ts`                                                                                                                                                    |
+
+### Token endpoint and tokens
+
+| Threat                                                | Control                                                                                                                                                                                                                  | Evidence                                                                                                                                                                                                                                   |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Refresh token theft and replay (§4.14)                | Public clients and any token past seventy percent of its life are rotated; presenting a consumed refresh token destroys it and revokes the grant family; total lifetime is capped                                        | [refresh_token.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/actions/grants/refresh_token.ts), [tokens.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/addon/tokens.ts), `test/refresh/`               |
+| Access token replay by a resource server (§4.10)      | DPoP (RFC 9449): `htm`, `htu`, `ath`, `jti` replay detection and server nonces derived from a rolling secret; a code exchanged with `dpop_jkt` yields tokens bound to that key, and the binding is re-checked on refresh | [validate_dpop.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/helpers/validate_dpop.ts), [dpop_nonces.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/helpers/dpop_nonces.ts), `test/dpop/dpop.spec.ts` |
+| Token presented to the wrong audience (§4.9)          | Resource indicators (RFC 8707) restrict the audience; the MCP plane refuses any token whose `aud` is not itself, and UserInfo refuses audience-carrying tokens                                                           | [check_resource.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/shared/check_resource.ts), [principal.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/mcp/principal.ts), `test/resource_indicators/`     |
+| Algorithm confusion, `alg: none`                      | JWT access tokens refuse `none`; symmetric algorithms require a secret key object; the allowed lists are fixed per use                                                                                                   | [jwt.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/models/formats/jwt.ts), [jwaAlgorithms.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/configs/jwaAlgorithms.ts), `test/formats/jwt.spec.ts`        |
+| Client assertion replay or misuse (`private_key_jwt`) | `exp`, `jti`, `iss` and `aud` are mandatory; `iss` must equal the client id; `aud` must be this issuer or the endpoint called; `jti` is replay-checked                                                                   | [token_jwt_auth.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/shared/token_jwt_auth.ts), `test/client_auth/client_auth.spec.ts`                                                                                         |
+| Timing side channel on secret comparison              | Client secrets, PKCE verifiers, device user codes, registration tokens, TOTP codes and DPoP nonces are compared in constant time; the client secret comparison pads to a floor of a thousand characters                  | [constant_equals.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/helpers/constant_equals.ts), `test/helpers/constant_equals.spec.ts`                                                                                      |
+| Unregistered or over-broad request parameters         | Routes validate against TypeBox schemas with normalisation off, so an undeclared property is refused rather than silently dropped                                                                                        | [index.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/index.ts)                                                                                                                                                          |
+
+### Accounts and sign-in
+
+| Threat                                       | Control                                                                                                                                                                                                                           | Evidence                                                                                                                                                                                                                                                                                         |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Password brute force and credential stuffing | A per-bucket, per-identity failure counter with a doubling lockout window, checked before the account is even looked up, and indistinguishable from a wrong password. It has no kill switch, deliberately                         | [throttle.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/login_throttle/throttle.ts), `test/login_throttle/`                                                                                                                                                                   |
+| Offline cracking of a leaked user table      | Passwords are hashed with argon2id via `Bun.password`; federated accounts get an unusable random hash                                                                                                                             | [setup.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/admin/auth/setup.ts), [resolve.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/federation/resolve.ts)                                                                                                   |
+| Phished or reused password                   | Per-bucket TOTP (RFC 6238) with a ten-failure window per account and a per-interaction attempt cap                                                                                                                                | [totp/](https://github.com/RedFox-Soft/OAuth-server.ts/tree/main/lib/totp), `test/totp/`                                                                                                                                                                                                         |
+| Guessing a verification code or reset link   | Codes are six digits, hashed at rest, capped at five attempts and then refused even when correct; links are 32 random bytes, single use, and the reset challenge is destroyed before the password changes so a replay cannot land | [verification/challenge.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/verification/challenge.ts), [password_reset/challenge.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/password_reset/challenge.ts), `test/email_verification/`, `test/password_reset/` |
+| Replay or CSRF against an upstream sign-in   | State is single use, the nonce must round-trip in the upstream ID token, and PKCE is sent whenever the upstream advertises it                                                                                                     | [federation/state.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/federation/state.ts), [verifyIdToken.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/federation/verifyIdToken.ts), `test/federation/`                                                        |
+| Correlating one user across relying parties  | Pairwise subject identifiers, salted from a stored secret                                                                                                                                                                         | [pairwiseSalt.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/configs/pairwiseSalt.ts)                                                                                                                                                                                          |
+
+### Administration and the MCP control plane
+
+| Threat                                                                   | Control                                                                                                                                                                                                                                                                                                | Evidence                                                                                                                                                                                                                                                                                                  |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| An administrator reaching another group's containers                     | Ownership is by group membership, resolved live on every request; a removal takes effect on the next call. Instance-wide surfaces are super-admin only                                                                                                                                                 | [rbac.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/admin/auth/rbac.ts), `test/admin/rbac.spec.ts`                                                                                                                                                                                     |
+| Confused deputy: an agent presenting a token issued for another resource | The MCP plane accepts only tokens whose audience is itself, and the agent gets exactly its authorising administrator's permissions, never more                                                                                                                                                         | [principal.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/mcp/principal.ts), `test/mcp/roles.spec.ts`                                                                                                                                                                                   |
+| A prompt-injected agent deleting something                               | High-consequence tools need a second call carrying a confirmation token bound to the tool, target, argument hash, principal and agent; a mismatch spends the token so it cannot be probed. The tool list is an allow-list checked against the admin routes by a test, not the whole surface            | [confirm.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/mcp/confirm.ts), [catalogue.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/mcp/catalogue.ts), `test/mcp/confirmation_matrix.spec.ts`, `test/mcp/catalogue_drift.spec.ts`                                      |
+| Covering tracks                                                          | Every state-changing admin route writes an append-only audit entry before the mutation; the store exposes no update or delete, and a test fails when a mutating route is not classified                                                                                                                | [record.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/admin/audit/record.ts), `test/admin/audit_route_classification.spec.ts`, `test/admin/audit_secrecy.spec.ts`                                                                                                                      |
+| Secrets leaking through telemetry                                        | The error store keeps an allow-list of fields, submitted field names and never values, and the caller address is keyed-hashed and truncated. Sentry receives an allow-listed event shape; an event with an unexpected key is refused, not scrubbed. Nothing in `lib/` logs a token, secret or password | [redact.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/error_store/redact.ts), [sentry/dispatch.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/sentry/dispatch.ts), `test/error_store/redaction.spec.ts`, `test/sentry/redaction.spec.ts`, `test/mcp/secrecy.spec.ts` |
+| CSRF against the admin API from a web attacker's page                    | The admin session cookie is `SameSite=Strict`, scoped to `/admin`, and no response ever carries `Access-Control-Allow-Credentials`                                                                                                                                                                     | [session.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/admin/auth/session.ts), [cors.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/plugins/cors.ts)                                                                                                                 |
+
+### Transport and browser surface
+
+| Threat                                                  | Control                                                                                                                                                                                                           | Evidence                                                                                                                                |
+| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Cross-origin reads of token responses                   | CORS is closed by data: an origin may read a client-based endpoint only if it is listed on the project that owns the calling client; an unidentifiable client gets no header at all                               | [cors.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/plugins/cors.ts), `test/cors/`                                   |
+| Downgrade, sniffing, referrer leaks                     | `Strict-Transport-Security` for two years with subdomains, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, a denying `Permissions-Policy`, and `default-src 'none'` on every non-HTML response | [securityHeaders.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/plugins/securityHeaders.ts), `test/security_headers/` |
+| Exhausting the sign-in, token or registration endpoints | Per-origin rate limiting tiered by route class, mounted before routing so a refused request costs nothing                                                                                                         | [rateLimit.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/plugins/rateLimit.ts), `test/rate_limit/`                   |
+
+## Known limitations
+
+These are true today. Each is either a deliberate trade-off with its reasoning, or a gap with its
+compensating control. A fix that closes one is welcome; a report that one of them is exploitable in
+a way the compensating control does not cover is a vulnerability report.
+
+- **Client secrets, signing keys and the SMTP password are stored unencrypted in the database.**
+  The database is inside the trust boundary and a compromised database is out of scope; the
+  compensating control is the operator's: network isolation and access control on MongoDB, and
+  encryption at rest where the platform offers it. Encrypting these fields with an operator-held key
+  is an open design question, not a decision against it.
+- **The rate limiter is a resource protection, not a security boundary.** Counters are in-process,
+  multiply per machine, reset on restart and fail open under an address-rotation flood. The
+  boundaries that must hold absolutely, the sign-in throttle, verification attempt caps and TOTP
+  failure windows, are persisted per identity and do not depend on it.
+- **CSRF protection on the admin API and on the sign-in, registration and TOTP screens rests on
+  `SameSite=Strict` cookies**, not on a per-request token. Every current browser honours the
+  attribute, and the credentialed CORS path that would bypass it does not exist; a browser that
+  ignores `SameSite` is the assumption this rests on.
+- **Cookies are opaque random identifiers, not signed values.** Forging one means guessing a
+  session id in the store; nothing on the cookie itself is trusted.
+- **Email-verification link tokens are looked up directly rather than hashed at rest.** A reader of
+  the database could redeem a pending link within its twenty-four-hour life; the six-digit codes
+  are hashed.
+- **Device-flow user codes have no per-code attempt counter.** Entropy is set by the mask, the
+  comparison is constant-time, and the verification screen is in the strict rate class; a
+  dedicated counter would make the code cheaper to give and is the natural next step.
+- **The container image runs as root.** The process writes no files and binds one port; the
+  compensating control is the platform's sandbox. Adding a non-root user is straightforward and
+  tracked.
+- **TOTP is not enforced for administrators by default.** It is a per-bucket setting, and the
+  [first administrator guide](/docs/get-started/first-admin/) says to turn it on before anything
+  else; the default is a choice about first-run friction rather than a limitation of the control.
+- **`dpop.allowReplay` exists** for deployments that cannot run replay detection. It is absent from
+  the settings console on purpose and defaults to off.
+
+## What the operator owns
+
+The controls above assume a deployment that: terminates TLS in front of the server with an
+`https://` issuer; sets `rateLimit.trustedProxy` only when a proxy it controls sets the forwarding
+headers; keeps MongoDB off the public network with authentication on and encryption at rest where
+available; turns on the TOTP requirement for the administrator bucket; and backs up the database,
+because the signing keys are in it. [Behind a reverse proxy](/docs/deploy/reverse-proxy/) covers
+the first two.
+
+## How this page stays true
+
+The evidence column is the maintenance rule: a control listed here without a test is a control that
+can disappear in a refactor with nothing to say so. When a control changes, this page changes in
+the same pull request, and the [assurance page](/docs/security/assurance/) describes the scanning
+that runs regardless of anyone remembering to.
