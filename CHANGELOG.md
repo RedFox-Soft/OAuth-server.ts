@@ -122,6 +122,22 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   the home page; all thirteen now measure no overflow at fourteen widths from 320px up, with the
   desktop layout unchanged.
 
+### Security
+
+- ci: every GitHub Action is pinned to a full commit SHA with the version beside it in a comment,
+  where all twenty were previously mutable tags and one — the Fly deployment's `setup-flyctl` — was
+  the `master` branch. A tag is a pointer its owner can move, so the workflows granted whatever
+  those repositories held at the moment a job started, including the ones holding the registry
+  credential and the release token. This is the OpenSSF Scorecard `Pinned-Dependencies` check, which
+  scored 0 against the badge the README publishes, and the gap was invisible in review precisely
+  because a version tag reads like a version. Dependabot updates a pinned SHA and its comment
+  together, so the pins stay current rather than merely frozen.
+
+  Landed with the five action upgrades this made necessary to resolve — `checkout` to v7.0.1,
+  `upload-artifact` to v7.0.1, `upload-pages-artifact` to v5.0.0, `metadata-action` to v6.2.0 and
+  `action-gh-release` to v3.0.3. `upload-pages-artifact` stops including dotfiles as of v4, which the
+  site build does not emit; `deploy-pages` stays on v4, which that version still requires.
+
 ## [0.1.0] - 2026-09-03
 
 The first tagged release: everything the server accumulated before a version number existed.
