@@ -71,7 +71,7 @@ const entries = (await getCollection('compare')).sort((a, b) =>
 	</Section>
 
 	<Section tone="muted">
-		<div class="grid gap-6 sm:grid-cols-2">
+		<div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
 			{
 				entries.map((entry) => (
 					<Card href={`/compare/${entry.id}/`}>

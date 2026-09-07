@@ -134,7 +134,7 @@ server ← { "restartRequired": true,
 	jsonLd={jsonLd}
 >
 	<Section>
-		<div class="grid items-start gap-12 lg:grid-cols-2">
+		<div class="grid grid-cols-1 items-start gap-12 lg:grid-cols-2">
 			<div>
 				<Eyebrow>OAuth 2.1 · OpenID Connect · MCP</Eyebrow>
 				<h1 class="text-4xl font-[650] leading-[1.15] tracking-tight text-balance sm:text-5xl">
@@ -180,7 +180,7 @@ server ← { "restartRequired": true,
 				</figure>
 				<Card>
 					<p class="text-sm font-semibold">What those two commands give you</p>
-					<ul class="mt-3 grid gap-2 text-sm text-gray-700 sm:grid-cols-2 dark:text-gray-300">
+					<ul class="mt-3 grid grid-cols-1 gap-2 text-sm text-gray-700 sm:grid-cols-2 dark:text-gray-300">
 						{
 							[
 								['MongoDB', 'started and provisioned, with indexes and a signing key'],
@@ -232,7 +232,7 @@ server ← { "restartRequired": true,
 		<p class="mt-3 max-w-prose text-gray-600 dark:text-gray-400">
 			The same binary, the same admin API. What changes is which flags you set.
 		</p>
-		<div class="mt-10 grid gap-6 lg:grid-cols-3">
+		<div class="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-3">
 			{
 				audiences.map((audience) => (
 					<Card href="/features/">
@@ -265,7 +265,7 @@ server ← { "restartRequired": true,
 		<p class="mt-3 max-w-prose text-gray-600 dark:text-gray-400">
 			No sign-up, no tenant, no API key. Three pages end with a token in your terminal.
 		</p>
-		<div class="mt-10 grid gap-6 lg:grid-cols-3">
+		<div class="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-3">
 			{
 				steps.map((step) => (
 					<Card href={step.href}>
@@ -311,7 +311,7 @@ server ← { "restartRequired": true,
 	</Section>
 
 	<Section>
-		<div class="grid items-start gap-12 lg:grid-cols-2">
+		<div class="grid grid-cols-1 items-start gap-12 lg:grid-cols-2">
 			<div>
 				<Eyebrow>Administration over MCP</Eyebrow>
 				<h2 class="text-3xl font-[650] tracking-tight text-balance">

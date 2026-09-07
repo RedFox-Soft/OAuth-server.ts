@@ -14,7 +14,7 @@ const value = JSON.stringify(setting.value);
 	</h3>
 	<p class="mt-1 font-medium">{setting.label}</p>
 	<p class="mt-1 text-sm text-gray-700 dark:text-gray-300">{setting.summary}</p>
-	<dl class="mt-2 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
+	<dl class="mt-2 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-1 text-sm">
 		<dt class="text-gray-500 dark:text-gray-400">Type</dt>
 		<dd>{setting.type}{setting.unit ? ` (${setting.unit})` : ''}</dd>
 		<dt class="text-gray-500 dark:text-gray-400">Default</dt>

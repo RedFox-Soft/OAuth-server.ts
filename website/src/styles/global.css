@@ -56,6 +56,14 @@
 		font-family: var(--font-mono);
 		font-size: 1em;
 	}
+	/*
+	 * A long identifier in prose — a dotted settings key in the changelog — is a single unbreakable
+	 * word, and these pages have no `overflow-x` backstop, so it would scroll the whole page sideways
+	 * on a phone. Code blocks are excluded: they own a horizontal scroll and must not re-wrap.
+	 */
+	html[data-layout='site'] :where(:not(pre) > code) {
+		overflow-wrap: anywhere;
+	}
 	html[data-layout='site'] :where(table) {
 		border-collapse: collapse;
 		border-color: inherit;

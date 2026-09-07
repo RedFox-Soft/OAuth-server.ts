@@ -65,6 +65,19 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   HTML, failing the build with the page and the rule. Two defects it caught on its first run are
   fixed: the licence page had two top-level headings, and the settings reference skipped a level.
 
+### Fixed
+
+- site: the home page no longer scrolls sideways on a phone. Below the `lg` breakpoint the hero grid
+  declared no base column count, so it formed a single implicit `auto` track sized to its content —
+  the page laid out 839px wide inside a 375px viewport, with the headline running off-screen. A grid
+  track's automatic minimum is `min-content`, so one unbreakable string sets the width of the whole
+  page; `overflow-x-auto` on the element does not save it, because by then the ancestor track has
+  already grown. Every grid now carries an explicit `grid-cols-1`, the settings reference uses
+  `minmax(0,1fr)` rather than `1fr` for the same reason, and long identifiers in prose break instead
+  of widening the page. Three pages were affected, the settings reference and the changelog beside
+  the home page; all thirteen now measure no overflow at fourteen widths from 320px up, with the
+  desktop layout unchanged.
+
 ## [0.1.0] - 2026-09-03
 
 The first tagged release: everything the server accumulated before a version number existed.
