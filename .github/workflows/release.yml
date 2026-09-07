@@ -11,9 +11,12 @@ on:
     tags:
       - 'v*.*.*'
 
+# Read at the top, write only where a write happens — the shape security.yml already uses. A top-level
+# `contents: write` is inherited by every job, so the suite below ran holding a token that could push to
+# the repository and publish to the registry, for no reason beyond the two jobs beside it needing one
+# each. `bun test` runs whatever the tag points at, which is the job that should hold the least.
 permissions:
-  contents: write
-  packages: write
+  contents: read
 
 concurrency:
   group: release-${{ github.ref }}
@@ -38,6 +41,9 @@ jobs:
     name: Publish image
     needs: test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
 
@@ -71,6 +77,8 @@ jobs:
     name: Create GitHub release
     needs: test
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2

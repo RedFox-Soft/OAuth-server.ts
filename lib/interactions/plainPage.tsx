@@ -9,14 +9,7 @@
  */
 
 import { htmlResponse } from '../html/csp.js';
-
-export function esc(value: string): string {
-	return value
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;');
-}
+import { esc } from '../html/escape.js';
 
 // A page reporting a refusal passes its own status: a rendered error that answers 200 tells a non-browser
 // client the opposite of what it says to a reader.

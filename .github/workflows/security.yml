@@ -47,6 +47,8 @@ jobs:
           # authorization server actually wants: weak crypto, insecure randomness, hard-coded
           # credentials, incomplete URL checks.
           queries: security-extended
+          # What is in scope, and why test/ is not — see the file.
+          config-file: ./.github/codeql/codeql-config.yml
 
       - uses: github/codeql-action/analyze@v4
         with:

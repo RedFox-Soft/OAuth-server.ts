@@ -1,0 +1,17 @@
+# CodeQL's view of this repository.
+#
+# The queries stay in security.yml (`security-extended`) rather than moving here: without a leading
+# `+` a workflow's `queries` input REPLACES the ones a config file names, so splitting them across
+# both places is the one arrangement where a future edit silently drops a suite. This file therefore
+# decides what gets scanned, and the workflow decides what it is scanned with.
+
+# The suite is not an attack surface, and treating it as one cost us the dashboard. Thirteen of twenty
+# high-severity alerts were test assertions — a redirect_uri written as a regex with an unescaped dot,
+# a `<script>` string a CSP test looks for, a password hashed by a fixture — none of them reachable by
+# anybody, all of them ranked beside two real findings in lib/ that nobody could see for the noise. An
+# alert list is a queue, and a queue that is 65% false is not read.
+#
+# Note this excludes test/ from the database entirely, so a call from a spec into lib/ is no longer a
+# taint source. That is the intended reading: a test is not a caller an attacker controls.
+paths-ignore:
+  - test

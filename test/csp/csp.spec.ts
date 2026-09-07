@@ -294,6 +294,36 @@ describe('content security policy: every rendered page', () => {
 		expect(csp.get('script-src')).toBe("'none'");
 	});
 
+	/*
+	 * The same page, asked the hostile question. Its title is the one position interpolated raw, and a
+	 * policy derived *from* the document would hash an injected inline script and then authorize it —
+	 * so the escaping and the hashing have to be asserted together. Tested apart, each looks fine: the
+	 * hash is honestly derived, and the injection is unreachable today.
+	 */
+	it('does not let text on the error page authorize its own script', () => {
+		const csp = directives(
+			getErrorHtmlResponse(400, '<script>alert(1)</script>', 'nope')
+		);
+		expect(csp.get('script-src')).toBe("'none'");
+	});
+
+	/*
+	 * Uppercase is the same tag to a browser and was a different tag to the hash derivation, so a page
+	 * spelling it that way lost its script with nothing to read anywhere: the hash was never issued,
+	 * the policy stayed valid, and the page still rendered.
+	 */
+	it('hashes an inline script whatever case the tag is written in', () => {
+		const body = 'console.log(1)';
+		const expected = `'sha256-${crypto.hash('sha256', body, 'base64')}'`;
+
+		for (const tag of ['script', 'SCRIPT', 'ScRiPt']) {
+			const policy = contentSecurityPolicyFor(
+				`<!DOCTYPE html><html><body><${tag}>${body}</${tag}></body></html>`
+			);
+			expect(policy).toContain(expected);
+		}
+	});
+
 	it('frame-busts every page except the auto-submit callback', async () => {
 		for (const [name, render] of pages) {
 			const res = await render();

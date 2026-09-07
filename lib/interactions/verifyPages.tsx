@@ -2,7 +2,8 @@
 // from a link in an email (possibly a different browser/session), so they are plain,
 // self-contained HTML with no dependency on the OIDC interaction cookie or the antd shell.
 
-import { esc, page } from './plainPage.js';
+import { page } from './plainPage.js';
+import { esc } from '../html/escape.js';
 
 export function verifySuccessPage(): Response {
 	return page(

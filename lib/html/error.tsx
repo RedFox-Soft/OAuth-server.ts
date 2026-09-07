@@ -3,6 +3,7 @@ import { Result } from 'antd';
 import { createCache, extractStyle, StyleProvider } from '@ant-design/cssinjs';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { htmlResponse } from './csp.js';
+import { esc } from './escape.js';
 
 type ResultStatus = ComponentProps<typeof Result>['status'];
 
@@ -55,7 +56,7 @@ function renderError(
 	<html>
 		<head>
 			<meta charSet="utf-8" />
-			<title>${title}</title>
+			<title>${esc(title)}</title>
 			${styleText}
 		</head>
 		<body>${html}</body>

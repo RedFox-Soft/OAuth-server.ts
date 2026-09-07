@@ -10,7 +10,8 @@
 // suite if any other place constructs an HTML response. These pages reference no script, so they inherit
 // `script-src 'none'`.
 
-import { esc, page } from '../interactions/plainPage.js';
+import { page } from '../interactions/plainPage.js';
+import { esc } from '../html/escape.js';
 
 const heading = 'color:#1f1f1f;';
 const body = 'color:#595959;';

@@ -79,8 +79,16 @@ export default function getWWWAuthenticate(
 			: undefined)
 	};
 
+	/*
+	 * Stripped, not escaped. RFC 6750 §3 restricts these values to NQCHAR, a grammar that holds neither
+	 * a quote nor a backslash, so there is nothing here to represent — and escaping is precisely what
+	 * made the defect expressible. Replacing only the quote left the backslash alone, so a value ending
+	 * in one escaped the *closing* quote instead: the quoted string ran on, and everything after it
+	 * parsed as further auth-params. A challenge that can be extended by the text it reports is not a
+	 * challenge, and no dynamic text reaches a 401 description today only by accident.
+	 */
 	const wwwAuth = Object.entries(obj)
-		.map(([key, val]) => `${key}="${val.replace(/"/g, '\\"')}"`)
+		.map(([key, val]) => `${key}="${val.replace(/[\\"]/g, '')}"`)
 		.join(', ');
 
 	return `${scheme} ${wwwAuth}`;

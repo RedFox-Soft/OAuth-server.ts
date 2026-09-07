@@ -4,7 +4,8 @@
 // antd shell — the same reasoning verifyPages.tsx records, and the reason the request form joins them
 // rather than matching the login page it is reached from.
 
-import { esc, page } from './plainPage.js';
+import { page } from './plainPage.js';
+import { esc } from '../html/escape.js';
 
 const input =
 	'width:100%; box-sizing:border-box; padding:10px; margin-bottom:12px; border:1px solid #d9d9d9; border-radius:6px;';

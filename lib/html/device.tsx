@@ -8,6 +8,7 @@ import {
 	confirm as confirmForm
 } from '../helpers/user_code_form.ts';
 import { htmlResponse } from './csp.js';
+import { esc } from './escape.js';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -26,7 +27,7 @@ function renderPage(title: string, node: ReactNode) {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${title}</title>
+  <title>${esc(title)}</title>
   <style>${styleText}</style>
   <style>.red{color:#d50000}</style>
 </head>

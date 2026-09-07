@@ -49,13 +49,20 @@ function resolveOrigin(raw: string, self: string | undefined): string {
 /*
  * Inline <script> blocks that carry a body rather than a src. Their hashes go into `script-src`; the
  * blanket 'unsafe-inline' is never used, which is the whole point of hashing them.
+ *
+ * WHY every pattern here is case-insensitive. A tag name and an attribute name are case-insensitive to
+ * a parser, so a matcher that is not reads a different document than the browser does — and the two
+ * failure directions are not symmetrical. A missed <SCRIPT> withholds a hash the page needs, which the
+ * browser then blocks with the page still rendering perfectly: the capability is gone and nothing
+ * anywhere says so. A missed style attribute does the same to `style-src-attr`. Neither is a hole, but
+ * both are the silent kind of wrong, and the flag costs nothing.
  */
 function inlineScripts(html: string): string[] {
 	const found: string[] = [];
 	for (const [, attributes, body] of html.matchAll(
-		/<script([^>]*)>([\s\S]*?)<\/script>/g
+		/<script([^>]*)>([\s\S]*?)<\/script>/gi
 	)) {
-		if (!/\ssrc=/.test(attributes) && body.trim()) {
+		if (!/\ssrc=/i.test(attributes) && body.trim()) {
 			found.push(body);
 		}
 	}
@@ -68,7 +75,7 @@ function inlineScripts(html: string): string[] {
  * one of these: the device user-code input's select-on-focus.
  */
 function inlineHandlers(html: string): string[] {
-	return [...html.matchAll(/\son[a-z]+="([^"]*)"/g)].map(([, value]) => value);
+	return [...html.matchAll(/\son[a-z]+="([^"]*)"/gi)].map(([, value]) => value);
 }
 
 /*
@@ -85,8 +92,8 @@ function scriptOrigins(html: string): string[] {
 	const self = ownOrigin();
 	const sources = new Set<string>();
 
-	for (const [, attributes] of html.matchAll(/<script([^>]*)>/g)) {
-		const src = /\ssrc="([^"]*)"/.exec(attributes)?.[1];
+	for (const [, attributes] of html.matchAll(/<script([^>]*)>/gi)) {
+		const src = /\ssrc="([^"]*)"/i.exec(attributes)?.[1];
 		if (!src) {
 			continue;
 		}
@@ -103,11 +110,11 @@ function stylesheetOrigins(html: string): string[] {
 	const self = ownOrigin();
 	const sources = new Set<string>();
 
-	for (const [, attributes] of html.matchAll(/<link([^>]*)>/g)) {
-		if (!/\srel="stylesheet"/.test(attributes)) {
+	for (const [, attributes] of html.matchAll(/<link([^>]*)>/gi)) {
+		if (!/\srel="stylesheet"/i.test(attributes)) {
 			continue;
 		}
-		const href = /\shref="([^"]*)"/.exec(attributes)?.[1];
+		const href = /\shref="([^"]*)"/i.exec(attributes)?.[1];
 		if (!href) {
 			continue;
 		}
@@ -125,7 +132,7 @@ function stylesheetOrigins(html: string): string[] {
 function inlineStyleBlocks(html: string): string[] {
 	const found: string[] = [];
 	for (const [, , body] of html.matchAll(
-		/<style([^>]*)>([\s\S]*?)<\/style>/g
+		/<style([^>]*)>([\s\S]*?)<\/style>/gi
 	)) {
 		if (body.trim()) {
 			found.push(body);
@@ -140,7 +147,7 @@ function inlineStyleBlocks(html: string): string[] {
  * direction is the safe one. A false negative would stop a page styling itself.
  */
 function hasStyleAttribute(html: string): boolean {
-	return /\sstyle="/.test(html);
+	return /\sstyle="/i.test(html);
 }
 
 /*
@@ -155,7 +162,7 @@ function foreignFormTargets(html: string): string[] {
 	const self = ownOrigin();
 	const foreign = new Set<string>();
 
-	for (const [, action] of html.matchAll(/<form[^>]*\saction="([^"]*)"/g)) {
+	for (const [, action] of html.matchAll(/<form[^>]*\saction="([^"]*)"/gi)) {
 		// A relative or same-origin action resolves to 'self', which contributes nothing here.
 		const resolved = resolveOrigin(action, self);
 		if (resolved !== "'self'") {

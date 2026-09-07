@@ -80,6 +80,37 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- security: three latent injection sinks closed, none of them reachable today, which is the only
+  reason this is a hardening note and not an advisory. The `WWW-Authenticate` challenge escaped the
+  quote in a parameter value and left the backslash alone — the one combination that fails, because a
+  value ending in a backslash then escaped the *closing* quote instead: the quoted string ran on and
+  everything after it parsed as further auth-params. Values are now stripped rather than escaped,
+  which is what [RFC 6750](https://datatracker.ietf.org/doc/html/rfc6750) §3 asks for (NQCHAR holds
+  neither character), and nothing dynamic reaches a 401 description today only by accident. The
+  rendered error page and the device pages interpolated their document title raw, where the plain
+  interaction pages already escaped the same position; there is now one escaper in `lib/html/escape.ts`
+  with all four callers on it, rather than one file getting it right and its neighbours not.
+
+  The reason the title mattered more than an unreachable sink usually does: the content security
+  policy is derived *from* the finished document, so an injected inline script would have been hashed
+  and then authorized by the very header meant to stop it. That chain is now pinned by a test that was
+  watched failing — it emitted a `sha256-` for `alert(1)` — rather than left as an argument.
+
+  Separately, every tag and attribute matcher in the policy derivation is case-insensitive. A tag name
+  is case-insensitive to a parser, so a page spelling one `<SCRIPT>` was read differently by the
+  deriver than by the browser: the hash was never issued, the browser blocked the script, and the page
+  still rendered perfectly with the capability silently gone.
+
+- ci: the release workflow no longer grants every job write access. `contents: write` and
+  `packages: write` sat at the top level, so the test job — which runs whatever a version tag points
+  at — held a token that could push to the repository and publish to the registry, for no reason
+  beyond the two jobs beside it needing one each. Read at the top, write only where a write happens,
+  the shape the security workflow already used. CodeQL also stops scanning `test/`: thirteen of twenty
+  high-severity alerts were test assertions — a `redirect_uri` written as a regex with an unescaped
+  dot, a `<script>` string a CSP test looks for, a password hashed by a fixture — ranked beside two
+  real findings in `lib/` that nobody could see for the noise. An alert list is a queue, and a queue
+  that is two-thirds false is not read.
+
 - site: the home page no longer scrolls sideways on a phone. Below the `lg` breakpoint the hero grid
   declared no base column count, so it formed a single implicit `auto` track sized to its content —
   the page laid out 839px wide inside a 375px viewport, with the headline running off-screen. A grid

@@ -2,6 +2,7 @@ import { describe, it, beforeAll, expect } from 'bun:test';
 
 import bootstrap, { agent } from '../test_helper.js';
 import { getErrorHtmlResponse } from 'lib/html/error.tsx';
+import getWWWAuthenticate from 'lib/shared/authorization_error_handler.js';
 import { send, UNSERVED_PATH } from '../feature_gate/helpers.ts';
 
 const browserAccept =
@@ -100,5 +101,57 @@ describe('an unserved path rendered for a browser', () => {
 		});
 		expect(res.status).toBe(404);
 		expect(await res.text()).toContain('ant-result-404');
+	});
+});
+
+/*
+ * RFC 6750 §3 limits `error_description` to NQCHAR, a grammar that holds neither a quote nor a
+ * backslash. The challenge used to escape the quote and leave the backslash alone, which is the one
+ * combination that fails: a value ending in a backslash closed the quoted string a character early,
+ * and everything after it became further auth-params. Escaping only moved the problem — a quoted-pair
+ * is exactly what makes an early terminator expressible. Stripping is what the grammar asks for.
+ *
+ * Nothing dynamic reaches a 401 description today, so this is the guard that has to fail first: the
+ * defect arms itself the moment one does.
+ */
+describe('the WWW-Authenticate challenge', () => {
+	it('carries no character the quoted-string grammar cannot hold', () => {
+		const header = getWWWAuthenticate('bearer', false, {
+			error: 'invalid_token',
+			error_description: 'ends with a backslash\\'
+		});
+
+		expect(header).not.toContain('\\');
+		expect(header).toMatch(/error_description="ends with a backslash"$/);
+	});
+
+	it('cannot be talked out of its quoted string into another auth-param', () => {
+		const header = getWWWAuthenticate('bearer', false, {
+			error: 'invalid_token',
+			error_description: 'nudge\\", scope="write'
+		});
+
+		// No backslash means no quoted-pair, so every quote left in the header is a real delimiter.
+		expect(header).not.toContain('\\');
+		expect(header).toMatch(/error_description="nudge, scope=write"$/);
+	});
+});
+
+/*
+ * The document title is the one thing on this page interpolated raw rather than through React, and
+ * lib/interactions/plainPage.tsx already escapes the same position — so the inconsistency, not the
+ * reachability, is the finding. The error code is drawn from a fixed set today; the page should not
+ * be the reason that stays true.
+ */
+describe('the rendered error page title', () => {
+	it('escapes the error code rather than interpolating it as markup', async () => {
+		const html = await getErrorHtmlResponse(
+			400,
+			'<script>alert(1)</script>',
+			'a description'
+		).text();
+
+		expect(html).not.toContain('<script>alert(1)</script>');
+		expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
 	});
 });
