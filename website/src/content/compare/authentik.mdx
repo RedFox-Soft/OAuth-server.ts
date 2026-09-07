@@ -30,7 +30,11 @@ groups:
   - label: Scope and stack
     rows:
       - dimension: Protocols
-        us: { status: no, text: 'OAuth 2.1 and OpenID Connect only. No SAML, LDAP or RADIUS.' }
+        us:
+          {
+            status: no,
+            text: 'OAuth 2.1 and OpenID Connect only. No SAML, LDAP or RADIUS.'
+          }
         them: { status: yes, text: 'SAML, OAuth2/OIDC, LDAP and RADIUS.' }
         verdict: them
         why: 'authentik covers an estate; FoxAuth covers applications that speak OAuth.'
@@ -49,13 +53,19 @@ groups:
         verdict: different
         why: 'These are adjacent products, not competing implementations of the same thing.'
       - dimension: Runtime and stack
-        us: { status: yes, text: 'TypeScript on Bun; the HTTP layer is Elysia.' }
-        them: { status: yes, text: 'Python, Go, Rust and TypeScript components.' }
+        us:
+          { status: yes, text: 'TypeScript on Bun; the HTTP layer is Elysia.' }
+        them:
+          { status: yes, text: 'Python, Go, Rust and TypeScript components.' }
         verdict: different
         why: 'A broader stack, because it does more; a smaller one is easier to reason about.'
       - dimension: Deployment footprint
         us: { status: yes, text: 'One process and a database.' }
-        them: { status: yes, text: 'Documented minimum of 2 CPU cores and 2 GB of RAM, with PostgreSQL.' }
+        them:
+          {
+            status: yes,
+            text: 'Documented minimum of 2 CPU cores and 2 GB of RAM, with PostgreSQL.'
+          }
         verdict: us
         why: 'A smaller footprint, for a smaller job.'
         note: 'The install guide requires "A host with at least 2 CPU cores and 2 GB of RAM".'
@@ -67,7 +77,11 @@ groups:
             status: yes,
             text: 'OAuth 2.1 with PKCE mandatory for every client, OIDC Core and Discovery.'
           }
-        them: { status: yes, text: 'OAuth2 and OIDC as one of several supported protocols.' }
+        them:
+          {
+            status: yes,
+            text: 'OAuth2 and OIDC as one of several supported protocols.'
+          }
         verdict: us
         why: 'OAuth 2.1 defaults — mandatory PKCE, exact redirect matching, no implicit grant — are the whole product here rather than one protocol among four.'
       - dimension: Sender-constrained tokens
@@ -88,27 +102,43 @@ groups:
         us: { status: yes, text: 'RFC 8628, behind a feature flag.' }
         them: { status: unknown, text: 'Not documented.' }
         verdict: us
-        why: 'Recorded as not documented rather than absent — authentik''s documentation does not describe it.'
+        why: "Recorded as not documented rather than absent — authentik's documentation does not describe it."
   - label: Administration and licensing
     rows:
       - dimension: Administration by an AI agent
         us:
           {
             status: yes,
-            text: 'MCP control plane over the console''s own routes, audited and confirmation-gated. Off by default.'
+            text: "MCP control plane over the console's own routes, audited and confirmation-gated. Off by default."
           }
         them: { status: unknown, text: 'Not documented.' }
         verdict: us
-        why: 'The agent path here is the console''s code rather than a second privileged API.'
+        why: "The agent path here is the console's code rather than a second privileged API."
       - dimension: Licence
-        us: { status: flag, text: 'FSL-1.1-ALv2: source-available, converting to Apache 2.0 after two years.' }
-        them: { status: yes, text: 'MIT for the core, with a separate enterprise licence for enterprise features.' }
+        us:
+          {
+            status: flag,
+            text: 'FSL-1.1-ALv2: source-available, converting to Apache 2.0 after two years.'
+          }
+        them:
+          {
+            status: yes,
+            text: 'MIT for the core, with a separate enterprise licence for enterprise features.'
+          }
         verdict: them
         why: 'An MIT core carries no competing-service restriction; FSL does until each version converts.'
         note: 'The repository lists an "MIT License" for the code and an "EE License" for enterprise features.'
       - dimension: Maturity
-        us: { status: flag, text: '0.1.0. The HTTP surface and admin API may still change between minor releases.' }
-        them: { status: yes, text: 'An established project with a large self-hosting community.' }
+        us:
+          {
+            status: flag,
+            text: '0.1.0. The HTTP surface and admin API may still change between minor releases.'
+          }
+        them:
+          {
+            status: yes,
+            text: 'An established project with a large self-hosting community.'
+          }
         verdict: them
         why: 'The maturity gap is real, and this page will not soften it.'
 ---

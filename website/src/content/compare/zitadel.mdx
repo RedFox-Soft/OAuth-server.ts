@@ -20,24 +20,29 @@ chooseUs:
   - 'You want an AI agent administering the instance through the same audited path a human uses.'
 faq:
   - question: 'Does FoxAuth support SAML like Zitadel does?'
-    answer: 'No. FoxAuth implements OAuth 2.1 and OpenID Connect only, and there is no SAML support planned. Zitadel documents SAML 2.0 and SCIM 2.0 alongside OIDC. If any application in your estate can only speak SAML, that settles it in Zitadel''s favour and no other row on this page matters.'
+    answer: "No. FoxAuth implements OAuth 2.1 and OpenID Connect only, and there is no SAML support planned. Zitadel documents SAML 2.0 and SCIM 2.0 alongside OIDC. If any application in your estate can only speak SAML, that settles it in Zitadel's favour and no other row on this page matters."
   - question: 'How do the licences differ?'
-    answer: 'Zitadel is AGPL-3.0 with Apache 2.0 and MIT exceptions for specific directories, and sells an enterprise contract whose commercial licence replaces the AGPL. FoxAuth is FSL-1.1-ALv2: you may read, modify, self-host and redistribute it and build a business around it, but not offer it as a competing hosted service — and each version converts to Apache 2.0 two years after it ships. AGPL''s network-copyleft and FSL''s competing-service restriction rule out different things, so which is the problem depends on what you are building.'
+    answer: "Zitadel is AGPL-3.0 with Apache 2.0 and MIT exceptions for specific directories, and sells an enterprise contract whose commercial licence replaces the AGPL. FoxAuth is FSL-1.1-ALv2: you may read, modify, self-host and redistribute it and build a business around it, but not offer it as a competing hosted service — and each version converts to Apache 2.0 two years after it ships. AGPL's network-copyleft and FSL's competing-service restriction rule out different things, so which is the problem depends on what you are building."
   - question: 'Can I migrate from Zitadel to FoxAuth?'
-    answer: 'OIDC clients port over with an issuer and client id change. What does not port is anything relying on Zitadel''s SAML or SCIM support, its organisation model, or its management API — FoxAuth models tenancy as projects and user buckets and exposes a different admin API. Assess the migration by how much of your estate is OIDC-only, because that part is straightforward and the rest is not.'
+    answer: "OIDC clients port over with an issuer and client id change. What does not port is anything relying on Zitadel's SAML or SCIM support, its organisation model, or its management API — FoxAuth models tenancy as projects and user buckets and exposes a different admin API. Assess the migration by how much of your estate is OIDC-only, because that part is straightforward and the rest is not."
   - question: 'Which is more production-ready?'
-    answer: 'Zitadel, on deployment history and on having a vendor-operated cloud and enterprise contracts behind it. FoxAuth is at a 0.1.0 release, so its HTTP surface and admin API may still change between minor versions. FoxAuth''s advantage is in specific protocol coverage and licence terms, not in maturity, and this page will not pretend otherwise.'
+    answer: "Zitadel, on deployment history and on having a vendor-operated cloud and enterprise contracts behind it. FoxAuth is at a 0.1.0 release, so its HTTP surface and admin API may still change between minor versions. FoxAuth's advantage is in specific protocol coverage and licence terms, not in maturity, and this page will not pretend otherwise."
 groups:
   - label: Scope and stack
     rows:
       - dimension: Protocols beyond OAuth and OIDC
-        us: { status: no, text: 'OAuth 2.1 and OpenID Connect only. No SAML, and none planned.' }
+        us:
+          {
+            status: no,
+            text: 'OAuth 2.1 and OpenID Connect only. No SAML, and none planned.'
+          }
         them: { status: yes, text: 'SAML 2.0 and SCIM 2.0 alongside OIDC.' }
         verdict: them
         why: 'A single SAML-only application in your estate decides this comparison on its own.'
         note: 'The repository lists "SAML 2.0" and "SCIM 2.0 Server" among its features.'
       - dimension: Runtime and stack
-        us: { status: yes, text: 'TypeScript on Bun; the HTTP layer is Elysia.' }
+        us:
+          { status: yes, text: 'TypeScript on Bun; the HTTP layer is Elysia.' }
         them: { status: yes, text: 'Go.' }
         verdict: different
         why: 'Pick the one your team can read and debug under pressure.'
@@ -57,7 +62,11 @@ groups:
             status: yes,
             text: 'Projects and user buckets, with group ownership deciding who administers what.'
           }
-        them: { status: yes, text: 'Organisations, presented as a core part of the product.' }
+        them:
+          {
+            status: yes,
+            text: 'Organisations, presented as a core part of the product.'
+          }
         verdict: them
         why: 'Zitadel has built its product around multi-tenancy for longer.'
   - label: Protocol coverage
@@ -73,7 +82,11 @@ groups:
         why: 'Certification is third-party evidence; FoxAuth has none yet.'
       - dimension: Device flow
         us: { status: yes, text: 'RFC 8628, behind a feature flag.' }
-        them: { status: yes, text: 'Device authorization, listed as a product feature.' }
+        them:
+          {
+            status: yes,
+            text: 'Device authorization, listed as a product feature.'
+          }
         verdict: even
         why: 'Both implement it.'
       - dimension: Sender-constrained tokens
@@ -91,7 +104,11 @@ groups:
         verdict: us
         why: 'The banking-grade profiles are implemented here rather than on a roadmap.'
       - dimension: Machine-to-machine
-        us: { status: yes, text: 'Client credentials, with JWT client authentication.' }
+        us:
+          {
+            status: yes,
+            text: 'Client credentials, with JWT client authentication.'
+          }
         them:
           {
             status: yes,
@@ -105,25 +122,49 @@ groups:
         us:
           {
             status: yes,
-            text: 'MCP control plane over the console''s own routes, audited and confirmation-gated. Off by default.'
+            text: "MCP control plane over the console's own routes, audited and confirmation-gated. Off by default."
           }
         them: { status: unknown, text: 'Not documented.' }
         verdict: us
-        why: 'The agent path here is the console''s code rather than a second privileged API.'
+        why: "The agent path here is the console's code rather than a second privileged API."
       - dimension: Managed hosting
-        us: { status: flag, text: 'A managed instance is on a waitlist; self-hosting is the only option today.' }
-        them: { status: yes, text: 'A vendor-operated cloud, alongside self-hosting.' }
+        us:
+          {
+            status: flag,
+            text: 'A managed instance is on a waitlist; self-hosting is the only option today.'
+          }
+        them:
+          {
+            status: yes,
+            text: 'A vendor-operated cloud, alongside self-hosting.'
+          }
         verdict: them
         why: 'If you would rather not run it at all, Zitadel can take it off you today.'
       - dimension: Licence
-        us: { status: flag, text: 'FSL-1.1-ALv2: source-available, converting to Apache 2.0 after two years.' }
-        them: { status: flag, text: 'AGPL-3.0, with Apache 2.0 and MIT exceptions for specific directories.' }
+        us:
+          {
+            status: flag,
+            text: 'FSL-1.1-ALv2: source-available, converting to Apache 2.0 after two years.'
+          }
+        them:
+          {
+            status: flag,
+            text: 'AGPL-3.0, with Apache 2.0 and MIT exceptions for specific directories.'
+          }
         verdict: different
-        why: 'Neither is permissive. AGPL''s network copyleft and FSL''s competing-service restriction rule out different things.'
+        why: "Neither is permissive. AGPL's network copyleft and FSL's competing-service restriction rule out different things."
         note: 'Zitadel sells an enterprise contract whose commercial licence replaces the AGPL.'
       - dimension: Maturity
-        us: { status: flag, text: '0.1.0. The HTTP surface and admin API may still change between minor releases.' }
-        them: { status: yes, text: 'Years of production deployment, a vendor cloud and enterprise contracts.' }
+        us:
+          {
+            status: flag,
+            text: '0.1.0. The HTTP surface and admin API may still change between minor releases.'
+          }
+        them:
+          {
+            status: yes,
+            text: 'Years of production deployment, a vendor cloud and enterprise contracts.'
+          }
         verdict: them
         why: 'The maturity gap is real and is the strongest argument for Zitadel.'
 ---

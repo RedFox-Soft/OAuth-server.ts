@@ -46,7 +46,7 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   anchor as data, and a guard fails naming the member if the anchor is removed or reclassified, so
   the justification cannot outlive what it depends on.
 
-- site: the SEO guardrail now checks that structured data is *present*, not only that it is correct
+- site: the SEO guardrail now checks that structured data is _present_, not only that it is correct
   (spec 037). It could tell whether a description was well-formed and truthful but not that one
   should exist, which is how the comparison pages shipped with no article markup past twenty passing
   rules. `STRUCTURED_COVERAGE` says what each kind of page must carry, an unclassified route fails
@@ -83,7 +83,7 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 - security: three latent injection sinks closed, none of them reachable today, which is the only
   reason this is a hardening note and not an advisory. The `WWW-Authenticate` challenge escaped the
   quote in a parameter value and left the backslash alone — the one combination that fails, because a
-  value ending in a backslash then escaped the *closing* quote instead: the quoted string ran on and
+  value ending in a backslash then escaped the _closing_ quote instead: the quoted string ran on and
   everything after it parsed as further auth-params. Values are now stripped rather than escaped,
   which is what [RFC 6750](https://datatracker.ietf.org/doc/html/rfc6750) §3 asks for (NQCHAR holds
   neither character), and nothing dynamic reaches a 401 description today only by accident. The
@@ -92,7 +92,7 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   with all four callers on it, rather than one file getting it right and its neighbours not.
 
   The reason the title mattered more than an unreachable sink usually does: the content security
-  policy is derived *from* the finished document, so an injected inline script would have been hashed
+  policy is derived _from_ the finished document, so an injected inline script would have been hashed
   and then authorized by the very header meant to stop it. That chain is now pinned by a test that was
   watched failing — it emitted a `sha256-` for `alert(1)` — rather than left as an argument.
 

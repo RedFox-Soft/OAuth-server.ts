@@ -263,7 +263,7 @@ Four rules keep it honest:
    because they used to disagree — a page could say `noindex` while the sitemap advertised it.
    Second, docs pages never reach `Seo.astro`; Starlight builds its own head, so
    `src/components/StarlightHead.astro` adds what it omits. Third, the rules check both that
-   structured data is *correct* and that it is *present*: `STRUCTURED_COVERAGE` says what each kind
+   structured data is _correct_ and that it is _present_: `STRUCTURED_COVERAGE` says what each kind
    of page must carry, and a route matching no entry fails as `unclassified-page-type` — added after
    the comparison pages shipped with no article markup past twenty passing rules.
 
