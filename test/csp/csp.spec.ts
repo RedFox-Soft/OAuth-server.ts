@@ -324,6 +324,33 @@ describe('content security policy: every rendered page', () => {
 		}
 	});
 
+	/*
+	 * The other half of the same rule, and the reason the case fix alone was not enough: a closing tag
+	 * may carry whitespace before its `>`, so `</script >` ends a script to every parser and ended
+	 * nothing here. The failure is the uppercase one exactly — the block is not recognized, no hash is
+	 * issued, and the browser blocks a script the page still believes it serves. Asserted for <style>
+	 * too, which has the identical shape and would otherwise be the next thing reported.
+	 */
+	it('hashes an inline block whose closing tag carries whitespace', () => {
+		const script = 'console.log(2)';
+		const style = '.a{color:red}';
+
+		const scriptPolicy = contentSecurityPolicyFor(
+			`<!DOCTYPE html><html><body><script>${script}</script ></body></html>`
+		);
+		expect(scriptPolicy).toContain(
+			`'sha256-${crypto.hash('sha256', script, 'base64')}'`
+		);
+
+		// No script on the page, so style blocks are hashed rather than blanket-allowed.
+		const stylePolicy = contentSecurityPolicyFor(
+			`<!DOCTYPE html><html><head><style>${style}</style\n></head><body></body></html>`
+		);
+		expect(stylePolicy).toContain(
+			`'sha256-${crypto.hash('sha256', style, 'base64')}'`
+		);
+	});
+
 	it('frame-busts every page except the auto-submit callback', async () => {
 		for (const [name, render] of pages) {
 			const res = await render();

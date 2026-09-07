@@ -56,11 +56,16 @@ function resolveOrigin(raw: string, self: string | undefined): string {
  * browser then blocks with the page still rendering perfectly: the capability is gone and nothing
  * anywhere says so. A missed style attribute does the same to `style-src-attr`. Neither is a hole, but
  * both are the silent kind of wrong, and the flag costs nothing.
+ *
+ * The `\s*` before the closing `>` is the same rule in its second form, and it is here because fixing
+ * only the first was not enough: `</script >` ends a script to every parser and ended nothing here, so
+ * the block went unrecognized and its hash unissued exactly as the uppercase spelling did. Two
+ * spellings of one mistake — reading this document by a stricter grammar than the browser uses.
  */
 function inlineScripts(html: string): string[] {
 	const found: string[] = [];
 	for (const [, attributes, body] of html.matchAll(
-		/<script([^>]*)>([\s\S]*?)<\/script>/gi
+		/<script([^>]*)>([\s\S]*?)<\/script\s*>/gi
 	)) {
 		if (!/\ssrc=/i.test(attributes) && body.trim()) {
 			found.push(body);
@@ -132,7 +137,7 @@ function stylesheetOrigins(html: string): string[] {
 function inlineStyleBlocks(html: string): string[] {
 	const found: string[] = [];
 	for (const [, , body] of html.matchAll(
-		/<style([^>]*)>([\s\S]*?)<\/style>/gi
+		/<style([^>]*)>([\s\S]*?)<\/style\s*>/gi
 	)) {
 		if (body.trim()) {
 			found.push(body);

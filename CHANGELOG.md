@@ -96,10 +96,14 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   and then authorized by the very header meant to stop it. That chain is now pinned by a test that was
   watched failing — it emitted a `sha256-` for `alert(1)` — rather than left as an argument.
 
-  Separately, every tag and attribute matcher in the policy derivation is case-insensitive. A tag name
-  is case-insensitive to a parser, so a page spelling one `<SCRIPT>` was read differently by the
-  deriver than by the browser: the hash was never issued, the browser blocked the script, and the page
-  still rendered perfectly with the capability silently gone.
+  Separately, every tag and attribute matcher in the policy derivation now reads a document by the
+  grammar a browser uses rather than a stricter one. Two spellings of that mistake were found, and the
+  second only after the first was fixed: a tag name is case-insensitive, so `<SCRIPT>` was a different
+  tag to the deriver than to the parser; and a closing tag may carry whitespace, so `</script >` ended
+  a script everywhere except here. Both failed the same way — the block went unrecognized, its hash
+  was never issued, the browser blocked a script the page still believed it served, and the page
+  rendered perfectly with the capability silently gone. Neither is a hole, both are the kind of wrong
+  that reports itself nowhere.
 
 - ci: the release workflow no longer grants every job write access. `contents: write` and
   `packages: write` sat at the top level, so the test job — which runs whatever a version tag points
