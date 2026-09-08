@@ -240,6 +240,23 @@ export function Resources({
 				<Typography.Text type="secondary">protected resources</Typography.Text>
 			</Space>
 
+			{/*
+			 * What a declared resource still needs before an agent host can reach it, stated once here
+			 * rather than left to be discovered by a client that fails to connect.
+			 *
+			 * Not read from the settings API, unlike the Agent access screen: this page is reachable by a
+			 * project administrator, who may not read instance settings. So it names the dependency
+			 * without claiming to know the current value — which is honest, and is the same thing the
+			 * guide says.
+			 */}
+			<Alert
+				type="info"
+				showIcon
+				style={{ marginBottom: 16 }}
+				message="A declared resource is half of the setup"
+				description="Declaring the resource is what makes this server mint tokens for it. For an agent host to obtain one it also needs a client identity: either clientIdMetadataDocument.enabled, so a client_id that is an HTTPS URL is accepted, or registration.enabled for an older host that registers itself. Both are instance settings and both are off by default."
+			/>
+
 			<div style={{ marginBottom: 16, textAlign: 'right' }}>
 				<Button
 					type="primary"

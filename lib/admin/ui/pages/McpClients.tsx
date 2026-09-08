@@ -64,6 +64,15 @@ export function McpClients() {
 	const [saving, setSaving] = useState(false);
 	/* The route's own words, shown only once it has refused for want of them. */
 	const [acknowledgement, setAcknowledgement] = useState<string | null>(null);
+	/*
+	 * Whether the two capabilities an entry depends on are actually in force.
+	 *
+	 * Both are off in a shipped configuration, so "permitted an identity and nothing happened" is the
+	 * *normal* first experience of this screen rather than an edge case — a permission is a standing
+	 * decision that does nothing until the surface is served and document identifiers are accepted.
+	 * Read from the settings API, which this screen may call because it is already super-admin only.
+	 */
+	const [inert, setInert] = useState<string[]>([]);
 	const [form] = Form.useForm<FormValues>();
 
 	async function load() {
@@ -71,9 +80,42 @@ export function McpClients() {
 		try {
 			const res = await fetch(base);
 			if (res.ok) setRows((await res.json()) as PermissionView[]);
+			await loadCapabilities();
 		} finally {
 			setLoading(false);
 		}
+	}
+
+	/*
+	 * `values` is the desired state and `changedKeys` names the keys saved but not yet in force, which
+	 * is the distinction that matters here: a flag switched on and not restarted looks on and is not.
+	 * Both are reported, and differently, because the remedy differs — switch it on, or restart.
+	 */
+	async function loadCapabilities() {
+		const res = await fetch('/admin/api/settings');
+		if (!res.ok) return;
+		const body = (await res.json()) as {
+			values: Record<string, unknown>;
+			changedKeys: string[];
+		};
+
+		const problems: string[] = [];
+		for (const [key, what] of [
+			['mcp.enabled', 'the administrative MCP surface is not served'],
+			[
+				'clientIdMetadataDocument.enabled',
+				'a client_id that is a URL is not accepted'
+			]
+		] as const) {
+			if (body.values[key] !== true) {
+				problems.push(`${key} is off, so ${what}.`);
+			} else if (body.changedKeys.includes(key)) {
+				problems.push(
+					`${key} is saved but not in force — settings apply at boot, so restart the server.`
+				);
+			}
+		}
+		setInert(problems);
 	}
 	useEffect(() => {
 		load();
@@ -159,6 +201,25 @@ export function McpClients() {
 
 	return (
 		<>
+			{inert.length > 0 ? (
+				<Alert
+					type="warning"
+					showIcon
+					style={{ marginBottom: 16 }}
+					message="Nothing on this page takes effect yet"
+					description={
+						<>
+							An entry here is a standing decision, and it does nothing until
+							the capabilities it depends on are in force.
+							<ul style={{ margin: '8px 0 0', paddingLeft: 20 }}>
+								{inert.map((problem) => (
+									<li key={problem}>{problem}</li>
+								))}
+							</ul>
+						</>
+					}
+				/>
+			) : null}
 			<Alert
 				type="info"
 				showIcon
