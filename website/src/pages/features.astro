@@ -221,13 +221,23 @@ const groups: {
 			},
 			{
 				title: 'Administration over MCP',
-				body: '60 tools served to an AI agent at POST /mcp as an OAuth 2.1 protected resource, with two-call confirmation on high-consequence operations.',
+				body: '65 tools served to an AI agent at POST /mcp as an OAuth 2.1 protected resource, with two-call confirmation on high-consequence operations.',
 				flag: 'mcp.enabled',
 				spec: rfc('9728')
 			},
 			{
+				title: 'Authorization for your own MCP servers',
+				body: 'Declare a third-party MCP server as a protected resource of a project and this server mints tokens whose audience is exactly that resource — no code change here and no restart. Self-contained tokens by default, so the resource verifies them against the published keys without credentials of its own.',
+				spec: rfc('8707')
+			},
+			{
+				title: 'Client identity documents',
+				body: 'A client_id that is an HTTPS URL naming a JSON document describing the client, retrieved and validated on demand and never stored — the mechanism the MCP authorization specification names first for a client with no prior relationship.',
+				flag: 'clientIdMetadataDocument.enabled'
+			},
+			{
 				title: 'Dynamic client registration',
-				body: 'Clients register themselves, subject to the project’s policy.',
+				body: 'Clients register themselves, subject to the registration policy. Deprecated by the MCP specification in favour of client identity documents.',
 				flag: 'registration.enabled',
 				spec: rfc('7591')
 			},
@@ -319,7 +329,7 @@ const groups: {
 
 <Site
 	title="Features — FoxAuth"
-	description="Every grant, profile and control OAuth-server.ts implements: OAuth 2.1 with PKCE, DPoP, PAR, FAPI, CIBA and mTLS, an audited admin console, and 60 MCP tools."
+	description="Every grant, profile and control OAuth-server.ts implements: OAuth 2.1 with PKCE, DPoP, PAR, FAPI, CIBA and mTLS, an audited console, and OAuth for MCP servers."
 >
 	<Section narrow>
 		<Eyebrow>Features</Eyebrow>

@@ -32,11 +32,11 @@ const audiences = [
 	},
 	{
 		title: 'For AI-agent builders',
-		body: 'The only authorization server where an agent administers the instance through the console’s own code path — no separate privileged API to keep in step.',
+		body: 'Protect your own MCP server with it, and let an agent administer the instance through the console’s own code path — no separate privileged API to keep in step.',
 		points: [
-			'60 MCP tools, off until you set mcp.enabled',
-			'Two-call confirmation on destructive operations',
-			'RFC 9728 protected-resource metadata'
+			'Declare your MCP server; get audience-bound tokens (RFC 8707)',
+			'Client ID Metadata Documents, so an agent host needs no setup',
+			'65 MCP tools for administration, off until you set mcp.enabled'
 		]
 	},
 	{
@@ -313,14 +313,22 @@ server ← { "restartRequired": true,
 	<Section>
 		<div class="grid grid-cols-1 items-start gap-12 lg:grid-cols-2">
 			<div>
-				<Eyebrow>Administration over MCP</Eyebrow>
+				<Eyebrow>An OAuth server for MCP</Eyebrow>
 				<h2 class="text-3xl font-[650] tracking-tight text-balance">
-					An agent operates it, under the same rules you do.
+					Protect your MCP server, and let an agent operate this one.
 				</h2>
+				<p class="mt-4 max-w-prose text-gray-600 dark:text-gray-400">
+					Declare your own MCP server as a protected resource of a project and this server
+					mints tokens whose audience is exactly that resource — no code here, no restart. An
+					agent host discovers it, signs your users in, and comes back with a token your MCP
+					server verifies against the published keys without asking anything. A
+					<code class="font-mono text-sm">client_id</code> that is an HTTPS URL is accepted as
+					a client identity document, so a host with nothing to configure still connects.
+				</p>
 				<p class="mt-4 max-w-prose text-gray-600 dark:text-gray-400">
 					Turn on <code class="font-mono text-sm">mcp.enabled</code> and the management API is
 					served to an AI agent at <code class="font-mono text-sm">POST /mcp</code> as an OAuth
-					2.1 protected resource. Each of the 60 tools rebuilds the request the console would
+					2.1 protected resource. Each of the 65 tools rebuilds the request the console would
 					have sent and runs the console's own permission checks, validation and audit write —
 					so there is no privileged back door to keep in step.
 				</p>
@@ -328,9 +336,12 @@ server ← { "restartRequired": true,
 					Destructive and instance-wide operations need two calls: the first returns a
 					confirmation token, the second carries it. It is off by default.
 				</p>
-				<p class="mt-6">
+				<p class="mt-6 flex flex-wrap gap-3">
+					<Button href="/docs/get-started/protect-your-mcp-server/">
+						Protect your MCP server
+					</Button>
 					<Button href="/docs/reference/mcp-tools/" variant="secondary">
-						All 60 MCP tools
+						All 65 MCP tools
 					</Button>
 				</p>
 			</div>

@@ -5,6 +5,7 @@ description: Both are servers you run yourself. They differ in runtime, storage,
 lastChecked: '2026-09-03'
 sources:
   - https://www.keycloak.org/securing-apps/oidc-layers
+  - https://www.keycloak.org/securing-apps/mcp-authz-server
   - https://www.keycloak.org/docs/latest/server_admin/index.html
   - https://www.keycloak.org/docs-api/latest/rest-api/index.html
   - https://www.keycloak.org/server/configuration
@@ -165,11 +166,38 @@ groups:
         us:
           {
             status: flag,
-            text: 'RFC 7591, plus RFC 7592 management, each behind its own flag.'
+            text: 'RFC 7591, plus RFC 7592 management, each behind its own flag. Deprecated by the MCP specification in favour of client identity documents.'
           }
         them: { status: yes, text: 'Supported.' }
         verdict: even
         why: 'Both implement it.'
+      - dimension: Client identity documents (CIMD)
+        us:
+          {
+            status: flag,
+            text: 'A client_id that is an HTTPS URL naming a document describing the client, retrieved and validated on demand, stored nowhere. Behind clientIdMetadataDocument.enabled.'
+          }
+        them:
+          {
+            status: flag,
+            text: 'Supported since 26.6, and documented as experimental — "may introduce breaking changes in future versions".'
+          }
+        verdict: even
+        why: 'Both implement the mechanism the MCP specification names first; theirs is labelled experimental and ours is behind a flag.'
+      - dimension: Authorization for your MCP server
+        us:
+          {
+            status: yes,
+            text: 'Declare the MCP server as a protected resource of a project and tokens carry it as their sole audience, via the resource parameter (RFC 8707). No code change, no restart.'
+          }
+        them:
+          {
+            status: flag,
+            text: 'Documented as an MCP authorization server, but "Keycloak cannot recognize resource parameter" — audience binding is done instead with a client scope and an audience mapper per MCP server.'
+          }
+        verdict: us
+        why: 'Both can front an MCP server. The difference is how the token is bound to it: the resource parameter the MCP specification requires of clients, against a per-server scope and mapper configured by hand.'
+        note: 'Keycloak states full support for MCP 2025-03-26 and partial support for later revisions, and that RFC 9728 metadata is the MCP server’s job rather than the authorization server’s — the same position taken here.'
   - label: Administration and agents
     rows:
       - dimension: Admin console
@@ -189,15 +217,16 @@ groups:
         us:
           {
             status: flag,
-            text: '60 MCP tools served by the server itself, two-call confirmation for destructive operations, behind mcp.enabled.'
+            text: '65 MCP tools served by the server itself, two-call confirmation for destructive operations, behind mcp.enabled.'
           }
         them:
           {
-            status: unknown,
-            text: 'No MCP guide in the documentation index; administration is the Admin REST API.'
+            status: no,
+            text: 'Administration is the Admin REST API. Keycloak documents MCP as an authorization server for other people’s MCP servers, not as an interface for administering Keycloak.'
           }
         verdict: us
         why: "An agent runs the console's own code path, checks and audit trail; there is no second privileged API to keep in step."
+        note: 'Keycloak’s MCP page is about a different job — being the authorization server in front of an MCP server. That capability is compared separately below.'
   - label: Licence and cost
     rows:
       - dimension: Licence
