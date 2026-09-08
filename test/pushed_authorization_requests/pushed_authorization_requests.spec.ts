@@ -26,6 +26,22 @@ import { PushedAuthorizationRequest } from 'lib/models/pushed_authorization_requ
 import { ISSUER } from 'lib/configs/env.js';
 import { Client } from 'lib/models/client.ts';
 
+/*
+ * The lifetime a request object dictates, allowing for the second that may tick between this test
+ * minting `exp` and the server subtracting its own `now` from it — the handler computes
+ * `ttl = exp - now`, so the answer is `seconds` or one less, and which one is a property of when the
+ * request lands rather than of the contract.
+ *
+ * Not `toBeCloseTo(seconds, 1)`, which is what stood here and reads as tolerant while allowing ±0.05:
+ * on a whole-second value that demands exactly `seconds`, and CI duly returned 29 for a 30-second
+ * request object. Where the server answers with its own MAX_TTL constant instead, the assertions
+ * below stay exact, because nothing about those can drift.
+ */
+function expectDictatedTtl(actual: number | undefined, seconds: number) {
+	expect(actual).toBeGreaterThanOrEqual(seconds - 1);
+	expect(actual).toBeLessThanOrEqual(seconds);
+}
+
 describe('Pushed Request Object', async () => {
 	const setup = await bootstrap(import.meta.url);
 	afterEach(() => {
@@ -701,7 +717,7 @@ describe('Pushed Request Object', async () => {
 								}
 							);
 							expect(response.status).toBe(201);
-							expect(data?.expires_in).toBeCloseTo(30, 1);
+							expectDictatedTtl(data?.expires_in, 30);
 							expect(data?.request_uri).toMatch(
 								/^urn:ietf:params:oauth:request_uri:(.+)$/
 							);
@@ -782,7 +798,7 @@ describe('Pushed Request Object', async () => {
 								}
 							);
 							expect(response.status).toBe(201);
-							expect(data?.expires_in).toBeCloseTo(20, 1);
+							expectDictatedTtl(data?.expires_in, 20);
 							expect(data?.request_uri).toMatch(
 								/^urn:ietf:params:oauth:request_uri:(.+)$/
 							);
