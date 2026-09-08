@@ -1,0 +1,23 @@
+# Coverage policy. It lives here rather than in bunfig.toml because it is a statement about which code
+# a coverage number should speak for, not a property of the test run.
+#
+# The ignore list is the whole of it, and it exists because of one specific failure: 7d6c809 changed a
+# single file — lib/admin/ui/pages/McpClients.tsx — and codecov/patch failed it at 63.29% of the diff
+# against an auto target of 83.34%. Nothing was wrong with that commit. The console's browser
+# components are pulled into the coverage run by the shell's module graph but never rendered by it, so
+# they report between 1% and 10%, and those 5,923 lines drag the project number from 97% to 82% — which
+# is then the target every other commit is measured against. Every commit Codecov has scored on server
+# code hit 100.00% of its diff, so the targets are left exactly as they are: the measurement was what
+# was wrong, not the standard.
+#
+# The ignored files are verified where they actually run — website/scripts/capture.ts drives the
+# hydrated console with Playwright at site-build time. Two neighbours are deliberately NOT ignored,
+# which is why the patterns name file kinds rather than directories: lib/admin/ui/settings/model.ts and
+# lib/admin/ui/serverRender.tsx run under `bun test` and are both at 100%.
+ignore:
+  # The antd screens and the settings editor's controls: React components that only exist in a browser.
+  - 'lib/admin/ui/pages/**'
+  - 'lib/admin/ui/settings/*.tsx'
+  # The two browser bundle entry points, per the target list in build.ts.
+  - 'lib/admin/ui/adminClient.tsx'
+  - 'lib/interactions/loginClient.tsx'

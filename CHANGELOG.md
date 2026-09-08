@@ -181,6 +181,15 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   real findings in `lib/` that nobody could see for the noise. An alert list is a queue, and a queue
   that is two-thirds false is not read.
 
+- ci: a commit that touches only the console's React components no longer fails the coverage gate.
+  Those components are pulled into the coverage run by the shell's module graph but never rendered by
+  it, so they report between 1% and 10%, and their 5,923 lines drag the project number from 97% to
+  82% — which Codecov then holds every other commit to. One duly failed at 63% of a diff that was a
+  single `.tsx` file. A `codecov.yml` ignores the browser bundle and changes no target, because every
+  commit scored on server code has hit 100% of its diff; the two modules beside those components that
+  `bun test` does exercise stay measured. They are verified where they run, by the Playwright capture
+  in the site build.
+
 - site: the home page no longer scrolls sideways on a phone. Below the `lg` breakpoint the hero grid
   declared no base column count, so it formed a single implicit `auto` track sized to its content —
   the page laid out 839px wide inside a 375px viewport, with the headline running off-screen. A grid
