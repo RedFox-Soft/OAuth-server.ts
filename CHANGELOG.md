@@ -110,6 +110,23 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   deliberately does not accept `</scriptfoo>` — a tag named `scriptfoo` — since reading that as a close
   would hash the wrong span rather than none.
 
+- test: the invariants behind the escaping and the policy derivation are now checked against generated
+  input rather than examples (`test/properties/invariants.spec.ts`, `fast-check` as a dev dependency).
+  Both had just cost three rounds each of the same shape: a fix was written for the one spelling that
+  had been reported, the suite went green, and the next spelling arrived on the next scan. An example
+  answers "does it handle this?"; these state what is true of every input — a challenge carries no
+  character that could end a parameter early, every inline script a document serves is authorized by
+  the policy derived from it whatever the tags are spelled, `</scriptfoo>` is never read as a close, the
+  escaper leaves nothing that could escape its position, and a base32 secret survives being retyped in
+  a different case with spaces in it.
+
+  Each property was checked by reintroducing the bug it exists to catch, which is the only way to know
+  a property has teeth — and the first draft did not. It passed against the restored escaping bug,
+  because a full-Unicode generator has no reason to favour one ASCII character and that invariant is
+  about exactly two of them; five hundred runs produced no `"` at all. Generating from the characters
+  that actually break the function fails it on the fifth case and shrinks the counterexample to a
+  single quotation mark. The lesson is in the file, next to the generator.
+
 - build: the container image no longer ships known-vulnerable OpenSSL, and the base it inherits is now
   a reference rather than a moving target. One package accounted for twenty of the twenty-five open
   scanner alerts — `libssl3`/`libcrypto3` 3.5.7-r0, two high, six medium, twelve low — and the standing
