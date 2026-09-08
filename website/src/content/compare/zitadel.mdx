@@ -26,7 +26,7 @@ faq:
   - question: 'Can I migrate from Zitadel to FoxAuth?'
     answer: "OIDC clients port over with an issuer and client id change. What does not port is anything relying on Zitadel's SAML or SCIM support, its organisation model, or its management API — FoxAuth models tenancy as projects and user buckets and exposes a different admin API. Assess the migration by how much of your estate is OIDC-only, because that part is straightforward and the rest is not."
   - question: 'Which is more production-ready?'
-    answer: "Zitadel, on deployment history and on having a vendor-operated cloud and enterprise contracts behind it. FoxAuth is at a 0.1.0 release, so its HTTP surface and admin API may still change between minor versions. FoxAuth's advantage is in specific protocol coverage and licence terms, not in maturity, and this page will not pretend otherwise."
+    answer: "Zitadel, on deployment history and on having a vendor-operated cloud and enterprise contracts behind it. FoxAuth is at a 0.2.0 release, so its HTTP surface and admin API may still change between minor versions. FoxAuth's advantage is in specific protocol coverage and licence terms, not in maturity, and this page will not pretend otherwise."
 groups:
   - label: Scope and stack
     rows:
@@ -158,7 +158,7 @@ groups:
         us:
           {
             status: flag,
-            text: '0.1.0. The HTTP surface and admin API may still change between minor releases.'
+            text: '0.2.0. The HTTP surface and admin API may still change between minor releases.'
           }
         them:
           {

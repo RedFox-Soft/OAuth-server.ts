@@ -30,7 +30,7 @@ export const PRICING_FAQ: readonly QuestionAnswer[] = [
 	{
 		question: 'Can I run it in production today?',
 		answer:
-			'Yes, self-hosted. The current release of FoxAuth is 0.1.0, and a 0.x version means the HTTP surface and the admin API may still change between minor releases; read the changelog before upgrading and re-run the setup script afterwards. The protocol endpoints follow the specs, so your clients are written against the RFC, not against us.'
+			'Yes, self-hosted. The current release of FoxAuth is 0.2.0, and a 0.x version means the HTTP surface and the admin API may still change between minor releases; read the changelog before upgrading and re-run the setup script afterwards. The protocol endpoints follow the specs, so your clients are written against the RFC, not against us.'
 	},
 	{
 		question: 'What does the cloud waitlist commit me to?',

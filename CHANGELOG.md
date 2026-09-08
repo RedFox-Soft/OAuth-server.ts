@@ -9,6 +9,16 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.2.0] - 2026-09-08
+
+Two things define this release. The server is now an authorization server **for** third-party MCP
+servers rather than only for its own administrative plane, and SECURITY.md has evidence behind it: a
+written threat model, a scanning pipeline, and a container image that is signed and ships an SBOM and
+build provenance. A plain OAuth 2.1 client can also discover a deployment at last, through RFC 8414
+metadata.
+
 ### Added
 
 - mcp: the server is now an authorization server **for** MCP servers, not only for its own admin
@@ -513,5 +523,6 @@ found`. The refusal text existed and never ran: the call that delivered it sat i
 - The DPoP nonce secret is self-provisioned at startup, making the requireNonce-without-secret 500
   state unrepresentable (spec 014)
 
-[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/RedFox-Soft/OAuth-server.ts/releases/tag/v0.1.0
