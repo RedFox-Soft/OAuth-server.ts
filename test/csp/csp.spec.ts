@@ -325,30 +325,58 @@ describe('content security policy: every rendered page', () => {
 	});
 
 	/*
-	 * The other half of the same rule, and the reason the case fix alone was not enough: a closing tag
-	 * may carry whitespace before its `>`, so `</script >` ends a script to every parser and ended
-	 * nothing here. The failure is the uppercase one exactly — the block is not recognized, no hash is
-	 * issued, and the browser blocks a script the page still believes it serves. Asserted for <style>
-	 * too, which has the identical shape and would otherwise be the next thing reported.
+	 * The closing forms an HTML parser accepts, taken from the corpus CodeQL's own js/bad-tag-filter
+	 * tests a pattern against (shared/regex/codeql/regex/nfa/BadTagFilterQuery.qll) rather than from
+	 * guesswork — which is what the two previous attempts at this were, each fixing the one spelling
+	 * that had been reported and handing the rule the next one.
+	 *
+	 * An end tag may carry attributes: `</script foo="bar">` closes a script, because a parser reads
+	 * the tag name and then skips to the `>`. All three failed identically here — the block went
+	 * unrecognized, its hash was never issued, and the browser blocked a script the page still
+	 * believed it served. `</scriptfoo>` is the case that must NOT match: that is a tag named
+	 * `scriptfoo`, and treating it as a close would hash the wrong span.
 	 */
-	it('hashes an inline block whose closing tag carries whitespace', () => {
-		const script = 'console.log(2)';
-		const style = '.a{color:red}';
+	const CLOSING_FORMS = [
+		'</script>',
+		'</script >',
+		'</script\n>',
+		'</script foo="bar">',
+		'</script\t\n bar>',
+		'</SCRIPT>',
+		'</ScRiPt foo="bar">'
+	];
 
-		const scriptPolicy = contentSecurityPolicyFor(
-			`<!DOCTYPE html><html><body><script>${script}</script ></body></html>`
+	it('hashes an inline script however its end tag is spelled', () => {
+		const body = 'console.log(2)';
+		const expected = `'sha256-${crypto.hash('sha256', body, 'base64')}'`;
+
+		for (const close of CLOSING_FORMS) {
+			const policy = contentSecurityPolicyFor(
+				`<!DOCTYPE html><html><body><script>${body}${close}</body></html>`
+			);
+			expect(policy, `end tag ${JSON.stringify(close)}`).toContain(expected);
+		}
+	});
+
+	it('does not read a longer tag name as a closing script tag', () => {
+		const policy = contentSecurityPolicyFor(
+			`<!DOCTYPE html><html><body><script>console.log(3)</scriptfoo></body></html>`
 		);
-		expect(scriptPolicy).toContain(
-			`'sha256-${crypto.hash('sha256', script, 'base64')}'`
-		);
+		expect(policy).toContain("script-src 'none'");
+	});
+
+	// <style> has the identical shape, so it gets the identical treatment before it is reported too.
+	it('hashes an inline style however its end tag is spelled', () => {
+		const style = '.a{color:red}';
+		const expected = `'sha256-${crypto.hash('sha256', style, 'base64')}'`;
 
 		// No script on the page, so style blocks are hashed rather than blanket-allowed.
-		const stylePolicy = contentSecurityPolicyFor(
-			`<!DOCTYPE html><html><head><style>${style}</style\n></head><body></body></html>`
-		);
-		expect(stylePolicy).toContain(
-			`'sha256-${crypto.hash('sha256', style, 'base64')}'`
-		);
+		for (const close of ['</style>', '</style >', '</style\t\n bar>']) {
+			const policy = contentSecurityPolicyFor(
+				`<!DOCTYPE html><html><head><style>${style}${close}</head><body></body></html>`
+			);
+			expect(policy, `end tag ${JSON.stringify(close)}`).toContain(expected);
+		}
 	});
 
 	it('frame-busts every page except the auto-submit callback', async () => {

@@ -97,13 +97,18 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   watched failing — it emitted a `sha256-` for `alert(1)` — rather than left as an argument.
 
   Separately, every tag and attribute matcher in the policy derivation now reads a document by the
-  grammar a browser uses rather than a stricter one. Two spellings of that mistake were found, and the
-  second only after the first was fixed: a tag name is case-insensitive, so `<SCRIPT>` was a different
-  tag to the deriver than to the parser; and a closing tag may carry whitespace, so `</script >` ended
-  a script everywhere except here. Both failed the same way — the block went unrecognized, its hash
-  was never issued, the browser blocked a script the page still believed it served, and the page
-  rendered perfectly with the capability silently gone. Neither is a hole, both are the kind of wrong
-  that reports itself nowhere.
+  grammar a browser uses rather than a stricter one. Three spellings of that mistake were found, and
+  each of the last two only after the previous was fixed: a tag name is case-insensitive, so `<SCRIPT>`
+  was a different tag to the deriver than to the parser; and an end tag may carry both whitespace and
+  attributes, so `</script >` and `</script foo="bar">` ended a script everywhere except here. All
+  three failed the same way — the block went unrecognized, its hash was never issued, the browser
+  blocked a script the page still believed it served, and the page rendered perfectly with the
+  capability silently gone. None is a hole; all are the kind of wrong that reports itself nowhere.
+
+  The end-tag pattern is now taken from the corpus the analyser itself checks a regex against rather
+  than reasoned about one spelling at a time, which is what produced two of the three rounds. It
+  deliberately does not accept `</scriptfoo>` — a tag named `scriptfoo` — since reading that as a close
+  would hash the wrong span rather than none.
 
 - ci: the release workflow no longer grants every job write access. `contents: write` and
   `packages: write` sat at the top level, so the test job — which runs whatever a version tag points

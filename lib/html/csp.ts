@@ -57,15 +57,22 @@ function resolveOrigin(raw: string, self: string | undefined): string {
  * anywhere says so. A missed style attribute does the same to `style-src-attr`. Neither is a hole, but
  * both are the silent kind of wrong, and the flag costs nothing.
  *
- * The `\s*` before the closing `>` is the same rule in its second form, and it is here because fixing
- * only the first was not enough: `</script >` ends a script to every parser and ended nothing here, so
- * the block went unrecognized and its hash unissued exactly as the uppercase spelling did. Two
- * spellings of one mistake — reading this document by a stricter grammar than the browser uses.
+ * The end-tag pattern comes from the corpus CodeQL's own js/bad-tag-filter checks a regex against
+ * (shared/regex/codeql/regex/nfa/BadTagFilterQuery.qll), not from reasoning about it: two earlier
+ * attempts each fixed the one spelling that had been reported and were handed the next one. The three
+ * it tests are `</script >`, `</script foo="bar">` and `</script\t\n bar>`, because an end tag may
+ * carry attributes — a parser reads the tag name and then skips to the `>`.
+ *
+ * Hence `(?:[\s/][^>]*)?`, and hence its shape. The optional group must begin with whitespace or a
+ * slash so `</scriptfoo>` is not read as a close: that is a tag named `scriptfoo`, and accepting it
+ * would hash the wrong span rather than none. Attributes are consumed with `[^>]*` rather than parsed,
+ * which is also why the rule's quote-style checks do not apply here — this pattern never looks at a
+ * quote.
  */
 function inlineScripts(html: string): string[] {
 	const found: string[] = [];
 	for (const [, attributes, body] of html.matchAll(
-		/<script([^>]*)>([\s\S]*?)<\/script\s*>/gi
+		/<script([^>]*)>([\s\S]*?)<\/script(?:[\s/][^>]*)?>/gi
 	)) {
 		if (!/\ssrc=/i.test(attributes) && body.trim()) {
 			found.push(body);
@@ -137,7 +144,7 @@ function stylesheetOrigins(html: string): string[] {
 function inlineStyleBlocks(html: string): string[] {
 	const found: string[] = [];
 	for (const [, , body] of html.matchAll(
-		/<style([^>]*)>([\s\S]*?)<\/style\s*>/gi
+		/<style([^>]*)>([\s\S]*?)<\/style(?:[\s/][^>]*)?>/gi
 	)) {
 		if (body.trim()) {
 			found.push(body);
