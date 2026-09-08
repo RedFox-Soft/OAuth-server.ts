@@ -22,3 +22,12 @@ updates:
     schedule:
       interval: weekly
       day: monday
+
+  # The base image, which is the other half of pinning it by digest: a pin nobody moves is a pin to a
+  # stale image, and the image scan reports against whatever it holds. Only works because the Dockerfile
+  # names a versioned tag — see the comment there for why the floating `alpine` tag could not be pinned.
+  - package-ecosystem: docker
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday

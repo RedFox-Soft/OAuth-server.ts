@@ -52,11 +52,22 @@ the list of what is *not* defended, with the compensating control for each, is w
 operator plan. The same rule governs the assurance page: an item leaves "What has not been done"
 only by moving to a section above with a link, never by deletion.
 
-**The image scan does not fail the build.** Nearly everything Trivy finds is in `oven/bun:alpine`,
-and the remedy is a rebuild once upstream ships a fix — not a change in this repository. A red build
-nobody can turn green teaches people to ignore red builds, so the finding is published to code
-scanning instead, with `ignore-unfixed: true` because an unfixable finding gives a reader nothing to
-do. `bun audit`, by contrast, *does* fail: a lockfile bump is always within the repository's power.
+**The image scan does not fail the build.** A red build nobody can turn green teaches people to ignore
+red builds, so the finding is published to code scanning instead, with `ignore-unfixed: true` because
+an unfixable finding gives a reader nothing to do. `bun audit`, by contrast, *does* fail: a lockfile
+bump is always within the repository's power.
+
+**Superseded 2026-09-08 — the base image was within its power after all.** This page used to say the
+remedy for a Trivy finding was "a rebuild once upstream ships a fix — not a change in this repository",
+and the release-then-wait reading of that was measured wrong: on a fresh pull `oven/bun:alpine` carried
+`libssl3 3.5.7-r0` while Alpine's v3.22 repository already served the fixed `3.5.8-r0`, so cutting a
+release rebuilt from the same vulnerable base. One OpenSSL package accounted for twenty of twenty-five
+open alerts. The Dockerfile now pins the base by digest on a *versioned* tag — the floating `alpine`
+could not be pinned, because Dependabot moves a digest only when the tag version changes
+(dependabot-core#1971) — and follows it with `apk upgrade --no-cache`. Verified locally with the
+workflow's own Trivy flags: zero fixable findings at every severity. The scan still does not fail the
+build; what changed is that its findings are now actionable here, which is the argument this paragraph
+originally got backwards.
 
 **Two audits, not one.** `website/` is an independent Bun project with its own lockfile and a build
 that runs a browser; it is not exempt because it is "just the site". On 2026-09-07 the root lockfile

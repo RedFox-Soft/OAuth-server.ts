@@ -110,6 +110,25 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   deliberately does not accept `</scriptfoo>` — a tag named `scriptfoo` — since reading that as a close
   would hash the wrong span rather than none.
 
+- build: the container image no longer ships known-vulnerable OpenSSL, and the base it inherits is now
+  a reference rather than a moving target. One package accounted for twenty of the twenty-five open
+  scanner alerts — `libssl3`/`libcrypto3` 3.5.7-r0, two high, six medium, twelve low — and the standing
+  plan of waiting for the base image to be rebuilt turned out not to work: measured on a fresh pull,
+  `oven/bun:alpine` still carried 3.5.7-r0 while Alpine's v3.22 repository already served the fixed
+  3.5.8-r0, so cutting a release would have rebuilt from the same vulnerable layer.
+
+  `FROM` is now pinned by digest, and to a versioned tag rather than the floating `alpine`, because
+  that is the only form anything keeps current: Dependabot moves a digest when the tag's version
+  changes and has no mechanism for "same tag, newer digest"
+  ([dependabot-core#1971](https://github.com/dependabot/dependabot-core/issues/1971)), so
+  `alpine@sha256:...` would have frozen the image at the day it was written — which is exactly why it
+  had been left unpinned. A `docker` entry in the Dependabot configuration keeps the pin moving, and
+  `apk upgrade --no-cache` takes the distribution's patches at build time rather than inheriting the
+  unpatched half of the digest. Reproducibility over time is the deliberate cost; within a run the
+  scan and the release still build identically, and `bun.lock` still pins the application's own
+  dependencies. Verified with the Security workflow's own Trivy flags: zero fixable findings at every
+  severity, down from twenty.
+
 - ci: the release workflow no longer grants every job write access. `contents: write` and
   `packages: write` sat at the top level, so the test job — which runs whatever a version tag points
   at — held a token that could push to the repository and publish to the registry, for no reason
