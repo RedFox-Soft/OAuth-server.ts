@@ -190,6 +190,12 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   `bun test` does exercise stay measured. They are verified where they run, by the Playwright capture
   in the site build.
 
+- test: the login throttle specs no longer sit one second away from bun's 5s default timeout. Each
+  spends the failure cap and each attempt costs an argon2 verification, so the file runs at roughly 3s
+  per test and contention from the rest of the suite decides the rest — which it did once, and a
+  timeout is reported as a failing assertion, reading like a broken throttle rather than a slow one.
+  The budget is stated once at the top of the file.
+
 - site: the home page no longer scrolls sideways on a phone. Below the `lg` breakpoint the hero grid
   declared no base column count, so it formed a single implicit `auto` track sized to its content —
   the page laid out 839px wide inside a 375px viewport, with the headline running off-screen. A grid

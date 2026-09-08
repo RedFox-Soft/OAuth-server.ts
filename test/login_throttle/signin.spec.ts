@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, beforeEach, spyOn } from 'bun:test';
+import { describe, it, expect, beforeAll, jest, spyOn } from 'bun:test';
 
 import bootstrap, { agent, getHeader } from '../test_helper.ts';
 import { AuthorizationRequest } from '../AuthorizationRequest.ts';
@@ -26,6 +26,15 @@ import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
  * is indistinguishable from the ordinary one. A throttle whose refusal looks different is an
  * account-existence oracle bolted onto a door built to be non-committal.
  */
+
+/*
+ * Every test here spends the cap, and each attempt costs an argon2 verification, so the file runs at
+ * roughly 3s per test against bun's 5s default — close enough that contention from the rest of the
+ * suite is what decides it. It cost a release candidate one red run: the timeout is reported as a
+ * failing assertion, which reads like a broken throttle rather than a slow one. The budget is the
+ * cost of a password hash times the cap, not a property of the contract, so it is stated once here.
+ */
+jest.setTimeout(30_000);
 
 const PASSWORD = 'correct horse battery';
 const WRONG = 'not the password';
