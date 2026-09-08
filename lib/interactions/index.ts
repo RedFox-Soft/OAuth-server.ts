@@ -74,9 +74,13 @@ import { Grant } from 'lib/models/grant.js';
 import { Client } from 'lib/models/client.js';
 import { responseModes } from 'lib/response_modes/index.js';
 import { ISSUER } from 'lib/configs/env.js';
-import { resolveBucketForClient } from 'lib/admin/auth/resolveBucket.js';
+import { resolveBucketForRequest } from 'lib/admin/auth/resolveBucket.js';
 import { ADMIN_BUCKET_ID } from 'lib/admin/consts.js';
-import { buildConsentView, type PromptDetails } from './consentView.js';
+import {
+	buildConsentView,
+	documentIdentityFor,
+	type PromptDetails
+} from './consentView.js';
 import { NOTICE_VERIFY, resolveNotice } from './notices.js';
 import {
 	registrationClosedPage,
@@ -235,7 +239,7 @@ async function passwordDoorClosed(
 	uid: string
 ): Promise<Response | undefined> {
 	const bucket = await getBucketStore().find(
-		await resolveBucketForClient(clientId)
+		await resolveBucketForRequest(clientId)
 	);
 	// `=== false` exactly: absent means available, which is what a bucket predating the field must get.
 	return bucket?.passwordLogin === false
@@ -277,6 +281,22 @@ function clientIdOf(interaction: {
 }): string | undefined {
 	return (interaction.payload.params as { client_id?: string } | undefined)
 		?.client_id;
+}
+
+/*
+ * The resource indicator the pending authorization request named, if it named one.
+ *
+ * Read from the stored interaction, never from the current request. By the time a user is typing a
+ * password the original parameters live only here, and the bucket they sign in against has to be the
+ * one the authorization request implied — a bucket taken from the login POST would let anyone aim an
+ * interaction at another tenant's accounts, which is the same reason `clientId` above is read here too.
+ */
+function resourceOf(interaction: {
+	payload: { params?: unknown };
+}): string | string[] | undefined {
+	return (
+		interaction.payload.params as { resource?: string | string[] } | undefined
+	)?.resource;
 }
 
 /*
@@ -375,7 +395,10 @@ export const ui = new Elysia()
 			const closed = await passwordDoorClosed(clientId, uid);
 			if (closed) return closed;
 
-			const bucketId = await resolveBucketForClient(clientId);
+			const bucketId = await resolveBucketForRequest(
+				clientId,
+				resourceOf(interaction)
+			);
 			/*
 			 * Resolved once, and used twice: the throttle needs to know whether a password alone can
 			 * complete a sign-in here, and the second-factor step below needs the same answer. Reading it
@@ -499,7 +522,10 @@ export const ui = new Elysia()
 		if (!pending) {
 			return Response.redirect(buildUILoginPath(uid), 303);
 		}
-		const bucketId = await resolveBucketForClient(clientIdOf(interaction));
+		const bucketId = await resolveBucketForRequest(
+			clientIdOf(interaction),
+			resourceOf(interaction)
+		);
 		const user = await getUserStore(bucketId).find(pending.accountId);
 		// Enrolment cleared between the password and now: send them to set one up rather than ask for a
 		// code from an authenticator they no longer have.
@@ -519,7 +545,10 @@ export const ui = new Elysia()
 				return Response.redirect(buildUILoginPath(uid), 303);
 			}
 
-			const bucketId = await resolveBucketForClient(clientIdOf(interaction));
+			const bucketId = await resolveBucketForRequest(
+				clientIdOf(interaction),
+				resourceOf(interaction)
+			);
 			const refuse = () =>
 				totpServer(uid, {
 					mode: 'verify',
@@ -586,7 +615,10 @@ export const ui = new Elysia()
 		}
 
 		const clientId = clientIdOf(interaction);
-		const bucketId = await resolveBucketForClient(clientId);
+		const bucketId = await resolveBucketForRequest(
+			clientId,
+			resourceOf(interaction)
+		);
 		const { totpRequired } = await loginOptionsForClient(clientId);
 		// Lowered while this person was mid-flow: there is nothing left to enrol for.
 		if (!totpRequired) {
@@ -625,7 +657,10 @@ export const ui = new Elysia()
 			}
 
 			const clientId = clientIdOf(interaction);
-			const bucketId = await resolveBucketForClient(clientId);
+			const bucketId = await resolveBucketForRequest(
+				clientId,
+				resourceOf(interaction)
+			);
 
 			/*
 			 * The per-interaction cap and no account window. The pending secret already expires on its
@@ -705,7 +740,10 @@ export const ui = new Elysia()
 			)?.client_id;
 			// The bucket comes from the client that began the interaction, never from the request: a bucket
 			// taken from a parameter would let anyone aim this at any tenant's provider.
-			const bucketId = await resolveBucketForClient(clientId);
+			const bucketId = await resolveBucketForRequest(
+				clientId,
+				resourceOf(interaction)
+			);
 			const bucket = await getBucketStore().find(bucketId);
 			/*
 			 * `providerId` is optional in the merged params type because the shared guard declares it that way
@@ -767,7 +805,10 @@ export const ui = new Elysia()
 			const clientId = (
 				interaction.payload.params as { client_id?: string } | undefined
 			)?.client_id;
-			const bucketId = await resolveBucketForClient(clientId);
+			const bucketId = await resolveBucketForRequest(
+				clientId,
+				resourceOf(interaction)
+			);
 			const user = await getUserStore(bucketId).find(handoff.accountId);
 			// Re-read rather than trusted from the record: an account frozen between hops must not sign in.
 			if (!user || !user.active) {
@@ -822,7 +863,10 @@ export const ui = new Elysia()
 			 * `client_id` taken from the form would let anyone aim the lookup at any bucket, which turns a
 			 * reset form into a cross-bucket address prober.
 			 */
-			const bucketId = await resolveBucketForClient(clientId);
+			const bucketId = await resolveBucketForRequest(
+				clientId,
+				resourceOf(interaction)
+			);
 			const outcome = await requestPasswordReset(body.email, bucketId);
 
 			if (!outcome.ok) {
@@ -853,7 +897,7 @@ export const ui = new Elysia()
 		if (closed) return closed;
 
 		const bucket = await getBucketStore().find(
-			await resolveBucketForClient(clientId)
+			await resolveBucketForRequest(clientId)
 		);
 		if (bucket && !bucket.registrationOpen) {
 			return registrationClosedPage();
@@ -868,7 +912,10 @@ export const ui = new Elysia()
 			const closed = await passwordDoorClosed(clientId, uid);
 			if (closed) return closed;
 
-			const bucketId = await resolveBucketForClient(clientId);
+			const bucketId = await resolveBucketForRequest(
+				clientId,
+				resourceOf(interaction)
+			);
 			const bucket = await getBucketStore().find(bucketId);
 
 			// A closed bucket accepts no self-service sign-ups: no account, no email.
@@ -971,7 +1018,21 @@ export const ui = new Elysia()
 			])
 		);
 		return consentServer(
-			buildConsentView({ uid, clientName, account, details, rarLabels }),
+			buildConsentView({
+				uid,
+				clientName,
+				account,
+				details,
+				rarLabels,
+				identity: documentIdentityFor({
+					clientId,
+					redirectUri: (
+						interaction.payload.params as { redirect_uri?: string } | undefined
+					)?.redirect_uri,
+					redirectUris: (client as { redirectUris?: string[] } | undefined)
+						?.redirectUris
+				})
+			}),
 			{ handOffTo: redirectUriOf(interaction) }
 		);
 	})

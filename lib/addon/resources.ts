@@ -1,6 +1,7 @@
 import { mustChange } from './_warn.ts';
 import * as errors from '../helpers/errors.ts';
 import { MCP_RESOURCE_SERVER, isMcpResource } from '../mcp/resource_server.js';
+import { resolveDeclaredResource } from '../resources/registry.js';
 
 export async function defaultResource(ctx, client, oneOf) {
 	// @param ctx - koa request context
@@ -39,6 +40,20 @@ export async function getResourceServerInfo(_ctx, resourceIndicator, _client) {
 	 */
 	if (isMcpResource(resourceIndicator)) {
 		return MCP_RESOURCE_SERVER;
+	}
+
+	/*
+	 * A resource an administrator declared in one of their projects. Second, not first: the arm above
+	 * claims this server's own MCP audience, and a declaration must never be able to take it over —
+	 * which is also why `${ISSUER}/mcp` is refused at declaration time rather than only here.
+	 *
+	 * This is what makes the capability data rather than code. Before it, an audience this server had
+	 * not been compiled to know about fell to the stub below, so protecting a third-party MCP server
+	 * meant writing an override in this repository.
+	 */
+	const declared = await resolveDeclaredResource(resourceIndicator);
+	if (declared) {
+		return declared;
 	}
 
 	mustChange(

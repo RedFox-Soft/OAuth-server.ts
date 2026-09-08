@@ -1,6 +1,6 @@
 import { getBucketStore } from '../adapters/index.js';
 import { enabledProviders } from '../federation/providers.js';
-import { resolveBucketForClient } from '../admin/auth/resolveBucket.js';
+import { resolveBucketForRequest } from '../admin/auth/resolveBucket.js';
 
 /*
  * What the login page needs to know about a bucket in order to render itself: whether it accepts a password
@@ -52,5 +52,5 @@ export async function loginOptionsForBucket(
 export async function loginOptionsForClient(
 	clientId: string | undefined
 ): Promise<LoginOptions> {
-	return loginOptionsForBucket(await resolveBucketForClient(clientId));
+	return loginOptionsForBucket(await resolveBucketForRequest(clientId));
 }

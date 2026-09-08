@@ -16,6 +16,10 @@ the very server it administers. The constitution requires it (Principle II) and 
 back door: every agent action must run the same management API, authorization and audit trail as a
 human's.
 
+A second kind of client can now reach this plane, and a second kind of MCP server can be protected by
+the same machinery — both in [[mcp-server-authorization]], which also carries the allowlist that
+decides which client identities may administer an instance.
+
 That last requirement is the whole design. A tool does not call a service — it rebuilds the HTTP
 request the console would have sent and hands it to the real admin routes in-process
 (`lib/mcp/dispatch.ts`). There is no second implementation to keep in step, so a tool cannot skip

@@ -143,10 +143,10 @@ describe('missingIndexes', () => {
 
 	it('reports nothing for an area that declares no index', () => {
 		// `userBuckets` used to stand here and no longer can: it declares an `ownerGroupId` index now
-		// that groups own containers. `serviceConfig` replaces it — permanent, like `Client`, so no
-		// expiry index is derived for it either.
+		// that groups own containers. `Client` followed it out for the same reason — it declares an
+		// index backing the self-registration sweep. `serviceConfig` is what is left: permanent, so no
+		// expiry index is derived for it either, and nothing queries it by a payload field.
 		expect(missingIndexes(areaNamed('serviceConfig'), [idIndex])).toEqual([]);
-		expect(missingIndexes(areaNamed('Client'), [idIndex])).toEqual([]);
 	});
 
 	// A non-unique index where a unique one is declared does not satisfy the declaration — this is the

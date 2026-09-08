@@ -140,6 +140,27 @@ export const ClientSchema = t.Object({
 	'consent.require': t.Boolean(),
 
 	/*
+	 * registeredDynamically
+	 *
+	 * description: Whether this client was created on its own request through dynamic client
+	 * registration, rather than by an administrator. Declared here — and therefore persisted, since a
+	 * model stores only the keys its schema declares — because the console marks such a client in a
+	 * project's client list, and because telling the two apart must not rest on a heuristic about the
+	 * shape of an id.
+	 */
+	registeredDynamically: t.Optional(t.Boolean()),
+
+	/*
+	 * registrationUsedAt
+	 *
+	 * description: When a self-registered client first completed an authorization, in epoch seconds.
+	 * Its absence is what marks a registration as never taken up, and therefore reclaimable — see
+	 * lib/models/client/dynamic_registration.ts. Never set for an administrator-created client, which
+	 * is not subject to reclamation at all.
+	 */
+	registrationUsedAt: t.Optional(t.Number({ minimum: 0, multipleOf: 1 })),
+
+	/*
 	 * The remaining members describe the full shape of a *validated* client
 	 * object: the schema engine (lib/models/client/schema.ts) projects the
 	 * recognised snake_case metadata onto these camelCased properties. They are

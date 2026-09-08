@@ -11,6 +11,20 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- mcp: the server is now an authorization server **for** MCP servers, not only for its own admin
+  plane. An administrator declares a third-party MCP server as a protected resource of a project — its
+  canonical identifier, the scopes it recognises, how its tokens are verified, their lifetime — and the
+  token endpoint mints audience-bound tokens for it with no source change and no restart; previously
+  every audience but `${ISSUER}/mcp` was refused, so protecting one meant writing an addon override.
+  A client with no prior relationship gets its project from the declared resource the request names,
+  which is what lets it sign in the right deployment's end-users. Client ID Metadata Documents are
+  supported as the mechanism the current MCP authorization revision names first: a `client_id` that is
+  an https URL resolves by retrieval and validation and creates no client record
+  (`clientIdMetadataDocument.enabled`, off by default). The administrative plane admits document
+  identifiers through a super-admin allowlist read live, so a withdrawal takes effect on the agent's
+  next call; a dynamically registered client can never administer the instance. A new guide,
+  [Protect your MCP server with OAuth](https://foxauth.dev/docs/get-started/protect-your-mcp-server/),
+  walks it end to end, and the README's compatibility note is replaced by which identity works where.
 - security: published evidence behind SECURITY.md, which until now was a policy with nothing standing
   behind it. A written [threat model](https://foxauth.dev/docs/security/threat-model/) names the
   assets, trust boundaries and attackers (RFC 9700 §3) and, for each threat, the control in the code

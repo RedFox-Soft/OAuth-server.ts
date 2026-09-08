@@ -138,10 +138,10 @@ describe('every high-consequence tool is gated', () => {
 		await ensureAdminSeed();
 	});
 
-	it('finds the thirteen the specification names', () => {
+	it('finds the fourteen the specification names', () => {
 		// If this number moves, FR-014 and the catalogue have to move with it — and the matrix below
 		// grows automatically rather than needing a new case written by hand.
-		expect(HIGH.length).toBe(13);
+		expect(HIGH.length).toBe(14);
 	});
 
 	it.each(HIGH.map((t) => [t.tool, t] as const))(
@@ -219,7 +219,7 @@ describe('every high-consequence tool is gated', () => {
 		const gated = mcpCatalogue.filter(
 			(t) => t.consequence === 'ordinary' || t.consequence === 'read'
 		);
-		expect(gated.length).toBe(60 - 13);
+		expect(gated.length).toBe(65 - 14);
 		for (const tool of gated) {
 			expect(tool.consequence, tool.tool).not.toBe('high');
 		}

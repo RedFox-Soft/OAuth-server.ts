@@ -11,6 +11,10 @@ import {
 } from '../admin/projects/schema.js';
 import { CreateClientBody, UpdateClientBody } from '../admin/clients/schema.js';
 import {
+	CreateResourceBody,
+	UpdateResourceBody
+} from '../admin/resources/schema.js';
+import {
 	AdminSettingsBody,
 	CreateAdminBody,
 	UpdateAdminBody
@@ -106,7 +110,7 @@ export function pathArgName(tool: McpTool, param: string): string {
 }
 
 const catalogue = [
-	/* ---------------------------------------------------------------- reads (16) */
+	/* ---------------------------------------------------------------- reads (18) */
 	{
 		tool: 'whoami',
 		method: 'GET',
@@ -145,6 +149,32 @@ const catalogue = [
 		pathParams: ['id'],
 		summary:
 			'One project: name, slug, managers, assigned user bucket, client ids, and CORS origins.'
+	},
+	{
+		tool: 'resource_list',
+		method: 'GET',
+		path: '/admin/api/projects/:id/resources',
+		action: null,
+		consequence: 'read',
+		requiredRole: null,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			"Every protected resource declared in a project: the audiences this server mints tokens for on that project's behalf, with the scopes each recognises, how its tokens are verified, and their lifetime."
+	},
+	{
+		tool: 'resource_get',
+		method: 'GET',
+		path: '/admin/api/projects/:id/resources/:resourceId',
+		action: null,
+		consequence: 'read',
+		requiredRole: null,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'resourceId'],
+		summary:
+			'One declared protected resource. The resourceId is the canonical resource identifier itself, percent-encoded into the path.'
 	},
 	{
 		tool: 'client_list',
@@ -488,6 +518,47 @@ const catalogue = [
 		pathParams: ['id'],
 		summary:
 			'Assign the user bucket whose accounts this project’s clients authenticate against.'
+	},
+
+	/* ---------------------------------------- writes: protected resources (3) */
+	{
+		tool: 'resource_declare',
+		method: 'POST',
+		path: '/admin/api/projects/:id/resources',
+		action: 'resource.create',
+		consequence: 'ordinary',
+		requiredRole: null,
+		bodySchema: CreateResourceBody,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			"Declare an MCP server (or any API) as a protected resource of this project, so this server will mint tokens whose audience is exactly that resource. The scope list is the baseline a general-purpose client requests in full, not a catalogue — an omnibus scope is refused. Tokens default to a self-contained JWT the resource verifies against this server's published keys, with a fifteen-minute lifetime."
+	},
+	{
+		tool: 'resource_update',
+		method: 'PATCH',
+		path: '/admin/api/projects/:id/resources/:resourceId',
+		action: 'resource.update',
+		consequence: 'ordinary',
+		requiredRole: null,
+		bodySchema: UpdateResourceBody,
+		querySchema: null,
+		pathParams: ['id', 'resourceId'],
+		summary:
+			"Change a declared resource's name, scopes, token format or lifetime. The identifier itself cannot be amended: it is the audience of every token already issued, so replacing it is a delete and a fresh declaration."
+	},
+	{
+		tool: 'resource_delete',
+		method: 'DELETE',
+		path: '/admin/api/projects/:id/resources/:resourceId',
+		action: 'resource.delete',
+		consequence: 'high',
+		requiredRole: null,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'resourceId'],
+		summary:
+			'Remove a declared protected resource. Token issuance for that audience stops on the next request, so a live integration loses access as its current tokens expire. High-consequence: describe it and confirm before running.'
 	},
 
 	/* ------------------------------------------------- writes: clients (4) */
@@ -947,6 +1018,45 @@ export interface ExcludedConsoleOperation {
 }
 
 export const excludedConsoleOperations: readonly ExcludedConsoleOperation[] = [
+	/*
+	 * The administrative client permission list, withheld in full.
+	 *
+	 * An agent granting another agent — or itself, on a second connection — access to this plane is a
+	 * privilege-escalation path, and it is one no operator gains anything from automating: the whole
+	 * value of the list is that a human decided which identities may administer the instance. The read
+	 * is withheld with the writes, because a published list of permitted identities tells an agent
+	 * exactly which identity to impersonate.
+	 *
+	 * Same reasoning that already withholds purging the error store.
+	 */
+	{
+		method: 'GET',
+		path: '/admin/api/mcp/clients',
+		absence: 'withheld',
+		reason:
+			'The list of client identities permitted to administer this instance. Withheld with the writes below: naming them tells an agent which identity to impersonate. Read it in the console.'
+	},
+	{
+		method: 'POST',
+		path: '/admin/api/mcp/clients',
+		absence: 'withheld',
+		reason:
+			'Permitting a client identity to administer this instance is a grant of administrative access, and an agent granting one to another agent is a privilege-escalation path. A super administrator does this in the console.'
+	},
+	{
+		method: 'PATCH',
+		path: '/admin/api/mcp/clients/:entryId',
+		absence: 'withheld',
+		reason:
+			'Relaxing or tightening the key-proof requirement on a permitted identity changes who may administer this instance. Console-only, with the permit and withdraw operations beside it.'
+	},
+	{
+		method: 'DELETE',
+		path: '/admin/api/mcp/clients/:entryId',
+		absence: 'withheld',
+		reason:
+			'Withdrawing a permitted identity is how an operator revokes administrative access — including, potentially, the agent making the call. Console-only.'
+	},
 	{
 		method: 'POST',
 		path: '/admin/api/setup',

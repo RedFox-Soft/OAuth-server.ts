@@ -8,7 +8,9 @@ import {
 } from '../helpers/validate_dpop.js';
 import { getUserStore } from '../adapters/index.js';
 import { ADMIN_BUCKET_ID } from '../admin/consts.js';
-import { MCP_RESOURCE, MCP_ROUTE } from './consts.js';
+import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE, MCP_ROUTE } from './consts.js';
+import { Client } from '../models/client.js';
+import { mcpClientPermissionStore } from '../adapters/index.js';
 
 /*
  * The identity behind an MCP request: which administrator authorized the agent, and which agent is
@@ -42,7 +44,11 @@ export type RejectionReason =
 	| 'dpop_failed'
 	| 'no_account'
 	| 'not_an_admin'
-	| 'inactive';
+	| 'inactive'
+	/* The client's identity is not one an operator permitted at this surface. */
+	| 'client_not_permitted'
+	/* Permitted, but the entry requires the client to prove possession of a published key. */
+	| 'key_proof_required';
 
 export class McpUnauthorized extends Error {
 	constructor(readonly reason: RejectionReason) {
@@ -174,10 +180,51 @@ export async function resolveMcpPrincipal(
 	if (!user) throw new McpUnauthorized('not_an_admin');
 	if (!user.active) throw new McpUnauthorized('inactive');
 
+	await assertClientPermitted(accessToken.payload.clientId);
+
 	return {
 		accessTokenId,
 		accountId,
 		clientId: accessToken.payload.clientId,
 		scopes: new Set(accessToken.payload.scope?.split(' ').filter(Boolean))
 	};
+}
+
+/*
+ * Whether this client identity may reach the administrative plane at all.
+ *
+ * Checked here, on every call, rather than only when the token was issued — that live read is what
+ * makes a withdrawal take effect on the agent's *next* call instead of when its token expires, which
+ * is the remedy an operator needs when a permitted host is taken over.
+ *
+ * The reserved client is exempt and needs no entry: its route to the administrator bucket is
+ * membership of the reserved admin project, which predates the allowlist and is an operator decision
+ * of its own. A dynamically registered client is refused here whatever the list says, because its
+ * identity is minted on demand by whoever asked and so cannot be allowlisted in any meaningful sense.
+ */
+async function assertClientPermitted(clientId: string | undefined) {
+	if (!clientId) throw new McpUnauthorized('client_not_permitted');
+	if (clientId === ADMIN_MCP_CLIENT_ID) return;
+
+	const client = await Client.tryFind(clientId);
+	if (!client) throw new McpUnauthorized('client_not_permitted');
+	if (client.registeredDynamically) {
+		throw new McpUnauthorized('client_not_permitted');
+	}
+
+	const permission = await mcpClientPermissionStore.findFor(clientId);
+	if (!permission) throw new McpUnauthorized('client_not_permitted');
+
+	/*
+	 * Key proof is read off the client's declared authentication method rather than from the token,
+	 * which records none. That is sufficient rather than approximate: a client declaring `none` could
+	 * not have presented a key-proof assertion at the token endpoint, so its method is exactly the
+	 * question being asked.
+	 */
+	if (
+		permission.requireKeyProof &&
+		client.tokenEndpointAuthMethod !== 'private_key_jwt'
+	) {
+		throw new McpUnauthorized('key_proof_required');
+	}
 }

@@ -9,6 +9,8 @@ import { invitationAcceptRoutes } from './groups/accept.js';
 import { scopeRoutes } from './scope/routes.js';
 import { projectRoutes } from './projects/routes.js';
 import { clientRoutes } from './clients/routes.js';
+import { resourceRoutes } from './resources/routes.js';
+import { mcpClientRoutes } from './mcp-clients/routes.js';
 import { adminUserRoutes } from './users/routes.js';
 import { bucketRoutes } from './buckets/routes.js';
 import { federationAdminRoutes } from './federation/routes.js';
@@ -62,6 +64,8 @@ export const adminApiRoutes = new Elysia({ name: 'admin-api' })
 	.use(scopeRoutes)
 	.use(projectRoutes)
 	.use(clientRoutes)
+	.use(resourceRoutes)
+	.use(mcpClientRoutes)
 	.use(adminUserRoutes)
 	.use(bucketRoutes)
 	.use(federationAdminRoutes)

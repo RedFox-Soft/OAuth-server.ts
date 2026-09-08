@@ -1,3 +1,5 @@
+import { isLoopbackRedirect } from '../client_metadata_document/identifier.js';
+
 // Derived, non-persisted view model for the consent screen. The consent prompt
 // stores the permissions the End-User must approve on the interaction session
 // (interaction.payload.prompt.details); this module turns that raw shape into a
@@ -25,6 +27,52 @@ export interface ConsentView {
 	clientName: string;
 	account?: string;
 	permissions: PermissionGroup[];
+	/*
+	 * Where the client's identity comes from, when it comes from a document the client hosts itself
+	 * rather than from a registration an operator made.
+	 *
+	 * The name above is then whatever that document claims, which is exactly why the hostnames matter:
+	 * the document proves control of a domain, so the domain is the part the End-User can actually
+	 * weigh. Both are required by the governing draft (§6.4) and the MCP security considerations —
+	 * show the `client_id` hostname, and show the redirect target's.
+	 */
+	clientIdHostname?: string;
+	redirectHostname?: string;
+	/*
+	 * Set when every redirect target the document offers is a loopback address. Such a document cannot
+	 * prove *which local process* will receive the authorization code — the specification says so
+	 * outright, and calls the warning a SHOULD. The End-User is the only party in a position to notice
+	 * that they did not just start the application being named.
+	 */
+	loopbackOnly?: boolean;
+}
+
+/*
+ * The identity facts a consent screen shows about a client identified by its own document. Returns
+ * nothing for an ordinary registered client: those were vouched for by an operator, so there is no
+ * domain for the End-User to weigh and a hostname line would be noise.
+ */
+export function documentIdentityFor(args: {
+	clientId?: string;
+	redirectUri?: string;
+	redirectUris?: string[];
+}): Pick<
+	ConsentView,
+	'clientIdHostname' | 'redirectHostname' | 'loopbackOnly'
+> {
+	const identifier = args.clientId ? URL.parse(args.clientId) : null;
+	if (!identifier || identifier.protocol !== 'https:') return {};
+
+	const redirect = args.redirectUri ? URL.parse(args.redirectUri) : null;
+	const offered = args.redirectUris ?? [];
+
+	return {
+		clientIdHostname: identifier.hostname,
+		...(redirect ? { redirectHostname: redirect.hostname } : {}),
+		...(offered.length > 0 && offered.every(isLoopbackRedirect)
+			? { loopbackOnly: true }
+			: {})
+	};
 }
 
 // The subset of the consent prompt's `details` this view consumes.
@@ -105,8 +153,13 @@ export function buildConsentView(args: {
 	// Type identifier → operator label. Passed in by the caller so this module stays a pure view-model
 	// builder with no configuration reads, testable without a live config.
 	rarLabels?: Record<string, string>;
+	/* Present only for a client identified by a document it hosts; see `documentIdentityFor`. */
+	identity?: Pick<
+		ConsentView,
+		'clientIdHostname' | 'redirectHostname' | 'loopbackOnly'
+	>;
 }): ConsentView {
-	const { uid, clientName, account, details, rarLabels } = args;
+	const { uid, clientName, account, details, rarLabels, identity } = args;
 	const permissions: PermissionGroup[] = [];
 
 	if (details.missingOIDCScope?.length) {
@@ -161,5 +214,5 @@ export function buildConsentView(args: {
 		}
 	}
 
-	return { uid, clientName, account, permissions };
+	return { uid, clientName, account, permissions, ...(identity ?? {}) };
 }

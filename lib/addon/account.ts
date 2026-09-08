@@ -1,6 +1,6 @@
 import { Grant } from '../models/grant.js';
 import { getUserStore } from '../adapters/index.js';
-import { resolveBucketForClient } from '../admin/auth/resolveBucket.js';
+import { resolveBucketForRequest } from '../admin/auth/resolveBucket.js';
 
 export async function findAccount(oidc, sub, _token?) {
 	// @param oidc - the OIDC context (ctx.oidc) for the current request.
@@ -8,11 +8,24 @@ export async function findAccount(oidc, sub, _token?) {
 	// @param token - reference to the token the account is being loaded for;
 	//   undefined at the authorization endpoint.
 
-	// Resolve the user bucket exactly as login does (resolveBucketForClient):
+	// Resolve the user bucket exactly as login does (resolveBucketForRequest):
 	// prefer the live client, falling back to the token's client for the
 	// token/userinfo flows where `oidc.client` may not be populated.
 	const clientId = oidc?.client?.clientId ?? _token?.payload?.clientId;
-	const bucketId = await resolveBucketForClient(clientId);
+	/*
+	 * The resource matters here for the same reason the client does, and leaving it out is not a
+	 * harmless omission: bucket resolution can derive a project from the declared resource a request
+	 * names, so a login that found the user in a project's bucket while this resolved against the
+	 * default one would authenticate somebody the very next step could not load. That is not a
+	 * hypothetical — it is what happened before this argument was passed, and it surfaced as a 500 in
+	 * the consent prompt rather than as a refusal, because `loadGrant` leaves `oidc.grant` unset when
+	 * no account resolved.
+	 *
+	 * Taken from the live request where there is one, and from the token otherwise, mirroring the
+	 * client fallback directly above.
+	 */
+	const resource = oidc?.params?.resource ?? _token?.payload?.resource;
+	const bucketId = await resolveBucketForRequest(clientId, resource);
 	const user = await getUserStore(bucketId).find(sub);
 
 	// A missing or deactivated user resolves to nothing so the calling flow

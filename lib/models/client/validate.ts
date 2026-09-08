@@ -17,6 +17,7 @@ import {
 } from '../../configs/clientSchema.js';
 import { Value } from '@sinclair/typebox/value';
 import { adapter } from '../../adapters/index.js';
+import { resolveClientDocument } from '../../client_metadata_document/resolve.js';
 import { sectorIdentifier } from './sector.ts';
 import {
 	responseTypeAllowed,
@@ -52,7 +53,15 @@ const BASE_METADATA_KEYS = [
 	'requestObject.require',
 	'requestObject.signingAlg',
 	'requestObject.backChannelSigningAlg',
-	'consent.require'
+	'consent.require',
+	/*
+	 * Whether the server created this client on its own request. A base key rather than recognised
+	 * metadata: it is not something a client may send — `lib/actions/registration.ts` sets it after the
+	 * wire translation precisely so a registration body cannot claim it — and it must survive the
+	 * round trip through storage, which only keeps what is picked here.
+	 */
+	'registeredDynamically',
+	'registrationUsedAt'
 ];
 
 // camelCase → snake_case metadata projection honouring RECOGNIZED_METADATA.
@@ -210,7 +219,28 @@ export async function tryFindClient(
 ): Promise<ClientSchemaType | undefined> {
 	const properties = await adapter('Client').find(id);
 	if (!properties) {
-		return;
+		/*
+		 * A `client_id` that is an https URL naming a document describing the client, resolved by
+		 * retrieval instead of by a stored record and stored nowhere.
+		 *
+		 * Placed AFTER the adapter read, and that order is load-bearing rather than incidental. A
+		 * URL-shaped client id is not new here: `test/client_id_uri/` covers dynamic registration
+		 * issuing one through a deployment's `idFactory`. A branch placed before this read would shadow
+		 * every such stored client with a document retrieval that must fail, taking that suite — and any
+		 * deployment relying on it — with it. Adapter-first is also the safer direction on its own
+		 * terms: a stored record always wins, and a registered client cannot claim a legitimate
+		 * document identifier because its id is server-generated, never client-chosen.
+		 */
+		const document = await resolveClientDocument(id);
+		if (!document) {
+			return;
+		}
+		/*
+		 * Not memoized. The document's own reuse window is the cache (`cache.ts`), bounded by what its
+		 * host said; a second memo keyed on content would extend that silently past the bound the
+		 * operator's host asked for.
+		 */
+		return addClient(document, { store: false });
 	}
 
 	const propHash = crypto.hash(

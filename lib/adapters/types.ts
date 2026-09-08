@@ -73,6 +73,27 @@ export interface ModelAdapter<TPayload = unknown> {
 	 * cannot silently work.
 	 */
 	destroyByOwner(field: string, value: string): Promise<number>;
+	/*
+	 * Destroys every record in this area whose `markerField` is set, whose `usedField` is absent, and
+	 * whose `ageField` is older than `before`. Returns how many went.
+	 *
+	 * A second enumerating method rather than a reuse of `destroyByOwner`, because the question is a
+	 * different one: not "which records belong to this principal" but "which records were never taken
+	 * up". It exists because the alternative was worse in both directions — an expiry index on the
+	 * whole `Client` area would silently delete administrator-created clients the moment a stale
+	 * `expiresAt` survived an upsert (lib/consts/storage_inventory.ts says so at the `Client` entry),
+	 * and a partial index is not something IndexSpec can express.
+	 *
+	 * Every field name comes from lib/consts/storage_inventory.ts, never from a caller — the same rule
+	 * `destroyByOwner` states, and the same reason: it is what keeps a `$`-prefixed or dotted name out
+	 * of a query.
+	 */
+	destroyUnusedSince(
+		markerField: string,
+		usedField: string,
+		ageField: string,
+		before: number
+	): Promise<number>;
 }
 
 export interface ModelAdapterConstructor {
@@ -744,6 +765,124 @@ export interface ProjectStoreInstance {
 
 export interface ProjectStoreConstructor {
 	new (): ProjectStoreInstance;
+}
+
+/*
+ * An audience this server will mint tokens for, declared by an administrator rather than compiled in.
+ *
+ * `_id` IS the canonical resource identifier, so instance-wide uniqueness is the primary key rather
+ * than a rule somebody has to remember to check. Ownership is not stored here: the resource names its
+ * project, the project names its owning group, and every access decision resolves through that — one
+ * source of ownership, as everywhere else.
+ */
+export interface ProtectedResource {
+	_id: string;
+	projectId: string;
+	name: string;
+	/*
+	 * What the resource recognises. Held as an array and joined only at the `ResourceServer` seam,
+	 * because a space-delimited string is the wire shape, not a storage shape.
+	 */
+	scopes: string[];
+	/*
+	 * How the resource verifies a token. `jwt` by default: an independent MCP server can then check a
+	 * signature against the published keys with no request back and no credentials of its own, which
+	 * is the case this whole capability exists to serve.
+	 */
+	tokenFormat: 'jwt' | 'opaque';
+	accessTokenTTL: number;
+	/*
+	 * Whether a trailing slash distinguishes this identifier from its sibling. Off for every resource
+	 * that does not say otherwise, because the MCP specification asks for the slash-free form.
+	 */
+	trailingSlashSignificant: boolean;
+	createdAt: Date;
+	updatedAt: Date;
+}
+
+export interface ProtectedResourceStoreInstance {
+	create(data: {
+		_id: string;
+		projectId: string;
+		name: string;
+		scopes: string[];
+		tokenFormat?: 'jwt' | 'opaque';
+		accessTokenTTL?: number;
+		trailingSlashSignificant?: boolean;
+	}): Promise<ProtectedResource>;
+	find(id: string): Promise<ProtectedResource | null>;
+	listByProject(projectId: string): Promise<ProtectedResource[]>;
+	list(): Promise<ProtectedResource[]>;
+	update(
+		id: string,
+		patch: Partial<
+			Pick<
+				ProtectedResource,
+				'name' | 'scopes' | 'tokenFormat' | 'accessTokenTTL'
+			>
+		>
+	): Promise<ProtectedResource | null>;
+	destroy(id: string): Promise<void>;
+	destroyByProject(projectId: string): Promise<number>;
+}
+
+export interface ProtectedResourceStoreConstructor {
+	new (): ProtectedResourceStoreInstance;
+}
+
+/*
+ * A super administrator's decision that one client description document, or one host publishing them,
+ * may reach the administrative MCP plane.
+ *
+ * Read live on every request rather than held in `ApplicationConfig`, because a withdrawal has to land
+ * on the agent's next call and boot-only settings cannot do that.
+ */
+export interface McpClientPermission {
+	/* The permitted identifier URL, or the bare host when the entry is host-wide. */
+	_id: string;
+	kind: 'identifier' | 'host';
+	/*
+	 * Requires the client to authenticate by proving possession of a key it published in its own
+	 * document. This is what defeats loopback impersonation outright: a stolen authorization code
+	 * cannot be redeemed without the private half, which an impersonator does not have.
+	 */
+	requireKeyProof: boolean;
+	/*
+	 * Set only where the document offers loopback redirect targets alone. Such a document proves
+	 * control of a domain but cannot prove which local process will receive the code, so the
+	 * administrator granting it has to say they were told.
+	 */
+	loopbackAcknowledged: boolean;
+	acknowledgedBy?: string;
+	acknowledgedAt?: Date;
+	createdAt: Date;
+}
+
+export interface McpClientPermissionStoreInstance {
+	create(data: {
+		_id: string;
+		kind: 'identifier' | 'host';
+		requireKeyProof?: boolean;
+		loopbackAcknowledged?: boolean;
+		acknowledgedBy?: string;
+	}): Promise<McpClientPermission>;
+	find(id: string): Promise<McpClientPermission | null>;
+	list(): Promise<McpClientPermission[]>;
+	update(
+		id: string,
+		patch: Partial<Pick<McpClientPermission, 'requireKeyProof'>>
+	): Promise<McpClientPermission | null>;
+	destroy(id: string): Promise<void>;
+	/*
+	 * Resolves an identifier against both kinds of entry in one call, so a caller cannot check the
+	 * exact-identifier entries and forget the host-wide ones — which would be a silent refusal of an
+	 * access the operator did grant.
+	 */
+	findFor(identifier: string): Promise<McpClientPermission | null>;
+}
+
+export interface McpClientPermissionStoreConstructor {
+	new (): McpClientPermissionStoreInstance;
 }
 
 export type VerificationMethod = 'link' | 'code';

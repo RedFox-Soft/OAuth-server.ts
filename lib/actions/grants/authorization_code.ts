@@ -18,6 +18,7 @@ import { AuthorizationCode } from 'lib/models/authorization_code.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Grant } from 'lib/models/grant.js';
 import ResourceServer from 'lib/helpers/resource_server.js';
+import { markRegistrationUsed } from '../../models/client/dynamic_registration.js';
 
 const gty = 'authorization_code';
 
@@ -45,6 +46,17 @@ export const handler = async function authorizationCodeHandler(oidc, dPoP) {
 	if (code.payload.clientId !== oidc.client.clientId) {
 		throw new InvalidGrant('client mismatch');
 	}
+
+	/*
+	 * The client completed an authorization, which takes a self-registered one out of reach of
+	 * reclamation. Placed here rather than at the authorization endpoint because a code that is issued
+	 * and never redeemed is not a client anyone is using — and this is the first point where that is
+	 * settled.
+	 *
+	 * A no-op for every administrator-created client and for every self-registered one already marked,
+	 * so the extra write happens at most once per client and never at all in the ordinary case.
+	 */
+	await markRegistrationUsed(oidc.client);
 
 	if (code.isExpired) {
 		throw new InvalidGrant('authorization code is expired');

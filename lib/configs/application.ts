@@ -492,6 +492,21 @@ export const ApplicationConfig = {
 	 */
 	'registration.enabled': false,
 	/*
+	 * features.clientIdMetadataDocument.enabled
+	 *
+	 * title: [`OAuth Client ID Metadata Documents`](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-client-id-metadata-document-00) — the mechanism the MCP authorization specification names first for a client with no prior relationship
+	 *
+	 * description: Accepts an https URL carrying a path component as a `client_id`, retrieves the JSON
+	 * document it names, and uses it as that client's metadata — creating no client record. Off by
+	 * default because switching it on lets an unauthenticated caller make this server issue an
+	 * outbound HTTP request, which is a capability a deployment consents to rather than inherits.
+	 * The egress is bounded (private, loopback and link-local addresses refused, every redirect hop
+	 * re-checked, 5 KB and a short timeout) and the document's own cache headers bound how long it is
+	 * reused. Advertised as `client_id_metadata_document_supported` only while this is on, because a
+	 * client checks for that member before attempting the mechanism and falls back otherwise.
+	 */
+	'clientIdMetadataDocument.enabled': false,
+	/*
 	 * features.registration.initialAccessToken
 	 *
 	 * description: Requires a valid initial access token for registration. `string` (static) or

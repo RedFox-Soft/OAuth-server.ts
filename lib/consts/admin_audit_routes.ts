@@ -60,6 +60,53 @@ const routes = [
 		targetType: 'Project'
 	},
 
+	/*
+	 * Declared protected resources. `targetId` is the canonical resource identifier, which is also the
+	 * document's primary key — so an entry names the audience itself rather than an opaque id nobody
+	 * can resolve after the declaration is gone.
+	 */
+	{
+		action: 'resource.create',
+		method: 'POST',
+		path: '/admin/api/projects/:id/resources',
+		targetType: 'ProtectedResource'
+	},
+	{
+		action: 'resource.update',
+		method: 'PATCH',
+		path: '/admin/api/projects/:id/resources/:resourceId',
+		targetType: 'ProtectedResource'
+	},
+	{
+		action: 'resource.delete',
+		method: 'DELETE',
+		path: '/admin/api/projects/:id/resources/:resourceId',
+		targetType: 'ProtectedResource'
+	},
+
+	/*
+	 * Which client identities may administer this instance. `targetId` is the permitted identifier URL
+	 * or bare host — the identity itself, so an entry stays meaningful after the permission is gone.
+	 */
+	{
+		action: 'mcp.client.permit',
+		method: 'POST',
+		path: '/admin/api/mcp/clients',
+		targetType: 'McpClientPermission'
+	},
+	{
+		action: 'mcp.client.update',
+		method: 'PATCH',
+		path: '/admin/api/mcp/clients/:entryId',
+		targetType: 'McpClientPermission'
+	},
+	{
+		action: 'mcp.client.withdraw',
+		method: 'DELETE',
+		path: '/admin/api/mcp/clients/:entryId',
+		targetType: 'McpClientPermission'
+	},
+
 	{
 		action: 'client.create',
 		method: 'POST',

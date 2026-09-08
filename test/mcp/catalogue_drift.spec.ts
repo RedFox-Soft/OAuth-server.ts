@@ -29,16 +29,16 @@ const mountedApi = mounted.routes
 	.map((r) => ({ method: r.method, path: r.path }));
 
 describe('MCP tool catalogue', () => {
-	it('publishes 60 tools: 26 reads and 34 writes', () => {
-		expect(mcpCatalogue.length).toBe(60);
-		expect(mcpCatalogue.filter((t) => t.method === 'GET').length).toBe(26);
-		expect(mcpCatalogue.filter((t) => t.method !== 'GET').length).toBe(34);
+	it('publishes 65 tools: 28 reads and 37 writes', () => {
+		expect(mcpCatalogue.length).toBe(65);
+		expect(mcpCatalogue.filter((t) => t.method === 'GET').length).toBe(28);
+		expect(mcpCatalogue.filter((t) => t.method !== 'GET').length).toBe(37);
 	});
 
-	it('names exactly eight exclusions', () => {
+	it('names exactly twelve exclusions', () => {
 		// A further exclusion is a product decision, not a refactor: it must fail here until the
 		// specification is updated to account for it.
-		expect(excludedConsoleOperations.length).toBe(8);
+		expect(excludedConsoleOperations.length).toBe(12);
 	});
 
 	it('accounts for every mounted /admin/api route, in both directions', () => {
@@ -81,11 +81,20 @@ describe('MCP tool catalogue', () => {
 	// builds that announcement from this field. Pinned so the two container deletions cannot quietly
 	// drop out of what the agent is told, which is the only way it can answer "do it in the console"
 	// instead of guessing a tool name (FR-034).
-	it('marks the three container deletions withheld, and the rest inapplicable', () => {
+	it('marks the destructive and escalating operations withheld, and the rest inapplicable', () => {
 		const withheld = withheldConsoleOperations.map(key);
 		// A group joined the two containers it owns: destroying one leaves nothing behind to inspect,
 		// and takes with it the only thing that granted anyone access to what it held.
+		//
+		// The four `/admin/api/mcp/clients` rows are withheld for a different reason: they decide which
+		// client identities may administer this instance, so an agent able to call them could grant
+		// itself — or another agent — administrative access. The read is withheld with the writes,
+		// because a list of permitted identities is a list of identities worth impersonating.
 		expect(withheld).toEqual([
+			'GET /admin/api/mcp/clients',
+			'POST /admin/api/mcp/clients',
+			'PATCH /admin/api/mcp/clients/:entryId',
+			'DELETE /admin/api/mcp/clients/:entryId',
 			'DELETE /admin/api/projects/:id',
 			'DELETE /admin/api/buckets/:id',
 			'DELETE /admin/api/groups/:id',
@@ -103,10 +112,10 @@ describe('MCP tool catalogue', () => {
 		]);
 	});
 
-	it('classifies exactly thirteen tools as high-consequence', () => {
+	it('classifies exactly fourteen tools as high-consequence', () => {
 		// Pinned as a count so FR-014's enumeration and this table cannot drift apart.
 		const high = mcpCatalogue.filter((t) => t.consequence === 'high');
-		expect(high.length).toBe(13);
+		expect(high.length).toBe(14);
 		expect(high.map((t) => t.tool).sort()).toEqual([
 			'admin_deactivate',
 			'bucket_user_delete',
@@ -118,6 +127,13 @@ describe('MCP tool catalogue', () => {
 			'group_member_remove',
 			'jwks_delete',
 			'jwks_generate',
+			/*
+			 * Removing a declared resource stops token issuance for that audience on the next request, so a
+			 * live third-party integration loses access as its current tokens expire. Destructive to
+			 * something outside this server, which is why it is gated even though it destroys no container
+			 * of accounts.
+			 */
+			'resource_delete',
 			'sentry_settings_update',
 			'settings_update',
 			'smtp_settings_update'

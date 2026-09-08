@@ -1,0 +1,207 @@
+---
+title: Protect your MCP server with OAuth
+description: Make your MCP server an OAuth 2.1 protected resource in ten minutes — declare it here, publish its metadata, validate a token, and prove both outcomes.
+sidebar:
+  order: 6
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+An MCP server that anyone can call is a set of tools with no front door. The MCP authorization
+specification closes that by making the MCP server an **OAuth 2.1 protected resource**: an agent host
+that reaches it without a token is told where to get one, goes and gets it, and comes back with a
+token minted for that MCP server and nothing else.
+
+This page is the whole of it. You will declare your MCP server here, publish two things from it, check
+one token, and then watch it refuse an anonymous call and accept an authorized one. Ten minutes if you
+already have an instance running — if you do not, [Run with Docker
+Compose](/docs/get-started/docker-compose/) takes about two of them.
+
+<Aside
+	type="note"
+	title="What you need first"
+>
+	A running instance with an administrator account ([Create the first
+	administrator](/docs/get-started/first-admin/)) and a project with a user
+	bucket ([Register your first client](/docs/get-started/first-client/) walks
+	that). Your MCP server can be a stub — it does not need to do anything yet
+	except answer HTTP.
+</Aside>
+
+## 1. Declare your MCP server as a resource
+
+<Steps>
+
+1. In the console, open your project and choose **Resources**, then **Declare a resource**.
+
+2. Fill in three things.
+
+   **Resource identifier** — the canonical URI of your MCP server, exactly as its clients will name
+   it. `https://mcp.example.com/mcp`. No fragment, and no trailing slash: the specification asks
+   implementations to prefer the slash-free form, and this server stores it that way.
+
+   **Name** — what the end-user sees on the consent screen.
+
+   **Scopes it recognises** — the permissions your tools distinguish. Start with one, something like
+   `mcp:tools-basic`.
+
+3. Leave the token settings alone. The defaults are a self-contained token your MCP server verifies
+   against this server's published keys, with a fifteen-minute lifetime — which is what lets step 3
+   below need no credentials of its own.
+
+</Steps>
+
+<Aside
+	type="caution"
+	title="The scope list is a baseline, not a catalogue"
+>
+	An agent host that is given no scope guidance requests **every** scope your
+	resource advertises. The specification says so, and says it is deliberate: a
+	general-purpose client cannot choose sensibly among names it does not
+	understand. So a long list is not a menu of options — it is a grant of the
+	whole list to every client that ever arrives. Name the scopes your tools
+	actually distinguish, and let the rest be asked for later.
+</Aside>
+
+## 2. Publish what an MCP server has to publish
+
+Two things, both from your own MCP server.
+
+### Protected resource metadata
+
+A JSON document at `/.well-known/oauth-protected-resource`, saying which authorization server protects
+you. This is the one part the specification makes a `MUST` for an MCP server:
+
+```json
+{
+	"resource": "https://mcp.example.com/mcp",
+	"authorization_servers": ["https://auth.example.com"],
+	"scopes_supported": ["mcp:tools-basic"],
+	"bearer_methods_supported": ["header"]
+}
+```
+
+`resource` is the identifier you declared in step 1, character for character. `authorization_servers`
+is your instance's issuer — the same URL as its `ISSUER` setting.
+
+### A challenge that says where to go
+
+When a request arrives with no token, or a token you reject, answer `401` with a `WWW-Authenticate`
+header pointing at that document:
+
+```http
+HTTP/1.1 401 Unauthorized
+WWW-Authenticate: Bearer resource_metadata="https://mcp.example.com/.well-known/oauth-protected-resource",
+                         scope="mcp:tools-basic"
+```
+
+The `scope` is a courtesy the specification asks for and clients use: without it, a client goes back to
+your metadata document and requests everything in `scopes_supported`.
+
+## 3. Validate the token
+
+Your MCP server has to establish two things about every token: that it is genuine, and that it was
+issued **for you**. The second is not optional — accepting a token minted for something else is the
+confused-deputy hole that audience binding exists to close, and the specification forbids it outright.
+
+With the default token format there is nothing to ask this server at request time. Fetch its public
+keys once from `/jwks`, cache them, and check four claims:
+
+```js
+import { createRemoteJWKSet, jwtVerify } from 'jose';
+
+const keys = createRemoteJWKSet(new URL('https://auth.example.com/jwks'));
+
+export async function principalFor(authorization) {
+	const token = authorization?.replace(/^Bearer /i, '');
+	if (!token) return null;
+
+	const { payload } = await jwtVerify(token, keys, {
+		issuer: 'https://auth.example.com',
+		// The identifier you declared. This is the check that makes the token yours.
+		audience: 'https://mcp.example.com/mcp'
+	});
+
+	return { subject: payload.sub, scopes: (payload.scope ?? '').split(' ') };
+}
+```
+
+`jwtVerify` checks the signature and `exp` for you; `issuer` and `audience` are the two you must state.
+Any JWT library in any language does the same four checks — the shape above is not a dependency, it is
+the checklist.
+
+<Aside
+	type="tip"
+	title="If you need revocation to be immediate"
+>
+	A self-contained token stays valid until it expires, which is why the default
+	lifetime is short. If your resource needs a revoked token to stop working at
+	once, declare it with the **opaque** token format instead and check each token
+	with [`POST /token/introspect`](/docs/reference/endpoints/). That endpoint
+	requires authentication, so your MCP server will need credentials of its own
+	and [`introspection.enabled`](/docs/reference/settings/#introspection.enabled)
+	switched on — which is the trade you are making.
+</Aside>
+
+## 4. Let an agent host identify itself
+
+An agent host usually knows nothing but a URL, and has nowhere for you to type a client identifier. The
+current specification's answer is **Client ID Metadata Documents**: the client's `client_id` _is_ an
+HTTPS URL naming a JSON document that describes it, and this server fetches and validates that document
+on demand — creating no client record at all.
+
+Turn it on in **Settings**:
+[`clientIdMetadataDocument.enabled`](/docs/reference/settings/#clientIdMetadataDocument.enabled).
+Settings apply at boot, so restart afterwards. Once it is on, discovery advertises
+`client_id_metadata_document_supported`, which is what a client checks before trying.
+
+<Aside type="note" title="Older hosts, and what each surface needs">
+Some agent hosts only do **dynamic client registration**, which the current specification marks
+deprecated but retains. It works: switch on
+[`registration.enabled`](/docs/reference/settings/#registration.enabled) and such a client will
+register itself, then reach your resource exactly as above.
+
+The **administrative** MCP plane at `/mcp` is stricter, and worth knowing before you try it. A
+dynamically registered client can never administer the instance, whatever else is configured. A
+document-identified client can, but only after a super administrator names it under **Agent access** in
+the console. Everything else can keep using the reserved `admin-mcp` client id, which needs no entry.
+
+</Aside>
+
+## 5. Prove it both ways
+
+Two calls. The refusal matters as much as the success — without it you cannot tell "protected" from
+"not reached yet".
+
+<Steps>
+
+1. **Call your MCP server with no token.** You should get `401`, and the `WWW-Authenticate` header from
+   step 2. If you get `200`, your validation is not wired into the request path.
+
+   ```sh
+   curl -i https://mcp.example.com/mcp -X POST \
+     -H 'content-type: application/json' \
+     -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+   ```
+
+2. **Get a token and call again.** Point your agent host at your MCP server and let it complete the
+   flow: it will read your metadata document, discover this server, sign your end-user in, and come
+   back with a token. The same call now answers `200`.
+
+3. **Try the token somewhere it does not belong.** Declare a second resource, get a token for it, and
+   present that one to your MCP server. It must be refused — the `aud` claim will not match. This is
+   the check that stops one integration's token working at another's, and it is worth seeing fail once.
+
+</Steps>
+
+## What you did not have to do
+
+No code in this server, and no restart for the resource itself — a declaration is data, read on every
+token request. No client secret for your MCP server, because it verifies tokens against published
+keys rather than asking anything. And no allowlist of agent hosts for an ordinary resource: which
+end-users a client can sign in follows from the resource it names, so the project that owns the
+resource owns that answer.
+
+The endpoints this page touches are in the [endpoints reference](/docs/reference/endpoints/), and every
+setting named above is in the [settings reference](/docs/reference/settings/) with its default and the
+argument for it.

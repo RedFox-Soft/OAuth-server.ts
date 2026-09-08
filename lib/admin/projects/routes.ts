@@ -1,5 +1,9 @@
 import { Elysia } from 'elysia';
-import { getProjectStore, getBucketStore } from '../../adapters/index.js';
+import {
+	getProjectStore,
+	getBucketStore,
+	getProtectedResourceStore
+} from '../../adapters/index.js';
 import type { Project } from '../../adapters/types.js';
 import {
 	assertAuth,
@@ -20,33 +24,10 @@ import {
 	InvalidOriginError,
 	normalizeOrigins
 } from '../../helpers/cors_origin.js';
+import { loadProject } from './access.js';
 import { recordAdminAudit } from '../audit/record.js';
 import { Client } from '../../models/client.js';
 import nanoid from '../../helpers/nanoid.js';
-
-/*
- * Loads a project the caller is allowed to see, refusing identically whether it is missing or simply
- * theirs to not reach.
- *
- * The two used to differ — 404 for a project that does not exist, 403 for one owned by another group —
- * which handed an outsider an existence oracle: walk ids, and the status tells you which are real.
- * Harmless while a project id was only ever handed out by an operator; not harmless once any
- * administrator can create projects and every id belongs to somebody else's tenant.
- *
- * A super administrator still gets 404, because their authority is instance-wide: there is no tenant
- * they could be probing, and collapsing the two would only make a real "wrong id" harder to diagnose.
- */
-async function loadProject(admin: AdminContext, id: string): Promise<Project> {
-	const project = await getProjectStore().find(id);
-	if (!project) {
-		if (admin.roles.includes('super_admin')) {
-			throw new AdminError(404, 'project not found');
-		}
-		throw new AdminError(403, 'no access to this project');
-	}
-	assertProjectAccess(admin, project);
-	return project;
-}
 
 /*
  * Normalizes a submitted origin list, or refuses the whole request. All-or-nothing on purpose: half a
@@ -180,12 +161,33 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 				blockers: [{ kind: 'client', count: held.length, ids: held }]
 			});
 		}
+		/*
+		 * Declared protected resources cascade rather than block, which is the opposite of the rule for
+		 * clients above — and the difference is what each thing is. A client is an entity an operator
+		 * can see and name, so refusing tells them exactly what is in the way. A resource declaration is
+		 * a property of the project: leaving one behind would strand an audience whose owning project no
+		 * longer exists, reachable by nobody and deletable through no route.
+		 *
+		 * One audit entry per declaration actually withdrawn, the same shape the client rule above
+		 * describes. Not a count on the project's own entry: an audit entry carries field *names* and
+		 * never values, deliberately, so that no secret can reach the trail — and a bare number would in
+		 * any case not say which audiences stopped being served. Named entries make the trail
+		 * reconstructible after the declarations themselves are gone.
+		 */
+		const declared = await getProtectedResourceStore().listByProject(params.id);
+
 		// After the guard: an entry for a request the 409 refused would describe a deletion never attempted.
+		for (const resource of declared) {
+			await recordAdminAudit(ctx, 'resource.delete', resource._id, {
+				ownerGroupId: project.ownerGroupId
+			});
+		}
 		await recordAdminAudit(ctx, 'project.delete', params.id, {
 			ownerGroupId: project.ownerGroupId
 		});
+		await getProtectedResourceStore().destroyByProject(params.id);
 		await getProjectStore().destroy(params.id);
-		return { ok: true };
+		return { ok: true, resourcesRemoved: declared.length };
 	})
 	.put(
 		'/admin/api/projects/:id/bucket',

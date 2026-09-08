@@ -79,6 +79,12 @@ const PERMANENT = [
 	'Client',
 	'jwks',
 	'projects',
+	/*
+	 * A declared protected resource outlives everything except the project that owns it. An expiry
+	 * here would stop tokens being minted for a live third-party integration with nothing to say why —
+	 * the same failure mode as an expiring project, one level down.
+	 */
+	'protectedResources',
 	'userBuckets',
 	/*
 	 * Groups own every project and bucket, so an expiring group would silently orphan whatever it
@@ -86,6 +92,12 @@ const PERMANENT = [
 	 */
 	'groups',
 	'adminAudit',
+	/*
+	 * Which client identities may administer this instance. An expiry here would silently restore
+	 * access nobody re-granted — the opposite of what an allowlist is for, and a failure an operator
+	 * would only notice by an agent working again that should not.
+	 */
+	'mcpClientPermissions',
 	'serviceConfig',
 	USER_AREA_PREFIX
 ];
@@ -134,8 +146,29 @@ describe('storage inventory: expiry', () => {
 		});
 	});
 
+	/*
+	 * `Client` is permanent and declares one ordinary index — the one backing the sweep that reclaims
+	 * self-registered clients which never completed an authorization. What must stay absent is an
+	 * *expiry* index: a stale `expiresAt` surviving an upsert would delete an administrator-created
+	 * client, which is why that area is `reaped: null` and why the sweep exists instead. Asserted as
+	 * "no expiry index among them" rather than "no indexes at all", so the distinction is the thing
+	 * being pinned.
+	 */
 	it('derives no expiry index for a permanent area', () => {
-		expect(indexesFor(areaNamed('Client'))).toEqual([]);
+		const specs = indexesFor(areaNamed('Client'));
+
+		expect(specs).toEqual([
+			{
+				key: {
+					'payload.registeredDynamically': 1,
+					'payload.client_id_issued_at': 1
+				}
+			}
+		]);
+		expect(
+			specs.some((spec) => spec.expireAfterSeconds !== undefined)
+		).toBeFalse();
+		expect(indexesFor(areaNamed('serviceConfig'))).toEqual([]);
 	});
 
 	// The admin audit trail is required to be immutable, so this one is worth its own assertion

@@ -384,10 +384,26 @@ container of clients or of accounts with nothing left afterwards to inspect, so 
 Everything else destructive takes two steps — the agent describes what would change and you confirm that
 specific operation.
 
-> **Compatibility note.** The `client_id` above is not optional. An administrator's account lives in the
-> reserved admin bucket, and a dynamically registered client is not routed there — so an MCP client that
-> only supports Dynamic Client Registration, with no way to configure a `client_id`, cannot use this
-> surface yet.
+> **Which client identity works here.** The reserved `client_id` above always works and needs no setup
+> beyond the toggle. An agent host that cannot be told a `client_id` can use this surface too, provided
+> it identifies itself with an [OAuth Client ID Metadata
+> Document](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-client-id-metadata-document-00) — an
+> HTTPS URL naming a document that describes it — and a super administrator has named that identity
+> under **Agent access** in the console. A client that registered itself through Dynamic Client
+> Registration cannot administer the instance under any configuration: its identity is minted on demand
+> by whoever asked for it, so there is nothing an operator could meaningfully allowlist.
+
+## Protecting your own MCP server
+
+The same protocol surface works for an MCP server that is not this one. Declare it as a **protected
+resource** of a project — its canonical URI, the scopes it recognises, how its tokens are verified —
+and this server mints tokens whose audience is exactly that resource, with no code change here and no
+restart. An agent host discovers it, signs your end-users in, and comes back with a token your MCP
+server verifies against `GET /jwks` without asking anything.
+
+[**Protect your MCP server with OAuth**](https://foxauth.dev/docs/get-started/protect-your-mcp-server/)
+walks it end to end — including what a correct refusal looks like, so you can tell "protected" from
+"not reached yet".
 
 ## Implemented Standards
 

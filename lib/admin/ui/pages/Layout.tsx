@@ -10,6 +10,7 @@ import {
 	KeyOutlined,
 	FileSearchOutlined,
 	BugOutlined,
+	RobotOutlined,
 	LogoutOutlined
 } from '@ant-design/icons';
 import type { AdminContext } from '../../auth/rbac.js';
@@ -20,6 +21,7 @@ import { Buckets } from './Buckets.js';
 import { Admins } from './Admins.js';
 import { Settings } from './Settings.js';
 import { Keys } from './Keys.js';
+import { McpClients } from './McpClients.js';
 import { Audit } from './Audit.js';
 import { Errors } from './Errors.js';
 
@@ -32,6 +34,7 @@ type PageKey =
 	| 'admins'
 	| 'settings'
 	| 'keys'
+	| 'mcp-clients'
 	| 'audit'
 	| 'errors';
 
@@ -55,6 +58,11 @@ export function Layout({ me }: { me: AdminContext | null }) {
 					{ key: 'admins', icon: <TeamOutlined />, label: 'Admins' },
 					{ key: 'settings', icon: <SettingOutlined />, label: 'Settings' },
 					{ key: 'keys', icon: <KeyOutlined />, label: 'Keys' },
+					{
+						key: 'mcp-clients',
+						icon: <RobotOutlined />,
+						label: 'Agent access'
+					},
 					{ key: 'errors', icon: <BugOutlined />, label: 'Faults' }
 				]
 			: [])
@@ -104,6 +112,12 @@ export function Layout({ me }: { me: AdminContext | null }) {
 			// belong to, so this no longer falls back to Projects for a non-super-admin.
 			case 'audit':
 				return <Audit />;
+			case 'mcp-clients':
+				return isSuperAdmin ? (
+					<McpClients />
+				) : (
+					<Projects isSuperAdmin={isSuperAdmin} />
+				);
 			case 'errors':
 				return isSuperAdmin ? (
 					<Errors />

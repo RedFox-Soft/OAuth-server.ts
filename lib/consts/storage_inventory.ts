@@ -96,6 +96,12 @@ export type ModelAreaName = (typeof MODEL_AREAS)[number];
 export const STORE_AREAS = {
 	jwks: 'jwks',
 	projects: 'projects',
+	/*
+	 * Audiences this server will mint tokens for, declared by an administrator. The document `_id` is
+	 * the canonical resource identifier, so instance-wide uniqueness is the primary key rather than a
+	 * rule a route has to remember.
+	 */
+	protectedResources: 'protectedResources',
 	userBuckets: 'userBuckets',
 	/* The owner of every project and user bucket, and the only thing that grants access to one. */
 	groups: 'groups',
@@ -105,6 +111,11 @@ export const STORE_AREAS = {
 	adminAudit: 'adminAudit',
 	/* Pending confirmations for the MCP control plane's high-consequence operations. */
 	mcpConfirmation: 'mcpConfirmation',
+	/*
+	 * Which client identities may reach the administrative MCP plane. Keyed by the permitted identifier
+	 * URL, or by a bare host when the entry covers everything that host publishes.
+	 */
+	mcpClientPermissions: 'mcpClientPermissions',
 	/* Recorded internal server faults, grouped by fingerprint. */
 	errorStore: 'errorStore',
 	/* One area, four writers: configStore keeps the persisted ApplicationConfig, SmtpSettingsStore the
@@ -217,7 +228,24 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 	modelArea(
 		'Client',
 		null,
-		unowned('a client is itself a principal, not owned by one')
+		unowned('a client is itself a principal, not owned by one'),
+		/*
+		 * Backs the sweep that reclaims self-registered clients which never completed an authorization
+		 * (lib/models/client/dynamic_registration.ts). An index rather than a scan because the sweep runs
+		 * on the registration path, and non-unique because the whole point is that many rows match.
+		 *
+		 * Note what this is NOT: an expiry index. The area stays `reaped: null` above for the reason
+		 * stated there — a stale `expiresAt` surviving an upsert would delete an administrator-created
+		 * client — and the sweep exists precisely so that reclamation does not need one.
+		 */
+		[
+			{
+				key: {
+					'payload.registeredDynamically': 1,
+					'payload.client_id_issued_at': 1
+				}
+			}
+		]
 	),
 	/*
 	 * Client-owned and reachable by no other route: a client-credentials token carries no grantId at
@@ -387,6 +415,41 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 			{ key: { clientIds: 1 } },
 			{ key: { ownerGroupId: 1 } }
 		]
+	),
+	/*
+	 * Never reaped, and that is the point rather than housekeeping: a declaration that expired on its
+	 * own would stop every token being minted for a live integration, with nothing to say why.
+	 *
+	 * Unowned by an account or a client. It is owned by a *project*, and a project is not a principal —
+	 * owner fields here drive the account and client cascades, which sweep model areas, so declaring
+	 * one would claim a sweep that never reaches this area. The project-delete route cascades it
+	 * explicitly instead, and reports how many went.
+	 *
+	 * `projectId` is indexed because the console lists a project's resources and the delete cascade
+	 * reads by it; the identifier needs no index, being the `_id`.
+	 */
+	storeArea(
+		STORE_AREAS.protectedResources,
+		null,
+		unowned(
+			'owned by a project, which is not a principal; cascaded by the project-delete route'
+		),
+		[{ key: { projectId: 1 } }]
+	),
+	/*
+	 * Permanent, and read on every administrative MCP request — which is what makes a withdrawal land
+	 * on the agent's next call rather than when its token expires. An expiry here would silently
+	 * restore access nobody re-granted, which is the opposite of what the list is for.
+	 *
+	 * No secondary index: both lookups are point reads on the primary key, one for the identifier and
+	 * one for its host.
+	 */
+	storeArea(
+		STORE_AREAS.mcpClientPermissions,
+		null,
+		unowned(
+			'an operator decision about a client identity; belongs to no principal and no group'
+		)
 	),
 	storeArea(
 		STORE_AREAS.userBuckets,

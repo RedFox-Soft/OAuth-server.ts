@@ -13,6 +13,7 @@ import {
 } from './principal.js';
 import { withheldOutcome } from './result.js';
 import { MCP_METADATA_ROUTE, MCP_RESOURCE, MCP_ROUTE } from './consts.js';
+import { MCP_RESOURCE_SERVER } from './resource_server.js';
 
 /*
  * The administrative MCP control plane's HTTP face.
@@ -115,11 +116,43 @@ function report(reason: RejectionReason | 'unknown') {
 
 function challenge(set: McpContext['set']) {
 	set.status = 401;
+	/*
+	 * `scope` alongside `resource_metadata`, which the MCP specification asks for: a client that arrives
+	 * without a token is told not only where to get one but what to ask for. Omitting it sends the
+	 * client to the protected resource metadata to guess from `scopes_supported`, which is a round trip
+	 * for something this challenge already knows.
+	 *
+	 * The value is the descriptor's own scope, so the two cannot disagree — this surface takes its
+	 * authority from the administrator's roles rather than from scopes, and `openid` is the whole of it.
+	 */
 	set.headers['www-authenticate'] =
-		`Bearer resource_metadata="${issuer}${MCP_METADATA_ROUTE}", error="invalid_token"`;
+		`Bearer resource_metadata="${issuer}${MCP_METADATA_ROUTE}", scope="${MCP_RESOURCE_SERVER.scope}", error="invalid_token"`;
 	return {
 		jsonrpc: '2.0',
 		error: { code: -32001, message: 'authorization required' },
+		id: null
+	};
+}
+
+/*
+ * The insufficient-scope arm, for a caller whose token is valid but lacks a scope the operation needs.
+ *
+ * Included for shape conformance — the specification defines this response and a client implements a
+ * step-up flow against it — and honestly noted as unreachable today: every tool on this surface is
+ * authorized by the administrator's roles, and the descriptor declares `openid` alone, so there is no
+ * scope a valid token here can be missing. Exported rather than inlined so it is testable as the shape
+ * it is, rather than left as a branch nothing exercises.
+ */
+export function insufficientScope(
+	set: McpContext['set'],
+	required: string
+): object {
+	set.status = 403;
+	set.headers['www-authenticate'] =
+		`Bearer error="insufficient_scope", scope="${required}", resource_metadata="${issuer}${MCP_METADATA_ROUTE}"`;
+	return {
+		jsonrpc: '2.0',
+		error: { code: -32003, message: 'insufficient scope' },
 		id: null
 	};
 }

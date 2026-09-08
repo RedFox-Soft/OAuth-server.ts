@@ -156,6 +156,17 @@ export function calculateDiscovery() {
 		token_endpoint_auth_signing_alg_values_supported:
 			clientAuthSigningAlgValues,
 		authorization_response_iss_parameter_supported: true,
+		/*
+		 * Emitted only while the capability is on, and the conditionality is the point. A client is told
+		 * to check for this member before presenting a URL-shaped `client_id` and to fall back otherwise
+		 * — so advertising it while the server would refuse the mechanism converts a working fallback
+		 * into a guaranteed failure.
+		 */
+		client_id_metadata_document_supported: config[
+			'clientIdMetadataDocument.enabled'
+		]
+			? true
+			: undefined,
 		request_uri_parameter_supported: false,
 
 		claims_parameter_supported: true,
@@ -288,6 +299,17 @@ export const metadataClassification: Record<DiscoveryKey, MetadataAudience> = {
 	authorization_response_iss_parameter_supported: {
 		audience: 'both',
 		registeredBy: 'RFC 9207'
+	},
+	/*
+	 * Registered by an IETF draft rather than a published RFC, which is why the value names the draft
+	 * revision: the member's spelling is only as stable as the document that defines it, and a reader
+	 * checking this against a future RFC needs to know which text it was written from. OAuth-side
+	 * regardless of that — it describes how a client identifies itself to the authorization server,
+	 * which OpenID Connect Discovery has nothing to say about.
+	 */
+	client_id_metadata_document_supported: {
+		audience: 'both',
+		registeredBy: 'draft-ietf-oauth-client-id-metadata-document-00'
 	},
 	tls_client_certificate_bound_access_tokens: {
 		audience: 'both',

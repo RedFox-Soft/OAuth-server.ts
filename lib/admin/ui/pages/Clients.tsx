@@ -10,6 +10,7 @@ import {
 	Typography,
 	Popconfirm,
 	Switch,
+	Tag,
 	message
 } from 'antd';
 import { PlusOutlined, ArrowLeftOutlined } from '@ant-design/icons';
@@ -49,6 +50,7 @@ interface ClientView {
 	backchannelTokenDeliveryMode?: 'poll' | 'ping';
 	backchannelClientNotificationEndpoint?: string;
 	authorizationDetailsTypes?: string[];
+	registeredDynamically?: boolean;
 }
 interface FormValues {
 	clientName?: string;
@@ -266,7 +268,22 @@ export function Clients({
 				loading={loading}
 				dataSource={rows}
 				columns={[
-					{ title: 'Name', dataIndex: 'clientName' },
+					{
+						title: 'Name',
+						dataIndex: 'clientName',
+						/*
+						 * A client the server created on its own request is marked here rather than left to be
+						 * inferred from the shape of its id. It cannot be inferred: a deployment's `idFactory`
+						 * may issue any id, including a URL, so "looks generated" is not a distinction. What an
+						 * operator needs to know is who vouched for the client — them, or nobody.
+						 */
+						render: (clientName: string | undefined, row: ClientView) => (
+							<Space size={4}>
+								<span>{clientName || '—'}</span>
+								{row.registeredDynamically ? <Tag>self-registered</Tag> : null}
+							</Space>
+						)
+					},
 					{ title: 'Client ID', dataIndex: 'clientId' },
 					{ title: 'Type', dataIndex: 'applicationType' },
 					{ title: 'Auth', dataIndex: 'tokenEndpointAuthMethod' },

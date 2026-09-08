@@ -5,6 +5,8 @@ import {
 	GroupStore as MemoryGroupStore,
 	GroupInvitationStore as MemoryGroupInvitationStore,
 	ProjectStore as MemoryProjectStore,
+	ProtectedResourceStore as MemoryProtectedResourceStore,
+	McpClientPermissionStore as MemoryMcpClientPermissionStore,
 	UserBucketStore as MemoryUserBucketStore,
 	AdminSessionStore as MemoryAdminSessionStore,
 	AdminAuditStore as MemoryAdminAuditStore,
@@ -35,6 +37,10 @@ import type {
 	PayloadForModel,
 	ProjectStoreConstructor,
 	ProjectStoreInstance,
+	ProtectedResourceStoreConstructor,
+	ProtectedResourceStoreInstance,
+	McpClientPermissionStoreConstructor,
+	McpClientPermissionStoreInstance,
 	SecretStoreConstructor,
 	SecretStoreInstance,
 	SmtpSettingsStoreConstructor,
@@ -52,6 +58,10 @@ let GroupStoreClass: GroupStoreConstructor = MemoryGroupStore;
 let GroupInvitationStoreClass: GroupInvitationStoreConstructor =
 	MemoryGroupInvitationStore;
 let ProjectStoreClass: ProjectStoreConstructor = MemoryProjectStore;
+let ProtectedResourceStoreClass: ProtectedResourceStoreConstructor =
+	MemoryProtectedResourceStore;
+let McpClientPermissionStoreClass: McpClientPermissionStoreConstructor =
+	MemoryMcpClientPermissionStore;
 let BucketStoreClass: UserBucketStoreConstructor = MemoryUserBucketStore;
 let AdminSessionStoreClass: AdminSessionStoreConstructor =
 	MemoryAdminSessionStore;
@@ -73,6 +83,8 @@ if (process.env.MONGODB_URI) {
 	GroupStoreClass = mongodb.GroupStore;
 	GroupInvitationStoreClass = mongodb.GroupInvitationStore;
 	ProjectStoreClass = mongodb.ProjectStore;
+	ProtectedResourceStoreClass = mongodb.ProtectedResourceStore;
+	McpClientPermissionStoreClass = mongodb.McpClientPermissionStore;
 	BucketStoreClass = mongodb.UserBucketStore;
 	AdminSessionStoreClass = mongodb.AdminSessionStore;
 	AdminAuditStoreClass = mongodb.AdminAuditStore;
@@ -93,6 +105,14 @@ export const adminAuditStore: AdminAuditStoreInstance =
 	new AdminAuditStoreClass();
 export const mcpConfirmationStore: McpConfirmationStoreInstance =
 	new McpConfirmationStoreClass();
+/*
+ * Which client identities may reach the administrative MCP plane. Eager like the stores above rather
+ * than a lazy getter, because it is read on the request path of every administrative MCP call — that
+ * live read is what makes a withdrawal take effect on the agent's next call instead of when its token
+ * expires.
+ */
+export const mcpClientPermissionStore: McpClientPermissionStoreInstance =
+	new McpClientPermissionStoreClass();
 export const errorStore: ErrorStoreInstance = new ErrorStoreClass();
 /* Eagerly constructed like the stores above, because both secrets are resolved at module scope —
  * configs/application.ts for the nonce secret, configs/pairwiseSalt.ts for the salt — before any
@@ -168,6 +188,21 @@ export function getProjectStore(): ProjectStoreInstance {
 		projectStoreSingleton = new ProjectStoreClass();
 	}
 	return projectStoreSingleton;
+}
+
+/*
+ * Declared protected resources. There is deliberately no memo in front of this store: it is read on
+ * every token request carrying a `resource`, and a deleted declaration has to stop issuance on the
+ * very next request — which a cache would defer. Same reasoning as `tryFindClient` reading the
+ * adapter every time.
+ */
+let protectedResourceStoreSingleton: ProtectedResourceStoreInstance | null =
+	null;
+export function getProtectedResourceStore(): ProtectedResourceStoreInstance {
+	if (!protectedResourceStoreSingleton) {
+		protectedResourceStoreSingleton = new ProtectedResourceStoreClass();
+	}
+	return protectedResourceStoreSingleton;
 }
 
 let bucketStoreSingleton: UserBucketStoreInstance | null = null;

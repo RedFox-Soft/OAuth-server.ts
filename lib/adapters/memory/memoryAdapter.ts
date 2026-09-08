@@ -169,4 +169,39 @@ export class MemoryAdapter<
 		}
 		return destroyed;
 	}
+
+	async destroyUnusedSince(
+		markerField: string,
+		usedField: string,
+		ageField: string,
+		before: number
+	) {
+		const storage = getStorage<AdapterStoreValue<TModelName>>();
+		const prefix = `${this.model}:`;
+		/* Snapshot first, for the same reason `destroyByOwner` does. */
+		const keys = new Set(storage.keys());
+
+		let destroyed = 0;
+		for (const key of keys) {
+			if (!key.startsWith(prefix)) {
+				continue;
+			}
+			const stored = storage.get<PayloadForModel<TModelName>>(key);
+			if (!stored) {
+				continue;
+			}
+			const record = stored as unknown as Record<string, unknown>;
+			const age = record[ageField];
+			if (
+				record[markerField] === true &&
+				record[usedField] === undefined &&
+				typeof age === 'number' &&
+				age < before
+			) {
+				storage.delete(key);
+				destroyed += 1;
+			}
+		}
+		return destroyed;
+	}
 }

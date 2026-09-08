@@ -9,6 +9,8 @@ import addClient from '../helpers/add_client.ts';
 import { idFactory, secretFactory } from '../addon/index.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { Client } from 'lib/models/client.js';
+import { reclaimUnusedRegistrations } from 'lib/models/client/dynamic_registration.js';
+import { snakeToCanonical, canonicalToSnake } from 'lib/models/client/wire.js';
 import { InitialAccessToken } from 'lib/models/initial_access_token.js';
 import { RegistrationAccessToken } from 'lib/models/registration_access_token.js';
 import { eventBus } from 'lib/event_bus.js';
@@ -26,51 +28,14 @@ const FORBIDDEN = [
 	'client_id_issued_at'
 ];
 
-// RFC 7591/7592 use snake_case on the wire, but the Client model keeps the base
-// registration attributes (client_id/client_secret/redirect_uris/… and the two
-// request-object signing options) as camelCase/dotted canonical keys internally —
-// they are NOT in RECOGNIZED_METADATA, so the schema engine neither reads them from
-// snake input nor snakes them back in metadata(). Translate at this boundary only —
-// snake→canonical on the incoming body, canonical→snake on the metadata() response —
-// so the registration contract stays standards-compliant while the rest of the server
-// uses the single canonical name. (Recognized metadata such as client_secret_expires_at
-// and token_endpoint_auth_method already round-trips through the schema, so it is absent
-// from this map.)
-const REQUEST_OBJECT_ALG_WIRE_MAP = {
-	client_id: 'clientId',
-	client_secret: 'clientSecret',
-	redirect_uris: 'redirectUris',
-	application_type: 'applicationType',
-	response_types: 'responseTypes',
-	response_modes: 'responseModes',
-	grant_types: 'grantTypes',
-	subject_type: 'subjectType',
-	request_object_signing_alg: 'requestObject.signingAlg',
-	backchannel_authentication_request_signing_alg:
-		'requestObject.backChannelSigningAlg'
-};
-
+/*
+ * snake_case on the wire, canonical names inside — translated at this boundary only, so the
+ * registration contract stays standards-compliant while the rest of the server uses one name per
+ * field. The map itself moved to `lib/models/client/wire.ts` when client description documents came
+ * to need the same translation; two copies of it would drift, and a drifted entry silently ignores a
+ * metadata field.
+ */
 type Body = Record<string, unknown>;
-
-function snakeToCanonical(body: Body) {
-	for (const [snake, dotted] of Object.entries(REQUEST_OBJECT_ALG_WIRE_MAP)) {
-		if (snake in body) {
-			body[dotted] = body[snake];
-			delete body[snake];
-		}
-	}
-	return body;
-}
-
-function canonicalToSnake(metadata: Body) {
-	for (const [snake, dotted] of Object.entries(REQUEST_OBJECT_ALG_WIRE_MAP)) {
-		if (dotted in metadata) {
-			metadata[snake] = metadata[dotted];
-			delete metadata[dotted];
-		}
-	}
-	return metadata;
-}
 
 // The registration routes authenticate with an opaque bearer token, not client auth. The token is
 // taken from the Authorization header (never the JSON body — a token in the body reads as absent),
@@ -177,7 +142,7 @@ async function create({ body, headers, request, set }) {
 
 	const issueRegistrationAccessToken =
 		ApplicationConfig['registration.issueRegistrationAccessToken'];
-	const properties: Body = {};
+	let properties: Body = {};
 	const clientId = idFactory({ oidc });
 
 	let rat;
@@ -195,7 +160,28 @@ async function create({ body, headers, request, set }) {
 		client_id: clientId,
 		client_id_issued_at: epochTime()
 	});
-	snakeToCanonical(properties);
+	properties = snakeToCanonical(properties);
+	/*
+	 * Marked as created on the client's own request, which is what lets the console tell it apart from
+	 * one an administrator made. Set after the wire translation so it cannot be supplied by the caller:
+	 * a registration body claiming `registered_dynamically: false` would otherwise be believed.
+	 *
+	 * There is deliberately no per-project acceptance check here, and the absence is a decision rather
+	 * than an omission. A registration request names no project — RFC 7591 has no field for one — so a
+	 * per-project rule could only rest on a project-scoped registration endpoint, which would hand an
+	 * unauthenticated caller an oracle for which projects exist. The association this client needs is
+	 * supplied at authorization time instead, from the declared resource the request names
+	 * (`resolveBucketForRequest`), which is the same rule a document-identified client follows.
+	 */
+	properties.registeredDynamically = true;
+
+	/*
+	 * Housekeeping, here because this is the only moment that both correlates with growth and is
+	 * already paying for a write. Registrations that were never taken up go; one that completed an
+	 * authorization is untouched, whatever its age. See lib/models/client/dynamic_registration.ts for
+	 * why this is a sweep rather than an expiry index.
+	 */
+	await reclaimUnusedRegistrations();
 
 	const secretRequired = Client.needsSecret(properties);
 

@@ -78,6 +78,25 @@ export class MongoAdapter<
 		return result.deletedCount;
 	}
 
+	async destroyUnusedSince(
+		markerField: string,
+		usedField: string,
+		ageField: string,
+		before: number
+	) {
+		/*
+		 * Every field name is a declared inventory value, never caller input, and the drift guard proves
+		 * each one is a plain identifier — so these interpolations cannot produce an operator or a dotted
+		 * path. Same rule and same reason as `destroyByOwner` above.
+		 */
+		const result = await this.coll().deleteMany({
+			[`payload.${markerField}`]: true,
+			[`payload.${usedField}`]: { $exists: false },
+			[`payload.${ageField}`]: { $lt: before }
+		});
+		return result.deletedCount;
+	}
+
 	async consume(_id: string) {
 		await this.coll().findOneAndUpdate(
 			{ _id },

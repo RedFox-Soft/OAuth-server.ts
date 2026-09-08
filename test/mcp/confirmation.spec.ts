@@ -134,9 +134,9 @@ describe('MCP confirmation gate', () => {
 		await ensureAdminSeed();
 	});
 
-	it('classifies thirteen tools as high-consequence and declares the argument on each', () => {
+	it('classifies fourteen tools as high-consequence and declares the argument on each', () => {
 		const high = mcpCatalogue.filter((t) => t.consequence === 'high');
-		expect(high.length).toBe(13);
+		expect(high.length).toBe(14);
 	});
 
 	it('describes instead of acting, and changes nothing', async () => {

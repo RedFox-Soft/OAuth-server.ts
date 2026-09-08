@@ -825,6 +825,17 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 	},
 
 	{
+		key: 'clientIdMetadataDocument.enabled',
+		domain: 'endpoints',
+		group: 'Client identity documents',
+		label: 'Accept a URL as a client identifier',
+		summary: 'Let a client identify itself with a document it hosts',
+		type: 'boolean',
+		description:
+			'Accepts an https URL carrying a path component as a `client_id`, retrieves the JSON document it names, and uses that as the metadata for the client — creating no client record at all. This is the mechanism the current MCP authorization specification names first for a client with no prior relationship, and it is what lets an agent host connect with nothing to configure. Off by default because switching it on lets an unauthenticated caller make this server issue an outbound HTTP request; the egress is bounded (private, loopback and link-local addresses refused, every redirect hop re-checked, 5 KB, short timeout) and the cache headers on the retrieved document bound how long it is reused. Advertised as `client_id_metadata_document_supported` only while this is on, because a client checks for that member before attempting the mechanism and falls back otherwise.'
+	},
+
+	{
 		key: 'registrationManagement.enabled',
 		domain: 'endpoints',
 		group: 'Registration Management',

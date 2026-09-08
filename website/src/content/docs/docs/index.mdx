@@ -31,6 +31,11 @@ PKCE end to end using `curl`, from the code challenge to a decoded ID token and 
 PKCE is mandatory for every client, not only public ones — that is OAuth 2.1, and it is the most
 common surprise for anyone arriving from an OAuth 2.0 server.
 
+If the application you are connecting is an **MCP server**, it is not an OAuth client but a protected
+resource, and the shape is different enough to have its own page: [Protect your MCP server with
+OAuth](/docs/get-started/protect-your-mcp-server/) declares it here, publishes the two things an MCP
+server has to publish, validates a token, and shows both a refusal and a success.
+
 ## Running it in production
 
 [Deploy](/docs/deploy/fly/) covers the targets people actually use: [Fly.io](/docs/deploy/fly/),

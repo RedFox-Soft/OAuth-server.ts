@@ -70,18 +70,27 @@ export class AdminError extends Error {
 	blockers?: readonly DeletionBlocker[];
 	/* Areas whose sweep failed after the principal was already destroyed. Drives the 500 body. */
 	failedAreas?: readonly string[];
+	/*
+	 * Set on the one 409 that means "the operator has to accept something first", so a caller can tell
+	 * it from the 409 that means "already exists". The console needs that distinction to decide whether
+	 * to render the message as an acknowledgement or as an error, and matching on the message text
+	 * would break the moment the wording improved.
+	 */
+	acknowledgementRequired?: boolean;
 	constructor(
 		status: number,
 		message: string,
 		extra?: {
 			blockers?: readonly DeletionBlocker[];
 			failedAreas?: readonly string[];
+			acknowledgementRequired?: boolean;
 		}
 	) {
 		super(message);
 		this.status = status;
 		this.blockers = extra?.blockers;
 		this.failedAreas = extra?.failedAreas;
+		this.acknowledgementRequired = extra?.acknowledgementRequired;
 	}
 }
 
@@ -94,12 +103,14 @@ export function adminErrorBody(error: AdminError): {
 	message: string;
 	blockers?: readonly DeletionBlocker[];
 	failedAreas?: readonly string[];
+	acknowledgementRequired?: boolean;
 } {
 	return {
 		error: 'admin_error',
 		message: error.message,
 		...(error.blockers ? { blockers: error.blockers } : {}),
-		...(error.failedAreas ? { failedAreas: error.failedAreas } : {})
+		...(error.failedAreas ? { failedAreas: error.failedAreas } : {}),
+		...(error.acknowledgementRequired ? { acknowledgementRequired: true } : {})
 	};
 }
 

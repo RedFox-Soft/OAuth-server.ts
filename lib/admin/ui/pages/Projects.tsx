@@ -13,6 +13,7 @@ import {
 import { PlusOutlined } from '@ant-design/icons';
 import type { Project } from '../../../adapters/types.js';
 import { Clients } from './Clients.js';
+import { Resources } from './Resources.js';
 import { BucketDetail } from './BucketDetail.js';
 
 interface CreateProjectValues {
@@ -124,6 +125,7 @@ export function Projects({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 	const [openProject, setOpenProject] = useState<Project | null>(null);
 	const [openBucketId, setOpenBucketId] = useState<string | null>(null);
 	const [originsFor, setOriginsFor] = useState<Project | null>(null);
+	const [resourcesFor, setResourcesFor] = useState<Project | null>(null);
 
 	async function load() {
 		setLoading(true);
@@ -181,6 +183,15 @@ export function Projects({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 		);
 	}
 
+	if (resourcesFor) {
+		return (
+			<Resources
+				project={resourcesFor}
+				onBack={() => setResourcesFor(null)}
+			/>
+		);
+	}
+
 	return (
 		<>
 			<div style={{ marginBottom: 16, textAlign: 'right' }}>
@@ -227,6 +238,12 @@ export function Projects({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 									onClick={() => row.bucketId && setOpenBucketId(row.bucketId)}
 								>
 									Users
+								</Button>
+								<Button
+									size="small"
+									onClick={() => setResourcesFor(row)}
+								>
+									Resources
 								</Button>
 								<Button
 									size="small"

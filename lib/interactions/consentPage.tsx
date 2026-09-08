@@ -7,7 +7,10 @@ const { Title, Paragraph, Text } = Typography;
 export const ConsentPage: React.FC<ConsentView> = ({
 	clientName,
 	account,
-	permissions
+	permissions,
+	clientIdHostname,
+	redirectHostname,
+	loopbackOnly
 }) => (
 	<Space
 		orientation="vertical"
@@ -23,6 +26,37 @@ export const ConsentPage: React.FC<ConsentView> = ({
 			<Paragraph>
 				<b>{clientName}</b> is requesting access to your account.
 			</Paragraph>
+			{/*
+			 * Shown only for a client that identified itself with a document it hosts. The name above is
+			 * then whatever that document claims, and the domain is the part of it that was actually
+			 * proved — so the End-User needs to see the domain to weigh the name. Required by the
+			 * governing draft (§6.4) and the MCP security considerations.
+			 */}
+			{clientIdHostname ? (
+				<Paragraph
+					type="secondary"
+					style={{ marginBottom: 4 }}
+				>
+					Identified by <Text code>{clientIdHostname}</Text>
+					{redirectHostname ? (
+						<>
+							, sending the result to <Text code>{redirectHostname}</Text>
+						</>
+					) : null}
+				</Paragraph>
+			) : null}
+			{/*
+			 * A document offering only loopback redirect targets proves control of a domain but cannot
+			 * prove which local process will receive the code. The End-User is the only party who can
+			 * notice that they did not just start the application being named.
+			 */}
+			{loopbackOnly ? (
+				<Paragraph type="warning">
+					This application runs on your own computer, and this page cannot
+					verify which program will receive the result. Continue only if you
+					just started {clientName} yourself.
+				</Paragraph>
+			) : null}
 			{account ? (
 				<Paragraph>
 					Signed in as <Text code>{account}</Text>
