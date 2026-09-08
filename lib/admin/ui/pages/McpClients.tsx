@@ -65,14 +65,19 @@ export function McpClients() {
 	/* The route's own words, shown only once it has refused for want of them. */
 	const [acknowledgement, setAcknowledgement] = useState<string | null>(null);
 	/*
-	 * Whether the two capabilities an entry depends on are actually in force.
+	 * Which capabilities are not in force, and — the part worth getting right — how much that costs.
 	 *
-	 * Both are off in a shipped configuration, so "permitted an identity and nothing happened" is the
-	 * *normal* first experience of this screen rather than an edge case — a permission is a standing
-	 * decision that does nothing until the surface is served and document identifiers are accepted.
+	 * The two flags are NOT equivalent, and an earlier version of this screen said they were. Turning
+	 * the surface off stops everything, the reserved client included. Turning document identifiers off
+	 * stops only the entries below: the reserved `admin-mcp` client is pre-registered, which is the
+	 * mechanism the MCP specification lists *first*, and it never touches a client document. Saying
+	 * "nothing here takes effect" in that case would send an operator to fix a setting that is not
+	 * their problem.
+	 *
 	 * Read from the settings API, which this screen may call because it is already super-admin only.
 	 */
-	const [inert, setInert] = useState<string[]>([]);
+	const [surfaceOff, setSurfaceOff] = useState<string | null>(null);
+	const [documentsOff, setDocumentsOff] = useState<string | null>(null);
 	const [form] = Form.useForm<FormValues>();
 
 	async function load() {
@@ -99,23 +104,26 @@ export function McpClients() {
 			changedKeys: string[];
 		};
 
-		const problems: string[] = [];
-		for (const [key, what] of [
-			['mcp.enabled', 'the administrative MCP surface is not served'],
-			[
-				'clientIdMetadataDocument.enabled',
-				'a client_id that is a URL is not accepted'
-			]
-		] as const) {
-			if (body.values[key] !== true) {
-				problems.push(`${key} is off, so ${what}.`);
-			} else if (body.changedKeys.includes(key)) {
-				problems.push(
-					`${key} is saved but not in force — settings apply at boot, so restart the server.`
-				);
+		const stateOf = (key: string, off: string) => {
+			if (body.values[key] !== true) return off;
+			if (body.changedKeys.includes(key)) {
+				return `${key} is saved but not in force. Settings apply at boot, so restart the server.`;
 			}
-		}
-		setInert(problems);
+			return null;
+		};
+
+		setSurfaceOff(
+			stateOf(
+				'mcp.enabled',
+				'mcp.enabled is off, so POST /mcp is not served at all — not for a permitted identity, and not for the reserved admin-mcp client either.'
+			)
+		);
+		setDocumentsOff(
+			stateOf(
+				'clientIdMetadataDocument.enabled',
+				'clientIdMetadataDocument.enabled is off, so a client_id that is an HTTPS URL does not resolve to a client. Entries below cannot take effect until it is on.'
+			)
+		);
 	}
 	useEffect(() => {
 		load();
@@ -201,21 +209,27 @@ export function McpClients() {
 
 	return (
 		<>
-			{inert.length > 0 ? (
+			{surfaceOff ? (
+				<Alert
+					type="error"
+					showIcon
+					style={{ marginBottom: 16 }}
+					message="No agent can reach this instance at all"
+					description={surfaceOff}
+				/>
+			) : null}
+			{documentsOff ? (
 				<Alert
 					type="warning"
 					showIcon
 					style={{ marginBottom: 16 }}
-					message="Nothing on this page takes effect yet"
+					message="Entries below cannot take effect yet"
 					description={
 						<>
-							An entry here is a standing decision, and it does nothing until
-							the capabilities it depends on are in force.
-							<ul style={{ margin: '8px 0 0', paddingLeft: 20 }}>
-								{inert.map((problem) => (
-									<li key={problem}>{problem}</li>
-								))}
-							</ul>
+							{documentsOff} The reserved <code>admin-mcp</code> client is
+							unaffected — it is pre-registered, which is the mechanism the MCP
+							specification lists first, and it never resolves a client
+							document.
 						</>
 					}
 				/>
