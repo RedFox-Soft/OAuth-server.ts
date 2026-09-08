@@ -38,6 +38,78 @@ against an unchanged dependency is the common case.
 	clears it.
 </Aside>
 
+## The released image, and how to check it is ours
+
+Everything above checks the code. This section is about the artifact you actually run. Every image
+[`release.yml`](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/.github/workflows/release.yml)
+publishes carries three things, and each of them is something you can verify yourself rather than
+take our word for:
+
+| What                 | Produced by                                                           | What it lets you establish                                                                                                         |
+| -------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| A **signature**      | `cosign sign`, keyless, over the image digest                         | These exact bytes were pushed by this repository's release workflow, running on a version tag — not by anyone who obtained a token |
+| An **SBOM**          | BuildKit (`sbom: true`), attached to the image as an attestation      | Every package inside the image, so you can answer "is today's advisory in here?" without waiting for us to publish an answer       |
+| **Build provenance** | BuildKit (`mode=max`) and a signed SLSA v1 statement through Sigstore | Which commit, which base image digest, which Dockerfile and which build inputs produced it                                         |
+
+The signing is **keyless**: the workflow exchanges its GitHub OIDC token for a short-lived Sigstore
+certificate that names the repository, the workflow file and the tag, and that certificate is what a
+verification checks. There is no long-lived signing key in the project, so there is none to leak or
+rotate — and no version of "trust this key we published somewhere".
+
+Verify the signature, naming the identity that is allowed to have produced it:
+
+```bash
+cosign verify \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity-regexp '^https://github\.com/RedFox-Soft/OAuth-server\.ts/\.github/workflows/release\.yml@refs/tags/v' \
+  ghcr.io/redfox-soft/oauth-server-ts:<version>
+```
+
+The identity is the point of the command, not decoration. `cosign verify` without those two flags
+asks only "is this signed by somebody", which every attacker with a Sigstore account can also
+satisfy.
+
+The release workflow runs that same command against the image it has just signed, with the identity
+pinned to its own tag, before the run is allowed to finish. So a signature that cannot be verified
+fails the release instead of reaching you — and the command above cannot quietly stop working here
+without going red there first.
+
+Read the SBOM and the build record, both of which travel inside the image index:
+
+```bash
+docker buildx imagetools inspect ghcr.io/redfox-soft/oauth-server-ts:<version> \
+  --format '{{ json .SBOM }}'
+
+docker buildx imagetools inspect ghcr.io/redfox-soft/oauth-server-ts:<version> \
+  --format '{{ json .Provenance }}'
+```
+
+And verify the signed SLSA provenance, which is filed in GitHub's attestation store and recorded in
+a public transparency log:
+
+```bash
+gh attestation verify oci://ghcr.io/redfox-soft/oauth-server-ts:<version> \
+  --repo RedFox-Soft/OAuth-server.ts
+```
+
+The SBOM matters more for this image than for most, because the
+[`Dockerfile`](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/Dockerfile) deliberately runs
+`apk upgrade` on top of a digest-pinned base: the distribution package set is therefore a property of
+the day the image was built and cannot be recovered by reading the repository. The SBOM is the record
+of it, which is also why the same Dockerfile does not claim a reproducible build.
+
+<Aside
+	type="caution"
+	title="What a signature does not say"
+>
+	It says where the image came from, and nothing about whether the code inside
+	is any good. A signed image with a critical vulnerability is signed and
+	vulnerable. Verification tells you that the artifact is the one this project
+	published for that version, so that the scanning, the threat model and the
+	tests on this page are evidence about the thing you are running rather than
+	about a lookalike.
+</Aside>
+
 ## OpenSSF Scorecard
 
 [`.github/workflows/scorecard.yml`](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/.github/workflows/scorecard.yml)
@@ -89,7 +161,14 @@ whole picture.
   money. The scope and safe harbour in the security policy are the whole programme.
 - **No OpenID Foundation certification.** The conformance suite has not been run against a release.
   Standards compliance is asserted by this project's own tests until it has.
-- **No fuzzing, no signed releases, no reproducible build.** Scorecard will say so; it is right.
+- **No fuzzing, and no reproducible build.** Scorecard will say so about both, and it is right about
+  both. The build is not reproducible by design — see the `apk upgrade` above — and that trade is
+  argued in the `Dockerfile` rather than hidden.
+- **Signed releases, partially.** The container image is signed and carries an SBOM and provenance
+  ([above](#the-released-image-and-how-to-check-it-is-ours)). The release's own assets — the
+  changelog and the generated reference tables — are not signed, because they are documentation
+  rather than something anyone executes; Scorecard's `Signed-Releases` check looks for a signature
+  beside a release asset and will keep reporting one missing.
 
 The list gets shorter as things are done, and never by deletion alone: an item leaves it by moving to
 one of the sections above with a link to the evidence.

@@ -148,6 +148,24 @@ Those are the security boundaries, and they are unaffected by how many pods you 
 
 </Aside>
 
+## Admitting only images we signed
+
+Every release is signed with `cosign` over its digest, keyless, and carries an SBOM and build
+provenance — so a cluster can refuse to run anything at this image name that did not come from this
+project's release workflow. Whichever admission controller you use ([sigstore
+policy-controller](https://docs.sigstore.dev/policy-controller/overview/), Kyverno's
+`verifyImages`, Connaisseur), a keyless policy needs the same two values, and they are the whole of
+what makes such a policy mean anything:
+
+| Field            | Value                                                                                           |
+| ---------------- | ----------------------------------------------------------------------------------------------- |
+| OIDC issuer      | `https://token.actions.githubusercontent.com`                                                   |
+| Subject (regexp) | `^https://github\.com/RedFox-Soft/OAuth-server\.ts/\.github/workflows/release\.yml@refs/tags/v` |
+
+A policy that checks for _a_ signature and not for that identity admits anything anyone has signed,
+which is every image on the internet. The same two values verify by hand before you roll:
+[cosign verify and the attestations](/docs/security/assurance/#the-released-image-and-how-to-check-it-is-ours).
+
 ## Scaling notes
 
 - Sessions, tokens, codes and interactions live in MongoDB, not in process memory, so more than one

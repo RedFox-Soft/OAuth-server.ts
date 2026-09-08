@@ -59,6 +59,18 @@ What exists:
   published container image. Run logs are public; findings land in the repository's code scanning
   alerts. [foxauth.dev/docs/security/assurance](https://foxauth.dev/docs/security/assurance/)
   describes each check and where to read its result.
+- **Signed images, with an SBOM and build provenance** — every image the
+  [Release workflow](https://github.com/RedFox-Soft/OAuth-server.ts/actions/workflows/release.yml)
+  publishes is signed with `cosign` over its digest, keyless, so the signature is verified against a
+  short-lived certificate naming this repository, this workflow and the version tag rather than
+  against a key we ask you to trust. The same image carries an SBOM of every package inside it and a
+  full build record, and a signed SLSA provenance statement is filed in a public transparency log.
+  The commands to check all of it yourself are on
+  [foxauth.dev/docs/security/assurance](https://foxauth.dev/docs/security/assurance/#the-released-image-and-how-to-check-it-is-ours).
+  A signature says where the image came from and nothing about whether the code in it is any good;
+  its worth is that it makes everything else on this page evidence about the artifact you are
+  actually running.
+
 - **An OpenSSF Scorecard**, published weekly by the
   [Scorecard workflow](https://github.com/RedFox-Soft/OAuth-server.ts/actions/workflows/scorecard.yml)
   and readable at

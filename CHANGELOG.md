@@ -24,6 +24,17 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   and states plainly what does not exist: no external audit, no paid bounty, no OpenID Foundation
   certification. SECURITY.md gained the same section and the README the badges.
 
+- security: the published container image is now **signed, and ships an SBOM and build provenance**.
+  `release.yml` signs it with `cosign` over the digest — keyless, so verification names this
+  repository, workflow and tag instead of a key we ask you to trust — and BuildKit attaches an SBOM
+  and a `mode=max` provenance document to the pushed index that the signature covers; a signed SLSA
+  v1 statement also goes to a transparency log for `gh attestation verify` and admission
+  controllers. The release verifies its own signature before finishing, so an unverifiable one fails
+  the release rather than reaching an operator. The SBOM matters here because the `Dockerfile` runs
+  `apk upgrade`, which makes the package set unrecoverable from the repository. Release assets stay
+  unsigned on purpose: documentation, not something anyone executes. Verification commands are on
+  the [assurance page](https://foxauth.dev/docs/security/assurance/).
+
 - protocol: authorization server metadata at `GET /.well-known/oauth-authorization-server`
   ([RFC 8414](https://datatracker.ietf.org/doc/html/rfc8414), spec 038, issue #30). A plain OAuth 2.1
   client that is not an OpenID Connect relying party looks for this path and no other, so until now

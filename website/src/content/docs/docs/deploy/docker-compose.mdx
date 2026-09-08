@@ -49,6 +49,20 @@ published tags are listed on the
 [GitHub releases page](https://github.com/RedFox-Soft/OAuth-server.ts/releases) and on the
 [container package page](https://github.com/RedFox-Soft/OAuth-server.ts/pkgs/container/oauth-server-ts).
 
+**Verify the image once per version you adopt.** Every release is signed over its digest and carries
+an SBOM and a build provenance attestation, so the tag you just pinned can be checked rather than
+assumed:
+
+```bash
+cosign verify \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity-regexp '^https://github\.com/RedFox-Soft/OAuth-server\.ts/\.github/workflows/release\.yml@refs/tags/v' \
+  ghcr.io/redfox-soft/oauth-server-ts:<version>
+```
+
+Fits naturally into the same change that moves the pin — that is the moment you are already reading
+the changelog. [What is attached and how to read the SBOM](/docs/security/assurance/#the-released-image-and-how-to-check-it-is-ours).
+
 **Use a database you back up.** The Get started file runs `mongo:8` on a local named volume, which
 is convenient and has no backups. Either point `MONGODB_URI` at a managed instance —
 [MongoDB Atlas](/docs/deploy/mongodb-atlas/) — or keep the local `mongo` service and treat the

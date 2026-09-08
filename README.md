@@ -259,7 +259,23 @@ docker run -p 3000:3000 --env-file .env ghcr.io/redfox-soft/oauth-server-ts:late
 ```
 
 Run `bun run db:setup` against the same database once before the first start (the Compose file
-above does this for you). To build locally instead:
+above does this for you).
+
+Every published image is signed over its digest, and carries an SBOM and a build provenance
+attestation. The signing is keyless, so verification names the workflow that is allowed to have
+produced it rather than a key:
+
+```bash
+cosign verify \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity-regexp '^https://github\.com/RedFox-Soft/OAuth-server\.ts/\.github/workflows/release\.yml@refs/tags/v' \
+  ghcr.io/redfox-soft/oauth-server-ts:latest
+```
+
+Reading the SBOM, the build record and the signed SLSA provenance is
+[three more commands](https://foxauth.dev/docs/security/assurance/#the-released-image-and-how-to-check-it-is-ours).
+
+To build locally instead:
 
 ```bash
 docker build -t oauth-server-ts .
@@ -413,6 +429,7 @@ Report a vulnerability to **security@foxauth.dev** or through
 The same file says what stands behind the code: a published
 [threat model](https://foxauth.dev/docs/security/threat-model/), CodeQL, dependency and container
 scanning on every push and every week ([what runs and where to read it](https://foxauth.dev/docs/security/assurance/)),
+[signed images with an SBOM and build provenance](https://foxauth.dev/docs/security/assurance/#the-released-image-and-how-to-check-it-is-ours),
 and an [OpenSSF Scorecard](https://scorecard.dev/viewer/?uri=github.com/RedFox-Soft/OAuth-server.ts).
 It also says what does not exist yet — no external audit, no paid bounty, no OpenID Foundation
 certification — because a security page that only lists the good news is not one you can trust.

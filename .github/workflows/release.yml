@@ -1,8 +1,14 @@
 name: Release
 
 # A version tag is the release act. Pushing `vX.Y.Z` runs the suite, publishes the container image
-# under that version, and creates the GitHub release the website reads: its body is the CHANGELOG
-# section for the version and its assets are the documentation export and the CHANGELOG itself.
+# under that version — signed, with an SBOM and a build provenance attestation — and creates the
+# GitHub release the website reads: its body is the CHANGELOG section for the version and its assets
+# are the documentation export and the CHANGELOG itself.
+#
+# What is deliberately not signed here: the release assets. They are documentation — the changelog
+# and the generated reference tables the website reads — not something anyone executes, and signing
+# them would buy a checkbox rather than a property. The artifact that runs in front of an
+# authorization server's users is the image, and that is what carries a signature.
 #
 # Deliberately separate from deploy.yml: publishing an image and release notes touches nothing in
 # production. Deploying stays a manual act.
@@ -44,6 +50,13 @@ jobs:
     permissions:
       contents: read
       packages: write
+      # The signature and the provenance attestation are both keyless: this job exchanges its OIDC
+      # token for a short-lived Sigstore certificate that names the workflow, the repository and the
+      # tag, and that certificate is what the signature is verified against. Nothing in the pipeline
+      # holds a signing key, so there is no key to leak, rotate, or be asked for by someone claiming
+      # to be us. `attestations: write` is the GitHub attestation store the provenance is filed in.
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -64,14 +77,71 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
 
-      - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+      - id: build
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # BuildKit attaches both of these to the pushed index as in-toto attestations, so they
+          # travel with the image instead of living in a document beside it that can go stale. The
+          # SBOM is what an operator answers "does this contain the package in today's advisory?"
+          # with, without waiting for us; `mode=max` provenance records the full build — every
+          # source input, the base image digest, the Dockerfile, the build arguments — rather than
+          # the materials-only summary the default `mode=min` would emit.
+          #
+          # This matters more here than in most images because the Dockerfile deliberately runs
+          # `apk upgrade`, which means the package set is a property of the day the image was built
+          # and cannot be recovered by reading the repository. The SBOM is the only record of it.
+          provenance: mode=max
+          sbom: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      # Signed by digest, not by tag: a tag is a mutable pointer, and a signature over a name that
+      # can be repointed proves nothing about the bytes anyone pulls. The signature lands beside
+      # the image in the registry and covers the index, whose digest in turn covers the SBOM and
+      # provenance manifests above — so verifying the signature is what makes those attestations
+      # ours rather than merely present.
+      #
+      # `$IMAGE` and `$DIGEST` are read from the environment rather than interpolated into the
+      # script, which is the difference between a shell command and a template a tag name is
+      # substituted into.
+      - name: Sign the image
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: cosign sign --yes "${IMAGE}@${DIGEST}"
+
+      # Then verify it here, with the identity, so that a release fails rather than shipping an
+      # image whose signature nobody can check — the failure mode a signing step has when it is
+      # never exercised. This is also the command the assurance page tells operators to run, so it
+      # cannot go stale in the documentation without going red here first. The page uses
+      # `--certificate-identity-regexp` because it has to match any version tag; this run knows its
+      # own, so it pins the identity exactly.
+      - name: Verify the signature
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          IDENTITY: https://github.com/${{ github.workflow_ref }}
+        run: |
+          cosign verify \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            --certificate-identity "${IDENTITY}" \
+            "${IMAGE}@${DIGEST}"
+
+      # A second, independent provenance document, and the reason for it is that the BuildKit one
+      # above is unsigned — it is a description of the build sitting inside the artifact it
+      # describes. This one is a SLSA v1 statement signed through Sigstore and recorded in a public
+      # transparency log, which is the form `gh attestation verify` and admission controllers such
+      # as policy-controller consume. Filed in GitHub's attestation store rather than pushed to
+      # ghcr as a referrer: verification then needs the repository name, which anyone reading this
+      # already has, and a release does not fail on a registry's referrers API.
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.build.outputs.digest }}
 
   release:
     name: Create GitHub release
