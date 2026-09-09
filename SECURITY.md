@@ -65,6 +65,8 @@ What exists:
   short-lived certificate naming this repository, this workflow and the version tag rather than
   against a key we ask you to trust. The same image carries an SBOM of every package inside it and a
   full build record, and a signed SLSA provenance statement is filed in a public transparency log.
+  The release's own assets — the changelog and the generated reference tables — carry a provenance
+  statement of their own, attached to the release so a download can be checked on its own terms.
   The commands to check all of it yourself are on
   [foxauth.dev/docs/security/assurance](https://foxauth.dev/docs/security/assurance/#the-released-image-and-how-to-check-it-is-ours).
   A signature says where the image came from and nothing about whether the code in it is any good;

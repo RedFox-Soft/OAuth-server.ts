@@ -3,12 +3,18 @@ name: Release
 # A version tag is the release act. Pushing `vX.Y.Z` runs the suite, publishes the container image
 # under that version — signed, with an SBOM and a build provenance attestation — and creates the
 # GitHub release the website reads: its body is the CHANGELOG section for the version and its assets
-# are the documentation export and the CHANGELOG itself.
+# are the documentation export, the CHANGELOG itself, and the provenance statement covering them.
 #
-# What is deliberately not signed here: the release assets. They are documentation — the changelog
-# and the generated reference tables the website reads — not something anyone executes, and signing
-# them would buy a checkbox rather than a property. The artifact that runs in front of an
-# authorization server's users is the image, and that is what carries a signature.
+# The release assets carry provenance too, by the same keyless route. They were left bare for a
+# while on the argument that documentation nobody executes does not need a signature; what changed
+# the answer is that `docs-export.json` is read rather than executed and is still worth substituting
+# — it is the reference data the website builds its pages from — and that a statement naming the
+# commit and the run that produced a file is a different thing from a signature asserting we like
+# it. The prompt was Scorecard's Signed-Releases check, which looks beside a release asset and had
+# nothing to find; the reason to do it rather than satisfy the check is the sentence before this one.
+#
+# The image is still the artifact that matters most, and it carries more: a signature over its
+# digest, an SBOM, and a build record. See the image job below.
 #
 # Deliberately separate from deploy.yml: publishing an image and release notes touches nothing in
 # production. Deploying stays a manual act.
@@ -149,6 +155,11 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      # The same keyless arrangement as the image job: an OIDC token exchanged for a short-lived
+      # Sigstore certificate naming this repository, this workflow and this tag, and the attestation
+      # store the statement is filed in. No signing key exists on this side either.
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
@@ -169,9 +180,51 @@ jobs:
           mkdir -p dist
           bun scripts/changelog_section.ts "${GITHUB_REF_NAME}" CHANGELOG.md > dist/release-notes.md
 
+      # One statement over both assets, so the two cannot be attested apart and paired back up
+      # wrongly. `release-notes.md` is not a subject because it is not an asset — it becomes the
+      # release body, and the release body is not a file anyone downloads and checks.
+      - id: attest
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            dist/docs-export.json
+            CHANGELOG.md
+
+      # The statement is already filed in GitHub's attestation store by the step above; this copies
+      # it out of the runner's temp directory so that it also ships as an asset, which is what lets
+      # somebody verify from the download alone instead of having to reach the store.
+      #
+      # `.intoto.jsonl` is a description of the file, not a name chosen to be recognised: JSON
+      # lines, each line a Sigstore bundle wrapping a DSSE envelope over an in-toto SLSA v1
+      # statement. `gh attestation verify --bundle` reads exactly this.
+      - name: Ship the provenance beside the assets
+        env:
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+        run: cp "${BUNDLE}" dist/release-assets.intoto.jsonl
+
+      # Verified here for the reason the image signature is: a signing step that is never exercised
+      # is a signing step nobody knows is broken. Verified against the copied bundle rather than the
+      # store, because the copied bundle is the artifact a downloader gets, and it is the copy that
+      # can go wrong. The identity is pinned to this exact tag — the assurance page has to use
+      # `--signer-workflow`, which matches any tag, but this run knows its own.
+      - name: Verify the provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IDENTITY: https://github.com/${{ github.workflow_ref }}
+        run: |
+          gh attestation verify dist/docs-export.json \
+            --bundle dist/release-assets.intoto.jsonl \
+            --repo "${GITHUB_REPOSITORY}" \
+            --cert-identity "${IDENTITY}"
+          gh attestation verify CHANGELOG.md \
+            --bundle dist/release-assets.intoto.jsonl \
+            --repo "${GITHUB_REPOSITORY}" \
+            --cert-identity "${IDENTITY}"
+
       - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           body_path: dist/release-notes.md
           files: |
             dist/docs-export.json
+            dist/release-assets.intoto.jsonl
             CHANGELOG.md

@@ -110,6 +110,29 @@ of it, which is also why the same Dockerfile does not claim a reproducible build
 	about a lookalike.
 </Aside>
 
+### The release's own assets
+
+A release carries two files besides its notes: `docs-export.json`, the reference data these
+documentation pages are built from, and the `CHANGELOG.md` as it stood at the tag. Both are covered
+by a single signed SLSA v1 provenance statement, produced the same keyless way as the image's and
+filed in the same public transparency log. It ships as a third asset,
+`release-assets.intoto.jsonl`, so you can check a download without reaching back to GitHub for the
+statement:
+
+```bash
+gh attestation verify docs-export.json \
+  --bundle release-assets.intoto.jsonl \
+  --repo RedFox-Soft/OAuth-server.ts \
+  --signer-workflow RedFox-Soft/OAuth-server.ts/.github/workflows/release.yml
+```
+
+Drop `--bundle` and the same command verifies against the attestation store instead. Either way the
+statement names the commit, the workflow and the run that produced the file, which is the question
+worth asking about a data file somebody else's build reads.
+
+The release workflow runs both verifications — one per asset — against the bundle it is about to
+attach, before the release is created.
+
 ## OpenSSF Scorecard
 
 [`.github/workflows/scorecard.yml`](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/.github/workflows/scorecard.yml)
@@ -164,11 +187,12 @@ whole picture.
 - **No fuzzing, and no reproducible build.** Scorecard will say so about both, and it is right about
   both. The build is not reproducible by design — see the `apk upgrade` above — and that trade is
   argued in the `Dockerfile` rather than hidden.
-- **Signed releases, partially.** The container image is signed and carries an SBOM and provenance
-  ([above](#the-released-image-and-how-to-check-it-is-ours)). The release's own assets — the
-  changelog and the generated reference tables — are not signed, because they are documentation
-  rather than something anyone executes; Scorecard's `Signed-Releases` check looks for a signature
-  beside a release asset and will keep reporting one missing.
 
 The list gets shorter as things are done, and never by deletion alone: an item leaves it by moving to
 one of the sections above with a link to the evidence.
+
+Signed releases left this list that way. The release assets were unsigned through v0.2.0, on the
+argument that documentation nobody executes does not need a signature; every release after it
+carries provenance ([above](#the-releases-own-assets)). The earlier ones cannot be given it
+retroactively, and Scorecard reads the last several releases, so its `Signed-Releases` check will
+keep reporting those two for as long as they are in range.

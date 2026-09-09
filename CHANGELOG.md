@@ -9,7 +9,15 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+
+- security: the release assets now carry provenance of their own. `docs-export.json` and the
+  `CHANGELOG.md` a release ships are covered by a single signed SLSA v1 statement, produced the same
+  keyless way as the image's and attached to the release as `release-assets.intoto.jsonl`, so a
+  download can be verified without reaching back to GitHub for the statement; the release fails if
+  the bundle it is about to attach does not verify. The previous argument — that documentation
+  nobody executes needs no signature — held for the changelog but not for reference data another
+  project's build reads, which is worth a statement naming the commit and the run behind it.
 
 ## [0.2.0] - 2026-09-08
 
