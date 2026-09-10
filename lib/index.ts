@@ -31,6 +31,8 @@ import { revocation } from './actions/revocation.js';
 import { jwks } from './actions/jwks.js';
 import { registration } from './actions/registration.js';
 import { healthCheck } from './actions/health.js';
+import { readyCheck } from './actions/ready.js';
+import { assertMigrationsCurrent } from './migrations/gate.js';
 import { securityTxt } from './actions/security_txt.js';
 import { featureGate } from './plugins/featureGate.js';
 import { rateLimit } from './plugins/rateLimit.js';
@@ -103,6 +105,7 @@ export const elysia = new Elysia({ strictPath: true, normalize: false })
 	})
 	.onError(errorHandler)
 	.use(healthCheck)
+	.use(readyCheck)
 	.use(securityTxt)
 	.use(staticPlugin({ assets: 'public' }))
 	.use(nocache)
@@ -159,6 +162,16 @@ export const elysia = new Elysia({ strictPath: true, normalize: false })
  * unusable configuration, an unreachable datastore — happens before this line and cannot be reported
  * from here. Those still surface only in the process output, as they always have.
  */
+/*
+ * The migration gate, before anything listens.
+ *
+ * Here rather than in a module the models import: a migration check reaches the adapters, and an
+ * await in that graph reorders module evaluation and trips the `base_model → provider → models`
+ * cycle — the trap `lib/configs/keystore.ts` documents. It is also the right place for a second
+ * reason: a server that cannot safely write should not first accept a request and then discover it.
+ */
+await assertMigrationsCurrent();
+
 try {
 	elysia.listen(3000);
 } catch (error) {

@@ -1,0 +1,110 @@
+---
+title: PostgreSQL
+description: Choosing PostgreSQL instead of MongoDB, the one variable that selects it, provisioning, and the migration step every upgrade needs.
+sidebar:
+  order: 6
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+The server supports two datastores and a deployment uses exactly one. MongoDB is selected by
+`MONGODB_URI`; PostgreSQL is selected by `POSTGRES_URL`. Everything above the storage layer is
+identical — the same endpoints, the same admin console, the same agent surface — so the choice is
+about which database your organisation already runs well.
+
+<Aside type="caution" title="One datastore, not two">
+Setting both `MONGODB_URI` and `POSTGRES_URL` makes the server refuse to start rather than pick one.
+A server that quietly chose the wrong database would look, from the outside, exactly like total data
+loss: it starts, it serves, and everything you had is missing.
+
+Check `.env` and `.env.local` as well as your shell — the runtime loads those automatically, so the
+variable causing the refusal is often one you cannot see with `env`.
+
+</Aside>
+
+## Setting it up
+
+<Steps>
+
+1. **Create a database and a role** that can create tables in it. `CREATE` is needed at
+   provisioning time and also while the server runs: creating a user bucket in the console
+   provisions that bucket's table and its unique-email constraint at that moment, so a bucket added
+   later is constrained exactly like one that came with the schema.
+
+2. **Set the connection string.** The database name is part of the URL, so `DATABASE_NAME` is not
+   used:
+
+   ```bash
+   POSTGRES_URL=postgres://user:password@host:5432/oauth
+   ISSUER=https://auth.example.com
+   ```
+
+3. **Provision the schema**, before the first start:
+
+   ```bash
+   bun run db:setup:pg
+   ```
+
+   This creates every table and index the release declares, seeds the reserved administrator
+   records, and provisions an initial RS256 signing key. It is idempotent — running it again reports
+   no work — and it is how a newly declared table reaches an existing database after an upgrade.
+
+4. **Start the server.** It refuses to start if the database is unreachable or if its schema is not
+   the one this release expects, rather than accepting a request and discovering that afterwards.
+
+</Steps>
+
+## Checking a database without changing it
+
+```bash
+bun run db:setup:pg --check
+```
+
+Reports every table or index that is missing and changes nothing. Useful in a deployment pipeline
+before a release, and after one if something looks wrong.
+
+## Upgrading
+
+Two steps, in this order, on every upgrade:
+
+```bash
+bun run db:setup:pg     # adds anything newly declared
+bun run db:migrate      # applies any schema migrations the release declares
+```
+
+`db:migrate` reports `current` and exits when there is nothing to do, which is the ordinary case.
+`--plan` lists what would run without running it, and exits non-zero when work is outstanding, so a
+pipeline can gate on it.
+
+<Aside
+	type="note"
+	title="Upgrading from before ownership groups"
+>
+	A deployment old enough to predate ownership groups must upgrade through an
+	earlier release first. The one-off conversion that introduced them has been
+	retired, and this release does not attempt it.
+</Aside>
+
+## What differs from MongoDB
+
+Nothing an application or an end user can observe. Two operational differences are worth knowing:
+
+- **Expired records are reclaimed by the server, not the database.** PostgreSQL has no TTL index, so
+  the server sweeps them on roughly the same interval MongoDB's monitor uses. Expiry itself is
+  enforced on every read regardless, on both backends — the sweep only reclaims space.
+- **`DATABASE_NAME` is unused.** The database name is in the connection URL.
+
+## Health and readiness
+
+Two probes, and they answer different questions:
+
+| Endpoint  | Question               | On failure                          |
+| --------- | ---------------------- | ----------------------------------- |
+| `/health` | Is this process alive? | Restart it.                         |
+| `/ready`  | Can it serve?          | Stop routing to it; do not restart. |
+
+`/ready` reports failure when the datastore is unreachable and recovers on its own when it returns.
+Point a liveness probe at the first and a readiness probe at the second. Wiring readiness to
+`/health` makes an outage invisible — the process is alive, so the probe passes while requests keep
+arriving at an instance that cannot serve them; wiring liveness to `/ready` restarts a healthy
+process for its dependency's outage.

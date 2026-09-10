@@ -8,8 +8,8 @@ sidebar:
 import { Aside } from '@astrojs/starlight/components';
 
 There is no shipped chart. The manifests below are the minimum that reflects how the server actually
-boots: a Job that provisions the database before the Deployment rolls, a readiness probe on
-`/health`, and configuration out of a Secret.
+boots: a Job that provisions the database before the Deployment rolls, two probes answering two
+different questions, and configuration out of a Secret.
 
 ## Secret
 
@@ -24,8 +24,14 @@ stringData:
   DATABASE_NAME: OAuth
 ```
 
-Only `MONGODB_URI` is a credential; keeping all three together is simply one `envFrom` instead of
-two. Each variable is described in the
+For PostgreSQL, the Secret holds `POSTGRES_URL` and `ISSUER` instead — the database name is part of
+that URL — and the Job's command becomes `db:setup:pg`. Set one connection string, never both: the
+server refuses to start with both rather than pick one, which is the failure mode you want, since a
+server that silently chose the other database looks exactly like total data loss.
+[PostgreSQL](/docs/deploy/postgresql/) covers it.
+
+Only the connection string is a credential; keeping all of them together is simply one `envFrom`
+instead of two. Each variable is described in the
 [environment variables reference](/docs/reference/environment/). The published image tags are
 listed on the [GitHub releases page](https://github.com/RedFox-Soft/OAuth-server.ts/releases) and
 on the
@@ -93,7 +99,7 @@ spec:
                 name: oauth-server
           readinessProbe:
             httpGet:
-              path: /health
+              path: /ready
               port: 3000
             initialDelaySeconds: 5
             periodSeconds: 10
@@ -121,10 +127,17 @@ spec:
       targetPort: 3000
 ```
 
-`/health` is the right probe target for two reasons: it is served unconditionally, with no feature
-flag behind it, and it is the one route the rate limiter never counts — a refused liveness probe
-would take the pod out of the endpoints list. A pod that cannot reach MongoDB exits at boot instead
-of serving, so a probe failure genuinely means "not serving".
+The two probes answer two different questions and must not share a path. `/health` says the process
+is alive: it touches nothing outside itself, is served unconditionally with no feature flag behind
+it, and is the one route the rate limiter never counts — a refused liveness probe would restart a
+healthy pod. `/ready` says the pod can actually serve, which means reaching the datastore; when the
+database goes away it fails and the pod leaves the endpoints list, and when the database comes back
+it passes again within about a second, with no restart in between.
+
+Both mistakes are worth naming, because they fail in opposite directions. Pointing the readiness
+probe at `/health` makes an outage invisible: the process is alive, so the probe passes, and the pod
+keeps receiving requests it cannot serve. Pointing the liveness probe at `/ready` kills every
+replica for the database's outage, in a loop, and a restart fixes nothing.
 
 Terminate TLS at the Ingress and set `ISSUER` to the public `https` URL; the
 [reverse proxy page](/docs/deploy/reverse-proxy/) applies to an Ingress controller exactly as it
@@ -168,8 +181,8 @@ which is every image on the internet. The same two values verify by hand before 
 
 ## Scaling notes
 
-- Sessions, tokens, codes and interactions live in MongoDB, not in process memory, so more than one
-  replica is fine as far as the protocol is concerned.
+- Sessions, tokens, codes and interactions live in the database, not in process memory, so more
+  than one replica is fine as far as the protocol is concerned.
 - Signing keys are loaded once at startup from the database. Generating one in the console
   hot-applies it to the replica that served that request only, so the others must be restarted or
   they will disagree about what `/jwks` advertises. The console's key page reports exactly this

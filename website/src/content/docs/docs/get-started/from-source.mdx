@@ -10,7 +10,8 @@ import { Steps, Aside } from '@astrojs/starlight/components';
 Running from source is the path for development, for reading the code alongside a live server, and
 for any deployment that wants to build its own image.
 
-**Prerequisites:** [Bun](https://bun.sh/) v1.3 or newer, and a MongoDB instance you can reach.
+**Prerequisites:** [Bun](https://bun.sh/) v1.3 or newer, and a database you can reach — MongoDB or
+PostgreSQL, whichever you would rather run.
 
 <Steps>
 
@@ -22,7 +23,7 @@ for any deployment that wants to build its own image.
    bun install
    ```
 
-2. Create a `.env` file with the three required variables:
+2. Create a `.env` file with the required variables:
 
    ```ini
    ISSUER=http://localhost:3000
@@ -30,7 +31,17 @@ for any deployment that wants to build its own image.
    DATABASE_NAME=OAuth
    ```
 
-   Bun loads `.env` automatically; nothing else needs configuring. Each variable is described in the
+   For PostgreSQL instead, set `POSTGRES_URL` and leave the other two out — the database name is
+   part of that URL, so `DATABASE_NAME` is unused:
+
+   ```ini
+   ISSUER=http://localhost:3000
+   POSTGRES_URL=postgres://user:password@localhost:5432/oauth
+   ```
+
+   Setting both connection strings makes the server refuse to start rather than pick one; see
+   [PostgreSQL](/docs/deploy/postgresql/). Bun loads `.env` automatically; nothing else needs
+   configuring. Each variable is described in the
    [environment variables reference](/docs/reference/environment/). `ISSUER` is the canonical public
    URL of this server: the `iss` of every token, the base of every endpoint in discovery, and the
    redirect target of the admin console client — so set it to its final value before the next step.
@@ -38,7 +49,8 @@ for any deployment that wants to build its own image.
 3. Provision the database:
 
    ```bash
-   bun run db:setup
+   bun run db:setup      # MongoDB
+   bun run db:setup:pg   # PostgreSQL
    ```
 
 4. Bundle the console and the sign-in screens into `public/`:
@@ -77,7 +89,12 @@ that turns an empty database into a working deployment:
 
 It is **idempotent**: every write is an upsert or a create-if-absent, so running it again changes
 nothing that already exists. Re-run it after upgrading an existing install — a release that adds a
-collection, an index or a seeded document applies it here and nowhere else.
+collection, an index or a seeded document applies it here and nowhere else — and then run
+`bun run db:migrate`, which applies anything a release has to reshape rather than merely add.
+
+On PostgreSQL, `bun run db:setup:pg` does the same job with tables in place of collections. The one
+structural difference is expiry: PostgreSQL has no TTL index, so the running server sweeps expired
+rows itself. `bun run db:migrate` is the same command on either backend.
 
 <Aside type="note">
 
@@ -89,7 +106,7 @@ that as a failed deploy rather than a warning; the shipped `fly.toml` does exact
 
 ## Notes
 
-- The admin console needs a MongoDB-backed deployment. Setting `NODE_ENV=test` swaps in the
+- The admin console needs a database-backed deployment. Setting `NODE_ENV=test` swaps in the
   in-memory adapter, which does not persist the seed across restarts.
 - Server settings are read at boot from the config store and applied at module load, so a change in
   the console takes effect at the next restart. Every one of them is listed in the

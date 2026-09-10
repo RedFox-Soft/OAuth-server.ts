@@ -9,7 +9,6 @@ export class GroupStore implements GroupStoreInstance {
 		name: string;
 		kind?: Group['kind'];
 		members?: GroupMember[];
-		needsReview?: boolean;
 	}): Promise<Group> {
 		const now = new Date();
 		const group: Group = {
@@ -17,7 +16,6 @@ export class GroupStore implements GroupStoreInstance {
 			name: data.name,
 			kind: data.kind ?? 'regular',
 			members: data.members ?? [],
-			needsReview: data.needsReview ?? false,
 			createdAt: now,
 			updatedAt: now
 		};
@@ -50,7 +48,7 @@ export class GroupStore implements GroupStoreInstance {
 
 	async update(
 		id: string,
-		patch: Partial<Pick<Group, 'name' | 'members' | 'needsReview'>>
+		patch: Partial<Pick<Group, 'name' | 'members'>>
 	): Promise<Group | null> {
 		const g = this.groups.get(id);
 		if (!g) return null;

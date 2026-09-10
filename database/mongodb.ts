@@ -1,10 +1,8 @@
 import { MongoClient, ServerApiVersion } from 'mongodb';
-import { planOwnershipMigration } from '../lib/admin/groups/migration.js';
 import {
 	FIXED_AREAS,
 	STORE_AREAS,
 	areaForBucket,
-	userAreaFor,
 	type IndexSpec,
 	type ModelAreaName,
 	type StorageArea
@@ -14,15 +12,19 @@ import {
 	ensureCollection
 } from '../lib/adapters/mongodb/provision.js';
 import {
-	duplicateEmailReport,
-	exitCodeFor,
 	missingIndexes,
 	staleExpiryIndexes,
-	toExistingIndexes,
+	toExistingIndexes
+} from './reconcile.js';
+import {
+	duplicateEmailReport,
+	exitCodeFor,
 	type DuplicateEmailRow,
 	type ProvisioningSummary
-} from './reconcile.js';
+} from './provisioning_report.js';
 import { generateJWKS } from '../lib/helpers/jwks.js';
+import { MIGRATIONS } from '../lib/consts/migrations.js';
+import { checksumOf } from '../lib/migrations/state.js';
 import { ISSUER } from '../lib/configs/env.js';
 import {
 	ADMIN_PROJECT_ID,
@@ -32,6 +34,14 @@ import {
 	SYSTEM_GROUP_NAME
 } from '../lib/admin/consts.js';
 import { ADMIN_MCP_CLIENT_ID } from '../lib/mcp/consts.js';
+import {
+	ADMIN_BUCKET_SEED,
+	ADMIN_MCP_CLIENT_SEED,
+	ADMIN_PROJECT_SEED,
+	DEFAULT_BUCKET_SEED,
+	SYSTEM_GROUP_SEED,
+	adminConsoleClientSeed
+} from '../lib/consts/admin_seed.js';
 
 if (!process.env.MONGODB_URI || !process.env.DATABASE_NAME) {
 	throw new Error(
@@ -164,6 +174,14 @@ if ((await jwks.countDocuments()) === 0) {
 // The `Client` document mirrors the shape `adapter('Client').upsert` persists
 // (lib/adapters/mongodb/mongoAdapter.ts): `{ _id, payload }`, with no `expiresAt`
 // since this client never expires.
+/* The shared declarations carry `_id`, because the store path passes it to `create`. Raw writes
+ * address the document by `_id` in the filter, and repeating it in `$setOnInsert` is an error. */
+function withoutId<T extends { _id: unknown }>(seed: T): Omit<T, '_id'> {
+	const { _id, ...rest } = seed;
+	void _id;
+	return rest;
+}
+
 const seedNow = new Date();
 /*
  * The holding group for containers no administrator managed. Seeded before the reserved project and
@@ -179,9 +197,7 @@ await db.collection(STORE_AREAS.groups).updateOne(
 		// name the same field.
 		$set: { name: SYSTEM_GROUP_NAME },
 		$setOnInsert: {
-			kind: 'system',
-			members: [],
-			needsReview: false,
+			...SYSTEM_GROUP_SEED,
 			createdAt: seedNow,
 			updatedAt: seedNow
 		}
@@ -192,18 +208,7 @@ await db.collection(STORE_AREAS.userBuckets).updateOne(
 	{ _id: ADMIN_BUCKET_ID },
 	{
 		$setOnInsert: {
-			name: 'Administrators',
-			ownerGroupId: UNASSIGNED_GROUP_ID,
-			roles: ['super_admin', 'project_admin'],
-			// The reserved admin bucket keeps password login and accepts no providers — see
-			// lib/admin/seed.ts, which this mirrors. Changing one seed and not the other is how a seed
-			// change silently no-ops in production: db:setup runs this file, never that one.
-			passwordLogin: true,
-			federation: [],
-			// the reserved admin bucket never accepts self-service registration
-			registrationOpen: false,
-			emailVerificationRequired: false,
-			verificationMethod: 'link',
+			...withoutId(ADMIN_BUCKET_SEED),
 			createdAt: seedNow,
 			updatedAt: seedNow
 		}
@@ -218,14 +223,7 @@ await db.collection(STORE_AREAS.userBuckets).updateOne(
 	{ _id: 'redfox' },
 	{
 		$setOnInsert: {
-			name: 'Default users',
-			ownerGroupId: UNASSIGNED_GROUP_ID,
-			roles: [],
-			passwordLogin: true,
-			federation: [],
-			registrationOpen: true,
-			emailVerificationRequired: false,
-			verificationMethod: 'link',
+			...withoutId(DEFAULT_BUCKET_SEED),
 			createdAt: seedNow,
 			updatedAt: seedNow
 		}
@@ -236,12 +234,7 @@ await db.collection(STORE_AREAS.projects).updateOne(
 	{ _id: ADMIN_PROJECT_ID },
 	{
 		$setOnInsert: {
-			name: 'Administration',
-			slug: 'admin',
-			type: 'admin',
-			ownerGroupId: UNASSIGNED_GROUP_ID,
-			bucketId: ADMIN_BUCKET_ID,
-			clientIds: [ADMIN_CLIENT_ID, ADMIN_MCP_CLIENT_ID],
+			...withoutId(ADMIN_PROJECT_SEED),
 			createdAt: seedNow,
 			updatedAt: seedNow
 		}
@@ -272,15 +265,7 @@ await db.collection(CLIENT_AREA).updateOne(
 	{ _id: ADMIN_CLIENT_ID },
 	{
 		$setOnInsert: {
-			payload: {
-				clientId: ADMIN_CLIENT_ID,
-				applicationType: 'web',
-				grantTypes: ['authorization_code'],
-				responseTypes: ['code'],
-				redirectUris: [`${ISSUER}/admin/callback`],
-				token_endpoint_auth_method: 'none',
-				'consent.require': false
-			}
+			payload: adminConsoleClientSeed(ISSUER)
 		}
 	},
 	{ upsert: true }
@@ -298,19 +283,7 @@ await db.collection(CLIENT_AREA).updateOne(
 	{ _id: ADMIN_MCP_CLIENT_ID },
 	{
 		$setOnInsert: {
-			payload: {
-				clientId: ADMIN_MCP_CLIENT_ID,
-				applicationType: 'native',
-				grantTypes: ['authorization_code', 'refresh_token'],
-				responseTypes: ['code'],
-				redirectUris: [
-					'http://127.0.0.1:33418/callback',
-					'http://localhost:33418/callback',
-					'http://127.0.0.1/callback'
-				],
-				token_endpoint_auth_method: 'none',
-				'consent.require': true
-			}
+			payload: ADMIN_MCP_CLIENT_SEED
 		}
 	},
 	{ upsert: true }
@@ -342,7 +315,11 @@ async function duplicateEmails(
 			{ $match: { email: { $type: 'string' } } },
 			{ $group: { _id: '$email', count: { $sum: 1 } } },
 			{ $match: { count: { $gt: 1 } } },
-			{ $sort: { _id: 1 } }
+			{ $sort: { _id: 1 } },
+			/* `$group` names the grouped key `_id`; the shared report type calls it `value`, because
+			 * PostgreSQL's GROUP BY names it after the column. Projected here, where the query knows
+			 * what it produced, rather than mapped by the caller. */
+			{ $project: { _id: 0, value: '$_id', count: 1 } }
 		])
 		.toArray();
 }
@@ -372,101 +349,30 @@ for (const bucket of buckets) {
 }
 
 /*
- * The ownership migration: `managedBy` to `ownerGroupId`.
+ * Baseline the migration record.
  *
- * Idempotent, and only ever touches documents that still carry the old field, so a second `db:setup`
- * run is a no-op rather than a reshuffle. The mapping rule itself lives in
- * lib/admin/groups/migration.ts and is tested in the default suite - see the comment there for why
- * identical manager sets, and not merely overlapping ones, are what share a group.
+ * A database provisioned from empty is at the current shape by construction — this routine built what
+ * the current release declares — so every declared migration is marked applied without being run.
+ *
+ * Written with the raw driver rather than through the runner, for the reason everything else in this
+ * script is written that way: importing `lib/adapters` builds every store and opens a SECOND
+ * connection this script has no handle on, so it would provision correctly and then never exit.
+ * Measured rather than feared — the first attempt did exactly that. The PostgreSQL script can afford
+ * the import because its adapter's handle is a module singleton it closes at the end; MongoDB's is not.
  */
-const legacyProjects = await db
-	.collection(STORE_AREAS.projects)
-	.find({ managedBy: { $exists: true }, _id: { $ne: ADMIN_PROJECT_ID } })
-	.toArray();
-const legacyBuckets = await db
-	.collection(STORE_AREAS.userBuckets)
-	.find({ managedBy: { $exists: true }, _id: { $ne: ADMIN_BUCKET_ID } })
-	.toArray();
-
-if (legacyProjects.length > 0 || legacyBuckets.length > 0) {
-	/*
-	 * Personal groups first: rule 1 of the mapping sends a single-manager container to one, so they
-	 * have to exist before the plan can be applied.
-	 */
-	const admins = await db
-		.collection(userAreaFor(ADMIN_BUCKET_ID))
-		.find({})
-		.toArray();
-	const personalGroupIdFor = new Map<string, string>();
-	for (const account of admins) {
-		const existing = await db
-			.collection(STORE_AREAS.groups)
-			.findOne({ kind: 'personal', 'members.userId': account._id });
-		if (existing) {
-			personalGroupIdFor.set(String(account._id), String(existing._id));
-			continue;
-		}
-		const id = `personal-${String(account._id)}`;
-		await db.collection(STORE_AREAS.groups).insertOne({
-			_id: id,
-			name: String(account.email ?? account._id),
-			kind: 'personal',
-			members: [{ userId: String(account._id), role: 'owner' }],
-			needsReview: false,
-			createdAt: seedNow,
-			updatedAt: seedNow
-		});
-		personalGroupIdFor.set(String(account._id), id);
-	}
-
-	const containers = [...legacyProjects, ...legacyBuckets].map((doc) => ({
-		_id: String(doc._id),
-		managedBy: (doc.managedBy as string[] | undefined) ?? []
-	}));
-	const plan = planOwnershipMigration(containers, personalGroupIdFor);
-
-	for (const group of plan.groupsToCreate) {
-		await db.collection(STORE_AREAS.groups).updateOne(
-			{ _id: group.id },
-			{
-				$setOnInsert: {
-					name: group.name,
-					kind: group.kind,
-					members: group.members,
-					needsReview: group.needsReview,
-					createdAt: seedNow,
-					updatedAt: seedNow
-				}
-			},
+const baselined: string[] = [];
+for (const migration of MIGRATIONS) {
+	const result = await db
+		.collection(STORE_AREAS.schemaMigrations)
+		.updateOne(
+			{ _id: migration.id },
+			{ $setOnInsert: { appliedAt: seedNow, checksum: checksumOf(migration) } },
 			{ upsert: true }
 		);
-	}
-
-	/*
-	 * The `$unset` rides in the same update as the `$set`, so a container never exists carrying both
-	 * fields. Two fields both claiming to say who may reach a container is the shape that disagrees
-	 * after the first edit - and leaving one behind is the shim Principle VII forbids.
-	 */
-	for (const area of [STORE_AREAS.projects, STORE_AREAS.userBuckets]) {
-		const docs = area === STORE_AREAS.projects ? legacyProjects : legacyBuckets;
-		for (const doc of docs) {
-			const ownerGroupId = plan.assignments.get(String(doc._id));
-			if (!ownerGroupId) continue;
-			await db.collection(area).updateOne(
-				{ _id: doc._id },
-				{
-					$set: { ownerGroupId, updatedAt: seedNow },
-					$unset: { managedBy: '' }
-				}
-			);
-		}
-	}
-
-	console.log(
-		`
-ownership migration: ${containers.length} container(s) moved to groups, ` +
-			`${plan.groupsToCreate.length} group(s) generated for multi-manager containers`
-	);
+	if (result.upsertedCount > 0) baselined.push(migration.id);
+}
+if (baselined.length > 0) {
+	console.log(`baselined ${baselined.length} declared migration(s) as applied`);
 }
 
 console.log(

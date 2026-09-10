@@ -13,13 +13,7 @@ export const CreateGroupBody = t.Object({
 });
 
 export const UpdateGroupBody = t.Object({
-	name: t.Optional(t.String({ minLength: 1, maxLength: 100 })),
-	/*
-	 * Clearing the migration's review flag. Settable but never *un*settable by a caller — a group is
-	 * flagged only by the migration, and letting a request re-raise the flag would let one group claim
-	 * an operator's attention indefinitely.
-	 */
-	needsReview: t.Optional(t.Literal(false))
+	name: t.Optional(t.String({ minLength: 1, maxLength: 100 }))
 });
 
 export const AddMemberBody = t.Object({

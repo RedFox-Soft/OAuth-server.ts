@@ -176,10 +176,17 @@ describe('route classification', () => {
 			'GET /.well-known/oauth-protected-resource/mcp',
 			'GET /.well-known/security.txt',
 			'GET /jwks',
-			'GET /public/*'
+			'GET /public/*',
+			/*
+			 * Readiness is metered where liveness is not, and the difference is the whole reason the two
+			 * are separate routes: this one reaches storage, and an unmetered route that reaches storage
+			 * is an unauthenticated amplifier onto the datastore.
+			 */
+			'GET /ready'
 		];
 
 		// The platform probes this every 30s. A refused health check takes the machine out of the proxy.
+		// Exempt only because it touches nothing — see `GET /ready` above, which does and is not.
 		const EXEMPT = ['GET /health'];
 
 		it('declares no entry for a route the server does not serve', () => {

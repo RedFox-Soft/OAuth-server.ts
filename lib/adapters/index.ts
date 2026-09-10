@@ -14,6 +14,8 @@ import {
 	McpConfirmationStore as MemoryMcpConfirmationStore,
 	SmtpSettingsStore as MemorySmtpSettingsStore,
 	SingletonSecretStore as MemorySingletonSecretStore,
+	SchemaMigrationStore as MemorySchemaMigrationStore,
+	MigrationLeaseStore as MemoryMigrationLeaseStore,
 	configStore as memoryConfig
 } from './memory/index.js';
 import type {
@@ -41,6 +43,10 @@ import type {
 	ProtectedResourceStoreInstance,
 	McpClientPermissionStoreConstructor,
 	McpClientPermissionStoreInstance,
+	MigrationLeaseStoreConstructor,
+	MigrationLeaseStoreInstance,
+	SchemaMigrationStoreConstructor,
+	SchemaMigrationStoreInstance,
 	SecretStoreConstructor,
 	SecretStoreInstance,
 	SmtpSettingsStoreConstructor,
@@ -50,6 +56,8 @@ import type {
 	UserStoreConstructor,
 	UserStoreInstance
 } from './types.js';
+import { selectBackend } from './selectBackend.js';
+import { withDeadline } from '../helpers/deadline.js';
 
 let Adapter: ModelAdapterConstructor = MemoryAdapter;
 let UserStore: UserStoreConstructor = MemoryUser;
@@ -72,9 +80,51 @@ let McpConfirmationStoreClass: McpConfirmationStoreConstructor =
 let SmtpSettingsStoreClass: SmtpSettingsStoreConstructor =
 	MemorySmtpSettingsStore;
 let SecretStoreClass: SecretStoreConstructor = MemorySingletonSecretStore;
+let SchemaMigrationStoreClass: SchemaMigrationStoreConstructor =
+	MemorySchemaMigrationStore;
+let MigrationLeaseStoreClass: MigrationLeaseStoreConstructor =
+	MemoryMigrationLeaseStore;
 export let configStore: AdapterConfigStore = memoryConfig;
 
-if (process.env.MONGODB_URI) {
+/*
+ * Decided before anything is constructed, so a deployment that configured two datastores is refused
+ * here rather than discovered later by whichever store happened to be built first. The decision is a
+ * pure function of the environment (selectBackend.ts) precisely so it can be tested without importing
+ * this module, which builds every store as a side effect.
+ */
+const backend = selectBackend(process.env);
+
+if (backend === 'postgres') {
+	const postgres = await import('./postgres/index.js');
+	Adapter = postgres.SqlAdapter;
+	configStore = postgres.configStore;
+	UserStore = postgres.UserStore;
+	JWKSStoreClass = postgres.JWKSStore;
+	GroupStoreClass = postgres.GroupStore;
+	GroupInvitationStoreClass = postgres.GroupInvitationStore;
+	ProjectStoreClass = postgres.ProjectStore;
+	ProtectedResourceStoreClass = postgres.ProtectedResourceStore;
+	McpClientPermissionStoreClass = postgres.McpClientPermissionStore;
+	BucketStoreClass = postgres.UserBucketStore;
+	AdminSessionStoreClass = postgres.AdminSessionStore;
+	AdminAuditStoreClass = postgres.AdminAuditStore;
+	ErrorStoreClass = postgres.ErrorStore;
+	McpConfirmationStoreClass = postgres.McpConfirmationStore;
+	SmtpSettingsStoreClass = postgres.SmtpSettingsStore;
+	SecretStoreClass = postgres.SingletonSecretStore;
+	SchemaMigrationStoreClass = postgres.SchemaMigrationStore;
+	MigrationLeaseStoreClass = postgres.MigrationLeaseStore;
+
+	/*
+	 * Started here rather than left to a caller, because MongoDB gets the equivalent from its server
+	 * for free. A PostgreSQL deployment whose sweeper was never started would reclaim nothing, ever,
+	 * and the only symptom would be storage that grows — no error, no failing request. The timer is
+	 * unreferenced, so it cannot hold a process open.
+	 */
+	postgres.startSweeper();
+}
+
+if (backend === 'mongodb') {
 	const mongodb = await import('./mongodb/index.js');
 	Adapter = mongodb.MongoAdapter;
 	configStore = mongodb.configStore;
@@ -92,6 +142,8 @@ if (process.env.MONGODB_URI) {
 	McpConfirmationStoreClass = mongodb.McpConfirmationStore;
 	SmtpSettingsStoreClass = mongodb.SmtpSettingsStore;
 	SecretStoreClass = mongodb.SingletonSecretStore;
+	SchemaMigrationStoreClass = mongodb.SchemaMigrationStore;
+	MigrationLeaseStoreClass = mongodb.MigrationLeaseStore;
 }
 
 if (process.env.NODE_ENV === 'test') {
@@ -143,6 +195,52 @@ export const errorOriginSaltStore: SecretStoreInstance = new SecretStoreClass(
 );
 
 export const cache = new Map();
+
+/*
+ * Whether the selected datastore answers.
+ *
+ * One function rather than a store method, because the question is about the backend and not about
+ * any area — and because the in-memory case has to answer without there being anything to ask.
+ *
+ * Resolved lazily per call rather than captured at selection time: the probe is used by the startup
+ * check and by the readiness endpoint, and binding it during module evaluation would mean importing
+ * a driver on a path that has none.
+ */
+/*
+ * How long a probe may take before it counts as a failure.
+ *
+ * A driver's own timeout bounds *establishing* a connection, not a query issued on one it already
+ * holds — and the case that matters is the second: a database that is up, connected, and no longer
+ * answering. Measured against a paused PostgreSQL container, an unbounded probe took 30 seconds to
+ * come back, which is three orchestrator probe intervals spent holding a request open. Both drivers
+ * behave that way, so the deadline lives here, at the seam both backends pass through, rather than
+ * being written twice with two chances to be forgotten.
+ *
+ * Five seconds is long enough that a merely slow database is not called unreachable, and short
+ * enough to answer inside a probe interval. The losing query is not cancellable — it finishes into
+ * nothing — which is why `lib/actions/ready.ts` also refuses to start a second probe while one is
+ * still in flight.
+ */
+const PING_TIMEOUT_MS = 5_000;
+
+export async function storagePing(
+	timeoutMs: number = PING_TIMEOUT_MS
+): Promise<void> {
+	await withDeadline(probe(), timeoutMs, 'storage');
+}
+
+async function probe(): Promise<void> {
+	if (backend === 'postgres') {
+		await (await import('./postgres/index.js')).ping();
+		return;
+	}
+	if (backend === 'mongodb') {
+		await (await import('./mongodb/db.js')).ping();
+		return;
+	}
+	/* Nothing to reach. An in-memory deployment is reachable exactly as long as the process is, which
+	 * is what the liveness endpoint already answers. */
+}
 export function adapter<TModelName extends string>(
 	name: TModelName
 ): ModelAdapter<PayloadForModel<TModelName>> {
@@ -211,6 +309,30 @@ export function getBucketStore(): UserBucketStoreInstance {
 		bucketStoreSingleton = new BucketStoreClass();
 	}
 	return bucketStoreSingleton;
+}
+
+/*
+ * The record of applied schema migrations. Lazy, unlike the stores above it: it is read once by the
+ * startup gate and once per migration run, never on a request path, so there is nothing to gain by
+ * building it at import time and something to lose — this module is imported by the test suite, which
+ * has no migrations to check.
+ */
+let schemaMigrationStoreSingleton: SchemaMigrationStoreInstance | null = null;
+export function getSchemaMigrationStore(): SchemaMigrationStoreInstance {
+	if (!schemaMigrationStoreSingleton) {
+		schemaMigrationStoreSingleton = new SchemaMigrationStoreClass();
+	}
+	return schemaMigrationStoreSingleton;
+}
+
+/* Lazy for the same reason the record store beside it is: read once per migration run and once at
+ * startup, never on a request path. */
+let migrationLeaseStoreSingleton: MigrationLeaseStoreInstance | null = null;
+export function getMigrationLeaseStore(): MigrationLeaseStoreInstance {
+	if (!migrationLeaseStoreSingleton) {
+		migrationLeaseStoreSingleton = new MigrationLeaseStoreClass();
+	}
+	return migrationLeaseStoreSingleton;
 }
 
 let smtpSettingsStoreSingleton: SmtpSettingsStoreInstance | null = null;

@@ -8,13 +8,14 @@ import { chromium, type BrowserContext, type Page } from 'playwright';
  * The server is booted in this process on the in-memory adapter, so the captures always show the
  * console as built from this commit, with demo data that is created fresh every run. Two things
  * about the environment are load-bearing: NODE_ENV=test is what swaps the storage adapter for the
- * in-memory one, and MONGODB_URI/DATABASE_NAME must be *absent* because the adapter index selects the
- * Mongo stores by the presence of the URI — a developer's .env.local would otherwise point the run at
- * a real database. ISSUER must be the address the browser will use.
+ * in-memory one, and MONGODB_URI/DATABASE_NAME/POSTGRES_URL must be *absent* because the adapter
+ * index selects a backend by the presence of a connection string — a developer's .env.local would
+ * otherwise point the run at a real database, or, with both strings set, be refused outright. ISSUER must be the address the browser will use.
  */
 process.env.NODE_ENV = 'test';
 delete process.env.MONGODB_URI;
 delete process.env.DATABASE_NAME;
+delete process.env.POSTGRES_URL;
 process.env.ISSUER = 'http://localhost:3000';
 
 const ORIGIN = process.env.ISSUER;

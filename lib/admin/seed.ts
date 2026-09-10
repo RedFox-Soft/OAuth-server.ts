@@ -14,48 +14,49 @@ import {
 	SYSTEM_GROUP_NAME
 } from './consts.js';
 import { ADMIN_MCP_CLIENT_ID } from '../mcp/consts.js';
+import {
+	ADMIN_BUCKET_SEED,
+	ADMIN_MCP_CLIENT_SEED,
+	ADMIN_PROJECT_SEED,
+	DEFAULT_BUCKET_SEED,
+	SYSTEM_GROUP_SEED,
+	adminConsoleClientSeed
+} from '../consts/admin_seed.js';
 
+/*
+ * Seeds a fresh instance through the store abstractions, which makes this the backend-agnostic path —
+ * it works against whichever datastore `lib/adapters/index.ts` selected, in-memory included.
+ *
+ * The values it writes come from `lib/consts/admin_seed.ts` and are shared with `database/mongodb.ts`,
+ * which writes the same documents through the raw driver because a one-shot script deliberately avoids
+ * this module graph. The mechanisms differ on purpose; the values are declared once, so a seed change
+ * can no longer land in the copy production never runs.
+ */
 export async function ensureAdminSeed(): Promise<void> {
-	/*
-	 * The holding group for containers no administrator managed. Seeded before anything that could own
-	 * a container, because the reserved admin project and bucket are given it as a formality: they sit
-	 * outside the group model and every route touching them refuses before ownership is consulted.
-	 *
-	 * Kept in step with database/mongodb.ts, which is the real deployment seed — this one is test-only,
-	 * and a change to just one of them silently no-ops in production.
-	 */
 	const groups = getGroupStore();
 	if (!(await groups.find(UNASSIGNED_GROUP_ID))) {
 		await groups.create({
 			_id: UNASSIGNED_GROUP_ID,
 			name: SYSTEM_GROUP_NAME,
-			kind: 'system',
-			members: []
+			...SYSTEM_GROUP_SEED,
+			members: [...SYSTEM_GROUP_SEED.members]
 		});
 	}
 
 	const buckets = getBucketStore();
 	if (!(await buckets.find(ADMIN_BUCKET_ID))) {
 		await buckets.create({
-			_id: ADMIN_BUCKET_ID,
-			name: 'Administrators',
-			ownerGroupId: UNASSIGNED_GROUP_ID,
-			roles: ['super_admin', 'project_admin'],
-			// The reserved admin bucket keeps password login and accepts no providers: the console is a
-			// relying party on this server's own issuer, and a second identity source for operators is a
-			// separate decision. Both the bucket PATCH and the provider routes refuse it.
-			passwordLogin: true,
-			// the reserved admin bucket never accepts self-service registration
-			registrationOpen: false
+			...ADMIN_BUCKET_SEED,
+			roles: [...ADMIN_BUCKET_SEED.roles],
+			federation: [...ADMIN_BUCKET_SEED.federation]
 		});
 	}
 
-	if (!(await buckets.find('redfox'))) {
+	if (!(await buckets.find(DEFAULT_BUCKET_SEED._id))) {
 		await buckets.create({
-			_id: 'redfox',
-			name: 'Default users',
-			ownerGroupId: UNASSIGNED_GROUP_ID,
-			roles: []
+			...DEFAULT_BUCKET_SEED,
+			roles: [...DEFAULT_BUCKET_SEED.roles],
+			federation: [...DEFAULT_BUCKET_SEED.federation]
 		});
 	}
 
@@ -63,17 +64,17 @@ export async function ensureAdminSeed(): Promise<void> {
 	const existingAdminProject = await projects.find(ADMIN_PROJECT_ID);
 	if (!existingAdminProject) {
 		await projects.create({
-			_id: ADMIN_PROJECT_ID,
-			name: 'Administration',
-			slug: 'admin',
-			type: 'admin',
-			ownerGroupId: UNASSIGNED_GROUP_ID,
-			bucketId: ADMIN_BUCKET_ID,
-			clientIds: [ADMIN_CLIENT_ID, ADMIN_MCP_CLIENT_ID]
+			...ADMIN_PROJECT_SEED,
+			clientIds: [...ADMIN_PROJECT_SEED.clientIds]
 		});
 	} else {
+		/*
+		 * An existing deployment's admin project predates the MCP agent client. Without adding the id the
+		 * client exists but belongs to no project, `resolveBucketForClient` routes it to the default
+		 * bucket, and an administrator cannot sign an agent in.
+		 */
 		const existingClientIds = existingAdminProject.clientIds ?? [];
-		const missing = [ADMIN_CLIENT_ID, ADMIN_MCP_CLIENT_ID].filter(
+		const missing = ADMIN_PROJECT_SEED.clientIds.filter(
 			(id) => !existingClientIds.includes(id)
 		);
 		if (missing.length > 0) {
@@ -83,41 +84,19 @@ export async function ensureAdminSeed(): Promise<void> {
 		}
 	}
 
-	/*
-	 * The reserved MCP agent client. Public with mandatory PKCE, so nothing secret needs distributing,
-	 * and it lives in the admin project because that is what routes it to the administrator bucket:
-	 * `resolveBucketForClient` sends a client there only if it is the reserved console client or belongs
-	 * to a project whose bucket is the admin bucket. A dynamically registered client falls through to
-	 * the default bucket and cannot authenticate an administrator at all.
-	 *
-	 * Loopback redirect URIs, which is what a local MCP client can actually receive a code on. The port
-	 * is unpredictable, so the standard three are registered; OAuth 2.1 allows a loopback port to vary.
-	 */
 	if (!(await Client.tryFind(ADMIN_MCP_CLIENT_ID))) {
 		await adapter('Client').upsert(ADMIN_MCP_CLIENT_ID, {
-			clientId: ADMIN_MCP_CLIENT_ID,
-			applicationType: 'native',
-			grantTypes: ['authorization_code', 'refresh_token'],
-			responseTypes: ['code'],
-			redirectUris: [
-				'http://127.0.0.1:33418/callback',
-				'http://localhost:33418/callback',
-				'http://127.0.0.1/callback'
-			],
-			token_endpoint_auth_method: 'none',
-			'consent.require': true
+			...ADMIN_MCP_CLIENT_SEED,
+			grantTypes: [...ADMIN_MCP_CLIENT_SEED.grantTypes],
+			responseTypes: [...ADMIN_MCP_CLIENT_SEED.responseTypes],
+			redirectUris: [...ADMIN_MCP_CLIENT_SEED.redirectUris]
 		});
 	}
 
 	if (!(await Client.tryFind(ADMIN_CLIENT_ID))) {
-		await adapter('Client').upsert(ADMIN_CLIENT_ID, {
-			clientId: ADMIN_CLIENT_ID,
-			applicationType: 'web',
-			grantTypes: ['authorization_code'],
-			responseTypes: ['code'],
-			redirectUris: [`${ISSUER}/admin/callback`],
-			token_endpoint_auth_method: 'none',
-			'consent.require': false
-		});
+		await adapter('Client').upsert(
+			ADMIN_CLIENT_ID,
+			adminConsoleClientSeed(ISSUER)
+		);
 	}
 }

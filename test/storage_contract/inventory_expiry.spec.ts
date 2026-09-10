@@ -93,6 +93,15 @@ const PERMANENT = [
 	'groups',
 	'adminAudit',
 	/*
+	 * The record of which schema migrations a database has had. An expiry here would let a completed
+	 * migration be applied a second time — the one thing the record exists to prevent, and the failure
+	 * would be silent because a re-run of a migration that has "not been applied" looks like ordinary
+	 * work. Migrations are separately required to survive a second application (a standalone `mongod`
+	 * cannot write the effect and this record atomically), but that is a safety net, not a licence to
+	 * forget on a timer.
+	 */
+	'schemaMigrations',
+	/*
 	 * Which client identities may administer this instance. An expiry here would silently restore
 	 * access nobody re-granted — the opposite of what an allowlist is for, and a failure an operator
 	 * would only notice by an agent working again that should not.

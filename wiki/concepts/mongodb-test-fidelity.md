@@ -4,7 +4,7 @@ title: 'Testing the MongoDB adapter: two tiers, and why the default suite stays 
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-26
-updated: 2026-08-26
+updated: 2026-09-10
 ---
 
 # Testing the MongoDB adapter: two tiers, and why the default suite stays hermetic
@@ -105,3 +105,5 @@ process starts against a real database — which, before this decision, first ha
   the same laziness is why SC-002 has to be a timed test rather than an assertion.
 - [[model-graph-import-order]] — the other place where an import-time side effect decides whether a
   module can be reached from a test at all.
+- [[postgresql-backend]] — the second production backend, built to this decision's shape: the same
+  two tiers, and three more defects that a green hermetic suite could not see.

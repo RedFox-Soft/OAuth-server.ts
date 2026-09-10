@@ -5,7 +5,14 @@ import {
 } from '../lib/consts/storage_inventory.js';
 
 /*
- * The provisioning routine's decisions, as pure functions over index descriptors.
+ * The MongoDB provisioning routine's index decisions, as pure functions over index descriptors.
+ *
+ * MongoDB-shaped, and deliberately not generalised. An index here is a key document plus
+ * `expireAfterSeconds`, which is how this driver reports one; PostgreSQL reports a definition
+ * string, an access method and a predicate, and has no expiry index at all — the sweeper replaces
+ * it — so `staleExpiryIndexes` has no counterpart there to share with. The backend-neutral half of
+ * provisioning (the summary, the exit code, the duplicate-address report) lives in
+ * ./provisioning_report.ts and IS shared.
  *
  * Kept out of the driver calls on purpose. Automated tests may not reach MongoDB (constitution
  * Principle III), so logic embedded in `db.collection(...).createIndexes(...)` would be verifiable
@@ -144,60 +151,4 @@ export function staleExpiryIndexes(
 				!declared.some((spec) => satisfies(spec, index))
 		)
 		.map((index) => index.name);
-}
-
-/* One duplicated address in a bucket, as a $group/$match aggregation reports it. */
-export interface DuplicateEmailRow {
-	readonly _id: string;
-	readonly count: number;
-}
-
-/*
- * The operator-facing account of why a bucket's uniqueness constraint could not be applied.
- *
- * Pre-checking rather than letting createIndex fail is what makes this actionable: the driver's
- * duplicate-key error names one offending value, aborting the run and saying nothing about the rest.
- * Resolving the conflict is deliberately left to the operator — deleting a record is forbidden here,
- * and choosing which of two accounts survives is a product decision, not a script's.
- */
-export function duplicateEmailReport(
-	bucketId: string,
-	rows: readonly DuplicateEmailRow[]
-): string | null {
-	if (rows.length === 0) {
-		return null;
-	}
-
-	const conflicts = rows
-		.map((row) => `  ${row._id} (${row.count} accounts)`)
-		.join('\n');
-
-	return (
-		`bucket ${bucketId}: skipped the unique email constraint — ` +
-		`${rows.length} address(es) are already duplicated:\n${conflicts}\n` +
-		'  resolve these and re-run; no records were changed.'
-	);
-}
-
-export interface ProvisioningSummary {
-	collectionsCreated: number;
-	indexesCreated: number;
-	indexesDropped: number;
-	bucketsProcessed: number;
-	/* Declared constraints the routine could not apply, because existing data or an existing index
-	 * conflicts with them. The only thing that makes a completed run a failed one. */
-	constraintsSkipped: number;
-}
-
-/*
- * The routine's exit status, decided in one place.
- *
- * Non-zero means "provisioning ran to completion but at least one declared constraint is not in
- * force" — the operator has data to fix and a re-run to do. It deliberately does not mean "nothing
- * happened": creating collections, creating indexes and dropping stale expiry rules are all ordinary
- * work and exit 0. A deployment pipeline reads this and nothing else, so conflating the two would
- * either cry wolf on every first run or hide an unenforced uniqueness constraint.
- */
-export function exitCodeFor(summary: ProvisioningSummary): 0 | 1 {
-	return summary.constraintsSkipped > 0 ? 1 : 0;
 }

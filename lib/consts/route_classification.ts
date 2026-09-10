@@ -158,6 +158,11 @@ export const gatedRoutes: readonly GatedRoute[] = [
  */
 export const alwaysAvailableRoutes: readonly AlwaysAvailableRoute[] = [
 	{ method: 'GET', path: '/health' },
+	/*
+	 * Unconditional for the same reason liveness is: an orchestrator cannot be asked to know which
+	 * optional capabilities a deployment switched on before it can find out whether to route to it.
+	 */
+	{ method: 'GET', path: '/ready' },
 	// RFC 9116 disclosure contact. Unconditional for the same reason discovery is: a researcher who
 	// has found something must be able to read where to send it whatever the deployment has switched on.
 	{ method: 'GET', path: '/.well-known/security.txt' },
@@ -328,6 +333,12 @@ export const rateRoutes: readonly RateRoute[] = [
 	 * prevent. Exempt rather than merely generous, because no allowance is high enough to be safe here.
 	 */
 	{ method: 'GET', path: '/health', rate: 'exempt' },
+	/*
+	 * `public`, deliberately NOT `exempt` like the liveness route beside it. This one reaches storage,
+	 * and an unmetered route that reaches storage is an unauthenticated amplifier onto the datastore —
+	 * exactly what the exemption above is safe only because it avoids.
+	 */
+	{ method: 'GET', path: '/ready', rate: 'public' },
 
 	/*
 	 * Strict: unauthenticated, or expensive, or both. Everything an attacker can make the server do real

@@ -142,6 +142,19 @@ export const RegistrationResponse = t.Union([
 export const DiscoveryResponse = t.Object({}, { additionalProperties: true });
 
 // Health probe — current literal body `{ status: 'OK', timestamp }`.
+/*
+ * Readiness. `subsystem` names what is unreachable and appears only on a failure — enough for an
+ * operator to know where to look, and never the connection detail that would tell them more than
+ * they should paste into an issue.
+ */
+export const ReadyResponse = t.Object(
+	{
+		status: t.Union([t.Literal('ready'), t.Literal('not_ready')]),
+		subsystem: t.Optional(t.Literal('storage'))
+	},
+	{ additionalProperties: false }
+);
+
 export const HealthResponse = t.Object(
 	{
 		status: t.String(),

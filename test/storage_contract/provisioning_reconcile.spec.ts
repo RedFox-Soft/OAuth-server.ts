@@ -1,19 +1,23 @@
 import { describe, it, expect } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import { areaForBucket, areaNamed } from 'lib/consts/storage_inventory.js';
 import type { Db } from 'mongodb';
 import { ensureCollection } from 'lib/adapters/mongodb/provision.js';
 import {
-	duplicateEmailReport,
-	exitCodeFor,
 	missingIndexes,
 	staleExpiryIndexes,
 	toExistingIndexes,
-	type DuplicateEmailRow,
 	type ExistingIndex,
-	type ProvisioningSummary,
 	type RawIndexDescriptor
 } from '../../database/reconcile.js';
+import {
+	duplicateEmailReport,
+	exitCodeFor,
+	type DuplicateEmailRow,
+	type ProvisioningSummary
+} from '../../database/provisioning_report.js';
 
 // The provisioning routine's decisions, tested as pure functions over index descriptors.
 //
@@ -285,8 +289,8 @@ describe('duplicateEmailReport', () => {
 
 	it('names the bucket and every conflicting address', () => {
 		const rows: DuplicateEmailRow[] = [
-			{ _id: 'clash@example.com', count: 2 },
-			{ _id: 'other@example.com', count: 3 }
+			{ value: 'clash@example.com', count: 2 },
+			{ value: 'other@example.com', count: 3 }
 		];
 
 		const report = duplicateEmailReport('dupcheck', rows);
@@ -300,7 +304,7 @@ describe('duplicateEmailReport', () => {
 	// unenforced constraint reported as a warning reads as cosmetic.
 	it('says the uniqueness constraint was skipped', () => {
 		const report = duplicateEmailReport('redfox', [
-			{ _id: 'clash@example.com', count: 2 }
+			{ value: 'clash@example.com', count: 2 }
 		]);
 
 		expect(report?.toLowerCase()).toContain('skipped');
@@ -309,7 +313,7 @@ describe('duplicateEmailReport', () => {
 
 	it('reports the multiplicity so the operator knows how much to clean up', () => {
 		const report = duplicateEmailReport('redfox', [
-			{ _id: 'clash@example.com', count: 4 }
+			{ value: 'clash@example.com', count: 4 }
 		]);
 
 		expect(report).toContain('4');
@@ -407,5 +411,35 @@ describe('ensureCollection', () => {
 		expect(await ensureCollection(db, 'serviceConfig')).toBeTrue();
 		expect(await ensureCollection(db, 'serviceConfig')).toBeFalse();
 		expect(await ensureCollection(db, 'serviceConfig')).toBeFalse();
+	});
+});
+
+describe('provisioning_report is backend-neutral', () => {
+	// The split between this module and reconcile.ts is the whole point of extracting it: the summary,
+	// the exit code and the duplicate-address message are policy both appliers must agree on, while the
+	// index comparison beside them is MongoDB-shaped and cannot be shared.
+	//
+	// Importing nothing is what keeps that true. A single driver import here — or even an import of the
+	// MongoDB applier for one type — would put a connection in the way of the PostgreSQL applier and of
+	// this very spec, which is the trap `lib/consts/storage_inventory.ts` documents at its own top.
+	const source = readFileSync(
+		resolve(import.meta.dir, '../../database/provisioning_report.ts'),
+		'utf8'
+	);
+
+	it('imports nothing at all', () => {
+		const imports = [...source.matchAll(/^\s*import\s/gm)].length;
+		expect(imports).toBe(0);
+	});
+
+	it('produces one message for a row set whatever produced it', () => {
+		// MongoDB's $group and PostgreSQL's GROUP BY name the grouped key differently; both project into
+		// `value` before reaching here, so an operator moving between backends reads the same sentence.
+		const rows: DuplicateEmailRow[] = [{ value: 'a@example.com', count: 2 }];
+
+		expect(duplicateEmailReport('b', rows)).toBe(
+			duplicateEmailReport('b', [...rows])
+		);
+		expect(duplicateEmailReport('b', rows)).toContain('a@example.com');
 	});
 });

@@ -81,7 +81,12 @@ through the console instead.
 - The discovery document, which is the authoritative list of endpoint URLs for a client library:
   `http://localhost:3000/.well-known/openid-configuration`.
 - The key set: `http://localhost:3000/jwks`.
-- A liveness probe that is never rate-limited: `http://localhost:3000/health`.
+- A liveness probe that is never rate-limited: `http://localhost:3000/health`, and its readiness
+  counterpart `http://localhost:3000/ready`, which additionally reaches the database.
+
+This file runs MongoDB because it is the shortest path to a working instance; PostgreSQL is the
+other supported datastore and is a swapped service and one connection string away — see
+[PostgreSQL](/docs/deploy/postgresql/).
 
 For a production-leaning Compose file — pinned tags, an external database, a TLS proxy in front —
 see [Deploy with Docker Compose](/docs/deploy/docker-compose/).

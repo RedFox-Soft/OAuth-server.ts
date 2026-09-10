@@ -86,6 +86,11 @@ with `depends_on: { mongo: { condition: service_healthy } }` on the `setup` serv
 `mongodump` against the volume. Everything a deployment cannot lose is in that database: end-user
 accounts, clients, the audit trail, and the signing keys.
 
+To run PostgreSQL instead, swap the service for `postgres:17`, put `POSTGRES_URL` in the `.env` in
+place of `MONGODB_URI` and `DATABASE_NAME`, and change the setup command to
+`['bun', 'run', 'db:setup:pg']`. Set one connection string, never both — the server refuses to start
+with both rather than pick one. [PostgreSQL](/docs/deploy/postgresql/) has the details.
+
 **`restart: unless-stopped` on the server, `restart: 'no'` on setup.** The `setup` service is a
 one-shot that must exit; restarting it would loop. The server should come back after a host reboot
 or a crash — remember that a Machine which cannot reach the datastore exits at boot rather than

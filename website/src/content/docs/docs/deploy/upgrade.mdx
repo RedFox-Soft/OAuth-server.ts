@@ -1,14 +1,14 @@
 ---
 title: Upgrading
-description: Read the changelog, move the tag, re-run db:setup, restart — and what each of those four steps is actually for.
+description: Read the changelog, move the tag, re-run db:setup, apply migrations, restart — and what each step is actually for.
 sidebar:
-  order: 6
+  order: 7
 ---
 
 import { Steps, Aside } from '@astrojs/starlight/components';
 
-An upgrade is four steps, and skipping the third is the one that produces a deployment that looks
-fine and is subtly broken.
+An upgrade is five steps, and skipping either of the two database steps is what produces a
+deployment that looks fine and is subtly broken.
 
 <Steps>
 
@@ -35,22 +35,48 @@ fine and is subtly broken.
 3. **Re-run the provisioning step** against the same database:
 
    ```bash
-   bun run db:setup
+   bun run db:setup      # MongoDB
+   bun run db:setup:pg   # PostgreSQL
    ```
 
-4. **Restart the server.**
+4. **Apply any schema migrations** the release declares:
+
+   ```bash
+   bun run db:migrate
+   ```
+
+   One command for either datastore. It reports `current` and exits when there is nothing to do,
+   which is the ordinary case. `--plan` lists what would run without running it and exits non-zero
+   when work is outstanding, so a pipeline can gate on it before the deploy rather than during it.
+
+   A migration that cannot be undone is called out by name before it runs. When you see one,
+   take the backup first.
+
+5. **Restart the server.** It refuses to start against a database whose schema is not the one the
+   release expects — behind, ahead, or holding a record for a migration whose declaration has since
+   changed — so a missed step 3 or 4 stops the deploy rather than corrupting data quietly.
 
 </Steps>
+
+<Aside
+	type="caution"
+	title="Upgrading from before ownership groups"
+>
+	A deployment old enough to predate ownership groups must upgrade through an
+	earlier release first. The one-off conversion that introduced them has been
+	retired, and current releases do not attempt it.
+</Aside>
 
 ## Why step 3 is not optional
 
 `db:setup` is the only thing that applies a release's structural changes, and it is idempotent — it
 upserts, so running it against an already-current database changes nothing. What a release can add:
 
-- **New collections**, for a capability that did not exist before.
+- **New collections** (tables, on PostgreSQL), for a capability that did not exist before.
 - **New indexes** — including TTL indexes. A collection that MongoDB auto-creates on first write has
   no TTL index, so documents that were meant to expire simply do not, and nothing complains. It also
-  drops stale expiry indexes that a release has stopped writing the field for.
+  drops stale expiry indexes that a release has stopped writing the field for. On PostgreSQL there
+  are no TTL indexes to create: the running server sweeps expired rows itself.
 - **Seed changes.** When a release changes the admin seed — a new reserved client, a new field on
   the administrator bucket, a group the ownership model now expects — `db:setup` is what applies it.
   The reserved `admin-mcp` agent client arrived exactly this way, and the script carries an explicit
@@ -60,6 +86,28 @@ upserts, so running it against an already-current database changes nothing. What
 than a fire-and-forget: the shipped `fly.toml` runs it as `release_command` and Fly aborts the deploy
 on failure; the Compose files run it as a `setup` service the server `depends_on` with
 `service_completed_successfully`; on Kubernetes it is a Job you wait for.
+
+## Why step 4 is a separate step
+
+`db:setup` only ever adds — a collection, an index, a seeded document — because that is the only
+kind of change safe to repeat against a database in any state. Reshaping data that already exists
+is a different job: it has to run once, in a declared order, and be recorded so the next deploy
+knows it happened. That is what `db:migrate` does, on either datastore, and it is why the two are
+not one command.
+
+Three things follow from the record it keeps, and each of them stops a deploy rather than letting it
+proceed on a guess:
+
+- A database **behind** this release has outstanding migrations. Run them.
+- A database **ahead** of it holds a record for a migration this release does not declare, which
+  means the binary is older than the database — a rollback past a migration, usually.
+- A database is **diverged** when a migration it already applied no longer matches the one declared
+  under that name. A released migration edited after the fact is the cause; the fix is a new
+  migration, not an edit.
+
+Only one process migrates at a time. A run takes a short renewable lease, so two replicas rolling
+at once do not both apply the same step, and a crashed run leaves a lease that expires rather than
+a database nobody may touch.
 
 <Aside type="caution">
 
@@ -83,17 +131,19 @@ admin API) as part of the change.
   to carry across by hand.
 - **SMTP settings are the exception** to boot-only: they are read live from the settings store, so
   they apply without a restart.
-- **Tokens, sessions and grants survive**, since they live in MongoDB. Users are not signed out by
-  an upgrade.
+- **Tokens, sessions and grants survive**, since they live in the database. Users are not signed
+  out by an upgrade.
 
 ## After the restart
 
 ```bash
-curl -sf https://auth.example.com/health
+curl -sf https://auth.example.com/ready
 curl -s https://auth.example.com/.well-known/openid-configuration | jq -r .issuer
 ```
 
-The second is the check worth automating — the shipped deploy workflow does exactly this, because
+`/ready` rather than `/health` on purpose: `/health` answers for the process alone and would pass
+against a server that came up unable to reach its database. The second is the check worth
+automating — the shipped deploy workflow does exactly this, because
 the advertised issuer is the one value a deploy can get wrong in a way nothing else catches.
 
 Then open `/admin` and sign in. That single act exercises the seed, the console client, the

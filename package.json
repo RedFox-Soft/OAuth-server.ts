@@ -34,6 +34,8 @@
 		"build": "bun build.ts",
 		"watch": "bun build.ts --watch",
 		"db:setup": "bun database/mongodb.ts",
+		"db:setup:pg": "bun database/postgres.ts",
+		"db:migrate": "bun database/migrate.ts",
 		"docs:export": "bun scripts/docs_export.ts",
 		"start": "bun lib/index.ts"
 	},

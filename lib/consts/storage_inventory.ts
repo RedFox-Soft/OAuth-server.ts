@@ -17,6 +17,18 @@ export interface IndexSpec {
 	readonly key: Readonly<Record<string, 1>>;
 	readonly unique?: boolean;
 	readonly expireAfterSeconds?: number;
+	/*
+	 * The field holding the array this key indexes into, for a key MongoDB serves with a multikey
+	 * index. Names the container rather than being a boolean, because the container is not derivable
+	 * from the key: for `clientIds` it is the key itself, for `members.userId` it is everything before
+	 * the leaf.
+	 *
+	 * MongoDB ignores it — it indexes array members automatically, which is exactly why nothing had to
+	 * declare this before. A datastore without that behaviour needs to be told: a scalar index over an
+	 * array value matches nothing, and the lookup silently degrades to a full scan rather than failing.
+	 * That asymmetry is why this is a declaration and not an implementation detail of one backend.
+	 */
+	readonly multikey?: string;
 }
 
 /*
@@ -118,6 +130,12 @@ export const STORE_AREAS = {
 	mcpClientPermissions: 'mcpClientPermissions',
 	/* Recorded internal server faults, grouped by fingerprint. */
 	errorStore: 'errorStore',
+	/*
+	 * The database's own account of which schema migrations it has had. One record per applied
+	 * migration, and the only thing that makes "is this deployment current?" answerable without
+	 * inspecting the data a migration would have changed.
+	 */
+	schemaMigrations: 'schemaMigrations',
 	/* One area, four writers: configStore keeps the persisted ApplicationConfig, SmtpSettingsStore the
 	 * SMTP credentials, and two SingletonSecretStore instances the server's DPoP nonce secret and its
 	 * pairwise identifier salt — singleton documents distinguished only by a derived ObjectId. One
@@ -412,7 +430,8 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 		),
 		[
 			{ key: { slug: 1 }, unique: true },
-			{ key: { clientIds: 1 } },
+			/* Multikey: read as findOne({ clientIds }) in projectStore, i.e. containment over the array. */
+			{ key: { clientIds: 1 }, multikey: 'clientIds' },
 			{ key: { ownerGroupId: 1 } }
 		]
 	),
@@ -474,7 +493,11 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 		unowned(
 			'a container of containers: an administrator is removed from it, never cascaded through it'
 		),
-		[{ key: { 'members.userId': 1 } }, { key: { kind: 1 } }]
+		[
+			/* Multikey over an array of objects: groupStore reads find({ 'members.userId' }). */
+			{ key: { 'members.userId': 1 }, multikey: 'members' },
+			{ key: { kind: 1 } }
+		]
 	),
 	/*
 	 * Reaped on `expiresAt`, and the TTL is the point rather than housekeeping: an invitation that
@@ -600,6 +623,22 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 		STORE_AREAS.serviceConfig,
 		null,
 		unowned('server configuration; no principal owns it')
+	),
+	/*
+	 * Permanent, and the `reaped: null` here is a control rather than housekeeping: a migration record
+	 * that expired would let a completed migration be applied a second time, which is the one thing the
+	 * record exists to prevent. The migration itself is required to survive that (a step must be safe to
+	 * apply twice, because on MongoDB the effect and this record cannot be one write) — but a store that
+	 * forgets on a timer would turn a safety net into a scheduled hazard.
+	 *
+	 * The `_id` IS the declared migration id, so ordering and uniqueness are the primary key rather than
+	 * rules a runner has to remember, and no secondary index is needed: the runner reads the whole set
+	 * once per run and compares it against a declaration of the same size.
+	 */
+	storeArea(
+		STORE_AREAS.schemaMigrations,
+		null,
+		unowned("the database's own schema state; no principal owns it")
 	),
 
 	perBucketArea

@@ -697,7 +697,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'Rename a group, or clear the review flag the ownership migration set on it. Requires being an owner of that group, which is a membership kind rather than an instance role.'
+			'Rename a group. Requires being an owner of that group, which is a membership kind rather than an instance role.'
 	},
 	{
 		tool: 'group_member_add',

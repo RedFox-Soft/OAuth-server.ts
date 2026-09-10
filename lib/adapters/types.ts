@@ -261,6 +261,74 @@ export interface JWKSStoreConstructor {
 	new (): JWKSStoreInstance;
 }
 
+/*
+ * One applied schema migration, as the database records it. The `id` is the declared migration's id,
+ * which is also the record's primary key — so "applied twice" is not a state the store can hold.
+ *
+ * `checksum` is of the declaration the migration was applied FROM, not of anything in the data. It
+ * exists to catch the one case a present/absent record cannot: a released entry edited after the
+ * fact, which is a different migration wearing an id that is already recorded. Without it the gate
+ * would report such a database current.
+ */
+export interface SchemaMigrationRecord {
+	id: string;
+	appliedAt: Date;
+	checksum: string;
+}
+
+export interface SchemaMigrationStoreInstance {
+	/*
+	 * Every applied record. Read whole rather than queried per id: the runner compares the recorded
+	 * set against a declaration of the same small size, so one read beats N lookups, and the gate
+	 * needs the complete set anyway to detect a record this release does not declare.
+	 */
+	all(): Promise<SchemaMigrationRecord[]>;
+	/*
+	 * Records a migration as applied. On PostgreSQL this participates in the transaction that carries
+	 * the effect; on MongoDB it cannot, because a standalone `mongod` is supported and has no
+	 * multi-document transaction — which is why every migration step must be safe to apply twice.
+	 */
+	record(entry: SchemaMigrationRecord): Promise<void>;
+	/*
+	 * Test- and verification-only. There is deliberately no way to alter a record's id or checksum:
+	 * editing history is exactly what the checksum exists to detect, so the store must not offer it.
+	 */
+	reset(): Promise<void>;
+}
+
+/*
+ * The migration run lease. Lives in the shared serviceConfig area beside the singleton secrets and
+ * the SMTP settings, told apart by a derived id — the same arrangement, for the same reason: it is a
+ * singleton whose identity is a name rather than a record.
+ *
+ * Not in `schemaMigrations`, where a row's id IS a declared migration id and a lease would have to
+ * wear a fake one.
+ */
+export interface MigrationLease {
+	holder: string;
+	expiresAt: Date;
+}
+
+export interface MigrationLeaseStoreInstance {
+	read(): Promise<MigrationLease | null>;
+	/*
+	 * Takes the lease only if none is held, the held one has expired, or it is already this holder's.
+	 * Returns whether it won. MUST be one atomic statement: a read-then-write would let two runs both
+	 * conclude the lease was free, which is the entire failure this exists to prevent.
+	 */
+	acquire(holder: string, expiresAt: Date): Promise<boolean>;
+	/* Releases only a lease this holder owns, so a run that overran cannot free somebody else's. */
+	release(holder: string): Promise<void>;
+}
+
+export interface MigrationLeaseStoreConstructor {
+	new (): MigrationLeaseStoreInstance;
+}
+
+export interface SchemaMigrationStoreConstructor {
+	new (): SchemaMigrationStoreInstance;
+}
+
 export interface AdminAuditEntry {
 	_id: string;
 	actorId: string;
@@ -641,12 +709,6 @@ export interface Group {
 	name: string;
 	kind: 'personal' | 'regular' | 'system';
 	members: GroupMember[];
-	/*
-	 * Set only by the ownership migration, on the groups it generated from a multi-manager container.
-	 * Drives a console prompt asking a super administrator to confirm the grouping. Carries no
-	 * authorization meaning whatever its value — a group that nobody reviews still works.
-	 */
-	needsReview: boolean;
 	createdAt: Date;
 	updatedAt: Date;
 }
@@ -657,7 +719,6 @@ export interface GroupStoreInstance {
 		name: string;
 		kind?: Group['kind'];
 		members?: GroupMember[];
-		needsReview?: boolean;
 	}): Promise<Group>;
 	find(id: string): Promise<Group | null>;
 	list(): Promise<Group[]>;
@@ -666,7 +727,7 @@ export interface GroupStoreInstance {
 	findPersonalFor(userId: string): Promise<Group | null>;
 	update(
 		id: string,
-		patch: Partial<Pick<Group, 'name' | 'members' | 'needsReview'>>
+		patch: Partial<Pick<Group, 'name' | 'members'>>
 	): Promise<Group | null>;
 	destroy(id: string): Promise<void>;
 }

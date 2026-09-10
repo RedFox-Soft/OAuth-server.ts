@@ -11,6 +11,31 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- storage: PostgreSQL is now a supported datastore alongside MongoDB. A deployment picks one by
+  which connection string it sets — `POSTGRES_URL` or `MONGODB_URI` — and setting both is refused at
+  startup rather than resolved by precedence, since a server that quietly chose the other database
+  is indistinguishable from total data loss. `bun run db:setup:pg` provisions the schema and
+  `--check` reports on it without writing; documents are stored as `jsonb`, and expired rows are
+  reclaimed by a sweeper because PostgreSQL has no TTL index. Nothing above the storage layer
+  changed, and existing MongoDB deployments are unaffected.
+- storage: a schema-migration layer for both backends, applied by `bun run db:migrate` (`--plan` to
+  gate a deploy). Migrations are declared as an ordered set with a checksum, recorded as they run,
+  and serialised by a renewable lease so two replicas rolling at once cannot both apply a step. The
+  server refuses to start against a database that is behind, ahead, or holding a record for a
+  migration whose declaration has since changed. The one-off `managedBy → ownerGroupId` conversion
+  has been retired rather than carried into it: a deployment predating ownership groups must upgrade
+  through an earlier release first.
+- ops: `GET /ready` joins `GET /health`, splitting "don't route to me" from "restart me". Liveness
+  answers from the process alone and stays exempt from the rate limiter; readiness reaches the
+  datastore, is metered as `public`, holds its last answer for a second so a probe storm cannot
+  become database load, shares one outstanding probe rather than starting one per caller, and
+  recovers on its own. The probe carries its own five-second deadline, because a driver's timeout
+  bounds establishing a connection and not a query on one it already holds: measured against a
+  database that was up, connected and no longer answering, an unbounded probe took 30 seconds to
+  report anything. Pointing both probes at `/health` turns a database
+  outage invisible, since the process is alive and the probe passes while requests keep arriving;
+  pointing liveness at `/ready` restarts healthy processes for a database's outage. Both are the
+  mistake this split exists to prevent.
 - security: the release assets now carry provenance of their own. `docs-export.json` and the
   `CHANGELOG.md` a release ships are covered by a single signed SLSA v1 statement, produced the same
   keyless way as the image's and attached to the release as `release-assets.intoto.jsonl`, so a

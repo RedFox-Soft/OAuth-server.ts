@@ -36,18 +36,27 @@ bun test                # run all tests
 bun run format          # lint + auto-fix (eslint --fix)
 bun run build           # bundle React login client → public/
 bun run watch           # watch-mode bundle for loginClient.tsx
+bun run db:setup        # provision MongoDB (idempotent)
+bun run db:setup:pg     # provision PostgreSQL (idempotent; --check reports only)
+bun run db:migrate      # apply declared schema migrations (--plan to gate a deploy)
 ```
+
+`bun test` never touches a real database: it runs on the in-memory adapter and the two verification
+scripts under `database/` are scripts, not specs, precisely so the default run cannot reach them.
 
 ---
 
 ## Environment variables
 
-| Variable        | Required  | Description                                            |
-| --------------- | --------- | ------------------------------------------------------ |
-| `ISSUER`        | yes       | Canonical server URL (e.g. `https://auth.example.com`) |
-| `MONGODB_URI`   | yes       | MongoDB connection string                              |
-| `DATABASE_NAME` | yes       | MongoDB database name                                  |
-| `NODE_ENV`      | test only | Set to `test` to use in-memory adapter                 |
+| Variable        | Required       | Description                                                |
+| --------------- | -------------- | ---------------------------------------------------------- |
+| `ISSUER`        | yes            | Canonical server URL (e.g. `https://auth.example.com`)     |
+| `MONGODB_URI`   | one of the two | MongoDB connection string — and what selects MongoDB       |
+| `DATABASE_NAME` | with MongoDB   | MongoDB database name                                      |
+| `POSTGRES_URL`  | one of the two | PostgreSQL connection string — and what selects PostgreSQL |
+| `NODE_ENV`      | test only      | Set to `test` to use in-memory adapter                     |
+
+**The datastore is chosen by which connection string is set, and exactly one may be** (`lib/adapters/selectBackend.ts`). Both set is refused at startup rather than resolved by precedence: a server that quietly picked the other database would look, from outside, exactly like total data loss. Neither set falls back to the in-memory adapter, which is what `NODE_ENV=test` and the docs-export scripts rely on — which is also why a script that must run hermetically deletes all three variables, since Bun loads `.env` and `.env.local` on its own. PostgreSQL takes its database name from the URL, so `DATABASE_NAME` is unused there.
 
 Signing/decryption keys are **not** an environment variable: they are stored via the `jwksStore`
 adapter and loaded once at startup. The initial RS256 key is provisioned during schema creation
@@ -59,7 +68,9 @@ The same `bun run db:setup` step seeds the admin panel (reserved admin project +
 bucket + the first-party `admin-panel` OAuth client) via `database/mongodb.ts`. It is idempotent and
 must be re-run after upgrading an existing install. `lib/admin/seed.ts` (`ensureAdminSeed`) is the
 app-side equivalent used by tests; there is **no** boot-time seeding, so admin login requires a
-Mongo-backed, `db:setup`-provisioned deployment.
+database-backed, provisioned deployment. On PostgreSQL the equivalent is `bun run db:setup:pg`
+(`database/postgres.ts`), and the values both scripts seed are single-sourced from
+`lib/consts/admin_seed.ts` so a seed change cannot land in one and not the other.
 
 Super-admins manage the running instance through the admin control plane (`lib/admin/`, mounted under
 `/admin/api/*`): projects, clients, buckets, end-users, server settings, and **signing keys**
@@ -117,7 +128,9 @@ lib/
     client/             ← checks, secret, sector, keystore, backchannel, validate, schema
   addon/                ← overridable behaviour functions (CORS, mTLS, claims, tokens, …); index.ts is the single import seam + override registry
   helpers/              ← JWT, crypto, claims, validation utilities
-  adapters/             ← MongoDB adapter; TestAdapter (in-memory) for tests
+  adapters/             ← three backends behind one contract: mongodb/, postgres/, memory/ (tests)
+    selectBackend.ts    ← the one place the datastore is chosen; refuses two connection strings
+  migrations/           ← the schema-migration layer: state, runner, lease, gate (both backends)
   plugins/              ← Elysia plugins: noCache, noQueryDup, auth
   interactions/         ← Login/consent UI endpoints (React + Ant Design)
   response_modes/       ← query, fragment, form_post, JWT response modes
@@ -136,7 +149,12 @@ lib/
     confirm.ts          ← the two-call gate on high-consequence operations
   error_store/          ← the one place a fault becomes a record (capture.ts is the choke point)
   sentry/               ← optional outbound reporting; registers NO Elysia hook (see below)
-database/               ← MongoDB collection definitions + TTL index setup
+database/               ← provisioning and verification scripts (see below)
+  mongodb.ts            ← db:setup — collections, TTL/unique indexes, admin seed
+  postgres.ts           ← db:setup:pg — the same job in tables; --check reports without writing
+  migrate.ts            ← db:migrate — applies declared migrations on either backend; --plan
+  verify_postgres.ts    ← storage fidelity against a REAL PostgreSQL; never run by bun test
+  verify_migrations.ts  ← the migration layer against a real PostgreSQL; likewise
 test/
   test_helper.ts        ← bootstrap: loads *.config.ts per feature, wires adapter + provider
   oauth/                ← core flow tests
@@ -159,7 +177,13 @@ test/
 
 **Behaviour functions** — Overridable server behaviour (CORS, token issuance/rotation, resource-server info, CIBA/mTLS/RAR/registration helpers, …) is **single-sourced through `lib/addon/index.ts`**. Each function's default lives in its addon module; the index exposes a dynamic call-time accessor per function plus an `addons.override(partial)` / `addons.reset()` registry (`lib/addon/registry.ts`). Source modules import the accessor from the index — never off the merged configuration. Deployments and tests override via the registry (the test harness resets it after every test via `test/preload.ts`; `test/addon_baseline.ts` bridges a `*.config.ts`'s behaviour-fn overrides into a per-spec baseline). `findAccount` / `assertJwtClientAuthClaimsAndHeader` keep their existing direct imports.
 
-**Adapter pattern** — All persistence goes through a `StorageAdapter` interface. Swap implementations without touching business logic. Use `TestAdapter` (in-memory) for unit/integration tests.
+**Adapter pattern** — All persistence goes through a `StorageAdapter` interface. Swap implementations without touching business logic. Use `TestAdapter` (in-memory) for unit/integration tests. There are three implementations and the storage areas they provision are declared once, for all of them, in `lib/consts/storage_inventory.ts` — an import-free module, deliberately, so the drift guard and the provisioning scripts can read it without pulling in a datastore. Add an area there or the two-way guard fails.
+
+Two properties of `lib/adapters/postgres/` are pinned by tests and easy to break. Importing any module in it must open no connection and must not need `POSTGRES_URL` — `lib/adapters/mongodb/db.ts` connects at module scope and the cost of that reaches into unrelated files. And a document column is written as an **object**, never `JSON.stringify(...)`: a pre-stringified value stores a jsonb _string_, every predicate reaching inside it silently matches nothing, and every round trip still looks perfect. `lib/adapters/postgres/json.ts` throws on read rather than papering over it.
+
+Where the two production backends differ on purpose, the difference is declared in `lib/consts/storage_divergences.ts` with a reason and what a caller could observe; `database/verify_postgres.ts` reads it, which is what makes the register a gate rather than a document.
+
+**Schema migrations** — `lib/consts/migrations.ts` declares the ordered set (import-free, same reason as the inventory); `lib/migrations/` runs it on either backend, records what ran in the `schemaMigrations` area, holds a renewable lease so two replicas rolling at once do not both apply a step, and gates startup: `behind`, `ahead` or `diverged` all refuse to boot. `bun run db:migrate` is the operator command on both backends. A migration declares `reversible` and a `rerunnable` sentence, because a standalone `mongod` has no multi-document transaction and the record can therefore follow the effect. The one-off `managedBy → ownerGroupId` conversion that predated this layer has been **retired**, not carried into it: a deployment old enough to need it upgrades through an earlier release first.
 
 **Storage contract** — Every persisted model (all `BaseModel`/`BaseToken` subclasses: tokens, `Grant`, `Session`, `Interaction`, `ReplayDetection`) filters its stored payload by its TypeBox schema: `Opaque.getValueAndPayload()` persists only the top-level keys declared in `this.model` and copies each value verbatim (a **shallow** projection — never `Value.Clean`, so freeform fields like `claims`/`rar`/`params`/`session.state` are preserved). A field must be declared in the model's schema to be persisted; there is no whole-payload fallback. When adding a field a model must persist, add it to that model's TypeBox schema.
 
@@ -201,7 +225,7 @@ Time-sensitive tests use Bun's `setSystemTime` (from `bun:test`) to travel time;
 1. Create `lib/actions/grants/<name>.ts` implementing the handler.
 2. Register it in `lib/actions/token.ts` grant dispatch map.
 3. Add a feature flag in `lib/configs/` if it should be opt-in.
-4. Add a MongoDB collection (with TTL index) in `database/` if the grant needs persistence.
+4. Declare a storage area in `lib/consts/storage_inventory.ts` if the grant needs persistence — both provisioning scripts read it, and the drift guard fails until it is there.
 5. Write tests under `test/<name>/` with a matching `*.config.ts`.
 
 ## Adding an administrative operation

@@ -40,7 +40,9 @@ server has to publish, validates a token, and shows both a refusal and a success
 
 [Deploy](/docs/deploy/fly/) covers the targets people actually use: [Fly.io](/docs/deploy/fly/),
 [Kubernetes](/docs/deploy/kubernetes/), [Docker Compose](/docs/deploy/docker-compose/) on a single
-host, and [MongoDB Atlas](/docs/deploy/mongodb-atlas/) for the database. Whichever you choose,
+host. The database is a choice of two — [MongoDB](/docs/deploy/mongodb-atlas/) or
+[PostgreSQL](/docs/deploy/postgresql/) — and which connection string you set is the whole of it.
+Whichever you choose,
 [Behind a reverse proxy](/docs/deploy/reverse-proxy/) matters: the issuer URL must be an `https://`
 address and must match what clients were configured with, and a proxy that rewrites headers without
 being told to is the usual cause of tokens that validate locally and fail in production.
@@ -48,7 +50,7 @@ being told to is the usual cause of tokens that validate locally and fail in pro
 Read [Upgrading](/docs/deploy/upgrade/) before you move between versions. The server is at a `0.x`
 release, which means the HTTP surface and the admin API may still change between minor versions;
 the changelog says what moved, and the setup script has to be re-run afterwards so new collections
-and indexes exist.
+and indexes exist, followed by `bun run db:migrate` for anything a release has to reshape.
 
 ## Deciding whether to trust it
 

@@ -17,3 +17,11 @@ const options = {
 const dbClient = new MongoClient(process.env.MONGODB_URI, options);
 
 export const db = (await dbClient.connect()).db(process.env.DATABASE_NAME);
+
+/*
+ * The reachability probe behind the startup check and the readiness endpoint. Reads and writes
+ * nothing, so it can neither be affected by application data nor affect it.
+ */
+export async function ping(): Promise<void> {
+	await db.command({ ping: 1 });
+}

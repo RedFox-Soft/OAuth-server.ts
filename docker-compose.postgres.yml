@@ -1,0 +1,65 @@
+# Quick Start on PostgreSQL: the database, a one-shot schema provisioning step, and the server.
+#
+#   docker compose -f docker-compose.postgres.yml up
+#   open http://localhost:3000/admin
+#
+# The MongoDB equivalent is docker-compose.yml. A deployment uses exactly ONE datastore: setting both
+# POSTGRES_URL and MONGODB_URI makes the server refuse to start rather than silently pick one, so the
+# two files are alternatives and never combined.
+#
+# The setup service runs `bun run db:setup:pg` and exits. It must finish before the server starts:
+# without the reserved admin project, bucket and client it seeds, the console's sign-in redirects to
+# a client that does not exist. It is idempotent, so re-running after pulling a newer image is the
+# upgrade path — followed by `bun run db:migrate` when a release declares new migrations.
+#
+# ISSUER must be the URL a browser reaches the server at. Set it to its final public URL BEFORE the
+# first `up`: the seeded admin client's redirect URI is derived from it once, and a later change is
+# not repaired by re-running setup (the workaround is deleting the pg-data volume).
+#
+# The host port is 5433, not 5432, so this never collides with a PostgreSQL already running on the
+# machine — which matters most when pointing the verification scripts at a throwaway database:
+#
+#   docker compose -f docker-compose.postgres.yml up -d postgres
+#   POSTGRES_URL='postgres://oauth:oauth@localhost:5433/oauth_scratch' bun database/verify_postgres.ts
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: oauth
+      POSTGRES_PASSWORD: oauth
+      POSTGRES_DB: OAuth
+    ports:
+      - '5433:5432'
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U oauth -d OAuth']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  setup:
+    image: ghcr.io/redfox-soft/oauth-server-ts:latest
+    command: ['bun', 'run', 'db:setup:pg']
+    environment:
+      ISSUER: http://localhost:3000
+      POSTGRES_URL: postgres://oauth:oauth@postgres:5432/OAuth
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: 'no'
+
+  oauth:
+    image: ghcr.io/redfox-soft/oauth-server-ts:latest
+    ports:
+      - '3000:3000'
+    environment:
+      ISSUER: http://localhost:3000
+      POSTGRES_URL: postgres://oauth:oauth@postgres:5432/OAuth
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  pg-data:
