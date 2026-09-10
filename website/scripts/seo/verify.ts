@@ -52,6 +52,13 @@ export interface VerifyInput {
 	llmsUrls: string[];
 	/* Cards are generated, never committed, so a skipped capture has none to check. */
 	cardsAvailable: boolean;
+	/*
+	 * The datastores that ship, as the words a page would use, from `docs-export.json` — which takes
+	 * them from `lib/adapters/selectBackend.ts`. Passed in rather than imported so the rule below is
+	 * a function of its input like every other one here, and so a test can hand it two backends the
+	 * site does not have.
+	 */
+	storageBackends: string[];
 }
 
 export interface VerifyOutput {
@@ -286,6 +293,58 @@ export function verify(input: VerifyInput): VerifyOutput {
 						`${block.type} claims ${JSON.stringify(claim.slice(0, 60))}, which the page does not visibly say`
 					);
 				}
+			}
+		}
+	}
+
+	// --- claims that must not outlive the code ---------------------------------------------------
+	/*
+	 * The rule that would have caught the drift this file was extended for.
+	 *
+	 * PostgreSQL shipped as a second datastore and the documentation pages were updated from a task
+	 * list that named them. Everything else kept the old world: five comparison tables, the feature
+	 * grid and the home page still said the server stores its data in MongoDB, and one comparison
+	 * argued "most teams already run PostgreSQL; fewer already run MongoDB" as a reason to choose the
+	 * competitor. Twenty-two rules passed, because none of them reads what a page *claims*.
+	 *
+	 * Two scoping decisions, both of which the first draft got wrong.
+	 *
+	 * It runs per *sentence*, not per page. A page-level check asks "does this page mention
+	 * PostgreSQL anywhere", which any page comparing us to a PostgreSQL product answers yes to while
+	 * saying we store data in MongoDB — the draft passed a deliberately reverted claim without a
+	 * murmur. Comparison tables are checked at their source instead, by the schema in
+	 * src/content.config.ts, where our cell can be read apart from the competitor's.
+	 *
+	 * And it stops at the /docs/ boundary. There, naming one datastore is usually a procedure rather
+	 * than a claim — the Atlas page is about Atlas — so the rule would need an allowlist, and an
+	 * allowlist is the part that rots. On the marketing surface there is no legitimate single-backend
+	 * sentence left: the two Compose lines that used to name MongoDB now say "the database", which is
+	 * also more accurate, since a Compose file ships for each.
+	 *
+	 * What it cannot see is prose naming no backend at all — "a Bun process and one database" would
+	 * survive a third one untouched. That limit is why the copy which *can* be computed is computed,
+	 * in src/data/storage.ts, rather than written and watched.
+	 */
+	const claimSurface = (route: string): boolean =>
+		route === '/' || route.startsWith('/features/');
+
+	if (input.storageBackends.length > 1) {
+		for (const page of indexable.filter((p) => claimSurface(p.route))) {
+			for (const sentence of page.text.split(/(?<=[.!?;])\s+/)) {
+				const named = input.storageBackends.filter((backend) =>
+					sentence.includes(backend)
+				);
+				if (named.length === 0 || named.length === input.storageBackends.length)
+					continue;
+
+				const missing = input.storageBackends.filter(
+					(backend) => !named.includes(backend)
+				);
+				fail(
+					'stale-datastore-claim',
+					page.route,
+					`"${sentence.trim().slice(0, 90)}" names ${named.join(', ')} but not ${missing.join(', ')}`
+				);
 			}
 		}
 	}

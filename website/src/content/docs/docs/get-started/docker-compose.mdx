@@ -84,9 +84,9 @@ through the console instead.
 - A liveness probe that is never rate-limited: `http://localhost:3000/health`, and its readiness
   counterpart `http://localhost:3000/ready`, which additionally reaches the database.
 
-This file runs MongoDB because it is the shortest path to a working instance; PostgreSQL is the
-other supported datastore and is a swapped service and one connection string away — see
-[PostgreSQL](/docs/deploy/postgresql/).
+This file runs MongoDB. `docker-compose.postgres.yml` beside it is the same three services on
+PostgreSQL — `docker compose -f docker-compose.postgres.yml up` — and the two are alternatives,
+never combined. See [PostgreSQL](/docs/deploy/postgresql/) for which variable selects which.
 
 For a production-leaning Compose file — pinned tags, an external database, a TLS proxy in front —
 see [Deploy with Docker Compose](/docs/deploy/docker-compose/).

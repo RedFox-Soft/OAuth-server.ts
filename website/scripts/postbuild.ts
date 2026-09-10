@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SITE_ORIGIN, normaliseRoute } from '../src/data/seo.ts';
+import { backendLabels } from '../src/data/storage.ts';
 import { collectPages } from './seo/collect.ts';
 import { writeImageSitemap } from './seo/image_sitemap.ts';
 import { writeLlmsFiles } from './seo/llms.ts';
@@ -70,7 +71,8 @@ async function main(): Promise<void> {
 		llmsUrls: [...llmsTxt.matchAll(/\]\((https:\/\/[^)]+\/)\)?:/g)].map(
 			(m) => m[1]
 		),
-		cardsAvailable
+		cardsAvailable,
+		storageBackends: backendLabels()
 	});
 
 	for (const note of result.skipped) console.log(`seo: skipped ${note}`);

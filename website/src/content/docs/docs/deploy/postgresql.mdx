@@ -54,6 +54,18 @@ variable causing the refusal is often one you cannot see with `env`.
 
 </Steps>
 
+## The shortest version
+
+A Compose file ships for exactly this, and it is the fastest way to see the server on PostgreSQL:
+
+```bash
+docker compose -f docker-compose.postgres.yml up
+```
+
+Three services — the database, a one-shot `db:setup:pg` that must finish first, and the server —
+with the host port on 5433 so it never collides with a PostgreSQL you already run.
+`docker-compose.yml` beside it is the MongoDB equivalent; they are alternatives, never combined.
+
 ## Checking a database without changing it
 
 ```bash

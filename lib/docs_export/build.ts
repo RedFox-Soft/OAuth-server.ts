@@ -25,6 +25,11 @@ import {
 } from '../mcp/catalogue.js';
 import { ADDON_SEAMS } from '../addon/seams.js';
 import {
+	BACKEND_SELECTORS,
+	PRODUCTION_BACKENDS,
+	type BackendName
+} from '../adapters/selectBackend.js';
+import {
 	ENVIRONMENT_VARIABLES,
 	type EnvironmentVariable
 } from './environment.js';
@@ -87,6 +92,35 @@ export interface DocsExport {
 	};
 	readonly addonSeams: readonly string[];
 	readonly environment: readonly EnvironmentVariable[];
+	/*
+	 * The datastores an operator can choose, and what selects each.
+	 *
+	 * Exported so the website states this from the source rather than from memory. It went in after
+	 * PostgreSQL shipped and five comparison tables plus two marketing pages kept saying the server
+	 * stores its data in MongoDB — one of them offering that as a reason to choose a competitor.
+	 */
+	readonly storage: {
+		readonly backends: readonly StorageBackendExport[];
+	};
+}
+
+/*
+ * What each backend is called in a sentence. Kept beside the export rather than in the adapter,
+ * because `postgres` is the identifier a connection string implies and `PostgreSQL` is the word a
+ * reader expects — and the website's drift rule searches rendered prose for these exact strings.
+ */
+const BACKEND_LABELS: Record<BackendName, string> = {
+	postgres: 'PostgreSQL',
+	mongodb: 'MongoDB',
+	memory: 'in-memory'
+};
+
+export interface StorageBackendExport {
+	readonly name: string;
+	/** The environment variable whose presence selects it. */
+	readonly selectedBy: string;
+	/** What the documentation calls it in a sentence. */
+	readonly label: string;
 }
 
 export interface DocsExportStamp {
@@ -153,6 +187,13 @@ export function buildDocsExport(stamp: DocsExportStamp): DocsExport {
 			excluded: [...excludedConsoleOperations]
 		},
 		addonSeams: [...ADDON_SEAMS],
-		environment: ENVIRONMENT_VARIABLES
+		environment: ENVIRONMENT_VARIABLES,
+		storage: {
+			backends: PRODUCTION_BACKENDS.map((name) => ({
+				name,
+				selectedBy: BACKEND_SELECTORS[name] as string,
+				label: BACKEND_LABELS[name]
+			}))
+		}
 	};
 }

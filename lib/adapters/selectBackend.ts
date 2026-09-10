@@ -1,6 +1,28 @@
 export type BackendName = 'memory' | 'mongodb' | 'postgres';
 
 /*
+ * The same decision the function below makes, stated as data.
+ *
+ * It exists for the callers that must *describe* the choice rather than make it — the documentation
+ * export, and through it the website. Those had been restating it in prose, and prose does not fail
+ * a build: when PostgreSQL shipped, five comparison tables and two marketing pages went on saying
+ * the server stores its data in MongoDB, one of them arguing that as a reason to choose a competitor.
+ *
+ * A backend whose selector is `null` is not a deployment option; `memory` is what a process with no
+ * connection string gets, which is tests and nothing else.
+ */
+export const BACKEND_SELECTORS: Readonly<Record<BackendName, string | null>> = {
+	postgres: 'POSTGRES_URL',
+	mongodb: 'MONGODB_URI',
+	memory: null
+};
+
+/* The backends an operator can actually choose, in the order the documentation introduces them. */
+export const PRODUCTION_BACKENDS = (
+	Object.keys(BACKEND_SELECTORS) as BackendName[]
+).filter((name) => BACKEND_SELECTORS[name] !== null);
+
+/*
  * Which storage backend a process uses, decided from the environment alone.
  *
  * A pure function taking the environment as an argument, for the reason `validateConfiguration` takes

@@ -301,7 +301,19 @@ Four rules keep it honest:
 
    So a new page needs a unique title (15–60 chars) and description (70–160), a section in the map,
    a `STRUCTURED_COVERAGE` entry (`requires: []` is fine, but the `reason` is not optional), and a
-   link from somewhere reachable within three hops of the home page, or the build stops. Question
+   link from somewhere reachable within three hops of the home page, or the build stops.
+
+   A twenty-third rule checks something different from the rest: whether a page's **claims** have
+   outlived the code. It exists because PostgreSQL shipped and five comparison tables plus two
+   marketing pages went on saying the server stores its data in MongoDB, one of them arguing that as
+   a reason to choose a competitor — twenty-two rules passed, because none of them reads what a page
+   asserts. Three parts, and the split matters. Copy that can be computed is computed, from
+   `docs-export.json` via `src/data/storage.ts`, so it cannot drift at all. A comparison's own cell
+   is checked in `src/content.config.ts`, at the source, because on a comparison page the
+   *competitor's* cell routinely names PostgreSQL and a check on the rendered page is satisfied by
+   text that says nothing about us. And free prose on `/` and `/features/` is checked per sentence
+   by `stale-datastore-claim` — per sentence, not per page, for the same reason. It stops at the
+   `/docs/` boundary, where naming one datastore is a procedure rather than a claim. Question
    sets are data — one array feeds both `FaqSection.astro` and `faqPage()`, so the visible and
    machine-readable forms cannot drift, and the overclaim rule proves it. Comparison pages carry
    `lastChecked`; past `FRESHNESS_LIMIT_DAYS` the build warns and the page shows a "due for review"

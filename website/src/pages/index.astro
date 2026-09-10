@@ -8,6 +8,7 @@ import Section from '../components/ui/Section.astro';
 import Eyebrow from '../components/ui/Eyebrow.astro';
 import CompareLinks from '../components/CompareLinks.astro';
 import { organization, softwareApplication } from '../data/structured.ts';
+import { backendChoice } from '../data/storage.ts';
 
 /*
  * `license` is the abbreviation this page visibly shows in its badge row, not a URL: the guardrail
@@ -26,7 +27,7 @@ const audiences = [
 		body: 'Bun and Elysia, one command to run, and 31 named seams you replace with your own function instead of forking.',
 		points: [
 			'Runs on Bun; the HTTP layer is Elysia',
-			'PostgreSQL or MongoDB in production, in-memory for tests',
+			`${backendChoice()} in production, in-memory for tests`,
 			'31 override seams, resolved at call time'
 		]
 	},
@@ -54,7 +55,7 @@ const steps = [
 	{
 		n: '1',
 		title: 'Run the server',
-		body: 'Docker Compose starts MongoDB, provisions the schema and seeds the admin console.',
+		body: 'Docker Compose starts the database, provisions the schema and seeds the admin console. One file per datastore; pick either.',
 		href: '/docs/get-started/docker-compose/'
 	},
 	{
@@ -183,7 +184,10 @@ server ← { "restartRequired": true,
 					<ul class="mt-3 grid grid-cols-1 gap-2 text-sm text-gray-700 sm:grid-cols-2 dark:text-gray-300">
 						{
 							[
-								['MongoDB', 'started and provisioned, with indexes and a signing key'],
+								[
+									'A database',
+									'started and provisioned, with indexes and a signing key'
+								],
 								['Admin console', 'at /admin, with first-run setup for the super administrator'],
 								['Discovery', 'at /.well-known/openid-configuration, reflecting the flags you set'],
 								['No sign-up', 'no tenant, no API key, no phone call']

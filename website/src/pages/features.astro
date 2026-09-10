@@ -6,6 +6,7 @@ import type { Feature } from '../components/FeatureGrid.astro';
 import Button from '../components/ui/Button.astro';
 import Section from '../components/ui/Section.astro';
 import CompareLinks from '../components/CompareLinks.astro';
+import { backendList } from '../data/storage.ts';
 import Eyebrow from '../components/ui/Eyebrow.astro';
 
 const rfc = (n: string) => ({
@@ -282,7 +283,7 @@ const groups: {
 			},
 			{
 				title: 'Pluggable storage',
-				body: 'Every persisted model goes through one adapter interface. PostgreSQL, MongoDB and in-memory implementations ship; one connection string picks which.'
+				body: `Every persisted model goes through one adapter interface. ${backendList('in-memory')} implementations ship; one connection string picks which.`
 			},
 			{
 				title: 'Mountable Elysia app',

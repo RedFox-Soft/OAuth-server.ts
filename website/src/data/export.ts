@@ -88,7 +88,23 @@ export const DocsExportSchema = z.object({
 			description: z.string(),
 			example: z.string().optional()
 		})
-	)
+	),
+	/*
+	 * The datastores an operator can choose. Required rather than optional, like everything else
+	 * here: a field the pages need and the export lacks must fail the build, and this one is read
+	 * by the guardrail as well as by two pages.
+	 */
+	storage: z.object({
+		backends: z
+			.array(
+				z.object({
+					name: z.string(),
+					selectedBy: z.string(),
+					label: z.string()
+				})
+			)
+			.min(1)
+	})
 });
 
 export type DocsExport = z.infer<typeof DocsExportSchema>;

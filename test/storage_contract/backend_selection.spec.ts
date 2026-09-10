@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'bun:test';
 
-import { selectBackend } from 'lib/adapters/selectBackend.js';
+import {
+	BACKEND_SELECTORS,
+	PRODUCTION_BACKENDS,
+	selectBackend
+} from 'lib/adapters/selectBackend.js';
 
 /*
  * Which storage backend a process uses, as a pure function of the environment — contract C1 in
@@ -55,5 +59,33 @@ describe('selectBackend', () => {
 		// Purity is the property that lets this be tested at all; a function reaching for process.env
 		// would give a different answer on a developer machine with .env.local present.
 		expect(selectBackend({})).toBe('memory');
+	});
+
+	/*
+	 * The table and the function are two statements of one decision, and the table is the one the
+	 * documentation reads. If they can disagree, the website can describe a backend nobody can select
+	 * — or, as happened when PostgreSQL shipped, go on describing a world with one datastore in it.
+	 */
+	describe('the selector table', () => {
+		it('selects the backend it claims to, for every entry', () => {
+			for (const [backend, variable] of Object.entries(BACKEND_SELECTORS)) {
+				if (variable === null) continue;
+				expect(selectBackend({ [variable]: 'set' })).toBe(backend);
+			}
+		});
+
+		it('names every backend, so a new one cannot be added without a decision', () => {
+			// `memory` carries null rather than being absent: "not selectable" is an answer, and an
+			// entry missing from the table would be indistinguishable from one nobody thought about.
+			expect(Object.keys(BACKEND_SELECTORS).sort()).toEqual([
+				'memory',
+				'mongodb',
+				'postgres'
+			]);
+		});
+
+		it('offers exactly the backends an operator can choose', () => {
+			expect([...PRODUCTION_BACKENDS].sort()).toEqual(['mongodb', 'postgres']);
+		});
 	});
 });

@@ -3,6 +3,7 @@ import { z } from 'astro/zod';
 import { glob } from 'astro/loaders';
 import { docsLoader } from '@astrojs/starlight/loaders';
 import { docsSchema } from '@astrojs/starlight/schema';
+import { backendLabels } from './data/storage.ts';
 
 /*
  * `yes` built in · `flag` available but switched on, previewed or paid for · `no` not available ·
@@ -53,15 +54,48 @@ export const collections = {
 					z.object({
 						label: z.string(),
 						rows: z.array(
-							z.object({
-								dimension: z.string(),
-								us: CompareCell,
-								them: CompareCell,
-								verdict: z.enum(['us', 'them', 'even', 'different']),
-								why: z.string(),
-								/* What the competitor's documentation literally says; kept for verifiability. */
-								note: z.string().optional()
-							})
+							z
+								.object({
+									dimension: z.string(),
+									us: CompareCell,
+									them: CompareCell,
+									verdict: z.enum(['us', 'them', 'even', 'different']),
+									why: z.string(),
+									/* What the competitor's documentation literally says; kept for verifiability. */
+									note: z.string().optional()
+								})
+								/*
+								 * Our own cell may not describe a world with fewer datastores than ship.
+								 *
+								 * Checked here rather than in the post-build sweep because on a comparison page
+								 * the *competitor's* cell routinely names PostgreSQL, so a scan of the rendered
+								 * page is satisfied by text that says nothing about us. That is not a hypothetical:
+								 * the first version of this guard was a page-level scan, and it passed a
+								 * deliberately reverted row without a murmur.
+								 *
+								 * The backend list comes from `docs-export.json`, which takes it from
+								 * `lib/adapters/selectBackend.ts`. A third backend therefore fails every
+								 * comparison whose storage sentence has not been rewritten, by file and by field.
+								 */
+								.superRefine((row, ctx) => {
+									const labels = backendLabels();
+									if (labels.length < 2) return;
+
+									const named = labels.filter((label) =>
+										row.us.text.includes(label)
+									);
+									if (named.length === 0 || named.length === labels.length)
+										return;
+
+									ctx.addIssue({
+										code: z.ZodIssueCode.custom,
+										path: ['us', 'text'],
+										message:
+											`the "${row.dimension}" row names ${named.join(', ')} but not ` +
+											`${labels.filter((label) => !named.includes(label)).join(', ')}. ` +
+											'Every datastore that ships has to appear in a sentence that describes ours.'
+									});
+								})
 						)
 					})
 				)
