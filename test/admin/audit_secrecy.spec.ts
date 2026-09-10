@@ -68,6 +68,10 @@ async function trailFor(targetId: string): Promise<string> {
 	return JSON.stringify(entries);
 }
 
+/**
+ * @proves The append-only trail records that a credential changed and never records the
+ * credential.
+ */
 describe('admin audit secrecy', () => {
 	beforeEach(async () => {
 		await ensureAdminSeed();

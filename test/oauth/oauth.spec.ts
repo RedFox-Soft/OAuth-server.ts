@@ -35,6 +35,10 @@ function codeFromResponse(response: Response) {
 	return code as string;
 }
 
+/**
+ * @proves A plain OAuth client - no OIDC scopes - completes the code, refresh and device flows,
+ * and cannot reach OIDC behaviour by naming a parameter.
+ */
 describe('requests without the openid scope', () => {
 	let setup: Setup;
 	beforeAll(async () => {
@@ -65,7 +69,7 @@ describe('requests without the openid scope', () => {
 			nonce: 'foo'
 		};
 		Object.keys(gatedValues).forEach((param) => {
-			it(`${param} can only be used when openid is amongst the requested scopes`, async function () {
+			it(`each OIDC-only parameter is refused on a plain OAuth request`, async function () {
 				const auth = new AuthorizationRequest({
 					[param]: gatedValues[param]
 				});
@@ -93,7 +97,7 @@ describe('requests without the openid scope', () => {
 			defaultMaxAge: 300,
 			requireAuthTime: true
 		}).forEach(([clientProperty, value]) => {
-			it(`must be provided when client is configured with ${snakeCase(clientProperty)}`, async function () {
+			it(`each client-required parameter is enforced`, async function () {
 				const auth = new AuthorizationRequest({ client_id: 'client' });
 
 				const client = await Client.find('client');
@@ -268,7 +272,7 @@ describe('requests without the openid scope', () => {
 			});
 
 			describe('response_type=none', () => {
-				it('gets nothing from the authorization endpoint', async function () {
+				it('response_type=none returns no token, only the redirect', async function () {
 					const auth = new AuthorizationRequest({
 						response_type: 'none',
 						scope

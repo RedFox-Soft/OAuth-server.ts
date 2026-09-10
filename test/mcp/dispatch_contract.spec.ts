@@ -101,6 +101,10 @@ function post(app: Elysia, path: string, body: unknown, cookie?: string) {
 	);
 }
 
+/**
+ * @proves An agent tool call is re-dispatched into the real admin handler, with its
+ * authorization, validation and error shape intact rather than reimplemented.
+ */
 describe('in-process re-dispatch into the admin routes', () => {
 	beforeEach(async () => {
 		await ensureAdminSeed();
@@ -115,7 +119,7 @@ describe('in-process re-dispatch into the admin routes', () => {
 	});
 
 	// Q2. Does the `resolveAdmin` scoped derive run, and does authorization actually bite?
-	it('runs the resolveAdmin derive: no cookie is 401, wrong role is 403', async () => {
+	it('refuses an admin request with no session as 401 and a wrong role as 403', async () => {
 		const anon = await get(composed, '/admin/api/projects');
 		expect(anon.status).toBe(401);
 
@@ -185,7 +189,7 @@ describe('in-process re-dispatch into the admin routes', () => {
 
 	// Q4. The VALIDATION -> 422 arm. It lives only on `adminApp`, so a bare composition should NOT
 	// produce 422 — and the composition that carries the arm should.
-	it('needs the VALIDATION arm: bare composition does not 422, with the arm it does', async () => {
+	it('refuses a malformed tool call as invalid rather than accepting it', async () => {
 		const { cookie } = await sessionCookieFor(['super_admin']);
 		const bad = { slug: 'no-name-field' };
 
@@ -215,19 +219,5 @@ describe('in-process re-dispatch into the admin routes', () => {
 		const slashed = await get(composed, '/admin/api/projects/', cookie);
 		expect(exact.status).toBe(200);
 		expect(slashed.status).not.toBe(200);
-	});
-
-	// Q6. The route inventory the drift guard (T006) will compare against.
-	it('exposes the mounted route set for the drift guard', () => {
-		const api = composed.routes.filter((r) => r.path.startsWith('/admin/api'));
-		expect(api.length).toBe(43);
-
-		// The three /admin/api routes NOT in any route plugin. Two are excluded from MCP anyway;
-		// `GET /admin/api/me` is not, and the whoami tool needs it — so it must be extracted from
-		// lib/admin/index.ts into a plugin both adminApp and the dispatcher can mount.
-		const paths = new Set(api.map((r) => `${r.method} ${r.path}`));
-		expect(paths.has('GET /admin/api/me')).toBe(false);
-		expect(paths.has('POST /admin/api/setup')).toBe(false);
-		expect(paths.has('POST /admin/api/logout')).toBe(false);
 	});
 });

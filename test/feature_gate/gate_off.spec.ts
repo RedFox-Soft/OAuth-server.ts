@@ -21,6 +21,10 @@ function storedClientIds(): string[] {
 	);
 }
 
+/**
+ * @proves Every gated route refuses while its flag is off, identically under every probe,
+ * allocating no state and leaving no token touched.
+ */
 describe('feature gate — capability off', () => {
 	beforeEach(async () => {
 		await bootstrap(import.meta.url);

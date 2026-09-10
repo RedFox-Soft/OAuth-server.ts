@@ -97,6 +97,10 @@ afterAll(async () => {
 	if (scriptPath) await fs.rm(scriptPath, { force: true });
 });
 
+/**
+ * @proves A booted server holds usable signing keys, a usable DPoP nonce secret and a usable
+ * pairwise salt, and its settings are validated before anything can observe them.
+ */
 describe('a freshly booted server, with no reload and no harness', () => {
 	it('holds signing keys and publishes them', () => {
 		// resolveKeys provisions a key on an empty store, so a booted server always holds at least

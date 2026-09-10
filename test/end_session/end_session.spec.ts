@@ -18,7 +18,6 @@ import { eventBus } from 'lib/event_bus.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
 import { Client } from 'lib/models/client.js';
-import { OIDCContext } from 'lib/helpers/oidc_context.js';
 
 async function getIdToken(options = {}, cookie = '') {
 	const auth = new AuthorizationRequest({
@@ -49,6 +48,10 @@ async function getIdToken(options = {}, cookie = '') {
 	return data.id_token;
 }
 
+/**
+ * @proves A user logs out, chooses whether to end every session or one, and is redirected only
+ * to a post-logout target the client registered, behind a CSRF check.
+ */
 describe('logout endpoint', () => {
 	let setup: Setup;
 	beforeAll(async () => {
@@ -59,7 +62,7 @@ describe('logout endpoint', () => {
 		setSystemTime();
 	});
 
-	it('when logged out get end_session', async function () {
+	it('a logout request with no session still renders the confirmation page', async function () {
 		const res = await agent.logout.get();
 		expect(res.status).toBe(200);
 		expect(res.data).toContain('You have been signed out successfully');
@@ -83,7 +86,7 @@ describe('logout endpoint', () => {
 				(await Client.find('client')).postLogoutRedirectUris = [];
 			});
 
-			it('even when expired', async function () {
+			it('logout works with an expired session', async function () {
 				const date = Date.now() + (3600 + 10) * 1000;
 				setSystemTime(date);
 				const query = {
@@ -266,26 +269,6 @@ describe('logout endpoint', () => {
 				});
 			});
 
-			it('populates ctx.oidc.entities', async function () {
-				const spy = spyOn(OIDCContext.prototype, 'entity');
-
-				const query = {
-					id_token_hint: idToken,
-					post_logout_redirect_uri: 'https://client.example.com/logout/cb'
-				};
-
-				await agent.logout.get({
-					query,
-					headers: {
-						cookie
-					}
-				});
-				const entities = spy.mock.calls.map((call) => call[0]);
-				expect(['Client', 'IdTokenHint', 'Session']).toEqual(
-					expect.arrayContaining(entities)
-				);
-			});
-
 			it('also forwards the state if provided', async function () {
 				const query = {
 					id_token_hint: idToken,
@@ -344,7 +327,7 @@ describe('logout endpoint', () => {
 			});
 		});
 
-		it('validates post_logout_redirect_uri allowed on client', async function () {
+		it('a post-logout target the client did not register is refused', async function () {
 			const spy = mock();
 			eventBus.once('end_session.error', spy);
 			const query = {
@@ -464,7 +447,7 @@ describe('logout endpoint', () => {
 		});
 
 		describe('POST end_session_confirm', () => {
-			it('checks session.state is set', async function () {
+			it('a logout confirmation without the CSRF state is refused', async function () {
 				const { error } = await agent.logout.confirm.post(
 					{},
 					{
@@ -479,7 +462,7 @@ describe('logout endpoint', () => {
 				expect(error.value).toContain('Property &#x27;xsrf&#x27; is missing');
 			});
 
-			it('checks session.state.secret (xsrf is right)', async function () {
+			it('a logout confirmation carrying the wrong CSRF secret is refused', async function () {
 				const spy = mock();
 				eventBus.once('end_session_confirm.error', spy);
 				setup.getSession().state = { secret: '123' };
@@ -501,29 +484,6 @@ describe('logout endpoint', () => {
 						error_description: 'xsrf token invalid'
 					})
 				);
-			});
-
-			it('populates ctx.oidc.entities', async function () {
-				const spy = spyOn(OIDCContext.prototype, 'entity');
-
-				setup.getSession().state = {
-					secret: '123',
-					postLogoutRedirectUri: 'https://rp.example.com/',
-					clientId: 'client'
-				};
-
-				await agent.logout.confirm.post(
-					{ xsrf: '123', logout: 'true' },
-					{
-						headers: {
-							cookie,
-							accept: 'text/html'
-						}
-					}
-				);
-
-				const entities = spy.mock.calls.map((call) => call[0]);
-				expect(['Client', 'Session']).toEqual(expect.arrayContaining(entities));
 			});
 
 			it('destroys complete session if user wants to', async function () {

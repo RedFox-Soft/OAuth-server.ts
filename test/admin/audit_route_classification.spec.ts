@@ -20,6 +20,10 @@ import {
  */
 const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
+/**
+ * @proves For every mounted state-changing admin route an audit classification exists or an
+ * explicit exclusion names it, so no administrative mutation can reach production unrecorded.
+ */
 describe('admin audit route classification', () => {
 	const mounted = elysia.routes
 		.map((route) => ({ method: route.method, path: route.path }))

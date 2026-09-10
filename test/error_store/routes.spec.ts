@@ -85,6 +85,10 @@ async function get(path: string, cookie?: string) {
 	);
 }
 
+/**
+ * @proves Fault records are readable only by a super administrator, with a true total, and a
+ * malformed query is refused rather than answered unfiltered.
+ */
 describe('GET /admin/api/errors', () => {
 	beforeEach(async () => {
 		await ensureAdminSeed();

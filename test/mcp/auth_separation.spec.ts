@@ -75,6 +75,10 @@ async function tokenWithAudience(audience: string | undefined) {
 	return { token: (await at.save()) as unknown as string, user };
 }
 
+/**
+ * @proves Only a live MCP-audience token belonging to an active administrator reaches the agent
+ * plane, and that token reaches nothing else.
+ */
 describe('MCP audience boundary', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);

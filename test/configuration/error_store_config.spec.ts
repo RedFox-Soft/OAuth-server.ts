@@ -16,6 +16,10 @@ const withErrorStore = (overrides: Record<string, unknown>) => ({
 	...overrides
 });
 
+/**
+ * @proves Every bound on the error store is a positive integer and every origin capture level is
+ * one the code handles, validated whether or not the capability is on.
+ */
 describe('errorStore configuration validation', () => {
 	it('accepts the shipped defaults', () => {
 		expect(() => validateConfiguration({ ...ApplicationConfig })).not.toThrow();
@@ -29,13 +33,13 @@ describe('errorStore configuration validation', () => {
 	];
 
 	for (const key of bounds) {
-		it(`rejects ${key} at zero`, () => {
+		it(`each bound is refused at zero`, () => {
 			expect(() => validateConfiguration(withErrorStore({ [key]: 0 }))).toThrow(
 				`${key} must be a positive integer`
 			);
 		});
 
-		it(`rejects ${key} negative`, () => {
+		it(`refuses a negative ${key}`, () => {
 			expect(() =>
 				validateConfiguration(withErrorStore({ [key]: -1 }))
 			).toThrow(`${key} must be a positive integer`);
@@ -46,13 +50,13 @@ describe('errorStore configuration validation', () => {
 		 * mean the store kept a different number than the operator asked for, which is the kind of
 		 * disagreement that is only ever discovered while reading an incomplete fault.
 		 */
-		it(`rejects ${key} fractional`, () => {
+		it(`refuses a fractional ${key}`, () => {
 			expect(() =>
 				validateConfiguration(withErrorStore({ [key]: 1.5 }))
 			).toThrow(`${key} must be a positive integer`);
 		});
 
-		it(`accepts ${key} at one`, () => {
+		it(`each bound is accepted at one`, () => {
 			expect(() =>
 				validateConfiguration(withErrorStore({ [key]: 1 }))
 			).not.toThrow();
@@ -68,7 +72,7 @@ describe('errorStore configuration validation', () => {
 	});
 
 	for (const level of ['omitted', 'anonymized', 'full']) {
-		it(`accepts the ${level} origin capture level`, () => {
+		it(`each declared capture level is accepted`, () => {
 			expect(() =>
 				validateConfiguration(
 					withErrorStore({ 'errorStore.originCaptureLevel': level })

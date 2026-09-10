@@ -8,13 +8,13 @@ import {
 // findAccount is no longer a provider configuration option — it is the built-in,
 // DB-backed resolver imported directly. An unset client resolves to the default
 // 'redfox' bucket via resolveBucketForClient.
+/**
+ * @proves A subject resolves to an account only while an active user record exists for it, with
+ * the claims that record carries.
+ */
 describe('built-in findAccount (DB-backed)', () => {
 	beforeEach(() => {
 		resetAdminMemoryStores();
-	});
-
-	it('returns a promise', () => {
-		expect(findAccount({}, 'id') instanceof Promise).toBe(true);
 	});
 
 	it('resolves an active user to an account whose claims come from the record', async () => {

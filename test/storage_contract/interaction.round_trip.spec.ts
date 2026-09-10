@@ -10,6 +10,10 @@ import {
 	storedPayloadFor
 } from './round_trip.js';
 
+/**
+ * @proves An interaction persists every audited field verbatim and no class instance, and
+ * nothing outside its schema.
+ */
 describe('storage contract: Interaction', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);

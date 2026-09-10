@@ -1,17 +1,8 @@
-import {
-	describe,
-	it,
-	beforeAll,
-	afterEach,
-	expect,
-	mock,
-	spyOn
-} from 'bun:test';
+import { describe, it, beforeAll, afterEach, expect, mock } from 'bun:test';
 
 import bootstrap, { agent, jsonToFormUrlEncoded } from '../test_helper.js';
 import { normalize } from '../../lib/helpers/user_codes.ts';
 import { eventBus } from 'lib/event_bus.js';
-import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
@@ -23,6 +14,10 @@ function post(body, headers = {}) {
 	});
 }
 
+/**
+ * @proves Only an authenticated client registered for the device grant can start one, and every
+ * unsupported parameter is refused.
+ */
 describe('device_authorization_endpoint', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);
@@ -72,7 +67,7 @@ describe('device_authorization_endpoint', () => {
 		// device authorization request (e.g. request_uri, registration) are rejected rather than
 		// silently ignored. This is stricter than the original arbitrary-param pass-through.
 		['request_uri', 'registration'].forEach((param) => {
-			it(`rejects not supported parameter ${param}`, async () => {
+			it(`each unsupported parameter is refused`, async () => {
 				const { error } = await post({
 					client_id: 'client',
 					[param]: 'some'
@@ -129,7 +124,7 @@ describe('device_authorization_endpoint', () => {
 		expect(dc.payload.params).not.toHaveProperty('response_mode');
 	});
 
-	it('handles regular client auth', async () => {
+	it('a client authenticating with its secret is accepted', async () => {
 		const { status, data } = await agent.device.auth.post(
 			jsonToFormUrlEncoded({}),
 			{
@@ -150,18 +145,5 @@ describe('device_authorization_endpoint', () => {
 				'expires_in'
 			].sort()
 		);
-	});
-
-	it('populates ctx.oidc.entities', async () => {
-		const spy = spyOn(OIDCContext.prototype, 'entity');
-
-		await post({
-			client_id: 'client',
-			scope: 'openid'
-		});
-
-		const keys = spy.mock.calls.map((c) => c[0]);
-		expect(keys).toContain('Client');
-		expect(keys).toContain('DeviceCode');
 	});
 });

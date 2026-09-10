@@ -50,6 +50,10 @@ const VALID = {
 
 const previousStore = ApplicationConfig['errorStore.enabled'];
 
+/**
+ * @proves The outbound reporting credential is stored, masked, never returned, and reporting
+ * cannot be armed without it or without the error store.
+ */
 describe('Sentry settings API', () => {
 	beforeEach(async () => {
 		await ensureAdminSeed();

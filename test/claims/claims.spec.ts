@@ -28,6 +28,11 @@ const route = '/auth';
 const expire = new Date();
 
 expire.setDate(expire.getDate() + 1);
+/**
+ * @proves A relying party receives the individual claims it requested, is refused when it names a
+ * different subject or an unmet authentication context, and a malformed claims parameter is
+ * refused.
+ */
 ['get', 'post'].forEach((verb) => {
 	function authRequest(auth, { cookie } = {}) {
 		if (verb === 'get') {
@@ -525,7 +530,7 @@ expire.setDate(expire.getDate() + 1);
 					);
 				});
 
-				it('additional claims are requested', async function () {
+				it('claims beyond the standard set reach the response', async function () {
 					const auth = new AuthorizationRequest({
 						scope: 'openid',
 						prompt: 'none',
@@ -719,7 +724,7 @@ expire.setDate(expire.getDate() + 1);
 				);
 			});
 
-			it('should handle when invalid json is provided', async function () {
+			it('a malformed claims parameter is refused as invalid_request', async function () {
 				const auth = new AuthorizationRequest({
 					scope: 'openid',
 					claims: 'something'
@@ -742,7 +747,7 @@ expire.setDate(expire.getDate() + 1);
 				);
 			});
 
-			it('should validate an object is passed', async function () {
+			it('refuses a claims parameter that is not an object', async function () {
 				const auth = new AuthorizationRequest({
 					scope: 'openid',
 					claims: 'true'
@@ -765,7 +770,7 @@ expire.setDate(expire.getDate() + 1);
 				);
 			});
 
-			it('should check accepted properties being present', async function () {
+			it('a claims parameter naming no known member is refused', async function () {
 				const auth = new AuthorizationRequest({
 					scope: 'openid',
 					claims: '{"not_recognized": "does not matter"}'
@@ -788,7 +793,7 @@ expire.setDate(expire.getDate() + 1);
 				);
 			});
 
-			it('should check userinfo property being a simple object', async function () {
+			it('refuses a claims parameter whose userinfo member is not a plain object', async function () {
 				const auth = new AuthorizationRequest({
 					scope: 'openid',
 					claims: '{"userinfo": "Not an Object"}'
@@ -811,7 +816,7 @@ expire.setDate(expire.getDate() + 1);
 				);
 			});
 
-			it('should check id_token property being a simple object', async function () {
+			it('refuses a claims parameter whose id_token member is not a plain object', async function () {
 				const auth = new AuthorizationRequest({
 					scope: 'openid',
 					claims: '{"id_token": "Not an Object"}'

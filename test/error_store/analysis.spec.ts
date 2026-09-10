@@ -82,6 +82,10 @@ interface Summary {
 	recording: boolean;
 }
 
+/**
+ * @proves A super administrator sees what is failing most, by occurrence rather than by row,
+ * filtered on every supported dimension and refused when the query is malformed.
+ */
 describe('error store analysis', () => {
 	beforeEach(async () => {
 		await ensureAdminSeed();

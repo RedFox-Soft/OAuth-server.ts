@@ -51,6 +51,10 @@ async function superCookie() {
 	return `${ADMIN_SESSION_COOKIE}=${session._id}`;
 }
 
+/**
+ * @proves A fault on the admin plane is recorded with a reference in its own error body, and a
+ * refused admin request is not.
+ */
 describe('admin-plane fault capture', () => {
 	beforeEach(async () => {
 		await ensureAdminSeed();

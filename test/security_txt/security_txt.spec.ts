@@ -13,6 +13,10 @@ const DAY = 86_400_000;
 
 // RFC 9116: Contact and Expires are required, Expires is ISO 8601 and should be under a year away,
 // Canonical names the URL the file is served from, Policy points at the disclosure policy.
+/**
+ * @proves A security researcher finds a parseable security.txt with an unexpired date, a mailto
+ * contact and an https policy.
+ */
 describe('GET /.well-known/security.txt', () => {
 	beforeEach(async () => {
 		await bootstrap(import.meta.url);

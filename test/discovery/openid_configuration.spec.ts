@@ -6,6 +6,10 @@ import { ApplicationConfig } from 'lib/configs/application.js';
 
 const discoveryEndpoint = agent['.well-known']['openid-configuration'];
 
+/**
+ * @proves The OIDC discovery document is reachable, carries operator metadata, and reports a
+ * fault as a fault rather than as a malformed document.
+ */
 describe('/.well-known/openid-configuration', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);

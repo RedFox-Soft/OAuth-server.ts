@@ -22,6 +22,10 @@ import {
 
 const HEALTH = resolve(import.meta.dir, '../../lib/actions/health.ts');
 
+/**
+ * @proves Liveness answers from the process alone and readiness from storage, so a database
+ * outage is not read as a dead process.
+ */
 describe('liveness and readiness are separate probes', () => {
 	it('serves liveness from a module that imports no storage', () => {
 		const source = readFileSync(HEALTH, 'utf8');

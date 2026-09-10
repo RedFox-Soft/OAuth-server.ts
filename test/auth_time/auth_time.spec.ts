@@ -13,6 +13,10 @@ import bootstrap, { agent } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 
+/**
+ * @proves A relying party that asks how recently the user authenticated - by max_age, by prompt,
+ * or by its own registration - gets auth_time in the id_token.
+ */
 describe('responds with a id_token containing auth_time', async () => {
 	const setup = await bootstrap(import.meta.url);
 	let cookie = '';
@@ -47,7 +51,7 @@ describe('responds with a id_token containing auth_time', async () => {
 		return data.id_token;
 	}
 
-	it('when max_age was present in the request', async function () {
+	it('the id_token carries auth_time when max_age was requested', async function () {
 		const id_token = await getIdToken({ max_age: 999 });
 		expect(decodeJwt(id_token)).toHaveProperty('auth_time');
 	});
@@ -61,17 +65,17 @@ describe('responds with a id_token containing auth_time', async () => {
 			mock.restore();
 		});
 
-		it('when prompt=login was requested', async function () {
+		it('carries auth_time when prompt=login was requested', async function () {
 			const id_token = await getIdToken({ prompt: 'login' });
 			expect(decodeJwt(id_token)).toHaveProperty('auth_time');
 		});
 
-		it('when max_age=0 was requested', async function () {
+		it('carries auth_time and re-authenticates when max_age=0 was requested', async function () {
 			const id_token = await getIdToken({ max_age: 0 });
 			expect(decodeJwt(id_token)).toHaveProperty('auth_time');
 		});
 
-		it('when client has default_max_age=0', async function () {
+		it('carries auth_time and re-authenticates for a client whose default_max_age is 0', async function () {
 			const id_token = await getIdToken({
 				client_id: 'client-with-default_max_age-zero'
 			});
@@ -79,14 +83,14 @@ describe('responds with a id_token containing auth_time', async () => {
 		});
 	});
 
-	it('when client has require_auth_time', async function () {
+	it('carries auth_time for a client that registered require_auth_time', async function () {
 		const id_token = await getIdToken({
 			client_id: 'client-with-require_auth_time'
 		});
 		expect(decodeJwt(id_token)).toHaveProperty('auth_time');
 	});
 
-	it('when client has default_max_age', async function () {
+	it('carries auth_time for a client that registered a default_max_age', async function () {
 		const id_token = await getIdToken({
 			client_id: 'client-with-default_max_age'
 		});

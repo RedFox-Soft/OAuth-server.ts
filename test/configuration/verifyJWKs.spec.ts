@@ -3,8 +3,12 @@ import { describe, it, expect } from 'bun:test';
 import { generateKeyPair, exportJWK } from 'jose';
 import { verifyJWKs } from 'lib/configs/verifyJWKs.js';
 
+/**
+ * @proves A key set the server cannot sign with is refused at startup rather than discovered at
+ * the first token request.
+ */
 describe('env jwks validation', () => {
-	it('must be a valid JWKS object', async () => {
+	it('a malformed key set is refused at startup', async () => {
 		expect(() => {
 			verifyJWKs({
 				jwks: []
@@ -12,7 +16,7 @@ describe('env jwks validation', () => {
 		}).toThrow('keystore must be a JSON Web Key Set formatted object');
 	});
 
-	it('must only contain RSA, EC, or OKP keys', () => {
+	it('refuses a key set containing a key type the signer cannot use', () => {
 		expect(() => {
 			verifyJWKs({
 				keys: [{ kty: 'oct', k: randomBytes(32).toString('base64url') }]
@@ -20,7 +24,7 @@ describe('env jwks validation', () => {
 		}).toThrow('only RSA, EC, or OKP keys should be part of jwks');
 	});
 
-	it('must only contain private keys', async () => {
+	it('a set carrying only public material is refused', async () => {
 		const { publicKey } = await generateKeyPair('EdDSA');
 		const jwk = await exportJWK(publicKey);
 		jwk.alg = 'EdDSA';

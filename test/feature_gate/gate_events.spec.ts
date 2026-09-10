@@ -17,6 +17,10 @@ const CAPABILITY_CHANNELS = [
 	'pushed_authorization_request.error'
 ] as const;
 
+/**
+ * @proves A refused capability emits exactly one signal naming the flag, is never reported as a
+ * fault, and the response is identical whether anything is listening.
+ */
 describe('feature gate — observability', () => {
 	const listeners: Array<[string, (...args: unknown[]) => void]> = [];
 

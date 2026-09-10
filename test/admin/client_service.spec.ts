@@ -8,6 +8,10 @@ import {
 } from 'lib/admin/clients/service.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 
+/**
+ * @proves A client gets the credential its authentication method needs and no other, defaults to
+ * requiring consent, and keeps its secret across unrelated edits.
+ */
 describe('admin client service', () => {
 	it('creates a public client (no secret) with derived response types', async () => {
 		const { view, secret } = await createClient({
@@ -157,7 +161,7 @@ describe('admin client service', () => {
 			ApplicationConfig['richAuthorizationRequests.types'] = {};
 		});
 
-		it('persists the field on create and reads it back', async () => {
+		it('persists the permitted authorization types on create and reads them back', async () => {
 			const { view } = await createClient({
 				clientName: 'RAR client',
 				grantTypes: ['authorization_code'],
@@ -171,7 +175,7 @@ describe('admin client service', () => {
 			expect(reloaded?.authorizationDetailsTypes).toEqual([PAYMENT]);
 		});
 
-		it('updates the field and preserves it across an unrelated patch', async () => {
+		it('updates the permitted authorization types and preserves them across an unrelated patch', async () => {
 			const { view } = await createClient({
 				clientName: 'RAR update',
 				grantTypes: ['authorization_code'],

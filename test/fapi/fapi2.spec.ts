@@ -12,6 +12,10 @@ import { eventBus } from 'lib/event_bus.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import nanoid from 'lib/helpers/nanoid.js';
 
+/**
+ * @proves A FAPI 2 deployment narrows what it accepts: a client assertion audienced at the
+ * issuer, and a request object bounded by exp and nbf.
+ */
 describe('FAPI 2.0 Final behaviours', async () => {
 	const setup = await bootstrap(import.meta.url, { config: 'fapi2' });
 
@@ -53,7 +57,7 @@ describe('FAPI 2.0 Final behaviours', async () => {
 	});
 
 	describe('Request Object', () => {
-		it('still works', async function () {
+		it('a conforming FAPI 2 request is accepted', async function () {
 			const request = await new SignJWT({
 				client_id: 'client',
 				iss: 'client',

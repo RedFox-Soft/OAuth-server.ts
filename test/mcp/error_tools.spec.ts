@@ -131,6 +131,10 @@ function payload(result: unknown): Record<string, unknown> {
 	return text ? (JSON.parse(text) as Record<string, unknown>) : {};
 }
 
+/**
+ * @proves An agent can read what is failing and can never purge it, and the withholding survives
+ * however the request is phrased.
+ */
 describe('error store tools over MCP', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);

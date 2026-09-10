@@ -56,6 +56,10 @@ const d = (over: Partial<Descriptor> & { key: string }): Descriptor => ({
 	...over
 });
 
+/**
+ * @proves The console settings editor shows every setting exactly once, tracks unsaved edits by
+ * content, asks about the risky ones, and never offers to save what the server would refuse.
+ */
 describe('settings model', () => {
 	describe('sameValue', () => {
 		it('compares structured values by content, not identity', () => {

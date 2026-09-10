@@ -43,6 +43,10 @@ function expectedSub(sector: string, accountId: string): string {
 		.digest('hex');
 }
 
+/**
+ * @proves A pairwise client sees a stable identifier that differs from the account id, is shared
+ * within a sector, and cannot be correlated across sectors.
+ */
 describe('pairwise identifiers', () => {
 	let setup: Setup;
 	const subs: Record<string, string> = {};

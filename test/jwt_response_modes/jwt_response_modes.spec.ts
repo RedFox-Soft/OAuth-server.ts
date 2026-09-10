@@ -7,6 +7,10 @@ import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { eventBus } from 'lib/event_bus.js';
 
+/**
+ * @proves JARM delivers a signed response by the mode the client asked for, defaulting to the
+ * safe one per response type, and an expired secret cannot obtain one.
+ */
 describe('configuration features.jwtResponseModes', () => {
 	let setup: Setup;
 	beforeAll(async function () {
@@ -14,7 +18,7 @@ describe('configuration features.jwtResponseModes', () => {
 	});
 
 	describe('discovery', () => {
-		it('extends the well known config', async function () {
+		it('discovery advertises the JARM response modes and signing algorithms', async function () {
 			const { data } = await agent['.well-known']['openid-configuration'].get();
 			if (!data) throw new Error('expected response data');
 
@@ -242,7 +246,7 @@ describe('configuration features.jwtResponseModes', () => {
 		'form_post.jwt': 400
 	}).forEach(([mode, errStatus]) => {
 		describe(`${mode} err handling`, () => {
-			it(`responds with a ${errStatus}`, async function () {
+			it(`each JARM error is delivered with its own status`, async function () {
 				const auth = new AuthorizationRequest({
 					prompt: 'none',
 					response_mode: mode,
@@ -259,7 +263,7 @@ describe('configuration features.jwtResponseModes', () => {
 				expect(spy).toBeCalled();
 			});
 
-			it('handles expired secrets', async function () {
+			it('a client whose symmetric secret has expired cannot obtain a signed JARM response', async function () {
 				const spy = mock();
 				eventBus.once('authorization.error', spy);
 

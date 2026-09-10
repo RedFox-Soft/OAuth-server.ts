@@ -16,6 +16,10 @@ import {
 
 const IDENTIFIER = 'https://app.example.com/oauth/client-metadata.json';
 
+/**
+ * @proves A user asked to authorize a document-identified client is shown who it actually is,
+ * including when its redirect leaves the identifier host or offers only loopback.
+ */
 describe('identity facts for a document-identified client', () => {
 	it('names the identifier host and the redirect host', () => {
 		const identity = documentIdentityFor({

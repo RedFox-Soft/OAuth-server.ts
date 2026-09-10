@@ -29,6 +29,10 @@ function sentrySource(): string {
 	return SENTRY_SOURCES.map((f) => readFileSync(f, 'utf8')).join('\n');
 }
 
+/**
+ * @proves Outbound reporting registers no lifecycle hook, adds no header, and does not import
+ * the framework - so responses are identical whether it is armed or not.
+ */
 describe('sentry adds no request-path instrumentation', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);

@@ -30,6 +30,10 @@ import { sessionFor } from '../admin_session.ts';
 // silently left behind with no error anywhere — which is why it has its own test rather than being
 // folded into a "sweeps everything" assertion.
 
+/**
+ * @proves Deleting an end-user stops their sessions and tokens, destroys every record keyed by
+ * their id or their address, and leaves the same address in another bucket untouched.
+ */
 describe('deletion cascade: end-user', () => {
 	let setup: Setup;
 

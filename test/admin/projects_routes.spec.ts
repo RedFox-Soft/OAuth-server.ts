@@ -32,6 +32,10 @@ async function sessionCookieFor(roles: string[]) {
 	return { cookie: `${ADMIN_SESSION_COOKIE}=${s._id}`, userId: user._id };
 }
 
+/**
+ * @proves Projects are created into the caller own scope, listed only within it, and the
+ * reserved admin project is neither listed nor editable by anyone.
+ */
 describe('projects API', () => {
 	beforeEach(async () => {
 		await ensureAdminSeed();

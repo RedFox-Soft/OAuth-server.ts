@@ -26,6 +26,10 @@ const fakeCtx = {
 	}
 };
 
+/**
+ * @proves A deployment can replace a behaviour function at runtime and have the override take
+ * effect on the next call, without losing the defaults it did not touch.
+ */
 describe('addon override registry', () => {
 	// This spec does not call bootstrap(), so clear any baseline a prior spec set
 	// before relying on default resolution.

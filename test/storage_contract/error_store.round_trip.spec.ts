@@ -64,6 +64,10 @@ function occurrence(over: Partial<ErrorOccurrence> = {}): ErrorOccurrence {
 	};
 }
 
+/**
+ * @proves Faults are grouped by fingerprint with exact counts, bounded, expired on read,
+ * filterable, and pageable without dropping a group.
+ */
 describe('ErrorStore (memory)', () => {
 	let store: ErrorStore;
 	let bounds = { retentionDays: 30, maxGroups: 100, samplesPerGroup: 10 };

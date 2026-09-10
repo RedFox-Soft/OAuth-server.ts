@@ -29,6 +29,10 @@ function decode(b64urljson) {
 	return JSON.parse(base64url.decode(b64urljson));
 }
 
+/**
+ * @proves A JWT-format token is signed, encrypted or nested as the deployment configured, and a
+ * configuration that would sign with none or with the wrong kind of key is refused.
+ */
 describe('jwt format', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);
@@ -224,7 +228,7 @@ describe('jwt format', () => {
 			expect(header).not.toHaveProperty('kid');
 		});
 
-		it('kid must be a string (sign)', async () => {
+		it('a non-string kid is refused rather than serialised into the header', async () => {
 			const resourceServer = new ResourceServer(resource, {
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
@@ -244,7 +248,7 @@ describe('jwt format', () => {
 			);
 		});
 
-		it('kid must be a string (encrypt)', async () => {
+		it('refuses a non-string kid on the encryption header', async () => {
 			const resourceServer = new ResourceServer(resource, {
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
@@ -699,7 +703,7 @@ describe('jwt format', () => {
 		});
 
 		for (const prop of ['alg', 'enc', 'key']) {
-			it(`ensures JWE Configuration has ${prop}`, async () => {
+			it(`each required encryption property is refused when absent`, async () => {
 				const resourceServer = new ResourceServer(resource, {
 					accessTokenFormat: 'jwt',
 					audience: 'foo',
@@ -727,7 +731,7 @@ describe('jwt format', () => {
 		}
 	});
 
-	it('for AccessToken', async () => {
+	it('an access token in JWT format carries the expected claims', async () => {
 		const upsert = spyOn(TestAdapter.for('AccessToken'), 'upsert');
 		const client = await Client.find(clientId);
 		const token = new AccessToken({ client, ...fullPayload });
@@ -757,7 +761,7 @@ describe('jwt format', () => {
 		});
 	});
 
-	it('for pairwise AccessToken', async () => {
+	it('a JWT access token for a pairwise client carries the pairwise subject', async () => {
 		const upsert = spyOn(TestAdapter.for('AccessToken'), 'upsert');
 		const client = await Client.find('pairwise');
 		const token = new AccessToken({ client, ...fullPayload });
@@ -787,7 +791,7 @@ describe('jwt format', () => {
 		});
 	});
 
-	it('for ClientCredentials', async () => {
+	it('a JWT client credentials token carries the expected claims', async () => {
 		const upsert = spyOn(TestAdapter.for('ClientCredentials'), 'upsert');
 		const client = await Client.find(clientId);
 		const token = new ClientCredentials({

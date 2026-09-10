@@ -14,6 +14,10 @@ import { resetReadinessCache } from 'lib/actions/ready.js';
  * be covered only by hand.
  */
 
+/**
+ * @proves Readiness reports what storage can actually do, recovers on its own, never repeats the
+ * driver error, and starts one probe per burst rather than one per caller.
+ */
 describe('liveness and readiness', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);

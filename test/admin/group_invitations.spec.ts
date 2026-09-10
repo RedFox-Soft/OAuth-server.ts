@@ -55,6 +55,10 @@ function tokenFor(email: string): string {
 	return token;
 }
 
+/**
+ * @proves An owner invites somebody into their own group by email, the invitation works exactly
+ * once, and it stops working when the group or the inviter no longer qualifies.
+ */
 describe('group invitations', () => {
 	beforeEach(async () => {
 		await ensureAdminSeed();

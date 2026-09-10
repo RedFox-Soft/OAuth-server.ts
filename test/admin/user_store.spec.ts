@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { UserStore } from 'lib/adapters/memory/userStore.ts';
 
+/**
+ * @proves An end-user record round-trips through the store with its roles, and a deletion
+ * actually removes it.
+ */
 describe('UserStore (memory) roles', () => {
 	let store: UserStore;
 	beforeEach(() => {

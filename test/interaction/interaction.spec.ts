@@ -31,6 +31,10 @@ function grantCount() {
 const expire = new Date();
 expire.setDate(expire.getDate() + 1);
 
+/**
+ * @proves A user signs in and consents through the interaction pages and is returned to the
+ * client, and no interaction completes on a session that ended or changed hands.
+ */
 describe('interaction UI', async () => {
 	const setup = await bootstrap(import.meta.url);
 	afterEach(function () {
@@ -56,7 +60,7 @@ describe('interaction UI', async () => {
 			object.url = url;
 		});
 
-		it('with a form', async function () {
+		it('the login page renders a usable form', async function () {
 			const uid = object.uid;
 			const { data } = await agent.ui[uid].login.get({
 				headers: {
@@ -69,7 +73,7 @@ describe('interaction UI', async () => {
 			expect(data).toContain(`action="/ui/${uid}/login`);
 		});
 
-		it('"handles" not found interaction session id cookie', async function () {
+		it('a request with no interaction cookie renders an error page rather than faulting', async function () {
 			const { error } = await agent.ui[object.uid].login.get();
 
 			expect(error.value).toEqual({
@@ -78,7 +82,7 @@ describe('interaction UI', async () => {
 			});
 		});
 
-		it('"handles" not found interaction session', async function () {
+		it('a cookie naming an interaction that does not exist is refused', async function () {
 			spyOn(Interaction, 'tryFind').mockResolvedValue(undefined);
 
 			const { error } = await agent.ui[object.uid].login.get({
@@ -116,7 +120,7 @@ describe('interaction UI', async () => {
 			[, , uid] = url.split('/');
 		});
 
-		it('with a form', async function () {
+		it('the consent page renders a usable form', async function () {
 			const { data, status } = await agent.ui[uid].consent.get({
 				headers: {
 					cookie
@@ -127,7 +131,7 @@ describe('interaction UI', async () => {
 			expect(data).toContain('Consent Required');
 		});
 
-		it('checks that the authentication session is still there', async function () {
+		it('a consent page for a session that has ended is refused', async function () {
 			const session = setup.getLastSession();
 			await session.destroy();
 
@@ -143,7 +147,7 @@ describe('interaction UI', async () => {
 			});
 		});
 
-		it("checks that the authentication session's principal didn't change", async function () {
+		it('a consent page is refused once a different user has signed in', async function () {
 			const session = setup.getLastSession();
 			session.payload.accountId = 'foobar';
 			await session.save();
@@ -348,7 +352,7 @@ describe('interaction UI', async () => {
 			expect(grantCount()).toBe(before + 1);
 		});
 
-		it('checks that the authentication session is still there', async function () {
+		it('a consent submission is refused once the session has ended', async function () {
 			const session = setup.getLastSession();
 			await session.destroy();
 
@@ -369,7 +373,7 @@ describe('interaction UI', async () => {
 			});
 		});
 
-		it("checks that the authentication session's principal didn't change", async function () {
+		it('a consent submission is refused once a different user has signed in', async function () {
 			const session = setup.getLastSession();
 			session.payload.accountId = 'foobar';
 			await session.save();
@@ -625,7 +629,7 @@ describe('resume after consent', async () => {
 	});
 
 	describe('custom interaction errors', () => {
-		it('custom interactions can fail too', async function () {
+		it("a deployment's own interaction can abort the flow with an error the client receives", async function () {
 			const session = await setup.login();
 			const auth = new AuthorizationRequest({
 				scope: 'openid',
@@ -746,7 +750,7 @@ describe('resume after consent', async () => {
 	});
 
 	describe('custom requestable prompts', () => {
-		it('should fail if they are not resolved', async function () {
+		it('an authorization with unresolved prompts is refused rather than completed', async function () {
 			const session = await setup.login();
 			const auth = new AuthorizationRequest({
 				scope: 'openid',
@@ -768,7 +772,7 @@ describe('resume after consent', async () => {
 	});
 
 	describe('custom unrequestable prompts', () => {
-		it('should fail if they are not satisfied', async function () {
+		it('an authorization whose prompt checks are unsatisfied is refused', async function () {
 			const session = await setup.login();
 			const auth = new AuthorizationRequest({
 				triggerUnrequestable: 'foo',
@@ -799,7 +803,7 @@ describe('resume after consent', async () => {
 	// The policy moved onto the addon seam. These pin the three properties that make that
 	// safe: a stable instance, isolation of overrides, and isolation of in-place mutation.
 	describe('policy resolution through the addon seam', () => {
-		it('resolves to a stable instance', () => {
+		it('the interaction policy is the same object across calls within a request', () => {
 			// Drop this spec's config-declared override so the shipped baseline is what
 			// resolves; the global afterEach restores the baseline.
 			addons.reset();

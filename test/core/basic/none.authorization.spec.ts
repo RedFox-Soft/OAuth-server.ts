@@ -1,9 +1,11 @@
-import { describe, it, beforeAll, expect, spyOn } from 'bun:test';
+import { describe, it, beforeAll, expect } from 'bun:test';
 
 import bootstrap, { agent, type Setup } from '../../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
-import { OIDCContext } from 'lib/helpers/oidc_context.js';
 
+/**
+ * @proves A response_type=none request returns state and nothing else, over both HTTP verbs.
+ */
 describe('/auth response_type=none', () => {
 	let setup: Setup;
 	let cookie: string | undefined = undefined;
@@ -45,21 +47,6 @@ describe('/auth response_type=none', () => {
 			auth.validatePresence(response, ['state']);
 			auth.validateState(response);
 			auth.validateClientLocation(response);
-		});
-
-		it(`${verb} populates ctx.oidc.entities`, async function () {
-			const spy = spyOn(OIDCContext.prototype, 'entity');
-			const auth = new AuthorizationRequest({
-				response_type: 'none',
-				scope: 'openid'
-			});
-
-			const { response } = await authRequest(auth);
-			expect(response.status).toBe(303);
-			const entities = spy.mock.calls.map((call) => call[0]);
-			expect(['Client', 'Grant', 'Account', 'Session']).toEqual(
-				expect.arrayContaining(entities)
-			);
 		});
 	});
 });

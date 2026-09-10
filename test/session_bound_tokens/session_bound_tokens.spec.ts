@@ -20,6 +20,10 @@ function codeFromResponse(response: Response) {
 	return code as string;
 }
 
+/**
+ * @proves A session-bound token dies with the session, and an offline_access refresh token
+ * deliberately does not.
+ */
 describe('session bound tokens behaviours', () => {
 	let setup: Setup;
 	beforeAll(async () => {
@@ -69,7 +73,7 @@ describe('session bound tokens behaviours', () => {
 			expect(denied.status).toBe(401);
 		});
 
-		it('"code" with "online" refresh token', async () => {
+		it('an online refresh token dies with the session', async () => {
 			const cookie = await setup.login({ scope: 'openid offline_access' });
 			const auth = new AuthorizationRequest({
 				client_id: 'client-refresh',

@@ -217,6 +217,10 @@ async function seedSecretHolders(token: string) {
 	};
 }
 
+/**
+ * @proves No secret leaves the agent surface through any read, error path or audit entry, and a
+ * client secret is disclosed exactly once at creation.
+ */
 describe('MCP surface leaks no secrets', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);

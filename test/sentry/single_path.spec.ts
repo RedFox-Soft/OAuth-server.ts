@@ -31,6 +31,10 @@ function callSitesOf(name: string, exclude: string[]): string[] {
 		.filter((file) => pattern.test(readFileSync(file, 'utf8')));
 }
 
+/**
+ * @proves Outbound reporting is reached from exactly one place per path, so nothing can send an
+ * event that skipped the classification and the redaction.
+ */
 describe('sentry has one dispatch path', () => {
 	it('is called from exactly one place, and that place is the error store', () => {
 		/* dispatch.ts defines it; event.ts and the specs are not call sites. */

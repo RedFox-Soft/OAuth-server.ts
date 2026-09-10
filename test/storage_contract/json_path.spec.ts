@@ -24,6 +24,10 @@ import {
  * a slow query ever says so.
  */
 
+/**
+ * @proves Every declared field and index translates to a PostgreSQL expression that actually
+ * addresses the stored document, quoted so a field name cannot close the literal.
+ */
 describe('jsonPath', () => {
 	describe('reserved keys that are real columns, not JSON', () => {
 		it('maps expiresAt to the expires_at column', () => {

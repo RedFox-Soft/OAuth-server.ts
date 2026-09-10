@@ -62,6 +62,10 @@ function expectFail(res, code, error, error_description) {
 	}
 }
 
+/**
+ * @proves A client manages its own registration with the token it was issued, sees its own
+ * metadata without internal fields, and has that token rotated and the old one destroyed.
+ */
 describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);
@@ -76,7 +80,7 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 	});
 
 	describe('feature flag', () => {
-		it('checks registration is also enabled', () => {
+		it('the management endpoints are unreachable while registration itself is off', () => {
 			// Validation is a pure function of the config handed to it, so the invalid combination is
 			// checked on a copy rather than by mutating the live settings and restoring them.
 			expect(() =>
@@ -231,7 +235,7 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 		});
 
 		for (const field of NOGO) {
-			it(`must not contain ${field}`, async () => {
+			it(`the response never carries the internal fields, for every one of them`, async () => {
 				const client = await register();
 				const res = await agent.reg({ clientId: client.client_id }).put(
 					updateProperties(client, {

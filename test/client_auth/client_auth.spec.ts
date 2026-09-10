@@ -49,12 +49,16 @@ const tokenAuthRejected = {
 	error_description: 'client authentication failed'
 };
 
+/**
+ * @proves Every client authentication method this server implements accepts a correct credential
+ * and refuses a wrong, absent, expired, replayed, duplicated or foreign one.
+ */
 describe('client authentication options', () => {
 	beforeAll(async function () {
 		await bootstrap(import.meta.url);
 	});
 
-	it('expects auth to be provided', async function () {
+	it('a token request with no client authentication is refused as invalid_client', async function () {
 		const { error } = await agent.token.post({
 			grant_type: 'client_credentials'
 		});
@@ -78,7 +82,7 @@ describe('client authentication options', () => {
 	});
 
 	describe('none "auth"', () => {
-		it('accepts the "auth"', async function () {
+		it('a client using auth method none is accepted', async function () {
 			const res = await agent.token.post({
 				grant_type: 'client_credentials',
 				client_id: 'client-none'
@@ -224,7 +228,7 @@ describe('client authentication options', () => {
 			});
 		});
 
-		it('validates the Basic scheme format (parts)', async function () {
+		it('a Basic credential that does not split into two parts is refused', async function () {
 			const { error } = await agent.token.post(
 				{
 					grant_type: 'client_credentials'
@@ -243,7 +247,7 @@ describe('client authentication options', () => {
 			});
 		});
 
-		it('validates the Basic scheme format (Basic)', async function () {
+		it('a scheme other than Basic is refused', async function () {
 			const { error } = await agent.token.post(
 				{
 					grant_type: 'client_credentials'
@@ -262,7 +266,7 @@ describe('client authentication options', () => {
 			});
 		});
 
-		it('validates the Basic scheme format (no :)', async function () {
+		it('a credential with no separator is refused', async function () {
 			const { error } = await agent.token.post(
 				{
 					grant_type: 'client_credentials'
@@ -721,7 +725,7 @@ describe('client authentication options', () => {
 			});
 		});
 
-		it('exp must be set', async function () {
+		it('an assertion with no exp is refused', async function () {
 			const spy = mock();
 			eventBus.once('grant.error', spy);
 
@@ -758,7 +762,7 @@ describe('client authentication options', () => {
 			expect(error.value).toEqual(tokenAuthRejected);
 		});
 
-		it('aud must be set', async function () {
+		it('an assertion with no audience is refused', async function () {
 			const spy = mock();
 			eventBus.once('grant.error', spy);
 			const assertion = await JWT.sign(
@@ -792,7 +796,7 @@ describe('client authentication options', () => {
 			expect(error.value).toEqual(tokenAuthRejected);
 		});
 
-		it('jti must be set', async function () {
+		it('an assertion with no jti is refused', async function () {
 			const spy = mock();
 			eventBus.once('grant.error', spy);
 			const assertion = await JWT.sign(
@@ -827,7 +831,7 @@ describe('client authentication options', () => {
 			expect(error.value).toEqual(tokenAuthRejected);
 		});
 
-		it('iss must be set', async function () {
+		it('refuses a client assertion with no iss', async function () {
 			const spy = mock();
 			eventBus.once('grant.error', spy);
 
@@ -863,7 +867,7 @@ describe('client authentication options', () => {
 			expect(error.value).toEqual(tokenAuthRejected);
 		});
 
-		it('sub must be set', async function () {
+		it('refuses a client assertion with no sub', async function () {
 			const spy = mock();
 			eventBus.once('grant.error', spy);
 
@@ -899,7 +903,7 @@ describe('client authentication options', () => {
 			expect(error.value).toEqual(tokenAuthRejected);
 		});
 
-		it('iss must be the client id', async function () {
+		it('an assertion whose issuer is not the client is refused', async function () {
 			const spy = mock();
 			eventBus.once('grant.error', spy);
 
@@ -934,7 +938,7 @@ describe('client authentication options', () => {
 			expect(error.value).toEqual(tokenAuthRejected);
 		});
 
-		it('checks for mismatch in client_assertion client_id and body client_id', async function () {
+		it('refuses an assertion whose client_id disagrees with the body', async function () {
 			const assertion = await JWT.sign(
 				{
 					jti: nanoid(),
@@ -962,7 +966,7 @@ describe('client authentication options', () => {
 			});
 		});
 
-		it('requires client_assertion_type', async function () {
+		it('an assertion with no type is refused as invalid_request', async function () {
 			const assertion = await JWT.sign(
 				{
 					jti: nanoid(),
@@ -989,7 +993,7 @@ describe('client authentication options', () => {
 			});
 		});
 
-		it('requires client_assertion_type of specific value', async function () {
+		it('a type other than the registered URN is refused', async function () {
 			const assertion = await JWT.sign(
 				{
 					jti: nanoid(),
@@ -1267,7 +1271,7 @@ describe('client authentication options', () => {
 			expect(data).toHaveProperty('access_token');
 		});
 
-		it('fails the auth when getCertificate() does not return a cert', async function () {
+		it('a request with no client certificate is refused', async function () {
 			const { error } = await agent.token.post({
 				client_id: 'client-pki-mtls',
 				grant_type: 'client_credentials'
@@ -1275,7 +1279,7 @@ describe('client authentication options', () => {
 			expect(error?.value).toEqual(tokenAuthRejected);
 		});
 
-		it('fails the auth when certificateAuthorized() fails', async function () {
+		it('a certificate the deployment does not authorize is refused', async function () {
 			const { error } = await agent.token.post(
 				{
 					client_id: 'client-pki-mtls',
@@ -1292,7 +1296,7 @@ describe('client authentication options', () => {
 			expect(error?.value).toEqual(tokenAuthRejected);
 		});
 
-		it('fails the auth when certificateSubjectMatches() return false', async function () {
+		it('a certificate whose subject does not match the registered one is refused', async function () {
 			const { error } = await agent.token.post(
 				{
 					client_id: 'client-pki-mtls',
@@ -1311,7 +1315,7 @@ describe('client authentication options', () => {
 	});
 
 	describe('self_signed_tls_client_auth auth', () => {
-		it('accepts the auth [1/2]', async function () {
+		it('accepts a self-signed RSA client certificate', async function () {
 			const { status, data } = await agent.token.post(
 				{
 					client_id: 'client-self-signed-mtls',
@@ -1327,7 +1331,7 @@ describe('client authentication options', () => {
 			expect(data).toHaveProperty('access_token');
 		});
 
-		it('accepts the auth [2/2]', async function () {
+		it('accepts a self-signed EC client certificate', async function () {
 			const { status, data } = await agent.token.post(
 				{
 					client_id: 'client-self-signed-mtls',
@@ -1366,7 +1370,7 @@ describe('client authentication options', () => {
 			expect(error?.value).toEqual(tokenAuthRejected);
 		});
 
-		it('handles rotation of stale jwks', async function () {
+		it('a client that rotated its published key can still authenticate on the next request', async function () {
 			mockHttp('https://client.example.com')
 				.intercept({
 					path: '/jwks'

@@ -28,17 +28,25 @@ const mountedApi = mounted.routes
 	.filter((r) => r.path.startsWith('/admin/api'))
 	.map((r) => ({ method: r.method, path: r.path }));
 
+/**
+ * @proves No administrative operation exists that the agent surface neither publishes nor names
+ * as a deliberate exclusion, in either direction, and every exclusion records why.
+ */
 describe('MCP tool catalogue', () => {
-	it('publishes 65 tools: 28 reads and 37 writes', () => {
-		expect(mcpCatalogue.length).toBe(65);
-		expect(mcpCatalogue.filter((t) => t.method === 'GET').length).toBe(28);
-		expect(mcpCatalogue.filter((t) => t.method !== 'GET').length).toBe(37);
-	});
+	it('gives every exclusion a recorded reason', () => {
+		/*
+		 * This replaces a bare `excludedConsoleOperations.length === 12`. The intent behind that count
+		 * was sound - a further exclusion is a product decision, not a refactor - but a count fires
+		 * identically on a considered addition and on a mistake, and the only way to repair it is to
+		 * edit the number. Requiring a reason keeps the deliberateness and fails informatively: adding
+		 * a thirteenth exclusion means writing down why an agent may not do it.
+		 */
+		const unexplained = excludedConsoleOperations
+			.filter((e) => !e.reason || !e.reason.trim())
+			.map(key);
 
-	it('names exactly twelve exclusions', () => {
-		// A further exclusion is a product decision, not a refactor: it must fail here until the
-		// specification is updated to account for it.
-		expect(excludedConsoleOperations.length).toBe(12);
+		expect(unexplained).toEqual([]);
+		expect(excludedConsoleOperations.length).toBeGreaterThan(0);
 	});
 
 	it('accounts for every mounted /admin/api route, in both directions', () => {
@@ -112,10 +120,10 @@ describe('MCP tool catalogue', () => {
 		]);
 	});
 
-	it('classifies exactly fourteen tools as high-consequence', () => {
-		// Pinned as a count so FR-014's enumeration and this table cannot drift apart.
+	it('names every high-consequence tool, so a new destructive one cannot arrive ungated', () => {
+		// The set is named below rather than counted: a count fires on a considered addition exactly as
+		// it fires on a mistake. confirmation_matrix guards the arity; this guards the membership.
 		const high = mcpCatalogue.filter((t) => t.consequence === 'high');
-		expect(high.length).toBe(14);
 		expect(high.map((t) => t.tool).sort()).toEqual([
 			'admin_deactivate',
 			'bucket_user_delete',

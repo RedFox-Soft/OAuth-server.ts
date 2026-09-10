@@ -84,6 +84,10 @@ async function resetStore() {
 	publicJWKS.keys.push(...BOOT_RUNNING);
 }
 
+/**
+ * @proves A super administrator views and rotates signing keys, never sees private material, is
+ * told when a deletion needs a restart, and cannot remove the last key.
+ */
 describe('admin JWKS API — view (US1)', () => {
 	beforeEach(resetStore);
 

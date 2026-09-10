@@ -1,8 +1,12 @@
 import { describe, it, expect } from 'bun:test';
 import { Grant } from '../test_helper.js';
 
+/**
+ * @proves A grant records the scope, claims and per-resource scope that were granted, and reads
+ * them back.
+ */
 describe('Grant', () => {
-	it('manages OIDC Scope', function () {
+	it('a granted scope is recorded and readable back on the grant', function () {
 		const grant = new Grant();
 		expect(grant.getOIDCScope()).toBe('');
 		grant.addOIDCScope('openid');
@@ -40,7 +44,7 @@ describe('Grant', () => {
 		);
 	});
 
-	it('manages OIDC Claims', function () {
+	it('records granted claims and reads them back on the grant', function () {
 		const grant = new Grant();
 		expect(grant.getOIDCClaims()).toEqual([]);
 		grant.addOIDCClaims(['sub']);
@@ -89,7 +93,7 @@ describe('Grant', () => {
 		]);
 	});
 
-	it('manages Resource Scope', function () {
+	it('records per-resource scope and reads it back on the grant', function () {
 		const grant = new Grant();
 		const resource = 'urn:example:rs';
 		expect(grant.getResourceScope(resource)).toBe('');

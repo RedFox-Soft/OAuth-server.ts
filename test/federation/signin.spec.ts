@@ -27,6 +27,10 @@ import {
  * failure would land on an unrelated case. One origin per case keeps each fetch count local.
  */
 
+/**
+ * @proves A federated sign-in links to the existing account rather than making a second,
+ * provisions with no usable password and no roles, and stores no upstream token.
+ */
 describe('federated sign-in', () => {
 	beforeAll(async () => {
 		// Named explicitly: bootstrap defaults to the directory name, and this suite's config is `signin`

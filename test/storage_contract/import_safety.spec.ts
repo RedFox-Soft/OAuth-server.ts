@@ -26,6 +26,10 @@ function modules(): string[] {
 		.map((entry) => join(POSTGRES, entry));
 }
 
+/**
+ * @proves Importing the PostgreSQL adapter opens no connection and needs no URL, deferring the
+ * failure to first use.
+ */
 describe('postgres adapter import safety', () => {
 	const saved = process.env.POSTGRES_URL;
 

@@ -7,6 +7,10 @@ import bootstrap, {
 } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
+/**
+ * @proves A relying party asking for distributed or aggregated claims receives the members that
+ * locate them, and a party that did not ask receives neither.
+ */
 describe('distributed and aggregated claims', () => {
 	let setup: Setup;
 	beforeAll(async function () {

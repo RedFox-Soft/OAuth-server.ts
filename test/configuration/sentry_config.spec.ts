@@ -17,6 +17,10 @@ const withSentry = (overrides: Record<string, unknown>) => ({
 	...overrides
 });
 
+/**
+ * @proves Outbound reporting cannot be enabled without a parseable credential and the error
+ * store behind it.
+ */
 describe('sentry configuration validation', () => {
 	it('accepts the shipped defaults', () => {
 		expect(() => validateConfiguration({ ...ApplicationConfig })).not.toThrow();

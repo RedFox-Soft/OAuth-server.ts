@@ -10,6 +10,10 @@ import { parseClientIdentifierUrl } from 'lib/client_metadata_document/identifie
  * authorization server can reach. Refusing on shape alone costs nothing and closes that.
  */
 
+/**
+ * @proves Only an https URL with a path is a document identifier, traversal and credentials and
+ * fragments are refused on the raw input, and an ordinary client id falls through untouched.
+ */
 describe('a client identifier that is a URL', () => {
 	it('accepts an https URL carrying a path component', () => {
 		const result = parseClientIdentifierUrl(

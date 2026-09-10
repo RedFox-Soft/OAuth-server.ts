@@ -13,6 +13,10 @@ import { captureOrigin, resetOriginSalt } from 'lib/error_store/redact.ts';
 const headersFor = (address: string) =>
 	new Headers(address ? { 'x-forwarded-for': address } : {});
 
+/**
+ * @proves The operator chooses whether a fault record carries the caller address, a stable
+ * pseudonym, or nothing at all.
+ */
 describe('origin capture levels', () => {
 	beforeEach(() => {
 		resetOriginSalt();
@@ -35,7 +39,7 @@ describe('origin capture levels', () => {
 	});
 
 	describe('anonymized', () => {
-		it('does not store the address', async () => {
+		it('at the anonymized level the raw address is never stored', async () => {
 			const origin = await captureOrigin(
 				headersFor('203.0.113.7'),
 				'anonymized'

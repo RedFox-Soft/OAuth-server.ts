@@ -59,6 +59,10 @@ function code(text: string): string {
 	return text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
 }
 
+/**
+ * @proves The retired managedBy conversion left no reference behind that could resurrect a code
+ * path nothing supports.
+ */
 describe('the retired ownership migration', () => {
 	const files = sources();
 
@@ -67,7 +71,7 @@ describe('the retired ownership migration', () => {
 	});
 
 	for (const identifier of GONE) {
-		it(`has no surviving reference to ${identifier}`, () => {
+		it(`no retired identifier survives anywhere in the tree`, () => {
 			const surviving = files
 				.filter((file) => file.text.includes(identifier))
 				.map((file) => file.shown);

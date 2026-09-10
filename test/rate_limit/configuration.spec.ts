@@ -41,6 +41,10 @@ function withKey(key: string, value: unknown) {
 	return { ...ApplicationConfig, [key]: value };
 }
 
+/**
+ * @proves Every rate-limit setting is validated whether or not the limiter is on, catalogued for
+ * the console, and enforced as the operator set it.
+ */
 describe('rate limit configuration', () => {
 	it('accepts the shipped defaults', () => {
 		expect(() => validateConfiguration({ ...ApplicationConfig })).not.toThrow();
@@ -49,7 +53,7 @@ describe('rate limit configuration', () => {
 	for (const key of NUMERIC_KEYS) {
 		describe(key, () => {
 			for (const [label, value] of REJECTED) {
-				it(`refuses ${label}, naming the key`, () => {
+				it(`each invalid value is refused with its key named`, () => {
 					expect(() => validateConfiguration(withKey(key, value))).toThrow(
 						TypeError
 					);

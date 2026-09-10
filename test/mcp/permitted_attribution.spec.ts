@@ -61,6 +61,10 @@ async function rpc(body: unknown, token: string) {
 			: undefined;
 }
 
+/**
+ * @proves An action taken through a permitted client identity names both the administrator and
+ * that identity.
+ */
 describe('attributing an action taken through a permitted identity', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'mcp' });

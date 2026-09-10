@@ -57,6 +57,10 @@ async function tenant(label: string, roles = ['project_admin']) {
 	};
 }
 
+/**
+ * @proves A project administrator can reach only what their own groups own, cannot escalate into
+ * another group or the reserved containers, and learns nothing about what it cannot reach.
+ */
 describe('group isolation', () => {
 	beforeEach(async () => {
 		await ensureAdminSeed();

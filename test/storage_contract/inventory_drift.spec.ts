@@ -116,6 +116,10 @@ function persistedModelClasses(all: DiscoveredClass[]): DiscoveredClass[] {
 	return all.filter(({ ctor }) => !bases.has(ctor));
 }
 
+/**
+ * @proves Every storage area the server touches is declared once with its ownership and payload
+ * schema, and nothing is declared that the server does not use.
+ */
 describe('storage inventory drift', () => {
 	const inventoried = new Set<string>(MODEL_AREAS);
 

@@ -5,6 +5,10 @@ import bootstrap, { type Setup } from '../test_helper.js';
 import addClient from '../../lib/helpers/add_client.ts';
 import 'lib/index.js';
 
+/**
+ * @proves RFC 8252 redirect targets are accepted for native apps and refused where they would
+ * let another app on the device intercept the code.
+ */
 describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
 	let setup: Setup;
 	beforeAll(async function () {

@@ -143,6 +143,10 @@ const CLIENT_BODY = {
  * bucket: the route closes itself as soon as one super_admin exists, and earlier specs in this process
  * have seeded several.
  */
+/**
+ * @proves Every state-changing administrative operation writes an entry naming the actor, the
+ * action and the target it will affect - and never the value of a credential.
+ */
 describe('admin audit coverage: bootstrap', () => {
 	it('records the first-run setup against the unauthenticated bootstrap actor', async () => {
 		resetAdminMemoryStores();

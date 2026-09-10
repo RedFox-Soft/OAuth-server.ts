@@ -18,6 +18,9 @@ async function member() {
 	];
 }
 
+/**
+ * @proves Client identity documents are advertised exactly while the capability is on.
+ */
 describe('client_id_metadata_document_supported', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'cimd' });

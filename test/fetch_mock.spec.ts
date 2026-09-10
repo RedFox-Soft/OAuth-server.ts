@@ -12,6 +12,10 @@ import { mock } from './fetch_mock.ts';
  * put such a spec first) while passing on Windows, and the failure looked like an unreachable
  * upstream rather than a harness bug, because the request really was reaching the network.
  */
+/**
+ * @proves The suite outbound-fetch stub actually intercepts, reinstalls itself when the global
+ * patch is dropped, and refuses an unmatched path.
+ */
 describe('the outbound fetch mock', () => {
 	afterEach(() => {
 		mock.restore();

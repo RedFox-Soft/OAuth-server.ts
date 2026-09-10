@@ -47,6 +47,10 @@ const FEATURE_GATED = [
 	'require_signed_request_object'
 ];
 
+/**
+ * @proves The discovery document advertises exactly the capabilities the deployment has, in both
+ * directions, and an explicit false is not the same as an absent member.
+ */
 describe('discovery pruning', () => {
 	describe('all features enabled', () => {
 		beforeAll(async () => {

@@ -20,6 +20,10 @@ import {
  * refusing rather than warning, because nobody reads a warning from a process that started.
  */
 
+/**
+ * @proves The datastore is chosen by which connection string is set, exactly one may be, and
+ * both set is refused by name rather than resolved by precedence.
+ */
 describe('selectBackend', () => {
 	it('uses the in-memory stores when no datastore is configured', () => {
 		expect(selectBackend({})).toBe('memory');

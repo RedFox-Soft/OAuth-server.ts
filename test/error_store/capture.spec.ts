@@ -27,6 +27,10 @@ async function faultsOn(route: string) {
 	return page.groups;
 }
 
+/**
+ * @proves An unexpected internal fault is recorded with the context to place it and a reference
+ * the caller can quote, while a routine refusal is not recorded at all.
+ */
 describe('error store capture', () => {
 	beforeEach(() => {
 		ApplicationConfig['errorStore.enabled'] = true;

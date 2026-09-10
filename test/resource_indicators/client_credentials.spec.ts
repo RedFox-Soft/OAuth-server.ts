@@ -1,18 +1,13 @@
-import {
-	describe,
-	beforeAll,
-	it,
-	mock,
-	afterEach,
-	expect,
-	spyOn
-} from 'bun:test';
+import { describe, beforeAll, it, mock, afterEach, expect } from 'bun:test';
 
 import bootstrap, { agent } from '../test_helper.js';
 import { eventBus } from 'lib/event_bus.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
-import { OIDCContext } from 'lib/helpers/oidc_context.js';
 
+/**
+ * @proves A machine client naming a resource receives a token bound to it in the format the
+ * resource declared, scoped to what that resource recognises.
+ */
 describe('grant_type=client_credentials w/ resourceIndicators', () => {
 	beforeAll(async function () {
 		await bootstrap(import.meta.url, {
@@ -109,7 +104,7 @@ describe('grant_type=client_credentials w/ resourceIndicators', () => {
 		expect(res.data.scope).toBe('api:read');
 	});
 
-	it('can reject resource indicator', async function () {
+	it("a deployment's policy can refuse a resource and the client is told", async function () {
 		const { error } = await agent.token.post(
 			{
 				grant_type: 'client_credentials',
@@ -148,7 +143,7 @@ describe('grant_type=client_credentials w/ resourceIndicators', () => {
 		});
 	});
 
-	it('validates each resource to be a valid URI individually', async function () {
+	it('each resource that is not an absolute URI is refused', async function () {
 		const { error } = await agent.token.post(
 			{
 				grant_type: 'client_credentials',
@@ -167,7 +162,7 @@ describe('grant_type=client_credentials w/ resourceIndicators', () => {
 		});
 	});
 
-	it('checks the policy and adds the resource', async function () {
+	it("an accepted resource becomes the token's audience", async function () {
 		const spy = mock();
 		eventBus.once('client_credentials.saved', spy);
 		eventBus.once('client_credentials.issued', spy);
@@ -247,23 +242,5 @@ describe('grant_type=client_credentials w/ resourceIndicators', () => {
 		const token = spy.mock.calls[0][0];
 		expect(token.payload.aud).toBe('urn:wl:opaque:default');
 		expect(token.payload.scope).toBe('api:read');
-	});
-
-	it('populates ctx.oidc.entities', async function () {
-		const spy = spyOn(OIDCContext.prototype, 'entity');
-
-		await agent.token.post(
-			{
-				grant_type: 'client_credentials',
-				scope: 'api:read'
-			},
-			{
-				headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
-			}
-		);
-		const entities = spy.mock.calls.map((call) => call[0]);
-		expect(['Client', 'ClientCredentials']).toEqual(
-			expect.arrayContaining(entities)
-		);
 	});
 });

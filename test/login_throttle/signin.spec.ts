@@ -179,6 +179,10 @@ function expectSignedIn(res: { status: number; setCookie: string | null }) {
 	expect(res.setCookie ?? '').toContain('_session=');
 }
 
+/**
+ * @proves A password door closes after a capped number of failures, escalates, verifies nothing
+ * while shut, and tells an attacker nothing about which addresses exist.
+ */
 describe('password door brute-force throttle', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'login_throttle' });

@@ -10,6 +10,10 @@ import { ENVIRONMENT_VARIABLES } from 'lib/docs_export/environment.ts';
  * the code can prove is the set of names: every `process.env.X` under lib/ must be documented, and
  * nothing documented may have stopped being read.
  */
+/**
+ * @proves The documented environment variables are exactly the ones the server reads, each with
+ * a description and a requirement.
+ */
 describe('environment variable inventory', () => {
 	const libRoot = resolve(import.meta.dir, '../../lib');
 	const referenced = new Set<string>();

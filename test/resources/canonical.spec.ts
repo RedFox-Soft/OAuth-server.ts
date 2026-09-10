@@ -17,6 +17,10 @@ function canonical(input: string): string {
 	return result.identifier;
 }
 
+/**
+ * @proves One canonicalization rule decides whether two spellings are one audience, tolerating
+ * what clients are told to expect and refusing a near miss.
+ */
 describe('canonical resource identifier', () => {
 	it('lower-cases the scheme and the host', () => {
 		expect(canonical('HTTPS://MCP.Example.COM/mcp')).toBe(

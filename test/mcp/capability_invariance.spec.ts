@@ -132,6 +132,10 @@ const CONFIGURATIONS: [string, Record<string, boolean>][] = [
 	]
 ];
 
+/**
+ * @proves The set of operations published to an agent does not change with capability flags, and
+ * no tool reads one.
+ */
 describe('published operation set is capability-invariant', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);

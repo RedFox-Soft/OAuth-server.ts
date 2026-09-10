@@ -74,6 +74,10 @@ async function seed(
 	return saved;
 }
 
+/**
+ * @proves An auditor reaches the trail newest-first, filters it conjunctively, pages it without
+ * losing an entry, and is refused rather than answered when the query is malformed.
+ */
 describe('GET /admin/api/audit', () => {
 	beforeEach(async () => {
 		await ensureAdminSeed();

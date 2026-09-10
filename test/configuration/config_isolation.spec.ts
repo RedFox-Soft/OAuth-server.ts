@@ -8,6 +8,10 @@ import { ApplicationConfig } from 'lib/configs/application.js';
 // object in place poisons the baseline itself and the mutation is re-applied by every later
 // bootstrap. That leak is invisible on a machine whose directory scan happens to run the mutating
 // spec last, and deterministic on one where it runs first — see test/discovery/discovery_parity.
+/**
+ * @proves A mutation of the process-wide configuration in one spec does not decide the result of
+ * the next.
+ */
 describe('ApplicationConfig isolation between specs', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);

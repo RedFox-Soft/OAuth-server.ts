@@ -32,6 +32,10 @@ const crt = new X509Certificate(
 );
 const expectedS256 = 'A4DtL2JmUMhAsvJj5tKyn64SqzmuXbMrJa0n761y5v0';
 
+/**
+ * @proves A token issued over mutual TLS carries the certificate thumbprint and is useless to
+ * anyone without that certificate, on every grant and across refresh.
+ */
 describe('features.mTLS.certificateBoundAccessTokens', () => {
 	let setup: Setup;
 	beforeAll(async function () {
@@ -44,7 +48,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 		mock.restore();
 	});
 
-	it('discovery extends discovery', async function () {
+	it('discovery advertises mutual-TLS client certificate binding', async function () {
 		const { data, status } =
 			await agent['.well-known']['openid-configuration'].get();
 		expect(status).toBe(200);
@@ -55,7 +59,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 	});
 
 	describe('userinfo', () => {
-		it('acts like an RS checking the thumbprint now', async function () {
+		it('a bound token presented without the matching certificate is refused', async function () {
 			const at = new AccessToken({
 				grantId: setup.getGrantId('client'),
 				accountId: setup.getAccountId(),
@@ -97,7 +101,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 	});
 
 	describe('introspection', () => {
-		it('exposes cnf now', async function () {
+		it('a bound token carries the certificate thumbprint in cnf', async function () {
 			const at = new AccessToken({
 				grantId: setup.getGrantId('client'),
 				accountId: setup.getAccountId(),

@@ -87,6 +87,11 @@ async function tokenFor(
 	return { token: value as unknown as string, user };
 }
 
+/**
+ * @proves The agent surface is discoverable, refuses an unauthenticated or wrongly-audienced
+ * call recoverably, scopes every read to the authorizing administrator, and is absent when
+ * switched off.
+ */
 describe('MCP transport', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);

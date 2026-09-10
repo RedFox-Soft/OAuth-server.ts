@@ -38,6 +38,10 @@ const schemas = {
 	UpdateClientBody
 };
 
+/**
+ * @proves Every admin schema reaches an agent as readable JSON Schema with its optionality and
+ * its allowed values intact, and no framework coercion format.
+ */
 describe('TypeBox admin schemas bridge into MCP tool schemas', () => {
 	it('every admin schema is already plain JSON Schema', () => {
 		for (const [name, schema] of Object.entries(schemas)) {
@@ -46,7 +50,7 @@ describe('TypeBox admin schemas bridge into MCP tool schemas', () => {
 		}
 	});
 
-	it('fromJsonSchema accepts each one', () => {
+	it('bridges every admin schema into a tool schema an agent can read', () => {
 		for (const [name, schema] of Object.entries(schemas)) {
 			const bridged = fromJsonSchema(
 				schema as Parameters<typeof fromJsonSchema>[0]
@@ -57,7 +61,7 @@ describe('TypeBox admin schemas bridge into MCP tool schemas', () => {
 
 	// The specific risk D2 named. `verificationMethod: t.Union([t.Literal('link'), t.Literal('code')])`
 	// must survive the bridge and still discriminate, or the affected schemas need an `enum` form.
-	it('renders and validates t.Union([t.Literal]) — the VerificationMethod case', () => {
+	it('shows an agent the allowed values of a constrained field, and refuses one outside them', () => {
 		const raw = CreateBucketBody.properties.verificationMethod;
 		// Record how TypeBox actually renders it, so a future TypeBox change is visible here.
 		expect(JSON.stringify(raw)).toMatch(/anyOf|enum|const/);

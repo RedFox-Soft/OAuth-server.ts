@@ -64,6 +64,10 @@ function ageWindow(email: string, by = CEILING + 1): void {
 	});
 }
 
+/**
+ * @proves The throttle window doubles to a ceiling and no further, never extends while an
+ * attacker keeps knocking, forgets after retention, and does not fail open.
+ */
 describe('login throttle: the curve', () => {
 	it('doubles from the first window up to the ceiling and stops there', () => {
 		expect(windowFor(0, 900, 3600)).toBe(900);

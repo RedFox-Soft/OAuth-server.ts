@@ -23,6 +23,10 @@ const STRICT_PATH = '/token';
 /* A public-class route, for proving the classes do not share a counter. */
 const PUBLIC_PATH = '/.well-known/openid-configuration';
 
+/**
+ * @proves Each origin gets its own allowance per class, is refused once it is spent without the
+ * penalty extending, and one origin cannot exhaust another.
+ */
 describe('rate limit enforcement', () => {
 	describe('one origin against its allowance', () => {
 		// Inside the describe, not at the top level: a top-level beforeEach does not reset

@@ -81,6 +81,10 @@ const RESOURCES = {
 	'urn:rar:other': 'api:read api:write'
 };
 
+/**
+ * @proves A client requests rich authorization details, the user is shown them in readable form
+ * and grants exactly those, and each token carries only what its resource server should see.
+ */
 describe('features.richAuthorizationRequests', () => {
 	let setup: Setup;
 
@@ -521,7 +525,7 @@ describe('features.richAuthorizationRequests', () => {
 		];
 
 		for (const [label, value] of cases) {
-			it(`refuses ${label} with invalid_authorization_details`, async () => {
+			it(`each malformed detail shape is refused with the RFC 9396 code`, async () => {
 				const { error } = await refusal(value);
 				expect(error).toBe('invalid_authorization_details');
 			});

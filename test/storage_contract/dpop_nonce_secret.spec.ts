@@ -21,6 +21,10 @@ import { SingletonSecretStore } from 'lib/adapters/memory/singletonSecretStore.t
 
 const bytes = (fill: number): Buffer => Buffer.alloc(32, fill);
 
+/**
+ * @proves The nonce secret round-trips as bytes, is never overwritten on create, and two racing
+ * replicas converge on one value.
+ */
 describe('SingletonSecretStore (memory): DPoP nonce secret instance', () => {
 	let store: SingletonSecretStore;
 

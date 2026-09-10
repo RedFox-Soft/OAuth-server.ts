@@ -15,12 +15,16 @@ function expectUri(registration_client_uri, client_id) {
 	expect(parsed.pathname.slice(i + 5)).toBe(encodeURIComponent(client_id));
 }
 
+/**
+ * @proves A client whose client_id is a URI can still be read and updated through registration
+ * management.
+ */
 describe('registration management with client_id as URI', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);
 	});
 
-	it('returns client_id as a URI string', async () => {
+	it('a client whose client_id is a URI can still be read and updated at /reg/:clientId', async () => {
 		let res = await agent.reg.post(
 			{ redirect_uris: ['https://client.example.com/cb'] },
 			{ headers: json }

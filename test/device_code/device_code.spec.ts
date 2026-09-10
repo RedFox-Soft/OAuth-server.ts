@@ -6,12 +6,16 @@ import {
 	reloadConfiguration
 } from 'lib/configs/application.js';
 
+/**
+ * @proves The device flow is advertised, and its user code is drawn from a charset and mask an
+ * operator can format but not weaken.
+ */
 describe('configuration features.deviceFlow', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);
 	});
 
-	it('extends discovery', async () => {
+	it('discovery advertises the device authorization endpoint', async () => {
 		const { status, data } =
 			await agent['.well-known']['openid-configuration'].get();
 		expect(status).toBe(200);

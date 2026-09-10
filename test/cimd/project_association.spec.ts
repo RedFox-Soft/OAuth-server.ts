@@ -54,6 +54,10 @@ function authParams(extra: Record<string, unknown> = {}) {
 	return { ...auth.params, ...extra };
 }
 
+/**
+ * @proves A client belonging to no project reaches the right tenant users through the resource
+ * it names, and reaches the default bucket only when it names none.
+ */
 describe('bucket resolution for a client that belongs to no project', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'project_association' });

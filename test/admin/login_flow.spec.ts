@@ -53,6 +53,10 @@ async function signIn(): Promise<string> {
 	return cookiePair(cb.response.headers.getSetCookie(), '_admin_session');
 }
 
+/**
+ * @proves The console signs an administrator in through its own issuer with PKCE and state,
+ * persists the session, and destroys both the console and the provider session on logout.
+ */
 describe('admin OIDC login (BFF)', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'admin' });

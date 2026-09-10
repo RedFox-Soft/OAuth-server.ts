@@ -17,6 +17,10 @@ async function discoveryDocument(): Promise<string> {
 	return res.text();
 }
 
+/**
+ * @proves A capability works when enabled, follows the flag on the very next request in both
+ * directions, and changes nothing but itself.
+ */
 describe('feature gate — capability on', () => {
 	beforeEach(async () => {
 		await bootstrap(import.meta.url);

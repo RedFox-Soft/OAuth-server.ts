@@ -89,6 +89,10 @@ async function purgeEntriesFor(targetId: string) {
 	return page.entries;
 }
 
+/**
+ * @proves Purging fault history is previewed, super-admin only, filtered, audited before it
+ * happens, and removes exactly what the preview described.
+ */
 describe('error store purge', () => {
 	beforeEach(async () => {
 		await ensureAdminSeed();

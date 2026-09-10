@@ -57,6 +57,10 @@ async function settle() {
 	await flushSentry();
 }
 
+/**
+ * @proves Exactly one outbound event is sent per unexpected fault, grouped as the local store
+ * groups it, and nothing is sent for a routine rejection or when the capability is off.
+ */
 describe('sentry dispatch', () => {
 	beforeEach(() => {
 		resetQueue();

@@ -170,6 +170,10 @@ async function passwordStep(clientId: string, email: string) {
 	return { uid, cookie, res };
 }
 
+/**
+ * @proves A correct password alone does not sign the person in, the code step reveals nothing
+ * and is throttled, and a bucket without the requirement is untouched.
+ */
 describe('second factor at sign-in (US3)', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'totp' });

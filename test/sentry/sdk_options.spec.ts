@@ -29,6 +29,10 @@ const previous = {
 	dsn: ApplicationConfig['sentry.dsn']
 };
 
+/**
+ * @proves Reporting arms only when an operator enabled it with a credential, with every SDK
+ * integration that would capture more than the allow-list disabled.
+ */
 describe('sentry client options', () => {
 	beforeEach(() => {
 		resetForTest();

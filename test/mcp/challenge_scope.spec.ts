@@ -30,6 +30,10 @@ async function challengeFor(headers: Record<string, string>) {
 	return { status: res.status, challenge: res.headers.get('www-authenticate') };
 }
 
+/**
+ * @proves An unauthenticated agent learns from the challenge where to get a token and what to
+ * ask for, and nothing about which check it failed.
+ */
 describe('the challenge an unauthenticated caller receives', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'mcp' });

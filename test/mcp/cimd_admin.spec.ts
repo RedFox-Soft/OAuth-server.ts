@@ -78,6 +78,10 @@ async function reach(token: string) {
 	return res.status;
 }
 
+/**
+ * @proves An agent identified only by a hosted document administers the instance when an
+ * operator permitted it, and never otherwise.
+ */
 describe('the administrative plane through a client identity document', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'cimd_admin' });

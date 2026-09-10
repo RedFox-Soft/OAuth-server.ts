@@ -15,6 +15,10 @@ import { DPoPNonces } from 'lib/helpers/dpop_nonces.ts';
 // shape the declared type calls impossible, so the check has to be a runtime predicate over unknown
 // rather than a type assertion; these cases are what make that claim checkable.
 
+/**
+ * @proves The DPoP nonce secret is provisioned once, reused verbatim across restarts, replaced
+ * only when unusable, and two replicas starting together converge on one.
+ */
 describe('nonce secret: usability predicate', () => {
 	it('accepts exactly 32 bytes of buffer material', () => {
 		expect(isUsableNonceSecret(Buffer.alloc(32, 0))).toBe(true);

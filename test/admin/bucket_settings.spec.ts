@@ -26,6 +26,10 @@ async function superCookie() {
 	return `${ADMIN_SESSION_COOKIE}=${s._id}`;
 }
 
+/**
+ * @proves An operator sets a bucket registration and verification policy, gets safe defaults if
+ * they set nothing, and the change is recorded.
+ */
 describe('bucket verification settings API', () => {
 	beforeEach(async () => {
 		await ensureAdminSeed();

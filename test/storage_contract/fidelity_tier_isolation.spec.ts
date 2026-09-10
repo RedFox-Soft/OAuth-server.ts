@@ -23,6 +23,10 @@ const BUNFIG = resolve(import.meta.dir, '../../bunfig.toml');
 /* Bun's default test discovery: `*.test.*`, `*_test.*`, `*.spec.*`, `*_spec.*`. */
 const DISCOVERED = /\.(test|spec)\.[cm]?[jt]sx?$|_(test|spec)\.[cm]?[jt]sx?$/;
 
+/**
+ * @proves The storage-fidelity scripts cannot be reached by the default test run, by naming
+ * rather than by an exclusion list.
+ */
 describe('the storage fidelity tier', () => {
 	const files = readdirSync(DATABASE, { recursive: true, encoding: 'utf8' });
 

@@ -78,7 +78,11 @@ It is not documentation:
   server does not serve fails too.
 
 Same shape as [[feature-flag-gating]]'s route classification and the storage inventory, and for the
-same reason: forgetting is the failure mode, so forgetting has to fail the suite. The module imports
+same reason: forgetting is the failure mode, so forgetting has to fail the suite. That sentence is
+now the constitution's own argument for the whole class — this spec is the canonical worked example
+of the completeness template in [[test-admission-rule]], because it enumerates `elysia.routes`, the
+running server's actual surface, rather than the text of a source file, and it closes a claim about
+absence that no example-based test can reach. The module imports
 nothing — anything transitively importing `lib/adapters/mongodb/db.ts` connects at module scope and is
 unloadable under test.
 

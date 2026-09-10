@@ -19,6 +19,10 @@ const withMask = (mask: unknown) => ({
 	'deviceFlow.mask': mask
 });
 
+/**
+ * @proves A device user-code mask is validated where it matters, so no deployment can hand every
+ * device the same code.
+ */
 describe('deviceFlow mask validation', () => {
 	it('accepts the shipped defaults', () => {
 		expect(() => validateConfiguration({ ...ApplicationConfig })).not.toThrow();
@@ -45,7 +49,7 @@ describe('deviceFlow mask validation', () => {
 		const noEntropy = ['', '-', '---', '-  -', ' '];
 
 		for (const mask of noEntropy) {
-			it(`refuses ${JSON.stringify(mask)}`, () => {
+			it(`each malformed mask is refused`, () => {
 				expect(() => validateConfiguration(withMask(mask))).toThrow(
 					/at least one asterisk/
 				);

@@ -27,6 +27,10 @@ async function makeAdmin(roles: string[]) {
 
 // Reset the shared admin stores each test so the active-super_admin count is
 // deterministic (other specs seed many super_admins into the same process).
+/**
+ * @proves The instance can never be left with no active super administrator, by demotion or by
+ * deactivation.
+ */
 describe('last active super_admin guard', () => {
 	beforeEach(async () => {
 		resetAdminMemoryStores();

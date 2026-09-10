@@ -40,6 +40,10 @@ async function faultsOn(route: string) {
 	return page.groups;
 }
 
+/**
+ * @proves Reporting never changes a response, never recurses when it fails, bounds its queue and
+ * its shutdown drain, and answers every request regardless.
+ */
 describe('sentry resilience', () => {
 	beforeEach(() => {
 		resetQueue();

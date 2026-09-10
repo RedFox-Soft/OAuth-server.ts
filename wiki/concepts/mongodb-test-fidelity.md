@@ -4,7 +4,7 @@ title: 'Testing the MongoDB adapter: two tiers, and why the default suite stays 
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-26
-updated: 2026-09-10
+updated: 2026-09-11
 ---
 
 # Testing the MongoDB adapter: two tiers, and why the default suite stays hermetic
@@ -34,9 +34,24 @@ back out; the caller's `instanceof Uint8Array` guard rejects it. Reproducing tha
 codec, not a server — and `bson` is already an installed transitive dependency, re-exported as `BSON`
 from `mongodb`, so `BSON.serialize` / `BSON.deserialize` round trips cost nothing to reach.
 
-This tier lives in `test/storage_contract/`, imports no `db.js`, runs in the default `bun test`, and
-needed no constitutional change to exist. It covers both singleton secrets' byte round trip, the
-`Date` in `expiresAt`, and any field a store reads back and type-checks.
+This tier was to live in `test/storage_contract/`, importing no `db.js`, running in the default
+`bun test`, and needing no constitutional change to exist. It was to cover both singleton secrets'
+byte round trip, the `Date` in `expiresAt`, and any field a store reads back and type-checks.
+
+> ⚠️ **It was never built, and the paragraph above is a plan written in the present tense.**
+> `grep -r BSON test` matches nothing — not at this commit, not at `f6eb1b9`. What
+> `test/storage_contract/` actually holds for these two secrets is
+> `dpop_nonce_secret.spec.ts` and `pairwise_salt.spec.ts`, both against the **memory**
+> implementation, both saying so in their headers. Removing the `Binary` unwrap that this page
+> exists to explain leaves that directory at 294 pass / 0 fail and the full suite green; the
+> defect was replayed to confirm it. Recorded as G-008 in `Task.md`. The argument
+> below still holds — the codec is reachable without a server and `bson` is already a transitive
+> dependency — so the tier remains one spec file away. Nobody has written it.
+
+This is a hazard of the form this whole wiki takes. A decision page reads, months later, exactly
+like a description of shipped work, and the reader who most needs the distinction — somebody
+deciding whether a defect class is already covered — is the one least able to see it. Two months
+after this page was written, the coverage it describes was cited as existing.
 
 ### Tier 2 — storage fidelity suite, real mongod, invoked separately
 
@@ -54,6 +69,14 @@ six lines of YAML against a Node dependency that would only ever serve one machi
 
 Principle III was amended to 2.2.0 to permit exactly this and no more: separately invoked,
 unreachable from the default run, confined to what a database-free test provably cannot cover.
+
+That clause still stands. What has changed around it is Principle V, rewritten at 3.0.0 — see
+[[test-admission-rule]]. This page answers *where* a test runs; that one answers *what* a test is
+for, and the two compose. Every member of the fidelity tier is a user case with the **operator** as
+its audience — expiry reaping, unique-index concurrency, the provisioned collection set — so the
+tier survives the new rule intact. The one new edge: Principle III already forbade moving
+database-free coverage into this tier, and the admission rule gives that prohibition a second
+motive, since relocating a test here is now also a way to make a deletion look free.
 
 ## Three barriers the implementation must clear
 

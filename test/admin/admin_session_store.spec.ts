@@ -1,13 +1,17 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { AdminSessionStore } from 'lib/adapters/memory/adminSessionStore.ts';
 
+/**
+ * @proves A console session survives a read, is extended by activity, is gone after logout, and
+ * is refused once it has expired.
+ */
 describe('AdminSessionStore (memory)', () => {
 	let store: AdminSessionStore;
 	beforeEach(() => {
 		store = new AdminSessionStore();
 	});
 
-	it('creates, finds, touches and destroys', async () => {
+	it('a console session survives a read, is extended by activity, and is gone after logout', async () => {
 		const s = await store.create({
 			userId: 'u1',
 			bucketId: 'admin',

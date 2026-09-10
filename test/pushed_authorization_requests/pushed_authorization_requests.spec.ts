@@ -21,7 +21,6 @@ import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { ClientDefaults } from 'lib/configs/clientBase.js';
-import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { PushedAuthorizationRequest } from 'lib/models/pushed_authorization_request.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { Client } from 'lib/models/client.ts';
@@ -42,6 +41,11 @@ function expectDictatedTtl(actual: number | undefined, seconds: number) {
 	expect(actual).toBeLessThanOrEqual(seconds);
 }
 
+/**
+ * @proves A client pushes an authorization request it has authenticated for, receives a bounded
+ * single-use request_uri, and cannot use PAR to modify a signed request or act as another
+ * client.
+ */
 describe('Pushed Request Object', async () => {
 	const setup = await bootstrap(import.meta.url);
 	afterEach(() => {
@@ -54,7 +58,7 @@ describe('Pushed Request Object', async () => {
 		});
 
 		describe('discovery', () => {
-			it('extends the well known config', async function () {
+			it('discovery advertises the PAR endpoint and whether it is required', async function () {
 				const { data } =
 					await agent['.well-known']['openid-configuration'].get();
 
@@ -269,7 +273,7 @@ describe('Pushed Request Object', async () => {
 
 			describe(`when require_pushed_authorization_requests=${requirePushedAuthorizationRequests}`, () => {
 				describe('using a JAR request parameter', () => {
-					it('is not enabled', async function () {
+					it('with the capability off the PAR endpoint is not served and discovery does not advertise it', async function () {
 						const { error } = await agent.par.post(
 							// @ts-expect-error endpoint will be parse to object
 							jsonToFormUrlEncoded({
@@ -293,34 +297,6 @@ describe('Pushed Request Object', async () => {
 
 				describe('using a plain pushed authorization request', () => {
 					describe('Pushed Authorization Request Endpoint', () => {
-						it('populates ctx.oidc.entities', async function () {
-							const spy = spyOn(OIDCContext.prototype, 'entity');
-							const code_verifier = randomBytes(32).toString('base64');
-							const code_challenge = createHash('sha256')
-								.update(code_verifier)
-								.digest('base64url');
-
-							await agent.par.post(
-								// @ts-expect-error endpoint will be parse to object
-								jsonToFormUrlEncoded({
-									response_type: 'code',
-									code_challenge_method: 'S256',
-									code_challenge,
-									client_id: clientId
-								}),
-								{
-									headers: {
-										['content-type']: 'application/x-www-form-urlencoded',
-										...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
-									}
-								}
-							);
-							const entities = spy.mock.calls.map((call) => call[0]);
-							expect(entities).toEqual(
-								expect.arrayContaining(['PushedAuthorizationRequest', 'Client'])
-							);
-						});
-
 						it('stores a request object and returns a uri', async function () {
 							const spy = mock();
 							eventBus.once('pushed_authorization_request.success', spy);
@@ -603,7 +579,7 @@ describe('Pushed Request Object', async () => {
 		});
 
 		describe('discovery', () => {
-			it('extends the well known config', async function () {
+			it('discovery advertises the PAR endpoint and whether it is required', async function () {
 				const { data } =
 					await agent['.well-known']['openid-configuration'].get();
 
@@ -643,46 +619,6 @@ describe('Pushed Request Object', async () => {
 			describe(`when require_pushed_authorization_requests=${requirePushedAuthorizationRequests}`, () => {
 				describe('using a JAR request parameter', () => {
 					describe('Pushed Authorization Request Endpoint', () => {
-						it('populates ctx.oidc.entities', async function () {
-							const spy = spyOn(OIDCContext.prototype, 'entity');
-							const code_verifier = randomBytes(32).toString('base64');
-							const code_challenge = createHash('sha256')
-								.update(code_verifier)
-								.digest('base64url');
-
-							const request = await JWT.sign(
-								{
-									jti: randomBytes(16).toString('base64url'),
-									response_type: 'code',
-									code_challenge_method: 'S256',
-									code_challenge,
-									client_id: clientId,
-									iss: clientId,
-									aud: ISSUER
-								},
-								key,
-								'HS256',
-								{ expiresIn: 30 }
-							);
-
-							await agent.par.post(
-								// @ts-expect-error endpoint will be parse to object
-								jsonToFormUrlEncoded({
-									request
-								}),
-								{
-									headers: {
-										['content-type']: 'application/x-www-form-urlencoded',
-										...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
-									}
-								}
-							);
-							const entities = spy.mock.calls.map((call) => call[0]);
-							expect(entities).toEqual(
-								expect.arrayContaining(['PushedAuthorizationRequest', 'Client'])
-							);
-						});
-
 						it('stores a request object and returns a uri', async function () {
 							const spy = mock();
 							eventBus.once('pushed_authorization_request.success', spy);
@@ -724,7 +660,7 @@ describe('Pushed Request Object', async () => {
 							expect(spy).toHaveBeenCalledTimes(1);
 						});
 
-						it('Error when no expires_in is present', async function () {
+						it('a pushed request with no expiry is refused rather than stored without one', async function () {
 							const spy = mock();
 							eventBus.once('pushed_authorization_request.success', spy);
 							const code_verifier = randomBytes(32).toString('base64');
@@ -1120,7 +1056,7 @@ describe('Pushed Request Object', async () => {
 							).toHaveProperty('consumed');
 						});
 
-						it('handles expired or invalid pushed authorization request object', async function () {
+						it('an expired or malformed request_uri is refused at the authorization endpoint', async function () {
 							const auth = new AuthorizationRequest({
 								client_id: clientId,
 								request_uri: 'urn:ietf:params:oauth:request_uri:foobar'

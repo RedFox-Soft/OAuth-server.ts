@@ -42,6 +42,11 @@
 
 [Gates determined based on constitution file]
 
+> **Principle V (tests)**: if this feature adds tests, the check MUST say which side of the rule
+> each one falls on — the User Case it proves or the Security Invariant it holds — and confirm
+> each is expressible in one of the two sentence templates. A test that proves neither is not
+> planned; it is not written.
+
 ## Project Structure
 
 ### Documentation (this feature)

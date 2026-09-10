@@ -4,6 +4,10 @@ import bootstrap from '../test_helper.js';
 import { Grant } from 'lib/models/grant.js';
 import { assertStoredMatchesSchema, storedPayloadFor } from './round_trip.js';
 
+/**
+ * @proves A grant persists its full aggregate with freeform sub-objects verbatim, and nothing
+ * outside its schema.
+ */
 describe('storage contract: Grant', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);

@@ -48,6 +48,10 @@ async function token() {
 	return res.data;
 }
 
+/**
+ * @proves A declared resource decides the format and lifetime of the tokens minted for it, with
+ * a bounded default when the owner chose nothing.
+ */
 describe('token format and lifetime for a declared resource', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'resources' });

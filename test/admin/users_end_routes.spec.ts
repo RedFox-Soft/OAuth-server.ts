@@ -43,6 +43,10 @@ async function makeBucket(
 	});
 }
 
+/**
+ * @proves End-users are administered by those with rights over their bucket, never with a
+ * password in a response, and never in the reserved admin bucket.
+ */
 describe('end-user API', () => {
 	beforeEach(async () => {
 		await ensureAdminSeed();

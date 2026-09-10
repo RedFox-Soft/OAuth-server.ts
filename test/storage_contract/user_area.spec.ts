@@ -10,6 +10,10 @@ import { getUserStore, resetAdminMemoryStores } from 'lib/adapters/index.ts';
 // left-behind-collection hole. In memory there is no collection to drop, but it is deliberately not a
 // no-op: a bucket re-created under the same id must not inherit its predecessor's users.
 
+/**
+ * @proves A deleted bucket leaves its user area holding nothing, and a bucket recreated with the
+ * same id starts empty.
+ */
 describe('storage contract: destroyArea', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);

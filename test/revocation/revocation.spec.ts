@@ -16,6 +16,10 @@ import { ClientCredentials } from 'lib/models/client_credentials.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 
+/**
+ * @proves A client revokes its own tokens whatever hint it sends, cannot revoke another client
+ * tokens, and an unknown token answers 200 rather than becoming an existence oracle.
+ */
 describe('revocation features', () => {
 	beforeAll(async function () {
 		await bootstrap(import.meta.url);
@@ -24,7 +28,7 @@ describe('revocation features', () => {
 		mock.restore();
 	});
 
-	it('enriched discovery shows the url now', async function () {
+	it('discovery advertises the revocation endpoint', async function () {
 		const { data, status } =
 			await agent['.well-known']['openid-configuration'].get();
 		if (!data) throw new Error('expected response data');
@@ -131,7 +135,7 @@ describe('revocation features', () => {
 			expect(stub).toHaveBeenCalledTimes(1);
 		});
 
-		it('propagates exceptions on find', async function () {
+		it('a storage failure during revocation is reported rather than answered as success', async function () {
 			const at = new AccessToken({
 				accountId: 'accountId',
 				grantId: 'foo',
@@ -353,7 +357,7 @@ describe('revocation features', () => {
 			expect(stub).toHaveBeenCalledTimes(1);
 		});
 
-		it('validates token param presence', async function () {
+		it('a revocation request with no token is refused as invalid_request', async function () {
 			const { error } = await agent.token.revocation.post(
 				{},
 				{
@@ -380,7 +384,7 @@ describe('revocation features', () => {
 			expect(status).toBe(200);
 		});
 
-		it('rejects wrong tokens', async function () {
+		it('answers the same for a well-formed token that belongs to nobody', async function () {
 			const { status } = await agent.token.revocation.post(
 				{
 					token:
@@ -438,7 +442,7 @@ describe('revocation features', () => {
 		});
 
 		describe('populates ctx.oidc.entities', () => {
-			it('when revoking an AccessToken', async function () {
+			it('the revocation event carries the token and its client', async function () {
 				const spy = spyOn(OIDCContext.prototype, 'entity');
 				const at = new AccessToken({
 					accountId: 'accountId',
@@ -464,7 +468,7 @@ describe('revocation features', () => {
 				);
 			});
 
-			it('when revoking a RefreshToken', async function () {
+			it('the revocation event carries the refresh token and its client', async function () {
 				const spy = spyOn(OIDCContext.prototype, 'entity');
 				const rt = new RefreshToken({
 					accountId: 'accountId',
@@ -490,7 +494,7 @@ describe('revocation features', () => {
 				);
 			});
 
-			it('when revoking ClientCredentials', async function () {
+			it('the revocation event carries the client credentials token and its client', async function () {
 				const spy = spyOn(OIDCContext.prototype, 'entity');
 				const rt = new ClientCredentials({
 					client: await Client.find('client')

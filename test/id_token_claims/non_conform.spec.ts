@@ -18,6 +18,10 @@ import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
 const scope = 'openid email offline_access';
 
+/**
+ * @proves With the non-conforming option an operator opts into, scope-requested claims appear in
+ * the id_token as well, including after a refresh.
+ */
 describe('configuration conformIdTokenClaims=false', () => {
 	let setup: Setup;
 	let cookie = null;

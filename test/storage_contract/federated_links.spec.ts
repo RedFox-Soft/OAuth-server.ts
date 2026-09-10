@@ -22,6 +22,9 @@ const LINK = {
 	linkedAt: new Date()
 };
 
+/**
+ * @proves Deleting an account leaves nothing an upstream sign-in could resolve back to it.
+ */
 describe('federated links and deletion', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);

@@ -36,6 +36,10 @@ import { sessionFor } from '../admin_session.ts';
 // Every test seeds its own client. Sharing one would make each test depend on the previous test not
 // having deleted it — which is exactly what this suite does to its subject.
 
+/**
+ * @proves Deleting a client stops every token, code and consent record it ever produced, and
+ * touches nothing belonging to another client.
+ */
 describe('deletion cascade: client', () => {
 	let setup: Setup;
 	let counter = 0;

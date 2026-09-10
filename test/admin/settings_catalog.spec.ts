@@ -4,6 +4,10 @@ import { resolve } from 'node:path';
 import { SETTINGS_CATALOG } from 'lib/admin/settings/catalog.ts';
 import { ApplicationConfig } from 'lib/configs/application.ts';
 
+/**
+ * @proves Every operator-editable setting exists, is described, and carries the argument for
+ * being editable at all - and the ones deliberately absent say why.
+ */
 describe('settings catalog', () => {
 	/*
 	 * The nonce secret's absence from the catalog is what makes it unreachable from the admin API,

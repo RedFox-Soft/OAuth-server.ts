@@ -32,6 +32,10 @@ afterEach(() => {
 	resolver.lookup = resolver.realLookup;
 });
 
+/**
+ * @proves The outbound fetch for a client document cannot be pointed at an internal address,
+ * downgraded, redirected without re-checking, or used to read an unbounded body.
+ */
 describe('refusing a destination this server should not reach', () => {
 	it('refuses every private and reserved range, by name', async () => {
 		/* The list the MCP security best practices names, plus the loopback forms. */

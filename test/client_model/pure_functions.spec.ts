@@ -18,6 +18,11 @@ import epochTime from 'lib/helpers/epoch_time.js';
 // Unit coverage for the pure client functions that replaced the Client class
 // methods. These exercise plain client objects directly (no provider / adapter
 // bootstrap) and do not replace the integration coverage (FR-009).
+/**
+ * @proves What a client registered bounds what it may do - response types, grants, redirect
+ * targets, secrets and pairwise sector - with the loopback licence extending to the port and
+ * nothing else.
+ */
 describe('client pure functions', () => {
 	describe('checks', () => {
 		const client = {
@@ -27,17 +32,17 @@ describe('client pure functions', () => {
 			postLogoutRedirectUris: ['https://rp.example.com/after-logout']
 		};
 
-		it('responseTypeAllowed reflects the registered list', () => {
+		it('a client cannot use a response type it did not register', () => {
 			expect(responseTypeAllowed(client, 'code')).toBe(true);
 			expect(responseTypeAllowed(client, 'none')).toBe(false);
 		});
 
-		it('grantTypeAllowed reflects the registered list', () => {
+		it('a client cannot use a grant type it did not register', () => {
 			expect(grantTypeAllowed(client, 'refresh_token')).toBe(true);
 			expect(grantTypeAllowed(client, 'client_credentials')).toBe(false);
 		});
 
-		it('redirectUriAllowed is an exact-match membership test', () => {
+		it('only an exactly registered redirect_uri is accepted', () => {
 			expect(redirectUriAllowed(client, 'https://rp.example.com/cb')).toBe(
 				true
 			);
@@ -109,7 +114,7 @@ describe('client pure functions', () => {
 			});
 		});
 
-		it('responseModeAllowed treats an absent list as "allowed"', () => {
+		it('a client that registered no response_modes may use any of them', () => {
 			expect(responseModeAllowed(client, 'query')).toBe(true);
 			expect(responseModeAllowed({ responseModes: ['query'] }, 'query')).toBe(
 				true
@@ -119,7 +124,7 @@ describe('client pure functions', () => {
 			).toBe(false);
 		});
 
-		it('postLogoutRedirectUriAllowed compares URL-normalised values', () => {
+		it('only a registered post-logout redirect is accepted, compared after normalisation', () => {
 			expect(
 				postLogoutRedirectUriAllowed(
 					client,
@@ -132,7 +137,7 @@ describe('client pure functions', () => {
 			).toBe(false);
 		});
 
-		it('includeSid requires both the uri and the session-required flag', () => {
+		it('a logout token carries sid only for a client that registered both the URI and the session flag', () => {
 			expect(
 				includeSid({
 					backchannelLogoutUri: 'https://rp.example.com/bcl',
@@ -150,17 +155,17 @@ describe('client pure functions', () => {
 	});
 
 	describe('secret', () => {
-		it('compareClientSecret is a constant-time equality check', () => {
+		it('answers equal only for the identical client secret', () => {
 			const client = { clientSecret: 'super-secret-value' };
 			expect(compareClientSecret(client, 'super-secret-value')).toBe(true);
 			expect(compareClientSecret(client, 'wrong')).toBe(false);
 		});
 
-		it('checkClientSecretExpiration is a no-op when no expiry is set', () => {
+		it('a client with no secret expiry keeps authenticating indefinitely', () => {
 			expect(() => checkClientSecretExpiration({}, 'msg')).not.toThrow();
 		});
 
-		it('checkClientSecretExpiration throws InvalidClient once expired', () => {
+		it('refuses a client whose secret has expired', () => {
 			const client = {
 				clientId: 'c',
 				clientSecretExpiresAt: epochTime() - 3600
@@ -170,7 +175,7 @@ describe('client pure functions', () => {
 			);
 		});
 
-		it('checkClientSecretExpiration honours errorOverride', () => {
+		it('lets an endpoint supply its own protocol error for an expired secret', () => {
 			const client = {
 				clientId: 'c',
 				clientSecretExpiresAt: epochTime() - 3600
@@ -184,7 +189,7 @@ describe('client pure functions', () => {
 			}
 		});
 
-		it('needsSecret reflects the auth method', () => {
+		it('a client using a secret-based method cannot be registered without one', () => {
 			expect(
 				needsSecret({ token_endpoint_auth_method: 'client_secret_basic' })
 			).toBe(true);
@@ -194,7 +199,7 @@ describe('client pure functions', () => {
 			).toBe(false);
 		});
 
-		it('needsSecret is true for HMAC signing or symmetric encryption algs', () => {
+		it('requires a secret for a client registered for symmetric signing or encryption', () => {
 			expect(
 				needsSecret({
 					token_endpoint_auth_method: 'none',
@@ -232,7 +237,7 @@ describe('client pure functions', () => {
 			expect(sectorIdentifier(client)).toBe('rp.example.com');
 		});
 
-		it('memoises per client object', () => {
+		it('a client updated through the admin API is used with its new metadata on the next request', () => {
 			const client = {
 				subjectType: 'public',
 				sectorIdentifierUri: 'https://sector.example.com/uris.json',

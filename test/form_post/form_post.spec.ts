@@ -3,6 +3,10 @@ import bootstrap, { agent, type Setup } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { eventBus } from 'lib/index.js';
 
+/**
+ * @proves The form_post response mode delivers a response or an error through a self-submitting
+ * form whose action cannot carry script.
+ */
 describe('/auth', () => {
 	let setup: Setup;
 	let cookie = null;

@@ -24,6 +24,10 @@ import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
 const scope = 'openid email offline_access';
 
+/**
+ * @proves With conforming id_token claims, scope-requested claims are delivered at UserInfo and
+ * kept out of the id_token, including after a refresh.
+ */
 describe('configuration conformIdTokenClaims=true', () => {
 	let setup: Setup;
 	let cookie = null;

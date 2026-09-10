@@ -52,6 +52,10 @@ async function enrolledAccount(bucketId: string) {
 	return user;
 }
 
+/**
+ * @proves An administrator with rights over the bucket clears an enrolment, ending the account
+ * sessions and any lockout, without ever seeing the secret.
+ */
 describe('clearing a lost authenticator (US5)', () => {
 	let bucketId: string;
 	let admin: { cookie: string; userId: string };

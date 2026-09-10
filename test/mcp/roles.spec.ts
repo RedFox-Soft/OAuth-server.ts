@@ -137,6 +137,10 @@ const EQUIVALENT: Record<string, number> = {
 
 const READS = mcpCatalogue.filter((t) => t.consequence === 'read');
 
+/**
+ * @proves An agent sees exactly what its authorizing administrator would see, cannot reach the
+ * reserved bucket, and cannot escalate by asking a different tool for the same thing.
+ */
 describe('agent permissions match the console, per role', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);

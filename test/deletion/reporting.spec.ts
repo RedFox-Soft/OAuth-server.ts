@@ -31,6 +31,10 @@ interface Blocker {
 	ids?: string[];
 }
 
+/**
+ * @proves A deletion tells the operator what blocked it or what it removed, per area, without
+ * naming end-users, and reports a partial failure rather than hiding it.
+ */
 describe('deletion reporting', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);

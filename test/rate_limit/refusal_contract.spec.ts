@@ -18,6 +18,10 @@ async function refusalOn(
 	return send(path, ORIGIN_A, init);
 }
 
+/**
+ * @proves A throttled caller gets 429 with a usable retry delay in the shape its surface speaks,
+ * disclosing nothing else and never filed as a fault.
+ */
 describe('rate limit refusal contract', () => {
 	describe('what every refusal carries', () => {
 		beforeEach(async () => {

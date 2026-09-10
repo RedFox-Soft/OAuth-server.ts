@@ -49,6 +49,10 @@ async function registerForCode(email: string) {
 	return { ref, code };
 }
 
+/**
+ * @proves A registrant proves their address with a six-digit code, guarded by an attempt cap and
+ * a resend cooldown.
+ */
 describe('email verification — code method', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'code' });

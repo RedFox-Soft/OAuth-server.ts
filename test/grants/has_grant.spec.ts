@@ -9,6 +9,10 @@ const CIBA = 'urn:openid:params:grant-type:ciba';
 // Unit coverage for hasGrant's server-level feature-flag gating. Token dispatch
 // (executeGrant) relies on this to hide grants whose feature is disabled, keeping
 // it in lockstep with the discovery grant_types_supported derivation.
+/**
+ * @proves A grant is available exactly while its flag is on, and the core grants have no flag to
+ * forget.
+ */
 describe('hasGrant feature-flag gating', () => {
 	afterEach(() => {
 		ApplicationConfig['clientCredentials.enabled'] = false;
@@ -43,9 +47,5 @@ describe('hasGrant feature-flag gating', () => {
 	it('leaves core grants ungated', () => {
 		expect(hasGrant('authorization_code')).toBe(true);
 		expect(hasGrant('refresh_token')).toBe(true);
-	});
-
-	it('returns false for unregistered grant types', () => {
-		expect(hasGrant('does_not_exist')).toBe(false);
 	});
 });

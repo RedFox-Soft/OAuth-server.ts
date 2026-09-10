@@ -53,6 +53,9 @@ interface AdminErrorBody {
 	message: string;
 }
 
+/**
+ * @proves An administrative mutation whose audit entry cannot be written does not happen at all.
+ */
 describe('admin audit write failure', () => {
 	let logged: unknown[][];
 

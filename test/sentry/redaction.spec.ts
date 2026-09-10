@@ -74,6 +74,10 @@ async function provoke(route: string, request: Request) {
 	return response;
 }
 
+/**
+ * @proves No credential, request parameter, URL, user identity or stack leaves the deployment in
+ * a fault report, because the projection cannot construct one that would.
+ */
 describe('sentry redaction', () => {
 	beforeEach(() => {
 		resetQueue();

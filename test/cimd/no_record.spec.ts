@@ -35,6 +35,10 @@ async function clientCount() {
 	return count;
 }
 
+/**
+ * @proves A document-identified client resolves and authorizes without ever being stored, and a
+ * stored client whose id is a URL still resolves from the adapter.
+ */
 describe('a client identified by a document, and one merely named like it', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'cimd' });

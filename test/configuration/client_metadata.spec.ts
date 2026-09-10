@@ -41,6 +41,10 @@ const COLLECTION_OPTIONS = new Set([
 	'claims'
 ]);
 
+/**
+ * @proves Client metadata is validated at registration, defaults come from ClientDefaults
+ * through the camelCase seam, and an incomplete encryption declaration is refused.
+ */
 describe('Client metadata validation', () => {
 	function register(metadata, configuration) {
 		Object.assign(ApplicationConfig, applicationDefaults);
@@ -101,7 +105,7 @@ describe('Client metadata validation', () => {
 	};
 
 	const mustBeUri = (prop, protocols, configuration, metadata) => {
-		it('must be a uri', () =>
+		it('a metadata field that is not a URI is refused at registration', () =>
 			assert.rejects(
 				register(
 					{
@@ -128,7 +132,7 @@ describe('Client metadata validation', () => {
 			));
 
 		protocols.forEach((protocol) => {
-			it(`can be ${protocol} uri`, () =>
+			it(`each permitted scheme is accepted`, () =>
 				register({
 					[prop]: `${protocol}://example.com/${prop}`
 				}));
@@ -2394,7 +2398,7 @@ describe('Client metadata validation', () => {
 		);
 	});
 
-	it('fails to determine sector identifier', () =>
+	it('a pairwise client whose sector cannot be determined is refused at registration', () =>
 		register(
 			{
 				clientId: 'authorization-server',

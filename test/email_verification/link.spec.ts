@@ -56,6 +56,10 @@ async function login(uid: string, cookie: string, email: string) {
 	return response.status;
 }
 
+/**
+ * @proves A registrant proves their address by opening a single-use link in any browser, and a
+ * closed bucket creates no account and sends no mail.
+ */
 describe('email verification — link method', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'link' });

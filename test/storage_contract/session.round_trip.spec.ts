@@ -9,6 +9,10 @@ import {
 	storedPayloadFor
 } from './round_trip.js';
 
+/**
+ * @proves A session persists its state and authorizations verbatim, and nothing outside its
+ * schema.
+ */
 describe('storage contract: Session', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);

@@ -31,6 +31,10 @@ function capturedEvents(): Record<string, unknown>[] {
 	return events;
 }
 
+/**
+ * @proves A failure to boot - the one fault the local store cannot hold - is reported once,
+ * filterably, with no request data.
+ */
 describe('sentry startup reporting', () => {
 	beforeEach(() => {
 		resetClient();

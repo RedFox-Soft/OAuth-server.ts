@@ -213,6 +213,10 @@ async function expectPolicyCoversItsOwnResources(res: Response, body?: string) {
 	expect(res.headers.get('content-type')).toContain('text/html');
 }
 
+/**
+ * @proves Every page this server renders carries a policy authorizing exactly the inline scripts
+ * it serves and nothing more, whatever case or spelling the tags use.
+ */
 describe('content security policy: every rendered page', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);

@@ -25,6 +25,10 @@ const bearer = (token) => ({ authorization: `Bearer ${token}` });
 
 // Policies are persisted under `.payload.*` (the top-level accessors were removed with the
 // IN_PAYLOAD refactor), so the saved-event instances and find() results expose `payload.policies`.
+/**
+ * @proves An operator policy applies to a self-registering client at creation and at every
+ * update, and travels with the rotated registration access token.
+ */
 describe('client registration policies', () => {
 	let setup: Setup;
 	beforeAll(async () => {
@@ -190,7 +194,7 @@ describe('client registration policies', () => {
 			]);
 		});
 
-		it('can be done to push different policies to rat', async () => {
+		it('an operator can apply different policies to management than to registration', async () => {
 			ApplicationConfig['registration.policies']['change-rat-policy'] = async (
 				ctx
 			) => {

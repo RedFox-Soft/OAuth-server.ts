@@ -9,6 +9,10 @@ import {
 // Claims and acrValues are server settings, read from ApplicationConfig at initialisation.
 // The claims map declared here is merged over the shipped one exactly as before, so these
 // assertions still describe the resolved configuration, only the input surface changed.
+/**
+ * @proves An operator adds claims and the scopes that carry them, and a claim with nothing
+ * behind it is not advertised.
+ */
 describe('custom claims', () => {
 	const original = {
 		claims: ApplicationConfig.claims,

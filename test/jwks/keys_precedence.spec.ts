@@ -9,6 +9,10 @@ const [, ecKey] = testSigningKeys;
 // are single-sourced from the jwksStore adapter (as clients are from the Client store), so there is
 // no per-instance key input left for the store to take precedence over. What remains worth pinning
 // is that the store — and only the store — decides the published set.
+/**
+ * @proves The store is the single source of signing keys, and a stale environment variable
+ * cannot override it.
+ */
 describe('JWKS source is the store, and only the store', () => {
 	afterAll(async () => {
 		delete process.env.JWKS;

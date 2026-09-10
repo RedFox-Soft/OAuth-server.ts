@@ -61,6 +61,22 @@ export const clients = [
 		responseTypes: ['code', 'none'],
 		redirectUris: ['com.example.app:/cb']
 	},
+	// Two redirect_uri shapes the response-mode cases need: one already carrying a query, with a
+	// planted `state` a client must not be able to pin, and one with no path at all.
+	{
+		clientId: 'client-query-cb',
+		clientSecret: 'secret',
+		grantTypes: ['authorization_code'],
+		responseTypes: ['code'],
+		redirectUris: ['https://client.example.com/cb?other=stuff&state=planted']
+	},
+	{
+		clientId: 'client-bare-origin-cb',
+		clientSecret: 'secret',
+		grantTypes: ['authorization_code'],
+		responseTypes: ['code'],
+		redirectUris: ['https://client.example.com']
+	},
 	{
 		clientId: 'client-limited-scope',
 		clientSecret: 'secret',

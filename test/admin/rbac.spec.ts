@@ -38,6 +38,10 @@ const project = (over: Partial<Project>): Project => ({
 	...over
 });
 
+/**
+ * @proves Instance-wide operations require a super administrator, and a scoped administrator
+ * reaches a project only through the group that owns it.
+ */
 describe('RBAC guards', () => {
 	it('assertRole passes for super_admin, throws 403 otherwise', () => {
 		expect(() => assertRole(superAdmin, 'super_admin')).not.toThrow();

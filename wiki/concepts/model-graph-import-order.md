@@ -45,6 +45,12 @@ the graph as a side effect.
 Recorded here rather than fixed, because the fix (an explicit warming import) is a one-line change
 somebody should make deliberately rather than discover.
 
+It is worth doing that deliberately now. Under [[test-admission-rule]] this guard is admissible on
+its merits — it enumerates a set and checks a property of every member — so its standing no longer
+rests on nobody having noticed the ordering. A guard whose passing depends on which position it
+occupies in its own file is a guard that reports the wrong thing the first time somebody reorders
+the file, and the reorder is exactly what the refactor does.
+
 ## Why the drift guard reads schemas, not source text
 
 The ownership drift guard for [[deletion-and-revocation]] needed each area's payload fields at runtime.

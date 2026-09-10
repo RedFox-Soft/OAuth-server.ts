@@ -18,6 +18,10 @@ import {
 } from 'lib/configs/application.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
+/**
+ * @proves A resource server that negotiates it receives a signed introspection response,
+ * including for an inactive token, and an expired secret refuses rather than signs.
+ */
 describe('jwtIntrospection features', () => {
 	let setup: Setup;
 	beforeAll(async () => {
@@ -27,7 +31,7 @@ describe('jwtIntrospection features', () => {
 	afterEach(() => setSystemTime());
 
 	describe('enriched discovery', () => {
-		it('shows the url now', async () => {
+		it('discovery advertises the JWT introspection endpoint', async () => {
 			const { data } = await agent['.well-known']['openid-configuration'].get();
 			expect(data).toHaveProperty('introspection_signing_alg_values_supported');
 		});

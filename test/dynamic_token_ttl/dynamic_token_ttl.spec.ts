@@ -23,6 +23,10 @@ import { AuthorizationCode } from 'lib/models/authorization_code.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { ClientCredentials } from 'lib/models/client_credentials.js';
 
+/**
+ * @proves Every token, code and device code takes the lifetime a deployment ttl function
+ * returned, including after a refresh.
+ */
 describe('dynamic ttl', () => {
 	let setup: Setup;
 	beforeAll(async function () {
@@ -38,7 +42,7 @@ describe('dynamic ttl', () => {
 
 	// return setup.login({ scope: 'openid offline_access' });
 
-	it('client credentials', async function () {
+	it("the token's lifetime is the one the dynamic ttl function returned", async function () {
 		const clientSpy = spyOn(ttl, 'ClientCredentials').mockReturnValue(123);
 
 		const { data, status } = await agent.token.post({
@@ -53,7 +57,7 @@ describe('dynamic ttl', () => {
 		expect(clientSpy.mock.calls[0][2]).toBeInstanceOf(Client);
 	});
 
-	it('device flow init', async function () {
+	it('the device code lifetime is the one the dynamic ttl function returned', async function () {
 		await setup.login({ scope: 'openid offline_access' });
 		const deviceCodeSpy = spyOn(ttl, 'DeviceCode').mockReturnValue(123);
 		const device = await agent.device.auth.post({
@@ -102,7 +106,7 @@ describe('dynamic ttl', () => {
 		expect(refreshTokenSpy.mock.calls[0][2]).toBeInstanceOf(Client);
 	});
 
-	it('authorization flow returned tokens', async function () {
+	it('the returned token lifetimes are the ones the dynamic ttl function returned', async function () {
 		const cookie = await setup.login({ scope: 'openid offline_access' });
 		const spy = spyOn(ttl, 'AuthorizationCode').mockReturnValue(12);
 		const auth = new AuthorizationRequest({ scope: 'openid' });
@@ -120,7 +124,7 @@ describe('dynamic ttl', () => {
 		expect(spy.mock.calls[0][2]).toBeInstanceOf(Client);
 	});
 
-	it('authorization code', async function () {
+	it('the authorization code lifetime is the one the dynamic ttl function returned', async function () {
 		const cookie = await setup.login({ scope: 'openid offline_access' });
 		const idTokenSpy = spyOn(ttl, 'IdToken').mockReturnValue(123);
 		const accessTokenSpy = spyOn(ttl, 'AccessToken').mockReturnValue(1234);
@@ -167,7 +171,7 @@ describe('dynamic ttl', () => {
 		expect(refreshTokenSpy.mock.calls[0][2]).toBeInstanceOf(Client);
 	});
 
-	it('refreshed tokens', async function () {
+	it('the refreshed token lifetimes are the ones the dynamic ttl function returned', async function () {
 		const cookie = await setup.login({ scope: 'openid offline_access' });
 		const auth = new AuthorizationRequest({
 			scope: 'openid offline_access',

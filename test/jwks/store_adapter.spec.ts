@@ -5,6 +5,10 @@ import { testSigningKeys } from './fixtures.js';
 
 const [rsaKey, ecKey] = testSigningKeys;
 
+/**
+ * @proves A key round-trips through the store as a plain JWK, is loaded in full at boot, and a
+ * deleted key stops being published or used.
+ */
 describe('jwksStore adapter contract (memory)', () => {
 	let store: JWKSStore;
 
@@ -31,7 +35,7 @@ describe('jwksStore adapter contract (memory)', () => {
 		expect(got).not.toHaveProperty('updatedAt');
 	});
 
-	it('getAll returns every stored JWK', async () => {
+	it('every stored key is loaded at boot', async () => {
 		await store.set(rsaKey.kid, rsaKey);
 		await store.set(ecKey.kid, ecKey);
 
@@ -40,14 +44,14 @@ describe('jwksStore adapter contract (memory)', () => {
 		expect(all).toEqual(expect.arrayContaining([rsaKey, ecKey]));
 	});
 
-	it('set is an idempotent upsert by kid', async () => {
+	it('storing a key twice leaves one key', async () => {
 		await store.set(rsaKey.kid, rsaKey);
 		await store.set(rsaKey.kid, rsaKey);
 
 		expect(await store.getAll()).toHaveLength(1);
 	});
 
-	it('delete removes a key by kid', async () => {
+	it('a deleted key is no longer published or used for signing', async () => {
 		await store.set(rsaKey.kid, rsaKey);
 		await store.delete(rsaKey.kid);
 

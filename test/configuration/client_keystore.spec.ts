@@ -42,6 +42,10 @@ function setResponse(
 }
 
 // NOTE: these tests are to be run sequentially, picking one random won't pass
+/**
+ * @proves A client published key set is fetched once per cache window, refreshed when a
+ * verification fails, and refused when it carries private keys or is not a key set at all.
+ */
 describe('client keystore refresh', () => {
 	beforeAll(async function () {
 		await bootstrap(import.meta.url, { config: 'client_keystore' });

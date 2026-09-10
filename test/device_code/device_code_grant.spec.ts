@@ -1,12 +1,4 @@
-import {
-	describe,
-	it,
-	beforeAll,
-	afterEach,
-	expect,
-	mock,
-	spyOn
-} from 'bun:test';
+import { describe, it, beforeAll, afterEach, expect, mock } from 'bun:test';
 import base64url from 'base64url';
 
 import bootstrap, {
@@ -19,7 +11,6 @@ import { fullProfileClaims } from '../models.js';
 import { getUserStore } from 'lib/adapters/index.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
 import { eventBus } from 'lib/event_bus.js';
-import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { TestAdapter } from 'test/models.js';
 import { ttl } from 'lib/configs/liveTime.js';
@@ -31,18 +22,10 @@ function errorDetail(spy) {
 
 const grant_type = 'urn:ietf:params:oauth:grant-type:device_code';
 
-function entityMap(spy) {
-	const map = {};
-	for (const [key, value] of spy.mock.calls) {
-		map[key] = value;
-	}
-	return map;
-}
-
-function gtyOf(entity: BaseToken) {
-	return entity?.payload?.gty;
-}
-
+/**
+ * @proves A device polling with an approved code receives tokens; a spent, expired, foreign or
+ * pending code answers with the protocol error it must.
+ */
 describe('grant_type=urn:ietf:params:oauth:grant-type:device_code w/ conformIdTokenClaims=false', () => {
 	let setup: Setup;
 	beforeAll(async () => {
@@ -61,7 +44,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code w/ conformIdTo
 		eventBus.removeAllListeners('grant.error');
 	});
 
-	it('returns the right stuff', async () => {
+	it('returns the tokens a device expects, with scope-requested claims in the id_token', async () => {
 		const spy = mock();
 		eventBus.once('grant.success', spy);
 
@@ -111,7 +94,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 		eventBus.removeAllListeners('grant.error');
 	});
 
-	it('returns the right stuff', async () => {
+	it('returns the tokens a device expects', async () => {
 		const spy = mock();
 		eventBus.once('grant.success', spy);
 
@@ -145,64 +128,8 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 		).not.toHaveProperty('given_name');
 	});
 
-	it('populates ctx.oidc.entities (no offline_access)', async () => {
-		const spy = spyOn(OIDCContext.prototype, 'entity');
-
-		const deviceCode = new DeviceCode({
-			accountId: 'sub',
-			grantId: setup.getGrantId(),
-			scope: 'openid',
-			clientId: 'client'
-		});
-		const code = await deviceCode.save();
-
-		const { data } = await agent.token.post({
-			client_id: 'client',
-			device_code: code,
-			grant_type
-		});
-		if (!data) throw new Error('expected response data');
-
-		expect(data.refresh_token).toBeUndefined();
-		const entities = entityMap(spy);
-		['Account', 'Grant', 'Client', 'DeviceCode', 'AccessToken'].forEach((k) =>
-			expect(entities).toHaveProperty(k)
-		);
-		expect(gtyOf(entities.AccessToken)).toBe('device_code');
-	});
-
-	it('populates ctx.oidc.entities (w/ offline_access)', async () => {
-		const spy = spyOn(OIDCContext.prototype, 'entity');
-
-		const deviceCode = new DeviceCode({
-			accountId: 'sub',
-			grantId: setup.getGrantId(),
-			scope: 'openid offline_access',
-			clientId: 'client'
-		});
-		const code = await deviceCode.save();
-
-		await agent.token.post({
-			client_id: 'client',
-			device_code: code,
-			grant_type
-		});
-
-		const entities = entityMap(spy);
-		[
-			'Account',
-			'Grant',
-			'Client',
-			'DeviceCode',
-			'AccessToken',
-			'RefreshToken'
-		].forEach((k) => expect(entities).toHaveProperty(k));
-		expect(gtyOf(entities.AccessToken)).toBe('device_code');
-		expect(gtyOf(entities.RefreshToken)).toBe('device_code');
-	});
-
 	describe('validates', () => {
-		it('device_code param presence', async () => {
+		it('a request with no device_code is refused as invalid_request', async () => {
 			const { error } = await agent.token.post({
 				client_id: 'client',
 				grant_type
@@ -215,7 +142,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 			});
 		});
 
-		it('code being "found"', async () => {
+		it('an unknown device code is refused as invalid_grant', async () => {
 			const spy = mock();
 			eventBus.once('grant.error', spy);
 			const { error } = await agent.token.post({
@@ -231,7 +158,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 			expect(error.value).toHaveProperty('error', 'invalid_grant');
 		});
 
-		it('validates account is still there', async () => {
+		it('a code for a deleted account is refused', async () => {
 			// Simulate the account having been removed since the code was issued:
 			// the DB-backed findAccount now resolves nothing for this subject.
 			await getUserStore('redfox').destroy(setup.getAccountId());
@@ -265,7 +192,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 			seedAccount(setup.getAccountId());
 		});
 
-		it('code belongs to client', async () => {
+		it('a device code issued to another client is refused', async () => {
 			const spy = mock();
 			eventBus.once('grant.error', spy);
 
@@ -299,7 +226,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 				ttl.DeviceCode = prev;
 			});
 
-			it('validates code is not expired', async () => {
+			it('refuses an expired device code', async () => {
 				const deviceCode = new DeviceCode({
 					scope: 'openid',
 					clientId: 'client'
@@ -340,7 +267,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 			expect(stored.consumed).toBeLessThanOrEqual(epochTime());
 		});
 
-		it('validates code is not already used', async () => {
+		it('a spent device code is refused', async () => {
 			const spy = mock();
 			eventBus.once('grant.error', spy);
 

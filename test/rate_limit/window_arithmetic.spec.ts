@@ -21,6 +21,10 @@ function counter(count: number, windowStart: number): OriginCounter {
 	return { count, windowStart };
 }
 
+/**
+ * @proves The window arithmetic serves up to the allowance, refuses after it, never charges a
+ * refusal, never understates the wait, and answers for any state and clock.
+ */
 describe('rate limit window arithmetic', () => {
 	describe('a first request', () => {
 		it('is never refused and opens a window at the current time', () => {

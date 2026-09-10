@@ -55,6 +55,10 @@ function expectNoSecretsIn(serialised: string) {
 	}
 }
 
+/**
+ * @proves A fault record carries the names of what was submitted and never a credential, a body,
+ * a URL or a stack.
+ */
 describe('error store redaction', () => {
 	beforeEach(() => {
 		ApplicationConfig['errorStore.enabled'] = true;

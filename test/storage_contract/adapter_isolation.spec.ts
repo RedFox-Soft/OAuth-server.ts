@@ -55,6 +55,10 @@ function importsDriver(source: string): string | null {
 	return null;
 }
 
+/**
+ * @proves Every database driver import stays inside lib/adapters/, so business logic never
+ * references a specific datastore.
+ */
 describe('adapter isolation', () => {
 	const files = sources();
 

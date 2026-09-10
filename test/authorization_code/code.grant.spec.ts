@@ -18,10 +18,13 @@ import epochTime from '../../lib/helpers/epoch_time.ts';
 import bootstrap, { agent, type Setup } from '../test_helper.js';
 import { getUserStore } from 'lib/adapters/index.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
-import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { TestAdapter } from 'test/models.js';
 import { ttl } from 'lib/configs/liveTime.js';
 
+/**
+ * @proves A client exchanging a valid authorization code receives tokens, and every way of
+ * presenting a spent, expired, foreign or mismatched code is refused with the protocol error.
+ */
 describe('grant_type=authorization_code', () => {
 	let setup: Setup;
 	beforeAll(async function () {
@@ -66,7 +69,7 @@ describe('grant_type=authorization_code', () => {
 			codeStore = TestAdapter.for('AuthorizationCode').syncFind(jti);
 		});
 
-		it('Should return specific properties on token request', async function () {
+		it('the token response carries access token, token type, expiry and scope', async function () {
 			const spy = mock();
 			eventBus.once('grant.success', spy);
 
@@ -85,78 +88,13 @@ describe('grant_type=authorization_code', () => {
 			expect(data).not.toHaveProperty('refresh_token');
 		});
 
-		it('populates ctx.oidc.entities (no offline_access)', async function () {
-			const spy = spyOn(OIDCContext.prototype, 'entity');
-
-			const { response } = await auth.getToken(code);
-			expect(response.status).toBe(200);
-
-			const entities = spy.mock.calls.map((call) => call[0]);
-			const accessToken = spy.mock.calls.find(
-				(call) => call[0] === 'AccessToken'
-			);
-
-			expect([
-				'Account',
-				'Grant',
-				'Client',
-				'AuthorizationCode',
-				'AccessToken'
-			]).toEqual(expect.arrayContaining(entities));
-			expect(accessToken[1].payload).toHaveProperty(
-				'gty',
-				'authorization_code'
-			);
-		});
-
-		it('populates ctx.oidc.entities (w/ offline_access)', async function () {
-			const spy = spyOn(OIDCContext.prototype, 'entity');
-			TestAdapter.for('Grant').syncUpdate(
-				setup.getSession().authorizations.client.grantId,
-				{
-					scope: 'openid offline_access'
-				}
-			);
-			TestAdapter.for('AuthorizationCode').syncUpdate(setup.getTokenJti(code), {
-				scope: 'openid offline_access'
-			});
-
-			const { response } = await auth.getToken(code);
-			expect(response.status).toBe(200);
-
-			const entities = spy.mock.calls.map((call) => call[0]);
-			const accessToken = spy.mock.calls.find(
-				(call) => call[0] === 'AccessToken'
-			);
-			const refreshToken = spy.mock.calls.find(
-				(call) => call[0] === 'RefreshToken'
-			);
-
-			expect([
-				'Account',
-				'Grant',
-				'Client',
-				'AuthorizationCode',
-				'AccessToken',
-				'RefreshToken'
-			]).toEqual(expect.arrayContaining(entities));
-			expect(accessToken[1].payload).toHaveProperty(
-				'gty',
-				'authorization_code'
-			);
-			expect(refreshToken[1].payload).toHaveProperty(
-				'gty',
-				'authorization_code'
-			);
-		});
-
 		it('returns token-endpoint-like cache headers', async function () {
 			const { response } = await auth.getToken(code);
 			expect(response.status).toBe(200);
 			expect(response.headers.get('cache-control')).toBe('no-store');
 		});
 
-		it('validates code is not expired', async function () {
+		it('an expired code is refused as invalid_grant', async function () {
 			spyOn(ttl, 'AuthorizationCode').mockReturnValue(5);
 			const { response } = await agent.auth.get({
 				query: auth.params,
@@ -183,7 +121,7 @@ describe('grant_type=authorization_code', () => {
 			expect(error.value).toHaveProperty('error', 'invalid_grant');
 		});
 
-		it('validates code is not already used', async function () {
+		it('a spent code is refused as invalid_grant', async function () {
 			const grantErrorSpy = mock();
 			const grantRevokeSpy = mock();
 			eventBus.on('grant.error', grantErrorSpy);
@@ -212,7 +150,7 @@ describe('grant_type=authorization_code', () => {
 			expect(codeStore.consumed).toBeLessThanOrEqual(epochTime());
 		});
 
-		it('validates code belongs to client', async function () {
+		it('a code issued to another client is refused', async function () {
 			const spy = mock();
 			eventBus.on('grant.error', spy);
 			auth.clientId = 'client2';
@@ -228,7 +166,7 @@ describe('grant_type=authorization_code', () => {
 			expect(error.value).toHaveProperty('error', 'invalid_grant');
 		});
 
-		it('validates a grant type is supported', async function () {
+		it('an unsupported grant_type is refused as unsupported_grant_type', async function () {
 			auth.grant_type = 'foobar';
 
 			const { error } = await auth.getToken(code);
@@ -240,7 +178,7 @@ describe('grant_type=authorization_code', () => {
 			);
 		});
 
-		it('validates used redirect_uri', async function () {
+		it('a redirect_uri differing from the one the code was issued for is refused', async function () {
 			const spy = mock();
 			eventBus.on('grant.error', spy);
 
@@ -256,7 +194,7 @@ describe('grant_type=authorization_code', () => {
 			expect(error.value).toHaveProperty('error', 'invalid_grant');
 		});
 
-		it('validates redirect_uri presence', async function () {
+		it('a client with several registered redirect URIs must send one', async function () {
 			auth.params.redirect_uri = undefined;
 
 			const { error } = await auth.getToken(code);
@@ -268,7 +206,7 @@ describe('grant_type=authorization_code', () => {
 			);
 		});
 
-		it('validates account is still there', async function () {
+		it('a code for a deleted account is refused', async function () {
 			// Simulate the account having been removed since the code was issued:
 			// the DB-backed findAccount now resolves nothing for this subject.
 			await getUserStore('redfox').destroy(setup.getAccountId());
@@ -311,7 +249,7 @@ describe('grant_type=authorization_code', () => {
 			code = query.code;
 		});
 
-		it('validates redirect_uri presence', async function () {
+		it('a client with several registered redirect URIs must send one', async function () {
 			const spy = mock();
 			eventBus.on('grant.error', spy);
 
@@ -366,7 +304,7 @@ describe('grant_type=authorization_code', () => {
 			codeStore = TestAdapter.for('AuthorizationCode').syncFind(jti);
 		});
 
-		it('returns the right stuff', async function () {
+		it('returns the access token, token type, expiry and scope the client expects', async function () {
 			const spy = mock();
 			eventBus.on('grant.success', spy);
 
@@ -386,73 +324,13 @@ describe('grant_type=authorization_code', () => {
 			expect(data).not.toHaveProperty('refresh_token');
 		});
 
-		it('populates ctx.oidc.entities (no offline_access)', async function () {
-			const spy = spyOn(OIDCContext.prototype, 'entity');
-			const { response } = await auth.getToken(code);
-			expect(response.status).toBe(200);
-			const entities = spy.mock.calls.map((call) => call[0]);
-			const accessToken = spy.mock.calls.find(
-				(call) => call[0] === 'AccessToken'
-			);
-			expect([
-				'Account',
-				'Grant',
-				'Client',
-				'AuthorizationCode',
-				'AccessToken'
-			]).toEqual(expect.arrayContaining(entities));
-			expect(accessToken[1].payload).toHaveProperty(
-				'gty',
-				'authorization_code'
-			);
-		});
-
-		it('populates ctx.oidc.entities (w/ offline_access)', async function () {
-			const spy = spyOn(OIDCContext.prototype, 'entity');
-			TestAdapter.for('Grant').syncUpdate(
-				setup.getSession().authorizations.client2.grantId,
-				{
-					scope: 'openid offline_access'
-				}
-			);
-			TestAdapter.for('AuthorizationCode').syncUpdate(setup.getTokenJti(code), {
-				scope: 'openid offline_access'
-			});
-
-			const { response } = await auth.getToken(code);
-			expect(response.status).toBe(200);
-			const entities = spy.mock.calls.map((call) => call[0]);
-			const accessToken = spy.mock.calls.find(
-				(call) => call[0] === 'AccessToken'
-			);
-			const refreshToken = spy.mock.calls.find(
-				(call) => call[0] === 'RefreshToken'
-			);
-			expect([
-				'Account',
-				'Grant',
-				'Client',
-				'AuthorizationCode',
-				'AccessToken',
-				'RefreshToken'
-			]).toEqual(expect.arrayContaining(entities));
-			expect(accessToken[1].payload).toHaveProperty(
-				'gty',
-				'authorization_code'
-			);
-			expect(refreshToken[1].payload).toHaveProperty(
-				'gty',
-				'authorization_code'
-			);
-		});
-
 		it('returns token-endpoint-like cache headers', async function () {
 			const { response } = await auth.getToken(code);
 			expect(response.status).toBe(200);
 			expect(response.headers.get('cache-control')).toBe('no-store');
 		});
 
-		it('validates code is not expired', async function () {
+		it('an expired code is refused as invalid_grant', async function () {
 			spyOn(ttl, 'AuthorizationCode').mockReturnValue(5);
 			const { response } = await agent.auth.get({
 				query: auth.params,
@@ -479,7 +357,7 @@ describe('grant_type=authorization_code', () => {
 			expect(error.value).toHaveProperty('error', 'invalid_grant');
 		});
 
-		it('validates code is not already used', async function () {
+		it('a spent code is refused as invalid_grant', async function () {
 			const grantErrorSpy = mock();
 			const grantRevokeSpy = mock();
 			eventBus.on('grant.error', grantErrorSpy);
@@ -506,7 +384,7 @@ describe('grant_type=authorization_code', () => {
 			expect(codeStore.consumed).toBeLessThanOrEqual(epochTime());
 		});
 
-		it('validates code belongs to client', async function () {
+		it('a code issued to another client is refused', async function () {
 			const spy = mock();
 			eventBus.on('grant.error', spy);
 
@@ -523,7 +401,7 @@ describe('grant_type=authorization_code', () => {
 			expect(error.value).toHaveProperty('error', 'invalid_grant');
 		});
 
-		it('validates a grant type is supported', async function () {
+		it('an unsupported grant_type is refused as unsupported_grant_type', async function () {
 			auth.grant_type = 'foobar';
 			const { error } = await auth.getToken(code);
 			expect(error.status).toBe(422);
@@ -534,7 +412,7 @@ describe('grant_type=authorization_code', () => {
 			);
 		});
 
-		it('validates used redirect_uri (should it be provided)', async function () {
+		it('a provided redirect_uri must still match even when it could have been omitted', async function () {
 			const spy = mock();
 			eventBus.on('grant.error', spy);
 
@@ -550,7 +428,7 @@ describe('grant_type=authorization_code', () => {
 			expect(error.value).toHaveProperty('error', 'invalid_grant');
 		});
 
-		it('validates account is still there', async function () {
+		it('a code for a deleted account is refused', async function () {
 			// Simulate the account having been removed since the code was issued:
 			// the DB-backed findAccount now resolves nothing for this subject.
 			await getUserStore('redfox').destroy(setup.getAccountId());
@@ -572,7 +450,7 @@ describe('grant_type=authorization_code', () => {
 	});
 
 	describe('validates', () => {
-		it('grant_type presence', async function () {
+		it('a token request with no grant_type is refused as invalid_request', async function () {
 			const auth = new AuthorizationRequest({
 				client_id: 'client',
 				scope: 'openid'
@@ -592,7 +470,7 @@ describe('grant_type=authorization_code', () => {
 			);
 		});
 
-		it('code presence', async function () {
+		it('a code grant with no code is refused', async function () {
 			const auth = new AuthorizationRequest({
 				client_id: 'client',
 				scope: 'openid'
@@ -616,7 +494,7 @@ describe('grant_type=authorization_code', () => {
 			);
 		});
 
-		it('redirect_uri presence (more then one registered)', async function () {
+		it('refuses a token request with no redirect_uri when several are registered', async function () {
 			const auth = new AuthorizationRequest({
 				client_id: 'client',
 				scope: 'openid'
@@ -640,7 +518,7 @@ describe('grant_type=authorization_code', () => {
 			);
 		});
 
-		it('code being "found"', async function () {
+		it('an unknown code is refused as invalid_grant', async function () {
 			const spy = mock();
 			eventBus.on('grant.error', spy);
 
@@ -671,7 +549,7 @@ describe('grant_type=authorization_code', () => {
 		});
 	});
 
-	it('handles exceptions', async function () {
+	it('an internal fault at the token endpoint answers server_error rather than leaking', async function () {
 		spyOn(Client, 'find').mockRejectedValue(new Error());
 		const spy = mock();
 		eventBus.on('server_error', spy);

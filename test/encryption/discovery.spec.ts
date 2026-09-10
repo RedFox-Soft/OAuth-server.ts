@@ -2,12 +2,16 @@ import { describe, it, beforeAll, expect } from 'bun:test';
 
 import bootstrap, { agent } from '../test_helper.js';
 
+/**
+ * @proves The encryption algorithms this server supports are advertised, so a client can choose
+ * one it can actually use.
+ */
 describe('configuration features.encryption', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);
 	});
 
-	it('extends discovery', async () => {
+	it('discovery advertises the encryption algorithms the server supports', async () => {
 		const { data, status } =
 			await agent['.well-known']['openid-configuration'].get();
 

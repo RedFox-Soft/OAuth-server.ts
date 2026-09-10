@@ -77,6 +77,10 @@ const payment = {
 	identifier: 'acct-1'
 };
 
+/**
+ * @proves The consent page names every kind of permission being asked for, once each and in a
+ * fixed order, and grants exactly what it listed.
+ */
 describe('consent page — every permission, stated once (US3)', () => {
 	let setup: Setup;
 	let jar: Jar;

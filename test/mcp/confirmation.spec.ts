@@ -124,6 +124,10 @@ async function projectWithClient(token: string) {
 	return { project, clientId: body.clientId };
 }
 
+/**
+ * @proves A high-consequence operation takes two calls, and the confirmation is bound to its
+ * operation, target, parameters and administrator, and spent on first use.
+ */
 describe('MCP confirmation gate', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);
@@ -134,7 +138,7 @@ describe('MCP confirmation gate', () => {
 		await ensureAdminSeed();
 	});
 
-	it('classifies fourteen tools as high-consequence and declares the argument on each', () => {
+	it('declares a confirmation argument on every high-consequence tool', () => {
 		const high = mcpCatalogue.filter((t) => t.consequence === 'high');
 		expect(high.length).toBe(14);
 	});

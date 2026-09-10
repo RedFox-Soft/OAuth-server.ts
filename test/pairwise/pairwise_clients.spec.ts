@@ -9,6 +9,10 @@ import addClient from '../../lib/helpers/add_client.ts';
 import { Claims } from 'lib/helpers/claims.js';
 import { Client } from 'lib/models/client.js';
 
+/**
+ * @proves A pairwise client sector is resolved or refused at registration, verified against a
+ * document served over https that lists the client own URIs.
+ */
 describe('pairwise features', () => {
 	beforeAll(() => bootstrap(import.meta.url));
 
@@ -96,7 +100,7 @@ describe('pairwise features', () => {
 				});
 			});
 
-			it('validates the sector from the provided uri', () => {
+			it("a sector document that does not list the client's redirect URIs is refused", () => {
 				mock('https://foobar.example.com')
 					.intercept({
 						path: '/sector'
@@ -124,7 +128,7 @@ describe('pairwise features', () => {
 				});
 			});
 
-			it('validates the sector from the provided uri for static clients too', () => {
+			it('refuses a provisioned client whose sector document does not list its redirect URIs', () => {
 				mock('https://foobar.example.com')
 					.intercept({
 						path: '/sector'
@@ -171,7 +175,7 @@ describe('pairwise features', () => {
 				);
 			});
 
-			it('validates all redirect_uris are in the uri', () => {
+			it('a client whose redirect URIs are not all listed in the sector document is refused', () => {
 				mock('https://client.example.com')
 					.intercept({
 						path: '/sector'
@@ -208,7 +212,7 @@ describe('pairwise features', () => {
 			});
 
 			describe('features.ciba', () => {
-				it('validates jwks_uri is in the response', () => {
+				it('refuses a CIBA client whose jwks_uri is not listed in the sector document', () => {
 					mock('https://client.example.com')
 						.intercept({
 							path: '/sector'
@@ -246,7 +250,7 @@ describe('pairwise features', () => {
 			});
 
 			describe('features.deviceFlow', () => {
-				it('validates jwks_uri is in the response', () => {
+				it('refuses a device-flow client whose jwks_uri is not listed in the sector document', () => {
 					mock('https://client.example.com')
 						.intercept({
 							path: '/sector'
@@ -282,7 +286,7 @@ describe('pairwise features', () => {
 				});
 			});
 
-			it('validates the response is a json', () => {
+			it('a sector document that is not JSON is refused', () => {
 				mock('https://client.example.com')
 					.intercept({
 						path: '/sector'
@@ -312,7 +316,7 @@ describe('pairwise features', () => {
 				);
 			});
 
-			it('validates only accepts json array responses', () => {
+			it('a sector document that is not a JSON array is refused', () => {
 				mock('https://client.example.com')
 					.intercept({
 						path: '/sector'
@@ -342,7 +346,7 @@ describe('pairwise features', () => {
 				);
 			});
 
-			it('handles got lib errors', () => {
+			it('an unreachable sector document refuses the registration rather than faulting', () => {
 				mock('https://client.example.com')
 					.intercept({
 						path: '/sector'

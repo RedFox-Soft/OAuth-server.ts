@@ -17,6 +17,10 @@ import {
  * server already holds as data must arrive complete, and the result must survive JSON — TypeBox
  * schemas carry symbol keys, and a Buffer or a function anywhere would turn into `{}` or vanish.
  */
+/**
+ * @proves The documentation export carries every catalogued setting, classified route, published
+ * tool, audited route and environment variable, serialisably and versioned.
+ */
 describe('documentation export', () => {
 	const out = buildDocsExport({
 		version: '0.0.0-test',

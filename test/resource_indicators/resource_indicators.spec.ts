@@ -16,8 +16,12 @@ import { grantFlags, resetGrantFlags } from './grant_flags.ts';
 
 const form = 'application/x-www-form-urlencoded';
 
+/**
+ * @proves A resource indicator becomes the token audience across every grant, the configured
+ * default applies when the client names none, and a malformed indicator is refused.
+ */
 describe('features.resourceIndicators defaults', () => {
-	it('defaultResource', async () => {
+	it('the configured default audience is applied when the client names none', async () => {
 		expect(await resourceIndicators.defaultResource()).toBeUndefined();
 		expect(
 			await resourceIndicators.defaultResource(undefined, undefined, [
@@ -26,7 +30,7 @@ describe('features.resourceIndicators defaults', () => {
 		).toEqual(['urn:example:rs']);
 	});
 
-	it('getResourceServerInfo', async () => {
+	it("the resource descriptor decides the token's format, lifetime and scopes", async () => {
 		await assert.rejects(resourceIndicators.getResourceServerInfo(), (err) => {
 			expect(err.message).toBe('invalid_target');
 			expect(err.error_description).toBe(
@@ -63,7 +67,7 @@ describe('features.resourceIndicators', () => {
 	});
 
 	describe('resource validations', () => {
-		it('must be a URI', async () => {
+		it('a resource indicator that is not an absolute URI is refused', async () => {
 			const { error } = await agent.token.post({
 				client_id: 'client',
 				grant_type: 'client_credentials',
@@ -78,7 +82,7 @@ describe('features.resourceIndicators', () => {
 			});
 		});
 
-		it('must not contain a fragment', async () => {
+		it('refuses a resource indicator carrying a fragment', async () => {
 			const { error } = await agent.token.post({
 				client_id: 'client',
 				grant_type: 'client_credentials',
@@ -106,7 +110,7 @@ describe('features.resourceIndicators', () => {
 		}
 
 		describe(`${verb} response_type includes code`, () => {
-			it('checks the policy and adds the resource', async () => {
+			it('an accepted resource becomes the token audience', async () => {
 				const spy = mock();
 				eventBus.once('authorization_code.saved', spy);
 
@@ -185,7 +189,7 @@ describe('features.resourceIndicators', () => {
 				expect(rt.payload.resource).toBe('urn:wl:explicit');
 			});
 
-			it('applies the default resource', async () => {
+			it('applies the configured default audience when the client names none', async () => {
 				const spy = mock();
 				eventBus.once('authorization_code.saved', spy);
 
@@ -247,7 +251,7 @@ describe('features.resourceIndicators', () => {
 				expect(rt.payload.resource).toBe('urn:wl:default');
 			});
 
-			it('applies the default resource (when useGrantedResource returns true)', async () => {
+			it('applies the default audience under the granted-resource policy', async () => {
 				grantFlags.useGranted = true;
 
 				const spy = mock();
@@ -311,7 +315,7 @@ describe('features.resourceIndicators', () => {
 				expect(rt.payload.resource).toBe('urn:wl:default');
 			});
 
-			it('applies the explicit resource', async () => {
+			it("the client's named resource becomes the audience and no other", async () => {
 				const spy = mock();
 				eventBus.once('authorization_code.saved', spy);
 
@@ -378,7 +382,7 @@ describe('features.resourceIndicators', () => {
 	});
 
 	describe('urn:ietf:params:oauth:grant-type:device_code', () => {
-		it('checks the policy and adds the resource', async () => {
+		it('an accepted resource becomes the token audience on the device grant', async () => {
 			const denied = await agent.device.auth.post(
 				jsonToFormUrlEncoded({
 					client_id: 'client',
@@ -461,7 +465,7 @@ describe('features.resourceIndicators', () => {
 			expect(rt.payload.resource).toBe('urn:wl:explicit');
 		});
 
-		it('applies the default resource', async () => {
+		it('applies the configured default audience on the device grant', async () => {
 			const authRes = await agent.device.auth.post(
 				jsonToFormUrlEncoded({
 					client_id: 'client',
@@ -528,7 +532,7 @@ describe('features.resourceIndicators', () => {
 			expect(rt.payload.resource).toBe('urn:wl:default');
 		});
 
-		it('applies the default resource (when useGrantedResource returns true)', async () => {
+		it('applies the default audience under the granted-resource policy, on the device grant', async () => {
 			grantFlags.useGranted = true;
 
 			const authRes = await agent.device.auth.post(
@@ -597,7 +601,7 @@ describe('features.resourceIndicators', () => {
 			expect(rt.payload.resource).toBe('urn:wl:default');
 		});
 
-		it('applies the explicit resource', async () => {
+		it("the client's named resource becomes the audience on the device grant", async () => {
 			const authRes = await agent.device.auth.post(
 				jsonToFormUrlEncoded({
 					client_id: 'client',
@@ -668,7 +672,7 @@ describe('features.resourceIndicators', () => {
 	});
 
 	describe('urn:openid:params:grant-type:ciba', () => {
-		it('checks the policy and adds the resource', async () => {
+		it('an accepted resource becomes the token audience on the CIBA grant', async () => {
 			const denied = await agent.backchannel.post(
 				jsonToFormUrlEncoded({
 					client_id: 'client',
@@ -742,7 +746,7 @@ describe('features.resourceIndicators', () => {
 			expect(rt.payload.resource).toBe('urn:wl:explicit');
 		});
 
-		it('applies the default resource (when useGrantedResource returns true)', async () => {
+		it('applies the default audience under the granted-resource policy, on the CIBA grant', async () => {
 			grantFlags.useGranted = true;
 
 			const backchannel = await agent.backchannel.post(

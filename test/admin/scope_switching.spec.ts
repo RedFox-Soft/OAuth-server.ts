@@ -50,6 +50,10 @@ type ScopeView = {
 	}[];
 };
 
+/**
+ * @proves The active scope decides where containers are created and what is visible, is
+ * re-validated every request, and never reaches another administrator personal group.
+ */
 describe('active scope', () => {
 	beforeEach(async () => {
 		await ensureAdminSeed();

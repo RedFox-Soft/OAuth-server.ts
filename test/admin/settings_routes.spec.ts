@@ -45,6 +45,11 @@ interface SettingsResponse {
 	changedKeys: string[];
 }
 
+/**
+ * @proves A super administrator edits server settings through a surface that validates the
+ * merged result with the same rules the server boots with, and refuses a batch that would not
+ * run.
+ */
 describe('settings API', () => {
 	beforeEach(async () => {
 		await configStore.set({}); // no persisted overrides -> desired == running

@@ -14,6 +14,10 @@ const PUBLIC = () => ApplicationConfig['rateLimit.public.max'] as number;
  * point: the design puts the exemptions in one declared place, so these specs are what prove that
  * place is right — and what fails if the mount order in lib/index.ts is ever reversed.
  */
+/**
+ * @proves The liveness probe, preflights and console assets are never throttled, and a
+ * registered target is indistinguishable from an unregistered one.
+ */
 describe('rate limit exemptions', () => {
 	describe('the liveness probe', () => {
 		beforeEach(async () => {

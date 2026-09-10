@@ -66,6 +66,10 @@ function fixture(name: MigrationBackend['name'] = 'postgres'): Fixture {
 	};
 }
 
+/**
+ * @proves Migrations apply in declared order under one lock, resume after a failure without
+ * repeating, and refuse a database that is ahead or diverged.
+ */
 describe('run', () => {
 	it('applies outstanding migrations in declared order', async () => {
 		const order: string[] = [];

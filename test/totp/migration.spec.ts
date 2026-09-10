@@ -90,6 +90,10 @@ async function raise(required: boolean) {
 	await getBucketStore().update(bucketId, { totpRequired: required });
 }
 
+/**
+ * @proves Raising the requirement on a live bucket leads existing accounts through enrolment
+ * inline, and lowering it does not discard what they enrolled.
+ */
 describe('bringing existing accounts under the requirement (US4)', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'totp' });

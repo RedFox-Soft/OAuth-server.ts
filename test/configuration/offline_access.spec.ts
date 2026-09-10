@@ -7,6 +7,10 @@ import {
 } from 'lib/configs/application.js';
 
 // Scopes are a server setting now, so grant-type derivation reads them from ApplicationConfig.
+/**
+ * @proves Offline access is available by default and follows either the scope list or the
+ * refresh-token flag, whichever the operator used.
+ */
 describe('Provider declaring support for refresh_token grant type', () => {
 	const originalScopes = ApplicationConfig.scopes;
 

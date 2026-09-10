@@ -52,6 +52,15 @@ claim an audit action the audit table does not declare, and
 `test/mcp/catalogue_drift.spec.ts` compares the table against the mounted routes in **both**
 directions. A new admin route is published, named as an exclusion, or a test failure.
 
+That two-way comparison is the guard, and it survives Principle V's admission rule as a completeness
+test — see [[test-admission-rule]]. Two assertions sitting beside it in the same file do not: the
+count of published tools and the count of exclusions name no set and no property, fire identically
+on a legitimate addition and on a mistake, and are always repaired by editing the number. The intent
+behind the exclusion count is real — growing that list should be a deliberate act — but a count is
+the wrong instrument, and *for every excluded operation, a recorded reason* states the same thing
+and fails informatively. That one file holds both kinds is why classification runs per test case
+rather than per spec file.
+
 It imports schema modules and never route modules — a route module reaches the adapters and from there
 `lib/adapters/mongodb/db.ts`, which connects at import time.
 

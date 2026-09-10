@@ -69,6 +69,11 @@ async function projectAdmin() {
 	return { cookie: `${ADMIN_SESSION_COOKIE}=${session._id}` };
 }
 
+/**
+ * @proves Permitting a client identity to administer the instance is a super-admin act, is
+ * refused for an unreachable or malformed document, and requires an acknowledgement for a
+ * loopback-only or host-wide entry.
+ */
 describe('permitting a client identity through the admin API', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'mcp' });

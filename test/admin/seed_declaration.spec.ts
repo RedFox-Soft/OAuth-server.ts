@@ -38,15 +38,19 @@ const SEEDED_LITERALS = [
 	...ADMIN_MCP_CLIENT_SEED.redirectUris
 ];
 
+/**
+ * @proves Both seeding sites read one declaration, so a seed change cannot land in the test path
+ * and not in the deployment one.
+ */
 describe('admin seed declaration', () => {
 	const seeders = ['lib/admin/seed.ts', 'database/mongodb.ts'] as const;
 
 	for (const path of seeders) {
-		it(`${path} takes its values from the shared declaration`, () => {
+		it(`every seeding site reads the one declaration`, () => {
 			expect(source(path)).toContain('consts/admin_seed.js');
 		});
 
-		it(`${path} inlines none of the seeded values`, () => {
+		it(`no seeding site inlines a value`, () => {
 			const text = source(path);
 			const inlined = SEEDED_LITERALS.filter((literal) =>
 				text.includes(`'${literal}'`)

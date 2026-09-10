@@ -34,6 +34,10 @@ async function superCookie() {
 	return (await sessionCookieFor(['super_admin'])).cookie;
 }
 
+/**
+ * @proves Buckets are administered only by those with rights over them, are never moved between
+ * groups by an update, and cannot be deleted while a project still points at them.
+ */
 describe('buckets API', () => {
 	beforeEach(async () => {
 		await ensureAdminSeed();

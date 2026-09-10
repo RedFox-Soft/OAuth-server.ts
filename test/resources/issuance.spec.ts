@@ -48,6 +48,10 @@ async function clearResources() {
 	}
 }
 
+/**
+ * @proves A token is minted only for a declared resource, with exactly that audience and the
+ * intersection of the scopes, and issuance stops the moment the declaration is removed.
+ */
 describe('issuing tokens for a declared protected resource', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);

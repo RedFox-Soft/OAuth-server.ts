@@ -18,6 +18,11 @@ import { AuthorizationCode } from 'lib/models/authorization_code.js';
 import { Client } from 'lib/models/client.js';
 import { InvalidGrant } from 'lib/helpers/errors.js';
 
+/**
+ * @proves A persisted token round-trips with its lifetime intact, is refused once spent or
+ * expired, and a storage failure while resolving one refuses the request rather than treating it
+ * as absent.
+ */
 describe('BaseToken', () => {
 	let setup: Setup;
 	const adapter = TestAdapter.for('RefreshToken');
@@ -53,14 +58,14 @@ describe('BaseToken', () => {
 		expect(await RefreshToken.tryFind(token)).toBeUndefined();
 	});
 
-	it('handles invalid inputs', async function () {
+	it('a malformed token value is refused as invalid_token rather than faulting', async function () {
 		for (const input of [true, Boolean, 1, Infinity, {}, [], new Set()]) {
 			const result = await RefreshToken.tryFind(input);
 			expect(result).toBeUndefined();
 		}
 	});
 
-	it('assigns returned consumed prop', async function () {
+	it('a code already exchanged is refused on the second attempt', async function () {
 		const token = await new RefreshToken({
 			grantId: 'foo'
 		}).save();
@@ -73,7 +78,7 @@ describe('BaseToken', () => {
 		);
 	});
 
-	it('uses expiration for upsert from global settings if not specified in token values', async function () {
+	it('a token with no explicit expiry lives for the configured default', async function () {
 		const token = await new RefreshToken({ grantId: 'foo' }).save();
 		const jti = setup.getTokenJti(token);
 		expect(adapter.upsert).toBeCalledWith(
@@ -83,7 +88,7 @@ describe('BaseToken', () => {
 		);
 	});
 
-	it('uses expiration for upsert from token values', async function () {
+	it('lets a per-token expiry win over the configured default', async function () {
 		const token = await new RefreshToken({
 			grantId: 'foo',
 			expiresIn: 60
@@ -137,7 +142,7 @@ describe('BaseToken', () => {
 		expect(third).toEqual(second);
 	});
 
-	it('rethrows adapter#find errors from session bound tokens looking up the session', async function () {
+	it('a storage failure while resolving the bound session refuses the request rather than treating it as unbound', async function () {
 		const token = new RefreshToken({
 			expiresWithSession: true,
 			sessionUid: 'foo'
@@ -149,7 +154,7 @@ describe('BaseToken', () => {
 		return expect(RefreshToken.find(value)).rejects.toThrow('adapter throw!');
 	});
 
-	it('consumed token save saves consumed', async function () {
+	it('records a token as spent, so a second use is refused', async function () {
 		let token = new AuthorizationCode({
 			grantId: 'foo',
 			consumed: true
@@ -160,7 +165,7 @@ describe('BaseToken', () => {
 		expect(token.payload.consumed).toBeTrue();
 	});
 
-	it('rethrows adapter#findByUserCode errors (Device Code)', async function () {
+	it('refuses a device user-code lookup when storage fails, rather than treating it as absent', async function () {
 		spyOn(TestAdapter.for('DeviceCode'), 'findByUserCode').mockRejectedValue(
 			new Error('adapter throw!')
 		);
@@ -170,7 +175,7 @@ describe('BaseToken', () => {
 	});
 
 	describe('strict find / nullable tryFind', () => {
-		it('find returns the same item as tryFind on a hit (success-path parity)', async function () {
+		it('both lookups find a token that exists', async function () {
 			const value = await new RefreshToken({ grantId: 'foo' }).save();
 			const viaFind = await RefreshToken.find(value);
 			const viaTryFind = await RefreshToken.tryFind(value);
@@ -196,7 +201,7 @@ describe('BaseToken', () => {
 			);
 		});
 
-		it('honors both lookup options and the error override', async function () {
+		it('honours the lookup options together with a caller-supplied error', async function () {
 			const error = new InvalidGrant('nope');
 			return expect(
 				RefreshToken.find('nonexistent', { ignoreExpiration: true, error })

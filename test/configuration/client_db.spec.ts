@@ -8,6 +8,10 @@ import { Client } from 'lib/models/client.js';
 // resolution contract: seeded clients resolve, updates/deletes are reflected
 // immediately (no stale window), unknown clients raise invalid_client, and one
 // module never inherits another module's seeded clients.
+/**
+ * @proves Clients are single-sourced from the adapter, so an update or a deletion takes effect
+ * on the next request with no stale window.
+ */
 describe('clients resolved from the storage adapter', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'client_db' });

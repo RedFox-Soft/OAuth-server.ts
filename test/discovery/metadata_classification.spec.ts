@@ -18,6 +18,10 @@ import {
  * already been pruned by feature flag and extended by operator overrides, and neither of those is
  * what this table is total over.
  */
+/**
+ * @proves Every member the discovery document can produce is classified, nothing stale is
+ * declared, and every coherence-admitted member is anchored to one that still exists.
+ */
 describe('discovery metadata classification', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'all_features' });

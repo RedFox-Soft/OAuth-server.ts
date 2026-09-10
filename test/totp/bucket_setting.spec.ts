@@ -39,6 +39,10 @@ async function superCookie() {
 	return (await sessionCookieFor(['super_admin'])).cookie;
 }
 
+/**
+ * @proves An operator raises or lowers the second-factor requirement per bucket, sees it
+ * recorded, and cannot touch a bucket outside their groups.
+ */
 describe('bucket sign-in method setting', () => {
 	beforeEach(async () => {
 		await ensureAdminSeed();

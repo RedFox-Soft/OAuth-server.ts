@@ -82,6 +82,10 @@ async function callMcp(token: string) {
 	);
 }
 
+/**
+ * @proves Only client identities an operator permitted reach the administrative plane, matched
+ * by exact host rather than by prefix.
+ */
 describe('permitting a client identity at the administrative plane', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'mcp' });

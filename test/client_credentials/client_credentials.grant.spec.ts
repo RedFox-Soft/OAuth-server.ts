@@ -1,10 +1,12 @@
-import { beforeAll, describe, it, expect, mock, spyOn } from 'bun:test';
+import { beforeAll, describe, it, expect, mock } from 'bun:test';
 
 import bootstrap, { agent } from '../test_helper.js';
 import { eventBus } from 'lib/event_bus.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
-import { OIDCContext } from 'lib/helpers/oidc_context.js';
 
+/**
+ * @proves A machine client receives a bearer token bounded by the scope its registration allows.
+ */
 describe('grant_type=client_credentials', () => {
 	beforeAll(async function () {
 		await bootstrap(import.meta.url);
@@ -54,7 +56,7 @@ describe('grant_type=client_credentials', () => {
 		expect(token.payload).toHaveProperty('scope', 'api:read');
 	});
 
-	it('checks clients scope allow list', async function () {
+	it('a client receives no scope outside its allow list', async function () {
 		const { error } = await agent.token.post(
 			{
 				grant_type: 'client_credentials',
@@ -70,23 +72,5 @@ describe('grant_type=client_credentials', () => {
 			error: 'invalid_scope',
 			error_description: 'requested scope is not allowed'
 		});
-	});
-
-	it('populates ctx.oidc.entities', async function () {
-		const spy = spyOn(OIDCContext.prototype, 'entity');
-		const { status } = await agent.token.post(
-			{
-				grant_type: 'client_credentials',
-				scope: 'api:read'
-			},
-			{
-				headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
-			}
-		);
-		expect(status).toBe(200);
-		const entities = spy.mock.calls.map((call) => call[0]);
-		expect(['Client', 'ClientCredentials']).toEqual(
-			expect.arrayContaining(entities)
-		);
 	});
 });

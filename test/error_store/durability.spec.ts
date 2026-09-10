@@ -31,6 +31,10 @@ function faulting(route: string) {
 	});
 }
 
+/**
+ * @proves Recording never fails a request: the queue drains on shutdown, gives up rather than
+ * hanging, and counts what it cannot keep.
+ */
 describe('error store durability', () => {
 	beforeEach(() => {
 		ApplicationConfig['errorStore.enabled'] = true;

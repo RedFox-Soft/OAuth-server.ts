@@ -30,6 +30,10 @@ const base = {
 	targetId: 'p1'
 };
 
+/**
+ * @proves The audit store stamps its own ids and timestamps, normalizes nothing, totally orders
+ * colliding entries, and exposes no way to alter what it holds.
+ */
 describe('AdminAuditStore (memory)', () => {
 	let store: AdminAuditStore;
 

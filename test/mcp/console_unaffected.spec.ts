@@ -29,6 +29,10 @@ import { sessionFor } from '../admin_session.ts';
  *
  * It runs with `mcp.enabled` both on and off, because the console must be unaffected either way.
  */
+/**
+ * @proves Adding the agent surface changed nothing the console can do, including the operations
+ * withheld from the agent.
+ */
 
 async function cookieFor(roles: string[]) {
 	const user = await getUserStore(ADMIN_BUCKET_ID).create(

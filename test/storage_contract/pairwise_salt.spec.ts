@@ -23,6 +23,10 @@ import { SingletonSecretStore } from 'lib/adapters/memory/singletonSecretStore.t
 
 const bytes = (fill: number): Buffer => Buffer.alloc(32, fill);
 
+/**
+ * @proves The pairwise salt round-trips as bytes, is never overwritten, and two secrets in one
+ * area stay apart.
+ */
 describe('SingletonSecretStore (memory): pairwise salt instance', () => {
 	let salt: SingletonSecretStore;
 

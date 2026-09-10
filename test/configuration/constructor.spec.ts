@@ -8,6 +8,10 @@ import {
 // The collection options are read from ApplicationConfig; there is no provider init step.
 // reloadConfiguration re-runs the same validation the server runs at startup, so it still rejects
 // a non-Array/Set and an unsupported client auth method — read from the server settings.
+/**
+ * @proves Collection settings accept only real collections, so a scalar cannot be iterated
+ * character by character into scopes or acr values.
+ */
 describe('Provider configuration', () => {
 	const original = {
 		acrValues: ApplicationConfig.acrValues,

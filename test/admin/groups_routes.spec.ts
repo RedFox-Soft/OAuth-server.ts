@@ -40,6 +40,10 @@ async function makeGroup(cookie: string, name = 'Acme') {
 	return res;
 }
 
+/**
+ * @proves Membership grants access, only owners change it, a group is never left ownerless, and
+ * a personal group is never deleted.
+ */
 describe('groups API', () => {
 	beforeEach(async () => {
 		await ensureAdminSeed();
@@ -205,7 +209,7 @@ describe('groups API', () => {
 	 * an addition rather than a transfer between two kinds of owner.
 	 */
 	describe('a personal group is shareable', () => {
-		it('gains a member, who then reaches what it owns', async () => {
+		it('a personal group can gain a second member, who then reaches what it owns', async () => {
 			const a = await admin();
 			const colleague = await admin();
 			const personal = await personalGroupId(a.userId);
@@ -249,7 +253,7 @@ describe('groups API', () => {
 			expect(demoted.status).toBe(409);
 		});
 
-		it('is still never deletable', async () => {
+		it('a personal group is never deletable, even once it has other members', async () => {
 			const a = await admin();
 			const res = await client.admin.api
 				.groups({ id: await personalGroupId(a.userId) })

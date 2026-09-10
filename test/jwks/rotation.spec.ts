@@ -17,6 +17,9 @@ function publishedKeySet() {
 // Rotation is performed the way a deployment performs it: write the jwksStore and reload, since
 // the store is the single source for the server's keys. The reload rebuilds the keystore and the
 // published JWKS in place (configs/keystore.ts) — no provider re-initialisation is involved.
+/**
+ * @proves Key rotation does not invalidate a token signed by a key that survives it.
+ */
 describe('key rotation does not invalidate tokens signed by a remaining key (SC-005)', () => {
 	afterAll(async () => {
 		await seedJwks(testSigningKeys);

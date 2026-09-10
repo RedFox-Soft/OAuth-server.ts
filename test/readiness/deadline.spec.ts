@@ -15,6 +15,10 @@ import { withDeadline } from 'lib/helpers/deadline.js';
  * reason a container will not shut down.
  */
 
+/**
+ * @proves A readiness check that does not answer in time is rejected rather than hanging, real
+ * errors pass through as themselves, and no timer is left behind.
+ */
 describe('withDeadline', () => {
 	it('rejects when the work does not answer in time', async () => {
 		const never = new Promise<string>(() => undefined);

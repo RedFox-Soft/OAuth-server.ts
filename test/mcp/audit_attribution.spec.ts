@@ -103,6 +103,10 @@ function slug() {
 	return `attr-${Math.floor(Math.random() * 1e6)}`;
 }
 
+/**
+ * @proves An action taken through the agent surface is attributable to both the agent and the
+ * authorizing administrator, and an auditor can separate the two.
+ */
 describe('MCP audit attribution', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);

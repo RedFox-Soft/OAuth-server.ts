@@ -19,6 +19,10 @@ import { AuthorizationCode } from 'lib/models/authorization_code.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { ClientCredentials } from 'lib/models/client_credentials.js';
 
+/**
+ * @proves A resource server learns what a token authorizes whatever hint it sends, and learns
+ * nothing at all about a token that is not its own or no longer active.
+ */
 describe('introspection features', () => {
 	let setup: Setup;
 	beforeAll(async function () {
@@ -29,7 +33,7 @@ describe('introspection features', () => {
 	});
 
 	describe('enriched discovery', () => {
-		it('shows the url now', async function () {
+		it('discovery advertises the introspection endpoint', async function () {
 			const { data } = await agent['.well-known']['openid-configuration'].get();
 
 			expect(data).toHaveProperty(
@@ -344,7 +348,7 @@ describe('introspection features', () => {
 			expect(getHeader(response, 'cache-control')).toBe('no-store');
 		});
 
-		it('validates token param presence', async function () {
+		it('a request with no token is refused as invalid_request', async function () {
 			const { error } = await agent.token.introspect.post(
 				{},
 				{
@@ -360,7 +364,7 @@ describe('introspection features', () => {
 			);
 		});
 
-		it('responds with active=false for total bs', async function () {
+		it('an unrecognisable token value answers active=false rather than an error', async function () {
 			const { data, status } = await agent.token.introspect.post(
 				{ token: 'this is not even a token' },
 				{
@@ -388,7 +392,7 @@ describe('introspection features', () => {
 			expect(data).toEqual({ active: false });
 		});
 
-		it('emits on (i.e. auth) error', async function () {
+		it('a failed client authentication at introspection emits the error event', async function () {
 			const spy = mock();
 			eventBus.once('introspection.error', spy);
 
@@ -402,7 +406,7 @@ describe('introspection features', () => {
 			expect(spy).toBeCalledTimes(1);
 		});
 
-		it('ignores unsupported tokens', async function () {
+		it('a token type this endpoint does not introspect answers active=false', async function () {
 			const ac = new AuthorizationCode({ clientId: 'client' });
 			const token = await ac.save();
 			const { data, status } = await agent.token.introspect.post(
@@ -475,7 +479,7 @@ describe('introspection features', () => {
 		});
 
 		describe('populates ctx.oidc.entities', () => {
-			it('when introspecting an AccessToken', async function () {
+			it('the introspection event carries the token and its client', async function () {
 				const spy = spyOn(OIDCContext.prototype, 'entity');
 
 				const at = new AccessToken({
@@ -496,7 +500,7 @@ describe('introspection features', () => {
 				expect(entities).toEqual(['Client', 'AccessToken']);
 			});
 
-			it('when introspecting a RefreshToken', async function () {
+			it('the introspection event carries the refresh token and its client', async function () {
 				const spy = spyOn(OIDCContext.prototype, 'entity');
 
 				const rt = new RefreshToken({
@@ -517,7 +521,7 @@ describe('introspection features', () => {
 				expect(entities).toEqual(['Client', 'RefreshToken']);
 			});
 
-			it('when introspecting ClientCredentials', async function () {
+			it('the introspection event carries the client credentials token and its client', async function () {
 				const spy = spyOn(OIDCContext.prototype, 'entity');
 
 				const rt = new ClientCredentials({

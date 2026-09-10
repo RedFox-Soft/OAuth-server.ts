@@ -95,6 +95,10 @@ async function reported(
 	return events[0];
 }
 
+/**
+ * @proves A fault is located by endpoint and code location, rendered consistently, and an
+ * unresolvable location is reported rather than dropped.
+ */
 describe('sentry fault location', () => {
 	beforeEach(() => {
 		resetQueue();

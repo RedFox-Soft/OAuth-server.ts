@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'bun:test';
 
-import { canonicalKey, canonicalKeySet } from 'lib/helpers/rar_canonical.js';
+import { canonicalKey } from 'lib/helpers/rar_canonical.js';
 
+/**
+ * @proves Two authorization details are the same authorization when their members are reordered
+ * and different when any string value differs, so distinct grants are never merged.
+ */
 describe('rar canonical key', () => {
 	it('is insensitive to member order', () => {
 		expect(canonicalKey({ type: 'a', actions: ['read'] })).toBe(
@@ -35,17 +39,5 @@ describe('rar canonical key', () => {
 		expect(canonicalKey({ type: 'a', actions: ['read', 'write'] })).not.toBe(
 			canonicalKey({ type: 'a', actions: ['write', 'read'] })
 		);
-	});
-
-	it('handles non-object input without throwing', () => {
-		expect(canonicalKey(undefined)).toBe('undefined');
-		expect(canonicalKey(null)).toBe('null');
-		expect(canonicalKey('a')).toBe('"a"');
-	});
-
-	it('builds a set only from arrays', () => {
-		expect(canonicalKeySet([{ type: 'a' }, { type: 'a' }]).size).toBe(1);
-		expect(canonicalKeySet(undefined).size).toBe(0);
-		expect(canonicalKeySet({ type: 'a' }).size).toBe(0);
 	});
 });

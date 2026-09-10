@@ -33,6 +33,11 @@ function post(body, headers = {}) {
 	});
 }
 
+/**
+ * @proves A backchannel authentication request names exactly one user, is authenticated, is
+ * completed only by a grant for the same client and account, and every malformed form of it is
+ * refused.
+ */
 describe('features.ciba', () => {
 	describe('w/o request objects', () => {
 		beforeAll(async () => {
@@ -48,7 +53,7 @@ describe('features.ciba', () => {
 			eventBus.removeAllListeners('backchannel_authentication.error');
 		});
 
-		it('extends discovery', async () => {
+		it('discovery advertises the backchannel authentication endpoint and its parameters', async () => {
 			const { status, data } =
 				await agent['.well-known']['openid-configuration'].get();
 			if (!data) throw new Error('expected response data');
@@ -96,7 +101,7 @@ describe('features.ciba', () => {
 				await backchannelResult(request, result);
 			});
 
-			it('"request" must be a supported type', async () => {
+			it('a request argument of any other type is refused', async () => {
 				const result = new AccessDenied();
 
 				for (const request of [
@@ -131,7 +136,7 @@ describe('features.ciba', () => {
 				);
 			});
 
-			it('"result" must be a supported type', async () => {
+			it('refuses a result argument of an unsupported type', async () => {
 				const request = new BackchannelAuthenticationRequest({
 					clientId: 'client'
 				});
@@ -152,7 +157,7 @@ describe('features.ciba', () => {
 				}
 			});
 
-			it('request.clientId must be a valid client', async () => {
+			it('a completion naming an unknown client is refused', async () => {
 				const result = new AccessDenied();
 				const request = new BackchannelAuthenticationRequest({
 					clientId: 'notfound'
@@ -190,7 +195,7 @@ describe('features.ciba', () => {
 				);
 			});
 
-			it('saves the "request"', async () => {
+			it('the backchannel request is persisted and pollable afterwards', async () => {
 				const result = new Grant({
 					clientId: 'client',
 					accountId: 'accountId'
@@ -258,7 +263,7 @@ describe('features.ciba', () => {
 		});
 
 		describe('backchannel_authentication_endpoint', () => {
-			it('minimal w/ login_hint', async () => {
+			it('a minimal request identified by login_hint is accepted and returns an auth_req_id', async () => {
 				const [res, [, request, account, client]] = await Promise.all([
 					post({
 						scope: 'openid',
@@ -297,7 +302,7 @@ describe('features.ciba', () => {
 				});
 			});
 
-			it('requested_expiry', async () => {
+			it('a client-requested expiry is honoured in the returned lifetime', async () => {
 				const { data } = await post({
 					scope: 'openid',
 					login_hint: 'accountId',
@@ -309,7 +314,7 @@ describe('features.ciba', () => {
 				expect(data.expires_in).toBeLessThanOrEqual(300);
 			});
 
-			it('minimal w/ login_hint_token', async () => {
+			it('accepts a minimal request identified by login_hint_token and returns an auth_req_id', async () => {
 				const [res, [, request, account, client]] = await Promise.all([
 					post({
 						scope: 'openid',
@@ -347,7 +352,7 @@ describe('features.ciba', () => {
 				});
 			});
 
-			it('minimal w/ id_token_hint', async () => {
+			it('accepts a minimal request identified by id_token_hint and returns an auth_req_id', async () => {
 				const [, [, request]] = await Promise.all([
 					post({
 						scope: 'openid',
@@ -461,7 +466,7 @@ describe('features.ciba', () => {
 
 			describe('param validation', () => {
 				['request', 'request_uri', 'registration'].forEach((param) => {
-					it(`check for not supported parameter ${param}`, async () => {
+					it(`refuses ${param}, which this endpoint does not support`, async () => {
 						const spy = mock();
 						eventBus.once('backchannel_authentication.error', spy);
 
@@ -480,7 +485,7 @@ describe('features.ciba', () => {
 					});
 				});
 
-				it('could not resolve Account', async () => {
+				it('a request naming a user who cannot be resolved is refused', async () => {
 					const spy = mock();
 					eventBus.once('backchannel_authentication.error', spy);
 
@@ -499,7 +504,7 @@ describe('features.ciba', () => {
 					expect(spy).toBeCalledTimes(1);
 				});
 
-				it('could not resolve account identifier', async () => {
+				it('refuses a request whose user cannot be resolved, without saying whether they exist', async () => {
 					const spy = mock();
 					eventBus.once('backchannel_authentication.error', spy);
 
@@ -518,7 +523,7 @@ describe('features.ciba', () => {
 					expect(spy).toBeCalledTimes(1);
 				});
 
-				it('requires the scope param', async () => {
+				it('a request with no scope is refused as invalid_request', async () => {
 					const spy = mock();
 					eventBus.once('backchannel_authentication.error', spy);
 
@@ -535,7 +540,7 @@ describe('features.ciba', () => {
 					expect(spy).toBeCalledTimes(1);
 				});
 
-				it('requires the client_notification_token param when using ping', async () => {
+				it('refuses a ping request with no client_notification_token', async () => {
 					const spy = mock();
 					eventBus.once('backchannel_authentication.error', spy);
 
@@ -554,7 +559,7 @@ describe('features.ciba', () => {
 					expect(spy).toBeCalledTimes(1);
 				});
 
-				it('requires the scope param with openid', async () => {
+				it('refuses a request whose scope omits openid', async () => {
 					const spy = mock();
 					eventBus.once('backchannel_authentication.error', spy);
 
@@ -572,7 +577,7 @@ describe('features.ciba', () => {
 					expect(spy).toBeCalledTimes(1);
 				});
 
-				it('validates requested_expiry', async () => {
+				it('an out-of-range requested expiry is refused', async () => {
 					const spy = mock();
 					eventBus.once('backchannel_authentication.error', spy);
 
@@ -591,7 +596,7 @@ describe('features.ciba', () => {
 					expect(spy).toBeCalledTimes(1);
 				});
 
-				it('validates one of the hints is provided', async () => {
+				it('a request naming no user at all is refused', async () => {
 					const spy = mock();
 					eventBus.once('backchannel_authentication.error', spy);
 
@@ -610,7 +615,7 @@ describe('features.ciba', () => {
 					expect(spy).toBeCalledTimes(1);
 				});
 
-				it('validates exactly one of the hints is provided', async () => {
+				it('a request naming two different users is refused', async () => {
 					const spy = mock();
 					eventBus.once('backchannel_authentication.error', spy);
 
@@ -646,7 +651,7 @@ describe('features.ciba', () => {
 			eventBus.removeAllListeners('backchannel_authentication.error');
 		});
 
-		it('extends discovery', async () => {
+		it('discovery advertises the backchannel authentication endpoint and its parameters', async () => {
 			const { data } = await agent['.well-known']['openid-configuration'].get();
 			if (!data) throw new Error('expected response data');
 			expect(
@@ -660,7 +665,7 @@ describe('features.ciba', () => {
 		describe('backchannel_authentication_endpoint', () => {
 			describe('param validation', () => {
 				['request_uri', 'registration'].forEach((param) => {
-					it(`check for not supported parameter ${param}`, async () => {
+					it(`refuses ${param}, which this endpoint does not support`, async () => {
 						const spy = mock();
 						eventBus.once('backchannel_authentication.error', spy);
 
@@ -679,7 +684,7 @@ describe('features.ciba', () => {
 					});
 				});
 
-				it('validates request object is used', async () => {
+				it('where request objects are required, a plain form request is refused', async () => {
 					const spy = mock();
 					eventBus.once('backchannel_authentication.error', spy);
 
@@ -728,7 +733,7 @@ describe('features.ciba', () => {
 					expect(status).toBe(200);
 				});
 
-				it('validates request object claims are present (exp)', async () => {
+				it('a request object with no exp is refused', async () => {
 					const spy = mock();
 					eventBus.once('backchannel_authentication.error', spy);
 
@@ -759,7 +764,7 @@ describe('features.ciba', () => {
 					expect(spy).toBeCalledTimes(1);
 				});
 
-				it('validates request object claims are present (nbf)', async () => {
+				it('refuses a request object with no nbf', async () => {
 					const spy = mock();
 					eventBus.once('backchannel_authentication.error', spy);
 
@@ -790,7 +795,7 @@ describe('features.ciba', () => {
 					expect(spy).toBeCalledTimes(1);
 				});
 
-				it('validates request object claims are present (jti)', async () => {
+				it('refuses a request object with no jti', async () => {
 					const spy = mock();
 					eventBus.once('backchannel_authentication.error', spy);
 
@@ -821,7 +826,7 @@ describe('features.ciba', () => {
 					expect(spy).toBeCalledTimes(1);
 				});
 
-				it('validates request object claims are present (iat)', async () => {
+				it('refuses a request object with no iat', async () => {
 					const spy = mock();
 					eventBus.once('backchannel_authentication.error', spy);
 
@@ -852,7 +857,7 @@ describe('features.ciba', () => {
 					expect(spy).toBeCalledTimes(1);
 				});
 
-				it('validates Encrypted Request Objects are not used', async () => {
+				it('an encrypted request object is refused rather than silently ignored', async () => {
 					const spy = mock();
 					eventBus.once('backchannel_authentication.error', spy);
 

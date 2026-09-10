@@ -52,6 +52,10 @@ const body = (origin: string, overrides: Record<string, unknown> = {}) => ({
 	...overrides
 });
 
+/**
+ * @proves An upstream provider is configured and verified before it is stored, its secret never
+ * comes back out, and the last door into a federated-only bucket cannot be closed.
+ */
 describe('provider management', () => {
 	beforeEach(async () => {
 		resetAdminMemoryStores();

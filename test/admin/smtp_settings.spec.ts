@@ -37,6 +37,10 @@ const VALID = {
 	fromEmail: 'no-reply@example.com'
 };
 
+/**
+ * @proves Mail transport is configured by a super administrator, the password is write-only and
+ * masked, and the trail names the field without the value.
+ */
 describe('SMTP settings API', () => {
 	beforeEach(async () => {
 		await ensureAdminSeed();

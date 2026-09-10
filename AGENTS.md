@@ -207,6 +207,46 @@ There is a second way a client can exist, and it stores nothing. A `client_id` t
 
 ## Testing
 
+**The rules for writing and maintaining tests here are [`test/RULES.md`](test/RULES.md). Read it
+before adding a test, and use its review checklist when reviewing a pull request that touches
+`test/`.** Nothing enforces the rule in code — deliberately, and that file explains why — so a
+review against it is the only thing standing between the suite and the bloat it was rewritten to
+remove.
+
+The rule in one paragraph, with the detail in that file:
+
+**A test proves a User Case or a Security Invariant. It does not prove that the code is the code
+it is.** This is Principle V of the constitution, it is non-negotiable, and a test that proves
+neither is deleted rather than reviewed. Before writing one, satisfy both halves:
+
+1. State it in one of two sentence forms, **without naming a function, class, module or file in
+   the trigger** — behavioural, _`<outcome>` when `<condition>`_; or completeness, _for every
+   `<member of a set>`, `<property>`_, where the set is either enumerated from the running system
+   (the drift guards) or generated over an input domain (`test/properties/`). A test fitting
+   neither form proves code. `expect(list.length).toBe(65)` fits neither: it names no set and no
+   property, and it is repaired by editing the number.
+2. Check the outcome matters to somebody — the end user, the integrating client, the operating
+   administrator, the agent on the management surface, or an attacker. A console notice's prefix
+   passes step 1 and fails here.
+
+A **refusal is an outcome**, and in this product the error responses are normative protocol
+surface: proving that a spent code yields `invalid_grant` rather than a 500 is a first-class user
+case, not an edge case. A **completeness guard** — enumerating the mounted route table against a
+declared registry, as `test/admin/audit_route_classification.spec.ts` does — is admissible under
+the second form and is not a third category; it closes a claim about absence that no example can
+close, because the defect is the route somebody forgot.
+
+Name a case for its **outcome in the present tense, plus its condition where the outcome is
+conditional** (`refuses …`, `returns … when …`). One action per case; two triggers means two
+cases. Given/When/Then belongs in the spec document, not in the code — the `describe` carries the
+context. No BDD tooling.
+
+Every spec file opens with a one-sentence `@proves` declaration above its top-level `describe`,
+stating what its cases collectively prove — so a reviewer, human or agent, can see the file's
+claimed intent before reading a single assertion. It lives in the file it describes and nowhere
+else: there is no index, no generator and no drift check, because a second copy of a sentence is a
+second thing to keep in step.
+
 Tests use **Bun's native test runner** with **Chai** assertions and **Sinon** stubs/spies.
 
 Each feature area has:
@@ -214,7 +254,7 @@ Each feature area has:
 - `*.config.ts` — per-feature test settings, expressed entirely as **named exports** the harness applies (nothing is passed to the provider): `ApplicationConfig` (feature flags and collection options incl. `claims` — omit it to get the shared test claim set, `claims: {}` to opt out), `ClientDefaults`, `addons` (behavior overrides incl. `interactionPolicy`), `jwks` (per-instance keys), and `clients` / `client` which are seeded into the `Client` store. Configs that clone another config must re-export its `clients`.
 - `*.spec.ts` — test cases using the Eden type-safe HTTP client
 
-`test_helper.ts` bootstraps the provider with the right config before each suite. Use `bootstrap(import.meta)` at the top of a spec file.
+`test_helper.ts` bootstraps the provider with the right config before each suite. Use `bootstrap(import.meta.url)` at the top of a spec file — the URL, not the `import.meta` object; pass `{ config: '<name>' }` to borrow another area's config.
 
 Time-sensitive tests use Bun's `setSystemTime` (from `bun:test`) to travel time; call `setSystemTime()` with no argument to reset.
 
@@ -310,7 +350,7 @@ Four rules keep it honest:
    asserts. Three parts, and the split matters. Copy that can be computed is computed, from
    `docs-export.json` via `src/data/storage.ts`, so it cannot drift at all. A comparison's own cell
    is checked in `src/content.config.ts`, at the source, because on a comparison page the
-   *competitor's* cell routinely names PostgreSQL and a check on the rendered page is satisfied by
+   _competitor's_ cell routinely names PostgreSQL and a check on the rendered page is satisfied by
    text that says nothing about us. And free prose on `/` and `/features/` is checked per sentence
    by `stale-datastore-claim` — per sentence, not per page, for the same reason. It stops at the
    `/docs/` boundary, where naming one datastore is a procedure rather than a claim. Question

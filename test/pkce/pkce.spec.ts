@@ -5,6 +5,10 @@ import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';
 
+/**
+ * @proves PKCE is mandatory for public clients, only S256 is accepted, and a code bound to a
+ * challenge cannot be exchanged without a verifier that hashes to it.
+ */
 describe('PKCE RFC7636', () => {
 	let setup: Setup;
 	let cookie = null;
@@ -14,7 +18,7 @@ describe('PKCE RFC7636', () => {
 	});
 
 	describe('authorization', () => {
-		it('Should throw Exception in check on PSCE if code_challenge is not defined', async function () {
+		it('refuses a public client that omits a code challenge', async function () {
 			const auth = new AuthorizationRequest({
 				scope: 'openid'
 			});
@@ -32,7 +36,7 @@ describe('PKCE RFC7636', () => {
 			);
 		});
 
-		it('checks that codeChallenge is conform to its ABNF (too short)', async function () {
+		it('a short code_challenge is refused', async function () {
 			const auth = new AuthorizationRequest({
 				scope: 'openid',
 				code_challenge_method: 'S256',
@@ -51,7 +55,7 @@ describe('PKCE RFC7636', () => {
 			);
 		});
 
-		it('checks that codeChallenge is conform to its ABNF (too long)', async function () {
+		it('refuses an over-long code_challenge', async function () {
 			const auth = new AuthorizationRequest({
 				scope: 'openid',
 				code_challenge_method: 'S256',
@@ -70,7 +74,7 @@ describe('PKCE RFC7636', () => {
 			);
 		});
 
-		it('checks that codeChallenge is conform to its ABNF (charset)', async function () {
+		it('refuses a code_challenge outside the permitted charset', async function () {
 			const auth = new AuthorizationRequest({
 				scope: 'openid',
 				code_challenge_method: 'S256',
@@ -89,7 +93,7 @@ describe('PKCE RFC7636', () => {
 			);
 		});
 
-		it('validates the value of codeChallengeMethod if provided', async function () {
+		it('only S256 is accepted', async function () {
 			const auth = new AuthorizationRequest({
 				scope: 'openid',
 				code_challenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
@@ -151,7 +155,7 @@ describe('PKCE RFC7636', () => {
 	});
 
 	describe('token grant_type=authorization_code', async () => {
-		it('passes with S256 values', async function () {
+		it('a client presenting a valid S256 challenge is accepted', async function () {
 			const authCode = new AuthorizationCode({
 				accountId: setup.getAccountId(),
 				grantId: setup.getGrantId(),
@@ -173,7 +177,7 @@ describe('PKCE RFC7636', () => {
 			expect(response).toHaveProperty('status', 200);
 		});
 
-		it('checks presence of code_verifier param if code has codeChallenge', async function () {
+		it('a code bound to a challenge cannot be exchanged without a verifier', async function () {
 			const authCode = new AuthorizationCode({
 				accountId: setup.getAccountId(),
 				grantId: setup.getGrantId(),
@@ -196,7 +200,7 @@ describe('PKCE RFC7636', () => {
 			expect(error.value).toHaveProperty('error', 'invalid_grant');
 		});
 
-		it('checks value of code_verifier when method = S256', async function () {
+		it('a verifier that does not hash to the challenge is refused', async function () {
 			const authCode = new AuthorizationCode({
 				accountId: setup.getAccountId(),
 				grantId: setup.getGrantId(),
@@ -220,7 +224,7 @@ describe('PKCE RFC7636', () => {
 			expect(error.value).toHaveProperty('error', 'invalid_grant');
 		});
 
-		it('checks that code_verifier is conform to its ABNF (too short)', async function () {
+		it('refuses a short code_verifier', async function () {
 			const authCode = new AuthorizationCode({
 				accountId: setup.getAccountId(),
 				grantId: setup.getGrantId(),
@@ -248,7 +252,7 @@ describe('PKCE RFC7636', () => {
 			);
 		});
 
-		it('checks that code_verifier is conform to its ABNF (too long)', async function () {
+		it('refuses an over-long code_verifier', async function () {
 			const authCode = new AuthorizationCode({
 				accountId: setup.getAccountId(),
 				grantId: setup.getGrantId(),
@@ -276,7 +280,7 @@ describe('PKCE RFC7636', () => {
 			);
 		});
 
-		it('checks that code_verifier is conform to its ABNF (charset)', async function () {
+		it('refuses a code_verifier outside the permitted charset', async function () {
 			const authCode = new AuthorizationCode({
 				accountId: setup.getAccountId(),
 				grantId: setup.getGrantId(),
@@ -304,7 +308,7 @@ describe('PKCE RFC7636', () => {
 			);
 		});
 
-		it('passes if S256 is used', async function () {
+		it('a correct verifier completes the exchange', async function () {
 			const authCode = new AuthorizationCode({
 				accountId: setup.getAccountId(),
 				grantId: setup.getGrantId(),

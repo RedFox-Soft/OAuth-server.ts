@@ -37,6 +37,10 @@ function decodeLogoutToken(value: string) {
 	};
 }
 
+/**
+ * @proves A logged-out session produces a logout token at every visited client that registered
+ * for one, correlated by sid, and one unreachable client does not strand the others.
+ */
 describe('Back-Channel Logout 1.0', () => {
 	let setup: Setup;
 	beforeAll(async function () {
@@ -54,7 +58,7 @@ describe('Back-Channel Logout 1.0', () => {
 	});
 
 	describe('Client#backchannelLogout', () => {
-		it('triggers the call', async function () {
+		it("a logged-out session produces a logout token at the client's backchannel URI", async function () {
 			const client = await Client.find('client');
 
 			mockHttp('https://client.example.com')
@@ -107,7 +111,7 @@ describe('Back-Channel Logout 1.0', () => {
 			return client.backchannelLogout('subject', 'foo');
 		});
 
-		it('handles non-200 OK responses', async function () {
+		it('one unreachable client does not abort logout for the others', async function () {
 			const client = await Client.find('no-sid');
 
 			mockHttp('https://no-sid.example.com')
@@ -125,7 +129,7 @@ describe('Back-Channel Logout 1.0', () => {
 	});
 
 	describe('discovery', () => {
-		it('extends the well known config', async function () {
+		it('discovery advertises backchannel logout support', async function () {
 			const { data } = await agent['.well-known']['openid-configuration'].get();
 			expect(data).toHaveProperty('end_session_endpoint');
 			expect(data).toHaveProperty('backchannel_logout_supported', true);

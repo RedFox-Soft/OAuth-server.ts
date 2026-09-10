@@ -6,6 +6,10 @@ import { STEP_SECONDS } from 'lib/totp/consts.ts';
 // The secret every published vector uses: the ASCII digits 1-0 repeated to 20 bytes.
 const SEED = Buffer.from('12345678901234567890', 'ascii');
 
+/**
+ * @proves The in-repo base32, HOTP and TOTP implementations match the published RFC vectors,
+ * tolerate how a person retypes a secret, and refuse a replayed step.
+ */
 describe('base32 (RFC 4648 §6)', () => {
 	// RFC 4648 §10 test vectors, unpadded — the padding this codec omits is the '=' run at the end.
 	const vectors: [string, string][] = [
@@ -19,11 +23,11 @@ describe('base32 (RFC 4648 §6)', () => {
 	];
 
 	for (const [plain, encoded] of vectors) {
-		it(`encodes ${JSON.stringify(plain)} as ${JSON.stringify(encoded)}`, () => {
+		it(`the encoder matches the RFC 4648 test vectors`, () => {
 			expect(encodeBase32(Buffer.from(plain, 'ascii'))).toBe(encoded);
 		});
 
-		it(`decodes ${JSON.stringify(encoded)} back to ${JSON.stringify(plain)}`, () => {
+		it(`matches the RFC 4648 decode vector for ${JSON.stringify(encoded)}`, () => {
 			expect(decodeBase32(encoded).toString('ascii')).toBe(plain);
 		});
 	}
@@ -59,7 +63,7 @@ describe('hotp (RFC 4226 Appendix D)', () => {
 	];
 
 	expected.forEach((code, counter) => {
-		it(`counter ${counter} yields ${code}`, () => {
+		it(`the HOTP implementation matches the RFC 4226 test vectors`, () => {
 			expect(hotp(SEED, counter)).toBe(code);
 		});
 	});
@@ -77,7 +81,7 @@ describe('totp (RFC 6238 Appendix B)', () => {
 	];
 
 	for (const [time, code] of vectors) {
-		it(`T=${time} yields ${code}`, () => {
+		it(`matches the RFC 6238 TOTP vector at T=${time}`, () => {
 			expect(hotp(SEED, stepFor(time), 8)).toBe(code);
 		});
 	}

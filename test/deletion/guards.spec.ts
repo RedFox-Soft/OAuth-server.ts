@@ -27,6 +27,10 @@ import { sessionFor } from '../admin_session.ts';
 // The *shape* of the refusal body belongs to User Story 4; here the claims are that the refusal happens,
 // that it changes nothing, and that an emptied container then deletes cleanly.
 
+/**
+ * @proves A container holding anything is not deleted, a refusal changes nothing, and an emptied
+ * container takes its per-bucket area with it.
+ */
 describe('deletion guards: containers', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);

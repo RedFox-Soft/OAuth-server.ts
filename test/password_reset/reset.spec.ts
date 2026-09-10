@@ -193,6 +193,10 @@ beforeAll(async () => {
 	});
 });
 
+/**
+ * @proves A user recovers their account through a single-use, expiring link that ends their
+ * sessions, clears a lockout, and tells nobody which addresses exist.
+ */
 describe('password reset — the journey (US1)', () => {
 	beforeEach(() => {
 		resetSentEmails();

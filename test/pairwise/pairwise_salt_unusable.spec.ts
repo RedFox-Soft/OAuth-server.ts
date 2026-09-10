@@ -39,6 +39,10 @@ const unusableStore = {
 	}
 };
 
+/**
+ * @proves With no usable salt the server refuses pairwise clients rather than inventing a fresh
+ * identifier, and says nothing about its key material.
+ */
 describe('pairwise identifiers: unusable salt', () => {
 	let setup: Setup;
 	let cookie: string;

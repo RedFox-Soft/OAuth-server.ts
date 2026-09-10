@@ -4,6 +4,10 @@ import bootstrap from '../test_helper.js';
 import { ReplayDetection } from 'lib/models/replay_detection.js';
 import { assertStoredMatchesSchema, storedPayloadFor } from './round_trip.js';
 
+/**
+ * @proves Replay detection persists exactly its declared fields and nothing else, so it cannot
+ * silently stop detecting replays.
+ */
 describe('storage contract: ReplayDetection', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);

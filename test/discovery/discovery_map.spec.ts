@@ -6,6 +6,10 @@ import { featuresKeyMap } from '../../lib/configs/discoverySupport.js';
 
 const endpoint = () => agent['.well-known']['openid-configuration'].get();
 
+/**
+ * @proves Every feature-gated discovery key is governed through the map, with no hidden branch
+ * in the handler.
+ */
 describe('discovery featuresKeyMap coverage', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'all_features' });

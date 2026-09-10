@@ -13,10 +13,13 @@ import bootstrap, { agent } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
-import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { validateConfiguration } from 'lib/configs/configuration.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 
+/**
+ * @proves UserInfo returns the claims the user allowed and refuses a token that is unknown, out
+ * of scope, or whose client or account no longer stands.
+ */
 describe('UserInfo', () => {
 	let access_token: string;
 	beforeAll(async () => {
@@ -90,21 +93,7 @@ describe('UserInfo', () => {
 		expect(data).not.toHaveProperty('email_verified');
 	});
 
-	it('populates ctx.oidc.entities', async function () {
-		const spy = spyOn(OIDCContext.prototype, 'entity');
-
-		await agent.userinfo.get({
-			headers: {
-				authorization: `Bearer ${access_token}`
-			}
-		});
-		const entities = spy.mock.calls.map((call) => call[0]);
-		expect(['Client', 'Grant', 'AccessToken', 'Account']).toEqual(
-			expect.arrayContaining(entities)
-		);
-	});
-
-	it('validates access token is found', async function () {
+	it('an unknown access token is refused as invalid_token', async function () {
 		const { error } = await agent.userinfo.get({
 			headers: {
 				authorization: `Bearer Loremipsumdolorsitametconsecteturadipisicingelitsed`
@@ -120,7 +109,7 @@ describe('UserInfo', () => {
 		});
 	});
 
-	it('validates access token is provided', async function () {
+	it('refuses a UserInfo request with no access token', async function () {
 		// @ts-expect-error intentionally calling with no args to test the missing-token path
 		const { error } = await agent.userinfo.get();
 		if (!error) {
@@ -133,7 +122,7 @@ describe('UserInfo', () => {
 		});
 	});
 
-	it('validates the openid scope is present', async function () {
+	it('refuses a token whose scope omits openid', async function () {
 		const at = await new AccessToken({
 			client: await Client.find('client')
 		}).save();
@@ -154,7 +143,7 @@ describe('UserInfo', () => {
 		});
 	});
 
-	it('validates a client is still valid for a found token', async function () {
+	it('refuses a token whose client no longer exists', async function () {
 		const at = await new AccessToken({
 			client: await Client.find('client'),
 			scope: 'openid'
@@ -176,7 +165,7 @@ describe('UserInfo', () => {
 		});
 	});
 
-	it('validates an account still valid for a found token', async function () {
+	it('refuses a token whose account has been deactivated', async function () {
 		const at = await new AccessToken({
 			client: await Client.find('client'),
 			scope: 'openid',

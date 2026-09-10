@@ -28,6 +28,10 @@ function withHeaders(headers: Record<string, string>) {
  * bucket and honest traffic is refused together; attribute one caller to two and the limit does not
  * exist. Both failures look like a working server.
  */
+/**
+ * @proves A request origin comes from the header the proxy sets, never one a client can forge,
+ * and an unattributable request is still bounded.
+ */
 describe('rate limit origin resolution', () => {
 	describe('behind a trusted proxy', () => {
 		beforeEach(async () => {

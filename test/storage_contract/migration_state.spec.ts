@@ -36,6 +36,10 @@ function applied(entry: Migration): SchemaMigrationRecord {
 	};
 }
 
+/**
+ * @proves The boot gate reports current, behind, ahead or diverged from the database and the
+ * declaration alone, preferring the more dangerous verdict.
+ */
 describe('compare', () => {
 	const first = migration('0001-first');
 	const second = migration('0002-second');
@@ -119,7 +123,7 @@ describe('compare', () => {
 		expect(compare([edited, second], [applied(first)]).status).toBe('diverged');
 	});
 
-	it('is a pure function of its two arguments', () => {
+	it('reports the same status for the same database and declaration set', () => {
 		const declared = [first, second];
 		const records = [applied(first)];
 		const once = compare(declared, records);

@@ -10,6 +10,10 @@ import bootstrap, { agent } from '../test_helper.js';
 const app = new Elysia().use(adminApp);
 const client = treaty(app);
 
+/**
+ * @proves An administrative failure reaches the console and the agent in the admin error shape
+ * rather than as an OAuth body, including once adminApp is mounted on the root app.
+ */
 describe('admin API error shape', () => {
 	it('returns an admin-shaped validation error, not an OAuth body', async () => {
 		// name (minLength 1) and slug (pattern) are both invalid values → VALIDATION.

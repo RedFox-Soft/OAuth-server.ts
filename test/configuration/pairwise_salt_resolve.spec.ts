@@ -17,6 +17,10 @@ import { SingletonSecretStore } from 'lib/adapters/memory/singletonSecretStore.t
 // secret wrongly accepted throws on first use; a salt wrongly accepted silently derives identifiers
 // nobody can reproduce.
 
+/**
+ * @proves The pairwise salt is provisioned once and never rotated, because a changed salt
+ * reassigns every pairwise identifier the instance has ever issued.
+ */
 describe('pairwise salt: usability predicate', () => {
 	it('accepts exactly 32 bytes of buffer material', () => {
 		expect(isUsablePairwiseSalt(Buffer.alloc(32, 0))).toBe(true);

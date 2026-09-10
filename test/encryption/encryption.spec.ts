@@ -25,6 +25,10 @@ import { Client } from 'lib/models/client.js';
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
+/**
+ * @proves A client registered for encryption receives nested signed-then-encrypted responses,
+ * and an expired secret or unsupported algorithm is refused rather than served in the clear.
+ */
 describe('encryption', () => {
 	let setup: Setup;
 	let cookie: string;
@@ -51,7 +55,7 @@ describe('encryption', () => {
 			'request_object_encryption_alg',
 			'userinfo_encrypted_response_alg'
 		].forEach((attr) => {
-			it(`symmetric ${attr} makes client secret mandatory (${alg})`, () => {
+			it(`every symmetric algorithm requires a client secret`, () => {
 				expect(
 					Client.needsSecret({
 						token_endpoint_auth_method: 'none',
@@ -128,7 +132,7 @@ describe('encryption', () => {
 					expect(header).toHaveProperty('aud', 'client');
 				});
 
-				it('handles nested encrypted and signed userinfo JWT', async () => {
+				it('an encrypted, signed UserInfo response is produced and decrypts to the claims', async () => {
 					const { data, response } = await agent.userinfo.get({
 						headers: { authorization: `Bearer ${access_token}` }
 					});
@@ -209,7 +213,7 @@ describe('encryption', () => {
 			});
 
 			describe('Request Object encryption', () => {
-				it('handles enc unsupported algs', async () => {
+				it('an unsupported encryption algorithm is refused at registration', async () => {
 					const signed = await JWT.sign(
 						{
 							client_id: 'client',
@@ -243,7 +247,7 @@ describe('encryption', () => {
 					);
 				});
 
-				it('handles enc unsupported encs', async () => {
+				it('refuses an unsupported content-encryption algorithm at registration', async () => {
 					const signed = await JWT.sign(
 						{
 							client_id: 'client',
@@ -283,7 +287,7 @@ describe('encryption', () => {
 			// signing key (see the config note), so asymmetric RSA-OAEP request-object encryption is
 			// unavailable in this environment.
 			describe('Pushed Request Object encryption', () => {
-				it('works signed', async () => {
+				it('a request object that is signed but not encrypted is accepted', async () => {
 					const client = await Client.find('client');
 					const [hsSecret] = client.symmetricKeyStore.selectForSign({
 						alg: 'HS256'
@@ -337,7 +341,7 @@ describe('encryption', () => {
 					expect(actual.query).toHaveProperty('code');
 				});
 
-				it('works with signed by other than none when an alg is required', async () => {
+				it('where an algorithm is required, a genuinely signed request object is accepted and an unsecured one is not', async () => {
 					const client = await Client.find('clientRequestObjectSigningAlg');
 					const [hsSecret] = client.symmetricKeyStore.selectForSign({
 						alg: 'HS256'
@@ -399,7 +403,7 @@ describe('encryption', () => {
 				});
 			});
 
-			it('handles when no suitable encryption key is found', async () => {
+			it('a client with no usable encryption key is refused rather than served an unencrypted response', async () => {
 				const client = await Client.find('client');
 
 				client.idTokenEncryptedResponseAlg = 'ECDH-ES';

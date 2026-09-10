@@ -112,6 +112,10 @@ export async function destroySeededProjects() {
 	}
 }
 
+/**
+ * @proves A browser client reads a response cross-origin only from an origin its project lists,
+ * on success and on every kind of refusal, and nothing at all when the capability is off.
+ */
 describe('CORS', () => {
 	let setup: Setup;
 

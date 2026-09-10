@@ -116,6 +116,10 @@ function result(response: {
 	return response.result?.structuredContent?.result;
 }
 
+/**
+ * @proves Individual agent tools refuse what would leave the instance unusable or half-changed,
+ * and record what they did.
+ */
 describe('individual tool behaviours', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);

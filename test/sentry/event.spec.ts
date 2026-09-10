@@ -41,6 +41,10 @@ const occurrence: ErrorOccurrence = {
 
 const labels = { environment: 'test', instance: 'https://e.ly' };
 
+/**
+ * @proves An outbound event carries exactly the permitted keys - enough to place the fault, and
+ * no actor, user agent or submitted value.
+ */
 describe('sentry event projection', () => {
 	it('projects exactly the permitted key set', () => {
 		const event = projectFault(occurrence, labels);

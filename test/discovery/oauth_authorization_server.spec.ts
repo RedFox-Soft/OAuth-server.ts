@@ -56,6 +56,10 @@ const OAUTH_EXTENSIONS = [
 // it is the only one that proves the pruning cannot strip the document below validity.
 const RFC_8414_REQUIRED = ['issuer', 'response_types_supported'];
 
+/**
+ * @proves The RFC 8414 document carries the required members, locates its endpoints absolutely,
+ * omits every OIDC-only member, and agrees with the OIDC document on the rest.
+ */
 describe('/.well-known/oauth-authorization-server', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);
@@ -230,7 +234,7 @@ describe('/.well-known/oauth-authorization-server at all features', () => {
 	 * override stage is the operator's, and RFC 8414 §2 permits the extra member. An operator who does
 	 * not want it can set it to undefined.
 	 */
-	it('carries the shipped claim_types_supported default, via the override stage', async () => {
+	it('carries the shipped claim_types_supported default into both documents', async () => {
 		const { data } = await oauthMetadata.get();
 		if (!data) throw new Error('expected response data');
 

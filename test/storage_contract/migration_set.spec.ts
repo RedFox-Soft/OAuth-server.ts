@@ -18,12 +18,26 @@ function ids(set: readonly Migration[]): string[] {
 	return set.map((migration) => migration.id);
 }
 
+/**
+ * @proves Every declared migration has a unique sortable id, accounts for both backends, and
+ * says how it is safe to apply twice and whether it can be reversed.
+ */
 describe('the declared migration set', () => {
-	it('ships empty', () => {
-		// The one migration this server had is retired rather than carried forward. A historical entry
-		// here would be one no PostgreSQL database can ever match, and it would teach the next author
-		// that such entries belong.
-		expect(MIGRATIONS).toEqual([]);
+	it('declares no historical migration a PostgreSQL database could never match', () => {
+		/*
+		 * The one migration this server had is retired rather than carried forward: a historical entry
+		 * here would be one no PostgreSQL database can ever satisfy, and it would teach the next author
+		 * that such entries belong.
+		 *
+		 * Stated as the property rather than as `toEqual([])`. An equality on empty is a fact about
+		 * today whose only repair, when the first real migration lands, is to delete the case - and
+		 * every other rule in this file already holds for a set of any size, including zero.
+		 */
+		const preLayer = MIGRATIONS.filter(
+			(migration) => migration.id < '2026'
+		).map((migration) => migration.id);
+
+		expect(preLayer).toEqual([]);
 	});
 
 	it('uses each id exactly once', () => {

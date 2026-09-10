@@ -62,6 +62,10 @@ async function list(cookie: string) {
 	};
 }
 
+/**
+ * @proves The read surface stays reachable while recording is switched off and says so, because
+ * the admin operation set is invariant under capability switches.
+ */
 describe('error store capability switch', () => {
 	beforeEach(async () => {
 		await ensureAdminSeed();

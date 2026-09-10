@@ -34,6 +34,10 @@ function faultingApp(routes: string[]) {
 	return app;
 }
 
+/**
+ * @proves Fault storage is bounded by what the operator configured while the occurrence count
+ * stays exact, and a still-occurring fault is not reaped.
+ */
 describe('error store bounding, driven by configuration', () => {
 	beforeEach(() => {
 		ApplicationConfig['errorStore.enabled'] = true;

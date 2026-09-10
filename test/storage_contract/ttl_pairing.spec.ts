@@ -176,6 +176,10 @@ function upsertCallSites(): { sites: CallSite[]; unresolved: string[] } {
 	return { sites, unresolved };
 }
 
+/**
+ * @proves Every upsert into a reaped area passes a ttl and every upsert into a permanent one
+ * does not, at every call site in lib/.
+ */
 describe('ttl pairing', () => {
 	const { sites, unresolved } = upsertCallSites();
 

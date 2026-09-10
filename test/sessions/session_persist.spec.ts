@@ -19,6 +19,10 @@ function makeCookieJar(sessionValue?: string) {
 	return { [cookieNames.session]: entry } as Record<string, typeof entry>;
 }
 
+/**
+ * @proves A first-time authenticated session is persisted and its cookie issued, and an
+ * anonymous one is not persisted at all.
+ */
 describe('session persistence (setCookies)', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);

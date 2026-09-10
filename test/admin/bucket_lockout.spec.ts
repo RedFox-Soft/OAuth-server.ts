@@ -59,6 +59,10 @@ function provider(
 	};
 }
 
+/**
+ * @proves No bucket can be left with no way for anyone to sign in to it, whether by closing the
+ * last door or by creating it closed.
+ */
 describe('a bucket must keep some way to sign in', () => {
 	beforeEach(async () => {
 		resetAdminMemoryStores();

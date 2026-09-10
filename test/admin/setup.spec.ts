@@ -9,6 +9,9 @@ import { ADMIN_BUCKET_ID } from 'lib/admin/consts.ts';
 const app = new Elysia().use(adminSetup);
 const client = treaty(app);
 
+/**
+ * @proves First-run setup creates the first super administrator and then closes permanently.
+ */
 describe('first-run setup', () => {
 	// This spec asserts a clean admin bucket (no super_admin yet); reset the
 	// process-wide store singletons so users seeded by earlier specs in the same

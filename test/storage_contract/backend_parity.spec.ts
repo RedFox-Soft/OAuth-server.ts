@@ -39,6 +39,10 @@ function areasNamedBy(backend: string): Set<string> {
 	return found;
 }
 
+/**
+ * @proves Both production backends cover the same declared store areas, and neither covers one
+ * the inventory does not declare.
+ */
 describe('storage backend parity', () => {
 	const postgres = areasNamedBy('postgres');
 	const mongodb = areasNamedBy('mongodb');

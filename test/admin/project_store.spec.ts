@@ -2,6 +2,10 @@ import { describe, it, expect, beforeEach } from 'bun:test';
 import { ProjectStore } from 'lib/adapters/memory/projectStore.ts';
 import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 
+/**
+ * @proves A project round-trips through the store, is listed by its owning group, and is
+ * findable by slug and by any of its client ids.
+ */
 describe('ProjectStore (memory)', () => {
 	let store: ProjectStore;
 	beforeEach(() => {

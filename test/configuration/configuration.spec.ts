@@ -2,6 +2,10 @@ import { describe, it, expect } from 'bun:test';
 import { validateConfiguration } from 'lib/configs/configuration.ts';
 import { ApplicationConfig } from 'lib/configs/application.ts';
 
+/**
+ * @proves An unrunnable configuration fails at startup, naming the setting responsible, and
+ * validating a candidate never mutates the configuration being validated.
+ */
 describe('Provider configuration', () => {
 	// Feature enable flags and experiment acknowledgements are owned by ApplicationConfig
 	// (flat dotted keys). Behavior-function overrides are owned by the addon registry.

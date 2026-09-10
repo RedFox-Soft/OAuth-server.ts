@@ -47,6 +47,10 @@ function reg(metadata = {}, headers = {}) {
 	);
 }
 
+/**
+ * @proves A client registers itself, receives exactly the credentials its method needs, and can
+ * read its own configuration only with the registration access token it was issued.
+ */
 describe('registration features', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);
@@ -221,7 +225,7 @@ describe('registration features', () => {
 			expect(spy.mock.calls[0][1]).toHaveProperty('clientId');
 		});
 
-		it('uses the adapter to find stored clients', async () => {
+		it('a registered client is resolvable on the next request', async () => {
 			const adapter = TestAdapter.for('Client');
 			// coverage-adapted: this port validates on read and keeps base metadata in
 			// canonical camelCase, so seed the stored record in that shape.
@@ -235,7 +239,7 @@ describe('registration features', () => {
 			expect(client).toBeTruthy();
 		});
 
-		it('validates the parameters to be valid and responds with errors', async () => {
+		it('invalid client metadata is refused with the registration error', async () => {
 			// spec-authoritative: this port validates canonical camelCase metadata, so the
 			// message is the port's ('grantTypes …') rather than the legacy snake wording.
 			const res = await reg({ grant_types: ['this is clearly wrong'] });
@@ -247,7 +251,7 @@ describe('registration features', () => {
 			);
 		});
 
-		it('validates the parameters to be valid and responds with redirect_uri errors', async () => {
+		it('an unacceptable redirect_uri is refused at registration', async () => {
 			// spec-authoritative: canonical camelCase message from this port's schema.
 			const res = await agent.reg.post({}, { headers: json });
 			expectFail(
@@ -404,40 +408,40 @@ describe('registration features', () => {
 			expect(getHeader(res.response, 'cache-control')).toBe('no-store');
 		});
 
-		it('validates client is a valid client', async () => {
+		it('a read for an unknown client is refused as invalid_client', async () => {
 			const res = await agent
 				.reg({ clientId: 'thisDOesnotCompute' })
 				.get({ headers: bearer('wahtever') });
 			expectFail(res, 401, 'invalid_token', 'invalid token provided');
 		});
 
-		it('validates auth presence', async () => {
+		it('a read with no registration access token is refused', async () => {
 			const res = await agent.reg({ clientId }).get();
 			expectFail(res, 400, 'invalid_request', 'no access token provided');
 		});
 
-		it('validates auth', async () => {
+		it('a wrong registration access token is refused', async () => {
 			const res = await agent
 				.reg({ clientId })
 				.get({ headers: bearer('invalidtoken') });
 			expectFail(res, 401, 'invalid_token', 'invalid token provided');
 		});
 
-		it('validates auth (notfoundtoken)', async () => {
+		it('refuses a registration access token that does not exist', async () => {
 			const res = await agent.reg({ clientId }).get({
 				headers: bearer('Loremipsumdolorsitametconsecteturadipisicingelitsed')
 			});
 			expectFail(res, 401, 'invalid_token', 'invalid token provided');
 		});
 
-		it('accepts query', async () => {
+		it('a registration access token presented in the query string is accepted', async () => {
 			const res = await agent
 				.reg({ clientId })
 				.get({ query: { access_token: token } });
 			expect(res.status).toBe(200);
 		});
 
-		it('accepts header', async () => {
+		it('accepts a registration access token in the Authorization header', async () => {
 			const res = await agent.reg({ clientId }).get({ headers: bearer(token) });
 			expect(res.status).toBe(200);
 		});

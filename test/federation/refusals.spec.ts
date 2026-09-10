@@ -45,6 +45,10 @@ function captureReasons(event: string) {
 	};
 }
 
+/**
+ * @proves An upstream assertion links to an account only when the provider is trusted, the
+ * address verified, the domain allowed and the state single-use.
+ */
 describe('federated sign-in: the decision ladder refuses', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'signin' });
@@ -496,7 +500,7 @@ describe('federated sign-in: the round trip and the assertion are refused', () =
 	];
 
 	for (const [index, row] of rejections.entries()) {
-		it(`refuses ${row.name}, and says why only on the event bus`, async () => {
+		it(`each malformed assertion is refused, with the reason kept off the response`, async () => {
 			const idp = await idpStub(`https://idp-reject-${index}.test`);
 			const bucketId = await seedBucket(CLIENT, {
 				federation: [provider(idp.origin, { emailTrusted: true })]

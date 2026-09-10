@@ -30,6 +30,10 @@ const records = () => TestAdapter.for('FederationState');
 const digest = (value: string) =>
 	crypto.createHash('sha256').update(value).digest('hex');
 
+/**
+ * @proves A federation round trip is stored under a digest, consumed once, refused when expired,
+ * and persists nothing its schema does not declare.
+ */
 describe('storage contract: FederationState', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);

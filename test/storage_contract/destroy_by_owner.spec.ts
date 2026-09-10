@@ -28,6 +28,10 @@ async function seed(
 	);
 }
 
+/**
+ * @proves A deletion sweep destroys exactly the records of its own area and owner, is
+ * idempotent, reports its count, and never takes the grant itself.
+ */
 describe('storage contract: destroyByOwner', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);

@@ -1,7 +1,7 @@
 [test]
 preload = ["./test/preload.ts"]
 coverageSkipTestFiles = true
-# Only entry left: test/helpers/attention.spec.ts uses Mocha's `context()` and has no bun:test
-# equivalent yet — it is migrated by GitHub issue #17. The former test/cors/* entries are gone: that
-# suite is rewritten against the delivered CORS contract and runs.
-pathIgnorePatterns = ["test/helpers/attention.spec.ts"]
+# No exclusions. The last one — test/helpers/attention.spec.ts, which used Mocha's `context()` and
+# never ran — was deleted rather than migrated: it asserted a console notice's prefix and colour,
+# which no audience outside the system depends on. Every file the glob finds is a file the runner
+# runs, and test/intent/declaration.spec.ts relies on those two sets being the same.

@@ -51,6 +51,10 @@ const hostile = fc.oneof(
 	text(60)
 );
 
+/**
+ * @proves Four invariants proven over generated input rather than examples: header injection,
+ * CSP tag matching, HTML escaping and base32 round-tripping.
+ */
 describe('the WWW-Authenticate challenge', () => {
 	/*
 	 * The property the escaping exists to hold: whatever the reported text, the challenge is still the

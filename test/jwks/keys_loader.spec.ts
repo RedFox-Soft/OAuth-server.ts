@@ -5,6 +5,10 @@ import { JWKSStore } from 'lib/adapters/memory/jwksStore.ts';
 import { type UnnormalizedJWK } from 'lib/configs/verifyJWKs.ts';
 import { testSigningKeys } from './fixtures.js';
 
+/**
+ * @proves Keys are loaded and validated at startup, and a key the server cannot use stops the
+ * boot rather than the first request.
+ */
 describe('resolveKeys (populated store + validation)', () => {
 	it('returns the validated keys from a populated store', async () => {
 		const store = new JWKSStore();

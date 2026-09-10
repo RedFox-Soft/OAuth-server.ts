@@ -37,6 +37,10 @@ const expiresAtIndex: ExistingIndex = {
 // The shared lookup every caller here uses. It throws rather than returning undefined because an
 // unknown area name is a programming error, not a runtime condition — and because the `StorageArea |
 // undefined` it replaced is what three `as never` casts in the sibling expiry spec existed to silence.
+/**
+ * @proves Provisioning is idempotent, creates what is missing, drops only the expiry indexes
+ * that disagree with the declaration, and fails loudly when a constraint could not be applied.
+ */
 describe('areaNamed', () => {
 	it('resolves a declared area by name', () => {
 		expect(areaNamed('Session').name).toBe('Session');

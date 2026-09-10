@@ -94,6 +94,10 @@ function claims(overrides: Record<string, unknown> = {}, login?: Login) {
 	return { sub: superAdminId, nonce: login?.nonce, ...overrides };
 }
 
+/**
+ * @proves The console verifies the id_token it receives from its own issuer, refuses twenty-six
+ * ways of forging or replaying one, and says why only on the event bus.
+ */
 describe('admin sign-in: ID token verification', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'admin' });

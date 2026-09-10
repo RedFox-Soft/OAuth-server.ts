@@ -18,6 +18,10 @@ async function cookieFor(roles: string[]): Promise<string> {
 	return `${ADMIN_SESSION_COOKIE}=${session._id}`;
 }
 
+/**
+ * @proves The console shell serves setup on a fresh instance and offers instance administration
+ * only to a super administrator.
+ */
 describe('admin UI shell', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'admin' });

@@ -8,6 +8,10 @@ import { configuration } from 'lib/configs/application.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';
 
+/**
+ * @proves A client registered for symmetric signing receives an id_token it can verify, and can
+ * present it back as an id_token_hint.
+ */
 describe('signatures', () => {
 	let setup: Setup;
 	beforeAll(async function () {

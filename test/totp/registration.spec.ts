@@ -123,6 +123,10 @@ async function register(clientId: string, email: string) {
 	return { uid, cookie, res };
 }
 
+/**
+ * @proves A registrant enrols an authenticator during registration, nothing is recorded until a
+ * code proves possession, and an abandoned enrolment cannot sign in.
+ */
 describe('enrolment at registration (US2)', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'totp' });

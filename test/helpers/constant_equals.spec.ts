@@ -1,8 +1,18 @@
 import { describe, it, expect } from 'bun:test';
 import constantEquals from '../../lib/helpers/constant_equals.ts';
 
-describe('constantEquals', () => {
-	it('compares strings in equal time', () => {
+/*
+ * These two cases prove the comparison's RESULTS, not its timing. The name they used to carry -
+ * "compares strings in equal time" - claimed a property neither of them measures, which is why
+ * nobody noticed the timing invariant has never been tested. Recorded as G-001 in Task.md; the
+ * timing assertion is new coverage and belongs in its own change.
+ */
+/**
+ * @proves Secret comparison answers equal only for identical secrets, whatever their lengths and
+ * whatever comparison length is forced.
+ */
+describe('secret comparison', () => {
+	it('answers equal only for identical secrets, whatever their lengths', () => {
 		const a = 'abcdf';
 		const b = 'abcdf';
 		const c = 'abcde';
@@ -16,7 +26,7 @@ describe('constantEquals', () => {
 		expect(() => constantEquals(Buffer.alloc(1), 'abc')).toThrow();
 	});
 
-	it('also works when providing minComp', () => {
+	it('answers the same when a comparison length is forced, however it is padded', () => {
 		const a1 = 'abcde';
 		const a2 = 'abcde';
 		const b1 = 'abcdef';

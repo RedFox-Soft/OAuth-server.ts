@@ -46,6 +46,10 @@ async function tenant(roles: string[] = ['project_admin']) {
 	return { userId: user._id, cookie };
 }
 
+/**
+ * @proves A project administrator reads the trail of the containers their groups own and nothing
+ * else, under every filter and after the container is gone.
+ */
 describe('group-scoped audit read', () => {
 	beforeEach(async () => {
 		await ensureAdminSeed();

@@ -29,6 +29,10 @@ import { serveDocument, mock } from './document_host.js';
 
 const publicAddress = '93.184.216.34';
 
+/**
+ * @proves A client document is cached within bounds this server chooses, so an unauthenticated
+ * caller cannot turn an authorization into an outbound fetch, and a failure is never cached.
+ */
 describe('reuse window taken from the document host', () => {
 	it('honours max-age within our own bounds', () => {
 		expect(reuseSecondsFor('max-age=300', null)).toBe(300);

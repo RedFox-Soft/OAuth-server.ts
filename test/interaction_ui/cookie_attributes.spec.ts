@@ -80,6 +80,10 @@ async function loginNewUser(email: string) {
 	return { started, response: loggedIn.response };
 }
 
+/**
+ * @proves Every cookie the interaction and logout paths write is hardened and path-scoped, and
+ * is cleared at the path it was written with.
+ */
 describe('end-user cookie attributes', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'pages' });

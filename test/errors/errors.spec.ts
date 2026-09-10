@@ -8,6 +8,10 @@ import { send, UNSERVED_PATH } from '../feature_gate/helpers.ts';
 const browserAccept =
 	'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8';
 
+/**
+ * @proves An error reaches a machine as JSON and a person as a readable page whose title matches
+ * its status, and neither can carry an unescapable character into a header or a page.
+ */
 describe('default error behavior', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);

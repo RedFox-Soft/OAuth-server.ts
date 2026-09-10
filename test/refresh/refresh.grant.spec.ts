@@ -26,6 +26,10 @@ function errorDetail(spy) {
 	return spy.mock.calls[0][0].error_detail;
 }
 
+/**
+ * @proves A refresh returns a new access token and a rotated refresh token with the same scope,
+ * never a wider one, and reuse of a spent token revokes the whole grant.
+ */
 describe('grant_type=refresh_token', () => {
 	let setup: Setup;
 	beforeAll(async function () {
@@ -75,7 +79,7 @@ describe('grant_type=refresh_token', () => {
 		rt = data.refresh_token;
 	});
 
-	it('returns the right stuff', async function () {
+	it('returns a new access token and a rotated refresh token', async function () {
 		const spy = mock();
 		eventBus.on('grant.success', spy);
 
@@ -106,42 +110,8 @@ describe('grant_type=refresh_token', () => {
 		expect(data.refresh_token).toBeString();
 	});
 
-	it('populates ctx.oidc.entities', async function () {
-		const spy = spyOn(OIDCContext.prototype, 'entity');
-
-		await agent.token.post(
-			{
-				refresh_token: rt,
-				grant_type: 'refresh_token'
-			},
-			{
-				headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
-			}
-		);
-
-		const entities = spy.mock.calls.map((call) => call[0]);
-		expect([
-			'Account',
-			'Grant',
-			'Client',
-			'AccessToken',
-			'RefreshToken'
-		]).toEqual(expect.arrayContaining(entities));
-		const refreshToken = spy.mock.calls.find(
-			(call) => call[0] === 'RefreshToken'
-		);
-		expect(refreshToken[1].payload).toHaveProperty('gty', 'authorization_code');
-		const accessToken = spy.mock.calls.find(
-			(call) => call[0] === 'AccessToken'
-		);
-		expect(accessToken[1].payload).toHaveProperty(
-			'gty',
-			'authorization_code refresh_token'
-		);
-	});
-
 	describe('validates', () => {
-		it('validates the refresh token is not expired', async function () {
+		it('an expired refresh token is refused as invalid_grant', async function () {
 			setSystemTime(Date.now() + 10 * 1000);
 			const spy = mock();
 			eventBus.on('grant.error', spy);
@@ -165,7 +135,7 @@ describe('grant_type=refresh_token', () => {
 			expect(errorDetail(spy)).toBe('refresh token is expired');
 		});
 
-		it('validates that token belongs to client', async function () {
+		it("another client's refresh token is refused", async function () {
 			const spy = mock();
 			eventBus.on('grant.error', spy);
 
@@ -279,7 +249,7 @@ describe('grant_type=refresh_token', () => {
 			expect(data).toHaveProperty('id_token');
 		});
 
-		it('validates account is still there', async function () {
+		it('a refresh for a deleted account is refused', async function () {
 			// Simulate the account having been removed since the token was issued:
 			// the DB-backed findAccount now resolves nothing for this subject.
 			await getUserStore('redfox').destroy(setup.getAccountId());
@@ -309,7 +279,7 @@ describe('grant_type=refresh_token', () => {
 		});
 	});
 
-	it('refresh_token presence', async function () {
+	it('a refresh request with no token is refused as invalid_request', async function () {
 		const { error } = await agent.token.post(
 			{
 				grant_type: 'refresh_token'
@@ -326,7 +296,7 @@ describe('grant_type=refresh_token', () => {
 		});
 	});
 
-	it('code being "found"', async function () {
+	it('an unknown refresh token is refused as invalid_grant', async function () {
 		const spy = mock();
 		eventBus.on('grant.error', spy);
 
@@ -353,51 +323,6 @@ describe('grant_type=refresh_token', () => {
 	describe('rotateRefreshToken=true', () => {
 		beforeEach(function () {
 			addons.override({ rotateRefreshToken: () => true });
-		});
-
-		it('populates ctx.oidc.entities', async function () {
-			const spy = spyOn(OIDCContext.prototype, 'entity');
-
-			await agent.token.post(
-				{
-					refresh_token: rt,
-					grant_type: 'refresh_token'
-				},
-				{
-					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
-				}
-			);
-			const entities = spy.mock.calls.map((call) => call[0]);
-			expect([
-				'Account',
-				'Grant',
-				'Client',
-				'AccessToken',
-				'RotatedRefreshToken',
-				'RefreshToken'
-			]).toEqual(expect.arrayContaining(entities));
-			const rotatedRefreshToken = spy.mock.calls.find(
-				(call) => call[0] === 'RotatedRefreshToken'
-			);
-			expect(rotatedRefreshToken[1].payload).toHaveProperty(
-				'gty',
-				'authorization_code'
-			);
-			const refreshToken = spy.mock.calls.findLast(
-				(call) => call[0] === 'RefreshToken'
-			);
-			expect(refreshToken[1].payload).not.toEqual(rotatedRefreshToken[1]);
-			expect(refreshToken[1].payload).toHaveProperty(
-				'gty',
-				'authorization_code refresh_token'
-			);
-			const accessToken = spy.mock.calls.find(
-				(call) => call[0] === 'AccessToken'
-			);
-			expect(accessToken[1].payload).toHaveProperty(
-				'gty',
-				'authorization_code refresh_token'
-			);
 		});
 
 		it('issues a new refresh token and consumes the old one', async function () {
@@ -537,51 +462,6 @@ describe('grant_type=refresh_token', () => {
 			addons.override({ rotateRefreshToken: () => true });
 		});
 
-		it('populates ctx.oidc.entities', async function () {
-			const spy = spyOn(OIDCContext.prototype, 'entity');
-
-			await agent.token.post(
-				{
-					refresh_token: rt,
-					grant_type: 'refresh_token'
-				},
-				{
-					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
-				}
-			);
-			const entities = spy.mock.calls.map((call) => call[0]);
-			expect([
-				'Account',
-				'Grant',
-				'Client',
-				'AccessToken',
-				'RotatedRefreshToken',
-				'RefreshToken'
-			]).toEqual(expect.arrayContaining(entities));
-			const rotatedRefreshToken = spy.mock.calls.find(
-				(call) => call[0] === 'RotatedRefreshToken'
-			);
-			expect(rotatedRefreshToken[1].payload).toHaveProperty(
-				'gty',
-				'authorization_code'
-			);
-			const refreshToken = spy.mock.calls.findLast(
-				(call) => call[0] === 'RefreshToken'
-			);
-			expect(refreshToken[1].payload).not.toEqual(rotatedRefreshToken[1]);
-			expect(refreshToken[1].payload).toHaveProperty(
-				'gty',
-				'authorization_code refresh_token'
-			);
-			const accessToken = spy.mock.calls.find(
-				(call) => call[0] === 'AccessToken'
-			);
-			expect(accessToken[1].payload).toHaveProperty(
-				'gty',
-				'authorization_code refresh_token'
-			);
-		});
-
 		it('issues a new refresh token and consumes the old one', async function () {
 			const consumeSpy = mock();
 			const issueSpy = mock();
@@ -717,7 +597,7 @@ describe('grant_type=refresh_token', () => {
 			addons.override({ rotateRefreshToken: () => false });
 		});
 
-		it('does not rotate', async function () {
+		it('with rotation off the presented refresh token stays valid', async function () {
 			const spy = spyOn(OIDCContext.prototype, 'entity');
 
 			const { data, status } = await agent.token.post(

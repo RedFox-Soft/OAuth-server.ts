@@ -23,6 +23,10 @@ import { AuthorizationCode } from 'lib/models/authorization_code.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { ClientCredentials } from 'lib/models/client_credentials.js';
 
+/**
+ * @proves Every kind of token round-trips through the opaque format and resolves back to what
+ * issued it.
+ */
 describe('opaque storage', () => {
 	// hasPolicies validates policies against ApplicationConfig on save/find (the same source
 	// registration.ts reads), so the throwaway ['foo'] policy below must be a configured one.
@@ -103,7 +107,7 @@ describe('opaque storage', () => {
 
 	afterEach(() => mock.restore());
 
-	it('for AccessToken', async () => {
+	it('an opaque access token round-trips and resolves to its grant', async () => {
 		const kind = 'AccessToken';
 		const adapter = TestAdapter.for(kind);
 		const upsert = spyOn(adapter, 'upsert');
@@ -133,7 +137,7 @@ describe('opaque storage', () => {
 		});
 	});
 
-	it('for AuthorizationCode', async () => {
+	it('an opaque authorization code round-trips and resolves to its grant', async () => {
 		const kind = 'AuthorizationCode';
 		const adapter = TestAdapter.for(kind);
 		const upsert = spyOn(adapter, 'upsert');
@@ -172,7 +176,7 @@ describe('opaque storage', () => {
 		});
 	});
 
-	it('for DeviceCode', async () => {
+	it('an opaque device code round-trips and resolves to its grant', async () => {
 		const kind = 'DeviceCode';
 		const adapter = TestAdapter.for(kind);
 		const upsert = spyOn(adapter, 'upsert');
@@ -210,7 +214,7 @@ describe('opaque storage', () => {
 		});
 	});
 
-	it('for BackchannelAuthenticationRequest', async () => {
+	it('an opaque backchannel request round-trips and resolves to its grant', async () => {
 		const kind = 'BackchannelAuthenticationRequest';
 		const adapter = TestAdapter.for(kind);
 		const upsert = spyOn(adapter, 'upsert');
@@ -248,7 +252,7 @@ describe('opaque storage', () => {
 		});
 	});
 
-	it('for RefreshToken', async () => {
+	it('an opaque refresh token round-trips and resolves to its grant', async () => {
 		const kind = 'RefreshToken';
 		const adapter = TestAdapter.for(kind);
 		const upsert = spyOn(adapter, 'upsert');
@@ -285,7 +289,7 @@ describe('opaque storage', () => {
 		});
 	});
 
-	it('for ClientCredentials', async () => {
+	it('an opaque client credentials token round-trips and resolves to its grant', async () => {
 		const kind = 'ClientCredentials';
 		const adapter = TestAdapter.for(kind);
 		const upsert = spyOn(adapter, 'upsert');
@@ -311,7 +315,7 @@ describe('opaque storage', () => {
 		});
 	});
 
-	it('for InitialAccessToken', async () => {
+	it('an opaque initial access token round-trips', async () => {
 		const kind = 'InitialAccessToken';
 		const adapter = TestAdapter.for(kind);
 		const upsert = spyOn(adapter, 'upsert');
@@ -332,7 +336,7 @@ describe('opaque storage', () => {
 		});
 	});
 
-	it('for RegistrationAccessToken', async () => {
+	it('an opaque registration access token round-trips', async () => {
 		const kind = 'RegistrationAccessToken';
 		const adapter = TestAdapter.for(kind);
 		const upsert = spyOn(adapter, 'upsert');

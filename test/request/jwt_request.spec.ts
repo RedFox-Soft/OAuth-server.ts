@@ -16,6 +16,10 @@ import { ApplicationConfig } from 'lib/configs/application.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { ValidationError } from 'elysia';
 
+/**
+ * @proves A signed request object is the request: a query parameter cannot modify it, the
+ * algorithm and client cannot differ from what was registered, and inception is refused.
+ */
 describe('request parameter features', () => {
 	let setup: Setup;
 	beforeAll(async function () {
@@ -27,7 +31,7 @@ describe('request parameter features', () => {
 	});
 
 	describe('configuration features.request', () => {
-		it('extends discovery', async function () {
+		it('discovery advertises request object support and its signing algorithms', async function () {
 			const { data } = await agent['.well-known']['openid-configuration'].get();
 			expect(data).toHaveProperty('request_parameter_supported', true);
 			expect(data).not.toHaveProperty('require_signed_request_object');
@@ -326,7 +330,7 @@ describe('request parameter features', () => {
 				});
 			});
 
-			it('works with signed by an actual DSA', async function () {
+			it('a request object signed with an asymmetric key is accepted', async function () {
 				const client = await Client.find('client-with-HS-sig');
 				let [key] = client.symmetricKeyStore.selectForSign({ alg: 'HS256' });
 				key = await importJWK(key);
@@ -428,7 +432,7 @@ describe('request parameter features', () => {
 					});
 				});
 
-				it('checks the response mode from the request', async function () {
+				it('a response mode the client may not use is refused', async function () {
 					const spy = mock();
 					eventBus.once(errorEvt, spy);
 
@@ -544,7 +548,7 @@ describe('request parameter features', () => {
 				);
 			});
 
-			it('handles invalid signed looklike jwts', async function () {
+			it('a value that resembles a JWT but is not one is refused', async function () {
 				const spy = mock();
 				eventBus.once(errorEvt, spy);
 
@@ -661,7 +665,7 @@ describe('request parameter features', () => {
 				expect(spy.mock.calls[0][0]).toBeInstanceOf(ValidationError);
 			});
 
-			it('handles unrecognized parameters', async function () {
+			it('an unknown member of the request object is ignored rather than refused', async function () {
 				const spy = mock();
 				eventBus.once(errorEvt, spy);
 				const client = await Client.find('client-with-HS-sig');

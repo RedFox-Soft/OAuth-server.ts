@@ -47,6 +47,10 @@ function leaseStore(): LeaseStore & {
 	};
 }
 
+/**
+ * @proves One replica holds the migration lease at a time, the holder is named, an expired lease
+ * is taken over, and a failure releases it.
+ */
 describe('withLease', () => {
 	it('runs the work and releases afterwards', async () => {
 		const store = leaseStore();

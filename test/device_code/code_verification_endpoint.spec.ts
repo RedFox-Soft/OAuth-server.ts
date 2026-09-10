@@ -23,6 +23,10 @@ import { Client } from 'lib/models/client.js';
 const route = 'device';
 const form = 'application/x-www-form-urlencoded';
 
+/**
+ * @proves A person approves a device by typing its code, the page is CSRF-protected and escapes
+ * what it renders, and every wrong code answers identically.
+ */
 describe('GET code_verification endpoint', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);

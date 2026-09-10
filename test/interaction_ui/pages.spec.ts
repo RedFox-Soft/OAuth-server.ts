@@ -114,6 +114,11 @@ async function register(clientId: string, email: string, password = PASSWORD) {
 	return { uid, cookie, response };
 }
 
+/**
+ * @proves The registration and login pages tell the user what happened, survive hydration,
+ * refuse a closed bucket with a rendered page, and stay non-committal about which addresses
+ * exist.
+ */
 describe('interaction UI — the post-registration notice (US1)', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'pages' });

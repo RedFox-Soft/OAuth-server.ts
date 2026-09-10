@@ -5,6 +5,10 @@ import { JWKSStore } from 'lib/adapters/memory/jwksStore.ts';
 
 // NOTE: the end-to-end HTTP-layer bootstrap is validated manually via quickstart Scenario A,
 // since JWKS_KEYS is a one-time module snapshot. Here we drive resolveKeys directly.
+/**
+ * @proves An un-provisioned deployment generates and persists one signing key, and a provisioned
+ * one never rotates on boot.
+ */
 describe('empty-store bootstrap (resolveKeys)', () => {
 	it('generates and persists one RS256 signing key on an empty store', async () => {
 		const store = new JWKSStore();

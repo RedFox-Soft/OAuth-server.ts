@@ -36,6 +36,9 @@ function decodeLogoutToken(value: string) {
 	return JSON.parse(base64url.decode(payload));
 }
 
+/**
+ * @proves A logout token carries the pairwise subject rather than the account identifier.
+ */
 describe('back-channel logout: pairwise client', () => {
 	let setup: Setup;
 	let idTokenSub: string;

@@ -29,6 +29,10 @@ async function declaredResourceIn(bucketId: string) {
 	return project;
 }
 
+/**
+ * @proves The five rules that decide which bucket a request signs a user into, in order,
+ * including that a named resource can select among an operator options but never create one.
+ */
 describe('resolveBucketForRequest', () => {
 	beforeEach(async () => {
 		resetAdminMemoryStores();

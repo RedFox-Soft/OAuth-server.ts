@@ -16,6 +16,10 @@ import { TestAdapter } from 'test/models.js';
 const route = '/auth';
 const scope = 'openid';
 
+/**
+ * @proves An expired session gets a new identifier rather than reusing the old one, with the
+ * configured clock tolerance honoured.
+ */
 describe('session exp handling', () => {
 	let setup: Setup;
 	beforeAll(async function () {
@@ -57,7 +61,7 @@ describe('session exp handling', () => {
 	});
 
 	describe('clockTolerance', () => {
-		it('respects clockTolerance option', async function () {
+		it('a session within the tolerance is still accepted', async function () {
 			const cookie = await setup.login();
 			const session = setup.getSession();
 			session.exp = epochTime() - 5;

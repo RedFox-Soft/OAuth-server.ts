@@ -31,6 +31,11 @@ const route = '/auth';
 const response_type = 'code';
 const scope = 'openid';
 
+/**
+ * @proves The authorization endpoint issues a code to a client that asked correctly, decides
+ * which interactions are required, and refuses every malformed or unregistered request without
+ * redirecting anywhere it did not verify.
+ */
 describe('BASIC code', () => {
 	let setup: Setup;
 	beforeAll(async function () {
@@ -81,21 +86,57 @@ describe('BASIC code', () => {
 				auth.validateClientLocation(response);
 			});
 
-			it('populates ctx.oidc.entities', async function () {
-				const spy = spyOn(OIDCContext.prototype, 'entity');
+			/*
+			 * The next three were re-anchored from test/helpers/redirect_uri.spec.ts, which asserted
+			 * them of the URL builder rather than of the response a client actually receives. Where
+			 * the browser lands is the outcome; how the URL was assembled is not.
+			 */
+			it('keeps a query the client registered in its own redirect_uri', async function () {
+				const auth = new AuthorizationRequest({
+					client_id: 'client-query-cb',
+					redirect_uri:
+						'https://client.example.com/cb?other=stuff&state=planted',
+					scope
+				});
 
-				const auth = new AuthorizationRequest({ scope });
 				const { response } = await authRequest(auth, { cookie });
 				expect(response.status).toBe(303);
 
-				const entities = spy.mock.calls.map((call) => call[0]);
-				expect([
-					'AuthorizationCode',
-					'Grant',
-					'Client',
-					'Account',
-					'Session'
-				]).toEqual(expect.arrayContaining(entities));
+				const location = new URL(response.headers.get('location'));
+				expect(location.searchParams.get('other')).toBe('stuff');
+				expect(location.searchParams.get('code')).toBeTruthy();
+			});
+
+			it('lets no client pin a response parameter through its own redirect_uri', async function () {
+				const auth = new AuthorizationRequest({
+					client_id: 'client-query-cb',
+					redirect_uri:
+						'https://client.example.com/cb?other=stuff&state=planted',
+					scope
+				});
+
+				const { response } = await authRequest(auth, { cookie });
+				expect(response.status).toBe(303);
+
+				const location = new URL(response.headers.get('location'));
+				expect(location.searchParams.getAll('state')).toHaveLength(1);
+				expect(location.searchParams.get('state')).not.toBe('planted');
+				auth.validateState(response);
+			});
+
+			it('lands in the query of a redirect_uri that carries no path', async function () {
+				const auth = new AuthorizationRequest({
+					client_id: 'client-bare-origin-cb',
+					redirect_uri: 'https://client.example.com',
+					scope
+				});
+
+				const { response } = await authRequest(auth, { cookie });
+				expect(response.status).toBe(303);
+
+				const location = new URL(response.headers.get('location'));
+				expect(location.pathname).toBe('/');
+				expect(location.searchParams.get('code')).toBeTruthy();
 			});
 
 			it('allows native apps to do none auth check when already authorized', async function () {
@@ -171,7 +212,7 @@ describe('BASIC code', () => {
 		describe(`${verb} ${route} interactions`, () => {
 			// An empty policy is registered through the addon seam; the global afterEach in
 			// test/preload.ts resets to this spec's baseline, so no manual restore is needed.
-			it('no account id was resolved and no interactions requested', async function () {
+			it('the request produces a login interaction', async function () {
 				addons.override({ interactionPolicy: () => [] });
 				const spy = mock();
 				eventBus.on('authorization.error', spy);
@@ -191,7 +232,7 @@ describe('BASIC code', () => {
 				);
 			});
 
-			it('no scope was resolved and no interactions requested', async function () {
+			it('the request produces a consent interaction', async function () {
 				addons.override({ interactionPolicy: () => [] });
 				const spy = mock();
 				eventBus.on('authorization.error', spy);
@@ -219,7 +260,7 @@ describe('BASIC code', () => {
 				cookie = await setup.login();
 			});
 
-			it('no account id was found in the session info', async function () {
+			it('produces a login interaction when the session names no account', async function () {
 				const session = setup.getSession();
 				delete session.loginTs;
 				delete session.accountId;
@@ -230,7 +271,7 @@ describe('BASIC code', () => {
 				auth.validateInteraction(response, 'login', 'no_session');
 			});
 
-			it('additional scopes are requested', async function () {
+			it('a newly requested scope produces a consent interaction', async function () {
 				const auth = new AuthorizationRequest({ scope: 'openid email' });
 				const { response } = await authRequest(auth, { cookie });
 				expect(response.status).toBe(303);
@@ -238,7 +279,7 @@ describe('BASIC code', () => {
 				auth.validateInteraction(response, 'consent', 'op_scopes_missing');
 			});
 
-			it('are required for native clients by default', async function () {
+			it('asks the user to confirm for a native client by default', async function () {
 				const auth = new AuthorizationRequest({
 					client_id: 'client-native',
 					redirect_uri: 'com.example.app:/cb',
@@ -252,7 +293,7 @@ describe('BASIC code', () => {
 				auth.validateInteraction(response, 'consent', 'native_client_prompt');
 			});
 
-			it('login was requested by the client by prompt parameter', async function () {
+			it('prompt=login forces re-authentication even with a live session', async function () {
 				const auth = new AuthorizationRequest({ prompt: 'login', scope });
 				const { response } = await authRequest(auth, { cookie });
 				expect(response.status).toBe(303);
@@ -260,7 +301,7 @@ describe('BASIC code', () => {
 				auth.validateInteraction(response, 'login', 'login_prompt');
 			});
 
-			it('login was requested by the client by max_age=0', async function () {
+			it('forces re-authentication when the client sends max_age=0', async function () {
 				const auth = new AuthorizationRequest({ max_age: 0, scope });
 				const { response } = await authRequest(auth, { cookie });
 				expect(response.status).toBe(303);
@@ -268,7 +309,7 @@ describe('BASIC code', () => {
 				auth.validateInteraction(response, 'login', 'login_prompt');
 			});
 
-			it('interaction check no session & max_age combo', async function () {
+			it('produces a login interaction when there is no session and max_age is set', async function () {
 				const auth = new AuthorizationRequest({
 					max_age: 1800, // 30 minutes old session max
 					scope
@@ -279,7 +320,7 @@ describe('BASIC code', () => {
 				auth.validateInteraction(response, 'login', 'max_age', 'no_session');
 			});
 
-			it('session is too old for this authorization request (1/2)', async function () {
+			it('a session older than max_age forces re-authentication', async function () {
 				const session = setup.getSession();
 				session.loginTs = epochTime() - 3600; // an hour ago
 
@@ -293,7 +334,7 @@ describe('BASIC code', () => {
 				auth.validateInteraction(response, 'login', 'max_age');
 			});
 
-			it('session is too old for this authorization request (2/2)', async function () {
+			it('forces re-authentication when the session is older than max_age, on the second path', async function () {
 				const session = setup.getSession();
 				delete session.loginTs;
 
@@ -307,7 +348,7 @@ describe('BASIC code', () => {
 				auth.validateInteraction(response, 'login', 'max_age');
 			});
 
-			it('session is too old for this client', async function () {
+			it('forces re-authentication when the session is older than the client default_max_age', async function () {
 				const client = await Client.find('client');
 				client.defaultMaxAge = 1800;
 
@@ -354,7 +395,7 @@ describe('BASIC code', () => {
 				}
 			});
 
-			it('invalid response mode (not validated yet)', async function () {
+			it('refuses an unsupported response_mode', async function () {
 				// fake a query like this state=foo&state=foo to trigger
 				// a validation error prior to validating response mode
 				const spy = mock();
@@ -385,7 +426,7 @@ describe('BASIC code', () => {
 				}
 			});
 
-			it('response mode provided twice', async function () {
+			it('refuses a duplicated response_mode rather than resolving it', async function () {
 				const spy = mock();
 				eventBus.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
@@ -414,7 +455,7 @@ describe('BASIC code', () => {
 				}
 			});
 
-			it('unregistered scope requested', async function () {
+			it('refuses a scope the server does not declare', async function () {
 				const spy = mock();
 				eventBus.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
@@ -441,7 +482,7 @@ describe('BASIC code', () => {
 			});
 
 			['request', 'request_uri', 'registration'].forEach((param) => {
-				it(`not supported parameter ${param}`, async function () {
+				it(`each unsupported parameter is refused`, async function () {
 					const spy = mock();
 					eventBus.once('authorization.error', spy);
 					const auth = new AuthorizationRequest({
@@ -471,7 +512,7 @@ describe('BASIC code', () => {
 					] = false;
 				});
 
-				it('missing mandatory parameter redirect_uri', async function () {
+				it('refuses a request with no redirect_uri', async function () {
 					const emitSpy = mock();
 					eventBus.once('authorization.error', emitSpy);
 					const auth = new AuthorizationRequest({ scope });
@@ -485,7 +526,7 @@ describe('BASIC code', () => {
 					expect(emitSpy).toHaveBeenCalledTimes(1);
 				});
 
-				it('unless allowOmittingSingleRegisteredRedirectUri is true', async function () {
+				it('with the setting on, a single registered URI may be omitted', async function () {
 					ApplicationConfig[
 						'authorization.allowOmittingSingleRegisteredRedirectUri'
 					] = true;
@@ -515,7 +556,7 @@ describe('BASIC code', () => {
 					client.redirectUris.pop();
 				});
 
-				it('missing mandatory parameter redirect_uri', async function () {
+				it('refuses a request with no redirect_uri', async function () {
 					const emitSpy = mock();
 					eventBus.once('authorization.error', emitSpy);
 					const auth = new AuthorizationRequest({ scope });
@@ -530,7 +571,7 @@ describe('BASIC code', () => {
 				});
 			});
 
-			it('missing mandatory parameter response_type', async function () {
+			it('refuses a request with no response_type', async function () {
 				const spy = mock();
 				eventBus.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({ scope });
@@ -553,7 +594,7 @@ describe('BASIC code', () => {
 				);
 			});
 
-			it('unsupported prompt', async function () {
+			it('refuses a prompt value the server does not support', async function () {
 				const spy = mock();
 				eventBus.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
@@ -578,7 +619,7 @@ describe('BASIC code', () => {
 				);
 			});
 
-			it('supported but not requestable prompt', async function () {
+			it('refuses a prompt a deployment added for its own use', async function () {
 				const spy = mock();
 				eventBus.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
@@ -603,7 +644,7 @@ describe('BASIC code', () => {
 				);
 			});
 
-			it('bad prompt combination', async function () {
+			it('prompt=none with any other prompt is refused', async function () {
 				const spy = mock();
 				eventBus.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
@@ -629,7 +670,7 @@ describe('BASIC code', () => {
 			});
 
 			// section-4.1.2.1 RFC6749
-			it('missing mandatory parameter client_id', async function () {
+			it('refuses a request with no client_id', async function () {
 				const auth = new AuthorizationRequest({ scope });
 				delete auth.params.client_id;
 
@@ -648,7 +689,7 @@ describe('BASIC code', () => {
 			});
 
 			// section-4.1.2.1 RFC6749
-			it('unrecognized client_id provided', async function () {
+			it('renders the refusal for an unknown client rather than redirecting anywhere', async function () {
 				const auth = new AuthorizationRequest({
 					client_id: 'foobar',
 					scope
@@ -667,7 +708,7 @@ describe('BASIC code', () => {
 			});
 
 			describe('section-4.1.2.1 RFC6749', () => {
-				it('validates redirect_uri ad acta [regular error]', async function () {
+				it('an error is only redirected to a redirect_uri that was verified first', async function () {
 					const spy = mock();
 					eventBus.on('authorization.error', spy);
 					const auth = new AuthorizationRequest({
@@ -699,7 +740,7 @@ describe('BASIC code', () => {
 					);
 				});
 
-				it('validates redirect_uri ad acta [server error]', async function () {
+				it('redirects a fault only to a redirect_uri it verified first', async function () {
 					const authErrorSpy = mock();
 					const serverErrorSpy = mock();
 					eventBus.once('authorization.error', authErrorSpy);
@@ -739,7 +780,7 @@ describe('BASIC code', () => {
 				});
 			});
 
-			it('unsupported response_type', async function () {
+			it('refuses a response_type the server does not support', async function () {
 				const spy = mock();
 				eventBus.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
@@ -764,7 +805,7 @@ describe('BASIC code', () => {
 				);
 			});
 
-			it('invalid max_age (negative)', async function () {
+			it('refuses a negative max_age', async function () {
 				const spy = mock();
 				eventBus.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
@@ -789,7 +830,7 @@ describe('BASIC code', () => {
 				);
 			});
 
-			it('invalid max_age (MAX_SAFE_INTEGER)', async function () {
+			it('refuses a max_age large enough to disable re-authentication', async function () {
 				const spy = mock();
 				eventBus.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
@@ -815,7 +856,7 @@ describe('BASIC code', () => {
 				);
 			});
 
-			it('restricted response_type', async function () {
+			it('a response type the client did not register is refused', async function () {
 				const spy = mock();
 				eventBus.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
@@ -841,7 +882,7 @@ describe('BASIC code', () => {
 				);
 			});
 
-			it('unsupported response type validation runs before oidc required params', async function () {
+			it('answers an unsupported response_type before complaining about missing OIDC parameters', async function () {
 				const spy = mock();
 				eventBus.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
@@ -867,7 +908,7 @@ describe('BASIC code', () => {
 				);
 			});
 
-			it('redirect_uri mismatch', async function () {
+			it('a redirect_uri the client did not register is refused and not redirected to', async function () {
 				const emitSpy = mock();
 				eventBus.once('authorization.error', emitSpy);
 				const auth = new AuthorizationRequest({
@@ -890,7 +931,7 @@ describe('BASIC code', () => {
 				);
 			});
 
-			it('login state specific malformed id_token_hint', async function () {
+			it('refuses a malformed id_token_hint', async function () {
 				const spy = mock();
 				eventBus.once('authorization.error', spy);
 				const cookie = await setup.login();

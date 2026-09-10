@@ -72,6 +72,10 @@ async function tokenFor(bound: boolean) {
 	return (await at.save()) as unknown as string;
 }
 
+/**
+ * @proves A sender-constrained token presented without its proof is refused at the agent
+ * surface, whatever the DPoP flag says.
+ */
 describe('sender-constrained tokens on the MCP surface', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);

@@ -128,6 +128,10 @@ const BODIES: Record<string, Record<string, unknown>> = {
 
 const HIGH = mcpCatalogue.filter((t) => t.consequence === 'high');
 
+/**
+ * @proves Every high-consequence tool is gated and every ordinary one is not, checked over the
+ * whole published set rather than by example.
+ */
 describe('every high-consequence tool is gated', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);
@@ -138,9 +142,13 @@ describe('every high-consequence tool is gated', () => {
 		await ensureAdminSeed();
 	});
 
-	it('finds the fourteen the specification names', () => {
-		// If this number moves, FR-014 and the catalogue have to move with it — and the matrix below
-		// grows automatically rather than needing a new case written by hand.
+	it('gates a non-empty set of high-consequence tools, which the matrix below covers in full', () => {
+		/*
+		 * The arity guard for the generated matrix beneath this: for-every over an empty set passes
+		 * while proving nothing, so the matrix would report clean if HIGH ever came back empty. The
+		 * membership is named in catalogue_drift rather than counted here.
+		 */
+		expect(HIGH.length).toBeGreaterThan(0);
 		expect(HIGH.length).toBe(14);
 	});
 

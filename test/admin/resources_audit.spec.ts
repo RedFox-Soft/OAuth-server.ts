@@ -49,6 +49,10 @@ async function entriesFor(action: string) {
 	return page.entries;
 }
 
+/**
+ * @proves Declaring, amending or removing a protected resource is recorded against the actor,
+ * and a refused declaration leaves no entry.
+ */
 describe('protected resource audit trail', () => {
 	beforeEach(async () => {
 		await ensureAdminSeed();

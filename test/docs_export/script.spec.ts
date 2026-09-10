@@ -8,6 +8,10 @@ import * as path from 'node:path';
  * process is the only honest test of that: the script must choose a loadable environment itself,
  * and the same technique test/boot/boot_state.spec.ts uses proves it did.
  */
+/**
+ * @proves The export runs with nothing configured and ignores a developer live database, so
+ * published documentation cannot leak one deployment configuration.
+ */
 describe('docs:export CLI', () => {
 	let dir = '';
 	let out = '';

@@ -16,6 +16,10 @@ import {
  * per-request comparison, so pinning it once here keeps the route specs to what they are actually
  * about. The admin routes still get their own integration coverage.
  */
+/**
+ * @proves An allowed origin is canonicalized once and matched exactly, an operator is told what
+ * was expected, and a list is never half-applied.
+ */
 describe('CORS origin validation', () => {
 	it('accepts a bare http(s) origin', () => {
 		expect(isValidOrigin('https://app.example.com')).toBe(true);

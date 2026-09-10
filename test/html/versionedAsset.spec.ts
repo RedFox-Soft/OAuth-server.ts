@@ -2,6 +2,10 @@ import { describe, it, expect } from 'bun:test';
 
 import { versionedAsset } from 'lib/html/versionedAsset.js';
 
+/**
+ * @proves A user gets the newly deployed bundle rather than a cached old one, and an unbuilt
+ * asset produces a usable URL rather than a broken one.
+ */
 describe('versionedAsset', () => {
 	it('addresses an existing asset by its build time', () => {
 		// Checked in, so it is present in every checkout and in CI.

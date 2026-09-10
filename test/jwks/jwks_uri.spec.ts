@@ -77,6 +77,10 @@ const noEncKeys = [
 	}
 ];
 
+/**
+ * @proves The published key set is exactly what the store holds for the configured capabilities,
+ * and no encryption key appears when encryption is off.
+ */
 describe('/jwks', () => {
 	describe('with encryption enabled', () => {
 		beforeAll(async () => {

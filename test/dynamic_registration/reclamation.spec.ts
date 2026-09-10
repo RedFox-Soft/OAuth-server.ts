@@ -39,6 +39,10 @@ function exists(clientId: string) {
 		.then((found) => Boolean(found));
 }
 
+/**
+ * @proves An abandoned self-registration is reclaimed after its window, and one that ever
+ * completed an authorization - or that an operator created - never is.
+ */
 describe('reclaiming registrations nobody took up', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'dynamic_registration' });

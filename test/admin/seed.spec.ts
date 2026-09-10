@@ -16,6 +16,10 @@ import {
 import { Client } from 'lib/models/client.ts';
 import { UNASSIGNED_GROUP_ID, SYSTEM_GROUP_NAME } from 'lib/admin/consts.ts';
 
+/**
+ * @proves Provisioning is idempotent and leaves an instance with a working admin project,
+ * bucket, console client and default bucket.
+ */
 describe('ensureAdminSeed', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'admin' });

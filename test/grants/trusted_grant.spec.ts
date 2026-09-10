@@ -2,6 +2,10 @@ import { describe, it, beforeAll, expect } from 'bun:test';
 import bootstrap from '../test_helper.js';
 import { loadExistingGrant } from 'lib/addon/account.ts';
 
+/**
+ * @proves Consent is skipped only for a client an operator marked trusted, and then only for the
+ * scope actually requested.
+ */
 describe('loadExistingGrant for consent-not-required clients', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);

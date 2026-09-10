@@ -75,6 +75,10 @@ async function reach(token: string) {
 	return res.status;
 }
 
+/**
+ * @proves The permission list is default-deny, is not satisfied by self-registration, takes a
+ * withdrawal effect on the next call, and is scoped to the audience it was granted for.
+ */
 describe('enforcing the administrative client permission list', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'mcp' });

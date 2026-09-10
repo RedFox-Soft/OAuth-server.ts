@@ -46,6 +46,10 @@ async function makeProject(ownerGroupId = UNASSIGNED_GROUP_ID) {
 	});
 }
 
+/**
+ * @proves An operator manages the clients of projects they manage, sees a new secret exactly
+ * once, and cannot reach another project or the reserved console client.
+ */
 describe('clients API', () => {
 	beforeEach(async () => {
 		await ensureAdminSeed();

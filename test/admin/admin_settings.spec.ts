@@ -37,6 +37,10 @@ async function sessionCookieFor(roles: string[]) {
 	return { cookie: `${ADMIN_SESSION_COOKIE}=${session._id}`, userId: user._id };
 }
 
+/**
+ * @proves A super administrator can require a second factor of every administrator, sees the
+ * change recorded, and nobody scoped below them can touch it.
+ */
 describe('admin bucket settings', () => {
 	let admin: { cookie: string; userId: string };
 

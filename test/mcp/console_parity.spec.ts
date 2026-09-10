@@ -117,6 +117,10 @@ function stripVolatile(value: unknown): unknown {
 	return value;
 }
 
+/**
+ * @proves For every read the catalogue publishes, the agent receives exactly what the console
+ * receives, including the same refusals.
+ */
 describe('agent answers match the console, field for field', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);

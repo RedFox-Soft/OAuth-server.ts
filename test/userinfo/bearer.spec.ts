@@ -1,13 +1,17 @@
 import { describe, it, beforeAll, expect } from 'bun:test';
 import bootstrap, { agent } from '../test_helper.js';
 
+/**
+ * @proves UserInfo refuses an absent or malformed credential with a bearer challenge rather than
+ * parsing it optimistically.
+ */
 describe('providing Bearer token', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);
 	});
 
 	describe('invalid requests', () => {
-		it('nothing provided', async function () {
+		it('UserInfo without a credential is refused with a bearer challenge', async function () {
 			// @ts-expect-error intentionally calling with no args to test the missing-token path
 			const { error } = await agent.userinfo.get();
 			if (!error) {
@@ -20,7 +24,7 @@ describe('providing Bearer token', () => {
 			});
 		});
 
-		it('bad Authorization header format (one part)', async function () {
+		it('refuses an Authorization header with only one part', async function () {
 			const { error } = await agent.userinfo.get({
 				headers: {
 					authorization: 'Bearer'
@@ -36,7 +40,7 @@ describe('providing Bearer token', () => {
 			});
 		});
 
-		it('bad Authorization header format (not bearer)', async function () {
+		it('refuses an Authorization scheme other than Bearer', async function () {
 			const { error } = await agent.userinfo.get({
 				headers: {
 					authorization: 'Basic some'

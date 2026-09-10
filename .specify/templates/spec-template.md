@@ -11,6 +11,15 @@
 ## User Scenarios & Testing *(mandatory)*
 
 <!--
+  Principle V: the acceptance scenarios below are where a feature's User Cases and Security
+  Invariants are first written down, and the tests that follow prove these and nothing else.
+  Given/When/Then belongs here, in the specification — it is the three-slot form. In test code
+  the enclosing group carries the Given and the case name carries the outcome and its condition.
+  A refusal or an error response is an outcome: write those scenarios here too, not as an
+  afterthought.
+-->
+
+<!--
   IMPORTANT: User stories should be PRIORITIZED as user journeys ordered by importance.
   Each user story/journey must be INDEPENDENTLY TESTABLE - meaning if you implement just ONE of them,
   you should still have a viable MVP (Minimum Viable Product) that delivers value.

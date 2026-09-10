@@ -31,6 +31,10 @@ const base = {
 	report: { effect: 'deletes the client' }
 };
 
+/**
+ * @proves A confirmation is stamped by the store, redeemed once, spent even on a mismatch, and
+ * an expired token is indistinguishable from an unknown one.
+ */
 describe('McpConfirmationStore (memory)', () => {
 	let store: McpConfirmationStore;
 

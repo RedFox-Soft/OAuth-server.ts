@@ -29,6 +29,10 @@ function prior(fields: Partial<RateFields> = {}): RateFields {
 	};
 }
 
+/**
+ * @proves Reset mail is bounded by a cooldown and a daily cap, the nearer limit is the one
+ * reported, and a refused send costs no allowance.
+ */
 describe('rate window: refusal', () => {
 	it('permits a send when nothing has been sent before', () => {
 		expect(rateRefusal(undefined, NOW, bounds)).toBeNull();

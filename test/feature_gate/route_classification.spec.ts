@@ -18,6 +18,10 @@ import {
 // The two-way drift guard. Behavioural specs prove the 15 known gated endpoints refuse correctly;
 // only this one can catch endpoint number 16 being mounted with no classification at all, which is
 // the failure mode the whole feature exists to prevent.
+/**
+ * @proves Every mounted route is classified exactly once for gating, cross-origin readability
+ * and rate limiting, with nothing declared that the server does not serve.
+ */
 describe('route classification', () => {
 	const mounted = elysia.routes.map((route) => ({
 		method: route.method,
@@ -100,7 +104,7 @@ describe('route classification', () => {
 			expect(declared.length).toBe(new Set(declared).size);
 		});
 
-		it('exposes exactly the nine routes a browser may read cross-origin', () => {
+		it('exposes exactly the routes a browser may read cross-origin, and no others', () => {
 			const enabled = mounted
 				.filter(
 					(route) => corsClassForPattern(route.method, route.path) !== 'none'

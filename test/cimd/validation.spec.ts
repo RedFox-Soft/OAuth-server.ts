@@ -21,6 +21,10 @@ function validate(body: unknown, identifier = IDENTIFIER) {
 	);
 }
 
+/**
+ * @proves A client document is bound to the URL it came from, carries no shared secret, and
+ * every malformed or unsupported shape is refused.
+ */
 describe('validating a client description document', () => {
 	it('accepts a well-formed document and hands back canonical metadata', () => {
 		const result = validate(documentFor(IDENTIFIER));

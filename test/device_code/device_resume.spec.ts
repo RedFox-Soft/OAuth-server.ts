@@ -57,6 +57,10 @@ function get(cookie) {
 	return agent.ui[uid].device_resume.get({ headers: { cookie } });
 }
 
+/**
+ * @proves A device code is bound to a session exactly once, and an expired, approved or
+ * already-refused code cannot be resumed.
+ */
 describe('device interaction resume /ui/:uid/device_resume', () => {
 	beforeAll(async () => {
 		setup = await bootstrap(import.meta.url);
@@ -90,7 +94,7 @@ describe('device interaction resume /ui/:uid/device_resume', () => {
 				);
 			});
 
-			it('checks code is not expired', async () => {
+			it('an expired code cannot be resumed', async () => {
 				const accountId = nanoid();
 				const cookie = await buildResume({
 					auth: { scope: 'openid' },
@@ -110,7 +114,7 @@ describe('device interaction resume /ui/:uid/device_resume', () => {
 				);
 			});
 
-			it('checks code is not used already (accountId)', async () => {
+			it('an already-approved code cannot be resumed', async () => {
 				const accountId = nanoid();
 				const cookie = await buildResume({
 					auth: { scope: 'openid' },
@@ -130,7 +134,7 @@ describe('device interaction resume /ui/:uid/device_resume', () => {
 				);
 			});
 
-			it('checks code is not used already (error)', async () => {
+			it('an already-refused code cannot be resumed', async () => {
 				const accountId = nanoid();
 				const cookie = await buildResume({
 					auth: { scope: 'openid' },

@@ -42,6 +42,10 @@ async function submitLogin(clientId: string, username: string) {
 	return response.status;
 }
 
+/**
+ * @proves Which bucket a client signs a user into is decided by the client, so console
+ * credentials and end-user credentials cannot be crossed.
+ */
 describe('interaction login bucket routing', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'admin' });

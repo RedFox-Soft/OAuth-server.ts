@@ -18,6 +18,10 @@ import { STORAGE_DIVERGENCES } from 'lib/consts/storage_divergences.js';
  * rather than by being blank.
  */
 
+/**
+ * @proves Every declared difference between the two backends says what each does, why, and what
+ * a caller could observe - so a divergence is argued rather than tolerated.
+ */
 describe('the storage divergence register', () => {
 	it('declares entries at all, so the rules below cannot pass vacuously', () => {
 		expect(STORAGE_DIVERGENCES.length).toBeGreaterThan(0);

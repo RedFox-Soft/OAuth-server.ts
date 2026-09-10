@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { UserBucketStore } from 'lib/adapters/memory/userBucketStore.ts';
 
+/**
+ * @proves A bucket round-trips through the store with its default sign-in settings, and is
+ * listed by the group that owns it.
+ */
 describe('UserBucketStore (memory)', () => {
 	let store: UserBucketStore;
 	beforeEach(() => {

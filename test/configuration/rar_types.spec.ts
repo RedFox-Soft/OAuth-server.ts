@@ -14,6 +14,10 @@ const withTypes = (types: unknown) => ({
 	'richAuthorizationRequests.types': types
 });
 
+/**
+ * @proves An operator declares which rich authorization types exist and how their fields are
+ * bounded, and every malformed declaration is refused at startup.
+ */
 describe('features.richAuthorizationRequests.types validation', () => {
 	it('accepts a minimal descriptor carrying only a label', () => {
 		expect(() =>

@@ -111,6 +111,10 @@ const PERMANENT = [
 	USER_AREA_PREFIX
 ];
 
+/**
+ * @proves Exactly the areas holding expiring records are reaped, on the field the adapter
+ * writes, and a permanent area never is.
+ */
 describe('storage inventory: expiry', () => {
 	it('reaps exactly the areas whose records carry an expiry', () => {
 		const reaped = STORAGE_INVENTORY.filter((area) => area.reaped !== null).map(

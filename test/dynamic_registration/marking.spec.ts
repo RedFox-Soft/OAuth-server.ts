@@ -20,6 +20,10 @@ import { Client } from 'lib/models/client.ts';
 
 const json = { 'content-type': 'application/json' };
 
+/**
+ * @proves A client the server created on a client request is marked as such, an operator client
+ * never is, and a registrant cannot opt itself out.
+ */
 describe('marking a dynamically created registration', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'dynamic_registration' });

@@ -70,6 +70,10 @@ function postForm(path: string, body: Record<string, unknown>) {
  * secret-copy surfaces depend on that feature staying permitted, instead of a diff on an opaque
  * one-line constant that looks like it was assembled carelessly.
  */
+/**
+ * @proves Every kind of response the server can produce carries the non-page hardening headers,
+ * and every page keeps its own policy instead.
+ */
 describe('security headers: the browser-feature policy', () => {
 	beforeEach(async () => {
 		await bootstrap(import.meta.url);

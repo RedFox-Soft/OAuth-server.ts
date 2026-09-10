@@ -70,6 +70,10 @@ async function DPoP(
 		.sign(keypair.privateKey);
 }
 
+/**
+ * @proves A DPoP proof binds a token to a key the client holds, is refused for every wrong typ,
+ * algorithm, method, URL, age, key shape or nonce, and the binding survives refresh.
+ */
 describe('features.dPoP', async () => {
 	const setup = await bootstrap(import.meta.url);
 	// The CIBA grant tests resolve login_hint 'accountId' without login().
@@ -87,7 +91,7 @@ describe('features.dPoP', async () => {
 		mock.restore();
 	});
 
-	it('extends discovery', async function () {
+	it('discovery advertises the DPoP signing algorithms the server accepts', async function () {
 		const { data, status } =
 			await agent['.well-known']['openid-configuration'].get();
 
@@ -99,7 +103,7 @@ describe('features.dPoP', async () => {
 	});
 
 	describe('userinfo', () => {
-		it('validates the way DPoP proof JWT is provided', async function () {
+		it('a proof presented other than in the DPoP header is refused', async function () {
 			const at = new AccessToken({
 				accountId: 'account',
 				client: await Client.find('client'),
@@ -188,7 +192,7 @@ describe('features.dPoP', async () => {
 				eventBus.removeAllListeners('userinfo.error');
 			});
 
-			it('invalid typ', async function () {
+			it('a proof whose typ is not dpop+jwt is refused', async function () {
 				const spy = mock();
 				eventBus.on('userinfo.error', spy);
 
@@ -225,7 +229,7 @@ describe('features.dPoP', async () => {
 				}
 			});
 
-			it('alg mismatch', async function () {
+			it('a proof signed with an algorithm the header does not declare is refused', async function () {
 				const spy = mock();
 				eventBus.on('userinfo.error', spy);
 
@@ -259,7 +263,7 @@ describe('features.dPoP', async () => {
 				}
 			});
 
-			it('embedded jwk header', async function () {
+			it('a proof carrying no embedded public key is refused', async function () {
 				const spy = mock();
 				eventBus.on('userinfo.error', spy);
 
@@ -298,7 +302,7 @@ describe('features.dPoP', async () => {
 				}
 			});
 
-			it('no private key in header', async function () {
+			it('a proof whose embedded key carries private material is refused', async function () {
 				const spy = mock();
 				eventBus.on('userinfo.error', spy);
 
@@ -335,7 +339,7 @@ describe('features.dPoP', async () => {
 				}
 			});
 
-			it('no symmetric key in header', async function () {
+			it('a proof whose embedded key is symmetric is refused', async function () {
 				const spy = mock();
 				eventBus.on('userinfo.error', spy);
 
@@ -372,7 +376,7 @@ describe('features.dPoP', async () => {
 				}
 			});
 
-			it('missing jti', async function () {
+			it('a proof with no jti is refused', async function () {
 				const { error, response } = await agent.userinfo.get({
 					headers: {
 						authorization: `DPoP ${access_token}`,
@@ -404,7 +408,7 @@ describe('features.dPoP', async () => {
 				);
 			});
 
-			it('htm mismatch', async function () {
+			it('a proof whose method does not match the request is refused', async function () {
 				const { error, response } = await agent.userinfo.get({
 					headers: {
 						authorization: `DPoP ${access_token}`,
@@ -438,7 +442,7 @@ describe('features.dPoP', async () => {
 				);
 			});
 
-			it('htu mismatch', async function () {
+			it('a proof whose target URL does not match the request is refused', async function () {
 				const { error, response } = await agent.userinfo.get({
 					headers: {
 						authorization: `DPoP ${access_token}`,
@@ -524,7 +528,7 @@ describe('features.dPoP', async () => {
 			}
 		});
 
-		it('acts like an RS checking the DPoP proof and thumbprint now', async function () {
+		it('a bound token presented without a matching proof is refused', async function () {
 			const at = new AccessToken({
 				accountId: setup.getAccountId(),
 				grantId: setup.getGrantId(),
@@ -622,7 +626,7 @@ describe('features.dPoP', async () => {
 	});
 
 	describe('introspection', () => {
-		it('exposes cnf and DPoP proof JWT type now', async function () {
+		it('a bound token carries the key thumbprint in cnf', async function () {
 			const at = new AccessToken({
 				accountId: 'account',
 				client: await Client.find('client'),
@@ -833,7 +837,7 @@ describe('features.dPoP', async () => {
 	});
 
 	describe('pushed authorization request', () => {
-		it('checks dpop_jkt equals the jwk thumbprint when both are present', async function () {
+		it('an authorization whose dpop_jkt disagrees with the proof key is refused', async function () {
 			const code_verifier = randomBytes(32).toString('base64url');
 
 			const par = await agent.par.post(
@@ -1411,7 +1415,7 @@ describe('features.dPoP', async () => {
 	});
 
 	describe('invalid nonce', () => {
-		it('@ userinfo', async function () {
+		it('a proof with a wrong nonce is refused at UserInfo, with a fresh nonce in the challenge', async function () {
 			const res = await agent.userinfo.get({
 				headers: {
 					authorization: 'DPoP foo',
@@ -1446,7 +1450,7 @@ describe('features.dPoP', async () => {
 			});
 		});
 
-		it('@ token endpoint', async function () {
+		it('a proof with a wrong nonce is refused at the token endpoint, with a fresh nonce', async function () {
 			const res = await agent.token.post(
 				{ grant_type: 'client_credentials' },
 				{
@@ -1494,7 +1498,7 @@ describe('features.dPoP', async () => {
 			config['dpop.requireNonce'] = false;
 		});
 
-		it('@ PAR endpoint', async function () {
+		it('refuses a proof with a wrong nonce at the PAR endpoint, with a fresh nonce', async function () {
 			const code_verifier = randomBytes(32).toString('base64url');
 
 			const res = await agent.par.post(
@@ -1545,7 +1549,7 @@ describe('features.dPoP', async () => {
 			expect(par.response.headers.get('dpop-nonce')).toBeEmpty();
 		});
 
-		it('@ userinfo', async function () {
+		it('with nonces required, a proof carrying none is refused at UserInfo and a nonce is supplied', async function () {
 			const res = await agent.userinfo.get({
 				headers: {
 					authorization: 'DPoP foo',
@@ -1578,7 +1582,7 @@ describe('features.dPoP', async () => {
 			expect(userInfo.response.headers.get('dpop-nonce')).toBeEmpty();
 		});
 
-		it('@ token endpoint', async function () {
+		it('with nonces required, a proof carrying none is refused at the token endpoint', async function () {
 			const res = await agent.token.post(
 				{ grant_type: 'client_credentials' },
 				{

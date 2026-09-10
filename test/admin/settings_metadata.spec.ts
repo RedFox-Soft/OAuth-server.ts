@@ -16,6 +16,10 @@ import { hasDetail } from 'lib/admin/ui/settings/model.ts';
  * presentable: a descriptor the console cannot file, summarise or label is not a validation failure,
  * it is a setting an operator meets as an unexplained control on a pane that may not exist.
  */
+/**
+ * @proves Every setting is filed under a domain with a summary, a unit where it is numeric, and
+ * a risk flag where changing it has a security consequence.
+ */
 describe('settings catalog presentation metadata', () => {
 	const DOMAIN_IDS = SETTING_DOMAINS.map((d) => d.id);
 

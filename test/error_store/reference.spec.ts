@@ -47,6 +47,10 @@ async function lookup(reference: string, cookie: string) {
 	);
 }
 
+/**
+ * @proves The reference a caller was handed resolves to that one record for a super
+ * administrator, and appears on nothing that was not recorded.
+ */
 describe('error reference lookup', () => {
 	beforeEach(async () => {
 		await ensureAdminSeed();

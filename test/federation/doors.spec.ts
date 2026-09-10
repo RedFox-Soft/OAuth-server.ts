@@ -75,6 +75,10 @@ async function postForm(
 	};
 }
 
+/**
+ * @proves A bucket configured for federation only refuses every password route, not merely hides
+ * the form, and a bucket that keeps passwords is untouched.
+ */
 describe('a bucket that only accepts federated sign-in', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'doors' });

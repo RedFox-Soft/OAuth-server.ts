@@ -105,6 +105,10 @@ async function median(runs: number, fn: () => Promise<unknown>) {
 	return samples[Math.floor(samples.length / 2)];
 }
 
+/**
+ * @proves Re-dispatching through the agent surface costs a bounded multiple of the admin route
+ * it wraps, and leaves that route unchanged.
+ */
 describe('tool call latency', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);

@@ -5,6 +5,9 @@ import { testSigningKeys } from './fixtures.js';
 
 const contentType = 'application/jwk-set+json; charset=utf-8';
 
+/**
+ * @proves Every signing key the server holds is published, and no private component ever is.
+ */
 describe('/jwks sourced from the store (no config.jwks)', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'store' });

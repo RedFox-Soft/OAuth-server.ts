@@ -98,6 +98,10 @@ async function superAdmin() {
 	return { user, token, init };
 }
 
+/**
+ * @proves The two container deletions are absent rather than gated, stay absent however
+ * insistently they are asked for, and the agent is told where to do them instead.
+ */
 describe('withheld container deletions', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);

@@ -5,6 +5,9 @@ import { ApplicationConfig } from '../../lib/configs/application.js';
 
 const endpoint = () => agent['.well-known']['openid-configuration'].get();
 
+/**
+ * @proves A runtime flag change is reflected in the discovery document without a restart.
+ */
 describe('discovery runtime mutability', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);

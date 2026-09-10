@@ -64,6 +64,10 @@ const body = {
 	scopes: ['mcp:tools-basic']
 };
 
+/**
+ * @proves An administrator declares a third-party protected resource, uniquely across projects,
+ * and cannot claim an identifier this server serves or amend one already issuing tokens.
+ */
 describe('protected resources API', () => {
 	beforeEach(async () => {
 		await ensureAdminSeed();

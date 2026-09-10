@@ -22,6 +22,10 @@ async function cookieFor(roles: string[]) {
 	return { cookie: `${ADMIN_SESSION_COOKIE}=${s._id}`, userId: user._id };
 }
 
+/**
+ * @proves Administrator accounts are created, listed, amended and deactivated only by an
+ * instance owner, and their passwords never appear in a response.
+ */
 describe('admin-accounts API', () => {
 	beforeEach(async () => {
 		await ensureAdminSeed();
@@ -58,7 +62,7 @@ describe('admin-accounts API', () => {
 		expect(admins?.every((u) => !('password' in u))).toBe(true);
 	});
 
-	it('project_admin is forbidden', async () => {
+	it('a project administrator cannot list administrator accounts', async () => {
 		const { cookie } = await cookieFor(['project_admin']);
 		const res = await client.admin.api.admins.get({ headers: { cookie } });
 		expect(res.status).toBe(403);

@@ -29,6 +29,10 @@ import {
 const MODEL = areaNamed('AccessToken');
 const STORE = areaNamed('projects');
 
+/**
+ * @proves The PostgreSQL provisioning plan covers every declared area with quoted identifiers,
+ * correct index kinds, and names that are unique, bounded and deterministic.
+ */
 describe('tableStatement', () => {
 	it('gives a model area the payload column its declared keys already name', () => {
 		expect(tableStatement(MODEL)).toBe(

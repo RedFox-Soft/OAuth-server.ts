@@ -14,6 +14,10 @@ void elysia;
  * seam missing from the list but cannot catch an accessor removed from the index while its type
  * lingers in AddonImplementations.
  */
+/**
+ * @proves The set of overridable behaviour functions a deployment can discover is exactly the
+ * set the addon index exposes, each named once.
+ */
 describe('addon seams', () => {
 	// Exported from the index but not seams: the registry itself, the warn helpers, and the two
 	// interaction-policy controls that already read through the registry internally.
