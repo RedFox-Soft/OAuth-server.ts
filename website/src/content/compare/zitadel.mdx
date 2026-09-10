@@ -50,11 +50,11 @@ groups:
         us:
           {
             status: yes,
-            text: 'MongoDB in production, in-memory for tests, behind one adapter interface.'
+            text: 'PostgreSQL or MongoDB in production, in-memory for tests, behind one adapter interface.'
           }
         them: { status: yes, text: 'PostgreSQL 14 or newer.' }
-        verdict: them
-        why: 'Most teams already run PostgreSQL; fewer already run MongoDB.'
+        verdict: even
+        why: 'Both run on the database most teams already operate; we also run on MongoDB.'
         note: 'The repository states "PostgreSQL (≥ 14)".'
       - dimension: Multi-tenancy
         us:

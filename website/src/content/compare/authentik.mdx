@@ -23,7 +23,7 @@ faq:
   - question: 'Does FoxAuth support LDAP or RADIUS?'
     answer: 'No, and neither is planned. FoxAuth implements OAuth 2.1 and OpenID Connect only. authentik supports LDAP and RADIUS as well as SAML, so if you need to put a login in front of an appliance or a legacy application that speaks one of those, FoxAuth cannot do it and authentik can.'
   - question: 'Is FoxAuth lighter to run than authentik?'
-    answer: 'It is a single Bun process and a MongoDB database. authentik documents a minimum of a host with at least 2 CPU cores and 2 GB of RAM, and its repository contains Python, Go, Rust and TypeScript components with PostgreSQL behind them — a broader surface, because it does considerably more. Whether that is worth it depends entirely on whether you need the protocols it adds.'
+    answer: 'It is a single Bun process and one database — PostgreSQL or MongoDB. authentik documents a minimum of a host with at least 2 CPU cores and 2 GB of RAM, and its repository contains Python, Go, Rust and TypeScript components with PostgreSQL behind them — a broader surface, because it does considerably more. Whether that is worth it depends entirely on whether you need the protocols it adds.'
   - question: 'Can I migrate from authentik to FoxAuth?'
     answer: 'Only if everything you have connected to it speaks OIDC. Those clients port over with an issuer and client id change. Anything connected over SAML, LDAP or RADIUS has no path, because FoxAuth does not implement those protocols — that part of the estate would have to be re-integrated over OIDC first, which is usually a larger project than the migration itself.'
 groups:

@@ -23,12 +23,12 @@ chooseUs:
   - 'Your team writes TypeScript and would rather read the server than wrap it.'
   - 'You want PKCE for every client, exact redirect matching and no Implicit grant as the default, not per-client configuration.'
   - "You want an AI agent to administer the instance through the console's own permission checks and audit trail."
-  - 'You run MongoDB, or you want a server small enough to mount inside your own Bun service.'
+  - 'You want a server small enough to mount inside your own Bun service, on the PostgreSQL or MongoDB you already run.'
 faq:
   - question: 'Can I migrate from Keycloak to FoxAuth?'
     answer: "Clients and users move without much trouble — both are OpenID Connect servers, so a client written against Keycloak's token endpoint works against FoxAuth's once the issuer and the client id change. The work is in what Keycloak calls realms, mappers and authentication flows: FoxAuth models tenancy as projects and user buckets, and custom behaviour as 31 named override seams in TypeScript rather than as SPI implementations in Java."
   - question: 'Is FoxAuth lighter to run than Keycloak?'
-    answer: 'It is a Bun process and a MongoDB database, which is a smaller operational surface than a JVM application server and a relational schema, and it starts in under a second rather than tens of seconds. That is a real difference in memory and startup, not in what the protocol endpoints do. Keycloak has years more production hardening behind it, and that is worth weighing against a 0.x release.'
+    answer: 'It is a Bun process and one database — PostgreSQL or MongoDB — which is a smaller operational surface than a JVM application server and its relational schema, and it starts in under a second rather than tens of seconds. That is a real difference in memory and startup, not in what the protocol endpoints do. Keycloak has years more production hardening behind it, and that is worth weighing against a 0.x release.'
   - question: 'Does FoxAuth support SAML?'
     answer: 'No. FoxAuth implements OAuth 2.1 and OpenID Connect only, and there is no SAML support planned. If an application in your estate can only speak SAML, FoxAuth cannot serve it and Keycloak can — that is a reason to stay where you are.'
   - question: 'Can an AI agent administer FoxAuth?'
@@ -60,7 +60,7 @@ groups:
         us:
           {
             status: yes,
-            text: 'MongoDB in production, in-memory for tests, one adapter interface.'
+            text: 'PostgreSQL or MongoDB in production, in-memory for tests, one adapter interface.'
           }
         them:
           {
@@ -68,7 +68,7 @@ groups:
             text: 'PostgreSQL, MySQL, MariaDB, Oracle, SQL Server, Aurora, Azure SQL.'
           }
         verdict: them
-        why: 'Keycloak speaks the relational databases most teams already operate.'
+        why: 'Both speak PostgreSQL; Keycloak also speaks six other relational databases, which matters if yours is one of them.'
         note: 'dev-file and dev-mem are "not suitable for production use-cases".'
       - dimension: Scope beyond OAuth and OIDC
         us:
