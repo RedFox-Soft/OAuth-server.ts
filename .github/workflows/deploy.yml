@@ -1,16 +1,27 @@
 name: Deploy
 
 # Manual only, deliberately. There is no push trigger: a deploy runs `bun run db:setup` as its
-# release command (see fly.toml), so it touches the production datastore and should be an explicit
+# release command (see fly.toml), so it touches the target's datastore and should be an explicit
 # act rather than a side effect of merging.
 on:
   workflow_dispatch:
+    inputs:
+      target:
+        description: Which deployment to update
+        type: choice
+        default: production
+        options:
+          - production
+          - conformance
 
 permissions:
   contents: read
 
 concurrency:
-  group: fly-deploy
+  # Per target, because the two deployments share no Fly app and no database: a conformance deploy
+  # has no reason to queue behind production's, and serialising them would only make a certification
+  # run wait on an unrelated release.
+  group: fly-deploy-${{ inputs.target }}
   # Never cancel a deploy in flight — the release command may be mid-provisioning.
   cancel-in-progress: false
 
@@ -27,43 +38,59 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
-      # No coverage upload here — that is ci.yml's job. This run exists only to gate the deploy.
+      # No coverage upload here — that is ci.yml's job. This run exists only to gate the deploy, and
+      # it cannot reach the deployment it is gating: no connection string is set, so the suite runs
+      # on the in-memory adapter by construction rather than by convention.
       - run: bun test
 
   deploy:
-    name: Deploy to Fly
+    name: Deploy ${{ inputs.target }} to Fly
     needs: test
     runs-on: ubuntu-latest
-    # Attach the repo's `production` environment so required reviewers, wait timers or
-    # environment-scoped secrets can be added later without touching this file.
-    environment: production
+    # One GitHub environment per target, so required reviewers or a wait timer can be demanded of
+    # production without also slowing down a test bed.
+    environment: ${{ inputs.target }}
+    env:
+      # The whole difference between the two deployments is which file describes it; app name,
+      # issuer, database and machine policy all follow from that one choice.
+      CONFIG: ${{ inputs.target == 'production' && 'fly.toml' || 'fly.conformance.toml' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
 
       # --remote-only builds on Fly's builder, so the runner needs no Docker daemon.
-      # fly.toml's release_command runs bun run db:setup on a temporary Machine first and aborts
-      # the deploy on a non-zero exit, which is what db:setup returns when a declared storage
+      # The config's release_command runs db:setup and db:migrate on a temporary Machine first and
+      # aborts the deploy on a non-zero exit, which is what db:setup returns when a declared storage
       # constraint is not in force.
       - name: Deploy
-        run: flyctl deploy --remote-only
+        run: flyctl deploy --remote-only -c "$CONFIG"
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
-      # Fly's own health check only proves /health answers. This additionally proves the OIDC
-      # surface is served and prints the advertised issuer, which is the one value a deploy can get
-      # wrong in a way nothing else catches: ISSUER is baked into the seeded admin client's
-      # redirect_uri via $setOnInsert, so a mismatch breaks admin login and re-running db:setup
-      # does not repair it.
+      # Fly's own checks prove the probes answer. This proves the deployment is the one the config
+      # describes, which is a different question: ISSUER is baked into the seeded console client's
+      # redirect_uri via `$setOnInsert`, so a deployment advertising an issuer nobody expects breaks
+      # admin login and re-running db:setup does not repair it. Reading the expected value out of the
+      # config rather than restating it here is what stops this check from agreeing with itself.
       - name: Smoke check
         run: |
-          APP=$(grep -m1 '^app' fly.toml | cut -d"'" -f2)
-          echo "app: $APP"
-          # Retries cover a cold start: min_machines_running = 0, so the first request wakes a Machine.
-          curl -fsS --retry 5 --retry-delay 5 --retry-connrefused \
-            "https://$APP.fly.dev/health"
+          ISSUER=$(grep -m1 "^  ISSUER = " "$CONFIG" | cut -d"'" -f2)
+          echo "config: $CONFIG"
+          echo "expecting issuer: $ISSUER"
+          # Retries cover a cold start: the conformance instance stops when idle, so the first
+          # request wakes a Machine.
+          curl -fsS --retry 5 --retry-delay 5 --retry-connrefused "$ISSUER/health"
           echo
-          curl -fsS --retry 3 --retry-delay 5 \
-            "https://$APP.fly.dev/.well-known/openid-configuration" \
-            | grep -o '"issuer":"[^"]*"'
+          # Readiness reaches the datastore, so this is the step that fails when a connection string
+          # points somewhere that is no longer there.
+          curl -fsS --retry 3 --retry-delay 5 "$ISSUER/ready"
+          echo
+          ADVERTISED=$(curl -fsS --retry 3 --retry-delay 5 \
+            "$ISSUER/.well-known/openid-configuration" \
+            | grep -o '"issuer":"[^"]*"' | cut -d'"' -f4)
+          if [ "$ADVERTISED" != "$ISSUER" ]; then
+            echo "advertised issuer is '$ADVERTISED', expected '$ISSUER'" >&2
+            exit 1
+          fi
+          echo "issuer matches: $ADVERTISED"

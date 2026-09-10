@@ -25,8 +25,11 @@ In scope: the server code in this repository — the protocol endpoints, the end
 administration console and its API, the MCP control plane, the storage adapters, the Docker image
 and the deployment configuration we ship.
 
-Out of scope: the hosted instance at `oauth-server-ts.fly.dev` beyond what a request to a public
-endpoint reveals (it is a production deployment, not a test target); denial of service by volume;
+Out of scope: the hosted instances at `auth.foxauth.dev` and `conformance.foxauth.dev` beyond what a
+request to a public endpoint reveals — the first is a production deployment and neither is a test
+target, and the second is configured for whichever profile the OpenID conformance suite is exercising,
+so a setting it has on or off is a test plan's requirement rather than a claim about the software;
+denial of service by volume;
 findings that require a compromised administrator account or a compromised database; reports
 against third-party dependencies without a demonstrated effect on this server.
 

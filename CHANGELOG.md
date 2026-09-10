@@ -36,6 +36,15 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   outage invisible, since the process is alive and the probe passes while requests keep arriving;
   pointing liveness at `/ready` restarts healthy processes for a database's outage. Both are the
   mistake this split exists to prevent.
+- ops: two Fly configurations instead of one. `fly.toml` now describes a deployment that must always
+  answer — machines are never stopped for want of traffic, deploys are blue-green so a single-machine
+  release costs no downtime, and both probes are wired — while the new `fly.conformance.toml`
+  describes a separate app for the OpenID conformance suite that stops when idle and keeps its own
+  database. `ISSUER` and `DATABASE_NAME` moved out of secrets into each file's `[env]`, since neither
+  is a credential and a config that names its own issuer lets the deploy workflow check the
+  advertised one against it. The workflow takes the target as an input, and the release command now
+  runs `db:migrate` after `db:setup` so a release carrying its first migration cannot deploy an image
+  that refuses to boot.
 - security: the release assets now carry provenance of their own. `docs-export.json` and the
   `CHANGELOG.md` a release ships are covered by a single signed SLSA v1 statement, produced the same
   keyless way as the image's and attached to the release as `release-assets.intoto.jsonl`, so a

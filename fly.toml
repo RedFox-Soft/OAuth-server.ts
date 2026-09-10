@@ -1,12 +1,28 @@
-# fly.toml app configuration file generated for oauth-server-ts on 2025-11-19T20:11:53+03:00
+# fly.toml — the production deployment.
 #
-# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file, and
+# `website/src/content/docs/docs/deploy/fly.mdx` for why each section here is shaped the way it is.
 #
+# The repository ships two Fly configurations and the difference between them is a deliberate one:
+# this file must never stop serving, while `fly.conformance.toml` — the instance the OpenID
+# conformance suite is pointed at — should cost nothing between runs. Adopt this one for a
+# deployment somebody depends on and that one for a test bed.
 
 app = 'oauth-server-ts'
 primary_region = 'arn'
 
 [build]
+
+# Neither of these is a credential, so neither is a secret: keeping them here is what makes the file
+# say which deployment it is, and lets the smoke check in `.github/workflows/deploy.yml` read the
+# issuer it should expect out of the config rather than being told a second time.
+#
+# ISSUER must be the public URL browsers reach the app at, and it must be right before the first
+# `db:setup` run: the seeded console client's redirect_uri is written from it with `$setOnInsert`, so
+# a later correction to this line does not reach a client that already exists.
+[env]
+  ISSUER = 'https://auth.foxauth.dev'
+  DATABASE_NAME = 'OAuth'
 
 # Provision the datastore before any new Machine serves traffic. Without this the reserved admin
 # project/bucket/client are never seeded (database/mongodb.ts), so `GET /admin/login` redirects to
@@ -17,17 +33,35 @@ primary_region = 'arn'
 # Runs on a temporary Machine with the app's env, once per deploy attempt, and aborts the deploy on a
 # non-zero exit — which db:setup returns when a declared constraint is not in force.
 #
-# Requires MONGODB_URI, DATABASE_NAME and ISSUER to be set (ISSUER is read for the admin client's
-# redirect_uri). Set MONGODB_URI with `fly secrets set`; the other two are not secret.
+# `db:migrate` follows it in the same command because the server refuses to start against a database
+# that is behind (lib/migrations/gate.ts): a release declaring a migration would otherwise deploy an
+# image that cannot boot. The declared set ships empty, so today this reports `current` and exits —
+# which is the point of wiring it before the first migration rather than with it. `sh -c` is what
+# makes the `&&` a shell operator instead of two arguments to bun.
+#
+# Requires MONGODB_URI (a secret) plus the two values above.
 [deploy]
-  release_command = 'bun run db:setup'
+  release_command = "sh -c 'bun run db:setup && bun run db:migrate'"
+  # One Machine, and a rolling deploy replaces it in place — which means every deploy of a deployment
+  # that must always answer takes it down for the length of a boot. bluegreen boots the replacement
+  # alongside the old Machine and moves traffic only once its checks pass, so the outage is zero and
+  # the cost is a second Machine for the couple of minutes a deploy lasts. It is available here only
+  # because nothing in this app has a volume attached; canary and bluegreen both refuse one.
+  strategy = 'bluegreen'
 
 [http_service]
   internal_port = 3000
   force_https = true
-  auto_stop_machines = 'stop'
+  # 'off' is what "always available" means to the proxy: it never stops a Machine for want of
+  # traffic, so a first request after a quiet night is served by a running process rather than
+  # waiting for a cold boot. `min_machines_running` is deliberately absent — it only has meaning
+  # while something is allowed to stop Machines, and leaving it set next to 'off' reads like it is
+  # doing work it cannot do.
+  #
+  # auto_start stays on as a backstop rather than for traffic: a Machine stopped by a host event or
+  # by hand is then brought back by the next request instead of waiting for someone to notice.
+  auto_stop_machines = 'off'
   auto_start_machines = true
-  min_machines_running = 0
   processes = ['app']
 
 # Boot does a MongoDB connection and a keystore load at module scope, so a machine that cannot reach
@@ -41,6 +75,22 @@ primary_region = 'arn'
   timeout = '5s'
   grace_period = '15s'
   # Documented safeguard against force_https turning the check into a 301 the proxy reads as a failure.
+  headers = { X-Forwarded-Proto = 'https' }
+
+# The other half of the pair. `/health` answers for the process alone; this one reaches the datastore,
+# so a Machine whose database has gone away stops receiving traffic instead of answering every request
+# with a fault. Fly's checks shed a Machine rather than restart it, which is the right response to a
+# dependency outage — a restart loop would add nothing and lose the warm process.
+#
+# The interval is longer than liveness on purpose: the endpoint holds its last answer for a second and
+# shares one outstanding probe, so it cannot become database load, but there is also nothing to gain
+# from asking twice a minute about something a deploy cannot fix.
+[[http_service.checks]]
+  method = 'GET'
+  path = '/ready'
+  interval = '60s'
+  timeout = '10s'
+  grace_period = '20s'
   headers = { X-Forwarded-Proto = 'https' }
 
 [[vm]]

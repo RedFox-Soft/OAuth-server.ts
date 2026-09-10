@@ -1,0 +1,68 @@
+# fly.conformance.toml — the instance the OpenID conformance suite is pointed at.
+#
+# Deployed with `flyctl deploy --remote-only -c fly.conformance.toml`, or by running
+# `.github/workflows/deploy.yml` with target `conformance`.
+#
+# It is a separate Fly app rather than a process group of the production one, and separate is the
+# whole point: a certification run is a few hours of a test harness driving every flow it can reach,
+# against feature flags set to whatever the profile under test requires. Sharing an app would mean
+# sharing settings — which are per-database and boot-only — and sharing the Machines that production
+# traffic lands on.
+#
+# Everything else here is `fly.toml` with two answers reversed: it stops when nobody is using it, and
+# it is not worth a zero-downtime deploy.
+
+app = 'oauth-server-ts-conformance'
+primary_region = 'arn'
+
+[build]
+
+# A different database on the same cluster, so a certification run cannot write into production data
+# and the console here can be set up however a test plan needs. The cluster itself is shared, which is
+# the one compromise in this file: MongoDB Atlas's free tier meters connections and operations per
+# cluster, so a heavy run and production contend. Worth knowing before scheduling one.
+[env]
+  ISSUER = 'https://conformance.foxauth.dev'
+  DATABASE_NAME = 'OAuthConformance'
+
+# Identical to production's, and identical on purpose: the release command is the half of a deployment
+# most easily got wrong, and a test bed that provisions itself differently from production is not
+# testing production. See the commentary in `fly.toml`.
+[deploy]
+  release_command = "sh -c 'bun run db:setup && bun run db:migrate'"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  # Stops when idle and starts on the next request, which is what makes this instance cost nothing
+  # between certification runs.
+  #
+  # 'stop' rather than 'suspend', though suspend resumes faster: boot connects to the datastore and
+  # loads the keystore at module scope, so a resumed process holds a connection pool it established
+  # before it was frozen. A cold start is a few seconds the conformance suite's own timeouts absorb;
+  # a resumed process with a dead pool fails in a way that reads as a server defect.
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+[[http_service.checks]]
+  method = 'GET'
+  path = '/health'
+  interval = '30s'
+  timeout = '5s'
+  grace_period = '15s'
+  headers = { X-Forwarded-Proto = 'https' }
+
+[[http_service.checks]]
+  method = 'GET'
+  path = '/ready'
+  interval = '60s'
+  timeout = '10s'
+  grace_period = '20s'
+  headers = { X-Forwarded-Proto = 'https' }
+
+[[vm]]
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1
