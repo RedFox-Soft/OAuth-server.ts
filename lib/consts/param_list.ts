@@ -1,5 +1,18 @@
 import { t } from 'elysia';
 
+/**
+ * A parameter this server refuses rather than ignores.
+ *
+ * Endpoints taking authorization-request parameters ignore what they do not recognize (RFC 6749
+ * §3.1/§3.2, RFC 8628 §3.1, CIBA §7.1, and RFC 9126 §2.1 by reference). That makes *absence from a
+ * schema* mean "ignore", so a parameter a specification tells this server to reject has to be
+ * declared and typed as absent — otherwise the rejection silently becomes an acceptance.
+ */
+export const refusedParam = (name: string) =>
+	t.Optional(
+		t.Undefined({ error: `Property '${name}' should not be provided` })
+	);
+
 export const AuthorizationParameters = t.Object({
 	client_id: t.String(),
 	redirect_uri: t.Optional(t.String({ format: 'uri' })),

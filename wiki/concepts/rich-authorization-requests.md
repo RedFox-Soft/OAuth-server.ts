@@ -97,9 +97,13 @@ returning user.
 
 ## Deviations, and the one that bites
 
-- **Device authorization and CIBA refuse the parameter** (§3), and it is absent from the strict `/token`
-  body schema (§6). The four grant-level §6 checks are therefore unreachable and still raise the wrong
-  error code; they are kept as the seam that channel support plugs into.
+- **Device authorization and CIBA refuse the parameter** (§3), and the `/token` body schema refuses it
+  too (§6). That refusal is now explicit — `refusedParam('authorization_details')` — rather than a
+  consequence of the member being absent, because the token endpoint ignores parameters it does not
+  declare and absence there would have become silent acceptance: a client asking under §7 to *narrow*
+  the grant it is exchanging would receive the broader token and no indication. See
+  [[unknown-request-parameters]]. The four grant-level §6 checks remain unreachable and still raise the
+  wrong error code; they are kept as the seam that channel support plugs into.
 - **Details reach a token only when a resource server resolves.** `at.payload.rar` is assigned only when
   `at.resourceServer` exists, and that needs a registered `getResourceServerInfo` override — whose
   default throws. A deployment without one grants details at consent that **no token ever carries**, with

@@ -163,6 +163,19 @@ metadata.
 
 ### Fixed
 
+- protocol: a request parameter the server does not define no longer refuses the request. Ignoring
+  one is a `MUST` in RFC 6749 §3.1 **and** §3.2, RFC 8628 §3.1 and CIBA §7.1, and RFC 9126 §2.1
+  inherits it for PAR — so `/auth`, `/par`, `/device/auth`, `/backchannel` and `/token` all answer a
+  request carrying an extension parameter exactly as they answer one without it, and a Request Object
+  may carry extension claims as RFC 9101 §4 permits. The undeclared keys are dropped before
+  validation rather than carried, so nothing a client invents is persisted in a pushed request object
+  or an interaction record. Because absence from a schema now means "ignore", parameters this server
+  must _reject_ are declared explicitly instead: `request_uri` at the pushed endpoint, `request` and
+  `request_uri` inside a Request Object, and `authorization_details` at the token endpoint, where
+  silently ignoring a client's attempt to narrow its grant would return a broader token than it asked
+  for. Elysia's own `normalize` was measured as the alternative and rejected: it also cleans request
+  headers, which strips the client certificate and breaks certificate-bound tokens.
+
 - par: a successful push answered with a JSON body and no `Content-Type`, which goes out as
   `application/octet-stream`, and with status 200 rather than the 201 [RFC
   9126](https://datatracker.ietf.org/doc/html/rfc9126) §2.2 requires — a client that checks the media

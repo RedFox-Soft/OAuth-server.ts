@@ -667,24 +667,20 @@ describe('request parameter features', () => {
 
 			it('an unknown member of the request object is ignored rather than refused', async function () {
 				const spy = mock();
-				eventBus.once(errorEvt, spy);
-				const client = await Client.find('client-with-HS-sig');
-				let [key] = client.symmetricKeyStore.selectForSign({ alg: 'HS256' });
-				key = await importJWK(key);
+				eventBus.once(successEvt, spy);
 
-				await authorizationRequest('client-with-HS-sig', {
+				await authorizationRequest('client', {
 					jwtPayload: {
+						scope: 'openid',
 						unrecognized: true
 					},
 					payload: {
 						scope: 'openid'
 					},
-					verb,
-					isError: true
+					verb
 				});
 
 				expect(spy).toHaveBeenCalledTimes(1);
-				expect(spy.mock.calls[0][0]).toBeInstanceOf(ValidationError);
 			});
 		});
 	});

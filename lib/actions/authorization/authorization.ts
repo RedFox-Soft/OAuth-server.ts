@@ -30,6 +30,7 @@ import {
 	AuthorizationCookies,
 	AuthorizationParameters,
 	JWTparameters,
+	refusedParam,
 	routeNames
 } from '../../consts/param_list.ts';
 import sessionHandler from '../../shared/session.ts';
@@ -38,6 +39,7 @@ import {
 	coerceArrayParams,
 	parseJsonParams
 } from 'lib/plugins/coerce_array_params.js';
+import { ignoreUnknownParams } from 'lib/plugins/ignore_unknown_params.js';
 import { featureVerification } from './featureVerification.js';
 import { authorizationPKCE } from 'lib/helpers/pkce.js';
 import {
@@ -66,11 +68,25 @@ import {
 	RedirectOrHtmlResponse
 } from 'lib/shared/response_schemas.js';
 
+/*
+ * `request` and `request_uri` are declared absent rather than omitted: OIDC Core §6.1 forbids them
+ * *inside* a Request Object, and a forbidden member has to be refused where an unrecognized one is
+ * ignored. Omitting them would make inception indistinguishable from an extension parameter.
+ */
 const authorizationRequest = t.Object({
 	...t.Omit(AuthorizationParameters, ['request_uri', 'request', 'client_id'])
 		.properties,
 	client_id: t.Optional(t.String()),
+	request: refusedParam('request'),
+	request_uri: refusedParam('request_uri'),
 	...JWTparameters.properties
+});
+
+// RFC 9126 §2.1 step 2: a pushed request carrying `request_uri` is rejected, not ignored.
+const pushedAuthorizationParameters = t.Object({
+	...t.Omit(AuthorizationParameters, ['request_uri', 'client_id']).properties,
+	...authParams.properties,
+	request_uri: refusedParam('request_uri')
 });
 
 export async function isAllowRedirectUri(params) {
@@ -149,6 +165,7 @@ async function authorizationActionHandler(oidc) {
 }
 
 export const authGet = new Elysia()
+	.use(ignoreUnknownParams(AuthorizationParameters))
 	.derive(noQueryDup(['resource', 'ui_locales', 'authorization_details']))
 	.guard({
 		query: AuthorizationParameters,
@@ -175,6 +192,7 @@ export const authGet = new Elysia()
 	);
 
 export const authPost = new Elysia()
+	.use(ignoreUnknownParams(AuthorizationParameters))
 	.use(coerceArrayParams('ui_locales', 'resource'))
 	.use(parseJsonParams('authorization_details'))
 	.guard({
@@ -209,14 +227,11 @@ export const authPost = new Elysia()
  */
 export const par = new Elysia()
 	.use(corsClientBased(formClientId))
+	.use(ignoreUnknownParams(pushedAuthorizationParameters))
 	.use(parseJsonParams('authorization_details'))
 	.use(AuthPlugin)
 	.guard({
-		body: t.Object({
-			...t.Omit(AuthorizationParameters, ['request_uri', 'client_id'])
-				.properties,
-			...authParams.properties
-		}),
+		body: pushedAuthorizationParameters,
 		headers: authHeaders
 	})
 	.resolve(({ body }) => {

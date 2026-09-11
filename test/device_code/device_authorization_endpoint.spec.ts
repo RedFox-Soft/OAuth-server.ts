@@ -63,20 +63,19 @@ describe('device_authorization_endpoint', () => {
 	});
 
 	describe('param validation', () => {
-		// The Elysia endpoint validates against a strict body schema: parameters not part of the
-		// device authorization request (e.g. request_uri, registration) are rejected rather than
-		// silently ignored. This is stricter than the original arbitrary-param pass-through.
-		['request_uri', 'registration'].forEach((param) => {
-			it(`each unsupported parameter is refused`, async () => {
-				const { error } = await post({
-					client_id: 'client',
-					[param]: 'some'
-				});
-				if (!error) throw new Error('expected error response');
-
-				expect(error.status).toBeGreaterThanOrEqual(400);
-				expect(error.status).toBeLessThan(500);
+		// `registration` is refused rather than ignored because OIDC Core §7.2.1 defines it as a
+		// parameter this server declines to support, which is a different answer from not knowing
+		// it. A parameter this endpoint simply does not define — `request_uri` among them — is
+		// ignored instead, per RFC 8628 §3.1.
+		it('refuses a request naming the registration parameter', async () => {
+			const { error } = await post({
+				client_id: 'client',
+				registration: 'some'
 			});
+			if (!error) throw new Error('expected error response');
+
+			expect(error.status).toBeGreaterThanOrEqual(400);
+			expect(error.status).toBeLessThan(500);
 		});
 	});
 

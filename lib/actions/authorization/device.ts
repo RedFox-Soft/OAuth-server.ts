@@ -21,6 +21,7 @@ import unsupportedRar from './unsupported_rar.ts';
 import {
 	DeviceAuthorizationParameters,
 	JWTparameters,
+	refusedParam,
 	routeNames,
 	BackchannelAuthParameters
 } from 'lib/consts/param_list.js';
@@ -40,6 +41,7 @@ import {
 	coerceArrayParams,
 	parseJsonParams
 } from 'lib/plugins/coerce_array_params.js';
+import { ignoreUnknownParams } from 'lib/plugins/ignore_unknown_params.js';
 import { corsClientBased, formClientId } from 'lib/plugins/cors.js';
 import {
 	BackchannelAuthenticationResponse,
@@ -50,8 +52,12 @@ import {
 const deviceAuthGrantType = 'urn:ietf:params:oauth:grant-type:device_code';
 const backchannelAuthGrantType = 'urn:openid:params:grant-type:ciba';
 
+// `request`/`request_uri` inside a Request Object is inception, refused rather than ignored — see
+// the same declaration on the authorization endpoint.
 const DeviceRequest = t.Object({
 	...t.Omit(DeviceAuthorizationParameters, ['request']).properties,
+	request: refusedParam('request'),
+	request_uri: refusedParam('request_uri'),
 	...JWTparameters.properties
 });
 
@@ -61,7 +67,21 @@ const DeviceRequest = t.Object({
 // (400) rather than a generic schema validation error (422).
 const BacckchannelRequest = t.Object({
 	...t.Omit(BackchannelAuthParameters, ['request']).properties,
+	request: refusedParam('request'),
+	request_uri: refusedParam('request_uri'),
 	...t.Partial(JWTparameters).properties
+});
+
+const DeviceAuthorizationBody = t.Object({
+	...authParams.properties,
+	...DeviceAuthorizationParameters.properties
+});
+
+const BackchannelAuthenticationBody = t.Object({
+	...authParams.properties,
+	...t.Omit(BackchannelAuthParameters, ['registration']).properties,
+	request_uri: t.Optional(t.String()),
+	registration: t.Optional(t.String())
 });
 
 async function authentication(params, headers, oidc) {
@@ -81,13 +101,11 @@ async function authentication(params, headers, oidc) {
  */
 export const deviceAuth = new Elysia()
 	.use(corsClientBased(formClientId))
+	.use(ignoreUnknownParams(DeviceAuthorizationBody))
 	.use(coerceArrayParams('ui_locales', 'resource'))
 	.use(parseJsonParams('authorization_details'))
 	.guard({
-		body: t.Object({
-			...authParams.properties,
-			...DeviceAuthorizationParameters.properties
-		}),
+		body: DeviceAuthorizationBody,
 		headers: authHeaders
 	})
 	.resolve(({ body }) => {
@@ -130,18 +148,14 @@ export const deviceAuth = new Elysia()
 	);
 
 export const backchannelAuth = new Elysia()
+	.use(ignoreUnknownParams(BackchannelAuthenticationBody))
 	.use(coerceArrayParams('ui_locales', 'resource'))
 	.use(parseJsonParams('authorization_details'))
 	.guard({
 		// request_uri and registration are accepted by the schema so the handler can reject them
 		// with the OIDC-specified `<param>_not_supported` errors rather than a generic 422.
 		// registration is otherwise typed as `t.Undefined` upstream, so it is omitted first.
-		body: t.Object({
-			...authParams.properties,
-			...t.Omit(BackchannelAuthParameters, ['registration']).properties,
-			request_uri: t.Optional(t.String()),
-			registration: t.Optional(t.String())
-		}),
+		body: BackchannelAuthenticationBody,
 		headers: authHeaders
 	})
 	.post(

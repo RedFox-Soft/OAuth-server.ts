@@ -28,9 +28,10 @@ graph:
 
 # Elysia lifecycle plugins (lib/plugins/)
 
-The cross-cutting hooks every response passes through before routing. Eight modules —
-`auth`, `coerce_array_params`, `cors`, `featureGate`, `noCache`, `noQueryDup`, `rateLimit`,
-`securityHeaders` — plus the mount order in `lib/index.ts` that makes them correct.
+The cross-cutting hooks every response passes through before routing. Nine modules —
+`auth`, `coerce_array_params`, `cors`, `featureGate`, `ignore_unknown_params`, `noCache`,
+`noQueryDup`, `rateLimit`, `securityHeaders` — plus the mount order in `lib/index.ts` that makes
+them correct.
 
 ## Callback-shaped, not named instances
 
@@ -82,6 +83,14 @@ the server emits: handler returns, raw `Response`s, error-pipeline output, named
 sub-apps, and static files. Being pre-routing also makes it immune to the registration-order
 constraint above.
 
+`coerce_array_params`, `parseJsonParams` and `ignore_unknown_params` use `onTransform` for one shared
+reason: it is the only stage where the body is parsed and validation has not run. `onRequest`
+precedes parsing, so a plugin there sees a URL and no body; `onBeforeHandle` follows validation,
+which has already answered. The three are not interchangeable with the framework's `normalize`
+option, which does adjacent work at the wrong scope — it cleans headers as well as body and query,
+stripping the `x-client-cert` that `lib/addon/mtls.ts` reads through no schema. See
+[[unknown-request-parameters]].
+
 CORS uses `onTransform`, not `onBeforeHandle`. Client authentication happens in `AuthPlugin`'s
 `derive`, which runs in the transform queue and throws `invalid_client` from there; body-schema
 failures raise a 422 in validation immediately after. Both precede `beforeHandle`, so a header
@@ -108,3 +117,5 @@ classification spec 018 concluded a test cannot answer, and hand the page policy
 - [[html-rendering]] — the page path, deliberately outside this subsystem.
 - [[per-origin-rate-limiting]] — bounded in-process counters; a resource protection, not a security boundary.
 - [[feature-flag-gating]] — the gate that makes a disabled endpoint answer as unserved.
+- [[unknown-request-parameters]] — why `ignore_unknown_params` exists, and the measured case against
+  answering the same need with `normalize: true`.

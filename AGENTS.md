@@ -310,6 +310,11 @@ traps that each cost a debugging session.
 2. Mount the route in the Elysia app in `lib/index.ts`.
 3. Expose it in the OIDC discovery document (`lib/actions/discovery.ts`).
 4. Protect it with the `auth` plugin if it requires client authentication.
+5. If it takes authorization-request parameters, mount `ignoreUnknownParams(<its body/query schema>)`
+   and add it to the table in `test/unknown_parameters/`. Every such endpoint is required to ignore
+   a parameter it does not define, and nothing fails if you forget — a parameter your schema omits
+   is now ignored, so a parameter you mean to **refuse** must be declared with `refusedParam(name)`.
+   See `wiki/concepts/unknown-request-parameters.md`.
 
 ## The website
 

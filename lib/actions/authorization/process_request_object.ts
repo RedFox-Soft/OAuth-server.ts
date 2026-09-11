@@ -7,6 +7,11 @@ import {
 	OIDCProviderError
 } from '../../helpers/errors.ts';
 import { getSchemaValidator, TSchema, ValidationError } from 'elysia';
+import type { TObject } from '@sinclair/typebox';
+import {
+	declaredParams,
+	ignoreUnknownIn
+} from 'lib/plugins/ignore_unknown_params.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { clockTolerance } from 'lib/configs/liveTime.js';
@@ -110,6 +115,13 @@ export default async function processRequestObject(
 		payload,
 		header: { alg }
 	} = decoded;
+
+	/*
+	 * RFC 9101 §4: "The Request Object MAY include any extension parameters." A closed schema turns
+	 * that permission into invalid_request, so the extras are dropped here and the declared members
+	 * are what gets checked — the same ignore rule the endpoints themselves live under, one level in.
+	 */
+	ignoreUnknownIn(declaredParams(schema as TObject), payload);
 
 	const validator = getSchemaValidator(schema);
 	if (!validator.Check(payload)) {
