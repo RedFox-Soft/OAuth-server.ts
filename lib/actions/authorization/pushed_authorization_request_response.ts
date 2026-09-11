@@ -59,13 +59,8 @@ export default async function pushedAuthorizationRequestResponse(
 
 	// event payload kept `{ oidc }`-shaped (was `ctx`)
 	eventBus.emit('pushed_authorization_request.success', { oidc }, oidc.client);
-	return new Response(
-		JSON.stringify({
-			expires_in: ttl,
-			request_uri: `${PUSHED_REQUEST_URN}${id}`
-		}),
-		{
-			status: 201
-		}
-	);
+	return {
+		expires_in: ttl,
+		request_uri: `${PUSHED_REQUEST_URN}${id}`
+	};
 }

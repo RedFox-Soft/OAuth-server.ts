@@ -261,6 +261,10 @@ export const par = new Elysia()
 				}
 			}
 
+			// RFC 9126 §2.2: 201 with an application/json body. The status belongs here rather
+			// than in the hook options below — `status` is not a local hook Elysia reads, so the
+			// declaration there was inert and the endpoint answered 200.
+			set.status = 201;
 			return pushedAuthorizationRequestResponse(oidc, request);
 		},
 		{
@@ -268,7 +272,6 @@ export const par = new Elysia()
 				201: ParResponse,
 				400: OAuthError,
 				401: OAuthError
-			},
-			status: 201
+			}
 		}
 	);

@@ -78,7 +78,8 @@ export const IntrospectionResponse = t.Union([
 	)
 ]);
 
-// PAR (RFC 9126) — handler returns a `Response` with status 201 (bypasses schema).
+// PAR (RFC 9126) — handler returns a plain object with `set.status = 201`, so this schema is what
+// serializes it: as a hand-built `Response` it went out untyped, i.e. application/octet-stream.
 export const ParResponse = t.Object({
 	request_uri: t.String(),
 	expires_in: t.Number()

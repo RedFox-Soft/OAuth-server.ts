@@ -297,6 +297,35 @@ describe('Pushed Request Object', async () => {
 
 				describe('using a plain pushed authorization request', () => {
 					describe('Pushed Authorization Request Endpoint', () => {
+						it('labels the pushed request uri as JSON', async function () {
+							const code_verifier = randomBytes(32).toString('base64');
+							const code_challenge = createHash('sha256')
+								.update(code_verifier)
+								.digest('base64url');
+
+							const { response } = await agent.par.post(
+								// @ts-expect-error endpoint will be parse to object
+								jsonToFormUrlEncoded({
+									scope: 'openid',
+									response_type: 'code',
+									code_challenge_method: 'S256',
+									code_challenge,
+									client_id: clientId
+								}),
+								{
+									headers: {
+										['content-type']: 'application/x-www-form-urlencoded',
+										...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
+									}
+								}
+							);
+
+							expect(response.status).toBe(201);
+							expect(response.headers.get('content-type')).toMatch(
+								/^application\/json\b/
+							);
+						});
+
 						it('stores a request object and returns a uri', async function () {
 							const spy = mock();
 							eventBus.once('pushed_authorization_request.success', spy);

@@ -163,6 +163,15 @@ metadata.
 
 ### Fixed
 
+- par: a successful push answered with a JSON body and no `Content-Type`, which goes out as
+  `application/octet-stream`, and with status 200 rather than the 201 [RFC
+  9126](https://datatracker.ietf.org/doc/html/rfc9126) §2.2 requires — a client that checks the media
+  type before parsing, as a FAPI client must, got nothing usable out of the `request_uri`. Only the
+  success path was affected; refusals were already correct. The handler now returns the object and
+  lets the declared response schema serialize it, which also puts that schema to work for the first
+  time: it was bypassed by the hand-built response, and the `status: 201` beside it was never a hook
+  Elysia reads.
+
 - test: a request to an origin no spec registered used to reach the real network; it is now refused by
   name, with interception installed for every spec so the runner's file order stops deciding it. A
   per-case bound also means a wedged case names itself in twenty seconds instead of idling in silence.
