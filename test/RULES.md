@@ -143,10 +143,11 @@ two grounds:
 
 **Effort is not a ground.** A test that is expensive to re-anchor is re-anchored.
 
-If the subject matter is real but there is no covering test and you are not writing one now, record
-it in [`../Task.md`](../Task.md) rather than deleting silently. That file is why we know about the
-constant-time comparison with no timing test, and about the two defect classes that look covered
-and are not.
+If the subject matter is real but there is no covering test and you are not writing one now, **open a
+GitHub issue** rather than deleting silently. That is how the constant-time comparison with no timing
+test, and the two defect classes that looked covered and were not, were found and then closed — each
+of them by somebody who was not the person who noticed it. A gap that is written down outlives the
+session that found it; one that is merely observed does not.
 
 ---
 
@@ -209,7 +210,7 @@ generated document caught it, not the guard.
 
 The working notes that refactor produced — the per-case register, the gap list, the measurements —
 were deleted with it, for the same reason: a monument to a finished piece of work is not something
-anybody reads, and the nine findings worth keeping moved to [`../Task.md`](../Task.md). What remains
-is this document, the `@proves` sentence in each file, and review.
+anybody reads, and the nine findings worth keeping were carried forward, worked, and closed. What
+remains is this document, the `@proves` sentence in each file, and review.
 
 A guard can tell you a sentence exists. Only a reader can tell you the sentence is true.

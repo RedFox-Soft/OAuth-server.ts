@@ -11,6 +11,12 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- test: coverage for six properties the suite claimed and did not hold — the MongoDB secret round trip
+  through the real BSON codec, the PostgreSQL document-column encoding, the timing of both
+  constant-time secret comparisons, the discovery document following `ISSUER` rather than a forwarded
+  header, and every published agent tool having a route the dispatcher serves. Each was verified by
+  reintroducing the defect and confirming the gate fails.
+
 - storage: PostgreSQL is now a supported datastore alongside MongoDB. A deployment picks one by
   which connection string it sets — `POSTGRES_URL` or `MONGODB_URI` — and setting both is refused at
   startup rather than resolved by precedence, since a server that quietly chose the other database
@@ -156,6 +162,10 @@ metadata.
   fixed: the licence page had two top-level headings, and the settings reference skipped a level.
 
 ### Fixed
+
+- test: a request to an origin no spec registered used to reach the real network; it is now refused by
+  name, with interception installed for every spec so the runner's file order stops deciding it. A
+  per-case bound also means a wedged case names itself in twenty seconds instead of idling in silence.
 
 - security: three latent injection sinks closed, none of them reachable today, which is the only
   reason this is a hardening note and not an advisory. The `WWW-Authenticate` challenge escaped the

@@ -6,8 +6,11 @@ import { SingletonSecretStore } from 'lib/adapters/memory/singletonSecretStore.t
 //
 // Memory implementation only. lib/adapters/mongodb/db.ts opens its connection at module scope and
 // throws without MONGODB_URI, which this suite deliberately lacks, so the MongoDB class cannot be
-// imported here at all; every store spec in this repository tests the memory implementation for that
-// reason. The MongoDB class is verified by hand per the feature's quickstart.
+// imported here WITHOUT SUBSTITUTING THAT MODULE — which is the step this file's earlier note, and
+// every sibling's, stopped short of. mongo_bson_round_trip.spec.ts does substitute it and runs the
+// real class against the real BSON codec; the storage-encoding half is covered there, not by hand.
+// What still needs a server, and is still out of reach here, is everything in Tier 2 of
+// wiki/concepts/mongodb-test-fidelity.md.
 //
 // The load-bearing property under test is that create and replace return the value AS READ BACK
 // rather than the candidate they were handed. That is what makes the round-trip check structural

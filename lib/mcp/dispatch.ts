@@ -21,9 +21,18 @@ import { CONFIRMATION_ARG } from './confirm.js';
  * `strictPath` and `normalize: false` mirror the root instance, so a path that would not match in
  * production does not match here either.
  */
-const admin = new Elysia({ strictPath: true, normalize: false }).use(
-	adminApiRoutes
-);
+/*
+ * Exported so the parity guard can enumerate what this dispatcher actually serves, rather than
+ * rebuild a composition beside it and check that. The distinction is not pedantic: the case that used
+ * to stand here measured a route list hand-assembled inside the test file, and went on passing after
+ * the extraction it was asking for had already happened.
+ */
+export const adminDispatchTarget = new Elysia({
+	strictPath: true,
+	normalize: false
+}).use(adminApiRoutes);
+
+const admin = adminDispatchTarget;
 
 export interface DispatchResult {
 	readonly status: number;

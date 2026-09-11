@@ -258,6 +258,19 @@ Each feature area has:
 
 Time-sensitive tests use Bun's `setSystemTime` (from `bun:test`) to travel time; call `setSystemTime()` with no argument to reset.
 
+Two properties hold for **every** spec, set once in `test/preload.ts` so no spec has to remember and
+no file order can change them:
+
+- **A case is bounded at 20 s.** `setDefaultTimeout` is here rather than in `bunfig.toml` because
+  `timeout` is not one of the `[test]` keys Bun parses, and not on the command line because the gate
+  is the bare `bun test`, which resolves to the builtin subcommand and would shadow a `test` script.
+  A case that genuinely needs longer passes its own third argument to `it(...)`. The bound catches a
+  case that _awaits_ too long; it cannot preempt one that blocks the event loop, and such a case
+  still reports its full duration — which is how to recognise it.
+- **No test reaches the real network.** `test/fetch_mock.ts` intercepts every outbound `fetch`, and a
+  request to an origin nobody registered with `mock(origin)` is **refused by name** rather than sent.
+  If you see `test fetch to an unregistered origin: …`, register that origin and intercept the path.
+
 ---
 
 ## Adding a new grant type

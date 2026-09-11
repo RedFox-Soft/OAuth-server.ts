@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { Elysia } from 'elysia';
 
+import { adminDispatchTarget } from 'lib/mcp/dispatch.ts';
+import { mcpCatalogue } from 'lib/mcp/catalogue.ts';
 import { resolveAdmin, AdminError } from 'lib/admin/auth/rbac.ts';
 import { projectRoutes } from 'lib/admin/projects/routes.ts';
 import { clientRoutes } from 'lib/admin/clients/routes.ts';
@@ -13,11 +15,7 @@ import { smtpSettingsRoutes } from 'lib/admin/settings/smtp/routes.ts';
 import { jwksRoutes } from 'lib/admin/jwks/routes.ts';
 import { auditRoutes } from 'lib/admin/audit/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	adminSessionStore,
-	getUserStore,
-	getProjectStore
-} from 'lib/adapters/index.ts';
+import { getUserStore, getProjectStore } from 'lib/adapters/index.ts';
 import {
 	ADMIN_BUCKET_ID,
 	ADMIN_SESSION_COOKIE,
@@ -219,5 +217,40 @@ describe('in-process re-dispatch into the admin routes', () => {
 		const slashed = await get(composed, '/admin/api/projects/', cookie);
 		expect(exact.status).toBe(200);
 		expect(slashed.status).not.toBe(200);
+	});
+});
+
+/*
+ * The half of the parity claim nothing held. `catalogue_drift.spec.ts` proves the catalogue matches
+ * the admin route set; this proves the dispatcher SERVES that set. An operation could be published and
+ * unreachable, and the agent would meet it as a not-found rather than the build meeting it as a
+ * failure.
+ *
+ * One direction only: every published tool is mounted. The reverse — every mounted route is published
+ * or excluded — is already held against `adminApiRoutes` next door, and restating it here would grow
+ * the suite without growing its coverage.
+ *
+ * Enumerated from the exported dispatcher rather than from a composition rebuilt here, which is the
+ * whole point. The case this replaces asserted that three `/admin/api` routes sat in no route plugin,
+ * measured a plugin list assembled inside this file, and kept passing after `lib/admin/me.ts` had
+ * already been extracted — proving nothing for however long it stood. Recorded as G-005.
+ */
+describe('the admin routes an agent tool call reaches', () => {
+	const mounted = new Set(
+		adminDispatchTarget.routes
+			.filter((route) => route.path.startsWith('/admin/api'))
+			.map((route) => `${route.method} ${route.path}`)
+	);
+	const published = mcpCatalogue.map((tool) => `${tool.method} ${tool.path}`);
+
+	it('are read from the dispatcher itself, so this guard cannot pass over nothing', () => {
+		expect(mounted.size).toBeGreaterThan(0);
+		expect(published.length).toBeGreaterThan(0);
+	});
+
+	it('include the route behind every published tool', () => {
+		const unreachable = published.filter((key) => !mounted.has(key));
+
+		expect(unreachable).toEqual([]);
 	});
 });

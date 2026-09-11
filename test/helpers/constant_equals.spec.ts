@@ -4,8 +4,12 @@ import constantEquals from '../../lib/helpers/constant_equals.ts';
 /*
  * These two cases prove the comparison's RESULTS, not its timing. The name they used to carry -
  * "compares strings in equal time" - claimed a property neither of them measures, which is why
- * nobody noticed the timing invariant has never been tested. Recorded as G-001 in Task.md; the
- * timing assertion is new coverage and belongs in its own change.
+ * nobody noticed the timing invariant had never been tested.
+ *
+ * The timing invariant is now measured, in test/timing/constant_equals.spec.ts. It lives in its own
+ * directory because it needs a shared measurement harness and because what it does is unlike anything
+ * else in this suite - so this pointer is the only thing connecting the two halves of one helper's
+ * coverage. Do not remove it without moving it.
  */
 /**
  * @proves Secret comparison answers equal only for identical secrets, whatever their lengths and

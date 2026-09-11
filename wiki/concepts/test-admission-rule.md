@@ -169,8 +169,9 @@ So enforcement is **review against a written document** — `test/RULES.md`, car
 working form and a pull-request checklist — rather than a test. The `@proves` sentence stays in each
 spec file, where a reviewer meets it; the generated index of all 277 of them did not, being a second
 copy of every sentence and so a second thing to keep in step, which needed the very drift check the
-document replaces. The nine findings worth carrying forward moved to `Task.md`, and the rest of
-`test/intent/` went with it: a monument to a finished refactor is not something anybody reads.
+document replaces. The nine findings worth carrying forward were kept as a backlog and have since
+been worked and closed; the rest of `test/intent/` went with it, a monument to a finished refactor
+being not something anybody reads.
 
 The general form: a rule about what tests are *for* cannot be held by a test, because the holder is
 subject to the rule. A guard can tell you a sentence exists; only a reader can tell you the sentence

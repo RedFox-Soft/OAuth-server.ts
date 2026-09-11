@@ -34,24 +34,29 @@ back out; the caller's `instanceof Uint8Array` guard rejects it. Reproducing tha
 codec, not a server — and `bson` is already an installed transitive dependency, re-exported as `BSON`
 from `mongodb`, so `BSON.serialize` / `BSON.deserialize` round trips cost nothing to reach.
 
-This tier was to live in `test/storage_contract/`, importing no `db.js`, running in the default
-`bun test`, and needing no constitutional change to exist. It was to cover both singleton secrets'
-byte round trip, the `Date` in `expiresAt`, and any field a store reads back and type-checks.
+This tier lives in `test/storage_contract/`, runs in the default `bun test`, and needed no
+constitutional change to exist. It is `mongo_bson_round_trip.spec.ts`, and it covers both singleton
+secrets' byte round trip plus the two translation commitments the store's own comment makes: any
+binary subtype is unwrapped, and a value that is not binary passes through for the caller to refuse.
+Removing the unwrap now fails three of its cases. The `Date` in `expiresAt`, and any other field a
+store reads back and type-checks, remain uncovered and are the obvious next additions.
 
-> ⚠️ **It was never built, and the paragraph above is a plan written in the present tense.**
-> `grep -r BSON test` matches nothing — not at this commit, not at `f6eb1b9`. What
-> `test/storage_contract/` actually holds for these two secrets is
-> `dpop_nonce_secret.spec.ts` and `pairwise_salt.spec.ts`, both against the **memory**
-> implementation, both saying so in their headers. Removing the `Binary` unwrap that this page
-> exists to explain leaves that directory at 294 pass / 0 fail and the full suite green; the
-> defect was replayed to confirm it. Recorded as G-008 in `Task.md`. The argument
-> below still holds — the codec is reachable without a server and `bson` is already a transitive
-> dependency — so the tier remains one spec file away. Nobody has written it.
+It runs the **real** store class, not a re-implementation of it, which is the only version worth
+having: a copy of the unwrap living in the test file would pass with the historical defect present.
+`db.js` is substituted for the spec's process — nothing else in the suite imports it — and the
+collection underneath serialises through `BSON.serialize` on write and `BSON.deserialize` on read,
+so the encoding the defect turned on is the encoding under test.
 
-This is a hazard of the form this whole wiki takes. A decision page reads, months later, exactly
-like a description of shipped work, and the reader who most needs the distinction — somebody
-deciding whether a defect class is already covered — is the one least able to see it. Two months
-after this page was written, the coverage it describes was cited as existing.
+> ⚠️ **For two months this section was a plan written in the present tense, and it was read as a
+> description of shipped work.** Removing the `Binary` unwrap left `test/storage_contract/` at
+> 294 pass / 0 fail and the full suite green; the defect was replayed to confirm it, and the gap was
+> recorded and tracked until it was closed here.
+>
+> This is a hazard of the form this whole wiki takes. A decision page reads, months later, exactly
+> like a description of shipped work, and the reader who most needs the distinction — somebody
+> deciding whether a defect class is already covered — is the one least able to see it. The warning
+> is kept after the fact rather than deleted with the gap, because the next page to do this will not
+> announce itself either.
 
 ### Tier 2 — storage fidelity suite, real mongod, invoked separately
 
@@ -84,10 +89,16 @@ None is optional, and each one silently defeats the suite rather than failing lo
 
 **The driver connects at import time.** `lib/adapters/mongodb/db.ts:3-19` opens its connection at
 module scope and throws without `MONGODB_URI`, and all twelve store files do `import { db } from './db.js'`.
-Today that makes every Mongo store *unimportable* from a test process. The connection has to become
-lazy or injectable before a spec can name one of these classes at all.
+The connection has to become lazy or injectable before a spec can hand these classes a *real* `Db`.
 `lib/adapters/mongodb/provision.ts:13-16` already shows the shape — it takes a caller's `Db` and
 keeps the driver import type-only, precisely so it stays loadable without the env var.
+
+Note what Tier 1 established while this barrier still stands: it is a barrier to *connecting*, not to
+*importing*. `mongo_bson_round_trip.spec.ts` substitutes `db.js` for its own process and the real
+store classes load and run, so a property that needs the driver's codec but not its socket does not
+have to wait for this refactor. Every sibling spec in that directory concluded otherwise — "the
+MongoDB class cannot be imported here at all", and therefore "verified by hand" — and that conclusion
+was one step short for two months.
 
 **`MONGODB_URI` alone does not switch the model adapter.** `lib/adapters/index.ts:58-72` selects the
 Mongo implementations when the URI is present — and then `:74-76` unconditionally overrides

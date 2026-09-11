@@ -4,4 +4,8 @@ coverageSkipTestFiles = true
 # No exclusions. The last one — test/helpers/attention.spec.ts, which used Mocha's `context()` and
 # never ran — was deleted rather than migrated: it asserted a console notice's prefix and colour,
 # which no audience outside the system depends on. Every file the glob finds is a file the runner
-# runs, and test/intent/declaration.spec.ts relies on those two sets being the same.
+# runs, and an exclusion list is a second place to look for why a spec never ran.
+#
+# The per-case time limit is NOT here, and cannot be: `timeout` is not one of the eighteen [test]
+# keys Bun parses. It is set with setDefaultTimeout in test/preload.ts, which applies however the
+# runner is invoked — a `test` script in package.json would be shadowed by the builtin subcommand.
