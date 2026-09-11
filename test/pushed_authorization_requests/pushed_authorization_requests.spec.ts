@@ -239,7 +239,7 @@ describe('Pushed Request Object', async () => {
 							}
 						}
 					);
-					expect(par.response.status).toBe(422);
+					expect(par.response.status).toBe(400);
 					expect(par.error?.value).toEqual({
 						error: 'invalid_request',
 						error_description: "Property 'redirect_uri' should be uri"
@@ -407,7 +407,7 @@ describe('Pushed Request Object', async () => {
 									}
 								}
 							);
-							expect(error?.status).toBe(422);
+							expect(error?.status).toBe(400);
 							expect(error?.value).toEqual({
 								error: 'invalid_request',
 								error_description:
@@ -722,7 +722,7 @@ describe('Pushed Request Object', async () => {
 								}
 							);
 							if (!error) throw new Error('expected error response');
-							expect(error.status).toBe(422);
+							expect(error.status).toBe(400);
 							expect(error.value).toEqual({
 								error: 'invalid_request',
 								error_description: "Property 'exp' is missing"

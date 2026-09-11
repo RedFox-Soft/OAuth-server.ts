@@ -30,7 +30,7 @@ import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
  *   filtering           — origin absent, project empty, no project, no client, unknown token,
  *                         malformed credential; each proving the request is otherwise unaffected
  *   client id sources   — body client_id, Basic username, access token
- *   error paths         — the transform-stage 401, a 422 from validation, a 400 from a handler
+ *   error paths         — the transform-stage 401, a 400 from validation, a 400 from a handler
  *   exposed headers     — the RFC 9449 pair on the DPoP nonce 401 and on successes
  *   negative sweep      — no CORS header on any of the 66 none-class routes, table-driven
  *   preflight           — 204 shape per route, flag-off 404 equivalence, not-a-preflight cases
@@ -46,7 +46,7 @@ const secret = { client_id: 'cors-client', client_secret: 'secret' };
 /*
  * One request shape per client-based form endpoint. Deliberately minimal: the CORS layer runs at
  * transform, before schema validation, so a body carrying only the credentials is enough to identify
- * the client — and a request that goes on to 400 or 422 is exactly the case the header must survive.
+ * the client — and a request that goes on to a 400 is exactly the case the header must survive.
  */
 const FORM_ENDPOINTS = [
 	{
@@ -291,7 +291,7 @@ describe('CORS', () => {
 
 			/*
 			 * The reason this layer sits at transform rather than beforeHandle. Each of these errors is
-			 * raised before beforeHandle would run — the 401 from AuthPlugin's derive, the 422 from
+			 * raised before beforeHandle would run — the 401 from AuthPlugin's derive, the 400 from
 			 * body-schema validation — and each is a response a browser app has to be able to read.
 			 */
 			describe('error responses', () => {
@@ -322,12 +322,12 @@ describe('CORS', () => {
 					expect(res.headers.get('access-control-allow-origin')).toBe(ORIGIN);
 				});
 
-				it('carries the header on a 422 from body-schema validation', async () => {
+				it('carries the header on a 400 from body-schema validation', async () => {
 					// No grant_type: the token body schema rejects it in the validation stage, which
 					// runs after transform and before beforeHandle.
 					const res = await postForm('/token', { ...secret }, ORIGIN);
 
-					expect(res.status).toBe(422);
+					expect(res.status).toBe(400);
 					expect(res.headers.get('access-control-allow-origin')).toBe(ORIGIN);
 				});
 			});

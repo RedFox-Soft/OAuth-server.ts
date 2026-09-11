@@ -17,7 +17,7 @@ describe('providing Bearer token', () => {
 			if (!error) {
 				throw new Error('Have to be exception');
 			}
-			expect(error.status).toBe(422);
+			expect(error.status).toBe(400);
 			expect(error.value).toEqual({
 				error: 'invalid_request',
 				error_description: 'no access token provided'

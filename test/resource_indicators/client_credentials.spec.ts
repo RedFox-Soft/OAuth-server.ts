@@ -135,7 +135,7 @@ describe('grant_type=client_credentials w/ resourceIndicators', () => {
 			}
 		);
 		if (!error) throw new Error('expected error response');
-		expect(error.status).toBe(422);
+		expect(error.status).toBe(400);
 		expect(error?.value).toEqual({
 			error: 'invalid_request',
 			error_description:
@@ -155,7 +155,7 @@ describe('grant_type=client_credentials w/ resourceIndicators', () => {
 			}
 		);
 		if (!error) throw new Error('expected error response');
-		expect(error.status).toBe(422);
+		expect(error.status).toBe(400);
 		expect(error?.value).toEqual({
 			error: 'invalid_request',
 			error_description: "Property 'resource' should be uri"

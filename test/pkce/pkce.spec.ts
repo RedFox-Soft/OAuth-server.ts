@@ -244,7 +244,7 @@ describe('PKCE RFC7636', () => {
 				code_verifier: 'f'.repeat(42)
 			});
 			if (!error) throw new Error('expected error response');
-			expect(error).toHaveProperty('status', 422);
+			expect(error).toHaveProperty('status', 400);
 			expect(error.value).toHaveProperty('error', 'invalid_request');
 		});
 
@@ -268,7 +268,7 @@ describe('PKCE RFC7636', () => {
 				code_verifier: 'f'.repeat(129)
 			});
 			if (!error) throw new Error('expected error response');
-			expect(error).toHaveProperty('status', 422);
+			expect(error).toHaveProperty('status', 400);
 			expect(error.value).toHaveProperty('error', 'invalid_request');
 		});
 
@@ -292,7 +292,7 @@ describe('PKCE RFC7636', () => {
 				code_verifier: `${'f'.repeat(42)}&`
 			});
 			if (!error) throw new Error('expected error response');
-			expect(error).toHaveProperty('status', 422);
+			expect(error).toHaveProperty('status', 400);
 			expect(error.value).toHaveProperty('error', 'invalid_request');
 		});
 

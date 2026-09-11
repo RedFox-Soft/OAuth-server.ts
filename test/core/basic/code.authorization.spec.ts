@@ -678,7 +678,7 @@ describe('BASIC code', () => {
 					accept: 'text/html'
 				});
 				if (!error) throw new Error('expected error response');
-				expect(response.status).toBe(422);
+				expect(response.status).toBe(400);
 				expect(response.headers.get('content-type')).toBe(
 					'text/html; charset=utf-8'
 				);

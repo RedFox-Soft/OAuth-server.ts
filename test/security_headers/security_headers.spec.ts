@@ -199,7 +199,7 @@ describe('security headers: protocol surfaces', () => {
 
 	/*
 	 * The highest-value cases in this file. Both responses are built before the route handler ever
-	 * runs — the 401 in AuthPlugin's derive (transform stage), the 422 in body-schema validation — and
+	 * runs — the 401 in AuthPlugin's derive (transform stage), the 400 in body-schema validation — and
 	 * they are the responses a misconfigured browser application hits most often. This is precisely
 	 * where the spec-018 mechanism failed, and it failed silently.
 	 */
@@ -230,10 +230,10 @@ describe('security headers: protocol surfaces', () => {
 			expectNonPageProfile(res);
 		});
 
-		it('covers the 422 from body-schema validation', async () => {
+		it('covers the 400 from body-schema validation', async () => {
 			const res = await postForm(routeNames.token, { ...credentials });
 
-			expect(res.status).toBe(422);
+			expect(res.status).toBe(400);
 			expectNonPageProfile(res);
 		});
 

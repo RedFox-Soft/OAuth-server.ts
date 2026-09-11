@@ -71,7 +71,7 @@ describe('/auth', () => {
 							'https://client.example.com/cb"><script>alert(0)</script><x="/'
 					});
 					const { error } = await authRequest(auth);
-					expect(error.status).toBe(422);
+					expect(error.status).toBe(400);
 
 					expect(error.value).toEqual({
 						error: 'invalid_request',

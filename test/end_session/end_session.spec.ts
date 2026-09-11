@@ -458,7 +458,7 @@ describe('logout endpoint', () => {
 					}
 				);
 				if (!error) throw new Error('expected error response');
-				expect(error.status).toBe(422);
+				expect(error.status).toBe(400);
 				expect(error.value).toContain('Property &#x27;xsrf&#x27; is missing');
 			});
 

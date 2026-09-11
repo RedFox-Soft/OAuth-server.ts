@@ -170,7 +170,7 @@ describe('grant_type=authorization_code', () => {
 			auth.grant_type = 'foobar';
 
 			const { error } = await auth.getToken(code);
-			expect(error.status).toBe(422);
+			expect(error.status).toBe(400);
 			expect(error.value).toHaveProperty('error', 'invalid_request');
 			expect(error.value).toHaveProperty(
 				'error_description',
@@ -404,7 +404,7 @@ describe('grant_type=authorization_code', () => {
 		it('an unsupported grant_type is refused as unsupported_grant_type', async function () {
 			auth.grant_type = 'foobar';
 			const { error } = await auth.getToken(code);
-			expect(error.status).toBe(422);
+			expect(error.status).toBe(400);
 			expect(error.value).toHaveProperty('error', 'invalid_request');
 			expect(error.value).toHaveProperty(
 				'error_description',
@@ -462,7 +462,7 @@ describe('grant_type=authorization_code', () => {
 				}
 			);
 			if (!error) throw new Error('expected error response');
-			expect(error.status).toBe(422);
+			expect(error.status).toBe(400);
 			expect(error.value).toHaveProperty('error', 'invalid_request');
 			expect(error.value).toHaveProperty(
 				'error_description',

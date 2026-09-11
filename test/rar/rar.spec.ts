@@ -882,7 +882,7 @@ describe('features.richAuthorizationRequests', () => {
 				authorization_details: details(payment())
 			} as never);
 
-			expect(status).toBe(422);
+			expect(status).toBe(400);
 		});
 
 		it('refuses the parameter at the device authorization endpoint', async () => {

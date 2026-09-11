@@ -356,7 +356,7 @@ describe('introspection features', () => {
 				}
 			);
 			if (!error) throw new Error('expected error response');
-			expect(error.status).toBe(422);
+			expect(error.status).toBe(400);
 			expect(error.value).toHaveProperty('error', 'invalid_request');
 			expect(error.value).toHaveProperty(
 				'error_description',

@@ -178,6 +178,31 @@ function statusFor(error: OIDCProviderError, route: string) {
 	return error.status;
 }
 
+/*
+ * A schema refusal on the protocol surface answers 400, not the validator's 422.
+ *
+ * The body was already right — `getObjFromError` renders a VALIDATION code as `invalid_request` with
+ * a description — so only the status was the framework's rather than the protocol's, and a client
+ * reading RFC 6749 §5.2 ("The authorization server responds with an HTTP 400 (Bad Request) status
+ * code (unless specified otherwise)") sees a status that specification does not define. It reads as
+ * a transport-level oddity rather than as the protocol error it is.
+ *
+ * Scoped to the `oauth` surface deliberately. The admin plane and `/mcp` have already exited this
+ * handler by the time it runs, and the interaction pages are not an OAuth response surface: on both
+ * of those 422 is the more precise answer, because a well-formed request whose *body* fails a schema
+ * is exactly what the code distinguishes, and the console and the agent are the ones who act on it.
+ */
+function schemaRefusalStatus(
+	code: string,
+	route: string,
+	fallback: ErrorContext['set']['status']
+) {
+	if (code === 'VALIDATION' && surfaceFor(route) === 'oauth') {
+		return 400;
+	}
+	return fallback;
+}
+
 export async function errorHandler(obj: ErrorContext) {
 	const { set, route, code, request } = obj;
 	let { error } = obj;
@@ -281,8 +306,10 @@ export async function errorHandler(obj: ErrorContext) {
 	}
 
 	const isOIDError = error instanceof OIDCProviderError;
-	const status = isOIDError ? statusFor(error, route) : set.status;
-	if (isOIDError) {
+	const status = isOIDError
+		? statusFor(error, route)
+		: schemaRefusalStatus(code, route, set.status);
+	if (status !== set.status) {
 		set.status = status;
 	}
 	if (code === 'UNKNOWN' && !isOIDError) {

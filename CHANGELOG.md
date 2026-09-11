@@ -163,6 +163,21 @@ metadata.
 
 ### Fixed
 
+- pkce: a `code_verifier` containing `.` or `~` is accepted. RFC 7636 §4.1 defines the verifier over
+  RFC 3986's `unreserved` set, which includes both; the pattern here was base64url, the alphabet the
+  _challenge_ is encoded in and the one this project happens to generate verifiers with. A client
+  whose verifier used the full range was refused at schema validation before the grant ran, so its
+  code could not be redeemed by any verifier — and since PKCE is mandatory here, that client could
+  not use the authorization code grant at all. This is the second correction to the same pattern
+  after its length, and both survived for the same reason: nothing this server or its suite produces
+  is outside base64url, so it could never trip over itself.
+
+- protocol: a request the schema refuses now answers `400`, not the framework validator's `422`. The
+  body was already correct (`invalid_request` with a description); only the status was the
+  framework's rather than the protocol's, and RFC 6749 §5.2 defines it as `400`. Scoped to the OAuth
+  endpoints: the admin API and `/mcp` keep `422`, where distinguishing a well-formed request with an
+  invalid body is what the console and the agent act on.
+
 - protocol: a request parameter the server does not define no longer refuses the request. Ignoring
   one is a `MUST` in RFC 6749 §3.1 **and** §3.2, RFC 8628 §3.1 and CIBA §7.1, and RFC 9126 §2.1
   inherits it for PAR — so `/auth`, `/par`, `/device/auth`, `/backchannel` and `/token` all answer a
