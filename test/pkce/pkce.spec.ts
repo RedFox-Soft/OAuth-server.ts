@@ -246,10 +246,6 @@ describe('PKCE RFC7636', () => {
 			if (!error) throw new Error('expected error response');
 			expect(error).toHaveProperty('status', 422);
 			expect(error.value).toHaveProperty('error', 'invalid_request');
-			expect(error.value).toHaveProperty(
-				'error_description',
-				"Expected string to match '^[A-Za-z0-9_-]{43,128}$'"
-			);
 		});
 
 		it('refuses an over-long code_verifier', async function () {
@@ -274,10 +270,6 @@ describe('PKCE RFC7636', () => {
 			if (!error) throw new Error('expected error response');
 			expect(error).toHaveProperty('status', 422);
 			expect(error.value).toHaveProperty('error', 'invalid_request');
-			expect(error.value).toHaveProperty(
-				'error_description',
-				"Expected string to match '^[A-Za-z0-9_-]{43,128}$'"
-			);
 		});
 
 		it('refuses a code_verifier outside the permitted charset', async function () {
@@ -302,10 +294,6 @@ describe('PKCE RFC7636', () => {
 			if (!error) throw new Error('expected error response');
 			expect(error).toHaveProperty('status', 422);
 			expect(error.value).toHaveProperty('error', 'invalid_request');
-			expect(error.value).toHaveProperty(
-				'error_description',
-				"Expected string to match '^[A-Za-z0-9_-]{43,128}$'"
-			);
 		});
 
 		it('a correct verifier completes the exchange', async function () {
@@ -357,6 +345,35 @@ describe('PKCE RFC7636', () => {
 				redirect_uri: 'com.example.myapp:/localhost/cb',
 				code_verifier:
 					'KsL9LbSq8HAS9Aiwd5MtGVtnXwcj0D5ccRCKr2rhRlNW5BPvi4mra89UGcgb7_O7VpYklHwQ_x8vlNw0pdUz7A'
+			});
+			expect(response).toHaveProperty('status', 200);
+		});
+
+		/*
+		 * The same lesson as the length case above, one level down. RFC 7636 §4.1 defines the verifier
+		 * over `unreserved` (RFC 3986 §2.3), which admits `.` and `~` — a base64url alphabet does not.
+		 * The verifier below is one the OpenID conformance suite generates; it carries both characters
+		 * and no client could have reached the PKCE comparison with it, because PKCE is mandatory here.
+		 */
+		it('accepts a verifier using the full unreserved alphabet', async function () {
+			const authCode = new AuthorizationCode({
+				accountId: setup.getAccountId(),
+				grantId: setup.getGrantId(),
+				scope: 'openid',
+				clientId: 'client',
+				codeChallenge: 'xW-ZPlknUPkAQ6tHsJEL5wG-y7DomDzrVmxntRzVcOk',
+				codeChallengeMethod: 'S256',
+				redirectUri: 'com.example.myapp:/localhost/cb'
+			});
+			const code = await authCode.save();
+
+			const { response } = await agent.token.post({
+				client_id: 'client',
+				code,
+				grant_type: 'authorization_code',
+				redirect_uri: 'com.example.myapp:/localhost/cb',
+				code_verifier:
+					'zeJ177XfptRQfjwu8S3q372e6IAOamDZvNokVxjVilR.CNdThtPrq~PG_zVJADVdHEGVMvPrZYBp-0S5aw.eMgASU2iy185_.5NO6bKPobA_JRSkwWvt'
 			});
 			expect(response).toHaveProperty('status', 200);
 		});

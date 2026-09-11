@@ -10,16 +10,26 @@ export const codeGrantParameters = t.Object({
 	code: t.String(),
 	redirect_uri: t.Optional(t.String()),
 	/*
-	 * The full range RFC 7636 §4.1 defines, not the 43 a SHA-256 digest happens to occupy. The
-	 * challenge is 43 characters because it is a digest; the verifier is whatever length in 43..128
-	 * the client chose, and a client that picks 64 or 86 is conformant. Pinning this at 43 rejected
-	 * such a client at schema validation with a 422, before the grant ran — so it never reached the
-	 * PKCE comparison and no amount of a correct verifier could redeem its code.
+	 * `43*128unreserved`, the whole of what RFC 7636 §4.1 defines — both halves of it, which this
+	 * pattern has now had to learn twice.
 	 *
-	 * It survived because every verifier this project produces is 43: lib/admin/auth/login.ts derives
-	 * one from 32 random bytes, and the suite hardcoded the RFC's own 43-character example.
+	 * The length came first: the challenge is 43 characters because it is a SHA-256 digest, while the
+	 * verifier is whatever length in 43..128 the client chose, and a client picking 64 or 86 is
+	 * conformant. The alphabet is the same mistake one level down. `[A-Za-z0-9_-]` is base64url, which
+	 * is how the *challenge* is encoded and how this project happens to generate verifiers; §4.1 says
+	 * `unreserved` from RFC 3986 §2.3, which also admits `.` and `~`. A verifier is an opaque string
+	 * the client chose, so its alphabet is the RFC's to fix and not ours.
+	 *
+	 * Both survived for one reason, and it is worth stating because it will recur: this server cannot
+	 * trip over itself here. Every verifier the project produces is 43 base64url characters —
+	 * lib/admin/auth/login.ts derives one from 32 random bytes, test/AuthorizationRequest.ts does the
+	 * same — so nothing in the suite ever presented a conformant verifier this pattern refused.
+	 *
+	 * A refusal here lands before the grant runs, so a mathematically correct verifier could not
+	 * redeem its code, and PKCE is mandatory: such a client cannot use the authorization code grant
+	 * at all.
 	 */
-	code_verifier: t.String({ pattern: '^[A-Za-z0-9_-]{43,128}$' })
+	code_verifier: t.String({ pattern: '^[A-Za-z0-9\\-._~]{43,128}$' })
 });
 
 export const refreshTokenGrantParameters = t.Object({
