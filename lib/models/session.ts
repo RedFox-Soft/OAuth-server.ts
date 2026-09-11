@@ -7,40 +7,38 @@ import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { BaseModel, BaseModelPayload } from './base_model.js';
 import { ttl } from 'lib/configs/liveTime.js';
 
-export const SessionPayload = t.Composite([
-	BaseModelPayload,
-	t.Object({
-		uid: t.String(),
-		accountId: t.Optional(t.String()),
-		loginTs: t.Optional(t.Number()),
-		amr: t.Optional(t.Array(t.String())),
-		acr: t.Optional(t.String()),
-		transient: t.Optional(t.Boolean()),
-		// `state` carries the CSRF secret plus interaction context (logout/device confirmation).
-		// It is an object across end_session, interaction resume, and the device flow; the schema
-		// must accept that object so a reloaded session does not silently drop it.
-		state: t.Optional(
-			t.Object(
-				{
-					secret: t.Optional(t.String()),
-					clientId: t.Optional(t.String()),
-					state: t.Optional(t.String()),
-					postLogoutRedirectUri: t.Optional(t.String())
-				},
-				{ additionalProperties: true }
-			)
-		),
-		authorizations: t.Optional(
-			t.Record(
-				t.String(),
-				t.Object({
-					sid: t.Optional(t.String()),
-					grantId: t.Optional(t.String())
-				})
-			)
+export const SessionPayload = t.Object({
+	...BaseModelPayload.properties,
+	uid: t.String(),
+	accountId: t.Optional(t.String()),
+	loginTs: t.Optional(t.Number()),
+	amr: t.Optional(t.Array(t.String())),
+	acr: t.Optional(t.String()),
+	transient: t.Optional(t.Boolean()),
+	// `state` carries the CSRF secret plus interaction context (logout/device confirmation).
+	// It is an object across end_session, interaction resume, and the device flow; the schema
+	// must accept that object so a reloaded session does not silently drop it.
+	state: t.Optional(
+		t.Object(
+			{
+				secret: t.Optional(t.String()),
+				clientId: t.Optional(t.String()),
+				state: t.Optional(t.String()),
+				postLogoutRedirectUri: t.Optional(t.String())
+			},
+			{ additionalProperties: true }
 		)
-	})
-]);
+	),
+	authorizations: t.Optional(
+		t.Record(
+			t.String(),
+			t.Object({
+				sid: t.Optional(t.String()),
+				grantId: t.Optional(t.String())
+			})
+		)
+	)
+});
 export type SessionPayloadType = Static<typeof SessionPayload>;
 
 function sessionPayload(

@@ -66,13 +66,12 @@ import {
 	RedirectOrHtmlResponse
 } from 'lib/shared/response_schemas.js';
 
-const authorizationRequest = t.Composite([
-	t.Omit(AuthorizationParameters, ['request_uri', 'request', 'client_id']),
-	t.Object({
-		client_id: t.Optional(t.String())
-	}),
-	JWTparameters
-]);
+const authorizationRequest = t.Object({
+	...t.Omit(AuthorizationParameters, ['request_uri', 'request', 'client_id'])
+		.properties,
+	client_id: t.Optional(t.String()),
+	...JWTparameters.properties
+});
 
 export async function isAllowRedirectUri(params) {
 	const oidc = new OIDCContext(params);
@@ -213,10 +212,11 @@ export const par = new Elysia()
 	.use(parseJsonParams('authorization_details'))
 	.use(AuthPlugin)
 	.guard({
-		body: t.Composite([
-			t.Omit(AuthorizationParameters, ['request_uri', 'client_id']),
-			authParams
-		]),
+		body: t.Object({
+			...t.Omit(AuthorizationParameters, ['request_uri', 'client_id'])
+				.properties,
+			...authParams.properties
+		}),
 		headers: authHeaders
 	})
 	.resolve(({ body }) => {

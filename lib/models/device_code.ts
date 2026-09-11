@@ -9,20 +9,18 @@ import {
 import consumable from './mixins/consumable.ts';
 import { authPayloadModel } from './mixins/stores_auth.js';
 
-export const DeviceCodePayload = t.Composite([
-	BaseTokenPayload,
-	SessionBoundPayload,
-	authPayloadModel,
-	t.Object({
-		consumed: t.Boolean(),
-		error: t.Optional(t.String()),
-		errorDescription: t.Optional(t.String()),
-		params: t.Optional(t.Unknown()),
-		userCode: t.Optional(t.String()),
-		inFlight: t.Optional(t.Boolean()),
-		deviceInfo: t.Optional(t.Unknown())
-	})
-]);
+export const DeviceCodePayload = t.Object({
+	...BaseTokenPayload.properties,
+	...SessionBoundPayload.properties,
+	...authPayloadModel.properties,
+	consumed: t.Boolean(),
+	error: t.Optional(t.String()),
+	errorDescription: t.Optional(t.String()),
+	params: t.Optional(t.Unknown()),
+	userCode: t.Optional(t.String()),
+	inFlight: t.Optional(t.Boolean()),
+	deviceInfo: t.Optional(t.Unknown())
+});
 export type DeviceCodePayloadType = Static<typeof DeviceCodePayload>;
 
 export class DeviceCode extends consumable(BaseToken) {

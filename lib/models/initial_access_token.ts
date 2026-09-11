@@ -5,12 +5,10 @@ import hasPolicies from './mixins/has_policies.ts';
 
 // InitialAccessTokens are not client-bound, so the schema omits clientId (unlike other
 // BaseToken descendants) and only persists the policies alongside the base fields.
-export const InitialAccessTokenPayload = t.Composite([
-	BaseModelPayload,
-	t.Object({
-		policies: t.Optional(t.Array(t.String()))
-	})
-]);
+export const InitialAccessTokenPayload = t.Object({
+	...BaseModelPayload.properties,
+	policies: t.Optional(t.Array(t.String()))
+});
 export type InitialAccessTokenPayloadType = Static<
 	typeof InitialAccessTokenPayload
 >;

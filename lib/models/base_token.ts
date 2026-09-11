@@ -10,12 +10,10 @@ import { jwt } from './formats/jwt.js';
 import { Session } from './session.js';
 import { InvalidTarget } from 'lib/helpers/errors.js';
 
-export const BaseTokenPayload = t.Composite([
-	BaseModelPayload,
-	t.Object({
-		clientId: t.String()
-	})
-]);
+export const BaseTokenPayload = t.Object({
+	...BaseModelPayload.properties,
+	clientId: t.String()
+});
 
 // Session-binding fields. Composed only into session-bound token schemas (access,
 // authorization code, refresh, device, backchannel) — deliberately NOT part of the shared

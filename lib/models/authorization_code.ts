@@ -7,19 +7,17 @@ import {
 import consumable from './mixins/consumable.js';
 import { authPayloadModel } from './mixins/stores_auth.js';
 
-export const AuthorizationCodePayload = t.Composite([
-	BaseTokenPayload,
-	SessionBoundPayload,
-	authPayloadModel,
-	t.Object({
-		codeChallenge: t.Optional(t.String()),
-		codeChallengeMethod: t.Optional(t.Literal('S256')),
-		redirectUri: t.Optional(t.String({ format: 'uri' })),
-		dpopJkt: t.Optional(t.String()),
-		rar: t.Optional(t.Array(t.Object({}, { additionalProperties: true }))),
-		consumed: t.Boolean()
-	})
-]);
+export const AuthorizationCodePayload = t.Object({
+	...BaseTokenPayload.properties,
+	...SessionBoundPayload.properties,
+	...authPayloadModel.properties,
+	codeChallenge: t.Optional(t.String()),
+	codeChallengeMethod: t.Optional(t.Literal('S256')),
+	redirectUri: t.Optional(t.String({ format: 'uri' })),
+	dpopJkt: t.Optional(t.String()),
+	rar: t.Optional(t.Array(t.Object({}, { additionalProperties: true }))),
+	consumed: t.Boolean()
+});
 export type AuthorizationCodePayloadType = Static<
 	typeof AuthorizationCodePayload
 >;

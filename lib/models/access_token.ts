@@ -7,20 +7,18 @@ import {
 	AudiencePayload
 } from './base_token.js';
 
-export const AccessTokenPayload = t.Composite([
-	BaseTokenPayload,
-	SessionBoundPayload,
-	AudiencePayload,
-	t.Object({
-		rar: t.Optional(t.Array(t.Object({}, { additionalProperties: true }))),
-		claims: t.Optional(t.Object({})),
-		scope: t.Optional(t.String()),
-		sid: t.Optional(t.String()),
-		gty: t.Optional(t.String()),
-		'x5t#S256': t.Optional(t.String()),
-		jkt: t.Optional(t.String())
-	})
-]);
+export const AccessTokenPayload = t.Object({
+	...BaseTokenPayload.properties,
+	...SessionBoundPayload.properties,
+	...AudiencePayload.properties,
+	rar: t.Optional(t.Array(t.Object({}, { additionalProperties: true }))),
+	claims: t.Optional(t.Object({})),
+	scope: t.Optional(t.String()),
+	sid: t.Optional(t.String()),
+	gty: t.Optional(t.String()),
+	'x5t#S256': t.Optional(t.String()),
+	jkt: t.Optional(t.String())
+});
 export type AccessTokenPayloadType = Static<typeof AccessTokenPayload>;
 
 export class AccessToken extends constrained<AccessTokenPayloadType>(

@@ -12,34 +12,32 @@ const NON_REJECTABLE_CLAIMS = new Set([
 	'iss'
 ]);
 
-export const GrantPayload = t.Composite([
-	BaseTokenPayload,
-	t.Object({
-		accountId: t.Optional(t.String()),
-		createdAt: t.Number(),
-		lastModifiedAt: t.Number(),
-		trusted: t.Boolean(),
-		resources: t.Optional(t.Record(t.String(), t.String())),
-		openid: t.Optional(
-			t.Object({
-				scope: t.Optional(t.String()),
-				claims: t.Optional(t.Array(t.String()))
-			})
-		),
-		rejected: t.Optional(
-			t.Object({
-				resources: t.Optional(t.Record(t.String(), t.String())),
-				openid: t.Optional(
-					t.Object({
-						scope: t.Optional(t.String()),
-						claims: t.Optional(t.Array(t.String()))
-					})
-				)
-			})
-		),
-		rar: t.Optional(t.Array(t.Object({}, { additionalProperties: true })))
-	})
-]);
+export const GrantPayload = t.Object({
+	...BaseTokenPayload.properties,
+	accountId: t.Optional(t.String()),
+	createdAt: t.Number(),
+	lastModifiedAt: t.Number(),
+	trusted: t.Boolean(),
+	resources: t.Optional(t.Record(t.String(), t.String())),
+	openid: t.Optional(
+		t.Object({
+			scope: t.Optional(t.String()),
+			claims: t.Optional(t.Array(t.String()))
+		})
+	),
+	rejected: t.Optional(
+		t.Object({
+			resources: t.Optional(t.Record(t.String(), t.String())),
+			openid: t.Optional(
+				t.Object({
+					scope: t.Optional(t.String()),
+					claims: t.Optional(t.Array(t.String()))
+				})
+			)
+		})
+	),
+	rar: t.Optional(t.Array(t.Object({}, { additionalProperties: true })))
+});
 export type GrantPayloadType = Static<typeof GrantPayload>;
 
 export class Grant extends BaseToken<GrantPayloadType> {

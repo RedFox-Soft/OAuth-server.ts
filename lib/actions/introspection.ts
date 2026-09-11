@@ -175,13 +175,11 @@ export const introspect = new Elysia().use(AuthPlugin).post(
 		return await renderTokenResponse(oidc);
 	},
 	{
-		body: t.Composite([
-			t.Object({
-				token: t.String(),
-				token_type_hint: t.Optional(t.String())
-			}),
-			authParams
-		]),
+		body: t.Object({
+			token: t.String(),
+			token_type_hint: t.Optional(t.String()),
+			...authParams.properties
+		}),
 		headers: authHeaders,
 		response: {
 			200: IntrospectionResponse,

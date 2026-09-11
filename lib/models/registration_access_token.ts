@@ -2,12 +2,10 @@ import { Type as t, type Static } from '@sinclair/typebox';
 import { BaseToken, BaseTokenPayload } from './base_token.js';
 import hasPolicies from './mixins/has_policies.ts';
 
-export const RegistrationAccessTokenPayload = t.Composite([
-	BaseTokenPayload,
-	t.Object({
-		policies: t.Optional(t.Array(t.String()))
-	})
-]);
+export const RegistrationAccessTokenPayload = t.Object({
+	...BaseTokenPayload.properties,
+	policies: t.Optional(t.Array(t.String()))
+});
 export type RegistrationAccessTokenPayloadType = Static<
 	typeof RegistrationAccessTokenPayload
 >;

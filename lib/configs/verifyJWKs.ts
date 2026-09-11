@@ -24,53 +24,45 @@ const BaseKey = t.Object({
 	key_ops: t.Optional(t.Array(t.String()))
 });
 
-const RSAKey = t.Composite(
-	[
-		BaseKey,
-		t.Object({
-			kty: t.Literal('RSA'),
-			alg: t.Union([...RSASignAlg, ...RSAEncAlg].map((alg) => t.Literal(alg))),
-			e: t.String(),
-			n: t.String(),
-			d: t.String(),
-			p: t.String(),
-			q: t.String(),
-			dp: t.String(),
-			dq: t.String(),
-			qi: t.String()
-		})
-	],
+const RSAKey = t.Object(
+	{
+		...BaseKey.properties,
+		kty: t.Literal('RSA'),
+		alg: t.Union([...RSASignAlg, ...RSAEncAlg].map((alg) => t.Literal(alg))),
+		e: t.String(),
+		n: t.String(),
+		d: t.String(),
+		p: t.String(),
+		q: t.String(),
+		dp: t.String(),
+		dq: t.String(),
+		qi: t.String()
+	},
 	{ additionalProperties: false }
 );
 
-const ECKey = t.Composite(
-	[
-		BaseKey,
-		t.Object({
-			kty: t.Literal('EC'),
-			alg: t.Union([...ECSignAlg, ...ECOKPEncAlg].map((alg) => t.Literal(alg))),
-			crv: t.Union(ECCurves.map((c) => t.Literal(c))),
-			x: t.String(),
-			y: t.String(),
-			d: t.String()
-		})
-	],
+const ECKey = t.Object(
+	{
+		...BaseKey.properties,
+		kty: t.Literal('EC'),
+		alg: t.Union([...ECSignAlg, ...ECOKPEncAlg].map((alg) => t.Literal(alg))),
+		crv: t.Union(ECCurves.map((c) => t.Literal(c))),
+		x: t.String(),
+		y: t.String(),
+		d: t.String()
+	},
 	{ additionalProperties: false }
 );
 
-const OKPKey = t.Composite(
-	[
-		BaseKey,
-		t.Object({
-			kty: t.Literal('OKP'),
-			alg: t.Union(
-				[...OKPSignAlg, ...ECOKPEncAlg].map((alg) => t.Literal(alg))
-			),
-			crv: t.Union(OKPCurves.map((c) => t.Literal(c))),
-			x: t.String(),
-			d: t.String()
-		})
-	],
+const OKPKey = t.Object(
+	{
+		...BaseKey.properties,
+		kty: t.Literal('OKP'),
+		alg: t.Union([...OKPSignAlg, ...ECOKPEncAlg].map((alg) => t.Literal(alg))),
+		crv: t.Union(OKPCurves.map((c) => t.Literal(c))),
+		x: t.String(),
+		d: t.String()
+	},
 	{ additionalProperties: false }
 );
 type reqProp = {

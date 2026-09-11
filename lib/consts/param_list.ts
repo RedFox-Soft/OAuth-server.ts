@@ -94,22 +94,20 @@ export const JWTparameters = t.Object({
 	nbf: t.Optional(t.Integer({ minimum: 0 }))
 });
 
-export const BackchannelAuthParameters = t.Composite([
-	DeviceAuthorizationParameters,
-	t.Object({
-		client_notification_token: t.Optional(t.String()),
-		login_hint_token: t.Optional(t.String()),
-		binding_message: t.Optional(t.String()),
-		user_code: t.Optional(t.String()),
-		request_context: t.Optional(t.String()),
-		requested_expiry: t.Optional(
-			t.Integer({
-				minimum: 0,
-				error: 'requested_expiry must be a positive integer'
-			})
-		)
-	})
-]);
+export const BackchannelAuthParameters = t.Object({
+	...DeviceAuthorizationParameters.properties,
+	client_notification_token: t.Optional(t.String()),
+	login_hint_token: t.Optional(t.String()),
+	binding_message: t.Optional(t.String()),
+	user_code: t.Optional(t.String()),
+	request_context: t.Optional(t.String()),
+	requested_expiry: t.Optional(
+		t.Integer({
+			minimum: 0,
+			error: 'requested_expiry must be a positive integer'
+		})
+	)
+});
 
 export const routeNames = {
 	authorization: '/auth',

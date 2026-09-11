@@ -42,22 +42,20 @@ export const tokenAction = new Elysia()
 			return executeGrant(grantType, oidc, dPoP);
 		},
 		{
-			body: t.Composite([
-				authParams,
-				t.Object({
-					scope: t.Optional(t.String()),
-					resource: t.Optional(t.String({ format: 'uri' })),
-					// Literal union of the grant types the project supports (single source of truth in
-					// grants/index.ts). A proper literal union — not a `keys().map(t.Literal)` array,
-					// whose TypeBox static type collapses to `never` and makes the handler fail Elysia's
-					// InlineHandlerNonMacro check (which is what previously blocked the `response` map).
-					grant_type: grantTypeSchema
-				}),
-				t.Partial(codeGrantParameters),
-				t.Partial(refreshTokenGrantParameters),
-				t.Partial(deviceCodeGrantParameters),
-				t.Partial(cibaGrantParameters)
-			]),
+			body: t.Object({
+				...authParams.properties,
+				scope: t.Optional(t.String()),
+				resource: t.Optional(t.String({ format: 'uri' })),
+				// Literal union of the grant types the project supports (single source of truth in
+				// grants/index.ts). A proper literal union — not a `keys().map(t.Literal)` array,
+				// whose TypeBox static type collapses to `never` and makes the handler fail Elysia's
+				// InlineHandlerNonMacro check (which is what previously blocked the `response` map).
+				grant_type: grantTypeSchema,
+				...t.Partial(codeGrantParameters).properties,
+				...t.Partial(refreshTokenGrantParameters).properties,
+				...t.Partial(deviceCodeGrantParameters).properties,
+				...t.Partial(cibaGrantParameters).properties
+			}),
 			headers: authHeaders,
 			// Success body varies by grant_type (access-token-only for client_credentials, +id_token/
 			// refresh_token for the code/device/ciba flows). Modelled as a grant-dependent union in

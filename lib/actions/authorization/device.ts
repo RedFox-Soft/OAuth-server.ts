@@ -50,19 +50,19 @@ import {
 const deviceAuthGrantType = 'urn:ietf:params:oauth:grant-type:device_code';
 const backchannelAuthGrantType = 'urn:openid:params:grant-type:ciba';
 
-const DeviceRequest = t.Composite([
-	t.Omit(DeviceAuthorizationParameters, ['request']),
-	JWTparameters
-]);
+const DeviceRequest = t.Object({
+	...t.Omit(DeviceAuthorizationParameters, ['request']).properties,
+	...JWTparameters.properties
+});
 
 // The request-object required-claim checks for CIBA (exp/iat/nbf/jti) are enforced by
 // features.requestObjects.assertJwtClaimsAndHeader with precise error messages; the JWT param
 // schema here is therefore relaxed to optional so a missing claim surfaces as invalid_request
 // (400) rather than a generic schema validation error (422).
-const BacckchannelRequest = t.Composite([
-	t.Omit(BackchannelAuthParameters, ['request']),
-	t.Partial(JWTparameters)
-]);
+const BacckchannelRequest = t.Object({
+	...t.Omit(BackchannelAuthParameters, ['request']).properties,
+	...t.Partial(JWTparameters).properties
+});
 
 async function authentication(params, headers, oidc) {
 	await tokenAuth(params, headers, oidc);
@@ -84,7 +84,10 @@ export const deviceAuth = new Elysia()
 	.use(coerceArrayParams('ui_locales', 'resource'))
 	.use(parseJsonParams('authorization_details'))
 	.guard({
-		body: t.Composite([authParams, DeviceAuthorizationParameters]),
+		body: t.Object({
+			...authParams.properties,
+			...DeviceAuthorizationParameters.properties
+		}),
 		headers: authHeaders
 	})
 	.resolve(({ body }) => {
@@ -133,14 +136,12 @@ export const backchannelAuth = new Elysia()
 		// request_uri and registration are accepted by the schema so the handler can reject them
 		// with the OIDC-specified `<param>_not_supported` errors rather than a generic 422.
 		// registration is otherwise typed as `t.Undefined` upstream, so it is omitted first.
-		body: t.Composite([
-			authParams,
-			t.Omit(BackchannelAuthParameters, ['registration']),
-			t.Object({
-				request_uri: t.Optional(t.String()),
-				registration: t.Optional(t.String())
-			})
-		]),
+		body: t.Object({
+			...authParams.properties,
+			...t.Omit(BackchannelAuthParameters, ['registration']).properties,
+			request_uri: t.Optional(t.String()),
+			registration: t.Optional(t.String())
+		}),
 		headers: authHeaders
 	})
 	.post(

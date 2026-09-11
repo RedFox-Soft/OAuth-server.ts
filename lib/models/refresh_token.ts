@@ -10,20 +10,18 @@ import consumable from './mixins/consumable.js';
 import constrained from './mixins/is_sender_constrained.js';
 import { authPayloadModel } from './mixins/stores_auth.js';
 
-export const RefreshTokenSchema = t.Composite([
-	BaseTokenPayload,
-	SessionBoundPayload,
-	authPayloadModel,
-	t.Object({
-		iiat: t.Number(),
-		gty: t.String(),
-		rar: t.Optional(t.Array(t.Object({}, { additionalProperties: true }))),
-		rotations: t.Optional(t.Number()),
-		consumed: t.Boolean(),
-		'x5t#S256': t.Optional(t.String()),
-		jkt: t.Optional(t.String())
-	})
-]);
+export const RefreshTokenSchema = t.Object({
+	...BaseTokenPayload.properties,
+	...SessionBoundPayload.properties,
+	...authPayloadModel.properties,
+	iiat: t.Number(),
+	gty: t.String(),
+	rar: t.Optional(t.Array(t.Object({}, { additionalProperties: true }))),
+	rotations: t.Optional(t.Number()),
+	consumed: t.Boolean(),
+	'x5t#S256': t.Optional(t.String()),
+	jkt: t.Optional(t.String())
+});
 
 export type RefreshTokenPayload = Static<typeof RefreshTokenSchema>;
 

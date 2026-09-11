@@ -40,33 +40,27 @@ const PublicBaseKey = t.Object({
 	x5c: t.Optional(t.Array(t.String({ minLength: 1 })))
 });
 
-const RSAPubKey = t.Composite([
-	PublicBaseKey,
-	t.Object({
-		kty: t.Literal('RSA'),
-		e: t.String({ minLength: 1 }),
-		n: t.String({ minLength: 1 })
-	})
-]);
+const RSAPubKey = t.Object({
+	...PublicBaseKey.properties,
+	kty: t.Literal('RSA'),
+	e: t.String({ minLength: 1 }),
+	n: t.String({ minLength: 1 })
+});
 
-const ECPubKey = t.Composite([
-	PublicBaseKey,
-	t.Object({
-		kty: t.Literal('EC'),
-		crv: t.Union(ECCurves.map((c) => t.Literal(c))),
-		x: t.String({ minLength: 1 }),
-		y: t.String({ minLength: 1 })
-	})
-]);
+const ECPubKey = t.Object({
+	...PublicBaseKey.properties,
+	kty: t.Literal('EC'),
+	crv: t.Union(ECCurves.map((c) => t.Literal(c))),
+	x: t.String({ minLength: 1 }),
+	y: t.String({ minLength: 1 })
+});
 
-const OKPPubKey = t.Composite([
-	PublicBaseKey,
-	t.Object({
-		kty: t.Literal('OKP'),
-		crv: t.Union(OKPCurves.map((c) => t.Literal(c))),
-		x: t.String({ minLength: 1 })
-	})
-]);
+const OKPPubKey = t.Object({
+	...PublicBaseKey.properties,
+	kty: t.Literal('OKP'),
+	crv: t.Union(OKPCurves.map((c) => t.Literal(c))),
+	x: t.String({ minLength: 1 })
+});
 
 export function validateJWK(jwk) {
 	if (!isPlainObject(jwk) || !(typeof jwk.kty === 'string' && jwk.kty)) {

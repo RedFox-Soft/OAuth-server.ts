@@ -3,12 +3,10 @@ import { Type as t, type Static } from '@sinclair/typebox';
 import epochTime from '../helpers/epoch_time.js';
 import { BaseModel, BaseModelPayload } from './base_model.js';
 
-export const ReplayDetectionPayload = t.Composite([
-	BaseModelPayload,
-	t.Object({
-		iss: t.String()
-	})
-]);
+export const ReplayDetectionPayload = t.Object({
+	...BaseModelPayload.properties,
+	iss: t.String()
+});
 export type ReplayDetectionPayloadType = Static<typeof ReplayDetectionPayload>;
 
 export class ReplayDetection extends BaseModel<ReplayDetectionPayloadType> {
