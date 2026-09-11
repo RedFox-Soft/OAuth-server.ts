@@ -11,6 +11,7 @@ import {
 } from 'elysia';
 import { isAllowRedirectUri } from 'lib/actions/authorization/authorization.js';
 import { ISSUER } from 'lib/configs/env.js';
+import { ApplicationConfig } from 'lib/configs/application.js';
 import { dPoPSigningAlgValues } from 'lib/configs/jwaAlgorithms.js';
 import { InvalidDpopProof, UseDpopNonce } from 'lib/helpers/validate_dpop.js';
 import { DPoPNonces } from 'lib/helpers/dpop_nonces.js';
@@ -179,6 +180,53 @@ function statusFor(error: OIDCProviderError, route: string) {
 }
 
 /*
+ * A protected-resource request that carried no credentials at all.
+ *
+ * The `authorization` header is required by the route's header schema, so its absence arrives as a
+ * schema refusal like any other — which is exactly why this went unnoticed: the answer was whatever
+ * the validator said (a 422, then a 400 once the correction above landed), and a resource server has
+ * a specified answer here that is neither.
+ *
+ * Keyed on the *missing* header rather than on the route alone: a credential that is present and
+ * unusable is a different outcome with a different error, and that one is raised by the handler.
+ */
+function lacksResourceCredential(
+	code: string,
+	route: string,
+	error: unknown,
+	request: Request
+) {
+	if (code !== 'VALIDATION' || !dpopProtectedResources.has(route)) {
+		return false;
+	}
+	if (request.headers.get('authorization')) {
+		return false;
+	}
+	return getFirstError(error as ValidationError).path === '/authorization';
+}
+
+/*
+ * What that request is answered with.
+ *
+ * RFC 6750 §3 makes `WWW-Authenticate` mandatory when a protected resource request carries no
+ * credentials, and §3.1 says the response SHOULD NOT carry an error code or any other error
+ * information: nothing was refused, the client simply never authenticated, and naming an error
+ * invites it to handle one. That is why this answers with no body rather than the OAuth error shape.
+ *
+ * RFC 9449 §7.1 adds the second scheme for a resource that accepts DPoP-bound tokens — its Figure 17
+ * is this exact response — with `algs` so a client knows what to sign a proof with. Advertised only
+ * when DPoP is switched on, since offering a scheme this deployment will not honour is worse than
+ * offering one.
+ */
+function unauthenticatedChallenge() {
+	const bearer = `Bearer realm="${ISSUER}"`;
+	if (!ApplicationConfig['dpop.enabled']) {
+		return bearer;
+	}
+	return `${bearer}, DPoP algs="${dPoPSigningAlgValues.join(' ')}"`;
+}
+
+/*
  * A schema refusal on the protocol surface answers 400, not the validator's 422.
  *
  * The body was already right — `getObjFromError` renders a VALIDATION code as `invalid_request` with
@@ -306,9 +354,17 @@ export async function errorHandler(obj: ErrorContext) {
 	}
 
 	const isOIDError = error instanceof OIDCProviderError;
+	const unauthenticatedResource = lacksResourceCredential(
+		code,
+		route,
+		error,
+		request
+	);
 	const status = isOIDError
 		? statusFor(error, route)
-		: schemaRefusalStatus(code, route, set.status);
+		: unauthenticatedResource
+			? 401
+			: schemaRefusalStatus(code, route, set.status);
 	if (status !== set.status) {
 		set.status = status;
 	}
@@ -371,6 +427,17 @@ export async function errorHandler(obj: ErrorContext) {
 		// A use_dpop_nonce error is only useful with a nonce attached, and one can always be produced —
 		// so there is no longer a branch here that turns a recoverable protocol error into a 500.
 		set.headers['DPoP-Nonce'] = DPoPNonces.fabrica().nextNonce();
+	}
+
+	if (unauthenticatedResource) {
+		const challenge = unauthenticatedChallenge();
+		set.headers['WWW-Authenticate'] = challenge;
+		// Ahead of the HTML branch: a protected resource answers a missing credential the same way
+		// whatever the caller's Accept says, and an error page is error information.
+		return new Response(null, {
+			status: 401,
+			headers: { 'WWW-Authenticate': challenge }
+		});
 	}
 
 	const accept = request.headers.get('accept') || '';

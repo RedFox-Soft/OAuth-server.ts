@@ -115,11 +115,8 @@ describe('UserInfo', () => {
 		if (!error) {
 			throw new Error('Have to be exception');
 		}
-		expect(error.status).toBe(400);
-		expect(error.value).toEqual({
-			error: 'invalid_request',
-			error_description: 'no access token provided'
-		});
+		expect(error.status).toBe(401);
+		expect(error.value).toBe('');
 	});
 
 	it('refuses a token whose scope omits openid', async function () {

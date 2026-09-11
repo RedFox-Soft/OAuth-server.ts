@@ -1,5 +1,6 @@
 import { describe, it, beforeAll, expect } from 'bun:test';
 import bootstrap, { agent } from '../test_helper.js';
+import { ISSUER } from 'lib/configs/env.js';
 
 /**
  * @proves UserInfo refuses an absent or malformed credential with a bearer challenge rather than
@@ -13,15 +14,20 @@ describe('providing Bearer token', () => {
 	describe('invalid requests', () => {
 		it('UserInfo without a credential is refused with a bearer challenge', async function () {
 			// @ts-expect-error intentionally calling with no args to test the missing-token path
-			const { error } = await agent.userinfo.get();
+			const { error, response } = await agent.userinfo.get();
 			if (!error) {
 				throw new Error('Have to be exception');
 			}
-			expect(error.status).toBe(400);
-			expect(error.value).toEqual({
-				error: 'invalid_request',
-				error_description: 'no access token provided'
-			});
+			expect(error.status).toBe(401);
+			expect(response.headers.get('www-authenticate')).toBe(
+				`Bearer realm="${ISSUER}"`
+			);
+			/*
+			 * RFC 6750 §3.1: a request that carried no credentials at all is told nothing about an
+			 * error, because it made none — it was never authenticated. Naming one invites a client to
+			 * handle a failure that did not happen.
+			 */
+			expect(error.value).toBe('');
 		});
 
 		it('refuses an Authorization header with only one part', async function () {

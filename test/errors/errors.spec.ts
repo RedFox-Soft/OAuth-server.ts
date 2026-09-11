@@ -17,15 +17,23 @@ describe('default error behavior', () => {
 		await bootstrap(import.meta.url);
 	});
 
+	/*
+	 * The trigger is a credential that is present and unusable, not an absent one. A request carrying
+	 * no credentials at all is the one error this pipeline deliberately does not negotiate: RFC 6750
+	 * §3.1 has it answered with a challenge and no error information whatever the caller accepts, so
+	 * it cannot demonstrate the choice these cases are about.
+	 */
+	const unusable = { authorization: 'Bearer not-a-token' };
+
 	it('responds with json when no Accept header', async () => {
-		const { response } = await agent.userinfo.post({});
+		const { response } = await agent.userinfo.post({}, { headers: unusable });
 		expect(response.headers.get('content-type')).toMatch(/json/);
 	});
 
 	it('responds with json when */* header', async () => {
 		const { response } = await agent.userinfo.post(
 			{},
-			{ headers: { accept: '*/*' } }
+			{ headers: { ...unusable, accept: '*/*' } }
 		);
 		expect(response.headers.get('content-type')).toMatch(/json/);
 	});
@@ -33,7 +41,7 @@ describe('default error behavior', () => {
 	it('responds with html when browser like header', async () => {
 		const { response } = await agent.userinfo.post(
 			{},
-			{ headers: { accept: browserAccept } }
+			{ headers: { ...unusable, accept: browserAccept } }
 		);
 		expect(response.headers.get('content-type')).toMatch(/html/);
 	});

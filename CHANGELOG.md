@@ -172,6 +172,13 @@ metadata.
   after its length, and both survived for the same reason: nothing this server or its suite produces
   is outside base64url, so it could never trip over itself.
 
+- userinfo: a request carrying no credentials is answered the way a protected resource must answer
+  one — `401` with a `WWW-Authenticate` challenge, and no error information at all. It was being
+  treated as an ordinary schema refusal, so the caller got a status RFC 6750 does not use and no
+  challenge to act on; the challenge advertises `DPoP` alongside `Bearer` only when DPoP is switched
+  on. A credential that is present and unusable is unchanged: that one is refused with `invalid_token`
+  and keeps its error body.
+
 - protocol: a request the schema refuses now answers `400`, not the framework validator's `422`. The
   body was already correct (`invalid_request` with a description); only the status was the
   framework's rather than the protocol's, and RFC 6749 §5.2 defines it as `400`. Scoped to the OAuth
