@@ -236,7 +236,7 @@ function pagePolicy(
 	/*
 	 * The gate here is external scripts specifically, not "code that runs after the document is
 	 * served" — the form_post auto-submit page and the device input page both run inline code after
-	 * serving (a module script, an onfocus handler), and both are hashed rather than excepted, because
+	 * serving (an auto-submit script, an onfocus handler), and both are hashed rather than excepted, because
 	 * that code is itself in the document. An external script is different: it is a linked bundle whose
 	 * post-serve behaviour the document cannot describe — specifically @ant-design/icons'
 	 * useInsertStyles, which injects a block that does not exist yet and therefore cannot be hashed. A

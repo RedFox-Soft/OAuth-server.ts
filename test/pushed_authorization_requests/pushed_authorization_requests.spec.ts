@@ -209,7 +209,7 @@ describe('Pushed Request Object', async () => {
 					);
 					expect(error?.status).toBe(400);
 					expect(error?.value).toEqual({
-						error: 'invalid_redirect_uri',
+						error: 'invalid_request',
 						error_description:
 							"redirect_uri did not match any of the client's registered redirectUris"
 					});
@@ -415,7 +415,7 @@ describe('Pushed Request Object', async () => {
 							});
 						});
 
-						it('remaps invalid_redirect_uri error to invalid_request', async function () {
+						it('refuses a pushed request naming an unregistered redirect_uri with invalid_request', async function () {
 							const code_verifier = randomBytes(32).toString('base64');
 							const code_challenge = createHash('sha256')
 								.update(code_verifier)
@@ -438,7 +438,7 @@ describe('Pushed Request Object', async () => {
 							);
 							expect(error?.status).toBe(400);
 							expect(error?.value).toEqual({
-								error: 'invalid_redirect_uri',
+								error: 'invalid_request',
 								error_description:
 									"redirect_uri did not match any of the client's registered redirectUris"
 							});
@@ -938,7 +938,7 @@ describe('Pushed Request Object', async () => {
 							});
 						});
 
-						it('remaps invalid_redirect_uri error to invalid_request', async function () {
+						it('refuses a request object naming an unregistered redirect_uri with invalid_request_object', async function () {
 							const code_verifier = randomBytes(32).toString('base64');
 							const code_challenge = createHash('sha256')
 								.update(code_verifier)
@@ -972,7 +972,7 @@ describe('Pushed Request Object', async () => {
 							);
 							expect(error?.status).toBe(400);
 							expect(error?.value).toEqual({
-								error: 'invalid_redirect_uri',
+								error: 'invalid_request_object',
 								error_description:
 									"redirect_uri did not match any of the client's registered redirectUris"
 							});

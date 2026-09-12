@@ -14,7 +14,7 @@ import nanoid from 'lib/helpers/nanoid.js';
 
 /**
  * @proves A FAPI 2 deployment narrows what it accepts: a client assertion audienced at the
- * issuer, and a request object bounded by exp and nbf.
+ * issuer identifier and nowhere else, and a request object bounded by exp and nbf.
  */
 describe('FAPI 2.0 Final behaviours', async () => {
 	const setup = await bootstrap(import.meta.url, { config: 'fapi2' });
@@ -35,6 +35,76 @@ describe('FAPI 2.0 Final behaviours', async () => {
 					sub: 'client',
 					iss: 'client',
 					aud: ISSUER + '/token',
+					exp: epochTime() + 60,
+					nbf: epochTime()
+				})
+					.setProtectedHeader({ alg: 'ES256' })
+					.sign(keypair.privateKey),
+				code_challenge_method: 'S256',
+				code_challenge: crypto.hash('sha256', 'foo', 'base64url')
+			});
+			expect(res.status).toBe(401);
+			if (!res.error) throw new Error('expected error response');
+			expect(res.error.value).toEqual({
+				error: 'invalid_client',
+				error_description: 'client authentication failed'
+			});
+
+			expect(spy.mock.calls[0][0].error_detail).toBe(
+				'audience (aud) must equal the issuer identifier url'
+			);
+		});
+
+		it('refuses a client assertion whose audience is a list', async function () {
+			const spy = mock();
+			eventBus.on('pushed_authorization_request.error', spy);
+
+			const res = await agent.par.post({
+				scope: 'openid',
+				client_id: 'client',
+				response_type: 'code',
+				client_assertion_type:
+					'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+				client_assertion: await new SignJWT({
+					jti: crypto.randomUUID(),
+					sub: 'client',
+					iss: 'client',
+					aud: [ISSUER, `${ISSUER}/token`],
+					exp: epochTime() + 60,
+					nbf: epochTime()
+				})
+					.setProtectedHeader({ alg: 'ES256' })
+					.sign(keypair.privateKey),
+				code_challenge_method: 'S256',
+				code_challenge: crypto.hash('sha256', 'foo', 'base64url')
+			});
+			expect(res.status).toBe(401);
+			if (!res.error) throw new Error('expected error response');
+			expect(res.error.value).toEqual({
+				error: 'invalid_client',
+				error_description: 'client authentication failed'
+			});
+
+			expect(spy.mock.calls[0][0].error_detail).toBe(
+				'audience (aud) must equal the issuer identifier url'
+			);
+		});
+
+		it('refuses a client assertion audienced at the endpoint receiving it', async function () {
+			const spy = mock();
+			eventBus.on('pushed_authorization_request.error', spy);
+
+			const res = await agent.par.post({
+				scope: 'openid',
+				client_id: 'client',
+				response_type: 'code',
+				client_assertion_type:
+					'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+				client_assertion: await new SignJWT({
+					jti: crypto.randomUUID(),
+					sub: 'client',
+					iss: 'client',
+					aud: `${ISSUER}/par`,
 					exp: epochTime() + 60,
 					nbf: epochTime()
 				})

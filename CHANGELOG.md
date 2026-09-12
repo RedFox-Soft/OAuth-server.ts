@@ -59,6 +59,23 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   nobody executes needs no signature — held for the changelog but not for reference data another
   project's build reads, which is worth a statement naming the commit and the run behind it.
 
+### Fixed
+
+- conformance: two findings from the OpenID Foundation suite runs. The `form_post` delivery page
+  submits itself with a classic script placed after the form rather than a module script in `<head>`,
+  so a user agent that runs scripts but not ES modules — some embedded webviews, and the suite's own
+  scripted browser — is no longer left on a page with no way forward at all; the module-capable and
+  scripting-disabled paths are unchanged. And a pushed authorization request refused for an
+  unregistered `redirect_uri` now answers `invalid_request`, or `invalid_request_object` where the
+  value arrived inside a request object, instead of `invalid_redirect_uri` — a dynamic-registration
+  code (RFC 7591) that has no definition in a PAR response, where RFC 9126 §2.3 prints the former.
+  The authorization endpoint and dynamic registration are untouched. A third item reported alongside
+  them — that client assertion audiences are accepted too widely — was investigated and is not a
+  defect: RFC 9126 §2 requires a non-FAPI deployment to accept its issuer identifier, token endpoint
+  URL and PAR endpoint URL alike, and the narrow FAPI 2.0 rule was already implemented and is now
+  covered for all three audience shapes. `CONFORMANCE.md` records the correction and names
+  `fapi.enabled` among the settings a FAPI conformance target needs.
+
 ## [0.2.0] - 2026-09-08
 
 Two things define this release. The server is now an authorization server **for** third-party MCP

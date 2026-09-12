@@ -42,11 +42,19 @@ export function formPost(
 	const form = renderForm(action, inputs);
 	const script = `document.forms[0].submit();`;
 
+	/*
+	 * WHY the script sits after the form rather than in <head>. It has to run once `document.forms[0]`
+	 * exists, and there are only two ways to arrange that: defer it, or put it past the form. Deferring
+	 * an inline script means `type="module"`, since `defer` is ignored on one — and a module script is
+	 * skipped outright by a user agent that runs scripts but does not implement modules, which
+	 * <noscript> does not render for either. That class (HtmlUnit, some embedded webviews) was left
+	 * with no way forward at all. Position is what makes the classic type safe here; moving this back
+	 * into <head> restores the dead end.
+	 */
 	const html = `<!DOCTYPE html>
 <html><head>
   <title>Submitting Callback</title>
-  <script type="module">${script}</script>
-</head><body>${renderToStaticMarkup(form)}</body></html>`;
+</head><body>${renderToStaticMarkup(form)}<script>${script}</script></body></html>`;
 
 	return htmlResponse(html);
 }

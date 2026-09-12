@@ -63,6 +63,59 @@ describe('/auth', () => {
 					);
 				});
 
+				it('delivers the response in a browser that runs classic scripts but not modules', async function () {
+					const auth = new AuthorizationRequest({
+						response_mode: 'form_post',
+						scope: 'openid'
+					});
+
+					const { data, response } = await authRequest(auth);
+					expect(response.status).toBe(200);
+
+					/*
+					 * A user agent that runs scripts but not ES modules skips a module script outright,
+					 * and <noscript> does not render for it either — so a module here leaves that class
+					 * with no way forward at all.
+					 */
+					expect(data).not.toContain('type="module"');
+
+					const script = data.indexOf(
+						'<script>document.forms[0].submit();</script>'
+					);
+					expect(script).toBeGreaterThan(-1);
+					// document.forms[0] must already exist when a classic script runs.
+					expect(script).toBeGreaterThan(data.indexOf('</form>'));
+				});
+
+				it('carries exactly one auto-submit script', async function () {
+					const auth = new AuthorizationRequest({
+						response_mode: 'form_post',
+						scope: 'openid'
+					});
+
+					const { data } = await authRequest(auth);
+
+					// Two would post the response twice, and the client would redeem one code twice.
+					expect(data.match(/document\.forms\[0\]\.submit\(\)/g)).toHaveLength(
+						1
+					);
+				});
+
+				it('offers a manual control when scripting is unavailable', async function () {
+					const auth = new AuthorizationRequest({
+						response_mode: 'form_post',
+						scope: 'openid'
+					});
+
+					const { data } = await authRequest(auth);
+
+					const opening = data.indexOf('<noscript>');
+					expect(opening).toBeGreaterThan(-1);
+					expect(data.slice(opening, data.indexOf('</noscript>'))).toContain(
+						'type="submit"'
+					);
+				});
+
 				it('sanitizes the action attribute', async function () {
 					const auth = new AuthorizationRequest({
 						response_mode: 'form_post',
