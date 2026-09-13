@@ -11,6 +11,15 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- conformance: `pkce.required`, a super-admin setting that relaxes the proof-of-possession demand for
+  clients which authenticate at the token endpoint. On by default, so nothing changes for a
+  deployment that leaves it alone. It exists because the OpenID Connect Basic profile sends a code
+  challenge in one of its 35 modules, so the other 34 were refused before they tested anything, and
+  OAuth 2.1 §7.5.1.1 provides for exactly this carve-out — for a confidential client only. A client
+  registered with no client authentication is still refused for omitting a challenge whatever the
+  setting says, which keeps this server's own public console and agent clients protected by an
+  operator's conformance choice.
+
 - test: coverage for six properties the suite claimed and did not hold — the MongoDB secret round trip
   through the real BSON codec, the PostgreSQL document-column encoding, the timing of both
   constant-time secret comparisons, the discovery document following `ISSUER` rather than a forwarded

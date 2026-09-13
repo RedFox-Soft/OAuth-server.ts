@@ -129,6 +129,27 @@ describe('PKCE RFC7636', () => {
 			);
 		});
 
+		it('refuses a client that authenticates at the token endpoint and omits a code challenge', async function () {
+			const auth = new AuthorizationRequest({
+				client_id: 'confidential-client',
+				response_type: 'code',
+				scope: 'openid'
+			});
+			auth.params.code_challenge = undefined;
+			auth.params.code_challenge_method = undefined;
+
+			const { response } = await agent.auth.get({
+				query: auth.params,
+				headers: { cookie }
+			});
+			auth.validatePresence(response, ['error', 'error_description', 'state']);
+			auth.validateError(response, 'invalid_request');
+			auth.validateErrorDescription(
+				response,
+				'Authorization Server policy requires PKCE to be used for this request'
+			);
+		});
+
 		it('stores codeChallenge and codeChallengeMethod in the code', async function () {
 			const auth = new AuthorizationRequest({
 				scope: 'openid',

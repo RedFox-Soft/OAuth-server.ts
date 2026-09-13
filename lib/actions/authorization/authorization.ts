@@ -144,7 +144,7 @@ async function authorizationActionHandler(oidc) {
 	checkScope(oidc, true);
 	checkOpenidScope(oidc);
 	checkRedirectUri(oidc);
-	authorizationPKCE(oidc.params);
+	authorizationPKCE(oidc);
 	await checkClaims(oidc);
 	await checkRar(oidc);
 	await checkResource(oidc);
@@ -254,7 +254,7 @@ export const par = new Elysia()
 			checkScope(oidc, true);
 			checkOpenidScope(oidc);
 			checkRedirectUri(oidc);
-			authorizationPKCE(oidc.params);
+			authorizationPKCE(oidc);
 			await checkClaims(oidc);
 			await checkRar(oidc);
 			await checkResource(oidc);

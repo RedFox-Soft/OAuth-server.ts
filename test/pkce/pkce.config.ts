@@ -9,6 +9,11 @@ merge(config.features, {
 	revocation: { enabled: true }
 });
 
+/*
+ * Order is load-bearing: AuthorizationRequest defaults client_id to clients[0], so the public client
+ * stays first and every case written against it keeps meaning what it meant. The confidential client
+ * is appended, never prepended.
+ */
 export const clients = [
 	{
 		clientId: 'client',
@@ -16,6 +21,14 @@ export const clients = [
 		grantTypes: ['authorization_code', 'refresh_token'],
 		redirectUris: ['https://rp.example.com/cb'],
 		token_endpoint_auth_method: 'none'
+	},
+	{
+		clientId: 'confidential-client',
+		clientSecret: 'confidential-secret',
+		responseTypes: ['code'],
+		grantTypes: ['authorization_code', 'refresh_token'],
+		redirectUris: ['https://confidential.example.com/cb'],
+		token_endpoint_auth_method: 'client_secret_basic'
 	}
 ];
 

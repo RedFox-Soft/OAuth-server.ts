@@ -63,13 +63,14 @@ at all (see below), `form_post` is not a weaker path than `query`.
 
 These are not certifications. They are local, unofficial runs whose value is the list below.
 
-**Three conditions made those numbers honest at the time, and one of them has since become a property
+**Three conditions made those numbers honest at the time, and two of them have since become properties
 of the release.** PKCE enforcement was disabled by a local patch that was not committed — see the
-first finding for why nothing else could be measured otherwise. Form Post additionally needed the
-auto-submit page's script moved, which was likewise uncommitted then and is committed now. And two
-features off by default were turned on
-(`claimsParameter.enabled`, `requestObjects.enabled`); with them off, three further modules fail for
-a reason that is configuration rather than defect.
+first finding for why nothing else could be measured otherwise; that patch is now the `pkce.required`
+setting, so the condition is a supported configuration rather than an uncommitted edit. Form Post
+additionally needed the auto-submit page's script moved, which was likewise uncommitted then and is
+committed now. And two features off by default were turned on (`claimsParameter.enabled`,
+`requestObjects.enabled`); with them off, three further modules fail for a reason that is
+configuration rather than defect.
 
 "Review" is not a failure. Those modules require a person to look at a screenshot of a page the
 server rendered; the server behaved correctly in each. See _Screenshots_ below.
@@ -78,14 +79,37 @@ server rendered; the server behaved correctly in each. See _Screenshots_ below.
 
 ### Mandatory PKCE makes the Basic profile unreachable
 
-`authorizationPKCE` ([`lib/helpers/pkce.ts`](lib/helpers/pkce.ts)) is called unconditionally from
-both authorization paths, and there is no setting for it in `ApplicationConfig` or in the admin
+**Resolved by configuration.** The switch is `pkce.required`, on by default; see the correction below
+for what the finding got wrong.
+
+`authorizationPKCE` ([`lib/helpers/pkce.ts`](lib/helpers/pkce.ts)) was called unconditionally from
+both authorization paths, and there was no setting for it in `ApplicationConfig` or in the admin
 settings catalog. The Basic certification profile sends PKCE in exactly one of its 35 modules, so
-against an unmodified build every other module is refused with `invalid_request` before it can test
+against an unmodified build every other module was refused with `invalid_request` before it could test
 anything.
 
-This is a collision between an OAuth 2.1 position and an OpenID Connect profile, not a bug. Resolving
-it is a product decision: certification for Basic OP requires a switch that makes PKCE optional.
+The finding called this "a collision between an OAuth 2.1 position and an OpenID Connect profile"
+whose resolution "is a product decision". **The collision is real; the second half was wrong, and the
+correction narrowed what got built.** OAuth 2.1 already resolves it, and resolves it in favour of
+exactly this switch — §7.5.1.1 lifts the demand when _both_ criteria hold: the client is a
+confidential client, and the server has reasonable assurance it implements the OpenID Connect `nonce`
+mechanism properly. RFC 9700 §2.1.1 states the same split from the other side: public clients **MUST**
+use PKCE, for confidential clients it is **RECOMMENDED**.
+
+So relaxing the demand for a confidential client is not a departure from OAuth 2.1 but a provision it
+makes, while relaxing it for a public client would be a departure from both documents — and no
+certification profile asks for one, since Basic and Form Post authenticate their clients with a
+secret. `pkce.required: false` therefore governs clients that authenticate at the token endpoint and
+nothing else; a client registered `token_endpoint_auth_method: 'none'` is refused for omitting a
+challenge whatever the setting says. That boundary is not incidental: the admin console client and the
+reserved MCP agent client are both public, so a wider switch would have let a conformance setting
+weaken sign-in to this server's own control plane.
+
+The second criterion is discharged by the operator's act of changing the setting, which is why its
+console description says what they are asserting rather than only what they are disabling. A
+per-request proxy — demand a `nonce` whenever the challenge is absent — was considered and rejected:
+`nonce` is OPTIONAL in the code flow under OIDC Core §3.1.2.1 and this very plan contains a module
+that omits it, so the proxy would re-erect the same wall one module further along.
 
 ### The authorization endpoint rejects unrecognized parameters
 
@@ -150,6 +174,41 @@ The registered codes `request_not_supported` and `request_uri_not_supported` are
 `lib/helpers/errors.ts` and are never used. The run did not fail on this only because the two
 relevant features were switched on; every deployment running the defaults emits an unregistered
 error code to real clients.
+
+### An essential `acr` claim locks the user in a login loop
+
+Not found by a run — found by reading the code behind the `acr` warning below, and confirmed by hand.
+The conformance suite cannot reach it, and that is the interesting part.
+
+Nothing ever assigns an ACR. The three places that build a login result
+([`lib/interactions/index.ts`](lib/interactions/index.ts)) set `accountId`, `transient` and sometimes
+`amr`, never `acr` — while everything downstream is already wired for it: `resume.ts` copies `acr`
+from the login result onto the session, the grant handlers copy it onto the token, and the ID token
+emits it. So `oidc.acr` is permanently `undefined`.
+
+The interaction policy's `essential_acrs` prompt
+([`lib/helpers/interaction_policy/prompts/login.ts`](lib/helpers/interaction_policy/prompts/login.ts))
+asks whether the requested values include `oidc.acr`. They never do, so the prompt is required; the
+user logs in; `oidc.acr` is still undefined; the prompt is required again. There is no guard for a
+prompt that stays unsatisfied.
+
+Measured against a local instance — five consecutive successful logins, each answered with a **new**
+interaction id and another login page, no end:
+
+| Authorization request                              | Outcome              |
+| -------------------------------------------------- | -------------------- |
+| no claims                                          | callback with a code |
+| `acr_values=…` (produces a _non_-essential claim)  | callback with a code |
+| `claims={"id_token":{"acr":{"essential":true,…}}}` | login page, forever  |
+
+The middle row is why the suite only warns: `assign_claims.ts` turns `acr_values` into a
+non-essential claim, and the prompt's `check` short-circuits on `!request?.essential` before it can
+compare anything. An essential ACR request is ordinary — it is how a relying party asks for step-up
+authentication — and against this server it cannot complete. Correct credentials, endless login
+screen, nothing logged as an error.
+
+Assigning an ACR at authentication closes it, which makes this the same work item as the gap below
+rather than a separate one.
 
 ### Two SHOULD-level gaps
 
@@ -451,6 +510,11 @@ suite says so in the failure text. One module aborted inside the suite's own Jav
 A run against a default instance fails for reasons that are settings, and each one reads in the test
 log exactly like a server defect. The conformance deployment needs all of:
 
+- **`pkce.required: false`.** On by default, and with it on 34 of the Basic profile's 35 modules are
+  refused before they test anything — the finding above, and the one setting without which that plan
+  cannot be attempted at all. It relaxes the demand for clients that authenticate at the token
+  endpoint only, which is all a static-client run needs. Boot-only: **restart after changing it**, or
+  the run produces refusals that read exactly like a server defect.
 - **Claim-defined scopes.** `profile`, `email`, `address`, `phone` and their claims, or the five
   `oidcc-scope-*` modules fail. The shipped default declares `openid` and `offline_access` only.
 - **`claimsParameter.enabled` and `requestObjects.enabled`.** Off by default; with them off the

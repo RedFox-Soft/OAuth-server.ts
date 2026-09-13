@@ -132,6 +132,7 @@ describe('settings catalog presentation metadata', () => {
 				'conformIdTokenClaims',
 				'cors.enabled',
 				'par.allowUnregisteredRedirectUris',
+				'pkce.required',
 				'rateLimit.enabled',
 				'rateLimit.trustedProxy'
 			].sort()

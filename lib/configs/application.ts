@@ -21,6 +21,40 @@ export const ApplicationConfig = {
 	'authorization.allowOmittingSingleRegisteredRedirectUri': false,
 
 	/*
+	 * pkce.required
+	 *
+	 * title: Require a PKCE code challenge on every authorization request.
+	 *
+	 * description: When enabled — the default — an authorization request for `response_type=code` must
+	 * carry a `code_challenge`. Disabling it relaxes that demand for clients that authenticate at the
+	 * token endpoint, and for those clients only.
+	 *
+	 * This flag exists because the OpenID Connect Basic certification profile sends a challenge in one
+	 * of its thirty-five modules, so the other thirty-four are refused before they test anything. It is
+	 * not a departure from OAuth 2.1: §7.5.1.1 defines the carve-out itself, permitting an authorization
+	 * server to stop enforcing `code_challenge`/`code_verifier` when BOTH of two criteria hold — the
+	 * client is a confidential client, and "in the specific deployment and the specific request, there
+	 * is reasonable assurance by the authorization server that the client implements the OpenID Connect
+	 * nonce mechanism properly". RFC 9700 §2.1.1 states the same split from the other side: public
+	 * clients MUST use PKCE, for confidential clients it is RECOMMENDED.
+	 *
+	 * The two criteria are discharged differently, and that asymmetry is the whole design:
+	 *
+	 * The FIRST is enforced here, in code, per request, and cannot be switched off by anyone — a client
+	 * registered `token_endpoint_auth_method: 'none'` is refused for omitting a challenge whatever this
+	 * flag says (lib/helpers/pkce.ts). Two first-party clients on every instance are public, the admin
+	 * console and the reserved MCP agent, so a flag that reached them would let a conformance setting
+	 * weaken sign-in to this server's own control plane.
+	 *
+	 * The SECOND is the operator's declaration, made by turning this off, which is why the settings
+	 * catalog description says what they are asserting rather than only what they are disabling. A
+	 * per-request proxy — demand a `nonce` whenever the challenge is absent — was considered and
+	 * rejected: `nonce` is OPTIONAL in the code flow under OIDC Core 3.1.2.1 and the Basic plan contains
+	 * a module that omits it, so the proxy would re-erect the same wall one module further along.
+	 */
+	'pkce.required': true,
+
+	/*
 	 * pushedAuthorizationRequests
 	 *
 	 * title: [`RFC9126`](https://www.rfc-editor.org/rfc/rfc9126.html) - OAuth 2.0 Pushed Authorization Requests (`PAR`)

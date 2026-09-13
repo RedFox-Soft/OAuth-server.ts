@@ -71,12 +71,14 @@ describe('the discovery document of a deployment that has configured nothing', (
 		expect(doc.jwks_uri).toStartWith(`${doc.issuer}/`);
 	});
 
-	it('offers PKCE with S256, which OAuth 2.1 requires of every client', async () => {
+	it('offers PKCE with S256', async () => {
 		const doc = (await agent['.well-known']['openid-configuration'].get())
 			.data as Record<string, string[]>;
 
-		// Advertised by default rather than only when something is switched on: a client that cannot
-		// see S256 here has no way to know PKCE is mandatory.
+		// Advertised unconditionally, in both states of `pkce.required`: the member says which methods
+		// are supported, and support does not change when the demand is relaxed. Whether a proof is
+		// mandatory for a given client is deliberately NOT advertised — no metadata member is
+		// registered for it, so a client learns it by being refused.
 		expect(doc.code_challenge_methods_supported).toContain('S256');
 	});
 });

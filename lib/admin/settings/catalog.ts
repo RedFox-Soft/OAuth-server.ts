@@ -146,6 +146,18 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 	},
 
 	{
+		key: 'pkce.required',
+		domain: 'request-security',
+		group: 'PKCE',
+		label: 'Require a PKCE code challenge',
+		summary: 'Demand proof of possession on every authorization request',
+		type: 'boolean',
+		risk: 'security',
+		description:
+			'On by default, and it governs only clients that authenticate at the token endpoint: a client registered with no client authentication is always required to send a code_challenge, and no setting here changes that. Turning this off is your assertion that your authenticating clients implement the OpenID Connect nonce mechanism correctly — OAuth 2.1 permits dropping the demand only for a confidential client and only where the authorization server has that assurance. Prefer leaving it on: a code challenge is the stronger protection, because it lets this server refuse an injected authorization code before issuing any token, where nonce leaves the client to reject an ID token afterwards. The reason to turn it off is OpenID Connect Basic certification, whose test suite sends a challenge in one module of thirty-five.'
+	},
+
+	{
 		key: 'par.enabled',
 		domain: 'request-security',
 		group: 'PAR',
