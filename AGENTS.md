@@ -280,6 +280,7 @@ no file order can change them:
 3. Add a feature flag in `lib/configs/` if it should be opt-in.
 4. Declare a storage area in `lib/consts/storage_inventory.ts` if the grant needs persistence — both provisioning scripts read it, and the drift guard fails until it is there.
 5. Write tests under `test/<name>/` with a matching `*.config.ts`.
+6. Correct any wiki page the grant falsifies, and add one if it carries a decision worth keeping. No guard fails for this — see **LLM Wiki** below.
 
 ## Adding an administrative operation
 
@@ -300,6 +301,8 @@ The admin routes are the definition; the MCP surface follows from them.
    `test/mcp/confirmation_matrix.spec.ts` covers it the moment it is classified.
 5. Run `bun test test/mcp/ test/admin/`. The guards that will complain at you — parity, audit
    classification, argument-name collisions, the secrecy sweep — are doing the job they were written for.
+6. Correct any wiki page the operation falsifies. Nothing fails if you skip it, which is precisely why
+   it is listed beside the guards that do — see **LLM Wiki** below.
 
 See `wiki/concepts/admin-mcp-control-plane.md` before changing anything in `lib/mcp/`; it records four
 traps that each cost a debugging session.
@@ -315,6 +318,8 @@ traps that each cost a debugging session.
    a parameter it does not define, and nothing fails if you forget — a parameter your schema omits
    is now ignored, so a parameter you mean to **refuse** must be declared with `refusedParam(name)`.
    See `wiki/concepts/unknown-request-parameters.md`.
+6. Correct any wiki page the endpoint falsifies, and add one if it carries a decision worth keeping —
+   see **LLM Wiki** below.
 
 ## The website
 
@@ -400,7 +405,18 @@ manually. The site has no test suite by decision: `cd website && bun run check
 
 This project maintains an LLM-curated wiki at `wiki/` following Andrej Karpathy's "LLM Wiki" pattern (https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f).
 
-Before answering questions that rely on knowledge accumulated in this project, read `wiki/index.md` (or the relevant shard under `wiki/indexes/` if the wiki has been sharded) and use its one-line summaries to find the pages you need. Cite with `[[wikilinks]]`. If the index does not surface good candidates, fall back to hybrid retrieval:
+**Read it before changing a subsystem, not only before answering a question about one.** Read
+`wiki/index.md` (or the relevant shard under `wiki/indexes/` if the wiki has been sharded) and use its
+one-line summaries to find the pages covering what you are about to touch. Cite with `[[wikilinks]]`.
+
+That trigger is deliberately wider than it used to be. It said "before answering questions", so a
+session that specified, planned and implemented a feature never fired it — and the wiki sat through
+the whole of `specs/045` asserting that `acr` is not set and `acr_values` requests are not honoured,
+in a section headed "What deliberately did not change", while the change that falsified it was being
+written. A subagent had even quoted the line. The pages most worth reading before a change are
+exactly the ones a change is most likely to falsify.
+
+If the index does not surface good candidates, fall back to hybrid retrieval:
 
 ```bash
 python wiki/bin/wiki.py search "query terms" --json   # add --no-embed for lexical-only BM25
@@ -409,6 +425,16 @@ python wiki/bin/wiki.py search "query terms" --json   # add --no-embed for lexic
 Run every wiki script through `wiki/bin/wiki.py` (`search`, `lint`, `stats`, `setup`, `graph-extract`, `graph-lint`, `graph-query`) — it resolves the plugin's versioned script path, supplies the wiki directory, and forces UTF-8. Calling the plugin scripts directly with bare `python` silently downgrades search to lexical and breaks the graph scripts.
 
 Relational questions — what links to what, which pages depend on a subsystem, the path between two pages — can consult the compiled graph instead of reading pages: `python wiki/bin/wiki.py graph-query neighbors --node concept:<slug>` (also `edges`, `facts`, `path`). Rebuild it with `graph-extract` after an ingest that adds typed `graph.relationships`.
+
+**A change that falsifies a wiki claim corrects it in the same change.** This is the half that had no
+trigger at all: reading was asked for, writing was left to whoever remembered to run `/wiki:ingest`.
+Before you finish, `grep -rn "\bterm\b" wiki/ --include=*.md` for the names your change touched, read
+what comes back, and fix what is now false. A stale page is worse than a missing one — it answers
+confidently, and the reader with the most at stake is the one deciding whether the behaviour already
+exists.
+
+A correction is a `str_replace`, not a rewrite, and it says what changed and at which commit. A
+change big enough to deserve a page of its own is an ingest, below.
 
 To add a new source, follow the `llm-wiki` skill's ingest workflow: decide placement under `wiki/sources/`, `wiki/entities/`, `wiki/concepts/`, or `wiki/synthesis/`; identify touched pages and make surgical `str_replace` updates rather than rewrites; update the index; append a one-line entry to `wiki/log.md`.
 
