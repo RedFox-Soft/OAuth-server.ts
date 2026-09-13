@@ -36,7 +36,9 @@ by reference (RFC 9101), which this server does not implement and refuses with t
 `request_uri_not_supported`.
 
 The auto-submit change Form Post needed in order to run at all is now committed — see that finding
-below.
+below. One of the two SHOULD-level warnings those plans report, `oidcc-userinfo-post-body`, has since
+been fixed as well, so both counts should read one on the next run; the numbers above are left as the
+run produced them rather than adjusted by prediction.
 
 **The original run, before any of it was fixed:**
 
@@ -151,8 +153,22 @@ error code to real clients.
 
 ### Two SHOULD-level gaps
 
-`/userinfo` does not accept the access token in a form-encoded POST body, which OpenID Connect Core
-§5.3.1 describes alongside the header form. The header form works.
+**The first is fixed.** `/userinfo` did not accept the access token in a form-encoded POST body,
+which OpenID Connect Core §5.3.1 describes alongside the header form by way of RFC 6750 §2.2; only
+the header form worked. It now accepts either, under the conditions RFC 6750 §2.2 attaches — the
+method is POST and the body is form-encoded — and refuses a request that uses both at once with the
+`invalid_request` §3.1 specifies for it. The query-parameter form of §2.3 is still not implemented
+and is not meant to be: OAuth 2.1 removes it, and a token in a URL reaches access logs, the `Referer`
+header and browser history.
+
+Two things came out of the same change and are worth recording, because neither was in the report.
+The `authorization` header could no longer be required by the route's schema, so the specified answer
+to a request carrying no credential at all — RFC 6750 §3's challenge with no error information — now
+comes from a marker the handler raises rather than from a schema refusal; the response is byte for
+byte what it was. And the DPoP proof check on that route asserted `htm: "GET"` whatever the request
+method was, so every conforming proof a `POST /userinfo` could carry was refused as an `htm`
+mismatch. That was a defect on a path that already existed, unrelated to the body form, and unnoticed
+because nothing exercised it.
 _Module: `oidcc-userinfo-post-body` (warning)._
 
 No `acr` claim is returned when a request carries `acr_values`. This looks like a consequence of

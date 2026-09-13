@@ -528,6 +528,32 @@ describe('features.dPoP', async () => {
 			}
 		});
 
+		it('returns claims over POST when the proof names POST', async function () {
+			const at = new AccessToken({
+				accountId: setup.getAccountId(),
+				grantId: setup.getGrantId(),
+				client: await Client.find('client'),
+				scope: 'openid'
+			});
+			at.setThumbprint('jkt', thumbprint);
+
+			const dpop = await at.save();
+
+			/*
+			 * OIDC Core §5.3.1 admits either method, so a proof's `htm` has to follow the request rather
+			 * than the endpoint: the userinfo route asserted `GET` whatever arrived, which refused every
+			 * conforming proof a POST could carry.
+			 */
+			const user = await agent.userinfo.post(null, {
+				headers: {
+					authorization: `DPoP ${dpop}`,
+					dpop: await DPoP(keypair, { accessToken: dpop, htm: 'POST' })
+				}
+			});
+			expect(user.status).toBe(200);
+			expect(user.data).toHaveProperty('sub');
+		});
+
 		it('a bound token presented without a matching proof is refused', async function () {
 			const at = new AccessToken({
 				accountId: setup.getAccountId(),

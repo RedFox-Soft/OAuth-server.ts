@@ -93,6 +93,21 @@ describe('UserInfo', () => {
 		expect(data).not.toHaveProperty('email_verified');
 	});
 
+	it('[post] returns user claims when the access token is in the form body', async function () {
+		const { data } = await agent.userinfo.post(
+			// @ts-expect-error a form-encoded body reaches the endpoint as an object
+			new URLSearchParams({ access_token }).toString(),
+			{
+				headers: {
+					['content-type']: 'application/x-www-form-urlencoded'
+				}
+			}
+		);
+		expect(data).toHaveProperty('sub');
+		expect(data).toHaveProperty('email');
+		expect(data).not.toHaveProperty('email_verified');
+	});
+
 	it('an unknown access token is refused as invalid_token', async function () {
 		const { error } = await agent.userinfo.get({
 			headers: {

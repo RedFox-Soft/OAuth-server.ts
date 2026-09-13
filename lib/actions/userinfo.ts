@@ -7,7 +7,12 @@ import {
 	setNonceHeader,
 	validateReplay
 } from '../helpers/validate_dpop.js';
-import { InvalidToken, InsufficientScope } from '../helpers/errors.ts';
+import {
+	InvalidToken,
+	InsufficientScope,
+	InvalidRequest,
+	MissingResourceCredential
+} from '../helpers/errors.ts';
 import { routeNames } from 'lib/consts/param_list.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { Claims } from 'lib/helpers/claims.js';
@@ -18,12 +23,71 @@ import { Grant } from 'lib/models/grant.js';
 import { OAuthError, UserinfoResponse } from 'lib/shared/response_schemas.js';
 import { accessTokenClientId, corsClientBased } from 'lib/plugins/cors.js';
 
-async function userInfo({ headers, set }) {
-	const oidc = new OIDCContext({}, headers);
+/*
+ * The access token a form-encoded request body carries, if it may carry one.
+ *
+ * RFC 6750 §2.2 defines this method for a request whose entity body is form-encoded and whose method
+ * is one that takes an entity body, so both conditions are checked rather than assumed from the
+ * presence of a parsed `access_token`. Neither is a formality: reading it from any other encoding
+ * would accept a credential over a transport the specification does not cover, and the content type
+ * is the only thing distinguishing the two.
+ */
+function formEncodedAccessToken(headers, body, method: string) {
+	if (method !== 'POST') {
+		return undefined;
+	}
+	const contentType = headers['content-type'] ?? '';
+	if (!contentType.startsWith('application/x-www-form-urlencoded')) {
+		return undefined;
+	}
+	const token = (body as Record<string, unknown> | undefined)?.access_token;
+	return typeof token === 'string' && token ? token : undefined;
+}
 
-	const accessTokenId = oidc.getAccessToken({
-		acceptDPoP: true
-	});
+/*
+ * Which of the two RFC 6750 methods presented the token, and a refusal when the answer is "both".
+ *
+ * §2 forbids a client using more than one, and §3.1 makes that `invalid_request` — so the question of
+ * which one the server would have believed never arises. The query-parameter method of §2.3 is not
+ * implemented and is not reached from here: OAuth 2.1 removes it, because a token in a URL reaches
+ * access logs, the Referer header and browser history.
+ */
+function resourceCredential(oidc, headers, body, method: string) {
+	const fromBody = formEncodedAccessToken(headers, body, method);
+
+	if (fromBody && headers.authorization) {
+		throw new InvalidRequest(
+			'access token transmitted by more than one method'
+		);
+	}
+
+	if (fromBody) {
+		/*
+		 * RFC 9449 has no body form: a DPoP-bound token is presented with the `DPoP` authentication
+		 * scheme, which only exists in the header. Refused rather than ignored, because a proof does
+		 * verify against a body-borne token's hash — so ignoring it would accept a sender-constrained
+		 * token through a transport no specification binds it to.
+		 */
+		if (headers.dpop) {
+			throw new InvalidRequest(
+				'a DPoP-bound access token must be sent in the Authorization header'
+			);
+		}
+		return fromBody;
+	}
+
+	if (!headers.authorization) {
+		throw new MissingResourceCredential();
+	}
+
+	return oidc.getAccessToken({ acceptDPoP: true });
+}
+
+async function userInfo({ headers, body, set, request }) {
+	const oidc = new OIDCContext({}, headers);
+	const { method } = request;
+
+	const accessTokenId = resourceCredential(oidc, headers, body, method);
 	/*
 	 * No catch to re-status the failure: a DPoP error raised at a resource server answers 401 rather
 	 * than the authorization server's 400 (RFC 9449 §7.1), and the error handler makes that correction
@@ -31,7 +95,7 @@ async function userInfo({ headers, set }) {
 	 */
 	const dPoP = await dpopValidate(headers.dpop, {
 		accessTokenId,
-		method: 'GET',
+		method,
 		route: routeNames.userinfo
 	});
 	setNonceHeader(set.headers, dPoP);
@@ -138,26 +202,44 @@ async function userInfo({ headers, set }) {
 	}
 }
 
+const responses = {
+	response: {
+		200: UserinfoResponse,
+		400: OAuthError,
+		401: OAuthError,
+		403: OAuthError
+	}
+};
+
 /*
- * Mounted ahead of the guard: the header schema below 422s a request with no `authorization`, and that
- * happens in the validation stage — after transform, before beforeHandle. Writing the CORS header at
- * transform is what puts it on that 422 and on the 401 DPoP-nonce challenge, which a browser client
- * must be able to read to perform its retry (RFC 9449 §7.1, §8).
+ * Mounted ahead of the guard: a schema refusal happens in the validation stage — after transform,
+ * before beforeHandle. Writing the CORS header at transform is what puts it on that refusal and on the
+ * 401 DPoP-nonce challenge, which a browser client must be able to read to perform its retry
+ * (RFC 9449 §7.1, §8).
+ *
+ * `authorization` is optional because OIDC Core §5.3.1 admits RFC 6750 §2.2, so a POST may carry the
+ * credential in its form body instead. Its absence is therefore not a schema question any more; the
+ * handler raises `MissingResourceCredential` when neither method presented one, and the shared error
+ * handler answers that with the same challenge the schema refusal used to produce.
  */
 export const userinfo = new Elysia()
 	.use(corsClientBased(accessTokenClientId))
 	.guard({
 		schema: 'standalone',
 		headers: t.Object({
-			authorization: t.String({
-				error: 'no access token provided'
-			}),
+			authorization: t.Optional(t.String()),
 			dpop: t.Optional(t.String())
 		})
 	})
-	.get(routeNames.userinfo, userInfo, {
-		response: { 200: UserinfoResponse, 401: OAuthError, 403: OAuthError }
-	})
+	.get(routeNames.userinfo, userInfo, responses)
 	.post(routeNames.userinfo, userInfo, {
-		response: { 200: UserinfoResponse, 401: OAuthError, 403: OAuthError }
+		...responses,
+		body: t.Optional(
+			t.Object(
+				{
+					access_token: t.Optional(t.String())
+				},
+				{ additionalProperties: true }
+			)
+		)
 	});

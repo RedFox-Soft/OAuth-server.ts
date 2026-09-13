@@ -16,7 +16,7 @@ import { dPoPSigningAlgValues } from 'lib/configs/jwaAlgorithms.js';
 import { InvalidDpopProof, UseDpopNonce } from 'lib/helpers/validate_dpop.js';
 import { DPoPNonces } from 'lib/helpers/dpop_nonces.js';
 import { FeatureDisabled } from 'lib/plugins/featureGate.js';
-import { RateLimited } from 'lib/helpers/errors.js';
+import { MissingResourceCredential, RateLimited } from 'lib/helpers/errors.js';
 import { captureFault } from 'lib/error_store/capture.js';
 import { fieldNamesOf } from 'lib/error_store/redact.js';
 import type { ErrorSurface } from 'lib/adapters/types.js';
@@ -182,10 +182,13 @@ function statusFor(error: OIDCProviderError, route: string) {
 /*
  * A protected-resource request that carried no credentials at all.
  *
- * The `authorization` header is required by the route's header schema, so its absence arrives as a
- * schema refusal like any other — which is exactly why this went unnoticed: the answer was whatever
- * the validator said (a 422, then a 400 once the correction above landed), and a resource server has
- * a specified answer here that is neither.
+ * It reaches here two ways, and both are here rather than in the resources because the specified
+ * answer belongs to the status, not to the endpoint. Where the `authorization` header is required by
+ * the route's header schema, its absence arrives as a schema refusal like any other — which is
+ * exactly why this went unnoticed: the answer was whatever the validator said (a 422, then a 400 once
+ * the correction above landed), and a resource server has a specified answer here that is neither.
+ * Where the credential may instead arrive in the form body (RFC 6750 §2.2) the header cannot be
+ * required, so nothing is refused by the schema and the handler raises the marker itself.
  *
  * Keyed on the *missing* header rather than on the route alone: a credential that is present and
  * unusable is a different outcome with a different error, and that one is raised by the handler.
@@ -196,10 +199,16 @@ function lacksResourceCredential(
 	error: unknown,
 	request: Request
 ) {
-	if (code !== 'VALIDATION' || !dpopProtectedResources.has(route)) {
+	if (!dpopProtectedResources.has(route)) {
 		return false;
 	}
 	if (request.headers.get('authorization')) {
+		return false;
+	}
+	if (error instanceof MissingResourceCredential) {
+		return true;
+	}
+	if (code !== 'VALIDATION') {
 		return false;
 	}
 	return getFirstError(error as ValidationError).path === '/authorization';

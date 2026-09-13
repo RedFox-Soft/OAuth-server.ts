@@ -35,6 +35,27 @@ export class InvalidToken extends OIDCProviderError {
 	}
 }
 
+/*
+ * A protected-resource request that presented no credential the server may read.
+ *
+ * It carries a code because every OIDCProviderError does, and none of it is ever serialised: RFC 6750
+ * §3.1 says such a response SHOULD NOT carry an error code or any other error information, so the
+ * shared handler answers the `unauthenticatedResource` marker with a challenge and an empty body. The
+ * marker exists because the credential may now arrive in the form body (RFC 6750 §2.2), which makes
+ * the `authorization` header optional — so its absence can no longer be a schema refusal, and the
+ * handler has to say so itself.
+ */
+export class MissingResourceCredential extends OIDCProviderError {
+	allow_redirect = false;
+
+	unauthenticatedResource = true;
+
+	constructor() {
+		super(401, 'invalid_request');
+		Error.captureStackTrace(this, this.constructor);
+	}
+}
+
 export class InvalidClientMetadata extends OIDCProviderError {
 	constructor(description: string, detail?: string) {
 		const message = description.startsWith('redirectUris')

@@ -61,6 +61,18 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- userinfo: the access token may be presented in a form-encoded POST body, which OpenID Connect Core
+  §5.3.1 describes alongside the header form. The body form is honoured only under the conditions
+  RFC 6750 §2.2 attaches — a POST whose body is form-encoded — and a request that uses both methods
+  at once is refused with the `invalid_request` §3.1 specifies; the query-parameter form of §2.3 is
+  still not implemented, since OAuth 2.1 removes it and a token in a URL reaches access logs and
+  browser history. A DPoP-bound token cannot be presented this way, because RFC 9449 defines no body
+  form for it. Two consequences of the same change: a request carrying no credential at all is still
+  answered with the bare RFC 6750 §3 challenge, now raised by the handler rather than by the header
+  schema, which can no longer require the header; and the route's DPoP proof check asserted
+  `htm: "GET"` whatever the method was, so a conforming proof on a `POST /userinfo` was refused as an
+  `htm` mismatch — an existing defect nothing had exercised.
+
 - conformance: two findings from the OpenID Foundation suite runs. The `form_post` delivery page
   submits itself with a classic script placed after the form rather than a module script in `<head>`,
   so a user agent that runs scripts but not ES modules — some embedded webviews, and the suite's own
