@@ -161,6 +161,20 @@ Those are the security boundaries, and they are unaffected by how many pods you 
 
 </Aside>
 
+<Aside type="caution" title="A saved setting applies to the pod that saved it">
+
+Settings are stored once, in the database, and every pod reads them at startup — but a save through
+the console or the management API takes effect in **the instance that served that request**. With
+several replicas behind a Service, the others keep running the values they started with until they
+restart. The settings page reports what is in force on the instance answering it, and names anything
+stored but not in force there.
+
+So on more than one replica, treat a settings change as you would a configuration change: save it,
+then roll the Deployment (`kubectl rollout restart`) to bring every pod onto the stored values. On a
+single replica there is nothing to do.
+
+</Aside>
+
 ## Admitting only images we signed
 
 Every release is signed with `cosign` over its digest, keyless, and carries an SBOM and build

@@ -284,8 +284,13 @@ describe('individual tool behaviours', () => {
 		expect(ApplicationConfig['registrationManagement.enabled']).toBe(before);
 	});
 
-	// US4 AS-4: a change that only takes effect on restart says so.
-	it('reports that a settings change needs a restart', async () => {
+	/*
+	 * US4 AS-4, and the constitution's parity requirement: the agent is told what is in force in the
+	 * same words the console is told it, because it is the same operation on the same route. An agent
+	 * reporting "saved" where the console reports "saved, and waiting" would be describing a different
+	 * server to the administrator who authorized it.
+	 */
+	it('tells the agent which settings a change put in force and which are waiting', async () => {
 		const { token } = await session();
 
 		const applied = await perform(token, 'settings_update', {
@@ -293,8 +298,15 @@ describe('individual tool behaviours', () => {
 		});
 
 		expect(applied.result?.isError).not.toBe(true);
-		const body = result(applied) as { restartRequired?: boolean };
-		expect(body.restartRequired).toBe(true);
+		const body = result(applied) as {
+			appliedKeys?: string[];
+			pendingRestartKeys?: string[];
+			notInForceKeys?: string[];
+		};
+		expect(body.appliedKeys).toContain('dpop.requireNonce');
+		expect(body.pendingRestartKeys).toEqual([]);
+		expect(body.notInForceKeys).toEqual([]);
+		expect(ApplicationConfig['dpop.requireNonce']).toBe(true);
 	});
 
 	// US3 AS-1 and AS-5: an end-user's lifecycle, and severing an identity without destroying the account.

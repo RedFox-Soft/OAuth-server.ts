@@ -4,7 +4,7 @@ title: 'The settings console is read from one descriptor'
 tags: [architecture, config, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-03
-updated: 2026-09-03
+updated: 2026-09-13
 graph:
   node_type: concept
   relationships:
@@ -91,14 +91,23 @@ against the real `windowFor` rather than restating its formula.
 ## Three save models became one, and the two that stayed say why
 
 The page had a header diff-save for catalogued settings plus SMTP's and Sentry's own buttons, with
-nothing to say which covered what. One save bar now replaces the header button: a count, a standing
-note that these apply **at restart**, a review drawer showing each pending change as old → new, and
-discard.
+nothing to say which covered what. One save bar now replaces the header button: a count, when the
+edits take effect, a review drawer showing each pending change as old → new, and discard.
 
-Restart was the most important fact on the page and was only ever reported *after* a save — the one
-moment it cannot be acted on. SMTP and Sentry keep their own buttons because they are separate
-endpoints, and now say "applies immediately" so the distinction between the boot-only
-`ApplicationConfig` surface and the runtime stores is visible rather than folklore.
+When a change takes effect was the most important fact on the page and was only ever reported *after*
+a save — the one moment it cannot be acted on. It is now stated before, and per setting: the save bar
+reads the class off the edits being saved, and the descriptor's `apply: 'restart'` (with its written
+`restartReason`) is what puts a setting in the other group. SMTP and Sentry keep their own buttons
+because they are separate endpoints.
+
+**Superseded, specs/046 (2026-09-13):** the standing "these apply at restart" note is gone, because
+the settings themselves no longer do. A save assigns the change onto the running `ApplicationConfig`
+(`applySettings`), so the notice appears only for a setting that declares it cannot be applied — and
+no catalogued setting declares that today. The page also distinguishes "waiting for a restart" from
+"stored but not in force on this instance", which one boolean used to conflate; the second is what an
+operator sees when another instance applied the change. The Sentry card's unconditional "applies
+immediately" tag is now derived from the same report, which is the defect that made the split
+necessary: the card asserted it while its own endpoint computed the opposite.
 
 Gating booleans sit in a card header with their dependents inside, **disabled rather than hidden**.
 Hiding them meant an operator could not see what enabling a feature would let them configure, and

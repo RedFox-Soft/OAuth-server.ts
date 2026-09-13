@@ -47,9 +47,10 @@ function pathnameOf(url: string): string {
  * omit the `Cache-Control: no-store` that every other response on the server carries, leaving a
  * one-header fingerprint that distinguishes "disabled" from "absent".
  *
- * The flag is read flat off ApplicationConfig per request rather than captured at boot: settings are
- * applied by restart in a deployment, but the test suite drives one long-lived instance and flips
- * them between cases.
+ * The flag is read flat off ApplicationConfig per request rather than captured at boot, and that is
+ * what lets an operator close a capability without restarting the server: a saved setting is applied
+ * to this process, and the next request through here reads it. Capturing it would put an endpoint's
+ * availability an hour behind the decision to withdraw it.
  */
 export const featureGate = (app: Elysia) =>
 	app.onRequest(({ request }) => {

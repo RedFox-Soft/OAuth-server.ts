@@ -11,6 +11,7 @@ import sectorValidate from '../../helpers/sector_validate.ts';
 import getSchema, { buildRecognizedMetadata } from './schema.ts';
 import addClient from '../../helpers/add_client.ts';
 import { ClientDefaults } from '../../configs/clientBase.js';
+import { onSettingsApplied } from '../../configs/application.js';
 import {
 	ClientSchema,
 	type ClientSchemaType
@@ -206,6 +207,14 @@ export async function assertClientValid(metadata: unknown): Promise<void> {
 // Validation memo, owned by its only consumer below. Size-bounded (LRU) — no time-based expiry,
 // which would drop entries out from under in-flight resolutions.
 const clientCache = new QuickLRU<string, ClientSchemaType>({ maxSize: 100 });
+
+/*
+ * The key is a hash of the client's STORED properties, so a settings change does not change it — and
+ * the schema a client is validated against is derived from the settings. Without this, a capability
+ * switched on would govern a client nobody had resolved yet and not one already in the memo, which is
+ * the difference between a setting that applies and a setting that appears to.
+ */
+onSettingsApplied(() => clientCache.clear());
 
 // Resolve a client by id from adapter('Client') — the single source of client
 // identity. The adapter is read on every call so updates and deletes are always

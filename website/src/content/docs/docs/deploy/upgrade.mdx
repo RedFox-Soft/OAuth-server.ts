@@ -120,17 +120,18 @@ admin API) as part of the change.
 
 ## What a restart carries, and what it does not
 
-- **Server settings are boot-only.** Everything on `ApplicationConfig` — every feature flag, every
-  rate-limit number — is read from the config store and applied at module load. A change you made
-  in the console last week takes effect at this restart, which makes an upgrade a good moment to
-  re-read the [settings reference](/docs/reference/settings/) for anything the release added. The
-  console says as much when you save.
+- **Server settings are already in force.** A change saved in the console takes effect in the
+  instance that saved it, so an upgrade neither applies nor re-applies it: the stored settings are
+  simply read again at startup. An upgrade is still a good moment to re-read the
+  [settings reference](/docs/reference/settings/) for anything the release added. A setting that
+  genuinely cannot be applied to a running server says so on its card and in the console, and there
+  are none at present.
 - **Signing keys persist in the database**, through the `jwksStore` adapter, and are loaded once at
   startup. An upgrade neither rotates nor invalidates them: tokens issued before it still verify,
   and `/jwks` serves the same key set. Keys are not environment configuration and there is nothing
   to carry across by hand.
-- **SMTP settings are the exception** to boot-only: they are read live from the settings store, so
-  they apply without a restart.
+- **SMTP settings** are read live from their own store on every send, so they are unaffected by a
+  restart in either direction.
 - **Tokens, sessions and grants survive**, since they live in the database. Users are not signed
   out by an upgrade.
 

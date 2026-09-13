@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { SETTINGS_CATALOG } from 'lib/admin/settings/catalog.ts';
+import { SETTINGS_CATALOG, appliesOnSave } from 'lib/admin/settings/catalog.ts';
 import { ApplicationConfig } from 'lib/configs/application.ts';
 
 /**
@@ -195,6 +195,23 @@ describe('settings catalog', () => {
 			(d) => d.key === 'ciba.deliveryModes'
 		);
 		expect(delivery?.options).toEqual(['poll', 'ping']);
+	});
+
+	/*
+	 * An operator is told which settings interrupt service, and that answer has to exist for every
+	 * setting rather than for the ones somebody remembered. Absence of `apply` is the permissive
+	 * answer, so the property here is that the answer is total and that the restrictive one is
+	 * argued: a warning with no reason beside it is the warning an operator learns to click past.
+	 */
+	it('every setting states whether it takes effect when saved, and every exception states why', () => {
+		for (const d of SETTINGS_CATALOG) {
+			expect(appliesOnSave(d.key as string)).toBe(d.apply !== 'restart');
+			if (d.apply === 'restart') {
+				expect(d.restartReason?.trim()).toBeTruthy();
+			} else {
+				expect(d.restartReason).toBeUndefined();
+			}
+		}
 	});
 
 	it('every dependsOn references a boolean catalog key in the same group', () => {

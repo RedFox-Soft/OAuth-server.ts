@@ -50,6 +50,21 @@ const VALID = {
 
 const previousStore = ApplicationConfig['errorStore.enabled'];
 
+/*
+ * A saved change now reaches the running process, so the credential a case stores is in force for
+ * every case after it — and "nothing is configured" is a state several of them start from. Restored
+ * around each case rather than left to the store, because what `configured` reports is the value in
+ * force, which is the point of this feature and no longer only what was persisted.
+ */
+const sentryAsFound = {
+	'sentry.enabled': ApplicationConfig['sentry.enabled'],
+	'sentry.dsn': ApplicationConfig['sentry.dsn']
+};
+
+function restoreSentrySettings(): void {
+	Object.assign(ApplicationConfig, sentryAsFound);
+}
+
 /**
  * @proves The outbound reporting credential is stored, masked, never returned, and reporting
  * cannot be armed without it or without the error store.
@@ -59,11 +74,13 @@ describe('Sentry settings API', () => {
 		await ensureAdminSeed();
 		await configStore.set({});
 		ApplicationConfig['errorStore.enabled'] = previousStore;
+		restoreSentrySettings();
 	});
 
 	afterEach(async () => {
 		await configStore.set({});
 		ApplicationConfig['errorStore.enabled'] = previousStore;
+		restoreSentrySettings();
 	});
 
 	it('stores the credential and never returns it', async () => {
@@ -86,6 +103,25 @@ describe('Sentry settings API', () => {
 		expect(serialized).not.toContain(DSN);
 		expect(serialized).not.toContain('publickey');
 		expect(data).not.toHaveProperty('dsn');
+	});
+
+	/*
+	 * The card used to carry a standing "applies immediately" tag beside a view that computed the
+	 * opposite, so an operator was told two different things about the same save. What is reported now
+	 * is what this process holds.
+	 */
+	it('puts the credential in force in this process, with nothing left waiting', async () => {
+		const cookie = await cookieFor(['super_admin']);
+
+		const put = await client.admin.api.settings.sentry.put(VALID, {
+			headers: { cookie }
+		});
+
+		expect(put.status).toBe(200);
+		expect((put.data as { notInForceKeys: string[] }).notInForceKeys).toEqual(
+			[]
+		);
+		expect(ApplicationConfig['sentry.dsn']).toBe(DSN);
 	});
 
 	it('reports configured false before anything is stored', async () => {

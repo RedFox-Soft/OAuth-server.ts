@@ -22,6 +22,13 @@ const Setting = z
 		dependsOn: z.string().nullable(),
 		risk: z.string().optional(),
 		experimental: z.boolean().optional(),
+		/*
+		 * Absent means the setting is in force the moment it is saved, which is the normal case; present
+		 * means it waits for the next start, and then `restartReason` says what about it cannot be
+		 * applied to a running server.
+		 */
+		apply: z.literal('restart').optional(),
+		restartReason: z.string().optional(),
 		value: z.unknown()
 	})
 	.loose();

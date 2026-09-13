@@ -22,6 +22,8 @@ const value = JSON.stringify(setting.value);
 		{setting.options && (<><dt class="text-gray-500 dark:text-gray-400">Options</dt><dd>{setting.options.join(', ')}</dd></>)}
 		{setting.dependsOn && (<><dt class="text-gray-500 dark:text-gray-400">Requires</dt><dd><code>{setting.dependsOn}</code></dd></>)}
 		{setting.risk && (<><dt class="text-gray-500 dark:text-gray-400">Risk</dt><dd>Changing this has a security consequence; the console asks for confirmation.</dd></>)}
+		<dt class="text-gray-500 dark:text-gray-400">Takes effect</dt>
+		<dd>{setting.apply === 'restart' ? `at the next start — ${setting.restartReason ?? 'it cannot be applied to a running server'}` : 'when you save it'}</dd>
 	</dl>
 	<details class="mt-2 text-sm">
 		<summary>Details</summary>

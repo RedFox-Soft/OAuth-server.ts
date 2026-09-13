@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button, Drawer, Modal, Table, Tag, Typography } from 'antd';
 import { ExclamationCircleOutlined } from '@ant-design/icons';
-import { riskyChanges, type Change } from './model.js';
+import { restartingChanges, riskyChanges, type Change } from './model.js';
 
 const show = (v: unknown): string => {
 	if (v === undefined) return '—';
@@ -83,12 +83,14 @@ function ReviewDrawer({
 }
 
 /*
- * The single save control for the boot-only settings.
+ * The single save control for the catalogued settings.
  *
- * It appears only when there is something to save, and it says three things the page never used to:
- * how many settings are edited, that they take effect at restart rather than now, and — when one of
- * them is flagged — that saving will ask for confirmation first. The SMTP and Sentry cards keep
- * their own buttons, because they are separate endpoints that apply immediately; each says so.
+ * It appears only when there is something to save, and it says three things: how many settings are
+ * edited, when they take effect, and — when one of them is flagged — that saving will ask for
+ * confirmation first. The second of those is read from the settings being saved rather than stated
+ * once for the page: nearly every setting on this server is in force the moment it is saved, and a
+ * standing warning about a restart that is not coming is the warning an operator learns to ignore.
+ * The SMTP and Sentry cards keep their own buttons, because they are separate endpoints.
  */
 export function SaveBar({
 	changes,
@@ -105,6 +107,7 @@ export function SaveBar({
 	if (changes.length === 0) return null;
 
 	const risky = riskyChanges(changes);
+	const restarting = restartingChanges(changes);
 
 	/*
 	 * A flagged change is confirmed, not merely clicked. These are the settings whose descriptions
@@ -167,7 +170,9 @@ export function SaveBar({
 					{changes.length} unsaved {changes.length === 1 ? 'change' : 'changes'}
 				</Typography.Text>
 				<Typography.Text type="secondary">
-					· takes effect when the server restarts
+					{restarting.length === 0
+						? '· takes effect as soon as you save'
+						: `· ${restarting.length} of them take effect when the server restarts`}
 				</Typography.Text>
 				{risky.length > 0 && (
 					<Tag color="orange">{risky.length} needs confirming</Tag>

@@ -19,9 +19,9 @@ import { reportFault } from '../sentry/dispatch.js';
  * handler already makes when it declines to report a gate refusal on the channel operators watch for
  * genuine faults.
  *
- * Reads configuration flat per call rather than capturing it at boot, matching featureGate: settings
- * are applied by restart in a deployment, but the test suite drives one long-lived instance and flips
- * them between cases.
+ * Reads configuration flat per call rather than capturing it at boot, matching featureGate: a saved
+ * setting is applied to the running process, so switching recording off has to take hold at the next
+ * fault rather than at the next restart.
  */
 export interface CaptureInput extends CaptureSubject {
 	surface: ErrorSurface;

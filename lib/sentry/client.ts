@@ -1,7 +1,10 @@
 import * as Sentry from '@sentry/bun';
 import type { BunOptions, ErrorEvent, EventHint } from '@sentry/bun';
 
-import { ApplicationConfig } from '../configs/application.js';
+import {
+	ApplicationConfig,
+	onSettingsApplied
+} from '../configs/application.js';
 import { eventLabels } from './labels.js';
 import { recordingTransport } from './transport.js';
 
@@ -46,6 +49,26 @@ export function resetForTest(): void {
 	armed = false;
 	lastOptions = undefined;
 }
+
+/*
+ * A credential replaced while the client is armed would otherwise keep reporting to the project the
+ * operator just moved away from, because arming is a latch and the options are read once.
+ *
+ * Dropping the latch is the whole mechanism: the next fault calls initSentry again, which arms a
+ * client with whatever is now configured. The accepted cost is that events queued in the previous
+ * client can be lost — they are the SECOND copy of a fault, since the local record is written first
+ * and is what the console reads, and the outbound queue is bounded for that same reason.
+ */
+onSettingsApplied((appliedKeys) => {
+	if (
+		!appliedKeys.includes('sentry.enabled') &&
+		!appliedKeys.includes('sentry.dsn')
+	) {
+		return;
+	}
+	armed = false;
+	lastOptions = undefined;
+});
 
 /*
  * Strips anything the SDK attached on its own.

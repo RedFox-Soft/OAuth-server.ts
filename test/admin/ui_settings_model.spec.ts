@@ -23,7 +23,9 @@ import {
 	buildRarTypes,
 	rarTypeIssues,
 	pendingChanges,
+	restartingChanges,
 	riskyChanges,
+	saveConsequence,
 	sameValue,
 	throttleRate,
 	type Descriptor,
@@ -264,6 +266,56 @@ describe('settings model', () => {
 				{ first: false, risky: false }
 			);
 			expect(riskyChanges(changes).map((c) => c.key)).toEqual(['risky']);
+		});
+
+		/*
+		 * The page's standing "waiting for a restart" notice was shown for every save, because nothing
+		 * distinguished a setting that interrupts service from one that does not. What an operator needs
+		 * before saving is which of their edits is in the first group — and by name, since the remedy is
+		 * theirs to schedule.
+		 */
+		it('names the edits that will not be in force until the server restarts', () => {
+			const withRestartBound = [
+				d({ key: 'first' }),
+				d({
+					key: 'bound',
+					apply: 'restart',
+					restartReason: 'read once while the process starts'
+				})
+			];
+
+			const changes = pendingChanges(
+				withRestartBound,
+				{ first: true, bound: true },
+				{ first: false, bound: false }
+			);
+
+			expect(restartingChanges(changes).map((c) => c.key)).toEqual(['bound']);
+			expect(restartingChanges(changes)[0]?.restartReason).toBe(
+				'read once while the process starts'
+			);
+		});
+
+		it('finds nothing waiting when every edited setting applies on save', () => {
+			const changes = pendingChanges(
+				catalog,
+				{ first: true, risky: true },
+				{ first: false, risky: false }
+			);
+
+			expect(restartingChanges(changes)).toEqual([]);
+		});
+
+		it('splits an intended save into what applies now and what waits', () => {
+			const withRestartBound = [
+				d({ key: 'now' }),
+				d({ key: 'later', apply: 'restart', restartReason: 'because' })
+			];
+
+			expect(saveConsequence(withRestartBound, ['now', 'later'])).toEqual({
+				appliesNow: ['now'],
+				awaitsRestart: ['later']
+			});
 		});
 
 		it('finds nothing to confirm when no flagged setting was touched', () => {

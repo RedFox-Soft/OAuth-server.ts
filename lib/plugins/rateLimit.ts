@@ -1,7 +1,10 @@
 import type { Elysia } from 'elysia';
 import QuickLRU from 'quick-lru';
 
-import { ApplicationConfig } from 'lib/configs/application.js';
+import {
+	ApplicationConfig,
+	onSettingsApplied
+} from 'lib/configs/application.js';
 import { eventBus } from 'lib/event_bus.js';
 import { RateLimited } from 'lib/helpers/errors.js';
 import {
@@ -74,6 +77,26 @@ function storeFor(rateClass: RateClass): QuickLRU<string, OriginCounter> {
 	stores.set(rateClass, created);
 	return created;
 }
+
+/*
+ * A store already created holds the capacity it was created with, so a saved change would otherwise
+ * reach only the classes nobody had counted yet.
+ *
+ * `resize` rather than a fresh store: the counters are what constrain an origin mid-flood, and
+ * replacing the structure would hand every one of them a clean allowance — an operator would have a
+ * way to forgive an attacker by editing an unrelated-looking number. Shrinking discards the
+ * least-recently-seen entries, which is what the bound already means and what ordinary traffic
+ * already does to it.
+ */
+onSettingsApplied((appliedKeys) => {
+	if (!appliedKeys.includes('rateLimit.maxTrackedOrigins')) {
+		return;
+	}
+	const maxSize = ApplicationConfig['rateLimit.maxTrackedOrigins'] as number;
+	for (const store of stores.values()) {
+		store.resize(maxSize);
+	}
+});
 
 /*
  * The clock, injectable for the tests only.

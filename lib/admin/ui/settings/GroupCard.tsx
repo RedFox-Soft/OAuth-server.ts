@@ -14,9 +14,13 @@ import {
 } from './model.js';
 
 /*
- * The tags that qualify a setting's label: that changing it has a security consequence, and that the
- * feature behind it tracks a draft spec. Shared by the card header and the rows so one of them
- * cannot quietly stop showing them.
+ * The tags that qualify a setting's label: that changing it has a security consequence, that the
+ * feature behind it tracks a draft spec, and that saving it will not be enough. Shared by the card
+ * header and the rows so one of them cannot quietly stop showing them.
+ *
+ * The restart tag carries the setting's own reason rather than a generic warning, because the
+ * question an operator is actually asking — whether this edit can wait for the next deploy — is
+ * answered by what about the setting cannot be applied, not by the fact that it cannot.
  */
 function Qualifiers({ d }: { d: Descriptor }) {
 	return (
@@ -29,6 +33,15 @@ function Qualifiers({ d }: { d: Descriptor }) {
 					>
 						security
 					</Tag>
+				</Tooltip>
+			)}
+			{d.apply === 'restart' && (
+				<Tooltip
+					title={
+						d.restartReason ?? 'This setting takes effect at the next start.'
+					}
+				>
+					<Tag color="gold">needs a restart</Tag>
 				</Tooltip>
 			)}
 			{d.experimental && <Tag color="purple">experimental</Tag>}

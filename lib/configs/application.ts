@@ -834,12 +834,88 @@ export const configuration: Configuration =
 /*
  * reloadConfiguration
  *
- * Re-derive after ApplicationConfig has been changed in place. The settings are boot-only in a
- * deployment — they are persisted and applied by a restart — so this exists for the tests, which
- * reconfigure the server per spec and would otherwise be reading values derived from the previous
- * spec's settings.
+ * Re-derive after ApplicationConfig has been changed in place. Two callers: applySettings below,
+ * which is how an operator's saved change reaches a running server, and the test harness, which
+ * reconfigures per spec file and would otherwise read values derived from the previous spec's
+ * settings.
  */
 export function reloadConfiguration(): Configuration {
 	Object.assign(configuration, validateConfiguration(ApplicationConfig));
 	return configuration;
+}
+
+type SettingsInvalidator = (appliedKeys: readonly string[]) => void;
+
+const invalidators: SettingsInvalidator[] = [];
+
+/*
+ * Register something to run after a settings change reaches this process.
+ *
+ * For state DERIVED from a setting and outlived by the change — a memo of objects validated under the
+ * old values, a structure sized from a number. The owner of that state registers here at import,
+ * rather than this module reaching into it, because the owners live under models/, plugins/ and
+ * sentry/, and an edge from the configuration layer into any of them closes an import cycle.
+ *
+ * An invalidator MUST be synchronous (an await would break the atomicity applySettings guarantees),
+ * idempotent, and safe to run when none of its keys changed. It MUST NOT throw: an apply that half-ran
+ * is the one outcome this whole path exists to avoid.
+ *
+ * Nothing can prove this list is complete. A future cache derived from a setting has to register
+ * itself, and this comment is where that obligation is recorded.
+ */
+export function onSettingsApplied(invalidate: SettingsInvalidator): void {
+	invalidators.push(invalidate);
+}
+
+export type ApplyOutcome =
+	| { state: 'applied'; appliedKeys: string[] }
+	| { state: 'withheld'; reason: string };
+
+/*
+ * applySettings
+ *
+ * Make a saved change govern this running process. The caller persists; this is only about the
+ * values in memory, and it is the counterpart of the Object.assign above that reads them at boot.
+ *
+ * SYNCHRONOUS END TO END, and that is a correctness property rather than a style: nothing between the
+ * assignment and the last invalidator yields to the event loop, so no request in flight can observe
+ * some of a change and not the rest. An `await` added anywhere inside removes that guarantee silently.
+ *
+ * The candidate is judged again here even though the caller validated its own merge. They are
+ * different objects: the caller validated stored-overrides-merged-onto-defaults, while what this
+ * process would hold is the running values plus the subset being applied — and those differ whenever a
+ * key is withheld, which is what a restart-class setting is. Applying a subset that breaks a cross-key
+ * invariant would leave the server holding a configuration it could not have booted with, so the whole
+ * apply is withheld instead; the change stays persisted and reaches the next start intact.
+ *
+ * Values are `unknown` because they arrive from a request body and are checked against the settings
+ * catalog by the caller, which is the only thing that knows what each key may hold.
+ */
+export function applySettings(changes: Record<string, unknown>): ApplyOutcome {
+	const appliedKeys = Object.keys(changes);
+	if (appliedKeys.length === 0) {
+		return { state: 'applied', appliedKeys };
+	}
+
+	try {
+		validateConfiguration({
+			...ApplicationConfig,
+			...changes
+			// The spread widens every known key to `unknown`; the object is an ApplicationConfig with
+			// some values replaced, which the type system cannot express through a Record spread.
+		} as ApplicationConfigType);
+	} catch (err) {
+		return {
+			state: 'withheld',
+			reason: err instanceof Error ? err.message : String(err)
+		};
+	}
+
+	Object.assign(ApplicationConfig, changes);
+	reloadConfiguration();
+	for (const invalidate of invalidators) {
+		invalidate(appliedKeys);
+	}
+
+	return { state: 'applied', appliedKeys };
 }

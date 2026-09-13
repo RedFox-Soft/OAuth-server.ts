@@ -11,6 +11,17 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- admin: a server setting now takes effect when it is saved, without restarting the server. Every
+  setting carries a class on its console descriptor — applied on save by default, or waiting for the
+  next start with a written reason — and the console's standing "waiting for a restart" banner is
+  replaced by one that names only the settings genuinely waiting, of which there are none today. The
+  settings state reports what is in force on the instance that answered, so a deployment running more
+  than one instance is told which values that instance is actually running; the agent-facing surface
+  reports the same. A refused submission still changes neither the store nor the running server, and a
+  change that would leave a running process holding a configuration it could not have booted with is
+  withheld rather than half-applied. Fixes the Sentry card, which claimed "applies immediately" while
+  its own endpoint reported the opposite.
+
 - conformance: the server now reports which authentication context a sign-in satisfied. A password
   sign-in, one with a second factor and one delegated to an upstream provider are distinguished, and
   the `acrValues` setting changes from a free-form list to a map from those three to the value each

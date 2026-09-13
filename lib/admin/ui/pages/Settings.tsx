@@ -40,8 +40,14 @@ export function Settings() {
 	 * toggle reaches the API — and the audit trail — as one field rather than the whole catalogue.
 	 */
 	const [baseline, setBaseline] = useState<Values>({});
-	const [restartRequired, setRestartRequired] = useState(false);
-	const [changedKeys, setChangedKeys] = useState<string[]>([]);
+	/*
+	 * Two lists, because the remedies differ: one is waiting for a restart this operator has to perform,
+	 * the other is stored and not in force in the instance that answered — another instance applied it,
+	 * or this one withheld the apply. One boolean used to say both, and the page said "restart" either
+	 * way.
+	 */
+	const [pendingRestartKeys, setPendingRestartKeys] = useState<string[]>([]);
+	const [notInForceKeys, setNotInForceKeys] = useState<string[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [saving, setSaving] = useState(false);
 	const [pane, setPane] = useState<SettingDomain | null>(null);
@@ -52,8 +58,8 @@ export function Settings() {
 		setDomains(body.domains);
 		setValues(body.values);
 		setBaseline(body.values);
-		setRestartRequired(body.restartRequired);
-		setChangedKeys(body.changedKeys);
+		setPendingRestartKeys(body.pendingRestartKeys);
+		setNotInForceKeys(body.notInForceKeys);
 		setPane((current) => current ?? body.domains[0]?.id ?? null);
 	}
 
@@ -181,13 +187,23 @@ export function Settings() {
 				/>
 			</div>
 
-			{restartRequired && (
+			{pendingRestartKeys.length > 0 && (
 				<Alert
 					type="warning"
 					showIcon
 					style={{ marginBottom: 16 }}
 					message="Saved changes are waiting for a restart"
-					description={`These settings are stored but not yet in force: ${changedKeys.join(', ')}`}
+					description={`These settings cannot be applied to a running server: ${pendingRestartKeys.join(', ')}`}
+				/>
+			)}
+
+			{notInForceKeys.length > 0 && (
+				<Alert
+					type="info"
+					showIcon
+					style={{ marginBottom: 16 }}
+					message="Saved, but not in force on this instance"
+					description={`Stored and applied elsewhere, or withheld here: ${notInForceKeys.join(', ')}. What this page reports is what the instance answering it is running.`}
 				/>
 			)}
 

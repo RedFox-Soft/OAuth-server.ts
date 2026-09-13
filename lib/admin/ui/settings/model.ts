@@ -38,6 +38,8 @@ export interface Descriptor {
 	dependsOn?: string;
 	risk?: 'security';
 	experimental?: boolean;
+	apply?: 'restart';
+	restartReason?: string;
 }
 
 export interface DomainMeta {
@@ -52,8 +54,44 @@ export interface SettingsResponse {
 	catalog: Descriptor[];
 	domains: DomainMeta[];
 	values: Values;
-	restartRequired: boolean;
-	changedKeys: string[];
+	/* Stored, not in force here, and waiting for a restart because the setting says it must. */
+	pendingRestartKeys: string[];
+	/*
+	 * Stored, not in force here, and not waiting for anything: another instance applied it, or this one
+	 * withheld the apply. A different sentence and a different remedy from the list above, which is why
+	 * they are two fields and not one flag.
+	 */
+	notInForceKeys: string[];
+	/* Only on the response to a save: what took effect in the instance that served it. */
+	appliedKeys?: string[];
+}
+
+/* Whether this setting takes effect when it is saved. Absence of `apply` is the permissive case. */
+export const appliesOnSave = (d: Descriptor): boolean => d.apply !== 'restart';
+
+/*
+ * What a save of these settings is about to do, worked out BEFORE it is saved.
+ *
+ * The page used to learn this only from the response, which is the one moment an operator can no
+ * longer act on it: a setting that interrupts service is a reason to pick the maintenance window, not
+ * a thing to be told afterwards.
+ */
+export function saveConsequence(
+	catalog: Descriptor[],
+	editedKeys: string[]
+): { appliesNow: string[]; awaitsRestart: string[] } {
+	const byKey = new Map(catalog.map((d) => [d.key, d]));
+	const appliesNow: string[] = [];
+	const awaitsRestart: string[] = [];
+	for (const key of editedKeys) {
+		const descriptor = byKey.get(key);
+		// An unknown key is refused by the server, so it is counted where a known one would be.
+		(!descriptor || appliesOnSave(descriptor)
+			? appliesNow
+			: awaitsRestart
+		).push(key);
+	}
+	return { appliesNow, awaitsRestart };
 }
 
 /*
@@ -497,6 +535,12 @@ export interface Change {
 	from: unknown;
 	to: unknown;
 	risk?: 'security';
+	/*
+	 * Carried on the change rather than looked up again when the save bar renders, for the reason the
+	 * risk flag is: what a save is about to do has to be sayable before it is saved.
+	 */
+	apply?: 'restart';
+	restartReason?: string;
 }
 
 /*
@@ -518,10 +562,16 @@ export function pendingChanges(
 			group: d.group,
 			from: baseline[d.key],
 			to: values[d.key],
-			risk: d.risk
+			risk: d.risk,
+			apply: d.apply,
+			restartReason: d.restartReason
 		}));
 }
 
 /* The pending edits that need confirming rather than merely saving. */
 export const riskyChanges = (changes: Change[]): Change[] =>
 	changes.filter((c) => c.risk === 'security');
+
+/* The pending edits this server cannot put in force without being restarted. */
+export const restartingChanges = (changes: Change[]): Change[] =>
+	changes.filter((c) => c.apply === 'restart');

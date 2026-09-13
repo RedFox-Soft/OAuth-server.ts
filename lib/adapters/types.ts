@@ -123,8 +123,8 @@ export interface SmtpSettings {
 }
 
 // Runtime, super-admin-editable SMTP transport config. Read live by the mailer on
-// every send so changes take effect without a provider restart (kept out of the
-// boot-only ApplicationConfig for that reason).
+// every send so changes take effect without reaching the settings object at all (kept out of it
+// for that reason, and unaffected by a restart in either direction).
 export interface SmtpSettingsStoreInstance {
 	get(): Promise<SmtpSettings | null>;
 	set(settings: SmtpSettings): Promise<void>;
@@ -641,8 +641,8 @@ export interface ErrorPurgeEstimate {
  *
  * An adapter cannot import ApplicationConfig — configs/application.ts imports the adapter registry, so
  * reading config here would close a cycle. Passing them per write also matches how featureGate reads
- * flags flat per request: settings are applied by restart in a deployment, but the test suite drives one
- * long-lived instance and flips them between cases.
+ * flags flat per request: a saved setting is applied to the running process, so a bound edited now
+ * governs the next write rather than the next boot.
  */
 export interface ErrorStoreBounds {
 	retentionDays: number;
@@ -896,7 +896,8 @@ export interface ProtectedResourceStoreConstructor {
  * may reach the administrative MCP plane.
  *
  * Read live on every request rather than held in `ApplicationConfig`, because a withdrawal has to land
- * on the agent's next call and boot-only settings cannot do that.
+ * on the agent's next call — including on an instance that did not serve the withdrawal, which an
+ * applied setting does not reach.
  */
 export interface McpClientPermission {
 	/* The permitted identifier URL, or the bare host when the entry is host-wide. */

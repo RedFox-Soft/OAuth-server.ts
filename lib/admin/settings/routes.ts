@@ -1,5 +1,6 @@
 import { Elysia } from 'elysia';
-import { ApplicationConfig } from '../../configs/application.js';
+import { ApplicationConfig, applySettings } from '../../configs/application.js';
+import { eventBus } from '../../event_bus.js';
 import {
 	validateConfiguration,
 	type ConfigurationInput
@@ -18,13 +19,11 @@ import { SETTINGS_TARGET_ID } from '../../consts/admin_audit_routes.js';
 import {
 	SETTINGS_CATALOG,
 	SETTING_DOMAINS,
+	CATALOG_BY_KEY,
+	appliesOnSave,
 	type SettingDescriptor
 } from './catalog.js';
 import { UpdateSettingsBody } from './schema.js';
-
-const CATALOG_BY_KEY = new Map<string, SettingDescriptor>(
-	SETTINGS_CATALOG.map((d) => [d.key as string, d])
-);
 
 const running = (key: string): unknown =>
 	(ApplicationConfig as Record<string, unknown>)[key];
@@ -109,17 +108,24 @@ function validateEffectiveConfig(effective: ConfigurationInput): void {
  */
 function stateFor(stored: Record<string, unknown>) {
 	const values: Record<string, unknown> = {};
-	const changedKeys: string[] = [];
+	/*
+	 * Two sets rather than one flag, because "waiting for a restart" and "this instance is behind"
+	 * need different sentences and different remedies, and one boolean said both. A key lands in the
+	 * second only when something applied it elsewhere — another instance, or an apply this one
+	 * withheld — so on a single instance it is empty and the console never mentions it.
+	 */
+	const pendingRestartKeys: string[] = [];
+	const notInForceKeys: string[] = [];
 	for (const d of SETTINGS_CATALOG) {
-		const run = running(d.key as string);
-		const desired = Object.prototype.hasOwnProperty.call(
-			stored,
-			d.key as string
-		)
-			? stored[d.key as string]
+		const key = d.key as string;
+		const run = running(key);
+		const desired = Object.prototype.hasOwnProperty.call(stored, key)
+			? stored[key]
 			: run;
-		values[d.key as string] = desired;
-		if (!sameValue(desired, run)) changedKeys.push(d.key as string);
+		values[key] = desired;
+		if (!sameValue(desired, run)) {
+			(appliesOnSave(key) ? notInForceKeys : pendingRestartKeys).push(key);
+		}
 	}
 	return {
 		catalog: SETTINGS_CATALOG,
@@ -131,8 +137,8 @@ function stateFor(stored: Record<string, unknown>) {
 		 */
 		domains: SETTING_DOMAINS,
 		values,
-		restartRequired: changedKeys.length > 0,
-		changedKeys
+		pendingRestartKeys,
+		notInForceKeys
 	};
 }
 
@@ -198,19 +204,52 @@ export const settingsRoutes = new Elysia({ name: 'admin-settings' })
 			}
 			// Nothing to apply, so there is nothing to record: an entry here would claim a change that
 			// never happened, on the one surface whose whole purpose is to be trusted about what did.
-			if (Object.keys(changes).length === 0) return current;
+			if (Object.keys(changes).length === 0) {
+				return { ...current, appliedKeys: [] };
+			}
 			const merged = { ...stored, ...changes };
 			// Still judged on the whole merged result, not on the changed keys alone: the invariants are
 			// cross-key, so a change can only be understood next to the settings it has to agree with.
 			validateEffectiveConfig({ ...ApplicationConfig, ...merged });
+			/*
+			 * Split by what each setting says about itself, before anything is written. The split is a
+			 * property of the catalog rather than of the apply below, which is what lets the audit entry
+			 * state it truthfully while still being written first.
+			 */
+			const changedKeys = Object.keys(changes);
+			const onSave = changedKeys.filter((key) => appliesOnSave(key));
+
 			// Audit-first: a persisted change must never outlive a failed audit write. The submitted keys
 			// used to travel in `targetId`, which had to stand in for a field the entry did not have; the
 			// target is now the settings document itself.
+			/*
+			 * The entry names the settings that changed, and deliberately does not carry the class split
+			 * beside them. With no restart-class setting in the catalog the two lists are the same list,
+			 * and a second copy of it in append-only storage would answer no question an operator asks —
+			 * what is in force is on the settings page, per setting. The day a setting is classified
+			 * restart, this is where the split belongs.
+			 */
 			await recordAdminAudit(ctx, 'settings.update', SETTINGS_TARGET_ID, {
-				attributes: Object.keys(changes)
+				attributes: changedKeys
 			});
 			await configStore.set(merged);
-			return currentState();
+
+			/*
+			 * Applied last, so a change in force is always one that was recorded and stored. The subset is
+			 * handed over rather than the whole submission: a restart-class setting is precisely one this
+			 * process must not start honouring, and applySettings withholds the rest rather than leave the
+			 * server holding a combination it could not have booted with.
+			 */
+			const outcome = applySettings(
+				Object.fromEntries(onSave.map((key) => [key, changes[key]]))
+			);
+			const appliedKeys =
+				outcome.state === 'applied' ? outcome.appliedKeys : [];
+			if (appliedKeys.length > 0) {
+				eventBus.emit('settings_applied', { keys: appliedKeys });
+			}
+
+			return { ...(await currentState()), appliedKeys };
 		},
 		{ body: UpdateSettingsBody }
 	);

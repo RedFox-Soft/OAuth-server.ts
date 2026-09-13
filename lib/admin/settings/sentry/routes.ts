@@ -1,6 +1,10 @@
 import { Elysia } from 'elysia';
 
-import { ApplicationConfig } from '../../../configs/application.js';
+import {
+	ApplicationConfig,
+	applySettings
+} from '../../../configs/application.js';
+import { eventBus } from '../../../event_bus.js';
 import {
 	validateConfiguration,
 	type ConfigurationInput
@@ -55,7 +59,13 @@ function inForce(stored: StoredOverrides, key: (typeof SENTRY_KEYS)[number]) {
 function present(stored: StoredOverrides) {
 	const dsn = String(inForce(stored, 'sentry.dsn') ?? '');
 	const running = ApplicationConfig as Record<string, unknown>;
-	const restartRequired = SENTRY_KEYS.some(
+	/*
+	 * Reported the way the settings page reports its own keys, and for the same reason: the card used
+	 * to carry a standing "applies immediately" tag while this function computed the opposite, and
+	 * nothing reconciled the two. Both keys apply when saved, so on a healthy instance this is empty —
+	 * and if it ever is not, it says which key rather than leaving the operator to guess.
+	 */
+	const notInForceKeys = SENTRY_KEYS.filter(
 		(key) =>
 			JSON.stringify(inForce(stored, key)) !== JSON.stringify(running[key])
 	);
@@ -71,7 +81,7 @@ function present(stored: StoredOverrides) {
 		configured: dsn.trim().length > 0,
 		environment: labels.environment,
 		release: labels.release ?? '',
-		restartRequired
+		notInForceKeys
 	};
 }
 
@@ -168,6 +178,19 @@ export const sentrySettingsRoutes = new Elysia({
 				attributes: [...changed]
 			});
 			await configStore.set(merged);
+
+			/*
+			 * Both keys travel together and are applied together, which is what the card's own shape
+			 * requires: enabling reporting without the credential beside it is a combination the validator
+			 * refuses, so applying one and withholding the other would leave this process holding a
+			 * configuration it could not have booted with. applySettings judges exactly that before it
+			 * assigns anything.
+			 */
+			const outcome = applySettings(changes as Record<string, unknown>);
+			if (outcome.state === 'applied' && outcome.appliedKeys.length > 0) {
+				eventBus.emit('settings_applied', { keys: outcome.appliedKeys });
+			}
+
 			return present(await storedOverrides());
 		},
 		{ body: UpdateSentryBody }

@@ -35,8 +35,8 @@ export function GroupNote({
  * rate of a sustained attack, which is the opposite of how the three read on the page.
  *
  * Live rather than static: it recomputes as the operator edits, so the effect of a change is visible
- * before it is saved. Which matters here more than most places, because these settings are boot-only
- * — without this, the consequence of a change could not be seen until after a restart.
+ * before it is saved rather than inferred from three numbers afterwards — which is what an operator
+ * is actually choosing between when they touch any of them.
  */
 function LoginThrottleNote({ values }: { values: Values }) {
 	const rate = throttleRate(values);

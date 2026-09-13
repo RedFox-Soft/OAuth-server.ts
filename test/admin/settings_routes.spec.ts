@@ -10,6 +10,7 @@ import {
 	configStore
 } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import bootstrap from '../test_helper.ts';
 import { sessionFor as adminSessionFor } from '../admin_session.ts';
 
 const app = new Elysia().use(resolveAdmin).use(settingsRoutes);
@@ -41,8 +42,9 @@ interface SettingsResponse {
 	catalog: Array<{ key: string; type: string; domain: string }>;
 	domains: Array<{ id: string; label: string; blurb: string }>;
 	values: Record<string, unknown>;
-	restartRequired: boolean;
-	changedKeys: string[];
+	pendingRestartKeys: string[];
+	notInForceKeys: string[];
+	appliedKeys?: string[];
 }
 
 /**
@@ -51,7 +53,14 @@ interface SettingsResponse {
  * run.
  */
 describe('settings API', () => {
+	/*
+	 * A save now reaches the running process, so every case here starts from the shipped defaults
+	 * rather than from whatever the case — or the spec file — before it left behind. Bootstrapping is
+	 * what restores them; without it a case asserting that a combination is unrunnable passes or fails
+	 * on the order the runner happened to walk the suite in, which differs between Windows and CI.
+	 */
 	beforeEach(async () => {
+		await bootstrap(import.meta.url);
 		await configStore.set({}); // no persisted overrides -> desired == running
 	});
 
@@ -72,8 +81,8 @@ describe('settings API', () => {
 		expect(res.status).toBe(200);
 		const body = res.data as SettingsResponse;
 		expect(body.catalog.length).toBeGreaterThan(0);
-		expect(body.restartRequired).toBe(false);
-		expect(body.changedKeys).toEqual([]);
+		expect(body.pendingRestartKeys).toEqual([]);
+		expect(body.notInForceKeys).toEqual([]);
 		expect(
 			Object.prototype.hasOwnProperty.call(body.values, 'par.enabled')
 		).toBe(true);
@@ -105,7 +114,7 @@ describe('settings API', () => {
 		expect(ids.filter((id) => !occupied.has(id))).toEqual([]);
 	});
 
-	it('PUT persists a change and reports restartRequired + changedKeys', async () => {
+	it('persists a change and reports it as in force, with nothing waiting', async () => {
 		const cookie = await sessionCookieFor(['super_admin']);
 		const before = (
 			await client.admin.api.settings.get({ headers: { cookie } })
@@ -118,8 +127,9 @@ describe('settings API', () => {
 		expect(put.status).toBe(200);
 		const body = put.data as SettingsResponse;
 		expect(body.values['par.enabled']).toBe(!running);
-		expect(body.restartRequired).toBe(true);
-		expect(body.changedKeys).toContain('par.enabled');
+		expect(body.appliedKeys).toContain('par.enabled');
+		expect(body.pendingRestartKeys).toEqual([]);
+		expect(body.notInForceKeys).toEqual([]);
 		// round-trips via configStore
 		const stored = (await configStore.get()) as Record<string, unknown>;
 		expect(stored['par.enabled']).toBe(!running);
@@ -151,8 +161,7 @@ describe('settings API', () => {
 		expect(
 			body.values['authorization.allowOmittingSingleRegisteredRedirectUri']
 		).toBe(true);
-		expect(body.restartRequired).toBe(true);
-		expect(body.changedKeys).toContain(
+		expect(body.appliedKeys).toContain(
 			'authorization.allowOmittingSingleRegisteredRedirectUri'
 		);
 		const stored = (await configStore.get()) as Record<string, unknown>;
@@ -406,7 +415,7 @@ describe('settings API', () => {
 		expect(Object.prototype.hasOwnProperty.call(body.values, 'discovery')).toBe(
 			false
 		);
-		expect(body.changedKeys).not.toContain('discovery');
+		expect(body.notInForceKeys).not.toContain('discovery');
 	});
 
 	it('rejects a PUT of the relocated-but-unlisted discovery key with 422', async () => {
@@ -453,8 +462,7 @@ describe('settings API', () => {
 		expect(put.status).toBe(200);
 		const body = put.data as SettingsResponse;
 		expect(body.values.conformIdTokenClaims).toBe(false);
-		expect(body.restartRequired).toBe(true);
-		expect(body.changedKeys).toContain('conformIdTokenClaims');
+		expect(body.appliedKeys).toContain('conformIdTokenClaims');
 		const stored = (await configStore.get()) as Record<string, unknown>;
 		expect(stored.conformIdTokenClaims).toBe(false);
 	});
@@ -544,7 +552,7 @@ describe('settings API', () => {
 		);
 
 		expect(res.status).toBe(200);
-		expect((res.data as SettingsResponse).changedKeys).toEqual([]);
+		expect((res.data as SettingsResponse).appliedKeys).toEqual([]);
 		expect((await settingsAudit()).total).toBe(before);
 		expect(await configStore.get()).toEqual({});
 	});
@@ -605,9 +613,8 @@ describe('settings API', () => {
 			);
 
 			expect(res.status).toBe(200);
-			// Boot-only like every setting: persisted now, live after a restart.
-			expect((res.data as SettingsResponse).restartRequired).toBe(true);
-			expect((res.data as SettingsResponse).changedKeys).toContain(
+			// In force in this process the moment it is saved, and stored for the next one.
+			expect((res.data as SettingsResponse).appliedKeys).toContain(
 				'dpop.requireNonce'
 			);
 		});

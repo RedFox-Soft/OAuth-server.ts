@@ -92,22 +92,27 @@ export function McpClients() {
 	}
 
 	/*
-	 * `values` is the desired state and `changedKeys` names the keys saved but not yet in force, which
-	 * is the distinction that matters here: a flag switched on and not restarted looks on and is not.
-	 * Both are reported, and differently, because the remedy differs — switch it on, or restart.
+	 * `values` is the desired state; the two key lists name what is stored and not in force here, which
+	 * is the distinction that matters on this page — a flag switched on and not applied looks on and is
+	 * not. Both are reported, and separately, because the remedy differs: switch it on, restart, or
+	 * look at the instance that did apply it.
 	 */
 	async function loadCapabilities() {
 		const res = await fetch('/admin/api/settings');
 		if (!res.ok) return;
 		const body = (await res.json()) as {
 			values: Record<string, unknown>;
-			changedKeys: string[];
+			pendingRestartKeys: string[];
+			notInForceKeys: string[];
 		};
 
 		const stateOf = (key: string, off: string) => {
 			if (body.values[key] !== true) return off;
-			if (body.changedKeys.includes(key)) {
-				return `${key} is saved but not in force. Settings apply at boot, so restart the server.`;
+			if (body.pendingRestartKeys.includes(key)) {
+				return `${key} is saved but cannot be applied to a running server. Restart it.`;
+			}
+			if (body.notInForceKeys.includes(key)) {
+				return `${key} is saved but not in force on this instance.`;
 			}
 			return null;
 		};

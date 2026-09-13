@@ -4,7 +4,7 @@ title: "Feature flags and endpoint gating"
 tags: [config, architecture, oauth, contract]
 sources: [oauth-server-codebase]
 created: 2026-07-31
-updated: 2026-08-25
+updated: 2026-09-13
 graph:
   node_type: concept
   relationships:
@@ -56,12 +56,15 @@ not derived is read flat from `ApplicationConfig`.
 
 Two properties follow from how it is maintained:
 
-- **Boot-only.** Settings are persisted and applied by a restart. An invalid configuration therefore
-  crashes startup, which is why the admin settings endpoint validates the *merged* configuration
-  against `configuration.ts` invariants before persisting.
+- **Applied when saved, not at boot only.** A save through the admin API assigns the changed keys onto
+  `ApplicationConfig` and re-derives, so the next request reads them (`applySettings`, since
+  specs/046). An invalid configuration would still crash startup, which is why the endpoint validates
+  the *merged* configuration against `configuration.ts` invariants before persisting — and why
+  `applySettings` validates the candidate it is about to assign, withholding the whole apply rather
+  than leaving the process holding a combination it could not have booted with.
 - **Mutated in place, never reassigned**, so every module holding the imported reference sees current
   values — the same rule the signing keys follow in `configs/keystore.ts`. `reloadConfiguration()`
-  re-derives after in-place changes and exists for the tests, which reconfigure per spec.
+  re-derives after in-place changes, for an applied save and for the tests alike.
 
 ## The gate
 

@@ -45,8 +45,8 @@ import {
 
 /*
  * Read flat off ApplicationConfig per request rather than captured at boot, for the same reason
- * featureGate does it: settings are applied by restart in a deployment, but the test suite drives one
- * long-lived instance and flips them between cases.
+ * featureGate does it: a saved setting is applied to the running process, so the request after the
+ * save must see it.
  */
 function corsEnabled(): boolean {
 	return ApplicationConfig['cors.enabled'] === true;

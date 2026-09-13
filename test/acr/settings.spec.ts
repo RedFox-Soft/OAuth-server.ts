@@ -57,18 +57,16 @@ describe('naming the authentication contexts', () => {
 		expect((await configStore.get()).acrValues).toEqual(named);
 	});
 
-	it('reports a restart is needed, because the setting is read at startup', async () => {
+	it('reports the renamed values as in force, with nothing waiting', async () => {
 		const { data } = await put(cookie, named);
 
-		expect(data?.restartRequired).toBe(true);
-		expect(data?.changedKeys).toContain('acrValues');
+		expect(data?.appliedKeys).toContain('acrValues');
+		expect(data?.pendingRestartKeys).toEqual([]);
+		expect(data?.notInForceKeys).toEqual([]);
 	});
 
-	it('advertises the renamed values once they are in force', async () => {
+	it('advertises the renamed values from the next request, without a restart', async () => {
 		await put(cookie, named);
-		// What a restart does: the persisted settings become the live ones.
-		Object.assign(ApplicationConfig, { acrValues: named });
-		reloadConfiguration();
 
 		expect([...configuration.acrValues]).toEqual(['bronze', 'silver', 'gold']);
 		expect(configuration.claimsSupported).toContain('acr');

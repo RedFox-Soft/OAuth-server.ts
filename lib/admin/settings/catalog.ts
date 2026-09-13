@@ -118,6 +118,25 @@ export interface SettingDescriptor {
 	 * needs it, and this comment is the only place the concept is explained.
 	 */
 	experimental?: boolean;
+	/*
+	 * The setting cannot be applied to a running server, so it takes effect at the next start.
+	 *
+	 * Absence is the permissive case, and that direction is deliberate: every read of every setting on
+	 * this server happens at the point of use, so a new setting applies when it is saved unless
+	 * somebody argues otherwise — and `restartReason` is where that argument is written. Sixty-odd
+	 * explicit "this one is normal" lines would bury the one that is not.
+	 *
+	 * No entry sets this today. The audit behind it (specs/046) found a mechanical answer for both
+	 * candidates: the per-origin counter store is resized rather than rebuilt, and the outbound
+	 * monitoring client is re-armed. Kept because it is the vocabulary the next setting needs, and
+	 * because the console cannot tell an operator what interrupts service without it.
+	 */
+	apply?: 'restart';
+	/*
+	 * What about this setting cannot be applied to a running server. Required whenever `apply` is set
+	 * and refused otherwise — a warning without its argument is the thing an operator learns to ignore.
+	 */
+	restartReason?: string;
 }
 
 const CLIENT_AUTH_METHODS = [
@@ -912,3 +931,23 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 			'token_endpoint_auth_methods_supported (mTLS methods added when enabled).'
 	}
 ];
+
+/*
+ * The catalog by key. Here rather than in the routes that first needed it, because the question
+ * "what does this setting say about itself" now has three askers — the settings route, the Sentry
+ * card's route and the apply path — and a second map built somewhere else is a second answer.
+ */
+export const CATALOG_BY_KEY = new Map<string, SettingDescriptor>(
+	SETTINGS_CATALOG.map((d) => [d.key as string, d])
+);
+
+/*
+ * Whether a setting takes effect when it is saved, read from the catalog and nowhere else.
+ *
+ * A key the catalog does not describe is not editable through any surface, so it never reaches a
+ * caller of this; answering `true` for one keeps the question total rather than inventing a third
+ * state nobody can act on.
+ */
+export function appliesOnSave(key: string): boolean {
+	return CATALOG_BY_KEY.get(key)?.apply !== 'restart';
+}

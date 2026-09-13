@@ -6,6 +6,12 @@ interface SentryView {
 	configured: boolean;
 	environment: string;
 	release: string;
+	/*
+	 * Stored here but not what this process is running. Empty on a healthy instance, because both of
+	 * this card's settings are applied when they are saved — which is what the tag below now reports
+	 * instead of asserting.
+	 */
+	notInForceKeys: string[];
 }
 
 /*
@@ -88,7 +94,11 @@ export function SentryCard() {
 			loading={loading}
 			extra={
 				<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-					<Tag color="green">applies immediately</Tag>
+					{view && view.notInForceKeys.length > 0 ? (
+						<Tag color="orange">saved, not in force here</Tag>
+					) : (
+						<Tag color="green">applies immediately</Tag>
+					)}
 					{configured ? (
 						<Tag color={view?.enabled ? 'green' : 'default'}>
 							{view?.enabled ? 'reporting' : 'stored, off'}

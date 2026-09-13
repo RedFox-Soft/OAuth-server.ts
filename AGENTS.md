@@ -74,7 +74,7 @@ database-backed, provisioned deployment. On PostgreSQL the equivalent is `bun ru
 
 Super-admins manage the running instance through the admin control plane (`lib/admin/`, mounted under
 `/admin/api/*`): projects, clients, buckets, end-users, server settings, and **signing keys**
-(`lib/admin/jwks/` — view/generate/delete over `jwksStore`, persist-then-restart like settings; RSA
+(`lib/admin/jwks/` — view/generate/delete over `jwksStore`, persist-then-restart, unlike settings; RSA
 generation only, private key material never returned; status is drift between `jwksStore` and the
 boot-time `JWKS_KEYS`). Every state-changing key action is written to an **append-only admin audit
 trail** (`adminAuditStore`, collection `adminAudit`, via `lib/admin/audit/record.ts`, audit-first
@@ -108,7 +108,8 @@ transport read live from a runtime `SmtpSettingsStore`, plus the standard templa
 cookie-less verification endpoints (`GET /verify-email`, `GET|POST /verify-email/code`,
 `POST /verify-email/resend`) are a standalone group in `lib/routes/verification.ts`. SMTP transport
 is a super-admin runtime setting (`/admin/api/settings/smtp`, password write-only/masked, audited)
-— deliberately **not** in the boot-only `ApplicationConfig`, so changes apply without a restart.
+— deliberately **not** in `ApplicationConfig` at all: it is read live from its own store on every
+send, so a restart neither applies nor disturbs it.
 
 The test suite loads `.env.test` automatically via Bun.
 
@@ -169,11 +170,11 @@ test/
 
 **Config** — every setting lives on exactly one of **three** surfaces, and there is no `lib/helpers/defaults.ts` and no `globalConfiguration.ts`:
 
-1. `lib/configs/application.ts` (`ApplicationConfig`) — **single source of truth for all server-wide flag/option DATA** (flat dotted feature keys plus `scopes`, `claims`, `acrValues`, `clientAuthMethods`, `conformIdTokenClaims`, `discovery`), each with an inline description. Boot-only: persisted via `configStore`, applied at module load, needs a restart.
+1. `lib/configs/application.ts` (`ApplicationConfig`) — **single source of truth for all server-wide flag/option DATA** (flat dotted feature keys plus `scopes`, `claims`, `acrValues`, `clientAuthMethods`, `conformIdTokenClaims`, `discovery`), each with an inline description. Persisted via `configStore` and applied at module load — and **applied again, to the running process, by the save that changes one**: `applySettings(changes)` assigns in place, re-derives through `reloadConfiguration()` and runs the invalidators registered with `onSettingsApplied` (the validated-client memo, the per-origin counter capacity, the Sentry arming latch). It is synchronous end to end, so no request sees half a change. A setting that genuinely cannot be applied to a running process declares `apply: 'restart'` on its settings-catalog descriptor with a written `restartReason`; none does today. Applying is per instance: what the console reports is what the instance answering it is running.
 2. `lib/configs/clientBase.ts` (`ClientDefaults`) — what a client gets when it does not specify, in **camelCase only**. Consumers working in wire-format (snake_case) metadata names translate at their own seam (see the map in `lib/models/client/schema.ts`).
 3. `lib/addon/*` — overridable behavior, resolved through the override registry at call time, **including the interaction policy** (`interactionPolicy()` plus an `interactionPolicyControl` add/reset surface).
 
-`lib/configs/configuration.ts` (`validateConfiguration`) is a **pure function of a config object**: it runs the validation and collection passes and returns the derived values (`scopes`, `claims`, `grantTypes`, `claimsSupported`, …). `application.ts` calls it at the point the settings finish loading and exports the result as `configuration`, so an unrunnable config fails at startup and nothing can observe an unvalidated one; `reloadConfiguration()` re-derives in place after a test mutates `ApplicationConfig`. Because it takes the config as an argument, the admin settings API validates a **candidate** config with the very same rules instead of mirroring them.
+`lib/configs/configuration.ts` (`validateConfiguration`) is a **pure function of a config object**: it runs the validation and collection passes and returns the derived values (`scopes`, `claims`, `grantTypes`, `claimsSupported`, …). `application.ts` calls it at the point the settings finish loading and exports the result as `configuration`, so an unrunnable config fails at startup and nothing can observe an unvalidated one; `reloadConfiguration()` re-derives in place after `ApplicationConfig` is changed — by an applied save, or by the test harness between spec files. `applySettings` validates the candidate it is about to assign with the same function, so a subset that would leave the process holding a combination it could not have booted with is withheld rather than applied. Because it takes the config as an argument, the admin settings API validates a **candidate** config with the very same rules instead of mirroring them.
 
 **Behaviour functions** — Overridable server behaviour (CORS, token issuance/rotation, resource-server info, CIBA/mTLS/RAR/registration helpers, …) is **single-sourced through `lib/addon/index.ts`**. Each function's default lives in its addon module; the index exposes a dynamic call-time accessor per function plus an `addons.override(partial)` / `addons.reset()` registry (`lib/addon/registry.ts`). Source modules import the accessor from the index — never off the merged configuration. Deployments and tests override via the registry (the test harness resets it after every test via `test/preload.ts`; `test/addon_baseline.ts` bridges a `*.config.ts`'s behaviour-fn overrides into a per-spec baseline). `findAccount` / `assertJwtClientAuthClaimsAndHeader` keep their existing direct imports.
 

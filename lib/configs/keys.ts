@@ -53,8 +53,9 @@ loadKeys(JWKS_KEYS);
  *
  * JWKS_KEYS, the keystore and the published JWKS are all rebuilt in place, so every module holding
  * one of the exported references sees the new keys. Algorithm sets derived once at module scope
- * (see jwaAlgorithms.ts) stay boot-derived, matching the boot-only semantics of the rest of the
- * configuration.
+ * (see jwaAlgorithms.ts) stay boot-derived: unlike the settings, which are re-derived wherever they
+ * are applied, these are computed once and nothing re-runs them, which is why a key in a new
+ * algorithm is advertised only after a restart.
  */
 export async function reloadJWKSKeys(): Promise<JWKS[]> {
 	const fresh = await resolveKeys(jwksStore);

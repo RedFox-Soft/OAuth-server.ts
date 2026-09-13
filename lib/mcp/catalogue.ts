@@ -957,7 +957,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: [],
 		summary:
-			'Change server settings. The merged configuration is validated first, so a combination the server would refuse at boot is refused here instead of taking the instance down on restart. Most changes apply only after a restart, and the result says so.'
+			'Change server settings. The merged configuration is validated first, so a combination the server would refuse at boot is refused here instead of taking the instance down on restart. A change takes effect in the instance that serves this call: the result names what it put in force (appliedKeys), what cannot be applied to a running server (pendingRestartKeys), and what is stored but not in force here (notInForceKeys).'
 	},
 	{
 		tool: 'smtp_settings_update',
@@ -983,7 +983,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: [],
 		summary:
-			'Change where recorded faults are reported. The ingestion credential is write-only: it can be set but never read back, and sending the mask keeps the stored one. Enabling this requires the error store, because the outbound event is built from the internal record. Applies after a restart.'
+			'Change where recorded faults are reported. The ingestion credential is write-only: it can be set but never read back, and sending the mask keeps the stored one. Enabling this requires the error store, because the outbound event is built from the internal record. Both settings take effect in the instance that serves this call; the result reports anything stored but not in force here.'
 	}
 ] as const satisfies readonly McpTool[];
 
