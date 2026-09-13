@@ -17,6 +17,36 @@ import { Grant } from '../../models/grant.js';
  * and a grant id, not the objects. It lives here rather than on the provider because it is CIBA
  * request lifecycle, not provider state — nothing it touches is per-provider.
  */
+/* An individual `acr` claim request, in either of the two forms §5.5.1 gives it. */
+interface RequestedAcr {
+	essential?: boolean;
+	value?: string;
+	values?: string[];
+}
+
+/*
+ * Whether the context the authentication device reported meets a context the client *required*.
+ * A merely preferred one — `acr_values`, or a claim without `essential: true` — never fails the
+ * transaction: the specification has the server return the context that was satisfied instead.
+ */
+function satisfiesRequiredAcr(
+	claims: { id_token?: { acr?: RequestedAcr } } | undefined,
+	acr: string | undefined
+): boolean {
+	const request = claims?.id_token?.acr;
+	if (!request?.essential) {
+		return true;
+	}
+	if (Array.isArray(request.values)) {
+		return acr !== undefined && request.values.includes(acr);
+	}
+	if (request.value !== undefined) {
+		return request.value === acr;
+	}
+	// Essential, but naming no acceptable value: any context satisfies it, absence does not.
+	return acr !== undefined;
+}
+
 export async function backchannelResult(
 	request,
 	result,
@@ -49,6 +79,25 @@ export async function backchannelResult(
 
 			if (request.payload.accountId !== result.payload.accountId) {
 				throw new Error('accountId mismatch');
+			}
+
+			/*
+			 * OIDC Core §5.5.1.1 requires an essential acr the authentication did not satisfy to be
+			 * treated as a failed authentication attempt. There is no login page to return to here, so
+			 * the failure this prevents is the opposite of the redirect flow's loop: a token issued
+			 * quietly, carrying a context that does not match what the client required, or none at all.
+			 *
+			 * Recorded at this point rather than at token issuance because this is when the outcome
+			 * becomes known: leaving the request marked successful would tell a ping-mode client to
+			 * collect a token that will never exist.
+			 */
+			if (!satisfiesRequiredAcr(request.payload.claims, acr)) {
+				Object.assign(request.payload, {
+					error: 'transaction_failed',
+					errorDescription:
+						'the authentication performed did not satisfy the requested acr'
+				});
+				break;
 			}
 
 			Object.assign(request.payload, {

@@ -10,6 +10,15 @@ import { Interaction } from 'lib/models/interaction.js';
 import { eventBus } from '../../event_bus.js';
 
 /*
+ * The two login-prompt checks that compare a requested authentication context against the one the
+ * session carries. Named here rather than imported so this module does not reach into the prompt's
+ * internals; the strings are the prompt's `reason` values, which are already public — they reach a
+ * relying party in the interaction details.
+ */
+const ACR_REASONS = new Set(['essential_acr', 'essential_acrs']);
+const isAcrReason = (reason: string) => ACR_REASONS.has(reason);
+
+/*
  * The interaction cookie's identity, owned next to the code that writes it.
  *
  * `(name, domain, path)` identifies a cookie, so the path is part of what has to be restated to clear
@@ -92,6 +101,22 @@ export default async function interactions(oidc) {
 		throw new errors.CustomOIDCProviderError(
 			failedCheck.error,
 			failedCheck.error_description
+		);
+	}
+
+	/*
+	 * The end user has authenticated and the requested authentication context still is not met, so
+	 * another login page cannot change the outcome — that is the unbounded loop this guard closes.
+	 * OIDC Core §5.5.1.1 calls for a failed authentication attempt here, not a further prompt.
+	 *
+	 * `oidc.result.login` is the discriminator between "has not tried yet", which must be shown a
+	 * login page, and "tried, and it is still not enough" — the same state the `max_age` check and
+	 * both consent checks already read for this purpose. Scoped to the ACR reasons: every other
+	 * prompt can legitimately be satisfied by a further interaction.
+	 */
+	if (oidc.result?.login && prompt.reasons?.some(isAcrReason)) {
+		throw new errors.UnmetAuthenticationRequirements(
+			failedCheck?.error_description
 		);
 	}
 

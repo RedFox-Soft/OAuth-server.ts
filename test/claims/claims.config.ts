@@ -4,7 +4,7 @@ const config = getConfig();
 
 export const ApplicationConfig = {
 	'claimsParameter.enabled': true,
-	acrValues: ['0', '1', '2']
+	acrValues: { password: '1', multi_factor: '2', federated: '3' }
 };
 
 export const addons = {

@@ -4,7 +4,7 @@ title: 'The TOTP second factor'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-27
-updated: 2026-09-01
+updated: 2026-09-13
 graph:
   node_type: concept
   relationships:
@@ -109,8 +109,19 @@ from ever enrolling — the throttle would become the attack.
 `amr` is set to `['pwd', 'otp']` on a two-factor sign-in and a password-only sign-in is left carrying no
 `amr` at all. Stamping `['pwd']` on the latter would be an observable change to the ID token of every
 bucket that does not use this feature, so the test a relying party makes is "does `amr` contain `otp`".
-Both values are registered in RFC 8176. `acr` is not set and `acr_values` requests are not honoured —
-there is no registered value meaning "two factors".
+Both values are registered in RFC 8176.
+
+**`acr` is no longer among the things that did not change.** As of commit `4101b93` a two-factor
+sign-in records the `multi_factor` authentication context alongside its `amr`, and `acr_values`
+requests are honoured — see [[authentication-context-reporting]]. What survives of the original
+reasoning is the narrower half: there is no *registered* value meaning "two factors", which is why
+the shipped default is an absolute URI of this project's own and why an operator is expected to
+rename it to whatever their relying parties already expect.
+
+One consequence belongs here rather than there, because it is a property of this feature: the demand
+for a second factor is a **bucket** flag, so an end user with an authenticator enrolled in a bucket
+that does not require one signs in with a password and reports the single-factor context. A relying
+party that *requires* multi-factor is refused for that person.
 
 Federated sign-in is never gated. The upstream provider owns its own factor policy, mirroring the
 existing split where `passwordLogin` governs password doors and federation is enabled per provider.

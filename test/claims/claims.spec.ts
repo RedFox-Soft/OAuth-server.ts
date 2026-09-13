@@ -1,4 +1,3 @@
-import get from 'lodash/get.js';
 import url from 'node:url';
 import {
 	describe,
@@ -21,7 +20,6 @@ import { fullProfileClaims } from '../models.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { Client } from 'lib/models/client.js';
 import { IdToken } from 'lib/models/id_token.js';
-import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { Interaction } from 'lib/models/interaction.js';
 
 const route = '/auth';
@@ -116,23 +114,15 @@ expire.setDate(expire.getDate() + 1);
 				delete client.defaultAcrValues;
 			});
 
-			it('(pre 4.x behavior backfill) should include the acr claim now', async function () {
-				const descriptor = Object.getOwnPropertyDescriptor(
-					OIDCContext.prototype,
-					'acr'
-				);
-
-				Object.defineProperty(OIDCContext.prototype, 'acr', {
-					get() {
-						return get(this, 'result.login.acr', '0');
-					}
-				});
+			it('carries the authentication context in the ID token when the client requests one by default', async function () {
+				const cookie = await setup.login();
+				setup.getSession().acr = '1';
 
 				const auth = new AuthorizationRequest({ scope: 'openid' });
-				const { id_token } = await getToken(auth);
+				const { id_token } = await getToken(auth, { cookie });
 
 				const { payload } = decodeJWT(id_token);
-				expect(payload).toContainKey('acr');
+				expect(payload.acr).toBe('1');
 			});
 		});
 
@@ -274,7 +264,18 @@ expire.setDate(expire.getDate() + 1);
 						if (auth) {
 							const cookie = `_interaction=cookieID; path=/ui/resume/resume; expires=${expire.toGMTString()}; httponly`;
 							cookies.push(cookie);
-							Object.assign(sess.payload, { params: auth.params });
+							/*
+							 * `claims` is stored as an object, the way a real interaction stores it. The
+							 * request helper JSON-stringifies it for the wire; storing that string here
+							 * made `oidc.claims` a string on resume, so `oidc.claims.id_token` was
+							 * undefined and every acr check returned early without comparing anything —
+							 * the cases below passed while proving nothing.
+							 */
+							const params = { ...auth.params };
+							if (typeof params.claims === 'string') {
+								params.claims = JSON.parse(params.claims);
+							}
+							Object.assign(sess.payload, { params });
 						}
 
 						if (result) {
@@ -461,7 +462,7 @@ expire.setDate(expire.getDate() + 1);
 					]);
 					auth.validateState(response);
 					auth.validateClientLocation(response);
-					auth.validateError(response, 'login_required');
+					auth.validateError(response, 'unmet_authentication_requirements');
 					auth.validateErrorDescription(
 						response,
 						'none of the requested ACRs could not be obtained'
@@ -523,7 +524,7 @@ expire.setDate(expire.getDate() + 1);
 					]);
 					auth.validateState(response);
 					auth.validateClientLocation(response);
-					auth.validateError(response, 'login_required');
+					auth.validateError(response, 'unmet_authentication_requirements');
 					auth.validateErrorDescription(
 						response,
 						'requested ACR could not be obtained'

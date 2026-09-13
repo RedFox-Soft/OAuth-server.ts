@@ -146,12 +146,18 @@ export class OIDCContext<T extends Record<string, unknown>> {
 		return undefined;
 	}
 
+	/*
+	 * Both read `payload` because that is where the value lives: `Session` declares `acr`/`amr` on
+	 * its TypeBox payload and `BaseModel` proxies nothing, so `session.acr` was `undefined` however
+	 * the session was loaded. The interaction policy compares a requested ACR against this getter,
+	 * so the miss made every essential `acr` request permanently unsatisfiable.
+	 */
 	get acr() {
-		return this.session.acr;
+		return this.session.payload.acr;
 	}
 
 	get amr() {
-		return this.session.amr;
+		return this.session.payload.amr;
 	}
 
 	get prompts() {

@@ -58,10 +58,22 @@ describe('custom claims', () => {
 		expect(configuration.scopes).toContain('insurance', 'payment');
 	});
 
-	it('removes the acr claim if no acrs are configured', () => {
-		ApplicationConfig.acrValues = [];
+	/*
+	 * Re-anchored: the claim used to be dropped when no acr values were configured, and that state is
+	 * no longer reachable — every authentication the server can distinguish carries a value, so it
+	 * can always supply the claim. What remains observable to a relying party reading discovery is
+	 * that the claim is advertised, and that what is advertised is what a sign-in can actually
+	 * produce.
+	 */
+	it('advertises the authentication context claim it can supply', () => {
+		ApplicationConfig.acrValues = {
+			password: 'bronze',
+			multi_factor: 'silver',
+			federated: 'gold'
+		};
 		reloadConfiguration();
 
-		expect(configuration.claimsSupported).not.toContain('acr');
+		expect(configuration.claimsSupported).toContain('acr');
+		expect([...configuration.acrValues]).toEqual(['bronze', 'silver', 'gold']);
 	});
 });

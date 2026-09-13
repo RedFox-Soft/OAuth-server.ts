@@ -34,7 +34,11 @@ import {
 	offer as offerEnrollment
 } from 'lib/totp/enrollment.js';
 import { MAX_ATTEMPTS_PER_INTERACTION } from 'lib/totp/consts.js';
-import { AccessDenied, SessionNotFound } from 'lib/helpers/errors.js';
+import {
+	AccessDenied,
+	SessionNotFound,
+	UnmetAuthenticationRequirements
+} from 'lib/helpers/errors.js';
 import epochTime from '../helpers/epoch_time.js';
 import sessionHandler from 'lib/shared/session.js';
 import respond from 'lib/actions/authorization/respond.js';
@@ -120,7 +124,7 @@ function persistInteraction(interaction: {
 	 */
 	return interaction.save(Math.max(1, remaining));
 }
-import { ApplicationConfig } from 'lib/configs/application.js';
+import { ApplicationConfig, configuration } from 'lib/configs/application.js';
 
 async function resume(interaction, cookie) {
 	const ctx = { cookie, _matchedRouteName: 'ui.resume' };
@@ -134,11 +138,13 @@ async function resume(interaction, cookie) {
 	}
 	cookie._interaction.set(expiredInteractionCookie(interaction.uid as string));
 
-	// An interaction that resolved with an error result aborts the authorization request and
-	// redirects the User-Agent back to the client with that error (mirrors device_resume and the
-	// authorization error handler).
-	if (ctx.oidc.result?.error) {
-		const { error, error_description: errorDescription } = ctx.oidc.result;
+	/*
+	 * Aborting the authorization request back to the client, which this route has to do for itself:
+	 * the shared onError only redirects on the authorization route, and this is `ui.resume`. The
+	 * stored interaction's params already passed redirect_uri validation, so there is nothing left
+	 * to check here.
+	 */
+	async function abortToClient(error: string, errorDescription?: string) {
 		const out = {
 			error,
 			...(errorDescription ? { error_description: errorDescription } : {}),
@@ -153,13 +159,34 @@ async function resume(interaction, cookie) {
 		return await handler({ oidc: ctx.oidc }, ctx.oidc.params.redirect_uri, out);
 	}
 
+	// An interaction that resolved with an error result aborts the authorization request and
+	// redirects the User-Agent back to the client with that error (mirrors device_resume and the
+	// authorization error handler).
+	if (ctx.oidc.result?.error) {
+		const { error, error_description: errorDescription } = ctx.oidc.result;
+		return abortToClient(error, errorDescription);
+	}
+
 	await checkClient(ctx.oidc);
 	await checkResource(ctx.oidc);
 	eventBus.emit('interaction.ended');
 	assignClaims(ctx.oidc);
 	await loadAccount(ctx.oidc);
 	await loadGrant(ctx.oidc);
-	const redirectUri = await interactions(ctx.oidc);
+	let redirectUri;
+	try {
+		redirectUri = await interactions(ctx.oidc);
+	} catch (err) {
+		/*
+		 * The end user authenticated and the required authentication context still is not met, so the
+		 * policy refused rather than minting another interaction. It has to be delivered here: on
+		 * this route the shared error handler would render it instead of returning it to the client.
+		 */
+		if (err instanceof UnmetAuthenticationRequirements) {
+			return abortToClient(err.error, err.error_description);
+		}
+		throw err;
+	}
 	if (redirectUri) {
 		await setCookies();
 		return Response.redirect(redirectUri, 303);
@@ -500,7 +527,13 @@ export const ui = new Elysia()
 			interaction.payload.result = {
 				login: {
 					accountId: user._id,
-					transient: body.remember === 'on'
+					transient: body.remember === 'on',
+					/*
+					 * The context this sign-in satisfied. A password alone, because a bucket that demands
+					 * a second factor never reaches here — it stages `secondFactor` above, and the
+					 * context is decided once the code is verified.
+					 */
+					acr: configuration.acrMap.password
 				}
 			};
 			return resume(interaction, cookie);
@@ -594,7 +627,8 @@ export const ui = new Elysia()
 					 * so "otp is present" is the test, and nothing changes for a bucket that does not
 					 * require the factor.
 					 */
-					amr: ['pwd', 'otp']
+					amr: ['pwd', 'otp'],
+					acr: configuration.acrMap.multi_factor
 				}
 			};
 			delete interaction.payload.secondFactor;
@@ -717,7 +751,8 @@ export const ui = new Elysia()
 				login: {
 					accountId: pending.accountId,
 					transient: pending.transient,
-					amr: ['pwd', 'otp']
+					amr: ['pwd', 'otp'],
+					acr: configuration.acrMap.multi_factor
 				}
 			};
 			delete interaction.payload.secondFactor;
@@ -837,7 +872,7 @@ export const ui = new Elysia()
 
 			interaction.payload.result = {
 				// No `transient`: there is no "remember me" on a federated sign-in.
-				login: { accountId: user._id }
+				login: { accountId: user._id, acr: configuration.acrMap.federated }
 			};
 			return resume(interaction, cookie);
 		},

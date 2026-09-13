@@ -11,6 +11,18 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- conformance: the server now reports which authentication context a sign-in satisfied. A password
+  sign-in, one with a second factor and one delegated to an upstream provider are distinguished, and
+  the `acrValues` setting changes from a free-form list to a map from those three to the value each
+  is reported as — so an operator can name the vocabulary their relying parties already expect, while
+  `acr_values_supported` is derived from those values and cannot advertise a context no sign-in
+  produces. Two behaviour changes an integrator could notice: `acr_values_supported` and the `acr`
+  entry in `claims_supported` now appear where they were absent, and an unmeetable essential `acr`
+  request answers with the registered `unmet_authentication_requirements` instead of looping on the
+  login page — with `prompt=none` that replaces `login_required`. On the backchannel path the same
+  requirement, unmet, ends the transaction as `transaction_failed` rather than issuing a token whose
+  context does not match. A request that asks for no context is unchanged.
+
 - conformance: `pkce.required`, a super-admin setting that relaxes the proof-of-possession demand for
   clients which authenticate at the token endpoint. On by default, so nothing changes for a
   deployment that leaves it alone. It exists because the OpenID Connect Basic profile sends a code

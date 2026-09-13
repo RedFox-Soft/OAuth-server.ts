@@ -893,10 +893,12 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 		key: 'acrValues',
 		domain: 'endpoints',
 		group: 'Discovery',
-		label: 'Supported acr values',
-		summary: 'ACR values this server claims to support',
-		type: 'string-array',
-		description: 'ACR values the server supports (acr_values_supported).'
+		label: 'Authentication context values',
+		summary:
+			'Which acr value each authentication this server can distinguish is reported as',
+		type: 'json',
+		description:
+			'Which Authentication Context Class Reference each authentication this server can distinguish is reported as, e.g. {"password":"1","multi_factor":"2","federated":"1"}. The server owns the distinctions and you own the names: a relying party matches a requested context against the one satisfied by exact string comparison, so values your applications already expect are what belong here. `acr_values_supported` is derived from these, so what is advertised is always what a sign-in can actually produce. Every distinction needs a value, no two may share one, and "0" is reserved by the specification for an authentication carrying no confidence that the same person is there. Note that a relying party which *requires* the multi-factor context is refused for anyone who signs in with a password alone — and whether a second factor is demanded is a user bucket setting, not a property of the person, so an end user with one enrolled in a bucket that does not require it reports the password context. A federated sign-in is never gated by that setting at all.'
 	},
 	{
 		key: 'clientAuthMethods',

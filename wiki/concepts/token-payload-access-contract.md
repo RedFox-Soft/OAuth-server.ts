@@ -4,7 +4,7 @@ title: "Token payload access contract"
 tags: [contract, gotcha, architecture]
 sources: [oauth-server-codebase]
 created: 2026-07-31
-updated: 2026-07-31
+updated: 2026-09-13
 graph:
   node_type: concept
   relationships:
@@ -44,6 +44,19 @@ The failure is silent. Reading `token.clientId` yields `undefined`, and `undefin
 failure or a mis-scoped token. This is how it broke CIBA: the delivery path read the client id off
 the instance instead of the payload.
 
+**The second recorded instance was inside an accessor, which is worse.** `OIDCContext` exposed
+`get acr() { return this.session.acr; }` — one indirection away from every call site, so each caller
+read `oidc.acr` and looked entirely correct. `Session` keeps `acr` on its payload, so the getter
+returned `undefined` unconditionally, and the interaction policy compared a requested authentication
+context against it. The result was not a mis-scoped token but a **permanently unsatisfiable protocol
+feature**: an essential `acr` request could never be met, and the end user was returned to the login
+page forever. `amr` had the identical defect on the next line. See
+[[authentication-context-reporting]].
+
+The general lesson the two instances share: when the bare read is hidden behind a getter, the
+contract cannot be enforced by reviewing call sites, because the call sites are right. It has to be
+enforced where the getter is written.
+
 Code that must tolerate a partially populated context reaches through the payload explicitly, for
 example `lib/addon/account.ts:14`:
 
@@ -79,5 +92,8 @@ persists.
 - [[account-resolution]] — reads `_token.payload.clientId` to resolve the user bucket.
 - [[client-identity-from-database]] — the validated-client object this contract does *not* apply to.
 - [[event-bus]] — why `base_token` → `base_model` → event bus module cycles matter for initialisation.
+- [[authentication-context-reporting]] — the second instance of this contract being broken, and the
+  one that cost a protocol feature rather than one delivery path.
 
-Verified against [[oauth-server-codebase]] at commit `2125ad0`.
+Verified against [[oauth-server-codebase]] at commit `2125ad0`, except the accessor instance above,
+which is verified at `4101b93`.

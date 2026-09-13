@@ -30,8 +30,10 @@ type Config = typeof ApplicationConfig;
 // lib/configs/configuration.ts (collectScopes/collectClaims/collectGrantTypes/checkAuthMethods);
 // the parity fixture test guards against divergence.
 
+// Mirrors lib/configs/configuration.ts: the advertised set is the values assigned to the
+// distinctions, so an operator cannot advertise a context that no sign-in here produces.
 function deriveAcrValues(config: Config): string[] {
-	return [...config.acrValues];
+	return [...new Set(Object.values(config.acrValues))];
 }
 
 function deriveScopes(config: Config): string[] {
@@ -80,11 +82,6 @@ function deriveClaimsSupported(config: Config): string[] {
 	const openid = claims.openid;
 	if (isPlainObject(openid) && !('sub' in openid)) {
 		openid.sub = null;
-	}
-
-	// acr is only advertised when the server declares acr values.
-	if (!deriveAcrValues(config).length) {
-		delete claims.acr;
 	}
 
 	const supported = new Set<string>();

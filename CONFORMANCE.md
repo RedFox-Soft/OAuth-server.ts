@@ -177,8 +177,27 @@ error code to real clients.
 
 ### An essential `acr` claim locks the user in a login loop
 
-Not found by a run — found by reading the code behind the `acr` warning below, and confirmed by hand.
-The conformance suite cannot reach it, and that is the interesting part.
+**Fixed**, together with the `acr` gap below — they were one defect with two symptoms, and the
+check against the governing text turned up two more things worth recording.
+
+The diagnosis below was right that nothing assigns an ACR, and wrong that everything downstream was
+wired: [`lib/helpers/oidc_context.ts`](lib/helpers/oidc_context.ts) read `session.acr`, and the value
+lives at `session.payload.acr` with no accessor above it, so `oidc.acr` was `undefined` even when the
+session carried one. Both gaps are closed — a sign-in now records which of three distinctions it
+satisfied (`lib/consts/acr.ts`), and the getter reads the payload.
+
+The loop itself is closed where it was made: [`interactions.ts`](lib/actions/authorization/interactions.ts)
+now refuses rather than minting another interaction once the end user has authenticated and the
+requirement still is not met, answering with the registered `unmet_authentication_requirements` —
+which already existed in `lib/helpers/errors.ts` with no call site. On the `prompt=none` path that
+replaces `login_required`, which said the end user had not authenticated when they had.
+
+Two findings the report did not have. The loop is **unreachable on default settings**:
+`claimsParameter.enabled` ships off, and §5.5.1.1 conditions its MUST on exactly that support, so the
+obligation and the defect appear and disappear together. And the backchannel path broke the same
+invariant from the other end — no login page, so no loop, but a token issued carrying a context that
+did not match what was required, or none at all. That is refused now as CIBA §12's
+`transaction_failed`, never `access_denied`: the end user authenticated, they denied nothing.
 
 Nothing ever assigns an ACR. The three places that build a login result
 ([`lib/interactions/index.ts`](lib/interactions/index.ts)) set `accountId`, `transient` and sometimes
@@ -230,9 +249,20 @@ mismatch. That was a defect on a path that already existed, unrelated to the bod
 because nothing exercised it.
 _Module: `oidcc-userinfo-post-body` (warning)._
 
-No `acr` claim is returned when a request carries `acr_values`. This looks like a consequence of
-`acrValues: []` in [`lib/configs/application.ts`](lib/configs/application.ts) — configuration rather
-than code — but that has not been confirmed by a run with a value set.
+**The second is fixed.** No `acr` claim was returned when a request carried `acr_values`. The guess
+that `acrValues: []` was the whole of it turned out to be half: the empty set did drop `acr` from
+`claims_supported`, but the server also had nothing to put there, because no sign-in recorded a
+context and the request context could not read one if it had. Both are closed above.
+
+`acrValues` is no longer a free-form list. It is a map from the three authentications this server can
+distinguish — password, password with a second factor, and a sign-in delegated upstream — to the
+value each is reported as, and `acr_values_supported` is **derived** from those values rather than
+stated beside them, so an operator can name the vocabulary their relying parties expect and cannot
+advertise a context no sign-in produces. Shipping defaults are absolute URIs, per §2's SHOULD.
+
+A voluntary request now gets what §5.5.1.1 asks for — the context actually satisfied, rather than
+silence or a failure — and a request that names no context is unchanged, because the same section
+says the claim is not required when it was not asked for.
 _Module: `oidcc-ensure-request-with-acr-values-succeeds` (warning)._
 
 ## Dynamic

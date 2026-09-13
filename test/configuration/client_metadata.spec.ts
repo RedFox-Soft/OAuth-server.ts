@@ -365,35 +365,32 @@ describe('Client metadata validation', () => {
 
 	describe('default_acr_values', function () {
 		mustBeArray('default_acr_values');
-		const acrValues = ['0', '1', '2'];
+		/*
+		 * The permitted set is what the server advertises, which is derived from the value assigned to
+		 * each authentication it can distinguish — so a client can only ask by default for a context
+		 * some sign-in here actually produces. The values are named by this fixture rather than taken
+		 * from the shipped defaults, so the rule is asserted and the default strings are not pinned.
+		 */
+		const acrValues = { password: '1', multi_factor: '2', federated: '3' };
+		const permitted = ['1', '2', '3'];
 
 		allows('default_acr_values', []);
-		acrValues.forEach((value) => {
+		permitted.forEach((value) => {
 			allows('default_acr_values', [value], undefined, { acrValues });
 		});
-		allows('default_acr_values', acrValues, undefined, { acrValues });
+		allows('default_acr_values', permitted, undefined, { acrValues });
 		rejects('default_acr_values', [123], /must only contain strings$/);
 		rejects(
 			'default_acr_values',
 			['not a member'],
-			'default_acr_values must be empty (no values are allowed)'
-		);
-		rejects('default_acr_values', [
-			'not a member',
-			'1',
-			'default_acr_values must be empty (no values are allowed)'
-		]);
-		rejects(
-			'default_acr_values',
-			['not a member'],
-			"default_acr_values can only contain '0', '1', or '2'",
+			"default_acr_values can only contain '1', '2', or '3'",
 			undefined,
 			{ acrValues }
 		);
 		rejects(
 			'default_acr_values',
 			['not a member', '1'],
-			"default_acr_values can only contain '0', '1', or '2'",
+			"default_acr_values can only contain '1', '2', or '3'",
 			undefined,
 			{ acrValues }
 		);

@@ -106,6 +106,13 @@ class LoginPromt extends Prompt {
 		{
 			reason: 'essential_acrs',
 			description: 'none of the requested ACRs could not be obtained',
+			/*
+			 * OIDC Core §5.5.1.1: an essential acr that cannot be met MUST be treated as a failed
+			 * authentication attempt. `unmet_authentication_requirements` is the code registered for
+			 * exactly that case, so it replaces the prompt's `login_required` default — which said the
+			 * end user had not authenticated, when in fact they had.
+			 */
+			error: 'unmet_authentication_requirements',
 			check: (ctx: any) => {
 				const { oidc } = ctx;
 				const request = oidc.claims?.id_token?.acr ?? {};
@@ -127,6 +134,8 @@ class LoginPromt extends Prompt {
 		{
 			reason: 'essential_acr',
 			description: 'requested ACR could not be obtained',
+			// The single-valued form of the requirement above, and the same rule applies to it.
+			error: 'unmet_authentication_requirements',
 			check: (ctx: any) => {
 				const { oidc } = ctx;
 				const request = oidc.claims?.id_token?.acr ?? {};

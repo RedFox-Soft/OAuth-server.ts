@@ -5,6 +5,8 @@ import {
 } from '../adapters/index.js';
 import { validateConfiguration, type Configuration } from './configuration.js';
 import { resolveNonceSecret } from './nonceSecret.js';
+// Import-free module, so this adds no runtime edge into the adapters or the models.
+import { DEFAULT_ACR_VALUES } from '../consts/acr.js';
 import { initPairwiseSalt } from './pairwiseSalt.js';
 
 export const ApplicationConfig = {
@@ -602,9 +604,14 @@ export const ApplicationConfig = {
 	/*
 	 * acrValues
 	 *
-	 * description: Authentication Context Class References the server supports; surfaced as `acr_values_supported`.
+	 * description: Which Authentication Context Class Reference each authentication this server can
+	 *   distinguish is reported as. The server owns the distinctions, an operator owns the names:
+	 *   matching a requested context against a satisfied one is exact string comparison, so a
+	 *   deployment whose relying parties expect their own vocabulary must be able to say so, while
+	 *   nobody can advertise a context that no sign-in here produces. `acr_values_supported` is
+	 *   derived from these values rather than stated beside them, so the two cannot disagree.
 	 */
-	acrValues: [],
+	acrValues: { ...DEFAULT_ACR_VALUES },
 
 	/*
 	 * conformIdTokenClaims

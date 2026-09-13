@@ -18,6 +18,9 @@ import bootstrap, { agent } from '../test_helper.js';
  * discovery_pruning.spec.ts and metadata_classification.spec.ts.
  */
 const DEFAULT_MEMBERS = [
+	// Present on a deployment that has configured nothing, because the server always knows which
+	// authentication contexts it can report — the set is derived from them rather than typed in.
+	'acr_values_supported',
 	'authorization_endpoint',
 	'authorization_response_iss_parameter_supported',
 	'claim_types_supported',

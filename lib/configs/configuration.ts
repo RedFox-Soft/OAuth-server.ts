@@ -11,6 +11,12 @@ import { isUsableNonceSecret } from './nonceSecret.js';
 // bound is read from there rather than restated here so the throttle's own module and the validator
 // that guards it cannot disagree about how long a counter lives.
 import { LOGIN_RETENTION_SECONDS } from '../login_throttle/consts.js';
+import {
+	ACR_DISTINCTIONS,
+	RESERVED_ACR_VALUE,
+	type AcrDistinction,
+	type AcrValues
+} from '../consts/acr.js';
 // The SDK's own DSN parser, so "the operator supplied a usable credential" and "the client can be
 // built from it" cannot disagree. Pure and total — it returns undefined rather than throwing on a
 // malformed value — and reused rather than restated for the reason the two imports above give: a
@@ -24,7 +30,10 @@ import { dsnFromString } from '@sentry/core';
  */
 export interface Configuration {
 	scopes: Set<string>;
+	/* What discovery advertises: derived from acrMap's values, never stated beside them. */
 	acrValues: Set<string>;
+	/* Which value each authentication the server can distinguish is reported as. */
+	acrMap: AcrValues;
 	clientAuthMethods: Set<string>;
 	claims: ClaimsConfig;
 	grantTypes: Set<string>;
@@ -46,6 +55,56 @@ export type ConfigurationInput = ApplicationConfigType;
  * entries are read back more loosely than they are written.
  */
 type ClaimsConfig = Record<string, unknown>;
+
+/*
+ * The distinction -> value map an operator controls, checked here rather than only at the admin
+ * route so the console, the agent surface and boot all refuse the same things for the same reasons.
+ * Returns the map; the supported set advertised in discovery is derived from its values, never
+ * stated beside them, so the two cannot disagree.
+ */
+function toAcrValues(value: unknown): AcrValues {
+	if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+		throw new TypeError(
+			`acrValues must be a map of ${ACR_DISTINCTIONS.join(', ')} to the value each is reported as`
+		);
+	}
+
+	const map = value as Record<string, unknown>;
+
+	for (const key of Object.keys(map)) {
+		if (!(ACR_DISTINCTIONS as readonly string[]).includes(key)) {
+			throw new TypeError(
+				`acrValues names '${key}', which is not an authentication the server can distinguish`
+			);
+		}
+	}
+
+	const seen = new Map<string, AcrDistinction>();
+	for (const distinction of ACR_DISTINCTIONS) {
+		const assigned = map[distinction];
+		if (typeof assigned !== 'string' || !assigned) {
+			throw new TypeError(
+				`acrValues.${distinction} must be a non-empty string — a sign-in of that kind would otherwise have no context to report`
+			);
+		}
+		if (assigned === RESERVED_ACR_VALUE) {
+			throw new TypeError(
+				`acrValues.${distinction} may not be '${RESERVED_ACR_VALUE}': OIDC Core §2 reserves it for an authentication carrying no confidence that the same person is there`
+			);
+		}
+		const clash = seen.get(assigned);
+		if (clash) {
+			throw new TypeError(
+				`acrValues.${distinction} repeats the value given to ${clash}; a requested context would then be satisfied by either sign-in`
+			);
+		}
+		seen.set(assigned, distinction);
+	}
+
+	return Object.fromEntries(
+		ACR_DISTINCTIONS.map((d) => [d, map[d] as string])
+	) as AcrValues;
+}
 
 function toSet(name: string, value: unknown): Set<string> {
 	if (value instanceof Set) {
@@ -94,12 +153,6 @@ function ensureOpenIdSub(claims: ClaimsConfig) {
 	}
 	if (!Object.keys(openid).includes('sub')) {
 		openid.sub = null;
-	}
-}
-
-function removeAcrIfEmpty(acrValues: Set<string>, claims: ClaimsConfig) {
-	if (!acrValues.size) {
-		delete claims.acr;
 	}
 }
 
@@ -580,7 +633,8 @@ export function validateConfiguration(
 	config: ConfigurationInput
 ): Configuration {
 	const scopes = toSet('scopes', config.scopes);
-	const acrValues = toSet('acrValues', config.acrValues);
+	const acrMap = toAcrValues(config.acrValues);
+	const acrValues = new Set(Object.values(acrMap));
 	const clientAuthMethods = toSet(
 		'clientAuthMethods',
 		config.clientAuthMethods
@@ -591,7 +645,6 @@ export function validateConfiguration(
 	collectScopes(scopes, claims);
 	unpackArrayClaims(claims);
 	ensureOpenIdSub(claims);
-	removeAcrIfEmpty(acrValues, claims);
 	const claimsSupported = collectClaims(scopes, claims);
 	const grantTypes = collectGrantTypes(config, scopes);
 
@@ -608,6 +661,7 @@ export function validateConfiguration(
 	return {
 		scopes,
 		acrValues,
+		acrMap,
 		clientAuthMethods,
 		claims,
 		grantTypes,
