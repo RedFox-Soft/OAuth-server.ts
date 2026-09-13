@@ -61,6 +61,19 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- jwks: key generation offers every asymmetric signing algorithm the server knows — `RS256`/`384`/
+  `512`, `PS256`/`384`/`512`, `ES256`/`384`/`512`, `EdDSA` and `Ed25519` — in the console and through
+  the agent tool, read from the algorithm register rather than restated beside it. It offered only the
+  three RSA `RS*` algorithms, which meant a FAPI 2.0 deployment could not be assembled through this
+  server's own management surface at all: the profile requires PS256 or ES256, and the operator had to
+  write a key straight into the key store. An existing RSA key is still not made to sign PS256 —
+  RFC 7517 §4.4 makes a key's `alg` the algorithm it is intended for, and honouring a key past its
+  declared intent would let a deployment that pinned a key to one algorithm quietly use another.
+  Generating the key you need is the route. The key page also now says when a generated algorithm is
+  not yet advertised: discovery's algorithm lists are built at startup, so such a key signs
+  immediately but no client asks for it until a restart — previously the page reported no restart
+  required, which was true of the key and misleading about the deployment.
+
 - userinfo: the access token may be presented in a form-encoded POST body, which OpenID Connect Core
   §5.3.1 describes alongside the header form. The body form is honoured only under the conditions
   RFC 6750 §2.2 attaches — a POST whose body is form-encoded — and a request that uses both methods

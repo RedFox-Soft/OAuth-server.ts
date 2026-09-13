@@ -23,6 +23,7 @@ interface JwksState {
 	keys: KeyView[];
 	restartRequired: boolean;
 	changedKeys: string[];
+	unadvertisedAlgorithms: string[];
 	supportedAlgorithms: string[];
 }
 
@@ -202,7 +203,21 @@ export function Keys() {
 					showIcon
 					style={{ marginBottom: 16 }}
 					message="Restart required to apply"
-					description={`Pending key changes take effect after a server restart: ${state.changedKeys.join(', ')}`}
+					description={[
+						state.changedKeys.length
+							? `Pending key changes take effect after a server restart: ${state.changedKeys.join(', ')}`
+							: null,
+						/*
+						 * Stated separately from the pending-key list because the remedy is the same and the
+						 * cause is not. A key can sign the moment it is generated, but clients only ask for an
+						 * algorithm the discovery document names, and that document is built at startup.
+						 */
+						state.unadvertisedAlgorithms.length
+							? `Signed responses can already use ${state.unadvertisedAlgorithms.join(', ')}, but clients will not ask for them until a restart adds them to the discovery document.`
+							: null
+					]
+						.filter(Boolean)
+						.join(' ')}
 				/>
 			)}
 

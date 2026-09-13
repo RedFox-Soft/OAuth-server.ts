@@ -263,13 +263,28 @@ $ curl -o /dev/null -w '%{http_code} %{content_type}\n' -u <client> -X POST /par
 Two things that looked like defects turned out to be configuration, and both are worth keeping:
 
 - **Signing algorithms.** 21 modules failed `FAPI2ValidateIdTokenSigningAlg` until an ES256 key was
-  added; then all 21 passed. The signing path is sound. What is _not_ sound is that this could not be
-  done through the product: `SUPPORTED_ALGS` in
-  [`lib/admin/jwks/schema.ts`](lib/admin/jwks/schema.ts) is `['RS256','RS384','RS512']`, and
-  `getAlgorithm` ([`lib/configs/verifyJWKs.ts`](lib/configs/verifyJWKs.ts)) advertises exactly the one
-  `alg` stamped on each stored key. So ES256 cannot be generated at all, and PS256 is unreachable even
-  though the RSA key already present can sign it. **A FAPI 2.0 deployment cannot be configured through
-  this server's own console.** The key here was written straight to `jwksStore`.
+  added; then all 21 passed. The signing path was sound; what was not was that this could not be done
+  through the product. `SUPPORTED_ALGS` in
+  [`lib/admin/jwks/schema.ts`](lib/admin/jwks/schema.ts) was `['RS256','RS384','RS512']`, so ES256
+  could not be generated at all and the key for that run was written straight to `jwksStore`. **Fixed**:
+  the console and the agent tool now offer every asymmetric signing algorithm this server knows —
+  `RS*`, `PS*`, `ES*`, `EdDSA` and `Ed25519` — read from the algorithm register rather than restated,
+  so the two cannot disagree.
+
+  PS256 on the RSA key that is already there is a different question, and the answer is deliberately
+  no. `getAlgorithm` ([`lib/configs/verifyJWKs.ts`](lib/configs/verifyJWKs.ts)) advertises the one
+  `alg` stamped on each stored key, and key selection matches that `alg` exactly, because RFC 7517
+  §4.4 makes `alg` the algorithm the key is _intended_ for. Honouring a key beyond its declared intent
+  would let a deployment that pinned a key to RS256 quietly sign PS256 with it. Generating a PS256 key
+  is the supported route, and now an available one.
+
+  One thing the fix surfaced that the report did not name: the discovery document's algorithm lists
+  are built at startup from the boot key set, so a generated key signs at once but is not _advertised_
+  until a restart. The console said "no restart required" and meant it about the key, which left an
+  operator with a server that could sign ES256 and a discovery document that never mentioned it. The
+  key page now reports that separately from pending key changes, because the remedy is the same and
+  the cause is not.
+
 - **Registered redirect URIs.** FAPI modules append `?dummy1=lorem&dummy2=ipsum` to prove the match is
   exact. A static client must register that variant too, and `authorization.requirePushedAuthorizationRequests`
   must be set, or four more modules fail for reasons that are the test config.
@@ -413,9 +428,16 @@ depends on that echo.
 
 ### Signing algorithms are below what FAPI 2.0 requires
 
-`id_token_signing_alg_values_supported` and `userinfo_signing_alg_values_supported` are
-`['HS256', 'RS256']`; FAPI 2.0 requires PS256 or ES256. This is a real gap for this profile alone —
-nothing in the OIDC profiles asks for it.
+**Fixed**, in the sense that mattered: the operator can now reach them.
+
+`id_token_signing_alg_values_supported` and `userinfo_signing_alg_values_supported` were
+`['HS256', 'RS256']` on a default instance; FAPI 2.0 requires PS256 or ES256. That is a property of
+which keys the deployment holds rather than of the code — the lists are derived from the key set —
+and the defect was that the console could only ever produce RSA `RS*` keys, so the required lists were
+unreachable through the product. Key generation now offers every asymmetric signing algorithm the
+server knows, so a FAPI 2.0 target is assembled by generating an ES256 (or PS256) key and restarting.
+See the signing-algorithms note under _Re-run of 2026-09-11, after five fixes_ for why the restart is
+part of it and why an existing RS256 key is not made to sign PS256.
 
 ### Not this server
 

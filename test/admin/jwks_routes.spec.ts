@@ -111,8 +111,25 @@ describe('admin JWKS API — view (US1)', () => {
 		expect(body.keys.every((k) => k.status === 'active')).toBe(true);
 		expect(body.restartRequired).toBe(false);
 		expect(body.changedKeys).toEqual([]);
-		expect(body.supportedAlgorithms).toEqual(['RS256', 'RS384', 'RS512']);
 		assertNoPrivateMaterial(body.keys);
+	});
+
+	it('offers only algorithms it can actually produce a key for', async () => {
+		const { cookie } = await sessionCookieFor(['super_admin']);
+		const res = await client.admin.api.jwks.get({ headers: { cookie } });
+		const { supportedAlgorithms } = res.data as JwksState;
+
+		expect(supportedAlgorithms.length).toBeGreaterThan(0);
+		for (const alg of supportedAlgorithms) {
+			const {
+				keys: [key]
+			} = await generateJWKS(alg as Parameters<typeof generateJWKS>[0]);
+			// The key's own `alg` is what selection and the discovery document both read, so a
+			// generator that produced a key stamped with anything else would advertise one algorithm
+			// and sign with another.
+			expect(key.alg).toBe(alg);
+			expect(key.use).toBe('sig');
+		}
 	});
 
 	// The view reads the persisted store directly, so it sees keys exactly as an operator wrote
@@ -205,10 +222,63 @@ describe('admin JWKS API — generate (US2)', () => {
 		expect(audit[0].actorEmail).toBeTruthy();
 	});
 
-	it('rejects an unsupported algorithm with 422', async () => {
+	it('generates the ES256 key a FAPI 2.0 deployment needs', async () => {
 		const { cookie } = await sessionCookieFor(['super_admin']);
+		const before = (await client.admin.api.jwks.get({ headers: { cookie } }))
+			.data as JwksState;
+		const beforeKids = new Set(before.keys.map((k) => k.kid));
+
 		const res = await client.admin.api.jwks.post(
 			{ alg: 'ES256' },
+			{ headers: { cookie } }
+		);
+		expect(res.status).toBe(200);
+		const body = res.data as JwksState;
+
+		const created = body.keys.find((k) => !beforeKids.has(k.kid));
+		expect(created?.alg).toBe('ES256');
+		expect(created?.kty).toBe('EC');
+		expect(created?.status).toBe('active');
+		assertNoPrivateMaterial(body.keys);
+	});
+
+	it('reports a generated algorithm the running server does not advertise as awaiting a restart', async () => {
+		const { cookie } = await sessionCookieFor(['super_admin']);
+		const before = (await client.admin.api.jwks.get({ headers: { cookie } }))
+			.data as JwksState;
+		expect(before.unadvertisedAlgorithms).toEqual([]);
+		expect(before.restartRequired).toBe(false);
+
+		// Derived rather than named, so the case does not depend on which algorithms this deployment
+		// happens to have booted with.
+		const bootAlgs = new Set(JWKS_KEYS.map((k) => k.alg));
+		const unbooted = before.supportedAlgorithms.find((a) => !bootAlgs.has(a));
+		if (!unbooted) {
+			throw new Error('every offered algorithm is already a boot key');
+		}
+
+		const res = await client.admin.api.jwks.post(
+			{ alg: unbooted },
+			{ headers: { cookie } }
+		);
+		expect(res.status).toBe(200);
+		const body = res.data as JwksState;
+
+		/*
+		 * The key signs at once, but the discovery document is built from the boot key set — so until a
+		 * restart no client learns the algorithm exists. An operator told "no restart required" would
+		 * have a server that signs what nothing ever asks it to sign.
+		 */
+		expect(body.unadvertisedAlgorithms).toContain(unbooted);
+		expect(body.restartRequired).toBe(true);
+	});
+
+	it('rejects a symmetric algorithm with 422', async () => {
+		const { cookie } = await sessionCookieFor(['super_admin']);
+		// HS256 is a signing algorithm this server knows, and is not one a key set can hold: the
+		// refusal is about what may be generated, not about an unrecognised string.
+		const res = await client.admin.api.jwks.post(
+			{ alg: 'HS256' },
 			{ headers: { cookie } }
 		);
 		expect(res.status).toBe(422);

@@ -1,15 +1,33 @@
 import { t } from 'elysia';
+import { ECSignAlg, OKPSignAlg, RSASignAlg } from 'lib/configs/jwaConsts.js';
 
 /*
- * RSA signing algorithms offered for generation. EC/OKP and encryption-use keys are out of scope for
- * key *generation*; such keys may still exist in the store if provisioned out of band, and are
- * displayed and removable.
+ * The asymmetric signing algorithms offered for generation — every one this server knows, taken
+ * from the algorithm register itself rather than restated, so the two cannot disagree.
+ *
+ * It used to be the three RSA `RS*` algorithms, on the reasoning that EC and OKP keys could be
+ * provisioned out of band. That reasoning had a cost nobody had measured: FAPI 2.0 requires PS256 or
+ * ES256, so a deployment targeting that profile could not be assembled through this server's own
+ * console at all — the operator had to write a key straight into the store. A management API that
+ * cannot produce the keys its own profiles require is not a management API.
+ *
+ * `EdDSA` and `Ed25519` both appear, and produce the same kind of key. That is not a duplicate: they
+ * are distinct `alg` identifiers on the wire, and key selection matches a key's declared `alg`
+ * exactly — so a deployment whose clients ask for one cannot be served by a key stamped the other.
+ *
+ * Encryption-use keys remain out of scope for generation; such keys may still exist in the store if
+ * provisioned out of band, and are displayed and removable.
  *
  * Declared here rather than in `service.ts` so the MCP tool catalogue can build an agent-facing schema
  * from the same list the service validates against — the service module reaches the adapters and from
- * there `lib/adapters/mongodb/db.ts`, which connects at import time.
+ * there `lib/adapters/mongodb/db.ts`, which connects at import time. `jwaConsts` is import-free, so
+ * reading it here adds no edge to that graph.
  */
-export const SUPPORTED_ALGS = ['RS256', 'RS384', 'RS512'] as const;
+export const SUPPORTED_ALGS = [
+	...RSASignAlg,
+	...ECSignAlg,
+	...OKPSignAlg
+] as const;
 export type SupportedAlg = (typeof SUPPORTED_ALGS)[number];
 
 /*

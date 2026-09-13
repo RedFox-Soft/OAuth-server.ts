@@ -6,7 +6,11 @@ import {
 	type PublicJWK
 } from '../../configs/keystore.js';
 import { generateJWKS } from '../../helpers/jwks.js';
-import { type UnnormalizedJWK } from '../../configs/verifyJWKs.js';
+import {
+	getAlgorithm,
+	type UnnormalizedJWK
+} from '../../configs/verifyJWKs.js';
+import { JWKS_KEYS } from '../../configs/keys.js';
 import { recordAdminAudit } from '../audit/record.js';
 import { AdminError, type AdminContext } from '../auth/rbac.js';
 
@@ -28,7 +32,25 @@ export interface JwksState {
 	keys: KeyView[];
 	restartRequired: boolean;
 	changedKeys: string[];
+	/* Signing algorithms present in the store that the running server does not advertise yet. */
+	unadvertisedAlgorithms: string[];
 	supportedAlgorithms: string[];
+}
+
+/*
+ * The signing algorithms the running server tells clients it supports.
+ *
+ * Derived at module load from the boot key set (`lib/configs/jwaAlgorithms.ts`) and published in the
+ * discovery document, which means it does NOT follow a key generated since — generation hot-applies a
+ * key for *signing*, but nothing recomputes what discovery advertises.
+ *
+ * That gap is why this is measured rather than assumed. An operator who generates the ES256 key a
+ * FAPI 2.0 deployment needs, and is told no restart is required, has a server that can sign ES256 and
+ * a discovery document that never mentions it — so no client ever asks. The same boot snapshot the
+ * advertisement is built from is read here, so the comparison cannot drift from the claim.
+ */
+function advertisedSigningAlgorithms(): Set<string> {
+	return new Set(getAlgorithm(JWKS_KEYS).sign);
 }
 
 // A key counts as a signing key by its published `use` — explicit, else inferred from `alg`, by
@@ -70,19 +92,40 @@ export async function getJwksState(): Promise<JwksState> {
 		}
 	}
 
+	/*
+	 * A signing algorithm reaches clients only once discovery names it, and discovery is built from
+	 * the boot key set — so a key whose algorithm is new to this server is not usable by anybody until
+	 * a restart, however live it is for signing. Reported beside the key drift rather than folded into
+	 * it because the remedy is the same (restart) but the reason is not, and an operator told only
+	 * "restart required" would look for a pending key and find none.
+	 */
+	const advertised = advertisedSigningAlgorithms();
+	const unadvertisedAlgorithms = [
+		...new Set(
+			keys
+				.filter((k) => k.use === 'sig' && k.status !== 'pending removal')
+				.map((k) => k.alg)
+				.filter((alg) => !advertised.has(alg))
+		)
+	];
+
 	return {
 		keys,
-		restartRequired: changedKeys.length > 0,
+		restartRequired:
+			changedKeys.length > 0 || unadvertisedAlgorithms.length > 0,
 		changedKeys,
+		unadvertisedAlgorithms,
 		supportedAlgorithms: [...SUPPORTED_ALGS]
 	};
 }
 
-// Generate a new RSA signing key, persist it, and hot-apply it to the live keystore so it is
-// usable immediately — no restart. Audit-first: the audit entry is written before any state
-// change, so a failed audit write aborts before a key is created. The key is added at the END
-// of the keystore, so the existing key keeps signing (publish-for-verification-only); a later
-// rotation makes the new key the signer by removing the old one.
+// Generate a new asymmetric signing key, persist it, and hot-apply it to the live keystore so it
+// can sign immediately. A key whose algorithm this server did not boot with still needs a restart
+// before discovery advertises it, which getJwksState reports. Audit-first: the audit entry is
+// written before any state change, so a failed audit write aborts before a key is created. The key
+// is added at the END of the keystore, so the existing key keeps signing
+// (publish-for-verification-only); a later rotation makes the new key the signer by removing the
+// old one.
 export async function generateKey(
 	ctx: AdminContext,
 	alg: unknown

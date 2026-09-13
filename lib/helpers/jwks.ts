@@ -1,13 +1,18 @@
 import { generateKeyPair, exportJWK } from 'jose';
 import nanoid from './nanoid.ts';
 import { verifyJWKs, type JWKS } from 'lib/configs/verifyJWKs.ts';
+import { type asymmetricSigningAlgType } from 'lib/configs/jwaConsts.ts';
 
 /**
- * Generates a JWKS (JSON Web Key Set) for RSA256
- * @returns {object} The JWKS object
+ * Generates a single-key JWKS for any asymmetric signing algorithm this server knows.
+ *
+ * The key type is whatever the algorithm implies — RSA for `RS*`/`PS*`, EC for `ES*`, OKP for
+ * `EdDSA`/`Ed25519` — and it is taken from the exported key rather than from a table here, because
+ * it is a property of the material jose produced and a second derivation of it could disagree with
+ * the key itself. The same goes for `crv` on the EC and OKP forms.
  */
 export async function generateJWKS(
-	alg: 'RS256' | 'RS384' | 'RS512' = 'RS256'
+	alg: asymmetricSigningAlgType = 'RS256'
 ): Promise<{ keys: JWKS[] }> {
 	const { publicKey, privateKey } = await generateKeyPair(alg, {
 		extractable: true
@@ -18,7 +23,6 @@ export async function generateJWKS(
 			{
 				...(await exportJWK(publicKey)),
 				...(await exportJWK(privateKey)),
-				kty: 'RSA',
 				use: 'sig',
 				alg,
 				kid: nanoid()
