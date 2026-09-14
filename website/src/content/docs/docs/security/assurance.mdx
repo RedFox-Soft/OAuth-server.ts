@@ -181,8 +181,10 @@ whole picture.
   is published on the [security policy page](/security/) in full, findings included.
 - **No paid bug bounty.** A confirmed report earns credit in the release notes and our thanks. There
   is no money in it. The scope and safe harbour in the security policy are the entire programme.
-- **No OpenID Foundation certification.** The conformance suite has not been run against a release.
-  Standards compliance is asserted by this project's own tests until it has.
+- **No OpenID Foundation certification.** The suite has been run, and
+  [`CONFORMANCE.md`](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/CONFORMANCE.md)
+  records the result — twelve plans, 16 680 conditions, and the defects still open. Certification
+  itself has not been applied for, so compliance remains this project's own claim.
 - **No fuzzing, and no reproducible build.** Scorecard will say so about both, and it is right about
   both. The build is not reproducible by design (see the `apk upgrade` above), and the `Dockerfile`
   argues that trade out in the open.

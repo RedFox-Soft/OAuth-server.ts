@@ -9,6 +9,15 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-14
+
+Three things define this release. The server runs on PostgreSQL as well as MongoDB, behind a
+schema-migration layer that gates startup on either. The OpenID Foundation conformance suite was run
+against it for the first time — twelve plans, 16 680 conditions — and the twelve defects those runs
+found are fixed here, from the PAR response's content type to the `code_verifier` alphabet, with
+`CONFORMANCE.md` recording where it stands and the five that are still open. And a server setting
+now takes effect when it is saved, without a restart.
+
 ### Added
 
 - admin: a server setting now takes effect when it is saved, without restarting the server. Every
@@ -43,11 +52,22 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   setting says, which keeps this server's own public console and agent clients protected by an
   operator's conformance choice.
 
+- conformance: `CONFORMANCE.md` records what the OpenID Foundation suite says about this server —
+  twelve plans and 16 680 conditions across two instance profiles, the nine OpenID Provider plans
+  among them carrying no failure attributable to this server, and the five defects still open written
+  out with the evidence for each. It also records the setup a run needs, because most of the cost of
+  a conformance run is not the run. Certification has not been applied for; `SECURITY.md` and the
+  assurance page now say that, rather than that the suite has never been run.
+
 - test: coverage for six properties the suite claimed and did not hold — the MongoDB secret round trip
   through the real BSON codec, the PostgreSQL document-column encoding, the timing of both
   constant-time secret comparisons, the discovery document following `ISSUER` rather than a forwarded
   header, and every published agent tool having a route the dispatcher serves. Each was verified by
   reintroducing the defect and confirming the gate fails.
+
+- test: a request to an origin no spec registered used to reach the real network; it is now refused by
+  name, with interception installed for every spec so the runner's file order stops deciding it. A
+  per-case bound also means a wedged case names itself in twenty seconds instead of idling in silence.
 
 - storage: PostgreSQL is now a supported datastore alongside MongoDB. A deployment picks one by
   which connection string it sets — `POSTGRES_URL` or `MONGODB_URI` — and setting both is refused at
@@ -103,6 +123,19 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- protocol: a request parameter the server does not define no longer refuses the request. Ignoring
+  one is a `MUST` in RFC 6749 §3.1 **and** §3.2, RFC 8628 §3.1 and CIBA §7.1, and RFC 9126 §2.1
+  inherits it for PAR — so `/auth`, `/par`, `/device/auth`, `/backchannel` and `/token` all answer a
+  request carrying an extension parameter exactly as they answer one without it, and a Request Object
+  may carry extension claims as RFC 9101 §4 permits. The undeclared keys are dropped before
+  validation rather than carried, so nothing a client invents is persisted in a pushed request object
+  or an interaction record. Because absence from a schema now means "ignore", parameters this server
+  must _reject_ are declared explicitly instead: `request_uri` at the pushed endpoint, `request` and
+  `request_uri` inside a Request Object, and `authorization_details` at the token endpoint, where
+  silently ignoring a client's attempt to narrow its grant would return a broader token than it asked
+  for. Elysia's own `normalize` was measured as the alternative and rejected: it also cleans request
+  headers, which strips the client certificate and breaks certificate-bound tokens.
+
 - claims: a `claims` request value carrying a top-level member the server does not define is ignored
   rather than refused, at every surface that accepts one. It was declared a closed object, so a value
   naming `id_token`, `userinfo` and anything else was rejected outright where OIDC Core §5.5 says
@@ -111,6 +144,31 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   wrong cause: one error string covered every object-level failure, so it reported `userinfo` and
   `id_token` as unsatisfied while both were present. Unknown members are now dropped before anything
   persists the request, so a client cannot make the server keep arbitrary content.
+
+- protocol: a request the schema refuses now answers `400`, not the framework validator's `422`. The
+  body was already correct (`invalid_request` with a description); only the status was the
+  framework's rather than the protocol's, and RFC 6749 §5.2 defines it as `400`. Scoped to the OAuth
+  endpoints: the admin API and `/mcp` keep `422`, where distinguishing a well-formed request with an
+  invalid body is what the console and the agent act on.
+
+- pkce: a `code_verifier` containing `.` or `~` is accepted. RFC 7636 §4.1 defines the verifier over
+  RFC 3986's `unreserved` set, which includes both; the pattern here was base64url, the alphabet the
+  _challenge_ is encoded in and the one this project happens to generate verifiers with. A client
+  whose verifier used the full range was refused at schema validation before the grant ran, so its
+  code could not be redeemed by any verifier — and since PKCE is mandatory here, that client could
+  not use the authorization code grant at all. This is the second correction to the same pattern
+  after its length, and both survived for the same reason: nothing this server or its suite produces
+  is outside base64url, so it could never trip over itself.
+
+- par: a successful push answered with a JSON body and no `Content-Type`, which goes out as
+  `application/octet-stream`, and with status 200 rather than the 201 [RFC
+  9126](https://datatracker.ietf.org/doc/html/rfc9126) §2.2 requires — a client that checks the media
+  type before parsing, as a FAPI client must, got nothing usable out of the `request_uri`. Only the
+  success path was affected; refusals were already correct. The handler now returns the object and
+  lets the declared response schema serialize it, which also puts that schema to work for the first
+  time: it was bypassed by the hand-built response, and the `status: 201` beside it was never a hook
+  Elysia reads.
+
 - par: a pushed `request_uri` is spent by the authorization response it produces even when the user
   had to sign in or consent along the way. One-time use was implemented and correctly placed, but the
   lookup that finds the pushed request after an interaction read `parJti` as a top-level property
@@ -118,6 +176,25 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   In practice a `request_uri` survived its own flow and was good for one more authorization — the
   replay RFC 9126 §7.3 describes. The same read appeared in the carry-forward between interactions,
   so a sign-in followed by a consent lost the link entirely. Four reads corrected; no new mechanism.
+
+- userinfo: a request carrying no credentials is answered the way a protected resource must answer
+  one — `401` with a `WWW-Authenticate` challenge, and no error information at all. It was being
+  treated as an ordinary schema refusal, so the caller got a status RFC 6750 does not use and no
+  challenge to act on; the challenge advertises `DPoP` alongside `Bearer` only when DPoP is switched
+  on. A credential that is present and unusable is unchanged: that one is refused with `invalid_token`
+  and keeps its error body.
+
+- userinfo: the access token may be presented in a form-encoded POST body, which OpenID Connect Core
+  §5.3.1 describes alongside the header form. The body form is honoured only under the conditions
+  RFC 6750 §2.2 attaches — a POST whose body is form-encoded — and a request that uses both methods
+  at once is refused with the `invalid_request` §3.1 specifies; the query-parameter form of §2.3 is
+  still not implemented, since OAuth 2.1 removes it and a token in a URL reaches access logs and
+  browser history. A DPoP-bound token cannot be presented this way, because RFC 9449 defines no body
+  form for it. Two consequences of the same change: a request carrying no credential at all is still
+  answered with the bare RFC 6750 §3 challenge, now raised by the handler rather than by the header
+  schema, which can no longer require the header; and the route's DPoP proof check asserted
+  `htm: "GET"` whatever the method was, so a conforming proof on a `POST /userinfo` was refused as an
+  `htm` mismatch — an existing defect nothing had exercised.
 
 - jwks: key generation offers every asymmetric signing algorithm the server knows — `RS256`/`384`/
   `512`, `PS256`/`384`/`512`, `ES256`/`384`/`512`, `EdDSA` and `Ed25519` — in the console and through
@@ -131,18 +208,6 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   not yet advertised: discovery's algorithm lists are built at startup, so such a key signs
   immediately but no client asks for it until a restart — previously the page reported no restart
   required, which was true of the key and misleading about the deployment.
-
-- userinfo: the access token may be presented in a form-encoded POST body, which OpenID Connect Core
-  §5.3.1 describes alongside the header form. The body form is honoured only under the conditions
-  RFC 6750 §2.2 attaches — a POST whose body is form-encoded — and a request that uses both methods
-  at once is refused with the `invalid_request` §3.1 specifies; the query-parameter form of §2.3 is
-  still not implemented, since OAuth 2.1 removes it and a token in a URL reaches access logs and
-  browser history. A DPoP-bound token cannot be presented this way, because RFC 9449 defines no body
-  form for it. Two consequences of the same change: a request carrying no credential at all is still
-  answered with the bare RFC 6750 §3 challenge, now raised by the handler rather than by the header
-  schema, which can no longer require the header; and the route's DPoP proof check asserted
-  `htm: "GET"` whatever the method was, so a conforming proof on a `POST /userinfo` was refused as an
-  `htm` mismatch — an existing defect nothing had exercised.
 
 - conformance: two findings from the OpenID Foundation suite runs. The `form_post` delivery page
   submits itself with a classic script placed after the form rather than a module script in `<head>`,
@@ -262,54 +327,6 @@ metadata.
   fixed: the licence page had two top-level headings, and the settings reference skipped a level.
 
 ### Fixed
-
-- pkce: a `code_verifier` containing `.` or `~` is accepted. RFC 7636 §4.1 defines the verifier over
-  RFC 3986's `unreserved` set, which includes both; the pattern here was base64url, the alphabet the
-  _challenge_ is encoded in and the one this project happens to generate verifiers with. A client
-  whose verifier used the full range was refused at schema validation before the grant ran, so its
-  code could not be redeemed by any verifier — and since PKCE is mandatory here, that client could
-  not use the authorization code grant at all. This is the second correction to the same pattern
-  after its length, and both survived for the same reason: nothing this server or its suite produces
-  is outside base64url, so it could never trip over itself.
-
-- userinfo: a request carrying no credentials is answered the way a protected resource must answer
-  one — `401` with a `WWW-Authenticate` challenge, and no error information at all. It was being
-  treated as an ordinary schema refusal, so the caller got a status RFC 6750 does not use and no
-  challenge to act on; the challenge advertises `DPoP` alongside `Bearer` only when DPoP is switched
-  on. A credential that is present and unusable is unchanged: that one is refused with `invalid_token`
-  and keeps its error body.
-
-- protocol: a request the schema refuses now answers `400`, not the framework validator's `422`. The
-  body was already correct (`invalid_request` with a description); only the status was the
-  framework's rather than the protocol's, and RFC 6749 §5.2 defines it as `400`. Scoped to the OAuth
-  endpoints: the admin API and `/mcp` keep `422`, where distinguishing a well-formed request with an
-  invalid body is what the console and the agent act on.
-
-- protocol: a request parameter the server does not define no longer refuses the request. Ignoring
-  one is a `MUST` in RFC 6749 §3.1 **and** §3.2, RFC 8628 §3.1 and CIBA §7.1, and RFC 9126 §2.1
-  inherits it for PAR — so `/auth`, `/par`, `/device/auth`, `/backchannel` and `/token` all answer a
-  request carrying an extension parameter exactly as they answer one without it, and a Request Object
-  may carry extension claims as RFC 9101 §4 permits. The undeclared keys are dropped before
-  validation rather than carried, so nothing a client invents is persisted in a pushed request object
-  or an interaction record. Because absence from a schema now means "ignore", parameters this server
-  must _reject_ are declared explicitly instead: `request_uri` at the pushed endpoint, `request` and
-  `request_uri` inside a Request Object, and `authorization_details` at the token endpoint, where
-  silently ignoring a client's attempt to narrow its grant would return a broader token than it asked
-  for. Elysia's own `normalize` was measured as the alternative and rejected: it also cleans request
-  headers, which strips the client certificate and breaks certificate-bound tokens.
-
-- par: a successful push answered with a JSON body and no `Content-Type`, which goes out as
-  `application/octet-stream`, and with status 200 rather than the 201 [RFC
-  9126](https://datatracker.ietf.org/doc/html/rfc9126) §2.2 requires — a client that checks the media
-  type before parsing, as a FAPI client must, got nothing usable out of the `request_uri`. Only the
-  success path was affected; refusals were already correct. The handler now returns the object and
-  lets the declared response schema serialize it, which also puts that schema to work for the first
-  time: it was bypassed by the hand-built response, and the `status: 201` beside it was never a hook
-  Elysia reads.
-
-- test: a request to an origin no spec registered used to reach the real network; it is now refused by
-  name, with interception installed for every spec so the runner's file order stops deciding it. A
-  per-case bound also means a wedged case names itself in twenty seconds instead of idling in silence.
 
 - security: three latent injection sinks closed, none of them reachable today, which is the only
   reason this is a hardening note and not an advisory. The `WWW-Authenticate` challenge escaped the
@@ -719,6 +736,7 @@ found`. The refusal text existed and never ran: the call that delivered it sat i
 - The DPoP nonce secret is self-provisioned at startup, making the requireNonce-without-secret 500
   state unrepresentable (spec 014)
 
-[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/RedFox-Soft/OAuth-server.ts/releases/tag/v0.1.0
