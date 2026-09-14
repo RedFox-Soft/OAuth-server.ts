@@ -17,14 +17,22 @@ import { eventBus } from '../../event_bus.js';
 export default async function respond(oidc) {
 	let pushedAuthorizationRequest = oidc.entities.PushedAuthorizationRequest;
 
-	if (!pushedAuthorizationRequest && oidc.entities.Interaction?.parJti) {
+	/*
+	 * `payload.parJti`, not `.parJti`. Model fields live on the payload and Interaction declares no
+	 * accessor for this one, so the property read silently returned undefined — and since the resume
+	 * path never runs loadPushedAuthorizationRequest, this lookup is the only thing that finds the
+	 * pushed request after an interaction. It failing open is what let a request_uri survive its own
+	 * flow and mint a second code (RFC 9126 §7.3).
+	 */
+	const carriedParJti = oidc.entities.Interaction?.payload?.parJti;
+	if (!pushedAuthorizationRequest && carriedParJti) {
 		pushedAuthorizationRequest = await PushedAuthorizationRequest.tryFind(
-			oidc.entities.Interaction.parJti,
+			carriedParJti,
 			{ ignoreExpiration: true }
 		);
 	}
 
-	if (pushedAuthorizationRequest?.consumed) {
+	if (pushedAuthorizationRequest?.payload.consumed) {
 		throw new InvalidRequestUri(
 			'request_uri is invalid, expired, or was already used'
 		);

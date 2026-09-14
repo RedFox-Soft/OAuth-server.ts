@@ -116,6 +116,31 @@ authorization endpoint delivers a refusal by redirecting to the client's `redire
 refused request and an honoured one are both a `303` and differ only in the query. Both `/auth`
 cases passed against the reintroduced defect until the comparison included the error code.
 
+## The same rule applies one level in, inside a parameter's value
+
+Added 2026-09-14 (spec 047). "Absence from a schema means ignore" was stated for request
+*parameters*; it holds for the members of a parameter's **value** too, and the `claims` object was
+the case where it did not.
+
+`claims` was declared `additionalProperties: false`, so a value carrying `id_token`, `userinfo` and
+a third member the server does not define was refused outright — where OIDC Core §5.5 says other
+members MAY be present and ones that are not understood MUST be ignored. It is the defect fixed in
+`1437341`, one level deeper, and the conformance suite found it the same way. The refusal also
+misreported itself: the object's single `error` string fired for *every* object-level failure, so
+the answer said the parameter "should be object with userinfo or id_token properties" while both of
+those members were present.
+
+The fix has the same shape as the parameter-level one and reuses its function. The schema no longer
+closes the object, and `checkClaims` calls `ignoreUnknownIn` with the member set exported from
+`param_list.ts` beside the schema built from it, so the two cannot drift. **Deleted, not merely
+tolerated** — for the reason `ignoreUnknownIn`'s own comment gives: PAR serialises `oidc.params`
+into the request object it stores and the interaction record copies them again, so a member carried
+rather than dropped is a member a client can make this server keep.
+
+`checkClaims` is the one place all five surfaces converge before anything persists their parameters,
+which is why the deletion sits there rather than at the transform stage — where `claims` is still a
+JSON *string*, since `t.ObjectString` parses it during validation.
+
 ## Related
 
 - [[elysia-lifecycle]] — the plugin family this joins, and the argument for each lifecycle stage.

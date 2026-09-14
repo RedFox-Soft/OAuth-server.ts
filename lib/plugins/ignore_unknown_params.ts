@@ -25,7 +25,10 @@ export function declaredParams(...schemas: TObject[]): Set<string> {
  * persisted: PAR stores its parameters as a request object and the interaction record stores them
  * again, so anything carried is anything a client can make this server keep.
  */
-export function ignoreUnknownIn(declared: Set<string>, target: unknown): void {
+export function ignoreUnknownIn(
+	declared: ReadonlySet<string>,
+	target: unknown
+): void {
 	if (!isRecord(target)) return;
 	for (const name of Object.keys(target)) {
 		if (!declared.has(name)) {

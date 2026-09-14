@@ -79,6 +79,19 @@ export async function tokenJwtAuth(
 		throw new InvalidClientAuth(message);
 	}
 
+	/*
+	 * A deliberate departure from RFC 9126 §2.1, isolated behind a named flag as the constitution
+	 * requires. That section says an authorization server "MUST accept its issuer identifier, token
+	 * endpoint URL, or pushed authorization request endpoint URL as values that identify it as an
+	 * intended audience" — which is what the check above implements, and narrowing it by default would
+	 * make this server non-conforming.
+	 *
+	 * FAPI 2.0 Security Profile §5.3.2.1 cl. 8 requires the opposite for deployments that opt into the
+	 * profile: the server "shall only accept its issuer identifier value (as defined in RFC 8414) as a
+	 * string in the `aud` claim received in client authentication assertions". §5.3.3.1 cl. 5 adds that
+	 * it is sent "as a string not as an item in an array", which the strict equality below enforces
+	 * without a separate check — a one-element array is not `=== ISSUER`.
+	 */
 	const isFapi = config['fapi.enabled'];
 	if (isFapi) {
 		if (payload.aud !== ISSUER) {

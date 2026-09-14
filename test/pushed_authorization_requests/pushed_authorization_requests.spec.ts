@@ -530,8 +530,8 @@ describe('Pushed Request Object', async () => {
 							auth.validatePresence(response, ['code']);
 
 							expect(
-								(await PushedAuthorizationRequest.find(id))?.payload
-							).toHaveProperty('consumed');
+								(await PushedAuthorizationRequest.find(id))?.payload.consumed
+							).toBeTruthy();
 						});
 
 						it('allows the request_uri to be used (when request object was not used but client has request_object_signing_alg for its optional use)', async function () {
@@ -586,8 +586,8 @@ describe('Pushed Request Object', async () => {
 							auth.validatePresence(response, ['code']);
 
 							expect(
-								(await PushedAuthorizationRequest.find(id))?.payload
-							).toHaveProperty('consumed');
+								(await PushedAuthorizationRequest.find(id))?.payload.consumed
+							).toBeTruthy();
 						});
 					});
 				});
@@ -1081,8 +1081,8 @@ describe('Pushed Request Object', async () => {
 							auth.validatePresence(response, ['code']);
 
 							expect(
-								(await PushedAuthorizationRequest.find(id))?.payload
-							).toHaveProperty('consumed');
+								(await PushedAuthorizationRequest.find(id))?.payload.consumed
+							).toBeTruthy();
 						});
 
 						it('an expired or malformed request_uri is refused at the authorization endpoint', async function () {

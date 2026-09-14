@@ -134,9 +134,12 @@ export default async function interactions(oidc) {
 		grant: oidc.grant,
 		cid: oidc.entities.Interaction?.cid || nanoid(),
 		deviceCode: oidc.deviceCode?.jti,
+		// `jti` is a real getter on BaseModel; `parJti` is not one on Interaction, so the carry-forward
+		// has to read the payload. Without it the link to the pushed request is severed at the first
+		// hand-off and a flow needing two interactions loses it entirely.
 		parJti:
 			oidc.entities.PushedAuthorizationRequest?.jti ||
-			oidc.entities.Interaction?.parJti
+			oidc.entities.Interaction?.payload?.parJti
 	});
 
 	await interactionSession.save(ttl.Interaction);

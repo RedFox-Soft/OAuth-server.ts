@@ -13,6 +13,24 @@ export const refusedParam = (name: string) =>
 		t.Undefined({ error: `Property '${name}' should not be provided` })
 	);
 
+/*
+ * The top-level members of the `claims` request value that this server understands. Declared as its
+ * own object so the schema below and the filter in checkClaims read the same source: the set of
+ * names that must survive cannot drift from the set the schema validates.
+ */
+const claimsMembers = {
+	id_token: t.Optional(
+		t.Object({}, { error: 'claims.id_token must be an object' })
+	),
+	userinfo: t.Optional(
+		t.Object({}, { error: 'claims.userinfo must be an object' })
+	)
+};
+
+export const CLAIMS_MEMBERS: ReadonlySet<string> = new Set(
+	Object.keys(claimsMembers)
+);
+
 export const AuthorizationParameters = t.Object({
 	client_id: t.String(),
 	redirect_uri: t.Optional(t.String({ format: 'uri' })),
@@ -55,21 +73,16 @@ export const AuthorizationParameters = t.Object({
 
 	// added conditionally depending on feature flag which will be checked in the code
 	claims: t.Optional(
-		t.ObjectString(
-			{
-				id_token: t.Optional(
-					t.Object({}, { error: 'claims.id_token must be an object' })
-				),
-				userinfo: t.Optional(
-					t.Object({}, { error: 'claims.userinfo must be an object' })
-				)
-			},
-			{
-				additionalProperties: false,
-				error:
-					'claims parameter should be object with userinfo or id_token properties'
-			}
-		)
+		t.ObjectString(claimsMembers, {
+			/*
+			 * No `additionalProperties: false`. OIDC Core §5.5: "Other members MAY be present. Any
+			 * members used that are not understood MUST be ignored." A closed object turns that
+			 * permission into invalid_request — the same defect the endpoints themselves were fixed
+			 * for in 1437341, one level in, inside a parameter's value rather than beside it.
+			 * checkClaims deletes the undeclared members; see [[unknown-request-parameters]].
+			 */
+			error: 'claims parameter must be a JSON object'
+		})
 	),
 	resource: t.Optional(t.Array(t.String())),
 	/*

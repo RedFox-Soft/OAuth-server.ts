@@ -771,10 +771,99 @@ expire.setDate(expire.getDate() + 1);
 				);
 			});
 
-			it('a claims parameter naming no known member is refused', async function () {
+			it('accepts a claims parameter naming only members it does not define', async function () {
 				const auth = new AuthorizationRequest({
 					scope: 'openid',
 					claims: '{"not_recognized": "does not matter"}'
+				});
+
+				const cookie = await setup.login();
+				const { response } = await authRequest(auth, { cookie });
+				expect(response.status).toBe(303);
+				auth.validatePresence(response, ['code', 'state']);
+				auth.validateState(response);
+				auth.validateClientLocation(response);
+			});
+
+			describe('when the claims parameter is not enabled', () => {
+				beforeEach(function () {
+					ApplicationConfig['claimsParameter.enabled'] = false;
+				});
+
+				afterEach(function () {
+					ApplicationConfig['claimsParameter.enabled'] = true;
+				});
+
+				it('refuses a claims parameter carrying a member it does not define as unsupported', async function () {
+					const auth = new AuthorizationRequest({
+						scope: 'openid',
+						claims: '{"urn_example_ext": {"anything": true}}'
+					});
+
+					const cookie = await setup.login();
+					const { response } = await authRequest(auth, { cookie });
+
+					// The operator's gate refuses it, not the schema: tolerating the member does not
+					// make the parameter reachable on a deployment that has not turned it on.
+					expect(response.status).toBe(303);
+					auth.validatePresence(response, [
+						'error',
+						'error_description',
+						'state'
+					]);
+					auth.validateErrorDescription(
+						response,
+						'Claims Parameter is not supported'
+					);
+				});
+			});
+
+			it('answers a claims parameter carrying a member it does not define as it answers one without it', async function () {
+				const requested = {
+					id_token: { email: null },
+					userinfo: { website: null }
+				};
+				const cookie = await setup.login({ claims: requested });
+
+				const withMember = new AuthorizationRequest({
+					scope: 'openid',
+					claims: { ...requested, urn_example_ext: { anything: true } }
+				});
+				const without = new AuthorizationRequest({
+					scope: 'openid',
+					claims: requested
+				});
+
+				const a = await authRequest(withMember, { cookie });
+				const b = await authRequest(without, { cookie });
+
+				expect(a.response.status).toBe(b.response.status);
+				withMember.validatePresence(a.response, ['code', 'state']);
+				without.validatePresence(b.response, ['code', 'state']);
+				withMember.validateClientLocation(a.response);
+				without.validateClientLocation(b.response);
+			});
+
+			it('honours the claims it does define when a member it does not sits beside them', async function () {
+				const requested = { id_token: { email: null, website: null } };
+				const cookie = await setup.login({ claims: requested });
+				const auth = new AuthorizationRequest({
+					scope: 'openid',
+					claims: { ...requested, urn_example_ext: { anything: true } }
+				});
+
+				const { id_token } = await getToken(auth, { cookie });
+				const { payload } = decodeJWT(id_token);
+
+				expect(payload).toHaveProperty('email');
+				expect(payload).toHaveProperty('website');
+				expect(payload).not.toHaveProperty('urn_example_ext');
+			});
+
+			it('refuses a claims parameter that is an array, naming the shape at fault', async function () {
+				const auth = new AuthorizationRequest({
+					scope: 'openid',
+					claims: '[]'
 				});
 
 				const cookie = await setup.login();
@@ -788,9 +877,37 @@ expire.setDate(expire.getDate() + 1);
 				auth.validateState(response);
 				auth.validateClientLocation(response);
 				auth.validateError(response, 'invalid_request');
-				auth.validateErrorDescription(
-					response,
-					'claims parameter should be object with userinfo or id_token properties'
+				expect(
+					new URL(response.headers.get('location') as string).searchParams.get(
+						'error_description'
+					)
+				).not.toContain('userinfo or id_token');
+			});
+
+			it('does not persist a claims member it does not define', async function () {
+				// No seeded grant for `email`, so the request needs consent and an Interaction record
+				// is written — which is one of the two places FR-006 says the member must not reach.
+				const cookie = await setup.login();
+				const auth = new AuthorizationRequest({
+					scope: 'openid',
+					claims: {
+						id_token: { email: { essential: true } },
+						urn_example_ext: { anything: true }
+					}
+				});
+
+				const { response } = await authRequest(auth, { cookie });
+				expect(response.status).toBe(303);
+
+				const location = response.headers.get('location') as string;
+				const uid = new URL(location, 'http://e.ly').pathname.split('/')[2];
+				expect(uid).toBeString();
+
+				const interaction = await Interaction.find(uid);
+				expect(interaction.payload.params).toHaveProperty('claims');
+				expect(interaction.payload.params.claims).toHaveProperty('id_token');
+				expect(interaction.payload.params.claims).not.toHaveProperty(
+					'urn_example_ext'
 				);
 			});
 

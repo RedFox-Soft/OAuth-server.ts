@@ -93,6 +93,22 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- claims: a `claims` request value carrying a top-level member the server does not define is ignored
+  rather than refused, at every surface that accepts one. It was declared a closed object, so a value
+  naming `id_token`, `userinfo` and anything else was rejected outright where OIDC Core §5.5 says
+  other members MAY be present and unrecognised ones MUST be ignored — the defect fixed in `1437341`
+  for request parameters, one level deeper, inside a parameter's value. The refusal also named the
+  wrong cause: one error string covered every object-level failure, so it reported `userinfo` and
+  `id_token` as unsatisfied while both were present. Unknown members are now dropped before anything
+  persists the request, so a client cannot make the server keep arbitrary content.
+- par: a pushed `request_uri` is spent by the authorization response it produces even when the user
+  had to sign in or consent along the way. One-time use was implemented and correctly placed, but the
+  lookup that finds the pushed request after an interaction read `parJti` as a top-level property
+  where the value lives on the payload, so it silently found nothing and the record was never marked.
+  In practice a `request_uri` survived its own flow and was good for one more authorization — the
+  replay RFC 9126 §7.3 describes. The same read appeared in the carry-forward between interactions,
+  so a sign-in followed by a consent lost the link entirely. Four reads corrected; no new mechanism.
+
 - jwks: key generation offers every asymmetric signing algorithm the server knows — `RS256`/`384`/
   `512`, `PS256`/`384`/`512`, `ES256`/`384`/`512`, `EdDSA` and `Ed25519` — in the console and through
   the agent tool, read from the algorithm register rather than restated beside it. It offered only the
