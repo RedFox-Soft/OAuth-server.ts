@@ -11,6 +11,14 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- admin: the reserved administrators' bucket can no longer be assigned as an ordinary project's user
+  bucket. It appeared to be protected by the rule that a project and its bucket share an owning group,
+  but that rule did not cover it: the admin bucket sits in the reserved System group, and a super
+  administrator whose active scope is empty creates projects into that same group — so the comparison
+  was `unassigned` against `unassigned`, which passes. Such a project's end-users were the accounts
+  that administer the instance. The route now refuses the reserved bucket outright, the same refusal
+  the bucket routes already make.
+
 - mcp: `settings_update` now tells an agent what each server setting accepts. Its published schema
   described no setting at all — the route behind it validates every value in its handler rather than
   in its body schema, so there was nothing there to publish — and a client with no type to check a

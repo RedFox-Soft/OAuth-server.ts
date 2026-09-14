@@ -123,8 +123,8 @@ server ← Nothing has been changed. Change server settings. The merged
 agent  → settings_update { "deviceFlow.enabled": false,
                            "confirmationToken": "<token from the first call>" }
 
-server ← { "restartRequired": true,
-           "changedKeys": ["deviceFlow.enabled"], … }
+server ← { "appliedKeys": ["deviceFlow.enabled"],
+           "pendingRestartKeys": [], … }
 
          Audit: actor agent:ops-bot, action settings.update.`;
 ---

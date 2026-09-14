@@ -153,6 +153,34 @@ describe('projects API', () => {
 	});
 
 	/*
+	 * The coherence rule above is not what keeps the administrators' accounts out of an ordinary
+	 * project, and it looks as though it is. The reserved admin bucket lives in the System group, and a
+	 * super administrator whose active scope is empty creates projects into that same group — so for
+	 * those projects the rule compares `unassigned` with `unassigned`, passes, and the end-users of an
+	 * ordinary project become the accounts that administer the instance.
+	 */
+	it('refuses the reserved administrator bucket as a project bucket', async () => {
+		const su = await sessionCookieFor(['super_admin']);
+		const proj = await getProjectStore().create({
+			name: 'Opportunist',
+			slug: `opp-${Math.random().toString(36).slice(2)}`,
+			ownerGroupId: UNASSIGNED_GROUP_ID
+		});
+
+		const res = await client.admin.api
+			.projects({ id: proj._id })
+			.bucket.put(
+				{ bucketId: ADMIN_BUCKET_ID },
+				{ headers: { cookie: su.cookie } }
+			);
+
+		expect(res.status).toBe(403);
+		expect((await getProjectStore().find(proj._id))?.bucketId).not.toBe(
+			ADMIN_BUCKET_ID
+		);
+	});
+
+	/*
 	 * CORS origins. Validated in the handler rather than by the body schema so a rejection returns the
 	 * admin_error shape and can name the offending value — a list that looks right but grants nothing is
 	 * the failure mode worth spending a message on.

@@ -24,6 +24,7 @@ import {
 	InvalidOriginError,
 	normalizeOrigins
 } from '../../helpers/cors_origin.js';
+import { ADMIN_BUCKET_ID } from '../consts.js';
 import { loadProject } from './access.js';
 import { recordAdminAudit } from '../audit/record.js';
 import { Client } from '../../models/client.js';
@@ -196,12 +197,33 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 			const project = await loadProject(ctx, params.id);
 			const bucket = await getBucketStore().find(body.bucketId);
 			if (!bucket) throw new AdminError(404, 'bucket not found');
+			/*
+			 * Refused before ownership is considered, because ownership does not actually cover it — it
+			 * only looks as though it does. The administrators' own bucket sits in the System group, and a
+			 * super administrator whose active scope is empty creates projects into that same group
+			 * (`assertActiveGroup`), so for those projects the rule below compares `unassigned` with
+			 * `unassigned` and passes. Without this an ordinary project could be backed by the very
+			 * accounts that administer the instance. Same refusal as `assertNotReserved` in
+			 * `lib/admin/buckets/access.ts`, which this route does not go through.
+			 */
+			if (bucket._id === ADMIN_BUCKET_ID) {
+				throw new AdminError(
+					403,
+					'the admin bucket is managed via /admin/api/admins'
+				);
+			}
 			assertBucketAccess(ctx, bucket);
 			/*
 			 * A project and the bucket backing it must belong to the same group. Both access checks above
 			 * can pass for an administrator who belongs to two groups — one owning the project, the other
 			 * the bucket — and letting that through would build a tenant whose end-users live in somebody
 			 * else's scope, reachable by people with no access to the project at all.
+			 *
+			 * It is not a way to reach the default bucket, and does not need to be. A project whose bucket
+			 * is unset already signs its users in from `redfox`, because `resolveBucketForRequest` falls
+			 * through on an empty `bucketId` to exactly that default. Leaving the bucket unset is the
+			 * supported way to use it; admitting the System group here would relax a tenant boundary to buy
+			 * nothing.
 			 */
 			if (bucket.ownerGroupId !== project.ownerGroupId) {
 				throw new AdminError(
