@@ -15,7 +15,7 @@ sources:
   - https://auth0.com/docs/api/management/v2
   - https://auth0.com/docs/get-started/auth0-mcp-server
   - https://auth0.com/pricing
-bottomLine: 'Pick Auth0 if you want identity as a service this week, with social connections and certified FAPI you can hand to a reviewer. Pick FoxAuth if the data must live in your own database, your per-user bill is the problem, or you need the banking-grade profiles without an Enterprise add-on.'
+bottomLine: 'Auth0 is the better pick when you want identity as a service this week, with social connections and a FAPI certification you can hand to a reviewer. FoxAuth is the better pick when the data has to live in your own database, when the per-user bill is the problem, or when you need the banking-grade profiles without an Enterprise add-on.'
 chooseThem:
   - 'You do not want to run a database or a container, ever.'
   - 'You need social and enterprise connections working this week.'
@@ -28,13 +28,13 @@ chooseUs:
   - 'You want an AI agent administering the instance through the same audited path a human uses.'
 faq:
   - question: 'Can I migrate from Auth0 to FoxAuth?'
-    answer: "Users, clients and their metadata port over: FoxAuth stores end users in buckets you provision through the admin console or the management API, and OAuth clients can be created there or by dynamic client registration. What does not port is anything written in Auth0's own extension model — Rules, Actions and Hooks have no equivalent and are rewritten as override seams, of which FoxAuth exposes 31 resolved at call time. Budget the migration by how much logic lives in Actions, not by how many users you have."
+    answer: "Users, clients and their metadata port over. FoxAuth stores end users in buckets you provision through the admin console or the management API, and OAuth clients can be created there or by dynamic client registration. What does not port is anything written in Auth0's own extension model: Rules, Actions and Hooks have no equivalent and are rewritten as override seams, of which FoxAuth exposes 31, each resolved at call time. Budget the migration by how much logic lives in Actions; the user count has little to do with it."
   - question: 'Does FoxAuth support social logins like Google and GitHub?'
-    answer: 'Through upstream OIDC federation, configured per user bucket, so an end user signs in at their own identity provider and returns with a token FoxAuth issues. That covers any provider speaking OpenID Connect. It is not the catalogue of pre-built connections Auth0 ships, and setting one up means registering a client with that provider yourself.'
+    answer: 'FoxAuth supports them through upstream OIDC federation, configured per user bucket: an end user signs in at their own identity provider and comes back with a token FoxAuth issues. That covers any provider speaking OpenID Connect. It is not the catalogue of pre-built connections Auth0 ships, and setting one up means registering a client with that provider yourself.'
   - question: 'Is FoxAuth cheaper than Auth0?'
-    answer: 'The bill is a different shape rather than uniformly smaller. FoxAuth is free to self-host under FSL-1.1-ALv2 and costs you a database, a container and the engineering time to keep them healthy, so the cost grows with infrastructure rather than with monthly active users. Auth0 bills per monthly active user, which is cheaper at small scale and is the thing teams usually come to us about at large scale.'
+    answer: 'The bill has a different shape, and it is not uniformly smaller. FoxAuth is free to self-host under FSL-1.1-ALv2; what it costs you is a database, a container and the engineering time to keep them healthy, so the cost grows with infrastructure and is indifferent to monthly active users. Auth0 bills per monthly active user. At small scale that is usually the cheaper option, and at large scale it is what teams tend to come to us about.'
   - question: 'Do I get FAPI, DPoP and PAR without an enterprise plan?'
-    answer: 'Yes. FoxAuth implements DPoP (RFC 9449), PAR (RFC 9126), mTLS (RFC 8705), CIBA, RAR (RFC 9396) and JARM, and every one is a feature flag on the instance you run rather than a plan tier or an add-on. They are off by default and turned on per deployment.'
+    answer: 'FoxAuth implements DPoP (RFC 9449), PAR (RFC 9126), mTLS (RFC 8705), CIBA, RAR (RFC 9396) and JARM, and each one is a feature flag on the instance you run. There is no plan tier and no add-on. All of them ship switched off and are turned on per deployment.'
 groups:
   - label: Getting started and operations
     rows:
@@ -61,12 +61,12 @@ groups:
         them:
           {
             status: na,
-            text: "Auth0's runtime. Customisation is through Actions, not the server."
+            text: "Auth0's runtime. Customisation is done in Actions, since the server itself is Auth0's."
           }
         verdict: different
         why: 'One is software you own; the other is a service you configure.'
       - dimension: Where the data lives
-        us: { status: yes, text: 'Your own database — PostgreSQL or MongoDB.' }
+        us: { status: yes, text: 'Your own PostgreSQL or MongoDB database.' }
         them:
           {
             status: no,
@@ -99,7 +99,7 @@ groups:
             text: "None. Uptime, upgrades and scaling are Auth0's."
           }
         verdict: them
-        why: 'If you cannot operate a database, choose the managed service.'
+        why: 'If running a database is not something your team wants to take on, the managed service is probably the right call.'
       - dimension: Maturity
         us:
           {
@@ -151,7 +151,7 @@ groups:
             text: 'Enterprise Plan with the Highly Regulated Identity add-on.'
           }
         verdict: us
-        why: 'Included, not an Enterprise add-on.'
+        why: 'Included with the server; there is no Enterprise add-on to buy.'
         note: '"you must have an Enterprise Plan with the Highly Regulated Identity add-on".'
       - dimension: FAPI profiles
         us:
@@ -188,7 +188,7 @@ groups:
             text: 'Enterprise Plan with the Highly Regulated Identity add-on.'
           }
         verdict: us
-        why: 'Included, not an Enterprise add-on.'
+        why: 'Ships with the server; there is no Enterprise add-on.'
       - dimension: Dynamic client registration
         us:
           {
@@ -265,9 +265,9 @@ groups:
 
 ## Migrating
 
-Auth0 can export users and clients, and its Management API can list both. FoxAuth clients are then
-created through the admin API or dynamic registration, and users through a user bucket. Password
-hashes are not portable, so plan a reset-on-first-login window.
+Auth0 can export users and clients, and its Management API can list both. On the FoxAuth side,
+clients are created through the admin API or dynamic registration and users through a user bucket.
+Password hashes do not port, so plan a reset-on-first-login window.
 
 - [Features, flag by flag](/features/)
 - [What self-hosting costs](/pricing/)

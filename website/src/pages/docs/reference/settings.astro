@@ -22,10 +22,10 @@ const headings = settings.domains.map((d) => ({ depth: 2, slug: d.id, text: d.la
 >
 	<UnreleasedNotice />
 	<p>
-		Settings are edited in the console under <strong>Settings</strong>, and take effect in the
-		instance that saves them — each card below says so, and names the reason where a setting has to
-		wait for the next start instead. A flag that is off means the capability's endpoint is not
-		served at all.
+		Settings are edited in the console under <strong>Settings</strong> and take effect in the
+		instance that saves them. Each card below says so, and names the reason where a setting has to
+		wait for the next start instead. When a flag is off, the capability's endpoint is not served
+		at all.
 	</p>
 	{
 		byDomain.map(({ domain, entries }) => (

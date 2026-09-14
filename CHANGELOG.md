@@ -91,6 +91,16 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   nobody executes needs no signature — held for the changelog but not for reference data another
   project's build reads, which is worth a statement naming the commit and the run behind it.
 
+### Changed
+
+- site: a copy-edit of the marketing, comparison and documentation prose for voice (spec 048).
+  Sentence rhythm now varies, em-dashes are roughly halved, the repeated "X, not Y" contrast is
+  thinned, and judgments (advice, a diagnosis, an assessment of another product) carry a hedge
+  where statements of what the server does, a protocol rule or a licence term do not. No
+  instruction, command, protocol statement, numeric claim or quoted competitor text changed; the
+  build's title, description, FAQ and datastore rules all still pass. `website/DESIGN.md` §Voice
+  records the conventions so a new page does not reintroduce the habits.
+
 ### Fixed
 
 - claims: a `claims` request value carrying a top-level member the server does not define is ignored

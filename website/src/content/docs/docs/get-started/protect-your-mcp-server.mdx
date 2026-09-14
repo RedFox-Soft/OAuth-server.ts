@@ -1,6 +1,6 @@
 ---
 title: Protect your MCP server with OAuth
-description: Make your MCP server an OAuth 2.1 protected resource in ten minutes — declare it here, publish its metadata, validate a token, and prove both outcomes.
+description: Make your MCP server an OAuth 2.1 protected resource in ten minutes. Declare it here, publish its metadata, validate a token, and prove both outcomes.
 sidebar:
   order: 6
 ---
@@ -12,10 +12,10 @@ specification closes that by making the MCP server an **OAuth 2.1 protected reso
 that reaches it without a token is told where to get one, goes and gets it, and comes back with a
 token minted for that MCP server and nothing else.
 
-This page is the whole of it. You will declare your MCP server here, publish two things from it, check
-one token, and then watch it refuse an anonymous call and accept an authorized one. Ten minutes if you
-already have an instance running — if you do not, [Run with Docker
-Compose](/docs/get-started/docker-compose/) takes about two of them.
+This page covers the whole job. You will declare your MCP server here, publish two things from it,
+check one token, and then watch it refuse an anonymous call and accept an authorized one. Call it ten
+minutes if you already have an instance running. If you do not, [Run with Docker
+Compose](/docs/get-started/docker-compose/) should take about two of them.
 
 <Aside
 	type="note"
@@ -24,7 +24,7 @@ Compose](/docs/get-started/docker-compose/) takes about two of them.
 	A running instance with an administrator account ([Create the first
 	administrator](/docs/get-started/first-admin/)) and a project with a user
 	bucket ([Register your first client](/docs/get-started/first-client/) walks
-	that). Your MCP server can be a stub — it does not need to do anything yet
+	that). Your MCP server can be a stub; it does not need to do anything yet
 	except answer HTTP.
 </Aside>
 
@@ -46,7 +46,7 @@ Compose](/docs/get-started/docker-compose/) takes about two of them.
    `mcp:tools-basic`.
 
 3. Leave the token settings alone. The defaults are a self-contained token your MCP server verifies
-   against this server's published keys, with a fifteen-minute lifetime — which is what lets step 3
+   against this server's published keys, with a fifteen-minute lifetime. That is what lets step 3
    below need no credentials of its own.
 
 </Steps>
@@ -56,9 +56,9 @@ Compose](/docs/get-started/docker-compose/) takes about two of them.
 	title="The scope list is a baseline, not a catalogue"
 >
 	An agent host that is given no scope guidance requests **every** scope your
-	resource advertises. The specification says so, and says it is deliberate: a
+	resource advertises. The specification says so, and says it is intended: a
 	general-purpose client cannot choose sensibly among names it does not
-	understand. So a long list is not a menu of options — it is a grant of the
+	understand. So a long list is not a menu of options. It is a grant of the
 	whole list to every client that ever arrives. Name the scopes your tools
 	actually distinguish, and let the rest be asked for later.
 </Aside>
@@ -70,7 +70,7 @@ Two things, both from your own MCP server.
 ### Protected resource metadata
 
 A JSON document at `/.well-known/oauth-protected-resource`, saying which authorization server protects
-you. This is the one part the specification makes a `MUST` for an MCP server:
+you. This is the only part the specification makes a `MUST` for an MCP server:
 
 ```json
 {
@@ -82,7 +82,7 @@ you. This is the one part the specification makes a `MUST` for an MCP server:
 ```
 
 `resource` is the identifier you declared in step 1, character for character. `authorization_servers`
-is your instance's issuer — the same URL as its `ISSUER` setting.
+is your instance's issuer, the same URL as its `ISSUER` setting.
 
 ### A challenge that says where to go
 
@@ -101,7 +101,7 @@ your metadata document and requests everything in `scopes_supported`.
 ## 3. Validate the token
 
 Your MCP server has to establish two things about every token: that it is genuine, and that it was
-issued **for you**. The second is not optional — accepting a token minted for something else is the
+issued **for you**. The second is not optional. Accepting a token minted for something else is the
 confused-deputy hole that audience binding exists to close, and the specification forbids it outright.
 
 With the default token format there is nothing to ask this server at request time. Fetch its public
@@ -127,8 +127,8 @@ export async function principalFor(authorization) {
 ```
 
 `jwtVerify` checks the signature and `exp` for you; `issuer` and `audience` are the two you must state.
-Any JWT library in any language does the same four checks — the shape above is not a dependency, it is
-the checklist.
+Any JWT library in any language does the same four checks. The shape above is the checklist; the
+library is your choice.
 
 <Aside
 	type="tip"
@@ -140,7 +140,7 @@ the checklist.
 	with [`POST /token/introspect`](/docs/reference/endpoints/). That endpoint
 	requires authentication, so your MCP server will need credentials of its own
 	and [`introspection.enabled`](/docs/reference/settings/#introspection.enabled)
-	switched on — which is the trade you are making.
+	switched on. That is the trade you are making.
 </Aside>
 
 ## 4. Let an agent host identify itself
@@ -148,7 +148,7 @@ the checklist.
 An agent host usually knows nothing but a URL, and has nowhere for you to type a client identifier. The
 current specification's answer is **Client ID Metadata Documents**: the client's `client_id` _is_ an
 HTTPS URL naming a JSON document that describes it, and this server fetches and validates that document
-on demand — creating no client record at all.
+on demand, and creates no client record at all.
 
 Turn it on in **Settings**:
 [`clientIdMetadataDocument.enabled`](/docs/reference/settings/#clientIdMetadataDocument.enabled).
@@ -170,13 +170,13 @@ the console. Everything else can keep using the reserved `admin-mcp` client id, 
 
 ## 5. Prove it both ways
 
-Two calls. The refusal matters as much as the success — without it you cannot tell "protected" from
-"not reached yet".
+Two calls. The refusal matters as much as the success, because without it there is no telling
+"protected" from "not reached yet".
 
 <Steps>
 
 1. **Call your MCP server with no token.** You should get `401`, and the `WWW-Authenticate` header from
-   step 2. If you get `200`, your validation is not wired into the request path.
+   step 2. If you get `200`, your validation is most likely not wired into the request path.
 
    ```sh
    curl -i https://mcp.example.com/mcp -X POST \
@@ -185,7 +185,7 @@ Two calls. The refusal matters as much as the success — without it you cannot 
    ```
 
 2. **Get a token and call again.** Point your agent host at your MCP server and let it complete the
-   flow: it will read your metadata document, discover this server, sign your end-user in, and come
+   flow: it should read your metadata document, discover this server, sign your end-user in, and come
    back with a token. The same call now answers `200`.
 
 3. **Try the token somewhere it does not belong.** Declare a second resource, get a token for it, and
@@ -196,9 +196,9 @@ Two calls. The refusal matters as much as the success — without it you cannot 
 
 ## What you did not have to do
 
-No code in this server, and no restart for the resource itself — a declaration is data, read on every
+No code in this server, and no restart for the resource itself: a declaration is data, read on every
 token request. No client secret for your MCP server, because it verifies tokens against published
-keys rather than asking anything. And no allowlist of agent hosts for an ordinary resource: which
+keys instead of asking anything. And no allowlist of agent hosts for an ordinary resource: which
 end-users a client can sign in follows from the resource it names, so the project that owns the
 resource owns that answer.
 

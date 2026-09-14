@@ -7,26 +7,26 @@ sources:
   - https://github.com/ory/hydra
   - https://www.ory.com/docs/hydra/self-hosted/quickstart
   - https://www.ory.com/docs/oauth2-oidc/device-authorization
-bottomLine: 'Pick Ory Hydra if you already have an identity system and want a hardened, Apache-licensed OAuth server in front of it. Pick FoxAuth if you do not want to build a login and consent application before you can issue your first token.'
+bottomLine: 'Pick Ory Hydra if you already have an identity system and want a hardened, Apache-licensed OAuth server sitting in front of it. Pick FoxAuth if you would rather not build a login and consent application before issuing your first token.'
 chooseThem:
   - 'You already run your own user store and login UI, and want an OAuth server that stays out of it.'
   - 'You need a permissive Apache-2.0 licence with no source-available restriction.'
   - 'You want Go, or a relational database you already operate.'
   - 'You want the option of a commercially supported build from the vendor.'
 chooseUs:
-  - 'You want users, login, consent, registration and an admin console in the box rather than as a project to build.'
+  - 'You want users, login, consent, registration and an admin console shipped with the server instead of left for you to build.'
   - 'You need DPoP, PAR, CIBA, mTLS, RAR or JARM, none of which Ory documents for Hydra.'
   - 'Your team writes TypeScript and would rather extend named seams than run a Go service.'
   - 'You want an AI agent administering the instance through the same audited path a human uses.'
 faq:
   - question: 'What is the difference between FoxAuth and Ory Hydra?'
-    answer: "Ory Hydra is an OAuth 2.0 and OpenID Connect server that does not manage identities: its quickstart has you run a separate login and consent application alongside it, and Ory sells Kratos as the identity system to pair with it. FoxAuth is both halves in one server — it stores end users in buckets, serves the login, consent and registration screens, and issues the tokens. If you already have an identity system, Hydra's split is an advantage; if you do not, it is a second project."
+    answer: "Ory Hydra is an OAuth 2.0 and OpenID Connect server that does not manage identities: its quickstart has you run a separate login and consent application alongside it, and Ory sells Kratos as the identity system to pair with it. FoxAuth is both halves in one server: it stores end users in buckets, serves the login, consent and registration screens, and issues the tokens. If you already have an identity system, Hydra's split is an advantage; if you do not, it is a second project."
   - question: 'Does Ory Hydra support DPoP, PAR or FAPI?'
-    answer: "Ory's own documentation for Hydra does not document DPoP, PAR, CIBA, mTLS or FAPI, which is why this page records them as not documented rather than as absent — community threads discuss them, but a claim that is not in the product documentation is not one this page will make. FoxAuth implements DPoP (RFC 9449), PAR (RFC 9126), mTLS (RFC 8705), CIBA, RAR (RFC 9396) and JARM, each behind a feature flag on the instance you run."
+    answer: "Ory's own documentation for Hydra does not cover DPoP, PAR, CIBA, mTLS or FAPI, so this page records them as not documented and stops short of calling them absent. Community threads discuss them, but a claim that is missing from the product documentation is one this page will not make. FoxAuth implements DPoP (RFC 9449), PAR (RFC 9126), mTLS (RFC 8705), CIBA, RAR (RFC 9396) and JARM, each behind a feature flag on the instance you run."
   - question: 'Is Ory Hydra more production-ready than FoxAuth?'
-    answer: 'Yes, on the evidence of deployment history. Ory Hydra has been in production use for years, is Apache-2.0 licensed with no source-available restriction, and has a commercial support option from the vendor. FoxAuth is at a 0.2.0 release, which means its HTTP surface and admin API may still change between minor versions. That is a real difference and it is the strongest argument for choosing Hydra.'
+    answer: 'On the evidence of deployment history, Ory Hydra is the more production-ready of the two. It has been in production use for years, is Apache-2.0 licensed with no source-available restriction, and has a commercial support option from the vendor. FoxAuth is at a 0.2.0 release, which means its HTTP surface and admin API may still change between minor versions. That is a real difference and it is the strongest argument for choosing Hydra.'
   - question: 'Can I migrate from Ory Hydra to FoxAuth?'
-    answer: 'OAuth clients port over — both servers speak the same protocol, so a client changes its issuer URL and client id and keeps working. The larger piece of work is the opposite of a migration: the login and consent application you wrote for Hydra becomes unnecessary, because FoxAuth serves those screens itself, and the users it authenticated have to be moved into a FoxAuth user bucket.'
+    answer: 'OAuth clients port over. Both servers speak the same protocol, so a client changes its issuer URL and client id and keeps working. The larger piece of work is the opposite of a migration: the login and consent application you wrote for Hydra becomes unnecessary, because FoxAuth serves those screens itself, and the users it authenticated have to be moved into a FoxAuth user bucket.'
 groups:
   - label: What you get in the box
     rows:
@@ -42,7 +42,7 @@ groups:
             text: 'OAuth 2.0 and OIDC server. Login and consent are a separate application you provide.'
           }
         verdict: us
-        why: 'Hydra is deliberately not an identity provider; with FoxAuth there is no second application to build.'
+        why: 'Hydra stays out of identity by design; with FoxAuth there is no second application to build.'
         note: 'The quickstart runs Hydra alongside "an exemplary User Login & Consent App".'
       - dimension: User storage
         us:
@@ -56,7 +56,7 @@ groups:
             text: 'No user store. Ory positions Kratos as the identity system to pair with Hydra.'
           }
         verdict: different
-        why: 'If you already have an identity system, Hydra staying out of it is the point.'
+        why: 'If you already run an identity system, Hydra staying out of it is probably what you want.'
       - dimension: Runtime and stack
         us:
           { status: yes, text: 'TypeScript on Bun; the HTTP layer is Elysia.' }
@@ -87,7 +87,7 @@ groups:
             text: 'RFC 6749 with PKCE, OIDC Core, Discovery, and front- and back-channel logout.'
           }
         verdict: even
-        why: 'Both are complete against the core specifications; Hydra additionally documents front- and back-channel logout.'
+        why: 'Both are complete against the core specifications, and Hydra also documents front- and back-channel logout.'
       - dimension: Device flow
         us: { status: yes, text: 'RFC 8628, behind a feature flag.' }
         them:
@@ -111,7 +111,7 @@ groups:
           }
         them: { status: unknown, text: 'Not documented for Hydra.' }
         verdict: us
-        why: 'The banking-grade profiles are implemented here rather than on a roadmap.'
+        why: 'The banking-grade profiles are already implemented here; none of them is a roadmap item.'
       - dimension: Dynamic client registration
         us: { status: yes, text: 'RFC 7591 and RFC 7592.' }
         them:
@@ -144,7 +144,7 @@ groups:
           }
         them: { status: unknown, text: 'Not documented.' }
         verdict: us
-        why: "The agent path here is the console's code rather than a second privileged API."
+        why: "Hydra's documentation has nothing on agent administration. FoxAuth gives an agent the same audited console path a person uses, and keeps the whole surface off until you enable it."
       - dimension: Licence
         us:
           {
@@ -171,15 +171,15 @@ groups:
 The comparison is not really about protocol coverage, though that is where the table shows the
 widest gaps. It is about how much of an identity system you already have.
 
-Ory Hydra is an OAuth and OpenID Connect server that deliberately does not manage users. Its
+Ory Hydra is an OAuth and OpenID Connect server built not to manage users. Its
 quickstart runs a separate login and consent application beside it, and Ory sells a second product,
-Kratos, as the identity system to pair with it. That split is a virtue when you already have a user
-store and a login page you trust: Hydra issues tokens against your authentication decisions and
-stays out of everything else.
+Kratos, as the identity system to pair with it. That split is usually a virtue when you already have
+a user store and a login page you trust: Hydra issues tokens against your authentication decisions
+and stays out of everything else.
 
 FoxAuth makes the opposite bet. End users live in buckets on the server, the login, consent and
-registration screens are served by it, and the admin console manages all of it — so the first token
-is issued without writing an application first.
+registration screens are served by it, and the admin console manages all of it. The first token is
+issued before you have written any application at all.
 
 ## What the protocol table does and does not say
 

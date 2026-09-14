@@ -83,3 +83,11 @@ Nothing moves on scroll.
 Plain, specific, developer-first; sentences under 20 words; claims the
 Reference can back; "source-available", never "open-source"; never "OpenID
 Certified".
+
+The 20-word figure is a norm, not a ceiling: vary sentence length, and let a
+short sentence land after a long one. The em-dash marks a real interruption of
+thought, at most once in a sentence; it is not the default way to join two
+clauses, and a page should not lean on it. Hedge judgments (advice, a
+diagnosis, an assessment of another product) with "usually", "tends to",
+"likely"; never hedge what the server does, refuses or requires, a protocol
+rule, or a licence term. Avoid the "X, not Y" contrast as a habit.

@@ -24,8 +24,8 @@ says so, because a threat model that lists only the good news is not one you can
 >
 	Links point at the `main` branch, so a line may have moved since this page was
 	written. The file and the test name are the stable part. If a link no longer
-	shows what the sentence claims, that is a documentation defect — report it
-	like any other.
+	shows what the sentence claims, that is a documentation defect. Report it like
+	any other.
 </Aside>
 
 ## Scope
@@ -101,7 +101,7 @@ Each row is a threat, the control, and the evidence. Tests live under
 | Mix-up attacks (§4.4)                                 | Every authorization response carries `iss` (RFC 9207); the OIDC callback of the admin console checks it                                                                                                                                                 | [authorization/](https://github.com/RedFox-Soft/OAuth-server.ts/tree/main/lib/actions/authorization), [login.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/admin/auth/login.ts)                                                            |
 | Code replay                                           | A code is consumed on first use; a second presentation revokes the whole grant, not only the code                                                                                                                                                       | [authorization_code.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/actions/grants/authorization_code.ts), `test/authorization_code/code.grant.spec.ts`                                                                                      |
 | Code bound to the wrong party                         | The exchange checks client, redirect URI, account and grant expiry; codes live sixty seconds                                                                                                                                                            | [liveTime.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/configs/liveTime.ts)                                                                                                                                                               |
-| Cross-site request forgery on the interaction screens | Interaction and session cookies are `HttpOnly; Secure; SameSite=Strict`; the device-code and end-session confirmations additionally carry a per-session token                                                                                           | [param_list.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/consts/param_list.ts), `test/sessions/sessions.spec.ts`, `test/end_session/end_session.spec.ts`                                                                                  |
+| Cross-site request forgery on the interaction screens | Interaction and session cookies are `HttpOnly; Secure; SameSite=Strict`; the device-code and end-session confirmations also carry a per-session token                                                                                                   | [param_list.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/consts/param_list.ts), `test/sessions/sessions.spec.ts`, `test/end_session/end_session.spec.ts`                                                                                  |
 | Open redirect after logout                            | `post_logout_redirect_uri` must be registered on the client or the parameter is refused                                                                                                                                                                 | [end_session.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/actions/end_session.ts)                                                                                                                                                         |
 | Clickjacking of the consent screen                    | Every HTML page ships `frame-ancestors 'none'` and `X-Frame-Options: DENY`; inline scripts are allowed by hash only, never by `'unsafe-inline'`                                                                                                         | [csp.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/html/csp.ts), `test/csp/csp.spec.ts`                                                                                                                                                    |
 
@@ -157,16 +157,16 @@ a way the compensating control does not cover is a vulnerability report.
   The database is inside the trust boundary and a compromised database is out of scope; the
   compensating control is the operator's: network isolation and access control on MongoDB, and
   encryption at rest where the platform offers it. Encrypting these fields with an operator-held key
-  is an open design question, not a decision against it.
-- **The rate limiter is a resource protection, not a security boundary.** Counters are in-process,
-  multiply per machine, reset on restart and fail open under an address-rotation flood. The
-  boundaries that must hold absolutely, the sign-in throttle, verification attempt caps and TOTP
+  remains an open design question; nothing has been decided against it.
+- **The rate limiter is a resource protection.** It is not a security boundary: counters are
+  in-process, multiply per machine, reset on restart and fail open under an address-rotation flood.
+  The boundaries that must hold absolutely, the sign-in throttle, verification attempt caps and TOTP
   failure windows, are persisted per identity and do not depend on it.
 - **CSRF protection on the admin API and on the sign-in, registration and TOTP screens rests on
-  `SameSite=Strict` cookies**, not on a per-request token. Every current browser honours the
+  `SameSite=Strict` cookies** alone, with no per-request token. Every current browser honours the
   attribute, and the credentialed CORS path that would bypass it does not exist; a browser that
   ignores `SameSite` is the assumption this rests on.
-- **Cookies are opaque random identifiers, not signed values.** Forging one means guessing a
+- **Cookies are opaque random identifiers and carry no signature.** Forging one means guessing a
   session id in the store; nothing on the cookie itself is trusted.
 - **Email-verification link tokens are looked up directly rather than hashed at rest.** A reader of
   the database could redeem a pending link within its twenty-four-hour life; the six-digit codes

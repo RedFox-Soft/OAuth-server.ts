@@ -24,7 +24,7 @@ The server administers itself. There is no seeded password to look up in a log a
 
 </Steps>
 
-The setup route closes as soon as any `super_admin` exists — it answers `409 already_initialized`
+The setup route closes as soon as any `super_admin` exists, and answers `409 already_initialized`
 from then on. `/admin` becomes a sign-in, and further administrators are created from inside the
 console under **Admins**: an e-mail address, a password of at least twelve characters, and one or
 both of the `super_admin` and `project_admin` roles. (Group membership, separately, is offered by
@@ -34,9 +34,9 @@ holds none.
 
 <Aside type="caution">
 
-`/admin` is a login screen open to the internet. Nothing about the first-run flow is authenticated —
-it cannot be, since no account exists yet — so provision the first administrator immediately after
-the deployment comes up, and do not leave a reachable, un-provisioned instance sitting around.
+`/admin` is a login screen open to the internet. Nothing about the first-run flow is authenticated,
+and it cannot be, since no account exists yet. So provision the first administrator immediately
+after the deployment comes up, and do not leave a reachable, un-provisioned instance sitting around.
 
 </Aside>
 
@@ -64,18 +64,18 @@ Two consequences follow, and both come up in practice:
 
 ## Turn on the second factor
 
-The administrator bucket is a password door on the public internet, so require an authenticator app
-on it before you do anything else. In the console, go to **Admins** (super administrators only) and
-switch on **Require an authenticator app**.
+The administrator bucket is a password door on the public internet, so our advice is to require an
+authenticator app on it before you do anything else. In the console, go to **Admins** (super
+administrators only) and switch on **Require an authenticator app**.
 
 Signing in then needs a six-digit code as well as a password. Nobody is locked out by turning it on:
 administrators without an authenticator enrol one at their next sign-in. That includes an agent
 signing in with the reserved `admin-mcp` client that `database/mongodb.ts` seeds, since it uses the
 same door.
 
-This matters more than it looks. Failed password attempts are counted per bucket and e-mail address,
-and an address that reaches the cap is refused for a while — but a bucket that requires a one-time code
-deliberately stays at the first lockout window however often it is tripped, because a guessed
+This matters more than it might look. Failed password attempts are counted per bucket and
+e-mail address, and an address that reaches the cap is refused for a while. A bucket that requires a
+one-time code stays at the first lockout window however often it is tripped, by design: a guessed
 password there does not sign anyone in. Administrators also have no self-service password reset to
 escape a lockout with. The way to make that door properly hard is the second factor, not the
 throttle. The throttle's own settings are `loginThrottle.failureCap`,
@@ -90,9 +90,9 @@ groups, invites people into their groups by e-mail, and reads the audit trail fo
 groups. Ownership is by group: belonging to a container's owning group is what grants access to
 it.
 
-Every state-changing action — the console's and an agent's alike — is written to an append-only
+Every state-changing action, the console's and an agent's alike, is written to an append-only
 audit trail before the mutation, naming the actor, the action and the target. The store exposes no
 update or delete.
 
-If you found a security problem rather than a configuration one, the project's disclosure policy and
-contact are on the [security page](/security/).
+If what you found is a security problem instead of a configuration one, the project's disclosure
+policy and contact are on the [security page](/security/).

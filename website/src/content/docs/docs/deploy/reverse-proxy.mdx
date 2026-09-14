@@ -1,14 +1,14 @@
 ---
 title: Behind a reverse proxy
-description: Where TLS terminates, the one setting with a wrong answer in each direction, and nginx and Caddy blocks that work.
+description: Where TLS terminates, the setting with a wrong answer in each direction, and nginx and Caddy blocks that work.
 sidebar:
   order: 4
 ---
 
 import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
-The server speaks plaintext HTTP on port 3000 and does not terminate TLS. In every deployment that
-is not a laptop, something in front of it does.
+The server speaks plaintext HTTP on port 3000 and does not terminate TLS. Anywhere other than a
+laptop, something in front of it almost always does.
 
 ## Three things to get right
 
@@ -17,23 +17,23 @@ nothing reaches 3000 from outside, and let the proxy hold the certificate.
 
 **`ISSUER` is the public `https` URL.** Not the internal address, not `http://`. It is the `iss`
 claim of every token, the base of every endpoint in the discovery document, and the redirect target
-of the console client — a client library that fetches discovery will follow whatever it says, so a
-wrong `ISSUER` produces a deployment that half-works in ways that are tedious to diagnose. See the
-[environment reference](/docs/reference/environment/).
+of the console client. A client library that fetches discovery will follow whatever it says, so a
+wrong `ISSUER` produces a deployment that half-works, in ways that tend to be tedious to diagnose.
+See the [environment reference](/docs/reference/environment/).
 
-**Decide `rateLimit.trustedProxy` deliberately.** It is the subject of the next section.
+**Choose `rateLimit.trustedProxy` on purpose.** The next section covers it.
 
 <Aside type="note" title="HSTS is emitted unconditionally">
 
 `Strict-Transport-Security: max-age=63072000; includeSubDomains` is sent on every response,
-including plaintext ones, and there is deliberately no branch on the scheme. In production the hop
-the RFC governs — server to user agent — _is_ HTTPS, because TLS terminated at your proxy; the
+including plaintext ones, and there is no branch on the scheme; that is intentional. In production
+the hop the RFC governs, server to user agent, _is_ HTTPS, because TLS terminated at your proxy. The
 plaintext this process sees on its internal port is an artefact of termination. On
 `http://localhost` the header is inert, since a user agent must ignore it when it arrives over
 plaintext.
 
 Two consequences for a proxy: do not add a second `Strict-Transport-Security` header (you will send
-two), and `preload` is deliberately absent — adding it is a decision for whoever controls the apex
+two), and `preload` is left out on purpose. Adding it is a decision for whoever controls the apex
 domain, at their own edge.
 
 </Aside>
@@ -49,8 +49,8 @@ From the project's README:
 > any caller can set `Fly-Client-IP` to a fresh value per request and is never limited.
 
 So: **behind a proxy, leave [`rateLimit.trustedProxy`](/docs/reference/settings/#rateLimit.trustedProxy)
-at `true`** — and make sure your proxy actually sets a forwarded header, and _overwrites_ rather
-than appends to any the client supplied.
+at `true`**, and make sure your proxy actually sets a forwarded header and _overwrites_ any the
+client supplied instead of appending to it.
 
 ### Exactly which header the resolver reads
 
@@ -62,7 +62,7 @@ in this order:
 3. `X-Real-IP`
 
 The value is trimmed and truncated to 64 characters. If none of the three is present, the request
-falls into a single shared `unknown` bucket rather than going uncounted — omitting the header must
+falls into a single shared `unknown` bucket instead of going uncounted. Omitting the header must
 not be a way to bypass the limiter.
 
 With `rateLimit.trustedProxy` set to `false`, none of those headers is read at all: the transport
@@ -139,7 +139,7 @@ curl -s https://auth.example.com/.well-known/openid-configuration | jq -r .issue
 The second command must print the public `https` URL you set as `ISSUER`. If it prints an internal
 address or an `http://` URL, fix that before anything else — every client will believe it.
 
-To confirm the forwarded header is reaching the server, watch what happens when you exceed a limit:
-a `429` with `Retry-After` that arrives for your address alone, rather than for everyone at once, is
-the resolver working. No `RateLimit-*` headers are emitted, deliberately — they would tell a caller
-probing for the threshold exactly where it is.
+To confirm the forwarded header is reaching the server, watch what happens when you exceed a limit.
+A `429` with `Retry-After` that arrives for your address alone, while other callers carry on, is
+the resolver working. No `RateLimit-*` headers are emitted, and that is intentional: they would
+tell a caller probing for the threshold exactly where it is.

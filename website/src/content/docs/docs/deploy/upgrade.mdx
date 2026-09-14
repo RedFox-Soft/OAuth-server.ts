@@ -1,14 +1,14 @@
 ---
 title: Upgrading
-description: Read the changelog, move the tag, re-run db:setup, apply migrations, restart — and what each step is actually for.
+description: Read the changelog, move the tag, re-run db:setup, apply migrations and restart. Five steps, and what each one is actually for.
 sidebar:
   order: 7
 ---
 
 import { Steps, Aside } from '@astrojs/starlight/components';
 
-An upgrade is five steps, and skipping either of the two database steps is what produces a
-deployment that looks fine and is subtly broken.
+An upgrade is five steps. Skip either of the two database steps and you get a deployment that looks
+fine and is subtly broken.
 
 <Steps>
 
@@ -46,15 +46,16 @@ deployment that looks fine and is subtly broken.
    ```
 
    One command for either datastore. It reports `current` and exits when there is nothing to do,
-   which is the ordinary case. `--plan` lists what would run without running it and exits non-zero
-   when work is outstanding, so a pipeline can gate on it before the deploy rather than during it.
+   which is how most upgrades go. `--plan` lists what would run without running it and exits
+   non-zero when work is outstanding, so a pipeline can gate on it before the deploy instead of
+   during it.
 
-   A migration that cannot be undone is called out by name before it runs. When you see one,
-   take the backup first.
+   A migration that cannot be undone is called out by name before it runs. When you see one, take
+   a backup first.
 
 5. **Restart the server.** It refuses to start against a database whose schema is not the one the
-   release expects — behind, ahead, or holding a record for a migration whose declaration has since
-   changed — so a missed step 3 or 4 stops the deploy rather than corrupting data quietly.
+   release expects: behind, ahead, or holding a record for a migration whose declaration has since
+   changed. A missed step 3 or 4 therefore stops the deploy instead of corrupting data quietly.
 
 </Steps>
 
@@ -69,33 +70,33 @@ deployment that looks fine and is subtly broken.
 
 ## Why step 3 is not optional
 
-`db:setup` is the only thing that applies a release's structural changes, and it is idempotent — it
+`db:setup` is the only thing that applies a release's structural changes. It is also idempotent: it
 upserts, so running it against an already-current database changes nothing. What a release can add:
 
 - **New collections** (tables, on PostgreSQL), for a capability that did not exist before.
-- **New indexes** — including TTL indexes. A collection that MongoDB auto-creates on first write has
-  no TTL index, so documents that were meant to expire simply do not, and nothing complains. It also
-  drops stale expiry indexes that a release has stopped writing the field for. On PostgreSQL there
-  are no TTL indexes to create: the running server sweeps expired rows itself.
-- **Seed changes.** When a release changes the admin seed — a new reserved client, a new field on
-  the administrator bucket, a group the ownership model now expects — `db:setup` is what applies it.
-  The reserved `admin-mcp` agent client arrived exactly this way, and the script carries an explicit
-  `$addToSet` for it because `$setOnInsert` would not touch a project that already existed.
+- **New indexes**, TTL indexes included. A collection that MongoDB auto-creates on first write has
+  no TTL index, so documents that were meant to expire simply do not, and nothing complains. The
+  script also drops stale expiry indexes for a field a release has stopped writing. On PostgreSQL
+  there are no TTL indexes to create; the running server sweeps expired rows itself.
+- **Seed changes.** When a release changes the admin seed, `db:setup` is what applies it: a new
+  reserved client, a new field on the administrator bucket, a group the ownership model now expects.
+  The reserved `admin-mcp` agent client arrived exactly this way. The script carries an explicit
+  `$addToSet` for it, because `$setOnInsert` would not touch a project that already existed.
 
-`db:setup` exits non-zero when a constraint it declares is not in force, so make it a gate rather
-than a fire-and-forget: the shipped `fly.toml` runs it as `release_command` and Fly aborts the deploy
+`db:setup` exits non-zero when a constraint it declares is not in force, so make it a gate instead
+of a fire-and-forget. The shipped `fly.toml` runs it as `release_command` and Fly aborts the deploy
 on failure; the Compose files run it as a `setup` service the server `depends_on` with
 `service_completed_successfully`; on Kubernetes it is a Job you wait for.
 
 ## Why step 4 is a separate step
 
-`db:setup` only ever adds — a collection, an index, a seeded document — because that is the only
-kind of change safe to repeat against a database in any state. Reshaping data that already exists
-is a different job: it has to run once, in a declared order, and be recorded so the next deploy
-knows it happened. That is what `db:migrate` does, on either datastore, and it is why the two are
-not one command.
+`db:setup` only ever adds things: a collection, an index, a seeded document. That is the only kind
+of change safe to repeat against a database in any state. Reshaping data that already exists is a
+different job. It has to run once, in a declared order, and be recorded so the next deploy knows it
+happened. That is what `db:migrate` does, on either datastore, and it is why the two are not one
+command.
 
-Three things follow from the record it keeps, and each of them stops a deploy rather than letting it
+Three things follow from the record it keeps, and each of them stops a deploy instead of letting it
 proceed on a guess:
 
 - A database **behind** this release has outstanding migrations. Run them.
@@ -103,7 +104,7 @@ proceed on a guess:
   means the binary is older than the database — a rollback past a migration, usually.
 - A database is **diverged** when a migration it already applied no longer matches the one declared
   under that name. A released migration edited after the fact is the cause; the fix is a new
-  migration, not an edit.
+  migration, and the released one stays as it was.
 
 Only one process migrates at a time. A run takes a short renewable lease, so two replicas rolling
 at once do not both apply the same step, and a crashed run leaves a lease that expires rather than
@@ -144,10 +145,10 @@ curl -s https://auth.example.com/.well-known/openid-configuration | jq -r .issue
 
 `/ready` rather than `/health` on purpose: `/health` answers for the process alone and would pass
 against a server that came up unable to reach its database. The second is the check worth
-automating — the shipped deploy workflow does exactly this, because
-the advertised issuer is the one value a deploy can get wrong in a way nothing else catches.
+automating. The shipped deploy workflow does exactly this, because the advertised issuer is the
+value a deploy can get wrong without anything else noticing.
 
 Then open `/admin` and sign in. That single act exercises the seed, the console client, the
 administrator bucket and the authorization code flow at once, so if it works, the upgrade landed.
-Super administrators should also glance at **Faults**: only genuine defects are recorded there —
-routine client rejections never are — so anything new after an upgrade is worth reading.
+Super administrators should also glance at **Faults**. Only genuine defects are recorded there,
+never routine client rejections, so anything new after an upgrade is probably worth reading.

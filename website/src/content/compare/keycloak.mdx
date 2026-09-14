@@ -13,26 +13,26 @@ sources:
   - https://www.keycloak.org/getting-started/getting-started-docker
   - https://www.keycloak.org/documentation
   - https://github.com/keycloak/keycloak
-bottomLine: 'Pick Keycloak if you need SAML, LDAP federation or certified FAPI today. Pick FoxAuth if your team writes TypeScript, wants OAuth 2.1 behaviour as the default, or wants an AI agent administering the server through the same audited path a human uses.'
+bottomLine: 'Pick Keycloak if you need SAML, LDAP federation or certified FAPI today. FoxAuth is the better fit for a team that writes TypeScript, wants OAuth 2.1 behaviour as the default, or wants an AI agent administering the server through the same audited path a human uses.'
 chooseThem:
   - 'You need SAML as well as OpenID Connect.'
   - 'You want LDAP or Active Directory user federation, realms, or policy-based fine-grained authorization.'
-  - 'You already run the JVM and a relational database, and a compliance reviewer recognises the name.'
+  - 'You already run the JVM and a relational database, and a compliance reviewer will probably recognise the name.'
   - 'You need extensive FAPI documentation and profiles (Open Finance Brasil, Australian CDR) today.'
 chooseUs:
   - 'Your team writes TypeScript and would rather read the server than wrap it.'
-  - 'You want PKCE for every client, exact redirect matching and no Implicit grant as the default, not per-client configuration.'
+  - 'You want PKCE for every client, exact redirect matching and no Implicit grant to be the default, with nothing to configure per client.'
   - "You want an AI agent to administer the instance through the console's own permission checks and audit trail."
   - 'You want a server small enough to mount inside your own Bun service, on the PostgreSQL or MongoDB you already run.'
 faq:
   - question: 'Can I migrate from Keycloak to FoxAuth?'
-    answer: "Clients and users move without much trouble — both are OpenID Connect servers, so a client written against Keycloak's token endpoint works against FoxAuth's once the issuer and the client id change. The work is in what Keycloak calls realms, mappers and authentication flows: FoxAuth models tenancy as projects and user buckets, and custom behaviour as 31 named override seams in TypeScript rather than as SPI implementations in Java."
+    answer: "Clients and users usually move from Keycloak to FoxAuth without much trouble. Both are OpenID Connect servers, so a client written against Keycloak's token endpoint works against FoxAuth's once the issuer and the client id change. The work is in what Keycloak calls realms, mappers and authentication flows. FoxAuth models tenancy as projects and user buckets, and custom behaviour lives in 31 named override seams in TypeScript where Keycloak would have you write SPI implementations in Java."
   - question: 'Is FoxAuth lighter to run than Keycloak?'
-    answer: 'It is a Bun process and one database — PostgreSQL or MongoDB — which is a smaller operational surface than a JVM application server and its relational schema, and it starts in under a second rather than tens of seconds. That is a real difference in memory and startup, not in what the protocol endpoints do. Keycloak has years more production hardening behind it, and that is worth weighing against a 0.x release.'
+    answer: 'FoxAuth is a Bun process and one database, PostgreSQL or MongoDB, which is a smaller operational surface than a JVM application server and its relational schema. It starts in under a second, against tens of seconds for Keycloak. That is a real difference in memory and startup. It is no difference at all in what the protocol endpoints do. Keycloak has years more production hardening behind it, and that is worth weighing against a 0.x release.'
   - question: 'Does FoxAuth support SAML?'
-    answer: 'No. FoxAuth implements OAuth 2.1 and OpenID Connect only, and there is no SAML support planned. If an application in your estate can only speak SAML, FoxAuth cannot serve it and Keycloak can — that is a reason to stay where you are.'
+    answer: 'FoxAuth does not support SAML. It implements OAuth 2.1 and OpenID Connect only, and there is no SAML support planned. If an application in your estate can only speak SAML, FoxAuth cannot serve it and Keycloak can, which is a good reason to stay where you are.'
   - question: 'Can an AI agent administer FoxAuth?'
-    answer: "Yes, over MCP, and it is the same code path a human administrator uses rather than a separate privileged API. Every agent action runs through the console's own routes, permission checks and validation, lands in the append-only audit trail attributed to the agent, and destructive operations require a second confirming call. It is off until you set mcp.enabled."
+    answer: "An AI agent can administer FoxAuth over MCP, and it uses the same code path a human administrator uses; there is no separate privileged API. Every agent action runs through the console's own routes, permission checks and validation, and lands in the append-only audit trail attributed to the agent. Destructive operations require a second confirming call. The whole surface is off until you set mcp.enabled."
 groups:
   - label: Getting started and operations
     rows:
@@ -82,7 +82,7 @@ groups:
             text: 'SAML, LDAP and Kerberos federation, realms, fine-grained authorization services.'
           }
         verdict: them
-        why: 'If SAML or LDAP is on your list, this is not a close call.'
+        why: 'If SAML or LDAP is on your list, this is unlikely to be a close call.'
       - dimension: Maturity
         us:
           {
@@ -110,7 +110,7 @@ groups:
             text: 'Supported; S256 enforced under the FAPI profiles. A server-wide default is not documented.'
           }
         verdict: us
-        why: 'OAuth 2.1 behaviour is the default, not something you configure per client.'
+        why: 'OAuth 2.1 behaviour is the default; there is nothing to configure per client.'
         note: 'Referenced as "RFC 7637 Proof Key for Code Exchange (PKCE)" (their numbering; the RFC is 7636).'
       - dimension: DPoP (RFC 9449)
         us:
@@ -120,7 +120,7 @@ groups:
           }
         them: { status: flag, text: 'Documented as a preview feature.' }
         verdict: us
-        why: 'Shipped rather than previewed; both need switching on.'
+        why: 'Ours is shipped and theirs is previewed; both need switching on.'
         note: 'Described as "a preview feature" that "binds an access token and a refresh token together with the public part of a client''s key pair".'
       - dimension: Pushed Authorization Requests (RFC 9126)
         us: { status: flag, text: 'Behind par.enabled.' }
@@ -180,7 +180,7 @@ groups:
         them:
           {
             status: flag,
-            text: 'Supported since 26.6, and documented as experimental — "may introduce breaking changes in future versions".'
+            text: 'Supported since 26.6, and documented as experimental: "may introduce breaking changes in future versions".'
           }
         verdict: even
         why: 'Both implement the mechanism the MCP specification names first; theirs is labelled experimental and ours is behind a flag.'
@@ -193,7 +193,7 @@ groups:
         them:
           {
             status: flag,
-            text: 'Documented as an MCP authorization server, but "Keycloak cannot recognize resource parameter" — audience binding is done instead with a client scope and an audience mapper per MCP server.'
+            text: 'Documented as an MCP authorization server, but "Keycloak cannot recognize resource parameter". Audience binding is done instead with a client scope and an audience mapper per MCP server.'
           }
         verdict: us
         why: 'Both can front an MCP server. The difference is how the token is bound to it: the resource parameter the MCP specification requires of clients, against a per-server scope and mapper configured by hand.'
@@ -222,7 +222,7 @@ groups:
         them:
           {
             status: no,
-            text: 'Administration is the Admin REST API. Keycloak documents MCP as an authorization server for other people’s MCP servers, not as an interface for administering Keycloak.'
+            text: 'Administration is the Admin REST API. Keycloak documents MCP as an authorization server for other people’s MCP servers, and does not describe it as an interface for administering Keycloak.'
           }
         verdict: us
         why: "An agent runs the console's own code path, checks and audit trail; there is no second privileged API to keep in step."

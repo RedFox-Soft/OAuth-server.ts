@@ -59,7 +59,7 @@ const groups: {
 			},
 			{
 				title: 'Refresh Token grant',
-				body: 'Long-lived sessions with rotation and reuse detection — a replayed token revokes the whole grant.',
+				body: 'Long-lived sessions with rotation and reuse detection. Replay a token and the whole grant is revoked.',
 				flag: 'refreshToken.enabled'
 			},
 			{
@@ -123,7 +123,7 @@ const groups: {
 			},
 			{
 				title: 'Signed UserInfo responses',
-				body: 'Return UserInfo as a signed JWT rather than plain JSON.',
+				body: 'Return UserInfo as a signed JWT instead of plain JSON.',
 				flag: 'jwtUserinfo.enabled'
 			},
 			{
@@ -192,7 +192,7 @@ const groups: {
 			},
 			{
 				title: 'CORS closed by data',
-				body: 'An origin is readable only if it is listed on the project that owns the calling client — not by a wildcard setting.',
+				body: 'An origin is readable only if the project that owns the calling client lists it. No wildcard setting opens it.',
 				flag: 'cors.enabled'
 			},
 			{
@@ -218,7 +218,7 @@ const groups: {
 			},
 			{
 				title: 'Append-only audit trail',
-				body: 'Every state-changing admin action records actor, action, target and time — written before the mutation, with no update or delete path.'
+				body: 'Every state-changing admin action records actor, action, target and time. The entry is written before the mutation, and the store has no update or delete path.'
 			},
 			{
 				title: 'Administration over MCP',
@@ -228,7 +228,7 @@ const groups: {
 			},
 			{
 				title: 'Authorization for your own MCP servers',
-				body: 'Declare a third-party MCP server as a protected resource of a project and this server mints tokens whose audience is exactly that resource — no code change here and no restart. Self-contained tokens by default, so the resource verifies them against the published keys without credentials of its own.',
+				body: 'Declare a third-party MCP server as a protected resource of a project and this server mints tokens whose audience is exactly that resource, with no code change here and no restart. Tokens are self-contained by default, so the resource verifies them against the published keys without credentials of its own.',
 				spec: rfc('8707')
 			},
 			{
@@ -254,7 +254,7 @@ const groups: {
 			},
 			{
 				title: 'Group ownership',
-				body: 'Projects and user buckets are owned by a group; membership is the only thing that grants access, re-resolved on every request.'
+				body: 'Projects and user buckets are owned by a group. Nothing but membership grants access, and it is re-resolved on every request.'
 			},
 			{
 				title: 'End-user self-service',
@@ -275,7 +275,7 @@ const groups: {
 		id: 'extensibility',
 		heading: 'Extensibility',
 		title: 'Change behaviour without forking.',
-		blurb: 'Named seams and one adapter interface, so your changes survive an upgrade.',
+		blurb: 'Named seams and one adapter interface, so your changes should survive an upgrade.',
 		items: [
 			{
 				title: '31 override seams',
@@ -339,9 +339,9 @@ const groups: {
 		</h1>
 		<p class="mt-5 text-lg text-gray-600 dark:text-gray-400">
 			FoxAuth ships one server with no feature editions. Authorization Code with PKCE and
-			OpenID Connect run from the first start, and most of the rest wait behind a named flag — so
-			your attack surface is the set of features you actually asked for. Each card says which of
-			the two it is.
+			OpenID Connect run from the first start, and most of the rest wait behind a named flag. In
+			practice your attack surface is the set of features you actually asked for. Each card says
+			which of the two it is.
 		</p>
 		<p class="mt-5 text-gray-600 dark:text-gray-400">
 			Each flag below links to its entry in the Settings reference, which is generated from the

@@ -8,9 +8,9 @@ sidebar:
 import { Steps, Aside } from '@astrojs/starlight/components';
 import ScreenshotFigure from '../../../../components/ScreenshotFigure.astro';
 
-This is one full Authorization Code + PKCE round trip against a local deployment, done by hand. It
-is the flow every client library implements, and doing it once by hand makes debugging one much
-easier.
+This is one full Authorization Code + PKCE round trip against a local deployment, done by hand.
+Every client library implements this flow, and having walked through it once yourself usually makes
+debugging one much easier.
 
 The examples assume `ISSUER=http://localhost:3000` and a public client with the id `demo` whose
 registered redirect URI is `http://localhost:8080/callback`. Substitute your own from
@@ -18,9 +18,10 @@ registered redirect URI is `http://localhost:8080/callback`. Substitute your own
 
 <Aside type="note">
 
-The endpoint paths below are this server's defaults. Do not hard-code them in a real client — read
-`GET /.well-known/openid-configuration` and use what it advertises. That document also reflects
-which capabilities are enabled, so it is the honest answer to "what does this deployment support".
+The endpoint paths below are this server's defaults. Do not hard-code them in a real client. Read
+`GET /.well-known/openid-configuration` and use what it advertises instead. That document also
+reflects which capabilities are enabled, so it is the honest answer to "what does this deployment
+support".
 
 </Aside>
 
@@ -58,11 +59,11 @@ which capabilities are enabled, so it is the honest answer to "what does this de
 
    (All on one line, without the indentation.) `state` is yours to check on the way back; `nonce` is
    echoed into the ID token so you can tie it to this request. `scope=openid` is what makes this an
-   OpenID Connect request and produces an ID token. A refresh token additionally needs
-   `offline_access` in the scope **and** `prompt=consent` in this URL **and** `refresh_token` among
-   the client's grant types — a console-created client has only `authorization_code` by default. If
-   any of the three is missing the scope is dropped silently, with no error: you get a token
-   response with no `refresh_token` in it.
+   OpenID Connect request and produces an ID token. A refresh token also needs `offline_access` in
+   the scope **and** `prompt=consent` in this URL **and** `refresh_token` among the client's grant
+   types. A console-created client has only `authorization_code` by default. If any of the three is
+   missing the scope is dropped silently, with no error: you get a token response with no
+   `refresh_token` in it.
 
 3. **Sign in and consent.** The server redirects to its own interaction screens: a sign-in form for
    the bucket this client's project points at, then a consent screen listing the scopes (consent is
@@ -72,11 +73,11 @@ which capabilities are enabled, so it is the honest answer to "what does this de
    http://localhost:8080/callback?code=<code>&state=8f2c1d&iss=http%3A%2F%2Flocalhost%3A3000
    ```
 
-   Nothing needs to be listening on port 8080 — copy the `code` out of the browser's address bar.
+   Nothing needs to be listening on port 8080; copy the `code` out of the browser's address bar.
    Check that `state` came back unchanged, and that `iss` is your issuer.
 
 4. **Exchange the code at the token endpoint.** The code is single-use and lives 60 seconds, so do
-   this promptly — if you take longer, start again at step 2:
+   this promptly. If you take longer, start again at step 2:
 
    ```bash
    curl -s http://localhost:3000/token \
@@ -142,7 +143,7 @@ The two screens step 3 passes through, on a default deployment:
 ## On by default, or behind a flag
 
 Most endpoints are governed by a feature flag, and **a flag that is off means the endpoint is not
-served at all** — the refusal is deliberately indistinguishable from a path the server does not
+served at all**. The refusal is indistinguishable, on purpose, from a path the server does not
 have. So a `404` on one of these is a configuration answer, not a defect:
 
 - **Always available**, with no flag: `/health`, `/.well-known/openid-configuration`,

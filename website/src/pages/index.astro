@@ -33,7 +33,7 @@ const audiences = [
 	},
 	{
 		title: 'For AI-agent builders',
-		body: 'Protect your own MCP server with it, and let an agent administer the instance through the console’s own code path — no separate privileged API to keep in step.',
+		body: 'Protect your own MCP server with it, and let an agent administer the instance through the console’s own code path. There is no separate privileged API to keep in step.',
 		points: [
 			'Declare your MCP server; get audience-bound tokens (RFC 8707)',
 			'Client ID Metadata Documents, so an agent host needs no setup',
@@ -42,7 +42,7 @@ const audiences = [
 	},
 	{
 		title: 'For regulated industries',
-		body: 'The banking-grade profiles are implemented, not on a roadmap: turn on the flag your regulator asks for.',
+		body: 'The banking-grade profiles are implemented today, and none of them is waiting on a roadmap. Turn on the flag your regulator asks for.',
 		points: [
 			'FAPI, DPoP, PAR, mTLS, CIBA, RAR, JARM',
 			'Append-only admin audit trail',
@@ -143,8 +143,8 @@ server ← { "restartRequired": true,
 				</h1>
 				<p class="mt-5 max-w-prose text-lg text-gray-600 dark:text-gray-400">
 					FoxAuth is built on OAuth-server.ts, a source-available OAuth 2.1 / OpenID Connect
-					server you run yourself — with a built-in admin console, banking-grade profiles, and
-					administration over MCP for AI agents.
+					server you run yourself. It ships with a built-in admin console, banking-grade
+					profiles, and administration over MCP for AI agents.
 				</p>
 				<!-- The opening has to stand alone: it is the first screen a search visitor sees,
 				     and the passage an assistant quotes when asked what this project is. What it is,
@@ -218,8 +218,8 @@ server ← { "restartRequired": true,
 		</h2>
 		<p class="mt-3 max-w-prose text-gray-600 dark:text-gray-400">
 			Projects, clients, user buckets, end-users, upstream providers, settings, SMTP, signing keys
-			and an append-only audit trail — one console, signed in through the server's own OpenID
-			Connect flow. The same API is what an AI agent uses over MCP.
+			and an append-only audit trail, all in one console that you sign into through the server's
+			own OpenID Connect flow. The same API is what an AI agent uses over MCP.
 		</p>
 		<ScreenshotFigure
 			name="admin-project-clients"
@@ -234,7 +234,7 @@ server ← { "restartRequired": true,
 			Three teams, one server.
 		</h2>
 		<p class="mt-3 max-w-prose text-gray-600 dark:text-gray-400">
-			The same binary, the same admin API. What changes is which flags you set.
+			The same binary, the same admin API. What changes, for the most part, is which flags you set.
 		</p>
 		<div class="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-3">
 			{
@@ -267,7 +267,8 @@ server ← { "restartRequired": true,
 			A token in five minutes.
 		</h2>
 		<p class="mt-3 max-w-prose text-gray-600 dark:text-gray-400">
-			No sign-up, no tenant, no API key. Three pages end with a token in your terminal.
+			No sign-up, no tenant, no API key. Three short pages, and you should have a token in your
+			terminal.
 		</p>
 		<div class="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-3">
 			{
@@ -323,7 +324,7 @@ server ← { "restartRequired": true,
 				</h2>
 				<p class="mt-4 max-w-prose text-gray-600 dark:text-gray-400">
 					Declare your own MCP server as a protected resource of a project and this server
-					mints tokens whose audience is exactly that resource — no code here, no restart. An
+					mints tokens whose audience is exactly that resource. No code here, no restart. An
 					agent host discovers it, signs your users in, and comes back with a token your MCP
 					server verifies against the published keys without asking anything. A
 					<code class="font-mono text-sm">client_id</code> that is an HTTPS URL is accepted as
@@ -333,8 +334,8 @@ server ← { "restartRequired": true,
 					Turn on <code class="font-mono text-sm">mcp.enabled</code> and the management API is
 					served to an AI agent at <code class="font-mono text-sm">POST /mcp</code> as an OAuth
 					2.1 protected resource. Each of the 65 tools rebuilds the request the console would
-					have sent and runs the console's own permission checks, validation and audit write —
-					so there is no privileged back door to keep in step.
+					have sent and runs the console's own permission checks, validation and audit write,
+					so no privileged back door can drift away from the console.
 				</p>
 				<p class="mt-4 max-w-prose text-gray-600 dark:text-gray-400">
 					Destructive and instance-wide operations need two calls: the first returns a

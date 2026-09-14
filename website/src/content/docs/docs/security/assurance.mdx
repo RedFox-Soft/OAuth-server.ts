@@ -1,6 +1,6 @@
 ---
 title: Security assurance
-description: What stands behind the security claims — the scanning that runs on every push and every week, where each result is published, and what has not been done yet.
+description: What backs the security claims, from the scanning that runs on every push and every week to where each result is published, and what has not been done yet.
 sidebar:
   order: 2
 ---
@@ -10,7 +10,7 @@ import { Aside } from '@astrojs/starlight/components';
 The [threat model](/docs/security/threat-model/) says what the server defends against and points at
 the code. This page says what checks the code without anyone remembering to, where you can read
 each result yourself, and, in plain words, what this project has not yet done. A security page
-that lists only the good news is not one you can trust, so the last section is not optional.
+that lists only the good news is hard to trust, so the last section is not optional.
 
 ## Continuous checks
 
@@ -18,7 +18,7 @@ Everything in this table runs from
 [`.github/workflows/security.yml`](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/.github/workflows/security.yml)
 on every push to `main`, on every pull request and every Monday. The weekly run matters more than it
 looks: a scan that only fires on a push goes quiet the moment the code does, and a new advisory
-against an unchanged dependency is the common case.
+against an unchanged dependency is, in our experience, the common case.
 
 | Check                           | What it covers                                                                                                                                                                                      | What happens on a finding                                                                                                                              | Where to read it                                                                                                 |
 | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
@@ -32,24 +32,24 @@ against an unchanged dependency is the common case.
 	title="Why the image scan does not fail the build"
 >
 	Almost everything an image scan finds is in the base image, and the remedy is
-	a rebuild once upstream ships a fix, not a change to this repository. A red
-	build that nobody can turn green teaches people to ignore red builds. The
-	finding is published instead, dated, where it stays visible until the rebuild
-	clears it.
+	a rebuild once upstream ships a fix; there is nothing to change in this
+	repository. A red build that nobody can turn green teaches people to ignore
+	red builds. The finding is published instead, dated, where it stays visible
+	until the rebuild clears it.
 </Aside>
 
 ## The released image, and how to check it is ours
 
 Everything above checks the code. This section is about the artifact you actually run. Every image
 [`release.yml`](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/.github/workflows/release.yml)
-publishes carries three things, and each of them is something you can verify yourself rather than
-take our word for:
+publishes carries three things, and you can verify each of them yourself instead of taking our word
+for it:
 
-| What                 | Produced by                                                           | What it lets you establish                                                                                                         |
-| -------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| A **signature**      | `cosign sign`, keyless, over the image digest                         | These exact bytes were pushed by this repository's release workflow, running on a version tag — not by anyone who obtained a token |
-| An **SBOM**          | BuildKit (`sbom: true`), attached to the image as an attestation      | Every package inside the image, so you can answer "is today's advisory in here?" without waiting for us to publish an answer       |
-| **Build provenance** | BuildKit (`mode=max`) and a signed SLSA v1 statement through Sigstore | Which commit, which base image digest, which Dockerfile and which build inputs produced it                                         |
+| What                 | Produced by                                                           | What it lets you establish                                                                                                       |
+| -------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| A **signature**      | `cosign sign`, keyless, over the image digest                         | These exact bytes were pushed by this repository's release workflow, running on a version tag, and not by anyone holding a token |
+| An **SBOM**          | BuildKit (`sbom: true`), attached to the image as an attestation      | Every package inside the image, so you can answer "is today's advisory in here?" without waiting for us to publish an answer     |
+| **Build provenance** | BuildKit (`mode=max`) and a signed SLSA v1 statement through Sigstore | Which commit, which base image digest, which Dockerfile and which build inputs produced it                                       |
 
 The signing is **keyless**: the workflow exchanges its GitHub OIDC token for a short-lived Sigstore
 certificate that names the repository, the workflow file and the tag, and that certificate is what a
@@ -65,13 +65,12 @@ cosign verify \
   ghcr.io/redfox-soft/oauth-server-ts:<version>
 ```
 
-The identity is the point of the command, not decoration. `cosign verify` without those two flags
-asks only "is this signed by somebody", which every attacker with a Sigstore account can also
-satisfy.
+The identity is what the command is for. `cosign verify` without those two flags asks only "is this
+signed by somebody", which every attacker with a Sigstore account can also satisfy.
 
 The release workflow runs that same command against the image it has just signed, with the identity
 pinned to its own tag, before the run is allowed to finish. So a signature that cannot be verified
-fails the release instead of reaching you — and the command above cannot quietly stop working here
+fails the release instead of reaching you. Nor can the command above quietly stop working here
 without going red there first.
 
 Read the SBOM and the build record, both of which travel inside the image index:
@@ -93,7 +92,7 @@ gh attestation verify oci://ghcr.io/redfox-soft/oauth-server-ts:<version> \
 ```
 
 The SBOM matters more for this image than for most, because the
-[`Dockerfile`](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/Dockerfile) deliberately runs
+[`Dockerfile`](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/Dockerfile) chooses to run
 `apk upgrade` on top of a digest-pinned base: the distribution package set is therefore a property of
 the day the image was built and cannot be recovered by reading the repository. The SBOM is the record
 of it, which is also why the same Dockerfile does not claim a reproducible build.
@@ -130,7 +129,7 @@ Drop `--bundle` and the same command verifies against the attestation store inst
 statement names the commit, the workflow and the run that produced the file, which is the question
 worth asking about a data file somebody else's build reads.
 
-The release workflow runs both verifications — one per asset — against the bundle it is about to
+The release workflow runs both verifications, one per asset, against the bundle it is about to
 attach, before the release is created.
 
 ## OpenSSF Scorecard
@@ -141,8 +140,8 @@ publishes the result to
 [scorecard.dev](https://scorecard.dev/viewer/?uri=github.com/RedFox-Soft/OAuth-server.ts). The
 checks are somebody else's: branch protection, whether actions and dependencies are pinned, whether
 a fuzzer exists, whether releases are signed, how quickly vulnerabilities are addressed. A low score
-on a check is information, not something to hide; the report is linked from the README badge so
-that it is the first thing a reader sees rather than the last.
+on a check is information, and nothing to hide; the report is linked from the README badge so
+that it is the first thing a reader sees.
 
 ## Repository protections
 
@@ -180,13 +179,13 @@ whole picture.
 
 - **No external audit.** No third party has been paid to assess this code. When one is, the report
   is published on the [security policy page](/security/) in full, findings included.
-- **No paid bug bounty.** A confirmed report earns credit in the release notes and our thanks, not
-  money. The scope and safe harbour in the security policy are the whole programme.
+- **No paid bug bounty.** A confirmed report earns credit in the release notes and our thanks. There
+  is no money in it. The scope and safe harbour in the security policy are the entire programme.
 - **No OpenID Foundation certification.** The conformance suite has not been run against a release.
   Standards compliance is asserted by this project's own tests until it has.
 - **No fuzzing, and no reproducible build.** Scorecard will say so about both, and it is right about
-  both. The build is not reproducible by design — see the `apk upgrade` above — and that trade is
-  argued in the `Dockerfile` rather than hidden.
+  both. The build is not reproducible by design (see the `apk upgrade` above), and the `Dockerfile`
+  argues that trade out in the open.
 
 The list gets shorter as things are done, and never by deletion alone: an item leaves it by moving to
 one of the sections above with a link to the evidence.

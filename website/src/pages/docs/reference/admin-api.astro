@@ -36,5 +36,5 @@ const headings = [
 		<tbody>{adminApi.audited.map((r) => <tr><td><code>{r.method} {r.path}</code></td><td><code>{r.action}</code></td><td>{r.targetType}</td><td>{summaryFor.get(`${r.method} ${r.path}`) ?? 'Console-only; see below.'}</td></tr>)}</tbody>
 	</table>
 	<h2 id="console-only">Console-only operations</h2>
-	<ul>{mcp.excluded.map((e) => <li><code>{e.method} {e.path}</code> — {e.reason}</li>)}</ul>
+	<ul>{mcp.excluded.map((e) => <li><code>{e.method} {e.path}</code>: {e.reason}</li>)}</ul>
 </StarlightPage>

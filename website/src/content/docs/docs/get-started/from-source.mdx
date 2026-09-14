@@ -7,10 +7,10 @@ sidebar:
 
 import { Steps, Aside } from '@astrojs/starlight/components';
 
-Running from source is the path for development, for reading the code alongside a live server, and
-for any deployment that wants to build its own image.
+Running from source is the usual path for development, for reading the code alongside a live
+server, and for any deployment that wants to build its own image.
 
-**Prerequisites:** [Bun](https://bun.sh/) v1.3 or newer, and a database you can reach — MongoDB or
+**Prerequisites:** [Bun](https://bun.sh/) v1.3 or newer, and a database you can reach: MongoDB or
 PostgreSQL, whichever you would rather run.
 
 <Steps>
@@ -31,7 +31,7 @@ PostgreSQL, whichever you would rather run.
    DATABASE_NAME=OAuth
    ```
 
-   For PostgreSQL instead, set `POSTGRES_URL` and leave the other two out — the database name is
+   For PostgreSQL instead, set `POSTGRES_URL` and leave the other two out. The database name is
    part of that URL, so `DATABASE_NAME` is unused:
 
    ```ini
@@ -39,7 +39,7 @@ PostgreSQL, whichever you would rather run.
    POSTGRES_URL=postgres://user:password@localhost:5432/oauth
    ```
 
-   Setting both connection strings makes the server refuse to start rather than pick one; see
+   Set both connection strings and the server refuses to start instead of picking one; see
    [PostgreSQL](/docs/deploy/postgresql/). Bun loads `.env` automatically; nothing else needs
    configuring. Each variable is described in the
    [environment variables reference](/docs/reference/environment/). `ISSUER` is the canonical public
@@ -72,14 +72,14 @@ PostgreSQL, whichever you would rather run.
 
 ## What `bun run db:setup` provisions
 
-`db:setup` runs `database/mongodb.ts` against `MONGODB_URI` / `DATABASE_NAME` and is the one step
-that turns an empty database into a working deployment:
+`db:setup` runs `database/mongodb.ts` against `MONGODB_URI` / `DATABASE_NAME`, and it is what
+turns an empty database into a working deployment:
 
 - **Collections**, one per storage area the server writes to.
 - **Indexes**: the TTL indexes that expire tokens, codes, sessions and interactions, and the unique
   e-mail index on each bucket's end-user collection. It also drops stale expiry indexes left on
   collections that no longer write the field.
-- **The initial RS256 signing key**, persisted through the `jwksStore` adapter — which is why keys
+- **The initial RS256 signing key**, persisted through the `jwksStore` adapter, which is why keys
   are not an environment variable here. (If the server ever starts against an empty key store it
   generates and persists one itself.)
 - **The admin panel seed**: the reserved admin project, its "Administrators" user bucket with
@@ -88,19 +88,19 @@ that turns an empty database into a working deployment:
   containers no administrator manages, and the default `redfox` end-user bucket.
 
 It is **idempotent**: every write is an upsert or a create-if-absent, so running it again changes
-nothing that already exists. Re-run it after upgrading an existing install — a release that adds a
-collection, an index or a seeded document applies it here and nowhere else — and then run
-`bun run db:migrate`, which applies anything a release has to reshape rather than merely add.
+nothing that already exists. Re-run it after upgrading an existing install, since a release that
+adds a collection, an index or a seeded document applies it here and nowhere else. Then run
+`bun run db:migrate`, which applies whatever a release has to reshape, as opposed to merely add.
 
-On PostgreSQL, `bun run db:setup:pg` does the same job with tables in place of collections. The one
+On PostgreSQL, `bun run db:setup:pg` does the same job with tables in place of collections. The only
 structural difference is expiry: PostgreSQL has no TTL index, so the running server sweeps expired
 rows itself. `bun run db:migrate` is the same command on either backend.
 
 <Aside type="note">
 
-`db:setup` exits non-zero when a constraint it declares is not in force — a unique index it could
-not create because the data already violates it, for instance. A deployment pipeline should treat
-that as a failed deploy rather than a warning; the shipped `fly.toml` does exactly that.
+`db:setup` exits non-zero when a constraint it declares is not in force: a unique index it could
+not create because the data already violates it, for instance. A deployment pipeline should fail
+the deploy on that exit code instead of logging a warning; the shipped `fly.toml` does exactly that.
 
 </Aside>
 

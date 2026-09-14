@@ -7,7 +7,7 @@ sources:
   - https://github.com/zitadel/zitadel
   - https://zitadel.com/self-hosted
   - https://zitadel.com/docs
-bottomLine: 'Pick Zitadel if you need SAML, SCIM provisioning or a managed cloud with an enterprise contract behind it. Pick FoxAuth if you want OAuth 2.1 behaviour by default, the banking-grade profiles without a plan tier, and a licence that is not AGPL.'
+bottomLine: 'Pick Zitadel if you need SAML, SCIM provisioning or a managed cloud with an enterprise contract behind it. Pick FoxAuth for OAuth 2.1 behaviour by default, the banking-grade profiles without a plan tier, and a licence other than AGPL.'
 chooseThem:
   - 'You need SAML 2.0 or SCIM 2.0 provisioning as well as OpenID Connect.'
   - 'You want a managed cloud option and an enterprise support contract from the vendor.'
@@ -20,13 +20,13 @@ chooseUs:
   - 'You want an AI agent administering the instance through the same audited path a human uses.'
 faq:
   - question: 'Does FoxAuth support SAML like Zitadel does?'
-    answer: "No. FoxAuth implements OAuth 2.1 and OpenID Connect only, and there is no SAML support planned. Zitadel documents SAML 2.0 and SCIM 2.0 alongside OIDC. If any application in your estate can only speak SAML, that settles it in Zitadel's favour and no other row on this page matters."
+    answer: "FoxAuth does not support SAML. It implements OAuth 2.1 and OpenID Connect only, and there is no SAML support planned. Zitadel documents SAML 2.0 and SCIM 2.0 alongside OIDC. If any application in your estate can only speak SAML, that settles it in Zitadel's favour and no other row on this page matters."
   - question: 'How do the licences differ?'
-    answer: "Zitadel is AGPL-3.0 with Apache 2.0 and MIT exceptions for specific directories, and sells an enterprise contract whose commercial licence replaces the AGPL. FoxAuth is FSL-1.1-ALv2: you may read, modify, self-host and redistribute it and build a business around it, but not offer it as a competing hosted service — and each version converts to Apache 2.0 two years after it ships. AGPL's network-copyleft and FSL's competing-service restriction rule out different things, so which is the problem depends on what you are building."
+    answer: "Zitadel is AGPL-3.0 with Apache 2.0 and MIT exceptions for specific directories, and sells an enterprise contract whose commercial licence replaces the AGPL. FoxAuth is FSL-1.1-ALv2: you may read, modify, self-host and redistribute it and build a business around it, but not offer it as a competing hosted service. Each version converts to Apache 2.0 two years after it ships. AGPL's network-copyleft and FSL's competing-service restriction rule out different things, so which is the problem depends on what you are building."
   - question: 'Can I migrate from Zitadel to FoxAuth?'
-    answer: "OIDC clients port over with an issuer and client id change. What does not port is anything relying on Zitadel's SAML or SCIM support, its organisation model, or its management API — FoxAuth models tenancy as projects and user buckets and exposes a different admin API. Assess the migration by how much of your estate is OIDC-only, because that part is straightforward and the rest is not."
+    answer: "OIDC clients port over with an issuer and client id change. What does not port is anything relying on Zitadel's SAML or SCIM support, its organisation model, or its management API. FoxAuth models tenancy as projects and user buckets and exposes a different admin API. Assess the migration by how much of your estate is OIDC-only, because that part is usually straightforward and the rest is not."
   - question: 'Which is more production-ready?'
-    answer: "Zitadel, on deployment history and on having a vendor-operated cloud and enterprise contracts behind it. FoxAuth is at a 0.2.0 release, so its HTTP surface and admin API may still change between minor versions. FoxAuth's advantage is in specific protocol coverage and licence terms, not in maturity, and this page will not pretend otherwise."
+    answer: "Zitadel is the more mature of the two, on deployment history and on having a vendor-operated cloud and enterprise contracts behind it. FoxAuth is at a 0.2.0 release, so its HTTP surface and admin API may still change between minor versions. FoxAuth's advantage lies in specific protocol coverage and licence terms; it has none in maturity, and this page will not pretend otherwise."
 groups:
   - label: Scope and stack
     rows:
@@ -68,7 +68,7 @@ groups:
             text: 'Organisations, presented as a core part of the product.'
           }
         verdict: them
-        why: 'Zitadel has built its product around multi-tenancy for longer.'
+        why: 'Zitadel has built its product around multi-tenancy for longer, and that experience probably shows.'
   - label: Protocol coverage
     rows:
       - dimension: Core OAuth and OIDC
@@ -102,7 +102,7 @@ groups:
           }
         them: { status: unknown, text: 'Not documented.' }
         verdict: us
-        why: 'The banking-grade profiles are implemented here rather than on a roadmap.'
+        why: "The banking-grade profiles ship here today; Zitadel's documentation does not mention them."
       - dimension: Machine-to-machine
         us:
           {
@@ -115,7 +115,7 @@ groups:
             text: 'JWT Profile, personal access tokens and client credentials.'
           }
         verdict: them
-        why: 'Zitadel additionally offers personal access tokens, which FoxAuth has no equivalent of.'
+        why: 'Zitadel also offers personal access tokens, and FoxAuth has no equivalent.'
   - label: Administration and licensing
     rows:
       - dimension: Administration by an AI agent
@@ -126,7 +126,7 @@ groups:
           }
         them: { status: unknown, text: 'Not documented.' }
         verdict: us
-        why: "The agent path here is the console's code rather than a second privileged API."
+        why: "The agent path here runs through the console's own code, so there is no second privileged API to secure."
       - dimension: Managed hosting
         us:
           {
@@ -166,28 +166,28 @@ groups:
             text: 'Years of production deployment, a vendor cloud and enterprise contracts.'
           }
         verdict: them
-        why: 'The maturity gap is real and is the strongest argument for Zitadel.'
+        why: 'The maturity gap is real, and it is probably the strongest argument for Zitadel.'
 ---
 
 ## The row that usually decides it
 
 If anything in your estate speaks SAML and only SAML, this comparison is over: Zitadel documents
 SAML 2.0 and SCIM 2.0, FoxAuth implements neither and has no plans to. That is not a gap waiting to
-be filled — it is a deliberate scope boundary, and it is the honest reason to choose Zitadel.
+be filled. It is a scope boundary we chose, and it is the honest reason to choose Zitadel.
 
 ## Where FoxAuth is genuinely ahead
 
 Two places, and both are narrow.
 
 The first is the banking-grade profiles. DPoP, PAR, CIBA, mTLS, RAR and JARM are implemented and
-flag-controlled on the instance you run. Zitadel's documentation does not describe them, which this
-page records as "not documented" rather than "absent" — the distinction matters, and a claim their
-own documentation does not make is not one we will make for them.
+flag-controlled on the instance you run. Zitadel's documentation does not describe them, so this
+page says "not documented" instead of "absent". The distinction matters: a claim their own
+documentation does not make is not one we will make for them.
 
 The second is the licence, and only for some readers. AGPL-3.0 is a genuine obstacle if you
 distribute software or offer a network service built on it, and the enterprise contract that
-replaces it is a commercial conversation. FSL-1.1-ALv2 has a narrower restriction — you may do
-anything except offer FoxAuth as a competing hosted service — and it expires on a schedule, with each
+replaces it is a commercial conversation. FSL-1.1-ALv2 has a narrower restriction: you may do
+anything except offer FoxAuth as a competing hosted service. It also expires on a schedule, with each
 version converting to Apache 2.0 two years after it ships.
 
 Neither licence is permissive. If that is what you need, neither of these is your answer.

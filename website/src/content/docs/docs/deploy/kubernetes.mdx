@@ -1,6 +1,6 @@
 ---
 title: Deploy on Kubernetes
-description: A Deployment, a Service, a provisioning Job that must finish first, and the one caveat about scaling replicas.
+description: A Deployment, a Service, a provisioning Job that must finish first, and a caveat about scaling replicas.
 sidebar:
   order: 3
 ---
@@ -24,10 +24,10 @@ stringData:
   DATABASE_NAME: OAuth
 ```
 
-For PostgreSQL, the Secret holds `POSTGRES_URL` and `ISSUER` instead — the database name is part of
-that URL — and the Job's command becomes `db:setup:pg`. Set one connection string, never both: the
-server refuses to start with both rather than pick one, which is the failure mode you want, since a
-server that silently chose the other database looks exactly like total data loss.
+For PostgreSQL, the Secret holds `POSTGRES_URL` and `ISSUER` instead, since the database name is
+part of that URL, and the Job's command becomes `db:setup:pg`. Set one connection string, never
+both. The server refuses to start when both are set instead of picking one, and that is the failure
+mode you want: a server that silently chose the other database looks exactly like total data loss.
 [PostgreSQL](/docs/deploy/postgresql/) covers it.
 
 Only the connection string is a credential; keeping all of them together is simply one `envFrom`
@@ -58,15 +58,16 @@ spec:
                 name: oauth-server
 ```
 
-Run this to completion **before** rolling the Deployment, and gate the rollout on it — an
+Run this to completion **before** rolling the Deployment, and gate the rollout on it: an
 `argocd.argoproj.io/hook: PreSync` annotation, a Helm `pre-install,pre-upgrade` hook, or simply
 `kubectl wait --for=condition=complete job/oauth-server-setup-0-1-0` in your pipeline.
 
 The reason is the same one that puts `release_command` in the shipped `fly.toml`: without the
 reserved admin project, bucket and client the seed creates, `GET /admin/login` redirects to `/auth`
 with a `client_id` no client matches and the console is unreachable, while the first-run setup page
-still answers — which reads as a login bug rather than a missing seed. The Job also provisions the
-TTL and unique-e-mail indexes the collections would otherwise be created without.
+still answers. From outside, that is easy to mistake for a login bug when the seed is what is
+missing. The Job also provisions the TTL and unique-e-mail indexes the collections would otherwise
+be created without.
 
 `db:setup` is idempotent, so re-running it is safe; it exits non-zero when a constraint it declares
 is not in force, so a failed Job is a real signal and should stop the rollout. Name the Job after
@@ -129,7 +130,7 @@ spec:
 
 The two probes answer two different questions and must not share a path. `/health` says the process
 is alive: it touches nothing outside itself, is served unconditionally with no feature flag behind
-it, and is the one route the rate limiter never counts — a refused liveness probe would restart a
+it, and is the only route the rate limiter never counts — a refused liveness probe would restart a
 healthy pod. `/ready` says the pod can actually serve, which means reaching the datastore; when the
 database goes away it fails and the pod leaves the endpoints list, and when the database comes back
 it passes again within about a second, with no restart in between.
@@ -147,12 +148,13 @@ does to nginx, including the `rateLimit.trustedProxy` decision.
 
 From the project's README: counting is per instance and held in memory, so **with N machines serving
 concurrently the effective allowance is N times the configured value**, and an instance restart
-clears every counter. It is a resource protection — it bounds what one source can cost the server —
-and not a security boundary.
+clears every counter. It is a resource protection that bounds what one source can cost the server.
+It is not a security boundary.
 
 So `replicas: 3` with `rateLimit.strict.max` at its default of 60 per minute means an origin can
-reach roughly 180 requests a minute against the token endpoint. Divide the configured maxima by the
-replica count if the aggregate number is what you care about, and re-check it when you scale.
+reach roughly 180 requests a minute against the token endpoint. If the aggregate number is what you
+care about, dividing the configured maxima by the replica count is usually the simplest answer, and
+it is worth re-checking whenever you scale.
 
 What does hold absolutely regardless of replica count are the per-identity throttles, because their
 counters are persisted: verification codes cap at five attempts, resends and password-reset requests
@@ -163,11 +165,11 @@ Those are the security boundaries, and they are unaffected by how many pods you 
 
 <Aside type="caution" title="A saved setting applies to the pod that saved it">
 
-Settings are stored once, in the database, and every pod reads them at startup — but a save through
-the console or the management API takes effect in **the instance that served that request**. With
-several replicas behind a Service, the others keep running the values they started with until they
-restart. The settings page reports what is in force on the instance answering it, and names anything
-stored but not in force there.
+Settings are stored once, in the database, and every pod reads them at startup. A save through the
+console or the management API, though, takes effect in **the instance that served that request**.
+With several replicas behind a Service, the others keep running the values they started with until
+they restart. The settings page reports what is in force on the instance answering it, and names
+anything stored but not in force there.
 
 So on more than one replica, treat a settings change as you would a configuration change: save it,
 then roll the Deployment (`kubectl rollout restart`) to bring every pod onto the stored values. On a
@@ -178,28 +180,28 @@ single replica there is nothing to do.
 ## Admitting only images we signed
 
 Every release is signed with `cosign` over its digest, keyless, and carries an SBOM and build
-provenance — so a cluster can refuse to run anything at this image name that did not come from this
-project's release workflow. Whichever admission controller you use ([sigstore
+provenance. A cluster can therefore refuse to run anything at this image name that did not come
+from this project's release workflow. Whichever admission controller you use ([sigstore
 policy-controller](https://docs.sigstore.dev/policy-controller/overview/), Kyverno's
-`verifyImages`, Connaisseur), a keyless policy needs the same two values, and they are the whole of
-what makes such a policy mean anything:
+`verifyImages`, Connaisseur), a keyless policy needs the same two values, and they are what gives
+such a policy any meaning:
 
 | Field            | Value                                                                                           |
 | ---------------- | ----------------------------------------------------------------------------------------------- |
 | OIDC issuer      | `https://token.actions.githubusercontent.com`                                                   |
 | Subject (regexp) | `^https://github\.com/RedFox-Soft/OAuth-server\.ts/\.github/workflows/release\.yml@refs/tags/v` |
 
-A policy that checks for _a_ signature and not for that identity admits anything anyone has signed,
-which is every image on the internet. The same two values verify by hand before you roll:
+A policy that checks for _a_ signature without pinning that identity admits anything anyone has
+signed, which is every image on the internet. The same two values verify by hand before you roll:
 [cosign verify and the attestations](/docs/security/assurance/#the-released-image-and-how-to-check-it-is-ours).
 
 ## Scaling notes
 
-- Sessions, tokens, codes and interactions live in the database, not in process memory, so more
+- Sessions, tokens, codes and interactions live in the database and never in process memory, so more
   than one replica is fine as far as the protocol is concerned.
 - Signing keys are loaded once at startup from the database. Generating one in the console
   hot-applies it to the replica that served that request only, so the others must be restarted or
   they will disagree about what `/jwks` advertises. The console's key page reports exactly this
   drift, between the stored key set and the one the process booted with.
-- Server settings are read at boot too. A settings change applies on the next rollout —
+- Server settings are read at boot too. A settings change applies on the next rollout:
   `kubectl rollout restart deployment/oauth-server`.

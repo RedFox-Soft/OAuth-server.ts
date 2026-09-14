@@ -1,6 +1,6 @@
 ---
 title: Deploy with Docker Compose
-description: A production-leaning Compose file — pinned tags, a database you back up, and a TLS proxy in front.
+description: A production-leaning Compose file, with pinned tags, a database you back up, and a TLS proxy in front.
 sidebar:
   order: 2
 ---
@@ -44,14 +44,14 @@ DATABASE_NAME=OAuth
 **Pin the image tag.** Images are published to `ghcr.io/redfox-soft/oauth-server-ts` on every
 release, tagged with the version and with `latest`. `latest` means a `docker compose pull` can move
 you across a release you have not read the changelog for. Name the version instead, and change it
-deliberately — that is also what makes the [upgrade](/docs/deploy/upgrade/) a reviewable diff. The
-published tags are listed on the
+on purpose. That is also what turns the [upgrade](/docs/deploy/upgrade/) into a reviewable diff.
+The published tags are listed on the
 [GitHub releases page](https://github.com/RedFox-Soft/OAuth-server.ts/releases) and on the
 [container package page](https://github.com/RedFox-Soft/OAuth-server.ts/pkgs/container/oauth-server-ts).
 
 **Verify the image once per version you adopt.** Every release is signed over its digest and carries
-an SBOM and a build provenance attestation, so the tag you just pinned can be checked rather than
-assumed:
+an SBOM and a build provenance attestation, so you can check the tag you just pinned instead of
+trusting it:
 
 ```bash
 cosign verify \
@@ -60,12 +60,12 @@ cosign verify \
   ghcr.io/redfox-soft/oauth-server-ts:<version>
 ```
 
-Fits naturally into the same change that moves the pin — that is the moment you are already reading
-the changelog. [What is attached and how to read the SBOM](/docs/security/assurance/#the-released-image-and-how-to-check-it-is-ours).
+It fits naturally into the same change that moves the pin, since that is usually the moment you are
+already reading the changelog. [What is attached and how to read the SBOM](/docs/security/assurance/#the-released-image-and-how-to-check-it-is-ours).
 
 **Use a database you back up.** The Get started file runs `mongo:8` on a local named volume, which
-is convenient and has no backups. Either point `MONGODB_URI` at a managed instance —
-[MongoDB Atlas](/docs/deploy/mongodb-atlas/) — or keep the local `mongo` service and treat the
+is convenient and has no backups. Either point `MONGODB_URI` at a managed instance such as
+[MongoDB Atlas](/docs/deploy/mongodb-atlas/), or keep the local `mongo` service and treat the
 volume as the production data it is:
 
 ```yaml
@@ -88,16 +88,16 @@ accounts, clients, the audit trail, and the signing keys.
 
 To run PostgreSQL instead, swap the service for `postgres:17`, put `POSTGRES_URL` in the `.env` in
 place of `MONGODB_URI` and `DATABASE_NAME`, and change the setup command to
-`['bun', 'run', 'db:setup:pg']`. Set one connection string, never both — the server refuses to start
-with both rather than pick one. [PostgreSQL](/docs/deploy/postgresql/) has the details.
+`['bun', 'run', 'db:setup:pg']`. Set one connection string, never both. Given both, the server
+refuses to start instead of picking one. [PostgreSQL](/docs/deploy/postgresql/) has the details.
 
 **`restart: unless-stopped` on the server, `restart: 'no'` on setup.** The `setup` service is a
 one-shot that must exit; restarting it would loop. The server should come back after a host reboot
-or a crash — remember that a Machine which cannot reach the datastore exits at boot rather than
-serving, so a restart policy is how it recovers when the database comes back.
+or a crash — remember that a Machine which cannot reach the datastore exits at boot instead of
+serving, so a restart policy is how it recovers once the database comes back.
 
 **Bind the port to loopback and put a proxy in front.** `'127.0.0.1:3000:3000'` keeps the plaintext
-port off the network. TLS terminates in the proxy, and `ISSUER` is the public `https` URL —
+port off the network. TLS terminates in the proxy, and `ISSUER` is the public `https` URL.
 [Behind a reverse proxy](/docs/deploy/reverse-proxy/) has the nginx and Caddy blocks and the one
 setting you must get right there.
 

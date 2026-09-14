@@ -1,6 +1,6 @@
 ---
 title: PostgreSQL
-description: Choosing PostgreSQL instead of MongoDB, the one variable that selects it, provisioning, and the migration step every upgrade needs.
+description: Choosing PostgreSQL instead of MongoDB, which variable selects it, how to provision the schema, and the migration step each upgrade needs.
 sidebar:
   order: 6
 ---
@@ -9,16 +9,16 @@ import { Steps, Aside } from '@astrojs/starlight/components';
 
 The server supports two datastores and a deployment uses exactly one. MongoDB is selected by
 `MONGODB_URI`; PostgreSQL is selected by `POSTGRES_URL`. Everything above the storage layer is
-identical — the same endpoints, the same admin console, the same agent surface — so the choice is
-about which database your organisation already runs well.
+identical: the same endpoints, the same admin console, the same agent surface. In practice the
+choice usually comes down to which database your organisation already runs well.
 
 <Aside type="caution" title="One datastore, not two">
-Setting both `MONGODB_URI` and `POSTGRES_URL` makes the server refuse to start rather than pick one.
+Set both `MONGODB_URI` and `POSTGRES_URL` and the server refuses to start instead of picking one.
 A server that quietly chose the wrong database would look, from the outside, exactly like total data
 loss: it starts, it serves, and everything you had is missing.
 
-Check `.env` and `.env.local` as well as your shell — the runtime loads those automatically, so the
-variable causing the refusal is often one you cannot see with `env`.
+Check `.env` and `.env.local` as well as your shell. The runtime loads those files automatically, so
+the variable causing the refusal is often one you cannot see with `env`.
 
 </Aside>
 
@@ -46,25 +46,26 @@ variable causing the refusal is often one you cannot see with `env`.
    ```
 
    This creates every table and index the release declares, seeds the reserved administrator
-   records, and provisions an initial RS256 signing key. It is idempotent — running it again reports
-   no work — and it is how a newly declared table reaches an existing database after an upgrade.
+   records, and provisions an initial RS256 signing key. It is idempotent: running it again reports
+   no work. It is also how a newly declared table reaches an existing database after an upgrade.
 
 4. **Start the server.** It refuses to start if the database is unreachable or if its schema is not
-   the one this release expects, rather than accepting a request and discovering that afterwards.
+   the one this release expects, instead of accepting a request and discovering that afterwards.
 
 </Steps>
 
 ## The shortest version
 
-A Compose file ships for exactly this, and it is the fastest way to see the server on PostgreSQL:
+A Compose file ships for exactly this, and it is probably the fastest way to see the server on
+PostgreSQL:
 
 ```bash
 docker compose -f docker-compose.postgres.yml up
 ```
 
-Three services — the database, a one-shot `db:setup:pg` that must finish first, and the server —
-with the host port on 5433 so it never collides with a PostgreSQL you already run.
-`docker-compose.yml` beside it is the MongoDB equivalent; they are alternatives, never combined.
+It runs three services: the database, a one-shot `db:setup:pg` that must finish first, and the
+server. The host port is 5433, so it does not collide with a PostgreSQL you already run.
+`docker-compose.yml` beside it is the MongoDB equivalent. Run one or the other, never both.
 
 ## Checking a database without changing it
 
@@ -101,9 +102,9 @@ pipeline can gate on it.
 
 Nothing an application or an end user can observe. Two operational differences are worth knowing:
 
-- **Expired records are reclaimed by the server, not the database.** PostgreSQL has no TTL index, so
-  the server sweeps them on roughly the same interval MongoDB's monitor uses. Expiry itself is
-  enforced on every read regardless, on both backends — the sweep only reclaims space.
+- **The server reclaims expired records itself.** PostgreSQL has no TTL index, so the server sweeps
+  them on roughly the same interval MongoDB's monitor uses. Expiry itself is enforced on every read
+  regardless, on both backends; the sweep only reclaims space.
 - **`DATABASE_NAME` is unused.** The database name is in the connection URL.
 
 ## Health and readiness

@@ -85,14 +85,14 @@ const stale = isStale(lastChecked);
 			{
 				stale ? (
 					<Fragment>
-						<strong>Due for review.</strong> Last checked {lastChecked} — {staleDays} days ago.
+						<strong>Due for review.</strong> Last checked {lastChecked}, {staleDays} days ago.
 						Claims about {competitor} may have gone out of date since.{' '}
 					</Fragment>
 				) : (
 					<Fragment>Last checked {lastChecked} against the linked sources. </Fragment>
 				)
 			}
-			{competitor} changes; where its documentation did not say, this page says so rather than
+			{competitor} changes. Where its documentation did not say, this page says so instead of
 			guessing. Found something out of date? Tell us at{' '}
 			<a
 				href="mailto:hello@foxauth.dev?subject=Comparison%20correction"
