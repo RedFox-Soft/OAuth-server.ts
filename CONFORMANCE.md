@@ -9,33 +9,153 @@ run needs — because most of the cost of a conformance run is not the run.
 
 ## Where it stands
 
-Measured 2026-09-14 against an **unmodified working tree**, across two instance profiles (below).
+Measured 2026-09-14, across two instance profiles (below). Twelve plans: nine testing this server as
+an **OpenID Provider**, three testing it as a **Relying Party** — because `lib/federation/` makes it
+one, and no OP plan reaches that code.
 
-| Plan                                                            | Conditions | Failures                                 |
-| --------------------------------------------------------------- | ---------- | ---------------------------------------- |
-| `oidcc-config-certification-test-plan`                          | 41         | **none**                                 |
-| `oidcc-basic-certification-test-plan`                           | 1 855      | **none**, and no warnings                |
-| `oidcc-formpost-basic-certification-test-plan`                  | 2 007      | **none**, and no warnings                |
-| `oidcc-rp-initiated-logout-certification-test-plan`             | 551        | **none**                                 |
-| `oidcc-backchannel-rp-initiated-logout-certification-test-plan` | 101        | **none**                                 |
-| `oidcc-3rdparty-init-login-certification-test-plan`             | 50         | **none**                                 |
-| `oidcc-dynamic-certification-test-plan`                         | 883        | 11, none of them this server — see below |
-| `fapi2-security-profile-final-test-plan`                        | 4 343      | 9, none of them this server — see below  |
+| Plan                                                            | Conditions | Failures                              |
+| --------------------------------------------------------------- | ---------- | ------------------------------------- |
+| `oidcc-config-certification-test-plan`                          | 41         | **none**                              |
+| `oidcc-basic-certification-test-plan`                           | 1 855      | **none**, and no warnings             |
+| `oidcc-formpost-basic-certification-test-plan`                  | 2 007      | **none**, and no warnings             |
+| `oidcc-rp-initiated-logout-certification-test-plan`             | 551        | **none**                              |
+| `oidcc-backchannel-rp-initiated-logout-certification-test-plan` | 101        | **none**                              |
+| `oidcc-3rdparty-init-login-certification-test-plan`             | 50         | **none**                              |
+| `oidcc-dynamic-certification-test-plan`                         | 883        | 11, none of them this server          |
+| `fapi2-security-profile-final-test-plan`                        | 4 343      | 9, none of them this server           |
+| `fapi2-message-signing-final-test-plan`                         | 5 693      | 13, **two of them this server**       |
+| `oidcc-client-basic-certification-test-plan`                    | 655        | none — **and one wrong acceptance**   |
+| `oidcc-client-config-certification-test-plan`                   | 285        | 3, all of them the runner's           |
+| `oidcc-client-refreshtoken-test-plan`                           | 216        | none — subject not exercised          |
 
-**9 831 conditions, and no failure left that is a defect in this server.** Six plans run clean
-outright; the other two fail only on things that are the profile, the suite, or the test rig, each
-enumerated below so the claim can be checked rather than taken.
+**16 680 conditions. Five defects are open**, all found by the three plans run for the first time on
+2026-09-14 (Message Signing and the client family); the nine plans above them are unchanged and still
+carry no failure attributable to this server.
 
-Twelve defects the suite found have been fixed: `830713b` (PAR content type), `1437341` (unknown
-request parameters, widened from the one endpoint reported to six), `6cdb9ec` (`code_verifier`
-alphabet), `848c179` (schema refusals answer 400, not 422), `dcc4c08` and `3589d48` (`/userinfo`
-challenge and POST body), `0353f4b` (form_post reaches a module-less browser; PAR names its own error
-code), `b891075` (key generation for any asymmetric signing algorithm), `87d44e8` (`pkce.required`),
-`a99c81a` (`acr`, which also closed an interaction loop an essential `acr` claim could not escape),
-`2b83c91` (unknown members inside `claims` are ignored; a pushed request is spent after a login, not
-only when no login was needed). The detail is in those commits.
+Twelve defects the suite found earlier have been fixed: `830713b` (PAR content type), `1437341`
+(unknown request parameters, widened from the one endpoint reported to six), `6cdb9ec`
+(`code_verifier` alphabet), `848c179` (schema refusals answer 400, not 422), `dcc4c08` and `3589d48`
+(`/userinfo` challenge and POST body), `0353f4b` (form_post reaches a module-less browser; PAR names
+its own error code), `b891075` (key generation for any asymmetric signing algorithm), `87d44e8`
+(`pkce.required`), `a99c81a` (`acr`, which also closed an interaction loop an essential `acr` claim
+could not escape), `2b83c91` (unknown members inside `claims` are ignored; a pushed request is spent
+after a login, not only when no login was needed). The detail is in those commits.
 
-## The two remaining plans, failure by failure
+## The five open defects
+
+### 1–3. One schema, three wrong answers about Request Objects
+
+[`lib/consts/param_list.ts`](lib/consts/param_list.ts) declares `JWTparameters` — `jti`, `iss`, `aud`
+and `exp` all required, `aud` a single string. That shape is right for a **client assertion**
+(RFC 7523 §3). [`lib/actions/authorization/authorization.ts`](lib/actions/authorization/authorization.ts)
+spreads the same object into the schema a **Request Object** is validated against, where the rules are
+different — and all three differences are wrong in the strict direction, so each one refuses a request
+the specification permits.
+
+**`jti` is demanded.** Every signed request object the suite pushes is answered
+`400 invalid_request: Property 'jti' is missing`. RFC 9101 §4 and OIDC Core §6.1 make `jti` optional
+in a Request Object, and FAPI 2.0 Message Signing requires only `aud`, `iss`, `exp` and `nbf`. This is
+not one module's failure: with `fapi_request_method=signed_non_repudiation` every module in the plan
+starts with a PAR push, so the whole plan died in the first block — 49 failed modules, each in 0.1
+seconds. A temporary local patch making `jti` optional took the run from 49 failures to 15, which is
+how the other two came into view.
+
+**`aud` may not be an array.** `ensure-request-object-with-multiple-aud-succeeds` pushes
+`"aud": ["https://oidcc-provider:3000", "https://other1.example.com", "invalid"]` and is answered
+`400: Expected property 'aud' to be string`. RFC 7519 §4.1.3 allows either form, and the rule the
+module tests is that the server's own identifier is *among* the values — which it is.
+
+**A refused Request Object names the wrong error.** `ensure-request-object-without-exp-fails` expects
+`invalid_request_object`; it gets `invalid_request`. RFC 9101 §5 registers the former for exactly this
+case. The cause is structural rather than a wrong string:
+[`process_request_object.ts:128`](lib/actions/authorization/process_request_object.ts#L128) throws a
+TypeBox `ValidationError`, which the shared error handler formats as `invalid_request`, while every
+other check in that same file throws `InvalidRequestObject`
+([`errors.ts:199`](lib/helpers/errors.ts#L199)) and answers correctly. It is also why the `jti`
+refusal above arrived under the wrong code.
+
+### 4. The relying party accepts an ID token with no `iat`
+
+`oidcc-client-test-missing-iat` issues an ID token without `iat`; this server completes the sign-in.
+OIDC Core §2 makes the claim REQUIRED. [`verifyIdToken.ts:162`](lib/federation/verifyIdToken.ts#L162)
+reads
+
+```ts
+typeof payload.iat === 'number' && payload.iat > epochTime() + clockTolerance
+```
+
+— so the *value* is checked and the *presence* is not, and jose does not require `iat` either unless
+`maxTokenAge` is set. The comment above it explains why the future-check has to live there; absence
+was simply not the case in view.
+
+**The suite cannot see this, and that is the point.** Every negative client module reported PASSED,
+including this one: the suite's OP has no way to observe whether the RP rejected what it sent, so a
+human tester is supposed to confirm it did. The runner here supplies that half by recording the HTTP
+status this server returned. Seven of the eight negatives answered 400 and aborted the sign-in; this
+one answered 303 and finished it. Without that second half the plan reads as fourteen passes.
+
+### 5. The relying party cannot follow an upstream key rotation
+
+`oidcc-client-test-signing-key-rotation` signs in, rotates the OP's signing key, and signs in again.
+The second sign-in is refused. [`jwks.ts:37`](lib/federation/jwks.ts#L37) calls
+`createRemoteJWKSet(new URL(jwksUri))` with jose's defaults, and two of them decide this:
+`cacheMaxAge` is 10 minutes, and the forced reload that rescues a rotation happens **only** on
+`JWKSNoMatchingKey` and **only** once `cooldownDuration` — 30 seconds — has elapsed.
+
+Measured directly, same module and same alias, changing nothing but the gap between the two sign-ins:
+
+| Gap | Second sign-in |
+| --- | -------------- |
+| 3 s | **refused** |
+| 45 s | succeeds |
+
+So there are two windows in which a rotation locks users out. Inside 30 seconds the reload is on
+cooldown. And if the new key carries **no `kid`**, `JWKSNoMatchingKey` never occurs at all, so nothing
+triggers a reload until the ten-minute cache expires — the failure then lasts twenty times longer than
+the one that is measurable above. That second window is also what made
+`oidcc-client-test-kid-absent-single-jwks` look like a defect on the first run, before every module got
+its own alias.
+
+## Failures that are not this server
+
+### FAPI 2.0 Message Signing — 13
+
+Run as
+`[openid=openid_connect][client_auth_type=private_key_jwt][sender_constrain=dpop][fapi_profile=plain_fapi][authorization_request_type=simple][fapi_request_method=signed_non_repudiation][fapi_response_mode=jarm][grant_management=disabled]`.
+64 of 71 modules pass. Two failures are defects 2 and 3 above. The rest:
+
+- 4 are `RequireOnlyBCP195RecommendedCiphersForTLS12`, which tests the nginx terminator standing in
+  for TLS in this rig, in `happy-flow` and `ensure-holder-of-key-required`.
+- 2 (plus both warnings) are `user-rejects-authentication`, which needs a human to press cancel.
+- 1 is `par-ensure-reused-request-uri-prior-to-auth-completion-succeeds`, which refuses to run when
+  the browser arrives at the login page already authenticated — a session left by an earlier module,
+  and the suite's own precondition rather than a result.
+- 1 is `Socket closed` fetching `/jwks`, in `ensure-mismatched-dpop-jkt-fails`. **Unexplained.** The
+  proxy's error log is empty for that run and so is the server's; it happened once in 5 693
+  conditions. The identically-worded failure that plagued the earlier OIDC runs had a cause (below)
+  and that cause is fixed, so this is not it, and nothing else is claimed.
+
+### FAPI 2.0 Security Profile — 9
+
+42 modules pass; the 9 failures are the same three classes: 2 `RequireOnlyBCP195Recommended…`, 3
+`user-rejects-authentication`, and 1 exception inside the suite's own Java.
+
+One correction is preserved here because the mistake is instructive. An earlier run reported that
+**client assertion audiences are accepted too widely** — three modules push a `client_assertion` whose
+`aud` is an array, the PAR endpoint URL, or the token endpoint URL, and each was answered `201` where
+FAPI 2.0 requires refusal. Read as an audience-confusion defect, the reasoning was seductive: an
+assertion is a bearer credential, so the set of accepted audiences is the set of places a captured one
+can be replayed. It was wrong. RFC 9126 §2 anticipated that ambiguity and resolved it the other way —
+an authorization server **MUST** accept its issuer identifier, token endpoint URL **or** PAR endpoint
+URL as values identifying it, so narrowing that by default would make this server non-conforming. The
+narrow rule is FAPI 2.0's alone, it is implemented behind `fapi.enabled`
+([`lib/shared/token_jwt_auth.ts`](lib/shared/token_jwt_auth.ts)), held by three cases in
+[`test/fapi/fapi2.spec.ts`](test/fapi/fapi2.spec.ts) — and with the flag on, as here, those three
+modules pass. **A run in the wrong instance profile does not report a configuration problem; it
+reports a security defect that is not there.**
+
+Note that defect 2 above is the *same shape* in the *other* direction: an array `aud` in a Request
+Object must be accepted, and is not. The two are worth reading together before touching either.
 
 ### Dynamic — 11
 
@@ -54,53 +174,60 @@ browser, which is HtmlUnit failing to finish a page, not an unanswered request.
 
 The plan is still worth running: it is the only one that exercises dynamic registration.
 
-### FAPI 2.0 — 9
+### The client plans — 3 failures, all the runner's
 
-Run as
-`[openid=openid_connect][client_auth_type=private_key_jwt][sender_constrain=dpop][fapi_profile=plain_fapi]`
-against two purpose-seeded clients holding ES256 keys, in the FAPI instance profile. 42 modules pass,
-9 await a screenshot.
+All three are in `oidcc-client-config-certification-test-plan` and all three are the runner driving a
+module more times than the module expects. `idtoken-sig-none` and
+`signing-key-rotation-just-before-signing` want one sign-in and got two, so the suite reported
+`Found existing client authentication` on the second token exchange; `discovery-openid-config`
+concludes as soon as the RP has fetched the discovery document, and the runner carried on to the
+authorization endpoint of a finished test. Fixing this means a per-module drive count; nothing about
+it reflects on the server.
 
-All 9 failures are outside the server: 2 are `RequireOnlyBCP195RecommendedCiphersForTLS12`, which
-tests the nginx terminator standing in for TLS in this rig; 3 (two failures and a warning) are
-`user-rejects-authentication`, which requires a human to press cancel and cannot be satisfied by a
-scripted browser that grants consent; and 1 is another exception inside the suite's Java.
+## What an RP run does and does not prove
 
-**This is the profile worth pursuing**, because FAPI 2.0 requires PKCE, requires PAR and requires
-sender-constrained tokens — the three things this server does by default and that make the OIDC Basic
-profile awkward for it.
+`lib/federation/` is a **login broker**, not a general-purpose OpenID client, and three of the plans'
+assumptions do not hold against it. This is design, not omission, but it bounds what the result means.
 
-One correction is preserved here because the mistake is instructive. An earlier run reported that
-**client assertion audiences are accepted too widely** — three modules push a `client_assertion` whose
-`aud` is an array, the PAR endpoint URL, or the token endpoint URL, and each was answered `201` where
-FAPI 2.0 requires refusal. Read as an audience-confusion defect, the reasoning was seductive: an
-assertion is a bearer credential, so the set of accepted audiences is the set of places a captured one
-can be replayed. It was wrong. RFC 9126 §2 anticipated that ambiguity and resolved it the other way —
-an authorization server **MUST** accept its issuer identifier, token endpoint URL **or** PAR endpoint
-URL as values identifying it, so narrowing that by default would make this server non-conforming. The
-narrow rule is FAPI 2.0's alone, it is implemented behind `fapi.enabled`
-([`lib/shared/token_jwt_auth.ts`](lib/shared/token_jwt_auth.ts)), held by three cases in
-[`test/fapi/fapi2.spec.ts`](test/fapi/fapi2.spec.ts) — and with the flag on, as here, those three
-modules pass. **A run in the wrong instance profile does not report a configuration problem; it
-reports a security defect that is not there.**
+- **It never calls `/userinfo`.** Six of the fourteen Basic modules therefore never conclude — the
+  module's script is still waiting for a call that is not coming — and are stopped rather than
+  finished. Their conditions are clean and the sign-in completed; `userinfo-invalid-sub` and
+  `scope-userinfo-claims` prove nothing at all.
+- **It never uses a refresh token**, and does not request `offline_access`. The whole
+  `oidcc-client-refreshtoken` plan therefore runs clean without touching its subject: 216 conditions,
+  no failures, and three modules that only ever saw two ordinary sign-ins.
+- **It only ever runs a code flow**, which is why the hybrid, implicit, session-management and
+  front-channel-logout client plans are inapplicable for the same reason their OP twins are.
+
+What it *does* prove is the verification, and there the result is worth having: `iss`, `aud`, `exp`,
+the algorithm allowlist, `alg: none`, a bad signature, a `kid` that is absent with several keys
+published, a mismatched `nonce`, a missing `sub`, and a discovery document whose `issuer` disagrees
+with the URL it came from — each refused, each correctly. Only `iat` gets through (defect 4).
 
 ## Two instance profiles
 
-The OIDC profiles and FAPI 2.0 want opposite settings, so one instance cannot serve both:
+The OIDC profiles and the FAPI profiles want opposite settings, so one instance cannot serve both:
 
-|                 | OIDC plans | FAPI 2.0 |
-| --------------- | ---------- | -------- |
-| `pkce.required` | `false`    | `true`   |
-| `fapi.enabled`  | `false`    | `true`   |
+|                          | OIDC plans | FAPI 2.0 Security | FAPI 2.0 Message Signing |
+| ------------------------ | ---------- | ----------------- | ------------------------ |
+| `pkce.required`          | `false`    | `true`            | `true`                   |
+| `fapi.enabled`           | `false`    | `true`            | `true`                   |
+| `requestObjects.enabled` | `false`    | `false`           | **`true`**               |
+| `responseMode.jwt.enabled` | `false`  | `false`           | **`true`**               |
 
 `pkce.required` is on by default, and with it on 34 of the Basic profile's 35 modules are refused
 before they test anything — it relaxes the demand only for clients that authenticate at the token
-endpoint, which is all a static-client run needs. FAPI 2.0 mandates PKCE and fails the opposite way.
+endpoint, which is all a static-client run needs. FAPI mandates PKCE and fails the opposite way.
+Message Signing is the Security Profile plus a signed request object (JAR) and a signed authorization
+response (JARM), which is the whole of the difference in that column.
+
+The client plans need one setting of their own: **`federation.enabled`**, off by default.
 
 ## What else a conformance target has to be configured with
 
 A run against a default instance fails for reasons that are settings, and **each one reads in the test
-log exactly like a server defect**. That is the trap this section exists for.
+log exactly like a server defect**. That is the trap this section exists for. The last two entries
+were each mistaken for a defect during this round before being traced back to the seed.
 
 - **`rateLimit.enabled: false`.** The loudest one. The suite drives several hundred `/auth` and
   `/token` requests from one address within a minute, far over `rateLimit.strict.max` (60 per 60s).
@@ -127,8 +254,17 @@ log exactly like a server defect**. That is the trap this section exists for.
   list. What surfaces is `400 post_logout_redirect_uri not registered` at logout, which reads as a
   server defect and is not one. `lib/admin/clients/service.ts` gets this right, so the console and DCR
   are unaffected; only hand-written seed data falls into it.
+- **`scope` in the suite's own client configuration**, for every FAPI plan. The suite omits the
+  parameter entirely when its config names none, a FAPI request always carries `nonce`, and this
+  server refuses `nonce` without `openid` ([`check_openid_scope.ts`](lib/actions/authorization/check_openid_scope.ts)).
+  The result is `400 openid scope must be requested when using the nonce parameter` on the first PAR
+  push of every module — indistinguishable, in the log, from defect 1.
+- **`require_signed_request_object: true` on the client**, for Message Signing. Without it
+  `ensure-unsigned-request-at-par-endpoint-fails` fails, because an unsigned push is accepted with
+  `201` and there is then no error for the authorization endpoint to return. It is a per-client
+  registration and not a mode of the server, so `fapi.enabled` does not imply it.
 
-## Running it
+## Running the OP plans
 
 The suite runs locally from `docker-compose-prebuilt.yml` (prebuilt images, no Maven build) plus an
 overlay adding an nginx TLS terminator the suite reaches as `https://oidcc-provider:3000`. The
@@ -151,6 +287,37 @@ Three properties of the rig cost a run each, and none of them announces itself:
   self-signed, so every outbound call from this server to it fails verification. That silently
   swallowed back-channel logout and made `sector_identifier_uri` look like an SSRF refusal.
 
+## Running the client plans
+
+`run-test-plan.py` cannot drive these: it knows how to run the suite's own sample RP, or a nested OP
+plan, and neither is `lib/federation/`. Each module has to be driven by replaying a federated sign-in
+through the deployment — start an authorization at `/auth`, follow it to `/ui/:uid/login`, hit
+`/ui/:uid/federation/:providerId/start`, follow that to the suite, and bring the callback back. Four
+things about that are not obvious.
+
+- **The driver has to run inside the suite's docker network.** The interaction cookie is written
+  `secure`, so the flow only works over the TLS terminator, and `oidcc-provider:3000` resolves
+  nowhere else. `docker exec` into the suite's own container, with `curl --resolve` for the suite's
+  hostname, is enough — it needs a cookie jar and nothing more.
+- **Give every module its own alias.** The suite mints a fresh signing key per module but serves the
+  whole plan from one `jwks_uri`, while this RP caches discovery per issuer for ten minutes and holds
+  one jose key set per `jwks_uri`. Behind a shared alias, module N verifies its token against module
+  1's key. `kid-absent-single-jwks` failed for exactly that reason and for no other — it passes
+  against a cold cache. Repoint the bucket's provider at the new issuer before each module.
+- **Stop each module before creating the next.** A client test concludes on its own only once the RP
+  has done everything its script expects, and this one never calls `/userinfo`. Creating the next
+  module while one is still `WAITING` makes the suite kill the earlier one for an alias conflict,
+  which reports `INTERRUPTED` and discards the verdict. `DELETE /api/runner/{id}` ends it cleanly.
+- **Read the conditions, not the module status.** A stopped module has no `result`, and — far more
+  importantly — a *finished* one reports `PASSED` on every negative test whether or not the RP
+  rejected anything (defect 4). The verdict worth recording is the failed-condition list from
+  `/api/log/{id}`, paired with the HTTP status the RP itself returned.
+
+The rig also needs an account in the target bucket already **linked** to the suite's subject
+(`user-subject-1234531`): the suite's OP issues no `email` claim, and without an existing federated
+identity the sign-in stops at "your identity provider sent no email address" before any of the
+interesting checks run.
+
 ## Screenshots
 
 Several modules per plan end in `REVIEW` because they need a screenshot of a page the server rendered
@@ -169,16 +336,21 @@ accepts either branch.
 
 ## Scope
 
-Every applicable OP plan has been run. The rest of the FAPI family — FAPI 1.0 Advanced, FAPI 2.0
-Message Signing and FAPI-CIBA — builds on the FAPI 2.0 result above and is the natural next step.
+Every applicable OP plan has been run, and the client family is now open rather than untouched.
+
+Still to run, in the order they are worth it: **FAPI 2.0 Message Signing again once defects 1–3 are
+fixed** (the plan has never completed without a local patch); the remaining client plans that a login
+broker can satisfy; **FAPI-CIBA ID1**, which needs only `ciba.enabled` and the `poll` delivery mode;
+and **FAPI 1.0 Advanced**, which is the expensive one — the profile requires certificate-bound access
+tokens, so the rig needs client certificates plumbed through the nginx terminator, and the `jarm`
+response-mode variant is what makes it reachable at all without `code id_token`.
 
 Inapplicable by design, not unfinished: Hybrid, Implicit and their form_post variants, because
 `response_types_supported` is `code` and `none`; Dynamic, for the reason above; Session Management and
-Frontchannel Logout, because there is no `check_session_iframe` and no front-channel logout.
-
-Untouched so far: the suite's 32 **client** plans. They apply — `lib/federation/` makes this server a
-relying party that fetches an upstream's discovery document, runs a code flow with PKCE and verifies
-somebody else's ID token, and no run on this page reaches that code.
+Frontchannel Logout, because there is no `check_session_iframe` and no front-channel logout; and their
+client-side twins, because the RP runs a code flow only. Not implemented at all, so not applicable:
+OID4VCI and OID4VP, the Shared Signals plans, AuthZEN, eKYC/IDA, OpenID Federation 1.0 (which is a
+different thing from `lib/federation/`), and every `*-brazil-*` variant, which needs that directory.
 
 Everything here ran against a local instance rather than the deployed `conformance.foxauth.dev`. One
 consequence is worth carrying forward: the end-user cookies are written `sameSite: 'strict'`
