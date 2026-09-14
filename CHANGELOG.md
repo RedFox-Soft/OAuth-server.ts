@@ -9,6 +9,17 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+### Fixed
+
+- interactions: the "Remember me" checkbox on the sign-in screen now decides how long the sign-in
+  lasts. It never had, on any path: the answer was recorded under one name and read under another,
+  the answer that was recorded was inverted, nothing anywhere read the resulting flag, and a
+  sign-in that asked to be remembered could not clear an earlier decline — four independent breaks
+  on one path, each sufficient alone. Declining now yields a session cookie the browser discards
+  when it closes; accepting keeps today's behaviour, up to the configured sign-in lifetime. The
+  choice survives a one-time-code step, and a path that offers no checkbox — federated sign-in —
+  still keeps the sign-in. Nobody who leaves the box ticked sees any change. (spec 049, issue #45)
+
 ## [0.3.0] - 2026-09-14
 
 Three things define this release. The server runs on PostgreSQL as well as MongoDB, behind a

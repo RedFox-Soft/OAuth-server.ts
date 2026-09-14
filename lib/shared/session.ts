@@ -47,10 +47,21 @@ export default async function sessionHandler(oidc) {
 			oidc.session.touched
 		) {
 			await oidc.session.save();
+			/*
+			 * The end user's "remember me" answer, and the only place it becomes observable. A cookie
+			 * carrying neither `Expires` nor `Max-Age` is non-persistent (RFC 6265 §4.1.2.1-2), so the
+			 * browser drops it when the browsing session ends — which is what declining asks for.
+			 *
+			 * Omission is enough: `set()` assigns onto the route schema's initial attributes rather than
+			 * merging onto the cookie's current state, and those attributes carry no lifetime. Were it
+			 * the other way round, this would silently do nothing on a request that wrote the cookie twice.
+			 */
 			cookie.set({
 				value: oidc.session.id,
 				path: SESSION_COOKIE_PATH,
-				expires: new Date(oidc.session.payload.exp * 1000)
+				...(oidc.session.payload.transient
+					? undefined
+					: { expires: new Date(oidc.session.payload.exp * 1000) })
 			});
 		}
 	};

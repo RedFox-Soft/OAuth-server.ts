@@ -94,7 +94,10 @@ async function postForm(
 		status: res.status,
 		text: await res.text(),
 		location: res.headers.get('location'),
-		setCookie: res.headers.get('set-cookie')
+		setCookie: res.headers.get('set-cookie'),
+		// Separated, because `get('set-cookie')` joins several headers into one string and a cookie's
+		// attributes cannot be read out of the join.
+		setCookies: res.headers.getSetCookie()
 	};
 }
 
@@ -160,19 +163,28 @@ function expectSignedIn(res: {
 	expect(res.location ?? '').toMatch(/\/consent$|\/callback/);
 }
 
-/* Password accepted, code not yet supplied. */
-async function passwordStep(clientId: string, email: string) {
+/*
+ * Password accepted, code not yet supplied. `remember` is omitted unless asked for, because an unchecked
+ * checkbox submits nothing — sending `off` would exercise a request no browser produces.
+ */
+async function passwordStep(
+	clientId: string,
+	email: string,
+	{ remember = false }: { remember?: boolean } = {}
+) {
 	const { uid, cookie } = await startInteraction(clientId);
 	const res = await postForm(`/ui/${uid}/login`, cookie, {
 		username: email,
-		password: PASSWORD
+		password: PASSWORD,
+		...(remember ? { remember: 'on' } : {})
 	});
 	return { uid, cookie, res };
 }
 
 /**
  * @proves A correct password alone does not sign the person in, the code step reveals nothing
- * and is throttled, and a bucket without the requirement is untouched.
+ * and is throttled, a bucket without the requirement is untouched, and the remember-me choice
+ * given at the password step still governs the sign-in the code step completes.
  */
 describe('second factor at sign-in (US3)', () => {
 	beforeAll(async () => {
@@ -512,6 +524,52 @@ describe('second factor at sign-in (US3)', () => {
 			await seedEnrolled(optionalBucketId, email);
 			const { res } = await passwordStep('totp-optional-app', email);
 			expectSignedIn(res);
+		});
+	});
+
+	/*
+	 * The answer is given at the password step and the session is created two requests later, with the end
+	 * user having left the page and come back with a code in between. That gap is the whole risk: the choice
+	 * is staged on the interaction and copied onto the result, and a hop that dropped it would leave a
+	 * deployment that takes shared machines seriously — one demanding a second factor — quietly ignoring it.
+	 */
+	describe('the "Remember me" choice given at the password step', () => {
+		function sessionCookieOf(res: { setCookies: string[] }) {
+			const header = res.setCookies.find((c) => c.startsWith('_session='));
+			expect(header).toBeTruthy();
+			return header as string;
+		}
+
+		it('leaves the sign-in unretained past the browsing session when it was declined', async () => {
+			const email = `totp-decline-${Math.random()}@x.io`;
+			await seedEnrolled(requiredBucketId, email);
+			const { uid, cookie } = await passwordStep('totp-required-app', email, {
+				remember: false
+			});
+
+			const res = await postForm(`/ui/${uid}/totp`, cookie, {
+				code: currentCode()
+			});
+			expectSignedIn(res);
+
+			const header = sessionCookieOf(res);
+			expect(header).not.toMatch(/;\s*Expires=/i);
+			expect(header).not.toMatch(/;\s*Max-Age=/i);
+		});
+
+		it('retains the sign-in past the browsing session when it was accepted', async () => {
+			const email = `totp-accept-${Math.random()}@x.io`;
+			await seedEnrolled(requiredBucketId, email);
+			const { uid, cookie } = await passwordStep('totp-required-app', email, {
+				remember: true
+			});
+
+			const res = await postForm(`/ui/${uid}/totp`, cookie, {
+				code: currentCode()
+			});
+			expectSignedIn(res);
+
+			expect(sessionCookieOf(res)).toMatch(/;\s*Expires=/i);
 		});
 	});
 });

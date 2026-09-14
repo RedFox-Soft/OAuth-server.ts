@@ -188,15 +188,23 @@ export class Session extends BaseModel<SessionPayloadType> {
 			);
 		}
 
-		Object.assign(
-			this.payload,
-			{
-				accountId,
-				loginTs,
-				amr,
-				acr
-			},
-			transient ? { transient: true } : undefined
-		);
+		Object.assign(this.payload, {
+			accountId,
+			loginTs,
+			amr,
+			acr
+		});
+
+		/*
+		 * Decided afresh at every sign-in, which is why it is not folded into the assign above. Setting the
+		 * flag without ever clearing it left a session that survived re-authentication carrying an earlier
+		 * decline, so an end user who then asked to be remembered was not. Absent is the one representation
+		 * of "remembered"; `false` is never stored.
+		 */
+		if (transient) {
+			this.payload.transient = true;
+		} else {
+			delete this.payload.transient;
+		}
 	}
 }

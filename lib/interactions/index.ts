@@ -508,7 +508,12 @@ export const ui = new Elysia()
 				 */
 				interaction.payload.secondFactor = {
 					accountId: user._id,
-					transient: body.remember === 'on',
+					/*
+					 * An unchecked checkbox submits nothing, so an absent field is the decline. `transient`
+					 * is the negative of what the control says, which is the trap this expression fell into:
+					 * it read `=== 'on'`, marking a sign-in the end user asked to keep as one to discard.
+					 */
+					transient: body.remember !== 'on',
 					attempts: 0
 				};
 				await persistInteraction(interaction);
@@ -527,7 +532,7 @@ export const ui = new Elysia()
 			interaction.payload.result = {
 				login: {
 					accountId: user._id,
-					transient: body.remember === 'on',
+					transient: body.remember !== 'on',
 					/*
 					 * The context this sign-in satisfied. A password alone, because a bucket that demands
 					 * a second factor never reaches here — it stages `secondFactor` above, and the

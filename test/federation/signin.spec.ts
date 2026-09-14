@@ -29,7 +29,8 @@ import {
 
 /**
  * @proves A federated sign-in links to the existing account rather than making a second,
- * provisions with no usable password and no roles, and stores no upstream token.
+ * provisions with no usable password and no roles, stores no upstream token, and — offering no
+ * remember-me choice — leaves the end user signed in past the browsing session.
  */
 describe('federated sign-in', () => {
 	beforeAll(async () => {
@@ -345,5 +346,30 @@ describe('federated sign-in', () => {
 			'federation.enabled',
 			'federation.enabled'
 		]);
+	});
+
+	/*
+	 * There is no "remember me" on this door, so the answer is the one an end user gets by not being asked.
+	 * Worth pinning rather than assuming: the choice is carried as its negative, so a change that got the
+	 * default backwards would sign every federated user out at the end of the browsing session.
+	 */
+	it('is retained past the browsing session when the sign-in offered no remember-me choice', async () => {
+		const idp = await idpStub('https://idp-retained.test');
+		await seedBucket(CLIENT, {
+			federation: [provider(idp.origin, { emailTrusted: true })]
+		});
+
+		idp.expectDiscovery();
+		const { uid, cookie } = await startInteraction();
+		const { complete } = await walk(uid, cookie, {
+			idp,
+			claims: { email: 'retained@acme.test', email_verified: true }
+		});
+
+		expect(complete?.status).toBe(303);
+		const header = complete?.setCookies.find((c) => c.startsWith('_session='));
+		expect(header).toBeTruthy();
+		expect(header).toMatch(/;\s*Expires=/i);
+		assertNoPendingInterceptors();
 	});
 });

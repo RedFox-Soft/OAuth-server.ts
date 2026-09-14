@@ -549,7 +549,21 @@ describe('resume after consent', async () => {
 			auth.validatePresence(response, ['code', 'state']);
 		});
 
-		it('should process an explicitly permanent (remember) login result', async function () {
+		/*
+		 * Both cases below assert on the session cookie the resume response writes, which is the only place
+		 * the remembered/not-remembered distinction is observable. They previously asserted the redirect
+		 * alone — so they carried this distinction in their names while proving nothing about it, and the
+		 * suite looked like it covered a control that had never worked.
+		 */
+		function sessionCookieOf(response: Response) {
+			const header = response.headers
+				.getSetCookie()
+				.find((c) => c.startsWith('_session='));
+			expect(header).toBeTruthy();
+			return header as string;
+		}
+
+		it('keeps the sign-in past the browsing session when the resumed result asks to be remembered', async function () {
 			const session = await setup.login();
 			const auth = new AuthorizationRequest({
 				response_mode: 'query',
@@ -559,7 +573,7 @@ describe('resume after consent', async () => {
 			const cookie = await saveResume(auth.params, {
 				login: {
 					accountId: setup.getAccountId(),
-					remember: true
+					transient: false
 				}
 			});
 
@@ -573,9 +587,10 @@ describe('resume after consent', async () => {
 			auth.validateClientLocation(response);
 			auth.validateState(response);
 			auth.validatePresence(response, ['code', 'state']);
+			expect(sessionCookieOf(response)).toMatch(/;\s*Expires=/i);
 		});
 
-		it('should process a transient (remember: false) login result', async function () {
+		it('leaves the sign-in unretained past the browsing session when the resumed result declines', async function () {
 			const session = await setup.login();
 			const auth = new AuthorizationRequest({
 				response_mode: 'query',
@@ -585,7 +600,7 @@ describe('resume after consent', async () => {
 			const cookie = await saveResume(auth.params, {
 				login: {
 					accountId: setup.getAccountId(),
-					remember: false
+					transient: true
 				}
 			});
 
@@ -599,6 +614,10 @@ describe('resume after consent', async () => {
 			auth.validateClientLocation(response);
 			auth.validateState(response);
 			auth.validatePresence(response, ['code', 'state']);
+
+			const header = sessionCookieOf(response);
+			expect(header).not.toMatch(/;\s*Expires=/i);
+			expect(header).not.toMatch(/;\s*Max-Age=/i);
 		});
 
 		it('should trigger logout when the session subject changes', async function () {
@@ -638,8 +657,7 @@ describe('resume after consent', async () => {
 
 			const cookie = await saveResume(auth.params, {
 				login: {
-					accountId: setup.getAccountId(),
-					remember: true
+					accountId: setup.getAccountId()
 				},
 				consent: {}
 			});
@@ -782,8 +800,7 @@ describe('resume after consent', async () => {
 
 			const cookie = await saveResume(auth.params, {
 				login: {
-					accountId: setup.getAccountId(),
-					remember: true
+					accountId: setup.getAccountId()
 				},
 				consent: {}
 			});

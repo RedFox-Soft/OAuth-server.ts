@@ -84,7 +84,10 @@ export async function get(path: string, cookie?: string) {
 		text: await res.text(),
 		contentType: res.headers.get('content-type') ?? '',
 		csp: res.headers.get('content-security-policy'),
-		setCookie: res.headers.get('set-cookie')
+		setCookie: res.headers.get('set-cookie'),
+		// Separated, because `get('set-cookie')` joins several headers into one string and a cookie's
+		// attributes cannot be read out of the join.
+		setCookies: res.headers.getSetCookie()
 	};
 }
 

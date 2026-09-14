@@ -86,4 +86,6 @@ that gap, and the same blindness applies to any spec that threads cookies throug
   same lesson about headless fetch scripts standing in for browsers.
 - [[end-user-cookie-attributes]] — the other half of a cookie's definition, and the second schema
   that was quietly writing `_session` with no attributes at all.
+- [[remember-me-session-retention]] — the same blindness one field over: a `_session` lifetime no
+  test could see, because the tests that named the distinction threaded cookies through by hand.
 - [[html-response-security-policy]] — the neighbouring per-response policy derived from one owner.

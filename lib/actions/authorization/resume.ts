@@ -49,14 +49,14 @@ export default async function resumeAction(oidc, interaction) {
 	oidc.redirectUriCheckPerformed = true;
 
 	if (result?.login) {
-		const { remember = true, accountId, ts: loginTs, amr, acr } = result.login;
+		const { transient, accountId, ts: loginTs, amr, acr } = result.login;
 
 		session.loginAccount({
 			accountId,
 			loginTs,
 			amr,
 			acr,
-			transient: !remember
+			transient
 		});
 	}
 
