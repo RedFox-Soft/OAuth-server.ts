@@ -44,7 +44,7 @@ export interface McpCredential {
  * flat argument object describes the whole call. An agent should not have to know that `id` travels in
  * the path while `name` travels in the body.
  */
-function inputSchemaFor(tool: McpTool): Record<string, unknown> {
+export function inputSchemaFor(tool: McpTool): Record<string, unknown> {
 	const properties: Record<string, unknown> = {};
 	const required: string[] = [];
 
@@ -90,18 +90,22 @@ function inputSchemaFor(tool: McpTool): Record<string, unknown> {
 	 * Closed by default, so a mistyped argument is refused rather than silently dropped — and so the
 	 * catalogue's no-passthrough guarantee has something to stand on.
 	 *
-	 * Open when the route's own body is an open map. `UpdateSettingsBody` is `t.Record(t.String(),
-	 * t.Unknown())` — a partial map of setting key to value, validated per key by the handler against the
-	 * catalog — so a closed tool schema refused every settings key before the handler ever saw it. Found
-	 * by the confirmation matrix, where `settings_update` was the one tool that never reached its gate.
+	 * Open when the route's own body says it is open. `UpdateSettingsBody` is a partial map of setting
+	 * key to value, validated per key by the handler against the catalog, so a closed tool schema
+	 * refused every settings key before the handler ever saw it. Found by the confirmation matrix,
+	 * where `settings_update` was the one tool that never reached its gate.
+	 *
+	 * Read from the body's own `additionalProperties` rather than inferred from its having no
+	 * properties, which is what this used to do. That inference tied openness to saying nothing about
+	 * the fields, so the settings body could not describe its keys without silently closing itself —
+	 * and describing them is the whole reason an agent can send a boolean rather than the word.
 	 *
 	 * Safe because openness is inherited from one fixed route's body, not from the caller: `dispatch.ts`
 	 * only ever sends these fields as that route's body. A tool with path parameters is never opened —
 	 * asserted by the drift guard — so an open object cannot smuggle a path segment.
 	 */
 	const bodyIsOpenMap =
-		tool.bodySchema !== null &&
-		Object.keys((tool.bodySchema.properties ?? {}) as object).length === 0;
+		tool.bodySchema !== null && tool.bodySchema.additionalProperties === true;
 
 	return {
 		type: 'object',

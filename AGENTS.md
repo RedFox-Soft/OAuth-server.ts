@@ -305,7 +305,7 @@ The admin routes are the definition; the MCP surface follows from them.
 6. Correct any wiki page the operation falsifies. Nothing fails if you skip it, which is precisely why
    it is listed beside the guards that do — see **LLM Wiki** below.
 
-See `wiki/concepts/admin-mcp-control-plane.md` before changing anything in `lib/mcp/`; it records four
+See `wiki/concepts/admin-mcp-control-plane.md` before changing anything in `lib/mcp/`; it records six
 traps that each cost a debugging session.
 
 ## Adding a new endpoint

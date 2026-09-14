@@ -4,7 +4,7 @@ title: 'The administrative MCP control plane'
 tags: [architecture, contract, gotcha, config]
 sources: [oauth-server-codebase]
 created: 2026-08-24
-updated: 2026-08-31
+updated: 2026-09-14
 graph:
   node_type: concept
 ---
@@ -66,8 +66,10 @@ It imports schema modules and never route modules — a route module reaches the
 
 Tool input schemas *are* the TypeBox objects the routes validate against, so the schema an agent reads
 cannot drift from the schema the route enforces. That decided against Zod, the SDK's documented default.
+`settings_update` is the one exception, for the reason the trap below gives: its route validates against
+nothing, so its published schema is derived from the same catalog the handler enforces.
 
-## Five traps this cost us
+## Six traps this cost us
 
 **One flat argument object cannot hold two things called `id`.** A tool takes a single flat object, so
 `federation_provider_create` — `POST /admin/api/buckets/:id/federation`, whose body carries the
@@ -81,6 +83,23 @@ final argument names collide.
 property and `settings_update` never reached its own confirmation gate. Openness is now inherited from
 the route's body, and a tool with path parameters is never opened — an arbitrary body key could
 otherwise shadow a path segment.
+
+**An open map that describes nothing makes every client guess — and guess wrongly.** The fix above left
+`settings_update` publishing an open object with no properties at all, so an agent was told nothing
+about any setting and a client with no type to check a value against sent the text it was handed:
+`par.enabled: true` arrived as `"true"`, `scopes` as one string, and the route correctly refused both.
+Two unrelated clients did it, and no caller-side encoding avoids it — only object values keep their
+types, and the route wants flat dotted keys. `PublishedSettingsBody` now types every key from
+SETTINGS_CATALOG. Three things about it are load-bearing. It is a *second* schema, making
+`settings_update` the one tool whose published schema is not the object its route validates against —
+admissible only because that route validates nothing and the catalog is the single authority both read.
+It is built from `t.Unknown` so it describes without enforcing: a validating constructor puts Elysia in
+front of the handler, which coerces (`richAuthorizationRequests.types: []` became `{}`, matched what was
+in force, and a 422 became a silent 200) and strips undeclared keys, which is how an unknown setting
+stops being distinguishable from a refused one. And the object stays open, or a setting retired between
+releases becomes a rejected argument with nothing naming it. Openness is now read from the body's own
+`additionalProperties` rather than inferred from its having no properties — that inference is what tied
+"open" to "says nothing". Fixed 2026-09-14; `test/mcp/settings_schema.spec.ts` holds all three halves.
 
 **Elysia consumes the request body before the handler runs.** The SDK cannot read the stream a second
 time, so every exchange — `initialize` included — answered an opaque JSON-RPC `-32603`. The SDK provides

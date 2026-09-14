@@ -1,4 +1,10 @@
-import { ApplicationConfig } from '../../configs/application.js';
+/*
+ * Type-only, and load-bearing that it stays so. `configs/application.ts` reads the config store at
+ * module scope, which reaches the adapters and from there a db module that connects at import time.
+ * This module is imported by `lib/admin/settings/schema.ts`, which `lib/mcp/catalogue.ts` imports —
+ * a value import here would put that connection on the MCP catalogue's import path.
+ */
+import type { ApplicationConfig } from '../../configs/application.js';
 
 export type SettingType =
 	| 'boolean'

@@ -11,6 +11,16 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- mcp: `settings_update` now tells an agent what each server setting accepts. Its published schema
+  described no setting at all — the route behind it validates every value in its handler rather than
+  in its body schema, so there was nothing there to publish — and a client with no type to check a
+  value against sends the text it was handed: `par.enabled: true` arrived as `"true"` and `scopes` as
+  one string, both correctly refused, with no encoding available that satisfied caller and server at
+  once. Two unrelated clients hit it. Every catalogue key is now published with its type, its allowed
+  values where it has them, and a one-line description, all derived from the same catalogue the
+  handler enforces. The published schema describes without enforcing, so a setting the catalogue does
+  not declare still reaches the handler and is refused by name rather than silently dropped.
+
 - interactions: the "Remember me" checkbox on the sign-in screen now decides how long the sign-in
   lasts. It never had, on any path: the answer was recorded under one name and read under another,
   the answer that was recorded was inverted, nothing anywhere read the resulting flag, and a

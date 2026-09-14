@@ -29,7 +29,7 @@ import {
 	CreateProviderBody,
 	UpdateProviderBody
 } from '../admin/federation/schema.js';
-import { UpdateSettingsBody } from '../admin/settings/schema.js';
+import { PublishedSettingsBody } from '../admin/settings/schema.js';
 import { UpdateSmtpBody } from '../admin/settings/smtp/schema.js';
 import { UpdateSentryBody } from '../admin/settings/sentry/schema.js';
 import { GenerateKeyBody } from '../admin/jwks/schema.js';
@@ -62,6 +62,12 @@ import { ErrorQuery, ErrorSummaryQuery } from '../admin/errors/schema.js';
  * why this module imports schema modules and never route modules: a route module reaches the adapters
  * and from there `lib/adapters/mongodb/db.ts`, which connects at import time and is unloadable under
  * test. Same import discipline as the audit table.
+ *
+ * `settings_update` is the single exception, and it is one because its route validates against
+ * nothing: `UpdateSettingsBody` is an open map, and every rule about a setting lives in the handler,
+ * which reads SETTINGS_CATALOG. `PublishedSettingsBody` is derived from that same catalog, so the rule
+ * above still holds where it matters — the published schema and the enforced one have one source — and
+ * the schema module's own comment carries the argument.
  *
  * Paths are written in Elysia's declaration form so they compare directly against `elysia.routes`.
  * Matching is exact on (method, path), never a prefix test: `POST /admin/api/buckets` and
@@ -953,7 +959,7 @@ const catalogue = [
 		action: 'settings.update',
 		consequence: 'high',
 		requiredRole: 'super_admin',
-		bodySchema: UpdateSettingsBody,
+		bodySchema: PublishedSettingsBody,
 		querySchema: null,
 		pathParams: [],
 		summary:

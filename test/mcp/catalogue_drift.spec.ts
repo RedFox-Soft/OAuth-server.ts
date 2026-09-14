@@ -236,16 +236,22 @@ describe('MCP tool catalogue', () => {
 	 * `settings_update` is open today; this is what keeps that true.
 	 */
 	it('never opens the schema of a tool that has path parameters', () => {
-		for (const tool of mcpCatalogue) {
-			const openBody =
-				tool.bodySchema !== null &&
-				Object.keys((tool.bodySchema.properties ?? {}) as object).length === 0;
-			if (!openBody) continue;
+		const open = mcpCatalogue.filter(
+			(tool) => tool.bodySchema?.additionalProperties === true
+		);
+
+		for (const tool of open) {
 			expect(
 				tool.pathParams,
 				`${tool.tool}: an open body schema plus path parameters would let a body key shadow a path segment`
 			).toEqual([]);
 		}
+
+		/*
+		 * Not vacuous. Openness used to be inferred from a body declaring no properties, so once the
+		 * settings body described its keys this loop would have run over nothing while still passing.
+		 */
+		expect(open.map((tool) => tool.tool)).toContain('settings_update');
 	});
 
 	// FR-002's second sentence: the allow-list is only meaningful if no tool can be talked into
