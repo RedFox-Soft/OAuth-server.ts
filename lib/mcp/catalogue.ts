@@ -525,6 +525,23 @@ const catalogue = [
 		summary:
 			'Assign the user bucket whose accounts this project’s clients authenticate against.'
 	},
+	{
+		tool: 'project_bucket_clear',
+		method: 'DELETE',
+		path: '/admin/api/projects/:id/bucket',
+		action: 'project.bucket.clear',
+		/*
+		 * Ordinary, like the assignment it undoes. It changes which accounts a project's clients
+		 * authenticate, which is disruptive, but it destroys nothing and is reversed by assigning again.
+		 */
+		consequence: 'ordinary',
+		requiredRole: null,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			'Remove the user bucket assigned to this project, returning its clients to the default bucket. Reversed by assigning one again.'
+	},
 
 	/* ---------------------------------------- writes: protected resources (3) */
 	{

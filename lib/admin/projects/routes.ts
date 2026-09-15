@@ -240,4 +240,26 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 			return getProjectStore().update(params.id, { bucketId: body.bucketId });
 		},
 		{ body: SetBucketBody }
-	);
+	)
+	/*
+	 * Its own route rather than a null the PUT accepts, because the audit trail records field *names*
+	 * and never values: one action would have written `project.bucket.assign` for a removal, and the
+	 * trail could not tell an operator which of the two had happened.
+	 *
+	 * Assigning was one-way until this existed — the body took a bucket id and had no value meaning
+	 * "none" — so a project pointed at the wrong bucket stayed pointed at it. Clearing returns it to the
+	 * default bucket, which is what `resolveBucketForRequest` falls through to on an empty `bucketId`.
+	 */
+	.delete('/admin/api/projects/:id/bucket', async ({ admin, params }) => {
+		const ctx = assertAuth(admin as AdminContext | null);
+		const project = await loadProject(ctx, params.id);
+		/*
+		 * Project access only, deliberately. The entity changed is the project, and dropping a pointer
+		 * needs no authority over what it pointed at — a caller who has lost access to the bucket is
+		 * precisely somebody who needs to clear it.
+		 */
+		await recordAdminAudit(ctx, 'project.bucket.clear', params.id, {
+			ownerGroupId: project.ownerGroupId
+		});
+		return getProjectStore().update(params.id, { bucketId: null });
+	});

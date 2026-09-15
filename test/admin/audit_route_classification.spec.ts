@@ -71,7 +71,8 @@ describe('admin audit route classification', () => {
 		 * authenticator + the admin bucket's own sign-in policy + the six group rows (three on the group
 		 * itself, three on its membership) + the three invitation
 		 * rows (issue, revoke, accept) + the three protected-resource rows (declare, amend, remove) + the
-		 * three administrative-client-permission rows (permit, amend, withdraw). A count that drifted
+		 * three administrative-client-permission rows (permit, amend, withdraw) + clearing a project's
+		 * assigned bucket. A count that drifted
 		 * upward silently would let an audited route be swapped for an unaudited one without either
 		 * total changing.
 		 *
@@ -80,8 +81,8 @@ describe('admin audit route classification', () => {
 		 * session and no managed entity. It filters to MUTATING methods, so the settings *read* that
 		 * shipped alongside the PATCH does not appear in either total.
 		 */
-		expect(auditedAdminRoutes).toHaveLength(46);
-		expect(mounted).toHaveLength(48);
+		expect(auditedAdminRoutes).toHaveLength(47);
+		expect(mounted).toHaveLength(49);
 	});
 
 	it('declares each route pattern only once', () => {

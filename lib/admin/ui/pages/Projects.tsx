@@ -5,13 +5,14 @@ import {
 	Modal,
 	Form,
 	Input,
+	Select,
 	Space,
 	Tag,
 	Typography,
 	message
 } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
-import type { Project } from '../../../adapters/types.js';
+import type { Project, UserBucket } from '../../../adapters/types.js';
 import { Clients } from './Clients.js';
 import { Resources } from './Resources.js';
 import { BucketDetail } from './BucketDetail.js';
@@ -116,6 +117,94 @@ function OriginsEditor({
 	);
 }
 
+/*
+ * The bucket selector.
+ *
+ * "Not set" is a real choice rather than an empty state, and it is the only way back: the assignment
+ * route takes a bucket id and has no value meaning none, so clearing is its own DELETE. A project with
+ * no bucket signs its users in from the default one, which is what `resolveBucketForRequest` falls
+ * through to — so choosing the default and choosing nothing are the same act, and the list does not
+ * offer the default separately. It could not: the default bucket belongs to no group, and this list is
+ * the buckets the caller manages.
+ */
+function BucketEditor({
+	project,
+	onClose,
+	onSaved
+}: {
+	project: Project;
+	onClose: () => void;
+	onSaved: () => void;
+}) {
+	const [buckets, setBuckets] = useState<UserBucket[]>([]);
+	const [selected, setSelected] = useState<string | null>(
+		project.bucketId ?? null
+	);
+	const [saving, setSaving] = useState(false);
+
+	useEffect(() => {
+		async function load() {
+			const res = await fetch('/admin/api/buckets');
+			if (res.ok) setBuckets((await res.json()) as UserBucket[]);
+		}
+		load();
+	}, []);
+
+	async function save() {
+		setSaving(true);
+		try {
+			const base = `/admin/api/projects/${project._id}/bucket`;
+			const res = selected
+				? await fetch(base, {
+						method: 'PUT',
+						headers: { 'content-type': 'application/json' },
+						body: JSON.stringify({ bucketId: selected })
+					})
+				: await fetch(base, { method: 'DELETE' });
+			if (!res.ok) {
+				const body = (await res.json().catch(() => null)) as {
+					message?: string;
+				} | null;
+				message.error(body?.message || 'failed to save the bucket');
+				return;
+			}
+			onSaved();
+			onClose();
+		} finally {
+			setSaving(false);
+		}
+	}
+
+	return (
+		<Modal
+			title={`Bucket — ${project.name}`}
+			open
+			onCancel={onClose}
+			onOk={save}
+			confirmLoading={saving}
+			okText="Save"
+			destroyOnHidden
+		>
+			<Typography.Paragraph type="secondary">
+				Which population of end-users this project&apos;s clients sign in. Leave
+				it unset to use the default bucket.
+			</Typography.Paragraph>
+			<Select<string | null>
+				style={{ width: '100%' }}
+				value={selected}
+				onChange={setSelected}
+				options={[
+					{ value: null, label: 'Not set — use the default bucket' },
+					...buckets.map((bucket) => ({
+						value: bucket._id,
+						label: bucket.name
+					}))
+				]}
+			/>
+		</Modal>
+	);
+}
+
 export function Projects({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 	const [projects, setProjects] = useState<Project[]>([]);
 	const [loading, setLoading] = useState(true);
@@ -125,6 +214,7 @@ export function Projects({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 	const [openProject, setOpenProject] = useState<Project | null>(null);
 	const [openBucketId, setOpenBucketId] = useState<string | null>(null);
 	const [originsFor, setOriginsFor] = useState<Project | null>(null);
+	const [bucketFor, setBucketFor] = useState<Project | null>(null);
 	const [resourcesFor, setResourcesFor] = useState<Project | null>(null);
 
 	async function load() {
@@ -214,7 +304,11 @@ export function Projects({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 				columns={[
 					{ title: 'Name', dataIndex: 'name' },
 					{ title: 'Slug', dataIndex: 'slug' },
-					{ title: 'Bucket', dataIndex: 'bucketId' },
+					{
+						title: 'Bucket',
+						dataIndex: 'bucketId',
+						render: (bucketId: string | null) => bucketId ?? 'default'
+					},
 
 					{
 						title: 'Browser origins',
@@ -251,6 +345,12 @@ export function Projects({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 								>
 									Origins
 								</Button>
+								<Button
+									size="small"
+									onClick={() => setBucketFor(row)}
+								>
+									Bucket
+								</Button>
 							</Space>
 						)
 					}
@@ -260,6 +360,13 @@ export function Projects({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 				<OriginsEditor
 					project={originsFor}
 					onClose={() => setOriginsFor(null)}
+					onSaved={load}
+				/>
+			)}
+			{bucketFor && (
+				<BucketEditor
+					project={bucketFor}
+					onClose={() => setBucketFor(null)}
 					onSaved={load}
 				/>
 			)}

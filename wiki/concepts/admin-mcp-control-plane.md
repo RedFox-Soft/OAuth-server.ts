@@ -45,8 +45,11 @@ consequences worth knowing:
 
 ## The catalogue is load-bearing
 
-`lib/mcp/catalogue.ts` enumerates all 39 published tools over the 43 routes under `/admin/api/`, plus
-the four deliberate exclusions. Same technique as [[admin-audit-trail]]'s route table, for the same
+`lib/mcp/catalogue.ts` enumerates every published tool over the routes under `/admin/api/`, plus the
+deliberate exclusions. It said "39 tools over 43 routes, plus four exclusions" until 2026-09-15, by
+which point all three numbers were wrong — which is the same argument the paragraph below makes
+against counting them in a test, and it applies here for the same reason. Same technique as
+[[admin-audit-trail]]'s route table, for the same
 reason: the tool-name union derives from the table, `action` is typed as `AuditAction` so a tool cannot
 claim an audit action the audit table does not declare, and
 `test/mcp/catalogue_drift.spec.ts` compares the table against the mounted routes in **both**

@@ -181,6 +181,53 @@ describe('projects API', () => {
 	});
 
 	/*
+	 * Assigning was one-way until this existed: the only route took a bucket id and there was no value
+	 * meaning "none", so a project pointed at the wrong bucket stayed pointed at it. Clearing returns the
+	 * project to the default bucket, which is what `resolveBucketForRequest` falls through to on an
+	 * empty `bucketId`.
+	 */
+	it('clears the bucket it was given', async () => {
+		const su = await sessionCookieFor(['super_admin']);
+		const ownerGroupId = await personalGroupId(su.userId);
+		const bucket = await getBucketStore().create({
+			name: 'Own bucket',
+			ownerGroupId
+		});
+		const proj = await getProjectStore().create({
+			name: 'Reassigned',
+			slug: `re-${Math.random().toString(36).slice(2)}`,
+			ownerGroupId,
+			bucketId: bucket._id
+		});
+
+		const res = await client.admin.api
+			.projects({ id: proj._id })
+			.bucket.delete(undefined, { headers: { cookie: su.cookie } });
+
+		expect(res.status).toBe(200);
+		expect((await getProjectStore().find(proj._id))?.bucketId).toBeNull();
+	});
+
+	it('denies clearing the bucket of a project the caller does not manage', async () => {
+		const pa = await sessionCookieFor(['project_admin']);
+		const proj = await getProjectStore().create({
+			name: 'Someone else',
+			slug: `else-${Math.random().toString(36).slice(2)}`,
+			ownerGroupId: 'a-group-nobody-here-belongs-to',
+			bucketId: 'some-bucket'
+		});
+
+		const res = await client.admin.api
+			.projects({ id: proj._id })
+			.bucket.delete(undefined, { headers: { cookie: pa.cookie } });
+
+		expect(res.status).toBe(403);
+		expect((await getProjectStore().find(proj._id))?.bucketId).toBe(
+			'some-bucket'
+		);
+	});
+
+	/*
 	 * CORS origins. Validated in the handler rather than by the body schema so a rejection returns the
 	 * admin_error shape and can name the offending value — a list that looks right but grants nothing is
 	 * the failure mode worth spending a message on.
