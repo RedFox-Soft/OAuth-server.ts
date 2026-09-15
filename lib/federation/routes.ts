@@ -31,9 +31,9 @@ import {
  * The return leg from an upstream provider.
  *
  * Mounted outside the `ui` instance because it cannot satisfy that instance's guard: the interaction cookie
- * is scoped `path: /ui/${uid}` and `sameSite: 'strict'`, and this route is reached by a cross-site top-level
- * navigation to a URL that must be byte-identical for every interaction. Everything it needs comes from a
- * short-lived record found by the digest of the `state` it was given. It reads no cookie and sets none.
+ * is scoped `path: /ui/${uid}`, and this route's URL must be byte-identical for every interaction, so it can
+ * never be inside that path. Everything it needs comes from a short-lived record found by the digest of the
+ * `state` it was given. It reads no cookie and sets none.
  */
 
 export const federationRoutes = new Elysia({ name: 'federation-callback' }).get(

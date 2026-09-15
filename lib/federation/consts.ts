@@ -20,8 +20,8 @@ export const HANDOFF_TTL_SECONDS = 120;
 /*
  * Fixed, because an upstream IdP matches `redirect_uri` by exact string and `uid` differs for every
  * interaction, so a per-interaction callback cannot be pre-registered. It is also why this route reads no
- * interaction cookie: the cookie is scoped `path: /ui/${uid}` and `sameSite: 'strict'`, and the return leg
- * from the IdP is a cross-site top-level navigation, which carries neither.
+ * interaction cookie: the cookie is scoped `path: /ui/${uid}`, and a fixed callback path is by definition
+ * outside it. The path alone settles this — it was never the `sameSite` value, which is now `lax`.
  */
 export const FEDERATION_CALLBACK_PATH = '/federation/callback';
 

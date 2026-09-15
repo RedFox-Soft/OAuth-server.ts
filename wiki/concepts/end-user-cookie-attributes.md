@@ -4,7 +4,7 @@ title: "One owner per cookie family, because two schemas can name one cookie"
 tags: [contract, gotcha, architecture]
 sources: [oauth-server-codebase]
 created: 2026-08-27
-updated: 2026-08-27
+updated: 2026-09-15
 graph:
   node_type: concept
   relationships:
@@ -54,6 +54,26 @@ on the wire* first. The admin cookie always had it (`lib/admin/auth/session.ts`)
 posture the end-user cookies now match. Local development is unaffected — `http://localhost` is a
 trustworthy origin, so browsers store `Secure` cookies from it; a non-TLS deployment on a real
 hostname is the only configuration this closes off, deliberately.
+
+## `sameSite` is `lax`, and `strict` was a defect (2026-09-15)
+
+Both end-user cookies were `strict` until a sign-in that started at a relying party was measured:
+click "Log in" at the RP → 422 `Invalid interaction cookie`; open or reload the very same URL by
+hand → 200. That asymmetry is the whole diagnosis. A `strict` cookie is withheld on a
+*cross-site-initiated* top-level navigation and sent on a browser-initiated one, and the entire
+authorization flow is the first kind: the RP navigates to `/auth`, which sets `_interaction` and
+redirects to `/ui/${uid}/login`, whose guard requires it (`lib/interactions/index.ts`). So the
+cookie was never sent, and the only way anyone saw the screen work was by reloading it themselves.
+
+`_session` had the same disease with a quieter symptom: withheld at `/auth`, an established session
+is invisible, so a second relying party re-prompts a user who is already signed in — SSO silently
+not working rather than failing.
+
+`lax` is not a relaxation of the property that matters. It still withholds both cookies on
+cross-site POSTs and on subresource requests, which is the CSRF boundary; every form on these
+screens posts same-site to a page this server served. The admin console's cookie is a separate
+constant (`lib/admin/auth/session.ts`) and stays `strict`, because nothing legitimately navigates to
+`/admin` from another site.
 
 ## The rule
 

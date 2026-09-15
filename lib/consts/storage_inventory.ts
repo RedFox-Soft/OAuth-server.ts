@@ -277,8 +277,8 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 	]),
 	/*
 	 * The federated sign-in's round-trip record: one area holding two stages, because the interaction
-	 * cookie provably cannot survive the trip to an upstream IdP (path-scoped and sameSite: 'strict',
-	 * against a fixed callback reached by a cross-site navigation). Stage one is keyed by sha256(state)
+	 * cookie provably cannot survive the trip to an upstream IdP (scoped `path: /ui/${uid}`, against a
+	 * callback whose URL must be fixed for every interaction). Stage one is keyed by sha256(state)
 	 * and holds the exchange context; stage two replaces it under sha256(ref) and holds only the
 	 * interaction and the account it resolved to. Neither live identifier is ever a field.
 	 *

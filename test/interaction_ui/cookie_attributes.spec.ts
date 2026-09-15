@@ -30,11 +30,13 @@ function setCookieFor(response: Response, name: string): string {
 }
 
 // `Secure` is the attribute this suite exists for; the other two travel with it from one owner
-// (endUserCookieAttributes) and would regress the same way.
+// (endUserCookieAttributes) and would regress the same way. `Lax` is asserted rather than `Strict`
+// because a strict cookie is withheld on the cross-site-initiated navigation that every sign-in
+// starting at a relying party is made of — the cookie never arrived and the `/ui` guard answered 422.
 function expectHardened(header: string) {
 	expect(header).toContain('HttpOnly');
 	expect(header).toContain('Secure');
-	expect(header).toContain('SameSite=Strict');
+	expect(header).toContain('SameSite=Lax');
 }
 
 // The `name=value` pair only, for re-sending as a request cookie.

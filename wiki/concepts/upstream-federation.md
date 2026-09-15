@@ -28,22 +28,28 @@ discipline pointed outward.
 
 This is the shape's whole reason, and it is not a preference.
 
-The interaction cookie is `path: /ui/${uid}` and `sameSite: 'strict'`. An upstream provider matches
-`redirect_uri` by **exact string**, so the callback URL must be identical for every interaction — it cannot
-contain the `uid`. And the return leg is a cross-site top-level navigation, which carries no strict cookie
-even if the path matched. So the callback provably cannot read the interaction cookie:
+The interaction cookie is `path: /ui/${uid}`. An upstream provider matches `redirect_uri` by **exact
+string**, so the callback URL must be identical for every interaction — it cannot contain the `uid`, and
+is therefore outside the only path the cookie is sent to. So the callback provably cannot read it:
+
+(Corrected 2026-09-15: this argument used to rest on `sameSite: 'strict'` as well — "the return leg is a
+cross-site top-level navigation, which carries no strict cookie even if the path matched". The attribute is
+now `lax`, which *does* travel on that navigation, so the path is the whole of the reason. The three hops
+are unchanged, because the path argument was always the decisive one.)
 
 | Hop | Route | Cookie | Carries |
 |---|---|---|---|
 | 1 | `GET /ui/:uid/federation/:providerId/start` | yes | mints `state`, `nonce`, PKCE verifier |
 | 2 | `GET /federation/callback` | **none** | finds everything by `sha256(state)` |
-| 3 | `GET /ui/:uid/federation/complete?ref=…` | yes again | same-site redirect, so the strict cookie applies |
+| 3 | `GET /ui/:uid/federation/complete?ref=…` | yes again | back inside the cookie's path |
 
-Hop 2 → 3 being **same-site and relative** is what restores the cookie. A absolute redirect would not.
+Hop 2 → 3 being **relative** is what restores the cookie: the redirect lands back under `/ui/${uid}`.
 
-Rejected alternatives, recorded so they are not re-proposed: relaxing the interaction cookie to `lax` and
-`path: /` (a change to every flow's security properties to serve one), and a per-interaction `redirect_uri`
-(no provider will match it, and it cannot be pre-registered).
+Rejected alternatives, recorded so they are not re-proposed: giving the interaction cookie `path: /` (a
+change to every flow's blast radius to serve one leg), and a per-interaction `redirect_uri` (no provider
+will match it, and it cannot be pre-registered). The `lax` half of that first alternative is no longer
+hypothetical — it shipped on 2026-09-15, for an unrelated reason: `strict` was withholding the cookie on
+the RP-initiated navigation that *every* sign-in is made of. It changes nothing here.
 
 ## Two round-trip records, neither storing its own key
 

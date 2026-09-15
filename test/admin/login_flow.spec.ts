@@ -249,7 +249,9 @@ describe('admin OIDC login (BFF)', () => {
 		// `endUserCookieAttributes` rather than listing only value/path/expiry.
 		expect(providerCleared).toContain('HttpOnly');
 		expect(providerCleared).toContain('Secure');
-		expect(providerCleared).toContain('SameSite=Strict');
+		// Lax, like every other write of `_session`: a clear whose attributes differ from the ones the
+		// cookie was set with names a different cookie and removes nothing.
+		expect(providerCleared).toContain('SameSite=Lax');
 	});
 
 	it('logout destroys the provider session, not just the console session', async () => {

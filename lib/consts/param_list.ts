@@ -173,12 +173,28 @@ export const cookieNames = {
  * writes `_session` through it, which is the moment the *authenticated* cookie is first issued.
  *
  * `secure` is the actual defense against the cookie travelling in cleartext; a proxy-level HTTPS
- * redirect (fly.toml `force_https`) only mitigates it. Matches the admin cookie's posture in
- * lib/admin/auth/session.ts.
+ * redirect (fly.toml `force_https`) only mitigates it.
+ *
+ * `lax` is not a weakening, and `strict` here broke every sign-in that actually started at a relying
+ * party. A strict cookie is withheld on a cross-site-initiated top-level navigation — which is the
+ * shape of the *whole* flow: the RP navigates the browser to `/auth`, which sets `_interaction` and
+ * redirects to `/ui/${uid}/login`, whose guard requires it. The cookie arrived bare and the guard
+ * answered 422 `Invalid interaction cookie`. It only ever worked when the navigation was
+ * browser-initiated — typing the URL or reloading it, which counts as same-site — so a manual reload
+ * of the failing URL returned 200 and hid the defect from every hand-driven reproduction.
+ *
+ * `_session` has the same requirement for a different outcome: withheld at `/auth`, an established
+ * session is invisible, so a second RP silently re-prompts a user who is already signed in.
+ *
+ * What `lax` still refuses is the boundary that carries the CSRF property: cross-site POSTs and
+ * cross-site subresource requests. Every form on these screens posts same-site to a page this server
+ * served, so none of them depends on `strict`. The admin console cookie is a separate constant and
+ * stays `strict` (lib/admin/auth/session.ts) — nothing legitimately navigates to `/admin` from
+ * another site.
  */
 export const endUserCookieAttributes = {
 	httpOnly: true,
-	sameSite: 'strict',
+	sameSite: 'lax',
 	secure: true
 } as const;
 

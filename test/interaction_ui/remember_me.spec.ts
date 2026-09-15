@@ -52,7 +52,7 @@ function expectRetained(header: string) {
 function expectHardened(header: string) {
 	expect(header).toContain('HttpOnly');
 	expect(header).toContain('Secure');
-	expect(header).toContain('SameSite=Strict');
+	expect(header).toContain('SameSite=Lax');
 	expect(header).toContain('Path=/');
 }
 

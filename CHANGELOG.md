@@ -11,6 +11,17 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- interactions: sign-in works again when it starts at a relying party. The `_interaction` and
+  `_session` cookies were written `SameSite=Strict`, which a browser withholds on a
+  cross-site-initiated top-level navigation — the shape of the whole flow, since the relying party
+  navigates to `/auth`, which sets the cookie and redirects to `/ui/:uid/login`, whose guard requires
+  it. Every such sign-in answered `422 Invalid interaction cookie`; opening or reloading the identical
+  URL by hand returned 200, because a browser-initiated navigation counts as same-site, which is what
+  hid it. `_session` shared the constant and failed more quietly: invisible at `/auth`, an established
+  session made a second relying party re-prompt a user who was already signed in. Both are now `Lax`,
+  which still withholds them on the cross-site POSTs and subresource requests that carry the CSRF
+  property. The admin console's cookie is a separate constant and stays `Strict`.
+
 - admin: a project's assigned user bucket can now be changed and removed. Assigning was one-way — the
   only route took a bucket id and had no value meaning "none" — and the console had no control for it
   at all, so a bucket could be set only through the MCP surface and never unset, however wrong it was.
