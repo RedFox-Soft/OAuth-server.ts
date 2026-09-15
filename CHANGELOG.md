@@ -14,8 +14,11 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 - admin: a project's assigned user bucket can now be changed and removed. Assigning was one-way — the
   only route took a bucket id and had no value meaning "none" — and the console had no control for it
   at all, so a bucket could be set only through the MCP surface and never unset, however wrong it was.
-  The Projects table now has a **Bucket** editor listing the buckets the caller manages plus "Not set",
-  and clearing is its own operation on both surfaces (`DELETE /admin/api/projects/:id/bucket`,
+  The Projects table now has a **Bucket** editor offering the buckets that share the project's owning
+  group — the only ones the server will accept — plus "Not set", which is how the default bucket is
+  chosen: it belongs to no group, so it is assignable to nothing and needs to be, since a project with
+  no bucket already signs its users in from it. Clearing is its own operation on both surfaces
+  (`DELETE /admin/api/projects/:id/bucket`,
   published to agents as `project_bucket_clear`). A project with no bucket signs its users in from the
   default bucket, as it always has. Clearing is its own audited action rather than an assignment
   carrying an empty value, because the audit trail records field names and never values: one action

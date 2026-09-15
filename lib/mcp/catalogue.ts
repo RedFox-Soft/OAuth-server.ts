@@ -523,7 +523,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'Assign the user bucket whose accounts this project’s clients authenticate against.'
+			'Assign the user bucket whose accounts this project’s clients authenticate against. The bucket must belong to the same group as the project, so not every bucket bucket_list returns can be assigned to every project. The default bucket is never assignable — it belongs to no group — and does not need to be: a project with no bucket already signs its users in from it, so project_bucket_clear is how that is chosen.'
 	},
 	{
 		tool: 'project_bucket_clear',

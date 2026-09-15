@@ -16,6 +16,7 @@ import type { Project, UserBucket } from '../../../adapters/types.js';
 import { Clients } from './Clients.js';
 import { Resources } from './Resources.js';
 import { BucketDetail } from './BucketDetail.js';
+import { assignableBuckets } from '../projects/model.js';
 
 interface CreateProjectValues {
 	name: string;
@@ -123,9 +124,10 @@ function OriginsEditor({
  * "Not set" is a real choice rather than an empty state, and it is the only way back: the assignment
  * route takes a bucket id and has no value meaning none, so clearing is its own DELETE. A project with
  * no bucket signs its users in from the default one, which is what `resolveBucketForRequest` falls
- * through to — so choosing the default and choosing nothing are the same act, and the list does not
- * offer the default separately. It could not: the default bucket belongs to no group, and this list is
- * the buckets the caller manages.
+ * through to — so choosing the default and choosing nothing are the same act, and "Not set" is how
+ * this screen offers it.
+ *
+ * What the endpoint returns is deliberately not what is offered: see `assignableBuckets`.
  */
 function BucketEditor({
 	project,
@@ -195,7 +197,7 @@ function BucketEditor({
 				onChange={setSelected}
 				options={[
 					{ value: null, label: 'Not set — use the default bucket' },
-					...buckets.map((bucket) => ({
+					...assignableBuckets(buckets, project).map((bucket) => ({
 						value: bucket._id,
 						label: bucket.name
 					}))
