@@ -100,7 +100,7 @@ describe.each([
 		const created = await admin('/admin/api/buckets', {
 			method: 'POST',
 			cookie,
-			body: { name: 'Deletable bucket' }
+			body: { name: 'Deletable bucket', slug: 'deletable-bucket-1' }
 		});
 		expect(created.status).toBe(201);
 		const bucket = (await created.json()) as { _id: string };

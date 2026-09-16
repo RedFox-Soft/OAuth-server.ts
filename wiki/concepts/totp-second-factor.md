@@ -131,7 +131,7 @@ sign-in still asks for a code.
 
 ## The administrator bucket needs its own door
 
-The console signs in through this same flow — `resolveBucketForClient` maps the reserved console
+The console signs in through this same flow — `resolveBucketForRequest` maps the reserved console
 client straight to the admin bucket — so enforcement works there for free. Reaching the *setting* does
 not: `assertNotReserved` (`lib/admin/buckets/access.ts`) refuses the admin bucket on both
 `loadBucketForEdit` and `loadBucketForUsers`, and its 403 names `/admin/api/admins` as where that

@@ -3,7 +3,11 @@ import { format } from 'node:util';
 import epochTime from '../helpers/epoch_time.js';
 import * as JWT from '../helpers/jwt.js';
 import { InvalidClientMetadata } from '../helpers/errors.ts';
-import { ISSUER } from 'lib/configs/env.js';
+import { issuerFor } from 'lib/configs/issuer.js';
+import {
+	DEFAULT_REQUEST_BUCKET,
+	type RequestBucket
+} from 'lib/configs/issuer.js';
 import { keystore } from 'lib/configs/keystore.js';
 import { type Client } from './client.js';
 import { Claims } from 'lib/helpers/claims.js';
@@ -42,9 +46,29 @@ export class IdToken {
 	mask?: Record<string, unknown>;
 	rejected?: string[];
 
-	constructor(client: Client, available: Record<string, unknown> = {}) {
+	/*
+	 * The bucket whose issuer this token carries.
+	 *
+	 * Passed rather than derived from the client: a client belongs to a bucket, but the fact that
+	 * matters here is where the token is being *issued*, and for a token minted against a stored
+	 * artifact that is the bucket recorded on the artifact. Defaulted to the default bucket, which is
+	 * the honest answer for every caller that has not been given an address to serve.
+	 */
+	bucket: RequestBucket;
+
+	constructor(
+		client: Client,
+		available: Record<string, unknown> = {},
+		bucket: RequestBucket = DEFAULT_REQUEST_BUCKET
+	) {
 		this.available = available;
 		this.client = client;
+		this.bucket = bucket;
+	}
+
+	/* The identifier a relying party will compare against the metadata it discovered. */
+	get issuer(): string {
+		return issuerFor(this.bucket);
 	}
 
 	set(key: string, value: unknown) {
@@ -76,7 +100,7 @@ export class IdToken {
 				signOptions = {
 					audience: client.clientId,
 					expiresIn: expiresIn || ttl.IdToken(this, client),
-					issuer: ISSUER,
+					issuer: this.issuer,
 					subject: payload.sub
 				};
 				encryption = {
@@ -88,7 +112,7 @@ export class IdToken {
 				alg = client.idTokenSignedResponseAlg;
 				signOptions = {
 					audience: client.clientId,
-					issuer: ISSUER,
+					issuer: this.issuer,
 					subject: payload.sub,
 					typ: 'logout+jwt',
 					expiresIn: 120
@@ -102,7 +126,7 @@ export class IdToken {
 				alg = client.userinfoSignedResponseAlg;
 				signOptions = {
 					audience: client.clientId,
-					issuer: ISSUER,
+					issuer: this.issuer,
 					subject: payload.sub,
 					expiresIn
 				};
@@ -115,7 +139,7 @@ export class IdToken {
 				alg = client.introspectionSignedResponseAlg;
 				signOptions = {
 					audience: client.clientId,
-					issuer: ISSUER,
+					issuer: this.issuer,
 					typ: 'token-introspection+jwt'
 				};
 				encryption = {
@@ -128,7 +152,7 @@ export class IdToken {
 				signOptions = {
 					audience: client.clientId,
 					expiresIn: 120,
-					issuer: ISSUER,
+					issuer: this.issuer,
 					noIat: true
 				};
 				encryption = {
@@ -223,7 +247,12 @@ export class IdToken {
 		});
 	}
 
-	static async validate(jwt: string, client: Client) {
+	/*
+	 * `issuer` is a parameter and not `this.issuer`: this is static, so there is no instance to read a
+	 * bucket from, and the value that must match is the issuer of the address the hint was presented
+	 * at. A constant here would accept a hint minted by any bucket at every bucket's endpoint.
+	 */
+	static async validate(jwt: string, client: Client, issuer: string) {
 		const alg = client.idTokenSignedResponseAlg;
 
 		let keyOrStore;
@@ -239,7 +268,7 @@ export class IdToken {
 		const opts = {
 			ignoreExpiration: true,
 			audience: client.clientId,
-			issuer: ISSUER,
+			issuer,
 			clockTolerance,
 			algorithm: alg,
 			subject: true

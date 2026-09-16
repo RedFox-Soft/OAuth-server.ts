@@ -3,6 +3,8 @@ import { triggerAuthenticationDevice } from '../../addon/index.js';
 
 export default async function backchannelRequestResponse(oidc) {
 	const request = new BackchannelAuthenticationRequest({
+		/* The address the request was made to. */
+		bucketId: oidc.bucket._id,
 		accountId: oidc.account.accountId,
 		claims: oidc.claims,
 		client: oidc.client,

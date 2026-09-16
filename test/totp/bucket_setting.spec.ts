@@ -24,6 +24,8 @@ const client = treaty(app);
 
 let seq = 0;
 const unique = (prefix: string) => `${prefix}-${Date.now()}-${(seq += 1)}`;
+/* A bucket's slug is an address, so it is lowercase where its display name need not be. */
+const uniqueSlug = (prefix: string) => unique(prefix).toLowerCase();
 
 async function sessionCookieFor(roles: string[]) {
 	const user = await getUserStore(ADMIN_BUCKET_ID).create(
@@ -51,7 +53,7 @@ describe('bucket sign-in method setting', () => {
 	it('defaults a newly created bucket to not requiring the second factor', async () => {
 		const cookie = await superCookie();
 		const res = await client.admin.api.buckets.post(
-			{ name: unique('Defaults') },
+			{ name: unique('Defaults'), slug: uniqueSlug('Defaults') },
 			{ headers: { cookie } }
 		);
 		expect((res.data as UserBucket).totpRequired).toBe(false);
@@ -80,7 +82,11 @@ describe('bucket sign-in method setting', () => {
 	it('accepts the setting at creation', async () => {
 		const cookie = await superCookie();
 		const res = await client.admin.api.buckets.post(
-			{ name: unique('Strict'), totpRequired: true },
+			{
+				name: unique('Strict'),
+				slug: uniqueSlug('Strict'),
+				totpRequired: true
+			},
 			{ headers: { cookie } }
 		);
 		expect((res.data as UserBucket).totpRequired).toBe(true);
@@ -90,13 +96,13 @@ describe('bucket sign-in method setting', () => {
 		const cookie = await superCookie();
 		const first = (
 			await client.admin.api.buckets.post(
-				{ name: unique('First') },
+				{ name: unique('First'), slug: uniqueSlug('First') },
 				{ headers: { cookie } }
 			)
 		).data as UserBucket;
 		const second = (
 			await client.admin.api.buckets.post(
-				{ name: unique('Second') },
+				{ name: unique('Second'), slug: uniqueSlug('Second') },
 				{ headers: { cookie } }
 			)
 		).data as UserBucket;
@@ -120,7 +126,11 @@ describe('bucket sign-in method setting', () => {
 		const cookie = await superCookie();
 		const bucket = (
 			await client.admin.api.buckets.post(
-				{ name: unique('Toggling'), totpRequired: true },
+				{
+					name: unique('Toggling'),
+					slug: uniqueSlug('Toggling'),
+					totpRequired: true
+				},
 				{ headers: { cookie } }
 			)
 		).data as UserBucket;
@@ -139,7 +149,7 @@ describe('bucket sign-in method setting', () => {
 		const cookie = await superCookie();
 		const bucket = (
 			await client.admin.api.buckets.post(
-				{ name: unique('Federated') },
+				{ name: unique('Federated'), slug: uniqueSlug('Federated') },
 				{ headers: { cookie } }
 			)
 		).data as UserBucket;
@@ -179,7 +189,7 @@ describe('bucket sign-in method setting', () => {
 		const cookie = await superCookie();
 		const bucket = (
 			await client.admin.api.buckets.post(
-				{ name: unique('Normal') },
+				{ name: unique('Normal'), slug: uniqueSlug('Normal') },
 				{ headers: { cookie } }
 			)
 		).data as UserBucket;
@@ -195,7 +205,7 @@ describe('bucket sign-in method setting', () => {
 		const outsider = await sessionCookieFor(['project_admin']);
 		const bucket = (
 			await client.admin.api.buckets.post(
-				{ name: unique('NotYours') },
+				{ name: unique('NotYours'), slug: uniqueSlug('NotYours') },
 				{ headers: { cookie } }
 			)
 		).data as UserBucket;
@@ -212,7 +222,7 @@ describe('bucket sign-in method setting', () => {
 		const cookie = await superCookie();
 		const bucket = (
 			await client.admin.api.buckets.post(
-				{ name: unique('Anon') },
+				{ name: unique('Anon'), slug: uniqueSlug('Anon') },
 				{ headers: { cookie } }
 			)
 		).data as UserBucket;
@@ -236,7 +246,7 @@ describe('bucket sign-in method setting', () => {
 		const admin = await sessionCookieFor(['super_admin']);
 		const bucket = (
 			await client.admin.api.buckets.post(
-				{ name: unique('Audited') },
+				{ name: unique('Audited'), slug: uniqueSlug('Audited') },
 				{ headers: { cookie: admin.cookie } }
 			)
 		).data as UserBucket;
@@ -266,7 +276,11 @@ describe('bucket sign-in method setting', () => {
 		const cookie = await superCookie();
 		const bucket = (
 			await client.admin.api.buckets.post(
-				{ name: unique('StillReachable'), totpRequired: true },
+				{
+					name: unique('StillReachable'),
+					slug: uniqueSlug('StillReachable'),
+					totpRequired: true
+				},
 				{ headers: { cookie } }
 			)
 		).data as UserBucket;

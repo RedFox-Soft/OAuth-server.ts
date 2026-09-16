@@ -3,7 +3,8 @@ import * as crypto from 'node:crypto';
 import * as JWT from '../../helpers/jwt.ts';
 import nanoid from '../../helpers/nanoid.js';
 import { keystore } from 'lib/configs/keystore.js';
-import { ISSUER } from 'lib/configs/env.js';
+import { issuerFor } from 'lib/configs/issuer.js';
+import { issuingBucket } from 'lib/admin/auth/bucketAddress.js';
 import { ClientDefaults } from 'lib/configs/clientBase.js';
 import { pairwiseIdentifier } from '../../addon/index.js';
 
@@ -121,6 +122,19 @@ export const jwt = {
 		} = payload;
 		let { accountId: sub } = payload;
 
+		/*
+		 * The bucket recorded when this token was minted, not the one the current request is addressed
+		 * to. RFC 9068 requires `iss` to match exactly what the resource server obtained from the
+		 * issuer's metadata, and the metadata a resource server holds is the one it discovered for the
+		 * bucket that issued the token — deriving it from anything about the present request would make
+		 * that comparison fail the moment the two diverge.
+		 *
+		 * Absent on a token minted before buckets became tenants, and the default bucket's issuer is the
+		 * bare one such a token was minted with, so reading the absence that way is exact rather than a
+		 * fallback.
+		 */
+		const iss = issuerFor(await issuingBucket(payload.bucketId));
+
 		if (sub) {
 			const { client } = this;
 			if (client?.clientId !== clientId) {
@@ -139,7 +153,7 @@ export const jwt = {
 			authorization_details: rar,
 			scope: scope || undefined,
 			client_id: clientId,
-			iss: ISSUER,
+			iss,
 			aud,
 			...(x5t || jkt ? { cnf: {} } : undefined)
 		};
@@ -179,7 +193,7 @@ export const jwt = {
 				const encrypted = await JWT.encrypt(signed, config.encrypt.key, {
 					fields: {
 						kid: config.encrypt.kid,
-						iss: ISSUER,
+						iss,
 						aud: structuredToken.payload.aud,
 						cty: 'at+jwt'
 					},
@@ -198,7 +212,7 @@ export const jwt = {
 			const encrypted = await JWT.encrypt(cleartext, config.encrypt.key, {
 				fields: {
 					kid: config.encrypt.kid,
-					iss: ISSUER,
+					iss,
 					aud: structuredToken.payload.aud,
 					typ: 'at+jwt',
 					...structuredToken.header

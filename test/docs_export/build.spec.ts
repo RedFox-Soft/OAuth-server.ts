@@ -49,8 +49,22 @@ describe('documentation export', () => {
 	});
 
 	it('exports every classified protocol route with its flag, CORS class and rate class', () => {
-		expect(out.endpoints.length).toBe(
-			gatedRoutes.length + alwaysAvailableRoutes.length
+		/*
+		 * Compared as sets rather than counts. A count is repaired by editing the number, which is what
+		 * happened when the classification gained a bucket-scoped twin for every route: the export
+		 * deliberately lists each endpoint once, at its bare address, and a length assertion could not
+		 * say whether that was the intent or an omission.
+		 *
+		 * Every classified route at a bare address is exported, and nothing else is. A bucket-scoped
+		 * route is the same endpoint at a tenant's address; listing both would double the reference with
+		 * entries whose only difference is where they answer.
+		 */
+		const classified = [...alwaysAvailableRoutes, ...gatedRoutes]
+			.filter((route) => !route.path.includes(':bucket'))
+			.map((route) => `${route.method} ${route.path}`);
+
+		expect(out.endpoints.map((e) => `${e.method} ${e.path}`).sort()).toEqual(
+			[...new Set(classified)].sort()
 		);
 		for (const endpoint of out.endpoints) {
 			expect(['open', 'client-based', 'none']).toContain(endpoint.cors);
@@ -58,8 +72,16 @@ describe('documentation export', () => {
 				endpoint.rate
 			);
 		}
-		expect(out.endpoints.filter((e) => e.flag === null).length).toBe(
-			alwaysAvailableRoutes.length
+		expect(
+			out.endpoints
+				.filter((e) => e.flag === null)
+				.map((e) => `${e.method} ${e.path}`)
+				.sort()
+		).toEqual(
+			alwaysAvailableRoutes
+				.filter((route) => !route.path.includes(':bucket'))
+				.map((route) => `${route.method} ${route.path}`)
+				.sort()
 		);
 		expect(out.alwaysAvailablePrefixes).toEqual([...alwaysAvailablePrefixes]);
 	});

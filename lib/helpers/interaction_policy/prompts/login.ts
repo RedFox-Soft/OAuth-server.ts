@@ -27,12 +27,25 @@ class LoginPromt extends Prompt {
 		{
 			reason: 'no_session',
 			description: 'End-User authentication is required',
+			/*
+			 * The resolved account, not the identifier the session happens to carry. The two are not the
+			 * same question, and reading the identifier answers the wrong one: an account identifier is
+			 * only meaningful inside the bucket that issued it, so a session established in one bucket
+			 * presents an identifier that resolves to nobody in another.
+			 *
+			 * Reading it suppressed the sign-in prompt for a request that had no account at all. The
+			 * pipeline then carried on without one, `loadGrant` left `oidc.grant` unset because it only
+			 * builds a grant for a known account, and the first consent check to reach inside it faulted —
+			 * so an end user who had done nothing wrong was handed `server_error` with nothing to retry.
+			 *
+			 * `loadAccount` runs before the policy, so `oidc.account` is populated by the time this is
+			 * asked, and it is set only when the account resolved in the bucket this request belongs to.
+			 * That also makes a deleted or deactivated account ask for a sign-in rather than fault, which
+			 * the identifier check could never do.
+			 */
 			check: (ctx: any) => {
 				const { oidc } = ctx;
-				if (oidc.session.payload.accountId) {
-					return false;
-				}
-				return true;
+				return !oidc.account;
 			}
 		},
 		{

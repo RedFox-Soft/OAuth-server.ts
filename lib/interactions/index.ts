@@ -62,6 +62,7 @@ import {
 import { deviceInputPage } from 'lib/html/device.js';
 import deviceVerificationResponse from 'lib/actions/authorization/device_user_flow_response.js';
 import * as crypto from 'node:crypto';
+import { issuingBucket } from 'lib/admin/auth/bucketAddress.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { Session } from 'lib/models/session.js';
 import { DeviceCode } from 'lib/models/device_code.js';
@@ -128,7 +129,25 @@ import { ApplicationConfig, configuration } from 'lib/configs/application.js';
 
 async function resume(interaction, cookie) {
 	const ctx = { cookie, _matchedRouteName: 'ui.resume' };
-	ctx.oidc = new OIDCContext({}, {}, 'ui.resume');
+	/*
+	 * The population this interaction belongs to, recovered from the request that started it.
+	 *
+	 * Nothing about the original address survives into a resumption — the browser arrives here from a
+	 * sign-in screen, not from the bucket's endpoint — so the context built here would otherwise be the
+	 * default bucket's, and this is where the authorization response is produced. The result was a code
+	 * whose `iss` named the instance while the metadata the client discovered named the bucket, which
+	 * clients reject with an error naming neither cause.
+	 *
+	 * The stored parameters are the ones the sign-in screen resolved its own bucket from, so the two
+	 * cannot disagree.
+	 */
+	const bucket = await issuingBucket(
+		await resolveBucketForRequest(
+			clientIdOf(interaction),
+			resourceOf(interaction)
+		)
+	);
+	ctx.oidc = new OIDCContext({}, {}, 'ui.resume', bucket);
 	ctx.oidc.cookie = cookie;
 
 	const setCookies = await sessionHandler(ctx.oidc);
@@ -823,7 +842,14 @@ export const ui = new Elysia()
 			});
 
 			return Response.redirect(
-				authorizationUrl(provider, metadata, secrets),
+				/* The callback the upstream returns to belongs to this bucket, and is the address its
+				 * provider record was registered with. */
+				authorizationUrl(
+					provider,
+					metadata,
+					secrets,
+					await issuingBucket(bucketId)
+				),
 				303
 			);
 		},

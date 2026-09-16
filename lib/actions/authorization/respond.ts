@@ -2,7 +2,6 @@ import { InvalidRequestUri } from '../../helpers/errors.ts';
 import { responseModes } from 'lib/response_modes/index.js';
 import processResponseTypes from '../../helpers/process_response_types.ts';
 import { PushedAuthorizationRequest } from 'lib/models/pushed_authorization_request.js';
-import { ISSUER } from 'lib/configs/env.js';
 import { eventBus } from '../../event_bus.js';
 
 /*
@@ -51,7 +50,13 @@ export default async function respond(oidc) {
 
 	const { responseMode } = oidc;
 	if (!responseMode.includes('jwt')) {
-		out.iss = ISSUER;
+		/*
+		 * RFC 9207: the issuer that produced this response, which is the bucket the request was
+		 * addressed to — not the instance's own, unless the two are the same because this is the
+		 * default bucket. A client checking `iss` against the metadata it discovered is checking exactly
+		 * this, so a constant here would fail every named bucket.
+		 */
+		out.iss = oidc.issuer;
 	}
 
 	// event payload kept `{ oidc }`-shaped: tests assert `args[0][0].oidc.params`

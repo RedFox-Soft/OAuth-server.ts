@@ -165,7 +165,7 @@ describe('withheld container deletions', () => {
 	it('deletes no bucket however insistently it is asked', async () => {
 		const { token } = await superAdmin();
 		const created = await rpc(
-			call('bucket_create', { name: 'Survivor' }),
+			call('bucket_create', { name: 'Survivor', slug: 'survivor-1' }),
 			token
 		);
 		const bucketId = (
@@ -250,7 +250,7 @@ describe('withheld container deletions', () => {
 	it('counts a bucket’s end-users without an operator needing the deletion', async () => {
 		const { token } = await superAdmin();
 		const created = await rpc(
-			call('bucket_create', { name: 'Counted' }),
+			call('bucket_create', { name: 'Counted', slug: 'counted-2' }),
 			token
 		);
 		const bucketId = (

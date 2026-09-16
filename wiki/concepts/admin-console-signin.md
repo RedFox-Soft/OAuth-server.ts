@@ -120,9 +120,15 @@ toggling a protocol feature would silently disable console sign-out; and it answ
 operator has already pressed. The registered `post_logout_redirect_uris` such a redirect would need
 is consequently still empty, and deliberately so.
 
-The cost is real and is the point: the provider session is global to the browser, so leaving the
-console signs that browser out of every relying party it had an SSO session with. That is what
-ending a provider session means everywhere else in this codebase.
+The cost used to be real and is no longer: signing out of the console ends the **administrators
+bucket's** sign-in and that one only. A browser session now belongs to one user bucket, so an
+administrator who is also an ordinary end user elsewhere keeps that sign-in when they leave the
+console.
+
+The older wording here — "the provider session is global to the browser, so leaving the console signs
+that browser out of every relying party" — described the mechanism of the time and presented it as a
+deliberate cost. It was a consequence of there being one session per browser, not a decision anybody
+made, and per-bucket sessions removed it. See [[bucket-is-an-issuer]].
 
 ## Freshness is requested, not merely checked
 

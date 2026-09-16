@@ -49,6 +49,9 @@ import {
 	OIDCProviderError
 } from 'lib/helpers/errors.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
+import type { RequestBucket } from 'lib/configs/issuer.js';
+import { requestBucketFor } from 'lib/admin/auth/bucketAddress.js';
+import checkBucket from './check_bucket.js';
 import { Client } from 'lib/models/client.js';
 import {
 	dpopValidate,
@@ -89,8 +92,14 @@ const pushedAuthorizationParameters = t.Object({
 	request_uri: refusedParam('request_uri')
 });
 
-export async function isAllowRedirectUri(params) {
-	const oidc = new OIDCContext(params);
+export async function isAllowRedirectUri(params, bucket?: RequestBucket) {
+	/*
+	 * The bucket is passed in because this runs from the error handler, which holds a route *pattern*
+	 * rather than a resolved request. Everything the delivered error carries hangs off it — most visibly
+	 * the `iss` RFC 9207 puts in the response, which a client compares against the metadata it
+	 * discovered for the bucket it is talking to.
+	 */
+	const oidc = new OIDCContext(params, {}, 'anonymous', bucket);
 
 	const client = await Client.find(params.client_id, {
 		error: new InvalidClient('client is invalid', 'client not found')
@@ -148,6 +157,13 @@ async function authorizationActionHandler(oidc) {
 	await checkClaims(oidc);
 	await checkRar(oidc);
 	await checkResource(oidc);
+	/*
+	 * After the resource, because a bucket can derive from a declared resource and a resource arriving
+	 * inside a pushed request or a request object is not settled until here. Before anything that
+	 * resolves an account or mints a grant, because everything downstream is scoped to a population and
+	 * a client at the wrong address has no business reaching any of it.
+	 */
+	await checkBucket(oidc);
 	checkMaxAge(oidc);
 	await checkIdTokenHint(oidc);
 	assignClaims(oidc);
@@ -176,11 +192,20 @@ export const authGet = new Elysia()
 	})
 	.get(
 		routeNames.authorization,
-		async ({ query, cookie, route, request }) => {
+		async ({ query, cookie, route, request, params }) => {
 			const url = new URL(request.url);
 			url.search = url.pathname = '';
 
-			const oidc = new OIDCContext(query, {}, route);
+			/*
+			 * The address decides the population, before anything else about the request is looked at.
+			 * `params.bucket` is present only on the prefixed mount; its absence is the bare address,
+			 * which is the default bucket's.
+			 */
+			const bucket = await requestBucketFor(
+				(params as { bucket?: string } | undefined)?.bucket
+			);
+
+			const oidc = new OIDCContext(query, {}, route, bucket);
 			oidc.cookie = cookie;
 			oidc.baseUrl = url.toString();
 
@@ -204,12 +229,17 @@ export const authPost = new Elysia()
 	})
 	.post(
 		routeNames.authorization,
-		async ({ body, cookie, route, request }) => {
+		async ({ body, cookie, route, request, params }) => {
 			const url = new URL(request.url);
 			url.search = '';
 			url.pathname = url.pathname.replace(route, '');
 
-			const oidc = new OIDCContext(body, {}, route);
+			/* The address decides the population, exactly as on the GET above. */
+			const bucket = await requestBucketFor(
+				(params as { bucket?: string } | undefined)?.bucket
+			);
+
+			const oidc = new OIDCContext(body, {}, route, bucket);
 			oidc.cookie = cookie;
 			oidc.baseUrl = url.toString();
 

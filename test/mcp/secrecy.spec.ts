@@ -158,7 +158,12 @@ async function seedSecretHolders(token: string) {
 	};
 
 	const bucket = await rpc(
-		call('bucket_create', { name: 'Secret bucket' }),
+		// Unique per call: this helper runs once per case, and the bucket store is a module-level
+		// singleton that no bootstrap clears — so a fixed slug collides with the previous case's.
+		call('bucket_create', {
+			name: 'Secret bucket',
+			slug: `secret-bucket-${Math.random().toString(36).slice(2, 10)}`
+		}),
 		token
 	);
 	const bucketId = (bucket.result?.structuredContent?.result as { _id: string })

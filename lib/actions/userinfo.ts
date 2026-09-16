@@ -14,6 +14,7 @@ import {
 	MissingResourceCredential
 } from '../helpers/errors.ts';
 import { routeNames } from 'lib/consts/param_list.js';
+import { requestBucketFor } from 'lib/admin/auth/bucketAddress.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { Claims } from 'lib/helpers/claims.js';
 import { IdToken } from 'lib/models/id_token.js';
@@ -83,8 +84,13 @@ function resourceCredential(oidc, headers, body, method: string) {
 	return oidc.getAccessToken({ acceptDPoP: true });
 }
 
-async function userInfo({ headers, body, set, request }) {
-	const oidc = new OIDCContext({}, headers);
+async function userInfo({ headers, body, set, request, params }) {
+	/* The address decides the population; its absence is the bare address, which is the default
+	 * bucket's. */
+	const bucket = await requestBucketFor(
+		(params as { bucket?: string } | undefined)?.bucket
+	);
+	const oidc = new OIDCContext({}, headers, 'anonymous', bucket);
 	const { method } = request;
 
 	const accessTokenId = resourceCredential(oidc, headers, body, method);

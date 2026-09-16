@@ -433,7 +433,7 @@ describe('admin audit coverage: buckets', () => {
 		const { cookie, userId } = await superCookie();
 
 		const res = await client.admin.api.buckets.post(
-			{ name: 'Audited bucket' },
+			{ name: 'Audited bucket', slug: 'audited-bucket-1' },
 			{ headers: { cookie } }
 		);
 		expect(res.status).toBe(201);

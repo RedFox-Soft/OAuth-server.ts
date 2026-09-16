@@ -130,6 +130,25 @@ export class NotSupportedError extends OIDCProviderError {
 
 export class SessionNotFound extends InvalidRequest {}
 
+/*
+ * A first path segment that names no user bucket.
+ *
+ * Not an OAuth error, and `allow_redirect` is off for the same reason: nothing here is a malformed
+ * request to a real endpoint, it is a request to an address this server does not serve, so there is no
+ * client to redirect an error to and no protocol error code that describes it. A 404 is what a mistyped
+ * tenant address should look like — the alternative, quietly serving the default bucket, would answer
+ * one population's endpoints at another population's address.
+ */
+export class UnknownBucket extends OIDCProviderError {
+	allow_redirect = false;
+	error_description = 'no user bucket is served at this address';
+
+	constructor() {
+		super(404, 'not_found');
+		Error.captureStackTrace(this, this.constructor);
+	}
+}
+
 export class InvalidClientAuth extends OIDCProviderError {
 	error_description = 'client authentication failed';
 

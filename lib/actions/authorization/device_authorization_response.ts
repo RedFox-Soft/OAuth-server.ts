@@ -10,6 +10,8 @@ export default async function deviceAuthorizationResponse(oidc, deviceInfo) {
 	const userCode = generate(charset, mask);
 
 	const dc = new DeviceCode({
+		/* The address the device flow was started at. */
+		bucketId: oidc.bucket._id,
 		client: oidc.client,
 		deviceInfo,
 		params: oidc.params,

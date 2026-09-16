@@ -313,7 +313,10 @@ describe('individual tool behaviours', () => {
 	it('creates and resets an end-user, and severs an identity without deleting the account', async () => {
 		const { token, user } = await session();
 
-		const bucket = await rpc(call('bucket_create', { name: 'Users' }), token);
+		const bucket = await rpc(
+			call('bucket_create', { name: 'Users', slug: 'users-1' }),
+			token
+		);
 		const bucketId = (result(bucket) as { _id: string })._id;
 
 		const email = `member-${Math.random()}@x.io`;

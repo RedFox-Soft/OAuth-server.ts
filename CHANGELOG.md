@@ -9,7 +9,33 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+### Added
+
+- buckets: a user bucket is now a tenant with its own issuer. An operator gives a bucket an address
+  and it is served beneath it — `https://auth.example.com/acme` publishes its own metadata at both
+  well-known locations a path-bearing issuer has, serves every protocol endpoint, and mints tokens
+  carrying itself as `iss`. A client integrates with one exactly as with any authorization server, and
+  can finally tell one population's tokens from another's. A client of an addressed bucket is refused
+  at any other bucket's address, and a token records which bucket issued it, so a token presented to a
+  bucket that did not issue it is reported inactive as RFC 7662 §2.2 requires. **The default bucket is
+  unchanged**: it keeps the bare issuer and the bare paths, so nothing integrated before this needs
+  reconfiguring and tokens in circulation stay valid. Two reserved buckets — the default one and the
+  administrators' — are served at the root by design and are not addressable, which is why the admin
+  console stays at `/admin`. A bucket's address is fixed once chosen; renaming would invalidate every
+  client integrated with it and wants an operation of its own.
+
 ### Fixed
+
+- buckets: reaching a second user bucket in one browser no longer fails. An authorization request for
+  one bucket from a browser signed into another answered `server_error`, leaving the end user with
+  nothing to retry: the sign-in check read the account identifier the session happened to carry rather
+  than the account that actually resolved, so it suppressed the sign-in prompt for a request that had
+  no account at all, and the first consent check to reach inside the absent grant faulted. And where a
+  sign-in as the second person did complete, it was read as an account change and answered with a
+  sign-out confirmation whose only working button ended every sign-in the browser held — a demand to
+  abandon one product in order to use another. A sign-in now records the bucket it belongs to, and
+  buckets are compared before account identifiers, because identifiers from two buckets are always
+  unequal and say nothing about who is signing in.
 
 - interactions: sign-in works again when it starts at a relying party. The `_interaction` and
   `_session` cookies were written `SameSite=Strict`, which a browser withholds on a

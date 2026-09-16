@@ -6,8 +6,16 @@ import {
 	ApplicationConfig as config,
 	configuration
 } from 'lib/configs/application.js';
-import { ISSUER } from 'lib/configs/env.js';
+import {
+	DEFAULT_REQUEST_BUCKET,
+	issuerFor,
+	type RequestBucket
+} from 'lib/configs/issuer.js';
 import { getCertificate } from '../addon/index.js';
+
+/* Re-exported so the request pipeline can keep importing these from here, while the declaration lives
+ * beside `issuerFor` — the models need it and must not reach into the request context to get it. */
+export { DEFAULT_REQUEST_BUCKET, type RequestBucket };
 
 export class OIDCContext<T extends Record<string, unknown>> {
 	#requestParamClaims = null;
@@ -16,14 +24,27 @@ export class OIDCContext<T extends Record<string, unknown>> {
 	params: T;
 	#headers: Record<string, string | undefined>;
 
+	/*
+	 * The population this request is addressed to, and the source of every absolute URL it produces.
+	 *
+	 * Defaulted rather than required, because the default bucket is the honest answer for a request to
+	 * a bare path and that is what every caller outside the prefixed routes is handling. The prefixed
+	 * routes set it from the address, in one place, so no individual handler can forget to — which is
+	 * the failure this default would otherwise hide, a token whose `iss` disagrees with the metadata
+	 * that advertised the endpoint it came from.
+	 */
+	bucket: RequestBucket;
+
 	constructor(
 		params: T,
 		headers: Record<string, string | undefined> = {},
-		route = 'anonymous'
+		route = 'anonymous',
+		bucket: RequestBucket = DEFAULT_REQUEST_BUCKET
 	) {
 		this.params = params;
 		this.route = route;
 		this.#headers = headers;
+		this.bucket = bucket;
 		this.authorization = {};
 		this.redirectUriCheckPerformed = false;
 		this.webMessageUriCheckPerformed = false;
@@ -56,16 +77,25 @@ export class OIDCContext<T extends Record<string, unknown>> {
 	 * actually follows are built where they are used: /ui/{uid}/{prompt} in the interactions pipeline
 	 * and /ui/{uid}/resume in the resume action.
 	 */
+	/* This request's issuer identifier — the bare one for the default bucket, `<ISSUER>/<slug>` for any
+	 * other. Everything absolute this context builds hangs off it. */
+	get issuer(): string {
+		return issuerFor(this.bucket);
+	}
+
+	/*
+	 * Concatenated rather than resolved against the issuer as a base: `new URL('/device',
+	 * 'https://host/acme')` yields `https://host/device`, because a leading slash makes the path
+	 * absolute and discards the base's own. Correct URL resolution, and exactly wrong here — it would
+	 * hand a named bucket's end user an address in the default bucket.
+	 */
 	urlFor(name, opt) {
 		if (name === 'code_verification') {
-			return new URL(routeNames.code_verification, ISSUER).toString();
+			return `${this.issuer}${routeNames.code_verification}`;
 		}
 
 		if (name === 'client') {
-			return new URL(
-				`${routeNames.registration}/${encodeURIComponent(opt.clientId)}`,
-				ISSUER
-			).toString();
+			return `${this.issuer}${routeNames.registration}/${encodeURIComponent(opt.clientId)}`;
 		}
 
 		throw new Error(`unknown route name: ${name}`);

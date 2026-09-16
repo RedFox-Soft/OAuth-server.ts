@@ -140,7 +140,7 @@ describe('a bucket must keep some way to sign in', () => {
 		const cookie = await superCookie();
 
 		const res = await client.admin.api.buckets.post(
-			{ name: 'stillborn', passwordLogin: false },
+			{ name: 'stillborn', slug: 'stillborn-1', passwordLogin: false },
 			{ headers: { cookie } }
 		);
 
@@ -153,7 +153,7 @@ describe('a bucket must keep some way to sign in', () => {
 		const cookie = await superCookie();
 
 		const res = await client.admin.api.buckets.post(
-			{ name: 'ordinary' },
+			{ name: 'ordinary', slug: 'ordinary-2' },
 			{ headers: { cookie } }
 		);
 

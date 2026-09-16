@@ -952,6 +952,17 @@ export type VerificationMethod = 'link' | 'code';
 export interface UserBucket {
 	_id: string;
 	name: string;
+	/*
+	 * The bucket's address: the path segment its endpoints live beneath, and the path component of its
+	 * issuer identifier. Distinct from `name`, which is the display name an operator reads in a list
+	 * ("Default users") and carries spaces and capitals — one field cannot answer to both a human
+	 * reading a table and a URL without failing one of them.
+	 *
+	 * Optional in the type because a bucket written before slugs existed has none, and such a bucket is
+	 * simply not addressable until one is assigned. The default bucket has one too, but never uses it
+	 * in an address: it is served at the root, which is what keeps every existing integration working.
+	 */
+	slug?: string;
 	/* The group that owns this bucket. Every access decision resolves through it. */
 	ownerGroupId: string;
 	roles: string[];
@@ -1009,6 +1020,7 @@ export interface UserBucketStoreInstance {
 	create(data: {
 		_id?: string;
 		name: string;
+		slug?: string;
 		ownerGroupId: string;
 		roles?: string[];
 		passwordLogin?: boolean;
@@ -1019,6 +1031,9 @@ export interface UserBucketStoreInstance {
 		totpRequired?: boolean;
 	}): Promise<UserBucket>;
 	find(id: string): Promise<UserBucket | null>;
+	/* Resolves a bucket by its address. Returns null for a slug nothing holds, which is what tells the
+	 * router that a first path segment is one of the server's own routes rather than a tenant. */
+	findBySlug(slug: string): Promise<UserBucket | null>;
 	list(): Promise<UserBucket[]>;
 	listByGroup(groupId: string): Promise<UserBucket[]>;
 	update(
@@ -1027,6 +1042,7 @@ export interface UserBucketStoreInstance {
 			Pick<
 				UserBucket,
 				| 'name'
+				| 'slug'
 				| 'ownerGroupId'
 				| 'roles'
 				| 'passwordLogin'

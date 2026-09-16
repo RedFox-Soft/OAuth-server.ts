@@ -31,6 +31,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 	async create(data: {
 		_id?: string;
 		name: string;
+		slug?: string;
 		ownerGroupId: string;
 		roles?: string[];
 		passwordLogin?: boolean;
@@ -44,6 +45,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		const bucket: UserBucket = {
 			_id: data._id ?? nanoid(),
 			name: data.name,
+			slug: data.slug,
 			ownerGroupId: data.ownerGroupId,
 			roles: data.roles ?? [],
 			passwordLogin: data.passwordLogin ?? true,
@@ -69,6 +71,10 @@ export class UserBucketStore implements UserBucketStoreInstance {
 
 	async find(id: string): Promise<UserBucket | null> {
 		return withDefaults(await this.collection.findOne({ _id: id }));
+	}
+
+	async findBySlug(slug: string): Promise<UserBucket | null> {
+		return withDefaults(await this.collection.findOne({ slug }));
 	}
 
 	async list(): Promise<UserBucket[]> {
@@ -106,6 +112,13 @@ export class UserBucketStore implements UserBucketStoreInstance {
 				{ $set: { ...patch, updatedAt: new Date() } },
 				{ returnDocument: 'after' }
 			)
+		);
+	}
+
+	async repairReservedSlug(id: string, slug: string): Promise<void> {
+		await this.collection.updateOne(
+			{ _id: id, slug: { $exists: false } },
+			{ $set: { slug, updatedAt: new Date() } }
 		);
 	}
 

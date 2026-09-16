@@ -1,6 +1,12 @@
 export const ADMIN_PROJECT_ID = 'admin';
 export const ADMIN_BUCKET_ID = 'admin';
 /*
+ * The bucket a request reaches when nothing else routes it. Named here rather than repeated as a
+ * literal because it is now load-bearing in a second way: it is the one bucket addressed at the bare
+ * paths, so it is the one bucket whose issuer is the server's own.
+ */
+export const DEFAULT_BUCKET_ID = 'redfox';
+/*
  * The group that owns containers no administrator owns. Reachable only by super administrators, and
  * exempt from the at-least-one-owner rule for the same reason the reserved admin project and bucket
  * are exempt from the group model: it is a holding area, not a tenant.

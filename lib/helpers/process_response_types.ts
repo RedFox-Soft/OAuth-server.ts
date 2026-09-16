@@ -13,6 +13,8 @@ async function codeHandler(ctx) {
 	);
 
 	const code = new AuthorizationCode({
+		/* The address this request was made to — there is no earlier artifact to inherit from. */
+		bucketId: ctx.oidc.bucket._id,
 		accountId: ctx.oidc.session.payload.accountId,
 		acr: ctx.oidc.acr,
 		amr: ctx.oidc.amr,

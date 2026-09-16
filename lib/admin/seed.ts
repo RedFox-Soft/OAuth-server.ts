@@ -8,7 +8,6 @@ import { Client } from '../models/client.js';
 import { ISSUER } from '../configs/env.js';
 import {
 	ADMIN_PROJECT_ID,
-	ADMIN_BUCKET_ID,
 	ADMIN_CLIENT_ID,
 	UNASSIGNED_GROUP_ID,
 	SYSTEM_GROUP_NAME
@@ -44,21 +43,37 @@ export async function ensureAdminSeed(): Promise<void> {
 	}
 
 	const buckets = getBucketStore();
-	if (!(await buckets.find(ADMIN_BUCKET_ID))) {
-		await buckets.create({
-			...ADMIN_BUCKET_SEED,
-			roles: [...ADMIN_BUCKET_SEED.roles],
-			federation: [...ADMIN_BUCKET_SEED.federation]
-		});
+	/*
+	 * A reserved bucket's slug is repaired on an existing record, unlike every other seeded field.
+	 *
+	 * The rest of a seed is a starting value an operator may edit, so re-running must not undo their
+	 * work — hence the create-if-absent shape around it. A slug is not that: it is the path component
+	 * of an issuer identifier this server addresses itself by and the console authenticates against,
+	 * and it is fixed at creation everywhere else. Left alone, a deployment provisioned before
+	 * addresses existed would keep two buckets with no address while a fresh one had them — the drift
+	 * re-running this exists to prevent.
+	 *
+	 * `repairReservedSlug` rather than `update`, which has no `slug` to give: it writes only where
+	 * there is nothing to overwrite, so re-running this can never turn into a rename.
+	 * `database/mongodb.ts` states the same rule beside its own seed.
+	 */
+	async function ensureReservedBucket(
+		seed: typeof ADMIN_BUCKET_SEED | typeof DEFAULT_BUCKET_SEED
+	) {
+		const existing = await buckets.find(seed._id);
+		if (!existing) {
+			await buckets.create({
+				...seed,
+				roles: [...seed.roles],
+				federation: [...seed.federation]
+			});
+			return;
+		}
+		await buckets.repairReservedSlug(seed._id, seed.slug);
 	}
 
-	if (!(await buckets.find(DEFAULT_BUCKET_SEED._id))) {
-		await buckets.create({
-			...DEFAULT_BUCKET_SEED,
-			roles: [...DEFAULT_BUCKET_SEED.roles],
-			federation: [...DEFAULT_BUCKET_SEED.federation]
-		});
-	}
+	await ensureReservedBucket(ADMIN_BUCKET_SEED);
+	await ensureReservedBucket(DEFAULT_BUCKET_SEED);
 
 	const projects = getProjectStore();
 	const existingAdminProject = await projects.find(ADMIN_PROJECT_ID);

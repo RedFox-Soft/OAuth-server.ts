@@ -11,6 +11,7 @@ import {
 } from 'elysia';
 import { isAllowRedirectUri } from 'lib/actions/authorization/authorization.js';
 import { ISSUER } from 'lib/configs/env.js';
+import { requestBucketFor } from 'lib/admin/auth/bucketAddress.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { dPoPSigningAlgValues } from 'lib/configs/jwaAlgorithms.js';
 import { InvalidDpopProof, UseDpopNonce } from 'lib/helpers/validate_dpop.js';
@@ -123,6 +124,32 @@ function getObjFromError(code: string, errorObj: any) {
 		error: 'server_error',
 		error_description: 'An unexpected error occurred'
 	};
+}
+
+/*
+ * The route pattern with a bucket's prefix removed, so a named bucket's endpoint is recognised as the
+ * endpoint it is.
+ *
+ * Every protocol endpoint is mounted twice — once bare, once beneath `/:bucket` — and two things here
+ * compare the route against a fixed name: which event a failure emits, and whether an authorization
+ * failure is delivered to the client by redirect. Both silently took the wrong branch for a prefixed
+ * route. The second is the one that matters: RFC 6749 §4.1.2.1 delivers an authorization error to the
+ * client's redirect_uri, and a named bucket was answering with a bare 400 the client never saw as a
+ * protocol error at all. The first is quieter and just as wrong — every failure at a bucket's address
+ * was emitted as `server_error`, so a deployment watching for `grant.error` saw none of them.
+ */
+function bareRoute(route: string | undefined): string | undefined {
+	/* Undefined where nothing matched — this handler also answers a request to no route at all, and a
+	 * 404 arrives here with no pattern to strip. */
+	if (!route) return route;
+	return route.startsWith('/:bucket/') ? route.slice('/:bucket'.length) : route;
+}
+
+/* The bucket a request was addressed to, read back off the URL because the matched route is a
+ * pattern. `undefined` for a bare address, which is the default bucket's. */
+function slugOf(route: string | undefined, url: string): string | undefined {
+	if (!route?.startsWith('/:bucket/')) return undefined;
+	return new URL(url).pathname.split('/')[1] || undefined;
 }
 
 const mapErrorCode = {
@@ -344,17 +371,20 @@ export async function errorHandler(obj: ErrorContext) {
 	} else if (set.status === 500) {
 		eventBus.emit('server_error', error);
 	} else {
-		const key = mapErrorCode[route] ?? 'server_error';
+		const key = mapErrorCode[bareRoute(route) as string] ?? 'server_error';
 		eventBus.emit(key, error);
 	}
 
-	if (route === routeNames.authorization && error.allow_redirect !== false) {
+	if (
+		bareRoute(route) === routeNames.authorization &&
+		error.allow_redirect !== false
+	) {
 		try {
 			return await authorizationErrorHandler(obj);
 		} catch (e) {
 			if (e instanceof OIDCProviderError) {
 				error = e;
-				const key = mapErrorCode[route] ?? 'server_error';
+				const key = mapErrorCode[bareRoute(route) as string] ?? 'server_error';
 				eventBus.emit(key, error);
 			} else {
 				eventBus.emit('server_error', e);
@@ -466,7 +496,8 @@ async function authorizationErrorHandler({
 	error,
 	query,
 	body,
-	request
+	request,
+	route
 }: Context) {
 	if (error instanceof ValidationError) {
 		const firstError = getFirstError(error);
@@ -479,13 +510,22 @@ async function authorizationErrorHandler({
 	}
 
 	const params = request.method === 'POST' ? body : query;
-	const redirectObj = await isAllowRedirectUri(params);
+	/*
+	 * The concrete address, not the route pattern. `route` is `/:bucket/auth` on the prefixed mount, so
+	 * the slug has to come from the request itself; without it the delivered error carries the
+	 * instance's `iss` while the client is talking to a bucket, and RFC 9207 exists precisely so a
+	 * client can tell those apart.
+	 */
+	const redirectObj = await isAllowRedirectUri(
+		params,
+		await requestBucketFor(slugOf(route, request.url))
+	);
 
 	const state = redirectObj.state;
 	const out = {
 		...getObjFromError(code, error),
 		...(state ? { state } : {}),
-		iss: ISSUER
+		iss: redirectObj.oidc.issuer
 	};
 	let mode = params.response_mode;
 	if (!responseModes.has(mode)) {

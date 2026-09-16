@@ -167,6 +167,11 @@ function exportTool(tool: McpTool): McpToolExport {
 	};
 }
 
+/* A bucket-scoped route is the same endpoint at a tenant's address; the reference lists each once. */
+function atBareAddress(route: { path: string }): boolean {
+	return !route.path.includes(':bucket');
+}
+
 export function buildDocsExport(stamp: DocsExportStamp): DocsExport {
 	return {
 		schemaVersion: 1,
@@ -176,9 +181,19 @@ export function buildDocsExport(stamp: DocsExportStamp): DocsExport {
 			domains: SETTING_DOMAINS,
 			entries: SETTINGS_CATALOG.map(exportSetting)
 		},
+		/*
+		 * The bare addresses only. Every one of these is also served beneath a named bucket's prefix, and
+		 * listing both would double the reference with entries whose only difference is an address — a
+		 * reader would have to work out that `/token` and `/:bucket/token` are one endpoint rather than
+		 * two. The addressing rule is documented once, in prose, where it can be explained.
+		 */
 		endpoints: [
-			...alwaysAvailableRoutes.map((route) => exportEndpoint(route, null)),
-			...gatedRoutes.map((route) => exportEndpoint(route, route.flag))
+			...alwaysAvailableRoutes
+				.filter(atBareAddress)
+				.map((route) => exportEndpoint(route, null)),
+			...gatedRoutes
+				.filter(atBareAddress)
+				.map((route) => exportEndpoint(route, route.flag))
 		],
 		alwaysAvailablePrefixes: [...alwaysAvailablePrefixes],
 		adminApi: { audited: [...auditedAdminRoutes] },

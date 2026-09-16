@@ -1,3 +1,4 @@
+import { issuerFor } from './issuer.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { routeNames } from 'lib/consts/param_list.js';
 import { ClientDefaults } from 'lib/configs/clientBase.js';
@@ -108,32 +109,53 @@ function deriveClientAuthMethods(config: Config): string[] {
 	return [...methods];
 }
 
-function endpoint(route: string): string {
-	return new URL(route, ISSUER).href;
+/*
+ * Concatenated, not resolved against a base.
+ *
+ * `new URL('/auth', 'https://host/acme')` yields `https://host/auth`: a leading slash makes the path
+ * absolute and the base's own path is discarded. That is correct URL resolution and exactly wrong
+ * here — every endpoint of a named bucket would be advertised at the default bucket's address, which
+ * is the kind of mistake that passes a smoke test and fails a conformance run.
+ */
+function endpoint(issuer: string, route: string): string {
+	return `${issuer}${route}`;
 }
 
 // Builds the full candidate discovery document as if every feature were enabled, reading all
 // values live from ApplicationConfig. The request handler prunes disabled features via
 // featuresKeyMap and applies operator discovery overrides.
-export function calculateDiscovery() {
+export function calculateDiscovery(bucket?: { _id: string; slug?: string }) {
 	const config = ApplicationConfig;
 	const acrValues = deriveAcrValues(config);
+	/*
+	 * Every endpoint below is built from the issuer of the bucket this document is being served for, so
+	 * a client reading it reaches that bucket and no other. Absent a bucket this is the instance's own
+	 * issuer, which is what the default bucket's document says and what it said before tenancy existed.
+	 */
+	const issuer = bucket ? issuerFor(bucket) : ISSUER;
 
 	return {
-		issuer: ISSUER,
-		authorization_endpoint: endpoint(routeNames.authorization),
-		token_endpoint: endpoint(routeNames.token),
-		jwks_uri: endpoint(routeNames.jwks),
-		userinfo_endpoint: endpoint(routeNames.userinfo),
-		registration_endpoint: endpoint(routeNames.registration),
-		device_authorization_endpoint: endpoint(routeNames.device_authorization),
-		end_session_endpoint: endpoint(routeNames.end_session),
-		revocation_endpoint: endpoint(routeNames.revocation),
-		introspection_endpoint: endpoint(routeNames.introspect),
+		issuer,
+		authorization_endpoint: endpoint(issuer, routeNames.authorization),
+		token_endpoint: endpoint(issuer, routeNames.token),
+		/* Instance-wide: buckets are populations, not cryptographic boundaries, so every bucket's
+		 * document points at the same key set. */
+		jwks_uri: endpoint(ISSUER, routeNames.jwks),
+		userinfo_endpoint: endpoint(issuer, routeNames.userinfo),
+		registration_endpoint: endpoint(issuer, routeNames.registration),
+		device_authorization_endpoint: endpoint(
+			issuer,
+			routeNames.device_authorization
+		),
+		end_session_endpoint: endpoint(issuer, routeNames.end_session),
+		revocation_endpoint: endpoint(issuer, routeNames.revocation),
+		introspection_endpoint: endpoint(issuer, routeNames.introspect),
 		pushed_authorization_request_endpoint: endpoint(
+			issuer,
 			routeNames.pushed_authorization_request
 		),
 		backchannel_authentication_endpoint: endpoint(
+			issuer,
 			routeNames.backchannel_authentication
 		),
 

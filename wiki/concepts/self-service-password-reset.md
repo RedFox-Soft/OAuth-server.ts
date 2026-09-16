@@ -73,7 +73,7 @@ engine, which makes "a mismatch does not consume the secret" true by constructio
 
 ## Departure 4 — the reserved admin bucket is refused
 
-`resolveBucketForClient` maps the reserved console client straight to the admin bucket, so **every end-user
+`resolveBucketForRequest` maps the reserved console client straight to the admin bucket, so **every end-user
 surface mounted under `/ui` is operator-reachable unless it says otherwise**. A self-service reset records no
 audit entry (there is no actor to attribute), so allowing it here would have created an unaudited path to
 changing console credentials from the console's own sign-in page. `request()` refuses that bucket with the

@@ -46,7 +46,7 @@ describe('buckets API', () => {
 	it('creates a standalone bucket', async () => {
 		const cookie = await superCookie();
 		const res = await client.admin.api.buckets.post(
-			{ name: 'Dev users', roles: ['viewer'] },
+			{ name: 'Dev users', slug: 'dev-users-1', roles: ['viewer'] },
 			{ headers: { cookie } }
 		);
 		expect(res.status).toBe(201);
@@ -60,7 +60,7 @@ describe('buckets API', () => {
 	it('refuses to delete a bucket still referenced by a project', async () => {
 		const cookie = await superCookie();
 		const res1 = await client.admin.api.buckets.post(
-			{ name: 'Shared' },
+			{ name: 'Shared', slug: 'shared-2' },
 			{ headers: { cookie } }
 		);
 		const bucket = res1.data as UserBucket;
@@ -80,13 +80,13 @@ describe('buckets API', () => {
 		const { cookie } = await sessionCookieFor(['super_admin']);
 		const otherPa = await sessionCookieFor(['project_admin']);
 		const a = await client.admin.api.buckets.post(
-			{ name: 'Bucket A' },
+			{ name: 'Bucket A', slug: 'bucket-a-3' },
 			{ headers: { cookie } }
 		);
 		// Owned by another tenant, created as that administrator: ownership follows the active scope
 		// of whoever creates it and is not a field a request can set.
 		const b = await client.admin.api.buckets.post(
-			{ name: 'Bucket B' },
+			{ name: 'Bucket B', slug: 'bucket-b-4' },
 			{ headers: { cookie: otherPa.cookie } }
 		);
 		const bucketA = a.data as UserBucket;
@@ -102,11 +102,11 @@ describe('buckets API', () => {
 		const pa = await sessionCookieFor(['project_admin']);
 		const otherPa = await sessionCookieFor(['project_admin']);
 		const mine = await client.admin.api.buckets.post(
-			{ name: 'Mine' },
+			{ name: 'Mine', slug: 'mine-5' },
 			{ headers: { cookie: pa.cookie } }
 		);
 		await client.admin.api.buckets.post(
-			{ name: 'Other' },
+			{ name: 'Other', slug: 'other-6' },
 			{ headers: { cookie: otherPa.cookie } }
 		);
 		const bucketMine = mine.data as UserBucket;
@@ -124,7 +124,7 @@ describe('buckets API', () => {
 	it('project_admin creates a bucket into their own group', async () => {
 		const pa = await sessionCookieFor(['project_admin']);
 		const res = await client.admin.api.buckets.post(
-			{ name: 'Allowed' },
+			{ name: 'Allowed', slug: 'allowed-7' },
 			{ headers: { cookie: pa.cookie } }
 		);
 		expect(res.status).toBe(201);
@@ -137,7 +137,7 @@ describe('buckets API', () => {
 		const superSession = await sessionCookieFor(['super_admin']);
 		const pa = await sessionCookieFor(['project_admin']);
 		const created = await client.admin.api.buckets.post(
-			{ name: 'Not managed by pa' },
+			{ name: 'Not managed by pa', slug: 'not-managed-by-pa-8' },
 			{ headers: { cookie: superSession.cookie } }
 		);
 		const bucket = created.data as UserBucket;
@@ -150,7 +150,7 @@ describe('buckets API', () => {
 	it('super_admin deletes an unreferenced bucket successfully', async () => {
 		const cookie = await superCookie();
 		const created = await client.admin.api.buckets.post(
-			{ name: 'To delete' },
+			{ name: 'To delete', slug: 'to-delete-9' },
 			{ headers: { cookie } }
 		);
 		const bucket = created.data as UserBucket;
@@ -163,7 +163,7 @@ describe('buckets API', () => {
 	it('gets and patches a bucket (name + roles)', async () => {
 		const cookie = await superCookie();
 		const created = await client.admin.api.buckets.post(
-			{ name: 'Editable', roles: ['viewer'] },
+			{ name: 'Editable', slug: 'editable-10', roles: ['viewer'] },
 			{ headers: { cookie } }
 		);
 		const bucket = created.data as UserBucket;
@@ -186,7 +186,7 @@ describe('buckets API', () => {
 		const pa = await sessionCookieFor(['project_admin']);
 		// bucket NOT owned by pa (managedBy empty)
 		const created = await client.admin.api.buckets.post(
-			{ name: 'Backing' },
+			{ name: 'Backing', slug: 'backing-11' },
 			{ headers: { cookie: su.cookie } }
 		);
 		const bucket = created.data as UserBucket;
@@ -207,7 +207,7 @@ describe('buckets API', () => {
 		const su = await sessionCookieFor(['super_admin']);
 		const pa = await sessionCookieFor(['project_admin']);
 		const created = await client.admin.api.buckets.post(
-			{ name: 'BackingRO' },
+			{ name: 'BackingRO', slug: 'backingro-12' },
 			{ headers: { cookie: su.cookie } }
 		);
 		const bucket = created.data as UserBucket;
@@ -244,7 +244,7 @@ describe('buckets API', () => {
 		const su = await sessionCookieFor(['super_admin']);
 		const pa = await sessionCookieFor(['project_admin']);
 		const created = await client.admin.api.buckets.post(
-			{ name: 'MB' },
+			{ name: 'MB', slug: 'mb-13' },
 			{ headers: { cookie: pa.cookie } }
 		);
 		const bucket = created.data as UserBucket;
@@ -266,7 +266,7 @@ describe('buckets API', () => {
 	it('lets a group member rename a bucket their group owns', async () => {
 		const pa = await sessionCookieFor(['project_admin']);
 		const created = await client.admin.api.buckets.post(
-			{ name: 'MBOwned' },
+			{ name: 'MBOwned', slug: 'mbowned-14' },
 			{ headers: { cookie: pa.cookie } }
 		);
 		const bucket = created.data as UserBucket;

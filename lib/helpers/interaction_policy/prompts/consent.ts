@@ -32,8 +32,18 @@ class ConsentPromt extends Prompt {
 			description: 'requested scopes not granted',
 			check: (ctx) => {
 				const { oidc } = ctx;
+				/*
+				 * An absent grant means nothing has been granted, so everything requested is missing and
+				 * the end user is asked — which is a refusal, and correct. It used to be a fault: reaching
+				 * inside an unset grant threw, and the request that got there was one whose account had
+				 * not resolved.
+				 *
+				 * That path is closed upstream now — a request with no account is sent to sign in before
+				 * any consent check runs — so this is defence rather than a live branch. It stays because
+				 * the failure it prevents is indistinguishable, from outside, from the server being broken.
+				 */
 				const encounteredScopes = new Set(
-					oidc.grant.getOIDCScopeEncountered().split(' ')
+					(oidc.grant?.getOIDCScopeEncountered() ?? '').split(' ')
 				);
 
 				let missing;
@@ -59,7 +69,7 @@ class ConsentPromt extends Prompt {
 			check: (ctx) => {
 				const { oidc } = ctx;
 				const encounteredClaims = new Set(
-					oidc.grant.getOIDCClaimsEncountered()
+					oidc.grant?.getOIDCClaimsEncountered() ?? []
 				);
 
 				let missing;
@@ -94,7 +104,9 @@ class ConsentPromt extends Prompt {
 					ctx.oidc.resourceServers
 				)) {
 					const encounteredScopes = new Set(
-						oidc.grant.getResourceScopeEncountered(indicator).split(' ')
+						(oidc.grant?.getResourceScopeEncountered(indicator) ?? '').split(
+							' '
+						)
 					);
 					const requestedScopes = ctx.oidc.requestParamScopes;
 					const availableScopes = resourceServer.scopes;

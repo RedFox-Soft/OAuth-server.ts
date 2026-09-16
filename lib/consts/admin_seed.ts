@@ -1,5 +1,6 @@
 import {
 	ADMIN_BUCKET_ID,
+	DEFAULT_BUCKET_ID,
 	ADMIN_CLIENT_ID,
 	ADMIN_PROJECT_ID,
 	UNASSIGNED_GROUP_ID
@@ -45,6 +46,12 @@ export const SYSTEM_GROUP_SEED = {
 export const ADMIN_BUCKET_SEED = {
 	_id: ADMIN_BUCKET_ID,
 	name: 'Administrators',
+	/*
+	 * The address of the administrators' issuer: `<ISSUER>/admin`. Free to take because the console
+	 * moved off `/admin`; the bucket keeps the word because that is what the population is, and an
+	 * operator reading the issuer should be able to tell.
+	 */
+	slug: 'admin',
 	ownerGroupId: UNASSIGNED_GROUP_ID,
 	roles: ['super_admin', 'project_admin'],
 	passwordLogin: true,
@@ -60,8 +67,15 @@ export const ADMIN_BUCKET_SEED = {
  * Seeded so it is manageable in the admin Buckets UI rather than existing only by implication.
  */
 export const DEFAULT_BUCKET_SEED = {
-	_id: 'redfox',
+	_id: DEFAULT_BUCKET_ID,
 	name: 'Default users',
+	/*
+	 * Carried so the bucket is addressable like any other, and never used in an address: the default
+	 * bucket is served at the root and its issuer is the server's own. That asymmetry is what keeps
+	 * every client integrated before buckets became tenants working untouched, and it lives in exactly
+	 * one place — `issuerFor`.
+	 */
+	slug: 'default',
 	ownerGroupId: UNASSIGNED_GROUP_ID,
 	roles: [],
 	passwordLogin: true,

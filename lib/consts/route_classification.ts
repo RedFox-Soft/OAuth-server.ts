@@ -25,7 +25,66 @@ const clientConfiguration = `${routeNames.registration}/:clientId`;
  * while `POST /token/introspect` and `POST /token/revocation` are gated, so a `startsWith('/token')`
  * would take down every grant flow. The same trap sits under `/device` and `/reg`.
  */
-export const gatedRoutes: readonly GatedRoute[] = [
+
+/*
+ * Every route a named bucket serves beneath its address, classified exactly as its bare counterpart.
+ *
+ * Derived rather than listed. The rule is "a bucket's endpoints are the server's endpoints, at a
+ * different address" — and a second hand-written table would state that rule in a form that can
+ * disagree with the first. It would also have to be remembered: the four guards over this file all
+ * enumerate the *mounted* route table, so a prefixed route nobody classified fails them, and the
+ * obvious repair is to paste twenty more entries rather than to notice they are all the same entry.
+ *
+ * `/.well-known/…/:bucket` is the odd one out and is written out below, because RFC 8414 inserts the
+ * well-known segment before the issuer's path instead of appending it — that shape cannot be derived
+ * by prefixing.
+ */
+const BUCKET_PREFIX = '/:bucket';
+
+/* Matches a scoped endpoint and anything beneath it — `/reg` scopes `/reg/:clientId` too, because an
+ * endpoint's sub-resources live at the same address it does. */
+function isBucketScoped(path: string, scoped: readonly string[]): boolean {
+	return scoped.some((base) => path === base || path.startsWith(`${base}/`));
+}
+
+function beneathBucket<T extends { path: string }>(
+	routes: readonly T[],
+	paths: readonly string[]
+): T[] {
+	return routes
+		.filter((route) => isBucketScoped(route.path, paths))
+		.map((route) => ({ ...route, path: `${BUCKET_PREFIX}${route.path}` }));
+}
+
+/* The endpoints mounted beneath a bucket's address in lib/index.ts. Kept here so the classification
+ * and the mounting can be read against each other; nothing derives one from the other, because the
+ * mounting needs plugin instances and this needs paths. */
+export const bucketScopedPaths: readonly string[] = [
+	routeNames.authorization,
+	routeNames.token,
+	routeNames.userinfo,
+	routeNames.introspect,
+	routeNames.revocation,
+	routeNames.pushed_authorization_request,
+	routeNames.device_authorization,
+	routeNames.backchannel_authentication,
+	routeNames.registration,
+	routeNames.end_session,
+	routeNames.end_session_confirm,
+	'/.well-known/openid-configuration',
+	'/.well-known/oauth-authorization-server',
+	'/federation/callback',
+	routeNames.code_verification
+];
+
+/* RFC 8414 §3 places the well-known segment before the issuer's path, so these two cannot be produced
+ * by prefixing and are named. */
+const INSERTED_METADATA_PATHS = [
+	'/.well-known/openid-configuration/:bucket',
+	'/.well-known/oauth-authorization-server/:bucket'
+];
+
+const bareGatedRoutes: readonly GatedRoute[] = [
 	{
 		method: 'POST',
 		path: routeNames.pushed_authorization_request,
@@ -151,12 +210,19 @@ export const gatedRoutes: readonly GatedRoute[] = [
 	 */
 ];
 
+/* A capability switched off must take the bucket's copy of an endpoint with it, or a named bucket
+ * would keep serving something the instance turned off. Derived, like the tables below. */
+export const gatedRoutes: readonly GatedRoute[] = [
+	...bareGatedRoutes,
+	...beneathBucket(bareGatedRoutes, bucketScopedPaths)
+];
+
 /*
  * Unconditional by design. Enumerated rather than defaulted, so mounting a new protocol endpoint is
  * a deliberate choice between gating it and listing it here — and forgetting to choose fails the
  * drift guard instead of shipping an ungated endpoint.
  */
-export const alwaysAvailableRoutes: readonly AlwaysAvailableRoute[] = [
+const bareAlwaysAvailableRoutes: readonly AlwaysAvailableRoute[] = [
 	{ method: 'GET', path: '/health' },
 	/*
 	 * Unconditional for the same reason liveness is: an orchestrator cannot be asked to know which
@@ -178,10 +244,22 @@ export const alwaysAvailableRoutes: readonly AlwaysAvailableRoute[] = [
 ];
 
 /*
+ * The bare table above plus its bucket-scoped twins, derived rather than listed. The rule is "a
+ * bucket's endpoints are the server's endpoints, at a different address", and a second hand-written
+ * table would state that rule in a form able to disagree with the first.
+ */
+export const alwaysAvailableRoutes: readonly AlwaysAvailableRoute[] = [
+	...bareAlwaysAvailableRoutes,
+	...beneathBucket(bareAlwaysAvailableRoutes, bucketScopedPaths),
+	...INSERTED_METADATA_PATHS.map((path) => ({ method: 'GET' as const, path }))
+];
+
+/*
  * Whole subtrees that are unconditional as a matter of design. A bare `/admin` and a bare
  * `/verify-email` are both mounted alongside their deeper paths, so the prefix test has to accept
  * the prefix itself — `startsWith('/admin/')` alone would leave `GET /admin` unclassified.
  */
+
 export const alwaysAvailablePrefixes: readonly string[] = [
 	'/ui',
 	'/verify-email',
@@ -215,7 +293,7 @@ export interface CorsRoute {
  * `open` echoes any Origin (the data is public to anyone who can issue a request). `client-based`
  * echoes only an Origin listed on the project owning the calling client.
  */
-export const corsRoutes: readonly CorsRoute[] = [
+const bareCorsRoutes: readonly CorsRoute[] = [
 	// OIDC Discovery 1.0 §4 and §3: a JavaScript client cannot know a deployment in advance, so it
 	// has to be able to fetch the metadata and the keys before it knows anything else.
 	{
@@ -246,6 +324,17 @@ export const corsRoutes: readonly CorsRoute[] = [
 		path: routeNames.device_authorization,
 		cors: 'client-based'
 	}
+];
+
+/* Same derivation, same reason — see `alwaysAvailableRoutes` above. */
+export const corsRoutes: readonly CorsRoute[] = [
+	...bareCorsRoutes,
+	...beneathBucket(bareCorsRoutes, bucketScopedPaths),
+	...INSERTED_METADATA_PATHS.map((path) => ({
+		method: 'GET' as const,
+		path,
+		cors: 'open' as const
+	}))
 ];
 
 /*
@@ -326,7 +415,7 @@ export interface RatePrefix {
  * Only the non-ordinary routes are enumerated, for the same reason corsRoutes enumerates only the two
  * permissive classes: the list that must be read carefully is the short one.
  */
-export const rateRoutes: readonly RateRoute[] = [
+const bareRateRoutes: readonly RateRoute[] = [
 	/*
 	 * The platform probes this every 30 seconds (fly.toml). A refused health check is read by the proxy
 	 * as an unhealthy machine and takes it out of rotation — the limiter causing the outage it exists to
@@ -402,6 +491,17 @@ export const rateRoutes: readonly RateRoute[] = [
 	{ method: 'GET', path: routeNames.mcp_metadata, rate: 'public' },
 	{ method: 'GET', path: routeNames.jwks, rate: 'public' },
 	{ method: 'GET', path: '/public/*', rate: 'public' }
+];
+
+/* Same derivation, same reason. */
+export const rateRoutes: readonly RateRoute[] = [
+	...bareRateRoutes,
+	...beneathBucket(bareRateRoutes, bucketScopedPaths),
+	...INSERTED_METADATA_PATHS.map((path) => ({
+		method: 'GET' as const,
+		path,
+		rate: 'public' as const
+	}))
 ];
 
 /*

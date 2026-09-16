@@ -3,6 +3,7 @@ import epochTime from '../../helpers/epoch_time.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { logout } from 'lib/html/logout.js';
 import { SessionNotFound } from '../../helpers/errors.js';
+import { resolveBucketForRequest } from '../../admin/auth/resolveBucket.js';
 
 export default async function resumeAction(oidc, interaction) {
 	oidc.entity('Interaction', interaction);
@@ -22,9 +23,36 @@ export default async function resumeAction(oidc, interaction) {
 		);
 	}
 
+	/*
+	 * Which population this sign-in is for. Derived here rather than carried on the login result
+	 * because four handlers write that result — password, second factor, federated, and the recovery
+	 * path — and threading one value through four writers is four chances for them to disagree about
+	 * one bucket. The stored parameters say everything `resolveBucketForRequest` needs, and they are
+	 * the same parameters the sign-in screen resolved its own bucket from.
+	 */
+	const bucketId = await resolveBucketForRequest(
+		storedParams.client_id,
+		storedParams.resource
+	);
+
+	/*
+	 * An account change, and only an account change.
+	 *
+	 * Two different people of the *same* bucket is one replacing the other, and the end user is asked
+	 * before their sign-in is taken over. Two people of *different* buckets is not that at all: an
+	 * account identifier is only meaningful inside the bucket that issued it, so identifiers from two
+	 * buckets are always unequal and say nothing about who is signing in. Comparing them alone turned
+	 * reaching a second product into "you are already signed in as somebody else" — a sign-out demand
+	 * in the middle of a sign-in, whose only working answer ended every session the browser held.
+	 *
+	 * The bucket is therefore compared first. A session carrying an account but no bucket predates
+	 * this field; it is not attributed to a bucket, so it fails the comparison and is replaced rather
+	 * than treated as a conflicting identity.
+	 */
 	if (
 		result?.login &&
 		session.payload.accountId &&
+		session.payload.bucketId === bucketId &&
 		session.payload.accountId !== result.login.accountId
 	) {
 		if (interaction.payload.session?.uid) {
@@ -53,6 +81,7 @@ export default async function resumeAction(oidc, interaction) {
 
 		session.loginAccount({
 			accountId,
+			bucketId,
 			loginTs,
 			amr,
 			acr,

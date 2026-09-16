@@ -5,6 +5,7 @@ import { ApplicationConfig } from '../../lib/configs/application.ts';
 import {
 	alwaysAvailablePrefixes,
 	alwaysAvailableRoutes,
+	bucketScopedPaths,
 	classifyRoutePattern,
 	corsClassForPattern,
 	corsMethodsForPath,
@@ -22,6 +23,32 @@ import {
  * @proves Every mounted route is classified exactly once for gating, cross-origin readability
  * and rate limiting, with nothing declared that the server does not serve.
  */
+/*
+ * The expected sets below are written out for the bare addresses, which is what makes them an
+ * independent statement of intent rather than a copy of the implementation. A bucket's endpoints are
+ * the same endpoints at a different address, so their expected classification is *derived* by the same
+ * rule the implementation uses — asserting the rule, rather than re-typing twenty entries whose only
+ * content is that they follow it.
+ */
+function alsoBeneathBucket(keys: readonly string[]): string[] {
+	const scoped = keys.filter((key) => {
+		const path = key.slice(key.indexOf(' ') + 1);
+		/* A path that already names a bucket is the RFC 8414 inserted form, written out below rather
+		 * than derived — prefixing it again would invent an address nothing serves. */
+		if (path.includes(':bucket')) return false;
+		return bucketScopedPaths.some(
+			(base) => path === base || path.startsWith(`${base}/`)
+		);
+	});
+	return [
+		...keys,
+		...scoped.map((key) => {
+			const space = key.indexOf(' ');
+			return `${key.slice(0, space)} /:bucket${key.slice(space + 1)}`;
+		})
+	];
+}
+
 describe('route classification', () => {
 	const mounted = elysia.routes.map((route) => ({
 		method: route.method,
@@ -79,6 +106,14 @@ describe('route classification', () => {
 		const CORS_ENABLED = [
 			'GET /.well-known/openid-configuration',
 			'GET /.well-known/oauth-authorization-server',
+			/*
+			 * RFC 8414 §3 puts the well-known segment *before* the issuer's path, so these two cannot be
+			 * produced by prefixing and are the one pair written out. Same reasoning as the bare
+			 * documents above: a browser client discovering a deployment it was not built against reaches
+			 * them first of all.
+			 */
+			'GET /.well-known/openid-configuration/:bucket',
+			'GET /.well-known/oauth-authorization-server/:bucket',
 			'GET /jwks',
 			'POST /token',
 			'GET /userinfo',
@@ -111,11 +146,11 @@ describe('route classification', () => {
 				)
 				.map(key);
 
-			expect(enabled.sort()).toEqual([...CORS_ENABLED].sort());
+			expect(enabled.sort()).toEqual(alsoBeneathBucket(CORS_ENABLED).sort());
 		});
 
 		it('classifies every other mounted route as none', () => {
-			const enabled = new Set(CORS_ENABLED);
+			const enabled = new Set(alsoBeneathBucket(CORS_ENABLED));
 
 			const leaked = mounted
 				.filter((route) => !enabled.has(key(route)))
@@ -177,6 +212,9 @@ describe('route classification', () => {
 		const PUBLIC = [
 			'GET /.well-known/openid-configuration',
 			'GET /.well-known/oauth-authorization-server',
+			/* Written out for the reason given on the CORS set: the inserted form is not a prefix. */
+			'GET /.well-known/openid-configuration/:bucket',
+			'GET /.well-known/oauth-authorization-server/:bucket',
 			'GET /.well-known/oauth-protected-resource/mcp',
 			'GET /.well-known/security.txt',
 			'GET /jwks',
@@ -216,7 +254,7 @@ describe('route classification', () => {
 				)
 				.map(key);
 
-			expect(strict.sort()).toEqual([...STRICT].sort());
+			expect(strict.sort()).toEqual(alsoBeneathBucket(STRICT).sort());
 		});
 
 		it('applies the loose allowance to exactly the cheap public surface', () => {
@@ -226,7 +264,7 @@ describe('route classification', () => {
 				)
 				.map(key);
 
-			expect(loose.sort()).toEqual([...PUBLIC].sort());
+			expect(loose.sort()).toEqual(alsoBeneathBucket(PUBLIC).sort());
 		});
 
 		it('exempts exactly the liveness probe', () => {
@@ -240,7 +278,11 @@ describe('route classification', () => {
 		});
 
 		it('classifies every other mounted route as ordinary', () => {
-			const enumerated = new Set([...STRICT, ...PUBLIC, ...EXEMPT]);
+			const enumerated = new Set([
+				...alsoBeneathBucket(STRICT),
+				...alsoBeneathBucket(PUBLIC),
+				...EXEMPT
+			]);
 
 			const misfiled = mounted
 				.filter((route) => !enumerated.has(key(route)))

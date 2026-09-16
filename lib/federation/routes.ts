@@ -1,3 +1,4 @@
+import { issuingBucket } from '../admin/auth/bucketAddress.js';
 import { Elysia, t } from 'elysia';
 
 import { getBucketStore } from '../adapters/index.js';
@@ -94,6 +95,9 @@ export const federationRoutes = new Elysia({ name: 'federation-callback' }).get(
 				provider,
 				metadata,
 				query.code,
+				/* The same address the authorization leg sent, recovered from the pending state — an
+				 * upstream matches `redirect_uri` by exact string across the two legs. */
+				await issuingBucket(pending.bucketId),
 				pending.codeVerifier
 			);
 		} catch (err) {

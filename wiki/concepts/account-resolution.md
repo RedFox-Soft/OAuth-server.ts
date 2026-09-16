@@ -11,7 +11,7 @@ graph:
     - predicate: depends_on
       object: concept:client-identity-from-database
       source: oauth-server-codebase
-      evidence: "const clientId = oidc?.client?.clientId ?? _token?.payload?.clientId; const bucketId = await resolveBucketForClient(clientId);"
+      evidence: "const clientId = oidc?.client?.clientId ?? _token?.payload?.clientId; const bucketId = await resolveBucketForRequest(clientId);"
       confidence: high
       status: current
 ---
@@ -37,13 +37,19 @@ export async function findAccount(oidc, sub, _token?)
 
 ## Bucket resolution mirrors login
 
-The resolver picks the user bucket exactly as login does, via `resolveBucketForClient`
+> **Narrowed once buckets became tenants.** `resolveBucketForRequest` no longer decides which bucket a
+> *request* belongs to — the address does, and a request to a bare path is the default bucket's. What
+> it still answers, and what this page describes, is which bucket a given **client** belongs to: the
+> question `findAccount` asks to know which population to look a subject up in, and the question the
+> cross-address refusal checks a client against. See [[bucket-is-an-issuer]].
+
+The resolver picks the user bucket exactly as login does, via `resolveBucketForRequest`
 (`lib/admin/auth/resolveBucket.js`), preferring the live client and falling back to the token's
 client (`account.ts:11-16`):
 
 ```ts
 const clientId = oidc?.client?.clientId ?? _token?.payload?.clientId;
-const bucketId = await resolveBucketForClient(clientId);
+const bucketId = await resolveBucketForRequest(clientId);
 const user = await getUserStore(bucketId).find(sub);
 ```
 

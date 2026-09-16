@@ -6,7 +6,7 @@ import {
 	pairwiseIdentifier,
 	rarForIntrospectionResponse
 } from '../addon/index.js';
-import { ISSUER } from 'lib/configs/env.js';
+import { issuingBucket } from 'lib/admin/auth/bucketAddress.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { IdToken } from 'lib/models/id_token.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
@@ -66,6 +66,24 @@ async function renderTokenResponse(oidc) {
 		return { active: false };
 	}
 
+	/*
+	 * A token this address did not issue is not active here.
+	 *
+	 * RFC 7662 §2.2 makes `active: true` an assertion that *this* authorization server issued the token,
+	 * and every bucket is its own authorization server. Answering `true` for a token minted by another
+	 * bucket would tell a resource server that a token from a different population is good — the same
+	 * defect a realm-confusion advisory reported against a Keycloak integration, where a token of one
+	 * realm was silently accepted by a policy configured for another.
+	 *
+	 * Compared against the recorded issuing bucket rather than anything derived from the client, which
+	 * is the whole reason that field is stored. A token minted before buckets became tenants records
+	 * nothing and belongs to the default bucket, which is what `issuingBucket` resolves an absence to.
+	 */
+	const issuedBy = await issuingBucket(token.payload.bucketId);
+	if (issuedBy._id !== oidc.bucket._id) {
+		return { active: false };
+	}
+
 	if (token.payload.grantId) {
 		const grant = await Grant.tryFind(token.payload.grantId, {
 			ignoreExpiration: true
@@ -112,7 +130,7 @@ async function renderTokenResponse(oidc) {
 		exp: token.payload.exp,
 		iat: token.payload.iat,
 		sid: token.payload.sid,
-		iss: ISSUER,
+		iss: oidc.issuer,
 		jti: token.payload.jti !== params.token ? token.payload.jti : undefined,
 		aud: token.payload.aud,
 		authorization_details: token.payload.rar

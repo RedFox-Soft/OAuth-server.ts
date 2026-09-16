@@ -82,6 +82,7 @@ export const elysia = new Elysia({ strictPath: true, normalize: false })
 		unapproved_software_statement: errors.UnapprovedSoftwareStatement,
 		not_supported: errors.NotSupportedError,
 		session_not_found: errors.SessionNotFound,
+		unknown_bucket: errors.UnknownBucket,
 		access_denied: errors.AccessDenied,
 		authorization_pending: errors.AuthorizationPending,
 		consent_required: errors.ConsentRequired,
@@ -145,7 +146,47 @@ export const elysia = new Elysia({ strictPath: true, normalize: false })
 	.use(passwordResetRoutes)
 	.use(federationRoutes)
 	.use(adminApp)
-	.use(mcpApp);
+	.use(mcpApp)
+	/*
+	 * The same routes again, beneath a bucket's address.
+	 *
+	 * Every route above is the default bucket's: its issuer is this server's own and its endpoints are
+	 * the bare paths every client integrated before tenancy already uses. A named bucket serves the same
+	 * endpoints beneath its own segment, and mounting the same plugins a second time is what keeps the
+	 * two from drifting — one declaration, two addresses, rather than a parallel route table that would
+	 * disagree on the first change.
+	 *
+	 * Measured against elysia 1.4.30 before relying on it: the same plugin instance mounts twice, both
+	 * routes register and answer, and a *static* route wins over a dynamic first segment — so nothing
+	 * here can shadow `/auth`, `/token` or any other endpoint above. The reserved-slug list is what
+	 * stops an operator choosing a confusing address, not what makes this correct.
+	 *
+	 * Instance-wide surfaces are deliberately absent: the key set, the management surface, the console
+	 * and static assets belong to the server rather than to a population, and each of their first
+	 * segments is a name a bucket may not take.
+	 */
+	.group('/:bucket', (bucketScoped) =>
+		bucketScoped
+			.use(authGet)
+			.use(authPost)
+			.use(tokenAction)
+			.use(userinfo)
+			.use(introspect)
+			.use(revocation)
+			.use(par)
+			.use(deviceAuth)
+			.use(backchannelAuth)
+			.use(registration)
+			.use(logoutAction)
+			.use(logoutConfirmAction)
+			/*
+			 * A bucket's upstream providers return to a callback beneath its own address. The provider
+			 * record already carried its bucket; only the address was global, which left every bucket's
+			 * federated sign-in landing on one route that then had to work out whose it was.
+			 */
+			.use(federationRoutes)
+			.use(codeVerification)
+	);
 
 /*
  * Binding the port, and the one startup failure this module can report.

@@ -38,6 +38,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 	async create(data: {
 		_id?: string;
 		name: string;
+		slug?: string;
 		ownerGroupId: string;
 		roles?: string[];
 		passwordLogin?: boolean;
@@ -51,6 +52,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		const bucket: UserBucket = {
 			_id: data._id ?? nanoid(),
 			name: data.name,
+			slug: data.slug,
 			ownerGroupId: data.ownerGroupId,
 			roles: data.roles ?? [],
 			passwordLogin: data.passwordLogin ?? true,
@@ -86,6 +88,14 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		const handle = sql();
 		const rows = await handle`
 			SELECT doc FROM ${handle(this.area)} WHERE id = ${id}
+		`;
+		return this.bucketOf(rows[0]);
+	}
+
+	async findBySlug(slug: string): Promise<UserBucket | null> {
+		const handle = sql();
+		const rows = await handle`
+			SELECT doc FROM ${handle(this.area)} WHERE doc->>'slug' = ${slug}
 		`;
 		return this.bucketOf(rows[0]);
 	}
@@ -129,6 +139,20 @@ export class UserBucketStore implements UserBucketStoreInstance {
 			RETURNING doc
 		`;
 		return this.bucketOf(rows[0]);
+	}
+
+	async repairReservedSlug(id: string, slug: string): Promise<void> {
+		const handle = sql();
+		/*
+		 * `jsonb_set` merges server-side rather than reading, mutating and writing the document back: a
+		 * round trip is where a document gets re-serialised, and a pre-stringified value stores a jsonb
+		 * *string* whose every predicate then silently matches nothing.
+		 */
+		await handle`
+			UPDATE ${handle(this.area)}
+			SET doc = jsonb_set(doc, '{slug}', ${JSON.stringify(slug)}::jsonb)
+			WHERE id = ${id} AND doc->>'slug' IS NULL
+		`;
 	}
 
 	async destroy(id: string): Promise<void> {

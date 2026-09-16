@@ -6,6 +6,7 @@ import { BucketDetail } from './BucketDetail.js';
 
 interface CreateBucketValues {
 	name: string;
+	slug: string;
 	roles?: string[];
 }
 
@@ -99,6 +100,12 @@ export function Buckets({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 				columns={[
 					{ title: 'Name', dataIndex: 'name' },
 					{
+						title: 'Address',
+						dataIndex: 'slug',
+						render: (slug?: string) =>
+							slug ? <code>/{slug}</code> : <Tag>not addressable</Tag>
+					},
+					{
 						title: 'Roles',
 						dataIndex: 'roles',
 						render: (roles: string[]) =>
@@ -140,6 +147,31 @@ export function Buckets({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 						rules={[{ required: true }]}
 					>
 						<Input />
+					</Form.Item>
+					{/*
+					 * The address, and not a second name: everything beneath it — this bucket's endpoints,
+					 * its metadata, the issuer in every token it mints — is built from this value, and it
+					 * cannot be changed afterwards. Said here rather than left to a validation error,
+					 * because an operator choosing one has no other way to know it is permanent.
+					 */}
+					<Form.Item
+						name="slug"
+						label="Address"
+						tooltip="Where this bucket is served, and the issuer in the tokens it mints. Cannot be changed later."
+						rules={[
+							{ required: true },
+							{
+								pattern: /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/,
+								message:
+									'lowercase letters, digits and hyphens; not starting or ending with a hyphen'
+							},
+							{ max: 63 }
+						]}
+					>
+						<Input
+							placeholder="acme"
+							addonBefore="/"
+						/>
 					</Form.Item>
 					<Form.Item
 						name="roles"

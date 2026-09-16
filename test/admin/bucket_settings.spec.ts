@@ -38,7 +38,7 @@ describe('bucket verification settings API', () => {
 	it('defaults new buckets to open + verification off', async () => {
 		const cookie = await superCookie();
 		const res = await client.admin.api.buckets.post(
-			{ name: 'Defaults' },
+			{ name: 'Defaults', slug: 'defaults-1' },
 			{ headers: { cookie } }
 		);
 		const bucket = res.data as UserBucket;
@@ -50,7 +50,7 @@ describe('bucket verification settings API', () => {
 	it('persists a settings patch and records an audit entry', async () => {
 		const cookie = await superCookie();
 		const created = await client.admin.api.buckets.post(
-			{ name: 'Settable' },
+			{ name: 'Settable', slug: 'settable-2' },
 			{ headers: { cookie } }
 		);
 		const bucket = created.data as UserBucket;
@@ -80,7 +80,7 @@ describe('bucket verification settings API', () => {
 	it('audits an update that touches no verification field', async () => {
 		const cookie = await superCookie();
 		const created = await client.admin.api.buckets.post(
-			{ name: 'Rename me' },
+			{ name: 'Rename me', slug: 'rename-me-3' },
 			{ headers: { cookie } }
 		);
 		const bucket = created.data as UserBucket;
@@ -100,7 +100,7 @@ describe('bucket verification settings API', () => {
 	it('rejects an invalid verification method', async () => {
 		const cookie = await superCookie();
 		const created = await client.admin.api.buckets.post(
-			{ name: 'BadMethod' },
+			{ name: 'BadMethod', slug: 'badmethod-4' },
 			{ headers: { cookie } }
 		);
 		const bucket = created.data as UserBucket;

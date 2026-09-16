@@ -8,6 +8,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 	async create(data: {
 		_id?: string;
 		name: string;
+		slug?: string;
 		ownerGroupId: string;
 		roles?: string[];
 		passwordLogin?: boolean;
@@ -21,6 +22,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		const bucket: UserBucket = {
 			_id: data._id ?? nanoid(),
 			name: data.name,
+			slug: data.slug,
 			ownerGroupId: data.ownerGroupId,
 			roles: data.roles ?? [],
 			// A bucket accepts passwords unless someone says otherwise, and holds no providers until one is
@@ -60,6 +62,13 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		return bucket ? this.withDefaults(bucket) : null;
 	}
 
+	async findBySlug(slug: string): Promise<UserBucket | null> {
+		for (const b of this.buckets.values()) {
+			if (b.slug === slug) return this.withDefaults(b);
+		}
+		return null;
+	}
+
 	async list(): Promise<UserBucket[]> {
 		return [...this.buckets.values()].map((b) => this.withDefaults(b));
 	}
@@ -91,6 +100,12 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		if (!b) return null;
 		Object.assign(b, patch, { updatedAt: new Date() });
 		return b;
+	}
+
+	async repairReservedSlug(id: string, slug: string): Promise<void> {
+		const b = this.buckets.get(id);
+		if (!b || b.slug) return;
+		Object.assign(b, { slug, updatedAt: new Date() });
 	}
 
 	async destroy(id: string): Promise<void> {

@@ -33,6 +33,8 @@ export async function clientCredentials(oidc, dPoP) {
 	}
 
 	const token = new ClientCredentials({
+		/* The address this request was made to — there is no earlier artifact to inherit from. */
+		bucketId: oidc.bucket._id,
 		client,
 		scope: scopes.join(' ') || undefined
 	});

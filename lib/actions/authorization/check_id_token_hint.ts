@@ -10,7 +10,8 @@ export default async function checkIdTokenHint(oidc) {
 		try {
 			idTokenHint = await IdToken.validate(
 				oidc.params.id_token_hint,
-				oidc.client
+				oidc.client,
+				oidc.issuer
 			);
 		} catch (err) {
 			if (err instanceof OIDCProviderError) {

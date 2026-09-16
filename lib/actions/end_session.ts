@@ -14,6 +14,7 @@ import { IdToken } from 'lib/models/id_token.js';
 import { Client } from 'lib/models/client.js';
 import { AuthorizationCookies, routeNames } from 'lib/consts/param_list.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
+import { requestBucketFor } from 'lib/admin/auth/bucketAddress.js';
 import sessionHandler, { expiredSessionCookie } from '../shared/session.ts';
 import {
 	backchannelLogoutFor,
@@ -43,8 +44,17 @@ export const logoutAction = new Elysia()
 	})
 	.get(
 		routeNames.end_session,
-		async ({ query, cookie, route }) => {
-			const oidc = new OIDCContext(query, {}, route);
+		async ({ query, cookie, route, params: routeParams }) => {
+			/*
+			 * The address names the population being signed out of. This is what removed the compromise an
+			 * address-less design had to make: a sign-out carrying no client identifier could not name a
+			 * bucket, so it had to end every sign-in the browser held or refuse outright. Addressed, it
+			 * ends exactly one.
+			 */
+			const bucket = await requestBucketFor(
+				(routeParams as { bucket?: string } | undefined)?.bucket
+			);
+			const oidc = new OIDCContext(query, {}, route, bucket);
 			oidc.cookie = cookie;
 			const setCookies = await sessionHandler(oidc);
 			const params = query;
@@ -76,7 +86,7 @@ export const logoutAction = new Elysia()
 					)
 				});
 				try {
-					await IdToken.validate(params.id_token_hint, client);
+					await IdToken.validate(params.id_token_hint, client, oidc.issuer);
 				} catch (err) {
 					if (err instanceof OIDCProviderError) {
 						throw err;
@@ -136,8 +146,11 @@ export const logoutConfirmAction = new Elysia()
 	})
 	.post(
 		routeNames.end_session_confirm,
-		async ({ body, cookie, route }) => {
-			const oidc = new OIDCContext(body, {}, route);
+		async ({ body, cookie, route, params }) => {
+			const bucket = await requestBucketFor(
+				(params as { bucket?: string } | undefined)?.bucket
+			);
+			const oidc = new OIDCContext(body, {}, route, bucket);
 			oidc.cookie = cookie;
 			const setCookies = await sessionHandler(oidc);
 

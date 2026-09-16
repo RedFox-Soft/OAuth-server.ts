@@ -24,6 +24,33 @@ import {
 	prospectiveBucket
 } from '../federation/validate.js';
 import { CreateBucketBody, UpdateBucketBody } from './schema.js';
+import { isReservedBucketName } from '../../consts/reserved_names.js';
+import { forgetBucketAddresses } from '../auth/bucketAddress.js';
+
+/*
+ * What the slug's pattern cannot check: that this address is free to take.
+ *
+ * Two refusals, and they are refused rather than resolved because a slug is the path component of an
+ * issuer identifier. A reserved slug would shadow one of the server's own endpoints; a duplicate would
+ * give two populations one identifier, which is the one thing an issuer identifier may not be. Both
+ * are stated with the rule they broke, because an operator who typed `auth` has no way to guess the
+ * list otherwise.
+ *
+ * Case is not normalised here, only compared: the schema pattern admits lowercase only, so a
+ * differently-cased slug never reaches this function — it is refused a step earlier, which is what
+ * tells the operator the rule instead of silently moving their bucket to an address they did not type.
+ */
+async function assertSlugAvailable(slug: string) {
+	if (isReservedBucketName(slug)) {
+		throw new AdminError(
+			409,
+			`'${slug}' is reserved for this server's own addresses and cannot be a bucket slug`
+		);
+	}
+	if (await getBucketStore().findBySlug(slug)) {
+		throw new AdminError(409, `slug '${slug}' is already taken`);
+	}
+}
 
 /*
  * A bucket as a reader may see it: identical except that every configured provider's `clientSecret` is
@@ -112,6 +139,11 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 				passwordLogin: body.passwordLogin !== false,
 				federation: []
 			});
+			/*
+			 * Before the audit entry, for the reason stated on the sign-in guard above: an entry describing
+			 * a bucket a 409 refused to create would record an address that never existed.
+			 */
+			await assertSlugAvailable(body.slug);
 			// The id is allocated here, not by the store, so the audit entry can name the bucket that is
 			// about to exist — audit-first has nothing to point at otherwise.
 			const bucketId = nanoid();
@@ -119,6 +151,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			const bucket = await getBucketStore().create({
 				_id: bucketId,
 				name: body.name,
+				slug: body.slug,
 				roles: body.roles ?? [],
 				ownerGroupId,
 				passwordLogin: body.passwordLogin,
@@ -127,6 +160,8 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 				verificationMethod: body.verificationMethod,
 				totpRequired: body.totpRequired
 			});
+			/* A new address exists; the resolver's positive cache must be able to see it. */
+			forgetBucketAddresses();
 			set.status = 201;
 			// No advisory is reachable here: the guard above proves a new bucket accepts passwords, so
 			// the requirement can never be inert at creation.
@@ -190,6 +225,8 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 		// a deletion that was never even attempted.
 		await recordAdminAudit(ctx, 'bucket.delete', params.id);
 		await getBucketStore().destroy(params.id);
+		/* The address is gone; a cached entry would keep answering for a bucket that no longer exists. */
+		forgetBucketAddresses();
 		/* The half that was missing: without this a deleted bucket left its `user_<bucket>` area behind
 		 * for good, indexes and all. Safe here and only here, because the guard above proved it empty. */
 		await store.destroyArea();

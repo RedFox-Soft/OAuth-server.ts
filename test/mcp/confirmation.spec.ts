@@ -321,7 +321,7 @@ describe('MCP confirmation gate', () => {
 	it('refuses when the parameters changed after the description', async () => {
 		const { token } = await session(['super_admin']);
 		const bucket = await rpc(
-			call('bucket_create', { name: 'Conf bucket' }),
+			call('bucket_create', { name: 'Conf bucket', slug: 'conf-bucket-1' }),
 			token
 		);
 		const bucketId = (

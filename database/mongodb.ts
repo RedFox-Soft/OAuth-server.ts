@@ -204,6 +204,18 @@ await db.collection(STORE_AREAS.groups).updateOne(
 	},
 	{ upsert: true }
 );
+/*
+ * `slug` is the one seeded field this script writes onto a record that already exists, and the
+ * exception is deliberate. Everything else in a seed is a starting value an operator may then edit, so
+ * touching it on re-run would undo their work. A reserved bucket's address is not that: it is the path
+ * component of an issuer identifier this server names itself by and the console authenticates against,
+ * and it is fixed at creation everywhere else. Without this, a deployment provisioned before addresses
+ * existed would keep two buckets with no address while a freshly provisioned one had them — the drift
+ * re-running this script exists to prevent.
+ *
+ * The filter is what keeps it from becoming a rename: it writes only where there is nothing to
+ * overwrite. `lib/admin/seed.ts` states the same rule through `repairReservedSlug`.
+ */
 await db.collection(STORE_AREAS.userBuckets).updateOne(
 	{ _id: ADMIN_BUCKET_ID },
 	{
@@ -215,6 +227,12 @@ await db.collection(STORE_AREAS.userBuckets).updateOne(
 	},
 	{ upsert: true }
 );
+await db
+	.collection(STORE_AREAS.userBuckets)
+	.updateOne(
+		{ _id: ADMIN_BUCKET_ID, slug: { $exists: false } },
+		{ $set: { slug: ADMIN_BUCKET_SEED.slug } }
+	);
 // The default ('redfox') bucket backs the pre-existing default user collection and
 // every client not assigned to a project (see resolveBucketForClient). Seeded here
 // so it is manageable in the admin Buckets UI. Mirrors ensureAdminSeed (lib/admin/seed.ts),
@@ -230,6 +248,13 @@ await db.collection(STORE_AREAS.userBuckets).updateOne(
 	},
 	{ upsert: true }
 );
+/* Same repair, same reason — see the administrators bucket above. */
+await db
+	.collection(STORE_AREAS.userBuckets)
+	.updateOne(
+		{ _id: 'redfox', slug: { $exists: false } },
+		{ $set: { slug: DEFAULT_BUCKET_SEED.slug } }
+	);
 await db.collection(STORE_AREAS.projects).updateOne(
 	{ _id: ADMIN_PROJECT_ID },
 	{

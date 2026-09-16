@@ -11,6 +11,20 @@ export const SessionPayload = t.Object({
 	...BaseModelPayload.properties,
 	uid: t.String(),
 	accountId: t.Optional(t.String()),
+	/*
+	 * The user bucket this sign-in belongs to. An account identifier is only meaningful inside the
+	 * bucket that issued it, so the two are read together or not at all: a session carrying an account
+	 * and no bucket predates this field and resolves nothing, rather than being attributed to whichever
+	 * bucket the next request happens to name.
+	 *
+	 * Declared here and not merely assigned, because `Opaque.getValueAndPayload()` persists only the
+	 * top-level keys this schema names. Assigned without being declared it would round-trip as
+	 * `undefined` on every read while every write appeared to succeed — the whole feature silently
+	 * inert, with nothing to see in a response or a store row.
+	 *
+	 * The bucket's record id, not its name: a rename must not orphan a sign-in.
+	 */
+	bucketId: t.Optional(t.String()),
 	loginTs: t.Optional(t.Number()),
 	amr: t.Optional(t.Array(t.String())),
 	acr: t.Optional(t.String()),
@@ -178,6 +192,7 @@ export class Session extends BaseModel<SessionPayloadType> {
 		const {
 			transient = false,
 			accountId,
+			bucketId,
 			loginTs = epochTime(),
 			amr,
 			acr
@@ -188,8 +203,14 @@ export class Session extends BaseModel<SessionPayloadType> {
 			);
 		}
 
+		/*
+		 * The bucket rides with the account because the two are one fact: an account identifier means
+		 * nothing without the population that issued it. Assigning one without the other is what leaves
+		 * a session whose identity cannot be checked against the request being served.
+		 */
 		Object.assign(this.payload, {
 			accountId,
+			bucketId,
 			loginTs,
 			amr,
 			acr

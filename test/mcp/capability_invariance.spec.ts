@@ -174,7 +174,10 @@ describe('published operation set is capability-invariant', () => {
 		ApplicationConfig['federation.enabled'] = true;
 		const token = await session();
 
-		const bucket = await rpc(call('bucket_create', { name: 'Fed' }), token);
+		const bucket = await rpc(
+			call('bucket_create', { name: 'Fed', slug: 'fed-1' }),
+			token
+		);
 		const bucketId = (
 			bucket.result?.structuredContent?.result as { _id: string }
 		)._id;
@@ -237,7 +240,7 @@ describe('published operation set is capability-invariant', () => {
 		const token = await session();
 
 		const bucket = await rpc(
-			call('bucket_create', { name: 'Readable' }),
+			call('bucket_create', { name: 'Readable', slug: 'readable-2' }),
 			token
 		);
 		const bucketId = (

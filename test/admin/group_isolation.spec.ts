@@ -122,7 +122,7 @@ describe('group isolation', () => {
 		const b = await tenant('b');
 
 		const created = await client.admin.api.buckets.post(
-			{ name: 'A users' },
+			{ name: 'A users', slug: 'a-users-1' },
 			{ headers: { cookie: a.cookie } }
 		);
 		expect(created.status).toBe(201);
@@ -153,7 +153,7 @@ describe('group isolation', () => {
 		const project = projectRes.data as Project;
 
 		const bucketRes = await client.admin.api.buckets.post(
-			{ name: 'B users' },
+			{ name: 'B users', slug: 'b-users-2' },
 			{ headers: { cookie: b.cookie } }
 		);
 		const bucket = bucketRes.data as UserBucket;
@@ -183,7 +183,7 @@ describe('group isolation', () => {
 		const project = projectRes.data as Project;
 
 		const bucketRes = await client.admin.api.buckets.post(
-			{ name: 'A users' },
+			{ name: 'A users', slug: 'a-users-3' },
 			{ headers: { cookie: a.cookie } }
 		);
 		const bucket = bucketRes.data as UserBucket;

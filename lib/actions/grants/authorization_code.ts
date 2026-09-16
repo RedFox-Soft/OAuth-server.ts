@@ -12,6 +12,7 @@ import {
 	issueRefreshToken,
 	rarForCodeResponse
 } from '../../addon/index.js';
+import { issuingBucket } from 'lib/admin/auth/bucketAddress.js';
 import { IdToken } from 'lib/models/id_token.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';
@@ -126,6 +127,9 @@ export const handler = async function authorizationCodeHandler(oidc, dPoP) {
 	oidc.entity('Account', account);
 
 	const at = new AccessToken({
+		/* Inherited from the artifact being redeemed, not from the address this redemption arrived at:
+		 * the issuer is a fact about where the grant was established. */
+		bucketId: code.payload.bucketId,
 		accountId: account.accountId,
 		client: oidc.client,
 		expiresWithSession: code.payload.expiresWithSession,
@@ -194,6 +198,7 @@ export const handler = async function authorizationCodeHandler(oidc, dPoP) {
 	let refreshToken;
 	if (await issueRefreshToken({ oidc }, oidc.client, code)) {
 		const rt = new RefreshToken({
+			bucketId: code.payload.bucketId,
 			accountId: account.accountId,
 			acr: code.payload.acr,
 			amr: code.payload.amr,
@@ -230,17 +235,24 @@ export const handler = async function authorizationCodeHandler(oidc, dPoP) {
 	if (code.scopes.has('openid')) {
 		const claims = filterClaims(code.payload.claims, 'id_token', grant);
 		const rejected = grant.getRejectedOIDCClaims();
-		const token = new IdToken(oidc.client, {
-			...(await account.claims(
-				'id_token',
-				code.payload.scope,
-				claims,
-				rejected
-			)),
-			acr: code.payload.acr,
-			amr: code.payload.amr,
-			auth_time: code.payload.authTime
-		});
+		const token = new IdToken(
+			oidc.client,
+			{
+				...(await account.claims(
+					'id_token',
+					code.payload.scope,
+					claims,
+					rejected
+				)),
+				acr: code.payload.acr,
+				amr: code.payload.amr,
+				auth_time: code.payload.authTime
+			},
+			/* The bucket the grant was established in — a relying party compares this token's `iss`
+			 * against the metadata it discovered for that bucket, not for whichever address this
+			 * redemption arrived at. */
+			await issuingBucket(code.payload.bucketId)
+		);
 
 		if (
 			ApplicationConfig.conformIdTokenClaims &&

@@ -83,13 +83,18 @@ describe('TypeBox admin schemas bridge into MCP tool schemas', () => {
 			);
 		}
 
-		const ok = std.validate({ name: 'B', verificationMethod: 'link' }) as {
+		const ok = std.validate({
+			name: 'B',
+			slug: 'b',
+			verificationMethod: 'link'
+		}) as {
 			issues?: unknown[];
 		};
 		expect(ok.issues ?? []).toBeArrayOfSize(0);
 
 		const bad = std.validate({
 			name: 'B',
+			slug: 'b',
 			verificationMethod: 'carrier-pigeon'
 		}) as { issues?: unknown[] };
 		expect((bad.issues ?? []).length).toBeGreaterThan(0);

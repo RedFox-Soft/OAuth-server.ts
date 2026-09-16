@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 
-import { ISSUER } from '../configs/env.js';
+import { issuerFor, type RequestBucket } from '../configs/issuer.js';
 import { FEDERATION_CALLBACK_PATH } from './consts.js';
 import type { ProviderMetadata } from './discovery.js';
 import type { FederationProvider } from './types.js';
@@ -13,11 +13,20 @@ import type { FederationProvider } from './types.js';
  */
 
 /*
- * Fixed for every interaction, because an upstream matches `redirect_uri` by exact string. This is the one
- * value in the flow that must not vary, and it is why the callback cannot read the interaction cookie.
+ * Fixed for every *interaction*, because an upstream matches `redirect_uri` by exact string. That is
+ * why the callback cannot read the interaction cookie — the address cannot carry a `uid`.
+ *
+ * It is not fixed for every *bucket*, and the distinction took a correction to see. A bucket is
+ * configuration, not an interaction: it is constant for any given provider record, so the address
+ * stays constant for the upstream that matches it. Each bucket already holds its own upstream client
+ * credentials per provider, so a per-bucket callback is one `redirect_uri` per upstream client — the
+ * normal arrangement rather than an extra one.
+ *
+ * The default bucket's issuer is the server's own, so its callback address is unchanged and no
+ * existing registration has to be touched.
  */
-export function callbackUri(): string {
-	return `${ISSUER}${FEDERATION_CALLBACK_PATH}`;
+export function callbackUri(bucket: RequestBucket): string {
+	return `${issuerFor(bucket)}${FEDERATION_CALLBACK_PATH}`;
 }
 
 /* PKCE only when the provider says S256: sending an unsupported parameter breaks sign-in at providers
@@ -29,13 +38,14 @@ export function supportsPkce(metadata: ProviderMetadata): boolean {
 export function authorizationUrl(
 	provider: FederationProvider,
 	metadata: ProviderMetadata,
-	secrets: { state: string; nonce: string; codeVerifier?: string }
+	secrets: { state: string; nonce: string; codeVerifier?: string },
+	bucket: RequestBucket
 ): string {
 	const url = new URL(metadata.authorizationEndpoint);
 	const params = new URLSearchParams({
 		client_id: provider.clientId,
 		response_type: 'code',
-		redirect_uri: callbackUri(),
+		redirect_uri: callbackUri(bucket),
 		scope: provider.scopes.join(' '),
 		state: secrets.state,
 		nonce: secrets.nonce
@@ -95,6 +105,7 @@ export async function exchangeCode(
 	provider: FederationProvider,
 	metadata: ProviderMetadata,
 	code: string,
+	bucket: RequestBucket,
 	codeVerifier?: string
 ): Promise<string | undefined> {
 	const method = authMethod(metadata);
@@ -102,7 +113,7 @@ export async function exchangeCode(
 	const body = new URLSearchParams({
 		grant_type: 'authorization_code',
 		code,
-		redirect_uri: callbackUri(),
+		redirect_uri: callbackUri(bucket),
 		client_id: provider.clientId
 	});
 	if (codeVerifier) {

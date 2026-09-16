@@ -21,6 +21,7 @@ import {
 
 import { gty as cibaGty } from './ciba.ts';
 import { gty as deviceCodeGty } from './device_code.ts';
+import { issuingBucket } from 'lib/admin/auth/bucketAddress.js';
 import { IdToken } from 'lib/models/id_token.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AccessToken } from 'lib/models/access_token.js';
@@ -149,6 +150,8 @@ export const handler = async function refreshTokenHandler(oidc, dPoP) {
 		oidc.entity('RotatedRefreshToken', refreshToken);
 
 		refreshToken = new RefreshToken({
+			/* Rotation keeps the issuing bucket: a rotated token is the same grant, not a new one. */
+			bucketId: refreshToken.payload.bucketId,
 			accountId: refreshToken.payload.accountId,
 			acr: refreshToken.payload.acr,
 			amr: refreshToken.payload.amr,
@@ -182,6 +185,9 @@ export const handler = async function refreshTokenHandler(oidc, dPoP) {
 	}
 
 	const at = new AccessToken({
+		/* Inherited from the artifact being redeemed, not from the address this redemption arrived at:
+		 * the issuer is a fact about where the grant was established. */
+		bucketId: refreshToken.payload.bucketId,
 		accountId: account.accountId,
 		client,
 		expiresWithSession: refreshToken.payload.expiresWithSession,
@@ -255,17 +261,24 @@ export const handler = async function refreshTokenHandler(oidc, dPoP) {
 	if (scope.has('openid')) {
 		const claims = filterClaims(refreshToken.payload.claims, 'id_token', grant);
 		const rejected = grant.getRejectedOIDCClaims();
-		const token = new IdToken(oidc.client, {
-			...(await account.claims(
-				'id_token',
-				[...scope].join(' '),
-				claims,
-				rejected
-			)),
-			acr: refreshToken.payload.acr,
-			amr: refreshToken.payload.amr,
-			auth_time: refreshToken.payload.authTime
-		});
+		const token = new IdToken(
+			oidc.client,
+			{
+				...(await account.claims(
+					'id_token',
+					[...scope].join(' '),
+					claims,
+					rejected
+				)),
+				acr: refreshToken.payload.acr,
+				amr: refreshToken.payload.amr,
+				auth_time: refreshToken.payload.authTime
+			},
+			/* The bucket the grant was established in — a relying party compares this token's `iss`
+			 * against the metadata it discovered for that bucket, not for whichever address this
+			 * redemption arrived at. */
+			await issuingBucket(refreshToken.payload.bucketId)
+		);
 
 		if (
 			ApplicationConfig.conformIdTokenClaims &&

@@ -10,7 +10,13 @@ import { treaty } from '@elysiajs/eden';
 import nanoid from '../lib/helpers/nanoid.js';
 import epochTime from '../lib/helpers/epoch_time.js';
 import { elysia } from '../lib/index.ts';
-import { adapter, getUserStore, jwksStore } from '../lib/adapters/index.ts';
+import {
+	adapter,
+	getBucketStore,
+	getProjectStore,
+	getUserStore,
+	jwksStore
+} from '../lib/adapters/index.ts';
 import { reloadJWKSKeys } from '../lib/configs/keys.ts';
 import { verifyJWKs, type UnnormalizedJWK } from '../lib/configs/verifyJWKs.ts';
 import { testSigningKeys } from './jwks/fixtures.js';
@@ -39,6 +45,7 @@ import { Session } from 'lib/models/session.js';
 import { ttl } from 'lib/configs/liveTime.js';
 import { Grant } from 'lib/models/grant.js';
 import { ISSUER } from 'lib/configs/env.js';
+import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.js';
 export { Grant } from 'lib/models/grant.js';
 
 // Deep copies, and each bootstrap re-applies a fresh deep copy of them. A shallow snapshot shares
@@ -176,6 +183,87 @@ export function seedClient(
 	adapter('Client').upsert(metadata.clientId, metadata);
 }
 
+/*
+ * Seed a second user bucket, complete with the project and client that route a request to it.
+ *
+ * A bucket on its own routes nothing: `resolveBucketForRequest` reaches a bucket through the project
+ * that holds the client, so a spec seeding only the bucket record gets the default bucket back and
+ * proves nothing. All three records are therefore one call, and the clientId is returned because it
+ * is the only handle a request has.
+ *
+ * Cleanup is the caller's, via `clearSeededBuckets()`. It has to be, because the bucket, project and
+ * user stores are module-level singletons holding their own Maps — `TestAdapter.clear()` empties the
+ * adapter's map and not theirs, so anything seeded here outlives the spec file that seeded it. A
+ * blanket reset in bootstrap() would be the tidier fix and is deliberately not done: at least one
+ * existing spec passes only because of that leakage, and repairing it is not this fixture's job.
+ */
+const seededBuckets: Array<{ bucketId: string; projectId: string }> = [];
+
+export async function seedBucket({
+	bucketId,
+	name = `${bucketId} users`,
+	slug,
+	clientId,
+	accountId,
+	client = {},
+	user = {}
+}: {
+	bucketId: string;
+	name?: string;
+	/* The bucket's address. Omitted where a spec only needs a second population and never addresses
+	 * it — an unaddressed bucket is a real state, not a broken fixture. */
+	slug?: string;
+	clientId: string;
+	accountId: string;
+	client?: Record<string, unknown>;
+	user?: Partial<Omit<User, '_id'>>;
+}): Promise<{ bucketId: string; clientId: string; accountId: string }> {
+	await getBucketStore().create({
+		_id: bucketId,
+		name,
+		slug,
+		ownerGroupId: 'unassigned'
+	});
+
+	const project = await getProjectStore().create({
+		name,
+		slug: bucketId,
+		ownerGroupId: 'unassigned',
+		bucketId,
+		clientIds: [clientId]
+	});
+
+	/*
+	 * Seeded only if the spec's own config has not already declared it. A spec that needs `login()` to
+	 * build a grant for this client has to declare it there — the harness grants against the config's
+	 * `clients` — and seeding it twice throws by design.
+	 */
+	if (!TestAdapter.for('Client').syncFind(clientId)) {
+		seedClient({
+			clientId,
+			clientSecret: `${clientId}-secret`,
+			grantTypes: ['authorization_code', 'refresh_token'],
+			responseTypes: ['code'],
+			redirectUris: [`https://${bucketId}.example.com/cb`],
+			...client
+		});
+	}
+
+	seedAccount(accountId, user, bucketId);
+
+	seededBuckets.push({ bucketId, projectId: project._id });
+	return { bucketId, clientId, accountId };
+}
+
+/* Removes exactly what seedBucket created, and nothing else — see the note above on why the stores
+ * cannot simply be emptied. Call from `afterAll`. */
+export async function clearSeededBuckets(): Promise<void> {
+	for (const { bucketId, projectId } of seededBuckets.splice(0)) {
+		await getProjectStore().destroy(projectId);
+		await getBucketStore().destroy(bucketId);
+	}
+}
+
 // Extra OIDC claims that login()'s seeded user carries for the current spec.
 // Conformance suites that assert full-profile or distributed-claim masking call
 // setSeedClaims(...) in beforeAll (after bootstrap, which resets it to none).
@@ -273,7 +361,8 @@ async function bootstrap(
 		resources = {},
 		rejectedScopes = [],
 		rejectedClaims = [],
-		accountId = nanoid()
+		accountId = nanoid(),
+		bucketId = DEFAULT_BUCKET_ID
 	}: {
 		scope?: string;
 		claims?: {
@@ -284,6 +373,9 @@ async function bootstrap(
 		rejectedScopes?: string[];
 		rejectedClaims?: string[];
 		accountId?: string;
+		/* The population this sign-in belongs to. Defaults to the bucket every spec's clients resolve
+		 * to, so a spec that does not care about buckets never has to mention one. */
+		bucketId?: string;
 	} = {}) {
 		const sessionId = nanoid();
 		const loginTs = epochTime();
@@ -291,10 +383,19 @@ async function bootstrap(
 		expire.setDate(expire.getDate() + 1);
 		lastAccountId = accountId;
 
+		/*
+		 * `bucketId` rides with `accountId` here for the same reason it does in `loginAccount`: an
+		 * account identifier means nothing without the population that issued it, and a sign-in this
+		 * helper produces has to look like one a real sign-in produced. Omitted, every session the suite
+		 * builds would look like a record written before the field existed — which is deliberately
+		 * replaced rather than treated as an identity, so the account-change gate would stop firing for
+		 * the specs that exist to prove it fires.
+		 */
 		const session = new Session({
 			jti: sessionId,
 			loginTs,
-			accountId
+			accountId,
+			bucketId
 		});
 		lastSession = session;
 		const sessionCookie = `_session=${sessionId}; path=/; expires=${expire.toGMTString()}; httponly`;
@@ -339,7 +440,7 @@ async function bootstrap(
 		// (the resolver reads getUserStore(bucket).find(sub)). Conformance clients
 		// resolve to the default 'redfox' bucket via resolveBucketForClient. Any
 		// spec-scoped extra claims (setSeedClaims) ride along on the record.
-		seedAccount(accountId, seedClaims ? { claims: seedClaims } : {});
+		seedAccount(accountId, seedClaims ? { claims: seedClaims } : {}, bucketId);
 		await session.save(ttl.Session);
 		return sessionCookie;
 	}

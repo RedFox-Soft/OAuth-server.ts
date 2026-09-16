@@ -8,6 +8,7 @@ import filterClaims from '../../helpers/filter_claims.ts';
 import revoke from '../../helpers/revoke.ts';
 import resolveResource from '../../helpers/resolve_resource.ts';
 import { getResourceServerInfo, issueRefreshToken } from '../../addon/index.js';
+import { issuingBucket } from 'lib/admin/auth/bucketAddress.js';
 import { IdToken } from 'lib/models/id_token.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AccessToken } from 'lib/models/access_token.js';
@@ -111,6 +112,9 @@ export const handler = async function cibaHandler(oidc, dPoP) {
 	oidc.entity('Account', account);
 
 	const at = new AccessToken({
+		/* Inherited from the artifact being redeemed, not from the address this redemption arrived at:
+		 * the issuer is a fact about where the grant was established. */
+		bucketId: request.payload.bucketId,
 		accountId: account.accountId,
 		client: oidc.client,
 		expiresWithSession: request.payload.expiresWithSession,
@@ -149,6 +153,7 @@ export const handler = async function cibaHandler(oidc, dPoP) {
 	let refreshToken;
 	if (await issueRefreshToken({ oidc }, oidc.client, request)) {
 		const rt = new RefreshToken({
+			bucketId: request.payload.bucketId,
 			accountId: account.accountId,
 			acr: request.payload.acr,
 			amr: request.payload.amr,
@@ -184,19 +189,26 @@ export const handler = async function cibaHandler(oidc, dPoP) {
 	if (request.scopes.has('openid')) {
 		const claims = filterClaims(request.payload.claims, 'id_token', grant);
 		const rejected = grant.getRejectedOIDCClaims();
-		const token = new IdToken(oidc.client, {
-			...(await account.claims(
-				'id_token',
-				request.payload.scope,
-				claims,
-				rejected
-			)),
-			...{
-				acr: request.payload.acr,
-				amr: request.payload.amr,
-				auth_time: request.payload.authTime
-			}
-		});
+		const token = new IdToken(
+			oidc.client,
+			{
+				...(await account.claims(
+					'id_token',
+					request.payload.scope,
+					claims,
+					rejected
+				)),
+				...{
+					acr: request.payload.acr,
+					amr: request.payload.amr,
+					auth_time: request.payload.authTime
+				}
+			},
+			/* The bucket the grant was established in — a relying party compares this token's `iss`
+			 * against the metadata it discovered for that bucket, not for whichever address this
+			 * redemption arrived at. */
+			await issuingBucket(request.payload.bucketId)
+		);
 
 		if (
 			ApplicationConfig.conformIdTokenClaims &&

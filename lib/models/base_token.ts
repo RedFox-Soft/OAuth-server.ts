@@ -12,7 +12,23 @@ import { InvalidTarget } from 'lib/helpers/errors.js';
 
 export const BaseTokenPayload = t.Object({
 	...BaseModelPayload.properties,
-	clientId: t.String()
+	clientId: t.String(),
+	/*
+	 * The user bucket that issued this token, recorded rather than derived.
+	 *
+	 * Every bucket is its own issuer, so `iss` is a fact about the moment of issuance and not about the
+	 * current configuration. Deriving it later — from the client, say — gets it wrong the first time a
+	 * client moves between projects, and, worse, cannot answer the question RFC 7662 §2.2 makes
+	 * introspection answer: `active: true` asserts that *this* authorization server issued the token, so
+	 * a token of another bucket presented here has to be refused, and refusing it means knowing who
+	 * issued it. A realm-confusion advisory against a Keycloak integration is the same defect from the
+	 * other end — a token of one realm silently accepted by a policy configured for another.
+	 *
+	 * Optional because a token minted before buckets became tenants carries none, and reading its
+	 * absence as the default bucket is exactly right for such a token: the default bucket's issuer is
+	 * the bare one those tokens were minted with.
+	 */
+	bucketId: t.Optional(t.String())
 });
 
 // Session-binding fields. Composed only into session-bound token schemas (access,

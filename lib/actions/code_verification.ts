@@ -24,6 +24,7 @@ import assignClaims from './authorization/assign_claims.js';
 import checkResource from 'lib/shared/check_resource.js';
 import checkClient from './authorization/check_client.js';
 import deviceVerificationResponse from './authorization/device_user_flow_response.js';
+import { requestBucketFor } from 'lib/admin/auth/bucketAddress.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { Client } from 'lib/models/client.js';
@@ -52,8 +53,17 @@ export const codeVerification = new Elysia()
 	})
 	.get(
 		routeNames.code_verification,
-		async ({ cookie, query }) => {
-			const oidc = new OIDCContext(query);
+		async ({ cookie, query, params }) => {
+			/*
+			 * The one flow whose entry point could not name a population before addresses existed: the
+			 * person has typed nothing yet, so there is no client, no resource and no user code to derive
+			 * one from. The address answers it, which is why this page is served beneath a bucket's
+			 * prefix as well as at the bare one.
+			 */
+			const bucket = await requestBucketFor(
+				(params as { bucket?: string } | undefined)?.bucket
+			);
+			const oidc = new OIDCContext(query, {}, 'anonymous', bucket);
 			oidc.cookie = cookie;
 			const setCookies = await sessionHandler(oidc);
 
@@ -81,8 +91,11 @@ export const codeVerification = new Elysia()
 	)
 	.post(
 		routeNames.code_verification,
-		async ({ cookie, body }) => {
-			const oidc = new OIDCContext({});
+		async ({ cookie, body, params }) => {
+			const bucket = await requestBucketFor(
+				(params as { bucket?: string } | undefined)?.bucket
+			);
+			const oidc = new OIDCContext({}, {}, 'anonymous', bucket);
 			oidc.cookie = cookie;
 			const setCookies = await sessionHandler(oidc);
 
