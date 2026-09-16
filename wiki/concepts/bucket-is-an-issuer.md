@@ -4,7 +4,7 @@ title: 'A user bucket is a tenant with its own issuer'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-15
-updated: 2026-09-15
+updated: 2026-09-16
 graph:
   node_type: concept
   relationships:
@@ -37,8 +37,16 @@ Auth0's primary tenant is likewise the bare domain.
 
 The cost is one branch, in one function, forever: `issuerFor(bucket)` in `lib/configs/issuer.ts`.
 **Never inline it.** Across the call sites that need an issuer it becomes that many chances to forget
-the default case, and the failure is a token whose `iss` does not match the metadata that advertised
+the root case, and the failure is a token whose `iss` does not match the metadata that advertised
 the endpoint it came from — which clients reject with an error naming neither cause.
+
+The branch tests `isServedAtTheRoot(bucketId)`, not the default bucket's id, and the difference is not
+cosmetic. It shipped as `bucket._id === DEFAULT_BUCKET_ID` while the *routing* side already excluded
+both reserved buckets, so the administrators bucket was unaddressable and yet issued
+`<ISSUER>/admin` — an identifier no metadata advertises. Every agent connection to the admin MCP plane
+signed in successfully and was then refused, because the client checked `iss` against what it had
+discovered. One predicate now answers both questions, and `isAddressable` derives from it; two lists
+of reserved ids is precisely how this returns.
 
 Any later change that gives the default bucket a prefix, for uniformity or to remove that branch, is a
 breaking release for every integration and every token in circulation, not a refactor.

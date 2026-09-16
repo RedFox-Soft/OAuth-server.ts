@@ -1,5 +1,5 @@
 import { ISSUER } from './env.js';
-import { DEFAULT_BUCKET_ID } from '../admin/consts.js';
+import { ADMIN_BUCKET_ID, DEFAULT_BUCKET_ID } from '../admin/consts.js';
 
 /*
  * Just enough of a bucket to derive an address from, and it lives here rather than beside the request
@@ -19,13 +19,33 @@ export const DEFAULT_REQUEST_BUCKET: RequestBucket = {
 };
 
 /*
- * The one place that knows the default bucket is addressed at the root.
+ * The one place that knows which buckets are addressed at the root, and therefore which ones issue the
+ * instance's own identifier rather than one of their own.
  *
- * Every other bucket is a tenant with its own issuer identifier — `<ISSUER>/<name>` — and serves its
- * endpoints beneath it. The default bucket keeps the bare issuer it already has, because an issuer
- * identifier is a promise already made: clients are configured against it and tokens carrying it are
- * in circulation. That asymmetry is the whole compatibility story of this feature, and it costs
- * exactly one branch, here.
+ * The default bucket is the obvious member: an issuer identifier is a promise already made, clients are
+ * configured against it and tokens carrying it are in circulation, so it keeps the bare address it has.
+ * That asymmetry is the whole compatibility story of this feature.
+ *
+ * The administrators bucket is the member that is not obvious, and leaving it out is expensive. The
+ * console is a relying party on the instance's issuer, so a token minted for that population claiming
+ * `<ISSUER>/admin` names an issuer no metadata advertises, and any client that checks `iss` against
+ * what it discovered rejects it. From outside that reads as "I authorized successfully and it still
+ * says unauthorized" — the sign-in genuinely succeeded and it is the token that is wrong.
+ *
+ * Both carry a slug regardless, because a session cookie has to be named after something; a slug is a
+ * name, not an address. Anything that needs to know whether a bucket has an address of its own asks
+ * this function rather than keeping a second list — `isAddressable` in `admin/auth/bucketAddress.ts`
+ * is derived from it, because two lists of reserved ids is exactly how the mismatch above comes back.
+ */
+const SERVED_AT_THE_ROOT = new Set([DEFAULT_BUCKET_ID, ADMIN_BUCKET_ID]);
+
+export function isServedAtTheRoot(bucketId: string): boolean {
+	return SERVED_AT_THE_ROOT.has(bucketId);
+}
+
+/*
+ * The issuer identifier a bucket's tokens carry. Every bucket not served at the root is a tenant with
+ * its own — `<ISSUER>/<name>` — and serves its endpoints beneath it.
  *
  * The parameter is required, deliberately. A caller that cannot say which bucket it is serving has
  * not decided, and a default argument would turn that undecided case into a silently wrong issuer —
@@ -33,10 +53,10 @@ export const DEFAULT_REQUEST_BUCKET: RequestBucket = {
  * with an error naming neither cause. Better to fail to compile.
  *
  * Never inline this branch. Across the thirty call sites that read the issuer it would become thirty
- * chances to forget the default case.
+ * chances to forget the root case.
  */
 export function issuerFor(bucket: RequestBucket): string {
-	if (bucket._id === DEFAULT_BUCKET_ID) {
+	if (isServedAtTheRoot(bucket._id)) {
 		return ISSUER;
 	}
 	/*
@@ -49,12 +69,12 @@ export function issuerFor(bucket: RequestBucket): string {
 }
 
 /*
- * The path segment a bucket's endpoints live beneath, empty for the default bucket. Separate from
- * `issuerFor` because routing needs the segment without the origin, and deriving one by string
+ * The path segment a bucket's endpoints live beneath, empty for a bucket served at the root. Separate
+ * from `issuerFor` because routing needs the segment without the origin, and deriving one by string
  * surgery on the other is how the two drift apart.
  */
 export function pathPrefixFor(bucket: RequestBucket): string {
-	if (bucket._id === DEFAULT_BUCKET_ID) {
+	if (isServedAtTheRoot(bucket._id)) {
 		return '';
 	}
 	return `/${bucket.slug ?? bucket._id}`;

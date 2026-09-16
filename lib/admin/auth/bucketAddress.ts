@@ -1,9 +1,10 @@
 import { getBucketStore } from '../../adapters/index.js';
-import { ADMIN_BUCKET_ID, DEFAULT_BUCKET_ID } from '../consts.js';
+import { DEFAULT_BUCKET_ID } from '../consts.js';
 import type { UserBucket } from '../../adapters/types.js';
 import { UnknownBucket } from '../../helpers/errors.js';
 import {
 	DEFAULT_REQUEST_BUCKET,
+	isServedAtTheRoot,
 	type RequestBucket
 } from '../../configs/issuer.js';
 
@@ -50,8 +51,13 @@ const byId = new Map<string, RequestBucket>();
  * the one thing an issuer identifier may not have.
  */
 export function isAddressable(bucket: { _id: string; slug?: string }): boolean {
-	if (!bucket.slug) return false;
-	return bucket._id !== DEFAULT_BUCKET_ID && bucket._id !== ADMIN_BUCKET_ID;
+	/*
+	 * Which buckets are served at the root is `issuerFor`'s knowledge rather than a second opinion held
+	 * here. A bucket reachable at a prefixed address but issuing the instance's identifier — or the
+	 * reverse — is exactly the mismatch that made a genuine sign-in produce a token no client would
+	 * accept, and two lists of reserved ids is how that comes back.
+	 */
+	return Boolean(bucket.slug) && !isServedAtTheRoot(bucket._id);
 }
 
 export function forgetBucketAddresses(): void {

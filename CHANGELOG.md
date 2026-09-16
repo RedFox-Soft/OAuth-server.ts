@@ -20,8 +20,9 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   bucket that did not issue it is reported inactive as RFC 7662 §2.2 requires. **The default bucket is
   unchanged**: it keeps the bare issuer and the bare paths, so nothing integrated before this needs
   reconfiguring and tokens in circulation stay valid. Two reserved buckets — the default one and the
-  administrators' — are served at the root by design and are not addressable, which is why the admin
-  console stays at `/admin`. A bucket's address is fixed once chosen; renaming would invalidate every
+  administrators' — are served at the root by design: they are not addressable and their tokens carry
+  the instance's own issuer, which is why the admin console stays at `/admin` and why an agent's
+  connection to the administrative MCP plane keeps working. A bucket's address is fixed once chosen; renaming would invalidate every
   client integrated with it and wants an operation of its own.
 
 ### Fixed
