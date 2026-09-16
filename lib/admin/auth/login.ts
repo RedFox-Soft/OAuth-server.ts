@@ -9,9 +9,13 @@ import {
 } from './session.js';
 import { IdTokenRejected, verifyAdminIdToken } from './verifyIdToken.js';
 import { eventBus } from '../../event_bus.js';
-import { cookieNames, routeNames } from '../../consts/param_list.js';
+import { routeNames, sessionCookieName } from '../../consts/param_list.js';
 import { Session } from '../../models/session.js';
-import { expiredSessionCookie } from '../../shared/session.js';
+import {
+	clearLegacySessionCookie,
+	expiredSessionCookie
+} from '../../shared/session.js';
+import { ADMIN_REQUEST_BUCKET } from '../../configs/issuer.js';
 import { destroyProviderSession } from '../../shared/destroy_session.js';
 import {
 	ADMIN_CLIENT_ID,
@@ -189,13 +193,21 @@ export const adminLogin = new Elysia({ name: 'admin-login' })
 		if (id) await adminSessionStore.destroy(id);
 		cookie[ADMIN_SESSION_COOKIE].set(expiredSessionCookieAttributes());
 
-		const providerSessionId = cookie[cookieNames.session]?.value as
+		/*
+		 * The administrators bucket's sign-in, and only it. The console is a relying party on this
+		 * server, so signing out of the console ends the provider session behind it — but that session
+		 * belongs to one population, and ending every sign-in the browser holds would sign an
+		 * administrator out of unrelated applications as a side effect of leaving the console.
+		 */
+		const adminBucketCookie = sessionCookieName(ADMIN_REQUEST_BUCKET);
+		const providerSessionId = cookie[adminBucketCookie]?.value as
 			string | undefined;
 		if (providerSessionId) {
 			const session = await findSession(providerSessionId);
 			if (session) await destroyProviderSession(session);
 		}
-		cookie[cookieNames.session].set(expiredSessionCookie());
+		cookie[adminBucketCookie].set(expiredSessionCookie());
+		clearLegacySessionCookie(cookie);
 
 		return { ok: true };
 	});

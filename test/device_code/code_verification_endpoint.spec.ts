@@ -17,6 +17,7 @@ import bootstrap, {
 	type Setup
 } from '../test_helper.js';
 import { eventBus } from 'lib/event_bus.js';
+import { DEFAULT_SESSION_COOKIE } from '../test_helper.ts';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { Client } from 'lib/models/client.js';
 
@@ -91,7 +92,7 @@ describe('POST code_verification endpoint w/o verification', () => {
 		return agent[route].post(jsonToFormUrlEncoded(body), {
 			headers: {
 				'content-type': form,
-				cookie: `_session=${setup.getSessionId()}`
+				cookie: `${DEFAULT_SESSION_COOKIE}=${setup.getSessionId()}`
 			}
 		});
 	}
@@ -250,7 +251,7 @@ describe('POST code_verification endpoint w/ verification', () => {
 		return agent[route].post(jsonToFormUrlEncoded(body), {
 			headers: {
 				'content-type': form,
-				cookie: `_session=${setup.getSessionId()}`
+				cookie: `${DEFAULT_SESSION_COOKIE}=${setup.getSessionId()}`
 			}
 		});
 	}

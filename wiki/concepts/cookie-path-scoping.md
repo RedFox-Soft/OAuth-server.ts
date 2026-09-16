@@ -4,7 +4,7 @@ title: "A cookie's Path is part of its identity"
 tags: [contract, gotcha, architecture]
 sources: [oauth-server-codebase]
 created: 2026-08-27
-updated: 2026-08-27
+updated: 2026-09-16
 graph:
   node_type: concept
   relationships:
@@ -71,6 +71,34 @@ it, so the two cannot name different cookies.
 **Never clear a cookie with `remove()` in this codebase.** Set an expired cookie carrying the same
 attributes it was created with, derived from the same constant that set it.
 
+## The name varies too, now, and it multiplies the same rule
+
+A session cookie is `_session_<bucket>` — `_session_default`, `_session_acme` — because a bucket is a
+population of its own and a browser may hold a sign-in in more than one ([[bucket-is-an-issuer]]).
+So the identity this page is about now has **two** variable parts on the same cookie, and the rule is
+unchanged: one derivation, used to write and to clear. `sessionCookieName(bucket)` in
+`lib/consts/param_list.ts` is that derivation, and it is the whole of it — `expiredSessionCookie()`
+supplies the attributes, the caller supplies the bucket, and neither hand-writes a name.
+
+It lives in `param_list.ts`, which imports nothing, because three modules need it and two of them
+cannot import each other: `lib/shared/session.ts` writes the cookie, `lib/models/session.ts` reads it,
+and the first already imports the second.
+
+Two consequences worth stating, because both are ways to clear nothing while reporting success:
+
+- **The bucket comes from the address, never from the cookie.** A forged `_session_<anything>` is read
+  only where the server independently resolved that same bucket, and its value must still name a
+  session record.
+- **A bucket with no slug shares the default bucket's name.** It has no address of its own, so its
+  clients use the bare endpoints — and the sign-in screen, which knows the bucket from the *client*,
+  must agree with `/auth` and `/logout`, which know only the address. Falling back to the bucket's
+  record id instead made those two disagree: the sign-in completed, wrote `_session_<id>`, and the
+  next request looked for `_session_default` and found nobody.
+
+The bare `_session` is now a legacy name. It is never read, and `clearLegacySessionCookie` expires it
+on the first request that presents it — cleared rather than ignored, or the browser sends it forever
+and a later change reintroducing the name finds a stale value waiting.
+
 ## Why the existing test could not see it
 
 `test/admin/login_flow.spec.ts` asserted that `/admin/api/me` answered 401 after logout — but it
@@ -86,6 +114,10 @@ that gap, and the same blindness applies to any spec that threads cookies throug
   same lesson about headless fetch scripts standing in for browsers.
 - [[end-user-cookie-attributes]] — the other half of a cookie's definition, and the second schema
   that was quietly writing `_session` with no attributes at all.
-- [[remember-me-session-retention]] — the same blindness one field over: a `_session` lifetime no
-  test could see, because the tests that named the distinction threaded cookies through by hand.
+- [[remember-me-session-retention]] — the same blindness one field over: a session-cookie lifetime no
+  test could see, because the tests that named the distinction threaded cookies through by hand. The
+  answer is now per bucket: declining in one leaves another's alone, which falls out of them being
+  separate cookies.
+- [[bucket-is-an-issuer]] — why the name carries the partition and the path cannot: the default bucket
+  is served at the root, so its cookie must live at `Path=/`, where every other bucket's path sees it.
 - [[html-response-security-policy]] — the neighbouring per-response policy derived from one owner.

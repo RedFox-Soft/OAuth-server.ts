@@ -7,6 +7,10 @@ import {
 	spyOn,
 	mock
 } from 'bun:test';
+import { sessionCookieName } from 'lib/consts/param_list.js';
+import { DEFAULT_REQUEST_BUCKET } from 'lib/configs/issuer.js';
+
+const SESSION_COOKIE = sessionCookieName(DEFAULT_REQUEST_BUCKET);
 
 import bootstrap, { agent, type Setup } from '../test_helper.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
@@ -37,7 +41,7 @@ describe('session exp handling', () => {
 	function sessionIdFromResponse(response) {
 		const setCookie = response.headers
 			.getSetCookie()
-			.find((c) => c.startsWith('_session=') && !c.includes('1970'));
+			.find((c) => c.startsWith(`${SESSION_COOKIE}=`) && !c.includes('1970'));
 		return setCookie?.split('=')[1].split(';')[0];
 	}
 

@@ -12,7 +12,11 @@ import { ApplicationConfig } from 'lib/configs/application.js';
 import revoke from '../helpers/revoke.ts';
 import { IdToken } from 'lib/models/id_token.js';
 import { Client } from 'lib/models/client.js';
-import { AuthorizationCookies, routeNames } from 'lib/consts/param_list.js';
+import {
+	AuthorizationCookies,
+	routeNames,
+	sessionCookieName
+} from 'lib/consts/param_list.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { requestBucketFor } from 'lib/admin/auth/bucketAddress.js';
 import sessionHandler, { expiredSessionCookie } from '../shared/session.ts';
@@ -181,7 +185,13 @@ export const logoutConfirmAction = new Elysia()
 
 			if (body.logout) {
 				await destroyProviderSession(session, { oidc });
-				cookie._session.set(expiredSessionCookie());
+				/*
+				 * The addressed bucket's cookie, named from the same function that wrote it. A literal here
+				 * would clear a name the browser is not holding — reporting a completed sign-out while the
+				 * sign-in stayed alive — and, once buckets are separate cookies, would end the wrong
+				 * population's sign-in if it matched anything at all.
+				 */
+				cookie[sessionCookieName(oidc.bucket)].set(expiredSessionCookie());
 			} else if (state.clientId) {
 				const grantId = session.grantIdFor(state.clientId);
 				if (

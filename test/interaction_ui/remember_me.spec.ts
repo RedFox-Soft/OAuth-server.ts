@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeAll } from 'bun:test';
-import bootstrap, { agent, getHeader } from '../test_helper.ts';
+import bootstrap, {
+	agent,
+	findSessionSetCookie,
+	getHeader
+} from '../test_helper.ts';
 import { AuthorizationRequest } from '../AuthorizationRequest.ts';
 import {
 	getBucketStore,
@@ -18,9 +22,15 @@ const PASSWORD = 'correct horse battery';
  * this whole file is about — the same blindness wiki/concepts/cookie-path-scoping.md names as the
  * reason every existing suite passed while the browser kept the wrong cookie.
  */
+const SESSION_COOKIE = '_session';
+
 function setCookieFor(response: Response, name: string): string {
 	const all = response.headers.getSetCookie();
-	const found = all.find((c) => c.startsWith(`${name}=`));
+	/* Named after the bucket that wrote it, so matched by prefix; `_interaction` keeps its one name. */
+	const found =
+		name === SESSION_COOKIE
+			? findSessionSetCookie(all)
+			: all.find((c) => c.startsWith(`${name}=`));
 	if (!found) {
 		throw new Error(
 			`expected a ${name} Set-Cookie, got ${JSON.stringify(all)}`
@@ -108,7 +118,7 @@ async function signIn(
 		{ headers: { cookie } }
 	);
 	expect(response.status).toBe(303);
-	return setCookieFor(response, '_session');
+	return setCookieFor(response, SESSION_COOKIE);
 }
 
 /**

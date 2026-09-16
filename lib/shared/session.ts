@@ -1,5 +1,9 @@
 import { Session } from 'lib/models/session.js';
-import { cookieNames, endUserCookieAttributes } from '../consts/param_list.js';
+import {
+	cookieNames,
+	endUserCookieAttributes,
+	sessionCookieName
+} from '../consts/param_list.js';
 
 /*
  * The session cookie's path, written explicitly on every set.
@@ -7,8 +11,14 @@ import { cookieNames, endUserCookieAttributes } from '../consts/param_list.js';
  * Left implicit, the browser applies RFC 6265's default-path — the directory of the *request* URI —
  * so the same cookie name landed on `/` when written from `/auth` and on `/logout` when written
  * from `/logout/confirm`. Two cookies under one name, and the clearing one at sign-out was not the
- * one the browser kept sending back. Naming the path makes `_session` a single cookie wherever it
- * is written, which is what makes destroying it observable to the browser.
+ * one the browser kept sending back. Naming the path makes a session cookie a single cookie wherever
+ * it is written, which is what makes destroying it observable to the browser.
+ *
+ * The path stays `/` for every bucket, and deliberately does not carry the bucket. It would, if every
+ * bucket were prefixed — but the default bucket is served at the root, so its cookie must live at `/`,
+ * and a cookie at `/` is sent to every other bucket's path anyway. Path scoping would isolate the
+ * named buckets from each other and fail on the one bucket every existing deployment uses. The name
+ * carries the partition instead.
  */
 export const SESSION_COOKIE_PATH = '/';
 
@@ -29,11 +39,24 @@ export function expiredSessionCookie() {
 	};
 }
 
+/*
+ * The un-suffixed name every session cookie carried before buckets were populations of their own.
+ *
+ * Expired rather than ignored on the first request that presents it. Left in place the browser keeps
+ * sending it forever, and a later change that reintroduced the bare name would find a stale value
+ * waiting for it — a sign-in nobody can account for.
+ */
+export function clearLegacySessionCookie(cookie): void {
+	if (!cookie[cookieNames.session]?.value) return;
+	cookie[cookieNames.session].set(expiredSessionCookie());
+}
+
 export default async function sessionHandler(oidc) {
 	oidc.session = await Session.get(oidc);
 
 	return async function setCookies() {
-		const cookie = oidc.cookie[cookieNames.session];
+		clearLegacySessionCookie(oidc.cookie);
+		const cookie = oidc.cookie[sessionCookieName(oidc.bucket)];
 		// Persist and (re)issue the session cookie when the session is worth
 		// keeping: it already had a cookie (returning user — refresh it), it now
 		// carries an authenticated account (a login just resolved), or it was

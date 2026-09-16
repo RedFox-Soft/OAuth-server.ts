@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeAll, spyOn } from 'bun:test';
-import bootstrap, { agent, getHeader } from '../test_helper.ts';
+import bootstrap, {
+	SESSION_COOKIE_PREFIX,
+	agent,
+	getHeader
+} from '../test_helper.ts';
 import { AuthorizationRequest } from '../AuthorizationRequest.ts';
 import {
 	adapter,
@@ -159,7 +163,7 @@ function expectSignedIn(res: {
 	setCookie: string | null;
 }) {
 	expect(res.status).toBe(303);
-	expect(res.setCookie ?? '').toContain('_session=');
+	expect(res.setCookie ?? '').toContain(SESSION_COOKIE_PREFIX);
 	expect(res.location ?? '').toMatch(/\/consent$|\/callback/);
 }
 
@@ -206,7 +210,7 @@ describe('second factor at sign-in (US3)', () => {
 		// Sent onward to the code step, and nothing was established on the way.
 		expect(res.status).toBe(303);
 		expect(res.location).toContain('/totp');
-		expect(res.setCookie ?? '').not.toContain('_session=');
+		expect(res.setCookie ?? '').not.toContain(SESSION_COOKIE_PREFIX);
 	});
 
 	it('leaves the authorization request unfinished until the code is supplied', async () => {
@@ -216,7 +220,7 @@ describe('second factor at sign-in (US3)', () => {
 
 		// Not handed back to the client, and no session issued: the redirect stays inside the interaction.
 		expect(res.location).toContain(`/ui/${uid}/totp`);
-		expect(res.setCookie ?? '').not.toContain('_session=');
+		expect(res.setCookie ?? '').not.toContain(SESSION_COOKIE_PREFIX);
 	});
 
 	it('renders a code page carrying no account detail', async () => {
@@ -346,7 +350,7 @@ describe('second factor at sign-in (US3)', () => {
 			code: currentCode()
 		});
 
-		expect(res.setCookie ?? '').not.toContain('_session=');
+		expect(res.setCookie ?? '').not.toContain(SESSION_COOKIE_PREFIX);
 		// Routed onward to enrolment, which finds no account either and returns them to the login door.
 		expect(res.location).toBe(`/ui/${uid}/totp/enroll`);
 
@@ -375,7 +379,7 @@ describe('second factor at sign-in (US3)', () => {
 			});
 			expect(update).toHaveBeenCalled();
 			// Not signed in on a verification whose replay guard never moved.
-			expect(res.setCookie ?? '').not.toContain('_session=');
+			expect(res.setCookie ?? '').not.toContain(SESSION_COOKIE_PREFIX);
 			expect(res.location).toBe(`/ui/${uid}/totp/enroll`);
 		} finally {
 			update.mockRestore();
@@ -486,7 +490,9 @@ describe('second factor at sign-in (US3)', () => {
 		});
 		expectSignedIn(res);
 
-		const sessionId = /_session=([^;]+)/.exec(res.setCookie ?? '')?.[1];
+		const sessionId = new RegExp(`${SESSION_COOKIE_PREFIX}[^=]+=([^;]+)`).exec(
+			res.setCookie ?? ''
+		)?.[1];
 		expect(sessionId).toBeTruthy();
 		expect(await amrOf(sessionId as string)).toEqual(['pwd', 'otp']);
 	});
@@ -501,7 +507,9 @@ describe('second factor at sign-in (US3)', () => {
 		);
 		const { res } = await passwordStep('totp-optional-app', email);
 
-		const sessionId = /_session=([^;]+)/.exec(res.setCookie ?? '')?.[1];
+		const sessionId = new RegExp(`${SESSION_COOKIE_PREFIX}[^=]+=([^;]+)`).exec(
+			res.setCookie ?? ''
+		)?.[1];
 		expect(await amrOf(sessionId as string)).toBeUndefined();
 	});
 
@@ -535,7 +543,9 @@ describe('second factor at sign-in (US3)', () => {
 	 */
 	describe('the "Remember me" choice given at the password step', () => {
 		function sessionCookieOf(res: { setCookies: string[] }) {
-			const header = res.setCookies.find((c) => c.startsWith('_session='));
+			const header = res.setCookies.find((c) =>
+				c.startsWith(SESSION_COOKIE_PREFIX)
+			);
 			expect(header).toBeTruthy();
 			return header as string;
 		}

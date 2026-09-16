@@ -78,6 +78,28 @@ a client. The console's decision is `bucketAddressFor` in `lib/admin/ui/bucketAd
 from the table's render function so `test/bucket_addressing/console_address.spec.ts` can check every
 listed bucket's address against the router that has to serve it.
 
+## A browser may hold a sign-in in each bucket
+
+A session cookie is named after the bucket that wrote it — `_session_default`, `_session_acme` — so
+two sign-ins in one browser are two cookies and neither disturbs the other. A request reads the one
+its address names and never looks for the other.
+
+This did not ship with the rest of the feature, and the gap was not visible from the outside: the
+buckets *were* isolated — reaching one while signed in to another asked you to sign in, correctly —
+but the second sign-in overwrote the first, so an end user was silently signed out of an application
+they had not touched. Isolation and co-existence are different properties, and the tests that proved
+the first said nothing about the second.
+
+The path stays `/` for every bucket and deliberately does not carry the partition. It would, if every
+bucket were prefixed — but the default bucket is served at the root, so its cookie must live at
+`Path=/`, and a cookie at `Path=/` is sent to every other bucket's path anyway. Path scoping would
+isolate the named buckets from each other and fail on the one bucket every existing deployment uses.
+See [[cookie-path-scoping]] for the identity rule this multiplies.
+
+Two things fall out of the cookies being separate rather than needing their own code: a sign-out at
+one bucket's address ends that bucket's sign-in and no other, and "Remember me" declined in one
+bucket says nothing about another's lifetime.
+
 ## What the address decides, and what it does not
 
 The address decides which population a request concerns. `resolveBucketForRequest` no longer answers

@@ -2,6 +2,7 @@ import { describe, it, beforeAll, afterEach, expect, mock } from 'bun:test';
 import { strict as assert } from 'node:assert';
 
 import bootstrap, {
+	DEFAULT_SESSION_COOKIE,
 	agent,
 	jsonToFormUrlEncoded,
 	seedAccount,
@@ -416,7 +417,7 @@ describe('features.resourceIndicators', () => {
 				{
 					headers: {
 						'content-type': form,
-						cookie: `_session=${setup.getSessionId()}`
+						cookie: `${DEFAULT_SESSION_COOKIE}=${setup.getSessionId()}`
 					}
 				}
 			);
@@ -483,7 +484,7 @@ describe('features.resourceIndicators', () => {
 				{
 					headers: {
 						'content-type': form,
-						cookie: `_session=${setup.getSessionId()}`
+						cookie: `${DEFAULT_SESSION_COOKIE}=${setup.getSessionId()}`
 					}
 				}
 			);
@@ -552,7 +553,7 @@ describe('features.resourceIndicators', () => {
 				{
 					headers: {
 						'content-type': form,
-						cookie: `_session=${setup.getSessionId()}`
+						cookie: `${DEFAULT_SESSION_COOKIE}=${setup.getSessionId()}`
 					}
 				}
 			);
@@ -619,7 +620,7 @@ describe('features.resourceIndicators', () => {
 				{
 					headers: {
 						'content-type': form,
-						cookie: `_session=${setup.getSessionId()}`
+						cookie: `${DEFAULT_SESSION_COOKIE}=${setup.getSessionId()}`
 					}
 				}
 			);

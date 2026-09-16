@@ -1,4 +1,5 @@
 import { t } from 'elysia';
+import type { RequestBucket } from '../configs/issuer.js';
 
 /**
  * A parameter this server refuses rather than ignores.
@@ -158,10 +159,48 @@ export const routeNames = {
 	userinfo: '/userinfo'
 } as const;
 
+/* The default bucket's name in a cookie. It has none in its address, and a cookie name cannot be
+ * empty; `default` is on the reserved list precisely so no bucket can collide with it. */
+const DEFAULT_BUCKET_SLUG = 'default';
+
 export const cookieNames = {
 	interaction: '_interaction',
 	session: '_session'
 };
+
+/*
+ * The name of a bucket's session cookie, and the only place that answer is produced.
+ *
+ * Two sign-ins in one browser are two cookies, which is what lets an end user hold one in each of two
+ * buckets without either disturbing the other. Before this, one name meant one cookie: signing in to a
+ * second bucket overwrote the first bucket's sign-in, and the end user was silently signed out of an
+ * application they had not touched.
+ *
+ * The bucket's public name, not its record id: it is already in the address bar, and the slug charset
+ * (lowercase ASCII, digits, hyphen) is a valid cookie name as it stands. The default bucket has no
+ * name in its address but has one here, because a cookie name cannot be empty — `default` is on the
+ * reserved list precisely so no bucket can collide with it.
+ *
+ * Used to write the cookie *and* to build the cookie that clears it. A clear only removes a cookie
+ * when it names the same one, so a second hand-written literal would clear a name the browser is not
+ * holding while reporting success — the failure `cookie-path-scoping` exists to forbid, one attribute
+ * over. It lives here, beside the name it extends and in a module neither the request pipeline nor the
+ * models can cycle through, because both of them need it.
+ */
+export function sessionCookieName(bucket: RequestBucket): string {
+	/*
+	 * A bucket with no slug has no address of its own, so its clients use the bare endpoints — the ones
+	 * they used before buckets became tenants — and share the default bucket's cookie, exactly as they
+	 * shared its behaviour. Falling back to the record id instead would name a cookie nobody reads: the
+	 * sign-in screen knows which bucket the client belongs to and would write `_session_<id>`, while the
+	 * bare `/auth` and `/logout` know only the address and would look for `_session_default`. The
+	 * sign-in would complete and then not exist.
+	 *
+	 * Every bucket that *is* addressed has a slug — the addressable ones by definition, and the two
+	 * reserved ones because they are separate populations that happen to share the root.
+	 */
+	return `${cookieNames.session}_${bucket.slug ?? DEFAULT_BUCKET_SLUG}`;
+}
 
 /*
  * The attributes both end-user cookies are written with, wherever they are written.

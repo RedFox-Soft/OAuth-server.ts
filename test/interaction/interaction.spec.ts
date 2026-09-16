@@ -9,6 +9,7 @@ import {
 } from 'bun:test';
 import nanoid from '../../lib/helpers/nanoid.ts';
 import bootstrap, { agent } from '../test_helper.js';
+import { SESSION_COOKIE_PREFIX } from '../test_helper.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { Interaction } from 'lib/models/interaction.js';
@@ -558,7 +559,7 @@ describe('resume after consent', async () => {
 		function sessionCookieOf(response: Response) {
 			const header = response.headers
 				.getSetCookie()
-				.find((c) => c.startsWith('_session='));
+				.find((c) => c.startsWith(SESSION_COOKIE_PREFIX));
 			expect(header).toBeTruthy();
 			return header as string;
 		}

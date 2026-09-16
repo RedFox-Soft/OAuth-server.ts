@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeAll } from 'bun:test';
-import bootstrap, { agent, getHeader } from '../test_helper.ts';
+import bootstrap, {
+	findSessionSetCookie,
+	agent,
+	getHeader
+} from '../test_helper.ts';
 import { AuthorizationRequest } from '../AuthorizationRequest.ts';
 import {
 	getBucketStore,
@@ -18,9 +22,18 @@ const PASSWORD = 'correct horse battery';
  * fail to apply — the blindness wiki/concepts/cookie-path-scoping.md names as the reason every
  * existing suite passed while the browser kept the wrong cookie.
  */
+const SESSION_COOKIE = '_session';
+
 function setCookieFor(response: Response, name: string): string {
 	const all = response.headers.getSetCookie();
-	const found = all.find((c) => c.startsWith(`${name}=`));
+	/*
+	 * The session cookie is named after the bucket that wrote it, so it is matched by prefix. The
+	 * interaction cookie keeps its one name and is still matched exactly.
+	 */
+	const found =
+		name === SESSION_COOKIE
+			? findSessionSetCookie(all)
+			: all.find((c) => c.startsWith(`${name}=`));
 	if (!found) {
 		throw new Error(
 			`expected a ${name} Set-Cookie, got ${JSON.stringify(all)}`
@@ -120,7 +133,7 @@ describe('end-user cookie attributes', () => {
 		// The regression: the `/ui` guard declared no cookie options, so this response carried
 		// `_session` with no HttpOnly, no SameSite and no Secure at all.
 		const { response } = await loginNewUser('cookie-attrs-login@x.io');
-		const header = setCookieFor(response, '_session');
+		const header = setCookieFor(response, SESSION_COOKIE);
 
 		expectHardened(header);
 		expect(header).toContain('Path=/');
@@ -132,7 +145,7 @@ describe('end-user cookie attributes', () => {
 		// this response that carries the live cookie, and the consent POST below that clears it.
 		const consentUid = getHeader(response, 'location').split('/')[2];
 		const cookie = [
-			pairOf(setCookieFor(response, '_session')),
+			pairOf(setCookieFor(response, SESSION_COOKIE)),
 			pairOf(setCookieFor(response, '_interaction'))
 		].join('; ');
 
@@ -159,14 +172,14 @@ describe('end-user cookie attributes', () => {
 	 */
 	it('writes the session cookie hardened from the end-session confirm response', async () => {
 		const { response } = await loginNewUser('cookie-attrs-logout@x.io');
-		let sessionCookie = pairOf(setCookieFor(response, '_session'));
+		let sessionCookie = pairOf(setCookieFor(response, SESSION_COOKIE));
 
 		const page = await agent.logout.get({
 			query: {},
 			headers: { cookie: sessionCookie, accept: 'text/html' }
 		});
 		expect(page.response.status).toBe(200);
-		sessionCookie = pairOf(setCookieFor(page.response, '_session'));
+		sessionCookie = pairOf(setCookieFor(page.response, SESSION_COOKIE));
 		const xsrf =
 			/name="xsrf"[^>]*value="([^"]+)"|value="([^"]+)"[^>]*name="xsrf"/.exec(
 				(page.data as string) ?? ''
@@ -179,7 +192,7 @@ describe('end-user cookie attributes', () => {
 			{ headers: { cookie: sessionCookie, accept: 'text/html' } }
 		);
 
-		const header = setCookieFor(confirmed, '_session');
+		const header = setCookieFor(confirmed, SESSION_COOKIE);
 		expect(header).toContain('Path=/');
 		expectHardened(header);
 	});

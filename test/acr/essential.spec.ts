@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeAll } from 'bun:test';
-import bootstrap, { agent, getHeader } from '../test_helper.ts';
+import bootstrap, {
+	agent,
+	getHeader,
+	SESSION_COOKIE_PREFIX
+} from '../test_helper.ts';
 import { AuthorizationRequest } from '../AuthorizationRequest.ts';
 import {
 	getBucketStore,
@@ -175,7 +179,9 @@ describe('a required authentication context', () => {
 
 		// A session that exists and carries the password context, then a request requiring more.
 		const first = await signIn(requiring([PWD]), email);
-		const session = /(_session=[^;]+)/.exec(first.res.setCookie ?? '')?.[1];
+		const session = new RegExp(`(${SESSION_COOKIE_PREFIX}[^=]+=[^;]+)`).exec(
+			first.res.setCookie ?? ''
+		)?.[1];
 		expect(session).toBeTruthy();
 
 		const auth = requiring([MFA], { prompt: 'none' });

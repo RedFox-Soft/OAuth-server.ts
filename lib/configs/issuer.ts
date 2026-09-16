@@ -1,5 +1,9 @@
 import { ISSUER } from './env.js';
-import { DEFAULT_BUCKET_ID, isServedAtTheRoot } from '../admin/consts.js';
+import {
+	ADMIN_BUCKET_ID,
+	DEFAULT_BUCKET_ID,
+	isServedAtTheRoot
+} from '../admin/consts.js';
 
 /*
  * Just enough of a bucket to derive an address from, and it lives here rather than beside the request
@@ -16,6 +20,16 @@ export type RequestBucket = { _id: string; slug?: string };
 export const DEFAULT_REQUEST_BUCKET: RequestBucket = {
 	_id: DEFAULT_BUCKET_ID,
 	slug: 'default'
+};
+
+/*
+ * The administrators bucket, for the one caller that knows its bucket without an address to read it
+ * from: the console's sign-out. Both slugs match what the seed writes, and the seed repairs them on an
+ * existing record, so neither is a guess about stored data.
+ */
+export const ADMIN_REQUEST_BUCKET: RequestBucket = {
+	_id: ADMIN_BUCKET_ID,
+	slug: 'admin'
 };
 
 /*

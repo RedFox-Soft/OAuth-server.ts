@@ -2,7 +2,10 @@ import { describe, it, beforeAll, expect } from 'bun:test';
 import bootstrap from '../test_helper.js';
 import sessionHandler from 'lib/shared/session.ts';
 import { Session } from 'lib/models/session.ts';
-import { cookieNames } from 'lib/consts/param_list.ts';
+import { sessionCookieName } from 'lib/consts/param_list.ts';
+import { DEFAULT_REQUEST_BUCKET } from 'lib/configs/issuer.ts';
+
+const SESSION_COOKIE = sessionCookieName(DEFAULT_REQUEST_BUCKET);
 
 // Minimal cookie jar matching the shape session.ts reads/writes: a per-name
 // entry exposing `.value` and `.set({ value })`.
@@ -16,7 +19,7 @@ function makeCookieJar(sessionValue?: string) {
 			this.value = undefined;
 		}
 	};
-	return { [cookieNames.session]: entry } as Record<string, typeof entry>;
+	return { [SESSION_COOKIE]: entry } as Record<string, typeof entry>;
 }
 
 /**
@@ -33,7 +36,10 @@ describe('session persistence (setCookies)', () => {
 		// already existed, so a first-time login was never persisted and its
 		// session-bound authorization code failed at the token endpoint
 		// (Session.findByUid returned nothing).
-		const oidc = { cookie: makeCookieJar() } as unknown as {
+		const oidc = {
+			cookie: makeCookieJar(),
+			bucket: DEFAULT_REQUEST_BUCKET
+		} as unknown as {
 			cookie: ReturnType<typeof makeCookieJar>;
 			session: Session;
 		};
@@ -42,13 +48,16 @@ describe('session persistence (setCookies)', () => {
 
 		await setCookies();
 
-		expect(oidc.cookie[cookieNames.session].value).toBe(oidc.session.id);
+		expect(oidc.cookie[SESSION_COOKIE].value).toBe(oidc.session.id);
 		const found = await Session.findByUid(oidc.session.payload.uid);
 		expect(found?.payload.accountId).toBe('acc-persist-1');
 	});
 
 	it('does not persist an anonymous session with no prior cookie', async () => {
-		const oidc = { cookie: makeCookieJar() } as unknown as {
+		const oidc = {
+			cookie: makeCookieJar(),
+			bucket: DEFAULT_REQUEST_BUCKET
+		} as unknown as {
 			cookie: ReturnType<typeof makeCookieJar>;
 			session: Session;
 		};
@@ -57,7 +66,7 @@ describe('session persistence (setCookies)', () => {
 
 		await setCookies();
 
-		expect(oidc.cookie[cookieNames.session].value).toBeUndefined();
+		expect(oidc.cookie[SESSION_COOKIE].value).toBeUndefined();
 		expect(await Session.findByUid(uid)).toBeUndefined();
 	});
 });

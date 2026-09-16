@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, jest, spyOn } from 'bun:test';
 
 import bootstrap, { agent, getHeader } from '../test_helper.ts';
+import { SESSION_COOKIE_PREFIX } from '../test_helper.ts';
 import { AuthorizationRequest } from '../AuthorizationRequest.ts';
 import {
 	getBucketStore,
@@ -176,7 +177,7 @@ function reopen(bucketId: string, email: string, by = CEILING + 1) {
 
 function expectSignedIn(res: { status: number; setCookie: string | null }) {
 	expect(res.status).toBe(303);
-	expect(res.setCookie ?? '').toContain('_session=');
+	expect(res.setCookie ?? '').toContain(SESSION_COOKIE_PREFIX);
 }
 
 /**
@@ -208,7 +209,7 @@ describe('password door brute-force throttle', () => {
 
 			const res = await attempt('throttle-password-app', email, PASSWORD);
 			expect(res.text).toContain(INVALID_CREDENTIALS);
-			expect(res.setCookie ?? '').not.toContain('_session=');
+			expect(res.setCookie ?? '').not.toContain(SESSION_COOKIE_PREFIX);
 		});
 
 		it('lets the correct password through once the window has elapsed', async () => {

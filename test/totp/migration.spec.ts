@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeAll } from 'bun:test';
-import bootstrap, { agent, getHeader } from '../test_helper.ts';
+import bootstrap, {
+	SESSION_COOKIE_PREFIX,
+	agent,
+	getHeader
+} from '../test_helper.ts';
 import { AuthorizationRequest } from '../AuthorizationRequest.ts';
 import {
 	getBucketStore,
@@ -131,7 +135,7 @@ describe('bringing existing accounts under the requirement (US4)', () => {
 		const email = await existingAccount('before');
 		const { res } = await signIn(email);
 		expect(res.status).toBe(303);
-		expect(res.setCookie ?? '').toContain('_session=');
+		expect(res.setCookie ?? '').toContain(SESSION_COOKIE_PREFIX);
 	});
 
 	it('routes an unenrolled account to enrolment once the bucket is raised', async () => {
@@ -142,7 +146,7 @@ describe('bringing existing accounts under the requirement (US4)', () => {
 		expect(res.status).toBe(303);
 		expect(res.location).toBe(`/ui/${uid}/totp/enroll`);
 		// Not signed in on the way past.
-		expect(res.setCookie ?? '').not.toContain('_session=');
+		expect(res.setCookie ?? '').not.toContain(SESSION_COOKIE_PREFIX);
 	});
 
 	it('completes that sign-in inline, without a second visit', async () => {
@@ -156,7 +160,7 @@ describe('bringing existing accounts under the requirement (US4)', () => {
 		});
 
 		expect(res.status).toBe(303);
-		expect(res.setCookie ?? '').toContain('_session=');
+		expect(res.setCookie ?? '').toContain(SESSION_COOKIE_PREFIX);
 		expect(res.location ?? '').toMatch(/\/consent$|\/callback/);
 	});
 
@@ -185,7 +189,7 @@ describe('bringing existing accounts under the requirement (US4)', () => {
 		// They walk away. A fresh attempt still demands enrolment, and no session exists.
 		const again = await signIn(email);
 		expect(again.res.location).toBe(`/ui/${again.uid}/totp/enroll`);
-		expect(again.res.setCookie ?? '').not.toContain('_session=');
+		expect(again.res.setCookie ?? '').not.toContain(SESSION_COOKIE_PREFIX);
 
 		const user = await getUserStore(bucketId).findByEmail(email);
 		expect(user?.totp).toBeUndefined();
@@ -210,7 +214,7 @@ describe('bringing existing accounts under the requirement (US4)', () => {
 		await raise(false);
 		const lowered = await signIn(email);
 		// Straight through: no code demanded of an enrolled account in a bucket that does not ask.
-		expect(lowered.res.setCookie ?? '').toContain('_session=');
+		expect(lowered.res.setCookie ?? '').toContain(SESSION_COOKIE_PREFIX);
 
 		// The enrolment survived the round trip.
 		const user = await getUserStore(bucketId).findByEmail(email);

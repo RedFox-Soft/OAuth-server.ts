@@ -29,6 +29,18 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- buckets: a browser can hold a sign-in in more than one user bucket at a time. The session cookie is
+  now named after the bucket that wrote it, so two sign-ins are two cookies and neither disturbs the
+  other. Before this, signing in to a second bucket overwrote the first bucket's sign-in and the end
+  user was silently signed out of an application they had never touched — the buckets were isolated
+  from each other, which is what the earlier work proved, but they could not coexist, which nothing
+  had checked. A sign-out now ends the sign-in of the bucket its address names and no other, tells no
+  other bucket's applications about it, and "Remember me" declined in one bucket says nothing about
+  another's lifetime. The administrators bucket is a population like any other here: signing out of
+  the console ends its sign-in rather than every sign-in the browser holds. **Everyone signed in when
+  this is deployed signs in once more**: the old cookie carried no bucket, is never read, and is
+  expired on the first request that presents it.
+
 - buckets: reaching a second user bucket in one browser no longer fails. An authorization request for
   one bucket from a browser signed into another answered `server_error`, leaving the end user with
   nothing to retry: the sign-in check read the account identifier the session happened to carry rather

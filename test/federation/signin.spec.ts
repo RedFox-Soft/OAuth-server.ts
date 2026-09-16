@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'bun:test';
 
 import bootstrap from '../test_helper.ts';
+import { findSessionSetCookie } from '../test_helper.ts';
 import { getUserStore, resetAdminMemoryStores } from 'lib/adapters/index.ts';
 import { TestAdapter } from 'test/models.ts';
 import { assertNoPendingInterceptors } from '../fetch_mock.ts';
@@ -367,7 +368,7 @@ describe('federated sign-in', () => {
 		});
 
 		expect(complete?.status).toBe(303);
-		const header = complete?.setCookies.find((c) => c.startsWith('_session='));
+		const header = findSessionSetCookie(complete?.setCookies ?? []);
 		expect(header).toBeTruthy();
 		expect(header).toMatch(/;\s*Expires=/i);
 		assertNoPendingInterceptors();

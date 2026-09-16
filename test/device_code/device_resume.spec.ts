@@ -12,6 +12,7 @@ import {
 import nanoid from '../../lib/helpers/nanoid.ts';
 import bootstrap, {
 	agent,
+	DEFAULT_SESSION_COOKIE,
 	passInteractionChecks,
 	seedAccount,
 	type Setup
@@ -50,7 +51,7 @@ async function buildResume({ auth = {}, result, accountId } = {}) {
 	});
 	await interaction.save(30);
 
-	return `_interaction=${nanoid()}; _session=${sessionId}`;
+	return `_interaction=${nanoid()}; ${DEFAULT_SESSION_COOKIE}=${sessionId}`;
 }
 
 function get(cookie) {

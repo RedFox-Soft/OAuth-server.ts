@@ -42,6 +42,9 @@ import {
 import { ClientDefaults } from 'lib/configs/clientBase.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { Session } from 'lib/models/session.js';
+import { cookieNames, sessionCookieName } from 'lib/consts/param_list.js';
+import { DEFAULT_REQUEST_BUCKET } from 'lib/configs/issuer.js';
+import { issuingBucket } from 'lib/admin/auth/bucketAddress.js';
 import { ttl } from 'lib/configs/liveTime.js';
 import { Grant } from 'lib/models/grant.js';
 import { ISSUER } from 'lib/configs/env.js';
@@ -172,6 +175,25 @@ export function seedAccount(
 // Throws on a duplicate client_id so a misconfigured spec fails loudly rather than
 // silently overwriting an existing record. upsert's body is synchronous for the
 // in-memory adapter, so the record is present the moment this returns.
+/*
+ * The session cookie's name now varies by bucket, so a spec that cares about *the* session cookie
+ * rather than about which population wrote it asks for it by prefix.
+ *
+ * The bare `_session=` is deliberately excluded: it is the legacy name, and the only thing the server
+ * ever writes under it now is the clear that expires it. Matching it would hand a spec an empty value
+ * and a 1970 expiry where it expected a live sign-in.
+ */
+export const SESSION_COOKIE_PREFIX = `${cookieNames.session}_`;
+
+/* The default bucket's session cookie name, for a spec that hands the server a cookie it built. */
+export const DEFAULT_SESSION_COOKIE = sessionCookieName(DEFAULT_REQUEST_BUCKET);
+
+export function findSessionSetCookie(
+	headers: readonly string[]
+): string | undefined {
+	return headers.find((c) => c.startsWith(SESSION_COOKIE_PREFIX));
+}
+
 export function seedClient(
 	metadata: { clientId: string } & Record<string, unknown>
 ): void {
@@ -398,7 +420,12 @@ async function bootstrap(
 			bucketId
 		});
 		lastSession = session;
-		const sessionCookie = `_session=${sessionId}; path=/; expires=${expire.toGMTString()}; httponly`;
+		/*
+		 * Named from the same derivation the server writes with, so a spec that signs into a second bucket
+		 * gets a second cookie rather than overwriting the first — which is the behaviour under test.
+		 */
+		const cookieName = sessionCookieName(await issuingBucket(bucketId));
+		const sessionCookie = `${cookieName}=${sessionId}; path=/; expires=${expire.toGMTString()}; httponly`;
 
 		session.payload.authorizations = {};
 		const oidc = new OIDCContext({ scope, claims });

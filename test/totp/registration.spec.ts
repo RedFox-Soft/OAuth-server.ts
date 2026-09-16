@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeAll } from 'bun:test';
-import bootstrap, { agent, getHeader } from '../test_helper.ts';
+import bootstrap, {
+	SESSION_COOKIE_PREFIX,
+	agent,
+	getHeader
+} from '../test_helper.ts';
 import { AuthorizationRequest } from '../AuthorizationRequest.ts';
 import {
 	adapter,
@@ -191,7 +195,7 @@ describe('enrolment at registration (US2)', () => {
 			code: codeFor(secret)
 		});
 		expect(res.status).toBe(303);
-		expect(res.setCookie ?? '').toContain('_session=');
+		expect(res.setCookie ?? '').toContain(SESSION_COOKIE_PREFIX);
 
 		const user = await getUserStore(requiredBucketId).findByEmail(email);
 		expect(user?.totp?.secret).toBe(secret);
@@ -239,7 +243,7 @@ describe('enrolment at registration (US2)', () => {
 		});
 		expect(res.status).toBe(303);
 		expect(res.location).toBe(`/ui/${uid}/totp/enroll`);
-		expect(res.setCookie ?? '').not.toContain('_session=');
+		expect(res.setCookie ?? '').not.toContain(SESSION_COOKIE_PREFIX);
 	});
 
 	it('signs the person in with two factors recorded', async () => {
@@ -309,7 +313,7 @@ describe('enrolment at registration (US2)', () => {
 			code: codeFor(secret)
 		});
 
-		expect(res.setCookie ?? '').not.toContain('_session=');
+		expect(res.setCookie ?? '').not.toContain(SESSION_COOKIE_PREFIX);
 		expect(res.location).toBe(`/ui/${uid}/login`);
 		// The pending secret is not left addressed to a row that no longer exists.
 		expect(await adapter('TotpEnrollment').find(uid)).toBeUndefined();

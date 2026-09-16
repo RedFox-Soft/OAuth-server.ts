@@ -2,7 +2,7 @@ import { Type as t, type Static } from '@sinclair/typebox';
 import nanoid from '../helpers/nanoid.js';
 import epochTime from '../helpers/epoch_time.js';
 
-import { cookieNames } from '../consts/param_list.js';
+import { sessionCookieName } from '../consts/param_list.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { BaseModel, BaseModelPayload } from './base_model.js';
 import { ttl } from 'lib/configs/liveTime.js';
@@ -94,7 +94,12 @@ export class Session extends BaseModel<SessionPayloadType> {
 
 	static async get(oidc) {
 		// is there supposed to be a session bound? generate if not
-		const cookieSessionId = oidc.cookie[cookieNames.session]?.value;
+		/*
+		 * The bucket comes from the address, never from the cookie. A forged `_session_<anything>` is read
+		 * only when the server has independently resolved that same bucket, and its value must still name
+		 * a session record — so the name cannot be used to reach another population's sign-in.
+		 */
+		const cookieSessionId = oidc.cookie[sessionCookieName(oidc.bucket)]?.value;
 
 		let session;
 

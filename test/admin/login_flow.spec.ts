@@ -26,6 +26,11 @@ let superAdminId: string;
 let fetchSpy: Mock<typeof fetch> | undefined;
 
 // Run the console's OIDC sign-in end to end and hand back its `_admin_session` cookie pair.
+import { sessionCookieName } from 'lib/consts/param_list.ts';
+import { ADMIN_REQUEST_BUCKET } from 'lib/configs/issuer.ts';
+
+/* The console signs out of the administrators bucket, so that is the cookie it clears. */
+const ADMIN_BUCKET_SESSION_COOKIE = sessionCookieName(ADMIN_REQUEST_BUCKET);
 // The token exchange is stubbed (ISSUER points at a fake host under test) but the identity
 // token is genuinely signed by the live keystore and carries this attempt's nonce.
 async function signIn(): Promise<string> {
@@ -240,7 +245,9 @@ describe('admin OIDC login (BFF)', () => {
 		expect(adminCleared).toContain('Path=/admin');
 		expect(adminCleared).toMatch(/Max-Age=0|Expires=Thu, 01 Jan 1970/i);
 
-		const providerCleared = cleared.find((c) => c.startsWith('_session='));
+		const providerCleared = cleared.find((c) =>
+			c.startsWith(`${ADMIN_BUCKET_SESSION_COOKIE}=`)
+		);
 		expect(providerCleared).toBeDefined();
 		expect(providerCleared).toMatch(/Path=\/(;|$)/);
 		expect(providerCleared).toMatch(/Max-Age=0|Expires=Thu, 01 Jan 1970/i);
@@ -249,7 +256,7 @@ describe('admin OIDC login (BFF)', () => {
 		// `endUserCookieAttributes` rather than listing only value/path/expiry.
 		expect(providerCleared).toContain('HttpOnly');
 		expect(providerCleared).toContain('Secure');
-		// Lax, like every other write of `_session`: a clear whose attributes differ from the ones the
+		// Lax, like every other write of a session cookie: a clear whose attributes differ from the ones the
 		// cookie was set with names a different cookie and removes nothing.
 		expect(providerCleared).toContain('SameSite=Lax');
 	});
@@ -266,7 +273,9 @@ describe('admin OIDC login (BFF)', () => {
 		expect(await Session.tryFind(providerSessionId)).toBeDefined();
 
 		const out = await agent.admin.api.logout.post(undefined, {
-			headers: { cookie: `${sessionCookie}; _session=${providerSessionId}` }
+			headers: {
+				cookie: `${sessionCookie}; ${ADMIN_BUCKET_SESSION_COOKIE}=${providerSessionId}`
+			}
 		});
 		expect(out.status).toBe(200);
 

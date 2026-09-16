@@ -3,6 +3,7 @@ import { randomBytes, createHash } from 'node:crypto';
 import { describe, it, beforeAll, expect } from 'bun:test';
 
 import bootstrap, {
+	DEFAULT_SESSION_COOKIE,
 	agent,
 	jsonToFormUrlEncoded,
 	type Setup
@@ -103,7 +104,7 @@ describe('single use of a pushed request_uri', () => {
 
 		return agent.ui['resume'].resume.get({
 			headers: {
-				cookie: `_interaction=cookieID; _session=${setup.getSession().jti}`
+				cookie: `_interaction=cookieID; ${DEFAULT_SESSION_COOKIE}=${setup.getSession().jti}`
 			}
 		});
 	}
