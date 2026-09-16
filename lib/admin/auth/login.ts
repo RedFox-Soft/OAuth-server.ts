@@ -181,9 +181,11 @@ export const adminLogin = new Elysia({ name: 'admin-login' })
 	 * Ending the provider session here rather than redirecting the browser through the RP-initiated
 	 * `/logout` endpoint keeps sign-out working when an operator turns `rpInitiatedLogout.enabled`
 	 * off, and spares the operator a confirmation interstitial on a button they already clicked.
-	 * The cost is deliberate and worth stating: the provider session is global to the browser, so
-	 * this signs that browser out of every relying party it had an SSO session with — which is what
-	 * `destroyProviderSession` already means everywhere else it is used.
+	 * What it costs is now bounded, and used to not be. A provider session belongs to one user bucket,
+	 * so this ends the administrators bucket's sign-in and the relying parties that had an SSO session
+	 * *in that bucket* — which, on a normal deployment, is the console and nothing else. Before the
+	 * session cookie carried its bucket, there was one session per browser and leaving the console
+	 * signed an administrator out of every unrelated application they were using.
 	 *
 	 * Both cookies are cleared unconditionally, even when their store row has already gone, so a
 	 * stale browser cookie can never outlive the record it points at.
