@@ -21,7 +21,10 @@ four concepts, but they nest, so the console walks them in order.
 - A **project** is a set of clients that belong to one application or one product, plus the bucket
   its users come from.
 - A **user bucket** is a population of end-users: their accounts, and the policy for how they
-  register and verify themselves.
+  register and verify themselves. A bucket you create is also a tenant with **its own issuer** — it
+  is served at `<ISSUER>/<slug>` and mints tokens carrying that, so a client in a project pointed at
+  it integrates against that address rather than the bare one. The default `redfox` bucket is the
+  exception: it keeps the bare issuer, which is what lets an existing deployment stay as it is.
 
 <Steps>
 
@@ -29,8 +32,14 @@ four concepts, but they nest, so the console walks them in order.
    working in. Leave it on **Personal**, or create a group under **Groups** if this belongs to a
    team. (Personal groups do not appear in the Groups table, since every administrator has one.)
 
-2. **Create a bucket** under **Buckets**, unless you want to use the default `redfox` bucket. Give
-   it a name; the registration and verification policy can be set now or later.
+2. **Create a bucket** under **Buckets**, unless you want to use the default `redfox` bucket. It
+   takes a name and a **slug** — the address its endpoints are served at and the path component of
+   the issuer in its tokens. Pick it deliberately: unlike the name, it cannot be changed afterwards,
+   because an issuer identifier is a promise made to every client configured against it. The
+   registration and verification policy can be set now or later.
+
+   The Buckets table shows each bucket's address in its **Address** column. The reserved buckets read
+   _served at the root_ there rather than a path, since they keep the bare issuer.
 
 3. **Create a project** under **Projects**. It takes a name and a slug (lower-case letters, digits
    and hyphens). Then press **Bucket** on its row and pick the bucket from the previous step. Leaving

@@ -24,6 +24,11 @@ const ADMIN = {
 	password: 'Screenshots-Demo-2026!'
 };
 const USER_PASSWORD = 'AcmeDemo-2026!';
+/*
+ * The demo bucket's address. A bucket is a tenant with its own issuer, so this is both where its
+ * endpoints are served and the path component of the `iss` its tokens carry.
+ */
+const BUCKET_SLUG = 'acme-customers';
 const VIEWPORT = { width: 1440, height: 900 } as const;
 const ADMIN_HEIGHT = 640;
 const OUT = resolve(import.meta.dir, '../public/screenshots');
@@ -120,7 +125,7 @@ interface Created {
 
 async function seed(
 	ctx: BrowserContext
-): Promise<{ projectName: string; bucketName: string }> {
+): Promise<{ projectName: string; bucketName: string; bucketSlug: string }> {
 	const group = await api<Created>(ctx, 'POST', '/admin/api/groups', {
 		name: 'Acme Corp'
 	});
@@ -136,8 +141,14 @@ async function seed(
 		name: 'Acme Mobile',
 		slug: 'acme-mobile'
 	});
+	/*
+	 * The slug is the bucket's address, and it is required: a bucket is a tenant with its own issuer, so
+	 * it cannot be created without somewhere to be served. Omitting it is what broke this capture — and
+	 * with it the whole site build — from the commit that made buckets addressable.
+	 */
 	const bucket = await api<Created>(ctx, 'POST', '/admin/api/buckets', {
 		name: 'Acme customers',
+		slug: BUCKET_SLUG,
 		roles: ['customer', 'support'],
 		registrationOpen: true
 	});
@@ -202,7 +213,11 @@ async function seed(
 		'clientCredentials.enabled': true,
 		'deviceFlow.enabled': true
 	});
-	return { projectName: 'Acme Web', bucketName: 'Acme customers' };
+	return {
+		projectName: 'Acme Web',
+		bucketName: 'Acme customers',
+		bucketSlug: BUCKET_SLUG
+	};
 }
 
 /*
@@ -335,7 +350,13 @@ try {
 	});
 	const userPage = await userCtx.newPage();
 	const { challenge } = pkce();
-	const auth = new URL(`${ORIGIN}/auth`);
+	/*
+	 * Addressed to the bucket, not to the bare path. The demo client belongs to a project whose bucket
+	 * has an address, and `check_bucket.ts` refuses such a client anywhere else — "client is not
+	 * authorized at this address", delivered to the redirect_uri, which the browser then cannot resolve.
+	 * That is the rule working, and this script is an integration like any other.
+	 */
+	const auth = new URL(`${ORIGIN}/${names.bucketSlug}/auth`);
 	auth.search = new URLSearchParams({
 		client_id: clientId,
 		response_type: 'code',

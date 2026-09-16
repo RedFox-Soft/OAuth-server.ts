@@ -23,6 +23,13 @@ The endpoint paths below are this server's defaults. Do not hard-code them in a 
 reflects which capabilities are enabled, so it is the honest answer to "what does this deployment
 support".
 
+This matters more than it used to. If your client's project points at a bucket you created, that
+bucket is its own issuer: its endpoints live under `<ISSUER>/<slug>` and its discovery document is at
+`<ISSUER>/<slug>/.well-known/openid-configuration`. A request for such a client sent to the bare
+`/auth` is refused with `unauthorized_client` — "client is not authorized at this address" — because a
+client may only be used at the address of the bucket it belongs to. The walk-through below uses the
+default `redfox` bucket, which is served at the root.
+
 </Aside>
 
 <Steps>
