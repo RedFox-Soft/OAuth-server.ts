@@ -9,24 +9,32 @@ run needs — because most of the cost of a conformance run is not the run.
 
 ## Where it stands
 
+**The measurement predates 0.4.0 and has not been repeated against it.** That release made a user
+bucket addressable in the URL and its own issuer, which is the subject these plans probe most
+directly: the issuer identifier, the two well-known locations a path-bearing issuer has, and the `iss`
+in an authorization response. The numbers below were taken against the default bucket, whose issuer
+and endpoints 0.4.0 deliberately leaves unchanged, so they still describe what a client integrated
+before that release meets. They say nothing about a _named_ bucket's metadata, which no run has
+covered. A run for both profiles is the open item.
+
 Measured 2026-09-14, across two instance profiles (below). Twelve plans: nine testing this server as
 an **OpenID Provider**, three testing it as a **Relying Party** — because `lib/federation/` makes it
 one, and no OP plan reaches that code.
 
-| Plan                                                            | Conditions | Failures                              |
-| --------------------------------------------------------------- | ---------- | ------------------------------------- |
-| `oidcc-config-certification-test-plan`                          | 41         | **none**                              |
-| `oidcc-basic-certification-test-plan`                           | 1 855      | **none**, and no warnings             |
-| `oidcc-formpost-basic-certification-test-plan`                  | 2 007      | **none**, and no warnings             |
-| `oidcc-rp-initiated-logout-certification-test-plan`             | 551        | **none**                              |
-| `oidcc-backchannel-rp-initiated-logout-certification-test-plan` | 101        | **none**                              |
-| `oidcc-3rdparty-init-login-certification-test-plan`             | 50         | **none**                              |
-| `oidcc-dynamic-certification-test-plan`                         | 883        | 11, none of them this server          |
-| `fapi2-security-profile-final-test-plan`                        | 4 343      | 9, none of them this server           |
-| `fapi2-message-signing-final-test-plan`                         | 5 693      | 13, **two of them this server**       |
-| `oidcc-client-basic-certification-test-plan`                    | 655        | none — **and one wrong acceptance**   |
-| `oidcc-client-config-certification-test-plan`                   | 285        | 3, all of them the runner's           |
-| `oidcc-client-refreshtoken-test-plan`                           | 216        | none — subject not exercised          |
+| Plan                                                            | Conditions | Failures                            |
+| --------------------------------------------------------------- | ---------- | ----------------------------------- |
+| `oidcc-config-certification-test-plan`                          | 41         | **none**                            |
+| `oidcc-basic-certification-test-plan`                           | 1 855      | **none**, and no warnings           |
+| `oidcc-formpost-basic-certification-test-plan`                  | 2 007      | **none**, and no warnings           |
+| `oidcc-rp-initiated-logout-certification-test-plan`             | 551        | **none**                            |
+| `oidcc-backchannel-rp-initiated-logout-certification-test-plan` | 101        | **none**                            |
+| `oidcc-3rdparty-init-login-certification-test-plan`             | 50         | **none**                            |
+| `oidcc-dynamic-certification-test-plan`                         | 883        | 11, none of them this server        |
+| `fapi2-security-profile-final-test-plan`                        | 4 343      | 9, none of them this server         |
+| `fapi2-message-signing-final-test-plan`                         | 5 693      | 13, **two of them this server**     |
+| `oidcc-client-basic-certification-test-plan`                    | 655        | none — **and one wrong acceptance** |
+| `oidcc-client-config-certification-test-plan`                   | 285        | 3, all of them the runner's         |
+| `oidcc-client-refreshtoken-test-plan`                           | 216        | none — subject not exercised        |
 
 **16 680 conditions. Five defects are open**, all found by the three plans run for the first time on
 2026-09-14 (Message Signing and the client family); the nine plans above them are unchanged and still
@@ -63,7 +71,7 @@ how the other two came into view.
 **`aud` may not be an array.** `ensure-request-object-with-multiple-aud-succeeds` pushes
 `"aud": ["https://oidcc-provider:3000", "https://other1.example.com", "invalid"]` and is answered
 `400: Expected property 'aud' to be string`. RFC 7519 §4.1.3 allows either form, and the rule the
-module tests is that the server's own identifier is *among* the values — which it is.
+module tests is that the server's own identifier is _among_ the values — which it is.
 
 **A refused Request Object names the wrong error.** `ensure-request-object-without-exp-fails` expects
 `invalid_request_object`; it gets `invalid_request`. RFC 9101 §5 registers the former for exactly this
@@ -81,10 +89,10 @@ OIDC Core §2 makes the claim REQUIRED. [`verifyIdToken.ts:162`](lib/federation/
 reads
 
 ```ts
-typeof payload.iat === 'number' && payload.iat > epochTime() + clockTolerance
+typeof payload.iat === 'number' && payload.iat > epochTime() + clockTolerance;
 ```
 
-— so the *value* is checked and the *presence* is not, and jose does not require `iat` either unless
+— so the _value_ is checked and the _presence_ is not, and jose does not require `iat` either unless
 `maxTokenAge` is set. The comment above it explains why the future-check has to live there; absence
 was simply not the case in view.
 
@@ -104,10 +112,10 @@ The second sign-in is refused. [`jwks.ts:37`](lib/federation/jwks.ts#L37) calls
 
 Measured directly, same module and same alias, changing nothing but the gap between the two sign-ins:
 
-| Gap | Second sign-in |
-| --- | -------------- |
-| 3 s | **refused** |
-| 45 s | succeeds |
+| Gap  | Second sign-in |
+| ---- | -------------- |
+| 3 s  | **refused**    |
+| 45 s | succeeds       |
 
 So there are two windows in which a rotation locks users out. Inside 30 seconds the reload is on
 cooldown. And if the new key carries **no `kid`**, `JWKSNoMatchingKey` never occurs at all, so nothing
@@ -154,7 +162,7 @@ narrow rule is FAPI 2.0's alone, it is implemented behind `fapi.enabled`
 modules pass. **A run in the wrong instance profile does not report a configuration problem; it
 reports a security defect that is not there.**
 
-Note that defect 2 above is the *same shape* in the *other* direction: an array `aud` in a Request
+Note that defect 2 above is the _same shape_ in the _other_ direction: an array `aud` in a Request
 Object must be accepted, and is not. The two are worth reading together before touching either.
 
 ### Dynamic — 11
@@ -199,7 +207,7 @@ assumptions do not hold against it. This is design, not omission, but it bounds 
 - **It only ever runs a code flow**, which is why the hybrid, implicit, session-management and
   front-channel-logout client plans are inapplicable for the same reason their OP twins are.
 
-What it *does* prove is the verification, and there the result is worth having: `iss`, `aud`, `exp`,
+What it _does_ prove is the verification, and there the result is worth having: `iss`, `aud`, `exp`,
 the algorithm allowlist, `alg: none`, a bad signature, a `kid` that is absent with several keys
 published, a mismatched `nonce`, a missing `sub`, and a discovery document whose `issuer` disagrees
 with the URL it came from — each refused, each correctly. Only `iat` gets through (defect 4).
@@ -208,12 +216,12 @@ with the URL it came from — each refused, each correctly. Only `iat` gets thro
 
 The OIDC profiles and the FAPI profiles want opposite settings, so one instance cannot serve both:
 
-|                          | OIDC plans | FAPI 2.0 Security | FAPI 2.0 Message Signing |
-| ------------------------ | ---------- | ----------------- | ------------------------ |
-| `pkce.required`          | `false`    | `true`            | `true`                   |
-| `fapi.enabled`           | `false`    | `true`            | `true`                   |
-| `requestObjects.enabled` | `false`    | `false`           | **`true`**               |
-| `responseMode.jwt.enabled` | `false`  | `false`           | **`true`**               |
+|                            | OIDC plans | FAPI 2.0 Security | FAPI 2.0 Message Signing |
+| -------------------------- | ---------- | ----------------- | ------------------------ |
+| `pkce.required`            | `false`    | `true`            | `true`                   |
+| `fapi.enabled`             | `false`    | `true`            | `true`                   |
+| `requestObjects.enabled`   | `false`    | `false`           | **`true`**               |
+| `responseMode.jwt.enabled` | `false`    | `false`           | **`true`**               |
 
 `pkce.required` is on by default, and with it on 34 of the Basic profile's 35 modules are refused
 before they test anything — it relaxes the demand only for clients that authenticate at the token
@@ -309,7 +317,7 @@ things about that are not obvious.
   module while one is still `WAITING` makes the suite kill the earlier one for an alias conflict,
   which reports `INTERRUPTED` and discards the verdict. `DELETE /api/runner/{id}` ends it cleanly.
 - **Read the conditions, not the module status.** A stopped module has no `result`, and — far more
-  importantly — a *finished* one reports `PASSED` on every negative test whether or not the RP
+  importantly — a _finished_ one reports `PASSED` on every negative test whether or not the RP
   rejected anything (defect 4). The verdict worth recording is the failed-condition list from
   `/api/log/{id}`, paired with the HTTP status the RP itself returned.
 

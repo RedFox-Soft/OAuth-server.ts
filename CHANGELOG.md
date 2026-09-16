@@ -9,6 +9,26 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-16
+
+One thing defines this release: a user bucket is a tenant of its own. It is addressed in the URL,
+publishes its own metadata, mints tokens carrying itself as `iss`, and holds its own sign-in — so a
+browser can be signed in to two buckets at once and neither disturbs the other. The default bucket
+keeps the bare issuer and the bare paths, which is what makes the change deliverable to an existing
+deployment without a flag day.
+
+Two sign-in defects found on the way are fixed with it, and both had the same shape: a browser rule
+no headless test could see. A sign-in that started at a relying party answered `422` for every real
+client while the identical URL opened by hand returned `200`, because `SameSite=Strict` withholds a
+cookie on exactly the navigation the flow is made of. And the "Remember me" checkbox had never
+decided anything.
+
+**Upgrading signs your end users in once.** A session cookie now carries the bucket it belongs to;
+one written before this release does not, is never read, and is expired on the first request that
+presents it. Nothing is lost — accounts, grants, consent and refresh tokens are untouched — and the
+[upgrade guide](https://foxauth.dev/docs/deploy/upgrade/) says what to expect. The admin console
+stays at `/admin`.
+
 ### Added
 
 - buckets: a user bucket is now a tenant with its own issuer. An operator gives a bucket an address
@@ -831,7 +851,8 @@ found`. The refusal text existed and never ran: the call that delivered it sat i
 - The DPoP nonce secret is self-provisioned at startup, making the requireNonce-without-secret 500
   state unrepresentable (spec 014)
 
-[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/RedFox-Soft/OAuth-server.ts/releases/tag/v0.1.0
