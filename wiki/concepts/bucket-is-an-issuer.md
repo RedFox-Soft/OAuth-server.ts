@@ -63,6 +63,21 @@ identifier may not have.
 This is why the console did **not** move off `/admin`: the move existed only to free that word for the
 administrators bucket, and the bucket never puts it in a URL.
 
+**A slug is a name, not an address**, and three places need to know the difference: `issuerFor`, which
+stamps `iss` into every token; `isAddressable`, which decides whether a prefixed address resolves; and
+the console's Buckets table, whose Address column is what an operator copies when pointing a client at
+a bucket. `isServedAtTheRoot` in `lib/admin/consts.ts` is the single predicate all three derive from,
+and it lives in that import-free module for the third of them — the browser bundle can reach no module
+that touches the configuration layer, which is why the rule could not simply live beside `issuerFor`.
+
+Each pair of them that once disagreed produced a defect of the same shape. Routing against issuing gave
+the administrators bucket no address and yet an `<ISSUER>/admin` identifier, so a genuine sign-in minted
+a token no client would accept. The console against both rendered any slug it found, so the Buckets
+table advertised the default bucket at `/default` — a path that answers 404 — as the place to integrate
+a client. The console's decision is `bucketAddressFor` in `lib/admin/ui/bucketAddress.ts`, extracted
+from the table's render function so `test/bucket_addressing/console_address.spec.ts` can check every
+listed bucket's address against the router that has to serve it.
+
 ## What the address decides, and what it does not
 
 The address decides which population a request concerns. `resolveBucketForRequest` no longer answers

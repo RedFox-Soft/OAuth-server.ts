@@ -22,7 +22,9 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   reconfiguring and tokens in circulation stay valid. Two reserved buckets — the default one and the
   administrators' — are served at the root by design: they are not addressable and their tokens carry
   the instance's own issuer, which is why the admin console stays at `/admin` and why an agent's
-  connection to the administrative MCP plane keeps working. A bucket's address is fixed once chosen; renaming would invalidate every
+  connection to the administrative MCP plane keeps working. The console's Buckets table reports those
+  two as served at the root rather than at the slug they hold, because the Address column is what an
+  operator copies when pointing a client at a bucket. A bucket's address is fixed once chosen; renaming would invalidate every
   client integrated with it and wants an operation of its own.
 
 ### Fixed

@@ -6,6 +6,33 @@ export const ADMIN_BUCKET_ID = 'admin';
  * paths, so it is the one bucket whose issuer is the server's own.
  */
 export const DEFAULT_BUCKET_ID = 'redfox';
+
+/*
+ * The two buckets served at the root, and therefore the two whose issuer is the instance's own.
+ *
+ * It lives here, in a module that imports nothing, because three very different places need the same
+ * answer: `issuerFor`, which stamps `iss` into every token; `isAddressable`, which decides whether a
+ * prefixed address resolves; and the console, whose browser bundle can reach no module that touches
+ * the configuration layer. Each of them once knew this rule in its own words, and each pair that
+ * disagreed produced a defect — the routing side and the issuing side disagreeing made a genuine
+ * sign-in mint a token no client would accept, and the console disagreeing with both printed `/default`
+ * as an address an operator could integrate against, which answers 404.
+ *
+ * The default bucket is the obvious member. The administrators bucket is the one that is not: the
+ * console is a relying party on the instance's own issuer, so a token minted for that population must
+ * carry it. Both hold a slug regardless, because a session cookie has to be named after something — a
+ * slug is a name, not an address, and this predicate is the only thing that decides which buckets have
+ * one.
+ */
+const SERVED_AT_THE_ROOT: ReadonlySet<string> = new Set([
+	DEFAULT_BUCKET_ID,
+	ADMIN_BUCKET_ID
+]);
+
+export function isServedAtTheRoot(bucketId: string): boolean {
+	return SERVED_AT_THE_ROOT.has(bucketId);
+}
+
 /*
  * The group that owns containers no administrator owns. Reachable only by super administrators, and
  * exempt from the at-least-one-owner rule for the same reason the reserved admin project and bucket

@@ -1,8 +1,19 @@
 import { useEffect, useState } from 'react';
-import { Table, Button, Modal, Form, Input, Select, Tag, message } from 'antd';
+import {
+	Table,
+	Button,
+	Modal,
+	Form,
+	Input,
+	Select,
+	Tag,
+	Tooltip,
+	message
+} from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import type { UserBucket, Project } from '../../../adapters/types.js';
 import { BucketDetail } from './BucketDetail.js';
+import { bucketAddressFor } from '../bucketAddress.js';
 
 interface CreateBucketValues {
 	name: string;
@@ -102,8 +113,20 @@ export function Buckets({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 					{
 						title: 'Address',
 						dataIndex: 'slug',
-						render: (slug?: string) =>
-							slug ? <code>/{slug}</code> : <Tag>not addressable</Tag>
+						/*
+						 * The address an operator can integrate a client against, which is not the same
+						 * question as whether the bucket has a slug — see `bucketAddressFor`.
+						 */
+						render: (_slug: string | undefined, row: UserBucket) => {
+							const address = bucketAddressFor(row);
+							if (address.kind === 'prefix') return <code>{address.path}</code>;
+							if (address.kind === 'none') return <Tag>not addressable</Tag>;
+							return (
+								<Tooltip title="Served at the server's own address, with no prefix, and its tokens carry the server's own issuer.">
+									<Tag color="blue">served at the root</Tag>
+								</Tooltip>
+							);
+						}
 					},
 					{
 						title: 'Roles',
