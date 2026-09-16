@@ -134,7 +134,27 @@ admin API) as part of the change.
 - **SMTP settings** are read live from their own store on every send, so they are unaffected by a
   restart in either direction.
 - **Tokens, sessions and grants survive**, since they live in the database. Users are not signed
-  out by an upgrade.
+  out by an upgrade, with one release-specific exception below.
+
+## One upgrade signs your end users in again
+
+Upgrading **to the release that made user buckets addressable**, and only that one, ends every
+end-user sign-in once.
+
+A sign-in is held in a browser cookie, and that cookie is now named after the bucket it belongs to —
+`_session_default`, `_session_acme` — so that somebody can be signed in to two buckets at once
+without either sign-in disturbing the other. Cookies written before the upgrade carry the old,
+bucket-less name. They are not read, and the server expires them on the first request that presents
+one, so a browser stops sending a cookie that no longer means anything.
+
+What your end users see: the sign-in screen, once, the next time they visit. Nothing is lost —
+accounts, grants, consent and refresh tokens are all untouched, and a refresh token keeps working
+without anybody signing in at all. There is nothing to do on your side and no order to do it in;
+it is listed here so the support question is expected rather than alarming.
+
+The console is unaffected in one respect worth naming: it stays at `/admin`. An earlier plan moved
+it to free that word for a bucket address, and that turned out not to be necessary — the
+administrators bucket is served at the root and never puts its name in a URL.
 
 ## After the restart
 
