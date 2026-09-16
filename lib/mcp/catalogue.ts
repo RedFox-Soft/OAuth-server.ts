@@ -1113,14 +1113,14 @@ export const excludedConsoleOperations: readonly ExcludedConsoleOperation[] = [
 		path: '/admin/api/projects/:id',
 		absence: 'withheld',
 		reason:
-			'Deleting a project destroys a container of clients with nothing left afterwards to inspect or restore. Withheld from agents by operator decision — delete it in the admin console instead.'
+			'Deleting a project can destroy every OAuth client it holds, with nothing left afterwards to inspect or restore. In the console an administrator is shown those clients by name, consents to their destruction as a separate act, and types a confirmation word; none of that is a gesture an agent can be asked to make on somebody else behalf. Withheld by operator decision — delete it in the admin console instead.'
 	},
 	{
 		method: 'DELETE',
 		path: '/admin/api/buckets/:id',
 		absence: 'withheld',
 		reason:
-			'Deleting a user bucket destroys a container of end-user accounts with nothing left afterwards to inspect or restore. Withheld from agents by operator decision — delete it in the admin console instead.'
+			'Deleting a user bucket can destroy every end-user account in it — people, not configuration — with nothing left afterwards to inspect or restore. In the console an administrator is shown how many, consents to their destruction as a separate act, and types a confirmation word. Withheld by operator decision — delete it in the admin console instead.'
 	},
 	{
 		method: 'DELETE',

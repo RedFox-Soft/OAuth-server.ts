@@ -13,8 +13,10 @@ import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
 	ADMIN_BUCKET_ID,
 	ADMIN_SESSION_COOKIE,
+	DEFAULT_BUCKET_ID,
 	UNASSIGNED_GROUP_ID
 } from 'lib/admin/consts.ts';
+import { Client } from 'lib/models/client.js';
 import { userAreaFor } from 'lib/consts/storage_inventory.js';
 import { sessionFor } from '../admin_session.ts';
 
@@ -28,8 +30,9 @@ import { sessionFor } from '../admin_session.ts';
 // that it changes nothing, and that an emptied container then deletes cleanly.
 
 /**
- * @proves A container holding anything is not deleted, a refusal changes nothing, and an emptied
- * container takes its per-bucket area with it.
+ * @proves A container holding anything is not deleted unless its contents were reviewed and
+ * consented to, a refusal changes nothing, an emptied container takes its per-bucket area with it,
+ * and the two buckets the instance is built on are refused to everyone.
  */
 describe('deletion guards: containers', () => {
 	beforeAll(async () => {
@@ -80,18 +83,18 @@ describe('deletion guards: containers', () => {
 		});
 	}
 
-	async function deleteProject(id: string) {
+	async function deleteProject(id: string, query?: Record<string, unknown>) {
 		const cookie = await superAdminCookie();
 		return agent.admin.api
 			.projects({ id })
-			.delete(undefined, { headers: { cookie } });
+			.delete(undefined, { headers: { cookie }, ...(query ? { query } : {}) });
 	}
 
-	async function deleteBucket(id: string) {
+	async function deleteBucket(id: string, query?: Record<string, unknown>) {
 		const cookie = await superAdminCookie();
 		return agent.admin.api
 			.buckets({ id })
-			.delete(undefined, { headers: { cookie } });
+			.delete(undefined, { headers: { cookie }, ...(query ? { query } : {}) });
 	}
 
 	async function deleteClient(projectId: string, clientId: string) {
@@ -214,5 +217,92 @@ describe('deletion guards: containers', () => {
 		expect(
 			bucketTrail.entries.filter((e) => e.action === 'bucket.delete')
 		).toEqual([]);
+	});
+
+	/*
+	 * The two buckets the instance is built on.
+	 *
+	 * Both are refused before the bucket is even loaded, so the answer cannot depend on whether they
+	 * happen to be empty — which matters because emptiness is reachable: the administrators' bucket
+	 * holds exactly the accounts an operator could remove one at a time, and the default bucket starts
+	 * empty on a fresh install. A super administrator is used deliberately, because there is no higher
+	 * authority left to argue the refusal is merely a scoping accident.
+	 */
+	it('refuses to delete the administrators bucket, whatever is elected', async () => {
+		expect((await deleteBucket(ADMIN_BUCKET_ID)).status).toBe(403);
+		expect(
+			(await deleteBucket(ADMIN_BUCKET_ID, { cascade: 'endusers', expect: 0 }))
+				.status
+		).toBe(403);
+		expect(await getBucketStore().find(ADMIN_BUCKET_ID)).not.toBeNull();
+	});
+
+	it('refuses to delete the default bucket, whatever is elected', async () => {
+		expect((await deleteBucket(DEFAULT_BUCKET_ID)).status).toBe(403);
+		expect(
+			(
+				await deleteBucket(DEFAULT_BUCKET_ID, {
+					cascade: 'endusers',
+					expect: 0
+				})
+			).status
+		).toBe(403);
+		expect(await getBucketStore().find(DEFAULT_BUCKET_ID)).not.toBeNull();
+	});
+
+	/*
+	 * A bucket assigned to a project is the one blocker no election clears, because what it protects
+	 * is outside the bucket: a project left pointing at a bucket that no longer exists is a broken
+	 * tenant, not a tidy-up.
+	 */
+	it('refuses an assigned bucket even when the accounts are consented to', async () => {
+		const assigned = await bucket();
+		await getUserStore(assigned._id).create('inside@example.com', 'hash');
+		await project([], assigned._id);
+
+		const res = await deleteBucket(assigned._id, {
+			cascade: 'endusers',
+			expect: 1
+		});
+
+		expect(res.status).toBe(409);
+		expect(await getBucketStore().find(assigned._id)).not.toBeNull();
+		expect((await getUserStore(assigned._id).list()).length).toBe(1);
+	});
+
+	/*
+	 * Consent is given for what was on the screen. These two cases are the reason the election carries
+	 * the reviewed set rather than only the word "yes": without them, an administrator who reviewed two
+	 * clients authorises destroying a third that arrived while they were reading.
+	 */
+	it('refuses a project cascade when its clients are not the ones consented to', async () => {
+		const reviewed = await liveClient();
+		const arrivedLater = await liveClient();
+		const proj = await project([reviewed, arrivedLater]);
+
+		const res = await deleteProject(proj._id, {
+			cascade: 'clients',
+			client: [reviewed]
+		});
+
+		expect(res.status).toBe(409);
+		expect(await getProjectStore().find(proj._id)).not.toBeNull();
+		expect(await Client.tryFind(reviewed)).toBeDefined();
+		expect(await Client.tryFind(arrivedLater)).toBeDefined();
+	});
+
+	it('refuses a bucket cascade when it holds more accounts than were consented to', async () => {
+		const held = await bucket();
+		await getUserStore(held._id).create('reviewed@example.com', 'hash');
+		await getUserStore(held._id).create('arrived-later@example.com', 'hash');
+
+		const res = await deleteBucket(held._id, {
+			cascade: 'endusers',
+			expect: 1
+		});
+
+		expect(res.status).toBe(409);
+		expect(await getBucketStore().find(held._id)).not.toBeNull();
+		expect((await getUserStore(held._id).list()).length).toBe(2);
 	});
 });

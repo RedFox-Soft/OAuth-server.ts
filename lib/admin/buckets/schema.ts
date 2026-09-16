@@ -68,3 +68,20 @@ export const UpdateBucketBody = t.Object({
 	 */
 	totpRequired: t.Optional(t.Boolean())
 });
+
+/*
+ * What a bucket deletion may take with it, and how many the caller reviewed before deciding.
+ *
+ * `expect` is a count where the project's equivalent is a list of ids, and the asymmetry is the
+ * point rather than an optimisation: a client is configuration an administrator named, an end-user
+ * is a person, and nothing here asks an administrator to decide about people by name. A count also
+ * survives a bucket holding thousands, where a list would not.
+ *
+ * What it accepts in exchange is stated rather than hidden: a count cannot tell "the same accounts"
+ * from "one left and one arrived". The residue is a single account in a bucket the administrator has
+ * already decided to destroy entirely.
+ */
+export const DeleteBucketQuery = t.Object({
+	cascade: t.Optional(t.Literal('endusers')),
+	expect: t.Optional(t.Numeric({ minimum: 0 }))
+});

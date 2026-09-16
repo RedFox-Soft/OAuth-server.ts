@@ -6,6 +6,7 @@ import {
 	Form,
 	Input,
 	Select,
+	Space,
 	Tag,
 	Tooltip,
 	message
@@ -14,6 +15,8 @@ import { PlusOutlined } from '@ant-design/icons';
 import type { UserBucket, Project } from '../../../adapters/types.js';
 import { BucketDetail } from './BucketDetail.js';
 import { bucketAddressFor } from '../bucketAddress.js';
+import { ConfirmDestruction } from '../ConfirmDestruction.js';
+import { isUndeletableBucket } from '../../consts.js';
 
 interface CreateBucketValues {
 	name: string;
@@ -29,6 +32,9 @@ export function Buckets({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 	const [creating, setCreating] = useState(false);
 	const [form] = Form.useForm<CreateBucketValues>();
 	const [openBucketId, setOpenBucketId] = useState<string | null>(null);
+	const [deleting, setDeleting] = useState<UserBucket | null>(null);
+	const [heldUsers, setHeldUsers] = useState(0);
+	const [destroying, setDestroying] = useState(false);
 
 	async function load() {
 		setLoading(true);
@@ -70,8 +76,59 @@ export function Buckets({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 		}
 	}
 
+	function assignedProjects(bucketId: string): Project[] {
+		return projects.filter((p) => p.bucketId === bucketId);
+	}
+
 	function projectCount(bucketId: string): number {
-		return projects.filter((p) => p.bucketId === bucketId).length;
+		return assignedProjects(bucketId).length;
+	}
+
+	/*
+	 * The account count is fetched when the dialog opens rather than listed in the table: it is a read
+	 * per bucket, and a table of twenty buckets does not need twenty of them to answer a question
+	 * nobody has asked yet.
+	 */
+	async function openDelete(bucket: UserBucket) {
+		const res = await fetch(
+			`/admin/api/buckets/${encodeURIComponent(bucket._id)}/users`
+		);
+		const users = res.ok ? ((await res.json()) as unknown[]) : [];
+		setHeldUsers(users.length);
+		setDeleting(bucket);
+	}
+
+	async function onDelete(bucket: UserBucket, withCascade: boolean) {
+		setDestroying(true);
+		try {
+			const params = new URLSearchParams();
+			if (withCascade) {
+				params.set('cascade', 'endusers');
+				// The number the administrator just reviewed. An account that arrived while they were
+				// reading makes this stale, and the server refuses rather than destroying it.
+				params.set('expect', String(heldUsers));
+			}
+			const qs = params.toString();
+			const res = await fetch(
+				`/admin/api/buckets/${encodeURIComponent(bucket._id)}${qs ? `?${qs}` : ''}`,
+				{ method: 'DELETE' }
+			);
+			if (!res.ok) {
+				const body = (await res.json().catch(() => null)) as {
+					message?: string;
+				} | null;
+				message.error(body?.message || `request failed (${res.status})`);
+				return;
+			}
+			const body = (await res.json()) as { endUsersDestroyed?: number };
+			message.success(
+				`Bucket deleted — ${body.endUsersDestroyed ?? 0} end-user accounts destroyed`
+			);
+			setDeleting(null);
+			await load();
+		} finally {
+			setDestroying(false);
+		}
 	}
 
 	if (openBucketId) {
@@ -141,16 +198,84 @@ export function Buckets({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 					{
 						title: '',
 						render: (_: unknown, row: UserBucket) => (
-							<Button
-								size="small"
-								onClick={() => setOpenBucketId(row._id)}
-							>
-								Users
-							</Button>
+							<Space>
+								<Button
+									size="small"
+									onClick={() => setOpenBucketId(row._id)}
+								>
+									Users
+								</Button>
+								{/*
+								 * No action at all for the two buckets the server is built on, rather
+								 * than one that answers 403. An administrator should not be invited into
+								 * a refusal — and a delete button beside the default bucket reads as an
+								 * offer no matter what happens when it is pressed.
+								 */}
+								{isUndeletableBucket(row._id) ? (
+									<Tooltip title="Part of the server itself — the instance needs somewhere to sign people in.">
+										<Button
+											size="small"
+											disabled
+										>
+											Delete
+										</Button>
+									</Tooltip>
+								) : (
+									<Button
+										size="small"
+										danger
+										onClick={() => openDelete(row)}
+									>
+										Delete
+									</Button>
+								)}
+							</Space>
 						)
 					}
 				]}
 			/>
+			{deleting && (
+				<ConfirmDestruction
+					open
+					title={`Delete ${deleting.name}?`}
+					consequences={[
+						'The bucket is gone permanently. There is nothing left to inspect or restore.',
+						`Its sign-in address stops answering, and every token it minted stops being issued from it.`,
+						/*
+						 * The blocker no election clears, said before the administrator elects anything.
+						 * Otherwise they consent to destroying every account in it and are then refused
+						 * for a reason that has nothing to do with the accounts.
+						 */
+						...(assignedProjects(deleting._id).length > 0
+							? [
+									/*
+									 * Named, not counted. The screen already holds the projects, and "one
+									 * project" leaves the administrator hunting through a list for which
+									 * one — the search this is here to save them.
+									 */
+									`Still assigned to ${assignedProjects(deleting._id)
+										.map((p) => p.name)
+										.join(
+											', '
+										)} — clear the assignment there first; no election deletes it while it is assigned.`
+								]
+							: [])
+					]}
+					cascade={
+						heldUsers > 0
+							? {
+									noun: 'end-user accounts',
+									count: heldUsers,
+									onInspect: () => setOpenBucketId(deleting._id),
+									inspectLabel: 'Look at the accounts first'
+								}
+							: undefined
+					}
+					busy={destroying}
+					onCancel={() => setDeleting(null)}
+					onConfirm={(withCascade) => onDelete(deleting, withCascade)}
+				/>
+			)}
 			<Modal
 				title="New bucket"
 				open={open}

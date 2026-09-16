@@ -164,18 +164,20 @@ describe('protected resource audit trail', () => {
 		).toEqual([]);
 
 		/*
-		 * One entry per declaration withdrawn, each naming the audience — not a count on the project's
-		 * entry. An audit entry carries field names and never values by design, and a bare number would
-		 * not say which audiences stopped being served anyway.
+		 * A count on the project's own entry, and exactly one entry — not one per declaration, as this
+		 * asserted until 051. The old shape argued that a bare number would not say which audiences
+		 * stopped being served; the project's identity says it, because a deletion is all-or-nothing
+		 * over what the project declared. What the change bought is a trail a bucket-sized deletion
+		 * cannot bury.
 		 */
-		const withdrawn = (await entriesFor('resource.delete'))
-			.filter((e) => e.actorId === userId)
-			.map((e) => e.targetId)
-			.sort();
-		expect(withdrawn).toEqual([AUDIENCE, 'https://other.example.com/mcp']);
+		const mine = (await entriesFor('project.delete')).filter(
+			(e) => e.actorId === userId
+		);
+		expect(mine.length).toBe(1);
+		expect(mine[0]?.cascade).toEqual({ resources: 2 });
 
 		expect(
-			(await entriesFor('project.delete')).some((e) => e.actorId === userId)
-		).toBe(true);
+			(await entriesFor('resource.delete')).filter((e) => e.actorId === userId)
+		).toEqual([]);
 	});
 });

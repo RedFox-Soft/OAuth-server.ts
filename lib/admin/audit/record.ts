@@ -13,6 +13,14 @@ export interface AuditDetail {
 	/* The container the target id resolves within, in practice a bucket. */
 	targetScope?: string;
 	/*
+	 * What a deletion took with it, as kind → how many. Counts, never identifiers — the same rule
+	 * `attributes` above follows, for the same reason.
+	 *
+	 * Omitted rather than passed as `{}` when nothing went with the container: two spellings of the
+	 * same fact is two things for a reader of the trail to tell apart.
+	 */
+	cascade?: Record<string, number>;
+	/*
 	 * The group this entry belongs to, and the only thing a group-scoped read selects on.
 	 *
 	 * Passed explicitly rather than taken from the acting administrator's active scope, because the two
@@ -126,6 +134,9 @@ async function write(input: {
 			...(input.detail.attributes === undefined
 				? {}
 				: { attributes: [...input.detail.attributes].sort() }),
+			...(input.detail.cascade === undefined
+				? {}
+				: { cascade: input.detail.cascade }),
 			/*
 			 * `viaSurface` is stored rather than inferred from `viaClientId`, because inferring "this was
 			 * an agent" from a client id would make every reader carry a list of which client ids are

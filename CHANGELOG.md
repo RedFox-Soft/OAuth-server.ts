@@ -9,6 +9,26 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+### Added
+
+- admin: projects and user buckets can be deleted from the console, which was impossible before — the
+  management API accepted both deletions and nothing in the console reached them. A container may now
+  take its contents with it, a project its OAuth clients and a bucket its end-user accounts, on an
+  election the administrator makes separately from confirming; the request carries what they reviewed,
+  so a client or account that arrived since is refused rather than destroyed on a stale consent.
+  Neither deletion completes by clicking: the administrator types `delete`. A project never reaches
+  the bucket it pointed at, under any election, because buckets are shared and hold people no project
+  knows about. One deletion writes one audit entry carrying what went by kind and count — replacing
+  one entry per withdrawn protected-resource declaration, which a bucket-sized deletion would have
+  turned into a trail nobody could read.
+
+### Fixed
+
+- admin: the administrators' bucket and the default end-user bucket could be deleted by a super
+  administrator while empty. The bucket deletion route does not go through the loader that carries the
+  reserved-bucket guard, so it reached no such guard at all; both are now refused before the bucket is
+  loaded, whatever is elected and whoever asks.
+
 ## [0.4.0] - 2026-09-16
 
 One thing defines this release: a user bucket is a tenant of its own. It is addressed in the URL,

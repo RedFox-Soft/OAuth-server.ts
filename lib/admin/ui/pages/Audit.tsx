@@ -19,6 +19,7 @@ interface AuditEntry {
 	targetId: string;
 	targetScope: string | null;
 	attributes: string[];
+	cascade: Record<string, number> | null;
 	timestamp: string;
 }
 
@@ -190,6 +191,36 @@ export function Audit() {
 						))}
 					</Space>
 				)
+		},
+		/*
+		 * What a deletion took with it. A separate column from "Fields set" rather than more tags in
+		 * it, because the two answer different questions: one says what the request changed, this says
+		 * what stopped existing. An operator scanning for the latter should not have to read the
+		 * former to find it.
+		 */
+		{
+			title: 'Also destroyed',
+			dataIndex: 'cascade',
+			render: (cascade: Record<string, number> | null) => {
+				const kinds = Object.entries(cascade ?? {});
+				return kinds.length === 0 ? (
+					<Typography.Text type="secondary">—</Typography.Text>
+				) : (
+					<Space
+						size={4}
+						wrap
+					>
+						{kinds.map(([kind, count]) => (
+							<Tag
+								key={kind}
+								color="red"
+							>
+								{count} {kind}
+							</Tag>
+						))}
+					</Space>
+				);
+			}
 		}
 	];
 

@@ -132,6 +132,68 @@ describe('admin audit secrecy', () => {
 		expect(entries[0]!.attributes).toEqual([]);
 	});
 
+	/*
+	 * The cascade is a new way for a secret-bearing entity to be destroyed, and the entry describing it
+	 * is written by a different handler from the one that created the entity. A sweep that covers only
+	 * the creating handler would pass while the destroying one recorded whatever it happened to hold.
+	 */
+	it('records a project deletion without the secrets of the clients it destroyed', async () => {
+		const cookie = await superCookie();
+		const project = await getProjectStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: 'P',
+			slug: unique('p')
+		});
+		const created = (
+			await client.admin.api.projects({ id: project._id }).clients.post(
+				{
+					grantTypes: ['authorization_code'],
+					tokenEndpointAuthMethod: 'client_secret_basic',
+					redirectUris: ['https://rp.example.com/cb']
+				},
+				{ headers: { cookie } }
+			)
+		).data as { clientId: string; secret?: string };
+
+		await client.admin.api.projects({ id: project._id }).delete(undefined, {
+			headers: { cookie },
+			query: { cascade: 'clients', client: [created.clientId] }
+		});
+
+		const trail = await trailFor(project._id);
+		expect(created.secret).toBeTruthy();
+		expect(trail).not.toContain(created.secret!);
+		// Nor the identity of what it destroyed: the entry carries how many, never which.
+		expect(trail).not.toContain(created.clientId);
+	});
+
+	it('records a bucket deletion without the addresses of the accounts it destroyed', async () => {
+		const cookie = await superCookie();
+		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: 'B'
+		});
+		const email = `${unique('resident')}@x.io`;
+		const created = (
+			await client.admin.api
+				.buckets({ id: bucket._id })
+				.users.post(
+					{ email, password: PASSWORD_MARKER },
+					{ headers: { cookie } }
+				)
+		).data as { _id: string };
+
+		await client.admin.api.buckets({ id: bucket._id }).delete(undefined, {
+			headers: { cookie },
+			query: { cascade: 'endusers', expect: 1 }
+		});
+
+		const trail = await trailFor(bucket._id);
+		expect(trail).not.toContain(PASSWORD_MARKER);
+		expect(trail).not.toContain(email);
+		expect(trail).not.toContain(created._id);
+	});
+
 	it('records an end-user creation without the password', async () => {
 		const cookie = await superCookie();
 		const bucket = await getBucketStore().create({

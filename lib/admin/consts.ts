@@ -34,6 +34,31 @@ export function isServedAtTheRoot(bucketId: string): boolean {
 }
 
 /*
+ * The two buckets the instance is built on, and the only two no authority can delete.
+ *
+ * Its own set rather than a call to `isServedAtTheRoot` above, although the members are identical
+ * today. The two rules are about different things: that one is about issuer identity, this one is
+ * about the instance needing somewhere to sign its administrators in and somewhere to fall back to
+ * when nothing else routes a request. Folding them would mean a future third root-served bucket
+ * silently becomes undeletable, or a future undeletable bucket silently claims the root issuer —
+ * each of them a decision nobody made, discovered later.
+ *
+ * Checked before the bucket is loaded, so the answer never depends on whether it happens to be empty.
+ * Emptiness is reachable for both: the administrators' bucket holds exactly the accounts an operator
+ * can remove one at a time, and the default bucket starts empty. Until 051 the delete route reached
+ * neither guard — it does not go through `loadBucketForEdit`, where `assertNotReserved` lives — so
+ * an empty one of either was deletable by a super administrator.
+ */
+const UNDELETABLE_BUCKETS: ReadonlySet<string> = new Set([
+	ADMIN_BUCKET_ID,
+	DEFAULT_BUCKET_ID
+]);
+
+export function isUndeletableBucket(bucketId: string): boolean {
+	return UNDELETABLE_BUCKETS.has(bucketId);
+}
+
+/*
  * The group that owns containers no administrator owns. Reachable only by super administrators, and
  * exempt from the at-least-one-owner rule for the same reason the reserved admin project and bucket
  * are exempt from the group model: it is a holding area, not a tenant.

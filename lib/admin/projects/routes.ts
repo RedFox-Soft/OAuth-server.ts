@@ -18,8 +18,11 @@ import {
 import {
 	CreateProjectBody,
 	UpdateProjectBody,
-	SetBucketBody
+	SetBucketBody,
+	DeleteProjectQuery
 } from './schema.js';
+import { deleteClientRecord } from '../clients/service.js';
+import { cascadeForClient } from '../../helpers/cascade.js';
 import {
 	InvalidOriginError,
 	normalizeOrigins
@@ -47,6 +50,26 @@ function validateCorsOrigins(origins: string[] | undefined) {
 		}
 		throw err;
 	}
+}
+
+/*
+ * A repeated query parameter arrives as an array, a single one as a string, and an absent one as
+ * undefined. Normalised here so the handler compares sets rather than three shapes — and `null` is
+ * kept distinct from `[]`, because "consented to nothing" and "did not consent" are different
+ * answers to the only question this parameter asks.
+ */
+function normalizeConsentedClients(
+	value: string | string[] | undefined
+): string[] | null {
+	if (value === undefined) return null;
+	return Array.isArray(value) ? value : [value];
+}
+
+/* Set equality, because the order the console listed them in is not part of what was consented to. */
+function sameSet(a: readonly string[], b: readonly string[]): boolean {
+	if (a.length !== b.length) return false;
+	const other = new Set(b);
+	return a.every((value) => other.has(value));
 }
 
 export const projectRoutes = new Elysia({ name: 'admin-projects' })
@@ -131,65 +154,126 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 		},
 		{ body: UpdateProjectBody }
 	)
-	.delete('/admin/api/projects/:id', async ({ admin, params }) => {
-		const ctx = assertAuth(admin as AdminContext | null);
-		const project = await loadProject(ctx, params.id);
-		if (project.type === 'admin')
-			throw new AdminError(403, 'cannot delete admin project');
-		/*
-		 * Ownership, not role: a group deletes what it owns. The client-blocker refusal below is what
-		 * actually protects the contents, and it is unchanged — widening who may ask did not widen what
-		 * may be destroyed.
-		 */
-		/*
-		 * A project is guarded rather than cascaded: its clients are things the operator can see and name,
-		 * so refusing says exactly what is in the way and leaves one audit entry per client actually
-		 * destroyed. Only ids that still *resolve* block — an id left behind after its client vanished
-		 * must never make a project permanently undeletable — and a refused request prunes nothing,
-		 * because a conflict changes nothing at all.
-		 *
-		 * An assigned bucket is deliberately not a blocker: buckets are shared and outlive projects.
-		 */
-		const held = (
-			await Promise.all(
-				project.clientIds.map(async (clientId) =>
-					(await Client.tryFind(clientId)) ? clientId : null
+	.delete(
+		'/admin/api/projects/:id',
+		async ({ admin, params, query }) => {
+			const ctx = assertAuth(admin as AdminContext | null);
+			const project = await loadProject(ctx, params.id);
+			if (project.type === 'admin')
+				throw new AdminError(403, 'cannot delete admin project');
+			/*
+			 * Ownership, not role: a group deletes what it owns. What protects the contents is the
+			 * election below, not who may ask — widening who may ask did not widen what may be destroyed.
+			 */
+			/*
+			 * Only ids that still *resolve* count. An id left behind after its client vanished must never
+			 * make a project permanently undeletable, and must never be offered to an administrator as
+			 * something they are consenting to destroy.
+			 *
+			 * An assigned bucket is deliberately absent from all of this: buckets are shared, they hold
+			 * people who have no relationship with any one project, and no election reaches one.
+			 */
+			const held = (
+				await Promise.all(
+					project.clientIds.map(async (clientId) =>
+						(await Client.tryFind(clientId)) ? clientId : null
+					)
 				)
-			)
-		).filter((clientId): clientId is string => clientId !== null);
-		if (held.length > 0) {
-			throw new AdminError(409, 'project still holds clients', {
-				blockers: [{ kind: 'client', count: held.length, ids: held }]
-			});
-		}
-		/*
-		 * Declared protected resources cascade rather than block, which is the opposite of the rule for
-		 * clients above — and the difference is what each thing is. A client is an entity an operator
-		 * can see and name, so refusing tells them exactly what is in the way. A resource declaration is
-		 * a property of the project: leaving one behind would strand an audience whose owning project no
-		 * longer exists, reachable by nobody and deletable through no route.
-		 *
-		 * One audit entry per declaration actually withdrawn, the same shape the client rule above
-		 * describes. Not a count on the project's own entry: an audit entry carries field *names* and
-		 * never values, deliberately, so that no secret can reach the trail — and a bare number would in
-		 * any case not say which audiences stopped being served. Named entries make the trail
-		 * reconstructible after the declarations themselves are gone.
-		 */
-		const declared = await getProtectedResourceStore().listByProject(params.id);
+			).filter((clientId): clientId is string => clientId !== null);
 
-		// After the guard: an entry for a request the 409 refused would describe a deletion never attempted.
-		for (const resource of declared) {
-			await recordAdminAudit(ctx, 'resource.delete', resource._id, {
-				ownerGroupId: project.ownerGroupId
+			const consented = normalizeConsentedClients(query.client);
+			if (consented !== null && query.cascade === undefined) {
+				throw new AdminError(
+					400,
+					'client requires cascade=clients: consenting to destroy a set nobody elected to destroy is not a request that means anything'
+				);
+			}
+
+			if (held.length > 0) {
+				/*
+				 * Two different refusals, and the difference is what the operator does next. Without an
+				 * election they have not decided yet; with one that no longer matches, they decided about
+				 * a list that has since changed and have to look again.
+				 */
+				if (query.cascade === undefined) {
+					throw new AdminError(409, 'project still holds clients', {
+						blockers: [{ kind: 'client', count: held.length, ids: held }]
+					});
+				}
+				if (!sameSet(held, consented ?? [])) {
+					throw new AdminError(
+						409,
+						'the project clients changed since you reviewed them',
+						{ blockers: [{ kind: 'client', count: held.length, ids: held }] }
+					);
+				}
+			}
+
+			/*
+			 * Declared protected resources go without being elected, unlike clients — and the difference
+			 * is what each thing is. A client is an entity in its own right, with its own credentials and
+			 * its own integrations, so destroying one is a decision. A resource declaration is a property
+			 * of the project: leaving one behind would strand an audience whose owning project no longer
+			 * exists, reachable by nobody and deletable through no route.
+			 */
+			const declared = await getProtectedResourceStore().listByProject(
+				params.id
+			);
+
+			/*
+			 * One entry, carrying counts — not one per client and one per declaration, as this wrote
+			 * until 051. The old shape argued that a bare number would not say which audiences stopped
+			 * being served, and that held while a project could only be deleted empty. It does not
+			 * survive the cascade: a deletion is all-or-nothing over what the project held, so the
+			 * project's identity already determines which clients and which declarations those were, and
+			 * a row per destroyed item would let one bucket-sized deletion bury everything else an
+			 * operator needs to investigate.
+			 *
+			 * Written after the guards and before the destruction, by the trail's own contract: an entry
+			 * attests that an authorized actor reached the point of applying this change, which is why
+			 * recording what is about to go is correct rather than optimistic.
+			 */
+			const cascade = {
+				...(held.length > 0 ? { clients: held.length } : {}),
+				...(declared.length > 0 ? { resources: declared.length } : {})
+			};
+			await recordAdminAudit(ctx, 'project.delete', params.id, {
+				ownerGroupId: project.ownerGroupId,
+				...(Object.keys(cascade).length > 0 ? { cascade } : {})
 			});
-		}
-		await recordAdminAudit(ctx, 'project.delete', params.id, {
-			ownerGroupId: project.ownerGroupId
-		});
-		await getProtectedResourceStore().destroyByProject(params.id);
-		await getProjectStore().destroy(params.id);
-		return { ok: true, resourcesRemoved: declared.length };
-	})
+
+			/*
+			 * Each client destroyed exactly as deleting it on its own destroys it. The shallow version —
+			 * drop the record, leave what it issued — is the failure that looks correct from the console:
+			 * the client disappears from the list while a registration access token it holds may carry no
+			 * expiry at all. A failed sweep is reported, never rolled back, because the principal is
+			 * already gone by then and closing the door first is the point.
+			 */
+			const failedAreas: string[] = [];
+			for (const clientId of held) {
+				await deleteClientRecord(clientId);
+				const swept = await cascadeForClient(clientId);
+				failedAreas.push(...swept.failedAreas);
+			}
+
+			await getProtectedResourceStore().destroyByProject(params.id);
+			await getProjectStore().destroy(params.id);
+
+			if (failedAreas.length > 0) {
+				throw new AdminError(
+					500,
+					`project deleted, but records of its clients survive in: ${[...new Set(failedAreas)].join(', ')}`,
+					{ failedAreas: [...new Set(failedAreas)] }
+				);
+			}
+			return {
+				ok: true,
+				clientsDestroyed: held.length,
+				resourcesRemoved: declared.length
+			};
+		},
+		{ query: DeleteProjectQuery }
+	)
 	.put(
 		'/admin/api/projects/:id/bucket',
 		async ({ admin, params, body }) => {

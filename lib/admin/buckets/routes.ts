@@ -15,7 +15,9 @@ import {
 } from '../auth/rbac.js';
 import type { UserBucket } from '../../adapters/types.js';
 import { presentAll } from '../federation/service.js';
-import { ADMIN_BUCKET_ID } from '../consts.js';
+import { ADMIN_BUCKET_ID, isUndeletableBucket } from '../consts.js';
+import { cascadeForAccount } from '../../helpers/cascade.js';
+import { emailScopedId } from '../../helpers/email_scoped_id.js';
 import { recordAdminAudit } from '../audit/record.js';
 import nanoid from '../../helpers/nanoid.js';
 import { loadBucketForUsers, loadBucketForEdit } from './access.js';
@@ -23,7 +25,11 @@ import {
 	assertSomeWayToSignIn,
 	prospectiveBucket
 } from '../federation/validate.js';
-import { CreateBucketBody, UpdateBucketBody } from './schema.js';
+import {
+	CreateBucketBody,
+	UpdateBucketBody,
+	DeleteBucketQuery
+} from './schema.js';
 import { isReservedBucketName } from '../../consts/reserved_names.js';
 import { forgetBucketAddresses } from '../auth/bucketAddress.js';
 
@@ -199,36 +205,101 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 		},
 		{ body: UpdateBucketBody }
 	)
-	.delete('/admin/api/buckets/:id', async ({ admin, params }) => {
-		const ctx = assertAuth(admin as AdminContext | null);
-		const bucket = await getBucketStore().find(params.id);
-		if (!bucket) throw new AdminError(404, 'bucket not found');
-		assertBucketAccess(ctx, bucket);
-		if ((await getProjectStore().countByBucket(params.id)) > 0) {
-			throw new AdminError(409, 'bucket is assigned to one or more projects');
-		}
-		/*
-		 * Guarded rather than cascaded, like a project: its users are accounts the operator can see and
-		 * name. `list()` does not filter, which is what makes a deactivated account count — deactivation is
-		 * a sign-in decision, not absence, and the account is still there to be destroyed. Only the count
-		 * is reported: a bucket can hold thousands of accounts and their identifiers are not the caller's
-		 * business.
-		 */
-		const store = getUserStore(params.id);
-		const held = (await store.list()).length;
-		if (held > 0) {
-			throw new AdminError(409, 'bucket still holds end-users', {
-				blockers: [{ kind: 'enduser', count: held }]
+	.delete(
+		'/admin/api/buckets/:id',
+		async ({ admin, params, query }) => {
+			const ctx = assertAuth(admin as AdminContext | null);
+			/*
+			 * First, before the bucket is even loaded, so the answer cannot depend on whether it happens
+			 * to be empty or on who is asking. This route does not go through `loadBucketForEdit`, which
+			 * is where `assertNotReserved` lives, so until 051 it reached no reserved-bucket guard at all
+			 * and an empty administrators' or default bucket was deletable by a super administrator.
+			 */
+			if (isUndeletableBucket(params.id)) {
+				throw new AdminError(
+					403,
+					'this bucket is part of the server itself and cannot be deleted'
+				);
+			}
+			const bucket = await getBucketStore().find(params.id);
+			if (!bucket) throw new AdminError(404, 'bucket not found');
+			assertBucketAccess(ctx, bucket);
+			/*
+			 * Before the election is even considered, and unclearable by it. What this protects is
+			 * outside the bucket: a project left pointing at a bucket that no longer exists is a broken
+			 * tenant, which is not something the bucket's own contents can consent away.
+			 */
+			if ((await getProjectStore().countByBucket(params.id)) > 0) {
+				throw new AdminError(409, 'bucket is assigned to one or more projects');
+			}
+			/*
+			 * `list()` does not filter, which is what makes a deactivated account count — deactivation is
+			 * a sign-in decision, not absence, and the account is still there to be destroyed. Only the
+			 * count is reported and only a count is accepted back: a bucket can hold thousands of
+			 * accounts, their identifiers are not the caller's business, and an administrator is not
+			 * asked to decide about people by name.
+			 */
+			const store = getUserStore(params.id);
+			const accounts = await store.list();
+			if (accounts.length > 0) {
+				if (query.cascade === undefined) {
+					throw new AdminError(409, 'bucket still holds end-users', {
+						blockers: [{ kind: 'enduser', count: accounts.length }]
+					});
+				}
+				if (query.expect !== accounts.length) {
+					throw new AdminError(
+						409,
+						'the bucket end-users changed since you reviewed them',
+						{ blockers: [{ kind: 'enduser', count: accounts.length }] }
+					);
+				}
+			}
+
+			/*
+			 * One entry carrying a count, never one per account: a bucket-sized deletion writing a row
+			 * per person would bury everything else an operator needs to investigate, and would say
+			 * nothing the bucket's identity does not already say — a cascade is all-or-nothing over what
+			 * it held. After the guards and before the destruction, by the trail's own contract.
+			 */
+			await recordAdminAudit(ctx, 'bucket.delete', params.id, {
+				...(accounts.length > 0
+					? { cascade: { endusers: accounts.length } }
+					: {})
 			});
-		}
-		// After the guards, before the deletion: an entry for a request the 409 refused would describe
-		// a deletion that was never even attempted.
-		await recordAdminAudit(ctx, 'bucket.delete', params.id);
-		await getBucketStore().destroy(params.id);
-		/* The address is gone; a cached entry would keep answering for a bucket that no longer exists. */
-		forgetBucketAddresses();
-		/* The half that was missing: without this a deleted bucket left its `user_<bucket>` area behind
-		 * for good, indexes and all. Safe here and only here, because the guard above proved it empty. */
-		await store.destroyArea();
-		return { ok: true };
-	});
+
+			/*
+			 * The email is read before the row goes, per account, because the email-scoped areas are
+			 * addressed by `${bucketId}:${email}` and nothing else records it. Destroy first and those
+			 * records are unreachable — skipped in silence, with no error anywhere to notice. The
+			 * already-computed id in `cascadeForAccount`'s signature is what makes that ordering
+			 * impossible to get wrong here.
+			 */
+			const failedAreas: string[] = [];
+			for (const account of accounts) {
+				const scopedId = account.email
+					? emailScopedId(params.id, account.email)
+					: null;
+				await store.destroy(account._id);
+				const swept = await cascadeForAccount(account._id, scopedId);
+				failedAreas.push(...swept.failedAreas);
+			}
+
+			await getBucketStore().destroy(params.id);
+			/* The address is gone; a cached entry would keep answering for a bucket that no longer exists. */
+			forgetBucketAddresses();
+			/* The half that was missing: without this a deleted bucket left its `user_<bucket>` area behind
+			 * for good, indexes and all. Safe here and only here, because the loop above emptied it. */
+			await store.destroyArea();
+
+			if (failedAreas.length > 0) {
+				throw new AdminError(
+					500,
+					`bucket deleted, but records of its end-users survive in: ${[...new Set(failedAreas)].join(', ')}`,
+					{ failedAreas: [...new Set(failedAreas)] }
+				);
+			}
+			return { ok: true, endUsersDestroyed: accounts.length };
+		},
+		{ query: DeleteBucketQuery }
+	);

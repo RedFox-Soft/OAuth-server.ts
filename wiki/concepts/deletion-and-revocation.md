@@ -4,7 +4,7 @@ title: 'Deletion and revocation'
 tags: [architecture, contract, gotcha, oauth]
 sources: [oauth-server-codebase]
 created: 2026-08-04
-updated: 2026-08-05
+updated: 2026-09-16
 graph:
   node_type: concept
 ---
@@ -17,11 +17,45 @@ Three different operations are easy to confuse, and the code has always distingu
 |---|---|---|
 | **Protocol revocation** (RFC 7009, end-session) | every token under one grant | the `Grant` record — the consent itself |
 | **Principal deletion** (client, end-user) | the principal, then every record naming it as owner, including its grants | nothing of that principal |
-| **Container deletion** (project, bucket) | nothing — it is *refused* while occupied | everything, until the operator empties it |
+| **Container deletion** (project, bucket) | nothing, unless the caller elected to take the contents — then every principal inside, each by the principal cascade above | the bucket a project merely pointed at, always |
 
 "Revoke" reads as "remove everything" and the code disagrees. A grant is the record that a user
 authorized a client; revoking a token is not withdrawing that authorization, so only a principal cascade
 destroys grant rows (`lib/helpers/revoke.ts`, `lib/helpers/cascade.ts`).
+
+## Container deletion stopped being "refused while occupied"
+
+Until **051** (after `f0ea7db`) the third row read "nothing — it is *refused* while occupied", and that
+was the whole rule: a project holding clients and a bucket holding accounts were undeletable until an
+operator emptied them by hand. The console had no delete action for either, so in practice neither was
+deletable at all.
+
+Three things now hold instead, and the first two are the ones a reader is likely to guess wrong.
+
+**A cascade is elected, never default.** `?cascade=clients` on the project route and
+`?cascade=endusers` on the bucket route, each carrying what the caller reviewed — the client ids, or
+the account count. If the container's contents have changed since, the request is refused rather than
+widened, because consent was given for what was on the screen. Without the election the old 409 is
+unchanged.
+
+**A project never reaches a bucket.** Buckets are shared and hold people with no relationship to any
+one project, so no election reaches one. This is the rule most likely to be "helpfully" broken by
+someone implementing a tidy-up.
+
+**One deletion writes one audit entry**, carrying kind → count in `cascade`. This replaced one entry
+per withdrawn declaration, and the comment that argued for those — *"a bare number would not say which
+audiences stopped being served"* — no longer holds: a cascade is all-or-nothing over the container's
+contents, so the container's identity already determines which ones those were. A row per destroyed
+item would let one bucket-sized deletion bury everything else in the trail.
+
+Two buckets are refused to everyone, empty or not: the administrators' bucket and the default bucket
+(`isUndeletableBucket`). That is deliberately a **separate set** from `isServedAtTheRoot`
+([[bucket-is-an-issuer]]) although the members are identical today: one rule is about issuer identity,
+the other about the instance needing somewhere to sign its administrators in. Folding them would make a
+future third root-served bucket silently undeletable, or a future undeletable bucket silently claim the
+root issuer. Before 051 the delete route reached no reserved-bucket guard at all, because it does not
+go through `loadBucketForEdit` where `assertNotReserved` lives — so an empty administrators' or default
+bucket was deletable by a super administrator.
 
 ## The visible half of client deletion was already fixed; the invisible half was not
 

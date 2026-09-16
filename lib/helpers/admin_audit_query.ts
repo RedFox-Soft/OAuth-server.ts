@@ -118,15 +118,20 @@ export function matchesAuditQuery(
 }
 
 /*
- * Read-side defaults for the two fields added after entries were already being written. Absent means
+ * Read-side defaults for the fields added after entries were already being written. Absent means
  * "nothing to say", identical to an entry from before the field existed — which is what makes the
  * absence free of a migration. Backfilling would mean writing to records the constitution declares
  * immutable.
+ *
+ * `cascade` defaults to null rather than `{}` so a reader never has to tell an entry that destroyed
+ * nothing beyond its container from one written before deletions could destroy anything at all. Both
+ * answers are "nothing went with it", and they should read as one answer.
  */
 export function withAuditDefaults(entry: AdminAuditEntry): AdminAuditEntry {
 	return {
 		...entry,
 		targetScope: entry.targetScope ?? null,
-		attributes: entry.attributes ?? []
+		attributes: entry.attributes ?? [],
+		cascade: entry.cascade ?? null
 	};
 }

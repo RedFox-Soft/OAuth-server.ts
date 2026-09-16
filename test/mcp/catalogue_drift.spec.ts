@@ -49,6 +49,37 @@ describe('MCP tool catalogue', () => {
 		expect(excludedConsoleOperations.length).toBeGreaterThan(0);
 	});
 
+	/*
+	 * A withheld operation's reason is the only thing an agent has to go on, and it is prose nobody
+	 * re-reads. The claim is about absence — the reason nobody checked — so no example closes it:
+	 * enumerate the withheld set from the running catalogue and require that a reason naming the
+	 * console names an operation the admin plane actually mounts.
+	 *
+	 * What this does NOT close, stated so nobody reads it as more: that the console UI offers a button
+	 * for it. The console is a client of these routes, so a mounted route is what makes the operation
+	 * possible, not what makes it reachable — and the reachable half lives in a React bundle with no
+	 * enumerable registry to check against. Until 051 that gap was real and cost exactly what this
+	 * comment describes: both container deletions were mounted, both reasons said "do it in the admin
+	 * console", and the console had no delete action on either screen. The reachable half is verified
+	 * by the console walk-through in the feature quickstart, deliberately rather than by a grep for a
+	 * button, which would prove that the code is the code it is.
+	 */
+	it('points every withheld operation at a console operation that exists', () => {
+		const mountedKeys = new Set(mountedApi.map(key));
+
+		const pointingNowhere = withheldConsoleOperations
+			.filter((e) => /admin console/i.test(e.reason))
+			.filter((e) => !mountedKeys.has(key(e)))
+			.map(key);
+
+		expect(pointingNowhere).toEqual([]);
+
+		// And every withheld operation says something, rather than being withheld in silence.
+		expect(
+			withheldConsoleOperations.every((e) => e.reason.trim().length > 0)
+		).toBe(true);
+	});
+
 	it('accounts for every mounted /admin/api route, in both directions', () => {
 		const published = new Set(mcpCatalogue.map(key));
 		const excluded = new Set(excludedConsoleOperations.map(key));

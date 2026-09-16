@@ -368,6 +368,21 @@ export interface AdminAuditEntry {
 	 */
 	attributes?: string[];
 	/*
+	 * What a deletion took with it, as kind → how many. Counts only: never an identifier, never an
+	 * email, never a claim, so the secrecy property holds structurally here exactly as it does for
+	 * `attributes` above rather than by a redaction rule somebody has to remember.
+	 *
+	 * A count is enough to reconstruct the deletion because a cascade is all-or-nothing over the
+	 * container's contents — an account that was in that bucket went, one that was not did not — which
+	 * is why a row per destroyed item would add volume without adding information, and why one
+	 * deletion writes one entry however much it destroyed.
+	 *
+	 * Optional for the reason `attributes` is: the trail is append-only, so there is no backfill, only
+	 * a read-side default. Absent on a deletion that destroyed only the container itself, because `{}`
+	 * and absent would otherwise say the same thing in two ways.
+	 */
+	cascade?: Record<string, number> | null;
+	/*
 	 * The agent that performed the action, and the surface it arrived on. Written together or not at
 	 * all; absent means the console.
 	 *
