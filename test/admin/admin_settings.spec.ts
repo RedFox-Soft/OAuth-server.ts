@@ -138,6 +138,25 @@ describe('admin bucket settings', () => {
 	});
 
 	it('records the change against the actor', async () => {
+		/*
+		 * Identified as the entry *this call* added, not as the first one carrying the action.
+		 *
+		 * The audit store is module state that outlives a spec file, and the MCP surface reaches this
+		 * same route through `admin_settings_update`, so another spec's entry for the same action and
+		 * target is already there. `list` sorts newest first and breaks a tie on a random id — and in a
+		 * suite this fast the two timestamps are the same millisecond — so "the first one" was decided by
+		 * a coin toss. It came up heads on Windows and tails on the Linux runner, where the file order
+		 * differs and the other spec runs first.
+		 */
+		const before = new Set(
+			(
+				await adminAuditStore.list({
+					targetType: 'UserBucket',
+					targetId: ADMIN_BUCKET_ID
+				})
+			).entries.map((e) => e._id)
+		);
+
 		await client.admin.api.admins.settings.patch(
 			{ totpRequired: true },
 			{ headers: { cookie: admin.cookie } }
@@ -147,7 +166,9 @@ describe('admin bucket settings', () => {
 			targetType: 'UserBucket',
 			targetId: ADMIN_BUCKET_ID
 		});
-		const entry = entries.find((e) => e.action === 'admin.settings.update');
+		const entry = entries.find(
+			(e) => e.action === 'admin.settings.update' && !before.has(e._id)
+		);
 		expect(entry).toBeDefined();
 		expect(entry?.actorId).toBe(admin.userId);
 		// Field names, never values — the trail's standing rule.
