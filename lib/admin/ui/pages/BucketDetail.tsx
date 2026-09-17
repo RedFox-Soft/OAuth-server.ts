@@ -384,19 +384,24 @@ export function BucketDetail({
 					layout="vertical"
 					onFinish={onCreate}
 				>
+					{/* An address beside a password reads as a sign-in form to a browser, which filled both
+					    with the administrator's own credentials. See the same pair in Admins.tsx. */}
 					<Form.Item
 						name="email"
 						label="Email"
 						rules={[{ required: true, type: 'email' }]}
 					>
-						<Input />
+						<Input autoComplete="off" />
 					</Form.Item>
 					<Form.Item
 						name="password"
 						label="Initial password"
 						rules={[{ required: true, min: 8 }]}
 					>
-						<Input.Password placeholder="at least 8 characters" />
+						<Input.Password
+							autoComplete="new-password"
+							placeholder="at least 8 characters"
+						/>
 					</Form.Item>
 					<Form.Item
 						name="roles"
@@ -458,7 +463,8 @@ export function BucketDetail({
 						label="New password"
 						rules={[{ required: true, min: 8 }]}
 					>
-						<Input.Password />
+						{/* This sets somebody else's password, so a stored one is never the right value. */}
+						<Input.Password autoComplete="new-password" />
 					</Form.Item>
 				</Form>
 			</Modal>

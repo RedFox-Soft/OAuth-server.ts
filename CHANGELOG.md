@@ -34,6 +34,14 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- admin: the console's dialogs offered the administrator's own saved credentials. A browser reads an
+  address or an identifier sitting beside a password field as a sign-in form, so creating an admin,
+  creating an end user, resetting somebody's password and entering an upstream provider's credentials
+  were all autofilled from the password store — one distracted confirmation away from creating an
+  account with the operator's own email and password, or from overwriting a working provider secret.
+- admin: dialogs sat a flat 100px below the top of the window whatever its height, which on a laptop
+  is a sixth of the screen and pushed taller dialogs off the bottom. Short viewports now get a small
+  offset; large monitors are unchanged.
 - interactions: a mistyped password removed the provider buttons from the login page. The refusal
   re-rendered from defaults rather than from the bucket's options, so a page that had just offered a
   federated sign-in came back offering only a password box; the unverified-email refusal did the same.

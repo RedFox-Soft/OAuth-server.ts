@@ -199,19 +199,28 @@ export function Admins() {
 					onFinish={onCreate}
 					initialValues={{ roles: ['project_admin'] }}
 				>
+					{/*
+					 * An address beside a password is a sign-in form as far as a browser is concerned, and it
+					 * filled this one with the *administrator's own* saved credentials — one distracted OK away
+					 * from creating an account with their own email and password. `new-password` is the part
+					 * that does the work: it is the documented signal not to offer a stored pair.
+					 */}
 					<Form.Item
 						name="email"
 						label="Email"
 						rules={[{ required: true, type: 'email' }]}
 					>
-						<Input />
+						<Input autoComplete="off" />
 					</Form.Item>
 					<Form.Item
 						name="password"
 						label="Password"
 						rules={[{ required: true, min: 12 }]}
 					>
-						<Input.Password placeholder="at least 12 characters" />
+						<Input.Password
+							autoComplete="new-password"
+							placeholder="at least 12 characters"
+						/>
 					</Form.Item>
 					<Form.Item
 						name="roles"

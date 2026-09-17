@@ -16,6 +16,22 @@
 			body {
 				margin: 0;
 			}
+
+			/*
+			 * antd places every dialog a flat 100px from the top of the viewport, whatever the window's
+			 * height. On a large monitor that is nothing; on a laptop it is a sixth of the screen, and a
+			 * tall dialog then runs off the bottom while an empty band sits above it.
+			 *
+			 * One rule here rather than `centered` on each of the twenty Modal call sites: the offset is a
+			 * property of the shell they all render into, and a prop repeated twenty times is nineteen
+			 * chances for the next dialog to be the one that forgets. Loaded after antd's own stylesheet,
+			 * so equal specificity resolves in this rule's favour.
+			 */
+			@media (max-height: 900px) {
+				.ant-modal {
+					top: 24px;
+				}
+			}
 		</style>
 	</head>
 	<body>

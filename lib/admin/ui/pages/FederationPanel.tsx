@@ -429,20 +429,25 @@ export function FederationPanel({
 								layout="vertical"
 								onFinish={connect}
 							>
+								{/*
+								 * These are an upstream's credentials, never the administrator's own. Without
+								 * this the browser reads an identifier beside a secret as a sign-in form and
+								 * fills both from its password store, which is both wrong and alarming.
+								 */}
 								<Form.Item
 									name="clientId"
 									label={connecting.credentialLabels.clientId}
 									tooltip={connecting.clientIdHint}
 									rules={[{ required: true }]}
 								>
-									<Input />
+									<Input autoComplete="off" />
 								</Form.Item>
 								<Form.Item
 									name="clientSecret"
 									label={connecting.credentialLabels.clientSecret}
 									rules={[{ required: true }]}
 								>
-									<Input.Password />
+									<Input.Password autoComplete="new-password" />
 								</Form.Item>
 								<Form.Item
 									name="allowedEmailDomains"
@@ -515,7 +520,7 @@ export function FederationPanel({
 						label="Client id"
 						rules={[{ required: !editing }]}
 					>
-						<Input />
+						<Input autoComplete="off" />
 					</Form.Item>
 					<Form.Item
 						name="clientSecret"
@@ -525,7 +530,12 @@ export function FederationPanel({
 						}
 						rules={[{ required: !editing }]}
 					>
-						<Input.Password placeholder={editing ? 'unchanged' : undefined} />
+						{/* Editing means an empty field keeps the stored secret, so an autofilled value here
+						    would silently overwrite a working credential with the wrong one. */}
+						<Input.Password
+							autoComplete="new-password"
+							placeholder={editing ? 'unchanged' : undefined}
+						/>
 					</Form.Item>
 					<Form.Item
 						name="scopes"
