@@ -11,6 +11,7 @@ import {
 import { loadBucketForEdit, loadBucketForUsers } from '../buckets/access.js';
 import { recordAdminAudit } from '../audit/record.js';
 import { CreateProviderBody, UpdateProviderBody } from './schema.js';
+import { guidanceForBucket } from './guidance.js';
 import {
 	createProvider,
 	deleteProvider,
@@ -47,6 +48,20 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 		const bucket = await loadBucketForUsers(ctx, params.id);
 		return presentAll(bucket);
 	})
+	/*
+	 * What it takes to connect a recognised provider to this bucket — including the callback address to
+	 * register, which depends on the bucket's own address and has never been visible anywhere in the
+	 * console. Ungated and unaudited for the same reasons as its siblings: a read records nothing, and an
+	 * administrator preparing a connection needs this before the capability is switched on.
+	 */
+	.get(
+		'/admin/api/buckets/:id/federation/catalogue',
+		async ({ admin, params }) => {
+			const ctx = assertAuth(admin as AdminContext | null);
+			const bucket = await loadBucketForUsers(ctx, params.id);
+			return { providers: guidanceForBucket(bucket) };
+		}
+	)
 	.post(
 		'/admin/api/buckets/:id/federation',
 		async ({ admin, params, body, set }) => {

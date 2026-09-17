@@ -337,6 +337,25 @@ const catalogue = [
 			'The upstream identity providers configured on a bucket. Never returns a provider client secret.'
 	},
 	{
+		/*
+		 * Published rather than withheld because the callback address is the one thing an agent cannot
+		 * derive: it depends on whether the bucket is served at the root and on the slug an operator chose.
+		 * Without it an agent could still configure a provider — one that cannot work, failing later on the
+		 * upstream's page with nothing on this server to explain it.
+		 */
+		tool: 'federation_catalogue_list',
+		method: 'GET',
+		path: '/admin/api/buckets/:id/federation/catalogue',
+		action: null,
+		consequence: 'read',
+		requiredRole: null,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			'What it takes to connect a recognised identity provider to a bucket: the ordered steps, where to perform them, and the exact callback address to register with the upstream. Returns no configured provider and no credential. Connect one by passing that provider catalogueId to federation_provider_create with the client id and secret it issued.'
+	},
+	{
 		tool: 'federation_identity_list',
 		method: 'GET',
 		path: '/admin/api/buckets/:id/users/:uid/identities',

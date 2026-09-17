@@ -19,6 +19,7 @@ import {
 	MCP_RESOURCE,
 	MCP_ROUTE
 } from 'lib/mcp/consts.ts';
+import { mcpCatalogue } from 'lib/mcp/catalogue.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { mock } from '../fetch_mock.ts';
 import { idpStub } from '../federation/idp_stub.ts';
@@ -163,7 +164,13 @@ describe('published operation set is capability-invariant', () => {
 		}
 
 		const [first, ...rest] = [...seen.values()];
-		expect(first.length).toBe(66);
+		/*
+		 * Every tool in the catalogue is offered, under the first configuration and therefore — by the
+		 * equality below — under all of them. Derived from the running catalogue rather than compared to a
+		 * written-down total: the number proved nothing on its own and was repaired by editing it, while
+		 * what this line has to establish is that the equality below is not comparing two empty lists.
+		 */
+		expect(first.length).toBe(mcpCatalogue.length);
 		for (const [label, names] of [...seen.entries()].slice(1)) {
 			expect(names, `tool list changed under: ${label}`).toEqual(first);
 		}

@@ -86,6 +86,30 @@ silent takeover.
 A provisioned account's password is a hash of 32 bytes discarded on the next line — deliberately not a
 sentinel string, which would be a value someone could eventually type.
 
+## Recognised providers are data, and that is what makes them safe
+
+Added by `specs/052-google-provider-onboarding`. `lib/consts/known_providers.ts` holds the settings that
+are the same for every deployment connecting a named upstream — issuer, scopes, email claim, whether its
+addresses are trusted, the button wording, and the steps an administrator performs at that provider.
+Google is the only entry.
+
+`POST …/federation` takes an optional `catalogueId`. The service resolves it, merges the entry **beneath**
+whatever the caller supplied, and discards the field. Three consequences, and the third is the one worth
+remembering:
+
+- only `clientId` and `clientSecret` stay required, so a connection is two pasted values;
+- an agent gets the same simplification, because it is the same route — no second write path, no second
+  audit action, no second set of refusals;
+- **nothing records that a provider came from the catalogue.** `FederationProvider` gained no field. So
+  no sign-in decision is *able* to branch on a provider's identity, which is Principle II held by the
+  absence of a field rather than by review — and a Google provider configured by hand long before any of
+  this renders with its mark on the next page load, so there was no migration to write.
+
+Recognition at read time is therefore a lookup on the stored `issuer`, in `loginOptions.ts` for the
+button's mark and in `guidance.ts` for "you already have this one". The console's old browser-side
+`PRESETS` map is gone: it made the same no-runtime-effect promise honestly, but it was a second copy of
+facts only the console could read.
+
 ## Gotchas
 
 ### A guarded route's schema is composed, not overridden
@@ -125,6 +149,37 @@ assumed they are disjoint. It is now a union comparison. See [[feature-flag-gati
 
 A deployment that switches federation off must still be able to **delete** a provider it stopped trusting.
 Gating configuration behind the capability it configures would make that provider unremovable.
+
+### A slugless bucket's callback address is real, registerable, and temporary
+
+Found while building `specs/052-google-provider-onboarding`, and it is the reason the guidance read
+reports a `callbackStability` rather than just an address.
+
+`callbackUri(bucket)` is `issuerFor(bucket) + '/federation/callback'`, and `issuerFor` falls back to the
+**record id** when a non-root bucket has no slug — `${ISSUER}/${bucket.slug ?? bucket._id}`. Its own
+comment says the case disappears once slugs are assigned. Meanwhile `bucketAddressFor` classifies the same
+bucket as `kind: 'none'`, "reachable nowhere until an operator gives it one".
+
+So an administrator connecting a provider to a slugless bucket is handed an address built from a
+43-character nanoid, registers it upstream, and it **silently stops matching** the moment somebody assigns
+a slug. It surfaces weeks later as `redirect_uri_mismatch` on the upstream's own page, to an end user,
+with nothing on this server to connect it to the slug that caused it.
+
+Not refused — refusing would block a legitimate order of operations. Reported, at the only moment the
+telling is useful: when the address is being copied.
+
+### A re-rendered login page lost its provider buttons
+
+`lib/interactions/index.ts`'s `refuse()` called `loginServer(uid, { errorMessage, handOffTo })` and
+nothing else, so the re-render fell through to that function's defaults — a password form and **no
+providers**. Every mistyped password therefore removed the bucket's provider buttons from a page that had
+just shown them, and the unverified-email re-render did the same.
+
+`loginOptions.ts` exists precisely to stop the four renderings of this page disagreeing, and its comment
+names "the POST that re-renders it on a bad password" as one of them. The value was resolved in that
+handler already — for the throttle and the second-factor step — and simply not passed on. A single
+resolver does not help if a call site does not use it; see [[interaction-page-families]], where this is
+the third distinct way this page has lost content it had rendered.
 
 ## What the upstream is trusted for, and what it is not
 

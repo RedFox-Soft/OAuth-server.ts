@@ -221,15 +221,19 @@ describe('every high-consequence tool is gated', () => {
 		expect(await mcpConfirmationStore.count()).toBe(before + HIGH.length);
 	});
 
-	it('leaves every ordinary tool ungated', () => {
-		// The converse of the matrix: confirmation is for the eleven, and an ordinary write must not
-		// quietly acquire a gate that an agent has no way to satisfy.
-		const gated = mcpCatalogue.filter(
+	it('classifies every published tool as high or as ordinary, with nothing in between', () => {
+		// The converse of the matrix: confirmation is for the high-consequence set, and an ordinary write
+		// must not quietly acquire a gate that an agent has no way to satisfy.
+		//
+		// Stated as a partition over the running catalogue rather than against a written-down total. The
+		// count this replaced named no set and no property: it fired identically on a legitimate new tool
+		// and on a mistake, and was always repaired by editing the number. What is actually worth proving
+		// is that the two classes account for every tool — which is what catches a mistyped `consequence`,
+		// the defect that would otherwise leave a tool in neither set and gated by nothing.
+		const ungated = mcpCatalogue.filter(
 			(t) => t.consequence === 'ordinary' || t.consequence === 'read'
 		);
-		expect(gated.length).toBe(66 - 14);
-		for (const tool of gated) {
-			expect(tool.consequence, tool.tool).not.toBe('high');
-		}
+		expect(ungated.length + HIGH.length).toBe(mcpCatalogue.length);
+		expect(ungated.length).toBeGreaterThan(0);
 	});
 });

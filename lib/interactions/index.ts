@@ -458,10 +458,18 @@ export const ui = new Elysia()
 			 * address, a wrong password, a deactivated account and a throttled attempt must be
 			 * indistinguishable, and a copy of the string is a copy that can drift.
 			 */
+			/*
+			 * The options travel with the refusal. Without them this re-render fell back to `loginServer`'s
+			 * defaults — a password form and *no providers* — so every mistyped password silently removed
+			 * the bucket's provider buttons from a page that had just shown them. The resolver above exists
+			 * precisely so the four renderings of this page cannot disagree; it was resolved here and then
+			 * not passed.
+			 */
 			const refuse = () =>
 				loginServer(uid, {
 					errorMessage: 'Invalid username or password',
-					handOffTo: redirectUriOf(interaction)
+					handOffTo: redirectUriOf(interaction),
+					...loginOptions
 				});
 
 			/*
@@ -510,7 +518,8 @@ export const ui = new Elysia()
 				return loginServer(uid, {
 					errorMessage:
 						'Please verify your email before signing in. Check your inbox for the verification message.',
-					handOffTo: redirectUriOf(interaction)
+					handOffTo: redirectUriOf(interaction),
+					...loginOptions
 				});
 			}
 			/*

@@ -57,6 +57,14 @@ both the page name and the interaction id from `window.location.pathname`, so a 
 the login path carrying a notice identifier rather than rendering the login page where it stands — see
 [[upstream-federation]].
 
+**And the props can be right while the page is still wrong.** Spec 052 found a third failure of the same
+shape, one floor down: the login POST's refusal path called `loginServer` with an error message and
+nothing else, so both the markup *and* the props were rendered from the function's defaults — password
+form, no providers. Hydration was blameless; the server had already forgotten what the bucket offered. The
+lesson the two halves share is that this page's content is only as good as the options reaching the render
+call, and a resolver that exists to prevent drift prevents none of it at a call site that ignores it. See
+[[upstream-federation]].
+
 `registrationServer` substituted no props and `loginClient`'s `registration` arm passed only `uid` — from
 the page's introduction until spec 021. Harmless while that page had nothing to say, which is exactly why
 it survived: the defect was invisible until someone rendered a message into it. If you add a message to a

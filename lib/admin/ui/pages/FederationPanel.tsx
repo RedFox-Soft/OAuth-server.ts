@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
+	Alert,
 	Table,
 	Button,
 	Modal,
@@ -38,44 +39,31 @@ interface ProviderValues {
 }
 
 /*
- * Form prefills only. These have **no runtime effect anywhere** — nothing in the server reads a preset name,
- * and behaviour comes from the stored fields alone. A branch per provider in business logic is exactly what
- * the multi-mode principle forbids; saving an operator from re-typing a well-known issuer is not that.
+ * What the server says it takes to connect a recognised provider to this bucket.
+ *
+ * This replaced a browser-side map of form prefills. The prefills were honest about having no runtime
+ * effect, but they were a second copy of facts the server now holds — and a copy only the console could
+ * read, so an agent got none of it. Everything below is fetched, including the one value nobody can guess.
  */
-const PRESETS: Record<string, Partial<ProviderValues>> = {
-	Google: {
-		id: 'google',
-		displayName: 'Google',
-		issuer: 'https://accounts.google.com',
-		scopes: ['openid', 'email', 'profile'],
-		emailTrusted: true
-	},
-	Microsoft: {
-		id: 'microsoft',
-		displayName: 'Microsoft',
-		issuer: 'https://login.microsoftonline.com/common/v2.0',
-		scopes: ['openid', 'email', 'profile'],
-		emailClaim: 'email'
-	},
-	Okta: {
-		id: 'okta',
-		displayName: 'Okta',
-		issuer: 'https://example.okta.com',
-		scopes: ['openid', 'email', 'profile']
-	},
-	Auth0: {
-		id: 'auth0',
-		displayName: 'Auth0',
-		issuer: 'https://example.eu.auth0.com',
-		scopes: ['openid', 'email', 'profile']
-	},
-	Keycloak: {
-		id: 'keycloak',
-		displayName: 'Keycloak',
-		issuer: 'https://keycloak.example.com/realms/main',
-		scopes: ['openid', 'email', 'profile']
-	}
-};
+interface Guidance {
+	catalogueId: string;
+	displayName: string;
+	consoleUrl: string;
+	steps: string[];
+	credentialLabels: { clientId: string; clientSecret: string };
+	clientIdHint: string;
+	callbackUri: string;
+	callbackStability: 'stable' | 'provisional';
+	javascriptOrigins: string[];
+	alreadyConnected: boolean;
+	existingProviderId?: string;
+}
+
+interface ConnectValues {
+	clientId: string;
+	clientSecret: string;
+	allowedEmailDomains?: string[];
+}
 
 export function FederationPanel({
 	bucketId,
@@ -93,14 +81,55 @@ export function FederationPanel({
 	const [editing, setEditing] = useState<FederationProvider | null>(null);
 	const [saving, setSaving] = useState(false);
 	const [form] = Form.useForm<ProviderValues>();
+	const [guidance, setGuidance] = useState<Guidance[]>([]);
+	const [connecting, setConnecting] = useState<Guidance | null>(null);
+	const [connectForm] = Form.useForm<ConnectValues>();
 
 	async function load() {
 		setLoading(true);
 		try {
-			const res = await fetch(base);
-			setRows(res.ok ? await res.json() : []);
+			const [providers, catalogue] = await Promise.all([
+				fetch(base),
+				fetch(`${base}/catalogue`)
+			]);
+			setRows(providers.ok ? await providers.json() : []);
+			setGuidance(
+				catalogue.ok ? ((await catalogue.json()).providers ?? []) : []
+			);
 		} finally {
 			setLoading(false);
+		}
+	}
+
+	/*
+	 * The address is the thing an administrator must carry to somebody else's console unchanged, so it is
+	 * offered as one action. The failure path still leaves it selectable on the page — a clipboard that
+	 * refuses is a browser setting, not a reason to be unable to finish.
+	 */
+	async function copyCallback(uri: string) {
+		try {
+			await navigator.clipboard.writeText(uri);
+			message.success('callback address copied');
+		} catch {
+			message.error('could not copy — select the address and copy it by hand');
+		}
+	}
+
+	async function connect(values: ConnectValues) {
+		if (!connecting) return;
+		setSaving(true);
+		try {
+			const ok = await send(base, 'POST', {
+				catalogueId: connecting.catalogueId,
+				...values
+			});
+			if (!ok) return;
+			setConnecting(null);
+			connectForm.resetFields();
+			await load();
+			onChanged?.();
+		} finally {
+			setSaving(false);
 		}
 	}
 
@@ -165,6 +194,25 @@ export function FederationPanel({
 				>
 					Identity providers
 				</Typography.Title>
+				{/*
+				 * A recognised provider is connected by name; anything else is configured field by field.
+				 * Two routes to the same stored record, and the guided one is offered first because it is
+				 * the one that can tell an administrator the callback address to register.
+				 */}
+				{guidance.map((entry) => (
+					<Button
+						key={entry.catalogueId}
+						type="primary"
+						onClick={() => {
+							connectForm.resetFields();
+							setConnecting(entry);
+						}}
+					>
+						{entry.alreadyConnected
+							? `${entry.displayName} connected`
+							: `Connect ${entry.displayName}`}
+					</Button>
+				))}
 				<Button
 					icon={<PlusOutlined />}
 					onClick={() => {
@@ -173,7 +221,7 @@ export function FederationPanel({
 						setOpen(true);
 					}}
 				>
-					Add provider
+					Add another provider
 				</Button>
 			</Space>
 
@@ -272,6 +320,147 @@ export function FederationPanel({
 				]}
 			/>
 
+			{/*
+			 * Restated beside the providers it governs, and worded so it claims nothing it cannot prove.
+			 * Whether the upstream actually holds this address is the one thing that cannot be checked
+			 * without a person completing a sign-in — so the console says where to look rather than
+			 * implying the connection has been verified.
+			 */}
+			{rows.length > 0 && guidance[0] && (
+				<div style={{ marginTop: 16 }}>
+					<Typography.Paragraph type="secondary">
+						Every provider on this bucket returns users to{' '}
+						<Typography.Text
+							code
+							copyable={{ text: guidance[0].callbackUri }}
+						>
+							{guidance[0].callbackUri}
+						</Typography.Text>
+						. If a sign-in fails on the provider's own page, that address not
+						being registered there is by far the most likely cause.
+					</Typography.Paragraph>
+					{guidance[0].callbackStability === 'provisional' && (
+						<Alert
+							type="warning"
+							showIcon
+							message="This address will change"
+							description="This bucket has no address of its own yet, so the address above is built from its internal id. Giving the bucket a slug changes it, and whatever you registered with the provider stops matching. Set the slug first."
+						/>
+					)}
+				</div>
+			)}
+
+			{connecting && (
+				<Modal
+					open
+					width={640}
+					title={`Connect ${connecting.displayName}`}
+					okText={connecting.alreadyConnected ? 'Close' : 'Connect'}
+					okButtonProps={{
+						style: connecting.alreadyConnected ? { display: 'none' } : undefined
+					}}
+					confirmLoading={saving}
+					onCancel={() => setConnecting(null)}
+					onOk={() => connectForm.submit()}
+				>
+					{connecting.alreadyConnected ? (
+						<Alert
+							type="info"
+							showIcon
+							message={`${connecting.displayName} is already connected to this bucket`}
+							description={`Edit the provider '${connecting.existingProviderId}' in the table below to change its credentials or settings. A bucket holds one connection per provider.`}
+						/>
+					) : (
+						<>
+							<Typography.Paragraph>
+								Do this at{' '}
+								<Typography.Link
+									href={connecting.consoleUrl}
+									target="_blank"
+									rel="noreferrer"
+								>
+									{connecting.displayName}
+								</Typography.Link>
+								, then come back with the two values it gives you.
+							</Typography.Paragraph>
+							<ol style={{ paddingLeft: 20, marginBottom: 16 }}>
+								{connecting.steps.map((step) => (
+									<li
+										key={step}
+										style={{ marginBottom: 6 }}
+									>
+										{step}
+									</li>
+								))}
+							</ol>
+
+							<Typography.Paragraph style={{ marginBottom: 4 }}>
+								<strong>The redirect URI to register</strong>
+							</Typography.Paragraph>
+							<Space
+								align="center"
+								style={{ marginBottom: 4 }}
+							>
+								<Typography.Text code>{connecting.callbackUri}</Typography.Text>
+								<Button
+									size="small"
+									onClick={() => void copyCallback(connecting.callbackUri)}
+								>
+									Copy
+								</Button>
+							</Space>
+							<Typography.Paragraph type="secondary">
+								Paste it exactly. Providers match this address character for
+								character, and a mismatch is refused on their page rather than
+								here.
+							</Typography.Paragraph>
+							{connecting.callbackStability === 'provisional' && (
+								<Alert
+									style={{ marginBottom: 16 }}
+									type="warning"
+									showIcon
+									message="Give this bucket a slug first"
+									description="This bucket has no address of its own, so the address above is built from its internal id and will change the moment you assign a slug — silently invalidating what you registered."
+								/>
+							)}
+
+							<Form
+								form={connectForm}
+								layout="vertical"
+								onFinish={connect}
+							>
+								<Form.Item
+									name="clientId"
+									label={connecting.credentialLabels.clientId}
+									tooltip={connecting.clientIdHint}
+									rules={[{ required: true }]}
+								>
+									<Input />
+								</Form.Item>
+								<Form.Item
+									name="clientSecret"
+									label={connecting.credentialLabels.clientSecret}
+									rules={[{ required: true }]}
+								>
+									<Input.Password />
+								</Form.Item>
+								<Form.Item
+									name="allowedEmailDomains"
+									label="Restrict to these email domains"
+									tooltip="Optional. Bare lower-case domains. Empty means anyone with an account at this provider can sign in."
+								>
+									<Select
+										mode="tags"
+										tokenSeparators={[' ', ',']}
+										placeholder="acme.com"
+									/>
+								</Form.Item>
+							</Form>
+						</>
+					)}
+				</Modal>
+			)}
+
 			<Modal
 				open={open}
 				title={
@@ -296,21 +485,6 @@ export function FederationPanel({
 						enabled: true
 					}}
 				>
-					{!editing && (
-						<Form.Item label="Start from">
-							<Select
-								placeholder="a well-known provider (optional)"
-								allowClear
-								options={Object.keys(PRESETS).map((name) => ({
-									label: name,
-									value: name
-								}))}
-								onChange={(name?: string) => {
-									if (name) form.setFieldsValue(PRESETS[name] ?? {});
-								}}
-							/>
-						</Form.Item>
-					)}
 					{!editing && (
 						<Form.Item
 							name="id"

@@ -6,9 +6,15 @@ import {
 	forgetDiscovery
 } from '../../federation/discovery.js';
 import { DEFAULT_SCOPES, SECRET_MASK } from '../../federation/consts.js';
+import {
+	knownProvider,
+	knownProviderIds,
+	type KnownProvider
+} from '../../consts/known_providers.js';
 import type { UserBucket } from '../../adapters/types.js';
 import type { FederationProvider } from '../../federation/types.js';
 import {
+	assertClientIdShape,
 	assertEmailDomains,
 	assertIssuer,
 	assertProviderId,
@@ -86,12 +92,45 @@ async function assertIssuerResolves(issuer: string): Promise<void> {
 	}
 }
 
+/*
+ * The recognised provider a body named, or nothing.
+ *
+ * The refusal lists what could have been said instead: an administrator who typed `gogle` is one keystroke
+ * from success, and a bare "unknown" makes them go looking for a spelling nobody published.
+ */
+function resolveCatalogue(catalogueId: string): KnownProvider {
+	const entry = knownProvider(catalogueId);
+	if (!entry) {
+		throw new AdminError(
+			422,
+			`no recognised provider is called '${catalogueId}' — try one of: ${knownProviderIds().join(', ')}`
+		);
+	}
+	return entry;
+}
+
+/* What a body had to supply itself, now that a catalogue entry may have supplied it. */
+function required(
+	value: string | undefined,
+	field: string,
+	fromCatalogue: boolean
+): string {
+	if (value) return value;
+	throw new AdminError(
+		422,
+		fromCatalogue
+			? `${field} is required`
+			: `${field} is required unless catalogueId names a recognised provider`
+	);
+}
+
 export async function createProvider(
 	bucket: UserBucket,
 	body: {
-		id: string;
-		displayName: string;
-		issuer: string;
+		catalogueId?: string;
+		id?: string;
+		displayName?: string;
+		issuer?: string;
 		clientId: string;
 		clientSecret: string;
 		enabled?: boolean;
@@ -103,23 +142,54 @@ export async function createProvider(
 	}
 ): Promise<FederationProvider> {
 	const existing = providersOf(bucket);
-	assertProviderId(body.id, existing);
-	assertIssuer(body.issuer);
+	/*
+	 * The entry fills only what the caller left out — every `??` below reads the body first — so narrowing
+	 * a connection to one email domain, or renaming it, is the ordinary case rather than a reason to
+	 * abandon the guided route and type eleven fields.
+	 *
+	 * `catalogueId` never reaches the object constructed below. That is the whole of FR-003: nothing
+	 * records which route created a provider, so nothing downstream is *able* to branch on it.
+	 */
+	const entry = body.catalogueId
+		? resolveCatalogue(body.catalogueId)
+		: undefined;
+	if (entry) assertClientIdShape(entry, body.clientId);
+
+	const id = required(
+		body.id ?? entry?.defaultProviderId,
+		'id',
+		Boolean(entry)
+	);
+	const issuer = required(
+		body.issuer ?? entry?.issuer,
+		'issuer',
+		Boolean(entry)
+	);
+	const displayName = required(
+		body.displayName ?? entry?.displayName,
+		'displayName',
+		Boolean(entry)
+	);
+
+	assertProviderId(id, existing);
+	assertIssuer(issuer);
 
 	const provider: FederationProvider = {
-		id: body.id,
-		displayName: body.displayName,
+		id,
+		displayName,
 		enabled: body.enabled ?? true,
-		issuer: body.issuer,
+		issuer,
 		clientId: body.clientId,
 		clientSecret: body.clientSecret,
-		scopes: body.scopes ?? DEFAULT_SCOPES,
+		scopes: body.scopes ?? (entry ? [...entry.scopes] : DEFAULT_SCOPES),
 		// Both default to the cautious reading: an operator opts in to trusting addresses and opts in to
-		// narrowing domains, and neither happens by accident.
-		emailTrusted: body.emailTrusted ?? false,
+		// narrowing domains, and neither happens by accident. A catalogue entry may raise the first, because
+		// that is a judgement about a named provider somebody made deliberately — it never raises the
+		// second, so the guided route cannot leave a bucket more open than the manual one would.
+		emailTrusted: body.emailTrusted ?? entry?.emailTrusted ?? false,
 		provisioning: body.provisioning ?? 'jit',
 		allowedEmailDomains: body.allowedEmailDomains ?? [],
-		emailClaim: body.emailClaim ?? 'email'
+		emailClaim: body.emailClaim ?? entry?.emailClaim ?? 'email'
 	};
 
 	assertScopes(provider.scopes);

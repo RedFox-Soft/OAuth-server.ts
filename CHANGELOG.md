@@ -11,6 +11,16 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- admin: Google can be connected to a user bucket by name. The console now shows what to do at Google,
+  links straight to it, and — the part that was missing entirely — the exact callback address to
+  register, which differs per bucket and appeared nowhere before; the administrator supplies only the
+  client id and secret Google issued. Everything else comes from a recognised-provider catalogue that is
+  data, not behaviour: the stored provider is indistinguishable from one configured by hand, so nothing
+  can branch on how it was made, and a Google provider configured by hand years ago now renders with its
+  own branded button without a migration. The same route serves agents, so an agent connects it the same
+  way, with the same checks and one audit entry. A bucket with no slug is told its callback address is
+  provisional, because assigning a slug later invalidates it.
+
 - admin: projects and user buckets can be deleted from the console, which was impossible before — the
   management API accepted both deletions and nothing in the console reached them. A container may now
   take its contents with it, a project its OAuth clients and a bucket its end-user accounts, on an
@@ -24,6 +34,9 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- interactions: a mistyped password removed the provider buttons from the login page. The refusal
+  re-rendered from defaults rather than from the bucket's options, so a page that had just offered a
+  federated sign-in came back offering only a password box; the unverified-email refusal did the same.
 - admin: the administrators' bucket and the default end-user bucket could be deleted by a super
   administrator while empty. The bucket deletion route does not go through the loader that carries the
   reserved-bucket guard, so it reached no such guard at all; both are now refused before the bucket is

@@ -11,9 +11,20 @@ const Provisioning = t.Union([t.Literal('jit'), t.Literal('existing_only')]);
  * two routes has one definition.
  */
 export const CreateProviderBody = t.Object({
-	id: t.String({ minLength: 1, maxLength: 32 }),
-	displayName: t.String({ minLength: 1 }),
-	issuer: t.String({ minLength: 1 }),
+	/*
+	 * Names a recognised provider whose settings fill everything an administrator would otherwise have to
+	 * know — so `id`, `displayName` and `issuer` become optional, and only the two values the upstream
+	 * itself issues stay required.
+	 *
+	 * The field is consumed and discarded: it selects defaults, it is never stored, and the provider it
+	 * produces is indistinguishable from one configured field by field. "Required unless a catalogue entry
+	 * supplies it" is enforced once in ./service.ts rather than expressed as a schema union, so a body that
+	 * names no entry and omits an issuer is refused with the message it has always been refused with.
+	 */
+	catalogueId: t.Optional(t.String({ minLength: 1 })),
+	id: t.Optional(t.String({ minLength: 1, maxLength: 32 })),
+	displayName: t.Optional(t.String({ minLength: 1 })),
+	issuer: t.Optional(t.String({ minLength: 1 })),
 	clientId: t.String({ minLength: 1 }),
 	clientSecret: t.String({ minLength: 1 }),
 	enabled: t.Optional(t.Boolean()),

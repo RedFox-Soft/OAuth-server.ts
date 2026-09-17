@@ -1,5 +1,6 @@
 import { getBucketStore } from '../adapters/index.js';
 import { enabledProviders } from '../federation/providers.js';
+import { knownProviderByIssuer } from '../consts/known_providers.js';
 import { resolveBucketForRequest } from '../admin/auth/resolveBucket.js';
 
 /*
@@ -24,8 +25,15 @@ export interface LoginOptions {
 	 * known would say something about the accounts in this bucket to anyone who asks.
 	 */
 	totpRequired: boolean;
-	/* Only what the page renders: an id to build the link from and a label to show. Never the credentials. */
-	providers: { id: string; displayName: string }[];
+	/*
+	 * Only what the page renders: an id to build the link from, a label to show, and — when the upstream is
+	 * one this server recognises — which mark and wording its own branding requires. Never the credentials.
+	 *
+	 * `brand` is resolved here rather than in the component, and that is the whole reason this module
+	 * exists: the login page renders twice from one props payload, and a value computed during render
+	 * would be computed twice and could differ. Resolved once, it travels with the rest.
+	 */
+	providers: { id: string; displayName: string; brand?: string }[];
 }
 
 export async function loginOptionsForBucket(
@@ -40,10 +48,19 @@ export async function loginOptionsForBucket(
 		// bucket predating the field must get, and what makes an unreadable bucket fail open on this
 		// rather than locking everyone out of a bucket nobody configured.
 		totpRequired: bucket?.totpRequired === true,
-		providers: enabledProviders(bucket).map((provider) => ({
-			id: provider.id,
-			displayName: provider.displayName
-		}))
+		/*
+		 * Recognition keys on the stored issuer, never on how the provider came to be configured — nothing
+		 * records that, deliberately. So a Google provider somebody typed in by hand long before the
+		 * catalogue existed renders with its mark on the next page load, and no migration is owed.
+		 */
+		providers: enabledProviders(bucket).map((provider) => {
+			const known = knownProviderByIssuer(provider.issuer);
+			return {
+				id: provider.id,
+				displayName: provider.displayName,
+				...(known ? { brand: known.catalogueId } : {})
+			};
+		})
 	};
 }
 

@@ -12,6 +12,8 @@ import {
 	buildUIFederationStartPath
 } from './buildUIPath.js';
 import { versionedAsset } from '../html/versionedAsset.js';
+import { knownProvider } from '../consts/known_providers.js';
+import { providerMark } from './providerMark.js';
 
 export function LoginPage({
 	uid,
@@ -25,7 +27,7 @@ export function LoginPage({
 	notice?: string;
 	/* Defaulted so the component renders the password page for any caller that says nothing. */
 	passwordLogin?: boolean;
-	providers?: { id: string; displayName: string }[];
+	providers?: { id: string; displayName: string; brand?: string }[];
 }) {
 	return (
 		<Flex
@@ -193,23 +195,57 @@ export function LoginPage({
 								or continue with
 							</div>
 						)}
-						{providers.map((provider) => (
-							<a
-								key={provider.id}
-								href={buildUIFederationStartPath(uid, provider.id)}
-								style={{
-									display: 'block',
-									padding: '8px 16px',
-									border: '1px solid #d9d9d9',
-									borderRadius: '6px',
-									textAlign: 'center',
-									color: '#1f1f1f',
-									textDecoration: 'none'
-								}}
-							>
-								Sign in with {provider.displayName}
-							</a>
-						))}
+						{providers.map((provider) => {
+							const known = knownProvider(provider.brand ?? '');
+							const mark = providerMark(provider.brand);
+							/*
+							 * A recognised provider's button follows that provider's own branding
+							 * requirements, which are a condition of using its mark rather than a design
+							 * preference. Google's light theme is #FFFFFF on a #747775 stroke with #1F1F1F
+							 * text, 12px before the mark, 10px after it and 12px after the text, and the
+							 * mark is never shown without the text.
+							 *
+							 * The wording comes from the catalogue, not from `displayName`: an administrator
+							 * may rename a provider to anything, and a branded button whose text an operator
+							 * can edit stops complying the first time somebody does.
+							 */
+							return (
+								<a
+									key={provider.id}
+									href={buildUIFederationStartPath(uid, provider.id)}
+									style={
+										known
+											? {
+													display: 'flex',
+													alignItems: 'center',
+													justifyContent: 'center',
+													gap: '10px',
+													height: '40px',
+													padding: '0 12px',
+													backgroundColor: '#FFFFFF',
+													border: '1px solid #747775',
+													borderRadius: '6px',
+													color: '#1F1F1F',
+													textDecoration: 'none'
+												}
+											: {
+													display: 'block',
+													padding: '8px 16px',
+													border: '1px solid #d9d9d9',
+													borderRadius: '6px',
+													textAlign: 'center',
+													color: '#1f1f1f',
+													textDecoration: 'none'
+												}
+									}
+								>
+									{mark}
+									{known
+										? known.buttonText
+										: `Sign in with ${provider.displayName}`}
+								</a>
+							);
+						})}
 					</Flex>
 				)}
 			</Card>

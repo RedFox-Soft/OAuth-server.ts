@@ -53,6 +53,32 @@ export function assertIssuer(issuer: string): void {
 	}
 }
 
+/*
+ * Refuse a credential that cannot be the one the named provider issues.
+ *
+ * Generic over a pattern the catalogue entry carries rather than a check that knows about any particular
+ * provider — the entry is data, and a branch here would be the thing the catalogue exists to avoid.
+ *
+ * It catches the mistake this is actually for: an administrator on somebody else's console, looking at
+ * four values, pasting the API key or the secret into the wrong box. It is deliberately a suffix test and
+ * not a model of the provider's identifier format, because a pattern tight enough to reject a future
+ * issuance format would be a refusal nobody can work around and nobody can diagnose.
+ */
+export function assertClientIdShape(
+	provider: {
+		displayName: string;
+		clientIdPattern: RegExp;
+		clientIdHint: string;
+	},
+	clientId: string
+): void {
+	if (provider.clientIdPattern.test(clientId)) return;
+	throw new AdminError(
+		422,
+		`that does not look like a ${provider.displayName} client id — ${provider.clientIdHint}`
+	);
+}
+
 export function assertScopes(scopes: string[]): void {
 	// Without `openid` the response is not an OIDC one and carries no ID token, so there is nothing to verify.
 	if (!scopes.includes('openid')) {
