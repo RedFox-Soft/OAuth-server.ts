@@ -13,7 +13,10 @@ import {
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { SECRET_MASK } from 'lib/federation/consts.ts';
-import { KNOWN_PROVIDERS } from 'lib/consts/known_providers.ts';
+import {
+	KNOWN_PROVIDERS,
+	issuerForKnownProvider
+} from 'lib/consts/known_providers.ts';
 import {
 	assertEmailDomains,
 	assertIssuer,
@@ -90,8 +93,15 @@ describe('connecting a recognised provider', () => {
 
 		for (const entry of KNOWN_PROVIDERS) {
 			assertProviderId(entry.defaultProviderId, []);
-			assertIssuer(entry.issuer);
-			assertScopes([...entry.scopes]);
+			/*
+			 * Through the entry's own rule, because one entry's issuer names an organisation and so has no
+			 * single value. A sample parameter is enough: the claim is that whatever an entry would store is
+			 * a valid issuer, not that any particular organisation exists.
+			 */
+			const issuer = issuerForKnownProvider(entry, { tenant: 'sample-tenant' });
+			expect(issuer).toBeDefined();
+			assertIssuer(issuer as string);
+			assertScopes([...entry.scopes], entry.protocol.kind);
 			assertEmailDomains([]);
 
 			expect(entry.steps.length).toBeGreaterThan(0);

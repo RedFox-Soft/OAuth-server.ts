@@ -79,10 +79,115 @@ export function assertClientIdShape(
 	);
 }
 
-export function assertScopes(scopes: string[]): void {
-	// Without `openid` the response is not an OIDC one and carries no ID token, so there is nothing to verify.
-	if (!scopes.includes('openid')) {
-		throw new AdminError(422, "scopes must include 'openid'");
+/*
+ * The rule is asked of the right providers rather than dropped.
+ *
+ * `openid` was required of everything, reasoning that without it the response carries no ID token and
+ * there is nothing to verify. That reasoning is still exactly right — and it does not apply to a provider
+ * that issues no ID token either way, for which enforcing it would simply make the provider
+ * unconfigurable. So the premise became a parameter.
+ */
+export function assertScopes(
+	scopes: string[],
+	protocol: 'oidc' | 'profile_api' = 'oidc'
+): void {
+	if (protocol === 'oidc') {
+		if (!scopes.includes('openid')) {
+			throw new AdminError(422, "scopes must include 'openid'");
+		}
+		return;
+	}
+	/*
+	 * A provider read through its own API still has to be asked for something: a token authorised for
+	 * nothing identifies nobody, and the failure would otherwise appear as a refusal at the decision
+	 * ladder's second step rather than as the misconfiguration it is.
+	 */
+	if (scopes.length === 0) {
+		throw new AdminError(
+			422,
+			'scopes must name what the provider should be asked for'
+		);
+	}
+}
+
+/*
+ * Every value the named provider asks for is present, and none it does not ask for was sent.
+ *
+ * Driven entirely by the entry's own `requiredValues`, so this function knows about no provider in
+ * particular and a fifth entry needs no edit here. The second half matters as much as the first: a secret
+ * offered to a provider that issues none is a sign the administrator is on the wrong screen, and storing
+ * it would leave a credential nothing will ever present.
+ */
+export function assertSuppliedValues(
+	entry: {
+		displayName: string;
+		requiredValues: readonly { name: string; label: string; hint: string }[];
+	},
+	body: Record<string, unknown>
+): void {
+	const asked = new Set(entry.requiredValues.map((value) => value.name));
+
+	for (const value of entry.requiredValues) {
+		if (!body[value.name]) {
+			throw new AdminError(
+				422,
+				`${entry.displayName} needs its ${value.label} — ${value.hint}`
+			);
+		}
+	}
+
+	for (const name of [
+		'clientSecret',
+		'tenant',
+		'teamId',
+		'keyId',
+		'signingKey'
+	]) {
+		if (body[name] && !asked.has(name)) {
+			throw new AdminError(
+				422,
+				`${entry.displayName} does not use ${name}; remove it`
+			);
+		}
+	}
+}
+
+/* Microsoft's documented words, or one organisation's own identifier. */
+const TENANT_WORDS = ['common', 'organizations', 'consumers'];
+/* A GUID, or a verified domain — the two forms an organisation is named by. */
+const TENANT_ID =
+	/^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+)$/i;
+
+export function assertTenant(tenant: string): void {
+	if (TENANT_WORDS.includes(tenant)) return;
+	if (TENANT_ID.test(tenant)) return;
+	throw new AdminError(
+		422,
+		`that does not look like an organisation — use its directory id, its verified domain, or one of: ${TENANT_WORDS.join(', ')}`
+	);
+}
+
+/*
+ * Apple's two identifiers are fixed-length alphanumeric, and the key is PEM.
+ *
+ * Shape only. Whether the key actually *works* is settled by signing with it — see `assertKeyUsable` in
+ * ./service.ts — because a well-formed key for the wrong account is the mistake this cannot catch and that
+ * one can.
+ */
+const APPLE_ID = /^[A-Z0-9]{8,12}$/;
+
+export function assertAppleIdentifiers(teamId: string, keyId: string): void {
+	if (!APPLE_ID.test(teamId)) {
+		throw new AdminError(
+			422,
+			'that does not look like an Apple Team ID — 10 characters, letters and digits, from your membership details'
+		);
+	}
+	if (!APPLE_ID.test(keyId)) {
+		throw new AdminError(
+			422,
+			'that does not look like an Apple Key ID — 10 characters, letters and digits, shown beside the key you created'
+		);
 	}
 }
 

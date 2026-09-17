@@ -192,6 +192,17 @@ const bareGatedRoutes: readonly GatedRoute[] = [
 		method: 'GET',
 		path: '/federation/callback',
 		flag: 'federation.enabled'
+	},
+	/*
+	 * The same path by a second method, because one recognised provider requires the return to be posted
+	 * and refuses the authorization request otherwise. Gated identically — with the flag off there is no
+	 * provider button and nothing a user could have started, so this is a path that does not exist rather
+	 * than one closed mid-flow.
+	 */
+	{
+		method: 'POST',
+		path: '/federation/callback',
+		flag: 'federation.enabled'
 	}
 
 	/*

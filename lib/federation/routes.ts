@@ -8,8 +8,7 @@ import {
 	buildUIFederationCompletePath,
 	buildUILoginPath
 } from '../interactions/buildUIPath.js';
-import { DiscoveryError, discover } from './discovery.js';
-import { ExchangeError, exchangeCode } from './flow.js';
+import { IdentityError, identityFor } from './identity/index.js';
 import {
 	federationDomainRefusedPage,
 	federationExpiredPage,
@@ -23,10 +22,6 @@ import {
 import { findEnabledProvider } from './providers.js';
 import { resolveFederatedAccount } from './resolve.js';
 import { consumePending, openHandoff } from './state.js';
-import {
-	FederationIdTokenRejected,
-	verifyFederatedIdToken
-} from './verifyIdToken.js';
 
 /*
  * The return leg from an upstream provider.
@@ -37,14 +32,55 @@ import {
  * `state` it was given. It reads no cookie and sets none.
  */
 
-export const federationRoutes = new Elysia({ name: 'federation-callback' }).get(
-	'/federation/callback',
-	async ({ query }) => {
-		/*
-		 * The state is spent first, whatever happens next — including when the provider reports an error.
-		 * A round trip is one attempt, and an attempt that came back at all is over.
-		 */
-		const pending = await consumePending(query.state);
+/*
+ * What an upstream sends back, however it sends it.
+ *
+ * `iss` is RFC 9207 and must be tolerated; `error`/`error_description` are how a provider reports a
+ * decline. All are declared because the app runs `normalize: false` — an undeclared parameter a real
+ * provider sends would 422 the request before the handler ran. Only `state` is required: without it there
+ * is no round trip to identify.
+ *
+ * One provider also posts a `user` field on a first authorization, carrying the name it will never send
+ * again. Declared for that reason, and read by the identity layer rather than here.
+ */
+const ReturnParams = t.Object({
+	state: t.String(),
+	code: t.Optional(t.String()),
+	iss: t.Optional(t.String()),
+	error: t.Optional(t.String()),
+	error_description: t.Optional(t.String()),
+	user: t.Optional(t.String())
+});
+
+type ReturnParams = typeof ReturnParams.static;
+
+export const federationRoutes = new Elysia({ name: 'federation-callback' })
+	.get('/federation/callback', ({ query }) => completeReturn(query), {
+		query: ReturnParams
+	})
+	/*
+	 * The same path, a second method, one handler.
+	 *
+	 * One recognised provider **requires** the return to be posted whenever a name or an address is among
+	 * the scopes, and refuses the authorization request outright otherwise — so this is a precondition of
+	 * connecting it, not an accommodation.
+	 *
+	 * On the same path deliberately. The reason this route reads no cookie is that the interaction cookie
+	 * is scoped `path: /ui/${uid}` and a fixed callback address is outside it — a property of the path, not
+	 * the method, so a POST is cookieless on exactly the same grounds. A second path would mean a second
+	 * address for every administrator to register and a second place for these rules to drift apart.
+	 */
+	.post('/federation/callback', ({ body }) => completeReturn(body), {
+		body: ReturnParams
+	});
+
+async function completeReturn(params: ReturnParams) {
+	/*
+	 * The state is spent first, whatever happens next — including when the provider reports an error.
+	 * A round trip is one attempt, and an attempt that came back at all is over.
+	 */
+	const pending = await consumePending(params.state);
+	{
 		if (
 			!pending ||
 			!pending.bucketId ||
@@ -65,14 +101,14 @@ export const federationRoutes = new Elysia({ name: 'federation-callback' }).get(
 		 * — in a browser only, with nothing logged. The message travels as a server-owned notice identifier,
 		 * which also keeps every byte of the provider's `error_description` off the page.
 		 */
-		if (query.error) {
+		if (params.error) {
 			return Response.redirect(
 				buildUILoginPath(uid, NOTICE_FEDERATION_ABORTED),
 				303
 			);
 		}
 
-		if (!query.code) {
+		if (!params.code) {
 			return federationRejectedPage(uid);
 		}
 
@@ -87,45 +123,32 @@ export const federationRoutes = new Elysia({ name: 'federation-callback' }).get(
 			return federationInactivePage();
 		}
 
-		let idToken: string | undefined;
-		let metadata;
+		let identity;
 		try {
-			metadata = await discover(provider.issuer);
-			idToken = await exchangeCode(
+			identity = await identityFor({
 				provider,
-				metadata,
-				query.code,
+				code: params.code,
 				/* The same address the authorization leg sent, recovered from the pending state — an
 				 * upstream matches `redirect_uri` by exact string across the two legs. */
-				await issuingBucket(pending.bucketId),
-				pending.codeVerifier
-			);
-		} catch (err) {
-			if (err instanceof DiscoveryError || err instanceof ExchangeError) {
-				eventBus.emit('federation.upstream.error', {
-					providerId: provider.id,
-					reason: err.reason
-				});
-				return federationUpstreamPage();
-			}
-			throw err;
-		}
-
-		let assertion;
-		try {
-			assertion = await verifyFederatedIdToken(idToken, {
-				metadata,
-				clientId: provider.clientId,
-				nonce: pending.nonce
+				bucket: await issuingBucket(pending.bucketId),
+				nonce: pending.nonce,
+				codeVerifier: pending.codeVerifier
 			});
 		} catch (err) {
-			if (err instanceof FederationIdTokenRejected) {
+			if (err instanceof IdentityError) {
 				/*
-				 * One response for every cause, and the reason goes to the event bus rather than to the console:
+				 * One response per stage, and the reason goes to the event bus rather than to the console:
 				 * this route is unauthenticated, so an attacker-triggerable log write is a vector of its own.
 				 * The reasoning is lib/admin/auth/login.ts's, and it applies here with more force — anyone who
 				 * can follow a redirect can reach this.
 				 */
+				if (err.stage === 'upstream') {
+					eventBus.emit('federation.upstream.error', {
+						providerId: provider.id,
+						reason: err.reason
+					});
+					return federationUpstreamPage();
+				}
 				eventBus.emit('federation.idtoken.error', {
 					providerId: provider.id,
 					reason: err.reason
@@ -138,8 +161,8 @@ export const federationRoutes = new Elysia({ name: 'federation-callback' }).get(
 		const resolution = await resolveFederatedAccount({
 			bucket,
 			provider,
-			subject: assertion.subject,
-			claims: assertion.claims
+			subject: identity.subject,
+			claims: identity.claims
 		});
 
 		if (!resolution.ok) {
@@ -166,20 +189,5 @@ export const federationRoutes = new Elysia({ name: 'federation-callback' }).get(
 			accountId: resolution.account._id
 		});
 		return Response.redirect(buildUIFederationCompletePath(uid, ref), 303);
-	},
-	{
-		/*
-		 * `iss` is RFC 9207 and must be tolerated; `error`/`error_description` are how a provider reports a
-		 * decline. All three are declared because the app runs `normalize: false` — an undeclared parameter a
-		 * real provider sends would 422 the request before the handler ran. Only `state` is required: without
-		 * it there is no round trip to identify.
-		 */
-		query: t.Object({
-			state: t.String(),
-			code: t.Optional(t.String()),
-			iss: t.Optional(t.String()),
-			error: t.Optional(t.String()),
-			error_description: t.Optional(t.String())
-		})
 	}
-);
+}

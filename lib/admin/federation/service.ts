@@ -7,19 +7,28 @@ import {
 } from '../../federation/discovery.js';
 import { DEFAULT_SCOPES, SECRET_MASK } from '../../federation/consts.js';
 import {
+	issuerForKnownProvider,
 	knownProvider,
+	knownProviderByIssuer,
 	knownProviderIds,
 	type KnownProvider
 } from '../../consts/known_providers.js';
 import type { UserBucket } from '../../adapters/types.js';
 import type { FederationProvider } from '../../federation/types.js';
 import {
+	CredentialError,
+	clientCredential
+} from '../../federation/credential.js';
+import {
+	assertAppleIdentifiers,
 	assertClientIdShape,
 	assertEmailDomains,
 	assertIssuer,
 	assertProviderId,
 	assertScopes,
-	assertSomeWayToSignIn
+	assertSomeWayToSignIn,
+	assertSuppliedValues,
+	assertTenant
 } from './validate.js';
 
 /*
@@ -38,7 +47,22 @@ import {
  * trail's names-not-values rule means it cannot reach a reader that way either.
  */
 export function present(provider: FederationProvider) {
-	return { ...provider, clientSecret: SECRET_MASK };
+	/*
+	 * Both secret-bearing fields, and masked only where one is actually stored — so a reader can still tell
+	 * "a value is held" from "none is", which is what the mask exists for.
+	 *
+	 * `signingKey` joined this in `specs/053-apple-microsoft-github`. The thing to know before adding a
+	 * third: this function is the *only* place either is masked, and `presentBucket` in
+	 * lib/admin/buckets/routes.ts reaches it by delegation rather than by repeating the rule. That
+	 * delegation is the fix for a leak that ran for a year — the bucket routes returned the containing
+	 * document whole while this function guarded the provider routes. Anything new that returns a bucket,
+	 * or anything containing one, must come through here too.
+	 */
+	return {
+		...provider,
+		...(provider.clientSecret ? { clientSecret: SECRET_MASK } : {}),
+		...(provider.signingKey ? { signingKey: SECRET_MASK } : {})
+	};
 }
 
 export function presentAll(bucket: Pick<UserBucket, 'federation'>) {
@@ -93,6 +117,47 @@ async function assertIssuerResolves(issuer: string): Promise<void> {
 }
 
 /*
+ * Every check that can be settled without a human completing a sign-in — which differs by provider,
+ * because what a provider publishes differs.
+ *
+ * The three cases below are not three policies. They are one policy — *establish what is establishable* —
+ * applied to three different sets of published facts. The one thing none of them does is claim the
+ * connection has been proven to work: whether the callback address is registered upstream lives in the
+ * provider's records, and nothing here can see it.
+ */
+async function assertCheckable(
+	provider: FederationProvider,
+	entry: KnownProvider | undefined
+): Promise<void> {
+	const credential = entry?.credential ?? { kind: 'secret' as const };
+
+	if (credential.kind === 'signed_assertion') {
+		// Settled here rather than at an end user's first sign-in, which is the whole reason a save-time
+		// check earns its place: the failure would otherwise appear on the provider's page, to somebody who
+		// cannot fix it.
+		try {
+			await clientCredential(provider);
+		} catch (err) {
+			if (err instanceof CredentialError) {
+				throw new AdminError(
+					422,
+					'that key cannot produce the credential Apple requires — check it is the .p8 file you downloaded, and that the Key ID and Team ID belong to it'
+				);
+			}
+			throw err;
+		}
+	}
+
+	/*
+	 * A provider that publishes no metadata document has none to check, and reporting its absence as
+	 * "unreachable" would send an administrator looking for a network fault that does not exist.
+	 */
+	if (entry?.protocol.kind === 'profile_api') return;
+
+	await assertIssuerResolves(provider.issuer);
+}
+
+/*
  * The recognised provider a body named, or nothing.
  *
  * The refusal lists what could have been said instead: an administrator who typed `gogle` is one keystroke
@@ -107,6 +172,21 @@ function resolveCatalogue(catalogueId: string): KnownProvider {
 		);
 	}
 	return entry;
+}
+
+/*
+ * One rule for every write-only value: absent means unchanged, and the mask means absent.
+ *
+ * Extracted when the second such value arrived rather than copied, because two copies of "the mask is
+ * never stored" disagree after the first edit — and the disagreement would store a literal `********` as
+ * somebody's credential, after which sign-in fails in a way that looks exactly like an upstream outage.
+ */
+function keptSecret(
+	submitted: string | undefined,
+	current: string | undefined
+): string | undefined {
+	if (!submitted || submitted === SECRET_MASK) return current;
+	return submitted;
 }
 
 /* What a body had to supply itself, now that a catalogue entry may have supplied it. */
@@ -132,7 +212,11 @@ export async function createProvider(
 		displayName?: string;
 		issuer?: string;
 		clientId: string;
-		clientSecret: string;
+		clientSecret?: string;
+		tenant?: string;
+		teamId?: string;
+		keyId?: string;
+		signingKey?: string;
 		enabled?: boolean;
 		scopes?: string[];
 		emailTrusted?: boolean;
@@ -153,7 +237,12 @@ export async function createProvider(
 	const entry = body.catalogueId
 		? resolveCatalogue(body.catalogueId)
 		: undefined;
-	if (entry) assertClientIdShape(entry, body.clientId);
+	if (entry) {
+		assertClientIdShape(entry, body.clientId);
+		// Which values a provider asks for is the entry's own statement, so the refusal for a missing one is
+		// generic here rather than a list this function keeps in step with the catalogue by hand.
+		assertSuppliedValues(entry, body);
+	}
 
 	const id = required(
 		body.id ?? entry?.defaultProviderId,
@@ -161,7 +250,10 @@ export async function createProvider(
 		Boolean(entry)
 	);
 	const issuer = required(
-		body.issuer ?? entry?.issuer,
+		body.issuer ??
+			(entry
+				? issuerForKnownProvider(entry, { tenant: body.tenant })
+				: undefined),
 		'issuer',
 		Boolean(entry)
 	);
@@ -180,7 +272,14 @@ export async function createProvider(
 		enabled: body.enabled ?? true,
 		issuer,
 		clientId: body.clientId,
-		clientSecret: body.clientSecret,
+		// Each present only when supplied, so a provider carries no empty strings standing in for values it
+		// does not have — and `credential.ts` can tell "no secret because none is needed" from "no secret
+		// because the connection is half configured".
+		...(body.clientSecret ? { clientSecret: body.clientSecret } : {}),
+		...(body.tenant ? { tenant: body.tenant } : {}),
+		...(body.teamId ? { teamId: body.teamId } : {}),
+		...(body.keyId ? { keyId: body.keyId } : {}),
+		...(body.signingKey ? { signingKey: body.signingKey } : {}),
 		scopes: body.scopes ?? (entry ? [...entry.scopes] : DEFAULT_SCOPES),
 		// Both default to the cautious reading: an operator opts in to trusting addresses and opts in to
 		// narrowing domains, and neither happens by accident. A catalogue entry may raise the first, because
@@ -192,9 +291,13 @@ export async function createProvider(
 		emailClaim: body.emailClaim ?? entry?.emailClaim ?? 'email'
 	};
 
-	assertScopes(provider.scopes);
+	assertScopes(provider.scopes, entry?.protocol.kind ?? 'oidc');
 	assertEmailDomains(provider.allowedEmailDomains);
-	await assertIssuerResolves(provider.issuer);
+	if (provider.tenant) assertTenant(provider.tenant);
+	if (provider.teamId || provider.keyId) {
+		assertAppleIdentifiers(provider.teamId ?? '', provider.keyId ?? '');
+	}
+	await assertCheckable(provider, entry);
 
 	await getBucketStore().update(bucket._id, {
 		federation: [...existing, provider]
@@ -215,19 +318,28 @@ export async function updateProvider(
 		// Absent means unchanged. The mask arriving as a value means the same thing, following the SMTP
 		// settings precedent — it is never stored either way, and a console that round-trips its own form
 		// therefore cannot overwrite a secret with a placeholder.
-		clientSecret:
-			body.clientSecret && body.clientSecret !== SECRET_MASK
-				? body.clientSecret
-				: current.clientSecret,
+		clientSecret: keptSecret(body.clientSecret, current.clientSecret),
+		// The same rule, for the same reason: renaming a provider must not require re-pasting a private key.
+		signingKey: keptSecret(body.signingKey, current.signingKey),
 		id: current.id
 	};
+
+	/*
+	 * Resolved from the issuer, not from the body: an update names no catalogue entry, and the provider's
+	 * protocol is not something a caller gets to change. Same lookup the sign-in path uses.
+	 */
+	const entry = knownProviderByIssuer(next.issuer);
 
 	if (next.issuer !== current.issuer) {
 		assertIssuer(next.issuer);
 		await assertIssuerResolves(next.issuer);
 	}
-	assertScopes(next.scopes);
+	assertScopes(next.scopes, entry?.protocol.kind ?? 'oidc');
 	assertEmailDomains(next.allowedEmailDomains);
+	if (next.tenant) assertTenant(next.tenant);
+	if (next.teamId || next.keyId) {
+		assertAppleIdentifiers(next.teamId ?? '', next.keyId ?? '');
+	}
 
 	const federation = providersOf(bucket).map((p) =>
 		p.id === providerId ? next : p

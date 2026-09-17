@@ -28,6 +28,13 @@ export const clients = [
 		redirectUris: ['http://e.ly/brand-plain/callback']
 	},
 	{
+		clientId: 'brand-all-app',
+		token_endpoint_auth_method: 'none',
+		grantTypes: ['authorization_code'],
+		responseTypes: ['code'],
+		redirectUris: ['http://e.ly/brand-all/callback']
+	},
+	{
 		clientId: 'brand-none-app',
 		token_endpoint_auth_method: 'none',
 		grantTypes: ['authorization_code'],

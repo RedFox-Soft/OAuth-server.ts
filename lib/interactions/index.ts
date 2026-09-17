@@ -3,7 +3,8 @@
 // answer the server gives for a path it does not serve, which is what an unknown provider must look like.
 import { Elysia, NotFoundError as UnservedPath, t } from 'elysia';
 import { eventBus } from 'lib/event_bus.js';
-import { DiscoveryError, discover } from 'lib/federation/discovery.js';
+import { DiscoveryError } from 'lib/federation/discovery.js';
+import { upstreamMetadata } from 'lib/federation/upstream.js';
 import { authorizationUrl, supportsPkce } from 'lib/federation/flow.js';
 import { findEnabledProvider } from 'lib/federation/providers.js';
 import { consumeHandoff, openPending } from 'lib/federation/state.js';
@@ -831,7 +832,8 @@ export const ui = new Elysia()
 
 			let metadata;
 			try {
-				metadata = await discover(provider.issuer);
+				// Discovered, or supplied by the catalogue for the one provider that publishes no metadata.
+				metadata = await upstreamMetadata(provider);
 			} catch (err) {
 				if (err instanceof DiscoveryError) {
 					eventBus.emit('federation.upstream.error', {
@@ -847,7 +849,7 @@ export const ui = new Elysia()
 				interactionUid: uid,
 				bucketId,
 				providerId: provider.id,
-				withPkce: supportsPkce(metadata)
+				withPkce: supportsPkce(metadata, provider)
 			});
 
 			return Response.redirect(

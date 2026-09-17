@@ -101,7 +101,17 @@ function acceptableAlgorithms(metadata: ProviderMetadata): string[] {
 
 export async function verifyFederatedIdToken(
 	idToken: string | undefined,
-	expected: { metadata: ProviderMetadata; clientId: string; nonce: string }
+	expected: {
+		metadata: ProviderMetadata;
+		clientId: string;
+		nonce: string;
+		/*
+		 * Present only for a provider whose issuer names the organisation, and which therefore publishes a
+		 * placeholder where the issuer would be. Supplying it replaces the string comparison with this
+		 * predicate — it does not remove the check.
+		 */
+		acceptIssuer?: (issuer: string) => boolean;
+	}
 ): Promise<VerifiedAssertion> {
 	if (typeof idToken !== 'string' || idToken.length === 0) {
 		throw new FederationIdTokenRejected('missing');
@@ -130,7 +140,14 @@ export async function verifyFederatedIdToken(
 			idToken,
 			keySetFor(expected.metadata.jwksUri),
 			{
-				issuer: expected.metadata.issuer,
+				/*
+				 * Omitted where the caller supplied a rule instead, which one recognised provider requires:
+				 * it issues assertions for every organisation from one endpoint, so the acceptable issuer is
+				 * a shape rather than a string and `jwtVerify` takes only strings. The claim is still
+				 * checked, immediately below and just as strictly — and *which* organisation is then
+				 * enforced separately, because a shape alone would admit all of them.
+				 */
+				...(expected.acceptIssuer ? {} : { issuer: expected.metadata.issuer }),
 				audience: expected.clientId,
 				algorithms,
 				clockTolerance
@@ -139,6 +156,13 @@ export async function verifyFederatedIdToken(
 		payload = verified.payload as Record<string, unknown>;
 	} catch (err) {
 		throw new FederationIdTokenRejected(reasonFor(err));
+	}
+
+	if (expected.acceptIssuer) {
+		const iss = payload.iss;
+		if (typeof iss !== 'string' || !expected.acceptIssuer(iss)) {
+			throw new FederationIdTokenRejected('issuer');
+		}
 	}
 
 	// Every claim below is read only after the signature verified.

@@ -91,6 +91,29 @@ export async function get(path: string, cookie?: string) {
 	};
 }
 
+/*
+ * The same, by POST. Carries no cookie either — for the provider that requires this return it is a
+ * cross-site form submission, which is exactly why the callback may not depend on one.
+ */
+export async function post(path: string, form: string) {
+	const res = await elysia.handle(
+		new Request(`http://e.ly${path}`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/x-www-form-urlencoded' },
+			body: form
+		})
+	);
+	return {
+		status: res.status,
+		location: res.headers.get('location') ?? '',
+		text: await res.text(),
+		contentType: res.headers.get('content-type') ?? '',
+		csp: res.headers.get('content-security-policy'),
+		setCookie: res.headers.get('set-cookie'),
+		setCookies: res.headers.getSetCookie()
+	};
+}
+
 type Stub = Awaited<ReturnType<typeof idpStub>>;
 
 export interface Answer {
@@ -110,7 +133,22 @@ export async function walk(
 	uid: string,
 	cookie: string,
 	answer?: Answer,
-	options: { providerId?: string; callbackQuery?: string } = {}
+	options: {
+		providerId?: string;
+		callbackQuery?: string;
+		/*
+		 * An upstream that is not `idp_stub.ts` answering. The recognised providers in
+		 * ./recognised_stubs.ts have their own shapes — one of them issues no assertion at all — so they
+		 * cannot satisfy `Answer`, and every one of them still needs the same two-phase timing: the
+		 * authorization request exists before the answer to it does.
+		 */
+		onAuthorize?: (authorizeUrl: URL) => Promise<void>;
+		/*
+		 * How the user comes back. One recognised provider requires it posted, and refuses the
+		 * authorization request otherwise — so this is that provider's contract, not a variation.
+		 */
+		returnBy?: 'GET' | 'POST';
+	} = {}
 ) {
 	const providerId = options.providerId ?? 'acme-sso';
 	const start = await get(`/ui/${uid}/federation/${providerId}/start`, cookie);
@@ -130,12 +168,18 @@ export async function walk(
 	if (answer) {
 		await answer.idp.answerToken(authorizeUrl, answer.claims, answer.opts);
 	}
+	if (options.onAuthorize) {
+		await options.onAuthorize(authorizeUrl);
+	}
 
 	// The return leg carries no cookie: it is a cross-site top-level navigation from the provider.
 	const query =
 		options.callbackQuery ??
 		`code=upstream-code&state=${encodeURIComponent(state)}`;
-	const callback = await get(`/federation/callback?${query}`);
+	const callback =
+		options.returnBy === 'POST'
+			? await post('/federation/callback', query)
+			: await get(`/federation/callback?${query}`);
 
 	const complete = callback.location.startsWith(
 		`/ui/${uid}/federation/complete`

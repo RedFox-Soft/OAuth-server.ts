@@ -91,13 +91,20 @@ sentinel string, which would be a value someone could eventually type.
 Added by `specs/052-google-provider-onboarding`. `lib/consts/known_providers.ts` holds the settings that
 are the same for every deployment connecting a named upstream — issuer, scopes, email claim, whether its
 addresses are trusted, the button wording, and the steps an administrator performs at that provider.
-Google is the only entry.
+
+**Four entries since `specs/053-apple-microsoft-github`:** Google, Microsoft, Apple and GitHub. That
+spec's closing assumption — that the rest would be "a matter of adding data" — turned out false for all
+three, in three different ways, and the entry grew four fields to say so as data rather than as branches:
+which protocol the provider speaks, how the credential presented to it is produced, how the user comes
+back, and which values the administrator must supply. See [[recognised-provider-divergences]].
 
 `POST …/federation` takes an optional `catalogueId`. The service resolves it, merges the entry **beneath**
 whatever the caller supplied, and discards the field. Three consequences, and the third is the one worth
 remembering:
 
-- only `clientId` and `clientSecret` stay required, so a connection is two pasted values;
+- only the values the named provider actually issues stay required — two for Google and GitHub, three for
+  Microsoft, four for Apple, published per entry as `requiredValues` so neither the console nor an agent
+  knows anything about a particular provider;
 - an agent gets the same simplification, because it is the same route — no second write path, no second
   audit action, no second set of refusals;
 - **nothing records that a provider came from the catalogue.** `FederationProvider` gained no field. So
@@ -105,10 +112,16 @@ remembering:
   absence of a field rather than by review — and a Google provider configured by hand long before any of
   this renders with its mark on the next page load, so there was no migration to write.
 
-Recognition at read time is therefore a lookup on the stored `issuer`, in `loginOptions.ts` for the
-button's mark and in `guidance.ts` for "you already have this one". The console's old browser-side
-`PRESETS` map is gone: it made the same no-runtime-effect promise honestly, but it was a second copy of
-facts only the console could read.
+Recognition at read time is therefore a lookup on the stored `issuer` — in `loginOptions.ts` for the
+button's mark, in `guidance.ts` for "you already have this one", and since `specs/053` also in
+`identity/index.ts` for the protocol, `credential.ts` for the credential and `flow.ts` for the code
+binding and the return mode. The console's old browser-side `PRESETS` map is gone: it made the same
+no-runtime-effect promise honestly, but it was a second copy of facts only the console could read.
+
+Matching is by **rule rather than equality** (`issuerRule`), because one entry's issuer contains the
+organisation and so differs per deployment. Extending the lookup rather than adding a stored `protocol`
+field was the deliberate choice: the absence of that field is what makes provenance-based branching
+impossible, and `specs/053` needed no migration for the same reason `specs/052` did not.
 
 ## Gotchas
 
@@ -191,7 +204,9 @@ adapting an upstream key set to that shape would mean writing a second keystore 
 verifier jose already exposes.
 
 The upstream's access and refresh tokens are destructured away and never bound to a name that outlives the
-exchange. Nothing calls an upstream API, so keeping them would create a secret to leak and a refresh
+exchange. Only one provider calls an upstream API at all — GitHub, which asserts no identity and must be
+read back — and its token is used and dropped inside `identity/github.ts` rather than stored, so the rule
+is unchanged: keeping one would create a secret to leak and a refresh
 lifecycle to maintain.
 
 Verification failures answer one uninformative page; the reason goes to the event bus, never to the console —

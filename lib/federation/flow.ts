@@ -1,7 +1,9 @@
 import crypto from 'crypto';
 
 import { issuerFor, type RequestBucket } from '../configs/issuer.js';
+import { knownProviderByIssuer } from '../consts/known_providers.js';
 import { FEDERATION_CALLBACK_PATH } from './consts.js';
+import { clientCredential } from './credential.js';
 import type { ProviderMetadata } from './discovery.js';
 import type { FederationProvider } from './types.js';
 
@@ -29,9 +31,29 @@ export function callbackUri(bucket: RequestBucket): string {
 	return `${issuerFor(bucket)}${FEDERATION_CALLBACK_PATH}`;
 }
 
-/* PKCE only when the provider says S256: sending an unsupported parameter breaks sign-in at providers
- * that reject unknown ones, for a spec-compliant reason. */
-export function supportsPkce(metadata: ProviderMetadata): boolean {
+/*
+ * Whether to bind the authorization code to the request that asked for it.
+ *
+ * Two sources, and the order is the whole point. **What a provider advertises under-reports what it
+ * supports**: of the four recognised entries, three support the binding and only one publishes a challenge
+ * method for it — Microsoft recommends it "for all application types, both public and confidential
+ * clients" while advertising nothing, and GitHub has supported it since July 2025 while publishing no
+ * metadata document at all. Inferring from metadata alone therefore silently dropped the binding from
+ * three of the four legs.
+ *
+ * So a recognised provider's own statement wins, and metadata decides for everything else — which is the
+ * only honest rule available for an arbitrary upstream nobody has looked at.
+ *
+ * The original caution is preserved exactly, and it is why `unknown` sends nothing rather than trying:
+ * a provider that rejects a parameter it does not recognise fails sign-in for **all** of its users. A
+ * missing binding is a weakness; a rejected authorization request is a total outage.
+ */
+export function supportsPkce(
+	metadata: ProviderMetadata,
+	provider?: FederationProvider
+): boolean {
+	const entry = provider ? knownProviderByIssuer(provider.issuer) : undefined;
+	if (entry) return entry.codeBinding === 'S256';
 	return metadata.codeChallengeMethods.includes('S256');
 }
 
@@ -50,6 +72,17 @@ export function authorizationUrl(
 		state: secrets.state,
 		nonce: secrets.nonce
 	});
+
+	/*
+	 * Sent only where an entry asks for it, because it is a demand rather than a preference: one recognised
+	 * provider **refuses the authorization request outright** unless the return is posted back, whenever a
+	 * name or an address is among the scopes. Left unset otherwise, so every other upstream keeps its own
+	 * default and no provider is told about a mode it never advertised.
+	 */
+	const entry = knownProviderByIssuer(provider.issuer);
+	if (entry && entry.returnMode !== 'query') {
+		params.set('response_mode', entry.returnMode);
+	}
 
 	if (secrets.codeVerifier) {
 		params.set(
@@ -109,6 +142,12 @@ export async function exchangeCode(
 	codeVerifier?: string
 ): Promise<string | undefined> {
 	const method = authMethod(metadata);
+	/*
+	 * Resolved rather than read off the provider, because one recognised upstream issues no secret and
+	 * derives its credential from a stored key instead. Everything below is unchanged by that: whatever the
+	 * model, what arrives here is the one string the endpoint expects.
+	 */
+	const credential = await clientCredential(provider);
 
 	const body = new URLSearchParams({
 		grant_type: 'authorization_code',
@@ -120,7 +159,7 @@ export async function exchangeCode(
 		body.set('code_verifier', codeVerifier);
 	}
 	if (method === 'post') {
-		body.set('client_secret', provider.clientSecret);
+		body.set('client_secret', credential);
 	}
 
 	const headers: Record<string, string> = {
@@ -128,7 +167,7 @@ export async function exchangeCode(
 	};
 	if (method === 'basic') {
 		// RFC 6749 §2.3.1: both halves are form-urlencoded before being joined and base64'd.
-		const credentials = `${encodeURIComponent(provider.clientId)}:${encodeURIComponent(provider.clientSecret)}`;
+		const credentials = `${encodeURIComponent(provider.clientId)}:${encodeURIComponent(credential)}`;
 		headers.authorization = `Basic ${Buffer.from(credentials).toString('base64')}`;
 	}
 

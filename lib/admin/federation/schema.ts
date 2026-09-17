@@ -26,7 +26,19 @@ export const CreateProviderBody = t.Object({
 	displayName: t.Optional(t.String({ minLength: 1 })),
 	issuer: t.Optional(t.String({ minLength: 1 })),
 	clientId: t.String({ minLength: 1 }),
-	clientSecret: t.String({ minLength: 1 }),
+	/*
+	 * Optional since `specs/053-apple-microsoft-github`: a provider whose credential is a signed assertion
+	 * issues no secret, so requiring one would make Apple unconfigurable. Which providers must supply it,
+	 * and which must not, is decided in ./service.ts against the catalogue entry — the same place the other
+	 * "required unless the entry supplies it" rules already live, rather than as a schema union.
+	 */
+	clientSecret: t.Optional(t.String({ minLength: 1 })),
+	/* Microsoft: which accounts may sign in. */
+	tenant: t.Optional(t.String({ minLength: 1 })),
+	/* Apple: the three values its developer account issues alongside the service identifier. */
+	teamId: t.Optional(t.String({ minLength: 1 })),
+	keyId: t.Optional(t.String({ minLength: 1 })),
+	signingKey: t.Optional(t.String({ minLength: 1 })),
 	enabled: t.Optional(t.Boolean()),
 	scopes: t.Optional(t.Array(t.String({ minLength: 1 }))),
 	emailTrusted: t.Optional(t.Boolean()),
@@ -47,6 +59,12 @@ export const UpdateProviderBody = t.Object({
 	issuer: t.Optional(t.String({ minLength: 1 })),
 	clientId: t.Optional(t.String({ minLength: 1 })),
 	clientSecret: t.Optional(t.String({ minLength: 1 })),
+	tenant: t.Optional(t.String({ minLength: 1 })),
+	teamId: t.Optional(t.String({ minLength: 1 })),
+	keyId: t.Optional(t.String({ minLength: 1 })),
+	/* Absent means unchanged, for the same reason `clientSecret` is: renaming a provider must not require
+	 * re-pasting a private key. */
+	signingKey: t.Optional(t.String({ minLength: 1 })),
 	enabled: t.Optional(t.Boolean()),
 	scopes: t.Optional(t.Array(t.String({ minLength: 1 }))),
 	emailTrusted: t.Optional(t.Boolean()),

@@ -10,11 +10,15 @@ import {
 	Switch,
 	Space,
 	Tag,
+	Tooltip,
+	Badge,
 	Typography,
 	Popconfirm,
 	message
 } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
+/* The login page's own marks, not a second copy: one table, corrected in one place. */
+import { providerMark } from '../../../interactions/providerMark.js';
 import type { FederationProvider } from '../../../federation/types.js';
 
 /*
@@ -51,6 +55,19 @@ interface Guidance {
 	consoleUrl: string;
 	steps: string[];
 	credentialLabels: { clientId: string; clientSecret: string };
+	/* Every value this provider asks for, in its own wording. Two for some, four for others. */
+	requiredValues: {
+		name: string;
+		label: string;
+		secret: boolean;
+		hint: string;
+	}[];
+	/* A question that must be answered before those values mean anything. Only one provider asks one. */
+	choices: {
+		name: string;
+		question: string;
+		options: { value: string | null; label: string; consequence: string }[];
+	}[];
 	clientIdHint: string;
 	callbackUri: string;
 	callbackStability: 'stable' | 'provisional';
@@ -59,10 +76,30 @@ interface Guidance {
 	existingProviderId?: string;
 }
 
-interface ConnectValues {
-	clientId: string;
-	clientSecret: string;
+/*
+ * Whatever the provider asked for, plus the answers to its questions.
+ *
+ * Open rather than a fixed shape, because the fields are driven by the guidance: naming them here would
+ * put the list in a second place and leave a provider added later silently unable to be connected.
+ */
+type ConnectValues = Record<string, unknown> & {
 	allowedEmailDomains?: string[];
+};
+
+/*
+ * The option value standing for "I will type it myself". A sentinel is needed because the choice and the
+ * value it decides are the same field: picking the broad answer *is* the value, while picking the narrow
+ * one only says that a value is coming.
+ */
+const SUPPLY_IT = '__supply__';
+
+/*
+ * Whether a value is already settled by the answer to a question, and so must not also be asked for.
+ * Without this the one provider that asks a question would show its organisation field twice — once as
+ * the question, once as a value.
+ */
+function suppliedByChoice(guidance: Guidance, name: string): boolean {
+	return guidance.choices.some((choice) => choice.name === name);
 }
 
 export function FederationPanel({
@@ -119,9 +156,24 @@ export function FederationPanel({
 		if (!connecting) return;
 		setSaving(true);
 		try {
+			/*
+			 * An answer of "I will type it myself" leaves the field to the value the administrator typed
+			 * beside it; any other answer *is* the value. Resolved here rather than in the form so the
+			 * question and the field it decides stay one thing on the wire, which is what the server
+			 * validates.
+			 */
+			const answered: Record<string, unknown> = {};
+			for (const choice of connecting.choices) {
+				const picked = values[`choice:${choice.name}`];
+				delete values[`choice:${choice.name}`];
+				if (picked !== SUPPLY_IT && picked !== undefined) {
+					answered[choice.name] = picked;
+				}
+			}
 			const ok = await send(base, 'POST', {
 				catalogueId: connecting.catalogueId,
-				...values
+				...values,
+				...answered
 			});
 			if (!ok) return;
 			setConnecting(null);
@@ -198,20 +250,66 @@ export function FederationPanel({
 				 * A recognised provider is connected by name; anything else is configured field by field.
 				 * Two routes to the same stored record, and the guided one is offered first because it is
 				 * the one that can tell an administrator the callback address to register.
+				 *
+				 * One mark per provider rather than a labelled button each. Four "Connect X" buttons beside
+				 * a heading was a wall of text that grew with the catalogue, and the mark is the thing an
+				 * administrator actually scans for — they arrive knowing which provider they want.
+				 *
+				 * The marks are imported from the login page's own table rather than copied: the same four
+				 * SVGs, so a corrected mark corrects both surfaces. Nothing about a provider's *sign-in*
+				 * branding rules applies here — those govern the button an end user presses, and this is an
+				 * administrative action on a page no end user sees.
+				 *
+				 * `aria-label` and not only the tooltip: a tooltip is visual, so an icon-only control
+				 * without one has no accessible name at all.
 				 */}
 				{guidance.map((entry) => (
-					<Button
+					<Tooltip
 						key={entry.catalogueId}
-						type="primary"
-						onClick={() => {
-							connectForm.resetFields();
-							setConnecting(entry);
-						}}
+						title={
+							entry.alreadyConnected
+								? `${entry.displayName} is connected — edit it in the table below`
+								: `Connect ${entry.displayName}`
+						}
 					>
-						{entry.alreadyConnected
-							? `${entry.displayName} connected`
-							: `Connect ${entry.displayName}`}
-					</Button>
+						{/*
+						 * `color` and not `status`: `status` turns a Badge into a standalone status dot meant
+						 * to sit beside its own `text`, which is a different component shape. On a badge
+						 * wrapping something, the dot's colour comes from `color`.
+						 */}
+						<Badge
+							dot={entry.alreadyConnected}
+							color="green"
+							offset={[-4, 4]}
+						>
+							<Button
+								/*
+								 * Never `primary`, and that is what removes the white chip a previous version
+								 * had. These marks are their own fixed colours — two of them are black — so on
+								 * a filled blue button they needed a white plate behind them, which read as a
+								 * sticker stuck to a button. On the default surface they need nothing.
+								 *
+								 * It is also the right emphasis regardless: four equal alternatives are not
+								 * four primary actions, and four filled buttons that never changed made the
+								 * panel look like four things left to do.
+								 *
+								 * Safe because the console's content area is light — the only dark theme here
+								 * is the `Menu` in the sider. A dark content theme would need each provider's
+								 * white mark variant instead, which is why their guidelines publish one.
+								 */
+								aria-label={
+									entry.alreadyConnected
+										? `${entry.displayName} is already connected`
+										: `Connect ${entry.displayName}`
+								}
+								icon={providerMark(entry.catalogueId)}
+								onClick={() => {
+									connectForm.resetFields();
+									setConnecting(entry);
+								}}
+							/>
+						</Badge>
+					</Tooltip>
 				))}
 				<Button
 					icon={<PlusOutlined />}
@@ -381,7 +479,8 @@ export function FederationPanel({
 								>
 									{connecting.displayName}
 								</Typography.Link>
-								, then come back with the two values it gives you.
+								, then come back with the {connecting.requiredValues.length}{' '}
+								values it gives you.
 							</Typography.Paragraph>
 							<ol style={{ paddingLeft: 20, marginBottom: 16 }}>
 								{connecting.steps.map((step) => (
@@ -430,25 +529,77 @@ export function FederationPanel({
 								onFinish={connect}
 							>
 								{/*
-								 * These are an upstream's credentials, never the administrator's own. Without
-								 * this the browser reads an identifier beside a secret as a sign-in form and
-								 * fills both from its password store, which is both wrong and alarming.
+								 * A question the provider forces before its values mean anything — only one
+								 * provider asks one, and the answer decides whether the button admits one
+								 * company's staff or everybody in the world with an account there. Rendered
+								 * from the guidance rather than written here, and **no option is preselected**:
+								 * a default would be this console choosing who may sign in.
 								 */}
-								<Form.Item
-									name="clientId"
-									label={connecting.credentialLabels.clientId}
-									tooltip={connecting.clientIdHint}
-									rules={[{ required: true }]}
-								>
-									<Input autoComplete="off" />
-								</Form.Item>
-								<Form.Item
-									name="clientSecret"
-									label={connecting.credentialLabels.clientSecret}
-									rules={[{ required: true }]}
-								>
-									<Input.Password autoComplete="new-password" />
-								</Form.Item>
+								{connecting.choices.map((choice) => (
+									<Form.Item
+										key={choice.name}
+										name={`choice:${choice.name}`}
+										label={choice.question}
+										rules={[{ required: true }]}
+									>
+										<Select
+											options={choice.options.map((option) => ({
+												value: option.value ?? SUPPLY_IT,
+												label: option.label,
+												title: option.consequence
+											}))}
+											optionRender={(option) => (
+												<div>
+													<div>{option.label}</div>
+													<Typography.Text
+														type="secondary"
+														style={{ fontSize: 12, whiteSpace: 'normal' }}
+													>
+														{option.data.title}
+													</Typography.Text>
+												</div>
+											)}
+										/>
+									</Form.Item>
+								))}
+
+								{/*
+								 * Every value this provider asks for, in its own wording, driven by the
+								 * guidance — two for some, four for others. Written as a loop rather than as
+								 * fields per provider so that a provider added later needs no console change,
+								 * which is the same reason the catalogue is data.
+								 *
+								 * `autoComplete` is off on all of them: these are an upstream's credentials,
+								 * never the administrator's own, and without it the browser reads an
+								 * identifier beside a secret as a sign-in form and fills both from its
+								 * password store.
+								 */}
+								{connecting.requiredValues
+									.filter((value) => !suppliedByChoice(connecting, value.name))
+									.map((value) => (
+										<Form.Item
+											key={value.name}
+											name={value.name}
+											label={value.label}
+											tooltip={value.hint}
+											rules={[{ required: true }]}
+										>
+											{value.secret ? (
+												/* A key is pasted from a file and is many lines long; a secret is one. */
+												value.name === 'signingKey' ? (
+													<Input.TextArea
+														rows={4}
+														autoComplete="off"
+														placeholder="-----BEGIN PRIVATE KEY-----"
+													/>
+												) : (
+													<Input.Password autoComplete="new-password" />
+												)
+											) : (
+												<Input autoComplete="off" />
+											)}
+										</Form.Item>
+									))}
 								<Form.Item
 									name="allowedEmailDomains"
 									label="Restrict to these email domains"

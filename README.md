@@ -89,7 +89,7 @@ Implemented, and off until the flag is set. Set them in the console under **Sett
 | Backchannel logout                                                                                                  | `backchannelLogout.enabled`         |
 | The `claims` request parameter                                                                                      | `claimsParameter.enabled`           |
 | Token and response encryption                                                                                       | `encryption.enabled`                |
-| Upstream OIDC federation — sign in via an external provider                                                         | `federation.enabled`                |
+| Sign in with Google, Microsoft, Apple or GitHub, or any other OIDC provider by hand                                 | `federation.enabled`                |
 | Administration over MCP — the same management API, served to an AI agent                                            | `mcp.enabled`                       |
 | Error-store recording (its read surface is always served, deliberately)                                             | `errorStore.enabled`                |
 
@@ -329,7 +329,7 @@ Absent from a default install until the flag is set.
 | `POST /backchannel`                              | Client-Initiated Backchannel Authentication (CIBA) | `ciba.enabled`                   |
 | `POST, GET /mcp`                                 | Administration over MCP                            | `mcp.enabled`                    |
 | `GET  /.well-known/oauth-protected-resource/mcp` | Protected resource metadata for `/mcp` (RFC 9728)  | `mcp.enabled`                    |
-| `GET  /federation/callback`                      | Upstream identity provider callback                | `federation.enabled`             |
+| `GET, POST /federation/callback`                 | Upstream identity provider callback                | `federation.enabled`             |
 
 Reading your own registration follows `registration.enabled` rather than
 `registrationManagement.enabled`: the registration response hands the client that URI, so refusing the

@@ -27,6 +27,7 @@ import { mcpCatalogue } from 'lib/mcp/catalogue.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { mock } from '../fetch_mock.ts';
 import { idpStub } from '../federation/idp_stub.ts';
+import { appleStub } from '../federation/recognised_stubs.ts';
 
 /*
  * FR-023 / SC-007: no secret may reach the agent surface, on any tool, in a success or an error, or in
@@ -47,6 +48,8 @@ const SECRETS = {
 	providerSecret: 'SECRET-provider-cs-7b31',
 	endUserPassword: 'SECRET-enduser-pw-c04d'
 };
+
+const NEWLINE = String.fromCharCode(10);
 
 let rpcId = 0;
 
@@ -204,6 +207,36 @@ async function seedSecretHolders(token: string) {
 		);
 	}
 
+	/*
+	 * A second provider, holding the *other* kind of credential: a private key rather than a secret.
+	 *
+	 * Seeded separately because a recognised provider whose credential is a signed assertion stores no
+	 * secret at all, so the provider above cannot carry one — and a sweep that only ever saw a
+	 * `clientSecret` would report clean while a stored key went out in every read of the bucket.
+	 *
+	 * The key is real, and must be: the create proves the key can produce the credential the provider
+	 * requires, so a placeholder string fails the write and leaves nothing stored — the trap this file's
+	 * other comments keep pointing at.
+	 */
+	const apple = await appleStub();
+	apple.expectDiscovery();
+	const keyed = await rpc(
+		call('federation_provider_create', {
+			bucketId,
+			catalogueId: 'apple',
+			clientId: apple.clientId,
+			teamId: apple.teamId,
+			keyId: apple.keyId,
+			signingKey: apple.signingKey
+		}),
+		token
+	);
+	if (keyed.result?.isError) {
+		throw new Error(
+			`key-bearing provider seed failed, so no key was ever stored: ${JSON.stringify(keyed.result)}`
+		);
+	}
+
 	await performGated(token, 'smtp_settings_update', {
 		host: 'smtp.example.com',
 		port: 587,
@@ -218,8 +251,25 @@ async function seedSecretHolders(token: string) {
 		project,
 		clientId: createdBody.clientId,
 		clientSecret: createdBody.secret,
+		/*
+		 * A line of the key rather than the whole of it, and that is not a shortcut. The stored value is PEM,
+		 * so a leak through a JSON response arrives with its newlines escaped and a needle containing real
+		 * newlines would never match it — the assertion would pass while the key was on the wire. One
+		 * newline-free base64 line appears verbatim either way.
+		 */
+		signingKey: longestLine(apple.signingKey),
 		bucketId
 	};
+}
+
+function longestLine(pem: string): string {
+	return pem
+		.split(NEWLINE)
+		.map((line) => line.trim())
+		.reduce(
+			(longest, line) => (line.length > longest.length ? line : longest),
+			''
+		);
 }
 
 /**
@@ -274,7 +324,12 @@ describe('MCP surface leaks no secrets', () => {
 
 		const needles = [
 			...Object.values(SECRETS),
-			...(seeded.clientSecret ? [seeded.clientSecret] : [])
+			...(seeded.clientSecret ? [seeded.clientSecret] : []),
+			/*
+			 * The other kind of credential a provider can hold. Swept by the same list rather than by a
+			 * case of its own, so a read added later is covered for both without anybody remembering.
+			 */
+			seeded.signingKey
 		];
 
 		const args: Record<string, Record<string, unknown>> = {
@@ -338,7 +393,12 @@ describe('MCP surface leaks no secrets', () => {
 		const seeded = await seedSecretHolders(token);
 		const needles = [
 			...Object.values(SECRETS),
-			...(seeded.clientSecret ? [seeded.clientSecret] : [])
+			...(seeded.clientSecret ? [seeded.clientSecret] : []),
+			/*
+			 * The other kind of credential a provider can hold. Swept by the same list rather than by a
+			 * case of its own, so a read added later is covered for both without anybody remembering.
+			 */
+			seeded.signingKey
 		];
 
 		// Validation failures, not-found failures, and a refused confirmation: the three shapes whose
@@ -382,7 +442,12 @@ describe('MCP surface leaks no secrets', () => {
 		const seeded = await seedSecretHolders(token);
 		const needles = [
 			...Object.values(SECRETS),
-			...(seeded.clientSecret ? [seeded.clientSecret] : [])
+			...(seeded.clientSecret ? [seeded.clientSecret] : []),
+			/*
+			 * The other kind of credential a provider can hold. Swept by the same list rather than by a
+			 * case of its own, so a read added later is covered for both without anybody remembering.
+			 */
+			seeded.signingKey
 		];
 
 		const { entries } = await adminAuditStore.list({ actor: user._id });

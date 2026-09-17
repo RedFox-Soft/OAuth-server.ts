@@ -23,8 +23,13 @@ export interface FederationProvider {
 	/*
 	 * Write-only: masked on every read, absent-means-unchanged on update, and the mask itself refused as a
 	 * value. Never in the audit trail — that trail records field names, never values.
+	 *
+	 * Optional since `specs/053-apple-microsoft-github`, because Apple issues no secret at all — it issues
+	 * a signing key, and the credential is derived from it per exchange. Absent rather than an empty string
+	 * on purpose: a sentinel is a value somebody eventually types, and `credential.ts` refuses the absence
+	 * outright for a provider whose credential model needs one.
 	 */
-	clientSecret: string;
+	clientSecret?: string;
 	/* IdPs differ on which scope yields an email. Must contain `openid`. */
 	scopes: string[];
 	/*
@@ -45,6 +50,37 @@ export interface FederationProvider {
 	 * commonly use `upn` rather than `email`.
 	 */
 	emailClaim: string;
+	/*
+	 * The four below arrived with `specs/053-apple-microsoft-github`, and every one of them is here because
+	 * it cannot be derived from anything else. All are optional, so every record written before them is
+	 * valid unchanged and there was no migration.
+	 *
+	 * Note what is NOT here: nothing records which protocol this provider speaks, which recognised entry it
+	 * is, or which route created it. The protocol is resolved from `issuer` through the catalogue on each
+	 * use, exactly as the login page already resolves the button's mark — so no sign-in decision is *able*
+	 * to branch on a provider's provenance. That was true before this feature and adding a field here
+	 * would have quietly ended it.
+	 */
+	/*
+	 * Which Microsoft accounts may sign in: `common`, `organizations`, `consumers`, or one organisation's
+	 * identifier. A per-connection decision about who is admitted, so no catalogue entry can hold it — and
+	 * the difference between one company's staff and everyone in the world with a Microsoft account.
+	 */
+	tenant?: string;
+	/* Apple: the developer account the signing key belongs to. */
+	teamId?: string;
+	/*
+	 * Apple: which key. Readable precisely so that an administrator whose key was revoked can tell which
+	 * one to replace — the failure appears on Apple's page, so the only clue available is here.
+	 */
+	keyId?: string;
+	/*
+	 * Apple: the private key the credential is signed with, and the reason Apple needs no stored secret.
+	 * Held to every rule `clientSecret` is — masked on every read for every role, absent-means-unchanged on
+	 * update, the mask refused as a value, never in the audit trail. Masked by the *containing* bucket's
+	 * projections as well; see the comment on `presentBucket`.
+	 */
+	signingKey?: string;
 }
 
 /*

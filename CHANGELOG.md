@@ -11,6 +11,16 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- admin: Microsoft, Apple and GitHub can be connected to a user bucket by name, alongside Google. Each
+  asks only for what it actually issues — two values for GitHub, three for Microsoft (including who may
+  sign in: one organisation or any Microsoft account, stated with its consequence and not chosen for
+  you), four for Apple. Apple needs no client secret: it supplies a signing key and this server produces
+  the credential Apple wants on every exchange, so nothing expires and nothing is ever renewed by hand.
+  GitHub is not an OpenID Connect provider and asserts no identity, so the signed-in person is read back
+  from GitHub — including the primary verified address of an account whose profile hides one, and never
+  an unverified one. Each provider gets its own branded button, rendered from an inline mark so loading a
+  login page still tells no provider that somebody is there.
+
 - admin: Google can be connected to a user bucket by name. The console now shows what to do at Google,
   links straight to it, and — the part that was missing entirely — the exact callback address to
   register, which differs per bucket and appeared nowhere before; the administrator supplies only the
@@ -33,6 +43,17 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   turned into a trail nobody could read.
 
 ### Fixed
+
+- federation: the authorization code is now bound to the request that asked for it at every recognised
+  upstream that supports the binding. Support was read from what a provider publishes, and three of the
+  four publish nothing — Microsoft recommends the binding while advertising no method, GitHub has
+  supported it since July 2025 while publishing no metadata at all — so those legs were silently going
+  without. A provider nobody has vouched for is still judged by its metadata, and nothing is sent where
+  support is unknown, because an unrecognised parameter breaks sign-in for everyone.
+
+- admin: an Apple signing key is masked on every read of a provider and of the bucket containing it, the
+  same rule the client secret follows and in the same place, so a second credential could not repeat the
+  leak the first one had.
 
 - admin: the console's dialogs offered the administrator's own saved credentials. A browser reads an
   address or an identifier sitting beside a password field as a sign-in form, so creating an admin,

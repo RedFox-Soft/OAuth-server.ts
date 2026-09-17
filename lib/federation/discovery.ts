@@ -1,3 +1,7 @@
+import {
+	knownProviderByIssuer,
+	type IssuerRule
+} from '../consts/known_providers.js';
 import { DISCOVERY_TTL_MS, PROVIDER_CACHE_LIMIT } from './consts.js';
 
 /*
@@ -69,7 +73,11 @@ function stringsAt(source: Record<string, unknown>, key: string): string[] {
 	return value.filter((item): item is string => typeof item === 'string');
 }
 
-function parse(document: unknown, expectedIssuer: string): ProviderMetadata {
+function parse(
+	document: unknown,
+	expectedIssuer: string,
+	rule: IssuerRule | undefined
+): ProviderMetadata {
 	if (typeof document !== 'object' || document === null) {
 		throw new DiscoveryError('malformed', 'not an object');
 	}
@@ -92,7 +100,26 @@ function parse(document: unknown, expectedIssuer: string): ProviderMetadata {
 	 * OIDC Discovery 1.0 §4.3: the document's own issuer must equal the one used to fetch it. This is the
 	 * check that catches a copy-pasted tenant URL, a redirect, or a stray trailing slash — and catching it
 	 * at configuration time is why the admin write calls this too.
+	 *
+	 * One recognised provider cannot satisfy it, and not through any fault: the documents it publishes for
+	 * its multi-organisation endpoints state the issuer as a literal placeholder rather than a URL, so
+	 * equality refuses it outright. Where the matched catalogue entry says its issuer is templated, the
+	 * published value is therefore checked against the shape an issuer of that provider has instead.
+	 *
+	 * The equality rule survives for **everything else**, which is the part worth protecting: for an
+	 * arbitrary upstream nobody has vouched for, a document naming a different issuer is a genuine attack
+	 * signal, and relaxing the check generally to accommodate one entry would give that up.
 	 */
+	if (rule?.kind === 'templated') {
+		if (!issuerShapeOk(metadata.issuer, rule.pattern)) {
+			throw new DiscoveryError(
+				'issuer_mismatch',
+				`document says ${metadata.issuer}`
+			);
+		}
+		return metadata;
+	}
+
 	if (metadata.issuer !== expectedIssuer) {
 		throw new DiscoveryError(
 			'issuer_mismatch',
@@ -101,6 +128,17 @@ function parse(document: unknown, expectedIssuer: string): ProviderMetadata {
 	}
 
 	return metadata;
+}
+
+/*
+ * A templated issuer is published with its parameter left as a placeholder, so it matches neither the
+ * configured issuer nor the pattern a real one satisfies. Accept either: the concrete form, for a
+ * single-organisation endpoint that fills it in, or the placeholder form, which is the same string with
+ * something brace-wrapped where the parameter goes.
+ */
+function issuerShapeOk(published: string, pattern: RegExp): boolean {
+	if (pattern.test(published)) return true;
+	return pattern.test(published.replace(/\{[^}]+\}/, 'placeholder'));
 }
 
 /* Discard a cached document — used by the admin write so a corrected issuer takes effect at once. */
@@ -137,7 +175,16 @@ export async function discover(issuer: string): Promise<ProviderMetadata> {
 		throw new DiscoveryError('malformed', 'body is not JSON');
 	}
 
-	const metadata = parse(document, issuer);
+	/*
+	 * Resolved here rather than passed in, so every caller — the sign-in flow and the admin write alike —
+	 * gets the same treatment without knowing that a templated issuer exists. That shared path is the
+	 * existing guarantee that a sign-in can never run against metadata the admin write would have refused.
+	 */
+	const metadata = parse(
+		document,
+		issuer,
+		knownProviderByIssuer(issuer)?.issuerRule
+	);
 	remember(issuer, metadata);
 	return metadata;
 }
