@@ -120,5 +120,25 @@ export function translateIndex(
 		};
 	}
 
+	/*
+	 * A sparse index becomes partial, over the rows that hold the key.
+	 *
+	 * PostgreSQL would tolerate the declaration without this — its unique indexes already treat NULLs as
+	 * distinct, so absent values never collide the way MongoDB's do. It is written anyway because the
+	 * two backends must not merely behave alike here but be *declared* alike: an index that silently
+	 * differs in shape is what `database/verify_postgres.ts` exists to catch, and a divergence nobody
+	 * declared is the thing lib/consts/storage_divergences.ts refuses to let pass.
+	 */
+	if (spec.sparse === true) {
+		return {
+			method: 'btree',
+			columns,
+			unique,
+			where: columns
+				.map((expression) => `${expression} IS NOT NULL`)
+				.join(' AND ')
+		};
+	}
+
 	return { method: 'btree', columns, unique };
 }

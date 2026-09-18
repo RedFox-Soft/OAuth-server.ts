@@ -5,6 +5,7 @@ import {
 	Modal,
 	Form,
 	Input,
+	Radio,
 	Select,
 	Space,
 	Tag,
@@ -20,7 +21,10 @@ import { isUndeletableBucket } from '../../consts.js';
 
 interface CreateBucketValues {
 	name: string;
-	slug: string;
+	/* Which form the operator chose. Never sent — the body carries `slug` or `host`, never both. */
+	addressForm: 'path' | 'host';
+	slug?: string;
+	host?: string;
 	roles?: string[];
 }
 
@@ -56,10 +60,18 @@ export function Buckets({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 	async function onCreate(values: CreateBucketValues) {
 		setCreating(true);
 		try {
+			/*
+			 * One form or the other, never both. The API refuses a body carrying two addresses rather than
+			 * preferring one, so sending the field the operator did not fill would turn their choice into a
+			 * 400 they did not cause.
+			 */
+			const { addressForm, slug, host, ...rest } = values;
 			const res = await fetch('/admin/api/buckets', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify(values)
+				body: JSON.stringify(
+					addressForm === 'host' ? { ...rest, host } : { ...rest, slug }
+				)
 			});
 			if (!res.ok) {
 				const body = (await res.json().catch(() => null)) as {
@@ -177,6 +189,13 @@ export function Buckets({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 						render: (_slug: string | undefined, row: UserBucket) => {
 							const address = bucketAddressFor(row);
 							if (address.kind === 'prefix') return <code>{address.path}</code>;
+							if (address.kind === 'host') {
+								return (
+									<Tooltip title="Served at a host of its own. Its tokens carry that origin as their issuer, and its sign-in cookie is isolated by the browser rather than by name.">
+										<code>{`https://${address.host}`}</code>
+									</Tooltip>
+								);
+							}
 							if (address.kind === 'none') return <Tag>not addressable</Tag>;
 							return (
 								<Tooltip title="Served at the server's own address, with no prefix, and its tokens carry the server's own issuer.">
@@ -302,24 +321,82 @@ export function Buckets({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 					 * cannot be changed afterwards. Said here rather than left to a validation error,
 					 * because an operator choosing one has no other way to know it is permanent.
 					 */}
+					{/*
+					 * Which form, asked before the value, because the two are alternatives rather than a
+					 * field and an option. The API refuses a body carrying both, so a form offering both at
+					 * once would invite a refusal the operator could not have anticipated.
+					 *
+					 * The help text states the trade-off rather than recommending blindly: a host is better
+					 * where a deployment can pay for one, and the payment is a DNS record and a certificate
+					 * this server neither creates nor can see.
+					 */}
 					<Form.Item
-						name="slug"
-						label="Address"
-						tooltip="Where this bucket is served, and the issuer in the tokens it mints. Cannot be changed later."
-						rules={[
-							{ required: true },
-							{
-								pattern: /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/,
-								message:
-									'lowercase letters, digits and hyphens; not starting or ending with a hyphen'
-							},
-							{ max: 63 }
-						]}
+						name="addressForm"
+						label="Address form"
+						initialValue="path"
+						tooltip="A host isolates this bucket's sign-in cookie by origin and publishes one metadata location instead of two. It needs a DNS record and a TLS certificate, which you provide — this server creates neither."
 					>
-						<Input
-							placeholder="acme"
-							addonBefore="/"
+						<Radio.Group
+							optionType="button"
+							options={[
+								{ label: 'Path', value: 'path' },
+								{
+									label: 'Host of its own',
+									value: 'host',
+									/* Only an administrator of the instance may give away a name in the
+									 * deployment's domain, so the API would refuse this for anybody else. */
+									disabled: !isSuperAdmin
+								}
+							]}
 						/>
+					</Form.Item>
+					<Form.Item
+						noStyle
+						shouldUpdate={(before, after) =>
+							before.addressForm !== after.addressForm
+						}
+					>
+						{({ getFieldValue }) =>
+							getFieldValue('addressForm') === 'host' ? (
+								<Form.Item
+									name="host"
+									label="Hostname"
+									tooltip="Where this bucket is served, and the issuer in the tokens it mints. Changing it later breaks every client integrated with this bucket."
+									rules={[
+										{ required: true },
+										{
+											pattern: /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i,
+											message:
+												'a fully qualified hostname — no scheme, no path, no port, no wildcard'
+										},
+										{ max: 253 }
+									]}
+									extra="Point this name at the deployment and obtain a certificate for it. Until a request arrives, the bucket page will say so."
+								>
+									<Input placeholder="acme.auth.example.com" />
+								</Form.Item>
+							) : (
+								<Form.Item
+									name="slug"
+									label="Address"
+									tooltip="Where this bucket is served, and the issuer in the tokens it mints. Changing it later breaks every client integrated with this bucket."
+									rules={[
+										{ required: true },
+										{
+											pattern: /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/,
+											message:
+												'lowercase letters, digits and hyphens; not starting or ending with a hyphen'
+										},
+										{ max: 63 }
+									]}
+								>
+									<Input
+										placeholder="acme"
+										addonBefore="/"
+									/>
+								</Form.Item>
+							)
+						}
 					</Form.Item>
 					<Form.Item
 						name="roles"

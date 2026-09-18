@@ -24,15 +24,40 @@ const BucketSlug = t.String({
 	maxLength: BUCKET_SLUG_MAX_LENGTH
 });
 
+/*
+ * The other address form. Shape is judged in the route rather than by a pattern here, because the
+ * refusals have to say what was wrong — "a hostname, not a URL — remove the scheme" is what turns a
+ * mistake into one correction, and a pattern can only say that a string did not match it.
+ *
+ * `slug` is optional above it, and exactly one of the two is required. That is checked in the route
+ * too: TypeBox can express the union, but the message it produces for a body carrying both names
+ * neither field and reads as a schema error rather than as the rule it broke.
+ */
+const BucketHost = t.String({ minLength: 1, maxLength: 253 });
+
 export const CreateBucketBody = t.Object({
 	name: t.String({ minLength: 1 }),
-	slug: BucketSlug,
+	slug: t.Optional(BucketSlug),
+	host: t.Optional(BucketHost),
 	roles: t.Optional(t.Array(t.String())),
 	passwordLogin: t.Optional(t.Boolean()),
 	registrationOpen: t.Optional(t.Boolean()),
 	emailVerificationRequired: t.Optional(t.Boolean()),
 	verificationMethod: t.Optional(VerificationMethod),
 	totpRequired: t.Optional(t.Boolean())
+});
+
+/*
+ * Moving a bucket to a new address. Its own body, because it is its own operation.
+ *
+ * `confirm` is the second call. The preview that precedes it names every client that will stop
+ * validating tokens, and an operator who has not seen that list has not been told what the change
+ * costs — so the change refuses until they say they have.
+ */
+export const ChangeBucketAddressBody = t.Object({
+	slug: t.Optional(BucketSlug),
+	host: t.Optional(t.String({ minLength: 1, maxLength: 253 })),
+	confirm: t.Optional(t.Boolean())
 });
 
 export const UpdateBucketBody = t.Object({

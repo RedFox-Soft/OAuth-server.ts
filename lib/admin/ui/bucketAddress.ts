@@ -17,13 +17,23 @@ import { isServedAtTheRoot } from '../consts.js';
  * against the router that has to agree with it — which is the whole of `bucket_address.spec.ts`.
  */
 export type BucketAddress =
-	{ kind: 'root' } | { kind: 'prefix'; path: string } | { kind: 'none' };
+	| { kind: 'root' }
+	| { kind: 'prefix'; path: string }
+	| { kind: 'host'; host: string }
+	| { kind: 'none' };
 
 export function bucketAddressFor(bucket: {
 	_id: string;
 	slug?: string;
+	host?: string;
 }): BucketAddress {
 	if (isServedAtTheRoot(bucket._id)) return { kind: 'root' };
+	/*
+	 * Before the slug, because the two are alternatives and a host-addressed bucket carries no slug at
+	 * all. Testing the slug first would report every one of them as `none` — "reachable nowhere" for a
+	 * bucket that is in fact reachable at an origin of its own, in the one column an operator copies.
+	 */
+	if (bucket.host) return { kind: 'host', host: bucket.host };
 	if (!bucket.slug) return { kind: 'none' };
 	return { kind: 'prefix', path: `/${bucket.slug}` };
 }

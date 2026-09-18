@@ -1,3 +1,4 @@
+import { instancePlaneOnly } from 'lib/plugins/instancePlane.js';
 import { eventBus } from './event_bus.ts';
 import * as errors from './helpers/errors.ts';
 import * as interactionPolicy from './helpers/interaction_policy/index.ts';
@@ -61,6 +62,7 @@ import { reportStartupFailure } from './sentry/startup.js';
 initSentry();
 
 export const elysia = new Elysia({ strictPath: true, normalize: false })
+	.use(instancePlaneOnly)
 	.error({
 		invalid_request: errors.InvalidRequest,
 		invalid_client: errors.InvalidClient,

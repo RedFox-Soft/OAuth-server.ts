@@ -487,6 +487,18 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 	},
 
 	{
+		key: 'buckets.reservedHostnames',
+		domain: 'endpoints',
+		group: 'Bucket addresses',
+		label: 'Reserved hostnames',
+		summary: 'Names in your domain that no bucket may be given',
+		type: 'string-array',
+		risk: 'security',
+		description:
+			'Hostnames beneath this deployment’s domain that no user bucket may be assigned. The deployment’s own canonical host is always refused and does not need listing; this is for everything else you run under the same domain — a marketing site, a status page, a staging instance — which this server has no way to discover. Empty by default, deliberately: a guess would either refuse a name you meant to use for a tenant or admit one that shadows something you already serve. Names are compared in normalised form, so case and a trailing dot do not matter.'
+	},
+
+	{
 		key: 'requestObjects.enabled',
 		domain: 'request-security',
 		group: 'Request Objects',

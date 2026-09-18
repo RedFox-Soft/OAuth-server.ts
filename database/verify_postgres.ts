@@ -348,6 +348,62 @@ check(
 );
 
 /*
+ * A bucket's hostname is its address, so two buckets may not share one — and a handler cannot promise
+ * that however carefully it looks first, because two operators assigning one name at the same moment
+ * both read "free". This is the check the in-memory adapter can only simulate: it has no concurrency
+ * to lose the race to, so a read-then-write there would pass forever and lose it here.
+ */
+const contested = `fidelity-${Date.now()}.example.test`;
+const racingHosts = await Promise.allSettled([
+	buckets.create({
+		name: `host-a-${Date.now()}`,
+		ownerGroupId: 'unassigned',
+		host: contested
+	}),
+	buckets.create({
+		name: `host-b-${Date.now()}`,
+		ownerGroupId: 'unassigned',
+		host: contested
+	})
+]);
+check(
+	'two buckets assigned one hostname at once: exactly one succeeds',
+	racingHosts.filter((r) => r.status === 'fulfilled').length === 1,
+	racingHosts.map((r) => r.status).join(', ')
+);
+
+/*
+ * And the loser is refused as a taken value rather than as an internal fault, which is what lets the
+ * admin route answer 409 instead of 500 on the race it cannot prevent.
+ */
+const loser = racingHosts.find((r) => r.status === 'rejected');
+check(
+	'and the loser is refused as a taken value, not as an internal fault',
+	loser !== undefined &&
+		(loser as PromiseRejectedResult).reason?.name === 'UniqueValueTaken',
+	loser === undefined
+		? 'nothing was rejected'
+		: String((loser as PromiseRejectedResult).reason?.name)
+);
+
+/* Buckets without a hostname must not collide with one another — the reason the index is sparse. */
+const hostless = await Promise.allSettled([
+	buckets.create({
+		name: `hostless-a-${Date.now()}`,
+		ownerGroupId: 'unassigned'
+	}),
+	buckets.create({
+		name: `hostless-b-${Date.now()}`,
+		ownerGroupId: 'unassigned'
+	})
+]);
+check(
+	'two buckets with no hostname do not collide, which is what sparse buys',
+	hostless.every((r) => r.status === 'fulfilled'),
+	hostless.map((r) => r.status).join(', ')
+);
+
+/*
  * Two driver behaviours the plan named as risks (research D1). `timestamptz` must come back as a
  * Date in its own right, and `int8` comes back as a *string* — deliberately, since a 64-bit integer
  * does not fit a JavaScript number. Both are checked against the driver rather than trusted, because

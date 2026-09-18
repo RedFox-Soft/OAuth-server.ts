@@ -198,6 +198,18 @@ Where the two production backends differ on purpose, the difference is declared 
 
 There is a second way a client can exist, and it stores nothing. A `client_id` that is an https URL with a path component is a **Client ID Metadata Document** identifier: `tryFindClient` retrieves the document it names, validates it (`lib/client_metadata_document/`) and returns a validated client object that is never written to the store. The branch sits **after** the adapter read and that order is load-bearing — `test/client_id_uri/` already covers URL-shaped ids issued by DCR, and a branch placed first would shadow every such stored client. Gated on `clientIdMetadataDocument.enabled`, off by default because it lets an unauthenticated caller make this server issue an outbound request; `fetch.ts` is the whole egress boundary (address classes, per-hop redirect checks, 5 KB, timeout) and is deliberately the only file in that directory that knows about the network.
 
+**Bucket addressing** — a bucket is reached by **a path segment or a hostname of its own, never both**:
+`https://auth.example.com/acme` or `https://acme.auth.example.com`. Which of three states a bucket is in
+— served at the root, path-addressed, host-addressed — is one derived answer, `addressOf` in
+`lib/configs/issuer.ts`, and `issuerFor`, `pathPrefixFor` and `sessionCookieName` all switch on it
+rather than re-inferring from two fields. The request's host is read in exactly one place
+(`hostOfRequest`, `lib/consts/request_host.ts`): the `Host` header, **never `X-Forwarded-Host`**, which
+is attacker-settable and here would select the tenant. A name beneath the canonical host that holds no
+bucket is refused as a typo; a name outside it (`localhost`, the platform's own, a health check) falls
+through to path resolution, or the deployment would answer only at the exact URL in `ISSUER`. Changing
+an address changes the issuer identifier, so it is its own route with a preview, a confirmation and its
+own audit action — never a field on the bucket PATCH. See `specs/056-host-addressed-buckets/`.
+
 **Bucket resolution** — which user bucket a request signs a user into is one function, `resolveBucketForRequest(clientId, resource?)` in `lib/admin/auth/resolveBucket.ts`, and it has five rules in order: the reserved console client → the admin bucket; a client belonging to a project → that project's bucket; a request naming ONE declared protected resource → that resource's project's bucket; a client identity an operator permitted, naming the administrative MCP audience → the admin bucket; otherwise `redfox`. The third rule is how a client that belongs to no project — dynamically registered, or document-identified — reaches the right deployment's end-users, and it is safe because an administrator authored the resource: the parameter selects among an operator's options and cannot create one. **Every caller must pass the resource it has**, including `findAccount` in `lib/addon/account.ts`; a caller that omits it resolves a different bucket than login did, which surfaces as a 500 in the consent prompt rather than as a refusal.
 
 **Interaction system** — Login/consent are served under `/ui/:uid/*` (`lib/interactions/index.ts`; `/ui` is an `alwaysAvailablePrefixes` entry, so the surface is unconditional). Screens belong to one of two families and which one is not a style choice: the **antd shell** pages (login, registration, consent) hydrate React and are reached inside an interaction with the `_interaction` cookie, while the **plain self-contained** pages (`/verify-email/*`, `/reset-password`, the device/registration notices) carry no script and must work in a different browser opened from an email. Interaction result is POSTed back; the server resumes the authorization flow.
@@ -248,7 +260,10 @@ claimed intent before reading a single assertion. It lives in the file it descri
 else: there is no index, no generator and no drift check, because a second copy of a sentence is a
 second thing to keep in step.
 
-Tests use **Bun's native test runner** with **Chai** assertions and **Sinon** stubs/spies.
+Tests use **Bun's native test runner**, with **its own matchers** (`toBe`, `toEqual`, `toMatch`,
+`toBeGreaterThanOrEqual`, …) and **Sinon** stubs/spies. Chai is not a dependency and no spec imports
+it — a chained `expect(x).to.equal(y)` fails at runtime with `undefined is not an object`, because
+`.to` does not exist.
 
 Each feature area has:
 

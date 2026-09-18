@@ -9,9 +9,15 @@ import {
 import { ApplicationConfig } from '../configs/application.js';
 import { DiscoveryResponse, OAuthError } from 'lib/shared/response_schemas.js';
 import { corsOpen } from 'lib/plugins/cors.js';
-import { bucketAtAddress } from 'lib/admin/auth/bucketAddress.js';
+import {
+	bucketAtAddress,
+	bucketAtHost,
+	isCanonicalHost,
+	isWithinDeploymentDomain
+} from 'lib/admin/auth/bucketAddress.js';
+import { hostOfRequest, normaliseHost } from 'lib/consts/request_host.js';
 
-type BucketAddress = { _id: string; slug?: string };
+type BucketAddress = { _id: string; slug?: string; host?: string };
 
 // Booleans whose `false` value is meaningful and must survive the falsy-value sweep.
 const MEANINGFUL_FALSE = new Set<string>(['request_uri_parameter_supported']);
@@ -107,19 +113,50 @@ async function forSlug(
 	return build(bucket);
 }
 
+/*
+ * The same answer for the other address form, at the one conventional location.
+ *
+ * A host-addressed bucket's issuer is an origin with no path, so OIDC Discovery and RFC 8414 agree on
+ * where its document lives and the two-location problem above simply does not arise — which is why
+ * this serves the bare routes rather than adding a third and fourth.
+ *
+ * A request to the deployment's own host is the default bucket's, exactly as before hostnames existed.
+ * Anything else must name a bucket or be refused: serving the default population's metadata at an
+ * address it does not answer at is the same defect `forSlug` refuses one line up.
+ */
+async function forHost(
+	host: string | null,
+	build: (bucket?: BucketAddress) => Record<string, unknown>,
+	set: { status?: number | string }
+) {
+	const normalised = normaliseHost(host ?? undefined);
+	if (normalised === null || isCanonicalHost(normalised)) return build();
+
+	const bucket = await bucketAtHost(normalised);
+	if (bucket) return build(bucket);
+
+	/*
+	 * Not found only inside the deployment's own domain, where a name can only be a tenant's. A name
+	 * outside it — `localhost`, the platform's own, whatever a health check uses — is another way of
+	 * reaching this deployment, and answering it with the instance's own metadata is what every request
+	 * got before hostnames existed.
+	 */
+	if (isWithinDeploymentDomain(normalised)) {
+		set.status = 404;
+		return { error: 'not_found' };
+	}
+	return build();
+}
+
 // corsOpen must precede the routes: an Elysia hook only affects routes declared after it. A JavaScript
 // client cannot discover a deployment it is not allowed to read (OIDC Discovery 1.0 §4, RFC 8414 §3).
 export const discovery = new Elysia()
 	.use(corsOpen)
-	.get('/.well-known/openid-configuration', () => openidConfiguration(), {
-		response: { 200: DiscoveryResponse, 500: OAuthError }
-	})
-	.get(
-		'/.well-known/oauth-authorization-server',
-		() => oauthAuthorizationServer(),
-		{
-			response: { 200: DiscoveryResponse, 500: OAuthError }
-		}
+	.get('/.well-known/openid-configuration', ({ request, set }) =>
+		forHost(hostOfRequest(request), openidConfiguration, set)
+	)
+	.get('/.well-known/oauth-authorization-server', ({ request, set }) =>
+		forHost(hostOfRequest(request), oauthAuthorizationServer, set)
 	)
 	/* OIDC Discovery 1.0 §4: the well-known segment is appended to the issuer. */
 	.get('/:bucket/.well-known/openid-configuration', ({ params, set }) =>

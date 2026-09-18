@@ -4,7 +4,7 @@ title: 'A user bucket is a tenant with its own issuer'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-15
-updated: 2026-09-16
+updated: 2026-09-18
 graph:
   node_type: concept
   relationships:
@@ -63,9 +63,30 @@ identifier may not have.
 This is why the console did **not** move off `/admin`: the move existed only to free that word for the
 administrators bucket, and the bucket never puts it in a URL.
 
+**As of `056-host-addressed-buckets` there are two address forms, and a bucket holds exactly one.** A
+named bucket carries a path segment (`<ISSUER>/acme`) **or** a hostname of its own
+(`https://acme.auth.example.com`), never both — two addresses would be two issuer identifiers for one
+population. Which of the three states a bucket is in is now one derived answer, `addressOf` in
+`lib/configs/issuer.ts`, and `issuerFor`, `pathPrefixFor` and `sessionCookieName` switch on it rather
+than each re-inferring from two fields and a reserved-id predicate. It returns a fourth state,
+`unaddressed`, on purpose: `issuerFor` falls back to the record id for a bucket written before slugs
+existed while the cookie falls back to `default`, and collapsing those two into one `path` state writes
+a cookie the bare `/auth` never looks for — the sign-in completes and then does not exist.
+
+Everything below about slugs continues to hold; a hostname simply takes the same place in the same
+rules. Three consequences are specific to the host form. The request's host is read in one place
+(`hostOfRequest`), from `Host` and never `X-Forwarded-Host`, because that header is attacker-settable
+and here it selects the tenant. A host-addressed bucket needs only the single well-known location, since
+its issuer is an origin with no path and the two specifications stop disagreeing. And an interaction now
+records the bucket it began at, because `/ui/*` is served from one origin for every path-addressed
+bucket but a hostname makes the origin a real boundary — without the record, an interaction begun at one
+bucket's host could be completed at another's, writing a session cookie named for the first onto the
+origin of the second.
+
 **A slug is a name, not an address**, and three places need to know the difference: `issuerFor`, which
-stamps `iss` into every token; `isAddressable`, which decides whether a prefixed address resolves; and
-the console's Buckets table, whose Address column is what an operator copies when pointing a client at
+stamps `iss` into every token; `isAddressable`, which decides whether an address resolves — and which now
+accepts either form, so testing the slug alone would declare every host-addressed bucket unaddressable;
+and the console's Buckets table, whose Address column is what an operator copies when pointing a client at
 a bucket. `isServedAtTheRoot` in `lib/admin/consts.ts` is the single predicate all three derive from,
 and it lives in that import-free module for the third of them — the browser bundle can reach no module
 that touches the configuration layer, which is why the rule could not simply live beside `issuerFor`.
@@ -83,6 +104,12 @@ listed bucket's address against the router that has to serve it.
 A session cookie is named after the bucket that wrote it — `_session_default`, `_session_acme` — so
 two sign-ins in one browser are two cookies and neither disturbs the other. A request reads the one
 its address names and never looks for the other.
+
+**A host-addressed bucket needs no such suffix and gets the bare `_session`.** The suffix exists only
+because path-addressed buckets share one origin; a bucket on its own origin already has its cookie kept
+apart by the browser, since nothing here sets a `Domain` attribute. Which name is produced follows from
+`addressOf`, not from whether a slug is present — a host-addressed bucket has no slug and must not fall
+into the branch written for a bucket that has no address at all.
 
 This did not ship with the rest of the feature, and the gap was not visible from the outside: the
 buckets *were* isolated — reaching one while signed in to another asked you to sign in, correctly —

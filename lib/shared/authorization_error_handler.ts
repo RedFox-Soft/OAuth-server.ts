@@ -1,3 +1,4 @@
+import { hostOfRequest } from 'lib/consts/request_host.js';
 import { eventBus } from 'lib/event_bus.js';
 import { responseModes } from 'lib/response_modes/index.js';
 import { OIDCProviderError } from '../helpers/errors.ts';
@@ -518,7 +519,7 @@ async function authorizationErrorHandler({
 	 */
 	const redirectObj = await isAllowRedirectUri(
 		params,
-		await requestBucketFor(slugOf(route, request.url))
+		await requestBucketFor(slugOf(route, request.url), hostOfRequest(request))
 	);
 
 	const state = redirectObj.state;

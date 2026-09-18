@@ -1,3 +1,4 @@
+import { hostOfRequest } from 'lib/consts/request_host.js';
 import { Elysia, t, ValidationError } from 'elysia';
 
 import checkRar from '../../shared/check_rar.ts';
@@ -202,7 +203,8 @@ export const authGet = new Elysia()
 			 * which is the default bucket's.
 			 */
 			const bucket = await requestBucketFor(
-				(params as { bucket?: string } | undefined)?.bucket
+				(params as { bucket?: string } | undefined)?.bucket,
+				hostOfRequest(request)
 			);
 
 			const oidc = new OIDCContext(query, {}, route, bucket);
@@ -236,7 +238,8 @@ export const authPost = new Elysia()
 
 			/* The address decides the population, exactly as on the GET above. */
 			const bucket = await requestBucketFor(
-				(params as { bucket?: string } | undefined)?.bucket
+				(params as { bucket?: string } | undefined)?.bucket,
+				hostOfRequest(request)
 			);
 
 			const oidc = new OIDCContext(body, {}, route, bucket);

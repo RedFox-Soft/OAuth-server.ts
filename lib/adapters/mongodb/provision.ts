@@ -100,6 +100,7 @@ export async function applyIndexes(
 		try {
 			await target.collection(name).createIndex(spec.key, {
 				...(spec.unique === true ? { unique: true } : {}),
+				...(spec.sparse === true ? { sparse: true } : {}),
 				...(spec.expireAfterSeconds !== undefined
 					? { expireAfterSeconds: spec.expireAfterSeconds }
 					: {})

@@ -1,4 +1,5 @@
 import { getBucketStore } from '../../adapters/index.js';
+import { recordHostArrival } from './hostArrivals.js';
 import { DEFAULT_BUCKET_ID, isServedAtTheRoot } from '../consts.js';
 import type { UserBucket } from '../../adapters/types.js';
 import { UnknownBucket } from '../../helpers/errors.js';
@@ -6,6 +7,8 @@ import {
 	DEFAULT_REQUEST_BUCKET,
 	type RequestBucket
 } from '../../configs/issuer.js';
+import { ISSUER } from '../../configs/env.js';
+import { canonicalHostOf, normaliseHost } from '../../consts/request_host.js';
 
 /*
  * Which bucket a request is addressed to, from the address itself.
@@ -35,6 +38,22 @@ import {
  */
 const bySlug = new Map<string, UserBucket>();
 const byId = new Map<string, RequestBucket>();
+/*
+ * The same cache for the other address form, with one difference worth stating: a hostname is NOT
+ * immutable the way a slug is. The address-change operation writes it, so this map must be cleared
+ * when it does — `forgetBucketAddresses` is that call, and forgetting it leaves a bucket answering at
+ * its old address out of cache after a move, which is precisely the second issuer identifier the move
+ * exists to avoid.
+ */
+const byHost = new Map<string, UserBucket>();
+
+/*
+ * The host this deployment itself answers at, derived once from the canonical URL.
+ *
+ * A request arriving here is addressed by *path*, exactly as every request was before hostnames
+ * existed. Anything else is a tenant's own address, or nothing.
+ */
+const CANONICAL_HOST = canonicalHostOf(ISSUER);
 
 /*
  * Whether a bucket has an address of its own.
@@ -49,19 +68,90 @@ const byId = new Map<string, RequestBucket>();
  * Admitting either at a prefixed address would give one population two issuer identifiers, which is
  * the one thing an issuer identifier may not have.
  */
-export function isAddressable(bucket: { _id: string; slug?: string }): boolean {
+export function isAddressable(bucket: {
+	_id: string;
+	slug?: string;
+	host?: string;
+}): boolean {
 	/*
 	 * Which buckets are served at the root is one predicate in `admin/consts.ts` rather than a second
 	 * opinion held here. A bucket reachable at a prefixed address but issuing the instance's identifier — or the
 	 * reverse — is exactly the mismatch that made a genuine sign-in produce a token no client would
 	 * accept, and two lists of reserved ids is how that comes back.
+	 *
+	 * Either address form counts. A host-addressed bucket carries no slug — the two are alternatives, not
+	 * layers — so testing the slug alone would declare every such bucket unaddressable and refuse every
+	 * request to it.
 	 */
-	return Boolean(bucket.slug) && !isServedAtTheRoot(bucket._id);
+	return Boolean(bucket.slug || bucket.host) && !isServedAtTheRoot(bucket._id);
 }
 
 export function forgetBucketAddresses(): void {
 	bySlug.clear();
 	byId.clear();
+	byHost.clear();
+}
+
+/*
+ * Whether a request's host is the deployment's own rather than a tenant's.
+ *
+ * A deployment whose canonical URL cannot be parsed resolves no tenant at all: every host reads as
+ * unknown, which refuses requests rather than serving one population at another's address. That is the
+ * right way round for a misconfiguration nobody can act on from inside a request.
+ */
+export function isCanonicalHost(host: string | null): boolean {
+	return CANONICAL_HOST !== null && host === CANONICAL_HOST;
+}
+
+/*
+ * Whether a host that named no bucket should be refused, or served as the deployment's own.
+ *
+ * The distinction is not pedantry; without it this feature breaks every deployment. A server is
+ * reachable at more names than its canonical one — `localhost` in development, the platform's own
+ * `*.fly.dev` name, the internal address a health check uses — and refusing all of them because they
+ * are not the canonical host would take the deployment off the air for everything except the exact
+ * URL an operator typed into `ISSUER`.
+ *
+ * So the rule keys on the deployment's **own domain**, which is the only place a tenant can live:
+ *
+ *   - a name beneath the canonical host that no bucket holds is a *typo of a tenant address*, and is
+ *     refused, because serving the default population there would make the mistake look like it worked;
+ *   - a name outside it is another way of reaching this deployment, and resolves by path exactly as
+ *     every request did before hostnames existed.
+ */
+export function isWithinDeploymentDomain(host: string): boolean {
+	return (
+		CANONICAL_HOST !== null &&
+		(host === CANONICAL_HOST || host.endsWith(`.${CANONICAL_HOST}`))
+	);
+}
+
+/*
+ * The bucket a hostname addresses, or null when it names none.
+ *
+ * Null is refused by the caller rather than falling back to the default bucket, for the same reason
+ * `bucketAtAddress` records about an unknown slug: falling back would serve one population's endpoints
+ * at another population's address, and would make a typo in a hostname look like it worked.
+ */
+export async function bucketAtHost(host: string): Promise<UserBucket | null> {
+	const cached = byHost.get(host);
+	if (cached) {
+		recordHostArrival(cached._id, host);
+		return cached;
+	}
+
+	const bucket = await getBucketStore().findByHost(host);
+	if (!bucket) return null;
+	if (!isAddressable(bucket)) return null;
+
+	byHost.set(host, bucket);
+	/*
+	 * Recorded on the cached path too, not only on a miss. The cache is what makes resolution cheap, so
+	 * recording only on a miss would report the first request after a restart and nothing else — an
+	 * "address last reached" that mostly measures uptime.
+	 */
+	recordHostArrival(bucket._id, host);
+	return bucket;
 }
 
 /*
@@ -107,8 +197,35 @@ export async function bucketAtAddress(
  * advertised the endpoint they came from.
  */
 export async function requestBucketFor(
-	slug: string | undefined
+	slug: string | undefined,
+	requestHost: string | null | undefined
 ): Promise<RequestBucket> {
+	const host = normaliseHost(requestHost ?? undefined);
+
+	/*
+	 * The host is asked first, and only a request arriving at the deployment's own host falls through to
+	 * the path. A tenant's host is an address in its own right, so a path segment beneath it is an
+	 * ordinary path — honouring it as well would give that bucket a second address and therefore a
+	 * second issuer identifier, which is the one thing an issuer identifier may not have.
+	 */
+	if (host !== null && !isCanonicalHost(host)) {
+		const addressed = await bucketAtHost(host);
+		if (addressed) {
+			/* One bucket, one address: a leading segment here names no bucket, and honouring it would
+			 * give that bucket a second address and therefore a second issuer identifier. */
+			if (slug !== undefined) throw new UnknownBucket();
+			return { _id: addressed._id, host: addressed.host };
+		}
+
+		/*
+		 * Refused only inside the deployment's own domain, where the only thing a name can be is a
+		 * tenant's — so one that holds no bucket is a typo, and serving the default population there
+		 * would make the mistake look like it worked. Anything else is another way of reaching this
+		 * deployment and falls through to the path, unchanged.
+		 */
+		if (isWithinDeploymentDomain(host)) throw new UnknownBucket();
+	}
+
 	if (slug === undefined) return DEFAULT_REQUEST_BUCKET;
 
 	const bucket = await bucketAtAddress(slug);

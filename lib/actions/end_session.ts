@@ -1,3 +1,4 @@
+import { hostOfRequest } from 'lib/consts/request_host.js';
 import { Elysia, t } from 'elysia';
 import * as crypto from 'node:crypto';
 
@@ -150,9 +151,10 @@ export const logoutConfirmAction = new Elysia()
 	})
 	.post(
 		routeNames.end_session_confirm,
-		async ({ body, cookie, route, params }) => {
+		async ({ body, cookie, route, params, request }) => {
 			const bucket = await requestBucketFor(
-				(params as { bucket?: string } | undefined)?.bucket
+				(params as { bucket?: string } | undefined)?.bucket,
+				hostOfRequest(request)
 			);
 			const oidc = new OIDCContext(body, {}, route, bucket);
 			oidc.cookie = cookie;

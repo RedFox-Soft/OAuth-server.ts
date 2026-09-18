@@ -1,3 +1,4 @@
+import { hostOfRequest } from 'lib/consts/request_host.js';
 import { Elysia, t } from 'elysia';
 import certificateThumbprint from '../helpers/certificate_thumbprint.ts';
 import { findAccount } from '../addon/account.js';
@@ -88,7 +89,8 @@ async function userInfo({ headers, body, set, request, params }) {
 	/* The address decides the population; its absence is the bare address, which is the default
 	 * bucket's. */
 	const bucket = await requestBucketFor(
-		(params as { bucket?: string } | undefined)?.bucket
+		(params as { bucket?: string } | undefined)?.bucket,
+		hostOfRequest(request)
 	);
 	const oidc = new OIDCContext({}, headers, 'anonymous', bucket);
 	const { method } = request;

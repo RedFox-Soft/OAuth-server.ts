@@ -133,6 +133,8 @@ export default async function interactions(oidc) {
 		session: oidc.session,
 		grant: oidc.grant,
 		cid: oidc.entities.Interaction?.cid || nanoid(),
+		/* The address this began at, so it cannot be completed at another bucket's. */
+		bucketId: oidc.bucket._id,
 		deviceCode: oidc.deviceCode?.jti,
 		// `jti` is a real getter on BaseModel; `parJti` is not one on Interaction, so the carry-forward
 		// has to read the payload. Without it the link to the pushed request is severed at the first

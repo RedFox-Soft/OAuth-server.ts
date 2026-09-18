@@ -1,3 +1,4 @@
+import { hostOfRequest } from 'lib/consts/request_host.js';
 import * as crypto from 'node:crypto';
 
 import { Elysia, t } from 'elysia';
@@ -53,7 +54,7 @@ export const codeVerification = new Elysia()
 	})
 	.get(
 		routeNames.code_verification,
-		async ({ cookie, query, params }) => {
+		async ({ cookie, query, params, request }) => {
 			/*
 			 * The one flow whose entry point could not name a population before addresses existed: the
 			 * person has typed nothing yet, so there is no client, no resource and no user code to derive
@@ -61,7 +62,8 @@ export const codeVerification = new Elysia()
 			 * prefix as well as at the bare one.
 			 */
 			const bucket = await requestBucketFor(
-				(params as { bucket?: string } | undefined)?.bucket
+				(params as { bucket?: string } | undefined)?.bucket,
+				hostOfRequest(request)
 			);
 			const oidc = new OIDCContext(query, {}, 'anonymous', bucket);
 			oidc.cookie = cookie;
@@ -91,9 +93,10 @@ export const codeVerification = new Elysia()
 	)
 	.post(
 		routeNames.code_verification,
-		async ({ cookie, body, params }) => {
+		async ({ cookie, body, params, request }) => {
 			const bucket = await requestBucketFor(
-				(params as { bucket?: string } | undefined)?.bucket
+				(params as { bucket?: string } | undefined)?.bucket,
+				hostOfRequest(request)
 			);
 			const oidc = new OIDCContext({}, {}, 'anonymous', bucket);
 			oidc.cookie = cookie;

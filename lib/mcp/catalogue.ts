@@ -19,7 +19,11 @@ import {
 	CreateAdminBody,
 	UpdateAdminBody
 } from '../admin/users/schema.js';
-import { CreateBucketBody, UpdateBucketBody } from '../admin/buckets/schema.js';
+import {
+	ChangeBucketAddressBody,
+	CreateBucketBody,
+	UpdateBucketBody
+} from '../admin/buckets/schema.js';
 import {
 	CreateEndUserBody,
 	UpdateEndUserBody,
@@ -817,6 +821,25 @@ const catalogue = [
 		pathParams: [],
 		summary:
 			'Create a user bucket. A bucket cannot be created unreachable: at creation it has no providers, so password login cannot be switched off. `totpRequired` makes a password sign-in also require a one-time code from an authenticator app; it governs password sign-in only and never gates a federated one.'
+	},
+	{
+		tool: 'bucket_address_change',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/address',
+		action: 'bucket.address.change',
+		/*
+		 * `high`, which puts the two-call confirmation gate in front of it automatically. Moving a bucket
+		 * changes its issuer identifier, so every client integrated with it stops validating tokens on the
+		 * next request — a consequence an agent must not be able to cause in one call, and the reason this
+		 * is a route of its own rather than a field on `bucket_update`.
+		 */
+		consequence: 'high',
+		requiredRole: 'super_admin',
+		bodySchema: ChangeBucketAddressBody,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			"Move a bucket to a different address: a path segment (`slug`) or a hostname of its own (`host`), never both. Called without `confirm`, it changes nothing and answers with the clients that will stop validating tokens. Called with `confirm: true`, it performs the move: the bucket's issuer identifier becomes the new address, the previous address stops answering, and everyone signed in signs in again. Only an administrator of the instance may do this, and a bucket served at the root cannot be moved at all."
 	},
 	{
 		tool: 'bucket_update',

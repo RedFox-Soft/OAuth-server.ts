@@ -1,3 +1,4 @@
+import { hostOfRequest } from 'lib/consts/request_host.js';
 import { Elysia, Static, t } from 'elysia';
 import { InvalidClientAuth } from 'lib/helpers/errors.js';
 import { requestBucketFor } from 'lib/admin/auth/bucketAddress.js';
@@ -34,7 +35,7 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 export const AuthPlugin = new Elysia().derive(
 	{ as: 'scoped' },
-	async function ({ headers, route, body, params }) {
+	async function ({ headers, route, body, params, request }) {
 		if (!isObject(body)) {
 			throw new InvalidClientAuth('Request body must be an object');
 		}
@@ -48,7 +49,8 @@ export const AuthPlugin = new Elysia().derive(
 		 * the default bucket's.
 		 */
 		const bucket = await requestBucketFor(
-			(params as { bucket?: string } | undefined)?.bucket
+			(params as { bucket?: string } | undefined)?.bucket,
+			hostOfRequest(request)
 		);
 		const oidc = new OIDCContext(body, headers, route, bucket);
 		await tokenAuth(body, headers, oidc);

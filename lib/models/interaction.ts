@@ -22,6 +22,20 @@ export const InteractionPayload = t.Object({
 	deviceCode: t.Optional(t.String()),
 	parJti: t.Optional(t.String()),
 	/*
+	 * The bucket whose address this interaction began at.
+	 *
+	 * Recorded so the interaction can only be completed there. Before buckets had hostnames this needed
+	 * nothing: every interaction was served from one origin, so carrying a uid "elsewhere" meant editing
+	 * a path prefix nothing read. A bucket host makes it a real boundary, and the failure without it is
+	 * quiet — the sign-in completes and writes a session cookie onto the origin the request arrived at,
+	 * named for the bucket the interaction belonged to, so it completes and then does not exist.
+	 *
+	 * Optional because an interaction written before this field existed has none, and one that does is
+	 * simply not checked — the guard degrades to the behaviour it replaced rather than stranding a
+	 * sign-in that is already in flight during a deploy.
+	 */
+	bucketId: t.Optional(t.String()),
+	/*
 	 * A sign-in that has passed the password and not yet the second factor. Declared rather than
 	 * folded into the freeform `lastSubmission`, because a state that gates authentication should be
 	 * visible in the model instead of inferred from an unknown blob.

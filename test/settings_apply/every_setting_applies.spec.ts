@@ -18,6 +18,9 @@ const ALTERNATIVES: Record<string, unknown> = {
 	'deviceFlow.charset': 'digits',
 	'deviceFlow.mask': '****-****-****',
 	'ciba.deliveryModes': ['poll', 'ping'],
+	/* Empty by default — the server cannot know what else lives in an operator's domain — so the second
+	 * value has to be a name rather than a shorter list. */
+	'buckets.reservedHostnames': ['status.example.test'],
 	'errorStore.originCaptureLevel': 'full',
 	'richAuthorizationRequests.types': {
 		'https://example.test/type': { label: 'Example' }

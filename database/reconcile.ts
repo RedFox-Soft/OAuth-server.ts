@@ -26,6 +26,7 @@ export interface ExistingIndex {
 	readonly name: string;
 	readonly key: Readonly<Record<string, unknown>>;
 	readonly unique?: boolean;
+	readonly sparse?: boolean;
 	readonly expireAfterSeconds?: number;
 }
 
@@ -43,6 +44,7 @@ export interface RawIndexDescriptor {
 	readonly name?: string;
 	readonly key: Readonly<Record<string, unknown>>;
 	readonly unique?: boolean;
+	readonly sparse?: boolean;
 	readonly expireAfterSeconds?: number;
 }
 
@@ -71,6 +73,7 @@ export function toExistingIndexes(
 			name: descriptor.name,
 			key: descriptor.key,
 			...(descriptor.unique !== undefined ? { unique: descriptor.unique } : {}),
+			...(descriptor.sparse !== undefined ? { sparse: descriptor.sparse } : {}),
 			...(descriptor.expireAfterSeconds !== undefined
 				? { expireAfterSeconds: descriptor.expireAfterSeconds }
 				: {})
@@ -104,6 +107,13 @@ function satisfies(declared: IndexSpec, existing: ExistingIndex): boolean {
 	return (
 		sameKey(declared.key, existing.key) &&
 		(declared.unique ?? false) === (existing.unique ?? false) &&
+		/*
+		 * Compared, not ignored. A unique index that is not sparse indexes every bucket without a
+		 * hostname as the same missing value and collides on the second one — so an existing non-sparse
+		 * index does not satisfy a sparse declaration, and reporting it as satisfied would leave a
+		 * deployment unable to create its second path-addressed bucket.
+		 */
+		(declared.sparse ?? false) === (existing.sparse ?? false) &&
 		(declared.expireAfterSeconds ?? null) ===
 			(existing.expireAfterSeconds ?? null)
 	);

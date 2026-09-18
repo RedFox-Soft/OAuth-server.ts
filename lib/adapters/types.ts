@@ -978,6 +978,42 @@ export interface UserBucket {
 	 * in an address: it is served at the root, which is what keeps every existing integration working.
 	 */
 	slug?: string;
+	/*
+	 * The bucket's own hostname, when it has one: `acme.auth.example.com`, and then its issuer
+	 * identifier is that origin and its endpoints are the bare paths beneath it.
+	 *
+	 * **Mutually exclusive with `slug` as an address.** A named bucket holds one or the other, never
+	 * both, and the write path refuses a body carrying both rather than resolving it by precedence — a
+	 * bucket reachable at two addresses holds two issuer identifiers, which is the one thing an issuer
+	 * identifier may not have, and a silent precedence rule leaves the operator who supplied the other
+	 * believing it took effect.
+	 *
+	 * Present ⇔ host-addressed. There is deliberately no third field recording which form is in use:
+	 * it would claim what these two already determine and disagree with them the first time somebody
+	 * wrote one and not the other — the shape `passwordLogin` and `totpRequired` both warn about below.
+	 * Which of the three address states a bucket is in (root, path, host) is therefore *derived*, by
+	 * `addressOf` in lib/configs/issuer.ts, and read from there rather than re-inferred at each site.
+	 *
+	 * Stored normalised — case folded, no trailing dot, no port (lib/consts/request_host.ts) — because
+	 * uniqueness over a name compared in two forms is not uniqueness.
+	 */
+	host?: string;
+	/*
+	 * When a request first reached this bucket's hostname, and when one last did.
+	 *
+	 * The only honest thing this server can say about whether an address works. Whether the name resolves
+	 * here and whether a certificate exists for it are facts about the world outside the process, and
+	 * both go stale the moment they are checked — a stored "verified" would be asserted once and believed
+	 * long after it stopped being true. "A request arrived" either happened or did not.
+	 *
+	 * Embedded rather than given an area of its own, for the reason `User.federated` and `User.totp`
+	 * record about themselves: bucket deletion destroys the record with the bucket, so no cascade arm
+	 * needs to know the field exists.
+	 *
+	 * Written debounced and never on the response path — see lib/admin/auth/hostArrivals.ts.
+	 */
+	hostFirstSeenAt?: Date;
+	hostLastSeenAt?: Date;
 	/* The group that owns this bucket. Every access decision resolves through it. */
 	ownerGroupId: string;
 	roles: string[];
@@ -1044,11 +1080,42 @@ export interface UserBucketStoreInstance {
 		emailVerificationRequired?: boolean;
 		verificationMethod?: VerificationMethod;
 		totpRequired?: boolean;
+		host?: string;
 	}): Promise<UserBucket>;
 	find(id: string): Promise<UserBucket | null>;
 	/* Resolves a bucket by its address. Returns null for a slug nothing holds, which is what tells the
 	 * router that a first path segment is one of the server's own routes rather than a tenant. */
 	findBySlug(slug: string): Promise<UserBucket | null>;
+	/*
+	 * The same question for the other address form, and with the same contract: null means this address
+	 * names no bucket, never "fall back to the default". A request arriving at an unknown host is
+	 * refused for the reason an unknown slug is — serving the default bucket there would answer one
+	 * population's endpoints at another population's address, and make a typo look like it worked.
+	 *
+	 * The host must already be normalised; this does not normalise it, because a store that silently
+	 * accepted an un-normalised name would let a lookup succeed that the uniqueness constraint never saw.
+	 */
+	findByHost(host: string): Promise<UserBucket | null>;
+	/*
+	 * Moves a bucket to a new address, and is deliberately not part of `update` below.
+	 *
+	 * `update`'s patch type is what makes an ordinary edit ordinary: one audit action and one `ordinary`
+	 * classification on the agent surface cover everything in it. An address change stops every
+	 * integrated client validating tokens, so it carries its own route, its own audit action and its own
+	 * `high` classification — the shape the comment on `slug` in the admin update body prescribes.
+	 *
+	 * **One call that writes one form and removes the other**, rather than a setter per form. A bucket
+	 * holds a slug or a hostname, never both, and two setters each responsible for clearing the other's
+	 * field is the arrangement where one of them eventually forgets — leaving a bucket reachable at two
+	 * addresses, which is two issuer identifiers for one population.
+	 *
+	 * Rejects rather than overwrites when the name is taken: the uniqueness guarantee is the store's,
+	 * because a read-then-write in a handler cannot promise it.
+	 */
+	setAddress(
+		id: string,
+		address: { slug?: string; host?: string }
+	): Promise<UserBucket | null>;
 	list(): Promise<UserBucket[]>;
 	listByGroup(groupId: string): Promise<UserBucket[]>;
 	update(

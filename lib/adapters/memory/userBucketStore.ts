@@ -1,14 +1,32 @@
 import type { UserBucket, UserBucketStoreInstance } from '../types.js';
 import type { FederationProvider } from '../../federation/types.js';
+import { UniqueValueTaken } from '../conflicts.js';
 import nanoid from '../../helpers/nanoid.js';
 
 export class UserBucketStore implements UserBucketStoreInstance {
 	private buckets = new Map<string, UserBucket>();
 
+	/*
+	 * The hostname uniqueness the two production backends get from a unique sparse index.
+	 *
+	 * The check and the write below are separated by no `await`, which on a single-threaded runtime is
+	 * what makes this genuinely atomic rather than merely usually right. Written as a read-then-write
+	 * with an await between them it would pass every test forever — the default run has no concurrency
+	 * to lose the race to — and lose it in production, which is the divergence Principle III refuses to
+	 * let pass silently.
+	 */
+	private hostHolder(host: string, exceptId?: string): UserBucket | undefined {
+		for (const b of this.buckets.values()) {
+			if (b.host === host && b._id !== exceptId) return b;
+		}
+		return undefined;
+	}
+
 	async create(data: {
 		_id?: string;
 		name: string;
 		slug?: string;
+		host?: string;
 		ownerGroupId: string;
 		roles?: string[];
 		passwordLogin?: boolean;
@@ -18,11 +36,16 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		verificationMethod?: UserBucket['verificationMethod'];
 		totpRequired?: boolean;
 	}): Promise<UserBucket> {
+		if (data.host !== undefined && this.hostHolder(data.host)) {
+			throw new UniqueValueTaken('host', data.host);
+		}
+
 		const now = new Date();
 		const bucket: UserBucket = {
 			_id: data._id ?? nanoid(),
 			name: data.name,
 			slug: data.slug,
+			...(data.host !== undefined ? { host: data.host } : {}),
 			ownerGroupId: data.ownerGroupId,
 			roles: data.roles ?? [],
 			// A bucket accepts passwords unless someone says otherwise, and holds no providers until one is
@@ -69,6 +92,37 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		return null;
 	}
 
+	/*
+	 * Matched exactly, never normalised here. A store that folded case on read would answer a lookup the
+	 * uniqueness check never saw, so two names that differ only in case could both be created and one of
+	 * them would resolve to the other's bucket. Normalisation belongs at the edges — the router and the
+	 * admin surface both go through lib/consts/request_host.ts — so that what is compared is what is
+	 * stored.
+	 */
+	async findByHost(host: string): Promise<UserBucket | null> {
+		for (const b of this.buckets.values()) {
+			if (b.host === host) return this.withDefaults(b);
+		}
+		return null;
+	}
+
+	async setAddress(
+		id: string,
+		address: { slug?: string; host?: string }
+	): Promise<UserBucket | null> {
+		const b = this.buckets.get(id);
+		if (!b) return null;
+		if (address.host !== undefined && this.hostHolder(address.host, id)) {
+			throw new UniqueValueTaken('host', address.host);
+		}
+
+		/* One form written, the other removed in the same step: a bucket holds one address, never both. */
+		delete b.slug;
+		delete b.host;
+		Object.assign(b, address, { updatedAt: new Date() });
+		return this.withDefaults(b);
+	}
+
 	async list(): Promise<UserBucket[]> {
 		return [...this.buckets.values()].map((b) => this.withDefaults(b));
 	}
@@ -93,6 +147,8 @@ export class UserBucketStore implements UserBucketStoreInstance {
 				| 'emailVerificationRequired'
 				| 'verificationMethod'
 				| 'totpRequired'
+				| 'hostFirstSeenAt'
+				| 'hostLastSeenAt'
 			>
 		>
 	): Promise<UserBucket | null> {

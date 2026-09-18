@@ -11,6 +11,15 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- A user bucket can be addressed by a hostname of its own rather than a path beneath the server, and
+  holds one form or the other — never both, since two addresses would be two issuer identifiers for one
+  population. A host isolates the bucket's sign-in cookie by origin, which path addressing cannot do at
+  all, and publishes one metadata location instead of the two a path-bearing issuer forces. It costs a
+  DNS record and a certificate the operator provides; the console names the record to create and reports
+  whether any request has yet arrived, and claims nothing about whether the name resolves. Changing an
+  address is its own operation, available only to an administrator of the instance: it names every client
+  that will stop validating tokens before anything changes and completes only on a second call. Spec 056.
+
 - site: a blog article can carry inline SVG diagrams. Three colour tokens in the stylesheet make a
   diagram follow the site palette and the reader's theme, and a diagram's labels are left out of the
   page's extracted text, so they neither run together in the Markdown alternate nor get judged as

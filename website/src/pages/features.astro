@@ -257,6 +257,10 @@ const groups: {
 				body: 'Projects and user buckets are owned by a group. Nothing but membership grants access, and it is re-resolved on every request.'
 			},
 			{
+				title: 'A bucket addressed by a path or a host',
+				body: 'Each user bucket is its own issuer, reached at a path beneath the server or at a hostname of its own — one or the other, never both. A hostname lets the browser isolate that bucket’s sign-in cookie by origin and publishes one metadata location instead of two; it costs a DNS record and a certificate you provide. Changing an address is its own operation: it shows you which clients it will break before it breaks them.'
+			},
+			{
 				title: 'End-user self-service',
 				body: 'Email verification and password reset per bucket, each with attempt caps, cooldowns and single-use links.'
 			},

@@ -16,6 +16,21 @@ export type AreaKind = 'model' | 'store' | 'perBucket';
 export interface IndexSpec {
 	readonly key: Readonly<Record<string, 1>>;
 	readonly unique?: boolean;
+	/*
+	 * Index only the documents that hold the key, so absent values do not collide with one another.
+	 *
+	 * Added for `userBuckets.host`, and the federated-identity comment further down is the argument for
+	 * why it was worth extending this type there and not here. That case wanted a
+	 * partialFilterExpression — a whole expression language — to make a *multikey* index unique, and
+	 * settled for enforcing uniqueness in code because the residual race produces a duplicate naming
+	 * the same account, which is harmless.
+	 *
+	 * A bucket's hostname has neither property. It is a scalar, so `sparse` alone is enough; and the
+	 * residual race is two buckets sharing an address, which is two issuer identifiers for one
+	 * population and unrecoverable without an operator noticing. A check in the handler cannot promise
+	 * it, so the datastore must.
+	 */
+	readonly sparse?: boolean;
 	readonly expireAfterSeconds?: number;
 	/*
 	 * The field holding the array this key indexes into, for a key MongoDB serves with a multikey
@@ -476,7 +491,17 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 		unowned(
 			'a container: guarded against deletion while occupied, never cascaded'
 		),
-		[{ key: { ownerGroupId: 1 } }]
+		[
+			{ key: { ownerGroupId: 1 } },
+			/*
+			 * A bucket's hostname is its address, so two buckets may not share one. Unique and sparse
+			 * rather than checked in the handler: two operators assigning one name at the same moment both
+			 * read "free" and both write, and the loser is only discovered when a request resolves to
+			 * whichever document the datastore returns first. Sparse because every bucket addressed by a
+			 * path holds no hostname at all, and absent values must not collide with each other.
+			 */
+			{ key: { host: 1 }, unique: true, sparse: true }
+		]
 	),
 	/*
 	 * Groups own every project and user bucket, so `members.userId` is read on every admin request —

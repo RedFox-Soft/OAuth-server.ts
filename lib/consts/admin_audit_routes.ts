@@ -254,6 +254,18 @@ const routes = [
 		path: '/admin/api/buckets/:id',
 		targetType: 'UserBucket'
 	},
+	/*
+	 * Moving a bucket to a different address. Its own action rather than part of `bucket.update`,
+	 * because it changes the bucket's issuer identifier and every client integrated with it stops
+	 * validating tokens — a consequence that must be filterable on its own, and must not share an
+	 * `ordinary` classification with a label rename on the agent surface.
+	 */
+	{
+		action: 'bucket.address.change',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/address',
+		targetType: 'UserBucket'
+	},
 	{
 		action: 'bucket.delete',
 		method: 'DELETE',

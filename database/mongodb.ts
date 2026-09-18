@@ -81,6 +81,7 @@ function describeIndex(spec: IndexSpec): string {
 	const key = Object.keys(spec.key).join(', ');
 	const options = [
 		spec.unique === true ? 'unique' : undefined,
+		spec.sparse === true ? 'sparse' : undefined,
 		spec.expireAfterSeconds !== undefined ? 'expiring' : undefined
 	]
 		.filter(Boolean)

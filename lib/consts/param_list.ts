@@ -1,5 +1,5 @@
 import { t } from 'elysia';
-import type { RequestBucket } from '../configs/issuer.js';
+import { addressOf, type RequestBucket } from '../configs/issuer.js';
 
 /**
  * A parameter this server refuses rather than ignores.
@@ -189,17 +189,32 @@ export const cookieNames = {
  */
 export function sessionCookieName(bucket: RequestBucket): string {
 	/*
-	 * A bucket with no slug has no address of its own, so its clients use the bare endpoints — the ones
-	 * they used before buckets became tenants — and share the default bucket's cookie, exactly as they
-	 * shared its behaviour. Falling back to the record id instead would name a cookie nobody reads: the
-	 * sign-in screen knows which bucket the client belongs to and would write `_session_<id>`, while the
-	 * bare `/auth` and `/logout` know only the address and would look for `_session_default`. The
-	 * sign-in would complete and then not exist.
+	 * Switched on the bucket's *address*, not on whether it holds a slug, and the difference is
+	 * load-bearing now that two kinds of bucket hold none.
 	 *
-	 * Every bucket that *is* addressed has a slug — the addressable ones by definition, and the two
-	 * reserved ones because they are separate populations that happen to share the root.
+	 * A bucket with no address of its own uses the bare endpoints — the ones its clients used before
+	 * buckets became tenants — and shares the default bucket's cookie, exactly as it shares its
+	 * behaviour. Falling back to the record id instead would name a cookie nobody reads: the sign-in
+	 * screen knows which bucket the client belongs to and would write `_session_<id>`, while the bare
+	 * `/auth` and `/logout` know only the address and would look for `_session_default`. The sign-in
+	 * would complete and then not exist.
+	 *
+	 * A host-addressed bucket also holds no slug and must NOT reach that branch: it has an address, just
+	 * not a path one. It needs no distinguishing name either. The suffix exists because path-addressed
+	 * buckets share one origin — "two sign-ins in one browser are two cookies" — and a bucket on its own
+	 * origin already has its cookie kept apart by the browser, since nothing here sets a domain
+	 * attribute. A suffix would distinguish what is already distinct.
 	 */
-	return `${cookieNames.session}_${bucket.slug ?? DEFAULT_BUCKET_SLUG}`;
+	const address = addressOf(bucket);
+	switch (address.kind) {
+		case 'host':
+			return cookieNames.session;
+		case 'path':
+			return `${cookieNames.session}_${address.segment}`;
+		case 'root':
+		case 'unaddressed':
+			return `${cookieNames.session}_${bucket.slug ?? DEFAULT_BUCKET_SLUG}`;
+	}
 }
 
 /*

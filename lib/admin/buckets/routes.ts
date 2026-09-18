@@ -26,12 +26,22 @@ import {
 	prospectiveBucket
 } from '../federation/validate.js';
 import {
+	ChangeBucketAddressBody,
 	CreateBucketBody,
 	UpdateBucketBody,
 	DeleteBucketQuery
 } from './schema.js';
 import { isReservedBucketName } from '../../consts/reserved_names.js';
-import { forgetBucketAddresses } from '../auth/bucketAddress.js';
+import {
+	normaliseHost,
+	validateBucketHost
+} from '../../consts/request_host.js';
+import { ApplicationConfig } from '../../configs/application.js';
+import { ISSUER } from '../../configs/env.js';
+import {
+	forgetBucketAddresses,
+	isCanonicalHost
+} from '../auth/bucketAddress.js';
 
 /*
  * What the slug's pattern cannot check: that this address is free to take.
@@ -59,6 +69,101 @@ async function assertSlugAvailable(slug: string) {
 }
 
 /*
+ * The address a bucket is being given, judged before anything is written.
+ *
+ * Exactly one form, never both and never neither. Refused rather than resolved by precedence: a rule
+ * that silently prefers the slug is a rule nobody reads, and the operator who supplied a hostname would
+ * believe it took effect while their bucket answered somewhere else entirely.
+ */
+async function resolveAddress(body: {
+	slug?: string;
+	host?: string;
+}): Promise<{ slug?: string; host?: string }> {
+	if (body.slug !== undefined && body.host !== undefined) {
+		throw new AdminError(
+			400,
+			'a bucket is addressed by a path segment or a hostname, not both — supply one'
+		);
+	}
+	if (body.slug === undefined && body.host === undefined) {
+		throw new AdminError(
+			400,
+			'a bucket needs an address: supply a slug or a hostname'
+		);
+	}
+
+	if (body.slug !== undefined) {
+		await assertSlugAvailable(body.slug);
+		return { slug: body.slug };
+	}
+
+	return { host: await assertHostAvailable(body.host as string) };
+}
+
+/*
+ * What the hostname's shape rules cannot check: that this name is this deployment's to give, and free.
+ *
+ * Every refusal names the rule it broke, for the reason `assertSlugAvailable` states about reserved
+ * slugs — an operator who typed the deployment's own hostname has no way to guess the rule otherwise.
+ */
+async function assertHostAvailable(value: string): Promise<string> {
+	const judged = validateBucketHost(value);
+	if (!judged.ok) {
+		throw new AdminError(
+			400,
+			`'${value}' is not usable as an address: ${judged.reason}`
+		);
+	}
+	const host = judged.host;
+
+	if (isCanonicalHost(host)) {
+		throw new AdminError(
+			409,
+			`'${host}' is this deployment's own address and cannot be a bucket's`
+		);
+	}
+	/*
+	 * Names the operator reserved for whatever else lives in their domain. Read live rather than at
+	 * module load, so an operator who notices a collision can close it without a restart — and compared
+	 * in normalised form, because a reservation typed with different case than the request would
+	 * otherwise be a reservation that does not hold.
+	 */
+	if (
+		(ApplicationConfig['buckets.reservedHostnames'] as string[]).some(
+			(reserved) => normaliseHost(reserved) === host
+		)
+	) {
+		throw new AdminError(
+			409,
+			`'${host}' is reserved for this deployment and cannot be a bucket's address`
+		);
+	}
+	const holder = await getBucketStore().findByHost(host);
+	if (holder) {
+		throw new AdminError(
+			409,
+			`hostname '${host}' is already taken by the bucket '${holder.name}'`
+		);
+	}
+	return host;
+}
+
+/*
+ * The clients that will stop validating tokens when this bucket's address changes.
+ *
+ * Named before the change rather than counted, because "14 clients" tells an operator nothing they can
+ * act on and a list of client ids is what they take to whoever owns each one. Read through the projects
+ * that point at the bucket, which is where a client's membership is recorded.
+ */
+async function clientsLosingTheirIssuer(bucketId: string): Promise<string[]> {
+	const projects = await getProjectStore().list();
+	return projects
+		.filter((project) => project.bucketId === bucketId)
+		.flatMap((project) => project.clientIds ?? [])
+		.sort();
+}
+
+/*
  * A bucket as a reader may see it: identical except that every configured provider's `clientSecret` is
  * masked.
  *
@@ -75,6 +180,46 @@ async function assertSlugAvailable(slug: string) {
 function presentBucket<T extends Pick<UserBucket, 'federation'>>(bucket: T): T {
 	if (!bucket.federation?.length) return bucket;
 	return { ...bucket, federation: presentAll(bucket) as T['federation'] };
+}
+
+/*
+ * What an operator needs to know about a hostname they have assigned, and nothing they would be wrong
+ * to believe.
+ *
+ * The record to create is *instruction*, which stays true; whether it exists is a claim about the world
+ * this server cannot make. So the address section states the record, and reports arrivals as the one
+ * observable fact — a request reached this host, which either happened or did not.
+ *
+ * Deliberately no `verified` flag. Auth0 and Logto both carry one, and both can: they issue the
+ * certificate, so they own a loop that re-checks it. This server issues none, so a flag written once
+ * would be believed indefinitely while the name behind it was repointed.
+ */
+function withAddressGuidance<
+	T extends Pick<UserBucket, 'host' | 'hostFirstSeenAt' | 'hostLastSeenAt'>
+>(bucket: T): T | (T & { address: Record<string, unknown> }) {
+	if (!bucket.host) return bucket;
+	return {
+		...bucket,
+		address: {
+			host: bucket.host,
+			requestsArrived: bucket.hostLastSeenAt !== undefined,
+			firstArrivalAt: bucket.hostFirstSeenAt ?? null,
+			lastArrivalAt: bucket.hostLastSeenAt ?? null,
+			/*
+			 * Named concretely rather than described. "Point this name at the deployment" sends an operator
+			 * to look something up; a record they can copy does not.
+			 */
+			dnsRecord: {
+				name: bucket.host,
+				type: 'CNAME',
+				value: new URL(ISSUER).hostname
+			},
+			stillToDo:
+				bucket.hostLastSeenAt === undefined
+					? 'No request has reached this hostname yet. Create the DNS record above and obtain a TLS certificate for the name — neither is done by this server, and it cannot tell you whether either has been done, only whether a request has arrived.'
+					: 'A TLS certificate is still required for this name; this server does not issue one and cannot confirm that one exists.'
+		}
+	};
 }
 
 /*
@@ -149,7 +294,19 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			 * Before the audit entry, for the reason stated on the sign-in guard above: an entry describing
 			 * a bucket a 409 refused to create would record an address that never existed.
 			 */
-			await assertSlugAvailable(body.slug);
+			const address = await resolveAddress(body);
+			/*
+			 * Naming a hostname is an instance-level act, never a group-level one. A project administrator
+			 * may create buckets in their own group; letting them name one would put a name in the
+			 * operator's own domain under their control — an escalation out of the group boundary, and out
+			 * of whatever else that domain is used for.
+			 */
+			if (address.host !== undefined && !ctx.roles.includes('super_admin')) {
+				throw new AdminError(
+					403,
+					'only an administrator of this instance may give a bucket a hostname of its own'
+				);
+			}
 			// The id is allocated here, not by the store, so the audit entry can name the bucket that is
 			// about to exist — audit-first has nothing to point at otherwise.
 			const bucketId = nanoid();
@@ -157,7 +314,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			const bucket = await getBucketStore().create({
 				_id: bucketId,
 				name: body.name,
-				slug: body.slug,
+				...address,
 				roles: body.roles ?? [],
 				ownerGroupId,
 				passwordLogin: body.passwordLogin,
@@ -177,7 +334,9 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 	)
 	.get('/admin/api/buckets/:id', async ({ admin, params }) => {
 		const ctx = assertAuth(admin as AdminContext | null);
-		return presentBucket(await loadBucketForUsers(ctx, params.id));
+		return withAddressGuidance(
+			presentBucket(await loadBucketForUsers(ctx, params.id))
+		);
 	})
 	.patch(
 		'/admin/api/buckets/:id',
@@ -204,6 +363,87 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			return withInertTotpAdvisory(presentBucket(updated));
 		},
 		{ body: UpdateBucketBody }
+	)
+	/*
+	 * Moving a bucket to a different address — its own route, its own audit action, and `high` on the
+	 * agent surface.
+	 *
+	 * Deliberately not a field on the PATCH body above, and the comment on `slug` in `UpdateBucketBody`
+	 * is the argument: changing an address changes the bucket's issuer identifier, so every client
+	 * integrated with it stops validating tokens on the next request. Admitting it there would give that
+	 * the same weight as renaming a label — one audit action for both, one `ordinary` classification
+	 * covering both, and the two-call confirmation gate would never see it.
+	 */
+	.post(
+		'/admin/api/buckets/:id/address',
+		async ({ admin, params, body, set }) => {
+			const ctx = assertAuth(admin as AdminContext | null);
+
+			/*
+			 * Instance-level, whichever form is being moved to. A group administrator who could rename a
+			 * bucket's address could break every client integrated with it, and one who could name a
+			 * hostname would reach into the operator's domain.
+			 */
+			if (!ctx.roles.includes('super_admin')) {
+				throw new AdminError(
+					403,
+					'only an administrator of this instance may change a bucket address'
+				);
+			}
+
+			/*
+			 * Before the bucket is loaded, so the answer cannot depend on who is asking — the order the
+			 * delete route below settled on for the same reason. The console authenticates against the
+			 * instance's own issuer, so moving the administrators bucket would lock every operator out of
+			 * the surface that could move it back.
+			 */
+			if (isUndeletableBucket(params.id)) {
+				throw new AdminError(
+					403,
+					'this bucket is served at the root and its address cannot be changed'
+				);
+			}
+
+			const bucket = await getBucketStore().find(params.id);
+			if (!bucket) throw new AdminError(404, 'bucket not found');
+
+			const address = await resolveAddress(body);
+
+			/*
+			 * What will break, named before anything changes. An operator who has not seen this list has
+			 * not been told what the change costs, which is why the write refuses without `confirm`.
+			 */
+			const affected = await clientsLosingTheirIssuer(params.id);
+			const preview = {
+				from: bucket.host ?? bucket.slug ?? null,
+				to: address.host ?? address.slug ?? null,
+				clientsNeedingReconfiguration: affected,
+				consequence:
+					'the issuer identifier changes, so every client listed stops validating tokens until it is reconfigured; the previous address stops answering and everyone signed in signs in again'
+			};
+
+			if (body.confirm !== true) {
+				set.status = 409;
+				return { ...preview, confirmationRequired: true };
+			}
+
+			await recordAdminAudit(ctx, 'bucket.address.change', params.id, {
+				from: preview.from,
+				to: preview.to
+			});
+
+			const moved = await getBucketStore().setAddress(params.id, address);
+			if (!moved) throw new AdminError(404, 'bucket not found');
+
+			/*
+			 * The one place this operation can leave a bucket answering at its old address. The resolver
+			 * caches by both forms, and a stale entry there is exactly the second issuer identifier the
+			 * move exists to avoid.
+			 */
+			forgetBucketAddresses();
+			return { ...preview, moved: true, bucket: presentBucket(moved) };
+		},
+		{ body: ChangeBucketAddressBody }
 	)
 	.delete(
 		'/admin/api/buckets/:id',

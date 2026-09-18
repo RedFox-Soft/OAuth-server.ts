@@ -2,7 +2,7 @@
 title: FoxAuth compared with Zitadel
 competitor: Zitadel
 description: Zitadel is a multi-tenant identity platform with SAML, SCIM and a managed cloud. FoxAuth is a smaller OAuth 2.1 server with the banking-grade profiles built in.
-lastChecked: '2026-09-06'
+lastChecked: '2026-09-18'
 sources:
   - https://github.com/zitadel/zitadel
   - https://zitadel.com/self-hosted
@@ -24,7 +24,7 @@ faq:
   - question: 'How do the licences differ?'
     answer: "Zitadel is AGPL-3.0 with Apache 2.0 and MIT exceptions for specific directories, and sells an enterprise contract whose commercial licence replaces the AGPL. FoxAuth is FSL-1.1-ALv2: you may read, modify, self-host and redistribute it and build a business around it, but not offer it as a competing hosted service. Each version converts to Apache 2.0 two years after it ships. AGPL's network-copyleft and FSL's competing-service restriction rule out different things, so which is the problem depends on what you are building."
   - question: 'Can I migrate from Zitadel to FoxAuth?'
-    answer: "OIDC clients port over with an issuer and client id change. What does not port is anything relying on Zitadel's SAML or SCIM support, its organisation model, or its management API. FoxAuth models tenancy as user buckets: each is addressed in the URL and is its own issuer, so a client integrates with one exactly as it would with any authorization server. Assess the migration by how much of your estate is OIDC-only, because that part is usually straightforward and the rest is not."
+    answer: "OIDC clients port over with an issuer and client id change. What does not port is anything relying on Zitadel's SAML or SCIM support, its organisation model, or its management API. FoxAuth models tenancy as user buckets: each is its own issuer, addressed either by a path beneath the server's URL or by a hostname of its own, so a client integrates with one exactly as it would with any authorization server. Assess the migration by how much of your estate is OIDC-only, because that part is usually straightforward and the rest is not."
   - question: 'Which is more production-ready?'
     answer: "Zitadel is the more mature of the two, on deployment history and on having a vendor-operated cloud and enterprise contracts behind it. FoxAuth is at a 0.4.0 release, so its HTTP surface and admin API may still change between minor versions. FoxAuth's advantage lies in specific protocol coverage and licence terms; it has none in maturity, and this page will not pretend otherwise."
 groups:
@@ -60,7 +60,7 @@ groups:
         us:
           {
             status: yes,
-            text: 'User buckets, each addressed in the URL and its own issuer, with group ownership deciding who administers what.'
+            text: 'User buckets, each its own issuer, addressed by a path or by a hostname of its own — group ownership decides who administers what.'
           }
         them:
           {

@@ -5,9 +5,26 @@ import { provisionUserArea } from './provision.js';
 import { reviveDates } from './dates.js';
 import type { UserBucket, UserBucketStoreInstance } from '../types.js';
 import type { FederationProvider } from '../../federation/types.js';
+import { UniqueValueTaken } from '../conflicts.js';
 import nanoid from '../../helpers/nanoid.js';
 
-const DATE_FIELDS = ['createdAt', 'updatedAt'] as const;
+const DATE_FIELDS = [
+	'createdAt',
+	'updatedAt',
+	/* Or an arrival reads back as the ISO string jsonb stored, and the console renders a raw timestamp. */
+	'hostFirstSeenAt',
+	'hostLastSeenAt'
+] as const;
+
+/* SQLSTATE 23505, classified here the way provision.ts classifies its own states. */
+function isUniqueViolation(error: unknown): boolean {
+	return (
+		typeof error === 'object' &&
+		error !== null &&
+		'code' in error &&
+		(error as { code: unknown }).code === '23505'
+	);
+}
 
 /*
  * Buckets written before a setting existed hold no value for it, so the safe default is projected on
@@ -39,6 +56,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		_id?: string;
 		name: string;
 		slug?: string;
+		host?: string;
 		ownerGroupId: string;
 		roles?: string[];
 		passwordLogin?: boolean;
@@ -53,6 +71,9 @@ export class UserBucketStore implements UserBucketStoreInstance {
 			_id: data._id ?? nanoid(),
 			name: data.name,
 			slug: data.slug,
+			/* Written only when present: a stored null would occupy the partial unique index, so the
+			 * second bucket created without a hostname would collide with the first. */
+			...(data.host !== undefined ? { host: data.host } : {}),
 			ownerGroupId: data.ownerGroupId,
 			roles: data.roles ?? [],
 			passwordLogin: data.passwordLogin ?? true,
@@ -66,10 +87,17 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		};
 
 		const handle = sql();
-		await handle`
-			INSERT INTO ${handle(this.area)} (id, doc, expires_at)
-			VALUES (${bucket._id}, ${bucket}, NULL)
-		`;
+		try {
+			await handle`
+				INSERT INTO ${handle(this.area)} (id, doc, expires_at)
+				VALUES (${bucket._id}, ${bucket}, NULL)
+			`;
+		} catch (error) {
+			if (data.host !== undefined && isUniqueViolation(error)) {
+				throw new UniqueValueTaken('host', data.host);
+			}
+			throw error;
+		}
 
 		/*
 		 * Provision the bucket's end-user table now, while we know the bucket is new. Buckets are created
@@ -100,6 +128,46 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		return this.bucketOf(rows[0]);
 	}
 
+	/*
+	 * Matched exactly, never normalised here — a store that folded case on read would answer a lookup the
+	 * unique index never saw. Normalisation is done at the edges, by lib/consts/request_host.ts, so what
+	 * is compared is what is stored.
+	 */
+	async findByHost(host: string): Promise<UserBucket | null> {
+		const handle = sql();
+		const rows = await handle`
+			SELECT doc FROM ${handle(this.area)} WHERE doc->>'host' = ${host}
+		`;
+		return this.bucketOf(rows[0]);
+	}
+
+	async setAddress(
+		id: string,
+		address: { slug?: string; host?: string }
+	): Promise<UserBucket | null> {
+		const handle = sql();
+		/*
+		 * Merge one form, then drop the other: a bucket holds one address, never both. `-` removes the
+		 * key outright rather than setting it null, which matters because a null would occupy the partial
+		 * unique index rather than being excluded from it.
+		 */
+		const dropped = address.host === undefined ? 'host' : 'slug';
+		const merged = { ...address, updatedAt: new Date() };
+		try {
+			const rows = await handle`
+				UPDATE ${handle(this.area)} SET doc = (doc || ${merged}) - ${dropped}
+				WHERE id = ${id}
+				RETURNING doc
+			`;
+			return this.bucketOf(rows[0]);
+		} catch (error) {
+			if (address.host !== undefined && isUniqueViolation(error)) {
+				throw new UniqueValueTaken('host', address.host);
+			}
+			throw error;
+		}
+	}
+
 	async list(): Promise<UserBucket[]> {
 		const handle = sql();
 		const rows = await handle`SELECT doc FROM ${handle(this.area)}`;
@@ -128,6 +196,8 @@ export class UserBucketStore implements UserBucketStoreInstance {
 				| 'emailVerificationRequired'
 				| 'verificationMethod'
 				| 'totpRequired'
+				| 'hostFirstSeenAt'
+				| 'hostLastSeenAt'
 			>
 		>
 	): Promise<UserBucket | null> {

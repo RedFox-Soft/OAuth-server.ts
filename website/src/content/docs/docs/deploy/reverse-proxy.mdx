@@ -10,7 +10,7 @@ import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 The server speaks plaintext HTTP on port 3000 and does not terminate TLS. Anywhere other than a
 laptop, something in front of it almost always does.
 
-## Three things to get right
+## Four things to get right
 
 **TLS terminates at the proxy.** Bind the server's port to loopback (or to a private network) so
 nothing reaches 3000 from outside, and let the proxy hold the certificate.
@@ -20,6 +20,18 @@ claim of every token, the base of every endpoint in the discovery document, and 
 of the console client. A client library that fetches discovery will follow whatever it says, so a
 wrong `ISSUER` produces a deployment that half-works, in ways that tend to be tedious to diagnose.
 See the [environment reference](/docs/reference/environment/).
+
+**Pass the original `Host` through.** The server reads that header, and only that header, to work out
+which user bucket a request is addressed to when buckets are given hostnames of their own. It
+deliberately does not read `X-Forwarded-Host`: that header is set by whatever spoke to your proxy, so a
+proxy which does not strip an inbound copy would let a caller choose which population answers them —
+the highest-leverage thing a request could influence here. `Host` is what the client actually connected
+to, and what your proxy's own routing already matched on.
+
+The nginx block below sets `proxy_set_header Host $host;` for this reason, and Caddy's `reverse_proxy`
+preserves it by default. A proxy that rewrites `Host` to the upstream's internal name leaves every
+host-addressed bucket unreachable; path-addressed buckets are unaffected, which is what makes this
+worth stating rather than leaving to be discovered.
 
 **Choose `rateLimit.trustedProxy` on purpose.** The next section covers it.
 

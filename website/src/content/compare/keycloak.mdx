@@ -2,7 +2,7 @@
 title: FoxAuth compared with Keycloak
 competitor: Keycloak
 description: Both are servers you run yourself. They differ in runtime, storage, scope and how much of the protocol is on by default.
-lastChecked: '2026-09-17'
+lastChecked: '2026-09-18'
 sources:
   - https://www.keycloak.org/securing-apps/oidc-layers
   - https://www.keycloak.org/securing-apps/mcp-authz-server
@@ -26,7 +26,7 @@ chooseUs:
   - 'You want a server small enough to mount inside your own Bun service, on the PostgreSQL or MongoDB you already run.'
 faq:
   - question: 'Can I migrate from Keycloak to FoxAuth?'
-    answer: "Clients and users usually move from Keycloak to FoxAuth without much trouble. Both are OpenID Connect servers, so a client written against Keycloak's token endpoint works against FoxAuth's once the issuer and the client id change. A Keycloak realm maps onto a FoxAuth user bucket more directly than the names suggest: a bucket is addressed in the URL and is its own issuer, so `https://auth.example.com/acme` publishes its own metadata and mints tokens carrying itself as `iss`, exactly as `/realms/acme` does. What does not map is the rest of what a realm carries — authentication flows, mappers, per-realm signing keys — and custom behaviour lives in 31 named override seams in TypeScript where Keycloak would have you write SPI implementations in Java."
+    answer: "Clients and users usually move from Keycloak to FoxAuth without much trouble. Both are OpenID Connect servers, so a client written against Keycloak's token endpoint works against FoxAuth's once the issuer and the client id change. A Keycloak realm maps onto a FoxAuth user bucket more directly than the names suggest: a bucket is its own issuer, so `https://auth.example.com/acme` publishes its own metadata and mints tokens carrying itself as `iss`, exactly as `/realms/acme` does. A bucket can also take a hostname of its own — `https://acme.auth.example.com` — which Keycloak realms cannot; there the hostname is a server-wide setting, so host-per-tenant is something you build in front of Keycloak rather than configure in it. What does not map is the rest of what a realm carries — authentication flows, mappers, per-realm signing keys — and custom behaviour lives in 31 named override seams in TypeScript where Keycloak would have you write SPI implementations in Java."
   - question: 'Is FoxAuth lighter to run than Keycloak?'
     answer: 'FoxAuth is a Bun process and one database, PostgreSQL or MongoDB, which is a smaller operational surface than a JVM application server and its relational schema. It starts in under a second, against tens of seconds for Keycloak. That is a real difference in memory and startup. It is no difference at all in what the protocol endpoints do. Keycloak has years more production hardening behind it, and that is worth weighing against a 0.x release.'
   - question: 'Does FoxAuth support SAML?'
@@ -83,6 +83,20 @@ groups:
           }
         verdict: them
         why: 'If SAML or LDAP is on your list, this is unlikely to be a close call.'
+      - dimension: Multi-tenancy
+        us:
+          {
+            status: yes,
+            text: "User buckets, each its own issuer. A bucket takes a path beneath the server's URL or a hostname of its own."
+          }
+        them:
+          {
+            status: yes,
+            text: 'Realms, each its own issuer at /realms/name, carrying their own flows, mappers and signing keys.'
+          }
+        verdict: different
+        why: "A realm carries far more than a bucket does — its own authentication flows and signing keys — and if you need that, it is not close. A bucket can take a hostname of its own, which a realm cannot: Keycloak's hostname is a server-wide setting, so host-per-tenant is built in front of it rather than configured in it."
+        note: "Keycloak's hostname configuration is documented at the server level, not per realm."
       - dimension: Maturity
         us:
           {

@@ -1,3 +1,5 @@
+import { hostOfRequest } from 'lib/consts/request_host.js';
+import { bucketAtHost, isCanonicalHost } from 'lib/admin/auth/bucketAddress.js';
 // Aliased: this module already imports a `NotFoundError` from helpers/re_render_errors.js, which is the
 // device-flow re-render error and a different thing entirely. Elysia's is the one that produces the same
 // answer the server gives for a path it does not serve, which is what an unknown provider must look like.
@@ -391,11 +393,53 @@ export const ui = new Elysia()
 			endUserCookieAttributes
 		)
 	})
-	.resolve(async ({ cookie, params }) => {
+	.resolve(async ({ cookie, params, request }) => {
 		const cookieId = cookie._interaction.value;
 		const interaction = await Interaction.find(params.uid, {
 			error: new SessionNotFound('interaction session not found')
 		});
+
+		/*
+		 * An interaction belongs to the address it began at.
+		 *
+		 * Before buckets had hostnames this needed no guard: every interaction was served from one origin,
+		 * so carrying a uid "elsewhere" meant editing a path prefix that nothing read. A bucket host makes
+		 * it a real boundary, and the failure without this check is quiet rather than loud — the sign-in
+		 * completes, and the session cookie it writes lands on the origin the request arrived at while
+		 * being named for the bucket the interaction belonged to. That is the shape
+		 * `sessionCookieName` already warns about: the sign-in completes and then does not exist.
+		 *
+		 * Compared against the *interaction's* bucket rather than re-derived from the client, so this
+		 * stays one comparison rather than a second opinion about which population a request concerns.
+		 */
+		const startedAt = interaction.payload.bucketId;
+		if (startedAt) {
+			const host = hostOfRequest(request);
+			const arrivedAt =
+				host !== null && !isCanonicalHost(host)
+					? await bucketAtHost(host)
+					: null;
+			const startedBucket = await issuingBucket(startedAt);
+
+			/*
+			 * Checked only when a hostname is involved on one side or the other, and that qualifier is what
+			 * makes this correct rather than merely strict. These pages are mounted at the root and are NOT
+			 * repeated beneath a bucket's path — a path-addressed bucket's sign-in screen is served from the
+			 * canonical origin, by design — so comparing the request's address against the interaction's
+			 * would refuse every path-addressed sign-in there has ever been.
+			 *
+			 * What is genuinely new is the origin: an interaction begun at a bucket's own host may be
+			 * completed only there, and a request arriving at a bucket's host may complete only that
+			 * bucket's interactions.
+			 */
+			if (startedBucket.host || arrivedAt) {
+				if (arrivedAt?._id !== startedBucket._id) {
+					throw new SessionNotFound(
+						'interaction session not found at this address'
+					);
+				}
+			}
+		}
 
 		if (interaction.payload.session?.uid) {
 			const session = await Session.findByUid(interaction.payload.session.uid);
