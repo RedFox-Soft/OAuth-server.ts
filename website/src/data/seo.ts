@@ -27,6 +27,7 @@ export type SectionName =
 	| 'Start here'
 	| 'Product'
 	| 'Compare'
+	| 'Blog'
 	| 'Documentation'
 	| 'Reference'
 	| 'Project';
@@ -41,6 +42,7 @@ const SECTION_PREFIXES: ReadonlyArray<readonly [string, SectionName]> = [
 	['/docs/get-started/', 'Start here'],
 	['/docs/', 'Documentation'],
 	['/compare/', 'Compare'],
+	['/blog/', 'Blog'],
 	['/features/', 'Product'],
 	['/pricing/', 'Product'],
 	['/contact/', 'Product'],
@@ -54,6 +56,7 @@ export const SECTION_ORDER: readonly SectionName[] = [
 	'Start here',
 	'Product',
 	'Compare',
+	'Blog',
 	'Documentation',
 	'Reference',
 	'Project'
@@ -63,6 +66,7 @@ export type StructuredType =
 	| 'Organization'
 	| 'SoftwareApplication'
 	| 'TechArticle'
+	| 'BlogPosting'
 	| 'FAQPage'
 	| 'BreadcrumbList';
 
@@ -107,6 +111,19 @@ export const STRUCTURED_COVERAGE: readonly CoverageEntry[] = [
 		requires: ['TechArticle', 'FAQPage'],
 		reason:
 			'A dated, sourced assessment of another product is an article, and was the page type that shipped without one.'
+	},
+	{
+		prefix: '/blog/',
+		exact: true,
+		requires: [],
+		reason:
+			'An index listing the articles; the articles are the pages beneath it.'
+	},
+	{
+		prefix: '/blog/',
+		requires: ['BlogPosting'],
+		reason:
+			'A dated, attributed article about a subject — the page type this table exists to require.'
 	},
 	{
 		prefix: '/docs/',

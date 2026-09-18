@@ -119,6 +119,15 @@ function assertedStringsOf(block: Record<string, unknown>): string[] {
 		push(block.name);
 	} else if (type === 'TechArticle') {
 		push(block.headline);
+	} else if (type === 'BlogPosting') {
+		push(block.headline);
+		/*
+		 * The byline too, unlike TechArticle. An article asserts who wrote it, and a reader deciding
+		 * whether to trust it is entitled to see that claim on the page rather than only in the
+		 * markup — so the rendered byline is what makes this assertion legal.
+		 */
+		const author = block.author;
+		if (isRecord(author)) push(author.name);
 	} else if (type === 'FAQPage') {
 		const entities = Array.isArray(block.mainEntity) ? block.mainEntity : [];
 		for (const q of entities.filter(isRecord)) {

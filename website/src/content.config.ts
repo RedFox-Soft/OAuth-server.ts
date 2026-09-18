@@ -118,5 +118,50 @@ export const collections = {
 				)
 				.optional()
 		})
+	}),
+	/*
+	 * The blog. An author writes one file here and everything else follows: the page, the index
+	 * entry, the sitemap entry, the card, the Markdown alternate, the feed item and the structured
+	 * description are all derived, and no other file is edited to publish.
+	 *
+	 * The fields below are the whole authoring contract, so what is absent is as deliberate as what
+	 * is present. There is no `author` — attribution is fixed to the organisation, so a per-article
+	 * field would have one legal value. No `slug` — the filename is the slug, and a second source
+	 * for one value is a second thing to keep in step. No `coverImage` — no binary asset is
+	 * committed to this repository, and the social card is rendered after the build.
+	 */
+	blog: defineCollection({
+		loader: glob({ base: './src/content/blog', pattern: '**/*.mdx' }),
+		schema: z.object({
+			title: z.string().min(1),
+			description: z.string().min(1),
+			publishedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+			/*
+			 * An editorial claim to the reader, not a fact about the repository — the sitemap's
+			 * lastmod is the latter and comes from git. Kept separate on purpose: a typo fix moves
+			 * the git date and must not claim the article was revised.
+			 */
+			updatedAt: z
+				.string()
+				.regex(/^\d{4}-\d{2}-\d{2}$/)
+				.optional(),
+			draft: z.boolean().default(false),
+			/* Shown on the article and used to relate articles. No page is generated per tag. */
+			tags: z.array(z.string()).default([]),
+			/*
+			 * Set only by an article genuinely about running on one backend. It exempts the
+			 * article's prose from the rule that fails any marketing sentence naming one datastore
+			 * and not the others — and it pays for that exemption by being stated to the reader on
+			 * the page, rather than hidden in a list of excused routes. The permitted values come
+			 * from the server's own backend list, so retiring a backend fails every article scoped
+			 * to it instead of leaving the claim standing.
+			 */
+			storageScope: z
+				.string()
+				.refine((value) => backendLabels().includes(value), {
+					message: `storageScope must name a datastore that ships: ${backendLabels().join(', ')}`
+				})
+				.optional()
+		})
 	})
 };

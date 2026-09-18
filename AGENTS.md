@@ -383,6 +383,24 @@ Four rules keep it honest:
    `lastChecked`; past `FRESHNESS_LIMIT_DAYS` the build warns and the page shows a "due for review"
    notice, but the build still passes — staleness is the passage of time, not a mistake to block on.
 
+The **blog** (`website/src/content/blog/*.mdx`, rendered by `website/src/pages/blog/`) is the
+worked example of adding a page type, and the thing to copy when adding another. An author writes
+one file and nothing else: `website/src/data/blog.ts` exports `publishedPosts()`, which is the
+**only** path from the collection to any published surface — the index, the article route and
+`rss.xml` all call it, so "a draft appears nowhere" is provable by reading one function instead of
+three call sites. Everything else the blog gets, it gets by being **declared**, because
+`collectPages` walks `dist/` and knows nothing about where a page came from: a section in
+`SECTION_PREFIXES`/`SECTION_ORDER`, two entries in `STRUCTURED_COVERAGE` (the index is not an
+article, so it needs its own `exact` entry), and `BlogPosting` in the closed structured-data set —
+which lives in **four** files, `src/data/seo.ts`, `scripts/seo/types.ts`, `scripts/seo/verify.ts`
+(both the set and `REQUIRED_PROPS`) and `scripts/seo/collect.ts`. Miss one of the first three and
+the build says so; miss the `assertedStringsOf` branch in the fourth and nothing fails, the article
+simply asserts nothing and `structured-overclaim` can never fire for it. `claimSurface` in
+`verify.ts` now reaches `/blog/` too, and an article genuinely about one backend earns its
+exemption by declaring `storageScope` — read back from the article's own **rendered** scope line
+rather than a list of excused routes, so the excuse rots in public. The feed is the one blog
+surface outside the sweep entirely, since `collectPages` reads only `.html`.
+
 Hand-written docs live in `website/src/content/docs/docs/<section>/*.mdx` (Starlight autogenerates
 the sidebar per section; `sidebar.order` in frontmatter orders pages). The links validator fails the
 build on a broken internal link, but it cannot see links into `website/src/pages` — the Reference

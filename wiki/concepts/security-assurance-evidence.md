@@ -89,7 +89,7 @@ than the action, an artifact upload and a SARIF upload. The file says so in its 
 failure mode is silent: the run goes green and nothing is published.
 
 **No tests for any of this**, by the owner's standing decision of 2026-09-03 that the site has no
-test suite and `test/repo/*` does not come back: the site's verification is `astro check` plus the build's twenty-two SEO rules,
+test suite and `test/repo/*` does not come back: the site's verification is `astro check` plus the build's twenty-three SEO rules,
 which the two new pages pass (unique titles inside the 15–60 band, descriptions inside 70–160,
 reachable from `/docs/` and the Starlight sidebar, `TechArticle` from `StarlightHead.astro`).
 

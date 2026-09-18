@@ -53,7 +53,10 @@ function candidates(route: string): string[] {
 		`src/content/docs/${asPage}.mdx`,
 		`src/content/docs/${asPage}/index.mdx`,
 		`src/content/docs/${asPage}.md`,
-		// /compare/auth0/ is rendered by src/pages/compare/[slug].astro from this collection entry.
+		// /compare/auth0/ and /blog/<slug>/ are rendered by their [slug].astro from this collection
+		// entry — the route's first segment is also the collection directory, so one candidate
+		// covers both. Without it an article falls through to the template below and reports the
+		// template's commit date as its own.
 		`src/content/${asPage}.mdx`
 	];
 }

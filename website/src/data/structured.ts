@@ -89,6 +89,42 @@ export function techArticle({
 	};
 }
 
+export interface BlogPostingInput {
+	/** The article's own h1, verbatim — the verifier checks it appears in the rendered text. */
+	headline: string;
+	description: string;
+	canonical: string;
+	datePublished: string;
+	dateModified?: string;
+}
+
+/*
+ * A blog article. Distinct from techArticle() rather than a reuse of it, because the coverage table
+ * has to be able to tell a comparison page from an article, which is the whole job of that table.
+ *
+ * There is no author parameter: articles are published by the organisation, so an author argument
+ * would have one legal value and an opportunity to pass a different one.
+ */
+export function blogPosting({
+	headline,
+	description,
+	canonical,
+	datePublished,
+	dateModified
+}: BlogPostingInput): JsonLd {
+	return {
+		'@context': 'https://schema.org',
+		'@type': 'BlogPosting',
+		headline,
+		description,
+		url: canonical,
+		author: { '@type': 'Organization', name: 'FoxAuth' },
+		publisher: { '@type': 'Organization', name: 'FoxAuth' },
+		datePublished,
+		...(dateModified ? { dateModified } : {})
+	};
+}
+
 export interface FaqItem {
 	question: string;
 	answer: string;
@@ -135,7 +171,8 @@ const SEGMENT_NAMES: Record<string, string> = {
 	'get-started': 'Get started',
 	deploy: 'Deploy',
 	reference: 'Reference',
-	compare: 'Compare'
+	compare: 'Compare',
+	blog: 'Blog'
 };
 
 export function crumbsFor(route: string, leafName: string): Crumb[] {

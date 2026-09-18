@@ -76,6 +76,7 @@ export default defineConfig({
 						'/features/',
 						'/pricing/',
 						'/compare/**',
+						'/blog/**',
 						'/contact/'
 					]
 				}),

@@ -1,0 +1,106 @@
+---
+import { render } from 'astro:content';
+import type { GetStaticPaths } from 'astro';
+import Site from '../../layouts/Site.astro';
+import Section from '../../components/ui/Section.astro';
+import Eyebrow from '../../components/ui/Eyebrow.astro';
+import Button from '../../components/ui/Button.astro';
+import { SITE_ORIGIN } from '../../data/seo.ts';
+import { blogPosting } from '../../data/structured.ts';
+import { publishedPosts, effectiveDate, type BlogPost } from '../../data/blog.ts';
+import { ageInDays, isStale } from '../../../scripts/seo/freshness.ts';
+
+/*
+ * Paths come from publishedPosts() rather than getCollection('blog'), which is what makes a draft
+ * have no page at all rather than an unlisted one.
+ */
+export const getStaticPaths: GetStaticPaths = async () => {
+	const posts = await publishedPosts();
+	return posts.map((post) => ({ params: { slug: post.id }, props: { post } }));
+};
+
+interface Props {
+	post: BlogPost;
+}
+const { post } = Astro.props as Props;
+const { Content } = await render(post);
+const { title, description, publishedAt, updatedAt } = post.data;
+
+/*
+ * `headline` is the visible h1 verbatim, because the guardrail checks every claimed string against
+ * the rendered text. Paraphrasing it here would fail the build, which is the intended outcome.
+ */
+const jsonLd = blogPosting({
+	headline: title,
+	description,
+	canonical: new URL(`/blog/${post.id}/`, SITE_ORIGIN).href,
+	datePublished: publishedAt,
+	dateModified: updatedAt
+});
+
+/*
+ * Past the freshness limit the article tells the reader so, in place of nothing. It never fails the
+ * build: an article going out of date is the passage of time rather than a mistake somebody made,
+ * and a build that breaks because nobody reread a two-year-old post blocks work that has nothing to
+ * do with it. The notice on the page is the signal with teeth — the same reasoning the comparison
+ * pages already run on.
+ */
+const dated = effectiveDate(post);
+const stale = isStale(dated);
+const staleDays = ageInDays(dated);
+---
+
+<Site
+	title={`${title} — FoxAuth`}
+	description={description}
+	jsonLd={jsonLd}
+	breadcrumbLeaf={title}
+>
+	<Section narrow>
+		<Eyebrow>Blog</Eyebrow>
+		<h1 class="text-4xl font-[650] leading-[1.15] tracking-tight text-balance">{title}</h1>
+		<p class="mt-5 text-lg text-gray-600 dark:text-gray-400">{description}</p>
+		<p class="mt-5 text-sm text-gray-500 dark:text-gray-400">
+			By <span class="font-medium text-gray-700 dark:text-gray-300">FoxAuth</span>{' · '}
+			<time datetime={publishedAt}>{publishedAt}</time>
+			{
+				updatedAt && updatedAt !== publishedAt && (
+					<Fragment>
+						{' · updated '}
+						<time datetime={updatedAt}>{updatedAt}</time>
+					</Fragment>
+				)
+			}
+		</p>
+		{
+			post.data.storageScope && (
+				<p class="mt-4 rounded-card border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400">
+					This article covers the {post.data.storageScope} backend specifically. The server runs
+					on more than one, and the others behave differently in places.
+				</p>
+			)
+		}
+		{
+			stale && (
+				<p class="mt-4 rounded-card border border-accent-300 bg-accent-50 p-4 text-sm text-gray-700 dark:border-accent-700 dark:bg-accent-950 dark:text-gray-200">
+					<strong>Worth a second look.</strong> This was last revised {staleDays} days ago, and
+					the server has moved since. The behaviour described may no longer be current — the
+					documentation is.
+				</p>
+			)
+		}
+	</Section>
+
+	<Section narrow tone="muted">
+		<div class="prose max-w-none dark:prose-invert">
+			<Content />
+		</div>
+	</Section>
+
+	<Section narrow>
+		<div class="flex flex-wrap gap-3">
+			<Button href="/blog/" variant="secondary">All articles</Button>
+			<Button href="/docs/get-started/docker-compose/">Try it yourself</Button>
+		</div>
+	</Section>
+</Site>

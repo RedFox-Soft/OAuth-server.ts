@@ -96,6 +96,20 @@ const plausible = import.meta.env.PUBLIC_PLAUSIBLE_DOMAIN;
 	href="/sitemap-index.xml"
 />
 {
+	/*
+	 * Only on the blog: autodiscovery on a page with no feed behind it points a reader's tooling at
+	 * something that has nothing to do with what they are reading.
+	 */
+	route.startsWith('/blog/') && (
+		<link
+			rel="alternate"
+			type="application/rss+xml"
+			title="FoxAuth blog"
+			href="/blog/rss.xml"
+		/>
+	)
+}
+{
 	!hidden && (
 		<link
 			rel="alternate"

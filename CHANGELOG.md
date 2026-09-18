@@ -11,6 +11,17 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- site: the public site has a blog, and publishing to it is writing one file. The page, the index entry,
+  the sitemap entry with its date, the social card, the plain-text alternate, the `llms.txt` entry and
+  the feed item are all derived from that file, so nothing is remembered and nothing is half-applied.
+  The blog is not exempt from anything: every rule that already fails the build for a marketing page
+  fails it for an article, and the rule that catches copy claiming the server stores its data in one
+  datastore now reaches articles too — an article genuinely about one backend earns its exemption by
+  printing a line telling the reader it is scoped, rather than by being added to a list of excused
+  pages. A draft or a future-dated article exists nowhere: no page, no sitemap entry, no feed item, no
+  card. Articles are attributed to the project, carry their publication and revision dates where a
+  reader can see them, and say so themselves once they are old enough to deserve a second look.
+
 - admin: Microsoft, Apple and GitHub can be connected to a user bucket by name, alongside Google. Each
   asks only for what it actually issues — two values for GitHub, three for Microsoft (including who may
   sign in: one organisation or any Microsoft account, stated with its consequence and not chosen for

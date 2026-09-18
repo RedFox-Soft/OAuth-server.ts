@@ -25,6 +25,7 @@ const STRUCTURED_TYPES = new Set([
 	'Organization',
 	'SoftwareApplication',
 	'TechArticle',
+	'BlogPosting',
 	'FAQPage',
 	'BreadcrumbList'
 ]);
@@ -39,6 +40,11 @@ const REQUIRED_PROPS: Record<string, string[]> = {
 		'url'
 	],
 	TechArticle: ['headline', 'description', 'author'],
+	/*
+	 * datePublished is required where TechArticle does not require a date, because an undated
+	 * article is the thing a reader cannot judge and a search engine discounts.
+	 */
+	BlogPosting: ['headline', 'description', 'author', 'datePublished'],
 	FAQPage: ['mainEntity'],
 	BreadcrumbList: ['itemListElement']
 };
@@ -325,11 +331,26 @@ export function verify(input: VerifyInput): VerifyOutput {
 	 * survive a third one untouched. That limit is why the copy which *can* be computed is computed,
 	 * in src/data/storage.ts, rather than written and watched.
 	 */
-	const claimSurface = (route: string): boolean =>
-		route === '/' || route.startsWith('/features/');
+	/*
+	 * The blog is on this list for the reason the blog exists: it is written to be found and to
+	 * persuade, which is exactly the surface the drift above happened on. Leaving it off would
+	 * reopen the hole on the pages a prospect is most likely to read.
+	 *
+	 * An article genuinely about one backend is exempted, and the exemption is read from the page's
+	 * own visible text rather than from a list kept here. That is the difference between this and
+	 * the allowlist the comment above warns about: an article earns the exemption by telling the
+	 * reader it is scoped, so it cannot be excused silently, and the excuse rots in public where
+	 * somebody will see it. The sentence comes from `storageScope` in the article's front matter,
+	 * which the content schema validates against the backends that actually ship.
+	 */
+	const SCOPE_NOTICE = /This article covers the .+? backend specifically/;
+	const claimSurface = (page: PageRecord): boolean =>
+		page.route === '/' ||
+		page.route.startsWith('/features/') ||
+		(page.route.startsWith('/blog/') && !SCOPE_NOTICE.test(page.text));
 
 	if (input.storageBackends.length > 1) {
-		for (const page of indexable.filter((p) => claimSurface(p.route))) {
+		for (const page of indexable.filter(claimSurface)) {
 			for (const sentence of page.text.split(/(?<=[.!?;])\s+/)) {
 				const named = input.storageBackends.filter((backend) =>
 					sentence.includes(backend)

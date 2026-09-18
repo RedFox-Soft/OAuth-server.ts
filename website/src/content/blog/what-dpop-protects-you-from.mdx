@@ -1,0 +1,72 @@
+---
+title: What DPoP actually protects you from
+description: A bearer token works for whoever holds it, including whoever stole it. DPoP binds it to a key the client keeps — here is what that buys, and what it does not.
+publishedAt: '2026-09-18'
+tags: [dpop, tokens, security]
+---
+
+A bearer token is a password with an expiry date. Whoever presents it gets the access it
+represents, and the server has no way to ask whether the presenter is the party it was issued to.
+That is not a flaw in anyone's implementation — it is what "bearer" means, stated plainly in
+RFC 6750, and every deployment that uses bearer tokens has accepted it whether or not anyone wrote
+it down.
+
+DPoP (RFC 9449) changes the question the server can ask. Instead of "is this token valid?", it can
+ask "is this token valid, _and_ does the caller hold the key it was bound to?".
+
+## What the client actually does
+
+The client generates a key pair and keeps the private key. On every request it sends a short signed
+JWT — the proof — alongside the access token. The proof covers the HTTP method, the URL, a
+timestamp and a unique identifier, and it is signed with that private key. The access token carries
+a thumbprint of the matching public key.
+
+The server checks three things together: the token is valid, the proof is signed by the key the
+token names, and the proof describes this request rather than a different one.
+
+A stolen access token now buys an attacker nothing on its own. They have the token, but not the key,
+so they cannot produce a proof the server will accept.
+
+## The part worth being precise about
+
+DPoP defends against a token that leaks _after_ it is issued — from a log file, a proxy, a browser
+extension, an error report, a misconfigured cache. That is the realistic threat and it is a common
+one.
+
+It does not defend against an attacker who is executing code in the client. If they can sign with
+the key, they can sign whatever they like, and binding the token to that key protects nothing. This
+is the distinction that gets lost when DPoP is described as "stopping token theft": it stops the
+_replay_ of a stolen token elsewhere, not the compromise of the place the key lives.
+
+Nor does it replace short lifetimes, audience restriction or refresh-token rotation. It composes
+with them. A DPoP-bound token with a four-hour lifetime and no audience restriction is still a
+four-hour, unrestricted token in the hands of anyone who compromises the client.
+
+## What it costs
+
+Three things, in our experience:
+
+**The client gets harder.** It needs a key, somewhere to keep it, and a proof on every request.
+In a browser that means a non-extractable `CryptoKey` in IndexedDB, which is not difficult but is
+not nothing.
+
+**Clock skew becomes your problem.** Proofs carry a timestamp and servers reject old ones. A client
+whose clock is wrong fails in a way that looks like an authorization bug and is not.
+
+**Nonces, if you want replay protection at the server.** The proof's unique identifier only helps if
+somebody remembers which identifiers have been seen, which means storage and an expiry policy.
+
+## Where we landed
+
+DPoP is worth it when tokens travel through infrastructure you do not fully control, or when the
+blast radius of one leaked token is large enough to justify the client complexity. For a first-party
+application talking to its own API over TLS with short-lived tokens, it is often the wrong thing to
+spend your complexity budget on — audience-restricted tokens and a shorter lifetime buy more for
+less.
+
+That is a judgement, not a rule, and it is the judgement we made. Yours will depend on what your
+tokens can reach.
+
+If you want to try it, DPoP is supported and switched on per client; the
+[settings reference](/docs/reference/settings/) covers the options, and the
+[endpoint reference](/docs/reference/endpoints/) shows which endpoints accept a proof.

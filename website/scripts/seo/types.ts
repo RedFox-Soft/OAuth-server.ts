@@ -25,6 +25,7 @@ export type StructuredType =
 	| 'Organization'
 	| 'SoftwareApplication'
 	| 'TechArticle'
+	| 'BlogPosting'
 	| 'FAQPage'
 	| 'BreadcrumbList';
 
