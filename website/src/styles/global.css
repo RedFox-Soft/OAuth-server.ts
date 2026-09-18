@@ -143,3 +143,33 @@
 	--sl-font: var(--font-sans);
 	--sl-font-mono: var(--font-mono);
 }
+
+/*
+ * The three colours an inline diagram may use. A blog article draws its diagrams as inline SVG and
+ * names these with a literal fallback (`fill="var(--diagram-fg, #1a1a1a)"`), so a diagram lifted out
+ * of the site still renders; here they follow the palette and flip with the theme by the same two
+ * routes the `dark` variant above uses — the stamped attribute, or the system preference when nothing
+ * is stamped and the reader has not chosen light.
+ */
+:root {
+	--diagram-fg: var(--color-gray-900);
+	--diagram-line: var(--color-gray-500);
+	--diagram-accent: var(--color-accent-700);
+}
+[data-theme='dark'] {
+	--diagram-fg: var(--color-gray-100);
+	--diagram-line: var(--color-gray-400);
+	--diagram-accent: var(--color-accent-300);
+}
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme='light']) {
+		--diagram-fg: var(--color-gray-100);
+		--diagram-line: var(--color-gray-400);
+		--diagram-accent: var(--color-accent-300);
+	}
+}
+.prose svg[role='img'] {
+	margin-block: 2rem;
+	width: 100%;
+	height: auto;
+}

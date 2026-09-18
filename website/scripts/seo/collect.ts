@@ -251,7 +251,10 @@ async function parsePage(file: string): Promise<Draft> {
 				if (jsonLdOpen) draft.jsonLd[draft.jsonLd.length - 1] += t.text;
 			}
 		})
-		.on('main script, main style, main noscript', {
+		// An inline diagram's labels are a picture's, not the page's: extracted, they arrive as bare
+		// `<text>` chunks with no block boundaries and run together into one line of the Markdown
+		// alternate — and a label naming a datastore would be judged as a sentence of prose.
+		.on('main script, main style, main noscript, main svg', {
 			element(el) {
 				suppressText += 1;
 				el.onEndTag(() => {

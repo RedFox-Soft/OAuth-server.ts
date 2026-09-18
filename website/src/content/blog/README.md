@@ -36,6 +36,22 @@ You never write an author (articles are published by FoxAuth), a slug (the filen
 cover image (no binaries live in this repository; the card is generated), or any of the tags,
 canonical URLs and structured data the site derives.
 
+## Diagrams
+
+A diagram is inline SVG in the article body, not an image file: nothing binary is committed here,
+and an SVG scales with the column and follows the theme. Give the root `viewBox="0 0 800 N"`,
+`width="100%"`, `role="img"` and a `<title>` that says what the picture shows, and take colours
+from the three tokens the stylesheet defines, each with a literal fallback so the SVG still renders
+lifted out of the site: `fill="var(--diagram-fg, #1a1a1a)"`, `stroke="var(--diagram-line, #555)"`
+and `var(--diagram-accent, #d9480f)` for the one thing the reader should look at first. Give the
+`<marker>` elements ids unique across the whole article, since every diagram shares one page.
+
+Two things the tooling does with a diagram are worth knowing. Its labels are excluded from the
+page's extracted text, so they never reach the Markdown alternate or the prose rules; the `<title>`
+is the diagram's whole voice to a reader who cannot see it. And a URL inside a `<text>` element
+is autolinked like any other URL in the body, so write `/userinfo on this host` rather than
+`https://…/userinfo`.
+
 ## Checking your work
 
 ```sh

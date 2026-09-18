@@ -11,6 +11,10 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- site: a blog article can carry inline SVG diagrams. Three colour tokens in the stylesheet make a
+  diagram follow the site palette and the reader's theme, and a diagram's labels are left out of the
+  page's extracted text, so they neither run together in the Markdown alternate nor get judged as
+  prose by the rules that read it. The first article, on DPoP, is rewritten around three of them.
 - site: the public site has a blog, and publishing to it is writing one file. The page, the index entry,
   the sitemap entry with its date, the social card, the plain-text alternate, the `llms.txt` entry and
   the feed item are all derived from that file, so nothing is remembered and nothing is half-applied.
