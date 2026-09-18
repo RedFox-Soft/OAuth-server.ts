@@ -59,6 +59,15 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- test: the constant-time comparison cases now judge a timing difference by its size rather than by its
+  statistical significance. Welch's t divides by the machine's noise floor, so the 0.1–0.4% residue a
+  correct comparison always leaves — where the strings landed, not what the comparison did, as two
+  candidates with identical content produce the same spread — scores about three times higher on a
+  Linux runner than on the Windows machine whose 100 ns clock the threshold was calibrated against.
+  That reddened CI on an unmodified tree, and it meant load made the cases pass while a quiet, precise
+  machine failed them. A leak is instead a fraction of the work, and that fraction transfers between
+  platforms: 52% on Linux and 59.5% on Windows for a first-difference mutant, against a floor of 2%.
+
 - federation: the authorization code is now bound to the request that asked for it at every recognised
   upstream that supports the binding. Support was read from what a provider publishes, and three of the
   four publish nothing — Microsoft recommends the binding while advertising no method, GitHub has

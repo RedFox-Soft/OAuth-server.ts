@@ -2,7 +2,7 @@
  * Measuring whether a comparison leaks the position of the first difference.
  *
  * One module rather than a copy in each spec, because the part that is easy to get wrong is invisible
- * when wrong. Two disciplines are load-bearing and both were arrived at by measurement, not by
+ * when wrong. Four disciplines are load-bearing and all four were arrived at by measurement, not by
  * reading:
  *
  * 1. Each sample is assigned to a class at RANDOM. Collected in blocks — all of one class, then all
@@ -23,17 +23,55 @@
  *    comparisons lifts the measured interval clear of the timer's resolution, and across 280 rounds
  *    afterwards there was not one zero-variance round.
  *
+ * 4. The verdict is gated on how BIG the difference is, and only secondarily on how significant it
+ *    is. The next block is why; it cost a red CI run to learn and is the easiest of the four to undo
+ *    by accident.
+ *
  * The technique is dudect's (Reparaz, Balasch, Verbauwhede, 2016) — two input classes, percentile
- * cropping, Welch's t. What is borrowed is the discipline, not the tooling.
+ * cropping, Welch's t. What is borrowed is the discipline, not the tooling; the effect-size gate is
+ * this file's own, for the reason below.
+ */
+
+/*
+ * Why effect size, and not Welch's t alone.
+ *
+ * At the settings below |t| is very nearly `15.8 * delta / sd`, and BOTH of those move for reasons
+ * that have nothing to do with the code under test.
+ *
+ * The numerator is not zero for a correct comparison. Two classes differ by 0.1-0.4% of the work even
+ * when a leak is impossible: feed the harness two candidates with IDENTICAL CONTENT and it reports
+ * the same spread of |t| as it does for the real pair — median 1.20 against 1.06 over twenty freshly
+ * allocated pairs. That residue is where the strings happened to land, not what the comparison did
+ * with them.
+ *
+ * The denominator is set by the machine. `Bun.nanoseconds()` is quantised at 100 ns on the Windows
+ * development machine, so its sd of ~45 ns is mostly the clock ticking rather than the code varying —
+ * a uniform 100 ns quantum contributes 100/sqrt(12) = 29 ns by itself. On Linux the same call
+ * resolves to ~57 ns and sd falls to 15-35 ns. So the identical, meaningless 0.2% residue scores
+ * about three times higher on the runner than on the machine a t threshold was calibrated on.
+ *
+ * Which is exactly what happened. CI run #143 failed `constant_equals` on an unmodified tree with
+ * rounds 1.7, 2.4, 2.3, 52.3, 52.9, 53.2, 53.3 — a constant numerator, and a denominator that dropped
+ * partway through. Note what that implies, because it inverts the advice this file used to give:
+ * LOAD MAKES THIS TEST PASS. Twenty-four spinning processes on a twenty-core machine drag the median
+ * |t| down to 0.5-0.9, because contention inflates sd. A quiet, precise machine is where a
+ * significance threshold fails, not where it succeeds.
+ *
+ * An effect size does not have that defect. A leak is a fraction of the work, and that fraction is a
+ * property of the algorithm: the first-difference mutant costs 52.0% of a comparison on Linux and
+ * 59.5% on Windows. The residue is 0.1-0.4% on both. So the gate is a percentage, and it means the
+ * same thing on every machine this runs on.
  */
 
 export interface TimingVerdict {
-	/* The two classes are distinguishable by time — the comparison leaks. */
+	/* The two classes are distinguishable by time, by enough to matter — the comparison leaks. */
 	readonly separable: boolean;
 	/* False when the measurement cannot support a conclusion either way. Never treat as a pass. */
 	readonly decided: boolean;
 	/* Median across rounds. */
 	readonly t: number;
+	/* Median across rounds of |early - late| as a fraction of one comparison's work. */
+	readonly effect: number;
 	readonly rounds: readonly number[];
 	readonly samples: number;
 	readonly reason?: string;
@@ -46,26 +84,34 @@ export interface TimingOptions {
 	readonly warmup?: number;
 	readonly crop?: number;
 	readonly threshold?: number;
+	readonly minimumEffect?: number;
 }
 
 /*
- * Calibration on the development machine (Windows, Bun 1.4.0) at the settings below, ten trials per
- * row, each the median of seven batched rounds:
+ * Calibration, ten trials per row, each the median of seven batched rounds, taken on both a Windows
+ * development machine and a Linux container on the same hardware — two platforms, because the whole
+ * point of an effect-size gate is that it transfers between them and a single-platform calibration
+ * could not show that.
  *
  *                                        correct    first-difference mutant
- *   constantEquals (minComp 0)           ≤ 2.29     ≥ 118.08
- *   compareClientSecret (minComp 1000)   ≤ 1.88     ≥ 371.75
+ *   constantEquals (minComp 0)           ≤ 0.20%    51.9% Linux / 59.5% Windows
+ *   compareClientSecret (minComp 1000)   ≤ 0.45%    13.7% Linux / 25.5% Windows
  *
- * And the number that matters more than either column: 100 consecutive runs of `test/timing/` on an
- * unmodified tree, zero failures. Two earlier configurations failed 5 and 4 of the same 100, which is
- * why the count is recorded — 20 runs would have passed both of them.
+ * `minimumEffect` sits at 2%: about three times the worst round a correct comparison produced (0.82%)
+ * and about three times below the weakest round a leaking one produced (6.45% — the minComp 1000
+ * mutant on Linux, where a thousand bytes of buffer allocation dilute the leak most). Deliberately in
+ * the middle of those two in log scale rather than hard against either, because the failure modes are
+ * not symmetric: too low is a suite that cries wolf until somebody deletes the case, which is the
+ * defect this replaces, and too high is an invariant that stopped being checked.
  *
- * A threshold of 10 sits ~4x above the worst correct observation and an order of magnitude below the
- * weakest leaking one — deliberately in the middle rather than hard against either, because the failure modes at the
- * two ends are not symmetric: too low is a suite that cries wolf until somebody deletes the case, too
- * high is an invariant that stopped being checked. The number lives here, in one place, so a runner
- * that needs a different one is a single edit with a recorded reason rather than a hunt through two
- * spec files.
+ * What the floor costs, stated plainly: a position leak worth less than 2% of a comparison is not
+ * detected here. It was not detected before either — it sat below the residue — the difference is
+ * that the limit is now written down instead of being whatever the calibration machine's clock
+ * happened to imply.
+ *
+ * `threshold` stays at 10 as the SECOND half of the leak verdict. Alone it is machine-dependent, per
+ * the block above; alongside the effect floor it does a different job — refusing to call a large
+ * difference a leak when the measurement was too noisy to establish it at all.
  *
  * Cropping keeps the FASTEST half. A descheduled sample carries no information about the comparison,
  * while the fast tail is where a leak shows; this is not symmetric trimming and must not be tidied
@@ -77,7 +123,8 @@ const DEFAULTS = {
 	batch: 16,
 	warmup: 20_000,
 	crop: 0.5,
-	threshold: 10
+	threshold: 10,
+	minimumEffect: 0.02
 } as const;
 
 /*
@@ -116,6 +163,21 @@ function welch(a: readonly number[], b: readonly number[]): number {
 	);
 }
 
+/*
+ * The difference between the classes as a fraction of the work one comparison does. Measured against
+ * the FASTER class, so the denominator is a comparison rather than a comparison plus whatever extra
+ * the slower class is doing.
+ */
+function effectShare(a: readonly number[], b: readonly number[]): number {
+	const meanA = mean(a);
+	const meanB = mean(b);
+	return Math.abs(meanA - meanB) / Math.min(meanA, meanB);
+}
+
+function percent(fraction: number): string {
+	return `${(fraction * 100).toFixed(2)}%`;
+}
+
 /**
  * Measures whether `compare` takes distinguishable time for the two candidate classes.
  *
@@ -127,7 +189,7 @@ export function measureSeparability(
 	classes: { readonly early: string; readonly late: string },
 	options: TimingOptions = {}
 ): TimingVerdict {
-	const { rounds, perRound, batch, warmup, crop, threshold } = {
+	const { rounds, perRound, batch, warmup, crop, threshold, minimumEffect } = {
 		...DEFAULTS,
 		...options
 	};
@@ -138,6 +200,7 @@ export function measureSeparability(
 	}
 
 	const scores: number[] = [];
+	const shares: number[] = [];
 	let retained = Number.POSITIVE_INFINITY;
 
 	for (let round = 0; round < rounds; round++) {
@@ -155,6 +218,7 @@ export function measureSeparability(
 		const b = cropped(late, crop);
 		retained = Math.min(retained, a.length, b.length);
 		scores.push(Math.abs(welch(a, b)));
+		shares.push(effectShare(a, b));
 	}
 
 	if (retained < MINIMUM_SAMPLES) {
@@ -162,6 +226,7 @@ export function measureSeparability(
 			separable: false,
 			decided: false,
 			t: Number.NaN,
+			effect: Number.NaN,
 			rounds: scores,
 			samples: retained,
 			reason: `only ${retained} samples retained per class per round, below the ${MINIMUM_SAMPLES} needed for a variance estimate`
@@ -173,6 +238,7 @@ export function measureSeparability(
 			separable: false,
 			decided: false,
 			t: Number.NaN,
+			effect: Number.NaN,
 			rounds: scores,
 			samples: retained,
 			reason: 'the timer produced no usable variation between samples'
@@ -180,35 +246,61 @@ export function measureSeparability(
 	}
 
 	const t = median(scores);
+	const effect = median(shares);
+
+	/*
+	 * The primary gate, and the one that means the same thing everywhere. Below the floor there is
+	 * nothing an attacker could use even if the difference is real and perfectly significant — and at
+	 * that size it is usually neither, being the allocation residue the block at the top describes.
+	 */
+	if (effect < minimumEffect) {
+		return {
+			separable: false,
+			decided: true,
+			t,
+			effect,
+			rounds: scores,
+			samples: retained
+		};
+	}
 
 	if (t <= threshold) {
 		return {
 			separable: false,
 			decided: true,
 			t,
+			effect,
 			rounds: scores,
 			samples: retained
 		};
 	}
 
 	/*
-	 * Past the threshold, consistency is what separates a leak from a loaded machine. A real leak is
-	 * present in every round — the mutant's worst round still scores tens — while noise large enough
-	 * to move the median shows up in some rounds and not others. When the rounds disagree, say so
-	 * instead of naming a culprit; the case fails either way, so nothing is weakened by admitting
-	 * which of the two it was.
+	 * A difference big enough to matter and significant on the median round, but not on every round.
+	 * Consistency is what separates a leak from a machine that moved: a real leak is present in every
+	 * round — the mutant's worst round still scores tens — while an excursion large enough to move the
+	 * median shows up in some rounds and not others. When the rounds disagree, say so instead of
+	 * naming a culprit; the case fails either way, so nothing is weakened by admitting which it was.
 	 */
 	const everyRoundAgrees = Math.min(...scores) > threshold;
 
 	return everyRoundAgrees
-		? { separable: true, decided: true, t, rounds: scores, samples: retained }
+		? {
+				separable: true,
+				decided: true,
+				t,
+				effect,
+				rounds: scores,
+				samples: retained
+			}
 		: {
 				separable: false,
 				decided: false,
 				t,
+				effect,
 				rounds: scores,
 				samples: retained,
-				reason: `rounds disagree — ${scores.map((s) => s.toFixed(1)).join(', ')} against a threshold of ${threshold}, so a leak cannot be told from load here`
+				reason: `a difference of ${percent(effect)} per comparison was measured, over the ${percent(minimumEffect)} that would matter, but the rounds disagree on whether it is significant — ${scores.map((s) => s.toFixed(1)).join(', ')} against a threshold of ${threshold}`
 			};
 }
 
@@ -224,13 +316,16 @@ export function expectIndistinguishable(
 	if (!verdict.decided) {
 		throw new Error(
 			`undecided: ${subject} could not be measured here — ${verdict.reason}. ` +
-				'This is not a pass. Re-run on a quieter machine, or raise the round count.'
+				'This is not a pass. Raise the round count and re-run; note that loading the machine ' +
+				'suppresses this measurement rather than disturbing it, so an idle machine is the ' +
+				'honest place to repeat it.'
 		);
 	}
 	if (verdict.separable) {
 		throw new Error(
 			`${subject} takes distinguishable time for a candidate differing at the first position ` +
-				`and one differing at the last: median |t| = ${verdict.t.toFixed(2)} across rounds ` +
+				`and one differing at the last: ${percent(verdict.effect)} of a comparison, median ` +
+				`|t| = ${verdict.t.toFixed(2)} across rounds ` +
 				`${verdict.rounds.map((s) => s.toFixed(1)).join(', ')}, over ${verdict.samples} samples ` +
 				'per class per round. A wrong guess can be told from a right one by how long the answer takes.'
 		);

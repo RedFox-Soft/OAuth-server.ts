@@ -20,3 +20,7 @@ website/dist
 website/.astro
 website/generated
 website/bun.lock
+
+# Blog articles carry hand-laid-out inline SVG diagrams. Prettier reflows them to one attribute
+# per line, which makes the drawing unreadable in the only place it is authored.
+website/src/content/blog
