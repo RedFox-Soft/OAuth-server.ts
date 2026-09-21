@@ -39,7 +39,7 @@ jobs:
         # Skipped rather than failed when there is no token to upload with, so a dependency bump is
         # judged on its tests. Coverage is still recorded on every push to main, where the secret is.
         if: env.CODECOV_TOKEN != ''
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ env.CODECOV_TOKEN }}
           slug: RedFox-Soft/OAuth-server.ts
