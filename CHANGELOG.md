@@ -9,6 +9,32 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-21
+
+A user bucket finishes becoming a tenant. 0.4.0 gave it a path beneath the server; this release lets
+it hold a hostname of its own instead — `acme.auth.example.com` rather than `auth.example.com/acme` —
+which is what puts its sign-in cookie on an origin of its own and publishes one metadata location
+where a path-bearing issuer forces two. A bucket holds one form of address or the other, never both,
+since two addresses would be two issuer identifiers for one population. Changing an address is its
+own operation and an administrator of the instance's alone: it names every client that will stop
+validating tokens before anything changes, and completes only on a second call.
+
+Signing in to a bucket stops being only a password. Google, Microsoft, Apple and GitHub can each be
+connected to a bucket by name, asking only for what that provider actually issues, and the console
+now shows the callback address to register — which differs per bucket and appeared nowhere before.
+Projects and user buckets can also be deleted from the console, which the management API has always
+accepted and nothing in the console reached; a container may take its contents with it, on an
+election made separately from confirming, and neither deletion completes by clicking.
+
+**Upgrading signs your administrators in once.** The session cookie is now named after the bucket the
+client signs into rather than the address the request arrived at, because the administrators' bucket
+and the default one are both served at the root and only the client says which population a sign-in
+is for. That is what fixes a console login failing with `interaction session and authentication
+session mismatch` whenever the browser already held an end-user sign-in from the same server; the
+price is that a console session held from before this release is not read, and the administrator
+signs in again. End users are unaffected, no schema migration is declared, and nothing is lost —
+accounts, grants, consent and refresh tokens are untouched.
+
 ### Added
 
 - A user bucket can be addressed by a hostname of its own rather than a path beneath the server, and
@@ -69,7 +95,7 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 ### Fixed
 
 - admin: signing in to the console no longer fails with `interaction session and authentication session
-  mismatch` when the browser already holds an end-user sign-in from the same server, and no longer asks
+mismatch` when the browser already holds an end-user sign-in from the same server, and no longer asks
   for the password on every authorization request. The default bucket and the administrators' bucket are
   both served at the root, so the address alone cannot say which population a sign-in is for — only the
   client can, which is how the rest of the sign-in has always decided it. Naming the session cookie from
@@ -980,7 +1006,8 @@ found`. The refusal text existed and never ran: the call that delivered it sat i
 - The DPoP nonce secret is self-provisioned at startup, making the requireNonce-without-secret 500
   state unrepresentable (spec 014)
 
-[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.1.0...v0.2.0

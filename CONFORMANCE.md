@@ -9,13 +9,14 @@ run needs — because most of the cost of a conformance run is not the run.
 
 ## Where it stands
 
-**The measurement predates 0.4.0 and has not been repeated against it.** That release made a user
-bucket addressable in the URL and its own issuer, which is the subject these plans probe most
-directly: the issuer identifier, the two well-known locations a path-bearing issuer has, and the `iss`
-in an authorization response. The numbers below were taken against the default bucket, whose issuer
-and endpoints 0.4.0 deliberately leaves unchanged, so they still describe what a client integrated
-before that release meets. They say nothing about a _named_ bucket's metadata, which no run has
-covered. A run for both profiles is the open item.
+**The measurement predates 0.4.0 and has not been repeated against it or against 0.5.0.** Those two
+releases made a user bucket addressable — in the URL, then at a hostname of its own — and its own
+issuer, which is the subject these plans probe most directly: the issuer identifier, the well-known
+locations an issuer carrying a path has, and the `iss` in an authorization response. The numbers below
+were taken against the default bucket, whose issuer and endpoints both releases deliberately leave
+unchanged, so they still describe what a client integrated before them meets. They say nothing about a
+_named_ bucket's metadata, at either kind of address, which no run has covered. A run for both
+profiles is the open item.
 
 Measured 2026-09-14, across two instance profiles (below). Twelve plans: nine testing this server as
 an **OpenID Provider**, three testing it as a **Relying Party** — because `lib/federation/` makes it
