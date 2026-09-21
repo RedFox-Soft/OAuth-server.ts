@@ -28,14 +28,19 @@ import { UnauthorizedClient } from '../../helpers/errors.js';
  *
  * Runs after the resource is final, because rule 3 derives a bucket from a declared resource and a
  * resource arriving inside a pushed request or a request object is not settled until then.
+ *
+ * The bucket it resolved is handed back rather than discarded, and that is not scope creep: the caller
+ * needs the same answer to name the session cookie, and resolving it twice is two chances to disagree
+ * about one population — the failure the login POST already records against itself one file over.
+ * Returning it keeps this a refusal that happens to say what it compared against.
  */
-export default async function checkBucket(oidc) {
+export default async function checkBucket(oidc): Promise<string> {
 	const belongsTo = await resolveBucketForRequest(
 		oidc.client.clientId,
 		oidc.params.resource
 	);
 
-	if (belongsTo === oidc.bucket._id) return;
+	if (belongsTo === oidc.bucket._id) return belongsTo;
 
 	/*
 	 * The default bucket is addressable by definition: its address is the root, which exists whether or
@@ -51,7 +56,7 @@ export default async function checkBucket(oidc) {
 		 * whether or not that record has been provisioned — so an answer is not evidence of a record.
 		 */
 		const bucket = await getBucketStore().find(belongsTo);
-		if (!bucket || !isAddressable(bucket)) return;
+		if (!bucket || !isAddressable(bucket)) return belongsTo;
 	}
 
 	/*

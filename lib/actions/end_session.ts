@@ -19,7 +19,11 @@ import {
 	sessionCookieName
 } from 'lib/consts/param_list.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
-import { requestBucketFor } from 'lib/admin/auth/bucketAddress.js';
+import {
+	issuingBucket,
+	requestBucketFor
+} from 'lib/admin/auth/bucketAddress.js';
+import { resolveBucketForRequest } from 'lib/admin/auth/resolveBucket.js';
 import sessionHandler, { expiredSessionCookie } from '../shared/session.ts';
 import {
 	backchannelLogoutFor,
@@ -109,6 +113,34 @@ export const logoutAction = new Elysia()
 					error: new InvalidClient('client is invalid', 'client not found')
 				});
 				oidc.entity('Client', client);
+			}
+
+			/*
+			 * A client may only end a sign-in it shares a session with.
+			 *
+			 * The sign-out ends whatever sign-in this *address* holds, which is the right answer only while
+			 * the client signs into that same population. It does not have to: an `id_token_hint` is
+			 * validated against the issuer, and the two buckets served at the root share one, so a token
+			 * minted for one of them presented at the bare path ended the other's sign-in. A named bucket's
+			 * token reaches the same hole from the other side — its client is refused at this address by
+			 * `checkBucket`, but nothing refused its token here.
+			 *
+			 * Compared by **cookie name** rather than by bucket id, and that is the qualifier that makes
+			 * this a refusal rather than a breakage: buckets that share a cookie share a sign-in, so the
+			 * default bucket and every bucket with no address of its own must keep ending each other's —
+			 * which is the behaviour their clients have always had at the bare endpoints.
+			 */
+			if (client) {
+				const signsInto = await issuingBucket(
+					await resolveBucketForRequest(client.clientId)
+				);
+				if (sessionCookieName(signsInto) !== sessionCookieName(oidc.bucket)) {
+					throw new InvalidRequest(
+						'client is not authorized at this address',
+						undefined,
+						'the client signs into a different user bucket than the one addressed'
+					);
+				}
 			}
 
 			if (client && params.post_logout_redirect_uri !== undefined) {

@@ -107,7 +107,12 @@ listed bucket's address against the router that has to serve it.
 
 A session cookie is named after the bucket that wrote it — `_session_default`, `_session_acme` — so
 two sign-ins in one browser are two cookies and neither disturbs the other. A request reads the one
-its address names and never looks for the other.
+its bucket names and never looks for the other.
+
+That bucket is the address for every endpoint but one. The two buckets served at the root share an
+address, so `/auth` resolves the population from the *client* instead (`OIDCContext.signInBucket`,
+assigned from `checkBucket`'s resolution) — see [[cookie-path-scoping]] for the sign-in this
+disagreement broke.
 
 **A host-addressed bucket needs no such suffix and gets the bare `_session`.** The suffix exists only
 because path-addressed buckets share one origin; a bucket on its own origin already has its cookie kept

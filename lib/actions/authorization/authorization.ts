@@ -51,7 +51,10 @@ import {
 } from 'lib/helpers/errors.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import type { RequestBucket } from 'lib/configs/issuer.js';
-import { requestBucketFor } from 'lib/admin/auth/bucketAddress.js';
+import {
+	issuingBucket,
+	requestBucketFor
+} from 'lib/admin/auth/bucketAddress.js';
 import checkBucket from './check_bucket.js';
 import { Client } from 'lib/models/client.js';
 import {
@@ -132,7 +135,6 @@ export async function isAllowRedirectUri(params, bucket?: RequestBucket) {
 }
 
 async function authorizationActionHandler(oidc) {
-	const setCookies = await sessionHandler(oidc);
 	await checkClient(oidc);
 
 	const pushedAuthorizationRequest = await loadPushedAuthorizationRequest(oidc);
@@ -164,7 +166,25 @@ async function authorizationActionHandler(oidc) {
 	 * resolves an account or mints a grant, because everything downstream is scoped to a population and
 	 * a client at the wrong address has no business reaching any of it.
 	 */
-	await checkBucket(oidc);
+	const signsInto = await checkBucket(oidc);
+	/*
+	 * The session is read only now, and this is the first step that could have read one.
+	 *
+	 * A session belongs to a population, and which population is not answerable from the address alone:
+	 * the default bucket and the administrators' bucket are both served at the root, so the two share an
+	 * address and only the client tells them apart. Read from the address, `/auth` took the default
+	 * bucket's cookie into a console sign-in whose resumption then read the administrators' — the
+	 * interaction recorded one session and the resumption found another, which is the
+	 * `interaction session and authentication session mismatch` an operator saw whenever their browser
+	 * already held an end-user sign-in at the same origin. It also meant a console session was never
+	 * recognised at `/auth`, so the password was asked for on every authorization request.
+	 *
+	 * Deliberately after `checkBucket` rather than before it. That check is a refusal, comparing the
+	 * client's bucket against the address, and a session loaded ahead of it would be the *client's*
+	 * before anything had established the client may be used here at all.
+	 */
+	oidc.signInBucket = await issuingBucket(signsInto);
+	const setCookies = await sessionHandler(oidc);
 	checkMaxAge(oidc);
 	await checkIdTokenHint(oidc);
 	assignClaims(oidc);

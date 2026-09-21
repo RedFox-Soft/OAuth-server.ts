@@ -44,7 +44,10 @@ import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { Session } from 'lib/models/session.js';
 import { cookieNames, sessionCookieName } from 'lib/consts/param_list.js';
 import { DEFAULT_REQUEST_BUCKET } from 'lib/configs/issuer.js';
-import { issuingBucket } from 'lib/admin/auth/bucketAddress.js';
+import {
+	forgetBucketAddresses,
+	issuingBucket
+} from 'lib/admin/auth/bucketAddress.js';
 import { ttl } from 'lib/configs/liveTime.js';
 import { Grant } from 'lib/models/grant.js';
 import { ISSUER } from 'lib/configs/env.js';
@@ -240,6 +243,14 @@ export async function seedBucket({
 	client?: Record<string, unknown>;
 	user?: Partial<Omit<User, '_id'>>;
 }): Promise<{ bucketId: string; clientId: string; accountId: string }> {
+	/*
+	 * A bucket appearing is one of the two events the address cache says must forget it, and here it is
+	 * load-bearing rather than tidy: those caches are module state, so they outlive a spec *file*. Two
+	 * files seeding `acme` with and without a slug left the second one reading the first one's address,
+	 * which is a failure that depends on the order Bun happens to walk the directory in — green on one
+	 * machine and red on the next.
+	 */
+	forgetBucketAddresses();
 	await getBucketStore().create({
 		_id: bucketId,
 		name,
@@ -284,6 +295,8 @@ export async function clearSeededBuckets(): Promise<void> {
 		await getProjectStore().destroy(projectId);
 		await getBucketStore().destroy(bucketId);
 	}
+	/* The other of the two events — see the note in `seedBucket`. */
+	forgetBucketAddresses();
 }
 
 // Extra OIDC claims that login()'s seeded user carries for the current spec.

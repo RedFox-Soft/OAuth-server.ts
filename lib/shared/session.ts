@@ -56,7 +56,10 @@ export default async function sessionHandler(oidc) {
 
 	return async function setCookies() {
 		clearLegacySessionCookie(oidc.cookie);
-		const cookie = oidc.cookie[sessionCookieName(oidc.bucket)];
+		// The bucket the sign-in is for, exactly as `Session.get` read it — a cookie written under one
+		// name and read back under another is a sign-in that completes and then does not exist.
+		const cookie =
+			oidc.cookie[sessionCookieName(oidc.signInBucket ?? oidc.bucket)];
 		// Persist and (re)issue the session cookie when the session is worth
 		// keeping: it already had a cookie (returning user — refresh it), it now
 		// carries an authenticated account (a login just resolved), or it was

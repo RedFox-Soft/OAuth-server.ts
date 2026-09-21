@@ -86,14 +86,51 @@ and the first already imports the second.
 
 Two consequences worth stating, because both are ways to clear nothing while reporting success:
 
-- **The bucket comes from the address, never from the cookie.** A forged `_session_<anything>` is read
+- **The bucket comes from the request, never from the cookie.** A forged `_session_<anything>` is read
   only where the server independently resolved that same bucket, and its value must still name a
   session record.
 - **A bucket with no slug shares the default bucket's name.** It has no address of its own, so its
   clients use the bare endpoints — and the sign-in screen, which knows the bucket from the *client*,
-  must agree with `/auth` and `/logout`, which know only the address. Falling back to the bucket's
-  record id instead made those two disagree: the sign-in completed, wrote `_session_<id>`, and the
-  next request looked for `_session_default` and found nobody.
+  must agree with `/auth` and `/logout`. Falling back to the bucket's record id instead made those two
+  disagree: the sign-in completed, wrote `_session_<id>`, and the next request looked for
+  `_session_default` and found nobody.
+
+### At the root the address does not name one bucket, so the client does
+
+The first bullet used to read "from the address", and that was the defect. Two buckets are served at
+the root — the default one and the administrators' ([[bucket-is-an-issuer]]) — so the bare paths are
+one address for two populations and the address alone cannot say which a sign-in is for. Only the
+client can, and `resolveBucketForRequest` is where that is already answered for everything else in a
+sign-in: the resumption, the login POST, `findAccount`.
+
+Naming the cookie from the address made `/auth` and the resumption disagree about the same sign-in.
+`/auth` read `_session_default`, recorded that session's `uid` on the interaction, and
+`lib/interactions/index.ts`'s `resume()` — which has always resolved its bucket from the client —
+read `_session_admin`, found another session, and threw **`interaction session and authentication
+session mismatch`**. It only fired for an operator whose browser already held an authenticated
+default-bucket cookie, because an interaction records a session only when that session carries an
+account (`lib/models/interaction.ts`), which is why a clean browser and every existing spec signed in
+perfectly. The quieter half of the same bug: a console session was never recognised at `/auth` at
+all, so the password was asked for on every authorization request.
+
+Signing *out* has the same hole and cannot take the same fix. `/logout` is two legs, and the second —
+`POST /logout/confirm` — carries no client identifier at all: it reads the sign-out details off the
+session, which it must first find by cookie name. Resolving the first leg from the client would simply
+move the disagreement to the second. So the sign-out keeps naming the cookie from the address and
+**refuses** a client that does not share that cookie, which is the actual defect: an `id_token_hint` is
+validated against the issuer, the two root-served buckets share one, and a named bucket's token was
+never checked here at all — so a token minted for one population ended another's sign-in. The
+comparison is by cookie *name*, not by bucket id, because buckets that share a cookie share a sign-in
+and their clients have always ended each other's at the bare endpoints.
+
+The fix is one field with one writer. `OIDCContext.signInBucket` defaults to `bucket` — the address,
+which is the honest answer everywhere else — and the authorization pipeline assigns it from
+`checkBucket`'s own resolution, which is why that check now returns the bucket it compared against
+rather than resolving it a second time. The session is therefore read **after** `checkBucket`, not
+at the top of the handler: a session loaded earlier would be the client's before anything had
+established the client may be used at this address at all. `signInBucket` is deliberately not folded
+into `bucket`, which is what `issuerFor` stamps into a token — a bucket with no address of its own
+would silently change issuer.
 
 The bare `_session` is now a legacy name. It is never read, and `clearLegacySessionCookie` expires it
 on the first request that presents it — cleared rather than ignored, or the browser sends it forever

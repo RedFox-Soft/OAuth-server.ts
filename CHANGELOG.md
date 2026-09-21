@@ -68,6 +68,21 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- admin: signing in to the console no longer fails with `interaction session and authentication session
+  mismatch` when the browser already holds an end-user sign-in from the same server, and no longer asks
+  for the password on every authorization request. The default bucket and the administrators' bucket are
+  both served at the root, so the address alone cannot say which population a sign-in is for — only the
+  client can, which is how the rest of the sign-in has always decided it. Naming the session cookie from
+  the address meant the authorization request and its resumption read two different cookies and saw two
+  different sessions.
+
+- A client can no longer sign an end user out of a user bucket it does not belong to. A sign-out ends
+  whatever sign-in the address it was requested at holds, and nothing checked that the client asking
+  shared that sign-in — an `id_token_hint` is validated against the issuer, and a bucket served at the
+  root shares the server's own, so a token minted for one population could end another's. Buckets that
+  share a session cookie still end each other's sign-in, which is what their clients have always done at
+  the bare endpoints; anything else is refused.
+
 - admin: two administrators assigning one hostname at the same moment now both get an answer they can
   act on. The route asks the store whether a name is free and writes after the answer, so both reads
   can return "free" and the datastore's own constraint refuses the second write — `UniqueValueTaken`,

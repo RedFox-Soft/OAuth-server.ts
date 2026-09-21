@@ -35,6 +35,24 @@ export class OIDCContext<T extends Record<string, unknown>> {
 	 */
 	bucket: RequestBucket;
 
+	/*
+	 * The population this request signs a user *into*, which is what the session cookie is named after.
+	 *
+	 * A second field rather than a second opinion about the first. The two answer questions the rest of
+	 * this server already keeps apart — `oidc.bucket` is the address, and `resolveBucketForRequest` is
+	 * the sign-in population — and at the root they genuinely differ: the default bucket and the
+	 * administrators' bucket are *both* served there, so the address cannot tell them apart and only the
+	 * client can. Naming the cookie after the address therefore wrote `_session_default` at `/auth` and
+	 * read `_session_admin` at the resumption, which surfaced as "interaction session and authentication
+	 * session mismatch" for any operator whose browser already held an end-user sign-in.
+	 *
+	 * It defaults to the address and has exactly one writer — the authorization pipeline, right after
+	 * `checkBucket` has refused a client that is at the wrong address — so every other endpoint keeps
+	 * the behaviour it had. It is deliberately NOT folded into `bucket`: that one is what `issuerFor`
+	 * stamps into a token, and a bucket with no address of its own would silently change issuer.
+	 */
+	signInBucket: RequestBucket;
+
 	constructor(
 		params: T,
 		headers: Record<string, string | undefined> = {},
@@ -45,6 +63,7 @@ export class OIDCContext<T extends Record<string, unknown>> {
 		this.route = route;
 		this.#headers = headers;
 		this.bucket = bucket;
+		this.signInBucket = bucket;
 		this.authorization = {};
 		this.redirectUriCheckPerformed = false;
 		this.webMessageUriCheckPerformed = false;

@@ -95,11 +95,16 @@ export class Session extends BaseModel<SessionPayloadType> {
 	static async get(oidc) {
 		// is there supposed to be a session bound? generate if not
 		/*
-		 * The bucket comes from the address, never from the cookie. A forged `_session_<anything>` is read
+		 * The bucket comes from the request, never from the cookie. A forged `_session_<anything>` is read
 		 * only when the server has independently resolved that same bucket, and its value must still name
 		 * a session record — so the name cannot be used to reach another population's sign-in.
+		 *
+		 * The *sign-in* bucket, which is the address for every endpoint but one: the authorization
+		 * pipeline resolves it from the client, because the two buckets served at the root share an
+		 * address and only the client says which of them a sign-in is for.
 		 */
-		const cookieSessionId = oidc.cookie[sessionCookieName(oidc.bucket)]?.value;
+		const cookieSessionId =
+			oidc.cookie[sessionCookieName(oidc.signInBucket ?? oidc.bucket)]?.value;
 
 		let session;
 
