@@ -68,6 +68,14 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- admin: two administrators assigning one hostname at the same moment now both get an answer they can
+  act on. The route asks the store whether a name is free and writes after the answer, so both reads
+  can return "free" and the datastore's own constraint refuses the second write — `UniqueValueTaken`,
+  a class introduced precisely so that refusal would be a 409 rather than an internal fault. Nothing
+  caught it, on either the create or the address-change route, so the operator who lost the race got a
+  500 and a recorded defect. Found by a coverage report rather than by a person: the class was raised
+  by all three bucket stores and reached by nothing.
+
 - ci: a commit that touches the PostgreSQL adapter no longer fails the coverage gate for doing so.
   `bun test` runs on the in-memory adapter, so a store's function bodies need a live server and can only
   run under `database/verify_postgres.ts`, which the default run deliberately cannot reach; they report

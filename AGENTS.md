@@ -201,8 +201,10 @@ There is a second way a client can exist, and it stores nothing. A `client_id` t
 **Bucket addressing** — a bucket is reached by **a path segment or a hostname of its own, never both**:
 `https://auth.example.com/acme` or `https://acme.auth.example.com`. Which of three states a bucket is in
 — served at the root, path-addressed, host-addressed — is one derived answer, `addressOf` in
-`lib/configs/issuer.ts`, and `issuerFor`, `pathPrefixFor` and `sessionCookieName` all switch on it
-rather than re-inferring from two fields. The request's host is read in exactly one place
+`lib/configs/issuer.ts`, and `issuerFor` and `sessionCookieName` both switch on it rather than
+re-inferring from two fields. There is no `pathPrefixFor`: the router mounts the same plugins under a
+dynamic `/:bucket` segment rather than building a prefix string, and the console derives its own in
+`lib/admin/ui/bucketAddress.ts` because that module is in the browser bundle. The request's host is read in exactly one place
 (`hostOfRequest`, `lib/consts/request_host.ts`): the `Host` header, **never `X-Forwarded-Host`**, which
 is attacker-settable and here would select the tenant. A name beneath the canonical host that holds no
 bucket is refused as a typo; a name outside it (`localhost`, the platform's own, a health check) falls

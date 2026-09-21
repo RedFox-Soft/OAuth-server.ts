@@ -67,8 +67,12 @@ administrators bucket, and the bucket never puts it in a URL.
 named bucket carries a path segment (`<ISSUER>/acme`) **or** a hostname of its own
 (`https://acme.auth.example.com`), never both — two addresses would be two issuer identifiers for one
 population. Which of the three states a bucket is in is now one derived answer, `addressOf` in
-`lib/configs/issuer.ts`, and `issuerFor`, `pathPrefixFor` and `sessionCookieName` switch on it rather
-than each re-inferring from two fields and a reserved-id predicate. It returns a fourth state,
+`lib/configs/issuer.ts`, and `issuerFor` and `sessionCookieName` switch on it rather than each
+re-inferring from two fields and a reserved-id predicate. A third consumer, `pathPrefixFor`, shipped
+with `056` and was **removed** once a coverage report showed it had never had a caller: the router
+mounts the same plugins under a dynamic `/:bucket` segment instead of building a prefix string, and the
+console derives the string in `lib/admin/ui/bucketAddress.ts`, which cannot delegate here because it is
+in the browser bundle and this module reads the environment. It returns a fourth state,
 `unaddressed`, on purpose: `issuerFor` falls back to the record id for a bucket written before slugs
 existed while the cookie falls back to `default`, and collapsing those two into one `path` state writes
 a cookie the bare `/auth` never looks for — the sign-in completes and then does not exist.

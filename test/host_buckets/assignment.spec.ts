@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'bun:test';
+import { describe, it, expect, beforeEach, spyOn } from 'bun:test';
 import { Elysia } from 'elysia';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { bucketRoutes } from 'lib/admin/buckets/routes.ts';
@@ -111,6 +111,28 @@ describe('refusing an address that cannot work or should not exist (US2)', () =>
 
 		expect(status).toBe(409);
 		expect(message).toContain('Taken');
+	});
+
+	/* The window the lookup above cannot cover. Two operators assigning one hostname both read "free"
+	 * and both write, so the datastore's own constraint is what makes the guarantee true — and the
+	 * loser of that race is owed the same refusal as the operator who was simply second, not an
+	 * internal fault and a recorded defect. The stubbed lookup is the race: it answers "free" about a
+	 * name that is held. */
+	it('refuses with a conflict when the hostname is taken between the check and the write', async () => {
+		const lookup = spyOn(getBucketStore(), 'findByHost').mockResolvedValue(
+			undefined
+		);
+
+		try {
+			const { status } = await createBucket(superCookie, {
+				name: 'Racer',
+				host: TAKEN_HOST
+			});
+
+			expect(status).toBe(409);
+		} finally {
+			lookup.mockRestore();
+		}
 	});
 
 	it('refuses a value that is a URL rather than a hostname, saying what was wrong', async () => {

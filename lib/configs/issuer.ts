@@ -112,26 +112,10 @@ export function issuerFor(bucket: RequestBucket): string {
 }
 
 /*
- * The path segment a bucket's endpoints live beneath, empty for a bucket served at the root. Separate
- * from `issuerFor` because routing needs the segment without the origin, and deriving one by string
- * surgery on the other is how the two drift apart.
+ * There is deliberately no `pathPrefixFor` beside `issuerFor`. One existed, computing the segment a
+ * bucket's endpoints live beneath, and nothing ever called it: the router does not build a prefix, it
+ * mounts the same plugins under a dynamic `/:bucket` segment and resolves the bucket from the request
+ * (`lib/index.ts`). The console does need the string, and derives it in `lib/admin/ui/bucketAddress.ts`
+ * rather than here, because that module is in the browser bundle and this one reads the environment.
+ * Restoring the function to remove that duplication would put `ISSUER` in the client build.
  */
-export function pathPrefixFor(bucket: RequestBucket): string {
-	const address = addressOf(bucket);
-	switch (address.kind) {
-		case 'root':
-			return '';
-		/*
-		 * Empty, and this is the routing half of "one bucket, one address". A host-addressed bucket's
-		 * endpoints are the bare paths beneath its own origin; giving it a prefix as well would make the
-		 * same bucket reachable two ways and therefore hold two issuer identifiers.
-		 */
-		case 'host':
-			return '';
-		case 'path':
-			return `/${address.segment}`;
-		/* Not routable: `isAddressable` refuses such a bucket an address, so nothing mounts a prefix for it. */
-		case 'unaddressed':
-			return `/${bucket._id}`;
-	}
-}

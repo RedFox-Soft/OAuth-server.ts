@@ -14,6 +14,7 @@ import {
 	type AdminContext
 } from '../auth/rbac.js';
 import type { UserBucket } from '../../adapters/types.js';
+import { isUniqueValueTaken } from '../../adapters/conflicts.js';
 import { presentAll } from '../federation/service.js';
 import { ADMIN_BUCKET_ID, isUndeletableBucket } from '../consts.js';
 import { cascadeForAccount } from '../../helpers/cascade.js';
@@ -146,6 +147,29 @@ async function assertHostAvailable(value: string): Promise<string> {
 		);
 	}
 	return host;
+}
+
+/*
+ * The same refusal, for the window the lookup above cannot cover.
+ *
+ * That lookup reads and the write happens after it, so two operators assigning one hostname both read
+ * "free" and both write; the datastore's own uniqueness constraint is what makes the guarantee true,
+ * and it reports in its own terms. Left unhandled, the loser of that race gets a 500 and a recorded
+ * defect for a refusal this API has a status code for — which is the outcome `UniqueValueTaken` was
+ * introduced to prevent and, until now, did not, because nothing caught it.
+ *
+ * No holder is named here. Naming one costs a second read on a path reached only by a race, and the
+ * operator's next step — choose another name — is the same either way.
+ */
+async function refusingATakenHostname<T>(write: () => Promise<T>): Promise<T> {
+	try {
+		return await write();
+	} catch (error) {
+		if (isUniqueValueTaken(error)) {
+			throw new AdminError(409, `hostname '${error.value}' is already taken`);
+		}
+		throw error;
+	}
 }
 
 /*
@@ -311,18 +335,20 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			// about to exist — audit-first has nothing to point at otherwise.
 			const bucketId = nanoid();
 			await recordAdminAudit(ctx, 'bucket.create', bucketId, { ownerGroupId });
-			const bucket = await getBucketStore().create({
-				_id: bucketId,
-				name: body.name,
-				...address,
-				roles: body.roles ?? [],
-				ownerGroupId,
-				passwordLogin: body.passwordLogin,
-				registrationOpen: body.registrationOpen,
-				emailVerificationRequired: body.emailVerificationRequired,
-				verificationMethod: body.verificationMethod,
-				totpRequired: body.totpRequired
-			});
+			const bucket = await refusingATakenHostname(() =>
+				getBucketStore().create({
+					_id: bucketId,
+					name: body.name,
+					...address,
+					roles: body.roles ?? [],
+					ownerGroupId,
+					passwordLogin: body.passwordLogin,
+					registrationOpen: body.registrationOpen,
+					emailVerificationRequired: body.emailVerificationRequired,
+					verificationMethod: body.verificationMethod,
+					totpRequired: body.totpRequired
+				})
+			);
 			/* A new address exists; the resolver's positive cache must be able to see it. */
 			forgetBucketAddresses();
 			set.status = 201;
@@ -432,7 +458,9 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 				to: preview.to
 			});
 
-			const moved = await getBucketStore().setAddress(params.id, address);
+			const moved = await refusingATakenHostname(() =>
+				getBucketStore().setAddress(params.id, address)
+			);
 			if (!moved) throw new AdminError(404, 'bucket not found');
 
 			/*

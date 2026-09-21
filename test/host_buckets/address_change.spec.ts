@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'bun:test';
+import { describe, it, expect, beforeEach, spyOn } from 'bun:test';
 import { Elysia } from 'elysia';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { bucketRoutes } from 'lib/admin/buckets/routes.ts';
@@ -116,6 +116,33 @@ describe('moving a bucket to a different address (US3)', () => {
 		const after = await getBucketStore().find(id);
 		expect(after?.slug).toBe(`unconfirmed-${counter}`);
 		expect(after?.host).toBeUndefined();
+	});
+
+	/* The other half of the window the create route has: a move is a write after a lookup too, so the
+	 * operator who loses the race is owed the same refusal rather than an internal fault. The stubbed
+	 * lookup is the race — it answers "free" about a name another bucket holds. */
+	it('refuses with a conflict when the hostname is taken between the check and the write', async () => {
+		const id = await seedBucketWithClients(`raced-${counter}`, []);
+		const held = `holder-${counter}.e.ly`;
+		await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: `Holder ${counter}`,
+			host: held
+		});
+		const lookup = spyOn(getBucketStore(), 'findByHost').mockResolvedValue(
+			undefined
+		);
+
+		try {
+			const { status } = await changeAddress(superCookie, id, {
+				host: held,
+				confirm: true
+			});
+
+			expect(status).toBe(409);
+		} finally {
+			lookup.mockRestore();
+		}
 	});
 
 	it('changes the issuer identifier when the change is confirmed', async () => {
