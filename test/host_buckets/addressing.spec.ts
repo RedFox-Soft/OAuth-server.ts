@@ -127,6 +127,21 @@ describe('a bucket addressed by a host of its own (US1)', () => {
 		expect(metadata.issuer).toBe(`http://${OTHER_HOST}`);
 	});
 
+	/* A deployment that is not on 80 or 443 — the development default here is 3000 — receives a `Host`
+	 * header carrying the port, because that is what the standard tells a client to send. The bucket is
+	 * addressed by a name, and a port is not part of a name. */
+	it('serves the bucket when the request names its host with a port', async () => {
+		const response = await at(
+			TENANT_HOST,
+			'/.well-known/openid-configuration',
+			{ headers: { host: `${TENANT_HOST}:3000` } }
+		);
+		expect(response.status).toBe(200);
+
+		const metadata = (await response.json()) as Record<string, string>;
+		expect(metadata.issuer).toBe(`http://${TENANT_HOST}`);
+	});
+
 	it('refuses a request to a hostname no bucket holds', async () => {
 		const response = await at(
 			UNCLAIMED_HOST,

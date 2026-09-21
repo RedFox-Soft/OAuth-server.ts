@@ -123,6 +123,19 @@ describe('refusing an address that cannot work or should not exist (US2)', () =>
 		expect(message).toContain('scheme');
 	});
 
+	/* Its own case rather than a second assertion on the one above: an operator who pastes the address
+	 * bar gets a value with a scheme, one who pastes a link gets a value with a path, and being told
+	 * "remove the scheme" about a value that has none is how a name takes three attempts. */
+	it('refuses a value carrying a path, saying what was wrong', async () => {
+		const { status, message } = await createBucket(superCookie, {
+			name: 'Path',
+			host: 'acme.e.ly/tenant'
+		});
+
+		expect(status).toBe(400);
+		expect(message).toContain('path');
+	});
+
 	it('refuses a wildcard hostname', async () => {
 		const { status, message } = await createBucket(superCookie, {
 			name: 'Wild',
@@ -131,6 +144,16 @@ describe('refusing an address that cannot work or should not exist (US2)', () =>
 
 		expect(status).toBe(400);
 		expect(message).toContain('wildcard');
+	});
+
+	it('refuses a hostname with a space in it, saying what was wrong', async () => {
+		const { status, message } = await createBucket(superCookie, {
+			name: 'Spaced',
+			host: 'acme .e.ly'
+		});
+
+		expect(status).toBe(400);
+		expect(message).toContain('whitespace');
 	});
 
 	it('refuses a hostname carrying a port', async () => {

@@ -68,6 +68,17 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- ci: a commit that touches the PostgreSQL adapter no longer fails the coverage gate for doing so.
+  `bun test` runs on the in-memory adapter, so a store's function bodies need a live server and can only
+  run under `database/verify_postgres.ts`, which the default run deliberately cannot reach; they report
+  4–17% rather than 0% because the import-safety sweep executes their top level and nothing else.
+  Seventeen stores and the plumbing they issue SQL through held the project number at 90.92% — which
+  Codecov then holds every later commit to — and one duly failed at 84% of a diff whose 62 worst lines
+  sat in a single such file. The `codecov.yml` ignore list now names the connection-bound files and only
+  those: everything under that directory which runs in process stays measured, because a low number
+  there is a real gap, and MongoDB's stores stay measured as well, having no equivalent verification run
+  to be judged in instead.
+
 - test: the constant-time comparison cases now judge a timing difference by its size rather than by its
   statistical significance. Welch's t divides by the machine's noise floor, so the 0.1–0.4% residue a
   correct comparison always leaves — where the strings landed, not what the comparison did, as two

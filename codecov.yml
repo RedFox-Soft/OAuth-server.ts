@@ -14,6 +14,21 @@
 # hydrated console with Playwright at site-build time. Two neighbours are deliberately NOT ignored,
 # which is why the patterns name file kinds rather than directories: lib/admin/ui/settings/model.ts and
 # lib/admin/ui/serverRender.tsx run under `bun test` and are both at 100%.
+#
+# The PostgreSQL stores are the same shape of mistake, found the same way: 536d9b7 failed codecov/patch
+# at 84.20% against an auto target of 91.02%, and 62 of its 91 missed lines were in one file the suite
+# is designed never to execute. `bun test` runs on the in-memory adapter, so a store's function bodies
+# need a live server and can only run under `database/verify_postgres.ts`, which the default run
+# deliberately cannot reach. They report 4-17% rather than 0% because test/storage_contract sweeps the
+# directory to prove every module imports without opening a connection — that executes the top level
+# and nothing else. Seventeen stores plus their plumbing is enough to hold the project number down and
+# therefore to set the target every later commit is judged against.
+#
+# Same discipline as above: this names the connection-bound files, not the directory. Everything under
+# lib/adapters/postgres/ that runs in process stays counted, because a low number there is a real gap —
+# jsonPath.ts and provision.ts have specs of their own, and json.ts and dates.ts are pure helpers whose
+# 11.76% and 0.00% are worth seeing. MongoDB's stores stay counted too: the argument here is that the
+# ignored code is verified somewhere else, and there is no verify_mongodb.ts for them to be verified in.
 ignore:
   # The antd screens and the settings editor's controls: React components that only exist in a browser.
   - 'lib/admin/ui/pages/**'
@@ -21,3 +36,8 @@ ignore:
   # The two browser bundle entry points, per the target list in build.ts.
   - 'lib/admin/ui/adminClient.tsx'
   - 'lib/interactions/loginClient.tsx'
+  # The PostgreSQL stores and the plumbing they issue SQL through: every function body needs a server.
+  - 'lib/adapters/postgres/*Store.ts'
+  - 'lib/adapters/postgres/sqlAdapter.ts'
+  - 'lib/adapters/postgres/db.ts'
+  - 'lib/adapters/postgres/reap.ts'
