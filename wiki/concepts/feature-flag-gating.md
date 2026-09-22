@@ -4,7 +4,7 @@ title: "Feature flags and endpoint gating"
 tags: [config, architecture, oauth, contract]
 sources: [oauth-server-codebase]
 created: 2026-07-31
-updated: 2026-09-13
+updated: 2026-09-22
 graph:
   node_type: concept
   relationships:
@@ -46,6 +46,36 @@ where `Object.assign` above lets those overrides win over the environment and th
 nobody ever edited — so changing an env var stops having any effect, silently, on a deployment whose
 operator has no reason to suspect the settings page. There is deliberately no delete path, so a key
 that gets pinned stays pinned.
+
+## The client's registration data is flat for the same reason
+
+The flat-key decision is not only about `ApplicationConfig`. A **client's registration data is a flat
+list on purpose too**: `clientId`, `redirectUris`, `applicationType`, `grantTypes`,
+`responseTypes`, `jwksUri` and the rest sit beside one another on the object, and code reads
+`client.redirectUris` directly rather than `client.redirects.uris`.
+
+Proposals to nest the fields that are validated together — redirect targets with the application
+type, grant types with response types — have been raised and **ruled out**. Grouping relocates a rule
+rather than removing a state: nothing becomes impossible, 68 call sites change, and the object stops
+matching the shape the rest of the configuration surface uses.
+
+**What is admissible is the opposite move**: several flat fields that were genuinely *alternatives*
+collapsing into **one flat field**. Two of those have landed and both kept the list flat while making
+an illegal state unrepresentable:
+
+- the five `tls_client_auth_*` certificate subject attributes, of which exactly one could be set,
+  became one `certificateSubject`
+- `dpop_bound_access_tokens` and `tls_client_certificate_bound_access_tokens`, which could not both
+  be set, became one `proofOfPossession`
+
+The rule in one line, and it decides every such proposal:
+
+> A flat field may replace several flat fields that were alternatives.
+> A flat field may not become a nested object holding fields that were never alternatives.
+
+The registration attributes stay exactly as they are on the wire and in storage in both cases; the
+projection puts them back. See `specs/058-typed-domain-models/data-model.md` for the dispositions and
+the measurements behind them.
 
 ## Derived configuration is validated once, at load
 
