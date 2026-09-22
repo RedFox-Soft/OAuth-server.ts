@@ -23,7 +23,7 @@ tells the console the token came from that exchange.
 
 ## The console must verify, and for a year it did not
 
-Until `specs/017-admin-idtoken-verification` the callback base64url-decoded the token's middle segment
+The callback used to base64url-decode the token's middle segment
 and trusted the `sub` it found. The code said so, with a comment promising that it "MUST be replaced
 with full signature verification". The consequence was the highest-value escalation available in the
 product: anything shaped like a token named any operator, including the super-administrator who can
@@ -168,4 +168,4 @@ repository's vocabulary, once.
 - [[group-ownership]] — the session this establishes now also carries the console's active scope,
   server-held because it sits on an authorization boundary.
 
-Verified against [[oauth-server-codebase]] as changed by `specs/017-admin-idtoken-verification`.
+Verified against [[oauth-server-codebase]].

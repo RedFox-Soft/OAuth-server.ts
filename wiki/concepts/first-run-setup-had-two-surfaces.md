@@ -36,7 +36,7 @@ empty white document with no error visible to the operator — on the only entry
 install. It was reachable **only by typing the URL**: nothing in `lib/`, `test/`, `database/` or the
 SPA linked to it.
 
-It was deleted rather than repaired (`specs/018-small-bugfix-batch`, D6). Correcting the address
+It was deleted rather than repaired. Correcting the address
 would have left two first-run surfaces, the second one strictly worse — no server-rendered markup, no
 hydration props, no cache-busted bundle, no favicon — and, after the same batch, needing its own
 content security policy. `POST /admin/api/setup` and the exported `hasSuperAdmin` are unchanged.

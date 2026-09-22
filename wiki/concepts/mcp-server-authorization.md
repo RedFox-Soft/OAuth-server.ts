@@ -58,8 +58,8 @@ bucket; client in a project → that project's bucket; **one** declared resource
 project's bucket; a permitted client identity naming the administrative MCP audience → admin bucket;
 otherwise `redfox`.
 
-Rule 3 is the answer to what `specs/024-admin-mcp-control-plane/research.md` D6 left open, and it is
-safe for the reason D6's rejected version was not: **an administrator authored the resource**, in a
+Rule 3 answers a question the admin MCP control plane left open, and it is
+safe for the reason the rejected version was not: **an administrator authored the resource**, in a
 project they own, whose bucket is their own choice. An attacker cannot declare a resource, so the
 parameter selects among an operator's options and cannot create one. `${ISSUER}/mcp` is not a declared
 resource — the built-in arm claims it and declaration refuses it — so the admin bucket is unreachable

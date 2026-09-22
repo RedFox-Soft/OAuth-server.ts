@@ -18,8 +18,8 @@ graph:
 
 # Why Microsoft, Apple and GitHub each needed more than a catalogue row
 
-`specs/052-google-provider-onboarding` shipped the recognised-provider catalogue and closed with the
-assumption that the remaining providers would be "a matter of adding data". `specs/053-apple-microsoft-github`
+Google shipped the recognised-provider catalogue and closed with the
+assumption that the remaining providers would be "a matter of adding data". Adding Apple, Microsoft and GitHub
 found that **false for all three, in three different ways**. Each is a fact about somebody else's product,
 so none of them will go away; they are recorded here because each one is invisible until it fails, and two
 of the three fail months or years after the change that caused them.
@@ -119,8 +119,8 @@ nothing, and GitHub publishes no document at all** — while Microsoft's documen
 binding "for all application types, both public and confidential clients" and GitHub has supported `S256`
 since 14 July 2025.
 
-So three of the four legs silently got no binding. That is a weakness in what `specs/052` shipped, not a
-cost of what `specs/053` added, and it also improves any hand-configured provider whose upstream
+So three of the four legs silently got no binding. That is a weakness in what the Google entry shipped, not a
+cost of the three that followed, and it also improves any hand-configured provider whose upstream
 under-reports. The rule now: a recognised entry's `codeBinding` wins over metadata, metadata decides for
 anything unrecognised, and `unknown` sends nothing — because a provider that rejects a parameter it does
 not recognise fails sign-in for *all* its users, so a missing binding is a weakness while a rejected
@@ -161,4 +161,4 @@ per stub, and advertising the key set at a per-case URL, since jose's `RemoteJWK
   satisfy.
 - [[admin-mcp-control-plane]] — the agent surface these providers reached with no new tool.
 
-Verified against [[oauth-server-codebase]] as changed by `specs/053-apple-microsoft-github`.
+Verified against [[oauth-server-codebase]].

@@ -18,7 +18,7 @@ graph:
 
 # Rendered pages and their content security policy
 
-Since `specs/018-small-bugfix-batch`, every HTML response this server produces carries a
+Every HTML response this server produces carries a
 `Content-Security-Policy`, and **there is exactly one place that may build such a response**:
 `htmlResponse` in `lib/html/csp.ts:76`.
 
@@ -70,7 +70,7 @@ escaping on the error and device pages) — CSP here is not a substitute for tha
 
 ## Why a constructor and not a plugin
 
-This was **built and measured**, not assumed — see `specs/018-small-bugfix-batch/research.md` M9.
+This was **built and measured**, not assumed.
 A `mapResponse({ as: 'global' })` plugin deriving the whole policy from the served document works for
 the root instance and for *unnamed* mounted sub-apps (`ui`, `codeVerification`), which corrects a
 belief carried over from the CORS work: `{ as: 'global' }` does reach descendants, and spec 011 had to

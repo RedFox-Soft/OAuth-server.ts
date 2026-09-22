@@ -162,4 +162,4 @@ console asks somebody to confirm the grouping.
 - [[account-resolution]] — per-bucket end-user storage, which is why bucket access has a broad form and
   a strict one.
 
-Verified against [[oauth-server-codebase]] as changed by `specs/033-project-admin-self-service`.
+Verified against [[oauth-server-codebase]].

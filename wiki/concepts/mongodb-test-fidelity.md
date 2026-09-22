@@ -64,7 +64,7 @@ Some properties are the server's behaviour and nothing else's: TTL reaping is a 
 its own schedule, a unique index is what makes two concurrent registrations of one address
 unwinnable, lookup cost at 100,000 accounts is an index question, and the set of collections a
 database ends up holding can only be read from a database. No double exhibits these. They are also
-exactly the four success criteria of `specs/012-db-setup-provisioning` (SC-001..004) that sat
+exactly the four provisioning guarantees that sat
 unmeasurable for as long as the absolute rule stood.
 
 This tier runs as its **own CI job** with a `mongo` service container, not from the merge gate. A

@@ -56,26 +56,20 @@ list on purpose too**: `clientId`, `redirectUris`, `applicationType`, `grantType
 
 Proposals to nest the fields that are validated together — redirect targets with the application
 type, grant types with response types — have been raised and **ruled out**. Grouping relocates a rule
-rather than removing a state: nothing becomes impossible, 68 call sites change, and the object stops
-matching the shape the rest of the configuration surface uses.
+rather than removing a state: nothing becomes impossible, around 68 call sites change, and the object
+stops matching the shape the rest of the configuration surface uses.
 
-**What is admissible is the opposite move**: several flat fields that were genuinely *alternatives*
-collapsing into **one flat field**. Two of those have landed and both kept the list flat while making
-an illegal state unrepresentable:
-
-- the five `tls_client_auth_*` certificate subject attributes, of which exactly one could be set,
-  became one `certificateSubject`
-- `dpop_bound_access_tokens` and `tls_client_certificate_bound_access_tokens`, which could not both
-  be set, became one `proofOfPossession`
+What is admissible is the opposite move: several flat fields that were genuinely *alternatives*
+collapsing into **one flat field**, which shortens the list without nesting it. The five
+`tls_client_auth_*` certificate subject attributes, of which exactly one may ever be set, and the
+mutually exclusive `dpop_bound_access_tokens` / `tls_client_certificate_bound_access_tokens` pair are
+the two candidates that fit. Neither has been done; both are recorded here as admissible in
+principle, not as work that exists.
 
 The rule in one line, and it decides every such proposal:
 
 > A flat field may replace several flat fields that were alternatives.
 > A flat field may not become a nested object holding fields that were never alternatives.
-
-The registration attributes stay exactly as they are on the wire and in storage in both cases; the
-projection puts them back. See `specs/058-typed-domain-models/data-model.md` for the dispositions and
-the measurements behind them.
 
 ## Derived configuration is validated once, at load
 
@@ -87,8 +81,8 @@ not derived is read flat from `ApplicationConfig`.
 Two properties follow from how it is maintained:
 
 - **Applied when saved, not at boot only.** A save through the admin API assigns the changed keys onto
-  `ApplicationConfig` and re-derives, so the next request reads them (`applySettings`, since
-  specs/046). An invalid configuration would still crash startup, which is why the endpoint validates
+  `ApplicationConfig` and re-derives, so the next request reads them (`applySettings`).
+  An invalid configuration would still crash startup, which is why the endpoint validates
   the *merged* configuration against `configuration.ts` invariants before persisting — and why
   `applySettings` validates the candidate it is about to assign, withholding the whole apply rather
   than leaving the process holding a combination it could not have booted with.

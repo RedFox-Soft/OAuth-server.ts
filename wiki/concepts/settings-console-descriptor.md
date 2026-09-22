@@ -100,7 +100,7 @@ reads the class off the edits being saved, and the descriptor's `apply: 'restart
 `restartReason`) is what puts a setting in the other group. SMTP and Sentry keep their own buttons
 because they are separate endpoints.
 
-**Superseded, specs/046 (2026-09-13):** the standing "these apply at restart" note is gone, because
+**Superseded (2026-09-13):** the standing "these apply at restart" note is gone, because
 the settings themselves no longer do. A save assigns the change onto the running `ApplicationConfig`
 (`applySettings`), so the notice appears only for a setting that declares it cannot be applied — and
 no catalogued setting declares that today. The page also distinguishes "waiting for a restart" from

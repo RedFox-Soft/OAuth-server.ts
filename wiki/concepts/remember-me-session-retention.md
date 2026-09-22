@@ -20,7 +20,7 @@ graph:
 
 The sign-in page offered a "Remember me" checkbox, pre-ticked, for the whole life of the product.
 Whatever the end user did with it, the outcome was identical: the sign-in was remembered. Closed at
-`f7473ee`+1 under specs/049; reported as issue #45, which named one of the four breaks.
+`f7473ee`+1; reported as issue #45, which named one of the four breaks.
 
 The interesting property is not any single break. It is that **four independent defects sat on one
 path and each alone was sufficient**, so no partial repair would have been observable — and the

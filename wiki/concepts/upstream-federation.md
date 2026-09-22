@@ -88,12 +88,11 @@ sentinel string, which would be a value someone could eventually type.
 
 ## Recognised providers are data, and that is what makes them safe
 
-Added by `specs/052-google-provider-onboarding`. `lib/consts/known_providers.ts` holds the settings that
+`lib/consts/known_providers.ts` holds the settings that
 are the same for every deployment connecting a named upstream — issuer, scopes, email claim, whether its
 addresses are trusted, the button wording, and the steps an administrator performs at that provider.
 
-**Four entries since `specs/053-apple-microsoft-github`:** Google, Microsoft, Apple and GitHub. That
-spec's closing assumption — that the rest would be "a matter of adding data" — turned out false for all
+**Four entries:** Google, Microsoft, Apple and GitHub. The catalogue's original closing assumption — that the rest would be "a matter of adding data" — turned out false for all
 three, in three different ways, and the entry grew four fields to say so as data rather than as branches:
 which protocol the provider speaks, how the credential presented to it is produced, how the user comes
 back, and which values the administrator must supply. See [[recognised-provider-divergences]].
@@ -113,7 +112,7 @@ remembering:
   this renders with its mark on the next page load, so there was no migration to write.
 
 Recognition at read time is therefore a lookup on the stored `issuer` — in `loginOptions.ts` for the
-button's mark, in `guidance.ts` for "you already have this one", and since `specs/053` also in
+button's mark, in `guidance.ts` for "you already have this one", and since the catalogue grew past Google also in
 `identity/index.ts` for the protocol, `credential.ts` for the credential and `flow.ts` for the code
 binding and the return mode. The console's old browser-side `PRESETS` map is gone: it made the same
 no-runtime-effect promise honestly, but it was a second copy of facts only the console could read.
@@ -121,7 +120,7 @@ no-runtime-effect promise honestly, but it was a second copy of facts only the c
 Matching is by **rule rather than equality** (`issuerRule`), because one entry's issuer contains the
 organisation and so differs per deployment. Extending the lookup rather than adding a stored `protocol`
 field was the deliberate choice: the absence of that field is what makes provenance-based branching
-impossible, and `specs/053` needed no migration for the same reason `specs/052` did not.
+impossible, and adding the three later entries needed no migration for the same reason Google did not.
 
 ## Gotchas
 
@@ -165,7 +164,7 @@ Gating configuration behind the capability it configures would make that provide
 
 ### A slugless bucket's callback address is real, registerable, and temporary
 
-Found while building `specs/052-google-provider-onboarding`, and it is the reason the guidance read
+Found while connecting the first recognised provider, and it is the reason the guidance read
 reports a `callbackStability` rather than just an address.
 
 `callbackUri(bucket)` is `issuerFor(bucket) + '/federation/callback'`, and `issuerFor` falls back to the
@@ -251,4 +250,4 @@ subject exists.
 - [[admin-console-signin]] — the same relying-party discipline pointed at this server's own issuer.
 - [[admin-mcp-control-plane]] — the agent surface whose secrecy sweep found the bucket-route leak above.
 
-Verified against [[oauth-server-codebase]] as changed by `specs/022-oidc-federation-login`.
+Verified against [[oauth-server-codebase]].

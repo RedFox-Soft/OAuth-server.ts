@@ -127,5 +127,5 @@ the introspection guard tests truthiness — where `[]` is truthy.
 - [[settings-console-descriptor]] — the types editor that enumerates these rules instead of
   reporting them as a 422 after the save.
 
-Verified against [[oauth-server-codebase]] at commit `5ce224a` plus the `specs/015-rar-end-to-end`
-implementation.
+Verified against [[oauth-server-codebase]] at commit `5ce224a` plus the end-to-end rich
+authorization request implementation that followed it.

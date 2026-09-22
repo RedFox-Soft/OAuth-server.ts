@@ -194,4 +194,4 @@ indistinguishable from "nothing happened", the one answer an audit trail must ne
 - [[upstream-federation]] — the four rows it added, and why a provider's `targetType` is the bucket that
   holds it rather than the provider itself.
 
-Verified against [[oauth-server-codebase]] as changed by `specs/016-admin-audit-completeness`.
+Verified against [[oauth-server-codebase]].
