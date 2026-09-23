@@ -15,6 +15,7 @@ import { ClientDefaults } from 'lib/configs/clientBase.js';
 import sectorIdentifier from '../../lib/helpers/sector_identifier.ts';
 import keys, { stripPrivateJWKFields } from '../keys.js';
 import addClient from '../../lib/helpers/add_client.ts';
+import { ATTRIBUTES, BASE_ATTRIBUTES } from 'lib/consts/client_attributes.js';
 import { TestAdapter } from '../models.js';
 import getConfig from '../default.config.js';
 
@@ -2460,6 +2461,254 @@ describe('Client metadata validation', () => {
 			expect(client.metadata()).toHaveProperty(
 				'token_endpoint_auth_method',
 				'client_secret_basic'
+			);
+		});
+	});
+	/*
+	 * Registration does not only refuse unacceptable metadata; it reshapes acceptable metadata, and
+	 * what a client is afterwards depends on that. These pin the reshaping that was otherwise unproven,
+	 * so a replacement that refuses identically but reshapes differently cannot pass.
+	 */
+	describe('reshaping of accepted metadata', function () {
+		const mtls = {
+			clientAuthMethods: [
+				'none',
+				'client_secret_basic',
+				'client_secret_post',
+				'private_key_jwt',
+				'client_secret_jwt',
+				'tls_client_auth'
+			],
+			'mTLS.enabled': true,
+			'mTLS.selfSignedTlsClientAuth': true,
+			'mTLS.tlsClientAuth': true
+		};
+
+		[
+			'tls_client_auth_subject_dn',
+			'tls_client_auth_san_dns',
+			'tls_client_auth_san_uri',
+			'tls_client_auth_san_ip',
+			'tls_client_auth_san_email'
+		].forEach((prop) => {
+			it(`drops ${prop} when the authentication method does not use a certificate`, async () => {
+				const client = await register(
+					{ token_endpoint_auth_method: 'client_secret_basic', [prop]: 'foo' },
+					mtls
+				);
+
+				expect(client.metadata()).not.toHaveProperty(prop);
+			});
+		});
+
+		it('keeps the certificate subject when the authentication method is tls_client_auth', async () => {
+			const client = await register(
+				{
+					token_endpoint_auth_method: 'tls_client_auth',
+					tls_client_auth_san_dns: 'foo'
+				},
+				mtls
+			);
+
+			expect(client.metadata()).toHaveProperty(
+				'tls_client_auth_san_dns',
+				'foo'
+			);
+		});
+
+		it('de-duplicates repeated contacts', async () => {
+			const client = await register({
+				contacts: ['dev@example.com', 'dev@example.com', 'ops@example.com']
+			});
+
+			expect(client.metadata()).toHaveProperty('contacts', [
+				'dev@example.com',
+				'ops@example.com'
+			]);
+		});
+
+		it('de-duplicates repeated default_acr_values', async () => {
+			const client = await register(
+				{ default_acr_values: ['1', '1', '2'] },
+				{ acrValues: { password: '1', multi_factor: '2', federated: '3' } }
+			);
+
+			expect(client.metadata()).toHaveProperty('default_acr_values', [
+				'1',
+				'2'
+			]);
+		});
+
+		it('de-duplicates repeated post_logout_redirect_uris', async () => {
+			const client = await register(
+				{
+					post_logout_redirect_uris: [
+						'https://client.example.com/logout',
+						'https://client.example.com/logout'
+					]
+				},
+				{ 'rpInitiatedLogout.enabled': true }
+			);
+
+			expect(client.metadata()).toHaveProperty('post_logout_redirect_uris', [
+				'https://client.example.com/logout'
+			]);
+		});
+
+		it('collapses repeated scope values', async () => {
+			const client = await register({ scope: 'openid openid offline_access' });
+
+			expect(client.metadata()).toHaveProperty(
+				'scope',
+				'openid offline_access'
+			);
+		});
+
+		/*
+		 * Not normalised: a doubled separator parses to an empty scope value, which is not one the server
+		 * supports, so the registration is refused. Asserted as the refusal because that is what the code
+		 * does — an earlier attempt assumed the opposite and the implementation disproved it.
+		 */
+		it('refuses a scope with a doubled separator', async () => {
+			await expect(
+				register({ scope: 'openid  offline_access' })
+			).rejects.toMatchObject({
+				error: 'invalid_client_metadata',
+				error_description:
+					'scope must only contain Authorization Server supported scope values'
+			});
+		});
+	});
+	/*
+	 * Enumerates the attribute declaration itself, so a rule an entry declares but the validator stops
+	 * applying fails here by name — the defect this closes is the attribute whose rule silently stopped
+	 * being enforced, which no single example can catch.
+	 */
+	describe('every declared attribute rule is enforced', function () {
+		const everything = {
+			clientAuthMethods: [
+				'none',
+				'client_secret_basic',
+				'client_secret_post',
+				'private_key_jwt',
+				'client_secret_jwt',
+				'tls_client_auth',
+				'self_signed_tls_client_auth'
+			],
+			acrValues: { password: '1', multi_factor: '2', federated: '3' },
+			'encryption.enabled': true,
+			'jwtUserinfo.enabled': true,
+			'introspection.enabled': true,
+			'jwtIntrospection.enabled': true,
+			'rpInitiatedLogout.enabled': true,
+			'backchannelLogout.enabled': true,
+			'requestObjects.enabled': true,
+			'responseMode.jwt.enabled': true,
+			'richAuthorizationRequests.enabled': true,
+			'richAuthorizationRequests.types': {
+				'https://scheme.example/payment': { label: 'Initiate a payment' }
+			},
+			'ciba.enabled': true,
+			'mTLS.enabled': true,
+			'mTLS.tlsClientAuth': true,
+			'mTLS.selfSignedTlsClientAuth': true,
+			'mTLS.certificateBoundAccessTokens': true
+		};
+		const withKeys = { jwks: { keys: [sigKey] } };
+
+		const refusalNaming = (name: string) =>
+			expect.objectContaining({
+				error_description: expect.stringContaining(name)
+			});
+
+		for (const [name, rules] of Object.entries(ATTRIBUTES)) {
+			if (rules.array) {
+				it(`refuses ${name} when it is not a list`, async () => {
+					await expect(
+						register({ ...withKeys, [name]: 'not-a-list' }, everything)
+					).rejects.toEqual(refusalNaming(name));
+				});
+			}
+
+			if (rules.values) {
+				it(`refuses ${name} when it is outside its permitted values`, async () => {
+					const value = rules.array
+						? ['not-a-permitted-value']
+						: 'not-a-permitted-value';
+					await expect(
+						register({ ...withKeys, [name]: value }, everything)
+					).rejects.toEqual(refusalNaming(name));
+				});
+			}
+
+			const companion = rules.when?.[0];
+			if (companion) {
+				it(`refuses ${name} when its companion ${companion} is missing`, async () => {
+					await expect(
+						register({ ...withKeys, [name]: 'RSA-OAEP' }, everything)
+					).rejects.toEqual(refusalNaming(companion));
+				});
+			}
+		}
+
+		for (const [name, rules] of Object.entries(BASE_ATTRIBUTES)) {
+			if (rules.required) {
+				it(`refuses a registration missing ${name}`, async () => {
+					await expect(register({ [name]: undefined })).rejects.toEqual(
+						expect.objectContaining({
+							error_description: `${name} is mandatory property`
+						})
+					);
+				});
+			}
+
+			const { oneOf, printable } = rules;
+			if (oneOf) {
+				it(`refuses ${name} outside its permitted values, with its own wording`, async () => {
+					await expect(
+						register({ [name]: 'not-a-permitted-value' })
+					).rejects.toEqual(
+						expect.objectContaining({ error_description: oneOf.refusal })
+					);
+				});
+			}
+
+			if (printable) {
+				it(`refuses ${name} carrying a non-printable character, with its own wording`, async () => {
+					await expect(register({ [name]: 'ab' })).rejects.toEqual(
+						expect.objectContaining({ error_description: printable })
+					);
+				});
+			}
+		}
+	});
+	/*
+	 * A permitted-value set is read from the configuration in force when the registration is validated,
+	 * not frozen when the module loads — so a capability an operator switches on governs the next
+	 * registration. Proven by registering the same metadata under two configurations in one process.
+	 */
+	describe('permitted values follow the configuration in force', function () {
+		const metadata = { token_endpoint_auth_method: 'client_secret_jwt' };
+
+		it('accepts an authentication method the deployment enables', async () => {
+			const client = await register(metadata, {
+				clientAuthMethods: ['client_secret_basic', 'client_secret_jwt']
+			});
+
+			expect(client.metadata()).toHaveProperty(
+				'token_endpoint_auth_method',
+				'client_secret_jwt'
+			);
+		});
+
+		it('refuses the same method once the deployment stops enabling it', async () => {
+			await expect(
+				register(metadata, { clientAuthMethods: ['client_secret_basic'] })
+			).rejects.toEqual(
+				expect.objectContaining({
+					error_description:
+						"token_endpoint_auth_method must be 'client_secret_basic'"
+				})
 			);
 		});
 	});

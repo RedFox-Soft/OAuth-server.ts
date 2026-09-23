@@ -1,10 +1,14 @@
 import { CLIENT_ATTRIBUTES } from '../../consts/index.ts';
-import { noVSCHAR } from '../../consts/client_attributes.ts';
+import {
+	BASE_ATTRIBUTES,
+	noVSCHAR,
+	recognizedFrom,
+	type ValueSetContext
+} from '../../consts/client_attributes.ts';
 import { ApplicationConfig, configuration } from '../../configs/application.ts';
 import { ClientDefaults } from '../../configs/clientBase.ts';
 
 import { InvalidClientMetadata } from '../../helpers/errors.ts';
-import sectorIdentifier from '../../helpers/sector_identifier.ts';
 import * as formatters from '../../helpers/formatters.ts';
 import { pick } from '../../helpers/_/object.js';
 import omitBy from '../../helpers/_/omit_by.ts';
@@ -47,8 +51,10 @@ const needsJwks = {
 const {
 	ARYS,
 	DEFAULT: DEFAULTS,
-	RECOGNIZED_METADATA: RECOGNIZED,
+	FORCED,
+	FORMATTED,
 	STRING,
+	VALUE_SETS,
 	WHEN
 } = CLIENT_ATTRIBUTES;
 
@@ -62,98 +68,29 @@ function isUndefined(value) {
 // key recognized here is one the schema engine will read, camelCase onto the client, and echo back
 // out of `clientMetadata` — so a stale list would accept and advertise metadata for a disabled
 // feature. Callers that consult it per-key must hoist the call out of their loop.
+/*
+ * The configuration a value set is computed from, read when the pass runs rather than when the
+ * module loads: capabilities change while the server runs, and a set read earlier would freeze.
+ */
+function valueSetContext(): ValueSetContext {
+	return {
+		acrValues: configuration.acrValues,
+		clientAuthMethods: configuration.clientAuthMethods,
+		cibaDeliveryModes: ApplicationConfig['ciba.deliveryModes'],
+		authorizationDetailsTypes: Object.keys(
+			ApplicationConfig['richAuthorizationRequests.types']
+		),
+		idTokenSigningAlgs: idTokenSigningAlgValues,
+		userinfoSigningAlgs: userinfoSigningAlgValues,
+		introspectionSigningAlgs: introspectionSigningAlgValues,
+		authorizationSigningAlgs: authorizationSigningAlgValues,
+		requestObjectEncryptionAlgs: requestObjectEncryptionAlgValues,
+		clientAuthSigningAlgs: clientAuthSigningAlgValues
+	};
+}
+
 export function buildRecognizedMetadata() {
-	const RECOGNIZED_METADATA = [...RECOGNIZED];
-
-	if (
-		ApplicationConfig['mTLS.enabled'] &&
-		ApplicationConfig['mTLS.tlsClientAuth']
-	) {
-		RECOGNIZED_METADATA.push('tls_client_auth_subject_dn');
-		RECOGNIZED_METADATA.push('tls_client_auth_san_dns');
-		RECOGNIZED_METADATA.push('tls_client_auth_san_uri');
-		RECOGNIZED_METADATA.push('tls_client_auth_san_ip');
-		RECOGNIZED_METADATA.push('tls_client_auth_san_email');
-		RECOGNIZED_METADATA.push('use_mtls_endpoint_aliases');
-	}
-
-	RECOGNIZED_METADATA.push('token_endpoint_auth_signing_alg');
-
-	if (ApplicationConfig['jwtUserinfo.enabled']) {
-		RECOGNIZED_METADATA.push('userinfo_signed_response_alg');
-	}
-
-	if (ApplicationConfig['introspection.enabled']) {
-		if (ApplicationConfig['jwtIntrospection.enabled']) {
-			RECOGNIZED_METADATA.push('introspection_signed_response_alg');
-
-			if (ApplicationConfig['encryption.enabled']) {
-				RECOGNIZED_METADATA.push('introspection_encrypted_response_alg');
-				RECOGNIZED_METADATA.push('introspection_encrypted_response_enc');
-			}
-		}
-	}
-
-	if (ApplicationConfig['rpInitiatedLogout.enabled']) {
-		RECOGNIZED_METADATA.push('post_logout_redirect_uris');
-	}
-
-	if (ApplicationConfig['backchannelLogout.enabled']) {
-		RECOGNIZED_METADATA.push('backchannel_logout_session_required');
-		RECOGNIZED_METADATA.push('backchannel_logout_uri');
-	}
-
-	if (ApplicationConfig['requestObjects.enabled']) {
-		// request_object_signing_alg is no longer recognized snake metadata — the value
-		// is the canonical dotted `requestObject.signingAlg` base key (Model B), validated
-		// by TypeBox and read by consumers directly.
-		RECOGNIZED_METADATA.push('require_signed_request_object');
-		if (ApplicationConfig['encryption.enabled']) {
-			RECOGNIZED_METADATA.push('request_object_encryption_alg');
-			RECOGNIZED_METADATA.push('request_object_encryption_enc');
-		}
-	}
-
-	if (ApplicationConfig['encryption.enabled']) {
-		RECOGNIZED_METADATA.push('id_token_encrypted_response_alg');
-		RECOGNIZED_METADATA.push('id_token_encrypted_response_enc');
-		if (ApplicationConfig['jwtUserinfo.enabled']) {
-			RECOGNIZED_METADATA.push('userinfo_encrypted_response_alg');
-			RECOGNIZED_METADATA.push('userinfo_encrypted_response_enc');
-		}
-	}
-
-	if (ApplicationConfig['responseMode.jwt.enabled']) {
-		RECOGNIZED_METADATA.push('authorization_signed_response_alg');
-		if (ApplicationConfig['encryption.enabled']) {
-			RECOGNIZED_METADATA.push('authorization_encrypted_response_alg');
-			RECOGNIZED_METADATA.push('authorization_encrypted_response_enc');
-		}
-	}
-
-	if (
-		ApplicationConfig['mTLS.enabled'] &&
-		ApplicationConfig['mTLS.certificateBoundAccessTokens']
-	) {
-		RECOGNIZED_METADATA.push('tls_client_certificate_bound_access_tokens');
-	}
-
-	if (ApplicationConfig['ciba.enabled']) {
-		RECOGNIZED_METADATA.push('backchannel_token_delivery_mode');
-		RECOGNIZED_METADATA.push('backchannel_user_code_parameter');
-		RECOGNIZED_METADATA.push('backchannel_client_notification_endpoint');
-		// backchannel_authentication_request_signing_alg is no longer recognized snake
-		// metadata — the value is the canonical dotted `requestObject.backChannelSigningAlg`
-		// base key (Model B), validated by TypeBox and read by consumers directly.
-	}
-
-	RECOGNIZED_METADATA.push('dpop_bound_access_tokens');
-
-	if (ApplicationConfig['richAuthorizationRequests.enabled']) {
-		RECOGNIZED_METADATA.push('authorization_details_types');
-	}
-
-	return RECOGNIZED_METADATA;
+	return recognizedFrom(ApplicationConfig);
 }
 
 export default function getSchema() {
@@ -162,55 +99,6 @@ export default function getSchema() {
 	const RECOGNIZED_METADATA = buildRecognizedMetadata();
 	const DEFAULT = structuredClone(DEFAULTS);
 	Object.assign(DEFAULT, wireFormatClientDefaults());
-
-	const ENUM = {
-		default_acr_values: () => configuration.acrValues,
-		id_token_signed_response_alg: () => idTokenSigningAlgValues,
-		// request_object_signing_alg / backchannel_authentication_request_signing_alg are
-		// now validated by TypeBox literal unions on the canonical dotted keys
-		// (requestObject.signingAlg / requestObject.backChannelSigningAlg) — no runtime ENUM.
-		backchannel_token_delivery_mode: () =>
-			ApplicationConfig['ciba.deliveryModes'],
-		request_object_encryption_alg: () => requestObjectEncryptionAlgValues,
-		authorization_details_types: () =>
-			Object.keys(ApplicationConfig['richAuthorizationRequests.types']),
-		token_endpoint_auth_method: (metadata) => {
-			if (metadata.metadata.subjectType === 'pairwise') {
-				for (const grant of [
-					'urn:ietf:params:oauth:grant-type:device_code',
-					'urn:openid:params:grant-type:ciba'
-				]) {
-					if (
-						metadata.metadata.grantTypes.includes(grant) &&
-						!['private_key_jwt', 'self_signed_tls_client_auth'].includes(
-							metadata.token_endpoint_auth_method
-						)
-					) {
-						metadata.invalidate(
-							`pairwise ${grant} clients must utilize private_key_jwt or self_signed_tls_client_auth token endpoint authentication methods`
-						);
-					}
-				}
-			}
-
-			return configuration.clientAuthMethods;
-		},
-		token_endpoint_auth_signing_alg: ({
-			token_endpoint_auth_method: method
-		}) => {
-			switch (method) {
-				case 'private_key_jwt':
-					return clientAuthSigningAlgValues.filter((x) => !x.startsWith('HS'));
-				case 'client_secret_jwt':
-					return clientAuthSigningAlgValues.filter((x) => x.startsWith('HS'));
-				default:
-					return [];
-			}
-		},
-		userinfo_signed_response_alg: () => userinfoSigningAlgValues,
-		introspection_signed_response_alg: () => introspectionSigningAlgValues,
-		authorization_signed_response_alg: () => authorizationSigningAlgValues
-	};
 
 	class Schema {
 		constructor(metadata) {
@@ -238,105 +126,10 @@ export default function getSchema() {
 			this.enums();
 			// Web/HTTPS URL shapes and the non-negative-integer checks for
 			// default_max_age / client_secret_expires_at now live in ClientSchema (TypeBox).
-			this.scopes();
-			this.postLogoutRedirectUris();
-			validateRedirectUri(
-				metadata.redirectUris ?? [],
-				metadata.applicationType
-			);
-			this.checkContacts();
-			this.jarPolicy();
+			this.formats();
+			this.forced();
 
-			const responseTypes = this.metadata.responseTypes;
-
-			if (
-				Array.isArray(this.metadata.grantTypes) &&
-				this.metadata.grantTypes.includes('authorization_code') &&
-				!responseTypes?.length
-			) {
-				this.invalidate('responseTypes must contain members');
-			}
-
-			if (responseTypes?.length && !this.metadata.redirectUris?.length) {
-				// Empty redirect_uris is only permissible when PAR allows
-				// unregistered redirect URIs AND this client requires PAR — and
-				// never for `none` auth or pairwise sector clients (which resolve a
-				// sector from the redirect URIs).
-				const parAllowsUnregistered =
-					ApplicationConfig['par.enabled'] &&
-					ApplicationConfig['par.allowUnregisteredRedirectUris'] &&
-					this.metadata['authorization.requirePushedAuthorizationRequests'] &&
-					this.token_endpoint_auth_method !== 'none' &&
-					!this.sector_identifier_uri;
-
-				if (!parAllowsUnregistered) {
-					this.invalidate('redirectUris must contain members');
-				}
-			}
-
-			if (responseTypes?.length && this.metadata.responseModes?.length === 0) {
-				this.invalidate('responseModes must contain members');
-			}
-
-			if (
-				responseTypes?.includes('code') &&
-				Array.isArray(this.metadata.grantTypes) &&
-				!this.metadata.grantTypes.includes('authorization_code')
-			) {
-				this.invalidate(
-					"grantTypes must contain 'authorization_code' when code is amongst responseTypes"
-				);
-			}
-
-			{
-				const { 0: pop, length } = [
-					'tls_client_certificate_bound_access_tokens',
-					'dpop_bound_access_tokens'
-				].filter((conf) => this[conf]);
-
-				if (length > 1) {
-					this.invalidate(
-						'only one proof of possession mechanism can be made required at a time'
-					);
-				}
-			}
-
-			{
-				const { length } = [
-					this.tls_client_auth_san_dns,
-					this.tls_client_auth_san_email,
-					this.tls_client_auth_san_ip,
-					this.tls_client_auth_san_uri,
-					this.tls_client_auth_subject_dn
-				].filter(Boolean);
-
-				if (this.token_endpoint_auth_method === 'tls_client_auth') {
-					if (length === 0) {
-						this.invalidate(
-							'tls_client_auth requires one of the certificate subject value parameters'
-						);
-					}
-
-					if (length !== 1) {
-						this.invalidate(
-							'only one tls_client_auth certificate subject value must be provided'
-						);
-					}
-				} else {
-					delete this.tls_client_auth_san_dns;
-					delete this.tls_client_auth_san_email;
-					delete this.tls_client_auth_san_ip;
-					delete this.tls_client_auth_san_uri;
-					delete this.tls_client_auth_subject_dn;
-				}
-			}
-
-			// SECTOR IDENTIFIER VALIDATION
-			sectorIdentifier(this);
-
-			if (this.jwks !== undefined && this.jwks_uri !== undefined) {
-				this.invalidate('jwks and jwks_uri must not be used at the same time');
-			}
+			this.crossFieldRules();
 
 			this.ensureStripUnrecognized();
 		}
@@ -351,77 +144,43 @@ export default function getSchema() {
 		// same upstream message shapes (kept camelCased to match `metadata()` and
 		// the `invalid_redirect_uri` mapping) before the constructor reaches the
 		// inline `responseTypes`/`grantTypes` checks that assume valid arrays.
+		/*
+		 * The base registration keys, each checked by the rules its entry declares, in declaration order —
+		 * see BASE_ATTRIBUTES for why "not sent" differs between them.
+		 */
 		baseKeys() {
-			const m = this.metadata;
+			for (const [name, rules] of Object.entries(BASE_ATTRIBUTES)) {
+				const value = this.metadata[name];
 
-			if (m.applicationType !== undefined) {
-				if (
-					typeof m.applicationType !== 'string' ||
-					!m.applicationType.length
-				) {
-					this.invalidate(
-						'applicationType must be a non-empty string if provided'
-					);
-				}
-				if (!['web', 'native'].includes(m.applicationType)) {
-					this.invalidate("applicationType must be 'native' or 'web'");
-				}
-			}
-
-			if (
-				m.clientId === undefined ||
-				m.clientId === null ||
-				m.clientId === ''
-			) {
-				this.invalidate('clientId is mandatory property');
-			}
-			if (typeof m.clientId !== 'string') {
-				this.invalidate('clientId must be a non-empty string if provided');
-			}
-			if (noVSCHAR.test(m.clientId)) {
-				this.invalidate('invalid client_id value');
-			}
-
-			if (
-				m.clientSecret === undefined ||
-				m.clientSecret === null ||
-				m.clientSecret === ''
-			) {
-				if (needsSecret(this)) {
-					this.invalidate('clientSecret is mandatory property');
-				}
-			} else {
-				if (typeof m.clientSecret !== 'string') {
-					this.invalidate(
-						'clientSecret must be a non-empty string if provided'
-					);
-				}
-				if (noVSCHAR.test(m.clientSecret)) {
-					this.invalidate('invalid client_secret value');
-				}
-			}
-
-			if (m.subjectType !== undefined) {
-				if (typeof m.subjectType !== 'string' || !m.subjectType.length) {
-					this.invalidate('subjectType must be a non-empty string if provided');
-				}
-				if (!['public', 'pairwise'].includes(m.subjectType)) {
-					this.invalidate('subjectType must be public or pairwise');
-				}
-			}
-
-			// redirectUris: only reached when not mandatory (required() throws first
-			// for the missing/empty-string cases when responseTypes are present), so
-			// a non-array here (incl. null for grant-only clients) is a type error.
-			if (m.redirectUris !== undefined && m.redirectUris !== '') {
-				if (!Array.isArray(m.redirectUris)) {
-					this.invalidate('redirectUris must be an array');
-				}
-				m.redirectUris.forEach((member) => {
-					if (typeof member !== 'string') {
-						this.invalidate('redirectUris must only contain strings');
+				if ((rules.absent ?? [undefined]).includes(value)) {
+					if (rules.required) {
+						this.invalidate(`${name} is mandatory property`);
 					}
-				});
+					continue;
+				}
+
+				if (rules.string && (typeof value !== 'string' || !value.length)) {
+					this.invalidate(`${name} must be a non-empty string if provided`);
+				}
+
+				if (rules.array) {
+					if (!Array.isArray(value)) {
+						this.invalidate(`${name} must be an array`);
+					}
+					value.forEach((member) => {
+						if (typeof member !== 'string') {
+							this.invalidate(`${name} must only contain strings`);
+						}
+					});
+				}
+
+				if (rules.oneOf && !rules.oneOf.values.includes(value)) {
+					this.invalidate(rules.oneOf.refusal);
+				}
+
+				if (rules.printable && noVSCHAR.test(value)) {
+					this.invalidate(rules.printable);
+				}
 			}
 		}
 
@@ -539,13 +298,44 @@ export default function getSchema() {
 			});
 		}
 
+		/*
+		 * A cross-field rule, not a value set: a pairwise client on the device-code or CIBA grant must
+		 * authenticate with a key it holds. It has always been raised at the moment the authentication
+		 * method's permitted set is consulted, and stays there so a registration breaking it and another
+		 * value-set rule is refused with the same description as before.
+		 */
+		pairwiseGrantAuthMethod() {
+			if (this.metadata.subjectType !== 'pairwise') {
+				return;
+			}
+			for (const grant of [
+				'urn:ietf:params:oauth:grant-type:device_code',
+				'urn:openid:params:grant-type:ciba'
+			]) {
+				if (
+					this.metadata.grantTypes.includes(grant) &&
+					!['private_key_jwt', 'self_signed_tls_client_auth'].includes(
+						this.token_endpoint_auth_method
+					)
+				) {
+					this.invalidate(
+						`pairwise ${grant} clients must utilize private_key_jwt or self_signed_tls_client_auth token endpoint authentication methods`
+					);
+				}
+			}
+		}
+
 		enums() {
-			Object.entries(ENUM).forEach(([prop, fn]) => {
-				const only = fn(this);
+			const context = valueSetContext();
+			VALUE_SETS.forEach(([prop, values]) => {
+				if (prop === 'token_endpoint_auth_method') {
+					this.pairwiseGrantAuthMethod();
+				}
+				const only = values(context, this);
 
 				if (this[prop] !== undefined) {
 					const isAry = ARYS.includes(prop);
-					// An allowed set arrives as either a Set or an Array depending on the ENUM entry.
+					// An allowed set arrives as either a Set or an Array depending on the entry.
 					// Membership is asked through one predicate rather than by indexing whichever
 					// method name fits, so the union does not have to be indexed by a string.
 					const length = only instanceof Set ? only.size : only.length;
@@ -575,32 +365,156 @@ export default function getSchema() {
 			});
 		}
 
-		postLogoutRedirectUris() {
-			if (this.post_logout_redirect_uris) {
-				validateRedirectUri(
-					this.post_logout_redirect_uris,
-					this.metadata.applicationType,
-					{ label: 'post_logout_redirect_uris' }
+		/*
+		 * The named checks attributes declare, in the order FORMAT_RANK fixes. Each reads the attribute
+		 * where its half keeps it: registration metadata on the instance, base keys on the submission.
+		 */
+		formats() {
+			for (const [name, format, half] of FORMATTED) {
+				const value = half === 'base' ? this.metadata[name] : this[name];
+				switch (format) {
+					case 'scope-list':
+						if (value) {
+							const parsed = new Set<string>(value.split(' '));
+							parsed.forEach((scope) => {
+								if (!scopes.has(scope)) {
+									this.invalidate(
+										`${name} must only contain Authorization Server supported scope values`
+									);
+								}
+							});
+							this[name] = [...parsed].join(' ');
+						}
+						break;
+					case 'redirect-uri':
+						validateRedirectUri(value ?? [], this.metadata.applicationType, {
+							label: name
+						});
+						break;
+					case 'email':
+						if (value) {
+							value.forEach((contact) => {
+								if (!W3CEmailRegExp.test(contact)) {
+									this.invalidate(`${name} can only contain email addresses`);
+								}
+							});
+						}
+						break;
+				}
+			}
+		}
+
+		/* Values a deployment setting imposes regardless of what the client sent. */
+		forced() {
+			for (const [name, { flags, value }] of FORCED) {
+				if (flags.every((flag) => ApplicationConfig[flag])) {
+					this[name] = value;
+				}
+			}
+		}
+
+		/*
+		 * The rules that are not a property of any one attribute, so they cannot live in the declaration.
+		 * Named here so they can be counted rather than found. With `required()` and
+		 * `pairwiseGrantAuthMethod()` they are the whole set of rules this validator keeps as code:
+		 *
+		 *   - response types are required when the authorization-code grant is used
+		 *   - redirect targets are required with response types, unless a pushed request may omit them
+		 *   - response modes may not be empty when response types are present
+		 *   - the code response type requires the authorization-code grant
+		 *   - at most one proof-of-possession mechanism may be required
+		 *   - tls_client_auth needs exactly one certificate subject; other methods carry none
+		 *   - an inline key set and a key-set URI are not both allowed
+		 *
+		 * The order is the order they have always been checked in.
+		 */
+		crossFieldRules() {
+			const responseTypes = this.metadata.responseTypes;
+
+			if (
+				Array.isArray(this.metadata.grantTypes) &&
+				this.metadata.grantTypes.includes('authorization_code') &&
+				!responseTypes?.length
+			) {
+				this.invalidate('responseTypes must contain members');
+			}
+
+			if (responseTypes?.length && !this.metadata.redirectUris?.length) {
+				// Empty redirect_uris is only permissible when PAR allows
+				// unregistered redirect URIs AND this client requires PAR — and
+				// never for `none` auth or pairwise sector clients (which resolve a
+				// sector from the redirect URIs).
+				const parAllowsUnregistered =
+					ApplicationConfig['par.enabled'] &&
+					ApplicationConfig['par.allowUnregisteredRedirectUris'] &&
+					this.metadata['authorization.requirePushedAuthorizationRequests'] &&
+					this.token_endpoint_auth_method !== 'none' &&
+					!this.sector_identifier_uri;
+
+				if (!parAllowsUnregistered) {
+					this.invalidate('redirectUris must contain members');
+				}
+			}
+
+			if (responseTypes?.length && this.metadata.responseModes?.length === 0) {
+				this.invalidate('responseModes must contain members');
+			}
+
+			if (
+				responseTypes?.includes('code') &&
+				Array.isArray(this.metadata.grantTypes) &&
+				!this.metadata.grantTypes.includes('authorization_code')
+			) {
+				this.invalidate(
+					"grantTypes must contain 'authorization_code' when code is amongst responseTypes"
 				);
 			}
-		}
 
-		checkContacts() {
-			if (this.contacts) {
-				this.contacts.forEach((contact) => {
-					if (!W3CEmailRegExp.test(contact)) {
-						this.invalidate('contacts can only contain email addresses');
-					}
-				});
+			{
+				const { 0: pop, length } = [
+					'tls_client_certificate_bound_access_tokens',
+					'dpop_bound_access_tokens'
+				].filter((conf) => this[conf]);
+
+				if (length > 1) {
+					this.invalidate(
+						'only one proof of possession mechanism can be made required at a time'
+					);
+				}
 			}
-		}
 
-		jarPolicy() {
-			if (
-				ApplicationConfig['requestObjects.enabled'] &&
-				ApplicationConfig['requestObjects.requireSignedRequestObject']
-			) {
-				this.require_signed_request_object = true;
+			{
+				const { length } = [
+					this.tls_client_auth_san_dns,
+					this.tls_client_auth_san_email,
+					this.tls_client_auth_san_ip,
+					this.tls_client_auth_san_uri,
+					this.tls_client_auth_subject_dn
+				].filter(Boolean);
+
+				if (this.token_endpoint_auth_method === 'tls_client_auth') {
+					if (length === 0) {
+						this.invalidate(
+							'tls_client_auth requires one of the certificate subject value parameters'
+						);
+					}
+
+					if (length !== 1) {
+						this.invalidate(
+							'only one tls_client_auth certificate subject value must be provided'
+						);
+					}
+				} else {
+					delete this.tls_client_auth_san_dns;
+					delete this.tls_client_auth_san_email;
+					delete this.tls_client_auth_san_ip;
+					delete this.tls_client_auth_san_uri;
+					delete this.tls_client_auth_subject_dn;
+				}
+			}
+
+			if (this.jwks !== undefined && this.jwks_uri !== undefined) {
+				this.invalidate('jwks and jwks_uri must not be used at the same time');
 			}
 		}
 
@@ -611,20 +525,6 @@ export default function getSchema() {
 					delete this[prop];
 				}
 			});
-		}
-
-		scopes() {
-			if (this.scope) {
-				const parsed = new Set<string>(this.scope.split(' '));
-				parsed.forEach((scope) => {
-					if (!scopes.has(scope)) {
-						this.invalidate(
-							'scope must only contain Authorization Server supported scope values'
-						);
-					}
-				});
-				this.scope = [...parsed].join(' ');
-			}
 		}
 	}
 

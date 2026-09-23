@@ -9,6 +9,13 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+### Changed
+
+- client: each registration attribute's validation rules are declared once, in
+  `lib/consts/client_attributes.ts`, replacing five parallel lists that nothing kept in step. No
+  behaviour change, verified against 33,159 registrations; three rules that could never fire, and one
+  check that never ran, are removed.
+
 ## [0.5.0] - 2026-09-21
 
 A user bucket finishes becoming a tenant. 0.4.0 gave it a path beneath the server; this release lets

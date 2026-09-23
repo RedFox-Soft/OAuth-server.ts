@@ -71,6 +71,9 @@ The rule in one line, and it decides every such proposal:
 > A flat field may replace several flat fields that were alternatives.
 > A flat field may not become a nested object holding fields that were never alternatives.
 
+Where each registration attribute's validation rules are declared, and what to know before editing
+that declaration: [[client-registration-attributes]].
+
 ## Derived configuration is validated once, at load
 
 `configuration` is the derived view — collections as `Set`s, scopes cross-referenced against claims —
