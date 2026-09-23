@@ -4,7 +4,7 @@ title: 'Error store capture sites'
 tags: [architecture, gotcha, contract]
 sources: [oauth-server-codebase]
 created: 2026-08-26
-updated: 2026-08-26
+updated: 2026-09-23
 graph:
   node_type: concept
   relationships:
@@ -41,6 +41,15 @@ already documents holds for free, without a second check.
 `status` is narrowed to a number first: `set.status` may be one of Elysia's status *names*, and comparing
 a name against 500 is `false` rather than an error, so an un-narrowed test would silently record nothing
 on precisely the responses the store exists for.
+
+## Recording never blocks or fails a request
+
+A fault is enqueued and the response goes out; the write happens in the background
+(`lib/error_store/queue.ts:118`). A store that fails to write degrades to `console.error` rather than
+becoming a second failure the caller sees. A full queue neither blocks nor drops silently: it
+**counts** what it could not accept, and the read surface reports that count as `dropped`
+(`lib/admin/errors/routes.ts:150`) so an operator is never shown an incomplete store as complete. The
+loss window is therefore stated: a process killed abruptly loses at most `errorStore.queueDepth` records.
 
 ## The reference identifier
 

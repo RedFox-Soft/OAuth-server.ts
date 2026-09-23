@@ -4,7 +4,7 @@ title: 'The PostgreSQL backend: two expiry reversals, a silent encoding defect, 
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-10
-updated: 2026-09-10
+updated: 2026-09-23
 ---
 
 # The PostgreSQL backend
@@ -13,6 +13,13 @@ A second production datastore, selected by `POSTGRES_URL` where MongoDB is selec
 `MONGODB_URI`. Nothing above the storage layer changed — the endpoints, the console, the agent
 surface and the tests are the same — so the interesting content is not the adapter but the
 decisions that were made wrong first and the defects only a real database could show.
+
+**Exactly one connection string may be set** (`selectBackend`, `lib/adapters/selectBackend.ts:37`).
+Both set is refused at startup rather than resolved by precedence: a server that quietly picked the
+other database would look, from outside, exactly like total data loss. Neither set selects the
+in-memory adapter, which the test run and the docs export rely on — so a script that must run
+hermetically deletes `MONGODB_URI`, `POSTGRES_URL` and `DATABASE_NAME`, because Bun loads `.env` and
+`.env.local` on its own. PostgreSQL takes its database name from the URL; `DATABASE_NAME` is unused.
 
 ## The two expiry reversals
 
@@ -138,6 +145,13 @@ startup gate closes that deliberately created divergence.
   shape every declared migration produces, so provisioning records them as applied instead of
   running them. On MongoDB this had to be written with the raw driver — importing `lib/adapters`
   from the provisioning script opened a second connection that never closed and hung the script.
+- **The gate only refuses; it never applies.** `assertMigrationsCurrent` (`lib/migrations/gate.ts:18`)
+  is called from the server entry, not from anything the models import, and tells the operator to run
+  `bun run db:migrate` (`--plan` to gate a deploy) — so an upgrade's data changes happen when an
+  operator chose them, not as a side effect of a restart that might be a crash loop. `ahead` is
+  reported before `behind`, because an older binary writing a newer database is silent damage.
+- **The set ships empty** (`MIGRATIONS`, `lib/consts/migrations.ts:71`), which is why the runner takes
+  it as an argument: a fixture set covers the machinery.
 - The one-off `managedBy → ownerGroupId` conversion was **retired**, not carried in. See
   [[group-ownership]]; a deployment old enough to need it upgrades through an earlier release first.
 

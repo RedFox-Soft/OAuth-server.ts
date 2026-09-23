@@ -4,7 +4,7 @@ title: 'Authorization for MCP servers'
 tags: [architecture, contract, gotcha, config]
 sources: [oauth-server-codebase]
 created: 2026-09-08
-updated: 2026-09-08
+updated: 2026-09-23
 graph:
   node_type: concept
 ---
@@ -76,7 +76,11 @@ The current MCP authorization revision (2026-07-28) marks dynamic client registr
 and names OAuth Client ID Metadata Documents first. `lib/client_metadata_document/` implements that in
 four modules, and the split is deliberate: `fetch.ts` is the whole egress boundary and knows nothing
 about JSON shapes, so it can be reviewed for one question only — can a caller make this server talk to
-something it should not.
+something it should not. It bounds the address classes it will reach, re-checks every redirect hop,
+stops at 5 KB (`MAX_DOCUMENT_BYTES`, `lib/client_metadata_document/fetch.ts:34`) and times out. The
+whole branch is gated on `clientIdMetadataDocument.enabled`, **off by default**
+(`lib/configs/application.ts:554`), because it lets an unauthenticated caller make this server issue an
+outbound request.
 
 Three traps live here.
 

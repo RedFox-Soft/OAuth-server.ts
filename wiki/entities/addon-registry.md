@@ -6,7 +6,7 @@ aliases: [addons, override registry, resolve, lib/addon]
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-01
-updated: 2026-09-01
+updated: 2026-09-23
 graph:
   node_id: subsystem:addon-registry
   node_type: subsystem
@@ -70,6 +70,10 @@ no module needs to be imported in a particular order for it to apply.
 Source modules import these accessors; they **never** read the functions off the merged
 configuration. A global `afterEach` in `test/preload.ts` calls `addons.reset()`, which deletes each
 key rather than reassigning the object, so suites stay isolated without the map identity changing.
+It resets to a **baseline**, not to empty: `test/addon_baseline.ts` takes a `*.config.ts`'s `addons`
+export as the spec's baseline when `bootstrap()` runs, so a per-test `addons.override(...)` is wiped
+after each case while the config-declared overrides persist across the spec, and never into the next
+file.
 
 ## The census trap
 

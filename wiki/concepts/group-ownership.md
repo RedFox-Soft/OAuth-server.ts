@@ -4,7 +4,7 @@ title: 'Group ownership of projects and buckets'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-29
-updated: 2026-09-02
+updated: 2026-09-23
 graph:
   node_type: concept
   relationships:
@@ -140,7 +140,12 @@ a database that already has the document rather than only in fresh ones.
 
 ## The migration
 
-`planOwnershipMigration` (`lib/admin/groups/migration.ts`) is a pure function so the rule is testable
+**Retired at `92a60cd`**: `lib/admin/groups/migration.ts` no longer exists, and the conversion was not
+carried into the schema-migration layer (see [[postgresql-backend]]). A deployment old enough to still
+hold `managedBy` upgrades through an earlier release first. The rule it applied is kept below because
+it is the argument against the obvious simplification, should anyone ever regroup containers again.
+
+`planOwnershipMigration` was a pure function so the rule was testable
 without a database. Three rules: one manager → that administrator's personal group; two or more →
 a generated group whose membership is *exactly* that set; none → `unassigned`.
 
@@ -153,6 +158,7 @@ console asks somebody to confirm the grouping.
 
 ## Related
 
+- [[admin-provisioning]] — the scripts that seed the `unassigned` group and the reserved containers
 - [[admin-audit-trail]] — the trail this feature made group-scoped, and the load-bearing route table
   every new group route had to be added to.
 - [[admin-mcp-control-plane]] — why `group_delete` is withheld from agents rather than

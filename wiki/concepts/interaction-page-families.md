@@ -4,7 +4,7 @@ title: "The two interaction page families"
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-04
-updated: 2026-08-05
+updated: 2026-09-23
 graph:
   node_type: concept
   relationships:
@@ -145,6 +145,7 @@ controls.
 
 ## Related
 
+- [[end-user-onboarding]] — the verification pages of the plain family, and the bucket flags behind the registration door
 - [[html-response-security-policy]] — the one constructor every page here goes through, and the origin of
   the rendered-error status rule.
 - [[self-service-password-reset]] — the plain family's other user, and the feature that made the login

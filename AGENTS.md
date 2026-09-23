@@ -1,5 +1,8 @@
 # OAuth-server.ts — Agent Guide
 
+This file holds the rules. The reasons, the history and the traps behind them live in the wiki at
+`wiki/` — each rule below names the page to read **before changing** that area.
+
 ## What this project is
 
 A standards-compliant OAuth 2.1 / OpenID Connect authorization server written in TypeScript, running on [Bun](https://bun.sh/) + [Elysia](https://elysiajs.com/). Downstream apps import the `elysia` app and mount it; there is no init step — importing is what boots it.
@@ -41,7 +44,7 @@ bun run db:setup:pg     # provision PostgreSQL (idempotent; --check reports only
 bun run db:migrate      # apply declared schema migrations (--plan to gate a deploy)
 ```
 
-`bun test` never touches a real database: it runs on the in-memory adapter and the two verification
+`bun test` never touches a real database: it runs on the in-memory adapter, and the two verification
 scripts under `database/` are scripts, not specs, precisely so the default run cannot reach them.
 
 ---
@@ -56,62 +59,15 @@ scripts under `database/` are scripts, not specs, precisely so the default run c
 | `POSTGRES_URL`  | one of the two | PostgreSQL connection string — and what selects PostgreSQL |
 | `NODE_ENV`      | test only      | Set to `test` to use in-memory adapter                     |
 
-**The datastore is chosen by which connection string is set, and exactly one may be** (`lib/adapters/selectBackend.ts`). Both set is refused at startup rather than resolved by precedence: a server that quietly picked the other database would look, from outside, exactly like total data loss. Neither set falls back to the in-memory adapter, which is what `NODE_ENV=test` and the docs-export scripts rely on — which is also why a script that must run hermetically deletes all three variables, since Bun loads `.env` and `.env.local` on its own. PostgreSQL takes its database name from the URL, so `DATABASE_NAME` is unused there.
-
-Signing/decryption keys are **not** an environment variable: they are stored via the `jwksStore`
-adapter and loaded once at startup. The initial RS256 key is provisioned during schema creation
-(`bun run db:setup` → `database/mongodb.ts`); the loader (`lib/configs/keys.ts`) also auto-generates
-and persists one if it finds an empty store (in-memory adapter, un-provisioned store). In tests,
-keys are seeded into the in-memory `jwksStore` by `test/preload.ts`.
-
-The same `bun run db:setup` step seeds the admin panel (reserved admin project + "Administrators"
-bucket + the first-party `admin-panel` OAuth client) via `database/mongodb.ts`. It is idempotent and
-must be re-run after upgrading an existing install. `lib/admin/seed.ts` (`ensureAdminSeed`) is the
-app-side equivalent used by tests; there is **no** boot-time seeding, so admin login requires a
-database-backed, provisioned deployment. On PostgreSQL the equivalent is `bun run db:setup:pg`
-(`database/postgres.ts`), and the values both scripts seed are single-sourced from
-`lib/consts/admin_seed.ts` so a seed change cannot land in one and not the other.
-
-Super-admins manage the running instance through the admin control plane (`lib/admin/`, mounted under
-`/admin/api/*`): projects, clients, buckets, end-users, server settings, and **signing keys**
-(`lib/admin/jwks/` — view/generate/delete over `jwksStore`, persist-then-restart, unlike settings; RSA
-generation only, private key material never returned; status is drift between `jwksStore` and the
-boot-time `JWKS_KEYS`). Every state-changing key action is written to an **append-only admin audit
-trail** (`adminAuditStore`, collection `adminAudit`, via `lib/admin/audit/record.ts`, audit-first
-before the mutation) capturing actor, action, target, and timestamp; the store exposes no
-update/delete so entries cannot be altered.
-
-**Ownership is by group, not by named manager.** Every project and user bucket carries `ownerGroupId`, and belonging to that group is the only thing that grants access to it — there is no per-container `managedBy` list, and no second ownership mechanism. Each administrator gets a `personal` group with their account (the console labels it "Personal", or "Personal — owner@email" for somebody else's, via `lib/admin/ui/groupLabel.ts`, and the Groups table does not list personal groups at all); a `regular` group is a company or team; the reserved `unassigned` system group, displayed as "System", holds containers no administrator managed. Within a group, `owner` and `member` are properties of the _membership_, not roles on the account: `assertGroupOwner` gates who is in the group and whether it may be deleted, while `assertRole` still gates the instance. `contextFor` resolves memberships on every request, so a removal takes effect on the next call. The console's active scope lives on the session (`AdminSession.activeGroupId`) and is re-validated against live membership each request; a super administrator may switch into any group _except_ another administrator's personal group, and their choice is honoured without a membership so it survives the next request. A project administrator creates projects, buckets and groups, invites people by email, and reads the audit trail for their own groups; the instance itself — settings, keys, SMTP, administrator accounts, the error store — stays super-admin-only. See `wiki/concepts/group-ownership.md`.
-
-Unexpected internal faults are recorded to a **server error store** (`lib/error_store/`, area
-`errorStore`, read at `/admin/api/errors`, super-admin only). Only defects are recorded — routine client
-rejections are correct behaviour and never appear. Three things about it are load-bearing and easy to
-get wrong: there are **two capture sites** (the global handler stands aside on the `adminPlane` marker,
-so `adminApp`'s own `onError` records 5xx `AdminError`s); recording never blocks a response and never
-fails a request, so a store failure degrades to the console and a full queue is _counted_; and the read
-surface is deliberately **not** flag-gated, because the admin operation set is invariant under capability
-switches — `errorStore.enabled` governs writes and is reported as `recording` in the payload. Agent
-purging is withheld outright for the same reason; `error_purge_preview` is published instead.
-
-End-user onboarding is bucket-scoped. Each `UserBucket` carries `registrationOpen`,
-`emailVerificationRequired`, and `verificationMethod` (`'link' | 'code'`); defaults are open +
-verification-off, except the reserved admin bucket which seeds `registrationOpen: false` (set in
-**both** `lib/admin/seed.ts` and `database/mongodb.ts`). `POST ui/:uid/registration` resolves the
-bucket from the interaction's client (`resolveBucketForClient`), rejects when registration is
-closed, and — when verification is required — creates the user unverified and issues a challenge;
-`POST ui/:uid/login` refuses an unverified user in such a bucket. Email verification lives in
-`lib/verification/` (challenge issue/verify/resend over `adapter('VerificationChallenge')` +
-`adapter('VerificationResend')` with TTLs; link tokens are single-use, codes are 6 digits hashed
-at rest with an attempt cap, resends are cooldown + daily-capped) and `lib/mail/` (Nodemailer
-transport read live from a runtime `SmtpSettingsStore`, plus the standard template; under
-`NODE_ENV=test` the transport captures messages in memory instead of sending). The public,
-cookie-less verification endpoints (`GET /verify-email`, `GET|POST /verify-email/code`,
-`POST /verify-email/resend`) are a standalone group in `lib/routes/verification.ts`. SMTP transport
-is a super-admin runtime setting (`/admin/api/settings/smtp`, password write-only/masked, audited)
-— deliberately **not** in `ApplicationConfig` at all: it is read live from its own store on every
-send, so a restart neither applies nor disturbs it.
-
-The test suite loads `.env.test` automatically via Bun.
+- **Exactly one connection string may be set**; both is refused at startup, neither selects the
+  in-memory adapter (`lib/adapters/selectBackend.ts`). Bun loads `.env` and `.env.local` on its own, so
+  a script that must run hermetically deletes all three datastore variables. The test suite loads
+  `.env.test`. → `wiki/concepts/postgresql-backend.md`
+- **Signing keys are not an environment variable.** They live in `jwksStore`, provisioned by
+  `db:setup`/`db:setup:pg`. → `wiki/concepts/signing-keys.md`
+- **Nothing is seeded at boot.** The console's records come from the provisioning scripts, which must be
+  re-run after an upgrade; seeded values are declared once in `lib/consts/admin_seed.ts`.
+  → `wiki/concepts/admin-provisioning.md`
 
 ---
 
@@ -120,176 +76,98 @@ The test suite loads `.env.test` automatically via Bun.
 ```
 lib/
   index.ts              ← library entry: exports elysia, errors, eventBus, interactionPolicy
-  event_bus.ts          ← the process-wide EventEmitter (default export of index.ts)
   actions/              ← per-endpoint request handlers (operate on `oidc`, the OIDCContext)
     authorization/      ← authorization endpoint pipeline (validate → interact → respond)
     grants/             ← grant type handlers (auth_code, refresh_token, device, ciba)
   models/               ← AccessToken, RefreshToken, IdToken, Grant, Session, …
-    client.ts           ← façade: validated plain-object client + pure-function exports
-    client/             ← checks, secret, sector, keystore, backchannel, validate, schema
-  addon/                ← overridable behaviour functions (CORS, mTLS, claims, tokens, …); index.ts is the single import seam + override registry
-  helpers/              ← JWT, crypto, claims, validation utilities
-  adapters/             ← three backends behind one contract: mongodb/, postgres/, memory/ (tests)
-    selectBackend.ts    ← the one place the datastore is chosen; refuses two connection strings
-  migrations/           ← the schema-migration layer: state, runner, lease, gate (both backends)
-  plugins/              ← Elysia plugins: noCache, noQueryDup, auth
-  interactions/         ← Login/consent UI endpoints (React + Ant Design)
+    client/             ← client checks, secret, sector, keystore, backchannel, validate, schema
+  addon/                ← overridable behaviour functions; index.ts is the single import seam
+  helpers/              ← JWT, crypto, claims, validation utilities; errors.ts
+  plugins/              ← Elysia plugins: noCache, noQueryDup, auth, feature gate, rate limit, …
   response_modes/       ← query, fragment, form_post, JWT response modes
-  shared/               ← session, authorization_error_handler (shared onError), token auth, resource validation
-  configs/              ← application.ts (single source of config DATA), algorithm lists, token lifetimes, env
-  resources/            ← declared protected resources: canonical form, matching rule, descriptor lookup
-  client_metadata_document/ ← a client_id that is a URL: form rules, SSRF-bounded fetch, validation, cache
+  adapters/             ← mongodb/, postgres/, memory/ behind one contract; selectBackend.ts chooses
+  migrations/           ← schema-migration state, runner, lease, startup gate (both backends)
+  configs/              ← application.ts (ApplicationConfig), clientBase.ts, keys, algorithm lists
+  consts/               ← import-free declarations: storage inventory, migrations, client attributes, …
+  interactions/         ← login/consent/registration UI endpoints (React + Ant Design)
+  shared/               ← session, the shared onError, token auth, resource validation
+  resources/            ← declared protected resources: canonical form, matching, descriptors
+  client_metadata_document/ ← a client_id that is a URL: form rules, SSRF-bounded fetch, cache
   admin/                ← the administrative control plane
-    routes.ts           ← THE admin API route set; mounted by both the console and lib/mcp/dispatch.ts
-    index.ts            ← the console: routes.ts plus the HTML shell (imports React/antd — expensive)
-    auth/rbac.ts        ← resolveAdmin: session cookie OR an MCP-audience bearer token → one AdminContext
+    routes.ts           ← THE admin API route set; mounted by the console and by lib/mcp/dispatch.ts
+    auth/rbac.ts        ← session cookie OR an MCP-audience bearer token → one AdminContext
     audit/              ← append-only trail; written before the mutation, inside the handler
-  mcp/                  ← the MCP control plane (agent-facing)
-    catalogue.ts        ← THE published tool set: load-bearing table, drift-guarded both ways
-    dispatch.ts         ← rebuilds the admin HTTP request and handles it in-process
-    confirm.ts          ← the two-call gate on high-consequence operations
+  mcp/                  ← catalogue.ts (published tools), dispatch.ts, confirm.ts (two-call gate)
   error_store/          ← the one place a fault becomes a record (capture.ts is the choke point)
-  sentry/               ← optional outbound reporting; registers NO Elysia hook (see below)
-database/               ← provisioning and verification scripts (see below)
-  mongodb.ts            ← db:setup — collections, TTL/unique indexes, admin seed
-  postgres.ts           ← db:setup:pg — the same job in tables; --check reports without writing
-  migrate.ts            ← db:migrate — applies declared migrations on either backend; --plan
-  verify_postgres.ts    ← storage fidelity against a REAL PostgreSQL; never run by bun test
-  verify_migrations.ts  ← the migration layer against a real PostgreSQL; likewise
-test/
-  test_helper.ts        ← bootstrap: loads *.config.ts per feature, wires adapter + provider
-  oauth/                ← core flow tests
-  …                     ← feature-specific test dirs, each with *.config.ts + *.spec.ts
+  sentry/               ← optional outbound reporting; registers NO Elysia hook
+database/               ← provisioning (mongodb.ts, postgres.ts), migrate.ts, real-DB verify scripts
+test/                   ← test_helper.ts bootstrap; one dir per feature with *.config.ts + *.spec.ts
 ```
 
-### Key patterns
+### Rules by area
 
-**Sentry reporting is off the request path** — `lib/sentry/` mounts nothing into Elysia: no plugin, no lifecycle hook, no `wrap`. A fault reaches it after the fact, from the single call inside `captureFault`'s record continuation in `lib/error_store/capture.ts`, which runs only once the fault is already classified as a defect (its callers gate on `status >= 500`) and already accepted for local recording. That shape is load-bearing, not stylistic: it is what keeps responses byte-identical, adds no latency, and stops routine protocol rejections being reported as faults. The official `@sentry/elysia` plugin does the opposite on all three counts and is deliberately not a dependency — `wiki/concepts/sentry-plugin-not-used.md` records why, and four specs in `test/sentry/` hold it.
+Each rule is the part that is easy to break. Read the named page before changing the area.
 
-**Action pipeline** — Each endpoint is a composed sequence of async functions that take the typed `OIDCContext` **directly as `oidc`** (the former `ctx = { oidc }` wrapper is gone). Helpers have `(oidc)` signatures and read `oidc.params`/`oidc.client`/`oidc.entities`/`oidc.cookie`/etc.; handlers **return** their typed response value (no `ctx.body`/`ctx.status` mutation). User-overridable config callbacks (findAccount, resourceIndicators.\*, interaction-policy `check(ctx)`, response-mode handlers) keep a `{ oidc }`-shaped argument as a public-API boundary; callers pass `{ oidc }` there. Event payloads that tests inspect (`authorization.success`, `registration_create.success`, `device_authorization.success`) stay `{ oidc }`-shaped.
+- **Action pipeline** — handlers take `OIDCContext` directly as `oidc` and **return** their response;
+  there is no `ctx = { oidc }` wrapper. The exception is public-API callbacks (`findAccount`,
+  `resourceIndicators.*`, interaction-policy `check`, response-mode handlers) and the event payloads
+  tests inspect, which stay `{ oidc }`-shaped.
+- **Errors** — throw an `OIDCProviderError` subclass (`lib/helpers/errors.ts`); one shared `onError`
+  (`lib/shared/authorization_error_handler.ts`) formats every one. → `admin-plane-error-shape.md`
+- **Configuration** — every setting lives on exactly one of three surfaces: `ApplicationConfig`
+  (flat dotted keys, applied to the running process on save), `ClientDefaults` (camelCase only), or
+  `lib/addon/*` (behaviour). Import `configuration` from `lib/configs/application.ts`, never off the
+  provider. A module that caches something derived from a setting registers an invalidator with
+  `onSettingsApplied`. → `feature-flag-gating.md`, `settings-console-descriptor.md`
+- **Behaviour functions** — import the accessor from `lib/addon/index.ts`, never the implementation;
+  override through `addons.override`. An empty addon body is an extension seam, not dead code.
+  → `entities/addon-registry.md`, `override-seams-vs-dead-code.md`
+- **Storage** — all persistence goes through the adapter contract; declare every area in
+  `lib/consts/storage_inventory.ts` and every intended backend difference in
+  `lib/consts/storage_divergences.ts`. Importing `lib/adapters/postgres/` opens no connection, and a
+  jsonb column is written as an object, never `JSON.stringify(...)`. → `postgresql-backend.md`,
+  `mongodb-test-fidelity.md`
+- **Schema migrations** — declared in `lib/consts/migrations.ts`, applied by `bun run db:migrate`;
+  startup refuses a database that is behind, ahead or diverged, and never migrates it itself. A
+  migration must be safe to apply twice. → `postgresql-backend.md`
+- **Persisted models** — only the keys a model's TypeBox schema declares are stored; add the field to
+  the schema. Read model fields through `.payload`. Use `tryFind` where absence is handled and `find`
+  where it is not. → `token-payload-access-contract.md`
+- **Signing keys** — import `keystore`/`publicJWKS` from `lib/configs/keystore.ts`, which stays a leaf
+  module. → `signing-keys.md`, `model-graph-import-order.md`
+- **Clients** — a client is a validated plain object read from `adapter('Client')` on every
+  resolution; there is no boot-time `clients` option. A URL `client_id` may resolve to a metadata
+  document, and that branch must stay after the adapter read. Registration attributes are declared once,
+  in `lib/consts/client_attributes.ts`, and kept flat. → `client-identity-from-database.md`,
+  `client-registration-attributes.md`, `mcp-server-authorization.md`
+- **Buckets** — a bucket is addressed by a path segment or a hostname, never both, and is its own
+  issuer. The request host is read only by `hostOfRequest`, never from `X-Forwarded-Host`. Which bucket
+  a sign-in uses is `resolveBucketForRequest`, and every caller passes the resource it has.
+  → `bucket-is-an-issuer.md`, `cookie-path-scoping.md`, `account-resolution.md`
+- **Ownership** — a group owns every project and bucket, and membership is the only grant of access;
+  instance-wide things stay super-admin-only. → `group-ownership.md`
+- **Audit** — a mutating admin route records audit-first, after authorization, inside the handler.
+  → `admin-audit-trail.md`
+- **Error store** — only defects (5xx) are recorded, from two capture sites; recording never blocks a
+  request; the read surface is not flag-gated. → `error-store-capture-sites.md`,
+  `error-store-is-not-flag-gated.md`
+- **Sentry** — reporting is off the request path: `lib/sentry/` mounts nothing into Elysia, and
+  `@sentry/elysia` is deliberately not a dependency. → `sentry-plugin-not-used.md`
+- **Interaction screens** — a page is either the antd shell (inside an interaction) or plain and
+  self-contained (opened from an email, no script); which one is not a style choice.
+  → `interaction-page-families.md`, `end-user-onboarding.md`
 
-**Config** — every setting lives on exactly one of **three** surfaces, and there is no `lib/helpers/defaults.ts` and no `globalConfiguration.ts`:
-
-1. `lib/configs/application.ts` (`ApplicationConfig`) — **single source of truth for all server-wide flag/option DATA** (flat dotted feature keys plus `scopes`, `claims`, `acrValues`, `clientAuthMethods`, `conformIdTokenClaims`, `discovery`), each with an inline description. Persisted via `configStore` and applied at module load — and **applied again, to the running process, by the save that changes one**: `applySettings(changes)` assigns in place, re-derives through `reloadConfiguration()` and runs the invalidators registered with `onSettingsApplied` (the validated-client memo, the per-origin counter capacity, the Sentry arming latch). It is synchronous end to end, so no request sees half a change. A setting that genuinely cannot be applied to a running process declares `apply: 'restart'` on its settings-catalog descriptor with a written `restartReason`; none does today. Applying is per instance: what the console reports is what the instance answering it is running.
-2. `lib/configs/clientBase.ts` (`ClientDefaults`) — what a client gets when it does not specify, in **camelCase only**. Consumers working in wire-format (snake_case) metadata names translate at their own seam (see the map in `lib/models/client/schema.ts`).
-3. `lib/addon/*` — overridable behavior, resolved through the override registry at call time, **including the interaction policy** (`interactionPolicy()` plus an `interactionPolicyControl` add/reset surface).
-
-`lib/configs/configuration.ts` (`validateConfiguration`) is a **pure function of a config object**: it runs the validation and collection passes and returns the derived values (`scopes`, `claims`, `grantTypes`, `claimsSupported`, …). `application.ts` calls it at the point the settings finish loading and exports the result as `configuration`, so an unrunnable config fails at startup and nothing can observe an unvalidated one; `reloadConfiguration()` re-derives in place after `ApplicationConfig` is changed — by an applied save, or by the test harness between spec files. `applySettings` validates the candidate it is about to assign with the same function, so a subset that would leave the process holding a combination it could not have booted with is withheld rather than applied. Because it takes the config as an argument, the admin settings API validates a **candidate** config with the very same rules instead of mirroring them.
-
-**Behaviour functions** — Overridable server behaviour (CORS, token issuance/rotation, resource-server info, CIBA/mTLS/RAR/registration helpers, …) is **single-sourced through `lib/addon/index.ts`**. Each function's default lives in its addon module; the index exposes a dynamic call-time accessor per function plus an `addons.override(partial)` / `addons.reset()` registry (`lib/addon/registry.ts`). Source modules import the accessor from the index — never off the merged configuration. Deployments and tests override via the registry (the test harness resets it after every test via `test/preload.ts`; `test/addon_baseline.ts` bridges a `*.config.ts`'s behaviour-fn overrides into a per-spec baseline). `findAccount` / `assertJwtClientAuthClaimsAndHeader` keep their existing direct imports.
-
-**Adapter pattern** — All persistence goes through a `StorageAdapter` interface. Swap implementations without touching business logic. Use `TestAdapter` (in-memory) for unit/integration tests. There are three implementations and the storage areas they provision are declared once, for all of them, in `lib/consts/storage_inventory.ts` — an import-free module, deliberately, so the drift guard and the provisioning scripts can read it without pulling in a datastore. Add an area there or the two-way guard fails.
-
-Two properties of `lib/adapters/postgres/` are pinned by tests and easy to break. Importing any module in it must open no connection and must not need `POSTGRES_URL` — `lib/adapters/mongodb/db.ts` connects at module scope and the cost of that reaches into unrelated files. And a document column is written as an **object**, never `JSON.stringify(...)`: a pre-stringified value stores a jsonb _string_, every predicate reaching inside it silently matches nothing, and every round trip still looks perfect. `lib/adapters/postgres/json.ts` throws on read rather than papering over it.
-
-Where the two production backends differ on purpose, the difference is declared in `lib/consts/storage_divergences.ts` with a reason and what a caller could observe; `database/verify_postgres.ts` reads it, which is what makes the register a gate rather than a document.
-
-**Schema migrations** — `lib/consts/migrations.ts` declares the ordered set (import-free, same reason as the inventory); `lib/migrations/` runs it on either backend, records what ran in the `schemaMigrations` area, holds a renewable lease so two replicas rolling at once do not both apply a step, and gates startup: `behind`, `ahead` or `diverged` all refuse to boot. `bun run db:migrate` is the operator command on both backends. A migration declares `reversible` and a `rerunnable` sentence, because a standalone `mongod` has no multi-document transaction and the record can therefore follow the effect. The one-off `managedBy → ownerGroupId` conversion that predated this layer has been **retired**, not carried into it: a deployment old enough to need it upgrades through an earlier release first.
-
-**Storage contract** — Every persisted model (all `BaseModel`/`BaseToken` subclasses: tokens, `Grant`, `Session`, `Interaction`, `ReplayDetection`) filters its stored payload by its TypeBox schema: `Opaque.getValueAndPayload()` persists only the top-level keys declared in `this.model` and copies each value verbatim (a **shallow** projection — never `Value.Clean`, so freeform fields like `claims`/`rar`/`params`/`session.state` are preserved). A field must be declared in the model's schema to be persisted; there is no whole-payload fallback. When adding a field a model must persist, add it to that model's TypeBox schema.
-
-**Model lookup** — Every `BaseModel`/`BaseToken` subclass (and the `Client` namespace) exposes two static lookups. `tryFind(id, opts?)` returns the item or `undefined` — use it where absence is a valid, handled outcome. `find(id, opts?)` returns the item or **throws** — use it where the item is required, so no `undefined` check or non-null assertion is needed at the call site. `find` accepts an optional pre-constructed `{ error }` to throw on miss; without it, each model throws its own `static notFoundError` default (token hierarchy → `InvalidToken`, `Client` → `InvalidClient`). `find` delegates to `tryFind`, so both share identical verification/expiration/session-binding/policy semantics — only the not-found outcome differs. In tests, `spyOn(Model, 'tryFind')` to simulate a miss (mocking `find` would bypass the throw path).
-
-**Provider singleton** — the provider has **no init step and no configuration of its own**; constructing it only opens the internals map the request path writes to. Server settings are validated and derived where they load (`configuration` from `lib/configs/application.ts`) — import that directly, never `instance(provider).configuration`. Signing keys are **not** part of it: `lib/configs/keystore.ts` exports the live `keystore` (sign/verify/encrypt/decrypt) and `publicJWKS` (what `/jwks` serves) as module state, loaded from the `jwksStore` adapter by `lib/configs/keys.ts` — the same "module state, single-sourced from a store" shape as `ApplicationConfig`. Import them directly; never reach for them through `instance(provider)`. Both are mutated **in place** and never reassigned, so a held reference always sees current keys (the admin API relies on this to hot-apply a generated key). `keystore.ts` deliberately imports nothing that reaches the adapters, `ApplicationConfig` or the models — keeping the key-loading `await` out of the model import graph, where it reorders module evaluation and trips the `base_model → provider → models` cycle. `provider.Client` is a **namespace** (`find`/`tryFind`/`validate`/`needsSecret`/`validateClient`/`adapter`), not a class.
-
-**Client model** — A client is a TypeBox `ClientSchema`-validated **plain object** (`validateClient(metadata)`), not a class instance. Behaviour lives in pure functions under `lib/models/client/` (`checks`, `secret`, `sector`, `keystore`, `backchannel`); `lib/models/client.ts` re-exports them. The object exposes the historical method/getter surface (delegating to those functions) for call-site/test compatibility.
-
-**Registration attributes are declared once**, in `lib/consts/client_attributes.ts` — adding one is one entry. Read `wiki/concepts/client-registration-attributes.md` before editing it: declaration order, two precedence lists and the separate structural layer all fail silently if changed carelessly.
-
-**Client provisioning** — Clients are **single-sourced from `adapter('Client')`**; there is no boot-time `clients` option (a stray one is silently ignored) and no in-memory static/dynamic client store. `tryFindClient` reads the adapter on every resolution (so updates/deletes are always current) and validates at resolution time, backed only by a size-bounded validated-object memo. Every client is uniformly manageable through the admin control plane and DCR (no `noManage` class). Provision clients via the admin API / DCR / DB seed; tests seed them with the harness's `seedClient`.
-
-There is a second way a client can exist, and it stores nothing. A `client_id` that is an https URL with a path component is a **Client ID Metadata Document** identifier: `tryFindClient` retrieves the document it names, validates it (`lib/client_metadata_document/`) and returns a validated client object that is never written to the store. The branch sits **after** the adapter read and that order is load-bearing — `test/client_id_uri/` already covers URL-shaped ids issued by DCR, and a branch placed first would shadow every such stored client. Gated on `clientIdMetadataDocument.enabled`, off by default because it lets an unauthenticated caller make this server issue an outbound request; `fetch.ts` is the whole egress boundary (address classes, per-hop redirect checks, 5 KB, timeout) and is deliberately the only file in that directory that knows about the network.
-
-**Bucket addressing** — a bucket is reached by **a path segment or a hostname of its own, never both**:
-`https://auth.example.com/acme` or `https://acme.auth.example.com`. Which of three states a bucket is in
-— served at the root, path-addressed, host-addressed — is one derived answer, `addressOf` in
-`lib/configs/issuer.ts`, and `issuerFor` and `sessionCookieName` both switch on it rather than
-re-inferring from two fields. There is no `pathPrefixFor`: the router mounts the same plugins under a
-dynamic `/:bucket` segment rather than building a prefix string, and the console derives its own in
-`lib/admin/ui/bucketAddress.ts` because that module is in the browser bundle. The request's host is read in exactly one place
-(`hostOfRequest`, `lib/consts/request_host.ts`): the `Host` header, **never `X-Forwarded-Host`**, which
-is attacker-settable and here would select the tenant. A name beneath the canonical host that holds no
-bucket is refused as a typo; a name outside it (`localhost`, the platform's own, a health check) falls
-through to path resolution, or the deployment would answer only at the exact URL in `ISSUER`. Changing
-an address changes the issuer identifier, so it is its own route with a preview, a confirmation and its
-own audit action — never a field on the bucket PATCH. See `specs/056-host-addressed-buckets/`.
-
-**Bucket resolution** — which user bucket a request signs a user into is one function, `resolveBucketForRequest(clientId, resource?)` in `lib/admin/auth/resolveBucket.ts`, and it has five rules in order: the reserved console client → the admin bucket; a client belonging to a project → that project's bucket; a request naming ONE declared protected resource → that resource's project's bucket; a client identity an operator permitted, naming the administrative MCP audience → the admin bucket; otherwise `redfox`. The third rule is how a client that belongs to no project — dynamically registered, or document-identified — reaches the right deployment's end-users, and it is safe because an administrator authored the resource: the parameter selects among an operator's options and cannot create one. **Every caller must pass the resource it has**, including `findAccount` in `lib/addon/account.ts`; a caller that omits it resolves a different bucket than login did, which surfaces as a 500 in the consent prompt rather than as a refusal.
-
-**Interaction system** — Login/consent are served under `/ui/:uid/*` (`lib/interactions/index.ts`; `/ui` is an `alwaysAvailablePrefixes` entry, so the surface is unconditional). Screens belong to one of two families and which one is not a style choice: the **antd shell** pages (login, registration, consent) hydrate React and are reached inside an interaction with the `_interaction` cookie, while the **plain self-contained** pages (`/verify-email/*`, `/reset-password`, the device/registration notices) carry no script and must work in a different browser opened from an email. Interaction result is POSTed back; the server resumes the authorization flow.
-
-**Error convention** — Throw an `OIDCProviderError` subclass (`lib/helpers/errors.ts`). The subclasses are registered with the Elysia app via `.error({...})` in `lib/index.ts`; a single shared app-level `onError` (`lib/shared/authorization_error_handler.ts`) formats every one (RFC 6749 §5.2 body, `WWW-Authenticate`, `DPoP-Nonce`, response-mode/JARM delivery, HTML variant) and endpoints declare per-route `response` schemas. The legacy Koa-style `shared/error_handler.ts` has been removed.
+Pages are under `wiki/concepts/` unless the path says otherwise.
 
 ---
 
 ## Testing
 
-**The rules for writing and maintaining tests here are [`test/RULES.md`](test/RULES.md). Read it
-before adding a test, and use its review checklist when reviewing a pull request that touches
-`test/`.** Nothing enforces the rule in code — deliberately, and that file explains why — so a
-review against it is the only thing standing between the suite and the bloat it was rewritten to
-remove.
-
-The rule in one paragraph, with the detail in that file:
-
-**A test proves a User Case or a Security Invariant. It does not prove that the code is the code
-it is.** This is Principle V of the constitution, it is non-negotiable, and a test that proves
-neither is deleted rather than reviewed. Before writing one, satisfy both halves:
-
-1. State it in one of two sentence forms, **without naming a function, class, module or file in
-   the trigger** — behavioural, _`<outcome>` when `<condition>`_; or completeness, _for every
-   `<member of a set>`, `<property>`_, where the set is either enumerated from the running system
-   (the drift guards) or generated over an input domain (`test/properties/`). A test fitting
-   neither form proves code. `expect(list.length).toBe(65)` fits neither: it names no set and no
-   property, and it is repaired by editing the number.
-2. Check the outcome matters to somebody — the end user, the integrating client, the operating
-   administrator, the agent on the management surface, or an attacker. A console notice's prefix
-   passes step 1 and fails here.
-
-A **refusal is an outcome**, and in this product the error responses are normative protocol
-surface: proving that a spent code yields `invalid_grant` rather than a 500 is a first-class user
-case, not an edge case. A **completeness guard** — enumerating the mounted route table against a
-declared registry, as `test/admin/audit_route_classification.spec.ts` does — is admissible under
-the second form and is not a third category; it closes a claim about absence that no example can
-close, because the defect is the route somebody forgot.
-
-Name a case for its **outcome in the present tense, plus its condition where the outcome is
-conditional** (`refuses …`, `returns … when …`). One action per case; two triggers means two
-cases. Given/When/Then belongs in the spec document, not in the code — the `describe` carries the
-context. No BDD tooling.
-
-Every spec file opens with a one-sentence `@proves` declaration above its top-level `describe`,
-stating what its cases collectively prove — so a reviewer, human or agent, can see the file's
-claimed intent before reading a single assertion. It lives in the file it describes and nowhere
-else: there is no index, no generator and no drift check, because a second copy of a sentence is a
-second thing to keep in step.
-
-Tests use **Bun's native test runner**, with **its own matchers** (`toBe`, `toEqual`, `toMatch`,
-`toBeGreaterThanOrEqual`, …) and **Sinon** stubs/spies. Chai is not a dependency and no spec imports
-it — a chained `expect(x).to.equal(y)` fails at runtime with `undefined is not an object`, because
-`.to` does not exist.
-
-Each feature area has:
-
-- `*.config.ts` — per-feature test settings, expressed entirely as **named exports** the harness applies (nothing is passed to the provider): `ApplicationConfig` (feature flags and collection options incl. `claims` — omit it to get the shared test claim set, `claims: {}` to opt out), `ClientDefaults`, `addons` (behavior overrides incl. `interactionPolicy`), `jwks` (per-instance keys), and `clients` / `client` which are seeded into the `Client` store. Configs that clone another config must re-export its `clients`.
-- `*.spec.ts` — test cases using the Eden type-safe HTTP client
-
-`test_helper.ts` bootstraps the provider with the right config before each suite. Use `bootstrap(import.meta.url)` at the top of a spec file — the URL, not the `import.meta` object; pass `{ config: '<name>' }` to borrow another area's config.
-
-Time-sensitive tests use Bun's `setSystemTime` (from `bun:test`) to travel time; call `setSystemTime()` with no argument to reset.
-
-Two properties hold for **every** spec, set once in `test/preload.ts` so no spec has to remember and
-no file order can change them:
-
-- **A case is bounded at 20 s.** `setDefaultTimeout` is here rather than in `bunfig.toml` because
-  `timeout` is not one of the `[test]` keys Bun parses, and not on the command line because the gate
-  is the bare `bun test`, which resolves to the builtin subcommand and would shadow a `test` script.
-  A case that genuinely needs longer passes its own third argument to `it(...)`. The bound catches a
-  case that _awaits_ too long; it cannot preempt one that blocks the event loop, and such a case
-  still reports its full duration — which is how to recognise it.
-- **No test reaches the real network.** `test/fetch_mock.ts` intercepts every outbound `fetch`, and a
-  request to an origin nobody registered with `mock(origin)` is **refused by name** rather than sent.
-  If you see `test fetch to an unregistered origin: …`, register that origin and intercept the path.
+**Read [`test/RULES.md`](test/RULES.md) before adding a test, and use its checklist when reviewing
+one.** In one line: a test proves a User Case or a Security Invariant, never that the code is the code
+it is — and a test that proves neither is deleted, not reviewed. That file also holds the mechanics:
+Bun matchers with Sinon (no Chai), the `*.config.ts` named exports, `bootstrap(import.meta.url)`, and
+what `test/preload.ts` guarantees for every spec (a 20 s bound, no real network).
 
 ---
 
@@ -304,28 +182,21 @@ no file order can change them:
 
 ## Adding an administrative operation
 
-The admin routes are the definition; the MCP surface follows from them.
+The admin routes are the definition; the MCP surface follows from them. Read
+`wiki/concepts/admin-mcp-control-plane.md` before changing anything in `lib/mcp/`.
 
 1. Add the route to a group under `lib/admin/<group>/routes.ts`, with its body schema in the group's
    `schema.ts` — **not** inline, because `lib/mcp/catalogue.ts` imports schema modules and must never
-   import a route module (a route module reaches the adapters and from there a db module that connects
-   at import time).
+   import a route module (a route module reaches a db module that connects at import time).
 2. If it mutates, add it to `lib/consts/admin_audit_routes.ts` and call `recordAdminAudit` inside the
-   handler, after authorization. `test/admin/audit_route_classification.spec.ts` fails otherwise. The
-   only escape is `excludedAdminRoutes`, and it is narrow: a route that changes the caller's own session
-   and no managed entity (logout, the scope switch). Anything that touches a managed entity is audited.
-3. Decide the agent's access and record it in `lib/mcp/catalogue.ts`: publish it as a tool, or name it
-   in `excludedConsoleOperations` with the reason. `test/mcp/catalogue_drift.spec.ts` fails until you do
-   one or the other — that is the point of the table.
-4. Classify a destructive or instance-wide operation as `high`, and it is gated automatically.
-   `test/mcp/confirmation_matrix.spec.ts` covers it the moment it is classified.
-5. Run `bun test test/mcp/ test/admin/`. The guards that will complain at you — parity, audit
-   classification, argument-name collisions, the secrecy sweep — are doing the job they were written for.
-6. Correct any wiki page the operation falsifies. Nothing fails if you skip it, which is precisely why
-   it is listed beside the guards that do — see **LLM Wiki** below.
-
-See `wiki/concepts/admin-mcp-control-plane.md` before changing anything in `lib/mcp/`; it records six
-traps that each cost a debugging session.
+   handler, after authorization. The only escape is `excludedAdminRoutes`, for a route that changes the
+   caller's own session and no managed entity.
+3. Publish it as a tool in `lib/mcp/catalogue.ts`, or name it in `excludedConsoleOperations` with the
+   reason.
+4. Classify a destructive or instance-wide operation as `high`; it is then gated automatically.
+5. Run `bun test test/mcp/ test/admin/` — the parity, audit-classification, argument-collision and
+   secrecy guards will tell you what you missed.
+6. Correct any wiki page the operation falsifies. Nothing fails if you skip it.
 
 ## Adding a new endpoint
 
@@ -334,98 +205,19 @@ traps that each cost a debugging session.
 3. Expose it in the OIDC discovery document (`lib/actions/discovery.ts`).
 4. Protect it with the `auth` plugin if it requires client authentication.
 5. If it takes authorization-request parameters, mount `ignoreUnknownParams(<its body/query schema>)`
-   and add it to the table in `test/unknown_parameters/`. Every such endpoint is required to ignore
-   a parameter it does not define, and nothing fails if you forget — a parameter your schema omits
-   is now ignored, so a parameter you mean to **refuse** must be declared with `refusedParam(name)`.
-   See `wiki/concepts/unknown-request-parameters.md`.
-6. Correct any wiki page the endpoint falsifies, and add one if it carries a decision worth keeping —
-   see **LLM Wiki** below.
+   and add it to the table in `test/unknown_parameters/`; a parameter you mean to **refuse** must be
+   declared with `refusedParam(name)`. Nothing fails if you forget.
+   → `wiki/concepts/unknown-request-parameters.md`
+6. Correct any wiki page the endpoint falsifies, and add one if it carries a decision worth keeping.
 
 ## The website
 
-`website/` is the public site (foxauth.dev): marketing pages plus Starlight documentation under
-`/docs`. It is an independent Astro project — its own `package.json` and lockfile, no Bun workspace —
-that treats this repository as its data source. `.github/workflows/site.yml` builds and deploys it to
-GitHub Pages on every push to `main` that touches the site or its inputs.
-
-Four rules keep it honest:
-
-1. **Reference pages are generated, never written.** `cd website && bun run generate` runs
-   `scripts/docs_export.ts` and writes `website/generated/`; the pages under
-   `website/src/pages/docs/reference/` render from that JSON through a zod schema
-   (`website/src/data/export.ts`) that fails the build when a field the pages need is missing. To
-   document a new setting, describe it in `lib/admin/settings/catalog.ts`; to document a new route,
-   classify it in `lib/consts/route_classification.ts`. There is nothing to edit on the site.
-2. **Nothing generated is committed.** `website/generated/`, `website/public/screenshots/` and
-   `website/public/og/` are gitignored. Screenshots are captured by `website/scripts/capture.ts`,
-   which boots the server in-process on the in-memory adapter and drives the console with Playwright.
-   The capture drives the hydrated console, so the root `bun run build` — which produces the
-   gitignored `public/*.js` bundles — must have run first or the capture times out on a blank page;
-   the workflow does this for you, and locally it means `bun run build` at the repository root once,
-   or `SITE_SKIP_CAPTURE=1 bun run build` to skip the capture for a fast local build. The same flag
-   also skips the social cards, and `robots.txt`, both sitemaps, `llms.txt`, the Markdown alternates
-   and the cards are all written into `dist/` after the build rather than kept in `public/`.
-3. **Root documents are rendered, not copied.** `/changelog/`, `/security/` and `/license/` read
-   `CHANGELOG.md`, `SECURITY.md`, `LICENSE` and `NOTICE` from the repository root at build time.
-4. **One page record, checked against what shipped.** `website/scripts/postbuild.ts` runs after
-   `astro build`, parses every emitted page into one `PageRecord` (`scripts/seo/collect.ts`), and
-   hands that same set to every generator — the image sitemap, `llms.txt`, the `.md` alternates, the
-   social cards — and then to `scripts/seo/verify.ts`, which fails the build on any of twenty-two
-   rules naming the page and the rule. Three consequences worth knowing before editing anything here.
-   First, **every indexing decision lives in `website/src/data/seo.ts`**: the non-indexable list, the
-   title and description bands, the route→section map, the AI-crawler allowlist and
-   `STRUCTURED_COVERAGE`. `Seo.astro` and the sitemap filter in `astro.config.mjs` both read it,
-   because they used to disagree — a page could say `noindex` while the sitemap advertised it.
-   Second, docs pages never reach `Seo.astro`; Starlight builds its own head, so
-   `src/components/StarlightHead.astro` adds what it omits. Third, the rules check both that
-   structured data is _correct_ and that it is _present_: `STRUCTURED_COVERAGE` says what each kind
-   of page must carry, and a route matching no entry fails as `unclassified-page-type` — added after
-   the comparison pages shipped with no article markup past twenty passing rules.
-
-   So a new page needs a unique title (15–60 chars) and description (70–160), a section in the map,
-   a `STRUCTURED_COVERAGE` entry (`requires: []` is fine, but the `reason` is not optional), and a
-   link from somewhere reachable within three hops of the home page, or the build stops.
-
-   A twenty-third rule checks something different from the rest: whether a page's **claims** have
-   outlived the code. It exists because PostgreSQL shipped and five comparison tables plus two
-   marketing pages went on saying the server stores its data in MongoDB, one of them arguing that as
-   a reason to choose a competitor — twenty-two rules passed, because none of them reads what a page
-   asserts. Three parts, and the split matters. Copy that can be computed is computed, from
-   `docs-export.json` via `src/data/storage.ts`, so it cannot drift at all. A comparison's own cell
-   is checked in `src/content.config.ts`, at the source, because on a comparison page the
-   _competitor's_ cell routinely names PostgreSQL and a check on the rendered page is satisfied by
-   text that says nothing about us. And free prose on `/` and `/features/` is checked per sentence
-   by `stale-datastore-claim` — per sentence, not per page, for the same reason. It stops at the
-   `/docs/` boundary, where naming one datastore is a procedure rather than a claim. Question
-   sets are data — one array feeds both `FaqSection.astro` and `faqPage()`, so the visible and
-   machine-readable forms cannot drift, and the overclaim rule proves it. Comparison pages carry
-   `lastChecked`; past `FRESHNESS_LIMIT_DAYS` the build warns and the page shows a "due for review"
-   notice, but the build still passes — staleness is the passage of time, not a mistake to block on.
-
-The **blog** (`website/src/content/blog/*.mdx`, rendered by `website/src/pages/blog/`) is the
-worked example of adding a page type, and the thing to copy when adding another. An author writes
-one file and nothing else: `website/src/data/blog.ts` exports `publishedPosts()`, which is the
-**only** path from the collection to any published surface — the index, the article route and
-`rss.xml` all call it, so "a draft appears nowhere" is provable by reading one function instead of
-three call sites. Everything else the blog gets, it gets by being **declared**, because
-`collectPages` walks `dist/` and knows nothing about where a page came from: a section in
-`SECTION_PREFIXES`/`SECTION_ORDER`, two entries in `STRUCTURED_COVERAGE` (the index is not an
-article, so it needs its own `exact` entry), and `BlogPosting` in the closed structured-data set —
-which lives in **four** files, `src/data/seo.ts`, `scripts/seo/types.ts`, `scripts/seo/verify.ts`
-(both the set and `REQUIRED_PROPS`) and `scripts/seo/collect.ts`. Miss one of the first three and
-the build says so; miss the `assertedStringsOf` branch in the fourth and nothing fails, the article
-simply asserts nothing and `structured-overclaim` can never fire for it. `claimSurface` in
-`verify.ts` now reaches `/blog/` too, and an article genuinely about one backend earns its
-exemption by declaring `storageScope` — read back from the article's own **rendered** scope line
-rather than a list of excused routes, so the excuse rots in public. The feed is the one blog
-surface outside the sweep entirely, since `collectPages` reads only `.html`.
-
-Hand-written docs live in `website/src/content/docs/docs/<section>/*.mdx` (Starlight autogenerates
-the sidebar per section; `sidebar.order` in frontmatter orders pages). The links validator fails the
-build on a broken internal link, but it cannot see links into `website/src/pages` — the Reference
-pages and the other `src/pages` routes — so a renamed route under `src/pages` must be grepped for
-manually. The site has no test suite by decision: `cd website && bun run check
-&& bun run build` is the verification, and the root `bun test` never touches `website/`.
+`website/` is the public site (foxauth.dev), an independent Astro project with no test suite by
+decision. **Read [`website/README.md`](website/README.md) before changing it.** Two rules reach back
+into this repository: reference pages are generated — document a setting in
+`lib/admin/settings/catalog.ts` and a route in `lib/consts/route_classification.ts`, never on the site —
+and the site build drives the real admin API, so a server change can break the site while `bun test`
+stays green. Verify with `cd website && bun run check && bun run build`.
 
 ---
 
@@ -441,44 +233,21 @@ manually. The site has no test suite by decision: `cd website && bun run check
 
 ## LLM Wiki
 
-This project maintains an LLM-curated wiki at `wiki/` following Andrej Karpathy's "LLM Wiki" pattern (https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f).
+`wiki/` is an LLM-curated wiki (Karpathy's "LLM Wiki" pattern). `wiki/SCHEMA.md` holds its
+conventions and is authoritative.
 
-**Read it before changing a subsystem, not only before answering a question about one.** Read
-`wiki/index.md` (or the relevant shard under `wiki/indexes/` if the wiki has been sharded) and use its
-one-line summaries to find the pages covering what you are about to touch. Cite with `[[wikilinks]]`.
-
-That trigger is deliberately wider than it used to be. It said "before answering questions", so a
-session that specified, planned and implemented a feature never fired it — and the wiki sat through
-the whole of `specs/045` asserting that `acr` is not set and `acr_values` requests are not honoured,
-in a section headed "What deliberately did not change", while the change that falsified it was being
-written. A subagent had even quoted the line. The pages most worth reading before a change are
-exactly the ones a change is most likely to falsify.
-
-If the index does not surface good candidates, fall back to hybrid retrieval:
-
-```bash
-python wiki/bin/wiki.py search "query terms" --json   # add --no-embed for lexical-only BM25
-```
-
-Run every wiki script through `wiki/bin/wiki.py` (`search`, `lint`, `stats`, `setup`, `graph-extract`, `graph-lint`, `graph-query`) — it resolves the plugin's versioned script path, supplies the wiki directory, and forces UTF-8. Calling the plugin scripts directly with bare `python` silently downgrades search to lexical and breaks the graph scripts.
-
-Relational questions — what links to what, which pages depend on a subsystem, the path between two pages — can consult the compiled graph instead of reading pages: `python wiki/bin/wiki.py graph-query neighbors --node concept:<slug>` (also `edges`, `facts`, `path`). Rebuild it with `graph-extract` after an ingest that adds typed `graph.relationships`.
-
-**A change that falsifies a wiki claim corrects it in the same change.** This is the half that had no
-trigger at all: reading was asked for, writing was left to whoever remembered to run `/wiki:ingest`.
-Before you finish, `grep -rn "\bterm\b" wiki/ --include=*.md` for the names your change touched, read
-what comes back, and fix what is now false. A stale page is worse than a missing one — it answers
-confidently, and the reader with the most at stake is the one deciding whether the behaviour already
-exists.
-
-A correction is a `str_replace`, not a rewrite, and it says what changed and at which commit. A
-change big enough to deserve a page of its own is an ingest, below.
-
-To add a new source, follow the `llm-wiki` skill's ingest workflow: decide placement under `wiki/sources/`, `wiki/entities/`, `wiki/concepts/`, or `wiki/synthesis/`; identify touched pages and make surgical `str_replace` updates rather than rewrites; update the index; append a one-line entry to `wiki/log.md`.
-
-Scaling discipline: atomic pages (400-line soft cap, 800-line hard cap), sharded indexes past ~150 pages or 300 index lines, required YAML frontmatter on every page, `[[wikilinks]]` for every cross-reference.
-
-Full conventions live in `wiki/SCHEMA.md`. Treat it as authoritative when it disagrees with this summary.
+- **Read it before changing a subsystem, not only before answering a question about one.** Start at
+  `wiki/index.md`; the pages most worth reading before a change are the ones the change is most likely
+  to falsify. If the index surfaces nothing, `python wiki/bin/wiki.py search "terms" --json`.
+- **A change that falsifies a wiki claim corrects it in the same change.** Before finishing,
+  `grep -rn "\bterm\b" wiki/ --include=*.md` for the names you touched and fix what is now false — a
+  surgical `str_replace` that says what changed and at which commit. A stale page is worse than a
+  missing one.
+- **New knowledge goes to the wiki, not here.** A decision worth keeping gets a page (frontmatter,
+  `file:line` citations, an index entry, a `wiki/log.md` line); this file gets at most a one-line rule
+  pointing to it. Wiki pages never cite `specs/`.
+- Run every wiki script through `wiki/bin/wiki.py` (`search`, `lint`, `graph-query`, …); calling the
+  plugin scripts with bare `python` silently downgrades search and breaks the graph scripts.
 
 <!-- SPECKIT START -->
 

@@ -4,7 +4,7 @@ title: "Feature flags and endpoint gating"
 tags: [config, architecture, oauth, contract]
 sources: [oauth-server-codebase]
 created: 2026-07-31
-updated: 2026-09-22
+updated: 2026-09-23
 graph:
   node_type: concept
   relationships:
@@ -93,6 +93,29 @@ Two properties follow from how it is maintained:
   values — the same rule the signing keys follow in `configs/keystore.ts`. `reloadConfiguration()`
   re-derives after in-place changes, for an applied save and for the tests alike.
 
+`applySettings` (`lib/configs/application.ts:904`) is synchronous end to end, so no request sees half
+a change. After assigning it runs the invalidators registered with `onSettingsApplied`
+(`lib/configs/application.ts:876`) — today the validated-client memo
+(`lib/models/client/validate.ts:217`), the per-origin counter capacity (`lib/plugins/rateLimit.ts:91`)
+and the Sentry arming latch (`lib/sentry/client.ts:62`). A module that caches something derived from a
+setting registers one there, or the save applies and the cache goes on answering the old value. A
+setting that genuinely cannot be applied to a running process declares `apply: 'restart'` with a
+written `restartReason` on its catalog descriptor (`lib/admin/settings/catalog.ts:140`); none does
+today. Applying is per instance: what the console reports is what the instance answering it runs.
+
+## Three surfaces, and every setting is on exactly one
+
+`ApplicationConfig` is one of three places a setting can live, and there is no fourth — no
+`lib/helpers/defaults.ts`, no `globalConfiguration.ts`:
+
+1. **`ApplicationConfig`** (`lib/configs/application.ts`) — all server-wide flag and option *data*,
+   described above.
+2. **`ClientDefaults`** (`lib/configs/clientBase.ts:12`) — what a client gets when it does not
+   specify, in **camelCase only**. Code that works in wire-format snake_case names translates at its
+   own seam (the map in `lib/models/client/schema.ts`) rather than the defaults carrying both.
+3. **`lib/addon/*`** — overridable *behaviour*, resolved at call time through the override registry,
+   including the interaction policy; see [[addon-registry]].
+
 ## The gate
 
 `lib/plugins/featureGate.ts` refuses a request to an endpoint whose governing flag is off, answering
@@ -142,6 +165,7 @@ still fails on an unclassified route and additionally fails on a declared route 
 
 ## Related
 
+- [[signing-keys]] — the other module state single-sourced from a store; generation hot-applies, deletion waits for a restart
 - [[deletion-and-revocation]] — the fourth use of this page's table-plus-drift-guard pattern, for storage ownership.
 - [[admin-plane-error-shape]] — `FeatureDisabled` is the precedent for recognising an error by a marker rather than a route.
 - [[event-bus]] — where refusals and other lifecycle signals are emitted.

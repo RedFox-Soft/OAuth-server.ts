@@ -4,7 +4,7 @@ title: 'The admin audit trail'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-03
-updated: 2026-08-31
+updated: 2026-09-23
 graph:
   node_type: concept
   relationships:
@@ -180,6 +180,7 @@ indistinguishable from "nothing happened", the one answer an audit trail must ne
 
 ## Related
 
+- [[signing-keys]] — the key actions recorded here, and why deletion is not hot-applied
 - [[deletion-and-revocation]] — a cascade is an effect of the already-recorded delete, and per-area counts stay out of the trail because a count is a value.
 - [[admin-plane-error-shape]] — the other admin-plane contract a standalone mount cannot verify.
 - [[feature-flag-gating]] — the declarative-table-plus-drift-guard pattern this reuses.

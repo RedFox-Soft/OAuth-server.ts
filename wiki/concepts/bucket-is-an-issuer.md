@@ -4,7 +4,7 @@ title: 'A user bucket is a tenant with its own issuer'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-15
-updated: 2026-09-18
+updated: 2026-09-23
 graph:
   node_type: concept
   relationships:
@@ -86,6 +86,19 @@ records the bucket it began at, because `/ui/*` is served from one origin for ev
 bucket but a hostname makes the origin a real boundary — without the record, an interaction begun at one
 bucket's host could be completed at another's, writing a session cookie named for the first onto the
 origin of the second.
+
+**Not every unknown host is refused.** A server answers at more names than its canonical one —
+`localhost`, the platform's own name, the address a health check uses — so the rule keys on the
+deployment's own domain (`isWithinDeploymentDomain`, `lib/admin/auth/bucketAddress.ts:122`). A name
+beneath the canonical host that no bucket holds is a typo of a tenant address and is refused, since
+serving the default population there would make the mistake look like it worked; a name outside it
+resolves by path, as every request did before hostnames. Refusing both would take the deployment off
+the air everywhere except the exact URL in `ISSUER`.
+
+**Changing an address changes the issuer**, so it is not a field on the bucket PATCH. It is its own
+route, `POST /admin/api/buckets/:id/address` (`lib/admin/buckets/routes.ts:404`), which answers with a
+preview until called with `confirm: true`, and is audited as its own action, `bucket.address.change`
+(`lib/consts/admin_audit_routes.ts:264`).
 
 **A slug is a name, not an address**, and three places need to know the difference: `issuerFor`, which
 stamps `iss` into every token; `isAddressable`, which decides whether an address resolves — and which now

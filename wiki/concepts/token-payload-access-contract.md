@@ -4,7 +4,7 @@ title: "Token payload access contract"
 tags: [contract, gotcha, architecture]
 sources: [oauth-server-codebase]
 created: 2026-07-31
-updated: 2026-09-13
+updated: 2026-09-23
 graph:
   node_type: concept
   relationships:
@@ -36,6 +36,32 @@ There are no generated per-field accessors. An earlier design mirrored payload f
 instance via an `IN_PAYLOAD` list; that indirection was removed, and the only surviving reference
 to it in the tree is a comment in `lib/actions/registration.ts:120` explaining why one call site
 still reads `client.*` directly (a validated client is a plain object, not a model).
+
+## What is persisted: only what the schema declares
+
+Every persisted model — the tokens, `Grant`, `Session`, `Interaction`, `ReplayDetection` — stores only
+the top-level keys its TypeBox schema declares (`getValueAndPayload`, `lib/models/formats/opaque.ts:28`).
+A field a model must persist is added to that schema; there is no whole-payload fallback, so an
+undeclared field is dropped on save without an error.
+
+The filter is **shallow** on purpose, and must not be replaced with `Value.Clean`. Several persisted
+fields are freeform — `claims`, `rar`, `params`, `session.state` — and `Value.Clean` recurses into
+nested object schemas and would prune them to `{}`, silently losing ID token and userinfo claims.
+
+## Finding a model: `tryFind` or `find`
+
+Every `BaseModel`/`BaseToken` subclass, and the `Client` namespace (`lib/models/client.ts:62`), has two
+static lookups sharing one set of semantics — verification, expiry, session binding, policy — and
+differing only on a miss:
+
+- `tryFind(id, opts?)` returns `undefined`: use it where absence is a handled outcome.
+- `find(id, opts?)` **throws**: use it where the item is required, so the call site needs no `undefined`
+  check and no non-null assertion. It throws `opts.error` if given, otherwise the model's
+  `static notFoundError` (`lib/models/base_model.ts:94`) — `InvalidToken` for the token hierarchy,
+  `InvalidClient` for `Client`.
+
+`find` delegates to `tryFind`, which is why a test simulates a miss with `spyOn(Model, 'tryFind')`:
+mocking `find` would bypass the throw path it exists to exercise.
 
 ## Why reading a bare field is a latent bug, not a type error
 
