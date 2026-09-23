@@ -1,3 +1,4 @@
+import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import nanoid from '../../helpers/nanoid.js';
 import epochTime from '../../helpers/epoch_time.js';
 import { ISSUER } from 'lib/configs/env.js';
@@ -5,7 +6,7 @@ import { logout } from 'lib/html/logout.js';
 import { SessionNotFound } from '../../helpers/errors.js';
 import { resolveBucketForRequest } from '../../admin/auth/resolveBucket.js';
 
-export default async function resumeAction(oidc, interaction) {
+export default async function resumeAction(oidc: OIDCContext, interaction) {
 	oidc.entity('Interaction', interaction);
 
 	const {

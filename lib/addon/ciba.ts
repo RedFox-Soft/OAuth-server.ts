@@ -1,8 +1,12 @@
 import { shouldChange, mustChange } from './_warn.ts';
 import * as errors from '../helpers/errors.ts';
+import type { OIDCContext } from '../helpers/oidc_context.ts';
 
-export async function processLoginHintToken(_ctx, _loginHintToken) {
-	// @param ctx - koa request context
+export async function processLoginHintToken(
+	_oidc: OIDCContext,
+	_loginHintToken
+) {
+	// @param oidc - the request context (OIDCContext)
 	// @param loginHintToken - string value of the login_hint_token parameter
 	mustChange(
 		'features.ciba.processLoginHintToken',
@@ -11,8 +15,8 @@ export async function processLoginHintToken(_ctx, _loginHintToken) {
 	throw new Error('features.ciba.processLoginHintToken not implemented');
 }
 
-export async function processLoginHint(_ctx, _loginHint) {
-	// @param ctx - koa request context
+export async function processLoginHint(_oidc: OIDCContext, _loginHint) {
+	// @param oidc - the request context (OIDCContext)
 	// @param loginHint - string value of the login_hint parameter
 	mustChange(
 		'features.ciba.processLoginHint',
@@ -21,8 +25,8 @@ export async function processLoginHint(_ctx, _loginHint) {
 	throw new Error('features.ciba.processLoginHint not implemented');
 }
 
-export async function verifyUserCode(_ctx, _account, _userCode) {
-	// @param ctx - koa request context
+export async function verifyUserCode(_oidc: OIDCContext, _account, _userCode) {
+	// @param oidc - the request context (OIDCContext)
 	// @param account -
 	// @param userCode - string value of the user_code parameter, when not provided it is undefined
 	mustChange(
@@ -32,8 +36,11 @@ export async function verifyUserCode(_ctx, _account, _userCode) {
 	throw new Error('features.ciba.verifyUserCode not implemented');
 }
 
-export async function validateBindingMessage(ctx, bindingMessage) {
-	// @param ctx - koa request context
+export async function validateBindingMessage(
+	_oidc: OIDCContext,
+	bindingMessage
+) {
+	// @param oidc - the request context (OIDCContext)
 	// @param bindingMessage - string value of the binding_message parameter, when not provided it is undefined
 	shouldChange(
 		'features.ciba.validateBindingMessage',
@@ -46,8 +53,11 @@ export async function validateBindingMessage(ctx, bindingMessage) {
 	}
 }
 
-export async function validateRequestContext(_ctx, _requestContext) {
-	// @param ctx - koa request context
+export async function validateRequestContext(
+	_oidc: OIDCContext,
+	_requestContext
+) {
+	// @param oidc - the request context (OIDCContext)
 	// @param requestContext - string value of the request_context parameter, when not provided it is undefined
 	mustChange(
 		'features.ciba.validateRequestContext',
@@ -57,12 +67,12 @@ export async function validateRequestContext(_ctx, _requestContext) {
 }
 
 export async function triggerAuthenticationDevice(
-	_ctx,
+	_oidc: OIDCContext,
 	_request,
 	_account,
 	_client
 ) {
-	// @param ctx - koa request context
+	// @param oidc - the request context (OIDCContext)
 	// @param request - the BackchannelAuthenticationRequest instance
 	// @param account - the account object retrieved by findAccount
 	// @param client - the Client instance

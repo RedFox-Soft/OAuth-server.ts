@@ -1,3 +1,4 @@
+import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { merge } from 'lib/helpers/_/object.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 
@@ -7,7 +8,7 @@ import { ApplicationConfig } from 'lib/configs/application.js';
  *
  * Merges requested claims with acr as requested if acr_values is provided
  */
-export default function assignClaims(oidc) {
+export default function assignClaims(oidc: OIDCContext) {
 	const { params } = oidc;
 
 	if (

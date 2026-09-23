@@ -86,7 +86,7 @@ against 10 for the scoped plugin, and two of them are live features breaking rat
 
 **`normalize` cleans headers too.** Elysia normalizes against the route's `headers` schema as well
 as body and query, and this server reads headers no schema enumerates — `x-client-cert`, fetched by
-`ctx.get('x-client-cert')` in `lib/addon/mtls.ts:11`, above all. The userinfo route declares only
+`oidc.get('x-client-cert')` in `lib/addon/mtls.ts:12`, above all. The userinfo route declares only
 `authorization` and `dpop`. Under the flag the certificate is stripped before the addon can read it,
 and a certificate-bound access token presented **with** its matching certificate answers 401 instead
 of 200. The same trap sits on `/token`, where that header is mTLS client authentication. Enumerating

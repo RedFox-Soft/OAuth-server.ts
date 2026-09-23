@@ -30,7 +30,7 @@ server no longer follows.
 export async function findAccount(oidc, sub, _token?)
 ```
 
-- `oidc` — the OIDC context (`ctx.oidc`) for the current request.
+- `oidc` — the request context (`OIDCContext`) for the current request.
 - `sub` — the account identifier; equals the user record `_id`.
 - `_token` — the token the account is being loaded for. **Undefined at the authorization endpoint**,
   which is why every read of it is optional-chained.

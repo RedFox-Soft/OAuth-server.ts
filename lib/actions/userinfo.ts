@@ -92,7 +92,7 @@ async function userInfo({ headers, body, set, request, params }) {
 		(params as { bucket?: string } | undefined)?.bucket,
 		hostOfRequest(request)
 	);
-	const oidc = new OIDCContext({}, headers, 'anonymous', bucket);
+	const oidc = new OIDCContext({ params: {}, headers, bucket });
 	const { method } = request;
 
 	const accessTokenId = resourceCredential(oidc, headers, body, method);

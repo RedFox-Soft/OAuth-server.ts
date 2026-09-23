@@ -1,3 +1,4 @@
+import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import * as JWT from '../../helpers/jwt.ts';
 import { keystore } from 'lib/configs/keystore.js';
 import { clientKeys, checkClientSecretExpiration } from 'lib/models/client.js';
@@ -33,7 +34,7 @@ export function isEncryptedJWT(jwt: string): boolean {
  */
 export default async function processRequestObject(
 	schema: TSchema,
-	oidc,
+	oidc: OIDCContext,
 	{
 		clientAlg,
 		isPar = false,
@@ -89,10 +90,6 @@ export default async function processRequestObject(
 			}
 
 			params.request = decrypted.toString('utf8');
-
-			if (oidc.body) {
-				oidc.body.request = params.request;
-			}
 		} catch (err) {
 			if (err instanceof OIDCProviderError) {
 				throw err;
@@ -259,9 +256,11 @@ export default async function processRequestObject(
 
 	if (
 		pushedRequestObject &&
-		oidc.entities.PushedAuthorizationRequest.payload.dpopJkt
+		oidc.require('PushedAuthorizationRequest').payload.dpopJkt
 	) {
-		params.dpop_jkt = oidc.entities.PushedAuthorizationRequest.payload.dpopJkt;
+		params.dpop_jkt = oidc.require(
+			'PushedAuthorizationRequest'
+		).payload.dpopJkt;
 		oidc.trusted?.push('dpop_jkt');
 	}
 	return decryptedRequest;

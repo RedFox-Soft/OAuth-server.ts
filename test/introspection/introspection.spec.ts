@@ -478,7 +478,7 @@ describe('introspection features', () => {
 			expect(data).toEqual({ active: false });
 		});
 
-		describe('populates ctx.oidc.entities', () => {
+		describe('an introspection request records the token and its client', () => {
 			it('the introspection event carries the token and its client', async function () {
 				const spy = spyOn(OIDCContext.prototype, 'entity');
 

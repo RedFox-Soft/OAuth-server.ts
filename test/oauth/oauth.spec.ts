@@ -291,10 +291,7 @@ describe('requests without the openid scope', () => {
 					auth.validatePresence(response, ['state']);
 
 					expect(spy).toHaveBeenCalledTimes(1);
-					expect(spy.mock.calls[0][0].oidc.params).toHaveProperty(
-						'scope',
-						scope
-					);
+					expect(spy.mock.calls[0][0].params).toHaveProperty('scope', scope);
 				});
 			});
 		});

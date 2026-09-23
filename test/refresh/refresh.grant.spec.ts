@@ -636,15 +636,15 @@ describe('grant_type=refresh_token', () => {
 			const refreshToken = spy.mock.calls.find(
 				(call) => call[0] === 'RefreshToken'
 			);
-			expect(refreshToken[1].payload).toHaveProperty(
-				'gty',
+			expect(refreshToken?.[1]).toHaveProperty(
+				'payload.gty',
 				'authorization_code'
 			);
 			const accessToken = spy.mock.calls.find(
 				(call) => call[0] === 'AccessToken'
 			);
-			expect(accessToken[1].payload).toHaveProperty(
-				'gty',
+			expect(accessToken?.[1]).toHaveProperty(
+				'payload.gty',
 				'authorization_code refresh_token'
 			);
 		});

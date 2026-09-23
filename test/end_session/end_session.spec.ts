@@ -574,6 +574,28 @@ describe('logout endpoint', () => {
 				expect(authorizationCodeAdapter.revokeByGrantId).not.toHaveBeenCalled();
 			});
 
+			it('announces the revoked grant once when the user signs out of one client only', async function () {
+				const session = setup.getSession();
+				const grantId = session.authorizations.client.grantId;
+				session.state = {
+					secret: '123',
+					postLogoutRedirectUri: 'https://rp.example.com/logout/cb',
+					clientId: 'client'
+				};
+				const revoked = mock();
+				eventBus.on('grant.revoked', revoked);
+
+				const res = await agent.logout.confirm.post(
+					{ xsrf: '123' },
+					{ headers: { cookie, accept: 'text/html' } }
+				);
+				eventBus.removeListener('grant.revoked', revoked);
+
+				expect(res.status).toBe(303);
+				expect(revoked).toHaveBeenCalledTimes(1);
+				expect(revoked.mock.calls[0].at(-1)).toBe(grantId);
+			});
+
 			it("only clears one clients session if user doesn't want to log out (using end_session_success)", async function () {
 				const adapter = TestAdapter.for('Session');
 				spyOn(adapter, 'destroy');

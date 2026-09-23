@@ -52,8 +52,8 @@ describe('dynamic ttl', () => {
 		expect(data).toHaveProperty('expires_in', 123);
 
 		expect(clientSpy).toBeCalledTimes(1);
-		expect(clientSpy.mock.calls[0][1]).toBeInstanceOf(ClientCredentials);
-		expect(clientSpy.mock.calls[0][2]).toMatchObject({ clientId: 'client' });
+		expect(clientSpy.mock.calls[0][0]).toBeInstanceOf(ClientCredentials);
+		expect(clientSpy.mock.calls[0][1]).toMatchObject({ clientId: 'client' });
 	});
 
 	it('the device code lifetime is the one the dynamic ttl function returned', async function () {
@@ -69,8 +69,8 @@ describe('dynamic ttl', () => {
 		const device_code = device.data.device_code;
 
 		expect(deviceCodeSpy).toBeCalledTimes(1);
-		expect(deviceCodeSpy.mock.calls[0][1]).toBeInstanceOf(DeviceCode);
-		expect(deviceCodeSpy.mock.calls[0][2]).toMatchObject({
+		expect(deviceCodeSpy.mock.calls[0][0]).toBeInstanceOf(DeviceCode);
+		expect(deviceCodeSpy.mock.calls[0][1]).toMatchObject({
 			clientId: 'client'
 		});
 
@@ -99,14 +99,14 @@ describe('dynamic ttl', () => {
 		expect(idTokenSpy.mock.calls[0][1]).toMatchObject({ clientId: 'client' });
 
 		expect(accessTokenSpy).toHaveBeenCalledTimes(1);
-		expect(accessTokenSpy.mock.calls[0][1]).toBeInstanceOf(AccessToken);
-		expect(accessTokenSpy.mock.calls[0][2]).toMatchObject({
+		expect(accessTokenSpy.mock.calls[0][0]).toBeInstanceOf(AccessToken);
+		expect(accessTokenSpy.mock.calls[0][1]).toMatchObject({
 			clientId: 'client'
 		});
 
 		expect(refreshTokenSpy).toHaveBeenCalledTimes(1);
-		expect(refreshTokenSpy.mock.calls[0][1]).toBeInstanceOf(RefreshToken);
-		expect(refreshTokenSpy.mock.calls[0][2]).toMatchObject({
+		expect(refreshTokenSpy.mock.calls[0][0]).toBeInstanceOf(RefreshToken);
+		expect(refreshTokenSpy.mock.calls[0][1]).toMatchObject({
 			clientId: 'client'
 		});
 	});
@@ -125,8 +125,8 @@ describe('dynamic ttl', () => {
 		expect(status).toBe(303);
 
 		expect(spy).toHaveBeenCalledTimes(1);
-		expect(spy.mock.calls[0][1]).toBeInstanceOf(AuthorizationCode);
-		expect(spy.mock.calls[0][2]).toMatchObject({ clientId: 'client' });
+		expect(spy.mock.calls[0][0]).toBeInstanceOf(AuthorizationCode);
+		expect(spy.mock.calls[0][1]).toMatchObject({ clientId: 'client' });
 	});
 
 	it('the authorization code lifetime is the one the dynamic ttl function returned', async function () {
@@ -168,14 +168,14 @@ describe('dynamic ttl', () => {
 		expect(idTokenSpy.mock.calls[0][1]).toMatchObject({ clientId: 'client' });
 
 		expect(accessTokenSpy).toHaveBeenCalledTimes(1);
-		expect(accessTokenSpy.mock.calls[0][1]).toBeInstanceOf(AccessToken);
-		expect(accessTokenSpy.mock.calls[0][2]).toMatchObject({
+		expect(accessTokenSpy.mock.calls[0][0]).toBeInstanceOf(AccessToken);
+		expect(accessTokenSpy.mock.calls[0][1]).toMatchObject({
 			clientId: 'client'
 		});
 
 		expect(refreshTokenSpy).toHaveBeenCalledTimes(1);
-		expect(refreshTokenSpy.mock.calls[0][1]).toBeInstanceOf(RefreshToken);
-		expect(refreshTokenSpy.mock.calls[0][2]).toMatchObject({
+		expect(refreshTokenSpy.mock.calls[0][0]).toBeInstanceOf(RefreshToken);
+		expect(refreshTokenSpy.mock.calls[0][1]).toMatchObject({
 			clientId: 'client'
 		});
 	});
@@ -226,14 +226,14 @@ describe('dynamic ttl', () => {
 		expect(idTokenSpy.mock.calls[0][1]).toMatchObject({ clientId: 'client' });
 
 		expect(accessTokenSpy).toHaveBeenCalledTimes(1);
-		expect(accessTokenSpy.mock.calls[0][1]).toBeInstanceOf(AccessToken);
-		expect(accessTokenSpy.mock.calls[0][2]).toMatchObject({
+		expect(accessTokenSpy.mock.calls[0][0]).toBeInstanceOf(AccessToken);
+		expect(accessTokenSpy.mock.calls[0][1]).toMatchObject({
 			clientId: 'client'
 		});
 
 		expect(refreshTokenSpy).toHaveBeenCalledTimes(1);
-		expect(refreshTokenSpy.mock.calls[0][1]).toBeInstanceOf(RefreshToken);
-		expect(refreshTokenSpy.mock.calls[0][2]).toMatchObject({
+		expect(refreshTokenSpy.mock.calls[0][0]).toBeInstanceOf(RefreshToken);
+		expect(refreshTokenSpy.mock.calls[0][1]).toMatchObject({
 			clientId: 'client'
 		});
 	});

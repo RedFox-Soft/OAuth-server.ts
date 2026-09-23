@@ -163,6 +163,16 @@ with no slug has no endpoints of its own, so its clients have nowhere to go but 
 them there strands every one of them. An unaddressed bucket keeps exactly the behaviour it had before
 tenancy, and the check begins to apply the moment an operator gives it an address.
 
+**It guards every endpoint that starts a flow, not only `/auth`.** Device authorization and backchannel
+authentication also store an artifact that records the bucket it was started at, and the token issued
+from it inherits that bucket. Until `060-typed-oidc-context` both built their context without a bucket,
+so a flow at `/acme/device/auth` recorded the default bucket and yielded the instance's `iss` — and that
+was the only reason they did not need the refusal. Honouring their address without it would have let a
+default client start a flow at `acme` and receive `acme`-issued tokens, so both now call `checkBucket`
+after the resource is final and before anything is stored (`lib/actions/authorization/device.ts`).
+Registration also honours its address, for the management URI it returns, but refuses nothing: a
+registration names no bucket.
+
 ## A token records the bucket that issued it
 
 `bucketId` is declared on `BaseTokenPayload` and set at issuance. Recorded, not derived, and the reason
@@ -196,7 +206,9 @@ Concatenate.
 authorization response in `resume()`, which knows nothing of the address the flow started at. It
 recovers the bucket from the stored interaction's parameters — the same ones the sign-in screen
 resolved its own bucket from. Forgotten, the response carries the instance's `iss` while the metadata
-promised the bucket's.
+promised the bucket's. The device flow's resumption (`ui/:uid/device_resume`) had forgotten it until
+`060-typed-oidc-context`: the sign-in still completed, but was written to `_session_default` for a
+bucket client's end user.
 
 **Metadata can advertise an endpoint nobody mounted.** `test/bucket_addressing/advertised_endpoints.spec.ts`
 enumerates what a bucket's document advertises and checks each is served. It was written because four

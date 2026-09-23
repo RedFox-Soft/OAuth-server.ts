@@ -28,7 +28,7 @@ export function authorizationPKCE(oidc: {
 	 */
 	const mayOmitProof =
 		!ApplicationConfig['pkce.required'] &&
-		oidc.client?.tokenEndpointAuthMethod !== 'none' &&
+		oidc.entities.Client?.tokenEndpointAuthMethod !== 'none' &&
 		!params.code_challenge_method;
 
 	if (!params.code_challenge) {

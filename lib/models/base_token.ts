@@ -1,5 +1,4 @@
 import { Type as t, type Static } from '@sinclair/typebox';
-import als from '../helpers/als.ts';
 import {
 	BaseModel,
 	BaseModelPayload,
@@ -90,9 +89,9 @@ export class BaseToken<
 		return this.#resourceServer;
 	}
 
-	static expiresIn(...args) {
+	static expiresIn(token: unknown, client: unknown) {
 		if (this.name in ttl) {
-			return ttl[this.name](...args);
+			return ttl[this.name](token, client);
 		}
 	}
 
@@ -102,11 +101,7 @@ export class BaseToken<
 
 	get expiration() {
 		if (!this.expiresIn) {
-			this.expiresIn = this.constructor.expiresIn(
-				als.getStore(),
-				this,
-				this.#client
-			);
+			this.expiresIn = this.constructor.expiresIn(this, this.#client);
 		}
 
 		return this.expiresIn;

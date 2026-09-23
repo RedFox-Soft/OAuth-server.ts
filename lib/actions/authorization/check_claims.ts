@@ -1,3 +1,4 @@
+import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { InvalidRequest } from '../../helpers/errors.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { assertClaimsParameter } from '../../addon/index.js';
@@ -15,7 +16,7 @@ import { ignoreUnknownIn } from 'lib/plugins/ignore_unknown_params.js';
  *
  * Merges requested claims with acr as requested if acr_values is provided
  */
-export default async function checkClaims(oidc) {
+export default async function checkClaims(oidc: OIDCContext) {
 	const { params } = oidc;
 
 	if (params.claims !== undefined) {

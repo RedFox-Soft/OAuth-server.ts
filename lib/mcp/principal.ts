@@ -1,5 +1,8 @@
 import { AccessToken } from '../models/access_token.js';
-import { OIDCContext } from '../helpers/oidc_context.js';
+import {
+	DEFAULT_REQUEST_BUCKET,
+	OIDCContext
+} from '../helpers/oidc_context.js';
 import {
 	dpopValidate,
 	validateReplay,
@@ -127,7 +130,12 @@ export async function resolveMcpPrincipal(
 	 */
 	method: ProofMethod = 'POST'
 ): Promise<McpPrincipal> {
-	const oidc = new OIDCContext({}, headers);
+	/* `/mcp` is instance-wide, not mounted beneath a bucket; only the credential is read here. */
+	const oidc = new OIDCContext({
+		params: {},
+		headers,
+		bucket: DEFAULT_REQUEST_BUCKET
+	});
 	let accessTokenId: string;
 	try {
 		accessTokenId = oidc.getAccessToken({ acceptDPoP: true });

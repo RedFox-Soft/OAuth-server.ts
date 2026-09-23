@@ -67,7 +67,7 @@ through rule 3.
 
 **The gotcha.** Every caller must pass the resource it has, `findAccount` included. It did not, at
 first: login resolved the project bucket and found the user, `findAccount` resolved `redfox` and did
-not, so `loadGrant` left `oidc.grant` unset and the consent prompt crashed with a 500 rather than
+not, so `loadGrant` left the grant unset and the consent prompt crashed with a 500 rather than
 refusing. A caller that omits the resource silently resolves a different bucket than login did.
 
 ## A client whose id is a URL, stored nowhere

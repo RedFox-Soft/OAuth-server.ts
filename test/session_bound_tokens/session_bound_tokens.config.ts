@@ -8,7 +8,7 @@ export const ApplicationConfig = {
 };
 
 export const addons = {
-	issueRefreshToken: (ctx, client) => grantTypeAllowed(client, 'refresh_token')
+	issueRefreshToken: (oidc, client) => grantTypeAllowed(client, 'refresh_token')
 };
 
 export const clients = [

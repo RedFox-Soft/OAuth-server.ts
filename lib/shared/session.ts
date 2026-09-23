@@ -52,7 +52,7 @@ export function clearLegacySessionCookie(cookie): void {
 }
 
 export default async function sessionHandler(oidc) {
-	oidc.session = await Session.get(oidc);
+	await Session.get(oidc);
 
 	return async function setCookies() {
 		clearLegacySessionCookie(oidc.cookie);

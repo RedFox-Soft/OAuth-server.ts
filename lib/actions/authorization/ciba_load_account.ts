@@ -1,3 +1,4 @@
+import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { InvalidRequest, UnknownUserId } from '../../helpers/errors.ts';
 import omitBy from '../../helpers/_/omit_by.ts';
 import { findAccount } from '../../addon/account.js';
@@ -9,7 +10,7 @@ import {
 
 import checkIdTokenHint from './check_id_token_hint.ts';
 
-export default async function cibaLoadAccount(oidc) {
+export default async function cibaLoadAccount(oidc: OIDCContext) {
 	const mechanisms = omitBy(
 		{
 			login_hint_token: oidc.params.login_hint_token,
@@ -47,13 +48,13 @@ export default async function cibaLoadAccount(oidc) {
 			await checkIdTokenHint(oidc);
 			({
 				payload: { sub: accountId }
-			} = oidc.entities.IdTokenHint);
+			} = oidc.require('IdTokenHint'));
 			break;
 		case 'login_hint_token':
-			accountId = await processLoginHintToken({ oidc }, value);
+			accountId = await processLoginHintToken(oidc, value);
 			break;
 		case 'login_hint':
-			accountId = await processLoginHint({ oidc }, value);
+			accountId = await processLoginHint(oidc, value);
 			break;
 	}
 
@@ -66,5 +67,5 @@ export default async function cibaLoadAccount(oidc) {
 	}
 	oidc.entity('Account', account);
 
-	await verifyUserCode({ oidc }, account, value);
+	await verifyUserCode(oidc, account, value);
 }

@@ -14,8 +14,8 @@ const check: CheckPartial = {
 	reason: 'reason_foo',
 	description: 'error_description_foo',
 	error: 'error_foo',
-	check: (ctx: any) => {
-		if (ctx.oidc.params.triggerCustomFail) {
+	check: (oidc: any) => {
+		if (oidc.params.triggerCustomFail) {
 			return true;
 		}
 		return false;
@@ -38,10 +38,10 @@ class UnrequestablePrompt extends Prompt {
 			reason: 'un_foo',
 			description: 'un_foo_desc',
 			error: 'un_foo_err',
-			check: (ctx: any) => {
+			check: (oidc: any) => {
 				if (
-					ctx.oidc.params.triggerUnrequestable &&
-					(!ctx.oidc.result || !('foo' in ctx.oidc.result))
+					oidc.params.triggerUnrequestable &&
+					(!oidc.result || !('foo' in oidc.result))
 				) {
 					return true;
 				}

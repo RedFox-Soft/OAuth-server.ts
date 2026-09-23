@@ -1,3 +1,4 @@
+import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import {
 	InvalidRequest,
 	InvalidRequestUri,
@@ -9,7 +10,9 @@ import { PushedAuthorizationRequest } from 'lib/models/pushed_authorization_requ
 /*
  * Validates request_uri is a PAR one when PAR is enabled and loads it. Throws
  */
-export default async function loadPushedAuthorizationRequest(oidc) {
+export default async function loadPushedAuthorizationRequest(
+	oidc: OIDCContext
+) {
 	const { client, params } = oidc;
 
 	if (

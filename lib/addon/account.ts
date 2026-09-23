@@ -3,22 +3,22 @@ import { getUserStore } from '../adapters/index.js';
 import { resolveBucketForRequest } from '../admin/auth/resolveBucket.js';
 
 export async function findAccount(oidc, sub, _token?) {
-	// @param oidc - the OIDC context (ctx.oidc) for the current request.
+	// @param oidc - the OIDC context for the current request.
 	// @param sub {string} - account identifier (subject); equals the user record _id.
 	// @param token - reference to the token the account is being loaded for;
 	//   undefined at the authorization endpoint.
 
 	// Resolve the user bucket exactly as login does (resolveBucketForRequest):
 	// prefer the live client, falling back to the token's client for the
-	// token/userinfo flows where `oidc.client` may not be populated.
-	const clientId = oidc?.client?.clientId ?? _token?.payload?.clientId;
+	// token/userinfo flows where no client may be resolved (`entities.Client`).
+	const clientId = oidc?.entities.Client?.clientId ?? _token?.payload?.clientId;
 	/*
 	 * The resource matters here for the same reason the client does, and leaving it out is not a
 	 * harmless omission: bucket resolution can derive a project from the declared resource a request
 	 * names, so a login that found the user in a project's bucket while this resolved against the
 	 * default one would authenticate somebody the very next step could not load. That is not a
 	 * hypothetical — it is what happened before this argument was passed, and it surfaced as a 500 in
-	 * the consent prompt rather than as a refusal, because `loadGrant` leaves `oidc.grant` unset when
+	 * the consent prompt rather than as a refusal, because `loadGrant` leaves the grant (`oidc.entities.Grant`) unset when
 	 * no account resolved.
 	 *
 	 * Taken from the live request where there is one, and from the token otherwise, mirroring the
@@ -72,7 +72,7 @@ export async function loadExistingGrant(oidc) {
 		}
 		return existing;
 	}
-	const accountId = oidc.account?.accountId;
+	const accountId = oidc.entities.Account?.accountId;
 	if (oidc.client['consent.require'] === false && accountId) {
 		// Mark the auto-created grant `trusted` (this is a consent-not-required
 		// client). A trusted grant's getOIDCScopeFiltered()/getResourceScopeFiltered()

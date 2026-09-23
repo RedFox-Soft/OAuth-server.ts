@@ -1,5 +1,6 @@
 import * as errors from '../helpers/errors.ts';
 import { ApplicationConfig as config } from '../configs/application.js';
+import type { OIDCContext } from '../helpers/oidc_context.ts';
 
 export function sectorIdentifierUriValidate(_client) {
 	// @param client - the Client instance
@@ -12,9 +13,18 @@ export function sectorIdentifierUriValidate(_client) {
 // authorization request carrying `claims` while claimsParameter.enabled is set. The
 // hook exists so a deployment can layer its own policy on top, via
 // addons.override({ assertClaimsParameter }). Throw to reject; resolve to accept.
-export async function assertClaimsParameter(_ctx, _claims, _client) {}
+export async function assertClaimsParameter(
+	_oidc: OIDCContext,
+	_claims,
+	_client
+) {}
 
-export async function assertJwtClaimsAndHeader(oidc, claims, _header, _client) {
+export async function assertJwtClaimsAndHeader(
+	oidc: OIDCContext,
+	claims,
+	_header,
+	_client
+) {
 	// @param oidc - the per-request oidc context
 	// @param claims - parsed Request Object JWT Claims Set as object
 	// @param header - parsed Request Object JWT Headers as object

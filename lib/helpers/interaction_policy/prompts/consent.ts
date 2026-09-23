@@ -1,22 +1,25 @@
-import { Prompt } from '../prompt.js';
+import { Prompt, type CheckPartial } from '../prompt.js';
 import { canonicalKey, canonicalKeySet } from '../../rar_canonical.js';
 
-const missingOIDCScope = Symbol();
-const missingOIDCClaims = Symbol();
-const missingResourceScopes = Symbol();
-const missingRar = Symbol();
+/*
+ * What a check found missing, kept for its `details` to report. Beside the request context rather than
+ * written onto it, so the context holds only what it declares.
+ */
+const missingOIDCScope = new WeakMap<object, unknown>();
+const missingOIDCClaims = new WeakMap<object, unknown>();
+const missingResourceScopes = new WeakMap<object, unknown>();
+const missingRar = new WeakMap<object, unknown>();
 
 class ConsentPromt extends Prompt {
 	name = 'consent';
 	requestable = true;
 	defaultError = 'consent_required';
-	checks = [
+	checks: CheckPartial[] = [
 		{
 			reason: 'native_client_prompt',
 			description: 'native clients require End-User interaction',
 			error: 'interaction_required',
-			check: (ctx) => {
-				const { oidc } = ctx;
+			check: (oidc) => {
 				if (
 					oidc.client.applicationType === 'native' &&
 					oidc.params.response_type !== 'none' &&
@@ -30,8 +33,7 @@ class ConsentPromt extends Prompt {
 		{
 			reason: 'op_scopes_missing',
 			description: 'requested scopes not granted',
-			check: (ctx) => {
-				const { oidc } = ctx;
+			check: (oidc) => {
 				/*
 				 * An absent grant means nothing has been granted, so everything requested is missing and
 				 * the end user is asked — which is a refusal, and correct. It used to be a fault: reaching
@@ -43,10 +45,10 @@ class ConsentPromt extends Prompt {
 				 * the failure it prevents is indistinguishable, from outside, from the server being broken.
 				 */
 				const encounteredScopes = new Set(
-					(oidc.grant?.getOIDCScopeEncountered() ?? '').split(' ')
+					(oidc.entities.Grant?.getOIDCScopeEncountered() ?? '').split(' ')
 				);
 
-				let missing;
+				let missing: string[] | undefined;
 				for (const scope of oidc.requestParamOIDCScopes) {
 					if (!encounteredScopes.has(scope)) {
 						missing ||= [];
@@ -55,24 +57,23 @@ class ConsentPromt extends Prompt {
 				}
 
 				if (missing?.length) {
-					ctx.oidc[missingOIDCScope] = missing;
+					missingOIDCScope.set(oidc, missing);
 					return true;
 				}
 
 				return false;
 			},
-			details: ({ oidc }) => ({ missingOIDCScope: oidc[missingOIDCScope] })
+			details: (oidc) => ({ missingOIDCScope: missingOIDCScope.get(oidc) })
 		},
 		{
 			reason: 'op_claims_missing',
 			description: 'requested claims not granted',
-			check: (ctx) => {
-				const { oidc } = ctx;
+			check: (oidc) => {
 				const encounteredClaims = new Set(
-					oidc.grant?.getOIDCClaimsEncountered() ?? []
+					oidc.entities.Grant?.getOIDCClaimsEncountered() ?? []
 				);
 
-				let missing;
+				let missing: string[] | undefined;
 				for (const claim of oidc.requestParamClaims) {
 					if (
 						!encounteredClaims.has(claim) &&
@@ -84,31 +85,29 @@ class ConsentPromt extends Prompt {
 				}
 
 				if (missing?.length) {
-					ctx.oidc[missingOIDCClaims] = missing;
+					missingOIDCClaims.set(oidc, missing);
 					return true;
 				}
 
 				return false;
 			},
-			details: ({ oidc }) => ({ missingOIDCClaims: oidc[missingOIDCClaims] })
+			details: (oidc) => ({ missingOIDCClaims: missingOIDCClaims.get(oidc) })
 		},
 		{
 			reason: 'rs_scopes_missing',
 			description: 'requested scopes not granted',
-			check: (ctx) => {
-				const { oidc } = ctx;
-
-				let missing;
+			check: (oidc) => {
+				let missing: Record<string, string[]> | undefined;
 
 				for (const [indicator, resourceServer] of Object.entries(
-					ctx.oidc.resourceServers
+					oidc.resourceServers
 				)) {
 					const encounteredScopes = new Set(
-						(oidc.grant?.getResourceScopeEncountered(indicator) ?? '').split(
-							' '
-						)
+						(
+							oidc.entities.Grant?.getResourceScopeEncountered(indicator) ?? ''
+						).split(' ')
 					);
-					const requestedScopes = ctx.oidc.requestParamScopes;
+					const requestedScopes = oidc.requestParamScopes;
 					const availableScopes = resourceServer.scopes;
 
 					for (const scope of requestedScopes) {
@@ -121,14 +120,14 @@ class ConsentPromt extends Prompt {
 				}
 
 				if (missing && Object.keys(missing).length) {
-					ctx.oidc[missingResourceScopes] = missing;
+					missingResourceScopes.set(oidc, missing);
 					return true;
 				}
 
 				return false;
 			},
-			details: ({ oidc }) => ({
-				missingResourceScopes: oidc[missingResourceScopes]
+			details: (oidc) => ({
+				missingResourceScopes: missingResourceScopes.get(oidc)
 			})
 		},
 		{
@@ -143,14 +142,12 @@ class ConsentPromt extends Prompt {
 			 *
 			 * No JSON.parse here: checkRar normalizes the parameter to an array before this runs.
 			 */
-			check: (ctx) => {
-				const { oidc } = ctx;
-
+			check: (oidc) => {
 				if (!oidc.params.authorization_details || oidc.result?.consent) {
 					return false;
 				}
 
-				const granted = canonicalKeySet(oidc.grant?.payload.rar);
+				const granted = canonicalKeySet(oidc.entities.Grant?.payload.rar);
 				const missing = (oidc.params.authorization_details as unknown[]).filter(
 					(detail: unknown) => !granted.has(canonicalKey(detail))
 				);
@@ -159,10 +156,10 @@ class ConsentPromt extends Prompt {
 					return false;
 				}
 
-				ctx.oidc[missingRar] = missing;
+				missingRar.set(oidc, missing);
 				return true;
 			},
-			details: ({ oidc }) => ({ rar: oidc[missingRar] })
+			details: (oidc) => ({ rar: missingRar.get(oidc) })
 		}
 	];
 }

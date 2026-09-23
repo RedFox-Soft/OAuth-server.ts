@@ -1,11 +1,13 @@
+import type { OIDCContext } from '../oidc_context.ts';
+
 export interface CheckPartial<
 	T extends Record<string, unknown> = Record<string, unknown>
 > {
 	reason: string;
 	description: string;
 	error?: string;
-	details?: (ctx: any) => Partial<T> | Promise<Partial<T>>;
-	check: (ctx: any) => boolean | Promise<boolean>;
+	details?: (oidc: OIDCContext) => Partial<T> | Promise<Partial<T>>;
+	check: (oidc: OIDCContext) => boolean | Promise<boolean>;
 }
 
 export class Prompt<
@@ -21,8 +23,7 @@ export class Prompt<
 			reason: `${this.name}_prompt`,
 			description: `${this.name} prompt was not resolved`,
 			error: `${this.name}_required`,
-			check: (ctx) => {
-				const { oidc } = ctx;
+			check: (oidc) => {
 				if (oidc.prompts.has(this.name) && oidc.promptPending(this.name)) {
 					return true;
 				}
@@ -32,11 +33,11 @@ export class Prompt<
 		};
 	}
 
-	details(ctx: any): Partial<T> | Promise<Partial<T>> {
+	details(_oidc: OIDCContext): Partial<T> | Promise<Partial<T>> {
 		return {};
 	}
 
-	async executeChecks(ctx: any): Promise<{
+	async executeChecks(oidc: OIDCContext): Promise<{
 		name: string;
 		details: T;
 		reasons: string[];
@@ -49,13 +50,13 @@ export class Prompt<
 		let firstError = null;
 		const results: executeResult = {};
 		for (const { reason, description, error, details, check } of checks) {
-			if (await check(ctx)) {
+			if (await check(oidc)) {
 				firstError ??= {
 					error: error || this.defaultError,
 					error_description:
 						description || 'interaction is required from the end-user'
 				};
-				results[reason] = await details?.(ctx);
+				results[reason] = await details?.(oidc);
 			}
 		}
 		if (!firstError) {
@@ -67,7 +68,7 @@ export class Prompt<
 			reasons: Object.keys(results),
 			details: Object.assign(
 				{},
-				await this.details(ctx),
+				await this.details(oidc),
 				...Object.values(results)
 			),
 			firstError

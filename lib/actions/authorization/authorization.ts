@@ -103,7 +103,7 @@ export async function isAllowRedirectUri(params, bucket?: RequestBucket) {
 	 * the `iss` RFC 9207 puts in the response, which a client compares against the metadata it
 	 * discovered for the bucket it is talking to.
 	 */
-	const oidc = new OIDCContext(params, {}, 'anonymous', bucket);
+	const oidc = new OIDCContext({ params, bucket });
 
 	const client = await Client.find(params.client_id, {
 		error: new InvalidClient('client is invalid', 'client not found')
@@ -134,7 +134,7 @@ export async function isAllowRedirectUri(params, bucket?: RequestBucket) {
 	return { redirect_uri, state, oidc };
 }
 
-async function authorizationActionHandler(oidc) {
+async function authorizationActionHandler(oidc: OIDCContext) {
 	await checkClient(oidc);
 
 	const pushedAuthorizationRequest = await loadPushedAuthorizationRequest(oidc);
@@ -214,9 +214,6 @@ export const authGet = new Elysia()
 	.get(
 		routeNames.authorization,
 		async ({ query, cookie, route, request, params }) => {
-			const url = new URL(request.url);
-			url.search = url.pathname = '';
-
 			/*
 			 * The address decides the population, before anything else about the request is looked at.
 			 * `params.bucket` is present only on the prefixed mount; its absence is the bare address,
@@ -227,9 +224,12 @@ export const authGet = new Elysia()
 				hostOfRequest(request)
 			);
 
-			const oidc = new OIDCContext(query, {}, route, bucket);
-			oidc.cookie = cookie;
-			oidc.baseUrl = url.toString();
+			const oidc = new OIDCContext({
+				params: query,
+				route,
+				bucket,
+				cookie
+			});
 
 			return await authorizationActionHandler(oidc);
 		},
@@ -252,19 +252,18 @@ export const authPost = new Elysia()
 	.post(
 		routeNames.authorization,
 		async ({ body, cookie, route, request, params }) => {
-			const url = new URL(request.url);
-			url.search = '';
-			url.pathname = url.pathname.replace(route, '');
-
 			/* The address decides the population, exactly as on the GET above. */
 			const bucket = await requestBucketFor(
 				(params as { bucket?: string } | undefined)?.bucket,
 				hostOfRequest(request)
 			);
 
-			const oidc = new OIDCContext(body, {}, route, bucket);
-			oidc.cookie = cookie;
-			oidc.baseUrl = url.toString();
+			const oidc = new OIDCContext({
+				params: body,
+				route,
+				bucket,
+				cookie
+			});
 
 			return await authorizationActionHandler(oidc);
 		},
@@ -296,7 +295,7 @@ export const par = new Elysia()
 			const oidc = withBody(oidcInc, body);
 
 			stripOutsideJarParams(oidc);
-			const client = oidc.authenticatedClient;
+			const client = oidc.client;
 
 			const request = await processRequestObject(authorizationRequest, oidc);
 			checkResponseMode(oidc);

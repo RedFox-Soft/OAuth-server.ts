@@ -4,7 +4,7 @@ import getConfig from '../default.config.js';
 const config = getConfig();
 
 export const addons = {
-	getResourceServerInfo(ctx, resourceIndicator) {
+	getResourceServerInfo(oidc, resourceIndicator) {
 		const [, wl, format] = resourceIndicator.split(':');
 		if (wl.includes('wl')) {
 			return {
@@ -15,8 +15,8 @@ export const addons = {
 
 		throw new errors.InvalidTarget();
 	},
-	defaultResource(ctx) {
-		if (ctx.oidc.body?.nodefault) {
+	defaultResource(oidc) {
+		if (oidc.params.nodefault) {
 			return undefined;
 		}
 

@@ -2,9 +2,10 @@ import { mustChange } from './_warn.ts';
 import * as errors from '../helpers/errors.ts';
 import { MCP_RESOURCE_SERVER, isMcpResource } from '../mcp/resource_server.js';
 import { resolveDeclaredResource } from '../resources/registry.js';
+import type { OIDCContext } from '../helpers/oidc_context.ts';
 
-export async function defaultResource(ctx, client, oneOf) {
-	// @param ctx - koa request context
+export async function defaultResource(_oidc: OIDCContext, client, oneOf) {
+	// @param oidc - the request context (OIDCContext)
 	// @param client - client making the request
 	// @param oneOf {string[]} - The authorization server needs to select **one** of the values provided.
 	//                           Default is that the array is provided so that the request will fail.
@@ -15,15 +16,19 @@ export async function defaultResource(ctx, client, oneOf) {
 	return undefined;
 }
 
-export async function useGrantedResource(_ctx, _model) {
-	// @param ctx - koa request context
+export async function useGrantedResource(_oidc: OIDCContext, _model) {
+	// @param oidc - the request context (OIDCContext)
 	// @param model - depending on the request's grant_type this can be either an AuthorizationCode, BackchannelAuthenticationRequest,
 	//                RefreshToken, or DeviceCode model instance.
 	return false;
 }
 
-export async function getResourceServerInfo(_ctx, resourceIndicator, _client) {
-	// @param ctx - koa request context
+export async function getResourceServerInfo(
+	_oidc: OIDCContext,
+	resourceIndicator,
+	_client
+) {
+	// @param oidc - the request context (OIDCContext)
 	// @param resourceIndicator - resource indicator value either requested or resolved by the defaultResource helper.
 	// @param client - client making the request
 

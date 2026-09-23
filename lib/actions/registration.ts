@@ -7,6 +7,8 @@ import { InvalidToken, InvalidRequest } from '../helpers/errors.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { idFactory, secretFactory } from '../addon/index.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
+import { hostOfRequest } from 'lib/consts/request_host.js';
+import { requestBucketFor } from 'lib/admin/auth/bucketAddress.js';
 import {
 	Client,
 	fromWire,
@@ -132,7 +134,19 @@ async function validateInitialAccessToken(
 	}
 }
 
-async function create({ body, headers, request, set }) {
+/*
+ * The management address a response hands back is built from the request's issuer, so it has to be
+ * the address the request was made at. No refusal accompanies it: a registration names no bucket, and
+ * the association a client needs is decided at authorization time (see `create`).
+ */
+function bucketOf(params: unknown, request: Request) {
+	return requestBucketFor(
+		(params as { bucket?: string } | undefined)?.bucket,
+		hostOfRequest(request)
+	);
+}
+
+async function create({ body, headers, params, request, set }) {
 	const contentType = request.headers.get('content-type') || '';
 	if (!contentType.includes('application/json')) {
 		throw new InvalidRequest(
@@ -141,21 +155,26 @@ async function create({ body, headers, request, set }) {
 	}
 
 	const requestBody: Body = (body as Body) ?? {};
-	const oidc = new OIDCContext<Body>(requestBody, headers, 'registration');
+	const oidc = new OIDCContext<Body>({
+		params: requestBody,
+		headers,
+		route: 'registration',
+		bucket: await bucketOf(params, request)
+	});
 
 	await validateInitialAccessToken(oidc, headers.authorization);
 
 	const issueRegistrationAccessToken =
 		ApplicationConfig['registration.issueRegistrationAccessToken'];
 	let properties: Body = {};
-	const clientId = idFactory({ oidc });
+	const clientId = idFactory(oidc);
 
 	let rat;
 
 	if (
 		issueRegistrationAccessToken === true ||
 		(typeof issueRegistrationAccessToken === 'function' &&
-			issueRegistrationAccessToken({ oidc }))
+			issueRegistrationAccessToken(oidc))
 	) {
 		rat = new RegistrationAccessToken({ clientId });
 		oidc.entity('RegistrationAccessToken', rat);
@@ -192,7 +211,7 @@ async function create({ body, headers, request, set }) {
 
 	if (secretRequired) {
 		Object.assign(properties, {
-			clientSecret: await secretFactory({ oidc }),
+			clientSecret: await secretFactory(oidc),
 			client_secret_expires_at: 0
 		});
 	} else {
@@ -204,7 +223,7 @@ async function create({ body, headers, request, set }) {
 	if (iatPolicies) {
 		const implementations = ApplicationConfig['registration.policies'];
 		for (const policy of iatPolicies) {
-			await implementations[policy]({ oidc }, properties);
+			await implementations[policy](oidc, properties);
 		}
 
 		if (rat && !('policies' in rat.payload)) {
@@ -225,14 +244,19 @@ async function create({ body, headers, request, set }) {
 	}
 
 	set.status = 201;
-	eventBus.emit('registration_create.success', { oidc }, client);
+	eventBus.emit('registration_create.success', oidc, client);
 
 	return responseBody;
 }
 
-async function read({ params, headers, query, set }) {
+async function read({ params, headers, query, request, set }) {
 	setBearerRealm(set);
-	const oidc = new OIDCContext<Body>({}, headers, 'registration');
+	const oidc = new OIDCContext<Body>({
+		params: {},
+		headers,
+		route: 'registration',
+		bucket: await bucketOf(params, request)
+	});
 	const token = readBearer(headers.authorization, query, true);
 	const { client } = await authenticate(oidc, params.clientId, token);
 
@@ -248,10 +272,15 @@ async function read({ params, headers, query, set }) {
 	return responseBody;
 }
 
-async function update({ params, body, headers, set }) {
+async function update({ params, body, headers, request, set }) {
 	setBearerRealm(set);
 	const requestBody: Body = (body as Body) ?? {};
-	const oidc = new OIDCContext<Body>(requestBody, headers, 'registration');
+	const oidc = new OIDCContext<Body>({
+		params: requestBody,
+		headers,
+		route: 'registration',
+		bucket: await bucketOf(params, request)
+	});
 	const token = readBearer(headers.authorization, undefined, false);
 	const { client, regAccessToken } = await authenticate(
 		oidc,
@@ -301,7 +330,7 @@ async function update({ params, body, headers, set }) {
 
 	if (secretRequired) {
 		Object.assign(properties, {
-			clientSecret: await secretFactory({ oidc }),
+			clientSecret: await secretFactory(oidc),
 			client_secret_expires_at: 0
 		});
 	} else {
@@ -315,7 +344,7 @@ async function update({ params, body, headers, set }) {
 		const { policies } = regAccessToken.payload;
 		const implementations = ApplicationConfig['registration.policies'];
 		for (const policy of policies) {
-			await implementations[policy]({ oidc }, properties);
+			await implementations[policy](oidc, properties);
 		}
 	}
 
@@ -335,7 +364,7 @@ async function update({ params, body, headers, set }) {
 	if (
 		rotateRegistrationAccessToken === true ||
 		(typeof rotateRegistrationAccessToken === 'function' &&
-			(await rotateRegistrationAccessToken({ oidc })))
+			(await rotateRegistrationAccessToken(oidc)))
 	) {
 		oidc.entity('RotatedRegistrationAccessToken', regAccessToken);
 		const rat = new RegistrationAccessToken({
@@ -349,14 +378,19 @@ async function update({ params, body, headers, set }) {
 		responseBody.registration_access_token = await rat.save();
 	}
 
-	eventBus.emit('registration_update.success', { oidc }, nextClient);
+	eventBus.emit('registration_update.success', oidc, nextClient);
 
 	return responseBody;
 }
 
-async function remove({ params, headers, set }) {
+async function remove({ params, headers, request, set }) {
 	setBearerRealm(set);
-	const oidc = new OIDCContext<Body>({}, headers, 'registration');
+	const oidc = new OIDCContext<Body>({
+		params: {},
+		headers,
+		route: 'registration',
+		bucket: await bucketOf(params, request)
+	});
 	const token = readBearer(headers.authorization, undefined, false);
 	const { client, regAccessToken } = await authenticate(
 		oidc,
@@ -368,7 +402,7 @@ async function remove({ params, headers, set }) {
 	await regAccessToken.destroy();
 
 	set.status = 204;
-	eventBus.emit('registration_delete.success', { oidc }, client);
+	eventBus.emit('registration_delete.success', oidc, client);
 }
 
 const OptionalBody = t.Optional(t.Record(t.String(), t.Unknown()));

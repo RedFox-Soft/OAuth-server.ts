@@ -5,18 +5,18 @@ import { backchannelResult } from 'lib/actions/authorization/backchannel_result.
 const config = getConfig();
 
 export const addons = {
-	processLoginHint(ctx, loginHint) {
+	processLoginHint(oidc, loginHint) {
 		return loginHint;
 	},
 	validateBindingMessage() {},
 	validateRequestContext() {},
 	verifyUserCode() {},
-	async triggerAuthenticationDevice(ctx, request) {
+	async triggerAuthenticationDevice(oidc, request) {
 		const grant = new Grant({
 			clientId: request.payload.clientId,
 			accountId: request.payload.accountId
 		});
-		grant.addOIDCScope(ctx.oidc.requestParamScopes);
+		grant.addOIDCScope(oidc.requestParamScopes);
 		await grant.save();
 		return backchannelResult(request, grant.jti);
 	}

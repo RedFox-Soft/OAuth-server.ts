@@ -4,33 +4,33 @@ import { AuthorizationCode } from 'lib/models/authorization_code.js';
 import { expiresWithSession, rarForAuthorizationCode } from '../addon/index.js';
 import { includeSid } from '../models/client/checks.ts';
 
-async function codeHandler(ctx) {
-	const { grant } = ctx.oidc;
+async function codeHandler(oidc) {
+	const grant = oidc.require('Grant');
 
 	const scopeSet = combinedScope(
 		grant,
-		ctx.oidc.requestParamScopes,
-		ctx.oidc.resourceServers
+		oidc.requestParamScopes,
+		oidc.resourceServers
 	);
 
 	const code = new AuthorizationCode({
 		/* The address this request was made to — there is no earlier artifact to inherit from. */
-		bucketId: ctx.oidc.bucket._id,
-		accountId: ctx.oidc.session.payload.accountId,
-		acr: ctx.oidc.acr,
-		amr: ctx.oidc.amr,
-		authTime: ctx.oidc.session.authTime(),
-		claims: ctx.oidc.claims,
-		client: ctx.oidc.client,
-		codeChallenge: ctx.oidc.params.code_challenge,
-		codeChallengeMethod: ctx.oidc.params.code_challenge_method,
-		grantId: ctx.oidc.session.grantIdFor(ctx.oidc.client.clientId),
-		nonce: ctx.oidc.params.nonce,
-		redirectUri: ctx.oidc.params.redirect_uri,
-		resource: Object.keys(ctx.oidc.resourceServers),
+		bucketId: oidc.bucket._id,
+		accountId: oidc.session.payload.accountId,
+		acr: oidc.acr,
+		amr: oidc.amr,
+		authTime: oidc.session.authTime(),
+		claims: oidc.claims,
+		client: oidc.client,
+		codeChallenge: oidc.params.code_challenge,
+		codeChallengeMethod: oidc.params.code_challenge_method,
+		grantId: oidc.session.grantIdFor(oidc.client.clientId),
+		nonce: oidc.params.nonce,
+		redirectUri: oidc.params.redirect_uri,
+		resource: Object.keys(oidc.resourceServers),
 		scope: [...scopeSet].join(' '),
-		sessionUid: ctx.oidc.session.payload.uid,
-		dpopJkt: ctx.oidc.params.dpop_jkt
+		sessionUid: oidc.session.payload.uid,
+		dpopJkt: oidc.params.dpop_jkt
 	});
 
 	/*
@@ -42,9 +42,9 @@ async function codeHandler(ctx) {
 	 */
 	if (
 		ApplicationConfig['richAuthorizationRequests.enabled'] &&
-		ctx.oidc.params.authorization_details
+		oidc.params.authorization_details
 	) {
-		code.payload.rar = await rarForAuthorizationCode(ctx);
+		code.payload.rar = await rarForAuthorizationCode(oidc);
 		if (!code.payload.rar?.length) {
 			delete code.payload.rar;
 		}
@@ -63,30 +63,29 @@ async function codeHandler(ctx) {
 			break;
 	}
 
-	if (await expiresWithSession(ctx, code)) {
+	if (await expiresWithSession(oidc, code)) {
 		code.payload.expiresWithSession = true;
 	} else {
-		ctx.oidc.session.authorizationFor(ctx.oidc.client.clientId).persistsLogout =
-			true;
+		oidc.session.authorizationFor(oidc.client.clientId).persistsLogout = true;
 	}
 
 	if (
-		includeSid(ctx.oidc.client) ||
-		(ctx.oidc.claims.id_token && 'sid' in ctx.oidc.claims.id_token)
+		includeSid(oidc.client) ||
+		(oidc.claims.id_token && 'sid' in oidc.claims.id_token)
 	) {
-		code.payload.sid = ctx.oidc.session.sidFor(ctx.oidc.client.clientId);
+		code.payload.sid = oidc.session.sidFor(oidc.client.clientId);
 	}
 
-	ctx.oidc.entity('AuthorizationCode', code);
+	oidc.entity('AuthorizationCode', code);
 
 	return { code: await code.save() };
 }
 
-export default async function processResponseTypes(ctx) {
-	const responseType = ctx.oidc.params.response_type;
+export default async function processResponseTypes(oidc) {
+	const responseType = oidc.params.response_type;
 
 	if (responseType === 'code') {
-		return codeHandler(ctx);
+		return codeHandler(oidc);
 	}
 
 	return {};

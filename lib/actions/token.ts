@@ -51,7 +51,7 @@ export const tokenAction = new Elysia()
 	.post(
 		routeNames.token,
 		async ({ body, headers, route, set, oidc }) => {
-			const client = oidc.authenticatedClient;
+			const client = oidc.client;
 			const dPoP = await dpopValidate(headers.dpop, { route });
 			setNonceHeader(set.headers, dPoP);
 			await validateReplay(client.clientId, dPoP);

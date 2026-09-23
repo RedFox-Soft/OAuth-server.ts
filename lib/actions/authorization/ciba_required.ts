@@ -1,7 +1,8 @@
+import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import presence from '../../helpers/validate_presence.ts';
 import { InvalidRequest } from '../../helpers/errors.ts';
 
-export default function cibaRequired(oidc) {
+export default function cibaRequired(oidc: OIDCContext) {
 	const required = new Set(['scope']);
 
 	if (oidc.client.backchannelTokenDeliveryMode !== 'poll') {

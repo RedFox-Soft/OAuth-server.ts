@@ -10,6 +10,10 @@ import bootstrap, {
 } from '../test_helper.js';
 import * as resourceIndicators from '../../lib/addon/resources.js';
 import { eventBus } from 'lib/event_bus.js';
+import {
+	DEFAULT_REQUEST_BUCKET,
+	OIDCContext
+} from 'lib/helpers/oidc_context.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
@@ -23,9 +27,15 @@ const form = 'application/x-www-form-urlencoded';
  */
 describe('features.resourceIndicators defaults', () => {
 	it('the configured default audience is applied when the client names none', async () => {
-		expect(await resourceIndicators.defaultResource()).toBeUndefined();
+		const oidc = new OIDCContext({
+			params: {},
+			bucket: DEFAULT_REQUEST_BUCKET
+		});
 		expect(
-			await resourceIndicators.defaultResource(undefined, undefined, [
+			await resourceIndicators.defaultResource(oidc, undefined, undefined)
+		).toBeUndefined();
+		expect(
+			await resourceIndicators.defaultResource(oidc, undefined, [
 				'urn:example:rs'
 			])
 		).toEqual(['urn:example:rs']);

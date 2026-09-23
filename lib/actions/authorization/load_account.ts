@@ -1,9 +1,10 @@
+import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { findAccount } from '../../addon/account.js';
 
 /*
  * Loads the End-User's account referenced by the session.
  */
-export default async function loadAccount(oidc) {
+export default async function loadAccount(oidc: OIDCContext) {
 	const { accountId } = oidc.session.payload;
 
 	if (accountId) {

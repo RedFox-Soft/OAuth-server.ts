@@ -13,7 +13,7 @@ export const addons = {
 	issueRefreshToken() {
 		return true;
 	},
-	getResourceServerInfo(ctx, resource) {
+	getResourceServerInfo(oidc, resource) {
 		if (resource === 'urn:rar:jwt') {
 			return {
 				audience: resource,
@@ -37,7 +37,7 @@ export const addons = {
 	 * a pushed request and then fails validation on the follow-up. A single value when `oneOf` is
 	 * supplied, because the token endpoint must resolve exactly one.
 	 */
-	defaultResource(ctx, client, oneOf) {
+	defaultResource(oidc, client, oneOf) {
 		if (oneOf) {
 			return oneOf[0];
 		}

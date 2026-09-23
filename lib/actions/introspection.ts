@@ -13,6 +13,7 @@ import { RefreshToken } from 'lib/models/refresh_token.js';
 import { Client } from 'lib/models/client.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Grant } from 'lib/models/grant.js';
+import { storeToken } from '../shared/findToken.js';
 import { ClientCredentials } from 'lib/models/client_credentials.js';
 import { hasGrant } from './grants/index.js';
 import { AuthPlugin, authHeaders, authParams } from 'lib/plugins/auth.js';
@@ -102,12 +103,12 @@ async function renderTokenResponse(oidc) {
 	}
 
 	if (introspectable.has(token.payload.kind)) {
-		oidc.entity(token.payload.kind, token);
+		storeToken(oidc, token);
 	} else {
 		return { active: false };
 	}
 
-	if (!(await introspectionAllowedPolicy({ oidc }, oidc.client, token))) {
+	if (!(await introspectionAllowedPolicy(oidc, oidc.client, token))) {
 		return { active: false };
 	}
 
@@ -134,7 +135,7 @@ async function renderTokenResponse(oidc) {
 		jti: token.payload.jti !== params.token ? token.payload.jti : undefined,
 		aud: token.payload.aud,
 		authorization_details: token.payload.rar
-			? await rarForIntrospectionResponse({ oidc }, token)
+			? await rarForIntrospectionResponse(oidc, token)
 			: undefined,
 		scope: token.payload.scope || undefined,
 		cnf: token.isSenderConstrained() ? {} : undefined,
@@ -156,7 +157,7 @@ export const introspect = new Elysia().use(AuthPlugin).post(
 	routeNames.introspect,
 	async function ({ oidc, request }) {
 		if (ApplicationConfig['jwtIntrospection.enabled']) {
-			const client = oidc.authenticatedClient;
+			const client = oidc.client;
 
 			const {
 				introspectionEncryptedResponseAlg: encrypt,

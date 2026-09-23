@@ -1,3 +1,4 @@
+import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { InvalidRequest } from '../../helpers/errors.ts';
 import { supportedPrompts } from '../../addon/index.js';
 
@@ -5,7 +6,7 @@ import { supportedPrompts } from '../../addon/index.js';
  * Checks that all requested prompts are supported and validates prompt none is not combined with
  * other prompts
  */
-export default function checkPrompt(oidc) {
+export default function checkPrompt(oidc: OIDCContext) {
 	if (oidc.params.prompt !== undefined) {
 		const { prompts } = oidc;
 		// Derived from the resolved policy per request, so a prompt registered after provider

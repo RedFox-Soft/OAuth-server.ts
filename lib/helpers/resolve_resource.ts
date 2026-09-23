@@ -2,26 +2,26 @@ import { InvalidTarget } from './errors.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { useGrantedResource, defaultResource } from '../addon/index.js';
 
-export default async (ctx, model, _config, scopes = model.scopes) => {
+export default async (oidc, model, _config, scopes = model.scopes) => {
 	let resource;
 	if (ApplicationConfig['resourceIndicators.enabled']) {
 		switch (true) {
-			case !!ctx.oidc.params.resource:
-				resource = ctx.oidc.params.resource;
+			case !!oidc.params.resource:
+				resource = oidc.params.resource;
 				break;
 			case !model.payload.resource:
 			case Array.isArray(model.payload.resource) &&
 				model.payload.resource.length === 0:
 				break;
-			case model.payload.resource && !!(await useGrantedResource(ctx, model)):
-			case !ctx.oidc.params.resource &&
+			case model.payload.resource && !!(await useGrantedResource(oidc, model)):
+			case !oidc.params.resource &&
 				(!ApplicationConfig['userinfo.enabled'] || !scopes.has('openid')):
 				resource = model.payload.resource;
 				break;
 		}
 
 		if (Array.isArray(resource)) {
-			resource = await defaultResource(ctx, ctx.oidc.client, resource);
+			resource = await defaultResource(oidc, oidc.client, resource);
 		}
 
 		if (Array.isArray(resource)) {

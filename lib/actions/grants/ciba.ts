@@ -1,3 +1,4 @@
+import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import upperFirst from '../../helpers/_/upper_first.ts';
 import camelCase from '../../helpers/_/camel_case.ts';
 import * as errors from '../../helpers/errors.ts';
@@ -20,7 +21,7 @@ const { AuthorizationPending, ExpiredToken, InvalidGrant } = errors;
 
 export const gty = 'ciba';
 
-export const handler = async function cibaHandler(oidc, dPoP) {
+export const handler = async function cibaHandler(oidc: OIDCContext, dPoP) {
 	presence(oidc, 'auth_req_id');
 
 	if (oidc.params.authorization_details) {
@@ -62,7 +63,7 @@ export const handler = async function cibaHandler(oidc, dPoP) {
 	}
 
 	if (request.payload.consumed) {
-		await revoke(request.payload.grantId);
+		await revoke(request.payload.grantId, oidc);
 		throw new InvalidGrant(
 			'backchannel authentication request already consumed'
 		);
@@ -132,11 +133,11 @@ export const handler = async function cibaHandler(oidc, dPoP) {
 		at.setThumbprint('jkt', dPoP.thumbprint);
 	}
 
-	const resource = await resolveResource({ oidc }, request);
+	const resource = await resolveResource(oidc, request);
 
 	if (resource) {
 		const resourceServerInfo = await getResourceServerInfo(
-			{ oidc },
+			oidc,
 			resource,
 			oidc.client
 		);
@@ -151,7 +152,7 @@ export const handler = async function cibaHandler(oidc, dPoP) {
 	const accessToken = await at.save();
 
 	let refreshToken;
-	if (await issueRefreshToken({ oidc }, oidc.client, request)) {
+	if (await issueRefreshToken(oidc, oidc.client, request)) {
 		const rt = new RefreshToken({
 			bucketId: request.payload.bucketId,
 			accountId: account.accountId,

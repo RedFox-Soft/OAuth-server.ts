@@ -81,9 +81,11 @@ exported from `lib/models/client.ts`: `redirectUriAllowed(client, uri)`,
 - **The type describes the object.** `ALWAYS_PRESENT` (`types.ts:15`) lists the attributes defaulted
   whatever is switched on, and `test/dynamic_registration/defaults.spec.ts` holds it to the declaration
   in both directions — on its first run it found `dpop_bound_access_tokens`, which the list had missed.
-  The request context carries the client typed: `oidc.client` is `Client | undefined`, and code that
-  runs only after client authentication reads `oidc.authenticatedClient`
-  (`lib/helpers/oidc_context.ts:256`), whose absence is a defect rather than a refusal. Each allowance
+  The request context carries the client typed: `oidc.client` is `Client`, and its absence is a defect
+  rather than a refusal — nearly all code runs after the client is resolved. The few places where no
+  client is a legitimate state read `oidc.entities.Client` (`Client | undefined`) instead. Until
+  `060-typed-oidc-context` it was the other way round, with the guaranteed read spelled
+  `oidc.authenticatedClient`, which left the common case with the long name. Each allowance
   function takes a `Pick` of the attributes it reads, so its dependencies are in its signature.
 
 A validated client is therefore read directly — `client.clientId` rather than a payload — the opposite

@@ -18,7 +18,6 @@ export const InteractionPayload = t.Object({
 	trusted: t.Optional(t.Unknown()),
 	session: t.Optional(t.Object({}, { additionalProperties: true })),
 	grantId: t.Optional(t.String()),
-	cid: t.Optional(t.String()),
 	deviceCode: t.Optional(t.String()),
 	parJti: t.Optional(t.String()),
 	/*

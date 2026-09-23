@@ -1,3 +1,4 @@
+import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import upperFirst from '../../helpers/_/upper_first.ts';
 import camelCase from '../../helpers/_/camel_case.ts';
 import * as errors from '../../helpers/errors.ts';
@@ -20,7 +21,10 @@ const { AuthorizationPending, ExpiredToken, InvalidGrant } = errors;
 
 export const gty = 'device_code';
 
-export const handler = async function deviceCodeHandler(oidc, dPoP) {
+export const handler = async function deviceCodeHandler(
+	oidc: OIDCContext,
+	dPoP
+) {
 	presence(oidc, 'device_code');
 
 	if (oidc.params.authorization_details) {
@@ -59,7 +63,7 @@ export const handler = async function deviceCodeHandler(oidc, dPoP) {
 	}
 
 	if (code.payload.consumed) {
-		await revoke(code.payload.grantId);
+		await revoke(code.payload.grantId, oidc);
 		throw new InvalidGrant('device code already consumed');
 	}
 
@@ -127,11 +131,11 @@ export const handler = async function deviceCodeHandler(oidc, dPoP) {
 		at.setThumbprint('jkt', dPoP.thumbprint);
 	}
 
-	const resource = await resolveResource({ oidc }, code);
+	const resource = await resolveResource(oidc, code);
 
 	if (resource) {
 		const resourceServerInfo = await getResourceServerInfo(
-			{ oidc },
+			oidc,
 			resource,
 			oidc.client
 		);
@@ -146,7 +150,7 @@ export const handler = async function deviceCodeHandler(oidc, dPoP) {
 	const accessToken = await at.save();
 
 	let refreshToken;
-	if (await issueRefreshToken({ oidc }, oidc.client, code)) {
+	if (await issueRefreshToken(oidc, oidc.client, code)) {
 		const rt = new RefreshToken({
 			bucketId: code.payload.bucketId,
 			accountId: account.accountId,

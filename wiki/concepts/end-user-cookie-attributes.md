@@ -37,7 +37,7 @@ names a cookie decides what the browser stores for it.**
   `/logout/confirm`, `/device`. Carried `httpOnly + sameSite: 'strict'`; `secure` was missing.
 - `lib/interactions/index.ts` — the `/ui/*` guard, declared with **no options at all**. And this is
   the schema that matters most: `resume()` runs `sessionHandler` on *this* jar
-  (`lib/interactions/index.ts` — `ctx.oidc.cookie = cookie`), so the login POST — where the
+  (`lib/interactions/index.ts` — the jar is handed to the context at construction, `new OIDCContext({ …, cookie })`), so the login POST — where the
   authenticated `_session` is first issued — emitted it with no `HttpOnly`, no `SameSite` and no
   `Secure`. Every existing spec re-sent `set-cookie` by hand as a request header, so none could see
   it.

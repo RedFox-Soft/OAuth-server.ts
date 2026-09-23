@@ -1,3 +1,4 @@
+import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import upperFirst from '../../helpers/_/upper_first.ts';
 import camelCase from '../../helpers/_/camel_case.ts';
 import * as errors from '../../helpers/errors.ts';
@@ -37,7 +38,7 @@ export const expiredInteractionCookie = (uid: string) => ({
 	expires: new Date(0)
 });
 
-export default async function interactions(oidc) {
+export default async function interactions(oidc: OIDCContext) {
 	const client = oidc.client;
 	let failedCheck;
 	let prompt;
@@ -48,9 +49,7 @@ export default async function interactions(oidc) {
 		if (poly.name === 'consent' && client['consent.require'] === false) {
 			continue;
 		}
-		// the interaction-policy check signature is a public extension API: checks read the
-		// oidc context off a ctx-shaped argument, so the policy boundary keeps the wrapper shape.
-		const result = await poly.executeChecks({ oidc });
+		const result = await poly.executeChecks(oidc);
 		if (result) {
 			({ firstError: failedCheck, ...prompt } = result);
 			break;
@@ -71,14 +70,12 @@ export default async function interactions(oidc) {
 		// if only claims parameter is used then it must be combined with openid scope anyway
 		// when no scope parameter was provided and none is injected by the AS policy access is
 		// denied rather then issuing a code/token without scopes
+		const grant = oidc.require('Grant');
 		if (
-			!oidc.grant.getOIDCScopeFiltered(oidc.requestParamOIDCScopes) &&
+			!grant.getOIDCScopeFiltered(oidc.requestParamOIDCScopes) &&
 			Object.keys(oidc.resourceServers).every(
 				(resource) =>
-					!oidc.grant.getResourceScopeFiltered(
-						resource,
-						oidc.requestParamScopes
-					)
+					!grant.getResourceScopeFiltered(resource, oidc.requestParamScopes)
 			) &&
 			!oidc.params.authorization_details
 		) {
@@ -131,11 +128,10 @@ export default async function interactions(oidc) {
 		params: omitBy({ ...oidc.params }, (val) => typeof val === 'undefined'),
 		trusted: oidc.trusted,
 		session: oidc.session,
-		grant: oidc.grant,
-		cid: oidc.entities.Interaction?.cid || nanoid(),
+		grant: oidc.entities.Grant,
 		/* The address this began at, so it cannot be completed at another bucket's. */
 		bucketId: oidc.bucket._id,
-		deviceCode: oidc.deviceCode?.jti,
+		deviceCode: oidc.entities.DeviceCode?.jti,
 		// `jti` is a real getter on BaseModel; `parJti` is not one on Interaction, so the carry-forward
 		// has to read the payload. Without it the link to the pushed request is severed at the first
 		// hand-off and a flow needing two interactions loses it entirely.
@@ -155,7 +151,7 @@ export default async function interactions(oidc) {
 		maxAge: ttl.Interaction
 	});
 
-	eventBus.emit('interaction.started', prompt);
+	eventBus.emit('interaction.started', oidc, prompt);
 	const destination = `/ui/${uid}/${prompt.name}`;
 	return destination;
 }

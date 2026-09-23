@@ -1,6 +1,11 @@
 import { shouldChange } from './_warn.ts';
+import type { OIDCContext } from '../helpers/oidc_context.ts';
 
-export async function introspectionAllowedPolicy(ctx, client, token) {
+export async function introspectionAllowedPolicy(
+	oidc: OIDCContext,
+	client,
+	token
+) {
 	shouldChange(
 		'features.introspection.allowedPolicy',
 		'to check whether the caller is authorized to receive the introspection response'
@@ -12,7 +17,7 @@ export async function introspectionAllowedPolicy(ctx, client, token) {
 	// test to introspect as a `none`-auth client.
 	if (
 		client.tokenEndpointAuthMethod === 'none' &&
-		token.payload.clientId !== ctx.oidc.client.clientId
+		token.payload.clientId !== oidc.client.clientId
 	) {
 		return false;
 	}

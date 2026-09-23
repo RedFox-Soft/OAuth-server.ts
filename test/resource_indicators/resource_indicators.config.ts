@@ -10,18 +10,18 @@ export const addons = {
 	issueRefreshToken() {
 		return true;
 	},
-	processLoginHint(ctx, loginHint) {
+	processLoginHint(oidc, loginHint) {
 		return loginHint;
 	},
 	validateBindingMessage() {},
 	validateRequestContext() {},
 	verifyUserCode() {},
-	async triggerAuthenticationDevice(ctx, request) {
+	async triggerAuthenticationDevice(oidc, request) {
 		const grant = new Grant({
 			clientId: request.payload.clientId,
 			accountId: request.payload.accountId
 		});
-		grant.addOIDCScope(ctx.oidc.requestParamScopes);
+		grant.addOIDCScope(oidc.requestParamScopes);
 
 		const resources = Array.isArray(request.payload.resource)
 			? request.payload.resource
@@ -37,7 +37,7 @@ export const addons = {
 	async useGrantedResource() {
 		return grantFlags.useGranted;
 	},
-	getResourceServerInfo(ctx, resource) {
+	getResourceServerInfo(oidc, resource) {
 		if (resource.includes('wl')) {
 			return {
 				audience: resource,

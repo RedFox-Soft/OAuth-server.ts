@@ -95,7 +95,7 @@ describe('client registration policies', () => {
 
 		it('allows for policies to set property defaults', async () => {
 			ApplicationConfig['registration.policies']['set-default'] = (
-				ctx,
+				oidc,
 				properties
 			) => {
 				if (!('id_token_signed_response_alg' in properties)) {
@@ -131,7 +131,7 @@ describe('client registration policies', () => {
 
 		it('allows for policies to force property values', async () => {
 			ApplicationConfig['registration.policies']['force-default'] = (
-				ctx,
+				oidc,
 				properties
 			) => {
 				properties.id_token_signed_response_alg = 'HS256';
@@ -196,11 +196,11 @@ describe('client registration policies', () => {
 
 		it('an operator can apply different policies to management than to registration', async () => {
 			ApplicationConfig['registration.policies']['change-rat-policy'] = async (
-				ctx
+				oidc
 			) => {
 				// Token fields live under `.payload.*` in this port, so mutate the entity's
 				// payload rather than a top-level `.policies` accessor (which no longer exists).
-				ctx.oidc.entities.RegistrationAccessToken.payload.policies = [
+				oidc.entities.RegistrationAccessToken.payload.policies = [
 					'empty-policy'
 				];
 			};
@@ -368,7 +368,7 @@ describe('client registration policies', () => {
 
 		it('allows for policies to set property defaults', async () => {
 			ApplicationConfig['registration.policies']['set-default'] = (
-				ctx,
+				oidc,
 				properties
 			) => {
 				if (!('client_name' in properties)) {
@@ -398,7 +398,7 @@ describe('client registration policies', () => {
 
 		it('allows for policies to force property values', async () => {
 			ApplicationConfig['registration.policies']['force-value'] = (
-				ctx,
+				oidc,
 				properties
 			) => {
 				properties.client_name = 'foobar';

@@ -63,8 +63,12 @@ export const logoutAction = new Elysia()
 			const bucket = await requestBucketFor(
 				(routeParams as { bucket?: string } | undefined)?.bucket
 			);
-			const oidc = new OIDCContext(query, {}, route, bucket);
-			oidc.cookie = cookie;
+			const oidc = new OIDCContext({
+				params: query,
+				route,
+				bucket,
+				cookie
+			});
 			const setCookies = await sessionHandler(oidc);
 			const params = query;
 			let client;
@@ -81,7 +85,7 @@ export const logoutAction = new Elysia()
 				}
 				const {
 					payload: { aud: clientId }
-				} = oidc.entities.IdTokenHint;
+				} = oidc.require('IdTokenHint');
 
 				if (params.client_id && params.client_id !== clientId) {
 					throw new InvalidRequest(
@@ -157,7 +161,7 @@ export const logoutAction = new Elysia()
 
 			oidc.session.payload.state = {
 				secret,
-				clientId: oidc.client ? oidc.client.clientId : undefined,
+				clientId: oidc.entities.Client?.clientId,
 				state: oidc.params.state,
 				postLogoutRedirectUri: oidc.params.post_logout_redirect_uri
 			};
@@ -188,19 +192,22 @@ export const logoutConfirmAction = new Elysia()
 				(params as { bucket?: string } | undefined)?.bucket,
 				hostOfRequest(request)
 			);
-			const oidc = new OIDCContext(body, {}, route, bucket);
-			oidc.cookie = cookie;
+			const oidc = new OIDCContext({
+				params: body,
+				route,
+				bucket,
+				cookie
+			});
 			const setCookies = await sessionHandler(oidc);
-
-			if (!oidc.session.payload.state) {
-				throw new InvalidRequest('could not find logout details');
-			}
-			if (oidc.session.payload.state.secret !== body.xsrf) {
-				throw new InvalidRequest('xsrf token invalid');
-			}
 
 			const { session } = oidc;
 			const { state } = session.payload;
+			if (!state) {
+				throw new InvalidRequest('could not find logout details');
+			}
+			if (state.secret !== body.xsrf) {
+				throw new InvalidRequest('xsrf token invalid');
+			}
 
 			// A partial sign-out still tells the one client being signed out. A full sign-out tells
 			// every client in the session, which `destroyProviderSession` handles as part of the
@@ -210,7 +217,7 @@ export const logoutConfirmAction = new Elysia()
 				state.clientId &&
 				ApplicationConfig['backchannelLogout.enabled']
 			) {
-				await backchannelLogoutFor(session, [state.clientId], { oidc });
+				await backchannelLogoutFor(session, [state.clientId], oidc);
 			}
 
 			if (state.clientId) {
@@ -218,7 +225,7 @@ export const logoutConfirmAction = new Elysia()
 			}
 
 			if (body.logout) {
-				await destroyProviderSession(session, { oidc });
+				await destroyProviderSession(session, oidc);
 				/*
 				 * The addressed bucket's cookie, named from the same function that wrote it. A literal here
 				 * would clear a name the browser is not holding — reporting a completed sign-out while the
@@ -232,8 +239,7 @@ export const logoutConfirmAction = new Elysia()
 					grantId &&
 					!session.authorizationFor(state.clientId).persistsLogout
 				) {
-					await revoke(grantId);
-					eventBus.emit('grant.revoked', { oidc }, grantId);
+					await revoke(grantId, oidc);
 				}
 				session.payload.state = undefined;
 				if (session.payload.authorizations) {
@@ -242,7 +248,7 @@ export const logoutConfirmAction = new Elysia()
 				session.resetIdentifier();
 			}
 
-			eventBus.emit('end_session.success', { oidc });
+			eventBus.emit('end_session.success', oidc);
 			await setCookies();
 
 			const usePostLogoutUri = state.postLogoutRedirectUri;

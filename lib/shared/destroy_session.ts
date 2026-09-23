@@ -4,6 +4,7 @@ import { Session } from 'lib/models/session.js';
 import { eventBus } from '../event_bus.js';
 import revoke from '../helpers/revoke.ts';
 import { clientNotifications } from './client_notifications.ts';
+import type { OIDCContext } from '../helpers/oidc_context.ts';
 
 /*
  * Notifies the given clients that a session has ended, for those that asked to be told.
@@ -14,7 +15,7 @@ import { clientNotifications } from './client_notifications.ts';
 export async function backchannelLogoutFor(
 	session: Session,
 	clientIds: string[],
-	ctx?: { oidc: unknown }
+	oidc?: OIDCContext
 ): Promise<void> {
 	const back = [];
 
@@ -27,12 +28,18 @@ export async function backchannelLogoutFor(
 				back.push(
 					clientNotifications.logout(client, accountId, sid).then(
 						() => {
-							eventBus.emit('backchannel.success', ctx, client, accountId, sid);
+							eventBus.emit(
+								'backchannel.success',
+								oidc,
+								client,
+								accountId,
+								sid
+							);
 						},
 						(err) => {
 							eventBus.emit(
 								'backchannel.error',
-								ctx,
+								oidc,
 								err,
 								client,
 								accountId,
@@ -60,17 +67,18 @@ export async function backchannelLogoutFor(
  * the backchannel fan-out, and reading the session's fields before it is gone — are exactly the
  * parts nothing would report missing.
  *
- * `ctx` only reaches the event bus; the admin path has no OIDCContext to offer.
+ * `oidc` only reaches the event bus and revocation; the admin path has no request context to offer,
+ * and passes none rather than a fabricated one.
  */
 export async function destroyProviderSession(
 	session: Session,
-	ctx?: { oidc: unknown }
+	oidc?: OIDCContext
 ): Promise<void> {
 	if (ApplicationConfig['backchannelLogout.enabled']) {
 		await backchannelLogoutFor(
 			session,
 			Object.keys(session.payload.authorizations || {}),
-			ctx
+			oidc
 		);
 	}
 
@@ -82,7 +90,7 @@ export async function destroyProviderSession(
 					// Note: tokens that don't get dropped due to offline_access having being added
 					// later will still not work, as such they will be orphaned until their TTL hits
 					if (grantId && !session.authorizationFor(clientId).persistsLogout) {
-						await revoke(grantId);
+						await revoke(grantId, oidc);
 					}
 				}
 			)

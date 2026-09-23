@@ -12,6 +12,7 @@ import {
 import bootstrap, { agent, getHeader } from '../test_helper.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { eventBus } from 'lib/event_bus.js';
+import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { Client } from 'lib/models/client.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { InitialAccessToken } from 'lib/models/initial_access_token.js';
@@ -221,7 +222,7 @@ describe('registration features', () => {
 			expect(spy).toHaveBeenCalledTimes(1);
 			// coverage-adapted: the port's validated client is a plain object (no `Client`
 			// class), so assert the emitted args' shape instead of constructor.name.
-			expect(spy.mock.calls[0][0]).toHaveProperty('oidc');
+			expect(spy.mock.calls[0][0]).toBeInstanceOf(OIDCContext);
 			expect(spy.mock.calls[0][1]).toHaveProperty('clientId');
 		});
 

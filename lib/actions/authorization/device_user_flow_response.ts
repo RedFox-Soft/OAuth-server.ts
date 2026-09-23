@@ -1,14 +1,15 @@
+import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import combinedScope from '../../helpers/combined_scope.ts';
 import { deviceSuccessPage } from '../../html/device.js';
 import { expiresWithSession } from '../../addon/index.js';
 import { eventBus } from '../../event_bus.js';
 import { includeSid } from 'lib/models/client.js';
 
-export default async function deviceVerificationResponse(oidc) {
-	const code = oidc.deviceCode;
+export default async function deviceVerificationResponse(oidc: OIDCContext) {
+	const code = oidc.require('DeviceCode');
 
 	const scopeSet = combinedScope(
-		oidc.grant,
+		oidc.require('Grant'),
 		oidc.requestParamScopes,
 		oidc.resourceServers
 	);
@@ -38,7 +39,7 @@ export default async function deviceVerificationResponse(oidc) {
 			break;
 	}
 
-	if (await expiresWithSession({ oidc }, code)) {
+	if (await expiresWithSession(oidc, code)) {
 		code.payload.expiresWithSession = true;
 	} else {
 		oidc.session.authorizationFor(oidc.client.clientId).persistsLogout = true;
@@ -53,7 +54,7 @@ export default async function deviceVerificationResponse(oidc) {
 
 	await code.save();
 
-	eventBus.emit('authorization.success', { oidc });
+	eventBus.emit('authorization.success', oidc);
 
 	return deviceSuccessPage({ client: oidc.client });
 }

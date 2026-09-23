@@ -131,7 +131,6 @@ function persistInteraction(interaction: {
 import { ApplicationConfig, configuration } from 'lib/configs/application.js';
 
 async function resume(interaction, cookie) {
-	const ctx = { cookie, _matchedRouteName: 'ui.resume' };
 	/*
 	 * The population this interaction belongs to, recovered from the request that started it.
 	 *
@@ -150,11 +149,15 @@ async function resume(interaction, cookie) {
 			resourceOf(interaction)
 		)
 	);
-	ctx.oidc = new OIDCContext({}, {}, 'ui.resume', bucket);
-	ctx.oidc.cookie = cookie;
+	const oidc = new OIDCContext({
+		params: {},
+		route: 'ui.resume',
+		bucket,
+		cookie
+	});
 
-	const setCookies = await sessionHandler(ctx.oidc);
-	const confirmPage = await getResume(ctx.oidc, interaction);
+	const setCookies = await sessionHandler(oidc);
+	const confirmPage = await getResume(oidc, interaction);
 	if (confirmPage) {
 		return confirmPage;
 	}
@@ -170,34 +173,32 @@ async function resume(interaction, cookie) {
 		const out = {
 			error,
 			...(errorDescription ? { error_description: errorDescription } : {}),
-			...(ctx.oidc.params.state !== undefined
-				? { state: ctx.oidc.params.state }
-				: {}),
+			...(oidc.params.state !== undefined ? { state: oidc.params.state } : {}),
 			iss: ISSUER
 		};
 		await setCookies();
-		const mode = ctx.oidc.responseMode ?? 'query';
+		const mode = oidc.responseMode ?? 'query';
 		const handler = responseModes.get(mode);
-		return await handler({ oidc: ctx.oidc }, ctx.oidc.params.redirect_uri, out);
+		return await handler(oidc, oidc.params.redirect_uri, out);
 	}
 
 	// An interaction that resolved with an error result aborts the authorization request and
 	// redirects the User-Agent back to the client with that error (mirrors device_resume and the
 	// authorization error handler).
-	if (ctx.oidc.result?.error) {
-		const { error, error_description: errorDescription } = ctx.oidc.result;
+	if (oidc.result?.error) {
+		const { error, error_description: errorDescription } = oidc.result;
 		return abortToClient(error, errorDescription);
 	}
 
-	await checkClient(ctx.oidc);
-	await checkResource(ctx.oidc);
-	eventBus.emit('interaction.ended');
-	assignClaims(ctx.oidc);
-	await loadAccount(ctx.oidc);
-	await loadGrant(ctx.oidc);
+	await checkClient(oidc);
+	await checkResource(oidc);
+	eventBus.emit('interaction.ended', oidc);
+	assignClaims(oidc);
+	await loadAccount(oidc);
+	await loadGrant(oidc);
 	let redirectUri;
 	try {
-		redirectUri = await interactions(ctx.oidc);
+		redirectUri = await interactions(oidc);
 	} catch (err) {
 		/*
 		 * The end user authenticated and the required authentication context still is not met, so the
@@ -214,7 +215,7 @@ async function resume(interaction, cookie) {
 		return Response.redirect(redirectUri, 303);
 	}
 	await setCookies();
-	return respond(ctx.oidc);
+	return respond(oidc);
 }
 
 async function createGrant(interaction) {
@@ -1177,8 +1178,19 @@ export const ui = new Elysia()
 		resume(interaction, cookie)
 	)
 	.get('ui/:uid/device_resume', async ({ interaction, cookie }) => {
-		const oidc = new OIDCContext({}, {}, 'ui.device_resume');
-		oidc.cookie = cookie;
+		/* Recovered from the interaction for the reason given in `resume()` above. */
+		const bucket = await issuingBucket(
+			await resolveBucketForRequest(
+				clientIdOf(interaction),
+				resourceOf(interaction)
+			)
+		);
+		const oidc = new OIDCContext({
+			params: {},
+			route: 'ui.device_resume',
+			bucket,
+			cookie
+		});
 
 		const setCookies = await sessionHandler(oidc);
 		const action = oidc.urlFor('code_verification');
@@ -1214,7 +1226,7 @@ export const ui = new Elysia()
 
 			await checkClient(oidc);
 			await checkResource(oidc);
-			eventBus.emit('interaction.ended');
+			eventBus.emit('interaction.ended', oidc);
 			assignClaims(oidc);
 			await loadAccount(oidc);
 			await loadGrant(oidc);

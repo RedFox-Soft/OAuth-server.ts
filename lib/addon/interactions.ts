@@ -1,10 +1,12 @@
 import { base } from '../helpers/interaction_policy/index.ts';
 import { resolve } from './registry.js';
+import type { OIDCContext } from '../helpers/oidc_context.ts';
 
-export function deviceInfo(ctx) {
+// What the device authorization endpoint records about the device that started the flow.
+export function deviceInfo(oidc: OIDCContext) {
 	return {
-		ip: ctx.ip,
-		ua: ctx.get('user-agent')
+		ip: oidc.ip,
+		ua: oidc.get('user-agent')
 	};
 }
 
@@ -12,7 +14,7 @@ export interface PolicyPrompt {
 	name: string;
 	requestable?: boolean;
 	checks: Array<{ reason: string; check: unknown }>;
-	executeChecks(ctx: { oidc: unknown }): Promise<{
+	executeChecks(oidc: OIDCContext): Promise<{
 		name: string;
 		details: Record<string, unknown>;
 		reasons: string[];

@@ -1,15 +1,14 @@
 import * as errors from '../../errors.ts';
 import { pairwiseIdentifier } from '../../../addon/index.js';
-import { Prompt } from '../prompt.js';
+import { Prompt, type CheckPartial } from '../prompt.js';
+import type { ClaimRequest, OIDCContext } from '../../oidc_context.ts';
 
 class LoginPromt extends Prompt {
 	name = 'login';
 	requestable = true;
 	defaultError = 'login_required';
 
-	details(ctx: any) {
-		const { oidc } = ctx;
-
+	details(oidc: OIDCContext) {
 		return {
 			...(oidc.params.max_age === undefined
 				? undefined
@@ -23,7 +22,7 @@ class LoginPromt extends Prompt {
 		};
 	}
 
-	checks = [
+	checks: CheckPartial[] = [
 		{
 			reason: 'no_session',
 			description: 'End-User authentication is required',
@@ -34,35 +33,31 @@ class LoginPromt extends Prompt {
 			 * presents an identifier that resolves to nobody in another.
 			 *
 			 * Reading it suppressed the sign-in prompt for a request that had no account at all. The
-			 * pipeline then carried on without one, `loadGrant` left `oidc.grant` unset because it only
+			 * pipeline then carried on without one, `loadGrant` left the grant unset because it only
 			 * builds a grant for a known account, and the first consent check to reach inside it faulted —
 			 * so an end user who had done nothing wrong was handed `server_error` with nothing to retry.
 			 *
-			 * `loadAccount` runs before the policy, so `oidc.account` is populated by the time this is
+			 * `loadAccount` runs before the policy, so the account (`oidc.entities.Account`) is populated by the time this is
 			 * asked, and it is set only when the account resolved in the bucket this request belongs to.
 			 * That also makes a deleted or deactivated account ask for a sign-in rather than fault, which
 			 * the identifier check could never do.
 			 */
-			check: (ctx: any) => {
-				const { oidc } = ctx;
-				return !oidc.account;
+			check: (oidc) => {
+				return !oidc.entities.Account;
 			}
 		},
 		{
 			reason: 'max_age',
 			description: 'End-User authentication could not be obtained',
-			check: (ctx: any) => {
-				const { oidc } = ctx;
-				if (oidc.params.max_age === undefined) {
+			check: (oidc) => {
+				const maxAge = oidc.params.max_age;
+				if (typeof maxAge !== 'string' && typeof maxAge !== 'number') {
 					return false;
 				}
 				if (!oidc.session.payload.accountId) {
 					return true;
 				}
-				if (
-					oidc.session.past(oidc.params.max_age) &&
-					(!ctx.oidc.result || !ctx.oidc.result.login)
-				) {
+				if (oidc.session.past(maxAge) && (!oidc.result || !oidc.result.login)) {
 					return true;
 				}
 				return false;
@@ -71,8 +66,7 @@ class LoginPromt extends Prompt {
 		{
 			reason: 'id_token_hint',
 			description: 'id_token_hint and authenticated subject do not match',
-			check: async (ctx: any) => {
-				const { oidc } = ctx;
+			check: async (oidc) => {
 				if (oidc.entities.IdTokenHint === undefined) {
 					return false;
 				}
@@ -93,8 +87,7 @@ class LoginPromt extends Prompt {
 		{
 			reason: 'claims_id_token_sub_value',
 			description: 'requested subject could not be obtained',
-			check: async (ctx: any) => {
-				const { oidc } = ctx;
+			check: async (oidc) => {
 				if (
 					!oidc.claims.id_token ||
 					!oidc.claims.id_token.sub ||
@@ -114,7 +107,7 @@ class LoginPromt extends Prompt {
 				}
 				return false;
 			},
-			details: ({ oidc }: any) => ({ sub: oidc.claims.id_token.sub })
+			details: (oidc) => ({ sub: oidc.claims.id_token?.sub })
 		},
 		{
 			reason: 'essential_acrs',
@@ -126,13 +119,13 @@ class LoginPromt extends Prompt {
 			 * end user had not authenticated, when in fact they had.
 			 */
 			error: 'unmet_authentication_requirements',
-			check: (ctx: any) => {
-				const { oidc } = ctx;
-				const request = oidc.claims?.id_token?.acr ?? {};
+			check: (oidc) => {
+				const request: NonNullable<ClaimRequest> =
+					oidc.claims.id_token?.acr ?? {};
 				if (!request?.essential || !request?.values) {
 					return false;
 				}
-				if (!Array.isArray(oidc.claims.id_token.acr.values)) {
+				if (!Array.isArray(request.values)) {
 					throw new errors.InvalidRequest(
 						'invalid claims.id_token.acr.values type'
 					);
@@ -142,16 +135,16 @@ class LoginPromt extends Prompt {
 				}
 				return true;
 			},
-			details: ({ oidc }: any) => ({ acr: oidc.claims.id_token.acr })
+			details: (oidc) => ({ acr: oidc.claims.id_token?.acr })
 		},
 		{
 			reason: 'essential_acr',
 			description: 'requested ACR could not be obtained',
 			// The single-valued form of the requirement above, and the same rule applies to it.
 			error: 'unmet_authentication_requirements',
-			check: (ctx: any) => {
-				const { oidc } = ctx;
-				const request = oidc.claims?.id_token?.acr ?? {};
+			check: (oidc) => {
+				const request: NonNullable<ClaimRequest> =
+					oidc.claims.id_token?.acr ?? {};
 				if (!request?.essential || !request?.value) {
 					return false;
 				}
@@ -160,7 +153,7 @@ class LoginPromt extends Prompt {
 				}
 				return true;
 			},
-			details: ({ oidc }: any) => ({ acr: oidc.claims.id_token.acr })
+			details: (oidc) => ({ acr: oidc.claims.id_token?.acr })
 		}
 	];
 }

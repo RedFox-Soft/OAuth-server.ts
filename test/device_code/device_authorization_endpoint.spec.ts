@@ -1,6 +1,8 @@
 import { describe, it, beforeAll, afterEach, expect, mock } from 'bun:test';
 
 import bootstrap, { agent, jsonToFormUrlEncoded } from '../test_helper.js';
+import { addons } from 'lib/addon/index.js';
+import { TestAdapter } from 'test/models.js';
 import { normalize } from '../../lib/helpers/user_codes.ts';
 import { eventBus } from 'lib/event_bus.js';
 import { DeviceCode } from 'lib/models/device_code.js';
@@ -77,6 +79,24 @@ describe('device_authorization_endpoint', () => {
 			expect(error.status).toBeGreaterThanOrEqual(400);
 			expect(error.status).toBeLessThan(500);
 		});
+	});
+
+	it('stores on the device code what a device-information override returned', async () => {
+		addons.override({
+			deviceInfo: () => ({ ip: 'override-ip', ua: 'override-ua' })
+		});
+
+		const { status, data } = await post({
+			client_id: 'client',
+			scope: 'openid'
+		});
+		if (!data) throw new Error('expected response data');
+		expect(status).toBe(200);
+
+		/* Opaque device codes are their own identifier in the store. */
+		expect(
+			TestAdapter.for('DeviceCode').syncFind(data.device_code)
+		).toHaveProperty('deviceInfo', { ip: 'override-ip', ua: 'override-ua' });
 	});
 
 	it('responds with json 200', async () => {

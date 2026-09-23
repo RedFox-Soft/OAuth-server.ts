@@ -3,7 +3,11 @@ import bootstrap from '../test_helper.js';
 import sessionHandler from 'lib/shared/session.ts';
 import { Session } from 'lib/models/session.ts';
 import { sessionCookieName } from 'lib/consts/param_list.ts';
-import { DEFAULT_REQUEST_BUCKET } from 'lib/configs/issuer.ts';
+import {
+	DEFAULT_REQUEST_BUCKET,
+	OIDCContext,
+	type OIDCCookies
+} from 'lib/helpers/oidc_context.ts';
 
 const SESSION_COOKIE = sessionCookieName(DEFAULT_REQUEST_BUCKET);
 
@@ -22,6 +26,15 @@ function makeCookieJar(sessionValue?: string) {
 	return { [SESSION_COOKIE]: entry } as Record<string, typeof entry>;
 }
 
+function requestWithJar() {
+	return new OIDCContext({
+		params: {},
+		bucket: DEFAULT_REQUEST_BUCKET,
+		// A stand-in exposing only the members session.ts touches, not a full Elysia cookie.
+		cookie: makeCookieJar() as unknown as OIDCCookies
+	});
+}
+
 /**
  * @proves A first-time authenticated session is persisted and its cookie issued, and an
  * anonymous one is not persisted at all.
@@ -36,37 +49,25 @@ describe('session persistence (setCookies)', () => {
 		// already existed, so a first-time login was never persisted and its
 		// session-bound authorization code failed at the token endpoint
 		// (Session.findByUid returned nothing).
-		const oidc = {
-			cookie: makeCookieJar(),
-			bucket: DEFAULT_REQUEST_BUCKET
-		} as unknown as {
-			cookie: ReturnType<typeof makeCookieJar>;
-			session: Session;
-		};
+		const oidc = requestWithJar();
 		const setCookies = await sessionHandler(oidc);
 		oidc.session.loginAccount({ accountId: 'acc-persist-1' });
 
 		await setCookies();
 
-		expect(oidc.cookie[SESSION_COOKIE].value).toBe(oidc.session.id);
+		expect(oidc.cookie?.[SESSION_COOKIE]?.value).toBe(oidc.session.id);
 		const found = await Session.findByUid(oidc.session.payload.uid);
 		expect(found?.payload.accountId).toBe('acc-persist-1');
 	});
 
 	it('does not persist an anonymous session with no prior cookie', async () => {
-		const oidc = {
-			cookie: makeCookieJar(),
-			bucket: DEFAULT_REQUEST_BUCKET
-		} as unknown as {
-			cookie: ReturnType<typeof makeCookieJar>;
-			session: Session;
-		};
+		const oidc = requestWithJar();
 		const setCookies = await sessionHandler(oidc);
 		const uid = oidc.session.payload.uid;
 
 		await setCookies();
 
-		expect(oidc.cookie[SESSION_COOKIE].value).toBeUndefined();
+		expect(oidc.cookie?.[SESSION_COOKIE]?.value).toBeUndefined();
 		expect(await Session.findByUid(uid)).toBeUndefined();
 	});
 });

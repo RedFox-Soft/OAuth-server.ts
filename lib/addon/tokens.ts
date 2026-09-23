@@ -5,24 +5,25 @@ import { pairwiseSalt } from '../configs/pairwiseSalt.ts';
 import { TemporarilyUnavailable } from '../helpers/errors.ts';
 import { sectorIdentifier } from '../models/client/sector.ts';
 import { grantTypeAllowed } from '../models/client/checks.ts';
+import type { OIDCContext } from '../helpers/oidc_context.ts';
 
-export function idFactory(_ctx) {
+export function idFactory(_oidc: OIDCContext) {
 	return nanoid();
 }
 
-export async function secretFactory(_ctx) {
+export async function secretFactory(_oidc: OIDCContext) {
 	return crypto.randomBytes(64).toString('base64url');
 }
 
 // Decides whether the given artifact is bound to the end-user session; the
 // default binds everything except offline_access grants so they survive logout.
-export async function expiresWithSession(ctx, code) {
+export async function expiresWithSession(_oidc: OIDCContext, code) {
 	return !code.scopes.has('offline_access');
 }
 
 // Decides whether a refresh token is issued for this exchange (grant advertisement
 // is a separate concern owned by ApplicationConfig['refreshToken.enabled']).
-export async function issueRefreshToken(ctx, client, code) {
+export async function issueRefreshToken(_oidc: OIDCContext, client, code) {
 	return (
 		grantTypeAllowed(client, 'refresh_token') &&
 		code.scopes.has('offline_access')
@@ -71,8 +72,8 @@ export async function pairwiseIdentifier(accountId, client) {
 
 // Decides if and how a refresh token is rotated after use. Returns a Boolean;
 // the default rotates public-client and near-expiry tokens (capped at ~1 year).
-export function rotateRefreshToken(ctx) {
-	const { RefreshToken: refreshToken, Client: client } = ctx.oidc.entities;
+export function rotateRefreshToken(oidc: OIDCContext) {
+	const { RefreshToken: refreshToken, Client: client } = oidc.entities;
 
 	// cap the maximum amount of time a refresh token can be
 	// rotated for up to 1 year, afterwards its TTL is final

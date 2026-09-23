@@ -1,3 +1,4 @@
+import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { InvalidGrant } from '../../helpers/errors.ts';
 import presence from '../../helpers/validate_presence.ts';
 import { findAccount } from '../../addon/account.js';
@@ -23,7 +24,10 @@ import { markRegistrationUsed } from '../../models/client/dynamic_registration.j
 
 const gty = 'authorization_code';
 
-export const handler = async function authorizationCodeHandler(oidc, dPoP) {
+export const handler = async function authorizationCodeHandler(
+	oidc: OIDCContext,
+	dPoP
+) {
 	if (
 		ApplicationConfig[
 			'authorization.allowOmittingSingleRegisteredRedirectUri'
@@ -103,7 +107,7 @@ export const handler = async function authorizationCodeHandler(oidc, dPoP) {
 	}
 
 	if (code.payload.consumed) {
-		await revoke(code.payload.grantId);
+		await revoke(code.payload.grantId, oidc);
 		throw new InvalidGrant('authorization code already consumed');
 	}
 
@@ -164,11 +168,11 @@ export const handler = async function authorizationCodeHandler(oidc, dPoP) {
 	 * specs/015-rar-end-to-end/research.md R19.
 	 */
 	await checkRar(oidc);
-	const resource = await resolveResource({ oidc }, code);
+	const resource = await resolveResource(oidc, code);
 
 	if (resource) {
 		const resourceServerInfo = await getResourceServerInfo(
-			{ oidc },
+			oidc,
 			resource,
 			oidc.client
 		);
@@ -186,7 +190,7 @@ export const handler = async function authorizationCodeHandler(oidc, dPoP) {
 		at.resourceServer &&
 		code.payload.rar
 	) {
-		const rar = await rarForCodeResponse({ oidc }, at.resourceServer);
+		const rar = await rarForCodeResponse(oidc, at.resourceServer);
 		if (rar?.length) {
 			at.payload.rar = rar;
 		}
@@ -196,7 +200,7 @@ export const handler = async function authorizationCodeHandler(oidc, dPoP) {
 	const accessToken = await at.save();
 
 	let refreshToken;
-	if (await issueRefreshToken({ oidc }, oidc.client, code)) {
+	if (await issueRefreshToken(oidc, oidc.client, code)) {
 		const rt = new RefreshToken({
 			bucketId: code.payload.bucketId,
 			accountId: account.accountId,

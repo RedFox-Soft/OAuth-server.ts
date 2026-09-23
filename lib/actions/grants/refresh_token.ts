@@ -1,3 +1,4 @@
+import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import difference from '../../helpers/_/difference.ts';
 import {
 	InvalidRequest,
@@ -35,7 +36,10 @@ function rarSupported(token) {
 
 const gty = 'refresh_token';
 
-export const handler = async function refreshTokenHandler(oidc, dPoP) {
+export const handler = async function refreshTokenHandler(
+	oidc: OIDCContext,
+	dPoP
+) {
 	presence(oidc, 'refresh_token');
 
 	const { client } = oidc;
@@ -134,7 +138,7 @@ export const handler = async function refreshTokenHandler(oidc, dPoP) {
 	if (refreshToken.payload.consumed) {
 		await Promise.all([
 			refreshToken.destroy(),
-			revoke(refreshToken.payload.grantId)
+			revoke(refreshToken.payload.grantId, oidc)
 		]);
 		throw new InvalidGrant('refresh token already used');
 	}
@@ -145,7 +149,7 @@ export const handler = async function refreshTokenHandler(oidc, dPoP) {
 		);
 	}
 
-	if (await rotateRefreshToken({ oidc })) {
+	if (await rotateRefreshToken(oidc)) {
 		await refreshToken.consume();
 		oidc.entity('RotatedRefreshToken', refreshToken);
 
@@ -219,16 +223,11 @@ export const handler = async function refreshTokenHandler(oidc, dPoP) {
 	 * specs/015-rar-end-to-end/research.md R19.
 	 */
 	await checkRar(oidc);
-	const resource = await resolveResource(
-		{ oidc },
-		refreshToken,
-		undefined,
-		scope
-	);
+	const resource = await resolveResource(oidc, refreshToken, undefined, scope);
 
 	if (resource) {
 		const resourceServerInfo = await getResourceServerInfo(
-			{ oidc },
+			oidc,
 			resource,
 			oidc.client
 		);
@@ -248,7 +247,7 @@ export const handler = async function refreshTokenHandler(oidc, dPoP) {
 		at.resourceServer &&
 		refreshToken.payload.rar
 	) {
-		const rar = await rarForRefreshTokenResponse({ oidc }, at.resourceServer);
+		const rar = await rarForRefreshTokenResponse(oidc, at.resourceServer);
 		if (rar?.length) {
 			at.payload.rar = rar;
 		}

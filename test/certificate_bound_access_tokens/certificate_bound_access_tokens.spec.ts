@@ -170,9 +170,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 			expect(status).toBe(200);
 			expect(spy).toBeCalledTimes(1);
 			const {
-				oidc: {
-					entities: { AccessToken: accessToken, RefreshToken: refreshToken }
-				}
+				entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 			} = spy.mock.calls[0][0];
 			expect(accessToken.payload).toHaveProperty('x5t#S256', expectedS256);
 			expect(refreshToken.payload).not.toHaveProperty('x5t#S256');
@@ -228,9 +226,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 			expect(status).toBe(200);
 			expect(spy).toBeCalledTimes(1);
 			const {
-				oidc: {
-					entities: { AccessToken: accessToken, RefreshToken: refreshToken }
-				}
+				entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 			} = spy.mock.calls[0][0];
 			expect(accessToken.payload).toHaveProperty('x5t#S256', expectedS256);
 			expect(refreshToken.payload).toHaveProperty('x5t#S256', expectedS256);
@@ -275,9 +271,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 			expect(status).toBe(200);
 			expect(spy).toBeCalledTimes(1);
 			const {
-				oidc: {
-					entities: { AccessToken: accessToken, RefreshToken: refreshToken }
-				}
+				entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 			} = spy.mock.calls[0][0];
 			expect(accessToken.payload).toHaveProperty('x5t#S256', expectedS256);
 			expect(refreshToken.payload).not.toHaveProperty('x5t#S256');
@@ -340,9 +334,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 			expect(status).toBe(200);
 			expect(spy).toBeCalledTimes(1);
 			const {
-				oidc: {
-					entities: { AccessToken: accessToken, RefreshToken: refreshToken }
-				}
+				entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 			} = spy.mock.calls[0][0];
 			expect(accessToken.payload).toHaveProperty('x5t#S256', expectedS256);
 			expect(refreshToken.payload).toHaveProperty('x5t#S256', expectedS256);
@@ -385,9 +377,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 				expect(status).toBe(200);
 				expect(spy).toBeCalledTimes(1);
 				const {
-					oidc: {
-						entities: { AccessToken: accessToken, RefreshToken: refreshToken }
-					}
+					entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 				} = spy.mock.calls[0][0];
 				expect(accessToken.payload).toHaveProperty('x5t#S256', expectedS256);
 				expect(refreshToken.payload).not.toHaveProperty('x5t#S256');
@@ -441,9 +431,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 				expect(spy).toBeCalledTimes(1);
 				const {
-					oidc: {
-						entities: { AccessToken: accessToken, RefreshToken: refreshToken }
-					}
+					entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 				} = spy.mock.calls[0][0];
 				expect(accessToken.payload).toHaveProperty('x5t#S256', expectedS256);
 				expect(refreshToken.payload['x5t#S256']).toBeUndefined();
@@ -519,9 +507,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 				expect(status).toBe(200);
 				expect(spy).toBeCalledTimes(1);
 				const {
-					oidc: {
-						entities: { AccessToken: accessToken, RefreshToken: refreshToken }
-					}
+					entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 				} = spy.mock.calls[0][0];
 				expect(accessToken.payload).toHaveProperty('x5t#S256', expectedS256);
 				expect(refreshToken.payload).toHaveProperty('x5t#S256', expectedS256);
@@ -575,9 +561,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 				expect(spy).toBeCalledTimes(1);
 				const {
-					oidc: {
-						entities: { AccessToken: accessToken, RefreshToken: refreshToken }
-					}
+					entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 				} = spy.mock.calls[0][0];
 				expect(accessToken.payload).toHaveProperty('x5t#S256', expectedS256);
 				expect(refreshToken.payload).toHaveProperty('x5t#S256', expectedS256);
@@ -660,9 +644,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 			expect(spy).toBeCalledTimes(1);
 			const {
-				oidc: {
-					entities: { ClientCredentials }
-				}
+				entities: { ClientCredentials }
 			} = spy.mock.calls[0][0];
 			expect(ClientCredentials.payload).toHaveProperty(
 				'x5t#S256',

@@ -75,6 +75,20 @@ export as the spec's baseline when `bootstrap()` runs, so a per-test `addons.ove
 after each case while the config-declared overrides persist across the spec, and never into the next
 file.
 
+## One calling convention
+
+Every key that needs the request takes the request context itself, `oidc: OIDCContext`, as its first
+argument; the four that do not (`assertJwtClientAuthClaimsAndHeader`, `pairwiseIdentifier`,
+`sectorIdentifierUriValidate`, `interactionPolicy`) take none. Until `060-typed-oidc-context` about
+twenty keys instead received `{ oidc }` — the shape of the Koa request object this server was ported
+from, built at every call site only to be taken apart inside — while three already took the context,
+so an override had to know which convention each key used. Interaction-policy `check`/`details`
+functions, registration policies and RAR type validators follow the same convention. Token lifetime
+functions (`ttl.*`) are not addon keys and take no context at all — see [[refresh-token-chain-bound]].
+
+`deviceInfo` became reachable in the same change: the device authorization endpoint used to build the
+record itself, so an override of the key had no effect on any request.
+
 ## The census trap
 
 This is the failure this subsystem is most likely to cause, and it is documented at length in
@@ -100,3 +114,4 @@ Thirty-odd keys grouped by the module that supplies the default: `account` (`fin
 - [[account-resolution]] — `findAccount` is one of these keys, and a direct-import DB resolver rather than a config option.
 - [[model-graph-import-order]] — the cycle this module's type-only imports are designed to avoid entering.
 - [[pairwise-identifier-salt]] — a seam whose default is deliberately not deployment-ready.
+- [[refresh-token-chain-bound]] — what bounds the tokens `rotateRefreshToken` decides to rotate.

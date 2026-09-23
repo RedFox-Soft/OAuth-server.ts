@@ -1,3 +1,4 @@
+import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 
 /*
@@ -5,7 +6,7 @@ import { ApplicationConfig } from 'lib/configs/application.js';
  * to be the requested redirect_uri and used as if it was explicitly provided; gated behind the
  * named OAuth 2.1 deviation flag (off by default).
  */
-export default function oneRedirectUriClients(oidc) {
+export default function oneRedirectUriClients(oidc: OIDCContext) {
 	if (
 		!ApplicationConfig['authorization.allowOmittingSingleRegisteredRedirectUri']
 	) {

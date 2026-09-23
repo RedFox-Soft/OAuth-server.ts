@@ -31,11 +31,11 @@ function renderForm(action: string, inputs: Record<string, string>) {
 }
 
 /*
- * `_ctx` is unused but cannot be dropped: response-mode handlers share one dispatch signature with
+ * `_oidc` is unused but cannot be dropped: response-mode handlers share one dispatch signature with
  * `query` and `jwt` (see lib/actions/authorization/respond.ts).
  */
 export function formPost(
-	_ctx: unknown,
+	_oidc: unknown,
 	action: string,
 	inputs: Record<string, string>
 ) {

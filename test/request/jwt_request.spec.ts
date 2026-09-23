@@ -210,9 +210,9 @@ describe('request parameter features', () => {
 				eventBus.once('authorization.success', spy);
 
 				if (route === '/device/auth') {
-					eventBus.once('device_authorization.success', ({ oidc }) => {
+					eventBus.once('device_authorization.success', (oidc) => {
 						eventBus.emit('authorization.success', {
-							oidc: { params: oidc.entities.DeviceCode.payload.params }
+							params: oidc.entities.DeviceCode.payload.params
 						});
 					});
 				}
@@ -228,7 +228,7 @@ describe('request parameter features', () => {
 				});
 
 				expect(spy).toHaveBeenCalledTimes(1);
-				expect(spy.mock.calls[0][0].oidc.params.ui_locales).toBeUndefined();
+				expect(spy.mock.calls[0][0].params.ui_locales).toBeUndefined();
 			});
 
 			it('can contain max_age parameter as a number and it (and other params too) will be forced as string', async function () {
@@ -247,7 +247,7 @@ describe('request parameter features', () => {
 				});
 
 				expect(spy.mock.calls[0][0]).toMatchObject({
-					oidc: { params: { max_age: expect.any(Number) } }
+					params: { max_age: expect.any(Number) }
 				});
 			});
 
@@ -286,9 +286,7 @@ describe('request parameter features', () => {
 					verb
 				});
 
-				expect(spy.mock.calls[0][0]).toMatchObject({
-					oidc: { params: { claims } }
-				});
+				expect(spy.mock.calls[0][0]).toMatchObject({ params: { claims } });
 			});
 
 			it('can contain claims parameter as object', async function () {
@@ -307,9 +305,7 @@ describe('request parameter features', () => {
 					verb
 				});
 
-				expect(spy.mock.calls[0][0]).toMatchObject({
-					oidc: { params: { claims } }
-				});
+				expect(spy.mock.calls[0][0]).toMatchObject({ params: { claims } });
 			});
 
 			it('can accept Request Objects issued within acceptable system clock skew', async function () {

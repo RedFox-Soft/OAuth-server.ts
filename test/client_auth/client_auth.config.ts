@@ -42,22 +42,22 @@ export const ApplicationConfig = {
 };
 
 export const addons = {
-	getCertificate(ctx) {
+	getCertificate(oidc) {
 		try {
 			return new X509Certificate(
-				Buffer.from(ctx.get('x-ssl-client-cert'), 'base64')
+				Buffer.from(oidc.get('x-ssl-client-cert'), 'base64')
 			);
 		} catch (e) {
 			return undefined;
 		}
 	},
-	certificateAuthorized(ctx) {
-		return ctx.get('x-ssl-client-verify') === 'SUCCESS';
+	certificateAuthorized(oidc) {
+		return oidc.get('x-ssl-client-verify') === 'SUCCESS';
 	},
-	certificateSubjectMatches(ctx, property, expected) {
+	certificateSubjectMatches(oidc, property, expected) {
 		return (
 			property === 'tls_client_auth_san_dns' &&
-			ctx.get('x-ssl-client-san-dns') === expected
+			oidc.get('x-ssl-client-san-dns') === expected
 		);
 	}
 };

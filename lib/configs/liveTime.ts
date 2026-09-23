@@ -1,5 +1,6 @@
 import type { Client } from 'lib/models/client.js';
 import type { IdToken } from 'lib/models/id_token.js';
+import epochTime from 'lib/helpers/epoch_time.js';
 
 /*
  * The constant which determines how many bits of randomness the opaque token should have. 256 bits is the same as the default for uuidv4, and is considered sufficient for security purposes. It also results in a token length of 43 characters when using nanoid, which is a reasonable length for an opaque token.
@@ -34,13 +35,13 @@ export const clockTolerance = 10;
  * will have their TTL refreshed (via rotation).
  */
 export const ttl = {
-	AccessToken(ctx, token, client) {
+	AccessToken(token, _client) {
 		return token.resourceServer?.accessTokenTTL || 60 * 60; // 1 hour in seconds
 	},
-	AuthorizationCode(ctx, code, client) {
+	AuthorizationCode(_code, _client) {
 		return 60; // 1 minute in seconds
 	},
-	BackchannelAuthenticationRequest(ctx, request, client) {
+	BackchannelAuthenticationRequest(request, _client) {
 		const requestedExpiry = request?.payload?.params?.requested_expiry;
 		if (requestedExpiry) {
 			return Math.min(10 * 60, +requestedExpiry); // 10 minutes in seconds or requested_expiry, whichever is shorter
@@ -48,30 +49,40 @@ export const ttl = {
 
 		return 10 * 60; // 10 minutes in seconds
 	},
-	ClientCredentials(ctx, token, client) {
+	ClientCredentials(token, _client) {
 		return token.resourceServer?.accessTokenTTL || 10 * 60; // 10 minutes in seconds
 	},
-	DeviceCode(ctx, deviceCode, client) {
+	DeviceCode(_deviceCode, _client) {
 		return 10 * 60; // 10 minutes in seconds
 	},
-	Grant(ctx, grant, client) {
+	Grant(_grant, _client) {
 		return 14 * 24 * 60 * 60; // 14 days in seconds
 	},
-	IdToken(token: IdToken, client: Client) {
+	IdToken(_token: IdToken, _client: Client) {
 		return 60 * 60; // 1 hour in seconds
 	},
-	RefreshToken(ctx, token, client) {
+	RefreshToken(token, client) {
+		const lifetime = 14 * 24 * 60 * 60; // 14 days in seconds
+		/*
+		 * A browser application's chain ends when its first token would have: rotation carries the
+		 * remaining lifetime forward instead of starting a new one, so a stolen token cannot be kept
+		 * alive by using it. Decided from the token's own record — `iiat` is the chain's first issuance
+		 * and survives every rotation — because a lifetime is computed whenever it is first read, not
+		 * necessarily inside a request. The rule once read the rotated token off an ambient request
+		 * store; when that store stopped being filled (54ba556) it went silently dead.
+		 *
+		 * Floored at one second, not zero: a zero lifetime reads as "not computed yet" to the token.
+		 */
 		if (
-			ctx?.oidc?.entities.RotatedRefreshToken &&
+			token.payload.rotations >= 1 &&
 			client.applicationType === 'web' &&
 			client.tokenEndpointAuthMethod === 'none' &&
 			!token.isSenderConstrained()
 		) {
-			// Non-Sender Constrained SPA RefreshTokens do not have infinite expiration through rotation
-			return ctx.oidc.entities.RotatedRefreshToken.remainingTTL;
+			return Math.max(1, token.payload.iiat + lifetime - epochTime());
 		}
 
-		return 14 * 24 * 60 * 60; // 14 days in seconds
+		return lifetime;
 	},
 	Interaction: 60 * 60, // 1 hour in seconds
 	Session: 14 * 24 * 60 * 60 // 14 days in seconds

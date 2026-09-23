@@ -1,3 +1,4 @@
+import type { OIDCContext } from '../helpers/oidc_context.ts';
 import { isPlainObject } from 'lib/helpers/_/object.js';
 import {
 	InvalidAuthorizationDetails,
@@ -125,8 +126,7 @@ export default async function checkRar(oidc) {
 
 				if (config.validate) {
 					try {
-						// config.validate is a user-defined RAR type validator expecting a `ctx`-shaped arg
-						await config.validate({ oidc }, detail, client);
+						await config.validate(oidc, detail, client);
 					} catch (err) {
 						// A validator rejection is a §5 type-and-field violation like any other, so it must
 						// not surface as a server fault just because the deployment threw a plain Error. One
@@ -167,7 +167,7 @@ interface TypeDescriptor {
 	label: string;
 	fields?: Record<string, FieldConstraint>;
 	allowUnknownFields?: boolean;
-	validate?: (ctx: unknown, detail: unknown, client: unknown) => unknown;
+	validate?: (oidc: OIDCContext, detail: unknown, client: unknown) => unknown;
 }
 
 function checkDescriptor(

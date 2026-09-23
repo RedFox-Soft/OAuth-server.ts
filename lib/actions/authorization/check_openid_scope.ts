@@ -1,3 +1,4 @@
+import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { InvalidRequest } from '../../helpers/errors.ts';
 
 const GATED_CLIENT = Object.entries({
@@ -18,7 +19,7 @@ const GATED = [
 /*
  * Validates that openid scope is requested when openid specific parameters are provided
  */
-export default function checkOpenIdScope(oidc) {
+export default function checkOpenIdScope(oidc: OIDCContext) {
 	if (oidc.params.scope?.split(' ').includes('openid')) {
 		return;
 	}

@@ -25,8 +25,7 @@ export default async function checkResource(oidc) {
 	}
 
 	if (params.resource === undefined) {
-		// defaultResource is a user-overridable callback expecting a `ctx`-shaped arg
-		params.resource = await defaultResource({ oidc }, client);
+		params.resource = await defaultResource(oidc, client);
 
 		if (params.authorization_details && emptyResource(params)) {
 			throw new InvalidTarget(
@@ -65,9 +64,8 @@ export default async function checkResource(oidc) {
 			);
 		}
 
-		// getResourceServerInfo is a user-overridable callback expecting a `ctx`-shaped arg
 		const resourceServer = await getResourceServerInfo(
-			{ oidc },
+			oidc,
 			identifier,
 			client
 		);

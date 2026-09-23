@@ -24,6 +24,7 @@ export function withBody<T extends Record<string, unknown>>(
 	oidc: OIDCContext<authParamsType>,
 	body: T
 ): OIDCContext<authParamsType & T> {
+	// The same object re-typed: the endpoint's body schema has just narrowed what `params` holds.
 	const typed = oidc as unknown as OIDCContext<authParamsType & T>;
 	typed.params = body as authParamsType & T;
 	return typed;
@@ -52,7 +53,7 @@ export const AuthPlugin = new Elysia().derive(
 			(params as { bucket?: string } | undefined)?.bucket,
 			hostOfRequest(request)
 		);
-		const oidc = new OIDCContext(body, headers, route, bucket);
+		const oidc = new OIDCContext({ params: body, headers, route, bucket });
 		await tokenAuth(body, headers, oidc);
 		return { oidc };
 	}

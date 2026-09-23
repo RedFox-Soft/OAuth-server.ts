@@ -109,9 +109,9 @@ test/                   ← test_helper.ts bootstrap; one dir per feature with *
 Each rule is the part that is easy to break. Read the named page before changing the area.
 
 - **Action pipeline** — handlers take `OIDCContext` directly as `oidc` and **return** their response;
-  there is no `ctx = { oidc }` wrapper. The exception is public-API callbacks (`findAccount`,
-  `resourceIndicators.*`, interaction-policy `check`, response-mode handlers) and the event payloads
-  tests inspect, which stay `{ oidc }`-shaped.
+  there is no `{ oidc }` wrapper anywhere. Every extension function, interaction-policy check and
+  request-scoped event receives the context itself, first. → `entities/addon-registry.md`,
+  `entities/event-bus.md`
 - **Errors** — throw an `OIDCProviderError` subclass (`lib/helpers/errors.ts`); one shared `onError`
   (`lib/shared/authorization_error_handler.ts`) formats every one. → `admin-plane-error-shape.md`
 - **Configuration** — every setting lives on exactly one of three surfaces: `ApplicationConfig`

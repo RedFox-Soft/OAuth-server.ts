@@ -1,5 +1,9 @@
 import checkResource from '../../shared/check_resource.ts';
 import { tokenAuth } from '../../shared/token_auth.ts';
+import { hostOfRequest } from 'lib/consts/request_host.js';
+import { requestBucketFor } from 'lib/admin/auth/bucketAddress.js';
+import checkBucket from './check_bucket.ts';
+import { deviceInfo } from '../../addon/index.js';
 
 import processRequestObject, {
 	isEncryptedJWT
@@ -85,7 +89,19 @@ const BackchannelAuthenticationBody = t.Object({
 	registration: t.Optional(t.String())
 });
 
-async function authentication(params, headers, oidc) {
+/*
+ * Both endpoints are mounted beneath every bucket's address, and what they store records the bucket
+ * the flow was started at — the token issued from it later carries that bucket's issuer. So the
+ * address is resolved here, as every other prefixed endpoint does, rather than left to the default.
+ */
+function bucketOf(params: unknown, request: Request) {
+	return requestBucketFor(
+		(params as { bucket?: string } | undefined)?.bucket,
+		hostOfRequest(request)
+	);
+}
+
+async function authentication(params, headers, oidc: OIDCContext) {
 	await tokenAuth(params, headers, oidc);
 
 	// params is the request body object here; setting client_id on it preserves prior behaviour
@@ -114,11 +130,16 @@ export const deviceAuth = new Elysia()
 	})
 	.post(
 		routeNames.device_authorization,
-		async ({ body, headers, server, request }) => {
-			const oidc = new OIDCContext(body, headers);
+		async ({ body, headers, params, server, request }) => {
+			const oidc = new OIDCContext({
+				params: body,
+				headers,
+				bucket: await bucketOf(params, request),
+				ip: server?.requestIP(request)?.address
+			});
 
 			await authentication(body, headers, oidc);
-			const client = oidc.authenticatedClient;
+			const client = oidc.client;
 			if (!grantTypeAllowed(client, deviceAuthGrantType)) {
 				throw new InvalidRequest(
 					`${deviceAuthGrantType} is not allowed for this client`
@@ -131,13 +152,11 @@ export const deviceAuth = new Elysia()
 			await checkClaims(oidc);
 			unsupportedRar(oidc);
 			await checkResource(oidc);
+			/* Once the address is honoured the refusal has to come with it — see `checkBucket`. */
+			await checkBucket(oidc);
 			checkMaxAge(oidc);
 			await checkIdTokenHint(oidc);
-			const deviceInfo = {
-				ip: server?.requestIP(request),
-				ua: request.headers.get('user-agent')
-			};
-			return deviceAuthorizationResponse(oidc, deviceInfo);
+			return deviceAuthorizationResponse(oidc, deviceInfo(oidc));
 		},
 		{
 			response: {
@@ -161,7 +180,7 @@ export const backchannelAuth = new Elysia()
 	})
 	.post(
 		routeNames.backchannel_authentication,
-		async ({ body, headers, request }) => {
+		async ({ body, headers, params, request }) => {
 			const contentType = request.headers.get('content-type') || '';
 			if (!contentType.includes('application/x-www-form-urlencoded')) {
 				throw new InvalidRequest(
@@ -169,10 +188,15 @@ export const backchannelAuth = new Elysia()
 				);
 			}
 
-			const oidc = new OIDCContext(body, headers, 'backchannel_authentication');
+			const oidc = new OIDCContext({
+				params: body,
+				headers,
+				route: 'backchannel_authentication',
+				bucket: await bucketOf(params, request)
+			});
 
 			await authentication(body, headers, oidc);
-			const client = oidc.authenticatedClient;
+			const client = oidc.client;
 
 			// CIBA does not accept request_uri or registration; request (JAR) is only
 			// accepted when Request Objects are enabled. These carry endpoint-specific
@@ -220,6 +244,7 @@ export const backchannelAuth = new Elysia()
 				await checkClaims(oidc);
 				unsupportedRar(oidc);
 				await checkResource(oidc);
+				await checkBucket(oidc);
 				checkMaxAge(oidc);
 				await checkCibaContext(oidc);
 				assignClaims(oidc);

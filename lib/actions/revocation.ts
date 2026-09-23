@@ -4,7 +4,7 @@ import revoke from '../helpers/revoke.js';
 import { routeNames } from 'lib/consts/param_list.js';
 import { authHeaders, AuthPlugin, authParams } from 'lib/plugins/auth.js';
 import { corsClientBased, formClientId } from 'lib/plugins/cors.js';
-import { findToken } from '../shared/findToken.js';
+import { findToken, storeToken } from '../shared/findToken.js';
 import { OAuthError } from 'lib/shared/response_schemas.js';
 
 const revokeable = new Set([
@@ -29,9 +29,9 @@ export const revocation = new Elysia()
 			if (!revokeable.has(token.payload.kind)) {
 				return;
 			}
-			oidc.entity(token.payload.kind, token);
+			storeToken(oidc, token);
 
-			if (token.payload.clientId !== oidc.authenticatedClient.clientId) {
+			if (token.payload.clientId !== oidc.client.clientId) {
 				throw new InvalidRequest('this token does not belong to you');
 			}
 
@@ -41,7 +41,7 @@ export const revocation = new Elysia()
 				token.payload.kind === 'RefreshToken' ||
 				token.payload.kind === 'AccessToken'
 			) {
-				await revoke(token.payload.grantId);
+				await revoke(token.payload.grantId, oidc);
 			}
 		},
 		{

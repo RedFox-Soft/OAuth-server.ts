@@ -37,12 +37,12 @@ import { eventBus } from '../event_bus.js';
 function renderInputError(oidc, err) {
 	const charset = ApplicationConfig['deviceFlow.charset'];
 	const secret =
-		oidc.session?.payload?.state?.secret ??
+		oidc.entities.Session?.payload?.state?.secret ??
 		crypto.randomBytes(24).toString('hex');
 	const action = oidc.urlFor('code_verification');
 
 	if (!(err instanceof ReRenderError)) {
-		eventBus.emit('code_verification.error', err, oidc);
+		eventBus.emit('code_verification.error', oidc, err);
 	}
 
 	return deviceInputPage({ action, secret, charset, err });
@@ -65,8 +65,7 @@ export const codeVerification = new Elysia()
 				(params as { bucket?: string } | undefined)?.bucket,
 				hostOfRequest(request)
 			);
-			const oidc = new OIDCContext(query, {}, 'anonymous', bucket);
-			oidc.cookie = cookie;
+			const oidc = new OIDCContext({ params: query, bucket, cookie });
 			const setCookies = await sessionHandler(oidc);
 
 			const charset = ApplicationConfig['deviceFlow.charset'];
@@ -98,8 +97,7 @@ export const codeVerification = new Elysia()
 				(params as { bucket?: string } | undefined)?.bucket,
 				hostOfRequest(request)
 			);
-			const oidc = new OIDCContext({}, {}, 'anonymous', bucket);
-			oidc.cookie = cookie;
+			const oidc = new OIDCContext({ params: {}, bucket, cookie });
 			const setCookies = await sessionHandler(oidc);
 
 			try {

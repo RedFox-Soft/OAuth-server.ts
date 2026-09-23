@@ -477,7 +477,10 @@ async function bootstrap(
 		const sessionCookie = `${cookieName}=${sessionId}; path=/; expires=${expire.toGMTString()}; httponly`;
 
 		session.payload.authorizations = {};
-		const oidc = new OIDCContext({ scope, claims });
+		const oidc = new OIDCContext({
+			params: { scope, claims },
+			bucket: DEFAULT_REQUEST_BUCKET
+		});
 
 		if (oidc.params.claims && typeof oidc.params.claims !== 'string') {
 			oidc.params.claims = JSON.stringify(oidc.params.claims);

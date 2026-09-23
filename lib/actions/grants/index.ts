@@ -1,3 +1,4 @@
+import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { t } from 'elysia';
 import { UnsupportedGrantType } from 'lib/helpers/errors.js';
 import { eventBus } from 'lib/event_bus.js';
@@ -106,7 +107,7 @@ export function hasGrant(grantType: string): boolean {
 
 export async function executeGrant(
 	grantType: string,
-	oidc,
+	oidc: OIDCContext,
 	dPoP
 ): Promise<TokenResponseBody> {
 	const grant = grantStore.get(grantType);
@@ -114,7 +115,6 @@ export async function executeGrant(
 		throw new UnsupportedGrantType();
 	}
 	const res: TokenResponseBody = await grant(oidc, dPoP);
-	// event payload kept `{ oidc }`-shaped (was the `ctx` wrapper)
-	eventBus.emit('grant.success', { oidc });
+	eventBus.emit('grant.success', oidc);
 	return res;
 }

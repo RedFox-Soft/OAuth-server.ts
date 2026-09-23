@@ -1,11 +1,12 @@
+import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { BackchannelAuthenticationRequest } from '../../models/backchannel_authentication_request.js';
 import { triggerAuthenticationDevice } from '../../addon/index.js';
 
-export default async function backchannelRequestResponse(oidc) {
+export default async function backchannelRequestResponse(oidc: OIDCContext) {
 	const request = new BackchannelAuthenticationRequest({
 		/* The address the request was made to. */
 		bucketId: oidc.bucket._id,
-		accountId: oidc.account.accountId,
+		accountId: oidc.require('Account').accountId,
 		claims: oidc.claims,
 		client: oidc.client,
 		nonce: oidc.params.nonce,
@@ -33,9 +34,9 @@ export default async function backchannelRequestResponse(oidc) {
 	};
 
 	await triggerAuthenticationDevice(
-		{ oidc },
+		oidc,
 		request,
-		oidc.account,
+		oidc.require('Account'),
 		oidc.client
 	);
 

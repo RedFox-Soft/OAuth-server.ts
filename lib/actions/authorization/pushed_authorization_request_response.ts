@@ -1,3 +1,4 @@
+import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { UnsecuredJWT } from 'jose';
 
 import { PUSHED_REQUEST_URN } from '../../consts/index.ts';
@@ -11,7 +12,7 @@ import { eventBus } from 'lib/event_bus.ts';
 const MAX_TTL = 60;
 
 export default async function pushedAuthorizationRequestResponse(
-	oidc,
+	oidc: OIDCContext,
 	requestBody?: string
 ) {
 	let ttl: number;
@@ -58,8 +59,7 @@ export default async function pushedAuthorizationRequestResponse(
 
 	oidc.entity('PushedAuthorizationRequest', requestObject);
 
-	// event payload kept `{ oidc }`-shaped (was `ctx`)
-	eventBus.emit('pushed_authorization_request.success', { oidc }, oidc.client);
+	eventBus.emit('pushed_authorization_request.success', oidc, oidc.client);
 	return {
 		expires_in: ttl,
 		request_uri: `${PUSHED_REQUEST_URN}${id}`

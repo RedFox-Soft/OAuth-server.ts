@@ -1,3 +1,4 @@
+import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import {
 	InvalidRedirectUri,
 	InvalidRequest,
@@ -22,7 +23,7 @@ const UNREGISTERED =
  * redirecting this error at all: the refusal there is a rendered page, not a protocol response, and
  * no specification defines a code for it.
  */
-function refusal(oidc) {
+function refusal(oidc: OIDCContext) {
 	if (oidc.route !== routeNames.pushed_authorization_request) {
 		return new InvalidRedirectUri();
 	}
@@ -32,7 +33,7 @@ function refusal(oidc) {
 		: new InvalidRequest(UNREGISTERED);
 }
 
-function allowUnregisteredUri(oidc) {
+function allowUnregisteredUri(oidc: OIDCContext) {
 	return (
 		(oidc.route === routeNames.pushed_authorization_request ||
 			'PushedAuthorizationRequest' in oidc.entities) &&
@@ -45,7 +46,7 @@ function allowUnregisteredUri(oidc) {
 /*
  * Checks that provided redirect_uri is allowed
  */
-export default function checkRedirectUri(oidc) {
+export default function checkRedirectUri(oidc: OIDCContext) {
 	if (!redirectUriAllowed(oidc.client, oidc.params.redirect_uri)) {
 		if (!allowUnregisteredUri(oidc)) {
 			throw refusal(oidc);

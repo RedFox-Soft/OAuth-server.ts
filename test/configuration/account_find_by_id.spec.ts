@@ -4,6 +4,15 @@ import {
 	getUserStore,
 	resetAdminMemoryStores
 } from '../../lib/adapters/index.ts';
+import {
+	DEFAULT_REQUEST_BUCKET,
+	OIDCContext
+} from '../../lib/helpers/oidc_context.ts';
+
+/* A request that has resolved no client, as on the userinfo path. */
+function requestWithoutClient() {
+	return new OIDCContext({ params: {}, bucket: DEFAULT_REQUEST_BUCKET });
+}
 
 // findAccount is no longer a provider configuration option — it is the built-in,
 // DB-backed resolver imported directly. An unset client resolves to the default
@@ -25,7 +34,7 @@ describe('built-in findAccount (DB-backed)', () => {
 			true
 		);
 
-		const account = await findAccount({}, user._id);
+		const account = await findAccount(requestWithoutClient(), user._id);
 
 		expect(account.accountId).toBe(user._id);
 		expect(await account.claims()).toEqual({
@@ -36,7 +45,7 @@ describe('built-in findAccount (DB-backed)', () => {
 	});
 
 	it('resolves to nothing when no user record exists for the subject', async () => {
-		const account = await findAccount({}, 'does-not-exist');
+		const account = await findAccount(requestWithoutClient(), 'does-not-exist');
 		expect(account).toBeUndefined();
 	});
 
@@ -49,7 +58,7 @@ describe('built-in findAccount (DB-backed)', () => {
 		);
 		await getUserStore('redfox').update(user._id, { active: false });
 
-		const account = await findAccount({}, user._id);
+		const account = await findAccount(requestWithoutClient(), user._id);
 		expect(account).toBeUndefined();
 	});
 });

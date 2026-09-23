@@ -11,18 +11,34 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- tokens: a browser application's rotated refresh tokens again expire when their chain's first token
+  would have, instead of each rotation granting a fresh lifetime — dead since `54ba556`, masked by the
+  equal default grant lifetime. `ttl.*` now take `(token, client)`. Deployments that lengthened a
+  lifetime will see older browser chains sign in once more.
+- buckets: device authorization and CIBA started at a named bucket now use its verification page,
+  session and `iss`, and refuse another bucket's client as `unauthorized_client`; registration there
+  returns a management URI beneath it. A `deviceInfo` override now takes effect (the default records the
+  caller's address as a string).
 - admin: editing a client in the console or through the agent's `client_update` no longer drops every
   attribute the console does not display. A pairwise client stayed pairwise only until its first edit,
   and a client authenticating with a private key could not be edited at all.
 
 ### Changed
 
+- **breaking** — extension functions, policy checks, registration policies and RAR validators receive
+  the request context itself (`issueRefreshToken(oidc, client, code)`, `check: (oidc) => …`), not
+  `{ oidc }`. Request-scoped events carry it first; `grant.revoked` is `(oidc?, grantId)` and fires once
+  (a partial sign-out emitted it twice), `code_verification.error` is `(oidc, error)`. No shim.
+- request context: `OIDCContext` declares what it holds — built from an init object with a required
+  `bucket`, typed entities, `oidc.require(name)`. A getter is a guarantee: `oidc.client` and
+  `oidc.session` throw when absent (`authenticatedClient` is gone); optional entities are read as
+  `oidc.entities.X?`, replacing the `grant`, `account` and `deviceCode` getters. Unread fields removed.
 - client: the client's type names its closed value sets (authentication method, CIBA delivery mode,
   signing algorithms) from the lists the configuration check uses, is read-only all the way down to
   match the freeze, and `adapter('Client')` is typed as holding a `StoredClient`.
 - client: the validated client has a type that matches it — the attributes a default always fills are
   required, `client_name`, `contacts`, `default_acr_values` and `client_id_issued_at` are declared — and
-  the request context carries it typed (`oidc.client`, `oidc.authenticatedClient`).
+  the request context carries it typed (`oidc.client`; see the request-context entry above).
 - client: a client is written the same way from every surface, through `registerClient`, and its sector
   identifier document is checked there and only there. Resolving a stored client no longer retrieves
   it, so a pairwise client stays usable while its sector host is down; the console, which stored

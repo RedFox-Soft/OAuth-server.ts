@@ -4,6 +4,7 @@ import { AuthorizationCode } from 'lib/models/authorization_code.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { BackchannelAuthenticationRequest } from 'lib/models/backchannel_authentication_request.js';
 import { eventBus } from 'lib/event_bus.js';
+import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 
 /*
  * Revokes every token issued under one grant, across all five grantable areas, unconditionally.
@@ -19,7 +20,7 @@ import { eventBus } from 'lib/event_bus.js';
  * The Grant record itself survives, deliberately: the grant is the consent, and revoking a token is not
  * withdrawing consent. Only a principal cascade (lib/helpers/cascade.ts) destroys grant rows.
  */
-export default async function revoke(grantId: string) {
+export default async function revoke(grantId: string, oidc?: OIDCContext) {
 	await Promise.all([
 		AccessToken.revokeByGrantId(grantId),
 		RefreshToken.revokeByGrantId(grantId),
@@ -27,5 +28,5 @@ export default async function revoke(grantId: string) {
 		DeviceCode.revokeByGrantId(grantId),
 		BackchannelAuthenticationRequest.revokeByGrantId(grantId)
 	]);
-	eventBus.emit('grant.revoked', grantId);
+	eventBus.emit('grant.revoked', oidc, grantId);
 }

@@ -10,8 +10,8 @@ const check: CheckPartial = {
 	reason: 'reason_foo',
 	description: 'error_description_foo',
 	error: 'error_foo',
-	check: (ctx) => {
-		if (ctx.oidc.params.triggerCustomFail) {
+	check: (oidc) => {
+		if (oidc.params.triggerCustomFail) {
 			return true;
 		}
 		return false;

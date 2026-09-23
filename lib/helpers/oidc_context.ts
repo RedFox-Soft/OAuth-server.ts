@@ -1,3 +1,4 @@
+import type { Cookie } from 'elysia';
 import { InvalidHeaderAuthorization } from './errors.ts';
 import { routeNames } from '../consts/param_list.ts';
 import { eventBus } from '../event_bus.js';
@@ -12,34 +13,125 @@ import {
 	type RequestBucket
 } from 'lib/configs/issuer.js';
 import { getCertificate } from '../addon/index.js';
-import { type Client } from '../models/client/types.ts';
+import type { Client } from '../models/client/types.ts';
+/*
+ * Every model is imported for its type only. This module sits under the model graph — models reach it
+ * through the addon registry — so a runtime import from here would enter that graph from the wrong end
+ * (wiki/concepts/model-graph-import-order.md).
+ */
+import type { Session } from '../models/session.ts';
+import type { Grant } from '../models/grant.ts';
+import type { Interaction } from '../models/interaction.ts';
+import type { PushedAuthorizationRequest } from '../models/pushed_authorization_request.ts';
+import type { IdToken } from '../models/id_token.ts';
+import type { AuthorizationCode } from '../models/authorization_code.ts';
+import type { AccessToken } from '../models/access_token.ts';
+import type { RefreshToken } from '../models/refresh_token.ts';
+import type { DeviceCode } from '../models/device_code.ts';
+import type { BackchannelAuthenticationRequest } from '../models/backchannel_authentication_request.ts';
+import type { ClientCredentials } from '../models/client_credentials.ts';
+import type { InitialAccessToken } from '../models/initial_access_token.ts';
+import type { RegistrationAccessToken } from '../models/registration_access_token.ts';
+import type { findAccount } from '../addon/account.ts';
+import type ResourceServer from './resource_server.ts';
 
 /* Re-exported so the request pipeline can keep importing these from here, while the declaration lives
  * beside `issuerFor` — the models need it and must not reach into the request context to get it. */
 export { DEFAULT_REQUEST_BUCKET, type RequestBucket };
 
-export class OIDCContext<T extends Record<string, unknown>> {
-	#requestParamClaims = null;
+export type Account = NonNullable<Awaited<ReturnType<typeof findAccount>>>;
+
+/*
+ * Everything the pipeline can resolve and place on a request, by the name it is stored under. One
+ * declaration, so that storing or reading an entity is checked: the reads this replaced went through an
+ * untyped bag, and two of them named fields that did not exist and read `undefined` for as long as they
+ * lived (`Interaction.cid`, `Interaction.deviceCode`).
+ */
+export interface OIDCEntities {
+	Client: Client;
+	Session: Session;
+	Grant: Grant;
+	Account: Account;
+	Interaction: Interaction;
+	PushedAuthorizationRequest: PushedAuthorizationRequest;
+	IdTokenHint: Awaited<ReturnType<typeof IdToken.validate>>;
+	AuthorizationCode: AuthorizationCode;
+	AccessToken: AccessToken;
+	RefreshToken: RefreshToken;
+	RotatedRefreshToken: RefreshToken;
+	DeviceCode: DeviceCode;
+	BackchannelAuthenticationRequest: BackchannelAuthenticationRequest;
+	ClientCredentials: ClientCredentials;
+	InitialAccessToken: InitialAccessToken;
+	RegistrationAccessToken: RegistrationAccessToken;
+	RotatedRegistrationAccessToken: RegistrationAccessToken;
+}
+
+/* One requested claim, as a client sent it — so `values` is checked for being an array where it is read. */
+export type ClaimRequest = {
+	essential?: boolean;
+	value?: unknown;
+	values?: unknown;
+} | null;
+
+export interface ClaimsParameter {
+	id_token?: Record<string, ClaimRequest>;
+	userinfo?: Record<string, ClaimRequest>;
+	rejected?: string[];
+}
+
+/* What an interaction resolved with, as the resumption hands it back. */
+export interface InteractionResult {
+	login?: { accountId: string; [key: string]: unknown };
+	consent?: { grantId?: string; [key: string]: unknown };
+	error?: string;
+	error_description?: string;
+	[key: string]: unknown;
+}
+
+export type OIDCCookies = Record<string, Cookie<unknown>>;
+
+export interface OIDCContextInit<T> {
+	params: T;
+	headers?: Record<string, string | undefined>;
+	route?: string;
+	bucket: RequestBucket;
+	cookie?: OIDCCookies;
+	ip?: string;
+}
+
+export class OIDCContext<
+	T extends Record<string, unknown> = Record<string, unknown>
+> {
+	#requestParamClaims: Set<string> | null = null;
 
 	#accessToken: string | null = null;
-	/*
-	 * The resolved client, typed. The other entities stay untyped for now: typing them means typing every
-	 * token model this context holds.
-	 */
-	#client: Client | undefined;
-	params: T;
 	#headers: Record<string, string | undefined>;
+
+	/*
+	 * Reassigned in three places only: a pushed or JWT-secured request replaces the parameters it
+	 * carries, the device flow restores the ones its code was started with, and a client-authenticated
+	 * endpoint narrows them to its own body.
+	 */
+	params: T;
+
+	/*
+	 * A route name ('registration', 'ui.resume') for contexts built directly, the Elysia route path
+	 * ('/token') for those built by the auth plugin. Readers compare against both; unifying them would
+	 * change the audience a JWT client assertion is checked against.
+	 */
+	readonly route: string;
 
 	/*
 	 * The population this request is addressed to, and the source of every absolute URL it produces.
 	 *
-	 * Defaulted rather than required, because the default bucket is the honest answer for a request to
-	 * a bare path and that is what every caller outside the prefixed routes is handling. The prefixed
-	 * routes set it from the address, in one place, so no individual handler can forget to — which is
-	 * the failure this default would otherwise hide, a token whose `iss` disagrees with the metadata
-	 * that advertised the endpoint it came from.
+	 * Required, not defaulted. It used to default to the default bucket as the honest answer for a bare
+	 * path, and that default is exactly what hid the device, backchannel and registration endpoints
+	 * forgetting their address: mounted beneath every bucket, they built a context without one, and a
+	 * flow started at a named bucket yielded tokens whose `iss` disagreed with the metadata that
+	 * advertised the endpoint. Every construction site now states its bucket.
 	 */
-	bucket: RequestBucket;
+	readonly bucket: RequestBucket;
 
 	/*
 	 * The population this request signs a user *into*, which is what the session cookie is named after.
@@ -59,41 +151,69 @@ export class OIDCContext<T extends Record<string, unknown>> {
 	 */
 	signInBucket: RequestBucket;
 
-	constructor(
-		params: T,
-		headers: Record<string, string | undefined> = {},
+	/* The request's cookie jar, on the routes that keep a session. */
+	readonly cookie: OIDCCookies | undefined;
+
+	/* The caller's address, where an endpoint records it (the device flow). */
+	readonly ip: string | undefined;
+
+	readonly entities: Partial<OIDCEntities> = {};
+
+	claims: ClaimsParameter = {};
+
+	resourceServers: Record<string, ResourceServer> = {};
+
+	result: InteractionResult | undefined;
+
+	/* The parameters a signed request object vouched for, which later checks may take on trust. */
+	trusted: string[] | undefined;
+
+	redirectUriCheckPerformed = false;
+
+	constructor({
+		params,
+		headers = {},
 		route = 'anonymous',
-		bucket: RequestBucket = DEFAULT_REQUEST_BUCKET
-	) {
+		bucket,
+		cookie,
+		ip
+	}: OIDCContextInit<T>) {
 		this.params = params;
-		this.route = route;
 		this.#headers = headers;
+		this.route = route;
 		this.bucket = bucket;
 		this.signInBucket = bucket;
-		this.authorization = {};
-		this.redirectUriCheckPerformed = false;
-		this.webMessageUriCheckPerformed = false;
-		this.entities = {};
-		this.claims = {};
-		this.resourceServers = {};
+		this.cookie = cookie;
+		this.ip = ip;
 	}
 
 	isFapi() {
 		return config['fapi.enabled'];
 	}
 
-	entity(key, value) {
-		if (!this.entities) {
-			throw new Error('entities not initialized');
-		}
+	entity<K extends keyof OIDCEntities>(
+		key: K,
+		value: OIDCEntities[K] | undefined
+	) {
 		this.entities[key] = value;
 
 		if (key === 'Client') {
-			this.#client = value;
-			// `this` is the oidc context (formerly the `ctx.oidc` payload); there is no
-			// `ctx` wrapper anymore, so emit the context itself as the event payload.
 			eventBus.emit('assign.client', this, value);
 		}
+	}
+
+	/*
+	 * An entity the pipeline guarantees by the time the caller runs. Its absence is a defect in the
+	 * pipeline, not something a caller did, so it surfaces as one — a server error recorded as a fault —
+	 * rather than as an OAuth refusal addressed to the client.
+	 */
+	require<K extends keyof OIDCEntities>(key: K): OIDCEntities[K] {
+		const value = this.entities[key];
+		if (value === undefined) {
+			throw new Error(`no ${key} has been resolved on this request`);
+		}
+		// Checked just above; TypeScript does not narrow an indexed access through a generic key.
+		return value as OIDCEntities[K];
 	}
 
 	/*
@@ -115,19 +235,21 @@ export class OIDCContext<T extends Record<string, unknown>> {
 	 * absolute and discards the base's own. Correct URL resolution, and exactly wrong here — it would
 	 * hand a named bucket's end user an address in the default bucket.
 	 */
-	urlFor(name, opt) {
+	urlFor(name: 'code_verification'): string;
+	urlFor(name: 'client', opt: { clientId: string }): string;
+	urlFor(name: 'code_verification' | 'client', opt?: { clientId: string }) {
 		if (name === 'code_verification') {
 			return `${this.issuer}${routeNames.code_verification}`;
 		}
 
-		if (name === 'client') {
+		if (name === 'client' && opt) {
 			return `${this.issuer}${routeNames.registration}/${encodeURIComponent(opt.clientId)}`;
 		}
 
 		throw new Error(`unknown route name: ${name}`);
 	}
 
-	promptPending(name) {
+	promptPending(name: string) {
 		if (this.route.endsWith('resume')) {
 			const should = new Set([...this.prompts]);
 			Object.keys(this.result || {}).forEach(Set.prototype.delete.bind(should));
@@ -139,26 +261,26 @@ export class OIDCContext<T extends Record<string, unknown>> {
 		return this.prompts.has(name);
 	}
 
-	get requestParamClaims() {
+	#stringParam(name: string): string | undefined {
+		const value = this.params[name];
+		return typeof value === 'string' ? value : undefined;
+	}
+
+	get requestParamClaims(): Set<string> {
 		if (this.#requestParamClaims) {
 			return this.#requestParamClaims;
 		}
-		const requestParamClaims = new Set();
+		const requestParamClaims = new Set<string>();
+		const { claims: requested } = this.params;
 
-		if (this.params.claims) {
-			const { userinfo, id_token: idToken } = this.params.claims;
+		if (isPlainObject(requested)) {
+			// `isPlainObject` is not a type guard; the members are narrowed claim by claim below.
+			const { userinfo, id_token: idToken } = requested as ClaimsParameter;
 
 			const claims = configuration.claimsSupported;
-			if (userinfo) {
-				Object.entries(userinfo).forEach(([claim, value]) => {
-					if (claims.has(claim) && (value === null || isPlainObject(value))) {
-						requestParamClaims.add(claim);
-					}
-				});
-			}
-
-			if (idToken) {
-				Object.entries(idToken).forEach(([claim, value]) => {
+			for (const members of [userinfo, idToken]) {
+				if (!members) continue;
+				Object.entries(members).forEach(([claim, value]) => {
 					if (claims.has(claim) && (value === null || isPlainObject(value))) {
 						requestParamClaims.add(claim);
 					}
@@ -172,27 +294,22 @@ export class OIDCContext<T extends Record<string, unknown>> {
 	}
 
 	get requestParamScopes() {
-		return new Set(this.params.scope?.split(' '));
+		return new Set(this.#stringParam('scope')?.split(' '));
 	}
 
 	get requestParamOIDCScopes() {
 		const { scopes: oidcScopes } = configuration;
 		return new Set(
-			this.params.scope?.split(' ').filter(Set.prototype.has.bind(oidcScopes))
+			this.#stringParam('scope')
+				?.split(' ')
+				.filter(Set.prototype.has.bind(oidcScopes))
 		);
 	}
 
-	resolvedClaims() {
-		const rejected = this.session.rejectedClaimsFor(this.params.client_id);
-		const claims = structuredClone(this.claims);
-		claims.rejected = [...rejected];
-
-		return claims;
-	}
-
 	get responseMode() {
-		if (typeof this.params.response_mode === 'string') {
-			return this.params.response_mode;
+		const responseMode = this.#stringParam('response_mode');
+		if (responseMode !== undefined) {
+			return responseMode;
 		}
 
 		if (this.params.response_type !== undefined) {
@@ -217,51 +334,31 @@ export class OIDCContext<T extends Record<string, unknown>> {
 	}
 
 	get prompts() {
-		return new Set(this.params.prompt ? this.params.prompt.split(' ') : []);
-	}
-
-	get registrationAccessToken() {
-		return this.entities.RegistrationAccessToken;
-	}
-
-	get deviceCode() {
-		return this.entities.DeviceCode;
-	}
-
-	get authorizationCode() {
-		return this.entities.AuthorizationCode;
-	}
-
-	get refreshToken() {
-		return this.entities.RefreshToken;
-	}
-
-	get accessToken() {
-		return this.entities.AccessToken;
-	}
-
-	get account() {
-		return this.entities.Account;
-	}
-
-	get client(): Client | undefined {
-		return this.#client;
+		const prompt = this.#stringParam('prompt');
+		return new Set(prompt ? prompt.split(' ') : []);
 	}
 
 	/*
-	 * The client, for code that runs only after the request has authenticated one. Its absence there
-	 * is a defect in the pipeline, not something a caller did, so it surfaces as one rather than as an
-	 * OAuth refusal.
+	 * A getter is a guarantee: it throws when its entity is absent, because the pipeline promised it.
+	 * Anything that may legitimately be absent — a grant before consent, an account before sign-in, a
+	 * device code outside the device flow — is read through `entities` instead, where the `?.` says so
+	 * at the call site. The half-way getters that returned `undefined` hid which of the two a reader
+	 * was relying on.
 	 */
-	get authenticatedClient(): Client {
-		if (!this.#client) {
-			throw new Error('no client has been authenticated on this request');
-		}
-		return this.#client;
+
+	/* Read only after the session has been loaded; before that its absence is a defect. */
+	get session(): Session {
+		return this.require('Session');
 	}
 
-	get grant() {
-		return this.entities.Grant;
+	/*
+	 * The client, for code that runs after the request has resolved one — nearly all of it. Its absence
+	 * there is a defect in the pipeline, not something a caller did, so it surfaces as one rather than as
+	 * an OAuth refusal. The few places where no client is a legitimate state (an account lookup on the
+	 * userinfo path, a logout naming no client) read `entities.Client` instead, which says so.
+	 */
+	get client(): Client {
+		return this.require('Client');
 	}
 
 	get(name: string) {

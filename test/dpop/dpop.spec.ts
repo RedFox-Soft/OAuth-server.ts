@@ -721,9 +721,7 @@ describe('features.dPoP', async () => {
 
 			expect(spy).toBeCalledTimes(1);
 			const {
-				oidc: {
-					entities: { AccessToken: accessToken, RefreshToken: refreshToken }
-				}
+				entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 			} = spy.mock.calls[0][0];
 			expect(accessToken.payload).toHaveProperty('jkt', thumbprint);
 			expect(refreshToken.payload).not.toHaveProperty('jkt');
@@ -759,9 +757,7 @@ describe('features.dPoP', async () => {
 
 			expect(spy).toBeCalledTimes(1);
 			const {
-				oidc: {
-					entities: { AccessToken, RefreshToken }
-				}
+				entities: { AccessToken, RefreshToken }
 			} = spy.mock.calls[0][0];
 			expect(AccessToken.payload).toHaveProperty('jkt', thumbprint);
 			expect(RefreshToken.payload).toHaveProperty('jkt', thumbprint);
@@ -809,9 +805,7 @@ describe('features.dPoP', async () => {
 			expect(status).toBe(200);
 			expect(spy).toBeCalledTimes(1);
 			const {
-				oidc: {
-					entities: { AccessToken: accessToken, RefreshToken: refreshToken }
-				}
+				entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 			} = spy.mock.calls[0][0];
 			expect(accessToken.payload).toHaveProperty('jkt', thumbprint);
 			expect(refreshToken.payload).not.toHaveProperty('jkt');
@@ -853,9 +847,7 @@ describe('features.dPoP', async () => {
 			expect(status).toBe(200);
 			expect(spy).toBeCalledTimes(1);
 			const {
-				oidc: {
-					entities: { AccessToken: accessToken, RefreshToken: refreshToken }
-				}
+				entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 			} = spy.mock.calls[0][0];
 			expect(accessToken.payload).toHaveProperty('jkt', thumbprint);
 			expect(refreshToken.payload).toHaveProperty('jkt', thumbprint);
@@ -1050,9 +1042,7 @@ describe('features.dPoP', async () => {
 
 				expect(spy).toBeCalledTimes(1);
 				const {
-					oidc: {
-						entities: { AccessToken, RefreshToken }
-					}
+					entities: { AccessToken, RefreshToken }
 				} = spy.mock.calls[0][0];
 				expect(AccessToken.payload).toHaveProperty('jkt', thumbprint);
 				expect(RefreshToken.payload).not.toHaveProperty('jkt');
@@ -1103,9 +1093,7 @@ describe('features.dPoP', async () => {
 
 				expect(spy).toBeCalledTimes(1);
 				const {
-					oidc: {
-						entities: { AccessToken, RefreshToken }
-					}
+					entities: { AccessToken, RefreshToken }
 				} = spy.mock.calls[0][0];
 				expect(AccessToken.payload).toHaveProperty('jkt', thumbprint);
 				expect(RefreshToken.payload).not.toHaveProperty('jkt');
@@ -1239,9 +1227,7 @@ describe('features.dPoP', async () => {
 
 				expect(spy).toBeCalledTimes(1);
 				const {
-					oidc: {
-						entities: { AccessToken, RefreshToken }
-					}
+					entities: { AccessToken, RefreshToken }
 				} = spy.mock.calls[0][0];
 				expect(AccessToken.payload).toHaveProperty('jkt', thumbprint);
 				expect(RefreshToken.payload.jkt).toBeEmpty();
@@ -1292,9 +1278,7 @@ describe('features.dPoP', async () => {
 			expect(spy).toBeCalledTimes(1);
 
 			const {
-				oidc: {
-					entities: { AccessToken, RefreshToken }
-				}
+				entities: { AccessToken, RefreshToken }
 			} = spy.mock.calls[0][0];
 			expect(AccessToken.payload).toHaveProperty('jkt', thumbprint);
 			expect(RefreshToken.payload).toHaveProperty('jkt', thumbprint);
@@ -1348,9 +1332,7 @@ describe('features.dPoP', async () => {
 				expect(spy).toBeCalledTimes(1);
 
 				const {
-					oidc: {
-						entities: { AccessToken, RefreshToken }
-					}
+					entities: { AccessToken, RefreshToken }
 				} = spy.mock.calls[0][0];
 				expect(AccessToken.payload).toHaveProperty('jkt', thumbprint);
 				expect(RefreshToken.payload).toHaveProperty('jkt', thumbprint);
@@ -1413,9 +1395,7 @@ describe('features.dPoP', async () => {
 
 		expect(spy).toBeCalledTimes(1);
 		const {
-			oidc: {
-				entities: { ClientCredentials }
-			}
+			entities: { ClientCredentials }
 		} = spy.mock.calls[0][0];
 		expect(ClientCredentials.payload).toHaveProperty('jkt', thumbprint);
 	});

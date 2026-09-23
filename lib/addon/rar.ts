@@ -13,14 +13,12 @@ interface RarResourceServer {
 	identifier(): string;
 }
 
-interface RarCtx {
-	oidc: {
-		params: { authorization_details?: unknown };
-		grant?: { getRarFiltered(requested: unknown): unknown[] };
-		entities: {
-			AuthorizationCode?: { payload: { rar?: unknown } };
-			RefreshToken?: { payload: { rar?: unknown } };
-		};
+interface RarContext {
+	params: { authorization_details?: unknown };
+	entities: {
+		Grant?: { getRarFiltered(requested: unknown): unknown[] };
+		AuthorizationCode?: { payload: { rar?: unknown } };
+		RefreshToken?: { payload: { rar?: unknown } };
 	};
 }
 
@@ -46,34 +44,34 @@ function filterToResourceServer(
 	});
 }
 
-export function rarForAuthorizationCode(ctx: RarCtx) {
+export function rarForAuthorizationCode(oidc: RarContext) {
 	// The requested details intersected with what the resource owner granted. Grant#getRarFiltered
 	// owns the trusted-grant case, so an override of this function cannot lose it.
-	return ctx.oidc.grant?.getRarFiltered(ctx.oidc.params.authorization_details);
+	return oidc.entities.Grant?.getRarFiltered(oidc.params.authorization_details);
 }
 
 export function rarForCodeResponse(
-	ctx: RarCtx,
+	oidc: RarContext,
 	resourceServer: RarResourceServer
 ) {
 	return filterToResourceServer(
-		ctx.oidc.entities.AuthorizationCode?.payload.rar,
+		oidc.entities.AuthorizationCode?.payload.rar,
 		resourceServer
 	);
 }
 
 export function rarForRefreshTokenResponse(
-	ctx: RarCtx,
+	oidc: RarContext,
 	resourceServer: RarResourceServer
 ) {
 	return filterToResourceServer(
-		ctx.oidc.entities.RefreshToken?.payload.rar,
+		oidc.entities.RefreshToken?.payload.rar,
 		resourceServer
 	);
 }
 
 export function rarForIntrospectionResponse(
-	_ctx: RarCtx,
+	_oidc: RarContext,
 	token: { payload: { rar?: unknown } }
 ) {
 	// The resource server is the intended audience of an introspection response, so its details are

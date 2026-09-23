@@ -6,7 +6,7 @@ aliases: [provider, event_bus]
 tags: [architecture, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-07-31
-updated: 2026-07-31
+updated: 2026-09-23
 graph:
   node_id: subsystem:event-bus
   node_type: subsystem
@@ -64,10 +64,35 @@ way."
 
 ## Known signals
 
-- `feature_disabled` — `{ method, path, flag }`, emitted once per gated refusal
-  ([[feature-flag-gating]]). Deliberately not routed to `server_error`.
+Each name has exactly one argument shape wherever it is emitted, and fires once per occurrence. A
+request-scoped event carries the request context (`OIDCContext`) first; where the same event can also
+happen with no protocol request behind it — the admin console ending a session — that position is
+`undefined`, never a fabricated context. Settled in `060-typed-oidc-context`, which found
+`grant.revoked` emitted twice on a partial sign-out, once as `(grantId)` and once as
+`({ oidc }, grantId)`, so every subscriber was wrong for one of them.
 
-This list covers only the signals verified while writing this page; it is not yet a complete
-inventory of emitted events.
+| Event | Arguments |
+|---|---|
+| `assign.client` | `(oidc, client)` |
+| `authorization.accepted` | `(oidc)` |
+| `authorization.success` | `(oidc, response?)` — no body from the device-flow path |
+| `interaction.started` | `(oidc, prompt)` |
+| `interaction.ended` | `(oidc)` |
+| `grant.success` | `(oidc)` |
+| `grant.revoked` | `(oidc?, grantId)` — emitted only by `lib/helpers/revoke.ts` |
+| `end_session.success` | `(oidc)` |
+| `device_authorization.success` | `(oidc, response)` |
+| `pushed_authorization_request.success` | `(oidc, client)` |
+| `registration_{create,update,delete}.success` | `(oidc, client)` |
+| `code_verification.error` | `(oidc, error)` |
+| `backchannel.success` | `(oidc?, client, accountId, sid)` |
+| `backchannel.error` | `(oidc?, error, client, accountId, sid)` |
 
-Verified against [[oauth-server-codebase]] at commit `2125ad0`.
+Signals with no request context: `server_error (error)` and `<endpoint>.error (error)` from the shared
+`onError`; `<model>.saved|issued|destroyed (model)` from `BaseModel`; `feature_disabled ({ method,
+path, flag })`, emitted once per gated refusal ([[feature-flag-gating]]) and deliberately not routed to
+`server_error`; `rate_limited`, `login_throttled ({ bucketId })`, `settings_applied ({ keys })`,
+`admin.login.error`, `federation.*.error`, `mcp.auth.error ({ reason })`.
+
+Verified against [[oauth-server-codebase]] at commit `2125ad0`; the table above against
+`060-typed-oidc-context`.

@@ -1,3 +1,4 @@
+import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { InvalidRequestUri } from '../../helpers/errors.ts';
 import { responseModes } from 'lib/response_modes/index.js';
 import processResponseTypes from '../../helpers/process_response_types.ts';
@@ -13,7 +14,7 @@ import { eventBus } from '../../event_bus.js';
  *
  * @emits: authorization.success
  */
-export default async function respond(oidc) {
+export default async function respond(oidc: OIDCContext) {
 	let pushedAuthorizationRequest = oidc.entities.PushedAuthorizationRequest;
 
 	/*
@@ -38,9 +39,7 @@ export default async function respond(oidc) {
 	}
 	await pushedAuthorizationRequest?.consume();
 
-	// processResponseTypes + response-mode handlers are `ctx`-shaped boundaries (the latter is a
-	// public, user-registrable handler API), so they receive a `{ oidc }` payload.
-	const out = await processResponseTypes({ oidc });
+	const out = await processResponseTypes(oidc);
 
 	const { params } = oidc;
 
@@ -59,9 +58,8 @@ export default async function respond(oidc) {
 		out.iss = oidc.issuer;
 	}
 
-	// event payload kept `{ oidc }`-shaped: tests assert `args[0][0].oidc.params`
-	eventBus.emit('authorization.success', { oidc }, out);
+	eventBus.emit('authorization.success', oidc, out);
 
 	const handler = responseModes.get(responseMode);
-	return await handler({ oidc }, params.redirect_uri, out);
+	return await handler(oidc, params.redirect_uri, out);
 }

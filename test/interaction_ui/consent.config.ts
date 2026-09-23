@@ -13,7 +13,7 @@ export const RESOURCE = 'urn:consent:api';
  * declared type. One render of all four is what proves the page groups and labels them.
  */
 export const addons = {
-	getResourceServerInfo(ctx: unknown, resource: string) {
+	getResourceServerInfo(oidc: unknown, resource: string) {
 		if (resource === RESOURCE) {
 			return { audience: resource, scope: 'api:read api:write' };
 		}
@@ -25,7 +25,7 @@ export const addons = {
 	 * invalid_target before the consent prompt is ever reached (the same reason rar.config.ts has one).
 	 * An array when defaulting for an authorization request; a single value when `oneOf` is supplied.
 	 */
-	defaultResource(ctx: unknown, client: unknown, oneOf?: string[]) {
+	defaultResource(oidc: unknown, client: unknown, oneOf?: string[]) {
 		if (oneOf) {
 			return oneOf[0];
 		}

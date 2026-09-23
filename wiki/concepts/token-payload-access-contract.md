@@ -83,15 +83,28 @@ The general lesson the two instances share: when the bare read is hidden behind 
 contract cannot be enforced by reviewing call sites, because the call sites are right. It has to be
 enforced where the getter is written.
 
+**The request context's entity store was the third place, and it is now typed.** Until
+`060-typed-oidc-context`, `oidc.entities` was an untyped bag keyed by strings, so a bare read through
+it compiled. Two had lived there unnoticed: `oidc.entities.Interaction?.cid` and
+`oidc.entities.Interaction?.deviceCode`, both fields that exist only on the interaction's payload, so
+both read `undefined` for as long as they existed (the first fed a value nothing read; the second sat
+in a module nothing imported). `OIDCEntities` in `lib/helpers/oidc_context.ts` now declares every
+entity with its model type and `entity()`/`entities` are checked against it, so the same read is a
+compile error. The reads follow one rule: a getter (`oidc.client`, `oidc.session`) is a guarantee
+and throws a server defect when its entity is absent, `oidc.require(name)` is the same for any other
+entity, and whatever may legitimately be absent — a grant before consent, an account before sign-in —
+is read as `oidc.entities.X?`, so the `?.` at the call site says which of the two the reader relies on.
+
 Code that must tolerate a partially populated context reaches through the payload explicitly, for
 example `lib/addon/account.ts:14`:
 
 ```ts
-const clientId = oidc?.client?.clientId ?? _token?.payload?.clientId;
+const clientId = oidc?.entities.Client?.clientId ?? _token?.payload?.clientId;
 ```
 
-Note the asymmetry in that line, which is the contract in miniature: `oidc.client` is a validated
-client object and is read directly, while the token is read through `.payload`. See
+Note the asymmetry in that line, which is the contract in miniature: the client is a validated
+client object and is read directly (through `entities`, because on the userinfo path none may be
+resolved), while the token is read through `.payload`. See
 [[client-identity-from-database]] for why validated clients are plain objects.
 
 ## Payload schemas are composed, not inherited flat

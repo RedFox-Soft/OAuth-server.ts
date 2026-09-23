@@ -2,6 +2,7 @@
 
 import { strict as assert } from 'node:assert';
 import * as events from 'node:events';
+import { OIDCContext } from 'lib/helpers/oidc_context.js';
 
 import getConfig from '../default.config.js';
 
@@ -16,14 +17,14 @@ export const ApplicationConfig = {
 };
 
 export const addons = {
-	processLoginHint(ctx, loginHint) {
-		assert(ctx?.oidc);
+	processLoginHint(oidc, loginHint) {
+		assert(oidc instanceof OIDCContext);
 		assert(typeof loginHint === 'string');
 		emitter.emit('processLoginHint', ...arguments);
 		return loginHint;
 	},
-	processLoginHintToken(ctx, loginHintToken) {
-		assert(ctx?.oidc);
+	processLoginHintToken(oidc, loginHintToken) {
+		assert(oidc instanceof OIDCContext);
 		assert(typeof loginHintToken === 'string');
 		emitter.emit('processLoginHintToken', ...arguments);
 		if (loginHintToken === 'notfound') {
@@ -31,18 +32,18 @@ export const addons = {
 		}
 		return loginHintToken;
 	},
-	validateBindingMessage(ctx, bindingMessage) {
-		assert(ctx?.oidc);
+	validateBindingMessage(oidc, bindingMessage) {
+		assert(oidc instanceof OIDCContext);
 		assert(bindingMessage === undefined || typeof bindingMessage === 'string');
 		emitter.emit('validateBindingMessage', ...arguments);
 	},
-	validateRequestContext(ctx, requestContext) {
-		assert(ctx?.oidc);
+	validateRequestContext(oidc, requestContext) {
+		assert(oidc instanceof OIDCContext);
 		assert(requestContext === undefined || typeof requestContext === 'string');
 		emitter.emit('validateRequestContext', ...arguments);
 	},
-	verifyUserCode(ctx, account, userCode) {
-		assert(ctx?.oidc);
+	verifyUserCode(oidc, account, userCode) {
+		assert(oidc instanceof OIDCContext);
 		assert(account?.accountId && typeof account.claims === 'function');
 		assert(userCode === undefined || typeof userCode === 'string');
 		emitter.emit('verifyUserCode', ...arguments);

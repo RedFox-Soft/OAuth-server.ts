@@ -1,3 +1,4 @@
+import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import {
 	InvalidRequest,
 	UnsupportedResponseMode
@@ -12,7 +13,7 @@ import {
  * Resolves and assigns params.response_mode if it was not explicitly requested. Validates id_token
  * and token containing responses do not use response_mode query.
  */
-export default function checkResponseMode(oidc) {
+export default function checkResponseMode(oidc: OIDCContext) {
 	const { params, client } = oidc;
 
 	const mode = oidc.responseMode;

@@ -1,10 +1,13 @@
-import { ISSUER } from 'lib/configs/env.js';
+import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { generate, normalize } from '../../helpers/user_codes.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { eventBus } from '../../event_bus.js';
 
-export default async function deviceAuthorizationResponse(oidc, deviceInfo) {
+export default async function deviceAuthorizationResponse(
+	oidc: OIDCContext,
+	deviceInfo
+) {
 	const charset = ApplicationConfig['deviceFlow.charset'];
 	const mask = ApplicationConfig['deviceFlow.mask'];
 	const userCode = generate(charset, mask);
@@ -19,15 +22,16 @@ export default async function deviceAuthorizationResponse(oidc, deviceInfo) {
 	});
 
 	oidc.entity('DeviceCode', dc);
+	/* The page of the bucket the flow was started at: its session is the one the sign-in belongs in. */
+	const verificationUri = oidc.urlFor('code_verification');
 	const body = {
 		device_code: await dc.save(),
 		user_code: userCode,
-		verification_uri: ISSUER + '/device',
-		verification_uri_complete: ISSUER + '/device' + `?user_code=${userCode}`,
+		verification_uri: verificationUri,
+		verification_uri_complete: `${verificationUri}?user_code=${userCode}`,
 		expires_in: dc.expiration
 	};
 
-	// event payload kept `{ oidc }`-shaped (was `ctx`)
-	eventBus.emit('device_authorization.success', { oidc }, body);
+	eventBus.emit('device_authorization.success', oidc, body);
 	return body;
 }

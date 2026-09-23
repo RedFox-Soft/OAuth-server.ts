@@ -14,17 +14,21 @@ import {
 	deviceInfo,
 	rarForCodeResponse
 } from '../../lib/addon/index.js';
+import {
+	DEFAULT_REQUEST_BUCKET,
+	OIDCContext
+} from '../../lib/helpers/oidc_context.js';
 
 // The global afterEach in test/preload.ts calls addons.reset() after every test.
 // These specs deliberately do NOT define a local reset — they prove the global
 // hook is what keeps overrides from leaking between tests.
 
-const fakeCtx = {
-	ip: '203.0.113.7',
-	get(header: string) {
-		return header === 'user-agent' ? 'default-agent' : undefined;
-	}
-};
+const fakeCtx = new OIDCContext({
+	params: {},
+	headers: { 'user-agent': 'default-agent' },
+	bucket: DEFAULT_REQUEST_BUCKET,
+	ip: '203.0.113.7'
+});
 
 /**
  * @proves A deployment can replace a behaviour function at runtime and have the override take
@@ -63,12 +67,10 @@ describe('addon override registry', () => {
 	 * guarding is covered by the cases above.
 	 */
 	it('resolves a working default for an un-overridden RAR transform', () => {
-		const ctx = {
-			oidc: {
-				entities: { AuthorizationCode: { payload: { rar: [{ type: 'a' }] } } }
-			}
+		const oidc = {
+			entities: { AuthorizationCode: { payload: { rar: [{ type: 'a' }] } } }
 		};
-		expect(rarForCodeResponse(ctx, { identifier: () => 'urn:rs' })).toEqual([
+		expect(rarForCodeResponse(oidc, { identifier: () => 'urn:rs' })).toEqual([
 			{ type: 'a' }
 		]);
 	});

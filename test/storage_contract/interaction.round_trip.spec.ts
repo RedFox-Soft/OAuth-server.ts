@@ -41,7 +41,6 @@ describe('storage contract: Interaction', () => {
 			trusted: ['nonce'],
 			session,
 			grant,
-			cid: 'cid-1',
 			deviceCode: 'device-1',
 			parJti: 'par-1'
 		});

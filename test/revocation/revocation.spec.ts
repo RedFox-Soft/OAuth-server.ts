@@ -441,7 +441,7 @@ describe('revocation features', () => {
 			expect(status).toBe(200);
 		});
 
-		describe('populates ctx.oidc.entities', () => {
+		describe('a revocation request records the token and its client', () => {
 			it('the revocation event carries the token and its client', async function () {
 				const spy = spyOn(OIDCContext.prototype, 'entity');
 				const at = new AccessToken({

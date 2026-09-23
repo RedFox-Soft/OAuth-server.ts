@@ -3,7 +3,7 @@ import nanoid from '../helpers/nanoid.js';
 import epochTime from '../helpers/epoch_time.js';
 
 import { sessionCookieName } from '../consts/param_list.js';
-import { OIDCContext } from 'lib/helpers/oidc_context.js';
+import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { BaseModel, BaseModelPayload } from './base_model.js';
 import { ttl } from 'lib/configs/liveTime.js';
 
@@ -48,7 +48,9 @@ export const SessionPayload = t.Object({
 			t.String(),
 			t.Object({
 				sid: t.Optional(t.String()),
-				grantId: t.Optional(t.String())
+				grantId: t.Optional(t.String()),
+				/* Set for an authorization that outlives a sign-out (offline access); read at logout. */
+				persistsLogout: t.Optional(t.Boolean())
 			})
 		)
 	)
@@ -92,7 +94,7 @@ export class Session extends BaseModel<SessionPayloadType> {
 		}
 	}
 
-	static async get(oidc) {
+	static async get(oidc: OIDCContext) {
 		// is there supposed to be a session bound? generate if not
 		/*
 		 * The bucket comes from the request, never from the cookie. A forged `_session_<anything>` is read
@@ -103,8 +105,10 @@ export class Session extends BaseModel<SessionPayloadType> {
 		 * pipeline resolves it from the client, because the two buckets served at the root share an
 		 * address and only the client says which of them a sign-in is for.
 		 */
+		const cookieValue =
+			oidc.cookie?.[sessionCookieName(oidc.signInBucket)]?.value;
 		const cookieSessionId =
-			oidc.cookie[sessionCookieName(oidc.signInBucket ?? oidc.bucket)]?.value;
+			typeof cookieValue === 'string' ? cookieValue : undefined;
 
 		let session;
 
@@ -118,9 +122,7 @@ export class Session extends BaseModel<SessionPayloadType> {
 			session = new this();
 		}
 
-		if (oidc instanceof OIDCContext) {
-			oidc.entity('Session', session);
-		}
+		oidc.entity('Session', session);
 
 		return session;
 	}

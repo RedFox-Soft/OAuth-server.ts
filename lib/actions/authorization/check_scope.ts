@@ -1,3 +1,4 @@
+import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { InvalidScope } from '../../helpers/errors.ts';
 import { configuration } from 'lib/configs/application.js';
 import { grantTypeAllowed } from 'lib/models/client.js';
@@ -6,7 +7,7 @@ import { grantTypeAllowed } from 'lib/models/client.js';
  * Validates that all requested scopes are supported by the provider, and that offline_access prompt
  * is requested together with consent prompt
  */
-export default function checkScope(oidc, isAuth = false) {
+export default function checkScope(oidc: OIDCContext, isAuth = false) {
 	const { scopes: statics } = configuration;
 	const { prompts, client } = oidc;
 
