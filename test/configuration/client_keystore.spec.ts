@@ -15,7 +15,7 @@ import * as JWT from '../../lib/helpers/jwt.ts';
 import epochTime from '../../lib/helpers/epoch_time.ts';
 import bootstrap, { seedClient } from '../test_helper.js';
 import { IdToken } from 'lib/models/id_token.js';
-import { Client } from 'lib/models/client.js';
+import { Client, clientKeys } from 'lib/models/client.js';
 
 const keys = [
 	{
@@ -70,13 +70,13 @@ describe('client keystore refresh', () => {
 
 		const client = await Client.find('client');
 		await Promise.all([
-			client.asymmetricKeyStore.refresh(),
-			client.asymmetricKeyStore.refresh()
+			clientKeys(client).asymmetric.refresh(),
+			clientKeys(client).asymmetric.refresh()
 		]);
 
 		expect(globalThis.fetch.mock.calls).toHaveLength(1);
 		expect(
-			client.asymmetricKeyStore.selectForSign({ kty: 'EC' })
+			clientKeys(client).asymmetric.selectForSign({ kty: 'EC' })
 		).not.toHaveLength(0);
 	});
 
@@ -94,9 +94,9 @@ describe('client keystore refresh', () => {
 		});
 
 		const client = await Client.find('client');
-		spyOn(client.asymmetricKeyStore, 'fresh').mockReturnValue(false);
+		spyOn(clientKeys(client).asymmetric, 'fresh').mockReturnValue(false);
 		return Promise.all([
-			assert.rejects(client.asymmetricKeyStore.refresh(), (err) => {
+			assert.rejects(clientKeys(client).asymmetric.refresh(), (err) => {
 				expect(err).toBeInstanceOf(Error);
 				expect(err.message).toBe('invalid_client_metadata');
 				expect(err.error_description).toEqual(
@@ -104,7 +104,7 @@ describe('client keystore refresh', () => {
 				);
 				return true;
 			}),
-			assert.rejects(client.asymmetricKeyStore.refresh(), (err) => {
+			assert.rejects(clientKeys(client).asymmetric.refresh(), (err) => {
 				expect(err).toBeInstanceOf(Error);
 				expect(err.message).toBe('invalid_client_metadata');
 				expect(err.error_description).toEqual(
@@ -125,31 +125,31 @@ describe('client keystore refresh', () => {
 		});
 		setResponse();
 
-		spyOn(client.asymmetricKeyStore, 'fresh').mockReturnValue(false);
-		await client.asymmetricKeyStore.refresh();
-		expect(client.asymmetricKeyStore.selectForSign({ kty: 'EC' })).toHaveLength(
-			2
-		);
+		spyOn(clientKeys(client).asymmetric, 'fresh').mockReturnValue(false);
+		await clientKeys(client).asymmetric.refresh();
+		expect(
+			clientKeys(client).asymmetric.selectForSign({ kty: 'EC' })
+		).toHaveLength(2);
 	});
 
 	it('removes not found keys', async function () {
 		setResponse({ keys: [] });
 
 		const client = await Client.find('client');
-		spyOn(client.asymmetricKeyStore, 'fresh').mockReturnValue(false);
-		await client.asymmetricKeyStore.refresh();
+		spyOn(clientKeys(client).asymmetric, 'fresh').mockReturnValue(false);
+		await clientKeys(client).asymmetric.refresh();
 
-		expect(client.asymmetricKeyStore.selectForSign({ kty: 'EC' })).toHaveLength(
-			0
-		);
+		expect(
+			clientKeys(client).asymmetric.selectForSign({ kty: 'EC' })
+		).toHaveLength(0);
 	});
 
 	it('only accepts 200s', async function () {
 		setResponse({ keys: [] }, 201);
 
 		const client = await Client.find('client');
-		spyOn(client.asymmetricKeyStore, 'fresh').mockReturnValue(false);
-		return assert.rejects(client.asymmetricKeyStore.refresh(), (err) => {
+		spyOn(clientKeys(client).asymmetric, 'fresh').mockReturnValue(false);
+		return assert.rejects(clientKeys(client).asymmetric.refresh(), (err) => {
 			expect(err).toBeInstanceOf(Error);
 			expect(err.message).toBe('invalid_client_metadata');
 			expect(err.error_description).toEqual(
@@ -163,8 +163,8 @@ describe('client keystore refresh', () => {
 		setResponse('not json');
 
 		const client = await Client.find('client');
-		spyOn(client.asymmetricKeyStore, 'fresh').mockReturnValue(false);
-		return assert.rejects(client.asymmetricKeyStore.refresh(), (err) => {
+		spyOn(clientKeys(client).asymmetric, 'fresh').mockReturnValue(false);
+		return assert.rejects(clientKeys(client).asymmetric.refresh(), (err) => {
 			expect(err).toBeInstanceOf(Error);
 			expect(err.message).toBe('invalid_client_metadata');
 			expect(err.error_description).toEqual(
@@ -178,8 +178,8 @@ describe('client keystore refresh', () => {
 		setResponse({ keys: {} });
 
 		const client = await Client.find('client');
-		spyOn(client.asymmetricKeyStore, 'fresh').mockReturnValue(false);
-		return assert.rejects(client.asymmetricKeyStore.refresh(), (err) => {
+		spyOn(clientKeys(client).asymmetric, 'fresh').mockReturnValue(false);
+		return assert.rejects(clientKeys(client).asymmetric.refresh(), (err) => {
 			expect(err).toBeInstanceOf(Error);
 			expect(err.message).toBe('invalid_client_metadata');
 			expect(err.error_description).toEqual(
@@ -200,15 +200,15 @@ describe('client keystore refresh', () => {
 
 			const freshUntil = epochTime(until);
 
-			const spy = spyOn(client.asymmetricKeyStore, 'fresh');
+			const spy = spyOn(clientKeys(client).asymmetric, 'fresh');
 			spy.mockImplementation(function () {
 				spy.mockRestore();
 				return false;
 			});
-			await client.asymmetricKeyStore.refresh();
-			expect(client.asymmetricKeyStore.fresh()).toBe(true);
-			expect(client.asymmetricKeyStore.stale()).toBe(false);
-			expect(client.asymmetricKeyStore.freshUntil).toBe(freshUntil);
+			await clientKeys(client).asymmetric.refresh();
+			expect(clientKeys(client).asymmetric.fresh()).toBe(true);
+			expect(clientKeys(client).asymmetric.stale()).toBe(false);
+			expect(clientKeys(client).asymmetric.freshUntil).toBe(freshUntil);
 		});
 
 		it('ignores the cache-control one when expires is provided', async function () {
@@ -222,15 +222,15 @@ describe('client keystore refresh', () => {
 
 			const freshUntil = epochTime(until);
 
-			const spy = spyOn(client.asymmetricKeyStore, 'fresh');
+			const spy = spyOn(clientKeys(client).asymmetric, 'fresh');
 			spy.mockImplementation(function () {
 				spy.mockRestore();
 				return false;
 			});
-			await client.asymmetricKeyStore.refresh();
-			expect(client.asymmetricKeyStore.fresh()).toBe(true);
-			expect(client.asymmetricKeyStore.stale()).toBe(false);
-			expect(client.asymmetricKeyStore.freshUntil).toBe(freshUntil);
+			await clientKeys(client).asymmetric.refresh();
+			expect(clientKeys(client).asymmetric.fresh()).toBe(true);
+			expect(clientKeys(client).asymmetric.stale()).toBe(false);
+			expect(clientKeys(client).asymmetric.freshUntil).toBe(freshUntil);
 		});
 
 		it('uses the max-age if Cache-Control is missing', async function () {
@@ -242,16 +242,16 @@ describe('client keystore refresh', () => {
 
 			const freshUntil = epochTime() + 3600;
 
-			const spy = spyOn(client.asymmetricKeyStore, 'fresh');
+			const spy = spyOn(clientKeys(client).asymmetric, 'fresh');
 			spy.mockImplementation(function () {
 				spy.mockRestore();
 				return false;
 			});
-			await client.asymmetricKeyStore.refresh();
-			expect(client.asymmetricKeyStore.fresh()).toBe(true);
-			expect(client.asymmetricKeyStore.stale()).toBe(false);
+			await clientKeys(client).asymmetric.refresh();
+			expect(clientKeys(client).asymmetric.fresh()).toBe(true);
+			expect(clientKeys(client).asymmetric.stale()).toBe(false);
 			expect(
-				Math.abs(client.asymmetricKeyStore.freshUntil - freshUntil)
+				Math.abs(clientKeys(client).asymmetric.freshUntil - freshUntil)
 			).toBeLessThanOrEqual(1);
 		});
 
@@ -262,16 +262,16 @@ describe('client keystore refresh', () => {
 
 			const freshUntil = epochTime() + 60;
 
-			const spy = spyOn(client.asymmetricKeyStore, 'fresh');
+			const spy = spyOn(clientKeys(client).asymmetric, 'fresh');
 			spy.mockImplementation(function () {
 				spy.mockRestore();
 				return false;
 			});
-			await client.asymmetricKeyStore.refresh();
-			expect(client.asymmetricKeyStore.fresh()).toBe(true);
-			expect(client.asymmetricKeyStore.stale()).toBe(false);
+			await clientKeys(client).asymmetric.refresh();
+			expect(clientKeys(client).asymmetric.fresh()).toBe(true);
+			expect(clientKeys(client).asymmetric.stale()).toBe(false);
 			expect(
-				Math.abs(client.asymmetricKeyStore.freshUntil - freshUntil)
+				Math.abs(clientKeys(client).asymmetric.freshUntil - freshUntil)
 			).toBeLessThanOrEqual(1);
 		});
 	});
@@ -281,11 +281,11 @@ describe('client keystore refresh', () => {
 			setResponse();
 
 			const client = await Client.find('client');
-			client.asymmetricKeyStore.freshUntil = epochTime() - 1;
+			clientKeys(client).asymmetric.freshUntil = epochTime() - 1;
 			return assert.rejects(
 				JWT.verify(
 					'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWV9.TJVA95OrM7E2cBab30RMHrHDcEfxjoYZgeFONFh7HgA',
-					client.asymmetricKeyStore
+					clientKeys(client).asymmetric
 				)
 			);
 		});
@@ -294,8 +294,8 @@ describe('client keystore refresh', () => {
 			setResponse();
 
 			const client = await Client.find('client');
-			client.asymmetricKeyStore.freshUntil = epochTime() - 1;
-			expect(client.asymmetricKeyStore.stale()).toBe(true);
+			clientKeys(client).asymmetric.freshUntil = epochTime() - 1;
+			expect(clientKeys(client).asymmetric.stale()).toBe(true);
 
 			const token = new IdToken(client, { foo: 'bar' });
 

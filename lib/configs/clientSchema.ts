@@ -174,6 +174,15 @@ export const ClientSchema = t.Object({
 	clientSecretExpiresAt: t.Optional(
 		t.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })
 	),
+	/*
+	 * Recognised metadata the object carries but the type used to omit, so reading it needed a cast.
+	 * Shapes only, matching what the declaration already enforces (a non-empty string, lists of
+	 * strings); client_id_issued_at is set by the server and never accepted from a registration.
+	 */
+	clientIdIssuedAt: t.Optional(t.Number()),
+	clientName: t.Optional(t.String()),
+	contacts: t.Optional(t.Array(t.String())),
+	defaultAcrValues: t.Optional(t.Array(t.String())),
 	// Informational client URLs (RFC 7591) — web URIs validated by TypeBox format.
 	clientUri: t.Optional(t.String({ format: 'web-uri' })),
 	logoUri: t.Optional(t.String({ format: 'web-uri' })),

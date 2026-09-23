@@ -209,6 +209,31 @@ export function seedClient(
 }
 
 /*
+ * Changes a seeded client's stored registration and returns the undo. A resolved client is frozen and
+ * shared by every request using it, so a case that needs the client in another state changes the
+ * record it is resolved from — the way an operator would — rather than the object. Changes use the
+ * stored names (recognised metadata in snake_case); `undefined` removes an attribute.
+ */
+export async function changeClient(
+	clientId: string,
+	changes: Record<string, unknown>
+): Promise<() => Promise<void>> {
+	const stored = await adapter('Client').find(clientId);
+	if (!stored) {
+		throw new Error(`no client '${clientId}' is seeded in the Client store`);
+	}
+	const next = Object.fromEntries(
+		Object.entries({ ...stored, ...changes }).filter(
+			([, value]) => value !== undefined
+		)
+	);
+	await adapter('Client').upsert(clientId, next);
+	return async () => {
+		await adapter('Client').upsert(clientId, stored);
+	};
+}
+
+/*
  * Seed a second user bucket, complete with the project and client that route a request to it.
  *
  * A bucket on its own routes nothing: `resolveBucketForRequest` reaches a bucket through the project

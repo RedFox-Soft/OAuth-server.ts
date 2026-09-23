@@ -12,7 +12,7 @@ import redirectUri from '../helpers/redirect_uri.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import revoke from '../helpers/revoke.ts';
 import { IdToken } from 'lib/models/id_token.js';
-import { Client } from 'lib/models/client.js';
+import { Client, postLogoutRedirectUriAllowed } from 'lib/models/client.js';
 import {
 	AuthorizationCookies,
 	routeNames,
@@ -145,7 +145,7 @@ export const logoutAction = new Elysia()
 
 			if (client && params.post_logout_redirect_uri !== undefined) {
 				if (
-					!client.postLogoutRedirectUriAllowed(params.post_logout_redirect_uri)
+					!postLogoutRedirectUriAllowed(client, params.post_logout_redirect_uri)
 				) {
 					throw new InvalidRequest('post_logout_redirect_uri not registered');
 				}

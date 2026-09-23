@@ -64,7 +64,7 @@ export const ttl = {
 		if (
 			ctx?.oidc?.entities.RotatedRefreshToken &&
 			client.applicationType === 'web' &&
-			client.clientAuthMethod === 'none' &&
+			client.tokenEndpointAuthMethod === 'none' &&
 			!token.isSenderConstrained()
 		) {
 			// Non-Sender Constrained SPA RefreshTokens do not have infinite expiration through rotation

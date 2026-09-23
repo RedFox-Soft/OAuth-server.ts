@@ -66,7 +66,7 @@ function isUndefined(value) {
 // keys the enabled features contribute. Derived from ApplicationConfig on every call rather than
 // frozen at module load, because the flags are mutable at runtime (the specs toggle them), and a
 // key recognized here is one the schema engine will read, camelCase onto the client, and echo back
-// out of `clientMetadata` — so a stale list would accept and advertise metadata for a disabled
+// out of `toStored` — so a stale list would accept and advertise metadata for a disabled
 // feature. Callers that consult it per-key must hoist the call out of their loop.
 /*
  * The configuration a value set is computed from, read when the pass runs rather than when the

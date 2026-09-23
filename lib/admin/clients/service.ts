@@ -1,6 +1,11 @@
 import crypto from 'node:crypto';
 import nanoid from '../../helpers/nanoid.js';
-import { Client } from '../../models/client.js';
+import {
+	Client,
+	needsSecret,
+	registerClient,
+	toStored
+} from '../../models/client.js';
 import { adapter } from '../../adapters/index.js';
 import { AdminError } from '../auth/rbac.js';
 
@@ -49,7 +54,7 @@ function responseTypesFor(grantTypes: string[]): string[] {
 	return grantTypes.includes('authorization_code') ? ['code'] : [];
 }
 
-// Build the canonical metadata object that Client.validateClient expects: base
+// Build the client record registerClient expects: base
 // attributes use canonical camelCase (redirectUris/grantTypes/…), recognized
 // metadata uses snake_case (token_endpoint_auth_method/scope/…), plus the dotted
 // `consent.require` key. Mirrors the boundary translation in actions/registration.ts.
@@ -119,12 +124,10 @@ function toView(client: {
 	};
 }
 
-async function validateAndStore(metadata: Record<string, unknown>) {
-	// Client.validateClient throws InvalidClient on bad metadata; the route layer
-	// maps that to HTTP 422.
-	const client = Client.validateClient(metadata);
-	await adapter('Client').upsert(client.clientId, client.metadata());
-	return client;
+// Validation refuses bad metadata with InvalidClientMetadata; the route layer
+// maps that to HTTP 422.
+function validateAndStore(metadata: Record<string, unknown>) {
+	return registerClient(metadata, { store: true });
 }
 
 export async function createClient(
@@ -133,20 +136,20 @@ export async function createClient(
 	const clientId = input.clientId ?? nanoid();
 	const metadata = toMetadata(input, clientId);
 	let secret: string | undefined;
-	if (Client.needsSecret(metadata)) {
+	if (needsSecret(metadata)) {
 		secret = generateSecret();
 		metadata.clientSecret = secret;
 		metadata.client_secret_expires_at = 0;
 	}
 	const client = await validateAndStore(metadata);
-	return { view: toView(client as never), secret };
+	return { view: toView(client), secret };
 }
 
 export async function getClientView(
 	clientId: string
 ): Promise<AdminClientView | null> {
 	const client = await Client.tryFind(clientId);
-	return client ? toView(client as never) : null;
+	return client ? toView(client) : null;
 }
 
 export async function updateClient(
@@ -180,22 +183,35 @@ export async function updateClient(
 		authorizationDetailsTypes:
 			patch.authorizationDetailsTypes ?? existing.authorizationDetailsTypes
 	};
-	const metadata = toMetadata(merged, clientId);
+	/*
+	 * Applied over the stored record, not in place of it. The console shows a subset of a client's
+	 * attributes, so a record rebuilt from that subset silently loses the rest — a pairwise client came
+	 * back public, which changes the subject identifier every relying party keys its accounts on, and a
+	 * client authenticating with a private key could not be edited at all once its key set was gone.
+	 */
+	const stored = (await adapter('Client').find(clientId)) ?? {};
+	const metadata: Record<string, unknown> = {
+		...stored,
+		...toMetadata(merged, clientId)
+	};
 	// Mirror createClient's secret logic on the merged (post-patch) metadata, not
 	// the pre-patch existing client — otherwise a confidential -> public transition
 	// leaves a stale clientSecret (so rotateSecret wrongly succeeds on what is now
 	// a public client), and a public -> confidential transition throws an unhandled
 	// InvalidClientMetadata (clientSecret is mandatory but never gets minted).
-	if (Client.needsSecret(metadata)) {
+	if (needsSecret(metadata)) {
 		// keep the existing secret, or mint one if transitioning public -> confidential
 		metadata.clientSecret = existing.clientSecret ?? generateSecret();
 		metadata.client_secret_expires_at = existing.clientSecret
 			? (existing.clientSecretExpiresAt ?? 0)
 			: 0;
+	} else {
+		// The stored record carries the old secret, so dropping it is now an explicit step.
+		delete metadata.clientSecret;
+		delete metadata.client_secret_expires_at;
 	}
-	// if the new auth method needs no secret, leave clientSecret unset so it's dropped
 	const client = await validateAndStore(metadata);
-	return toView(client as never);
+	return toView(client);
 }
 
 export async function rotateSecret(clientId: string): Promise<string> {
@@ -205,7 +221,7 @@ export async function rotateSecret(clientId: string): Promise<string> {
 		throw new AdminError(400, 'client has no secret to rotate');
 	}
 	const secret = generateSecret();
-	const metadata = { ...existing.metadata(), clientSecret: secret };
+	const metadata = { ...toStored(existing), clientSecret: secret };
 	await validateAndStore(metadata as Record<string, unknown>);
 	return secret;
 }

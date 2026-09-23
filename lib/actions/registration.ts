@@ -5,12 +5,17 @@ import constantEquals from '../helpers/constant_equals.ts';
 import epochTime from '../helpers/epoch_time.ts';
 import { InvalidToken, InvalidRequest } from '../helpers/errors.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
-import addClient from '../helpers/add_client.ts';
 import { idFactory, secretFactory } from '../addon/index.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
-import { Client } from 'lib/models/client.js';
+import {
+	Client,
+	fromWire,
+	needsSecret,
+	registerClient,
+	toWire
+} from 'lib/models/client.js';
+import { adapter } from 'lib/adapters/index.js';
 import { reclaimUnusedRegistrations } from 'lib/models/client/dynamic_registration.js';
-import { snakeToCanonical, canonicalToSnake } from 'lib/models/client/wire.js';
 import { InitialAccessToken } from 'lib/models/initial_access_token.js';
 import { RegistrationAccessToken } from 'lib/models/registration_access_token.js';
 import { eventBus } from 'lib/event_bus.js';
@@ -160,7 +165,7 @@ async function create({ body, headers, request, set }) {
 		client_id: clientId,
 		client_id_issued_at: epochTime()
 	});
-	properties = snakeToCanonical(properties);
+	properties = fromWire(properties);
 	/*
 	 * Marked as created on the client's own request, which is what lets the console tell it apart from
 	 * one an administrator made. Set after the wire translation so it cannot be supplied by the caller:
@@ -183,7 +188,7 @@ async function create({ body, headers, request, set }) {
 	 */
 	await reclaimUnusedRegistrations();
 
-	const secretRequired = Client.needsSecret(properties);
+	const secretRequired = needsSecret(properties);
 
 	if (secretRequired) {
 		Object.assign(properties, {
@@ -207,10 +212,10 @@ async function create({ body, headers, request, set }) {
 		}
 	}
 
-	const client = await addClient(properties, { store: true });
+	const client = await registerClient(properties, { store: true });
 	oidc.entity('Client', client);
 
-	const responseBody: Body = canonicalToSnake(client.metadata());
+	const responseBody: Body = toWire(client);
 
 	if (rat) {
 		Object.assign(responseBody, {
@@ -231,7 +236,7 @@ async function read({ params, headers, query, set }) {
 	const token = readBearer(headers.authorization, query, true);
 	const { client } = await authenticate(oidc, params.clientId, token);
 
-	const responseBody: Body = canonicalToSnake(client.metadata());
+	const responseBody: Body = toWire(client);
 
 	Object.assign(responseBody, {
 		registration_access_token: token,
@@ -281,7 +286,7 @@ async function update({ params, body, headers, set }) {
 		}
 	}
 
-	const properties = snakeToCanonical(
+	const properties = fromWire(
 		omitBy(
 			{
 				client_id: client.clientId,
@@ -292,7 +297,7 @@ async function update({ params, body, headers, set }) {
 		)
 	);
 
-	const secretRequired = !client.clientSecret && Client.needsSecret(properties);
+	const secretRequired = !client.clientSecret && needsSecret(properties);
 
 	if (secretRequired) {
 		Object.assign(properties, {
@@ -314,9 +319,9 @@ async function update({ params, body, headers, set }) {
 		}
 	}
 
-	const nextClient = await addClient(properties, { store: true });
+	const nextClient = await registerClient(properties, { store: true });
 
-	const responseBody: Body = canonicalToSnake(nextClient.metadata());
+	const responseBody: Body = toWire(nextClient);
 
 	Object.assign(responseBody, {
 		registration_access_token: token,
@@ -359,7 +364,7 @@ async function remove({ params, headers, set }) {
 		token
 	);
 
-	await Client.adapter.destroy(client.clientId);
+	await adapter('Client').destroy(client.clientId);
 	await regAccessToken.destroy();
 
 	set.status = 204;

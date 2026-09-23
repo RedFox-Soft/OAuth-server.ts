@@ -11,7 +11,7 @@ graph:
     - predicate: depends_on
       object: concept:client-identity-from-database
       source: oauth-server-codebase
-      evidence: '.update(client.sectorIdentifier)'
+      evidence: '.update(sectorIdentifier(client))'
       confidence: high
       status: current
     - predicate: depends_on

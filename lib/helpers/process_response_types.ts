@@ -2,6 +2,7 @@ import combinedScope from './combined_scope.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';
 import { expiresWithSession, rarForAuthorizationCode } from '../addon/index.js';
+import { includeSid } from '../models/client/checks.ts';
 
 async function codeHandler(ctx) {
 	const { grant } = ctx.oidc;
@@ -70,7 +71,7 @@ async function codeHandler(ctx) {
 	}
 
 	if (
-		ctx.oidc.client.includeSid() ||
+		includeSid(ctx.oidc.client) ||
 		(ctx.oidc.claims.id_token && 'sid' in ctx.oidc.claims.id_token)
 	) {
 		code.payload.sid = ctx.oidc.session.sidFor(ctx.oidc.client.clientId);

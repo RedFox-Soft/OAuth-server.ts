@@ -156,7 +156,7 @@ export const introspect = new Elysia().use(AuthPlugin).post(
 	routeNames.introspect,
 	async function ({ oidc, request }) {
 		if (ApplicationConfig['jwtIntrospection.enabled']) {
-			const { client } = oidc;
+			const client = oidc.authenticatedClient;
 
 			const {
 				introspectionEncryptedResponseAlg: encrypt,

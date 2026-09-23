@@ -3,6 +3,10 @@ import {
 	UnsupportedResponseMode
 } from '../../helpers/errors.ts';
 import { responseModes } from 'lib/response_modes/index.js';
+import {
+	checkClientSecretExpiration,
+	responseModeAllowed
+} from 'lib/models/client.js';
 
 /*
  * Resolves and assigns params.response_mode if it was not explicitly requested. Validates id_token
@@ -18,7 +22,7 @@ export default function checkResponseMode(oidc) {
 		throw new UnsupportedResponseMode();
 	}
 
-	if (!oidc.client.responseModeAllowed(mode)) {
+	if (!responseModeAllowed(oidc.client, mode)) {
 		throw new InvalidRequest(
 			'requested response_mode is not allowed for this client or request'
 		);
@@ -33,7 +37,8 @@ export default function checkResponseMode(oidc) {
 			/^(A|dir$)/.test(client.authorizationEncryptedResponseAlg))
 	) {
 		try {
-			client.checkClientSecretExpiration(
+			checkClientSecretExpiration(
+				client,
 				'client secret is expired, cannot issue a JWT Authorization response'
 			);
 		} catch (err) {

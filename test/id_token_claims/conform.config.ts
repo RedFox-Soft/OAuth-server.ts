@@ -10,6 +10,7 @@ export const addons = {
 
 export const ApplicationConfig = {
 	'claimsParameter.enabled': true,
+	'jwtUserinfo.enabled': true,
 	'registration.initialAccessToken': true,
 	'registration.policies': {
 		foo() {}

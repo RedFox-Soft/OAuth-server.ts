@@ -1,6 +1,7 @@
 import { InvalidClientMetadata } from './errors.ts';
+import { type SectorSource } from '../models/client/sector.ts';
 
-export default (client) => {
+export default (client: SectorSource): string | undefined => {
 	if (client.subjectType === 'pairwise') {
 		if (!client.sectorIdentifierUri) {
 			switch (true) {
@@ -10,7 +11,8 @@ export default (client) => {
 				case client.grantTypes.includes(
 					'urn:ietf:params:oauth:grant-type:device_code'
 				):
-					return new URL(client.jwksUri).host;
+					// Asserted: validation requires jwks_uri of a pairwise client on these grants.
+					return new URL(client.jwksUri as string).host;
 				default:
 					throw new InvalidClientMetadata(
 						'could not determine a sector identifier'

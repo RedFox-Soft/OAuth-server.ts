@@ -6,6 +6,7 @@ import {
 import { ApplicationConfig } from '../../configs/application.js';
 import { validateRedirectUri } from 'lib/helpers/validateRedirectUri.js';
 import { routeNames } from 'lib/consts/param_list.js';
+import { redirectUriAllowed } from 'lib/models/client.js';
 
 const UNREGISTERED =
 	"redirect_uri did not match any of the client's registered redirectUris";
@@ -37,7 +38,7 @@ function allowUnregisteredUri(oidc) {
 			'PushedAuthorizationRequest' in oidc.entities) &&
 		ApplicationConfig['par.allowUnregisteredRedirectUris'] &&
 		oidc.client.sectorIdentifierUri === undefined &&
-		oidc.client.clientAuthMethod !== 'none'
+		oidc.client.tokenEndpointAuthMethod !== 'none'
 	);
 }
 
@@ -45,7 +46,7 @@ function allowUnregisteredUri(oidc) {
  * Checks that provided redirect_uri is allowed
  */
 export default function checkRedirectUri(oidc) {
-	if (!oidc.client.redirectUriAllowed(oidc.params.redirect_uri)) {
+	if (!redirectUriAllowed(oidc.client, oidc.params.redirect_uri)) {
 		if (!allowUnregisteredUri(oidc)) {
 			throw refusal(oidc);
 		}

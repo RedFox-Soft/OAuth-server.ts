@@ -12,6 +12,8 @@ import {
 	needsSecret,
 	sectorIdentifier
 } from 'lib/models/client.js';
+import { type Client } from 'lib/models/client.js';
+import { type SectorSource } from 'lib/models/client/sector.ts';
 import { InvalidClient } from 'lib/helpers/errors.js';
 import epochTime from 'lib/helpers/epoch_time.js';
 
@@ -25,7 +27,10 @@ import epochTime from 'lib/helpers/epoch_time.js';
  */
 describe('client pure functions', () => {
 	describe('checks', () => {
-		const client = {
+		const client: Pick<
+			Client,
+			'responseTypes' | 'grantTypes' | 'redirectUris' | 'postLogoutRedirectUris'
+		> = {
 			responseTypes: ['code'],
 			grantTypes: ['authorization_code', 'refresh_token'],
 			redirectUris: ['https://rp.example.com/cb'],
@@ -59,7 +64,7 @@ describe('client pure functions', () => {
 		 * vary"), and a real MCP client picks a different port on every attempt — 3118, then 46937.
 		 */
 		describe('loopback redirect URIs at request time (RFC 8252 §7.3)', () => {
-			const native = {
+			const native: Pick<Client, 'applicationType' | 'redirectUris'> = {
 				applicationType: 'native',
 				redirectUris: [
 					'http://127.0.0.1:33418/callback',
@@ -115,7 +120,9 @@ describe('client pure functions', () => {
 		});
 
 		it('a client that registered no response_modes may use any of them', () => {
-			expect(responseModeAllowed(client, 'query')).toBe(true);
+			expect(responseModeAllowed({ responseModes: undefined }, 'query')).toBe(
+				true
+			);
 			expect(responseModeAllowed({ responseModes: ['query'] }, 'query')).toBe(
 				true
 			);
@@ -162,7 +169,9 @@ describe('client pure functions', () => {
 		});
 
 		it('a client with no secret expiry keeps authenticating indefinitely', () => {
-			expect(() => checkClientSecretExpiration({}, 'msg')).not.toThrow();
+			expect(() =>
+				checkClientSecretExpiration({ clientId: 'c' }, 'msg')
+			).not.toThrow();
 		});
 
 		it('refuses a client whose secret has expired', () => {
@@ -217,7 +226,7 @@ describe('client pure functions', () => {
 
 	describe('sector', () => {
 		it('returns the sector_identifier_uri host when set', () => {
-			const client = {
+			const client: SectorSource = {
 				subjectType: 'public',
 				sectorIdentifierUri: 'https://sector.example.com/uris.json',
 				responseTypes: ['code'],
@@ -228,24 +237,13 @@ describe('client pure functions', () => {
 		});
 
 		it('falls back to the first redirect_uri host for pairwise clients', () => {
-			const client = {
+			const client: SectorSource = {
 				subjectType: 'pairwise',
 				responseTypes: ['code'],
 				redirectUris: ['https://rp.example.com/cb'],
 				grantTypes: ['authorization_code']
 			};
 			expect(sectorIdentifier(client)).toBe('rp.example.com');
-		});
-
-		it('a client updated through the admin API is used with its new metadata on the next request', () => {
-			const client = {
-				subjectType: 'public',
-				sectorIdentifierUri: 'https://sector.example.com/uris.json',
-				responseTypes: ['code'],
-				redirectUris: ['https://rp.example.com/cb'],
-				grantTypes: ['authorization_code']
-			};
-			expect(sectorIdentifier(client)).toBe(sectorIdentifier(client));
 		});
 	});
 });

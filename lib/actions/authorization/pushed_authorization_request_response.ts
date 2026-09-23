@@ -50,7 +50,8 @@ export default async function pushedAuthorizationRequestResponse(
 	const requestObject = new PushedAuthorizationRequest({
 		request,
 		dpopJkt,
-		trusted: oidc.client.clientAuthMethod !== 'none' || !!oidc.trusted?.length
+		trusted:
+			oidc.client.tokenEndpointAuthMethod !== 'none' || !!oidc.trusted?.length
 	});
 
 	const id = await requestObject.save(ttl);

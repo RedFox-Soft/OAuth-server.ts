@@ -56,7 +56,7 @@ import {
 	requestBucketFor
 } from 'lib/admin/auth/bucketAddress.js';
 import checkBucket from './check_bucket.js';
-import { Client } from 'lib/models/client.js';
+import { Client, redirectUriAllowed } from 'lib/models/client.js';
 import {
 	dpopValidate,
 	setNonceHeader,
@@ -125,7 +125,7 @@ export async function isAllowRedirectUri(params, bucket?: RequestBucket) {
 	if (typeof redirect_uri !== 'string') {
 		throw new InvalidRedirectUri();
 	}
-	if (!client.redirectUriAllowed(redirect_uri)) {
+	if (!redirectUriAllowed(client, redirect_uri)) {
 		throw new InvalidRedirectUri();
 	}
 
@@ -296,7 +296,7 @@ export const par = new Elysia()
 			const oidc = withBody(oidcInc, body);
 
 			stripOutsideJarParams(oidc);
-			const client = oidc.client;
+			const client = oidc.authenticatedClient;
 
 			const request = await processRequestObject(authorizationRequest, oidc);
 			checkResponseMode(oidc);

@@ -2,7 +2,7 @@ import { describe, it, beforeAll, afterEach, expect, mock } from 'bun:test';
 
 import bootstrap, { agent, getHeader } from '../test_helper.js';
 import { eventBus } from 'lib/event_bus.js';
-import { Client } from 'lib/models/client.js';
+import { Client, toStored } from 'lib/models/client.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { RegistrationAccessToken } from 'lib/models/registration_access_token.js';
@@ -261,7 +261,7 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 			const token = await rat.save();
 			const client = await Client.find('client');
 			const res = await agent.reg({ clientId: 'client' }).put(
-				updateProperties(client.metadata(), {
+				updateProperties(toStored(client), {
 					redirect_uris: ['https://client.example.com/foobar/cb'],
 					client_id: 'client'
 				}),

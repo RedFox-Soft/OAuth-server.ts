@@ -23,7 +23,7 @@ import { ApplicationConfig } from 'lib/configs/application.js';
 import { ClientDefaults } from 'lib/configs/clientBase.js';
 import { PushedAuthorizationRequest } from 'lib/models/pushed_authorization_request.js';
 import { ISSUER } from 'lib/configs/env.js';
-import { Client } from 'lib/models/client.ts';
+import { Client, clientKeys } from 'lib/models/client.ts';
 
 /*
  * The lifetime a request object dictates, allowing for the second that may tick between this test
@@ -600,7 +600,7 @@ describe('Pushed Request Object', async () => {
 		beforeAll(async function () {
 			const client = await Client.find('client');
 			key = await importJWK(
-				client.symmetricKeyStore.selectForSign({ alg: 'HS256' })[0]
+				clientKeys(client).symmetric.selectForSign({ alg: 'HS256' })[0]
 			);
 		});
 		beforeEach(function () {

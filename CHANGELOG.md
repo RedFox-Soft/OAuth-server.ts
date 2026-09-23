@@ -9,8 +9,28 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+### Fixed
+
+- admin: editing a client in the console or through the agent's `client_update` no longer drops every
+  attribute the console does not display. A pairwise client stayed pairwise only until its first edit,
+  and a client authenticating with a private key could not be edited at all.
+
 ### Changed
 
+- client: the validated client has a type that matches it — the attributes a default always fills are
+  required, `client_name`, `contacts`, `default_acr_values` and `client_id_issued_at` are declared — and
+  the request context carries it typed (`oidc.client`, `oidc.authenticatedClient`).
+- client: a client is written the same way from every surface, through `registerClient`, and its sector
+  identifier document is checked there and only there. Resolving a stored client no longer retrieves
+  it, so a pairwise client stays usable while its sector host is down; the console, which stored
+  without the check, now refuses an edit the document does not cover. A document-described client
+  keeps the check on resolution.
+- client: a resolved client is frozen data — no methods, no prototype — and is used through functions
+  (`redirectUriAllowed(client, uri)`, `clientMetadata(client)`, …). `Client` is an object holding
+  `find`/`tryFind`; back-channel logout and CIBA ping moved to `lib/shared/client_notifications.ts`.
+- client: a client's key material is derived beside it by `clientKeys(client)` instead of hanging off
+  the object, and its key set no longer writes certificate thumbprints onto the client's own keys. The
+  `clientAuthMethod` / `clientAuthSigningAlg` aliases are gone; read the registered attribute names.
 - client: each registration attribute's validation rules are declared once, in
   `lib/consts/client_attributes.ts`, replacing five parallel lists that nothing kept in step. No
   behaviour change, verified against 33,159 registrations; three rules that could never fire, and one

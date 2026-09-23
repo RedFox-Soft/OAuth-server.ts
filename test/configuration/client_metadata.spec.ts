@@ -14,10 +14,15 @@ import {
 import { ClientDefaults } from 'lib/configs/clientBase.js';
 import sectorIdentifier from '../../lib/helpers/sector_identifier.ts';
 import keys, { stripPrivateJWKFields } from '../keys.js';
-import addClient from '../../lib/helpers/add_client.ts';
+
 import { ATTRIBUTES, BASE_ATTRIBUTES } from 'lib/consts/client_attributes.js';
 import { TestAdapter } from '../models.js';
 import getConfig from '../default.config.js';
+import {
+	registerClient,
+	responseModeAllowed,
+	toStored
+} from 'lib/models/client.js';
 
 const sigKey = stripPrivateJWKFields(keys[0]);
 const privateKey = keys[0];
@@ -65,12 +70,15 @@ describe('Client metadata validation', () => {
 		}
 		reloadConfiguration();
 
-		return addClient({
-			clientId: 'client',
-			clientSecret: 'secret',
-			redirectUris: ['https://client.example.com/cb'],
-			...metadata
-		});
+		return registerClient(
+			{
+				clientId: 'client',
+				clientSecret: 'secret',
+				redirectUris: ['https://client.example.com/cb'],
+				...metadata
+			},
+			{ store: false }
+		);
 	}
 
 	const mustBeString = (
@@ -213,9 +221,9 @@ describe('Client metadata validation', () => {
 		it(msg, () =>
 			register(metadata, configuration).then((client) => {
 				if (value === undefined) {
-					expect(client.metadata()).not.toHaveProperty(prop);
+					expect(toStored(client)).not.toHaveProperty(prop);
 				} else {
-					expect(client.metadata()).toHaveProperty(prop, value);
+					expect(toStored(client)).toHaveProperty(prop, value);
 				}
 
 				if (additionalAssertion) {
@@ -261,7 +269,7 @@ describe('Client metadata validation', () => {
 		metadata,
 		configuration,
 		assertion = (client) => {
-			expect(client.metadata()[prop]).toEqual(value);
+			expect(toStored(client)[prop]).toEqual(value);
 		}
 	) => {
 		let msg = util.format('passes %j', value);
@@ -437,7 +445,7 @@ describe('Client metadata validation', () => {
 			ClientDefaults['requestObject.require'] = true;
 			try {
 				const client = await register(undefined, configuration());
-				expect(client.metadata()).toHaveProperty(
+				expect(toStored(client)).toHaveProperty(
 					'require_signed_request_object',
 					true
 				);
@@ -784,9 +792,9 @@ describe('Client metadata validation', () => {
 
 	describe('responseModes', function () {
 		defaultsTo('responseModes', undefined, undefined, undefined, (client) => {
-			expect(client.responseModeAllowed('query')).toBe(true);
-			expect(client.responseModeAllowed('fragment')).toBe(true);
-			expect(client.responseModeAllowed('form_post')).toBe(true);
+			expect(responseModeAllowed(client, 'query')).toBe(true);
+			expect(responseModeAllowed(client, 'fragment')).toBe(true);
+			expect(responseModeAllowed(client, 'form_post')).toBe(true);
 		});
 
 		// responseModes structure (an array of the response_mode enum) is enforced by
@@ -807,8 +815,8 @@ describe('Client metadata validation', () => {
 		// ClientSchema; responseModeAllowed still treats an absent list as
 		// allowing it (the `!== false` rule), exercised by the defaultsTo above.
 		allows('responseModes', ['query'], undefined, undefined, (client) => {
-			expect(client.responseModeAllowed('query')).toBe(true);
-			expect(client.responseModeAllowed('form_post')).toBe(false);
+			expect(responseModeAllowed(client, 'query')).toBe(true);
+			expect(responseModeAllowed(client, 'form_post')).toBe(false);
 		});
 
 		allows('responseModes', ['jwt'], undefined, {
@@ -2203,7 +2211,7 @@ describe('Client metadata validation', () => {
 				undefined,
 				configuration,
 				(client) => {
-					expect(client.metadata()['tls_client_auth_subject_dn']).toEqual(
+					expect(toStored(client)['tls_client_auth_subject_dn']).toEqual(
 						undefined
 					);
 				}
@@ -2231,7 +2239,7 @@ describe('Client metadata validation', () => {
 				undefined,
 				configuration,
 				(client) => {
-					expect(client.metadata()['tls_client_auth_san_dns']).toEqual(
+					expect(toStored(client)['tls_client_auth_san_dns']).toEqual(
 						undefined
 					);
 				}
@@ -2259,7 +2267,7 @@ describe('Client metadata validation', () => {
 				undefined,
 				configuration,
 				(client) => {
-					expect(client.metadata()['tls_client_auth_san_uri']).toEqual(
+					expect(toStored(client)['tls_client_auth_san_uri']).toEqual(
 						undefined
 					);
 				}
@@ -2287,9 +2295,7 @@ describe('Client metadata validation', () => {
 				undefined,
 				configuration,
 				(client) => {
-					expect(client.metadata()['tls_client_auth_san_ip']).toEqual(
-						undefined
-					);
+					expect(toStored(client)['tls_client_auth_san_ip']).toEqual(undefined);
 				}
 			);
 		});
@@ -2315,7 +2321,7 @@ describe('Client metadata validation', () => {
 				undefined,
 				configuration,
 				(client) => {
-					expect(client.metadata()['tls_client_auth_san_email']).toEqual(
+					expect(toStored(client)['tls_client_auth_san_email']).toEqual(
 						undefined
 					);
 				}
@@ -2437,7 +2443,7 @@ describe('Client metadata validation', () => {
 		it('camelCase tokenEndpointAuthMethod drives the token_endpoint_auth_method default', async () => {
 			ClientDefaults.tokenEndpointAuthMethod = 'client_secret_post';
 			const client = await register();
-			expect(client.metadata()).toHaveProperty(
+			expect(toStored(client)).toHaveProperty(
 				'token_endpoint_auth_method',
 				'client_secret_post'
 			);
@@ -2446,7 +2452,7 @@ describe('Client metadata validation', () => {
 		it('camelCase idTokenSignedResponseAlg drives the id_token_signed_response_alg default', async () => {
 			ClientDefaults.idTokenSignedResponseAlg = 'ES256';
 			const client = await register();
-			expect(client.metadata()).toHaveProperty(
+			expect(toStored(client)).toHaveProperty(
 				'id_token_signed_response_alg',
 				'ES256'
 			);
@@ -2454,11 +2460,11 @@ describe('Client metadata validation', () => {
 
 		it('ships RS256 / client_secret_basic when nothing is overridden', async () => {
 			const client = await register();
-			expect(client.metadata()).toHaveProperty(
+			expect(toStored(client)).toHaveProperty(
 				'id_token_signed_response_alg',
 				'RS256'
 			);
-			expect(client.metadata()).toHaveProperty(
+			expect(toStored(client)).toHaveProperty(
 				'token_endpoint_auth_method',
 				'client_secret_basic'
 			);
@@ -2497,7 +2503,7 @@ describe('Client metadata validation', () => {
 					mtls
 				);
 
-				expect(client.metadata()).not.toHaveProperty(prop);
+				expect(toStored(client)).not.toHaveProperty(prop);
 			});
 		});
 
@@ -2510,10 +2516,7 @@ describe('Client metadata validation', () => {
 				mtls
 			);
 
-			expect(client.metadata()).toHaveProperty(
-				'tls_client_auth_san_dns',
-				'foo'
-			);
+			expect(toStored(client)).toHaveProperty('tls_client_auth_san_dns', 'foo');
 		});
 
 		it('de-duplicates repeated contacts', async () => {
@@ -2521,7 +2524,7 @@ describe('Client metadata validation', () => {
 				contacts: ['dev@example.com', 'dev@example.com', 'ops@example.com']
 			});
 
-			expect(client.metadata()).toHaveProperty('contacts', [
+			expect(toStored(client)).toHaveProperty('contacts', [
 				'dev@example.com',
 				'ops@example.com'
 			]);
@@ -2533,10 +2536,7 @@ describe('Client metadata validation', () => {
 				{ acrValues: { password: '1', multi_factor: '2', federated: '3' } }
 			);
 
-			expect(client.metadata()).toHaveProperty('default_acr_values', [
-				'1',
-				'2'
-			]);
+			expect(toStored(client)).toHaveProperty('default_acr_values', ['1', '2']);
 		});
 
 		it('de-duplicates repeated post_logout_redirect_uris', async () => {
@@ -2550,7 +2550,7 @@ describe('Client metadata validation', () => {
 				{ 'rpInitiatedLogout.enabled': true }
 			);
 
-			expect(client.metadata()).toHaveProperty('post_logout_redirect_uris', [
+			expect(toStored(client)).toHaveProperty('post_logout_redirect_uris', [
 				'https://client.example.com/logout'
 			]);
 		});
@@ -2558,10 +2558,7 @@ describe('Client metadata validation', () => {
 		it('collapses repeated scope values', async () => {
 			const client = await register({ scope: 'openid openid offline_access' });
 
-			expect(client.metadata()).toHaveProperty(
-				'scope',
-				'openid offline_access'
-			);
+			expect(toStored(client)).toHaveProperty('scope', 'openid offline_access');
 		});
 
 		/*
@@ -2695,7 +2692,7 @@ describe('Client metadata validation', () => {
 				clientAuthMethods: ['client_secret_basic', 'client_secret_jwt']
 			});
 
-			expect(client.metadata()).toHaveProperty(
+			expect(toStored(client)).toHaveProperty(
 				'token_endpoint_auth_method',
 				'client_secret_jwt'
 			);

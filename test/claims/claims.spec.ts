@@ -14,7 +14,8 @@ import bootstrap, {
 	agent,
 	jsonToFormUrlEncoded,
 	setSeedClaims,
-	type Setup
+	type Setup,
+	changeClient
 } from '../test_helper.js';
 import { fullProfileClaims } from '../models.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
@@ -104,14 +105,16 @@ expire.setDate(expire.getDate() + 1);
 		});
 
 		describe('with acr_values on the client', () => {
+			let restore: () => Promise<void>;
+
 			beforeEach(async function () {
-				const client = await Client.find('client');
-				client.defaultAcrValues = ['1', '2'];
+				restore = await changeClient('client', {
+					default_acr_values: ['1', '2']
+				});
 			});
 
 			afterEach(async function () {
-				const client = await Client.find('client');
-				delete client.defaultAcrValues;
+				await restore();
 			});
 
 			it('carries the authentication context in the ID token when the client requests one by default', async function () {

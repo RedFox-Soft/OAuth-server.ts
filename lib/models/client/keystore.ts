@@ -1,21 +1,13 @@
-import crypto from 'node:crypto';
 import { STATUS_CODES } from 'node:http';
 
 import { Type as t } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
 
 import KeyStore from '../../helpers/keystore.ts';
-import * as base64url from '../../helpers/base64url.ts';
 import epochTime from '../../helpers/epoch_time.ts';
 import certificateThumbprint from '../../helpers/certificate_thumbprint.ts';
 import { InvalidClientMetadata } from '../../helpers/errors.ts';
 import { isPlainObject } from '../../helpers/_/object.js';
-import {
-	clientAuthSigningAlgValues,
-	requestObjectEncryptionAlgValues,
-	requestObjectEncryptionEncValues,
-	requestObjectSigningAlgValues
-} from '../../configs/jwaAlgorithms.js';
 import { ECCurves, OKPCurves } from '../../configs/jwaConsts.js';
 
 // NOTE: client JWKS validation here is intentionally the mirror image of the
@@ -99,36 +91,30 @@ export function validateJWK(jwk) {
 	return jwk;
 }
 
-function deriveEncryptionKey(secret, length) {
-	const digest =
-		length <= 32
-			? 'sha256'
-			: length <= 48
-				? 'sha384'
-				: length <= 64
-					? 'sha512'
-					: false;
-	if (!digest) {
-		throw new Error('unsupported symmetric encryption key derivation');
-	}
-	return crypto.hash(digest, secret, 'buffer').subarray(0, length);
-}
-
 export class ClientKeyStore extends KeyStore {
-	#client;
+	readonly jwksUri: string | undefined;
+	readonly #thumbprintCertificates: boolean;
+	// Until when the fetched key set is fresh, and the fetch in flight — shared by concurrent requests.
+	freshUntil?: number;
+	lock?: Promise<void>;
 
-	constructor(clientInstance) {
+	/*
+	 * Given the values it needs rather than the client. It used to hold the client and read them off
+	 * it, which made the key set a property of an object it also pointed back to.
+	 */
+	constructor({
+		keys = [],
+		jwksUri,
+		thumbprintCertificates = false
+	}: {
+		keys?: Array<Record<string, unknown>>;
+		jwksUri?: string;
+		thumbprintCertificates?: boolean;
+	}) {
 		super();
-
-		this.#client = clientInstance;
-	}
-
-	get client() {
-		return this.#client;
-	}
-
-	get jwksUri() {
-		return this.client?.jwksUri;
+		this.jwksUri = jwksUri;
+		this.#thumbprintCertificates = thumbprintCertificates;
+		keys.forEach((key) => this.add(key));
 	}
 
 	fresh() {
@@ -141,13 +127,18 @@ export class ClientKeyStore extends KeyStore {
 		return !this.fresh();
 	}
 
+	/*
+	 * Annotates a copy. The key it is handed may be a member of the client's own key set, which is
+	 * shared by every request using that client and must not change under them.
+	 */
 	add(key) {
 		if (
-			this.client.clientAuthMethod === 'self_signed_tls_client_auth' &&
+			this.#thumbprintCertificates &&
 			Array.isArray(key.x5c) &&
 			key.x5c.length
 		) {
-			key['x5t#S256'] = certificateThumbprint(key.x5c[0]);
+			super.add({ ...key, 'x5t#S256': certificateThumbprint(key.x5c[0]) });
+			return;
 		}
 		super.add(key);
 	}
@@ -215,110 +206,5 @@ export class ClientKeyStore extends KeyStore {
 		}
 
 		await this.lock;
-	}
-}
-
-export function buildAsymmetricKeyStore(client) {
-	Object.defineProperty(client, 'asymmetricKeyStore', {
-		configurable: true,
-		get() {
-			const keystore = new ClientKeyStore(this);
-			Object.defineProperty(this, 'asymmetricKeyStore', {
-				configurable: false,
-				value: keystore
-			});
-
-			return this.asymmetricKeyStore;
-		}
-	});
-}
-
-export function buildSymmetricKeyStore(client) {
-	Object.defineProperty(client, 'symmetricKeyStore', {
-		configurable: false,
-		value: new KeyStore()
-	});
-
-	const algs = new Set();
-
-	if (client.clientSecret) {
-		if (client.clientAuthMethod === 'client_secret_jwt') {
-			if (client.clientAuthSigningAlg) {
-				algs.add(client.clientAuthSigningAlg);
-			} else {
-				clientAuthSigningAlgValues.forEach(Set.prototype.add.bind(algs));
-			}
-		}
-
-		[
-			'introspectionSignedResponseAlg',
-			'userinfoSignedResponseAlg',
-			'authorizationSignedResponseAlg',
-			'idTokenSignedResponseAlg',
-			'requestObject.signingAlg'
-		].forEach((prop) => {
-			algs.add(client[prop]);
-		});
-
-		if (!client['requestObject.signingAlg']) {
-			requestObjectSigningAlgValues.forEach(Set.prototype.add.bind(algs));
-		}
-
-		requestObjectEncryptionAlgValues.forEach(Set.prototype.add.bind(algs));
-
-		if (requestObjectEncryptionAlgValues.includes('dir')) {
-			requestObjectEncryptionEncValues.forEach(Set.prototype.add.bind(algs));
-		}
-
-		[
-			'idTokenEncryptedResponse',
-			'userinfoEncryptedResponse',
-			'introspectionEncryptedResponse',
-			'authorizationEncryptedResponse'
-		].forEach((prop) => {
-			algs.add(client[`${prop}Alg`]);
-			if (client[`${prop}Alg`] === 'dir') {
-				algs.add(client[`${prop}Enc`]);
-			}
-		});
-
-		algs.delete(undefined);
-
-		for (const alg of algs) {
-			if (!(
-				alg.startsWith('HS') ||
-				/^A(\d{3})(?:GCM)?KW$/.test(alg) ||
-				/^A(\d{3})(?:GCM|CBC-HS(\d{3}))$/.test(alg)
-			)) {
-				algs.delete(alg);
-			}
-		}
-
-		for (const alg of algs) {
-			if (alg.startsWith('HS')) {
-				client.symmetricKeyStore.add({
-					alg,
-					use: 'sig',
-					kty: 'oct',
-					k: base64url.encode(client.clientSecret)
-				});
-			} else if (/^A(\d{3})(?:GCM)?KW$/.test(alg)) {
-				const len = parseInt(RegExp.$1, 10) / 8;
-				client.symmetricKeyStore.add({
-					alg,
-					use: 'enc',
-					kty: 'oct',
-					k: deriveEncryptionKey(client.clientSecret, len).toString('base64url')
-				});
-			} else if (/^A(\d{3})(?:GCM|CBC-HS(\d{3}))$/.test(alg)) {
-				const len = parseInt(RegExp.$2 || RegExp.$1, 10) / 8;
-				client.symmetricKeyStore.add({
-					alg,
-					use: 'enc',
-					kty: 'oct',
-					k: deriveEncryptionKey(client.clientSecret, len).toString('base64url')
-				});
-			}
-		}
 	}
 }

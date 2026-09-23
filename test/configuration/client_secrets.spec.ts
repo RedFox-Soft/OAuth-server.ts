@@ -1,7 +1,7 @@
 import { describe, it, beforeAll, expect } from 'bun:test';
 
 import bootstrap from '../test_helper.js';
-import { Client } from 'lib/models/client.js';
+import { needsSecret } from 'lib/models/client.js';
 
 /**
  * @proves A client registered for a secret-based authentication method cannot exist without a
@@ -14,7 +14,7 @@ describe('Client#add', () => {
 
 	it('client secret is mandatory if client auth needs it', () => {
 		expect(
-			Client.needsSecret({
+			needsSecret({
 				token_endpoint_auth_method: 'client_secret_basic'
 			})
 		).toBe(true);

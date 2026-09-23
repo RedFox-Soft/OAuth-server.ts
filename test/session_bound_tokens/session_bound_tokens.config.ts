@@ -1,4 +1,5 @@
 import getConfig from '../default.config.js';
+import { grantTypeAllowed } from 'lib/models/client.js';
 
 const config = getConfig();
 
@@ -7,7 +8,7 @@ export const ApplicationConfig = {
 };
 
 export const addons = {
-	issueRefreshToken: (ctx, client) => client.grantTypeAllowed('refresh_token')
+	issueRefreshToken: (ctx, client) => grantTypeAllowed(client, 'refresh_token')
 };
 
 export const clients = [

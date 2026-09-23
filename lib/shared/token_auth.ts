@@ -8,7 +8,12 @@ import {
 	certificateAuthorized,
 	certificateSubjectMatches
 } from '../addon/index.js';
-import { Client } from 'lib/models/client.js';
+import {
+	Client,
+	clientKeys,
+	checkClientSecretExpiration,
+	compareClientSecret
+} from 'lib/models/client.js';
 import { clientAuthSigningAlgValues } from 'lib/configs/jwaAlgorithms.js';
 import { type OIDCContext } from 'lib/helpers/oidc_context.js';
 import { type authParamsType } from 'lib/plugins/auth.js';
@@ -150,7 +155,10 @@ export async function tokenAuth(
 
 	oidc.entity('Client', client);
 
-	const { clientAuthMethod, clientAuthSigningAlg } = client;
+	const {
+		tokenEndpointAuthMethod: clientAuthMethod,
+		tokenEndpointAuthSigningAlg: clientAuthSigningAlg
+	} = client;
 	if (!auth.methods.includes(clientAuthMethod)) {
 		throw new InvalidClientAuth(
 			'the provided authentication mechanism does not match the registered client authentication method'
@@ -163,11 +171,12 @@ export async function tokenAuth(
 
 		case 'client_secret_basic':
 		case 'client_secret_post': {
-			client.checkClientSecretExpiration(
+			checkClientSecretExpiration(
+				client,
 				'could not authenticate the client - its client secret is expired'
 			);
 			const actual = params.client_secret || auth.clientSecret;
-			const matches = await client.compareClientSecret(actual);
+			const matches = await compareClientSecret(client, actual);
 			if (!matches) {
 				throw new InvalidClientAuth('invalid secret provided');
 			}
@@ -176,12 +185,13 @@ export async function tokenAuth(
 		}
 
 		case 'client_secret_jwt':
-			client.checkClientSecretExpiration(
+			checkClientSecretExpiration(
+				client,
 				'could not authenticate the client - its client secret used for the client_assertion is expired'
 			);
 			await tokenJwtAuth(
 				oidc,
-				client.symmetricKeyStore,
+				clientKeys(client).symmetric,
 				clientAuthSigningAlg
 					? [clientAuthSigningAlg]
 					: clientAuthSigningAlgValues.filter((alg) => alg.startsWith('HS'))
@@ -192,7 +202,7 @@ export async function tokenAuth(
 		case 'private_key_jwt':
 			await tokenJwtAuth(
 				oidc,
-				client.asymmetricKeyStore,
+				clientKeys(client).asymmetric,
 				clientAuthSigningAlg
 					? [clientAuthSigningAlg]
 					: clientAuthSigningAlgValues.filter((alg) => !alg.startsWith('HS'))
@@ -210,13 +220,13 @@ export async function tokenAuth(
 				throw new InvalidClientAuth('client certificate was not verified');
 			}
 
-			for (const [prop, key] of Object.entries({
-				tlsClientAuthSubjectDn: 'tls_client_auth_subject_dn',
-				tlsClientAuthSanDns: 'tls_client_auth_san_dns',
-				tlsClientAuthSanIp: 'tls_client_auth_san_ip',
-				tlsClientAuthSanEmail: 'tls_client_auth_san_email',
-				tlsClientAuthSanUri: 'tls_client_auth_san_uri'
-			})) {
+			for (const [prop, key] of [
+				['tlsClientAuthSubjectDn', 'tls_client_auth_subject_dn'],
+				['tlsClientAuthSanDns', 'tls_client_auth_san_dns'],
+				['tlsClientAuthSanIp', 'tls_client_auth_san_ip'],
+				['tlsClientAuthSanEmail', 'tls_client_auth_san_email'],
+				['tlsClientAuthSanUri', 'tls_client_auth_san_uri']
+			] as const) {
 				const value = client[prop];
 				if (value) {
 					if (!certificateSubjectMatches(oidc, key, value)) {
@@ -236,9 +246,9 @@ export async function tokenAuth(
 				throw new InvalidClientAuth('client certificate was not provided');
 			}
 
-			await client.asymmetricKeyStore.refresh();
+			await clientKeys(client).asymmetric.refresh();
 			const expected = certificateThumbprint(cert);
-			const match = [...client.asymmetricKeyStore].find(
+			const match = [...clientKeys(client).asymmetric].find(
 				({ 'x5t#S256': actual }) => actual === expected
 			);
 

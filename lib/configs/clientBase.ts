@@ -1,4 +1,4 @@
-import { type ClientSchemaType } from './clientSchema.js';
+import { type ClientData } from '../models/client/types.ts';
 
 /*
  * ClientDefaults
@@ -9,7 +9,7 @@ import { type ClientSchemaType } from './clientSchema.js';
  * ClientSchema). Consumers that work in wire-format (snake_case) metadata names translate
  * at their own seam — see lib/models/client/schema.ts.
  */
-export const ClientDefaults: Omit<ClientSchemaType, 'clientId'> = {
+export const ClientDefaults: Omit<ClientData, 'clientId'> = {
 	redirectUris: [],
 	applicationType: 'web',
 	responseTypes: ['code'],

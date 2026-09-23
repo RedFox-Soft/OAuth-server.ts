@@ -3,6 +3,7 @@ import { Client } from 'lib/models/client.js';
 import { Session } from 'lib/models/session.js';
 import { eventBus } from '../event_bus.js';
 import revoke from '../helpers/revoke.ts';
+import { clientNotifications } from './client_notifications.ts';
 
 /*
  * Notifies the given clients that a session has ended, for those that asked to be told.
@@ -24,7 +25,7 @@ export async function backchannelLogoutFor(
 			if (client.backchannelLogoutUri) {
 				const { accountId } = session.payload;
 				back.push(
-					client.backchannelLogout(accountId, sid).then(
+					clientNotifications.logout(client, accountId, sid).then(
 						() => {
 							eventBus.emit('backchannel.success', ctx, client, accountId, sid);
 						},

@@ -217,7 +217,7 @@ export const handler = async function authorizationCodeHandler(oidc, dPoP) {
 			rar: code.payload.rar
 		});
 
-		if (oidc.client.clientAuthMethod === 'none') {
+		if (oidc.client.tokenEndpointAuthMethod === 'none') {
 			if (at.payload.jkt) {
 				rt.payload.jkt = at.payload.jkt;
 			}

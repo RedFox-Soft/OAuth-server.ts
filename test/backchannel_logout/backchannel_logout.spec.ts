@@ -22,6 +22,8 @@ import {
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { eventBus } from 'lib/event_bus.js';
 import { Client } from 'lib/models/client.js';
+import { adapter } from 'lib/adapters/index.js';
+import { clientNotifications } from 'lib/shared/client_notifications.ts';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
 // Decode a JWS compact serialization sent as `logout_token=<jwt>` in the POST body.
@@ -82,7 +84,7 @@ describe('Back-Channel Logout 1.0', () => {
 				})
 				.reply(200);
 
-			return client.backchannelLogout('subject', 'foo');
+			return clientNotifications.logout(client, 'subject', 'foo');
 		});
 
 		it('omits sid when its not required', async function () {
@@ -108,7 +110,7 @@ describe('Back-Channel Logout 1.0', () => {
 				})
 				.reply(200);
 
-			return client.backchannelLogout('subject', 'foo');
+			return clientNotifications.logout(client, 'subject', 'foo');
 		});
 
 		it('one unreachable client does not abort logout for the others', async function () {
@@ -121,10 +123,13 @@ describe('Back-Channel Logout 1.0', () => {
 				})
 				.reply(500);
 
-			return assert.rejects(client.backchannelLogout('subject', 'foo'), {
-				message:
-					'expected 200 OK from https://no-sid.example.com/backchannel_logout, got: 500 Internal Server Error'
-			});
+			return assert.rejects(
+				clientNotifications.logout(client, 'subject', 'foo'),
+				{
+					message:
+						'expected 200 OK from https://no-sid.example.com/backchannel_logout, got: 500 Internal Server Error'
+				}
+			);
 		});
 	});
 
@@ -240,11 +245,8 @@ describe('Back-Channel Logout 1.0', () => {
 			};
 			const client = await Client.find('client');
 			const client2 = await Client.find('second-client');
-			const client3 = await Client.find('no-sid');
 
-			spyOn(client, 'backchannelLogout');
-			spyOn(client2, 'backchannelLogout');
-			spyOn(client3, 'backchannelLogout');
+			const logout = spyOn(clientNotifications, 'logout');
 
 			// A global logout POSTs a logout token to every visited client. Mock all three origins
 			// so no real outbound fetch escapes: `client` succeeds, the others fail (500) to drive
@@ -274,14 +276,12 @@ describe('Back-Channel Logout 1.0', () => {
 
 			{
 				const { sid } = session.authorizations.client;
-				expect(client.backchannelLogout).toHaveBeenCalled();
-				expect(client.backchannelLogout).toHaveBeenCalledWith(accountId, sid);
+				expect(logout).toHaveBeenCalledWith(client, accountId, sid);
 				expect(successSpy).toHaveBeenCalledTimes(1);
 			}
 			{
 				const { sid } = session.authorizations['second-client'];
-				expect(client2.backchannelLogout).toHaveBeenCalled();
-				expect(client2.backchannelLogout).toHaveBeenCalledWith(accountId, sid);
+				expect(logout).toHaveBeenCalledWith(client2, accountId, sid);
 				expect(errorSpy).toHaveBeenCalledTimes(1);
 			}
 		});
@@ -295,10 +295,8 @@ describe('Back-Channel Logout 1.0', () => {
 				postLogoutRedirectUri: 'https://rp.example.com/'
 			};
 			const client = await Client.find('client');
-			const client2 = await Client.find('second-client');
 
-			spyOn(client, 'backchannelLogout');
-			spyOn(client2, 'backchannelLogout');
+			const logout = spyOn(clientNotifications, 'logout');
 
 			const { accountId } = session;
 			const { sid } = session.authorizations.client;
@@ -313,9 +311,10 @@ describe('Back-Channel Logout 1.0', () => {
 			);
 			expect(response.status).toBe(303);
 
-			expect(client.backchannelLogout).toHaveBeenCalled();
-			expect(client.backchannelLogout).toHaveBeenCalledWith(accountId, sid);
-			expect(client2.backchannelLogout).not.toHaveBeenCalled();
+			expect(logout).toHaveBeenCalledWith(client, accountId, sid);
+			expect(logout.mock.calls.map(([called]) => called.clientId)).toEqual([
+				'client'
+			]);
 		});
 
 		// SKIPPED: same source bug as above (end_session.ts session.authorizations/accountId).
@@ -325,13 +324,13 @@ describe('Back-Channel Logout 1.0', () => {
 				clientId: 'client',
 				postLogoutRedirectUri: 'https://rp.example.com/'
 			};
-			const client = await Client.find('client');
-			const client2 = await Client.find('second-client');
-			const client3 = await Client.find('no-sid');
-			delete client.backchannelLogoutUri;
+			// The state a deployment reaches when the client's registration drops its logout URI.
+			const registered = await adapter('Client').find('client');
+			const withoutUri = { ...registered };
+			delete withoutUri.backchannel_logout_uri;
+			await adapter('Client').upsert('client', withoutUri);
 
-			spyOn(client, 'backchannelLogout');
-			spyOn(client2, 'backchannelLogout');
+			const logout = spyOn(clientNotifications, 'logout');
 
 			// `client` no longer advertises a URI, so only the other visited clients are POSTed to;
 			// mock both so nothing escapes to the network.
@@ -348,8 +347,10 @@ describe('Back-Channel Logout 1.0', () => {
 			);
 			expect(response.status).toBe(303);
 
-			expect(client.backchannelLogout).not.toHaveBeenCalled();
-			expect(client2.backchannelLogout).toHaveBeenCalled();
+			await adapter('Client').upsert('client', registered);
+			const notified = logout.mock.calls.map(([called]) => called.clientId);
+			expect(notified).not.toContain('client');
+			expect(notified).toContain('second-client');
 		});
 	});
 });

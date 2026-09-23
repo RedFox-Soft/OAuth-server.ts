@@ -114,7 +114,7 @@ function argumentCount(source: string, open: number): number {
 /*
  * The receiver of an `.upsert(` call, in the three shapes this codebase uses: a literal
  * `adapter('Area')`, a module-local no-argument helper wrapping one, or a dotted property chain
- * (`Client.adapter`, `this.adapter`).
+ * (`this.adapter`).
  *
  * Enumerating the shapes rather than matching "anything up to `.upsert(`" is what keeps the leading
  * `await` — and, in one file, a preceding comment that happened to end in a full stop — out of the
@@ -161,8 +161,6 @@ function upsertCallSites(): { sites: CallSite[]; unresolved: string[] } {
 				sites.push({ file: shown, area: literal[1], passesTtl });
 			} else if (viaHelper !== undefined) {
 				sites.push({ file: shown, area: viaHelper, passesTtl });
-			} else if (receiver === 'Client.adapter') {
-				sites.push({ file: shown, area: 'Client', passesTtl });
 			} else if (receiver === 'this.adapter') {
 				/* The generic model path, checked on its own below: its area is whatever model is
 				 * saving, so it cannot be resolved here and must hold for every reaped area at once. */

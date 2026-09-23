@@ -1,28 +1,29 @@
 import { LOOPBACKS } from '../../consts/client_attributes.js';
-import { type ClientSchemaType } from '../../configs/clientSchema.ts';
+import { type Client } from './types.ts';
 
-// Pure allowance predicates replacing the former Client instance methods.
-// Each takes the validated plain client object first. Behaviour must match the
-// former methods exactly (FR-009), including responseModeAllowed's
-// "absent list ⇒ allowed" rule and postLogoutRedirectUriAllowed's URL-normalised
-// comparison.
+// Allowance predicates over a validated client. Each declares only the attributes it reads, so a
+// caller can see what a decision depends on. responseModeAllowed keeps its "absent list ⇒ allowed"
+// rule and postLogoutRedirectUriAllowed its URL-normalised comparison.
 
 export function responseTypeAllowed(
-	client: ClientSchemaType,
+	client: Pick<Client, 'responseTypes'>,
 	type: string
 ): boolean {
-	return client.responseTypes.includes(type);
+	return client.responseTypes.some((registered) => registered === type);
 }
 
 export function responseModeAllowed(
-	client: ClientSchemaType,
+	client: Pick<Client, 'responseModes'>,
 	responseMode: string
 ): boolean {
-	return client.responseModes?.includes(responseMode) !== false;
+	return (
+		client.responseModes?.some((registered) => registered === responseMode) !==
+		false
+	);
 }
 
 export function grantTypeAllowed(
-	client: ClientSchemaType,
+	client: Pick<Client, 'grantTypes'>,
 	type: string
 ): boolean {
 	return client.grantTypes.includes(type);
@@ -54,7 +55,8 @@ export function grantTypeAllowed(
  * here, which is the same trade RFC 8252 §8.10 makes.
  */
 export function redirectUriAllowed(
-	client: ClientSchemaType,
+	client: Pick<Client, 'redirectUris'> &
+		Partial<Pick<Client, 'applicationType'>>,
 	value: string
 ): boolean {
 	if (client.redirectUris.includes(value)) {
@@ -87,16 +89,22 @@ export function redirectUriAllowed(
 }
 
 export function postLogoutRedirectUriAllowed(
-	client: ClientSchemaType,
+	client: Pick<Client, 'postLogoutRedirectUris'>,
 	value: string
 ): boolean {
 	const parsed = URL.parse(value);
 	if (!parsed) return false;
-	return !!client.postLogoutRedirectUris.find(
+	return !!client.postLogoutRedirectUris?.find(
 		(allowed) => URL.parse(allowed)?.href === parsed.href
 	);
 }
 
-export function includeSid(client: ClientSchemaType): boolean {
+// Read for its truthiness: undefined when the client registered no logout URI, as it always was.
+export function includeSid(
+	client: Pick<
+		Client,
+		'backchannelLogoutUri' | 'backchannelLogoutSessionRequired'
+	>
+): string | boolean | undefined {
 	return client.backchannelLogoutUri && client.backchannelLogoutSessionRequired;
 }

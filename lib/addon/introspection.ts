@@ -11,7 +11,7 @@ export async function introspectionAllowedPolicy(ctx, client, token) {
 	// true — meaning a public client was refused introspection of its own token. Found by the first
 	// test to introspect as a `none`-auth client.
 	if (
-		client.clientAuthMethod === 'none' &&
+		client.tokenEndpointAuthMethod === 'none' &&
 		token.payload.clientId !== ctx.oidc.client.clientId
 	) {
 		return false;

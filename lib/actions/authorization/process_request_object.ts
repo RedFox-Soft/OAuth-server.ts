@@ -1,5 +1,6 @@
 import * as JWT from '../../helpers/jwt.ts';
 import { keystore } from 'lib/configs/keystore.js';
+import { clientKeys, checkClientSecretExpiration } from 'lib/models/client.js';
 import { assertJwtClaimsAndHeader } from '../../addon/index.js';
 import {
 	InvalidRequest,
@@ -73,11 +74,15 @@ export default async function processRequestObject(
 
 			let decrypted;
 			if (/^(A|dir$)/.test(header.alg)) {
-				client.checkClientSecretExpiration(
+				checkClientSecretExpiration(
+					client,
 					'could not decrypt the Request Object - the client secret used for its encryption is expired',
 					'invalid_request_object'
 				);
-				decrypted = await JWT.decrypt(params.request, client.symmetricKeyStore);
+				decrypted = await JWT.decrypt(
+					params.request,
+					clientKeys(client).symmetric
+				);
 				trusted = true;
 			} else {
 				decrypted = await JWT.decrypt(params.request, keystore);
@@ -212,13 +217,14 @@ export default async function processRequestObject(
 	} else {
 		try {
 			if (alg.startsWith('HS')) {
-				client.checkClientSecretExpiration(
+				checkClientSecretExpiration(
+					client,
 					'could not validate the Request Object - the client secret used for its signature is expired',
 					'invalid_request_object'
 				);
-				await JWT.verify(params.request, client.symmetricKeyStore, opts);
+				await JWT.verify(params.request, clientKeys(client).symmetric, opts);
 			} else {
-				await JWT.verify(params.request, client.asymmetricKeyStore, opts);
+				await JWT.verify(params.request, clientKeys(client).asymmetric, opts);
 			}
 			trusted = true;
 		} catch (err) {

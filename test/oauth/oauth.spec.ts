@@ -15,11 +15,12 @@ import snakeCase from 'lodash/snakeCase.js';
 import bootstrap, {
 	agent,
 	jsonToFormUrlEncoded,
-	type Setup
+	type Setup,
+	changeClient
 } from '../test_helper.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { eventBus } from 'lib/event_bus.js';
-import { Client } from 'lib/models/client.js';
+import { configuration } from 'lib/configs/application.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
 
@@ -93,21 +94,23 @@ describe('requests without the openid scope', () => {
 		});
 
 		Object.entries({
-			defaultAcrValues: ['foo'],
-			defaultMaxAge: 300,
-			requireAuthTime: true
+			// A value the deployment admits: a client registering any other is refused before this gate.
+			default_acr_values: [[...configuration.acrValues][0]],
+			default_max_age: 300,
+			require_auth_time: true
 		}).forEach(([clientProperty, value]) => {
 			it(`each client-required parameter is enforced`, async function () {
 				const auth = new AuthorizationRequest({ client_id: 'client' });
 
-				const client = await Client.find('client');
-				client[clientProperty] = value;
+				const restore = await changeClient('client', {
+					[clientProperty]: value
+				});
 
 				let response;
 				try {
 					({ response } = await getAuth(auth));
 				} finally {
-					delete client[clientProperty];
+					await restore();
 				}
 
 				expect(response.status).toBe(303);

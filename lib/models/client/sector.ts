@@ -1,4 +1,15 @@
-import { type ClientSchemaType } from '../../configs/clientSchema.ts';
+import { type Client } from './types.ts';
+
+/* What a sector identifier is computed from. */
+export type SectorSource = Pick<
+	Client,
+	| 'subjectType'
+	| 'sectorIdentifierUri'
+	| 'responseTypes'
+	| 'redirectUris'
+	| 'grantTypes'
+	| 'jwksUri'
+>;
 import computeSectorIdentifier from '../../helpers/sector_identifier.ts';
 
 // Memoised sector identifier resolution, replacing the former Client
@@ -8,7 +19,7 @@ import computeSectorIdentifier from '../../helpers/sector_identifier.ts';
 // from a legitimately cached `undefined`.
 const cache = new WeakMap<object, string | undefined>();
 
-export function sectorIdentifier(client: ClientSchemaType): string | undefined {
+export function sectorIdentifier(client: SectorSource): string | undefined {
 	if (!cache.has(client)) {
 		cache.set(client, computeSectorIdentifier(client));
 	}

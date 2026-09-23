@@ -1,4 +1,4 @@
-import { type ClientSchemaType } from '../../configs/clientSchema.ts';
+import { type Client } from './types.ts';
 import epochTime from '../../helpers/epoch_time.ts';
 import constantEquals from '../../helpers/constant_equals.ts';
 import { InvalidClient } from '../../helpers/errors.ts';
@@ -39,7 +39,7 @@ function isHmac(prop) {
 
 // Constant-time compare with the preserved 1000ms floor.
 export function compareClientSecret(
-	client: ClientSchemaType,
+	client: Pick<Client, 'clientSecret'>,
 	actual: string
 ): boolean {
 	return constantEquals(client.clientSecret, actual, 1000);
@@ -47,7 +47,7 @@ export function compareClientSecret(
 
 // Throw InvalidClient if clientSecretExpiresAt has passed (clockTolerance + optional errorOverride).
 export function checkClientSecretExpiration(
-	client: ClientSchemaType,
+	client: Pick<Client, 'clientId' | 'clientSecretExpiresAt'>,
 	message: string,
 	errorOverride?: string
 ): void {

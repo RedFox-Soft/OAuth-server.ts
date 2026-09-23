@@ -48,6 +48,7 @@ import {
 	DeviceAuthorizationResponse,
 	OAuthError
 } from 'lib/shared/response_schemas.js';
+import { grantTypeAllowed } from 'lib/models/client.js';
 
 const deviceAuthGrantType = 'urn:ietf:params:oauth:grant-type:device_code';
 const backchannelAuthGrantType = 'urn:openid:params:grant-type:ciba';
@@ -117,8 +118,8 @@ export const deviceAuth = new Elysia()
 			const oidc = new OIDCContext(body, headers);
 
 			await authentication(body, headers, oidc);
-			const client = oidc.client;
-			if (!client.grantTypeAllowed(deviceAuthGrantType)) {
+			const client = oidc.authenticatedClient;
+			if (!grantTypeAllowed(client, deviceAuthGrantType)) {
 				throw new InvalidRequest(
 					`${deviceAuthGrantType} is not allowed for this client`
 				);
@@ -171,7 +172,7 @@ export const backchannelAuth = new Elysia()
 			const oidc = new OIDCContext(body, headers, 'backchannel_authentication');
 
 			await authentication(body, headers, oidc);
-			const client = oidc.client;
+			const client = oidc.authenticatedClient;
 
 			// CIBA does not accept request_uri or registration; request (JAR) is only
 			// accepted when Request Objects are enabled. These carry endpoint-specific
@@ -193,7 +194,7 @@ export const backchannelAuth = new Elysia()
 
 			stripOutsideJarParams(oidc);
 
-			if (!client.grantTypeAllowed(backchannelAuthGrantType)) {
+			if (!grantTypeAllowed(client, backchannelAuthGrantType)) {
 				throw new InvalidRequest(
 					`${backchannelAuthGrantType} is not allowed for this client`
 				);

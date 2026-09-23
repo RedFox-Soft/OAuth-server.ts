@@ -31,7 +31,7 @@ export const revocation = new Elysia()
 			}
 			oidc.entity(token.payload.kind, token);
 
-			if (token.payload.clientId !== oidc.client.clientId) {
+			if (token.payload.clientId !== oidc.authenticatedClient.clientId) {
 				throw new InvalidRequest('this token does not belong to you');
 			}
 

@@ -2,6 +2,7 @@ import { OIDCProviderError } from '../../helpers/errors.ts';
 import { BackchannelAuthenticationRequest } from '../../models/backchannel_authentication_request.js';
 import { Client } from '../../models/client.js';
 import { Grant } from '../../models/grant.js';
+import { clientNotifications } from '../../shared/client_notifications.ts';
 
 /*
  * backchannelResult
@@ -10,7 +11,7 @@ import { Grant } from '../../models/grant.js';
  * BackchannelAuthenticationRequest and hands it to the `triggerAuthenticationDevice` addon; this one
  * completes it once the end-user's authentication device answers — with a Grant when they approved,
  * or an OIDCProviderError when they did not. The client learns the outcome by polling the token
- * endpoint, or immediately via backchannelPing when it registered for ping delivery.
+ * endpoint, or immediately via a ping notification when it registered for ping delivery.
  *
  * Deployments call this (re-exported from lib/index.ts), which is why it takes ids as readily as
  * instances: the code that resolves an authentication device callback usually holds an auth_req_id
@@ -123,6 +124,6 @@ export async function backchannelResult(
 	await request.save();
 
 	if (client.backchannelTokenDeliveryMode === 'ping') {
-		await client.backchannelPing(request);
+		await clientNotifications.ping(client, request);
 	}
 }

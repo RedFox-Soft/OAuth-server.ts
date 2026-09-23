@@ -3,39 +3,19 @@ import crypto from 'node:crypto';
 import QuickLRU from 'quick-lru';
 
 import mapKeys from '../../helpers/_/map_keys.ts';
-import snakeCase from '../../helpers/_/snake_case.ts';
 import camelCase from '../../helpers/_/camel_case.ts';
 import { pick } from '../../helpers/_/object.js';
 import { InvalidClientMetadata } from '../../helpers/errors.ts';
-import sectorValidate from '../../helpers/sector_validate.ts';
 import getSchema, { buildRecognizedMetadata } from './schema.ts';
-import addClient from '../../helpers/add_client.ts';
 import { ClientDefaults } from '../../configs/clientBase.js';
 import { onSettingsApplied } from '../../configs/application.js';
-import {
-	ClientSchema,
-	type ClientSchemaType
-} from '../../configs/clientSchema.js';
+import { ClientSchema } from '../../configs/clientSchema.js';
+import { type Client, type ClientRecord } from './types.ts';
 import { Value } from '@sinclair/typebox/value';
 import { adapter } from '../../adapters/index.js';
 import { resolveClientDocument } from '../../client_metadata_document/resolve.js';
-import { sectorIdentifier } from './sector.ts';
-import {
-	responseTypeAllowed,
-	responseModeAllowed,
-	grantTypeAllowed,
-	redirectUriAllowed,
-	postLogoutRedirectUriAllowed,
-	includeSid
-} from './checks.ts';
-import { compareClientSecret, checkClientSecretExpiration } from './secret.ts';
-import { backchannelPing, backchannelLogout } from './backchannel.ts';
-import {
-	ClientKeyStore,
-	buildAsymmetricKeyStore,
-	buildSymmetricKeyStore,
-	validateJWK
-} from './keystore.ts';
+import { validateJWK } from './keystore.ts';
+import { registerClient } from './register.ts';
 
 // The base registration keys copied verbatim from the raw input. Frozen here so
 // expanding `ClientSchema` to describe the full validated-object type (the rest
@@ -65,79 +45,10 @@ const BASE_METADATA_KEYS = [
 	'registrationUsedAt'
 ];
 
-// camelCase → snake_case metadata projection honouring RECOGNIZED_METADATA.
-// Replaces the former `client.metadata()` instance method.
-export function clientMetadata(
-	client: ClientSchemaType
-): Record<string, unknown> {
-	const recognized = buildRecognizedMetadata();
-
-	return mapKeys(client, (value, key) => {
-		const snaked = snakeCase(key);
-		if (!recognized.includes(snaked)) {
-			return key;
-		}
-
-		return snaked;
-	});
-}
-
-// Prototype for validated client objects. The former `Client` class methods
-// become thin delegators to the pure functions (the single source of truth),
-// and the derived accessors stay as getters. Living on the prototype keeps them
-// non-own/non-enumerable so they are excluded from `clientMetadata`'s
-// projection and `instanceof`-free spying/restoration behaves as before — the
-// object is a plain object (no `class`), but exposes the exact method surface
-// the integration suite (the oracle) and call sites rely on.
-export const clientPrototype = {
-	responseTypeAllowed(type) {
-		return responseTypeAllowed(this, type);
-	},
-	responseModeAllowed(responseMode) {
-		return responseModeAllowed(this, responseMode);
-	},
-	grantTypeAllowed(type) {
-		return grantTypeAllowed(this, type);
-	},
-	redirectUriAllowed(value) {
-		return redirectUriAllowed(this, value);
-	},
-	postLogoutRedirectUriAllowed(value) {
-		return postLogoutRedirectUriAllowed(this, value);
-	},
-	includeSid() {
-		return includeSid(this);
-	},
-	compareClientSecret(actual) {
-		return compareClientSecret(this, actual);
-	},
-	checkClientSecretExpiration(message, errorOverride) {
-		return checkClientSecretExpiration(this, message, errorOverride);
-	},
-	metadata() {
-		return clientMetadata(this);
-	},
-	backchannelPing(backchannelAuthenticationRequest) {
-		return backchannelPing(this, backchannelAuthenticationRequest);
-	},
-	backchannelLogout(sub, sid) {
-		return backchannelLogout(this, sub, sid);
-	},
-	get clientAuthMethod() {
-		return this.tokenEndpointAuthMethod;
-	},
-	get clientAuthSigningAlg() {
-		return this.tokenEndpointAuthSigningAlg;
-	},
-	get sectorIdentifier() {
-		return sectorIdentifier(this);
-	}
-};
-
-// Validate raw metadata → plain client object (defaults applied, recognised
-// metadata camelCased, key stores built) or throw InvalidClientMetadata.
-// Replaces the former Client-class constructor validation path.
-export function validateClient(metadata: unknown): ClientSchemaType {
+// Validate raw metadata → plain, frozen client object (defaults applied,
+// recognised metadata camelCased) or throw InvalidClientMetadata. Key material
+// is derived beside the client, on first use, by clientKeys().
+export function validateClient(metadata: ClientRecord): Client {
 	const Schema = getSchema();
 	const recognized = buildRecognizedMetadata();
 	const clientMetadataInput = {
@@ -154,8 +65,7 @@ export function validateClient(metadata: unknown): ClientSchemaType {
 		clientMetadataInput.redirectUris = [];
 	}
 
-	const client = Object.create(clientPrototype);
-	Object.assign(client, pick(clientMetadataInput, ...BASE_METADATA_KEYS));
+	const client = { ...pick(clientMetadataInput, ...BASE_METADATA_KEYS) };
 	Object.assign(
 		client,
 		mapKeys(schema, (value, key) => {
@@ -171,7 +81,6 @@ export function validateClient(metadata: unknown): ClientSchemaType {
 	// validated shape — not the raw snake_case input. This is what makes ClientSchema's
 	// camelCase literal unions and formats authoritative for the recognized metadata
 	// (whose keys are snake_case on input and never matched the camelCase schema keys).
-	// Runs before key-store construction so an invalid client never builds key stores.
 	if (!Value.Check(ClientSchema, client)) {
 		throw new InvalidClientMetadata(
 			'client metadata validation error',
@@ -181,32 +90,34 @@ export function validateClient(metadata: unknown): ClientSchemaType {
 		);
 	}
 
-	buildAsymmetricKeyStore(client);
-	buildSymmetricKeyStore(client);
+	// Checked here although the key set is built later, so an invalid one refuses the client now.
+	client.jwks?.keys.forEach(validateJWK);
 
-	if (client.jwks) {
-		client.jwks.keys
-			.map(validateJWK)
-			.filter(Boolean)
-			.forEach(ClientKeyStore.prototype.add.bind(client.asymmetricKeyStore));
-	}
-
-	return client;
+	/*
+	 * Frozen because one validated client is shared by every request using it until its record
+	 * changes, so a change made while handling one request would be seen by all of them. A copy is
+	 * frozen rather than the object built above, whose arrays may be the stored record's own or the
+	 * shared defaults'.
+	 */
+	/*
+	 * Asserted, because ClientSchema cannot say which of its optional attributes a default always
+	 * fills. AlwaysPresent (./types.ts) says it, and client_metadata.spec.ts proves it for every
+	 * attribute the declaration gives an ungated default.
+	 */
+	return deepFreeze(structuredClone(client)) as Client;
 }
 
-// Replaces the former static `Client.validate(metadata)` — runs sector
-// validation when sectorIdentifierUri is set.
-export async function assertClientValid(metadata: unknown): Promise<void> {
-	const client = validateClient(metadata);
-
-	if (client.sectorIdentifierUri !== undefined) {
-		await sectorValidate(client);
+function deepFreeze<T>(value: T): T {
+	if (value !== null && typeof value === 'object' && !Object.isFrozen(value)) {
+		Object.values(value).forEach(deepFreeze);
+		Object.freeze(value);
 	}
+	return value;
 }
 
 // Validation memo, owned by its only consumer below. Size-bounded (LRU) — no time-based expiry,
 // which would drop entries out from under in-flight resolutions.
-const clientCache = new QuickLRU<string, ClientSchemaType>({ maxSize: 100 });
+const clientCache = new QuickLRU<string, Client>({ maxSize: 100 });
 
 /*
  * The key is a hash of the client's STORED properties, so a settings change does not change it — and
@@ -223,9 +134,7 @@ onSettingsApplied(() => clientCache.clear());
 // keyed by a hash of the stored properties, so unchanged clients skip
 // re-validation. Nullable variant behind `Client.tryFind`; the strict
 // `Client.find` wraps this and throws on miss.
-export async function tryFindClient(
-	id: string
-): Promise<ClientSchemaType | undefined> {
+export async function tryFindClient(id: string): Promise<Client | undefined> {
 	const properties = await adapter('Client').find(id);
 	if (!properties) {
 		/*
@@ -249,7 +158,7 @@ export async function tryFindClient(
 		 * host said; a second memo keyed on content would extend that silently past the bound the
 		 * operator's host asked for.
 		 */
-		return addClient(document, { store: false });
+		return registerClient(document, { store: false });
 	}
 
 	const propHash = crypto.hash(
@@ -259,7 +168,8 @@ export async function tryFindClient(
 	);
 	let client = clientCache.get(propHash);
 	if (!client) {
-		client = await addClient(properties, { store: false });
+		// No sector check: that runs when a client is written (register.ts), not each time it is used.
+		client = validateClient(properties);
 		clientCache.set(propHash, client);
 	}
 

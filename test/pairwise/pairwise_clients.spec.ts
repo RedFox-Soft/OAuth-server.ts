@@ -5,9 +5,11 @@ import uniq from 'lodash/uniq.js';
 
 import bootstrap from '../test_helper.js';
 import { assertNoPendingInterceptors, mock } from '../fetch_mock.js';
-import addClient from '../../lib/helpers/add_client.ts';
+
 import { Claims } from 'lib/helpers/claims.js';
-import { Client } from 'lib/models/client.js';
+import { Client, registerClient, sectorIdentifier } from 'lib/models/client.js';
+import { configStore } from 'lib/adapters/index.js';
+import { saveSettings, superAdminCookie } from '../settings_apply/helpers.js';
 
 /**
  * @proves A pairwise client sector is resolved or refused at registration, verified against a
@@ -21,42 +23,51 @@ describe('pairwise features', () => {
 	describe('pairwise client configuration', () => {
 		describe('sector_identifier_uri is not provided', () => {
 			it('resolves the sector_identifier from one redirect_uri', () => {
-				return addClient({
-					clientId: 'client',
-					clientSecret: 'secret',
-					redirectUris: ['https://client.example.com/cb'],
-					subjectType: 'pairwise'
-				}).then((client) => {
-					expect(client.sectorIdentifier).toBeTruthy();
-					expect(client.sectorIdentifier).toBe('client.example.com');
+				return registerClient(
+					{
+						clientId: 'client',
+						clientSecret: 'secret',
+						redirectUris: ['https://client.example.com/cb'],
+						subjectType: 'pairwise'
+					},
+					{ store: false }
+				).then((client) => {
+					expect(sectorIdentifier(client)).toBeTruthy();
+					expect(sectorIdentifier(client)).toBe('client.example.com');
 				});
 			});
 
 			it('resolves the sector_identifier if redirect_uris hosts are the same', () => {
-				return addClient({
-					clientId: 'client',
-					clientSecret: 'secret',
-					redirectUris: [
-						'https://client.example.com/cb',
-						'https://client.example.com/forum/cb'
-					],
-					subjectType: 'pairwise'
-				}).then((client) => {
-					expect(client.sectorIdentifier).toBeTruthy();
-					expect(client.sectorIdentifier).toBe('client.example.com');
+				return registerClient(
+					{
+						clientId: 'client',
+						clientSecret: 'secret',
+						redirectUris: [
+							'https://client.example.com/cb',
+							'https://client.example.com/forum/cb'
+						],
+						subjectType: 'pairwise'
+					},
+					{ store: false }
+				).then((client) => {
+					expect(sectorIdentifier(client)).toBeTruthy();
+					expect(sectorIdentifier(client)).toBe('client.example.com');
 				});
 			});
 
 			it('fails to validate when multiple redirect_uris hosts are provided', () => {
-				return addClient({
-					clientId: 'client',
-					clientSecret: 'secret',
-					redirectUris: [
-						'https://client.example.com/cb',
-						'https://wrongsubdomain.example.com/forum/cb'
-					],
-					subjectType: 'pairwise'
-				}).then(
+				return registerClient(
+					{
+						clientId: 'client',
+						clientSecret: 'secret',
+						redirectUris: [
+							'https://client.example.com/cb',
+							'https://wrongsubdomain.example.com/forum/cb'
+						],
+						subjectType: 'pairwise'
+					},
+					{ store: false }
+				).then(
 					(client) => {
 						expect(client).toBeFalsy();
 					},
@@ -85,18 +96,21 @@ describe('pairwise features', () => {
 						])
 					);
 
-				return addClient({
-					clientId: 'client',
-					clientSecret: 'secret',
-					redirectUris: [
-						'https://client.example.com/cb',
-						'https://another.example.com/forum/cb'
-					],
-					sector_identifier_uri: 'https://foobar.example.com/sector',
-					subjectType: 'public'
-				}).then((client) => {
+				return registerClient(
+					{
+						clientId: 'client',
+						clientSecret: 'secret',
+						redirectUris: [
+							'https://client.example.com/cb',
+							'https://another.example.com/forum/cb'
+						],
+						sector_identifier_uri: 'https://foobar.example.com/sector',
+						subjectType: 'public'
+					},
+					{ store: false }
+				).then((client) => {
 					expect(client).toBeTruthy();
-					expect(client.sectorIdentifier).toBe('foobar.example.com');
+					expect(sectorIdentifier(client)).toBe('foobar.example.com');
 				});
 			});
 
@@ -113,51 +127,59 @@ describe('pairwise features', () => {
 						])
 					);
 
-				return addClient({
-					clientId: 'client',
-					clientSecret: 'secret',
-					redirectUris: [
-						'https://client.example.com/cb',
-						'https://another.example.com/forum/cb'
-					],
-					sector_identifier_uri: 'https://foobar.example.com/sector',
-					subjectType: 'pairwise'
-				}).then((client) => {
+				return registerClient(
+					{
+						clientId: 'client',
+						clientSecret: 'secret',
+						redirectUris: [
+							'https://client.example.com/cb',
+							'https://another.example.com/forum/cb'
+						],
+						sector_identifier_uri: 'https://foobar.example.com/sector',
+						subjectType: 'pairwise'
+					},
+					{ store: false }
+				).then((client) => {
 					expect(client).toBeTruthy();
-					expect(client.sectorIdentifier).toBe('foobar.example.com');
+					expect(sectorIdentifier(client)).toBe('foobar.example.com');
 				});
 			});
 
-			it('refuses a provisioned client whose sector document does not list its redirect URIs', () => {
-				mock('https://foobar.example.com')
-					.intercept({
-						path: '/sector'
-					})
-					.reply(
-						200,
-						JSON.stringify([
-							'https://client.example.com/cb',
-							'https://another.example.com/forum/cb'
-						])
-					);
+			/*
+			 * The sector document is checked when a client is written, not each time it is used: a
+			 * client stays usable while its sector host is down, including after a settings save empties
+			 * the validation memo. The origin is registered with nothing served, so a retrieval would throw.
+			 */
+			it('resolves a provisioned pairwise client while its sector host is unreachable', async () => {
+				mock('https://foobar.example.com');
 
-				return Client.find('client-static-with-sector').then((client) => {
-					expect(client).toBeTruthy();
-					expect(client.sectorIdentifier).toBe('foobar.example.com');
+				const client = await Client.find('client-static-with-sector');
+				expect(sectorIdentifier(client)).toBe('foobar.example.com');
+
+				await configStore.set({});
+				const saved = await saveSettings(await superAdminCookie(), {
+					'introspection.enabled': true
 				});
+				expect(saved.status).toBe(200);
+
+				const again = await Client.find('client-static-with-sector');
+				expect(sectorIdentifier(again)).toBe('foobar.example.com');
 			});
 
 			it('must be an https uri', () => {
-				return addClient({
-					clientId: 'client',
-					clientSecret: 'secret',
-					redirectUris: [
-						'https://client.example.com/cb',
-						'https://another.example.com/forum/cb'
-					],
-					sector_identifier_uri: 'http://client.example.com/sector',
-					subjectType: 'pairwise'
-				}).then(
+				return registerClient(
+					{
+						clientId: 'client',
+						clientSecret: 'secret',
+						redirectUris: [
+							'https://client.example.com/cb',
+							'https://another.example.com/forum/cb'
+						],
+						sector_identifier_uri: 'http://client.example.com/sector',
+						subjectType: 'pairwise'
+					},
+					{ store: false }
+				).then(
 					(client) => {
 						expect(client).toBeFalsy();
 					},
@@ -188,16 +210,19 @@ describe('pairwise features', () => {
 						])
 					);
 
-				return addClient({
-					clientId: 'client',
-					clientSecret: 'secret',
-					redirectUris: [
-						'https://client.example.com/cb',
-						'https://missing.example.com/forum/cb'
-					],
-					sector_identifier_uri: 'https://client.example.com/sector',
-					subjectType: 'pairwise'
-				}).then(
+				return registerClient(
+					{
+						clientId: 'client',
+						clientSecret: 'secret',
+						redirectUris: [
+							'https://client.example.com/cb',
+							'https://missing.example.com/forum/cb'
+						],
+						sector_identifier_uri: 'https://client.example.com/sector',
+						subjectType: 'pairwise'
+					},
+					{ store: false }
+				).then(
 					(client) => {
 						expect(client).toBeFalsy();
 					},
@@ -225,16 +250,19 @@ describe('pairwise features', () => {
 							])
 						);
 
-					return addClient({
-						clientId: 'client',
-						responseTypes: [],
-						backchannel_token_delivery_mode: 'poll',
-						grantTypes: ['urn:openid:params:grant-type:ciba'],
-						token_endpoint_auth_method: 'private_key_jwt',
-						jwks_uri: 'https://client.example.com/jwks',
-						sector_identifier_uri: 'https://client.example.com/sector',
-						subjectType: 'pairwise'
-					}).then(
+					return registerClient(
+						{
+							clientId: 'client',
+							responseTypes: [],
+							backchannel_token_delivery_mode: 'poll',
+							grantTypes: ['urn:openid:params:grant-type:ciba'],
+							token_endpoint_auth_method: 'private_key_jwt',
+							jwks_uri: 'https://client.example.com/jwks',
+							sector_identifier_uri: 'https://client.example.com/sector',
+							subjectType: 'pairwise'
+						},
+						{ store: false }
+					).then(
 						(client) => {
 							expect(client).toBeFalsy();
 						},
@@ -263,15 +291,18 @@ describe('pairwise features', () => {
 							])
 						);
 
-					return addClient({
-						clientId: 'client',
-						responseTypes: [],
-						grantTypes: ['urn:ietf:params:oauth:grant-type:device_code'],
-						token_endpoint_auth_method: 'private_key_jwt',
-						jwks_uri: 'https://client.example.com/jwks',
-						sector_identifier_uri: 'https://client.example.com/sector',
-						subjectType: 'pairwise'
-					}).then(
+					return registerClient(
+						{
+							clientId: 'client',
+							responseTypes: [],
+							grantTypes: ['urn:ietf:params:oauth:grant-type:device_code'],
+							token_endpoint_auth_method: 'private_key_jwt',
+							jwks_uri: 'https://client.example.com/jwks',
+							sector_identifier_uri: 'https://client.example.com/sector',
+							subjectType: 'pairwise'
+						},
+						{ store: false }
+					).then(
 						(client) => {
 							expect(client).toBeFalsy();
 						},
@@ -293,16 +324,19 @@ describe('pairwise features', () => {
 					})
 					.reply(200, '{ not a valid json');
 
-				return addClient({
-					clientId: 'client',
-					clientSecret: 'secret',
-					redirectUris: [
-						'https://client.example.com/cb',
-						'https://missing.example.com/forum/cb'
-					],
-					sector_identifier_uri: 'https://client.example.com/sector',
-					subjectType: 'pairwise'
-				}).then(
+				return registerClient(
+					{
+						clientId: 'client',
+						clientSecret: 'secret',
+						redirectUris: [
+							'https://client.example.com/cb',
+							'https://missing.example.com/forum/cb'
+						],
+						sector_identifier_uri: 'https://client.example.com/sector',
+						subjectType: 'pairwise'
+					},
+					{ store: false }
+				).then(
 					(client) => {
 						expect(client).toBeFalsy();
 					},
@@ -323,16 +357,19 @@ describe('pairwise features', () => {
 					})
 					.reply(200, JSON.stringify('https://client.example.com/cb'));
 
-				return addClient({
-					clientId: 'client',
-					clientSecret: 'secret',
-					redirectUris: [
-						'https://client.example.com/cb',
-						'https://missing.example.com/forum/cb'
-					],
-					sector_identifier_uri: 'https://client.example.com/sector',
-					subjectType: 'pairwise'
-				}).then(
+				return registerClient(
+					{
+						clientId: 'client',
+						clientSecret: 'secret',
+						redirectUris: [
+							'https://client.example.com/cb',
+							'https://missing.example.com/forum/cb'
+						],
+						sector_identifier_uri: 'https://client.example.com/sector',
+						subjectType: 'pairwise'
+					},
+					{ store: false }
+				).then(
 					(client) => {
 						expect(client).toBeFalsy();
 					},
@@ -353,16 +390,19 @@ describe('pairwise features', () => {
 					})
 					.reply(500);
 
-				return addClient({
-					clientId: 'client',
-					clientSecret: 'secret',
-					redirectUris: [
-						'https://client.example.com/cb',
-						'https://missing.example.com/forum/cb'
-					],
-					sector_identifier_uri: 'https://client.example.com/sector',
-					subjectType: 'pairwise'
-				}).then(
+				return registerClient(
+					{
+						clientId: 'client',
+						clientSecret: 'secret',
+						redirectUris: [
+							'https://client.example.com/cb',
+							'https://missing.example.com/forum/cb'
+						],
+						sector_identifier_uri: 'https://client.example.com/sector',
+						subjectType: 'pairwise'
+					},
+					{ store: false }
+				).then(
 					(client) => {
 						expect(client).toBeFalsy();
 					},
@@ -383,16 +423,19 @@ describe('pairwise features', () => {
 					})
 					.reply(201, JSON.stringify('https://client.example.com/cb'));
 
-				return addClient({
-					clientId: 'client',
-					clientSecret: 'secret',
-					redirectUris: [
-						'https://client.example.com/cb',
-						'https://missing.example.com/forum/cb'
-					],
-					sector_identifier_uri: 'https://client.example.com/sector',
-					subjectType: 'pairwise'
-				}).then(
+				return registerClient(
+					{
+						clientId: 'client',
+						clientSecret: 'secret',
+						redirectUris: [
+							'https://client.example.com/cb',
+							'https://missing.example.com/forum/cb'
+						],
+						sector_identifier_uri: 'https://client.example.com/sector',
+						subjectType: 'pairwise'
+					},
+					{ store: false }
+				).then(
 					(client) => {
 						expect(client).toBeFalsy();
 					},
@@ -412,33 +455,42 @@ describe('pairwise features', () => {
 		const clients = [];
 
 		beforeAll(() => {
-			return addClient({
-				clientId: 'clientOne',
-				clientSecret: 'secret',
-				redirectUris: ['https://clientone.com/cb'],
-				subjectType: 'pairwise'
-			}).then((client) => {
+			return registerClient(
+				{
+					clientId: 'clientOne',
+					clientSecret: 'secret',
+					redirectUris: ['https://clientone.com/cb'],
+					subjectType: 'pairwise'
+				},
+				{ store: false }
+			).then((client) => {
 				clients.push(client);
 			});
 		});
 
 		beforeAll(() => {
-			return addClient({
-				clientId: 'clientTwo',
-				clientSecret: 'secret',
-				redirectUris: ['https://clienttwo.com/cb'],
-				subjectType: 'pairwise'
-			}).then((client) => {
+			return registerClient(
+				{
+					clientId: 'clientTwo',
+					clientSecret: 'secret',
+					redirectUris: ['https://clienttwo.com/cb'],
+					subjectType: 'pairwise'
+				},
+				{ store: false }
+			).then((client) => {
 				clients.push(client);
 			});
 		});
 
 		beforeAll(() => {
-			return addClient({
-				clientId: 'clientThree',
-				clientSecret: 'secret',
-				redirectUris: ['https://clientthree.com/cb']
-			}).then((client) => {
+			return registerClient(
+				{
+					clientId: 'clientThree',
+					clientSecret: 'secret',
+					redirectUris: ['https://clientthree.com/cb']
+				},
+				{ store: false }
+			).then((client) => {
 				clients.push(client);
 			});
 		});

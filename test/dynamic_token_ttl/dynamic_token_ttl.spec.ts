@@ -12,7 +12,6 @@ import {
 
 import bootstrap, { agent, type Setup } from '../test_helper.js';
 import { IdToken } from 'lib/models/id_token.js';
-import { Client } from 'lib/models/client.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { TestAdapter } from 'test/models.js';
@@ -54,7 +53,7 @@ describe('dynamic ttl', () => {
 
 		expect(clientSpy).toBeCalledTimes(1);
 		expect(clientSpy.mock.calls[0][1]).toBeInstanceOf(ClientCredentials);
-		expect(clientSpy.mock.calls[0][2]).toBeInstanceOf(Client);
+		expect(clientSpy.mock.calls[0][2]).toMatchObject({ clientId: 'client' });
 	});
 
 	it('the device code lifetime is the one the dynamic ttl function returned', async function () {
@@ -71,7 +70,9 @@ describe('dynamic ttl', () => {
 
 		expect(deviceCodeSpy).toBeCalledTimes(1);
 		expect(deviceCodeSpy.mock.calls[0][1]).toBeInstanceOf(DeviceCode);
-		expect(deviceCodeSpy.mock.calls[0][2]).toBeInstanceOf(Client);
+		expect(deviceCodeSpy.mock.calls[0][2]).toMatchObject({
+			clientId: 'client'
+		});
 
 		TestAdapter.for('DeviceCode').syncUpdate(setup.getTokenJti(device_code), {
 			scope: 'openid offline_access',
@@ -95,15 +96,19 @@ describe('dynamic ttl', () => {
 
 		expect(idTokenSpy).toHaveBeenCalledTimes(1);
 		expect(idTokenSpy.mock.calls[0][0]).toBeInstanceOf(IdToken);
-		expect(idTokenSpy.mock.calls[0][1]).toBeInstanceOf(Client);
+		expect(idTokenSpy.mock.calls[0][1]).toMatchObject({ clientId: 'client' });
 
 		expect(accessTokenSpy).toHaveBeenCalledTimes(1);
 		expect(accessTokenSpy.mock.calls[0][1]).toBeInstanceOf(AccessToken);
-		expect(accessTokenSpy.mock.calls[0][2]).toBeInstanceOf(Client);
+		expect(accessTokenSpy.mock.calls[0][2]).toMatchObject({
+			clientId: 'client'
+		});
 
 		expect(refreshTokenSpy).toHaveBeenCalledTimes(1);
 		expect(refreshTokenSpy.mock.calls[0][1]).toBeInstanceOf(RefreshToken);
-		expect(refreshTokenSpy.mock.calls[0][2]).toBeInstanceOf(Client);
+		expect(refreshTokenSpy.mock.calls[0][2]).toMatchObject({
+			clientId: 'client'
+		});
 	});
 
 	it('the returned token lifetimes are the ones the dynamic ttl function returned', async function () {
@@ -121,7 +126,7 @@ describe('dynamic ttl', () => {
 
 		expect(spy).toHaveBeenCalledTimes(1);
 		expect(spy.mock.calls[0][1]).toBeInstanceOf(AuthorizationCode);
-		expect(spy.mock.calls[0][2]).toBeInstanceOf(Client);
+		expect(spy.mock.calls[0][2]).toMatchObject({ clientId: 'client' });
 	});
 
 	it('the authorization code lifetime is the one the dynamic ttl function returned', async function () {
@@ -160,15 +165,19 @@ describe('dynamic ttl', () => {
 
 		expect(idTokenSpy).toHaveBeenCalledTimes(1);
 		expect(idTokenSpy.mock.calls[0][0]).toBeInstanceOf(IdToken);
-		expect(idTokenSpy.mock.calls[0][1]).toBeInstanceOf(Client);
+		expect(idTokenSpy.mock.calls[0][1]).toMatchObject({ clientId: 'client' });
 
 		expect(accessTokenSpy).toHaveBeenCalledTimes(1);
 		expect(accessTokenSpy.mock.calls[0][1]).toBeInstanceOf(AccessToken);
-		expect(accessTokenSpy.mock.calls[0][2]).toBeInstanceOf(Client);
+		expect(accessTokenSpy.mock.calls[0][2]).toMatchObject({
+			clientId: 'client'
+		});
 
 		expect(refreshTokenSpy).toHaveBeenCalledTimes(1);
 		expect(refreshTokenSpy.mock.calls[0][1]).toBeInstanceOf(RefreshToken);
-		expect(refreshTokenSpy.mock.calls[0][2]).toBeInstanceOf(Client);
+		expect(refreshTokenSpy.mock.calls[0][2]).toMatchObject({
+			clientId: 'client'
+		});
 	});
 
 	it('the refreshed token lifetimes are the ones the dynamic ttl function returned', async function () {
@@ -214,14 +223,18 @@ describe('dynamic ttl', () => {
 
 		expect(idTokenSpy).toHaveBeenCalledTimes(1);
 		expect(idTokenSpy.mock.calls[0][0]).toBeInstanceOf(IdToken);
-		expect(idTokenSpy.mock.calls[0][1]).toBeInstanceOf(Client);
+		expect(idTokenSpy.mock.calls[0][1]).toMatchObject({ clientId: 'client' });
 
 		expect(accessTokenSpy).toHaveBeenCalledTimes(1);
 		expect(accessTokenSpy.mock.calls[0][1]).toBeInstanceOf(AccessToken);
-		expect(accessTokenSpy.mock.calls[0][2]).toBeInstanceOf(Client);
+		expect(accessTokenSpy.mock.calls[0][2]).toMatchObject({
+			clientId: 'client'
+		});
 
 		expect(refreshTokenSpy).toHaveBeenCalledTimes(1);
 		expect(refreshTokenSpy.mock.calls[0][1]).toBeInstanceOf(RefreshToken);
-		expect(refreshTokenSpy.mock.calls[0][2]).toBeInstanceOf(Client);
+		expect(refreshTokenSpy.mock.calls[0][2]).toMatchObject({
+			clientId: 'client'
+		});
 	});
 });

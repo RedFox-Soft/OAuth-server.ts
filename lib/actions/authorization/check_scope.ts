@@ -1,5 +1,6 @@
 import { InvalidScope } from '../../helpers/errors.ts';
 import { configuration } from 'lib/configs/application.js';
+import { grantTypeAllowed } from 'lib/models/client.js';
 
 /*
  * Validates that all requested scopes are supported by the provider, and that offline_access prompt
@@ -27,7 +28,7 @@ export default function checkScope(oidc, isAuth = false) {
 		if (
 			(isAuth && !responseType.includes('code')) ||
 			(isAuth && !prompts.has('consent')) ||
-			!client.grantTypeAllowed('refresh_token')
+			!grantTypeAllowed(client, 'refresh_token')
 		) {
 			scopes.splice(scopes.indexOf('offline_access'), 1);
 		}

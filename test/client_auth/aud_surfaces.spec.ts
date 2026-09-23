@@ -5,7 +5,7 @@ import * as JWT from '../../lib/helpers/jwt.ts';
 import bootstrap, { agent } from '../test_helper.js';
 import nanoid from 'lib/helpers/nanoid.js';
 import { ISSUER } from 'lib/configs/env.js';
-import { Client } from 'lib/models/client.js';
+import { Client, clientKeys } from 'lib/models/client.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { routeNames } from 'lib/consts/param_list.js';
 
@@ -69,7 +69,7 @@ describe('client assertion audience, at every endpoint that authenticates a clie
 		}
 
 		key = await importJWK(
-			(await Client.find(CLIENT)).symmetricKeyStore.selectForSign({
+			clientKeys(await Client.find(CLIENT)).symmetric.selectForSign({
 				alg: 'HS256'
 			})[0]
 		);

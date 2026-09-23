@@ -52,7 +52,7 @@ touch, to fix a case that cannot arise:
 - `BaseModel.save(ttl)` always passes a ttl, so every record in a `reaped: EXPIRES_AT` area gets a
   fresh expiry on every upsert.
 - Every no-ttl `upsert` call site targets exactly one area, `Client`
-  (`lib/admin/clients/service.ts`, `lib/admin/seed.ts`, `lib/helpers/add_client.ts`,
+  (`lib/admin/clients/service.ts`, `lib/admin/seed.ts`, `lib/models/client/register.ts`,
   `markRegistrationUsed` in `lib/models/client/dynamic_registration.ts`).
 - `Client` is `reaped: null`: no expiry index, reclamation through `destroyUnusedSince` instead.
 

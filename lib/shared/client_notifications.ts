@@ -1,15 +1,16 @@
 import { STATUS_CODES } from 'node:http';
 
-import nanoid from '../../helpers/nanoid.ts';
-import { IdToken } from '../id_token.ts';
+import nanoid from '../helpers/nanoid.ts';
+import { IdToken } from '../models/id_token.ts';
 
-// Network side-effecting client behaviours, extracted from the former Client
-// methods. Each takes the client object first. Not pure (perform HTTP).
+/*
+ * The notifications this server sends to a client. They perform network requests and mint a logout
+ * token, so they are not part of the client model; they sit on one object so a test can replace a
+ * notification the way it replaces any other outbound call.
+ */
+export const clientNotifications = { ping, logout };
 
-export async function backchannelPing(
-	client,
-	backchannelAuthenticationRequest
-) {
+async function ping(client, backchannelAuthenticationRequest) {
 	if (
 		!client.backchannelClientNotificationEndpoint ||
 		client.backchannelTokenDeliveryMode !== 'ping' ||
@@ -43,7 +44,7 @@ export async function backchannelPing(
 	});
 }
 
-export async function backchannelLogout(client, sub, sid) {
+async function logout(client, sub, sid) {
 	const logoutToken = new IdToken(client, { sub });
 	logoutToken.mask = { sub: null };
 	logoutToken.set('events', {

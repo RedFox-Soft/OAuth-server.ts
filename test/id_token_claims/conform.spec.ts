@@ -14,11 +14,11 @@ import bootstrap, {
 	agent,
 	getHeader,
 	setSeedClaims,
-	type Setup
+	type Setup,
+	changeClient
 } from '../test_helper.js';
 import { fullProfileClaims } from '../models.js';
 import { decode as decodeJWT } from '../../lib/helpers/jwt.ts';
-import { Client } from 'lib/models/client.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
@@ -53,8 +53,6 @@ describe('configuration conformIdTokenClaims=true', () => {
 		let refreshIdToken = null;
 
 		beforeAll(async () => {
-			const client = await Client.find('client');
-
 			const claims = JSON.stringify({
 				id_token: { gender: null, email: null, email_verified: null },
 				userinfo: { gender: null }
@@ -96,18 +94,23 @@ describe('configuration conformIdTokenClaims=true', () => {
 			const access_token = refreshRes.data.access_token;
 
 			if (access_token) {
-				delete client.userinfoSignedResponseAlg;
+				const unsigned = await changeClient('client', {
+					userinfo_signed_response_alg: undefined
+				});
 				const uiRes = await agent.userinfo.get({
 					headers: { authorization: `Bearer ${access_token}` }
 				});
 				userinfo = uiRes.data;
+				await unsigned();
 
-				client.userinfoSignedResponseAlg = 'HS256';
-				await Client.find('client');
+				const signed = await changeClient('client', {
+					userinfo_signed_response_alg: 'HS256'
+				});
 				const uiSignedRes = await agent.userinfo.get({
 					headers: { authorization: `Bearer ${access_token}` }
 				});
 				userinfoSigned = uiSignedRes.data;
+				await signed();
 			}
 		});
 

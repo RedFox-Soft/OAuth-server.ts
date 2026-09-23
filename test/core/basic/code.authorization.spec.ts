@@ -15,7 +15,8 @@ import { addons } from 'lib/addon/registry.js';
 import bootstrap, {
 	agent,
 	jsonToFormUrlEncoded,
-	type Setup
+	type Setup,
+	changeClient
 } from '../../test_helper.js';
 import epochTime from '../../../lib/helpers/epoch_time.ts';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
@@ -349,15 +350,14 @@ describe('BASIC code', () => {
 			});
 
 			it('forces re-authentication when the session is older than the client default_max_age', async function () {
-				const client = await Client.find('client');
-				client.defaultMaxAge = 1800;
+				const restore = await changeClient('client', { default_max_age: 1800 });
 
 				const session = setup.getSession();
 				session.loginTs = epochTime() - 3600; // an hour ago
 
 				const auth = new AuthorizationRequest({ scope });
 				const { response } = await authRequest(auth, { cookie });
-				delete client.defaultMaxAge;
+				await restore();
 				expect(response.status).toBe(303);
 				auth.validateInteractionRedirect(response);
 				auth.validateInteraction(response, 'login', 'max_age');
@@ -546,14 +546,17 @@ describe('BASIC code', () => {
 			});
 
 			describe('when client has more then one redirect_uri', () => {
+				let restore: () => Promise<void>;
+
 				beforeEach(async function () {
-					const client = await Client.find('client');
-					client.redirectUris.push('https://someOtherUri.com');
+					const { redirectUris } = await Client.find('client');
+					restore = await changeClient('client', {
+						redirectUris: [...redirectUris, 'https://someOtherUri.com']
+					});
 				});
 
 				afterEach(async function () {
-					const client = await Client.find('client');
-					client.redirectUris.pop();
+					await restore();
 				});
 
 				it('refuses a request with no redirect_uri', async function () {

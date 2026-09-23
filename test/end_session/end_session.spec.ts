@@ -11,13 +11,17 @@ import {
 } from 'bun:test';
 import { parse as parseUrl } from 'node:url';
 
-import bootstrap, { agent, getHeader, type Setup } from '../test_helper.js';
+import bootstrap, {
+	agent,
+	getHeader,
+	type Setup,
+	changeClient
+} from '../test_helper.js';
 import * as JWT from '../../lib/helpers/jwt.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { eventBus } from 'lib/event_bus.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
-import { Client } from 'lib/models/client.js';
 
 async function getIdToken(options = {}, cookie = '') {
 	const auth = new AuthorizationRequest({
@@ -77,13 +81,15 @@ describe('logout endpoint', () => {
 		});
 
 		describe('client with postLogoutRedirectUris', () => {
+			let restoreRedirects: () => Promise<void>;
+
 			beforeEach(async function () {
-				(await Client.find('client')).postLogoutRedirectUris = [
-					'https://client.example.com/logout/cb'
-				];
+				restoreRedirects = await changeClient('client', {
+					post_logout_redirect_uris: ['https://client.example.com/logout/cb']
+				});
 			});
 			afterEach(async function () {
-				(await Client.find('client')).postLogoutRedirectUris = [];
+				await restoreRedirects();
 			});
 
 			it('logout works with an expired session', async function () {
@@ -224,21 +230,23 @@ describe('logout endpoint', () => {
 			});
 
 			describe('expired client secrets', () => {
+				let restore: (() => Promise<void>) | undefined;
+
 				afterEach(async function () {
-					const client = await Client.find('client-hmac');
-					client.clientSecretExpiresAt = 0;
+					await restore?.();
+					restore = undefined;
 				});
 
 				it('rejects HMAC hints if the secret is expired', async function () {
-					const client = await Client.find('client-hmac');
-
 					const idToken = await getIdToken(
 						{
 							client_id: 'client-hmac'
 						},
 						cookie
 					);
-					client.clientSecretExpiresAt = 1;
+					restore = await changeClient('client-hmac', {
+						client_secret_expires_at: 1
+					});
 
 					const query = {
 						id_token_hint: idToken,

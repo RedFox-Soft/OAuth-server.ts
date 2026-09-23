@@ -55,7 +55,7 @@ export async function tokenJwtAuth(
 	}
 	checkPayload(payload);
 
-	if (payload.iss !== oidc.client.clientId) {
+	if (payload.iss !== oidc.authenticatedClient.clientId) {
 		throw new InvalidClientAuth('iss (JWT issuer) must be the client_id');
 	}
 	if (Array.isArray(payload.aud)) {
@@ -101,7 +101,11 @@ export async function tokenJwtAuth(
 		}
 	}
 
-	await assertJwtClientAuthClaimsAndHeader(oidc.client, payload, header);
+	await assertJwtClientAuthClaimsAndHeader(
+		oidc.authenticatedClient,
+		payload,
+		header
+	);
 
 	const unique = await ReplayDetection.unique(
 		payload.iss,

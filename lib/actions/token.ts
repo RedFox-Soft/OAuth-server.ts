@@ -18,6 +18,7 @@ import { AuthPlugin, authHeaders, authParams } from 'lib/plugins/auth.js';
 import { corsClientBased, formClientId } from 'lib/plugins/cors.js';
 import { ignoreUnknownParams } from 'lib/plugins/ignore_unknown_params.js';
 import { TokenResponse } from 'lib/shared/response_schemas.js';
+import { grantTypeAllowed } from 'lib/models/client.js';
 
 const TokenRequestBody = t.Object({
 	...authParams.properties,
@@ -50,13 +51,13 @@ export const tokenAction = new Elysia()
 	.post(
 		routeNames.token,
 		async ({ body, headers, route, set, oidc }) => {
-			const client = oidc.client;
+			const client = oidc.authenticatedClient;
 			const dPoP = await dpopValidate(headers.dpop, { route });
 			setNonceHeader(set.headers, dPoP);
 			await validateReplay(client.clientId, dPoP);
 
 			const grantType = body.grant_type;
-			if (!client.grantTypeAllowed(grantType)) {
+			if (!grantTypeAllowed(client, grantType)) {
 				throw new InvalidRequest(
 					'requested grant type is not allowed for this client'
 				);

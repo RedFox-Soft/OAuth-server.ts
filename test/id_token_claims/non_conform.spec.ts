@@ -10,9 +10,13 @@ import {
 	mock
 } from 'bun:test';
 
-import bootstrap, { agent, getHeader, type Setup } from '../test_helper.js';
+import bootstrap, {
+	agent,
+	getHeader,
+	type Setup,
+	changeClient
+} from '../test_helper.js';
 import { decode as decodeJWT } from '../../lib/helpers/jwt.ts';
-import { Client } from 'lib/models/client.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
@@ -45,8 +49,6 @@ describe('configuration conformIdTokenClaims=false', () => {
 		let refreshIdToken = null;
 
 		beforeAll(async () => {
-			const client = await Client.find('client');
-
 			const auth = new AuthorizationRequest({
 				scope,
 				prompt: 'consent'
@@ -82,18 +84,23 @@ describe('configuration conformIdTokenClaims=false', () => {
 			const access_token = refreshRes.data.access_token;
 
 			if (access_token) {
-				delete client.userinfoSignedResponseAlg;
+				const unsigned = await changeClient('client', {
+					userinfo_signed_response_alg: undefined
+				});
 				const uiRes = await agent.userinfo.get({
 					headers: { authorization: `Bearer ${access_token}` }
 				});
 				userinfo = uiRes.data;
+				await unsigned();
 
-				client.userinfoSignedResponseAlg = 'HS256';
-				await Client.find('client');
+				const signed = await changeClient('client', {
+					userinfo_signed_response_alg: 'HS256'
+				});
 				const uiSignedRes = await agent.userinfo.get({
 					headers: { authorization: `Bearer ${access_token}` }
 				});
 				userinfoSigned = uiSignedRes.data;
+				await signed();
 			}
 		});
 

@@ -3,6 +3,8 @@ import crypto from 'node:crypto';
 import nanoid from '../helpers/nanoid.ts';
 import { pairwiseSalt } from '../configs/pairwiseSalt.ts';
 import { TemporarilyUnavailable } from '../helpers/errors.ts';
+import { sectorIdentifier } from '../models/client/sector.ts';
+import { grantTypeAllowed } from '../models/client/checks.ts';
 
 export function idFactory(_ctx) {
 	return nanoid();
@@ -22,7 +24,7 @@ export async function expiresWithSession(ctx, code) {
 // is a separate concern owned by ApplicationConfig['refreshToken.enabled']).
 export async function issueRefreshToken(ctx, client, code) {
 	return (
-		client.grantTypeAllowed('refresh_token') &&
+		grantTypeAllowed(client, 'refresh_token') &&
 		code.scopes.has('offline_access')
 	);
 }
@@ -61,7 +63,7 @@ export async function pairwiseIdentifier(accountId, client) {
 
 	return crypto
 		.createHash('sha256')
-		.update(client.sectorIdentifier)
+		.update(sectorIdentifier(client))
 		.update(accountId)
 		.update(salt)
 		.digest('hex');
@@ -80,7 +82,7 @@ export function rotateRefreshToken(ctx) {
 
 	// rotate non sender-constrained public client refresh tokens
 	if (
-		client.clientAuthMethod === 'none' &&
+		client.tokenEndpointAuthMethod === 'none' &&
 		!refreshToken.isSenderConstrained()
 	) {
 		return true;

@@ -10,6 +10,7 @@ import {
 } from '../fetch_mock.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { Client } from 'lib/models/client.js';
+import { clientNotifications } from 'lib/shared/client_notifications.ts';
 
 /*
  * A pairwise client's logout token must name the subject that client already knows — spec 023,
@@ -104,6 +105,6 @@ describe('back-channel logout: pairwise client', () => {
 			})
 			.reply(200);
 
-		return client.backchannelLogout(ACCOUNT, 'sid-value');
+		return clientNotifications.logout(client, ACCOUNT, 'sid-value');
 	});
 });

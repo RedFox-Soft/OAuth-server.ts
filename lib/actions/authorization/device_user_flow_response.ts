@@ -2,6 +2,7 @@ import combinedScope from '../../helpers/combined_scope.ts';
 import { deviceSuccessPage } from '../../html/device.js';
 import { expiresWithSession } from '../../addon/index.js';
 import { eventBus } from '../../event_bus.js';
+import { includeSid } from 'lib/models/client.js';
 
 export default async function deviceVerificationResponse(oidc) {
 	const code = oidc.deviceCode;
@@ -44,7 +45,7 @@ export default async function deviceVerificationResponse(oidc) {
 	}
 
 	if (
-		oidc.client.includeSid() ||
+		includeSid(oidc.client) ||
 		(oidc.claims.id_token && 'sid' in oidc.claims.id_token)
 	) {
 		code.payload.sid = oidc.session.sidFor(oidc.client.clientId);

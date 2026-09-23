@@ -14,7 +14,7 @@ import {
 
 import nanoid from '../../lib/helpers/nanoid.ts';
 import { eventBus } from '../../lib/index.ts';
-import bootstrap, { agent } from '../test_helper.js';
+import bootstrap, { agent, changeClient } from '../test_helper.js';
 import {
 	mock as mockHttp,
 	assertNoPendingInterceptors
@@ -23,7 +23,7 @@ import clientKey from '../client.sig.key.js';
 import * as JWT from '../../lib/helpers/jwt.ts';
 import { ISSUER } from 'lib/configs/env.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
-import { Client } from 'lib/models/client.js';
+import { Client, clientKeys } from 'lib/models/client.js';
 
 const mtlsKeys = JSON.parse(
 	readFileSync('test/jwks/jwks.json', {
@@ -479,9 +479,9 @@ describe('client authentication options', () => {
 
 		beforeEach(async function () {
 			key = await importJWK(
-				(
+				clientKeys(
 					await Client.find('client-jwt-secret')
-				).symmetricKeyStore.selectForSign({ alg: 'HS256' })[0]
+				).symmetric.selectForSign({ alg: 'HS256' })[0]
 			);
 		});
 
@@ -1072,9 +1072,9 @@ describe('client authentication options', () => {
 
 		it('rejects assertions when the secret is expired', async function () {
 			const key = await importJWK(
-				(
+				clientKeys(
 					await Client.find('secret-expired-jwt')
-				).symmetricKeyStore.selectForSign({ alg: 'HS256' })[0]
+				).symmetric.selectForSign({ alg: 'HS256' })[0]
 			);
 			const assertion = await JWT.sign(
 				{
@@ -1149,15 +1149,25 @@ describe('client authentication options', () => {
 				expect(error.value).toEqual(tokenAuthRejected);
 			});
 		});
+	});
 
+	describe('private_key_jwt auth', () => {
+		const privateKey = createPrivateKey({ format: 'jwk', key: clientKey });
+
+		/*
+		 * Reached with a key-authenticated client: this deployment admits one HMAC algorithm for
+		 * client_secret_jwt, so a secret-authenticated client cannot register a different one to mismatch.
+		 */
 		describe('when token_endpoint_auth_signing_alg is set on the client', () => {
+			let restore: () => Promise<void>;
+
 			beforeEach(async function () {
-				(await Client.find('client-jwt-secret')).tokenEndpointAuthSigningAlg =
-					'HS384';
+				restore = await changeClient('client-jwt-key', {
+					token_endpoint_auth_signing_alg: 'PS256'
+				});
 			});
 			afterEach(async function () {
-				delete (await Client.find('client-jwt-secret'))
-					.tokenEndpointAuthSigningAlg;
+				await restore();
 			});
 
 			it('rejects signatures with different algorithm', async function () {
@@ -1168,11 +1178,11 @@ describe('client authentication options', () => {
 					{
 						jti: nanoid(),
 						aud: ISSUER,
-						sub: 'client-jwt-secret',
-						iss: 'client-jwt-secret'
+						sub: 'client-jwt-key',
+						iss: 'client-jwt-key'
 					},
-					key,
-					'HS256',
+					privateKey,
+					'RS256',
 					{
 						expiresIn: 60
 					}
@@ -1195,10 +1205,6 @@ describe('client authentication options', () => {
 				expect(error.value).toEqual(tokenAuthRejected);
 			});
 		});
-	});
-
-	describe('private_key_jwt auth', () => {
-		const privateKey = createPrivateKey({ format: 'jwk', key: clientKey });
 
 		it('accepts the auth', async function () {
 			const assertion = await JWT.sign(

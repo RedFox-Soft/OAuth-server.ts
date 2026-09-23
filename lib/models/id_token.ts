@@ -10,9 +10,12 @@ import {
 } from 'lib/configs/issuer.js';
 import { keystore } from 'lib/configs/keystore.js';
 import { type Client } from './client.js';
+// From the module itself, not the seam: the seam reaches this module back through the notifications.
+import { clientKeys } from './client/keys.ts';
 import { Claims } from 'lib/helpers/claims.js';
 import { merge } from 'lib/helpers/_/object.js';
 import { clockTolerance, ttl } from 'lib/configs/liveTime.js';
+import { checkClientSecretExpiration } from './client/secret.ts';
 
 const messages = {
 	sig: {
@@ -171,10 +174,10 @@ export class IdToken {
 			if (alg.startsWith('HS')) {
 				if (use !== 'authorization') {
 					// handled in checkResponseMode
-					client.checkClientSecretExpiration(format(messages.sig[use], alg));
+					checkClientSecretExpiration(client, format(messages.sig[use], alg));
 				}
-				[jwk] = client.symmetricKeyStore.selectForSign({ alg, use: 'sig' });
-				key = client.symmetricKeyStore.getKeyObject(jwk);
+				[jwk] = clientKeys(client).symmetric.selectForSign({ alg, use: 'sig' });
+				key = clientKeys(client).symmetric.getKeyObject(jwk);
 			} else {
 				[jwk] = keystore.selectForSign({
 					alg,
@@ -197,7 +200,8 @@ export class IdToken {
 		if (/^(A|dir$)/.test(encryption.alg)) {
 			if (use !== 'authorization') {
 				// handled in checkResponseMode
-				client.checkClientSecretExpiration(
+				checkClientSecretExpiration(
+					client,
 					format(messages.enc[use], encryption.alg)
 				);
 			}
@@ -206,25 +210,27 @@ export class IdToken {
 		let jwk;
 		let encryptionKey;
 		if (encryption.alg === 'dir') {
-			[jwk] = client.symmetricKeyStore.selectForEncrypt({
+			[jwk] = clientKeys(client).symmetric.selectForEncrypt({
 				alg: encryption.enc,
 				use: 'enc'
 			});
-			jwk && (encryptionKey = client.symmetricKeyStore.getKeyObject(jwk, true));
+			jwk &&
+				(encryptionKey = clientKeys(client).symmetric.getKeyObject(jwk, true));
 		} else if (encryption.alg.startsWith('A')) {
-			[jwk] = client.symmetricKeyStore.selectForEncrypt({
-				alg: encryption.alg,
-				use: 'enc'
-			});
-			jwk && (encryptionKey = client.symmetricKeyStore.getKeyObject(jwk, true));
-		} else {
-			await client.asymmetricKeyStore.refresh();
-			[jwk] = client.asymmetricKeyStore.selectForEncrypt({
+			[jwk] = clientKeys(client).symmetric.selectForEncrypt({
 				alg: encryption.alg,
 				use: 'enc'
 			});
 			jwk &&
-				(encryptionKey = client.asymmetricKeyStore.getKeyObject(jwk, true));
+				(encryptionKey = clientKeys(client).symmetric.getKeyObject(jwk, true));
+		} else {
+			await clientKeys(client).asymmetric.refresh();
+			[jwk] = clientKeys(client).asymmetric.selectForEncrypt({
+				alg: encryption.alg,
+				use: 'enc'
+			});
+			jwk &&
+				(encryptionKey = clientKeys(client).asymmetric.getKeyObject(jwk, true));
 		}
 
 		if (!encryptionKey) {
@@ -257,10 +263,11 @@ export class IdToken {
 
 		let keyOrStore;
 		if (alg.startsWith('HS')) {
-			client.checkClientSecretExpiration(
+			checkClientSecretExpiration(
+				client,
 				'client secret is expired - cannot validate ID Token Hint'
 			);
-			keyOrStore = client.symmetricKeyStore;
+			keyOrStore = clientKeys(client).symmetric;
 		} else {
 			keyOrStore = keystore;
 		}

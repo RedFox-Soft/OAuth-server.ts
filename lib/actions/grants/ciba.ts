@@ -171,7 +171,7 @@ export const handler = async function cibaHandler(oidc, dPoP) {
 			sid: request.payload.sid
 		});
 
-		if (oidc.client.clientAuthMethod === 'none') {
+		if (oidc.client.tokenEndpointAuthMethod === 'none') {
 			if (at.payload.jkt) {
 				rt.payload.jkt = at.payload.jkt;
 			}

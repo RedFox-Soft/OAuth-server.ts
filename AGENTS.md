@@ -80,7 +80,7 @@ lib/
     authorization/      ← authorization endpoint pipeline (validate → interact → respond)
     grants/             ← grant type handlers (auth_code, refresh_token, device, ciba)
   models/               ← AccessToken, RefreshToken, IdToken, Grant, Session, …
-    client/             ← client checks, secret, sector, keystore, backchannel, validate, schema
+    client/             ← validate, register, projection, types, checks, secret, sector, keys, schema
   addon/                ← overridable behaviour functions; index.ts is the single import seam
   helpers/              ← JWT, crypto, claims, validation utilities; errors.ts
   plugins/              ← Elysia plugins: noCache, noQueryDup, auth, feature gate, rate limit, …
@@ -90,7 +90,7 @@ lib/
   configs/              ← application.ts (ApplicationConfig), clientBase.ts, keys, algorithm lists
   consts/               ← import-free declarations: storage inventory, migrations, client attributes, …
   interactions/         ← login/consent/registration UI endpoints (React + Ant Design)
-  shared/               ← session, the shared onError, token auth, resource validation
+  shared/               ← session, the shared onError, token auth, client notifications, resource validation
   resources/            ← declared protected resources: canonical form, matching, descriptors
   client_metadata_document/ ← a client_id that is a URL: form rules, SSRF-bounded fetch, cache
   admin/                ← the administrative control plane
@@ -138,7 +138,10 @@ Each rule is the part that is easy to break. Read the named page before changing
 - **Clients** — a client is a validated plain object read from `adapter('Client')` on every
   resolution; there is no boot-time `clients` option. A URL `client_id` may resolve to a metadata
   document, and that branch must stay after the adapter read. Registration attributes are declared once,
-  in `lib/consts/client_attributes.ts`, and kept flat. → `client-identity-from-database.md`,
+  in `lib/consts/client_attributes.ts`, and kept flat. A resolved client is frozen data: use the functions
+  in `lib/models/client.ts`, read key material through `clientKeys(client)`, write only through
+  `registerClient`, and in a test change the stored record (`changeClient`), never the object.
+  → `client-identity-from-database.md`,
   `client-registration-attributes.md`, `mcp-server-authorization.md`
 - **Buckets** — a bucket is addressed by a path segment or a hostname, never both, and is its own
   issuer. The request host is read only by `hostOfRequest`, never from `X-Forwarded-Host`. Which bucket

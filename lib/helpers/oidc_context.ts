@@ -12,6 +12,7 @@ import {
 	type RequestBucket
 } from 'lib/configs/issuer.js';
 import { getCertificate } from '../addon/index.js';
+import { type Client } from '../models/client/types.ts';
 
 /* Re-exported so the request pipeline can keep importing these from here, while the declaration lives
  * beside `issuerFor` — the models need it and must not reach into the request context to get it. */
@@ -21,6 +22,11 @@ export class OIDCContext<T extends Record<string, unknown>> {
 	#requestParamClaims = null;
 
 	#accessToken: string | null = null;
+	/*
+	 * The resolved client, typed. The other entities stay untyped for now: typing them means typing every
+	 * token model this context holds.
+	 */
+	#client: Client | undefined;
 	params: T;
 	#headers: Record<string, string | undefined>;
 
@@ -83,6 +89,7 @@ export class OIDCContext<T extends Record<string, unknown>> {
 		this.entities[key] = value;
 
 		if (key === 'Client') {
+			this.#client = value;
 			// `this` is the oidc context (formerly the `ctx.oidc` payload); there is no
 			// `ctx` wrapper anymore, so emit the context itself as the event payload.
 			eventBus.emit('assign.client', this, value);
@@ -237,8 +244,20 @@ export class OIDCContext<T extends Record<string, unknown>> {
 		return this.entities.Account;
 	}
 
-	get client() {
-		return this.entities.Client;
+	get client(): Client | undefined {
+		return this.#client;
+	}
+
+	/*
+	 * The client, for code that runs only after the request has authenticated one. Its absence there
+	 * is a defect in the pipeline, not something a caller did, so it surfaces as one rather than as an
+	 * OAuth refusal.
+	 */
+	get authenticatedClient(): Client {
+		if (!this.#client) {
+			throw new Error('no client has been authenticated on this request');
+		}
+		return this.#client;
 	}
 
 	get grant() {
