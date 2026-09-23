@@ -11,6 +11,7 @@ export type {
 	AlwaysPresent,
 	ClientData,
 	ClientRecord,
+	StoredClient,
 	WireClient
 } from './client/types.ts';
 

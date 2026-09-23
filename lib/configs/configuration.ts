@@ -1,5 +1,9 @@
 import { isPlainObject, merge } from '../helpers/_/object.js';
 import * as formatters from '../helpers/formatters.ts';
+import {
+	CIBA_DELIVERY_MODES,
+	type TokenEndpointAuthMethod
+} from '../consts/client_attributes.ts';
 // Type-only, so it adds no runtime edge back to the module that calls this one. ApplicationConfig
 // declares every setting, which makes `typeof` it the exact type of what is being validated — a
 // misspelled flag read below is a compile error rather than a silently-undefined lookup.
@@ -317,7 +321,7 @@ function checkCibaDeliveryModes(config: ConfigurationInput) {
 	}
 
 	for (const mode of modes) {
-		if (!['ping', 'poll'].includes(mode)) {
+		if (!CIBA_DELIVERY_MODES.some((supported) => supported === mode)) {
 			throw new TypeError(
 				'only poll and ping CIBA delivery modes are supported'
 			);
@@ -484,21 +488,24 @@ function checkAuthMethods(
 	config: ConfigurationInput,
 	clientAuthMethods: Set<string>
 ) {
-	const authMethods = new Set([
+	// Typed so a method outside TOKEN_ENDPOINT_AUTH_METHODS cannot be admitted here without the list.
+	const admitted: TokenEndpointAuthMethod[] = [
 		'none',
 		'client_secret_basic',
 		'client_secret_jwt',
 		'client_secret_post',
 		'private_key_jwt'
-	]);
+	];
 
 	if (config['mTLS.enabled'] && config['mTLS.tlsClientAuth']) {
-		authMethods.add('tls_client_auth');
+		admitted.push('tls_client_auth');
 	}
 
 	if (config['mTLS.enabled'] && config['mTLS.selfSignedTlsClientAuth']) {
-		authMethods.add('self_signed_tls_client_auth');
+		admitted.push('self_signed_tls_client_auth');
 	}
+
+	const authMethods = new Set<string>(admitted);
 
 	clientAuthMethods.forEach((method) => {
 		if (!authMethods.has(method)) {

@@ -33,15 +33,15 @@ export interface CreateClientInput {
 	clientId?: string;
 	clientName?: string;
 	applicationType?: 'web' | 'native';
-	grantTypes: string[];
-	redirectUris?: string[];
-	postLogoutRedirectUris?: string[];
+	grantTypes: readonly string[];
+	redirectUris?: readonly string[];
+	postLogoutRedirectUris?: readonly string[];
 	tokenEndpointAuthMethod: string;
 	scope?: string;
 	requireConsent?: boolean;
 	backchannelTokenDeliveryMode?: string;
 	backchannelClientNotificationEndpoint?: string;
-	authorizationDetailsTypes?: string[];
+	authorizationDetailsTypes?: readonly string[];
 }
 
 export type UpdateClientInput = Partial<CreateClientInput>;
@@ -50,7 +50,7 @@ function generateSecret(): string {
 	return crypto.randomBytes(48).toString('base64url');
 }
 
-function responseTypesFor(grantTypes: string[]): string[] {
+function responseTypesFor(grantTypes: readonly string[]): string[] {
 	return grantTypes.includes('authorization_code') ? ['code'] : [];
 }
 
@@ -91,36 +91,25 @@ function toMetadata(input: CreateClientInput, clientId: string) {
 	return metadata;
 }
 
-function toView(client: {
-	clientId: string;
-	clientName?: string;
-	applicationType?: string;
-	grantTypes?: string[];
-	responseTypes?: string[];
-	redirectUris?: string[];
-	postLogoutRedirectUris?: string[];
-	tokenEndpointAuthMethod?: string;
-	scope?: string;
-	backchannelTokenDeliveryMode?: string;
-	backchannelClientNotificationEndpoint?: string;
-	authorizationDetailsTypes?: string[];
-	['consent.require']?: boolean;
-}): AdminClientView {
+// The view is handed out, so its lists are copies rather than the frozen client's own.
+function toView(client: Client): AdminClientView {
 	return {
 		clientId: client.clientId,
 		clientName: client.clientName,
-		applicationType: client.applicationType ?? 'web',
-		grantTypes: client.grantTypes ?? [],
-		responseTypes: client.responseTypes ?? [],
-		redirectUris: client.redirectUris ?? [],
-		postLogoutRedirectUris: client.postLogoutRedirectUris ?? [],
-		tokenEndpointAuthMethod: client.tokenEndpointAuthMethod ?? 'none',
+		applicationType: client.applicationType,
+		grantTypes: [...client.grantTypes],
+		responseTypes: [...client.responseTypes],
+		redirectUris: [...client.redirectUris],
+		postLogoutRedirectUris: [...(client.postLogoutRedirectUris ?? [])],
+		tokenEndpointAuthMethod: client.tokenEndpointAuthMethod,
 		scope: client.scope,
 		requireConsent: client['consent.require'] !== false,
 		backchannelTokenDeliveryMode: client.backchannelTokenDeliveryMode,
 		backchannelClientNotificationEndpoint:
 			client.backchannelClientNotificationEndpoint,
-		authorizationDetailsTypes: client.authorizationDetailsTypes
+		authorizationDetailsTypes: client.authorizationDetailsTypes && [
+			...client.authorizationDetailsTypes
+		]
 	};
 }
 

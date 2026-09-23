@@ -15,6 +15,27 @@
  * sit after the mTLS group rather than beside the unconditional ones at the top.
  */
 
+/*
+ * Every token endpoint authentication method and CIBA delivery mode this server can admit. A
+ * deployment admits a subset (its `clientAuthMethods`, its `ciba.deliveryModes`), and the configuration
+ * check refuses anything outside these lists — so they are also exactly what a validated client can
+ * carry, which is why the client's type is derived from them.
+ */
+export const TOKEN_ENDPOINT_AUTH_METHODS = [
+	'none',
+	'client_secret_basic',
+	'client_secret_jwt',
+	'client_secret_post',
+	'private_key_jwt',
+	'tls_client_auth',
+	'self_signed_tls_client_auth'
+] as const;
+export type TokenEndpointAuthMethod =
+	(typeof TOKEN_ENDPOINT_AUTH_METHODS)[number];
+
+export const CIBA_DELIVERY_MODES = ['poll', 'ping'] as const;
+export type CibaDeliveryMode = (typeof CIBA_DELIVERY_MODES)[number];
+
 /** A permitted-value set, exactly as the validator has always received it. */
 export type ValueSet = ReadonlySet<string> | readonly string[];
 

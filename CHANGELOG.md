@@ -17,6 +17,9 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Changed
 
+- client: the client's type names its closed value sets (authentication method, CIBA delivery mode,
+  signing algorithms) from the lists the configuration check uses, is read-only all the way down to
+  match the freeze, and `adapter('Client')` is typed as holding a `StoredClient`.
 - client: the validated client has a type that matches it — the attributes a default always fills are
   required, `client_name`, `contacts`, `default_acr_values` and `client_id_issued_at` are declared — and
   the request context carries it typed (`oidc.client`, `oidc.authenticatedClient`).

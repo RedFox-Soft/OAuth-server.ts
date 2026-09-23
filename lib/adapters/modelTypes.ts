@@ -3,6 +3,7 @@ import type { AccessTokenPayloadType } from '../models/access_token.js';
 import type { AuthorizationCodePayloadType } from '../models/authorization_code.js';
 import type { BackchannelAuthenticationRequestPayloadType } from '../models/backchannel_authentication_request.js';
 import type { ClientCredentialsPayload } from '../models/client_credentials.js';
+import type { StoredClient } from '../models/client/types.js';
 import type { DeviceCodePayloadType } from '../models/device_code.js';
 import type { FederationStatePayload } from '../federation/types.js';
 import type { GrantPayloadType } from '../models/grant.js';
@@ -47,7 +48,7 @@ export interface ModelPayloadByName {
 	AccessToken: AccessTokenPayloadType;
 	AuthorizationCode: AuthorizationCodePayloadType;
 	BackchannelAuthenticationRequest: BackchannelAuthenticationRequestPayloadType;
-	Client: Record<string, unknown>;
+	Client: StoredClient;
 	ClientCredentials: ClientCredentialsPayload;
 	DeviceCode: DeviceCodePayloadType;
 	FederationState: FederationStatePayload;

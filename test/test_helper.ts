@@ -222,11 +222,14 @@ export async function changeClient(
 	if (!stored) {
 		throw new Error(`no client '${clientId}' is seeded in the Client store`);
 	}
-	const next = Object.fromEntries(
-		Object.entries({ ...stored, ...changes }).filter(
-			([, value]) => value !== undefined
-		)
-	);
+	const next = {
+		...Object.fromEntries(
+			Object.entries({ ...stored, ...changes }).filter(
+				([, value]) => value !== undefined
+			)
+		),
+		clientId
+	};
 	await adapter('Client').upsert(clientId, next);
 	return async () => {
 		await adapter('Client').upsert(clientId, stored);

@@ -326,6 +326,7 @@ describe('Back-Channel Logout 1.0', () => {
 			};
 			// The state a deployment reaches when the client's registration drops its logout URI.
 			const registered = await adapter('Client').find('client');
+			if (!registered) throw new Error('the seeded client is missing');
 			const withoutUri = { ...registered };
 			delete withoutUri.backchannel_logout_uri;
 			await adapter('Client').upsert('client', withoutUri);

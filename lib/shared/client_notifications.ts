@@ -2,6 +2,9 @@ import { STATUS_CODES } from 'node:http';
 
 import nanoid from '../helpers/nanoid.ts';
 import { IdToken } from '../models/id_token.ts';
+import { type Client } from '../models/client/types.ts';
+import { isPlainObject } from '../helpers/_/object.js';
+import { type BackchannelAuthenticationRequest } from '../models/backchannel_authentication_request.ts';
 
 /*
  * The notifications this server sends to a client. They perform network requests and mint a logout
@@ -10,7 +13,15 @@ import { IdToken } from '../models/id_token.ts';
  */
 export const clientNotifications = { ping, logout };
 
-async function ping(client, backchannelAuthenticationRequest) {
+async function ping(
+	client: Client,
+	backchannelAuthenticationRequest: BackchannelAuthenticationRequest
+) {
+	// The stored params are opaque to the model; the notification token is the one member read here.
+	const params = backchannelAuthenticationRequest?.payload.params;
+	const notificationToken = isPlainObject(params)
+		? params.client_notification_token
+		: undefined;
 	if (
 		!client.backchannelClientNotificationEndpoint ||
 		client.backchannelTokenDeliveryMode !== 'ping' ||
@@ -18,15 +29,17 @@ async function ping(client, backchannelAuthenticationRequest) {
 		!backchannelAuthenticationRequest.jti ||
 		backchannelAuthenticationRequest.payload.kind !==
 			'BackchannelAuthenticationRequest' ||
-		!backchannelAuthenticationRequest.payload.params.client_notification_token
+		typeof notificationToken !== 'string' ||
+		!notificationToken
 	) {
 		throw new TypeError();
 	}
 
-	return fetch(new URL(client.backchannelClientNotificationEndpoint).href, {
+	const endpoint = client.backchannelClientNotificationEndpoint;
+	return fetch(new URL(endpoint).href, {
 		method: 'POST',
 		headers: {
-			authorization: `Bearer ${backchannelAuthenticationRequest.payload.params.client_notification_token}`,
+			authorization: `Bearer ${notificationToken}`,
 			'content-type': 'application/json'
 		},
 		body: JSON.stringify({
@@ -35,16 +48,22 @@ async function ping(client, backchannelAuthenticationRequest) {
 	}).then((response) => {
 		const { status } = response;
 		if (status !== 204 && status !== 200) {
-			const error = new Error(
-				`expected 204 No Content from ${client.backchannelClientNotificationEndpoint}, got: ${status} ${STATUS_CODES[status]}`
+			throw Object.assign(
+				new Error(
+					`expected 204 No Content from ${endpoint}, got: ${status} ${STATUS_CODES[status]}`
+				),
+				{ response }
 			);
-			error.response = response;
-			throw error;
 		}
 	});
 }
 
-async function logout(client, sub, sid) {
+// sid is absent when the session never recorded one for this client; it is only sent when required.
+async function logout(
+	client: Client,
+	sub: string | undefined,
+	sid: string | undefined
+) {
 	const logoutToken = new IdToken(client, { sub });
 	logoutToken.mask = { sub: null };
 	logoutToken.set('events', {
@@ -56,7 +75,8 @@ async function logout(client, sub, sid) {
 		logoutToken.set('sid', sid);
 	}
 
-	return fetch(new URL(client.backchannelLogoutUri).href, {
+	// String(): what new URL() does to an absent value itself; callers check the URI is registered.
+	return fetch(new URL(String(client.backchannelLogoutUri)).href, {
 		method: 'POST',
 		headers: {
 			'content-type': 'application/x-www-form-urlencoded'
@@ -67,11 +87,12 @@ async function logout(client, sub, sid) {
 	}).then((response) => {
 		const { status } = response;
 		if (status !== 200 && status !== 204) {
-			const error = new Error(
-				`expected 200 OK from ${client.backchannelLogoutUri}, got: ${status} ${STATUS_CODES[status]}`
+			throw Object.assign(
+				new Error(
+					`expected 200 OK from ${client.backchannelLogoutUri}, got: ${status} ${STATUS_CODES[status]}`
+				),
+				{ response }
 			);
-			error.response = response;
-			throw error;
 		}
 	});
 }

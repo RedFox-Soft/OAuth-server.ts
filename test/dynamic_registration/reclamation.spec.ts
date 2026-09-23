@@ -80,10 +80,8 @@ describe('reclaiming registrations nobody took up', () => {
 	 */
 	it('never removes one that completed an authorization, however old', async () => {
 		const used = await register();
-		const stored = (await adapter('Client').find(used)) as Record<
-			string,
-			unknown
-		>;
+		const stored = await adapter('Client').find(used);
+		if (!stored) throw new Error('the registration was not stored');
 		await adapter('Client').upsert(used, {
 			...stored,
 			registrationUsedAt: Math.floor(Date.now() / 1000)

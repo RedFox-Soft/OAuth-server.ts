@@ -1,6 +1,11 @@
 import mapKeys from '../../helpers/_/map_keys.ts';
 import snakeCase from '../../helpers/_/snake_case.ts';
-import { type Client, type ClientRecord, type WireClient } from './types.ts';
+import {
+	type Client,
+	type ClientRecord,
+	type StoredClient,
+	type WireClient
+} from './types.ts';
 import { buildRecognizedMetadata } from './schema.ts';
 import { canonicalToSnake, snakeToCanonical } from './wire.ts';
 
@@ -12,10 +17,10 @@ import { canonicalToSnake, snakeToCanonical } from './wire.ts';
  */
 
 // camelCase → the stored record: recognised metadata goes back to its wire name.
-export function toStored(client: Client): ClientRecord {
+export function toStored(client: Client): StoredClient {
 	const recognized = buildRecognizedMetadata();
 
-	return mapKeys(client, (value, key) => {
+	const stored = mapKeys(client, (value, key) => {
 		const snaked = snakeCase(key);
 		if (!recognized.includes(snaked)) {
 			return key;
@@ -23,6 +28,8 @@ export function toStored(client: Client): ClientRecord {
 
 		return snaked;
 	});
+	// clientId is a base key, never renamed, and every validated client has one.
+	return { ...stored, clientId: client.clientId };
 }
 
 // The metadata echoed to a registering client (RFC 7591 §3.2.1, RFC 7592 §3): all snake_case.

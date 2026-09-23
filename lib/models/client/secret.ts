@@ -27,14 +27,13 @@ const signAlgAttributes = [
 	'authorization_signed_response_alg'
 ];
 
-function isSymmetricAlg(prop) {
-	const value = this[prop];
-	return /^(A|dir$)/.test(value);
+// String() is what RegExp#test does to a non-string anyway; it is spelled out for the type checker.
+function isSymmetricAlg(this: Readonly<Record<string, unknown>>, prop: string) {
+	return /^(A|dir$)/.test(String(this[prop]));
 }
 
-function isHmac(prop) {
-	const value = this[prop];
-	return /^HS/.test(value);
+function isHmac(this: Readonly<Record<string, unknown>>, prop: string) {
+	return /^HS/.test(String(this[prop]));
 }
 
 // Constant-time compare with the preserved 1000ms floor.
@@ -71,8 +70,12 @@ export function checkClientSecretExpiration(
 // Auth-method / HMAC / symmetric-encryption derivation. Operates on recognized
 // snake_case metadata plus the canonical dotted `requestObject.signingAlg` key
 // (callers must make that key readable on the passed object — see schema.ts).
-export function needsSecret(metadata): boolean {
-	if (!nonSecretAuthMethods.has(metadata.token_endpoint_auth_method)) {
+export function needsSecret(submitted: object): boolean {
+	// Read by name: the validator hands in its own instance, which carries the attributes as own
+	// properties but has no index signature.
+	const metadata = submitted as Readonly<Record<string, unknown>>;
+	const method = metadata.token_endpoint_auth_method;
+	if (typeof method !== 'string' || !nonSecretAuthMethods.has(method)) {
 		return true;
 	}
 

@@ -26,6 +26,7 @@ describe('clients resolved from the storage adapter', () => {
 		// Populate the validation memo first, then mutate the stored record.
 		await Client.find('db-client');
 		const current = await adapter('Client').find('db-client');
+		if (!current) throw new Error('the seeded client is missing');
 		await adapter('Client').upsert('db-client', {
 			...current,
 			redirectUris: ['https://client.example.com/updated']

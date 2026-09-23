@@ -64,8 +64,16 @@ exported from `lib/models/client.ts`: `redirectUriAllowed(client, uri)`,
   requests and mint a logout token, so they sit in `lib/shared/client_notifications.ts` on one object
   (`clientNotifications`, line 11) that a test can spy on.
 - **`Client` is an object**, `{ tryFind, find }` (`lib/models/client.ts`), and the type of the same
-  name is the validated client (`lib/models/client/types.ts`): `ClientSchema`'s attributes, read-only,
-  with the ones a default always fills marked present. There is no `instanceof Client`.
+  name is the validated client (`lib/models/client/types.ts`): `ClientSchema`'s attributes, read-only
+  all the way down as the object is frozen, with the ones a default always fills marked present. There
+  is no `instanceof Client`.
+- **Closed sets are named in the type, not in the schema.** `ClientSchema` declares the authentication
+  method, the CIBA delivery mode and the response signing algorithms as any string, because the set a
+  deployment admits is resolved while validation runs. Each such set is a subset of a fixed list —
+  `TOKEN_ENDPOINT_AUTH_METHODS` and `CIBA_DELIVERY_MODES` in `lib/consts/client_attributes.ts`, which the
+  configuration check itself uses, and the JWA lists — so the client's type names the list while the
+  runtime schema is left as it was. The stored record is typed too: `adapter('Client')` holds a
+  `StoredClient`.
 - **The type describes the object.** `ALWAYS_PRESENT` (`types.ts:15`) lists the attributes defaulted
   whatever is switched on, and `test/dynamic_registration/defaults.spec.ts` holds it to the declaration
   in both directions — on its first run it found `dpop_bound_access_tokens`, which the list had missed.

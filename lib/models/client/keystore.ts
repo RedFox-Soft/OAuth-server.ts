@@ -1,6 +1,6 @@
 import { STATUS_CODES } from 'node:http';
 
-import { Type as t } from '@sinclair/typebox';
+import { Type as t, type Static } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
 
 import KeyStore from '../../helpers/keystore.ts';
@@ -54,12 +54,21 @@ const OKPPubKey = t.Object({
 	x: t.String({ minLength: 1 })
 });
 
-export function validateJWK(jwk) {
-	if (!isPlainObject(jwk) || !(typeof jwk.kty === 'string' && jwk.kty)) {
+/* A client's public key, in one of the shapes validateJWK admits. */
+export type PublicJWK =
+	Static<typeof RSAPubKey> | Static<typeof ECPubKey> | Static<typeof OKPPubKey>;
+
+/* A key this server can use, undefined for one it skips (an unknown type or curve), or a refusal. */
+export function validateJWK(value: unknown): PublicJWK | undefined {
+	if (!isPlainObject(value)) {
+		throw new InvalidClientMetadata('client JSON Web Key Set is invalid');
+	}
+	const jwk = value;
+	if (!(typeof jwk.kty === 'string' && jwk.kty)) {
 		throw new InvalidClientMetadata('client JSON Web Key Set is invalid');
 	}
 
-	let schema;
+	let schema: typeof RSAPubKey | typeof ECPubKey | typeof OKPPubKey;
 	switch (jwk.kty) {
 		case 'RSA':
 			schema = RSAPubKey;
