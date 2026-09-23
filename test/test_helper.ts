@@ -37,7 +37,8 @@ type SeedableUserStore = ReturnType<typeof getUserStore> & {
 
 import {
 	ApplicationConfig,
-	reloadConfiguration
+	reloadConfiguration,
+	settingsApplied
 } from '../lib/configs/application.js';
 import { ClientDefaults } from 'lib/configs/clientBase.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
@@ -408,6 +409,13 @@ async function bootstrap(
 	// init step — nothing is configured through the provider.
 	await seedJwks(jwksOverride?.keys ?? testSigningKeys);
 	reloadConfiguration();
+	/*
+	 * This spec's settings replace the last one's, so whatever was derived under those goes too — above
+	 * all the client validation memo, which is keyed by the stored record alone. Without this, a spec
+	 * resolving a record another spec had resolved under different capabilities got that spec's client,
+	 * and passed or failed by file order: Windows and CI walk the specs in different orders.
+	 */
+	settingsApplied(Object.keys(ApplicationConfig));
 
 	// Clients now live in the Client store (single source of truth); seed each
 	// exported client so tryFindClient resolves it from the adapter.

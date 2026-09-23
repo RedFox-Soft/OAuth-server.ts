@@ -40,7 +40,11 @@ are reflected immediately because the adapter read is unconditional — the comm
 window would let a revoked or edited client keep operating.
 
 The store is a size-bounded `QuickLRU` with `maxSize: 100` and **no time-based expiry**
-(`validate.ts:117`), emptied on every settings save (`validate.ts:125`). The comment records why entries are not evicted on a timer: doing so would
+(`validate.ts:117`), emptied on every settings save (`validate.ts:125`). The test harness empties it
+too: `bootstrap` replaces the settings once per spec file and runs the same invalidators
+(`settingsApplied` in `lib/configs/application.ts`). Before it did, a spec resolving a record another
+spec had already resolved under different capabilities received that spec's client, so the two
+signed-userinfo cases in `test/id_token_claims/` passed on Windows's file order and failed on CI's. The comment records why entries are not evicted on a timer: doing so would
 "drop entries out from under in-flight resolutions".
 
 ## A resolved client is frozen data

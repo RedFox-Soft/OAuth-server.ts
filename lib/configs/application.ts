@@ -877,6 +877,17 @@ export function onSettingsApplied(invalidate: SettingsInvalidator): void {
 	invalidators.push(invalidate);
 }
 
+/*
+ * Run every registered invalidator. applySettings is the one caller in the server; the test harness is
+ * the other, because it too replaces the settings a running process holds — once per spec file — and
+ * state derived under one spec's settings must not survive into the next.
+ */
+export function settingsApplied(appliedKeys: readonly string[]): void {
+	for (const invalidate of invalidators) {
+		invalidate(appliedKeys);
+	}
+}
+
 export type ApplyOutcome =
 	| { state: 'applied'; appliedKeys: string[] }
 	| { state: 'withheld'; reason: string };
@@ -923,9 +934,7 @@ export function applySettings(changes: Record<string, unknown>): ApplyOutcome {
 
 	Object.assign(ApplicationConfig, changes);
 	reloadConfiguration();
-	for (const invalidate of invalidators) {
-		invalidate(appliedKeys);
-	}
+	settingsApplied(appliedKeys);
 
 	return { state: 'applied', appliedKeys };
 }
