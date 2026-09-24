@@ -271,8 +271,9 @@ describe('Pushed Request Object', async () => {
 							}
 						);
 						expect(error?.status).toBe(400);
+						// OIDC Core §3.1.2.6 names this error.
 						expect(error?.value).toEqual({
-							error: 'not_supported',
+							error: 'request_not_supported',
 							error_description: 'Request Object is not supported'
 						});
 					});

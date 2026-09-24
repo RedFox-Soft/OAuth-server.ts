@@ -11,6 +11,13 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- request parameters follow their specifications: `ui_locales` and `claims_locales` are one
+  space-separated string each (OIDC Core), no longer an array, and `ui_locales` sent twice is refused;
+  `registration`, and a disabled `request`/`request_uri`, are refused with the OIDC Core §3.1.2.6 codes
+  instead of `not_supported`; several or malformed `resource` values at `/token` are `invalid_target`
+  (RFC 8707), not `invalid_request`; a parameter sent twice to `GET /logout` is refused.
+- **breaking** — registration read (`GET /reg/:clientId`) no longer accepts the registration access
+  token in the query string (RFC 6750 §2.3, OAuth 2.1); send it in the Authorization header.
 - token, device authorization and CIBA endpoints answer as RFC 6749 §5.2 says: an unknown `grant_type` is
   `unsupported_grant_type` (was `invalid_request`), and a grant the client is not registered for is
   `unauthorized_client` (was `invalid_request`).

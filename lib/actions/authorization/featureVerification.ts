@@ -1,4 +1,8 @@
-import { NotSupportedError } from 'lib/helpers/errors.js';
+import {
+	NotSupportedError,
+	RequestNotSupported,
+	RequestUriNotSupported
+} from 'lib/helpers/errors.js';
 import { ApplicationConfig as config } from 'lib/configs/application.js';
 
 export function featureVerification(params: Record<string, unknown>) {
@@ -24,9 +28,10 @@ export function featureVerification(params: Record<string, unknown>) {
 		params.request !== undefined &&
 		!config['requestObjects.enabled']
 	) {
-		throw new NotSupportedError('Request Object is not supported');
+		// OIDC Core §3.1.2.6 names the error for each of these two.
+		throw new RequestNotSupported('Request Object is not supported');
 	} else if (params.request_uri !== undefined && !config['par.enabled']) {
 		// For Authorization endpoint only
-		throw new NotSupportedError('Request URI is not supported');
+		throw new RequestUriNotSupported('Request URI is not supported');
 	}
 }

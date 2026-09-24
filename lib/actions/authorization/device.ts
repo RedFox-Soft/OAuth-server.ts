@@ -125,7 +125,7 @@ async function authentication(
 export const deviceAuth = new Elysia()
 	.use(corsClientBased(formClientId))
 	.use(ignoreUnknownParams(DeviceAuthorizationBody))
-	.use(coerceArrayParams('ui_locales', 'resource'))
+	.use(coerceArrayParams('resource'))
 	.use(parseJsonParams('authorization_details'))
 	.guard({
 		body: DeviceAuthorizationBody,
@@ -176,7 +176,7 @@ export const deviceAuth = new Elysia()
 
 export const backchannelAuth = new Elysia()
 	.use(ignoreUnknownParams(BackchannelAuthenticationBody))
-	.use(coerceArrayParams('ui_locales', 'resource'))
+	.use(coerceArrayParams('resource'))
 	.use(parseJsonParams('authorization_details'))
 	.guard({
 		// request_uri and registration are accepted by the schema so the handler can reject them

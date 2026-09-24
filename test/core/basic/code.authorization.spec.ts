@@ -480,7 +480,14 @@ describe('BASIC code', () => {
 				);
 			});
 
-			['request', 'request_uri', 'registration'].forEach((param) => {
+			// OIDC Core §3.1.2.6 names the error for each of these parameters.
+			(
+				[
+					['request', 'request_not_supported'],
+					['request_uri', 'request_uri_not_supported'],
+					['registration', 'registration_not_supported']
+				] as const
+			).forEach(([param, code]) => {
 				it(`each unsupported parameter is refused`, async function () {
 					const spy = mock();
 					eventBus.once('authorization.error', spy);
@@ -500,8 +507,29 @@ describe('BASIC code', () => {
 					]);
 					auth.validateState(response);
 					auth.validateClientLocation(response);
-					auth.validateError(response, 'not_supported');
+					auth.validateError(response, code);
 				});
+			});
+
+			// OIDC Core §3.1.2.1: ui_locales is one space-separated list, and RFC 6749 §3.1 forbids
+			// sending a parameter twice.
+			it('refuses ui_locales sent twice', async function () {
+				const auth = new AuthorizationRequest({
+					scope,
+					// @ts-expect-error the case sends ui_locales twice, which the schema does not allow
+					ui_locales: ['fr', 'en']
+				});
+
+				const { response } = await authRequest(auth);
+				expect(response.status).toBe(303);
+				auth.validateClientLocation(response);
+				auth.validateError(response, 'invalid_request');
+				auth.validateErrorDescription(
+					response,
+					verb === 'get'
+						? 'Duplicate query parameter "ui_locales" detected'
+						: "Expected property 'ui_locales' to be string but found: fr,en"
+				);
 			});
 
 			describe('when client has a single redirect_uri', () => {

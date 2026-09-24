@@ -47,26 +47,16 @@ type Body = Record<string, unknown>;
 type RegistrationBody = Static<typeof RegistrationResponse>;
 
 // The registration routes authenticate with an opaque bearer token, not client auth. The token is
-// taken from the Authorization header (never the JSON body — a token in the body reads as absent),
-// and additionally from the `access_token` query on read. Absence is `invalid_request` (400) with
-// the RFC challenge text; an unresolved token surfaces later as `invalid_token` (401).
-function readBearer(
-	authorization: string | undefined,
-	query: Record<string, unknown> | undefined,
-	allowQuery: boolean
-) {
+// taken from the Authorization header only: never the JSON body (a token there reads as absent), and
+// not the `access_token` query either, which RFC 6750 §2.3 advises against and OAuth 2.1 removes — a
+// URL is written to logs and history. Absence is `invalid_request` (400) with the RFC challenge text;
+// an unresolved token surfaces later as `invalid_token` (401).
+function readBearer(authorization: string | undefined) {
 	if (typeof authorization === 'string') {
 		const [scheme, value] = authorization.split(' ');
 		if (scheme?.toLowerCase() === 'bearer' && value) {
 			return value;
 		}
-	}
-	if (
-		allowQuery &&
-		typeof query?.access_token === 'string' &&
-		query.access_token
-	) {
-		return query.access_token;
 	}
 	throw new InvalidRequest('no access token provided');
 }
@@ -112,10 +102,9 @@ async function validateInitialAccessToken(
 		ApplicationConfig['registration.initialAccessToken'];
 	switch (initialAccessToken && typeof initialAccessToken) {
 		case 'boolean': {
-			const iat = await InitialAccessToken.find(
-				readBearer(token, undefined, false),
-				{ error: new InvalidToken('initial access token not found') }
-			);
+			const iat = await InitialAccessToken.find(readBearer(token), {
+				error: new InvalidToken('initial access token not found')
+			});
 			oidc.entity('InitialAccessToken', iat);
 			break;
 		}
@@ -124,7 +113,7 @@ async function validateInitialAccessToken(
 			// union (false | string | true), which TypeScript does not narrow off `typeof`.
 			const valid = constantEquals(
 				initialAccessToken as string,
-				readBearer(token, undefined, false),
+				readBearer(token),
 				1000
 			);
 			if (!valid) {
@@ -254,7 +243,7 @@ async function create({ body, headers, params, request, set }) {
 	return responseBody;
 }
 
-async function read({ params, headers, query, request, set }) {
+async function read({ params, headers, request, set }) {
 	setBearerRealm(set);
 	const oidc = new OIDCContext<Body>({
 		params: {},
@@ -262,7 +251,7 @@ async function read({ params, headers, query, request, set }) {
 		route: 'registration',
 		bucket: await bucketOf(params, request)
 	});
-	const token = readBearer(headers.authorization, query, true);
+	const token = readBearer(headers.authorization);
 	const { client } = await authenticate(oidc, params.clientId, token);
 
 	const responseBody: RegistrationBody = {
@@ -289,7 +278,7 @@ async function update({ params, body, headers, request, set }) {
 		route: 'registration',
 		bucket: await bucketOf(params, request)
 	});
-	const token = readBearer(headers.authorization, undefined, false);
+	const token = readBearer(headers.authorization);
 	const { client, regAccessToken } = await authenticate(
 		oidc,
 		params.clientId,
@@ -402,7 +391,7 @@ async function remove({ params, headers, request, set }) {
 		route: 'registration',
 		bucket: await bucketOf(params, request)
 	});
-	const token = readBearer(headers.authorization, undefined, false);
+	const token = readBearer(headers.authorization);
 	const { client, regAccessToken } = await authenticate(
 		oidc,
 		params.clientId,

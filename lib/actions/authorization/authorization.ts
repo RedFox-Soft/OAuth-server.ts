@@ -205,7 +205,7 @@ async function authorizationActionHandler(oidc: OIDCContext<PipelineParams>) {
 
 export const authGet = new Elysia()
 	.use(ignoreUnknownParams(AuthorizationParameters))
-	.derive(noQueryDup(['resource', 'ui_locales', 'authorization_details']))
+	.derive(noQueryDup(['resource', 'authorization_details']))
 	.guard({
 		query: AuthorizationParameters,
 		cookie: AuthorizationCookies
@@ -242,7 +242,7 @@ export const authGet = new Elysia()
 
 export const authPost = new Elysia()
 	.use(ignoreUnknownParams(AuthorizationParameters))
-	.use(coerceArrayParams('ui_locales', 'resource'))
+	.use(coerceArrayParams('resource'))
 	.use(parseJsonParams('authorization_details'))
 	.guard({
 		body: AuthorizationParameters,

@@ -50,7 +50,8 @@ export const AuthorizationParameters = t.Object({
 	),
 
 	state: t.Optional(t.String()),
-	claims_locales: t.Optional(t.Array(t.String())),
+	// OIDC Core §5.2 and §3.1.2.1: one parameter each, a space-separated list, like scope.
+	claims_locales: t.Optional(t.String()),
 	code_challenge: t.Optional(t.String({ pattern: '^[A-Za-z0-9_-]{43}$' })),
 	code_challenge_method: t.Optional(t.Literal('S256')),
 	display: t.Optional(t.String()),
@@ -70,14 +71,14 @@ export const AuthorizationParameters = t.Object({
 	registration: t.Optional(
 		t.Undefined({
 			error: {
-				error: 'not_supported',
+				error: 'registration_not_supported',
 				error_description: 'Registration is not supported'
 			}
 		})
 	),
 	request: t.Optional(t.String()),
 	request_uri: t.Optional(t.String({ format: 'uri' })),
-	ui_locales: t.Optional(t.Array(t.String())),
+	ui_locales: t.Optional(t.String()),
 	acr_values: t.Optional(t.String()),
 
 	// added conditionally depending on feature flag which will be checked in the code

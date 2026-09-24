@@ -1,5 +1,6 @@
 import { hostOfRequest } from 'lib/consts/request_host.js';
 import { Elysia, t } from 'elysia';
+import { noQueryDup } from 'lib/plugins/noQueryDup.js';
 import * as crypto from 'node:crypto';
 
 import {
@@ -47,6 +48,8 @@ const logoutParameters = t.Object({
 });
 
 export const logoutAction = new Elysia()
+	// As at the authorization endpoint: a parameter sent twice is refused, not read one way.
+	.derive(noQueryDup())
 	.guard({
 		query: logoutParameters,
 		cookie: AuthorizationCookies

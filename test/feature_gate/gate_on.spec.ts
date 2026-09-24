@@ -91,7 +91,7 @@ describe('feature gate — capability on', () => {
 		expect(authorization.status).not.toBe(404);
 		const surfaced =
 			authorization.headers.get('location') ?? (await authorization.text());
-		expect(surfaced).toContain('not_supported');
+		expect(surfaced).toContain('request_uri_not_supported');
 	});
 
 	/*

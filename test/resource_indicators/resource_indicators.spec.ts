@@ -75,6 +75,7 @@ describe('features.resourceIndicators', () => {
 		});
 	});
 
+	// RFC 8707 §2: a resource that is "invalid, missing, unknown, or malformed" is invalid_target.
 	describe('resource validations', () => {
 		it('a resource indicator that is not an absolute URI is refused', async () => {
 			const { error } = await agent.token.post({
@@ -86,9 +87,23 @@ describe('features.resourceIndicators', () => {
 			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(error.value).toEqual({
-				error: 'invalid_request',
-				error_description: "Property 'resource' should be uri"
+				error: 'invalid_target',
+				error_description: 'resource indicator must be an absolute URI'
 			});
+		});
+
+		// RFC 8707 §2.2 lets a token request name several resources; this server issues a token for one
+		// audience, and says so with invalid_target rather than failing to read the request.
+		it('refuses a token request naming more than one resource as invalid_target', async () => {
+			const { error } = await formAgent.token.post({
+				client_id: 'client',
+				grant_type: 'client_credentials',
+				scope: 'api:read',
+				resource: ['urn:wl:opaque:default', 'urn:wl:jwt:default']
+			});
+			if (!error) throw new Error('expected error response');
+			expect(error.status).toBe(400);
+			expect(error.value).toHaveProperty('error', 'invalid_target');
 		});
 
 		it('refuses a resource indicator carrying a fragment', async () => {

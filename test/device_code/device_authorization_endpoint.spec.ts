@@ -76,8 +76,8 @@ describe('device_authorization_endpoint', () => {
 			});
 			if (!error) throw new Error('expected error response');
 
-			expect(error.status).toBeGreaterThanOrEqual(400);
-			expect(error.status).toBeLessThan(500);
+			expect(error.status).toBe(400);
+			expect(error.value).toHaveProperty('error', 'registration_not_supported');
 		});
 	});
 
@@ -141,6 +141,22 @@ describe('device_authorization_endpoint', () => {
 		expect(dc.payload.params).not.toHaveProperty('response_type');
 		expect(dc.payload.params).not.toHaveProperty('state');
 		expect(dc.payload.params).not.toHaveProperty('response_mode');
+	});
+
+	// OIDC Core §3.1.2.1 and §5.2: ui_locales and claims_locales are one parameter each, a
+	// space-separated list of language tags, and the request carries them on as the client wrote them.
+	it('keeps the locales a client asks for as the space-separated lists it sent', async () => {
+		const { data } = await post({
+			client_id: 'client',
+			scope: 'openid',
+			ui_locales: 'fr-CA fr en',
+			claims_locales: 'fr en'
+		});
+		if (!data?.device_code) throw new Error('expected a device code');
+
+		const dc = await DeviceCode.find(data.device_code);
+		expect(dc.payload.params).toHaveProperty('ui_locales', 'fr-CA fr en');
+		expect(dc.payload.params).toHaveProperty('claims_locales', 'fr en');
 	});
 
 	it('a client authenticating with its secret is accepted', async () => {

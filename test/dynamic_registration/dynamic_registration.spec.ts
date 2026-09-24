@@ -435,11 +435,13 @@ describe('registration features', () => {
 			expectFail(res, 401, 'invalid_token', 'invalid token provided');
 		});
 
-		it('a registration access token presented in the query string is accepted', async () => {
+		// RFC 6750 §2.3 says a token SHOULD NOT travel in the URL, and OAuth 2.1 removes that method:
+		// a URL is written to logs and history. UserInfo already refuses it.
+		it('a registration access token presented in the query string is refused', async () => {
 			const res = await agent
 				.reg({ clientId })
 				.get({ query: { access_token: token } });
-			expect(res.status).toBe(200);
+			expectFail(res, 400, 'invalid_request', 'no access token provided');
 		});
 
 		it('accepts a registration access token in the Authorization header', async () => {

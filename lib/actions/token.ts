@@ -28,7 +28,12 @@ import { grantTypeAllowed } from 'lib/models/client.js';
 const TokenRequestBody = t.Object({
 	...authParams.properties,
 	scope: t.Optional(t.String()),
-	resource: t.Optional(t.String({ format: 'uri' })),
+	/*
+	 * A string or several (RFC 8707 §2.2), and no URI format here: a malformed resource, or more than
+	 * this server issues one token for, is invalid_target, which the grant answers; a format check here
+	 * answered invalid_request first.
+	 */
+	resource: t.Optional(t.Union([t.String(), t.Array(t.String())])),
 	/*
 	 * Any string, not the set this server implements: RFC 6749 §5.2 answers a grant type the server
 	 * does not support with `unsupported_grant_type`, and a closed schema turned it into

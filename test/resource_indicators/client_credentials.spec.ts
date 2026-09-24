@@ -136,10 +136,11 @@ describe('grant_type=client_credentials w/ resourceIndicators', () => {
 		);
 		if (!error) throw new Error('expected error response');
 		expect(error.status).toBe(400);
+		// RFC 8707 §2: more than this server issues one token for is invalid_target.
 		expect(error?.value).toEqual({
-			error: 'invalid_request',
+			error: 'invalid_target',
 			error_description:
-				"Expected property 'resource' to be string but found: urn:wl:opaque:default,urn:wl:opaque:explicit"
+				'only a single resource indicator value is supported for this grant type'
 		});
 	});
 
@@ -157,8 +158,8 @@ describe('grant_type=client_credentials w/ resourceIndicators', () => {
 		if (!error) throw new Error('expected error response');
 		expect(error.status).toBe(400);
 		expect(error?.value).toEqual({
-			error: 'invalid_request',
-			error_description: "Property 'resource' should be uri"
+			error: 'invalid_target',
+			error_description: 'resource indicator must be an absolute URI'
 		});
 	});
 

@@ -70,6 +70,11 @@ real strings and refused in the handler, because CIBA specifies the named error 
 `request_uri_not_supported` / `registration_not_supported` rather than a generic refusal
 (`lib/actions/authorization/device.ts:165-176`).
 
+The authorization endpoint names them too since 2026-09-24: OIDC Core §3.1.2.6 defines the same codes
+there, and the generic `not_supported` it used to answer is in no registry. The schema refusal of
+`registration` carries `registration_not_supported`, and a `request` or `request_uri` whose feature is
+off answers `request_not_supported` / `request_uri_not_supported` (`featureVerification`).
+
 ## The Request Object is not a route, so a framework-level answer cannot reach it
 
 `processRequestObject` validates the decoded JWT payload with a direct

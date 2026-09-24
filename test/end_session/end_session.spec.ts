@@ -19,6 +19,7 @@ import bootstrap, {
 } from '../test_helper.js';
 import * as JWT from '../../lib/helpers/jwt.js';
 import { ISSUER } from 'lib/configs/env.js';
+import { elysia } from 'lib/index.js';
 import { eventBus } from 'lib/event_bus.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
@@ -70,6 +71,19 @@ describe('logout endpoint', () => {
 		const res = await agent.logout.get();
 		expect(res.status).toBe(200);
 		expect(res.data).toContain('You have been signed out successfully');
+	});
+
+	// As at the authorization endpoint: a parameter sent twice is refused rather than read one way.
+	// Raw, because the typed client cannot send one parameter twice.
+	it('a logout request naming a parameter twice is refused', async function () {
+		const response = await elysia.handle(
+			new Request(`${ISSUER}/logout?state=first&state=second`)
+		);
+		expect(response.status).toBe(400);
+		expect(await response.json()).toEqual({
+			error: 'invalid_request',
+			error_description: 'Duplicate query parameter "state" detected'
+		});
 	});
 
 	describe('when logged in', () => {
