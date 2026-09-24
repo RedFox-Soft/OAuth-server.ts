@@ -80,7 +80,9 @@ export const IntrospectionResponse = t.Union([
 			authorization_details: t.Optional(t.Array(t.Unknown()))
 		},
 		{ additionalProperties: true }
-	)
+	),
+	// A client registered for a signed or encrypted answer receives it as a JWT (RFC 9701 §5).
+	t.String()
 ]);
 
 // PAR (RFC 9126) — handler returns a plain object with `set.status = 201`, so this schema is what
@@ -121,11 +123,13 @@ export const RedirectOrHtmlResponse = t.Union([
 	t.Void()
 ]);
 
-// UserInfo — the claims object, or the signed/encrypted JWT as a string (OIDC Core §5.3.2). The
-// members that locate distributed and aggregated claims (§5.6.2) are declared.
+// UserInfo — the claims object, or the signed/encrypted JWT as a string (OIDC Core §5.3.2). `sub` is
+// always sent but optional here, so a grant that rejected it answers without it rather than failing
+// validation; the members that locate distributed and aggregated claims (§5.6.2) are declared.
 export const UserinfoResponse = t.Union([
 	t.Object(
 		{
+			sub: t.Optional(t.String()),
 			_claim_names: t.Optional(t.Record(t.String(), t.String())),
 			_claim_sources: t.Optional(t.Record(t.String(), t.Unknown()))
 		},
@@ -243,6 +247,16 @@ export const DiscoveryResponse = t.Object(
 // Indexable by any member name, as the pruning in lib/actions/discovery.ts reads and deletes them.
 export type DiscoveryDocument = Static<typeof DiscoveryResponse> &
 	Record<string, unknown>;
+
+// The published key set (RFC 7517 §5): each key carries its own members beyond `kty`.
+export const JwksResponse = t.Object({
+	keys: t.Array(
+		t.Object(
+			{ kty: t.String(), kid: t.Optional(t.String()) },
+			{ additionalProperties: true }
+		)
+	)
+});
 
 // Health probe — current literal body `{ status: 'OK', timestamp }`.
 /*

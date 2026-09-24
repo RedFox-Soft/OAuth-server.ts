@@ -120,7 +120,7 @@ describe('refusing an address that cannot work or should not exist (US2)', () =>
 	 * name that is held. */
 	it('refuses with a conflict when the hostname is taken between the check and the write', async () => {
 		const lookup = spyOn(getBucketStore(), 'findByHost').mockResolvedValue(
-			undefined
+			null
 		);
 
 		try {

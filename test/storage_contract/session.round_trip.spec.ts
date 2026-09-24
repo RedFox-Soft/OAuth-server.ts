@@ -33,6 +33,7 @@ describe('storage contract: Session', () => {
 				clientId: 'client',
 				state: 'opaque-state',
 				postLogoutRedirectUri: 'https://client.example.com/post-logout',
+				// @ts-expect-error a member the schema does not name; additionalProperties must keep it
 				extra: 'must-be-kept'
 			},
 			authorizations: {

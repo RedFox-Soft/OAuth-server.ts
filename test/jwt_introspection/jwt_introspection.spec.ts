@@ -79,8 +79,11 @@ describe('jwtIntrospection features', () => {
 				'application/json'
 			);
 			const json = jsonRes.data;
-			if (!json) throw new Error('expected response data');
-			const iat = json.iat;
+			if (typeof json !== 'object' || !json?.active) {
+				throw new Error('expected an active token');
+			}
+			const { iat } = json;
+			if (iat === undefined) throw new Error('expected an iat');
 
 			setSystemTime(now + 10 * 1000);
 
@@ -97,6 +100,7 @@ describe('jwtIntrospection features', () => {
 			expect(jwtRes.response.headers.get('content-type')).toBe(
 				'application/token-introspection+jwt; charset=utf-8'
 			);
+			if (typeof jwtRes.data !== 'string') throw new Error('expected a JWT');
 			const {
 				payload: { iat: jwtIat, iss, aud, token_introspection },
 				header
@@ -125,6 +129,7 @@ describe('jwtIntrospection features', () => {
 			expect(jwtRes.response.headers.get('content-type')).toBe(
 				'application/token-introspection+jwt; charset=utf-8'
 			);
+			if (typeof jwtRes.data !== 'string') throw new Error('expected a JWT');
 			const {
 				payload: { iat: jwtIat, iss, aud, token_introspection },
 				header
@@ -194,6 +199,7 @@ describe('jwtIntrospection features', () => {
 			expect(okRes.response.headers.get('content-type')).toBe(
 				'application/token-introspection+jwt; charset=utf-8'
 			);
+			if (typeof okRes.data !== 'string') throw new Error('expected a JWT');
 			const header = JWT.header(okRes.data);
 			expect(header).toHaveProperty('alg', 'A128KW');
 			expect(header).toHaveProperty('enc', 'A128CBC-HS256');

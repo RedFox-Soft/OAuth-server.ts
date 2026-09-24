@@ -25,7 +25,7 @@ import { AccessToken } from 'lib/models/access_token.js';
 import { ClientCredentials } from 'lib/models/client_credentials.js';
 
 const generateKeyPair = util.promisify(crypto.generateKeyPair);
-function decode(b64urljson) {
+function decode(b64urljson: string) {
 	return JSON.parse(base64url.decode(b64urljson));
 }
 
@@ -73,6 +73,7 @@ describe('jwt format', () => {
 	const iiat = epochTime();
 	const rotations = 1;
 	const resourceServer = new ResourceServer(resource, {
+		scope,
 		accessTokenFormat: 'jwt',
 		audience: 'foo'
 	});
@@ -113,6 +114,7 @@ describe('jwt format', () => {
 	describe('Resource Server Configuration', () => {
 		it('can be used to specify the signing algorithm', async () => {
 			const resourceServer = new ResourceServer(resource, {
+				scope,
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
 				jwt: {
@@ -134,6 +136,7 @@ describe('jwt format', () => {
 
 		it('uses the default idtokensigningalg by default (no jwt)', async () => {
 			const resourceServer = new ResourceServer(resource, {
+				scope,
 				accessTokenFormat: 'jwt',
 				audience: 'foo'
 			});
@@ -156,6 +159,7 @@ describe('jwt format', () => {
 
 		it('uses the default idtokensigningalg by default (jwt)', async () => {
 			const resourceServer = new ResourceServer(resource, {
+				scope,
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
 				jwt: {}
@@ -179,6 +183,7 @@ describe('jwt format', () => {
 
 		it('can be used to specify the signing algorithm to be HMAC (buffer)', async () => {
 			const resourceServer = new ResourceServer(resource, {
+				scope,
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
 				jwt: {
@@ -201,6 +206,7 @@ describe('jwt format', () => {
 
 		it('can be used to specify the signing algorithm to be HMAC (CryptoKey)', async () => {
 			const resourceServer = new ResourceServer(resource, {
+				scope,
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
 				jwt: {
@@ -230,6 +236,7 @@ describe('jwt format', () => {
 
 		it('a non-string kid is refused rather than serialised into the header', async () => {
 			const resourceServer = new ResourceServer(resource, {
+				scope,
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
 				jwt: {
@@ -250,6 +257,7 @@ describe('jwt format', () => {
 
 		it('refuses a non-string kid on the encryption header', async () => {
 			const resourceServer = new ResourceServer(resource, {
+				scope,
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
 				jwt: {
@@ -275,6 +283,7 @@ describe('jwt format', () => {
 
 		it('can be used to specify the signing algorithm to be HMAC (buffer w/ kid)', async () => {
 			const resourceServer = new ResourceServer(resource, {
+				scope,
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
 				jwt: {
@@ -296,6 +305,7 @@ describe('jwt format', () => {
 
 		it('can be used to specify the signing algorithm to be HMAC (KeyObject)', async () => {
 			const resourceServer = new ResourceServer(resource, {
+				scope,
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
 				jwt: {
@@ -321,6 +331,7 @@ describe('jwt format', () => {
 
 		it('can be an encrypted JWT (Buffer)', async () => {
 			const resourceServer = new ResourceServer(resource, {
+				scope,
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
 				jwt: {
@@ -352,6 +363,7 @@ describe('jwt format', () => {
 
 		it('can be an encrypted JWT (KeyObject)', async () => {
 			const resourceServer = new ResourceServer(resource, {
+				scope,
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
 				jwt: {
@@ -383,6 +395,7 @@ describe('jwt format', () => {
 
 		it('can be an encrypted JWT (CryptoKey)', async () => {
 			const resourceServer = new ResourceServer(resource, {
+				scope,
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
 				jwt: {
@@ -418,6 +431,7 @@ describe('jwt format', () => {
 
 		it('can be an encrypted JWT w/ kid', async () => {
 			const resourceServer = new ResourceServer(resource, {
+				scope,
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
 				jwt: {
@@ -445,6 +459,7 @@ describe('jwt format', () => {
 
 		it('can be a nested JWT (explicit)', async () => {
 			const resourceServer = new ResourceServer(resource, {
+				scope,
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
 				jwt: {
@@ -479,6 +494,7 @@ describe('jwt format', () => {
 
 		it('can be a nested JWT w/ kid', async () => {
 			const resourceServer = new ResourceServer(resource, {
+				scope,
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
 				jwt: {
@@ -509,6 +525,7 @@ describe('jwt format', () => {
 
 		it('can be a nested JWT (implicit signing alg)', async () => {
 			const resourceServer = new ResourceServer(resource, {
+				scope,
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
 				jwt: {
@@ -540,6 +557,7 @@ describe('jwt format', () => {
 
 		it('ensures "none" JWS algorithm cannot be used', async () => {
 			const resourceServer = new ResourceServer(resource, {
+				scope,
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
 				jwt: {
@@ -562,6 +580,7 @@ describe('jwt format', () => {
 
 		it('ensures HMAC JWS algorithms get a key', async () => {
 			const resourceServer = new ResourceServer(resource, {
+				scope,
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
 				jwt: {
@@ -584,6 +603,7 @@ describe('jwt format', () => {
 
 		it('ensures HMAC JWS algorithms get a secret key (1/2)', async () => {
 			const resourceServer = new ResourceServer(resource, {
+				scope,
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
 				jwt: {
@@ -608,6 +628,7 @@ describe('jwt format', () => {
 
 		it('ensures HMAC JWS algorithms get a secret key (2/2)', async () => {
 			const resourceServer = new ResourceServer(resource, {
+				scope,
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
 				jwt: {
@@ -632,6 +653,7 @@ describe('jwt format', () => {
 
 		it('ensures Asymmetric JWS algorithms have a key in the provider keystore', async () => {
 			const resourceServer = new ResourceServer(resource, {
+				scope,
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
 				jwt: {
@@ -654,6 +676,7 @@ describe('jwt format', () => {
 
 		it('ensures JWE key is public or secret', async () => {
 			const resourceServer = new ResourceServer(resource, {
+				scope,
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
 				jwt: {
@@ -679,6 +702,7 @@ describe('jwt format', () => {
 
 		it('ensures Nested JWT when JWE encryption is a public one', async () => {
 			const resourceServer = new ResourceServer(resource, {
+				scope,
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
 				jwt: {
@@ -704,19 +728,19 @@ describe('jwt format', () => {
 
 		for (const prop of ['alg', 'enc', 'key']) {
 			it(`each required encryption property is refused when absent`, async () => {
+				const encrypt: Record<string, unknown> = {
+					alg: 'dir',
+					enc: 'A128GCM',
+					key: crypto.randomBytes(16)
+				};
+				// eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+				delete encrypt[prop];
 				const resourceServer = new ResourceServer(resource, {
+					scope,
 					accessTokenFormat: 'jwt',
 					audience: 'foo',
-					jwt: {
-						encrypt: {
-							alg: 'dir',
-							enc: 'A128GCM',
-							key: crypto.randomBytes(16)
-						}
-					}
+					jwt: { encrypt }
 				});
-
-				delete resourceServer.jwt.encrypt[prop];
 
 				const client = await Client.find(clientId);
 				const token = new AccessToken({

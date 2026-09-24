@@ -669,7 +669,8 @@ describe('features.dPoP', async () => {
 					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 				}
 			);
-			if (!data?.active) throw new Error('expected an active token');
+			if (typeof data !== 'object' || !data?.active)
+				throw new Error('expected an active token');
 			expect(status).toBe(200);
 			expect(data).toHaveProperty('active', true);
 			expect(data).toHaveProperty('token_type', 'DPoP');

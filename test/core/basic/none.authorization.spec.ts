@@ -1,6 +1,6 @@
 import { describe, it, beforeAll, expect } from 'bun:test';
 
-import bootstrap, { agent, type Setup } from '../../test_helper.js';
+import bootstrap, { agent, formAgent, type Setup } from '../../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
 /**
@@ -16,24 +16,10 @@ describe('/auth response_type=none', () => {
 
 	['get', 'post'].forEach((verb) => {
 		async function authRequest(auth: AuthorizationRequest) {
-			if (verb === 'get') {
-				return agent.auth.get({
-					query: auth.params,
-					headers: {
-						cookie
-					}
-				});
-			} else if (verb === 'post') {
-				return agent.auth.post(
-					new URLSearchParams(Object.entries(auth.params)).toString(),
-					{
-						headers: {
-							cookie,
-							['content-type']: 'application/x-www-form-urlencoded'
-						}
-					}
-				);
-			}
+			const headers = { cookie };
+			return verb === 'get'
+				? agent.auth.get({ query: auth.params, headers })
+				: formAgent.auth.post(auth.params, { headers });
 		}
 
 		it(`${verb} responds with a state in search`, async function () {

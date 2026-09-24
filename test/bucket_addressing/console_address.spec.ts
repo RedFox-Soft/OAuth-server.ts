@@ -69,8 +69,20 @@ describe('the address the console reports for a bucket', () => {
 			const address = bucketAddressFor(bucket);
 			if (address.kind === 'none') continue;
 
-			const prefix = address.kind === 'root' ? '' : address.path;
-			const response = await discoveryAt(prefix);
+			// A host-addressed bucket answers at its own origin, its issuer taking ISSUER's scheme.
+			const { origin, issuer } =
+				address.kind === 'host'
+					? {
+							origin: `http://${address.host}`,
+							issuer: `${new URL(ISSUER).protocol}//${address.host}`
+						}
+					: {
+							origin: `http://localhost${address.kind === 'root' ? '' : address.path}`,
+							issuer: `${ISSUER}${address.kind === 'root' ? '' : address.path}`
+						};
+			const response = await elysia.handle(
+				new Request(`${origin}/.well-known/openid-configuration`)
+			);
 
 			expect({
 				bucket: bucket._id,
@@ -79,7 +91,7 @@ describe('the address the console reports for a bucket', () => {
 			expect({
 				bucket: bucket._id,
 				issuer: (await response.json()).issuer
-			}).toEqual({ bucket: bucket._id, issuer: `${ISSUER}${prefix}` });
+			}).toEqual({ bucket: bucket._id, issuer });
 		}
 	});
 });

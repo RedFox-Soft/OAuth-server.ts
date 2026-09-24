@@ -1,8 +1,11 @@
 import { describe, it, beforeAll, expect } from 'bun:test';
 import crypto from 'node:crypto';
-import url from 'node:url';
 
-import bootstrap, { agent, type Setup } from '../test_helper.js';
+import bootstrap, {
+	agent,
+	redirectParameter,
+	type Setup
+} from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { decode as decodeJWT } from 'lib/helpers/jwt.js';
 import { pairwiseSalt } from 'lib/configs/pairwiseSalt.js';
@@ -65,16 +68,16 @@ describe('pairwise identifiers', () => {
 		});
 
 		expect(response.status).toBe(303);
-		const location = response.headers.get('location');
-		if (!location) throw new Error(`no location for ${clientId}`);
-		const { code } = url.parse(location, true).query;
+		const code = redirectParameter(response, 'code');
 
 		const { data } = await auth.getToken(code);
 		if (!data?.id_token || !data?.access_token) {
 			throw new Error(`no tokens for ${clientId}: ${JSON.stringify(data)}`);
 		}
 
-		subs[clientId] = decodeJWT(data.id_token).payload.sub;
+		const { sub } = decodeJWT(data.id_token).payload;
+		if (!sub) throw new Error(`no subject for ${clientId}`);
+		subs[clientId] = sub;
 		accessTokens[clientId] = data.access_token;
 	}
 
@@ -147,8 +150,11 @@ describe('pairwise identifiers', () => {
 			const { data } = await agent.userinfo.get({
 				headers: { authorization: `Bearer ${accessTokens['pairwise-one']}` }
 			});
+			if (typeof data !== 'object' || !data) {
+				throw new Error('expected a JSON UserInfo response');
+			}
 
-			expect(data?.sub).toBe(subs['pairwise-one']);
+			expect(data.sub).toBe(subs['pairwise-one']);
 		});
 
 		it('reports the same identifier at the introspection endpoint', async () => {
@@ -163,7 +169,10 @@ describe('pairwise identifiers', () => {
 			);
 
 			expect(status).toBe(200);
-			expect(data?.sub).toBe(subs['pairwise-one']);
+			if (typeof data !== 'object' || !data?.active) {
+				throw new Error('expected an active token');
+			}
+			expect(data.sub).toBe(subs['pairwise-one']);
 		});
 
 		it('does not leak one sector identifier to another sector', async () => {
@@ -182,8 +191,11 @@ describe('pairwise identifiers', () => {
 			);
 
 			expect(status).toBe(200);
-			expect(data?.sub).toBe(subs['pairwise-two']);
-			expect(data?.sub).not.toBe(subs['pairwise-one']);
+			if (typeof data !== 'object' || !data?.active) {
+				throw new Error('expected an active token');
+			}
+			expect(data.sub).toBe(subs['pairwise-two']);
+			expect(data.sub).not.toBe(subs['pairwise-one']);
 		});
 	});
 });

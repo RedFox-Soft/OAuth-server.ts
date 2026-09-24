@@ -68,6 +68,7 @@ describe('addon override registry', () => {
 	 */
 	it('resolves a working default for an un-overridden RAR transform', () => {
 		const oidc = {
+			params: {},
 			entities: { AuthorizationCode: { payload: { rar: [{ type: 'a' }] } } }
 		};
 		expect(rarForCodeResponse(oidc, { identifier: () => 'urn:rs' })).toEqual([

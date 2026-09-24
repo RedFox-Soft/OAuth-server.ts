@@ -66,7 +66,8 @@ describe('introspection features', () => {
 					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 				}
 			);
-			if (!data?.active) throw new Error('expected an active token');
+			if (typeof data !== 'object' || !data?.active)
+				throw new Error('expected an active token');
 			expect(status).toBe(200);
 			expect(data).toContainKeys([
 				'client_id',
@@ -99,7 +100,8 @@ describe('introspection features', () => {
 					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 				}
 			);
-			if (!data?.active) throw new Error('expected an active token');
+			if (typeof data !== 'object' || !data?.active)
+				throw new Error('expected an active token');
 			expect(status).toBe(200);
 
 			expect(data).toContainKeys(['client_id', 'scope', 'sub']);
@@ -121,7 +123,8 @@ describe('introspection features', () => {
 					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 				}
 			);
-			if (!data?.active) throw new Error('expected an active token');
+			if (typeof data !== 'object' || !data?.active)
+				throw new Error('expected an active token');
 			expect(status).toBe(200);
 
 			expect(data).toContainKeys(['client_id', 'scope', 'sub']);
@@ -143,7 +146,8 @@ describe('introspection features', () => {
 					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 				}
 			);
-			if (!data?.active) throw new Error('expected an active token');
+			if (typeof data !== 'object' || !data?.active)
+				throw new Error('expected an active token');
 			expect(status).toBe(200);
 
 			expect(data).toContainKeys(['client_id', 'scope', 'sub']);
@@ -308,7 +312,8 @@ describe('introspection features', () => {
 					)
 				}
 			);
-			if (!data?.active) throw new Error('expected an active token');
+			if (typeof data !== 'object' || !data?.active)
+				throw new Error('expected an active token');
 			expect(status).toBe(200);
 			expect(data).toContainKeys(['client_id', 'scope', 'sub']);
 			expect(data.sub).not.toBe('accountId');
@@ -332,7 +337,8 @@ describe('introspection features', () => {
 					)
 				}
 			);
-			if (!data?.active) throw new Error('expected an active token');
+			if (typeof data !== 'object' || !data?.active)
+				throw new Error('expected an active token');
 			expect(status).toBe(200);
 			expect(data).toContainKeys(['client_id', 'scope', 'sub']);
 			expect(data.sub).not.toBe('accountId');

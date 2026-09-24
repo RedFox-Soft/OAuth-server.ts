@@ -22,7 +22,6 @@ import { eventBus } from 'lib/event_bus.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
-import { ApplicationConfig } from 'lib/configs/application.js';
 import { ClientDefaults } from 'lib/configs/clientBase.js';
 import { PushedAuthorizationRequest } from 'lib/models/pushed_authorization_request.js';
 import { ISSUER } from 'lib/configs/env.js';
@@ -462,9 +461,7 @@ describe('Pushed Request Object', async () => {
 								.update(code_verifier)
 								.digest('base64url');
 
-							const {
-								data: { request_uri }
-							} = await formAgent.par.post(
+							const { data: pushed } = await formAgent.par.post(
 								{
 									scope: 'openid',
 									response_type: 'code',
@@ -478,9 +475,10 @@ describe('Pushed Request Object', async () => {
 									}
 								}
 							);
+							if (!pushed) throw new Error('expected a pushed request');
+							const { request_uri } = pushed;
 
-							let id = request_uri.split(':');
-							id = id[id.length - 1];
+							const id = request_uri.slice(request_uri.lastIndexOf(':') + 1);
 
 							expect(await PushedAuthorizationRequest.find(id)).toBeObject();
 
@@ -513,9 +511,7 @@ describe('Pushed Request Object', async () => {
 								.update(code_verifier)
 								.digest('base64url');
 
-							const {
-								data: { request_uri }
-							} = await formAgent.par.post(
+							const { data: pushed } = await formAgent.par.post(
 								{
 									scope: 'openid',
 									response_type: 'code',
@@ -532,9 +528,10 @@ describe('Pushed Request Object', async () => {
 									}
 								}
 							);
+							if (!pushed) throw new Error('expected a pushed request');
+							const { request_uri } = pushed;
 
-							let id = request_uri.split(':');
-							id = id[id.length - 1];
+							const id = request_uri.slice(request_uri.lastIndexOf(':') + 1);
 
 							expect(await PushedAuthorizationRequest.find(id)).toBeObject();
 

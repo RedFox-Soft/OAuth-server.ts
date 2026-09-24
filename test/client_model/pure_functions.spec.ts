@@ -194,7 +194,7 @@ describe('client pure functions', () => {
 				throw new Error('should have thrown');
 			} catch (err) {
 				expect(err).toBeInstanceOf(InvalidClient);
-				expect(err.error).toBe('invalid_grant');
+				expect(err).toHaveProperty('error', 'invalid_grant');
 			}
 		});
 

@@ -29,11 +29,14 @@ interface KeyView {
 	status: string;
 	[k: string]: unknown;
 }
-interface JwksState {
-	keys: KeyView[];
-	restartRequired: boolean;
-	changedKeys: string[];
-	supportedAlgorithms: string[];
+type JwksAnswer = NonNullable<
+	Awaited<ReturnType<typeof client.admin.api.jwks.get>>['data']
+>;
+
+// The key-set view a call answered with, rather than the admin error arm; fails the case otherwise.
+function keySet(data: JwksAnswer | null) {
+	if (!data || 'error' in data) throw new Error('expected the key-set view');
+	return data;
 }
 
 async function sessionCookieFor(roles: string[]) {
@@ -106,7 +109,7 @@ describe('admin JWKS API — view (US1)', () => {
 		const { cookie } = await sessionCookieFor(['super_admin']);
 		const res = await client.admin.api.jwks.get({ headers: { cookie } });
 		expect(res.status).toBe(200);
-		const body = res.data as JwksState;
+		const body = keySet(res.data);
 		expect(body.keys.length).toBe(JWKS_KEYS.length);
 		expect(body.keys.every((k) => k.status === 'active')).toBe(true);
 		expect(body.restartRequired).toBe(false);
@@ -117,13 +120,13 @@ describe('admin JWKS API — view (US1)', () => {
 	it('offers only algorithms it can actually produce a key for', async () => {
 		const { cookie } = await sessionCookieFor(['super_admin']);
 		const res = await client.admin.api.jwks.get({ headers: { cookie } });
-		const { supportedAlgorithms } = res.data as JwksState;
+		const { supportedAlgorithms } = keySet(res.data);
 
 		expect(supportedAlgorithms.length).toBeGreaterThan(0);
 		for (const alg of supportedAlgorithms) {
 			const {
 				keys: [key]
-			} = await generateJWKS(alg as Parameters<typeof generateJWKS>[0]);
+			} = await generateJWKS(alg);
 			// The key's own `alg` is what selection and the discovery document both read, so a
 			// generator that produced a key stamped with anything else would advertise one algorithm
 			// and sign with another.
@@ -146,7 +149,7 @@ describe('admin JWKS API — view (US1)', () => {
 		await jwksStore.set(key.kid, withoutUse);
 
 		const res = await client.admin.api.jwks.get({ headers: { cookie } });
-		const body = res.data as JwksState;
+		const body = keySet(res.data);
 		const view = body.keys.find((k) => k.kid === key.kid);
 		expect(view?.use).toBe('sig');
 	});
@@ -167,7 +170,7 @@ describe('admin JWKS API — view (US1)', () => {
 		// this one does not have, so it would outlive the spec and leak into every later one.
 		try {
 			const res = await client.admin.api.jwks.get({ headers: { cookie } });
-			const body = res.data as JwksState;
+			const body = keySet(res.data);
 
 			// Not the store's map key — the thumbprint, which is what verifyJWKs would assign.
 			const derived = calculateKid(withoutKid);
@@ -191,15 +194,16 @@ describe('admin JWKS API — generate (US2)', () => {
 
 	it('generates a signing key that is live immediately (active), audited, no private material', async () => {
 		const { cookie, userId } = await sessionCookieFor(['super_admin']);
-		const before = (await client.admin.api.jwks.get({ headers: { cookie } }))
-			.data as JwksState;
+		const before = keySet(
+			(await client.admin.api.jwks.get({ headers: { cookie } })).data
+		);
 		const beforeKids = new Set(before.keys.map((k) => k.kid));
 		const res = await client.admin.api.jwks.post(
 			{ alg: 'RS256' },
 			{ headers: { cookie } }
 		);
 		expect(res.status).toBe(200);
-		const body = res.data as JwksState;
+		const body = keySet(res.data);
 		expect(body.keys.length).toBe(before.keys.length + 1);
 		const created = body.keys.find((k) => !beforeKids.has(k.kid));
 		expect(created).toBeDefined();
@@ -224,8 +228,9 @@ describe('admin JWKS API — generate (US2)', () => {
 
 	it('generates the ES256 key a FAPI 2.0 deployment needs', async () => {
 		const { cookie } = await sessionCookieFor(['super_admin']);
-		const before = (await client.admin.api.jwks.get({ headers: { cookie } }))
-			.data as JwksState;
+		const before = keySet(
+			(await client.admin.api.jwks.get({ headers: { cookie } })).data
+		);
 		const beforeKids = new Set(before.keys.map((k) => k.kid));
 
 		const res = await client.admin.api.jwks.post(
@@ -233,7 +238,7 @@ describe('admin JWKS API — generate (US2)', () => {
 			{ headers: { cookie } }
 		);
 		expect(res.status).toBe(200);
-		const body = res.data as JwksState;
+		const body = keySet(res.data);
 
 		const created = body.keys.find((k) => !beforeKids.has(k.kid));
 		expect(created?.alg).toBe('ES256');
@@ -244,8 +249,9 @@ describe('admin JWKS API — generate (US2)', () => {
 
 	it('reports a generated algorithm the running server does not advertise as awaiting a restart', async () => {
 		const { cookie } = await sessionCookieFor(['super_admin']);
-		const before = (await client.admin.api.jwks.get({ headers: { cookie } }))
-			.data as JwksState;
+		const before = keySet(
+			(await client.admin.api.jwks.get({ headers: { cookie } })).data
+		);
 		expect(before.unadvertisedAlgorithms).toEqual([]);
 		expect(before.restartRequired).toBe(false);
 
@@ -262,7 +268,7 @@ describe('admin JWKS API — generate (US2)', () => {
 			{ headers: { cookie } }
 		);
 		expect(res.status).toBe(200);
-		const body = res.data as JwksState;
+		const body = keySet(res.data);
 
 		/*
 		 * The key signs at once, but the discovery document is built from the boot key set — so until a
@@ -317,7 +323,7 @@ describe('admin JWKS API — retire (US3)', () => {
 			.jwks({ kid: seededKid })
 			.delete(undefined, { headers: { cookie } });
 		expect(res.status).toBe(200);
-		const body = res.data as JwksState;
+		const body = keySet(res.data);
 		expect(body.keys.some((k) => k.kid === seededKid)).toBe(false);
 
 		const { entries: audit } = await adminAuditStore.list({
@@ -337,7 +343,7 @@ describe('admin JWKS API — retire (US3)', () => {
 			.jwks({ kid: bootKid })
 			.delete(undefined, { headers: { cookie } });
 		expect(res.status).toBe(200);
-		const body = res.data as JwksState;
+		const body = keySet(res.data);
 		const view = body.keys.find((k) => k.kid === bootKid);
 		expect(view?.status).toBe('pending removal');
 		expect(body.restartRequired).toBe(true);

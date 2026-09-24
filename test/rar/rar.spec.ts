@@ -15,7 +15,9 @@ import bootstrap, {
 	agent,
 	type Setup,
 	formAgent,
-	changeClient
+	changeClient,
+	getHeader,
+	locationParameter
 } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { eventBus } from 'lib/event_bus.js';
@@ -105,7 +107,7 @@ describe('features.richAuthorizationRequests', () => {
 			headers: { cookie: header(jar) }
 		});
 		expect(response.status).toBe(303);
-		const location = response.headers.get('location');
+		const location = getHeader(response, 'location');
 		expect(location).toContain('/ui/');
 		const [, , uid] = location.split('/');
 		return { uid, jar: merge(jar, response) };
@@ -401,7 +403,11 @@ describe('features.richAuthorizationRequests', () => {
 			});
 
 			expect(introspected.status).toBe(200);
-			expect(introspected.data.authorization_details).toEqual([payment()]);
+			const introspection = introspected.data;
+			if (typeof introspection !== 'object' || !introspection?.active) {
+				throw new Error('expected an active token');
+			}
+			expect(introspection.authorization_details).toEqual([payment()]);
 		});
 
 		/*
@@ -423,10 +429,10 @@ describe('features.richAuthorizationRequests', () => {
 			});
 
 			expect(response.status).toBe(303);
-			const location = response.headers.get('location');
+			const location = getHeader(response, 'location');
 			// No interaction at all.
 			expect(location).not.toContain('/ui/');
-			const code = new URL(location).searchParams.get('code');
+			const code = locationParameter(location, 'code');
 
 			const { status, data } = await agent.token.post({
 				client_id: 'trusted',
@@ -508,7 +514,7 @@ describe('features.richAuthorizationRequests', () => {
 				headers: { cookie: header(cookie) }
 			});
 			expect(response.status).toBe(303);
-			const location = new URL(response.headers.get('location'));
+			const location = new URL(getHeader(response, 'location'));
 			return {
 				error: location.searchParams.get('error'),
 				description: location.searchParams.get('error_description')
@@ -576,7 +582,7 @@ describe('features.richAuthorizationRequests', () => {
 				query: auth.params,
 				headers: { cookie: header(cookie) }
 			});
-			const location = new URL(response.headers.get('location'));
+			const location = new URL(getHeader(response, 'location'));
 			expect(location.searchParams.get('error')).toBe('invalid_request');
 		});
 
@@ -622,8 +628,11 @@ describe('features.richAuthorizationRequests', () => {
 				authorization_details: details(payment())
 			});
 
-			const par = await formAgent.par.post(auth.params);
+			// Everything the request carries except request_uri, which a pushed request cannot name.
+			const { request_uri: _none, ...pushed } = auth.params;
+			const par = await formAgent.par.post(pushed);
 			expect(par.status).toBe(201);
+			if (!par.data) throw new Error('expected a pushed request');
 
 			const followUp = new AuthorizationRequest({
 				request_uri: par.data.request_uri
@@ -701,6 +710,7 @@ describe('features.richAuthorizationRequests', () => {
 			});
 
 			expect(refreshed.status).toBe(200);
+			if (!refreshed.data) throw new Error('expected a token response');
 			expect(refreshed.data.authorization_details).toEqual([payment()]);
 		});
 
@@ -725,6 +735,7 @@ describe('features.richAuthorizationRequests', () => {
 				refresh_token: data.refresh_token,
 				resource: 'urn:rar:default'
 			});
+			if (!first.data) throw new Error('expected a token response');
 			expect(first.data.authorization_details).toEqual([
 				payment({ locations: ['urn:rar:default'] }),
 				{ type: OPEN_TYPE }
@@ -736,6 +747,7 @@ describe('features.richAuthorizationRequests', () => {
 				refresh_token: first.data.refresh_token,
 				resource: 'urn:rar:other'
 			});
+			if (!second.data) throw new Error('expected a token response');
 			expect(second.data.authorization_details).toEqual([
 				payment({ locations: ['urn:rar:other'], actions: ['status'] }),
 				{ type: OPEN_TYPE }
@@ -767,7 +779,7 @@ describe('features.richAuthorizationRequests', () => {
 					query: auth.params,
 					headers: { cookie: header(jar) }
 				});
-				const location = response.headers.get('location');
+				const location = getHeader(response, 'location');
 				jar = merge(jar, response);
 
 				if (location.includes('/ui/')) {
@@ -780,6 +792,7 @@ describe('features.richAuthorizationRequests', () => {
 			}
 
 			expect(interactions).toBe(1);
+			if (!grantId) throw new Error('expected the approved grant');
 			const grant = await Grant.find(grantId);
 			expect(grant.payload.rar).toEqual([payment()]);
 		});

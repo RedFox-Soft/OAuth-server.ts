@@ -155,7 +155,7 @@ async function renderTokenResponse(oidc) {
 
 export const introspect = new Elysia().use(AuthPlugin).post(
 	routeNames.introspect,
-	async function ({ oidc, request }) {
+	async function ({ oidc, request, set }) {
 		if (ApplicationConfig['jwtIntrospection.enabled']) {
 			const client = oidc.client;
 
@@ -181,12 +181,11 @@ export const introspect = new Elysia().use(AuthPlugin).post(
 					aud: body.aud
 				};
 
+				// Set once issuing has succeeded: a refusal from issue() is answered through `set` too.
 				const jwt = await token.issue('introspection');
-				return new Response(jwt, {
-					headers: {
-						'Content-Type': 'application/token-introspection+jwt; charset=utf-8'
-					}
-				});
+				set.headers['content-type'] =
+					'application/token-introspection+jwt; charset=utf-8';
+				return jwt;
 			}
 			return body;
 		}

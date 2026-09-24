@@ -240,7 +240,7 @@ describe('deletion reporting', () => {
 		}
 
 		// One area failing must not abort the others: the access token is gone, and so is the client.
-		expect(await adapter('AccessToken').find(at.jti)).toBeUndefined();
+		expect(await adapter('AccessToken').find(at.id)).toBeUndefined();
 		expect(await adapter('Client').find(clientId)).toBeUndefined();
 		// And the grant survived, which is exactly what the 500 said.
 		expect(await adapter('Grant').find(grantId)).toBeDefined();

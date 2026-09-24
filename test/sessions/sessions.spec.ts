@@ -34,11 +34,11 @@ describe('session exp handling', () => {
 		mock.restore();
 	});
 
-	function authRequest(auth, cookie) {
+	function authRequest(auth: AuthorizationRequest, cookie: string) {
 		return agent.auth.get({ query: auth.params, headers: { cookie } });
 	}
 
-	function sessionIdFromResponse(response) {
+	function sessionIdFromResponse(response: Response) {
 		const setCookie = response.headers
 			.getSetCookie()
 			.find((c) => c.startsWith(`${SESSION_COOKIE}=`) && !c.includes('1970'));

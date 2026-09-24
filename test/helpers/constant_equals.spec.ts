@@ -27,6 +27,7 @@ describe('secret comparison', () => {
 		expect(constantEquals(c, d)).toBe(false);
 		expect(constantEquals(a, a)).toBe(true);
 		expect(constantEquals('abc', 'a0c')).toBe(false);
+		// @ts-expect-error what is refused here is a Buffer, not a string
 		expect(() => constantEquals(Buffer.alloc(1), 'abc')).toThrow();
 	});
 
@@ -48,6 +49,7 @@ describe('secret comparison', () => {
 		expect(constantEquals(b1, c1, b1.length - 1)).toBe(false);
 		expect(constantEquals(b1, c1, b1.length)).toBe(false);
 		expect(constantEquals(b1, c1, b1.length + 1)).toBe(false);
+		// @ts-expect-error what is refused here is a Buffer, not a string
 		expect(() => constantEquals(Buffer.alloc(1), c1, c1.length + 1)).toThrow();
 
 		expect(constantEquals('foo', 'foo', 512)).toBe(true);

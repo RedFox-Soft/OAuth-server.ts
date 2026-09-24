@@ -39,7 +39,6 @@ async function sessionCookieFor(roles: string[]) {
 
 async function makeProject(ownerGroupId = UNASSIGNED_GROUP_ID) {
 	return getProjectStore().create({
-		ownerGroupId: UNASSIGNED_GROUP_ID,
 		name: 'P',
 		slug: `p-${Math.random()}`,
 		ownerGroupId

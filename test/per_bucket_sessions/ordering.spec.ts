@@ -4,7 +4,8 @@ import fc from 'fast-check';
 import bootstrap, {
 	clearSeededBuckets,
 	seedBucket,
-	type Setup
+	type Setup,
+	jsonToFormUrlEncoded
 } from '../test_helper.js';
 import { elysia } from 'lib/index.js';
 import { getUserStore } from 'lib/adapters/index.js';
@@ -40,9 +41,7 @@ async function authorize(where: Where, cookie: string) {
 	});
 	return elysia.handle(
 		new Request(
-			`http://localhost${where.prefix}/auth?${new URLSearchParams(
-				auth.params as Record<string, string>
-			)}`,
+			`http://localhost${where.prefix}/auth?${jsonToFormUrlEncoded(auth.params)}`,
 			{ headers: { cookie } }
 		)
 	);

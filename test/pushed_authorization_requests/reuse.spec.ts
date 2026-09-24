@@ -36,9 +36,7 @@ describe('single use of a pushed request_uri', () => {
 			.update(codeVerifier)
 			.digest('base64url');
 
-		const {
-			data: { request_uri }
-		} = await formAgent.par.post(
+		const { data: pushed } = await formAgent.par.post(
 			{
 				client_id: clientId,
 				response_type: 'code',
@@ -53,8 +51,13 @@ describe('single use of a pushed request_uri', () => {
 				}
 			}
 		);
+		if (!pushed) throw new Error('expected a pushed request');
+		const { request_uri } = pushed;
 
-		return { request_uri, id: request_uri.split(':').at(-1) as string };
+		return {
+			request_uri,
+			id: request_uri.slice(request_uri.lastIndexOf(':') + 1)
+		};
 	}
 
 	function present(request_uri: string, cookie?: string) {

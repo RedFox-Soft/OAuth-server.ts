@@ -3,12 +3,21 @@ import { describe, it, beforeAll, expect } from 'bun:test';
 import bootstrap, { agent } from '../test_helper.js';
 
 const json = { 'content-type': 'application/json' };
-const bearer = (token) => ({ authorization: `Bearer ${token}` });
+// The registration access token a management call presents; fails the case when none was issued.
+function bearer(token: string | undefined) {
+	if (!token) throw new Error('expected a registration access token');
+	return { authorization: `Bearer ${token}` };
+}
 
 // The client_id here is a full URI (the config's idFactory returns one), so it is percent-encoded
 // into the /reg/:clientId path segment. registration_client_uri must therefore carry the encoded
 // client_id in its path and no query string.
-function expectUri(registration_client_uri, client_id) {
+function expectUri(
+	registration_client_uri: string | undefined,
+	client_id: string
+) {
+	if (!registration_client_uri)
+		throw new Error('expected a registration_client_uri');
 	const parsed = new URL(registration_client_uri);
 	expect(parsed.search).toHaveLength(0);
 	const i = parsed.pathname.indexOf('/reg/');
@@ -60,9 +69,9 @@ describe('registration management with client_id as URI', () => {
 		({ registration_access_token, registration_client_uri } = res.data);
 		expectUri(registration_client_uri, client_id);
 
-		res = await agent
+		const deleted = await agent
 			.reg({ clientId })
 			.delete(undefined, { headers: bearer(registration_access_token) });
-		expect(res.status).toBe(204);
+		expect(deleted.status).toBe(204);
 	});
 });

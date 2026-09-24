@@ -13,8 +13,8 @@ import { BackchannelAuthenticationRequest } from 'lib/models/backchannel_authent
 import { Grant } from 'lib/models/grant.js';
 import { decode as decodeJWT } from 'lib/helpers/jwt.ts';
 import { idTokenOf } from './response.ts';
+import { isPlainObject } from 'lib/helpers/_/object.js';
 
-const form = { 'content-type': 'application/x-www-form-urlencoded' };
 const PWD = 'urn:example:acr:pwd';
 const MFA = 'urn:example:acr:mfa';
 const ACCOUNT = 'ciba-account';
@@ -22,25 +22,23 @@ const ACCOUNT = 'ciba-account';
 /* Ask for a backchannel authentication, requiring or merely preferring a context. */
 async function request(
 	clientId: string,
-	claims?: Record<string, unknown>,
+	claims?: { id_token?: Record<string, unknown> },
 	acrValues?: string
 ) {
-	const res = await formAgent.backchannel.post(
-		{
-			client_id: clientId,
-			scope: 'openid',
-			login_hint: ACCOUNT,
-			// A ping-mode client supplies the token the server echoes back when it notifies.
-			...(clientId === 'ciba-ping'
-				? { client_notification_token: 'notification-token-value' }
-				: {}),
-			...(claims ? { claims: JSON.stringify(claims) } : {}),
-			...(acrValues ? { acr_values: acrValues } : {})
-		},
-		{ headers: form }
-	);
+	const res = await formAgent.backchannel.post({
+		client_id: clientId,
+		scope: 'openid',
+		login_hint: ACCOUNT,
+		// A ping-mode client supplies the token the server echoes back when it notifies.
+		...(clientId === 'ciba-ping'
+			? { client_notification_token: 'notification-token-value' }
+			: {}),
+		...(claims ? { claims } : {}),
+		...(acrValues ? { acr_values: acrValues } : {})
+	});
 	expect(res.response.status).toBe(200);
-	return res.data.auth_req_id as string;
+	if (!res.data) throw new Error('expected an auth_req_id');
+	return res.data.auth_req_id;
 }
 
 /* What the end user's authentication device reports back. */
@@ -57,16 +55,14 @@ async function report(
 
 /* What the relying party collects at the token endpoint — tokens, or the reason there are none. */
 async function collect(authReqId: string, clientId: string) {
-	const res = await formAgent.token.post(
-		{
-			client_id: clientId,
-			grant_type: 'urn:openid:params:grant-type:ciba',
-			auth_req_id: authReqId
-		},
-		{ headers: form }
-	);
+	const res = await formAgent.token.post({
+		client_id: clientId,
+		grant_type: 'urn:openid:params:grant-type:ciba',
+		auth_req_id: authReqId
+	});
+	const body: unknown = res.data ?? res.error?.value;
 	return {
-		data: (res.data ?? res.error?.value ?? {}) as Record<string, unknown>,
+		data: isPlainObject(body) ? body : {},
 		status: res.response.status
 	};
 }

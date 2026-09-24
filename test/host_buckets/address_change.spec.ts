@@ -130,7 +130,7 @@ describe('moving a bucket to a different address (US3)', () => {
 			host: held
 		});
 		const lookup = spyOn(getBucketStore(), 'findByHost').mockResolvedValue(
-			undefined
+			null
 		);
 
 		try {

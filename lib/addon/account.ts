@@ -1,12 +1,30 @@
 import { Grant } from '../models/grant.js';
 import { getUserStore } from '../adapters/index.js';
 import { resolveBucketForRequest } from '../admin/auth/resolveBucket.js';
+import type { OIDCContext } from '../helpers/oidc_context.ts';
 
-export async function findAccount(oidc, sub, _token?) {
+// The token an account is loaded for at the token and userinfo endpoints.
+type AccountToken = {
+	payload: { clientId?: string; resource?: string | readonly string[] };
+};
+
+// Generic over the endpoint's parameters: all it reads from them is the resource the request names.
+export async function findAccount<
+	P extends Record<string, unknown> & {
+		resource?: string | readonly string[];
+	}
+>(
+	oidc: OIDCContext<P> | undefined,
+	sub: string | undefined,
+	_token?: AccountToken
+) {
 	// @param oidc - the OIDC context for the current request.
 	// @param sub {string} - account identifier (subject); equals the user record _id.
 	// @param token - reference to the token the account is being loaded for;
 	//   undefined at the authorization endpoint.
+
+	// A token issued to no account (client credentials) has none to load.
+	if (!sub) return undefined;
 
 	// Resolve the user bucket exactly as login does (resolveBucketForRequest):
 	// prefer the live client, falling back to the token's client for the
@@ -41,7 +59,12 @@ export async function findAccount(oidc, sub, _token?) {
 		// @param use {string} - "id_token" or "userinfo"; the provider masks the
 		//   returned claims by granted scope automatically. Any extra claims stored
 		//   on the record (profile, distributed/aggregated) are merged in.
-		async claims(_use, _scope, _claims, _rejected) {
+		async claims(
+			_use?: string,
+			_scope?: string,
+			_claims?: unknown,
+			_rejected?: readonly string[]
+		) {
 			return {
 				sub,
 				email: user.email,

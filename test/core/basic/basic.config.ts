@@ -24,7 +24,9 @@ class CustomPrompt extends Prompt {
 	name = 'unrequestable';
 }
 
-policy.get('login').checks.push(check);
+const login = policy.get('login');
+if (!login) throw new Error('the base policy has a login prompt');
+login.checks.push(check);
 policy.add(new CustomPrompt());
 
 // The policy is overridable behavior, registered through the addon seam rather than passed

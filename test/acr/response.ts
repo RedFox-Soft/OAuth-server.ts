@@ -1,20 +1,26 @@
+import { isPlainObject } from 'lib/helpers/_/object.js';
+
 /*
- * Reading a token response in these specs.
- *
- * The Eden client types a token response as a union of every shape the endpoint can return, and
- * narrowing it at each call site would need a discriminant the response does not carry. The
- * assertions are here, once, rather than scattered through four spec files — and each case still
- * asserts the value it reads, so a response that did not carry the field fails on the assertion
- * rather than on the cast.
+ * Reading a token response in these specs: the member a case needs, or a failed case when the
+ * response did not carry it. `data` is `unknown` because the backchannel cases read a success and an
+ * error body through the one field.
  */
 interface TokenResponse {
 	data: unknown;
 }
 
+function member(res: TokenResponse, name: string): string {
+	const value = isPlainObject(res.data) ? res.data[name] : undefined;
+	if (typeof value !== 'string') {
+		throw new Error(`expected ${name} in the token response`);
+	}
+	return value;
+}
+
 export function idTokenOf(res: TokenResponse): string {
-	return (res.data as { id_token: string }).id_token;
+	return member(res, 'id_token');
 }
 
 export function refreshTokenOf(res: TokenResponse): string {
-	return (res.data as { refresh_token: string }).refresh_token;
+	return member(res, 'refresh_token');
 }

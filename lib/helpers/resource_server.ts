@@ -11,7 +11,14 @@ export type ResourceServerInfo = {
 };
 
 export default class ResourceServer {
-	constructor(identifier, data) {
+	private _identifier: string;
+	audience: ResourceServerInfo['audience'];
+	scope: ResourceServerInfo['scope'];
+	accessTokenTTL: ResourceServerInfo['accessTokenTTL'];
+	accessTokenFormat: ResourceServerInfo['accessTokenFormat'];
+	jwt: ResourceServerInfo['jwt'];
+
+	constructor(identifier: string, data: ResourceServerInfo) {
 		this._identifier = identifier;
 		this.audience = data.audience;
 		this.scope = data.scope;

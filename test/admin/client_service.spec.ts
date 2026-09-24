@@ -57,7 +57,7 @@ describe('admin client service', () => {
 		});
 		expect(secret).toBeTruthy();
 		// secret is never echoed back through the view
-		expect((view as Record<string, unknown>).clientSecret).toBeUndefined();
+		expect(Reflect.get(view, 'clientSecret')).toBeUndefined();
 		const rotated = await rotateSecret(view.clientId);
 		expect(rotated).toBeTruthy();
 		expect(rotated).not.toBe(secret);

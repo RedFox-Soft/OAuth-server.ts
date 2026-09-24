@@ -118,7 +118,8 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 				}
 			);
-			if (!data?.active) throw new Error('expected an active token');
+			if (typeof data !== 'object' || !data?.active)
+				throw new Error('expected an active token');
 			expect(status).toBe(200);
 			expect(data).toHaveProperty('cnf');
 			expect(data).toHaveProperty('token_type', 'Bearer');

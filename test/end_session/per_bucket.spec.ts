@@ -5,7 +5,8 @@ import bootstrap, {
 	clearSeededBuckets,
 	findSessionSetCookie,
 	seedBucket,
-	type Setup
+	type Setup,
+	jsonToFormUrlEncoded
 } from '../test_helper.js';
 import { elysia } from 'lib/index.js';
 import { getUserStore } from 'lib/adapters/index.js';
@@ -23,9 +24,7 @@ async function signInToAcme(held: string): Promise<string> {
 	});
 	const prompt = await elysia.handle(
 		new Request(
-			`http://localhost/${SLUG}/auth?${new URLSearchParams(
-				auth.params as Record<string, string>
-			)}`,
+			`http://localhost/${SLUG}/auth?${jsonToFormUrlEncoded(auth.params)}`,
 			{ headers: { cookie: held } }
 		)
 	);

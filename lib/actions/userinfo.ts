@@ -188,11 +188,13 @@ async function userInfo({ headers, body, set, request, params }) {
 		token.mask = claims;
 		token.rejected = rejected;
 
-		// The JWT itself, which is the string branch UserinfoResponse declares for this answer.
-		set.headers['content-type'] = 'application/jwt; charset=utf-8';
-		return await token.issue('userinfo', {
+		// The JWT itself, the string branch UserinfoResponse declares. Its content type is set once
+		// issuing has succeeded: a refusal from issue() is answered through `set` too.
+		const jwt = await token.issue('userinfo', {
 			expiresAt: accessToken.payload.exp
 		});
+		set.headers['content-type'] = 'application/jwt; charset=utf-8';
+		return jwt;
 	} else {
 		const mask = new Claims(
 			client,
@@ -211,7 +213,8 @@ const responses = {
 	response: {
 		200: UserinfoResponse,
 		400: OAuthError,
-		401: OAuthError,
+		// RFC 6750 §3.1: a request that carried no credential is challenged with no error body.
+		401: t.Union([OAuthError, t.Literal('')]),
 		403: OAuthError,
 		500: OAuthError
 	}

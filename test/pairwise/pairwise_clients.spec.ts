@@ -449,7 +449,7 @@ describe('pairwise features', () => {
 	});
 
 	describe('pairwise client Subject calls', () => {
-		const clients = [];
+		const clients: Client[] = [];
 
 		beforeAll(() => {
 			return registerClient(

@@ -17,7 +17,8 @@ export const addons: Partial<AddonImplementations> = {
 		throw new errors.InvalidTarget();
 	},
 	defaultResource(oidc) {
-		if (oidc.params.nodefault) {
+		// A parameter of this deployment's own, sent by the cases that want no default resource.
+		if ('nodefault' in oidc.params && oidc.params.nodefault) {
 			return undefined;
 		}
 

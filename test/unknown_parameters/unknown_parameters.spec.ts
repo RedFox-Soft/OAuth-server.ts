@@ -20,7 +20,7 @@ const codeChallenge = createHash('sha256')
 	.update(codeVerifier)
 	.digest('base64url');
 
-const authorizationParameters: Static<typeof AuthorizationParameters> = {
+const authorizationParameters = {
 	client_id: 'client',
 	response_type: 'code',
 	scope: 'openid',
@@ -28,7 +28,7 @@ const authorizationParameters: Static<typeof AuthorizationParameters> = {
 	code_challenge_method: 'S256',
 	code_challenge: codeChallenge,
 	nonce: 'nonce'
-};
+} satisfies Static<typeof AuthorizationParameters>;
 
 const basic = () => AuthorizationRequest.basicAuthHeader('client', 'secret');
 

@@ -129,6 +129,7 @@ describe('an agent editing a client', () => {
 
 		expect(response.result?.isError).not.toBe(true);
 		const after = await adapter('Client').find(record.clientId);
+		if (!before || !after) throw new Error('expected the stored client');
 		expect(after.client_name).toBe('After');
 		for (const [name, value] of Object.entries(before)) {
 			if (name === 'client_name') continue;

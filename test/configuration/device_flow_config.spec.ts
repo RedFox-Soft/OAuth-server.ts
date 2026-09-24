@@ -13,7 +13,7 @@ import { generate } from 'lib/helpers/user_codes.ts';
  * asterisks the entire entropy of the code, and a mask with none of them a code that is the same for
  * every pairing — which is why zero is refused here rather than merely discouraged.
  */
-const withMask = (mask: unknown) => ({
+const withMask = (mask: string) => ({
 	...ApplicationConfig,
 	'deviceFlow.enabled': true,
 	'deviceFlow.mask': mask

@@ -44,11 +44,13 @@ describe('Provider configuration', () => {
 		});
 
 		it('refuses a list, which cannot say which authentication a value describes', () => {
+			// @ts-expect-error a list, which the validation must refuse
 			ApplicationConfig.acrValues = ['bronze', 'silver'];
 			expect(() => reloadConfiguration()).toThrow('acrValues must be a map');
 		});
 
 		it('refuses an authentication the server cannot distinguish', () => {
+			// @ts-expect-error an authentication the server cannot distinguish
 			ApplicationConfig.acrValues = { ...named, retina_scan: 'platinum' };
 			expect(() => reloadConfiguration()).toThrow(
 				"acrValues names 'retina_scan'"
@@ -57,6 +59,7 @@ describe('Provider configuration', () => {
 
 		it('refuses a missing authentication, which would have no context to report', () => {
 			const { federated: _dropped, ...missing } = named;
+			// @ts-expect-error a map missing an authentication
 			ApplicationConfig.acrValues = missing;
 			expect(() => reloadConfiguration()).toThrow(
 				'acrValues.federated must be a non-empty string'
@@ -87,8 +90,10 @@ describe('Provider configuration', () => {
 		it('only accepts arrays and sets', () => {
 			ApplicationConfig.scopes = ['foo', 'bar'];
 			reloadConfiguration();
+			// @ts-expect-error a Set is outside the setting's type; validation still accepts one
 			ApplicationConfig.scopes = new Set(['foo', 'bar']);
 			reloadConfiguration();
+			// @ts-expect-error neither a list nor a Set, which the validation must refuse
 			ApplicationConfig.scopes = { foo: true };
 			expect(() => {
 				reloadConfiguration();

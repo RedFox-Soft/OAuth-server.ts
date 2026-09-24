@@ -26,6 +26,13 @@ async function superAdminCookie() {
 	return `${ADMIN_SESSION_COOKIE}=${session._id}`;
 }
 
+// What the settings document holds; fails the case when there is none.
+async function storedSettings() {
+	const stored = await configStore.get();
+	if (!stored) throw new Error('expected a settings document');
+	return stored;
+}
+
 function put(cookie: string, acrValues: unknown) {
 	return client.admin.api.settings.put({ acrValues }, { headers: { cookie } });
 }
@@ -54,15 +61,16 @@ describe('naming the authentication contexts', () => {
 		const { response } = await put(cookie, named);
 
 		expect(response.status).toBe(200);
-		expect((await configStore.get()).acrValues).toEqual(named);
+		expect((await storedSettings()).acrValues).toEqual(named);
 	});
 
 	it('reports the renamed values as in force, with nothing waiting', async () => {
 		const { data } = await put(cookie, named);
+		if (!data || 'error' in data) throw new Error('expected the settings');
 
-		expect(data?.appliedKeys).toContain('acrValues');
-		expect(data?.pendingRestartKeys).toEqual([]);
-		expect(data?.notInForceKeys).toEqual([]);
+		expect(data.appliedKeys).toContain('acrValues');
+		expect(data.pendingRestartKeys).toEqual([]);
+		expect(data.notInForceKeys).toEqual([]);
 	});
 
 	it('advertises the renamed values from the next request, without a restart', async () => {
@@ -110,6 +118,6 @@ describe('naming the authentication contexts', () => {
 	it('leaves the settings unchanged when it refuses', async () => {
 		await put(cookie, { ...named, password: '0' });
 
-		expect((await configStore.get()).acrValues).toBeUndefined();
+		expect((await storedSettings()).acrValues).toBeUndefined();
 	});
 });

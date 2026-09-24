@@ -62,6 +62,7 @@ describe('BaseToken', () => {
 
 	it('a malformed token value is refused as invalid_token rather than faulting', async function () {
 		for (const input of [true, Boolean, 1, Infinity, {}, [], new Set()]) {
+			// @ts-expect-error what is refused here is a value that is not a string
 			const result = await RefreshToken.tryFind(input);
 			expect(result).toBeUndefined();
 		}

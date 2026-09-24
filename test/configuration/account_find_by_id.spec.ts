@@ -35,6 +35,7 @@ describe('built-in findAccount (DB-backed)', () => {
 		);
 
 		const account = await findAccount(requestWithoutClient(), user._id);
+		if (!account) throw new Error('expected an account');
 
 		expect(account.accountId).toBe(user._id);
 		expect(await account.claims()).toEqual({

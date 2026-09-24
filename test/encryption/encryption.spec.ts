@@ -184,11 +184,15 @@ describe('encryption', () => {
 					});
 
 					it('errors with a specific message', async () => {
-						const { error } = await agent.userinfo.get({
+						const { error, response } = await agent.userinfo.get({
 							headers: { authorization: `Bearer ${access_token}` }
 						});
 						if (!error) throw new Error('expected error response');
 						expect(error.status).toBe(400);
+						// The refusal is JSON, not the JWT this client registered for (OIDC Core §5.3.3).
+						expect(response.headers.get('content-type')).toContain(
+							'application/json'
+						);
 						expect(error.value).toEqual({
 							error: 'invalid_client',
 							error_description:
@@ -212,11 +216,15 @@ describe('encryption', () => {
 					});
 
 					it('errors with a specific message', async () => {
-						const { error } = await agent.userinfo.get({
+						const { error, response } = await agent.userinfo.get({
 							headers: { authorization: `Bearer ${access_token}` }
 						});
 						if (!error) throw new Error('expected error response');
 						expect(error.status).toBe(400);
+						// The refusal is JSON, not the JWT this client registered for (OIDC Core §5.3.3).
+						expect(response.headers.get('content-type')).toContain(
+							'application/json'
+						);
 						expect(error.value).toEqual({
 							error: 'invalid_client',
 							error_description:

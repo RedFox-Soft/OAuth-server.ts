@@ -80,7 +80,9 @@ describe('security headers: the browser-feature policy', () => {
 	});
 
 	it('denies the high-privilege features outright', async () => {
-		const res = await send(routeNames.discovery, { method: 'GET' });
+		const res = await send('/.well-known/openid-configuration', {
+			method: 'GET'
+		});
 		const policy = res.headers.get('permissions-policy') ?? '';
 
 		for (const feature of ['camera', 'microphone', 'geolocation', 'payment']) {
@@ -95,7 +97,9 @@ describe('security headers: the browser-feature policy', () => {
 	 * console — on the deprecated path, to fail whenever a browser drops it.
 	 */
 	it('leaves clipboard-write permitted, or the TOTP secret loses its copy button', async () => {
-		const res = await send(routeNames.discovery, { method: 'GET' });
+		const res = await send('/.well-known/openid-configuration', {
+			method: 'GET'
+		});
 
 		expect(res.headers.get('permissions-policy')).not.toContain('clipboard');
 	});

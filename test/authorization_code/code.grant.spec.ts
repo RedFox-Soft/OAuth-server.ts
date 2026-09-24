@@ -80,6 +80,7 @@ describe('grant_type=authorization_code', () => {
 			const { data, response } = await auth.getToken(code);
 			expect(response.status).toBe(200);
 			expect(spy).toHaveBeenCalledTimes(1);
+			if (!data) throw new Error('expected a token response');
 			expect(Object.keys(data)).toEqual(
 				expect.arrayContaining([
 					'access_token',
@@ -317,6 +318,7 @@ describe('grant_type=authorization_code', () => {
 
 			expect(response.status).toBe(200);
 			expect(spy).toBeCalledTimes(1);
+			if (!data) throw new Error('expected a token response');
 			expect(Object.keys(data)).toEqual(
 				expect.arrayContaining([
 					'access_token',

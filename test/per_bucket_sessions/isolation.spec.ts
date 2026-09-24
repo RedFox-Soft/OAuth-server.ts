@@ -5,7 +5,8 @@ import bootstrap, {
 	clearSeededBuckets,
 	findSessionSetCookie,
 	seedBucket,
-	type Setup
+	type Setup,
+	jsonToFormUrlEncoded
 } from '../test_helper.js';
 import { elysia } from 'lib/index.js';
 import { getUserStore } from 'lib/adapters/index.js';
@@ -27,9 +28,7 @@ async function signInToAcme(held: string): Promise<string> {
 	});
 	const prompt = await elysia.handle(
 		new Request(
-			`http://localhost/${SLUG}/auth?${new URLSearchParams(
-				auth.params as Record<string, string>
-			)}`,
+			`http://localhost/${SLUG}/auth?${jsonToFormUrlEncoded(auth.params)}`,
 			{ headers: { cookie: held } }
 		)
 	);
@@ -141,13 +140,13 @@ describe('a browser holding a sign-in in two buckets', () => {
 		const atDefault = await authorizeAtDefault(both);
 		const atAcme = await elysia.handle(
 			new Request(
-				`http://localhost/${SLUG}/auth?${new URLSearchParams({
-					...(new AuthorizationRequest({
+				`http://localhost/${SLUG}/auth?${jsonToFormUrlEncoded(
+					new AuthorizationRequest({
 						client_id: 'acme-app',
 						scope: 'openid',
 						redirect_uri: 'https://acme.example.com/cb'
-					}).params as Record<string, string>)
-				})}`,
+					}).params
+				)}`,
 				{ headers: { cookie: both } }
 			)
 		);

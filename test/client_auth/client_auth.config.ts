@@ -17,8 +17,7 @@ const clientKey = {
 	e: key.e,
 	n: key.n,
 	kid: key.kid,
-	kty: key.kty,
-	use: key.use
+	kty: key.kty
 };
 const rsaKeys = structuredClone(mtlsKeys);
 rsaKeys.keys.splice(0, 1);
@@ -42,10 +41,10 @@ export const ApplicationConfig = {
 
 export const addons: Partial<AddonImplementations> = {
 	getCertificate(oidc) {
+		const cert = oidc.get('x-ssl-client-cert');
+		if (!cert) return undefined;
 		try {
-			return new X509Certificate(
-				Buffer.from(oidc.get('x-ssl-client-cert'), 'base64')
-			);
+			return new X509Certificate(Buffer.from(cert, 'base64'));
 		} catch (e) {
 			return undefined;
 		}

@@ -74,7 +74,9 @@ describe('selectBackend', () => {
 		it('selects the backend it claims to, for every entry', () => {
 			for (const [backend, variable] of Object.entries(BACKEND_SELECTORS)) {
 				if (variable === null) continue;
-				expect(selectBackend({ [variable]: 'set' })).toBe(backend);
+				// Widened to compare with the table's own keys, which Object.entries hands back as strings.
+				const selected: string = selectBackend({ [variable]: 'set' });
+				expect(selected).toBe(backend);
 			}
 		});
 

@@ -359,6 +359,7 @@ describe('revocation features', () => {
 
 		it('a revocation request with no token is refused as invalid_request', async function () {
 			const { error } = await agent.token.revocation.post(
+				// @ts-expect-error what is refused here is a request with no token
 				{},
 				{
 					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
@@ -427,6 +428,7 @@ describe('revocation features', () => {
 
 		it('does not allow to revoke the unrevokable (in case adapter is implemented wrong)', async function () {
 			spyOn(AccessToken, 'tryFind').mockResolvedValue({
+				// @ts-expect-error an adapter answering with a record of another kind
 				payload: { isValid: true, kind: 'AuthorizationCode' }
 			});
 

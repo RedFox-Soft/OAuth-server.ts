@@ -34,7 +34,7 @@ export interface JwksState {
 	changedKeys: string[];
 	/* Signing algorithms present in the store that the running server does not advertise yet. */
 	unadvertisedAlgorithms: string[];
-	supportedAlgorithms: string[];
+	supportedAlgorithms: SupportedAlg[];
 }
 
 /*

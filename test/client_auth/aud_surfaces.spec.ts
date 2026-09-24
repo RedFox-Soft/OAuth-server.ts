@@ -56,14 +56,17 @@ function unauthenticated(status: number) {
  */
 describe('client assertion audience, at every endpoint that authenticates a client', () => {
 	let key: Awaited<ReturnType<typeof importJWK>>;
-	const restore: Array<[string, unknown]> = [];
+	const flags = ['par.enabled', 'revocation.enabled'] satisfies Array<
+		keyof typeof ApplicationConfig
+	>;
+	const restore: Array<[(typeof flags)[number], boolean]> = [];
 
 	beforeAll(async function () {
 		await bootstrap(import.meta.url, { config: 'client_auth' });
 
 		// Both are off by default; the endpoints are gated on them, so without this two of the four
 		// entries below answer 404 and the guard correctly calls the set dishonest.
-		for (const flag of ['par.enabled', 'revocation.enabled']) {
+		for (const flag of flags) {
 			restore.push([flag, ApplicationConfig[flag]]);
 			ApplicationConfig[flag] = true;
 		}

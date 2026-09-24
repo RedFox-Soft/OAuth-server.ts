@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll } from 'bun:test';
 import bootstrap, {
 	agent,
 	getHeader,
+	locationParameter,
 	SESSION_COOKIE_PREFIX
 } from '../test_helper.ts';
 import { AuthorizationRequest } from '../AuthorizationRequest.ts';
@@ -94,6 +95,12 @@ async function postForm(
 	};
 }
 
+// Where a request ended up; fails the case when it was not redirected.
+function redirectOf(res: { location: string | null }): string {
+	if (!res.location) throw new Error('expected a redirect');
+	return res.location;
+}
+
 /* Sign in with a password and report where the request ended up. */
 async function signIn(auth: AuthorizationRequest, email: string) {
 	const { uid, cookie } = await startInteraction(auth);
@@ -125,8 +132,7 @@ describe('a required authentication context', () => {
 
 		expect(res.status).toBe(303);
 		expect(res.location ?? '').toContain('/acr/callback');
-		const code = new URL(res.location as string).searchParams.get('code');
-		expect(code).toBeTruthy();
+		const code = locationParameter(redirectOf(res), 'code');
 
 		const token = await auth.getToken(code);
 		expect(token.response.status).toBe(200);
@@ -141,14 +147,17 @@ describe('a required authentication context', () => {
 		const { res } = await signIn(auth, email);
 
 		expect(res.status).toBe(303);
-		const location = new URL(res.location as string);
+		const location = new URL(redirectOf(res));
 		expect(`${location.origin}${location.pathname}`).toBe(
 			'http://e.ly/acr/callback'
 		);
 		expect(location.searchParams.get('error')).toBe(
 			'unmet_authentication_requirements'
 		);
-		expect(location.searchParams.get('state')).toBe(auth.params.state);
+		expect(Object.fromEntries(location.searchParams)).toHaveProperty(
+			'state',
+			auth.params.state
+		);
 		expect(location.searchParams.get('code')).toBeNull();
 	});
 
@@ -168,7 +177,7 @@ describe('a required authentication context', () => {
 
 		const { res } = await signIn(requiring(MFA), email);
 
-		expect(new URL(res.location as string).searchParams.get('error')).toBe(
+		expect(new URL(redirectOf(res)).searchParams.get('error')).toBe(
 			'unmet_authentication_requirements'
 		);
 	});
@@ -198,7 +207,10 @@ describe('a required authentication context', () => {
 		expect(location.searchParams.get('error')).toBe(
 			'unmet_authentication_requirements'
 		);
-		expect(location.searchParams.get('state')).toBe(auth.params.state);
+		expect(Object.fromEntries(location.searchParams)).toHaveProperty(
+			'state',
+			auth.params.state
+		);
 	});
 
 	it('refuses a malformed requirement before any login page is shown', async () => {
@@ -221,7 +233,7 @@ describe('a required authentication context', () => {
 		await seedUser(email);
 
 		const { res } = await signIn(requiring([MFA]), email);
-		const location = new URL(res.location as string);
+		const location = new URL(redirectOf(res));
 
 		// Nothing to exchange: the refusal is what keeps a mismatched context out of a token.
 		expect(location.searchParams.get('code')).toBeNull();

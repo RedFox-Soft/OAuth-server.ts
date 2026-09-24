@@ -2,7 +2,10 @@ import getConfig from '../default.config.js';
 
 const config = getConfig();
 
-function allowUnregisteredClient(suffix, metadata) {
+function allowUnregisteredClient(
+	suffix: string,
+	metadata: Record<string, unknown>
+) {
 	return {
 		clientId: `client-unregistered-test-${suffix}`,
 		applicationType: 'web',

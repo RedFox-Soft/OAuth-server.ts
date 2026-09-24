@@ -4,7 +4,7 @@ title: "Account resolution (findAccount)"
 tags: [contract, architecture, oidc]
 sources: [oauth-server-codebase]
 created: 2026-07-31
-updated: 2026-07-31
+updated: 2026-09-24
 graph:
   node_type: concept
   relationships:
@@ -27,13 +27,22 @@ server no longer follows.
 ## Signature and inputs
 
 ```ts
-export async function findAccount(oidc, sub, _token?)
+export async function findAccount<P extends Record<string, unknown> & { resource?: string | readonly string[] }>(
+	oidc: OIDCContext<P> | undefined,
+	sub: string | undefined,
+	_token?: AccountToken // { payload: { clientId?, resource? } }
+)
 ```
 
-- `oidc` — the request context (`OIDCContext`) for the current request.
-- `sub` — the account identifier; equals the user record `_id`.
+- `oidc` — the request context (`OIDCContext`) for the current request. Generic over the endpoint's
+  parameters (authorization or token), because all it reads from them is `resource`.
+- `sub` — the account identifier; equals the user record `_id`. **May be absent**: a token issued to
+  no account (client credentials) carries none, and that resolves to `undefined` before any bucket is
+  looked up.
 - `_token` — the token the account is being loaded for. **Undefined at the authorization endpoint**,
   which is why every read of it is optional-chained.
+
+(Typed on 2026-09-24; until then all three parameters were implicit `any`.)
 
 ## Bucket resolution mirrors login
 
