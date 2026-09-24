@@ -2,11 +2,8 @@ import { describe, it, expect, afterEach } from 'bun:test';
 import { strict as assert } from 'node:assert';
 import * as util from 'node:util';
 
-import merge from 'lodash/merge.js';
-import omit from 'lodash/omit.js';
-import cloneDeep from 'lodash/cloneDeep.js';
-
 import { InvalidClientMetadata } from 'lib/helpers/errors.js';
+import { merge } from 'lib/helpers/_/object.js';
 import {
 	ApplicationConfig,
 	reloadConfiguration
@@ -25,6 +22,13 @@ import {
 } from 'lib/models/client.js';
 
 const sigKey = stripPrivateJWKFields(keys[0]);
+
+// Keys are left out of the test titles: they are long and say nothing about the case.
+function withoutKeys(metadata: { jwks?: object }) {
+	return metadata.jwks
+		? { ...metadata, jwks: { ...metadata.jwks, keys: undefined } }
+		: metadata;
+}
 const privateKey = keys[0];
 
 // The provider is a process-wide singleton with no configuration of its own (there is no
@@ -54,9 +58,10 @@ const COLLECTION_OPTIONS = new Set([
 describe('Client metadata validation', () => {
 	function register(metadata, configuration) {
 		Object.assign(ApplicationConfig, applicationDefaults);
-		const initConfig = configuration
-			? merge(baseConfig(), cloneDeep(configuration))
-			: baseConfig();
+		const initConfig: Record<string, unknown> = merge(
+			baseConfig(),
+			structuredClone(configuration ?? {})
+		);
 		for (const key of Object.keys(initConfig)) {
 			if (key.includes('.') || COLLECTION_OPTIONS.has(key)) {
 				// claims merge over the shipped map (Configuration used to do this when claims
@@ -90,7 +95,7 @@ describe('Client metadata validation', () => {
 		values.forEach((value) => {
 			let msg = util.format('must be a string, %j provided', value);
 			if (metadata)
-				msg = util.format(`${msg}, [client %j]`, omit(metadata, ['jwks.keys']));
+				msg = util.format(`${msg}, [client %j]`, withoutKeys(metadata));
 			if (configuration)
 				msg = util.format(`${msg}, [provider %j]`, configuration);
 
@@ -183,7 +188,7 @@ describe('Client metadata validation', () => {
 		[{}, 'string', 123, null, []].forEach((value) => {
 			let msg = util.format('must be a boolean, %j provided', value);
 			if (metadata)
-				msg = util.format(`${msg}, [client %j]`, omit(metadata, ['jwks.keys']));
+				msg = util.format(`${msg}, [client %j]`, withoutKeys(metadata));
 			if (configuration)
 				msg = util.format(`${msg}, [provider %j]`, configuration);
 			it(msg, () =>
@@ -214,7 +219,7 @@ describe('Client metadata validation', () => {
 	) => {
 		let msg = util.format('defaults to %s', value);
 		if (metadata)
-			msg = util.format(`${msg}, [client %j]`, omit(metadata, ['jwks.keys']));
+			msg = util.format(`${msg}, [client %j]`, withoutKeys(metadata));
 		if (configuration)
 			msg = util.format(`${msg}, [provider %j]`, configuration);
 
@@ -274,7 +279,7 @@ describe('Client metadata validation', () => {
 	) => {
 		let msg = util.format('passes %j', value);
 		if (metadata)
-			msg = util.format(`${msg}, [client %j]`, omit(metadata, ['jwks.keys']));
+			msg = util.format(`${msg}, [client %j]`, withoutKeys(metadata));
 		if (configuration)
 			msg = util.format(`${msg}, [provider %j]`, configuration);
 
@@ -295,7 +300,7 @@ describe('Client metadata validation', () => {
 	const rejects = (prop, value, description, metadata, configuration) => {
 		let msg = util.format('rejects %j', value);
 		if (metadata)
-			msg = util.format(`${msg}, [client %j]`, omit(metadata, ['jwks.keys']));
+			msg = util.format(`${msg}, [client %j]`, withoutKeys(metadata));
 		if (configuration)
 			msg = util.format(`${msg}, [provider %j]`, configuration);
 

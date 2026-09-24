@@ -1,18 +1,8 @@
-import merge from 'lodash/merge.js';
-
 import getConfig from '../default.config.js';
 import { testSigningKeys } from '../jwks/fixtures.js';
 
 const config = getConfig();
 
-merge(config.features, {
-	registration: {
-		initialAccessToken: true,
-		policies: {
-			foo() {}
-		}
-	}
-});
 export const addons = {
 	pairwiseIdentifier: () => 'pairwise-sub'
 };

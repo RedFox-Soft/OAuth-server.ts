@@ -1,5 +1,3 @@
-import cloneDeep from 'lodash/cloneDeep.js';
-
 import config, {
 	ApplicationConfig as CibaApplicationConfig
 } from './ciba.config.js';
@@ -17,4 +15,4 @@ export { clients } from './ciba.config.js';
 // base ciba set so the JAR variant keeps the same CIBA helper implementations.
 export { addons } from './ciba.config.js';
 
-export default cloneDeep(config);
+export default config;

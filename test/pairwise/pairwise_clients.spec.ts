@@ -1,8 +1,5 @@
 import { describe, it, beforeAll, afterEach, expect } from 'bun:test';
 
-import map from 'lodash/map.js';
-import uniq from 'lodash/uniq.js';
-
 import bootstrap from '../test_helper.js';
 import { assertNoPendingInterceptors, mock } from '../fetch_mock.js';
 
@@ -497,7 +494,7 @@ describe('pairwise features', () => {
 
 		it('returns different subs', async () => {
 			const subs = await Promise.all(
-				map(clients, async (client) => {
+				clients.map(async (client) => {
 					const claims = new Claims(client, { sub: 'accountId' });
 					claims.scope('openid');
 
@@ -507,7 +504,7 @@ describe('pairwise features', () => {
 			);
 
 			expect(subs).toHaveLength(3);
-			expect(uniq(subs)).toHaveLength(3);
+			expect(new Set(subs).size).toBe(3);
 			expect(subs).toContain('accountId');
 		});
 	});

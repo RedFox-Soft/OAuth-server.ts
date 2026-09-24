@@ -1,8 +1,6 @@
 import { X509Certificate } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
-import cloneDeep from 'lodash/cloneDeep.js';
-
 import key from '../client.sig.key.js';
 import getConfig from '../default.config.js';
 
@@ -21,7 +19,7 @@ const clientKey = {
 	kty: key.kty,
 	use: key.use
 };
-const rsaKeys = cloneDeep(mtlsKeys);
+const rsaKeys = structuredClone(mtlsKeys);
 rsaKeys.keys.splice(0, 1);
 
 export const ApplicationConfig = {

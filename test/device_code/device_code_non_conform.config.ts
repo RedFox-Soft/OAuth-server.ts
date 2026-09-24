@@ -1,8 +1,4 @@
-import cloneDeep from 'lodash/cloneDeep.js';
-
 import config, { ApplicationConfig as base } from './device_code.config.js';
-
-const setup = cloneDeep(config);
 
 // conformIdTokenClaims=false puts scope-derived profile claims (given_name, …)
 // into the id_token; the spec seeds them via setSeedClaims(fullProfileClaims).
@@ -18,4 +14,4 @@ export const ApplicationConfig = {
 // Clients are seeded from the `clients` named export; inherit the base set.
 export { clients } from './device_code.config.js';
 
-export default setup;
+export default config;

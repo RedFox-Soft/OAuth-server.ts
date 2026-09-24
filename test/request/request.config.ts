@@ -1,16 +1,7 @@
-import merge from 'lodash/merge.js';
-
 import getConfig from '../default.config.js';
 
 const config = getConfig();
 
-merge(config.features, {
-	requestObjects: {
-		requireUriRegistration: false
-	}
-});
-
-// Discovery reads feature state from ApplicationConfig; mirror the flags enabled above.
 export const ApplicationConfig = {
 	'authorization.allowOmittingSingleRegisteredRedirectUri': true,
 	'requestObjects.enabled': true,

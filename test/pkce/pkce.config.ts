@@ -1,13 +1,6 @@
-import merge from 'lodash/merge.js';
-
 import getConfig from '../default.config.js';
 
 const config = getConfig();
-
-merge(config.features, {
-	introspection: { enabled: true },
-	revocation: { enabled: true }
-});
 
 /*
  * Order is load-bearing: AuthorizationRequest defaults client_id to clients[0], so the public client

@@ -10,7 +10,6 @@ import {
 	spyOn,
 	mock
 } from 'bun:test';
-import snakeCase from 'lodash/snakeCase.js';
 
 import bootstrap, {
 	agent,
@@ -124,7 +123,7 @@ describe('requests without the openid scope', () => {
 				auth.validateError(response, 'invalid_request');
 				auth.validateErrorDescription(
 					response,
-					`openid scope must be requested for clients with ${snakeCase(clientProperty)}`
+					`openid scope must be requested for clients with ${clientProperty}`
 				);
 			});
 		});
