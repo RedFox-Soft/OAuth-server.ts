@@ -1,7 +1,7 @@
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import type { PipelineParams } from 'lib/consts/param_list.js';
+import type { Interaction } from 'lib/models/interaction.js';
 import nanoid from '../../helpers/nanoid.js';
-import epochTime from '../../helpers/epoch_time.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { logout } from 'lib/html/logout.js';
 import { SessionNotFound } from '../../helpers/errors.js';
@@ -9,7 +9,7 @@ import { resolveBucketForRequest } from '../../admin/auth/resolveBucket.js';
 
 export default async function resumeAction(
 	oidc: OIDCContext<PipelineParams>,
-	interaction
+	interaction: Interaction
 ) {
 	oidc.entity('Interaction', interaction);
 
@@ -62,7 +62,7 @@ export default async function resumeAction(
 	) {
 		if (interaction.payload.session?.uid) {
 			delete interaction.payload.session.uid;
-			await interaction.save(interaction.payload.exp - epochTime());
+			await interaction.persist();
 		}
 
 		const secret = nanoid();
@@ -78,8 +78,7 @@ export default async function resumeAction(
 
 	await interaction.destroy();
 
-	// Stored by this pipeline after validation; re-validating would add a refusal the server does not make.
-	oidc.params = storedParams as PipelineParams;
+	oidc.params = storedParams;
 	oidc.trusted = trusted;
 	oidc.redirectUriCheckPerformed = true;
 

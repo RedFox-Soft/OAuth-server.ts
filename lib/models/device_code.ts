@@ -40,7 +40,10 @@ export class DeviceCode extends consumable(BaseToken<DeviceCodePayloadType>) {
 		if (!stored) return;
 		try {
 			const payload = await this.verify(stored, { ignoreExpiration });
-			if (!constantEquals(userCode, payload.userCode)) {
+			if (
+				typeof payload.userCode !== 'string' ||
+				!constantEquals(userCode, payload.userCode)
+			) {
 				return;
 			}
 			return new this(payload);

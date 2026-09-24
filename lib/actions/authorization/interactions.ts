@@ -37,26 +37,25 @@ export const expiredInteractionCookie = (uid: string) => ({
 	expires: new Date(0)
 });
 
-export default async function interactions(oidc: OIDCContext<PipelineParams>) {
-	const client = oidc.client;
-	let failedCheck;
-	let prompt;
-
-	const policy = interactionPolicy();
-
-	for (const poly of policy) {
-		if (poly.name === 'consent' && client['consent.require'] === false) {
+// The first prompt of the policy whose checks this request fails, or null when none does.
+async function pendingPrompt(oidc: OIDCContext<PipelineParams>) {
+	for (const poly of interactionPolicy()) {
+		if (poly.name === 'consent' && oidc.client['consent.require'] === false) {
 			continue;
 		}
 		const result = await poly.executeChecks(oidc);
 		if (result) {
-			({ firstError: failedCheck, ...prompt } = result);
-			break;
+			return result;
 		}
 	}
+	return null;
+}
+
+export default async function interactions(oidc: OIDCContext<PipelineParams>) {
+	const pending = await pendingPrompt(oidc);
 
 	// no interaction requested
-	if (!prompt) {
+	if (!pending) {
 		// check there's an accountId to continue
 		if (!oidc.session.payload.accountId) {
 			throw new errors.AccessDenied(
@@ -88,6 +87,8 @@ export default async function interactions(oidc: OIDCContext<PipelineParams>) {
 		return;
 	}
 
+	const { firstError: failedCheck, ...prompt } = pending;
+
 	// if interaction needed but prompt=none => throw;
 	if (oidc.promptPending('none')) {
 		throw errors.errorForCode(failedCheck.error, failedCheck.error_description);
@@ -105,7 +106,7 @@ export default async function interactions(oidc: OIDCContext<PipelineParams>) {
 	 */
 	if (oidc.result?.login && prompt.reasons?.some(isAcrReason)) {
 		throw new errors.UnmetAuthenticationRequirements(
-			failedCheck?.error_description
+			failedCheck.error_description
 		);
 	}
 
@@ -135,7 +136,7 @@ export default async function interactions(oidc: OIDCContext<PipelineParams>) {
 	await interactionSession.save(ttl.Interaction);
 	oidc.entity('Interaction', interactionSession);
 
-	oidc.cookie[cookieNames.interaction].set({
+	oidc.requireCookies()[cookieNames.interaction].set({
 		value: cookieID,
 		path: interactionCookiePath(uid),
 		// Seconds, not milliseconds: the `* 1000` this carried handed the cookie a ~41-day lifetime for

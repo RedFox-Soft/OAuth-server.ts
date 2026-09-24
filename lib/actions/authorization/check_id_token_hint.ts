@@ -25,7 +25,7 @@ export default async function checkIdTokenHint(
 			throw new InvalidRequest(
 				'could not validate id_token_hint',
 				undefined,
-				err.message
+				err instanceof Error ? err.message : String(err)
 			);
 		}
 		oidc.entity('IdTokenHint', idTokenHint);

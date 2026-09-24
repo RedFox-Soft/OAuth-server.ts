@@ -1,4 +1,5 @@
 import { Session } from 'lib/models/session.js';
+import type { OIDCContext, OIDCCookies } from 'lib/helpers/oidc_context.js';
 import {
 	cookieNames,
 	endUserCookieAttributes,
@@ -46,20 +47,22 @@ export function expiredSessionCookie() {
  * sending it forever, and a later change that reintroduced the bare name would find a stale value
  * waiting for it — a sign-in nobody can account for.
  */
-export function clearLegacySessionCookie(cookie): void {
+export function clearLegacySessionCookie(cookie: OIDCCookies): void {
 	if (!cookie[cookieNames.session]?.value) return;
 	cookie[cookieNames.session].set(expiredSessionCookie());
 }
 
-export default async function sessionHandler(oidc) {
+export default async function sessionHandler<T extends Record<string, unknown>>(
+	oidc: OIDCContext<T>
+) {
 	await Session.get(oidc);
 
 	return async function setCookies() {
-		clearLegacySessionCookie(oidc.cookie);
+		const cookies = oidc.requireCookies();
+		clearLegacySessionCookie(cookies);
 		// The bucket the sign-in is for, exactly as `Session.get` read it — a cookie written under one
 		// name and read back under another is a sign-in that completes and then does not exist.
-		const cookie =
-			oidc.cookie[sessionCookieName(oidc.signInBucket ?? oidc.bucket)];
+		const cookie = cookies[sessionCookieName(oidc.signInBucket ?? oidc.bucket)];
 		// Persist and (re)issue the session cookie when the session is worth
 		// keeping: it already had a cookie (returning user — refresh it), it now
 		// carries an authenticated account (a login just resolved), or it was
@@ -82,12 +85,14 @@ export default async function sessionHandler(oidc) {
 			 * merging onto the cookie's current state, and those attributes carry no lifetime. Were it
 			 * the other way round, this would silently do nothing on a request that wrote the cookie twice.
 			 */
+			const { transient, exp } = oidc.session.payload;
 			cookie.set({
 				value: oidc.session.id,
 				path: SESSION_COOKIE_PATH,
-				...(oidc.session.payload.transient
+				// save() has just stamped `exp`; without one there is no lifetime to state.
+				...(transient || exp === undefined
 					? undefined
-					: { expires: new Date(oidc.session.payload.exp * 1000) })
+					: { expires: new Date(exp * 1000) })
 			});
 		}
 	};

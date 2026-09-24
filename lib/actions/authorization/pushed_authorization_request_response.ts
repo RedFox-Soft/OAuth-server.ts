@@ -17,7 +17,7 @@ export default async function pushedAuthorizationRequestResponse(
 	requestBody?: string
 ) {
 	let ttl: number;
-	let dpopJkt;
+	let dpopJkt: string | undefined;
 	const now = epochTime();
 	let request: string;
 	if (requestBody) {
@@ -30,7 +30,9 @@ export default async function pushedAuthorizationRequestResponse(
 		if (!Number.isInteger(ttl) || ttl > MAX_TTL) {
 			ttl = MAX_TTL;
 		}
-		dpopJkt = thumbprint || oidc.params.dpop_jkt;
+		// The request object passed the endpoint's schema, which declares dpop_jkt a string.
+		dpopJkt =
+			(typeof thumbprint === 'string' && thumbprint) || oidc.params.dpop_jkt;
 	} else {
 		ttl = MAX_TTL;
 		// authorization_details is already an array here — the request parser coerces it and checkRar

@@ -119,7 +119,8 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		/* One form set, the other unset in the same update: a bucket holds one address, never both. An
 		 * absent hostname must be *removed* rather than written null, or it would occupy the unique
 		 * sparse index and collide with every other bucket that has none. */
-		const unset = address.host === undefined ? { host: '' } : { slug: '' };
+		const unset: { host: '' } | { slug: '' } =
+			address.host === undefined ? { host: '' } : { slug: '' };
 		try {
 			return withDefaults(
 				await this.collection.findOneAndUpdate(

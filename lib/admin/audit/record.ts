@@ -29,6 +29,12 @@ export interface AuditDetail {
 	 * group can read. Omitted for an instance-wide action, which belongs to no group.
 	 */
 	ownerGroupId?: string;
+	/*
+	 * An address change (`bucket.address.change`): the address the bucket answered at and the one it
+	 * answers at now, a slug or a hostname, or null for none. Addresses are public, unlike field values.
+	 */
+	from?: string | null;
+	to?: string | null;
 }
 
 /*

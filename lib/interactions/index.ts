@@ -43,7 +43,6 @@ import {
 	SessionNotFound,
 	UnmetAuthenticationRequirements
 } from 'lib/helpers/errors.js';
-import epochTime from '../helpers/epoch_time.js';
 import sessionHandler from 'lib/shared/session.js';
 import respond from 'lib/actions/authorization/respond.js';
 import getResume from 'lib/actions/authorization/resume.js';
@@ -71,7 +70,7 @@ import { deviceInputPage } from 'lib/html/device.js';
 import deviceVerificationResponse from 'lib/actions/authorization/device_user_flow_response.js';
 import * as crypto from 'node:crypto';
 import { issuingBucket } from 'lib/admin/auth/bucketAddress.js';
-import { OIDCContext } from 'lib/helpers/oidc_context.js';
+import { OIDCContext, type OIDCCookies } from 'lib/helpers/oidc_context.js';
 import { Session } from 'lib/models/session.js';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { Interaction } from 'lib/models/interaction.js';
@@ -107,31 +106,6 @@ import { buildUILoginPath, buildUIPath } from './buildUIPath.js';
  */
 const INVALID_CODE = 'Invalid code';
 
-/*
- * Save an interaction without changing when it expires.
- *
- * Not `interaction.persist()`, which reads for exactly this and cannot work: its guard tests
- * `this.exp`, while the value lives at `this.payload.exp` (lib/models/base_model.ts), so it throws
- * `persist can only be called on previously persisted Interactions` for every interaction that has in
- * fact been persisted. It had no callers before this, which is why nothing noticed. Written the way
- * lib/actions/authorization/resume.ts already writes it.
- */
-function persistInteraction(interaction: {
-	payload: { exp?: number };
-	save(ttl: number): Promise<unknown>;
-}): Promise<unknown> {
-	const remaining = (interaction.payload.exp ?? epochTime()) - epochTime();
-	/*
-	 * Clamped, because both ends of the unclamped range write the wrong thing through
-	 * MongoAdapter.upsert: a TTL of exactly 0 is falsy there, so no `expiresAt` is written at all and
-	 * an interaction that should be seconds from death is instead left non-expiring; a negative one
-	 * back-dates `expiresAt` and kills the record mid-request. Both are reachable in the same narrow
-	 * window — an interaction that expires between the resolve step reading it and a handler saving it,
-	 * or one whose `exp` is somehow absent. One second is the same floor lib/totp/verify.ts uses when
-	 * it re-writes an attempt window for the same reason.
-	 */
-	return interaction.save(Math.max(1, remaining));
-}
 import { ApplicationConfig, configuration } from 'lib/configs/application.js';
 import { isPlainObject } from 'lib/helpers/_/object.js';
 
@@ -143,7 +117,7 @@ function resumed(oidc: OIDCContext<PipelineParams>) {
 	return oidc as OIDCContext<PipelineParamsWith<'redirect_uri'>>;
 }
 
-async function resume(interaction, cookie) {
+async function resume(interaction: Interaction, cookie: OIDCCookies) {
 	/*
 	 * The population this interaction belongs to, recovered from the request that started it.
 	 *
@@ -176,7 +150,7 @@ async function resume(interaction, cookie) {
 		await setCookies();
 		return confirmPage;
 	}
-	cookie._interaction.set(expiredInteractionCookie(interaction.uid as string));
+	cookie._interaction.set(expiredInteractionCookie(interaction.uid));
 
 	/*
 	 * Aborting the authorization request back to the client, which this route has to do for itself:
@@ -238,11 +212,9 @@ async function resume(interaction, cookie) {
 	return respond(resumed(oidc));
 }
 
-async function createGrant(interaction) {
+async function createGrant(interaction: Interaction) {
 	const grantId = interaction.payload.grantId;
-	const details = (interaction.payload.prompt?.details ?? {}) as PromptDetails;
-	const session = interaction.payload.session ?? {};
-	const params = interaction.payload.params ?? {};
+	const details: PromptDetails = interaction.payload.prompt?.details ?? {};
 
 	/*
 	 * `tryFind`, because the interaction's grantId is a hint and not proof that a grant was stored. The
@@ -262,8 +234,8 @@ async function createGrant(interaction) {
 		stored ??
 		// establish a new grant for this account/client
 		new Grant({
-			accountId: session.accountId,
-			clientId: params.client_id
+			accountId: interaction.payload.session?.accountId,
+			clientId: clientIdOf(interaction)
 		});
 
 	if (details.missingOIDCScope) {
@@ -347,11 +319,8 @@ function verificationGates(
 }
 
 /* The client that began an interaction — the only trustworthy route to a bucket. */
-function clientIdOf(interaction: {
-	payload: { params?: unknown };
-}): string | undefined {
-	return (interaction.payload.params as { client_id?: string } | undefined)
-		?.client_id;
+function clientIdOf(interaction: Interaction): string | undefined {
+	return interaction.payload.params?.client_id;
 }
 
 /*
@@ -362,12 +331,8 @@ function clientIdOf(interaction: {
  * one the authorization request implied — a bucket taken from the login POST would let anyone aim an
  * interaction at another tenant's accounts, which is the same reason `clientId` above is read here too.
  */
-function resourceOf(interaction: {
-	payload: { params?: unknown };
-}): string | string[] | undefined {
-	return (
-		interaction.payload.params as { resource?: string | string[] } | undefined
-	)?.resource;
+function resourceOf(interaction: Interaction): string | string[] | undefined {
+	return interaction.payload.params?.resource;
 }
 
 /*
@@ -375,11 +340,8 @@ function resourceOf(interaction: {
  * inside an interaction needs it: the browser checks that address against the policy of the document
  * whose form was submitted, because the submission's redirect chain ends there — see lib/html/csp.ts.
  */
-function redirectUriOf(interaction: {
-	payload: { params?: unknown };
-}): string | undefined {
-	return (interaction.payload.params as { redirect_uri?: string } | undefined)
-		?.redirect_uri;
+function redirectUriOf(interaction: Interaction): string | undefined {
+	return interaction.payload.params?.redirect_uri;
 }
 
 export const ui = new Elysia()
@@ -496,9 +458,7 @@ export const ui = new Elysia()
 			 * property of the bucket, and a page that offered what the POST would refuse is a dead end dressed
 			 * as an invitation.
 			 */
-			const clientId = (
-				interaction.payload.params as { client_id?: string } | undefined
-			)?.client_id;
+			const clientId = clientIdOf(interaction);
 			return loginServer(uid, {
 				notice: resolveNotice(query.notice),
 				handOffTo: redirectUriOf(interaction),
@@ -618,7 +578,7 @@ export const ui = new Elysia()
 					transient: body.remember !== 'on',
 					attempts: 0
 				};
-				await persistInteraction(interaction);
+				await interaction.persist();
 				/*
 				 * A redirect rather than a render, and that is forced rather than stylistic:
 				 * loginClient.tsx reads the page name out of window.location.pathname, so a code page
@@ -714,7 +674,7 @@ export const ui = new Elysia()
 					...pending,
 					attempts: pending.attempts + 1
 				};
-				await persistInteraction(interaction);
+				await interaction.persist();
 				/*
 				 * One answer for every failure — wrong, replayed, and throttled alike. A distinct "too many
 				 * attempts" would confirm to someone guessing that the account is real and that their
@@ -831,7 +791,7 @@ export const ui = new Elysia()
 					...pending,
 					attempts: pending.attempts + 1
 				};
-				await persistInteraction(interaction);
+				await interaction.persist();
 
 				const user = await getUserStore(bucketId).find(pending.accountId);
 				const bucket = await getBucketStore().find(bucketId);
@@ -877,9 +837,7 @@ export const ui = new Elysia()
 	.get(
 		'ui/:uid/federation/:providerId/start',
 		async ({ params: { uid, providerId }, interaction }) => {
-			const clientId = (
-				interaction.payload.params as { client_id?: string } | undefined
-			)?.client_id;
+			const clientId = clientIdOf(interaction);
 			// The bucket comes from the client that began the interaction, never from the request: a bucket
 			// taken from a parameter would let anyone aim this at any tenant's provider.
 			const bucketId = await resolveBucketForRequest(
@@ -952,9 +910,7 @@ export const ui = new Elysia()
 				return federationExpiredPage();
 			}
 
-			const clientId = (
-				interaction.payload.params as { client_id?: string } | undefined
-			)?.client_id;
+			const clientId = clientIdOf(interaction);
 			const bucketId = await resolveBucketForRequest(
 				clientId,
 				resourceOf(interaction)
@@ -1127,7 +1083,7 @@ export const ui = new Elysia()
 					transient: false,
 					attempts: 0
 				};
-				await persistInteraction(interaction);
+				await interaction.persist();
 				return Response.redirect(buildUIPath(uid, 'totp/enroll'), 303);
 			}
 
@@ -1142,21 +1098,11 @@ export const ui = new Elysia()
 		}
 	)
 	.get('ui/:uid/consent', async ({ params: { uid }, interaction }) => {
-		const params = interaction.payload.params as
-			{ client_id?: string } | undefined;
-		const clientId = params?.client_id;
-		const client = clientId
-			? ((await Client.tryFind(clientId)) as
-					{ clientName?: string; client_name?: string } | undefined)
-			: undefined;
-		const clientName =
-			client?.clientName || client?.client_name || clientId || uid;
-		const details =
-			(interaction.payload.prompt as { details?: PromptDetails } | undefined)
-				?.details ?? {};
-		const account = (
-			interaction.payload.session as { accountId?: string } | undefined
-		)?.accountId;
+		const clientId = clientIdOf(interaction);
+		const client = clientId ? await Client.tryFind(clientId) : undefined;
+		const clientName = client?.clientName || clientId || uid;
+		const details = interaction.payload.prompt?.details ?? {};
+		const account = interaction.payload.session?.accountId;
 		// The view builder reads no configuration, so the type → label map is resolved here and
 		// handed in.
 		const rarLabels = Object.fromEntries(
@@ -1173,11 +1119,8 @@ export const ui = new Elysia()
 				rarLabels,
 				identity: documentIdentityFor({
 					clientId,
-					redirectUri: (
-						interaction.payload.params as { redirect_uri?: string } | undefined
-					)?.redirect_uri,
-					redirectUris: (client as { redirectUris?: string[] } | undefined)
-						?.redirectUris
+					redirectUri: redirectUriOf(interaction),
+					redirectUris: client?.redirectUris
 				})
 			}),
 			{ handOffTo: redirectUriOf(interaction) }
@@ -1233,11 +1176,13 @@ export const ui = new Elysia()
 				throw new AccessDenied(undefined, oidc.result.error_description);
 			}
 
-			cookie._interaction.set(
-				expiredInteractionCookie(interaction.uid as string)
-			);
+			cookie._interaction.set(expiredInteractionCookie(interaction.uid));
 
-			code = await DeviceCode.find(interaction.payload.deviceCode, {
+			const { deviceCode } = interaction.payload;
+			if (!deviceCode) {
+				throw new NotFoundError();
+			}
+			code = await DeviceCode.find(deviceCode, {
 				ignoreExpiration: true,
 				ignoreSessionBinding: true,
 				error: new NotFoundError()

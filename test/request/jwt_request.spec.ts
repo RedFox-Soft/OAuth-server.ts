@@ -439,6 +439,38 @@ describe('request parameter features', () => {
 						});
 					});
 
+					/*
+					 * Refused before the pipeline read the request object at all — a parameter beside it
+					 * fails validation — and still delivered where the request object asked. The request
+					 * carries no response_mode of its own, so the fallback would be a query redirect.
+					 */
+					it('delivers a refusal by the response mode the request object asked for', async function () {
+						const request = await JWT.sign(
+							{
+								jti: crypto.randomBytes(16).toString('base64url'),
+								client_id: 'client',
+								redirect_uri: 'https://client.example.com/cb',
+								response_type: 'code',
+								scope: 'openid',
+								response_mode: 'form_post'
+							},
+							Buffer.from('secret'),
+							'HS256',
+							{ issuer: 'client', audience: ISSUER, expiresIn: 30 }
+						);
+						const params = { client_id: 'client', request, max_age: -1 };
+						const { response, error } =
+							verb === 'get'
+								? await agent.auth.get({ query: params })
+								: await formAgent.auth.post(params);
+
+						expect(response.headers.get('location')).toBeNull();
+						// A 4xx body is Eden's error value; this one is the auto-submitting page.
+						const page = String(error?.value);
+						expect(page).toContain('action="https://client.example.com/cb"');
+						expect(page).toContain('name="error" value="invalid_request"');
+					});
+
 					it('a response mode the client may not use is refused', async function () {
 						const spy = mock();
 						eventBus.once(errorEvt, spy);

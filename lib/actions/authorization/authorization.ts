@@ -51,6 +51,7 @@ import {
 } from 'lib/helpers/errors.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import type { PipelineParams } from 'lib/consts/param_list.js';
+import { isRecord } from 'lib/helpers/_/object.js';
 import type { RequestBucket } from 'lib/configs/issuer.js';
 import {
 	issuingBucket,
@@ -98,7 +99,36 @@ const pushedAuthorizationParameters = t.Object({
 	request_uri: refusedParam('request_uri')
 });
 
-export async function isAllowRedirectUri(params, bucket: RequestBucket) {
+/*
+ * The members deciding where an error is delivered, each taken only as a well-formed value. The error
+ * can surface before validation passed, so nothing else about what was sent is known; the request
+ * object merge replaces every other member anyway.
+ */
+function deliveryParams(sent: unknown): PipelineParams {
+	const params: PipelineParams = {};
+	if (!isRecord(sent)) {
+		return params;
+	}
+	for (const key of [
+		'client_id',
+		'redirect_uri',
+		'state',
+		'response_mode',
+		'request'
+	] as const) {
+		const value = sent[key];
+		if (typeof value === 'string') {
+			params[key] = value;
+		}
+	}
+	if (sent.response_type === 'code' || sent.response_type === 'none') {
+		params.response_type = sent.response_type;
+	}
+	return params;
+}
+
+export async function isAllowRedirectUri(sent: unknown, bucket: RequestBucket) {
+	const params = deliveryParams(sent);
 	/*
 	 * The bucket is passed in because this runs from the error handler, which holds a route *pattern*
 	 * rather than a resolved request. Everything the delivered error carries hangs off it — most visibly
@@ -107,9 +137,14 @@ export async function isAllowRedirectUri(params, bucket: RequestBucket) {
 	 */
 	const oidc = new OIDCContext({ params, bucket });
 
-	const client = await Client.find(params.client_id, {
-		error: new InvalidClient('client is invalid', 'client not found')
-	});
+	const unknownClient = new InvalidClient(
+		'client is invalid',
+		'client not found'
+	);
+	if (params.client_id === undefined) {
+		throw unknownClient;
+	}
+	const client = await Client.find(params.client_id, { error: unknownClient });
 	oidc.entity('Client', client);
 	try {
 		await processRequestObject(authorizationRequest, oidc);

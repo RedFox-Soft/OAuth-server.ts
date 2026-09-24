@@ -3,8 +3,8 @@ import htmlSafe from './html_safe.ts';
 export function input(
 	action: string,
 	csrfToken: string,
-	code: string,
-	charset: string
+	code?: string,
+	charset?: string
 ) {
 	const attributes =
 		charset === 'digits' ? 'pattern="[0-9]*" inputmode="numeric" ' : '';

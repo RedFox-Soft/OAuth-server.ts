@@ -9,6 +9,7 @@ import {
 } from '../helpers/user_code_form.ts';
 import { htmlResponse } from './csp.js';
 import { esc } from './escape.js';
+import { isRecord } from '../helpers/_/object.ts';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -75,14 +76,16 @@ export function deviceInputPage({
 	action: string;
 	secret: string;
 	charset?: string;
-	err?: { status?: number; userCode?: string; name?: string };
+	// Whatever the handler caught: a re-render names the code it failed on, a protocol error its status.
+	err?: unknown;
 }) {
+	const failure = isRecord(err) ? err : {};
 	let message: ReactNode;
-	if (err && (err.userCode || err.name === 'NoCodeError')) {
+	if (err && (failure.userCode || failure.name === 'NoCodeError')) {
 		message = (
 			<p className="red">The code you entered is incorrect. Try again</p>
 		);
-	} else if (err && err.name === 'AbortedError') {
+	} else if (err && failure.name === 'AbortedError') {
 		message = <p className="red">The Sign-in request was interrupted</p>;
 	} else if (err) {
 		message = <p className="red">There was an error processing your request</p>;
@@ -114,7 +117,8 @@ export function deviceInputPage({
 		</CenteredCard>
 	);
 
-	return htmlResponse(html, { status: err ? (err.status ?? 400) : 200 });
+	const status = typeof failure.status === 'number' ? failure.status : 400;
+	return htmlResponse(html, { status: err ? status : 200 });
 }
 
 export function deviceConfirmPage({

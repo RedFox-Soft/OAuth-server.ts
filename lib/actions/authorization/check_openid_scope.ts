@@ -1,12 +1,13 @@
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import type { PipelineParams } from 'lib/consts/param_list.js';
+import type { Client } from 'lib/models/client.js';
 import { InvalidRequest } from '../../helpers/errors.ts';
 
-const GATED_CLIENT = Object.entries({
-	defaultAcrValues: 'default_acr_values',
-	defaultMaxAge: 'default_max_age',
-	requireAuthTime: 'require_auth_time'
-});
+const GATED_CLIENT: [keyof Client, string][] = [
+	['defaultAcrValues', 'default_acr_values'],
+	['defaultMaxAge', 'default_max_age'],
+	['requireAuthTime', 'require_auth_time']
+];
 
 const GATED: (keyof PipelineParams)[] = [
 	'acr_values',

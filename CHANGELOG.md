@@ -11,6 +11,10 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- Device verification refuses a confirmation when the session holds no form secret, instead of
+  comparing two absent values as a match; resuming an interaction after an account change re-saves it
+  with the same TTL floor the sign-in screens use, so a record about to expire is not left
+  non-expiring.
 - Host-addressed buckets: a sign-in at the bucket's host wrote a session cookie the host never read
   (so it was forgotten), and authorization responses and tokens named `ISSUER/<id>` instead of the
   bucket's origin its discovery document advertises; `GET /logout` there read the default bucket's

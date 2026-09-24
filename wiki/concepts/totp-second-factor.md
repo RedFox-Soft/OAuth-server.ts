@@ -4,7 +4,7 @@ title: 'The TOTP second factor'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-27
-updated: 2026-09-13
+updated: 2026-09-24
 graph:
   node_type: concept
   relationships:
@@ -169,7 +169,9 @@ constitution says must not have one.
 `this.payload.exp` (`lib/models/base_model.ts`), so it throws *"persist can only be called on previously
 persisted Interactions"* for every interaction that has in fact been persisted. It had no callers, which
 is why nothing noticed. `lib/interactions/index.ts` uses a local `persistInteraction` written the way
-`lib/actions/authorization/resume.ts` already writes it.
+`lib/actions/authorization/resume.ts` already writes it. (Since 2026-09-24 that function *is*
+`Interaction.persist()`, moved onto the model with its TTL clamp; `resume.ts` calls it too, so its unclamped
+re-save is gone.)
 
 The `MongoDB` user store's `update` now splits its patch into `$set` and `$unset`. The driver drops
 undefined values from `$set`, so clearing an enrolment through it would have left the secret in place —

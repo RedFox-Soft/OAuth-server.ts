@@ -39,7 +39,7 @@ function readDetails(value: unknown) {
 	);
 }
 
-export default async function checkRar(oidc) {
+export default async function checkRar(oidc: OIDCContext) {
 	const { params, client } = oidc;
 
 	if (params.authorization_details !== undefined) {
@@ -75,7 +75,7 @@ export default async function checkRar(oidc) {
 					);
 				}
 
-				if (typeof detail.type !== 'string' || !detail.type.length) {
+				if (!isTyped(detail)) {
 					throw new InvalidAuthorizationDetails(
 						`authorization_details parameter members' type attribute must be a non-empty string (authorization details index ${i})`
 					);
@@ -161,6 +161,13 @@ export default async function checkRar(oidc) {
  * known type containing unknown fields, fields with invalid values, and missing required fields. The
  * descriptor is what lets a type declare a closed field set at all.
  */
+// RFC 9396 §2: every member names its type, a non-empty string.
+function isTyped(
+	detail: Record<string, unknown>
+): detail is Record<string, unknown> & { type: string } {
+	return typeof detail.type === 'string' && detail.type.length > 0;
+}
+
 function checkDescriptor(
 	config: RarTypeDescriptor,
 	detail: Record<string, unknown> & { type: string },

@@ -55,7 +55,7 @@ export interface ConsentView {
 export function documentIdentityFor(args: {
 	clientId?: string;
 	redirectUri?: string;
-	redirectUris?: string[];
+	redirectUris?: readonly string[];
 }): Pick<
 	ConsentView,
 	'clientIdHostname' | 'redirectHostname' | 'loopbackOnly'

@@ -1133,9 +1133,16 @@ export interface UserBucketStoreInstance {
 				| 'emailVerificationRequired'
 				| 'verificationMethod'
 				| 'totpRequired'
+				| 'hostFirstSeenAt'
+				| 'hostLastSeenAt'
 			>
 		>
 	): Promise<UserBucket | null>;
+	/*
+	 * Writes a reserved bucket's slug only where the record has none (lib/admin/seed.ts): `update`
+	 * cannot, because an address is not an ordinary edit.
+	 */
+	repairReservedSlug(id: string, slug: string): Promise<void>;
 	destroy(id: string): Promise<void>;
 }
 

@@ -36,7 +36,7 @@ import { eventBus } from '../event_bus.js';
 // Renders (or re-renders) the user-code input page for an error. ReRenderErrors (bad/missing/
 // expired/used code, aborted interaction) are ordinary re-renders and do NOT emit an error event;
 // request/client errors DO emit `code_verification.error` and render at their own status.
-function renderInputError(oidc, err) {
+function renderInputError(oidc: OIDCContext<PipelineParams>, err: unknown) {
 	const charset = ApplicationConfig['deviceFlow.charset'];
 	const secret =
 		oidc.entities.Session?.payload?.state?.secret ??
@@ -111,10 +111,12 @@ export const codeVerification = new Elysia()
 			try {
 				const { xsrf, user_code: userCode, confirm, abort } = body;
 
-				if (!oidc.session.payload.state) {
+				// Required on both sides: two absent values are equal, and would pass for a matching token.
+				const secret = oidc.session.payload.state?.secret;
+				if (!secret) {
 					throw new InvalidRequest('could not find device form details');
 				}
-				if (oidc.session.payload.state.secret !== xsrf) {
+				if (secret !== xsrf) {
 					throw new InvalidRequest('xsrf token invalid');
 				}
 
@@ -162,7 +164,7 @@ export const codeVerification = new Elysia()
 					const action = oidc.urlFor('code_verification');
 					return deviceConfirmPage({
 						action,
-						secret: oidc.session.payload.state.secret,
+						secret,
 						userCode: denormalize(normalized, mask),
 						client
 					});

@@ -87,7 +87,15 @@ export type RequestParams = PipelineParams | TokenParams;
 
 /* What an interaction resolved with, as the resumption hands it back. */
 export interface InteractionResult {
-	login?: { accountId: string; [key: string]: unknown };
+	// What the sign-in screens write (lib/interactions/index.ts); `ts` is the sign-in time when not now.
+	login?: {
+		accountId: string;
+		transient?: boolean;
+		ts?: number;
+		amr?: string[];
+		acr?: string;
+		[key: string]: unknown;
+	};
 	consent?: { grantId?: string; [key: string]: unknown };
 	error?: string;
 	error_description?: string;
@@ -217,6 +225,14 @@ export class OIDCContext<T extends Record<string, unknown> = RequestParams> {
 		}
 		// Checked just above; TypeScript does not narrow an indexed access through a generic key.
 		return value as OIDCEntities[K];
+	}
+
+	/* The cookie jar, on a route that keeps a session; asked for on one that does not, it is a defect. */
+	requireCookies(): OIDCCookies {
+		if (!this.cookie) {
+			throw new Error('this route keeps no cookie jar');
+		}
+		return this.cookie;
 	}
 
 	/*

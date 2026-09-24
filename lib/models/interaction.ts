@@ -1,22 +1,61 @@
 import { Type as t, type Static } from '@sinclair/typebox';
 import epochTime from '../helpers/epoch_time.js';
 import { BaseModel, BaseModelPayload } from './base_model.js';
+import type { PipelineParams } from '../consts/param_list.ts';
+import type { InteractionResult } from '../helpers/oidc_context.ts';
 
-// Interaction persists a freeform interaction record. Freeform sub-objects (prompt, params,
-// result, lastSubmission) are declared as t.Unknown() so the shallow projection copies them
-// verbatim and Value.Check accepts every real shape on both save and reload. `session` is an open
-// object because the constructor reduces the Session model to a plain subset. `grant` is
-// deliberately NOT declared: the constructor derives `grantId` from the Grant instance and nothing
-// reads the instance back, so filtering drops it rather than persisting a live model instance.
+/*
+ * What the authorization pipeline wrote: its own validated parameters, and the outcome the interaction
+ * screens record. Only the top-level keys are filtered on save (formats/opaque.ts) — nested content is
+ * copied verbatim and never re-validated — so these schemas state the writers' types rather than check
+ * them. Re-validating the parameters would add a refusal the server does not make.
+ */
+const StoredParams = t.Unsafe<PipelineParams>(
+	t.Record(t.String(), t.Unknown())
+);
+const Outcome = t.Unsafe<InteractionResult>(t.Record(t.String(), t.Unknown()));
+
+// The prompt the policy stopped at (lib/actions/authorization/interactions.ts); `details` carries the
+// consent checks' findings and whatever a deployment's own checks add.
+const PendingPrompt = t.Object({
+	name: t.String(),
+	reasons: t.Array(t.String()),
+	details: t.Object(
+		{
+			missingOIDCScope: t.Optional(t.Array(t.String())),
+			missingOIDCClaims: t.Optional(t.Array(t.String())),
+			missingResourceScopes: t.Optional(
+				t.Record(t.String(), t.Array(t.String()))
+			),
+			rar: t.Optional(t.Array(t.Unknown()))
+		},
+		{ additionalProperties: true }
+	)
+});
+
+// `session` is the subset of the Session model the constructor reduces it to. `grant` is deliberately
+// NOT declared: the constructor derives `grantId` from the Grant instance and nothing reads the
+// instance back, so filtering drops it rather than persisting a live model instance.
 export const InteractionPayload = t.Object({
 	...BaseModelPayload.properties,
-	prompt: t.Optional(t.Unknown()),
+	prompt: t.Optional(PendingPrompt),
 	cookieID: t.Optional(t.String()),
-	lastSubmission: t.Optional(t.Unknown()),
+	lastSubmission: t.Optional(Outcome),
 	accountId: t.Optional(t.String()),
-	params: t.Optional(t.Unknown()),
-	trusted: t.Optional(t.Unknown()),
-	session: t.Optional(t.Object({}, { additionalProperties: true })),
+	params: t.Optional(StoredParams),
+	trusted: t.Optional(t.Array(t.String())),
+	session: t.Optional(
+		t.Object(
+			{
+				accountId: t.String(),
+				uid: t.Optional(t.String()),
+				cookie: t.Optional(t.String()),
+				acr: t.Optional(t.String()),
+				amr: t.Optional(t.Array(t.String()))
+			},
+			{ additionalProperties: true }
+		)
+	),
 	grantId: t.Optional(t.String()),
 	deviceCode: t.Optional(t.String()),
 	parJti: t.Optional(t.String()),
@@ -53,7 +92,7 @@ export const InteractionPayload = t.Object({
 			attempts: t.Number()
 		})
 	),
-	result: t.Optional(t.Unknown())
+	result: t.Optional(Outcome)
 });
 export type InteractionPayloadType = Static<typeof InteractionPayload>;
 
@@ -109,12 +148,25 @@ export class Interaction extends BaseModel<InteractionPayloadType> {
 		}
 	}
 
-	get uid() {
-		return this.jti;
+	// Every interaction is created with its identifier (the constructor requires one).
+	get uid(): string {
+		return this.id;
 	}
 
-	set uid(value) {
-		this.jti = value;
+	set uid(value: string) {
+		this.id = value;
+	}
+
+	/*
+	 * Saved again without changing when it expires. Clamped, because both ends of the unclamped range
+	 * write the wrong thing through MongoAdapter.upsert: a TTL of exactly 0 is falsy there, so no
+	 * `expiresAt` is written and an interaction seconds from death is left non-expiring; a negative one
+	 * back-dates `expiresAt` and kills the record mid-request. Both are reachable when the interaction
+	 * expires between being read and being saved. One second is the floor lib/totp/verify.ts uses too.
+	 */
+	persist() {
+		const remaining = (this.payload.exp ?? epochTime()) - epochTime();
+		return this.save(Math.max(1, remaining));
 	}
 
 	async save(ttl: number) {
@@ -122,14 +174,5 @@ export class Interaction extends BaseModel<InteractionPayloadType> {
 			throw new TypeError('"ttl" argument must be a number');
 		}
 		return super.save(ttl);
-	}
-
-	async persist() {
-		if (typeof this.exp !== 'number') {
-			throw new TypeError(
-				'persist can only be called on previously persisted Interactions'
-			);
-		}
-		return this.save(this.exp - epochTime());
 	}
 }

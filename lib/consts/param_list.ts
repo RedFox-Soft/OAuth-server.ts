@@ -1,6 +1,18 @@
 import { t, type Static } from 'elysia';
 import { addressOf, type RequestBucket } from '../configs/issuer.js';
 
+/*
+ * A schema may name the whole OAuth refusal for a member rather than only its description (see
+ * `registration` below). Elysia carries the value through to the validation error unchanged, and
+ * getObjFromError (lib/shared/authorization_error_handler.ts) renders it; this is the extension point
+ * Elysia declares for widening what `error` accepts.
+ */
+declare module 'elysia/type-system/types' {
+	interface ElysiaTypeCustomErrors {
+		oauthRefusal: { error: string; error_description: string };
+	}
+}
+
 /**
  * A parameter this server refuses rather than ignores.
  *

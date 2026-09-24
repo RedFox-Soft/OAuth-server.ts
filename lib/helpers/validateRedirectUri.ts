@@ -1,10 +1,16 @@
 import { LOOPBACKS } from 'lib/consts/client_attributes.js';
-import { InvalidClientMetadata } from './errors.js';
+import { InvalidClientMetadata, type OIDCProviderError } from './errors.js';
+
+// Registration refuses with invalid_client_metadata; the authorization endpoint with invalid_request.
+interface Refusal {
+	label?: string;
+	ErrorClass?: new (description: string) => OIDCProviderError;
+}
 
 export function validateRedirectUri(
 	uris: string[],
 	appType: string,
-	{ label = 'redirectUris', ErrorClass = InvalidClientMetadata } = {}
+	{ label = 'redirectUris', ErrorClass = InvalidClientMetadata }: Refusal = {}
 ) {
 	for (const redirectUri of uris) {
 		const parsed = URL.parse(redirectUri);

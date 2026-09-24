@@ -7,7 +7,7 @@ import { eventBus } from '../../event_bus.js';
 
 export default async function deviceAuthorizationResponse(
 	oidc: OIDCContext<PipelineParams>,
-	deviceInfo
+	deviceInfo: unknown
 ) {
 	const charset = ApplicationConfig['deviceFlow.charset'];
 	const mask = ApplicationConfig['deviceFlow.mask'];

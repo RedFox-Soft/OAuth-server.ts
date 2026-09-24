@@ -94,7 +94,7 @@ export class Session extends BaseModel<SessionPayloadType> {
 		}
 	}
 
-	static async get(oidc: OIDCContext) {
+	static async get<T extends Record<string, unknown>>(oidc: OIDCContext<T>) {
 		// is there supposed to be a session bound? generate if not
 		/*
 		 * The bucket comes from the request, never from the cookie. A forged `_session_<anything>` is read
@@ -200,7 +200,14 @@ export class Session extends BaseModel<SessionPayloadType> {
 		}
 	}
 
-	loginAccount(details) {
+	loginAccount(details: {
+		accountId: string;
+		bucketId?: string;
+		transient?: boolean;
+		loginTs?: number;
+		amr?: string[];
+		acr?: string;
+	}) {
 		const {
 			transient = false,
 			accountId,

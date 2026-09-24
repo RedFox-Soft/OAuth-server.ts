@@ -42,7 +42,11 @@ import { ApplicationConfig } from 'lib/configs/application.js';
 import { featureVerification } from './featureVerification.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import type { PipelineParams } from 'lib/consts/param_list.js';
-import { authHeaders, authParams } from 'lib/plugins/auth.js';
+import {
+	authHeaders,
+	authParams,
+	type authParamsType
+} from 'lib/plugins/auth.js';
 import {
 	coerceArrayParams,
 	parseJsonParams
@@ -104,8 +108,8 @@ function bucketOf(params: unknown, request: Request) {
 }
 
 async function authentication(
-	params,
-	headers,
+	params: authParamsType,
+	headers: Record<string, string | undefined>,
 	oidc: OIDCContext<PipelineParams>
 ) {
 	await tokenAuth(params, headers, oidc);
