@@ -6,7 +6,7 @@ import { getErrorHtmlResponse } from '../html/error.tsx';
 import { routeNames } from 'lib/consts/param_list.js';
 import { ErrorContext, mapValueError, ValidationError } from 'elysia';
 import { TransformDecodeCheckError } from '@sinclair/typebox/value';
-import { isPlainObject } from 'lib/helpers/_/object.js';
+import { isPlainObject, isRecord } from 'lib/helpers/_/object.js';
 
 /*
  * What this handler reads off the context Elysia hands onError. Structural on purpose: the app
@@ -575,7 +575,7 @@ async function authorizationErrorHandler({
 		...(state ? { state } : {}),
 		iss: redirectObj.oidc.issuer
 	};
-	const requested = isPlainObject(params) ? params.response_mode : undefined;
+	const requested = isRecord(params) ? params.response_mode : undefined;
 	const handler =
 		(typeof requested === 'string' && responseModes.get(requested)) ||
 		responseModes.get('query');

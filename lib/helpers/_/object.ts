@@ -16,6 +16,14 @@ export function isPlainObject(
 	return !!value && value.constructor === Object;
 }
 
+/*
+ * An object read by member name, whatever its prototype. Request parameters are one: a parsed form
+ * body may have no prototype, which isPlainObject (constructor === Object) refuses.
+ */
+export function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 export function merge(
 	target: Record<string, unknown>,
 	...sources: Record<string, unknown>[]

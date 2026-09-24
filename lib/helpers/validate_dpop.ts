@@ -31,7 +31,8 @@ export class UseDpopNonce extends InvalidHeaderAuthorization {
 
 type options = {
 	accessTokenId?: string;
-	method?: 'GET' | 'POST';
+	// The request's method, which the proof's `htm` must name (RFC 9449 §4.3).
+	method?: string;
 	route?: string;
 };
 

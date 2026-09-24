@@ -646,7 +646,9 @@ export const ApplicationConfig = {
 	 *
 	 * description: Enables registration access token rotation (boolean or function).
 	 */
-	'registrationManagement.rotateRegistrationAccessToken': true,
+	'registrationManagement.rotateRegistrationAccessToken': setting<
+		boolean | ((oidc: OIDCContext) => boolean | Promise<boolean>)
+	>(true),
 
 	/*
 	 * scopes

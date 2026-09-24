@@ -121,6 +121,30 @@ describe('/auth', () => {
 				});
 			});
 
+			/*
+			 * A refusal from the parameter schema, not from the pipeline: it reaches the shared error
+			 * handler, which has to read response_mode from the request itself — for a POST, from a
+			 * parsed form body.
+			 */
+			it('delivers a refused request by the response mode it asked for', async function () {
+				const auth = new AuthorizationRequest({
+					response_mode: 'form_post',
+					scope: 'openid',
+					// @ts-expect-error a response type this server does not support, which the schema refuses
+					response_type: 'token'
+				});
+
+				const { response, error } = await authRequest(auth);
+				if (!error) throw new Error('expected error response');
+				expect(response.headers.get('content-type')).toBe(
+					'text/html; charset=utf-8'
+				);
+				expect(error.value).toContain(
+					`form action="${auth.params.redirect_uri}" method="post"`
+				);
+				expect(error.value).toContain('name="error"');
+			});
+
 			it('responds by rendering a self-submitting form with the error', async function () {
 				const auth = new AuthorizationRequest({
 					prompt: 'none',

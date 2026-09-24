@@ -1,5 +1,5 @@
 import { hostOfRequest } from 'lib/consts/request_host.js';
-import { Elysia, t } from 'elysia';
+import { Elysia, t, type Context } from 'elysia';
 import certificateThumbprint from '../helpers/certificate_thumbprint.ts';
 import { findAccount } from '../addon/account.js';
 import filterClaims from '../helpers/filter_claims.ts';
@@ -34,7 +34,21 @@ import { accessTokenClientId, corsClientBased } from 'lib/plugins/cors.js';
  * would accept a credential over a transport the specification does not cover, and the content type
  * is the only thing distinguishing the two.
  */
-function formEncodedAccessToken(headers, body, method: string) {
+// What the UserInfo handler reads off the request context.
+type UserinfoContext = {
+	headers: Record<string, string | undefined>;
+	body?: unknown;
+	set: Context['set'];
+	request: Request;
+	// Absent at the bare address, where no path parameter is matched.
+	params?: { bucket?: string };
+};
+
+function formEncodedAccessToken(
+	headers: UserinfoContext['headers'],
+	body: unknown,
+	method: string
+) {
 	if (method !== 'POST') {
 		return undefined;
 	}
@@ -42,7 +56,11 @@ function formEncodedAccessToken(headers, body, method: string) {
 	if (!contentType.startsWith('application/x-www-form-urlencoded')) {
 		return undefined;
 	}
-	const token = (body as Record<string, unknown> | undefined)?.access_token;
+	// A parsed form body may have no prototype, so it is tested by shape rather than by constructor.
+	const token =
+		typeof body === 'object' && body !== null && 'access_token' in body
+			? body.access_token
+			: undefined;
 	return typeof token === 'string' && token ? token : undefined;
 }
 
@@ -54,7 +72,12 @@ function formEncodedAccessToken(headers, body, method: string) {
  * implemented and is not reached from here: OAuth 2.1 removes it, because a token in a URL reaches
  * access logs, the Referer header and browser history.
  */
-function resourceCredential(oidc, headers, body, method: string) {
+function resourceCredential(
+	oidc: Pick<OIDCContext, 'getAccessToken'>,
+	headers: UserinfoContext['headers'],
+	body: unknown,
+	method: string
+) {
 	const fromBody = formEncodedAccessToken(headers, body, method);
 
 	if (fromBody && headers.authorization) {
@@ -85,13 +108,16 @@ function resourceCredential(oidc, headers, body, method: string) {
 	return oidc.getAccessToken({ acceptDPoP: true });
 }
 
-async function userInfo({ headers, body, set, request, params }) {
+async function userInfo({
+	headers,
+	body,
+	set,
+	request,
+	params
+}: UserinfoContext) {
 	/* The address decides the population; its absence is the bare address, which is the default
 	 * bucket's. */
-	const bucket = await requestBucketFor(
-		(params as { bucket?: string } | undefined)?.bucket,
-		hostOfRequest(request)
-	);
+	const bucket = await requestBucketFor(params?.bucket, hostOfRequest(request));
 	const oidc = new OIDCContext({ params: {}, headers, bucket });
 	const { method } = request;
 
@@ -155,7 +181,11 @@ async function userInfo({ headers, body, set, request, params }) {
 		throw new InvalidToken('associated account not found');
 	}
 
-	const grant = await Grant.find(accessToken.payload.grantId, {
+	const { grantId } = accessToken.payload;
+	if (!grantId) {
+		throw new InvalidToken('grant not found');
+	}
+	const grant = await Grant.find(grantId, {
 		ignoreExpiration: true,
 		error: new InvalidToken('grant not found')
 	});
@@ -175,7 +205,7 @@ async function userInfo({ headers, body, set, request, params }) {
 	const claims = filterClaims(accessToken.payload.claims, 'userinfo', grant);
 	const rejected = grant.getRejectedOIDCClaims();
 	const scope = grant.getOIDCScopeFiltered(
-		new Set(accessToken.payload.scope.split(' '))
+		new Set((accessToken.payload.scope ?? '').split(' '))
 	);
 
 	if (client.userinfoSignedResponseAlg || client.userinfoEncryptedResponseAlg) {

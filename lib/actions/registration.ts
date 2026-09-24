@@ -1,4 +1,4 @@
-import { Elysia, t, type Static } from 'elysia';
+import { Elysia, t, type Context, type Static } from 'elysia';
 
 import omitBy from '../helpers/_/omit_by.ts';
 import constantEquals from '../helpers/constant_equals.ts';
@@ -17,6 +17,7 @@ import {
 	toWire
 } from 'lib/models/client.js';
 import { adapter } from 'lib/adapters/index.js';
+import { isPlainObject } from 'lib/helpers/_/object.js';
 import { reclaimUnusedRegistrations } from 'lib/models/client/dynamic_registration.js';
 import { InitialAccessToken } from 'lib/models/initial_access_token.js';
 import { RegistrationAccessToken } from 'lib/models/registration_access_token.js';
@@ -43,6 +44,20 @@ const FORBIDDEN = [
  * metadata field.
  */
 type Body = Record<string, unknown>;
+
+// What the registration handlers read off the request context.
+type RegistrationContext = {
+	body?: unknown;
+	headers: Record<string, string | undefined>;
+	request: Request;
+	set: Context['set'];
+	// Absent on a route with no path parameters (POST /reg at the bare address).
+	params?: { bucket?: string };
+};
+// A request addressed to one registered client.
+type ClientContext = RegistrationContext & {
+	params: { bucket?: string; clientId: string };
+};
 // What create, read and update answer; typed from the response schema, so the typed client sees its members.
 type RegistrationBody = Static<typeof RegistrationResponse>;
 
@@ -65,7 +80,26 @@ function readBearer(authorization: string | undefined) {
 // realm="<issuer>"`. The global error handler enriches 401s with error/error_description from the
 // bearer header; the realm-only baseline set here is what remains on the 400 "no access token
 // provided" case (which has no Authorization header for the global handler to key off).
-function setBearerRealm(set: { headers: Record<string, string> }) {
+/*
+ * Runs the registration policies a token carries. Each name was checked against the configured
+ * policies when the token was issued; one that has since gone from the configuration is a fault.
+ */
+async function applyPolicies(
+	names: readonly string[],
+	oidc: OIDCContext<Body>,
+	properties: Body
+) {
+	const implementations = ApplicationConfig['registration.policies'];
+	for (const name of names) {
+		const policy = implementations?.[name];
+		if (!policy) {
+			throw new Error(`registration policy ${name} is not configured`);
+		}
+		await policy(oidc, properties);
+	}
+}
+
+function setBearerRealm(set: Context['set']) {
 	set.headers['WWW-Authenticate'] = `Bearer realm="${ISSUER}"`;
 }
 
@@ -119,14 +153,17 @@ async function validateInitialAccessToken(
  * the address the request was made at. No refusal accompanies it: a registration names no bucket, and
  * the association a client needs is decided at authorization time (see `create`).
  */
-function bucketOf(params: unknown, request: Request) {
-	return requestBucketFor(
-		(params as { bucket?: string } | undefined)?.bucket,
-		hostOfRequest(request)
-	);
+function bucketOf(params: { bucket?: string } | undefined, request: Request) {
+	return requestBucketFor(params?.bucket, hostOfRequest(request));
 }
 
-async function create({ body, headers, params, request, set }) {
+async function create({
+	body,
+	headers,
+	params,
+	request,
+	set
+}: RegistrationContext) {
 	const contentType = request.headers.get('content-type') || '';
 	if (!contentType.includes('application/json')) {
 		throw new InvalidRequest(
@@ -134,7 +171,7 @@ async function create({ body, headers, params, request, set }) {
 		);
 	}
 
-	const requestBody: Body = (body as Body) ?? {};
+	const requestBody: Body = isPlainObject(body) ? body : {};
 	const oidc = new OIDCContext<Body>({
 		params: requestBody,
 		headers,
@@ -201,10 +238,7 @@ async function create({ body, headers, params, request, set }) {
 
 	const iatPolicies = oidc.entities.InitialAccessToken?.payload?.policies;
 	if (iatPolicies) {
-		const implementations = ApplicationConfig['registration.policies'];
-		for (const policy of iatPolicies) {
-			await implementations[policy](oidc, properties);
-		}
+		await applyPolicies(iatPolicies, oidc, properties);
 
 		if (rat && !('policies' in rat.payload)) {
 			rat.payload.policies = iatPolicies;
@@ -232,7 +266,7 @@ async function create({ body, headers, params, request, set }) {
 	return responseBody;
 }
 
-async function read({ params, headers, request, set }) {
+async function read({ params, headers, request, set }: ClientContext) {
 	setBearerRealm(set);
 	const oidc = new OIDCContext<Body>({
 		params: {},
@@ -258,9 +292,9 @@ async function read({ params, headers, request, set }) {
 	return responseBody;
 }
 
-async function update({ params, body, headers, request, set }) {
+async function update({ params, body, headers, request, set }: ClientContext) {
 	setBearerRealm(set);
-	const requestBody: Body = (body as Body) ?? {};
+	const requestBody: Body = isPlainObject(body) ? body : {};
 	const oidc = new OIDCContext<Body>({
 		params: requestBody,
 		headers,
@@ -328,10 +362,7 @@ async function update({ params, body, headers, request, set }) {
 
 	if (regAccessToken.payload.policies) {
 		const { policies } = regAccessToken.payload;
-		const implementations = ApplicationConfig['registration.policies'];
-		for (const policy of policies) {
-			await implementations[policy](oidc, properties);
-		}
+		await applyPolicies(policies, oidc, properties);
 	}
 
 	const nextClient = await registerClient(properties, { store: true });
@@ -372,7 +403,7 @@ async function update({ params, body, headers, request, set }) {
 	return responseBody;
 }
 
-async function remove({ params, headers, request, set }) {
+async function remove({ params, headers, request, set }: ClientContext) {
 	setBearerRealm(set);
 	const oidc = new OIDCContext<Body>({
 		params: {},
