@@ -424,15 +424,30 @@ export function parseRarTypes(value: unknown): RarType[] {
  * difference is invisible to the server but not to the review drawer, which would otherwise report a
  * change every time the editor was opened and closed.
  */
-export function buildRarTypes(types: RarType[]): Record<string, unknown> {
-	const out: Record<string, unknown> = {};
+/*
+ * The descriptor the server stores for a type, mirrored from `RarTypeDescriptor` in
+ * lib/configs/application.ts for the reason given at the top of this file.
+ */
+export interface RarDescriptor {
+	label: string;
+	fields?: Record<string, RarConstraint>;
+	allowUnknownFields?: boolean;
+}
+
+export interface RarConstraint {
+	required?: boolean;
+	allowed?: string[];
+}
+
+export function buildRarTypes(types: RarType[]): Record<string, RarDescriptor> {
+	const out: Record<string, RarDescriptor> = {};
 	for (const t of types) {
-		const descriptor: Record<string, unknown> = { label: t.label };
-		const fields: Record<string, unknown> = {};
+		const descriptor: RarDescriptor = { label: t.label };
+		const fields: Record<string, RarConstraint> = {};
 		for (const name of RAR_FIELDS) {
 			const c = t.fields[name];
 			if (!c) continue;
-			const constraint: Record<string, unknown> = {};
+			const constraint: RarConstraint = {};
 			if (c.required !== undefined) constraint.required = c.required;
 			if (c.allowed?.length) constraint.allowed = [...c.allowed];
 			fields[name] = constraint;

@@ -8,7 +8,7 @@ import {
 	mock
 } from 'bun:test';
 import nanoid from '../../lib/helpers/nanoid.ts';
-import bootstrap, { agent, getHeader } from '../test_helper.js';
+import bootstrap, { agent, getHeader, noPrompts } from '../test_helper.js';
 import { SESSION_COOKIE_PREFIX } from '../test_helper.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
@@ -855,7 +855,7 @@ describe('resume after consent', async () => {
 		});
 
 		it('does not leak a per-test override into the next test', () => {
-			addons.override({ interactionPolicy: () => [] });
+			addons.override({ interactionPolicy: noPrompts });
 			expect([...interactionPolicy()]).toHaveLength(0);
 		});
 

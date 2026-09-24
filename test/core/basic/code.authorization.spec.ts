@@ -16,7 +16,9 @@ import bootstrap, {
 	agent,
 	type Setup,
 	changeClient,
-	formAgent
+	formAgent,
+	getHeader,
+	noPrompts
 } from '../../test_helper.js';
 import epochTime from '../../../lib/helpers/epoch_time.ts';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
@@ -102,7 +104,7 @@ describe('BASIC code', () => {
 				const { response } = await authRequest(auth, { cookie });
 				expect(response.status).toBe(303);
 
-				const location = new URL(response.headers.get('location'));
+				const location = new URL(getHeader(response, 'location'));
 				expect(location.searchParams.get('other')).toBe('stuff');
 				expect(location.searchParams.get('code')).toBeTruthy();
 			});
@@ -118,7 +120,7 @@ describe('BASIC code', () => {
 				const { response } = await authRequest(auth, { cookie });
 				expect(response.status).toBe(303);
 
-				const location = new URL(response.headers.get('location'));
+				const location = new URL(getHeader(response, 'location'));
 				expect(location.searchParams.getAll('state')).toHaveLength(1);
 				expect(location.searchParams.get('state')).not.toBe('planted');
 				auth.validateState(response);
@@ -134,7 +136,7 @@ describe('BASIC code', () => {
 				const { response } = await authRequest(auth, { cookie });
 				expect(response.status).toBe(303);
 
-				const location = new URL(response.headers.get('location'));
+				const location = new URL(getHeader(response, 'location'));
 				expect(location.pathname).toBe('/');
 				expect(location.searchParams.get('code')).toBeTruthy();
 			});
@@ -213,7 +215,7 @@ describe('BASIC code', () => {
 			// An empty policy is registered through the addon seam; the global afterEach in
 			// test/preload.ts resets to this spec's baseline, so no manual restore is needed.
 			it('the request produces a login interaction', async function () {
-				addons.override({ interactionPolicy: () => [] });
+				addons.override({ interactionPolicy: noPrompts });
 				const spy = mock();
 				eventBus.on('authorization.error', spy);
 
@@ -233,7 +235,7 @@ describe('BASIC code', () => {
 			});
 
 			it('the request produces a consent interaction', async function () {
-				addons.override({ interactionPolicy: () => [] });
+				addons.override({ interactionPolicy: noPrompts });
 				const spy = mock();
 				eventBus.on('authorization.error', spy);
 
@@ -369,8 +371,11 @@ describe('BASIC code', () => {
 				const spy = mock();
 				eventBus.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
+					// @ts-expect-error the case sends the parameter twice
 					scope: ['openid', 'openid'],
+					// @ts-expect-error the case sends the parameter twice
 					state: ['foo', 'foo'],
+					// @ts-expect-error the case sends the parameter twice
 					response_type: ['code', 'code']
 				});
 
@@ -401,6 +406,7 @@ describe('BASIC code', () => {
 				eventBus.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
 					scope,
+					// @ts-expect-error the case sends the parameter twice
 					state: ['foo', 'bar'],
 					response_mode: 'foo'
 				});
@@ -430,6 +436,7 @@ describe('BASIC code', () => {
 				eventBus.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
 					scope,
+					// @ts-expect-error the case sends the parameter twice
 					response_mode: ['query', 'query']
 				});
 				delete auth.params.state;
@@ -702,6 +709,7 @@ describe('BASIC code', () => {
 			// section-4.1.2.1 RFC6749
 			it('refuses a request with no client_id', async function () {
 				const auth = new AuthorizationRequest({ scope });
+				// @ts-expect-error the case sends no client_id
 				delete auth.params.client_id;
 
 				const { response, error } = await authRequest(auth, {
@@ -814,6 +822,7 @@ describe('BASIC code', () => {
 				const spy = mock();
 				eventBus.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
+					// @ts-expect-error a response_type the server does not support is the case
 					response_type: 'unsupported',
 					scope
 				});
@@ -916,6 +925,7 @@ describe('BASIC code', () => {
 				const spy = mock();
 				eventBus.once('authorization.error', spy);
 				const auth = new AuthorizationRequest({
+					// @ts-expect-error a response_type the server does not support is the case
 					response_type: 'id_token token',
 					nonce: undefined,
 					scope

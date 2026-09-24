@@ -14,7 +14,9 @@ export type PushedAuthorizationRequestPayloadType = Static<
 	typeof PushedAuthorizationRequestPayload
 >;
 
-export class PushedAuthorizationRequest extends consumable(BaseModel) {
+export class PushedAuthorizationRequest extends consumable(
+	BaseModel<PushedAuthorizationRequestPayloadType>
+) {
 	declare payload: PushedAuthorizationRequestPayloadType & { kind: string };
 	model = PushedAuthorizationRequestPayload;
 

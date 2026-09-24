@@ -5,7 +5,10 @@ import {
 	InvalidRequest,
 	OIDCProviderError
 } from '../helpers/errors.ts';
-import { ApplicationConfig } from 'lib/configs/application.js';
+import {
+	ApplicationConfig,
+	type RarTypeDescriptor
+} from 'lib/configs/application.js';
 
 const LIST_FIELDS = ['locations', 'actions', 'datatypes', 'privileges'];
 const COMMON_FIELDS = [...LIST_FIELDS, 'identifier'];
@@ -158,20 +161,8 @@ export default async function checkRar(oidc) {
  * known type containing unknown fields, fields with invalid values, and missing required fields. The
  * descriptor is what lets a type declare a closed field set at all.
  */
-interface FieldConstraint {
-	required?: boolean;
-	allowed?: string[];
-}
-
-interface TypeDescriptor {
-	label: string;
-	fields?: Record<string, FieldConstraint>;
-	allowUnknownFields?: boolean;
-	validate?: (oidc: OIDCContext, detail: unknown, client: unknown) => unknown;
-}
-
 function checkDescriptor(
-	config: TypeDescriptor,
+	config: RarTypeDescriptor,
 	detail: Record<string, unknown> & { type: string },
 	i: number
 ) {

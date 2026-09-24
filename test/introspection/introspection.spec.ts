@@ -66,7 +66,7 @@ describe('introspection features', () => {
 					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 				}
 			);
-			if (!data) throw new Error('expected response data');
+			if (!data?.active) throw new Error('expected an active token');
 			expect(status).toBe(200);
 			expect(data).toContainKeys([
 				'client_id',
@@ -99,7 +99,7 @@ describe('introspection features', () => {
 					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 				}
 			);
-			if (!data) throw new Error('expected response data');
+			if (!data?.active) throw new Error('expected an active token');
 			expect(status).toBe(200);
 
 			expect(data).toContainKeys(['client_id', 'scope', 'sub']);
@@ -121,7 +121,7 @@ describe('introspection features', () => {
 					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 				}
 			);
-			if (!data) throw new Error('expected response data');
+			if (!data?.active) throw new Error('expected an active token');
 			expect(status).toBe(200);
 
 			expect(data).toContainKeys(['client_id', 'scope', 'sub']);
@@ -143,7 +143,7 @@ describe('introspection features', () => {
 					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 				}
 			);
-			if (!data) throw new Error('expected response data');
+			if (!data?.active) throw new Error('expected an active token');
 			expect(status).toBe(200);
 
 			expect(data).toContainKeys(['client_id', 'scope', 'sub']);
@@ -308,7 +308,7 @@ describe('introspection features', () => {
 					)
 				}
 			);
-			if (!data) throw new Error('expected response data');
+			if (!data?.active) throw new Error('expected an active token');
 			expect(status).toBe(200);
 			expect(data).toContainKeys(['client_id', 'scope', 'sub']);
 			expect(data.sub).not.toBe('accountId');
@@ -332,7 +332,7 @@ describe('introspection features', () => {
 					)
 				}
 			);
-			if (!data) throw new Error('expected response data');
+			if (!data?.active) throw new Error('expected an active token');
 			expect(status).toBe(200);
 			expect(data).toContainKeys(['client_id', 'scope', 'sub']);
 			expect(data.sub).not.toBe('accountId');
@@ -340,6 +340,7 @@ describe('introspection features', () => {
 
 		it('returns token-endpoint-like cache headers', async function () {
 			const { response } = await agent.token.introspect.post(
+				// @ts-expect-error any answer will do here, so the case sends no token
 				{},
 				{
 					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
@@ -350,6 +351,7 @@ describe('introspection features', () => {
 
 		it('a request with no token is refused as invalid_request', async function () {
 			const { error } = await agent.token.introspect.post(
+				// @ts-expect-error the case sends no token
 				{},
 				{
 					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
@@ -461,6 +463,7 @@ describe('introspection features', () => {
 
 		it('does not allow to introspect the uninstrospectable (in case adapter is implemented wrong)', async function () {
 			spyOn(AccessToken, 'tryFind').mockReturnValue({
+				// @ts-expect-error an adapter answering with a record of another kind is the case
 				payload: {
 					isValid: true,
 					kind: 'AuthorizationCode'

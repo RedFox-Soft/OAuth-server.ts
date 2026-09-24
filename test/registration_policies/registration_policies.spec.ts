@@ -223,6 +223,7 @@ describe('client registration policies', () => {
 
 		it('policies must be an array', async () => {
 			await assert.rejects(
+				// @ts-expect-error policies that are not an array are the case
 				new InitialAccessToken({ policies: null }).save(),
 				(err) => {
 					expect(err).toHaveProperty('message', 'policies must be an array');
@@ -271,6 +272,7 @@ describe('client registration policies', () => {
 
 		it('policies members must be strings', async () => {
 			await assert.rejects(
+				// @ts-expect-error policies that are not strings are the case
 				new InitialAccessToken({ policies: [null] }).save(),
 				(err) => {
 					expect(err).toHaveProperty('message', 'policies must be strings');

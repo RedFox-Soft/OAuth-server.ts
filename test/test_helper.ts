@@ -27,6 +27,7 @@ import { TestAdapter } from './models.js';
 import { AuthorizationRequest } from './AuthorizationRequest.js';
 import { setAddonBaseline } from './addon_baseline.js';
 import { interactionPolicy } from '../lib/addon/index.js';
+import { base as basePolicy } from '../lib/helpers/interaction_policy/index.js';
 
 // In test mode getUserStore() returns the in-memory UserStore, which exposes a
 // test-only `seed()` (see lib/adapters/memory/userStore.ts). The mongo store is
@@ -182,6 +183,13 @@ export function passInteractionChecks(...args: unknown[]) {
 // (`Headers | Record<string,string> | [string,string][] | undefined`), which has
 // no `.get()`. Read headers off the real `response` and assert presence so callers
 // get a non-null string back.
+// An interaction policy with no prompts, for a case that must never be sent to an interaction.
+export function noPrompts() {
+	const policy = basePolicy();
+	policy.clear();
+	return policy;
+}
+
 export function getHeader(response: Response, name: string): string {
 	const value = response.headers.get(name);
 	if (value === null) {

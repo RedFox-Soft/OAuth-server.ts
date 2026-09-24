@@ -1,5 +1,3 @@
-import { parse as parseUrl } from 'node:url';
-
 import {
 	describe,
 	it,
@@ -15,7 +13,8 @@ import bootstrap, {
 	agent,
 	type Setup,
 	changeClient,
-	formAgent
+	formAgent,
+	redirectParameter
 } from '../test_helper.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { eventBus } from 'lib/event_bus.js';
@@ -23,16 +22,12 @@ import { configuration } from 'lib/configs/application.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
 
-function getAuth(auth, cookie?) {
+function getAuth(auth: AuthorizationRequest, cookie?: string) {
 	return agent.auth.get({ query: auth.params, headers: { cookie } });
 }
 
 function codeFromResponse(response: Response) {
-	const location = response.headers.get('location');
-	const {
-		query: { code }
-	} = parseUrl(location, true);
-	return code as string;
+	return redirectParameter(response, 'code');
 }
 
 /**
@@ -68,10 +63,10 @@ describe('requests without the openid scope', () => {
 			max_age: 300,
 			nonce: 'foo'
 		};
-		Object.keys(gatedValues).forEach((param) => {
+		Object.entries(gatedValues).forEach(([param, value]) => {
 			it(`each OIDC-only parameter is refused on a plain OAuth request`, async function () {
 				const auth = new AuthorizationRequest({
-					[param]: gatedValues[param]
+					[param]: value
 				});
 
 				const { response } = await getAuth(auth);
@@ -158,8 +153,8 @@ describe('requests without the openid scope', () => {
 				});
 
 				describe('authorization code exchange', () => {
-					let auth;
-					let code;
+					let auth: AuthorizationRequest;
+					let code: string;
 					beforeEach(async function () {
 						auth = new AuthorizationRequest({ scope });
 
@@ -219,7 +214,7 @@ describe('requests without the openid scope', () => {
 
 				describe('refresh token exchange', () => {
 					const refreshScope = `${scope || ''} offline_access`.trim();
-					let rt;
+					let rt: string;
 
 					beforeAll(async function () {
 						cookie = await setup.login({
@@ -240,7 +235,8 @@ describe('requests without the openid scope', () => {
 						const code = codeFromResponse(response);
 
 						const { data } = await auth.getToken(code);
-						if (!data) throw new Error('expected response data');
+						if (!data?.refresh_token)
+							throw new Error('expected a refresh token');
 						rt = data.refresh_token;
 					});
 
@@ -324,8 +320,8 @@ describe('requests without the openid scope', () => {
 			});
 
 			describe('urn:ietf:params:oauth:grant-type:device_code', () => {
-				let jti;
-				let code;
+				let jti: string;
+				let code: string;
 				beforeEach(async function () {
 					eventBus.on('device_code.saved', (token) => {
 						jti = token.jti;
@@ -335,7 +331,7 @@ describe('requests without the openid scope', () => {
 						client_id: 'client',
 						scope
 					});
-					if (!data) throw new Error('expected response data');
+					if (!data?.device_code) throw new Error('expected a device code');
 					expect(status).toBe(200);
 					code = data.device_code;
 

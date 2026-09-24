@@ -23,7 +23,7 @@ export class BaseModel<
 	model = BaseModelPayload;
 	payload = {} as Req<T, 'kind'>;
 
-	constructor(payload: T = {} as T) {
+	constructor(payload: Partial<T> = {}) {
 		super();
 
 		payload.kind ||= this.constructor.name;
@@ -31,6 +31,8 @@ export class BaseModel<
 		if (!check) {
 			throw new TypeError('invalid payload');
 		}
+		// Taken as the full payload: a caller built it or storage returned it. Not a verified narrowing —
+		// the check above runs against BaseModelPayload only (wiki: token-payload-access-contract).
 		this.payload = payload as Req<T, 'kind'>;
 		const { kind } = payload;
 		if (kind && kind !== this.constructor.name) {

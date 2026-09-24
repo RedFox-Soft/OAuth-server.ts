@@ -22,7 +22,9 @@ export type AuthorizationCodePayloadType = Static<
 	typeof AuthorizationCodePayload
 >;
 
-export class AuthorizationCode extends consumable(BaseToken) {
+export class AuthorizationCode extends consumable(
+	BaseToken<AuthorizationCodePayloadType>
+) {
 	declare payload: Omit<AuthorizationCodePayloadType, 'kind'> & {
 		kind: string;
 	};

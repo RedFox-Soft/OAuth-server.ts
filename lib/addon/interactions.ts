@@ -23,9 +23,7 @@ export interface PolicyPrompt {
 	} | null>;
 }
 
-// The policy is an array carrying helper methods, built imperatively in
-// helpers/interaction_policy/index.ts — TypeScript infers a bare array there, so the methods have
-// to be described here for callers to see them.
+// The policy is an array carrying helper methods; helpers/interaction_policy/index.ts builds one.
 export interface Policy extends Array<PolicyPrompt> {
 	get(name: string): PolicyPrompt | undefined;
 	add(prompt: PolicyPrompt, index?: number): void;
@@ -50,9 +48,7 @@ let baseline: Policy | undefined;
  * of those incoherent.
  */
 export function interactionPolicy(): Policy {
-	// base() is built imperatively and infers as a bare array; Policy describes the helper
-	// methods it actually carries.
-	baseline ??= base() as Policy;
+	baseline ??= base();
 	return baseline;
 }
 

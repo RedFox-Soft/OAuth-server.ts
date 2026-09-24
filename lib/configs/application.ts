@@ -16,6 +16,17 @@ export type RegistrationPolicy = (
 	properties: Record<string, unknown>
 ) => unknown;
 
+/* A constraint on one RFC 9396 §2 field of an authorization details type. */
+export type RarFieldConstraint = { required?: boolean; allowed?: string[] };
+
+/* One authorization details type this server accepts; described at `richAuthorizationRequests.types`. */
+export type RarTypeDescriptor = {
+	label: string;
+	fields?: Record<string, RarFieldConstraint>;
+	allowUnknownFields?: boolean;
+	validate?: (oidc: OIDCContext, detail: unknown, client: unknown) => unknown;
+};
+
 /* Members added to the discovery document; any other member extends it as given. */
 export type DiscoveryExtensions = {
 	claim_types_supported?: string[];
@@ -403,7 +414,9 @@ export const ApplicationConfig = {
 	 * rejection from it surfaces as `invalid_authorization_details`. Enabling the feature with an empty
 	 * map fails validation, because every request would then be refused.
 	 */
-	'richAuthorizationRequests.types': {},
+	'richAuthorizationRequests.types': setting<Record<string, RarTypeDescriptor>>(
+		{}
+	),
 
 	/*
 	 * cors

@@ -23,7 +23,7 @@ export const DeviceCodePayload = t.Object({
 });
 export type DeviceCodePayloadType = Static<typeof DeviceCodePayload>;
 
-export class DeviceCode extends consumable(BaseToken) {
+export class DeviceCode extends consumable(BaseToken<DeviceCodePayloadType>) {
 	declare payload: Omit<DeviceCodePayloadType, 'kind'> & { kind: string };
 	model = DeviceCodePayload;
 

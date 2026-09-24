@@ -8,6 +8,8 @@ import { ttl } from '../configs/liveTime.js';
 import { jwt } from './formats/jwt.js';
 import { Session } from './session.js';
 import { InvalidTarget } from 'lib/helpers/errors.js';
+import type { Client } from './client.js';
+import type ResourceServer from '../helpers/resource_server.js';
 
 export const BaseTokenPayload = t.Object({
 	...BaseModelPayload.properties,
@@ -50,6 +52,17 @@ export type BaseTokenPayloadType = Static<typeof BaseTokenPayload> &
 	Static<typeof SessionBoundPayload> &
 	Static<typeof AudiencePayload>;
 
+/*
+ * What a token is built from: members of its payload, and the client, resource server and lifetime the
+ * constructor takes apart from it (the client also sets clientId). Partial, because a model fills some
+ * members itself (kind, iiat, consumed) and a caller supplies the ones it knows.
+ */
+export type TokenInit<T> = Partial<T> & {
+	client?: Client;
+	resourceServer?: ResourceServer;
+	expiresIn?: number;
+};
+
 export class BaseToken<
 	T extends BaseTokenPayloadType = BaseTokenPayloadType
 > extends BaseModel<T> {
@@ -58,7 +71,12 @@ export class BaseToken<
 
 	#resourceServer;
 
-	constructor({ client, resourceServer, expiresIn, ...rest } = {}) {
+	constructor({
+		client,
+		resourceServer,
+		expiresIn,
+		...rest
+	}: TokenInit<T> = {}) {
 		super(rest);
 		if (typeof client !== 'undefined') {
 			this.client = client;

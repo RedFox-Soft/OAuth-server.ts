@@ -14,6 +14,7 @@ import moment from 'moment';
 import * as JWT from '../../lib/helpers/jwt.ts';
 import epochTime from '../../lib/helpers/epoch_time.ts';
 import bootstrap, { seedClient } from '../test_helper.js';
+import { OIDCProviderError } from 'lib/helpers/errors.js';
 import { IdToken } from 'lib/models/id_token.js';
 import { Client, clientKeys } from 'lib/models/client.js';
 
@@ -26,14 +27,15 @@ const keys = [
 	}
 ];
 
+// The client's jwks_uri answering with `body` — anything a remote server might serve, keys or not.
 function setResponse(
-	body = {
+	body: unknown = {
 		keys
 	},
 	status = 200,
-	headers = {}
+	headers: Record<string, string> = {}
 ) {
-	spyOn(globalThis, 'fetch').mockResolvedValue(
+	return spyOn(globalThis, 'fetch').mockResolvedValue(
 		new Response(typeof body === 'string' ? body : JSON.stringify(body), {
 			status,
 			headers
@@ -66,7 +68,7 @@ describe('client keystore refresh', () => {
 	});
 
 	it('gets the jwks from the uri (and does only one request concurrently)', async function () {
-		setResponse();
+		const fetched = setResponse();
 
 		const client = await Client.find('client');
 		await Promise.all([
@@ -74,7 +76,7 @@ describe('client keystore refresh', () => {
 			clientKeys(client).asymmetric.refresh()
 		]);
 
-		expect(globalThis.fetch.mock.calls).toHaveLength(1);
+		expect(fetched.mock.calls).toHaveLength(1);
 		expect(
 			clientKeys(client).asymmetric.selectForSign({ kty: 'EC' })
 		).not.toHaveLength(0);
@@ -97,6 +99,7 @@ describe('client keystore refresh', () => {
 		spyOn(clientKeys(client).asymmetric, 'fresh').mockReturnValue(false);
 		return Promise.all([
 			assert.rejects(clientKeys(client).asymmetric.refresh(), (err) => {
+				if (!(err instanceof OIDCProviderError)) throw err;
 				expect(err).toBeInstanceOf(Error);
 				expect(err.message).toBe('invalid_client_metadata');
 				expect(err.error_description).toEqual(
@@ -105,6 +108,7 @@ describe('client keystore refresh', () => {
 				return true;
 			}),
 			assert.rejects(clientKeys(client).asymmetric.refresh(), (err) => {
+				if (!(err instanceof OIDCProviderError)) throw err;
 				expect(err).toBeInstanceOf(Error);
 				expect(err.message).toBe('invalid_client_metadata');
 				expect(err.error_description).toEqual(
@@ -150,6 +154,7 @@ describe('client keystore refresh', () => {
 		const client = await Client.find('client');
 		spyOn(clientKeys(client).asymmetric, 'fresh').mockReturnValue(false);
 		return assert.rejects(clientKeys(client).asymmetric.refresh(), (err) => {
+			if (!(err instanceof OIDCProviderError)) throw err;
 			expect(err).toBeInstanceOf(Error);
 			expect(err.message).toBe('invalid_client_metadata');
 			expect(err.error_description).toEqual(
@@ -165,6 +170,7 @@ describe('client keystore refresh', () => {
 		const client = await Client.find('client');
 		spyOn(clientKeys(client).asymmetric, 'fresh').mockReturnValue(false);
 		return assert.rejects(clientKeys(client).asymmetric.refresh(), (err) => {
+			if (!(err instanceof OIDCProviderError)) throw err;
 			expect(err).toBeInstanceOf(Error);
 			expect(err.message).toBe('invalid_client_metadata');
 			expect(err.error_description).toEqual(
@@ -180,6 +186,7 @@ describe('client keystore refresh', () => {
 		const client = await Client.find('client');
 		spyOn(clientKeys(client).asymmetric, 'fresh').mockReturnValue(false);
 		return assert.rejects(clientKeys(client).asymmetric.refresh(), (err) => {
+			if (!(err instanceof OIDCProviderError)) throw err;
 			expect(err).toBeInstanceOf(Error);
 			expect(err.message).toBe('invalid_client_metadata');
 			expect(err.error_description).toEqual(
@@ -198,7 +205,7 @@ describe('client keystore refresh', () => {
 				Expires: until.toUTCString()
 			});
 
-			const freshUntil = epochTime(until);
+			const freshUntil = epochTime(until.getTime());
 
 			const spy = spyOn(clientKeys(client).asymmetric, 'fresh');
 			spy.mockImplementation(function () {
@@ -220,7 +227,7 @@ describe('client keystore refresh', () => {
 				'Cache-Control': 'private, max-age: 3600'
 			});
 
-			const freshUntil = epochTime(until);
+			const freshUntil = epochTime(until.getTime());
 
 			const spy = spyOn(clientKeys(client).asymmetric, 'fresh');
 			spy.mockImplementation(function () {
@@ -250,9 +257,10 @@ describe('client keystore refresh', () => {
 			await clientKeys(client).asymmetric.refresh();
 			expect(clientKeys(client).asymmetric.fresh()).toBe(true);
 			expect(clientKeys(client).asymmetric.stale()).toBe(false);
-			expect(
-				Math.abs(clientKeys(client).asymmetric.freshUntil - freshUntil)
-			).toBeLessThanOrEqual(1);
+			const refreshed = clientKeys(client).asymmetric.freshUntil;
+			if (refreshed === undefined)
+				throw new Error('expected a freshness deadline');
+			expect(Math.abs(refreshed - freshUntil)).toBeLessThanOrEqual(1);
 		});
 
 		it('falls back to 1 minute throttle if no caching header is found', async function () {
@@ -270,9 +278,10 @@ describe('client keystore refresh', () => {
 			await clientKeys(client).asymmetric.refresh();
 			expect(clientKeys(client).asymmetric.fresh()).toBe(true);
 			expect(clientKeys(client).asymmetric.stale()).toBe(false);
-			expect(
-				Math.abs(clientKeys(client).asymmetric.freshUntil - freshUntil)
-			).toBeLessThanOrEqual(1);
+			const refreshed = clientKeys(client).asymmetric.freshUntil;
+			if (refreshed === undefined)
+				throw new Error('expected a freshness deadline');
+			expect(Math.abs(refreshed - freshUntil)).toBeLessThanOrEqual(1);
 		});
 	});
 

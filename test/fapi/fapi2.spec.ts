@@ -156,8 +156,8 @@ describe('FAPI 2.0 Final behaviours', async () => {
 				headers: { cookie }
 			});
 			expect(res.status).toBe(303);
-			auth.validatePresence(res, ['code']);
-			auth.validateClientLocation(res);
+			auth.validatePresence(res.response, ['code']);
+			auth.validateClientLocation(res.response);
 		});
 
 		it('requires exp to be provided in the Request Object', async function () {
@@ -187,10 +187,14 @@ describe('FAPI 2.0 Final behaviours', async () => {
 				headers: { cookie }
 			});
 			expect(res.status).toBe(303);
-			auth.validatePresence(res, ['error', 'error_description', 'state']);
-			auth.validateClientLocation(res);
-			auth.validateError(res, 'invalid_request');
-			auth.validateErrorDescription(res, "Property 'exp' is missing");
+			auth.validatePresence(res.response, [
+				'error',
+				'error_description',
+				'state'
+			]);
+			auth.validateClientLocation(res.response);
+			auth.validateError(res.response, 'invalid_request');
+			auth.validateErrorDescription(res.response, "Property 'exp' is missing");
 		});
 
 		it('requires nbf to be provided in the Request Object', async function () {
@@ -221,11 +225,15 @@ describe('FAPI 2.0 Final behaviours', async () => {
 				headers: { cookie }
 			});
 			expect(res.status).toBe(303);
-			auth.validatePresence(res, ['error', 'error_description', 'state']);
-			auth.validateClientLocation(res);
-			auth.validateError(res, 'invalid_request_object');
+			auth.validatePresence(res.response, [
+				'error',
+				'error_description',
+				'state'
+			]);
+			auth.validateClientLocation(res.response);
+			auth.validateError(res.response, 'invalid_request_object');
 			auth.validateErrorDescription(
-				res,
+				res.response,
 				"Request Object is missing the 'nbf' claim"
 			);
 		});
@@ -258,11 +266,15 @@ describe('FAPI 2.0 Final behaviours', async () => {
 				headers: { cookie }
 			});
 			expect(res.status).toBe(303);
-			auth.validatePresence(res, ['error', 'error_description', 'state']);
-			auth.validateClientLocation(res);
-			auth.validateError(res, 'invalid_request_object');
+			auth.validatePresence(res.response, [
+				'error',
+				'error_description',
+				'state'
+			]);
+			auth.validateClientLocation(res.response);
+			auth.validateError(res.response, 'invalid_request_object');
 			auth.validateErrorDescription(
-				res,
+				res.response,
 				"Request Object 'exp' claim too far from 'nbf' claim"
 			);
 		});

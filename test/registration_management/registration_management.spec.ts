@@ -7,6 +7,8 @@ import { ISSUER } from 'lib/configs/env.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { RegistrationAccessToken } from 'lib/models/registration_access_token.js';
 import { validateConfiguration } from 'lib/configs/configuration.js';
+import type { RegistrationResponse } from 'lib/shared/response_schemas.js';
+import type { Static } from 'elysia';
 
 const json = { 'content-type': 'application/json' };
 const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
@@ -18,27 +20,44 @@ const NOGO = [
 	'client_id_issued_at'
 ];
 
-function omit(obj, keys) {
+function omit(obj: Record<string, unknown>, keys: string[]) {
 	const out = { ...obj };
 	for (const key of keys) delete out[key];
 	return out;
 }
 
-function updateProperties(client, props = {}) {
+function updateProperties(
+	client: Record<string, unknown>,
+	props: Record<string, unknown> = {}
+) {
 	return Object.assign(omit(client, NOGO), props);
 }
 
-async function register(metadata = {}) {
+// A registered client as the response describes it, with the registration access token it was issued.
+type RegisteredClient = Record<string, unknown> &
+	Static<typeof RegistrationResponse> & { registration_access_token: string };
+
+async function register(metadata = {}): Promise<RegisteredClient> {
 	const { data, status } = await agent.reg.post(
 		{ redirect_uris: ['https://client.example.com/cb'], ...metadata },
 		{ headers: json }
 	);
 	expect(status).toBe(201);
-	if (!data) throw new Error('expected response data');
-	return data;
+	if (!data?.registration_access_token) {
+		throw new Error('expected a registration access token');
+	}
+	return { ...data, registration_access_token: data.registration_access_token };
 }
 
-function body(res) {
+// What these cases read off a typed-client result.
+type Result = {
+	status: number;
+	data?: unknown;
+	error?: { value: unknown } | null;
+	response?: Response;
+};
+
+function body(res: Result) {
 	return res.error?.value ?? res.data;
 }
 
@@ -46,12 +65,17 @@ function body(res) {
 // the Bearer challenge with error/error_description is asserted on 401 responses (where
 // it is mandated), and the realm-only challenge on the 400 "no access token provided"
 // case; status + body error/error_description are always checked.
-function expectFail(res, code, error, error_description) {
+function expectFail(
+	res: Result,
+	code: number,
+	error: string,
+	error_description: string
+) {
 	expect(res.status).toBe(code);
 	expect(body(res)).toHaveProperty('error', error);
 	expect(body(res)).toHaveProperty('error_description', error_description);
 
-	const wwwAuth = res.headers?.get?.('www-authenticate');
+	const wwwAuth = res.response?.headers.get('www-authenticate');
 	if (code === 401) {
 		expect(wwwAuth).toContain(`Bearer realm="${ISSUER}"`);
 		expect(wwwAuth).toContain(`error="${error}"`);
@@ -307,7 +331,9 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 					});
 				expect(res.status).toBe(200);
 				expect(saved).toHaveBeenCalledTimes(1);
-				if (!res.data) throw new Error('expected response data');
+				if (!res.data?.registration_access_token) {
+					throw new Error('expected a rotated registration access token');
+				}
 				expect(res.data.registration_access_token).not.toBe(
 					client.registration_access_token
 				);

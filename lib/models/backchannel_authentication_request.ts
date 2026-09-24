@@ -20,7 +20,9 @@ export type BackchannelAuthenticationRequestPayloadType = Static<
 	typeof BackchannelAuthenticationRequestPayload
 >;
 
-export class BackchannelAuthenticationRequest extends consumable(BaseToken) {
+export class BackchannelAuthenticationRequest extends consumable(
+	BaseToken<BackchannelAuthenticationRequestPayloadType>
+) {
 	declare payload: Omit<BackchannelAuthenticationRequestPayloadType, 'kind'> & {
 		kind: string;
 	};

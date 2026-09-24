@@ -1160,10 +1160,7 @@ export const ui = new Elysia()
 		const rarLabels = Object.fromEntries(
 			Object.entries(
 				ApplicationConfig['richAuthorizationRequests.types'] ?? {}
-			).map(([type, descriptor]) => [
-				type,
-				(descriptor as { label?: string })?.label ?? type
-			])
+			).map(([type, descriptor]) => [type, descriptor.label ?? type])
 		);
 		return consentServer(
 			buildConsentView({

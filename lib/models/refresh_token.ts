@@ -3,7 +3,8 @@ import epochTime from '../helpers/epoch_time.js';
 import {
 	BaseToken,
 	BaseTokenPayload,
-	SessionBoundPayload
+	SessionBoundPayload,
+	type TokenInit
 } from './base_token.js';
 
 import consumable, { ConsumedPayload } from './mixins/consumable.js';
@@ -32,7 +33,7 @@ export class RefreshToken extends consumable(
 	model = RefreshTokenSchema;
 	static isSessionBound = true;
 
-	constructor(payload: RefreshTokenPayload) {
+	constructor(payload: TokenInit<RefreshTokenPayload>) {
 		super(payload);
 		if (!this.payload.iiat) {
 			this.payload.iiat = this.payload.iat || epochTime();

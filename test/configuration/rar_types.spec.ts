@@ -1,13 +1,16 @@
 import { describe, it, expect } from 'bun:test';
 import { validateConfiguration } from 'lib/configs/configuration.ts';
-import { ApplicationConfig } from 'lib/configs/application.ts';
+import {
+	ApplicationConfig,
+	type RarTypeDescriptor
+} from 'lib/configs/application.ts';
 
 /*
  * Descriptor validation, tested against the pure validator. This is the single definition the
  * administrative PUT reaches through validateEffectiveConfig, so what is pinned here is what a
  * super-admin cannot persist — see test/admin/settings.spec.ts for the API side of the same rules.
  */
-const withTypes = (types: unknown) => ({
+const withTypes = (types: Record<string, RarTypeDescriptor>) => ({
 	...ApplicationConfig,
 	'richAuthorizationRequests.enabled': true,
 	'resourceIndicators.enabled': true,
@@ -57,12 +60,14 @@ describe('features.richAuthorizationRequests.types validation', () => {
 	});
 
 	it('rejects a non-object map', () => {
+		// @ts-expect-error the case declares a malformed type descriptor
 		expect(() => validateConfiguration(withTypes([]))).toThrow(
 			/must be an object/
 		);
 	});
 
 	it('rejects a descriptor with no label', () => {
+		// @ts-expect-error the case declares a malformed type descriptor
 		expect(() => validateConfiguration(withTypes({ 'urn:t': {} }))).toThrow(
 			/label must be a non-empty string/
 		);
@@ -73,6 +78,7 @@ describe('features.richAuthorizationRequests.types validation', () => {
 			validateConfiguration(withTypes({ 'urn:t': { label: '' } }))
 		).toThrow(/label must be a non-empty string/);
 		expect(() =>
+			// @ts-expect-error the case declares a malformed type descriptor
 			validateConfiguration(withTypes({ 'urn:t': { label: 7 } }))
 		).toThrow(/label must be a non-empty string/);
 	});
@@ -101,6 +107,7 @@ describe('features.richAuthorizationRequests.types validation', () => {
 			expect(() =>
 				validateConfiguration(
 					withTypes({
+						// @ts-expect-error the case declares a malformed type descriptor
 						'urn:t': { label: 'T', fields: { actions: { allowed } } }
 					})
 				)
@@ -112,12 +119,14 @@ describe('features.richAuthorizationRequests.types validation', () => {
 		expect(() =>
 			validateConfiguration(
 				withTypes({
+					// @ts-expect-error the case declares a malformed type descriptor
 					'urn:t': { label: 'T', fields: { actions: { required: 'yes' } } }
 				})
 			)
 		).toThrow(/required must be a boolean/);
 		expect(() =>
 			validateConfiguration(
+				// @ts-expect-error the case declares a malformed type descriptor
 				withTypes({ 'urn:t': { label: 'T', allowUnknownFields: 'yes' } })
 			)
 		).toThrow(/allowUnknownFields must be a boolean/);
@@ -136,6 +145,7 @@ describe('features.richAuthorizationRequests.types validation', () => {
 		).not.toThrow();
 		expect(() =>
 			validateConfiguration(
+				// @ts-expect-error the case declares a malformed type descriptor
 				withTypes({ 'urn:t': { label: 'T', validate: 'nope' } })
 			)
 		).toThrow(/validate must be a function/);
@@ -146,6 +156,7 @@ describe('features.richAuthorizationRequests.types validation', () => {
 			validateConfiguration({
 				...ApplicationConfig,
 				'richAuthorizationRequests.enabled': false,
+				// @ts-expect-error the case declares a malformed type descriptor
 				'richAuthorizationRequests.types': { 'urn:t': { nonsense: true } }
 			})
 		).not.toThrow();

@@ -10,6 +10,7 @@ import bootstrap, {
 } from '../test_helper.js';
 import * as resourceIndicators from '../../lib/addon/resources.js';
 import { eventBus } from 'lib/event_bus.js';
+import { InvalidTarget } from 'lib/helpers/errors.js';
 import {
 	DEFAULT_REQUEST_BUCKET,
 	OIDCContext
@@ -40,19 +41,24 @@ describe('features.resourceIndicators defaults', () => {
 	});
 
 	it("the resource descriptor decides the token's format, lifetime and scopes", async () => {
-		await assert.rejects(resourceIndicators.getResourceServerInfo(), (err) => {
-			expect(err.message).toBe('invalid_target');
-			expect(err.error_description).toBe(
-				'resource indicator is missing, or unknown'
-			);
-			return true;
-		});
+		await assert.rejects(
+			// @ts-expect-error the default is called with nothing, to see it refuse
+			resourceIndicators.getResourceServerInfo(),
+			(err) => {
+				if (!(err instanceof InvalidTarget)) throw err;
+				expect(err.message).toBe('invalid_target');
+				expect(err.error_description).toBe(
+					'resource indicator is missing, or unknown'
+				);
+				return true;
+			}
+		);
 	});
 });
 
 describe('features.resourceIndicators', () => {
 	let setup: Setup;
-	let cookie = null;
+	let cookie: string;
 
 	beforeAll(async () => {
 		setup = await bootstrap(import.meta.url);
@@ -124,7 +130,7 @@ describe('features.resourceIndicators', () => {
 	});
 
 	['get', 'post'].forEach((verb) => {
-		function authRequest(auth) {
+		function authRequest(auth: AuthorizationRequest) {
 			if (verb === 'get') {
 				return agent.auth.get({ query: auth.params, headers: { cookie } });
 			}
@@ -139,7 +145,7 @@ describe('features.resourceIndicators', () => {
 				eventBus.once('authorization_code.saved', spy);
 
 				const auth = new AuthorizationRequest({
-					resource: 'urn:not:allowed',
+					resource: ['urn:not:allowed'],
 					scope: 'api:read'
 				});
 
@@ -158,7 +164,7 @@ describe('features.resourceIndicators', () => {
 					'resource indicator is missing, or unknown'
 				);
 
-				auth.params.resource = 'urn:wl:explicit';
+				auth.params.resource = ['urn:wl:explicit'];
 				res = await authRequest(auth);
 				expect(res.status).toBe(303);
 				auth.validatePresence(res.response, ['code', 'state']);
@@ -409,7 +415,7 @@ describe('features.resourceIndicators', () => {
 		it('an accepted resource becomes the token audience on the device grant', async () => {
 			const denied = await formAgent.device.auth.post({
 				client_id: 'client',
-				resource: 'urn:not:allowed',
+				resource: ['urn:not:allowed'],
 				scope: 'api:read'
 			});
 			if (!denied.error) throw new Error('expected error response');
@@ -421,16 +427,19 @@ describe('features.resourceIndicators', () => {
 
 			const authRes = await formAgent.device.auth.post({
 				client_id: 'client',
-				resource: 'urn:wl:explicit',
+				resource: ['urn:wl:explicit'],
 				scope: 'api:read'
 			});
 			expect(authRes.status).toBe(200);
+			if (!authRes.data?.user_code || !authRes.data.device_code) {
+				throw new Error('expected a device authorization');
+			}
 			const { user_code, device_code } = authRes.data;
 
 			setup.getSession().state = { secret: 'foo' };
 
 			const confirm = await formAgent.device.post(
-				{ user_code, xsrf: 'foo', confirm: true },
+				{ user_code, xsrf: 'foo', confirm: 'true' },
 				{
 					headers: {
 						cookie: `${DEFAULT_SESSION_COOKIE}=${setup.getSessionId()}`
@@ -488,12 +497,15 @@ describe('features.resourceIndicators', () => {
 				scope: 'api:read'
 			});
 			expect(authRes.status).toBe(200);
+			if (!authRes.data?.user_code || !authRes.data.device_code) {
+				throw new Error('expected a device authorization');
+			}
 			const { user_code, device_code } = authRes.data;
 
 			setup.getSession().state = { secret: 'foo' };
 
 			const confirm = await formAgent.device.post(
-				{ user_code, xsrf: 'foo', confirm: true },
+				{ user_code, xsrf: 'foo', confirm: 'true' },
 				{
 					headers: {
 						cookie: `${DEFAULT_SESSION_COOKIE}=${setup.getSessionId()}`
@@ -553,12 +565,15 @@ describe('features.resourceIndicators', () => {
 				scope: 'openid api:read'
 			});
 			expect(authRes.status).toBe(200);
+			if (!authRes.data?.user_code || !authRes.data.device_code) {
+				throw new Error('expected a device authorization');
+			}
 			const { user_code, device_code } = authRes.data;
 
 			setup.getSession().state = { secret: 'foo' };
 
 			const confirm = await formAgent.device.post(
-				{ user_code, xsrf: 'foo', confirm: true },
+				{ user_code, xsrf: 'foo', confirm: 'true' },
 				{
 					headers: {
 						cookie: `${DEFAULT_SESSION_COOKIE}=${setup.getSessionId()}`
@@ -616,12 +631,15 @@ describe('features.resourceIndicators', () => {
 				scope: 'openid api:read'
 			});
 			expect(authRes.status).toBe(200);
+			if (!authRes.data?.user_code || !authRes.data.device_code) {
+				throw new Error('expected a device authorization');
+			}
 			const { user_code, device_code } = authRes.data;
 
 			setup.getSession().state = { secret: 'foo' };
 
 			const confirm = await formAgent.device.post(
-				{ user_code, xsrf: 'foo', confirm: true },
+				{ user_code, xsrf: 'foo', confirm: 'true' },
 				{
 					headers: {
 						cookie: `${DEFAULT_SESSION_COOKIE}=${setup.getSessionId()}`
@@ -680,7 +698,7 @@ describe('features.resourceIndicators', () => {
 		it('an accepted resource becomes the token audience on the CIBA grant', async () => {
 			const denied = await formAgent.backchannel.post({
 				client_id: 'client',
-				resource: 'urn:not:allowed',
+				resource: ['urn:not:allowed'],
 				scope: 'openid api:read',
 				login_hint: 'accountId'
 			});
@@ -693,11 +711,13 @@ describe('features.resourceIndicators', () => {
 
 			const backchannel = await formAgent.backchannel.post({
 				client_id: 'client',
-				resource: 'urn:wl:explicit',
+				resource: ['urn:wl:explicit'],
 				scope: 'openid api:read',
 				login_hint: 'accountId'
 			});
 			expect(backchannel.status).toBe(200);
+			if (!backchannel.data?.auth_req_id)
+				throw new Error('expected an auth_req_id');
 			const { auth_req_id } = backchannel.data;
 
 			const spy = mock();
@@ -754,6 +774,8 @@ describe('features.resourceIndicators', () => {
 				login_hint: 'accountId'
 			});
 			expect(backchannel.status).toBe(200);
+			if (!backchannel.data?.auth_req_id)
+				throw new Error('expected an auth_req_id');
 			const { auth_req_id } = backchannel.data;
 
 			const spy = mock();
@@ -806,6 +828,8 @@ describe('features.resourceIndicators', () => {
 				login_hint: 'accountId'
 			});
 			expect(backchannel.status).toBe(200);
+			if (!backchannel.data?.auth_req_id)
+				throw new Error('expected an auth_req_id');
 			const { auth_req_id } = backchannel.data;
 
 			const spy = mock();

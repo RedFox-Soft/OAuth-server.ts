@@ -219,7 +219,7 @@ export class AuthorizationRequest {
 		this.validateResponseParameter(response, 'scope', expected);
 	}
 
-	validateErrorDescription(response: Response, expected: string) {
+	validateErrorDescription(response: Response, expected: string | RegExp) {
 		this.validateResponseParameter(response, 'error_description', expected);
 	}
 
