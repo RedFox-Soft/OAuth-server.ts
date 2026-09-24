@@ -24,12 +24,9 @@ export const addons: Partial<AddonImplementations> = {
 		});
 		grant.addOIDCScope(oidc.requestParamScopes);
 
-		const resources = Array.isArray(request.payload.resource)
-			? request.payload.resource
-			: [request.payload.resource];
-
-		for (const resource of resources) {
-			grant.addResourceScope(resource, request.payload.scope);
+		const { resource, scope = '' } = request.payload;
+		for (const indicator of [resource ?? []].flat()) {
+			grant.addResourceScope(indicator, scope);
 		}
 
 		await grant.save();

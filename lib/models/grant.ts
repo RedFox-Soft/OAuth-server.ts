@@ -1,6 +1,5 @@
 import { Type as t, type Static } from '@sinclair/typebox';
 import { BaseToken, BaseTokenPayload } from './base_token.js';
-import consent from 'lib/helpers/interaction_policy/prompts/consent.js';
 import { canonicalKey, canonicalKeySet } from 'lib/helpers/rar_canonical.js';
 import { ttl } from '../configs/liveTime.js';
 
@@ -41,6 +40,163 @@ export const GrantPayload = t.Object({
 });
 export type GrantPayloadType = Static<typeof GrantPayload>;
 
+/*
+ * What a grant records consent in: the grant's own payload, or the `rejected` record inside it, which
+ * has the same shape less its own `rejected`. The functions below take either; a grant subtracts what
+ * it rejected from what it granted.
+ */
+type Consent = {
+	openid?: { scope?: string; claims?: string[] };
+	resources?: Record<string, string>;
+	rejected?: Consent;
+};
+
+// A scope as a caller may hand it over.
+type ScopeInput = Set<string> | string[] | string;
+
+function scopeString(scope: ScopeInput): string {
+	if (scope instanceof Set) {
+		return [...scope].join(' ');
+	}
+	if (Array.isArray(scope)) {
+		return scope.join(' ');
+	}
+	if (typeof scope !== 'string') {
+		throw new TypeError('"scope" must be a string');
+	}
+	return scope;
+}
+
+function cleanConsent(context: Consent) {
+	if (
+		context.openid &&
+		!context.openid.scope &&
+		(!context.openid.claims || context.openid.claims.length === 0)
+	) {
+		delete context.openid;
+	}
+
+	if (context.resources) {
+		for (const [identifier, value] of Object.entries(context.resources)) {
+			if (!value) {
+				// eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+				delete context.resources[identifier];
+			}
+		}
+		if (Object.keys(context.resources).length === 0) {
+			delete context.resources;
+		}
+	}
+}
+
+function oidcScope(context: Consent): string {
+	if (context.openid?.scope) {
+		if (context.rejected) {
+			const rejected = oidcScope(context.rejected).split(' ');
+			const granted = new Set(context.openid.scope.split(' '));
+			for (const scope of rejected) {
+				if (scope !== 'openid') {
+					granted.delete(scope);
+				}
+			}
+			return [...granted].join(' ');
+		}
+		return context.openid.scope;
+	}
+	return '';
+}
+
+function addScope(context: Consent, input: ScopeInput) {
+	const scope = scopeString(input);
+	context.openid ||= {};
+	if (context.openid.scope) {
+		context.openid.scope = [
+			...new Set([...context.openid.scope.split(' '), ...scope.split(' ')])
+		].join(' ');
+	} else {
+		context.openid.scope = scope;
+	}
+}
+
+function resourceScope(context: Consent, resource: string): string {
+	if (typeof resource !== 'string') {
+		throw new TypeError('"resource" must be a string');
+	}
+	const granted = context.resources?.[resource];
+	if (granted) {
+		if (context.rejected) {
+			const rejected = resourceScope(context.rejected, resource).split(' ');
+			const remaining = new Set(granted.split(' '));
+			for (const scope of rejected) {
+				remaining.delete(scope);
+			}
+			return [...remaining].join(' ');
+		}
+		return granted;
+	}
+	return '';
+}
+
+function addResourceScope(
+	context: Consent,
+	resource: string,
+	input: ScopeInput
+) {
+	if (typeof resource !== 'string') {
+		throw new TypeError('"resource" must be a string');
+	}
+	const scope = scopeString(input);
+	context.resources ||= {};
+	const existing = context.resources[resource];
+	if (existing) {
+		context.resources[resource] = [
+			...new Set([...existing.split(' '), ...scope.split(' ')])
+		].join(' ');
+	} else {
+		context.resources[resource] = scope;
+	}
+}
+
+function oidcClaims(context: Consent): string[] {
+	if (context.openid?.claims) {
+		if (context.rejected) {
+			const rejected = oidcClaims(context.rejected);
+			const granted = new Set(context.openid.claims);
+			for (const claim of rejected) {
+				if (!NON_REJECTABLE_CLAIMS.has(claim)) {
+					granted.delete(claim);
+				}
+			}
+			return [...granted];
+		}
+		return context.openid.claims;
+	}
+	return [];
+}
+
+function addClaims(context: Consent, input: Set<string> | string[]) {
+	let claims: unknown[];
+	if (input instanceof Set) {
+		claims = [...input];
+	} else if (Array.isArray(input)) {
+		claims = input;
+	} else {
+		throw new TypeError('"claims" must be an array');
+	}
+	const strings = claims.filter((claim) => typeof claim === 'string');
+	if (strings.length !== claims.length) {
+		throw new TypeError('"claims" must be an array of strings');
+	}
+	context.openid ||= {};
+	if (context.openid.claims) {
+		context.openid.claims = [
+			...new Set([...context.openid.claims, ...strings])
+		];
+	} else {
+		context.openid.claims = strings;
+	}
+}
+
 export class Grant extends BaseToken<GrantPayloadType> {
 	model = GrantPayload;
 
@@ -57,55 +213,26 @@ export class Grant extends BaseToken<GrantPayloadType> {
 	}
 
 	clean() {
-		const context = this.payload || this;
-		if (
-			consent.openid &&
-			!context.openid.scope &&
-			(!context.openid.claims || context.openid.claims.length === 0)
-		) {
-			delete context.openid;
-		}
-
-		if (context.resources) {
-			for (const [identifier, value] of Object.entries(context.resources)) {
-				if (!value) {
-					delete context.resources[identifier];
-				}
-			}
-			if (Object.keys(context.resources).length === 0) {
-				delete context.resources;
-			}
-		}
+		cleanConsent(this.payload);
+		if (this.payload.rejected) cleanConsent(this.payload.rejected);
 	}
 
-	async save(...args) {
+	async save() {
 		this.clean();
-		if (this.payload.rejected) this.clean.call(this.payload.rejected);
+		return super.save();
+	}
 
-		return super.save(...args);
+	#rejected(): Consent {
+		this.payload.rejected ||= {};
+		return this.payload.rejected;
 	}
 
 	getOIDCScope() {
-		const context = this.payload || this;
-		if (context.openid?.scope) {
-			if (context.rejected) {
-				const rejected = this.getOIDCScope.call(context.rejected).split(' ');
-				const granted = new Set(context.openid.scope.split(' '));
-				for (const scope of rejected) {
-					if (scope !== 'openid') {
-						granted.delete(scope);
-					}
-				}
-				return [...granted].join(' ');
-			}
-			return context.openid.scope;
-		}
-		return '';
+		return oidcScope(this.payload);
 	}
 
 	getRejectedOIDCScope() {
-		this.payload.rejected ||= {};
-		return this.getOIDCScope.call(this.payload.rejected);
+		return oidcScope(this.#rejected());
 	}
 
 	getOIDCScopeFiltered(filter: Set<string> | string[]) {
@@ -119,28 +246,12 @@ export class Grant extends BaseToken<GrantPayloadType> {
 		return granted.filter(Set.prototype.has.bind(filter)).join(' ');
 	}
 
-	addOIDCScope(scope) {
-		if (scope instanceof Set) {
-			scope = [...scope].join(' ');
-		} else if (Array.isArray(scope)) {
-			scope = scope.join(' ');
-		} else if (typeof scope !== 'string') {
-			throw new TypeError('"scope" must be a string');
-		}
-		const context = this.payload || this;
-		context.openid ||= {};
-		if (context.openid.scope) {
-			context.openid.scope = [
-				...new Set([...context.openid.scope.split(' '), ...scope.split(' ')])
-			].join(' ');
-		} else {
-			context.openid.scope = scope;
-		}
+	addOIDCScope(scope: ScopeInput) {
+		addScope(this.payload, scope);
 	}
 
-	rejectOIDCScope(...args) {
-		this.payload.rejected ||= {};
-		this.addOIDCScope.call(this.payload.rejected, ...args);
+	rejectOIDCScope(scope: ScopeInput) {
+		addScope(this.#rejected(), scope);
 	}
 
 	getOIDCScopeEncountered() {
@@ -150,29 +261,11 @@ export class Grant extends BaseToken<GrantPayloadType> {
 	}
 
 	getResourceScope(resource: string) {
-		if (typeof resource !== 'string') {
-			throw new TypeError('"resource" must be a string');
-		}
-		const context = this.payload || this;
-		if (context.resources?.[resource]) {
-			if (context.rejected) {
-				const rejected = this.getResourceScope
-					.call(context.rejected, resource)
-					.split(' ');
-				const granted = new Set(context.resources[resource].split(' '));
-				for (const scope of rejected) {
-					granted.delete(scope);
-				}
-				return [...granted].join(' ');
-			}
-			return context.resources[resource];
-		}
-		return '';
+		return resourceScope(this.payload, resource);
 	}
 
-	getRejectedResourceScope(...args) {
-		this.payload.rejected ||= {};
-		return this.getResourceScope.call(this.payload.rejected, ...args);
+	getRejectedResourceScope(resource: string) {
+		return resourceScope(this.#rejected(), resource);
 	}
 
 	getResourceScopeFiltered(resource: string, filter: Set<string> | string[]) {
@@ -186,37 +279,15 @@ export class Grant extends BaseToken<GrantPayloadType> {
 		return granted.filter(Set.prototype.has.bind(filter)).join(' ');
 	}
 
-	addResourceScope(resource, scope) {
-		if (typeof resource !== 'string') {
-			throw new TypeError('"resource" must be a string');
-		}
-		if (scope instanceof Set) {
-			scope = [...scope].join(' ');
-		} else if (Array.isArray(scope)) {
-			scope = scope.join(' ');
-		} else if (typeof scope !== 'string') {
-			throw new TypeError('"scope" must be a string');
-		}
-		const context = this.payload || this;
-		context.resources ||= {};
-		if (context.resources[resource]) {
-			context.resources[resource] = [
-				...new Set([
-					...context.resources[resource].split(' '),
-					...scope.split(' ')
-				])
-			].join(' ');
-		} else {
-			context.resources[resource] = scope;
-		}
+	addResourceScope(resource: string, scope: ScopeInput) {
+		addResourceScope(this.payload, resource, scope);
 	}
 
-	rejectResourceScope(...args) {
-		this.payload.rejected ||= {};
-		this.addResourceScope.call(this.payload.rejected, ...args);
+	rejectResourceScope(resource: string, scope: ScopeInput) {
+		addResourceScope(this.#rejected(), resource, scope);
 	}
 
-	getResourceScopeEncountered(resource) {
+	getResourceScopeEncountered(resource: string) {
 		if (typeof resource !== 'string') {
 			throw new TypeError('"resource" must be a string');
 		}
@@ -226,26 +297,11 @@ export class Grant extends BaseToken<GrantPayloadType> {
 	}
 
 	getOIDCClaims() {
-		const context = this.payload || this;
-		if (context.openid?.claims) {
-			if (context.rejected) {
-				const rejected = this.getOIDCClaims.call(context.rejected);
-				const granted = new Set(context.openid.claims);
-				for (const claim of rejected) {
-					if (!NON_REJECTABLE_CLAIMS.has(claim)) {
-						granted.delete(claim);
-					}
-				}
-				return [...granted];
-			}
-			return context.openid.claims;
-		}
-		return [];
+		return oidcClaims(this.payload);
 	}
 
 	getRejectedOIDCClaims() {
-		this.payload.rejected ||= {};
-		return this.getOIDCClaims.call(this.payload.rejected);
+		return oidcClaims(this.#rejected());
 	}
 
 	getOIDCClaimsFiltered(filter: Set<string> | string[]) {
@@ -259,29 +315,12 @@ export class Grant extends BaseToken<GrantPayloadType> {
 		return granted.filter(Set.prototype.has.bind(filter));
 	}
 
-	addOIDCClaims(claims) {
-		if (claims instanceof Set) {
-			claims = [...claims];
-		} else if (!Array.isArray(claims)) {
-			throw new TypeError('"claims" must be an array');
-		}
-		if (claims.some((claim) => typeof claim !== 'string')) {
-			throw new TypeError('"claims" must be an array of strings');
-		}
-		const context = this.payload || this;
-		context.openid ||= {};
-		if (context.openid.claims) {
-			context.openid.claims = [
-				...new Set([...context.openid.claims, ...claims])
-			];
-		} else {
-			context.openid.claims = claims;
-		}
+	addOIDCClaims(claims: Set<string> | string[]) {
+		addClaims(this.payload, claims);
 	}
 
-	rejectOIDCClaims(...args) {
-		this.payload.rejected ||= {};
-		this.addOIDCClaims.call(this.payload.rejected, ...args);
+	rejectOIDCClaims(claims: Set<string> | string[]) {
+		addClaims(this.#rejected(), claims);
 	}
 
 	getOIDCClaimsEncountered() {
@@ -294,7 +333,7 @@ export class Grant extends BaseToken<GrantPayloadType> {
 	 * Idempotent by structural identity: without this, every re-consent appends a duplicate and the
 	 * grant grows without bound for as long as the client keeps asking.
 	 */
-	addRar(detail) {
+	addRar(detail: Record<string, unknown>) {
 		this.payload.rar ||= [];
 		const key = canonicalKey(detail);
 		if (this.payload.rar.some((granted) => canonicalKey(granted) === key)) {

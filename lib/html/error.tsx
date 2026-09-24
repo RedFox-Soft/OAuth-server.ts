@@ -30,7 +30,7 @@ const cache = createCache();
 function renderError(
 	status: number,
 	title: string,
-	subTitle: string,
+	subTitle: string | undefined,
 	reference?: string
 ) {
 	/*
@@ -66,7 +66,7 @@ function renderError(
 export function getErrorHtmlResponse(
 	status: number,
 	error: string,
-	message: string,
+	message: string | undefined,
 	reference?: string
 ) {
 	const html = renderError(status, error, message, reference);

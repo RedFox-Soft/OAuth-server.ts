@@ -134,6 +134,7 @@ function persistInteraction(interaction: {
 	return interaction.save(Math.max(1, remaining));
 }
 import { ApplicationConfig, configuration } from 'lib/configs/application.js';
+import { isPlainObject } from 'lib/helpers/_/object.js';
 
 /*
  * A resumed request's parameters are the ones the authorization pipeline stored after `presence`
@@ -283,7 +284,8 @@ async function createGrant(interaction) {
 	// every requested detail.
 	if (details.rar) {
 		for (const detail of details.rar) {
-			grant.addRar(detail);
+			// Each member was validated as an object when the request was checked (check_rar.ts).
+			if (isPlainObject(detail)) grant.addRar(detail);
 		}
 	}
 

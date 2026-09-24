@@ -4,12 +4,24 @@ import { responseModes } from 'lib/response_modes/index.js';
 import { OIDCProviderError } from '../helpers/errors.ts';
 import { getErrorHtmlResponse } from '../html/error.tsx';
 import { routeNames } from 'lib/consts/param_list.js';
-import {
-	type Context,
-	ErrorContext,
-	mapValueError,
-	ValidationError
-} from 'elysia';
+import { ErrorContext, mapValueError, ValidationError } from 'elysia';
+import { TransformDecodeCheckError } from '@sinclair/typebox/value';
+import { isPlainObject } from 'lib/helpers/_/object.js';
+
+/*
+ * What this handler reads off the context Elysia hands onError. Structural on purpose: the app
+ * registers its own error codes (lib/index.ts), so its context is wider than Elysia's default one, and
+ * every error is identified by `instanceof` below rather than trusted from `code`.
+ */
+type ErrorHandlerContext = {
+	code: string | number;
+	error: unknown;
+	set: ErrorContext['set'];
+	route: string;
+	request: Request;
+	query: Record<string, unknown>;
+	body: unknown;
+};
 import { isAllowRedirectUri } from 'lib/actions/authorization/authorization.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { requestBucketFor } from 'lib/admin/auth/bucketAddress.js';
@@ -53,10 +65,29 @@ function surfaceFor(route: string): ErrorSurface {
 	return 'oauth';
 }
 
-function getFirstError(error: ValidationError) {
-	const firstError =
-		'valueError' in error ? mapValueError(error.valueError) : error;
-	return firstError;
+/*
+ * The first schema violation behind a VALIDATION code, if there is one. Elysia reports two kinds under
+ * that code: its own ValidationError, and TypeBox's TransformDecodeCheckError when a member fails to
+ * decode (a query value that is not the JSON its schema expects), which carries the violation inside.
+ */
+function getFirstError(
+	error: unknown
+): { path: string; schemaError: unknown; summary?: string } | undefined {
+	if (error instanceof ValidationError) {
+		const first = mapValueError(error.valueError);
+		return (
+			first && {
+				path: first.path,
+				schemaError: first.schema.error,
+				summary: first.summary
+			}
+		);
+	}
+	if (error instanceof TransformDecodeCheckError) {
+		const { path, schema, message } = error.error;
+		return { path, schemaError: schema.error, summary: message };
+	}
+	return undefined;
 }
 
 export default function getWWWAuthenticate(
@@ -97,25 +128,35 @@ export default function getWWWAuthenticate(
 	return `${scheme} ${wwwAuth}`;
 }
 
-function getObjFromError(code: string, errorObj: any) {
+function getObjFromError(
+	code: string | number,
+	errorObj: unknown
+): { error: string; error_description?: string } {
 	if (errorObj instanceof OIDCProviderError) {
 		const { error, error_description } = errorObj;
 		return { error, ...(error_description ? { error_description } : {}) };
 	}
 	if (code === 'VALIDATION') {
 		const firstError = getFirstError(errorObj);
-		if (firstError.schema.error) {
-			const schemaError = firstError.schema.error;
-			if (typeof schemaError === 'string') {
-				return {
-					error: 'invalid_request',
-					error_description: firstError.schema.error
-				};
-			}
-			return schemaError;
+		/*
+		 * A schema names the refusal for a member in one of two shapes (lib/consts/param_list.ts): a
+		 * description, answered as invalid_request, or the whole `{ error, error_description }`.
+		 */
+		const schemaError = firstError?.schemaError;
+		if (typeof schemaError === 'string' && schemaError) {
+			return {
+				error: 'invalid_request',
+				error_description: schemaError
+			};
 		}
-		const error_description =
-			mapValueError(firstError).summary || 'Validation error';
+		if (isPlainObject(schemaError) && typeof schemaError.error === 'string') {
+			const { error, error_description } = schemaError;
+			return {
+				error,
+				...(typeof error_description === 'string' ? { error_description } : {})
+			};
+		}
+		const error_description = firstError?.summary || 'Validation error';
 		return {
 			error: 'invalid_request',
 			error_description
@@ -153,7 +194,7 @@ function slugOf(route: string | undefined, url: string): string | undefined {
 	return new URL(url).pathname.split('/')[1] || undefined;
 }
 
-const mapErrorCode = {
+const mapErrorCode: Record<string, string> = {
 	[routeNames.token]: 'grant.error',
 	[routeNames.pushed_authorization_request]:
 		'pushed_authorization_request.error',
@@ -222,7 +263,7 @@ function statusFor(error: OIDCProviderError, route: string) {
  * unusable is a different outcome with a different error, and that one is raised by the handler.
  */
 function lacksResourceCredential(
-	code: string,
+	code: string | number,
 	route: string,
 	error: unknown,
 	request: Request
@@ -239,7 +280,7 @@ function lacksResourceCredential(
 	if (code !== 'VALIDATION') {
 		return false;
 	}
-	return getFirstError(error as ValidationError).path === '/authorization';
+	return getFirstError(error)?.path === '/authorization';
 }
 
 /*
@@ -278,7 +319,7 @@ function unauthenticatedChallenge() {
  * is exactly what the code distinguishes, and the console and the agent are the ones who act on it.
  */
 function schemaRefusalStatus(
-	code: string,
+	code: string | number,
 	route: string,
 	fallback: ErrorContext['set']['status']
 ) {
@@ -288,7 +329,7 @@ function schemaRefusalStatus(
 	return fallback;
 }
 
-export async function errorHandler(obj: ErrorContext) {
+export async function errorHandler(obj: ErrorHandlerContext) {
 	const { set, route, code, request } = obj;
 	let { error } = obj;
 
@@ -372,20 +413,25 @@ export async function errorHandler(obj: ErrorContext) {
 	} else if (set.status === 500) {
 		eventBus.emit('server_error', error);
 	} else {
-		const key = mapErrorCode[bareRoute(route) as string] ?? 'server_error';
+		const key = mapErrorCode[bareRoute(route) ?? ''] ?? 'server_error';
 		eventBus.emit(key, error);
 	}
 
 	if (
 		bareRoute(route) === routeNames.authorization &&
-		error.allow_redirect !== false
+		!(
+			typeof error === 'object' &&
+			error !== null &&
+			'allow_redirect' in error &&
+			error.allow_redirect === false
+		)
 	) {
 		try {
 			return await authorizationErrorHandler(obj);
 		} catch (e) {
 			if (e instanceof OIDCProviderError) {
 				error = e;
-				const key = mapErrorCode[bareRoute(route) as string] ?? 'server_error';
+				const key = mapErrorCode[bareRoute(route) ?? ''] ?? 'server_error';
 				eventBus.emit(key, error);
 			} else {
 				eventBus.emit('server_error', e);
@@ -400,11 +446,12 @@ export async function errorHandler(obj: ErrorContext) {
 		error,
 		request
 	);
-	const status = isOIDError
-		? statusFor(error, route)
-		: unauthenticatedResource
-			? 401
-			: schemaRefusalStatus(code, route, set.status);
+	const status =
+		error instanceof OIDCProviderError
+			? statusFor(error, route)
+			: unauthenticatedResource
+				? 401
+				: schemaRefusalStatus(code, route, set.status);
 	if (status !== set.status) {
 		set.status = status;
 	}
@@ -483,7 +530,7 @@ export async function errorHandler(obj: ErrorContext) {
 	const accept = request.headers.get('accept') || '';
 	if (accept.includes('text/html')) {
 		return getErrorHtmlResponse(
-			set.status,
+			numericStatus ?? 500,
 			errorObj.error,
 			errorObj.error_description,
 			reference
@@ -499,12 +546,12 @@ async function authorizationErrorHandler({
 	body,
 	request,
 	route
-}: Context) {
+}: ErrorHandlerContext) {
 	if (error instanceof ValidationError) {
 		const firstError = getFirstError(error);
 		if (
-			firstError.path === '/redirect_uri' ||
-			firstError.path === '/client_id'
+			firstError?.path === '/redirect_uri' ||
+			firstError?.path === '/client_id'
 		) {
 			throw error;
 		}
@@ -528,10 +575,12 @@ async function authorizationErrorHandler({
 		...(state ? { state } : {}),
 		iss: redirectObj.oidc.issuer
 	};
-	let mode = params.response_mode;
-	if (!responseModes.has(mode)) {
-		mode = 'query';
+	const requested = isPlainObject(params) ? params.response_mode : undefined;
+	const handler =
+		(typeof requested === 'string' && responseModes.get(requested)) ||
+		responseModes.get('query');
+	if (!handler) {
+		throw new Error('the query response mode is always available');
 	}
-	const handler = responseModes.get(mode);
 	return await handler(redirectObj.oidc, redirectObj.redirect_uri, out);
 }

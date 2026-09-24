@@ -58,8 +58,28 @@ const {
 	WHEN
 } = CLIENT_ATTRIBUTES;
 
-function isUndefined(value) {
+function isUndefined(value: unknown) {
 	return value === undefined;
+}
+
+// `value?.length` for what a submission may carry before its shapes are checked: a list or a string.
+function lengthOf(value: unknown): number | undefined {
+	return typeof value === 'string' || Array.isArray(value)
+		? value.length
+		: undefined;
+}
+
+// `value.includes(member)` for a member that may still be a string or a list.
+function mentions(value: unknown, member: string): boolean {
+	return (
+		(typeof value === 'string' || Array.isArray(value)) &&
+		value.includes(member)
+	);
+}
+
+// A member an earlier pass has already required to be a list, or its absence.
+function listOf(value: unknown): unknown[] | undefined {
+	return Array.isArray(value) ? value : undefined;
 }
 
 // The snake_case client metadata this deployment recognizes: the always-on base list plus the
@@ -100,8 +120,15 @@ export default function getSchema() {
 	const DEFAULT = structuredClone(DEFAULTS);
 	Object.assign(DEFAULT, wireFormatClientDefaults());
 
+	/*
+	 * The instance is the metadata being validated: each pass reads, rewrites or removes recognised
+	 * members on it by name, so it is typed as the record it is.
+	 */
 	class Schema {
-		constructor(metadata) {
+		[member: string]: unknown;
+		metadata: Record<string, unknown>;
+
+		constructor(metadata: Record<string, unknown>) {
 			this.metadata = metadata;
 			Object.assign(
 				this,
@@ -134,7 +161,7 @@ export default function getSchema() {
 			this.ensureStripUnrecognized();
 		}
 
-		invalidate(message) {
+		invalidate(message: string): never {
 			throw new InvalidClientMetadata(message);
 		}
 
@@ -174,11 +201,14 @@ export default function getSchema() {
 					});
 				}
 
-				if (rules.oneOf && !rules.oneOf.values.includes(value)) {
+				if (
+					rules.oneOf &&
+					(typeof value !== 'string' || !rules.oneOf.values.includes(value))
+				) {
 					this.invalidate(rules.oneOf.refusal);
 				}
 
-				if (rules.printable && noVSCHAR.test(value)) {
+				if (rules.printable && noVSCHAR.test(String(value))) {
 					this.invalidate(rules.printable);
 				}
 			}
@@ -190,7 +220,7 @@ export default function getSchema() {
 				checked.push('clientSecret');
 			}
 
-			if (this.metadata.responseTypes?.length) {
+			if (lengthOf(this.metadata.responseTypes)) {
 				checked.push('redirectUris');
 			}
 
@@ -205,7 +235,7 @@ export default function getSchema() {
 
 				if (this.metadata.subjectType === 'pairwise') {
 					checked.push('jwks_uri');
-					if (this.metadata.responseTypes?.length) {
+					if (lengthOf(this.metadata.responseTypes)) {
 						checked.push('sector_identifier_uri');
 					}
 				}
@@ -219,13 +249,13 @@ export default function getSchema() {
 					)
 				) {
 					checked.push('jwks_uri');
-					if (this.metadata.responseTypes?.length) {
+					if (lengthOf(this.metadata.responseTypes)) {
 						checked.push('sector_identifier_uri');
 					}
 				}
 
 				if (
-					this.metadata.responseTypes?.length &&
+					lengthOf(this.metadata.responseTypes) &&
 					Array.isArray(this.metadata.redirectUris) &&
 					new Set(this.metadata.redirectUris.map((uri) => new URL(uri).host))
 						.size > 1
@@ -240,16 +270,19 @@ export default function getSchema() {
 				}
 			});
 
+			// RegExp#test reads its argument as a string, absent members included; so do these.
 			const requireJwks =
 				['private_key_jwt', 'self_signed_tls_client_auth'].includes(
-					this.token_endpoint_auth_method
+					String(this.token_endpoint_auth_method)
 				) ||
-				needsJwks.jws.test(this['requestObject.signingAlg']) ||
-				needsJwks.jws.test(this['requestObject.backChannelSigningAlg']) ||
-				needsJwks.jwe.test(this.id_token_encrypted_response_alg) ||
-				needsJwks.jwe.test(this.userinfo_encrypted_response_alg) ||
-				needsJwks.jwe.test(this.introspection_encrypted_response_alg) ||
-				needsJwks.jwe.test(this.authorization_encrypted_response_alg);
+				needsJwks.jws.test(String(this['requestObject.signingAlg'])) ||
+				needsJwks.jws.test(
+					String(this['requestObject.backChannelSigningAlg'])
+				) ||
+				needsJwks.jwe.test(String(this.id_token_encrypted_response_alg)) ||
+				needsJwks.jwe.test(String(this.userinfo_encrypted_response_alg)) ||
+				needsJwks.jwe.test(String(this.introspection_encrypted_response_alg)) ||
+				needsJwks.jwe.test(String(this.authorization_encrypted_response_alg));
 
 			if (requireJwks && !this.jwks && !this.jwks_uri) {
 				this.invalidate('jwks or jwks_uri is mandatory for this client');
@@ -260,7 +293,11 @@ export default function getSchema() {
 			STRING.forEach((prop) => {
 				if (this[prop] !== undefined) {
 					const isAry = ARYS.includes(prop);
-					(isAry ? this[prop] : [this[prop]]).forEach((val) => {
+					const current = this[prop];
+					// A list member was made an array by arrays(), which runs first.
+					const values: unknown[] =
+						isAry && Array.isArray(current) ? current : [current];
+					values.forEach((val) => {
 						if (typeof val !== 'string' || !val.length) {
 							this.invalidate(
 								isAry
@@ -313,9 +350,9 @@ export default function getSchema() {
 				'urn:openid:params:grant-type:ciba'
 			]) {
 				if (
-					this.metadata.grantTypes.includes(grant) &&
+					mentions(this.metadata.grantTypes, grant) &&
 					!['private_key_jwt', 'self_signed_tls_client_auth'].includes(
-						this.token_endpoint_auth_method
+						String(this.token_endpoint_auth_method)
 					)
 				) {
 					this.invalidate(
@@ -338,11 +375,13 @@ export default function getSchema() {
 					// An allowed set arrives as either a Set or an Array depending on the entry.
 					// Membership is asked through one predicate rather than by indexing whichever
 					// method name fits, so the union does not have to be indexed by a string.
-					const length = only instanceof Set ? only.size : only.length;
-					const allows = (value: string) =>
-						only instanceof Set ? only.has(value) : only.includes(value);
+					const allowed = [...only];
+					const { length } = allowed;
+					const allows = (value: unknown) =>
+						typeof value === 'string' && allowed.includes(value);
+					const current = this[prop];
 
-					if (isAry && !this[prop].every((val) => allows(val))) {
+					if (isAry && !listOf(current)?.every((val) => allows(val))) {
 						if (length) {
 							this.invalidate(
 								`${prop} can only contain ${formatters.formatList([...only], { type: 'disjunction' })}`
@@ -350,7 +389,7 @@ export default function getSchema() {
 						} else {
 							this.invalidate(`${prop} must be empty (no values are allowed)`);
 						}
-					} else if (!isAry && !allows(this[prop])) {
+					} else if (!isAry && !allows(current)) {
 						if (length) {
 							this.invalidate(
 								`${prop} must be ${formatters.formatList([...only], { type: 'disjunction' })}`
@@ -374,7 +413,7 @@ export default function getSchema() {
 				const value = half === 'base' ? this.metadata[name] : this[name];
 				switch (format) {
 					case 'scope-list':
-						if (value) {
+						if (typeof value === 'string' && value) {
 							const parsed = new Set<string>(value.split(' '));
 							parsed.forEach((scope) => {
 								if (!scopes.has(scope)) {
@@ -387,14 +426,18 @@ export default function getSchema() {
 						}
 						break;
 					case 'redirect-uri':
-						validateRedirectUri(value ?? [], this.metadata.applicationType, {
-							label: name
-						});
+						validateRedirectUri(
+							listOf(value)?.map(String) ?? [],
+							String(this.metadata.applicationType),
+							{
+								label: name
+							}
+						);
 						break;
 					case 'email':
 						if (value) {
-							value.forEach((contact) => {
-								if (!W3CEmailRegExp.test(contact)) {
+							listOf(value)?.forEach((contact) => {
+								if (!W3CEmailRegExp.test(String(contact))) {
 									this.invalidate(`${name} can only contain email addresses`);
 								}
 							});
@@ -406,8 +449,9 @@ export default function getSchema() {
 
 		/* Values a deployment setting imposes regardless of what the client sent. */
 		forced() {
+			const settings: Record<string, unknown> = ApplicationConfig;
 			for (const [name, { flags, value }] of FORCED) {
-				if (flags.every((flag) => ApplicationConfig[flag])) {
+				if (flags.every((flag) => settings[flag])) {
 					this[name] = value;
 				}
 			}
@@ -429,17 +473,21 @@ export default function getSchema() {
 		 * The order is the order they have always been checked in.
 		 */
 		crossFieldRules() {
-			const responseTypes = this.metadata.responseTypes;
+			// Not a base key, so any shape may still be here (ClientSchema refuses a wrong one later); a
+			// string answers length and includes as it always did.
+			const { responseTypes } = this.metadata;
+			const responseTypeCount = lengthOf(responseTypes);
+			const hasCodeResponseType = mentions(responseTypes, 'code');
 
 			if (
 				Array.isArray(this.metadata.grantTypes) &&
 				this.metadata.grantTypes.includes('authorization_code') &&
-				!responseTypes?.length
+				!responseTypeCount
 			) {
 				this.invalidate('responseTypes must contain members');
 			}
 
-			if (responseTypes?.length && !this.metadata.redirectUris?.length) {
+			if (responseTypeCount && !lengthOf(this.metadata.redirectUris)) {
 				// Empty redirect_uris is only permissible when PAR allows
 				// unregistered redirect URIs AND this client requires PAR — and
 				// never for `none` auth or pairwise sector clients (which resolve a
@@ -456,12 +504,12 @@ export default function getSchema() {
 				}
 			}
 
-			if (responseTypes?.length && this.metadata.responseModes?.length === 0) {
+			if (responseTypeCount && lengthOf(this.metadata.responseModes) === 0) {
 				this.invalidate('responseModes must contain members');
 			}
 
 			if (
-				responseTypes?.includes('code') &&
+				hasCodeResponseType &&
 				Array.isArray(this.metadata.grantTypes) &&
 				!this.metadata.grantTypes.includes('authorization_code')
 			) {
