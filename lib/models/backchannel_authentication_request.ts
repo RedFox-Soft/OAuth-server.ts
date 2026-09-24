@@ -6,6 +6,7 @@ import {
 } from './base_token.js';
 import consumable, { ConsumedPayload } from './mixins/consumable.ts';
 import { authPayloadModel } from './mixins/stores_auth.js';
+import { StoredParams } from './stored_params.ts';
 import { ttl } from '../configs/liveTime.js';
 
 export const BackchannelAuthenticationRequestPayload = t.Object({
@@ -15,7 +16,7 @@ export const BackchannelAuthenticationRequestPayload = t.Object({
 	consumed: ConsumedPayload,
 	error: t.Optional(t.String()),
 	errorDescription: t.Optional(t.String()),
-	params: t.Optional(t.Unknown())
+	params: t.Optional(StoredParams)
 });
 export type BackchannelAuthenticationRequestPayloadType = Static<
 	typeof BackchannelAuthenticationRequestPayload

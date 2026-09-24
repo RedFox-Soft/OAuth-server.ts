@@ -52,6 +52,11 @@ The filter is **shallow** on purpose, and must not be replaced with `Value.Clean
 fields are freeform — `claims`, `rar`, `params`, `session.state` — and `Value.Clean` recurses into
 nested object schemas and would prune them to `{}`, silently losing ID token and userinfo claims.
 
+Freeform is not untyped. The stored authorization-request `params` of `Interaction`, `DeviceCode` and
+`BackchannelAuthenticationRequest` are declared with `StoredParams` (`lib/models/stored_params.ts`), a
+`t.Unsafe` that gives the pipeline's parameter type to a schema that checks nothing: the reads are typed,
+and nothing the pipeline accepted can be refused on reload (since 2026-09-24).
+
 ## Finding a model: `tryFind` or `find`
 
 Every `BaseModel`/`BaseToken` subclass, and the `Client` namespace (`lib/models/client.ts:62`), has two

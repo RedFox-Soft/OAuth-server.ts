@@ -57,7 +57,8 @@ describe('opaque storage', () => {
 	const gty = 'foo';
 	const error = 'access_denied';
 	const errorDescription = 'resource owner denied access';
-	const params = { foo: 'bar' };
+	// What the pipeline stores: the authorization request's own parameters.
+	const params = { scope: 'openid', state: 'bar' };
 	const userCode = '1384-3217';
 	const deviceInfo = { foo: 'bar' };
 	const inFlight = true;

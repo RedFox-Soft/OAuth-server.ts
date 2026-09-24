@@ -3,7 +3,6 @@ import { STATUS_CODES } from 'node:http';
 import nanoid from '../helpers/nanoid.ts';
 import { IdToken } from '../models/id_token.ts';
 import { type Client } from '../models/client/types.ts';
-import { isPlainObject } from '../helpers/_/object.js';
 import { type BackchannelAuthenticationRequest } from '../models/backchannel_authentication_request.ts';
 
 /*
@@ -17,11 +16,8 @@ async function ping(
 	client: Client,
 	backchannelAuthenticationRequest: BackchannelAuthenticationRequest
 ) {
-	// The stored params are opaque to the model; the notification token is the one member read here.
-	const params = backchannelAuthenticationRequest?.payload.params;
-	const notificationToken = isPlainObject(params)
-		? params.client_notification_token
-		: undefined;
+	const notificationToken =
+		backchannelAuthenticationRequest?.payload.params?.client_notification_token;
 	if (
 		!client.backchannelClientNotificationEndpoint ||
 		client.backchannelTokenDeliveryMode !== 'ping' ||

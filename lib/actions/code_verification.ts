@@ -177,7 +177,7 @@ export const codeVerification = new Elysia()
 				// confirm === yes: resolve the interaction against the authenticated session and
 				// either redirect to a required interaction (login/consent) or bind + render success.
 				// The device authorization request's parameters, validated when the code was issued.
-				oidc.params = { ...(code.payload.params as PipelineParams) };
+				oidc.params = { ...code.payload.params };
 				await checkClient(oidc);
 				await checkResource(oidc);
 				assignClaims(oidc);

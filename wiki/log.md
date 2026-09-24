@@ -89,3 +89,4 @@ Operations:
 - 2026-09-24 — corrected [[token-payload-access-contract]]: two more bare reads found by typing the grants — `at.aud` in three grants (ID Token claims beside a resource-bound access token) and `token.gty` in the refresh grant.
 - 2026-09-24 — corrected [[bucket-is-an-issuer]]: `issuingBucket` dropped `host`, so a host-addressed bucket was taken for an unaddressed one (cookie `_session_default`, issuer `ISSUER/<id>`), and `GET /logout` ignored the request host; both fixed.
 - 2026-09-24 — corrected [[totp-second-factor]]: the broken `Interaction.persist()` is replaced by `persistInteraction`, moved onto the model with its TTL clamp; `resume.ts` uses it too.
+- 2026-09-24 — corrected [[token-payload-access-contract]]: stored `params` are typed by `StoredParams` (a checking-free `t.Unsafe`), not left `t.Unknown()`.

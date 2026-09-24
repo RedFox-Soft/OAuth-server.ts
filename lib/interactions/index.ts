@@ -56,9 +56,9 @@ import interactions, {
 } from 'lib/actions/authorization/interactions.js';
 import {
 	endUserCookieAttributes,
-	type PipelineParams,
-	type PipelineParamsWith
+	type PipelineParams
 } from 'lib/consts/param_list.js';
+import presence from 'lib/helpers/validate_presence.js';
 import {
 	AlreadyUsedError,
 	ExpiredError,
@@ -109,14 +109,6 @@ const INVALID_CODE = 'Invalid code';
 import { ApplicationConfig, configuration } from 'lib/configs/application.js';
 import { isPlainObject } from 'lib/helpers/_/object.js';
 
-/*
- * A resumed request's parameters are the ones the authorization pipeline stored after `presence`
- * established `redirect_uri`, so the resumed context carries it.
- */
-function resumed(oidc: OIDCContext<PipelineParams>) {
-	return oidc as OIDCContext<PipelineParamsWith<'redirect_uri'>>;
-}
-
 async function resume(interaction: Interaction, cookie: OIDCCookies) {
 	/*
 	 * The population this interaction belongs to, recovered from the request that started it.
@@ -153,12 +145,19 @@ async function resume(interaction: Interaction, cookie: OIDCCookies) {
 	cookie._interaction.set(expiredInteractionCookie(interaction.uid));
 
 	/*
+	 * The stored parameters are the ones the authorization pipeline kept after `presence` established
+	 * `redirect_uri` there, so this cannot refuse a request that began at the authorization endpoint;
+	 * it is what lets the response below be addressed without taking that on trust.
+	 */
+	presence(oidc, 'redirect_uri');
+
+	/*
 	 * Aborting the authorization request back to the client, which this route has to do for itself:
 	 * the shared onError only redirects on the authorization route, and this is `ui.resume`. The
 	 * stored interaction's params already passed redirect_uri validation, so there is nothing left
 	 * to check here.
 	 */
-	async function abortToClient(error: string, errorDescription?: string) {
+	const abortToClient = async (error: string, errorDescription?: string) => {
 		const out = {
 			error,
 			...(errorDescription ? { error_description: errorDescription } : {}),
@@ -173,8 +172,8 @@ async function resume(interaction: Interaction, cookie: OIDCCookies) {
 			// The stored request passed checkResponseMode; an unknown mode here is a defect.
 			throw new Error(`no handler for response mode ${mode}`);
 		}
-		return await handler(oidc, resumed(oidc).params.redirect_uri, out);
-	}
+		return await handler(oidc, oidc.params.redirect_uri, out);
+	};
 
 	// An interaction that resolved with an error result aborts the authorization request and
 	// redirects the User-Agent back to the client with that error (mirrors device_resume and the
@@ -209,7 +208,7 @@ async function resume(interaction: Interaction, cookie: OIDCCookies) {
 		return Response.redirect(redirectUri, 303);
 	}
 	await setCookies();
-	return respond(resumed(oidc));
+	return respond(oidc);
 }
 
 async function createGrant(interaction: Interaction) {

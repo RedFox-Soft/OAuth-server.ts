@@ -1,18 +1,13 @@
 import { Type as t, type Static } from '@sinclair/typebox';
 import epochTime from '../helpers/epoch_time.js';
 import { BaseModel, BaseModelPayload } from './base_model.js';
-import type { PipelineParams } from '../consts/param_list.ts';
 import type { InteractionResult } from '../helpers/oidc_context.ts';
+import { StoredParams } from './stored_params.ts';
 
 /*
- * What the authorization pipeline wrote: its own validated parameters, and the outcome the interaction
- * screens record. Only the top-level keys are filtered on save (formats/opaque.ts) — nested content is
- * copied verbatim and never re-validated — so these schemas state the writers' types rather than check
- * them. Re-validating the parameters would add a refusal the server does not make.
+ * The outcome the interaction screens record. Like the stored parameters, it is copied verbatim on save
+ * and never re-validated, so the schema states the writers' type rather than checks it.
  */
-const StoredParams = t.Unsafe<PipelineParams>(
-	t.Record(t.String(), t.Unknown())
-);
 const Outcome = t.Unsafe<InteractionResult>(t.Record(t.String(), t.Unknown()));
 
 // The prompt the policy stopped at (lib/actions/authorization/interactions.ts); `details` carries the

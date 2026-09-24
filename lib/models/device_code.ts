@@ -8,6 +8,7 @@ import {
 
 import consumable, { ConsumedPayload } from './mixins/consumable.ts';
 import { authPayloadModel } from './mixins/stores_auth.js';
+import { StoredParams } from './stored_params.ts';
 import { ttl } from '../configs/liveTime.js';
 
 export const DeviceCodePayload = t.Object({
@@ -17,7 +18,7 @@ export const DeviceCodePayload = t.Object({
 	consumed: ConsumedPayload,
 	error: t.Optional(t.String()),
 	errorDescription: t.Optional(t.String()),
-	params: t.Optional(t.Unknown()),
+	params: t.Optional(StoredParams),
 	userCode: t.Optional(t.String()),
 	inFlight: t.Optional(t.Boolean()),
 	deviceInfo: t.Optional(t.Unknown())
