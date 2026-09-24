@@ -152,6 +152,10 @@ async function forHost(
 // client cannot discover a deployment it is not allowed to read (OIDC Discovery 1.0 §4, RFC 8414 §3).
 export const discovery = new Elysia()
 	.use(corsOpen)
+	// The metadata, an address naming no bucket (404, `not_found`), or the shared server_error body.
+	.guard({
+		response: { 200: DiscoveryResponse, 404: OAuthError, 500: OAuthError }
+	})
 	.get('/.well-known/openid-configuration', ({ request, set }) =>
 		forHost(hostOfRequest(request), openidConfiguration, set)
 	)

@@ -2,8 +2,11 @@ import { describe, it, expect, afterEach } from 'bun:test';
 import { strict as assert } from 'node:assert';
 import * as util from 'node:util';
 
-import { InvalidClientMetadata } from 'lib/helpers/errors.js';
-import { merge } from 'lib/helpers/_/object.js';
+import {
+	InvalidClientMetadata,
+	OIDCProviderError
+} from 'lib/helpers/errors.js';
+import { isPlainObject, merge } from 'lib/helpers/_/object.js';
 import {
 	ApplicationConfig,
 	reloadConfiguration
@@ -18,7 +21,8 @@ import getConfig from '../default.config.js';
 import {
 	registerClient,
 	responseModeAllowed,
-	toStored
+	toStored,
+	type Client
 } from 'lib/models/client.js';
 
 const sigKey = stripPrivateJWKFields(keys[0]);
@@ -56,7 +60,16 @@ const COLLECTION_OPTIONS = new Set([
  * through the camelCase seam, and an incomplete encryption declaration is refused.
  */
 describe('Client metadata validation', () => {
-	function register(metadata, configuration) {
+	type Metadata = Record<string, unknown>;
+	type Configuration = Record<string, unknown>;
+
+	// What registration refuses with: an OIDC error naming its code and describing the fault.
+	function refusal(thrown: unknown): OIDCProviderError {
+		if (!(thrown instanceof OIDCProviderError)) throw thrown;
+		return thrown;
+	}
+
+	function register(metadata?: Metadata, configuration?: Configuration) {
 		Object.assign(ApplicationConfig, applicationDefaults);
 		const initConfig: Record<string, unknown> = merge(
 			baseConfig(),
@@ -66,10 +79,17 @@ describe('Client metadata validation', () => {
 			if (key.includes('.') || COLLECTION_OPTIONS.has(key)) {
 				// claims merge over the shipped map (Configuration used to do this when claims
 				// arrived as provider setup); everything else replaces.
-				ApplicationConfig[key] =
-					key === 'claims'
-						? merge({}, applicationDefaults.claims, initConfig.claims)
-						: initConfig[key];
+				const { claims } = initConfig;
+				Object.assign(ApplicationConfig, {
+					[key]:
+						key === 'claims'
+							? merge(
+									{},
+									applicationDefaults.claims,
+									isPlainObject(claims) ? claims : {}
+								)
+							: initConfig[key]
+				});
 				delete initConfig[key];
 			}
 		}
@@ -87,10 +107,10 @@ describe('Client metadata validation', () => {
 	}
 
 	const mustBeString = (
-		prop,
-		values = [[], 123, true, null, false, {}, ''],
-		metadata,
-		configuration
+		prop: string,
+		values: unknown[] = [[], 123, true, null, false, {}, ''],
+		metadata?: Metadata,
+		configuration?: Configuration
 	) => {
 		values.forEach((value) => {
 			let msg = util.format('must be a string, %j provided', value);
@@ -102,7 +122,8 @@ describe('Client metadata validation', () => {
 			it(msg, () =>
 				assert.rejects(
 					register({ ...metadata, [prop]: value }, configuration),
-					(err) => {
+					(thrown) => {
+						const err = refusal(thrown);
 						if (prop === 'redirectUris') {
 							expect(err.message).toBe('invalid_redirect_uri');
 						} else {
@@ -118,7 +139,12 @@ describe('Client metadata validation', () => {
 		});
 	};
 
-	const mustBeUri = (prop, protocols, configuration, metadata) => {
+	const mustBeUri = (
+		prop: string,
+		protocols: string[],
+		configuration?: Configuration,
+		metadata?: Metadata
+	) => {
 		it('a metadata field that is not a URI is refused at registration', () =>
 			assert.rejects(
 				register(
@@ -128,7 +154,8 @@ describe('Client metadata validation', () => {
 					},
 					configuration
 				),
-				(err) => {
+				(thrown) => {
+					const err = refusal(thrown);
 					if (prop === 'redirectUris') {
 						expect(err.message).toBe('invalid_redirect_uri');
 						if (protocols.length === 1 && protocols[0] === 'https') {
@@ -154,9 +181,9 @@ describe('Client metadata validation', () => {
 	};
 
 	const mustBeArray = (
-		prop,
-		values = [{}, 'string', 123, true, null, false],
-		configuration
+		prop: string,
+		values: unknown[] = [{}, 'string', 123, true, null, false],
+		configuration?: Configuration
 	) => {
 		values.forEach((value) => {
 			let msg = util.format('must be a array, %j provided', value);
@@ -170,7 +197,8 @@ describe('Client metadata validation', () => {
 						},
 						configuration
 					),
-					(err) => {
+					(thrown) => {
+						const err = refusal(thrown);
 						if (prop === 'redirectUris') {
 							expect(err.message).toBe('invalid_redirect_uri');
 						} else {
@@ -184,7 +212,11 @@ describe('Client metadata validation', () => {
 		});
 	};
 
-	const mustBeBoolean = (prop, metadata, configuration) => {
+	const mustBeBoolean = (
+		prop: string,
+		metadata?: Metadata,
+		configuration?: Configuration
+	) => {
 		[{}, 'string', 123, null, []].forEach((value) => {
 			let msg = util.format('must be a boolean, %j provided', value);
 			if (metadata)
@@ -199,7 +231,8 @@ describe('Client metadata validation', () => {
 						},
 						configuration
 					),
-					(err) => {
+					(thrown) => {
+						const err = refusal(thrown);
 						// Boolean type is now enforced by ClientSchema (TypeBox); the exact
 						// description is TypeBox's, so assert the error code only.
 						expect(err.message).toBe('invalid_client_metadata');
@@ -211,11 +244,11 @@ describe('Client metadata validation', () => {
 	};
 
 	const defaultsTo = (
-		prop,
-		value,
-		metadata,
-		configuration,
-		additionalAssertion
+		prop: string,
+		value: unknown,
+		metadata?: Metadata,
+		configuration?: Configuration,
+		additionalAssertion?: (client: Client) => unknown
 	) => {
 		let msg = util.format('defaults to %s', value);
 		if (metadata)
@@ -240,7 +273,12 @@ describe('Client metadata validation', () => {
 		);
 	};
 
-	const isRequired = (prop, values, configuration, metadata) => {
+	const isRequired = (
+		prop: string,
+		values?: unknown[],
+		configuration?: Configuration,
+		metadata?: Metadata
+	) => {
 		(values || [null, undefined, '']).forEach((value) => {
 			let msg = util.format('is required, %j provided', value);
 			if (configuration)
@@ -254,7 +292,8 @@ describe('Client metadata validation', () => {
 						},
 						configuration
 					),
-					(err) => {
+					(thrown) => {
+						const err = refusal(thrown);
 						if (prop === 'redirectUris') {
 							expect(err.message).toBe('invalid_redirect_uri');
 						} else {
@@ -269,11 +308,11 @@ describe('Client metadata validation', () => {
 	};
 
 	const allows = (
-		prop,
-		value,
-		metadata,
-		configuration,
-		assertion = (client) => {
+		prop: string,
+		value: unknown,
+		metadata?: Metadata,
+		configuration?: Configuration,
+		assertion = (client: Client) => {
 			expect(toStored(client)[prop]).toEqual(value);
 		}
 	) => {
@@ -286,7 +325,7 @@ describe('Client metadata validation', () => {
 		it(msg, () =>
 			register({ ...metadata, [prop]: value }, configuration).then(
 				assertion,
-				(err) => {
+				(err: unknown) => {
 					if (err instanceof InvalidClientMetadata) {
 						throw new Error(
 							`InvalidClientMetadata received ${err.message} ${err.error_description}`
@@ -297,7 +336,13 @@ describe('Client metadata validation', () => {
 		);
 	};
 
-	const rejects = (prop, value, description, metadata, configuration) => {
+	const rejects = (
+		prop: string,
+		value: unknown,
+		description?: string | RegExp,
+		metadata?: Metadata,
+		configuration?: Configuration
+	) => {
 		let msg = util.format('rejects %j', value);
 		if (metadata)
 			msg = util.format(`${msg}, [client %j]`, withoutKeys(metadata));
@@ -307,14 +352,15 @@ describe('Client metadata validation', () => {
 		it(msg, () =>
 			assert.rejects(
 				register({ ...metadata, [prop]: value }, configuration),
-				(err) => {
+				(thrown) => {
+					const err = refusal(thrown);
 					if (prop === 'redirectUris') {
 						expect(err.message).toBe('invalid_redirect_uri');
 					} else {
 						expect(err.message).toBe('invalid_client_metadata');
 					}
 					if (description) {
-						if (description.exec) {
+						if (description instanceof RegExp) {
 							expect(err.error_description).toMatch(description);
 						} else {
 							expect(err.error_description).toBe(description);
@@ -481,7 +527,8 @@ describe('Client metadata validation', () => {
 		it('is rejected by the schema when not an array of strings', () =>
 			assert.rejects(
 				register({ grantTypes: 123, responseTypes: [] }),
-				(err) => {
+				(thrown) => {
+					const err = refusal(thrown);
 					expect(err.message).toBe('invalid_client_metadata');
 					expect(err.error_description).toBe(
 						'client metadata validation error'
@@ -759,7 +806,8 @@ describe('Client metadata validation', () => {
 		// TypeBox ClientSchema, so a structurally invalid value is rejected with the
 		// generic schema validation error.
 		it('is rejected by the schema when not an array', () =>
-			assert.rejects(register({ responseTypes: 'string' }), (err) => {
+			assert.rejects(register({ responseTypes: 'string' }), (thrown) => {
+				const err = refusal(thrown);
 				expect(err.message).toBe('invalid_client_metadata');
 				expect(err.error_description).toBe('client metadata validation error');
 				return true;
@@ -806,7 +854,8 @@ describe('Client metadata validation', () => {
 		// the TypeBox ClientSchema, so a structurally invalid value is rejected with
 		// the generic schema validation error.
 		it('is rejected by the schema when not an array', () =>
-			assert.rejects(register({ responseModes: 'string' }), (err) => {
+			assert.rejects(register({ responseModes: 'string' }), (thrown) => {
+				const err = refusal(thrown);
 				expect(err.message).toBe('invalid_client_metadata');
 				expect(err.error_description).toBe('client metadata validation error');
 				return true;
@@ -991,31 +1040,34 @@ describe('Client metadata validation', () => {
 
 		describe('token_endpoint_auth_signing_alg', function () {
 			rejects('token_endpoint_auth_signing_alg', 'none');
-			Object.entries({
+			const methods: Record<string, [string, string, Metadata?]> = {
 				client_secret_jwt: ['HS', 'RS'],
 				private_key_jwt: ['RS', 'HS', { jwks: { keys: [sigKey] } }]
-			}).forEach(([method, [accepted, rejected, additional]]) => {
-				allows(
-					'token_endpoint_auth_signing_alg',
-					`${accepted}256`,
-					{
-						token_endpoint_auth_method: method,
-						...additional
-					},
-					configuration
-				);
+			};
+			Object.entries(methods).forEach(
+				([method, [accepted, rejected, additional]]) => {
+					allows(
+						'token_endpoint_auth_signing_alg',
+						`${accepted}256`,
+						{
+							token_endpoint_auth_method: method,
+							...additional
+						},
+						configuration
+					);
 
-				rejects(
-					'token_endpoint_auth_signing_alg',
-					`${rejected}256`,
-					/^token_endpoint_auth_signing_alg must be/,
-					{
-						token_endpoint_auth_method: method,
-						...additional
-					},
-					configuration
-				);
-			});
+					rejects(
+						'token_endpoint_auth_signing_alg',
+						`${rejected}256`,
+						/^token_endpoint_auth_signing_alg must be/,
+						{
+							token_endpoint_auth_method: method,
+							...additional
+						},
+						configuration
+					);
+				}
+			);
 		});
 	}
 
@@ -1165,7 +1217,8 @@ describe('Client metadata validation', () => {
 						},
 						configuration
 					),
-					(err) => {
+					(thrown) => {
+						const err = refusal(thrown);
 						expect(err.message).toBe('invalid_client_metadata');
 						expect(err.error_description).toBe(
 							'id_token_encrypted_response_alg is mandatory property when id_token_encrypted_response_enc is provided'
@@ -1291,7 +1344,8 @@ describe('Client metadata validation', () => {
 						},
 						configuration
 					),
-					(err) => {
+					(thrown) => {
+						const err = refusal(thrown);
 						expect(err.message).toBe('invalid_client_metadata');
 						expect(err.error_description).toBe(
 							'userinfo_encrypted_response_alg is mandatory property when userinfo_encrypted_response_enc is provided'
@@ -1431,7 +1485,8 @@ describe('Client metadata validation', () => {
 						},
 						configuration
 					),
-					(err) => {
+					(thrown) => {
+						const err = refusal(thrown);
 						expect(err.message).toBe('invalid_client_metadata');
 						expect(err.error_description).toBe(
 							'introspection_encrypted_response_alg is mandatory property when introspection_encrypted_response_enc is provided'
@@ -1561,7 +1616,8 @@ describe('Client metadata validation', () => {
 						},
 						configuration
 					),
-					(err) => {
+					(thrown) => {
+						const err = refusal(thrown);
 						expect(err.message).toBe('invalid_client_metadata');
 						expect(err.error_description).toBe(
 							'authorization_encrypted_response_alg is mandatory property when authorization_encrypted_response_enc is provided'
@@ -1693,7 +1749,8 @@ describe('Client metadata validation', () => {
 						},
 						configuration
 					),
-					(err) => {
+					(thrown) => {
+						const err = refusal(thrown);
 						expect(err.message).toBe('invalid_client_metadata');
 						expect(err.error_description).toBe(
 							'request_object_encryption_alg is mandatory property when request_object_encryption_enc is provided'
@@ -2425,7 +2482,8 @@ describe('Client metadata validation', () => {
 			expect(() => sectorIdentifier(client)).toThrow();
 			try {
 				sectorIdentifier(client);
-			} catch (err) {
+			} catch (thrown) {
+				const err = refusal(thrown);
 				expect(err.error).toEqual('invalid_client_metadata');
 				expect(err.error_description).toEqual(
 					'could not determine a sector identifier'

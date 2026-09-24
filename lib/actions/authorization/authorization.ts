@@ -236,7 +236,11 @@ export const authGet = new Elysia()
 			return await authorizationActionHandler(oidc);
 		},
 		{
-			response: { 200: RedirectOrHtmlResponse, 400: OAuthError }
+			response: {
+				200: RedirectOrHtmlResponse,
+				400: OAuthError,
+				500: OAuthError
+			}
 		}
 	);
 
@@ -270,7 +274,11 @@ export const authPost = new Elysia()
 			return await authorizationActionHandler(oidc);
 		},
 		{
-			response: { 200: RedirectOrHtmlResponse, 400: OAuthError }
+			response: {
+				200: RedirectOrHtmlResponse,
+				400: OAuthError,
+				500: OAuthError
+			}
 		}
 	);
 
@@ -340,7 +348,8 @@ export const par = new Elysia()
 			response: {
 				201: ParResponse,
 				400: OAuthError,
-				401: OAuthError
+				401: OAuthError,
+				500: OAuthError
 			}
 		}
 	);

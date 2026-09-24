@@ -176,7 +176,11 @@ export const logoutAction = new Elysia()
 			return logoutSuccess();
 		},
 		{
-			response: { 200: RedirectOrHtmlResponse, 400: OAuthError }
+			response: {
+				200: RedirectOrHtmlResponse,
+				400: OAuthError,
+				500: OAuthError
+			}
 		}
 	);
 
@@ -264,6 +268,10 @@ export const logoutConfirmAction = new Elysia()
 			return logoutSuccess();
 		},
 		{
-			response: { 200: RedirectOrHtmlResponse, 400: OAuthError }
+			response: {
+				200: RedirectOrHtmlResponse,
+				400: OAuthError,
+				500: OAuthError
+			}
 		}
 	);

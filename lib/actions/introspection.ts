@@ -203,7 +203,8 @@ export const introspect = new Elysia().use(AuthPlugin).post(
 		response: {
 			200: IntrospectionResponse,
 			400: OAuthError,
-			401: OAuthError
+			401: OAuthError,
+			500: OAuthError
 		}
 	}
 );

@@ -6,7 +6,7 @@ import {
 	SessionBoundPayload
 } from './base_token.js';
 
-import consumable from './mixins/consumable.js';
+import consumable, { ConsumedPayload } from './mixins/consumable.js';
 import constrained from './mixins/is_sender_constrained.js';
 import { authPayloadModel } from './mixins/stores_auth.js';
 
@@ -18,7 +18,7 @@ export const RefreshTokenSchema = t.Object({
 	gty: t.String(),
 	rar: t.Optional(t.Array(t.Object({}, { additionalProperties: true }))),
 	rotations: t.Optional(t.Number()),
-	consumed: t.Boolean(),
+	consumed: ConsumedPayload,
 	'x5t#S256': t.Optional(t.String()),
 	jkt: t.Optional(t.String())
 });

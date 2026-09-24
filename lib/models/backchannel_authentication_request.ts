@@ -4,14 +4,14 @@ import {
 	BaseTokenPayload,
 	SessionBoundPayload
 } from './base_token.js';
-import consumable from './mixins/consumable.ts';
+import consumable, { ConsumedPayload } from './mixins/consumable.ts';
 import { authPayloadModel } from './mixins/stores_auth.js';
 
 export const BackchannelAuthenticationRequestPayload = t.Object({
 	...BaseTokenPayload.properties,
 	...SessionBoundPayload.properties,
 	...authPayloadModel.properties,
-	consumed: t.Boolean(),
+	consumed: ConsumedPayload,
 	error: t.Optional(t.String()),
 	errorDescription: t.Optional(t.String()),
 	params: t.Optional(t.Unknown())

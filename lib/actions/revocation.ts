@@ -54,7 +54,8 @@ export const revocation = new Elysia()
 			response: {
 				200: t.Void(),
 				400: OAuthError,
-				401: OAuthError
+				401: OAuthError,
+				500: OAuthError
 			}
 		}
 	);

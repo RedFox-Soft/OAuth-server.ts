@@ -215,7 +215,8 @@ const responses = {
 		200: UserinfoResponse,
 		400: OAuthError,
 		401: OAuthError,
-		403: OAuthError
+		403: OAuthError,
+		500: OAuthError
 	}
 };
 

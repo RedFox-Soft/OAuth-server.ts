@@ -42,7 +42,8 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 - types: the typed (Eden) client sees what the endpoints answer — `/token` declares its 400/401 errors and
   one token body, registration and introspection declare their RFC members, the request headers include
   `accept` and `x-client-cert`, and the admin client schema's grant types and auth method are no longer
-  `never` (unions built from a mapped array). No response changes on the wire.
+  `never` (unions built from a mapped array); the interaction pages (`/ui/*`) and discovery declare
+  their answers, and every protocol route its 500. No response changes on the wire.
 - **breaking** — extension functions, policy checks, registration policies and RAR validators receive
   the request context itself (`issueRefreshToken(oidc, client, code)`, `check: (oidc) => …`), not
   `{ oidc }`. Request-scoped events carry it first; `grant.revoked` is `(oidc?, grantId)` and fires once

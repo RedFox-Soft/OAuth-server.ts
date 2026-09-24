@@ -26,10 +26,14 @@ bugs rather than a stylistic detail.
 
 ## The mechanism
 
-`BaseModel` holds one property, `payload`, assigned in the constructor after the payload is
-validated against the model's TypeBox schema (`lib/models/base_model.ts:24-34`). A payload that
-fails `Value.Check` throws `TypeError('invalid payload')`, so a constructed model always carries a
-schema-valid payload. Everything else on the class — `jti`, `exp`, TTL handling, persistence —
+`BaseModel` holds one property, `payload`, assigned in the constructor after a `Value.Check`
+(`lib/models/base_model.ts:26-38`) that throws `TypeError('invalid payload')` on failure. **That check
+does not use the subclass's schema.** It reads `this.model`, and a subclass's `model = …` field is only
+defined after `BaseModel`'s constructor returns, so the check runs against `BaseModelPayload` — four
+optional members — for every model. Found on 2026-09-24: a consumed refresh token carries a numeric
+`consumed` its `t.Boolean()` schema rejects, and it is still constructed. The subclass schema does
+govern what is *stored* (below), and `consumed` is now declared as what the adapters write (`false`,
+then the consumption second); enforcing the subclass schema at construction is not done. Everything else on the class — `jti`, `exp`, TTL handling, persistence —
 reads and writes through `this.payload` (`lib/models/base_model.ts:44-72`, `144-159`).
 
 There are no generated per-field accessors. An earlier design mirrored payload fields onto the

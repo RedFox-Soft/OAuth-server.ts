@@ -4,7 +4,7 @@ import {
 	BaseTokenPayload,
 	SessionBoundPayload
 } from './base_token.js';
-import consumable from './mixins/consumable.js';
+import consumable, { ConsumedPayload } from './mixins/consumable.js';
 import { authPayloadModel } from './mixins/stores_auth.js';
 
 export const AuthorizationCodePayload = t.Object({
@@ -16,7 +16,7 @@ export const AuthorizationCodePayload = t.Object({
 	redirectUri: t.Optional(t.String({ format: 'uri' })),
 	dpopJkt: t.Optional(t.String()),
 	rar: t.Optional(t.Array(t.Object({}, { additionalProperties: true }))),
-	consumed: t.Boolean()
+	consumed: ConsumedPayload
 });
 export type AuthorizationCodePayloadType = Static<
 	typeof AuthorizationCodePayload

@@ -90,7 +90,8 @@ export const tokenAction = new Elysia()
 			response: {
 				200: TokenResponse,
 				400: OAuthError,
-				401: OAuthError
+				401: OAuthError,
+				500: OAuthError
 			}
 		}
 	);

@@ -1,6 +1,14 @@
+import { Type as t } from '@sinclair/typebox';
 import { type BaseModel, type BaseModelPayloadType } from '../base_model.js';
 
-type ConsumdedPayload = BaseModelPayloadType & { consumed?: boolean };
+/*
+ * `false` until the item is consumed; then the second it was consumed at, which is what every adapter's
+ * `consume` writes (memory, MongoDB and PostgreSQL alike). Declared as the boolean alone, the type said
+ * a consumed item could not be read back.
+ */
+export const ConsumedPayload = t.Union([t.Boolean(), t.Number()]);
+
+type ConsumdedPayload = BaseModelPayloadType & { consumed?: boolean | number };
 
 // Generic over the concrete base class (TBase) rather than a fixed
 // `typeof BaseModel`. Extending the type parameter preserves the passed class's

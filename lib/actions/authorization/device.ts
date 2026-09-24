@@ -169,7 +169,8 @@ export const deviceAuth = new Elysia()
 			response: {
 				200: DeviceAuthorizationResponse,
 				400: OAuthError,
-				401: OAuthError
+				401: OAuthError,
+				500: OAuthError
 			}
 		}
 	);
@@ -275,7 +276,8 @@ export const backchannelAuth = new Elysia()
 			response: {
 				200: BackchannelAuthenticationResponse,
 				400: OAuthError,
-				401: OAuthError
+				401: OAuthError,
+				500: OAuthError
 			}
 		}
 	);

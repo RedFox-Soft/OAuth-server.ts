@@ -1,4 +1,3 @@
-import url from 'node:url';
 import {
 	describe,
 	it,
@@ -15,11 +14,17 @@ import { eventBus } from 'lib/event_bus.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { Client } from 'lib/models/client.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
-import bootstrap, { agent, changeClient, type Setup } from '../test_helper.js';
+import bootstrap, {
+	agent,
+	changeClient,
+	redirectParameter,
+	type Setup
+} from '../test_helper.js';
 import { getUserStore } from 'lib/adapters/index.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
 import { ttl } from 'lib/configs/liveTime.js';
+import type { AuthorizationCodePayloadType } from 'lib/models/authorization_code.js';
 
 /**
  * @proves A client exchanging a valid authorization code receives tokens, and every way of
@@ -41,10 +46,10 @@ describe('grant_type=authorization_code', () => {
 	});
 
 	describe('with real tokens (1/3) - more than one redirectUris registered', () => {
-		let auth = null;
-		let code: string | undefined;
-		let codeStore = null;
-		let session = null;
+		let auth: AuthorizationRequest;
+		let code: string;
+		let codeStore: AuthorizationCodePayloadType;
+		let session: string;
 
 		beforeEach(async function () {
 			const cookie = await setup.login();
@@ -62,10 +67,9 @@ describe('grant_type=authorization_code', () => {
 			});
 
 			expect(response.status).toBe(303);
-			const { query } = url.parse(response.headers.get('location'), true);
-			code = query.code;
+			code = redirectParameter(response, 'code');
 
-			const jti = setup.getTokenJti(query.code);
+			const jti = setup.getTokenJti(code);
 			codeStore = TestAdapter.for('AuthorizationCode').syncFind(jti);
 		});
 
@@ -102,14 +106,14 @@ describe('grant_type=authorization_code', () => {
 					cookie: session
 				}
 			});
-			const { query } = url.parse(response.headers.get('location'), true);
-			const code = query.code;
+			const code = redirectParameter(response, 'code');
 
 			setSystemTime(Date.now() + 10 * 1000);
 			const spy = mock();
 			eventBus.on('grant.error', spy);
 
 			const { error } = await auth.getToken(code);
+			if (!error) throw new Error('expected error response');
 
 			expect(error.status).toBe(400);
 			expect(spy).toBeCalledTimes(1);
@@ -130,6 +134,7 @@ describe('grant_type=authorization_code', () => {
 			codeStore.consumed = epochTime();
 
 			const { error } = await auth.getToken(code);
+			if (!error) throw new Error('expected error response');
 			console.log(error.value);
 			expect(error.status).toBe(400);
 			expect(grantRevokeSpy).toBeCalledTimes(1);
@@ -156,6 +161,7 @@ describe('grant_type=authorization_code', () => {
 			auth.clientId = 'client2';
 
 			const { error } = await auth.getToken(code);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(spy).toBeCalledTimes(1);
 			expect(spy).toBeCalledWith(
@@ -170,6 +176,7 @@ describe('grant_type=authorization_code', () => {
 			auth.grant_type = 'foobar';
 
 			const { error } = await auth.getToken(code);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(error.value).toHaveProperty('error', 'unsupported_grant_type');
 		});
@@ -180,6 +187,7 @@ describe('grant_type=authorization_code', () => {
 
 			auth.params.redirect_uri = 'https://client.example.com/cb?thensome';
 			const { error } = await auth.getToken(code);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(spy).toBeCalledTimes(1);
 			expect(spy).toBeCalledWith(
@@ -194,6 +202,7 @@ describe('grant_type=authorization_code', () => {
 			auth.params.redirect_uri = undefined;
 
 			const { error } = await auth.getToken(code);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(error.value).toHaveProperty('error', 'invalid_request');
 			expect(error.value).toHaveProperty(
@@ -211,6 +220,7 @@ describe('grant_type=authorization_code', () => {
 			eventBus.on('grant.error', spy);
 
 			const { error } = await auth.getToken(code);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(spy).toBeCalledTimes(1);
 			const err = spy.mock.calls[0][0];
@@ -222,8 +232,8 @@ describe('grant_type=authorization_code', () => {
 	});
 
 	describe('with real tokens (2/3) - one redirect_uri registered with allowOmittingSingleRegisteredRedirectUri=false', () => {
-		let auth = null;
-		let code: string | undefined;
+		let auth: AuthorizationRequest;
+		let code: string;
 
 		beforeEach(async function () {
 			const cookie = await setup.login();
@@ -241,8 +251,7 @@ describe('grant_type=authorization_code', () => {
 			});
 
 			expect(response.status).toBe(303);
-			const { query } = url.parse(response.headers.get('location'), true);
-			code = query.code;
+			code = redirectParameter(response, 'code');
 		});
 
 		it('a client with several registered redirect URIs must send one', async function () {
@@ -251,6 +260,7 @@ describe('grant_type=authorization_code', () => {
 
 			auth.params.redirect_uri = undefined;
 			const { error } = await auth.getToken(code);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(spy).toBeCalledTimes(1);
 			expect(error.value).toHaveProperty('error', 'invalid_request');
@@ -262,10 +272,10 @@ describe('grant_type=authorization_code', () => {
 	});
 
 	describe('with real tokens (3/3) - one redirect_uri registered with allowOmittingSingleRegisteredRedirectUri=true', () => {
-		let auth = null;
-		let code: string | undefined;
-		let codeStore = null;
-		let session = null;
+		let auth: AuthorizationRequest;
+		let code: string;
+		let codeStore: AuthorizationCodePayloadType;
+		let session: string;
 
 		afterEach(function () {
 			ApplicationConfig[
@@ -284,7 +294,7 @@ describe('grant_type=authorization_code', () => {
 				scope: 'openid',
 				response_type: 'code'
 			});
-			delete auth.redirect_uri;
+			delete auth.params.redirect_uri;
 			const { response } = await agent.auth.get({
 				query: auth.params,
 				headers: {
@@ -293,10 +303,9 @@ describe('grant_type=authorization_code', () => {
 			});
 
 			expect(response.status).toBe(303);
-			const { query } = url.parse(response.headers.get('location'), true);
-			code = query.code;
+			code = redirectParameter(response, 'code');
 
-			const jti = setup.getTokenJti(query.code);
+			const jti = setup.getTokenJti(code);
 			codeStore = TestAdapter.for('AuthorizationCode').syncFind(jti);
 		});
 
@@ -334,14 +343,14 @@ describe('grant_type=authorization_code', () => {
 					cookie: session
 				}
 			});
-			const { query } = url.parse(response.headers.get('location'), true);
-			const code = query.code;
+			const code = redirectParameter(response, 'code');
 
 			setSystemTime(Date.now() + 10 * 1000);
 			const spy = mock();
 			eventBus.on('grant.error', spy);
 
 			const { error } = await auth.getToken(code);
+			if (!error) throw new Error('expected error response');
 
 			expect(error.status).toBe(400);
 			expect(spy).toBeCalledTimes(1);
@@ -362,6 +371,7 @@ describe('grant_type=authorization_code', () => {
 			codeStore.consumed = epochTime();
 
 			const { error } = await auth.getToken(code);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(grantRevokeSpy).toBeCalledTimes(1);
 			expect(grantErrorSpy).toBeCalledTimes(1);
@@ -385,8 +395,9 @@ describe('grant_type=authorization_code', () => {
 			eventBus.on('grant.error', spy);
 
 			auth.clientId = 'client';
-			auth.redirect_uri = 'https://client.example.com/cb2';
+			auth.params.redirect_uri = 'https://client.example.com/cb2';
 			const { error } = await auth.getToken(code);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(spy).toBeCalledTimes(1);
 			expect(spy).toBeCalledWith(
@@ -400,6 +411,7 @@ describe('grant_type=authorization_code', () => {
 		it('an unsupported grant_type is refused as unsupported_grant_type', async function () {
 			auth.grant_type = 'foobar';
 			const { error } = await auth.getToken(code);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(error.value).toHaveProperty('error', 'unsupported_grant_type');
 		});
@@ -410,6 +422,7 @@ describe('grant_type=authorization_code', () => {
 
 			auth.params.redirect_uri = 'https://client.example.com/cb?thensome';
 			const { error } = await auth.getToken(code);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(spy).toBeCalledTimes(1);
 			expect(spy).toBeCalledWith(
@@ -429,6 +442,7 @@ describe('grant_type=authorization_code', () => {
 			eventBus.on('grant.error', spy);
 
 			const { error } = await auth.getToken(code);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(spy).toBeCalledTimes(1);
 			expect(spy).toBeCalledWith(
@@ -448,6 +462,7 @@ describe('grant_type=authorization_code', () => {
 				scope: 'openid'
 			});
 			const { error } = await agent.token.post(
+				// @ts-expect-error the case sends no grant_type, which the schema requires
 				{},
 				{
 					headers: auth.basicAuthHeader

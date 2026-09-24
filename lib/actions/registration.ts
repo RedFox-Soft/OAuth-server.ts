@@ -409,7 +409,8 @@ const OptionalBody = t.Optional(t.Record(t.String(), t.Unknown()));
 const errors = {
 	400: OAuthError,
 	401: OAuthError,
-	403: OAuthError
+	403: OAuthError,
+	500: OAuthError
 };
 
 export const registration = new Elysia()
