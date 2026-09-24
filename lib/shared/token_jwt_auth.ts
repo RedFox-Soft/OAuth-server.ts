@@ -40,17 +40,22 @@ function checkPayload(
 
 export async function tokenJwtAuth(
 	oidc: OIDCContext<authParamsType>,
-	keystore,
-	algorithms
+	keystore: JWT.KeySet,
+	algorithms: readonly string[]
 ) {
+	// Reached only for a request that presented one (token_auth's findClientId).
+	const assertion = oidc.params.client_assertion;
+	if (assertion === undefined) {
+		throw new InvalidClientAuth('client_assertion must be provided');
+	}
 	const auds = new Set([
 		ISSUER,
 		`${ISSUER}${routeNames.token}`,
 		`${ISSUER}${oidc.route}`
 	]);
-	const { header, payload } = JWT.decode(oidc.params.client_assertion);
+	const { header, payload } = JWT.decode(assertion);
 
-	if (!algorithms.includes(header.alg)) {
+	if (typeof header.alg !== 'string' || !algorithms.includes(header.alg)) {
 		throw new InvalidClientAuth('alg mismatch');
 	}
 	checkPayload(payload);
@@ -71,7 +76,7 @@ export async function tokenJwtAuth(
 	}
 
 	try {
-		await JWT.verify(oidc.params.client_assertion, keystore, {
+		await JWT.verify(assertion, keystore, {
 			clockTolerance
 		});
 	} catch (err) {

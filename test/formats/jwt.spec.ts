@@ -212,7 +212,7 @@ describe('jwt format', () => {
 				jwt: {
 					sign: {
 						alg: 'HS256',
-						key: await crypto.subtle.generateKey(
+						key: await globalThis.crypto.subtle.generateKey(
 							{ name: 'HMAC', hash: 'SHA-256' },
 							false,
 							['sign']
@@ -240,6 +240,7 @@ describe('jwt format', () => {
 				accessTokenFormat: 'jwt',
 				audience: 'foo',
 				jwt: {
+					// @ts-expect-error a kid that is not a string, which the format must refuse
 					sign: { alg: 'HS256', key: crypto.randomBytes(32), kid: 200 }
 				}
 			});
@@ -265,6 +266,7 @@ describe('jwt format', () => {
 						alg: 'dir',
 						enc: 'A128GCM',
 						key: crypto.randomBytes(16),
+						// @ts-expect-error a kid that is not a string, which the format must refuse
 						kid: 200
 					}
 				}
@@ -403,7 +405,7 @@ describe('jwt format', () => {
 					encrypt: {
 						alg: 'dir',
 						enc: 'A128GCM',
-						key: await crypto.subtle.generateKey(
+						key: await globalThis.crypto.subtle.generateKey(
 							{ name: 'AES-GCM', length: 128 },
 							false,
 							['encrypt']

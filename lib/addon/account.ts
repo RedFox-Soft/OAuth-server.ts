@@ -75,7 +75,7 @@ export async function findAccount<
 	};
 }
 
-export async function loadExistingGrant(oidc) {
+export async function loadExistingGrant(oidc: OIDCContext) {
 	const clientId = oidc.client.clientId;
 	const grantId =
 		oidc.result?.consent?.grantId || oidc.session.grantIdFor(clientId);

@@ -7,17 +7,34 @@ import { issuerFor } from 'lib/configs/issuer.js';
 import { issuingBucket } from 'lib/admin/auth/bucketAddress.js';
 import { ClientDefaults } from 'lib/configs/clientBase.js';
 import { pairwiseIdentifier } from '../../addon/index.js';
+import type { JWK } from 'jose';
+import type ResourceServer from '../../helpers/resource_server.ts';
+import type { BaseToken } from '../base_token.ts';
 
-async function getResourceServerConfig(token) {
+type TokenKey = crypto.KeyObject | CryptoKey | JWK | Uint8Array | string;
+
+async function getResourceServerConfig(token: {
+	resourceServer?: ResourceServer;
+}) {
 	const defaultAlg = ClientDefaults.idTokenSignedResponseAlg;
 
-	let sign;
-	let encrypt;
+	// Resolved to a key object or one of this server's keys; raw secrets are converted first.
+	let sign:
+		| { alg: string; key: crypto.KeyObject | CryptoKey | JWK; kid?: string }
+		| undefined;
+	let encrypt:
+		| {
+				alg: string;
+				enc: string;
+				key: crypto.KeyObject | CryptoKey;
+				kid?: string;
+		  }
+		| undefined;
 
 	{
-		let alg;
-		let key;
-		let kid;
+		let alg: string | undefined;
+		let key: TokenKey | undefined;
+		let kid: string | undefined;
 
 		if (token.resourceServer) {
 			if (token.resourceServer.jwt?.sign) {
@@ -37,8 +54,16 @@ async function getResourceServerConfig(token) {
 				if (!key) {
 					throw new Error('missing jwt.sign.key Resource Server configuration');
 				}
-				if (!(key instanceof crypto.KeyObject || key instanceof CryptoKey)) {
+				if (typeof key === 'string') {
+					key = crypto.createSecretKey(key, 'utf8');
+				} else if (ArrayBuffer.isView(key)) {
 					key = crypto.createSecretKey(key);
+				} else if (!(
+					key instanceof crypto.KeyObject || key instanceof CryptoKey
+				)) {
+					throw new Error(
+						'jwt.sign.key Resource Server configuration must be a secret (symmetric) key'
+					);
 				}
 				if (key.type !== 'secret') {
 					throw new Error(
@@ -46,14 +71,14 @@ async function getResourceServerConfig(token) {
 					);
 				}
 			} else {
-				[key] = keystore.selectForVerify({ alg, use: 'sig', kid });
-				if (!key) {
+				const [jwk] = keystore.selectForVerify({ alg, use: 'sig', kid });
+				if (!jwk) {
 					throw new Error(
 						"resolved Resource Server jwt configuration has no corresponding key in the provider's keystore"
 					);
 				}
-				kid = key.kid;
-				key = keystore.getKeyObject(key);
+				kid = jwk.kid;
+				key = keystore.getKeyObject(jwk);
 			}
 			if (kid !== undefined && typeof kid !== 'string') {
 				throw new Error('jwt.sign.kid must be a string when provided');
@@ -63,8 +88,7 @@ async function getResourceServerConfig(token) {
 	}
 
 	if (token.resourceServer?.jwt?.encrypt) {
-		const { alg, enc, kid } = token.resourceServer.jwt.encrypt;
-		let { key } = token.resourceServer.jwt.encrypt;
+		const { alg, enc, kid, key: configured } = token.resourceServer.jwt.encrypt;
 
 		if (!alg) {
 			throw new Error('missing jwt.encrypt.alg Resource Server configuration');
@@ -72,15 +96,26 @@ async function getResourceServerConfig(token) {
 		if (!enc) {
 			throw new Error('missing jwt.encrypt.enc Resource Server configuration');
 		}
-		if (!key) {
+		if (!configured) {
 			throw new Error('missing jwt.encrypt.key Resource Server configuration');
 		}
 
+		// Raw bytes are a symmetric key, which only the symmetric algorithms can use.
+		let key: crypto.KeyObject | CryptoKey;
 		if (
-			!(key instanceof crypto.KeyObject || key instanceof CryptoKey) &&
-			/^(A|dir$)/.test(alg)
+			configured instanceof crypto.KeyObject ||
+			configured instanceof CryptoKey
 		) {
-			key = crypto.createSecretKey(key);
+			key = configured;
+		} else if (/^(A|dir$)/.test(alg)) {
+			key =
+				typeof configured === 'string'
+					? crypto.createSecretKey(configured, 'utf8')
+					: crypto.createSecretKey(configured);
+		} else {
+			throw new Error(
+				'jwt.encrypt.key Resource Server configuration must be a key object for this algorithm'
+			);
 		}
 
 		if (key.type === 'private')
@@ -108,7 +143,7 @@ export const jwt = {
 	generateTokenId() {
 		return nanoid();
 	},
-	async getValueAndPayload(payload) {
+	async getValueAndPayload(this: BaseToken, payload: Record<string, unknown>) {
 		const {
 			aud,
 			jti,
@@ -120,7 +155,8 @@ export const jwt = {
 			jkt,
 			rar
 		} = payload;
-		let { accountId: sub } = payload;
+		let sub =
+			typeof payload.accountId === 'string' ? payload.accountId : undefined;
 
 		/*
 		 * The bucket recorded when this token was minted, not the one the current request is addressed
@@ -133,16 +169,28 @@ export const jwt = {
 		 * bare one such a token was minted with, so reading the absence that way is exact rather than a
 		 * fallback.
 		 */
-		const iss = issuerFor(await issuingBucket(payload.bucketId));
+		const iss = issuerFor(
+			await issuingBucket(
+				typeof payload.bucketId === 'string' ? payload.bucketId : undefined
+			)
+		);
 
 		if (sub) {
 			const { client } = this;
-			if (client?.clientId !== clientId) {
+			if (!client || client.clientId !== clientId) {
 				throw new TypeError('clientId and client mismatch');
 			}
 			if (client.subjectType === 'pairwise') {
 				sub = await pairwiseIdentifier(sub, client);
 			}
+		}
+
+		const cnf: Record<string, unknown> = {};
+		if (x5t) {
+			cnf['x5t#S256'] = x5t;
+		}
+		if (jkt) {
+			cnf.jkt = jkt;
 		}
 
 		const tokenPayload = {
@@ -155,20 +203,10 @@ export const jwt = {
 			client_id: clientId,
 			iss,
 			aud,
-			...(x5t || jkt ? { cnf: {} } : undefined)
+			...(x5t || jkt ? { cnf } : undefined)
 		};
 
-		if (x5t) {
-			tokenPayload.cnf['x5t#S256'] = x5t;
-		}
-		if (jkt) {
-			tokenPayload.cnf.jkt = jkt;
-		}
-
-		const structuredToken = {
-			header: undefined,
-			payload: tokenPayload
-		};
+		const structuredToken = { payload: tokenPayload };
 
 		if (!structuredToken.payload.aud) {
 			throw new Error(
@@ -185,7 +223,7 @@ export const jwt = {
 				config.sign.alg,
 				{
 					typ: 'at+jwt',
-					fields: { kid: config.sign.kid, ...structuredToken.header }
+					fields: { kid: config.sign.kid }
 				}
 			);
 
@@ -214,8 +252,7 @@ export const jwt = {
 					kid: config.encrypt.kid,
 					iss,
 					aud: structuredToken.payload.aud,
-					typ: 'at+jwt',
-					...structuredToken.header
+					typ: 'at+jwt'
 				},
 				enc: config.encrypt.enc,
 				alg: config.encrypt.alg

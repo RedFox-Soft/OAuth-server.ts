@@ -10,7 +10,7 @@ export const addons: Partial<AddonImplementations> = {
 		if (wl.includes('wl')) {
 			return {
 				scope: 'api:read api:write',
-				accessTokenFormat: format || 'opaque'
+				accessTokenFormat: format === 'jwt' ? 'jwt' : 'opaque'
 			};
 		}
 

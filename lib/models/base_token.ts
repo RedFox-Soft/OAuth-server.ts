@@ -1,10 +1,10 @@
-import { Type as t, type Static } from '@sinclair/typebox';
+import { Type as t, type Static, type TObject } from '@sinclair/typebox';
 import {
 	BaseModel,
 	BaseModelPayload,
-	type BaseModelPayloadType
+	type BaseModelPayloadType,
+	type ModelClass
 } from './base_model.js';
-import { ttl } from '../configs/liveTime.js';
 import { jwt } from './formats/jwt.js';
 import { Session } from './session.js';
 import { InvalidTarget } from 'lib/helpers/errors.js';
@@ -63,21 +63,35 @@ export type TokenInit<T> = Partial<T> & {
 	expiresIn?: number;
 };
 
+// Members only some tokens carry, read by the scope and resource accessors below.
+type GrantedPayload = { scope?: string; resource?: string | string[] };
+
+// A token class as its static finders use it.
+type TokenClass<A, T> = (new (payload: A) => T) &
+	Pick<
+		typeof BaseToken,
+		'adapter' | 'verify' | 'notFoundError' | 'isSessionBound'
+	>;
+
 export class BaseToken<
-	T extends BaseTokenPayloadType = BaseTokenPayloadType
+	T extends BaseTokenPayloadType & GrantedPayload = BaseTokenPayloadType
 > extends BaseModel<T> {
-	model = BaseTokenPayload;
-	#client;
+	model: TObject = BaseTokenPayload;
+	#client: Client | undefined;
 
-	#resourceServer;
+	#resourceServer: ResourceServer | undefined;
 
-	constructor({
-		client,
-		resourceServer,
-		expiresIn,
-		...rest
-	}: TokenInit<T> = {}) {
-		super(rest);
+	// Seconds this token is issued for: given at construction, or computed once from its lifetime.
+	expiresIn?: number;
+
+	constructor(init: TokenInit<T> = {}) {
+		// The payload is what init carries apart from the three members the constructor takes apart.
+		const payload: Partial<T> = { ...init };
+		for (const member of ['client', 'resourceServer', 'expiresIn']) {
+			Reflect.deleteProperty(payload, member);
+		}
+		super(payload);
+		const { client, resourceServer, expiresIn } = init;
 		if (typeof client !== 'undefined') {
 			this.client = client;
 		}
@@ -89,39 +103,38 @@ export class BaseToken<
 		}
 	}
 
-	set client(client) {
+	set client(client: Client) {
 		this.payload.clientId = client.clientId;
 		this.#client = client;
 	}
 
-	get client() {
+	get client(): Client | undefined {
 		return this.#client;
 	}
 
-	set resourceServer(resourceServer) {
+	set resourceServer(resourceServer: ResourceServer) {
 		this.setAudience(resourceServer.audience || resourceServer.identifier());
 		this.#resourceServer = resourceServer;
 	}
 
-	get resourceServer() {
+	get resourceServer(): ResourceServer | undefined {
 		return this.#resourceServer;
 	}
 
-	static expiresIn(token: unknown, client: unknown) {
-		if (this.name in ttl) {
-			return ttl[this.name](token, client);
-		}
+	stampsExpiryOnSave() {
+		return false;
 	}
 
 	async save() {
 		return super.save(this.remainingTTL);
 	}
 
-	get expiration() {
-		if (!this.expiresIn) {
-			this.expiresIn = this.constructor.expiresIn(this, this.#client);
-		}
-
+	/*
+	 * A token kind with a configured lifetime (lib/configs/liveTime.ts `ttl`) overrides this to compute
+	 * it; one without (registration and initial access tokens) lives as long as it was told to, or
+	 * does not expire.
+	 */
+	get expiration(): number | undefined {
 		return this.expiresIn;
 	}
 
@@ -158,13 +171,19 @@ export class BaseToken<
 	}
 
 	static isSessionBound = false;
+	// The model finder's own signature first, so the static side still extends BaseModel's.
 	static async tryFind<A extends BaseModelPayloadType, T extends BaseModel<A>>(
-		this: new (payload: A) => T,
+		this: ModelClass<A, T>,
 		value: string,
-		{ ignoreExpiration }?: { ignoreExpiration?: boolean | undefined }
+		options?: { ignoreExpiration?: boolean }
 	): Promise<T | undefined>;
 	static async tryFind<A extends BaseTokenPayloadType, T extends BaseToken<A>>(
-		this: new (payload: A) => T,
+		this: TokenClass<A, T>,
+		value: string,
+		options?: { ignoreExpiration?: boolean; ignoreSessionBinding?: boolean }
+	): Promise<T | undefined>;
+	static async tryFind<A extends BaseTokenPayloadType, T extends BaseToken<A>>(
+		this: TokenClass<A, T>,
 		value: string,
 		{ ignoreExpiration = false, ignoreSessionBinding = false } = {}
 	): Promise<T | undefined> {
@@ -203,7 +222,21 @@ export class BaseToken<
 	}
 
 	static async find<A extends BaseModelPayloadType, T extends BaseModel<A>>(
-		this: new (payload: A) => T,
+		this: ModelClass<A, T> & Pick<typeof BaseModel, 'tryFind'>,
+		value: string,
+		options?: { ignoreExpiration?: boolean; error?: Error }
+	): Promise<T>;
+	static async find<A extends BaseTokenPayloadType, T extends BaseToken<A>>(
+		this: TokenClass<A, T> & Pick<typeof BaseToken, 'tryFind'>,
+		value: string,
+		options?: {
+			ignoreExpiration?: boolean;
+			ignoreSessionBinding?: boolean;
+			error?: Error;
+		}
+	): Promise<T>;
+	static async find<A extends BaseTokenPayloadType, T extends BaseToken<A>>(
+		this: TokenClass<A, T> & Pick<typeof BaseToken, 'tryFind'>,
 		value: string,
 		options?: {
 			ignoreExpiration?: boolean;
@@ -237,6 +270,10 @@ export class BaseToken<
 		}
 		if (format !== 'jwt') {
 			throw new Error('invalid format resolved');
+		}
+		// Opaque always produces the payload; the JWT is built from it.
+		if (!result.payload) {
+			throw new Error('a token payload was not produced');
 		}
 		return jwt.getValueAndPayload.call(this, result.payload);
 	}

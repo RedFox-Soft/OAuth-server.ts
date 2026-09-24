@@ -1,6 +1,8 @@
 import { shouldChange, mustChange } from './_warn.ts';
 import * as errors from '../helpers/errors.ts';
 import type { Account, OIDCContext } from '../helpers/oidc_context.ts';
+import type { Client } from '../models/client.ts';
+import type { BackchannelAuthenticationRequest } from '../models/backchannel_authentication_request.ts';
 
 export async function processLoginHintToken(
 	_oidc: OIDCContext,
@@ -75,10 +77,10 @@ export async function validateRequestContext(
 
 export async function triggerAuthenticationDevice(
 	_oidc: OIDCContext,
-	_request,
-	_account,
-	_client
-) {
+	_request: BackchannelAuthenticationRequest,
+	_account: Account,
+	_client: Client
+): Promise<void> {
 	// @param oidc - the request context (OIDCContext)
 	// @param request - the BackchannelAuthenticationRequest instance
 	// @param account - the account object retrieved by findAccount

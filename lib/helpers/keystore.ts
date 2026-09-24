@@ -1,4 +1,27 @@
-const keyscore = (key, { alg, use }) => {
+import type { JWK } from 'jose';
+
+// What a signing or verification key is selected by: an algorithm, or a key type when no algorithm
+// is known yet. `use` is accepted and implied ('sig').
+type SignatureSelection = {
+	alg?: string;
+	kid?: string;
+	kty?: string | string[];
+	crv?: string;
+	use?: string;
+};
+
+// What an encryption or decryption key is selected by; `epk` is the sender's ephemeral key, if any.
+type EncryptionSelection = {
+	alg: string;
+	kid?: string;
+	kty?: string | string[];
+	epk?: { crv?: unknown };
+	use?: string;
+};
+
+type Scoring = { alg?: string; use?: string };
+
+const keyscore = (key: JWK, { alg, use }: Scoring) => {
 	let score = 0;
 
 	if (alg && key.alg) {
@@ -12,8 +35,8 @@ const keyscore = (key, { alg, use }) => {
 	return score;
 };
 
-const getKtyFromJWSAlg = (alg) => {
-	switch (alg.substring(0, 2)) {
+const getKtyFromJWSAlg = (alg: string | undefined): string => {
+	switch (alg?.substring(0, 2)) {
 		case 'RS':
 		case 'PS':
 			return 'RSA';
@@ -28,7 +51,7 @@ const getKtyFromJWSAlg = (alg) => {
 	}
 };
 
-const getCrvFromJWSAlg = (alg) => {
+const getCrvFromJWSAlg = (alg: string | undefined) => {
 	switch (alg) {
 		case 'ES256':
 			return 'P-256';
@@ -44,7 +67,10 @@ const getCrvFromJWSAlg = (alg) => {
 	}
 };
 
-const getKtyFromJWEAlg = (alg, epk) => {
+const getKtyFromJWEAlg = (
+	alg: string,
+	epk: EncryptionSelection['epk']
+): string | string[] => {
 	switch (alg[0]) {
 		case 'A':
 			return 'oct';
@@ -52,7 +78,9 @@ const getKtyFromJWEAlg = (alg, epk) => {
 			return 'RSA';
 		case 'E': {
 			if (epk) {
-				return epk.crv.startsWith('X') ? 'OKP' : 'EC';
+				return typeof epk.crv === 'string' && epk.crv.startsWith('X')
+					? 'OKP'
+					: 'EC';
 			}
 
 			return ['OKP', 'EC'];
@@ -62,24 +90,23 @@ const getKtyFromJWEAlg = (alg, epk) => {
 	}
 };
 
-function stripPrivate(jwk) {
+function stripPrivate(jwk: JWK): JWK {
 	const { d, p, q, dp, dq, qi, oth, ...pub } = jwk;
 	return pub;
 }
 
 class KeyStore {
-	#keys;
+	#keys: JWK[];
 
-	#cachedPub;
+	#cachedPub?: WeakMap<JWK, JWK>;
 
-	// Loosely typed on purpose: this store backs both the server's own keys and per-client key
-	// stores, whose members differ by key type (RSA/EC/OKP/oct). Without an annotation an empty
-	// default infers `never[]`, which makes every selector return `never`.
-	constructor(keys: Array<Record<string, any>> = []) {
+	// This store backs both the server's own keys and per-client key stores, whose members differ by
+	// key type (RSA/EC/OKP/oct); jose's JWK names every member any of them carries.
+	constructor(keys: JWK[] = []) {
 		this.#keys = keys;
 	}
 
-	#selectForDSA(options, operation) {
+	#selectForDSA(options: SignatureSelection, operation: 'sign' | 'verify') {
 		const {
 			alg,
 			kid,
@@ -91,7 +118,9 @@ class KeyStore {
 
 		return this.#filter((jwk) => {
 			let candidate =
-				typeof kty === 'string' ? jwk.kty === kty : kty.includes(jwk.kty);
+				typeof kty === 'string'
+					? jwk.kty === kty
+					: jwk.kty !== undefined && kty.includes(jwk.kty);
 
 			if (candidate && typeof kid === 'string') {
 				candidate = kid === jwk.kid;
@@ -117,22 +146,25 @@ class KeyStore {
 		}, scoring);
 	}
 
-	selectForVerify(options) {
+	selectForVerify(options: SignatureSelection) {
 		return this.#selectForDSA(options, 'verify');
 	}
 
-	selectForSign(options) {
+	selectForSign(options: SignatureSelection) {
 		return this.#selectForDSA(options, 'sign');
 	}
 
-	#selectForEncDec(options, operation) {
+	#selectForEncDec(
+		options: EncryptionSelection,
+		operation: 'encrypt' | 'decrypt'
+	) {
 		const { alg, kid, epk, kty = getKtyFromJWEAlg(alg, epk) } = options;
 
 		const scoring = { alg, use: 'enc' };
 
 		return this.#filter((jwk) => {
 			let candidate = Array.isArray(kty)
-				? kty.includes(jwk.kty)
+				? jwk.kty !== undefined && kty.includes(jwk.kty)
 				: jwk.kty === kty;
 
 			if (candidate && kid !== undefined) {
@@ -171,15 +203,15 @@ class KeyStore {
 		}, scoring);
 	}
 
-	selectForDecrypt(options) {
+	selectForDecrypt(options: EncryptionSelection) {
 		return this.#selectForEncDec(options, 'decrypt');
 	}
 
-	selectForEncrypt(options) {
+	selectForEncrypt(options: EncryptionSelection) {
 		return this.#selectForEncDec(options, 'encrypt');
 	}
 
-	#filter(selector, scoring) {
+	#filter(selector: (jwk: JWK) => boolean, scoring: Scoring) {
 		return this.#keys
 			.filter(selector)
 			.sort(
@@ -187,7 +219,7 @@ class KeyStore {
 			);
 	}
 
-	add(key) {
+	add(key: JWK) {
 		this.#keys.push(key);
 	}
 
@@ -195,7 +227,7 @@ class KeyStore {
 		this.#keys = [];
 	}
 
-	getKeyObject(input, getPublic = false) {
+	getKeyObject(input: JWK, getPublic = false): JWK {
 		if (input.kty === 'oct' || !input.d || !getPublic) {
 			return input;
 		}
@@ -206,7 +238,7 @@ class KeyStore {
 			this.#cachedPub.set(input, stripPrivate(input));
 		}
 
-		return this.#cachedPub.get(input);
+		return this.#cachedPub.get(input) ?? input;
 	}
 
 	*[Symbol.iterator]() {

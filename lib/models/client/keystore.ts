@@ -3,6 +3,8 @@ import { STATUS_CODES } from 'node:http';
 import { Type as t, type Static } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
 
+import type { JWK } from 'jose';
+
 import KeyStore from '../../helpers/keystore.ts';
 import epochTime from '../../helpers/epoch_time.ts';
 import certificateThumbprint from '../../helpers/certificate_thumbprint.ts';
@@ -116,7 +118,7 @@ export class ClientKeyStore extends KeyStore {
 		jwksUri,
 		thumbprintCertificates = false
 	}: {
-		keys?: Array<Record<string, unknown>>;
+		keys?: JWK[];
 		jwksUri?: string;
 		thumbprintCertificates?: boolean;
 	}) {
@@ -140,7 +142,7 @@ export class ClientKeyStore extends KeyStore {
 	 * Annotates a copy. The key it is handed may be a member of the client's own key set, which is
 	 * shared by every request using that client and must not change under them.
 	 */
-	add(key) {
+	add(key: JWK) {
 		if (
 			this.#thumbprintCertificates &&
 			Array.isArray(key.x5c) &&
@@ -153,11 +155,13 @@ export class ClientKeyStore extends KeyStore {
 	}
 
 	async refresh() {
-		if (this.fresh()) return;
+		// fresh() already answers true for a key set with no jwks_uri; naming it here types the fetch.
+		const { jwksUri } = this;
+		if (!jwksUri || this.fresh()) return;
 
 		if (!this.lock) {
 			this.lock = (async () => {
-				const response = await fetch(new URL(this.jwksUri).href, {
+				const response = await fetch(new URL(jwksUri).href, {
 					method: 'GET',
 					headers: {
 						Accept: 'application/json'
@@ -170,14 +174,13 @@ export class ClientKeyStore extends KeyStore {
 				// min refetch in 60 seconds unless cache headers say a longer response ttl
 				const freshUntil = [epochTime() + 60];
 
-				if (headers.has('expires')) {
-					freshUntil.push(epochTime(Date.parse(headers.get('expires'))));
+				const expires = headers.get('expires');
+				if (expires) {
+					freshUntil.push(epochTime(Date.parse(expires)));
 				}
 
-				if (
-					headers.has('cache-control') &&
-					/max-age=(\d+)/.test(headers.get('cache-control'))
-				) {
+				const cacheControl = headers.get('cache-control');
+				if (cacheControl && /max-age=(\d+)/.test(cacheControl)) {
 					const maxAge = parseInt(RegExp.$1, 10);
 					freshUntil.push(epochTime() + maxAge);
 				}

@@ -6,6 +6,10 @@ import { TemporarilyUnavailable } from '../helpers/errors.ts';
 import { sectorIdentifier } from '../models/client/sector.ts';
 import { grantTypeAllowed } from '../models/client/checks.ts';
 import type { OIDCContext } from '../helpers/oidc_context.ts';
+import type { Client } from '../models/client.ts';
+
+// The artifact a session or refresh-token decision is made for: all these defaults read is its scopes.
+type ScopedArtifact = { readonly scopes: Set<string> };
 
 export function idFactory(_oidc: OIDCContext) {
 	return nanoid();
@@ -17,13 +21,20 @@ export async function secretFactory(_oidc: OIDCContext) {
 
 // Decides whether the given artifact is bound to the end-user session; the
 // default binds everything except offline_access grants so they survive logout.
-export async function expiresWithSession(_oidc: OIDCContext, code) {
+export async function expiresWithSession(
+	_oidc: OIDCContext,
+	code: ScopedArtifact
+) {
 	return !code.scopes.has('offline_access');
 }
 
 // Decides whether a refresh token is issued for this exchange (grant advertisement
 // is a separate concern owned by ApplicationConfig['refreshToken.enabled']).
-export async function issueRefreshToken(_oidc: OIDCContext, client, code) {
+export async function issueRefreshToken(
+	_oidc: OIDCContext,
+	client: Client,
+	code: ScopedArtifact
+) {
 	return (
 		grantTypeAllowed(client, 'refresh_token') &&
 		code.scopes.has('offline_access')
@@ -45,7 +56,7 @@ export async function issueRefreshToken(_oidc: OIDCContext, client, code) {
  * ID token, userinfo, introspection, interaction prompts and back-channel logout all reach the
  * derivation through this one function.
  */
-export async function pairwiseIdentifier(accountId, client) {
+export async function pairwiseIdentifier(accountId: string, client: Client) {
 	const salt = pairwiseSalt();
 
 	if (salt === null) {
@@ -62,9 +73,15 @@ export async function pairwiseIdentifier(accountId, client) {
 		);
 	}
 
+	// Every pairwise client has one: its sector_identifier_uri host, or its single redirect host.
+	const sector = sectorIdentifier(client);
+	if (sector === undefined) {
+		throw new Error(`client ${client.clientId} has no sector identifier`);
+	}
+
 	return crypto
 		.createHash('sha256')
-		.update(sectorIdentifier(client))
+		.update(sector)
 		.update(accountId)
 		.update(salt)
 		.digest('hex');
@@ -73,7 +90,8 @@ export async function pairwiseIdentifier(accountId, client) {
 // Decides if and how a refresh token is rotated after use. Returns a Boolean;
 // the default rotates public-client and near-expiry tokens (capped at ~1 year).
 export function rotateRefreshToken(oidc: OIDCContext) {
-	const { RefreshToken: refreshToken, Client: client } = oidc.entities;
+	const refreshToken = oidc.require('RefreshToken');
+	const client = oidc.require('Client');
 
 	// cap the maximum amount of time a refresh token can be
 	// rotated for up to 1 year, afterwards its TTL is final

@@ -2,6 +2,7 @@ import { Type as t, type Static } from '@sinclair/typebox';
 import { BaseToken, BaseTokenPayload } from './base_token.js';
 import consent from 'lib/helpers/interaction_policy/prompts/consent.js';
 import { canonicalKey, canonicalKeySet } from 'lib/helpers/rar_canonical.js';
+import { ttl } from '../configs/liveTime.js';
 
 const NON_REJECTABLE_CLAIMS = new Set([
 	'sub',
@@ -42,6 +43,10 @@ export type GrantPayloadType = Static<typeof GrantPayload>;
 
 export class Grant extends BaseToken<GrantPayloadType> {
 	model = GrantPayload;
+
+	get expiration(): number {
+		return (this.expiresIn ||= ttl.Grant(this, this.client));
+	}
 
 	constructor(payload: Partial<GrantPayloadType> = {}) {
 		super(payload);

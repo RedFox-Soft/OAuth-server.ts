@@ -31,9 +31,11 @@ describe('features.resourceIndicators defaults', () => {
 			bucket: DEFAULT_REQUEST_BUCKET
 		});
 		expect(
+			// @ts-expect-error the default never reads the client, so none is given
 			await resourceIndicators.defaultResource(oidc, undefined, undefined)
 		).toBeUndefined();
 		expect(
+			// @ts-expect-error the default never reads the client, so none is given
 			await resourceIndicators.defaultResource(oidc, undefined, [
 				'urn:example:rs'
 			])

@@ -43,15 +43,15 @@ export const clockTolerance = 10;
  * will have their TTL refreshed (via rotation).
  */
 export const ttl = {
-	AccessToken(token: AccessToken, _client: Client) {
+	AccessToken(token: AccessToken, _client: Client | undefined) {
 		return token.resourceServer?.accessTokenTTL || 60 * 60; // 1 hour in seconds
 	},
-	AuthorizationCode(_code: AuthorizationCode, _client: Client) {
+	AuthorizationCode(_code: AuthorizationCode, _client: Client | undefined) {
 		return 60; // 1 minute in seconds
 	},
 	BackchannelAuthenticationRequest(
 		request: BackchannelAuthenticationRequest,
-		_client: Client
+		_client: Client | undefined
 	) {
 		const { params } = request.payload;
 		const requestedExpiry = isPlainObject(params)
@@ -67,19 +67,19 @@ export const ttl = {
 
 		return 10 * 60; // 10 minutes in seconds
 	},
-	ClientCredentials(token: ClientCredentials, _client: Client) {
+	ClientCredentials(token: ClientCredentials, _client: Client | undefined) {
 		return token.resourceServer?.accessTokenTTL || 10 * 60; // 10 minutes in seconds
 	},
-	DeviceCode(_deviceCode: DeviceCode, _client: Client) {
+	DeviceCode(_deviceCode: DeviceCode, _client: Client | undefined) {
 		return 10 * 60; // 10 minutes in seconds
 	},
-	Grant(_grant: Grant, _client: Client) {
+	Grant(_grant: Grant, _client: Client | undefined) {
 		return 14 * 24 * 60 * 60; // 14 days in seconds
 	},
-	IdToken(_token: IdToken, _client: Client) {
+	IdToken(_token: IdToken, _client: Client | undefined) {
 		return 60 * 60; // 1 hour in seconds
 	},
-	RefreshToken(token: RefreshToken, client: Client) {
+	RefreshToken(token: RefreshToken, client: Client | undefined) {
 		const lifetime = 14 * 24 * 60 * 60; // 14 days in seconds
 		/*
 		 * A browser application's chain ends when its first token would have: rotation carries the
@@ -93,7 +93,7 @@ export const ttl = {
 		 */
 		if (
 			(token.payload.rotations ?? 0) >= 1 &&
-			client.applicationType === 'web' &&
+			client?.applicationType === 'web' &&
 			client.tokenEndpointAuthMethod === 'none' &&
 			!token.isSenderConstrained()
 		) {

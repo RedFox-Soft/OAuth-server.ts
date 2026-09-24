@@ -1,10 +1,12 @@
 import { shouldChange } from './_warn.ts';
 import type { OIDCContext } from '../helpers/oidc_context.ts';
+import type { Client } from '../models/client.ts';
 
 export async function introspectionAllowedPolicy(
 	oidc: OIDCContext,
-	client,
-	token
+	client: Client,
+	// The token being introspected; all the default reads is whose it is.
+	token: { payload: { clientId?: string } }
 ) {
 	shouldChange(
 		'features.introspection.allowedPolicy',

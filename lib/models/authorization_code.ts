@@ -6,6 +6,7 @@ import {
 } from './base_token.js';
 import consumable, { ConsumedPayload } from './mixins/consumable.js';
 import { authPayloadModel } from './mixins/stores_auth.js';
+import { ttl } from '../configs/liveTime.js';
 
 export const AuthorizationCodePayload = t.Object({
 	...BaseTokenPayload.properties,
@@ -30,4 +31,8 @@ export class AuthorizationCode extends consumable(
 	};
 	model = AuthorizationCodePayload;
 	static isSessionBound = true;
+
+	get expiration(): number {
+		return (this.expiresIn ||= ttl.AuthorizationCode(this, this.client));
+	}
 }

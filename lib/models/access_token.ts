@@ -6,6 +6,7 @@ import {
 	SessionBoundPayload,
 	AudiencePayload
 } from './base_token.js';
+import { ttl } from '../configs/liveTime.js';
 
 export const AccessTokenPayload = t.Object({
 	...BaseTokenPayload.properties,
@@ -26,4 +27,8 @@ export class AccessToken extends constrained<AccessTokenPayloadType>(
 ) {
 	model = AccessTokenPayload;
 	static isSessionBound = true;
+
+	get expiration(): number {
+		return (this.expiresIn ||= ttl.AccessToken(this, this.client));
+	}
 }

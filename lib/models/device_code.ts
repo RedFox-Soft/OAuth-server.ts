@@ -8,6 +8,7 @@ import {
 
 import consumable, { ConsumedPayload } from './mixins/consumable.ts';
 import { authPayloadModel } from './mixins/stores_auth.js';
+import { ttl } from '../configs/liveTime.js';
 
 export const DeviceCodePayload = t.Object({
 	...BaseTokenPayload.properties,
@@ -26,6 +27,10 @@ export type DeviceCodePayloadType = Static<typeof DeviceCodePayload>;
 export class DeviceCode extends consumable(BaseToken<DeviceCodePayloadType>) {
 	declare payload: Omit<DeviceCodePayloadType, 'kind'> & { kind: string };
 	model = DeviceCodePayload;
+
+	get expiration(): number {
+		return (this.expiresIn ||= ttl.DeviceCode(this, this.client));
+	}
 
 	static async findByUserCode(
 		userCode: string,

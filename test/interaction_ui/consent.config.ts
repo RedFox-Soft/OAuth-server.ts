@@ -26,9 +26,9 @@ export const addons: Partial<AddonImplementations> = {
 	 * invalid_target before the consent prompt is ever reached (the same reason rar.config.ts has one).
 	 * An array when defaulting for an authorization request; a single value when `oneOf` is supplied.
 	 */
-	defaultResource(oidc: unknown, client: unknown, oneOf?: string[]) {
+	defaultResource(_oidc, _client, oneOf) {
 		if (oneOf) {
-			return oneOf[0];
+			return Array.isArray(oneOf) ? oneOf[0] : oneOf;
 		}
 		return [RESOURCE];
 	}

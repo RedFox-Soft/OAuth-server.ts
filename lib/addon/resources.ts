@@ -4,8 +4,17 @@ import { MCP_RESOURCE_SERVER, isMcpResource } from '../mcp/resource_server.js';
 import { resolveDeclaredResource } from '../resources/registry.js';
 import type { OIDCContext } from '../helpers/oidc_context.ts';
 import type { ResourceServerInfo } from '../helpers/resource_server.ts';
+import type { Client } from '../models/client.ts';
+import type { AuthorizationCode } from '../models/authorization_code.ts';
+import type { BackchannelAuthenticationRequest } from '../models/backchannel_authentication_request.ts';
+import type { DeviceCode } from '../models/device_code.ts';
+import type { RefreshToken } from '../models/refresh_token.ts';
 
-export async function defaultResource(_oidc: OIDCContext, client, oneOf) {
+export async function defaultResource(
+	_oidc: OIDCContext,
+	_client: Client,
+	oneOf?: string | string[]
+): Promise<string | string[] | undefined> {
 	// @param oidc - the request context (OIDCContext)
 	// @param client - client making the request
 	// @param oneOf {string[]} - The authorization server needs to select **one** of the values provided.
@@ -17,7 +26,14 @@ export async function defaultResource(_oidc: OIDCContext, client, oneOf) {
 	return undefined;
 }
 
-export async function useGrantedResource(_oidc: OIDCContext, _model) {
+export async function useGrantedResource(
+	_oidc: OIDCContext,
+	_model:
+		| AuthorizationCode
+		| BackchannelAuthenticationRequest
+		| RefreshToken
+		| DeviceCode
+) {
 	// @param oidc - the request context (OIDCContext)
 	// @param model - depending on the request's grant_type this can be either an AuthorizationCode, BackchannelAuthenticationRequest,
 	//                RefreshToken, or DeviceCode model instance.
@@ -26,8 +42,8 @@ export async function useGrantedResource(_oidc: OIDCContext, _model) {
 
 export async function getResourceServerInfo(
 	_oidc: OIDCContext,
-	resourceIndicator,
-	_client
+	resourceIndicator: string,
+	_client: Client
 ): Promise<ResourceServerInfo> {
 	// @param oidc - the request context (OIDCContext)
 	// @param resourceIndicator - resource indicator value either requested or resolved by the defaultResource helper.

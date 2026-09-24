@@ -36,7 +36,7 @@ export class Claims {
 		merge(this.filter, value);
 	}
 
-	rejected(value = []) {
+	rejected(value: readonly string[] = []) {
 		value.forEach((claim) => {
 			delete this.filter[claim];
 		});
@@ -69,6 +69,10 @@ export class Claims {
 		}
 
 		if (this.client.subjectType === 'pairwise' && claims.sub) {
+			// Refused rather than passed through: a subject left as it is would reach a pairwise client.
+			if (typeof claims.sub !== 'string') {
+				throw new TypeError('an account subject must be a string');
+			}
 			claims.sub = await pairwiseIdentifier(claims.sub, this.client);
 		}
 

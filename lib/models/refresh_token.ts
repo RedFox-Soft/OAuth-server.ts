@@ -10,6 +10,7 @@ import {
 import consumable, { ConsumedPayload } from './mixins/consumable.js';
 import constrained from './mixins/is_sender_constrained.js';
 import { authPayloadModel } from './mixins/stores_auth.js';
+import { ttl } from '../configs/liveTime.js';
 
 export const RefreshTokenSchema = t.Object({
 	...BaseTokenPayload.properties,
@@ -32,6 +33,10 @@ export class RefreshToken extends consumable(
 	declare payload: Omit<RefreshTokenPayload, 'kind'> & { kind: string };
 	model = RefreshTokenSchema;
 	static isSessionBound = true;
+
+	get expiration(): number {
+		return (this.expiresIn ||= ttl.RefreshToken(this, this.client));
+	}
 
 	constructor(payload: TokenInit<RefreshTokenPayload>) {
 		super(payload);

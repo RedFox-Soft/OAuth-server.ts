@@ -34,7 +34,7 @@ export const findAccount: typeof accountMod.findAccount = async (...args) =>
 export const expiresWithSession: typeof tokensMod.expiresWithSession = async (
 	...args
 ) => resolve('expiresWithSession', tokensMod.expiresWithSession)(...args);
-export const issueRefreshToken: typeof tokensMod.issueRefreshToken = (
+export const issueRefreshToken: typeof tokensMod.issueRefreshToken = async (
 	...args
 ) => resolve('issueRefreshToken', tokensMod.issueRefreshToken)(...args);
 export const pairwiseIdentifier: typeof tokensMod.pairwiseIdentifier = async (
@@ -47,8 +47,9 @@ export const idFactory: typeof tokensMod.idFactory = (...args) =>
 	resolve('idFactory', tokensMod.idFactory)(...args);
 export const secretFactory: typeof tokensMod.secretFactory = async (...args) =>
 	resolve('secretFactory', tokensMod.secretFactory)(...args);
-export const defaultResource: typeof resourcesMod.defaultResource = (...args) =>
-	resolve('defaultResource', resourcesMod.defaultResource)(...args);
+export const defaultResource: typeof resourcesMod.defaultResource = async (
+	...args
+) => resolve('defaultResource', resourcesMod.defaultResource)(...args);
 export const useGrantedResource: typeof resourcesMod.useGrantedResource =
 	async (...args) =>
 		resolve('useGrantedResource', resourcesMod.useGrantedResource)(...args);

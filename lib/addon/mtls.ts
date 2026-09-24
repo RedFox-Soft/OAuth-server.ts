@@ -32,8 +32,8 @@ export function certificateAuthorized(_oidc: OIDCContext) {
 
 export function certificateSubjectMatches(
 	_oidc: OIDCContext,
-	_property,
-	_expected
+	_property: string,
+	_expected: string
 ) {
 	mustChange(
 		'features.mTLS.certificateSubjectMatches',

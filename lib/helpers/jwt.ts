@@ -12,9 +12,21 @@ import { Type as t, type Static } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
 import * as base64url from './base64url.ts';
 import epochTime from './epoch_time.ts';
+import { isPlainObject } from './_/object.ts';
+import type KeyStore from './keystore.ts';
+
+/*
+ * A key set to verify or decrypt with: this server's own, or a client's, which can say whether it is
+ * fresh and refresh itself from the client's jwks_uri.
+ */
+export type KeySet = KeyStore & {
+	fresh?(): boolean;
+	refresh?(): Promise<void>;
+};
 
 const {
 	JWEDecryptionFailed,
+	JWEInvalid,
 	JWKSNoMatchingKey,
 	JWSSignatureVerificationFailed
 } = errors;
@@ -151,7 +163,7 @@ export function assertPayload(
 
 export async function verify(
 	jwt: string,
-	keystore,
+	keystore: KeySet,
 	options: {
 		algorithm?: string;
 		clockTolerance?: number;
@@ -188,7 +200,7 @@ export async function verify(
 			throw new JWSSignatureVerificationFailed();
 		}
 	} catch (err) {
-		if (typeof keystore.fresh !== 'function' || keystore.fresh()) {
+		if (!keystore.fresh || !keystore.refresh || keystore.fresh()) {
 			throw err;
 		}
 
@@ -202,7 +214,15 @@ export async function verify(
 	return { payload, header: protectedHeader };
 }
 
-export async function encrypt(cleartext, key, { enc, alg, fields } = {}) {
+export async function encrypt(
+	cleartext: string,
+	key: Parameters<CompactEncrypt['encrypt']>[0],
+	{
+		enc,
+		alg,
+		fields
+	}: { enc: string; alg: string; fields?: Record<string, unknown> }
+) {
 	const protectedHeader = {
 		alg,
 		enc,
@@ -214,14 +234,18 @@ export async function encrypt(cleartext, key, { enc, alg, fields } = {}) {
 		.encrypt(key);
 }
 
-export async function decrypt(jwe, keystore) {
+export async function decrypt(jwe: string, keystore: KeySet) {
 	const protectedHeader = decodeProtectedHeader(jwe);
+	const alg =
+		protectedHeader.alg === 'dir' ? protectedHeader.enc : protectedHeader.alg;
+	if (!alg) {
+		throw new JWEInvalid('JWE Protected Header must carry alg and enc');
+	}
 
 	const keys = keystore.selectForDecrypt({
-		alg:
-			protectedHeader.alg === 'dir' ? protectedHeader.enc : protectedHeader.alg,
+		alg,
 		kid: protectedHeader.kid,
-		epk: protectedHeader.epk
+		epk: isPlainObject(protectedHeader.epk) ? protectedHeader.epk : undefined
 	});
 	let decrypted;
 	if (keys.length === 0) {

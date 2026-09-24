@@ -6,6 +6,7 @@ import {
 } from './base_token.js';
 import consumable, { ConsumedPayload } from './mixins/consumable.ts';
 import { authPayloadModel } from './mixins/stores_auth.js';
+import { ttl } from '../configs/liveTime.js';
 
 export const BackchannelAuthenticationRequestPayload = t.Object({
 	...BaseTokenPayload.properties,
@@ -28,4 +29,11 @@ export class BackchannelAuthenticationRequest extends consumable(
 	};
 	model = BackchannelAuthenticationRequestPayload;
 	static isSessionBound = true;
+
+	get expiration(): number {
+		return (this.expiresIn ||= ttl.BackchannelAuthenticationRequest(
+			this,
+			this.client
+		));
+	}
 }

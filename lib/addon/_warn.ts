@@ -1,8 +1,8 @@
 import * as attention from '../helpers/attention.ts';
 
-const warned = new Set();
+const warned = new Set<string>();
 
-export function shouldChange(name, msg) {
+export function shouldChange(name: string, msg: string) {
 	if (!warned.has(name)) {
 		warned.add(name);
 		attention.info(
@@ -11,7 +11,7 @@ export function shouldChange(name, msg) {
 	}
 }
 
-export function mustChange(name, msg) {
+export function mustChange(name: string, msg: string) {
 	if (!warned.has(name)) {
 		warned.add(name);
 		attention.warn(

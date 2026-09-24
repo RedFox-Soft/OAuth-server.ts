@@ -4,7 +4,7 @@ title: "A browser application's refresh-token chain is bounded by its first life
 tags: [contract, gotcha, oauth]
 sources: [oauth-server-codebase]
 created: 2026-09-23
-updated: 2026-09-23
+updated: 2026-09-24
 ---
 
 # A browser application's refresh-token chain is bounded by its first lifetime
@@ -29,8 +29,10 @@ minted and its client:
 - `payload.rotations` — incremented by every rotation (`lib/models/refresh_token.ts:20`).
 
 A rotated token (`rotations >= 1`) of such a client lives `iiat + lifetime − now`, floored at one
-second. The floor is not cosmetic: `BaseToken#expiration` treats a falsy `expiresIn` as "not computed
-yet", so a zero would be recomputed rather than honoured.
+second. The floor is not cosmetic: `RefreshToken#expiration` treats a falsy `expiresIn` as "not computed
+yet", so a zero would be recomputed rather than honoured. (Since 2026-09-24 each token kind with a
+configured lifetime names its own `ttl` function in that getter; it used to be one `BaseToken` getter
+dispatching on the class name.)
 
 It is decided from the record, not from the request, because a lifetime is computed lazily — the
 first time `expiration` is read — and that is not guaranteed to be inside a request. Every lifetime

@@ -1,6 +1,7 @@
 import { Type as t, type Static } from '@sinclair/typebox';
 import constrained from './mixins/is_sender_constrained.js';
 import { BaseToken, BaseTokenPayload, AudiencePayload } from './base_token.js';
+import { ttl } from '../configs/liveTime.js';
 
 export const ClientCredentialsPayload = t.Object({
 	...BaseTokenPayload.properties,
@@ -16,4 +17,8 @@ export class ClientCredentials extends constrained(
 	BaseToken<ClientCredentialsPayload>
 ) {
 	model = ClientCredentialsPayload;
+
+	get expiration(): number {
+		return (this.expiresIn ||= ttl.ClientCredentials(this, this.client));
+	}
 }

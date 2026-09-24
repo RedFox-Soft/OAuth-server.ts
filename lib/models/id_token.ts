@@ -94,8 +94,10 @@ export class IdToken {
 		let alg;
 
 		const payload = await this.payload();
-		let signOptions;
-		let encryption;
+		// A payload's `sub` becomes the token's subject; a non-string one is left for sign() to keep.
+		const subject = typeof payload.sub === 'string' ? payload.sub : undefined;
+		let signOptions: NonNullable<Parameters<typeof JWT.sign>[3]> = {};
+		let encryption: { alg?: string; enc?: string } = {};
 
 		switch (use) {
 			case 'idtoken':
@@ -104,7 +106,7 @@ export class IdToken {
 					audience: client.clientId,
 					expiresIn: expiresIn || ttl.IdToken(this, client),
 					issuer: this.issuer,
-					subject: payload.sub
+					subject
 				};
 				encryption = {
 					alg: client.idTokenEncryptedResponseAlg,
@@ -116,7 +118,7 @@ export class IdToken {
 				signOptions = {
 					audience: client.clientId,
 					issuer: this.issuer,
-					subject: payload.sub,
+					subject,
 					typ: 'logout+jwt',
 					expiresIn: 120
 				};
@@ -130,7 +132,7 @@ export class IdToken {
 				signOptions = {
 					audience: client.clientId,
 					issuer: this.issuer,
-					subject: payload.sub,
+					subject,
 					expiresIn
 				};
 				encryption = {
@@ -195,6 +197,11 @@ export class IdToken {
 
 		if (!encryption.enc) {
 			return signed;
+		}
+		// Client validation refuses an `enc` registered without its `alg`, so this cannot happen for a
+		// validated client; it is refused rather than answered unencrypted.
+		if (!encryption.alg) {
+			throw new InvalidClientMetadata('an encrypted response needs its alg');
 		}
 
 		if (/^(A|dir$)/.test(encryption.alg)) {

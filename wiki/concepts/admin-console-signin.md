@@ -4,7 +4,7 @@ title: 'Admin console sign-in'
 tags: [architecture, contract, gotcha, oidc]
 sources: [oauth-server-codebase]
 created: 2026-08-04
-updated: 2026-08-27
+updated: 2026-09-24
 graph:
   node_type: concept
 ---
@@ -154,6 +154,11 @@ signature to anonymous object types only, never to interfaces. The key plumbing 
 `exportJWK`'s value directly forced every consumer to cast. The fix belongs at that single boundary
 (`return { ...jwk, alg }`), not at each call site: convert where a third-party type meets this
 repository's vocabulary, once.
+
+> **Superseded in part (2026-09-24).** `KeyStore` (`lib/helpers/keystore.ts`) now holds jose's `JWK`
+> itself rather than `Record<string, any>`, and in jose 6.2.12 `JWK` is a type alias, not an interface.
+> The rule about converting once at a boundary still stands for the `Record`-shaped plumbing that remains
+> (`seedJwks`' parameter).
 
 ## Related
 
