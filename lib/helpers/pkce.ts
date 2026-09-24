@@ -10,7 +10,7 @@ export function authorizationPKCE(oidc: {
 		code_challenge_method?: string | undefined;
 		response_type?: string;
 	};
-	client?: { tokenEndpointAuthMethod?: string } | undefined;
+	entities: { Client?: { tokenEndpointAuthMethod?: string } };
 }) {
 	const params = oidc.params;
 

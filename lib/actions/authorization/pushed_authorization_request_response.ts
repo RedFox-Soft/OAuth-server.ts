@@ -1,4 +1,5 @@
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
+import type { PipelineParams } from 'lib/consts/param_list.js';
 import { UnsecuredJWT } from 'jose';
 
 import { PUSHED_REQUEST_URN } from '../../consts/index.ts';
@@ -12,7 +13,7 @@ import { eventBus } from 'lib/event_bus.ts';
 const MAX_TTL = 60;
 
 export default async function pushedAuthorizationRequestResponse(
-	oidc: OIDCContext,
+	oidc: OIDCContext<PipelineParams>,
 	requestBody?: string
 ) {
 	let ttl: number;

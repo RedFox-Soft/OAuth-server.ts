@@ -1,8 +1,11 @@
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
+import type { PipelineParams } from 'lib/consts/param_list.js';
 import { BackchannelAuthenticationRequest } from '../../models/backchannel_authentication_request.js';
 import { triggerAuthenticationDevice } from '../../addon/index.js';
 
-export default async function backchannelRequestResponse(oidc: OIDCContext) {
+export default async function backchannelRequestResponse(
+	oidc: OIDCContext<PipelineParams>
+) {
 	const request = new BackchannelAuthenticationRequest({
 		/* The address the request was made to. */
 		bucketId: oidc.bucket._id,

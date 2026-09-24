@@ -20,7 +20,10 @@ import type { OIDCContext } from 'lib/helpers/oidc_context.js';
  * The Grant record itself survives, deliberately: the grant is the consent, and revoking a token is not
  * withdrawing consent. Only a principal cascade (lib/helpers/cascade.ts) destroys grant rows.
  */
-export default async function revoke(grantId: string, oidc?: OIDCContext) {
+export default async function revoke(
+	grantId: string,
+	oidc?: OIDCContext<Record<string, unknown>>
+) {
 	await Promise.all([
 		AccessToken.revokeByGrantId(grantId),
 		RefreshToken.revokeByGrantId(grantId),

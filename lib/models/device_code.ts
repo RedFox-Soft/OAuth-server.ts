@@ -24,6 +24,7 @@ export const DeviceCodePayload = t.Object({
 export type DeviceCodePayloadType = Static<typeof DeviceCodePayload>;
 
 export class DeviceCode extends consumable(BaseToken) {
+	declare payload: Omit<DeviceCodePayloadType, 'kind'> & { kind: string };
 	model = DeviceCodePayload;
 
 	static async findByUserCode(

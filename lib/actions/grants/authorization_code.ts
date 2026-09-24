@@ -1,4 +1,5 @@
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
+import type { TokenParams } from 'lib/actions/token.js';
 import { InvalidGrant } from '../../helpers/errors.ts';
 import presence from '../../helpers/validate_presence.ts';
 import { findAccount } from '../../addon/account.js';
@@ -25,7 +26,7 @@ import { markRegistrationUsed } from '../../models/client/dynamic_registration.j
 const gty = 'authorization_code';
 
 export const handler = async function authorizationCodeHandler(
-	oidc: OIDCContext,
+	oidc: OIDCContext<TokenParams>,
 	dPoP
 ) {
 	if (

@@ -1,9 +1,10 @@
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
+import type { PipelineParams } from 'lib/consts/param_list.js';
 /*
  * assign max_age and acr_values if it is not provided explictly but is configured with default
  * values on the client
  */
-export default function assignDefaults(oidc: OIDCContext) {
+export default function assignDefaults(oidc: OIDCContext<PipelineParams>) {
 	const { params, client } = oidc;
 
 	if (!params.acr_values && client.defaultAcrValues) {

@@ -1,4 +1,5 @@
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
+import type { PipelineParams } from 'lib/consts/param_list.js';
 import upperFirst from '../../helpers/_/upper_first.ts';
 import camelCase from '../../helpers/_/camel_case.ts';
 import * as errors from '../../helpers/errors.ts';
@@ -38,7 +39,7 @@ export const expiredInteractionCookie = (uid: string) => ({
 	expires: new Date(0)
 });
 
-export default async function interactions(oidc: OIDCContext) {
+export default async function interactions(oidc: OIDCContext<PipelineParams>) {
 	const client = oidc.client;
 	let failedCheck;
 	let prompt;

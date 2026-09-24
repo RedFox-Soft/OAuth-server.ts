@@ -1,4 +1,5 @@
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
+import type { PipelineParams } from 'lib/consts/param_list.js';
 import {
 	InvalidRequest,
 	InvalidRequestUri,
@@ -11,7 +12,7 @@ import { PushedAuthorizationRequest } from 'lib/models/pushed_authorization_requ
  * Validates request_uri is a PAR one when PAR is enabled and loads it. Throws
  */
 export default async function loadPushedAuthorizationRequest(
-	oidc: OIDCContext
+	oidc: OIDCContext<PipelineParams>
 ) {
 	const { client, params } = oidc;
 

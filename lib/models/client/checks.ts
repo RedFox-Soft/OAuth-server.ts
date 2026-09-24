@@ -14,7 +14,7 @@ export function responseTypeAllowed(
 
 export function responseModeAllowed(
 	client: Pick<Client, 'responseModes'>,
-	responseMode: string
+	responseMode: string | undefined
 ): boolean {
 	return (
 		client.responseModes?.some((registered) => registered === responseMode) !==

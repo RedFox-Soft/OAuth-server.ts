@@ -1,4 +1,5 @@
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
+import type { PipelineParams } from 'lib/consts/param_list.js';
 import nanoid from '../../helpers/nanoid.js';
 import epochTime from '../../helpers/epoch_time.js';
 import { ISSUER } from 'lib/configs/env.js';
@@ -6,7 +7,10 @@ import { logout } from 'lib/html/logout.js';
 import { SessionNotFound } from '../../helpers/errors.js';
 import { resolveBucketForRequest } from '../../admin/auth/resolveBucket.js';
 
-export default async function resumeAction(oidc: OIDCContext, interaction) {
+export default async function resumeAction(
+	oidc: OIDCContext<PipelineParams>,
+	interaction
+) {
 	oidc.entity('Interaction', interaction);
 
 	const {
@@ -62,7 +66,8 @@ export default async function resumeAction(oidc: OIDCContext, interaction) {
 		}
 
 		const secret = nanoid();
-		session.state = {
+		// On the payload: only payload keys are stored, and the sign-out confirmation reads it from there.
+		session.payload.state = {
 			secret,
 			clientId: storedParams.client_id,
 			postLogoutRedirectUri: `${ISSUER}/ui/${interaction.uid}/resume`
@@ -73,7 +78,8 @@ export default async function resumeAction(oidc: OIDCContext, interaction) {
 
 	await interaction.destroy();
 
-	oidc.params = storedParams;
+	// Stored by this pipeline after validation; re-validating would add a refusal the server does not make.
+	oidc.params = storedParams as PipelineParams;
 	oidc.trusted = trusted;
 	oidc.redirectUriCheckPerformed = true;
 

@@ -27,6 +27,7 @@ import checkClient from './authorization/check_client.js';
 import deviceVerificationResponse from './authorization/device_user_flow_response.js';
 import { requestBucketFor } from 'lib/admin/auth/bucketAddress.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
+import type { PipelineParams } from 'lib/consts/param_list.js';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { Client } from 'lib/models/client.js';
 import { eventBus } from '../event_bus.js';
@@ -97,7 +98,11 @@ export const codeVerification = new Elysia()
 				(params as { bucket?: string } | undefined)?.bucket,
 				hostOfRequest(request)
 			);
-			const oidc = new OIDCContext({ params: {}, bucket, cookie });
+			const oidc = new OIDCContext<PipelineParams>({
+				params: {},
+				bucket,
+				cookie
+			});
 			const setCookies = await sessionHandler(oidc);
 
 			try {
@@ -166,7 +171,8 @@ export const codeVerification = new Elysia()
 
 				// confirm === yes: resolve the interaction against the authenticated session and
 				// either redirect to a required interaction (login/consent) or bind + render success.
-				oidc.params = { ...code.payload.params };
+				// The device authorization request's parameters, validated when the code was issued.
+				oidc.params = { ...(code.payload.params as PipelineParams) };
 				await checkClient(oidc);
 				await checkResource(oidc);
 				assignClaims(oidc);

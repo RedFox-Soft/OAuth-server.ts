@@ -4,7 +4,7 @@ title: "Token payload access contract"
 tags: [contract, gotcha, architecture]
 sources: [oauth-server-codebase]
 created: 2026-07-31
-updated: 2026-09-23
+updated: 2026-09-24
 graph:
   node_type: concept
   relationships:
@@ -94,6 +94,18 @@ compile error. The reads follow one rule: a getter (`oidc.client`, `oidc.session
 and throws a server defect when its entity is absent, `oidc.require(name)` is the same for any other
 entity, and whatever may legitimately be absent — a grant before consent, an account before sign-in —
 is read as `oidc.entities.X?`, so the `?.` at the call site says which of the two the reader relies on.
+
+The request's own parameters are typed the same way since `061-typed-request-params`:
+`PipelineParams` and `TokenParams` are derived from the schemas the endpoints validate against
+(`lib/consts/param_list.ts`, `lib/actions/token.ts`), closed so a misspelt member is a compile error.
+Where a step needs a parameter a caller has already checked with `presence`, it declares that with
+`PipelineParamsWith<'name'>`, and `presence` — an assertion function — narrows the caller's context to
+match. `claims` members are `unknown` until read through `claimRequest()`
+(`lib/helpers/claim_request.ts`): the server accepts any JSON value there, so a member is only a claim
+request once a reader has checked it is an object. Typing them caught the contract broken twice more:
+`pushedAuthorizationRequest.trusted` (the flag lives on `payload.trusted`, so a pushed request was never
+trusted) and `session.state` (written off the payload, so the sign-out confirmation after an account
+change always failed). Both are fixed.
 
 Code that must tolerate a partially populated context reaches through the payload explicitly, for
 example `lib/addon/account.ts:14`:

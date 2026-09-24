@@ -1,11 +1,14 @@
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
+import type { PipelineParams } from 'lib/consts/param_list.js';
 import { IdToken } from 'lib/models/id_token.js';
 import { InvalidRequest, OIDCProviderError } from '../../helpers/errors.ts';
 
 /*
  * Validates the incoming id_token_hint
  */
-export default async function checkIdTokenHint(oidc: OIDCContext) {
+export default async function checkIdTokenHint(
+	oidc: OIDCContext<PipelineParams>
+) {
 	if (oidc.params.id_token_hint !== undefined) {
 		let idTokenHint;
 		try {

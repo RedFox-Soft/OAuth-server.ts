@@ -28,6 +28,7 @@ export type RefreshTokenPayload = Static<typeof RefreshTokenSchema>;
 export class RefreshToken extends consumable(
 	constrained<RefreshTokenPayload>(BaseToken)
 ) {
+	declare payload: Omit<RefreshTokenPayload, 'kind'> & { kind: string };
 	model = RefreshTokenSchema;
 	static isSessionBound = true;
 

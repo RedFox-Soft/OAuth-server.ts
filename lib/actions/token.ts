@@ -1,4 +1,4 @@
-import { Elysia, t } from 'elysia';
+import { Elysia, t, type Static } from 'elysia';
 import { InvalidRequest } from '../helpers/errors.js';
 import {
 	cibaGrantParameters,
@@ -14,7 +14,12 @@ import {
 	setNonceHeader,
 	validateReplay
 } from 'lib/helpers/validate_dpop.js';
-import { AuthPlugin, authHeaders, authParams } from 'lib/plugins/auth.js';
+import {
+	AuthPlugin,
+	authHeaders,
+	authParams,
+	withBody
+} from 'lib/plugins/auth.js';
 import { corsClientBased, formClientId } from 'lib/plugins/cors.js';
 import { ignoreUnknownParams } from 'lib/plugins/ignore_unknown_params.js';
 import { TokenResponse } from 'lib/shared/response_schemas.js';
@@ -41,6 +46,9 @@ const TokenRequestBody = t.Object({
 	authorization_details: refusedParam('authorization_details')
 });
 
+/* What a grant handler may read off `oidc.params`, derived from the body the token endpoint validates. */
+export type TokenParams = Static<typeof TokenRequestBody>;
+
 // The CORS hook must precede AuthPlugin: AuthPlugin authenticates the client in a `derive`, which runs
 // in the same transform queue and throws `invalid_client` from there. Registered after it, this hook
 // would never run for a wrong-secret 401 — the response a misconfigured browser app sees most often.
@@ -63,7 +71,7 @@ export const tokenAction = new Elysia()
 				);
 			}
 
-			return executeGrant(grantType, oidc, dPoP);
+			return executeGrant(grantType, withBody(oidc, body), dPoP);
 		},
 		{
 			body: TokenRequestBody,

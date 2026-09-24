@@ -34,6 +34,8 @@ import type { InitialAccessToken } from '../models/initial_access_token.ts';
 import type { RegistrationAccessToken } from '../models/registration_access_token.ts';
 import type { findAccount } from '../addon/account.ts';
 import type ResourceServer from './resource_server.ts';
+import type { PipelineParams } from '../consts/param_list.ts';
+import type { TokenParams } from '../actions/token.ts';
 
 /* Re-exported so the request pipeline can keep importing these from here, while the declaration lives
  * beside `issuerFor` — the models need it and must not reach into the request context to get it. */
@@ -67,18 +69,21 @@ export interface OIDCEntities {
 	RotatedRegistrationAccessToken: RegistrationAccessToken;
 }
 
-/* One requested claim, as a client sent it — so `values` is checked for being an array where it is read. */
-export type ClaimRequest = {
-	essential?: boolean;
-	value?: unknown;
-	values?: unknown;
-} | null;
-
-export interface ClaimsParameter {
-	id_token?: Record<string, ClaimRequest>;
-	userinfo?: Record<string, ClaimRequest>;
+/*
+ * The requested claims by name. Each member may be any JSON value — OIDC Core §5.5 has members not
+ * understood ignored — so it stays `unknown` until a reader uses it as a claim request, through
+ * `claimRequest`. A type alias rather than an interface so it passes where a record is expected.
+ */
+export type ClaimsParameter = {
+	id_token?: Record<string, unknown>;
+	userinfo?: Record<string, unknown>;
 	rejected?: string[];
-}
+};
+
+export { claimRequest, type ClaimRequest } from './claim_request.ts';
+
+/* Parameters as the seams shared by the authorization pipeline and the token endpoint see them. */
+export type RequestParams = PipelineParams | TokenParams;
 
 /* What an interaction resolved with, as the resumption hands it back. */
 export interface InteractionResult {
@@ -100,9 +105,7 @@ export interface OIDCContextInit<T> {
 	ip?: string;
 }
 
-export class OIDCContext<
-	T extends Record<string, unknown> = Record<string, unknown>
-> {
+export class OIDCContext<T extends Record<string, unknown> = RequestParams> {
 	#requestParamClaims: Set<string> | null = null;
 
 	#accessToken: string | null = null;
@@ -274,12 +277,9 @@ export class OIDCContext<
 		const { claims: requested } = this.params;
 
 		if (isPlainObject(requested)) {
-			// `isPlainObject` is not a type guard; the members are narrowed claim by claim below.
-			const { userinfo, id_token: idToken } = requested as ClaimsParameter;
-
 			const claims = configuration.claimsSupported;
-			for (const members of [userinfo, idToken]) {
-				if (!members) continue;
+			for (const members of [requested.userinfo, requested.id_token]) {
+				if (!isPlainObject(members)) continue;
 				Object.entries(members).forEach(([claim, value]) => {
 					if (claims.has(claim) && (value === null || isPlainObject(value))) {
 						requestParamClaims.add(claim);

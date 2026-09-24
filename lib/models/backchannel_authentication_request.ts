@@ -21,6 +21,9 @@ export type BackchannelAuthenticationRequestPayloadType = Static<
 >;
 
 export class BackchannelAuthenticationRequest extends consumable(BaseToken) {
+	declare payload: Omit<BackchannelAuthenticationRequestPayloadType, 'kind'> & {
+		kind: string;
+	};
 	model = BackchannelAuthenticationRequestPayload;
 	static isSessionBound = true;
 }

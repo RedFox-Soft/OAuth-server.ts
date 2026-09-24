@@ -256,6 +256,26 @@ expire.setDate(expire.getDate() + 1);
 					auth.validateClientLocation(response);
 				});
 
+				/*
+				 * OIDC Core §5.5: a member value that is not understood is ignored, so a subject request
+				 * that is not an object asks for the subject with no constraint — the same as `null`.
+				 */
+				it('issues a code when the subject is requested with a value that is not an object', async function () {
+					const cookie = await setup.login();
+					const auth = new AuthorizationRequest({
+						client_id: 'client',
+						scope: 'openid',
+						prompt: 'none',
+						claims: { id_token: { sub: true } }
+					});
+
+					const { response } = await authRequest(auth, { cookie });
+					expect(response.status).toBe(303);
+					auth.validatePresence(response, ['code', 'state']);
+					auth.validateState(response);
+					auth.validateClientLocation(response);
+				});
+
 				if (verb === 'get') {
 					async function setupFun(auth, result) {
 						const cookies = [];

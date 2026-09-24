@@ -11,7 +11,8 @@ const check: CheckPartial = {
 	description: 'error_description_foo',
 	error: 'error_foo',
 	check: (oidc) => {
-		if (oidc.params.triggerCustomFail) {
+		// A deployment's own parameter, which the declared request parameters do not name.
+		if ((oidc.params as Record<string, unknown>).triggerCustomFail) {
 			return true;
 		}
 		return false;

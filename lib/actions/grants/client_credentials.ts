@@ -1,4 +1,5 @@
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
+import type { TokenParams } from 'lib/actions/token.js';
 import {
 	InvalidGrant,
 	InvalidTarget,
@@ -9,7 +10,7 @@ import { configuration } from 'lib/configs/application.js';
 import checkResource from '../../shared/check_resource.ts';
 import { ClientCredentials } from 'lib/models/client_credentials.js';
 
-export async function clientCredentials(oidc: OIDCContext, dPoP) {
+export async function clientCredentials(oidc: OIDCContext<TokenParams>, dPoP) {
 	const { client } = oidc;
 	const { scopes: statics } = configuration;
 

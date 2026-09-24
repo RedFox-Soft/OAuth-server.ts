@@ -1,4 +1,5 @@
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
+import type { PipelineParamsWith } from 'lib/consts/param_list.js';
 import { InvalidRequestUri } from '../../helpers/errors.ts';
 import { responseModes } from 'lib/response_modes/index.js';
 import processResponseTypes from '../../helpers/process_response_types.ts';
@@ -14,7 +15,9 @@ import { eventBus } from '../../event_bus.js';
  *
  * @emits: authorization.success
  */
-export default async function respond(oidc: OIDCContext) {
+export default async function respond(
+	oidc: OIDCContext<PipelineParamsWith<'redirect_uri'>>
+) {
 	let pushedAuthorizationRequest = oidc.entities.PushedAuthorizationRequest;
 
 	/*
@@ -47,7 +50,8 @@ export default async function respond(oidc: OIDCContext) {
 		out.state = params.state;
 	}
 
-	const { responseMode } = oidc;
+	/* Always set once a response type is known, which it is by now; `query` is its own default. */
+	const responseMode = oidc.responseMode ?? 'query';
 	if (!responseMode.includes('jwt')) {
 		/*
 		 * RFC 9207: the issuer that produced this response, which is the bucket the request was
@@ -61,5 +65,9 @@ export default async function respond(oidc: OIDCContext) {
 	eventBus.emit('authorization.success', oidc, out);
 
 	const handler = responseModes.get(responseMode);
+	if (!handler) {
+		// checkResponseMode refused an unknown mode earlier; reaching here is a defect, not a refusal.
+		throw new Error(`no handler for response mode ${responseMode}`);
+	}
 	return await handler(oidc, params.redirect_uri, out);
 }

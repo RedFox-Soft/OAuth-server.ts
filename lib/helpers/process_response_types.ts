@@ -1,10 +1,12 @@
+import type { OIDCContext } from 'lib/helpers/oidc_context.js';
+import type { PipelineParams } from 'lib/consts/param_list.js';
 import combinedScope from './combined_scope.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';
 import { expiresWithSession, rarForAuthorizationCode } from '../addon/index.js';
 import { includeSid } from '../models/client/checks.ts';
 
-async function codeHandler(oidc) {
+async function codeHandler(oidc: OIDCContext<PipelineParams>) {
 	const grant = oidc.require('Grant');
 
 	const scopeSet = combinedScope(
@@ -81,7 +83,10 @@ async function codeHandler(oidc) {
 	return { code: await code.save() };
 }
 
-export default async function processResponseTypes(oidc) {
+/* The authorization response members, before `state` and `iss` are added to them. */
+export default async function processResponseTypes(
+	oidc: OIDCContext<PipelineParams>
+): Promise<Record<string, unknown>> {
 	const responseType = oidc.params.response_type;
 
 	if (responseType === 'code') {

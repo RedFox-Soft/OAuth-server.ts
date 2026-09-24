@@ -1,14 +1,16 @@
 import * as errors from '../../errors.ts';
 import { pairwiseIdentifier } from '../../../addon/index.js';
 import { Prompt, type CheckPartial } from '../prompt.js';
-import type { ClaimRequest, OIDCContext } from '../../oidc_context.ts';
+import type { OIDCContext } from '../../oidc_context.ts';
+import { claimRequest } from '../../claim_request.ts';
+import type { PipelineParams } from '../../../consts/param_list.ts';
 
 class LoginPromt extends Prompt {
 	name = 'login';
 	requestable = true;
 	defaultError = 'login_required';
 
-	details(oidc: OIDCContext) {
+	details(oidc: OIDCContext<PipelineParams>) {
 		return {
 			...(oidc.params.max_age === undefined
 				? undefined
@@ -88,11 +90,13 @@ class LoginPromt extends Prompt {
 			reason: 'claims_id_token_sub_value',
 			description: 'requested subject could not be obtained',
 			check: async (oidc) => {
-				if (
-					!oidc.claims.id_token ||
-					!oidc.claims.id_token.sub ||
-					!('value' in oidc.claims.id_token.sub)
-				) {
+				/*
+				 * Through `claimRequest`: a member may be any JSON value, and `in` on a primitive threw,
+				 * answering a client's `{"sub": true}` with server_error. A non-object requests the subject
+				 * with no constraint, like `null`.
+				 */
+				const request = claimRequest(oidc.claims.id_token?.sub);
+				if (!('value' in request)) {
 					return false;
 				}
 				let sub = oidc.session.payload.accountId;
@@ -102,7 +106,7 @@ class LoginPromt extends Prompt {
 				if (oidc.client.subjectType === 'pairwise') {
 					sub = await pairwiseIdentifier(sub, oidc.client);
 				}
-				if (oidc.claims.id_token.sub.value !== sub) {
+				if (request.value !== sub) {
 					return true;
 				}
 				return false;
@@ -120,8 +124,7 @@ class LoginPromt extends Prompt {
 			 */
 			error: 'unmet_authentication_requirements',
 			check: (oidc) => {
-				const request: NonNullable<ClaimRequest> =
-					oidc.claims.id_token?.acr ?? {};
+				const request = claimRequest(oidc.claims.id_token?.acr);
 				if (!request?.essential || !request?.values) {
 					return false;
 				}
@@ -143,8 +146,7 @@ class LoginPromt extends Prompt {
 			// The single-valued form of the requirement above, and the same rule applies to it.
 			error: 'unmet_authentication_requirements',
 			check: (oidc) => {
-				const request: NonNullable<ClaimRequest> =
-					oidc.claims.id_token?.acr ?? {};
+				const request = claimRequest(oidc.claims.id_token?.acr);
 				if (!request?.essential || !request?.value) {
 					return false;
 				}

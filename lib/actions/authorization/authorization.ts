@@ -50,6 +50,7 @@ import {
 	OIDCProviderError
 } from 'lib/helpers/errors.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
+import type { PipelineParams } from 'lib/consts/param_list.js';
 import type { RequestBucket } from 'lib/configs/issuer.js';
 import {
 	issuingBucket,
@@ -96,7 +97,7 @@ const pushedAuthorizationParameters = t.Object({
 	request_uri: refusedParam('request_uri')
 });
 
-export async function isAllowRedirectUri(params, bucket?: RequestBucket) {
+export async function isAllowRedirectUri(params, bucket: RequestBucket) {
 	/*
 	 * The bucket is passed in because this runs from the error handler, which holds a route *pattern*
 	 * rather than a resolved request. Everything the delivered error carries hangs off it — most visibly
@@ -134,7 +135,7 @@ export async function isAllowRedirectUri(params, bucket?: RequestBucket) {
 	return { redirect_uri, state, oidc };
 }
 
-async function authorizationActionHandler(oidc: OIDCContext) {
+async function authorizationActionHandler(oidc: OIDCContext<PipelineParams>) {
 	await checkClient(oidc);
 
 	const pushedAuthorizationRequest = await loadPushedAuthorizationRequest(oidc);
@@ -144,7 +145,8 @@ async function authorizationActionHandler(oidc: OIDCContext) {
 	};
 	if (pushedAuthorizationRequest) {
 		requestOptions.isPar = true;
-		requestOptions.trusted = pushedAuthorizationRequest.trusted;
+		requestOptions.trusted =
+			pushedAuthorizationRequest.payload.trusted ?? false;
 	}
 	await processRequestObject(authorizationRequest, oidc, requestOptions);
 	checkResponseMode(oidc);

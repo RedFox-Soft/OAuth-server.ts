@@ -1,4 +1,5 @@
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
+import type { PipelineParams } from 'lib/consts/param_list.js';
 import { InvalidScope } from '../../helpers/errors.ts';
 import { configuration } from 'lib/configs/application.js';
 import { grantTypeAllowed } from 'lib/models/client.js';
@@ -7,7 +8,10 @@ import { grantTypeAllowed } from 'lib/models/client.js';
  * Validates that all requested scopes are supported by the provider, and that offline_access prompt
  * is requested together with consent prompt
  */
-export default function checkScope(oidc: OIDCContext, isAuth = false) {
+export default function checkScope(
+	oidc: OIDCContext<PipelineParams>,
+	isAuth = false
+) {
 	const { scopes: statics } = configuration;
 	const { prompts, client } = oidc;
 
@@ -27,7 +31,7 @@ export default function checkScope(oidc: OIDCContext, isAuth = false) {
 
 	if (scopes.includes('offline_access')) {
 		if (
-			(isAuth && !responseType.includes('code')) ||
+			(isAuth && !responseType?.includes('code')) ||
 			(isAuth && !prompts.has('consent')) ||
 			!grantTypeAllowed(client, 'refresh_token')
 		) {

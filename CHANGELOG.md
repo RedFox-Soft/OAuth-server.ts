@@ -22,6 +22,10 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 - admin: editing a client in the console or through the agent's `client_update` no longer drops every
   attribute the console does not display. A pairwise client stayed pairwise only until its first edit,
   and a client authenticating with a private key could not be edited at all.
+- claims: a client requesting `claims.id_token.sub` as a non-object (`true`, a string, a number) now gets a
+  code, as for `null`, instead of `server_error`.
+- interactions: when a different account signed in during an interaction, confirming the sign-out
+  continues it again. The confirmation always answered 400 `could not find logout details`.
 
 ### Changed
 
@@ -33,6 +37,12 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   `bucket`, typed entities, `oidc.require(name)`. A getter is a guarantee: `oidc.client` and
   `oidc.session` throw when absent (`authenticatedClient` is gone); optional entities are read as
   `oidc.entities.X?`, replacing the `grant`, `account` and `deviceCode` getters. Unread fields removed.
+- request context: request parameters are typed from the schemas the endpoints validate against —
+  `PipelineParams` for the authorization, device and backchannel pipeline, `TokenParams` for the grant
+  handlers — and the type is closed, so TypeScript overrides reading their own extension parameter
+  need an explicit widening. `claims` members are `unknown` until read through `claimRequest()`;
+  the schema now declares them as records, accepting exactly the same inputs. JavaScript overrides are
+  unaffected.
 - client: the client's type names its closed value sets (authentication method, CIBA delivery mode,
   signing algorithms) from the lists the configuration check uses, is read-only all the way down to
   match the freeze, and `adapter('Client')` is typed as holding a `StoredClient`.

@@ -1,4 +1,5 @@
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
+import type { PipelineParams } from 'lib/consts/param_list.js';
 import { InvalidRequest, UnknownUserId } from '../../helpers/errors.ts';
 import omitBy from '../../helpers/_/omit_by.ts';
 import { findAccount } from '../../addon/account.js';
@@ -10,7 +11,9 @@ import {
 
 import checkIdTokenHint from './check_id_token_hint.ts';
 
-export default async function cibaLoadAccount(oidc: OIDCContext) {
+export default async function cibaLoadAccount(
+	oidc: OIDCContext<PipelineParams>
+) {
 	const mechanisms = omitBy(
 		{
 			login_hint_token: oidc.params.login_hint_token,

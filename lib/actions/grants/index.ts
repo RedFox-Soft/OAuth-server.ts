@@ -1,4 +1,5 @@
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
+import type { TokenParams } from 'lib/actions/token.js';
 import { t } from 'elysia';
 import { UnsupportedGrantType } from 'lib/helpers/errors.js';
 import { eventBus } from 'lib/event_bus.js';
@@ -60,7 +61,7 @@ import { ApplicationConfig as config } from 'lib/configs/application.js';
 // Grant handlers always resolve to the grant-dependent token response body. No handler returns a
 // raw `Response`; the /token route relies on this so its `response` schema is TokenResponse.
 type GrantHandler = (
-	oidc: unknown,
+	oidc: OIDCContext<TokenParams>,
 	dPoP: unknown
 ) => Promise<TokenResponseBody>;
 
@@ -107,11 +108,11 @@ export function hasGrant(grantType: string): boolean {
 
 export async function executeGrant(
 	grantType: string,
-	oidc: OIDCContext,
+	oidc: OIDCContext<TokenParams>,
 	dPoP
 ): Promise<TokenResponseBody> {
 	const grant = grantStore.get(grantType);
-	if (!hasGrant(grantType)) {
+	if (!grant || !hasGrant(grantType)) {
 		throw new UnsupportedGrantType();
 	}
 	const res: TokenResponseBody = await grant(oidc, dPoP);

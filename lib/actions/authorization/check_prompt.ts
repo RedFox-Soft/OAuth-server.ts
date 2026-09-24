@@ -1,4 +1,5 @@
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
+import type { PipelineParams } from 'lib/consts/param_list.js';
 import { InvalidRequest } from '../../helpers/errors.ts';
 import { supportedPrompts } from '../../addon/index.js';
 
@@ -6,7 +7,7 @@ import { supportedPrompts } from '../../addon/index.js';
  * Checks that all requested prompts are supported and validates prompt none is not combined with
  * other prompts
  */
-export default function checkPrompt(oidc: OIDCContext) {
+export default function checkPrompt(oidc: OIDCContext<PipelineParams>) {
 	if (oidc.params.prompt !== undefined) {
 		const { prompts } = oidc;
 		// Derived from the resolved policy per request, so a prompt registered after provider

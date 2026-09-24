@@ -54,7 +54,11 @@ import loadGrant from 'lib/actions/authorization/load_grant.js';
 import interactions, {
 	expiredInteractionCookie
 } from 'lib/actions/authorization/interactions.js';
-import { endUserCookieAttributes } from 'lib/consts/param_list.js';
+import {
+	endUserCookieAttributes,
+	type PipelineParams,
+	type PipelineParamsWith
+} from 'lib/consts/param_list.js';
 import {
 	AlreadyUsedError,
 	ExpiredError,
@@ -130,6 +134,14 @@ function persistInteraction(interaction: {
 }
 import { ApplicationConfig, configuration } from 'lib/configs/application.js';
 
+/*
+ * A resumed request's parameters are the ones the authorization pipeline stored after `presence`
+ * established `redirect_uri`, so the resumed context carries it.
+ */
+function resumed(oidc: OIDCContext<PipelineParams>) {
+	return oidc as OIDCContext<PipelineParamsWith<'redirect_uri'>>;
+}
+
 async function resume(interaction, cookie) {
 	/*
 	 * The population this interaction belongs to, recovered from the request that started it.
@@ -149,7 +161,7 @@ async function resume(interaction, cookie) {
 			resourceOf(interaction)
 		)
 	);
-	const oidc = new OIDCContext({
+	const oidc = new OIDCContext<PipelineParams>({
 		params: {},
 		route: 'ui.resume',
 		bucket,
@@ -159,6 +171,8 @@ async function resume(interaction, cookie) {
 	const setCookies = await sessionHandler(oidc);
 	const confirmPage = await getResume(oidc, interaction);
 	if (confirmPage) {
+		// Saved first: the sign-out confirmation this page posts to reads the state it just recorded.
+		await setCookies();
 		return confirmPage;
 	}
 	cookie._interaction.set(expiredInteractionCookie(interaction.uid as string));
@@ -179,7 +193,11 @@ async function resume(interaction, cookie) {
 		await setCookies();
 		const mode = oidc.responseMode ?? 'query';
 		const handler = responseModes.get(mode);
-		return await handler(oidc, oidc.params.redirect_uri, out);
+		if (!handler) {
+			// The stored request passed checkResponseMode; an unknown mode here is a defect.
+			throw new Error(`no handler for response mode ${mode}`);
+		}
+		return await handler(oidc, resumed(oidc).params.redirect_uri, out);
 	}
 
 	// An interaction that resolved with an error result aborts the authorization request and
@@ -215,7 +233,7 @@ async function resume(interaction, cookie) {
 		return Response.redirect(redirectUri, 303);
 	}
 	await setCookies();
-	return respond(oidc);
+	return respond(resumed(oidc));
 }
 
 async function createGrant(interaction) {
@@ -1185,7 +1203,7 @@ export const ui = new Elysia()
 				resourceOf(interaction)
 			)
 		);
-		const oidc = new OIDCContext({
+		const oidc = new OIDCContext<PipelineParams>({
 			params: {},
 			route: 'ui.device_resume',
 			bucket,
@@ -1199,7 +1217,8 @@ export const ui = new Elysia()
 		try {
 			const confirmPage = await getResume(oidc, interaction);
 			if (confirmPage) {
-				// subject changed — logout confirmation self-submitting form
+				// subject changed — logout confirmation self-submitting form, whose state must be saved
+				await setCookies();
 				return confirmPage;
 			}
 

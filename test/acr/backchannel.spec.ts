@@ -158,8 +158,8 @@ describe('a required authentication context on the backchannel', () => {
 		// What the integration is handed: it chooses the channel, so a requirement it cannot see
 		// could not be honoured by anyone.
 		const stored = await BackchannelAuthenticationRequest.find(id);
-		expect(stored.payload.params.acr_values).toBe(MFA);
-		expect(stored.payload.claims.id_token.acr).toEqual({
+		expect(stored.payload).toHaveProperty('params.acr_values', MFA);
+		expect(stored.payload).toHaveProperty('claims.id_token.acr', {
 			essential: true,
 			values: [MFA]
 		});

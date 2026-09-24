@@ -1,4 +1,5 @@
 import type { OIDCContext } from '../oidc_context.ts';
+import type { PipelineParams } from '../../consts/param_list.ts';
 
 export interface CheckPartial<
 	T extends Record<string, unknown> = Record<string, unknown>
@@ -6,8 +7,10 @@ export interface CheckPartial<
 	reason: string;
 	description: string;
 	error?: string;
-	details?: (oidc: OIDCContext) => Partial<T> | Promise<Partial<T>>;
-	check: (oidc: OIDCContext) => boolean | Promise<boolean>;
+	details?: (
+		oidc: OIDCContext<PipelineParams>
+	) => Partial<T> | Promise<Partial<T>>;
+	check: (oidc: OIDCContext<PipelineParams>) => boolean | Promise<boolean>;
 }
 
 export class Prompt<
@@ -33,11 +36,13 @@ export class Prompt<
 		};
 	}
 
-	details(_oidc: OIDCContext): Partial<T> | Promise<Partial<T>> {
+	details(
+		_oidc: OIDCContext<PipelineParams>
+	): Partial<T> | Promise<Partial<T>> {
 		return {};
 	}
 
-	async executeChecks(oidc: OIDCContext): Promise<{
+	async executeChecks(oidc: OIDCContext<PipelineParams>): Promise<{
 		name: string;
 		details: T;
 		reasons: string[];

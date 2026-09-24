@@ -1,4 +1,5 @@
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
+import type { PipelineParams } from 'lib/consts/param_list.js';
 import { getBucketStore } from '../../adapters/index.js';
 import { resolveBucketForRequest } from '../../admin/auth/resolveBucket.js';
 import { DEFAULT_BUCKET_ID } from '../../admin/consts.js';
@@ -35,7 +36,9 @@ import { UnauthorizedClient } from '../../helpers/errors.js';
  * about one population — the failure the login POST already records against itself one file over.
  * Returning it keeps this a refusal that happens to say what it compared against.
  */
-export default async function checkBucket(oidc: OIDCContext): Promise<string> {
+export default async function checkBucket(
+	oidc: OIDCContext<PipelineParams>
+): Promise<string> {
 	const belongsTo = await resolveBucketForRequest(
 		oidc.client.clientId,
 		oidc.params.resource

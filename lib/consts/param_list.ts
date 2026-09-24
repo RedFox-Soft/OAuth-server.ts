@@ -1,4 +1,4 @@
-import { t } from 'elysia';
+import { t, type Static } from 'elysia';
 import { addressOf, type RequestBucket } from '../configs/issuer.js';
 
 /**
@@ -18,13 +18,21 @@ export const refusedParam = (name: string) =>
  * The top-level members of the `claims` request value that this server understands. Declared as its
  * own object so the schema below and the filter in checkClaims read the same source: the set of
  * names that must survive cannot drift from the set the schema validates.
+ *
+ * Records rather than empty objects so the declared type says what the members hold: requested claims
+ * by name, each any JSON value (OIDC Core §5.5 — members not understood are ignored). A record accepts
+ * exactly the JSON values an empty object schema did.
  */
 const claimsMembers = {
 	id_token: t.Optional(
-		t.Object({}, { error: 'claims.id_token must be an object' })
+		t.Record(t.String(), t.Unknown(), {
+			error: 'claims.id_token must be an object'
+		})
 	),
 	userinfo: t.Optional(
-		t.Object({}, { error: 'claims.userinfo must be an object' })
+		t.Record(t.String(), t.Unknown(), {
+			error: 'claims.userinfo must be an object'
+		})
 	)
 };
 
@@ -135,6 +143,31 @@ export const BackchannelAuthParameters = t.Object({
 		})
 	)
 });
+
+/*
+ * What the shared authorization pipeline may read off `oidc.params`: the members of every endpoint
+ * schema it serves plus those a request object carries, derived here so the type cannot drift from the
+ * validation. Closed on purpose — nothing in the pipeline reads an undeclared member, so a misspelt one
+ * is a compile error. Partial because contexts start empty and the request-object merge clears members.
+ * Two members are wider than their schema: `registration` is a string because the backchannel endpoint
+ * accepts it to refuse it with `registration_not_supported` after authenticating the client, and
+ * `max_age` may be a string because a client's registered default is written in that form.
+ */
+export type PipelineParams = Partial<
+	Omit<
+		Static<typeof AuthorizationParameters> &
+			Static<typeof DeviceAuthorizationParameters> &
+			Static<typeof BackchannelAuthParameters> &
+			Static<typeof JWTparameters>,
+		'registration' | 'max_age'
+	> & { registration: string; max_age: number | string }
+>;
+
+/* The pipeline parameters once `presence` has established the named ones. */
+export type PipelineParamsWith<K extends keyof PipelineParams> =
+	PipelineParams & {
+		[P in K]-?: Exclude<PipelineParams[P], undefined>;
+	};
 
 export const routeNames = {
 	authorization: '/auth',

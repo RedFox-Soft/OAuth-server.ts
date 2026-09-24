@@ -1,4 +1,5 @@
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
+import type { TokenParams } from 'lib/actions/token.js';
 import upperFirst from '../../helpers/_/upper_first.ts';
 import camelCase from '../../helpers/_/camel_case.ts';
 import * as errors from '../../helpers/errors.ts';
@@ -22,7 +23,7 @@ const { AuthorizationPending, ExpiredToken, InvalidGrant } = errors;
 export const gty = 'device_code';
 
 export const handler = async function deviceCodeHandler(
-	oidc: OIDCContext,
+	oidc: OIDCContext<TokenParams>,
 	dPoP
 ) {
 	presence(oidc, 'device_code');

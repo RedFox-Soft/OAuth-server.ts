@@ -1,4 +1,5 @@
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
+import type { PipelineParams } from 'lib/consts/param_list.js';
 import { InvalidRequest } from '../../helpers/errors.ts';
 
 const GATED_CLIENT = Object.entries({
@@ -7,7 +8,7 @@ const GATED_CLIENT = Object.entries({
 	requireAuthTime: 'require_auth_time'
 });
 
-const GATED = [
+const GATED: (keyof PipelineParams)[] = [
 	'acr_values',
 	'claims',
 	'claims_locales',
@@ -19,7 +20,7 @@ const GATED = [
 /*
  * Validates that openid scope is requested when openid specific parameters are provided
  */
-export default function checkOpenIdScope(oidc: OIDCContext) {
+export default function checkOpenIdScope(oidc: OIDCContext<PipelineParams>) {
 	if (oidc.params.scope?.split(' ').includes('openid')) {
 		return;
 	}

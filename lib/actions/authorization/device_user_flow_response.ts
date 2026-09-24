@@ -1,11 +1,14 @@
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
+import type { PipelineParams } from 'lib/consts/param_list.js';
 import combinedScope from '../../helpers/combined_scope.ts';
 import { deviceSuccessPage } from '../../html/device.js';
 import { expiresWithSession } from '../../addon/index.js';
 import { eventBus } from '../../event_bus.js';
 import { includeSid } from 'lib/models/client.js';
 
-export default async function deviceVerificationResponse(oidc: OIDCContext) {
+export default async function deviceVerificationResponse(
+	oidc: OIDCContext<PipelineParams>
+) {
 	const code = oidc.require('DeviceCode');
 
 	const scopeSet = combinedScope(

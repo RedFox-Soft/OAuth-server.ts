@@ -1,4 +1,5 @@
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
+import type { TokenParams } from 'lib/actions/token.js';
 import difference from '../../helpers/_/difference.ts';
 import {
 	InvalidRequest,
@@ -37,7 +38,7 @@ function rarSupported(token) {
 const gty = 'refresh_token';
 
 export const handler = async function refreshTokenHandler(
-	oidc: OIDCContext,
+	oidc: OIDCContext<TokenParams>,
 	dPoP
 ) {
 	presence(oidc, 'refresh_token');

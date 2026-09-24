@@ -1,9 +1,10 @@
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
+import type { PipelineParams } from 'lib/consts/param_list.js';
 import presence from '../../helpers/validate_presence.ts';
 import { InvalidRequest } from '../../helpers/errors.ts';
 
-export default function cibaRequired(oidc: OIDCContext) {
-	const required = new Set(['scope']);
+export default function cibaRequired(oidc: OIDCContext<PipelineParams>) {
+	const required = new Set<keyof PipelineParams>(['scope']);
 
 	if (oidc.client.backchannelTokenDeliveryMode !== 'poll') {
 		required.add('client_notification_token');

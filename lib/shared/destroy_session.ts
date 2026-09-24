@@ -15,7 +15,7 @@ import type { OIDCContext } from '../helpers/oidc_context.ts';
 export async function backchannelLogoutFor(
 	session: Session,
 	clientIds: string[],
-	oidc?: OIDCContext
+	oidc?: OIDCContext<Record<string, unknown>>
 ): Promise<void> {
 	const back = [];
 
@@ -72,7 +72,7 @@ export async function backchannelLogoutFor(
  */
 export async function destroyProviderSession(
 	session: Session,
-	oidc?: OIDCContext
+	oidc?: OIDCContext<Record<string, unknown>>
 ): Promise<void> {
 	if (ApplicationConfig['backchannelLogout.enabled']) {
 		await backchannelLogoutFor(

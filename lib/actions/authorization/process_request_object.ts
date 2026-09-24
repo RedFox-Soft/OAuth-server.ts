@@ -1,4 +1,5 @@
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
+import type { PipelineParams } from 'lib/consts/param_list.js';
 import * as JWT from '../../helpers/jwt.ts';
 import { keystore } from 'lib/configs/keystore.js';
 import { clientKeys, checkClientSecretExpiration } from 'lib/models/client.js';
@@ -28,13 +29,21 @@ export function isEncryptedJWT(jwt: string): boolean {
 	return jwt.split('.').length === 5;
 }
 
+function copyParam<K extends keyof PipelineParams>(
+	target: PipelineParams,
+	source: PipelineParams,
+	key: K
+) {
+	target[key] = source[key];
+}
+
 /*
  * Decrypts and validates the content of provided request parameter and replaces the parameters
  * provided via OAuth2.0 authorization request with these
  */
 export default async function processRequestObject(
 	schema: TSchema,
-	oidc: OIDCContext,
+	oidc: OIDCContext<PipelineParams>,
 	{
 		clientAlg,
 		isPar = false,
@@ -130,9 +139,10 @@ export default async function processRequestObject(
 		throw new ValidationError('requestObject', validator, payload);
 	}
 
-	const request = payload;
-	const original = {};
-	for (const param of ['state', 'response_mode', 'response_type']) {
+	// Validated just above against this endpoint's own request schema, whose members are pipeline parameters.
+	const request = payload as PipelineParams;
+	const original: PipelineParams = {};
+	for (const param of ['state', 'response_mode', 'response_type'] as const) {
 		original[param] = params[param];
 		if (request[param] !== undefined) {
 			params[param] = request[param];
@@ -209,9 +219,12 @@ export default async function processRequestObject(
 		client
 	);
 
-	if (pushedRequestObject) {
-		({ trusted } = pushedRequestObject);
-	} else {
+	/*
+	 * A pushed request was verified when it was pushed, and whether it was trusted arrives in the
+	 * `trusted` option. This branch used to destructure `trusted` out of the boolean `isPar`, which
+	 * replaced the flag with `undefined` for every pushed request.
+	 */
+	if (!pushedRequestObject) {
 		try {
 			if (alg.startsWith('HS')) {
 				checkClientSecretExpiration(
@@ -243,11 +256,15 @@ export default async function processRequestObject(
 	const decryptedRequest = params.request;
 	params.request = undefined;
 
-	const keys = new Set([...Object.keys(request), ...Object.keys(params)]);
+	// `Object.keys` widens to string; every key comes from one of these two pipeline-parameter objects.
+	const keys = new Set([
+		...Object.keys(request),
+		...Object.keys(params)
+	] as (keyof PipelineParams)[]);
 	keys.forEach((key) => {
 		if (key in request) {
 			// use value from Request Object
-			params[key] = request[key];
+			copyParam(params, request, key);
 		} else {
 			// ignore all OAuth 2.0 parameters outside of Request Object
 			params[key] = undefined;

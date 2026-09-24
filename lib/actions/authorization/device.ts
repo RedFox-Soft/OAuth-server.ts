@@ -40,6 +40,7 @@ import {
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { featureVerification } from './featureVerification.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
+import type { PipelineParams } from 'lib/consts/param_list.js';
 import { authHeaders, authParams } from 'lib/plugins/auth.js';
 import {
 	coerceArrayParams,
@@ -101,7 +102,11 @@ function bucketOf(params: unknown, request: Request) {
 	);
 }
 
-async function authentication(params, headers, oidc: OIDCContext) {
+async function authentication(
+	params,
+	headers,
+	oidc: OIDCContext<PipelineParams>
+) {
 	await tokenAuth(params, headers, oidc);
 
 	// params is the request body object here; setting client_id on it preserves prior behaviour
