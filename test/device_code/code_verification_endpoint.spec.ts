@@ -88,7 +88,7 @@ describe('POST code_verification endpoint w/o verification', () => {
 		eventBus.removeAllListeners('code_verification.error');
 	});
 
-	function post(body) {
+	function post(body: Parameters<(typeof formAgent)[typeof route]['post']>[0]) {
 		return formAgent[route].post(body, {
 			headers: {
 				'content-type': form,
@@ -247,7 +247,7 @@ describe('POST code_verification endpoint w/ verification', () => {
 		mock.restore();
 	});
 
-	function post(body) {
+	function post(body: Parameters<(typeof formAgent)[typeof route]['post']>[0]) {
 		return formAgent[route].post(body, {
 			headers: {
 				'content-type': form,
@@ -258,7 +258,7 @@ describe('POST code_verification endpoint w/ verification', () => {
 
 	passInteractionChecks('native_client_prompt', 'op_claims_missing', () => {
 		it('accepts an abort command', async () => {
-			let code = await new DeviceCode({
+			const code = await new DeviceCode({
 				clientId: 'client',
 				userCode: 'FOO',
 				params: {
@@ -277,17 +277,17 @@ describe('POST code_verification endpoint w/ verification', () => {
 			expect(status).toBe(200);
 			expect(data).toMatch(/The Sign-in request was interrupted/);
 
-			code = await DeviceCode.find(code);
-			expect(code.payload).not.toHaveProperty('accountId');
-			expect(code.payload).toHaveProperty('error', 'access_denied');
-			expect(code.payload).toHaveProperty(
+			const stored = await DeviceCode.find(code);
+			expect(stored.payload).not.toHaveProperty('accountId');
+			expect(stored.payload).toHaveProperty('error', 'access_denied');
+			expect(stored.payload).toHaveProperty(
 				'errorDescription',
 				'End-User aborted interaction'
 			);
 		});
 
 		it('renders a confirmation and assigns', async () => {
-			let code = await new DeviceCode({
+			const code = await new DeviceCode({
 				clientId: 'client',
 				userCode: 'FOO',
 				params: {
@@ -300,18 +300,18 @@ describe('POST code_verification endpoint w/ verification', () => {
 			const { status } = await post({ xsrf, confirm: 'yes', user_code: 'FOO' });
 			expect(status).toBe(200);
 
-			code = await DeviceCode.find(code);
+			const stored = await DeviceCode.find(code);
 			const session = setup.getSession();
 
-			expect(code.payload).not.toHaveProperty('sid');
-			expect(code.payload).toHaveProperty('accountId', session.accountId);
-			expect(code.payload).toHaveProperty('authTime', session.loginTs);
-			expect(code.payload).toHaveProperty('scope', 'openid email');
-			expect(code.payload.claims).toEqual({ userinfo: { email: null } });
+			expect(stored.payload).not.toHaveProperty('sid');
+			expect(stored.payload).toHaveProperty('accountId', session.accountId);
+			expect(stored.payload).toHaveProperty('authTime', session.loginTs);
+			expect(stored.payload).toHaveProperty('scope', 'openid email');
+			expect(stored.payload.claims).toEqual({ userinfo: { email: null } });
 		});
 
 		it('renders a confirmation and assigns (incl. sid because of client configuration)', async () => {
-			let code = await new DeviceCode({
+			const code = await new DeviceCode({
 				clientId: 'client-backchannel',
 				userCode: 'FOO',
 				params: {
@@ -323,12 +323,12 @@ describe('POST code_verification endpoint w/ verification', () => {
 			const { status } = await post({ xsrf, confirm: 'yes', user_code: 'FOO' });
 			expect(status).toBe(200);
 
-			code = await DeviceCode.find(code);
-			expect(code.payload).toHaveProperty('sid');
+			const stored = await DeviceCode.find(code);
+			expect(stored.payload).toHaveProperty('sid');
 		});
 
 		it('renders a confirmation and assigns (incl. sid because of claims)', async () => {
-			let code = await new DeviceCode({
+			const code = await new DeviceCode({
 				clientId: 'client',
 				userCode: 'FOO',
 				params: {
@@ -341,12 +341,12 @@ describe('POST code_verification endpoint w/ verification', () => {
 			const { status } = await post({ xsrf, confirm: 'yes', user_code: 'FOO' });
 			expect(status).toBe(200);
 
-			code = await DeviceCode.find(code);
-			expect(code.payload).toHaveProperty('sid');
+			const stored = await DeviceCode.find(code);
+			expect(stored.payload).toHaveProperty('sid');
 		});
 
 		it('allows for punctuation to be included and characters to be downcased', async () => {
-			let code = await new DeviceCode({
+			const code = await new DeviceCode({
 				clientId: 'client',
 				userCode: 'FOOBAR',
 				params: {
@@ -363,13 +363,13 @@ describe('POST code_verification endpoint w/ verification', () => {
 			});
 			expect(status).toBe(200);
 
-			code = await DeviceCode.find(code);
+			const stored = await DeviceCode.find(code);
 			const session = setup.getSession();
 
-			expect(code.payload).toHaveProperty('accountId', session.accountId);
-			expect(code.payload).toHaveProperty('authTime', session.loginTs);
-			expect(code.payload).toHaveProperty('scope', 'openid email');
-			expect(code.payload.claims).toEqual({ userinfo: { email: null } });
+			expect(stored.payload).toHaveProperty('accountId', session.accountId);
+			expect(stored.payload).toHaveProperty('authTime', session.loginTs);
+			expect(stored.payload).toHaveProperty('scope', 'openid email');
+			expect(stored.payload.claims).toEqual({ userinfo: { email: null } });
 		});
 	});
 });

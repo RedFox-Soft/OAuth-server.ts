@@ -8,6 +8,44 @@ import { resolveNonceSecret } from './nonceSecret.js';
 // Import-free module, so this adds no runtime edge into the adapters or the models.
 import { DEFAULT_ACR_VALUES } from '../consts/acr.js';
 import { initPairwiseSalt } from './pairwiseSalt.js';
+import type { OIDCContext } from '../helpers/oidc_context.js';
+
+/* A registration policy: reads the request and may adjust the client properties being registered. */
+export type RegistrationPolicy = (
+	oidc: OIDCContext<Record<string, unknown>>,
+	properties: Record<string, unknown>
+) => unknown;
+
+/* Members added to the discovery document; any other member extends it as given. */
+export type DiscoveryExtensions = {
+	claim_types_supported?: string[];
+	claims_locales_supported?: string[];
+	display_values_supported?: string[];
+	op_policy_uri?: string;
+	op_tos_uri?: string;
+	service_documentation?: string;
+	ui_locales_supported?: string[];
+	[member: string]: unknown;
+};
+
+/*
+ * A default typed as the setting it belongs to. Written bare in the object literal below, `undefined`,
+ * `false` or `true` would type a setting that also takes a string, a function or a map as just that
+ * literal's type, and nothing else could be assigned to it. A function result, because a typed `const`
+ * initialised to such a value is narrowed to it all the same.
+ */
+function setting<T>(value: T): T {
+	return value;
+}
+const discoveryDefaults: DiscoveryExtensions = {
+	claim_types_supported: ['normal'],
+	claims_locales_supported: undefined,
+	display_values_supported: undefined,
+	op_policy_uri: undefined,
+	op_tos_uri: undefined,
+	service_documentation: undefined,
+	ui_locales_supported: undefined
+};
 
 export const ApplicationConfig = {
 	/*
@@ -558,19 +596,23 @@ export const ApplicationConfig = {
 	 * description: Requires a valid initial access token for registration. `string` (static) or
 	 * `boolean` (adapter-backed).
 	 */
-	'registration.initialAccessToken': false,
+	'registration.initialAccessToken': setting<string | boolean>(false),
 	/*
 	 * features.registration.policies
 	 *
 	 * description: Registration/registration-management policies applied to client properties.
 	 */
-	'registration.policies': undefined,
+	'registration.policies': setting<
+		Record<string, RegistrationPolicy> | undefined
+	>(undefined),
 	/*
 	 * features.registration.issueRegistrationAccessToken
 	 *
 	 * description: Whether (or a function deciding whether) a registration access token is issued.
 	 */
-	'registration.issueRegistrationAccessToken': true,
+	'registration.issueRegistrationAccessToken': setting<
+		boolean | ((oidc: OIDCContext<Record<string, unknown>>) => boolean)
+	>(true),
 
 	/*
 	 * features.registrationManagement
@@ -638,15 +680,7 @@ export const ApplicationConfig = {
 	 *   from the admin settings catalog: it is not operator-editable, so it is neither returned by
 	 *   nor writable through the settings API.
 	 */
-	discovery: {
-		claim_types_supported: ['normal'],
-		claims_locales_supported: undefined,
-		display_values_supported: undefined,
-		op_policy_uri: undefined,
-		op_tos_uri: undefined,
-		service_documentation: undefined,
-		ui_locales_supported: undefined
-	},
+	discovery: discoveryDefaults,
 
 	/*
 	 * clientAuthMethods

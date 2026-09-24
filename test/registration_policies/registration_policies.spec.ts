@@ -21,7 +21,15 @@ import { RegistrationAccessToken } from 'lib/models/registration_access_token.js
 import { TestAdapter } from 'test/models.js';
 
 const json = { 'content-type': 'application/json' };
-const bearer = (token) => ({ authorization: `Bearer ${token}` });
+const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
+
+// The policies this spec's config declares; absent, every case here would be testing nothing.
+function policies() {
+	const configured = ApplicationConfig['registration.policies'];
+	if (!configured)
+		throw new Error('the spec config declares registration policies');
+	return configured;
+}
 
 // Policies are persisted under `.payload.*` (the top-level accessors were removed with the
 // IN_PAYLOAD refactor), so the saved-event instances and find() results expose `payload.policies`.
@@ -76,10 +84,7 @@ describe('client registration policies', () => {
 		});
 
 		it('runs the policies when a client is getting created', async () => {
-			const spy = spyOn(
-				ApplicationConfig['registration.policies'],
-				'empty-policy'
-			);
+			const spy = spyOn(policies(), 'empty-policy');
 			const value = await new InitialAccessToken({
 				policies: ['empty-policy']
 			}).save();
@@ -94,10 +99,7 @@ describe('client registration policies', () => {
 		});
 
 		it('allows for policies to set property defaults', async () => {
-			ApplicationConfig['registration.policies']['set-default'] = (
-				oidc,
-				properties
-			) => {
+			policies()['set-default'] = (oidc, properties) => {
 				if (!('id_token_signed_response_alg' in properties)) {
 					properties.id_token_signed_response_alg = 'HS256';
 				}
@@ -130,10 +132,7 @@ describe('client registration policies', () => {
 		});
 
 		it('allows for policies to force property values', async () => {
-			ApplicationConfig['registration.policies']['force-default'] = (
-				oidc,
-				properties
-			) => {
+			policies()['force-default'] = (oidc, properties) => {
 				properties.id_token_signed_response_alg = 'HS256';
 			};
 
@@ -153,7 +152,7 @@ describe('client registration policies', () => {
 		});
 
 		it('allows for policies to validate property values', async () => {
-			ApplicationConfig['registration.policies']['throw-error'] = () => {
+			policies()['throw-error'] = () => {
 				throw new errors.InvalidClientMetadata('foo');
 			};
 
@@ -195,12 +194,10 @@ describe('client registration policies', () => {
 		});
 
 		it('an operator can apply different policies to management than to registration', async () => {
-			ApplicationConfig['registration.policies']['change-rat-policy'] = async (
-				oidc
-			) => {
+			policies()['change-rat-policy'] = async (oidc) => {
 				// Token fields live under `.payload.*` in this port, so mutate the entity's
 				// payload rather than a top-level `.policies` accessor (which no longer exists).
-				oidc.entities.RegistrationAccessToken.payload.policies = [
+				oidc.require('RegistrationAccessToken').payload.policies = [
 					'empty-policy'
 				];
 			};
@@ -325,9 +322,9 @@ describe('client registration policies', () => {
 	});
 
 	describe('Registration Management & RegistrationAccessToken', () => {
-		let rat;
-		let clientId;
-		let body;
+		let rat: string;
+		let clientId: string;
+		let body: Record<string, unknown>;
 
 		beforeEach(async () => {
 			const iat = await new InitialAccessToken({}).save();
@@ -336,6 +333,9 @@ describe('client registration policies', () => {
 				{ headers: { ...json, ...bearer(iat) } }
 			);
 			expect(res.status).toBe(201);
+			if (!res.data?.registration_access_token) {
+				throw new Error('expected a registration access token');
+			}
 			const {
 				registration_access_token,
 				registration_client_uri,
@@ -353,10 +353,7 @@ describe('client registration policies', () => {
 				setup.getTokenJti(rat),
 				{ policies: ['empty-policy'] }
 			);
-			const spy = spyOn(
-				ApplicationConfig['registration.policies'],
-				'empty-policy'
-			);
+			const spy = spyOn(policies(), 'empty-policy');
 
 			const res = await agent
 				.reg({ clientId })
@@ -367,10 +364,7 @@ describe('client registration policies', () => {
 		});
 
 		it('allows for policies to set property defaults', async () => {
-			ApplicationConfig['registration.policies']['set-default'] = (
-				oidc,
-				properties
-			) => {
+			policies()['set-default'] = (oidc, properties) => {
 				if (!('client_name' in properties)) {
 					properties.client_name = 'foobar';
 				}
@@ -397,10 +391,7 @@ describe('client registration policies', () => {
 		});
 
 		it('allows for policies to force property values', async () => {
-			ApplicationConfig['registration.policies']['force-value'] = (
-				oidc,
-				properties
-			) => {
+			policies()['force-value'] = (oidc, properties) => {
 				properties.client_name = 'foobar';
 			};
 			TestAdapter.for('RegistrationAccessToken').syncUpdate(
@@ -419,7 +410,7 @@ describe('client registration policies', () => {
 		});
 
 		it('allows for policies to validate property values', async () => {
-			ApplicationConfig['registration.policies']['throw-error'] = () => {
+			policies()['throw-error'] = () => {
 				throw new errors.InvalidClientMetadata('foo');
 			};
 			TestAdapter.for('RegistrationAccessToken').syncUpdate(
@@ -462,7 +453,9 @@ describe('client registration policies', () => {
 					.reg({ clientId })
 					.put(body, { headers: { ...json, ...bearer(rat) } });
 				expect(res.status).toBe(200);
-				const value = res.data.registration_access_token;
+				const value = res.data?.registration_access_token;
+				if (!value)
+					throw new Error('expected a rotated registration access token');
 
 				expect(spy).toHaveBeenCalled();
 				expect(spy.mock.calls[0][0]).toHaveProperty('payload.policies', [

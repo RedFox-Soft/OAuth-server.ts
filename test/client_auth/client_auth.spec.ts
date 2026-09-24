@@ -40,7 +40,7 @@ const eccrt = new X509Certificate(
 
 const route = '/token';
 
-const introspectionAuthSucceeded = {
+const introspectionAuthSucceeded: { active: false } = {
 	active: false
 };
 
@@ -475,7 +475,7 @@ describe('client authentication options', () => {
 	});
 
 	describe('client_secret_jwt auth', () => {
-		let key;
+		let key: CryptoKey | Uint8Array;
 
 		beforeEach(async function () {
 			key = await importJWK(
@@ -1267,6 +1267,7 @@ describe('client authentication options', () => {
 				},
 				{
 					headers: {
+						// @ts-expect-error this spec's getCertificate reads a header the route cannot name
 						'x-ssl-client-cert': rsacrt.raw.toString('base64'),
 						'x-ssl-client-verify': 'SUCCESS',
 						'x-ssl-client-san-dns': 'rp.example.com'
@@ -1293,6 +1294,7 @@ describe('client authentication options', () => {
 				},
 				{
 					headers: {
+						// @ts-expect-error this spec's getCertificate reads a header the route cannot name
 						'x-ssl-client-cert': rsacrt.raw.toString('base64'),
 						'x-ssl-client-verify': 'FAILED: self signed certificate',
 						'x-ssl-client-san-dns': 'rp.example.com'
@@ -1310,6 +1312,7 @@ describe('client authentication options', () => {
 				},
 				{
 					headers: {
+						// @ts-expect-error this spec's getCertificate reads a header the route cannot name
 						'x-ssl-client-cert': rsacrt.raw.toString('base64'),
 						'x-ssl-client-verify': 'SUCCESS',
 						'x-ssl-client-san-dns': 'foobarbaz'
@@ -1329,6 +1332,7 @@ describe('client authentication options', () => {
 				},
 				{
 					headers: {
+						// @ts-expect-error this spec's getCertificate reads a header the route cannot name
 						'x-ssl-client-cert': rsacrt.raw.toString('base64')
 					}
 				}
@@ -1345,6 +1349,7 @@ describe('client authentication options', () => {
 				},
 				{
 					headers: {
+						// @ts-expect-error this spec's getCertificate reads a header the route cannot name
 						'x-ssl-client-cert': eccrt.raw.toString('base64')
 					}
 				}
@@ -1369,6 +1374,7 @@ describe('client authentication options', () => {
 				},
 				{
 					headers: {
+						// @ts-expect-error this spec's getCertificate reads a header the route cannot name
 						'x-ssl-client-cert': eccrt.raw.toString('base64')
 					}
 				}
@@ -1390,6 +1396,7 @@ describe('client authentication options', () => {
 				},
 				{
 					headers: {
+						// @ts-expect-error this spec's getCertificate reads a header the route cannot name
 						'x-ssl-client-cert': rsacrt.raw.toString('base64')
 					}
 				}

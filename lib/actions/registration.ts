@@ -100,28 +100,17 @@ async function validateInitialAccessToken(
 ) {
 	const initialAccessToken =
 		ApplicationConfig['registration.initialAccessToken'];
-	switch (initialAccessToken && typeof initialAccessToken) {
-		case 'boolean': {
-			const iat = await InitialAccessToken.find(readBearer(token), {
-				error: new InvalidToken('initial access token not found')
-			});
-			oidc.entity('InitialAccessToken', iat);
-			break;
+	// `true` means adapter-backed tokens; a non-empty string is the one static token; otherwise none.
+	if (initialAccessToken === true) {
+		const iat = await InitialAccessToken.find(readBearer(token), {
+			error: new InvalidToken('initial access token not found')
+		});
+		oidc.entity('InitialAccessToken', iat);
+	} else if (typeof initialAccessToken === 'string' && initialAccessToken) {
+		const valid = constantEquals(initialAccessToken, readBearer(token), 1000);
+		if (!valid) {
+			throw new InvalidToken('invalid initial access token value');
 		}
-		case 'string': {
-			// The switch guarantees a string here; the config value's declared type is a
-			// union (false | string | true), which TypeScript does not narrow off `typeof`.
-			const valid = constantEquals(
-				initialAccessToken as string,
-				readBearer(token),
-				1000
-			);
-			if (!valid) {
-				throw new InvalidToken('invalid initial access token value');
-			}
-			break;
-		}
-		default:
 	}
 }
 

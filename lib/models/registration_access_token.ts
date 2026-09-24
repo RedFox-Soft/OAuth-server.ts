@@ -11,5 +11,8 @@ export type RegistrationAccessTokenPayloadType = Static<
 >;
 
 export class RegistrationAccessToken extends hasPolicies(BaseToken) {
+	declare payload: Omit<RegistrationAccessTokenPayloadType, 'kind'> & {
+		kind: string;
+	};
 	model = RegistrationAccessTokenPayload;
 }

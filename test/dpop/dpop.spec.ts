@@ -1,4 +1,3 @@
-import * as url from 'node:url';
 import { hash, randomBytes, randomUUID } from 'node:crypto';
 import {
 	describe,
@@ -23,6 +22,7 @@ import epochTime from '../../lib/helpers/epoch_time.ts';
 import bootstrap, {
 	agent,
 	getHeader,
+	locationParameter,
 	seedAccount,
 	formAgent
 } from '../test_helper.js';
@@ -173,8 +173,8 @@ describe('features.dPoP', async () => {
 		});
 
 		describe('validates the DPoP proof JWT is conform', () => {
-			let access_token = null;
-			let ath = null;
+			let access_token: string;
+			let ath: string;
 			beforeEach(async function () {
 				const at = new AccessToken({
 					accountId: setup.getAccountId(),
@@ -274,6 +274,7 @@ describe('features.dPoP', async () => {
 							dpop: await new SignJWT({})
 								.setProtectedHeader({
 									alg: 'ES256',
+									// @ts-expect-error the case sets jwk to values that are not a JWK, on purpose
 									jwk: value,
 									typ: 'dpop+jwt'
 								})
@@ -668,7 +669,7 @@ describe('features.dPoP', async () => {
 					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 				}
 			);
-			if (!data) throw new Error('expected response data');
+			if (!data?.active) throw new Error('expected an active token');
 			expect(status).toBe(200);
 			expect(data).toHaveProperty('active', true);
 			expect(data).toHaveProperty('token_type', 'DPoP');
@@ -688,7 +689,7 @@ describe('features.dPoP', async () => {
 				}
 			);
 			expect(code.status).toBe(200);
-			if (!code.data) throw new Error('expected response data');
+			if (!code.data?.device_code) throw new Error('expected a device code');
 			device_code = code.data.device_code;
 
 			TestAdapter.for('DeviceCode').syncUpdate(setup.getTokenJti(device_code), {
@@ -765,7 +766,7 @@ describe('features.dPoP', async () => {
 	});
 
 	describe('urn:openid:params:grant-type:ciba', () => {
-		let reqId;
+		let reqId: string;
 		beforeEach(async function () {
 			const { data } = await formAgent.backchannel.post(
 				{
@@ -778,7 +779,7 @@ describe('features.dPoP', async () => {
 					}
 				}
 			);
-			if (!data) throw new Error('expected response data');
+			if (!data?.auth_req_id) throw new Error('expected an auth_req_id');
 			reqId = data.auth_req_id;
 		});
 
@@ -934,9 +935,9 @@ describe('features.dPoP', async () => {
 				headers: { cookie }
 			});
 			expect(res.status).toBe(303);
-			auth.validateClientLocation(res);
+			auth.validateClientLocation(res.response);
 			const location = getHeader(res.response, 'location');
-			const code = url.parse(location, true).query.code;
+			const code = locationParameter(location, 'code');
 
 			const { dpopJkt } = TestAdapter.for('AuthorizationCode').syncFind(code);
 			expect(typeof dpopJkt).toBe('string');
@@ -987,9 +988,9 @@ describe('features.dPoP', async () => {
 				headers: { cookie }
 			});
 			expect(res.status).toBe(303);
-			auth.validateClientLocation(res);
+			auth.validateClientLocation(res.response);
 			const location = getHeader(res.response, 'location');
-			const code = url.parse(location, true).query.code;
+			const code = locationParameter(location, 'code');
 
 			const { dpopJkt } = TestAdapter.for('AuthorizationCode').syncFind(code);
 			expect(typeof dpopJkt).toBe('string');
@@ -1012,8 +1013,7 @@ describe('features.dPoP', async () => {
 				});
 				expect(res.status).toBe(303);
 				const location = getHeader(res.response, 'location');
-				const parsed = url.parse(location, true);
-				code = parsed.query.code;
+				code = locationParameter(location, 'code');
 			});
 
 			it('authorization_code binds the access token to the jwk', async function () {
@@ -1063,8 +1063,7 @@ describe('features.dPoP', async () => {
 				});
 				expect(res.status).toBe(303);
 				const location = getHeader(res.response, 'location');
-				const parsed = url.parse(location, true);
-				code = parsed.query.code;
+				code = locationParameter(location, 'code');
 			});
 
 			it('authorization_code binds the access token to the jwk', async function () {
@@ -1178,8 +1177,7 @@ describe('features.dPoP', async () => {
 				});
 				expect(res.status).toBe(303);
 				const location = getHeader(res.response, 'location');
-				const parsed = url.parse(location, true);
-				const code = parsed.query.code;
+				const code = locationParameter(location, 'code');
 
 				const token = await agent.token.post(
 					{
@@ -1199,7 +1197,8 @@ describe('features.dPoP', async () => {
 					}
 				);
 				expect(token.status).toBe(200);
-				if (!token.data) throw new Error('expected response data');
+				if (!token.data?.refresh_token)
+					throw new Error('expected a refresh token');
 				refresh_token = token.data.refresh_token;
 			});
 
@@ -1235,8 +1234,8 @@ describe('features.dPoP', async () => {
 	});
 
 	describe('authorization flow (public client)', () => {
-		let code = null;
-		let auth = null;
+		let code: string;
+		let auth: AuthorizationRequest;
 		beforeEach(async function () {
 			auth = new AuthorizationRequest({
 				client_id: 'client-none',
@@ -1248,8 +1247,7 @@ describe('features.dPoP', async () => {
 				headers: { cookie }
 			});
 			const location = getHeader(res.response, 'location');
-			const parsed = url.parse(location, true);
-			code = parsed.query.code;
+			code = locationParameter(location, 'code');
 		});
 
 		it('authorization_code binds the access token to the jwk', async function () {
@@ -1304,7 +1302,8 @@ describe('features.dPoP', async () => {
 					}
 				);
 				expect(res.status).toBe(200);
-				if (!res.data) throw new Error('expected response data');
+				if (!res.data?.refresh_token)
+					throw new Error('expected a refresh token');
 				refresh_token = res.data.refresh_token;
 			});
 

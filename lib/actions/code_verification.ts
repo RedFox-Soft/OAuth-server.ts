@@ -17,6 +17,7 @@ import {
 	AbortedError
 } from '../helpers/re_render_errors.ts';
 import { AuthorizationCookies, routeNames } from 'lib/consts/param_list.js';
+import { PageResponses } from 'lib/shared/response_schemas.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import interactions from './authorization/interactions.js';
 import loadGrant from './authorization/load_grant.js';
@@ -51,7 +52,9 @@ function renderInputError(oidc, err) {
 
 export const codeVerification = new Elysia()
 	.guard({
-		cookie: AuthorizationCookies
+		cookie: AuthorizationCookies,
+		// Every handler returns a built page or redirect, which Elysia does not validate; this is for the typed client.
+		response: PageResponses
 	})
 	.get(
 		routeNames.code_verification,

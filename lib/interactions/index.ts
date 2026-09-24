@@ -4,7 +4,7 @@ import { bucketAtHost, isCanonicalHost } from 'lib/admin/auth/bucketAddress.js';
 // device-flow re-render error and a different thing entirely. Elysia's is the one that produces the same
 // answer the server gives for a path it does not serve, which is what an unknown provider must look like.
 import { Elysia, NotFoundError as UnservedPath, t } from 'elysia';
-import { OAuthError } from 'lib/shared/response_schemas.js';
+import { PageResponses } from 'lib/shared/response_schemas.js';
 import { eventBus } from 'lib/event_bus.js';
 import { DiscoveryError } from 'lib/federation/discovery.js';
 import { upstreamMetadata } from 'lib/federation/upstream.js';
@@ -380,8 +380,6 @@ function redirectUriOf(interaction: {
 		?.redirect_uri;
 }
 
-const InteractionError = t.Union([OAuthError, t.String()]);
-
 export const ui = new Elysia()
 	.guard({
 		params: t.Object({
@@ -420,15 +418,7 @@ export const ui = new Elysia()
 		 * it: a page is HTML, and a refusal is the shared error body — or an HTML page, when the form is
 		 * re-rendered with its error or the caller's Accept asks for a page.
 		 */
-		response: {
-			200: t.String(),
-			400: InteractionError,
-			401: InteractionError,
-			403: InteractionError,
-			422: InteractionError,
-			429: InteractionError,
-			500: InteractionError
-		}
+		response: PageResponses
 	})
 	.resolve(async ({ cookie, params, request }) => {
 		const cookieId = cookie._interaction.value;

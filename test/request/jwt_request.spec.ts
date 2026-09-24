@@ -1,11 +1,15 @@
 import * as crypto from 'node:crypto';
-import { parse, URL } from 'node:url';
 
 import { describe, it, beforeAll, afterEach, expect, mock } from 'bun:test';
 import { importJWK } from 'jose';
 
 import * as JWT from '../../lib/helpers/jwt.ts';
-import bootstrap, { agent, type Setup, formAgent } from '../test_helper.js';
+import bootstrap, {
+	agent,
+	formAgent,
+	getHeader,
+	type Setup
+} from '../test_helper.js';
 import { eventBus } from 'lib/event_bus.js';
 import { Client, clientKeys } from 'lib/models/client.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
@@ -46,6 +50,16 @@ describe('request parameter features', () => {
 		});
 	});
 
+	// How a case sends its request object: what it signs, what travels beside it, and with which key.
+	type RequestCase = {
+		jwtPayload?: Record<string, unknown>;
+		payload?: Record<string, unknown>;
+		verb?: string;
+		isError?: boolean;
+		jwtKey?: crypto.KeyObject | CryptoKey | Uint8Array;
+		alg?: string;
+	};
+
 	async function authorization(
 		client_id: string,
 		{
@@ -55,7 +69,7 @@ describe('request parameter features', () => {
 			isError = false,
 			jwtKey,
 			alg = 'HS256'
-		} = {}
+		}: RequestCase = {}
 	) {
 		const code_verifier = crypto.randomBytes(32).toString('base64url');
 		const code_challenge = crypto.hash('sha256', code_verifier, 'base64url');
@@ -117,9 +131,9 @@ describe('request parameter features', () => {
 			return authResp;
 		}
 		expect(authResp.status).toBe(303);
-		const location = authResp.response.headers.get('location');
-		expect(location?.startsWith('https://client.example.com/cb')).toBeTrue();
-		const params = new URLSearchParams(parse(location).query);
+		const location = getHeader(authResp.response, 'location');
+		expect(location.startsWith('https://client.example.com/cb')).toBeTrue();
+		const params = new URL(location).searchParams;
 		expect(params.get('code')).not.toBeNull();
 
 		return authResp;
@@ -133,7 +147,7 @@ describe('request parameter features', () => {
 			isError = false,
 			jwtKey,
 			alg = 'HS256'
-		} = {}
+		}: RequestCase = {}
 	) {
 		const request = await JWT.sign(
 			{
@@ -163,7 +177,14 @@ describe('request parameter features', () => {
 		return authResp;
 	}
 
-	[
+	// Each endpoint that takes a request object: its route, verb, how to call it, and its two events.
+	const endpoints: [
+		route: string,
+		verb: string,
+		authorizationRequest: typeof authorization | typeof authorizationDevice,
+		errorEvt: string,
+		successEvt: string
+	][] = [
 		[
 			'auth',
 			'get',
@@ -185,279 +206,171 @@ describe('request parameter features', () => {
 			'device_authorization.error',
 			'device_authorization.success'
 		]
-	].forEach(([route, verb, authorizationRequest, errorEvt, successEvt]) => {
-		describe(`${route} ${verb} passing request parameters as JWTs`, () => {
-			it('does not use anything from the OAuth 2.0 parameters', async function () {
-				const spy = mock();
-				eventBus.once('authorization.success', spy);
+	];
+	endpoints.forEach(
+		([route, verb, authorizationRequest, errorEvt, successEvt]) => {
+			describe(`${route} ${verb} passing request parameters as JWTs`, () => {
+				it('does not use anything from the OAuth 2.0 parameters', async function () {
+					const spy = mock();
+					eventBus.once('authorization.success', spy);
 
-				if (route === '/device/auth') {
-					eventBus.once('device_authorization.success', (oidc) => {
-						eventBus.emit('authorization.success', {
-							params: oidc.entities.DeviceCode.payload.params
+					if (route === '/device/auth') {
+						eventBus.once('device_authorization.success', (oidc) => {
+							eventBus.emit('authorization.success', {
+								params: oidc.entities.DeviceCode.payload.params
+							});
 						});
+					}
+
+					await authorizationRequest('client', {
+						jwtPayload: {
+							scope: 'openid'
+						},
+						payload: {
+							ui_locales: 'foo'
+						},
+						verb
 					});
-				}
 
-				await authorizationRequest('client', {
-					jwtPayload: {
-						scope: 'openid'
-					},
-					payload: {
-						ui_locales: 'foo'
-					},
-					verb
+					expect(spy).toHaveBeenCalledTimes(1);
+					expect(spy.mock.calls[0][0].params.ui_locales).toBeUndefined();
 				});
 
-				expect(spy).toHaveBeenCalledTimes(1);
-				expect(spy.mock.calls[0][0].params.ui_locales).toBeUndefined();
-			});
+				it('can contain max_age parameter as a number and it (and other params too) will be forced as string', async function () {
+					const spy = mock();
+					eventBus.once(successEvt, spy);
 
-			it('can contain max_age parameter as a number and it (and other params too) will be forced as string', async function () {
-				const spy = mock();
-				eventBus.once(successEvt, spy);
-
-				await authorizationRequest('client', {
-					jwtPayload: {
-						scope: 'openid',
-						max_age: 300
-					},
-					payload: {
-						scope: 'openid'
-					},
-					verb
-				});
-
-				expect(spy.mock.calls[0][0]).toMatchObject({
-					params: { max_age: expect.any(Number) }
-				});
-			});
-
-			it('can contain params as array and have them handled as dupes', async function () {
-				const spy = mock();
-				eventBus.once(errorEvt, spy);
-
-				await authorizationRequest('client', {
-					jwtPayload: {
-						scope: ['openid', 'profile']
-					},
-					payload: {
-						scope: 'openid'
-					},
-					verb,
-					isError: true
-				});
-
-				expect(spy).toHaveBeenCalledTimes(1);
-				expect(spy.mock.calls[0][0]).toBeInstanceOf(ValidationError);
-			});
-
-			it('can contain claims parameter as JSON', async function () {
-				const spy = mock();
-				eventBus.once(successEvt, spy);
-				const claims = JSON.stringify({ id_token: { email: null } });
-
-				await authorizationRequest('client', {
-					jwtPayload: {
-						scope: 'openid',
-						claims
-					},
-					payload: {
-						scope: 'openid'
-					},
-					verb
-				});
-
-				expect(spy.mock.calls[0][0]).toMatchObject({ params: { claims } });
-			});
-
-			it('can contain claims parameter as object', async function () {
-				const spy = mock();
-				eventBus.once(successEvt, spy);
-				const claims = { id_token: { email: null } };
-
-				await authorizationRequest('client', {
-					jwtPayload: {
-						scope: 'openid',
-						claims
-					},
-					payload: {
-						scope: 'openid'
-					},
-					verb
-				});
-
-				expect(spy.mock.calls[0][0]).toMatchObject({ params: { claims } });
-			});
-
-			it('can accept Request Objects issued within acceptable system clock skew', async function () {
-				const client = await Client.find('client-with-HS-sig');
-				let [key] = clientKeys(client).symmetric.selectForSign({
-					alg: 'HS256'
-				});
-				key = await importJWK(key);
-
-				await authorizationRequest('client-with-HS-sig', {
-					jwtPayload: {
-						scope: 'openid',
-						iat: Math.ceil(Date.now() / 1000) + 5
-					},
-					payload: {
-						scope: 'openid'
-					},
-					verb,
-					jwtKey: key
-				});
-			});
-
-			it('a request object signed with an asymmetric key is accepted', async function () {
-				const client = await Client.find('client-with-HS-sig');
-				let [key] = clientKeys(client).symmetric.selectForSign({
-					alg: 'HS256'
-				});
-				key = await importJWK(key);
-
-				await authorizationRequest('client-with-HS-sig', {
-					jwtPayload: {
-						scope: 'openid'
-					},
-					payload: {
-						scope: 'openid'
-					},
-					verb,
-					jwtKey: key
-				});
-			});
-
-			it('rejects HMAC based requests when signed with an expired secret', async function () {
-				const client = await Client.find('client-with-HS-sig-expired');
-				let [key] = clientKeys(client).symmetric.selectForSign({
-					alg: 'HS256'
-				});
-				key = await importJWK(key);
-
-				const spy = mock();
-				eventBus.once(errorEvt, spy);
-
-				await authorizationRequest('client-with-HS-sig-expired', {
-					jwtPayload: {
-						scope: 'openid'
-					},
-					payload: {
-						scope: 'openid'
-					},
-					verb,
-					jwtKey: key,
-					isError: true
-				});
-
-				expect(spy).toHaveBeenCalledTimes(1);
-				expect(spy.mock.calls[0][0]).toHaveProperty(
-					'message',
-					'invalid_request_object'
-				);
-				expect(spy.mock.calls[0][0]).toHaveProperty(
-					'error_description',
-					'could not validate the Request Object - the client secret used for its signature is expired'
-				);
-			});
-
-			it('doesnt allow request inception', async function () {
-				const spy = mock();
-				eventBus.once(errorEvt, spy);
-
-				await authorizationRequest('client', {
-					jwtPayload: {
-						scope: 'openid',
-						request: 'request inception'
-					},
-					payload: {
-						scope: 'openid'
-					},
-					verb,
-					isError: true
-				});
-
-				expect(spy).toHaveBeenCalledTimes(1);
-				expect(spy.mock.calls[0][0]).toBeInstanceOf(ValidationError);
-			});
-
-			it('doesnt allow requestUri inception', async function () {
-				const spy = mock();
-				eventBus.once(errorEvt, spy);
-
-				await authorizationRequest('client', {
-					jwtPayload: {
-						scope: 'openid',
-						request_uri: 'request uri inception'
-					},
-					payload: {
-						scope: 'openid'
-					},
-					verb,
-					isError: true
-				});
-
-				expect(spy).toHaveBeenCalledTimes(1);
-				expect(spy.mock.calls[0][0]).toBeInstanceOf(ValidationError);
-			});
-
-			if (route !== '/device/auth') {
-				it('may contain a response_mode and it will be honoured', async function () {
 					await authorizationRequest('client', {
 						jwtPayload: {
 							scope: 'openid',
-							response_mode: 'form_post'
+							max_age: 300
 						},
 						payload: {
 							scope: 'openid'
 						},
 						verb
 					});
+
+					expect(spy.mock.calls[0][0]).toMatchObject({
+						params: { max_age: expect.any(Number) }
+					});
 				});
 
-				it('a response mode the client may not use is refused', async function () {
+				it('can contain params as array and have them handled as dupes', async function () {
 					const spy = mock();
 					eventBus.once(errorEvt, spy);
 
 					await authorizationRequest('client', {
 						jwtPayload: {
-							scope: 'openid',
-							response_mode: 'foo'
+							scope: ['openid', 'profile']
 						},
 						payload: {
-							scope: 'openid',
-							response_mode: 'query'
+							scope: 'openid'
 						},
 						verb,
 						isError: true
 					});
 
 					expect(spy).toHaveBeenCalledTimes(1);
-					expect(spy.mock.calls[0][0]).toHaveProperty(
-						'message',
-						'unsupported_response_mode'
-					);
-					expect(spy.mock.calls[0][0]).toHaveProperty(
-						'error_description',
-						'unsupported response_mode requested'
-					);
+					expect(spy.mock.calls[0][0]).toBeInstanceOf(ValidationError);
 				});
 
-				it('doesnt allow response_type to differ', async function () {
+				it('can contain claims parameter as JSON', async function () {
 					const spy = mock();
-					eventBus.once(errorEvt, spy);
+					eventBus.once(successEvt, spy);
+					const claims = JSON.stringify({ id_token: { email: null } });
 
 					await authorizationRequest('client', {
 						jwtPayload: {
 							scope: 'openid',
-							response_type: 'code'
+							claims
 						},
 						payload: {
+							scope: 'openid'
+						},
+						verb
+					});
+
+					expect(spy.mock.calls[0][0]).toMatchObject({ params: { claims } });
+				});
+
+				it('can contain claims parameter as object', async function () {
+					const spy = mock();
+					eventBus.once(successEvt, spy);
+					const claims = { id_token: { email: null } };
+
+					await authorizationRequest('client', {
+						jwtPayload: {
 							scope: 'openid',
-							response_type: 'none'
+							claims
+						},
+						payload: {
+							scope: 'openid'
+						},
+						verb
+					});
+
+					expect(spy.mock.calls[0][0]).toMatchObject({ params: { claims } });
+				});
+
+				it('can accept Request Objects issued within acceptable system clock skew', async function () {
+					const client = await Client.find('client-with-HS-sig');
+					const [jwk] = clientKeys(client).symmetric.selectForSign({
+						alg: 'HS256'
+					});
+					const key = await importJWK(jwk);
+
+					await authorizationRequest('client-with-HS-sig', {
+						jwtPayload: {
+							scope: 'openid',
+							iat: Math.ceil(Date.now() / 1000) + 5
+						},
+						payload: {
+							scope: 'openid'
 						},
 						verb,
+						jwtKey: key
+					});
+				});
+
+				it('a request object signed with an asymmetric key is accepted', async function () {
+					const client = await Client.find('client-with-HS-sig');
+					const [jwk] = clientKeys(client).symmetric.selectForSign({
+						alg: 'HS256'
+					});
+					const key = await importJWK(jwk);
+
+					await authorizationRequest('client-with-HS-sig', {
+						jwtPayload: {
+							scope: 'openid'
+						},
+						payload: {
+							scope: 'openid'
+						},
+						verb,
+						jwtKey: key
+					});
+				});
+
+				it('rejects HMAC based requests when signed with an expired secret', async function () {
+					const client = await Client.find('client-with-HS-sig-expired');
+					const [jwk] = clientKeys(client).symmetric.selectForSign({
+						alg: 'HS256'
+					});
+					const key = await importJWK(jwk);
+
+					const spy = mock();
+					eventBus.once(errorEvt, spy);
+
+					await authorizationRequest('client-with-HS-sig-expired', {
+						jwtPayload: {
+							scope: 'openid'
+						},
+						payload: {
+							scope: 'openid'
+						},
+						verb,
+						jwtKey: key,
 						isError: true
 					});
 
@@ -468,19 +381,18 @@ describe('request parameter features', () => {
 					);
 					expect(spy.mock.calls[0][0]).toHaveProperty(
 						'error_description',
-						'request response_type must equal the one in request parameters'
+						'could not validate the Request Object - the client secret used for its signature is expired'
 					);
 				});
 
-				it('uses the state from the request even if its validations will fail', async function () {
+				it('doesnt allow request inception', async function () {
 					const spy = mock();
 					eventBus.once(errorEvt, spy);
 
-					const { response } = await authorizationRequest('client', {
+					await authorizationRequest('client', {
 						jwtPayload: {
 							scope: 'openid',
-							state: 'foobar',
-							client_id: 'client2'
+							request: 'request inception'
 						},
 						payload: {
 							scope: 'openid'
@@ -488,9 +400,149 @@ describe('request parameter features', () => {
 						verb,
 						isError: true
 					});
-					const location = response.headers.get('location');
-					const params = new URL(location).searchParams;
-					expect(params.get('state')).toBe('foobar');
+
+					expect(spy).toHaveBeenCalledTimes(1);
+					expect(spy.mock.calls[0][0]).toBeInstanceOf(ValidationError);
+				});
+
+				it('doesnt allow requestUri inception', async function () {
+					const spy = mock();
+					eventBus.once(errorEvt, spy);
+
+					await authorizationRequest('client', {
+						jwtPayload: {
+							scope: 'openid',
+							request_uri: 'request uri inception'
+						},
+						payload: {
+							scope: 'openid'
+						},
+						verb,
+						isError: true
+					});
+
+					expect(spy).toHaveBeenCalledTimes(1);
+					expect(spy.mock.calls[0][0]).toBeInstanceOf(ValidationError);
+				});
+
+				if (route !== '/device/auth') {
+					it('may contain a response_mode and it will be honoured', async function () {
+						await authorizationRequest('client', {
+							jwtPayload: {
+								scope: 'openid',
+								response_mode: 'form_post'
+							},
+							payload: {
+								scope: 'openid'
+							},
+							verb
+						});
+					});
+
+					it('a response mode the client may not use is refused', async function () {
+						const spy = mock();
+						eventBus.once(errorEvt, spy);
+
+						await authorizationRequest('client', {
+							jwtPayload: {
+								scope: 'openid',
+								response_mode: 'foo'
+							},
+							payload: {
+								scope: 'openid',
+								response_mode: 'query'
+							},
+							verb,
+							isError: true
+						});
+
+						expect(spy).toHaveBeenCalledTimes(1);
+						expect(spy.mock.calls[0][0]).toHaveProperty(
+							'message',
+							'unsupported_response_mode'
+						);
+						expect(spy.mock.calls[0][0]).toHaveProperty(
+							'error_description',
+							'unsupported response_mode requested'
+						);
+					});
+
+					it('doesnt allow response_type to differ', async function () {
+						const spy = mock();
+						eventBus.once(errorEvt, spy);
+
+						await authorizationRequest('client', {
+							jwtPayload: {
+								scope: 'openid',
+								response_type: 'code'
+							},
+							payload: {
+								scope: 'openid',
+								response_type: 'none'
+							},
+							verb,
+							isError: true
+						});
+
+						expect(spy).toHaveBeenCalledTimes(1);
+						expect(spy.mock.calls[0][0]).toHaveProperty(
+							'message',
+							'invalid_request_object'
+						);
+						expect(spy.mock.calls[0][0]).toHaveProperty(
+							'error_description',
+							'request response_type must equal the one in request parameters'
+						);
+					});
+
+					it('uses the state from the request even if its validations will fail', async function () {
+						const spy = mock();
+						eventBus.once(errorEvt, spy);
+
+						const { response } = await authorizationRequest('client', {
+							jwtPayload: {
+								scope: 'openid',
+								state: 'foobar',
+								client_id: 'client2'
+							},
+							payload: {
+								scope: 'openid'
+							},
+							verb,
+							isError: true
+						});
+						const params = new URL(getHeader(response, 'location'))
+							.searchParams;
+						expect(params.get('state')).toBe('foobar');
+
+						expect(spy).toHaveBeenCalledTimes(1);
+						expect(spy.mock.calls[0][0]).toHaveProperty(
+							'message',
+							'invalid_request_object'
+						);
+						expect(spy.mock.calls[0][0]).toHaveProperty(
+							'error_description',
+							'request client_id must equal the one in request parameters'
+						);
+					});
+				}
+
+				it('doesnt allow client_id to differ', async function () {
+					const spy = mock();
+					eventBus.once(errorEvt, spy);
+
+					await authorizationRequest('client', {
+						jwtPayload: {
+							scope: 'openid',
+							client_id: 'client2',
+							iss: 'client2'
+						},
+						payload: {
+							scope: 'openid'
+						},
+						verb,
+						isError: true
+					});
 
 					expect(spy).toHaveBeenCalledTimes(1);
 					expect(spy.mock.calls[0][0]).toHaveProperty(
@@ -502,170 +554,142 @@ describe('request parameter features', () => {
 						'request client_id must equal the one in request parameters'
 					);
 				});
-			}
 
-			it('doesnt allow client_id to differ', async function () {
-				const spy = mock();
-				eventBus.once(errorEvt, spy);
+				it('a value that resembles a JWT but is not one is refused', async function () {
+					const spy = mock();
+					eventBus.once(errorEvt, spy);
 
-				await authorizationRequest('client', {
-					jwtPayload: {
-						scope: 'openid',
-						client_id: 'client2',
-						iss: 'client2'
-					},
-					payload: {
-						scope: 'openid'
-					},
-					verb,
-					isError: true
+					await authorizationRequest('client', {
+						payload: {
+							scope: 'openid',
+							request: 'definitely.notsigned.jwt'
+						},
+						verb,
+						isError: true
+					});
+
+					expect(spy).toHaveBeenCalledTimes(1);
+					expect(spy.mock.calls[0][0]).toHaveProperty(
+						'message',
+						'invalid_request_object'
+					);
+					expect(spy.mock.calls[0][0]).toHaveProperty(
+						'error_description',
+						'could not parse Request Object'
+					);
 				});
 
-				expect(spy).toHaveBeenCalledTimes(1);
-				expect(spy.mock.calls[0][0]).toHaveProperty(
-					'message',
-					'invalid_request_object'
-				);
-				expect(spy.mock.calls[0][0]).toHaveProperty(
-					'error_description',
-					'request client_id must equal the one in request parameters'
-				);
-			});
+				it('doesnt allow clients with predefined alg to bypass this alg', async function () {
+					const spy = mock();
+					eventBus.once(errorEvt, spy);
 
-			it('a value that resembles a JWT but is not one is refused', async function () {
-				const spy = mock();
-				eventBus.once(errorEvt, spy);
+					await authorizationRequest('client-with-HS-sig', {
+						payload: {
+							scope: 'openid'
+						},
+						verb,
+						alg: 'HS384',
+						isError: true
+					});
 
-				await authorizationRequest('client', {
-					payload: {
-						scope: 'openid',
-						request: 'definitely.notsigned.jwt'
-					},
-					verb,
-					isError: true
+					expect(spy).toHaveBeenCalledTimes(1);
+					expect(spy.mock.calls[0][0]).toHaveProperty(
+						'message',
+						'invalid_request_object'
+					);
+					expect(spy.mock.calls[0][0]).toHaveProperty(
+						'error_description',
+						'the preregistered alg must be used in request or request_uri'
+					);
 				});
 
-				expect(spy).toHaveBeenCalledTimes(1);
-				expect(spy.mock.calls[0][0]).toHaveProperty(
-					'message',
-					'invalid_request_object'
-				);
-				expect(spy.mock.calls[0][0]).toHaveProperty(
-					'error_description',
-					'could not parse Request Object'
-				);
-			});
+				it('unsupported algs must not be used', async function () {
+					const spy = mock();
+					eventBus.once(errorEvt, spy);
 
-			it('doesnt allow clients with predefined alg to bypass this alg', async function () {
-				const spy = mock();
-				eventBus.once(errorEvt, spy);
+					await authorizationRequest('client', {
+						payload: {
+							scope: 'openid'
+						},
+						verb,
+						jwtKey: crypto.createSecretKey(crypto.randomBytes(48)),
+						alg: 'HS512',
+						isError: true
+					});
 
-				await authorizationRequest('client-with-HS-sig', {
-					payload: {
-						scope: 'openid'
-					},
-					verb,
-					alg: 'HS384',
-					isError: true
+					expect(spy).toHaveBeenCalledTimes(1);
+					expect(spy.mock.calls[0][0]).toHaveProperty(
+						'message',
+						'invalid_request_object'
+					);
+					expect(spy.mock.calls[0][0]).toHaveProperty(
+						'error_description',
+						'unsupported signed request alg'
+					);
 				});
 
-				expect(spy).toHaveBeenCalledTimes(1);
-				expect(spy.mock.calls[0][0]).toHaveProperty(
-					'message',
-					'invalid_request_object'
-				);
-				expect(spy.mock.calls[0][0]).toHaveProperty(
-					'error_description',
-					'the preregistered alg must be used in request or request_uri'
-				);
-			});
+				it('bad signatures will be rejected', async function () {
+					const spy = mock();
+					eventBus.once(errorEvt, spy);
 
-			it('unsupported algs must not be used', async function () {
-				const spy = mock();
-				eventBus.once(errorEvt, spy);
+					await authorizationRequest('client', {
+						payload: {
+							scope: 'openid'
+						},
+						verb,
+						jwtKey: Buffer.from('not THE secret'),
+						isError: true
+					});
 
-				await authorizationRequest('client', {
-					payload: {
-						scope: 'openid'
-					},
-					verb,
-					jwtKey: crypto.createSecretKey(crypto.randomBytes(48)),
-					alg: 'HS512',
-					isError: true
+					expect(spy).toHaveBeenCalledTimes(1);
+					expect(spy.mock.calls[0][0]).toHaveProperty(
+						'message',
+						'invalid_request_object'
+					);
+					expect(spy.mock.calls[0][0]).toHaveProperty(
+						'error_description',
+						'could not validate Request Object'
+					);
 				});
 
-				expect(spy).toHaveBeenCalledTimes(1);
-				expect(spy.mock.calls[0][0]).toHaveProperty(
-					'message',
-					'invalid_request_object'
-				);
-				expect(spy.mock.calls[0][0]).toHaveProperty(
-					'error_description',
-					'unsupported signed request alg'
-				);
-			});
+				it('rejects "registration" parameter part of the Request Object', async function () {
+					const spy = mock();
+					eventBus.once(errorEvt, spy);
 
-			it('bad signatures will be rejected', async function () {
-				const spy = mock();
-				eventBus.once(errorEvt, spy);
+					await authorizationRequest('client', {
+						jwtPayload: {
+							scope: 'openid',
+							registration: 'foo'
+						},
+						payload: {
+							scope: 'openid'
+						},
+						verb,
+						isError: true
+					});
 
-				await authorizationRequest('client', {
-					payload: {
-						scope: 'openid'
-					},
-					verb,
-					jwtKey: Buffer.from('not THE secret'),
-					isError: true
+					expect(spy).toHaveBeenCalledTimes(1);
+					expect(spy.mock.calls[0][0]).toBeInstanceOf(ValidationError);
 				});
 
-				expect(spy).toHaveBeenCalledTimes(1);
-				expect(spy.mock.calls[0][0]).toHaveProperty(
-					'message',
-					'invalid_request_object'
-				);
-				expect(spy.mock.calls[0][0]).toHaveProperty(
-					'error_description',
-					'could not validate Request Object'
-				);
-			});
+				it('an unknown member of the request object is ignored rather than refused', async function () {
+					const spy = mock();
+					eventBus.once(successEvt, spy);
 
-			it('rejects "registration" parameter part of the Request Object', async function () {
-				const spy = mock();
-				eventBus.once(errorEvt, spy);
+					await authorizationRequest('client', {
+						jwtPayload: {
+							scope: 'openid',
+							unrecognized: true
+						},
+						payload: {
+							scope: 'openid'
+						},
+						verb
+					});
 
-				await authorizationRequest('client', {
-					jwtPayload: {
-						scope: 'openid',
-						registration: 'foo'
-					},
-					payload: {
-						scope: 'openid'
-					},
-					verb,
-					isError: true
+					expect(spy).toHaveBeenCalledTimes(1);
 				});
-
-				expect(spy).toHaveBeenCalledTimes(1);
-				expect(spy.mock.calls[0][0]).toBeInstanceOf(ValidationError);
 			});
-
-			it('an unknown member of the request object is ignored rather than refused', async function () {
-				const spy = mock();
-				eventBus.once(successEvt, spy);
-
-				await authorizationRequest('client', {
-					jwtPayload: {
-						scope: 'openid',
-						unrecognized: true
-					},
-					payload: {
-						scope: 'openid'
-					},
-					verb
-				});
-
-				expect(spy).toHaveBeenCalledTimes(1);
-			});
-		});
-	});
+		}
+	);
 });

@@ -18,6 +18,24 @@ export const OAuthError = t.Object({
 	iss: t.Optional(t.String())
 });
 
+/*
+ * What a page route (the interaction pages, the device code entry) answers with when it refuses: the
+ * shared error body, or an HTML page — a form re-rendered with its error, or any refusal when the
+ * caller's Accept asks for a page. Its pages themselves are HTML strings.
+ */
+export const PageError = t.Union([OAuthError, t.String()]);
+
+// Pages answer 200 with HTML; these are the refusals the shared error handler and the pages produce.
+export const PageResponses = {
+	200: t.String(),
+	400: PageError,
+	401: PageError,
+	403: PageError,
+	422: PageError,
+	429: PageError,
+	500: PageError
+};
+
 // Token endpoint (RFC 6749 §5.1). Which members a success body carries depends on grant_type:
 //   - client_credentials                → access token only (no id_token / refresh_token)
 //   - device_code, ciba                 → + id_token, refresh_token

@@ -10,11 +10,11 @@ import {
 } from 'bun:test';
 import { X509Certificate } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import * as url from 'node:url';
 
 import bootstrap, {
 	agent,
 	getHeader,
+	locationParameter,
 	seedAccount,
 	type Setup,
 	formAgent
@@ -118,7 +118,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 					headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 				}
 			);
-			if (!data) throw new Error('expected response data');
+			if (!data?.active) throw new Error('expected an active token');
 			expect(status).toBe(200);
 			expect(data).toHaveProperty('cnf');
 			expect(data).toHaveProperty('token_type', 'Bearer');
@@ -127,7 +127,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 	});
 
 	describe('urn:ietf:params:oauth:grant-type:device_code', () => {
-		let dc;
+		let dc: string;
 		beforeAll(async function () {
 			await setup.login({ scope: 'openid offline_access' });
 		});
@@ -140,7 +140,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 					}
 				}
 			);
-			if (!data) throw new Error('expected response data');
+			if (!data?.device_code) throw new Error('expected a device code');
 			dc = data.device_code;
 
 			TestAdapter.for('DeviceCode').syncUpdate(setup.getTokenJti(dc), {
@@ -233,7 +233,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 	});
 
 	describe('urn:openid:params:grant-type:ciba', () => {
-		let reqId;
+		let reqId: string;
 		beforeEach(async function () {
 			const { data } = await formAgent.backchannel.post(
 				{
@@ -246,7 +246,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 					}
 				}
 			);
-			if (!data) throw new Error('expected response data');
+			if (!data?.auth_req_id) throw new Error('expected an auth_req_id');
 			reqId = data.auth_req_id;
 		});
 
@@ -341,8 +341,8 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 	describe('authorization flow', () => {
 		let cookie: string;
-		let auth;
-		let code;
+		let auth: AuthorizationRequest;
+		let code: string;
 		beforeAll(async function () {
 			cookie = await setup.login({ scope: 'openid offline_access' });
 		});
@@ -360,9 +360,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 				}
 			});
 			const location = getHeader(res.response, 'location');
-			({
-				query: { code }
-			} = url.parse(location, true));
+			code = locationParameter(location, 'code');
 		});
 
 		describe('authorization_code', () => {
@@ -386,6 +384,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 				eventBus.once('grant.error', spy);
 
 				const { error } = await auth.getToken(code);
+				if (!error) throw new Error('expected error response');
 				expect(error.status).toBe(400);
 				expect(error.value).toEqual({
 					error: 'invalid_grant',
@@ -401,11 +400,12 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 		});
 
 		describe('refresh_token', () => {
-			let refresh_token;
+			let refresh_token: string;
 			beforeEach(async function () {
 				const { data } = await auth.getToken(code, {
 					headers: { 'x-client-cert': crt.raw.toString('base64') }
 				});
+				if (!data?.refresh_token) throw new Error('expected a refresh token');
 				refresh_token = data.refresh_token;
 			});
 
@@ -468,8 +468,8 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 	describe('authorization flow (public client)', () => {
 		let cookie: string;
-		let auth;
-		let code;
+		let auth: AuthorizationRequest;
+		let code: string;
 		beforeAll(async function () {
 			cookie = await setup.login({ scope: 'openid offline_access' });
 		});
@@ -489,9 +489,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 				}
 			});
 			const location = getHeader(res.response, 'location');
-			({
-				query: { code }
-			} = url.parse(location, true));
+			code = locationParameter(location, 'code');
 		});
 
 		describe('authorization_code', () => {
@@ -516,6 +514,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 				eventBus.once('grant.error', spy);
 
 				const { error } = await auth.getToken(code);
+				if (!error) throw new Error('expected error response');
 				expect(error.status).toBe(400);
 				expect(error.value).toEqual({
 					error: 'invalid_grant',
@@ -531,11 +530,12 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 		});
 
 		describe('refresh_token', () => {
-			let refresh_token;
+			let refresh_token: string;
 			beforeEach(async function () {
 				const { data } = await auth.getToken(code, {
 					headers: { 'x-client-cert': crt.raw.toString('base64') }
 				});
+				if (!data?.refresh_token) throw new Error('expected a refresh token');
 				refresh_token = data.refresh_token;
 			});
 

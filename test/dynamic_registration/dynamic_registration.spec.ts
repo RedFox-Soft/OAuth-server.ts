@@ -20,18 +20,31 @@ import { RegistrationAccessToken } from 'lib/models/registration_access_token.js
 import { TestAdapter } from 'test/models.js';
 
 const json = { 'content-type': 'application/json' };
-const bearer = (token) => ({ authorization: `Bearer ${token}` });
+const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
 
-function bodyOf(res) {
+// What these cases read off a typed-client result.
+type Result = {
+	status: number;
+	data?: unknown;
+	error?: { value: unknown } | null;
+	response?: Response;
+};
+
+function bodyOf(res: Result) {
 	return res.error?.value ?? res.data;
 }
 
-function expectFail(res, code, error, error_description) {
+function expectFail(
+	res: Result,
+	code: number,
+	error: string,
+	error_description: string
+) {
 	expect(res.status).toBe(code);
 	expect(bodyOf(res)).toHaveProperty('error', error);
 	expect(bodyOf(res)).toHaveProperty('error_description', error_description);
 
-	const wwwAuth = res.headers?.get?.('www-authenticate');
+	const wwwAuth = res.response?.headers.get('www-authenticate');
 	if (code === 401) {
 		expect(wwwAuth).toContain(`Bearer realm="${ISSUER}"`);
 		expect(wwwAuth).toContain(`error="${error}"`);
@@ -305,7 +318,7 @@ describe('registration features', () => {
 			});
 
 			describe('using a model', () => {
-				let token;
+				let token: string;
 				beforeAll(async () => {
 					ApplicationConfig['registration.initialAccessToken'] = true;
 					token = await new InitialAccessToken({}).save();
@@ -369,11 +382,13 @@ describe('registration features', () => {
 	});
 
 	describe('GET /reg/:clientId', () => {
-		let clientId;
-		let token;
+		let clientId: string;
+		let token: string;
 		beforeAll(async () => {
 			const { data } = await reg();
-			if (!data) throw new Error('expected response data');
+			if (!data?.registration_access_token) {
+				throw new Error('expected a registration access token');
+			}
 			clientId = data.client_id;
 			token = data.registration_access_token;
 		});

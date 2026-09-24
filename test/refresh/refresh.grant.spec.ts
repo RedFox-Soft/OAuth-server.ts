@@ -1,5 +1,4 @@
 import { addons } from 'lib/addon/index.js';
-import { parse as parseUrl } from 'node:url';
 import {
 	describe,
 	it,
@@ -9,12 +8,17 @@ import {
 	spyOn,
 	mock,
 	expect,
-	setSystemTime
+	setSystemTime,
+	type Mock
 } from 'bun:test';
 
 import * as base64url from 'lib/helpers/base64url.js';
 
-import bootstrap, { agent, getHeader, type Setup } from '../test_helper.js';
+import bootstrap, {
+	agent,
+	redirectParameter,
+	type Setup
+} from '../test_helper.js';
 import { getUserStore } from 'lib/adapters/index.js';
 import { eventBus } from 'lib/event_bus.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
@@ -22,8 +26,14 @@ import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
 import { ttl } from 'lib/configs/liveTime.js';
 
-function errorDetail(spy) {
+function errorDetail(spy: Mock<(error: { error_detail?: string }) => void>) {
 	return spy.mock.calls[0][0].error_detail;
+}
+
+// The claims of an id_token the response must carry.
+function claimsOf(idToken: string | undefined) {
+	if (!idToken) throw new Error('expected an id_token');
+	return JSON.parse(base64url.decode(idToken.split('.')[1]));
 }
 
 /**
@@ -48,7 +58,7 @@ describe('grant_type=refresh_token', () => {
 	});
 
 	let refreshToken = null;
-	let rt = null;
+	let rt: string;
 	beforeEach(async function () {
 		const authReq = new AuthorizationRequest({
 			client_id: 'client',
@@ -65,12 +75,10 @@ describe('grant_type=refresh_token', () => {
 			}
 		});
 		expect(auth.status).toBe(303);
-		const {
-			query: { code }
-		} = parseUrl(getHeader(auth.response, 'location'), true);
+		const code = redirectParameter(auth.response, 'code');
 
 		const { data } = await authReq.getToken(code);
-		if (!data) throw new Error('expected response data');
+		if (!data?.refresh_token) throw new Error('expected a refresh token');
 
 		expect(data).toHaveProperty('refresh_token');
 		const jti = setup.getTokenJti(data.refresh_token);
@@ -103,9 +111,7 @@ describe('grant_type=refresh_token', () => {
 			'refresh_token',
 			'scope'
 		]);
-		const refreshIdToken = JSON.parse(
-			base64url.decode(data.id_token.split('.')[1])
-		);
+		const refreshIdToken = claimsOf(data.id_token);
 		expect(refreshIdToken).toHaveProperty('nonce', 'foobarnonce');
 		expect(data.refresh_token).toBeString();
 	});
@@ -352,9 +358,7 @@ describe('grant_type=refresh_token', () => {
 				'refresh_token',
 				'scope'
 			]);
-			const refreshIdToken = JSON.parse(
-				base64url.decode(data.id_token.split('.')[1])
-			);
+			const refreshIdToken = claimsOf(data.id_token);
 			expect(refreshIdToken).toHaveProperty('nonce', 'foobarnonce');
 			expect(data.refresh_token).toBeString();
 			expect(data.refresh_token).not.toEqual(rt);
@@ -489,9 +493,7 @@ describe('grant_type=refresh_token', () => {
 				'refresh_token',
 				'scope'
 			]);
-			const refreshIdToken = JSON.parse(
-				base64url.decode(data.id_token.split('.')[1])
-			);
+			const refreshIdToken = claimsOf(data.id_token);
 			expect(refreshIdToken).toHaveProperty('nonce', 'foobarnonce');
 			expect(data.refresh_token).toBeString();
 			expect(data.refresh_token).not.toEqual(rt);
@@ -619,9 +621,7 @@ describe('grant_type=refresh_token', () => {
 				'refresh_token',
 				'scope'
 			]);
-			const refreshIdToken = JSON.parse(
-				base64url.decode(data.id_token.split('.')[1])
-			);
+			const refreshIdToken = claimsOf(data.id_token);
 			expect(refreshIdToken).toHaveProperty('nonce', 'foobarnonce');
 			expect(data.refresh_token).toEqual(rt);
 

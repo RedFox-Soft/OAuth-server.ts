@@ -199,6 +199,15 @@ export function redirectParameter(response: Response, name: string): string {
 	return locationParameter(getHeader(response, 'location'), name);
 }
 
+// The whole query of the URL a response redirects to, one value per parameter.
+export function redirectQuery(response: Response): Record<string, string> {
+	return locationQuery(getHeader(response, 'location'));
+}
+
+export function locationQuery(location: string): Record<string, string> {
+	return Object.fromEntries(new URL(location, ISSUER).searchParams);
+}
+
 export function locationParameter(location: string, name: string): string {
 	const value = new URL(location, ISSUER).searchParams.get(name);
 	if (value === null) {

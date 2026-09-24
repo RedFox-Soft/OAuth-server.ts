@@ -1,4 +1,3 @@
-import * as url from 'node:url';
 import * as crypto from 'node:crypto';
 
 import { describe, it, beforeAll, afterAll, expect } from 'bun:test';
@@ -14,7 +13,10 @@ import bootstrap, {
 	agent,
 	type Setup,
 	changeClient,
-	formAgent
+	formAgent,
+	getHeader,
+	locationQuery,
+	redirectQuery
 } from '../test_helper.js';
 import * as JWT from '../../lib/helpers/jwt.ts';
 
@@ -70,7 +72,7 @@ describe('encryption', () => {
 	['get', 'post'].forEach((verb) => {
 		// Implicit flow was removed; these previously-implicit id_token/token cases now exercise the
 		// authorization code flow and read tokens from the token endpoint response.
-		function authRequest(auth) {
+		function authRequest(auth: { params: AuthorizationRequest['params'] }) {
 			if (verb === 'get') {
 				return agent.auth.get({
 					query: auth.params,
@@ -86,16 +88,17 @@ describe('encryption', () => {
 
 		// Issue an authorization request from a plain params object (used for request-object /
 		// request_uri flows where we must NOT auto-generate PKCE/state like AuthorizationRequest does).
-		function rawAuthRequest(params) {
+		function rawAuthRequest(params: AuthorizationRequest['params']) {
 			return authRequest({ params });
 		}
 
 		// Run the full code flow for `auth` and return the token endpoint response body
 		// (token payload on success, or the error body on failure).
-		async function getTokenBody(auth) {
+		async function getTokenBody(
+			auth: AuthorizationRequest
+		): Promise<Record<string, unknown> | undefined> {
 			const { response } = await authRequest(auth);
-			const location = response.headers.get('location');
-			const { query } = url.parse(location, true);
+			const query = redirectQuery(response);
 			if (query.error) {
 				return query;
 			}
@@ -103,15 +106,22 @@ describe('encryption', () => {
 			return data ?? error?.value;
 		}
 
+		// A token the flow must have produced; the case cannot go on without it.
+		function stringOf(body: Record<string, unknown> | undefined, name: string) {
+			const value = body?.[name];
+			if (typeof value !== 'string') throw new Error(`expected ${name}`);
+			return value;
+		}
+
 		describe(`[encryption] code+token ${verb} /auth`, () => {
 			describe('encrypted authorization results', () => {
-				let id_token;
-				let access_token;
+				let id_token: string;
+				let access_token: string;
 				beforeAll(async () => {
 					const auth = new AuthorizationRequest({ scope: 'openid' });
 					const body = await getTokenBody(auth);
-					id_token = body.id_token;
-					access_token = body.access_token;
+					id_token = stringOf(body, 'id_token');
+					access_token = stringOf(body, 'access_token');
 				});
 
 				it('responds with a nested encrypted and signed id_token JWT', async () => {
@@ -136,7 +146,8 @@ describe('encryption', () => {
 					const { data, response } = await agent.userinfo.get({
 						headers: { authorization: `Bearer ${access_token}` }
 					});
-					if (!data) throw new Error('expected response data');
+					if (typeof data !== 'string')
+						throw new Error('expected a JWT response');
 
 					expect(response.status).toBe(200);
 					expect(response.headers.get('content-type')).toMatch(
@@ -154,6 +165,7 @@ describe('encryption', () => {
 					expect(payload).toBeTruthy();
 					expect(payload).toHaveProperty('sub');
 					expect(payload).toHaveProperty('exp');
+					if (typeof payload.iat !== 'number') throw new Error('expected iat');
 					expect(payload.exp).toBeGreaterThan(payload.iat);
 				});
 
@@ -241,7 +253,7 @@ describe('encryption', () => {
 						client_id: 'client',
 						response_type: 'code'
 					});
-					const { query } = url.parse(response.headers.get('location'), true);
+					const query = redirectQuery(response);
 					expect(query).toHaveProperty('error', 'invalid_request_object');
 					expect(query).toHaveProperty(
 						'error_description',
@@ -273,7 +285,7 @@ describe('encryption', () => {
 						client_id: 'client',
 						response_type: 'code'
 					});
-					const { query } = url.parse(response.headers.get('location'), true);
+					const query = redirectQuery(response);
 					expect(query).toHaveProperty('error', 'invalid_request_object');
 					expect(query).toHaveProperty(
 						'error_description',
@@ -334,12 +346,14 @@ describe('encryption', () => {
 						client_id: 'client'
 					});
 					expect(response.status).toBe(303);
-					const expected = url.parse('https://client.example.com/cb', true);
-					const actual = url.parse(response.headers.get('location'), true);
-					['protocol', 'host', 'pathname'].forEach((attr) => {
+					const expected = new URL('https://client.example.com/cb');
+					const actual = new URL(getHeader(response, 'location'));
+					(['protocol', 'host', 'pathname'] as const).forEach((attr) => {
 						expect(actual[attr]).toBe(expected[attr]);
 					});
-					expect(actual.query).toHaveProperty('code');
+					expect(Object.fromEntries(actual.searchParams)).toHaveProperty(
+						'code'
+					);
 				});
 
 				it('where an algorithm is required, a genuinely signed request object is accepted and an unsecured one is not', async () => {
@@ -394,12 +408,14 @@ describe('encryption', () => {
 						client_id: 'clientRequestObjectSigningAlg'
 					});
 					expect(response.status).toBe(303);
-					const expected = url.parse('https://client.example.com/cb', true);
-					const actual = url.parse(response.headers.get('location'), true);
-					['protocol', 'host', 'pathname'].forEach((attr) => {
+					const expected = new URL('https://client.example.com/cb');
+					const actual = new URL(getHeader(response, 'location'));
+					(['protocol', 'host', 'pathname'] as const).forEach((attr) => {
 						expect(actual[attr]).toBe(expected[attr]);
 					});
-					expect(actual.query).toHaveProperty('code');
+					expect(Object.fromEntries(actual.searchParams)).toHaveProperty(
+						'code'
+					);
 				});
 			});
 
@@ -422,14 +438,14 @@ describe('encryption', () => {
 			});
 
 			describe('symmetric encryption', () => {
-				let id_token;
+				let id_token: string;
 				beforeAll(async () => {
 					const auth = new AuthorizationRequest({
 						scope: 'openid',
 						client_id: 'clientSymmetric'
 					});
 					const body = await getTokenBody(auth);
-					id_token = body.id_token;
+					id_token = stringOf(body, 'id_token');
 				});
 
 				it('accepts symmetric encrypted Request Objects', async () => {
@@ -466,15 +482,14 @@ describe('encryption', () => {
 						client_id: 'clientSymmetric'
 					});
 					expect(response.status).toBe(303);
-					const expected = url.parse('https://client.example.com/cb', true);
-					const actual = url.parse(response.headers.get('location'), true);
-					['protocol', 'host', 'pathname'].forEach((attr) => {
+					const expected = new URL('https://client.example.com/cb');
+					const actual = new URL(getHeader(response, 'location'));
+					(['protocol', 'host', 'pathname'] as const).forEach((attr) => {
 						expect(actual[attr]).toBe(expected[attr]);
 					});
-					const code = actual.query.code;
+					const code = actual.searchParams.get('code') ?? undefined;
 
 					const auth = new AuthorizationRequest({
-						code_verifier,
 						scope: 'openid',
 						client_id: 'clientSymmetric'
 					});
@@ -516,7 +531,7 @@ describe('encryption', () => {
 						response_type: 'code'
 					});
 					expect(response.status).toBe(303);
-					const { query } = url.parse(response.headers.get('location'), true);
+					const query = redirectQuery(response);
 					expect(query).toHaveProperty('error', 'invalid_request_object');
 					expect(query).toHaveProperty(
 						'error_description',
@@ -535,14 +550,14 @@ describe('encryption', () => {
 			});
 
 			describe('direct key agreement symmetric encryption', () => {
-				let id_token;
+				let id_token: string;
 				beforeAll(async () => {
 					const auth = new AuthorizationRequest({
 						scope: 'openid',
 						client_id: 'clientSymmetric-dir'
 					});
 					const body = await getTokenBody(auth);
-					id_token = body.id_token;
+					id_token = stringOf(body, 'id_token');
 				});
 
 				it('accepts symmetric (dir) encrypted Request Objects', async () => {
@@ -579,15 +594,14 @@ describe('encryption', () => {
 						client_id: 'clientSymmetric-dir'
 					});
 					expect(response.status).toBe(303);
-					const expected = url.parse('https://client.example.com/cb', true);
-					const actual = url.parse(response.headers.get('location'), true);
-					['protocol', 'host', 'pathname'].forEach((attr) => {
+					const expected = new URL('https://client.example.com/cb');
+					const actual = new URL(getHeader(response, 'location'));
+					(['protocol', 'host', 'pathname'] as const).forEach((attr) => {
 						expect(actual[attr]).toBe(expected[attr]);
 					});
-					const code = actual.query.code;
+					const code = actual.searchParams.get('code') ?? undefined;
 
 					const auth = new AuthorizationRequest({
-						code_verifier,
 						scope: 'openid',
 						client_id: 'clientSymmetric-dir'
 					});
@@ -629,9 +643,8 @@ describe('encryption', () => {
 						response_type: 'code'
 					});
 					expect(response.status).toBe(303);
-					const { query } = url.parse(
-						response.headers.get('location').replace('#', '?'),
-						true
+					const query = locationQuery(
+						getHeader(response, 'location').replace('#', '?')
 					);
 					expect(query).toHaveProperty('error', 'invalid_request_object');
 					expect(query).toHaveProperty(
