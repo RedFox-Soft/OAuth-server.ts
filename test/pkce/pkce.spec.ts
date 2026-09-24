@@ -1,6 +1,9 @@
-import { parse as parseUrl } from 'node:url';
 import { describe, it, beforeAll, expect } from 'bun:test';
-import bootstrap, { agent, type Setup } from '../test_helper.js';
+import bootstrap, {
+	agent,
+	type Setup,
+	redirectParameter
+} from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';
@@ -11,7 +14,7 @@ import { AuthorizationCode } from 'lib/models/authorization_code.js';
  */
 describe('PKCE RFC7636', () => {
 	let setup: Setup;
-	let cookie = null;
+	let cookie: string;
 	beforeAll(async function () {
 		setup = await bootstrap(import.meta.url);
 		cookie = await setup.login();
@@ -97,6 +100,7 @@ describe('PKCE RFC7636', () => {
 			const auth = new AuthorizationRequest({
 				scope: 'openid',
 				code_challenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
+				// @ts-expect-error a method other than S256 is the case
 				code_challenge_method: 'bar'
 			});
 
@@ -162,9 +166,7 @@ describe('PKCE RFC7636', () => {
 				headers: { cookie }
 			});
 
-			const {
-				query: { code }
-			} = parseUrl(response.headers.get('location'), true);
+			const code = redirectParameter(response, 'code');
 			const jti = setup.getTokenJti(code);
 			const stored = TestAdapter.for('AuthorizationCode').syncFind(jti);
 			expect(stored).toHaveProperty('codeChallengeMethod', 'S256');

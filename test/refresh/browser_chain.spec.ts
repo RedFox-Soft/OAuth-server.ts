@@ -1,4 +1,3 @@
-import { parse as parseUrl } from 'node:url';
 import {
 	describe,
 	it,
@@ -17,7 +16,12 @@ import {
 	type GenerateKeyPairResult
 } from 'jose';
 
-import bootstrap, { agent, getHeader, type Setup } from '../test_helper.js';
+import bootstrap, {
+	agent,
+	getHeader,
+	type Setup,
+	redirectParameter
+} from '../test_helper.js';
 import nanoid from '../../lib/helpers/nanoid.ts';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { ISSUER } from 'lib/configs/env.js';
@@ -84,9 +88,7 @@ describe('a browser application refreshing its tokens', () => {
 			query: authReq.params,
 			headers: { cookie }
 		});
-		const {
-			query: { code }
-		} = parseUrl(getHeader(auth.response, 'location'), true);
+		const code = redirectParameter(auth.response, 'code');
 		const { data } = await authReq.getToken(code, {
 			headers: dpop ? { dpop } : {}
 		});

@@ -1,9 +1,10 @@
 import getConfig from '../default.config.js';
 import { testSigningKeys } from '../jwks/fixtures.js';
+import type { AddonImplementations } from 'lib/addon/types.js';
 
 const config = getConfig();
 
-export const addons = {
+export const addons: Partial<AddonImplementations> = {
 	pairwiseIdentifier: () => 'pairwise-sub'
 };
 

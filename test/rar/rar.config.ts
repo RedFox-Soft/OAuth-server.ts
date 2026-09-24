@@ -1,5 +1,6 @@
 import * as errors from '../../lib/helpers/errors.ts';
 import getConfig from '../default.config.js';
+import type { AddonImplementations } from 'lib/addon/types.js';
 
 const config = getConfig();
 
@@ -9,7 +10,7 @@ const config = getConfig();
  * InvalidTarget. Without this override every token assertion in this suite would fail for a reason
  * unrelated to RAR — see specs/015-rar-end-to-end/research.md R22.
  */
-export const addons = {
+export const addons: Partial<AddonImplementations> = {
 	issueRefreshToken() {
 		return true;
 	},

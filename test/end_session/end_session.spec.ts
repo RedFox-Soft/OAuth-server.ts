@@ -15,7 +15,8 @@ import bootstrap, {
 	agent,
 	getHeader,
 	type Setup,
-	changeClient
+	changeClient,
+	redirectParameter
 } from '../test_helper.js';
 import * as JWT from '../../lib/helpers/jwt.js';
 import { ISSUER } from 'lib/configs/env.js';
@@ -44,12 +45,10 @@ async function getIdToken(options = {}, cookie = '') {
 	auth.validateState(response);
 	auth.validateClientLocation(response);
 
-	const {
-		query: { code }
-	} = parseUrl(response.headers.get('location'), true);
+	const code = redirectParameter(response, 'code');
 
 	const { data } = await auth.getToken(code);
-	if (!data) throw new Error('expected response data');
+	if (!data?.id_token) throw new Error('expected an id_token');
 	return data.id_token;
 }
 
@@ -88,7 +87,7 @@ describe('logout endpoint', () => {
 
 	describe('when logged in', () => {
 		let cookie: string;
-		let idToken;
+		let idToken: string;
 		beforeEach(async function () {
 			cookie = await setup.login();
 			idToken = await getIdToken({}, cookie);
@@ -471,6 +470,7 @@ describe('logout endpoint', () => {
 		describe('POST end_session_confirm', () => {
 			it('a logout confirmation without the CSRF state is refused', async function () {
 				const { error } = await agent.logout.confirm.post(
+					// @ts-expect-error the case sends no xsrf
 					{},
 					{
 						headers: {

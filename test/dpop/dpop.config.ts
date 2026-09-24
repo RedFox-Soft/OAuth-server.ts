@@ -1,10 +1,11 @@
 import getConfig from '../default.config.js';
 import { Grant } from 'lib/models/grant.js';
 import { backchannelResult } from 'lib/actions/authorization/backchannel_result.js';
+import type { AddonImplementations } from 'lib/addon/types.js';
 
 const config = getConfig();
 
-export const addons = {
+export const addons: Partial<AddonImplementations> = {
 	processLoginHint(oidc, loginHint) {
 		return loginHint;
 	},

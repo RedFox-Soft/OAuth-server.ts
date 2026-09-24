@@ -1,4 +1,3 @@
-import * as url from 'node:url';
 import {
 	describe,
 	it,
@@ -10,7 +9,11 @@ import {
 	expect
 } from 'bun:test';
 
-import bootstrap, { agent, type Setup } from '../test_helper.js';
+import bootstrap, {
+	agent,
+	type Setup,
+	redirectParameter
+} from '../test_helper.js';
 import { IdToken } from 'lib/models/id_token.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { DeviceCode } from 'lib/models/device_code.js';
@@ -66,6 +69,7 @@ describe('dynamic ttl', () => {
 		expect(device.response.status).toBe(200);
 		if (!device.data) throw new Error('expected response data');
 		expect(device.data.expires_in).toBe(123);
+		if (!device.data?.device_code) throw new Error('expected a device code');
 		const device_code = device.data.device_code;
 
 		expect(deviceCodeSpy).toBeCalledTimes(1);
@@ -147,9 +151,7 @@ describe('dynamic ttl', () => {
 			}
 		});
 		expect(res.response.status).toBe(303);
-		const {
-			query: { code }
-		} = url.parse(res.response.headers.get('location'), true);
+		const code = redirectParameter(res.response, 'code');
 
 		const { status } = await agent.token.post(
 			{
@@ -194,9 +196,7 @@ describe('dynamic ttl', () => {
 			}
 		});
 		expect(res.response.status).toBe(303);
-		const {
-			query: { code }
-		} = url.parse(res.response.headers.get('location'), true);
+		const code = redirectParameter(res.response, 'code');
 
 		const tokenRes = await agent.token.post({
 			client_id: 'client',

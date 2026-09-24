@@ -34,7 +34,7 @@ import { logoutSuccess } from '../html/logoutSuccess.tsx';
 import { logout } from '../html/logout.tsx';
 import { eventBus } from '../event_bus.js';
 import {
-	OAuthError,
+	PageError,
 	RedirectOrHtmlResponse
 } from 'lib/shared/response_schemas.js';
 
@@ -178,8 +178,8 @@ export const logoutAction = new Elysia()
 		{
 			response: {
 				200: RedirectOrHtmlResponse,
-				400: OAuthError,
-				500: OAuthError
+				400: PageError,
+				500: PageError
 			}
 		}
 	);
@@ -270,8 +270,8 @@ export const logoutConfirmAction = new Elysia()
 		{
 			response: {
 				200: RedirectOrHtmlResponse,
-				400: OAuthError,
-				500: OAuthError
+				400: PageError,
+				500: PageError
 			}
 		}
 	);

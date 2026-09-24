@@ -4,8 +4,8 @@ import type { OIDCContext } from '../helpers/oidc_context.ts';
 
 export async function processLoginHintToken(
 	_oidc: OIDCContext,
-	_loginHintToken
-) {
+	_loginHintToken: string
+): Promise<string | undefined> {
 	// @param oidc - the request context (OIDCContext)
 	// @param loginHintToken - string value of the login_hint_token parameter
 	mustChange(
@@ -15,7 +15,10 @@ export async function processLoginHintToken(
 	throw new Error('features.ciba.processLoginHintToken not implemented');
 }
 
-export async function processLoginHint(_oidc: OIDCContext, _loginHint) {
+export async function processLoginHint(
+	_oidc: OIDCContext,
+	_loginHint: string
+): Promise<string | undefined> {
 	// @param oidc - the request context (OIDCContext)
 	// @param loginHint - string value of the login_hint parameter
 	mustChange(
@@ -25,7 +28,11 @@ export async function processLoginHint(_oidc: OIDCContext, _loginHint) {
 	throw new Error('features.ciba.processLoginHint not implemented');
 }
 
-export async function verifyUserCode(_oidc: OIDCContext, _account, _userCode) {
+export async function verifyUserCode(
+	_oidc: OIDCContext,
+	_account: unknown,
+	_userCode: string | undefined
+): Promise<void> {
 	// @param oidc - the request context (OIDCContext)
 	// @param account -
 	// @param userCode - string value of the user_code parameter, when not provided it is undefined
@@ -38,8 +45,8 @@ export async function verifyUserCode(_oidc: OIDCContext, _account, _userCode) {
 
 export async function validateBindingMessage(
 	_oidc: OIDCContext,
-	bindingMessage
-) {
+	bindingMessage: string | undefined
+): Promise<void> {
 	// @param oidc - the request context (OIDCContext)
 	// @param bindingMessage - string value of the binding_message parameter, when not provided it is undefined
 	shouldChange(
@@ -55,8 +62,8 @@ export async function validateBindingMessage(
 
 export async function validateRequestContext(
 	_oidc: OIDCContext,
-	_requestContext
-) {
+	_requestContext: string | undefined
+): Promise<void> {
 	// @param oidc - the request context (OIDCContext)
 	// @param requestContext - string value of the request_context parameter, when not provided it is undefined
 	mustChange(

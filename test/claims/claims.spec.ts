@@ -1,4 +1,3 @@
-import url from 'node:url';
 import {
 	describe,
 	it,
@@ -15,8 +14,11 @@ import bootstrap, {
 	setSeedClaims,
 	type Setup,
 	changeClient,
-	formAgent
+	formAgent,
+	getHeader,
+	redirectParameter
 } from '../test_helper.js';
+import { isPlainObject } from 'lib/helpers/_/object.js';
 import { fullProfileClaims } from '../models.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { Client } from 'lib/models/client.js';
@@ -33,7 +35,10 @@ expire.setDate(expire.getDate() + 1);
  * refused.
  */
 ['get', 'post'].forEach((verb) => {
-	function authRequest(auth, { cookie } = {}) {
+	function authRequest(
+		auth: AuthorizationRequest,
+		{ cookie }: { cookie?: string } = {}
+	) {
 		if (verb === 'get') {
 			return agent.auth.get({
 				query: auth.params,
@@ -48,16 +53,13 @@ expire.setDate(expire.getDate() + 1);
 
 	describe(`claimsParameter via ${verb} ${route}`, () => {
 		let setup: Setup;
-		async function getToken(auth, { cookie: cookieHeader } = {}) {
+		async function getToken(
+			auth: AuthorizationRequest,
+			{ cookie: cookieHeader }: { cookie?: string } = {}
+		) {
 			const cookie = cookieHeader || (await setup.login());
 			const authRes = await authRequest(auth, { cookie });
-			const location = authRes.response.headers.get('location');
-			const {
-				query: { code }
-			} = url.parse(location, true);
-			if (!code) {
-				console.error('no code in location', location);
-			}
+			const code = redirectParameter(authRes.response, 'code');
 
 			const token = await auth.getToken(code);
 			expect(token.response.status).toBe(200);
@@ -276,20 +278,23 @@ expire.setDate(expire.getDate() + 1);
 				});
 
 				if (verb === 'get') {
-					async function setupFun(auth, result) {
-						const cookies = [];
+					async function setupFun(
+						auth: AuthorizationRequest,
+						result: Record<string, unknown>
+					) {
+						const cookies: string[] = [];
 
 						const sess = new Interaction('resume', {
 							uid: 'resume',
 							cookieID: 'cookieID'
 						});
 						if (auth) {
-							const cookie = `_interaction=cookieID; path=/ui/resume/resume; expires=${expire.toGMTString()}; httponly`;
+							const cookie = `_interaction=cookieID; path=/ui/resume/resume; expires=${expire.toUTCString()}; httponly`;
 							cookies.push(cookie);
 							/*
-							 * `claims` is stored as an object, the way a real interaction stores it. The
-							 * request helper JSON-stringifies it for the wire; storing that string here
-							 * made `oidc.claims` a string on resume, so `oidc.claims.id_token` was
+							 * `claims` is stored as an object, the way a real interaction stores it. A case
+							 * may hand it over as JSON text; storing that string here made
+							 * `oidc.claims` a string on resume, so `oidc.claims.id_token` was
 							 * undefined and every acr check returned early without comparing anything —
 							 * the cases below passed while proving nothing.
 							 */
@@ -931,16 +936,17 @@ expire.setDate(expire.getDate() + 1);
 				const { response } = await authRequest(auth, { cookie });
 				expect(response.status).toBe(303);
 
-				const location = response.headers.get('location') as string;
+				const location = getHeader(response, 'location');
 				const uid = new URL(location, 'http://e.ly').pathname.split('/')[2];
 				expect(uid).toBeString();
 
 				const interaction = await Interaction.find(uid);
-				expect(interaction.payload.params).toHaveProperty('claims');
-				expect(interaction.payload.params.claims).toHaveProperty('id_token');
-				expect(interaction.payload.params.claims).not.toHaveProperty(
-					'urn_example_ext'
-				);
+				const { params } = interaction.payload;
+				if (!isPlainObject(params))
+					throw new Error('expected stored parameters');
+				expect(params).toHaveProperty('claims');
+				expect(params.claims).toHaveProperty('id_token');
+				expect(params.claims).not.toHaveProperty('urn_example_ext');
 			});
 
 			it('refuses a claims parameter whose userinfo member is not a plain object', async function () {

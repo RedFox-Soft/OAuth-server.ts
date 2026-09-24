@@ -1,3 +1,15 @@
+/*
+ * What getResourceServerInfo answers for a resource indicator: the scopes it offers and, optionally, the
+ * audience its tokens carry and how they look (opaque unless it says otherwise).
+ */
+export type ResourceServerInfo = {
+	scope: string;
+	audience?: string;
+	accessTokenFormat?: 'jwt' | 'opaque';
+	accessTokenTTL?: number;
+	jwt?: Record<string, unknown>;
+};
+
 export default class ResourceServer {
 	constructor(identifier, data) {
 		this._identifier = identifier;

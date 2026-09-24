@@ -60,8 +60,14 @@ export type InteractionPayloadType = Static<typeof InteractionPayload>;
 export class Interaction extends BaseModel<InteractionPayloadType> {
 	model = InteractionPayload;
 
-	constructor(jti: string, payload: Record<string, unknown>) {
-		if (arguments.length === 2) {
+	// Read back from storage, the stored payload alone (that is how tryFind builds one); new, an id and a payload.
+	constructor(payload: InteractionPayloadType);
+	constructor(jti: string, payload: Record<string, unknown>);
+	constructor(
+		jti: string | InteractionPayloadType,
+		payload?: Record<string, unknown>
+	) {
+		if (typeof jti === 'string' && payload) {
 			if (payload.session instanceof BaseModel) {
 				const { session } = payload;
 				Object.assign(
@@ -96,8 +102,10 @@ export class Interaction extends BaseModel<InteractionPayloadType> {
 			}
 
 			super({ jti, ...payload });
-		} else {
+		} else if (typeof jti !== 'string') {
 			super(jti);
+		} else {
+			throw new TypeError('a new interaction needs a payload');
 		}
 	}
 

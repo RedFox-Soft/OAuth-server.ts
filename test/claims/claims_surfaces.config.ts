@@ -1,4 +1,5 @@
 import getConfig from '../default.config.js';
+import type { AddonImplementations } from 'lib/addon/types.js';
 
 const config = getConfig();
 
@@ -21,7 +22,7 @@ export const ApplicationConfig = {
  * one — so without this the backchannel endpoint answers 500 and the case below would pass on two
  * matched server errors rather than on two matched successes.
  */
-export const addons = {
+export const addons: Partial<AddonImplementations> = {
 	validateRequestContext() {},
 	verifyUserCode() {},
 	triggerAuthenticationDevice() {},

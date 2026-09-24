@@ -1,7 +1,6 @@
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import type { PipelineParams } from 'lib/consts/param_list.js';
 import { InvalidRequest, UnknownUserId } from '../../helpers/errors.ts';
-import omitBy from '../../helpers/_/omit_by.ts';
 import { findAccount } from '../../addon/account.js';
 import {
 	processLoginHintToken,
@@ -14,25 +13,15 @@ import checkIdTokenHint from './check_id_token_hint.ts';
 export default async function cibaLoadAccount(
 	oidc: OIDCContext<PipelineParams>
 ) {
-	const mechanisms = omitBy(
-		{
-			login_hint_token: oidc.params.login_hint_token,
-			id_token_hint: oidc.params.id_token_hint,
-			login_hint: oidc.params.login_hint
-		},
-		(value) => typeof value !== 'string' || !value
+	const mechanisms = Object.entries({
+		login_hint_token: oidc.params.login_hint_token,
+		id_token_hint: oidc.params.id_token_hint,
+		login_hint: oidc.params.login_hint
+	}).filter(
+		(entry): entry is [string, string] =>
+			typeof entry[1] === 'string' && entry[1] !== ''
 	);
-
-	let mechanism;
-	let length;
-	let value;
-
-	try {
-		({
-			0: [mechanism, value],
-			length
-		} = Object.entries(mechanisms));
-	} catch (err) {}
+	const { length } = mechanisms;
 
 	if (!length) {
 		throw new InvalidRequest(
@@ -44,6 +33,7 @@ export default async function cibaLoadAccount(
 		);
 	}
 
+	const [[mechanism, value]] = mechanisms;
 	let accountId;
 
 	switch (mechanism) {

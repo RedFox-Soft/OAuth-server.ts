@@ -1,5 +1,6 @@
 import getConfig from '../default.config.js';
 import { grantTypeAllowed } from 'lib/models/client.js';
+import type { AddonImplementations } from 'lib/addon/types.js';
 
 const config = getConfig();
 
@@ -7,7 +8,7 @@ export const ApplicationConfig = {
 	'deviceFlow.enabled': true
 };
 
-export const addons = {
+export const addons: Partial<AddonImplementations> = {
 	issueRefreshToken: (oidc, client) => grantTypeAllowed(client, 'refresh_token')
 };
 

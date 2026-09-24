@@ -1,5 +1,6 @@
 import * as errors from '../../lib/helpers/errors.ts';
 import getConfig from '../default.config.js';
+import type { AddonImplementations } from 'lib/addon/types.js';
 
 const config = getConfig();
 
@@ -12,7 +13,7 @@ export const RESOURCE = 'urn:consent:api';
  * resource indicators *and* a resource server that offers the requested scope, and rich details need a
  * declared type. One render of all four is what proves the page groups and labels them.
  */
-export const addons = {
+export const addons: Partial<AddonImplementations> = {
 	getResourceServerInfo(oidc: unknown, resource: string) {
 		if (resource === RESOURCE) {
 			return { audience: resource, scope: 'api:read api:write' };

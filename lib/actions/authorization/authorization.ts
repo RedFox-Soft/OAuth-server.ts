@@ -72,6 +72,7 @@ import {
 import { corsClientBased, formClientId } from 'lib/plugins/cors.js';
 import {
 	OAuthError,
+	PageError,
 	ParResponse,
 	RedirectOrHtmlResponse
 } from 'lib/shared/response_schemas.js';
@@ -238,8 +239,8 @@ export const authGet = new Elysia()
 		{
 			response: {
 				200: RedirectOrHtmlResponse,
-				400: OAuthError,
-				500: OAuthError
+				400: PageError,
+				500: PageError
 			}
 		}
 	);
@@ -276,8 +277,8 @@ export const authPost = new Elysia()
 		{
 			response: {
 				200: RedirectOrHtmlResponse,
-				400: OAuthError,
-				500: OAuthError
+				400: PageError,
+				500: PageError
 			}
 		}
 	);

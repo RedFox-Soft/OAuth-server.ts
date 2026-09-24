@@ -1,9 +1,10 @@
 import * as errors from '../../lib/helpers/errors.ts';
 import getConfig from '../default.config.js';
+import type { AddonImplementations } from 'lib/addon/types.js';
 
 const config = getConfig();
 
-export const addons = {
+export const addons: Partial<AddonImplementations> = {
 	getResourceServerInfo(oidc, resourceIndicator) {
 		const [, wl, format] = resourceIndicator.split(':');
 		if (wl.includes('wl')) {

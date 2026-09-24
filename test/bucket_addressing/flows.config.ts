@@ -1,6 +1,7 @@
 import { Grant } from 'lib/models/grant.js';
 import { backchannelResult } from 'lib/actions/authorization/backchannel_result.js';
 import type { BackchannelAuthenticationRequest } from 'lib/models/backchannel_authentication_request.js';
+import type { AddonImplementations } from 'lib/addon/types.js';
 
 /*
  * The flows that start somewhere other than the authorization endpoint — device authorization,
@@ -47,7 +48,7 @@ export const acmeClient = {
  * The backchannel request is approved the moment it is made, so a spec can go straight to redeeming
  * it: what is under test is which issuer the redemption answers with, not the approval.
  */
-export const addons = {
+export const addons: Partial<AddonImplementations> = {
 	processLoginHint(_oidc: unknown, loginHint: string) {
 		return loginHint;
 	},

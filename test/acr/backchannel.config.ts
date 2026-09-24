@@ -1,4 +1,5 @@
 import getConfig from '../default.config.js';
+import type { AddonImplementations } from 'lib/addon/types.js';
 
 const config = getConfig();
 
@@ -12,7 +13,7 @@ const config = getConfig();
  * then complete the request by calling `backchannelResult` directly, which is what that deployment's
  * integration does when the person answers.
  */
-export const addons = {
+export const addons: Partial<AddonImplementations> = {
 	processLoginHint: (_ctx: unknown, loginHint: string) => loginHint,
 	validateBindingMessage: () => {},
 	validateRequestContext: () => {},

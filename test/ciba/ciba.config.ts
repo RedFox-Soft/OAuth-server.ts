@@ -5,6 +5,7 @@ import * as events from 'node:events';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 
 import getConfig from '../default.config.js';
+import type { AddonImplementations } from 'lib/addon/types.js';
 
 const config = getConfig();
 
@@ -16,7 +17,7 @@ export const ApplicationConfig = {
 	'ciba.deliveryModes': ['poll', 'ping']
 };
 
-export const addons = {
+export const addons: Partial<AddonImplementations> = {
 	processLoginHint(oidc, loginHint) {
 		assert(oidc instanceof OIDCContext);
 		assert(typeof loginHint === 'string');

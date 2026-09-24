@@ -1,5 +1,5 @@
 import { describe, it, beforeAll, expect, mock, afterEach } from 'bun:test';
-import bootstrap, { agent, type Setup } from '../test_helper.js';
+import bootstrap, { agent, formAgent, type Setup } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { eventBus } from 'lib/index.js';
 
@@ -9,7 +9,7 @@ import { eventBus } from 'lib/index.js';
  */
 describe('/auth', () => {
 	let setup: Setup;
-	let cookie = null;
+	let cookie: string;
 	beforeAll(async function () {
 		setup = await bootstrap(import.meta.url);
 		cookie = await setup.login();
@@ -21,24 +21,11 @@ describe('/auth', () => {
 
 	['get', 'post'].forEach((verb) => {
 		async function authRequest(auth: AuthorizationRequest, skipCookie = false) {
+			const headers = skipCookie ? {} : { cookie };
 			if (verb === 'get') {
-				return agent.auth.get({
-					query: auth.params,
-					headers: {
-						cookie: skipCookie ? undefined : cookie
-					}
-				});
-			} else if (verb === 'post') {
-				return agent.auth.post(
-					new URLSearchParams(Object.entries(auth.params)).toString(),
-					{
-						headers: {
-							cookie: skipCookie ? undefined : cookie,
-							['content-type']: 'application/x-www-form-urlencoded'
-						}
-					}
-				);
+				return agent.auth.get({ query: auth.params, headers });
 			}
+			return formAgent.auth.post(auth.params, { headers });
 		}
 
 		describe(`${verb} response_mode=form_post`, () => {
@@ -124,6 +111,7 @@ describe('/auth', () => {
 							'https://client.example.com/cb"><script>alert(0)</script><x="/'
 					});
 					const { error } = await authRequest(auth);
+					if (!error) throw new Error('expected error response');
 					expect(error.status).toBe(400);
 
 					expect(error.value).toEqual({
@@ -144,6 +132,7 @@ describe('/auth', () => {
 				eventBus.once('authorization.error', spy);
 
 				const { response, error } = await authRequest(auth, true);
+				if (!error) throw new Error('expected error response');
 				expect(response.status).toBe(400);
 				expect(response.headers.get('content-type')).toBe(
 					'text/html; charset=utf-8'

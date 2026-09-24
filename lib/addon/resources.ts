@@ -3,6 +3,7 @@ import * as errors from '../helpers/errors.ts';
 import { MCP_RESOURCE_SERVER, isMcpResource } from '../mcp/resource_server.js';
 import { resolveDeclaredResource } from '../resources/registry.js';
 import type { OIDCContext } from '../helpers/oidc_context.ts';
+import type { ResourceServerInfo } from '../helpers/resource_server.ts';
 
 export async function defaultResource(_oidc: OIDCContext, client, oneOf) {
 	// @param oidc - the request context (OIDCContext)
@@ -27,7 +28,7 @@ export async function getResourceServerInfo(
 	_oidc: OIDCContext,
 	resourceIndicator,
 	_client
-) {
+): Promise<ResourceServerInfo> {
 	// @param oidc - the request context (OIDCContext)
 	// @param resourceIndicator - resource indicator value either requested or resolved by the defaultResource helper.
 	// @param client - client making the request

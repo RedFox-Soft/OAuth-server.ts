@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 
 import key from '../client.sig.key.js';
 import getConfig from '../default.config.js';
+import type { AddonImplementations } from 'lib/addon/types.js';
 
 const mtlsKeys = JSON.parse(
 	readFileSync('test/jwks/jwks.json', {
@@ -39,7 +40,7 @@ export const ApplicationConfig = {
 	]
 };
 
-export const addons = {
+export const addons: Partial<AddonImplementations> = {
 	getCertificate(oidc) {
 		try {
 			return new X509Certificate(

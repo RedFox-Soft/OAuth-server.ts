@@ -1,5 +1,3 @@
-import { parse as parseUrl } from 'node:url';
-
 import {
 	describe,
 	it,
@@ -15,7 +13,8 @@ import bootstrap, {
 	getHeader,
 	setSeedClaims,
 	type Setup,
-	changeClient
+	changeClient,
+	redirectParameter
 } from '../test_helper.js';
 import { fullProfileClaims } from '../models.js';
 import { decode as decodeJWT } from '../../lib/helpers/jwt.ts';
@@ -30,7 +29,7 @@ const scope = 'openid email offline_access';
  */
 describe('configuration conformIdTokenClaims=true', () => {
 	let setup: Setup;
-	let cookie = null;
+	let cookie: string;
 	beforeAll(async () => {
 		setup = await bootstrap(import.meta.url, { config: 'conform' });
 		setSeedClaims(fullProfileClaims);
@@ -47,10 +46,10 @@ describe('configuration conformIdTokenClaims=true', () => {
 	});
 
 	describe('response_type=code', () => {
-		let userinfo = null;
-		let userinfoSigned = null;
-		let tokenIdToken = null;
-		let refreshIdToken = null;
+		let userinfo: unknown;
+		let userinfoSigned: string;
+		let tokenIdToken: string;
+		let refreshIdToken: string;
 
 		beforeAll(async () => {
 			const claims = {
@@ -71,13 +70,11 @@ describe('configuration conformIdTokenClaims=true', () => {
 			expect(authResponse.status).toBe(303);
 			auth.validateClientLocation(authResponse.response);
 
-			const {
-				query: { code }
-			} = parseUrl(getHeader(authResponse.response, 'location'), true);
+			const code = redirectParameter(authResponse.response, 'code');
 
 			const tokenRes = await auth.getToken(code);
 			expect(tokenRes.status).toBe(200);
-			if (!tokenRes.data) throw new Error('expected response data');
+			if (!tokenRes.data?.id_token) throw new Error('expected an id_token');
 			tokenIdToken = tokenRes.data.id_token;
 			const refresh_token = tokenRes.data.refresh_token;
 
@@ -89,7 +86,7 @@ describe('configuration conformIdTokenClaims=true', () => {
 				{ headers: AuthorizationRequest.basicAuthHeader('client', 'secret') }
 			);
 			expect(refreshRes.status).toBe(200);
-			if (!refreshRes.data) throw new Error('expected response data');
+			if (!refreshRes.data?.id_token) throw new Error('expected an id_token');
 			refreshIdToken = refreshRes.data.id_token;
 			const access_token = refreshRes.data.access_token;
 
@@ -109,6 +106,9 @@ describe('configuration conformIdTokenClaims=true', () => {
 				const uiSignedRes = await agent.userinfo.get({
 					headers: { authorization: `Bearer ${access_token}` }
 				});
+				if (typeof uiSignedRes.data !== 'string') {
+					throw new Error('expected a signed userinfo response');
+				}
 				userinfoSigned = uiSignedRes.data;
 				await signed();
 			}

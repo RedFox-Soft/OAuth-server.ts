@@ -1,4 +1,5 @@
 import getConfig from '../default.config.js';
+import type { AddonImplementations } from 'lib/addon/types.js';
 
 const config = getConfig();
 
@@ -7,7 +8,7 @@ export const ApplicationConfig = {
 	acrValues: { password: '1', multi_factor: '2', federated: '3' }
 };
 
-export const addons = {
+export const addons: Partial<AddonImplementations> = {
 	pairwiseIdentifier: (sub) => `${sub}-pairwise`
 };
 // This suite asserts scope/claims-parameter masking over a FULL OIDC profile;

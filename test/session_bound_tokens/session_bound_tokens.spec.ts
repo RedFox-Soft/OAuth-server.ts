@@ -1,7 +1,10 @@
 import { describe, it, beforeAll, expect, spyOn } from 'bun:test';
-import * as url from 'node:url';
 
-import bootstrap, { agent, type Setup } from '../test_helper.js';
+import bootstrap, {
+	agent,
+	type Setup,
+	locationParameter
+} from '../test_helper.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
@@ -14,9 +17,7 @@ function codeFromResponse(response: Response) {
 	if (!location) {
 		throw new Error('location header is missing');
 	}
-	const {
-		query: { code }
-	} = url.parse(location, true);
+	const code = locationParameter(location, 'code');
 	return code as string;
 }
 

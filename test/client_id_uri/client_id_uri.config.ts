@@ -1,5 +1,6 @@
 import nanoid from '../../lib/helpers/nanoid.ts';
 import getConfig from '../default.config.js';
+import type { AddonImplementations } from 'lib/addon/types.js';
 
 const config = getConfig();
 
@@ -8,7 +9,7 @@ export const ApplicationConfig = {
 	'registrationManagement.enabled': true
 };
 
-export const addons = {
+export const addons: Partial<AddonImplementations> = {
 	idFactory() {
 		return new URL(`https://repo.clients.com/path?id=${nanoid()}`).href;
 	}

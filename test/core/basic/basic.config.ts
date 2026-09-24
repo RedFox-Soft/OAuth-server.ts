@@ -1,6 +1,7 @@
 import { type CheckPartial } from 'lib/helpers/interaction_policy/prompt.js';
 import { Prompt, base } from '../../../lib/helpers/interaction_policy/index.ts';
 import getConfig from '../../default.config.js';
+import type { AddonImplementations } from 'lib/addon/types.js';
 
 const config = getConfig();
 
@@ -28,7 +29,7 @@ policy.add(new CustomPrompt());
 
 // The policy is overridable behavior, registered through the addon seam rather than passed
 // as provider configuration. bootstrap() makes this the spec's addon baseline.
-export const addons = {
+export const addons: Partial<AddonImplementations> = {
 	interactionPolicy: () => policy
 };
 

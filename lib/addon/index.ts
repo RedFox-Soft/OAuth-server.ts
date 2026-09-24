@@ -21,23 +21,23 @@ export type { AddonImplementations } from './types.js';
 // of module load order. Source modules import these accessors; they never read
 // the functions off the merged configuration.
 export const assertJwtClientAuthClaimsAndHeader: typeof defaultMod.assertJwtClientAuthClaimsAndHeader =
-	(...args) =>
+	async (...args) =>
 		resolve(
 			'assertJwtClientAuthClaimsAndHeader',
 			defaultMod.assertJwtClientAuthClaimsAndHeader
 		)(...args);
-export const loadExistingGrant: typeof accountMod.loadExistingGrant = (
+export const loadExistingGrant: typeof accountMod.loadExistingGrant = async (
 	...args
 ) => resolve('loadExistingGrant', accountMod.loadExistingGrant)(...args);
-export const findAccount: typeof accountMod.findAccount = (...args) =>
+export const findAccount: typeof accountMod.findAccount = async (...args) =>
 	resolve('findAccount', accountMod.findAccount)(...args);
-export const expiresWithSession: typeof tokensMod.expiresWithSession = (
+export const expiresWithSession: typeof tokensMod.expiresWithSession = async (
 	...args
 ) => resolve('expiresWithSession', tokensMod.expiresWithSession)(...args);
 export const issueRefreshToken: typeof tokensMod.issueRefreshToken = (
 	...args
 ) => resolve('issueRefreshToken', tokensMod.issueRefreshToken)(...args);
-export const pairwiseIdentifier: typeof tokensMod.pairwiseIdentifier = (
+export const pairwiseIdentifier: typeof tokensMod.pairwiseIdentifier = async (
 	...args
 ) => resolve('pairwiseIdentifier', tokensMod.pairwiseIdentifier)(...args);
 export const rotateRefreshToken: typeof tokensMod.rotateRefreshToken = (
@@ -45,15 +45,15 @@ export const rotateRefreshToken: typeof tokensMod.rotateRefreshToken = (
 ) => resolve('rotateRefreshToken', tokensMod.rotateRefreshToken)(...args);
 export const idFactory: typeof tokensMod.idFactory = (...args) =>
 	resolve('idFactory', tokensMod.idFactory)(...args);
-export const secretFactory: typeof tokensMod.secretFactory = (...args) =>
+export const secretFactory: typeof tokensMod.secretFactory = async (...args) =>
 	resolve('secretFactory', tokensMod.secretFactory)(...args);
 export const defaultResource: typeof resourcesMod.defaultResource = (...args) =>
 	resolve('defaultResource', resourcesMod.defaultResource)(...args);
-export const useGrantedResource: typeof resourcesMod.useGrantedResource = (
-	...args
-) => resolve('useGrantedResource', resourcesMod.useGrantedResource)(...args);
+export const useGrantedResource: typeof resourcesMod.useGrantedResource =
+	async (...args) =>
+		resolve('useGrantedResource', resourcesMod.useGrantedResource)(...args);
 export const getResourceServerInfo: typeof resourcesMod.getResourceServerInfo =
-	(...args) =>
+	async (...args) =>
 		resolve(
 			'getResourceServerInfo',
 			resourcesMod.getResourceServerInfo
@@ -64,11 +64,11 @@ export const sectorIdentifierUriValidate: typeof claimsMod.sectorIdentifierUriVa
 			'sectorIdentifierUriValidate',
 			claimsMod.sectorIdentifierUriValidate
 		)(...args);
-export const assertClaimsParameter: typeof claimsMod.assertClaimsParameter = (
-	...args
-) => resolve('assertClaimsParameter', claimsMod.assertClaimsParameter)(...args);
+export const assertClaimsParameter: typeof claimsMod.assertClaimsParameter =
+	async (...args) =>
+		resolve('assertClaimsParameter', claimsMod.assertClaimsParameter)(...args);
 export const assertJwtClaimsAndHeader: typeof claimsMod.assertJwtClaimsAndHeader =
-	(...args) =>
+	async (...args) =>
 		resolve(
 			'assertJwtClaimsAndHeader',
 			claimsMod.assertJwtClaimsAndHeader
@@ -81,7 +81,7 @@ export const interactionPolicy: typeof interactionsMod.interactionPolicy = (
 // Not wrapped in resolve(): both already read through the override registry internally.
 export { interactionPolicyControl, supportedPrompts } from './interactions.js';
 export const introspectionAllowedPolicy: typeof introspectionMod.introspectionAllowedPolicy =
-	(...args) =>
+	async (...args) =>
 		resolve(
 			'introspectionAllowedPolicy',
 			introspectionMod.introspectionAllowedPolicy
@@ -98,23 +98,24 @@ export const certificateSubjectMatches: typeof mtlsMod.certificateSubjectMatches
 			mtlsMod.certificateSubjectMatches
 		)(...args);
 export const triggerAuthenticationDevice: typeof cibaMod.triggerAuthenticationDevice =
-	(...args) =>
+	async (...args) =>
 		resolve(
 			'triggerAuthenticationDevice',
 			cibaMod.triggerAuthenticationDevice
 		)(...args);
-export const validateBindingMessage: typeof cibaMod.validateBindingMessage = (
+export const validateBindingMessage: typeof cibaMod.validateBindingMessage =
+	async (...args) =>
+		resolve('validateBindingMessage', cibaMod.validateBindingMessage)(...args);
+export const validateRequestContext: typeof cibaMod.validateRequestContext =
+	async (...args) =>
+		resolve('validateRequestContext', cibaMod.validateRequestContext)(...args);
+export const processLoginHintToken: typeof cibaMod.processLoginHintToken =
+	async (...args) =>
+		resolve('processLoginHintToken', cibaMod.processLoginHintToken)(...args);
+export const processLoginHint: typeof cibaMod.processLoginHint = async (
 	...args
-) => resolve('validateBindingMessage', cibaMod.validateBindingMessage)(...args);
-export const validateRequestContext: typeof cibaMod.validateRequestContext = (
-	...args
-) => resolve('validateRequestContext', cibaMod.validateRequestContext)(...args);
-export const processLoginHintToken: typeof cibaMod.processLoginHintToken = (
-	...args
-) => resolve('processLoginHintToken', cibaMod.processLoginHintToken)(...args);
-export const processLoginHint: typeof cibaMod.processLoginHint = (...args) =>
-	resolve('processLoginHint', cibaMod.processLoginHint)(...args);
-export const verifyUserCode: typeof cibaMod.verifyUserCode = (...args) =>
+) => resolve('processLoginHint', cibaMod.processLoginHint)(...args);
+export const verifyUserCode: typeof cibaMod.verifyUserCode = async (...args) =>
 	resolve('verifyUserCode', cibaMod.verifyUserCode)(...args);
 export const rarForAuthorizationCode: typeof rarMod.rarForAuthorizationCode = (
 	...args

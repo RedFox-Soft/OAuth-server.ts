@@ -1,6 +1,10 @@
-import { parse as parseUrl } from 'node:url';
 import { describe, it, beforeAll, expect } from 'bun:test';
-import bootstrap, { agent, type Setup, formAgent } from '../test_helper.js';
+import bootstrap, {
+	agent,
+	type Setup,
+	formAgent,
+	redirectParameter
+} from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';
@@ -15,7 +19,7 @@ const POLICY_REFUSAL =
  */
 describe('PKCE not required', () => {
 	let setup: Setup;
-	let cookie = null;
+	let cookie: string;
 	beforeAll(async function () {
 		// Named explicitly: bootstrap derives the config from the DIRECTORY name, so the bare call
 		// would load pkce.config.ts and every case here would pass against an instance that still
@@ -71,9 +75,7 @@ describe('PKCE not required', () => {
 			});
 			auth.validatePresence(response, ['code', 'state']);
 
-			const {
-				query: { code }
-			} = parseUrl(response.headers.get('location'), true);
+			const code = redirectParameter(response, 'code');
 			const stored = TestAdapter.for('AuthorizationCode').syncFind(
 				setup.getTokenJti(code)
 			);
@@ -94,9 +96,7 @@ describe('PKCE not required', () => {
 				headers: { cookie }
 			});
 
-			const {
-				query: { code }
-			} = parseUrl(response.headers.get('location'), true);
+			const code = redirectParameter(response, 'code');
 			const stored = TestAdapter.for('AuthorizationCode').syncFind(
 				setup.getTokenJti(code)
 			);
@@ -112,6 +112,7 @@ describe('PKCE not required', () => {
 				client_id: 'confidential-client',
 				scope: 'openid',
 				code_challenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
+				// @ts-expect-error a method other than S256 is the case
 				code_challenge_method: 'bar'
 			});
 

@@ -6,7 +6,7 @@ aliases: [addons, override registry, resolve, lib/addon]
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-01
-updated: 2026-09-23
+updated: 2026-09-24
 graph:
   node_id: subsystem:addon-registry
   node_type: subsystem
@@ -51,6 +51,13 @@ export function resolve<K extends keyof AddonImplementations>(
 so the module pulls in no runtime code**. `index.ts` exports one accessor per key, each resolving at
 call time against its addon-module default.
 
+Since 2026-09-24 each signature is wrapped in `Overridable<...>`: an override may answer synchronously
+where the default is async, because every caller awaits. An accessor whose default is async is itself
+`async`, so its callers always receive a promise whatever the override returns. The extension seams
+whose default only warns and throws (CIBA's `processLoginHint`, `validateBindingMessage`, …) declare
+their contract's return type explicitly, and `getResourceServerInfo` answers a `ResourceServerInfo`
+(`lib/helpers/resource_server.ts`); a signature inferred from a stub had said `Promise<void>`.
+
 That layering is deliberate and load-bearing. Because `registry.ts` and `types.ts` import no runtime
 code, the registry can be imported anywhere — including the test preload — without loading the addon
 modules and, through them, the model graph. See [[model-graph-import-order]] for what happens when
@@ -59,7 +66,7 @@ that graph is entered cold.
 ## Resolution happens at call time
 
 ```ts
-export const findAccount: typeof accountMod.findAccount = (...args) =>
+export const findAccount: typeof accountMod.findAccount = async (...args) =>
     resolve('findAccount', accountMod.findAccount)(...args);
 ```
 
