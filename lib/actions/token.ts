@@ -1,11 +1,11 @@
 import { Elysia, t, type Static } from 'elysia';
-import { InvalidRequest } from '../helpers/errors.js';
+import { UnauthorizedClient, UnsupportedGrantType } from '../helpers/errors.js';
 import {
 	cibaGrantParameters,
 	codeGrantParameters,
 	deviceCodeGrantParameters,
 	executeGrant,
-	grantTypeSchema,
+	hasGrant,
 	refreshTokenGrantParameters
 } from './grants/index.js';
 import { refusedParam, routeNames } from 'lib/consts/param_list.js';
@@ -22,18 +22,19 @@ import {
 } from 'lib/plugins/auth.js';
 import { corsClientBased, formClientId } from 'lib/plugins/cors.js';
 import { ignoreUnknownParams } from 'lib/plugins/ignore_unknown_params.js';
-import { TokenResponse } from 'lib/shared/response_schemas.js';
+import { OAuthError, TokenResponse } from 'lib/shared/response_schemas.js';
 import { grantTypeAllowed } from 'lib/models/client.js';
 
 const TokenRequestBody = t.Object({
 	...authParams.properties,
 	scope: t.Optional(t.String()),
 	resource: t.Optional(t.String({ format: 'uri' })),
-	// Literal union of the grant types the project supports (single source of truth in
-	// grants/index.ts). A proper literal union — not a `keys().map(t.Literal)` array,
-	// whose TypeBox static type collapses to `never` and makes the handler fail Elysia's
-	// InlineHandlerNonMacro check (which is what previously blocked the `response` map).
-	grant_type: grantTypeSchema,
+	/*
+	 * Any string, not the set this server implements: RFC 6749 §5.2 answers a grant type the server
+	 * does not support with `unsupported_grant_type`, and a closed schema turned it into
+	 * `invalid_request` before the handler could say so. Only its absence is invalid_request.
+	 */
+	grant_type: t.String({ error: 'invalid grant_type' }),
 	...t.Partial(codeGrantParameters).properties,
 	...t.Partial(refreshTokenGrantParameters).properties,
 	...t.Partial(deviceCodeGrantParameters).properties,
@@ -65,8 +66,12 @@ export const tokenAction = new Elysia()
 			await validateReplay(client.clientId, dPoP);
 
 			const grantType = body.grant_type;
+			if (!hasGrant(grantType)) {
+				throw new UnsupportedGrantType();
+			}
+			// RFC 6749 §5.2: a grant type the client is not registered for is unauthorized_client.
 			if (!grantTypeAllowed(client, grantType)) {
-				throw new InvalidRequest(
+				throw new UnauthorizedClient(
 					'requested grant type is not allowed for this client'
 				);
 			}
@@ -76,9 +81,11 @@ export const tokenAction = new Elysia()
 		{
 			body: TokenRequestBody,
 			headers: authHeaders,
-			// Success body varies by grant_type (access-token-only for client_credentials, +id_token/
-			// refresh_token for the code/device/ciba flows). Modelled as a grant-dependent union in
-			// TokenResponse. See contracts/endpoint-responses.md.
-			response: TokenResponse
+			// Which members a success body carries depends on grant_type; see TokenResponse.
+			response: {
+				200: TokenResponse,
+				400: OAuthError,
+				401: OAuthError
+			}
 		}
 	);

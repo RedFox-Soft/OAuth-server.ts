@@ -1,5 +1,4 @@
 import { randomBytes, createHash } from 'node:crypto';
-import { parse as parseUrl } from 'node:url';
 
 import {
 	describe,
@@ -14,7 +13,11 @@ import {
 import { importJWK, decodeProtectedHeader, decodeJwt } from 'jose';
 
 import * as JWT from '../../lib/helpers/jwt.ts';
-import bootstrap, { agent, jsonToFormUrlEncoded } from '../test_helper.js';
+import bootstrap, {
+	agent,
+	formAgent,
+	redirectParameter
+} from '../test_helper.js';
 import { eventBus } from 'lib/event_bus.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
@@ -108,19 +111,17 @@ describe('Pushed Request Object', async () => {
 						.update(code_verifier)
 						.digest('base64url');
 
-					const par = await agent.par.post(
-						// @ts-expect-error endpoint will be parse to object
-						jsonToFormUrlEncoded({
+					const par = await formAgent.par.post(
+						{
 							scope: 'openid',
 							response_type: 'code',
 							code_challenge_method: 'S256',
 							code_challenge,
 							client_id: clientId,
 							redirect_uri: 'https://rp.example.com/unlisted'
-						}),
+						},
 						{
 							headers: {
-								['content-type']: 'application/x-www-form-urlencoded',
 								...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
 							}
 						}
@@ -159,25 +160,21 @@ describe('Pushed Request Object', async () => {
 
 					expect(authGet.status).toBe(303);
 					auth.validatePresence(authGet.response, ['code']);
-					const {
-						query: { code }
-					} = parseUrl(authGet.response.headers.get('location'), true);
+					const code = redirectParameter(authGet.response, 'code');
 					const jti = setup.getTokenJti(code);
 					expect(
 						TestAdapter.for('AuthorizationCode').syncFind(jti)
 					).toHaveProperty('redirectUri', 'https://rp.example.com/unlisted');
 
-					const { response } = await agent.token.post(
-						// @ts-expect-error endpoint will be parse to object
-						jsonToFormUrlEncoded({
+					const { response } = await formAgent.token.post(
+						{
 							code,
 							code_verifier,
 							grant_type: 'authorization_code',
 							redirect_uri: 'https://rp.example.com/unlisted'
-						}),
+						},
 						{
 							headers: {
-								['content-type']: 'application/x-www-form-urlencoded',
 								...auth.basicAuthHeader
 							}
 						}
@@ -192,21 +189,13 @@ describe('Pushed Request Object', async () => {
 						.update(code_verifier)
 						.digest('base64url');
 
-					const { error } = await agent.par.post(
-						// @ts-expect-error endpoint will be parse to object
-						jsonToFormUrlEncoded({
-							response_type: 'code',
-							code_challenge_method: 'S256',
-							code_challenge,
-							client_id: testClientId,
-							redirect_uri: 'https://rp.example.com/unlisted'
-						}),
-						{
-							headers: {
-								['content-type']: 'application/x-www-form-urlencoded'
-							}
-						}
-					);
+					const { error } = await formAgent.par.post({
+						response_type: 'code',
+						code_challenge_method: 'S256',
+						code_challenge,
+						client_id: testClientId,
+						redirect_uri: 'https://rp.example.com/unlisted'
+					});
 					expect(error?.status).toBe(400);
 					expect(error?.value).toEqual({
 						error: 'invalid_request',
@@ -222,19 +211,17 @@ describe('Pushed Request Object', async () => {
 						.digest('base64url');
 
 					// must only contain valid uris
-					const par = await agent.par.post(
-						// @ts-expect-error endpoint will be parse to object
-						jsonToFormUrlEncoded({
+					const par = await formAgent.par.post(
+						{
 							scope: 'openid',
 							response_type: 'code',
 							code_challenge_method: 'S256',
 							code_challenge,
 							client_id: clientId,
 							redirect_uri: 'not-a-valid-uri'
-						}),
+						},
 						{
 							headers: {
-								['content-type']: 'application/x-www-form-urlencoded',
 								...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
 							}
 						}
@@ -246,19 +233,17 @@ describe('Pushed Request Object', async () => {
 					});
 
 					// must not contain fragments
-					const { error } = await agent.par.post(
-						// @ts-expect-error endpoint will be parse to object
-						jsonToFormUrlEncoded({
+					const { error } = await formAgent.par.post(
+						{
 							scope: 'openid',
 							response_type: 'code',
 							code_challenge_method: 'S256',
 							code_challenge,
 							client_id: clientId,
 							redirect_uri: 'https://rp.example.com/unlisted#fragment'
-						}),
+						},
 						{
 							headers: {
-								['content-type']: 'application/x-www-form-urlencoded',
 								...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
 							}
 						}
@@ -274,15 +259,13 @@ describe('Pushed Request Object', async () => {
 			describe(`when require_pushed_authorization_requests=${requirePushedAuthorizationRequests}`, () => {
 				describe('using a JAR request parameter', () => {
 					it('with the capability off the PAR endpoint is not served and discovery does not advertise it', async function () {
-						const { error } = await agent.par.post(
-							// @ts-expect-error endpoint will be parse to object
-							jsonToFormUrlEncoded({
+						const { error } = await formAgent.par.post(
+							{
 								client_id: clientId,
 								request: 'this.should.be.a.jwt'
-							}),
+							},
 							{
 								headers: {
-									['content-type']: 'application/x-www-form-urlencoded',
 									...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
 								}
 							}
@@ -303,18 +286,16 @@ describe('Pushed Request Object', async () => {
 								.update(code_verifier)
 								.digest('base64url');
 
-							const { response } = await agent.par.post(
-								// @ts-expect-error endpoint will be parse to object
-								jsonToFormUrlEncoded({
+							const { response } = await formAgent.par.post(
+								{
 									scope: 'openid',
 									response_type: 'code',
 									code_challenge_method: 'S256',
 									code_challenge,
 									client_id: clientId
-								}),
+								},
 								{
 									headers: {
-										['content-type']: 'application/x-www-form-urlencoded',
 										...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
 									}
 								}
@@ -337,23 +318,21 @@ describe('Pushed Request Object', async () => {
 								.update(code_verifier)
 								.digest('base64url');
 
-							const { data, response } = await agent.par.post(
-								// @ts-expect-error endpoint will be parse to object
-								jsonToFormUrlEncoded({
+							const { data, response } = await formAgent.par.post(
+								{
 									scope: 'openid',
 									response_type: 'code',
 									code_challenge_method: 'S256',
 									code_challenge,
 									client_id: clientId,
-									claims: JSON.stringify({
+									claims: {
 										id_token: {
 											auth_time: { essential: true }
 										}
-									})
-								}),
+									}
+								},
 								{
 									headers: {
-										['content-type']: 'application/x-www-form-urlencoded',
 										...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
 									}
 								}
@@ -392,17 +371,16 @@ describe('Pushed Request Object', async () => {
 							const code_challenge = createHash('sha256')
 								.update(code_verifier)
 								.digest('base64url');
-							const { error } = await agent.par.post(
-								// @ts-expect-error endpoint will be parse to object
-								jsonToFormUrlEncoded({
+							const { error } = await formAgent.par.post(
+								{
 									response_type: 'code',
 									code_challenge_method: 'S256',
 									code_challenge,
+									// @ts-expect-error the endpoint refuses request_uri, which is what this case sends
 									request_uri: 'https://rp.example.com/jar#foo'
-								}),
+								},
 								{
 									headers: {
-										['content-type']: 'application/x-www-form-urlencoded',
 										...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
 									}
 								}
@@ -420,18 +398,16 @@ describe('Pushed Request Object', async () => {
 							const code_challenge = createHash('sha256')
 								.update(code_verifier)
 								.digest('base64url');
-							const { error } = await agent.par.post(
-								// @ts-expect-error endpoint will be parse to object
-								jsonToFormUrlEncoded({
+							const { error } = await formAgent.par.post(
+								{
 									response_type: 'code',
 									code_challenge_method: 'S256',
 									code_challenge,
 									client_id: clientId,
 									redirect_uri: 'https://rp.example.com/unlisted'
-								}),
+								},
 								{
 									headers: {
-										['content-type']: 'application/x-www-form-urlencoded',
 										...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
 									}
 								}
@@ -456,17 +432,15 @@ describe('Pushed Request Object', async () => {
 								'upsert'
 							).mockRejectedValue(adapterThrow);
 
-							const { error } = await agent.par.post(
-								// @ts-expect-error endpoint will be parse to object
-								jsonToFormUrlEncoded({
+							const { error } = await formAgent.par.post(
+								{
 									response_type: 'code',
 									code_challenge_method: 'S256',
 									code_challenge,
 									client_id: clientId
-								}),
+								},
 								{
 									headers: {
-										['content-type']: 'application/x-www-form-urlencoded',
 										...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
 									}
 								}
@@ -489,18 +463,16 @@ describe('Pushed Request Object', async () => {
 
 							const {
 								data: { request_uri }
-							} = await agent.par.post(
-								// @ts-expect-error endpoint will be parse to object
-								jsonToFormUrlEncoded({
+							} = await formAgent.par.post(
+								{
 									scope: 'openid',
 									response_type: 'code',
 									code_challenge_method: 'S256',
 									code_challenge,
 									client_id: clientId
-								}),
+								},
 								{
 									headers: {
-										['content-type']: 'application/x-www-form-urlencoded',
 										...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
 									}
 								}
@@ -542,18 +514,16 @@ describe('Pushed Request Object', async () => {
 
 							const {
 								data: { request_uri }
-							} = await agent.par.post(
-								// @ts-expect-error endpoint will be parse to object
-								jsonToFormUrlEncoded({
+							} = await formAgent.par.post(
+								{
 									scope: 'openid',
 									response_type: 'code',
 									code_challenge_method: 'S256',
 									code_challenge,
 									client_id: 'client-alg-registered'
-								}),
+								},
 								{
 									headers: {
-										['content-type']: 'application/x-www-form-urlencoded',
 										...AuthorizationRequest.basicAuthHeader(
 											'client-alg-registered',
 											'secret'
@@ -656,9 +626,8 @@ describe('Pushed Request Object', async () => {
 								.update(code_verifier)
 								.digest('base64url');
 
-							const { data, response } = await agent.par.post(
-								// @ts-expect-error endpoint will be parse to object
-								jsonToFormUrlEncoded({
+							const { data, response } = await formAgent.par.post(
+								{
 									request: await JWT.sign(
 										{
 											jti: randomBytes(16).toString('base64url'),
@@ -673,10 +642,9 @@ describe('Pushed Request Object', async () => {
 										'HS256',
 										{ expiresIn: 30 }
 									)
-								}),
+								},
 								{
 									headers: {
-										['content-type']: 'application/x-www-form-urlencoded',
 										...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
 									}
 								}
@@ -697,9 +665,8 @@ describe('Pushed Request Object', async () => {
 								.update(code_verifier)
 								.digest('base64url');
 
-							const { error } = await agent.par.post(
-								// @ts-expect-error endpoint will be parse to object
-								jsonToFormUrlEncoded({
+							const { error } = await formAgent.par.post(
+								{
 									request: await JWT.sign(
 										{
 											jti: randomBytes(16).toString('base64url'),
@@ -713,10 +680,9 @@ describe('Pushed Request Object', async () => {
 										key,
 										'HS256'
 									)
-								}),
+								},
 								{
 									headers: {
-										['content-type']: 'application/x-www-form-urlencoded',
 										...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
 									}
 								}
@@ -737,9 +703,8 @@ describe('Pushed Request Object', async () => {
 								.update(code_verifier)
 								.digest('base64url');
 
-							const { data, response } = await agent.par.post(
-								// @ts-expect-error endpoint will be parse to object
-								jsonToFormUrlEncoded({
+							const { data, response } = await formAgent.par.post(
+								{
 									request: await JWT.sign(
 										{
 											jti: randomBytes(16).toString('base64url'),
@@ -754,10 +719,9 @@ describe('Pushed Request Object', async () => {
 										'HS256',
 										{ expiresIn: 20 }
 									)
-								}),
+								},
 								{
 									headers: {
-										['content-type']: 'application/x-www-form-urlencoded',
 										...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
 									}
 								}
@@ -778,9 +742,8 @@ describe('Pushed Request Object', async () => {
 								.update(code_verifier)
 								.digest('base64url');
 
-							const { data, response } = await agent.par.post(
-								// @ts-expect-error endpoint will be parse to object
-								jsonToFormUrlEncoded({
+							const { data, response } = await formAgent.par.post(
+								{
 									request: await JWT.sign(
 										{
 											jti: randomBytes(16).toString('base64url'),
@@ -797,10 +760,9 @@ describe('Pushed Request Object', async () => {
 											expiresIn: 120
 										}
 									)
-								}),
+								},
 								{
 									headers: {
-										['content-type']: 'application/x-www-form-urlencoded',
 										...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
 									}
 								}
@@ -821,9 +783,8 @@ describe('Pushed Request Object', async () => {
 								.update(code_verifier)
 								.digest('base64url');
 
-							const { response } = await agent.par.post(
-								// @ts-expect-error endpoint will be parse to object
-								jsonToFormUrlEncoded({
+							const { response } = await formAgent.par.post(
+								{
 									nonce: 'foo',
 									response_type: 'code',
 									request: await JWT.sign(
@@ -840,10 +801,9 @@ describe('Pushed Request Object', async () => {
 										'HS256',
 										{ expiresIn: 30 }
 									)
-								}),
+								},
 								{
 									headers: {
-										['content-type']: 'application/x-www-form-urlencoded',
 										...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
 									}
 								}
@@ -863,9 +823,8 @@ describe('Pushed Request Object', async () => {
 								.update(code_verifier)
 								.digest('base64url');
 
-							const { error } = await agent.par.post(
-								// @ts-expect-error endpoint will be parse to object
-								jsonToFormUrlEncoded({
+							const { error } = await formAgent.par.post(
+								{
 									request: await JWT.sign(
 										{
 											jti: randomBytes(16).toString('base64url'),
@@ -880,10 +839,9 @@ describe('Pushed Request Object', async () => {
 										'HS384',
 										{ expiresIn: 30 }
 									)
-								}),
+								},
 								{
 									headers: {
-										['content-type']: 'application/x-www-form-urlencoded',
 										...AuthorizationRequest.basicAuthHeader(
 											'client-alg-registered',
 											'secret'
@@ -905,9 +863,8 @@ describe('Pushed Request Object', async () => {
 								.update(code_verifier)
 								.digest('base64url');
 
-							const { error } = await agent.par.post(
-								// @ts-expect-error endpoint will be parse to object
-								jsonToFormUrlEncoded({
+							const { error } = await formAgent.par.post(
+								{
 									request: await JWT.sign(
 										{
 											jti: randomBytes(16).toString('base64url'),
@@ -922,10 +879,9 @@ describe('Pushed Request Object', async () => {
 										'HS256',
 										{ expiresIn: 30 }
 									)
-								}),
+								},
 								{
 									headers: {
-										['content-type']: 'application/x-www-form-urlencoded',
 										...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
 									}
 								}
@@ -944,9 +900,8 @@ describe('Pushed Request Object', async () => {
 								.update(code_verifier)
 								.digest('base64url');
 
-							const { error } = await agent.par.post(
-								// @ts-expect-error endpoint will be parse to object
-								jsonToFormUrlEncoded({
+							const { error } = await formAgent.par.post(
+								{
 									request: await JWT.sign(
 										{
 											jti: randomBytes(16).toString('base64url'),
@@ -962,10 +917,9 @@ describe('Pushed Request Object', async () => {
 										'HS256',
 										{ expiresIn: 30 }
 									)
-								}),
+								},
 								{
 									headers: {
-										['content-type']: 'application/x-www-form-urlencoded',
 										...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
 									}
 								}
@@ -989,9 +943,8 @@ describe('Pushed Request Object', async () => {
 								.update(code_verifier)
 								.digest('base64url');
 
-							const { error } = await agent.par.post(
-								// @ts-expect-error endpoint will be parse to object
-								jsonToFormUrlEncoded({
+							const { error } = await formAgent.par.post(
+								{
 									request: await JWT.sign(
 										{
 											jti: randomBytes(16).toString('base64url'),
@@ -1006,10 +959,9 @@ describe('Pushed Request Object', async () => {
 										'HS256',
 										{ expiresIn: 30 }
 									)
-								}),
+								},
 								{
 									headers: {
-										['content-type']: 'application/x-www-form-urlencoded',
 										...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
 									}
 								}
@@ -1030,9 +982,8 @@ describe('Pushed Request Object', async () => {
 								.update(code_verifier)
 								.digest('base64url');
 
-							const par = await agent.par.post(
-								// @ts-expect-error endpoint will be parse to object
-								jsonToFormUrlEncoded({
+							const par = await formAgent.par.post(
+								{
 									request: await JWT.sign(
 										{
 											jti: randomBytes(16).toString('base64url'),
@@ -1048,10 +999,9 @@ describe('Pushed Request Object', async () => {
 										'HS256',
 										{ expiresIn: 30 }
 									)
-								}),
+								},
 								{
 									headers: {
-										['content-type']: 'application/x-www-form-urlencoded',
 										...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
 									}
 								}

@@ -6,7 +6,7 @@ aliases: [plugins, onRequest, lifecycle hooks, lib/plugins]
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-01
-updated: 2026-09-01
+updated: 2026-09-24
 graph:
   node_id: subsystem:elysia-lifecycle
   node_type: subsystem
@@ -88,7 +88,8 @@ reason: it is the only stage where the body is parsed and validation has not run
 precedes parsing, so a plugin there sees a URL and no body; `onBeforeHandle` follows validation,
 which has already answered. The three are not interchangeable with the framework's `normalize`
 option, which does adjacent work at the wrong scope — it cleans headers as well as body and query,
-stripping the `x-client-cert` that `lib/addon/mtls.ts` reads through no schema. See
+stripping a certificate header no route schema can name, such as the `x-ssl-client-cert` a
+deployment's `getCertificate` override may read. See
 [[unknown-request-parameters]].
 
 CORS uses `onTransform`, not `onBeforeHandle`. Client authentication happens in `AuthPlugin`'s

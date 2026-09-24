@@ -4,7 +4,7 @@ title: "Ignoring request parameters the server does not define"
 tags: [oauth, oidc, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-11
-updated: 2026-09-11
+updated: 2026-09-24
 graph:
   node_type: concept
   relationships:
@@ -85,12 +85,14 @@ were measured on 2026-09-11 by flipping the flag on a clean tree and running the
 against 10 for the scoped plugin, and two of them are live features breaking rather than test shape.
 
 **`normalize` cleans headers too.** Elysia normalizes against the route's `headers` schema as well
-as body and query, and this server reads headers no schema enumerates — `x-client-cert`, fetched by
-`oidc.get('x-client-cert')` in `lib/addon/mtls.ts:12`, above all. The userinfo route declares only
-`authorization` and `dpop`. Under the flag the certificate is stripped before the addon can read it,
-and a certificate-bound access token presented **with** its matching certificate answers 401 instead
-of 200. The same trap sits on `/token`, where that header is mTLS client authentication. Enumerating
-every header in every route schema would undo the seam the addon layer exists to provide.
+as body and query, and this server reads a header no schema can enumerate — the client certificate,
+which `getCertificate` (`lib/addon/mtls.ts`) reads under a name a deployment may change. Since
+2026-09-24 the route schemas declare the default, `x-client-cert`, so the typed client can send it;
+a deployment whose proxy forwards `x-ssl-client-cert` overrides the addon, and under the flag that
+header is stripped before the addon can read it, so a certificate-bound access token presented
+**with** its matching certificate answers 401 instead of 200. The same trap sits on `/token`, where
+that header is mTLS client authentication. Enumerating every header a deployment might use in every
+route schema would undo the seam the addon layer exists to provide.
 
 **`normalize` repairs the input; the requirement is only to ignore it.** It coerces a value to fit
 the schema recursively, so a malformed `claims` parameter stops being refused and is silently

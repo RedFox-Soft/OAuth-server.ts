@@ -57,10 +57,8 @@ export class BaseModel<
 		return value;
 	}
 
-	get id() {
-		if (typeof this.payload.jti === 'undefined') {
-			this.payload.jti = this.generateTokenId();
-		}
+	get id(): string {
+		this.payload.jti ??= this.generateTokenId();
 		return this.payload.jti;
 	}
 

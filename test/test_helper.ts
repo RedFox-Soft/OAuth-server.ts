@@ -4,7 +4,7 @@ import * as path from 'node:path';
 import { dirname } from 'desm';
 import { beforeEach, afterEach, expect } from 'bun:test';
 
-import base64url from 'base64url';
+import * as base64url from 'lib/helpers/base64url.js';
 import { treaty } from '@elysiajs/eden';
 
 import nanoid from '../lib/helpers/nanoid.js';
@@ -41,17 +41,17 @@ import {
 	settingsApplied
 } from '../lib/configs/application.js';
 import { ClientDefaults } from 'lib/configs/clientBase.js';
-import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { Session } from 'lib/models/session.js';
 import { cookieNames, sessionCookieName } from 'lib/consts/param_list.js';
 import { DEFAULT_REQUEST_BUCKET } from 'lib/configs/issuer.js';
+import { type ClaimsParameter } from 'lib/helpers/oidc_context.js';
 import {
 	forgetBucketAddresses,
 	issuingBucket
 } from 'lib/admin/auth/bucketAddress.js';
-import { ttl } from 'lib/configs/liveTime.js';
 import { Grant } from 'lib/models/grant.js';
 import { ISSUER } from 'lib/configs/env.js';
+import { isPlainObject } from 'lib/helpers/_/object.js';
 import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.js';
 export { Grant } from 'lib/models/grant.js';
 
@@ -111,6 +111,38 @@ const jwt = (token: string) =>
 
 export const agent = treaty(elysia);
 
+/*
+ * The typed client again, sending its body as application/x-www-form-urlencoded — how an OAuth client
+ * sends one (RFC 6749 §4.1.3, RFC 9126 §2.1) — where `agent` sends JSON. Eden has no form body of its
+ * own, so the JSON it built is re-encoded before the request leaves: an array as repeated members, and
+ * an object, or an array of objects such as authorization_details, as its JSON text, the same rule Eden
+ * applies to a multipart body.
+ */
+export const formAgent = treaty(elysia, {
+	onRequest(_path, init) {
+		if (typeof init.body !== 'string') return;
+		const params: unknown = JSON.parse(init.body);
+		if (!isPlainObject(params)) return;
+		const form = new URLSearchParams();
+		for (const [key, value] of Object.entries(params)) {
+			if (
+				isPlainObject(value) ||
+				(Array.isArray(value) && value.some((item) => isPlainObject(item)))
+			) {
+				form.append(key, JSON.stringify(value));
+			} else if (Array.isArray(value)) {
+				value.forEach((item) => form.append(key, String(item)));
+			} else {
+				form.append(key, String(value));
+			}
+		}
+		return {
+			body: form.toString(),
+			headers: { 'content-type': 'application/x-www-form-urlencoded' }
+		};
+	}
+});
+
 // Faithful port of oidc-provider's test helper: the leading arguments are interaction-policy
 // check reasons that must be made to "pass" (i.e. never trigger a prompt) for the wrapped cases,
 // and the final argument is the callback that registers the nested describe/it cases.
@@ -154,6 +186,23 @@ export function getHeader(response: Response, name: string): string {
 	const value = response.headers.get(name);
 	if (value === null) {
 		throw new Error(`expected response header "${name}"`);
+	}
+	return value;
+}
+
+/*
+ * One parameter of the URL a response redirects to, read the way a client reads it. The legacy
+ * `url.parse(location, true).query` hands back `string | string[] | undefined` for a value that is
+ * single by definition; this returns the string, and fails the case when the parameter is absent.
+ */
+export function redirectParameter(response: Response, name: string): string {
+	return locationParameter(getHeader(response, 'location'), name);
+}
+
+export function locationParameter(location: string, name: string): string {
+	const value = new URL(location, ISSUER).searchParams.get(name);
+	if (value === null) {
+		throw new Error(`expected a "${name}" parameter in ${location}`);
 	}
 	return value;
 }
@@ -336,11 +385,14 @@ export function setSeedClaims(claims: Record<string, unknown> | undefined) {
 	seedClaims = claims;
 }
 
+// An object member (claims) is written as its JSON text, as a client sends it, not as "[object Object]".
 export function jsonToFormUrlEncoded(json: Record<string, unknown>) {
 	const searchParams = new URLSearchParams();
 	for (const [key, value] of Object.entries(json)) {
 		if (Array.isArray(value)) {
-			value.forEach((v) => searchParams.append(key, v));
+			value.forEach((v) => searchParams.append(key, String(v)));
+		} else if (isPlainObject(value)) {
+			searchParams.append(key, JSON.stringify(value));
 		} else {
 			searchParams.append(key, String(value));
 		}
@@ -436,10 +488,8 @@ async function bootstrap(
 		bucketId = DEFAULT_BUCKET_ID
 	}: {
 		scope?: string;
-		claims?: {
-			id_token?: Record<string, unknown>;
-			userinfo?: Record<string, unknown>;
-		};
+		// The claims parameter as a client sends it (a JSON string) or already parsed.
+		claims?: string | ClaimsParameter;
 		resources?: Record<string, string>;
 		rejectedScopes?: string[];
 		rejectedClaims?: string[];
@@ -474,28 +524,17 @@ async function bootstrap(
 		 * gets a second cookie rather than overwriting the first — which is the behaviour under test.
 		 */
 		const cookieName = sessionCookieName(await issuingBucket(bucketId));
-		const sessionCookie = `${cookieName}=${sessionId}; path=/; expires=${expire.toGMTString()}; httponly`;
+		const sessionCookie = `${cookieName}=${sessionId}; path=/; expires=${expire.toUTCString()}; httponly`;
 
 		session.payload.authorizations = {};
-		const oidc = new OIDCContext({
-			params: { scope, claims },
-			bucket: DEFAULT_REQUEST_BUCKET
-		});
-
-		if (oidc.params.claims && typeof oidc.params.claims !== 'string') {
-			oidc.params.claims = JSON.stringify(oidc.params.claims);
-		}
-
+		const requested: ClaimsParameter | undefined =
+			typeof claims === 'string' ? JSON.parse(claims) : claims;
 		for (const cl of clients) {
 			const grant = new Grant({ clientId: cl.clientId, accountId });
 			grant.addOIDCScope(scope);
-			if (oidc.params.claims) {
-				grant.addOIDCClaims(
-					Object.keys(JSON.parse(oidc.params.claims).id_token || {})
-				);
-				grant.addOIDCClaims(
-					Object.keys(JSON.parse(oidc.params.claims).userinfo || {})
-				);
+			if (requested) {
+				grant.addOIDCClaims(Object.keys(requested.id_token || {}));
+				grant.addOIDCClaims(Object.keys(requested.userinfo || {}));
 			}
 			if (rejectedScopes.length) {
 				grant.rejectOIDCScope(rejectedScopes.join(' '));
@@ -520,7 +559,7 @@ async function bootstrap(
 		// resolve to the default 'redfox' bucket via resolveBucketForClient. Any
 		// spec-scoped extra claims (setSeedClaims) ride along on the record.
 		seedAccount(accountId, seedClaims ? { claims: seedClaims } : {}, bucketId);
-		await session.save(ttl.Session);
+		await session.save();
 		return sessionCookie;
 	}
 
@@ -543,6 +582,7 @@ async function bootstrap(
 		if (!clientId && client) clientId = client.clientId;
 		if (!clientId && clients) clientId = clients[0].clientId;
 		try {
+			if (!clientId) throw new Error('no client');
 			return session.authorizations[clientId].grantId;
 		} catch (err) {
 			throw new Error('getGrantId() failed');

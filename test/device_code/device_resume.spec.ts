@@ -20,24 +20,31 @@ import bootstrap, {
 import epochTime from '../../lib/helpers/epoch_time.ts';
 import { generate } from '../../lib/helpers/user_codes.ts';
 import { Session } from 'lib/models/session.js';
-import { ttl } from 'lib/configs/liveTime.js';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { Interaction } from 'lib/models/interaction.js';
 import { Grant } from 'lib/models/grant.js';
 
 let setup: Setup;
-let uid;
-let userCode;
+let uid: string;
+let userCode: string;
 
 // Builds a device interaction resumable at GET /ui/:uid/device_resume: a saved Session, a saved
 // DeviceCode, and a saved Interaction referencing both. Returns the request cookie header.
-async function buildResume({ auth = {}, result, accountId } = {}) {
+async function buildResume({
+	auth = {},
+	result,
+	accountId
+}: {
+	auth?: Record<string, unknown>;
+	result?: Record<string, unknown>;
+	accountId?: string;
+} = {}) {
 	const session = new Session({
 		jti: nanoid(),
 		accountId,
 		loginTs: epochTime()
 	});
-	const sessionId = await session.save(ttl.Session);
+	const sessionId = await session.save();
 
 	const params = { client_id: 'client', ...auth };
 	const deviceCode = new DeviceCode({ params, clientId: 'client', userCode });
@@ -54,8 +61,17 @@ async function buildResume({ auth = {}, result, accountId } = {}) {
 	return `_interaction=${nanoid()}; ${DEFAULT_SESSION_COOKIE}=${sessionId}`;
 }
 
-function get(cookie) {
-	return agent.ui[uid].device_resume.get({ headers: { cookie } });
+// A device code in the state a case needs, where the lookup would otherwise find the one buildResume saved.
+function storedCode(state: {
+	exp?: number;
+	accountId?: string;
+	error?: string;
+}) {
+	return new DeviceCode({ params: {}, clientId: 'client', userCode, ...state });
+}
+
+function get(cookie: string) {
+	return agent.ui({ uid: uid }).device_resume.get({ headers: { cookie } });
 }
 
 /**
@@ -103,10 +119,9 @@ describe('device interaction resume /ui/:uid/device_resume', () => {
 					accountId
 				});
 
-				spyOn(DeviceCode, 'find').mockResolvedValue({
-					isExpired: true,
-					payload: {}
-				});
+				spyOn(DeviceCode, 'find').mockResolvedValue(
+					storedCode({ exp: epochTime() - 1 })
+				);
 
 				const { data } = await get(cookie);
 				expect(data).toContain('id="op.deviceInputForm"');
@@ -123,10 +138,9 @@ describe('device interaction resume /ui/:uid/device_resume', () => {
 					accountId
 				});
 
-				spyOn(DeviceCode, 'find').mockResolvedValue({
-					isExpired: false,
-					payload: { accountId: 'foo' }
-				});
+				spyOn(DeviceCode, 'find').mockResolvedValue(
+					storedCode({ accountId: 'foo' })
+				);
 
 				const { data } = await get(cookie);
 				expect(data).toContain('id="op.deviceInputForm"');
@@ -143,10 +157,9 @@ describe('device interaction resume /ui/:uid/device_resume', () => {
 					accountId
 				});
 
-				spyOn(DeviceCode, 'find').mockResolvedValue({
-					isExpired: false,
-					payload: { error: 'access_denied' }
-				});
+				spyOn(DeviceCode, 'find').mockResolvedValue(
+					storedCode({ error: 'access_denied' })
+				);
 
 				const { data } = await get(cookie);
 				expect(data).toContain('id="op.deviceInputForm"');
@@ -173,6 +186,7 @@ describe('device interaction resume /ui/:uid/device_resume', () => {
 				expect(status).toBe(200);
 
 				const code = await DeviceCode.findByUserCode(userCode);
+				if (!code) throw new Error('expected the device code');
 				expect(code.payload).toHaveProperty('accountId');
 			});
 		});

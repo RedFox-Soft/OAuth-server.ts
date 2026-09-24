@@ -31,30 +31,31 @@ function readCookie(value: string) {
 	return parsed[key];
 }
 
-type AuthParams = Static<typeof AuthorizationParameters> & {
-	claims?: object | string;
-};
+type AuthParams = Static<typeof AuthorizationParameters>;
+
+// A spec's `clients` export: registration metadata, a few members still under their stored names.
+type SeedClient = ClientSchemaType & { token_endpoint_auth_method?: string };
 
 export class AuthorizationRequest {
-	static clients: ClientSchemaType[] = [];
+	static clients: SeedClient[] = [];
 
 	params: AuthParams;
-	client: ClientSchemaType;
+	// Absent when a case names a client_id no spec seeded.
+	client: SeedClient | undefined;
 	res = {};
 	code_verifier = crypto.randomBytes(32).toString('base64url');
 	clientId: string;
-	grant_type = 'authorization_code';
+	grant_type: string = 'authorization_code';
 
 	constructor(parameters: Partial<AuthParams> = {}) {
-		if (parameters.claims && typeof parameters.claims !== 'string') {
-			parameters.claims = JSON.stringify(parameters.claims);
-		}
-		if (!AuthorizationRequest.clients[0]) {
+		const [defaultClient] = AuthorizationRequest.clients;
+		if (!defaultClient) {
 			throw new Error('No clients have been registered');
 		}
 
-		parameters.client_id ??= AuthorizationRequest.clients[0].clientId;
-		this.params = parameters;
+		this.params = Object.assign(parameters, {
+			client_id: parameters.client_id ?? defaultClient.clientId
+		});
 		this.clientId = this.params.client_id;
 		this.client = AuthorizationRequest.clients.find(
 			(cl) => cl.clientId === this.params.client_id
@@ -77,12 +78,23 @@ export class AuthorizationRequest {
 		}
 	}
 
+	private get registered() {
+		if (!this.client) {
+			throw new Error(
+				`client ${this.clientId} is not among the seeded clients`
+			);
+		}
+		return this.client;
+	}
+
 	get basicAuthHeader() {
-		if (this.client.token_endpoint_auth_method === 'none') {
+		const { token_endpoint_auth_method, clientSecret } = this.registered;
+		if (token_endpoint_auth_method === 'none') {
 			return {};
 		}
-
-		const { clientSecret } = this.client;
+		if (clientSecret === undefined) {
+			throw new Error(`client ${this.clientId} has no secret`);
+		}
 		return AuthorizationRequest.basicAuthHeader(this.clientId, clientSecret);
 	}
 
@@ -102,11 +114,11 @@ export class AuthorizationRequest {
 			expect(location).toMatch(new RegExp(this.params.redirect_uri));
 			expected = parse(this.params.redirect_uri, true);
 		} else {
-			expect(location).toMatch(new RegExp(this.client.redirectUris[0]));
-			expected = parse(this.client.redirectUris[0], true);
+			expect(location).toMatch(new RegExp(this.registered.redirectUris[0]));
+			expected = parse(this.registered.redirectUris[0], true);
 		}
 
-		['protocol', 'host', 'pathname'].forEach((attr) => {
+		(['protocol', 'host', 'pathname'] as const).forEach((attr) => {
 			expect(actual[attr]).toBe(expected[attr]);
 		});
 	}
@@ -141,10 +153,6 @@ export class AuthorizationRequest {
 		const interaction = TestAdapter.for('Interaction').syncFind(uid);
 		const cookieID = readCookie(getSetCookies(cookies)[0]);
 		expect(cookieID).toBe(interaction.cookieID);
-
-		if (interaction.params.claims) {
-			interaction.params.claims = JSON.stringify(interaction.params.claims);
-		}
 
 		Object.entries(this.params).forEach(([key, value]) => {
 			if (key === 'res') return;
@@ -219,7 +227,7 @@ export class AuthorizationRequest {
 		if (!code || Array.isArray(code)) {
 			throw new Error('authorization code is required to get token');
 		}
-		const isBasicAuth = this.client.token_endpoint_auth_method !== 'none';
+		const isBasicAuth = this.registered.token_endpoint_auth_method !== 'none';
 		return await agent.token.post(
 			{
 				client_id: isBasicAuth ? undefined : this.clientId,

@@ -13,8 +13,9 @@ import {
 import * as JWT from '../../lib/helpers/jwt.ts';
 import bootstrap, {
 	agent,
-	jsonToFormUrlEncoded,
-	type Setup
+	type Setup,
+	formAgent,
+	changeClient
 } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { eventBus } from 'lib/event_bus.js';
@@ -118,10 +119,9 @@ describe('features.richAuthorizationRequests', () => {
 	async function approve(uid: string, jar: Jar) {
 		const codeSpy = mock();
 		eventBus.once('authorization_code.saved', codeSpy);
-		const { response } = await agent.ui[uid].consent.post(
-			{ action: 'allow' },
-			{ headers: { cookie: header(jar) } }
-		);
+		const { response } = await agent
+			.ui({ uid: uid })
+			.consent.post({ action: 'allow' }, { headers: { cookie: header(jar) } });
 		expect(response.status).toBe(303);
 		const location = response.headers.get('location');
 		expect(location).toContain('https://client.example.com/cb');
@@ -206,9 +206,11 @@ describe('features.richAuthorizationRequests', () => {
 			});
 			const session = await toConsent(auth, cookie);
 
-			const { data, status } = await agent.ui[session.uid].consent.get({
-				headers: { cookie: header(session.jar) }
-			});
+			const { data, status } = await agent
+				.ui({ uid: session.uid })
+				.consent.get({
+					headers: { cookie: header(session.jar) }
+				});
 
 			expect(status).toBe(200);
 			expect(data).toContain('Initiate a payment');
@@ -251,7 +253,7 @@ describe('features.richAuthorizationRequests', () => {
 			});
 			const session = await toConsent(auth, cookie);
 
-			const { data } = await agent.ui[session.uid].consent.get({
+			const { data } = await agent.ui({ uid: session.uid }).consent.get({
 				headers: { cookie: header(session.jar) }
 			});
 
@@ -275,7 +277,7 @@ describe('features.richAuthorizationRequests', () => {
 				[OPEN_TYPE]: configured[OPEN_TYPE]
 			};
 			try {
-				const { data } = await agent.ui[session.uid].consent.get({
+				const { data } = await agent.ui({ uid: session.uid }).consent.get({
 					headers: { cookie: header(session.jar) }
 				});
 				expect(data).toContain(PAYMENT_TYPE);
@@ -294,7 +296,7 @@ describe('features.richAuthorizationRequests', () => {
 			});
 			const session = await toConsent(auth, cookie);
 
-			const { data } = await agent.ui[session.uid].consent.get({
+			const { data } = await agent.ui({ uid: session.uid }).consent.get({
 				headers: { cookie: header(session.jar) }
 			});
 
@@ -323,6 +325,7 @@ describe('features.richAuthorizationRequests', () => {
 			const { code } = await approve(session.uid, session.jar);
 
 			const { status, data } = await exchange(auth, code.jti);
+			if (data === null) throw new Error('expected a success response');
 
 			expect(status).toBe(200);
 			expect(data.authorization_details).toEqual([payment()]);
@@ -346,6 +349,7 @@ describe('features.richAuthorizationRequests', () => {
 				code.jti,
 				'urn:rar:default'
 			);
+			if (data === null) throw new Error('expected a success response');
 
 			expect(status).toBe(200);
 			// The urn:rar:other detail is excluded; the location-less OPEN_TYPE detail is kept, because
@@ -366,6 +370,7 @@ describe('features.richAuthorizationRequests', () => {
 			const { code } = await approve(session.uid, session.jar);
 
 			const { status, data } = await exchange(auth, code.jti, 'urn:rar:jwt');
+			if (data === null) throw new Error('expected a success response');
 			expect(status).toBe(200);
 
 			const claims = JSON.parse(
@@ -388,6 +393,7 @@ describe('features.richAuthorizationRequests', () => {
 			const session = await toConsent(auth, cookie);
 			const { code } = await approve(session.uid, session.jar);
 			const { data } = await exchange(auth, code.jti);
+			if (data === null) throw new Error('expected a success response');
 
 			const introspected = await agent.token.introspect.post({
 				client_id: 'client',
@@ -429,6 +435,7 @@ describe('features.richAuthorizationRequests', () => {
 				code,
 				resource: 'urn:rar:default'
 			});
+			if (data === null) throw new Error('expected a success response');
 
 			expect(status).toBe(200);
 			expect(data.authorization_details).toEqual([payment()]);
@@ -451,6 +458,7 @@ describe('features.richAuthorizationRequests', () => {
 			expect(code.payload.rar).toEqual(shaped);
 
 			const { data } = await exchange(auth, code.jti);
+			if (data === null) throw new Error('expected a success response');
 			expect(data.authorization_details).toEqual(shaped);
 		});
 
@@ -614,9 +622,7 @@ describe('features.richAuthorizationRequests', () => {
 				authorization_details: details(payment())
 			});
 
-			const par = await agent.par.post(jsonToFormUrlEncoded(auth.params), {
-				headers: { 'content-type': form }
-			});
+			const par = await formAgent.par.post(auth.params);
 			expect(par.status).toBe(201);
 
 			const followUp = new AuthorizationRequest({
@@ -684,6 +690,7 @@ describe('features.richAuthorizationRequests', () => {
 			const session = await toConsent(auth, cookie);
 			const { code } = await approve(session.uid, session.jar);
 			const { data } = await exchange(auth, code.jti);
+			if (data === null) throw new Error('expected a success response');
 			expect(data.refresh_token).toBeTruthy();
 
 			const refreshed = await agent.token.post({
@@ -710,6 +717,7 @@ describe('features.richAuthorizationRequests', () => {
 			const session = await toConsent(auth, cookie);
 			const { code } = await approve(session.uid, session.jar);
 			const { data } = await exchange(auth, code.jti, 'urn:rar:default');
+			if (data === null) throw new Error('expected a success response');
 
 			const first = await agent.token.post({
 				client_id: 'client',
@@ -790,7 +798,7 @@ describe('features.richAuthorizationRequests', () => {
 			});
 			const session = await toConsent(second, approved.jar);
 
-			const { data } = await agent.ui[session.uid].consent.get({
+			const { data } = await agent.ui({ uid: session.uid }).consent.get({
 				headers: { cookie: header(session.jar) }
 			});
 			// Only the not-yet-granted detail is shown; the End-User is not asked to re-approve.
@@ -843,6 +851,7 @@ describe('features.richAuthorizationRequests', () => {
 			expect(code.payload).not.toHaveProperty('rar');
 
 			const { status, data } = await exchange(auth, code.jti);
+			if (data === null) throw new Error('expected a success response');
 			expect(status).toBe(200);
 			expect(data).not.toHaveProperty('authorization_details');
 
@@ -887,18 +896,30 @@ describe('features.richAuthorizationRequests', () => {
 
 		it('refuses the parameter at the device authorization endpoint', async () => {
 			ApplicationConfig['deviceFlow.enabled'] = true;
+			// A client allowed the device flow, so the refusal is the parameter's and not the grant's.
+			const restore = await changeClient('client', {
+				grantTypes: [
+					'authorization_code',
+					'refresh_token',
+					'urn:ietf:params:oauth:grant-type:device_code'
+				]
+			});
 			try {
-				const { status, error } = await agent.device.auth.post(
-					jsonToFormUrlEncoded({
-						client_id: 'client',
-						scope: 'openid',
-						authorization_details: details(payment())
-					}),
-					{ headers: { 'content-type': form } }
-				);
+				const { status, error } = await formAgent.device.auth.post({
+					client_id: 'client',
+					scope: 'openid',
+					authorization_details: details(payment())
+				});
+				if (!error) throw new Error('expected error response');
 				expect(status).toBe(400);
-				expect(error.value.error).toBe('invalid_request');
+				expect(error.value).toMatchObject({
+					error: 'invalid_request',
+					error_description: expect.stringContaining(
+						'authorization_details is unsupported'
+					)
+				});
 			} finally {
+				await restore();
 				ApplicationConfig['deviceFlow.enabled'] = false;
 			}
 		});

@@ -127,7 +127,11 @@ export function installFetchInterception(): void {
 		fetchSpy?.mockClear();
 		return;
 	}
-	fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(dispatchFetch);
+	// Bun's fetch also carries `preconnect`; the mock keeps the real one so it is a whole fetch.
+	const mocked = Object.assign(dispatchFetch, {
+		preconnect: globalThis.fetch.preconnect
+	});
+	fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(mocked);
 	(globalThis.fetch as MaybeInstalled)[INSTALLED] = true;
 }
 

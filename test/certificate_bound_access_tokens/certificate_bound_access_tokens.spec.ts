@@ -15,9 +15,9 @@ import * as url from 'node:url';
 import bootstrap, {
 	agent,
 	getHeader,
-	jsonToFormUrlEncoded,
 	seedAccount,
-	type Setup
+	type Setup,
+	formAgent
 } from '../test_helper.js';
 import { eventBus } from 'lib/event_bus.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
@@ -132,11 +132,10 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 			await setup.login({ scope: 'openid offline_access' });
 		});
 		beforeEach(async function () {
-			const { data } = await agent.device.auth.post(
-				jsonToFormUrlEncoded({ scope: 'openid' }),
+			const { data } = await formAgent.device.auth.post(
+				{ scope: 'openid' },
 				{
 					headers: {
-						'content-type': 'application/x-www-form-urlencoded',
 						...AuthorizationRequest.basicAuthHeader('client', 'secret')
 					}
 				}
@@ -236,14 +235,13 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 	describe('urn:openid:params:grant-type:ciba', () => {
 		let reqId;
 		beforeEach(async function () {
-			const { data } = await agent.backchannel.post(
-				jsonToFormUrlEncoded({
+			const { data } = await formAgent.backchannel.post(
+				{
 					scope: 'openid offline_access',
 					login_hint: 'accountId'
-				}),
+				},
 				{
 					headers: {
-						'content-type': 'application/x-www-form-urlencoded',
 						...AuthorizationRequest.basicAuthHeader('client', 'secret')
 					}
 				}

@@ -1,10 +1,6 @@
 import { parse as parseUrl } from 'node:url';
 import { describe, it, beforeAll, expect } from 'bun:test';
-import bootstrap, {
-	agent,
-	jsonToFormUrlEncoded,
-	type Setup
-} from '../test_helper.js';
+import bootstrap, { agent, type Setup, formAgent } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';
@@ -47,20 +43,12 @@ describe('PKCE not required', () => {
 		});
 
 		it('is refused when it pushes a request omitting a code challenge', async function () {
-			const { error } = await agent.par.post(
-				// @ts-expect-error endpoint will be parsed to an object
-				jsonToFormUrlEncoded({
-					scope: 'openid',
-					response_type: 'code',
-					client_id: 'client',
-					redirect_uri: 'https://rp.example.com/cb'
-				}),
-				{
-					headers: {
-						['content-type']: 'application/x-www-form-urlencoded'
-					}
-				}
-			);
+			const { error } = await formAgent.par.post({
+				scope: 'openid',
+				response_type: 'code',
+				client_id: 'client',
+				redirect_uri: 'https://rp.example.com/cb'
+			});
 
 			if (!error) throw new Error('expected error response');
 			expect(error.value).toHaveProperty('error', 'invalid_request');
@@ -137,17 +125,15 @@ describe('PKCE not required', () => {
 		});
 
 		it('may push a request omitting a code challenge', async function () {
-			const { response } = await agent.par.post(
-				// @ts-expect-error endpoint will be parsed to an object
-				jsonToFormUrlEncoded({
+			const { response } = await formAgent.par.post(
+				{
 					scope: 'openid',
 					response_type: 'code',
 					client_id: 'confidential-client',
 					redirect_uri: 'https://confidential.example.com/cb'
-				}),
+				},
 				{
 					headers: {
-						['content-type']: 'application/x-www-form-urlencoded',
 						...AuthorizationRequest.basicAuthHeader(
 							'confidential-client',
 							'confidential-secret'

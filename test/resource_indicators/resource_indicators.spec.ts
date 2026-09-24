@@ -4,9 +4,9 @@ import { strict as assert } from 'node:assert';
 import bootstrap, {
 	DEFAULT_SESSION_COOKIE,
 	agent,
-	jsonToFormUrlEncoded,
 	seedAccount,
-	type Setup
+	type Setup,
+	formAgent
 } from '../test_helper.js';
 import * as resourceIndicators from '../../lib/addon/resources.js';
 import { eventBus } from 'lib/event_bus.js';
@@ -18,8 +18,6 @@ import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { grantFlags, resetGrantFlags } from './grant_flags.ts';
-
-const form = 'application/x-www-form-urlencoded';
 
 /**
  * @proves A resource indicator becomes the token audience across every grant, the configured
@@ -115,8 +113,8 @@ describe('features.resourceIndicators', () => {
 			if (verb === 'get') {
 				return agent.auth.get({ query: auth.params, headers: { cookie } });
 			}
-			return agent.auth.post(jsonToFormUrlEncoded(auth.params), {
-				headers: { cookie, 'content-type': form }
+			return formAgent.auth.post(auth.params, {
+				headers: { cookie }
 			});
 		}
 
@@ -394,14 +392,11 @@ describe('features.resourceIndicators', () => {
 
 	describe('urn:ietf:params:oauth:grant-type:device_code', () => {
 		it('an accepted resource becomes the token audience on the device grant', async () => {
-			const denied = await agent.device.auth.post(
-				jsonToFormUrlEncoded({
-					client_id: 'client',
-					resource: 'urn:not:allowed',
-					scope: 'api:read'
-				}),
-				{ headers: { 'content-type': form } }
-			);
+			const denied = await formAgent.device.auth.post({
+				client_id: 'client',
+				resource: 'urn:not:allowed',
+				scope: 'api:read'
+			});
 			if (!denied.error) throw new Error('expected error response');
 			expect(denied.error.status).toBe(400);
 			expect(denied.error.value).toEqual({
@@ -409,24 +404,20 @@ describe('features.resourceIndicators', () => {
 				error_description: 'resource indicator is missing, or unknown'
 			});
 
-			const authRes = await agent.device.auth.post(
-				jsonToFormUrlEncoded({
-					client_id: 'client',
-					resource: 'urn:wl:explicit',
-					scope: 'api:read'
-				}),
-				{ headers: { 'content-type': form } }
-			);
+			const authRes = await formAgent.device.auth.post({
+				client_id: 'client',
+				resource: 'urn:wl:explicit',
+				scope: 'api:read'
+			});
 			expect(authRes.status).toBe(200);
 			const { user_code, device_code } = authRes.data;
 
 			setup.getSession().state = { secret: 'foo' };
 
-			const confirm = await agent.device.post(
-				jsonToFormUrlEncoded({ user_code, xsrf: 'foo', confirm: true }),
+			const confirm = await formAgent.device.post(
+				{ user_code, xsrf: 'foo', confirm: true },
 				{
 					headers: {
-						'content-type': form,
 						cookie: `${DEFAULT_SESSION_COOKIE}=${setup.getSessionId()}`
 					}
 				}
@@ -477,23 +468,19 @@ describe('features.resourceIndicators', () => {
 		});
 
 		it('applies the configured default audience on the device grant', async () => {
-			const authRes = await agent.device.auth.post(
-				jsonToFormUrlEncoded({
-					client_id: 'client',
-					scope: 'api:read'
-				}),
-				{ headers: { 'content-type': form } }
-			);
+			const authRes = await formAgent.device.auth.post({
+				client_id: 'client',
+				scope: 'api:read'
+			});
 			expect(authRes.status).toBe(200);
 			const { user_code, device_code } = authRes.data;
 
 			setup.getSession().state = { secret: 'foo' };
 
-			const confirm = await agent.device.post(
-				jsonToFormUrlEncoded({ user_code, xsrf: 'foo', confirm: true }),
+			const confirm = await formAgent.device.post(
+				{ user_code, xsrf: 'foo', confirm: true },
 				{
 					headers: {
-						'content-type': form,
 						cookie: `${DEFAULT_SESSION_COOKIE}=${setup.getSessionId()}`
 					}
 				}
@@ -546,23 +533,19 @@ describe('features.resourceIndicators', () => {
 		it('applies the default audience under the granted-resource policy, on the device grant', async () => {
 			grantFlags.useGranted = true;
 
-			const authRes = await agent.device.auth.post(
-				jsonToFormUrlEncoded({
-					client_id: 'client',
-					scope: 'openid api:read'
-				}),
-				{ headers: { 'content-type': form } }
-			);
+			const authRes = await formAgent.device.auth.post({
+				client_id: 'client',
+				scope: 'openid api:read'
+			});
 			expect(authRes.status).toBe(200);
 			const { user_code, device_code } = authRes.data;
 
 			setup.getSession().state = { secret: 'foo' };
 
-			const confirm = await agent.device.post(
-				jsonToFormUrlEncoded({ user_code, xsrf: 'foo', confirm: true }),
+			const confirm = await formAgent.device.post(
+				{ user_code, xsrf: 'foo', confirm: true },
 				{
 					headers: {
-						'content-type': form,
 						cookie: `${DEFAULT_SESSION_COOKIE}=${setup.getSessionId()}`
 					}
 				}
@@ -613,23 +596,19 @@ describe('features.resourceIndicators', () => {
 		});
 
 		it("the client's named resource becomes the audience on the device grant", async () => {
-			const authRes = await agent.device.auth.post(
-				jsonToFormUrlEncoded({
-					client_id: 'client',
-					scope: 'openid api:read'
-				}),
-				{ headers: { 'content-type': form } }
-			);
+			const authRes = await formAgent.device.auth.post({
+				client_id: 'client',
+				scope: 'openid api:read'
+			});
 			expect(authRes.status).toBe(200);
 			const { user_code, device_code } = authRes.data;
 
 			setup.getSession().state = { secret: 'foo' };
 
-			const confirm = await agent.device.post(
-				jsonToFormUrlEncoded({ user_code, xsrf: 'foo', confirm: true }),
+			const confirm = await formAgent.device.post(
+				{ user_code, xsrf: 'foo', confirm: true },
 				{
 					headers: {
-						'content-type': form,
 						cookie: `${DEFAULT_SESSION_COOKIE}=${setup.getSessionId()}`
 					}
 				}
@@ -684,15 +663,12 @@ describe('features.resourceIndicators', () => {
 
 	describe('urn:openid:params:grant-type:ciba', () => {
 		it('an accepted resource becomes the token audience on the CIBA grant', async () => {
-			const denied = await agent.backchannel.post(
-				jsonToFormUrlEncoded({
-					client_id: 'client',
-					resource: 'urn:not:allowed',
-					scope: 'openid api:read',
-					login_hint: 'accountId'
-				}),
-				{ headers: { 'content-type': form } }
-			);
+			const denied = await formAgent.backchannel.post({
+				client_id: 'client',
+				resource: 'urn:not:allowed',
+				scope: 'openid api:read',
+				login_hint: 'accountId'
+			});
 			if (!denied.error) throw new Error('expected error response');
 			expect(denied.error.status).toBe(400);
 			expect(denied.error.value).toEqual({
@@ -700,15 +676,12 @@ describe('features.resourceIndicators', () => {
 				error_description: 'resource indicator is missing, or unknown'
 			});
 
-			const backchannel = await agent.backchannel.post(
-				jsonToFormUrlEncoded({
-					client_id: 'client',
-					resource: 'urn:wl:explicit',
-					scope: 'openid api:read',
-					login_hint: 'accountId'
-				}),
-				{ headers: { 'content-type': form } }
-			);
+			const backchannel = await formAgent.backchannel.post({
+				client_id: 'client',
+				resource: 'urn:wl:explicit',
+				scope: 'openid api:read',
+				login_hint: 'accountId'
+			});
 			expect(backchannel.status).toBe(200);
 			const { auth_req_id } = backchannel.data;
 
@@ -760,14 +733,11 @@ describe('features.resourceIndicators', () => {
 		it('applies the default audience under the granted-resource policy, on the CIBA grant', async () => {
 			grantFlags.useGranted = true;
 
-			const backchannel = await agent.backchannel.post(
-				jsonToFormUrlEncoded({
-					client_id: 'client',
-					scope: 'openid api:read',
-					login_hint: 'accountId'
-				}),
-				{ headers: { 'content-type': form } }
-			);
+			const backchannel = await formAgent.backchannel.post({
+				client_id: 'client',
+				scope: 'openid api:read',
+				login_hint: 'accountId'
+			});
 			expect(backchannel.status).toBe(200);
 			const { auth_req_id } = backchannel.data;
 
@@ -815,14 +785,11 @@ describe('features.resourceIndicators', () => {
 		});
 
 		it('issues access token for userinfo (when useGrantedResource returns false)', async () => {
-			const backchannel = await agent.backchannel.post(
-				jsonToFormUrlEncoded({
-					client_id: 'client',
-					scope: 'openid api:read',
-					login_hint: 'accountId'
-				}),
-				{ headers: { 'content-type': form } }
-			);
+			const backchannel = await formAgent.backchannel.post({
+				client_id: 'client',
+				scope: 'openid api:read',
+				login_hint: 'accountId'
+			});
 			expect(backchannel.status).toBe(200);
 			const { auth_req_id } = backchannel.data;
 

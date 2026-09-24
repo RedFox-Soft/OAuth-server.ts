@@ -2,11 +2,11 @@ import { createHash, randomBytes } from 'node:crypto';
 
 import { describe, it, expect } from 'bun:test';
 
-import bootstrap, { agent, jsonToFormUrlEncoded } from '../test_helper.js';
+import bootstrap, { agent, formAgent } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { ISSUER } from 'lib/configs/env.js';
-
-const form = 'application/x-www-form-urlencoded';
+import type { AuthorizationParameters } from 'lib/consts/param_list.js';
+import type { Static } from 'elysia';
 
 /*
  * A name no profile defines and this server therefore cannot recognize. Not `foo`: the point is a
@@ -20,7 +20,7 @@ const codeChallenge = createHash('sha256')
 	.update(codeVerifier)
 	.digest('base64url');
 
-const authorizationParameters = {
+const authorizationParameters: Static<typeof AuthorizationParameters> = {
 	client_id: 'client',
 	response_type: 'code',
 	scope: 'openid',
@@ -88,11 +88,7 @@ const endpoints: {
 		name: 'POST /auth',
 		send: async (extra) => {
 			return outcome(
-				await agent.auth.post(
-					// @ts-expect-error the endpoint parses the form body into an object
-					jsonToFormUrlEncoded({ ...authorizationParameters, ...extra }),
-					{ headers: { ['content-type']: form } }
-				)
+				await formAgent.auth.post({ ...authorizationParameters, ...extra })
 			);
 		}
 	},
@@ -100,10 +96,9 @@ const endpoints: {
 		name: 'POST /par',
 		send: async (extra) => {
 			return outcome(
-				await agent.par.post(
-					// @ts-expect-error the endpoint parses the form body into an object
-					jsonToFormUrlEncoded({ ...authorizationParameters, ...extra }),
-					{ headers: { ['content-type']: form, ...basic() } }
+				await formAgent.par.post(
+					{ ...authorizationParameters, ...extra },
+					{ headers: { ...basic() } }
 				)
 			);
 		}
@@ -112,15 +107,11 @@ const endpoints: {
 		name: 'POST /device/auth',
 		send: async (extra) => {
 			return outcome(
-				await agent.device.auth.post(
-					// @ts-expect-error the endpoint parses the form body into an object
-					jsonToFormUrlEncoded({
-						client_id: 'device-client',
-						scope: 'openid',
-						...extra
-					}),
-					{ headers: { ['content-type']: form } }
-				)
+				await formAgent.device.auth.post({
+					client_id: 'device-client',
+					scope: 'openid',
+					...extra
+				})
 			);
 		}
 	},
@@ -128,14 +119,13 @@ const endpoints: {
 		name: 'POST /token',
 		send: async (extra) => {
 			return outcome(
-				await agent.token.post(
-					// @ts-expect-error the endpoint parses the form body into an object
-					jsonToFormUrlEncoded({
+				await formAgent.token.post(
+					{
 						grant_type: 'refresh_token',
 						refresh_token: 'not-a-refresh-token',
 						...extra
-					}),
-					{ headers: { ['content-type']: form, ...basic() } }
+					},
+					{ headers: { ...basic() } }
 				)
 			);
 		}

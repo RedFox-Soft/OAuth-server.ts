@@ -12,9 +12,9 @@ import {
 
 import bootstrap, {
 	agent,
-	jsonToFormUrlEncoded,
 	passInteractionChecks,
-	type Setup
+	type Setup,
+	formAgent
 } from '../test_helper.js';
 import { eventBus } from 'lib/event_bus.js';
 import { DEFAULT_SESSION_COOKIE } from '../test_helper.ts';
@@ -89,7 +89,7 @@ describe('POST code_verification endpoint w/o verification', () => {
 	});
 
 	function post(body) {
-		return agent[route].post(jsonToFormUrlEncoded(body), {
+		return formAgent[route].post(body, {
 			headers: {
 				'content-type': form,
 				cookie: `${DEFAULT_SESSION_COOKIE}=${setup.getSessionId()}`
@@ -248,7 +248,7 @@ describe('POST code_verification endpoint w/ verification', () => {
 	});
 
 	function post(body) {
-		return agent[route].post(jsonToFormUrlEncoded(body), {
+		return formAgent[route].post(body, {
 			headers: {
 				'content-type': form,
 				cookie: `${DEFAULT_SESSION_COOKIE}=${setup.getSessionId()}`

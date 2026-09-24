@@ -1,23 +1,16 @@
 import { describe, it, beforeAll, expect } from 'bun:test';
 
-import bootstrap, {
-	agent,
-	jsonToFormUrlEncoded,
-	type Setup
-} from '../test_helper.js';
+import bootstrap, { agent, type Setup, formAgent } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import * as paramList from 'lib/consts/param_list.js';
 
 const UNKNOWN_MEMBER = { urn_example_ext: { anything: true } };
 const basic = AuthorizationRequest.basicAuthHeader('client', 'secret');
-const form = { ['content-type']: 'application/x-www-form-urlencoded' };
 
 const DEFINED = { id_token: { email: null } };
 
 function claims(withUnknown: boolean) {
-	return JSON.stringify(
-		withUnknown ? { ...DEFINED, ...UNKNOWN_MEMBER } : DEFINED
-	);
+	return withUnknown ? { ...DEFINED, ...UNKNOWN_MEMBER } : DEFINED;
 }
 
 function refusedForClaims(body: unknown): boolean {
@@ -110,16 +103,15 @@ describe('unknown claims members across every surface that accepts claims', () =
 
 	it('answers the pushed authorization request endpoint the same with and without an undefined claims member', async function () {
 		const send = (withUnknown: boolean) =>
-			agent.par.post(
-				// @ts-expect-error endpoint parses form-url-encoded into an object
-				jsonToFormUrlEncoded({
+			formAgent.par.post(
+				{
 					client_id: 'client',
 					response_type: 'code',
 					redirect_uri: 'https://client.example.com/cb',
 					scope: 'openid',
 					claims: claims(withUnknown)
-				}),
-				{ headers: { ...form, ...basic } }
+				},
+				{ headers: basic }
 			);
 
 		const a = await send(true);
@@ -131,14 +123,13 @@ describe('unknown claims members across every surface that accepts claims', () =
 
 	it('answers the device authorization endpoint the same with and without an undefined claims member', async function () {
 		const send = (withUnknown: boolean) =>
-			agent.device.auth.post(
-				// @ts-expect-error endpoint parses form-url-encoded into an object
-				jsonToFormUrlEncoded({
+			formAgent.device.auth.post(
+				{
 					client_id: 'client',
 					scope: 'openid',
 					claims: claims(withUnknown)
-				}),
-				{ headers: { ...form, ...basic } }
+				},
+				{ headers: basic }
 			);
 
 		const a = await send(true);
@@ -153,15 +144,14 @@ describe('unknown claims members across every surface that accepts claims', () =
 		const { accountId } = setup.getSession();
 
 		const send = (withUnknown: boolean) =>
-			agent.backchannel.post(
-				// @ts-expect-error endpoint parses form-url-encoded into an object
-				jsonToFormUrlEncoded({
+			formAgent.backchannel.post(
+				{
 					client_id: 'client',
 					scope: 'openid',
 					login_hint: accountId,
 					claims: claims(withUnknown)
-				}),
-				{ headers: { ...form, ...basic } }
+				},
+				{ headers: basic }
 			);
 
 		const a = await send(true);

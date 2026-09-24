@@ -586,7 +586,7 @@ describe('content security policy: over the HTTP layer', () => {
 		const { response } = await agent.auth.get({ query: auth.params });
 		const [, , uid] = (response.headers.get('location') ?? '').split('/');
 
-		const login = await agent.ui[uid].login.get({
+		const login = await agent.ui({ uid: uid }).login.get({
 			headers: { cookie: response.headers.get('set-cookie') }
 		});
 		await expectPolicyCoversItsOwnResources(

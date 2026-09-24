@@ -53,10 +53,10 @@ describe('configuration conformIdTokenClaims=true', () => {
 		let refreshIdToken = null;
 
 		beforeAll(async () => {
-			const claims = JSON.stringify({
+			const claims = {
 				id_token: { gender: null, email: null, email_verified: null },
 				userinfo: { gender: null }
-			});
+			};
 
 			const auth = new AuthorizationRequest({
 				scope,

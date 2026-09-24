@@ -1,5 +1,5 @@
 import { describe, it, beforeAll, afterEach, expect, mock } from 'bun:test';
-import base64url from 'base64url';
+import * as base64url from 'lib/helpers/base64url.js';
 
 import bootstrap, {
 	agent,

@@ -56,10 +56,12 @@ describe('signing in to a second bucket while a sign-in is already held', () => 
 		const [, , uid] = location.split('/');
 		const interactionCookie = prompt.headers.get('set-cookie') ?? '';
 
-		const { response } = await agent.ui[uid].login.post(
-			{ username: 'bob@acme.example.com', password: PASSWORD },
-			{ headers: { cookie: `${held}; ${interactionCookie}` } }
-		);
+		const { response } = await agent
+			.ui({ uid: uid })
+			.login.post(
+				{ username: 'bob@acme.example.com', password: PASSWORD },
+				{ headers: { cookie: `${held}; ${interactionCookie}` } }
+			);
 
 		/*
 		 * Asserted on where the end user is sent, not merely on the absence of an error. The sign-out

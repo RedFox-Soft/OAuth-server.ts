@@ -234,9 +234,12 @@ export const userinfo = new Elysia()
 	.use(corsClientBased(accessTokenClientId))
 	.guard({
 		schema: 'standalone',
+		// As authHeaders: `accept` for the error page, `x-client-cert` for certificate-bound tokens.
 		headers: t.Object({
 			authorization: t.Optional(t.String()),
-			dpop: t.Optional(t.String())
+			dpop: t.Optional(t.String()),
+			accept: t.Optional(t.String()),
+			'x-client-cert': t.Optional(t.String())
 		})
 	})
 	.get(routeNames.userinfo, userInfo, responses)

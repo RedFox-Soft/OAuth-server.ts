@@ -73,22 +73,6 @@ export const grantStore: Map<string, GrantHandler> = new Map([
 	['urn:openid:params:grant-type:ciba', ciba.handler]
 ]);
 
-// Single source of truth for the grant types the /token endpoint accepts. An explicit tuple of
-// literals (not `keys().map(t.Literal)`, whose array shape collapses the TypeBox static type to
-// `never`) so `GrantType` is a real literal union and the /token handler stays well-typed.
-export const grantTypeSchema = t.Union(
-	[
-		t.Literal('authorization_code'),
-		t.Literal('client_credentials'),
-		t.Literal('refresh_token'),
-		t.Literal('urn:ietf:params:oauth:grant-type:device_code'),
-		t.Literal('urn:openid:params:grant-type:ciba')
-	],
-	{ error: 'invalid grant_type' }
-);
-
-export type GrantType = (typeof grantTypeSchema)['static'];
-
 // Server-level feature flag gating each optional grant. Mirrors deriveGrantTypes in
 // lib/configs/discoverySupport.ts so token dispatch and discovery advertise the same set.
 const grantFeatureFlags = {

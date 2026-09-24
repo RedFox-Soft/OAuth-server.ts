@@ -11,6 +11,9 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- token, device authorization and CIBA endpoints answer as RFC 6749 §5.2 says: an unknown `grant_type` is
+  `unsupported_grant_type` (was `invalid_request`), and a grant the client is not registered for is
+  `unauthorized_client` (was `invalid_request`).
 - tokens: a browser application's rotated refresh tokens again expire when their chain's first token
   would have, instead of each rotation granting a fresh lifetime — dead since `54ba556`, masked by the
   equal default grant lifetime. `ttl.*` now take `(token, client)`. Deployments that lengthened a
@@ -29,6 +32,10 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Changed
 
+- types: the typed (Eden) client sees what the endpoints answer — `/token` declares its 400/401 errors and
+  one token body, registration and introspection declare their RFC members, the request headers include
+  `accept` and `x-client-cert`, and the admin client schema's grant types and auth method are no longer
+  `never` (unions built from a mapped array). No response changes on the wire.
 - **breaking** — extension functions, policy checks, registration policies and RAR validators receive
   the request context itself (`issueRefreshToken(oidc, client, code)`, `check: (oidc) => …`), not
   `{ oidc }`. Request-scoped events carry it first; `grant.revoked` is `(oidc?, grantId)` and fires once

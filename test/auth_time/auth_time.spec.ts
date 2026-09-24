@@ -1,4 +1,3 @@
-import url from 'node:url';
 import {
 	describe,
 	it,
@@ -9,7 +8,7 @@ import {
 	spyOn
 } from 'bun:test';
 import { decodeJwt } from 'jose';
-import bootstrap, { agent } from '../test_helper.js';
+import bootstrap, { agent, redirectParameter } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 
@@ -42,12 +41,10 @@ describe('responds with a id_token containing auth_time', async () => {
 		auth.validateState(response);
 		auth.validateClientLocation(response);
 
-		const {
-			query: { code }
-		} = url.parse(response.headers.get('location'), true);
+		const code = redirectParameter(response, 'code');
 
 		const { data } = await auth.getToken(code);
-		if (!data) throw new Error('expected response data');
+		if (!data?.id_token) throw new Error('expected an id_token');
 		return data.id_token;
 	}
 

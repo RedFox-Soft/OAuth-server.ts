@@ -125,7 +125,6 @@ describe('UserInfo', () => {
 	});
 
 	it('refuses a UserInfo request with no access token', async function () {
-		// @ts-expect-error intentionally calling with no args to test the missing-token path
 		const { error } = await agent.userinfo.get();
 		if (!error) {
 			throw new Error('Have to be exception');

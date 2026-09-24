@@ -35,7 +35,8 @@ import {
 	InvalidRequestObject,
 	RegistrationNotSupported,
 	RequestNotSupported,
-	RequestUriNotSupported
+	RequestUriNotSupported,
+	UnauthorizedClient
 } from 'lib/helpers/errors.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { featureVerification } from './featureVerification.js';
@@ -145,8 +146,9 @@ export const deviceAuth = new Elysia()
 
 			await authentication(body, headers, oidc);
 			const client = oidc.client;
+			// RFC 8628 §3.2 answers with the token endpoint's errors (RFC 6749 §5.2): unauthorized_client.
 			if (!grantTypeAllowed(client, deviceAuthGrantType)) {
-				throw new InvalidRequest(
+				throw new UnauthorizedClient(
 					`${deviceAuthGrantType} is not allowed for this client`
 				);
 			}
@@ -223,8 +225,9 @@ export const backchannelAuth = new Elysia()
 
 			stripOutsideJarParams(oidc);
 
+			// CIBA Core §13: unauthorized_client for a client not allowed this authentication flow.
 			if (!grantTypeAllowed(client, backchannelAuthGrantType)) {
-				throw new InvalidRequest(
+				throw new UnauthorizedClient(
 					`${backchannelAuthGrantType} is not allowed for this client`
 				);
 			}

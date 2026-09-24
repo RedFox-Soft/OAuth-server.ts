@@ -5,28 +5,27 @@ import { MemoryAdapter, setStorage } from '../lib/adapters/memory/index.js';
 
 const map = new Map();
 
-map.del = function (...args) {
-	this.delete(...args);
-};
-
 setStorage(map);
-const testStorage = new Map();
+const testStorage = new Map<string, TestAdapter>();
 
 export class TestAdapter extends MemoryAdapter {
+	// The one storage map every model shares, exposed so a spec can inspect or seed records directly.
+	declare store: typeof map;
+
 	constructor(name: string) {
-		if (testStorage.has(name)) return testStorage.get(name);
+		const existing = testStorage.get(name);
+		if (existing) return existing;
 		super(name);
 		this.store = map;
 		testStorage.set(name, this);
 	}
 
 	static for(name: string) {
-		if (testStorage.has(name)) return testStorage.get(name);
-		return new this(name);
+		return testStorage.get(name) ?? new TestAdapter(name);
 	}
 
 	get(key: string) {
-		return this.constructor.for(key);
+		return TestAdapter.for(key);
 	}
 
 	static clear() {
@@ -47,7 +46,11 @@ export class TestAdapter extends MemoryAdapter {
 		Object.assign(found, update);
 	}
 
-	async upsert(id: string, payload, expiresIn: number) {
+	async upsert(
+		id: string,
+		payload: Parameters<MemoryAdapter['upsert']>[1],
+		expiresIn: number
+	) {
 		if (
 			this.model !== 'RegistrationAccessToken' &&
 			this.model !== 'InitialAccessToken' &&
@@ -55,7 +58,9 @@ export class TestAdapter extends MemoryAdapter {
 			this.model !== 'Grant'
 		) {
 			expect(payload).toHaveProperty('exp');
-			expect(payload.exp).toBeTypeOf('number');
+			if (typeof payload.exp !== 'number') {
+				throw new TypeError('a stored payload must carry a numeric exp');
+			}
 			expect(Number.isFinite(payload.exp)).toBe(true);
 			expect(
 				Math.abs(payload.exp - (expiresIn + epochTime()))

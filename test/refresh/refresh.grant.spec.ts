@@ -12,7 +12,7 @@ import {
 	setSystemTime
 } from 'bun:test';
 
-import base64url from 'base64url';
+import * as base64url from 'lib/helpers/base64url.js';
 
 import bootstrap, { agent, getHeader, type Setup } from '../test_helper.js';
 import { getUserStore } from 'lib/adapters/index.js';

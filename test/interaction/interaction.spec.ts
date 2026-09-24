@@ -8,7 +8,7 @@ import {
 	mock
 } from 'bun:test';
 import nanoid from '../../lib/helpers/nanoid.ts';
-import bootstrap, { agent } from '../test_helper.js';
+import bootstrap, { agent, getHeader } from '../test_helper.js';
 import { SESSION_COOKIE_PREFIX } from '../test_helper.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
@@ -29,6 +29,12 @@ function grantCount() {
 	).length;
 }
 
+// What an interaction records as its outcome: the sign-in, and whatever the later prompts added.
+type InteractionResult = {
+	login?: { accountId: string; ts?: number; [member: string]: unknown };
+	[prompt: string]: unknown;
+};
+
 const expire = new Date();
 expire.setDate(expire.getDate() + 1);
 
@@ -43,7 +49,7 @@ describe('interaction UI', async () => {
 	});
 
 	describe('render login', () => {
-		const object = {};
+		const object = { cookie: '', uid: '', url: '' };
 
 		beforeEach(async function () {
 			const auth = new AuthorizationRequest({
@@ -53,17 +59,17 @@ describe('interaction UI', async () => {
 				query: auth.params
 			});
 
-			const url = response.headers.get('location');
+			const url = getHeader(response, 'location');
 			const [, , uid] = url.split('/');
 
-			object.cookie = response.headers.get('set-cookie');
+			object.cookie = getHeader(response, 'set-cookie');
 			object.uid = uid;
 			object.url = url;
 		});
 
 		it('the login page renders a usable form', async function () {
 			const uid = object.uid;
-			const { data } = await agent.ui[uid].login.get({
+			const { data } = await agent.ui({ uid: uid }).login.get({
 				headers: {
 					cookie: object.cookie
 				}
@@ -75,7 +81,8 @@ describe('interaction UI', async () => {
 		});
 
 		it('a request with no interaction cookie renders an error page rather than faulting', async function () {
-			const { error } = await agent.ui[object.uid].login.get();
+			const { error } = await agent.ui({ uid: object.uid }).login.get();
+			if (!error) throw new Error('expected error response');
 
 			expect(error.value).toEqual({
 				error: 'invalid_request',
@@ -86,11 +93,12 @@ describe('interaction UI', async () => {
 		it('a cookie naming an interaction that does not exist is refused', async function () {
 			spyOn(Interaction, 'tryFind').mockResolvedValue(undefined);
 
-			const { error } = await agent.ui[object.uid].login.get({
+			const { error } = await agent.ui({ uid: object.uid }).login.get({
 				headers: {
 					cookie: object.cookie
 				}
 			});
+			if (!error) throw new Error('expected error response');
 			expect(error.value).toEqual({
 				error: 'invalid_request',
 				error_description: 'interaction session not found'
@@ -99,9 +107,9 @@ describe('interaction UI', async () => {
 	});
 
 	describe('render interaction', () => {
-		let uid = null;
-		let cookie = null;
-		let url = null;
+		let uid: string;
+		let cookie: string;
+		let url: string;
 
 		beforeEach(async function () {
 			const login = await setup.login();
@@ -116,13 +124,13 @@ describe('interaction UI', async () => {
 					cookie: login
 				}
 			});
-			cookie = [response.headers.get('set-cookie'), login];
-			url = response.headers.get('location');
+			cookie = [getHeader(response, 'set-cookie'), login].join('; ');
+			url = getHeader(response, 'location');
 			[, , uid] = url.split('/');
 		});
 
 		it('the consent page renders a usable form', async function () {
-			const { data, status } = await agent.ui[uid].consent.get({
+			const { data, status } = await agent.ui({ uid: uid }).consent.get({
 				headers: {
 					cookie
 				}
@@ -136,11 +144,12 @@ describe('interaction UI', async () => {
 			const session = setup.getLastSession();
 			await session.destroy();
 
-			const { error } = await agent.ui[uid].consent.get({
+			const { error } = await agent.ui({ uid: uid }).consent.get({
 				headers: {
 					cookie
 				}
 			});
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(error.value).toEqual({
 				error: 'invalid_request',
@@ -153,11 +162,12 @@ describe('interaction UI', async () => {
 			session.payload.accountId = 'foobar';
 			await session.save();
 
-			const { error } = await agent.ui[uid].consent.get({
+			const { error } = await agent.ui({ uid: uid }).consent.get({
 				headers: {
 					cookie
 				}
 			});
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(error.value).toEqual({
 				error: 'invalid_request',
@@ -181,21 +191,24 @@ describe('interaction UI', async () => {
 				}
 			});
 
-			const url = res.headers.get('location');
+			const url = getHeader(res, 'location');
 			const [, , uid] = url.split('/');
-			const cookie = [res.headers.get('set-cookie'), login];
+			const cookie = [getHeader(res, 'set-cookie'), login].join('; ');
 
 			const before = grantCount();
-			const { response: aborted, error } = await agent.ui[uid].consent.post(
-				{
-					action: 'cancel'
-				},
-				{
-					headers: {
-						cookie
+			const { response: aborted, error } = await agent
+				.ui({ uid: uid })
+				.consent.post(
+					{
+						action: 'cancel'
+					},
+					{
+						headers: {
+							cookie
+						}
 					}
-				}
-			);
+				);
+			if (!error) throw new Error('expected error response');
 
 			expect(aborted.status).toBe(400);
 			expect(error.value).toEqual({
@@ -208,8 +221,8 @@ describe('interaction UI', async () => {
 	});
 
 	describe('submit login', () => {
-		let uid = null;
-		let cookie = null;
+		let uid: string;
+		let cookie: string;
 
 		beforeEach(async function () {
 			const auth = new AuthorizationRequest({
@@ -218,9 +231,9 @@ describe('interaction UI', async () => {
 			const { response } = await agent.auth.get({
 				query: auth.params
 			});
-			const url = response.headers.get('location');
+			const url = getHeader(response, 'location');
 			[, , uid] = url.split('/');
-			cookie = response.headers.get('set-cookie');
+			cookie = getHeader(response, 'set-cookie');
 		});
 
 		it('accepts valid credentials and resumes the authorization request', async function () {
@@ -228,7 +241,7 @@ describe('interaction UI', async () => {
 			const username = `${nanoid()}@example.com`;
 			await getUserStore().create(username, await Bun.password.hash(password));
 
-			const { response } = await agent.ui[uid].login.post(
+			const { response } = await agent.ui({ uid: uid }).login.post(
 				{
 					username,
 					password
@@ -247,7 +260,7 @@ describe('interaction UI', async () => {
 		});
 
 		it('re-renders the login form with an error for an unknown user', async function () {
-			const { error } = await agent.ui[uid].login.post(
+			const { error } = await agent.ui({ uid: uid }).login.post(
 				{
 					username: `${nanoid()}@example.com`,
 					password: 'whatever'
@@ -258,6 +271,7 @@ describe('interaction UI', async () => {
 					}
 				}
 			);
+			if (!error) throw new Error('expected error response');
 
 			expect(error.status).toBe(400);
 			expect(error.value).toContain('Invalid username or password');
@@ -270,7 +284,7 @@ describe('interaction UI', async () => {
 				await Bun.password.hash('the-real-password')
 			);
 
-			const { error } = await agent.ui[uid].login.post(
+			const { error } = await agent.ui({ uid: uid }).login.post(
 				{
 					username,
 					password: 'wrong-password'
@@ -281,6 +295,7 @@ describe('interaction UI', async () => {
 					}
 				}
 			);
+			if (!error) throw new Error('expected error response');
 
 			expect(error.status).toBe(400);
 			expect(error.value).toContain('Invalid username or password');
@@ -288,8 +303,8 @@ describe('interaction UI', async () => {
 	});
 
 	describe('submit consent', () => {
-		let uid = null;
-		let cookie = null;
+		let uid: string;
+		let cookie: string;
 
 		beforeEach(async function () {
 			const login = await setup.login();
@@ -304,13 +319,13 @@ describe('interaction UI', async () => {
 					cookie: login
 				}
 			});
-			cookie = [response.headers.get('set-cookie'), login].join('; ');
-			const url = response.headers.get('location');
+			cookie = [getHeader(response, 'set-cookie'), login].join('; ');
+			const url = getHeader(response, 'location');
 			[, , uid] = url.split('/');
 		});
 
 		it('accepts the consent and resumes the authorization request', async function () {
-			const { response } = await agent.ui[uid].consent.post(
+			const { response } = await agent.ui({ uid: uid }).consent.post(
 				{
 					action: 'allow'
 				},
@@ -344,10 +359,9 @@ describe('interaction UI', async () => {
 			await interaction.save(300);
 			const before = grantCount();
 
-			const { response } = await agent.ui[uid].consent.post(
-				{ action: 'allow' },
-				{ headers: { cookie } }
-			);
+			const { response } = await agent
+				.ui({ uid: uid })
+				.consent.post({ action: 'allow' }, { headers: { cookie } });
 
 			expect(response.status).toBe(303);
 			expect(grantCount()).toBe(before + 1);
@@ -357,7 +371,7 @@ describe('interaction UI', async () => {
 			const session = setup.getLastSession();
 			await session.destroy();
 
-			const { error } = await agent.ui[uid].consent.post(
+			const { error } = await agent.ui({ uid: uid }).consent.post(
 				{
 					action: 'allow'
 				},
@@ -367,6 +381,7 @@ describe('interaction UI', async () => {
 					}
 				}
 			);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(error.value).toEqual({
 				error: 'invalid_request',
@@ -379,7 +394,7 @@ describe('interaction UI', async () => {
 			session.payload.accountId = 'foobar';
 			await session.save();
 
-			const { error } = await agent.ui[uid].consent.post(
+			const { error } = await agent.ui({ uid: uid }).consent.post(
 				{
 					action: 'allow'
 				},
@@ -389,6 +404,7 @@ describe('interaction UI', async () => {
 					}
 				}
 			);
+			if (!error) throw new Error('expected error response');
 			expect(error.status).toBe(400);
 			expect(error.value).toEqual({
 				error: 'invalid_request',
@@ -398,9 +414,9 @@ describe('interaction UI', async () => {
 	});
 
 	describe('consent details (US1)', () => {
-		let uid = null;
-		let cookie = null;
-		let auth = null;
+		let uid: string;
+		let cookie: string;
+		let auth: AuthorizationRequest;
 
 		beforeEach(async function () {
 			// grant only `openid` at login, then request more so `profile`/`email`
@@ -419,13 +435,13 @@ describe('interaction UI', async () => {
 					cookie: login
 				}
 			});
-			cookie = [response.headers.get('set-cookie'), login].join('; ');
-			const url = response.headers.get('location');
+			cookie = [getHeader(response, 'set-cookie'), login].join('; ');
+			const url = getHeader(response, 'location');
 			[, , uid] = url.split('/');
 		});
 
 		it('renders the real client name and the requested scopes', async function () {
-			const { data, status } = await agent.ui[uid].consent.get({
+			const { data, status } = await agent.ui({ uid: uid }).consent.get({
 				headers: {
 					cookie
 				}
@@ -437,7 +453,7 @@ describe('interaction UI', async () => {
 		});
 
 		it('allow issues a grant for the requested scopes and resumes to the client', async function () {
-			const { response } = await agent.ui[uid].consent.post(
+			const { response } = await agent.ui({ uid: uid }).consent.post(
 				{
 					action: 'allow'
 				},
@@ -468,7 +484,10 @@ describe('resume after consent', async () => {
 	// Persists a `resume` interaction the way the authorization pipeline would have, then returns the
 	// matching `_interaction` cookie. The web resume flow is GET /ui/:uid/resume (uid === 'resume');
 	// the interaction carries the stored authorization `params` plus the interaction `result`.
-	async function saveResume(params, result) {
+	async function saveResume(
+		params?: AuthorizationRequest['params'],
+		result?: InteractionResult
+	) {
 		const sess = new Interaction('resume', {
 			uid: 'resume',
 			cookieID: 'cookieID'
@@ -485,12 +504,13 @@ describe('resume after consent', async () => {
 			Object.assign(sess.payload, { result });
 		}
 		await sess.save(30);
-		return `_interaction=cookieID; path=/ui/resume/resume; expires=${expire.toGMTString()}; httponly`;
+		return `_interaction=cookieID; path=/ui/resume/resume; expires=${expire.toUTCString()}; httponly`;
 	}
 
 	describe('general', () => {
 		it('needs the resume cookie to be present, else renders an err', async function () {
-			const { error } = await agent.ui['resume'].resume.get();
+			const { error } = await agent.ui({ uid: 'resume' }).resume.get();
+			if (!error) throw new Error('expected error response');
 
 			expect(error.status).toBe(422);
 			expect(error.value).toEqual({
@@ -509,11 +529,12 @@ describe('resume after consent', async () => {
 
 			spyOn(Interaction, 'tryFind').mockResolvedValue(undefined);
 
-			const { error } = await agent.ui['resume'].resume.get({
+			const { error } = await agent.ui({ uid: 'resume' }).resume.get({
 				headers: {
 					cookie: [session, cookie].join('; ')
 				}
 			});
+			if (!error) throw new Error('expected error response');
 
 			expect(error.status).toBe(400);
 			expect(error.value).toEqual({
@@ -538,7 +559,7 @@ describe('resume after consent', async () => {
 				}
 			});
 
-			const { response } = await agent.ui['resume'].resume.get({
+			const { response } = await agent.ui({ uid: 'resume' }).resume.get({
 				headers: {
 					cookie: [session, cookie].join('; ')
 				}
@@ -578,7 +599,7 @@ describe('resume after consent', async () => {
 				}
 			});
 
-			const { response } = await agent.ui['resume'].resume.get({
+			const { response } = await agent.ui({ uid: 'resume' }).resume.get({
 				headers: {
 					cookie: [session, cookie].join('; ')
 				}
@@ -605,7 +626,7 @@ describe('resume after consent', async () => {
 				}
 			});
 
-			const { response } = await agent.ui['resume'].resume.get({
+			const { response } = await agent.ui({ uid: 'resume' }).resume.get({
 				headers: {
 					cookie: [session, cookie].join('; ')
 				}
@@ -635,7 +656,7 @@ describe('resume after consent', async () => {
 				}
 			});
 
-			const { response, data } = await agent.ui['resume'].resume.get({
+			const { response, data } = await agent.ui({ uid: 'resume' }).resume.get({
 				headers: {
 					cookie: [session, cookie].join('; ')
 				}
@@ -663,7 +684,7 @@ describe('resume after consent', async () => {
 				consent: {}
 			});
 
-			const { response } = await agent.ui['resume'].resume.get({
+			const { response } = await agent.ui({ uid: 'resume' }).resume.get({
 				headers: {
 					cookie: [session, cookie].join('; ')
 				}
@@ -686,7 +707,7 @@ describe('resume after consent', async () => {
 				error: 'access_denied'
 			});
 
-			const { response } = await agent.ui['resume'].resume.get({
+			const { response } = await agent.ui({ uid: 'resume' }).resume.get({
 				headers: {
 					cookie: [session, cookie].join('; ')
 				}
@@ -709,7 +730,7 @@ describe('resume after consent', async () => {
 				error: 'access_denied'
 			});
 
-			const { response } = await agent.ui['resume'].resume.get({
+			const { response } = await agent.ui({ uid: 'resume' }).resume.get({
 				headers: {
 					cookie: [session, cookie].join('; ')
 				}
@@ -732,7 +753,7 @@ describe('resume after consent', async () => {
 				error_description: 'scope out of reach'
 			});
 
-			const { response } = await agent.ui['resume'].resume.get({
+			const { response } = await agent.ui({ uid: 'resume' }).resume.get({
 				headers: {
 					cookie: [session, cookie].join('; ')
 				}
@@ -755,7 +776,7 @@ describe('resume after consent', async () => {
 				error_description: 'custom_foobar'
 			});
 
-			const { response } = await agent.ui['resume'].resume.get({
+			const { response } = await agent.ui({ uid: 'resume' }).resume.get({
 				headers: {
 					cookie: [session, cookie].join('; ')
 				}
@@ -778,7 +799,7 @@ describe('resume after consent', async () => {
 
 			const cookie = await saveResume(auth.params, {});
 
-			const { response } = await agent.ui['resume'].resume.get({
+			const { response } = await agent.ui({ uid: 'resume' }).resume.get({
 				headers: {
 					cookie: [session, cookie].join('; ')
 				}
@@ -806,7 +827,7 @@ describe('resume after consent', async () => {
 				consent: {}
 			});
 
-			const { response } = await agent.ui['resume'].resume.get({
+			const { response } = await agent.ui({ uid: 'resume' }).resume.get({
 				headers: {
 					cookie: [session, cookie].join('; ')
 				}

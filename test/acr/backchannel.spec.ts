@@ -7,11 +7,7 @@ import {
 	spyOn,
 	mock
 } from 'bun:test';
-import bootstrap, {
-	agent,
-	jsonToFormUrlEncoded,
-	seedAccount
-} from '../test_helper.ts';
+import bootstrap, { seedAccount, formAgent } from '../test_helper.ts';
 import { backchannelResult } from 'lib/actions/authorization/backchannel_result.js';
 import { BackchannelAuthenticationRequest } from 'lib/models/backchannel_authentication_request.js';
 import { Grant } from 'lib/models/grant.js';
@@ -29,8 +25,8 @@ async function request(
 	claims?: Record<string, unknown>,
 	acrValues?: string
 ) {
-	const res = await agent.backchannel.post(
-		jsonToFormUrlEncoded({
+	const res = await formAgent.backchannel.post(
+		{
 			client_id: clientId,
 			scope: 'openid',
 			login_hint: ACCOUNT,
@@ -40,7 +36,7 @@ async function request(
 				: {}),
 			...(claims ? { claims: JSON.stringify(claims) } : {}),
 			...(acrValues ? { acr_values: acrValues } : {})
-		}),
+		},
 		{ headers: form }
 	);
 	expect(res.response.status).toBe(200);
@@ -61,12 +57,12 @@ async function report(
 
 /* What the relying party collects at the token endpoint — tokens, or the reason there are none. */
 async function collect(authReqId: string, clientId: string) {
-	const res = await agent.token.post(
-		jsonToFormUrlEncoded({
+	const res = await formAgent.token.post(
+		{
 			client_id: clientId,
 			grant_type: 'urn:openid:params:grant-type:ciba',
 			auth_req_id: authReqId
-		}),
+		},
 		{ headers: form }
 	);
 	return {

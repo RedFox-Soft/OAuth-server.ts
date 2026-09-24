@@ -5,8 +5,8 @@ import { describe, it, beforeAll, expect } from 'bun:test';
 import bootstrap, {
 	DEFAULT_SESSION_COOKIE,
 	agent,
-	jsonToFormUrlEncoded,
-	type Setup
+	type Setup,
+	formAgent
 } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { PushedAuthorizationRequest } from 'lib/models/pushed_authorization_request.js';
@@ -38,19 +38,17 @@ describe('single use of a pushed request_uri', () => {
 
 		const {
 			data: { request_uri }
-		} = await agent.par.post(
-			// @ts-expect-error endpoint parses form-url-encoded into an object
-			jsonToFormUrlEncoded({
+		} = await formAgent.par.post(
+			{
 				client_id: clientId,
 				response_type: 'code',
 				redirect_uri: redirectUri,
 				scope: 'openid',
 				code_challenge_method: 'S256',
 				code_challenge: codeChallenge
-			}),
+			},
 			{
 				headers: {
-					['content-type']: 'application/x-www-form-urlencoded',
 					...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
 				}
 			}
@@ -102,7 +100,7 @@ describe('single use of a pushed request_uri', () => {
 		});
 		await resume.save(30);
 
-		return agent.ui['resume'].resume.get({
+		return agent.ui({ uid: 'resume' }).resume.get({
 			headers: {
 				cookie: `_interaction=cookieID; ${DEFAULT_SESSION_COOKIE}=${setup.getSession().jti}`
 			}

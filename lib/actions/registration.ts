@@ -1,4 +1,4 @@
-import { Elysia, t } from 'elysia';
+import { Elysia, t, type Static } from 'elysia';
 
 import omitBy from '../helpers/_/omit_by.ts';
 import constantEquals from '../helpers/constant_equals.ts';
@@ -43,6 +43,8 @@ const FORBIDDEN = [
  * metadata field.
  */
 type Body = Record<string, unknown>;
+// What create, read and update answer; typed from the response schema, so the typed client sees its members.
+type RegistrationBody = Static<typeof RegistrationResponse>;
 
 // The registration routes authenticate with an opaque bearer token, not client auth. The token is
 // taken from the Authorization header (never the JSON body — a token in the body reads as absent),
@@ -234,7 +236,10 @@ async function create({ body, headers, params, request, set }) {
 	const client = await registerClient(properties, { store: true });
 	oidc.entity('Client', client);
 
-	const responseBody: Body = toWire(client);
+	const responseBody: RegistrationBody = {
+		...toWire(client),
+		client_id: client.clientId
+	};
 
 	if (rat) {
 		Object.assign(responseBody, {
@@ -260,7 +265,10 @@ async function read({ params, headers, query, request, set }) {
 	const token = readBearer(headers.authorization, query, true);
 	const { client } = await authenticate(oidc, params.clientId, token);
 
-	const responseBody: Body = toWire(client);
+	const responseBody: RegistrationBody = {
+		...toWire(client),
+		client_id: client.clientId
+	};
 
 	Object.assign(responseBody, {
 		registration_access_token: token,
@@ -350,7 +358,10 @@ async function update({ params, body, headers, request, set }) {
 
 	const nextClient = await registerClient(properties, { store: true });
 
-	const responseBody: Body = toWire(nextClient);
+	const responseBody: RegistrationBody = {
+		...toWire(nextClient),
+		client_id: nextClient.clientId
+	};
 
 	Object.assign(responseBody, {
 		registration_access_token: token,
@@ -406,10 +417,7 @@ async function remove({ params, headers, request, set }) {
 }
 
 const OptionalBody = t.Optional(t.Record(t.String(), t.Unknown()));
-const responses = {
-	200: RegistrationResponse,
-	201: RegistrationResponse,
-	204: RegistrationResponse,
+const errors = {
 	400: OAuthError,
 	401: OAuthError,
 	403: OAuthError
@@ -418,15 +426,15 @@ const responses = {
 export const registration = new Elysia()
 	.post(routeNames.registration, create, {
 		body: OptionalBody,
-		response: responses
+		response: { 201: RegistrationResponse, ...errors }
 	})
 	.get(`${routeNames.registration}/:clientId`, read, {
-		response: responses
+		response: { 200: RegistrationResponse, ...errors }
 	})
 	.put(`${routeNames.registration}/:clientId`, update, {
 		body: OptionalBody,
-		response: responses
+		response: { 200: RegistrationResponse, ...errors }
 	})
 	.delete(`${routeNames.registration}/:clientId`, remove, {
-		response: responses
+		response: { 204: t.Void(), ...errors }
 	});

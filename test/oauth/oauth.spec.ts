@@ -13,9 +13,9 @@ import {
 
 import bootstrap, {
 	agent,
-	jsonToFormUrlEncoded,
 	type Setup,
-	changeClient
+	changeClient,
+	formAgent
 } from '../test_helper.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { eventBus } from 'lib/event_bus.js';
@@ -304,17 +304,10 @@ describe('requests without the openid scope', () => {
 				const spy = mock();
 				eventBus.on('device_code.saved', spy);
 
-				const { status } = await agent.device.auth.post(
-					jsonToFormUrlEncoded({
-						client_id: 'client',
-						scope
-					}),
-					{
-						headers: {
-							'content-type': 'application/x-www-form-urlencoded'
-						}
-					}
-				);
+				const { status } = await formAgent.device.auth.post({
+					client_id: 'client',
+					scope
+				});
 
 				expect(status).toBe(200);
 				expect(spy).toHaveBeenCalledTimes(1);
@@ -338,17 +331,10 @@ describe('requests without the openid scope', () => {
 						jti = token.jti;
 					});
 
-					const { data, status } = await agent.device.auth.post(
-						jsonToFormUrlEncoded({
-							client_id: 'client',
-							scope
-						}),
-						{
-							headers: {
-								'content-type': 'application/x-www-form-urlencoded'
-							}
-						}
-					);
+					const { data, status } = await formAgent.device.auth.post({
+						client_id: 'client',
+						scope
+					});
 					if (!data) throw new Error('expected response data');
 					expect(status).toBe(200);
 					code = data.device_code;

@@ -1,6 +1,6 @@
 import { describe, it, beforeAll, afterEach, expect, mock } from 'bun:test';
 
-import bootstrap, { agent, jsonToFormUrlEncoded } from '../test_helper.js';
+import bootstrap, { formAgent } from '../test_helper.js';
 import { addons } from 'lib/addon/index.js';
 import { TestAdapter } from 'test/models.js';
 import { normalize } from '../../lib/helpers/user_codes.ts';
@@ -11,7 +11,7 @@ import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 const form = { 'content-type': 'application/x-www-form-urlencoded' };
 
 function post(body, headers = {}) {
-	return agent.device.auth.post(jsonToFormUrlEncoded(body), {
+	return formAgent.device.auth.post(body, {
 		headers: { ...form, ...headers }
 	});
 }
@@ -41,7 +41,7 @@ describe('device_authorization_endpoint', () => {
 
 			expect(error.status).toBe(400);
 			expect(error.value).toEqual({
-				error: 'invalid_request',
+				error: 'unauthorized_client',
 				error_description:
 					'urn:ietf:params:oauth:grant-type:device_code is not allowed for this client'
 			});
@@ -144,8 +144,8 @@ describe('device_authorization_endpoint', () => {
 	});
 
 	it('a client authenticating with its secret is accepted', async () => {
-		const { status, data } = await agent.device.auth.post(
-			jsonToFormUrlEncoded({}),
+		const { status, data } = await formAgent.device.auth.post(
+			{},
 			{
 				headers: {
 					...form,

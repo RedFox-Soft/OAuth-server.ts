@@ -18,44 +18,21 @@ export const OAuthError = t.Object({
 	iss: t.Optional(t.String())
 });
 
-// Token endpoint (RFC 6749 §5.1). The success body depends on grant_type:
-//   - client_credentials            → access token only (no id_token / refresh_token)
-//   - device_code, ciba             → + id_token, refresh_token
+// Token endpoint (RFC 6749 §5.1). Which members a success body carries depends on grant_type:
+//   - client_credentials                → access token only (no id_token / refresh_token)
+//   - device_code, ciba                 → + id_token, refresh_token
 //   - authorization_code, refresh_token → + id_token, refresh_token, authorization_details (RAR)
-// `additionalProperties` stays open (DPoP `cnf`, and other dynamic extras) so a real body never
-// 422s. Optional fields are declared nullable-ish (a grant may emit the key with `undefined`, e.g.
-// `scope: … || undefined`).
-
-// Common OAuth access-token response fields, shared by every grant.
-const accessTokenResponseFields = {
-	access_token: t.String(),
-	token_type: t.String(),
-	expires_in: t.Number(),
-	scope: t.Optional(t.String())
-};
-
-// client_credentials — access token, no id_token / refresh_token.
-export const ClientCredentialsTokenResponse = t.Object(
-	accessTokenResponseFields,
+// One object with those members optional, not a union per grant: every member beyond the access
+// token is already optional, so each grant's body was valid against the widest branch and the union
+// admitted exactly what this admits. The union only made a member absent from one branch unreadable
+// on the others. `additionalProperties` stays open (DPoP `cnf` and other dynamic extras) so a real
+// body never 422s.
+export const TokenResponse = t.Object(
 	{
-		additionalProperties: true
-	}
-);
-
-// device_code / ciba — adds id_token + refresh_token.
-export const RefreshableTokenResponse = t.Object(
-	{
-		...accessTokenResponseFields,
-		id_token: t.Optional(t.String()),
-		refresh_token: t.Optional(t.String())
-	},
-	{ additionalProperties: true }
-);
-
-// authorization_code / refresh_token — additionally carries RAR authorization_details.
-export const AuthorizationCodeTokenResponse = t.Object(
-	{
-		...accessTokenResponseFields,
+		access_token: t.String(),
+		token_type: t.String(),
+		expires_in: t.Number(),
+		scope: t.Optional(t.String()),
 		id_token: t.Optional(t.String()),
 		refresh_token: t.Optional(t.String()),
 		authorization_details: t.Optional(t.Array(t.Unknown()))
@@ -63,17 +40,27 @@ export const AuthorizationCodeTokenResponse = t.Object(
 	{ additionalProperties: true }
 );
 
-export const TokenResponse = t.Union([
-	AuthorizationCodeTokenResponse,
-	RefreshableTokenResponse,
-	ClientCredentialsTokenResponse
-]);
-
 // Introspection (RFC 7662) — JSON variant; the JWT variant returns a `Response` (bypasses schema).
+// The active branch declares the members RFC 7662 §2.2 defines and this server emits, with the types
+// it emits them in (`cnf` carries `x5t#S256` or `jkt`), so a reader can use them without a cast.
 export const IntrospectionResponse = t.Union([
 	t.Object({ active: t.Literal(false) }, { additionalProperties: true }),
 	t.Object(
-		{ active: t.Literal(true), client_id: t.String() },
+		{
+			active: t.Literal(true),
+			client_id: t.String(),
+			scope: t.Optional(t.String()),
+			token_type: t.Optional(t.String()),
+			exp: t.Optional(t.Number()),
+			iat: t.Optional(t.Number()),
+			sub: t.Optional(t.String()),
+			aud: t.Optional(t.String()),
+			iss: t.Optional(t.String()),
+			jti: t.Optional(t.String()),
+			sid: t.Optional(t.String()),
+			cnf: t.Optional(t.Record(t.String(), t.String())),
+			authorization_details: t.Optional(t.Array(t.Unknown()))
+		},
 		{ additionalProperties: true }
 	)
 ]);
@@ -126,18 +113,24 @@ export const UserinfoResponse = t.Union([
 	t.String()
 ]);
 
-// Dynamic Client Registration / Registration Management (RFC 7591/7592). Create/read/update return
-// the client metadata (snake_case) plus, when issued, registration_access_token/registration_client_uri;
-// the field set is dynamic per client, so this stays permissive. Delete returns 204 with no body (Void).
-export const RegistrationResponse = t.Union([
-	t.Object(
-		{
-			client_id: t.String()
-		},
-		{ additionalProperties: true }
-	),
-	t.Void()
-]);
+// Dynamic Client Registration / Registration Management (RFC 7591/7592). Create, read and update
+// return the client metadata (snake_case) plus, when issued, the registration credentials. The members
+// both RFCs define for the response are declared; the rest of the metadata varies per client and stays
+// open. Delete answers 204 with no body, declared on its own route.
+export const RegistrationResponse = t.Object(
+	{
+		client_id: t.String(),
+		client_secret: t.Optional(t.String()),
+		client_id_issued_at: t.Optional(t.Number()),
+		client_secret_expires_at: t.Optional(t.Number()),
+		registration_access_token: t.Optional(t.String()),
+		registration_client_uri: t.Optional(t.String()),
+		redirect_uris: t.Optional(t.Array(t.String())),
+		grant_types: t.Optional(t.Array(t.String())),
+		response_types: t.Optional(t.Array(t.String()))
+	},
+	{ additionalProperties: true }
+);
 
 // Discovery metadata is a large dynamic object assembled from enabled features (runtime-validated).
 export const DiscoveryResponse = t.Object({}, { additionalProperties: true });

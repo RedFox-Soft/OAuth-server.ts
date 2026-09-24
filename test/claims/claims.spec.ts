@@ -12,10 +12,10 @@ import { decode as decodeJWT } from '../../lib/helpers/jwt.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import bootstrap, {
 	agent,
-	jsonToFormUrlEncoded,
 	setSeedClaims,
 	type Setup,
-	changeClient
+	changeClient,
+	formAgent
 } from '../test_helper.js';
 import { fullProfileClaims } from '../models.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
@@ -41,9 +41,8 @@ expire.setDate(expire.getDate() + 1);
 			});
 		}
 
-		// @ts-expect-error string will be converted to form url encoded
-		return agent.auth.post(jsonToFormUrlEncoded(auth.params), {
-			headers: { cookie, ['content-type']: 'application/x-www-form-urlencoded' }
+		return formAgent.auth.post(auth.params, {
+			headers: { cookie }
 		});
 	}
 
@@ -331,7 +330,7 @@ expire.setDate(expire.getDate() + 1);
 							}
 						});
 
-						const { response } = await agent.ui['resume'].resume.get({
+						const { response } = await agent.ui({ uid: 'resume' }).resume.get({
 							headers: { cookie: [seesion, cookie].join('; ') }
 						});
 						expect(response.status).toBe(303);
@@ -362,9 +361,11 @@ expire.setDate(expire.getDate() + 1);
 							}
 						});
 
-						const { response, error } = await agent.ui['resume'].resume.get({
-							headers: { cookie: [session, cookie].join('; ') }
-						});
+						const { response, error } = await agent
+							.ui({ uid: 'resume' })
+							.resume.get({
+								headers: { cookie: [session, cookie].join('; ') }
+							});
 						expect(response.status).toBe(303);
 						auth.validatePresence(response, ['code', 'state']);
 						auth.validateState(response);
@@ -751,6 +752,7 @@ expire.setDate(expire.getDate() + 1);
 			it('a malformed claims parameter is refused as invalid_request', async function () {
 				const auth = new AuthorizationRequest({
 					scope: 'openid',
+					// @ts-expect-error the claims parameter is malformed on purpose: that is the case
 					claims: 'something'
 				});
 
@@ -774,6 +776,7 @@ expire.setDate(expire.getDate() + 1);
 			it('refuses a claims parameter that is not an object', async function () {
 				const auth = new AuthorizationRequest({
 					scope: 'openid',
+					// @ts-expect-error the claims parameter is malformed on purpose: that is the case
 					claims: 'true'
 				});
 
@@ -797,6 +800,7 @@ expire.setDate(expire.getDate() + 1);
 			it('accepts a claims parameter naming only members it does not define', async function () {
 				const auth = new AuthorizationRequest({
 					scope: 'openid',
+					// @ts-expect-error the case sends a claims member this server does not define
 					claims: '{"not_recognized": "does not matter"}'
 				});
 
@@ -820,6 +824,7 @@ expire.setDate(expire.getDate() + 1);
 				it('refuses a claims parameter carrying a member it does not define as unsupported', async function () {
 					const auth = new AuthorizationRequest({
 						scope: 'openid',
+						// @ts-expect-error the case sends a claims member this server does not define
 						claims: '{"urn_example_ext": {"anything": true}}'
 					});
 
@@ -850,6 +855,7 @@ expire.setDate(expire.getDate() + 1);
 
 				const withMember = new AuthorizationRequest({
 					scope: 'openid',
+					// @ts-expect-error the case sends a claims member this server does not define
 					claims: { ...requested, urn_example_ext: { anything: true } }
 				});
 				const without = new AuthorizationRequest({
@@ -872,6 +878,7 @@ expire.setDate(expire.getDate() + 1);
 				const cookie = await setup.login({ claims: requested });
 				const auth = new AuthorizationRequest({
 					scope: 'openid',
+					// @ts-expect-error the case sends a claims member this server does not define
 					claims: { ...requested, urn_example_ext: { anything: true } }
 				});
 
@@ -886,6 +893,7 @@ expire.setDate(expire.getDate() + 1);
 			it('refuses a claims parameter that is an array, naming the shape at fault', async function () {
 				const auth = new AuthorizationRequest({
 					scope: 'openid',
+					// @ts-expect-error the claims parameter is malformed on purpose: that is the case
 					claims: '[]'
 				});
 
@@ -915,6 +923,7 @@ expire.setDate(expire.getDate() + 1);
 					scope: 'openid',
 					claims: {
 						id_token: { email: { essential: true } },
+						// @ts-expect-error the case sends a claims member this server does not define
 						urn_example_ext: { anything: true }
 					}
 				});
@@ -937,6 +946,7 @@ expire.setDate(expire.getDate() + 1);
 			it('refuses a claims parameter whose userinfo member is not a plain object', async function () {
 				const auth = new AuthorizationRequest({
 					scope: 'openid',
+					// @ts-expect-error the claims parameter is malformed on purpose: that is the case
 					claims: '{"userinfo": "Not an Object"}'
 				});
 
@@ -960,6 +970,7 @@ expire.setDate(expire.getDate() + 1);
 			it('refuses a claims parameter whose id_token member is not a plain object', async function () {
 				const auth = new AuthorizationRequest({
 					scope: 'openid',
+					// @ts-expect-error the claims parameter is malformed on purpose: that is the case
 					claims: '{"id_token": "Not an Object"}'
 				});
 

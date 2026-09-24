@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { parse as parseUrl } from 'node:url';
 
-import base64url from 'base64url';
+import * as base64url from 'lib/helpers/base64url.js';
 
 import {
 	describe,

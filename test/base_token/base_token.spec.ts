@@ -7,7 +7,8 @@ import {
 	spyOn,
 	mock,
 	expect,
-	setSystemTime
+	setSystemTime,
+	type Mock
 } from 'bun:test';
 
 import bootstrap, { type Setup } from '../test_helper.js';
@@ -26,13 +27,14 @@ import { InvalidGrant } from 'lib/helpers/errors.js';
 describe('BaseToken', () => {
 	let setup: Setup;
 	const adapter = TestAdapter.for('RefreshToken');
+	let upsert: Mock<typeof adapter.upsert>;
 	beforeAll(async function () {
 		setup = await bootstrap(import.meta.url);
 	});
 
 	beforeEach(function () {
 		spyOn(adapter, 'find');
-		spyOn(adapter, 'upsert');
+		upsert = spyOn(adapter, 'upsert');
 	});
 
 	afterEach(function () {
@@ -106,7 +108,7 @@ describe('BaseToken', () => {
 			expect.any(Object),
 			14 * 24 * 60 * 60
 		);
-		adapter.upsert.mockClear();
+		upsert.mockClear();
 		setSystemTime((((Date.now() / 1000) | 0) + 60) * 1000);
 
 		token = await RefreshToken.find(value);

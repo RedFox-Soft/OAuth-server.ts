@@ -14,9 +14,9 @@ import { ApplicationConfig } from 'lib/configs/application.js';
 import { addons } from 'lib/addon/registry.js';
 import bootstrap, {
 	agent,
-	jsonToFormUrlEncoded,
 	type Setup,
-	changeClient
+	changeClient,
+	formAgent
 } from '../../test_helper.js';
 import epochTime from '../../../lib/helpers/epoch_time.ts';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
@@ -62,11 +62,10 @@ describe('BASIC code', () => {
 				});
 			}
 
-			return agent.auth.post(jsonToFormUrlEncoded(auth.params), {
+			return formAgent.auth.post(auth.params, {
 				headers: {
 					cookie,
-					accept,
-					['content-type']: 'application/x-www-form-urlencoded'
+					accept
 				}
 			});
 		}

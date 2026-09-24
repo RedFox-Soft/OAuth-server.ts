@@ -12,9 +12,9 @@ import {
 
 import bootstrap, {
 	agent,
-	jsonToFormUrlEncoded,
 	type Setup,
-	changeClient
+	changeClient,
+	formAgent
 } from '../test_helper.js';
 import * as JWT from '../../lib/helpers/jwt.ts';
 
@@ -77,10 +77,9 @@ describe('encryption', () => {
 					headers: { cookie }
 				});
 			}
-			return agent.auth.post(jsonToFormUrlEncoded(auth.params), {
+			return formAgent.auth.post(auth.params, {
 				headers: {
-					cookie,
-					['content-type']: 'application/x-www-form-urlencoded'
+					cookie
 				}
 			});
 		}
@@ -320,11 +319,10 @@ describe('encryption', () => {
 						.setProtectedHeader({ enc: 'A128CBC-HS256', alg: 'A128KW' })
 						.encrypt(key);
 
-					const { data: par } = await agent.par.post(
-						jsonToFormUrlEncoded({ request: encrypted }),
+					const { data: par } = await formAgent.par.post(
+						{ request: encrypted },
 						{
 							headers: {
-								['content-type']: 'application/x-www-form-urlencoded',
 								...AuthorizationRequest.basicAuthHeader('client', 'secret')
 							}
 						}
@@ -378,11 +376,10 @@ describe('encryption', () => {
 						.setProtectedHeader({ enc: 'A128CBC-HS256', alg: 'A128KW' })
 						.encrypt(key);
 
-					const { data: par } = await agent.par.post(
-						jsonToFormUrlEncoded({ request: encrypted }),
+					const { data: par } = await formAgent.par.post(
+						{ request: encrypted },
 						{
 							headers: {
-								['content-type']: 'application/x-www-form-urlencoded',
 								...AuthorizationRequest.basicAuthHeader(
 									'clientRequestObjectSigningAlg',
 									'secret'

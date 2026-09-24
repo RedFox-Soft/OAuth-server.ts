@@ -15,7 +15,7 @@ import { eventBus } from 'lib/event_bus.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { Client } from 'lib/models/client.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
-import bootstrap, { agent, type Setup } from '../test_helper.js';
+import bootstrap, { agent, changeClient, type Setup } from '../test_helper.js';
 import { getUserStore } from 'lib/adapters/index.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
@@ -171,11 +171,7 @@ describe('grant_type=authorization_code', () => {
 
 			const { error } = await auth.getToken(code);
 			expect(error.status).toBe(400);
-			expect(error.value).toHaveProperty('error', 'invalid_request');
-			expect(error.value).toHaveProperty(
-				'error_description',
-				'invalid grant_type'
-			);
+			expect(error.value).toHaveProperty('error', 'unsupported_grant_type');
 		});
 
 		it('a redirect_uri differing from the one the code was issued for is refused', async function () {
@@ -405,11 +401,7 @@ describe('grant_type=authorization_code', () => {
 			auth.grant_type = 'foobar';
 			const { error } = await auth.getToken(code);
 			expect(error.status).toBe(400);
-			expect(error.value).toHaveProperty('error', 'invalid_request');
-			expect(error.value).toHaveProperty(
-				'error_description',
-				'invalid grant_type'
-			);
+			expect(error.value).toHaveProperty('error', 'unsupported_grant_type');
 		});
 
 		it('a provided redirect_uri must still match even when it could have been omitted', async function () {
@@ -468,6 +460,27 @@ describe('grant_type=authorization_code', () => {
 				'error_description',
 				'invalid grant_type'
 			);
+		});
+
+		it('a grant type the client is not registered for is refused as unauthorized_client', async function () {
+			const restore = await changeClient('client', {
+				grantTypes: ['authorization_code']
+			});
+			try {
+				const auth = new AuthorizationRequest({
+					client_id: 'client',
+					scope: 'openid'
+				});
+				const { error } = await agent.token.post(
+					{ grant_type: 'refresh_token', refresh_token: 'any' },
+					{ headers: auth.basicAuthHeader }
+				);
+				if (!error) throw new Error('expected error response');
+				expect(error.status).toBe(400);
+				expect(error.value).toHaveProperty('error', 'unauthorized_client');
+			} finally {
+				await restore();
+			}
 		});
 
 		it('a code grant with no code is refused', async function () {

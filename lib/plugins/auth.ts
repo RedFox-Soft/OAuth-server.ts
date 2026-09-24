@@ -5,9 +5,16 @@ import { requestBucketFor } from 'lib/admin/auth/bucketAddress.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { tokenAuth } from 'lib/shared/token_auth.js';
 
+/*
+ * The request headers these endpoints read. `accept` picks an error page or JSON in the shared error
+ * handler (and a JWT introspection response); `x-client-cert` is where the default getCertificate
+ * finds a mutual-TLS client certificate forwarded by the proxy.
+ */
 export const authHeaders = t.Object({
 	authorization: t.Optional(t.String()),
-	dpop: t.Optional(t.String())
+	dpop: t.Optional(t.String()),
+	accept: t.Optional(t.String()),
+	'x-client-cert': t.Optional(t.String())
 });
 
 export const authParams = t.Object({

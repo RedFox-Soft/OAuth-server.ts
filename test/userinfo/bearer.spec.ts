@@ -1,5 +1,5 @@
 import { describe, it, beforeAll, expect } from 'bun:test';
-import bootstrap, { agent } from '../test_helper.js';
+import bootstrap, { agent, formAgent } from '../test_helper.js';
 import { ISSUER } from 'lib/configs/env.js';
 
 /**
@@ -13,7 +13,6 @@ describe('providing Bearer token', () => {
 
 	describe('invalid requests', () => {
 		it('UserInfo without a credential is refused with a bearer challenge', async function () {
-			// @ts-expect-error intentionally calling with no args to test the missing-token path
 			const { error, response } = await agent.userinfo.get();
 			if (!error) {
 				throw new Error('Have to be exception');
@@ -63,15 +62,9 @@ describe('providing Bearer token', () => {
 		});
 
 		it('refuses an access token sent in both the header and the form body', async function () {
-			const { error } = await agent.userinfo.post(
-				// @ts-expect-error a form-encoded body reaches the endpoint as an object
-				new URLSearchParams({ access_token: 'from-body' }).toString(),
-				{
-					headers: {
-						authorization: 'Bearer from-header',
-						['content-type']: 'application/x-www-form-urlencoded'
-					}
-				}
+			const { error } = await formAgent.userinfo.post(
+				{ access_token: 'from-body' },
+				{ headers: { authorization: 'Bearer from-header' } }
 			);
 			if (!error) {
 				throw new Error('Have to be exception');
@@ -89,15 +82,9 @@ describe('providing Bearer token', () => {
 		});
 
 		it('refuses a form-body access token accompanied by a DPoP proof', async function () {
-			const { error } = await agent.userinfo.post(
-				// @ts-expect-error a form-encoded body reaches the endpoint as an object
-				new URLSearchParams({ access_token: 'from-body' }).toString(),
-				{
-					headers: {
-						dpop: 'a.proof.jwt',
-						['content-type']: 'application/x-www-form-urlencoded'
-					}
-				}
+			const { error } = await formAgent.userinfo.post(
+				{ access_token: 'from-body' },
+				{ headers: { dpop: 'a.proof.jwt' } }
 			);
 			if (!error) {
 				throw new Error('Have to be exception');
@@ -111,10 +98,9 @@ describe('providing Bearer token', () => {
 		});
 
 		it('refuses an access token sent in a JSON body', async function () {
-			const { error, response } = await agent.userinfo.post(
-				// @ts-expect-error the endpoint declares no JSON body
-				{ access_token: 'from-body' }
-			);
+			const { error, response } = await agent.userinfo.post({
+				access_token: 'from-body'
+			});
 			if (!error) {
 				throw new Error('Have to be exception');
 			}
@@ -129,7 +115,6 @@ describe('providing Bearer token', () => {
 
 		it('refuses an access token sent in the query string', async function () {
 			const { error, response } = await agent.userinfo.get({
-				// @ts-expect-error the endpoint declares no query parameters
 				query: { access_token: 'from-query' }
 			});
 			if (!error) {

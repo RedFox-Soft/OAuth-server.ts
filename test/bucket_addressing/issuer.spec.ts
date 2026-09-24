@@ -181,10 +181,12 @@ describe('a request addressed to a named bucket', () => {
 		const [, , uid] = location.split('/');
 		const interactionCookie = prompt.headers.get('set-cookie') ?? '';
 
-		const { response } = await agent.ui[uid].login.post(
-			{ username: 'carol@acme.example.com', password },
-			{ headers: { cookie: interactionCookie } }
-		);
+		const { response } = await agent
+			.ui({ uid: uid })
+			.login.post(
+				{ username: 'carol@acme.example.com', password },
+				{ headers: { cookie: interactionCookie } }
+			);
 
 		expect(issuerOf(response)).toBe(`${ISSUER}/${SLUG}`);
 	});

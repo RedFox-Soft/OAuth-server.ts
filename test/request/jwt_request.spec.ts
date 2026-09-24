@@ -5,11 +5,7 @@ import { describe, it, beforeAll, afterEach, expect, mock } from 'bun:test';
 import { importJWK } from 'jose';
 
 import * as JWT from '../../lib/helpers/jwt.ts';
-import bootstrap, {
-	agent,
-	jsonToFormUrlEncoded,
-	type Setup
-} from '../test_helper.js';
+import bootstrap, { agent, type Setup, formAgent } from '../test_helper.js';
 import { eventBus } from 'lib/event_bus.js';
 import { Client, clientKeys } from 'lib/models/client.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
@@ -94,17 +90,15 @@ describe('request parameter features', () => {
 				}
 			});
 		} else {
-			authResp = await agent.auth.post(
-				// @ts-expect-error endpoint will be parse to object
-				jsonToFormUrlEncoded({
+			authResp = await formAgent.auth.post(
+				{
 					client_id,
 					request,
 					...payload
-				}),
+				},
 				{
 					headers: {
-						cookie,
-						['content-type']: 'application/x-www-form-urlencoded'
+						cookie
 					}
 				}
 			);
@@ -152,24 +146,12 @@ describe('request parameter features', () => {
 			{ issuer: client_id, audience: ISSUER, expiresIn: 30 }
 		);
 
-		const cookie = await setup.login({
-			claims: { id_token: { email: null } }
+		// No sign-in: the device authorization request comes from the device, which holds no session.
+		const authResp = await formAgent.device.auth.post({
+			client_id,
+			request,
+			...payload
 		});
-
-		const authResp = await agent.device.auth.post(
-			// @ts-expect-error endpoint will be parse to object
-			jsonToFormUrlEncoded({
-				client_id,
-				request,
-				...payload
-			}),
-			{
-				headers: {
-					cookie,
-					['content-type']: 'application/x-www-form-urlencoded'
-				}
-			}
-		);
 
 		if (isError) {
 			expect([400, 422]).toContain(authResp.status);

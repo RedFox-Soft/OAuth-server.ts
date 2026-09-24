@@ -23,8 +23,8 @@ import epochTime from '../../lib/helpers/epoch_time.ts';
 import bootstrap, {
 	agent,
 	getHeader,
-	jsonToFormUrlEncoded,
-	seedAccount
+	seedAccount,
+	formAgent
 } from '../test_helper.js';
 import * as base64url from '../../lib/helpers/base64url.ts';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
@@ -767,14 +767,13 @@ describe('features.dPoP', async () => {
 	describe('urn:openid:params:grant-type:ciba', () => {
 		let reqId;
 		beforeEach(async function () {
-			const { data } = await agent.backchannel.post(
-				jsonToFormUrlEncoded({
+			const { data } = await formAgent.backchannel.post(
+				{
 					scope: 'openid offline_access',
 					login_hint: 'accountId'
-				}),
+				},
 				{
 					headers: {
-						'content-type': 'application/x-www-form-urlencoded',
 						...AuthorizationRequest.basicAuthHeader('client', 'secret')
 					}
 				}

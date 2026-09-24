@@ -12,11 +12,7 @@ import { once } from 'node:events';
 import { generateKeyPair, SignJWT, exportJWK } from 'jose';
 
 import { AccessDenied } from '../../lib/helpers/errors.ts';
-import bootstrap, {
-	agent,
-	jsonToFormUrlEncoded,
-	seedAccount
-} from '../test_helper.js';
+import bootstrap, { agent, seedAccount, formAgent } from '../test_helper.js';
 
 import { emitter } from './ciba.config.js';
 import { eventBus } from 'lib/event_bus.js';
@@ -28,7 +24,7 @@ import { backchannelResult } from 'lib/actions/authorization/backchannel_result.
 const form = { 'content-type': 'application/x-www-form-urlencoded' };
 
 function post(body, headers = {}) {
-	return agent.backchannel.post(jsonToFormUrlEncoded(body), {
+	return formAgent.backchannel.post(body, {
 		headers: { ...form, ...headers }
 	});
 }
@@ -369,12 +365,12 @@ describe('features.ciba', () => {
 				await grant.save();
 				await backchannelResult(request, grant);
 
-				const { data: tokenData } = await agent.token.post(
-					jsonToFormUrlEncoded({
+				const { data: tokenData } = await formAgent.token.post(
+					{
 						client_id: 'client',
 						grant_type: 'urn:openid:params:grant-type:ciba',
 						auth_req_id: request.jti
-					}),
+					},
 					{ headers: form }
 				);
 				const { id_token } = tokenData;
@@ -421,7 +417,7 @@ describe('features.ciba', () => {
 
 					expect(error.status).toBe(400);
 					expect(error.value).toEqual({
-						error: 'invalid_request',
+						error: 'unauthorized_client',
 						error_description:
 							'urn:openid:params:grant-type:ciba is not allowed for this client'
 					});
