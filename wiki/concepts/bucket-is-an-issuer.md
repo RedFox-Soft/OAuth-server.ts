@@ -4,7 +4,7 @@ title: 'A user bucket is a tenant with its own issuer'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-15
-updated: 2026-09-23
+updated: 2026-09-24
 graph:
   node_type: concept
   relationships:
@@ -138,6 +138,18 @@ buckets *were* isolated — reaching one while signed in to another asked you to
 but the second sign-in overwrote the first, so an end user was silently signed out of an application
 they had not touched. Isolation and co-existence are different properties, and the tests that proved
 the first said nothing about the second.
+
+**The name was right and the bucket handed to it was not (fixed 2026-09-24).** `issuingBucket`
+(`lib/admin/auth/bucketAddress.ts`) — the record every path uses once it knows a bucket id: the
+sign-in screens, the interaction resume, token issuance — returned `{ _id, slug }` and dropped `host`.
+`addressOf` then took a host-addressed bucket for one with no address, so its sign-in wrote
+`_session_default` (a cookie its host, which reads `_session`, never looked for — every sign-in there
+was forgotten) and its authorization responses and tokens named `ISSUER/<id>` while its discovery
+document named its origin. The host now travels with the slug. `GET /logout` had the other half: it
+resolved the bucket without the request host, so at a bucket host it read the default bucket's session.
+The existing cases passed through both, because they asserted the metadata's issuer and a refusal —
+`test/host_buckets/addressing.spec.ts` now completes a sign-in and a sign-out at the host and reads
+`iss` off the authorization response.
 
 The path stays `/` for every bucket and deliberately does not carry the partition. It would, if every
 bucket were prefixed — but the default bucket is served at the root, so its cookie must live at

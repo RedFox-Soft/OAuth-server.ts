@@ -7,6 +7,7 @@ import { validateConfiguration, type Configuration } from './configuration.js';
 import { resolveNonceSecret } from './nonceSecret.js';
 // Import-free module, so this adds no runtime edge into the adapters or the models.
 import { DEFAULT_ACR_VALUES } from '../consts/acr.js';
+import type { UserCodeCharset } from '../helpers/user_codes.js';
 import { initPairwiseSalt } from './pairwiseSalt.js';
 import type { OIDCContext } from '../helpers/oidc_context.js';
 
@@ -330,7 +331,7 @@ export const ApplicationConfig = {
 	 *
 	 * description: Character set for generated user codes — `base-20` or `digits`.
 	 */
-	'deviceFlow.charset': 'base-20',
+	'deviceFlow.charset': setting<UserCodeCharset>('base-20'),
 	/*
 	 * features.deviceFlow.mask
 	 *

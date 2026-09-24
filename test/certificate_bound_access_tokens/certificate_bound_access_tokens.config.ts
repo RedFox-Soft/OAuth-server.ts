@@ -19,7 +19,7 @@ export const addons: Partial<AddonImplementations> = {
 		});
 		grant.addOIDCScope(oidc.requestParamScopes);
 		await grant.save();
-		return backchannelResult(request, grant.jti);
+		return backchannelResult(request, grant.id);
 	}
 };
 

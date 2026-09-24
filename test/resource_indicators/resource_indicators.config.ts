@@ -30,7 +30,7 @@ export const addons: Partial<AddonImplementations> = {
 		}
 
 		await grant.save();
-		return backchannelResult(request, grant.jti);
+		return backchannelResult(request, grant.id);
 	},
 	async useGrantedResource() {
 		return grantFlags.useGranted;

@@ -48,17 +48,37 @@ function satisfiesRequiredAcr(
 	return acr !== undefined;
 }
 
+/* What the end user's authentication device reports with a successful result (see the addon's notes). */
+export type BackchannelOutcome = {
+	acr?: string;
+	amr?: string[];
+	authTime?: number;
+	sessionUid?: string;
+	expiresWithSession?: boolean;
+	sid?: string;
+};
+
 export async function backchannelResult(
-	request,
-	result,
-	{ acr, amr, authTime, sessionUid, expiresWithSession, sid } = {}
+	requestOrId: BackchannelAuthenticationRequest | string,
+	resultOrId: Grant | OIDCProviderError | string,
+	{
+		acr,
+		amr,
+		authTime,
+		sessionUid,
+		expiresWithSession,
+		sid
+	}: BackchannelOutcome = {}
 ) {
+	// Checked at runtime too: a deployment calls this from its own code, typed or not.
+	let request: unknown = requestOrId;
 	if (typeof request === 'string' && request) {
 		request = await BackchannelAuthenticationRequest.find(request, {
 			ignoreExpiration: true,
 			error: new Error('BackchannelAuthenticationRequest not found')
 		});
-	} else if (!(request instanceof BackchannelAuthenticationRequest)) {
+	}
+	if (!(request instanceof BackchannelAuthenticationRequest)) {
 		throw new TypeError('invalid "request" argument');
 	}
 
@@ -66,11 +86,10 @@ export async function backchannelResult(
 		error: new Error('Client not found')
 	});
 
-	if (typeof result === 'string' && result) {
-		result = await Grant.find(result, {
-			error: new Error('Grant not found')
-		});
-	}
+	const result =
+		typeof resultOrId === 'string' && resultOrId
+			? await Grant.find(resultOrId, { error: new Error('Grant not found') })
+			: resultOrId;
 
 	switch (true) {
 		case result instanceof Grant:

@@ -74,7 +74,7 @@ describe('features.ciba', () => {
 					clientId: 'client'
 				});
 				await request.save();
-				await backchannelResult(request.jti, result);
+				await backchannelResult(request.id, result);
 				await expect(backchannelResult('notfound', result)).rejects.toThrow(
 					'BackchannelAuthenticationRequest not found'
 				);
@@ -106,6 +106,7 @@ describe('features.ciba', () => {
 					new Set(),
 					new Error()
 				]) {
+					// @ts-expect-error what is refused here is a value that names no request
 					await expect(backchannelResult(request, result)).rejects.toThrow(
 						'invalid "request" argument'
 					);
@@ -122,7 +123,7 @@ describe('features.ciba', () => {
 					accountId: 'accountId'
 				});
 				await result.save();
-				await backchannelResult(request, result.jti);
+				await backchannelResult(request, result.id);
 				await expect(backchannelResult(request, 'notfound')).rejects.toThrow(
 					'Grant not found'
 				);
@@ -143,6 +144,7 @@ describe('features.ciba', () => {
 					new Set(),
 					new Error()
 				]) {
+					// @ts-expect-error what is refused here is a value that is neither a grant nor an error
 					await expect(backchannelResult(request, result)).rejects.toThrow(
 						'invalid "result" argument'
 					);

@@ -86,7 +86,6 @@ import {
 import { Grant } from 'lib/models/grant.js';
 import { Client } from 'lib/models/client.js';
 import { responseModes } from 'lib/response_modes/index.js';
-import { ISSUER } from 'lib/configs/env.js';
 import { resolveBucketForRequest } from 'lib/admin/auth/resolveBucket.js';
 import { ADMIN_BUCKET_ID } from 'lib/admin/consts.js';
 import {
@@ -190,7 +189,8 @@ async function resume(interaction, cookie) {
 			error,
 			...(errorDescription ? { error_description: errorDescription } : {}),
 			...(oidc.params.state !== undefined ? { state: oidc.params.state } : {}),
-			iss: ISSUER
+			// The issuer of the bucket this began at, which is the one the client discovered (RFC 9207).
+			iss: oidc.issuer
 		};
 		await setCookies();
 		const mode = oidc.responseMode ?? 'query';

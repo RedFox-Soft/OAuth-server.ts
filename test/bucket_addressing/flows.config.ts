@@ -65,6 +65,6 @@ export const addons: Partial<AddonImplementations> = {
 		});
 		grant.addOIDCScope('openid');
 		await grant.save();
-		return backchannelResult(request, grant.jti);
+		return backchannelResult(request, grant.id);
 	}
 };

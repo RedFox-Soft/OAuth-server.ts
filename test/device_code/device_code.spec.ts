@@ -34,6 +34,7 @@ describe('configuration features.deviceFlow', () => {
 			ApplicationConfig['deviceFlow.charset'] = 'base-20';
 			expect(() => reloadConfiguration()).not.toThrow();
 
+			// @ts-expect-error a charset the validation must refuse
 			ApplicationConfig['deviceFlow.charset'] = 'foo';
 			expect(() => reloadConfiguration()).toThrow(
 				'only supported charsets are "base-20" and "digits"'

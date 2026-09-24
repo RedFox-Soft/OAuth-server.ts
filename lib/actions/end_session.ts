@@ -56,7 +56,7 @@ export const logoutAction = new Elysia()
 	})
 	.get(
 		routeNames.end_session,
-		async ({ query, cookie, route, params: routeParams }) => {
+		async ({ query, cookie, route, params: routeParams, request }) => {
 			/*
 			 * The address names the population being signed out of. This is what removed the compromise an
 			 * address-less design had to make: a sign-out carrying no client identifier could not name a
@@ -64,7 +64,8 @@ export const logoutAction = new Elysia()
 			 * ends exactly one.
 			 */
 			const bucket = await requestBucketFor(
-				(routeParams as { bucket?: string } | undefined)?.bucket
+				(routeParams as { bucket?: string } | undefined)?.bucket,
+				hostOfRequest(request)
 			);
 			const oidc = new OIDCContext({
 				params: query,
@@ -83,7 +84,7 @@ export const logoutAction = new Elysia()
 					throw new InvalidRequest(
 						'could not decode id_token_hint',
 						undefined,
-						err.message
+						err instanceof Error ? err.message : String(err)
 					);
 				}
 				const {
@@ -95,12 +96,15 @@ export const logoutAction = new Elysia()
 						'client_id does not match the provided id_token_hint'
 					);
 				}
-				client = await Client.find(clientId, {
-					error: new InvalidClient(
-						'unrecognized id_token_hint audience',
-						'client not found'
-					)
-				});
+				const unrecognized = new InvalidClient(
+					'unrecognized id_token_hint audience',
+					'client not found'
+				);
+				// An audience list names no single client to end the session for; the lookup refused it too.
+				if (typeof clientId !== 'string') {
+					throw unrecognized;
+				}
+				client = await Client.find(clientId, { error: unrecognized });
 				try {
 					await IdToken.validate(params.id_token_hint, client, oidc.issuer);
 				} catch (err) {
@@ -111,7 +115,7 @@ export const logoutAction = new Elysia()
 					throw new InvalidRequest(
 						'could not validate id_token_hint',
 						undefined,
-						err.message
+						err instanceof Error ? err.message : String(err)
 					);
 				}
 				oidc.entity('Client', client);
@@ -260,8 +264,9 @@ export const logoutConfirmAction = new Elysia()
 
 			const usePostLogoutUri = state.postLogoutRedirectUri;
 			if (usePostLogoutUri) {
-				const param = state.state != null ? { state: state.state } : {};
-				const uri = redirectUri(state.postLogoutRedirectUri, param);
+				const param: Record<string, string> =
+					state.state != null ? { state: state.state } : {};
+				const uri = redirectUri(usePostLogoutUri, param);
 				return Response.redirect(uri, 303);
 			}
 

@@ -11,6 +11,11 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- Host-addressed buckets: a sign-in at the bucket's host wrote a session cookie the host never read
+  (so it was forgotten), and authorization responses and tokens named `ISSUER/<id>` instead of the
+  bucket's origin its discovery document advertises; `GET /logout` there read the default bucket's
+  session. The bucket record now keeps its host, and `/logout` passes the request host. An interaction
+  aborted back to the client names the bucket's issuer, not the instance's.
 - ID Token claims beside a resource-bound access token: with `conformIdTokenClaims`, the
   authorization-code, device and CIBA grants read the access token's audience off the instance (always
   empty) and so left profile claims to UserInfo even when the access token, bound to a resource server,

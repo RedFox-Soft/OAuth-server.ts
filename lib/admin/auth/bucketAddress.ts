@@ -261,8 +261,14 @@ export async function issuingBucket(
 	 * server — so the identifier keeps the id it was minted under, which matches nothing and is exactly
 	 * the outcome wanted.
 	 */
+	/*
+	 * The host travels with the slug: an issuer and a session cookie are both derived from the address
+	 * (addressOf), and a host-addressed bucket read back without its host is taken for one with no
+	 * address at all — its tokens named `ISSUER/<id>` and its sign-in wrote a cookie its own host never
+	 * reads.
+	 */
 	const resolved: RequestBucket = bucket
-		? { _id: bucket._id, slug: bucket.slug }
+		? { _id: bucket._id, slug: bucket.slug, host: bucket.host }
 		: { _id: bucketId, slug: undefined };
 
 	byId.set(bucketId, resolved);

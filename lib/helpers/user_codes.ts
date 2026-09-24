@@ -5,12 +5,20 @@ const CHARSETS = {
 	digits: '0123456789'
 };
 
-export function generate(charset, mask: string) {
+// The alphabets a user code may be drawn from (deviceFlow.charset).
+export type UserCodeCharset = keyof typeof CHARSETS;
+
+// One generator per alphabet, built on first use.
+const generators = new Map<UserCodeCharset, (size: number) => string>();
+
+export function generate(charset: UserCodeCharset, mask: string) {
 	const length = mask.split('*').length - 1;
-	if (typeof CHARSETS[charset] !== 'function') {
-		CHARSETS[charset] = customAlphabet(CHARSETS[charset]);
+	let generator = generators.get(charset);
+	if (!generator) {
+		generator = customAlphabet(CHARSETS[charset]);
+		generators.set(charset, generator);
 	}
-	const generated = CHARSETS[charset](length).split('');
+	const generated = generator(length).split('');
 	return mask
 		.split('')
 		.map((p) => {

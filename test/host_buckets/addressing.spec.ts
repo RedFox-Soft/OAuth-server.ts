@@ -86,6 +86,33 @@ async function signIn(host: string, clientId: string, email: string) {
 	};
 }
 
+// The cookies a response sets, as a request sends them back (cleared ones left out).
+function cookiesOf(res: Response): string[] {
+	return res.headers
+		.getSetCookie()
+		.filter((cookie) => !cookie.includes('Max-Age=0'))
+		.map((cookie) => cookie.split(';')[0]);
+}
+
+/* A sign-in carried through consent, which completes the authorization back to the client. */
+async function completeSignIn(host: string, clientId: string, email: string) {
+	const { response } = await signIn(host, clientId, email);
+	const consentUid = (response.headers.get('location') ?? '').split('/')[2];
+	const allowed = await at(host, `/ui/${consentUid}/consent`, {
+		method: 'POST',
+		headers: {
+			'content-type': 'application/x-www-form-urlencoded',
+			cookie: cookiesOf(response).join('; ')
+		},
+		body: new URLSearchParams({ action: 'allow' }).toString()
+	});
+	const session = cookiesOf(allowed).find((cookie) =>
+		cookie.startsWith('_session')
+	);
+	if (!session) throw new Error('expected a session cookie');
+	return { session, location: allowed.headers.get('location') ?? '' };
+}
+
 /**
  * @proves A bucket given a host of its own is reached there and nowhere else: its metadata and its
  * issuer are that origin's, an address no bucket holds is refused rather than served by the default
@@ -182,13 +209,18 @@ describe('a bucket addressed by a host of its own (US1)', () => {
 			true
 		);
 
-		const { response } = await signIn(TENANT_HOST, 'host-bucket-app', email);
-		expect(response.status).toBeLessThan(400);
+		const { location } = await completeSignIn(
+			TENANT_HOST,
+			'host-bucket-app',
+			email
+		);
 
 		const metadata = (await (
 			await at(TENANT_HOST, '/.well-known/openid-configuration')
 		).json()) as Record<string, string>;
 		expect(metadata.issuer).toBe(`http://${TENANT_HOST}`);
+		/* RFC 9207: the authorization response names the issuer the client discovered. */
+		expect(new URL(location).searchParams.get('iss')).toBe(metadata.issuer);
 	});
 
 	it('sets no domain attribute on a session cookie', async () => {
@@ -205,6 +237,65 @@ describe('a bucket addressed by a host of its own (US1)', () => {
 		/* A cookie broadened to a parent domain would hand every bucket every other bucket's session,
 		 * and nothing visible would break. */
 		expect(setCookie ?? '').not.toMatch(/;\s*domain=/i);
+	});
+
+	/*
+	 * A sign-in and a sign-out at one bucket host, end to end. Both halves were broken: the sign-in's
+	 * record of the bucket had lost its host, so the session cookie was named for a bucket with no
+	 * address and the host never read it back; and the sign-out page resolved the default bucket, so the
+	 * confirmation secret it stored was not in the session the confirmation reads.
+	 */
+	it('signs out, at a bucket host, the sign-in held there', async () => {
+		const email = `logout-${Math.random()}@x.io`;
+		await getUserStore(tenantBucketId).create(
+			email,
+			await Bun.password.hash(PASSWORD),
+			[],
+			true
+		);
+		const { session } = await completeSignIn(
+			TENANT_HOST,
+			'host-bucket-app',
+			email
+		);
+
+		const authorize = () =>
+			at(
+				TENANT_HOST,
+				'/auth?client_id=host-bucket-app&scope=openid&response_type=code' +
+					`&code_challenge=${createHash('sha256').update(randomBytes(32).toString('base64url')).digest('base64url')}` +
+					`&code_challenge_method=S256` +
+					`&redirect_uri=${encodeURIComponent(REDIRECTS['host-bucket-app'])}`,
+				{ headers: { cookie: session } }
+			);
+		/* Signed in: the host reads its own session back and skips the login screen. */
+		expect((await authorize()).headers.get('location') ?? '').toContain(
+			'code='
+		);
+
+		const page = await at(TENANT_HOST, '/logout', {
+			headers: { cookie: session, accept: 'text/html' }
+		});
+		const xsrf =
+			/name="xsrf"[^>]*value="([^"]+)"|value="([^"]+)"[^>]*name="xsrf"/.exec(
+				await page.text()
+			);
+		const secret = xsrf?.[1] ?? xsrf?.[2];
+		if (!secret) throw new Error('expected a confirmation secret');
+
+		const confirmed = await at(TENANT_HOST, '/logout/confirm', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/x-www-form-urlencoded',
+				cookie: [session, ...cookiesOf(page)].join('; '),
+				accept: 'text/html'
+			},
+			body: new URLSearchParams({ xsrf: secret, logout: 'true' }).toString()
+		});
+		expect(confirmed.status).toBeLessThan(400);
+
+		/* Signed out: the same cookie now leads to the login screen. */
+		expect((await authorize()).headers.get('location') ?? '').toMatch(/\/ui\//);
 	});
 
 	it('does not accept, on one bucket host, a session established on another', async () => {

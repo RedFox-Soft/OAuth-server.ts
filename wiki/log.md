@@ -87,3 +87,4 @@ Operations:
 - 2026-09-24 — corrected [[admin-console-signin]] (KeyStore now holds jose's `JWK`, a type alias in jose 6.2.12) and [[refresh-token-chain-bound]] (each token kind's own `expiration` getter names its `ttl` function; no class-name dispatch).
 - 2026-09-24 — added [[typebox-dual-type-resolution]]: why a TypeBox schema or error crossing to Elysia fails to type-check under `nodenext`, and why the fix is structural types rather than `paths`.
 - 2026-09-24 — corrected [[token-payload-access-contract]]: two more bare reads found by typing the grants — `at.aud` in three grants (ID Token claims beside a resource-bound access token) and `token.gty` in the refresh grant.
+- 2026-09-24 — corrected [[bucket-is-an-issuer]]: `issuingBucket` dropped `host`, so a host-addressed bucket was taken for an unaddressed one (cookie `_session_default`, issuer `ISSUER/<id>`), and `GET /logout` ignored the request host; both fixed.
