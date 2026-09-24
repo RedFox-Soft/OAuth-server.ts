@@ -36,6 +36,9 @@ type options = {
 	route?: string;
 };
 
+// A verified DPoP proof, or undefined where none was presented or DPoP is off.
+export type DPoPProof = Awaited<ReturnType<typeof dpopValidate>>;
+
 export async function dpopValidate(
 	proof: string | undefined,
 	{ accessTokenId, method = 'POST', route }: options = {}

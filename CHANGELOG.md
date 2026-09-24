@@ -11,6 +11,10 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- ID Token claims beside a resource-bound access token: with `conformIdTokenClaims`, the
+  authorization-code, device and CIBA grants read the access token's audience off the instance (always
+  empty) and so left profile claims to UserInfo even when the access token, bound to a resource server,
+  cannot call it; they now read it from the token's payload, as the refresh grant already did.
 - CIBA: the `verifyUserCode` addon receives the request's `user_code`; it was handed the login hint
   instead, so a deployment's user-code check never saw the code the client sent.
 - request parameters follow their specifications: `ui_locales` and `claims_locales` are one

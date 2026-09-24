@@ -4,7 +4,7 @@ import camelCase from './_/camel_case.ts';
 export class OIDCProviderError extends Error {
 	allow_redirect = true;
 	error: string;
-	error_description = '';
+	error_description: string | undefined = '';
 	error_detail?: string;
 	status = 400;
 
@@ -181,6 +181,24 @@ export class InvalidRedirectUri extends OIDCProviderError {
 	}
 }
 
+// Every class E() declares, by the error code it answers with.
+const declaredByCode = new Map<string, ReturnType<typeof E>>();
+
+/*
+ * The error a code names when it arrives as data — stored on a device code or backchannel request, or
+ * reported by an interaction check: the class declared for it, carrying the description, or a
+ * CustomOIDCProviderError answering with the same code where none is declared.
+ */
+export function errorForCode(
+	code: string,
+	description?: string
+): OIDCProviderError {
+	const Declared = declaredByCode.get(code);
+	return Declared
+		? new Declared(description)
+		: new CustomOIDCProviderError(code, description ?? '');
+}
+
 function E(message: string, errorDescription?: string) {
 	const klassName = upperFirst(camelCase(message));
 	const klass = class extends OIDCProviderError {
@@ -200,6 +218,7 @@ function E(message: string, errorDescription?: string) {
 		}
 	};
 	Object.defineProperty(klass, 'name', { value: klassName });
+	declaredByCode.set(message, klass);
 	return klass;
 }
 

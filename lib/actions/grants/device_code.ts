@@ -1,7 +1,6 @@
+import type { X509Certificate } from 'node:crypto';
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import type { TokenParams } from 'lib/actions/token.js';
-import upperFirst from '../../helpers/_/upper_first.ts';
-import camelCase from '../../helpers/_/camel_case.ts';
 import * as errors from '../../helpers/errors.ts';
 import presence from '../../helpers/validate_presence.ts';
 import { findAccount } from '../../addon/account.js';
@@ -17,6 +16,7 @@ import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Grant } from 'lib/models/grant.js';
 import ResourceServer from 'lib/helpers/resource_server.js';
+import type { DPoPProof } from 'lib/helpers/validate_dpop.js';
 
 const { AuthorizationPending, ExpiredToken, InvalidGrant } = errors;
 
@@ -24,7 +24,7 @@ export const gty = 'device_code';
 
 export const handler = async function deviceCodeHandler(
 	oidc: OIDCContext<TokenParams>,
-	dPoP
+	dPoP: DPoPProof
 ) {
 	presence(oidc, 'device_code');
 
@@ -43,7 +43,7 @@ export const handler = async function deviceCodeHandler(
 		throw new InvalidGrant('client mismatch');
 	}
 
-	let cert;
+	let cert: X509Certificate | undefined;
 	if (oidc.client.tlsClientCertificateBoundAccessTokens) {
 		cert = oidc.getClientCertificate();
 		if (!cert) {
@@ -64,24 +64,24 @@ export const handler = async function deviceCodeHandler(
 	}
 
 	if (code.payload.consumed) {
-		await revoke(code.payload.grantId, oidc);
+		if (code.payload.grantId) await revoke(code.payload.grantId, oidc);
 		throw new InvalidGrant('device code already consumed');
 	}
 
 	await code.consume();
 
 	if (code.payload.error) {
-		const className = upperFirst(camelCase(code.payload.error));
-		if (errors[className]) {
-			throw new errors[className](code.payload.errorDescription);
-		}
-		throw new errors.CustomOIDCProviderError(
+		throw errors.errorForCode(
 			code.payload.error,
 			code.payload.errorDescription
 		);
 	}
 
-	const grant = await Grant.find(code.payload.grantId, {
+	const { grantId } = code.payload;
+	if (!grantId) {
+		throw new InvalidGrant('grant not found');
+	}
+	const grant = await Grant.find(grantId, {
 		ignoreExpiration: true,
 		error: new InvalidGrant('grant not found')
 	});
@@ -124,7 +124,7 @@ export const handler = async function deviceCodeHandler(
 		sid: code.payload.sid
 	});
 
-	if (oidc.client.tlsClientCertificateBoundAccessTokens) {
+	if (oidc.client.tlsClientCertificateBoundAccessTokens && cert) {
 		at.setThumbprint('x5t', cert);
 	}
 
@@ -213,7 +213,7 @@ export const handler = async function deviceCodeHandler(
 		if (
 			ApplicationConfig.conformIdTokenClaims &&
 			ApplicationConfig['userinfo.enabled'] &&
-			!at.aud
+			!at.payload.aud
 		) {
 			token.scope = 'openid';
 		} else {

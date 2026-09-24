@@ -9,8 +9,7 @@ import {
 	InvalidRequestObject,
 	OIDCProviderError
 } from '../../helpers/errors.ts';
-import { getSchemaValidator, TSchema, ValidationError } from 'elysia';
-import type { TObject } from '@sinclair/typebox';
+import { getSchemaValidator, type TSchema, ValidationError } from 'elysia';
 import {
 	declaredParams,
 	ignoreUnknownIn
@@ -29,6 +28,18 @@ export function isEncryptedJWT(jwt: string): boolean {
 	return jwt.split('.').length === 5;
 }
 
+// Whether a JOSE header member is one of the values this server supports.
+function isOneOf<T extends string>(
+	values: readonly T[],
+	value: unknown
+): value is T {
+	return values.some((allowed) => allowed === value);
+}
+
+function messageOf(err: unknown): string {
+	return err instanceof Error ? err.message : String(err);
+}
+
 function copyParam<K extends keyof PipelineParams>(
 	target: PipelineParams,
 	source: PipelineParams,
@@ -42,7 +53,8 @@ function copyParam<K extends keyof PipelineParams>(
  * provided via OAuth2.0 authorization request with these
  */
 export default async function processRequestObject(
-	schema: TSchema,
+	// An endpoint's object schema: validated against, and read for the names it declares.
+	schema: TSchema & { readonly properties: Record<string, unknown> },
 	oidc: OIDCContext<PipelineParams>,
 	{
 		clientAlg,
@@ -75,10 +87,10 @@ export default async function processRequestObject(
 		try {
 			const header = JWT.header(params.request);
 
-			if (!requestObjectEncryptionAlgValues.includes(header.alg)) {
+			if (!isOneOf(requestObjectEncryptionAlgValues, header.alg)) {
 				throw new TypeError('unsupported encrypted request alg');
 			}
-			if (!requestObjectEncryptionEncValues.includes(header.enc)) {
+			if (!isOneOf(requestObjectEncryptionEncValues, header.enc)) {
 				throw new TypeError('unsupported encrypted request enc');
 			}
 
@@ -106,7 +118,7 @@ export default async function processRequestObject(
 
 			throw new InvalidRequestObject(
 				'could not decrypt request object',
-				err.message
+				messageOf(err)
 			);
 		}
 	}
@@ -118,21 +130,20 @@ export default async function processRequestObject(
 	} catch (err) {
 		throw new InvalidRequestObject(
 			'could not parse Request Object',
-			err.message
+			messageOf(err)
 		);
 	}
 
-	const {
-		payload,
-		header: { alg }
-	} = decoded;
+	const { payload } = decoded;
+	const alg =
+		typeof decoded.header.alg === 'string' ? decoded.header.alg : undefined;
 
 	/*
 	 * RFC 9101 §4: "The Request Object MAY include any extension parameters." A closed schema turns
 	 * that permission into invalid_request, so the extras are dropped here and the declared members
 	 * are what gets checked — the same ignore rule the endpoints themselves live under, one level in.
 	 */
-	ignoreUnknownIn(declaredParams(schema as TObject), payload);
+	ignoreUnknownIn(declaredParams(schema), payload);
 
 	const validator = getSchemaValidator(schema);
 	if (!validator.Check(payload)) {
@@ -143,9 +154,9 @@ export default async function processRequestObject(
 	const request = payload as PipelineParams;
 	const original: PipelineParams = {};
 	for (const param of ['state', 'response_mode', 'response_type'] as const) {
-		original[param] = params[param];
+		copyParam(original, params, param);
 		if (request[param] !== undefined) {
-			params[param] = request[param];
+			copyParam(params, request, param);
 		}
 	}
 
@@ -184,7 +195,7 @@ export default async function processRequestObject(
 		throw new InvalidRequestObject('request client_id mismatch');
 	}
 
-	if (!pushedRequestObject && !requestObjectSigningAlgValues.includes(alg)) {
+	if (!pushedRequestObject && !isOneOf(requestObjectSigningAlgValues, alg)) {
 		throw new InvalidRequestObject('unsupported signed request alg');
 	}
 
@@ -208,7 +219,7 @@ export default async function processRequestObject(
 	} catch (err) {
 		throw new InvalidRequestObject(
 			'Request Object claims are invalid',
-			err.message
+			messageOf(err)
 		);
 	}
 
@@ -226,7 +237,7 @@ export default async function processRequestObject(
 	 */
 	if (!pushedRequestObject) {
 		try {
-			if (alg.startsWith('HS')) {
+			if (alg?.startsWith('HS')) {
 				checkClientSecretExpiration(
 					client,
 					'could not validate the Request Object - the client secret used for its signature is expired',
@@ -244,7 +255,7 @@ export default async function processRequestObject(
 
 			throw new InvalidRequestObject(
 				'could not validate Request Object',
-				err.message
+				messageOf(err)
 			);
 		}
 	}

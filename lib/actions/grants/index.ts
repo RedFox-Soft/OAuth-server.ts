@@ -57,12 +57,13 @@ import * as refresh_token from './refresh_token.ts';
 import * as device_code from './device_code.ts';
 import * as ciba from './ciba.ts';
 import { ApplicationConfig as config } from 'lib/configs/application.js';
+import type { DPoPProof } from 'lib/helpers/validate_dpop.js';
 
 // Grant handlers always resolve to the grant-dependent token response body. No handler returns a
 // raw `Response`; the /token route relies on this so its `response` schema is TokenResponse.
 type GrantHandler = (
 	oidc: OIDCContext<TokenParams>,
-	dPoP: unknown
+	dPoP: DPoPProof
 ) => Promise<TokenResponseBody>;
 
 export const grantStore: Map<string, GrantHandler> = new Map([
@@ -93,7 +94,7 @@ export function hasGrant(grantType: string): boolean {
 export async function executeGrant(
 	grantType: string,
 	oidc: OIDCContext<TokenParams>,
-	dPoP
+	dPoP: DPoPProof
 ): Promise<TokenResponseBody> {
 	const grant = grantStore.get(grantType);
 	if (!grant || !hasGrant(grantType)) {

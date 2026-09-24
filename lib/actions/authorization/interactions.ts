@@ -1,7 +1,5 @@
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import type { PipelineParams } from 'lib/consts/param_list.js';
-import upperFirst from '../../helpers/_/upper_first.ts';
-import camelCase from '../../helpers/_/camel_case.ts';
 import * as errors from '../../helpers/errors.ts';
 import { interactionPolicy } from '../../addon/index.js';
 import nanoid from '../../helpers/nanoid.ts';
@@ -92,14 +90,7 @@ export default async function interactions(oidc: OIDCContext<PipelineParams>) {
 
 	// if interaction needed but prompt=none => throw;
 	if (oidc.promptPending('none')) {
-		const className = upperFirst(camelCase(failedCheck.error));
-		if (errors[className]) {
-			throw new errors[className](failedCheck.error_description);
-		}
-		throw new errors.CustomOIDCProviderError(
-			failedCheck.error,
-			failedCheck.error_description
-		);
+		throw errors.errorForCode(failedCheck.error, failedCheck.error_description);
 	}
 
 	/*

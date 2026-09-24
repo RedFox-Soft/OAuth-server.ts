@@ -6,7 +6,9 @@ import bootstrap, {
 	agent,
 	seedAccount,
 	type Setup,
-	formAgent
+	formAgent,
+	redirectParameter,
+	setSeedClaims
 } from '../test_helper.js';
 import * as resourceIndicators from '../../lib/addon/resources.js';
 import { eventBus } from 'lib/event_bus.js';
@@ -19,6 +21,7 @@ import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { grantFlags, resetGrantFlags } from './grant_flags.ts';
+import { decode as decodeJWT } from 'lib/helpers/jwt.js';
 
 /**
  * @proves A resource indicator becomes the token audience across every grant, the configured
@@ -875,6 +878,53 @@ describe('features.resourceIndicators', () => {
 			expect(spy4).toHaveBeenCalledTimes(1);
 			rt = spy4.mock.calls[0][0];
 			expect(rt.payload.resource).toBe('urn:wl:default');
+		});
+	});
+
+	/*
+	 * conformIdTokenClaims leaves profile claims out of the ID Token because the client can fetch them
+	 * from UserInfo — which only an audience-less access token can call. With a resource-server
+	 * audience it cannot, so the ID Token has to carry them.
+	 */
+	describe('ID Token claims beside a resource-bound access token', () => {
+		async function idTokenClaims(resource?: string) {
+			setSeedClaims({ email: 'jane@example.com' });
+			const cookie = await setup.login({
+				scope: 'openid email',
+				resources: { 'urn:wl:explicit': 'api:read' }
+			});
+			const auth = new AuthorizationRequest({
+				scope: 'openid email',
+				...(resource ? { resource: [resource] } : {})
+			});
+			const { response } = await agent.auth.get({
+				query: auth.params,
+				headers: { cookie }
+			});
+			const code = redirectParameter(response, 'code');
+			const { data } = await agent.token.post({
+				client_id: 'client',
+				grant_type: 'authorization_code',
+				code_verifier: auth.code_verifier,
+				code,
+				// Named at the token endpoint too: with openid and UserInfo on, an access token asked for
+				// without one is issued for UserInfo (resolve_resource.ts).
+				...(resource ? { resource } : {})
+			});
+			if (!data?.id_token) throw new Error('expected an ID Token');
+			return decodeJWT(data.id_token).payload;
+		}
+
+		afterEach(() => {
+			setSeedClaims(undefined);
+		});
+
+		it('carries the granted claims when the access token is bound to a resource server', async () => {
+			expect(await idTokenClaims('urn:wl:explicit')).toHaveProperty('email');
+		});
+
+		it('leaves them to UserInfo when the access token can call it', async () => {
+			expect(await idTokenClaims()).not.toHaveProperty('email');
 		});
 	});
 

@@ -1,7 +1,6 @@
+import type { X509Certificate } from 'node:crypto';
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import type { TokenParams } from 'lib/actions/token.js';
-import upperFirst from '../../helpers/_/upper_first.ts';
-import camelCase from '../../helpers/_/camel_case.ts';
 import * as errors from '../../helpers/errors.ts';
 import presence from '../../helpers/validate_presence.ts';
 import { findAccount } from '../../addon/account.js';
@@ -17,6 +16,7 @@ import { AccessToken } from 'lib/models/access_token.js';
 import { BackchannelAuthenticationRequest } from 'lib/models/backchannel_authentication_request.js';
 import { Grant } from 'lib/models/grant.js';
 import ResourceServer from 'lib/helpers/resource_server.js';
+import type { DPoPProof } from 'lib/helpers/validate_dpop.js';
 
 const { AuthorizationPending, ExpiredToken, InvalidGrant } = errors;
 
@@ -24,7 +24,7 @@ export const gty = 'ciba';
 
 export const handler = async function cibaHandler(
 	oidc: OIDCContext<TokenParams>,
-	dPoP
+	dPoP: DPoPProof
 ) {
 	presence(oidc, 'auth_req_id');
 
@@ -46,7 +46,7 @@ export const handler = async function cibaHandler(
 		throw new InvalidGrant('client mismatch');
 	}
 
-	let cert;
+	let cert: X509Certificate | undefined;
 	if (oidc.client.tlsClientCertificateBoundAccessTokens) {
 		cert = oidc.getClientCertificate();
 		if (!cert) {
@@ -67,7 +67,7 @@ export const handler = async function cibaHandler(
 	}
 
 	if (request.payload.consumed) {
-		await revoke(request.payload.grantId, oidc);
+		if (request.payload.grantId) await revoke(request.payload.grantId, oidc);
 		throw new InvalidGrant(
 			'backchannel authentication request already consumed'
 		);
@@ -76,17 +76,17 @@ export const handler = async function cibaHandler(
 	await request.consume();
 
 	if (request.payload.error) {
-		const className = upperFirst(camelCase(request.payload.error));
-		if (errors[className]) {
-			throw new errors[className](request.payload.errorDescription);
-		}
-		throw new errors.CustomOIDCProviderError(
+		throw errors.errorForCode(
 			request.payload.error,
 			request.payload.errorDescription
 		);
 	}
 
-	const grant = await Grant.find(request.payload.grantId, {
+	const { grantId } = request.payload;
+	if (!grantId) {
+		throw new InvalidGrant('grant not found');
+	}
+	const grant = await Grant.find(grantId, {
 		ignoreExpiration: true,
 		error: new InvalidGrant('grant not found')
 	});
@@ -129,7 +129,7 @@ export const handler = async function cibaHandler(
 		sid: request.payload.sid
 	});
 
-	if (oidc.client.tlsClientCertificateBoundAccessTokens) {
+	if (oidc.client.tlsClientCertificateBoundAccessTokens && cert) {
 		at.setThumbprint('x5t', cert);
 	}
 
@@ -218,7 +218,7 @@ export const handler = async function cibaHandler(
 		if (
 			ApplicationConfig.conformIdTokenClaims &&
 			ApplicationConfig['userinfo.enabled'] &&
-			!at.aud
+			!at.payload.aud
 		) {
 			token.scope = 'openid';
 		} else {

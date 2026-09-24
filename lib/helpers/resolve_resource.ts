@@ -1,9 +1,27 @@
 import { InvalidTarget } from './errors.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { useGrantedResource, defaultResource } from '../addon/index.js';
+import type { OIDCContext } from './oidc_context.ts';
+import type { TokenParams } from 'lib/actions/token.js';
+import type { AuthorizationCode } from 'lib/models/authorization_code.js';
+import type { BackchannelAuthenticationRequest } from 'lib/models/backchannel_authentication_request.js';
+import type { DeviceCode } from 'lib/models/device_code.js';
+import type { RefreshToken } from 'lib/models/refresh_token.js';
 
-export default async (oidc, model, _config, scopes = model.scopes) => {
-	let resource;
+// The artifact a token request redeems, which records the resources it was granted for.
+type Redeemed =
+	| AuthorizationCode
+	| BackchannelAuthenticationRequest
+	| DeviceCode
+	| RefreshToken;
+
+export default async function resolveResource(
+	oidc: OIDCContext<TokenParams>,
+	model: Redeemed,
+	_config?: unknown,
+	scopes: Set<string> = model.scopes
+): Promise<string | undefined> {
+	let resource: string | string[] | undefined = undefined;
 	if (ApplicationConfig['resourceIndicators.enabled']) {
 		switch (true) {
 			case !!oidc.params.resource:
@@ -35,4 +53,4 @@ export default async (oidc, model, _config, scopes = model.scopes) => {
 		}
 	}
 	return resource;
-};
+}

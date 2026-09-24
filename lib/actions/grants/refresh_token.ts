@@ -1,3 +1,4 @@
+import type { X509Certificate } from 'node:crypto';
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import type { TokenParams } from 'lib/actions/token.js';
 import difference from '../../helpers/_/difference.ts';
@@ -29,9 +30,11 @@ import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Grant } from 'lib/models/grant.js';
 import ResourceServer from 'lib/helpers/resource_server.js';
+import type { DPoPProof } from 'lib/helpers/validate_dpop.js';
 
-function rarSupported(token) {
-	const [origin] = token.gty.split(' ');
+function rarSupported(token: RefreshToken) {
+	// The payload's `gty`: the model has no top-level accessor for it (token-payload-access-contract).
+	const [origin] = (token.payload.gty ?? '').split(' ');
 	return origin !== cibaGty && origin !== deviceCodeGty;
 }
 
@@ -39,7 +42,7 @@ const gty = 'refresh_token';
 
 export const handler = async function refreshTokenHandler(
 	oidc: OIDCContext<TokenParams>,
-	dPoP
+	dPoP: DPoPProof
 ) {
 	presence(oidc, 'refresh_token');
 
@@ -59,7 +62,7 @@ export const handler = async function refreshTokenHandler(
 		throw new InvalidGrant('refresh token is expired');
 	}
 
-	let cert;
+	let cert: X509Certificate | undefined;
 	if (
 		client.tlsClientCertificateBoundAccessTokens ||
 		refreshToken.payload['x5t#S256']
@@ -76,12 +79,16 @@ export const handler = async function refreshTokenHandler(
 
 	if (
 		refreshToken.payload['x5t#S256'] &&
-		refreshToken.payload['x5t#S256'] !== certificateThumbprint(cert)
+		(!cert || refreshToken.payload['x5t#S256'] !== certificateThumbprint(cert))
 	) {
 		throw new InvalidGrant('failed x5t#S256 verification');
 	}
 
-	const grant = await Grant.find(refreshToken.payload.grantId, {
+	const { grantId } = refreshToken.payload;
+	if (!grantId) {
+		throw new InvalidGrant('grant not found');
+	}
+	const grant = await Grant.find(grantId, {
 		ignoreExpiration: true,
 		error: new InvalidGrant('grant not found')
 	});
@@ -137,9 +144,10 @@ export const handler = async function refreshTokenHandler(
 	oidc.entity('Account', account);
 
 	if (refreshToken.payload.consumed) {
+		const { grantId: consumedGrantId } = refreshToken.payload;
 		await Promise.all([
 			refreshToken.destroy(),
-			revoke(refreshToken.payload.grantId, oidc)
+			consumedGrantId && revoke(consumedGrantId, oidc)
 		]);
 		throw new InvalidGrant('refresh token already used');
 	}
@@ -202,7 +210,7 @@ export const handler = async function refreshTokenHandler(
 		sid: refreshToken.payload.sid
 	});
 
-	if (client.tlsClientCertificateBoundAccessTokens) {
+	if (client.tlsClientCertificateBoundAccessTokens && cert) {
 		at.setThumbprint('x5t', cert);
 	}
 

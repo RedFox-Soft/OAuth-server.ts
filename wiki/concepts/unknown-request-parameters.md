@@ -11,7 +11,7 @@ graph:
     - predicate: implements
       object: subsystem:elysia-lifecycle
       source: oauth-server-codebase
-      evidence: "export function ignoreUnknownParams(...schemas: TObject[]) { return new Elysia().onTransform({ as: 'scoped' }, ({ body, query }) => { ignoreUnknownIn(declared, body); ignoreUnknownIn(declared, query); }) }"
+      evidence: "export function ignoreUnknownParams(...schemas: DeclaredSchema[]) { return new Elysia().onTransform({ as: 'scoped' }, ({ body, query }) => { ignoreUnknownIn(declared, body); ignoreUnknownIn(declared, query); }) }"
       confidence: high
       status: current
 ---
@@ -151,6 +151,7 @@ JSON *string*, since `t.ObjectString` parses it during validation.
 ## Related
 
 - [[elysia-lifecycle]] — the plugin family this joins, and the argument for each lifecycle stage.
+- [[typebox-dual-type-resolution]] — why the plugin takes schemas by shape (`{ properties }`) rather than as TypeBox's `TObject` (changed 2026-09-24).
 - [[rich-authorization-requests]] — the declared shape of `authorization_details` as a runtime
   coercion contract, and why the token endpoint refuses it.
 - [[test-admission-rule]] — why the spec above is a behavioural table rather than a completeness

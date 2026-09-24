@@ -1,5 +1,11 @@
 import { Elysia } from 'elysia';
-import type { TObject } from '@sinclair/typebox';
+
+/*
+ * An object schema, read only for the names it declares. Structural rather than TypeBox's TObject:
+ * TypeScript sees TypeBox twice here (Elysia's declarations resolve its CommonJS types, this
+ * repository's imports its ES module ones), and a schema built with either is still just this.
+ */
+type DeclaredSchema = { readonly properties: Record<string, unknown> };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null;
@@ -9,7 +15,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * The parameter names a schema declares — the one definition of "recognized" for the request it
  * guards, so the answer cannot drift from what the route actually validates.
  */
-export function declaredParams(...schemas: TObject[]): Set<string> {
+export function declaredParams(...schemas: DeclaredSchema[]): Set<string> {
 	const names = new Set<string>();
 	for (const schema of schemas) {
 		for (const name of Object.keys(schema.properties)) {
@@ -61,7 +67,7 @@ export function ignoreUnknownIn(
  * (RFC 9126 §2.1), `registration` at the authorization endpoint (OIDC Core §7.2.1) — is a declared
  * member typed `t.Undefined`, not an absent one. Absence here means "ignore", and nothing else.
  */
-export function ignoreUnknownParams(...schemas: TObject[]) {
+export function ignoreUnknownParams(...schemas: DeclaredSchema[]) {
 	const declared = declaredParams(...schemas);
 
 	return new Elysia().onTransform({ as: 'scoped' }, ({ body, query }) => {

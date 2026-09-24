@@ -9,8 +9,12 @@ import {
 import { configuration } from 'lib/configs/application.js';
 import checkResource from '../../shared/check_resource.ts';
 import { ClientCredentials } from 'lib/models/client_credentials.js';
+import type { DPoPProof } from 'lib/helpers/validate_dpop.js';
 
-export async function clientCredentials(oidc: OIDCContext<TokenParams>, dPoP) {
+export async function clientCredentials(
+	oidc: OIDCContext<TokenParams>,
+	dPoP: DPoPProof
+) {
 	const { client } = oidc;
 	const { scopes: statics } = configuration;
 

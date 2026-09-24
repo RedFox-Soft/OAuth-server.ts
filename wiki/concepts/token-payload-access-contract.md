@@ -99,6 +99,14 @@ and throws a server defect when its entity is absent, `oidc.require(name)` is th
 entity, and whatever may legitimately be absent — a grant before consent, an account before sign-in —
 is read as `oidc.entities.X?`, so the `?.` at the call site says which of the two the reader relies on.
 
+**Two more surfaced when the token handlers were typed (2026-09-24).** The authorization-code, device
+and CIBA grants decided whether the ID Token may leave profile claims to UserInfo from `!at.aud`, which
+is always `undefined` — so under `conformIdTokenClaims` an ID Token issued beside a resource-bound
+access token (which cannot call UserInfo) lost its claims. The refresh grant already read
+`at.payload.aud`; the other three do now, and `test/resource_indicators` proves the difference. The
+refresh grant's `rarSupported` read `token.gty` (it would have thrown on `undefined.split`); it is
+unreachable while `/token` declares no `authorization_details`, and reads `token.payload.gty` now.
+
 The request's own parameters are typed the same way since `061-typed-request-params`:
 `PipelineParams` and `TokenParams` are derived from the schemas the endpoints validate against
 (`lib/consts/param_list.ts`, `lib/actions/token.ts`), closed so a misspelt member is a compile error.

@@ -1,3 +1,4 @@
+import type { X509Certificate } from 'node:crypto';
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import type { TokenParams } from 'lib/actions/token.js';
 import { InvalidGrant } from '../../helpers/errors.ts';
@@ -22,12 +23,13 @@ import { AccessToken } from 'lib/models/access_token.js';
 import { Grant } from 'lib/models/grant.js';
 import ResourceServer from 'lib/helpers/resource_server.js';
 import { markRegistrationUsed } from '../../models/client/dynamic_registration.js';
+import type { DPoPProof } from 'lib/helpers/validate_dpop.js';
 
 const gty = 'authorization_code';
 
 export const handler = async function authorizationCodeHandler(
 	oidc: OIDCContext<TokenParams>,
-	dPoP
+	dPoP: DPoPProof
 ) {
 	if (
 		ApplicationConfig[
@@ -87,7 +89,7 @@ export const handler = async function authorizationCodeHandler(
 		code.payload.codeChallengeMethod
 	);
 
-	let cert;
+	let cert: X509Certificate | undefined;
 	if (oidc.client.tlsClientCertificateBoundAccessTokens) {
 		cert = oidc.getClientCertificate();
 		if (!cert) {
@@ -144,7 +146,7 @@ export const handler = async function authorizationCodeHandler(
 		sid: code.payload.sid
 	});
 
-	if (oidc.client.tlsClientCertificateBoundAccessTokens) {
+	if (oidc.client.tlsClientCertificateBoundAccessTokens && cert) {
 		at.setThumbprint('x5t', cert);
 	}
 
@@ -262,7 +264,7 @@ export const handler = async function authorizationCodeHandler(
 		if (
 			ApplicationConfig.conformIdTokenClaims &&
 			ApplicationConfig['userinfo.enabled'] &&
-			!at.aud
+			!at.payload.aud
 		) {
 			token.scope = 'openid';
 		} else {
