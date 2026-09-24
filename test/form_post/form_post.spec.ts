@@ -57,6 +57,8 @@ describe('/auth', () => {
 					});
 
 					const { data, response } = await authRequest(auth);
+					if (typeof data !== 'string')
+						throw new Error('expected an HTML page');
 					expect(response.status).toBe(200);
 
 					/*
@@ -81,6 +83,8 @@ describe('/auth', () => {
 					});
 
 					const { data } = await authRequest(auth);
+					if (typeof data !== 'string')
+						throw new Error('expected an HTML page');
 
 					// Two would post the response twice, and the client would redeem one code twice.
 					expect(data.match(/document\.forms\[0\]\.submit\(\)/g)).toHaveLength(
@@ -95,6 +99,8 @@ describe('/auth', () => {
 					});
 
 					const { data } = await authRequest(auth);
+					if (typeof data !== 'string')
+						throw new Error('expected an HTML page');
 
 					const opening = data.indexOf('<noscript>');
 					expect(opening).toBeGreaterThan(-1);

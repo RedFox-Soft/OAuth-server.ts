@@ -69,5 +69,9 @@ export default async function respond(
 		// checkResponseMode refused an unknown mode earlier; reaching here is a defect, not a refusal.
 		throw new Error(`no handler for response mode ${responseMode}`);
 	}
+	// checkRedirectUri resolved it, the registered one included, before any response is produced.
+	if (!params.redirect_uri) {
+		throw new Error('the authorization response has no redirect_uri to go to');
+	}
 	return await handler(oidc, params.redirect_uri, out);
 }

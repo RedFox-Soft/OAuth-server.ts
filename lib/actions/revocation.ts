@@ -6,6 +6,8 @@ import { authHeaders, AuthPlugin, authParams } from 'lib/plugins/auth.js';
 import { corsClientBased, formClientId } from 'lib/plugins/cors.js';
 import { findToken, storeToken } from '../shared/findToken.js';
 import { OAuthError } from 'lib/shared/response_schemas.js';
+import { AccessToken } from 'lib/models/access_token.js';
+import { RefreshToken } from 'lib/models/refresh_token.js';
 
 const revokeable = new Set([
 	'AccessToken',
@@ -37,9 +39,10 @@ export const revocation = new Elysia()
 
 			await token.destroy();
 
+			// By class, which a model's kind always names; a client-credentials token has no grant.
 			if (
-				token.payload.kind === 'RefreshToken' ||
-				token.payload.kind === 'AccessToken'
+				(token instanceof RefreshToken || token instanceof AccessToken) &&
+				token.payload.grantId
 			) {
 				await revoke(token.payload.grantId, oidc);
 			}

@@ -14,7 +14,8 @@ interface RarResourceServer {
 }
 
 interface RarContext {
-	params: { authorization_details?: unknown };
+	// Any endpoint's parameters; the RAR seams read only authorization_details.
+	params: Record<string, unknown> & { authorization_details?: unknown };
 	entities: {
 		Grant?: { getRarFiltered(requested: unknown): unknown[] };
 		AuthorizationCode?: { payload: { rar?: unknown } };
@@ -72,7 +73,8 @@ export function rarForRefreshTokenResponse(
 
 export function rarForIntrospectionResponse(
 	_oidc: RarContext,
-	token: { payload: { rar?: unknown } }
+	// Any introspectable token; a client-credentials token carries no details at all.
+	token: { payload: Record<string, unknown> & { rar?: unknown } }
 ) {
 	// The resource server is the intended audience of an introspection response, so its details are
 	// returned unchanged.

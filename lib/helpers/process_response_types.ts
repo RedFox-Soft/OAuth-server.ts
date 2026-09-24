@@ -5,6 +5,7 @@ import { ApplicationConfig } from 'lib/configs/application.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';
 import { expiresWithSession, rarForAuthorizationCode } from '../addon/index.js';
 import { includeSid } from '../models/client/checks.ts';
+import { isRecord } from './_/object.ts';
 
 async function codeHandler(oidc: OIDCContext<PipelineParams>) {
 	const grant = oidc.require('Grant');
@@ -15,6 +16,7 @@ async function codeHandler(oidc: OIDCContext<PipelineParams>) {
 		oidc.resourceServers
 	);
 
+	const resources = Object.keys(oidc.resourceServers);
 	const code = new AuthorizationCode({
 		/* The address this request was made to — there is no earlier artifact to inherit from. */
 		bucketId: oidc.bucket._id,
@@ -29,7 +31,8 @@ async function codeHandler(oidc: OIDCContext<PipelineParams>) {
 		grantId: oidc.session.grantIdFor(oidc.client.clientId),
 		nonce: oidc.params.nonce,
 		redirectUri: oidc.params.redirect_uri,
-		resource: Object.keys(oidc.resourceServers),
+		// One resource is recorded as itself, several as the list, none not at all.
+		resource: resources.length > 1 ? resources : resources[0],
 		scope: [...scopeSet].join(' '),
 		sessionUid: oidc.session.payload.uid,
 		dpopJkt: oidc.params.dpop_jkt
@@ -46,23 +49,15 @@ async function codeHandler(oidc: OIDCContext<PipelineParams>) {
 		ApplicationConfig['richAuthorizationRequests.enabled'] &&
 		oidc.params.authorization_details
 	) {
-		code.payload.rar = await rarForAuthorizationCode(oidc);
+		// A detail is an object; the shaping seam is a deployment's and may hand back anything.
+		code.payload.rar = (await rarForAuthorizationCode(oidc))?.filter(isRecord);
 		if (!code.payload.rar?.length) {
 			delete code.payload.rar;
 		}
 	}
 
-	if (Object.keys(code.payload.claims).length === 0) {
+	if (Object.keys(code.payload.claims ?? {}).length === 0) {
 		delete code.payload.claims;
-	}
-
-	switch (code.payload.resource.length) {
-		case 0:
-			delete code.payload.resource;
-			break;
-		case 1:
-			[code.payload.resource] = code.payload.resource;
-			break;
 	}
 
 	if (await expiresWithSession(oidc, code)) {
@@ -86,7 +81,7 @@ async function codeHandler(oidc: OIDCContext<PipelineParams>) {
 /* The authorization response members, before `state` and `iss` are added to them. */
 export default async function processResponseTypes(
 	oidc: OIDCContext<PipelineParams>
-): Promise<Record<string, unknown>> {
+): Promise<Record<string, string>> {
 	const responseType = oidc.params.response_type;
 
 	if (responseType === 'code') {

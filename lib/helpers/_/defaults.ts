@@ -1,6 +1,11 @@
 import { isPlainObject } from './object.js';
 
-function defaults(deep, target, ...sources) {
+// Fills each member of `target` still undefined from the sources, in order; deep into plain objects.
+function defaults(
+	deep: boolean,
+	target: Record<string, unknown>,
+	...sources: unknown[]
+): Record<string, unknown> {
 	for (const source of sources) {
 		if (!isPlainObject(source)) {
 			continue;

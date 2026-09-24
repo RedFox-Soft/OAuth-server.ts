@@ -176,8 +176,7 @@ export async function tokenAuth(
 				'could not authenticate the client - its client secret is expired'
 			);
 			const actual = params.client_secret || auth.clientSecret;
-			const matches = await compareClientSecret(client, actual);
-			if (!matches) {
+			if (!actual || !compareClientSecret(client, actual)) {
 				throw new InvalidClientAuth('invalid secret provided');
 			}
 

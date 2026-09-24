@@ -30,14 +30,14 @@ export default function checkResponseMode(oidc: OIDCContext<PipelineParams>) {
 		);
 	}
 
-	const JWT = /jwt/.test(mode);
+	const JWT = mode !== undefined && /jwt/.test(mode);
+	const signedWithSecret =
+		client.authorizationSignedResponseAlg?.startsWith('HS');
+	const encryptedWithSecret =
+		client.authorizationEncryptedResponseAlg !== undefined &&
+		/^(A|dir$)/.test(client.authorizationEncryptedResponseAlg);
 
-	if (
-		mode !== undefined &&
-		JWT &&
-		(/^HS/.test(client.authorizationSignedResponseAlg) ||
-			/^(A|dir$)/.test(client.authorizationEncryptedResponseAlg))
-	) {
+	if (mode !== undefined && JWT && (signedWithSecret || encryptedWithSecret)) {
 		try {
 			checkClientSecretExpiration(
 				client,

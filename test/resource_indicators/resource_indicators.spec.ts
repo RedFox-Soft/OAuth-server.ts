@@ -186,13 +186,13 @@ describe('features.resourceIndicators', () => {
 				const spy3 = mock();
 				eventBus.once('refresh_token.saved', spy3);
 
-				res = await agent.token.post({
+				const redeemed = await agent.token.post({
 					client_id: 'client',
 					grant_type: 'authorization_code',
 					code_verifier: auth.code_verifier,
 					code: code.jti
 				});
-				expect(res.status).toBe(200);
+				expect(redeemed.status).toBe(200);
 
 				expect(spy2).toHaveBeenCalledTimes(1);
 				let at = spy2.mock.calls[0][0];
@@ -208,12 +208,12 @@ describe('features.resourceIndicators', () => {
 				const spy5 = mock();
 				eventBus.once('refresh_token.saved', spy5);
 
-				res = await agent.token.post({
+				const refreshed = await agent.token.post({
 					client_id: 'client',
 					grant_type: 'refresh_token',
 					refresh_token: rt.jti
 				});
-				expect(res.status).toBe(200);
+				expect(refreshed.status).toBe(200);
 
 				expect(spy4).toHaveBeenCalledTimes(1);
 				at = spy4.mock.calls[0][0];
@@ -248,13 +248,13 @@ describe('features.resourceIndicators', () => {
 				const spy3 = mock();
 				eventBus.once('refresh_token.saved', spy3);
 
-				res = await agent.token.post({
+				const redeemed = await agent.token.post({
 					client_id: 'client',
 					grant_type: 'authorization_code',
 					code_verifier: auth.code_verifier,
 					code: code.jti
 				});
-				expect(res.status).toBe(200);
+				expect(redeemed.status).toBe(200);
 
 				expect(spy2).toHaveBeenCalledTimes(1);
 				let at = spy2.mock.calls[0][0];
@@ -270,12 +270,12 @@ describe('features.resourceIndicators', () => {
 				const spy5 = mock();
 				eventBus.once('refresh_token.saved', spy5);
 
-				res = await agent.token.post({
+				const refreshed = await agent.token.post({
 					client_id: 'client',
 					grant_type: 'refresh_token',
 					refresh_token: rt.jti
 				});
-				expect(res.status).toBe(200);
+				expect(refreshed.status).toBe(200);
 
 				expect(spy4).toHaveBeenCalledTimes(1);
 				at = spy4.mock.calls[0][0];
@@ -312,13 +312,13 @@ describe('features.resourceIndicators', () => {
 				const spy3 = mock();
 				eventBus.once('refresh_token.saved', spy3);
 
-				res = await agent.token.post({
+				const redeemed = await agent.token.post({
 					client_id: 'client',
 					grant_type: 'authorization_code',
 					code_verifier: auth.code_verifier,
 					code: code.jti
 				});
-				expect(res.status).toBe(200);
+				expect(redeemed.status).toBe(200);
 
 				expect(spy2).toHaveBeenCalledTimes(1);
 				let at = spy2.mock.calls[0][0];
@@ -334,12 +334,12 @@ describe('features.resourceIndicators', () => {
 				const spy5 = mock();
 				eventBus.once('refresh_token.saved', spy5);
 
-				res = await agent.token.post({
+				const refreshed = await agent.token.post({
 					client_id: 'client',
 					grant_type: 'refresh_token',
 					refresh_token: rt.jti
 				});
-				expect(res.status).toBe(200);
+				expect(refreshed.status).toBe(200);
 
 				expect(spy4).toHaveBeenCalledTimes(1);
 				at = spy4.mock.calls[0][0];
@@ -374,14 +374,14 @@ describe('features.resourceIndicators', () => {
 				const spy3 = mock();
 				eventBus.once('refresh_token.saved', spy3);
 
-				res = await agent.token.post({
+				const tokenResponse1 = await agent.token.post({
 					client_id: 'client',
 					grant_type: 'authorization_code',
 					code_verifier: auth.code_verifier,
 					code: code.jti,
 					resource: 'urn:wl:default'
 				});
-				expect(res.status).toBe(200);
+				expect(tokenResponse1.status).toBe(200);
 
 				expect(spy2).toHaveBeenCalledTimes(1);
 				let at = spy2.mock.calls[0][0];
@@ -397,13 +397,13 @@ describe('features.resourceIndicators', () => {
 				const spy5 = mock();
 				eventBus.once('refresh_token.saved', spy5);
 
-				res = await agent.token.post({
+				const tokenResponse2 = await agent.token.post({
 					client_id: 'client',
 					grant_type: 'refresh_token',
 					refresh_token: rt.jti,
 					resource: 'urn:wl:default'
 				});
-				expect(res.status).toBe(200);
+				expect(tokenResponse2.status).toBe(200);
 
 				expect(spy4).toHaveBeenCalledTimes(1);
 				at = spy4.mock.calls[0][0];
@@ -480,12 +480,12 @@ describe('features.resourceIndicators', () => {
 			const spy4 = mock();
 			eventBus.once('refresh_token.saved', spy4);
 
-			res = await agent.token.post({
+			const tokenResponse3 = await agent.token.post({
 				client_id: 'client',
 				grant_type: 'refresh_token',
 				refresh_token: rt.jti
 			});
-			expect(res.status).toBe(200);
+			expect(tokenResponse3.status).toBe(200);
 
 			expect(spy3).toHaveBeenCalledTimes(1);
 			at = spy3.mock.calls[0][0];
@@ -546,12 +546,12 @@ describe('features.resourceIndicators', () => {
 			const spy4 = mock();
 			eventBus.once('refresh_token.saved', spy4);
 
-			res = await agent.token.post({
+			const tokenResponse4 = await agent.token.post({
 				client_id: 'client',
 				grant_type: 'refresh_token',
 				refresh_token: rt.jti
 			});
-			expect(res.status).toBe(200);
+			expect(tokenResponse4.status).toBe(200);
 
 			expect(spy3).toHaveBeenCalledTimes(1);
 			at = spy3.mock.calls[0][0];
@@ -614,12 +614,12 @@ describe('features.resourceIndicators', () => {
 			const spy4 = mock();
 			eventBus.once('refresh_token.saved', spy4);
 
-			res = await agent.token.post({
+			const tokenResponse5 = await agent.token.post({
 				client_id: 'client',
 				grant_type: 'refresh_token',
 				refresh_token: rt.jti
 			});
-			expect(res.status).toBe(200);
+			expect(tokenResponse5.status).toBe(200);
 
 			expect(spy3).toHaveBeenCalledTimes(1);
 			at = spy3.mock.calls[0][0];
@@ -681,13 +681,13 @@ describe('features.resourceIndicators', () => {
 			const spy4 = mock();
 			eventBus.once('refresh_token.saved', spy4);
 
-			res = await agent.token.post({
+			const tokenResponse6 = await agent.token.post({
 				client_id: 'client',
 				resource: 'urn:wl:default',
 				grant_type: 'refresh_token',
 				refresh_token: rt.jti
 			});
-			expect(res.status).toBe(200);
+			expect(tokenResponse6.status).toBe(200);
 
 			expect(spy3).toHaveBeenCalledTimes(1);
 			at = spy3.mock.calls[0][0];
@@ -753,13 +753,13 @@ describe('features.resourceIndicators', () => {
 			const spy4 = mock();
 			eventBus.once('refresh_token.saved', spy4);
 
-			res = await agent.token.post({
+			const tokenResponse7 = await agent.token.post({
 				client_id: 'client',
 				grant_type: 'refresh_token',
 				refresh_token: rt.jti,
 				resource: 'urn:wl:explicit'
 			});
-			expect(res.status).toBe(200);
+			expect(tokenResponse7.status).toBe(200);
 
 			expect(spy3).toHaveBeenCalledTimes(1);
 			at = spy3.mock.calls[0][0];
@@ -810,12 +810,12 @@ describe('features.resourceIndicators', () => {
 			const spy4 = mock();
 			eventBus.once('refresh_token.saved', spy4);
 
-			res = await agent.token.post({
+			const tokenResponse8 = await agent.token.post({
 				client_id: 'client',
 				grant_type: 'refresh_token',
 				refresh_token: rt.jti
 			});
-			expect(res.status).toBe(200);
+			expect(tokenResponse8.status).toBe(200);
 
 			expect(spy3).toHaveBeenCalledTimes(1);
 			at = spy3.mock.calls[0][0];
@@ -864,12 +864,12 @@ describe('features.resourceIndicators', () => {
 			const spy4 = mock();
 			eventBus.once('refresh_token.saved', spy4);
 
-			res = await agent.token.post({
+			const tokenResponse9 = await agent.token.post({
 				client_id: 'client',
 				grant_type: 'refresh_token',
 				refresh_token: rt.jti
 			});
-			expect(res.status).toBe(200);
+			expect(tokenResponse9.status).toBe(200);
 
 			expect(spy3).toHaveBeenCalledTimes(1);
 			at = spy3.mock.calls[0][0];

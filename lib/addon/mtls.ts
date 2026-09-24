@@ -20,7 +20,8 @@ export function getCertificate(oidc: OIDCContext) {
 	}
 }
 
-export function certificateAuthorized(_oidc: OIDCContext) {
+// Whether the client certificate is verified and chains to a trusted CA; the deployment decides.
+export function certificateAuthorized(_oidc: OIDCContext): boolean {
 	mustChange(
 		'features.mTLS.certificateAuthorized',
 		'determine if the client certificate is verified and comes from a trusted CA'
@@ -34,7 +35,7 @@ export function certificateSubjectMatches(
 	_oidc: OIDCContext,
 	_property: string,
 	_expected: string
-) {
+): boolean {
 	mustChange(
 		'features.mTLS.certificateSubjectMatches',
 		'verify that the tls_client_auth_* registered client property value matches the certificate one'

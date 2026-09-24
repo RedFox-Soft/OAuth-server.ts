@@ -6,6 +6,7 @@ import { triggerAuthenticationDevice } from '../../addon/index.js';
 export default async function backchannelRequestResponse(
 	oidc: OIDCContext<PipelineParams>
 ) {
+	const resources = Object.keys(oidc.resourceServers);
 	const request = new BackchannelAuthenticationRequest({
 		/* The address the request was made to. */
 		bucketId: oidc.bucket._id,
@@ -14,18 +15,10 @@ export default async function backchannelRequestResponse(
 		client: oidc.client,
 		nonce: oidc.params.nonce,
 		params: { ...oidc.params },
-		resource: Object.keys(oidc.resourceServers),
+		// One resource is recorded as itself, several as the list, none not at all.
+		resource: resources.length > 1 ? resources : resources[0],
 		scope: [...oidc.requestParamScopes].join(' ')
 	});
-
-	switch (request.payload.resource.length) {
-		case 0:
-			delete request.payload.resource;
-			break;
-		case 1:
-			[request.payload.resource] = request.payload.resource;
-			break;
-	}
 
 	oidc.entity('BackchannelAuthenticationRequest', request);
 

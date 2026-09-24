@@ -17,6 +17,7 @@ export default async function deviceVerificationResponse(
 		oidc.resourceServers
 	);
 
+	const resources = Object.keys(oidc.resourceServers);
 	Object.assign(code.payload, {
 		accountId: oidc.session.payload.accountId,
 		acr: oidc.acr,
@@ -26,20 +27,12 @@ export default async function deviceVerificationResponse(
 		grantId: oidc.session.grantIdFor(oidc.client.clientId),
 		scope: [...scopeSet].join(' '),
 		sessionUid: oidc.session.payload.uid,
-		resource: Object.keys(oidc.resourceServers)
+		// One resource is recorded as itself, several as the list, none not at all.
+		resource: resources.length > 1 ? resources : resources[0]
 	});
 
-	if (Object.keys(code.payload.claims).length === 0) {
+	if (Object.keys(code.payload.claims ?? {}).length === 0) {
 		delete code.payload.claims;
-	}
-
-	switch (code.payload.resource.length) {
-		case 0:
-			delete code.payload.resource;
-			break;
-		case 1:
-			[code.payload.resource] = code.payload.resource;
-			break;
 	}
 
 	if (await expiresWithSession(oidc, code)) {

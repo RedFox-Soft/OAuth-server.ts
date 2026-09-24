@@ -2,21 +2,27 @@ import { InvalidTarget } from '../helpers/errors.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import ResourceServer from 'lib/helpers/resource_server.js';
 import { defaultResource, getResourceServerInfo } from '../addon/index.js';
+import type { OIDCContext } from 'lib/helpers/oidc_context.js';
+import type { PipelineParams } from 'lib/consts/param_list.js';
+import type { TokenParams } from 'lib/actions/token.js';
 
-const filterStatics = (oidc) => {
+// The authorization pipeline's context, or the token endpoint's for client credentials.
+type ResourceContext = OIDCContext<PipelineParams> | OIDCContext<TokenParams>;
+
+const filterStatics = (oidc: ResourceContext) => {
 	if (oidc.params.scope && !oidc.params.resource) {
 		oidc.params.scope = [...oidc.requestParamOIDCScopes].join(' ');
 	}
 };
 
-function emptyResource(params) {
+function emptyResource(params: { resource?: string | string[] }) {
 	return (
 		!params.resource ||
 		(Array.isArray(params.resource) && !params.resource.length)
 	);
 }
 
-export default async function checkResource(oidc) {
+export default async function checkResource(oidc: ResourceContext) {
 	const { params, client, resourceServers } = oidc;
 
 	if (!ApplicationConfig['resourceIndicators.enabled']) {
@@ -39,17 +45,15 @@ export default async function checkResource(oidc) {
 		return;
 	}
 
-	let { resource } = params;
-
 	if (params.resource === undefined) {
 		return;
 	}
 
-	if (!Array.isArray(params.resource)) {
-		resource = [resource];
-	}
+	const resources = Array.isArray(params.resource)
+		? params.resource
+		: [params.resource];
 
-	for (const identifier of resource) {
+	for (const identifier of resources) {
 		const href = URL.parse(identifier)?.href;
 
 		if (!href) {

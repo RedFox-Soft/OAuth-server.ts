@@ -1,5 +1,6 @@
 import { InvalidRequest } from '../helpers/errors.ts';
-import { Elysia, t } from 'elysia';
+import type { OIDCContext } from 'lib/helpers/oidc_context.js';
+import { Elysia, t, type Static } from 'elysia';
 import { routeNames } from 'lib/consts/param_list.js';
 import {
 	introspectionAllowedPolicy,
@@ -16,7 +17,13 @@ import { Grant } from 'lib/models/grant.js';
 import { storeToken } from '../shared/findToken.js';
 import { ClientCredentials } from 'lib/models/client_credentials.js';
 import { hasGrant } from './grants/index.js';
-import { AuthPlugin, authHeaders, authParams } from 'lib/plugins/auth.js';
+import {
+	AuthPlugin,
+	authHeaders,
+	authParams,
+	withBody,
+	type authParamsType
+} from 'lib/plugins/auth.js';
 import {
 	IntrospectionResponse,
 	OAuthError
@@ -44,18 +51,54 @@ const tokenTypes = {
 	}
 };
 
-async function renderTokenResponse(oidc) {
+// What the introspection endpoint reads off its request, once its body schema has been applied.
+type IntrospectionParams = authParamsType & {
+	token: string;
+	token_type_hint?: string;
+};
+
+function isTokenTypeHint(value: unknown): value is keyof typeof tokenTypes {
+	return typeof value === 'string' && Object.hasOwn(tokenTypes, value);
+}
+
+// The members an introspection answer reads off a token; a client-credentials token carries fewer.
+type IntrospectedPayload = {
+	clientId: string;
+	kind: string;
+	bucketId?: string;
+	grantId?: string;
+	accountId?: string;
+	exp?: number;
+	iat?: number;
+	sid?: string;
+	jti?: string;
+	aud?: string;
+	rar?: unknown[];
+	scope?: string;
+	jkt?: string;
+	'x5t#S256'?: string;
+};
+
+// The JSON answer (the JWT form is built from it by the handler).
+type IntrospectionAnswer = Exclude<
+	Static<typeof IntrospectionResponse>,
+	string
+>;
+
+async function renderTokenResponse(
+	oidc: OIDCContext<IntrospectionParams>
+): Promise<IntrospectionAnswer> {
 	const { params } = oidc;
 	let token;
 
-	const methodToken = tokenTypes[params.token_type_hint];
-	if (methodToken) {
-		token = await methodToken(params.token);
+	const hint = params.token_type_hint;
+	if (isTokenTypeHint(hint)) {
+		token = await tokenTypes[hint](params.token);
 		if (!token) {
-			const otherMethods = Object.keys(tokenTypes)
-				.filter((type) => type !== params.token_type_hint)
-				.map((type) => tokenTypes[type](params.token));
-			token = (await Promise.all(otherMethods)).find((t) => t);
+			const otherMethods = Object.entries(tokenTypes)
+				.filter(([type]) => type !== hint)
+				.map(([, find]) => find(params.token));
+			token = (await Promise.all(otherMethods)).find((found) => found);
 		}
 	} else {
 		token = (
@@ -66,6 +109,8 @@ async function renderTokenResponse(oidc) {
 	if (!token?.isValid) {
 		return { active: false };
 	}
+
+	const payload: IntrospectedPayload = token.payload;
 
 	/*
 	 * A token this address did not issue is not active here.
@@ -80,21 +125,21 @@ async function renderTokenResponse(oidc) {
 	 * is the whole reason that field is stored. A token minted before buckets became tenants records
 	 * nothing and belongs to the default bucket, which is what `issuingBucket` resolves an absence to.
 	 */
-	const issuedBy = await issuingBucket(token.payload.bucketId);
+	const issuedBy = await issuingBucket(payload.bucketId);
 	if (issuedBy._id !== oidc.bucket._id) {
 		return { active: false };
 	}
 
-	if (token.payload.grantId) {
-		const grant = await Grant.tryFind(token.payload.grantId, {
+	if (payload.grantId) {
+		const grant = await Grant.tryFind(payload.grantId, {
 			ignoreExpiration: true
 		});
 
 		if (
 			!grant ||
 			grant.isExpired ||
-			grant.payload.clientId !== token.payload.clientId ||
-			grant.payload.accountId !== token.payload.accountId
+			grant.payload.clientId !== payload.clientId ||
+			grant.payload.accountId !== payload.accountId
 		) {
 			return { active: false };
 		}
@@ -102,7 +147,7 @@ async function renderTokenResponse(oidc) {
 		oidc.entity('Grant', grant);
 	}
 
-	if (introspectable.has(token.payload.kind)) {
+	if (introspectable.has(payload.kind)) {
 		storeToken(oidc, token);
 	} else {
 		return { active: false };
@@ -112,50 +157,55 @@ async function renderTokenResponse(oidc) {
 		return { active: false };
 	}
 
-	const body: any = { active: false };
-	if (token.payload.accountId) {
-		body.sub = token.payload.accountId;
-		if (token.payload.clientId !== oidc.client.clientId) {
-			const client = await Client.find(token.payload.clientId);
+	const body: IntrospectionAnswer = {
+		active: true,
+		client_id: payload.clientId,
+		exp: payload.exp,
+		iat: payload.iat,
+		sid: payload.sid,
+		iss: oidc.issuer,
+		jti: payload.jti !== params.token ? payload.jti : undefined,
+		aud: payload.aud,
+		scope: payload.scope || undefined,
+		token_type: payload.kind !== 'RefreshToken' ? token.tokenType : undefined
+	};
+
+	if (payload.accountId) {
+		let sub = payload.accountId;
+		if (payload.clientId !== oidc.client.clientId) {
+			const client = await Client.find(payload.clientId);
 			if (client.subjectType === 'pairwise') {
-				body.sub = await pairwiseIdentifier(body.sub, client);
+				sub = await pairwiseIdentifier(sub, client);
 			}
 		} else if (oidc.client.subjectType === 'pairwise') {
-			body.sub = await pairwiseIdentifier(body.sub, oidc.client);
+			sub = await pairwiseIdentifier(sub, oidc.client);
 		}
+		body.sub = sub;
 	}
 
-	Object.assign(body, {
-		active: true,
-		client_id: token.payload.clientId,
-		exp: token.payload.exp,
-		iat: token.payload.iat,
-		sid: token.payload.sid,
-		iss: oidc.issuer,
-		jti: token.payload.jti !== params.token ? token.payload.jti : undefined,
-		aud: token.payload.aud,
-		authorization_details: token.payload.rar
-			? await rarForIntrospectionResponse(oidc, token)
-			: undefined,
-		scope: token.payload.scope || undefined,
-		cnf: token.isSenderConstrained() ? {} : undefined,
-		token_type:
-			token.payload.kind !== 'RefreshToken' ? token.tokenType : undefined
-	});
-
-	if (token.payload['x5t#S256']) {
-		body.cnf['x5t#S256'] = token.payload['x5t#S256'];
+	if (payload.rar) {
+		const details = await rarForIntrospectionResponse(oidc, token);
+		// A deployment shapes these; anything but a list is not an authorization_details value.
+		body.authorization_details = Array.isArray(details) ? details : undefined;
 	}
 
-	if (token.payload.jkt) {
-		body.cnf.jkt = token.payload.jkt;
+	if (token.isSenderConstrained()) {
+		const cnf: Record<string, string> = {};
+		if (payload['x5t#S256']) {
+			cnf['x5t#S256'] = payload['x5t#S256'];
+		}
+		if (payload.jkt) {
+			cnf.jkt = payload.jkt;
+		}
+		body.cnf = cnf;
 	}
 	return body;
 }
 
 export const introspect = new Elysia().use(AuthPlugin).post(
 	routeNames.introspect,
-	async function ({ oidc, request, set }) {
+	async function ({ oidc: context, body: requestBody, request, set }) {
+		const oidc = withBody(context, requestBody);
 		if (ApplicationConfig['jwtIntrospection.enabled']) {
 			const client = oidc.client;
 
@@ -178,7 +228,7 @@ export const introspect = new Elysia().use(AuthPlugin).post(
 				const token = new IdToken(client);
 				token.extra = {
 					token_introspection: body,
-					aud: body.aud
+					aud: body.active ? body.aud : undefined
 				};
 
 				// Set once issuing has succeeded: a refusal from issue() is answered through `set` too.

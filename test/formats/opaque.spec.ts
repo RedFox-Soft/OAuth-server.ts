@@ -183,7 +183,6 @@ describe('opaque storage', () => {
 		const adapter = TestAdapter.for(kind);
 		const upsert = spyOn(adapter, 'upsert');
 		const client = await Client.find(clientId);
-		// @ts-expect-error the case feeds every model's members at once, some typed for another model; what matters is what the format keeps
 		const token = new DeviceCode({ client, ...fullPayload });
 		await token.save();
 
@@ -222,7 +221,6 @@ describe('opaque storage', () => {
 		const adapter = TestAdapter.for(kind);
 		const upsert = spyOn(adapter, 'upsert');
 		const client = await Client.find(clientId);
-		// @ts-expect-error the case feeds every model's members at once, some typed for another model; what matters is what the format keeps
 		const token = new BackchannelAuthenticationRequest({
 			client,
 			...fullPayload
@@ -261,7 +259,6 @@ describe('opaque storage', () => {
 		const adapter = TestAdapter.for(kind);
 		const upsert = spyOn(adapter, 'upsert');
 		const client = await Client.find(clientId);
-		// @ts-expect-error the case feeds every model's members at once, some typed for another model; what matters is what the format keeps
 		const token = new RefreshToken({ client, ...fullPayload });
 		await token.save();
 

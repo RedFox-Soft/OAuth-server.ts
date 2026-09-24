@@ -5,12 +5,18 @@ import { type Client } from '../models/client/types.ts';
 import { InvalidClientMetadata } from './errors.ts';
 import { sectorIdentifierUriValidate } from '../addon/index.js';
 
+function messageOf(err: unknown): string {
+	return err instanceof Error ? err.message : String(err);
+}
+
 export default async function sectorValidate(client: Client) {
-	if (!sectorIdentifierUriValidate(client)) {
+	const { sectorIdentifierUri } = client;
+	// Called for a client that declares one; without it there is nothing to fetch.
+	if (!sectorIdentifierUri || !sectorIdentifierUriValidate(client)) {
 		return;
 	}
 
-	const response = await fetch(new URL(client.sectorIdentifierUri).href, {
+	const response = await fetch(new URL(sectorIdentifierUri).href, {
 		method: 'GET',
 		headers: {
 			accept: 'application/json'
@@ -18,7 +24,7 @@ export default async function sectorValidate(client: Client) {
 	}).catch((err) => {
 		throw new InvalidClientMetadata(
 			'could not load sector_identifier_uri response',
-			err.message
+			messageOf(err)
 		);
 	});
 
@@ -34,7 +40,7 @@ export default async function sectorValidate(client: Client) {
 	} catch (err) {
 		throw new InvalidClientMetadata(
 			'failed to parse sector_identifier_uri JSON response',
-			err.message
+			messageOf(err)
 		);
 	}
 
@@ -59,6 +65,6 @@ export default async function sectorValidate(client: Client) {
 				);
 		}
 	} catch (err) {
-		throw new InvalidClientMetadata(err.message);
+		throw new InvalidClientMetadata(messageOf(err));
 	}
 }
