@@ -1,5 +1,4 @@
 import { strict as assert } from 'node:assert';
-import { parse as parseUrl } from 'node:url';
 
 import * as base64url from 'lib/helpers/base64url.js';
 
@@ -14,7 +13,12 @@ import {
 	mock
 } from 'bun:test';
 
-import bootstrap, { agent, type Setup } from '../test_helper.js';
+import bootstrap, {
+	agent,
+	redirectParameter,
+	type Setup
+} from '../test_helper.js';
+import { decode } from 'lib/helpers/jwt.js';
 import {
 	mock as mockHttp,
 	assertNoPendingInterceptors
@@ -37,6 +41,12 @@ function decodeLogoutToken(value: string) {
 		header: JSON.parse(base64url.decode(header)),
 		payload: JSON.parse(base64url.decode(payload))
 	};
+}
+
+// The sid an ID Token carries; fails the case when the response has no ID Token.
+function sidOf(idToken: string | undefined) {
+	if (!idToken) throw new Error('expected an ID Token');
+	return decode(idToken).payload.sid;
 }
 
 /**
@@ -144,8 +154,8 @@ describe('Back-Channel Logout 1.0', () => {
 
 	describe('end_session extension', () => {
 		let cookie: string;
-		let auth;
-		let code;
+		let auth: AuthorizationRequest;
+		let code: string;
 
 		beforeEach(() => {
 			// Re-applied every test because the outer afterEach's mock.restore()
@@ -168,17 +178,13 @@ describe('Back-Channel Logout 1.0', () => {
 				headers: { cookie }
 			});
 			expect(response.status).toBe(303);
-			const { query } = parseUrl(response.headers.get('location'), true);
-			expect(query).toHaveProperty('code');
-			code = query.code;
+			code = redirectParameter(response, 'code');
 		});
 
 		it('makes sid available in id_token issued by authorization endpoint', async function () {
 			const { data } = await auth.getToken(code);
-			expect(data).toHaveProperty('id_token');
 
-			const payload = JSON.parse(base64url.decode(data.id_token.split('.')[1]));
-			expect(typeof payload.sid).toBe('string');
+			expect(typeof sidOf(data?.id_token)).toBe('string');
 		});
 
 		it('makes sid available in id_token issued by grant_type=authorization_code', async function () {
@@ -193,8 +199,7 @@ describe('Back-Channel Logout 1.0', () => {
 			);
 			if (!data) throw new Error('expected response data');
 
-			const payload = JSON.parse(base64url.decode(data.id_token.split('.')[1]));
-			expect(typeof payload.sid).toBe('string');
+			expect(typeof sidOf(data.id_token)).toBe('string');
 		});
 
 		it('makes sid available in id_token issued by grant_type=refresh_token', async function () {
@@ -222,10 +227,7 @@ describe('Back-Channel Logout 1.0', () => {
 			);
 			if (!rtData) throw new Error('expected response data');
 
-			const payload = JSON.parse(
-				base64url.decode(rtData.id_token.split('.')[1])
-			);
-			expect(typeof payload.sid).toBe('string');
+			expect(typeof sidOf(rtData.id_token)).toBe('string');
 		});
 
 		// SKIPPED (source bug, not obsolete): lib/actions/end_session.ts reads the top-level

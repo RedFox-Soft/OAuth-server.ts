@@ -21,13 +21,14 @@ const {
 
 export async function sign(
 	payload: Record<string, unknown>,
-	key,
-	alg,
+	key: Parameters<CompactSign['sign']>[0],
+	alg: string,
 	options: {
 		typ?: string;
 		fields?: Record<string, unknown>;
 		noIat?: boolean;
-		audience?: string;
+		// RFC 7519 §4.1.3: one audience, or a list of them.
+		audience?: string | string[];
 		expiresIn?: number;
 		issuer?: string;
 		subject?: string;

@@ -1,7 +1,7 @@
 import { describe, it, beforeAll, expect } from 'bun:test';
 import bootstrap, {
 	agent,
-	getHeader,
+	redirectParameter,
 	setSeedClaims,
 	type Setup
 } from '../test_helper.js';
@@ -51,10 +51,10 @@ describe('distributed and aggregated claims', () => {
 				}
 			});
 			expect(authRes.status).toBe(303);
-			const location = getHeader(authRes.response, 'location');
-			const code = new URL(location).searchParams.get('code');
+			const code = redirectParameter(authRes.response, 'code');
 
 			const res = await auth.getToken(code);
+			if (!res.data) throw new Error('expected a token response');
 			const { access_token } = res.data;
 
 			const { data } = await agent.userinfo.get({
@@ -62,7 +62,9 @@ describe('distributed and aggregated claims', () => {
 					authorization: `Bearer ${access_token}`
 				}
 			});
-			if (!data) throw new Error('expected response data');
+			if (!data || typeof data === 'string') {
+				throw new Error('expected a JSON UserInfo response');
+			}
 
 			expect(data).toHaveProperty('nickname', 'foobar');
 			expect(data).not.toHaveProperty('given_name');
@@ -88,10 +90,10 @@ describe('distributed and aggregated claims', () => {
 				}
 			});
 			expect(authRes.status).toBe(303);
-			const location = getHeader(authRes.response, 'location');
-			const code = new URL(location).searchParams.get('code');
+			const code = redirectParameter(authRes.response, 'code');
 
 			const res = await auth.getToken(code);
+			if (!res.data) throw new Error('expected a token response');
 			const { access_token } = res.data;
 
 			const { data } = await agent.userinfo.get({

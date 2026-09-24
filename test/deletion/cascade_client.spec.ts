@@ -181,9 +181,7 @@ describe('deletion cascade: client', () => {
 
 		// Recorded from a probe: a registration access token is persisted with no `exp` at all, which is
 		// why this area is the one swept first — its residue is not bounded by any TTL.
-		expect(
-			await adapter('RegistrationAccessToken').find(rat.jti)
-		).toBeDefined();
+		expect(await adapter('RegistrationAccessToken').find(rat.id)).toBeDefined();
 
 		await deleteClient(client.clientId);
 
@@ -191,7 +189,7 @@ describe('deletion cascade: client', () => {
 		// authenticates with, so a PUT would destroy the record itself and make this assertion pass for
 		// the wrong reason.
 		expect(
-			await adapter('RegistrationAccessToken').find(rat.jti)
+			await adapter('RegistrationAccessToken').find(rat.id)
 		).toBeUndefined();
 
 		const res = await agent.reg({ clientId: client.clientId }).put(
@@ -236,10 +234,10 @@ describe('deletion cascade: client', () => {
 
 		await deleteClient(client.clientId);
 
-		expect(await adapter('AuthorizationCode').find(code.jti)).toBeUndefined();
-		expect(await adapter('DeviceCode').find(device.jti)).toBeUndefined();
+		expect(await adapter('AuthorizationCode').find(code.id)).toBeUndefined();
+		expect(await adapter('DeviceCode').find(device.id)).toBeUndefined();
 		expect(
-			await adapter('BackchannelAuthenticationRequest').find(backchannel.jti)
+			await adapter('BackchannelAuthenticationRequest').find(backchannel.id)
 		).toBeUndefined();
 	});
 
@@ -279,7 +277,7 @@ describe('deletion cascade: client', () => {
 		});
 		await deleteClient(client.clientId);
 
-		expect(await adapter('RefreshToken').find(rt.jti)).toBeUndefined();
+		expect(await adapter('RefreshToken').find(rt.id)).toBeUndefined();
 	});
 
 	it('deletes a client that issued nothing (scenario 8)', async () => {

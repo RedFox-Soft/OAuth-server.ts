@@ -78,7 +78,7 @@ async function sessionCookieFor(roles: string[]) {
 	return { cookie: `${ADMIN_SESSION_COOKIE}=${s._id}`, userId: user._id };
 }
 
-function get(app: Elysia, path: string, cookie?: string) {
+function get(app: Pick<Elysia, 'handle'>, path: string, cookie?: string) {
 	return app.handle(
 		new Request(`http://e.ly${path}`, {
 			headers: cookie ? { cookie } : {}
@@ -86,7 +86,12 @@ function get(app: Elysia, path: string, cookie?: string) {
 	);
 }
 
-function post(app: Elysia, path: string, body: unknown, cookie?: string) {
+function post(
+	app: Pick<Elysia, 'handle'>,
+	path: string,
+	body: unknown,
+	cookie?: string
+) {
 	return app.handle(
 		new Request(`http://e.ly${path}`, {
 			method: 'POST',

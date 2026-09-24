@@ -11,6 +11,8 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- CIBA: the `verifyUserCode` addon receives the request's `user_code`; it was handed the login hint
+  instead, so a deployment's user-code check never saw the code the client sent.
 - request parameters follow their specifications: `ui_locales` and `claims_locales` are one
   space-separated string each (OIDC Core), no longer an array, and `ui_locales` sent twice is refused;
   `registration`, and a disabled `request`/`request_uri`, are refused with the OIDC Core §3.1.2.6 codes

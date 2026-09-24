@@ -27,6 +27,12 @@ export type RarTypeDescriptor = {
 	validate?: (oidc: OIDCContext, detail: unknown, client: unknown) => unknown;
 };
 
+/* `claims`: a standalone claim (null), or a scope naming its claims as a list or a claim map. */
+export type ClaimsSetting = Record<
+	string,
+	null | string[] | Record<string, null>
+>;
+
 /* Members added to the discovery document; any other member extends it as given. */
 export type DiscoveryExtensions = {
 	claim_types_supported?: string[];
@@ -658,13 +664,13 @@ export const ApplicationConfig = {
 	 * description: Claims map used to derive `claims_supported` and claim-defined scopes for discovery.
 	 *   `{ claimName: null }` exposes a standalone claim; `{ scopeName: ['claim', ...] }` groups claims under a scope.
 	 */
-	claims: {
+	claims: setting<ClaimsSetting>({
 		acr: null,
 		sid: null,
 		auth_time: null,
 		iss: null,
 		openid: ['sub']
-	},
+	}),
 
 	/*
 	 * acrValues

@@ -7,7 +7,11 @@ import {
 	type FeatureFlagKey
 } from 'lib/configs/discoverySupport.js';
 import { ApplicationConfig } from '../configs/application.js';
-import { DiscoveryResponse, OAuthError } from 'lib/shared/response_schemas.js';
+import {
+	DiscoveryResponse,
+	OAuthError,
+	type DiscoveryDocument
+} from 'lib/shared/response_schemas.js';
 import { corsOpen } from 'lib/plugins/cors.js';
 import {
 	bucketAtAddress,
@@ -29,7 +33,7 @@ const MEANINGFUL_FALSE = new Set<string>(['request_uri_parameter_supported']);
  * everything after that point is identical, which is what keeps the two documents agreeing on every
  * member they have in common.
  */
-function gateAndExtend(body: Record<string, unknown>): Record<string, unknown> {
+function gateAndExtend(body: DiscoveryDocument): DiscoveryDocument {
 	const keysToDelete = new Set<string>();
 
 	// Prune keys whose governing feature flag is disabled (multi-feature keys are listed
@@ -64,7 +68,7 @@ function openidConfiguration(bucket?: BucketAddress) {
 }
 
 function oauthAuthorizationServer(bucket?: BucketAddress) {
-	const body: Record<string, unknown> = calculateDiscovery(bucket);
+	const body: DiscoveryDocument = calculateDiscovery(bucket);
 
 	/*
 	 * Narrow to the OAuth surface BEFORE gating. Order is load-bearing: the override stage
@@ -72,8 +76,8 @@ function oauthAuthorizationServer(bucket?: BucketAddress) {
 	 * delete a value an operator had explicitly set — and only for the members they cared
 	 * enough to configure.
 	 */
-	for (const key of Object.keys(body)) {
-		if (metadataClassification[key as never]?.audience === 'oidc') {
+	for (const [key, { audience }] of Object.entries(metadataClassification)) {
+		if (audience === 'oidc') {
 			// eslint-disable-next-line @typescript-eslint/no-dynamic-delete
 			delete body[key];
 		}
@@ -97,7 +101,7 @@ function oauthAuthorizationServer(bucket?: BucketAddress) {
  */
 async function forSlug(
 	slug: string,
-	build: (bucket?: BucketAddress) => Record<string, unknown>,
+	build: (bucket?: BucketAddress) => DiscoveryDocument,
 	set: { status?: number | string }
 ) {
 	const bucket = await bucketAtAddress(slug);
@@ -126,7 +130,7 @@ async function forSlug(
  */
 async function forHost(
 	host: string | null,
-	build: (bucket?: BucketAddress) => Record<string, unknown>,
+	build: (bucket?: BucketAddress) => DiscoveryDocument,
 	set: { status?: number | string }
 ) {
 	const normalised = normaliseHost(host ?? undefined);

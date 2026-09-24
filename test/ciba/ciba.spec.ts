@@ -21,12 +21,8 @@ import { BackchannelAuthenticationRequest } from 'lib/models/backchannel_authent
 import { Grant } from 'lib/models/grant.js';
 import { backchannelResult } from 'lib/actions/authorization/backchannel_result.js';
 
-const form = { 'content-type': 'application/x-www-form-urlencoded' };
-
-function post(body, headers = {}) {
-	return formAgent.backchannel.post(body, {
-		headers: { ...form, ...headers }
-	});
+function post(body: Parameters<typeof formAgent.backchannel.post>[0]) {
+	return formAgent.backchannel.post(body);
 }
 
 /**
@@ -259,6 +255,26 @@ describe('features.ciba', () => {
 		});
 
 		describe('backchannel_authentication_endpoint', () => {
+			/*
+			 * CIBA §7.1: the user code is what stops anyone who knows an identifier from pushing
+			 * authentication requests at that user, so the deployment's check must see the one the client
+			 * sent — not the login hint that named the user.
+			 */
+			it('hands the user_code the client sent to verifyUserCode', async () => {
+				const [res, [, , userCode]] = await Promise.all([
+					post({
+						scope: 'openid',
+						login_hint: 'accountId',
+						user_code: 'a-user-code',
+						client_id: 'client'
+					}),
+					once(emitter, 'verifyUserCode')
+				]);
+
+				expect(res.status).toBe(200);
+				expect(userCode).toBe('a-user-code');
+			});
+
 			it('a minimal request identified by login_hint is accepted and returns an auth_req_id', async () => {
 				const [res, [, request, account, client]] = await Promise.all([
 					post({
@@ -365,15 +381,13 @@ describe('features.ciba', () => {
 				await grant.save();
 				await backchannelResult(request, grant);
 
-				const { data: tokenData } = await formAgent.token.post(
-					{
-						client_id: 'client',
-						grant_type: 'urn:openid:params:grant-type:ciba',
-						auth_req_id: request.jti
-					},
-					{ headers: form }
-				);
-				const { id_token } = tokenData;
+				const { data: tokenData } = await formAgent.token.post({
+					client_id: 'client',
+					grant_type: 'urn:openid:params:grant-type:ciba',
+					auth_req_id: request.jti
+				});
+				const id_token = tokenData?.id_token;
+				if (!id_token) throw new Error('expected an ID Token');
 
 				const [res2, [, request2, account, client]] = await Promise.all([
 					post({
@@ -388,6 +402,7 @@ describe('features.ciba', () => {
 				]);
 
 				expect(res2.status).toBe(200);
+				if (!res2.data) throw new Error('expected response data');
 				expect(Object.keys(res2.data).sort()).toEqual(
 					['auth_req_id', 'expires_in'].sort()
 				);

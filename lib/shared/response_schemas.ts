@@ -1,4 +1,4 @@
-import { t } from 'elysia';
+import { t, type Static } from 'elysia';
 
 /*
  * Shared response schemas for per-endpoint typed responses (FR-013).
@@ -90,32 +90,28 @@ export const ParResponse = t.Object({
 	expires_in: t.Number()
 });
 
-// Device authorization (RFC 8628) — returned as a plain object (runtime-validated).
+// Device authorization (RFC 8628 §3.2) — returned as a plain object (runtime-validated).
 export const DeviceAuthorizationResponse = t.Object(
 	{
-		device_code: t.Optional(t.String()),
-		user_code: t.Optional(t.String()),
-		verification_uri: t.Optional(t.String()),
+		device_code: t.String(),
+		user_code: t.String(),
+		verification_uri: t.String(),
 		verification_uri_complete: t.Optional(t.String()),
-		expires_in: t.Optional(t.Number()),
+		expires_in: t.Number(),
 		interval: t.Optional(t.Number())
 	},
 	{ additionalProperties: true }
 );
 
-// CIBA backchannel authentication (OpenID CIBA). The handler currently returns no body; the Void
-// branch keeps that behaviour while the object branch documents the negotiated shape for Eden.
-export const BackchannelAuthenticationResponse = t.Union([
-	t.Object(
-		{
-			auth_req_id: t.String(),
-			expires_in: t.Number(),
-			interval: t.Optional(t.Number())
-		},
-		{ additionalProperties: true }
-	),
-	t.Void()
-]);
+// CIBA backchannel authentication response (CIBA Core §7.3) — returned as a plain object.
+export const BackchannelAuthenticationResponse = t.Object(
+	{
+		auth_req_id: t.String(),
+		expires_in: t.Number(),
+		interval: t.Optional(t.Number())
+	},
+	{ additionalProperties: true }
+);
 
 // Authorization / end-session deliver via redirect (302) or auto-submitting HTML form / logout
 // confirmation page. Handlers return `Response` objects, so this is type-level only (bypassed).
@@ -125,9 +121,16 @@ export const RedirectOrHtmlResponse = t.Union([
 	t.Void()
 ]);
 
-// UserInfo — claims object (runtime-validated); signed/encrypted variant returns a `Response`.
+// UserInfo — the claims object, or the signed/encrypted JWT as a string (OIDC Core §5.3.2). The
+// members that locate distributed and aggregated claims (§5.6.2) are declared.
 export const UserinfoResponse = t.Union([
-	t.Object({}, { additionalProperties: true }),
+	t.Object(
+		{
+			_claim_names: t.Optional(t.Record(t.String(), t.String())),
+			_claim_sources: t.Optional(t.Record(t.String(), t.Unknown()))
+		},
+		{ additionalProperties: true }
+	),
 	t.String()
 ]);
 
@@ -150,8 +153,96 @@ export const RegistrationResponse = t.Object(
 	{ additionalProperties: true }
 );
 
-// Discovery metadata is a large dynamic object assembled from enabled features (runtime-validated).
-export const DiscoveryResponse = t.Object({}, { additionalProperties: true });
+/*
+ * The discovery document (OIDC Discovery 1.0 §3, RFC 8414 §2): every member the server computes, plus
+ * the ones an operator may add (DiscoveryExtensions). All are optional because a disabled feature
+ * removes its members; any other member an operator configures is passed through as given.
+ */
+export const DiscoveryResponse = t.Object(
+	{
+		issuer: t.Optional(t.String()),
+		authorization_endpoint: t.Optional(t.String()),
+		token_endpoint: t.Optional(t.String()),
+		jwks_uri: t.Optional(t.String()),
+		userinfo_endpoint: t.Optional(t.String()),
+		registration_endpoint: t.Optional(t.String()),
+		device_authorization_endpoint: t.Optional(t.String()),
+		end_session_endpoint: t.Optional(t.String()),
+		revocation_endpoint: t.Optional(t.String()),
+		introspection_endpoint: t.Optional(t.String()),
+		pushed_authorization_request_endpoint: t.Optional(t.String()),
+		backchannel_authentication_endpoint: t.Optional(t.String()),
+		op_policy_uri: t.Optional(t.String()),
+		op_tos_uri: t.Optional(t.String()),
+		service_documentation: t.Optional(t.String()),
+		scopes_supported: t.Optional(t.Array(t.String())),
+		claims_supported: t.Optional(t.Array(t.String())),
+		grant_types_supported: t.Optional(t.Array(t.String())),
+		token_endpoint_auth_methods_supported: t.Optional(t.Array(t.String())),
+		acr_values_supported: t.Optional(t.Array(t.String())),
+		response_types_supported: t.Optional(t.Array(t.String())),
+		response_modes_supported: t.Optional(t.Array(t.String())),
+		subject_types_supported: t.Optional(t.Array(t.String())),
+		code_challenge_methods_supported: t.Optional(t.Array(t.String())),
+		id_token_signing_alg_values_supported: t.Optional(t.Array(t.String())),
+		token_endpoint_auth_signing_alg_values_supported: t.Optional(
+			t.Array(t.String())
+		),
+		dpop_signing_alg_values_supported: t.Optional(t.Array(t.String())),
+		id_token_encryption_alg_values_supported: t.Optional(t.Array(t.String())),
+		id_token_encryption_enc_values_supported: t.Optional(t.Array(t.String())),
+		request_object_signing_alg_values_supported: t.Optional(
+			t.Array(t.String())
+		),
+		request_object_encryption_alg_values_supported: t.Optional(
+			t.Array(t.String())
+		),
+		request_object_encryption_enc_values_supported: t.Optional(
+			t.Array(t.String())
+		),
+		userinfo_signing_alg_values_supported: t.Optional(t.Array(t.String())),
+		userinfo_encryption_alg_values_supported: t.Optional(t.Array(t.String())),
+		userinfo_encryption_enc_values_supported: t.Optional(t.Array(t.String())),
+		authorization_signing_alg_values_supported: t.Optional(t.Array(t.String())),
+		authorization_encryption_alg_values_supported: t.Optional(
+			t.Array(t.String())
+		),
+		authorization_encryption_enc_values_supported: t.Optional(
+			t.Array(t.String())
+		),
+		introspection_signing_alg_values_supported: t.Optional(t.Array(t.String())),
+		introspection_encryption_alg_values_supported: t.Optional(
+			t.Array(t.String())
+		),
+		introspection_encryption_enc_values_supported: t.Optional(
+			t.Array(t.String())
+		),
+		backchannel_token_delivery_modes_supported: t.Optional(t.Array(t.String())),
+		backchannel_authentication_request_signing_alg_values_supported: t.Optional(
+			t.Array(t.String())
+		),
+		authorization_details_types_supported: t.Optional(t.Array(t.String())),
+		claim_types_supported: t.Optional(t.Array(t.String())),
+		claims_locales_supported: t.Optional(t.Array(t.String())),
+		display_values_supported: t.Optional(t.Array(t.String())),
+		ui_locales_supported: t.Optional(t.Array(t.String())),
+		authorization_response_iss_parameter_supported: t.Optional(t.Boolean()),
+		client_id_metadata_document_supported: t.Optional(t.Boolean()),
+		request_uri_parameter_supported: t.Optional(t.Boolean()),
+		claims_parameter_supported: t.Optional(t.Boolean()),
+		require_pushed_authorization_requests: t.Optional(t.Boolean()),
+		request_parameter_supported: t.Optional(t.Boolean()),
+		require_signed_request_object: t.Optional(t.Boolean()),
+		backchannel_logout_supported: t.Optional(t.Boolean()),
+		backchannel_logout_session_supported: t.Optional(t.Boolean()),
+		tls_client_certificate_bound_access_tokens: t.Optional(t.Boolean()),
+		backchannel_user_code_parameter_supported: t.Optional(t.Boolean())
+	},
+	{ additionalProperties: true }
+);
+// Indexable by any member name, as the pruning in lib/actions/discovery.ts reads and deletes them.
+export type DiscoveryDocument = Static<typeof DiscoveryResponse> &
+	Record<string, unknown>;
 
 // Health probe — current literal body `{ status: 'OK', timestamp }`.
 /*

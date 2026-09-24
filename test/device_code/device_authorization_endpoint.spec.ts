@@ -8,12 +8,8 @@ import { eventBus } from 'lib/event_bus.js';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
-const form = { 'content-type': 'application/x-www-form-urlencoded' };
-
-function post(body, headers = {}) {
-	return formAgent.device.auth.post(body, {
-		headers: { ...form, ...headers }
-	});
+function post(body: Parameters<typeof formAgent.device.auth.post>[0]) {
+	return formAgent.device.auth.post(body);
 }
 
 /**
@@ -72,6 +68,7 @@ describe('device_authorization_endpoint', () => {
 		it('refuses a request naming the registration parameter', async () => {
 			const { error } = await post({
 				client_id: 'client',
+				// @ts-expect-error registration is declared only to be refused
 				registration: 'some'
 			});
 			if (!error) throw new Error('expected error response');
@@ -106,7 +103,7 @@ describe('device_authorization_endpoint', () => {
 		const { status, data } = await post({
 			client_id: 'client',
 			scope: 'openid',
-			claims: JSON.stringify({ userinfo: { email: null } })
+			claims: { userinfo: { email: null } }
 		});
 		if (!data) throw new Error('expected response data');
 
@@ -136,7 +133,9 @@ describe('device_authorization_endpoint', () => {
 		expect(typeof dc.payload.params).toBe('object');
 		expect(dc.payload.params).toHaveProperty('client_id', 'client');
 		expect(dc.payload.params).toHaveProperty('scope', 'openid');
-		expect(dc.payload.params.claims).toEqual({ userinfo: { email: null } });
+		expect(dc.payload.params).toHaveProperty('claims', {
+			userinfo: { email: null }
+		});
 		expect(dc.payload.params).not.toHaveProperty('redirect_uri');
 		expect(dc.payload.params).not.toHaveProperty('response_type');
 		expect(dc.payload.params).not.toHaveProperty('state');
@@ -163,14 +162,15 @@ describe('device_authorization_endpoint', () => {
 		const { status, data } = await formAgent.device.auth.post(
 			{},
 			{
-				headers: {
-					...form,
-					...AuthorizationRequest.basicAuthHeader('client-basic-auth', 'secret')
-				}
+				headers: AuthorizationRequest.basicAuthHeader(
+					'client-basic-auth',
+					'secret'
+				)
 			}
 		);
 
 		expect(status).toBe(200);
+		if (!data) throw new Error('expected response data');
 		expect(Object.keys(data).sort()).toEqual(
 			[
 				'device_code',

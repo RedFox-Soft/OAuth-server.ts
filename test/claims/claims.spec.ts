@@ -63,7 +63,8 @@ expire.setDate(expire.getDate() + 1);
 
 			const token = await auth.getToken(code);
 			expect(token.response.status).toBe(200);
-			return token.data;
+			if (!token.data?.id_token) throw new Error('expected an ID Token');
+			return { ...token.data, id_token: token.data.id_token };
 		}
 
 		beforeAll(async function () {
@@ -512,7 +513,7 @@ expire.setDate(expire.getDate() + 1);
 						}
 					});
 
-					const cookie = setup.login();
+					const cookie = await setup.login();
 					const { response } = await authRequest(auth, { cookie });
 					expect(response.status).toBe(303);
 					auth.validatePresence(response, [

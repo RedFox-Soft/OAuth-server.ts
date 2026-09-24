@@ -3,7 +3,8 @@ import '../../lib/index.ts';
 import {
 	ApplicationConfig,
 	configuration,
-	reloadConfiguration
+	reloadConfiguration,
+	type ClaimsSetting
 } from 'lib/configs/application.js';
 
 // Claims and acrValues are server settings, read from ApplicationConfig at initialisation.
@@ -24,7 +25,7 @@ describe('custom claims', () => {
 		reloadConfiguration();
 	});
 
-	function initWithClaims(claims: Record<string, unknown>) {
+	function initWithClaims(claims: ClaimsSetting) {
 		ApplicationConfig.claims = { ...original.claims, ...claims };
 		reloadConfiguration();
 	}
@@ -55,7 +56,8 @@ describe('custom claims', () => {
 			}
 		});
 
-		expect(configuration.scopes).toContain('insurance', 'payment');
+		expect(configuration.scopes).toContain('insurance');
+		expect(configuration.scopes).toContain('payment');
 	});
 
 	/*

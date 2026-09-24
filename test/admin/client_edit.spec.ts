@@ -33,6 +33,13 @@ import { Claims } from 'lib/helpers/claims.ts';
 import { Client } from 'lib/models/client.js';
 import { buildRecognizedMetadata } from 'lib/models/client/schema.ts';
 
+// The stored record of a client the case seeded; fails the case when there is none.
+async function storedClient(clientId: string) {
+	const record = await adapter('Client').find(clientId);
+	if (!record) throw new Error(`expected a stored client ${clientId}`);
+	return record;
+}
+
 const RP = 'https://rp.example.com';
 const SECTOR = 'https://sector.example.com';
 const SECTOR_PATH = '/sector.json';
@@ -199,11 +206,11 @@ describe('editing a client through the console', () => {
 			const clientId = record.clientId as string;
 			serveSectorDocument([`${RP}/cb`, `${RP}/jwks`]);
 			seedClient(record as { clientId: string });
-			const before = await adapter('Client').find(clientId);
+			const before = await storedClient(clientId);
 
 			await updateClient(clientId, { clientName: 'Renamed' });
 
-			const after = await adapter('Client').find(clientId);
+			const after = await storedClient(clientId);
 			expect(after.client_name).toBe('Renamed');
 			for (const [name, value] of Object.entries(before)) {
 				if (name === 'client_name') continue;
@@ -249,7 +256,7 @@ describe('editing a client through the console', () => {
 		});
 
 		expect(view.redirectUris).toEqual([`${RP}/two`]);
-		const stored = await adapter('Client').find('edit-private-key');
+		const stored = await storedClient('edit-private-key');
 		expect(stored.jwks_uri).toBe(`${RP}/jwks`);
 	});
 
@@ -348,7 +355,7 @@ describe('editing a client after a capability is switched off', () => {
 
 		await updateClient('edit-capability-off', { clientName: 'Renamed' });
 
-		const stored = await adapter('Client').find('edit-capability-off');
+		const stored = await storedClient('edit-capability-off');
 		expect(stored.backchannel_logout_uri).toBeUndefined();
 		expect(stored.backchannel_logout_session_required).toBeUndefined();
 		expect(stored.default_max_age).toBe(900);

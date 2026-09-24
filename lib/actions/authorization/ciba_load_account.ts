@@ -60,5 +60,5 @@ export default async function cibaLoadAccount(
 	}
 	oidc.entity('Account', account);
 
-	await verifyUserCode(oidc, account, value);
+	await verifyUserCode(oidc, account, oidc.params.user_code);
 }

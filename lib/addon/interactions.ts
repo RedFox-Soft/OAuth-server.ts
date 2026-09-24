@@ -2,6 +2,7 @@ import { base } from '../helpers/interaction_policy/index.ts';
 import { resolve } from './registry.js';
 import type { OIDCContext } from '../helpers/oidc_context.ts';
 import type { PipelineParams } from '../consts/param_list.ts';
+import type { CheckPartial } from '../helpers/interaction_policy/prompt.ts';
 
 // What the device authorization endpoint records about the device that started the flow.
 export function deviceInfo(oidc: OIDCContext) {
@@ -14,7 +15,7 @@ export function deviceInfo(oidc: OIDCContext) {
 export interface PolicyPrompt {
 	name: string;
 	requestable?: boolean;
-	checks: Array<{ reason: string; check: unknown }>;
+	checks: CheckPartial[];
 	executeChecks(oidc: OIDCContext<PipelineParams>): Promise<{
 		name: string;
 		details: Record<string, unknown>;

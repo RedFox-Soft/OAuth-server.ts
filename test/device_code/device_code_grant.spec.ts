@@ -1,5 +1,13 @@
-import { describe, it, beforeAll, afterEach, expect, mock } from 'bun:test';
-import * as base64url from 'lib/helpers/base64url.js';
+import {
+	describe,
+	it,
+	beforeAll,
+	afterEach,
+	expect,
+	mock,
+	type Mock
+} from 'bun:test';
+import { decode } from 'lib/helpers/jwt.js';
 
 import bootstrap, {
 	agent,
@@ -16,7 +24,13 @@ import { TestAdapter } from 'test/models.js';
 import { ttl } from 'lib/configs/liveTime.js';
 import { type BaseToken } from 'lib/models/base_token.ts';
 
-function errorDetail(spy) {
+// The claims of an ID Token the response must carry.
+function claimsOf(idToken: string | undefined) {
+	if (!idToken) throw new Error('expected an ID Token');
+	return decode(idToken).payload;
+}
+
+function errorDetail(spy: Mock<(error: { error_detail?: string }) => void>) {
 	return spy.mock.calls[0][0].error_detail;
 }
 
@@ -73,9 +87,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code w/ conformIdTo
 			'scope',
 			'refresh_token'
 		].forEach((prop) => expect(data).toHaveProperty(prop));
-		expect(
-			JSON.parse(base64url.decode(data.id_token.split('.')[1]))
-		).toHaveProperty('given_name');
+		expect(claimsOf(data.id_token)).toHaveProperty('given_name');
 	});
 });
 
@@ -123,9 +135,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 			'scope',
 			'refresh_token'
 		].forEach((prop) => expect(data).toHaveProperty(prop));
-		expect(
-			JSON.parse(base64url.decode(data.id_token.split('.')[1]))
-		).not.toHaveProperty('given_name');
+		expect(claimsOf(data.id_token)).not.toHaveProperty('given_name');
 	});
 
 	describe('validates', () => {
@@ -217,7 +227,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 		});
 
 		describe('expired', () => {
-			let prev;
+			let prev: typeof ttl.DeviceCode;
 			beforeAll(() => {
 				prev = ttl.DeviceCode;
 				ttl.DeviceCode = () => 0;

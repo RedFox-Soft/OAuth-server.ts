@@ -188,13 +188,10 @@ async function userInfo({ headers, body, set, request, params }) {
 		token.mask = claims;
 		token.rejected = rejected;
 
-		const body = await token.issue('userinfo', {
+		// The JWT itself, which is the string branch UserinfoResponse declares for this answer.
+		set.headers['content-type'] = 'application/jwt; charset=utf-8';
+		return await token.issue('userinfo', {
 			expiresAt: accessToken.payload.exp
-		});
-		return new Response(body, {
-			headers: {
-				'Content-Type': 'application/jwt; charset=utf-8'
-			}
 		});
 	} else {
 		const mask = new Claims(

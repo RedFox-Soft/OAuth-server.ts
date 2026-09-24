@@ -674,6 +674,7 @@ describe('resume after consent', async () => {
 			const session = await setup.login();
 			const auth = new AuthorizationRequest({
 				scope: 'openid',
+				// @ts-expect-error a deployment's own parameter, read by the check in interaction.config
 				triggerCustomFail: 'foo'
 			});
 
@@ -815,6 +816,7 @@ describe('resume after consent', async () => {
 		it('an authorization whose prompt checks are unsatisfied is refused', async function () {
 			const session = await setup.login();
 			const auth = new AuthorizationRequest({
+				// @ts-expect-error a deployment's own parameter, read by the prompt in interaction.config
 				triggerUnrequestable: 'foo',
 				response_mode: 'query',
 				scope: 'openid'
@@ -866,6 +868,7 @@ describe('resume after consent', async () => {
 		it('does not leak an in-place mutation of a prompt check into the next test', () => {
 			addons.reset();
 			const login = interactionPolicy().get('login');
+			if (!login) throw new Error('the base policy has a login prompt');
 			login.checks.push({
 				reason: 'leak_probe',
 				description: 'leak probe',
@@ -877,11 +880,9 @@ describe('resume after consent', async () => {
 
 		it('sees unmutated checks again, proving the policy reset ran', () => {
 			addons.reset();
-			expect(
-				interactionPolicy()
-					.get('login')
-					.checks.some((c) => c.reason === 'leak_probe')
-			).toBe(false);
+			const login = interactionPolicy().get('login');
+			if (!login) throw new Error('the base policy has a login prompt');
+			expect(login.checks.some((c) => c.reason === 'leak_probe')).toBe(false);
 		});
 
 		it('accepts a prompt added after provider initialisation as a supported value', () => {

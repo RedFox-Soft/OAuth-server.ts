@@ -2,6 +2,7 @@ import { generateKeyPair, generateSecret, exportJWK } from 'jose';
 import { describe, it, expect } from 'bun:test';
 
 import * as JWT from '../../lib/helpers/jwt.ts';
+import * as base64url from '../../lib/helpers/base64url.ts';
 import epochTime from '../../lib/helpers/epoch_time.ts';
 import KeyStore from '../../lib/helpers/keystore.ts';
 
@@ -12,6 +13,7 @@ import KeyStore from '../../lib/helpers/keystore.ts';
 describe('JSON Web Token (JWT) RFC7519 implementation', () => {
 	describe('.decode()', () => {
 		it('a value that is not a token is refused rather than partially decoded', () => {
+			// @ts-expect-error what is refused here is a value that is not a string
 			expect(() => JWT.decode({})).toThrow(TypeError);
 		});
 
@@ -20,32 +22,21 @@ describe('JSON Web Token (JWT) RFC7519 implementation', () => {
 		});
 	});
 
-	it('does not verify none', () =>
-		JWT.sign({ data: true }, null, 'none')
-			.then((jwt) => JWT.verify(jwt))
-			.then(
-				(valid) => {
-					expect(valid).not.toBeTruthy();
-				},
-				(err) => {
-					expect(err).toBeTruthy();
-				}
-			));
-
-	it('does not verify none with a key', async () => {
+	/*
+	 * Built by hand: nothing here will sign with alg=none, so a token signed through `sign` never
+	 * reached `verify` and the refusal it proved was the signer's. An unsecured JWT (RFC 7519 §6) is a
+	 * header and payload with an empty signature.
+	 */
+	it('refuses an unsecured token even where a key is configured', async () => {
 		const keyobject = await generateSecret('HS256', { extractable: true });
 		const jwk = await exportJWK(keyobject);
+		const unsecured = [{ alg: 'none' }, { data: true }]
+			.map((part) => base64url.encode(JSON.stringify(part)))
+			.join('.');
 
-		return JWT.sign({ data: true }, null, 'none')
-			.then((jwt) => JWT.verify(jwt, new KeyStore([jwk])))
-			.then(
-				(valid) => {
-					expect(valid).not.toBeTruthy();
-				},
-				(err) => {
-					expect(err).toBeTruthy();
-				}
-			);
+		await expect(
+			JWT.verify(`${unsecured}.`, new KeyStore([jwk]))
+		).rejects.toThrow();
 	});
 
 	it('signs and validates with oct', async () => {
@@ -133,11 +124,9 @@ describe('JSON Web Token (JWT) RFC7519 implementation', () => {
 				{ expiresIn: 60 }
 			)
 				.then((jwt) => JWT.decode(jwt))
-				.then((decoded) => {
-					expect(decoded.payload).toHaveProperty(
-						'exp',
-						decoded.payload.iat + 60
-					);
+				.then(({ payload: { iat, exp } }) => {
+					if (iat === undefined) throw new Error('expected an iat claim');
+					expect(exp).toBe(iat + 60);
 				}));
 
 		it('a signed token carries the audience it was issued for', async () =>
@@ -245,10 +234,7 @@ describe('JSON Web Token (JWT) RFC7519 implementation', () => {
 			return JWT.sign(
 				{ data: true, iat: epochTime() + 3600 },
 				keyobject,
-				'HS256',
-				{
-					noTimestamp: true
-				}
+				'HS256'
 			)
 				.then((jwt) => JWT.verify(jwt, new KeyStore([jwk])))
 				.then(
@@ -269,10 +255,7 @@ describe('JSON Web Token (JWT) RFC7519 implementation', () => {
 			return JWT.sign(
 				{ data: true, iat: epochTime() + 5 },
 				keyobject,
-				'HS256',
-				{
-					noTimestamp: true
-				}
+				'HS256'
 			).then((jwt) =>
 				JWT.verify(jwt, new KeyStore([jwk]), {
 					clockTolerance: 10
@@ -283,9 +266,7 @@ describe('JSON Web Token (JWT) RFC7519 implementation', () => {
 		it('a token issued in the future is refused', async () => {
 			const keyobject = await generateSecret('HS256', { extractable: true });
 			const jwk = await exportJWK(keyobject);
-			return JWT.sign({ data: true, iat: 'not an iat' }, keyobject, 'HS256', {
-				noTimestamp: true
-			})
+			return JWT.sign({ data: true, iat: 'not an iat' }, keyobject, 'HS256')
 				.then((jwt) => JWT.verify(jwt, new KeyStore([jwk])))
 				.then(
 					(valid) => {

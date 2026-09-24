@@ -23,7 +23,9 @@ const check: CheckPartial = {
 	}
 };
 
-policy.get('login').checks.push(check);
+const login = policy.get('login');
+if (!login) throw new Error('the base policy has a login prompt');
+login.checks.push(check);
 
 class CustomPrompt extends Prompt {
 	name = 'custom';

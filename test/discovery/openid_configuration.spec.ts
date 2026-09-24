@@ -57,6 +57,7 @@ describe('/.well-known/openid-configuration', () => {
 			// restore the original descriptor afterwards.
 			const config = ApplicationConfig;
 			const original = Object.getOwnPropertyDescriptor(config, 'discovery');
+			if (!original) throw new Error('discovery is an own setting');
 			Object.defineProperty(config, 'discovery', {
 				configurable: true,
 				get() {
@@ -75,11 +76,7 @@ describe('/.well-known/openid-configuration', () => {
 				});
 				expect(spy).toHaveBeenCalledTimes(1);
 			} finally {
-				if (original) {
-					Object.defineProperty(config, 'discovery', original);
-				} else {
-					delete config.discovery;
-				}
+				Object.defineProperty(config, 'discovery', original);
 			}
 		});
 	});

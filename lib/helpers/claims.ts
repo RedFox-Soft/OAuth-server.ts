@@ -42,7 +42,7 @@ export class Claims {
 		});
 	}
 
-	async result() {
+	async result(): Promise<ClaimsData> {
 		const { available } = this;
 		const { claimsSupported } = configuration;
 		const include = Object.entries(this.filter)
@@ -52,7 +52,7 @@ export class Claims {
 			)
 			.map(([key, value]) => key);
 
-		const claims = pick(available, ...include);
+		const claims: ClaimsData = pick(available, ...include);
 
 		if (available._claim_names && available._claim_sources) {
 			const names = pick(available._claim_names, ...include);

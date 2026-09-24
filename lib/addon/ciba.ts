@@ -1,6 +1,6 @@
 import { shouldChange, mustChange } from './_warn.ts';
 import * as errors from '../helpers/errors.ts';
-import type { OIDCContext } from '../helpers/oidc_context.ts';
+import type { Account, OIDCContext } from '../helpers/oidc_context.ts';
 
 export async function processLoginHintToken(
 	_oidc: OIDCContext,
@@ -30,11 +30,11 @@ export async function processLoginHint(
 
 export async function verifyUserCode(
 	_oidc: OIDCContext,
-	_account: unknown,
+	_account: Account,
 	_userCode: string | undefined
 ): Promise<void> {
 	// @param oidc - the request context (OIDCContext)
-	// @param account -
+	// @param account - the account object retrieved by findAccount
 	// @param userCode - string value of the user_code parameter, when not provided it is undefined
 	mustChange(
 		'features.ciba.verifyUserCode',

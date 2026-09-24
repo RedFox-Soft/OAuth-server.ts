@@ -1,7 +1,10 @@
-import * as url from 'node:url';
 import { describe, it, beforeAll, expect, mock } from 'bun:test';
 
-import bootstrap, { agent, type Setup } from '../test_helper.js';
+import bootstrap, {
+	agent,
+	redirectParameter,
+	type Setup
+} from '../test_helper.js';
 import { decode } from '../../lib/helpers/jwt.ts';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { ISSUER } from 'lib/configs/env.js';
@@ -51,10 +54,7 @@ describe('configuration features.jwtResponseModes', () => {
 			expect(status).toBe(303);
 			auth.validatePresence(response, ['response']);
 			auth.validateClientLocation(response);
-			const location = response.headers.get('location');
-			const {
-				query: { response: jwt }
-			} = url.parse(location, true);
+			const jwt = redirectParameter(response, 'response');
 			const { payload } = decode(jwt);
 			expect(payload).toHaveProperty('code');
 			expect(payload.exp).toBeNumber();
@@ -81,10 +81,7 @@ describe('configuration features.jwtResponseModes', () => {
 			expect(status).toBe(303);
 			auth.validatePresence(response, ['response']);
 			auth.validateClientLocation(response);
-			const location = response.headers.get('location');
-			const {
-				query: { response: jwt }
-			} = url.parse(location, true);
+			const jwt = redirectParameter(response, 'response');
 			const { payload } = decode(jwt);
 			expect(payload).toContainAllKeys(['exp', 'aud', 'state', 'iss']);
 		});
@@ -202,10 +199,7 @@ describe('configuration features.jwtResponseModes', () => {
 			expect(status).toBe(303);
 			auth.validatePresence(response, ['response']);
 			auth.validateClientLocation(response);
-			const location = response.headers.get('location');
-			const {
-				query: { response: jwt }
-			} = url.parse(location, true);
+			const jwt = redirectParameter(response, 'response');
 			const { payload } = decode(jwt);
 			expect(payload).toHaveProperty('code');
 			expect(payload.exp).toBeNumber();
@@ -232,10 +226,7 @@ describe('configuration features.jwtResponseModes', () => {
 			expect(status).toBe(303);
 			auth.validatePresence(response, ['response']);
 			auth.validateClientLocation(response);
-			const location = response.headers.get('location');
-			const {
-				query: { response: jwt }
-			} = url.parse(location, true);
+			const jwt = redirectParameter(response, 'response');
 			const { payload } = decode(jwt);
 			expect(payload).toContainAllKeys(['exp', 'aud', 'state', 'iss']);
 		});
