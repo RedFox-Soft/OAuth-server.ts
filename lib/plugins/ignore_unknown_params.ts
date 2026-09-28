@@ -53,7 +53,7 @@ export function ignoreUnknownIn(
  * extensible: a client may send what a newer profile defines, and an older server must still answer.
  *
  * Runs at the `transform` stage, before validation, and is scoped to the routes of the instance that
- * mounts it — the same shape as coerceArrayParams and parseJsonParams, which it runs alongside.
+ * mounts it — the same shape as coerceArrayParams, which it runs alongside.
  *
  * Elysia's own `normalize: true` does something adjacent, and is not what this wants. Two measured
  * differences, not preferences. It cleans *headers* against the route's header schema, and this

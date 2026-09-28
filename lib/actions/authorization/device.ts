@@ -47,10 +47,7 @@ import {
 	authParams,
 	type authParamsType
 } from 'lib/plugins/auth.js';
-import {
-	coerceArrayParams,
-	parseJsonParams
-} from 'lib/plugins/coerce_array_params.js';
+import { coerceArrayParams } from 'lib/plugins/coerce_array_params.js';
 import { ignoreUnknownParams } from 'lib/plugins/ignore_unknown_params.js';
 import { corsClientBased, formClientId } from 'lib/plugins/cors.js';
 import {
@@ -130,7 +127,6 @@ export const deviceAuth = new Elysia()
 	.use(corsClientBased(formClientId))
 	.use(ignoreUnknownParams(DeviceAuthorizationBody))
 	.use(coerceArrayParams('resource'))
-	.use(parseJsonParams('authorization_details'))
 	.guard({
 		body: DeviceAuthorizationBody,
 		headers: authHeaders
@@ -182,7 +178,6 @@ export const deviceAuth = new Elysia()
 export const backchannelAuth = new Elysia()
 	.use(ignoreUnknownParams(BackchannelAuthenticationBody))
 	.use(coerceArrayParams('resource'))
-	.use(parseJsonParams('authorization_details'))
 	.guard({
 		// request_uri and registration are accepted by the schema so the handler can reject them
 		// with the OIDC-specified `<param>_not_supported` errors rather than a generic 422.

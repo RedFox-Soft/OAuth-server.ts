@@ -6,7 +6,7 @@ aliases: [plugins, onRequest, lifecycle hooks, lib/plugins]
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-01
-updated: 2026-09-24
+updated: 2026-09-28
 graph:
   node_id: subsystem:elysia-lifecycle
   node_type: subsystem
@@ -83,10 +83,11 @@ the server emits: handler returns, raw `Response`s, error-pipeline output, named
 sub-apps, and static files. Being pre-routing also makes it immune to the registration-order
 constraint above.
 
-`coerce_array_params`, `parseJsonParams` and `ignore_unknown_params` use `onTransform` for one shared
-reason: it is the only stage where the body is parsed and validation has not run. `onRequest`
+`coerce_array_params` and `ignore_unknown_params` use `onTransform` for one shared
+reason: it is the only stage where the body is parsed and validation has not run (a third,
+`parseJsonParams`, was removed on 2026-09-28 when `authorization_details` became `t.ArrayString`). `onRequest`
 precedes parsing, so a plugin there sees a URL and no body; `onBeforeHandle` follows validation,
-which has already answered. The three are not interchangeable with the framework's `normalize`
+which has already answered. The two are not interchangeable with the framework's `normalize`
 option, which does adjacent work at the wrong scope — it cleans headers as well as body and query,
 stripping a certificate header no route schema can name, such as the `x-ssl-client-cert` a
 deployment's `getCertificate` override may read. See

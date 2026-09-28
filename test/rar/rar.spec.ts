@@ -17,8 +17,10 @@ import bootstrap, {
 	formAgent,
 	changeClient,
 	getHeader,
-	locationParameter
+	locationParameter,
+	encodeParams
 } from '../test_helper.js';
+import { elysia } from '../../lib/index.ts';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { eventBus } from 'lib/event_bus.js';
 import { addons } from 'lib/addon/registry.js';
@@ -75,8 +77,8 @@ const payment = (extra: Record<string, unknown> = {}) => ({
 	...extra
 });
 
-const details = (...entries: Record<string, unknown>[]) =>
-	JSON.stringify(entries);
+// The details as a client means them; `authorize()` and `formAgent` put them on the wire as JSON.
+const details = (...entries: Record<string, unknown>[]) => entries;
 
 const RESOURCES = {
 	'urn:rar:default': 'api:read api:write',
@@ -102,10 +104,7 @@ describe('features.richAuthorizationRequests', () => {
 
 	// Drives an authorization request to the consent interaction; every consent-facing case starts here.
 	async function toConsent(auth: AuthorizationRequest, jar: Jar) {
-		const { response } = await agent.auth.get({
-			query: auth.params,
-			headers: { cookie: header(jar) }
-		});
+		const response = await auth.authorize({ headers: { cookie: header(jar) } });
 		expect(response.status).toBe(303);
 		const location = getHeader(response, 'location');
 		expect(location).toContain('/ui/');
@@ -166,6 +165,31 @@ describe('features.richAuthorizationRequests', () => {
 		});
 
 		/*
+		 * RFC 9396 §3 sends the details as one parameter holding the JSON array, and RFC 6749 §3.1 forbids
+		 * sending any parameter twice. The endpoint used to allow the repeat, which is how one member per
+		 * repeated key — the typed client's encoding of an array — got through as a request.
+		 */
+		it('refuses authorization_details sent more than once', async () => {
+			const auth = new AuthorizationRequest({ scope: 'openid' });
+			const query = encodeParams(auth.params);
+			query.append('authorization_details', JSON.stringify([payment()]));
+			query.append('authorization_details', JSON.stringify([payment()]));
+
+			const response = await elysia.handle(
+				new Request(`${ISSUER}/auth?${query}`, {
+					headers: { cookie: header(cookie) }
+				})
+			);
+
+			expect(response.status).toBe(303);
+			const location = new URL(getHeader(response, 'location'));
+			expect(location.searchParams.get('error')).toBe('invalid_request');
+			expect(location.searchParams.get('error_description')).toContain(
+				'authorization_details'
+			);
+		});
+
+		/*
 		 * The declared member shape in lib/consts/param_list.ts decides whether the detail's own fields
 		 * exist by the time any of our code runs: t.Object({}) strips every one of them, so `type`
 		 * arrives undefined and validation rejects the request for a reason that has nothing to do with
@@ -178,8 +202,7 @@ describe('features.richAuthorizationRequests', () => {
 				authorization_details: details(payment())
 			});
 
-			const { response } = await agent.auth.get({
-				query: auth.params,
+			const response = await auth.authorize({
 				headers: { cookie: header(cookie) }
 			});
 
@@ -238,8 +261,7 @@ describe('features.richAuthorizationRequests', () => {
 				scope: 'openid',
 				authorization_details: details(payment())
 			});
-			const { response } = await agent.auth.get({
-				query: repeat.params,
+			const response = await repeat.authorize({
 				headers: { cookie: header(approved.jar) }
 			});
 
@@ -423,8 +445,7 @@ describe('features.richAuthorizationRequests', () => {
 				authorization_details: details(payment())
 			});
 
-			const { response } = await agent.auth.get({
-				query: auth.params,
+			const response = await auth.authorize({
 				headers: { cookie: header(cookie) }
 			});
 
@@ -503,14 +524,16 @@ describe('features.richAuthorizationRequests', () => {
 			);
 		});
 
-		async function refusal(authorization_details: string, clientId = 'client') {
+		async function refusal(
+			authorization_details: Record<string, unknown>[],
+			clientId = 'client'
+		) {
 			const auth = new AuthorizationRequest({
 				client_id: clientId,
 				scope: 'openid',
 				authorization_details
 			});
-			const { response } = await agent.auth.get({
-				query: auth.params,
+			const response = await auth.authorize({
 				headers: { cookie: header(cookie) }
 			});
 			expect(response.status).toBe(303);
@@ -521,7 +544,7 @@ describe('features.richAuthorizationRequests', () => {
 			};
 		}
 
-		const cases: Array<[string, string]> = [
+		const cases: Array<[string, Record<string, unknown>[]]> = [
 			[
 				'an unregistered type',
 				details({ type: 'https://scheme.example/nope' })
@@ -555,8 +578,7 @@ describe('features.richAuthorizationRequests', () => {
 				scope: 'openid',
 				authorization_details: details({ type: OPEN_TYPE, whatever: 'fine' })
 			});
-			const { response } = await agent.auth.get({
-				query: auth.params,
+			const response = await auth.authorize({
 				headers: { cookie: header(cookie) }
 			});
 			expect(response.headers.get('location')).toContain('/ui/');
@@ -568,6 +590,7 @@ describe('features.richAuthorizationRequests', () => {
 		 * that no longer runs for this input.
 		 */
 		it('refuses a value that does not parse as an array with invalid_request', async () => {
+			// @ts-expect-error what is refused is a value that is not JSON at all, as sent
 			const { error } = await refusal('not json at all');
 			expect(error).toBe('invalid_request');
 		});
@@ -578,8 +601,7 @@ describe('features.richAuthorizationRequests', () => {
 				response_type: 'none',
 				authorization_details: details(payment())
 			});
-			const { response } = await agent.auth.get({
-				query: auth.params,
+			const response = await auth.authorize({
 				headers: { cookie: header(cookie) }
 			});
 			const location = new URL(getHeader(response, 'location'));
@@ -775,8 +797,7 @@ describe('features.richAuthorizationRequests', () => {
 					scope: 'openid',
 					authorization_details: details(payment())
 				});
-				const { response } = await agent.auth.get({
-					query: auth.params,
+				const response = await auth.authorize({
 					headers: { cookie: header(jar) }
 				});
 				const location = getHeader(response, 'location');
@@ -855,8 +876,7 @@ describe('features.richAuthorizationRequests', () => {
 			});
 			const codeSpy = mock();
 			eventBus.once('authorization_code.saved', codeSpy);
-			const { response } = await agent.auth.get({
-				query: auth.params,
+			const response = await auth.authorize({
 				headers: { cookie: header(cookie) }
 			});
 			expect(response.status).toBe(303);
@@ -879,14 +899,11 @@ describe('features.richAuthorizationRequests', () => {
 			const auth = new AuthorizationRequest({
 				scope: 'openid',
 				resource: ['urn:rar:default'],
-				authorization_details: '[]'
+				authorization_details: []
 			});
 			const codeSpy = mock();
 			eventBus.once('authorization_code.saved', codeSpy);
-			await agent.auth.get({
-				query: auth.params,
-				headers: { cookie: header(cookie) }
-			});
+			await auth.authorize({ headers: { cookie: header(cookie) } });
 			const code = codeSpy.mock.calls[0][0];
 			expect(code.payload).not.toHaveProperty('rar');
 		});

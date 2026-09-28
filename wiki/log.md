@@ -91,3 +91,4 @@ Operations:
 - 2026-09-24 — corrected [[totp-second-factor]]: the broken `Interaction.persist()` is replaced by `persistInteraction`, moved onto the model with its TTL clamp; `resume.ts` uses it too.
 - 2026-09-24 — corrected [[token-payload-access-contract]]: stored `params` are typed by `StoredParams` (a checking-free `t.Unsafe`), not left `t.Unknown()`.
 - 2026-09-28 — corrected [[token-payload-access-contract]] and [[model-graph-import-order]]: a model's schema is now `static schema`, enforced by `BaseModel.fromStored` on every read from storage (a refused record is not found); construction checks the base members by name.
+- 2026-09-28 — corrected [[rich-authorization-requests]] and [[elysia-lifecycle]]: `authorization_details` is `t.ArrayString` (RFC 9396 §3 wire form), `parseJsonParams` removed, a repeat refused; tests send it via `AuthorizationRequest.authorize()`.

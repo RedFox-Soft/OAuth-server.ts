@@ -108,14 +108,16 @@ export const AuthorizationParameters = t.Object({
 	),
 	resource: t.Optional(t.Array(t.String())),
 	/*
-	 * The declared member shape is a runtime coercion contract, not just documentation: Elysia parses
-	 * a JSON query value against it before any of our code runs. `t.Object({})` strips every member
-	 * field, so `type` and the common fields arrive gone; `t.Array(t.Unknown())` splits the raw JSON
-	 * string on its commas. Only an object that admits additional properties survives — measured, see
-	 * specs/015-rar-end-to-end/research.md B3.
+	 * RFC 9396 §3: one parameter whose value is the serialized JSON array, in a query and in a form
+	 * body alike — `ArrayString` is that wire form, decoded to the array during validation. Inside a
+	 * request object (§2) it is a JSON array already, which the same schema accepts as it is.
+	 *
+	 * The member shape is a runtime contract, not just documentation: `t.Object({})` would strip every
+	 * member field, so `type` and the common fields would arrive gone. Only an object that admits
+	 * additional properties survives — measured, see specs/015-rar-end-to-end/research.md B3.
 	 */
 	authorization_details: t.Optional(
-		t.Array(t.Object({}, { additionalProperties: true }))
+		t.ArrayString(t.Object({}, { additionalProperties: true }))
 	),
 	dpop_jkt: t.Optional(t.String())
 });

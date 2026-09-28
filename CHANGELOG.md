@@ -54,6 +54,9 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Changed
 
+- authorization_details: declared in its RFC 9396 §3 wire form (`t.ArrayString`: one parameter, the
+  JSON array as text) at `/auth`, PAR, device and CIBA, and a repeat is refused as RFC 6749 §3.1
+  requires. A repeated parameter used to be accepted as one detail per copy.
 - models: a stored record becomes a model only if it satisfies that model's schema, now a static
   `schema` on the class; one that does not (a malformed or foreign record) is treated as not found.
   Until now nothing checked a model's own schema, on construction or on read.

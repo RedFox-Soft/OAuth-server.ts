@@ -113,32 +113,42 @@ const jwt = (token: string) =>
 export const agent = treaty(elysia);
 
 /*
+ * Parameters as an OAuth client puts them on the wire, in a query and a form body alike: an array of
+ * strings as repeated members (`resource`, RFC 8707 §2), an object or an array of objects as one member
+ * holding its JSON text (`claims`, OIDC Core §5.5; `authorization_details`, RFC 9396 §3), anything
+ * else as its string. Eden cannot do this for a query — it always repeats an array's members — which
+ * is why an authorization request carrying details is sent with `AuthorizationRequest.authorize()`.
+ */
+export function encodeParams(params: Record<string, unknown>): URLSearchParams {
+	const encoded = new URLSearchParams();
+	for (const [key, value] of Object.entries(params)) {
+		if (value === undefined) continue;
+		if (
+			isPlainObject(value) ||
+			(Array.isArray(value) && value.some((item) => isPlainObject(item)))
+		) {
+			encoded.append(key, JSON.stringify(value));
+		} else if (Array.isArray(value)) {
+			value.forEach((item) => encoded.append(key, String(item)));
+		} else {
+			encoded.append(key, String(value));
+		}
+	}
+	return encoded;
+}
+
+/*
  * The typed client again, sending its body as application/x-www-form-urlencoded — how an OAuth client
  * sends one (RFC 6749 §4.1.3, RFC 9126 §2.1) — where `agent` sends JSON. Eden has no form body of its
- * own, so the JSON it built is re-encoded before the request leaves: an array as repeated members, and
- * an object, or an array of objects such as authorization_details, as its JSON text, the same rule Eden
- * applies to a multipart body.
+ * own, so the JSON it built is re-encoded by `encodeParams` before the request leaves.
  */
 export const formAgent = treaty(elysia, {
 	onRequest(_path, init) {
 		if (typeof init.body !== 'string') return;
 		const params: unknown = JSON.parse(init.body);
 		if (!isPlainObject(params)) return;
-		const form = new URLSearchParams();
-		for (const [key, value] of Object.entries(params)) {
-			if (
-				isPlainObject(value) ||
-				(Array.isArray(value) && value.some((item) => isPlainObject(item)))
-			) {
-				form.append(key, JSON.stringify(value));
-			} else if (Array.isArray(value)) {
-				value.forEach((item) => form.append(key, String(item)));
-			} else {
-				form.append(key, String(value));
-			}
-		}
 		return {
-			body: form.toString(),
+			body: encodeParams(params).toString(),
 			headers: { 'content-type': 'application/x-www-form-urlencoded' }
 		};
 	}

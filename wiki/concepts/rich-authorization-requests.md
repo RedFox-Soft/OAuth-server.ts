@@ -4,7 +4,7 @@ title: "Rich Authorization Requests and its conformance boundary"
 tags: [oauth, config, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-07-31
-updated: 2026-07-31
+updated: 2026-09-28
 graph:
   node_type: concept
   relationships:
@@ -59,9 +59,21 @@ code runs**:
 | `t.Array(t.Unknown())` | the raw string split on its commas |
 
 Form-encoded bodies do not coerce at all: a JSON string arrives as **one object per character**, status
-200, no error. Since PAR is form-encoded, that corrupted every pushed rich request until
-`parseJsonParams` (`lib/plugins/coerce_array_params.ts`) was mounted on the form routes. It is the
-sibling of `coerceArrayParams`, which exists for the same class of quirk.
+200, no error. Since PAR is form-encoded, that corrupted every pushed rich request until a
+`parseJsonParams` plugin parsed the string before validation.
+
+Since 2026-09-28 the parameter is declared `t.ArrayString(t.Object({}, { additionalProperties: true }))`
+and the plugin is gone. That is RFC 9396 §3's wire form — **one** parameter holding the serialized JSON
+array, in a query and a form body alike — decoded to the array during validation; a request object (§2),
+which carries a real JSON array, passes the same schema as it is. The repeat is refused too:
+`noQueryDup` allows only `resource` (RFC 8707 §2), where it used to allow `authorization_details` —
+RFC 6749 §3.1 forbids sending a parameter twice.
+
+The declared type is the decoded array, so the typed Eden client asks for an array and, in a query,
+sends it the only way Eden can: one member per repeated key — one detail as a bare object, several as a
+repeat, both refused. Tests therefore send an authorization request with details through
+`AuthorizationRequest.authorize()`, which encodes by the same rule as `formAgent` (`encodeParams` in
+`test/test_helper.ts`).
 
 `checkRar` accepts the parameter as a JSON string *or* an already-parsed array, then **normalizes** it to
 an array on `oidc.params`, so no consumer downstream re-parses it or needs to know which path a request

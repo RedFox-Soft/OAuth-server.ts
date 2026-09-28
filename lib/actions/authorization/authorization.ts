@@ -36,10 +36,7 @@ import {
 } from '../../consts/param_list.ts';
 import sessionHandler from '../../shared/session.ts';
 import { noQueryDup } from 'lib/plugins/noQueryDup.js';
-import {
-	coerceArrayParams,
-	parseJsonParams
-} from 'lib/plugins/coerce_array_params.js';
+import { coerceArrayParams } from 'lib/plugins/coerce_array_params.js';
 import { ignoreUnknownParams } from 'lib/plugins/ignore_unknown_params.js';
 import { featureVerification } from './featureVerification.js';
 import { authorizationPKCE } from 'lib/helpers/pkce.js';
@@ -241,7 +238,8 @@ async function authorizationActionHandler(oidc: OIDCContext<PipelineParams>) {
 
 export const authGet = new Elysia()
 	.use(ignoreUnknownParams(AuthorizationParameters))
-	.derive(noQueryDup(['resource', 'authorization_details']))
+	// RFC 8707 §2 lets `resource` repeat; nothing else may (RFC 6749 §3.1), authorization_details included.
+	.derive(noQueryDup(['resource']))
 	.guard({
 		query: AuthorizationParameters,
 		cookie: AuthorizationCookies
@@ -283,7 +281,6 @@ export const authGet = new Elysia()
 export const authPost = new Elysia()
 	.use(ignoreUnknownParams(AuthorizationParameters))
 	.use(coerceArrayParams('resource'))
-	.use(parseJsonParams('authorization_details'))
 	.guard({
 		body: AuthorizationParameters,
 		cookie: AuthorizationCookies
@@ -326,7 +323,6 @@ export const authPost = new Elysia()
 export const par = new Elysia()
 	.use(corsClientBased(formClientId))
 	.use(ignoreUnknownParams(pushedAuthorizationParameters))
-	.use(parseJsonParams('authorization_details'))
 	.use(AuthPlugin)
 	.guard({
 		body: pushedAuthorizationParameters,

@@ -4,7 +4,8 @@ import { parse } from 'node:url';
 import querystring from 'node:querystring';
 
 import { TestAdapter } from './models.js';
-import { agent } from './test_helper.js';
+import { agent, encodeParams } from './test_helper.js';
+import { elysia } from '../lib/index.ts';
 import { type AuthorizationParameters } from '../lib/consts/param_list.js';
 import { type Static } from 'elysia';
 import { type ClientSchemaType } from 'lib/configs/clientSchema.js';
@@ -76,6 +77,17 @@ export class AuthorizationRequest {
 				'base64url'
 			);
 		}
+	}
+
+	/*
+	 * GET /auth with the parameters encoded as a client sends them (`encodeParams`). Through Eden a
+	 * query repeats an array's members, so one authorization detail would arrive as a bare object and
+	 * several as a repeated parameter — neither is RFC 9396 §3, and the endpoint refuses both.
+	 */
+	authorize({ headers = {} }: { headers?: Record<string, string> } = {}) {
+		return elysia.handle(
+			new Request(`${ISSUER}/auth?${encodeParams(this.params)}`, { headers })
+		);
 	}
 
 	private get registered() {
