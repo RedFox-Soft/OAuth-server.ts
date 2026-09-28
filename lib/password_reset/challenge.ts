@@ -1,6 +1,14 @@
 import crypto from 'crypto';
 
-import { adapter, getUserStore, getBucketStore } from '../adapters/index.js';
+import {
+	checkedAdapter,
+	getUserStore,
+	getBucketStore
+} from '../adapters/index.js';
+import {
+	PasswordResetChallengePayload,
+	PasswordResetThrottlePayload
+} from './types.js';
 import type { User, UserBucket } from '../adapters/types.js';
 import { ADMIN_BUCKET_ID } from '../admin/consts.js';
 import { ISSUER } from '../configs/env.js';
@@ -20,14 +28,16 @@ import {
 	REQUEST_DAILY_CAP,
 	REQUEST_WINDOW_SECONDS
 } from './consts.js';
-import type { PasswordResetChallengePayload } from './types.js';
 
 function challenges() {
-	return adapter('PasswordResetChallenge');
+	return checkedAdapter(
+		'PasswordResetChallenge',
+		PasswordResetChallengePayload
+	);
 }
 
 function throttles() {
-	return adapter('PasswordResetThrottle');
+	return checkedAdapter('PasswordResetThrottle', PasswordResetThrottlePayload);
 }
 
 /* Every email-scoped record shares this shape so one computed id serves the deletion cascade (D9). */

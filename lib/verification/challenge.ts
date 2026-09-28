@@ -1,5 +1,13 @@
 import crypto from 'crypto';
-import { adapter, getUserStore, getBucketStore } from '../adapters/index.js';
+import {
+	checkedAdapter,
+	getUserStore,
+	getBucketStore
+} from '../adapters/index.js';
+import {
+	VerificationChallengePayload,
+	VerificationResendPayload
+} from './types.js';
 import type {
 	User,
 	UserBucket,
@@ -22,16 +30,13 @@ import {
 	RESEND_DAILY_CAP,
 	RESEND_WINDOW_SECONDS
 } from './consts.js';
-import type { VerificationResendPayload } from './types.js';
-
-type ResendRecord = VerificationResendPayload & { challengeId?: string };
 
 function challenges() {
-	return adapter('VerificationChallenge');
+	return checkedAdapter('VerificationChallenge', VerificationChallengePayload);
 }
 
 function resends() {
-	return adapter('VerificationResend');
+	return checkedAdapter('VerificationResend', VerificationResendPayload);
 }
 
 export function resendKey(bucketId: string, email: string): string {
@@ -79,7 +84,7 @@ export async function issueAndSend(
 	const method = bucket.verificationMethod;
 	const key = resendKey(bucket._id, user.email);
 
-	const prior = (await resends().find(key)) as ResendRecord | undefined;
+	const prior = await resends().find(key);
 	if (prior?.challengeId) {
 		await challenges().destroy(prior.challengeId);
 	}
@@ -192,8 +197,7 @@ export async function resend(ref: string): Promise<ResendOutcome> {
 	if (!challenge) return { ok: true, sent: false };
 
 	const { bucketId, accountId, email } = challenge;
-	const prior = (await resends().find(resendKey(bucketId, email))) as
-		ResendRecord | undefined;
+	const prior = await resends().find(resendKey(bucketId, email));
 	const refusal = rateRefusal(prior, epochTime(), RESEND_BOUNDS);
 	if (refusal) {
 		return { ok: false, reason: refusal };

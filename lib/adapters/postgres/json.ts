@@ -1,3 +1,5 @@
+import { isRecord } from '../../helpers/_/object.js';
+
 /*
  * Reading a `jsonb` column.
  *
@@ -16,14 +18,18 @@
  *
  * So a string is an error here, not an input to repair.
  */
+function stringified(column: string): Error {
+	return new Error(
+		`the '${column}' column holds a jsonb string rather than an object, which means it was ` +
+			'written with a pre-stringified value — pass the object itself, not JSON.stringify(...)'
+	);
+}
+
 function decoded<T>(value: unknown, column: string): T | undefined {
 	if (value === undefined || value === null) return undefined;
 
 	if (typeof value === 'string') {
-		throw new Error(
-			`the '${column}' column holds a jsonb string rather than an object, which means it was ` +
-				'written with a pre-stringified value — pass the object itself, not JSON.stringify(...)'
-		);
+		throw stringified(column);
 	}
 
 	return value as T;
@@ -35,9 +41,21 @@ export function docOf<T>(row: unknown): T | undefined {
 	return decoded<T>((row as { doc?: unknown } | undefined)?.doc, 'doc');
 }
 
-export function payloadOf<T>(row: unknown): T | undefined {
-	return decoded<T>(
-		(row as { payload?: unknown } | undefined)?.payload,
-		'payload'
-	);
+/*
+ * A model area's record: an object, and nothing more is established here — which model's payload it is,
+ * is the model's to check (BaseModel.fromStored). A record that is not an object is as much a broken
+ * write as a stringified one, and is as loud.
+ */
+export function payloadOf(row: unknown): Record<string, unknown> | undefined {
+	const value = isRecord(row) ? row.payload : undefined;
+	if (value === undefined || value === null) return undefined;
+	if (typeof value === 'string') {
+		throw stringified('payload');
+	}
+	if (!isRecord(value)) {
+		throw new Error(
+			`the 'payload' column holds a jsonb ${Array.isArray(value) ? 'array' : typeof value} rather than an object`
+		);
+	}
+	return value;
 }

@@ -1,9 +1,9 @@
-import { adapter, getUserStore } from '../adapters/index.js';
+import { checkedAdapter, getUserStore } from '../adapters/index.js';
 import epochTime from '../helpers/epoch_time.js';
 import { decodeBase32 } from './base32.js';
 import { verifyAt } from './code.js';
 import { ACCOUNT_FAILURE_CAP, ACCOUNT_WINDOW_SECONDS } from './consts.js';
-import type { TotpAttemptPayload } from './types.js';
+import { TotpAttemptPayload } from './types.js';
 
 /*
  * Verification against a standing enrolment, with both things that make a six-digit secret survivable:
@@ -20,7 +20,7 @@ import type { TotpAttemptPayload } from './types.js';
  */
 
 function attempts() {
-	return adapter('TotpAttempt');
+	return checkedAdapter('TotpAttempt', TotpAttemptPayload);
 }
 
 /* Addressed, never scanned for — the account cascade destroys it by computed id. */
@@ -50,7 +50,7 @@ export async function verifyForAccount(
 
 	const now = epochTime();
 	const key = attemptKey(bucketId, accountId);
-	const prior = (await attempts().find(key)) as TotpAttemptPayload | undefined;
+	const prior = await attempts().find(key);
 	const windowActive =
 		prior !== undefined && now - prior.windowStart < ACCOUNT_WINDOW_SECONDS;
 

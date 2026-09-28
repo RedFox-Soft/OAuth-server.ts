@@ -36,7 +36,6 @@ import type {
 	JWKSStoreInstance,
 	ModelAdapter,
 	ModelAdapterConstructor,
-	PayloadForModel,
 	ProjectStoreConstructor,
 	ProjectStoreInstance,
 	ProtectedResourceStoreConstructor,
@@ -57,6 +56,8 @@ import type {
 	UserStoreInstance
 } from './types.js';
 import { selectBackend } from './selectBackend.js';
+import type { Static, TObject } from '@sinclair/typebox';
+import { Value } from '@sinclair/typebox/value';
 import { withDeadline } from '../helpers/deadline.js';
 
 let Adapter: ModelAdapterConstructor = MemoryAdapter;
@@ -194,7 +195,7 @@ export const errorOriginSaltStore: SecretStoreInstance = new SecretStoreClass(
 	'errorOriginSalt'
 );
 
-export const cache = new Map();
+export const cache = new Map<string, ModelAdapter<StoredRecord>>();
 
 /*
  * Whether the selected datastore answers.
@@ -241,13 +242,47 @@ async function probe(): Promise<void> {
 	/* Nothing to reach. An in-memory deployment is reachable exactly as long as the process is, which
 	 * is what the liveness endpoint already answers. */
 }
-export function adapter<TModelName extends string>(
-	name: TModelName
-): ModelAdapter<PayloadForModel<TModelName>> {
-	if (!cache.has(name)) {
-		cache.set(name, new Adapter(name));
+type StoredRecord = Record<string, unknown>;
+
+/*
+ * A model area's records as the backend holds them: objects. Which area's payload a record is, is its
+ * reader's to establish — a model class checks it in BaseModel.fromStored, and an area read directly
+ * goes through `checkedAdapter` below. Presenting a record as a typed payload here would be a claim no
+ * backend checks.
+ */
+export function adapter(name: string): ModelAdapter<StoredRecord> {
+	let found = cache.get(name);
+	if (!found) {
+		found = new Adapter(name);
+		cache.set(name, found);
 	}
-	return cache.get(name) as ModelAdapter<PayloadForModel<TModelName>>;
+	return found;
+}
+
+/*
+ * An area read directly rather than through a model class, typed by its own schema and checked by it on
+ * every read: a record the schema refuses is not found, exactly as BaseModel.fromStored treats one.
+ */
+export function checkedAdapter<S extends TObject>(
+	name: string,
+	schema: S
+): ModelAdapter<Static<S>> {
+	const raw = adapter(name);
+	const checked = (record: StoredRecord | undefined): Static<S> | undefined =>
+		record !== undefined && Value.Check(schema, record) ? record : undefined;
+	return {
+		upsert: (id, payload, expiresIn) => raw.upsert(id, payload, expiresIn),
+		find: async (id) => checked(await raw.find(id)),
+		findByUserCode: async (userCode) =>
+			checked(await raw.findByUserCode(userCode)),
+		findByUid: async (uid) => checked(await raw.findByUid(uid)),
+		destroy: (id) => raw.destroy(id),
+		revokeByGrantId: (grantId) => raw.revokeByGrantId(grantId),
+		consume: (id) => raw.consume(id),
+		destroyByOwner: (field, value) => raw.destroyByOwner(field, value),
+		destroyUnusedSince: (markerField, usedField, ageField, before) =>
+			raw.destroyUnusedSince(markerField, usedField, ageField, before)
+	};
 }
 
 export type {

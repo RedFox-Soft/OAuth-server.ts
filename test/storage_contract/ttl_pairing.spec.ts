@@ -47,16 +47,17 @@ const reapedByArea = new Map(
 );
 
 /*
- * The module-local helpers that wrap one area — `function records() { return adapter('FederationState'); }`
- * and its seven siblings. Resolving them is what lets the sweep see `records().upsert(...)` as an
+ * The module-local helpers that wrap one area — `function records() { return adapter('FederationState'); }`,
+ * or the `checkedAdapter('Area', Schema)` form that also checks what it reads — and their siblings. Resolving them is what lets the sweep see `records().upsert(...)` as an
  * upsert against FederationState instead of an unrecognised receiver.
  */
 function helperAreas(source: string): Map<string, string> {
 	const helpers = new Map<string, string>();
 	const pattern =
-		/function\s+([A-Za-z_$][\w$]*)\s*\(\s*\)\s*\{\s*return\s+adapter\(\s*'([^']+)'\s*\)\s*;?\s*\}/g;
+		/function\s+([A-Za-z_$][\w$]*)\s*\(\s*\)\s*\{\s*return\s+(?:adapter\(\s*'([^']+)'\s*\)|checkedAdapter\(\s*'([^']+)'\s*,\s*[A-Za-z_$][\w$]*\s*\))\s*;?\s*\}/g;
 	for (const match of source.matchAll(pattern)) {
-		const [, name, area] = match;
+		const [, name, literal, checked] = match;
+		const area = literal ?? checked;
 		if (name && area) helpers.set(name, area);
 	}
 	return helpers;

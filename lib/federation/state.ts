@@ -1,9 +1,9 @@
 import crypto from 'crypto';
 
-import { adapter } from '../adapters/index.js';
+import { checkedAdapter } from '../adapters/index.js';
 import epochTime from '../helpers/epoch_time.js';
 import { HANDOFF_TTL_SECONDS, STATE_TTL_SECONDS } from './consts.js';
-import type { FederationStatePayload } from './types.js';
+import { FederationStatePayload } from './types.js';
 
 /*
  * The two-stage round-trip record. This module owns both the secrets and their storage, deliberately:
@@ -17,7 +17,7 @@ import type { FederationStatePayload } from './types.js';
  */
 
 function records() {
-	return adapter('FederationState');
+	return checkedAdapter('FederationState', FederationStatePayload);
 }
 
 /* 32 bytes of uniform randomness: the same size the admin console's own outbound flow uses. */

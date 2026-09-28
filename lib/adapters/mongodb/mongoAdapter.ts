@@ -1,21 +1,29 @@
 import { db } from './db.js';
 import type { ModelAdapter } from '../types.js';
-import type { PayloadForModel } from '../modelTypes.js';
+import { isRecord } from '../../helpers/_/object.js';
+
+type StoredRecord = Record<string, unknown>;
+
+/*
+ * A model area's record as the collection holds it: an object under `payload`. Which model's payload it
+ * is, is the model's to check (BaseModel.fromStored), so a document is read as untyped and narrowed.
+ */
+function payloadOf(
+	document: { payload?: unknown } | null
+): StoredRecord | undefined {
+	return isRecord(document?.payload) ? document.payload : undefined;
+}
 
 export class MongoAdapter<
 	TModelName extends string = string
-> implements ModelAdapter<PayloadForModel<TModelName>> {
+> implements ModelAdapter<StoredRecord> {
 	name: TModelName;
 
 	constructor(name: TModelName) {
 		this.name = name;
 	}
 
-	async upsert(
-		_id: string,
-		payload: PayloadForModel<TModelName>,
-		expiresIn: number
-	) {
+	async upsert(_id: string, payload: StoredRecord, expiresIn: number) {
 		let expiresAt!: Date;
 
 		if (expiresIn) {
@@ -35,8 +43,7 @@ export class MongoAdapter<
 			{ projection: { payload: 1 } }
 		);
 
-		if (!result) return;
-		return result.payload;
+		return payloadOf(result);
 	}
 
 	async findByUserCode(userCode: string) {
@@ -45,8 +52,7 @@ export class MongoAdapter<
 			{ projection: { payload: 1 } }
 		);
 
-		if (!result) return;
-		return result.payload;
+		return payloadOf(result);
 	}
 
 	async findByUid(uid: string) {
@@ -55,8 +61,7 @@ export class MongoAdapter<
 			{ projection: { payload: 1 } }
 		);
 
-		if (!result) return;
-		return result.payload;
+		return payloadOf(result);
 	}
 
 	async destroy(_id: string) {
@@ -105,9 +110,6 @@ export class MongoAdapter<
 	}
 
 	coll(name: string = this.name) {
-		return db.collection<{
-			_id: string;
-			payload: PayloadForModel<TModelName>;
-		}>(name);
+		return db.collection<{ _id: string; payload?: unknown }>(name);
 	}
 }

@@ -38,15 +38,17 @@ function libSources(): string[] {
 		.map((entry) => join(LIB, entry));
 }
 
-// Collection names passed to `adapter()` as a literal. Sees only literal arguments by construction;
+// Collection names passed to `adapter()` or `checkedAdapter()` as a literal. Sees only literal arguments by construction;
 // the one dynamic form in the codebase is `adapter(this.name)` on the model classes, which the
 // second half below covers.
 function literalAdapterAreas(): Map<string, string> {
 	const found = new Map<string, string>();
 	for (const file of libSources()) {
 		const source = readFileSync(file, 'utf8');
-		for (const match of source.matchAll(/\badapter\(\s*'([^']+)'\s*\)/g)) {
-			const area = match[1];
+		for (const match of source.matchAll(
+			/\b(?:adapter\(\s*'([^']+)'\s*\)|checkedAdapter\(\s*'([^']+)'\s*,)/g
+		)) {
+			const area = match[1] ?? match[2];
 			if (area !== undefined && !found.has(area)) {
 				found.set(area, file);
 			}

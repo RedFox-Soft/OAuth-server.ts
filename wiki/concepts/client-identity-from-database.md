@@ -4,7 +4,7 @@ title: "Client identity from the database"
 tags: [contract, architecture, oauth]
 sources: [oauth-server-codebase]
 created: 2026-07-31
-updated: 2026-09-23
+updated: 2026-09-28
 graph:
   node_type: concept
 ---
@@ -76,8 +76,9 @@ exported from `lib/models/client.ts`: `redirectUriAllowed(client, uri)`,
   deployment admits is resolved while validation runs. Each such set is a subset of a fixed list —
   `TOKEN_ENDPOINT_AUTH_METHODS` and `CIBA_DELIVERY_MODES` in `lib/consts/client_attributes.ts`, which the
   configuration check itself uses, and the JWA lists — so the client's type names the list while the
-  runtime schema is left as it was. The stored record is typed too: `adapter('Client')` holds a
-  `StoredClient`.
+  runtime schema is left as it was. The stored record is not typed that way: since 2026-09-28
+  `adapter('Client')` answers an object (`Record<string, unknown>`), because no backend can vouch for a
+  record's shape — validation is what makes it a client.
 - **The type describes the object.** `ALWAYS_PRESENT` (`types.ts:15`) lists the attributes defaulted
   whatever is switched on, and `test/dynamic_registration/defaults.spec.ts` holds it to the declaration
   in both directions — on its first run it found `dpop_bound_access_tokens`, which the list had missed.

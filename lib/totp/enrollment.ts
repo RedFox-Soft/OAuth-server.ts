@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 
-import { adapter, getUserStore } from '../adapters/index.js';
+import { checkedAdapter, getUserStore } from '../adapters/index.js';
 import epochTime from '../helpers/epoch_time.js';
 import { decodeBase32, encodeBase32 } from './base32.js';
 import { verifyAt } from './code.js';
@@ -10,7 +10,7 @@ import {
 	SECRET_BYTES,
 	STEP_SECONDS
 } from './consts.js';
-import type { TotpEnrollmentPayload } from './types.js';
+import { TotpEnrollmentPayload } from './types.js';
 
 /*
  * The lifecycle of a secret that has been offered but not yet proved.
@@ -26,7 +26,7 @@ import type { TotpEnrollmentPayload } from './types.js';
  */
 
 function enrollments() {
-	return adapter('TotpEnrollment');
+	return checkedAdapter('TotpEnrollment', TotpEnrollmentPayload);
 }
 
 /*
@@ -75,8 +75,7 @@ export async function offer(
 	bucketId: string,
 	{ email, label }: { email: string; label: string }
 ): Promise<Offer> {
-	const existing = (await enrollments().find(uid)) as
-		TotpEnrollmentPayload | undefined;
+	const existing = await enrollments().find(uid);
 
 	// Compared rather than left to the store: MongoDB's TTL monitor deletes lazily, so an expired
 	// record can still be found for a while — the departure lib/password_reset/challenge.ts makes for
@@ -116,8 +115,7 @@ export async function confirm(
 	uid: string,
 	code: string
 ): Promise<ConfirmOutcome> {
-	const pending = (await enrollments().find(uid)) as
-		TotpEnrollmentPayload | undefined;
+	const pending = await enrollments().find(uid);
 	if (!pending || pending.exp <= epochTime()) {
 		return { ok: false, reason: 'expired' };
 	}

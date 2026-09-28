@@ -1,9 +1,9 @@
-import { adapter } from '../adapters/index.js';
+import { checkedAdapter } from '../adapters/index.js';
 import { ApplicationConfig } from '../configs/application.js';
 import { emailScopedId } from '../helpers/email_scoped_id.js';
 import epochTime from '../helpers/epoch_time.js';
 import { LOGIN_RETENTION_SECONDS, windowFor } from './consts.js';
-import type { LoginThrottlePayload } from './types.js';
+import { LoginThrottlePayload } from './types.js';
 
 /*
  * The password sign-in door's brute-force throttle: failed attempts counted per bucket-and-address
@@ -36,7 +36,7 @@ import type { LoginThrottlePayload } from './types.js';
  */
 
 function counters() {
-	return adapter('LoginThrottle');
+	return checkedAdapter('LoginThrottle', LoginThrottlePayload);
 }
 
 /* Addressed, never scanned for — the account cascade destroys it by computed id. */
@@ -88,8 +88,7 @@ async function held(key: string): Promise<LoginThrottlePayload | undefined> {
 	 * with no model class to validate it, so the read is narrowed the way lib/totp/verify.ts narrows
 	 * TotpAttempt: the type system cannot know that what came back matches what was written.
 	 */
-	const record = (await counters().find(key)) as
-		LoginThrottlePayload | undefined;
+	const record = await counters().find(key);
 	if (!record) return undefined;
 	return record.exp <= epochTime() ? undefined : record;
 }

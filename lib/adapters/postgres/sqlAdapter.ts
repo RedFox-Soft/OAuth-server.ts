@@ -1,7 +1,8 @@
 import { sql } from './db.js';
-import { payloadOf as decodePayload } from './json.js';
+import { payloadOf } from './json.js';
 import type { ModelAdapter } from '../types.js';
-import type { PayloadForModel } from '../modelTypes.js';
+
+type StoredRecord = Record<string, unknown>;
 
 /*
  * The model adapter over PostgreSQL.
@@ -20,7 +21,7 @@ import type { PayloadForModel } from '../modelTypes.js';
  */
 export class SqlAdapter<
 	TModelName extends string = string
-> implements ModelAdapter<PayloadForModel<TModelName>> {
+> implements ModelAdapter<StoredRecord> {
 	name: TModelName;
 
 	constructor(name: TModelName) {
@@ -29,7 +30,7 @@ export class SqlAdapter<
 
 	async upsert(
 		_id: string,
-		payload: PayloadForModel<TModelName>,
+		payload: StoredRecord,
 		expiresIn?: number
 	): Promise<void> {
 		const handle = sql();
@@ -62,33 +63,29 @@ export class SqlAdapter<
 	 * own schedule. Filtering here would make the two adapters disagree about what they return in the
 	 * window between expiry and reaping, which is a divergence dressed as a fix.
 	 */
-	async find(_id: string): Promise<PayloadForModel<TModelName> | undefined> {
+	async find(_id: string): Promise<StoredRecord | undefined> {
 		const handle = sql();
 		const rows = await handle`
 			SELECT payload FROM ${handle(this.name)} WHERE id = ${_id}
 		`;
-		return this.payloadOf(rows[0]);
+		return payloadOf(rows[0]);
 	}
 
-	async findByUserCode(
-		userCode: string
-	): Promise<PayloadForModel<TModelName> | undefined> {
+	async findByUserCode(userCode: string): Promise<StoredRecord | undefined> {
 		const handle = sql();
 		const rows = await handle`
 			SELECT payload FROM ${handle(this.name)}
 			WHERE payload->>'userCode' = ${userCode}
 		`;
-		return this.payloadOf(rows[0]);
+		return payloadOf(rows[0]);
 	}
 
-	async findByUid(
-		uid: string
-	): Promise<PayloadForModel<TModelName> | undefined> {
+	async findByUid(uid: string): Promise<StoredRecord | undefined> {
 		const handle = sql();
 		const rows = await handle`
 			SELECT payload FROM ${handle(this.name)} WHERE payload->>'uid' = ${uid}
 		`;
-		return this.payloadOf(rows[0]);
+		return payloadOf(rows[0]);
 	}
 
 	async destroy(_id: string): Promise<void> {
@@ -157,15 +154,5 @@ export class SqlAdapter<
 			SET payload = jsonb_set(payload, '{consumed}', to_jsonb(${consumedAt}::bigint))
 			WHERE id = ${_id}
 		`;
-	}
-
-	/*
-	 * A jsonb column arrives already decoded, so this claims only that the decoded value is the payload
-	 * the model wrote. No runtime check can establish more: the payload's shape is the model's TypeBox
-	 * schema, which is deliberately not this layer's business — the storage contract's rule is that a
-	 * payload round-trips unchanged, not that the adapter understands it.
-	 */
-	private payloadOf(row: unknown): PayloadForModel<TModelName> | undefined {
-		return decodePayload<PayloadForModel<TModelName>>(row);
 	}
 }
