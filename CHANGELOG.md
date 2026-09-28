@@ -9,6 +9,25 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-28
+
+The server stops taking its own data on trust. Every record read back from storage — a token, a
+session, an account, a bucket — is checked against its schema on the way out, and the request context,
+request parameters and clients are typed from the schemas the endpoints validate against instead of
+asserted. Checking what is actually stored found what the assertions had hidden: on PostgreSQL every
+account update and every group-filtered audit read failed, and a lost race for a bucket hostname
+answered 500; MongoDB stored an undefined member as null; a host-addressed bucket forgot its
+sign-ins; and a client's `default_max_age` of 0 depended on whether a clock second had passed. Error
+codes at the token, device and CIBA endpoints, and several request parameters, now follow their RFCs.
+
+**Upgrading asks two things of an integration.** Extension functions, policy checks, registration
+policies and RAR validators receive the request context itself rather than `{ oidc }`, with no shim;
+and a client reading its registration with the access token in the query string sends it in the
+Authorization header instead. A stored record that does not match its schema now fails its request as
+a server error the error store records, rather than passing as a malformed value — the shapes 0.5.0
+writes are accepted, and no schema migration is declared. Deployments that lengthened a token lifetime
+will see older browser refresh-token chains sign in once more.
+
 ### Fixed
 
 - authorization: a client registered with `default_max_age: 0` is asked to sign in again on every
@@ -97,7 +116,7 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   unaffected.
 - client: the client's type names its closed value sets (authentication method, CIBA delivery mode,
   signing algorithms) from the lists the configuration check uses, is read-only all the way down to
-  match the freeze, and `adapter('Client')` is typed as holding a `StoredClient`.
+  match the freeze.
 - client: the validated client has a type that matches it — the attributes a default always fills are
   required, `client_name`, `contacts`, `default_acr_values` and `client_id_issued_at` are declared — and
   the request context carries it typed (`oidc.client`; see the request-context entry above).
@@ -1114,7 +1133,8 @@ found`. The refusal text existed and never ran: the call that delivered it sat i
 - The DPoP nonce secret is self-provisioned at startup, making the requireNonce-without-secret 500
   state unrepresentable (spec 014)
 
-[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.2.0...v0.3.0
