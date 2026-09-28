@@ -59,6 +59,7 @@ import {
 	type PipelineParams
 } from 'lib/consts/param_list.js';
 import presence from 'lib/helpers/validate_presence.js';
+import constantEquals from 'lib/helpers/constant_equals.js';
 import {
 	AlreadyUsedError,
 	ExpiredError,
@@ -384,10 +385,27 @@ export const ui = new Elysia()
 		response: PageResponses
 	})
 	.resolve(async ({ cookie, params, request }) => {
-		const cookieId = cookie._interaction.value;
 		const interaction = await Interaction.find(params.uid, {
 			error: new SessionNotFound('interaction session not found')
 		});
+
+		/*
+		 * The interaction belongs to the browser it began in.
+		 *
+		 * The uid is in every URL of the flow, so it is not a secret: it reaches access logs, browser
+		 * history and screenshots. The cookie carries a second value, minted beside the uid and never put in
+		 * a URL, and this comparison is the only thing that makes it mean anything — the guard above checks
+		 * that a cookie is present, not what it says. Without it, anyone holding the uid could continue the
+		 * flow from their own browser with a cookie of their choosing: after the end user's correct password
+		 * that meant reading their authenticator secret off the enrolment page, enrolling their own, and
+		 * leaving with a session for the account.
+		 *
+		 * The same refusal as an unknown uid, so the answer does not say whether the uid exists.
+		 */
+		const expected = interaction.payload.cookieID;
+		if (!expected || !constantEquals(cookie._interaction.value, expected)) {
+			throw new SessionNotFound('interaction session not found');
+		}
 
 		/*
 		 * An interaction belongs to the address it began at.

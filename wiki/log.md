@@ -96,3 +96,4 @@ Operations:
 - 2026-09-28 — added [[stored-document-schemas]]; corrected [[postgresql-backend]]: `postgres/dates.ts` is gone, dates are revived by schema in `documentOf`.
 - 2026-09-28 — corrected [[postgresql-backend]]: array parameters need `handle.array` (every account update and group-filtered audit read threw), and Bun's SQLSTATE is in `errno` (unique-violation classification never matched).
 - 2026-09-28 — corrected [[token-payload-access-contract]], [[stored-document-schemas]] and [[mongodb-test-fidelity]]: checkedAdapter throws on a refused record; MongoDB writers store undefined as absent (`ABSENT_UNDEFINED`).
+- 2026-09-28 — added [[interaction-browser-binding]]; corrected [[upstream-federation]]: the `_interaction` cookie value is now compared with the interaction's `cookieID` (missing since `53341c6`), so hop 3 is bound to the browser by value, not by path alone.

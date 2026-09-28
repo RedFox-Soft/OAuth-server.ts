@@ -261,11 +261,13 @@ describe('a flow started at a named bucket address', () => {
 		});
 		await deviceCode.save();
 
+		const cookieID = nanoid();
 		await new Interaction(uid, {
 			deviceCode: deviceCode.jti,
 			session: { accountId: 'bob' },
 			params,
-			result: { login: { accountId: 'bob' } }
+			result: { login: { accountId: 'bob' } },
+			cookieID
 		}).save(30);
 
 		const acmeSession = sessionCookieName({ _id: BUCKET_ID, slug: SLUG });
@@ -273,7 +275,7 @@ describe('a flow started at a named bucket address', () => {
 		const response = await elysia.handle(
 			new Request(`http://localhost/ui/${uid}/device_resume`, {
 				headers: {
-					cookie: `_interaction=${nanoid()}; ${acmeSession}=${sessionId}`
+					cookie: `_interaction=${cookieID}; ${acmeSession}=${sessionId}`
 				}
 			})
 		);

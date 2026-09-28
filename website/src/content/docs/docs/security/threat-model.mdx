@@ -173,7 +173,9 @@ a way the compensating control does not cover is a vulnerability report.
   credentialed CORS path that would bypass it does not exist; a browser that ignores `SameSite` is
   the assumption this rests on.
 - **Cookies are opaque random identifiers and carry no signature.** Forging one means guessing a
-  session id in the store; nothing on the cookie itself is trusted.
+  session id in the store; nothing on the cookie itself is trusted. The interaction cookie carries a
+  value that never appears in a URL and is compared with the one stored for the interaction, so the
+  interaction's address alone does not let another browser continue a sign-in.
 - **Email-verification link tokens are looked up directly rather than hashed at rest.** A reader of
   the database could redeem a pending link within its twenty-four-hour life; the six-digit codes
   are hashed.

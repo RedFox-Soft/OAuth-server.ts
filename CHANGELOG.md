@@ -9,6 +9,15 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+### Security
+
+- **A sign-in can be continued only in the browser that began it.** The sign-in screens checked that an
+  interaction cookie was present but never compared its value, so anyone holding an interaction's
+  address — which appears in every URL of the flow — could continue it from another browser. After the
+  end user's password in a bucket requiring a second factor, that exposed the new authenticator secret
+  and let the other browser enrol its own and leave signed in as the account. Regression since
+  `53341c6`; a foreign cookie is now refused exactly as an unknown address is.
+
 ## [0.6.0] - 2026-09-28
 
 The server stops taking its own data on trust. Every record read back from storage — a token, a

@@ -50,15 +50,17 @@ async function buildResume({
 	const deviceCode = new DeviceCode({ params, clientId: 'client', userCode });
 	await deviceCode.save();
 
+	const cookieID = nanoid();
 	const interaction = new Interaction(uid, {
 		deviceCode: deviceCode.jti,
 		session: { accountId },
 		params,
-		result
+		result,
+		cookieID
 	});
 	await interaction.save(30);
 
-	return `_interaction=${nanoid()}; ${DEFAULT_SESSION_COOKIE}=${sessionId}`;
+	return `_interaction=${cookieID}; ${DEFAULT_SESSION_COOKIE}=${sessionId}`;
 }
 
 // A device code in the state a case needs, where the lookup would otherwise find the one buildResume saved.

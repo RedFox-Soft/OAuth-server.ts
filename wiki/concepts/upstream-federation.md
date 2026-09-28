@@ -4,7 +4,7 @@ title: 'Signing in through somebody else’s identity provider'
 tags: [architecture, contract, gotcha, oidc]
 sources: [oauth-server-codebase]
 created: 2026-08-05
-updated: 2026-08-24
+updated: 2026-09-28
 graph:
   node_type: concept
   relationships:
@@ -44,6 +44,10 @@ are unchanged, because the path argument was always the decisive one.)
 | 3 | `GET /ui/:uid/federation/complete?ref=…` | yes again | back inside the cookie's path |
 
 Hop 2 → 3 being **relative** is what restores the cookie: the redirect lands back under `/ui/${uid}`.
+
+(Corrected 2026-09-28: restoring the cookie only binds hop 3 to the browser because its *value* is
+compared with the interaction's `cookieID`, and until that date it was not — see
+[[interaction-browser-binding]]. Hop 2 being cookieless is safe only on that condition.)
 
 Rejected alternatives, recorded so they are not re-proposed: giving the interaction cookie `path: /` (a
 change to every flow's blast radius to serve one leg), and a per-interaction `redirect_uri` (no provider
