@@ -38,8 +38,6 @@ const eccrt = new X509Certificate(
 	readFileSync('test/jwks/ec.crt', { encoding: 'ascii' })
 );
 
-const route = '/token';
-
 const introspectionAuthSucceeded: { active: false } = {
 	active: false
 };

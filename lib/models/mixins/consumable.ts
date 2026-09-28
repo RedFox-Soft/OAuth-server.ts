@@ -14,10 +14,16 @@ type ConsumdedPayload = BaseModelPayloadType & { consumed?: boolean | number };
 // `typeof BaseModel`. Extending the type parameter preserves the passed class's
 // own static members (e.g. BaseToken.revokeByGrantId), which a fixed parameter
 // type would erase down to BaseModel's statics.
+//
+// The two `any[]` are the language's, not a shortcut: TypeScript accepts a class as a mixin base only
+// when its constructor takes a single rest parameter of exactly `any[]` (TS2545), and `unknown[]` is
+// refused.
 export default function consumable<
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	TBase extends new (...args: any[]) => BaseModel<ConsumdedPayload>
 >(superclass: TBase) {
 	return class extends superclass {
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		constructor(...args: any[]) {
 			const [payload] = args as [ConsumdedPayload];
 			payload.consumed ??= false;

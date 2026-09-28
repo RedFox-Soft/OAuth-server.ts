@@ -18,6 +18,9 @@ import type { SecretStoreInstance } from '../types.js';
 export class SingletonSecretStore implements SecretStoreInstance {
 	private secret: unknown = null;
 
+	// Takes the document name only to share the MongoDB store's signature: adapters/index.ts constructs
+	// whichever class is selected with it, and one process-local value needs no document to live in.
+	// eslint-disable-next-line @typescript-eslint/no-useless-constructor
 	constructor(_documentName: string) {}
 
 	async read(): Promise<unknown> {

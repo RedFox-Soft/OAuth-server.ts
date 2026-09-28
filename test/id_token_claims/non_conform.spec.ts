@@ -10,7 +10,6 @@ import {
 
 import bootstrap, {
 	agent,
-	getHeader,
 	type Setup,
 	changeClient,
 	redirectParameter

@@ -1,19 +1,14 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'bun:test';
 import { Type, type Static, type TSchema } from '@sinclair/typebox';
 
-import bootstrap, { agent, type Setup } from '../test_helper.js';
+import bootstrap, { agent } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { Session } from 'lib/models/session.js';
 import { Grant } from 'lib/models/grant.js';
 import { Client } from 'lib/models/client.js';
-import {
-	adapter,
-	adminSessionStore,
-	getBucketStore,
-	getUserStore
-} from 'lib/adapters/index.ts';
+import { adapter, getBucketStore, getUserStore } from 'lib/adapters/index.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
 	ADMIN_BUCKET_ID,
@@ -37,10 +32,8 @@ import { shaped } from 'test/shape.js';
  * their id or their address, and leaves the same address in another bucket untouched.
  */
 describe('deletion cascade: end-user', () => {
-	let setup: Setup;
-
 	beforeAll(async () => {
-		setup = await bootstrap(import.meta.url);
+		await bootstrap(import.meta.url);
 	});
 
 	beforeEach(async () => {

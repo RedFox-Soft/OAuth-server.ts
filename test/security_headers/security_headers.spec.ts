@@ -19,7 +19,7 @@ import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { routeNames } from 'lib/consts/param_list.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { adminSessionStore, getUserStore } from 'lib/adapters/index.ts';
+import { getUserStore } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 
 import {
@@ -33,6 +33,7 @@ import {
 	expectPageProfile,
 	expectProfileByKind
 } from './profile.js';
+import { present } from 'test/shape.js';
 
 /*
  * Contract of record: specs/026-non-html-security-headers/contracts/response-headers.md.
@@ -571,7 +572,7 @@ describe('security headers: the static surface', () => {
 			method: 'GET',
 			headers: etag
 				? { 'if-none-match': etag }
-				: { 'if-modified-since': lastModified! }
+				: { 'if-modified-since': present(lastModified, 'lastModified') }
 		});
 
 		expectNonPageProfile(res);

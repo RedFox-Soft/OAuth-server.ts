@@ -192,7 +192,9 @@ export async function verify(
 						await keystore.getKeyObject(key, true),
 						{ algorithms: options.algorithm ? [options.algorithm] : undefined }
 					);
-				} catch {}
+				} catch {
+					// Not this token's key; a later one may verify it, and none doing so is refused below.
+				}
 			}
 		}
 
@@ -254,7 +256,9 @@ export async function decrypt(jwe: string, keystore: KeySet) {
 		for (const key of keys) {
 			try {
 				decrypted = await compactDecrypt(jwe, keystore.getKeyObject(key));
-			} catch {}
+			} catch {
+				// Not this token's key; a later one may decrypt it, and none doing so is refused below.
+			}
 		}
 	}
 

@@ -7,7 +7,6 @@ import { federationAdminRoutes } from 'lib/admin/federation/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
 	adminAuditStore,
-	adminSessionStore,
 	getBucketStore,
 	getUserStore,
 	resetAdminMemoryStores

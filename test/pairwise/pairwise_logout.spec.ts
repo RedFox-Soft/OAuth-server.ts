@@ -11,6 +11,7 @@ import {
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { Client } from 'lib/models/client.js';
 import { clientNotifications } from 'lib/shared/client_notifications.ts';
+import { present } from 'test/shape.js';
 
 /*
  * A pairwise client's logout token must name the subject that client already knows — spec 023,
@@ -33,7 +34,7 @@ const ACCOUNT = 'pairwise-logout-account';
 function decodeLogoutToken(value: string) {
 	const match = value.match(/^logout_token=(([\w-]+\.?){3})$/);
 	expect(match).toBeTruthy();
-	const [, payload] = match![1].split('.');
+	const [, payload] = present(match, 'match')[1].split('.');
 	return JSON.parse(base64url.decode(payload));
 }
 

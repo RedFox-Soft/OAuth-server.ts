@@ -368,11 +368,9 @@ expire.setDate(expire.getDate() + 1);
 							}
 						});
 
-						const { response, error } = await agent
-							.ui({ uid: 'resume' })
-							.resume.get({
-								headers: { cookie: [session, cookie].join('; ') }
-							});
+						const { response } = await agent.ui({ uid: 'resume' }).resume.get({
+							headers: { cookie: [session, cookie].join('; ') }
+						});
 						expect(response.status).toBe(303);
 						auth.validatePresence(response, ['code', 'state']);
 						auth.validateState(response);

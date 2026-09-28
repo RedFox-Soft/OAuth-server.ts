@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
 	Alert,
 	Button,
@@ -47,19 +47,18 @@ export function Keys() {
 	const [generating, setGenerating] = useState(false);
 	const [alg, setAlg] = useState('RS256');
 
-	async function load() {
-		setLoading(true);
+	// Every state write follows an await: `loading` starts true, so the mount has nothing to set first.
+	const load = useCallback(async () => {
 		try {
 			const res = await fetch('/admin/api/jwks');
 			if (res.ok) setState((await res.json()) as JwksState);
 		} finally {
 			setLoading(false);
 		}
-	}
-	useEffect(() => {
-		load();
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
+	useEffect(() => {
+		void load();
+	}, [load]);
 
 	async function generate() {
 		setGenerating(true);

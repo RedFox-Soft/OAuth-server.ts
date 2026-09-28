@@ -14,6 +14,7 @@ import {
 	emailsTo,
 	extractInvitationToken
 } from '../mail_capture.ts';
+import { present } from 'test/shape.js';
 
 const app = new Elysia()
 	.use(resolveAdmin)
@@ -85,12 +86,14 @@ describe('group invitations', () => {
 		const account = await getUserStore(ADMIN_BUCKET_ID).findByEmail(invitee);
 		expect(account).not.toBeNull();
 		// Exactly one instance role, and never the super one.
-		expect(account!.roles).toEqual(['project_admin']);
+		expect(present(account, 'account').roles).toEqual(['project_admin']);
 
 		const joined = await getGroupStore().find(group._id);
-		expect(joined!.members.map((m) => m.userId)).toContain(account!._id);
+		expect(present(joined, 'joined').members.map((m) => m.userId)).toContain(
+			present(account, 'account')._id
+		);
 		// Their own scope exists too, so they land somewhere usable on first sign-in.
-		expect(await personalGroupId(account!._id)).toBeString();
+		expect(await personalGroupId(present(account, 'account')._id)).toBeString();
 	});
 
 	it('adds an existing administrator without creating a second account', async () => {
@@ -105,12 +108,14 @@ describe('group invitations', () => {
 		expect(accepted.status).toBe(200);
 
 		const joined = await getGroupStore().find(group._id);
-		expect(joined!.members.map((m) => m.userId)).toContain(existing.userId);
+		expect(present(joined, 'joined').members.map((m) => m.userId)).toContain(
+			existing.userId
+		);
 		// The same account, not a second one wearing the same address.
 		const account = await getUserStore(ADMIN_BUCKET_ID).findByEmail(
 			existing.email
 		);
-		expect(account!._id).toBe(existing.userId);
+		expect(present(account, 'account')._id).toBe(existing.userId);
 	});
 
 	it('accepts once and no more', async () => {

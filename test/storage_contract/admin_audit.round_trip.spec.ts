@@ -9,6 +9,7 @@ import {
 
 import { AdminAuditStore } from 'lib/adapters/memory/adminAuditStore.ts';
 import type { AdminAuditEntry } from 'lib/adapters/types.ts';
+import { present } from 'test/shape.js';
 
 // The admin audit store contract — specs/016-admin-audit-completeness/contracts/audit-store.md.
 // Clause ids below (R-1.., L-1..) are that document's.
@@ -295,7 +296,7 @@ describe('AdminAuditStore (memory)', () => {
 		await store.record(base);
 
 		const first = await store.list();
-		first.entries[0]!.action = 'tampered';
+		present(first.entries[0], 'first.entries[0]').action = 'tampered';
 
 		const second = await store.list();
 		expect(second.entries[0]?.action).toBe('project.update');

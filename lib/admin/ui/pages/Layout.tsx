@@ -84,23 +84,11 @@ export function Layout({ me }: { me: AdminContext | null }) {
 			case 'buckets':
 				return <Buckets isSuperAdmin={isSuperAdmin} />;
 			case 'admins':
-				return isSuperAdmin ? (
-					<Admins />
-				) : (
-					<Projects />
-				);
+				return isSuperAdmin ? <Admins /> : <Projects />;
 			case 'settings':
-				return isSuperAdmin ? (
-					<Settings />
-				) : (
-					<Projects />
-				);
+				return isSuperAdmin ? <Settings /> : <Projects />;
 			case 'keys':
-				return isSuperAdmin ? (
-					<Keys />
-				) : (
-					<Projects />
-				);
+				return isSuperAdmin ? <Keys /> : <Projects />;
 			case 'groups':
 				return (
 					<Groups
@@ -113,17 +101,9 @@ export function Layout({ me }: { me: AdminContext | null }) {
 			case 'audit':
 				return <Audit />;
 			case 'mcp-clients':
-				return isSuperAdmin ? (
-					<McpClients />
-				) : (
-					<Projects />
-				);
+				return isSuperAdmin ? <McpClients /> : <Projects />;
 			case 'errors':
-				return isSuperAdmin ? (
-					<Errors />
-				) : (
-					<Projects />
-				);
+				return isSuperAdmin ? <Errors /> : <Projects />;
 			default:
 				return <Projects />;
 		}

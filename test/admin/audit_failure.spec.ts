@@ -7,7 +7,6 @@ import { bucketRoutes } from 'lib/admin/buckets/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
 	adminAuditStore,
-	adminSessionStore,
 	getUserStore,
 	getProjectStore,
 	getBucketStore

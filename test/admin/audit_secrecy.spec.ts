@@ -11,7 +11,6 @@ import { smtpSettingsRoutes } from 'lib/admin/settings/smtp/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
 	adminAuditStore,
-	adminSessionStore,
 	getUserStore,
 	getProjectStore,
 	getBucketStore
@@ -23,6 +22,7 @@ import {
 } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
 import { answered } from './answered.ts';
+import { present } from 'test/shape.js';
 
 /*
  * No secret value may reach the trail — from any operation, in any field.
@@ -108,7 +108,7 @@ describe('admin audit secrecy', () => {
 		expect(secret).toBeTruthy();
 		expect(trail).not.toContain(secret);
 		expect(created.secret).toBeTruthy();
-		expect(trail).not.toContain(created.secret!);
+		expect(trail).not.toContain(present(created.secret, 'created.secret'));
 	});
 
 	it('records an end-user password reset without the password', async () => {
@@ -132,7 +132,7 @@ describe('admin audit secrecy', () => {
 		// No field names either — the action name already says what happened, so there is nothing for a
 		// field list to add. (The action itself contains the word, hence asserting on the list.)
 		const { entries } = await adminAuditStore.list({ targetId: target._id });
-		expect(entries[0]!.attributes).toEqual([]);
+		expect(present(entries[0], 'entries[0]').attributes).toEqual([]);
 	});
 
 	/*
@@ -167,7 +167,7 @@ describe('admin audit secrecy', () => {
 
 		const trail = await trailFor(project._id);
 		expect(created.secret).toBeTruthy();
-		expect(trail).not.toContain(created.secret!);
+		expect(trail).not.toContain(present(created.secret, 'created.secret'));
 		// Nor the identity of what it destroyed: the entry carries how many, never which.
 		expect(trail).not.toContain(created.clientId);
 	});
@@ -287,7 +287,7 @@ describe('admin audit secrecy', () => {
 
 		const trail = await trailFor(created.clientId);
 		expect(created.secret).toBeTruthy();
-		expect(trail).not.toContain(created.secret!);
+		expect(trail).not.toContain(present(created.secret, 'created.secret'));
 		// Values of any kind stay out, secret or not: the client name was submitted and is not recorded.
 		expect(trail).not.toContain(CLIENT_SECRET_MARKER);
 	});

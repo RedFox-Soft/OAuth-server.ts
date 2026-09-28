@@ -14,6 +14,7 @@ import {
 	extractVerifyUrl
 } from '../mail_capture.ts';
 import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { present } from 'test/shape.js';
 
 const CLIENT_ID = 'verify-link-app';
 const PASSWORD = 'correct horse battery';
@@ -95,15 +96,21 @@ describe('email verification — link method', () => {
 		const user = await getUserStore(bucketId).findByEmail(email);
 		expect(user?.verified).toBe(false);
 		expect(sentEmails.length).toBe(1);
-		const url = extractVerifyUrl(lastEmail()!);
+		const url = extractVerifyUrl(present(lastEmail(), 'lastEmail()'));
 		expect(url).toBeDefined();
 	});
 
 	it('verifies the account when the link is opened, then allows login', async () => {
 		const email = 'link-verify@x.io';
 		await register(email);
-		const url = extractVerifyUrl(lastEmail()!)!;
-		const token = new URL(url).searchParams.get('token')!;
+		const url = present(
+			extractVerifyUrl(present(lastEmail(), 'lastEmail()')),
+			'extractVerifyUrl(lastEmail())'
+		);
+		const token = present(
+			new URL(url).searchParams.get('token'),
+			"new URL(url).searchParams.get('token')"
+		);
 
 		// unverified → login refused
 		const start = await startInteraction();
@@ -127,9 +134,15 @@ describe('email verification — link method', () => {
 
 		const email = 'link-reuse@x.io';
 		await register(email);
-		const token = new URL(extractVerifyUrl(lastEmail()!)!).searchParams.get(
-			'token'
-		)!;
+		const token = present(
+			new URL(
+				present(
+					extractVerifyUrl(present(lastEmail(), 'lastEmail()')),
+					'extractVerifyUrl(lastEmail())'
+				)
+			).searchParams.get('token'),
+			"new URL(extractVerifyUrl(lastEmail())).searchParams.get( 'token' )"
+		);
 		const first = await agent['verify-email'].get({ query: { token } });
 		expect(first.response.status).toBe(200);
 		// second use of the same token is refused (single-use)
@@ -165,7 +178,10 @@ describe('registration gating', () => {
 		});
 		const started = await agent.auth.get({ query: auth.params });
 		const uid = getHeader(started.response, 'location').split('/')[2];
-		const cookie = started.response.headers.get('set-cookie')!;
+		const cookie = present(
+			started.response.headers.get('set-cookie'),
+			"started.response.headers.get('set-cookie')"
+		);
 		const email = 'closed-user@x.io';
 		const res = await agent
 			.ui({ uid })
@@ -200,7 +216,10 @@ describe('registration gating', () => {
 		});
 		const started = await agent.auth.get({ query: auth.params });
 		const uid = getHeader(started.response, 'location').split('/')[2];
-		const cookie = started.response.headers.get('set-cookie')!;
+		const cookie = present(
+			started.response.headers.get('set-cookie'),
+			"started.response.headers.get('set-cookie')"
+		);
 		const email = 'off-user@x.io';
 		const res = await agent
 			.ui({ uid })
@@ -220,7 +239,10 @@ describe('registration gating', () => {
 		});
 		const s2 = await agent.auth.get({ query: auth2.params });
 		const uid2 = getHeader(s2.response, 'location').split('/')[2];
-		const cookie2 = s2.response.headers.get('set-cookie')!;
+		const cookie2 = present(
+			s2.response.headers.get('set-cookie'),
+			"s2.response.headers.get('set-cookie')"
+		);
 		const login = await agent
 			.ui({ uid: uid2 })
 			.login.post(

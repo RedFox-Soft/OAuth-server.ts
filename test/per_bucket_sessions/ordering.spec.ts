@@ -4,7 +4,6 @@ import fc from 'fast-check';
 import bootstrap, {
 	clearSeededBuckets,
 	seedBucket,
-	type Setup,
 	jsonToFormUrlEncoded
 } from '../test_helper.js';
 import { elysia } from 'lib/index.js';
@@ -116,10 +115,8 @@ async function signIn(where: Where, jar: Jar): Promise<void> {
  * with an identity only if its own bucket was signed in to.
  */
 describe('sign-ins and requests interleaved across buckets', () => {
-	let setup: Setup;
-
 	beforeAll(async () => {
-		setup = await bootstrap(import.meta.url, {
+		await bootstrap(import.meta.url, {
 			config: 'per_bucket_sessions'
 		});
 		await seedBucket({

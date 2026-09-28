@@ -12,12 +12,7 @@ import { BackchannelAuthenticationRequest } from 'lib/models/backchannel_authent
 import { RegistrationAccessToken } from 'lib/models/registration_access_token.js';
 import { Grant } from 'lib/models/grant.js';
 import { Client } from 'lib/models/client.js';
-import {
-	adapter,
-	adminSessionStore,
-	getProjectStore,
-	getUserStore
-} from 'lib/adapters/index.ts';
+import { adapter, getProjectStore, getUserStore } from 'lib/adapters/index.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
 	ADMIN_BUCKET_ID,

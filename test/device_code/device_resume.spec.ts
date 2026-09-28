@@ -14,8 +14,7 @@ import bootstrap, {
 	agent,
 	DEFAULT_SESSION_COOKIE,
 	passInteractionChecks,
-	seedAccount,
-	type Setup
+	seedAccount
 } from '../test_helper.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
 import { generate } from '../../lib/helpers/user_codes.ts';
@@ -24,7 +23,6 @@ import { DeviceCode } from 'lib/models/device_code.js';
 import { Interaction } from 'lib/models/interaction.js';
 import { Grant } from 'lib/models/grant.js';
 
-let setup: Setup;
 let uid: string;
 let userCode: string;
 
@@ -82,7 +80,7 @@ function get(cookie: string) {
  */
 describe('device interaction resume /ui/:uid/device_resume', () => {
 	beforeAll(async () => {
-		setup = await bootstrap(import.meta.url);
+		await bootstrap(import.meta.url);
 	});
 
 	beforeEach(() => {
@@ -205,7 +203,7 @@ describe('device interaction resume /ui/:uid/device_resume', () => {
 					accountId
 				});
 
-				const { error, status, data } = await get(cookie);
+				const { error, data } = await get(cookie);
 				const body = data ?? error?.value;
 				expect(body).toContain('id="op.deviceInputForm"');
 				expect(body).toContain(

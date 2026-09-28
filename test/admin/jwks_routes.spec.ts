@@ -4,7 +4,6 @@ import { treaty } from '@elysiajs/eden';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { jwksRoutes } from 'lib/admin/jwks/routes.ts';
 import {
-	adminSessionStore,
 	adminAuditStore,
 	getUserStore,
 	jwksStore
@@ -15,6 +14,7 @@ import { generateJWKS } from 'lib/helpers/jwks.ts';
 import { calculateKid } from 'lib/configs/verifyJWKs.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
+import { present } from 'test/shape.js';
 
 const app = new Elysia().use(resolveAdmin).use(jwksRoutes);
 const client = treaty(app);
@@ -211,14 +211,16 @@ describe('admin JWKS API — generate (US2)', () => {
 		// Hot-applied into the running provider: live at once, no restart required.
 		expect(created?.status).toBe('active');
 		expect(body.restartRequired).toBe(false);
-		expect(body.changedKeys).not.toContain(created!.kid);
+		expect(body.changedKeys).not.toContain(present(created, 'created').kid);
 		assertNoPrivateMaterial(body.keys);
 		// Served live at /jwks (present in the running published set).
-		expect(publicJWKS.keys.some((k) => k.kid === created!.kid)).toBe(true);
+		expect(
+			publicJWKS.keys.some((k) => k.kid === present(created, 'created').kid)
+		).toBe(true);
 
 		const { entries: audit } = await adminAuditStore.list({
 			targetType: 'jwks',
-			targetId: created!.kid
+			targetId: present(created, 'created').kid
 		});
 		expect(audit.length).toBe(1);
 		expect(audit[0].action).toBe('jwks.generate');

@@ -6,7 +6,6 @@ import { adminUserRoutes } from 'lib/admin/users/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
 	adminAuditStore,
-	adminSessionStore,
 	getBucketStore,
 	getUserStore
 } from 'lib/adapters/index.ts';

@@ -37,7 +37,7 @@ import { present } from 'test/shape.js';
 function decodeLogoutToken(value: string) {
 	const match = value.match(/^logout_token=(([\w-]+\.?){3})$/);
 	expect(match).toBeTruthy();
-	const [header, payload] = match![1].split('.');
+	const [header, payload] = present(match, 'match')[1].split('.');
 	return {
 		header: JSON.parse(base64url.decode(header)),
 		payload: JSON.parse(base64url.decode(payload))

@@ -735,7 +735,6 @@ describe('jwt format', () => {
 					enc: 'A128GCM',
 					key: crypto.randomBytes(16)
 				};
-				// eslint-disable-next-line @typescript-eslint/no-dynamic-delete
 				delete encrypt[prop];
 				const resourceServer = new ResourceServer(resource, {
 					scope,

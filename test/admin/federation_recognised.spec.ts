@@ -22,6 +22,7 @@ import {
 import { sessionFor } from '../admin_session.ts';
 import { answered } from './answered.ts';
 import type { ProviderGuidance } from 'lib/admin/federation/guidance.ts';
+import { present } from 'test/shape.js';
 
 /*
  * Connecting Microsoft, Apple and GitHub through the administrative surface: what each asks for, and what
@@ -102,9 +103,15 @@ describe('connecting Microsoft, Apple or GitHub', () => {
 				entry?.requiredValues,
 				`${catalogueId} published no required values`
 			).toBeDefined();
-			expect(entry!.requiredValues!.length).toBe(expected);
+			expect(
+				present(present(entry, 'entry').requiredValues, 'entry.requiredValues')
+					.length
+			).toBe(expected);
 			// Every value carries the label the provider itself uses, so nobody is translating.
-			for (const value of entry!.requiredValues!) {
+			for (const value of present(
+				present(entry, 'entry').requiredValues,
+				'entry.requiredValues'
+			)) {
 				expect(value.label.length).toBeGreaterThan(0);
 			}
 		}
@@ -120,7 +127,10 @@ describe('connecting Microsoft, Apple or GitHub', () => {
 
 		const microsoft = guidanceFor(answered(res.data), 'microsoft');
 		expect(microsoft?.choices).toHaveLength(1);
-		const choice = microsoft!.choices![0]!;
+		const choice = present(
+			present(present(microsoft, 'microsoft').choices, 'microsoft.choices')[0],
+			'microsoft.choices[0]'
+		);
 		expect(choice.name).toBe('tenant');
 		expect(choice.options).toHaveLength(2);
 		// Each answer says what it means. The broad one must say so in the administrator's own terms.

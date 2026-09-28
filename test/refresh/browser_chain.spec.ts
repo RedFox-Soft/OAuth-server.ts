@@ -18,7 +18,6 @@ import {
 
 import bootstrap, {
 	agent,
-	getHeader,
 	type Setup,
 	redirectParameter
 } from '../test_helper.js';

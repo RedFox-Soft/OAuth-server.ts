@@ -53,7 +53,7 @@ describe('rate limit configuration', () => {
 	for (const key of NUMERIC_KEYS) {
 		describe(key, () => {
 			for (const [label, value] of REJECTED) {
-				it(`each invalid value is refused with its key named`, () => {
+				it(`refuses ${label}, naming the key`, () => {
 					expect(() => validateConfiguration(withKey(key, value))).toThrow(
 						TypeError
 					);

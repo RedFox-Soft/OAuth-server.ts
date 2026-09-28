@@ -79,7 +79,6 @@ function cleanConsent(context: Consent) {
 	if (context.resources) {
 		for (const [identifier, value] of Object.entries(context.resources)) {
 			if (!value) {
-				// eslint-disable-next-line @typescript-eslint/no-dynamic-delete
 				delete context.resources[identifier];
 			}
 		}

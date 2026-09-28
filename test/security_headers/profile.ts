@@ -1,4 +1,5 @@
 import { expect } from 'bun:test';
+import { present } from 'test/shape.js';
 
 /*
  * The expected profile, restated here rather than imported from lib/plugins/securityHeaders.ts.
@@ -40,7 +41,7 @@ function occurrences(res: Response, name: string): string[] {
 function expectExactlyOnce(res: Response, name: string): string {
 	const found = occurrences(res, name);
 	expect(found.length, `${name} should appear exactly once`).toBe(1);
-	return found[0]!;
+	return present(found[0], 'found[0]');
 }
 
 function expectSharedHeaders(res: Response): void {

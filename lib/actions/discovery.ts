@@ -53,7 +53,6 @@ function gateAndExtend(body: DiscoveryDocument): DiscoveryDocument {
 
 	// Delete collected keys in a separate pass
 	keysToDelete.forEach((key) => {
-		// eslint-disable-next-line @typescript-eslint/no-dynamic-delete
 		delete body[key];
 	});
 
@@ -78,7 +77,6 @@ function oauthAuthorizationServer(bucket?: BucketAddress) {
 	 */
 	for (const [key, { audience }] of Object.entries(metadataClassification)) {
 		if (audience === 'oidc') {
-			// eslint-disable-next-line @typescript-eslint/no-dynamic-delete
 			delete body[key];
 		}
 	}

@@ -7,7 +7,6 @@ import {
 	getUserStore,
 	getProjectStore,
 	getBucketStore,
-	adminSessionStore,
 	adminAuditStore
 } from 'lib/adapters/index.ts';
 import {

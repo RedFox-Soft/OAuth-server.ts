@@ -11,11 +11,18 @@ import { get, provider, seedBucket } from './harness.ts';
 import { AuthorizationRequest } from '../AuthorizationRequest.ts';
 import { agent, getHeader } from '../test_helper.ts';
 import { Type } from '@sinclair/typebox';
-import { shaped } from 'test/shape.ts';
+import { present, shaped } from 'test/shape.ts';
 
-const GOOGLE = KNOWN_PROVIDERS.find((entry) => entry.catalogueId === 'google')!;
+const GOOGLE = present(
+	KNOWN_PROVIDERS.find((entry) => entry.catalogueId === 'google'),
+	"KNOWN_PROVIDERS.find((entry) => entry.catalogueId === 'google')"
+);
 /* Through the entry's rule rather than a literal, so the case follows the catalogue if the value moves. */
-const googleIssuer = () => issuerForKnownProvider(GOOGLE, {})!;
+const googleIssuer = () =>
+	present(
+		issuerForKnownProvider(GOOGLE, {}),
+		'issuerForKnownProvider(GOOGLE, {})'
+	);
 
 const BRANDED = 'brand-google-app';
 const PLAIN = 'brand-plain-app';
@@ -25,10 +32,13 @@ const NONE = 'brand-none-app';
 /* Every recognised provider, so a provider added later is covered without editing a list here. */
 const RECOGNISED = KNOWN_PROVIDERS.map((entry) => ({
 	entry,
-	issuer: issuerForKnownProvider(entry, {
-		/* Only one entry needs it; the rest ignore it. */
-		tenant: '11112222-bbbb-3333-cccc-4444dddd5555'
-	})!
+	issuer: present(
+		issuerForKnownProvider(entry, {
+			/* Only one entry needs it; the rest ignore it. */
+			tenant: '11112222-bbbb-3333-cccc-4444dddd5555'
+		}),
+		"issuerForKnownProvider(entry, { /* Only one entry needs it; the rest ignore it. */ tenant: '11112222-bbbb-3333-cccc-4444dddd5555' })"
+	)
 }));
 
 async function startInteractionFor(clientId: string) {

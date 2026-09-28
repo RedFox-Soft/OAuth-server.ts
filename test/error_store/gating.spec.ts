@@ -7,11 +7,7 @@ import { errorHandler } from 'lib/shared/authorization_error_handler.ts';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { errorRoutes } from 'lib/admin/errors/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	adminSessionStore,
-	errorStore,
-	getUserStore
-} from 'lib/adapters/index.ts';
+import { errorStore, getUserStore } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { flushForTest, resetQueue } from 'lib/error_store/queue.ts';
 import { sessionFor } from '../admin_session.ts';

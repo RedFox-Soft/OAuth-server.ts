@@ -91,7 +91,7 @@ describe('request parameter features', () => {
 		const cookie = await setup.login({
 			claims: { id_token: { email: null } }
 		});
-		let authResp = null;
+		let authResp;
 		if (verb === 'get') {
 			authResp = await agent.auth.get({
 				query: {

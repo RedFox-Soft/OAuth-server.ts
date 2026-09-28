@@ -232,7 +232,7 @@ describe('features.resourceIndicators', () => {
 					scope: 'api:read'
 				});
 
-				let res = await authRequest(auth);
+				const res = await authRequest(auth);
 				expect(res.status).toBe(303);
 				auth.validatePresence(res.response, ['code', 'state']);
 				auth.validateState(res.response);
@@ -296,7 +296,7 @@ describe('features.resourceIndicators', () => {
 					scope: 'openid api:read'
 				});
 
-				let res = await authRequest(auth);
+				const res = await authRequest(auth);
 				expect(res.status).toBe(303);
 				auth.validatePresence(res.response, ['code', 'state']);
 				auth.validateState(res.response);
@@ -358,7 +358,7 @@ describe('features.resourceIndicators', () => {
 					scope: 'openid api:read'
 				});
 
-				let res = await authRequest(auth);
+				const res = await authRequest(auth);
 				expect(res.status).toBe(303);
 				auth.validatePresence(res.response, ['code', 'state']);
 				auth.validateState(res.response);
@@ -459,7 +459,7 @@ describe('features.resourceIndicators', () => {
 			const spy2 = mock();
 			eventBus.once('refresh_token.saved', spy2);
 
-			let res = await agent.token.post({
+			const res = await agent.token.post({
 				client_id: 'client',
 				grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
 				device_code
@@ -525,7 +525,7 @@ describe('features.resourceIndicators', () => {
 			const spy2 = mock();
 			eventBus.once('refresh_token.saved', spy2);
 
-			let res = await agent.token.post({
+			const res = await agent.token.post({
 				client_id: 'client',
 				grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
 				device_code
@@ -593,7 +593,7 @@ describe('features.resourceIndicators', () => {
 			const spy2 = mock();
 			eventBus.once('refresh_token.saved', spy2);
 
-			let res = await agent.token.post({
+			const res = await agent.token.post({
 				client_id: 'client',
 				grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
 				device_code
@@ -659,7 +659,7 @@ describe('features.resourceIndicators', () => {
 			const spy2 = mock();
 			eventBus.once('refresh_token.saved', spy2);
 
-			let res = await agent.token.post({
+			const res = await agent.token.post({
 				client_id: 'client',
 				resource: 'urn:wl:default',
 				grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
@@ -731,7 +731,7 @@ describe('features.resourceIndicators', () => {
 			const spy2 = mock();
 			eventBus.once('refresh_token.saved', spy2);
 
-			let res = await agent.token.post({
+			const res = await agent.token.post({
 				client_id: 'client',
 				grant_type: 'urn:openid:params:grant-type:ciba',
 				auth_req_id,
@@ -789,7 +789,7 @@ describe('features.resourceIndicators', () => {
 			const spy2 = mock();
 			eventBus.once('refresh_token.saved', spy2);
 
-			let res = await agent.token.post({
+			const res = await agent.token.post({
 				client_id: 'client',
 				grant_type: 'urn:openid:params:grant-type:ciba',
 				auth_req_id
@@ -843,7 +843,7 @@ describe('features.resourceIndicators', () => {
 			const spy2 = mock();
 			eventBus.once('refresh_token.saved', spy2);
 
-			let res = await agent.token.post({
+			const res = await agent.token.post({
 				client_id: 'client',
 				grant_type: 'urn:openid:params:grant-type:ciba',
 				auth_req_id

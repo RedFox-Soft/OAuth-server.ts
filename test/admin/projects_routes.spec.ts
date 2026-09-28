@@ -5,7 +5,6 @@ import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { projectRoutes } from 'lib/admin/projects/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
-	adminSessionStore,
 	getUserStore,
 	getProjectStore,
 	getBucketStore

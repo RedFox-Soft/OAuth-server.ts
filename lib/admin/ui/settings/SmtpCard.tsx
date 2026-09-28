@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
 	Button,
 	Card,
@@ -34,18 +34,18 @@ export function SmtpCard() {
 	const [loading, setLoading] = useState(true);
 	const [saving, setSaving] = useState(false);
 
-	async function load() {
-		setLoading(true);
+	// Every state write follows an await: `loading` starts true, so the mount has nothing to set first.
+	const load = useCallback(async () => {
 		try {
 			const res = await fetch('/admin/api/settings/smtp');
 			if (res.ok) form.setFieldsValue((await res.json()) as SmtpView);
 		} finally {
 			setLoading(false);
 		}
-	}
+	}, [form]);
 	useEffect(() => {
-		load();
-	}, []);
+		void load();
+	}, [load]);
 
 	async function save(values: SmtpView) {
 		setSaving(true);

@@ -9,6 +9,7 @@ import {
 	assertNotPersisted,
 	storedPayloadFor
 } from './round_trip.js';
+import { present } from 'test/shape.js';
 
 /**
  * @proves An interaction persists every audited field verbatim and no class instance, and
@@ -87,10 +88,10 @@ describe('storage contract: Interaction', () => {
 		// reload exercises Value.Check on the stored shape
 		const reloaded = await Interaction.find('interaction-1');
 		expect(reloaded).toBeDefined();
-		expect(reloaded!.payload.result).toEqual({
+		expect(present(reloaded, 'reloaded').payload.result).toEqual({
 			login: { accountId: 'account-1', transient: false }
 		});
-		expect(reloaded!.payload.deviceCode).toBe('device-1');
+		expect(present(reloaded, 'reloaded').payload.deviceCode).toBe('device-1');
 	});
 
 	it('persists nothing outside the schema', async () => {
@@ -100,7 +101,10 @@ describe('storage contract: Interaction', () => {
 		});
 		await interaction.save(3600);
 
-		const stored = storedPayloadFor(interaction)!;
+		const stored = present(
+			storedPayloadFor(interaction),
+			'storedPayloadFor(interaction)'
+		);
 		const schemaKeys = Object.keys(interaction.model.properties);
 		for (const key of Object.keys(stored)) {
 			expect(schemaKeys).toContain(key);

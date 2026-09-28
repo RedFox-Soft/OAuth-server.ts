@@ -10,6 +10,7 @@ import {
 import { elysia } from 'lib/index.ts';
 import { sentEmails, resetSentEmails } from '../mail_capture.ts';
 import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { present } from 'test/shape.js';
 
 const PASSWORD = 'correct horse battery';
 
@@ -231,7 +232,7 @@ describe('interaction UI — the post-registration notice (US1)', () => {
 		// The props script must carry the message too — the hydrated tree is built from it.
 		const props = page.text.match(/window\.PROPS=(\{.*?\})<\/script>/)?.[1];
 		expect(props).toBeDefined();
-		expect(JSON.parse(props!).notice).toContain(NOTICE_TEXT);
+		expect(JSON.parse(present(props, 'props')).notice).toContain(NOTICE_TEXT);
 	});
 });
 
@@ -316,7 +317,7 @@ describe('interaction UI — registration refusals (US2)', () => {
 
 		const props = res.text.match(/window\.PROPS=(\{.*?\})<\/script>/)?.[1];
 		expect(props).toBeDefined();
-		const parsed = JSON.parse(props!);
+		const parsed = JSON.parse(present(props, 'props'));
 		expect(parsed.errorMessage).toContain('Passwords do not match');
 		expect(parsed.email).toBe(email);
 		expect(JSON.stringify(parsed)).not.toContain(PASSWORD);

@@ -1,10 +1,6 @@
 import { describe, it, expect, beforeAll } from 'bun:test';
 import bootstrap, { agent } from '../test_helper.ts';
-import {
-	adminSessionStore,
-	getUserStore,
-	resetAdminMemoryStores
-} from 'lib/adapters/index.ts';
+import { getUserStore, resetAdminMemoryStores } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
 import { shaped } from 'test/shape.js';

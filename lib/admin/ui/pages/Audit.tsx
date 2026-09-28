@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
 	Alert,
 	Button,
@@ -91,21 +91,29 @@ export function Audit() {
 	 * Filters are passed in rather than read from state, so a request always uses the values the caller
 	 * meant — resetting and reloading in one action would otherwise send the state it just replaced.
 	 */
-	async function load(active: Filters, atPage: number, size: number) {
+	// Every state write follows an await, so the mount effect calls this without setting
+	// `loading` first; `load` is the reload, which does.
+	const fetchPage = useCallback(
+		async (active: Filters, atPage: number, size: number) => {
+			try {
+				const res = await fetch(
+					`/admin/api/audit?${buildQuery(active, atPage, size)}`
+				);
+				if (res.ok) setPage((await res.json()) as AuditPage);
+			} finally {
+				setLoading(false);
+			}
+		},
+		[]
+	);
+	function load(active: Filters, atPage: number, size: number) {
 		setLoading(true);
-		try {
-			const res = await fetch(
-				`/admin/api/audit?${buildQuery(active, atPage, size)}`
-			);
-			if (res.ok) setPage((await res.json()) as AuditPage);
-		} finally {
-			setLoading(false);
-		}
+		return fetchPage(active, atPage, size);
 	}
 
 	useEffect(() => {
-		load(EMPTY_FILTERS, 1, 50);
-	}, []);
+		void fetchPage(EMPTY_FILTERS, 1, 50);
+	}, [fetchPage]);
 
 	function apply() {
 		setCurrent(1);

@@ -59,7 +59,7 @@ function literalAdapterAreas(): Map<string, string> {
 
 interface DiscoveredClass {
 	readonly name: string;
-	readonly ctor: Function;
+	readonly ctor: unknown;
 	readonly file: string;
 }
 
@@ -89,7 +89,7 @@ async function modelClasses(): Promise<DiscoveredClass[]> {
 }
 
 // Reads the descriptor without invoking the getter, so no adapter is instantiated by this spec.
-function hasStaticAdapter(candidate: Function): boolean {
+function hasStaticAdapter(candidate: unknown): boolean {
 	let current: unknown = candidate;
 	while (typeof current === 'function') {
 		const descriptor = Object.getOwnPropertyDescriptor(current, 'adapter');
@@ -107,7 +107,7 @@ function hasStaticAdapter(candidate: Function): boolean {
 // needs no edit here, and a persisted model that accidentally extends another would fail loudly
 // rather than slip through.
 function persistedModelClasses(all: DiscoveredClass[]): DiscoveredClass[] {
-	const bases = new Set<Function>();
+	const bases = new Set<unknown>();
 	for (const { ctor } of all) {
 		let parent: unknown = Object.getPrototypeOf(ctor);
 		while (typeof parent === 'function') {

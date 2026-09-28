@@ -4,7 +4,6 @@ import bootstrap, { agent } from '../test_helper.js';
 import {
 	adapter,
 	adminAuditStore,
-	adminSessionStore,
 	getBucketStore,
 	getProjectStore,
 	getUserStore

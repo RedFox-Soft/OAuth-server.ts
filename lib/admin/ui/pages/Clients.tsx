@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
 	Table,
 	Button,
@@ -89,19 +89,23 @@ export function Clients({
 	const [secret, setSecret] = useState<string | null>(null);
 	const [form] = Form.useForm<FormValues>();
 
-	async function load() {
-		setLoading(true);
+	// Every state write follows an await, so the mount effect calls this without setting
+	// `loading` first; `load` is the reload, which does.
+	const fetchClients = useCallback(async () => {
 		try {
 			const res = await fetch(base);
 			if (res.ok) setRows((await res.json()) as ClientView[]);
 		} finally {
 			setLoading(false);
 		}
+	}, [base]);
+	function load() {
+		setLoading(true);
+		return fetchClients();
 	}
 	useEffect(() => {
-		load();
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [project._id]);
+		void fetchClients();
+	}, [fetchClients]);
 
 	function openCreateModal() {
 		setMode('create');

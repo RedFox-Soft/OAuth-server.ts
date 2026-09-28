@@ -10,7 +10,6 @@ import {
 
 import bootstrap, {
 	agent,
-	getHeader,
 	setSeedClaims,
 	type Setup,
 	changeClient,

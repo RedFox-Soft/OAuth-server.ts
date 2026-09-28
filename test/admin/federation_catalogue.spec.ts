@@ -238,10 +238,20 @@ describe('connecting a recognised provider', () => {
 			{ headers: { cookie } }
 		);
 
-		const [guidedStored] = (await getBucketStore().find(guided._id))!
-			.federation!;
-		const [manualStored] = (await getBucketStore().find(manual._id))!
-			.federation!;
+		const [guidedStored] = present(
+			present(
+				await getBucketStore().find(guided._id),
+				'(await getBucketStore().find(guided._id))'
+			).federation,
+			'(await getBucketStore().find(guided._id)) .federation'
+		);
+		const [manualStored] = present(
+			present(
+				await getBucketStore().find(manual._id),
+				'(await getBucketStore().find(manual._id))'
+			).federation,
+			'(await getBucketStore().find(manual._id)) .federation'
+		);
 
 		expect(guidedStored).toEqual(manualStored);
 		// The field that selected the defaults is consumed, never stored — nothing downstream can branch on it.
@@ -340,9 +350,15 @@ describe('connecting a recognised provider', () => {
 			.federation.post(body, { headers: { cookie } });
 
 		expect(second.status).toBe(422);
-		expect((await getBucketStore().find(bucket._id))!.federation!.length).toBe(
-			1
-		);
+		expect(
+			present(
+				present(
+					await getBucketStore().find(bucket._id),
+					'(await getBucketStore().find(bucket._id))'
+				).federation,
+				'(await getBucketStore().find(bucket._id)).federation'
+			).length
+		).toBe(1);
 	});
 
 	it('reports an already connected provider in the guidance', async () => {

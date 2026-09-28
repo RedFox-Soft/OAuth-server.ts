@@ -3,6 +3,7 @@ import { describe, it, beforeAll, expect } from 'bun:test';
 import bootstrap from '../test_helper.js';
 import { Grant } from 'lib/models/grant.js';
 import { assertStoredMatchesSchema, storedPayloadFor } from './round_trip.js';
+import { present } from 'test/shape.js';
 
 /**
  * @proves A grant persists its full aggregate with freeform sub-objects verbatim, and nothing
@@ -42,15 +43,17 @@ describe('storage contract: Grant', () => {
 		// reload exercises Value.Check on the stored shape
 		const reloaded = await Grant.find(grantId);
 		expect(reloaded).toBeDefined();
-		expect(reloaded!.payload.accountId).toBe('account-xyz');
-		expect(reloaded!.getOIDCScopeEncountered()).toContain('email');
+		expect(present(reloaded, 'reloaded').payload.accountId).toBe('account-xyz');
+		expect(present(reloaded, 'reloaded').getOIDCScopeEncountered()).toContain(
+			'email'
+		);
 	});
 
 	it('persists nothing outside the schema', async () => {
 		const grant = new Grant({ clientId: 'client', accountId: 'account-2' });
 		await grant.save();
 
-		const stored = storedPayloadFor(grant)!;
+		const stored = present(storedPayloadFor(grant), 'storedPayloadFor(grant)');
 		const schemaKeys = Object.keys(grant.model.properties);
 		for (const key of Object.keys(stored)) {
 			expect(schemaKeys).toContain(key);

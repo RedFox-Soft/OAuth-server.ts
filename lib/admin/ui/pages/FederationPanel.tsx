@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
 	Alert,
 	Table,
@@ -122,8 +122,9 @@ export function FederationPanel({
 	const [connecting, setConnecting] = useState<Guidance | null>(null);
 	const [connectForm] = Form.useForm<ConnectValues>();
 
-	async function load() {
-		setLoading(true);
+	// Every state write follows an await, so the mount effect calls this without setting
+	// `loading` first; `load` is the reload, which does.
+	const fetchProviders = useCallback(async () => {
 		try {
 			const [providers, catalogue] = await Promise.all([
 				fetch(base),
@@ -136,6 +137,10 @@ export function FederationPanel({
 		} finally {
 			setLoading(false);
 		}
+	}, [base]);
+	function load() {
+		setLoading(true);
+		return fetchProviders();
 	}
 
 	/*
@@ -186,8 +191,8 @@ export function FederationPanel({
 	}
 
 	useEffect(() => {
-		void load();
-	}, [bucketId]);
+		void fetchProviders();
+	}, [fetchProviders]);
 
 	/* One reporter for every mutation, so the server's reason is what an operator reads. */
 	async function send(

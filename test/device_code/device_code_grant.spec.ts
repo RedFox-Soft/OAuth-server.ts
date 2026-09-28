@@ -22,7 +22,6 @@ import { eventBus } from 'lib/event_bus.js';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { TestAdapter } from 'test/models.js';
 import { ttl } from 'lib/configs/liveTime.js';
-import { type BaseToken } from 'lib/models/base_token.ts';
 import { DeviceCodePayload } from 'lib/models/device_code.js';
 
 // The claims of an ID Token the response must carry.

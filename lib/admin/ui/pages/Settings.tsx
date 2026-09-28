@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Badge, Card, Input, Menu, Typography, message } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';
 import {
@@ -53,7 +53,7 @@ export function Settings() {
 	const [pane, setPane] = useState<SettingDomain | null>(null);
 	const [query, setQuery] = useState('');
 
-	function apply(body: SettingsResponse) {
+	const apply = useCallback((body: SettingsResponse) => {
 		setCatalog(body.catalog);
 		setDomains(body.domains);
 		setValues(body.values);
@@ -61,20 +61,20 @@ export function Settings() {
 		setPendingRestartKeys(body.pendingRestartKeys);
 		setNotInForceKeys(body.notInForceKeys);
 		setPane((current) => current ?? body.domains[0]?.id ?? null);
-	}
+	}, []);
 
-	async function load() {
-		setLoading(true);
+	// Every state write follows an await: `loading` starts true, so the mount has nothing to set first.
+	const load = useCallback(async () => {
 		try {
 			const res = await fetch('/admin/api/settings');
 			if (res.ok) apply((await res.json()) as SettingsResponse);
 		} finally {
 			setLoading(false);
 		}
-	}
+	}, [apply]);
 	useEffect(() => {
-		load();
-	}, []);
+		void load();
+	}, [load]);
 
 	const dirty = useMemo(() => dirtyKeys(values, baseline), [values, baseline]);
 	const dirtySet = useMemo(() => new Set(dirty), [dirty]);

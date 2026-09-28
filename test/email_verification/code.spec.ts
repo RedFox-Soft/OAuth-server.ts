@@ -14,6 +14,7 @@ import {
 	extractCode
 } from '../mail_capture.ts';
 import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { present } from 'test/shape.js';
 
 const CLIENT_ID = 'verify-code-app';
 const PASSWORD = 'correct horse battery';
@@ -44,8 +45,14 @@ async function registerForCode(email: string) {
 		);
 	expect(response.status).toBe(303);
 	const location = getHeader(response, 'location');
-	const ref = new URL(location, 'http://e.ly').searchParams.get('ref')!;
-	const code = extractCode(lastEmail()!)!;
+	const ref = present(
+		new URL(location, 'http://e.ly').searchParams.get('ref'),
+		"new URL(location, 'http://e.ly').searchParams.get('ref')"
+	);
+	const code = present(
+		extractCode(present(lastEmail(), 'lastEmail()')),
+		'extractCode(lastEmail())'
+	);
 	return { ref, code };
 }
 
@@ -127,10 +134,13 @@ describe('email verification — code method', () => {
 		expect(first.response.status).toBe(303); // new code issued
 		expect(sentEmails.length).toBe(1);
 		// the first resend supersedes the challenge; a second resend targets the fresh ref
-		const newRef = new URL(
-			getHeader(first.response, 'location'),
-			'http://e.ly'
-		).searchParams.get('ref')!;
+		const newRef = present(
+			new URL(
+				getHeader(first.response, 'location'),
+				'http://e.ly'
+			).searchParams.get('ref'),
+			"new URL( getHeader(first.response, 'location'), 'http://e.ly' ).searchParams.get('ref')"
+		);
 		const second = await agent['verify-email'].resend.post({ ref: newRef });
 		expect(second.response.status).toBe(429); // cooldown
 		expect(sentEmails.length).toBe(1); // no additional email

@@ -10,6 +10,7 @@ import { getUserStore } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
 import { answered } from './answered.ts';
+import { present } from 'test/shape.js';
 
 /*
  * The tenant boundary of the audit trail.
@@ -71,8 +72,12 @@ describe('group-scoped audit read', () => {
 		);
 
 		expect(page.total).toBe(1);
-		expect(page.entries[0]!.action).toBe('project.create');
-		expect(page.entries[0]!.ownerGroupId).toBeString();
+		expect(present(page.entries[0], 'page.entries[0]').action).toBe(
+			'project.create'
+		);
+		expect(
+			present(page.entries[0], 'page.entries[0]').ownerGroupId
+		).toBeString();
 	});
 
 	it('hides another group’s history under every filter, including a direct one', async () => {

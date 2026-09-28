@@ -1,4 +1,4 @@
-export function pick<T extends unknown>(
+export function pick<T>(
 	object: Record<string, T> = {},
 	...properties: string[]
 ) {

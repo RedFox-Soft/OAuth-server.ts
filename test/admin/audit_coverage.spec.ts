@@ -14,7 +14,6 @@ import { jwksRoutes } from 'lib/admin/jwks/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
 	adminAuditStore,
-	adminSessionStore,
 	getUserStore,
 	getProjectStore,
 	getBucketStore,
@@ -35,6 +34,7 @@ import {
 	SETTINGS_TARGET_ID,
 	SMTP_TARGET_ID
 } from 'lib/consts/admin_audit_routes.ts';
+import { present } from 'test/shape.js';
 
 /*
  * One audit entry per state-changing admin operation — all 23 of them, driven through the real HTTP
@@ -93,7 +93,7 @@ async function entriesFor(targetId: string): Promise<AdminAuditEntry[]> {
 async function soleEntry(targetId: string): Promise<AdminAuditEntry> {
 	const entries = await entriesFor(targetId);
 	expect(entries).toHaveLength(1);
-	return entries[0]!;
+	return present(entries[0], 'entries[0]');
 }
 
 function expectEntry(
@@ -162,7 +162,7 @@ describe('admin audit coverage: bootstrap', () => {
 		const created = await getUserStore(ADMIN_BUCKET_ID).findByEmail(email);
 		expect(created).not.toBeNull();
 
-		const entry = await soleEntry(created!._id);
+		const entry = await soleEntry(present(created, 'created')._id);
 		expectEntry(entry, {
 			action: 'setup.bootstrap',
 			targetType: 'AdminUser',
@@ -293,7 +293,7 @@ describe('admin audit coverage: clients', () => {
 			action: 'client.update'
 		});
 		expect(entries).toHaveLength(1);
-		expectEntry(entries[0]!, {
+		expectEntry(present(entries[0], 'entries[0]'), {
 			action: 'client.update',
 			targetType: 'Client',
 			actorId: userId,
@@ -324,7 +324,7 @@ describe('admin audit coverage: clients', () => {
 			action: 'client.secret.rotate'
 		});
 		expect(entries).toHaveLength(1);
-		expectEntry(entries[0]!, {
+		expectEntry(present(entries[0], 'entries[0]'), {
 			action: 'client.secret.rotate',
 			targetType: 'Client',
 			actorId: userId
@@ -354,7 +354,7 @@ describe('admin audit coverage: clients', () => {
 			action: 'client.delete'
 		});
 		expect(entries).toHaveLength(1);
-		expectEntry(entries[0]!, {
+		expectEntry(present(entries[0], 'entries[0]'), {
 			action: 'client.delete',
 			targetType: 'Client',
 			actorId: userId
@@ -636,23 +636,23 @@ describe('admin audit coverage: keys and settings', () => {
 		const kid = state.keys.find((k) => !beforeKids.has(k.kid))?.kid;
 		expect(kid).toBeString();
 
-		expectEntry(await soleEntry(kid!), {
+		expectEntry(await soleEntry(present(kid, 'kid')), {
 			action: 'jwks.generate',
 			targetType: 'jwks',
 			actorId: userId
 		});
 
 		const removed = await client.admin.api
-			.jwks({ kid: kid! })
+			.jwks({ kid: present(kid, 'kid') })
 			.delete(undefined, { headers: { cookie } });
 		expect(removed.status).toBe(200);
 
 		const { entries } = await adminAuditStore.list({
-			targetId: kid!,
+			targetId: present(kid, 'kid'),
 			action: 'jwks.delete'
 		});
 		expect(entries).toHaveLength(1);
-		expectEntry(entries[0]!, {
+		expectEntry(present(entries[0], 'entries[0]'), {
 			action: 'jwks.delete',
 			targetType: 'jwks',
 			actorId: userId
@@ -681,14 +681,14 @@ describe('admin audit coverage: keys and settings', () => {
 			action: 'settings.update'
 		});
 		expect(total).toBe(before + 1);
-		expectEntry(entries[0]!, {
+		expectEntry(present(entries[0], 'entries[0]'), {
 			action: 'settings.update',
 			targetType: 'ApplicationConfig',
 			actorId: userId,
 			attributes: ['par.enabled', 'revocation.enabled']
 		});
 		// The key list used to travel here, because the entry had no field for it.
-		expect(entries[0]!.targetId).toBe(SETTINGS_TARGET_ID);
+		expect(present(entries[0], 'entries[0]').targetId).toBe(SETTINGS_TARGET_ID);
 	});
 
 	it('records a mail settings update, without the password', async () => {
@@ -725,7 +725,7 @@ describe('admin audit coverage: keys and settings', () => {
 			targetId: SMTP_TARGET_ID
 		});
 		expect(total).toBe(before + 1);
-		expectEntry(entries[0]!, {
+		expectEntry(present(entries[0], 'entries[0]'), {
 			action: 'smtp.settings.update',
 			targetType: 'SmtpSettings',
 			actorId: userId,

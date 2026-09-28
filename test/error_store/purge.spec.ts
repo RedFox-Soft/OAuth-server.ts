@@ -8,7 +8,6 @@ import { errorRoutes } from 'lib/admin/errors/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
 	adminAuditStore,
-	adminSessionStore,
 	errorStore,
 	getUserStore
 } from 'lib/adapters/index.ts';

@@ -623,16 +623,18 @@ async function bootstrap(
 			if (!clientId) throw new Error('no client');
 			return present(session.authorizations?.[clientId]?.grantId, 'a grant');
 		} catch (err) {
-			throw new Error('getGrantId() failed');
+			throw new Error('getGrantId() failed', { cause: err });
 		}
 	}
 
 	function getTokenJti(token: string) {
 		try {
 			return jwt(token);
-		} catch (err) {}
+		} catch {
+			// Not a JWT: an opaque token is its own identifier.
+		}
 
-		return token; // opaque
+		return token;
 	}
 
 	function failWith(

@@ -29,8 +29,6 @@ import { ISSUER } from 'lib/configs/env.js';
 import { Grant } from 'lib/models/grant.js';
 import { PAYMENT_TYPE, OPEN_TYPE } from './rar.config.ts';
 
-const form = 'application/x-www-form-urlencoded';
-
 /*
  * A real cookie jar, not a string concatenation. Resuming an authorization request calls
  * session.resetIdentifier(), so the session cookie changes on every completed interaction; and
@@ -562,7 +560,7 @@ describe('features.richAuthorizationRequests', () => {
 		];
 
 		for (const [label, value] of cases) {
-			it(`each malformed detail shape is refused with the RFC 9396 code`, async () => {
+			it(`refuses ${label} with invalid_authorization_details`, async () => {
 				const { error } = await refusal(value);
 				expect(error).toBe('invalid_authorization_details');
 			});

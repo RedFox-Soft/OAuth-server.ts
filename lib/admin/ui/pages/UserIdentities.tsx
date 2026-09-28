@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Modal, List, Button, Typography, Popconfirm, message } from 'antd';
 import type { FederatedIdentity } from '../../../federation/types.js';
 
@@ -18,26 +18,40 @@ export function UserIdentities({
 	onClose: () => void;
 }) {
 	const [links, setLinks] = useState<FederatedIdentity[]>([]);
-	const [loading, setLoading] = useState(false);
+	/*
+	 * Whose links `links` holds. The modal stays mounted while the account it shows changes, so this is
+	 * what says the list is still loading on opening — without it, the previous account's links showed
+	 * under the new account's name until the fetch returned.
+	 */
+	const [linksOf, setLinksOf] = useState<string | null>(null);
+	const [reloading, setReloading] = useState(false);
 
-	const base = user
-		? `/admin/api/buckets/${encodeURIComponent(bucketId)}/users/${encodeURIComponent(user._id)}/identities`
+	const userId = user?._id;
+	const base = userId
+		? `/admin/api/buckets/${encodeURIComponent(bucketId)}/users/${encodeURIComponent(userId)}/identities`
 		: '';
 
-	async function load() {
-		if (!user) return;
-		setLoading(true);
+	const fetchLinks = useCallback(async () => {
+		if (!userId) return;
 		try {
 			const res = await fetch(base);
 			setLinks(res.ok ? await res.json() : []);
+			setLinksOf(userId);
 		} finally {
-			setLoading(false);
+			setReloading(false);
 		}
+	}, [base, userId]);
+	function load() {
+		setReloading(true);
+		return fetchLinks();
 	}
 
 	useEffect(() => {
-		void load();
-	}, [user?._id]);
+		void fetchLinks();
+	}, [fetchLinks]);
+
+	const current = userId !== undefined && linksOf === userId;
+	const loading = reloading || (userId !== undefined && !current);
 
 	return (
 		<Modal
@@ -53,7 +67,7 @@ export function UserIdentities({
 			</Typography.Paragraph>
 			<List<FederatedIdentity>
 				loading={loading}
-				dataSource={links}
+				dataSource={current ? links : []}
 				locale={{ emptyText: 'This account has no linked identities.' }}
 				rowKey={(link) => `${link.providerId}:${link.sub}`}
 				renderItem={(link) => (

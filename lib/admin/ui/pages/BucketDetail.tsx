@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
 	Table,
 	Button,
@@ -71,8 +71,9 @@ export function BucketDetail({
 		value: r
 	}));
 
-	async function load() {
-		setLoading(true);
+	// Every state write follows an await, so the mount effect calls this without setting
+	// `loading` first; `load` is the reload, which does.
+	const fetchBucket = useCallback(async () => {
 		try {
 			const [b, u] = await Promise.all([fetch(base), fetch(`${base}/users`)]);
 			if (b.ok) setBucket((await b.json()) as UserBucket);
@@ -80,11 +81,14 @@ export function BucketDetail({
 		} finally {
 			setLoading(false);
 		}
+	}, [base]);
+	function load() {
+		setLoading(true);
+		return fetchBucket();
 	}
 	useEffect(() => {
-		load();
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [bucketId]);
+		void fetchBucket();
+	}, [fetchBucket]);
 
 	async function post(path: string, bodyObj: unknown, okMsg: string) {
 		const res = await fetch(`${base}${path}`, {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
 	Table,
 	Button,
@@ -223,14 +223,19 @@ export function Projects() {
 	const [heldClients, setHeldClients] = useState<string[]>([]);
 	const [destroying, setDestroying] = useState(false);
 
-	async function load() {
-		setLoading(true);
+	// Every state write follows an await, so the mount effect calls this without setting
+	// `loading` first; `load` is the reload, which does.
+	const fetchProjects = useCallback(async () => {
 		try {
 			const res = await fetch('/admin/api/projects');
 			if (res.ok) setProjects((await res.json()) as Project[]);
 		} finally {
 			setLoading(false);
 		}
+	}, []);
+	function load() {
+		setLoading(true);
+		return fetchProjects();
 	}
 
 	/*
@@ -288,8 +293,8 @@ export function Projects() {
 	}
 
 	useEffect(() => {
-		load();
-	}, []);
+		void fetchProjects();
+	}, [fetchProjects]);
 
 	async function onCreate(values: CreateProjectValues) {
 		setCreating(true);

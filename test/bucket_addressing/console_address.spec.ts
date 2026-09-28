@@ -7,6 +7,7 @@ import { ISSUER } from 'lib/configs/env.js';
 import { ensureAdminSeed } from 'lib/admin/seed.js';
 import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.js';
 import { bucketAddressFor } from 'lib/admin/ui/bucketAddress.js';
+import { present } from 'test/shape.js';
 
 async function discoveryAt(prefix: string) {
 	return elysia.handle(
@@ -49,7 +50,9 @@ describe('the address the console reports for a bucket', () => {
 		const bucket = await getBucketStore().find(DEFAULT_BUCKET_ID);
 
 		expect(bucket?.slug).toBe('default');
-		expect(bucketAddressFor(bucket!)).toEqual({ kind: 'root' });
+		expect(bucketAddressFor(present(bucket, 'bucket'))).toEqual({
+			kind: 'root'
+		});
 	});
 
 	it('answers nothing at the slug the default bucket holds', async () => {

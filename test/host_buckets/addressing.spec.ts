@@ -22,7 +22,6 @@ const UNCLAIMED_HOST = 'nobody.e.ly';
 const Metadata = Type.Object({ issuer: Type.String() });
 
 let tenantBucketId: string;
-let otherBucketId: string;
 
 async function seedBucket(name: string, host: string, clientId: string) {
 	const bucket = await getBucketStore().create({
@@ -128,11 +127,7 @@ describe('a bucket addressed by a host of its own (US1)', () => {
 		resetAdminMemoryStores();
 		forgetBucketAddresses();
 		tenantBucketId = await seedBucket('Acme', TENANT_HOST, 'host-bucket-app');
-		otherBucketId = await seedBucket(
-			'Globex',
-			OTHER_HOST,
-			'other-host-bucket-app'
-		);
+		await seedBucket('Globex', OTHER_HOST, 'other-host-bucket-app');
 	});
 
 	it('serves the bucket its metadata belongs to when the request arrives at that bucket host', async () => {

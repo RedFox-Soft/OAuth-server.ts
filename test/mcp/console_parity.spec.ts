@@ -8,8 +8,7 @@ import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
 	getUserStore,
 	getProjectStore,
-	getBucketStore,
-	adminSessionStore
+	getBucketStore
 } from 'lib/adapters/index.ts';
 import {
 	ADMIN_BUCKET_ID,

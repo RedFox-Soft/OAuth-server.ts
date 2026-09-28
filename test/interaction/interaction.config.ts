@@ -15,8 +15,8 @@ const check: CheckPartial = {
 	reason: 'reason_foo',
 	description: 'error_description_foo',
 	error: 'error_foo',
-	check: (oidc: any) => {
-		if (oidc.params.triggerCustomFail) {
+	check: (oidc) => {
+		if ('triggerCustomFail' in oidc.params && oidc.params.triggerCustomFail) {
 			return true;
 		}
 		return false;
@@ -36,13 +36,14 @@ policy.add(new CustomPrompt());
 class UnrequestablePrompt extends Prompt {
 	name = 'unrequestable';
 	requestable = false;
-	checks = [
+	checks: CheckPartial[] = [
 		{
 			reason: 'un_foo',
 			description: 'un_foo_desc',
 			error: 'un_foo_err',
-			check: (oidc: any) => {
+			check: (oidc) => {
 				if (
+					'triggerUnrequestable' in oidc.params &&
 					oidc.params.triggerUnrequestable &&
 					(!oidc.result || !('foo' in oidc.result))
 				) {

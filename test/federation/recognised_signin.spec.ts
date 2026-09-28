@@ -8,13 +8,13 @@ import { mock } from '../fetch_mock.ts';
 import { appleStub, githubStub, microsoftStub } from './recognised_stubs.ts';
 import {
 	CLIENT,
-	get,
 	provider,
 	seedBucket,
 	signedInAccountIds,
 	startInteraction,
 	walk
 } from './harness.ts';
+import { present } from 'test/shape.js';
 
 /*
  * Signing in through the three recognised providers that are not Google, each of which breaks a different
@@ -73,7 +73,7 @@ describe('signing in through a recognised provider', () => {
 		expect(users.map((user) => user.email)).toEqual(['someone@acme.test']);
 		// Named rather than counted: sessions are process state and outlive a case, so a count here would
 		// measure what ran before it.
-		expect(signedInAccountIds()).toContain(users[0]!._id);
+		expect(signedInAccountIds()).toContain(present(users[0], 'users[0]')._id);
 	});
 
 	it('refuses a person whose organisation the connection does not permit, naming neither them nor it', async () => {
@@ -245,11 +245,15 @@ describe('signing in through a recognised provider', () => {
 
 		const presented = idp.presentedCredential();
 		expect(presented).toBeDefined();
-		const verified = await jwtVerify(presented!, idp.verificationKey, {
-			issuer: idp.teamId,
-			subject: idp.clientId,
-			audience: idp.issuer
-		});
+		const verified = await jwtVerify(
+			present(presented, 'presented'),
+			idp.verificationKey,
+			{
+				issuer: idp.teamId,
+				subject: idp.clientId,
+				audience: idp.issuer
+			}
+		);
 		expect(verified.protectedHeader.kid).toBe(idp.keyId);
 	});
 
@@ -291,7 +295,7 @@ describe('signing in through a recognised provider', () => {
 
 			expect(complete?.status).toBe(303);
 			const users = await getUserStore(bucketId).list();
-			expect(signedInAccountIds()).toContain(users[0]!._id);
+			expect(signedInAccountIds()).toContain(present(users[0], 'users[0]')._id);
 		} finally {
 			setSystemTime();
 		}

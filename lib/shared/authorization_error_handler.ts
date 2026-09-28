@@ -95,7 +95,7 @@ export default function getWWWAuthenticate(
 	isDpop: boolean,
 	errorObj: { error: string; error_description?: string }
 ) {
-	let scheme = '';
+	let scheme: string;
 	if (authorization.startsWith('dpop') || isDpop) {
 		scheme = 'DPoP';
 	} else if (authorization.startsWith('bearer')) {

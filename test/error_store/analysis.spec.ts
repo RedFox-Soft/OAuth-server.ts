@@ -6,11 +6,7 @@ import { ApplicationConfig } from 'lib/configs/application.ts';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { errorRoutes } from 'lib/admin/errors/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	adminSessionStore,
-	errorStore,
-	getUserStore
-} from 'lib/adapters/index.ts';
+import { errorStore, getUserStore } from 'lib/adapters/index.ts';
 import type { ErrorOccurrence } from 'lib/adapters/types.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';

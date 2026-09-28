@@ -19,6 +19,7 @@ import { AuthorizationCode } from 'lib/models/authorization_code.js';
 import { Client } from 'lib/models/client.js';
 import { InvalidGrant } from 'lib/helpers/errors.js';
 import { RefreshTokenSchema } from 'lib/models/refresh_token.js';
+import { present } from 'test/shape.js';
 
 /**
  * @proves A persisted token round-trips with its lifetime intact, is refused once spent or
@@ -216,8 +217,10 @@ describe('BaseToken', () => {
 			const viaFind = await RefreshToken.find(value);
 			const viaTryFind = await RefreshToken.tryFind(value);
 			expect(viaTryFind).toBeDefined();
-			expect(viaFind.jti).toBe(viaTryFind!.jti);
-			expect(viaFind.payload).toEqual(viaTryFind!.payload);
+			expect(viaFind.jti).toBe(present(viaTryFind, 'viaTryFind').jti);
+			expect(viaFind.payload).toEqual(
+				present(viaTryFind, 'viaTryFind').payload
+			);
 		});
 
 		it('find throws the model default (invalid_token) on miss', async function () {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
 	Table,
 	Button,
@@ -80,24 +80,13 @@ export function McpClients() {
 	const [documentsOff, setDocumentsOff] = useState<string | null>(null);
 	const [form] = Form.useForm<FormValues>();
 
-	async function load() {
-		setLoading(true);
-		try {
-			const res = await fetch(base);
-			if (res.ok) setRows((await res.json()) as PermissionView[]);
-			await loadCapabilities();
-		} finally {
-			setLoading(false);
-		}
-	}
-
 	/*
 	 * `values` is the desired state; the two key lists name what is stored and not in force here, which
 	 * is the distinction that matters on this page — a flag switched on and not applied looks on and is
 	 * not. Both are reported, and separately, because the remedy differs: switch it on, restart, or
 	 * look at the instance that did apply it.
 	 */
-	async function loadCapabilities() {
+	const loadCapabilities = useCallback(async () => {
 		const res = await fetch('/admin/api/settings');
 		if (!res.ok) return;
 		const body = (await res.json()) as {
@@ -129,10 +118,26 @@ export function McpClients() {
 				'clientIdMetadataDocument.enabled is off, so a client_id that is an HTTPS URL does not resolve to a client. Entries below cannot take effect until it is on.'
 			)
 		);
+	}, []);
+
+	// Every state write follows an await, so the mount effect calls this without setting
+	// `loading` first; `load` is the reload, which does.
+	const fetchPermissions = useCallback(async () => {
+		try {
+			const res = await fetch(base);
+			if (res.ok) setRows((await res.json()) as PermissionView[]);
+			await loadCapabilities();
+		} finally {
+			setLoading(false);
+		}
+	}, [loadCapabilities]);
+	function load() {
+		setLoading(true);
+		return fetchPermissions();
 	}
 	useEffect(() => {
-		load();
-	}, []);
+		void fetchPermissions();
+	}, [fetchPermissions]);
 
 	function openModal() {
 		setAcknowledgement(null);

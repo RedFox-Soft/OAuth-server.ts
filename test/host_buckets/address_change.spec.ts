@@ -18,7 +18,7 @@ import { forgetBucketAddresses } from 'lib/admin/auth/bucketAddress.ts';
 import { issuerFor } from 'lib/configs/issuer.ts';
 import { sessionFor } from '../admin_session.ts';
 import { Type } from '@sinclair/typebox';
-import { shaped } from 'test/shape.ts';
+import { present, shaped } from 'test/shape.ts';
 
 const app = new Elysia().use(resolveAdmin).use(bucketRoutes);
 
@@ -161,7 +161,7 @@ describe('moving a bucket to a different address (US3)', () => {
 
 		const after = await getBucketStore().find(id);
 		expect(after?.host).toBe(host);
-		expect(issuerFor(after!)).toBe(`http://${host}`);
+		expect(issuerFor(present(after, 'after'))).toBe(`http://${host}`);
 	});
 
 	it('stops answering at the previous address once the change is confirmed', async () => {

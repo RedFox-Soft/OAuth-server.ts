@@ -7,7 +7,6 @@ import { Client } from 'lib/models/client.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import {
 	adapter,
-	adminSessionStore,
 	getBucketStore,
 	getProjectStore,
 	getUserStore

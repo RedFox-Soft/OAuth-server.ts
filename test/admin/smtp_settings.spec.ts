@@ -5,7 +5,6 @@ import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { smtpSettingsRoutes } from 'lib/admin/settings/smtp/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
-	adminSessionStore,
 	adminAuditStore,
 	getUserStore,
 	getSmtpSettingsStore

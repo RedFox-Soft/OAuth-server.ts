@@ -132,14 +132,16 @@ export function loadExport(): DocsExport {
 		raw = JSON.parse(readFileSync(file, 'utf8'));
 	} catch (error) {
 		throw new Error(
-			`generated/docs-export.json is missing or unreadable — run \`bun run generate\` (${String(error)})`
+			`generated/docs-export.json is missing or unreadable — run \`bun run generate\` (${String(error)})`,
+			{ cause: error }
 		);
 	}
 	try {
 		cached = DocsExportSchema.parse(raw);
 	} catch (error) {
 		throw new Error(
-			`generated/docs-export.json is malformed — run \`bun run generate\`: ${String(error)}`
+			`generated/docs-export.json is malformed — run \`bun run generate\`: ${String(error)}`,
+			{ cause: error }
 		);
 	}
 	return cached;

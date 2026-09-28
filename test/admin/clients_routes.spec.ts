@@ -10,11 +10,7 @@ import {
 } from 'lib/admin/clients/schema.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	adminSessionStore,
-	getUserStore,
-	getProjectStore
-} from 'lib/adapters/index.ts';
+import { getUserStore, getProjectStore } from 'lib/adapters/index.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
 import { answered } from './answered.ts';
 import {

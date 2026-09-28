@@ -44,7 +44,8 @@ export async function assertMigrationsCurrent(): Promise<void> {
 		await storagePing();
 	} catch (error) {
 		throw new Error(
-			`the configured ${backend} datastore did not answer: ${(error as Error).message}`
+			`the configured ${backend} datastore did not answer: ${(error as Error).message}`,
+			{ cause: error }
 		);
 	}
 

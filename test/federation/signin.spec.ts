@@ -17,6 +17,7 @@ import {
 	startInteraction,
 	walk
 } from './harness.ts';
+import { present } from 'test/shape.js';
 
 /*
  * The federated sign-in succeeding, end to end, against a stub upstream provider. Its refusals live in
@@ -150,7 +151,7 @@ describe('federated sign-in', () => {
 
 		const all = await store.list();
 		expect(all).toHaveLength(1);
-		const created = all[0]!;
+		const created = present(all[0], 'all[0]');
 		expect(created.email).toBe('new@acme.test');
 		expect(created.roles).toEqual([]);
 		// Trusted provider + verified assertion, so the account is verified by the same test that allowed

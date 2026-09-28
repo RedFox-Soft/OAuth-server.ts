@@ -221,23 +221,23 @@ export class IdToken {
 				alg: encryption.enc,
 				use: 'enc'
 			});
-			jwk &&
-				(encryptionKey = clientKeys(client).symmetric.getKeyObject(jwk, true));
+			if (jwk)
+				encryptionKey = clientKeys(client).symmetric.getKeyObject(jwk, true);
 		} else if (encryption.alg.startsWith('A')) {
 			[jwk] = clientKeys(client).symmetric.selectForEncrypt({
 				alg: encryption.alg,
 				use: 'enc'
 			});
-			jwk &&
-				(encryptionKey = clientKeys(client).symmetric.getKeyObject(jwk, true));
+			if (jwk)
+				encryptionKey = clientKeys(client).symmetric.getKeyObject(jwk, true);
 		} else {
 			await clientKeys(client).asymmetric.refresh();
 			[jwk] = clientKeys(client).asymmetric.selectForEncrypt({
 				alg: encryption.alg,
 				use: 'enc'
 			});
-			jwk &&
-				(encryptionKey = clientKeys(client).asymmetric.getKeyObject(jwk, true));
+			if (jwk)
+				encryptionKey = clientKeys(client).asymmetric.getKeyObject(jwk, true);
 		}
 
 		if (!encryptionKey) {

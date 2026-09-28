@@ -4,15 +4,12 @@ import { treaty } from '@elysiajs/eden';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { auditRoutes } from 'lib/admin/audit/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	adminAuditStore,
-	adminSessionStore,
-	getUserStore
-} from 'lib/adapters/index.ts';
+import { adminAuditStore, getUserStore } from 'lib/adapters/index.ts';
 import type { AdminAuditEntry } from 'lib/adapters/types.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
 import { answered } from './answered.ts';
+import { present } from 'test/shape.js';
 
 /*
  * The read surface — specs/016-admin-audit-completeness/contracts/admin-audit-api.md.
@@ -172,8 +169,8 @@ describe('GET /admin/api/audit', () => {
 			});
 
 			const [entry] = answered(res.data).entries;
-			expect(entry!.targetScope).toBeNull();
-			expect(entry!.attributes).toEqual([]);
+			expect(present(entry, 'entry').targetScope).toBeNull();
+			expect(present(entry, 'entry').attributes).toEqual([]);
 		});
 
 		it('reports the page and page size it applied', async () => {
@@ -209,9 +206,19 @@ describe('GET /admin/api/audit', () => {
 			});
 
 			expect(answered(byId.data).total).toBe(1);
-			expect(answered(byId.data).entries[0]!.actorId).toBe('a-one');
+			expect(
+				present(
+					answered(byId.data).entries[0],
+					'answered(byId.data).entries[0]'
+				).actorId
+			).toBe('a-one');
 			expect(answered(byEmail.data).total).toBe(1);
-			expect(answered(byEmail.data).entries[0]!.actorId).toBe('a-two');
+			expect(
+				present(
+					answered(byEmail.data).entries[0],
+					'answered(byEmail.data).entries[0]'
+				).actorId
+			).toBe('a-two');
 		});
 
 		it('matches action, target type, target id and scope, combining conjunctively', async () => {
@@ -269,8 +276,8 @@ describe('GET /admin/api/audit', () => {
 			});
 
 			const [entry] = answered(res.data).entries;
-			expect(entry!.actorEmail).toBe('gone@x.io');
-			expect(entry!.targetId).toBe('deleted-project');
+			expect(present(entry, 'entry').actorEmail).toBe('gone@x.io');
+			expect(present(entry, 'entry').targetId).toBe('deleted-project');
 		});
 	});
 
@@ -342,7 +349,7 @@ describe('GET /admin/api/audit', () => {
 
 			const page = answered(res.data);
 			expect(page.total).toBe(1);
-			expect(page.entries[0]!.targetId).toBe('deep');
+			expect(present(page.entries[0], 'page.entries[0]').targetId).toBe('deep');
 		});
 
 		it('refuses a backwards window instead of returning an empty page', async () => {

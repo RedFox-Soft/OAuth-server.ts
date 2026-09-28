@@ -5,7 +5,6 @@ import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { settingsRoutes } from 'lib/admin/settings/routes.ts';
 import {
 	adminAuditStore,
-	adminSessionStore,
 	getUserStore,
 	configStore
 } from 'lib/adapters/index.ts';
@@ -13,6 +12,7 @@ import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import bootstrap from '../test_helper.ts';
 import { sessionFor as adminSessionFor } from '../admin_session.ts';
 import { answered } from './answered.ts';
+import { present } from 'test/shape.js';
 
 // What the settings store holds; every read below follows a save, so an empty store is a failure.
 async function storedSettings(): Promise<Record<string, unknown>> {
@@ -533,7 +533,9 @@ describe('settings API', () => {
 		expect(res.status).toBe(200);
 		const { entries, total } = await settingsAudit();
 		expect(total).toBe(before + 1);
-		expect(entries[0]!.attributes).toEqual(['par.enabled']);
+		expect(present(entries[0], 'entries[0]').attributes).toEqual([
+			'par.enabled'
+		]);
 		// The store keeps an override for the edited key only. Pinning all of them took the environment
 		// and the defaults out of the loop at the next boot for keys nobody had ever edited.
 		expect(Object.keys(await storedSettings())).toEqual(['par.enabled']);

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
 	Table,
 	Button,
@@ -127,14 +127,19 @@ export function Resources({
 	const ttlValue = Form.useWatch('accessTokenTTL', form) ?? 900;
 	const formatValue = Form.useWatch('tokenFormat', form) ?? 'jwt';
 
-	async function load() {
-		setLoading(true);
+	// Every state write follows an await, so the mount effect calls this without setting
+	// `loading` first; `load` is the reload, which does.
+	const fetchResources = useCallback(async () => {
 		try {
 			const res = await fetch(base);
 			if (res.ok) setRows((await res.json()) as ResourceView[]);
 		} finally {
 			setLoading(false);
 		}
+	}, [base]);
+	function load() {
+		setLoading(true);
+		return fetchResources();
 	}
 	/*
 	 * Reloads when the project changes and never on `load` identity — the list belongs to the project,
@@ -142,8 +147,8 @@ export function Resources({
 	 * repository, so the comment would only be an inert lint error (as it is in `Clients.tsx`).
 	 */
 	useEffect(() => {
-		load();
-	}, [project._id]);
+		void fetchResources();
+	}, [fetchResources]);
 
 	function openCreateModal() {
 		setMode('create');

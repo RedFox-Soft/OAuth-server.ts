@@ -45,7 +45,7 @@ export const addons: Partial<AddonImplementations> = {
 		if (!cert) return undefined;
 		try {
 			return new X509Certificate(Buffer.from(cert, 'base64'));
-		} catch (e) {
+		} catch {
 			return undefined;
 		}
 	},

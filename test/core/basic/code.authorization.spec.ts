@@ -2,7 +2,6 @@ import {
 	describe,
 	it,
 	beforeAll,
-	afterAll,
 	beforeEach,
 	afterEach,
 	expect,

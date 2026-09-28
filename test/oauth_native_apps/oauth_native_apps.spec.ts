@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { describe, it, beforeAll, expect } from 'bun:test';
 
-import bootstrap, { type Setup } from '../test_helper.js';
+import bootstrap from '../test_helper.js';
 import { redirectUriAllowed, registerClient } from 'lib/models/client.js';
 import 'lib/index.js';
 
@@ -10,9 +10,8 @@ import 'lib/index.js';
  * let another app on the device intercept the code.
  */
 describe('OAuth 2.0 for Native Apps Best Current Practice features', () => {
-	let setup: Setup;
 	beforeAll(async function () {
-		setup = await bootstrap(import.meta.url);
+		await bootstrap(import.meta.url);
 	});
 
 	describe('changed native client validations', () => {

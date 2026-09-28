@@ -22,14 +22,16 @@ export function loadVersion(): VersionInfo {
 		raw = JSON.parse(readFileSync(file, 'utf8'));
 	} catch (error) {
 		throw new Error(
-			`generated/version.json is missing or unreadable — run \`bun run generate\` (${String(error)})`
+			`generated/version.json is missing or unreadable — run \`bun run generate\` (${String(error)})`,
+			{ cause: error }
 		);
 	}
 	try {
 		return VersionSchema.parse(raw);
 	} catch (error) {
 		throw new Error(
-			`generated/version.json is malformed — run \`bun run generate\`: ${String(error)}`
+			`generated/version.json is malformed — run \`bun run generate\`: ${String(error)}`,
+			{ cause: error }
 		);
 	}
 }

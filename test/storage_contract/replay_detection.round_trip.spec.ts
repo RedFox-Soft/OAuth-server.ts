@@ -3,6 +3,7 @@ import { describe, it, beforeAll, expect } from 'bun:test';
 import bootstrap from '../test_helper.js';
 import { ReplayDetection } from 'lib/models/replay_detection.js';
 import { assertStoredMatchesSchema, storedPayloadFor } from './round_trip.js';
+import { present } from 'test/shape.js';
 
 /**
  * @proves Replay detection persists exactly its declared fields and nothing else, so it cannot
@@ -30,7 +31,7 @@ describe('storage contract: ReplayDetection', () => {
 		// reload exercises Value.Check on the stored shape
 		const reloaded = await ReplayDetection.find(jti);
 		expect(reloaded).toBeDefined();
-		expect(reloaded!.payload.iss).toBe(iss);
+		expect(present(reloaded, 'reloaded').payload.iss).toBe(iss);
 	});
 
 	it('does not persist an undeclared field', async () => {
@@ -38,7 +39,7 @@ describe('storage contract: ReplayDetection', () => {
 		const inst = new ReplayDetection({ jti, iss: 'https://op.example.com' });
 		await inst.save(3600);
 
-		const stored = storedPayloadFor(inst)!;
+		const stored = present(storedPayloadFor(inst), 'storedPayloadFor(inst)');
 		// every persisted key must be a schema property
 		const schemaKeys = Object.keys(inst.model.properties);
 		for (const key of Object.keys(stored)) {

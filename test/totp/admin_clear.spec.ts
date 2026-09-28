@@ -7,15 +7,10 @@ import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
 	adapter,
 	adminAuditStore,
-	adminSessionStore,
 	getBucketStore,
 	getUserStore
 } from 'lib/adapters/index.ts';
-import {
-	ADMIN_BUCKET_ID,
-	ADMIN_SESSION_COOKIE,
-	UNASSIGNED_GROUP_ID
-} from 'lib/admin/consts.ts';
+import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { encodeBase32 } from 'lib/totp/base32.ts';
 import { attemptKey } from 'lib/totp/verify.ts';
 import epochTime from 'lib/helpers/epoch_time.ts';

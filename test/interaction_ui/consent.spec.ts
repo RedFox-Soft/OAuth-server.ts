@@ -4,6 +4,7 @@ import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { Grant } from 'lib/models/grant.js';
 import { buildConsentView } from 'lib/interactions/consentView.js';
 import { PAYMENT_TYPE, RESOURCE } from './consent.config.ts';
+import { present } from 'test/shape.js';
 
 /*
  * A real cookie jar rather than a joined string: resuming an authorization request rotates the session
@@ -102,7 +103,10 @@ describe('consent page — every permission, stated once (US3)', () => {
 	async function toConsent(auth: AuthorizationRequest) {
 		const response = await auth.authorize({ headers: { cookie: header(jar) } });
 		expect(response.status).toBe(303);
-		const location = response.headers.get('location')!;
+		const location = present(
+			response.headers.get('location'),
+			"response.headers.get('location')"
+		);
 		expect(location).toContain('/ui/');
 		const [, , uid] = location.split('/');
 		return { uid, jar: merge(jar, response) };
@@ -188,16 +192,20 @@ describe('consent page — every permission, stated once (US3)', () => {
 				{ headers: { cookie: header(session.jar) } }
 			);
 		expect(response.status).toBe(303);
-		const location = response.headers.get('location')!;
+		const location = present(
+			response.headers.get('location'),
+			"response.headers.get('location')"
+		);
 		expect(location).toContain('https://client.example.com/cb');
 		expect(location).toContain('code=');
 
-		const grantId = [
-			...(await import('../models.ts')).TestAdapter.for('Grant').store.keys()
-		]
-			.filter((k) => k.startsWith('Grant:'))
-			.map((k) => k.slice('Grant:'.length))
-			.at(-1)!;
+		const grantId = present(
+			[...(await import('../models.ts')).TestAdapter.for('Grant').store.keys()]
+				.filter((k) => k.startsWith('Grant:'))
+				.map((k) => k.slice('Grant:'.length))
+				.at(-1),
+			"[ ...(await import('../models.ts')).TestAdapter.for('Grant').store.keys() ] .filter((k) => k.startsWith('Grant:')) .map((k) => k.slice('Grant:'.length)) .at(-1)"
+		);
 		const grant = await Grant.find(grantId);
 
 		const scopes = grant.getOIDCScopeEncountered().split(' ');
@@ -235,7 +243,9 @@ describe('buildConsentView labels (US3)', () => {
 			...base,
 			details: { missingOIDCScope: ['openid'] }
 		});
-		expect(view.permissions[0]!.label).toBe('Your identity information');
+		expect(present(view.permissions[0], 'view.permissions[0]').label).toBe(
+			'Your identity information'
+		);
 	});
 
 	it('labels a claims group', () => {
@@ -243,7 +253,9 @@ describe('buildConsentView labels (US3)', () => {
 			...base,
 			details: { missingOIDCClaims: ['email'] }
 		});
-		expect(view.permissions[0]!.label).toBe('Specific details about you');
+		expect(present(view.permissions[0], 'view.permissions[0]').label).toBe(
+			'Specific details about you'
+		);
 	});
 
 	it('names the resource in a resource-scope group label', () => {
@@ -251,9 +263,13 @@ describe('buildConsentView labels (US3)', () => {
 			...base,
 			details: { missingResourceScopes: { 'urn:x': ['api:read'] } }
 		});
-		expect(view.permissions[0]!.label).toBe('Access to urn:x');
+		expect(present(view.permissions[0], 'view.permissions[0]').label).toBe(
+			'Access to urn:x'
+		);
 		// The indicator stays on the group as data, for keys and for tests.
-		expect(view.permissions[0]!.resourceIndicator).toBe('urn:x');
+		expect(
+			present(view.permissions[0], 'view.permissions[0]').resourceIndicator
+		).toBe('urn:x');
 	});
 
 	it('keeps the operator label for a rich detail, and falls back to the raw type', () => {
@@ -262,12 +278,16 @@ describe('buildConsentView labels (US3)', () => {
 			details: { rar: [{ type: 'urn:t', actions: ['a'] }] },
 			rarLabels: { 'urn:t': 'Do a thing' }
 		});
-		expect(labelled.permissions[0]!.label).toBe('Do a thing');
+		expect(
+			present(labelled.permissions[0], 'labelled.permissions[0]').label
+		).toBe('Do a thing');
 
 		const unlabelled = buildConsentView({
 			...base,
 			details: { rar: [{ type: 'urn:t', actions: ['a'] }] }
 		});
-		expect(unlabelled.permissions[0]!.label).toBe('urn:t');
+		expect(
+			present(unlabelled.permissions[0], 'unlabelled.permissions[0]').label
+		).toBe('urn:t');
 	});
 });

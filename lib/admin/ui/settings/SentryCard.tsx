@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Button, Card, Form, Input, Tag, Typography, message } from 'antd';
 
 interface SentryView {
@@ -41,18 +41,18 @@ export function SentryCard() {
 	const [saving, setSaving] = useState(false);
 	const [view, setView] = useState<SentryView | null>(null);
 
-	async function load() {
-		setLoading(true);
+	// Every state write follows an await: `loading` starts true, so the mount has nothing to set first.
+	const load = useCallback(async () => {
 		try {
 			const res = await fetch('/admin/api/settings/sentry');
 			if (res.ok) setView((await res.json()) as SentryView);
 		} finally {
 			setLoading(false);
 		}
-	}
-	useEffect(() => {
-		load();
 	}, []);
+	useEffect(() => {
+		void load();
+	}, [load]);
 
 	/*
 	 * `enabled` is echoed back at whatever the card last read, because the endpoint is a full replace.

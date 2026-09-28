@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
 	Table,
 	Button,
@@ -40,8 +40,9 @@ export function Buckets({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 	const [heldUsers, setHeldUsers] = useState(0);
 	const [destroying, setDestroying] = useState(false);
 
-	async function load() {
-		setLoading(true);
+	// Every state write follows an await, so the mount effect calls this without setting
+	// `loading` first; `load` is the reload, which does.
+	const fetchBuckets = useCallback(async () => {
 		try {
 			const [b, p] = await Promise.all([
 				fetch('/admin/api/buckets'),
@@ -52,10 +53,14 @@ export function Buckets({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 		} finally {
 			setLoading(false);
 		}
+	}, []);
+	function load() {
+		setLoading(true);
+		return fetchBuckets();
 	}
 	useEffect(() => {
-		load();
-	}, []);
+		void fetchBuckets();
+	}, [fetchBuckets]);
 
 	async function onCreate(values: CreateBucketValues) {
 		setCreating(true);

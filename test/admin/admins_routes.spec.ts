@@ -4,7 +4,7 @@ import { treaty } from '@elysiajs/eden';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { adminUserRoutes } from 'lib/admin/users/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { adminSessionStore, getUserStore } from 'lib/adapters/index.ts';
+import { getUserStore } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
 import { answered } from './answered.ts';

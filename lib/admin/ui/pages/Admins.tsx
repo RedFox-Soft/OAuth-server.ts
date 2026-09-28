@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
 	Table,
 	Button,
@@ -38,8 +38,9 @@ export function Admins() {
 	const [savingTotp, setSavingTotp] = useState(false);
 	const [form] = Form.useForm<CreateAdminValues>();
 
-	async function load() {
-		setLoading(true);
+	// Every state write follows an await, so the mount effect calls this without setting
+	// `loading` first; `load` is the reload, which does.
+	const fetchAdmins = useCallback(async () => {
 		try {
 			const [list, settings] = await Promise.all([
 				fetch('/admin/api/admins'),
@@ -53,6 +54,10 @@ export function Admins() {
 		} finally {
 			setLoading(false);
 		}
+	}, []);
+	function load() {
+		setLoading(true);
+		return fetchAdmins();
 	}
 
 	async function onToggleTotp(next: boolean) {
@@ -82,8 +87,8 @@ export function Admins() {
 	}
 
 	useEffect(() => {
-		load();
-	}, []);
+		void fetchAdmins();
+	}, [fetchAdmins]);
 
 	async function onCreate(values: CreateAdminValues) {
 		setCreating(true);

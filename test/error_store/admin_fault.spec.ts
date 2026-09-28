@@ -7,11 +7,7 @@ import { errorStore } from 'lib/adapters/index.ts';
 import { errorHandler } from 'lib/shared/authorization_error_handler.ts';
 import { adminApp } from 'lib/admin/index.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	adminAuditStore,
-	adminSessionStore,
-	getUserStore
-} from 'lib/adapters/index.ts';
+import { adminAuditStore, getUserStore } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { flushForTest, resetQueue } from 'lib/error_store/queue.ts';
 import { sessionFor } from '../admin_session.ts';

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { AdminSessionStore } from 'lib/adapters/memory/adminSessionStore.ts';
+import { present } from 'test/shape.js';
 
 /**
  * @proves A console session survives a read, is extended by activity, is gone after logout, and
@@ -21,11 +22,17 @@ describe('AdminSessionStore (memory)', () => {
 			absoluteTtlSeconds: 3600
 		});
 		expect(await store.find(s._id)).toMatchObject({ userId: 'u1' });
-		const before = (await store.find(s._id))!.expiresAt.getTime();
+		const before = present(
+			await store.find(s._id),
+			'(await store.find(s._id))'
+		).expiresAt.getTime();
 		await store.touch(s._id, 120);
-		expect((await store.find(s._id))!.expiresAt.getTime()).toBeGreaterThan(
-			before
-		);
+		expect(
+			present(
+				await store.find(s._id),
+				'(await store.find(s._id))'
+			).expiresAt.getTime()
+		).toBeGreaterThan(before);
 		await store.destroy(s._id);
 		expect(await store.find(s._id)).toBeNull();
 	});

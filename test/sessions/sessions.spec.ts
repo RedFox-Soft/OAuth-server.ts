@@ -17,7 +17,6 @@ import epochTime from '../../lib/helpers/epoch_time.ts';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
 
-const route = '/auth';
 const scope = 'openid';
 
 /**

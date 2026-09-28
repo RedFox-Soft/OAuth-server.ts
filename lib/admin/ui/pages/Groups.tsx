@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
 	Button,
 	Form,
@@ -205,8 +205,9 @@ export function Groups({
 	const [editing, setEditing] = useState<Group | null>(null);
 	const [form] = Form.useForm<{ name: string }>();
 
-	async function load() {
-		setLoading(true);
+	// Every state write follows an await, so the mount effect calls this without setting
+	// `loading` first; `load` is the reload, which does.
+	const fetchGroups = useCallback(async () => {
 		try {
 			const res = await fetch('/admin/api/groups');
 			if (res.ok) setGroups((await res.json()) as Group[]);
@@ -217,11 +218,15 @@ export function Groups({
 		} finally {
 			setLoading(false);
 		}
+	}, []);
+	function load() {
+		setLoading(true);
+		return fetchGroups();
 	}
 
 	useEffect(() => {
-		load();
-	}, []);
+		void fetchGroups();
+	}, [fetchGroups]);
 
 	function isOwner(group: Group): boolean {
 		if (isSuperAdmin) return true;

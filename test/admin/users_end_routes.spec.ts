@@ -6,7 +6,6 @@ import { bucketRoutes } from 'lib/admin/buckets/routes.ts';
 import { endUserRoutes } from 'lib/admin/users-end/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
-	adminSessionStore,
 	getUserStore,
 	getBucketStore,
 	getProjectStore
@@ -16,7 +15,6 @@ import {
 	ADMIN_SESSION_COOKIE,
 	UNASSIGNED_GROUP_ID
 } from 'lib/admin/consts.ts';
-import type { UserBucket } from 'lib/adapters/types.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
 import { answered } from './answered.ts';
 

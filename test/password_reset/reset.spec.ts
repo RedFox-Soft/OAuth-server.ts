@@ -28,6 +28,7 @@ import {
 import { REQUEST_COOLDOWN_SECONDS } from 'lib/password_reset/consts.ts';
 import { throttleKey as throttleKeyFor } from 'lib/login_throttle/throttle.ts';
 import { elysia } from 'lib/index.ts';
+import { present } from 'test/shape.js';
 
 const CLIENT_ID = 'reset-app';
 const OTHER_CLIENT_ID = 'reset-other-app';
@@ -67,9 +68,11 @@ async function seedUser(email: string, area = bucketId) {
 
 async function requestReset(email: string, clientId = CLIENT_ID) {
 	const { uid, cookie } = await startInteraction(clientId);
-	const result = await agent
-		.ui({ uid })
-		['forgot-password'].post({ email }, { headers: { cookie } });
+	const screens = agent.ui({ uid });
+	const result = await screens['forgot-password'].post(
+		{ email },
+		{ headers: { cookie } }
+	);
 	// `data` travels with the result so callers can compare rendered pages, not just statuses.
 	return { uid, cookie, response: result.response, data: result.data };
 }
@@ -214,7 +217,9 @@ describe('password reset — the journey (US1)', () => {
 		expect(response.status).toBe(200);
 		expect(sentEmails.length).toBe(1);
 		expect(sentEmails[0]?.to).toBe(email);
-		expect(extractResetUrl(sentEmails[0]!)).toContain('/reset-password?token=');
+		expect(extractResetUrl(present(sentEmails[0], 'sentEmails[0]'))).toContain(
+			'/reset-password?token='
+		);
 	});
 
 	it('renders a form from the emailed link (scenario 2)', async () => {
@@ -292,9 +297,8 @@ describe('password reset — the journey (US1)', () => {
 			.login.get({ headers: { cookie } });
 		expect(bodyOf(loginPage)).toContain(`/ui/${uid}/forgot-password`);
 
-		const form = await agent
-			.ui({ uid })
-			['forgot-password'].get({ headers: { cookie } });
+		const screens = agent.ui({ uid });
+		const form = await screens['forgot-password'].get({ headers: { cookie } });
 		expect(form.response.status).toBe(200);
 		expect(bodyOf(form)).toContain('name="email"');
 	});

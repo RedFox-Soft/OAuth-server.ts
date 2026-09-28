@@ -20,6 +20,8 @@ export class PushedAuthorizationRequest extends consumable(
 	declare payload: PushedAuthorizationRequestPayloadType & { kind: string };
 	static schema = PushedAuthorizationRequestPayload;
 
+	// Not useless: it narrows the parameter so a new request may omit `consumed`, which the mixin sets.
+	// eslint-disable-next-line @typescript-eslint/no-useless-constructor
 	constructor(
 		payload: Omit<PushedAuthorizationRequestPayloadType, 'consumed'> & {
 			consumed?: boolean | number;

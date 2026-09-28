@@ -5,11 +5,7 @@ import { elysia } from 'lib/index.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	getUserStore,
-	getProjectStore,
-	adminSessionStore
-} from 'lib/adapters/index.ts';
+import { getUserStore, getProjectStore } from 'lib/adapters/index.ts';
 import {
 	ADMIN_BUCKET_ID,
 	ADMIN_SESSION_COOKIE,
