@@ -3,6 +3,7 @@ import { Elysia } from 'elysia';
 import { adminApiRoutes } from '../admin/routes.js';
 import { ISSUER } from '../configs/env.js';
 import { pathArgName, type McpTool } from './catalogue.js';
+import { markDispatched } from './channel.js';
 import { CONFIRMATION_ARG } from './confirm.js';
 
 /*
@@ -120,11 +121,13 @@ export async function dispatchTool(
 	};
 
 	const response = await admin.handle(
-		new Request(url, {
-			method: tool.method,
-			headers,
-			...(body !== undefined ? { body: JSON.stringify(body) } : {})
-		})
+		markDispatched(
+			new Request(url, {
+				method: tool.method,
+				headers,
+				...(body !== undefined ? { body: JSON.stringify(body) } : {})
+			})
+		)
 	);
 
 	const text = await response.text();

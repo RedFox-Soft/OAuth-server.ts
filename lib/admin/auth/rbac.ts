@@ -7,6 +7,7 @@ import {
 } from '../../adapters/index.js';
 import type { Group, Project, UserBucket } from '../../adapters/types.js';
 import { ApplicationConfig } from '../../configs/application.js';
+import { isDispatched } from '../../mcp/channel.js';
 import {
 	ADMIN_BUCKET_ID,
 	ADMIN_SESSION_COOKIE,
@@ -332,11 +333,19 @@ export const resolveAdmin = new Elysia({ name: 'admin-resolve' }).derive(
 		 *
 		 * Gated on the capability being switched on, so a deployment running with `mcp.enabled` off
 		 * accepts no bearer credential on the admin plane at all.
+		 *
+		 * And accepted only from the agent surface's own dispatch (`lib/mcp/channel.ts`), never from the
+		 * network: what an agent is withheld from or asked to confirm is decided in the `/mcp` transport,
+		 * and this plane is publicly mounted, so the same token presented here directly used to skip both.
 		 */
 		// Bound to a local so the narrowing survives into the call below: `headers` is a bag of
 		// `string | undefined`, and `resolveMcpPrincipal` asks for a credential it can count on.
 		const authorization = headers.authorization;
-		if (!authorization || !ApplicationConfig['mcp.enabled']) {
+		if (
+			!authorization ||
+			!ApplicationConfig['mcp.enabled'] ||
+			!isDispatched(request)
+		) {
 			return { admin: null };
 		}
 		/*

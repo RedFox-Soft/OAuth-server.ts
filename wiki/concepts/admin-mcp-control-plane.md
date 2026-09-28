@@ -158,6 +158,16 @@ Two things make it work at all, and neither is obvious:
 RFC 9728 metadata is **path-aware**: a resource at `/mcp` publishes at
 `/.well-known/oauth-protected-resource/mcp`, not the bare well-known root.
 
+**The token is accepted only through `/mcp`** (since 2026-09-28). The bearer arm of `resolveAdmin`
+answers only for a request `dispatchTool` built and marked (`lib/mcp/channel.ts`, a `WeakSet<Request>`
+nothing arriving from the network can be in). Before, it answered on the publicly mounted `/admin/api/*`
+as well, and everything below — the withheld operations, the confirmation — lives in the transport, so
+the same token sent straight to the REST routes deleted a project, permitted another client identity
+and deleted a signing key with no confirmation. It gained the agent nothing its administrator lacked,
+but it made every agent-specific restriction advisory. `test/mcp/public_admin_api.spec.ts` is the
+attack. The DPoP verb collapse in `resolveAdmin` now applies only to dispatched requests, which is
+where it was always meant to.
+
 ## What agents may not do
 
 Deleting a project, a user bucket, or a **group** is withheld — not confirmation-gated, absent. These

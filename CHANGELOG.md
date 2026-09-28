@@ -38,6 +38,13 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   turned the victim's first federated sign-in into access for the registrant. The identity now waits on
   the interaction and is linked once that account's own sign-in completes, second factor included; an
   account that already holds an upstream identity links as before.
+- **An agent's token no longer works on the management API directly.** What an agent is withheld
+  from and asked to confirm is decided in the `/mcp` transport, but the management API accepted the
+  same token from the network too, so an agent able to make an HTTP request could delete a project,
+  bucket or group, permit another client identity onto the administrative plane, or delete a signing
+  key without confirmation. The token is now accepted there only for requests the agent surface
+  dispatches itself. The threat model also states that the confirmation step is answered by the same
+  agent it asks.
 
 ## [0.6.0] - 2026-09-28
 
