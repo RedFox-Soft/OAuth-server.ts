@@ -4,7 +4,7 @@ title: 'Testing the MongoDB adapter: two tiers, and why the default suite stays 
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-26
-updated: 2026-09-11
+updated: 2026-09-28
 ---
 
 # Testing the MongoDB adapter: two tiers, and why the default suite stays hermetic
@@ -38,6 +38,8 @@ This tier lives in `test/storage_contract/`, runs in the default `bun test`, and
 constitutional change to exist. It is `mongo_bson_round_trip.spec.ts`, and it covers both singleton
 secrets' byte round trip plus the two translation commitments the store's own comment makes: any
 binary subtype is unwrapped, and a value that is not binary passes through for the caller to refuse.
+Since 2026-09-28 it also runs the real admin-session and bucket stores, to prove a member their writers
+leave undefined is stored as absent rather than as BSON null.
 Removing the unwrap now fails three of its cases. The `Date` in `expiresAt`, and any other field a
 store reads back and type-checks, remain uncovered and are the obvious next additions.
 

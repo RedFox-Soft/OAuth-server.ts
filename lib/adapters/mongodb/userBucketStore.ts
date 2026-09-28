@@ -1,4 +1,5 @@
 import { db } from './db.js';
+import { ABSENT_UNDEFINED } from './write_options.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
 import { provisionUserArea } from './provision.js';
 import { documentOf } from '../documents.js';
@@ -81,7 +82,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 			updatedAt: now
 		};
 		try {
-			await this.collection.insertOne(bucket);
+			await this.collection.insertOne(bucket, ABSENT_UNDEFINED);
 		} catch (error) {
 			if (data.host !== undefined && isDuplicateKey(error)) {
 				throw new UniqueValueTaken('host', data.host);
@@ -175,7 +176,8 @@ export class UserBucketStore implements UserBucketStoreInstance {
 			await this.collection.findOneAndUpdate(
 				{ _id: id },
 				{ $set: { ...patch, updatedAt: new Date() } },
-				{ returnDocument: 'after' }
+				// A federation list carries providers whose optional secrets may be undefined.
+				{ returnDocument: 'after', ...ABSENT_UNDEFINED }
 			)
 		);
 	}

@@ -1,4 +1,5 @@
 import { db } from './db.js';
+import { ABSENT_UNDEFINED } from './write_options.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
 import { documentOf } from '../documents.js';
 import {
@@ -40,7 +41,7 @@ export class McpClientPermissionStore implements McpClientPermissionStoreInstanc
 				: {}),
 			createdAt: new Date()
 		};
-		await this.collection.insertOne(entry);
+		await this.collection.insertOne(entry, ABSENT_UNDEFINED);
 		return entry;
 	}
 

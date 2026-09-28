@@ -1,4 +1,5 @@
 import { db } from './db.js';
+import { ABSENT_UNDEFINED } from './write_options.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
 import { documentOf } from '../documents.js';
 import { Group, type GroupMember, type GroupStoreInstance } from '../types.js';
@@ -30,7 +31,7 @@ export class GroupStore implements GroupStoreInstance {
 			createdAt: now,
 			updatedAt: now
 		};
-		await this.collection.insertOne(group);
+		await this.collection.insertOne(group, ABSENT_UNDEFINED);
 		return group;
 	}
 

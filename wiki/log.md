@@ -95,3 +95,4 @@ Operations:
 - 2026-09-28 — corrected [[client-identity-from-database]] and [[token-payload-access-contract]]: `adapter()` answers `Record<string, unknown>` from every backend; directly read areas go through `checkedAdapter(name, schema)`.
 - 2026-09-28 — added [[stored-document-schemas]]; corrected [[postgresql-backend]]: `postgres/dates.ts` is gone, dates are revived by schema in `documentOf`.
 - 2026-09-28 — corrected [[postgresql-backend]]: array parameters need `handle.array` (every account update and group-filtered audit read threw), and Bun's SQLSTATE is in `errno` (unique-violation classification never matched).
+- 2026-09-28 — corrected [[token-payload-access-contract]], [[stored-document-schemas]] and [[mongodb-test-fidelity]]: checkedAdapter throws on a refused record; MongoDB writers store undefined as absent (`ABSENT_UNDEFINED`).

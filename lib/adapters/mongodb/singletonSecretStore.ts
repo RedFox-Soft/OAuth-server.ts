@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { Binary, ObjectId } from 'mongodb';
 import { db } from './db.js';
+import { ABSENT_UNDEFINED } from './write_options.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
 import type { SecretStoreInstance } from '../types.js';
 
@@ -64,7 +65,10 @@ export class SingletonSecretStore implements SecretStoreInstance {
 		try {
 			await db
 				.collection(this.collectionName)
-				.insertOne({ _id: this.secretId, secret, updatedAt: new Date() });
+				.insertOne(
+					{ _id: this.secretId, secret, updatedAt: new Date() },
+					ABSENT_UNDEFINED
+				);
 		} catch (err) {
 			if (!isDuplicateKey(err)) {
 				throw err;

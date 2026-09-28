@@ -57,7 +57,7 @@ import type {
 } from './types.js';
 import { selectBackend } from './selectBackend.js';
 import type { Static, TObject } from '@sinclair/typebox';
-import { Value } from '@sinclair/typebox/value';
+import { documentOf } from './documents.js';
 import { withDeadline } from '../helpers/deadline.js';
 
 let Adapter: ModelAdapterConstructor = MemoryAdapter;
@@ -261,7 +261,9 @@ export function adapter(name: string): ModelAdapter<StoredRecord> {
 
 /*
  * An area read directly rather than through a model class, typed by its own schema and checked by it on
- * every read: a record the schema refuses is not found, exactly as BaseModel.fromStored treats one.
+ * every read (`documentOf`). A record the schema refuses is a defect and throws, as a store document
+ * does — not "not found", which for these areas would fail open: a login throttle or a resend window
+ * that reads as absent is a fresh allowance, and a challenge that reads as absent can be re-issued.
  */
 export function checkedAdapter<S extends TObject>(
 	name: string,
@@ -269,7 +271,7 @@ export function checkedAdapter<S extends TObject>(
 ): ModelAdapter<Static<S>> {
 	const raw = adapter(name);
 	const checked = (record: StoredRecord | undefined): Static<S> | undefined =>
-		record !== undefined && Value.Check(schema, record) ? record : undefined;
+		record === undefined ? undefined : documentOf(name, schema, record);
 	return {
 		upsert: (id, payload, expiresIn) => raw.upsert(id, payload, expiresIn),
 		find: async (id) => checked(await raw.find(id)),

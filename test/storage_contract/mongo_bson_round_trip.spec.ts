@@ -30,10 +30,21 @@ import { shaped } from 'test/shape.js';
 
 const documents = new Map<string, Record<string, unknown>>();
 
-/* What the driver does to a document on the way to disk and back. The whole point of the file. */
-function throughBSON(doc: Record<string, unknown>): Record<string, unknown> {
-	return BSON.deserialize(BSON.serialize(doc));
+/*
+ * What the driver does to a document on the way to disk and back. The whole point of the file. The
+ * options are the write's own: `ignoreUndefined` is what decides whether an undefined member reaches
+ * the disk as null.
+ */
+function throughBSON(
+	doc: Record<string, unknown>,
+	options?: { ignoreUndefined?: boolean }
+): Record<string, unknown> {
+	return BSON.deserialize(BSON.serialize(doc, options));
 }
+
+// The secret stores key by a derived ObjectId, the others by a string id.
+const keyOf = (id: unknown): string =>
+	id instanceof ObjectId ? id.toHexString() : String(id);
 
 function duplicateKey(): Error & { code: number } {
 	return Object.assign(new Error('E11000 duplicate key'), { code: 11000 });
@@ -41,21 +52,28 @@ function duplicateKey(): Error & { code: number } {
 
 mock.module('lib/adapters/mongodb/db.js', () => ({
 	db: {
+		/* Creating a bucket provisions its user area; that the area exists is all this file needs. */
+		listCollections: () => ({ hasNext: async () => true }),
+		createCollection: async () => {},
 		collection: () => ({
-			async findOne(filter: { _id: ObjectId }) {
-				return documents.get(filter._id.toHexString()) ?? null;
+			createIndex: async () => 'index',
+			async findOne(filter: { _id: unknown }) {
+				return documents.get(keyOf(filter._id)) ?? null;
 			},
-			async insertOne(doc: { _id: ObjectId } & Record<string, unknown>) {
-				const key = doc._id.toHexString();
+			async insertOne(
+				doc: { _id: unknown } & Record<string, unknown>,
+				options?: { ignoreUndefined?: boolean }
+			) {
+				const key = keyOf(doc._id);
 				if (documents.has(key)) throw duplicateKey();
-				documents.set(key, throughBSON(doc));
+				documents.set(key, throughBSON(doc, options));
 				return { acknowledged: true };
 			},
 			async updateOne(
-				filter: { _id: ObjectId },
+				filter: { _id: unknown },
 				update: { $set: Record<string, unknown> }
 			) {
-				const key = filter._id.toHexString();
+				const key = keyOf(filter._id);
 				const current = documents.get(key);
 				if (!current) return { matchedCount: 0 };
 				documents.set(key, throughBSON({ ...current, ...update.$set }));
@@ -68,6 +86,10 @@ mock.module('lib/adapters/mongodb/db.js', () => ({
 
 const { SingletonSecretStore } =
 	await import('lib/adapters/mongodb/singletonSecretStore.js');
+const { AdminSessionStore } =
+	await import('lib/adapters/mongodb/adminSessionStore.js');
+const { UserBucketStore } =
+	await import('lib/adapters/mongodb/userBucketStore.js');
 
 /* The store derives its _id from the document name, so seeding a case directly uses the same rule. */
 function idFor(documentName: string): string {
@@ -166,5 +188,46 @@ describe('a singleton secret in MongoDB storage', () => {
 
 	it('reads nothing when the secret has never been provisioned', async () => {
 		expect(await new SingletonSecretStore('pairwiseSalt').read()).toBeNull();
+	});
+});
+
+/**
+ * @proves A member a MongoDB writer leaves undefined is stored as absent, not as the BSON null the
+ * driver writes by default — so the stored document has the shape its type declares, and nothing reads
+ * a null where its writer meant nothing.
+ */
+describe('an optional member left undefined in MongoDB storage', () => {
+	beforeEach(() => documents.clear());
+
+	/* Every console session: the admin client has no refresh-token grant, so the token is undefined. */
+	it('stores an admin session with no refresh token without one', async () => {
+		const session = await new AdminSessionStore().create({
+			userId: 'u-1',
+			bucketId: 'b-1',
+			activeGroupId: 'g-1',
+			tokens: { accessToken: 'a', idToken: 'i', refreshToken: undefined },
+			ttlSeconds: 60,
+			absoluteTtlSeconds: 600
+		});
+
+		const stored = shaped(
+			Type.Object({ tokens: Type.Record(Type.String(), Type.Unknown()) }),
+			documents.get(session._id)
+		);
+		expect(Object.keys(stored.tokens).sort()).toEqual([
+			'accessToken',
+			'idToken'
+		]);
+	});
+
+	/* A bucket addressed by its host carries no slug. */
+	it('stores a bucket created without a slug without one', async () => {
+		const bucket = await new UserBucketStore().create({
+			name: 'hosted',
+			ownerGroupId: 'unassigned',
+			host: 'hosted.example.test'
+		});
+
+		expect(documents.get(bucket._id)).not.toHaveProperty('slug');
 	});
 });

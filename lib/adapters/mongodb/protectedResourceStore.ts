@@ -1,4 +1,5 @@
 import { db } from './db.js';
+import { ABSENT_UNDEFINED } from './write_options.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
 import { documentOf } from '../documents.js';
 import {
@@ -52,7 +53,7 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 			createdAt: now,
 			updatedAt: now
 		};
-		await this.collection.insertOne(resource);
+		await this.collection.insertOne(resource, ABSENT_UNDEFINED);
 		return resource;
 	}
 

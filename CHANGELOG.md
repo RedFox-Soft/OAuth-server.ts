@@ -11,6 +11,11 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- authorization: a client registered with `default_max_age: 0` is asked to sign in again on every
+  request, as `max_age=0` is. The default was applied as the string `"0"`, which skipped the
+  re-authentication rule and left it to whether a clock second had passed since sign-in.
+- MongoDB: a member a writer leaves undefined is stored as absent rather than as null — a console
+  session's refresh token, a host-addressed bucket's slug, a federation provider's secrets.
 - PostgreSQL: account updates (roles, password, TOTP, federated links) and group-filtered audit reads
   failed on every call — a JS array was bound as text PostgreSQL cannot read as an array. A lost race
   for a bucket hostname answered 500 instead of "taken", because Bun reports SQLSTATE in `errno`.
@@ -65,7 +70,8 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   Until now nothing checked a model's own schema, on construction or on read.
 - storage: records read without a model class — federation state, the login, reset and resend
   throttles, the verification and reset challenges, the TOTP records — are checked against their own
-  schema too, and one that does not match is treated as not found.
+  schema too, and one that does not match fails the request (a throttle read as absent would be a
+  fresh allowance).
 - storage: every PostgreSQL and MongoDB store document (accounts, buckets, groups, projects, sessions,
   audit, errors, keys, settings) is checked against its schema when read; one that does not match fails
   the request as a server error, recorded by the error store, instead of passing as the type. On

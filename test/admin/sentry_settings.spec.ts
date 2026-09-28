@@ -64,13 +64,15 @@ const previousStore = ApplicationConfig['errorStore.enabled'];
  * around each case rather than left to the store, because what `configured` reports is the value in
  * force, which is the point of this feature and no longer only what was persisted.
  */
-const sentryAsFound = {
+const settingsAsFound = {
 	'sentry.enabled': ApplicationConfig['sentry.enabled'],
-	'sentry.dsn': ApplicationConfig['sentry.dsn']
+	'sentry.dsn': ApplicationConfig['sentry.dsn'],
+	// Saved through the generic route by the last case, which applies it to the running process too.
+	'dpop.requireNonce': ApplicationConfig['dpop.requireNonce']
 };
 
-function restoreSentrySettings(): void {
-	Object.assign(ApplicationConfig, sentryAsFound);
+function restoreSettings(): void {
+	Object.assign(ApplicationConfig, settingsAsFound);
 }
 
 /**
@@ -82,13 +84,13 @@ describe('Sentry settings API', () => {
 		await ensureAdminSeed();
 		await configStore.set({});
 		ApplicationConfig['errorStore.enabled'] = previousStore;
-		restoreSentrySettings();
+		restoreSettings();
 	});
 
 	afterEach(async () => {
 		await configStore.set({});
 		ApplicationConfig['errorStore.enabled'] = previousStore;
-		restoreSentrySettings();
+		restoreSettings();
 	});
 
 	it('stores the credential and never returns it', async () => {

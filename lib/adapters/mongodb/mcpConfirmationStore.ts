@@ -1,4 +1,5 @@
 import { db } from './db.js';
+import { ABSENT_UNDEFINED } from './write_options.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
 import { documentOf } from '../documents.js';
 import {
@@ -25,7 +26,7 @@ export class McpConfirmationStore implements McpConfirmationStoreInstance {
 			createdAt: now,
 			expiresAt: new Date(now.getTime() + ttlSeconds * 1000)
 		};
-		await this.collection.insertOne(record);
+		await this.collection.insertOne(record, ABSENT_UNDEFINED);
 		return record;
 	}
 

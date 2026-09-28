@@ -5,6 +5,7 @@ import {
 	afterAll,
 	expect,
 	mock,
+	setSystemTime,
 	spyOn
 } from 'bun:test';
 import { decodeJwt } from 'jose';
@@ -78,6 +79,32 @@ describe('responds with a id_token containing auth_time', async () => {
 			});
 			expect(decodeJwt(id_token)).toHaveProperty('auth_time');
 		});
+	});
+
+	/*
+	 * A client's default_max_age applies exactly as a requested max_age (OIDC Core §5.1 / RFC 7591 §2),
+	 * so 0 demands re-authentication however recent the sign-in. The clock is held at the sign-in's own
+	 * second: that is the case the defect passed, because a string "0" skipped the max_age=0 → login
+	 * translation and was left to a comparison that is false when no second has elapsed.
+	 */
+	it('sends the user of a client whose default_max_age is 0 to sign in again, even within the same second', async function () {
+		const { loginTs } = setup.getSession();
+		if (loginTs === undefined) throw new Error('expected a signed-in session');
+		setSystemTime(loginTs * 1000);
+		try {
+			const auth = new AuthorizationRequest({
+				scope: 'openid',
+				client_id: 'client-with-default_max_age-zero'
+			});
+			const { response } = await agent.auth.get({
+				query: auth.params,
+				headers: { cookie }
+			});
+			expect(response.status).toBe(303);
+			auth.validateInteraction(response, 'login');
+		} finally {
+			setSystemTime();
+		}
 	});
 
 	it('carries auth_time for a client that registered require_auth_time', async function () {

@@ -37,6 +37,9 @@ for (const key of testSigningKeys) {
 	await jwksStore.set(key.kid, key);
 }
 
+// The settings baseline every bootstrap restores, taken now — after the keys above, before any spec.
+await import('./config_baseline.js');
+
 let policyControl: { reset(): void } | undefined;
 let rateLimiter: { resetRateLimiter(): void } | undefined;
 

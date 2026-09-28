@@ -1,4 +1,5 @@
 import { db } from './db.js';
+import { ABSENT_UNDEFINED } from './write_options.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
 import { documentOf } from '../documents.js';
 import {
@@ -40,7 +41,7 @@ export class GroupInvitationStore implements GroupInvitationStoreInstance {
 			acceptedAt: null,
 			createdAt: now
 		};
-		await this.collection.insertOne(invitation);
+		await this.collection.insertOne(invitation, ABSENT_UNDEFINED);
 		return invitation;
 	}
 

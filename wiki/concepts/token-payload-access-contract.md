@@ -48,7 +48,9 @@ The same rule holds below the models. `adapter(name)` (`lib/adapters/index.ts`) 
 `Record<string, unknown>` from every backend — it used to present them as `PayloadForModel<Name>`, a
 claim none of the three checked — and an area read directly rather than through a model class
 (FederationState, the throttles, the challenges, the TOTP records) goes through `checkedAdapter(name,
-schema)`, which checks each read against the area's own schema and treats a refused record as not found. Everything else on the class — `jti`, `exp`, TTL handling, persistence —
+schema)`, which checks each read against the area's own schema with `documentOf` and, like a store
+document, throws on a refused record — "not found" would fail open here, a throttle read as absent being
+a fresh allowance. Everything else on the class — `jti`, `exp`, TTL handling, persistence —
 reads and writes through `this.payload` (`lib/models/base_model.ts:44-72`, `144-159`).
 
 There are no generated per-field accessors. An earlier design mirrored payload fields onto the

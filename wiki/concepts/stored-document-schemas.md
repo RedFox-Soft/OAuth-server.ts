@@ -54,7 +54,10 @@ not a third). Model records differ on purpose: a token that fails its schema is 
   left `undefined` is stored as BSON null. Where the schema declares the member optional and does not
   admit null, null is read as the absence it was written as. Found before it shipped: every console
   session holds `tokens.refreshToken: null`, a host-addressed bucket `slug: null`, and a federation
-  provider update `signingKey: null` — each would otherwise have failed its read.
+  provider update `signingKey: null` — each would otherwise have failed its read. The writers now pass
+  `ABSENT_UNDEFINED` (`lib/adapters/mongodb/write_options.ts`) on every insert and on the bucket update,
+  so new documents carry no such null; the read rule stays for the ones already stored. The option is
+  never put on an operation whose filter could hold undefined — there it drops the condition.
 
 Nothing is sniffed from the value: a string that looks like a date stays a string unless the schema
 declares a date there.

@@ -52,13 +52,11 @@ import { isPlainObject } from 'lib/helpers/_/object.js';
 import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.js';
 export { Grant } from 'lib/models/grant.js';
 
-// Deep copies, and each bootstrap re-applies a fresh deep copy of them. A shallow snapshot shares
-// every nested value (`discovery`, `claims`, `scopes`, `clientAuthMethods`, ...) with the live
-// config, so one spec mutating a nested object in place poisons the baseline itself and the
-// mutation is re-applied by every later bootstrap — a leak no per-spec `finally` restore can undo,
-// because restoring the *reference* leaves the mutated object sitting in the baseline.
-const applicationDefaultSettings = structuredClone(ApplicationConfig);
-const clientDefaultSettings = structuredClone(ClientDefaults);
+// Taken before the first spec runs, not here — see test/config_baseline.ts for why that matters.
+import {
+	applicationDefaultSettings,
+	clientDefaultSettings
+} from './config_baseline.js';
 const testClaims = sharedTestClaims().claims;
 
 /*

@@ -1,5 +1,6 @@
 import { Type as t, type Static } from '@sinclair/typebox';
 import { db } from './db.js';
+import { ABSENT_UNDEFINED } from './write_options.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
 import { documentOf } from '../documents.js';
 import type {
@@ -55,11 +56,14 @@ export class SchemaMigrationStore implements SchemaMigrationStoreInstance {
 	 */
 	async record(entry: SchemaMigrationRecord): Promise<void> {
 		try {
-			await this.collection().insertOne({
-				_id: entry.id,
-				appliedAt: entry.appliedAt,
-				checksum: entry.checksum
-			});
+			await this.collection().insertOne(
+				{
+					_id: entry.id,
+					appliedAt: entry.appliedAt,
+					checksum: entry.checksum
+				},
+				ABSENT_UNDEFINED
+			);
 		} catch (err) {
 			if (!isDuplicateKey(err)) throw err;
 		}

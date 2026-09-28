@@ -2,6 +2,7 @@ import { Type as t } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
 import type { Filter } from 'mongodb';
 import { db } from './db.js';
+import { ABSENT_UNDEFINED } from './write_options.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
 import { documentOf } from '../documents.js';
 import {
@@ -190,7 +191,7 @@ export class ErrorStore implements ErrorStoreInstance {
 		};
 
 		try {
-			await this.collection.insertOne(group);
+			await this.collection.insertOne(group, ABSENT_UNDEFINED);
 			return group;
 		} catch {
 			/*

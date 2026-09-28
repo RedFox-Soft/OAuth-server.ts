@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { db } from './db.js';
+import { ABSENT_UNDEFINED } from './write_options.js';
 import { userAreaFor } from '../../consts/storage_inventory.js';
 import { documentOf } from '../documents.js';
 import { User, type UserStoreInstance } from '../types.js';
@@ -78,7 +79,9 @@ export class UserStore implements UserStoreInstance {
 			updatedAt: now,
 			lastLoginAt: null
 		};
-		await db.collection<User>(this.collectionName).insertOne(user);
+		await db
+			.collection<User>(this.collectionName)
+			.insertOne(user, ABSENT_UNDEFINED);
 		return user;
 	}
 

@@ -1,5 +1,6 @@
 import type { Filter } from 'mongodb';
 import { db } from './db.js';
+import { ABSENT_UNDEFINED } from './write_options.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
 import { documentOf } from '../documents.js';
 import {
@@ -89,7 +90,7 @@ export class AdminAuditStore implements AdminAuditStoreInstance {
 			timestamp: new Date(),
 			...entry
 		};
-		await this.collection.insertOne(saved);
+		await this.collection.insertOne(saved, ABSENT_UNDEFINED);
 		return saved;
 	}
 

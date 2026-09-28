@@ -1,4 +1,5 @@
 import { db } from './db.js';
+import { ABSENT_UNDEFINED } from './write_options.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
 import { documentOf } from '../documents.js';
 import { AdminSession, type AdminSessionStoreInstance } from '../types.js';
@@ -34,7 +35,7 @@ export class AdminSessionStore implements AdminSessionStoreInstance {
 				now.getTime() + data.absoluteTtlSeconds * 1000
 			)
 		};
-		await this.collection.insertOne(session);
+		await this.collection.insertOne(session, ABSENT_UNDEFINED);
 		return session;
 	}
 

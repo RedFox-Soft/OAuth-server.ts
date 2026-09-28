@@ -12,6 +12,8 @@ export default function assignDefaults(oidc: OIDCContext<PipelineParams>) {
 	}
 
 	if (params.max_age === undefined && client.defaultMaxAge !== undefined) {
-		params.max_age = client.defaultMaxAge.toString();
+		// A number, as a requested max_age is once validated: checkMaxAge turns only a numeric 0 into
+		// prompt=login, so a string "0" left a client's default_max_age of 0 to a clock-second race.
+		params.max_age = client.defaultMaxAge;
 	}
 }

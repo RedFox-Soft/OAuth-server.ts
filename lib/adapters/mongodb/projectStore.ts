@@ -1,4 +1,5 @@
 import { db } from './db.js';
+import { ABSENT_UNDEFINED } from './write_options.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
 import { documentOf } from '../documents.js';
 import { Project, type ProjectStoreInstance } from '../types.js';
@@ -47,7 +48,7 @@ export class ProjectStore implements ProjectStoreInstance {
 			createdAt: now,
 			updatedAt: now
 		};
-		await this.collection.insertOne(project);
+		await this.collection.insertOne(project, ABSENT_UNDEFINED);
 		return project;
 	}
 
