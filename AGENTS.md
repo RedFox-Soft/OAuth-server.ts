@@ -36,8 +36,9 @@ The third exists because the constitution requires an agent to be able to do wha
 ```sh
 bun start               # start server (port 3000)
 bun test                # run all tests
-bun run format          # prettier --write
+bun run format          # prettier --write (CI runs `prettier --check .`)
 bun run lint            # eslint --fix (CI runs `bunx eslint .` and fails on any error)
+bun run typecheck       # tsc --noEmit — bun test strips types without checking them
 bun run build           # bundle React login client → public/
 bun run watch           # watch-mode bundle for loginClient.tsx
 bun run db:setup        # provision MongoDB (idempotent)
@@ -232,7 +233,8 @@ stays green. Verify with `cd website && bun run check && bun run build`.
   enforces).
 - No `any` — use proper types or `unknown` with narrowing.
 - No comments explaining _what_ — only _why_ when non-obvious.
-- `bun run format` and `bun run lint` must pass before committing.
+- `bun run format`, `bun run lint` and `bun run typecheck` must pass before committing; CI fails on any
+  of the three.
 
 ---
 

@@ -189,7 +189,7 @@ const seedNow = new Date();
  * bucket, which are given it as a formality: both sit outside the group model and every route touching
  * them refuses before ownership is consulted. Mirrors lib/admin/seed.ts, which is the test-only seed.
  */
-await db.collection(STORE_AREAS.groups).updateOne(
+await db.collection<{ _id: string }>(STORE_AREAS.groups).updateOne(
 	{ _id: UNASSIGNED_GROUP_ID },
 	{
 		// `$set` rather than `$setOnInsert` for the name alone, so a database seeded under the group's
@@ -217,7 +217,7 @@ await db.collection(STORE_AREAS.groups).updateOne(
  * The filter is what keeps it from becoming a rename: it writes only where there is nothing to
  * overwrite. `lib/admin/seed.ts` states the same rule through `repairReservedSlug`.
  */
-await db.collection(STORE_AREAS.userBuckets).updateOne(
+await db.collection<{ _id: string }>(STORE_AREAS.userBuckets).updateOne(
 	{ _id: ADMIN_BUCKET_ID },
 	{
 		$setOnInsert: {
@@ -229,7 +229,7 @@ await db.collection(STORE_AREAS.userBuckets).updateOne(
 	{ upsert: true }
 );
 await db
-	.collection(STORE_AREAS.userBuckets)
+	.collection<{ _id: string }>(STORE_AREAS.userBuckets)
 	.updateOne(
 		{ _id: ADMIN_BUCKET_ID, slug: { $exists: false } },
 		{ $set: { slug: ADMIN_BUCKET_SEED.slug } }
@@ -238,7 +238,7 @@ await db
 // every client not assigned to a project (see resolveBucketForClient). Seeded here
 // so it is manageable in the admin Buckets UI. Mirrors ensureAdminSeed (lib/admin/seed.ts),
 // which db:setup does not call — this script owns the deployment seed.
-await db.collection(STORE_AREAS.userBuckets).updateOne(
+await db.collection<{ _id: string }>(STORE_AREAS.userBuckets).updateOne(
 	{ _id: 'redfox' },
 	{
 		$setOnInsert: {
@@ -251,12 +251,12 @@ await db.collection(STORE_AREAS.userBuckets).updateOne(
 );
 /* Same repair, same reason — see the administrators bucket above. */
 await db
-	.collection(STORE_AREAS.userBuckets)
+	.collection<{ _id: string }>(STORE_AREAS.userBuckets)
 	.updateOne(
 		{ _id: 'redfox', slug: { $exists: false } },
 		{ $set: { slug: DEFAULT_BUCKET_SEED.slug } }
 	);
-await db.collection(STORE_AREAS.projects).updateOne(
+await db.collection<{ _id: string }>(STORE_AREAS.projects).updateOne(
 	{ _id: ADMIN_PROJECT_ID },
 	{
 		$setOnInsert: {
@@ -272,7 +272,7 @@ await db.collection(STORE_AREAS.projects).updateOne(
  * not touch it — so the id is added explicitly. Without it the client exists but belongs to no project,
  * `resolveBucketForClient` routes it to the default bucket, and an administrator cannot sign an agent in.
  */
-await db.collection(STORE_AREAS.projects).updateOne(
+await db.collection<{ _id: string }>(STORE_AREAS.projects).updateOne(
 	{ _id: ADMIN_PROJECT_ID },
 	{
 		$addToSet: {
@@ -287,7 +287,7 @@ await db.collection(STORE_AREAS.projects).updateOne(
  */
 const CLIENT_AREA: ModelAreaName = 'Client';
 
-await db.collection(CLIENT_AREA).updateOne(
+await db.collection<{ _id: string }>(CLIENT_AREA).updateOne(
 	{ _id: ADMIN_CLIENT_ID },
 	{
 		$setOnInsert: {
@@ -305,7 +305,7 @@ await db.collection(CLIENT_AREA).updateOne(
  * Public with mandatory PKCE, so there is no secret to distribute, and native/loopback redirect URIs
  * because that is what a local MCP client can receive a code on.
  */
-await db.collection(CLIENT_AREA).updateOne(
+await db.collection<{ _id: string }>(CLIENT_AREA).updateOne(
 	{ _id: ADMIN_MCP_CLIENT_ID },
 	{
 		$setOnInsert: {
@@ -389,7 +389,7 @@ for (const bucket of buckets) {
 const baselined: string[] = [];
 for (const migration of MIGRATIONS) {
 	const result = await db
-		.collection(STORE_AREAS.schemaMigrations)
+		.collection<{ _id: string }>(STORE_AREAS.schemaMigrations)
 		.updateOne(
 			{ _id: migration.id },
 			{ $setOnInsert: { appliedAt: seedNow, checksum: checksumOf(migration) } },

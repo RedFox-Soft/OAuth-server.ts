@@ -37,6 +37,13 @@ jobs:
       - name: Lint
         run: bunx eslint .
 
+      # `bun test` strips types without checking them, so a type error reaches main unless this runs.
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Check formatting
+        run: bunx prettier --check .
+
       - name: Run tests with coverage
         run: bun test --coverage --coverage-reporter=lcov
 

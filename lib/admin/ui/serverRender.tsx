@@ -9,10 +9,13 @@ import { ZeroRuntime } from '../../html/zeroRuntime.js';
 
 const template = Bun.file('./lib/admin/ui/htmlTemplate.html');
 
-export async function renderAdminShell(props: {
+/* What the shell writes to `window.PROPS`, and so what adminClient.tsx reads back. */
+export interface AdminShellProps {
 	needsSetup: boolean;
 	me: AdminContext | null;
-}) {
+}
+
+export async function renderAdminShell(props: AdminShellProps) {
 	let html = await template.text();
 	html = html
 		.replace('/public/admin.js', versionedAsset('admin.js'))
