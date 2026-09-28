@@ -789,7 +789,12 @@ export const ui = new Elysia()
 				return Response.redirect(buildUIPath(uid, 'totp/enroll'), 303);
 			}
 
-			const outcome = await confirmEnrollment(uid, body.code);
+			const outcome = await confirmEnrollment(
+				uid,
+				pending.accountId,
+				bucketId,
+				body.code
+			);
 
 			if (!outcome.ok) {
 				/*

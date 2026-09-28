@@ -27,6 +27,11 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   rebuilt the record from the body alone, dropping the self-registration marking — which lifted the
   refusal of such clients on the administrative MCP surface — and the record of its first completed
   authorization, which returned a client in use to the sweep of unused registrations.
+- **An enrolment secret completes only the sign-in of the account it was offered to.** The password
+  step can be submitted again inside one interaction, and the secret was keyed by the interaction
+  alone: someone holding a victim's password but not their authenticator could sign in as an
+  unenrolled account of their own, take its secret, submit the victim's password and prove that
+  secret, leaving signed in as the victim with two factors recorded.
 
 ## [0.6.0] - 2026-09-28
 

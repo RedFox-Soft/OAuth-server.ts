@@ -17,9 +17,13 @@ import { TotpEnrollmentPayload } from './types.js';
  *
  * Records are keyed by the **interaction uid**, which decides three things at once. There is no
  * enrolment handle to put in a hidden form field, so none to leak or to guess. An enrolment can only be
- * completed from inside the interaction that started it, without a single ownership check. And a reload
- * or a wrong code re-reads the same record, so the same secret stays on screen — a fresh one per request
- * would mean a person who mistyped a digit has to delete and re-add the entry in their app.
+ * completed from inside the interaction that started it. And a reload or a wrong code re-reads the same
+ * record, so the same secret stays on screen — a fresh one per request would mean a person who mistyped
+ * a digit has to delete and re-add the entry in their app.
+ *
+ * The uid is not the whole ownership check, though. The password step can be submitted again inside
+ * one interaction, changing whose sign-in it is, so the record also names its account and bucket and
+ * both `offer` and `confirm` compare them with the sign-in's own.
  *
  * Nothing here writes to the account until a code proves possession, so an abandoned enrolment leaves
  * the account exactly as it was.
@@ -65,6 +69,14 @@ export interface Offer {
 	secretText: string;
 }
 
+function ownedBy(
+	pending: { accountId: string; bucketId: string },
+	accountId: string,
+	bucketId: string
+): boolean {
+	return pending.accountId === accountId && pending.bucketId === bucketId;
+}
+
 /*
  * The secret on offer for this interaction — created on the first call, and the *same one* on every
  * later call until it is confirmed or expires.
@@ -80,7 +92,15 @@ export async function offer(
 	// Compared rather than left to the store: MongoDB's TTL monitor deletes lazily, so an expired
 	// record can still be found for a while — the departure lib/password_reset/challenge.ts makes for
 	// the same reason, and it matters more here because this secret becomes a standing credential.
-	const live = existing && existing.exp > epochTime() ? existing : undefined;
+	//
+	// And re-offered only to the account it was minted for. The password step can be submitted again
+	// inside the same interaction, so the uid alone does not say whose secret this is.
+	const live =
+		existing &&
+		existing.exp > epochTime() &&
+		ownedBy(existing, accountId, bucketId)
+			? existing
+			: undefined;
 
 	const secret = live?.secret ?? encodeBase32(crypto.randomBytes(SECRET_BYTES));
 
@@ -110,13 +130,23 @@ export type ConfirmOutcome =
  * page: `expired` routes to a fresh secret, `invalid` re-renders the page already on screen, and
  * `gone` sends them back to the login door. Only the first two reach a person, and they reach them
  * as the same words.
+ *
+ * `accountId` and `bucketId` are the sign-in's, not the offer's: the caller completes the sign-in of
+ * the account the interaction now names, so a secret offered to anyone else is spent and refused as
+ * expired. Otherwise a code proved for one account enrolled that account and signed in another.
  */
 export async function confirm(
 	uid: string,
+	accountId: string,
+	bucketId: string,
 	code: string
 ): Promise<ConfirmOutcome> {
 	const pending = await enrollments().find(uid);
 	if (!pending || pending.exp <= epochTime()) {
+		return { ok: false, reason: 'expired' };
+	}
+	if (!ownedBy(pending, accountId, bucketId)) {
+		await enrollments().destroy(uid);
 		return { ok: false, reason: 'expired' };
 	}
 

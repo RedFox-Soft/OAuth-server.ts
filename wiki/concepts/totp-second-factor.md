@@ -4,7 +4,7 @@ title: 'The TOTP second factor'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-27
-updated: 2026-09-24
+updated: 2026-09-28
 graph:
   node_type: concept
   relationships:
@@ -46,7 +46,7 @@ collision resistance SHA-1 lost.
 |---|---|---|
 | The standing enrolment | `User.totp`, embedded | Deletion integrity. The account cascade destroys the row and bucket deletion destroys the area, so no cascade arm knows the field exists — the same reasoning `federated` records. |
 | The half-finished sign-in | `InteractionPayload.secondFactor` | Expiry. The interaction already has a TTL, so a sign-in stuck between the password and the code dies with the attempt it belongs to. No expiry logic exists for it. |
-| The unproved secret | `TotpEnrollment`, **keyed by the interaction uid** | No handle to leak or guess; completable only from inside the interaction that started it; and the same secret re-offered on every reload. |
+| The unproved secret | `TotpEnrollment`, **keyed by the interaction uid**, naming its account and bucket | No handle to leak or guess; completable only from inside the interaction that started it, and only for the account it was offered to; and the same secret re-offered on every reload. |
 | The failure window | `TotpAttempt`, id `${bucketId}:${accountId}` | Survives across interactions, which is the only way the throttle means anything. |
 
 **Present ⇔ enrolled.** There is no `enrolled` boolean beside the secret. Two fields claiming to say the
@@ -103,6 +103,18 @@ guessing that the account is real and that their guesses are landing.
 **No account window on enrolment**, only the per-interaction cap. The pending secret already expires on
 its own, and an account-wide lockout there would let a stranger who knows an email stop a real person
 from ever enrolling — the throttle would become the attack.
+
+## The uid does not say whose secret it is
+
+Keying the unproved secret by the interaction uid was once taken to need no ownership check. It does,
+because the password step can be submitted again inside one interaction and each submission replaces
+`secondFactor.accountId`. Until 2026-09-28 `confirm` enrolled whichever account the *offer* named
+while the route signed in whichever account the *interaction* named, so someone holding a victim's
+password but not their authenticator signed in as an unenrolled account of their own, took its secret,
+submitted the victim's password, and proved the first secret — leaving signed in as the victim with
+`amr: ['pwd', 'otp']`. The record names its account and bucket, `offer` re-offers a secret only to
+them (`lib/totp/enrollment.ts:84`), and `confirm` refuses anyone else as expired
+(`lib/totp/enrollment.ts:138`); `test/totp/enrolment_binding.spec.ts` is the attack.
 
 ## What deliberately did not change
 
