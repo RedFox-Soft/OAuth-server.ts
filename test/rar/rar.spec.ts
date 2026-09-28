@@ -320,7 +320,7 @@ describe('features.richAuthorizationRequests', () => {
 		it('completes the flow with no overrides registered and returns the details', async () => {
 			const auth = new AuthorizationRequest({
 				scope: 'openid',
-				resource: 'urn:rar:default',
+				resource: ['urn:rar:default'],
 				authorization_details: details(payment())
 			});
 			const session = await toConsent(auth, cookie);
@@ -365,7 +365,7 @@ describe('features.richAuthorizationRequests', () => {
 		it('presents the details as a top-level JWT claim', async () => {
 			const auth = new AuthorizationRequest({
 				scope: 'openid',
-				resource: 'urn:rar:jwt',
+				resource: ['urn:rar:jwt'],
 				authorization_details: details(payment())
 			});
 			const session = await toConsent(auth, cookie);
@@ -389,7 +389,7 @@ describe('features.richAuthorizationRequests', () => {
 		it('returns the details as a top-level introspection member', async () => {
 			const auth = new AuthorizationRequest({
 				scope: 'openid',
-				resource: 'urn:rar:default',
+				resource: ['urn:rar:default'],
 				authorization_details: details(payment())
 			});
 			const session = await toConsent(auth, cookie);
@@ -419,7 +419,7 @@ describe('features.richAuthorizationRequests', () => {
 			const auth = new AuthorizationRequest({
 				client_id: 'trusted',
 				scope: 'openid',
-				resource: 'urn:rar:default',
+				resource: ['urn:rar:default'],
 				authorization_details: details(payment())
 			});
 
@@ -439,7 +439,7 @@ describe('features.richAuthorizationRequests', () => {
 				grant_type: 'authorization_code',
 				code_verifier: auth.code_verifier,
 				code,
-				resource: 'urn:rar:default'
+				resource: ['urn:rar:default']
 			});
 			if (data === null) throw new Error('expected a success response');
 
@@ -456,7 +456,7 @@ describe('features.richAuthorizationRequests', () => {
 
 			const auth = new AuthorizationRequest({
 				scope: 'openid',
-				resource: 'urn:rar:default',
+				resource: ['urn:rar:default'],
 				authorization_details: details(payment())
 			});
 			const session = await toConsent(auth, cookie);
@@ -693,7 +693,7 @@ describe('features.richAuthorizationRequests', () => {
 		it('carries the details onto a refreshed access token', async () => {
 			const auth = new AuthorizationRequest({
 				scope: 'openid',
-				resource: 'urn:rar:default',
+				resource: ['urn:rar:default'],
 				authorization_details: details(payment())
 			});
 			const session = await toConsent(auth, cookie);
@@ -706,7 +706,7 @@ describe('features.richAuthorizationRequests', () => {
 				client_id: 'client',
 				grant_type: 'refresh_token',
 				refresh_token: data.refresh_token,
-				resource: 'urn:rar:default'
+				resource: ['urn:rar:default']
 			});
 
 			expect(refreshed.status).toBe(200);
@@ -733,7 +733,7 @@ describe('features.richAuthorizationRequests', () => {
 				client_id: 'client',
 				grant_type: 'refresh_token',
 				refresh_token: data.refresh_token,
-				resource: 'urn:rar:default'
+				resource: ['urn:rar:default']
 			});
 			if (!first.data) throw new Error('expected a token response');
 			expect(first.data.authorization_details).toEqual([
@@ -745,7 +745,7 @@ describe('features.richAuthorizationRequests', () => {
 				client_id: 'client',
 				grant_type: 'refresh_token',
 				refresh_token: first.data.refresh_token,
-				resource: 'urn:rar:other'
+				resource: ['urn:rar:other']
 			});
 			if (!second.data) throw new Error('expected a token response');
 			expect(second.data.authorization_details).toEqual([
@@ -851,7 +851,7 @@ describe('features.richAuthorizationRequests', () => {
 		it('omits the member entirely when no details were requested', async () => {
 			const auth = new AuthorizationRequest({
 				scope: 'openid',
-				resource: 'urn:rar:default'
+				resource: ['urn:rar:default']
 			});
 			const codeSpy = mock();
 			eventBus.once('authorization_code.saved', codeSpy);
@@ -878,7 +878,7 @@ describe('features.richAuthorizationRequests', () => {
 		it('omits the member when an empty array was requested', async () => {
 			const auth = new AuthorizationRequest({
 				scope: 'openid',
-				resource: 'urn:rar:default',
+				resource: ['urn:rar:default'],
 				authorization_details: '[]'
 			});
 			const codeSpy = mock();
