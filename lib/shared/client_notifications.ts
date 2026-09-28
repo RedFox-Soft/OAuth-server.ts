@@ -4,12 +4,17 @@ import nanoid from '../helpers/nanoid.ts';
 import { IdToken } from '../models/id_token.ts';
 import { type Client } from '../models/client/types.ts';
 import { type BackchannelAuthenticationRequest } from '../models/backchannel_authentication_request.ts';
+import { guardedFetch } from './egress.ts';
 
 /*
  * The notifications this server sends to a client. They perform network requests and mint a logout
  * token, so they are not part of the client model; they sit on one object so a test can replace a
  * notification the way it replaces any other outbound call.
+ *
+ * Both endpoints are addresses the client registered, so both go through the egress boundary: a
+ * notification is a POST this server makes to wherever a registrant pointed it.
  */
+const NOTIFICATION_TIMEOUT_MS = 5_000;
 export const clientNotifications = { ping, logout };
 
 async function ping(
@@ -32,7 +37,7 @@ async function ping(
 	}
 
 	const endpoint = client.backchannelClientNotificationEndpoint;
-	return fetch(new URL(endpoint).href, {
+	return guardedFetch(endpoint, {
 		method: 'POST',
 		headers: {
 			authorization: `Bearer ${notificationToken}`,
@@ -40,7 +45,8 @@ async function ping(
 		},
 		body: JSON.stringify({
 			auth_req_id: backchannelAuthenticationRequest.jti
-		})
+		}),
+		timeoutMs: NOTIFICATION_TIMEOUT_MS
 	}).then((response) => {
 		const { status } = response;
 		if (status !== 204 && status !== 200) {
@@ -72,14 +78,15 @@ async function logout(
 	}
 
 	// String(): what new URL() does to an absent value itself; callers check the URI is registered.
-	return fetch(new URL(String(client.backchannelLogoutUri)).href, {
+	return guardedFetch(String(client.backchannelLogoutUri), {
 		method: 'POST',
 		headers: {
 			'content-type': 'application/x-www-form-urlencoded'
 		},
 		body: new URLSearchParams({
 			logout_token: await logoutToken.issue('logout')
-		})
+		}),
+		timeoutMs: NOTIFICATION_TIMEOUT_MS
 	}).then((response) => {
 		const { status } = response;
 		if (status !== 200 && status !== 204) {

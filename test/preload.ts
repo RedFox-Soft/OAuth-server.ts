@@ -3,6 +3,7 @@ import { afterEach, beforeEach, setDefaultTimeout } from 'bun:test';
 import { jwksStore } from '../lib/adapters/index.js';
 import { resetToBaseline } from './addon_baseline.js';
 import { installFetchInterception } from './fetch_mock.js';
+import { resolver } from '../lib/shared/egress.js';
 import { testSigningKeys } from './jwks/fixtures.js';
 
 /*
@@ -30,6 +31,17 @@ setDefaultTimeout(20_000);
  * between Windows and CI and shifts every time a spec file is added or removed.
  */
 beforeEach(installFetchInterception);
+
+/*
+ * Name resolution is network too. Every outbound request to an address a client supplied checks what
+ * that name resolves to (lib/shared/egress.ts), and a spec naming `https://rp.example.com` means a
+ * public host, not whatever the machine running it can resolve today — an offline run would otherwise
+ * refuse it as unresolvable, and an online one would send the query. Each test starts with every name
+ * resolving to one public address; a spec about the address rules sets its own answer.
+ */
+beforeEach(() => {
+	resolver.lookup = async () => ['93.184.216.34'];
+});
 
 // Seed the in-memory jwksStore before any provider import so the store-loading path resolves to
 // known keys (replacing the former JWKS env-var seed). Runs as a Bun `preload`, ahead of all specs.

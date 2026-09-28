@@ -89,13 +89,30 @@ override answer for themselves. `test/resources/machine_access.spec.ts` is the a
 
 The current MCP authorization revision (2026-07-28) marks dynamic client registration **deprecated**
 and names OAuth Client ID Metadata Documents first. `lib/client_metadata_document/` implements that in
-four modules, and the split is deliberate: `fetch.ts` is the whole egress boundary and knows nothing
-about JSON shapes, so it can be reviewed for one question only — can a caller make this server talk to
-something it should not. It bounds the address classes it will reach, re-checks every redirect hop,
-stops at 5 KB (`MAX_DOCUMENT_BYTES`, `lib/client_metadata_document/fetch.ts:34`) and times out. The
-whole branch is gated on `clientIdMetadataDocument.enabled`, **off by default**
-(`lib/configs/application.ts:554`), because it lets an unauthenticated caller make this server issue an
-outbound request.
+four modules, and the split is deliberate: `fetch.ts` knows nothing about JSON shapes, so it can be
+reviewed for one question only — can a caller make this server talk to something it should not. It
+stops at 5 KB (`MAX_DOCUMENT_BYTES`, `lib/client_metadata_document/fetch.ts:33`) and keeps redirects on
+https; the address classes it will reach, the re-check of every redirect hop and the time bound are
+`lib/shared/egress.ts`'s. The whole branch is gated on `clientIdMetadataDocument.enabled`, **off by
+default** (`lib/configs/application.ts:554`), because it lets an unauthenticated caller make this server
+issue an outbound request.
+
+**It was not the only such request** (corrected 2026-09-28). `fetch.ts` used to say it was "the only
+place this server makes an outbound request on behalf of an unauthenticated caller", and three more
+went through plain `fetch`: the sector document (`sector_identifier_uri`), the client's key set
+(`jwks_uri`) and the back-channel notifications (CIBA ping, back-channel logout) — every one an address
+the registrant chose, and for a document-identified client the sector check ran on every `/auth`.
+Redirects were followed wherever they led, nothing refused `169.254.169.254` or `10/8`, nothing bounded
+time or size, and the sector refusal repeated the status the target answered, which made it a port
+scanner. The egress rules moved out of `fetch.ts` into `lib/shared/egress.ts` — `guardedFetch`
+(`:157`) and `readBounded` (`:211`), a streaming byte bound rather than a read-then-measure — and all
+four go through them. The sector refusal is now one message whatever went wrong.
+`test/egress/client_addresses.spec.ts` is the attack, and `test/preload.ts` resolves every name to one
+public address so no spec depends on the machine's DNS.
+
+Still outside it: federation discovery, token exchange and upstream key sets
+(`lib/federation/discovery.ts`, `flow.ts`, `jwks.ts`). Those addresses are an administrator's, not a
+stranger's, and jose's remote key set does its own fetching.
 
 Three traps live here.
 

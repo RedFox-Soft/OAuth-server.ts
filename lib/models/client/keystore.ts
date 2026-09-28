@@ -11,6 +11,15 @@ import certificateThumbprint from '../../helpers/certificate_thumbprint.ts';
 import { InvalidClientMetadata } from '../../helpers/errors.ts';
 import { isPlainObject } from '../../helpers/_/object.js';
 import { ECCurves, OKPCurves } from '../../configs/jwaConsts.js';
+import { guardedFetch, readBounded } from '../../shared/egress.js';
+
+/*
+ * A client's published key set is read while a token request or a signed request object waits on it.
+ * 256 KB holds hundreds of keys with certificate chains; five seconds is longer than any host that is
+ * serving one needs.
+ */
+const MAX_JWKS_BYTES = 256 * 1024;
+const JWKS_FETCH_TIMEOUT_MS = 5_000;
 
 // NOTE: client JWKS validation here is intentionally the mirror image of the
 // server-side `verifyJWKs` (lib/configs/verifyJWKs.ts): these are PUBLIC keys
@@ -161,14 +170,13 @@ export class ClientKeyStore extends KeyStore {
 
 		if (!this.lock) {
 			this.lock = (async () => {
-				const response = await fetch(new URL(jwksUri).href, {
-					method: 'GET',
-					headers: {
-						Accept: 'application/json'
-					}
+				// The address is the client's own choice, so it goes through the egress boundary.
+				const response = await guardedFetch(jwksUri, {
+					headers: { accept: 'application/json' },
+					timeoutMs: JWKS_FETCH_TIMEOUT_MS
 				});
 
-				const body = await response.json();
+				const body = JSON.parse(await readBounded(response, MAX_JWKS_BYTES));
 				const { headers, status } = response;
 
 				// min refetch in 60 seconds unless cache headers say a longer response ttl

@@ -50,6 +50,12 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   confidential client of any tenant, or one that registered itself, could mint a token carrying another
   tenant's resource as its audience, that tenant's issuer and its scopes. It is now refused with
   `invalid_target` unless the client belongs to the project that declared the resource.
+- **Every address a client supplies is fetched through one egress boundary.** The sector document,
+  the client's key set and the CIBA and back-channel logout notifications went through plain `fetch`:
+  redirects followed anywhere, private and link-local addresses reachable, no bound on time or size,
+  and the sector refusal repeated the status the target answered. They now share the address check,
+  per-hop redirect check, timeout and streaming byte bound the client ID metadata document fetch had,
+  and the sector refusal is one message whatever went wrong.
 
 ## [0.6.0] - 2026-09-28
 

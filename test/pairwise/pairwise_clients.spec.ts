@@ -407,7 +407,7 @@ describe('pairwise features', () => {
 						expect(err).toBeTruthy();
 						expect(err.message).toBe('invalid_client_metadata');
 						expect(err.error_description).toBe(
-							'unexpected sector_identifier_uri response status code, expected 200 OK, got 500 Internal Server Error'
+							'sector_identifier_uri could not be retrieved'
 						);
 					}
 				);
@@ -440,7 +440,7 @@ describe('pairwise features', () => {
 						expect(err).toBeTruthy();
 						expect(err.message).toBe('invalid_client_metadata');
 						expect(err.error_description).toBe(
-							'unexpected sector_identifier_uri response status code, expected 200 OK, got 201 Created'
+							'sector_identifier_uri could not be retrieved'
 						);
 					}
 				);
