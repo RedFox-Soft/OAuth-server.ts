@@ -4,13 +4,17 @@ type StorageOptions = {
 	maxAge?: number;
 };
 
-export interface MemoryStore<TValue = unknown> {
-	get<TGet extends TValue = TValue>(key: string): TGet | undefined;
-	set<TSet extends TValue = TValue>(
-		key: string,
-		value: TSet,
-		options?: StorageOptions
-	): unknown;
+/*
+ * Everything the memory backend keeps, each under its own key prefix (helpers.ts): a model's record
+ * (`<Model>:<id>`), the id a session uid or a user code points at (`sessionUid:`, `userCode:`), and the
+ * record keys issued under one grant (`grant:`). The one union a key can hold, so a reader narrows what
+ * it finds instead of naming what it would like to find.
+ */
+export type StoredValue = Record<string, unknown> | string | string[];
+
+export interface MemoryStore {
+	get(key: string): StoredValue | undefined;
+	set(key: string, value: StoredValue, options?: StorageOptions): unknown;
 	delete(key: string): boolean;
 	/*
 	 * Required by MemoryAdapter.destroyByOwner: sweeping a principal's records means finding them, and
@@ -20,14 +24,14 @@ export interface MemoryStore<TValue = unknown> {
 	keys(): IterableIterator<string>;
 }
 
-let storage: MemoryStore<unknown> = new QuickLRU<string, unknown>({
+let storage: MemoryStore = new QuickLRU<string, StoredValue>({
 	maxSize: 1000
-}) as MemoryStore<unknown>;
+});
 
-export function getStorage<TValue = unknown>(): MemoryStore<TValue> {
-	return storage as MemoryStore<TValue>;
+export function getStorage(): MemoryStore {
+	return storage;
 }
 
-export function setStorage<TValue = unknown>(store: MemoryStore<TValue>) {
-	storage = store as MemoryStore<unknown>;
+export function setStorage(store: MemoryStore) {
+	storage = store;
 }

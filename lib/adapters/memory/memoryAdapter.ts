@@ -9,23 +9,40 @@ import {
 	type ModelStorageKey
 } from './helpers.js';
 import type { ModelAdapter } from '../types.js';
-import type { PayloadForModel } from '../modelTypes.js';
 
-type AdapterStoreValue<TModelName extends string> =
-	PayloadForModel<TModelName> | string | string[];
+type StoredRecord = Record<string, unknown>;
 
-function getStringField(payload: unknown, field: string): string | undefined {
-	if (payload && typeof payload === 'object') {
-		const value = Reflect.get(payload, field);
-		if (typeof value === 'string') {
-			return value;
-		}
-	}
+/*
+ * The three readers of the one store, each narrowing to what its key prefix holds. A key read by the
+ * wrong reader answers undefined rather than a value of another kind.
+ */
+function recordAt(key: string): StoredRecord | undefined {
+	const value = getStorage().get(key);
+	return typeof value === 'object' && !Array.isArray(value) ? value : undefined;
 }
 
+function idAt(key: string): string | undefined {
+	const value = getStorage().get(key);
+	return typeof value === 'string' ? value : undefined;
+}
+
+function keysAt(key: string): string[] | undefined {
+	const value = getStorage().get(key);
+	return Array.isArray(value) ? value : undefined;
+}
+
+function stringField(record: StoredRecord, field: string): string | undefined {
+	const value = record[field];
+	return typeof value === 'string' ? value : undefined;
+}
+
+/*
+ * A record is stored as the object it was given and handed back as an object: which model's payload it
+ * is, is the model's to check (BaseModel.fromStored), not a type this backend can vouch for.
+ */
 export class MemoryAdapter<
 	TModelName extends string = string
-> implements ModelAdapter<PayloadForModel<TModelName>> {
+> implements ModelAdapter<StoredRecord> {
 	model: TModelName;
 
 	constructor(model: TModelName) {
@@ -37,76 +54,60 @@ export class MemoryAdapter<
 	}
 
 	async destroy(id: string) {
-		const key = this.key(id);
-		const storage = getStorage<AdapterStoreValue<TModelName>>();
-		storage.delete(key);
+		getStorage().delete(this.key(id));
 	}
 
 	async consume(id: string) {
-		const storage = getStorage<AdapterStoreValue<TModelName>>();
-		const stored = storage.get<PayloadForModel<TModelName>>(this.key(id));
+		const stored = recordAt(this.key(id));
 		if (stored) {
-			Reflect.set(stored, 'consumed', epochTime());
+			stored.consumed = epochTime();
 		}
 	}
 
 	async find(id: string) {
-		const storage = getStorage<AdapterStoreValue<TModelName>>();
-		return storage.get<PayloadForModel<TModelName>>(this.key(id));
+		return recordAt(this.key(id));
 	}
 
 	async findByUid(uid: string) {
-		const storage = getStorage<AdapterStoreValue<TModelName>>();
-		const id = storage.get<string>(sessionUidKeyFor(uid));
-		if (typeof id !== 'string') {
-			return;
-		}
-		return this.find(id);
+		const id = idAt(sessionUidKeyFor(uid));
+		return id === undefined ? undefined : this.find(id);
 	}
 
 	async findByUserCode(userCode: string) {
-		const storage = getStorage<AdapterStoreValue<TModelName>>();
-		const id = storage.get<string>(userCodeKeyFor(userCode));
-		if (typeof id !== 'string') {
-			return;
-		}
-		return this.find(id);
+		const id = idAt(userCodeKeyFor(userCode));
+		return id === undefined ? undefined : this.find(id);
 	}
 
-	async upsert(
-		id: string,
-		payload: PayloadForModel<TModelName>,
-		expiresIn: number
-	) {
+	async upsert(id: string, payload: StoredRecord, expiresIn: number) {
 		const key = this.key(id);
-		const storage = getStorage<AdapterStoreValue<TModelName>>();
-		const uid = getStringField(payload, 'uid');
-		const grantId = getStringField(payload, 'grantId');
-		const userCode = getStringField(payload, 'userCode');
+		const storage = getStorage();
+		const uid = stringField(payload, 'uid');
+		const grantId = stringField(payload, 'grantId');
+		const userCode = stringField(payload, 'userCode');
 
 		if (this.model === 'Session' && uid) {
-			storage.set<string>(sessionUidKeyFor(uid), id, {
+			storage.set(sessionUidKeyFor(uid), id, {
 				maxAge: expiresIn * 1000
 			});
 		}
 
 		if (grantable.has(this.model) && grantId) {
 			const grantKey = grantKeyFor(grantId);
-			const grant = storage.get<string[]>(grantKey);
+			const grant = keysAt(grantKey);
 			if (!grant) {
-				storage.set<string[]>(grantKey, [key]);
+				storage.set(grantKey, [key]);
 			} else {
 				grant.push(key);
 			}
 		}
 
 		if (userCode) {
-			storage.set<string>(userCodeKeyFor(userCode), id, {
+			storage.set(userCodeKeyFor(userCode), id, {
 				maxAge: expiresIn * 1000
 			});
 		}
 
-		storage.set<PayloadForModel<TModelName>>(key, payload, {
+		storage.set(key, payload, {
 			maxAge: expiresIn * 1000
 		});
 	}
@@ -120,8 +121,8 @@ export class MemoryAdapter<
 	 */
 	async revokeByGrantId(grantId: string) {
 		const grantKey = grantKeyFor(grantId);
-		const storage = getStorage<AdapterStoreValue<TModelName>>();
-		const grant = storage.get<string[]>(grantKey);
+		const storage = getStorage();
+		const grant = keysAt(grantKey);
 		if (!grant) {
 			return;
 		}
@@ -139,12 +140,12 @@ export class MemoryAdapter<
 		if (remaining.length === 0) {
 			storage.delete(grantKey);
 		} else {
-			storage.set<string[]>(grantKey, remaining);
+			storage.set(grantKey, remaining);
 		}
 	}
 
 	async destroyByOwner(field: string, value: string) {
-		const storage = getStorage<AdapterStoreValue<TModelName>>();
+		const storage = getStorage();
 		const prefix = `${this.model}:`;
 		/*
 		 * Snapshot before deleting: iterating a store while removing from it is undefined, and the Set
@@ -157,12 +158,12 @@ export class MemoryAdapter<
 			if (!key.startsWith(prefix)) {
 				continue;
 			}
-			const stored = storage.get<PayloadForModel<TModelName>>(key);
+			const stored = recordAt(key);
 			/* Expired but not yet evicted — already gone as far as any reader is concerned. */
 			if (!stored) {
 				continue;
 			}
-			if (getStringField(stored, field) === value) {
+			if (stringField(stored, field) === value) {
 				storage.delete(key);
 				destroyed += 1;
 			}
@@ -176,7 +177,7 @@ export class MemoryAdapter<
 		ageField: string,
 		before: number
 	) {
-		const storage = getStorage<AdapterStoreValue<TModelName>>();
+		const storage = getStorage();
 		const prefix = `${this.model}:`;
 		/* Snapshot first, for the same reason `destroyByOwner` does. */
 		const keys = new Set(storage.keys());
@@ -186,11 +187,10 @@ export class MemoryAdapter<
 			if (!key.startsWith(prefix)) {
 				continue;
 			}
-			const stored = storage.get<PayloadForModel<TModelName>>(key);
-			if (!stored) {
+			const record = recordAt(key);
+			if (!record) {
 				continue;
 			}
-			const record = stored as unknown as Record<string, unknown>;
 			const age = record[ageField];
 			if (
 				record[markerField] === true &&

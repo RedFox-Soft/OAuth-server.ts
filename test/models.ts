@@ -1,13 +1,15 @@
 import { expect } from 'bun:test';
 
 import epochTime from '../lib/helpers/epoch_time.ts';
-import { MemoryAdapter, setStorage } from '../lib/adapters/memory/index.js';
-import { isPlainObject } from '../lib/helpers/_/object.ts';
+import {
+	MemoryAdapter,
+	setStorage,
+	type StoredValue
+} from '../lib/adapters/memory/index.js';
 import type { Static, TSchema } from '@sinclair/typebox';
 import { present, shaped } from './shape.js';
 
-// Untyped because lib's MemoryStore lets each caller pick what `get` returns; reads below narrow.
-const map = new Map();
+const map = new Map<string, StoredValue>();
 
 setStorage(map);
 const testStorage = new Map<string, TestAdapter>();
@@ -42,8 +44,10 @@ export class TestAdapter extends MemoryAdapter {
 
 	// The record a model stored under this id — an object; what is in it is the spec's to check.
 	syncFind(id: string): Record<string, unknown> | undefined {
-		const found: unknown = map.get(this.key(id));
-		return isPlainObject(found) ? found : undefined;
+		const found = map.get(this.key(id));
+		return typeof found === 'object' && !Array.isArray(found)
+			? found
+			: undefined;
 	}
 
 	// The same record checked against its model's schema, as the model checks it on the way out.
@@ -60,9 +64,9 @@ export class TestAdapter extends MemoryAdapter {
 		const records: Record<string, unknown>[] = [];
 		for (const [key, value] of map) {
 			if (
-				typeof key === 'string' &&
 				key.startsWith(prefix) &&
-				isPlainObject(value)
+				typeof value === 'object' &&
+				!Array.isArray(value)
 			) {
 				records.push(value);
 			}
