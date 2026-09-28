@@ -11,6 +11,6 @@ export default defineConfig(globalIgnores(['dist']), {
 		globals: globals.browser
 	},
 	rules: {
-		'@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }]
+		'@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', ignoreRestSiblings: true }]
 	}
 });

@@ -24,8 +24,7 @@ import {
 	UpdateGroupBody,
 	AddMemberBody,
 	UpdateMemberBody,
-	CreateInvitationBody,
-	AcceptInvitationBody
+	CreateInvitationBody
 } from './schema.js';
 import {
 	INVITATION_TTL_SECONDS,

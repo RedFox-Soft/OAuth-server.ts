@@ -519,7 +519,7 @@ export default function getSchema() {
 			}
 
 			{
-				const { 0: pop, length } = [
+				const { length } = [
 					'tls_client_certificate_bound_access_tokens',
 					'dpop_bound_access_tokens'
 				].filter((conf) => this[conf]);

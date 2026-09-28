@@ -50,7 +50,7 @@ export class Claims {
 				([key, value]) =>
 					(value === null || isPlainObject(value)) && claimsSupported.has(key)
 			)
-			.map(([key, value]) => key);
+			.map(([key]) => key);
 
 		const claims: ClaimsData = pick(available, ...include);
 

@@ -87,19 +87,19 @@ export function Layout({ me }: { me: AdminContext | null }) {
 				return isSuperAdmin ? (
 					<Admins />
 				) : (
-					<Projects isSuperAdmin={isSuperAdmin} />
+					<Projects />
 				);
 			case 'settings':
 				return isSuperAdmin ? (
 					<Settings />
 				) : (
-					<Projects isSuperAdmin={isSuperAdmin} />
+					<Projects />
 				);
 			case 'keys':
 				return isSuperAdmin ? (
 					<Keys />
 				) : (
-					<Projects isSuperAdmin={isSuperAdmin} />
+					<Projects />
 				);
 			case 'groups':
 				return (
@@ -116,16 +116,16 @@ export function Layout({ me }: { me: AdminContext | null }) {
 				return isSuperAdmin ? (
 					<McpClients />
 				) : (
-					<Projects isSuperAdmin={isSuperAdmin} />
+					<Projects />
 				);
 			case 'errors':
 				return isSuperAdmin ? (
 					<Errors />
 				) : (
-					<Projects isSuperAdmin={isSuperAdmin} />
+					<Projects />
 				);
 			default:
-				return <Projects isSuperAdmin={isSuperAdmin} />;
+				return <Projects />;
 		}
 	}
 

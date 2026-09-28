@@ -57,10 +57,9 @@ export default async function processRequestObject(
 	schema: TSchema & { readonly properties: Record<string, unknown> },
 	oidc: OIDCContext<PipelineParams>,
 	{
-		clientAlg,
 		isPar = false,
 		trusted = false
-	}: { clientAlg?: string; isPar?: boolean; trusted?: boolean } = {}
+	}: { isPar?: boolean; trusted?: boolean } = {}
 ) {
 	const { params, client, route } = oidc;
 

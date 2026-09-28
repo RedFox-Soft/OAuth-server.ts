@@ -208,7 +208,7 @@ function BucketEditor({
 	);
 }
 
-export function Projects({ isSuperAdmin }: { isSuperAdmin: boolean }) {
+export function Projects() {
 	const [projects, setProjects] = useState<Project[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [open, setOpen] = useState(false);
@@ -319,7 +319,6 @@ export function Projects({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 			<BucketDetail
 				bucketId={openBucketId}
 				onBack={() => setOpenBucketId(null)}
-				isSuperAdmin={isSuperAdmin}
 			/>
 		);
 	}

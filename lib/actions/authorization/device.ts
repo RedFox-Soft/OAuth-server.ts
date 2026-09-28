@@ -242,9 +242,7 @@ export const backchannelAuth = new Elysia()
 					);
 				}
 
-				await processRequestObject(BacckchannelRequest, oidc, {
-					clientAlg: client['requestObject.backChannelSigningAlg']
-				});
+				await processRequestObject(BacckchannelRequest, oidc);
 				cibaRequired(oidc);
 				assignDefaults(oidc);
 				checkScope(oidc);

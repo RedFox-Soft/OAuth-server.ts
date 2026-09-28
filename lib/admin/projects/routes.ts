@@ -4,11 +4,9 @@ import {
 	getBucketStore,
 	getProtectedResourceStore
 } from '../../adapters/index.js';
-import type { Project } from '../../adapters/types.js';
 import {
 	assertAuth,
 	assertActiveGroup,
-	assertProjectAccess,
 	assertBucketAccess,
 	AdminError,
 	adminErrorBody,

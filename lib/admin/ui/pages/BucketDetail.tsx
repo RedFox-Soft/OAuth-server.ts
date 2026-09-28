@@ -38,12 +38,10 @@ interface CreateValues {
 
 export function BucketDetail({
 	bucketId,
-	onBack,
-	isSuperAdmin
+	onBack
 }: {
 	bucketId: string;
 	onBack: () => void;
-	isSuperAdmin: boolean;
 }) {
 	const base = `/admin/api/buckets/${encodeURIComponent(bucketId)}`;
 	const [bucket, setBucket] = useState<UserBucket | null>(null);

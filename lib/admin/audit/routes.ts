@@ -1,4 +1,4 @@
-import { Elysia, t } from 'elysia';
+import { Elysia } from 'elysia';
 import { adminAuditStore } from '../../adapters/index.js';
 import type { AdminAuditQuery } from '../../adapters/types.js';
 import {

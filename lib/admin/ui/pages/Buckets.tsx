@@ -151,7 +151,6 @@ export function Buckets({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 					setOpenBucketId(null);
 					load();
 				}}
-				isSuperAdmin={isSuperAdmin}
 			/>
 		);
 	}
