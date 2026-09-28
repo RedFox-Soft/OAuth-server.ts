@@ -177,9 +177,9 @@ describe('the "Remember me" choice at sign-in', () => {
 		expectHardened(header);
 
 		// Remembering does not mean forever: the server's own ceiling on a sign-in is still the ceiling.
-		const expires = new Date(
-			/;\s*Expires=([^;]+)/i.exec(header)?.[1] as string
-		);
+		const expiresAt = /;\s*Expires=([^;]+)/i.exec(header)?.[1];
+		if (!expiresAt) throw new Error('expected a persistent session cookie');
+		const expires = new Date(expiresAt);
 		const expected = Date.now() + ttl.Session * 1000;
 		expect(Math.abs(expires.getTime() - expected)).toBeLessThan(5 * 60 * 1000);
 	});

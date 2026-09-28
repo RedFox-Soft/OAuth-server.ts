@@ -63,13 +63,14 @@ function visible(html: string): string {
 
 /*
  * Eden types this route's `data` from the handler's `Response` return value; at runtime the client hands
- * back the rendered HTML. One narrowing here rather than a cast at every read.
+ * back the rendered HTML. Checked here rather than asserted at every read.
  */
-const bodyOf = (data: unknown): string => data as string;
-
-// One place for the request/derived-type mismatch, so no call site repeats the cast.
-const wire = (params: Record<string, string>) =>
-	params as unknown as { resource: string[]; authorization_details: object[] };
+function bodyOf(data: unknown): string {
+	if (typeof data !== 'string') {
+		throw new Error('expected the rendered consent page');
+	}
+	return data;
+}
 
 const payment = {
 	type: PAYMENT_TYPE,
@@ -99,10 +100,7 @@ describe('consent page — every permission, stated once (US3)', () => {
 	});
 
 	async function toConsent(auth: AuthorizationRequest) {
-		const { response } = await agent.auth.get({
-			query: auth.params,
-			headers: { cookie: header(jar) }
-		});
+		const response = await auth.authorize({ headers: { cookie: header(jar) } });
 		expect(response.status).toBe(303);
 		const location = response.headers.get('location')!;
 		expect(location).toContain('/ui/');
@@ -117,15 +115,8 @@ describe('consent page — every permission, stated once (US3)', () => {
 			client_id: 'consent-app',
 			scope: 'openid profile billing api:read',
 			claims: { id_token: { email: null } },
-			/*
-			 * These two travel as query strings. AuthParams types them as the array shapes the server
-			 * validates *after* parsing (checkRar normalises `authorization_details` to an array before
-			 * validation), which a request literal cannot express — hence the one cast, for both.
-			 */
-			...wire({
-				resource: RESOURCE,
-				authorization_details: JSON.stringify([payment])
-			})
+			resource: [RESOURCE],
+			authorization_details: [payment]
 		});
 	}
 

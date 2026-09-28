@@ -182,13 +182,14 @@ describe('end-user cookie attributes', () => {
 		sessionCookie = pairOf(setCookieFor(page.response, SESSION_COOKIE));
 		const xsrf =
 			/name="xsrf"[^>]*value="([^"]+)"|value="([^"]+)"[^>]*name="xsrf"/.exec(
-				(page.data as string) ?? ''
+				typeof page.data === 'string' ? page.data : ''
 			);
 		const secret = xsrf?.[1] ?? xsrf?.[2];
-		expect(secret).toBeTruthy();
+		if (!secret)
+			throw new Error('expected the sign-out form to carry its secret');
 
 		const { response: confirmed } = await agent.logout.confirm.post(
-			{ xsrf: secret as string, logout: 'true' },
+			{ xsrf: secret, logout: 'true' },
 			{ headers: { cookie: sessionCookie, accept: 'text/html' } }
 		);
 
