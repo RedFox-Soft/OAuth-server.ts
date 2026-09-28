@@ -1,13 +1,9 @@
 import { sql } from './db.js';
 import { docOf } from './json.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
-import { reviveDates } from './dates.js';
-import type { AdminSession, AdminSessionStoreInstance } from '../types.js';
+import { documentOf } from '../documents.js';
+import { AdminSession, type AdminSessionStoreInstance } from '../types.js';
 import nanoid from '../../helpers/nanoid.js';
-
-/* Three dates, and all three are compared numerically below — a jsonb round trip returns them as
- * strings, so reviving them is what keeps those comparisons meaningful rather than always false. */
-const DATE_FIELDS = ['createdAt', 'expiresAt', 'absoluteExpiresAt'] as const;
 
 export class AdminSessionStore implements AdminSessionStoreInstance {
 	private area: string = STORE_AREAS.adminSession;
@@ -54,10 +50,10 @@ export class AdminSessionStore implements AdminSessionStoreInstance {
 		const rows = await handle`
 			SELECT doc FROM ${handle(this.area)} WHERE id = ${id}
 		`;
-		const stored = docOf<AdminSession>(rows[0]);
+		const stored = docOf(rows[0]);
 		if (stored === undefined) return null;
 
-		const session = reviveDates(stored, DATE_FIELDS);
+		const session = documentOf(this.area, AdminSession, stored);
 		const now = Date.now();
 		if (
 			session.expiresAt.getTime() <= now ||

@@ -1,9 +1,19 @@
 import crypto from 'crypto';
+import { Type as t, type Static } from '@sinclair/typebox';
 import { ObjectId } from 'mongodb';
 
 import { db } from './db.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
+import { documentOf } from '../documents.js';
 import type { MigrationLease, MigrationLeaseStoreInstance } from '../types.js';
+
+/* What this store writes, which is not MigrationLease: the expiry is stored as `leaseExpiresAt` — see
+ * `acquire` for why. The ObjectId `_id` is left to the collection type; nothing reads it back. */
+const LeaseDocument = t.Object({
+	holder: t.String(),
+	leaseExpiresAt: t.Date()
+});
+type LeaseDocument = Static<typeof LeaseDocument>;
 
 /*
  * The migration run lease, as one document in the shared serviceConfig area — beside the singleton
@@ -25,7 +35,7 @@ function isDuplicateKey(error: unknown): boolean {
 		typeof error === 'object' &&
 		error !== null &&
 		'code' in error &&
-		(error as { code: unknown }).code === 11000
+		error.code === 11000
 	);
 }
 
@@ -34,17 +44,16 @@ export class MigrationLeaseStore implements MigrationLeaseStoreInstance {
 	private leaseId = new ObjectId(stringTo24CharHex('migrationLock'));
 
 	private collection() {
-		return db.collection<{
-			_id: ObjectId;
-			holder: string;
-			leaseExpiresAt: Date;
-		}>(this.collectionName);
+		return db.collection<LeaseDocument & { _id: ObjectId }>(
+			this.collectionName
+		);
 	}
 
 	async read(): Promise<MigrationLease | null> {
 		const found = await this.collection().findOne({ _id: this.leaseId });
 		if (!found) return null;
-		return { holder: found.holder, expiresAt: found.leaseExpiresAt };
+		const lease = documentOf(this.collectionName, LeaseDocument, found);
+		return { holder: lease.holder, expiresAt: lease.leaseExpiresAt };
 	}
 
 	/*

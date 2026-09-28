@@ -149,9 +149,9 @@ export function admitSample(
  * seen once, which is the whole point of the view. Most frequent first, ties broken by key so the
  * ordering is stable across calls and between adapters.
  */
-export function summarizeBy(
-	groups: readonly ErrorGroup[],
-	keyOf: (group: ErrorGroup) => string
+export function summarizeBy<G extends Pick<ErrorGroup, 'occurrences'>>(
+	groups: readonly G[],
+	keyOf: (group: G) => string
 ): ErrorSummaryBucket[] {
 	const counts = new Map<string, number>();
 	for (const group of groups) {
@@ -165,7 +165,9 @@ export function summarizeBy(
 		);
 }
 
-export function totalOccurrences(groups: readonly ErrorGroup[]): number {
+export function totalOccurrences(
+	groups: readonly Pick<ErrorGroup, 'occurrences'>[]
+): number {
 	return groups.reduce((sum, group) => sum + group.occurrences, 0);
 }
 

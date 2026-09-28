@@ -1,11 +1,12 @@
 import type { Filter } from 'mongodb';
 import { db } from './db.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
-import type {
+import { documentOf } from '../documents.js';
+import {
 	AdminAuditEntry,
-	AdminAuditPage,
-	AdminAuditQuery,
-	AdminAuditStoreInstance
+	type AdminAuditPage,
+	type AdminAuditQuery,
+	type AdminAuditStoreInstance
 } from '../types.js';
 import {
 	normalizeAuditPaging,
@@ -57,7 +58,9 @@ function toFilter(query: AdminAuditQuery): Filter<AdminAuditEntry> {
 		filter.viaSurface =
 			query.viaSurface === 'console'
 				? null
-				: (query.viaSurface as AdminAuditEntry['viaSurface']);
+				: query.viaSurface === 'mcp'
+					? 'mcp'
+					: { $in: [] };
 	}
 	if (query.viaClientId !== undefined) {
 		filter.viaClientId = query.viaClientId;
@@ -111,7 +114,11 @@ export class AdminAuditStore implements AdminAuditStoreInstance {
 		]);
 
 		return {
-			entries: documents.map((entry) => withAuditDefaults(entry)),
+			entries: documents.map((entry) =>
+				withAuditDefaults(
+					documentOf(STORE_AREAS.adminAudit, AdminAuditEntry, entry)
+				)
+			),
 			total
 		};
 	}

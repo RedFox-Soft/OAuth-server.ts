@@ -24,6 +24,11 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/* A member read off a value that may not be an object at all — a thrown error, a driver's row. */
+export function member(value: unknown, name: string): unknown {
+	return isRecord(value) ? value[name] : undefined;
+}
+
 export function merge(
 	target: Record<string, unknown>,
 	...sources: Record<string, unknown>[]

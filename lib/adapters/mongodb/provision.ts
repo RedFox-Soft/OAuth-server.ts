@@ -4,6 +4,7 @@ import {
 	indexesFor,
 	type IndexSpec
 } from '../../consts/storage_inventory.js';
+import { member } from '../../helpers/_/object.js';
 
 /*
  * Applying the inventory to a database. Shared by the operator routine (database/mongodb.ts, which
@@ -26,9 +27,8 @@ const INDEX_OPTIONS_CONFLICT = 85;
 const INDEX_KEY_SPECS_CONFLICT = 86;
 
 function codeOf(error: unknown): number | undefined {
-	return typeof error === 'object' && error !== null
-		? (error as { code?: number }).code
-		: undefined;
+	const code = member(error, 'code');
+	return typeof code === 'number' ? code : undefined;
 }
 
 export function isNamespaceExists(error: unknown): boolean {

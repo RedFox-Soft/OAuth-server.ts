@@ -3,7 +3,8 @@ import crypto from 'crypto';
 import { sql } from './db.js';
 import { docOf } from './json.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
-import type { MigrationLease, MigrationLeaseStoreInstance } from '../types.js';
+import { documentOf } from '../documents.js';
+import { MigrationLease, type MigrationLeaseStoreInstance } from '../types.js';
 
 /*
  * The migration run lease, as one row in the shared serviceConfig area — beside the singleton secrets
@@ -20,11 +21,6 @@ function derivedId(name: string): string {
 		.substring(0, 24);
 }
 
-interface StoredLease {
-	holder: string;
-	expiresAt: string;
-}
-
 export class MigrationLeaseStore implements MigrationLeaseStoreInstance {
 	private area: string = STORE_AREAS.serviceConfig;
 	private leaseId = derivedId('migrationLock');
@@ -34,9 +30,10 @@ export class MigrationLeaseStore implements MigrationLeaseStoreInstance {
 		const rows = await handle`
 			SELECT doc FROM ${handle(this.area)} WHERE id = ${this.leaseId}
 		`;
-		const stored = docOf<StoredLease>(rows[0]);
-		if (stored === undefined) return null;
-		return { holder: stored.holder, expiresAt: new Date(stored.expiresAt) };
+		const stored = docOf(rows[0]);
+		return stored === undefined
+			? null
+			: documentOf(this.area, MigrationLease, stored);
 	}
 
 	/*
@@ -50,10 +47,7 @@ export class MigrationLeaseStore implements MigrationLeaseStoreInstance {
 	 */
 	async acquire(holder: string, expiresAt: Date): Promise<boolean> {
 		const handle = sql();
-		const lease: StoredLease = {
-			holder,
-			expiresAt: expiresAt.toISOString()
-		};
+		const lease: MigrationLease = { holder, expiresAt };
 
 		const rows = await handle`
 			INSERT INTO ${handle(this.area)} (id, doc, expires_at)

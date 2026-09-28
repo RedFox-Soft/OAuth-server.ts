@@ -13,20 +13,29 @@ const ErrorBody = Type.Object({
 	message: Type.String()
 });
 
+type Refusal = AdminErrorBody | Static<typeof ErrorBody>;
+
+/*
+ * Neither null nor an error body — the members of `data`'s type left once those are taken out. The
+ * check below is what establishes it: both refusals match `ErrorBody`, and no answer does.
+ */
+function isAnswer<D>(data: D): data is Exclude<D, Refusal | null> {
+	return data !== null && !Value.Check(ErrorBody, data);
+}
+
 /*
  * The body of an admin route that succeeded. Treaty types `data` as the route's return type joined with
  * the bodies the routes' `onError` returns, since Elysia counts an `onError` return as a response, and
  * as null when the call was refused. A test that expects success checks for both, and a refusal fails
  * here with its message instead of as a read of a member the error body does not have.
  */
-export function answered<T>(
-	data: T | AdminErrorBody | Static<typeof ErrorBody> | null
-): T {
-	if (data === null) {
-		throw new Error('expected an admin answer, the call was refused');
-	}
-	if (Value.Check(ErrorBody, data)) {
-		throw new Error(`expected an admin answer, got an error: ${data.message}`);
+export function answered<D>(data: D): Exclude<D, Refusal | null> {
+	if (!isAnswer(data)) {
+		throw new Error(
+			Value.Check(ErrorBody, data)
+				? `expected an admin answer, got an error: ${data.message}`
+				: 'expected an admin answer, the call was refused'
+		);
 	}
 	return data;
 }

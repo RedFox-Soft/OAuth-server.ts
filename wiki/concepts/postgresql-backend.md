@@ -4,7 +4,7 @@ title: 'The PostgreSQL backend: two expiry reversals, a silent encoding defect, 
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-10
-updated: 2026-09-23
+updated: 2026-09-28
 ---
 
 # The PostgreSQL backend
@@ -86,8 +86,10 @@ document.**
 
 Two smaller instances of the same shape:
 
-- Dates in jsonb come back as strings. `lib/adapters/postgres/dates.ts` revives explicitly named
-  fields; a blanket "looks like a date" heuristic would eventually revive a user's string.
+- Dates in jsonb come back as strings. They are revived where the document's schema declares a date
+  — `documentOf` in `lib/adapters/documents.ts`, which replaced the per-store field lists of
+  `postgres/dates.ts` on 2026-09-28 ([[stored-document-schemas]]); a blanket "looks like a date"
+  heuristic would eventually revive a user's string.
 - `to_regclass('adminAudit')` folds an unquoted identifier to lower case, so 32 existing tables
   reported missing and were "created" on every run, and `--check` called a healthy schema broken.
   The already-quoted identifier is what must be passed.

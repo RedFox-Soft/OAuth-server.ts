@@ -1,13 +1,11 @@
 import { sql } from './db.js';
 import { docOf } from './json.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
-import { reviveDates } from './dates.js';
-import type {
+import { documentOf } from '../documents.js';
+import {
 	ProtectedResource,
-	ProtectedResourceStoreInstance
+	type ProtectedResourceStoreInstance
 } from '../types.js';
-
-const DATE_FIELDS = ['createdAt', 'updatedAt'] as const;
 
 /*
  * Declared protected resources, keyed by the canonical resource identifier.
@@ -108,8 +106,10 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 	}
 
 	private resourceOf(row: unknown): ProtectedResource | null {
-		const doc = docOf<ProtectedResource>(row);
-		return doc === undefined ? null : reviveDates(doc, DATE_FIELDS);
+		const doc = docOf(row);
+		return doc === undefined
+			? null
+			: documentOf(this.area, ProtectedResource, doc);
 	}
 
 	private resourcesOf(rows: unknown[]): ProtectedResource[] {

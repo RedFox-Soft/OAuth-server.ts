@@ -133,7 +133,7 @@ export class UserStore implements UserStoreInstance {
 		// behind here would make the two adapters disagree about what a cleared enrolment looks like.
 		for (const [field, value] of Object.entries(patch)) {
 			if (value === undefined) {
-				delete user[field as keyof User];
+				Reflect.deleteProperty(user, field);
 			}
 		}
 		return user;

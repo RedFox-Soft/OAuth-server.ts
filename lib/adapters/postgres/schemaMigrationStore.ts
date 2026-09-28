@@ -1,10 +1,12 @@
 import { sql } from './db.js';
 import { docOf } from './json.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
-import type {
+import { documentOf } from '../documents.js';
+import {
 	SchemaMigrationRecord,
-	SchemaMigrationStoreInstance
+	type SchemaMigrationStoreInstance
 } from '../types.js';
+import { isRecord } from '../../helpers/_/object.js';
 
 /*
  * The record of which schema migrations this database has had.
@@ -27,14 +29,12 @@ export class SchemaMigrationStore implements SchemaMigrationStoreInstance {
 			SELECT id, doc FROM ${handle(this.area)}
 		`;
 		return rows.map((row: unknown) => {
-			const doc = docOf<{ appliedAt: string; checksum: string }>(row);
-			return {
-				id: (row as { id: string }).id,
-				/* Stored inside the document, so it comes back as a string a jsonb round trip flattened —
-				 * revived here rather than by the shared helper, because there is exactly one field. */
-				appliedAt: new Date(doc?.appliedAt ?? 0),
-				checksum: doc?.checksum ?? ''
-			};
+			/* The id is the row's key rather than a member of the document, so the record is assembled
+			 * before it is checked. */
+			const doc = docOf(row);
+			const record =
+				isRecord(doc) && isRecord(row) ? { ...doc, id: row.id } : doc;
+			return documentOf(this.area, SchemaMigrationRecord, record);
 		});
 	}
 

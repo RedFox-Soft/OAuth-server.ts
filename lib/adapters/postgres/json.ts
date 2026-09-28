@@ -25,20 +25,16 @@ function stringified(column: string): Error {
 	);
 }
 
-function decoded<T>(value: unknown, column: string): T | undefined {
-	if (value === undefined || value === null) return undefined;
-
-	if (typeof value === 'string') {
-		throw stringified(column);
-	}
-
-	return value as T;
-}
-
 /* The document column of a row. Named for the two column names the schema uses, so a call site reads
- * as what it fetches: model areas keep their record in `payload`, everything else in `doc`. */
-export function docOf<T>(row: unknown): T | undefined {
-	return decoded<T>((row as { doc?: unknown } | undefined)?.doc, 'doc');
+ * as what it fetches: model areas keep their record in `payload`, everything else in `doc`. What the
+ * document is, is the store's to establish against its schema (lib/adapters/documents.ts). */
+export function docOf(row: unknown): unknown {
+	const value = isRecord(row) ? row.doc : undefined;
+	if (value === undefined || value === null) return undefined;
+	if (typeof value === 'string') {
+		throw stringified('doc');
+	}
+	return value;
 }
 
 /*

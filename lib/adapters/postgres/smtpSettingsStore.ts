@@ -3,7 +3,8 @@ import crypto from 'crypto';
 import { sql } from './db.js';
 import { docOf } from './json.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
-import type { SmtpSettings, SmtpSettingsStoreInstance } from '../types.js';
+import { documentOf } from '../documents.js';
+import { SmtpSettings, type SmtpSettingsStoreInstance } from '../types.js';
 
 function derivedId(name: string): string {
 	return crypto
@@ -33,8 +34,8 @@ export class SmtpSettingsStore implements SmtpSettingsStoreInstance {
 		const rows = await handle`
 			SELECT doc FROM ${handle(this.area)} WHERE id = ${this.settingsId}
 		`;
-		const doc = docOf<SmtpSettings>(rows[0]);
-		return doc ?? null;
+		const doc = docOf(rows[0]);
+		return doc === undefined ? null : documentOf(this.area, SmtpSettings, doc);
 	}
 
 	async set(settings: SmtpSettings): Promise<void> {

@@ -1,8 +1,13 @@
 import crypto from 'crypto';
+import { Type as t } from '@sinclair/typebox';
 import { ObjectId } from 'mongodb';
 import { db } from './db.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
+import { documentOf } from '../documents.js';
 import type { AdapterConfigStore } from '../types.js';
+
+/* The settings record is arbitrary here; what its keys mean is checked where it is applied. */
+const StoredConfig = t.Record(t.String(), t.Unknown());
 
 function stringTo24CharHex(str: string) {
 	const hash = crypto.createHash('sha256').update(str).digest('hex');
@@ -18,7 +23,8 @@ class ConfigStore implements AdapterConfigStore {
 		const result = await db
 			.collection(this.collectionName)
 			.findOne({ _id: this.configId });
-		return result?.config || null;
+		if (!result?.config) return null;
+		return documentOf(this.collectionName, StoredConfig, result.config);
 	}
 
 	async set(config: Record<string, unknown>): Promise<void> {

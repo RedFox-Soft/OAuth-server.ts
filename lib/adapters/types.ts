@@ -1,30 +1,28 @@
 import type { UnnormalizedJWK } from 'lib/configs/verifyJWKs.ts';
-import type {
-	FederatedIdentity,
-	FederationProvider
-} from '../federation/types.js';
+import { Type as t, type Static } from '@sinclair/typebox';
+import { FederatedIdentity, FederationProvider } from '../federation/types.js';
 
-export interface User {
-	_id: string;
-	email: string;
-	verified: boolean;
-	password: string;
-	active: boolean;
-	roles: string[];
-	createdAt: Date;
-	updatedAt: Date;
-	lastLoginAt: Date | null;
+export const User = t.Object({
+	_id: t.String(),
+	email: t.String(),
+	verified: t.Boolean(),
+	password: t.String(),
+	active: t.Boolean(),
+	roles: t.Array(t.String()),
+	createdAt: t.Date(),
+	updatedAt: t.Date(),
+	lastLoginAt: t.Union([t.Date(), t.Null()]),
 	// Optional extra OIDC claims sourced with the account (e.g. profile claims
 	// like given_name, or distributed/aggregated `_claim_names`/`_claim_sources`).
 	// Merged into the account's claims() output; the provider masks by scope.
-	claims?: Record<string, unknown>;
+	claims: t.Optional(t.Record(t.String(), t.Unknown())),
 	/*
 	 * Upstream identities this account holds, at most one per (providerId, sub) within the bucket.
 	 * Embedded rather than given an area of its own, which is what makes deletion integrity free: the
 	 * account cascade destroys this row and bucket deletion destroys the whole area, so no cascade arm
 	 * needs to know the field exists.
 	 */
-	federated?: FederatedIdentity[];
+	federated: t.Optional(t.Array(FederatedIdentity)),
 	/*
 	 * This account's authenticator, when it has one. Present ⇔ enrolled: there is deliberately no
 	 * separate `enrolled` boolean, because two fields claiming to say the same thing disagree after
@@ -41,18 +39,21 @@ export interface User {
 	 * test/mcp/secrecy.spec.ts sweeps every published read to keep that true. Nothing outside
 	 * lib/totp/ reads it.
 	 */
-	totp?: {
-		/* Base32, RFC 4648 §6. */
-		secret: string;
-		enrolledAt: Date;
-		/*
-		 * The time step of the most recently accepted code. A submitted code whose step is at or below
-		 * this is refused, which is what stops a code observed in flight being replayed for the rest of
-		 * its ~90-second acceptance band.
-		 */
-		lastStep: number;
-	};
-}
+	totp: t.Optional(
+		t.Object({
+			/* Base32, RFC 4648 §6. */
+			secret: t.String(),
+			enrolledAt: t.Date(),
+			/*
+			 * The time step of the most recently accepted code. A submitted code whose step is at or below
+			 * this is refused, which is what stops a code observed in flight being replayed for the rest of
+			 * its ~90-second acceptance band.
+			 */
+			lastStep: t.Number()
+		})
+	)
+});
+export type User = Static<typeof User>;
 
 export interface ModelAdapter<TPayload = unknown> {
 	upsert(id: string, payload: TPayload, expiresIn?: number): Promise<void>;
@@ -111,16 +112,17 @@ export interface AdapterConfigStore {
 	set(config: Record<string, unknown>): Promise<void>;
 }
 
-export interface SmtpSettings {
-	host: string;
-	port: number;
-	secure: boolean;
-	username: string;
+export const SmtpSettings = t.Object({
+	host: t.String(),
+	port: t.Number(),
+	secure: t.Boolean(),
+	username: t.String(),
 	// Stored as provided; never returned to clients (masked) and never logged.
-	password: string;
-	fromName: string;
-	fromEmail: string;
-}
+	password: t.String(),
+	fromName: t.String(),
+	fromEmail: t.String()
+});
+export type SmtpSettings = Static<typeof SmtpSettings>;
 
 // Runtime, super-admin-editable SMTP transport config. Read live by the mailer on
 // every send so changes take effect without reaching the settings object at all (kept out of it
@@ -270,11 +272,12 @@ export interface JWKSStoreConstructor {
  * fact, which is a different migration wearing an id that is already recorded. Without it the gate
  * would report such a database current.
  */
-export interface SchemaMigrationRecord {
-	id: string;
-	appliedAt: Date;
-	checksum: string;
-}
+export const SchemaMigrationRecord = t.Object({
+	id: t.String(),
+	appliedAt: t.Date(),
+	checksum: t.String()
+});
+export type SchemaMigrationRecord = Static<typeof SchemaMigrationRecord>;
 
 export interface SchemaMigrationStoreInstance {
 	/*
@@ -304,10 +307,11 @@ export interface SchemaMigrationStoreInstance {
  * Not in `schemaMigrations`, where a row's id IS a declared migration id and a lease would have to
  * wear a fake one.
  */
-export interface MigrationLease {
-	holder: string;
-	expiresAt: Date;
-}
+export const MigrationLease = t.Object({
+	holder: t.String(),
+	expiresAt: t.Date()
+});
+export type MigrationLease = Static<typeof MigrationLease>;
 
 export interface MigrationLeaseStoreInstance {
 	read(): Promise<MigrationLease | null>;
@@ -329,13 +333,13 @@ export interface SchemaMigrationStoreConstructor {
 	new (): SchemaMigrationStoreInstance;
 }
 
-export interface AdminAuditEntry {
-	_id: string;
-	actorId: string;
-	actorEmail: string;
-	action: string;
-	targetType: string;
-	targetId: string;
+export const AdminAuditEntry = t.Object({
+	_id: t.String(),
+	actorId: t.String(),
+	actorEmail: t.String(),
+	action: t.String(),
+	targetType: t.String(),
+	targetId: t.String(),
 	/*
 	 * The container within which `targetId` resolves — in practice a bucket id, set only by the
 	 * end-user operations. Kept separate from `targetId` rather than fused into it so exact-match
@@ -344,7 +348,7 @@ export interface AdminAuditEntry {
 	 * Written as a string or omitted; read back as a string or `null`, so a consumer never has to tell
 	 * "absent" from "not applicable".
 	 */
-	targetScope?: string | null;
+	targetScope: t.Optional(t.Union([t.String(), t.Null()])),
 	/*
 	 * The group this entry belongs to, and the only thing a group-scoped read selects on.
 	 *
@@ -360,13 +364,13 @@ export interface AdminAuditEntry {
 	 * Written at the time of the action and never re-derived from `targetId`, so an entry outlives the
 	 * container it describes: a group can still see what happened to something that is gone.
 	 */
-	ownerGroupId?: string | null;
+	ownerGroupId: t.Optional(t.Union([t.String(), t.Null()])),
 	/*
 	 * Names of the fields the request set — never their values, so no secret can reach the trail
 	 * through this field. Optional because entries written before it existed do not carry it, and the
 	 * trail is immutable: there is no backfill, only a read-side default.
 	 */
-	attributes?: string[];
+	attributes: t.Optional(t.Array(t.String())),
 	/*
 	 * What a deletion took with it, as kind → how many. Counts only: never an identifier, never an
 	 * email, never a claim, so the secrecy property holds structurally here exactly as it does for
@@ -381,7 +385,7 @@ export interface AdminAuditEntry {
 	 * a read-side default. Absent on a deletion that destroyed only the container itself, because `{}`
 	 * and absent would otherwise say the same thing in two ways.
 	 */
-	cascade?: Record<string, number> | null;
+	cascade: t.Optional(t.Union([t.Record(t.String(), t.Number()), t.Null()])),
 	/*
 	 * The agent that performed the action, and the surface it arrived on. Written together or not at
 	 * all; absent means the console.
@@ -394,10 +398,11 @@ export interface AdminAuditEntry {
 	 * which is what lets the constitution's "attributable to the agent and the authorizing principal"
 	 * hold without redefining an existing field.
 	 */
-	viaClientId?: string | null;
-	viaSurface?: 'mcp' | null;
-	timestamp: Date;
-}
+	viaClientId: t.Optional(t.Union([t.String(), t.Null()])),
+	viaSurface: t.Optional(t.Union([t.Literal('mcp'), t.Null()])),
+	timestamp: t.Date()
+});
+export type AdminAuditEntry = Static<typeof AdminAuditEntry>;
 
 export interface AdminAuditQuery {
 	// Matches actorId OR actorEmail: a reviewer reads emails, but a deleted admin's entries are
@@ -461,29 +466,30 @@ export interface AdminAuditStoreConstructor {
  * cannot be spent twice, and the TTL index reaps what nobody confirmed. A self-contained signed token
  * would need no storage but could be neither revoked nor spent once.
  */
-export interface McpConfirmation {
-	_id: string;
+export const McpConfirmation = t.Object({
+	_id: t.String(),
 	/* The tool the token authorizes. A token for one tool never authorizes another. */
-	tool: string;
+	tool: t.String(),
 	/*
 	 * Canonical target identity — the resolved path parameters, joined. Human-readable on purpose: it
 	 * appears in the refusal when a confirmation is presented for the wrong target.
 	 */
-	targetKey: string;
+	targetKey: t.String(),
 	/*
 	 * SHA-256 over the canonicalised arguments. What makes "the parameters differ from what was
 	 * described" checkable rather than aspirational.
 	 */
-	argumentsHash: string;
+	argumentsHash: t.String(),
 	/* One operator's confirmation must not authorize another's call. */
-	principalId: string;
+	principalId: t.String(),
 	/* Nor one agent's a different agent's. */
-	viaClientId: string;
+	viaClientId: t.String(),
 	/* The description the operator was shown, retained so a redemption can be checked against it. */
-	report: Record<string, unknown>;
-	createdAt: Date;
-	expiresAt: Date;
-}
+	report: t.Record(t.String(), t.Unknown()),
+	createdAt: t.Date(),
+	expiresAt: t.Date()
+});
+export type McpConfirmation = Static<typeof McpConfirmation>;
 
 export interface McpConfirmationStoreInstance {
 	issue(
@@ -506,7 +512,13 @@ export interface McpConfirmationStoreConstructor {
 }
 
 /* Which plane raised a fault. Drives the surface filter, and is captured, never inferred. */
-export type ErrorSurface = 'oauth' | 'admin' | 'mcp' | 'interaction';
+export const ErrorSurface = t.Union([
+	t.Literal('oauth'),
+	t.Literal('admin'),
+	t.Literal('mcp'),
+	t.Literal('interaction')
+]);
+export type ErrorSurface = Static<typeof ErrorSurface>;
 
 /* How much of the caller's address a record keeps. See errorStore.originCaptureLevel. */
 export type OriginCaptureLevel = 'omitted' | 'anonymized' | 'full';
@@ -516,82 +528,86 @@ export type OriginCaptureLevel = 'omitted' | 'anonymized' | 'full';
  * message is the likeliest way a request value reaches this record by accident, so nothing keeps a
  * verbatim stack.
  */
-export interface ErrorOrigin {
-	file: string;
-	line: number | null;
-	frame: string;
-}
+export const ErrorOrigin = t.Object({
+	file: t.String(),
+	line: t.Union([t.Number(), t.Null()]),
+	frame: t.String()
+});
+export type ErrorOrigin = Static<typeof ErrorOrigin>;
 
 /*
  * One occurrence of a fault. Immutable once written — there is no path through any surface that edits
  * one, which is why the store interface below offers no update.
  */
-export interface ErrorRecord {
+export const ErrorRecord = t.Object({
 	/* The opaque identifier handed to the caller, and the only thing they can report back. */
-	reference: string;
-	at: Date;
+	reference: t.String(),
+	at: t.Date(),
 	/*
 	 * `null` throughout means "not known" and is written explicitly rather than inferred — an
 	 * unauthenticated malformed request genuinely has no client, and guessing one would make the record
 	 * lie about who was involved.
 	 */
-	clientId: string | null;
-	actor: { id: string; email: string } | null;
-	scope: string | null;
-	requestId: string | null;
+	clientId: t.Union([t.String(), t.Null()]),
+	actor: t.Union([t.Object({ id: t.String(), email: t.String() }), t.Null()]),
+	scope: t.Union([t.String(), t.Null()]),
+	requestId: t.Union([t.String(), t.Null()]),
 	/*
 	 * The caller's origin at the configured level. `'not-captured'` is distinct from `null`: the first
 	 * says the operator chose not to look, the second that there was nothing to see. A reader must not
 	 * have to tell those apart by consulting the configuration.
 	 */
-	origin: string | null | 'not-captured';
-	userAgent: string | null;
+	origin: t.Union([t.String(), t.Null()]),
+	userAgent: t.Union([t.String(), t.Null()]),
 	/*
 	 * Names of the fields the request carried — never their values, so no secret can reach the store
 	 * through this field. Same rule, and the same reason, as AdminAuditEntry.attributes.
 	 */
-	submittedFields: string[];
-}
+	submittedFields: t.Array(t.String())
+});
+export type ErrorRecord = Static<typeof ErrorRecord>;
 
 /*
  * A distinct fault, and the unit both the caps and the reader work in. One row per fingerprint, so a
  * fault repeating a thousand times reads as one problem with a magnitude.
  */
-export interface ErrorGroup {
-	_id: string;
-	fingerprint: string;
-	errorCode: string;
-	status: number;
-	surface: ErrorSurface;
+export const ErrorGroup = t.Object({
+	_id: t.String(),
+	fingerprint: t.String(),
+	errorCode: t.String(),
+	status: t.Number(),
+	surface: ErrorSurface,
 	/*
 	 * Elysia's declaration form (`/admin/api/clients/:id`), never the concrete URL — a concrete path
 	 * would split one fault into one group per identifier.
 	 */
-	route: string;
-	method: string;
-	origin: ErrorOrigin;
-	message: string;
+	route: t.String(),
+	method: t.String(),
+	origin: ErrorOrigin,
+	message: t.String(),
 	/* Exact, always. The sample cap bounds retained detail, never the tally. */
-	occurrences: number;
-	firstSeenAt: Date;
-	lastSeenAt: Date;
+	occurrences: t.Number(),
+	firstSeenAt: t.Date(),
+	lastSeenAt: t.Date(),
 	/* Advanced on every occurrence, so a fault that is still happening does not age out mid-life. */
-	expiresAt: Date;
-	samples: ErrorRecord[];
-}
+	expiresAt: t.Date(),
+	samples: t.Array(ErrorRecord)
+});
+export type ErrorGroup = Static<typeof ErrorGroup>;
 
 /* What the capture path hands the store: one occurrence, already redacted and fingerprinted. */
-export interface ErrorOccurrence {
-	fingerprint: string;
-	errorCode: string;
-	status: number;
-	surface: ErrorSurface;
-	route: string;
-	method: string;
-	origin: ErrorOrigin;
-	message: string;
-	record: ErrorRecord;
-}
+export const ErrorOccurrence = t.Object({
+	fingerprint: t.String(),
+	errorCode: t.String(),
+	status: t.Number(),
+	surface: ErrorSurface,
+	route: t.String(),
+	method: t.String(),
+	origin: ErrorOrigin,
+	message: t.String(),
+	record: ErrorRecord
+});
+export type ErrorOccurrence = Static<typeof ErrorOccurrence>;
 
 export interface ErrorStoreQuery {
 	errorCode?: string;
@@ -697,10 +713,11 @@ export interface ErrorStoreConstructor {
  * administrator is an owner of one group and a plain member of another — which is why it cannot live
  * on the user record beside `roles`.
  */
-export interface GroupMember {
-	userId: string;
-	role: 'owner' | 'member';
-}
+export const GroupMember = t.Object({
+	userId: t.String(),
+	role: t.Union([t.Literal('owner'), t.Literal('member')])
+});
+export type GroupMember = Static<typeof GroupMember>;
 
 /*
  * The owner of every project and user bucket, and the only thing that grants access to one.
@@ -719,14 +736,19 @@ export interface GroupMember {
  *   - `system` is the reserved `unassigned` holding group, which has no members and is exempt from the
  *     at-least-one-owner rule.
  */
-export interface Group {
-	_id: string;
-	name: string;
-	kind: 'personal' | 'regular' | 'system';
-	members: GroupMember[];
-	createdAt: Date;
-	updatedAt: Date;
-}
+export const Group = t.Object({
+	_id: t.String(),
+	name: t.String(),
+	kind: t.Union([
+		t.Literal('personal'),
+		t.Literal('regular'),
+		t.Literal('system')
+	]),
+	members: t.Array(GroupMember),
+	createdAt: t.Date(),
+	updatedAt: t.Date()
+});
+export type Group = Static<typeof Group>;
 
 export interface GroupStoreInstance {
 	create(data: {
@@ -757,17 +779,18 @@ export interface GroupStoreConstructor {
  * The token is mailed and never stored: only its hash is kept, the same shape
  * `lib/password_reset/challenge.ts` uses, so a database read cannot yield a usable invitation.
  */
-export interface GroupInvitation {
-	_id: string;
-	groupId: string;
-	email: string;
-	role: GroupMember['role'];
-	invitedBy: string;
-	tokenHash: string;
-	expiresAt: Date;
-	acceptedAt: Date | null;
-	createdAt: Date;
-}
+export const GroupInvitation = t.Object({
+	_id: t.String(),
+	groupId: t.String(),
+	email: t.String(),
+	role: GroupMember.properties.role,
+	invitedBy: t.String(),
+	tokenHash: t.String(),
+	expiresAt: t.Date(),
+	acceptedAt: t.Union([t.Date(), t.Null()]),
+	createdAt: t.Date()
+});
+export type GroupInvitation = Static<typeof GroupInvitation>;
 
 export interface GroupInvitationStoreInstance {
 	create(data: {
@@ -791,24 +814,25 @@ export interface GroupInvitationStoreConstructor {
 	new (): GroupInvitationStoreInstance;
 }
 
-export interface Project {
-	_id: string;
-	name: string;
-	slug: string;
-	type: 'admin' | 'regular';
+export const Project = t.Object({
+	_id: t.String(),
+	name: t.String(),
+	slug: t.String(),
+	type: t.Union([t.Literal('admin'), t.Literal('regular')]),
 	/* The group that owns this project. Every access decision resolves through it. */
-	ownerGroupId: string;
-	bucketId: string | null;
-	clientIds: string[];
+	ownerGroupId: t.String(),
+	bucketId: t.Union([t.String(), t.Null()]),
+	clientIds: t.Array(t.String()),
 	/*
 	 * Web origins whose browser code may read cross-origin responses on behalf of this project's
 	 * clients. Operator-managed, empty by default — a project grants nothing until one is added.
 	 * Stored canonical and matched by exact equality (lib/helpers/cors_origin.ts).
 	 */
-	corsOrigins: string[];
-	createdAt: Date;
-	updatedAt: Date;
-}
+	corsOrigins: t.Array(t.String()),
+	createdAt: t.Date(),
+	updatedAt: t.Date()
+});
+export type Project = Static<typeof Project>;
 
 export interface ProjectStoreInstance {
 	create(data: {
@@ -851,30 +875,31 @@ export interface ProjectStoreConstructor {
  * project, the project names its owning group, and every access decision resolves through that — one
  * source of ownership, as everywhere else.
  */
-export interface ProtectedResource {
-	_id: string;
-	projectId: string;
-	name: string;
+export const ProtectedResource = t.Object({
+	_id: t.String(),
+	projectId: t.String(),
+	name: t.String(),
 	/*
 	 * What the resource recognises. Held as an array and joined only at the `ResourceServer` seam,
 	 * because a space-delimited string is the wire shape, not a storage shape.
 	 */
-	scopes: string[];
+	scopes: t.Array(t.String()),
 	/*
 	 * How the resource verifies a token. `jwt` by default: an independent MCP server can then check a
 	 * signature against the published keys with no request back and no credentials of its own, which
 	 * is the case this whole capability exists to serve.
 	 */
-	tokenFormat: 'jwt' | 'opaque';
-	accessTokenTTL: number;
+	tokenFormat: t.Union([t.Literal('jwt'), t.Literal('opaque')]),
+	accessTokenTTL: t.Number(),
 	/*
 	 * Whether a trailing slash distinguishes this identifier from its sibling. Off for every resource
 	 * that does not say otherwise, because the MCP specification asks for the slash-free form.
 	 */
-	trailingSlashSignificant: boolean;
-	createdAt: Date;
-	updatedAt: Date;
-}
+	trailingSlashSignificant: t.Boolean(),
+	createdAt: t.Date(),
+	updatedAt: t.Date()
+});
+export type ProtectedResource = Static<typeof ProtectedResource>;
 
 export interface ProtectedResourceStoreInstance {
 	create(data: {
@@ -914,26 +939,27 @@ export interface ProtectedResourceStoreConstructor {
  * on the agent's next call — including on an instance that did not serve the withdrawal, which an
  * applied setting does not reach.
  */
-export interface McpClientPermission {
+export const McpClientPermission = t.Object({
 	/* The permitted identifier URL, or the bare host when the entry is host-wide. */
-	_id: string;
-	kind: 'identifier' | 'host';
+	_id: t.String(),
+	kind: t.Union([t.Literal('identifier'), t.Literal('host')]),
 	/*
 	 * Requires the client to authenticate by proving possession of a key it published in its own
 	 * document. This is what defeats loopback impersonation outright: a stolen authorization code
 	 * cannot be redeemed without the private half, which an impersonator does not have.
 	 */
-	requireKeyProof: boolean;
+	requireKeyProof: t.Boolean(),
 	/*
 	 * Set only where the document offers loopback redirect targets alone. Such a document proves
 	 * control of a domain but cannot prove which local process will receive the code, so the
 	 * administrator granting it has to say they were told.
 	 */
-	loopbackAcknowledged: boolean;
-	acknowledgedBy?: string;
-	acknowledgedAt?: Date;
-	createdAt: Date;
-}
+	loopbackAcknowledged: t.Boolean(),
+	acknowledgedBy: t.Optional(t.String()),
+	acknowledgedAt: t.Optional(t.Date()),
+	createdAt: t.Date()
+});
+export type McpClientPermission = Static<typeof McpClientPermission>;
 
 export interface McpClientPermissionStoreInstance {
 	create(data: {
@@ -962,11 +988,15 @@ export interface McpClientPermissionStoreConstructor {
 	new (): McpClientPermissionStoreInstance;
 }
 
-export type VerificationMethod = 'link' | 'code';
+export const VerificationMethod = t.Union([
+	t.Literal('link'),
+	t.Literal('code')
+]);
+export type VerificationMethod = Static<typeof VerificationMethod>;
 
-export interface UserBucket {
-	_id: string;
-	name: string;
+export const UserBucket = t.Object({
+	_id: t.String(),
+	name: t.String(),
 	/*
 	 * The bucket's address: the path segment its endpoints live beneath, and the path component of its
 	 * issuer identifier. Distinct from `name`, which is the display name an operator reads in a list
@@ -977,7 +1007,7 @@ export interface UserBucket {
 	 * simply not addressable until one is assigned. The default bucket has one too, but never uses it
 	 * in an address: it is served at the root, which is what keeps every existing integration working.
 	 */
-	slug?: string;
+	slug: t.Optional(t.String()),
 	/*
 	 * The bucket's own hostname, when it has one: `acme.auth.example.com`, and then its issuer
 	 * identifier is that origin and its endpoints are the bare paths beneath it.
@@ -997,7 +1027,7 @@ export interface UserBucket {
 	 * Stored normalised — case folded, no trailing dot, no port (lib/consts/request_host.ts) — because
 	 * uniqueness over a name compared in two forms is not uniqueness.
 	 */
-	host?: string;
+	host: t.Optional(t.String()),
 	/*
 	 * When a request first reached this bucket's hostname, and when one last did.
 	 *
@@ -1012,11 +1042,11 @@ export interface UserBucket {
 	 *
 	 * Written debounced and never on the response path — see lib/admin/auth/hostArrivals.ts.
 	 */
-	hostFirstSeenAt?: Date;
-	hostLastSeenAt?: Date;
+	hostFirstSeenAt: t.Optional(t.Date()),
+	hostLastSeenAt: t.Optional(t.Date()),
 	/* The group that owns this bucket. Every access decision resolves through it. */
-	ownerGroupId: string;
-	roles: string[];
+	ownerGroupId: t.String(),
+	roles: t.Array(t.String()),
 	/*
 	 * Whether this bucket accepts an email and a password at all. Replaces `authMethods`, which was a
 	 * dead field: nothing read it, and the admin bodies omitted it entirely, so no operator could set it.
@@ -1029,21 +1059,21 @@ export interface UserBucket {
 	 * `federation.some((p) => p.enabled)`, so a provider is enabled in exactly one place. Two fields that
 	 * both claim to say whether federation works is the shape that disagrees after the first edit.
 	 */
-	passwordLogin: boolean;
+	passwordLogin: t.Boolean(),
 	/* This bucket's upstream providers, credentials included. Managed only through their own routes. */
-	federation: FederationProvider[];
+	federation: t.Array(FederationProvider),
 	// Whether self-service registration is accepted for this bucket. The reserved
 	// admin bucket seeds this false; every other bucket defaults true.
 	//
 	// Governs the PASSWORD registration form only. Federated provisioning is the
 	// per-provider `provisioning` knob — which is what lets a bucket close password
 	// sign-ups while still accepting anyone from its corporate IdP.
-	registrationOpen: boolean;
+	registrationOpen: t.Boolean(),
 	// Whether a newly registered account must verify its email before it counts as
 	// verified (and, when required, before it can sign in).
-	emailVerificationRequired: boolean;
+	emailVerificationRequired: t.Boolean(),
 	// Which proof the registrant uses when verification is required.
-	verificationMethod: VerificationMethod;
+	verificationMethod: VerificationMethod,
 	/*
 	 * Whether a **password** sign-in to this bucket must also carry a one-time code from an
 	 * authenticator app. Defaulted `false` on read in both adapters, so a bucket document written
@@ -1062,10 +1092,11 @@ export interface UserBucket {
 	 * Permitted, and inert, while `passwordLogin` is false. The admin route says so rather than
 	 * refusing: an operator recording intent ahead of opening the door is doing something reasonable.
 	 */
-	totpRequired: boolean;
-	createdAt: Date;
-	updatedAt: Date;
-}
+	totpRequired: t.Boolean(),
+	createdAt: t.Date(),
+	updatedAt: t.Date()
+});
+export type UserBucket = Static<typeof UserBucket>;
 
 export interface UserBucketStoreInstance {
 	create(data: {
@@ -1150,10 +1181,10 @@ export interface UserBucketStoreConstructor {
 	new (): UserBucketStoreInstance;
 }
 
-export interface AdminSession {
-	_id: string;
-	userId: string;
-	bucketId: string;
+export const AdminSession = t.Object({
+	_id: t.String(),
+	userId: t.String(),
+	bucketId: t.String(),
 	/*
 	 * The group the console is currently pointed at: what is listed, and where a new container is
 	 * created. Server-held rather than caller-asserted, because it is read on an authorization
@@ -1161,12 +1192,17 @@ export interface AdminSession {
 	 * from. Re-validated against live membership on every request, falling back to the personal group
 	 * rather than erroring, so a removed member keeps a usable console.
 	 */
-	activeGroupId: string;
-	tokens: { accessToken?: string; idToken?: string; refreshToken?: string };
-	createdAt: Date;
-	expiresAt: Date;
-	absoluteExpiresAt: Date;
-}
+	activeGroupId: t.String(),
+	tokens: t.Object({
+		accessToken: t.Optional(t.String()),
+		idToken: t.Optional(t.String()),
+		refreshToken: t.Optional(t.String())
+	}),
+	createdAt: t.Date(),
+	expiresAt: t.Date(),
+	absoluteExpiresAt: t.Date()
+});
+export type AdminSession = Static<typeof AdminSession>;
 
 export interface AdminSessionStoreInstance {
 	create(data: {

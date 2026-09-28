@@ -1,24 +1,25 @@
 import { sql } from './db.js';
 import { docOf } from './json.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
-import { reviveDates } from './dates.js';
-import type { Project, ProjectStoreInstance } from '../types.js';
+import { documentOf } from '../documents.js';
+import { Project, type ProjectStoreInstance } from '../types.js';
+import { isRecord } from '../../helpers/_/object.js';
 import nanoid from '../../helpers/nanoid.js';
-
-const DATE_FIELDS = ['createdAt', 'updatedAt'] as const;
+import { member } from '../../helpers/_/object.js';
 
 /*
  * Documents written before corsOrigins existed carry no such key, and there is no backfill: the field
- * is defaulted on read so every consumer sees the declared `string[]` rather than `undefined`.
+ * is defaulted on read so every consumer sees the declared `string[]` rather than `undefined`. Applied
+ * before the schema check, which would otherwise refuse such a document as malformed.
  *
  * Kept on this backend even though no PostgreSQL deployment can hold such a document — there are no
  * PostgreSQL deployments older than the field. Dropping it would make the two stores answer
  * differently for the same input, which is a divergence with nothing to gain, and it would be the
  * first thing to go wrong if a record were ever moved between them.
  */
-function withDefaults(project: Project | null): Project | null {
-	if (!project) return null;
-	return { ...project, corsOrigins: project.corsOrigins ?? [] };
+function withDefaults(doc: unknown): unknown {
+	if (!isRecord(doc)) return doc;
+	return { ...doc, corsOrigins: doc.corsOrigins ?? [] };
 }
 
 export class ProjectStore implements ProjectStoreInstance {
@@ -117,7 +118,7 @@ export class ProjectStore implements ProjectStoreInstance {
 			SELECT count(*)::int AS held FROM ${handle(this.area)}
 			WHERE doc->>'bucketId' = ${bucketId}
 		`;
-		return Number((rows[0] as { held?: number } | undefined)?.held ?? 0);
+		return Number(member(rows[0], 'held') ?? 0);
 	}
 
 	/*
@@ -139,10 +140,10 @@ export class ProjectStore implements ProjectStoreInstance {
 	}
 
 	private projectOf(row: unknown): Project | null {
-		const doc = docOf<Project>(row);
+		const doc = docOf(row);
 		return doc === undefined
 			? null
-			: withDefaults(reviveDates(doc, DATE_FIELDS));
+			: documentOf(this.area, Project, withDefaults(doc));
 	}
 
 	private projectsOf(rows: unknown[]): Project[] {

@@ -80,6 +80,14 @@ type StaticOKPKey = Static<typeof OKPKey>;
  * once normalized, with both filled in.
  */
 export type UnnormalizedJWK = StaticRSAKey | StaticECKey | StaticOKPKey;
+
+/*
+ * A key as the key store holds it: schema-shaped, not yet normalized — `kid` and `use` may still be
+ * absent on a key provisioned out of band, and `verifyJWKs` is what fills them in on the way in to the
+ * key set. Each key schema refuses a member it does not declare, so a store strips its own bookkeeping
+ * first.
+ */
+export const StoredJWK = t.Union([RSAKey, ECKey, OKPKey]);
 export type JWKS =
 	(reqProp & StaticRSAKey) | (reqProp & StaticECKey) | (reqProp & StaticOKPKey);
 

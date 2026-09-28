@@ -2,19 +2,12 @@ import { sql } from './db.js';
 import { docOf } from './json.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
 import { provisionUserArea } from './provision.js';
-import { reviveDates } from './dates.js';
-import type { UserBucket, UserBucketStoreInstance } from '../types.js';
+import { documentOf } from '../documents.js';
+import { UserBucket, type UserBucketStoreInstance } from '../types.js';
 import type { FederationProvider } from '../../federation/types.js';
 import { UniqueValueTaken } from '../conflicts.js';
+import { isRecord } from '../../helpers/_/object.js';
 import nanoid from '../../helpers/nanoid.js';
-
-const DATE_FIELDS = [
-	'createdAt',
-	'updatedAt',
-	/* Or an arrival reads back as the ISO string jsonb stored, and the console renders a raw timestamp. */
-	'hostFirstSeenAt',
-	'hostLastSeenAt'
-] as const;
 
 /* SQLSTATE 23505, classified here the way provision.ts classifies its own states. */
 function isUniqueViolation(error: unknown): boolean {
@@ -22,7 +15,7 @@ function isUniqueViolation(error: unknown): boolean {
 		typeof error === 'object' &&
 		error !== null &&
 		'code' in error &&
-		(error as { code: unknown }).code === '23505'
+		error.code === '23505'
 	);
 }
 
@@ -34,18 +27,18 @@ function isUniqueViolation(error: unknown): boolean {
  * leaving it out would close the password door on every bucket that predates federation; `totpRequired`
  * is its mirror. Carried over to this backend unchanged even though no PostgreSQL deployment can hold
  * a document that old — two stores answering differently for the same input is a divergence with
- * nothing to gain.
+ * nothing to gain. Applied before the schema check, which would otherwise refuse such a document.
  */
-function withDefaults(bucket: UserBucket | null): UserBucket | null {
-	if (!bucket) return null;
+function withDefaults(doc: unknown): unknown {
+	if (!isRecord(doc)) return doc;
 	return {
-		...bucket,
-		registrationOpen: bucket.registrationOpen ?? true,
-		emailVerificationRequired: bucket.emailVerificationRequired ?? false,
-		verificationMethod: bucket.verificationMethod ?? 'link',
-		passwordLogin: bucket.passwordLogin ?? true,
-		federation: bucket.federation ?? [],
-		totpRequired: bucket.totpRequired ?? false
+		...doc,
+		registrationOpen: doc.registrationOpen ?? true,
+		emailVerificationRequired: doc.emailVerificationRequired ?? false,
+		verificationMethod: doc.verificationMethod ?? 'link',
+		passwordLogin: doc.passwordLogin ?? true,
+		federation: doc.federation ?? [],
+		totpRequired: doc.totpRequired ?? false
 	};
 }
 
@@ -231,10 +224,10 @@ export class UserBucketStore implements UserBucketStoreInstance {
 	}
 
 	private bucketOf(row: unknown): UserBucket | null {
-		const doc = docOf<UserBucket>(row);
+		const doc = docOf(row);
 		return doc === undefined
 			? null
-			: withDefaults(reviveDates(doc, DATE_FIELDS));
+			: documentOf(this.area, UserBucket, withDefaults(doc));
 	}
 
 	private bucketsOf(rows: unknown[]): UserBucket[] {

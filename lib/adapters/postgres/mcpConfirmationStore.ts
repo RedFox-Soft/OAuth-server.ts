@@ -1,16 +1,13 @@
 import { sql } from './db.js';
 import { docOf } from './json.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
-import { reviveDates } from './dates.js';
-import type {
+import { documentOf } from '../documents.js';
+import {
 	McpConfirmation,
-	McpConfirmationStoreInstance
+	type McpConfirmationStoreInstance
 } from '../types.js';
 import nanoid from '../../helpers/nanoid.js';
-
-/* The record's own date fields, named rather than sniffed — a jsonb round trip returns them as
- * strings, and `record.expiresAt.getTime()` below is exactly the call that would fail. */
-const DATE_FIELDS = ['createdAt', 'expiresAt'] as const;
+import { member } from '../../helpers/_/object.js';
 
 export class McpConfirmationStore implements McpConfirmationStoreInstance {
 	private area: string = STORE_AREAS.mcpConfirmation;
@@ -54,10 +51,10 @@ export class McpConfirmationStore implements McpConfirmationStoreInstance {
 			DELETE FROM ${handle(this.area)} WHERE id = ${id} RETURNING doc
 		`;
 
-		const stored = docOf<McpConfirmation>(rows[0]);
+		const stored = docOf(rows[0]);
 		if (stored === undefined) return null;
 
-		const record = reviveDates(stored, DATE_FIELDS);
+		const record = documentOf(this.area, McpConfirmation, stored);
 		if (record.expiresAt.getTime() <= Date.now()) return null;
 		return record;
 	}
@@ -68,6 +65,6 @@ export class McpConfirmationStore implements McpConfirmationStoreInstance {
 			SELECT count(*)::int AS pending FROM ${handle(this.area)}
 			WHERE expires_at > now()
 		`;
-		return Number((rows[0] as { pending?: number } | undefined)?.pending ?? 0);
+		return Number(member(rows[0], 'pending') ?? 0);
 	}
 }

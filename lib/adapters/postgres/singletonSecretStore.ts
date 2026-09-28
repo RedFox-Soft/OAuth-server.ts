@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { sql } from './db.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
 import type { SecretStoreInstance } from '../types.js';
+import { member } from '../../helpers/_/object.js';
 
 /*
  * A permanent server-wide secret, held as raw bytes.
@@ -62,8 +63,8 @@ export class SingletonSecretStore implements SecretStoreInstance {
 		const rows = await handle`
 			SELECT secret FROM ${handle(this.area)} WHERE id = ${this.secretId}
 		`;
-		const row = rows[0] as { secret?: unknown } | undefined;
-		return row === undefined ? null : toBytes(row.secret);
+		const row: unknown = rows[0];
+		return row === undefined ? null : toBytes(member(row, 'secret'));
 	}
 
 	/*

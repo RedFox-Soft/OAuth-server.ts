@@ -10,16 +10,16 @@ import { Type as t, type Static } from '@sinclair/typebox';
  * setting nobody varies is surface with no requirement behind it, and every setting is a way to be
  * misconfigured.
  */
-export interface FederationProvider {
+export const FederationProvider = t.Object({
 	/* Slug, unique within the bucket. Appears in the start URL, so an operator needs it readable. */
-	id: string;
+	id: t.String(),
 	/* The button label on the login page. */
-	displayName: string;
+	displayName: t.String(),
 	/* A kill switch that keeps the credentials, so an incident costs no re-provisioning. */
-	enabled: boolean;
+	enabled: t.Boolean(),
 	/* Discovery source. `https:` only, and validated at write time against its own metadata. */
-	issuer: string;
-	clientId: string;
+	issuer: t.String(),
+	clientId: t.String(),
 	/*
 	 * Write-only: masked on every read, absent-means-unchanged on update, and the mask itself refused as a
 	 * value. Never in the audit trail — that trail records field names, never values.
@@ -29,27 +29,27 @@ export interface FederationProvider {
 	 * on purpose: a sentinel is a value somebody eventually types, and `credential.ts` refuses the absence
 	 * outright for a provider whose credential model needs one.
 	 */
-	clientSecret?: string;
+	clientSecret: t.Optional(t.String()),
 	/* IdPs differ on which scope yields an email. Must contain `openid`. */
-	scopes: string[];
+	scopes: t.Array(t.String()),
 	/*
 	 * The linking trust decision, per provider rather than per bucket: Google verifies addresses, and a
 	 * corporate Keycloak may assert whatever an operator typed into it.
 	 */
-	emailTrusted: boolean;
+	emailTrusted: t.Boolean(),
 	/* Whether a first-time federated user gets an account at all. */
-	provisioning: 'jit' | 'existing_only';
+	provisioning: t.Union([t.Literal('jit'), t.Literal('existing_only')]),
 	/*
 	 * Empty means any, which is the default — so this is opt-in tightening. Without it an enabled Google
 	 * button provisions the entire internet, the classic misconfiguration of this feature. Bare lowercase
 	 * domains, matched case-insensitively on the address's domain part. No subdomain wildcarding.
 	 */
-	allowedEmailDomains: string[];
+	allowedEmailDomains: t.Array(t.String()),
 	/*
 	 * The one load-bearing claim mapping: no email means neither link nor provision. Corporate IdPs
 	 * commonly use `upn` rather than `email`.
 	 */
-	emailClaim: string;
+	emailClaim: t.String(),
 	/*
 	 * The four below arrived with `specs/053-apple-microsoft-github`, and every one of them is here because
 	 * it cannot be derived from anything else. All are optional, so every record written before them is
@@ -66,33 +66,35 @@ export interface FederationProvider {
 	 * identifier. A per-connection decision about who is admitted, so no catalogue entry can hold it — and
 	 * the difference between one company's staff and everyone in the world with a Microsoft account.
 	 */
-	tenant?: string;
+	tenant: t.Optional(t.String()),
 	/* Apple: the developer account the signing key belongs to. */
-	teamId?: string;
+	teamId: t.Optional(t.String()),
 	/*
 	 * Apple: which key. Readable precisely so that an administrator whose key was revoked can tell which
 	 * one to replace — the failure appears on Apple's page, so the only clue available is here.
 	 */
-	keyId?: string;
+	keyId: t.Optional(t.String()),
 	/*
 	 * Apple: the private key the credential is signed with, and the reason Apple needs no stored secret.
 	 * Held to every rule `clientSecret` is — masked on every read for every role, absent-means-unchanged on
 	 * update, the mask refused as a value, never in the audit trail. Masked by the *containing* bucket's
 	 * projections as well; see the comment on `presentBucket`.
 	 */
-	signingKey?: string;
-}
+	signingKey: t.Optional(t.String())
+});
+export type FederationProvider = Static<typeof FederationProvider>;
 
 /*
  * That one account in one bucket holds one subject at one provider. Lives on the user row, which is what
  * makes deletion integrity free: the account cascade destroys the row and bucket deletion destroys the
  * area, so no cascade arm has to know this field exists.
  */
-export interface FederatedIdentity {
-	providerId: string;
-	sub: string;
-	linkedAt: Date;
-}
+export const FederatedIdentity = t.Object({
+	providerId: t.String(),
+	sub: t.String(),
+	linkedAt: t.Date()
+});
+export type FederatedIdentity = Static<typeof FederatedIdentity>;
 
 /*
  * The short-lived record that stands in for the browser cookie which cannot survive the trip to the IdP.

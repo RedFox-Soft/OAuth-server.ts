@@ -1,9 +1,19 @@
+import { Type as t, type Static } from '@sinclair/typebox';
 import { db } from './db.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
+import { documentOf } from '../documents.js';
 import type {
 	SchemaMigrationRecord,
 	SchemaMigrationStoreInstance
 } from '../types.js';
+
+/* A SchemaMigrationRecord as stored: the migration id is the document `_id`. */
+const MigrationDocument = t.Object({
+	_id: t.String(),
+	appliedAt: t.Date(),
+	checksum: t.String()
+});
+type MigrationDocument = Static<typeof MigrationDocument>;
 
 /*
  * The record of which schema migrations this database has had.
@@ -21,20 +31,19 @@ export class SchemaMigrationStore implements SchemaMigrationStoreInstance {
 	private collectionName: string = STORE_AREAS.schemaMigrations;
 
 	private collection() {
-		return db.collection<{
-			_id: string;
-			appliedAt: Date;
-			checksum: string;
-		}>(this.collectionName);
+		return db.collection<MigrationDocument>(this.collectionName);
 	}
 
 	async all(): Promise<SchemaMigrationRecord[]> {
 		const docs = await this.collection().find({}).toArray();
-		return docs.map((doc) => ({
-			id: doc._id,
-			appliedAt: doc.appliedAt,
-			checksum: doc.checksum
-		}));
+		return docs.map((found) => {
+			const doc = documentOf(this.collectionName, MigrationDocument, found);
+			return {
+				id: doc._id,
+				appliedAt: doc.appliedAt,
+				checksum: doc.checksum
+			};
+		});
 	}
 
 	/*
@@ -66,6 +75,6 @@ function isDuplicateKey(err: unknown): boolean {
 		typeof err === 'object' &&
 		err !== null &&
 		'code' in err &&
-		(err as { code: unknown }).code === 11000
+		err.code === 11000
 	);
 }

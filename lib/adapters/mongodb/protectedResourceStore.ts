@@ -1,9 +1,22 @@
 import { db } from './db.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
-import type {
+import { documentOf } from '../documents.js';
+import {
 	ProtectedResource,
-	ProtectedResourceStoreInstance
+	type ProtectedResourceStoreInstance
 } from '../types.js';
+
+function resourceOf(found: unknown): ProtectedResource | null {
+	return found
+		? documentOf(STORE_AREAS.protectedResources, ProtectedResource, found)
+		: null;
+}
+
+function resourcesOf(found: unknown[]): ProtectedResource[] {
+	return found.map((resource) =>
+		documentOf(STORE_AREAS.protectedResources, ProtectedResource, resource)
+	);
+}
 
 /*
  * Declared protected resources, keyed by the canonical resource identifier.
@@ -44,15 +57,15 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 	}
 
 	async find(id: string): Promise<ProtectedResource | null> {
-		return this.collection.findOne({ _id: id });
+		return resourceOf(await this.collection.findOne({ _id: id }));
 	}
 
 	async listByProject(projectId: string): Promise<ProtectedResource[]> {
-		return this.collection.find({ projectId }).toArray();
+		return resourcesOf(await this.collection.find({ projectId }).toArray());
 	}
 
 	async list(): Promise<ProtectedResource[]> {
-		return this.collection.find().toArray();
+		return resourcesOf(await this.collection.find().toArray());
 	}
 
 	async update(
@@ -69,7 +82,7 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 			{ $set: { ...patch, updatedAt: new Date() } },
 			{ returnDocument: 'after' }
 		);
-		return result ?? null;
+		return resourceOf(result);
 	}
 
 	async destroy(id: string): Promise<void> {

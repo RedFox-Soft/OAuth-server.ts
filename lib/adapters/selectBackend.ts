@@ -18,9 +18,15 @@ export const BACKEND_SELECTORS: Readonly<Record<BackendName, string | null>> = {
 };
 
 /* The backends an operator can actually choose, in the order the documentation introduces them. */
-export const PRODUCTION_BACKENDS = (
-	Object.keys(BACKEND_SELECTORS) as BackendName[]
-).filter((name) => BACKEND_SELECTORS[name] !== null);
+export const PRODUCTION_BACKENDS = Object.entries(BACKEND_SELECTORS)
+	.filter(([, selector]) => selector !== null)
+	.map(([name]) => name)
+	.filter(isBackendName);
+
+// A key of the table above; `Object.entries` answers strings, and every key it holds is a backend.
+function isBackendName(name: string): name is BackendName {
+	return Object.hasOwn(BACKEND_SELECTORS, name);
+}
 
 /*
  * Which storage backend a process uses, decided from the environment alone.

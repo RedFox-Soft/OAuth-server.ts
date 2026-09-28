@@ -1,11 +1,18 @@
 import { db } from './db.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
-import type {
+import { documentOf } from '../documents.js';
+import {
 	GroupInvitation,
-	GroupInvitationStoreInstance,
-	GroupMember
+	type GroupInvitationStoreInstance,
+	type GroupMember
 } from '../types.js';
 import nanoid from '../../helpers/nanoid.js';
+
+function invitationOf(found: unknown): GroupInvitation | null {
+	return found
+		? documentOf(STORE_AREAS.groupInvitations, GroupInvitation, found)
+		: null;
+}
 
 export class GroupInvitationStore implements GroupInvitationStoreInstance {
 	private collection = db.collection<GroupInvitation>(
@@ -38,7 +45,7 @@ export class GroupInvitationStore implements GroupInvitationStoreInstance {
 	}
 
 	async find(id: string): Promise<GroupInvitation | null> {
-		return this.collection.findOne({ _id: id });
+		return invitationOf(await this.collection.findOne({ _id: id }));
 	}
 
 	/*
@@ -47,14 +54,19 @@ export class GroupInvitationStore implements GroupInvitationStoreInstance {
 	 * and an invitation that outlives its expiry is a standing offer of access to a group.
 	 */
 	async findByTokenHash(tokenHash: string): Promise<GroupInvitation | null> {
-		return this.collection.findOne({
-			tokenHash,
-			expiresAt: { $gt: new Date() }
-		});
+		return invitationOf(
+			await this.collection.findOne({
+				tokenHash,
+				expiresAt: { $gt: new Date() }
+			})
+		);
 	}
 
 	async listByGroup(groupId: string): Promise<GroupInvitation[]> {
-		return this.collection.find({ groupId }).toArray();
+		const found = await this.collection.find({ groupId }).toArray();
+		return found.map((invitation) =>
+			documentOf(STORE_AREAS.groupInvitations, GroupInvitation, invitation)
+		);
 	}
 
 	async markAccepted(id: string): Promise<void> {

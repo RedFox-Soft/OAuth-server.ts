@@ -1,6 +1,7 @@
 import { sql } from './db.js';
 import { docOf } from './json.js';
-import { type UnnormalizedJWK } from 'lib/configs/verifyJWKs.ts';
+import { StoredJWK, type UnnormalizedJWK } from 'lib/configs/verifyJWKs.ts';
+import { documentOf } from '../documents.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
 import type { JWKSStoreInstance } from '../types.js';
 
@@ -50,12 +51,10 @@ export class JWKSStore implements JWKSStoreInstance {
 		return jwks.filter((jwk): jwk is UnnormalizedJWK => jwk !== undefined);
 	}
 
-	/*
-	 * Claims only that the stored document is a schema-shaped JWK — not that it is normalized. Nothing
-	 * but a read can tell us what is in a jsonb column, and `verifyJWKs` is what checks even that, on
-	 * the way in to the key set.
-	 */
 	private jwkOf(row: unknown): UnnormalizedJWK | undefined {
-		return docOf<UnnormalizedJWK>(row);
+		const doc = docOf(row);
+		return doc === undefined
+			? undefined
+			: documentOf(this.area, StoredJWK, doc);
 	}
 }

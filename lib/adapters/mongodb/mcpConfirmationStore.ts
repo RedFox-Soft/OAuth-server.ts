@@ -1,8 +1,9 @@
 import { db } from './db.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
-import type {
+import { documentOf } from '../documents.js';
+import {
 	McpConfirmation,
-	McpConfirmationStoreInstance
+	type McpConfirmationStoreInstance
 } from '../types.js';
 import nanoid from '../../helpers/nanoid.js';
 
@@ -37,8 +38,13 @@ export class McpConfirmationStore implements McpConfirmationStoreInstance {
 	 * its own schedule — up to a minute behind — so the check cannot be left to the index.
 	 */
 	async redeem(id: string): Promise<McpConfirmation | null> {
-		const record = await this.collection.findOneAndDelete({ _id: id });
-		if (!record) return null;
+		const found = await this.collection.findOneAndDelete({ _id: id });
+		if (!found) return null;
+		const record = documentOf(
+			STORE_AREAS.mcpConfirmation,
+			McpConfirmation,
+			found
+		);
 		if (record.expiresAt.getTime() <= Date.now()) return null;
 		return record;
 	}

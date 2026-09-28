@@ -2,7 +2,8 @@ import crypto from 'crypto';
 import { ObjectId } from 'mongodb';
 import { db } from './db.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
-import type { SmtpSettings, SmtpSettingsStoreInstance } from '../types.js';
+import { documentOf } from '../documents.js';
+import { SmtpSettings, type SmtpSettingsStoreInstance } from '../types.js';
 
 function stringTo24CharHex(str: string) {
 	const hash = crypto.createHash('sha256').update(str).digest('hex');
@@ -19,7 +20,10 @@ export class SmtpSettingsStore implements SmtpSettingsStoreInstance {
 		const result = await db
 			.collection(this.collectionName)
 			.findOne({ _id: this.settingsId });
-		return (result?.settings as SmtpSettings | undefined) ?? null;
+		const settings: unknown = result?.settings ?? null;
+		return settings === null
+			? null
+			: documentOf(this.collectionName, SmtpSettings, settings);
 	}
 
 	async set(settings: SmtpSettings): Promise<void> {

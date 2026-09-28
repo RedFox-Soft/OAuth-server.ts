@@ -1,13 +1,11 @@
 import { sql } from './db.js';
 import { docOf } from './json.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
-import { reviveDates } from './dates.js';
-import type {
+import { documentOf } from '../documents.js';
+import {
 	McpClientPermission,
-	McpClientPermissionStoreInstance
+	type McpClientPermissionStoreInstance
 } from '../types.js';
-
-const DATE_FIELDS = ['createdAt', 'acknowledgedAt'] as const;
 
 /*
  * Administrative client permissions, keyed by the permitted identifier URL or by the bare host.
@@ -107,7 +105,9 @@ export class McpClientPermissionStore implements McpClientPermissionStoreInstanc
 	}
 
 	private permissionOf(row: unknown): McpClientPermission | null {
-		const doc = docOf<McpClientPermission>(row);
-		return doc === undefined ? null : reviveDates(doc, DATE_FIELDS);
+		const doc = docOf(row);
+		return doc === undefined
+			? null
+			: documentOf(this.area, McpClientPermission, doc);
 	}
 }

@@ -1,18 +1,24 @@
 import { db } from './db.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
-import type { Project, ProjectStoreInstance } from '../types.js';
+import { documentOf } from '../documents.js';
+import { Project, type ProjectStoreInstance } from '../types.js';
 import nanoid from '../../helpers/nanoid.js';
 
 /*
  * Documents written before corsOrigins existed carry no such key, and there is no backfill: the field
  * is defaulted on read so every consumer sees the declared `string[]` rather than `undefined`. Cheaper
- * and safer than a migration for a field whose absence means "grants nothing" anyway.
+ * and safer than a migration for a field whose absence means "grants nothing" anyway. Defaulted before
+ * the check, which is what lets such a document pass it.
  */
-function withDefaults(project: Project | null): Project | null {
-	if (!project) {
-		return null;
-	}
-	return { ...project, corsOrigins: project.corsOrigins ?? [] };
+function projectOf(project: Partial<Project>): Project {
+	return documentOf(STORE_AREAS.projects, Project, {
+		...project,
+		corsOrigins: project.corsOrigins ?? []
+	});
+}
+
+function withDefaults(project: Partial<Project> | null): Project | null {
+	return project ? projectOf(project) : null;
 }
 
 export class ProjectStore implements ProjectStoreInstance {
@@ -55,12 +61,12 @@ export class ProjectStore implements ProjectStoreInstance {
 
 	async list(): Promise<Project[]> {
 		const all = await this.collection.find().toArray();
-		return all.map((p) => withDefaults(p) as Project);
+		return all.map(projectOf);
 	}
 
 	async listByGroup(groupId: string): Promise<Project[]> {
 		const all = await this.collection.find({ ownerGroupId: groupId }).toArray();
-		return all.map((p) => withDefaults(p) as Project);
+		return all.map(projectOf);
 	}
 
 	async update(

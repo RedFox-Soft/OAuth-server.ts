@@ -3,10 +3,8 @@ import crypto from 'crypto';
 import { sql } from './db.js';
 import { docOf } from './json.js';
 import { userAreaFor } from '../../consts/storage_inventory.js';
-import { reviveDates } from './dates.js';
-import { type User, type UserStoreInstance } from '../types.js';
-
-const DATE_FIELDS = ['createdAt', 'updatedAt', 'lastLoginAt'] as const;
+import { documentOf } from '../documents.js';
+import { User, type UserStoreInstance } from '../types.js';
 
 export class UserStore implements UserStoreInstance {
 	name = 'redfox';
@@ -170,8 +168,8 @@ export class UserStore implements UserStoreInstance {
 	}
 
 	private userOf(row: unknown): User | null {
-		const doc = docOf<User>(row);
-		return doc === undefined ? null : reviveDates(doc, DATE_FIELDS);
+		const doc = docOf(row);
+		return doc === undefined ? null : documentOf(this.area, User, doc);
 	}
 }
 

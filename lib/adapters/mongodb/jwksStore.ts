@@ -1,17 +1,16 @@
+import type { Document } from 'mongodb';
 import { db } from './db.js';
-import { type UnnormalizedJWK } from 'lib/configs/verifyJWKs.ts';
+import { StoredJWK, type UnnormalizedJWK } from 'lib/configs/verifyJWKs.ts';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
+import { documentOf } from '../documents.js';
 import type { JWKSStoreInstance } from '../types.js';
 
 // Discard storage-only fields so callers only ever see plain JWK objects (contract parity with the
-// in-memory adapter). `_id`/`updatedAt` are MongoDB bookkeeping, not part of the JWK.
-//
-// The cast is the one unavoidable one here: a BSON document is untyped, so nothing but a read can
-// tell us what is in it. It claims only that the document is a schema-shaped JWK — not that it is
-// normalized — and verifyJWKs is what checks even that, on the way in to the key set.
-function toJWK(doc: Record<string, unknown>): UnnormalizedJWK {
+// in-memory adapter). `_id`/`updatedAt` are MongoDB bookkeeping, not part of the JWK — and must go
+// before the check, since every key schema refuses a member it does not declare.
+function toJWK(doc: Document): UnnormalizedJWK {
 	const { _id, updatedAt, ...jwk } = doc;
-	return jwk as UnnormalizedJWK;
+	return documentOf(STORE_AREAS.jwks, StoredJWK, jwk);
 }
 
 export class JWKSStore implements JWKSStoreInstance {

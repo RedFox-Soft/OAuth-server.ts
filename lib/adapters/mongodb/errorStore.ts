@@ -1,16 +1,20 @@
+import { Type as t } from '@sinclair/typebox';
+import { Value } from '@sinclair/typebox/value';
 import type { Filter } from 'mongodb';
 import { db } from './db.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
-import type {
+import { documentOf } from '../documents.js';
+import {
 	ErrorGroup,
-	ErrorGroupPage,
-	ErrorOccurrence,
-	ErrorPurgeEstimate,
-	ErrorRecord,
-	ErrorStoreBounds,
-	ErrorStoreInstance,
-	ErrorStoreQuery,
-	ErrorSummary
+	type ErrorGroupPage,
+	type ErrorOccurrence,
+	ErrorSurface,
+	type ErrorPurgeEstimate,
+	type ErrorRecord,
+	type ErrorStoreBounds,
+	type ErrorStoreInstance,
+	type ErrorStoreQuery,
+	type ErrorSummary
 } from '../types.js';
 import {
 	admitSample,
@@ -41,7 +45,8 @@ function toFilter(query: ErrorStoreQuery, now: Date): Filter<ErrorGroup> {
 		filter.route = query.route;
 	}
 	if (query.surface !== undefined) {
-		filter.surface = query.surface as ErrorGroup['surface'];
+		const { surface } = query;
+		filter.surface = Value.Check(ErrorSurface, surface) ? surface : { $in: [] };
 	}
 	if (query.status !== undefined) {
 		filter.status = query.status;
@@ -70,6 +75,15 @@ function toFilter(query: ErrorStoreQuery, now: Date): Filter<ErrorGroup> {
 	return filter;
 }
 
+/* The projected reads below return partial documents, each checked for exactly what it projects. */
+const EvictionCandidate = t.Object({ _id: t.String() });
+const GroupWithoutSamples = t.Omit(ErrorGroup, ['samples']);
+const GroupOccurrences = t.Object({ occurrences: t.Number() });
+
+function groupOf(found: unknown): ErrorGroup {
+	return documentOf(STORE_AREAS.errorStore, ErrorGroup, found);
+}
+
 /*
  * MongoDB record of internal server faults (collection `errorStore`), one document per distinct fault
  * with its occurrences embedded.
@@ -92,14 +106,19 @@ export class ErrorStore implements ErrorStoreInstance {
 			if (count < limit) {
 				return;
 			}
-			const oldest = await this.collection
+			const found = await this.collection
 				.find({}, { projection: { _id: 1 } })
 				.sort({ lastSeenAt: 1, _id: 1 })
 				.limit(1)
 				.next();
-			if (!oldest) {
+			if (!found) {
 				return;
 			}
+			const oldest = documentOf(
+				STORE_AREAS.errorStore,
+				EvictionCandidate,
+				found
+			);
 			await this.collection.deleteOne({ _id: oldest._id });
 		}
 	}
@@ -111,11 +130,12 @@ export class ErrorStore implements ErrorStoreInstance {
 		const now = new Date();
 		const expiresAt = expiryFrom(now, bounds.retentionDays);
 
-		const existing = await this.collection.findOne({
+		const found = await this.collection.findOne({
 			fingerprint: occurrence.fingerprint
 		});
 
-		if (existing) {
+		if (found) {
+			const existing = groupOf(found);
 			const samples = admitSample(
 				existing.samples,
 				occurrence.record,
@@ -194,7 +214,7 @@ export class ErrorStore implements ErrorStoreInstance {
 		 * Served by the `{ lastSeenAt: 1, _id: 1 }` index traversed backwards: an index scan, not an
 		 * in-memory sort.
 		 */
-		const [groups, total] = await Promise.all([
+		const [found, total] = await Promise.all([
 			this.collection
 				.find(filter)
 				.sort({ lastSeenAt: -1, _id: -1 })
@@ -205,7 +225,7 @@ export class ErrorStore implements ErrorStoreInstance {
 		]);
 
 		// Filled in by the route from the queue, which owns the counter; the store cannot know it.
-		return { groups, total, dropped: 0 };
+		return { groups: found.map(groupOf), total, dropped: 0 };
 	}
 
 	async get(id: string): Promise<ErrorGroup | undefined> {
@@ -213,19 +233,20 @@ export class ErrorStore implements ErrorStoreInstance {
 			_id: id,
 			expiresAt: { $gt: new Date() }
 		});
-		return found ?? undefined;
+		return found ? groupOf(found) : undefined;
 	}
 
 	async findByReference(
 		reference: string
 	): Promise<{ group: ErrorGroup; sample: ErrorRecord } | undefined> {
-		const group = await this.collection.findOne({
+		const found = await this.collection.findOne({
 			'samples.reference': reference,
 			expiresAt: { $gt: new Date() }
 		});
-		if (!group) {
+		if (!found) {
 			return undefined;
 		}
+		const group = groupOf(found);
 		const sample = group.samples.find(
 			(candidate) => candidate.reference === reference
 		);
@@ -242,9 +263,13 @@ export class ErrorStore implements ErrorStoreInstance {
 		 * also be a second definition of "most frequent first, ties broken by key" — and the two adapters
 		 * agreeing on that ordering matters more here than the round trip does at a four-figure group cap.
 		 */
-		const groups = (await this.collection
-			.find(toFilter(query, now), { projection: { samples: 0 } })
-			.toArray()) as ErrorGroup[];
+		const groups = (
+			await this.collection
+				.find(toFilter(query, now), { projection: { samples: 0 } })
+				.toArray()
+		).map((found) =>
+			documentOf(STORE_AREAS.errorStore, GroupWithoutSamples, found)
+		);
 
 		return {
 			total: totalOccurrences(groups),
@@ -256,9 +281,13 @@ export class ErrorStore implements ErrorStoreInstance {
 
 	async previewPurge(query: ErrorStoreQuery): Promise<ErrorPurgeEstimate> {
 		const now = new Date();
-		const groups = (await this.collection
-			.find(toFilter(query, now), { projection: { occurrences: 1 } })
-			.toArray()) as ErrorGroup[];
+		const groups = (
+			await this.collection
+				.find(toFilter(query, now), { projection: { occurrences: 1 } })
+				.toArray()
+		).map((found) =>
+			documentOf(STORE_AREAS.errorStore, GroupOccurrences, found)
+		);
 
 		return {
 			groups: groups.length,

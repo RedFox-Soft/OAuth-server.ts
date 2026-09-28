@@ -1,9 +1,16 @@
 import { db } from './db.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
-import type {
+import { documentOf } from '../documents.js';
+import {
 	McpClientPermission,
-	McpClientPermissionStoreInstance
+	type McpClientPermissionStoreInstance
 } from '../types.js';
+
+function permissionOf(found: unknown): McpClientPermission | null {
+	return found
+		? documentOf(STORE_AREAS.mcpClientPermissions, McpClientPermission, found)
+		: null;
+}
 
 /*
  * Administrative client permissions, keyed by the permitted identifier URL or by the bare host.
@@ -38,11 +45,14 @@ export class McpClientPermissionStore implements McpClientPermissionStoreInstanc
 	}
 
 	async find(id: string): Promise<McpClientPermission | null> {
-		return this.collection.findOne({ _id: id });
+		return permissionOf(await this.collection.findOne({ _id: id }));
 	}
 
 	async list(): Promise<McpClientPermission[]> {
-		return this.collection.find().toArray();
+		const found = await this.collection.find().toArray();
+		return found.map((entry) =>
+			documentOf(STORE_AREAS.mcpClientPermissions, McpClientPermission, entry)
+		);
 	}
 
 	async update(
@@ -54,7 +64,7 @@ export class McpClientPermissionStore implements McpClientPermissionStoreInstanc
 			{ $set: patch },
 			{ returnDocument: 'after' }
 		);
-		return result ?? null;
+		return permissionOf(result);
 	}
 
 	async destroy(id: string): Promise<void> {
@@ -62,10 +72,12 @@ export class McpClientPermissionStore implements McpClientPermissionStoreInstanc
 	}
 
 	async findFor(identifier: string): Promise<McpClientPermission | null> {
-		const exact = await this.collection.findOne({
-			_id: identifier,
-			kind: 'identifier'
-		});
+		const exact = permissionOf(
+			await this.collection.findOne({
+				_id: identifier,
+				kind: 'identifier'
+			})
+		);
 		/*
 		 * An exact entry wins over the host it lives on, so an operator can require key proof of one
 		 * application without imposing it on every other that host publishes.
@@ -75,6 +87,8 @@ export class McpClientPermissionStore implements McpClientPermissionStoreInstanc
 		const host = URL.parse(identifier)?.hostname;
 		if (!host) return null;
 
-		return this.collection.findOne({ _id: host, kind: 'host' });
+		return permissionOf(
+			await this.collection.findOne({ _id: host, kind: 'host' })
+		);
 	}
 }

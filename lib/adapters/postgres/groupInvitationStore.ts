@@ -1,15 +1,13 @@
 import { sql } from './db.js';
 import { docOf } from './json.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
-import { reviveDates } from './dates.js';
-import type {
+import { documentOf } from '../documents.js';
+import {
 	GroupInvitation,
-	GroupInvitationStoreInstance,
-	GroupMember
+	type GroupInvitationStoreInstance,
+	type GroupMember
 } from '../types.js';
 import nanoid from '../../helpers/nanoid.js';
-
-const DATE_FIELDS = ['createdAt', 'expiresAt', 'acceptedAt'] as const;
 
 export class GroupInvitationStore implements GroupInvitationStoreInstance {
 	private area: string = STORE_AREAS.groupInvitations;
@@ -107,7 +105,9 @@ export class GroupInvitationStore implements GroupInvitationStoreInstance {
 	}
 
 	private invitationOf(row: unknown): GroupInvitation | null {
-		const doc = docOf<GroupInvitation>(row);
-		return doc === undefined ? null : reviveDates(doc, DATE_FIELDS);
+		const doc = docOf(row);
+		return doc === undefined
+			? null
+			: documentOf(this.area, GroupInvitation, doc);
 	}
 }

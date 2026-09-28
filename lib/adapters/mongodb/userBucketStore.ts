@@ -1,7 +1,8 @@
 import { db } from './db.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
 import { provisionUserArea } from './provision.js';
-import type { UserBucket, UserBucketStoreInstance } from '../types.js';
+import { documentOf } from '../documents.js';
+import { UserBucket, type UserBucketStoreInstance } from '../types.js';
 import type { FederationProvider } from '../../federation/types.js';
 import { UniqueValueTaken } from '../conflicts.js';
 import nanoid from '../../helpers/nanoid.js';
@@ -12,15 +13,15 @@ function isDuplicateKey(error: unknown): boolean {
 		typeof error === 'object' &&
 		error !== null &&
 		'code' in error &&
-		(error as { code: unknown }).code === 11000
+		error.code === 11000
 	);
 }
 
 // Buckets created before the verification settings existed have no stored values;
-// project the safe defaults on read so callers always see the full shape.
-function withDefaults(bucket: UserBucket | null): UserBucket | null {
-	if (!bucket) return null;
-	return {
+// project the safe defaults on read so callers always see the full shape. Defaulted before the
+// check, which is what lets such a document pass it.
+function bucketOf(bucket: Partial<UserBucket>): UserBucket {
+	return documentOf(STORE_AREAS.userBuckets, UserBucket, {
 		...bucket,
 		registrationOpen: bucket.registrationOpen ?? true,
 		emailVerificationRequired: bucket.emailVerificationRequired ?? false,
@@ -33,7 +34,11 @@ function withDefaults(bucket: UserBucket | null): UserBucket | null {
 		// Undefined is falsy, and "not required" is the right reading for a bucket written before the
 		// second factor existed — the mirror of the passwordLogin default above.
 		totpRequired: bucket.totpRequired ?? false
-	};
+	});
+}
+
+function withDefaults(bucket: Partial<UserBucket> | null): UserBucket | null {
+	return bucket ? bucketOf(bucket) : null;
 }
 
 export class UserBucketStore implements UserBucketStoreInstance {
@@ -138,15 +143,13 @@ export class UserBucketStore implements UserBucketStoreInstance {
 	}
 
 	async list(): Promise<UserBucket[]> {
-		return (await this.collection.find().toArray()).map(
-			(b) => withDefaults(b) as UserBucket
-		);
+		return (await this.collection.find().toArray()).map(bucketOf);
 	}
 
 	async listByGroup(groupId: string): Promise<UserBucket[]> {
 		return (
 			await this.collection.find({ ownerGroupId: groupId }).toArray()
-		).map((b) => withDefaults(b) as UserBucket);
+		).map(bucketOf);
 	}
 
 	async update(

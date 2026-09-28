@@ -1,11 +1,9 @@
 import { sql } from './db.js';
 import { docOf } from './json.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
-import { reviveDates } from './dates.js';
-import type { Group, GroupMember, GroupStoreInstance } from '../types.js';
+import { documentOf } from '../documents.js';
+import { Group, type GroupMember, type GroupStoreInstance } from '../types.js';
 import nanoid from '../../helpers/nanoid.js';
-
-const DATE_FIELDS = ['createdAt', 'updatedAt'] as const;
 
 /*
  * Membership lookups are containment queries, not equality.
@@ -113,8 +111,8 @@ export class GroupStore implements GroupStoreInstance {
 	}
 
 	private groupOf(row: unknown): Group | null {
-		const doc = docOf<Group>(row);
-		return doc === undefined ? null : reviveDates(doc, DATE_FIELDS);
+		const doc = docOf(row);
+		return doc === undefined ? null : documentOf(this.area, Group, doc);
 	}
 
 	private groupsOf(rows: unknown[]): Group[] {

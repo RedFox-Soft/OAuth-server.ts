@@ -8,6 +8,7 @@ import {
 	type StorageArea
 } from '../../consts/storage_inventory.js';
 import { columnFor, jsonPath, translateIndex } from './jsonPath.js';
+import { member } from '../../helpers/_/object.js';
 
 /*
  * Applying the inventory to a PostgreSQL database.
@@ -150,8 +151,7 @@ const DUPLICATE_OBJECT = '42710';
 const INSUFFICIENT_PRIVILEGE = '42501';
 
 function sqlState(error: unknown): string | undefined {
-	if (typeof error !== 'object' || error === null) return undefined;
-	const code = (error as { code?: unknown }).code;
+	const code = member(error, 'code');
 	return typeof code === 'string' ? code : undefined;
 }
 

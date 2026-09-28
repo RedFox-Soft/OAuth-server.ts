@@ -3,20 +3,19 @@ import type { SQL } from 'bun';
 import { sql } from './db.js';
 import { docOf } from './json.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
-import { reviveDates } from './dates.js';
-import type {
+import { documentOf } from '../documents.js';
+import {
 	AdminAuditEntry,
-	AdminAuditPage,
-	AdminAuditQuery,
-	AdminAuditStoreInstance
+	type AdminAuditPage,
+	type AdminAuditQuery,
+	type AdminAuditStoreInstance
 } from '../types.js';
 import {
 	normalizeAuditPaging,
 	withAuditDefaults
 } from '../../helpers/admin_audit_query.js';
 import nanoid from '../../helpers/nanoid.js';
-
-const DATE_FIELDS = ['timestamp'] as const;
+import { member } from '../../helpers/_/object.js';
 
 /*
  * Timestamps are compared as text, and that is deliberate rather than lazy.
@@ -154,16 +153,16 @@ export class AdminAuditStore implements AdminAuditStoreInstance {
 			`
 		]);
 
-		const docs: (AdminAuditEntry | undefined)[] = rows.map((row: unknown) =>
-			docOf<AdminAuditEntry>(row)
-		);
-		const entries = docs
-			.filter((doc): doc is AdminAuditEntry => doc !== undefined)
-			.map((doc) => withAuditDefaults(reviveDates(doc, DATE_FIELDS)));
+		const entries = rows
+			.map((row: unknown) => docOf(row))
+			.filter((doc: unknown) => doc !== undefined)
+			.map((doc: unknown) =>
+				withAuditDefaults(documentOf(this.area, AdminAuditEntry, doc))
+			);
 
 		return {
 			entries,
-			total: Number((counted[0] as { total?: number } | undefined)?.total ?? 0)
+			total: Number(member(counted[0], 'total') ?? 0)
 		};
 	}
 }

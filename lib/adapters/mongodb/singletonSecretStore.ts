@@ -15,7 +15,7 @@ function isDuplicateKey(err: unknown): boolean {
 		typeof err === 'object' &&
 		err !== null &&
 		'code' in err &&
-		(err as { code: unknown }).code === 11000
+		err.code === 11000
 	);
 }
 

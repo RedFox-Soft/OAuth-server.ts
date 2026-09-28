@@ -1,7 +1,14 @@
 import { db } from './db.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
-import type { AdminSession, AdminSessionStoreInstance } from '../types.js';
+import { documentOf } from '../documents.js';
+import { AdminSession, type AdminSessionStoreInstance } from '../types.js';
 import nanoid from '../../helpers/nanoid.js';
+
+function sessionOf(found: unknown): AdminSession | null {
+	return found
+		? documentOf(STORE_AREAS.adminSession, AdminSession, found)
+		: null;
+}
 
 export class AdminSessionStore implements AdminSessionStoreInstance {
 	private collection = db.collection<AdminSession>(STORE_AREAS.adminSession);
@@ -32,7 +39,7 @@ export class AdminSessionStore implements AdminSessionStoreInstance {
 	}
 
 	async find(id: string): Promise<AdminSession | null> {
-		const s = await this.collection.findOne({ _id: id });
+		const s = sessionOf(await this.collection.findOne({ _id: id }));
 		if (!s) return null;
 		const now = Date.now();
 		if (s.expiresAt.getTime() <= now || s.absoluteExpiresAt.getTime() <= now) {
@@ -43,7 +50,7 @@ export class AdminSessionStore implements AdminSessionStoreInstance {
 	}
 
 	async touch(id: string, ttlSeconds: number): Promise<void> {
-		const s = await this.collection.findOne({ _id: id });
+		const s = sessionOf(await this.collection.findOne({ _id: id }));
 		if (!s) return;
 		const next = new Date(Date.now() + ttlSeconds * 1000);
 		const expiresAt =

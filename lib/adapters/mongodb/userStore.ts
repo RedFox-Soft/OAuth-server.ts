@@ -1,7 +1,8 @@
 import crypto from 'crypto';
 import { db } from './db.js';
 import { userAreaFor } from '../../consts/storage_inventory.js';
-import { type User, type UserStoreInstance } from '../types.js';
+import { documentOf } from '../documents.js';
+import { User, type UserStoreInstance } from '../types.js';
 
 export class UserStore implements UserStoreInstance {
 	name = 'redfox';
@@ -18,18 +19,22 @@ export class UserStore implements UserStoreInstance {
 		return userAreaFor(this.name);
 	}
 
+	private userOf(found: unknown): User | null {
+		return found ? documentOf(this.collectionName, User, found) : null;
+	}
+
 	async find(_id: string): Promise<User | null> {
 		const result = await db
 			.collection<User>(this.collectionName)
 			.findOne({ _id });
-		return result || null;
+		return this.userOf(result);
 	}
 
 	async findByEmail(email: string): Promise<User | null> {
 		const result = await db
 			.collection<User>(this.collectionName)
 			.findOne({ email: email.toLowerCase() });
-		return result || null;
+		return this.userOf(result);
 	}
 
 	/*
@@ -45,7 +50,7 @@ export class UserStore implements UserStoreInstance {
 		const result = await db
 			.collection<User>(this.collectionName)
 			.findOne({ federated: { $elemMatch: { providerId, sub } } });
-		return result || null;
+		return this.userOf(result);
 	}
 
 	async create(
@@ -78,7 +83,11 @@ export class UserStore implements UserStoreInstance {
 	}
 
 	async list(): Promise<User[]> {
-		return db.collection<User>(this.collectionName).find().toArray();
+		const found = await db
+			.collection<User>(this.collectionName)
+			.find()
+			.toArray();
+		return found.map((user) => documentOf(this.collectionName, User, user));
 	}
 
 	async update(
@@ -113,12 +122,17 @@ export class UserStore implements UserStoreInstance {
 			}
 		}
 
-		return db.collection<User>(this.collectionName).findOneAndUpdate(
-			{ _id },
-			// An empty $unset is rejected by MongoDB, so the operator only appears when it has work.
-			Object.keys(unset).length ? { $set: set, $unset: unset } : { $set: set },
-			{ returnDocument: 'after' }
-		);
+		const updated = await db
+			.collection<User>(this.collectionName)
+			.findOneAndUpdate(
+				{ _id },
+				// An empty $unset is rejected by MongoDB, so the operator only appears when it has work.
+				Object.keys(unset).length
+					? { $set: set, $unset: unset }
+					: { $set: set },
+				{ returnDocument: 'after' }
+			);
+		return this.userOf(updated);
 	}
 
 	async destroy(_id: string): Promise<void> {

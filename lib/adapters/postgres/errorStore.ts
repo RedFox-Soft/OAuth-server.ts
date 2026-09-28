@@ -1,19 +1,20 @@
 import type { SQL } from 'bun';
+import { Type, type Static } from '@sinclair/typebox';
 
 import { sql } from './db.js';
 import { docOf } from './json.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
-import { reviveDates } from './dates.js';
-import type {
+import { documentOf } from '../documents.js';
+import {
 	ErrorGroup,
-	ErrorGroupPage,
-	ErrorOccurrence,
-	ErrorPurgeEstimate,
-	ErrorRecord,
-	ErrorStoreBounds,
-	ErrorStoreInstance,
-	ErrorStoreQuery,
-	ErrorSummary
+	type ErrorGroupPage,
+	type ErrorOccurrence,
+	type ErrorPurgeEstimate,
+	type ErrorRecord,
+	type ErrorStoreBounds,
+	type ErrorStoreInstance,
+	type ErrorStoreQuery,
+	type ErrorSummary
 } from '../types.js';
 import {
 	admitSample,
@@ -23,9 +24,10 @@ import {
 	totalOccurrences
 } from '../../helpers/error_store_query.js';
 import nanoid from '../../helpers/nanoid.js';
+import { member } from '../../helpers/_/object.js';
 
-const GROUP_DATES = ['firstSeenAt', 'lastSeenAt', 'expiresAt'] as const;
-const SAMPLE_DATES = ['at'] as const;
+/* A group as the summary reads select it: `samples` projected away, being the whole weight of a row. */
+const SummarizedGroup = Type.Omit(ErrorGroup, ['samples']);
 
 /* A unique-violation, which here means only one thing: two instances recorded the same new fault in
  * the same instant and the fingerprint index refused the second. */
@@ -35,7 +37,8 @@ function isUniqueViolation(error: unknown): boolean {
 	return (
 		typeof error === 'object' &&
 		error !== null &&
-		(error as { code?: unknown }).code === UNIQUE_VIOLATION
+		'code' in error &&
+		error.code === UNIQUE_VIOLATION
 	);
 }
 
@@ -127,9 +130,7 @@ export class ErrorStore implements ErrorStoreInstance {
 			const counted = await handle`
 				SELECT count(*)::int AS held FROM ${handle(this.area)}
 			`;
-			const held = Number(
-				(counted[0] as { held?: number } | undefined)?.held ?? 0
-			);
+			const held = Number(member(counted[0], 'held') ?? 0);
 			if (held < limit) return;
 
 			const removed = await handle`
@@ -252,7 +253,7 @@ export class ErrorStore implements ErrorStoreInstance {
 		// know it.
 		return {
 			groups: this.groupsOf(rows),
-			total: Number((counted[0] as { total?: number } | undefined)?.total ?? 0),
+			total: Number(member(counted[0], 'total') ?? 0),
 			dropped: 0
 		};
 	}
@@ -299,7 +300,7 @@ export class ErrorStore implements ErrorStoreInstance {
 		const rows = await handle`
 			SELECT (doc - 'samples') AS doc FROM ${handle(this.area)} WHERE ${where}
 		`;
-		const groups = this.groupsOf(rows);
+		const groups = this.summarizedOf(rows);
 
 		return {
 			total: totalOccurrences(groups),
@@ -315,7 +316,7 @@ export class ErrorStore implements ErrorStoreInstance {
 		const rows = await handle`
 			SELECT (doc - 'samples') AS doc FROM ${handle(this.area)} WHERE ${where}
 		`;
-		const groups = this.groupsOf(rows);
+		const groups = this.summarizedOf(rows);
 
 		return { groups: groups.length, occurrences: totalOccurrences(groups) };
 	}
@@ -329,29 +330,21 @@ export class ErrorStore implements ErrorStoreInstance {
 		return rows.length;
 	}
 
-	/*
-	 * Revives the group's own dates and each retained sample's `at`. `reviveDates` reaches top-level
-	 * keys only, and a sample's timestamp is one level down — missing it would leave every occurrence
-	 * carrying a string where the console renders a time.
-	 */
 	private groupOf(row: unknown): ErrorGroup | null {
-		const doc = docOf<ErrorGroup>(row);
-		if (doc === undefined) return null;
-
-		const group = reviveDates(doc, GROUP_DATES);
-		return group.samples === undefined
-			? group
-			: {
-					...group,
-					samples: group.samples.map((sample) =>
-						reviveDates(sample, SAMPLE_DATES)
-					)
-				};
+		const doc = docOf(row);
+		return doc === undefined ? null : documentOf(this.area, ErrorGroup, doc);
 	}
 
 	private groupsOf(rows: unknown[]): ErrorGroup[] {
 		return rows
 			.map((row) => this.groupOf(row))
 			.filter((group): group is ErrorGroup => group !== null);
+	}
+
+	private summarizedOf(rows: unknown[]): Static<typeof SummarizedGroup>[] {
+		return rows
+			.map((row) => docOf(row))
+			.filter((doc) => doc !== undefined)
+			.map((doc) => documentOf(this.area, SummarizedGroup, doc));
 	}
 }

@@ -1,9 +1,13 @@
 import crypto from 'crypto';
+import { Type } from '@sinclair/typebox';
 
 import { sql } from './db.js';
 import { docOf } from './json.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
+import { documentOf } from '../documents.js';
 import type { AdapterConfigStore } from '../types.js';
+
+const StoredConfig = Type.Record(Type.String(), Type.Unknown());
 
 /*
  * The persisted ApplicationConfig — one row in the shared serviceConfig area, told apart from the
@@ -31,7 +35,8 @@ class ConfigStore implements AdapterConfigStore {
 		const rows = await handle`
 			SELECT doc FROM ${handle(this.area)} WHERE id = ${this.configId}
 		`;
-		return docOf<Record<string, unknown>>(rows[0]) ?? null;
+		const doc = docOf(rows[0]);
+		return doc === undefined ? null : documentOf(this.area, StoredConfig, doc);
 	}
 
 	async set(config: Record<string, unknown>): Promise<void> {

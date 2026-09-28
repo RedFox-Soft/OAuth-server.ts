@@ -1,7 +1,16 @@
 import { db } from './db.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
-import type { Group, GroupMember, GroupStoreInstance } from '../types.js';
+import { documentOf } from '../documents.js';
+import { Group, type GroupMember, type GroupStoreInstance } from '../types.js';
 import nanoid from '../../helpers/nanoid.js';
+
+function groupOf(found: unknown): Group | null {
+	return found ? documentOf(STORE_AREAS.groups, Group, found) : null;
+}
+
+function groupsOf(found: unknown[]): Group[] {
+	return found.map((group) => documentOf(STORE_AREAS.groups, Group, group));
+}
 
 export class GroupStore implements GroupStoreInstance {
 	private collection = db.collection<Group>(STORE_AREAS.groups);
@@ -26,11 +35,11 @@ export class GroupStore implements GroupStoreInstance {
 	}
 
 	async find(id: string): Promise<Group | null> {
-		return this.collection.findOne({ _id: id });
+		return groupOf(await this.collection.findOne({ _id: id }));
 	}
 
 	async list(): Promise<Group[]> {
-		return this.collection.find().toArray();
+		return groupsOf(await this.collection.find().toArray());
 	}
 
 	/*
@@ -38,24 +47,30 @@ export class GroupStore implements GroupStoreInstance {
 	 * hence the multikey `members.userId` index declared in the storage inventory.
 	 */
 	async listByMember(userId: string): Promise<Group[]> {
-		return this.collection.find({ 'members.userId': userId }).toArray();
+		return groupsOf(
+			await this.collection.find({ 'members.userId': userId }).toArray()
+		);
 	}
 
 	async findPersonalFor(userId: string): Promise<Group | null> {
-		return this.collection.findOne({
-			kind: 'personal',
-			'members.userId': userId
-		});
+		return groupOf(
+			await this.collection.findOne({
+				kind: 'personal',
+				'members.userId': userId
+			})
+		);
 	}
 
 	async update(
 		id: string,
 		patch: Partial<Pick<Group, 'name' | 'members'>>
 	): Promise<Group | null> {
-		return this.collection.findOneAndUpdate(
-			{ _id: id },
-			{ $set: { ...patch, updatedAt: new Date() } },
-			{ returnDocument: 'after' }
+		return groupOf(
+			await this.collection.findOneAndUpdate(
+				{ _id: id },
+				{ $set: { ...patch, updatedAt: new Date() } },
+				{ returnDocument: 'after' }
+			)
 		);
 	}
 
