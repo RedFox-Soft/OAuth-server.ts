@@ -16,5 +16,5 @@ export class RegistrationAccessToken extends hasPolicies<RegistrationAccessToken
 	declare payload: Omit<RegistrationAccessTokenPayloadType, 'kind'> & {
 		kind: string;
 	};
-	model = RegistrationAccessTokenPayload;
+	static schema = RegistrationAccessTokenPayload;
 }

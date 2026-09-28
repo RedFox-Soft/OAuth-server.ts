@@ -41,8 +41,11 @@ export default function hasPolicies<TPayload extends PoliciesPayload>(
 			options?: { ignoreExpiration?: boolean }
 		): Promise<T | undefined> {
 			const result = await super.tryFind<A, T>(value, options);
-			const policies = (result?.payload as PoliciesPayload | undefined)
-				?.policies;
+			// Checked as stored: `validate` refuses anything that is not a configured policy list.
+			const policies =
+				result && 'policies' in result.payload
+					? result.payload.policies
+					: undefined;
 			if (typeof policies !== 'undefined') {
 				validate(policies);
 			}

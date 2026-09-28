@@ -16,7 +16,7 @@ export type ClientCredentialsPayload = Static<typeof ClientCredentialsPayload>;
 export class ClientCredentials extends constrained(
 	BaseToken<ClientCredentialsPayload>
 ) {
-	model = ClientCredentialsPayload;
+	static schema = ClientCredentialsPayload;
 
 	get expiration(): number {
 		return (this.expiresIn ||= ttl.ClientCredentials(this, this.client));

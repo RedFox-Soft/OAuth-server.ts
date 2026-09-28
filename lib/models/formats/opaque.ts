@@ -14,7 +14,7 @@ const tokenLength = (i: number) => Math.ceil(i / bitsPerSymbol);
 export abstract class Opaque {
 	declare payload: BaseModelPayloadType;
 	// The model's TypeBox schema: what it persists (see getValueAndPayload).
-	declare model: TObject;
+	abstract get model(): TObject;
 	abstract get id(): string;
 
 	// Seconds left; a token without a configured lifetime overrides this to answer undefined.

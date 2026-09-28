@@ -92,7 +92,7 @@ export const InteractionPayload = t.Object({
 export type InteractionPayloadType = Static<typeof InteractionPayload>;
 
 export class Interaction extends BaseModel<InteractionPayloadType> {
-	model = InteractionPayload;
+	static schema = InteractionPayload;
 
 	// Read back from storage, the stored payload alone (that is how tryFind builds one); new, an id and a payload.
 	constructor(payload: InteractionPayloadType);

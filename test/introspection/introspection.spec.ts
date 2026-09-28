@@ -156,6 +156,7 @@ describe('introspection features', () => {
 
 		it('returns the properties for refresh token [no hint]', async function () {
 			const rt = new RefreshToken({
+				gty: 'authorization_code',
 				accountId: 'accountId',
 				grantId: setup.getGrantId(),
 				client: await Client.find('client'),
@@ -175,6 +176,7 @@ describe('introspection features', () => {
 
 		it('returns the properties for refresh token [correct hint]', async function () {
 			const rt = new RefreshToken({
+				gty: 'authorization_code',
 				accountId: 'accountId',
 				grantId: setup.getGrantId(),
 				client: await Client.find('client'),
@@ -194,6 +196,7 @@ describe('introspection features', () => {
 
 		it('returns the properties for refresh token [wrong hint]', async function () {
 			const rt = new RefreshToken({
+				gty: 'authorization_code',
 				accountId: 'accountId',
 				grantId: setup.getGrantId(),
 				client: await Client.find('client'),
@@ -213,6 +216,7 @@ describe('introspection features', () => {
 
 		it('returns the properties for refresh token [unrecognized hint]', async function () {
 			const rt = new RefreshToken({
+				gty: 'authorization_code',
 				accountId: 'accountId',
 				grantId: setup.getGrantId(),
 				client: await Client.find('client'),
@@ -296,6 +300,7 @@ describe('introspection features', () => {
 
 		it('can be called by pairwise clients', async function () {
 			const rt = new RefreshToken({
+				gty: 'authorization_code',
 				accountId: 'accountId',
 				grantId: setup.getGrantId('client-pairwise'),
 				clientId: 'client-pairwise',
@@ -321,6 +326,7 @@ describe('introspection features', () => {
 
 		it('can be called by RS clients and uses the original subjectType', async function () {
 			const rt = new RefreshToken({
+				gty: 'authorization_code',
 				accountId: 'accountId',
 				grantId: setup.getGrantId('client-pairwise'),
 				clientId: 'client-pairwise',
@@ -449,6 +455,7 @@ describe('introspection features', () => {
 
 		it('responds only with active=false when token is already consumed', async function () {
 			const rt = new RefreshToken({
+				gty: 'authorization_code',
 				accountId: 'accountId',
 				grantId: setup.getGrantId(),
 				client: await Client.find('client'),
@@ -513,6 +520,7 @@ describe('introspection features', () => {
 				const spy = spyOn(OIDCContext.prototype, 'entity');
 
 				const rt = new RefreshToken({
+					gty: 'authorization_code',
 					accountId: 'accountId',
 					client: await Client.find('client'),
 					scope: 'scope'

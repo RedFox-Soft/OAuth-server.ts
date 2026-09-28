@@ -31,7 +31,7 @@ export class RefreshToken extends consumable(
 	constrained<RefreshTokenPayload>(BaseToken)
 ) {
 	declare payload: Omit<RefreshTokenPayload, 'kind'> & { kind: string };
-	model = RefreshTokenSchema;
+	static schema = RefreshTokenSchema;
 	static isSessionBound = true;
 
 	get expiration(): number {

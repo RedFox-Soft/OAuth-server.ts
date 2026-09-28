@@ -10,7 +10,7 @@ export const ReplayDetectionPayload = t.Object({
 export type ReplayDetectionPayloadType = Static<typeof ReplayDetectionPayload>;
 
 export class ReplayDetection extends BaseModel<ReplayDetectionPayloadType> {
-	model = ReplayDetectionPayload;
+	static schema = ReplayDetectionPayload;
 
 	static async unique(iss: string, jti: string, exp: number) {
 		const id = crypto.hash('sha256', `${iss}${jti}`, 'base64url');

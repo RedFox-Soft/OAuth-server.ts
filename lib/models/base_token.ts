@@ -67,16 +67,13 @@ export type TokenInit<T> = Partial<T> & {
 type GrantedPayload = { scope?: string; resource?: string | string[] };
 
 // A token class as its static finders use it.
-type TokenClass<A, T> = (new (payload: A) => T) &
-	Pick<
-		typeof BaseToken,
-		'adapter' | 'verify' | 'notFoundError' | 'isSessionBound'
-	>;
+type TokenClass<A, T> = ModelClass<A, T> &
+	Pick<typeof BaseToken, 'isSessionBound' | 'fromStored'>;
 
 export class BaseToken<
 	T extends BaseTokenPayloadType & GrantedPayload = BaseTokenPayloadType
 > extends BaseModel<T> {
-	model: TObject = BaseTokenPayload;
+	static schema: TObject = BaseTokenPayload;
 	#client: Client | undefined;
 
 	#resourceServer: ResourceServer | undefined;
@@ -173,7 +170,7 @@ export class BaseToken<
 	static isSessionBound = false;
 	// The model finder's own signature first, so the static side still extends BaseModel's.
 	static async tryFind<A extends BaseModelPayloadType, T extends BaseModel<A>>(
-		this: ModelClass<A, T>,
+		this: ModelClass<A, T> & Pick<typeof BaseModel, 'fromStored'>,
 		value: string,
 		options?: { ignoreExpiration?: boolean }
 	): Promise<T | undefined>;
@@ -222,7 +219,7 @@ export class BaseToken<
 	}
 
 	static async find<A extends BaseModelPayloadType, T extends BaseModel<A>>(
-		this: ModelClass<A, T> & Pick<typeof BaseModel, 'tryFind'>,
+		this: ModelClass<A, T> & Pick<typeof BaseModel, 'tryFind' | 'fromStored'>,
 		value: string,
 		options?: { ignoreExpiration?: boolean; error?: Error }
 	): Promise<T>;

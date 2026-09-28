@@ -4,7 +4,7 @@ title: 'Model graph import order'
 tags: [gotcha, architecture]
 sources: [oauth-server-codebase]
 created: 2026-08-04
-updated: 2026-08-04
+updated: 2026-09-28
 graph:
   node_type: concept
 ---
@@ -58,8 +58,8 @@ Two obvious routes are both wrong:
 
 - **Constructing the model classes** to read `instance.model`: measured, 6 of 14 persisted classes throw
   on a no-argument construction — five from the `consumable` mixin (`payload.consumed`), plus `Client`
-  (`invalid_client_metadata`). `model` is an instance field, so there is no way to reach it without
-  running the constructor.
+  (`invalid_client_metadata`). `model` was an instance field then, so there was no way to reach it
+  without running the constructor; since 2026-09-28 it is `static schema`, readable off the class.
 - **Scanning the source text**, the technique the existing guard uses for `adapter('X')` calls. Wrong,
   not merely fragile: `lib/models/session.ts` declares `clientId: t.Optional(t.String())` *inside* its
   nested `authorizations` object, so a text scan reports `Session` as client-owned. Its composed

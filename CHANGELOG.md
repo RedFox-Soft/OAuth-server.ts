@@ -54,6 +54,9 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Changed
 
+- models: a stored record becomes a model only if it satisfies that model's schema, now a static
+  `schema` on the class; one that does not (a malformed or foreign record) is treated as not found.
+  Until now nothing checked a model's own schema, on construction or on read.
 - types: the typed (Eden) client sees what the endpoints answer — `/token` declares its 400/401 errors and
   one token body, registration and introspection declare their RFC members, the request headers include
   `accept` and `x-client-cert`, and the admin client schema's grant types and auth method are no longer

@@ -28,7 +28,7 @@ export class BackchannelAuthenticationRequest extends consumable(
 	declare payload: Omit<BackchannelAuthenticationRequestPayloadType, 'kind'> & {
 		kind: string;
 	};
-	model = BackchannelAuthenticationRequestPayload;
+	static schema = BackchannelAuthenticationRequestPayload;
 	static isSessionBound = true;
 
 	get expiration(): number {

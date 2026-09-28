@@ -24,6 +24,9 @@ import { InvalidGrant } from 'lib/helpers/errors.js';
  * expired, and a storage failure while resolving one refuses the request rather than treating it
  * as absent.
  */
+// What every issued refresh token carries; a stored one without them is not a refresh token.
+const issued = { clientId: 'client', gty: 'authorization_code' };
+
 describe('BaseToken', () => {
 	let setup: Setup;
 	const adapter = TestAdapter.for('RefreshToken');
@@ -43,18 +46,42 @@ describe('BaseToken', () => {
 	});
 
 	it('handles legacy structured tokens', async function () {
-		const token = await new RefreshToken({
-			grantId: 'foo'
-		}).save();
+		const token = await new RefreshToken({ ...issued, grantId: 'foo' }).save();
 		const jti = setup.getTokenJti(token);
 		adapter.syncUpdate(jti, { jwt: 'foo' });
 		expect(await RefreshToken.tryFind(token)).toBeUndefined();
 	});
 
+	/*
+	 * A stored record becomes a model only if it satisfies that model's schema. Nothing else checks it —
+	 * save filters top-level keys and the constructor sees only the base members — so without this a
+	 * record with, say, a non-string client would be handed to every caller typed as a refresh token.
+	 */
+	it('a stored record its schema refuses is not found', async function () {
+		const token = await new RefreshToken({ ...issued, grantId: 'foo' }).save();
+		adapter.syncUpdate(setup.getTokenJti(token), { clientId: 42 });
+		expect(await RefreshToken.tryFind(token)).toBeUndefined();
+		return expect(RefreshToken.find(token)).rejects.toMatchObject({
+			error: 'invalid_token'
+		});
+	});
+
+	it('a device code whose stored record its schema refuses is not found by its user code', async function () {
+		const code = new DeviceCode({
+			clientId: 'client',
+			userCode: 'ABCDEFGH'
+		});
+		const value = await code.save();
+		expect(await DeviceCode.findByUserCode('ABCDEFGH')).toBeDefined();
+
+		TestAdapter.for('DeviceCode').syncUpdate(setup.getTokenJti(value), {
+			inFlight: 'yes'
+		});
+		expect(await DeviceCode.findByUserCode('ABCDEFGH')).toBeUndefined();
+	});
+
 	it('handles expired tokens', async function () {
-		const token = await new RefreshToken({
-			grantId: 'foo'
-		}).save();
+		const token = await new RefreshToken({ ...issued, grantId: 'foo' }).save();
 		const jti = setup.getTokenJti(token);
 		adapter.syncUpdate(jti, { exp: 0 });
 		expect(await RefreshToken.tryFind(token)).toBeUndefined();
@@ -69,9 +96,7 @@ describe('BaseToken', () => {
 	});
 
 	it('a code already exchanged is refused on the second attempt', async function () {
-		const token = await new RefreshToken({
-			grantId: 'foo'
-		}).save();
+		const token = await new RefreshToken({ ...issued, grantId: 'foo' }).save();
 		const jti = setup.getTokenJti(token);
 		const stored = TestAdapter.for('RefreshToken').syncFind(jti);
 		stored.consumed = true;
@@ -82,7 +107,7 @@ describe('BaseToken', () => {
 	});
 
 	it('a token with no explicit expiry lives for the configured default', async function () {
-		const token = await new RefreshToken({ grantId: 'foo' }).save();
+		const token = await new RefreshToken({ ...issued, grantId: 'foo' }).save();
 		const jti = setup.getTokenJti(token);
 		expect(adapter.upsert).toBeCalledWith(
 			jti,
@@ -93,6 +118,7 @@ describe('BaseToken', () => {
 
 	it('lets a per-token expiry win over the configured default', async function () {
 		const token = await new RefreshToken({
+			...issued,
 			grantId: 'foo',
 			expiresIn: 60
 		}).save();
@@ -101,7 +127,7 @@ describe('BaseToken', () => {
 	});
 
 	it('resaves tokens with their actual remaining ttl passed to expiration', async function () {
-		let token = new RefreshToken({ grantId: 'foo' });
+		let token = new RefreshToken({ ...issued, grantId: 'foo' });
 		const value = await token.save();
 		const jti = setup.getTokenJti(value);
 		expect(adapter.upsert).toBeCalledWith(
@@ -123,9 +149,7 @@ describe('BaseToken', () => {
 	});
 
 	it('additional save does not change the token value', async function () {
-		let token = new RefreshToken({
-			grantId: 'foo'
-		});
+		let token = new RefreshToken({ ...issued, grantId: 'foo' });
 		const first = await token.save();
 
 		token = await RefreshToken.find(first);
@@ -147,6 +171,7 @@ describe('BaseToken', () => {
 
 	it('a storage failure while resolving the bound session refuses the request rather than treating it as unbound', async function () {
 		const token = new RefreshToken({
+			...issued,
 			expiresWithSession: true,
 			sessionUid: 'foo'
 		});
@@ -159,6 +184,7 @@ describe('BaseToken', () => {
 
 	it('records a token as spent, so a second use is refused', async function () {
 		let token = new AuthorizationCode({
+			clientId: 'client',
 			grantId: 'foo',
 			consumed: true
 		});
@@ -179,7 +205,10 @@ describe('BaseToken', () => {
 
 	describe('strict find / nullable tryFind', () => {
 		it('both lookups find a token that exists', async function () {
-			const value = await new RefreshToken({ grantId: 'foo' }).save();
+			const value = await new RefreshToken({
+				...issued,
+				grantId: 'foo'
+			}).save();
 			const viaFind = await RefreshToken.find(value);
 			const viaTryFind = await RefreshToken.tryFind(value);
 			expect(viaTryFind).toBeDefined();

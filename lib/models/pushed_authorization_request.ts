@@ -18,7 +18,7 @@ export class PushedAuthorizationRequest extends consumable(
 	BaseModel<PushedAuthorizationRequestPayloadType>
 ) {
 	declare payload: PushedAuthorizationRequestPayloadType & { kind: string };
-	model = PushedAuthorizationRequestPayload;
+	static schema = PushedAuthorizationRequestPayload;
 
 	constructor(
 		payload: Omit<PushedAuthorizationRequestPayloadType, 'consumed'> & {

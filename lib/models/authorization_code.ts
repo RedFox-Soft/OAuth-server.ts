@@ -29,7 +29,7 @@ export class AuthorizationCode extends consumable(
 	declare payload: Omit<AuthorizationCodePayloadType, 'kind'> & {
 		kind: string;
 	};
-	model = AuthorizationCodePayload;
+	static schema = AuthorizationCodePayload;
 	static isSessionBound = true;
 
 	get expiration(): number {

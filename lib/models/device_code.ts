@@ -27,7 +27,7 @@ export type DeviceCodePayloadType = Static<typeof DeviceCodePayload>;
 
 export class DeviceCode extends consumable(BaseToken<DeviceCodePayloadType>) {
 	declare payload: Omit<DeviceCodePayloadType, 'kind'> & { kind: string };
-	model = DeviceCodePayload;
+	static schema = DeviceCodePayload;
 
 	get expiration(): number {
 		return (this.expiresIn ||= ttl.DeviceCode(this, this.client));
@@ -39,18 +39,14 @@ export class DeviceCode extends consumable(BaseToken<DeviceCodePayloadType>) {
 	) {
 		const stored = await this.adapter.findByUserCode(userCode);
 		if (!stored) return;
-		try {
-			const payload = await this.verify(stored, { ignoreExpiration });
-			if (
-				typeof payload.userCode !== 'string' ||
-				!constantEquals(userCode, payload.userCode)
-			) {
-				return;
-			}
-			return new this(payload);
-		} catch (err) {
+		const code = await this.fromStored(stored, { ignoreExpiration });
+		if (
+			!code?.payload.userCode ||
+			!constantEquals(userCode, code.payload.userCode)
+		) {
 			return;
 		}
+		return code;
 	}
 
 	static isSessionBound = true;

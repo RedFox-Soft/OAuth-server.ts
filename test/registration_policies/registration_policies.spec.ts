@@ -240,9 +240,9 @@ describe('client registration policies', () => {
 				}
 			);
 
-			return assert.rejects(InitialAccessToken.find(saved), (err) => {
-				expect(err).toHaveProperty('message', 'policies must be an array');
-				return true;
+			// Not a policies value at all: the record fails its schema and is no token of this kind.
+			return expect(InitialAccessToken.find(saved)).rejects.toMatchObject({
+				error: 'invalid_token'
 			});
 		});
 
@@ -289,9 +289,9 @@ describe('client registration policies', () => {
 				}
 			);
 
-			return assert.rejects(InitialAccessToken.find(saved), (err) => {
-				expect(err).toHaveProperty('message', 'policies must be strings');
-				return true;
+			// Not a policies value at all: the record fails its schema and is no token of this kind.
+			return expect(InitialAccessToken.find(saved)).rejects.toMatchObject({
+				error: 'invalid_token'
 			});
 		});
 
@@ -473,6 +473,7 @@ describe('client registration policies', () => {
 
 		it('policies must be an array', async () => {
 			const saved = await new RegistrationAccessToken({
+				clientId,
 				policies: undefined
 			}).save();
 			TestAdapter.for('RegistrationAccessToken').syncUpdate(
@@ -480,14 +481,15 @@ describe('client registration policies', () => {
 				{ policies: null }
 			);
 
-			return assert.rejects(RegistrationAccessToken.find(saved), (err) => {
-				expect(err).toHaveProperty('message', 'policies must be an array');
-				return true;
+			// Not a policies value at all: the record fails its schema and is no token of this kind.
+			return expect(RegistrationAccessToken.find(saved)).rejects.toMatchObject({
+				error: 'invalid_token'
 			});
 		});
 
 		it('policies array must have members', async () => {
 			const saved = await new RegistrationAccessToken({
+				clientId,
 				policies: undefined
 			}).save();
 			TestAdapter.for('RegistrationAccessToken').syncUpdate(
@@ -503,6 +505,7 @@ describe('client registration policies', () => {
 
 		it('policies members must be strings', async () => {
 			const saved = await new RegistrationAccessToken({
+				clientId,
 				policies: undefined
 			}).save();
 			TestAdapter.for('RegistrationAccessToken').syncUpdate(
@@ -510,14 +513,15 @@ describe('client registration policies', () => {
 				{ policies: [null] }
 			);
 
-			return assert.rejects(RegistrationAccessToken.find(saved), (err) => {
-				expect(err).toHaveProperty('message', 'policies must be strings');
-				return true;
+			// Not a policies value at all: the record fails its schema and is no token of this kind.
+			return expect(RegistrationAccessToken.find(saved)).rejects.toMatchObject({
+				error: 'invalid_token'
 			});
 		});
 
 		it('policies members must be present in the provider configuration', async () => {
 			const saved = await new RegistrationAccessToken({
+				clientId,
 				policies: undefined
 			}).save();
 			TestAdapter.for('RegistrationAccessToken').syncUpdate(

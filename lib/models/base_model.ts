@@ -1,4 +1,9 @@
-import { Type as t, type Static, type TObject } from '@sinclair/typebox';
+import {
+	Type as t,
+	type Static,
+	type TObject,
+	type TSchema
+} from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
 import snakeCase from '../helpers/_/snake_case.js';
 import epochTime from '../helpers/epoch_time.js';
@@ -17,28 +22,41 @@ export const BaseModelPayload = t.Object({
 export type BaseModelPayloadType = Static<typeof BaseModelPayload>;
 type Req<T, K extends keyof T> = Required<Pick<T, K>> & Omit<T, K>;
 
-// A model class as its static finders use it: constructible from a stored payload, with the statics
-// they read.
-export type ModelClass<A, T> = (new (payload: A) => T) &
-	Pick<typeof BaseModel, 'adapter' | 'verify' | 'notFoundError'>;
+// A model class as its static finders use it: constructible from what its schema admits, with the
+// statics they read.
+export type ModelClass<A, T> = (new (payload: A) => T) & {
+	schema: TSchema & { static: A };
+} & Pick<typeof BaseModel, 'adapter' | 'verify' | 'notFoundError'>;
 
 export class BaseModel<
 	T extends BaseModelPayloadType = BaseModelPayloadType
 > extends Opaque {
-	// Widened: every subclass names its own schema here.
-	model: TObject = BaseModelPayload;
+	/*
+	 * The model's schema: the keys it persists, and what a stored record must satisfy to become one
+	 * (`fromStored`). Static, so a finder can check a record before any instance exists; every subclass
+	 * names its own.
+	 */
+	static schema: TObject = BaseModelPayload;
+	declare ['constructor']: typeof BaseModel;
 	payload = {} as Req<T, 'kind'>;
+
+	get model(): TObject {
+		return this.constructor.schema;
+	}
 
 	constructor(payload: Partial<T> = {}) {
 		super();
 
 		payload.kind ||= this.constructor.name;
-		const check = Value.Check(this.model, payload);
-		if (!check) {
+		/*
+		 * The base members only. A payload under construction is partial by design — a token takes its
+		 * clientId from the client after this runs — so the model's own schema is checked where a
+		 * record is complete: on the way out of storage, in `fromStored`.
+		 */
+		if (!Value.Check(BaseModelPayload, payload)) {
 			throw new TypeError('invalid payload');
 		}
-		// Taken as the full payload: a caller built it or storage returned it. Not a verified narrowing —
-		// the check above runs against BaseModelPayload only (wiki: token-payload-access-contract).
+		// Taken as the full payload: a caller built it, or `fromStored` checked it against the schema.
 		this.payload = payload as Req<T, 'kind'>;
 		const { kind } = payload;
 		if (kind && kind !== this.constructor.name) {
@@ -106,8 +124,29 @@ export class BaseModel<
 	// zero/optional-arg OIDCProviderError subclass.
 	static notFoundError: new (...args: never[]) => Error = InvalidToken;
 
-	static async tryFind<A extends BaseModelPayloadType, T extends BaseModel<A>>(
+	/*
+	 * A stored record as this model, or undefined when it is not one. Its schema is checked here because
+	 * nothing else checks it: save filters top-level keys only, and the constructor runs before the
+	 * model's own fields exist. A record the schema refuses is treated as not found.
+	 */
+	static async fromStored<
+		A extends BaseModelPayloadType,
+		T extends BaseModel<A>
+	>(
 		this: ModelClass<A, T>,
+		stored: Record<string, unknown>,
+		{ ignoreExpiration = false } = {}
+	): Promise<T | undefined> {
+		try {
+			const payload = await this.verify(stored, { ignoreExpiration });
+			return Value.Check(this.schema, payload) ? new this(payload) : undefined;
+		} catch {
+			return;
+		}
+	}
+
+	static async tryFind<A extends BaseModelPayloadType, T extends BaseModel<A>>(
+		this: ModelClass<A, T> & Pick<typeof BaseModel, 'fromStored'>,
 		value: string,
 		{ ignoreExpiration = false } = {}
 	): Promise<T | undefined> {
@@ -120,17 +159,11 @@ export class BaseModel<
 			return;
 		}
 
-		try {
-			const payload = await this.verify(stored, { ignoreExpiration });
-
-			return new this(payload);
-		} catch (err) {
-			return;
-		}
+		return this.fromStored<A, T>(stored, { ignoreExpiration });
 	}
 
 	static async find<A extends BaseModelPayloadType, T extends BaseModel<A>>(
-		this: ModelClass<A, T> & Pick<typeof BaseModel, 'tryFind'>,
+		this: ModelClass<A, T> & Pick<typeof BaseModel, 'tryFind' | 'fromStored'>,
 		value: string,
 		options?: { ignoreExpiration?: boolean; error?: Error }
 	): Promise<T> {

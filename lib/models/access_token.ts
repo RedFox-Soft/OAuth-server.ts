@@ -25,7 +25,7 @@ export type AccessTokenPayloadType = Static<typeof AccessTokenPayload>;
 export class AccessToken extends constrained<AccessTokenPayloadType>(
 	BaseToken
 ) {
-	model = AccessTokenPayload;
+	static schema = AccessTokenPayload;
 	static isSessionBound = true;
 
 	get expiration(): number {

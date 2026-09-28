@@ -166,6 +166,7 @@ describe('revocation features', () => {
 
 		it('revokes refresh token [no hint]', async function () {
 			const rt = new RefreshToken({
+				gty: 'authorization_code',
 				accountId: 'accountId',
 				grantId: 'foo',
 				client: await Client.find('client'),
@@ -192,6 +193,7 @@ describe('revocation features', () => {
 
 		it('revokes refresh token [correct hint]', async function () {
 			const rt = new RefreshToken({
+				gty: 'authorization_code',
 				accountId: 'accountId',
 				grantId: 'foo',
 				client: await Client.find('client'),
@@ -216,6 +218,7 @@ describe('revocation features', () => {
 
 		it('revokes refresh token [wrong hint]', async function () {
 			const rt = new RefreshToken({
+				gty: 'authorization_code',
 				accountId: 'accountId',
 				grantId: 'foo',
 				client: await Client.find('client'),
@@ -240,6 +243,7 @@ describe('revocation features', () => {
 
 		it('revokes refresh token [unrecognized hint]', async function () {
 			const rt = new RefreshToken({
+				gty: 'authorization_code',
 				accountId: 'accountId',
 				grantId: 'foo',
 				client: await Client.find('client'),
@@ -473,6 +477,7 @@ describe('revocation features', () => {
 			it('the revocation event carries the refresh token and its client', async function () {
 				const spy = spyOn(OIDCContext.prototype, 'entity');
 				const rt = new RefreshToken({
+					gty: 'authorization_code',
 					accountId: 'accountId',
 					grantId: 'foo',
 					client: await Client.find('client'),

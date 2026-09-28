@@ -1,10 +1,6 @@
 import { Type as t, type Static } from '@sinclair/typebox';
 import { BaseModelPayload } from './base_model.js';
-import {
-	BaseToken,
-	BaseTokenPayload,
-	type BaseTokenPayloadType
-} from './base_token.js';
+import { BaseToken, type BaseTokenPayloadType } from './base_token.js';
 import hasPolicies from './mixins/has_policies.ts';
 
 // InitialAccessTokens are not client-bound, so the schema omits clientId (unlike other
@@ -17,10 +13,9 @@ export type InitialAccessTokenPayloadType = Static<
 	typeof InitialAccessTokenPayload
 >;
 
-// Parameterised with the policies it carries; the base token type still names a clientId (see `model`).
+// Parameterised with the policies it carries; the base token type still names a clientId the schema omits.
 export class InitialAccessToken extends hasPolicies<
 	BaseTokenPayloadType & { policies?: string[] }
 >(BaseToken) {
-	// Cast: this schema omits the clientId that BaseToken's model type requires (see above).
-	model = InitialAccessTokenPayload as unknown as typeof BaseTokenPayload;
+	static schema = InitialAccessTokenPayload;
 }

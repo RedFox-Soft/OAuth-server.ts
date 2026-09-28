@@ -33,7 +33,11 @@ describe('storage contract: Interaction', () => {
 		});
 
 		const interaction = new Interaction('interaction-1', {
-			prompt: { name: 'consent', reasons: ['op_scopes_missing'] },
+			prompt: {
+				name: 'consent',
+				reasons: ['op_scopes_missing'],
+				details: { missingOIDCScope: ['openid'] }
+			},
 			cookieID: 'cookie-1',
 			lastSubmission: { login: { accountId: 'account-1' } },
 			accountId: 'account-1',
@@ -68,7 +72,8 @@ describe('storage contract: Interaction', () => {
 		});
 		expect(stored.prompt).toEqual({
 			name: 'consent',
-			reasons: ['op_scopes_missing']
+			reasons: ['op_scopes_missing'],
+			details: { missingOIDCScope: ['openid'] }
 		});
 		// Session model reduced to its persisted subset
 		expect(stored.session).toEqual({

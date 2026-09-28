@@ -66,7 +66,7 @@ function sessionPayload(
 }
 
 export class Session extends BaseModel<SessionPayloadType> {
-	model = SessionPayload;
+	static schema = SessionPayload;
 	#isDestroyed = false;
 	#isNew = true;
 	#oldId: string | undefined;
@@ -86,12 +86,7 @@ export class Session extends BaseModel<SessionPayloadType> {
 		if (!stored) {
 			return;
 		}
-		try {
-			const payload = await this.verify(stored);
-			return new this(payload);
-		} catch (err) {
-			return;
-		}
+		return this.fromStored(stored);
 	}
 
 	static async get<T extends Record<string, unknown>>(oidc: OIDCContext<T>) {

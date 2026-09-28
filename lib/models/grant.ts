@@ -198,7 +198,7 @@ function addClaims(context: Consent, input: Set<string> | string[]) {
 }
 
 export class Grant extends BaseToken<GrantPayloadType> {
-	model = GrantPayload;
+	static schema = GrantPayload;
 
 	get expiration(): number {
 		return (this.expiresIn ||= ttl.Grant(this, this.client));

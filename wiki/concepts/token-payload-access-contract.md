@@ -4,7 +4,7 @@ title: "Token payload access contract"
 tags: [contract, gotcha, architecture]
 sources: [oauth-server-codebase]
 created: 2026-07-31
-updated: 2026-09-24
+updated: 2026-09-28
 graph:
   node_type: concept
   relationships:
@@ -33,7 +33,16 @@ defined after `BaseModel`'s constructor returns, so the check runs against `Base
 optional members — for every model. Found on 2026-09-24: a consumed refresh token carries a numeric
 `consumed` its `t.Boolean()` schema rejects, and it is still constructed. The subclass schema does
 govern what is *stored* (below), and `consumed` is now declared as what the adapters write (`false`,
-then the consumption second); enforcing the subclass schema at construction is not done. Everything else on the class — `jti`, `exp`, TTL handling, persistence —
+then the consumption second).
+
+Since 2026-09-28 the subclass schema is enforced where a record is complete — on the way out of
+storage. It is a static (`static schema = …`), so `BaseModel.fromStored` checks a stored record against
+it before constructing, and every finder (`tryFind`/`find`, `Session.findByUid`,
+`DeviceCode.findByUserCode`) goes through it; a record the schema refuses is **not found**. Construction
+still checks the base members only, now by name (`Value.Check(BaseModelPayload, …)`), because a payload
+under construction is partial by design — a token takes `clientId` from its client after the base
+constructor runs. The consequence for tests: a fixture must store what production stores (a refresh
+token carries `clientId` and `gty`), or it is not found. Everything else on the class — `jti`, `exp`, TTL handling, persistence —
 reads and writes through `this.payload` (`lib/models/base_model.ts:44-72`, `144-159`).
 
 There are no generated per-field accessors. An earlier design mirrored payload fields onto the
