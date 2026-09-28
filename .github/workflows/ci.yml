@@ -32,6 +32,11 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # Without --fix: CI reports what is wrong rather than repairing a tree it then throws away. It
+      # ran nowhere before this step, and 250 errors accumulated unseen.
+      - name: Lint
+        run: bunx eslint .
+
       - name: Run tests with coverage
         run: bun test --coverage --coverage-reporter=lcov
 

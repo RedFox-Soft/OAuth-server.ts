@@ -29,7 +29,7 @@
 	],
 	"scripts": {
 		"format": "prettier --write .",
-		"lint": "eslint lib test --fix",
+		"lint": "eslint . --fix",
 		"typecheck": "tsc --noEmit",
 		"build": "bun build.ts",
 		"watch": "bun build.ts --watch",
