@@ -96,7 +96,7 @@ Two properties follow from how it is maintained:
 `applySettings` (`lib/configs/application.ts:904`) is synchronous end to end, so no request sees half
 a change. After assigning it runs the invalidators registered with `onSettingsApplied`
 (`lib/configs/application.ts:876`) — today the validated-client memo
-(`lib/models/client/validate.ts:217`), the per-origin counter capacity (`lib/plugins/rateLimit.ts:91`)
+(`lib/models/client/validate.ts:101`), the per-origin counter capacity (`lib/plugins/rateLimit.ts:91`)
 and the Sentry arming latch (`lib/sentry/client.ts:62`). A module that caches something derived from a
 setting registers one there, or the save applies and the cache goes on answering the old value. A
 setting that genuinely cannot be applied to a running process declares `apply: 'restart'` with a

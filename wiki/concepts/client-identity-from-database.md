@@ -18,7 +18,7 @@ which read the adapter on **every call**.
 
 ## The lookup and its memo
 
-`tryFindClient` (`lib/models/client/validate.ts:134`) reads the adapter first, and only then
+`tryFindClient` (`lib/models/client/validate.ts:110`) reads the adapter first, and only then
 consults a cache:
 
 ```ts
@@ -36,11 +36,11 @@ The cache is keyed by a hash of the stored properties, not by client id. That is
 *validation* memo rather than a client cache: changed properties hash differently, so the entry is
 missed and the client is re-validated, while an unchanged client skips the work. Updates and deletes
 are reflected immediately because the adapter read is unconditional — the comment at
-`validate.ts:201-207` ties this to FR-009 and the security-first principle, since a stale-metadata
+`validate.ts:102-109` ties this to FR-009 and the security-first principle, since a stale-metadata
 window would let a revoked or edited client keep operating.
 
 The store is a size-bounded `QuickLRU` with `maxSize: 100` and **no time-based expiry**
-(`validate.ts:117`), emptied on every settings save (`validate.ts:125`). The test harness empties it
+(`validate.ts:93`), emptied on every settings save (`validate.ts:101`). The test harness empties it
 too: `bootstrap` replaces the settings once per spec file and runs the same invalidators
 (`settingsApplied` in `lib/configs/application.ts`). Before it did, a spec resolving a record another
 spec had already resolved under different capabilities received that spec's client, so the two
@@ -56,7 +56,7 @@ exported from `lib/models/client.ts`: `redirectUriAllowed(client, uri)`,
 `checkClientSecretExpiration(client, …)`, `toStored(client)`, and so on.
 
 - **It is frozen.** `validateClient` returns `deepFreeze(structuredClone(client))`
-  (`lib/models/client/validate.ts:122`). One validated object is shared by every request using that
+  (`lib/models/client/validate.ts:80`). One validated object is shared by every request using that
   client until its record changes, so a write from one request would be seen by all of them. A copy is
   frozen because the object built during validation holds references into the stored record and into
   the shared `ClientDefaults`.
@@ -107,10 +107,19 @@ userinfo switched off); going through the record makes such a state impossible t
 Every surface that writes a client — dynamic registration, registration management, the console, the
 agent — goes through `registerClient` (`lib/models/client/register.ts:18`): validate, check the
 sector identifier document, store `toStored(client)`. Resolving a **stored** client only validates it;
-it retrieves no sector document (`validate.ts:170`). So a client stays usable while its sector host is
+it retrieves no sector document (`validate.ts:144`). So a client stays usable while its sector host is
 unreachable, and a settings save — which empties the memo — no longer turns into one outbound request
 per pairwise client. The cost, accepted: a sector document changed after registration is not
 re-checked until the client is next written. OIDC Core §8.1 places the check at registration.
+
+What a caller writes is wire metadata only. The base attributes the validator copies verbatim
+(`BASE_METADATA_KEYS`, `lib/models/client/wire.ts:43`) are canonical names, and the translation from
+wire form drops any of them it finds (`wire.ts:90`), so a registration body or a client document
+cannot spell one. Until 2026-09-28 they passed through: `clientId` placed after the server's own
+`client_id` overwrote any stored client, the console's included, and `consent.require: false` switched
+off the consent screen for a self-registered or document-identified client
+(`test/registration_management/internal_keys.spec.ts`, `test/cimd/internal_keys.spec.ts`). The console
+is unaffected — it builds canonical records itself and never goes through the wire translation.
 
 Before this, the surfaces disagreed: the console stored without the check, which then ran on the next
 resolution instead, as an unrelated failure for whoever used the client next.

@@ -16,34 +16,7 @@ import { adapter } from '../../adapters/index.js';
 import { resolveClientDocument } from '../../client_metadata_document/resolve.js';
 import { validateJWK } from './keystore.ts';
 import { registerClient } from './register.ts';
-
-// The base registration keys copied verbatim from the raw input. Frozen here so
-// expanding `ClientSchema` to describe the full validated-object type (the rest
-// of the metadata is produced by the schema engine and camelCased) cannot change
-// which raw keys are picked — keeping `validateClient` behaviour-neutral.
-const BASE_METADATA_KEYS = [
-	'clientId',
-	'clientSecret',
-	'redirectUris',
-	'applicationType',
-	'responseTypes',
-	'responseModes',
-	'grantTypes',
-	'subjectType',
-	'authorization.requirePushedAuthorizationRequests',
-	'requestObject.require',
-	'requestObject.signingAlg',
-	'requestObject.backChannelSigningAlg',
-	'consent.require',
-	/*
-	 * Whether the server created this client on its own request. A base key rather than recognised
-	 * metadata: it is not something a client may send — `lib/actions/registration.ts` sets it after the
-	 * wire translation precisely so a registration body cannot claim it — and it must survive the
-	 * round trip through storage, which only keeps what is picked here.
-	 */
-	'registeredDynamically',
-	'registrationUsedAt'
-];
+import { BASE_METADATA_KEYS } from './wire.ts';
 
 // Validate raw metadata → plain, frozen client object (defaults applied,
 // recognised metadata camelCased) or throw InvalidClientMetadata. Key material

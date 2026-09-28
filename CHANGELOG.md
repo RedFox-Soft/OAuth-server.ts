@@ -17,6 +17,16 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   end user's password in a bucket requiring a second factor, that exposed the new authenticator secret
   and let the other browser enrol its own and leave signed in as the account. Regression since
   `53341c6`; a foreign cookie is now refused exactly as an unknown address is.
+- **Client metadata can no longer name the model's internal attributes.** A dynamic registration
+  body, a registration update or a client ID metadata document that spelled a canonical key had it
+  copied into the client: `clientId` overwrote any stored client, the console's own included,
+  `consent.require: false` switched off the consent screen, and a document's `clientSecret` survived
+  the rule that such clients hold no secret. Wire input now carries snake_case metadata only; those
+  keys are dropped as unrecognised.
+- **A self-registered client stays marked as one after updating its registration.** `PUT /reg/:id`
+  rebuilt the record from the body alone, dropping the self-registration marking — which lifted the
+  refusal of such clients on the administrative MCP surface — and the record of its first completed
+  authorization, which returned a client in use to the sweep of unused registrations.
 
 ## [0.6.0] - 2026-09-28
 

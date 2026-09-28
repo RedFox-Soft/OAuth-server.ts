@@ -345,6 +345,16 @@ async function update({ params, body, headers, request, set }: ClientContext) {
 			(value) => value === null || value === ''
 		)
 	);
+	/*
+	 * Server-owned facts, carried over after the wire translation for the same reason `create` sets the
+	 * marking there: the body cannot speak for them, and an update built from the body alone would drop
+	 * them — unmarking the client, which lifts the refusal of self-registered clients at `/mcp`, or
+	 * forgetting that it was used, which hands it back to the sweep of unused registrations.
+	 */
+	Object.assign(properties, {
+		registeredDynamically: client.registeredDynamically,
+		registrationUsedAt: client.registrationUsedAt
+	});
 
 	const secretRequired = !client.clientSecret && needsSecret(properties);
 
