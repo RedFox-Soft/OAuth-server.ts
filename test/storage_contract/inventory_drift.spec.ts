@@ -279,8 +279,9 @@ describe('storage ownership drift', () => {
 		const unregistered = MODEL_AREAS.filter(
 			(area) => !SCHEMA_EXEMPT_AREAS.has(area) && !(area in PAYLOAD_SCHEMAS)
 		);
+		const modelAreas = new Set<string>(MODEL_AREAS);
 		const stale = Object.keys(PAYLOAD_SCHEMAS).filter(
-			(area) => !MODEL_AREAS.includes(area as (typeof MODEL_AREAS)[number])
+			(area) => !modelAreas.has(area)
 		);
 
 		expect(unregistered).toEqual([]);

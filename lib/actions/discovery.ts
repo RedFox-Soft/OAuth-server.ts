@@ -3,8 +3,8 @@ import defaults from '../helpers/_/defaults.ts';
 import {
 	calculateDiscovery,
 	featuresKeyMap,
-	metadataClassification,
-	type FeatureFlagKey
+	isFeatureFlag,
+	metadataClassification
 } from 'lib/configs/discoverySupport.js';
 import { ApplicationConfig } from '../configs/application.js';
 import {
@@ -38,7 +38,7 @@ function gateAndExtend(body: DiscoveryDocument): DiscoveryDocument {
 
 	// Prune keys whose governing feature flag is disabled (multi-feature keys are listed
 	// under each flag, so any disabled flag removes them).
-	for (const flag of Object.keys(featuresKeyMap) as FeatureFlagKey[]) {
+	for (const flag of Object.keys(featuresKeyMap).filter(isFeatureFlag)) {
 		if (!ApplicationConfig[flag]) {
 			featuresKeyMap[flag]?.forEach((key) => keysToDelete.add(key));
 		}

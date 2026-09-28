@@ -21,11 +21,7 @@ async function seed(
 	id: string,
 	payload: Record<string, unknown>
 ): Promise<void> {
-	await adapter(area).upsert(
-		id,
-		{ ...payload, exp: epochTime() + TTL } as never,
-		TTL
-	);
+	await adapter(area).upsert(id, { ...payload, exp: epochTime() + TTL }, TTL);
 }
 
 /**
@@ -114,7 +110,7 @@ describe('storage contract: destroyByOwner', () => {
 				uid: 'c6-uid',
 				accountId: 'c6-account',
 				exp: epochTime() + TTL
-			} as never,
+			},
 			TTL
 		);
 
@@ -180,7 +176,7 @@ describe('storage contract: revokeByGrantId is per-collection', () => {
 				createdAt: epochTime(),
 				lastModifiedAt: epochTime(),
 				trusted: false
-			} as never,
+			},
 			TTL
 		);
 		await seed('AccessToken', 'c10-at', {

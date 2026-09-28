@@ -72,7 +72,7 @@ function serveSectorDocument(redirectUris: string[]) {
  * recognises — alternatives that cannot share a client (a key set and a key-set URI, the five
  * certificate subjects, the two proof-of-possession requirements) are split across records.
  */
-function fixtures(): Record<string, unknown>[] {
+function fixtures(): ({ clientId: string } & Record<string, unknown>)[] {
 	const acr = [...configuration.acrValues][0];
 
 	const rich = {
@@ -203,9 +203,9 @@ describe('editing a client through the console', () => {
 		expect(recognised.filter((name) => !carried.has(name))).toEqual([]);
 
 		for (const record of records) {
-			const clientId = record.clientId as string;
+			const { clientId } = record;
 			serveSectorDocument([`${RP}/cb`, `${RP}/jwks`]);
-			seedClient(record as { clientId: string });
+			seedClient(record);
 			const before = await storedClient(clientId);
 
 			await updateClient(clientId, { clientName: 'Renamed' });

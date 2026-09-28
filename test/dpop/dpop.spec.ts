@@ -35,6 +35,9 @@ import { TestAdapter } from 'test/models.js';
 import { Client } from 'lib/models/client.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { ApplicationConfig as config } from 'lib/configs/application.js';
+import { AuthorizationCodePayload } from 'lib/models/authorization_code.js';
+import { BackchannelAuthenticationRequestPayload } from 'lib/models/backchannel_authentication_request.js';
+import { present } from 'test/shape.js';
 
 function ath(accessToken: string) {
 	return hash('sha256', accessToken, 'base64url');
@@ -825,8 +828,11 @@ describe('features.dPoP', async () => {
 			);
 			const { grantId } = TestAdapter.for(
 				'BackchannelAuthenticationRequest'
-			).syncFind(setup.getTokenJti(reqId));
-			TestAdapter.for('Grant').syncUpdate(grantId, {
+			).syncFindAs(
+				BackchannelAuthenticationRequestPayload,
+				setup.getTokenJti(reqId)
+			);
+			TestAdapter.for('Grant').syncUpdate(present(grantId, 'a grant'), {
 				clientId: 'client-none'
 			});
 
@@ -940,7 +946,10 @@ describe('features.dPoP', async () => {
 			const location = getHeader(res.response, 'location');
 			const code = locationParameter(location, 'code');
 
-			const { dpopJkt } = TestAdapter.for('AuthorizationCode').syncFind(code);
+			const { dpopJkt } = TestAdapter.for('AuthorizationCode').syncFindAs(
+				AuthorizationCodePayload,
+				code
+			);
 			expect(typeof dpopJkt).toBe('string');
 			expect(dpopJkt).toHaveLength(43);
 		});
@@ -993,7 +1002,10 @@ describe('features.dPoP', async () => {
 			const location = getHeader(res.response, 'location');
 			const code = locationParameter(location, 'code');
 
-			const { dpopJkt } = TestAdapter.for('AuthorizationCode').syncFind(code);
+			const { dpopJkt } = TestAdapter.for('AuthorizationCode').syncFindAs(
+				AuthorizationCodePayload,
+				code
+			);
 			expect(typeof dpopJkt).toBe('string');
 			expect(dpopJkt).toHaveLength(43);
 		});

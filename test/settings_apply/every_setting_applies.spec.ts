@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
+import { Type } from '@sinclair/typebox';
 
 import bootstrap from '../test_helper.js';
 import { configStore } from 'lib/adapters/index.js';
@@ -8,6 +9,7 @@ import {
 	type SettingDescriptor
 } from 'lib/admin/settings/catalog.js';
 import { saveSettings, superAdminCookie } from './helpers.js';
+import { shaped } from '../shape.js';
 
 /*
  * A second value for the settings whose type does not imply one. Spelled out rather than generated,
@@ -57,17 +59,26 @@ const NOT_EXERCISABLE_ALONE: Record<string, string> = {
 		'reporting requires an ingestion credential, which is deliberately absent from the catalog and is written through the Sentry card instead'
 };
 
+function isSetting(key: string): key is keyof typeof ApplicationConfig {
+	return Object.hasOwn(ApplicationConfig, key);
+}
+
 function alternativeFor(d: SettingDescriptor): unknown {
-	const key = d.key as string;
+	const key = d.key;
 	if (Object.prototype.hasOwnProperty.call(ALTERNATIVES, key)) {
 		return ALTERNATIVES[key];
 	}
-	const current = (ApplicationConfig as Record<string, unknown>)[key];
+	const current = ApplicationConfig[key];
 	if (d.type === 'boolean') {
 		return !current;
 	}
 	if (d.type === 'number') {
-		return (current as number) + 1;
+		if (typeof current !== 'number') {
+			throw new Error(
+				`${key} is declared a number but holds ${typeof current}`
+			);
+		}
+		return current + 1;
 	}
 	if (d.type === 'enum') {
 		return d.options?.find((option) => option !== current);
@@ -93,7 +104,7 @@ describe('the settings an operator is told take effect when saved', () => {
 		const applied: string[] = [];
 
 		for (const d of SETTINGS_CATALOG) {
-			const key = d.key as string;
+			const key = d.key;
 			if (d.apply === 'restart') {
 				continue;
 			}
@@ -101,7 +112,7 @@ describe('the settings an operator is told take effect when saved', () => {
 				continue;
 			}
 
-			const before = (ApplicationConfig as Record<string, unknown>)[key];
+			const before = ApplicationConfig[key];
 			const next = alternativeFor(d);
 			expect(
 				next,
@@ -115,30 +126,32 @@ describe('the settings an operator is told take effect when saved', () => {
 			 * which one — so the parent travels with it rather than being listed as an exception.
 			 */
 			if (d.dependsOn && next === true) {
-				const parent = d.dependsOn as string;
-				restore[parent] = (ApplicationConfig as Record<string, unknown>)[
-					parent
-				];
+				const parent = d.dependsOn;
+				restore[parent] = ApplicationConfig[parent];
 				change[parent] = true;
 			}
 			for (const [companion, value] of Object.entries(COMPANIONS[key] ?? {})) {
-				restore[companion] = (ApplicationConfig as Record<string, unknown>)[
-					companion
-				];
+				if (!isSetting(companion)) {
+					throw new Error(`companion ${companion} of ${key} is not a setting`);
+				}
+				restore[companion] = ApplicationConfig[companion];
 				change[companion] = value;
 			}
 
 			const res = await saveSettings(cookie, change);
 			expect(res.status, `${key} was refused`).toBe(200);
 
-			const body = (await res.json()) as {
-				appliedKeys: string[];
-				notInForceKeys: string[];
-				values: Record<string, unknown>;
-			};
+			const body = shaped(
+				Type.Object({
+					appliedKeys: Type.Array(Type.String()),
+					notInForceKeys: Type.Array(Type.String())
+				}),
+				await res.json()
+			);
 			expect(body.appliedKeys, `${key} did not take effect`).toContain(key);
 			expect(body.notInForceKeys).toEqual([]);
-			expect((ApplicationConfig as Record<string, unknown>)[key]).toEqual(next);
+			const inForce: unknown = ApplicationConfig[key];
+			expect(inForce).toEqual(next);
 
 			applied.push(key);
 			expect((await saveSettings(cookie, restore)).status).toBe(200);

@@ -12,8 +12,8 @@ import {
 	ADMIN_SESSION_COOKIE,
 	UNASSIGNED_GROUP_ID
 } from 'lib/admin/consts.ts';
-import type { Group, Project } from 'lib/adapters/types.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
+import { answered } from './answered.ts';
 
 const app = new Elysia()
 	.use(resolveAdmin)
@@ -39,17 +39,6 @@ async function admin(roles: string[] = ['project_admin']) {
 	};
 }
 
-type ScopeView = {
-	activeGroupId: string;
-	available: {
-		id: string;
-		name: string;
-		kind: string;
-		role: string | null;
-		own: boolean;
-	}[];
-};
-
 /**
  * @proves The active scope decides where containers are created and what is visible, is
  * re-validated every request, and never reaches another administrator personal group.
@@ -61,16 +50,18 @@ describe('active scope', () => {
 
 	it('starts in the personal group and offers every group the caller belongs to', async () => {
 		const a = await admin();
-		const group = (
-			await client.admin.api.groups.post(
-				{ name: 'Acme' },
-				{ headers: { cookie: a.cookie } }
-			)
-		).data as Group;
+		const group = answered(
+			(
+				await client.admin.api.groups.post(
+					{ name: 'Acme' },
+					{ headers: { cookie: a.cookie } }
+				)
+			).data
+		);
 
-		const scope = (
-			await client.admin.api.scope.get({ headers: { cookie: a.cookie } })
-		).data as ScopeView;
+		const scope = answered(
+			(await client.admin.api.scope.get({ headers: { cookie: a.cookie } })).data
+		);
 
 		expect(scope.activeGroupId).toBe(await personalGroupId(a.userId));
 		expect(scope.available.map((g) => g.id)).toContain(group._id);
@@ -79,20 +70,24 @@ describe('active scope', () => {
 
 	it('creates into whichever scope is active, and lists only that scope', async () => {
 		const a = await admin();
-		const group = (
-			await client.admin.api.groups.post(
-				{ name: 'Acme' },
-				{ headers: { cookie: a.cookie } }
-			)
-		).data as Group;
+		const group = answered(
+			(
+				await client.admin.api.groups.post(
+					{ name: 'Acme' },
+					{ headers: { cookie: a.cookie } }
+				)
+			).data
+		);
 
 		// One project in the personal scope...
-		const personalProject = (
-			await client.admin.api.projects.post(
-				{ name: 'Personal', slug: slug('p') },
-				{ headers: { cookie: a.cookie } }
-			)
-		).data as Project;
+		const personalProject = answered(
+			(
+				await client.admin.api.projects.post(
+					{ name: 'Personal', slug: slug('p') },
+					{ headers: { cookie: a.cookie } }
+				)
+			).data
+		);
 
 		// ...then switch, and the next creation lands in the group without being asked again.
 		const switched = await client.admin.api.scope.put(
@@ -101,17 +96,20 @@ describe('active scope', () => {
 		);
 		expect(switched.status).toBe(200);
 
-		const groupProject = (
-			await client.admin.api.projects.post(
-				{ name: 'Company', slug: slug('c') },
-				{ headers: { cookie: a.cookie } }
-			)
-		).data as Project;
+		const groupProject = answered(
+			(
+				await client.admin.api.projects.post(
+					{ name: 'Company', slug: slug('c') },
+					{ headers: { cookie: a.cookie } }
+				)
+			).data
+		);
 		expect(groupProject.ownerGroupId).toBe(group._id);
 
-		const inGroup = (
-			await client.admin.api.projects.get({ headers: { cookie: a.cookie } })
-		).data as Project[];
+		const inGroup = answered(
+			(await client.admin.api.projects.get({ headers: { cookie: a.cookie } }))
+				.data
+		);
 		expect(inGroup.map((p) => p._id)).toEqual([groupProject._id]);
 
 		// Switching back shows the other set — nothing is merged.
@@ -119,29 +117,32 @@ describe('active scope', () => {
 			{ groupId: await personalGroupId(a.userId) },
 			{ headers: { cookie: a.cookie } }
 		);
-		const inPersonal = (
-			await client.admin.api.projects.get({ headers: { cookie: a.cookie } })
-		).data as Project[];
+		const inPersonal = answered(
+			(await client.admin.api.projects.get({ headers: { cookie: a.cookie } }))
+				.data
+		);
 		expect(inPersonal.map((p) => p._id)).toEqual([personalProject._id]);
 	});
 
 	it('persists the choice across requests within the session', async () => {
 		const a = await admin();
-		const group = (
-			await client.admin.api.groups.post(
-				{ name: 'Acme' },
-				{ headers: { cookie: a.cookie } }
-			)
-		).data as Group;
+		const group = answered(
+			(
+				await client.admin.api.groups.post(
+					{ name: 'Acme' },
+					{ headers: { cookie: a.cookie } }
+				)
+			).data
+		);
 
 		await client.admin.api.scope.put(
 			{ groupId: group._id },
 			{ headers: { cookie: a.cookie } }
 		);
 
-		const later = (
-			await client.admin.api.scope.get({ headers: { cookie: a.cookie } })
-		).data as ScopeView;
+		const later = answered(
+			(await client.admin.api.scope.get({ headers: { cookie: a.cookie } })).data
+		);
 		expect(later.activeGroupId).toBe(group._id);
 	});
 
@@ -157,12 +158,14 @@ describe('active scope', () => {
 	 */
 	it('writes no audit entry for the switch itself', async () => {
 		const a = await admin();
-		const group = (
-			await client.admin.api.groups.post(
-				{ name: 'Acme' },
-				{ headers: { cookie: a.cookie } }
-			)
-		).data as Group;
+		const group = answered(
+			(
+				await client.admin.api.groups.post(
+					{ name: 'Acme' },
+					{ headers: { cookie: a.cookie } }
+				)
+			).data
+		);
 
 		const before = (await adminAuditStore.list({ targetId: group._id })).total;
 
@@ -179,12 +182,14 @@ describe('active scope', () => {
 	it('refuses a switch to a group the caller does not belong to', async () => {
 		const a = await admin();
 		const b = await admin();
-		const theirs = (
-			await client.admin.api.groups.post(
-				{ name: 'Theirs' },
-				{ headers: { cookie: b.cookie } }
-			)
-		).data as Group;
+		const theirs = answered(
+			(
+				await client.admin.api.groups.post(
+					{ name: 'Theirs' },
+					{ headers: { cookie: b.cookie } }
+				)
+			).data
+		);
 
 		const denied = await client.admin.api.scope.put(
 			{ groupId: theirs._id },
@@ -210,16 +215,19 @@ describe('active scope', () => {
 		const root = await admin(['super_admin']);
 		const other = await admin();
 		const theirs = await personalGroupId(other.userId);
-		const shared = (
-			await client.admin.api.groups.post(
-				{ name: 'Acme' },
-				{ headers: { cookie: other.cookie } }
-			)
-		).data as Group;
+		const shared = answered(
+			(
+				await client.admin.api.groups.post(
+					{ name: 'Acme' },
+					{ headers: { cookie: other.cookie } }
+				)
+			).data
+		);
 
-		const scope = (
-			await client.admin.api.scope.get({ headers: { cookie: root.cookie } })
-		).data as ScopeView;
+		const scope = answered(
+			(await client.admin.api.scope.get({ headers: { cookie: root.cookie } }))
+				.data
+		);
 
 		// Not a filter on personal groups as such: the super administrator's own is still there.
 		expect(scope.available.map((g) => g.id)).toContain(
@@ -246,12 +254,14 @@ describe('active scope', () => {
 	it('keeps a super administrator in a group they do not belong to', async () => {
 		const root = await admin(['super_admin']);
 		const other = await admin();
-		const theirs = (
-			await client.admin.api.groups.post(
-				{ name: 'Acme' },
-				{ headers: { cookie: other.cookie } }
-			)
-		).data as Group;
+		const theirs = answered(
+			(
+				await client.admin.api.groups.post(
+					{ name: 'Acme' },
+					{ headers: { cookie: other.cookie } }
+				)
+			).data
+		);
 
 		const switched = await client.admin.api.scope.put(
 			{ groupId: theirs._id },
@@ -259,17 +269,20 @@ describe('active scope', () => {
 		);
 		expect(switched.status).toBe(200);
 
-		const later = (
-			await client.admin.api.scope.get({ headers: { cookie: root.cookie } })
-		).data as ScopeView;
+		const later = answered(
+			(await client.admin.api.scope.get({ headers: { cookie: root.cookie } }))
+				.data
+		);
 		expect(later.activeGroupId).toBe(theirs._id);
 
-		const project = (
-			await client.admin.api.projects.post(
-				{ name: 'Company', slug: slug('c') },
-				{ headers: { cookie: root.cookie } }
-			)
-		).data as Project;
+		const project = answered(
+			(
+				await client.admin.api.projects.post(
+					{ name: 'Company', slug: slug('c') },
+					{ headers: { cookie: root.cookie } }
+				)
+			).data
+		);
 		expect(project.ownerGroupId).toBe(theirs._id);
 	});
 
@@ -292,9 +305,10 @@ describe('active scope', () => {
 				{ headers: { cookie: owner.cookie } }
 			);
 
-		const scope = (
-			await client.admin.api.scope.get({ headers: { cookie: member.cookie } })
-		).data as ScopeView;
+		const scope = answered(
+			(await client.admin.api.scope.get({ headers: { cookie: member.cookie } }))
+				.data
+		);
 
 		expect(scope.available.find((g) => g.id === theirs)?.own).toBe(false);
 		expect(scope.available.find((g) => g.id === mine)?.own).toBe(true);
@@ -308,12 +322,14 @@ describe('active scope', () => {
 	it('falls back to the personal group when membership of the active one is revoked', async () => {
 		const owner = await admin();
 		const member = await admin();
-		const group = (
-			await client.admin.api.groups.post(
-				{ name: 'Acme' },
-				{ headers: { cookie: owner.cookie } }
-			)
-		).data as Group;
+		const group = answered(
+			(
+				await client.admin.api.groups.post(
+					{ name: 'Acme' },
+					{ headers: { cookie: owner.cookie } }
+				)
+			).data
+		);
 		await client.admin.api
 			.groups({ id: group._id })
 			.members.post(
@@ -330,9 +346,10 @@ describe('active scope', () => {
 			.members({ userId: member.userId })
 			.delete(undefined, { headers: { cookie: owner.cookie } });
 
-		const scope = (
-			await client.admin.api.scope.get({ headers: { cookie: member.cookie } })
-		).data as ScopeView;
+		const scope = answered(
+			(await client.admin.api.scope.get({ headers: { cookie: member.cookie } }))
+				.data
+		);
 		expect(scope.activeGroupId).toBe(await personalGroupId(member.userId));
 		expect(scope.available.map((g) => g.id)).not.toContain(group._id);
 	});

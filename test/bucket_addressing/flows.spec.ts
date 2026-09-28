@@ -28,6 +28,8 @@ import epochTime from '../../lib/helpers/epoch_time.ts';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
 import { acmeClient } from './flows.config.js';
+import { Type } from '@sinclair/typebox';
+import { shaped } from 'test/shape.js';
 
 const SLUG = 'acme';
 const BUCKET_ID = 'acme-bucket';
@@ -35,7 +37,9 @@ const ACME_ISSUER = `${ISSUER}/${SLUG}`;
 const DEVICE = 'urn:ietf:params:oauth:grant-type:device_code';
 const CIBA = 'urn:openid:params:grant-type:ciba';
 
-type Json = Record<string, unknown>;
+const ErrorBody = Type.Object({ error: Type.String() });
+const IdTokenBody = Type.Object({ id_token: Type.String() });
+const Verification = Type.Object({ verification_uri: Type.String() });
 
 /**
  * @proves A device or backchannel flow started at a named bucket's address belongs to that bucket —
@@ -86,9 +90,10 @@ describe('a flow started at a named bucket address', () => {
 
 	/* Compared exactly after decoding: the instance issuer is a prefix of every bucket's. */
 	function issuerOfIdToken(idToken: string): string {
-		const payload = JSON.parse(
-			Buffer.from(idToken.split('.')[1], 'base64url').toString()
-		) as { iss: string };
+		const payload = shaped(
+			Type.Object({ iss: Type.String() }),
+			JSON.parse(Buffer.from(idToken.split('.')[1], 'base64url').toString())
+		);
 		return payload.iss;
 	}
 
@@ -106,10 +111,16 @@ describe('a flow started at a named bucket address', () => {
 			{ scope: 'openid' }
 		);
 		expect(response.status).toBe(200);
-		const body = (await response.json()) as Json;
+		const body = shaped(
+			Type.Object({
+				verification_uri: Type.String(),
+				verification_uri_complete: Type.String()
+			}),
+			await response.json()
+		);
 
 		expect(body.verification_uri).toBe(`${ACME_ISSUER}/device`);
-		expect(String(body.verification_uri_complete)).toStartWith(
+		expect(body.verification_uri_complete).toStartWith(
 			`${ACME_ISSUER}/device?user_code=`
 		);
 	});
@@ -121,9 +132,10 @@ describe('a flow started at a named bucket address', () => {
 			'acme-secret',
 			{ scope: 'openid' }
 		);
-		const { device_code: deviceCode } = (await started.json()) as {
-			device_code: string;
-		};
+		const { device_code: deviceCode } = shaped(
+			Type.Object({ device_code: Type.String() }),
+			await started.json()
+		);
 		TestAdapter.for('DeviceCode').syncUpdate(setup.getTokenJti(deviceCode), {
 			scope: 'openid',
 			accountId: 'bob',
@@ -140,9 +152,7 @@ describe('a flow started at a named bucket address', () => {
 			}
 		);
 		expect(redeemed.status).toBe(200);
-		const { id_token: idToken } = (await redeemed.json()) as {
-			id_token: string;
-		};
+		const { id_token: idToken } = shaped(IdTokenBody, await redeemed.json());
 
 		expect(issuerOfIdToken(idToken)).toBe(ACME_ISSUER);
 	});
@@ -155,9 +165,10 @@ describe('a flow started at a named bucket address', () => {
 			{ scope: 'openid', login_hint: 'bob' }
 		);
 		expect(started.status).toBe(200);
-		const { auth_req_id: authReqId } = (await started.json()) as {
-			auth_req_id: string;
-		};
+		const { auth_req_id: authReqId } = shaped(
+			Type.Object({ auth_req_id: Type.String() }),
+			await started.json()
+		);
 
 		const redeemed = await post(
 			`/${SLUG}/token`,
@@ -169,9 +180,7 @@ describe('a flow started at a named bucket address', () => {
 			}
 		);
 		expect(redeemed.status).toBe(200);
-		const { id_token: idToken } = (await redeemed.json()) as {
-			id_token: string;
-		};
+		const { id_token: idToken } = shaped(IdTokenBody, await redeemed.json());
 
 		expect(issuerOfIdToken(idToken)).toBe(ACME_ISSUER);
 	});
@@ -188,7 +197,9 @@ describe('a flow started at a named bucket address', () => {
 		);
 
 		expect(response.status).toBe(400);
-		expect(((await response.json()) as Json).error).toBe('unauthorized_client');
+		expect(shaped(ErrorBody, await response.json()).error).toBe(
+			'unauthorized_client'
+		);
 		expect(stored).not.toHaveBeenCalled();
 	});
 
@@ -204,7 +215,9 @@ describe('a flow started at a named bucket address', () => {
 		);
 
 		expect(response.status).toBe(400);
-		expect(((await response.json()) as Json).error).toBe('unauthorized_client');
+		expect(shaped(ErrorBody, await response.json()).error).toBe(
+			'unauthorized_client'
+		);
 		expect(stored).not.toHaveBeenCalled();
 	});
 
@@ -219,7 +232,7 @@ describe('a flow started at a named bucket address', () => {
 		);
 		expect(response.status).toBe(200);
 
-		expect(((await response.json()) as Json).verification_uri).toBe(
+		expect(shaped(Verification, await response.json()).verification_uri).toBe(
 			`${ISSUER}/device`
 		);
 	});
@@ -286,10 +299,11 @@ describe('a flow started at a named bucket address', () => {
 			})
 		);
 		expect(response.status).toBe(201);
-		const body = (await response.json()) as Json;
-
-		expect(String(body.registration_client_uri)).toStartWith(
-			`${ACME_ISSUER}/reg/`
+		const body = shaped(
+			Type.Object({ registration_client_uri: Type.String() }),
+			await response.json()
 		);
+
+		expect(body.registration_client_uri).toStartWith(`${ACME_ISSUER}/reg/`);
 	});
 });

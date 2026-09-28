@@ -3,6 +3,7 @@ import { describe, it, beforeAll, expect } from 'bun:test';
 import bootstrap, { agent } from '../test_helper.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
+import type { FeatureFlagKey } from 'lib/configs/discoverySupport.js';
 
 const oauthMetadata = agent['.well-known']['oauth-authorization-server'];
 const oidcMetadata = agent['.well-known']['openid-configuration'];
@@ -140,7 +141,7 @@ describe('/.well-known/oauth-authorization-server at all features', () => {
 
 	// Flag-driven withdrawal, on the same fetch and with no restart: both documents are recomputed per
 	// request from the live configuration.
-	it.each([
+	it.each<[FeatureFlagKey, string]>([
 		['par.enabled', 'pushed_authorization_request_endpoint'],
 		['dpop.enabled', 'dpop_signing_alg_values_supported'],
 		['introspection.enabled', 'introspection_endpoint'],
@@ -157,20 +158,19 @@ describe('/.well-known/oauth-authorization-server at all features', () => {
 		['responseMode.jwt.enabled', 'authorization_signing_alg_values_supported'],
 		['jwtIntrospection.enabled', 'introspection_signing_alg_values_supported']
 	])('withdraws the members %s governs', async (flag, member) => {
-		const config = ApplicationConfig as Record<string, unknown>;
-		const original = config[flag];
+		const original = ApplicationConfig[flag];
 
 		try {
 			expect((await oauthMetadata.get()).data).toHaveProperty(member);
 
-			config[flag] = false;
+			ApplicationConfig[flag] = false;
 			const { data } = await oauthMetadata.get();
 			if (!data) throw new Error('expected response data');
 
 			expect(member in data).toBe(false);
 		} finally {
 			// ApplicationConfig is process-wide; leaving it flipped leaks into every later suite.
-			config[flag] = original;
+			ApplicationConfig[flag] = original;
 		}
 	});
 
@@ -179,25 +179,24 @@ describe('/.well-known/oauth-authorization-server at all features', () => {
 	 * flags govern OIDC-only members exclusively, so by the time the prune runs there is nothing of
 	 * theirs left to remove and this document cannot move.
 	 */
-	it.each([
+	it.each<FeatureFlagKey>([
 		'userinfo.enabled',
 		'jwtUserinfo.enabled',
 		'rpInitiatedLogout.enabled',
 		'backchannelLogout.enabled',
 		'claimsParameter.enabled'
 	])('is unmoved by %s, which governs only OIDC-only members', async (flag) => {
-		const config = ApplicationConfig as Record<string, unknown>;
-		const original = config[flag];
+		const original = ApplicationConfig[flag];
 
 		try {
 			const before = (await oauthMetadata.get()).data;
 
-			config[flag] = false;
+			ApplicationConfig[flag] = false;
 			const after = (await oauthMetadata.get()).data;
 
 			expect(after).toEqual(before);
 		} finally {
-			config[flag] = original;
+			ApplicationConfig[flag] = original;
 		}
 	});
 
@@ -206,11 +205,12 @@ describe('/.well-known/oauth-authorization-server at all features', () => {
 		const { data: oidc } = await oidcMetadata.get();
 		if (!data || !oidc) throw new Error('expected response data');
 
-		const oidcBody = oidc as Record<string, unknown>;
-		const disagreeing = Object.keys(data).filter(
+		// Both documents admit members their schema does not name, so each is read as a record.
+		const body: Record<string, unknown> = data;
+		const oidcBody: Record<string, unknown> = oidc;
+		const disagreeing = Object.keys(body).filter(
 			(member) =>
-				JSON.stringify(oidcBody[member]) !==
-				JSON.stringify((data as Record<string, unknown>)[member])
+				JSON.stringify(oidcBody[member]) !== JSON.stringify(body[member])
 		);
 
 		expect(disagreeing).toEqual([]);

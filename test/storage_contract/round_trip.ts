@@ -23,8 +23,7 @@ interface PersistedModel {
 export function storedPayloadFor(
 	instance: PersistedModel
 ): Persisted | undefined {
-	return TestAdapter.for(instance.constructor.name).syncFind(instance.id) as
-		Persisted | undefined;
+	return TestAdapter.for(instance.constructor.name).syncFind(instance.id);
 }
 
 // Asserts an already-saved instance honors the schema-driven storage contract:

@@ -1,4 +1,5 @@
 import { describe, it, beforeAll, expect } from 'bun:test';
+import { Cookie } from 'elysia';
 import bootstrap from '../test_helper.js';
 import sessionHandler from 'lib/shared/session.ts';
 import { Session } from 'lib/models/session.ts';
@@ -11,27 +12,16 @@ import {
 
 const SESSION_COOKIE = sessionCookieName(DEFAULT_REQUEST_BUCKET);
 
-// Minimal cookie jar matching the shape session.ts reads/writes: a per-name
-// entry exposing `.value` and `.set({ value })`.
-function makeCookieJar(sessionValue?: string) {
-	const entry = {
-		value: sessionValue as string | undefined,
-		set(o: { value: string }) {
-			this.value = o.value;
-		},
-		remove() {
-			this.value = undefined;
-		}
-	};
-	return { [SESSION_COOKIE]: entry } as Record<string, typeof entry>;
+// Elysia's own cookie over an empty store: a browser that sends no session cookie yet.
+function makeCookieJar(): OIDCCookies {
+	return { [SESSION_COOKIE]: new Cookie<unknown>(SESSION_COOKIE, {}) };
 }
 
 function requestWithJar() {
 	return new OIDCContext({
 		params: {},
 		bucket: DEFAULT_REQUEST_BUCKET,
-		// A stand-in exposing only the members session.ts touches, not a full Elysia cookie.
-		cookie: makeCookieJar() as unknown as OIDCCookies
+		cookie: makeCookieJar()
 	});
 }
 

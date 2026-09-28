@@ -23,6 +23,7 @@ import {
 	mintWithForeignKey,
 	tamperPayload
 } from './id_token_fixture.ts';
+import { fetchAnswering } from 'test/fetch_mock.ts';
 
 function requiredParam(url: URL, name: string): string {
 	const value = url.searchParams.get(name);
@@ -60,10 +61,9 @@ let superAdminId: string;
 // The loopback exchange can never reach a real server: ISSUER points at a fake host under test. The
 // stub returns a genuinely signed token instead of a forged one, which is the whole point.
 function stubExchange(body: Record<string, unknown>) {
-	fetchSpy = spyOn(globalThis, 'fetch').mockImplementation((async () => ({
-		ok: true,
-		json: async () => body
-	})) as unknown as typeof fetch);
+	fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
+		fetchAnswering(async () => Response.json(body))
+	);
 }
 
 async function callback(login: Login, idToken: unknown) {

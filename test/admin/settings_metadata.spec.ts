@@ -122,8 +122,10 @@ describe('settings catalog presentation metadata', () => {
 	 * an assertion on "some settings are flagged" would not catch.
 	 */
 	it('flags every setting whose change has a security consequence', () => {
-		const flagged = SETTINGS_CATALOG.filter((d) => d.risk === 'security')
-			.map((d) => d.key as string)
+		const flagged: string[] = SETTINGS_CATALOG.filter(
+			(d) => d.risk === 'security'
+		)
+			.map((d) => d.key)
 			.sort();
 
 		expect(flagged).toEqual(

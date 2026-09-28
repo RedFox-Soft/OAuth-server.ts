@@ -20,6 +20,8 @@ import {
 	microsoftStub
 } from '../federation/recognised_stubs.ts';
 import { sessionFor } from '../admin_session.ts';
+import { answered } from './answered.ts';
+import type { ProviderGuidance } from 'lib/admin/federation/guidance.ts';
 
 /*
  * Connecting Microsoft, Apple and GitHub through the administrative surface: what each asks for, and what
@@ -55,10 +57,11 @@ async function seedBucket(fields: Record<string, unknown> = {}) {
 	});
 }
 
-function guidanceFor(payload: unknown, catalogueId: string) {
-	const providers = (payload as { providers?: Record<string, unknown>[] })
-		?.providers;
-	return providers?.find((entry) => entry.catalogueId === catalogueId);
+function guidanceFor(
+	payload: { providers: ProviderGuidance[] },
+	catalogueId: string
+) {
+	return payload.providers.find((entry) => entry.catalogueId === catalogueId);
 }
 
 /**
@@ -94,9 +97,7 @@ describe('connecting Microsoft, Apple or GitHub', () => {
 			apple: 4
 		};
 		for (const [catalogueId, expected] of Object.entries(counts)) {
-			const entry = guidanceFor(res.data, catalogueId) as {
-				requiredValues?: { label: string; secret: boolean }[];
-			};
+			const entry = guidanceFor(answered(res.data), catalogueId);
 			expect(
 				entry?.requiredValues,
 				`${catalogueId} published no required values`
@@ -117,13 +118,7 @@ describe('connecting Microsoft, Apple or GitHub', () => {
 			.buckets({ id: bucket._id })
 			.federation.catalogue.get({ headers: { cookie } });
 
-		const microsoft = guidanceFor(res.data, 'microsoft') as {
-			choices?: {
-				name: string;
-				question: string;
-				options: { value: string | null; consequence: string }[];
-			}[];
-		};
+		const microsoft = guidanceFor(answered(res.data), 'microsoft');
 		expect(microsoft?.choices).toHaveLength(1);
 		const choice = microsoft!.choices![0]!;
 		expect(choice.name).toBe('tenant');
@@ -141,7 +136,7 @@ describe('connecting Microsoft, Apple or GitHub', () => {
 		// The other three ask nothing, so a console rendering choices generically shows none for them.
 		for (const catalogueId of ['google', 'apple', 'github']) {
 			expect(
-				(guidanceFor(res.data, catalogueId) as { choices?: unknown[] })?.choices
+				guidanceFor(answered(res.data), catalogueId)?.choices
 			).toHaveLength(0);
 		}
 	});
@@ -167,12 +162,12 @@ describe('connecting Microsoft, Apple or GitHub', () => {
 			);
 
 		expect(res.status).toBe(201);
-		const created = res.data as Record<string, unknown>;
+		const created = answered(res.data);
 		expect(created.issuer).toBe(idp.issuer);
 		expect(created.tenant).toBe(TENANT);
 		expect(created.displayName).toBe('Microsoft');
 		// Indistinguishable from one configured field by field: nothing records the route that made it.
-		expect(created.catalogueId).toBeUndefined();
+		expect(created).not.toHaveProperty('catalogueId');
 	});
 
 	it('refuses an organisation identifier that cannot be one, naming it, and stores nothing', async () => {
@@ -242,7 +237,7 @@ describe('connecting Microsoft, Apple or GitHub', () => {
 			);
 
 		expect(res.status).toBe(201);
-		const created = res.data as Record<string, unknown>;
+		const created = answered(res.data);
 		expect(created.issuer).toBe(idp.issuer);
 		// Readable, so an administrator whose key was revoked can tell which one to replace.
 		expect(created.keyId).toBe(idp.keyId);
@@ -326,7 +321,7 @@ describe('connecting Microsoft, Apple or GitHub', () => {
 		 * send an administrator looking for something that does not exist.
 		 */
 		expect(res.status).toBe(201);
-		const created = res.data as Record<string, unknown>;
+		const created = answered(res.data);
 		expect(created.issuer).toBe('https://github.com');
 		expect(created.scopes).toEqual(['read:user', 'user:email']);
 	});

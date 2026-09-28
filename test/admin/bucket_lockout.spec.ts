@@ -18,6 +18,7 @@ import {
 } from 'lib/admin/consts.ts';
 import type { FederationProvider } from 'lib/federation/types.ts';
 import { sessionFor } from '../admin_session.ts';
+import { answered } from './answered.ts';
 
 /*
  * A bucket nobody can sign into must not be reachable through the management API.
@@ -158,7 +159,7 @@ describe('a bucket must keep some way to sign in', () => {
 		);
 
 		expect(res.status).toBe(201);
-		expect((res.data as { passwordLogin?: boolean })?.passwordLogin).toBe(true);
+		expect(answered(res.data).passwordLogin).toBe(true);
 	});
 
 	it('refuses password sign-in changes on the reserved admin bucket', async () => {

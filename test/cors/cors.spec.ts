@@ -107,8 +107,8 @@ export async function seedProjectWithOrigins(
 
 export async function destroySeededProjects() {
 	const store = getProjectStore();
-	while (createdProjects.length) {
-		await store.destroy(createdProjects.pop() as string);
+	for (const id of createdProjects.splice(0)) {
+		await store.destroy(id);
 	}
 }
 

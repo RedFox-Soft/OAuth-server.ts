@@ -29,6 +29,7 @@ import { Client } from 'lib/models/client.js';
 import { adapter } from 'lib/adapters/index.js';
 import { clientNotifications } from 'lib/shared/client_notifications.ts';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
+import { present } from 'test/shape.js';
 
 // Decode a JWS compact serialization sent as `logout_token=<jwt>` in the POST body.
 // The old test relied on RegExp.$1 side effects of chai's `.match`; bun's matchers don't set
@@ -277,12 +278,18 @@ describe('Back-Channel Logout 1.0', () => {
 			expect(response.status).toBe(303);
 
 			{
-				const { sid } = session.authorizations.client;
+				const { sid } = present(
+					session.authorizations?.client,
+					'the client authorization'
+				);
 				expect(logout).toHaveBeenCalledWith(client, accountId, sid);
 				expect(successSpy).toHaveBeenCalledTimes(1);
 			}
 			{
-				const { sid } = session.authorizations['second-client'];
+				const { sid } = present(
+					session.authorizations?.['second-client'],
+					'the second client authorization'
+				);
 				expect(logout).toHaveBeenCalledWith(client2, accountId, sid);
 				expect(errorSpy).toHaveBeenCalledTimes(1);
 			}
@@ -301,7 +308,10 @@ describe('Back-Channel Logout 1.0', () => {
 			const logout = spyOn(clientNotifications, 'logout');
 
 			const { accountId } = session;
-			const { sid } = session.authorizations.client;
+			const { sid } = present(
+				session.authorizations?.client,
+				'the client authorization'
+			);
 
 			mockHttp('https://client.example.com')
 				.intercept({ path: '/backchannel_logout', method: 'POST' })

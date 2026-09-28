@@ -7,6 +7,8 @@ import {
 } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
+import { shaped } from 'test/shape.js';
+import { Type } from '@sinclair/typebox';
 
 async function cookieFor(roles: string[]): Promise<string> {
 	const user = await getUserStore(ADMIN_BUCKET_ID).create(
@@ -34,7 +36,7 @@ describe('admin UI shell', () => {
 
 	it('serves the setup screen when no super_admin exists', async () => {
 		const res = await agent.admin.get();
-		const html = res.data as unknown as string;
+		const html = shaped(Type.String(), res.data);
 		expect(res.response.headers.get('content-type')).toContain('text/html');
 		expect(html).toContain('window.PROPS');
 		expect(html).toContain('"needsSetup":true');
@@ -68,13 +70,14 @@ describe('admin UI shell', () => {
 		const superAdmin = await agent.admin.get({
 			headers: { cookie: await cookieFor(['super_admin']) }
 		});
-		expect(superAdmin.data as unknown as string).toContain('Settings');
-		expect(superAdmin.data as unknown as string).toContain('Keys');
+		const superShell = shaped(Type.String(), superAdmin.data);
+		expect(superShell).toContain('Settings');
+		expect(superShell).toContain('Keys');
 
 		const projectAdmin = await agent.admin.get({
 			headers: { cookie: await cookieFor(['project_admin']) }
 		});
-		const shell = projectAdmin.data as unknown as string;
+		const shell = shaped(Type.String(), projectAdmin.data);
 		expect(shell).not.toContain('Settings');
 		expect(shell).not.toContain('Faults');
 		// ...but the tenant's own surfaces are offered, including the two this feature unblocked.

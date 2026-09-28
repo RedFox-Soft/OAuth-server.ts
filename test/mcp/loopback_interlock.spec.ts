@@ -27,6 +27,8 @@ import { resolver } from 'lib/client_metadata_document/fetch.ts';
 import { serveDocument, mock } from '../cimd/document_host.js';
 import { sessionFor } from '../admin_session.ts';
 import { clearPermissions } from './permissions.ts';
+import { shaped } from 'test/shape.js';
+import { Type } from '@sinclair/typebox';
 
 /*
  * Granting a client identity administrative authority, and the one thing an operator has to be told
@@ -111,9 +113,12 @@ describe('permitting a client identity through the admin API', () => {
 		);
 
 		expect(res.status).toBe(201);
-		expect(
-			(res.data as { loopbackAcknowledged?: boolean }).loopbackAcknowledged
-		).toBe(false);
+		// The route's data type also carries the admin error body its onError answers with.
+		const entry = res.data;
+		if (!entry || 'error' in entry) {
+			throw new Error(`expected a permission entry: ${JSON.stringify(entry)}`);
+		}
+		expect(entry.loopbackAcknowledged).toBe(false);
 	});
 
 	/*
@@ -132,9 +137,9 @@ describe('permitting a client identity through the admin API', () => {
 		);
 
 		expect(res.status).toBe(409);
-		expect((res.error?.value as { message?: string })?.message).toBe(
-			LOOPBACK_ACKNOWLEDGEMENT
-		);
+		expect(
+			shaped(Type.Object({ message: Type.String() }), res.error?.value).message
+		).toBe(LOOPBACK_ACKNOWLEDGEMENT);
 		expect(await mcpClientPermissionStore.list()).toEqual([]);
 	});
 

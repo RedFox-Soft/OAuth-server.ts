@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll } from 'bun:test';
+import { Type } from '@sinclair/typebox';
 import bootstrap, {
 	SESSION_COOKIE_PREFIX,
 	agent,
@@ -16,6 +17,7 @@ import { decodeBase32 } from 'lib/totp/base32.ts';
 import { hotp, stepFor } from 'lib/totp/code.ts';
 import epochTime from 'lib/helpers/epoch_time.ts';
 import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { shaped } from 'test/shape.js';
 
 const PASSWORD = 'correct horse battery';
 
@@ -72,7 +74,10 @@ async function getPage(path: string, cookie: string) {
 function secretFrom(html: string): string {
 	const props = /window\.PROPS=(\{.*?\})<\/script>/s.exec(html)?.[1];
 	if (!props) throw new Error('the enrolment page carried no props script');
-	const parsed = JSON.parse(props) as { secretText?: string };
+	const parsed = shaped(
+		Type.Object({ secretText: Type.Optional(Type.String()) }),
+		JSON.parse(props)
+	);
 	if (!parsed.secretText) throw new Error('the props carried no secret');
 	return parsed.secretText.replace(/\s+/g, '');
 }

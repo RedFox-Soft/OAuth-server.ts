@@ -1,4 +1,5 @@
 import { describe, beforeAll, it, expect } from 'bun:test';
+import { Type } from '@sinclair/typebox';
 
 import bootstrap, { agent } from '../test_helper.js';
 import { ClientDefaults } from 'lib/configs/clientBase.js';
@@ -7,6 +8,7 @@ import snakeCase from 'lib/helpers/_/snake_case.ts';
 import { CLIENT_METADATA_WIRE_MAP } from 'lib/models/client/wire.ts';
 import camelCase from 'lib/helpers/_/camel_case.ts';
 import { ALWAYS_PRESENT } from 'lib/models/client/types.ts';
+import { shaped } from 'test/shape.js';
 
 const json = { 'content-type': 'application/json' };
 const REDIRECT = 'https://client.example.com/cb';
@@ -71,7 +73,7 @@ describe('registering without the defaulted attributes', () => {
 		);
 
 		expect(status).toBe(201);
-		const echoed = data as Record<string, unknown>;
+		const echoed = shaped(Type.Record(Type.String(), Type.Unknown()), data);
 		for (const [name, value] of defaults) {
 			const wire = wireName(name);
 			expect({ [wire]: echoed[wire] }).toEqual({ [wire]: value });

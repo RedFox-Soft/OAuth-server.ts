@@ -14,6 +14,7 @@ import {
 } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
+import { answered } from './answered.ts';
 
 /*
  * The audit trail for protected-resource operations, and the one cascade a project delete performs.
@@ -156,9 +157,7 @@ describe('protected resource audit trail', () => {
 			.delete(undefined, { headers });
 
 		expect(deleted.status).toBe(200);
-		expect(
-			(deleted.data as { resourcesRemoved?: number }).resourcesRemoved
-		).toBe(2);
+		expect(answered(deleted.data).resourcesRemoved).toBe(2);
 		expect(
 			await getProtectedResourceStore().listByProject(project._id)
 		).toEqual([]);

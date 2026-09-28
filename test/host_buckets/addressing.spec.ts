@@ -10,12 +10,16 @@ import {
 import { elysia } from 'lib/index.ts';
 import { forgetBucketAddresses } from 'lib/admin/auth/bucketAddress.ts';
 import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { Type } from '@sinclair/typebox';
+import { present, shaped } from 'test/shape.ts';
 
 const PASSWORD = 'correct horse battery';
 
 const TENANT_HOST = 'acme.e.ly';
 const OTHER_HOST = 'globex.e.ly';
 const UNCLAIMED_HOST = 'nobody.e.ly';
+
+const Metadata = Type.Object({ issuer: Type.String() });
 
 let tenantBucketId: string;
 let otherBucketId: string;
@@ -135,13 +139,19 @@ describe('a bucket addressed by a host of its own (US1)', () => {
 		const response = await at(TENANT_HOST, '/.well-known/openid-configuration');
 		expect(response.status).toBe(200);
 
-		const metadata = (await response.json()) as Record<string, string>;
+		const metadata = shaped(Metadata, await response.json());
 		expect(metadata.issuer).toBe(`http://${TENANT_HOST}`);
 	});
 
 	it('advertises endpoints beneath that origin with no bucket segment in any of them', async () => {
 		const response = await at(TENANT_HOST, '/.well-known/openid-configuration');
-		const metadata = (await response.json()) as Record<string, string>;
+		const metadata = shaped(
+			Type.Object({
+				authorization_endpoint: Type.String(),
+				token_endpoint: Type.String()
+			}),
+			await response.json()
+		);
 
 		expect(metadata.authorization_endpoint).toBe(`http://${TENANT_HOST}/auth`);
 		expect(metadata.token_endpoint).toBe(`http://${TENANT_HOST}/token`);
@@ -149,7 +159,7 @@ describe('a bucket addressed by a host of its own (US1)', () => {
 
 	it('serves a different bucket at a different host on the same deployment', async () => {
 		const response = await at(OTHER_HOST, '/.well-known/openid-configuration');
-		const metadata = (await response.json()) as Record<string, string>;
+		const metadata = shaped(Metadata, await response.json());
 
 		expect(metadata.issuer).toBe(`http://${OTHER_HOST}`);
 	});
@@ -165,7 +175,7 @@ describe('a bucket addressed by a host of its own (US1)', () => {
 		);
 		expect(response.status).toBe(200);
 
-		const metadata = (await response.json()) as Record<string, string>;
+		const metadata = shaped(Metadata, await response.json());
 		expect(metadata.issuer).toBe(`http://${TENANT_HOST}`);
 	});
 
@@ -195,7 +205,7 @@ describe('a bucket addressed by a host of its own (US1)', () => {
 		const response = await elysia.handle(
 			new Request('http://e.ly/.well-known/openid-configuration')
 		);
-		const metadata = (await response.json()) as Record<string, string>;
+		const metadata = shaped(Metadata, await response.json());
 
 		expect(metadata.issuer).toBe('http://e.ly');
 	});
@@ -215,9 +225,10 @@ describe('a bucket addressed by a host of its own (US1)', () => {
 			email
 		);
 
-		const metadata = (await (
-			await at(TENANT_HOST, '/.well-known/openid-configuration')
-		).json()) as Record<string, string>;
+		const metadata = shaped(
+			Metadata,
+			await (await at(TENANT_HOST, '/.well-known/openid-configuration')).json()
+		);
 		expect(metadata.issuer).toBe(`http://${TENANT_HOST}`);
 		/* RFC 9207: the authorization response names the issuer the client discovered. */
 		expect(new URL(location).searchParams.get('iss')).toBe(metadata.issuer);
@@ -319,7 +330,11 @@ describe('a bucket addressed by a host of its own (US1)', () => {
 			'/auth?client_id=other-host-bucket-app&scope=openid&response_type=code' +
 				`&code_challenge=${challenge}&code_challenge_method=S256` +
 				`&redirect_uri=${encodeURIComponent(REDIRECTS['other-host-bucket-app'])}`,
-			{ headers: { cookie: (setCookie as string).split(';')[0] } }
+			{
+				headers: {
+					cookie: present(setCookie, 'a session cookie').split(';')[0]
+				}
+			}
 		);
 
 		/* An established session skips the login screen; a rejected one does not. */

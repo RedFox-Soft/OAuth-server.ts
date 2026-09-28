@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { Elysia } from 'elysia';
+import { Type, type Static } from '@sinclair/typebox';
 
 import { ApplicationConfig } from 'lib/configs/application.ts';
 import { errorHandler } from 'lib/shared/authorization_error_handler.ts';
@@ -12,6 +13,7 @@ import {
 	resetForTest as resetDispatch
 } from 'lib/sentry/dispatch.ts';
 import { clearRecorded, recordedEnvelopes } from 'lib/sentry/transport.ts';
+import { shaped } from 'test/shape.js';
 
 /*
  * What does not leave this server, asserted over the envelopes that would have been delivered.
@@ -47,12 +49,20 @@ const previous = {
 	dsn: ApplicationConfig['sentry.dsn']
 };
 
-function capturedEvents(): Record<string, unknown>[] {
-	const events: Record<string, unknown>[] = [];
+/* What this file reads off an outbound event; values stay unknown so the leak assertions judge them. */
+const CapturedEvent = Type.Object({
+	tags: Type.Record(Type.String(), Type.Unknown()),
+	contexts: Type.Object({
+		fault: Type.Record(Type.String(), Type.Unknown())
+	})
+});
+
+function capturedEvents(): Static<typeof CapturedEvent>[] {
+	const events: Static<typeof CapturedEvent>[] = [];
 	for (const [, items] of recordedEnvelopes()) {
-		for (const [header, payload] of items as [{ type?: string }, unknown][]) {
-			if (header?.type === 'event') {
-				events.push(payload as Record<string, unknown>);
+		for (const [header, payload] of items) {
+			if (header.type === 'event') {
+				events.push(shaped(CapturedEvent, payload));
 			}
 		}
 	}
@@ -196,8 +206,7 @@ describe('sentry redaction', () => {
 			)
 		);
 
-		const fault = (capturedEvents()[0].contexts as Record<string, unknown>)
-			.fault as Record<string, unknown>;
+		const fault = capturedEvents()[0].contexts.fault;
 		expect(fault.submittedFields).toContain('state');
 		expect(JSON.stringify(fault.submittedFields)).not.toContain(
 			SENTINELS.state
@@ -231,8 +240,7 @@ describe('sentry redaction', () => {
 			})
 		);
 
-		const fault = (capturedEvents()[0].contexts as Record<string, unknown>)
-			.fault as Record<string, unknown>;
+		const fault = capturedEvents()[0].contexts.fault;
 		expect(fault.origin).toBe('not-captured');
 		expect(serialized()).not.toContain(SENTINELS.address);
 	});
@@ -245,8 +253,7 @@ describe('sentry redaction', () => {
 			})
 		);
 
-		const fault = (capturedEvents()[0].contexts as Record<string, unknown>)
-			.fault as Record<string, unknown>;
+		const fault = capturedEvents()[0].contexts.fault;
 		expect(fault.origin).toBeTruthy();
 		expect(fault.origin).not.toBe(SENTINELS.address);
 		expect(serialized()).not.toContain(SENTINELS.address);
@@ -261,8 +268,7 @@ describe('sentry redaction', () => {
 			})
 		);
 
-		const fault = (capturedEvents()[0].contexts as Record<string, unknown>)
-			.fault as Record<string, unknown>;
+		const fault = capturedEvents()[0].contexts.fault;
 		expect(fault.origin).toBe(SENTINELS.address);
 	});
 
@@ -302,7 +308,7 @@ describe('sentry redaction', () => {
 		await flushForTest();
 		await flushSentry();
 
-		const tags = capturedEvents()[0].tags as Record<string, string>;
+		const tags = capturedEvents()[0].tags;
 		expect(tags.route).toBe('/redact-pattern/:id');
 		expect(serialized()).not.toContain('ZZobjectidZZ');
 	});
@@ -318,8 +324,7 @@ describe('sentry redaction', () => {
 	it('carries a code location but never a stack', async () => {
 		await provoke('/redact-frames', new Request('http://e.ly/redact-frames'));
 		const [event] = capturedEvents();
-		const fault = (event.contexts as Record<string, Record<string, unknown>>)
-			.fault;
+		const fault = event.contexts.fault;
 
 		expect(fault.codeLocation).toBeDefined();
 
@@ -351,8 +356,7 @@ describe('sentry redaction', () => {
 		await flushSentry();
 
 		const [event] = capturedEvents();
-		const fault = (event.contexts as Record<string, Record<string, unknown>>)
-			.fault;
+		const fault = event.contexts.fault;
 		expect(JSON.stringify(fault.codeLocation)).not.toContain(
 			SENTINELS.password
 		);
@@ -378,7 +382,7 @@ describe('sentry redaction', () => {
 		await flushForTest();
 		await flushSentry();
 
-		const tags = capturedEvents()[0].tags as Record<string, string>;
+		const tags = capturedEvents()[0].tags;
 		const values = JSON.stringify(Object.values(tags));
 		expect(values).not.toContain('ZZtagpathZZ');
 		expect(values).not.toContain(SENTINELS.state);

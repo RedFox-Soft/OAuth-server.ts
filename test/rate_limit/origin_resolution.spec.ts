@@ -11,7 +11,7 @@ import {
 	send
 } from './helper.js';
 
-const STRICT = () => ApplicationConfig['rateLimit.strict.max'] as number;
+const STRICT = () => ApplicationConfig['rateLimit.strict.max'];
 const STRICT_PATH = '/token';
 
 const post = { method: 'POST' };

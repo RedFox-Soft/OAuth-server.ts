@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { SETTINGS_CATALOG, appliesOnSave } from 'lib/admin/settings/catalog.ts';
 import { ApplicationConfig } from 'lib/configs/application.ts';
+import { present } from 'test/shape.js';
 
 /**
  * @proves Every operator-editable setting exists, is described, and carries the argument for
@@ -205,7 +206,7 @@ describe('settings catalog', () => {
 	 */
 	it('every setting states whether it takes effect when saved, and every exception states why', () => {
 		for (const d of SETTINGS_CATALOG) {
-			expect(appliesOnSave(d.key as string)).toBe(d.apply !== 'restart');
+			expect(appliesOnSave(d.key)).toBe(d.apply !== 'restart');
 			if (d.apply === 'restart') {
 				expect(d.restartReason?.trim()).toBeTruthy();
 			} else {
@@ -219,13 +220,11 @@ describe('settings catalog', () => {
 		const details = SETTINGS_CATALOG.filter((d) => d.dependsOn);
 		expect(details.length).toBeGreaterThan(0);
 		for (const d of details) {
+			const parentKey = present(d.dependsOn, `a dependsOn on ${d.key}`);
 			expect(
-				Object.prototype.hasOwnProperty.call(
-					ApplicationConfig,
-					d.dependsOn as string
-				)
+				Object.prototype.hasOwnProperty.call(ApplicationConfig, parentKey)
 			).toBe(true);
-			const parent = byKey.get(d.dependsOn as keyof typeof ApplicationConfig);
+			const parent = byKey.get(parentKey);
 			expect(parent).toBeDefined();
 			expect(parent?.type).toBe('boolean');
 			expect(parent?.group).toBe(d.group);

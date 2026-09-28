@@ -13,6 +13,8 @@ import {
 	MCP_ROUTE
 } from 'lib/mcp/consts.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
+import { shaped } from 'test/shape.js';
+import { Type } from '@sinclair/typebox';
 
 /*
  * US5 — the agent's view of recorded faults.
@@ -74,7 +76,7 @@ async function agentFor(roles: string[]) {
 		scope: 'openid'
 	});
 	at.setAudience(MCP_RESOURCE);
-	const token = (await at.save()) as unknown as string;
+	const token = await at.save();
 	const init = await rpc(
 		{
 			jsonrpc: '2.0',
@@ -125,10 +127,21 @@ async function seedFault(route: string) {
  * A read tool returns its payload as JSON in the text content — that is what an agent reads, so it is
  * what this asserts against rather than the structured mirror, which reads do not populate.
  */
+const ToolResult = Type.Object({
+	content: Type.Optional(
+		Type.Array(
+			Type.Object({ type: Type.String(), text: Type.Optional(Type.String()) })
+		)
+	)
+});
+
 function payload(result: unknown): Record<string, unknown> {
-	const r = result as { content?: { type: string; text?: string }[] };
-	const text = r.content?.find((part) => part.type === 'text')?.text;
-	return text ? (JSON.parse(text) as Record<string, unknown>) : {};
+	const text = shaped(ToolResult, result).content?.find(
+		(part) => part.type === 'text'
+	)?.text;
+	return text
+		? shaped(Type.Record(Type.String(), Type.Unknown()), JSON.parse(text))
+		: {};
 }
 
 /**

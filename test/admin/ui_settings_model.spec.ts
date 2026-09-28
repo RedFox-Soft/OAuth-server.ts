@@ -140,13 +140,11 @@ describe('settings model', () => {
 			const seen: string[] = [];
 			for (const domain of SETTING_DOMAINS) {
 				for (const g of groupsFor(SETTINGS_CATALOG, domain.id)) {
-					if (g.primary) seen.push(g.primary.key as string);
-					for (const r of g.rows) seen.push(r.key as string);
+					if (g.primary) seen.push(g.primary.key);
+					for (const r of g.rows) seen.push(r.key);
 				}
 			}
-			expect(seen.sort()).toEqual(
-				SETTINGS_CATALOG.map((x) => x.key as string).sort()
-			);
+			expect(seen.sort()).toEqual(SETTINGS_CATALOG.map((x) => x.key).sort());
 		});
 	});
 
@@ -584,12 +582,10 @@ describe('settings model', () => {
 		 */
 		it('agrees with the description at the shipped defaults', () => {
 			const rate = throttleRate({
-				'loginThrottle.failureCap': ApplicationConfig[
-					'loginThrottle.failureCap'
-				] as number,
-				'loginThrottle.windowCeilingSeconds': ApplicationConfig[
-					'loginThrottle.windowCeilingSeconds'
-				] as number
+				'loginThrottle.failureCap':
+					ApplicationConfig['loginThrottle.failureCap'],
+				'loginThrottle.windowCeilingSeconds':
+					ApplicationConfig['loginThrottle.windowCeilingSeconds']
 			});
 			expect(rate?.guessesPerDay).toBe(120);
 		});

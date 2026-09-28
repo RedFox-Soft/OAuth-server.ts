@@ -20,7 +20,7 @@ describe('environment variable inventory', () => {
 	for (const rel of new Glob('**/*.{ts,tsx}').scanSync({ cwd: libRoot })) {
 		const source = readFileSync(resolve(libRoot, rel), 'utf8');
 		for (const match of source.matchAll(/process\.env\.([A-Z][A-Z0-9_]*)/g)) {
-			referenced.add(match[1] as string);
+			referenced.add(match[1]);
 		}
 	}
 

@@ -18,6 +18,7 @@ import {
 } from 'lib/admin/consts.ts';
 import type { UserBucket } from 'lib/adapters/types.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
+import { answered } from './answered.ts';
 
 const app = new Elysia().use(resolveAdmin).use(bucketRoutes).use(endUserRoutes);
 const client = treaty(app);
@@ -68,23 +69,23 @@ describe('end-user API', () => {
 				{ headers: { cookie } }
 			);
 		expect(created.status).toBe(201);
-		const body = created.data as Record<string, unknown>;
-		expect(body.password).toBeUndefined();
+		const body = answered(created.data);
+		expect(body).not.toHaveProperty('password');
 		expect(body.verified).toBe(true);
-		const uid = body._id as string;
+		const uid = body._id;
 
 		const list = await client.admin.api
 			.buckets({ id: bucket._id })
 			.users.get({ headers: { cookie } });
-		const users = list.data as Array<Record<string, unknown>>;
+		const users = answered(list.data);
 		expect(users.some((u) => u._id === uid)).toBe(true);
-		expect(users.every((u) => u.password === undefined)).toBe(true);
+		expect(users.every((u) => !('password' in u))).toBe(true);
 
 		const patched = await client.admin.api
 			.buckets({ id: bucket._id })
 			.users({ uid })
 			.patch({ active: false }, { headers: { cookie } });
-		expect((patched.data as Record<string, unknown>).active).toBe(false);
+		expect(answered(patched.data).active).toBe(false);
 
 		const del = await client.admin.api
 			.buckets({ id: bucket._id })
@@ -128,7 +129,7 @@ describe('end-user API', () => {
 				{ email: 'pw@x.io', password: 'supersecret' },
 				{ headers: { cookie } }
 			);
-		const uid = (created.data as Record<string, unknown>)._id as string;
+		const uid = answered(created.data)._id;
 		const before = (await getUserStore(bucket._id).find(uid))?.password;
 		const res = await client.admin.api
 			.buckets({ id: bucket._id })

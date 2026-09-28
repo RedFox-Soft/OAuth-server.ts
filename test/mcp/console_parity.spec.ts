@@ -24,6 +24,8 @@ import {
 import { mcpCatalogue, pathArgName } from 'lib/mcp/catalogue.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
+import { shaped } from 'test/shape.js';
+import { Type } from '@sinclair/typebox';
 
 /*
  * SC-002 / FR-025: an operator reading the agent's answer and the console side by side sees the same
@@ -77,7 +79,7 @@ async function principal() {
 		scope: 'openid'
 	});
 	at.setAudience(MCP_RESOURCE);
-	const token = (await at.save()) as unknown as string;
+	const token = await at.save();
 	const session = await sessionFor(user);
 	await rpc(
 		{
@@ -105,11 +107,14 @@ const VOLATILE = new Set(['updatedAt', 'createdAt']);
  */
 const AGENT_ONLY = 'viaClientId';
 
+// A whoami answer, read field by field on both surfaces.
+const Fields = Type.Record(Type.String(), Type.Unknown());
+
 function stripVolatile(value: unknown): unknown {
 	if (Array.isArray(value)) return value.map(stripVolatile);
 	if (value && typeof value === 'object') {
 		return Object.fromEntries(
-			Object.entries(value as Record<string, unknown>)
+			Object.entries(value)
 				.filter(([k]) => !VOLATILE.has(k))
 				.map(([k, v]) => [k, stripVolatile(v)])
 		);
@@ -162,9 +167,10 @@ describe('agent answers match the console, field for field', () => {
 			},
 			token
 		);
-		const clientId = (
-			created.result?.structuredContent?.result as { clientId: string }
-		).clientId;
+		const { clientId } = shaped(
+			Type.Object({ clientId: Type.String() }),
+			created.result?.structuredContent?.result
+		);
 		const endUser = await getUserStore(bucket._id).create(
 			`member-${Math.random()}@x.io`,
 			'hash',
@@ -220,20 +226,18 @@ describe('agent answers match the console, field for field', () => {
 			).not.toBe(true);
 			const viaAgent = agentResponse.result?.structuredContent?.result;
 
-			const agentPayload = stripVolatile(viaAgent) as Record<string, unknown>;
-			const consolePayload = stripVolatile(viaConsole) as Record<
-				string,
-				unknown
-			>;
+			const agentPayload = stripVolatile(viaAgent);
+			const consolePayload = stripVolatile(viaConsole);
 
 			let comparable = agentPayload;
 			if (tool.tool === 'whoami') {
-				expect(agentPayload[AGENT_ONLY]).toBe(ADMIN_MCP_CLIENT_ID);
-				expect(consolePayload[AGENT_ONLY]).toBeUndefined();
+				const agentWhoami = shaped(Fields, agentPayload);
+				expect(agentWhoami[AGENT_ONLY]).toBe(ADMIN_MCP_CLIENT_ID);
+				expect(shaped(Fields, consolePayload)[AGENT_ONLY]).toBeUndefined();
 				// Rebuilt without the field rather than deleted from it: the payload is the assertion's
 				// subject, and mutating it would make a later failure harder to read.
 				comparable = Object.fromEntries(
-					Object.entries(agentPayload).filter(([k]) => k !== AGENT_ONLY)
+					Object.entries(agentWhoami).filter(([k]) => k !== AGENT_ONLY)
 				);
 			}
 
@@ -262,7 +266,7 @@ describe('agent answers match the console, field for field', () => {
 			scope: 'openid'
 		});
 		at.setAudience(MCP_RESOURCE);
-		const token = (await at.save()) as unknown as string;
+		const token = await at.save();
 		const session = await sessionFor(user);
 		const cookie = `${ADMIN_SESSION_COOKIE}=${session._id}`;
 
@@ -277,7 +281,10 @@ describe('agent answers match the console, field for field', () => {
 				headers: { cookie }
 			})
 		);
-		const consoleBody = (await httpRes.json()) as { message?: string };
+		const consoleBody = shaped(
+			Type.Object({ message: Type.Optional(Type.String()) }),
+			await httpRes.json()
+		);
 
 		const agentResponse = await rpc(
 			{

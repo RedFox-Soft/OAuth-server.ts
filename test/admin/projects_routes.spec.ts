@@ -16,8 +16,12 @@ import {
 	ADMIN_SESSION_COOKIE,
 	UNASSIGNED_GROUP_ID
 } from 'lib/admin/consts.ts';
-import type { Project } from 'lib/adapters/types.ts';
+import { Type } from '@sinclair/typebox';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
+import { shaped } from 'test/shape.js';
+import { answered } from './answered.ts';
+
+const MessageBody = Type.Object({ message: Type.String() });
 
 const app = new Elysia().use(resolveAdmin).use(projectRoutes);
 const client = treaty(app);
@@ -54,8 +58,8 @@ describe('projects API', () => {
 		);
 		expect(created.status).toBe(201);
 		const list = await client.admin.api.projects.get({ headers: { cookie } });
-		const projects = list.data as Project[] | undefined;
-		expect(projects?.some((p) => p.slug === 'acme')).toBe(true);
+		const projects = answered(list.data);
+		expect(projects.some((p) => p.slug === 'acme')).toBe(true);
 	});
 
 	/*
@@ -72,7 +76,7 @@ describe('projects API', () => {
 			{ headers: { cookie: pa.cookie } }
 		);
 		expect(mine.status).toBe(201);
-		expect((mine.data as Project).ownerGroupId).toBe(
+		expect(answered(mine.data).ownerGroupId).toBe(
 			await personalGroupId(pa.userId)
 		);
 
@@ -86,16 +90,18 @@ describe('projects API', () => {
 		const list = await client.admin.api.projects.get({
 			headers: { cookie: pa.cookie }
 		});
-		const projects = list.data as Project[] | undefined;
-		expect(projects?.map((p) => p.slug)).toEqual(['mine']);
+		const projects = answered(list.data);
+		expect(projects.map((p) => p.slug)).toEqual(['mine']);
 
 		// The super admin still sees both.
 		const all = await client.admin.api.projects.get({
 			headers: { cookie: superSession.cookie }
 		});
-		expect((all.data as Project[]).map((p) => p.slug).sort()).toContain(
-			'other'
-		);
+		expect(
+			answered(all.data)
+				.map((p) => p.slug)
+				.sort()
+		).toContain('other');
 	});
 
 	it('never lists the admin project, even for a manager of it', async () => {
@@ -106,9 +112,9 @@ describe('projects API', () => {
 		const list = await client.admin.api.projects.get({
 			headers: { cookie: pa.cookie }
 		});
-		const projects = list.data as Project[] | undefined;
+		const projects = answered(list.data);
 		expect(
-			projects?.some((p) => p.type === 'admin' || p._id === ADMIN_PROJECT_ID)
+			projects.some((p) => p.type === 'admin' || p._id === ADMIN_PROJECT_ID)
 		).toBe(false);
 	});
 
@@ -245,7 +251,7 @@ describe('projects API', () => {
 			);
 
 			expect(created.status).toBe(201);
-			expect((created.data as Project).corsOrigins).toEqual([
+			expect(answered(created.data).corsOrigins).toEqual([
 				'https://app.example.com'
 			]);
 		});
@@ -260,7 +266,7 @@ describe('projects API', () => {
 				{ headers: { cookie } }
 			);
 
-			expect((created.data as Project).corsOrigins).toEqual([]);
+			expect(answered(created.data).corsOrigins).toEqual([]);
 		});
 
 		it('replaces the list on patch, and clears it with an empty array', async () => {
@@ -279,14 +285,14 @@ describe('projects API', () => {
 					{ headers: { cookie } }
 				);
 			expect(replaced.status).toBe(200);
-			expect((replaced.data as Project).corsOrigins).toEqual([
+			expect(answered(replaced.data).corsOrigins).toEqual([
 				'https://new.example.com'
 			]);
 
 			const cleared = await client.admin.api
 				.projects({ id: project._id })
 				.patch({ corsOrigins: [] }, { headers: { cookie } });
-			expect((cleared.data as Project).corsOrigins).toEqual([]);
+			expect(answered(cleared.data).corsOrigins).toEqual([]);
 		});
 
 		it('leaves the list untouched when the key is omitted', async () => {
@@ -302,7 +308,7 @@ describe('projects API', () => {
 				.projects({ id: project._id })
 				.patch({ name: 'Renamed' }, { headers: { cookie } });
 
-			expect((renamed.data as Project).corsOrigins).toEqual([
+			expect(answered(renamed.data).corsOrigins).toEqual([
 				'https://keep.example.com'
 			]);
 		});
@@ -318,7 +324,7 @@ describe('projects API', () => {
 				{ headers: { cookie } }
 			);
 
-			expect((created.data as Project).corsOrigins).toEqual([
+			expect(answered(created.data).corsOrigins).toEqual([
 				'https://app.example.com'
 			]);
 		});
@@ -348,7 +354,7 @@ describe('projects API', () => {
 
 			expect(res.status).toBe(400);
 			expect(res.error?.value).toMatchObject({ error: 'admin_error' });
-			expect((res.error?.value as { message: string }).message).toContain(
+			expect(shaped(MessageBody, res.error?.value).message).toContain(
 				JSON.stringify(origin)
 			);
 			// All-or-nothing: the stored list must be exactly as it was.
@@ -441,7 +447,7 @@ describe('projects API', () => {
 				);
 
 			expect(res.status).toBe(403);
-			expect((res.error?.value as { message: string }).message).toBe(
+			expect(shaped(MessageBody, res.error?.value).message).toBe(
 				'cannot modify admin project'
 			);
 		});

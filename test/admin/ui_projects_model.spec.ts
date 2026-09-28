@@ -1,11 +1,22 @@
 import { describe, it, expect } from 'bun:test';
 import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { assignableBuckets } from 'lib/admin/ui/projects/model.ts';
+import type { UserBucket } from 'lib/adapters/types.ts';
 
-const bucket = (id: string, ownerGroupId: string) =>
-	({ _id: id, name: id, ownerGroupId }) as Parameters<
-		typeof assignableBuckets
-	>[0][number];
+const bucket = (id: string, ownerGroupId: string): UserBucket => ({
+	_id: id,
+	name: id,
+	ownerGroupId,
+	roles: [],
+	passwordLogin: true,
+	federation: [],
+	registrationOpen: false,
+	emailVerificationRequired: false,
+	verificationMethod: 'link',
+	totpRequired: false,
+	createdAt: new Date(0),
+	updatedAt: new Date(0)
+});
 
 const project = { ownerGroupId: 'team-a' };
 

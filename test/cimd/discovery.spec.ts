@@ -2,6 +2,7 @@ import { describe, beforeAll, it, expect } from 'bun:test';
 
 import bootstrap, { agent } from '../test_helper.js';
 import { ApplicationConfig } from 'lib/configs/application.ts';
+import { present } from '../shape.js';
 
 /*
  * That the advertised capability follows the actual one.
@@ -13,9 +14,8 @@ import { ApplicationConfig } from 'lib/configs/application.ts';
 
 async function member() {
 	const res = await agent['.well-known']['oauth-authorization-server'].get();
-	return (res.data as Record<string, unknown> | undefined)?.[
-		'client_id_metadata_document_supported'
-	];
+	return present(res.data, 'the authorization server metadata')
+		.client_id_metadata_document_supported;
 }
 
 /**

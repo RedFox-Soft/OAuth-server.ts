@@ -13,6 +13,7 @@ import { decode as decodeJWT } from 'lib/helpers/jwt.ts';
 import { idTokenOf, refreshTokenOf } from './response.ts';
 import { encodeBase32, decodeBase32 } from 'lib/totp/base32.ts';
 import { hotp, stepFor } from 'lib/totp/code.ts';
+import { present } from 'test/shape.ts';
 import epochTime from 'lib/helpers/epoch_time.ts';
 
 const PASSWORD = 'correct horse battery';
@@ -102,7 +103,10 @@ async function codeFrom(
 		});
 	}
 	expect(res.location ?? '').toContain('/callback');
-	return new URL(res.location as string).searchParams.get('code') as string;
+	return present(
+		new URL(present(res.location, 'a redirect')).searchParams.get('code'),
+		'an authorization code'
+	);
 }
 
 function preferring(values: string, clientId = 'acr-app') {

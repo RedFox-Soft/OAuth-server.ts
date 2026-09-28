@@ -8,8 +8,8 @@ import { projectRoutes } from 'lib/admin/projects/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { getUserStore } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
-import type { AdminAuditEntry, Project } from 'lib/adapters/types.ts';
 import { sessionFor } from '../admin_session.ts';
+import { answered } from './answered.ts';
 
 /*
  * The tenant boundary of the audit trail.
@@ -25,11 +25,6 @@ const app = new Elysia()
 	.use(groupRoutes)
 	.use(projectRoutes);
 const client = treaty(app);
-
-interface AuditPage {
-	entries: AdminAuditEntry[];
-	total: number;
-}
 
 function slug(prefix: string): string {
 	return `${prefix}-${Math.random().toString(36).slice(2)}`;
@@ -57,19 +52,23 @@ describe('group-scoped audit read', () => {
 
 	it('shows a group its own container history', async () => {
 		const a = await tenant();
-		const project = (
-			await client.admin.api.projects.post(
-				{ name: 'Mine', slug: slug('m') },
-				{ headers: { cookie: a.cookie } }
-			)
-		).data as Project;
+		const project = answered(
+			(
+				await client.admin.api.projects.post(
+					{ name: 'Mine', slug: slug('m') },
+					{ headers: { cookie: a.cookie } }
+				)
+			).data
+		);
 
-		const page = (
-			await client.admin.api.audit.get({
-				query: { targetId: project._id },
-				headers: { cookie: a.cookie }
-			})
-		).data as AuditPage;
+		const page = answered(
+			(
+				await client.admin.api.audit.get({
+					query: { targetId: project._id },
+					headers: { cookie: a.cookie }
+				})
+			).data
+		);
 
 		expect(page.total).toBe(1);
 		expect(page.entries[0]!.action).toBe('project.create');
@@ -80,38 +79,46 @@ describe('group-scoped audit read', () => {
 		const a = await tenant();
 		const b = await tenant();
 
-		const theirs = (
-			await client.admin.api.projects.post(
-				{ name: 'Theirs', slug: slug('t') },
-				{ headers: { cookie: b.cookie } }
-			)
-		).data as Project;
+		const theirs = answered(
+			(
+				await client.admin.api.projects.post(
+					{ name: 'Theirs', slug: slug('t') },
+					{ headers: { cookie: b.cookie } }
+				)
+			).data
+		);
 
 		// Unfiltered.
-		const all = (
-			await client.admin.api.audit.get({
-				query: {},
-				headers: { cookie: a.cookie }
-			})
-		).data as AuditPage;
+		const all = answered(
+			(
+				await client.admin.api.audit.get({
+					query: {},
+					headers: { cookie: a.cookie }
+				})
+			).data
+		);
 		expect(JSON.stringify(all.entries)).not.toContain(theirs._id);
 
 		// Aimed straight at the other tenant's container.
-		const aimed = (
-			await client.admin.api.audit.get({
-				query: { targetId: theirs._id },
-				headers: { cookie: a.cookie }
-			})
-		).data as AuditPage;
+		const aimed = answered(
+			(
+				await client.admin.api.audit.get({
+					query: { targetId: theirs._id },
+					headers: { cookie: a.cookie }
+				})
+			).data
+		);
 		expect(aimed.total).toBe(0);
 
 		// By action, which would otherwise sweep every tenant's creations.
-		const byAction = (
-			await client.admin.api.audit.get({
-				query: { action: 'project.create' },
-				headers: { cookie: a.cookie }
-			})
-		).data as AuditPage;
+		const byAction = answered(
+			(
+				await client.admin.api.audit.get({
+					query: { action: 'project.create' },
+					headers: { cookie: a.cookie }
+				})
+			).data
+		);
 		expect(JSON.stringify(byAction.entries)).not.toContain(theirs._id);
 	});
 
@@ -122,12 +129,14 @@ describe('group-scoped audit read', () => {
 		 * Settings, keys and administrator accounts belong to no group, so no group restriction can match
 		 * them. Asserted through the action filter, which is how somebody would go looking.
 		 */
-		const page = (
-			await client.admin.api.audit.get({
-				query: { action: 'settings.update' },
-				headers: { cookie: a.cookie }
-			})
-		).data as AuditPage;
+		const page = answered(
+			(
+				await client.admin.api.audit.get({
+					query: { action: 'settings.update' },
+					headers: { cookie: a.cookie }
+				})
+			).data
+		);
 		expect(page.total).toBe(0);
 	});
 
@@ -136,7 +145,8 @@ describe('group-scoped audit read', () => {
 		const res = await client.admin.api.audit.get({
 			// A filter the schema does not know. Answering it by ignoring the parameter would return a
 			// wider trail than the caller asked for — a wrong answer wearing a 200.
-			query: { ownerGroupId: 'someone-elses-group' } as never,
+			// @ts-expect-error an undeclared filter; the route must refuse it
+			query: { ownerGroupId: 'someone-elses-group' },
 			headers: { cookie: a.cookie }
 		});
 		expect(res.status).toBe(422);
@@ -144,24 +154,28 @@ describe('group-scoped audit read', () => {
 
 	it('keeps an entry readable after the container it describes is gone', async () => {
 		const a = await tenant();
-		const project = (
-			await client.admin.api.projects.post(
-				{ name: 'Doomed', slug: slug('d') },
-				{ headers: { cookie: a.cookie } }
-			)
-		).data as Project;
+		const project = answered(
+			(
+				await client.admin.api.projects.post(
+					{ name: 'Doomed', slug: slug('d') },
+					{ headers: { cookie: a.cookie } }
+				)
+			).data
+		);
 
 		const deleted = await client.admin.api
 			.projects({ id: project._id })
 			.delete(undefined, { headers: { cookie: a.cookie } });
 		expect(deleted.status).toBe(200);
 
-		const page = (
-			await client.admin.api.audit.get({
-				query: { targetId: project._id },
-				headers: { cookie: a.cookie }
-			})
-		).data as AuditPage;
+		const page = answered(
+			(
+				await client.admin.api.audit.get({
+					query: { targetId: project._id },
+					headers: { cookie: a.cookie }
+				})
+			).data
+		);
 
 		// Creation and deletion both survive: the entry carries its group, so it does not depend on the
 		// container still existing to be attributed.
@@ -171,19 +185,23 @@ describe('group-scoped audit read', () => {
 	it('serves a super administrator the whole trail', async () => {
 		const su = await tenant(['super_admin']);
 		const a = await tenant();
-		const project = (
-			await client.admin.api.projects.post(
-				{ name: 'Someone else’s', slug: slug('x') },
-				{ headers: { cookie: a.cookie } }
-			)
-		).data as Project;
+		const project = answered(
+			(
+				await client.admin.api.projects.post(
+					{ name: 'Someone else’s', slug: slug('x') },
+					{ headers: { cookie: a.cookie } }
+				)
+			).data
+		);
 
-		const page = (
-			await client.admin.api.audit.get({
-				query: { targetId: project._id },
-				headers: { cookie: su.cookie }
-			})
-		).data as AuditPage;
+		const page = answered(
+			(
+				await client.admin.api.audit.get({
+					query: { targetId: project._id },
+					headers: { cookie: su.cookie }
+				})
+			).data
+		);
 		expect(page.total).toBe(1);
 	});
 });

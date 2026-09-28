@@ -14,6 +14,9 @@ import { ADMIN_BUCKET_ID } from 'lib/admin/consts.ts';
 import { routeNames } from 'lib/consts/param_list.ts';
 import { Session } from 'lib/models/session.ts';
 import { mintAdminIdToken } from './id_token_fixture.ts';
+import { fetchAnswering } from 'test/fetch_mock.ts';
+import { present } from 'test/shape.ts';
+import { answered } from './answered.ts';
 
 // Pull one `name=value` pair out of a Set-Cookie response header array.
 function cookiePair(setCookies: string[], name: string): string {
@@ -40,16 +43,17 @@ async function signIn(): Promise<string> {
 		'admin_oauth'
 	);
 	const params = new URL(getHeader(login.response, 'location')).searchParams;
-	const state = params.get('state') as string;
+	const state = present(params.get('state'), 'a state parameter');
 
 	const idToken = await mintAdminIdToken({
 		sub: superAdminId,
 		nonce: params.get('nonce') ?? undefined
 	});
-	fetchSpy = spyOn(globalThis, 'fetch').mockImplementation((async () => ({
-		ok: true,
-		json: async () => ({ access_token: 'x', id_token: idToken })
-	})) as unknown as typeof fetch);
+	fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
+		fetchAnswering(async () =>
+			Response.json({ access_token: 'x', id_token: idToken })
+		)
+	);
 
 	const cb = await agent.admin.callback.get({
 		query: { code: 'valid-code', state },
@@ -133,7 +137,7 @@ describe('admin OIDC login (BFF)', () => {
 			'admin_oauth'
 		);
 		const params = new URL(getHeader(login.response, 'location')).searchParams;
-		const state = params.get('state') as string;
+		const state = present(params.get('state'), 'a state parameter');
 
 		// Stub the internal token exchange: ISSUER points at a fake host in tests,
 		// so the callback's fetch(`${ISSUER}/token`) can never reach a real server.
@@ -143,10 +147,11 @@ describe('admin OIDC login (BFF)', () => {
 			sub: superAdminId,
 			nonce: params.get('nonce') ?? undefined
 		});
-		fetchSpy = spyOn(globalThis, 'fetch').mockImplementation((async () => ({
-			ok: true,
-			json: async () => ({ access_token: 'x', id_token: idToken })
-		})) as unknown as typeof fetch);
+		fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
+			fetchAnswering(async () =>
+				Response.json({ access_token: 'x', id_token: idToken })
+			)
+		);
 
 		// Include `iss` — the provider appends the RFC 9207 issuer identifier to the
 		// authorization response redirect, and the callback query schema must accept
@@ -167,15 +172,11 @@ describe('admin OIDC login (BFF)', () => {
 			headers: { cookie: sessionCookie }
 		});
 		expect(me.status).toBe(200);
-		const meData = me.data as {
-			roles: string[];
-			bucketId: string;
-			email: string;
-		} | null;
-		expect(meData?.roles).toContain('super_admin');
-		expect(meData?.bucketId).toBe(ADMIN_BUCKET_ID);
+		const meData = answered(me.data);
+		expect(meData.roles).toContain('super_admin');
+		expect(meData.bucketId).toBe(ADMIN_BUCKET_ID);
 		// The admin shell header renders the email (not the raw user id).
-		expect(meData?.email).toBe('root@x.io');
+		expect(meData.email).toBe('root@x.io');
 	});
 
 	it('logout destroys the session', async () => {
@@ -185,16 +186,17 @@ describe('admin OIDC login (BFF)', () => {
 			'admin_oauth'
 		);
 		const params = new URL(getHeader(login.response, 'location')).searchParams;
-		const state = params.get('state') as string;
+		const state = present(params.get('state'), 'a state parameter');
 
 		const idToken = await mintAdminIdToken({
 			sub: superAdminId,
 			nonce: params.get('nonce') ?? undefined
 		});
-		fetchSpy = spyOn(globalThis, 'fetch').mockImplementation((async () => ({
-			ok: true,
-			json: async () => ({ access_token: 'x', id_token: idToken })
-		})) as unknown as typeof fetch);
+		fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
+			fetchAnswering(async () =>
+				Response.json({ access_token: 'x', id_token: idToken })
+			)
+		);
 
 		const cb = await agent.admin.callback.get({
 			query: { code: 'valid-code', state },
@@ -269,7 +271,7 @@ describe('admin OIDC login (BFF)', () => {
 		const providerSession = new Session({ uid: 'logout-spec' });
 		providerSession.loginAccount({ accountId: superAdminId });
 		await providerSession.save();
-		const providerSessionId = providerSession.id as string;
+		const providerSessionId = providerSession.id;
 		expect(await Session.tryFind(providerSessionId)).toBeDefined();
 
 		const out = await agent.admin.api.logout.post(undefined, {

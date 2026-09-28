@@ -18,6 +18,7 @@ import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';
 import { Client } from 'lib/models/client.js';
 import { InvalidGrant } from 'lib/helpers/errors.js';
+import { RefreshTokenSchema } from 'lib/models/refresh_token.js';
 
 /**
  * @proves A persisted token round-trips with its lifetime intact, is refused once spent or
@@ -98,7 +99,10 @@ describe('BaseToken', () => {
 	it('a code already exchanged is refused on the second attempt', async function () {
 		const token = await new RefreshToken({ ...issued, grantId: 'foo' }).save();
 		const jti = setup.getTokenJti(token);
-		const stored = TestAdapter.for('RefreshToken').syncFind(jti);
+		const stored = TestAdapter.for('RefreshToken').syncFindAs(
+			RefreshTokenSchema,
+			jti
+		);
 		stored.consumed = true;
 		expect((await RefreshToken.find(token)).payload).toHaveProperty(
 			'consumed',

@@ -15,6 +15,8 @@ import {
 } from 'lib/admin/auth/bucketAddress.ts';
 import { forgetHostArrivals } from 'lib/admin/auth/hostArrivals.ts';
 import { sessionFor } from '../admin_session.ts';
+import { Type } from '@sinclair/typebox';
+import { shaped } from 'test/shape.ts';
 
 const app = new Elysia().use(resolveAdmin).use(bucketRoutes);
 
@@ -34,9 +36,12 @@ async function readBucket(cookie: string, id: string) {
 			headers: { cookie }
 		})
 	);
-	return (await response.json()) as {
-		address?: Record<string, unknown>;
-	};
+	return shaped(
+		Type.Object({
+			address: Type.Optional(Type.Record(Type.String(), Type.Unknown()))
+		}),
+		await response.json()
+	);
 }
 
 /* The recorder never delays a response and is therefore not awaited by its caller. A read taken in the

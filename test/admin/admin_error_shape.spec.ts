@@ -2,7 +2,9 @@ import { describe, it, expect, beforeAll } from 'bun:test';
 import { Elysia } from 'elysia';
 import { treaty } from '@elysiajs/eden';
 import { adminApp } from 'lib/admin/index.ts';
+import { Type } from '@sinclair/typebox';
 import bootstrap, { agent } from '../test_helper.js';
+import { shaped } from 'test/shape.js';
 
 // adminApp's own onError must keep request-validation failures in the admin
 // `{ error, message }` shape rather than letting them fall through to the global
@@ -19,7 +21,7 @@ describe('admin API error shape', () => {
 		// name (minLength 1) and slug (pattern) are both invalid values → VALIDATION.
 		const res = await client.admin.api.projects.post({ name: '', slug: '' });
 		expect(res.status).toBe(422);
-		const body = res.error?.value as { error?: string } | undefined;
+		const body = res.error?.value;
 		expect(body).toMatchObject({ error: 'invalid_request' });
 		expect(body).not.toHaveProperty('error_description');
 	});
@@ -39,10 +41,12 @@ describe('admin API error shape through the real app', () => {
 		const res = await agent.admin.api.projects.get();
 
 		expect(res.status).toBe(401);
-		const body = (res.data ?? res.error?.value) as
-			{ error?: string; message?: string } | undefined;
-		expect(body?.error).toBe('admin_error');
-		expect(body?.message).toBe('authentication required');
+		const body = shaped(
+			Type.Object({ error: Type.String(), message: Type.String() }),
+			res.data ?? res.error?.value
+		);
+		expect(body.error).toBe('admin_error');
+		expect(body.message).toBe('authentication required');
 		expect(body).not.toHaveProperty('error_description');
 	});
 });

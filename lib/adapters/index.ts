@@ -258,10 +258,12 @@ export type {
 
 const userStores = new Map<string, UserStoreInstance>();
 export function getUserStore(area = 'redfox'): UserStoreInstance {
-	if (!userStores.has(area)) {
-		userStores.set(area, new UserStore(area));
+	let store = userStores.get(area);
+	if (!store) {
+		store = new UserStore(area);
+		userStores.set(area, store);
 	}
-	return userStores.get(area) as UserStoreInstance;
+	return store;
 }
 
 let groupStoreSingleton: GroupStoreInstance | null = null;

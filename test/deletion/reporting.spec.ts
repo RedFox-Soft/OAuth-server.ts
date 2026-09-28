@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach, spyOn } from 'bun:test';
+import { Type, type Static, type TSchema } from '@sinclair/typebox';
 
 import bootstrap, { agent } from '../test_helper.js';
 import { Grant } from 'lib/models/grant.js';
@@ -18,6 +19,7 @@ import {
 	UNASSIGNED_GROUP_ID
 } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
+import { shaped } from 'test/shape.js';
 
 // User Story 4 — an operator can see the consequences, before and after.
 //
@@ -25,11 +27,32 @@ import { sessionFor } from '../admin_session.ts';
 // consume the same management API, and neither should have to parse a sentence to list what a deletion
 // will destroy.
 
-interface Blocker {
-	kind: string;
-	count: number;
-	ids?: string[];
-}
+const Blocker = Type.Object({
+	kind: Type.String(),
+	count: Type.Number(),
+	ids: Type.Optional(Type.Array(Type.String()))
+});
+
+const Refusal = Type.Object({
+	error: Type.Optional(Type.String()),
+	message: Type.Optional(Type.String()),
+	blockers: Type.Optional(Type.Array(Blocker))
+});
+
+const Swept = Type.Object({
+	ok: Type.Boolean(),
+	destroyed: Type.Record(Type.String(), Type.Number())
+});
+
+const Answer = Type.Object({
+	data: Type.Optional(Type.Unknown()),
+	error: Type.Optional(
+		Type.Union([
+			Type.Null(),
+			Type.Object({ value: Type.Optional(Type.Unknown()) })
+		])
+	)
+});
 
 /**
  * @proves A deletion tells the operator what blocked it or what it removed, per area, without
@@ -68,15 +91,9 @@ describe('deletion reporting', () => {
 
 	/* Narrowed from `unknown`: Eden's response type differs per route, so naming one shape here would
 	 * only fit one call site. */
-	function bodyOf<
-		T = { error?: string; message?: string; blockers?: Blocker[] }
-	>(response: unknown): T | undefined {
-		if (typeof response !== 'object' || response === null) return undefined;
-		const { data, error } = response as {
-			data?: unknown;
-			error?: { value?: unknown } | null;
-		};
-		return (data ?? error?.value) as T | undefined;
+	function bodyOf<S extends TSchema>(schema: S, response: unknown): Static<S> {
+		const { data, error } = shaped(Answer, response);
+		return shaped(schema, data ?? error?.value);
 	}
 
 	it('lists the blocking client ids on a refused project deletion', async () => {
@@ -95,7 +112,7 @@ describe('deletion reporting', () => {
 			.delete(undefined, { headers: { cookie } });
 
 		expect(res.status).toBe(409);
-		const body = bodyOf(res);
+		const body = bodyOf(Refusal, res);
 		// The existing envelope is unchanged; blockers ride alongside it.
 		expect(body?.error).toBe('admin_error');
 		expect(body?.blockers).toEqual([
@@ -119,7 +136,7 @@ describe('deletion reporting', () => {
 			.delete(undefined, { headers: { cookie } });
 
 		expect(res.status).toBe(409);
-		const body = bodyOf(res);
+		const body = bodyOf(Refusal, res);
 		expect(body?.blockers).toEqual([{ kind: 'enduser', count: 2 }]);
 		// A bucket can hold thousands of accounts; their identities are not the caller's business.
 		expect(JSON.stringify(body)).not.toContain(one._id);
@@ -161,7 +178,7 @@ describe('deletion reporting', () => {
 			.delete(undefined, { headers: { cookie } });
 
 		expect(res.status).toBe(200);
-		const body = res.data as { ok: boolean; destroyed: Record<string, number> };
+		const body = shaped(Swept, res.data);
 		expect(body.ok).toBe(true);
 		expect(body.destroyed.AccessToken).toBe(2);
 		expect(body.destroyed.Grant).toBe(1);
@@ -191,7 +208,7 @@ describe('deletion reporting', () => {
 			.delete(undefined, { headers: { cookie } });
 
 		expect(res.status).toBe(200);
-		const body = res.data as { ok: boolean; destroyed: Record<string, number> };
+		const body = shaped(Swept, res.data);
 		expect(body.destroyed.Grant).toBe(1);
 		expect(body.destroyed.Session).toBe(0);
 	});
@@ -233,7 +250,10 @@ describe('deletion reporting', () => {
 				.delete(undefined, { headers: { cookie } });
 
 			expect(res.status).toBe(500);
-			const body = bodyOf<{ failedAreas?: string[] }>(res);
+			const body = bodyOf(
+				Type.Object({ failedAreas: Type.Optional(Type.Array(Type.String())) }),
+				res
+			);
 			expect(body?.failedAreas).toEqual(['Grant']);
 		} finally {
 			spy.mockRestore();

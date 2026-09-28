@@ -6,6 +6,8 @@ import {
 } from 'lib/admin/settings/catalog.ts';
 import { mcpCatalogue } from 'lib/mcp/catalogue.ts';
 import { inputSchemaFor } from 'lib/mcp/server.ts';
+import { shaped } from 'test/shape.js';
+import { Type } from '@sinclair/typebox';
 
 /*
  * `settings_update` published its body as an open map with no properties at all, because the route's
@@ -32,10 +34,16 @@ const settingsUpdate = mcpCatalogue.find((t) => t.tool === 'settings_update');
 if (!settingsUpdate) throw new Error('settings_update is not published');
 
 const published = inputSchemaFor(settingsUpdate);
-const properties = published.properties as Record<
-	string,
-	{ type?: string; items?: { type?: string } } | undefined
->;
+const properties = shaped(
+	Type.Record(
+		Type.String(),
+		Type.Object({
+			type: Type.Optional(Type.String()),
+			items: Type.Optional(Type.Object({ type: Type.Optional(Type.String()) }))
+		})
+	),
+	published.properties
+);
 
 /**
  * @proves An agent is told what every editable setting accepts, so it sends a typed value rather
@@ -44,11 +52,11 @@ const properties = published.properties as Record<
 describe('the published schema of the settings tool', () => {
 	it('declares the type of every editable setting', () => {
 		const undeclared = SETTINGS_CATALOG.filter(
-			(d) => properties[d.key as string]?.type !== PUBLISHED_TYPE[d.type]
+			(d) => properties[d.key]?.type !== PUBLISHED_TYPE[d.type]
 		).map(
 			(d) =>
 				`${d.key}: expected ${PUBLISHED_TYPE[d.type]}, published ${
-					properties[d.key as string]?.type ?? 'nothing'
+					properties[d.key]?.type ?? 'nothing'
 				}`
 		);
 
@@ -62,8 +70,8 @@ describe('the published schema of the settings tool', () => {
 		expect(listKeys.length).toBeGreaterThan(0);
 
 		const vague = listKeys
-			.filter((d) => properties[d.key as string]?.items?.type !== 'string')
-			.map((d) => d.key as string);
+			.filter((d) => properties[d.key]?.items?.type !== 'string')
+			.map((d) => d.key);
 
 		expect(vague).toBeArrayOfSize(0);
 	});

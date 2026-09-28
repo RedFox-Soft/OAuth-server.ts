@@ -11,6 +11,8 @@ import { elysia } from 'lib/index.js';
 import { getUserStore } from 'lib/adapters/index.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
+import { Type } from '@sinclair/typebox';
+import { shaped } from 'test/shape.js';
 
 const SLUG = 'acme';
 
@@ -53,7 +55,12 @@ describe('a request addressed to a named bucket', () => {
 	async function refusalOf(response: Response): Promise<string | null> {
 		const location = response.headers.get('location');
 		if (location) return new URL(location).searchParams.get('error');
-		return ((await response.json()) as { error?: string }).error ?? null;
+		return (
+			shaped(
+				Type.Object({ error: Type.Optional(Type.String()) }),
+				await response.json()
+			).error ?? null
+		);
 	}
 
 	async function authorizeAt(

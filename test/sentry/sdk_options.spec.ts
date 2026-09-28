@@ -101,9 +101,9 @@ describe('sentry client options', () => {
 	 * under one heading — so the resolver omits the option entirely rather than sending a blank.
 	 */
 	it('labels the release with the package version', async () => {
-		const manifest = (await import('../../package.json', {
+		const manifest = await import('../../package.json', {
 			with: { type: 'json' }
-		}).catch(() => null)) as { default?: { version?: string } } | null;
+		}).catch(() => null);
 		initSentry();
 		const release = initOptionsForTest()?.release;
 		expect(release).toBeString();

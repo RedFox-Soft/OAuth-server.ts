@@ -24,6 +24,8 @@ import {
 import { mcpCatalogue, pathArgName } from 'lib/mcp/catalogue.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
+import { shaped } from 'test/shape.js';
+import { Type } from '@sinclair/typebox';
 
 /*
  * SC-006: no agent-initiated operation succeeds with permissions the same account would not have in the
@@ -87,7 +89,7 @@ async function principal(roles: string[]) {
 		scope: 'openid'
 	});
 	at.setAudience(MCP_RESOURCE);
-	const token = (await at.save()) as unknown as string;
+	const token = await at.save();
 	const session = await sessionFor(user);
 	await rpc(
 		{
@@ -123,9 +125,10 @@ async function viaAgent(
 	token: string
 ) {
 	const response = await rpc(call(tool, args), token);
-	return response.result?.isError === true
-		? (response.result?.structuredContent?.reason as string)
-		: 'ok';
+	if (response.result?.isError !== true) return 'ok';
+	const reason = response.result?.structuredContent?.reason;
+	// A call refused by the tool's own input schema never reaches a handler, so it carries no reason.
+	return typeof reason === 'string' ? reason : 'refused without a reason';
 }
 
 /* The console status a tool's refusal reason corresponds to. */
@@ -183,8 +186,9 @@ describe('agent permissions match the console, per role', () => {
 		});
 
 		const listed = await rpc(call('project_list', {}), token);
-		const ids = (
-			(listed.result?.structuredContent?.result ?? []) as { _id: string }[]
+		const ids = shaped(
+			Type.Array(Type.Object({ _id: Type.String() })),
+			listed.result?.structuredContent?.result ?? []
 		).map((p) => p._id);
 		expect(ids).toContain(mine._id);
 		expect(ids).not.toContain(theirs._id);

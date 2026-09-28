@@ -37,7 +37,8 @@ describe('addon seams', () => {
 			.map(([name]) => name)
 			.sort();
 
-		expect(([...ADDON_SEAMS] as string[]).sort()).toEqual(exported);
+		const seams: string[] = [...ADDON_SEAMS];
+		expect(seams.sort()).toEqual(exported);
 	});
 
 	it('names each seam once', () => {

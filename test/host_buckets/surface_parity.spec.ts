@@ -14,8 +14,7 @@ const TENANT_HOST = 'parity.e.ly';
  * forgot to exclude, and no example-based case can prove an absence.
  */
 function mountedRoutes(): string[] {
-	const routes = (elysia as unknown as { routes?: { path: string }[] }).routes;
-	return (routes ?? []).map((route) => route.path);
+	return elysia.routes.map((route) => route.path);
 }
 
 function at(path: string, host: string) {

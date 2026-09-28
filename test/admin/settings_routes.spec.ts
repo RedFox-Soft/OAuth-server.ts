@@ -12,6 +12,14 @@ import {
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import bootstrap from '../test_helper.ts';
 import { sessionFor as adminSessionFor } from '../admin_session.ts';
+import { answered } from './answered.ts';
+
+// What the settings store holds; every read below follows a save, so an empty store is a failure.
+async function storedSettings(): Promise<Record<string, unknown>> {
+	const stored = await configStore.get();
+	if (!stored) throw new Error('expected saved settings');
+	return stored;
+}
 
 const app = new Elysia().use(resolveAdmin).use(settingsRoutes);
 const client = treaty(app);
@@ -37,15 +45,6 @@ const SETTINGS_TARGET = 'ApplicationConfig';
 // length would silently stop growing once the shared in-memory trail passes one page.
 const settingsAudit = () =>
 	adminAuditStore.list({ targetType: SETTINGS_TARGET });
-
-interface SettingsResponse {
-	catalog: Array<{ key: string; type: string; domain: string }>;
-	domains: Array<{ id: string; label: string; blurb: string }>;
-	values: Record<string, unknown>;
-	pendingRestartKeys: string[];
-	notInForceKeys: string[];
-	appliedKeys?: string[];
-}
 
 /**
  * @proves A super administrator edits server settings through a surface that validates the
@@ -79,7 +78,7 @@ describe('settings API', () => {
 		const cookie = await sessionCookieFor(['super_admin']);
 		const res = await client.admin.api.settings.get({ headers: { cookie } });
 		expect(res.status).toBe(200);
-		const body = res.data as SettingsResponse;
+		const body = answered(res.data);
 		expect(body.catalog.length).toBeGreaterThan(0);
 		expect(body.pendingRestartKeys).toEqual([]);
 		expect(body.notInForceKeys).toEqual([]);
@@ -98,7 +97,7 @@ describe('settings API', () => {
 	it('GET serves the panes the console navigates by, and files every setting onto one', async () => {
 		const cookie = await sessionCookieFor(['super_admin']);
 		const res = await client.admin.api.settings.get({ headers: { cookie } });
-		const body = res.data as SettingsResponse;
+		const body = answered(res.data);
 
 		expect(body.domains.length).toBeGreaterThan(0);
 		for (const domain of body.domains) {
@@ -116,22 +115,24 @@ describe('settings API', () => {
 
 	it('persists a change and reports it as in force, with nothing waiting', async () => {
 		const cookie = await sessionCookieFor(['super_admin']);
-		const before = (
-			await client.admin.api.settings.get({ headers: { cookie } })
-		).data as SettingsResponse;
-		const running = before.values['par.enabled'] as boolean;
+		const before = answered(
+			(await client.admin.api.settings.get({ headers: { cookie } })).data
+		);
+		const running = before.values['par.enabled'];
+		if (typeof running !== 'boolean')
+			throw new Error('expected par.enabled to be a boolean');
 		const put = await client.admin.api.settings.put(
 			{ 'par.enabled': !running },
 			{ headers: { cookie } }
 		);
 		expect(put.status).toBe(200);
-		const body = put.data as SettingsResponse;
+		const body = answered(put.data);
 		expect(body.values['par.enabled']).toBe(!running);
 		expect(body.appliedKeys).toContain('par.enabled');
 		expect(body.pendingRestartKeys).toEqual([]);
 		expect(body.notInForceKeys).toEqual([]);
 		// round-trips via configStore
-		const stored = (await configStore.get()) as Record<string, unknown>;
+		const stored = await storedSettings();
 		expect(stored['par.enabled']).toBe(!running);
 	});
 
@@ -145,7 +146,7 @@ describe('settings API', () => {
 			{ 'revocation.enabled': true },
 			{ headers: { cookie } }
 		);
-		const stored = (await configStore.get()) as Record<string, unknown>;
+		const stored = await storedSettings();
 		expect(stored['par.enabled']).toBe(true);
 		expect(stored['revocation.enabled']).toBe(true);
 	});
@@ -157,14 +158,14 @@ describe('settings API', () => {
 			{ headers: { cookie } }
 		);
 		expect(put.status).toBe(200);
-		const body = put.data as SettingsResponse;
+		const body = answered(put.data);
 		expect(
 			body.values['authorization.allowOmittingSingleRegisteredRedirectUri']
 		).toBe(true);
 		expect(body.appliedKeys).toContain(
 			'authorization.allowOmittingSingleRegisteredRedirectUri'
 		);
-		const stored = (await configStore.get()) as Record<string, unknown>;
+		const stored = await storedSettings();
 		expect(
 			stored['authorization.allowOmittingSingleRegisteredRedirectUri']
 		).toBe(true);
@@ -205,9 +206,9 @@ describe('settings API', () => {
 			);
 
 			expect(put.status).toBe(200);
-			const body = put.data as SettingsResponse;
+			const body = answered(put.data);
 			expect(body.values['richAuthorizationRequests.types']).toEqual(types);
-			const stored = (await configStore.get()) as Record<string, unknown>;
+			const stored = await storedSettings();
 			expect(stored['richAuthorizationRequests.types']).toEqual(types);
 		});
 
@@ -410,7 +411,7 @@ describe('settings API', () => {
 		const cookie = await sessionCookieFor(['super_admin']);
 		const res = await client.admin.api.settings.get({ headers: { cookie } });
 		expect(res.status).toBe(200);
-		const body = res.data as SettingsResponse;
+		const body = answered(res.data);
 		expect(body.catalog.map((d) => d.key)).not.toContain('discovery');
 		expect(Object.prototype.hasOwnProperty.call(body.values, 'discovery')).toBe(
 			false
@@ -423,11 +424,11 @@ describe('settings API', () => {
 		const res = await client.admin.api.settings.put(
 			{
 				discovery: { op_tos_uri: 'https://evil.example.com' }
-			} as unknown as Record<string, boolean>,
+			},
 			{ headers: { cookie } }
 		);
 		expect(res.status).toBe(422);
-		const stored = (await configStore.get()) as Record<string, unknown>;
+		const stored = await storedSettings();
 		expect(Object.prototype.hasOwnProperty.call(stored, 'discovery')).toBe(
 			false
 		);
@@ -439,12 +440,12 @@ describe('settings API', () => {
 			{
 				'revocation.enabled': true,
 				discovery: { op_tos_uri: 'https://evil.example.com' }
-			} as unknown as Record<string, boolean>,
+			},
 			{ headers: { cookie } }
 		);
 		expect(res.status).toBe(422);
 		// Atomic rejection: validation runs over every key before configStore.set().
-		const stored = (await configStore.get()) as Record<string, unknown>;
+		const stored = await storedSettings();
 		expect(Object.prototype.hasOwnProperty.call(stored, 'discovery')).toBe(
 			false
 		);
@@ -460,17 +461,17 @@ describe('settings API', () => {
 			{ headers: { cookie } }
 		);
 		expect(put.status).toBe(200);
-		const body = put.data as SettingsResponse;
+		const body = answered(put.data);
 		expect(body.values.conformIdTokenClaims).toBe(false);
 		expect(body.appliedKeys).toContain('conformIdTokenClaims');
-		const stored = (await configStore.get()) as Record<string, unknown>;
+		const stored = await storedSettings();
 		expect(stored.conformIdTokenClaims).toBe(false);
 	});
 
 	it('rejects a non-boolean conformIdTokenClaims with 422', async () => {
 		const cookie = await sessionCookieFor(['super_admin']);
 		const res = await client.admin.api.settings.put(
-			{ conformIdTokenClaims: 'nope' } as unknown as Record<string, boolean>,
+			{ conformIdTokenClaims: 'nope' },
 			{ headers: { cookie } }
 		);
 		expect(res.status).toBe(422);
@@ -502,7 +503,7 @@ describe('settings API', () => {
 		const cookie = await sessionCookieFor(['super_admin']);
 		const before = (await settingsAudit()).total;
 		const res = await client.admin.api.settings.put(
-			{ 'par.enabled': 'nope' } as unknown as Record<string, boolean>,
+			{ 'par.enabled': 'nope' },
 			{ headers: { cookie } }
 		);
 		expect(res.status).toBe(422);
@@ -517,17 +518,17 @@ describe('settings API', () => {
 	it('audits only the edited key when the whole catalogue is submitted', async () => {
 		const cookie = await sessionCookieFor(['super_admin']);
 		const before = (await settingsAudit()).total;
-		const state = (await client.admin.api.settings.get({ headers: { cookie } }))
-			.data as SettingsResponse;
+		const state = answered(
+			(await client.admin.api.settings.get({ headers: { cookie } })).data
+		);
 		const edited = {
 			...state.values,
 			'par.enabled': !state.values['par.enabled']
 		};
 
-		const res = await client.admin.api.settings.put(
-			edited as unknown as Record<string, boolean>,
-			{ headers: { cookie } }
-		);
+		const res = await client.admin.api.settings.put(edited, {
+			headers: { cookie }
+		});
 
 		expect(res.status).toBe(200);
 		const { entries, total } = await settingsAudit();
@@ -535,42 +536,41 @@ describe('settings API', () => {
 		expect(entries[0]!.attributes).toEqual(['par.enabled']);
 		// The store keeps an override for the edited key only. Pinning all of them took the environment
 		// and the defaults out of the loop at the next boot for keys nobody had ever edited.
-		expect(Object.keys((await configStore.get()) as object)).toEqual([
-			'par.enabled'
-		]);
+		expect(Object.keys(await storedSettings())).toEqual(['par.enabled']);
 	});
 
 	it('records nothing and persists nothing when no value actually changes', async () => {
 		const cookie = await sessionCookieFor(['super_admin']);
-		const state = (await client.admin.api.settings.get({ headers: { cookie } }))
-			.data as SettingsResponse;
+		const state = answered(
+			(await client.admin.api.settings.get({ headers: { cookie } })).data
+		);
 		const before = (await settingsAudit()).total;
 
-		const res = await client.admin.api.settings.put(
-			state.values as unknown as Record<string, boolean>,
-			{ headers: { cookie } }
-		);
+		const res = await client.admin.api.settings.put(state.values, {
+			headers: { cookie }
+		});
 
 		expect(res.status).toBe(200);
-		expect((res.data as SettingsResponse).appliedKeys).toEqual([]);
+		expect(answered(res.data).appliedKeys).toEqual([]);
 		expect((await settingsAudit()).total).toBe(before);
 		expect(await configStore.get()).toEqual({});
 	});
 
 	it('treats re-saving what a successful save returned as no change at all', async () => {
 		const cookie = await sessionCookieFor(['super_admin']);
-		const applied = (
-			await client.admin.api.settings.put(
-				{ 'par.enabled': true },
-				{ headers: { cookie } }
-			)
-		).data as SettingsResponse;
+		const applied = answered(
+			(
+				await client.admin.api.settings.put(
+					{ 'par.enabled': true },
+					{ headers: { cookie } }
+				)
+			).data
+		);
 		const before = (await settingsAudit()).total;
 
-		const again = await client.admin.api.settings.put(
-			applied.values as unknown as Record<string, boolean>,
-			{ headers: { cookie } }
-		);
+		const again = await client.admin.api.settings.put(applied.values, {
+			headers: { cookie }
+		});
 
 		expect(again.status).toBe(200);
 		expect((await settingsAudit()).total).toBe(before);
@@ -579,16 +579,14 @@ describe('settings API', () => {
 
 	it('still refuses an unknown key inside an otherwise unchanged body', async () => {
 		const cookie = await sessionCookieFor(['super_admin']);
-		const state = (await client.admin.api.settings.get({ headers: { cookie } }))
-			.data as SettingsResponse;
+		const state = answered(
+			(await client.admin.api.settings.get({ headers: { cookie } })).data
+		);
 
 		// An unknown key has no value in force to be compared against, so it must never be filtered out
 		// as "unchanged" and answered with a 200 that applied nothing.
 		const res = await client.admin.api.settings.put(
-			{ ...state.values, 'dpop.nonceSecret': 'no' } as unknown as Record<
-				string,
-				boolean
-			>,
+			{ ...state.values, 'dpop.nonceSecret': 'no' },
 			{ headers: { cookie } }
 		);
 
@@ -614,9 +612,7 @@ describe('settings API', () => {
 
 			expect(res.status).toBe(200);
 			// In force in this process the moment it is saved, and stored for the next one.
-			expect((res.data as SettingsResponse).appliedKeys).toContain(
-				'dpop.requireNonce'
-			);
+			expect(answered(res.data).appliedKeys).toContain('dpop.requireNonce');
 		});
 
 		it('refuses to accept the nonce secret as a setting', async () => {
@@ -626,10 +622,7 @@ describe('settings API', () => {
 			// secret is deliberately absent from it, so this is rejected as an unknown key rather than
 			// validated and stored.
 			const res = await client.admin.api.settings.put(
-				{ 'dpop.nonceSecret': Buffer.alloc(32, 0) } as unknown as Record<
-					string,
-					boolean
-				>,
+				{ 'dpop.nonceSecret': Buffer.alloc(32, 0) },
 				{ headers: { cookie } }
 			);
 
@@ -642,7 +635,7 @@ describe('settings API', () => {
 			const res = await client.admin.api.settings.get({ headers: { cookie } });
 
 			expect(res.status).toBe(200);
-			const body = res.data as SettingsResponse;
+			const body = answered(res.data);
 			expect(Object.keys(body.values)).not.toContain('dpop.nonceSecret');
 			expect(body.catalog.map((d) => d.key)).not.toContain('dpop.nonceSecret');
 			// Not merely absent from the keys: the value must not appear anywhere in the payload, in

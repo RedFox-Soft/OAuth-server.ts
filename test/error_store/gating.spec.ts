@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { Elysia } from 'elysia';
+import { Type } from '@sinclair/typebox';
 
 import { ApplicationConfig } from 'lib/configs/application.ts';
 import { errorHandler } from 'lib/shared/authorization_error_handler.ts';
@@ -14,6 +15,7 @@ import {
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { flushForTest, resetQueue } from 'lib/error_store/queue.ts';
 import { sessionFor } from '../admin_session.ts';
+import { shaped } from 'test/shape.js';
 
 /*
  * What the capability switch does, and — as importantly — what it deliberately does NOT do.
@@ -54,11 +56,10 @@ async function list(cookie: string) {
 	);
 	return {
 		status: response.status,
-		body: (await response.json()) as {
-			total: number;
-			dropped: number;
-			recording: boolean;
-		}
+		body: shaped(
+			Type.Object({ recording: Type.Boolean() }),
+			await response.json()
+		)
 	};
 }
 
@@ -101,7 +102,10 @@ describe('error store capability switch', () => {
 			throw new Error('unrecorded while off');
 		});
 		const response = await faulting.handle(new Request('http://e.ly/gate-off'));
-		const body = (await response.json()) as Record<string, string>;
+		const body = shaped(
+			Type.Object({ error_reference: Type.Optional(Type.String()) }),
+			await response.json()
+		);
 		await flushForTest();
 
 		expect(response.status).toBe(500);

@@ -1,6 +1,7 @@
 import { describe, it, beforeAll, expect } from 'bun:test';
 
 import bootstrap, { agent } from '../test_helper.js';
+import { present } from '../shape.js';
 
 /*
  * What a default deployment advertises.
@@ -54,14 +55,16 @@ describe('the discovery document of a deployment that has configured nothing', (
 	it('advertises exactly the default capability set, and no others', async () => {
 		const { data } = await agent['.well-known']['openid-configuration'].get();
 
-		expect(Object.keys(data as object).sort()).toEqual(
+		expect(Object.keys(present(data, 'the discovery document')).sort()).toEqual(
 			[...DEFAULT_MEMBERS].sort()
 		);
 	});
 
 	it('roots every advertised endpoint at the issuer it names', async () => {
-		const doc = (await agent['.well-known']['openid-configuration'].get())
-			.data as Record<string, string>;
+		const doc = present(
+			(await agent['.well-known']['openid-configuration'].get()).data,
+			'the discovery document'
+		);
 
 		// A relative endpoint is unusable, and one rooted somewhere other than the issuer sends a
 		// client to a server the issuer did not vouch for.
@@ -75,8 +78,10 @@ describe('the discovery document of a deployment that has configured nothing', (
 	});
 
 	it('offers PKCE with S256', async () => {
-		const doc = (await agent['.well-known']['openid-configuration'].get())
-			.data as Record<string, string[]>;
+		const doc = present(
+			(await agent['.well-known']['openid-configuration'].get()).data,
+			'the discovery document'
+		);
 
 		// Advertised unconditionally, in both states of `pkce.required`: the member says which methods
 		// are supported, and support does not change when the demand is relaxed. Whether a proof is

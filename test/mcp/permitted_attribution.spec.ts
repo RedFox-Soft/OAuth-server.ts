@@ -95,7 +95,7 @@ describe('attributing an action taken through a permitted identity', () => {
 			scope: 'openid'
 		});
 		at.setAudience(MCP_RESOURCE);
-		const token = (await at.save()) as unknown as string;
+		const token = await at.save();
 
 		await rpc(
 			{

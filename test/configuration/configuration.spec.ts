@@ -87,19 +87,20 @@ describe('Provider configuration: DPoP nonces', () => {
 	});
 
 	it('rejects a secret of the shape a storage round trip produces', () => {
-		// Asserted because the whole point of this case is a value the type system says cannot exist —
-		// the declared type is byte material, and a document store hands back this instead. That gap
-		// between declared and actual is the defect itself, so it cannot be expressed without overriding
-		// the type, and a runtime check is the only thing that can catch it.
+		// The whole point of this case is a value the type system says cannot exist — the declared type
+		// is byte material, and a document store hands back this instead. That gap between declared and
+		// actual is the defect itself, so it cannot be expressed without overriding the type, and a
+		// runtime check is the only thing that can catch it.
 		const roundTripped = {
 			type: 'Buffer',
 			data: new Array(32).fill(0)
-		} as unknown as Uint8Array;
+		};
 
 		expect(() =>
 			validateConfiguration({
 				...ApplicationConfig,
 				'dpop.enabled': true,
+				// @ts-expect-error deliberately not byte material: what a storage round trip leaves.
 				'dpop.nonceSecret': roundTripped
 			})
 		).toThrow(/32-byte/);

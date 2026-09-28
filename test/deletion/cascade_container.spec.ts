@@ -16,6 +16,7 @@ import {
 } from 'lib/admin/consts.ts';
 import { Client } from 'lib/models/client.js';
 import { sessionFor } from '../admin_session.ts';
+import { answered } from '../admin/answered.ts';
 
 // A container may take its contents with it, on an election the administrator makes separately from
 // confirming the deletion.
@@ -110,7 +111,7 @@ describe('deletion cascade: containers', () => {
 		});
 
 		expect(res.status).toBe(200);
-		expect((res.data as { clientsDestroyed: number }).clientsDestroyed).toBe(2);
+		expect(answered(res.data).clientsDestroyed).toBe(2);
 		expect(await getProjectStore().find(proj._id)).toBeNull();
 		expect(await Client.tryFind(first)).toBeUndefined();
 		expect(await Client.tryFind(second)).toBeUndefined();
@@ -184,9 +185,7 @@ describe('deletion cascade: containers', () => {
 		});
 
 		expect(res.status).toBe(200);
-		expect((res.data as { endUsersDestroyed: number }).endUsersDestroyed).toBe(
-			2
-		);
+		expect(answered(res.data).endUsersDestroyed).toBe(2);
 		expect(await getBucketStore().find(held._id)).toBeNull();
 		expect(await getUserStore(held._id).list()).toEqual([]);
 	});
@@ -226,8 +225,8 @@ describe('deletion cascade: containers', () => {
 	 * and only diverges as the deletion gets big enough to matter.
 	 */
 	it('writes exactly one entry per deletion, whether the container held one thing or several', async () => {
-		const one = await project([await liveClient()]);
-		const oneId = one.clientIds[0] as string;
+		const oneId = await liveClient();
+		const one = await project([oneId]);
 		expect(
 			(await deleteProject(one._id, { cascade: 'clients', client: [oneId] }))
 				.status

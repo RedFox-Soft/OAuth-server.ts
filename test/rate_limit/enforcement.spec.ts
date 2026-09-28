@@ -15,8 +15,8 @@ import {
  * The allowances the sibling rate_limit.config.ts sets. Read from the live settings rather than
  * restated, so a change there cannot leave these specs asserting against a number nothing uses.
  */
-const STRICT = () => ApplicationConfig['rateLimit.strict.max'] as number;
-const PUBLIC = () => ApplicationConfig['rateLimit.public.max'] as number;
+const STRICT = () => ApplicationConfig['rateLimit.strict.max'];
+const PUBLIC = () => ApplicationConfig['rateLimit.public.max'];
 
 /* A strict-class route that needs no client, no body and no session to reach the limiter. */
 const STRICT_PATH = '/token';
@@ -74,7 +74,7 @@ describe('rate limit enforcement', () => {
 
 			expect(refused.status).toBe(429);
 			expect(retryAfter).toBeLessThanOrEqual(
-				ApplicationConfig['rateLimit.strict.windowSeconds'] as number
+				ApplicationConfig['rateLimit.strict.windowSeconds']
 			);
 		});
 	});

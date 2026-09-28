@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'bun:test';
+import { Type, type Static, type TSchema } from '@sinclair/typebox';
 
 import bootstrap, { agent, type Setup } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
@@ -25,6 +26,7 @@ import {
 } from 'lib/admin/consts.ts';
 import { updateClient } from 'lib/admin/clients/service.ts';
 import { sessionFor } from '../admin_session.ts';
+import { shaped } from 'test/shape.js';
 
 // User Story 1 — deleting a client destroys everything it issued.
 //
@@ -308,15 +310,24 @@ async function introspect(token: string): Promise<unknown> {
 /* Eden's response type varies per route, so this narrows from `unknown` rather than naming a shape that
  * only fits one of them. */
 function errorOf(response: unknown): string {
-	return bodyOf<{ error?: string }>(response)?.error ?? '';
+	return (
+		bodyOf(Type.Object({ error: Type.Optional(Type.String()) }), response)
+			.error ?? ''
+	);
 }
 
+const Answer = Type.Object({
+	data: Type.Optional(Type.Unknown()),
+	error: Type.Optional(
+		Type.Union([
+			Type.Null(),
+			Type.Object({ value: Type.Optional(Type.Unknown()) })
+		])
+	)
+});
+
 /* The body of a response, whether the route answered with it as data or as an error. */
-function bodyOf<T>(response: unknown): T | undefined {
-	if (typeof response !== 'object' || response === null) return undefined;
-	const { data, error } = response as {
-		data?: unknown;
-		error?: { value?: unknown } | null;
-	};
-	return (data ?? error?.value) as T | undefined;
+function bodyOf<S extends TSchema>(schema: S, response: unknown): Static<S> {
+	const { data, error } = shaped(Answer, response);
+	return shaped(schema, data ?? error?.value);
 }

@@ -17,6 +17,8 @@ import {
 } from 'lib/admin/consts.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { sessionFor } from '../admin_session.ts';
+import { shaped } from 'test/shape.js';
+import { Type } from '@sinclair/typebox';
 
 /*
  * FR-036: the console keeps both container deletions in full, and nothing about the agent surface
@@ -103,7 +105,10 @@ describe.each([
 			body: { name: 'Deletable bucket', slug: 'deletable-bucket-1' }
 		});
 		expect(created.status).toBe(201);
-		const bucket = (await created.json()) as { _id: string };
+		const bucket = shaped(
+			Type.Object({ _id: Type.String() }),
+			await created.json()
+		);
 
 		const res = await admin(`/admin/api/buckets/${bucket._id}`, {
 			method: 'DELETE',
@@ -137,10 +142,20 @@ describe.each([
 			cookie
 		});
 		expect(refused.status).toBe(409);
-		const body = (await refused.json()) as {
-			error: string;
-			blockers?: { kind: string; count: number; ids?: string[] }[];
-		};
+		const body = shaped(
+			Type.Object({
+				error: Type.String(),
+				blockers: Type.Optional(
+					Type.Array(
+						Type.Object({
+							kind: Type.String(),
+							ids: Type.Optional(Type.Array(Type.String()))
+						})
+					)
+				)
+			}),
+			await refused.json()
+		);
 		expect(body.error).toBe('admin_error');
 		expect(body.blockers?.[0]?.kind).toBe('client');
 		expect(body.blockers?.[0]?.ids).toBeArray();
@@ -151,7 +166,10 @@ describe.each([
 
 		const res = await admin('/admin/api/me', { cookie });
 		expect(res.status).toBe(200);
-		const me = (await res.json()) as Record<string, unknown>;
+		const me = shaped(
+			Type.Record(Type.String(), Type.Unknown()),
+			await res.json()
+		);
 
 		expect(me.userId).toBe(user._id);
 		expect(me.email).toBe(user.email);

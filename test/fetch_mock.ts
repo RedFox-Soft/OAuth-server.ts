@@ -34,10 +34,9 @@ let fetchSpy: ReturnType<typeof spyOn> | undefined;
  * let the next file's requests reach the real network. Ask the live global what it is instead.
  */
 const INSTALLED = Symbol.for('test.fetchMock.installed');
-type MaybeInstalled = typeof globalThis.fetch & { [INSTALLED]?: true };
 
 function isInstalled(): boolean {
-	return (globalThis.fetch as MaybeInstalled)[INSTALLED] === true;
+	return Reflect.get(globalThis.fetch, INSTALLED) === true;
 }
 
 async function dispatchFetch(
@@ -49,13 +48,11 @@ async function dispatchFetch(
 			? input
 			: input instanceof URL
 				? input.href
-				: (input as Request).url;
+				: input.url;
 	const url = new URL(href);
 	const method = (
 		init?.method ??
-		(typeof input === 'object' && 'method' in input
-			? (input as Request).method
-			: 'GET')
+		(typeof input === 'object' && 'method' in input ? input.method : 'GET')
 	).toUpperCase();
 
 	if (!mockedOrigins.has(url.origin)) {
@@ -132,7 +129,17 @@ export function installFetchInterception(): void {
 		preconnect: globalThis.fetch.preconnect
 	});
 	fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(mocked);
-	(globalThis.fetch as MaybeInstalled)[INSTALLED] = true;
+	Reflect.set(globalThis.fetch, INSTALLED, true);
+}
+
+/*
+ * A whole fetch around a test's own answer, for `spyOn(globalThis, 'fetch').mockImplementation(...)`:
+ * Bun's fetch also carries `preconnect`, kept from the real one as the interceptor above does.
+ */
+export function fetchAnswering(
+	answer: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
+): typeof fetch {
+	return Object.assign(answer, { preconnect: globalThis.fetch.preconnect });
 }
 
 export function mock(origin: string) {

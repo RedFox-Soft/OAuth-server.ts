@@ -14,6 +14,14 @@ import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { ApplicationConfig } from 'lib/configs/application.ts';
 import { SENTRY_DSN_MASK } from 'lib/admin/settings/sentry/schema.ts';
 import { sessionFor } from '../admin_session.ts';
+import { answered } from './answered.ts';
+
+// What the settings store holds; every read below follows a save, so an empty store is a failure.
+async function storedSettings(): Promise<Record<string, unknown>> {
+	const stored = await configStore.get();
+	if (!stored) throw new Error('expected saved settings');
+	return stored;
+}
 
 /*
  * The Sentry card, and the one property that makes it different from every other settings surface:
@@ -93,7 +101,7 @@ describe('Sentry settings API', () => {
 		const got = await client.admin.api.settings.sentry.get({
 			headers: { cookie }
 		});
-		const data = got.data as Record<string, unknown>;
+		const data = answered(got.data);
 		expect(data.configured).toBe(true);
 		/* Reported from the deployment, not from what was submitted — there is no field for it. */
 		expect(data.environment).toBeString();
@@ -118,9 +126,7 @@ describe('Sentry settings API', () => {
 		});
 
 		expect(put.status).toBe(200);
-		expect((put.data as { notInForceKeys: string[] }).notInForceKeys).toEqual(
-			[]
-		);
+		expect(answered(put.data).notInForceKeys).toEqual([]);
 		expect(ApplicationConfig['sentry.dsn']).toBe(DSN);
 	});
 
@@ -129,7 +135,7 @@ describe('Sentry settings API', () => {
 		const got = await client.admin.api.settings.sentry.get({
 			headers: { cookie }
 		});
-		expect((got.data as Record<string, unknown>).configured).toBe(false);
+		expect(answered(got.data).configured).toBe(false);
 	});
 
 	/* The sentinel lets the console save the rest of the card without holding the secret. */
@@ -143,7 +149,7 @@ describe('Sentry settings API', () => {
 		);
 		expect(put.status).toBe(200);
 
-		const stored = (await configStore.get()) as Record<string, unknown>;
+		const stored = await storedSettings();
 		expect(stored['sentry.dsn']).toBe(DSN);
 	});
 
@@ -159,7 +165,7 @@ describe('Sentry settings API', () => {
 			{ headers: { cookie } }
 		);
 
-		const stored = (await configStore.get()) as Record<string, unknown>;
+		const stored = await storedSettings();
 		expect(stored['sentry.dsn']).toBe('');
 	});
 
@@ -171,7 +177,7 @@ describe('Sentry settings API', () => {
 			{ headers: { cookie } }
 		);
 
-		const stored = (await configStore.get()) as Record<string, unknown>;
+		const stored = await storedSettings();
 		expect(stored['sentry.dsn']).toBe(OTHER_DSN);
 	});
 
@@ -230,10 +236,10 @@ describe('Sentry settings API', () => {
 			{ headers: { cookie } }
 		);
 		expect(cleared.status).toBe(200);
-		expect((cleared.data as Record<string, unknown>).configured).toBe(false);
-		expect((cleared.data as Record<string, unknown>).enabled).toBe(false);
+		expect(answered(cleared.data).configured).toBe(false);
+		expect(answered(cleared.data).enabled).toBe(false);
 
-		const stored = (await configStore.get()) as Record<string, unknown>;
+		const stored = await storedSettings();
 		expect(stored['sentry.dsn']).toBe('');
 		expect(stored['sentry.enabled']).toBe(false);
 	});
@@ -269,9 +275,7 @@ describe('Sentry settings API', () => {
 		const got = await client.admin.api.settings.sentry.get({
 			headers: { cookie }
 		});
-		expect(got.data as Record<string, unknown>).not.toHaveProperty(
-			'queueDepth'
-		);
+		expect(answered(got.data)).not.toHaveProperty('queueDepth');
 	});
 
 	it('refuses a project-scoped administrator on both verbs', async () => {
@@ -301,7 +305,7 @@ describe('Sentry settings API', () => {
 		await client.admin.api.settings.sentry.put(VALID, { headers: { cookie } });
 
 		const got = await client.admin.api.settings.get({ headers: { cookie } });
-		const body = got.data as { values: Record<string, unknown> };
+		const body = answered(got.data);
 		/*
 		 * Key presence rather than `toHaveProperty`: these keys contain dots, and toHaveProperty reads a
 		 * dot as a path separator — so `not.toHaveProperty('sentry.dsn')` looks for a nested
@@ -339,7 +343,7 @@ describe('Sentry settings API', () => {
 			{ headers: { cookie } }
 		);
 
-		const stored = (await configStore.get()) as Record<string, unknown>;
+		const stored = await storedSettings();
 		expect(stored['sentry.dsn']).toBe(DSN);
 	});
 });

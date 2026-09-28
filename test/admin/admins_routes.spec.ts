@@ -6,8 +6,8 @@ import { adminUserRoutes } from 'lib/admin/users/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { adminSessionStore, getUserStore } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
-import type { User } from 'lib/adapters/types.ts';
 import { sessionFor } from '../admin_session.ts';
+import { answered } from './answered.ts';
 
 const app = new Elysia().use(resolveAdmin).use(adminUserRoutes);
 const client = treaty(app);
@@ -58,8 +58,8 @@ describe('admin-accounts API', () => {
 		);
 		expect(created.data).not.toHaveProperty('password');
 		const list = await client.admin.api.admins.get({ headers: { cookie } });
-		const admins = list.data as Omit<User, 'password'>[] | undefined;
-		expect(admins?.every((u) => !('password' in u))).toBe(true);
+		const admins = answered(list.data);
+		expect(admins.every((u) => !('password' in u))).toBe(true);
 	});
 
 	it('a project administrator cannot list administrator accounts', async () => {

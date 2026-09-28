@@ -10,8 +10,8 @@ import {
 	getUserStore
 } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
-import type { UserBucket } from 'lib/adapters/types.ts';
 import { sessionFor } from '../admin_session.ts';
+import { answered } from './answered.ts';
 
 const app = new Elysia().use(resolveAdmin).use(bucketRoutes);
 const client = treaty(app);
@@ -41,7 +41,7 @@ describe('bucket verification settings API', () => {
 			{ name: 'Defaults', slug: 'defaults-1' },
 			{ headers: { cookie } }
 		);
-		const bucket = res.data as UserBucket;
+		const bucket = answered(res.data);
 		expect(bucket.registrationOpen).toBe(true);
 		expect(bucket.emailVerificationRequired).toBe(false);
 		expect(bucket.verificationMethod).toBe('link');
@@ -53,7 +53,7 @@ describe('bucket verification settings API', () => {
 			{ name: 'Settable', slug: 'settable-2' },
 			{ headers: { cookie } }
 		);
-		const bucket = created.data as UserBucket;
+		const bucket = answered(created.data);
 		const patched = await client.admin.api.buckets({ id: bucket._id }).patch(
 			{
 				registrationOpen: false,
@@ -63,7 +63,7 @@ describe('bucket verification settings API', () => {
 			{ headers: { cookie } }
 		);
 		expect(patched.status).toBe(200);
-		const after = patched.data as UserBucket;
+		const after = answered(patched.data);
 		expect(after.registrationOpen).toBe(false);
 		expect(after.emailVerificationRequired).toBe(true);
 		expect(after.verificationMethod).toBe('code');
@@ -83,7 +83,7 @@ describe('bucket verification settings API', () => {
 			{ name: 'Rename me', slug: 'rename-me-3' },
 			{ headers: { cookie } }
 		);
-		const bucket = created.data as UserBucket;
+		const bucket = answered(created.data);
 
 		const patched = await client.admin.api
 			.buckets({ id: bucket._id })
@@ -103,10 +103,12 @@ describe('bucket verification settings API', () => {
 			{ name: 'BadMethod', slug: 'badmethod-4' },
 			{ headers: { cookie } }
 		);
-		const bucket = created.data as UserBucket;
-		const res = await client.admin.api
-			.buckets({ id: bucket._id })
-			.patch({ verificationMethod: 'sms' as 'link' }, { headers: { cookie } });
+		const bucket = answered(created.data);
+		const res = await client.admin.api.buckets({ id: bucket._id }).patch(
+			// @ts-expect-error a verification method the schema does not offer
+			{ verificationMethod: 'sms' },
+			{ headers: { cookie } }
+		);
 		expect(res.status).toBe(422);
 	});
 });

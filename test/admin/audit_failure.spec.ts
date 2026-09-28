@@ -17,7 +17,9 @@ import {
 	ADMIN_SESSION_COOKIE,
 	UNASSIGNED_GROUP_ID
 } from 'lib/admin/consts.ts';
+import { Type } from '@sinclair/typebox';
 import { sessionFor } from '../admin_session.ts';
+import { shaped } from 'test/shape.js';
 
 /*
  * What an operator sees when the trail itself refuses a write, and what the deployment does about it.
@@ -48,41 +50,43 @@ async function superCookie() {
 	return `${ADMIN_SESSION_COOKIE}=${session._id}`;
 }
 
-interface AdminErrorBody {
-	error: string;
-	message: string;
-}
+const AdminErrorBody = Type.Object({
+	error: Type.String(),
+	message: Type.String()
+});
 
 /**
  * @proves An administrative mutation whose audit entry cannot be written does not happen at all.
  */
 describe('admin audit write failure', () => {
 	let logged: unknown[][];
+	let recordSpy: { mockRestore(): void };
+	let errorSpy: { mockRestore(): void };
 
 	beforeEach(async () => {
 		await ensureAdminSeed();
 		// Spies live in beforeEach, not beforeAll: mock.restore() in another suite's afterEach clears
 		// anything set once at file scope.
-		spyOn(adminAuditStore, 'record').mockImplementation(() => {
+		recordSpy = spyOn(adminAuditStore, 'record').mockImplementation(() => {
 			throw new Error('trail is unavailable');
 		});
 		logged = [];
-		spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
-			logged.push(args);
-		});
+		errorSpy = spyOn(console, 'error').mockImplementation(
+			(...args: unknown[]) => {
+				logged.push(args);
+			}
+		);
 	});
 
 	afterEach(() => {
 		// Not mock.restore(): that would also clear the console spy other suites rely on being absent.
-		(
-			adminAuditStore.record as unknown as { mockRestore(): void }
-		).mockRestore();
-		(console.error as unknown as { mockRestore(): void }).mockRestore();
+		recordSpy.mockRestore();
+		errorSpy.mockRestore();
 	});
 
 	function expectAuditFailure(status: number, body: unknown) {
 		expect(status).toBe(500);
-		const parsed = body as AdminErrorBody;
+		const parsed = shaped(AdminErrorBody, body);
 		expect(parsed.error).toBe('admin_error');
 		// Distinguishable from any other failure, and it states the outcome the operator needs.
 		expect(parsed.message).toContain('audit unavailable');

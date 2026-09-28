@@ -19,6 +19,8 @@ import {
 } from 'lib/mcp/consts.ts';
 import { mcpCatalogue } from 'lib/mcp/catalogue.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
+import { shaped } from 'test/shape.js';
+import { Type } from '@sinclair/typebox';
 
 /*
  * The two-step gate on high-consequence operations.
@@ -29,6 +31,8 @@ import { ApplicationConfig } from 'lib/configs/application.js';
  */
 
 let rpcId = 0;
+
+const Created = Type.Object({ _id: Type.String() });
 
 async function rpc(body: unknown, token?: string) {
 	const res = await elysia.handle(
@@ -71,7 +75,7 @@ async function tokenFor(roles: string[]) {
 		scope: 'openid'
 	});
 	at.setAudience(MCP_RESOURCE);
-	return { token: (await at.save()) as unknown as string, user };
+	return { token: await at.save(), user };
 }
 
 async function session(roles: string[]) {
@@ -118,10 +122,11 @@ async function projectWithClient(token: string) {
 		}),
 		token
 	);
-	const body = created.payload.result?.structuredContent?.result as {
-		clientId: string;
-	};
-	return { project, clientId: body.clientId };
+	const { clientId } = shaped(
+		Type.Object({ clientId: Type.String() }),
+		created.payload.result?.structuredContent?.result
+	);
+	return { project, clientId };
 }
 
 /**
@@ -324,9 +329,10 @@ describe('MCP confirmation gate', () => {
 			call('bucket_create', { name: 'Conf bucket', slug: 'conf-bucket-1' }),
 			token
 		);
-		const bucketId = (
-			bucket.payload.result?.structuredContent?.result as { _id: string }
-		)._id;
+		const { _id: bucketId } = shaped(
+			Created,
+			bucket.payload.result?.structuredContent?.result
+		);
 		const created = await rpc(
 			call('bucket_user_create', {
 				id: bucketId,
@@ -335,9 +341,10 @@ describe('MCP confirmation gate', () => {
 			}),
 			token
 		);
-		const uid = (
-			created.payload.result?.structuredContent?.result as { _id: string }
-		)._id;
+		const { _id: uid } = shaped(
+			Created,
+			created.payload.result?.structuredContent?.result
+		);
 
 		const described = await rpc(
 			call('bucket_user_password_reset', {

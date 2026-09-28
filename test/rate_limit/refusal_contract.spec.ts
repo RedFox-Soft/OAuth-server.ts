@@ -5,8 +5,8 @@ import { ApplicationConfig } from 'lib/configs/application.ts';
 import { eventBus } from 'lib/event_bus.js';
 import { ORIGIN_A, flood, resetRateLimiter, send } from './helper.js';
 
-const STRICT = () => ApplicationConfig['rateLimit.strict.max'] as number;
-const ORDINARY = () => ApplicationConfig['rateLimit.ordinary.max'] as number;
+const STRICT = () => ApplicationConfig['rateLimit.strict.max'];
+const ORDINARY = () => ApplicationConfig['rateLimit.ordinary.max'];
 
 /* Spends an allowance and returns the first refusal, so each case starts from a 429. */
 async function refusalOn(
@@ -42,7 +42,7 @@ describe('rate limit refusal contract', () => {
 			expect(Number.isInteger(retryAfter)).toBe(true);
 			expect(retryAfter).toBeGreaterThanOrEqual(1);
 			expect(retryAfter).toBeLessThanOrEqual(
-				ApplicationConfig['rateLimit.strict.windowSeconds'] as number
+				ApplicationConfig['rateLimit.strict.windowSeconds']
 			);
 		});
 
@@ -218,7 +218,7 @@ describe('rate limit refusal contract', () => {
 		const listeners: Array<[string, (...args: unknown[]) => void]> = [];
 
 		function listen(channel: string) {
-			const spy = mock();
+			const spy = mock((_payload: unknown) => {});
 			eventBus.on(channel, spy);
 			listeners.push([channel, spy]);
 			return spy;
@@ -274,7 +274,11 @@ describe('rate limit refusal contract', () => {
 			const payload = JSON.stringify(limited.mock.calls[0]?.[0] ?? {});
 			expect(payload).not.toContain('secret');
 			expect(payload).not.toContain('Basic');
-			expect(Object.keys(limited.mock.calls[0]?.[0] as object).sort()).toEqual([
+			const event = limited.mock.calls[0]?.[0];
+			if (typeof event !== 'object' || event === null) {
+				throw new Error('expected a rate_limited payload');
+			}
+			expect(Object.keys(event).sort()).toEqual([
 				'class',
 				'method',
 				'origin',

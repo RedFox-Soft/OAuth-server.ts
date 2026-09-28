@@ -18,6 +18,8 @@ import {
 	MCP_ROUTE
 } from 'lib/mcp/consts.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
+import { shaped } from 'test/shape.js';
+import { Type, type TSchema } from '@sinclair/typebox';
 
 /*
  * The named acceptance scenarios of user stories 2, 3 and 4 that the surface-wide guards do not reach:
@@ -80,7 +82,7 @@ async function session() {
 		scope: 'openid'
 	});
 	at.setAudience(MCP_RESOURCE);
-	const token = (await at.save()) as unknown as string;
+	const token = await at.save();
 	await rpc(
 		{
 			jsonrpc: '2.0',
@@ -110,11 +112,14 @@ async function perform(
 	return rpc(call(name, { ...args, confirmationToken }), token);
 }
 
-function result(response: {
-	result?: { structuredContent?: { result?: unknown } };
-}) {
-	return response.result?.structuredContent?.result;
+function result<T extends TSchema>(
+	schema: T,
+	response: { result?: { structuredContent?: { result?: unknown } } }
+) {
+	return shaped(schema, response.result?.structuredContent?.result);
 }
+
+const Created = Type.Object({ _id: Type.String() });
 
 /**
  * @proves Individual agent tools refuse what would leave the instance unusable or half-changed,
@@ -148,7 +153,10 @@ describe('individual tool behaviours', () => {
 			}),
 			token
 		);
-		const clientId = (result(created) as { clientId: string }).clientId;
+		const { clientId } = result(
+			Type.Object({ clientId: Type.String() }),
+			created
+		);
 
 		const refused = await rpc(
 			call('client_update', {
@@ -165,9 +173,10 @@ describe('individual tool behaviours', () => {
 			call('client_get', { id: project._id, clientId }),
 			token
 		);
-		expect((result(reread) as { redirectUris: string[] }).redirectUris).toEqual(
-			['https://ok.example.com/cb']
-		);
+		expect(
+			result(Type.Object({ redirectUris: Type.Array(Type.String()) }), reread)
+				.redirectUris
+		).toEqual(['https://ok.example.com/cb']);
 	});
 
 	// US2 AS-4: rotation returns a new secret once, and the rotation is recorded.
@@ -188,16 +197,19 @@ describe('individual tool behaviours', () => {
 			}),
 			token
 		);
-		const { clientId, secret } = result(created) as {
-			clientId: string;
-			secret: string;
-		};
+		const { clientId, secret } = result(
+			Type.Object({ clientId: Type.String(), secret: Type.String() }),
+			created
+		);
 
 		const rotated = await perform(token, 'client_secret_rotate', {
 			id: project._id,
 			clientId
 		});
-		const next = (result(rotated) as { secret: string }).secret;
+		const { secret: next } = result(
+			Type.Object({ secret: Type.String() }),
+			rotated
+		);
 
 		expect(next).toBeString();
 		expect(next).not.toBe(secret);
@@ -251,8 +263,14 @@ describe('individual tool behaviours', () => {
 		const { token } = await session();
 
 		const listed = await rpc(call('jwks_list', {}), token);
-		const keys = (result(listed) as { keys: { kid: string; use?: string }[] })
-			.keys;
+		const { keys } = result(
+			Type.Object({
+				keys: Type.Array(
+					Type.Object({ kid: Type.String(), use: Type.Optional(Type.String()) })
+				)
+			}),
+			listed
+		);
 		const signing = keys.filter((k) => k.use === 'sig' || k.use === undefined);
 
 		// Delete down to one, then assert the last is refused.
@@ -298,11 +316,14 @@ describe('individual tool behaviours', () => {
 		});
 
 		expect(applied.result?.isError).not.toBe(true);
-		const body = result(applied) as {
-			appliedKeys?: string[];
-			pendingRestartKeys?: string[];
-			notInForceKeys?: string[];
-		};
+		const body = result(
+			Type.Object({
+				appliedKeys: Type.Optional(Type.Array(Type.String())),
+				pendingRestartKeys: Type.Optional(Type.Array(Type.String())),
+				notInForceKeys: Type.Optional(Type.Array(Type.String()))
+			}),
+			applied
+		);
 		expect(body.appliedKeys).toContain('dpop.requireNonce');
 		expect(body.pendingRestartKeys).toEqual([]);
 		expect(body.notInForceKeys).toEqual([]);
@@ -317,7 +338,7 @@ describe('individual tool behaviours', () => {
 			call('bucket_create', { name: 'Users', slug: 'users-1' }),
 			token
 		);
-		const bucketId = (result(bucket) as { _id: string })._id;
+		const { _id: bucketId } = result(Created, bucket);
 
 		const email = `member-${Math.random()}@x.io`;
 		const created = await rpc(
@@ -328,7 +349,7 @@ describe('individual tool behaviours', () => {
 			}),
 			token
 		);
-		const uid = (result(created) as { _id: string })._id;
+		const { _id: uid } = result(Created, created);
 
 		const reset = await perform(token, 'bucket_user_password_reset', {
 			id: bucketId,

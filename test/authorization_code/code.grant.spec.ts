@@ -25,6 +25,7 @@ import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
 import { ttl } from 'lib/configs/liveTime.js';
 import type { AuthorizationCodePayloadType } from 'lib/models/authorization_code.js';
+import { AuthorizationCodePayload } from 'lib/models/authorization_code.js';
 
 /**
  * @proves A client exchanging a valid authorization code receives tokens, and every way of
@@ -70,7 +71,10 @@ describe('grant_type=authorization_code', () => {
 			code = redirectParameter(response, 'code');
 
 			const jti = setup.getTokenJti(code);
-			codeStore = TestAdapter.for('AuthorizationCode').syncFind(jti);
+			codeStore = TestAdapter.for('AuthorizationCode').syncFindAs(
+				AuthorizationCodePayload,
+				jti
+			);
 		});
 
 		it('the token response carries access token, token type, expiry and scope', async function () {
@@ -307,7 +311,10 @@ describe('grant_type=authorization_code', () => {
 			code = redirectParameter(response, 'code');
 
 			const jti = setup.getTokenJti(code);
-			codeStore = TestAdapter.for('AuthorizationCode').syncFind(jti);
+			codeStore = TestAdapter.for('AuthorizationCode').syncFindAs(
+				AuthorizationCodePayload,
+				jti
+			);
 		});
 
 		it('returns the access token, token type, expiry and scope the client expects', async function () {

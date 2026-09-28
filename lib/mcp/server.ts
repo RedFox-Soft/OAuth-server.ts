@@ -1,6 +1,5 @@
 import {
 	McpServer,
-	fromJsonSchema,
 	type McpRequestContext
 } from '@modelcontextprotocol/server';
 
@@ -11,6 +10,7 @@ import {
 	type McpTool
 } from './catalogue.js';
 import { dispatchTool } from './dispatch.js';
+import { bridgeSchema } from './schema_bridge.js';
 import { annotationsFor, toOutcome, withheldOutcome } from './result.js';
 import {
 	CONFIRMATION_ARG,
@@ -231,9 +231,7 @@ const REGISTRATIONS = mcpCatalogue.map((tool) => ({
 	tool,
 	config: {
 		description: describe(tool),
-		inputSchema: fromJsonSchema(
-			inputSchemaFor(tool) as Parameters<typeof fromJsonSchema>[0]
-		),
+		inputSchema: bridgeSchema(inputSchemaFor(tool)),
 		annotations: annotationsFor(tool)
 	}
 }));

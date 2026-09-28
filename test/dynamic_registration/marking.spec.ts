@@ -3,6 +3,7 @@ import { describe, beforeAll, it, expect } from 'bun:test';
 import bootstrap, { agent } from '../test_helper.js';
 import { adapter } from 'lib/adapters/index.ts';
 import { Client } from 'lib/models/client.ts';
+import { present } from 'test/shape.js';
 
 /*
  * Telling a client the server created on its own request apart from one an administrator made.
@@ -36,10 +37,9 @@ describe('marking a dynamically created registration', () => {
 		);
 
 		expect(res.status).toBe(201);
-		const clientId = res.data?.client_id as string;
+		const clientId = present(res.data?.client_id, 'a client_id');
 
-		const stored = (await adapter('Client').find(clientId)) as
-			{ registeredDynamically?: boolean } | undefined;
+		const stored = await adapter('Client').find(clientId);
 		expect(stored?.registeredDynamically).toBe(true);
 	});
 
@@ -48,8 +48,7 @@ describe('marking a dynamically created registration', () => {
 	 * console reads, so a stored `undefined` has to mean "an operator made this".
 	 */
 	it('leaves an administrator-created client unmarked', async () => {
-		const stored = (await adapter('Client').find('client')) as
-			{ registeredDynamically?: boolean } | undefined;
+		const stored = await adapter('Client').find('client');
 
 		expect(stored?.registeredDynamically).toBeUndefined();
 	});
@@ -64,14 +63,14 @@ describe('marking a dynamically created registration', () => {
 				redirect_uris: ['https://client.example.com/cb'],
 				registered_dynamically: false,
 				registeredDynamically: false
-			} as never,
+			},
 			{ headers: json }
 		);
 
 		expect(res.status).toBe(201);
-		const stored = (await adapter('Client').find(
-			res.data?.client_id as string
-		)) as { registeredDynamically?: boolean } | undefined;
+		const stored = await adapter('Client').find(
+			present(res.data?.client_id, 'a client_id')
+		);
 		expect(stored?.registeredDynamically).toBe(true);
 	});
 
@@ -80,7 +79,7 @@ describe('marking a dynamically created registration', () => {
 			{ redirect_uris: ['https://client.example.com/cb'] },
 			{ headers: json }
 		);
-		const clientId = res.data?.client_id as string;
+		const clientId = present(res.data?.client_id, 'a client_id');
 
 		const client = await Client.tryFind(clientId);
 
@@ -93,7 +92,7 @@ describe('marking a dynamically created registration', () => {
 			{ redirect_uris: ['https://client.example.com/cb'] },
 			{ headers: json }
 		);
-		const clientId = res.data?.client_id as string;
+		const clientId = present(res.data?.client_id, 'a client_id');
 		expect(await Client.tryFind(clientId)).toBeDefined();
 
 		await adapter('Client').destroy(clientId);

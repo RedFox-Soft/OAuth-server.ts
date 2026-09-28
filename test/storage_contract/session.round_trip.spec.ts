@@ -1,4 +1,5 @@
 import { describe, it, beforeAll, expect } from 'bun:test';
+import { Type } from '@sinclair/typebox';
 
 import bootstrap from '../test_helper.js';
 import epochTime from 'lib/helpers/epoch_time.js';
@@ -8,6 +9,7 @@ import {
 	assertNotPersisted,
 	storedPayloadFor
 } from './round_trip.js';
+import { present, shaped } from 'test/shape.js';
 
 /**
  * @proves A session persists its state and authorizations verbatim, and nothing outside its
@@ -53,10 +55,13 @@ describe('storage contract: Session', () => {
 
 		const reloaded = await Session.find('session-1');
 		expect(reloaded).toBeDefined();
-		expect((reloaded!.payload.state as { extra?: string }).extra).toBe(
-			'must-be-kept'
-		);
-		expect(reloaded!.payload.authorizations?.client?.grantId).toBe('grant-1');
+		expect(
+			shaped(
+				Type.Object({ extra: Type.Optional(Type.String()) }),
+				reloaded.payload.state
+			).extra
+		).toBe('must-be-kept');
+		expect(reloaded.payload.authorizations?.client?.grantId).toBe('grant-1');
 	});
 
 	it('persists nothing outside the schema', async () => {
@@ -64,7 +69,7 @@ describe('storage contract: Session', () => {
 		session.loginAccount({ accountId: 'account-2', amr: ['pwd'] });
 		await session.save();
 
-		const stored = storedPayloadFor(session)!;
+		const stored = present(storedPayloadFor(session), 'the stored session');
 		const schemaKeys = Object.keys(session.model.properties);
 		for (const key of Object.keys(stored)) {
 			expect(schemaKeys).toContain(key);

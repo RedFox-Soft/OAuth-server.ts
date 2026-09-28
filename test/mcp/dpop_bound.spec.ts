@@ -69,7 +69,7 @@ async function tokenFor(bound: boolean) {
 		...(bound ? { jkt: 'a-key-thumbprint' } : {})
 	});
 	at.setAudience(MCP_RESOURCE);
-	return (await at.save()) as unknown as string;
+	return await at.save();
 }
 
 /**

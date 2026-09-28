@@ -2,7 +2,11 @@ import { expect } from 'bun:test';
 
 import epochTime from '../lib/helpers/epoch_time.ts';
 import { MemoryAdapter, setStorage } from '../lib/adapters/memory/index.js';
+import { isPlainObject } from '../lib/helpers/_/object.ts';
+import type { Static, TSchema } from '@sinclair/typebox';
+import { present, shaped } from './shape.js';
 
+// Untyped because lib's MemoryStore lets each caller pick what `get` returns; reads below narrow.
 const map = new Map();
 
 setStorage(map);
@@ -36,12 +40,38 @@ export class TestAdapter extends MemoryAdapter {
 		map.clear();
 	}
 
-	syncFind(id: string) {
-		return map.get(this.key(id)) || undefined;
+	// The record a model stored under this id — an object; what is in it is the spec's to check.
+	syncFind(id: string): Record<string, unknown> | undefined {
+		const found: unknown = map.get(this.key(id));
+		return isPlainObject(found) ? found : undefined;
+	}
+
+	// The same record checked against its model's schema, as the model checks it on the way out.
+	syncFindAs<S extends TSchema>(schema: S, id: string): Static<S> {
+		return shaped(
+			schema,
+			present(this.syncFind(id), `the ${this.model} record ${id}`)
+		);
+	}
+
+	// Every record stored under this model, for a spec that has to search them.
+	syncRecords(): Record<string, unknown>[] {
+		const prefix = `${this.model}:`;
+		const records: Record<string, unknown>[] = [];
+		for (const [key, value] of map) {
+			if (
+				typeof key === 'string' &&
+				key.startsWith(prefix) &&
+				isPlainObject(value)
+			) {
+				records.push(value);
+			}
+		}
+		return records;
 	}
 
 	syncUpdate(id: string, update: object) {
-		const found = map.get(this.key(id));
+		const found = this.syncFind(id);
 		if (!found) return;
 		Object.assign(found, update);
 	}

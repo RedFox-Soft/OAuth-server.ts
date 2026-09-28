@@ -9,6 +9,7 @@ import {
 
 import { decode as decodeJWT } from '../../lib/helpers/jwt.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
+import { present } from 'test/shape.js';
 import bootstrap, {
 	agent,
 	setSeedClaims,
@@ -915,9 +916,9 @@ expire.setDate(expire.getDate() + 1);
 				auth.validateClientLocation(response);
 				auth.validateError(response, 'invalid_request');
 				expect(
-					new URL(response.headers.get('location') as string).searchParams.get(
-						'error_description'
-					)
+					new URL(
+						present(response.headers.get('location'), 'a redirect')
+					).searchParams.get('error_description')
 				).not.toContain('userinfo or id_token');
 			});
 

@@ -18,18 +18,22 @@ function refusedForClaims(body: unknown): boolean {
 }
 
 /*
- * A TypeBox object schema that declares a top-level `claims` member. Discovered rather than listed,
- * so a surface somebody adds later shows up here instead of going unnoticed.
+ * The `claims` member a TypeBox object schema declares at its top level, if it declares one.
+ * Discovered rather than listed, so a surface somebody adds later shows up here instead of going
+ * unnoticed.
  */
-function declaresClaims(value: unknown): boolean {
-	return (
-		typeof value === 'object' &&
-		value !== null &&
-		'properties' in value &&
-		typeof (value as { properties?: unknown }).properties === 'object' &&
-		(value as { properties: Record<string, unknown> }).properties?.claims !==
-			undefined
-	);
+function claimsSchemaOf(value: unknown): unknown {
+	if (
+		typeof value !== 'object' ||
+		value === null ||
+		!('properties' in value) ||
+		typeof value.properties !== 'object' ||
+		value.properties === null ||
+		!('claims' in value.properties)
+	) {
+		return undefined;
+	}
+	return value.properties.claims;
 }
 
 /**
@@ -51,17 +55,15 @@ describe('unknown claims members across every surface that accepts claims', () =
 	 * object's properties, so it carries the same `claims` schema object rather than a copy.
 	 */
 	it('declares no schema that refuses an undefined member of the claims object', () => {
-		const schemas = Object.entries(paramList).filter(([, value]) =>
-			declaresClaims(value)
+		const schemas = Object.entries(paramList).filter(
+			([, value]) => claimsSchemaOf(value) !== undefined
 		);
 
 		expect(schemas.length).toBeGreaterThan(0);
 
 		const closed = schemas
 			.filter(([, value]) => {
-				const claims = (
-					value as { properties: Record<string, Record<string, unknown>> }
-				).properties.claims;
+				const claims = claimsSchemaOf(value);
 				return JSON.stringify(claims).includes('"additionalProperties":false');
 			})
 			.map(([name]) => name);

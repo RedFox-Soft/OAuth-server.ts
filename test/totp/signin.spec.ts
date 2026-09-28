@@ -22,6 +22,7 @@ import {
 } from 'lib/totp/consts.ts';
 import epochTime from 'lib/helpers/epoch_time.ts';
 import { TestAdapter } from 'test/models.js';
+import { present } from 'test/shape.js';
 import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 
 const PASSWORD = 'correct horse battery';
@@ -120,21 +121,10 @@ async function getPage(path: string, cookie?: string) {
 	};
 }
 
-/*
- * The `amr` recorded on a session, read back through the model.
- *
- * Narrowed at this one call site rather than by widening the model layer, exactly as
- * lib/admin/auth/login.ts narrows `Session.tryFind` and for the same pre-existing reason: `BaseModel`'s
- * `this` constraint does not admit `Session`'s own constructor, and its payload type collapses to the
- * base shape on the way out.
- */
+/* The `amr` recorded on a session, read back through the model. */
 async function amrOf(sessionId: string): Promise<string[] | undefined> {
-	const session = await (
-		Session as unknown as {
-			find(id: string): Promise<{ payload: { amr?: string[] } } | undefined>;
-		}
-	).find(sessionId);
-	return session?.payload.amr;
+	const session = await Session.find(sessionId);
+	return session.payload.amr;
 }
 
 /* An account that already holds an authenticator, without driving the enrolment flow to create one. */
@@ -422,7 +412,7 @@ describe('second factor at sign-in (US3)', () => {
 		TestAdapter.for('Interaction').syncUpdate(uid, { exp: epochTime() });
 
 		const store = adapter('Interaction');
-		const ttls: unknown[] = [];
+		const ttls: (number | undefined)[] = [];
 		const upsert = spyOn(store, 'upsert').mockImplementation(
 			async (id: string, payload: unknown, expiresIn?: number) => {
 				ttls.push(expiresIn);
@@ -437,7 +427,7 @@ describe('second factor at sign-in (US3)', () => {
 		expect(ttls.length).toBeGreaterThan(0);
 		for (const ttl of ttls) {
 			expect(typeof ttl).toBe('number');
-			expect(ttl as number).toBeGreaterThanOrEqual(1);
+			expect(present(ttl, 'a TTL')).toBeGreaterThanOrEqual(1);
 		}
 	});
 
@@ -494,7 +484,10 @@ describe('second factor at sign-in (US3)', () => {
 			res.setCookie ?? ''
 		)?.[1];
 		expect(sessionId).toBeTruthy();
-		expect(await amrOf(sessionId as string)).toEqual(['pwd', 'otp']);
+		expect(await amrOf(present(sessionId, 'a session cookie'))).toEqual([
+			'pwd',
+			'otp'
+		]);
 	});
 
 	it('leaves amr absent on a password-only sign-in, changing nothing for it', async () => {
@@ -510,7 +503,7 @@ describe('second factor at sign-in (US3)', () => {
 		const sessionId = new RegExp(`${SESSION_COOKIE_PREFIX}[^=]+=([^;]+)`).exec(
 			res.setCookie ?? ''
 		)?.[1];
-		expect(await amrOf(sessionId as string)).toBeUndefined();
+		expect(await amrOf(present(sessionId, 'a session cookie'))).toBeUndefined();
 	});
 
 	describe('a bucket that does not require the second factor', () => {
@@ -547,7 +540,7 @@ describe('second factor at sign-in (US3)', () => {
 				c.startsWith(SESSION_COOKIE_PREFIX)
 			);
 			expect(header).toBeTruthy();
-			return header as string;
+			return present(header, 'a session cookie');
 		}
 
 		it('leaves the sign-in unretained past the browsing session when it was declined', async () => {

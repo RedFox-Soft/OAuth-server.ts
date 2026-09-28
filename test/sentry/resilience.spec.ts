@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, spyOn } from 'bun:test';
 import { Elysia } from 'elysia';
+import { Type } from '@sinclair/typebox';
 
 import { ApplicationConfig } from 'lib/configs/application.ts';
 import { errorStore } from 'lib/adapters/index.ts';
@@ -9,6 +10,7 @@ import { resetOriginSalt } from 'lib/error_store/redact.ts';
 import { initSentry, resetForTest as resetClient } from 'lib/sentry/client.ts';
 import * as dispatch from 'lib/sentry/dispatch.ts';
 import { clearRecorded, recordedEnvelopes } from 'lib/sentry/transport.ts';
+import { shaped } from 'test/shape.js';
 
 /*
  * Monitoring cannot degrade the thing it monitors.
@@ -72,10 +74,11 @@ describe('sentry resilience', () => {
 	 * a comparison can say that.
 	 */
 	it('leaves the response identical to the reporting-disabled case', async () => {
+		const Body = Type.Record(Type.String(), Type.Unknown());
 		const armed = await appThrowing('/resil-same').handle(
 			new Request('http://e.ly/resil-same')
 		);
-		const armedBody = (await armed.json()) as Record<string, unknown>;
+		const armedBody = shaped(Body, await armed.json());
 		await settle();
 
 		ApplicationConfig['sentry.enabled'] = false;
@@ -83,7 +86,7 @@ describe('sentry resilience', () => {
 		const bare = await appThrowing('/resil-same').handle(
 			new Request('http://e.ly/resil-same')
 		);
-		const bareBody = (await bare.json()) as Record<string, unknown>;
+		const bareBody = shaped(Body, await bare.json());
 		await settle();
 
 		expect(armed.status).toBe(bare.status);

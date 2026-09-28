@@ -4,6 +4,7 @@ import bootstrap from '../test_helper.ts';
 import { resetAdminMemoryStores } from 'lib/adapters/index.ts';
 import { mock } from '../fetch_mock.ts';
 import { forgetDiscovery } from 'lib/federation/discovery.ts';
+import { present } from 'test/shape.ts';
 import {
 	KNOWN_PROVIDERS,
 	issuerForKnownProvider,
@@ -91,13 +92,15 @@ describe('binding the authorization code to its request', () => {
 		expect(KNOWN_PROVIDERS.length).toBeGreaterThan(0);
 
 		for (const entry of KNOWN_PROVIDERS) {
-			const issuer = issuerForKnownProvider(entry, { tenant: 'a-tenant-id' });
-			expect(issuer).toBeDefined();
-			stubDiscovery(entry, issuer as string);
+			const issuer = present(
+				issuerForKnownProvider(entry, { tenant: 'a-tenant-id' }),
+				`an issuer for ${entry.catalogueId}`
+			);
+			stubDiscovery(entry, issuer);
 
 			await seedBucket(CLIENT, {
 				federation: [
-					provider(issuer as string, {
+					provider(issuer, {
 						id: entry.defaultProviderId,
 						clientId: 'stub-client',
 						scopes: [...entry.scopes],

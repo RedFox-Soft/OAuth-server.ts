@@ -17,6 +17,8 @@ import {
 import { forgetBucketAddresses } from 'lib/admin/auth/bucketAddress.ts';
 import { issuerFor } from 'lib/configs/issuer.ts';
 import { sessionFor } from '../admin_session.ts';
+import { Type } from '@sinclair/typebox';
+import { shaped } from 'test/shape.ts';
 
 const app = new Elysia().use(resolveAdmin).use(bucketRoutes);
 
@@ -46,7 +48,9 @@ async function changeAddress(
 	const text = await response.text();
 	return {
 		status: response.status,
-		body: text ? (JSON.parse(text) as Record<string, unknown>) : {}
+		body: text
+			? shaped(Type.Record(Type.String(), Type.Unknown()), JSON.parse(text))
+			: {}
 	};
 }
 

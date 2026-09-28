@@ -3,8 +3,10 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { areaForBucket, areaNamed } from 'lib/consts/storage_inventory.js';
-import type { Db } from 'mongodb';
-import { ensureCollection } from 'lib/adapters/mongodb/provision.js';
+import {
+	ensureCollection,
+	type CollectionHost
+} from 'lib/adapters/mongodb/provision.js';
 import {
 	missingIndexes,
 	staleExpiryIndexes,
@@ -92,13 +94,13 @@ describe('toExistingIndexes', () => {
 	});
 
 	it('drops a descriptor whose name is not a string', () => {
-		// The assertion is the subject of the test, not a workaround: the type system cannot express
-		// "data that violates this very type", and a boundary mapper exists precisely because what the
-		// datastore returns is not constrained by our declarations.
-		const raw = [
+		// The violation is the subject of the test, not a workaround: a boundary mapper exists precisely
+		// because what the datastore returns is not constrained by our declarations.
+		const raw: RawIndexDescriptor[] = [
+			// @ts-expect-error deliberately a name that is not a string, as a datastore can return.
 			{ name: 7, key: { expiresAt: 1 } },
 			{ name: 'keep_1', key: { keep: 1 } }
-		] as unknown as RawIndexDescriptor[];
+		];
 
 		expect(toExistingIndexes(raw)).toEqual([
 			{ name: 'keep_1', key: { keep: 1 } }
@@ -374,11 +376,11 @@ describe('exitCodeFor', () => {
 // twice against a real database, not by reading the driver docs. Existence has to be asked, not
 // deduced.
 describe('ensureCollection', () => {
-	// A Db stub, so the behaviour is pinned without a database. Only the three members
-	// ensureCollection touches are implemented, hence the narrow cast.
+	// A stand-in for the database, so the behaviour is pinned without one: ensureCollection asks only
+	// for a CollectionHost, which this implements whole.
 	function fakeDb(present: string[]) {
 		const created: string[] = [];
-		const db = {
+		const db: CollectionHost = {
 			listCollections: (filter: { name: string }) => ({
 				hasNext: async () => present.includes(filter.name)
 			}),
@@ -389,7 +391,7 @@ describe('ensureCollection', () => {
 					present.push(name);
 				}
 			}
-		} as unknown as Db;
+		};
 		return { db, created };
 	}
 

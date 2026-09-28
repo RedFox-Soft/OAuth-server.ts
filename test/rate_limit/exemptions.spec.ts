@@ -4,8 +4,8 @@ import bootstrap from '../test_helper.js';
 import { ApplicationConfig } from 'lib/configs/application.ts';
 import { ORIGIN_A, flood, refusals, resetRateLimiter, send } from './helper.js';
 
-const STRICT = () => ApplicationConfig['rateLimit.strict.max'] as number;
-const PUBLIC = () => ApplicationConfig['rateLimit.public.max'] as number;
+const STRICT = () => ApplicationConfig['rateLimit.strict.max'];
+const PUBLIC = () => ApplicationConfig['rateLimit.public.max'];
 
 /*
  * The ways this feature could take the deployment down by itself (US4).
@@ -140,7 +140,7 @@ describe('rate limit exemptions', () => {
 		});
 
 		it('answer identically once both are over it', async () => {
-			const ordinary = ApplicationConfig['rateLimit.ordinary.max'] as number;
+			const ordinary = ApplicationConfig['rateLimit.ordinary.max'];
 
 			await flood(DISABLED, ORIGIN_A, ordinary, post);
 			const disabled = await send(DISABLED, ORIGIN_A, post);
@@ -157,7 +157,7 @@ describe('rate limit exemptions', () => {
 		// The counted-or-not asymmetry is the actual leak, so it is asserted directly rather than only
 		// through the two responses above.
 		it('are both counted, so neither can be identified by how long it takes to refuse', async () => {
-			const ordinary = ApplicationConfig['rateLimit.ordinary.max'] as number;
+			const ordinary = ApplicationConfig['rateLimit.ordinary.max'];
 
 			const disabled = await flood(DISABLED, ORIGIN_A, ordinary + 1, post);
 			resetRateLimiter();

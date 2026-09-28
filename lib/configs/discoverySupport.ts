@@ -491,3 +491,8 @@ export const featuresKeyMap: Partial<Record<FeatureFlagKey, DiscoveryKey[]>> = {
 		'introspection_encryption_enc_values_supported'
 	]
 };
+
+// A key of the map above; `Object.keys` answers strings, and every key it holds is a flag.
+export function isFeatureFlag(key: string): key is FeatureFlagKey {
+	return Object.hasOwn(featuresKeyMap, key);
+}

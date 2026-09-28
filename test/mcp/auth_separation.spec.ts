@@ -72,7 +72,7 @@ async function tokenWithAudience(audience: string | undefined) {
 		scope: 'openid'
 	});
 	if (audience !== undefined) at.setAudience(audience);
-	return { token: (await at.save()) as unknown as string, user };
+	return { token: await at.save(), user };
 }
 
 /**
@@ -123,7 +123,7 @@ describe('MCP audience boundary', () => {
 			scope: 'openid'
 		});
 		at.setAudience(MCP_RESOURCE);
-		const token = (await at.save()) as unknown as string;
+		const token = await at.save();
 		expect(await callMcp(token)).toBe(401);
 	});
 

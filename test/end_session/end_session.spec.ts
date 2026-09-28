@@ -24,6 +24,7 @@ import { elysia } from 'lib/index.js';
 import { eventBus } from 'lib/event_bus.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
+import { present } from 'test/shape.js';
 
 async function getIdToken(options = {}, cookie = '') {
 	const auth = new AuthorizationRequest({
@@ -118,9 +119,10 @@ describe('logout endpoint', () => {
 					headers: { cookie }
 				});
 				expect(status).toBe(200);
-				const {
-					state: { postLogoutRedirectUri }
-				} = setup.getSession();
+				const { postLogoutRedirectUri } = present(
+					setup.getSession().state,
+					'the logout state'
+				);
 				expect(postLogoutRedirectUri).toBe(
 					'https://client.example.com/logout/cb'
 				);
@@ -137,9 +139,10 @@ describe('logout endpoint', () => {
 					headers: { cookie }
 				});
 				expect(status).toBe(200);
-				const {
-					state: { postLogoutRedirectUri }
-				} = setup.getSession();
+				const { postLogoutRedirectUri } = present(
+					setup.getSession().state,
+					'the logout state'
+				);
 				expect(postLogoutRedirectUri).toBe(
 					'https://client.example.com/logout/cb'
 				);
@@ -156,9 +159,10 @@ describe('logout endpoint', () => {
 					headers: { cookie }
 				});
 				expect(status).toBe(200);
-				const {
-					state: { postLogoutRedirectUri }
-				} = setup.getSession();
+				const { postLogoutRedirectUri } = present(
+					setup.getSession().state,
+					'the logout state'
+				);
 				expect(postLogoutRedirectUri).toBe(
 					'https://client.example.com/logout/cb'
 				);
@@ -176,9 +180,10 @@ describe('logout endpoint', () => {
 					headers: { cookie }
 				});
 				expect(status).toBe(200);
-				const {
-					state: { postLogoutRedirectUri }
-				} = setup.getSession();
+				const { postLogoutRedirectUri } = present(
+					setup.getSession().state,
+					'the logout state'
+				);
 				expect(postLogoutRedirectUri).toBe(
 					'https://client.example.com/logout/cb'
 				);
@@ -304,9 +309,10 @@ describe('logout endpoint', () => {
 					}
 				});
 				expect(status).toBe(200);
-				const {
-					state: { postLogoutRedirectUri, state }
-				} = setup.getSession();
+				const { postLogoutRedirectUri, state } = present(
+					setup.getSession().state,
+					'the logout state'
+				);
 				expect(postLogoutRedirectUri).toBe(
 					'https://client.example.com/logout/cb'
 				);
@@ -323,9 +329,10 @@ describe('logout endpoint', () => {
 					}
 				});
 				expect(status).toBe(200);
-				const {
-					state: { postLogoutRedirectUri }
-				} = setup.getSession();
+				const { postLogoutRedirectUri } = present(
+					setup.getSession().state,
+					'the logout state'
+				);
 				expect(postLogoutRedirectUri).toBeUndefined();
 			});
 
@@ -341,9 +348,10 @@ describe('logout endpoint', () => {
 					}
 				});
 				expect(status).toBe(200);
-				const {
-					state: { postLogoutRedirectUri }
-				} = setup.getSession();
+				const { postLogoutRedirectUri } = present(
+					setup.getSession().state,
+					'the logout state'
+				);
 				expect(postLogoutRedirectUri).toBeUndefined();
 			});
 		});
@@ -522,11 +530,14 @@ describe('logout endpoint', () => {
 					postLogoutRedirectUri: 'https://rp.example.com/',
 					clientId: 'client'
 				};
-				session.authorizations.client.persistsLogout = true;
+				present(
+					session.authorizations?.client,
+					'the client authorization'
+				).persistsLogout = true;
 
-				const [firstGrant, secondGrant] = Object.keys(
-					session.authorizations
-				).map((x) => session.authorizations[x].grantId);
+				const [firstGrant, secondGrant] = Object.values(
+					present(session.authorizations, 'the authorizations')
+				).map((authorization) => authorization.grantId);
 
 				const res = await agent.logout.confirm.post(
 					{ xsrf: '123', logout: 'true' },
@@ -562,9 +573,12 @@ describe('logout endpoint', () => {
 					postLogoutRedirectUri: 'https://rp.example.com/logout/cb',
 					clientId: 'client'
 				};
-				session.authorizations.client.persistsLogout = true;
+				present(
+					session.authorizations?.client,
+					'the client authorization'
+				).persistsLogout = true;
 
-				expect(session.authorizations.client).toBeTruthy();
+				expect(session.authorizations?.client).toBeTruthy();
 
 				const res = await agent.logout.confirm.post(
 					{ xsrf: '123' },
@@ -581,7 +595,7 @@ describe('logout endpoint', () => {
 					.split('=')[1]
 					.trim();
 				session = setup.getSession(sessionID);
-				expect(session.authorizations.client).toBeUndefined();
+				expect(session.authorizations?.client).toBeUndefined();
 				expect(session.state).toBeUndefined();
 				expect(sessionID).not.toBe(oldId);
 				expect(adapter.destroy).toHaveBeenCalledWith(oldId);
@@ -590,7 +604,10 @@ describe('logout endpoint', () => {
 
 			it('announces the revoked grant once when the user signs out of one client only', async function () {
 				const session = setup.getSession();
-				const grantId = session.authorizations.client.grantId;
+				const grantId = present(
+					session.authorizations?.client,
+					'the client authorization'
+				).grantId;
 				session.state = {
 					secret: '123',
 					postLogoutRedirectUri: 'https://rp.example.com/logout/cb',
@@ -617,7 +634,7 @@ describe('logout endpoint', () => {
 				const oldId = setup.getSessionId();
 				session.state = { secret: '123', clientId: 'client' };
 
-				expect(session.authorizations.client).toBeTruthy();
+				expect(session.authorizations?.client).toBeTruthy();
 
 				const res = await agent.logout.confirm.post(
 					{ xsrf: '123' },
@@ -634,7 +651,7 @@ describe('logout endpoint', () => {
 					.split('=')[1]
 					.trim();
 				session = setup.getSession(sessionID);
-				expect(session.authorizations.client).toBeUndefined();
+				expect(session.authorizations?.client).toBeUndefined();
 				expect(session.state).toBeUndefined();
 				expect(sessionID).not.toBe(oldId);
 				expect(adapter.destroy).toHaveBeenCalledWith(oldId);

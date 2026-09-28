@@ -185,10 +185,11 @@ describe('admin bucket settings', () => {
 		const res = await client.admin.api.admins.settings.patch(
 			{
 				totpRequired: true,
+				// @ts-expect-error settings the endpoint does not carry; the schema refuses them
 				emailVerificationRequired: true,
 				registrationOpen: true,
 				passwordLogin: false
-			} as never,
+			},
 			{ headers: { cookie: admin.cookie } }
 		);
 		expect(res.status).toBe(422);

@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach, mock } from 'bun:test';
 import { BSON, Binary, ObjectId } from 'mongodb';
+import { Type } from '@sinclair/typebox';
+
+import { shaped } from 'test/shape.js';
 
 /*
  * The tier `wiki/concepts/mongodb-test-fidelity.md` described and nobody built. Recorded as G-008.
@@ -101,10 +104,12 @@ describe('a singleton secret in MongoDB storage', () => {
 		const created = await store.create(secret);
 
 		expect(created).toBeInstanceOf(Uint8Array);
-		expect(Buffer.from(created as Uint8Array).equals(secret)).toBe(true);
-		expect(Buffer.from((await store.read()) as Uint8Array).equals(secret)).toBe(
+		expect(Buffer.from(shaped(Type.Uint8Array(), created)).equals(secret)).toBe(
 			true
 		);
+		expect(
+			Buffer.from(shaped(Type.Uint8Array(), await store.read())).equals(secret)
+		).toBe(true);
 	});
 
 	/*
@@ -119,10 +124,12 @@ describe('a singleton secret in MongoDB storage', () => {
 		const created = await store.create(salt);
 
 		expect(created).toBeInstanceOf(Uint8Array);
-		expect(Buffer.from(created as Uint8Array).equals(salt)).toBe(true);
-		expect(Buffer.from((await store.read()) as Uint8Array).equals(salt)).toBe(
+		expect(Buffer.from(shaped(Type.Uint8Array(), created)).equals(salt)).toBe(
 			true
 		);
+		expect(
+			Buffer.from(shaped(Type.Uint8Array(), await store.read())).equals(salt)
+		).toBe(true);
 	});
 
 	/*
@@ -138,7 +145,9 @@ describe('a singleton secret in MongoDB storage', () => {
 		const read = await new SingletonSecretStore('dpopNonceSecret').read();
 
 		expect(read).toBeInstanceOf(Uint8Array);
-		expect(Buffer.from(read as Uint8Array).equals(secret)).toBe(true);
+		expect(Buffer.from(shaped(Type.Uint8Array(), read)).equals(secret)).toBe(
+			true
+		);
 	});
 
 	/*

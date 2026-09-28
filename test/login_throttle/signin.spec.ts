@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, jest, spyOn } from 'bun:test';
+import { Type } from '@sinclair/typebox';
 
 import bootstrap, { agent, getHeader } from '../test_helper.ts';
 import { SESSION_COOKIE_PREFIX } from '../test_helper.ts';
@@ -14,8 +15,9 @@ import { elysia } from 'lib/index.ts';
 import epochTime from 'lib/helpers/epoch_time.ts';
 import { eventBus } from 'lib/event_bus.ts';
 import { throttleKey } from 'lib/login_throttle/throttle.ts';
-import type { LoginThrottlePayload } from 'lib/login_throttle/types.ts';
+import { LoginThrottlePayload } from 'lib/login_throttle/types.ts';
 import { TestAdapter } from 'test/models.js';
+import { present, shaped } from 'test/shape.js';
 import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 
 /*
@@ -43,11 +45,9 @@ const WRONG = 'not the password';
 /* The one message every failed sign-in produces, whatever the reason. */
 const INVALID_CREDENTIALS = 'Invalid username or password';
 
-const CAP = ApplicationConfig['loginThrottle.failureCap'] as number;
-const WINDOW = ApplicationConfig['loginThrottle.windowSeconds'] as number;
-const CEILING = ApplicationConfig[
-	'loginThrottle.windowCeilingSeconds'
-] as number;
+const CAP = ApplicationConfig['loginThrottle.failureCap'];
+const WINDOW = ApplicationConfig['loginThrottle.windowSeconds'];
+const CEILING = ApplicationConfig['loginThrottle.windowCeilingSeconds'];
 
 let passwordBucketId: string;
 let secondFactorBucketId: string;
@@ -161,9 +161,10 @@ function counter(
 	bucketId: string,
 	email: string
 ): LoginThrottlePayload | undefined {
-	return TestAdapter.for('LoginThrottle').syncFind(
-		throttleKey(bucketId, email)
-	) as LoginThrottlePayload | undefined;
+	return shaped(
+		Type.Union([LoginThrottlePayload, Type.Undefined()]),
+		TestAdapter.for('LoginThrottle').syncFind(throttleKey(bucketId, email))
+	);
 }
 
 /* Reopen the door without waiting, leaving `step` where it is — the state a real lockout ends in. */
@@ -421,7 +422,7 @@ describe('password door brute-force throttle', () => {
 			for (let i = 0; i < CAP; i += 1) {
 				const res = await attempt(
 					'throttle-password-app',
-					spellings[i % spellings.length] as string,
+					present(spellings[i % spellings.length], 'a spelling'),
 					WRONG
 				);
 				expect(res.text).toContain(INVALID_CREDENTIALS);

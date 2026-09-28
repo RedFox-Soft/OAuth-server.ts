@@ -12,6 +12,7 @@ import {
 } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
+import { answered } from '../admin/answered.ts';
 
 /*
  * Declaring a protected resource through the admin API.
@@ -102,20 +103,18 @@ describe('protected resources API', () => {
 
 		const listed = await resources.get({ headers });
 		expect(listed.status).toBe(200);
-		expect((listed.data as Array<{ _id: string }>).map((r) => r._id)).toEqual([
-			AUDIENCE
-		]);
+		expect(answered(listed.data).map((r) => r._id)).toEqual([AUDIENCE]);
 
 		const read = await resources({ resourceId: encoded }).get({ headers });
 		expect(read.status).toBe(200);
-		expect((read.data as { name?: string }).name).toBe('Acme MCP');
+		expect(answered(read.data).name).toBe('Acme MCP');
 
 		const amended = await resources({ resourceId: encoded }).patch(
 			{ name: 'Acme MCP v2', scopes: ['mcp:tools-basic', 'mcp:files-read'] },
 			{ headers }
 		);
 		expect(amended.status).toBe(200);
-		expect((amended.data as { scopes?: string[] }).scopes).toEqual([
+		expect(answered(amended.data).scopes).toEqual([
 			'mcp:tools-basic',
 			'mcp:files-read'
 		]);
@@ -139,7 +138,7 @@ describe('protected resources API', () => {
 		);
 
 		expect(created.status).toBe(201);
-		expect((created.data as { _id?: string })._id).toBe(AUDIENCE);
+		expect(answered(created.data)._id).toBe(AUDIENCE);
 	});
 
 	it('refuses an identifier carrying a fragment', async () => {
@@ -252,7 +251,8 @@ describe('protected resources API', () => {
 		await resources.post(body, { headers });
 
 		const res = await resources({ resourceId: encoded }).patch(
-			{ identifier: 'https://elsewhere.example.com/mcp' } as never,
+			// @ts-expect-error the identifier is not an amendable field; the route must refuse it.
+			{ identifier: 'https://elsewhere.example.com/mcp' },
 			{ headers }
 		);
 

@@ -11,6 +11,7 @@ import bootstrap, {
 import { elysia } from 'lib/index.js';
 import { getUserStore } from 'lib/adapters/index.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
+import { present } from 'test/shape.js';
 
 const PASSWORD = 'sup3rsecret';
 const SLUG = 'acme';
@@ -54,7 +55,7 @@ async function signInToAcme(held: string): Promise<string> {
 
 	const written = findSessionSetCookie(loggedIn.headers.getSetCookie());
 	expect(written).toBeDefined();
-	return (written as string).split(';')[0];
+	return present(written, 'a session cookie').split(';')[0];
 }
 
 async function authorizeAtDefault(cookie: string) {

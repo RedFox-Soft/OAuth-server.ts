@@ -109,10 +109,12 @@ describe('token format and lifetime for a declared resource', () => {
 		);
 
 		expect(introspected.status).toBe(200);
-		const body = introspected.data as
-			{ active?: boolean; aud?: string; scope?: string } | undefined;
-		expect(body?.active).toBe(true);
-		expect(body?.aud).toBe(AUDIENCE);
+		const body = introspected.data;
+		if (typeof body !== 'object' || body === null) {
+			throw new Error(`expected an introspection response: ${body}`);
+		}
+		expect(body.active).toBe(true);
+		expect('aud' in body ? body.aud : undefined).toBe(AUDIENCE);
 	});
 
 	/*

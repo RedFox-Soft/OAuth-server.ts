@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { Elysia } from 'elysia';
+import { Type } from '@sinclair/typebox';
 
 import { ApplicationConfig } from 'lib/configs/application.ts';
 import { errorStore } from 'lib/adapters/index.ts';
 import { errorHandler } from 'lib/shared/authorization_error_handler.ts';
 import { flushForTest, resetQueue } from 'lib/error_store/queue.ts';
 import { resetOriginSalt } from 'lib/error_store/redact.ts';
+import { shaped } from 'test/shape.js';
 
 /*
  * The capture path, exercised through the real global error handler rather than by calling captureFault
@@ -90,7 +92,14 @@ describe('error store capture', () => {
 		});
 
 		const response = await app.handle(new Request('http://e.ly/boom-body'));
-		const body = (await response.json()) as Record<string, string>;
+		const body = shaped(
+			Type.Object({
+				error: Type.String(),
+				error_description: Type.String(),
+				error_reference: Type.String()
+			}),
+			await response.json()
+		);
 
 		expect(body.error).toBe('server_error');
 		expect(body.error_description).toBe('An unexpected error occurred');
@@ -106,9 +115,10 @@ describe('error store capture', () => {
 		});
 
 		const response = await app.handle(new Request('http://e.ly/boom-ref'));
-		const { error_reference: reference } = (await response.json()) as {
-			error_reference: string;
-		};
+		const { error_reference: reference } = shaped(
+			Type.Object({ error_reference: Type.String() }),
+			await response.json()
+		);
 		await flushForTest();
 
 		const hit = await errorStore.findByReference(reference);
@@ -156,7 +166,13 @@ describe('error store capture', () => {
 		});
 
 		const response = await app.handle(new Request('http://e.ly/boom-off'));
-		const body = (await response.json()) as Record<string, string>;
+		const body = shaped(
+			Type.Object({
+				error: Type.String(),
+				error_reference: Type.Optional(Type.String())
+			}),
+			await response.json()
+		);
 
 		expect(response.status).toBe(500);
 		expect(body.error).toBe('server_error');
@@ -170,7 +186,7 @@ describe('error store capture', () => {
 	 */
 	it('answers normally when the store cannot accept a write', async () => {
 		const original = errorStore.record;
-		(errorStore as { record: unknown }).record = async () => {
+		errorStore.record = async () => {
 			throw new Error('store unavailable');
 		};
 
@@ -181,13 +197,16 @@ describe('error store capture', () => {
 			const response = await app.handle(
 				new Request('http://e.ly/boom-store-down')
 			);
-			const body = (await response.json()) as Record<string, string>;
+			const body = shaped(
+				Type.Object({ error: Type.String() }),
+				await response.json()
+			);
 
 			expect(response.status).toBe(500);
 			expect(body.error).toBe('server_error');
 			await flushForTest();
 		} finally {
-			(errorStore as { record: unknown }).record = original;
+			errorStore.record = original;
 		}
 	});
 

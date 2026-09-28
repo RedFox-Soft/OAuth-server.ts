@@ -103,15 +103,10 @@ describe('federated links and deletion', () => {
 
 /* How many live handoffs name this account. Read from the adapter, since nothing queries them by owner. */
 function handoffsFor(accountId: string): number {
-	const store = TestAdapter.for('FederationState').store as Map<
-		string,
-		{ accountId?: string; exp?: number }
-	>;
 	let found = 0;
-	for (const [key, value] of store) {
-		if (typeof key !== 'string' || !key.startsWith('FederationState:'))
-			continue;
-		if (value?.accountId === accountId && (value.exp ?? 0) > epochTime()) {
+	for (const record of TestAdapter.for('FederationState').syncRecords()) {
+		const exp = typeof record.exp === 'number' ? record.exp : 0;
+		if (record.accountId === accountId && exp > epochTime()) {
 			found += 1;
 		}
 	}

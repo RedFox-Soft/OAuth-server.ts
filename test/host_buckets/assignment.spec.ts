@@ -199,7 +199,7 @@ describe('refusing an address that cannot work or should not exist (US2)', () =>
 	});
 
 	it('refuses a hostname the operator reserved for this deployment', async () => {
-		const reserved = ApplicationConfig['buckets.reservedHostnames'] as string[];
+		const reserved = ApplicationConfig['buckets.reservedHostnames'];
 		const restore = [...reserved];
 		reserved.push('STATUS.e.ly');
 

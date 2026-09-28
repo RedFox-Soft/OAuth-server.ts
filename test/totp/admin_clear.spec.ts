@@ -19,8 +19,8 @@ import {
 import { encodeBase32 } from 'lib/totp/base32.ts';
 import { attemptKey } from 'lib/totp/verify.ts';
 import epochTime from 'lib/helpers/epoch_time.ts';
-import type { User } from 'lib/adapters/types.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
+import { present } from 'test/shape.js';
 
 const app = new Elysia().use(resolveAdmin).use(endUserRoutes);
 const client = treaty(app);
@@ -78,9 +78,10 @@ describe('clearing a lost authenticator (US5)', () => {
 			.users.get({ headers: { cookie: admin.cookie } });
 
 		expect(res.status).toBe(200);
-		const listed = (res.data as { _id: string }[]).find(
-			(u) => u._id === user._id
-		) as { totpEnrolled?: boolean; totpEnrolledAt?: string } | undefined;
+		// The route's answer is typed as the list or the admin error envelope; only the list has accounts.
+		const listed = Array.isArray(res.data)
+			? res.data.find((u) => u._id === user._id)
+			: undefined;
 		expect(listed?.totpEnrolled).toBe(true);
 		expect(listed?.totpEnrolledAt).toBeTruthy();
 	});
@@ -94,9 +95,9 @@ describe('clearing a lost authenticator (US5)', () => {
 		const res = await client.admin.api
 			.buckets({ id: bucketId })
 			.users.get({ headers: { cookie: admin.cookie } });
-		const listed = (res.data as { _id: string }[]).find(
-			(u) => u._id === user._id
-		) as { totpEnrolled?: boolean; totpEnrolledAt?: string | null } | undefined;
+		const listed = Array.isArray(res.data)
+			? res.data.find((u) => u._id === user._id)
+			: undefined;
 		expect(listed?.totpEnrolled).toBe(false);
 		expect(listed?.totpEnrolledAt).toBeNull();
 	});
@@ -267,7 +268,10 @@ describe('clearing a lost authenticator (US5)', () => {
 			.totp.delete(undefined, { headers: { cookie: admin.cookie } });
 
 		expect(await adapter('Grant').find('grant-that-stays')).toBeDefined();
-		const after = (await getUserStore(bucketId).find(user._id)) as User;
+		const after = present(
+			await getUserStore(bucketId).find(user._id),
+			'the account after the clear'
+		);
 		expect(after.email).toBeTruthy();
 		expect(after.active).toBe(true);
 	});

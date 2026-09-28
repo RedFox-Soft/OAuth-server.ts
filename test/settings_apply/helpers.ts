@@ -1,8 +1,11 @@
+import { Type, type Static } from '@sinclair/typebox';
+
 import { getUserStore } from 'lib/adapters/index.js';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.js';
 
 import { sessionFor } from '../admin_session.js';
 import { send } from '../feature_gate/helpers.js';
+import { shaped } from '../shape.js';
 
 /*
  * A signed-in super administrator, because every case in this area changes a setting the way an
@@ -19,12 +22,11 @@ export async function superAdminCookie(): Promise<string> {
 	return `${ADMIN_SESSION_COOKIE}=${session._id}`;
 }
 
-export interface SettingsState {
-	values: Record<string, unknown>;
-	pendingRestartKeys: string[];
-	notInForceKeys: string[];
-	appliedKeys?: string[];
-}
+const SettingsState = Type.Object({
+	values: Type.Record(Type.String(), Type.Unknown()),
+	pendingRestartKeys: Type.Array(Type.String()),
+	notInForceKeys: Type.Array(Type.String())
+});
 
 export async function saveSettings(
 	cookie: string,
@@ -37,17 +39,19 @@ export async function saveSettings(
 	});
 }
 
-export async function readSettings(cookie: string): Promise<SettingsState> {
+export async function readSettings(
+	cookie: string
+): Promise<Static<typeof SettingsState>> {
 	const res = await send('/admin/api/settings', {
 		method: 'GET',
 		headers: { cookie }
 	});
-	return (await res.json()) as SettingsState;
+	return shaped(SettingsState, await res.json());
 }
 
 export async function discoveryDocument(): Promise<Record<string, unknown>> {
 	const res = await send('/.well-known/openid-configuration', {
 		method: 'GET'
 	});
-	return (await res.json()) as Record<string, unknown>;
+	return shaped(Type.Record(Type.String(), Type.Unknown()), await res.json());
 }

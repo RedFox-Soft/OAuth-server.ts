@@ -1,8 +1,10 @@
 import { describe, it, beforeAll, expect } from 'bun:test';
 import crypto from 'crypto';
+import { Type } from '@sinclair/typebox';
 
 import bootstrap from '../test_helper.js';
 import { TestAdapter } from 'test/models.js';
+import { shaped } from 'test/shape.js';
 import epochTime from 'lib/helpers/epoch_time.js';
 import {
 	consumeHandoff,
@@ -29,6 +31,8 @@ import {
 const records = () => TestAdapter.for('FederationState');
 const digest = (value: string) =>
 	crypto.createHash('sha256').update(value).digest('hex');
+const storedAt = (id: string) =>
+	shaped(Type.Record(Type.String(), Type.Unknown()), records().syncFind(id));
 
 /**
  * @proves A federation round trip is stored under a digest, consumed once, refused when expired,
@@ -47,15 +51,14 @@ describe('storage contract: FederationState', () => {
 			withPkce: true
 		});
 
-		const stored = records().syncFind(digest(state)) as
-			Record<string, unknown> | undefined;
+		const stored = storedAt(digest(state));
 		expect(stored).toBeDefined();
-		expect(stored!.stage).toBe('pending');
-		expect(stored!.interactionUid).toBe('int-1');
-		expect(stored!.bucketId).toBe('redfox');
-		expect(stored!.providerId).toBe('acme-sso');
-		expect(stored!.nonce).toBe(nonce);
-		expect(stored!.codeVerifier).toBe(codeVerifier);
+		expect(stored.stage).toBe('pending');
+		expect(stored.interactionUid).toBe('int-1');
+		expect(stored.bucketId).toBe('redfox');
+		expect(stored.providerId).toBe('acme-sso');
+		expect(stored.nonce).toBe(nonce);
+		expect(stored.codeVerifier).toBe(codeVerifier);
 
 		// The record is not findable by the live value — only by its digest.
 		expect(records().syncFind(state)).toBeUndefined();
@@ -78,7 +81,7 @@ describe('storage contract: FederationState', () => {
 		});
 
 		expect(codeVerifier).toBeUndefined();
-		const stored = records().syncFind(digest(state)) as Record<string, unknown>;
+		const stored = storedAt(digest(state));
 		// Absent, not present-and-empty: an empty verifier sent to a token endpoint is a failed exchange.
 		expect(stored).not.toHaveProperty('codeVerifier');
 	});
@@ -125,7 +128,7 @@ describe('storage contract: FederationState', () => {
 			accountId: 'account-5'
 		});
 
-		const stored = records().syncFind(digest(ref)) as Record<string, unknown>;
+		const stored = storedAt(digest(ref));
 		expect(stored.stage).toBe('complete');
 		expect(stored.interactionUid).toBe('int-5');
 		expect(stored.accountId).toBe('account-5');
@@ -183,7 +186,7 @@ describe('storage contract: FederationState', () => {
 
 		const declared = Object.keys(FederationStatePayload.properties);
 		for (const id of [digest(state), digest(ref)]) {
-			const stored = records().syncFind(id) as Record<string, unknown>;
+			const stored = storedAt(id);
 			for (const key of Object.keys(stored)) {
 				expect(declared).toContain(key);
 			}

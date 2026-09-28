@@ -7,6 +7,7 @@ import {
 } from 'lib/configs/pairwiseSalt.ts';
 import type { SecretStoreInstance } from 'lib/adapters/types.ts';
 import { SingletonSecretStore } from 'lib/adapters/memory/singletonSecretStore.ts';
+import { present } from 'test/shape.js';
 
 // The narrowing predicate and the generator —
 // specs/023-pairwise-identifier-salt/data-model.md, "Validation rules".
@@ -135,8 +136,8 @@ describe('pairwise salt: startup resolution', () => {
 		const second = await resolvePairwiseSalt(store, undefined);
 
 		expect(isUsablePairwiseSalt(first)).toBe(true);
-		expect(Buffer.from(second as Uint8Array)).toEqual(
-			Buffer.from(first as Uint8Array)
+		expect(Buffer.from(present(second, 'a second salt'))).toEqual(
+			Buffer.from(present(first, 'a first salt'))
 		);
 	});
 
@@ -182,8 +183,8 @@ describe('pairwise salt: startup resolution', () => {
 		]);
 
 		expect(isUsablePairwiseSalt(first)).toBe(true);
-		expect(Buffer.from(second as Uint8Array)).toEqual(
-			Buffer.from(first as Uint8Array)
+		expect(Buffer.from(present(second, 'a second salt'))).toEqual(
+			Buffer.from(present(first, 'a first salt'))
 		);
 	});
 

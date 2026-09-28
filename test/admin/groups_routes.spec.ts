@@ -8,8 +8,8 @@ import { scopeRoutes } from 'lib/admin/scope/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { getUserStore } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
-import type { Group, Project } from 'lib/adapters/types.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
+import { answered } from './answered.ts';
 
 const app = new Elysia()
 	.use(resolveAdmin)
@@ -54,19 +54,19 @@ describe('groups API', () => {
 		const res = await makeGroup(a.cookie);
 
 		expect(res.status).toBe(201);
-		const group = res.data as Group;
+		const group = answered(res.data);
 		expect(group.kind).toBe('regular');
 		expect(group.members).toEqual([{ userId: a.userId, role: 'owner' }]);
 	});
 
 	it('lists the groups the caller belongs to, personal group included', async () => {
 		const a = await admin();
-		const created = (await makeGroup(a.cookie)).data as Group;
+		const created = answered((await makeGroup(a.cookie)).data);
 
 		const list = await client.admin.api.groups.get({
 			headers: { cookie: a.cookie }
 		});
-		const ids = (list.data as Group[]).map((g) => g._id);
+		const ids = answered(list.data).map((g) => g._id);
 		expect(ids).toContain(created._id);
 		expect(ids).toContain(await personalGroupId(a.userId));
 	});
@@ -74,12 +74,12 @@ describe('groups API', () => {
 	it('hides a group from an administrator who does not belong to it', async () => {
 		const a = await admin();
 		const b = await admin();
-		const group = (await makeGroup(a.cookie)).data as Group;
+		const group = answered((await makeGroup(a.cookie)).data);
 
 		const list = await client.admin.api.groups.get({
 			headers: { cookie: b.cookie }
 		});
-		expect((list.data as Group[]).map((g) => g._id)).not.toContain(group._id);
+		expect(answered(list.data).map((g) => g._id)).not.toContain(group._id);
 
 		const read = await client.admin.api
 			.groups({ id: group._id })
@@ -91,7 +91,7 @@ describe('groups API', () => {
 		it('lets an owner add a member, who then reaches what the group owns', async () => {
 			const owner = await admin();
 			const member = await admin();
-			const group = (await makeGroup(owner.cookie)).data as Group;
+			const group = answered((await makeGroup(owner.cookie)).data);
 
 			const added = await client.admin.api
 				.groups({ id: group._id })
@@ -107,12 +107,17 @@ describe('groups API', () => {
 				{ groupId: group._id },
 				{ headers: { cookie: owner.cookie } }
 			);
-			const project = (
-				await client.admin.api.projects.post(
-					{ name: 'Shared', slug: `s-${Math.random().toString(36).slice(2)}` },
-					{ headers: { cookie: owner.cookie } }
-				)
-			).data as Project;
+			const project = answered(
+				(
+					await client.admin.api.projects.post(
+						{
+							name: 'Shared',
+							slug: `s-${Math.random().toString(36).slice(2)}`
+						},
+						{ headers: { cookie: owner.cookie } }
+					)
+				).data
+			);
 
 			await client.admin.api.scope.put(
 				{ groupId: group._id },
@@ -128,7 +133,7 @@ describe('groups API', () => {
 			const owner = await admin();
 			const member = await admin();
 			const third = await admin();
-			const group = (await makeGroup(owner.cookie)).data as Group;
+			const group = answered((await makeGroup(owner.cookie)).data);
 			await client.admin.api
 				.groups({ id: group._id })
 				.members.post(
@@ -160,7 +165,7 @@ describe('groups API', () => {
 		it('ends a removed member’s access on their very next request', async () => {
 			const owner = await admin();
 			const member = await admin();
-			const group = (await makeGroup(owner.cookie)).data as Group;
+			const group = answered((await makeGroup(owner.cookie)).data);
 			await client.admin.api
 				.groups({ id: group._id })
 				.members.post(
@@ -187,7 +192,7 @@ describe('groups API', () => {
 
 		it('never leaves a group without an owner', async () => {
 			const owner = await admin();
-			const group = (await makeGroup(owner.cookie)).data as Group;
+			const group = answered((await makeGroup(owner.cookie)).data);
 
 			const demote = await client.admin.api
 				.groups({ id: group._id })
@@ -266,7 +271,7 @@ describe('groups API', () => {
 		it('deletes an empty group, but only for an owner', async () => {
 			const owner = await admin();
 			const member = await admin();
-			const group = (await makeGroup(owner.cookie)).data as Group;
+			const group = answered((await makeGroup(owner.cookie)).data);
 			await client.admin.api
 				.groups({ id: group._id })
 				.members.post(
@@ -287,7 +292,7 @@ describe('groups API', () => {
 
 		it('refuses while the group still owns a project, and names what', async () => {
 			const owner = await admin();
-			const group = (await makeGroup(owner.cookie)).data as Group;
+			const group = answered((await makeGroup(owner.cookie)).data);
 			await client.admin.api.scope.put(
 				{ groupId: group._id },
 				{ headers: { cookie: owner.cookie } }

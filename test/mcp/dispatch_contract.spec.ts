@@ -22,6 +22,8 @@ import {
 	UNASSIGNED_GROUP_ID
 } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
+import { shaped } from 'test/shape.js';
+import { Type } from '@sinclair/typebox';
 
 /*
  * The dispatch contract: what a composition of the admin route plugins does and does not carry.
@@ -180,10 +182,21 @@ describe('in-process re-dispatch into the admin routes', () => {
 			})
 		);
 		expect(refused.status).toBe(409);
-		const body = (await refused.json()) as {
-			error: string;
-			blockers?: { kind: string; count: number; ids?: string[] }[];
-		};
+		const body = shaped(
+			Type.Object({
+				error: Type.String(),
+				blockers: Type.Optional(
+					Type.Array(
+						Type.Object({
+							kind: Type.String(),
+							count: Type.Number(),
+							ids: Type.Optional(Type.Array(Type.String()))
+						})
+					)
+				)
+			}),
+			await refused.json()
+		);
 		expect(body.error).toBe('admin_error');
 		expect(body.blockers?.[0]?.kind).toBe('client');
 		expect(body.blockers?.[0]?.count).toBe(1);

@@ -6,6 +6,8 @@ import {
 	reloadConfiguration
 } from 'lib/configs/application.js';
 import { send } from './helpers.js';
+import { Type } from '@sinclair/typebox';
+import { shaped } from 'test/shape.js';
 
 const json = { 'content-type': 'application/json' };
 const form = { 'content-type': 'application/x-www-form-urlencoded' };
@@ -147,10 +149,10 @@ describe('feature gate — capability on', () => {
 			})
 		});
 		expect(registered.status).toBe(201);
-		const { client_id, client_secret } = (await registered.json()) as {
-			client_id: string;
-			client_secret: string;
-		};
+		const { client_id, client_secret } = shaped(
+			Type.Object({ client_id: Type.String(), client_secret: Type.String() }),
+			await registered.json()
+		);
 
 		ApplicationConfig['registration.enabled'] = false;
 
@@ -181,27 +183,27 @@ describe('feature gate — capability on', () => {
 	// FR-013 across the whole gated set, not just registration: advertisement keeps tracking the flag
 	// in both states for every capability, which is what "gating did not perturb discovery" means.
 	it('keeps discovery tracking every gated flag in both states', async () => {
-		const advertised = {
-			'par.enabled': 'pushed_authorization_request_endpoint',
-			'introspection.enabled': 'introspection_endpoint',
-			'revocation.enabled': 'revocation_endpoint',
-			'registration.enabled': 'registration_endpoint',
-			'rpInitiatedLogout.enabled': 'end_session_endpoint',
-			'userinfo.enabled': 'userinfo_endpoint',
-			'deviceFlow.enabled': 'device_authorization_endpoint',
-			'ciba.enabled': 'backchannel_authentication_endpoint'
-		} as const;
+		const advertised = [
+			['par.enabled', 'pushed_authorization_request_endpoint'],
+			['introspection.enabled', 'introspection_endpoint'],
+			['revocation.enabled', 'revocation_endpoint'],
+			['registration.enabled', 'registration_endpoint'],
+			['rpInitiatedLogout.enabled', 'end_session_endpoint'],
+			['userinfo.enabled', 'userinfo_endpoint'],
+			['deviceFlow.enabled', 'device_authorization_endpoint'],
+			['ciba.enabled', 'backchannel_authentication_endpoint']
+		] as const;
 
-		for (const [flag, key] of Object.entries(advertised)) {
-			ApplicationConfig[flag as keyof typeof advertised] = false;
+		for (const [flag, key] of advertised) {
+			ApplicationConfig[flag] = false;
 			reloadConfiguration();
 			expect(JSON.parse(await discoveryDocument())).not.toHaveProperty(key);
 
-			ApplicationConfig[flag as keyof typeof advertised] = true;
+			ApplicationConfig[flag] = true;
 			reloadConfiguration();
 			expect(JSON.parse(await discoveryDocument())).toHaveProperty(key);
 
-			ApplicationConfig[flag as keyof typeof advertised] = false;
+			ApplicationConfig[flag] = false;
 			reloadConfiguration();
 		}
 	});

@@ -88,9 +88,12 @@ describe('the insufficient-scope response', () => {
 	 * flow against it; a declared resource's owner will need the same shape.
 	 */
 	it('carries the error, the required scope and where to look', () => {
-		const set = { status: 200, headers: {} as Record<string, string> };
+		const set: Parameters<typeof insufficientScope>[0] = {
+			status: 200,
+			headers: {}
+		};
 
-		const body = insufficientScope(set as never, 'files:write');
+		const body = insufficientScope(set, 'files:write');
 
 		expect(set.status).toBe(403);
 		const challenge = set.headers['www-authenticate'];

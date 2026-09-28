@@ -91,9 +91,12 @@ function tokenFromMail(): string {
  * throws ERR_BODY_ALREADY_USED. A 2xx body lands in `data`; a 4xx/5xx body lands in `error.value`. Both are
  * documents here, and comparing rendered pages (not just statuses) is what pins "indistinguishable".
  */
-function bodyOf(result: { data?: unknown; error?: unknown }): string {
+function bodyOf(result: {
+	data?: unknown;
+	error?: { value?: unknown } | null;
+}): string {
 	if (typeof result.data === 'string') return result.data;
-	const value = (result.error as { value?: unknown } | null | undefined)?.value;
+	const value = result.error?.value;
 	return typeof value === 'string' ? value : String(result.data ?? value);
 }
 

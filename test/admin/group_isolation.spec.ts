@@ -10,8 +10,8 @@ import { adminUserRoutes } from 'lib/admin/users/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { getUserStore } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
-import type { Project, UserBucket } from 'lib/adapters/types.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
+import { answered } from './answered.ts';
 
 /*
  * The suite that has to hold for this feature to be safe to ship.
@@ -75,16 +75,14 @@ describe('group isolation', () => {
 			{ headers: { cookie: a.cookie } }
 		);
 		expect(created.status).toBe(201);
-		const project = created.data as Project;
+		const project = answered(created.data);
 		expect(project.ownerGroupId).toBe(a.groupId);
 
 		// B's listing must not mention it, and B's read of it must be refused.
 		const bList = await client.admin.api.projects.get({
 			headers: { cookie: b.cookie }
 		});
-		expect((bList.data as Project[]).map((p) => p._id)).not.toContain(
-			project._id
-		);
+		expect(answered(bList.data).map((p) => p._id)).not.toContain(project._id);
 
 		const bRead = await client.admin.api
 			.projects({ id: project._id })
@@ -100,7 +98,7 @@ describe('group isolation', () => {
 			{ name: 'A project', slug: slug('a') },
 			{ headers: { cookie: a.cookie } }
 		);
-		const project = created.data as Project;
+		const project = answered(created.data);
 
 		const foreign = await client.admin.api
 			.projects({ id: project._id })
@@ -126,15 +124,13 @@ describe('group isolation', () => {
 			{ headers: { cookie: a.cookie } }
 		);
 		expect(created.status).toBe(201);
-		const bucket = created.data as UserBucket;
+		const bucket = answered(created.data);
 		expect(bucket.ownerGroupId).toBe(a.groupId);
 
 		const bList = await client.admin.api.buckets.get({
 			headers: { cookie: b.cookie }
 		});
-		expect((bList.data as UserBucket[]).map((x) => x._id)).not.toContain(
-			bucket._id
-		);
+		expect(answered(bList.data).map((x) => x._id)).not.toContain(bucket._id);
 
 		const bRead = await client.admin.api
 			.buckets({ id: bucket._id })
@@ -150,13 +146,13 @@ describe('group isolation', () => {
 			{ name: 'A project', slug: slug('a') },
 			{ headers: { cookie: a.cookie } }
 		);
-		const project = projectRes.data as Project;
+		const project = answered(projectRes.data);
 
 		const bucketRes = await client.admin.api.buckets.post(
 			{ name: 'B users', slug: 'b-users-2' },
 			{ headers: { cookie: b.cookie } }
 		);
-		const bucket = bucketRes.data as UserBucket;
+		const bucket = answered(bucketRes.data);
 
 		/*
 		 * A owns the project, B owns the bucket, and neither may join them — otherwise A's clients would
@@ -180,13 +176,13 @@ describe('group isolation', () => {
 			{ name: 'A project', slug: slug('a') },
 			{ headers: { cookie: a.cookie } }
 		);
-		const project = projectRes.data as Project;
+		const project = answered(projectRes.data);
 
 		const bucketRes = await client.admin.api.buckets.post(
 			{ name: 'A users', slug: 'a-users-3' },
 			{ headers: { cookie: a.cookie } }
 		);
-		const bucket = bucketRes.data as UserBucket;
+		const bucket = answered(bucketRes.data);
 
 		const assigned = await client.admin.api
 			.projects({ id: project._id })
@@ -202,7 +198,7 @@ describe('group isolation', () => {
 			{ name: 'A project', slug: slug('a') },
 			{ headers: { cookie: a.cookie } }
 		);
-		const project = created.data as Project;
+		const project = answered(created.data);
 
 		const denied = await client.admin.api
 			.projects({ id: project._id })
@@ -274,17 +270,20 @@ describe('group isolation', () => {
 		it('cannot move a container into its own group by updating it', async () => {
 			const a = await tenant('a');
 			const b = await tenant('b');
-			const theirs = (
-				await client.admin.api.projects.post(
-					{ name: 'Theirs', slug: slug('t') },
-					{ headers: { cookie: b.cookie } }
-				)
-			).data as Project;
+			const theirs = answered(
+				(
+					await client.admin.api.projects.post(
+						{ name: 'Theirs', slug: slug('t') },
+						{ headers: { cookie: b.cookie } }
+					)
+				).data
+			);
 
 			const res = await client.admin.api.projects({ id: theirs._id }).patch(
 				// `ownerGroupId` is not in the update body at all; submitted as an unknown field it is
 				// either refused or ignored, and either way the project must not move.
-				{ ownerGroupId: a.groupId } as never,
+				// @ts-expect-error an unknown field; the update schema does not declare it
+				{ ownerGroupId: a.groupId },
 				{ headers: { cookie: a.cookie } }
 			);
 			expect([403, 422]).toContain(res.status);
@@ -292,7 +291,7 @@ describe('group isolation', () => {
 			const after = await client.admin.api
 				.projects({ id: theirs._id })
 				.get({ headers: { cookie: b.cookie } });
-			expect((after.data as Project).ownerGroupId).toBe(b.groupId);
+			expect(answered(after.data).ownerGroupId).toBe(b.groupId);
 		});
 	});
 

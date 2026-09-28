@@ -16,6 +16,7 @@ import {
 	getProjectStore
 } from 'lib/adapters/index.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
+import { answered } from './answered.ts';
 import {
 	ADMIN_BUCKET_ID,
 	ADMIN_PROJECT_ID,
@@ -75,7 +76,7 @@ describe('clients API', () => {
 				{ headers: { cookie } }
 			);
 		expect(created.status).toBe(201);
-		const body = created.data as { clientId: string; secret?: string };
+		const body = answered(created.data);
 		expect(body.clientId).toBeTruthy();
 		expect(body.secret).toBeUndefined(); // public client
 		const reloaded = await getProjectStore().find(proj._id);
@@ -83,7 +84,7 @@ describe('clients API', () => {
 		const list = await client.admin.api
 			.projects({ id: proj._id })
 			.clients.get({ headers: { cookie } });
-		const clients = list.data as Array<{ clientId: string }>;
+		const clients = answered(list.data);
 		expect(clients.some((c) => c.clientId === body.clientId)).toBe(true);
 	});
 
@@ -99,14 +100,15 @@ describe('clients API', () => {
 				},
 				{ headers: { cookie } }
 			);
-		const body = created.data as { clientId: string; secret?: string };
+		const body = answered(created.data);
 		expect(body.secret).toBeTruthy();
 		const one = await client.admin.api
 			.projects({ id: proj._id })
 			.clients({ clientId: body.clientId })
 			.get({ headers: { cookie } });
-		expect((one.data as Record<string, unknown>).secret).toBeUndefined();
-		expect((one.data as Record<string, unknown>).clientSecret).toBeUndefined();
+		const view = answered(one.data);
+		expect(view).not.toHaveProperty('secret');
+		expect(view).not.toHaveProperty('clientSecret');
 	});
 
 	it('maps invalid client metadata to 422', async () => {
@@ -138,11 +140,9 @@ describe('clients API', () => {
 		const offered = (
 			schema: typeof CreateClientBody | typeof UpdateClientBody
 		) =>
-			(
-				schema.properties.backchannelTokenDeliveryMode as {
-					anyOf: Array<{ const: string }>;
-				}
-			).anyOf.map((member) => member.const);
+			schema.properties.backchannelTokenDeliveryMode.anyOf.map(
+				(member) => member.const
+			);
 
 		expect(offered(CreateClientBody)).toEqual(['poll', 'ping']);
 		expect(offered(UpdateClientBody)).toEqual(['poll', 'ping']);
@@ -195,7 +195,7 @@ describe('clients API', () => {
 				},
 				{ headers: { cookie: su.cookie } }
 			);
-		const otherClientId = (created.data as { clientId: string }).clientId;
+		const otherClientId = answered(created.data).clientId;
 		// project_admin cannot list `other`
 		const denied = await client.admin.api
 			.projects({ id: other._id })
@@ -231,7 +231,7 @@ describe('clients API', () => {
 				},
 				{ headers: { cookie } }
 			);
-		const id = (created.data as { clientId: string }).clientId;
+		const id = answered(created.data).clientId;
 		const del = await client.admin.api
 			.projects({ id: proj._id })
 			.clients({ clientId: id })
@@ -254,7 +254,7 @@ describe('clients API', () => {
 				},
 				{ headers: { cookie } }
 			);
-		const id = (created.data as { clientId: string }).clientId;
+		const id = answered(created.data).clientId;
 		const patched = await client.admin.api
 			.projects({ id: proj._id })
 			.clients({ clientId: id })
@@ -267,7 +267,7 @@ describe('clients API', () => {
 			.projects({ id: proj._id })
 			.clients({ clientId: id })
 			.get({ headers: { cookie } });
-		expect((reloaded.data as { redirectUris: string[] }).redirectUris).toEqual([
+		expect(answered(reloaded.data).redirectUris).toEqual([
 			'https://updated.example.com/cb'
 		]);
 	});
@@ -284,13 +284,13 @@ describe('clients API', () => {
 				},
 				{ headers: { cookie } }
 			);
-		const confidentialId = (confidential.data as { clientId: string }).clientId;
+		const confidentialId = answered(confidential.data).clientId;
 		const rotated = await client.admin.api
 			.projects({ id: proj._id })
 			.clients({ clientId: confidentialId })
 			.secret.post(undefined, { headers: { cookie } });
 		expect(rotated.status).toBe(200);
-		expect((rotated.data as { secret: string }).secret).toBeTruthy();
+		expect(answered(rotated.data).secret).toBeTruthy();
 
 		const pub = await client.admin.api.projects({ id: proj._id }).clients.post(
 			{
@@ -300,7 +300,7 @@ describe('clients API', () => {
 			},
 			{ headers: { cookie } }
 		);
-		const pubId = (pub.data as { clientId: string }).clientId;
+		const pubId = answered(pub.data).clientId;
 		const pubRotate = await client.admin.api
 			.projects({ id: proj._id })
 			.clients({ clientId: pubId })
@@ -322,7 +322,7 @@ describe('clients API', () => {
 				},
 				{ headers: { cookie } }
 			);
-		const clientId = (created.data as { clientId: string }).clientId;
+		const clientId = answered(created.data).clientId;
 		const crossProject = await client.admin.api
 			.projects({ id: projB._id })
 			.clients({ clientId })

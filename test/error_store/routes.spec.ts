@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { Elysia } from 'elysia';
+import { Type } from '@sinclair/typebox';
 
 import { ApplicationConfig } from 'lib/configs/application.ts';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
@@ -13,6 +14,7 @@ import {
 import type { ErrorOccurrence } from 'lib/adapters/types.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
+import { shaped } from 'test/shape.js';
 
 /*
  * The read surface — specs/025-server-error-store/contracts/admin-api.md.
@@ -155,11 +157,14 @@ describe('GET /admin/api/errors', () => {
 				`/admin/api/errors?route=${route}&limit=2`,
 				cookie
 			);
-			const body = (await response.json()) as {
-				groups: unknown[];
-				total: number;
-				dropped: number;
-			};
+			const body = shaped(
+				Type.Object({
+					groups: Type.Array(Type.Unknown()),
+					total: Type.Number(),
+					dropped: Type.Number()
+				}),
+				await response.json()
+			);
 
 			expect(body.groups).toHaveLength(2);
 			expect(body.total).toBe(3);
@@ -174,7 +179,10 @@ describe('GET /admin/api/errors', () => {
 				'/admin/api/errors?rout=/typo-in-the-name',
 				cookie
 			);
-			const body = (await response.json()) as { message: string };
+			const body = shaped(
+				Type.Object({ message: Type.String() }),
+				await response.json()
+			);
 
 			expect(response.status).toBe(422);
 			expect(body.message).toContain('rout');
@@ -204,10 +212,13 @@ describe('GET /admin/api/errors', () => {
 			const created = must(await seedFault(route), 'the seeded group');
 
 			const response = await get(`/admin/api/errors/${created._id}`, cookie);
-			const body = (await response.json()) as {
-				_id: string;
-				samples: unknown[];
-			};
+			const body = shaped(
+				Type.Object({
+					_id: Type.String(),
+					samples: Type.Array(Type.Unknown())
+				}),
+				await response.json()
+			);
 
 			expect(response.status).toBe(200);
 			expect(body._id).toBe(created._id);
@@ -228,7 +239,10 @@ describe('GET /admin/api/errors', () => {
 		it('does not treat a reserved sub-path as a group id', async () => {
 			const cookie = await cookieFor(['super_admin']);
 			const response = await get('/admin/api/errors/summary', cookie);
-			const body = (await response.json()) as { byRoute?: unknown[] };
+			const body = shaped(
+				Type.Object({ byRoute: Type.Optional(Type.Unknown()) }),
+				await response.json()
+			);
 
 			expect(response.status).toBe(200);
 			expect(Array.isArray(body.byRoute)).toBe(true);

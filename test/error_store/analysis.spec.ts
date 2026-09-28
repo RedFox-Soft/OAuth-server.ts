@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { Elysia } from 'elysia';
+import { Type } from '@sinclair/typebox';
 
 import { ApplicationConfig } from 'lib/configs/application.ts';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
@@ -13,6 +14,7 @@ import {
 import type { ErrorOccurrence } from 'lib/adapters/types.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
+import { shaped } from 'test/shape.js';
 
 /*
  * The analysis surface — US2. What makes a pile of records answer a question.
@@ -74,13 +76,14 @@ async function get(path: string, cookie?: string) {
 	);
 }
 
-interface Summary {
-	total: number;
-	byErrorCode: { key: string; count: number }[];
-	byRoute: { key: string; count: number }[];
-	dropped: number;
-	recording: boolean;
-}
+const Bucket = Type.Object({ key: Type.String(), count: Type.Number() });
+const Summary = Type.Object({
+	byErrorCode: Type.Array(Bucket),
+	byRoute: Type.Array(Bucket),
+	dropped: Type.Number(),
+	recording: Type.Boolean()
+});
+const Listing = Type.Object({ total: Type.Number() });
 
 /**
  * @proves A super administrator sees what is failing most, by occurrence rather than by row,
@@ -131,7 +134,7 @@ describe('error store analysis', () => {
 			}
 
 			const response = await get('/admin/api/errors/summary', cookie);
-			const body = (await response.json()) as Summary;
+			const body = shaped(Summary, await response.json());
 
 			expect(response.status).toBe(200);
 
@@ -151,9 +154,10 @@ describe('error store analysis', () => {
 			await seed({ route, errorCode: 'server_error' });
 			await seed({ route, errorCode: 'admin_error' });
 
-			const body = (await get('/admin/api/errors/summary', cookie).then((r) =>
-				r.json()
-			)) as Summary;
+			const body = shaped(
+				Summary,
+				await get('/admin/api/errors/summary', cookie).then((r) => r.json())
+			);
 
 			const codes = body.byErrorCode.map((b) => b.key);
 			expect(codes).toContain('server_error');
@@ -166,10 +170,12 @@ describe('error store analysis', () => {
 			await seed({ route });
 
 			const future = new Date(Date.now() + 60_000).toISOString();
-			const body = (await get(
-				`/admin/api/errors/summary?from=${future}`,
-				cookie
-			).then((r) => r.json())) as Summary;
+			const body = shaped(
+				Summary,
+				await get(`/admin/api/errors/summary?from=${future}`, cookie).then(
+					(r) => r.json()
+				)
+			);
 
 			expect(body.byRoute.find((b) => b.key === route)).toBeUndefined();
 		});
@@ -196,9 +202,10 @@ describe('error store analysis', () => {
 
 		it('reports the dropped count and whether recording is on', async () => {
 			const cookie = await superCookie();
-			const body = (await get('/admin/api/errors/summary', cookie).then((r) =>
-				r.json()
-			)) as Summary;
+			const body = shaped(
+				Summary,
+				await get('/admin/api/errors/summary', cookie).then((r) => r.json())
+			);
 
 			expect(body.dropped).toBe(0);
 			expect(body.recording).toBe(true);
@@ -212,22 +219,30 @@ describe('error store analysis', () => {
 			await seed({ route, status: 500, surface: 'oauth' });
 			await seed({ route, status: 502, surface: 'admin' });
 
-			const byStatus = (await get(
-				`/admin/api/errors?route=${route}&status=502`,
-				cookie
-			).then((r) => r.json())) as { total: number };
+			const byStatus = shaped(
+				Listing,
+				await get(`/admin/api/errors?route=${route}&status=502`, cookie).then(
+					(r) => r.json()
+				)
+			);
 			expect(byStatus.total).toBe(1);
 
-			const bySurface = (await get(
-				`/admin/api/errors?route=${route}&surface=admin`,
-				cookie
-			).then((r) => r.json())) as { total: number };
+			const bySurface = shaped(
+				Listing,
+				await get(
+					`/admin/api/errors?route=${route}&surface=admin`,
+					cookie
+				).then((r) => r.json())
+			);
 			expect(bySurface.total).toBe(1);
 
-			const byCode = (await get(
-				`/admin/api/errors?route=${route}&errorCode=server_error`,
-				cookie
-			).then((r) => r.json())) as { total: number };
+			const byCode = shaped(
+				Listing,
+				await get(
+					`/admin/api/errors?route=${route}&errorCode=server_error`,
+					cookie
+				).then((r) => r.json())
+			);
 			expect(byCode.total).toBe(2);
 		});
 
@@ -250,17 +265,23 @@ describe('error store analysis', () => {
 			});
 			await seed({ route });
 
-			const byClient = (await get(
-				`/admin/api/errors?route=${route}&clientId=client-alpha`,
-				cookie
-			).then((r) => r.json())) as { total: number };
+			const byClient = shaped(
+				Listing,
+				await get(
+					`/admin/api/errors?route=${route}&clientId=client-alpha`,
+					cookie
+				).then((r) => r.json())
+			);
 			expect(byClient.total).toBe(1);
 
 			for (const actor of ['admin-9', 'ops9@x.io']) {
-				const byActor = (await get(
-					`/admin/api/errors?route=${route}&actor=${encodeURIComponent(actor)}`,
-					cookie
-				).then((r) => r.json())) as { total: number };
+				const byActor = shaped(
+					Listing,
+					await get(
+						`/admin/api/errors?route=${route}&actor=${encodeURIComponent(actor)}`,
+						cookie
+					).then((r) => r.json())
+				);
 				expect(byActor.total).toBe(1);
 			}
 		});
@@ -278,10 +299,15 @@ describe('error store analysis', () => {
 
 			const seen: string[] = [];
 			for (let offset = 0; offset < 5; offset += 1) {
-				const page = (await get(
-					`/admin/api/errors?route=${route}&limit=1&offset=${offset}`,
-					cookie
-				).then((r) => r.json())) as { groups: { _id: string }[] };
+				const page = shaped(
+					Type.Object({
+						groups: Type.Array(Type.Object({ _id: Type.String() }))
+					}),
+					await get(
+						`/admin/api/errors?route=${route}&limit=1&offset=${offset}`,
+						cookie
+					).then((r) => r.json())
+				);
 				seen.push(page.groups[0]._id);
 			}
 

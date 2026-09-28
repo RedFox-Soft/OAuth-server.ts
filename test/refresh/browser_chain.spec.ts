@@ -28,6 +28,9 @@ import { ISSUER } from 'lib/configs/env.js';
 import { ttl } from 'lib/configs/liveTime.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
+import { present, shaped } from 'test/shape.js';
+import { Type } from '@sinclair/typebox';
+import { RefreshTokenSchema } from 'lib/models/refresh_token.js';
 
 const DAY = 24 * 60 * 60;
 const REFRESH_LIFETIME = 14 * DAY;
@@ -119,16 +122,18 @@ describe('a browser application refreshing its tokens', () => {
 
 	/* The token response's refresh token; the response union also covers the error shapes. */
 	function rotatedFrom(data: unknown): string {
-		// The union of success and error bodies has no common `refresh_token`; checked at runtime below.
-		const value = (data as { refresh_token?: unknown } | null)?.refresh_token;
-		if (typeof value !== 'string') throw new Error('expected a refresh token');
-		return value;
+		return shaped(Type.Object({ refresh_token: Type.String() }), data)
+			.refresh_token;
 	}
 
 	function expiryOf(refreshToken: string): number {
-		return TestAdapter.for('RefreshToken').syncFind(
-			setup.getTokenJti(refreshToken)
-		).exp;
+		return present(
+			TestAdapter.for('RefreshToken').syncFindAs(
+				RefreshTokenSchema,
+				setup.getTokenJti(refreshToken)
+			).exp,
+			'an expiry'
+		);
 	}
 
 	function at(days: number, seconds = 0) {

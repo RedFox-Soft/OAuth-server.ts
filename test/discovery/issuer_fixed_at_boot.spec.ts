@@ -30,13 +30,12 @@ const STEERED = {
 };
 
 function urlsIn(document: Record<string, unknown>): string[] {
-	return Object.entries(document)
-		.filter(
-			([key, value]) =>
-				typeof value === 'string' &&
-				(key.endsWith('_endpoint') || key.endsWith('_uri') || key === 'issuer')
-		)
-		.map(([, value]) => value as string);
+	return Object.entries(document).flatMap(([key, value]) =>
+		typeof value === 'string' &&
+		(key.endsWith('_endpoint') || key.endsWith('_uri') || key === 'issuer')
+			? [value]
+			: []
+	);
 }
 
 /**
@@ -54,7 +53,7 @@ describe('the published endpoint URLs', () => {
 		});
 		if (!data) throw new Error('expected a discovery document');
 
-		const urls = urlsIn(data as Record<string, unknown>);
+		const urls = urlsIn(data);
 
 		expect(urls.length).toBeGreaterThan(0);
 		expect(urls.filter((url) => !url.startsWith(ISSUER))).toEqual([]);
@@ -68,7 +67,7 @@ describe('the published endpoint URLs', () => {
 		if (!data)
 			throw new Error('expected an authorization server metadata document');
 
-		const urls = urlsIn(data as Record<string, unknown>);
+		const urls = urlsIn(data);
 
 		expect(urls.length).toBeGreaterThan(0);
 		expect(urls.filter((url) => !url.startsWith(ISSUER))).toEqual([]);

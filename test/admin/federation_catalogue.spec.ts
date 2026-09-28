@@ -26,6 +26,9 @@ import {
 import { mock } from '../fetch_mock.ts';
 import { idpStub } from '../federation/idp_stub.ts';
 import { sessionFor } from '../admin_session.ts';
+import { answered } from './answered.ts';
+import { present } from 'test/shape.ts';
+import type { ProviderGuidance } from 'lib/admin/federation/guidance.ts';
 
 /*
  * Google's issuer is fixed, so every case here stubs the same origin rather than taking its own as the
@@ -63,10 +66,11 @@ async function stubGoogle() {
 	return idp;
 }
 
-function guidanceFor(payload: unknown, catalogueId = 'google') {
-	const providers = (payload as { providers?: Record<string, unknown>[] })
-		?.providers;
-	return providers?.find((entry) => entry.catalogueId === catalogueId);
+function guidanceFor(
+	payload: { providers: ProviderGuidance[] },
+	catalogueId = 'google'
+) {
+	return payload.providers.find((entry) => entry.catalogueId === catalogueId);
 }
 
 /**
@@ -98,9 +102,11 @@ describe('connecting a recognised provider', () => {
 			 * single value. A sample parameter is enough: the claim is that whatever an entry would store is
 			 * a valid issuer, not that any particular organisation exists.
 			 */
-			const issuer = issuerForKnownProvider(entry, { tenant: 'sample-tenant' });
-			expect(issuer).toBeDefined();
-			assertIssuer(issuer as string);
+			const issuer = present(
+				issuerForKnownProvider(entry, { tenant: 'sample-tenant' }),
+				`an issuer for ${entry.catalogueId}`
+			);
+			assertIssuer(issuer);
 			assertScopes([...entry.scopes], entry.protocol.kind);
 			assertEmailDomains([]);
 
@@ -123,10 +129,10 @@ describe('connecting a recognised provider', () => {
 			.federation.catalogue.get({ headers: { cookie } });
 
 		expect(res.status).toBe(200);
-		const google = guidanceFor(res.data);
+		const google = guidanceFor(answered(res.data));
 		expect(google?.callbackUri).toBe('http://e.ly/acme/federation/callback');
 		expect(google?.consoleUrl).toStartWith('https://console.cloud.google.com');
-		expect((google?.steps as string[]).length).toBeGreaterThan(0);
+		expect(google?.steps.length).toBeGreaterThan(0);
 		// Google's form asks for these; this flow is server-side and needs none, so the guidance says so.
 		expect(google?.javascriptOrigins).toEqual([]);
 	});
@@ -143,10 +149,10 @@ describe('connecting a recognised provider', () => {
 			.buckets({ id: second._id })
 			.federation.catalogue.get({ headers: { cookie } });
 
-		expect(guidanceFor(one.data)?.callbackUri).toBe(
+		expect(guidanceFor(answered(one.data))?.callbackUri).toBe(
 			'http://e.ly/tenant-one/federation/callback'
 		);
-		expect(guidanceFor(two.data)?.callbackUri).toBe(
+		expect(guidanceFor(answered(two.data))?.callbackUri).toBe(
 			'http://e.ly/tenant-two/federation/callback'
 		);
 	});
@@ -159,7 +165,7 @@ describe('connecting a recognised provider', () => {
 			.buckets({ id: bucket._id })
 			.federation.catalogue.get({ headers: { cookie } });
 
-		const google = guidanceFor(res.data);
+		const google = guidanceFor(answered(res.data));
 		expect(google?.callbackStability).toBe('provisional');
 		// Built from the record id, which is what assigning a slug later invalidates.
 		expect(google?.callbackUri).toContain(bucket._id);
@@ -173,7 +179,7 @@ describe('connecting a recognised provider', () => {
 			.buckets({ id: bucket._id })
 			.federation.catalogue.get({ headers: { cookie } });
 
-		expect(guidanceFor(res.data)?.callbackStability).toBe('stable');
+		expect(guidanceFor(answered(res.data))?.callbackStability).toBe('stable');
 	});
 
 	it('connects a recognised provider from its name and two credentials alone', async () => {
@@ -193,7 +199,7 @@ describe('connecting a recognised provider', () => {
 			);
 
 		expect(res.status).toBe(201);
-		const created = res.data as Record<string, unknown>;
+		const created = answered(res.data);
 		expect(created.id).toBe('google');
 		expect(created.issuer).toBe(GOOGLE_ISSUER);
 		expect(created.displayName).toBe('Google');
@@ -262,7 +268,7 @@ describe('connecting a recognised provider', () => {
 			);
 
 		expect(res.status).toBe(201);
-		const created = res.data as Record<string, unknown>;
+		const created = answered(res.data);
 		expect(created.allowedEmailDomains).toEqual(['acme.com']);
 		expect(created.emailTrusted).toBe(false);
 		expect(created.displayName).toBe('Acme Google');
@@ -357,7 +363,7 @@ describe('connecting a recognised provider', () => {
 			.buckets({ id: bucket._id })
 			.federation.catalogue.get({ headers: { cookie } });
 
-		const google = guidanceFor(res.data);
+		const google = guidanceFor(answered(res.data));
 		expect(google?.alreadyConnected).toBe(true);
 		expect(google?.existingProviderId).toBe('google');
 	});

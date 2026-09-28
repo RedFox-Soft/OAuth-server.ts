@@ -187,6 +187,15 @@ Call `bootstrap(import.meta.url)` at the top of a spec — the URL, not the `imp
 Time-sensitive cases travel with Bun's `setSystemTime` (from `bun:test`); call it with no argument to
 reset.
 
+**Data from outside the type system is checked, not cast.** A cast is a claim nobody verifies, and a
+spec's reads are where a wrong claim hides. A JSON body (`Response.json()` answers `any`), a parsed page
+prop or a raw record goes through `shaped(schema, value)` (`test/shape.ts`; build the schema with
+`Type` from `@sinclair/typebox`, not Elysia's `t`), a value that may be absent through
+`present(value, 'what')`, an admin route's Eden `data` through `answered` (`test/admin/answered.ts`),
+and a stored model record through `TestAdapter.for(name).syncFindAs(<the model's payload schema>, id)`.
+A mocked `fetch` is `fetchAnswering(...)` over a real `Response`. `@ts-expect-error` is for input that is
+off-schema on purpose, with the reason on the directive.
+
 **Two properties hold for every spec**, set once in `test/preload.ts` so no spec has to remember them and
 no file order can change them:
 

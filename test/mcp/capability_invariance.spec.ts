@@ -20,9 +20,14 @@ import {
 	MCP_ROUTE
 } from 'lib/mcp/consts.ts';
 import { mcpCatalogue } from 'lib/mcp/catalogue.ts';
-import { ApplicationConfig } from 'lib/configs/application.js';
+import {
+	ApplicationConfig,
+	type ApplicationConfigType
+} from 'lib/configs/application.js';
 import { mock } from '../fetch_mock.ts';
 import { idpStub } from '../federation/idp_stub.ts';
+import { shaped } from 'test/shape.js';
+import { Type } from '@sinclair/typebox';
 
 /*
  * FR-006, FR-037, SC-012: the published operation set does not vary with the instance's capability
@@ -39,6 +44,8 @@ import { idpStub } from '../federation/idp_stub.ts';
  */
 
 let rpcId = 0;
+
+const Created = Type.Object({ _id: Type.String() });
 
 async function rpc(body: unknown, token: string) {
 	const res = await elysia.handle(
@@ -89,7 +96,7 @@ async function session() {
 		scope: 'openid'
 	});
 	at.setAudience(MCP_RESOURCE);
-	const token = (await at.save()) as unknown as string;
+	const token = await at.save();
 	await rpc(
 		{
 			jsonrpc: '2.0',
@@ -111,13 +118,16 @@ async function publishedToolNames(token: string): Promise<string[]> {
 		{ jsonrpc: '2.0', id: ++rpcId, method: 'tools/list', params: {} },
 		token
 	);
-	return ((listed.result?.tools ?? []) as { name: string }[])
+	return shaped(
+		Type.Array(Type.Object({ name: Type.String() })),
+		listed.result?.tools ?? []
+	)
 		.map((t) => t.name)
 		.sort();
 }
 
 /* Flag configurations that differ in ways a naive implementation would have leaked into the tool list. */
-const CONFIGURATIONS: [string, Record<string, boolean>][] = [
+const CONFIGURATIONS: [string, Partial<ApplicationConfigType>][] = [
 	['everything on', { 'federation.enabled': true, 'dpop.enabled': true }],
 	['federation off', { 'federation.enabled': false }],
 	['dpop off', { 'dpop.enabled': false }],
@@ -156,9 +166,7 @@ describe('published operation set is capability-invariant', () => {
 		const seen = new Map<string, string[]>();
 
 		for (const [label, flags] of CONFIGURATIONS) {
-			for (const [key, value] of Object.entries(flags)) {
-				(ApplicationConfig as Record<string, unknown>)[key] = value;
-			}
+			Object.assign(ApplicationConfig, flags);
 			const token = await session();
 			seen.set(label, await publishedToolNames(token));
 		}
@@ -185,9 +193,10 @@ describe('published operation set is capability-invariant', () => {
 			call('bucket_create', { name: 'Fed', slug: 'fed-1' }),
 			token
 		);
-		const bucketId = (
-			bucket.result?.structuredContent?.result as { _id: string }
-		)._id;
+		const { _id: bucketId } = shaped(
+			Created,
+			bucket.result?.structuredContent?.result
+		);
 
 		/*
 		 * Creating a provider validates its issuer by fetching the discovery document — deliberately, so a
@@ -250,9 +259,10 @@ describe('published operation set is capability-invariant', () => {
 			call('bucket_create', { name: 'Readable', slug: 'readable-2' }),
 			token
 		);
-		const bucketId = (
-			bucket.result?.structuredContent?.result as { _id: string }
-		)._id;
+		const { _id: bucketId } = shaped(
+			Created,
+			bucket.result?.structuredContent?.result
+		);
 
 		// The operation is offered and answers. If a capability affected the outcome, the operation
 		// itself would say so — the surface does not pre-empt it (FR-037).

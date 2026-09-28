@@ -58,7 +58,7 @@ describe('ensureAdminSeed', () => {
 			bucketId: ADMIN_BUCKET_ID
 		});
 		// Simulate a legacy document created before clientIds existed.
-		delete (p as { clientIds?: string[] }).clientIds;
+		Reflect.deleteProperty(p, 'clientIds');
 		await ensureAdminSeed();
 		const reloaded = await store.find(ADMIN_PROJECT_ID);
 		expect(reloaded?.clientIds).toContain(ADMIN_CLIENT_ID);

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
+import { Type } from '@sinclair/typebox';
 
 import bootstrap from '../test_helper.js';
 import { configStore } from 'lib/adapters/index.js';
@@ -8,6 +9,7 @@ import {
 	saveSettings,
 	superAdminCookie
 } from './helpers.js';
+import { shaped } from '../shape.js';
 
 const form = { 'content-type': 'application/x-www-form-urlencoded' };
 
@@ -70,11 +72,14 @@ describe('a capability switched through the management API', () => {
 
 	it('reports the saved value as running once it has been applied', async () => {
 		const res = await saveSettings(cookie, { 'par.enabled': true });
-		const body = (await res.json()) as {
-			appliedKeys: string[];
-			pendingRestartKeys: string[];
-			notInForceKeys: string[];
-		};
+		const body = shaped(
+			Type.Object({
+				appliedKeys: Type.Array(Type.String()),
+				pendingRestartKeys: Type.Array(Type.String()),
+				notInForceKeys: Type.Array(Type.String())
+			}),
+			await res.json()
+		);
 
 		expect(body.appliedKeys).toEqual(['par.enabled']);
 		expect(body.pendingRestartKeys).toEqual([]);

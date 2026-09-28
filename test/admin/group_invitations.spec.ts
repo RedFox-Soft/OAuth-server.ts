@@ -7,8 +7,8 @@ import { invitationAcceptRoutes } from 'lib/admin/groups/accept.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { getUserStore, getGroupStore } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
-import type { Group } from 'lib/adapters/types.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
+import { answered } from './answered.ts';
 import {
 	resetSentEmails,
 	emailsTo,
@@ -39,7 +39,7 @@ async function groupOwnedBy(cookie: string, name = 'Acme') {
 		{ name },
 		{ headers: { cookie } }
 	);
-	return res.data as Group;
+	return answered(res.data);
 }
 
 async function invite(cookie: string, groupId: string, email: string) {
@@ -223,7 +223,7 @@ describe('group invitations', () => {
 		const invitee = `revoked-${unique()}@x.io`;
 		const sent = await invite(owner.cookie, group._id, invitee);
 		const token = tokenFor(invitee);
-		const inviteId = (sent.data as { _id: string })._id;
+		const inviteId = answered(sent.data)._id;
 
 		const revoked = await client.admin.api
 			.groups({ id: group._id })

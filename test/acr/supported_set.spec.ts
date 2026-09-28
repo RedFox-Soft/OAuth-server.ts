@@ -3,6 +3,8 @@ import bootstrap, { agent } from '../test_helper.ts';
 import { elysia } from 'lib/index.ts';
 import { configuration } from 'lib/configs/application.js';
 import { ACR_DISTINCTIONS, RESERVED_ACR_VALUE } from 'lib/consts/acr.ts';
+import { Type } from '@sinclair/typebox';
+import { shaped } from 'test/shape.ts';
 
 /*
  * Every mounted way of finishing a sign-in, and whether completing it records an authentication
@@ -40,8 +42,10 @@ describe('what the server says it can report', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'acr' });
 		const { data } = await agent['.well-known']['openid-configuration'].get();
-		advertised = (data as { acr_values_supported: string[] })
-			.acr_values_supported;
+		advertised = shaped(
+			Type.Object({ acr_values_supported: Type.Array(Type.String()) }),
+			data
+		).acr_values_supported;
 	});
 
 	it('advertises a set that is not empty', () => {

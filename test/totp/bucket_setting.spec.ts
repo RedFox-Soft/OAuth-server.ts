@@ -16,8 +16,8 @@ import {
 	ADMIN_SESSION_COOKIE,
 	UNASSIGNED_GROUP_ID
 } from 'lib/admin/consts.ts';
-import type { UserBucket } from 'lib/adapters/types.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
+import { answered } from '../admin/answered.ts';
 
 const app = new Elysia().use(resolveAdmin).use(bucketRoutes);
 const client = treaty(app);
@@ -56,7 +56,7 @@ describe('bucket sign-in method setting', () => {
 			{ name: unique('Defaults'), slug: uniqueSlug('Defaults') },
 			{ headers: { cookie } }
 		);
-		expect((res.data as UserBucket).totpRequired).toBe(false);
+		expect(answered(res.data).totpRequired).toBe(false);
 	});
 
 	// A bucket document written before this field existed holds no value for it. Reading it back as
@@ -70,13 +70,13 @@ describe('bucket sign-in method setting', () => {
 		});
 
 		// The in-memory store hands back the live record, so this is the stored document losing a field.
-		delete (bucket as Partial<UserBucket>).totpRequired;
+		Reflect.deleteProperty(bucket, 'totpRequired');
 
 		const res = await client.admin.api
 			.buckets({ id: bucket._id })
 			.get({ headers: { cookie } });
 		expect(res.status).toBe(200);
-		expect((res.data as UserBucket).totpRequired).toBe(false);
+		expect(answered(res.data).totpRequired).toBe(false);
 	});
 
 	it('accepts the setting at creation', async () => {
@@ -89,34 +89,38 @@ describe('bucket sign-in method setting', () => {
 			},
 			{ headers: { cookie } }
 		);
-		expect((res.data as UserBucket).totpRequired).toBe(true);
+		expect(answered(res.data).totpRequired).toBe(true);
 	});
 
 	it('persists a change and leaves every other bucket alone', async () => {
 		const cookie = await superCookie();
-		const first = (
-			await client.admin.api.buckets.post(
-				{ name: unique('First'), slug: uniqueSlug('First') },
-				{ headers: { cookie } }
-			)
-		).data as UserBucket;
-		const second = (
-			await client.admin.api.buckets.post(
-				{ name: unique('Second'), slug: uniqueSlug('Second') },
-				{ headers: { cookie } }
-			)
-		).data as UserBucket;
+		const first = answered(
+			(
+				await client.admin.api.buckets.post(
+					{ name: unique('First'), slug: uniqueSlug('First') },
+					{ headers: { cookie } }
+				)
+			).data
+		);
+		const second = answered(
+			(
+				await client.admin.api.buckets.post(
+					{ name: unique('Second'), slug: uniqueSlug('Second') },
+					{ headers: { cookie } }
+				)
+			).data
+		);
 
 		const patched = await client.admin.api
 			.buckets({ id: first._id })
 			.patch({ totpRequired: true }, { headers: { cookie } });
 		expect(patched.status).toBe(200);
-		expect((patched.data as UserBucket).totpRequired).toBe(true);
+		expect(answered(patched.data).totpRequired).toBe(true);
 
 		const untouched = await client.admin.api
 			.buckets({ id: second._id })
 			.get({ headers: { cookie } });
-		expect((untouched.data as UserBucket).totpRequired).toBe(false);
+		expect(answered(untouched.data).totpRequired).toBe(false);
 
 		// And it survives a read, rather than only appearing in the patch response.
 		expect((await getBucketStore().find(first._id))?.totpRequired).toBe(true);
@@ -124,21 +128,23 @@ describe('bucket sign-in method setting', () => {
 
 	it('turns the requirement back off', async () => {
 		const cookie = await superCookie();
-		const bucket = (
-			await client.admin.api.buckets.post(
-				{
-					name: unique('Toggling'),
-					slug: uniqueSlug('Toggling'),
-					totpRequired: true
-				},
-				{ headers: { cookie } }
-			)
-		).data as UserBucket;
+		const bucket = answered(
+			(
+				await client.admin.api.buckets.post(
+					{
+						name: unique('Toggling'),
+						slug: uniqueSlug('Toggling'),
+						totpRequired: true
+					},
+					{ headers: { cookie } }
+				)
+			).data
+		);
 
 		const patched = await client.admin.api
 			.buckets({ id: bucket._id })
 			.patch({ totpRequired: false }, { headers: { cookie } });
-		expect((patched.data as UserBucket).totpRequired).toBe(false);
+		expect(answered(patched.data).totpRequired).toBe(false);
 	});
 
 	/*
@@ -147,12 +153,14 @@ describe('bucket sign-in method setting', () => {
 	 */
 	it('advises, rather than refuses, when password sign-in is off', async () => {
 		const cookie = await superCookie();
-		const bucket = (
-			await client.admin.api.buckets.post(
-				{ name: unique('Federated'), slug: uniqueSlug('Federated') },
-				{ headers: { cookie } }
-			)
-		).data as UserBucket;
+		const bucket = answered(
+			(
+				await client.admin.api.buckets.post(
+					{ name: unique('Federated'), slug: uniqueSlug('Federated') },
+					{ headers: { cookie } }
+				)
+			).data
+		);
 
 		// A provider has to exist before password login can be switched off, or the lockout guard refuses.
 		await getBucketStore().update(bucket._id, {
@@ -179,36 +187,42 @@ describe('bucket sign-in method setting', () => {
 			.patch({ totpRequired: true }, { headers: { cookie } });
 
 		expect(patched.status).toBe(200);
-		expect((patched.data as UserBucket).totpRequired).toBe(true);
-		expect((patched.data as { advisory?: string }).advisory).toContain(
+		const body = answered(patched.data);
+		expect(body.totpRequired).toBe(true);
+		expect('advisory' in body ? body.advisory : undefined).toContain(
 			'passwordLogin'
 		);
 	});
 
 	it('carries no advisory when password sign-in is on', async () => {
 		const cookie = await superCookie();
-		const bucket = (
-			await client.admin.api.buckets.post(
-				{ name: unique('Normal'), slug: uniqueSlug('Normal') },
-				{ headers: { cookie } }
-			)
-		).data as UserBucket;
+		const bucket = answered(
+			(
+				await client.admin.api.buckets.post(
+					{ name: unique('Normal'), slug: uniqueSlug('Normal') },
+					{ headers: { cookie } }
+				)
+			).data
+		);
 
 		const patched = await client.admin.api
 			.buckets({ id: bucket._id })
 			.patch({ totpRequired: true }, { headers: { cookie } });
-		expect((patched.data as { advisory?: string }).advisory).toBeUndefined();
+		const body = answered(patched.data);
+		expect('advisory' in body ? body.advisory : undefined).toBeUndefined();
 	});
 
 	it('refuses a caller with no rights over the bucket, changing nothing', async () => {
 		const cookie = await superCookie();
 		const outsider = await sessionCookieFor(['project_admin']);
-		const bucket = (
-			await client.admin.api.buckets.post(
-				{ name: unique('NotYours'), slug: uniqueSlug('NotYours') },
-				{ headers: { cookie } }
-			)
-		).data as UserBucket;
+		const bucket = answered(
+			(
+				await client.admin.api.buckets.post(
+					{ name: unique('NotYours'), slug: uniqueSlug('NotYours') },
+					{ headers: { cookie } }
+				)
+			).data
+		);
 
 		const res = await client.admin.api
 			.buckets({ id: bucket._id })
@@ -220,12 +234,14 @@ describe('bucket sign-in method setting', () => {
 
 	it('refuses an unauthenticated caller', async () => {
 		const cookie = await superCookie();
-		const bucket = (
-			await client.admin.api.buckets.post(
-				{ name: unique('Anon'), slug: uniqueSlug('Anon') },
-				{ headers: { cookie } }
-			)
-		).data as UserBucket;
+		const bucket = answered(
+			(
+				await client.admin.api.buckets.post(
+					{ name: unique('Anon'), slug: uniqueSlug('Anon') },
+					{ headers: { cookie } }
+				)
+			).data
+		);
 
 		const res = await client.admin.api
 			.buckets({ id: bucket._id })
@@ -244,12 +260,14 @@ describe('bucket sign-in method setting', () => {
 	 */
 	it('records the change against the actor, naming the field and not its value', async () => {
 		const admin = await sessionCookieFor(['super_admin']);
-		const bucket = (
-			await client.admin.api.buckets.post(
-				{ name: unique('Audited'), slug: uniqueSlug('Audited') },
-				{ headers: { cookie: admin.cookie } }
-			)
-		).data as UserBucket;
+		const bucket = answered(
+			(
+				await client.admin.api.buckets.post(
+					{ name: unique('Audited'), slug: uniqueSlug('Audited') },
+					{ headers: { cookie: admin.cookie } }
+				)
+			).data
+		);
 
 		await client.admin.api
 			.buckets({ id: bucket._id })
@@ -274,16 +292,18 @@ describe('bucket sign-in method setting', () => {
 	// no way in at all, and must not start refusing a bucket that simply asks for more proof.
 	it('does not engage the no-way-to-sign-in guard', async () => {
 		const cookie = await superCookie();
-		const bucket = (
-			await client.admin.api.buckets.post(
-				{
-					name: unique('StillReachable'),
-					slug: uniqueSlug('StillReachable'),
-					totpRequired: true
-				},
-				{ headers: { cookie } }
-			)
-		).data as UserBucket;
+		const bucket = answered(
+			(
+				await client.admin.api.buckets.post(
+					{
+						name: unique('StillReachable'),
+						slug: uniqueSlug('StillReachable'),
+						totpRequired: true
+					},
+					{ headers: { cookie } }
+				)
+			).data
+		);
 		expect(bucket.totpRequired).toBe(true);
 		expect(bucket.passwordLogin).toBe(true);
 	});
@@ -307,7 +327,7 @@ describe('bucket sign-in method setting', () => {
 			.buckets({ id: bucket._id })
 			.get({ headers: { cookie: manager.cookie } });
 		expect(read.status).toBe(200);
-		expect((read.data as UserBucket).totpRequired).toBe(false);
+		expect(answered(read.data).totpRequired).toBe(false);
 		expect(cookie).toBeTruthy();
 	});
 });

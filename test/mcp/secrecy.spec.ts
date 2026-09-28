@@ -28,6 +28,8 @@ import { ApplicationConfig } from 'lib/configs/application.js';
 import { mock } from '../fetch_mock.ts';
 import { idpStub } from '../federation/idp_stub.ts';
 import { appleStub } from '../federation/recognised_stubs.ts';
+import { shaped } from 'test/shape.js';
+import { Type } from '@sinclair/typebox';
 
 /*
  * FR-023 / SC-007: no secret may reach the agent surface, on any tool, in a success or an error, or in
@@ -102,7 +104,7 @@ async function superAdminSession() {
 		scope: 'openid'
 	});
 	at.setAudience(MCP_RESOURCE);
-	const token = (await at.save()) as unknown as string;
+	const token = await at.save();
 	await rpc(
 		{
 			jsonrpc: '2.0',
@@ -155,10 +157,13 @@ async function seedSecretHolders(token: string) {
 		}),
 		token
 	);
-	const createdBody = created.result?.structuredContent?.result as {
-		clientId: string;
-		secret?: string;
-	};
+	const createdBody = shaped(
+		Type.Object({
+			clientId: Type.String(),
+			secret: Type.Optional(Type.String())
+		}),
+		created.result?.structuredContent?.result
+	);
 
 	const bucket = await rpc(
 		// Unique per call: this helper runs once per case, and the bucket store is a module-level
@@ -169,8 +174,10 @@ async function seedSecretHolders(token: string) {
 		}),
 		token
 	);
-	const bucketId = (bucket.result?.structuredContent?.result as { _id: string })
-		._id;
+	const { _id: bucketId } = shaped(
+		Type.Object({ _id: Type.String() }),
+		bucket.result?.structuredContent?.result
+	);
 
 	await rpc(
 		call('bucket_user_create', {

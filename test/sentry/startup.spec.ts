@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
+import { Type, type Static } from '@sinclair/typebox';
 
 import { ApplicationConfig } from 'lib/configs/application.ts';
 import { initSentry, resetForTest as resetClient } from 'lib/sentry/client.ts';
 import { reportStartupFailure } from 'lib/sentry/startup.ts';
 import { clearRecorded, recordedEnvelopes } from 'lib/sentry/transport.ts';
 import { PERMITTED_STARTUP_KEYS } from 'lib/sentry/types.ts';
+import { shaped } from 'test/shape.js';
 
 /*
  * The declared exception to "every event comes from an internal record".
@@ -19,12 +21,17 @@ const previous = {
 	dsn: ApplicationConfig['sentry.dsn']
 };
 
-function capturedEvents(): Record<string, unknown>[] {
-	const events: Record<string, unknown>[] = [];
+const CapturedEvent = Type.Object({
+	server_name: Type.Optional(Type.Unknown()),
+	tags: Type.Record(Type.String(), Type.Unknown())
+});
+
+function capturedEvents(): Static<typeof CapturedEvent>[] {
+	const events: Static<typeof CapturedEvent>[] = [];
 	for (const [, items] of recordedEnvelopes()) {
-		for (const [header, payload] of items as [{ type?: string }, unknown][]) {
-			if (header?.type === 'event') {
-				events.push(payload as Record<string, unknown>);
+		for (const [header, payload] of items) {
+			if (header.type === 'event') {
+				events.push(shaped(CapturedEvent, payload));
 			}
 		}
 	}
@@ -61,7 +68,7 @@ describe('sentry startup reporting', () => {
 
 	it('marks the event as a startup failure so it is filterable', async () => {
 		await reportStartupFailure('EADDRINUSE', 'listen');
-		const tags = capturedEvents()[0].tags as Record<string, string>;
+		const tags = capturedEvents()[0].tags;
 		expect(tags.startup).toBe('true');
 		expect(tags.kind).toBe('EADDRINUSE');
 		expect(tags.phase).toBe('listen');
@@ -81,7 +88,7 @@ describe('sentry startup reporting', () => {
 		const event = capturedEvents()[0];
 		expect(event).not.toHaveProperty('request');
 		expect(event).not.toHaveProperty('user');
-		const tags = event.tags as Record<string, string>;
+		const tags = event.tags;
 		expect(tags).not.toHaveProperty('reference');
 		expect(tags).not.toHaveProperty('clientId');
 		expect(tags).not.toHaveProperty('route');

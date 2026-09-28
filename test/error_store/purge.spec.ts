@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, spyOn } from 'bun:test';
 import { Elysia } from 'elysia';
+import { Type } from '@sinclair/typebox';
 
 import { ApplicationConfig } from 'lib/configs/application.ts';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
@@ -14,6 +15,7 @@ import {
 import type { ErrorOccurrence } from 'lib/adapters/types.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
+import { shaped } from 'test/shape.js';
 
 /*
  * US4 — the purge, and what the trail says about it.
@@ -117,10 +119,10 @@ describe('error store purge', () => {
 				`/admin/api/errors/purge-preview?route=${route}`,
 				cookie
 			);
-			const body = (await response.json()) as {
-				groups: number;
-				occurrences: number;
-			};
+			const body = shaped(
+				Type.Object({ groups: Type.Number(), occurrences: Type.Number() }),
+				await response.json()
+			);
 
 			expect(response.status).toBe(200);
 			expect(body.groups).toBe(2);
@@ -145,18 +147,24 @@ describe('error store purge', () => {
 			await seed(drop);
 			await seed(keep);
 
-			const preview = (await call(
-				'GET',
-				`/admin/api/errors/purge-preview?route=${drop}`,
-				cookie
-			).then((r) => r.json())) as { groups: number };
+			const preview = shaped(
+				Type.Object({ groups: Type.Number() }),
+				await call(
+					'GET',
+					`/admin/api/errors/purge-preview?route=${drop}`,
+					cookie
+				).then((r) => r.json())
+			);
 
 			const response = await call(
 				'DELETE',
 				`/admin/api/errors?route=${drop}`,
 				cookie
 			);
-			const body = (await response.json()) as { removed: number };
+			const body = shaped(
+				Type.Object({ removed: Type.Number() }),
+				await response.json()
+			);
 
 			expect(response.status).toBe(200);
 			expect(body.removed).toBe(preview.groups);
@@ -172,7 +180,10 @@ describe('error store purge', () => {
 		it('refuses a purge with no filter at all', async () => {
 			const cookie = await superCookie();
 			const response = await call('DELETE', '/admin/api/errors', cookie);
-			const body = (await response.json()) as { message: string };
+			const body = shaped(
+				Type.Object({ message: Type.String() }),
+				await response.json()
+			);
 
 			expect(response.status).toBe(422);
 			expect(body.message).toContain('filter');
@@ -220,10 +231,10 @@ describe('error store purge', () => {
 				`/admin/api/errors?route=${route}`,
 				cookie
 			);
-			const body = (await response.json()) as {
-				removed: number;
-				purgeId: string;
-			};
+			const body = shaped(
+				Type.Object({ removed: Type.Number(), purgeId: Type.String() }),
+				await response.json()
+			);
 
 			const entries = await purgeEntriesFor(body.purgeId);
 			// Two: the intention, then the outcome. The trail has no update path, so an entry written

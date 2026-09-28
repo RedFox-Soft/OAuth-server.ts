@@ -2,6 +2,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import bootstrap, { clearSeededBuckets, seedBucket } from '../test_helper.js';
 import { elysia } from 'lib/index.js';
+import { Type } from '@sinclair/typebox';
+import { shaped } from 'test/shape.js';
 
 const SLUG = 'acme';
 
@@ -29,11 +31,16 @@ describe('a bucket metadata', () => {
 	 * and forgot to mount. A client following discovery has no other way to find out than a 404.
 	 */
 	it('advertises no endpoint that is not served', async () => {
-		const doc = (await (
-			await elysia.handle(
-				new Request(`http://localhost/${SLUG}/.well-known/openid-configuration`)
-			)
-		).json()) as Record<string, unknown>;
+		const doc = shaped(
+			Type.Record(Type.String(), Type.Unknown()),
+			await (
+				await elysia.handle(
+					new Request(
+						`http://localhost/${SLUG}/.well-known/openid-configuration`
+					)
+				)
+			).json()
+		);
 
 		const missing: string[] = [];
 		for (const [member, value] of Object.entries(doc)) {

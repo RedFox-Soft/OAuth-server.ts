@@ -58,7 +58,7 @@ describe('discovery metadata classification', () => {
 	 * no longer holds, with nothing to report it.
 	 */
 	it('anchors every coherence-admitted member to a member that still exists and is itself shared', () => {
-		const document = calculateDiscovery() as Record<string, unknown>;
+		const document = calculateDiscovery();
 		const orphaned: string[] = [];
 
 		for (const [member, classification] of Object.entries(

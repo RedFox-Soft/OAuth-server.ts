@@ -61,8 +61,8 @@ describe('error store durability', () => {
 	// the tail is bad; never exiting is worse, and the records are lost either way.
 	it('gives up draining rather than hanging on a store that never answers', async () => {
 		const original = errorStore.record;
-		(errorStore as { record: unknown }).record = () =>
-			new Promise(() => {
+		errorStore.record = () =>
+			new Promise<never>(() => {
 				/* never settles */
 			});
 
@@ -74,7 +74,7 @@ describe('error store durability', () => {
 			await drainForShutdown(50);
 			expect(Date.now() - started).toBeLessThan(2000);
 		} finally {
-			(errorStore as { record: unknown }).record = original;
+			errorStore.record = original;
 		}
 	});
 
@@ -88,8 +88,8 @@ describe('error store durability', () => {
 
 		// The store never settles, so the queue cannot drain and fills.
 		const original = errorStore.record;
-		(errorStore as { record: unknown }).record = () =>
-			new Promise(() => {
+		errorStore.record = () =>
+			new Promise<never>(() => {
 				/* never settles */
 			});
 
@@ -107,7 +107,7 @@ describe('error store durability', () => {
 			expect(statuses.every((status) => status === 500)).toBe(true);
 			expect(droppedCount()).toBeGreaterThan(0);
 		} finally {
-			(errorStore as { record: unknown }).record = original;
+			errorStore.record = original;
 		}
 	});
 
@@ -118,7 +118,7 @@ describe('error store durability', () => {
 	// FR-006 restated at the queue level: a rejecting store costs zero requests.
 	it('fails no request when the store rejects every write', async () => {
 		const original = errorStore.record;
-		(errorStore as { record: unknown }).record = async () => {
+		errorStore.record = async () => {
 			throw new Error('store rejects writes');
 		};
 
@@ -132,7 +132,7 @@ describe('error store durability', () => {
 			}
 			await flushForTest();
 		} finally {
-			(errorStore as { record: unknown }).record = original;
+			errorStore.record = original;
 		}
 	});
 });

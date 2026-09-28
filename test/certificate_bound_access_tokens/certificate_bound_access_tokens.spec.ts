@@ -26,6 +26,8 @@ import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { InvalidRequest } from 'lib/helpers/errors.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
+import { BackchannelAuthenticationRequestPayload } from 'lib/models/backchannel_authentication_request.js';
+import { present } from 'test/shape.js';
 
 const crt = new X509Certificate(
 	readFileSync('./test/jwks/client.crt', { encoding: 'ascii' })
@@ -315,8 +317,11 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 			);
 			const { grantId } = TestAdapter.for(
 				'BackchannelAuthenticationRequest'
-			).syncFind(setup.getTokenJti(reqId));
-			TestAdapter.for('Grant').syncUpdate(grantId, {
+			).syncFindAs(
+				BackchannelAuthenticationRequestPayload,
+				setup.getTokenJti(reqId)
+			);
+			TestAdapter.for('Grant').syncUpdate(present(grantId, 'a grant'), {
 				clientId: 'client-none'
 			});
 

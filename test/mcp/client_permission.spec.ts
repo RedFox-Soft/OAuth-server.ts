@@ -56,7 +56,7 @@ async function tokenFor(clientId: string) {
 		scope: 'openid'
 	});
 	at.setAudience(MCP_RESOURCE);
-	return (await at.save()) as unknown as string;
+	return await at.save();
 }
 
 async function callMcp(token: string) {

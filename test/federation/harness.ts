@@ -6,6 +6,8 @@ import { TestAdapter } from 'test/models.js';
 import type { FederationProvider } from 'lib/federation/types.js';
 import type { idpStub } from './idp_stub.js';
 import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { Type } from '@sinclair/typebox';
+import { shaped } from 'test/shape.js';
 
 /*
  * Shared scaffolding for the federation suites. Extracted when the second spec arrived rather than copied,
@@ -190,6 +192,8 @@ export async function walk(
 	return { start, authorizeUrl, state, callback, complete };
 }
 
+const SignedIn = Type.Object({ accountId: Type.Optional(Type.String()) });
+
 /*
  * Who got signed in, read from the sessions the flow created.
  *
@@ -198,11 +202,10 @@ export async function walk(
  * ordering. The session is the durable record of "this account is signed in", which is the claim being made.
  */
 export function signedInAccountIds(): string[] {
-	const store = TestAdapter.for('Session').store as Map<string, unknown>;
 	const ids: string[] = [];
-	for (const [key, value] of store) {
+	for (const [key, value] of TestAdapter.for('Session').store) {
 		if (typeof key !== 'string' || !key.startsWith('Session:')) continue;
-		const accountId = (value as { accountId?: string } | undefined)?.accountId;
+		const { accountId } = shaped(SignedIn, value);
 		if (accountId) ids.push(accountId);
 	}
 	return ids;

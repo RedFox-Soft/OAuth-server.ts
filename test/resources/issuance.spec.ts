@@ -3,6 +3,8 @@ import { describe, beforeAll, beforeEach, it, expect } from 'bun:test';
 import bootstrap, { agent } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { getProtectedResourceStore } from 'lib/adapters/index.ts';
+import { shaped } from 'test/shape.js';
+import { Type } from '@sinclair/typebox';
 
 /*
  * The token endpoint resolving a declared resource. This is the integration half of what
@@ -52,6 +54,8 @@ async function clearResources() {
  * @proves A token is minted only for a declared resource, with exactly that audience and the
  * intersection of the scopes, and issuance stops the moment the declaration is removed.
  */
+const OAuthError = Type.Object({ error: Type.String() });
+
 describe('issuing tokens for a declared protected resource', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);
@@ -65,9 +69,7 @@ describe('issuing tokens for a declared protected resource', () => {
 		const res = await tokenFor('https://nobody.example.com/mcp');
 
 		expect(res.status).toBe(400);
-		expect((res.error?.value as { error?: string })?.error).toBe(
-			'invalid_target'
-		);
+		expect(shaped(OAuthError, res.error?.value).error).toBe('invalid_target');
 	});
 
 	it('mints a token whose audience is exactly the declared identifier', async () => {
@@ -146,9 +148,7 @@ describe('issuing tokens for a declared protected resource', () => {
 
 		const res = await tokenFor(AUDIENCE);
 		expect(res.status).toBe(400);
-		expect((res.error?.value as { error?: string })?.error).toBe(
-			'invalid_target'
-		);
+		expect(shaped(OAuthError, res.error?.value).error).toBe('invalid_target');
 	});
 
 	/*

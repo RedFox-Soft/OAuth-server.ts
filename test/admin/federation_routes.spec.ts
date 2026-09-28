@@ -21,6 +21,7 @@ import { SECRET_MASK } from 'lib/federation/consts.ts';
 import { mock } from '../fetch_mock.ts';
 import { idpStub } from '../federation/idp_stub.ts';
 import { sessionFor } from '../admin_session.ts';
+import { answered } from './answered.ts';
 
 /*
  * Configuring providers, and severing an account's link to one.
@@ -80,7 +81,7 @@ describe('provider management', () => {
 			.federation.post(body(idp.origin), { headers: { cookie } });
 
 		expect(res.status).toBe(201);
-		const created = res.data as Record<string, unknown>;
+		const created = answered(res.data);
 		// Opt-in, both of them: trusting a provider's addresses and narrowing domains are decisions.
 		expect(created.emailTrusted).toBe(false);
 		expect(created.provisioning).toBe('jit');
@@ -112,7 +113,7 @@ describe('provider management', () => {
 			.buckets({ id: bucket._id })
 			.federation.get({ headers: { cookie } });
 
-		const list = res.data as Record<string, unknown>[];
+		const list = answered(res.data);
 		expect(list).toHaveLength(1);
 		// For every role, super-admin included: there is no reader this value is for.
 		expect(list[0]?.clientSecret).toBe(SECRET_MASK);
@@ -464,8 +465,7 @@ describe("an account's upstream identities", () => {
 			.users({ uid: user._id })
 			.identities.get({ headers: { cookie } });
 
-		// Through `unknown`: the typed client's union includes the admin error body, which does not overlap.
-		const links = res.data as unknown as Record<string, unknown>[];
+		const links = answered(res.data);
 		expect(links).toHaveLength(1);
 		expect(links[0]?.providerId).toBe('acme-sso');
 		expect(links[0]?.sub).toBe('upstream-subject-1');

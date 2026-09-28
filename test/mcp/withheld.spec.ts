@@ -18,6 +18,8 @@ import {
 } from 'lib/mcp/consts.ts';
 import { excludedConsoleOperations, mcpCatalogue } from 'lib/mcp/catalogue.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
+import { shaped, present } from 'test/shape.js';
+import { Type } from '@sinclair/typebox';
 
 /*
  * The two withheld operations: deleting a project and deleting a user bucket.
@@ -31,6 +33,9 @@ import { ApplicationConfig } from 'lib/configs/application.js';
  */
 
 let rpcId = 0;
+
+const Created = Type.Object({ _id: Type.String() });
+const CreatedClient = Type.Object({ clientId: Type.String() });
 
 async function rpc(body: unknown, token: string) {
 	const res = await elysia.handle(
@@ -81,7 +86,7 @@ async function superAdmin() {
 		scope: 'openid'
 	});
 	at.setAudience(MCP_RESOURCE);
-	const token = (await at.save()) as unknown as string;
+	const token = await at.save();
 	const init = await rpc(
 		{
 			jsonrpc: '2.0',
@@ -168,9 +173,10 @@ describe('withheld container deletions', () => {
 			call('bucket_create', { name: 'Survivor', slug: 'survivor-1' }),
 			token
 		);
-		const bucketId = (
-			created.result?.structuredContent?.result as { _id: string }
-		)._id;
+		const { _id: bucketId } = shaped(
+			Created,
+			created.result?.structuredContent?.result
+		);
 
 		for (const name of ['bucket_delete', 'bucket_delete', 'delete_bucket']) {
 			const refused = await rpc(call(name, { id: bucketId }), token);
@@ -228,9 +234,10 @@ describe('withheld container deletions', () => {
 			}),
 			token
 		);
-		const clientId = (
-			created.result?.structuredContent?.result as { clientId: string }
-		).clientId;
+		const { clientId } = shaped(
+			CreatedClient,
+			created.result?.structuredContent?.result
+		);
 
 		/*
 		 * FR-035 asks for this through *ordinary* read operations, under those reads' own disclosure
@@ -238,9 +245,10 @@ describe('withheld container deletions', () => {
 		 * project names the clients that block it; a bucket's end-users are countable.
 		 */
 		const detail = await rpc(call('project_get', { id: project._id }), token);
-		const holds = (
-			detail.result?.structuredContent?.result as { clientIds: string[] }
-		).clientIds;
+		const { clientIds: holds } = shaped(
+			Type.Object({ clientIds: Type.Array(Type.String()) }),
+			detail.result?.structuredContent?.result
+		);
 		expect(holds).toContain(clientId);
 
 		const clients = await rpc(call('client_list', { id: project._id }), token);
@@ -253,9 +261,10 @@ describe('withheld container deletions', () => {
 			call('bucket_create', { name: 'Counted', slug: 'counted-2' }),
 			token
 		);
-		const bucketId = (
-			created.result?.structuredContent?.result as { _id: string }
-		)._id;
+		const { _id: bucketId } = shaped(
+			Created,
+			created.result?.structuredContent?.result
+		);
 		await rpc(
 			call('bucket_user_create', {
 				id: bucketId,
@@ -266,7 +275,10 @@ describe('withheld container deletions', () => {
 		);
 
 		const users = await rpc(call('bucket_user_list', { id: bucketId }), token);
-		const held = users.result?.structuredContent?.result as unknown[];
+		const held = shaped(
+			Type.Array(Type.Unknown()),
+			users.result?.structuredContent?.result
+		);
 		expect(held.length).toBe(1);
 	});
 
@@ -287,9 +299,10 @@ describe('withheld container deletions', () => {
 			}),
 			token
 		);
-		const clientId = (
-			created.result?.structuredContent?.result as { clientId: string }
-		).clientId;
+		const { clientId } = shaped(
+			CreatedClient,
+			created.result?.structuredContent?.result
+		);
 
 		// Each item is its own confirmed deletion — the container cannot be cleared in one step.
 		const described = await rpc(
@@ -330,16 +343,19 @@ describe('withheld container deletions', () => {
 				token
 			);
 
-			const expected = excludedConsoleOperations.find(
-				(e) => e.path === '/admin/api/projects/:id' && e.method === 'DELETE'
+			const expected = present(
+				excludedConsoleOperations.find(
+					(e) => e.path === '/admin/api/projects/:id' && e.method === 'DELETE'
+				),
+				'the project deletion in the exclusion table'
 			);
 			expect(refused.result?.isError).toBe(true);
 			expect(refused.result?.structuredContent?.reason).toBe(
 				'not_available_here'
 			);
 			// The very string the table holds, not a paraphrase of it: that is the property FR-034 wants.
-			expect(refused.result?.structuredContent?.message).toBe(expected!.reason);
-			expect(refused.result?.content?.[0]?.text).toBe(expected!.reason);
+			expect(refused.result?.structuredContent?.message).toBe(expected.reason);
+			expect(refused.result?.content?.[0]?.text).toBe(expected.reason);
 		});
 
 		it('answers an inapplicable operation the same way', async () => {

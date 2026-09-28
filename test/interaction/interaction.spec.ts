@@ -15,6 +15,7 @@ import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { Interaction } from 'lib/models/interaction.js';
 import { getUserStore } from 'lib/adapters/index.js';
 import { TestAdapter } from 'test/models.js';
+import { present } from 'test/shape.js';
 import { addons } from 'lib/addon/registry.js';
 import {
 	interactionPolicy,
@@ -582,7 +583,7 @@ describe('resume after consent', async () => {
 				.getSetCookie()
 				.find((c) => c.startsWith(SESSION_COOKIE_PREFIX));
 			expect(header).toBeTruthy();
-			return header as string;
+			return present(header, 'a session cookie');
 		}
 
 		it('keeps the sign-in past the browsing session when the resumed result asks to be remembered', async function () {

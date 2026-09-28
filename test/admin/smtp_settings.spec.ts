@@ -13,6 +13,7 @@ import {
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { SMTP_PASSWORD_MASK } from 'lib/admin/settings/smtp/schema.ts';
 import { sessionFor } from '../admin_session.ts';
+import { answered } from './answered.ts';
 
 const app = new Elysia().use(resolveAdmin).use(smtpSettingsRoutes);
 const client = treaty(app);
@@ -55,7 +56,7 @@ describe('SMTP settings API', () => {
 		const got = await client.admin.api.settings.smtp.get({
 			headers: { cookie }
 		});
-		const data = got.data as Record<string, unknown>;
+		const data = answered(got.data);
 		expect(data.host).toBe('smtp.example.com');
 		expect(data.password).toBe(SMTP_PASSWORD_MASK);
 		expect(data.configured).toBe(true);
@@ -114,7 +115,7 @@ describe('SMTP settings API', () => {
 			(await adminAuditStore.list({ targetType: 'SmtpSettings' })).total
 		).toBe(before);
 		// Still answered with the stored settings, so the page it refreshes stays correct.
-		expect((again.data as Record<string, unknown>).host).toBe(VALID.host);
+		expect(answered(again.data).host).toBe(VALID.host);
 	});
 
 	it('rejects non-super-admins', async () => {

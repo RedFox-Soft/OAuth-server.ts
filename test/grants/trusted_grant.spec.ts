@@ -1,21 +1,31 @@
 import { describe, it, beforeAll, expect } from 'bun:test';
-import bootstrap from '../test_helper.js';
+import bootstrap, { seedClient } from '../test_helper.js';
 import { loadExistingGrant } from 'lib/addon/account.ts';
 import {
 	DEFAULT_REQUEST_BUCKET,
-	OIDCContext,
-	type Account
+	OIDCContext
 } from 'lib/helpers/oidc_context.ts';
 import { Session } from 'lib/models/session.ts';
-import type { Client } from 'lib/models/client/types.ts';
+import { Client } from 'lib/models/client.ts';
+import { present } from 'test/shape.js';
 
 /* A request that has resolved a client, a fresh session and an account, and nothing else. */
-function requestFor(client: Record<string, unknown>, accountId: string) {
+async function requestFor(clientId: string, accountId: string) {
 	const oidc = new OIDCContext({ params: {}, bucket: DEFAULT_REQUEST_BUCKET });
-	// Only the members loadExistingGrant reads; a full client and account add nothing here.
-	oidc.entity('Client', client as unknown as Client);
+	oidc.entity(
+		'Client',
+		present(await Client.tryFind(clientId), `client ${clientId}`)
+	);
 	oidc.entity('Session', new Session());
-	oidc.entity('Account', { accountId } as unknown as Account);
+	// loadExistingGrant reads only the id; the claims are the shape an account resolves to.
+	oidc.entity('Account', {
+		accountId,
+		claims: async () => ({
+			sub: accountId,
+			email: `${accountId}@example.com`,
+			email_verified: true
+		})
+	});
 	return oidc;
 }
 
@@ -26,32 +36,38 @@ function requestFor(client: Record<string, unknown>, accountId: string) {
 describe('loadExistingGrant for consent-not-required clients', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);
+		for (const [clientId, requireConsent] of [
+			['first-party', false],
+			['needs-consent', true]
+		] as const) {
+			seedClient({
+				clientId,
+				clientSecret: 'secret',
+				'consent.require': requireConsent,
+				redirectUris: [`https://${clientId}.example.com/cb`]
+			});
+		}
 	});
 
 	it('auto-creates a trusted grant that grants the full requested scope', async () => {
 		// Regression: the auto-created grant must be `trusted`. A non-trusted grant
 		// has no scopes, so getOIDCScopeFiltered() returns nothing and interactions()
 		// denies the request with access_denied ("no scope was granted").
-		const oidc = requestFor(
-			{ clientId: 'first-party', 'consent.require': false },
-			'acc-1'
-		);
+		const oidc = await requestFor('first-party', 'acc-1');
 
 		const grant = await loadExistingGrant(oidc);
 
 		expect(grant).toBeTruthy();
-		expect(grant!.payload.trusted).toBe(true);
-		expect(grant!.payload.accountId).toBe('acc-1');
-		expect(grant!.payload.clientId).toBe('first-party');
+		const trusted = present(grant, 'an auto-created grant');
+		expect(trusted.payload.trusted).toBe(true);
+		expect(trusted.payload.accountId).toBe('acc-1');
+		expect(trusted.payload.clientId).toBe('first-party');
 		// A trusted grant returns whatever scope is requested.
-		expect(grant!.getOIDCScopeFiltered(['openid'])).toBe('openid');
+		expect(trusted.getOIDCScopeFiltered(['openid'])).toBe('openid');
 	});
 
 	it('returns nothing for a client that requires consent and has no existing grant', async () => {
-		const oidc = requestFor(
-			{ clientId: 'needs-consent', 'consent.require': true },
-			'acc-2'
-		);
+		const oidc = await requestFor('needs-consent', 'acc-2');
 
 		expect(await loadExistingGrant(oidc)).toBeUndefined();
 	});

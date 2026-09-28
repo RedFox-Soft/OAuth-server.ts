@@ -73,7 +73,7 @@ async function setup() {
 		scope: 'openid'
 	});
 	at.setAudience(MCP_RESOURCE);
-	const token = (await at.save()) as unknown as string;
+	const token = await at.save();
 	const session = await sessionFor(user);
 	await rpc(
 		{

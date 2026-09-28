@@ -70,7 +70,7 @@ async function adminAndToken() {
 		scope: 'openid'
 	});
 	at.setAudience(MCP_RESOURCE);
-	const token = (await at.save()) as unknown as string;
+	const token = await at.save();
 	await rpc(
 		{
 			jsonrpc: '2.0',

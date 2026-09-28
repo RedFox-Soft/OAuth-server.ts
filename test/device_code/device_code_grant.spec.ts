@@ -23,6 +23,7 @@ import { DeviceCode } from 'lib/models/device_code.js';
 import { TestAdapter } from 'test/models.js';
 import { ttl } from 'lib/configs/liveTime.js';
 import { type BaseToken } from 'lib/models/base_token.ts';
+import { DeviceCodePayload } from 'lib/models/device_code.js';
 
 // The claims of an ID Token the response must carry.
 function claimsOf(idToken: string | undefined) {
@@ -273,7 +274,10 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 			});
 			expect(status).toBe(200);
 			const jti = setup.getTokenJti(code);
-			const stored = TestAdapter.for('DeviceCode').syncFind(jti);
+			const stored = TestAdapter.for('DeviceCode').syncFindAs(
+				DeviceCodePayload,
+				jti
+			);
 			expect(stored.consumed).toBeLessThanOrEqual(epochTime());
 		});
 

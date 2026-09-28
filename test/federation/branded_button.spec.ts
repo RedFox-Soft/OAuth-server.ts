@@ -10,6 +10,8 @@ import {
 import { get, provider, seedBucket } from './harness.ts';
 import { AuthorizationRequest } from '../AuthorizationRequest.ts';
 import { agent, getHeader } from '../test_helper.ts';
+import { Type } from '@sinclair/typebox';
+import { shaped } from 'test/shape.ts';
 
 const GOOGLE = KNOWN_PROVIDERS.find((entry) => entry.catalogueId === 'google')!;
 /* Through the entry's rule rather than a literal, so the case follows the catalogue if the value moves. */
@@ -66,14 +68,20 @@ async function postLogin(clientId: string, fields: Record<string, string>) {
  * appears and then vanishes the instant React takes over — silently, in a browser only, with nothing
  * logged and no server-side assertion on the markup able to see it. So every case here reads both.
  */
-function props(text: string): Record<string, unknown> {
+const Props = Type.Object({
+	providers: Type.Optional(
+		Type.Array(Type.Record(Type.String(), Type.Unknown()))
+	)
+});
+
+function props(text: string) {
 	const match = text.match(/window\.PROPS=(\{.*?\})<\/script>/s);
 	if (!match) throw new Error('the login page carried no props script');
-	return JSON.parse(match[1].replace(/\\u003c/g, '<'));
+	return shaped(Props, JSON.parse(match[1].replace(/\\u003c/g, '<')));
 }
 
-function providerProps(text: string): Record<string, unknown>[] {
-	return (props(text).providers ?? []) as Record<string, unknown>[];
+function providerProps(text: string) {
+	return props(text).providers ?? [];
 }
 
 /**

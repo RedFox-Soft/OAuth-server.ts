@@ -2,6 +2,9 @@ import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { Type } from '@sinclair/typebox';
+
+import { shaped } from 'test/shape.js';
 
 /*
  * The release workflow runs the CLI on a bare checkout with no database and no ISSUER. A child
@@ -46,11 +49,14 @@ describe('docs:export CLI', () => {
 		expect(stderr).toBe('');
 		expect(exitCode).toBe(0);
 
-		const parsed = JSON.parse(await fs.readFile(out, 'utf8')) as {
-			schemaVersion: number;
-			version: string;
-			settings: { entries: unknown[] };
-		};
+		const parsed = shaped(
+			Type.Object({
+				schemaVersion: Type.Number(),
+				version: Type.String(),
+				settings: Type.Object({ entries: Type.Array(Type.Unknown()) })
+			}),
+			JSON.parse(await fs.readFile(out, 'utf8'))
+		);
 		expect(parsed.schemaVersion).toBe(1);
 		expect(parsed.version).toMatch(/^\d+\.\d+\.\d+/);
 		expect(parsed.settings.entries.length).toBeGreaterThan(50);
@@ -77,9 +83,16 @@ describe('docs:export CLI', () => {
 		expect(stderr).toBe('');
 		expect(exitCode).toBe(0);
 
-		const parsed = JSON.parse(await fs.readFile(out, 'utf8')) as {
-			settings: { entries: { key: string; value: unknown }[] };
-		};
+		const parsed = shaped(
+			Type.Object({
+				settings: Type.Object({
+					entries: Type.Array(
+						Type.Object({ key: Type.String(), value: Type.Unknown() })
+					)
+				})
+			}),
+			JSON.parse(await fs.readFile(out, 'utf8'))
+		);
 		const clientCredentials = parsed.settings.entries.find(
 			(entry) => entry.key === 'clientCredentials.enabled'
 		);

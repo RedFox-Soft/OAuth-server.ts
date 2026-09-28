@@ -29,6 +29,7 @@ import {
 	UNASSIGNED_GROUP_ID
 } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
+import { answered } from './answered.ts';
 import {
 	BOOTSTRAP_ACTOR,
 	SETTINGS_TARGET_ID,
@@ -186,7 +187,7 @@ describe('admin audit coverage: projects', () => {
 			{ headers: { cookie } }
 		);
 		expect(res.status).toBe(201);
-		const created = res.data as { _id: string };
+		const created = answered(res.data);
 
 		expectEntry(await soleEntry(created._id), {
 			action: 'project.create',
@@ -260,7 +261,7 @@ describe('admin audit coverage: clients', () => {
 			.projects({ id: project._id })
 			.clients.post(CLIENT_BODY, { headers: { cookie } });
 		expect(res.status).toBe(201);
-		const created = res.data as { clientId: string };
+		const created = answered(res.data);
 
 		expectEntry(await soleEntry(created.clientId), {
 			action: 'client.create',
@@ -272,11 +273,13 @@ describe('admin audit coverage: clients', () => {
 	it('records a client update', async () => {
 		const { cookie, userId } = await superCookie();
 		const project = await makeProject();
-		const created = (
-			await client.admin.api
-				.projects({ id: project._id })
-				.clients.post(CLIENT_BODY, { headers: { cookie } })
-		).data as { clientId: string };
+		const created = answered(
+			(
+				await client.admin.api
+					.projects({ id: project._id })
+					.clients.post(CLIENT_BODY, { headers: { cookie } })
+			).data
+		);
 
 		const res = await client.admin.api
 			.projects({ id: project._id })
@@ -301,18 +304,20 @@ describe('admin audit coverage: clients', () => {
 	it('records a secret rotation, without the secret', async () => {
 		const { cookie, userId } = await superCookie();
 		const project = await makeProject();
-		const created = (
-			await client.admin.api
-				.projects({ id: project._id })
-				.clients.post(CLIENT_BODY, { headers: { cookie } })
-		).data as { clientId: string; secret?: string };
+		const created = answered(
+			(
+				await client.admin.api
+					.projects({ id: project._id })
+					.clients.post(CLIENT_BODY, { headers: { cookie } })
+			).data
+		);
 
 		const res = await client.admin.api
 			.projects({ id: project._id })
 			.clients({ clientId: created.clientId })
 			.secret.post(undefined, { headers: { cookie } });
 		expect(res.status).toBe(200);
-		const rotated = res.data as { secret: string };
+		const rotated = answered(res.data);
 
 		const { entries } = await adminAuditStore.list({
 			targetId: created.clientId,
@@ -330,11 +335,13 @@ describe('admin audit coverage: clients', () => {
 	it('records a client deletion', async () => {
 		const { cookie, userId } = await superCookie();
 		const project = await makeProject();
-		const created = (
-			await client.admin.api
-				.projects({ id: project._id })
-				.clients.post(CLIENT_BODY, { headers: { cookie } })
-		).data as { clientId: string };
+		const created = answered(
+			(
+				await client.admin.api
+					.projects({ id: project._id })
+					.clients.post(CLIENT_BODY, { headers: { cookie } })
+			).data
+		);
 
 		const res = await client.admin.api
 			.projects({ id: project._id })
@@ -372,7 +379,7 @@ describe('admin audit coverage: administrators', () => {
 			{ headers: { cookie } }
 		);
 		expect(res.status).toBe(201);
-		const created = res.data as { _id: string };
+		const created = answered(res.data);
 
 		expectEntry(await soleEntry(created._id), {
 			action: 'admin.create',
@@ -437,7 +444,7 @@ describe('admin audit coverage: buckets', () => {
 			{ headers: { cookie } }
 		);
 		expect(res.status).toBe(201);
-		const created = res.data as { _id: string };
+		const created = answered(res.data);
 
 		expectEntry(await soleEntry(created._id), {
 			action: 'bucket.create',
@@ -524,7 +531,7 @@ describe('admin audit coverage: end-users', () => {
 				{ headers: { cookie } }
 			);
 		expect(res.status).toBe(201);
-		const created = res.data as { _id: string };
+		const created = answered(res.data);
 
 		expectEntry(await soleEntry(created._id), {
 			action: 'enduser.create',
@@ -616,16 +623,14 @@ describe('admin audit coverage: keys and settings', () => {
 		const { cookie, userId } = await superCookie();
 
 		const before = await client.admin.api.jwks.get({ headers: { cookie } });
-		const beforeKids = new Set(
-			(before.data as { keys: { kid: string }[] }).keys.map((k) => k.kid)
-		);
+		const beforeKids = new Set(answered(before.data).keys.map((k) => k.kid));
 
 		const generated = await client.admin.api.jwks.post(
 			{ alg: 'RS256' },
 			{ headers: { cookie } }
 		);
 		expect(generated.status).toBe(200);
-		const state = generated.data as { keys: { kid: string }[] };
+		const state = answered(generated.data);
 		// A generated key is hot-applied, so it is active rather than "changed" — the new kid is the one
 		// the previous listing did not have.
 		const kid = state.keys.find((k) => !beforeKids.has(k.kid))?.kid;

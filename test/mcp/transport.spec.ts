@@ -83,8 +83,7 @@ async function tokenFor(
 		...overrides
 	});
 	at.setAudience(MCP_RESOURCE);
-	const value = await at.save();
-	return { token: value as unknown as string, user };
+	return { token: await at.save(), user };
 }
 
 /**
@@ -163,7 +162,7 @@ describe('MCP transport', () => {
 			scope: 'openid'
 		});
 		at.setAudience('https://somewhere.else.example/api');
-		const token = (await at.save()) as unknown as string;
+		const token = await at.save();
 
 		const { status } = await mcp('tools/list', {}, token);
 		expect(status).toBe(401);
@@ -180,7 +179,7 @@ describe('MCP transport', () => {
 			accountId: user._id,
 			scope: 'openid'
 		});
-		const token = (await at.save()) as unknown as string;
+		const token = await at.save();
 
 		const { status } = await mcp('tools/list', {}, token);
 		expect(status).toBe(401);

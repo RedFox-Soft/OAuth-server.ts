@@ -49,7 +49,8 @@ describe('RBAC guards', () => {
 			assertRole(projectAdmin, 'super_admin');
 			throw new Error('should have thrown');
 		} catch (e) {
-			expect((e as AdminError).status).toBe(403);
+			if (!(e instanceof AdminError)) throw e;
+			expect(e.status).toBe(403);
 		}
 	});
 
@@ -65,7 +66,8 @@ describe('RBAC guards', () => {
 			);
 			throw new Error('should have thrown');
 		} catch (e) {
-			expect((e as AdminError).status).toBe(403);
+			if (!(e instanceof AdminError)) throw e;
+			expect(e.status).toBe(403);
 		}
 	});
 

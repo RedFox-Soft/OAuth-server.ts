@@ -25,23 +25,6 @@ import {
 
 const REDIRECT_URI = `${ISSUER}/admin/callback`;
 
-/*
- * `Session.tryFind` is inherited from `BaseModel`, whose `this` constraint does not admit
- * `Session`'s own constructor (its payload parameter is `Partial`), and `Session` does not satisfy
- * `BaseModel<SessionPayloadType>` because `BaseModel.save` is typed to return `string | undefined`.
- * Both are pre-existing gaps in the model layer, so the lookup is narrowed at this one call site
- * rather than the model layer widened to accommodate it.
- */
-function findSession(value: string): Promise<Session | undefined> {
-	// Called as a method, deliberately: `tryFind` reaches for `this.adapter`, so detaching it
-	// from `Session` leaves the lookup with no adapter at all.
-	return (
-		Session as unknown as {
-			tryFind(v: string): Promise<Session | undefined>;
-		}
-	).tryFind(value);
-}
-
 function base64url(buf: Buffer) {
 	return buf.toString('base64url');
 }
@@ -202,10 +185,9 @@ export const adminLogin = new Elysia({ name: 'admin-login' })
 		 * administrator out of unrelated applications as a side effect of leaving the console.
 		 */
 		const adminBucketCookie = sessionCookieName(ADMIN_REQUEST_BUCKET);
-		const providerSessionId = cookie[adminBucketCookie]?.value as
-			string | undefined;
-		if (providerSessionId) {
-			const session = await findSession(providerSessionId);
+		const providerSessionId = cookie[adminBucketCookie]?.value;
+		if (typeof providerSessionId === 'string' && providerSessionId) {
+			const session = await Session.tryFind(providerSessionId);
 			if (session) await destroyProviderSession(session);
 		}
 		cookie[adminBucketCookie].set(expiredSessionCookie());

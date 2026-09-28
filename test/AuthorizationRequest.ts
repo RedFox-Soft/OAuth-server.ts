@@ -4,6 +4,8 @@ import { parse } from 'node:url';
 import querystring from 'node:querystring';
 
 import { TestAdapter } from './models.js';
+import { present, shaped } from './shape.js';
+import { InteractionPayload } from '../lib/models/interaction.ts';
 import { agent, encodeParams } from './test_helper.js';
 import { elysia } from '../lib/index.ts';
 import { type AuthorizationParameters } from '../lib/consts/param_list.js';
@@ -36,6 +38,17 @@ type AuthParams = Static<typeof AuthorizationParameters>;
 
 // A spec's `clients` export: registration metadata, a few members still under their stored names.
 type SeedClient = ClientSchemaType & { token_endpoint_auth_method?: string };
+
+// The stored interaction, checked against the model's own schema.
+function storedInteraction(uid: string) {
+	return shaped(
+		InteractionPayload,
+		present(
+			TestAdapter.for('Interaction').syncFind(uid),
+			'the interaction record'
+		)
+	);
+}
 
 export class AuthorizationRequest {
 	static clients: SeedClient[] = [];
@@ -162,7 +175,7 @@ export class AuthorizationRequest {
 
 		const [, , uid] = location.split('/');
 
-		const interaction = TestAdapter.for('Interaction').syncFind(uid);
+		const interaction = storedInteraction(uid);
 		const cookieID = readCookie(getSetCookies(cookies)[0]);
 		expect(cookieID).toBe(interaction.cookieID);
 
@@ -173,7 +186,9 @@ export class AuthorizationRequest {
 			if (key === 'request_uri') return;
 			if (key === 'max_age' && value === 0) {
 				expect(interaction.params).not.toHaveProperty('max_age');
-				expect(interaction.params.prompt).toContain('login');
+				expect(
+					present(interaction.params, 'the stored parameters').prompt
+				).toContain('login');
 			} else {
 				expect(interaction.params).toHaveProperty(key, value);
 			}
@@ -187,9 +202,10 @@ export class AuthorizationRequest {
 	) {
 		const location = getLocation(response);
 		const [, , uid] = location.split('/');
-		const {
-			prompt: { name, reasons }
-		} = TestAdapter.for('Interaction').syncFind(uid);
+		const { name, reasons } = present(
+			storedInteraction(uid).prompt,
+			'the interaction prompt'
+		);
 		expect(name).toBe(eName);
 		expect(reasons).toEqual(expect.arrayContaining(eReasons));
 	}

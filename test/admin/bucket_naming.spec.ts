@@ -7,6 +7,7 @@ import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { getBucketStore, getUserStore } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
+import { answered } from './answered.ts';
 
 const app = new Elysia().use(resolveAdmin).use(bucketRoutes);
 const client = treaty(app);
@@ -38,7 +39,7 @@ describe('naming a bucket', () => {
 		const res = await create(await superCookie(), 'acme');
 
 		expect(res.status).toBe(201);
-		expect((res.data as { slug?: string } | undefined)?.slug).toBe('acme');
+		expect(answered(res.data).slug).toBe('acme');
 	});
 
 	/*
@@ -90,13 +91,13 @@ describe('naming a bucket', () => {
 	it('leaves the address of a bucket unchanged when an edit names one', async () => {
 		const cookie = await superCookie();
 		const created = await create(cookie, 'immutable');
-		const id = (created.data as { _id: string })._id;
+		const id = answered(created.data)._id;
 
-		await client.admin.api
-			.buckets({ id })
-			.patch({ name: 'Renamed', slug: 'something-else' } as never, {
-				headers: { cookie }
-			});
+		await client.admin.api.buckets({ id }).patch(
+			// @ts-expect-error `slug` is not in the update body; the schema has no such field
+			{ name: 'Renamed', slug: 'something-else' },
+			{ headers: { cookie } }
+		);
 
 		expect((await getBucketStore().find(id))?.slug).toBe('immutable');
 	});

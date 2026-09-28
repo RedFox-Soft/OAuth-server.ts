@@ -4,8 +4,7 @@ import type { ErrorOccurrence, ErrorRecord } from 'lib/adapters/types.ts';
 import { projectFault, unpermittedKeys } from 'lib/sentry/event.ts';
 import {
 	PERMITTED_EVENT_KEYS,
-	PERMITTED_LOCATION_KEYS,
-	type SentryFailureEvent
+	PERMITTED_LOCATION_KEYS
 } from 'lib/sentry/types.ts';
 
 /*
@@ -177,7 +176,7 @@ describe('sentry permitted-key guard', () => {
 		const event = {
 			...projectFault(occurrence, labels),
 			userAgent: 'Mozilla/5.0'
-		} as unknown as SentryFailureEvent;
+		};
 		expect(unpermittedKeys(event)).toEqual(['userAgent']);
 	});
 
@@ -194,7 +193,7 @@ describe('sentry permitted-key guard', () => {
 				frame: 'tokenAction',
 				requestId: 'req-1'
 			}
-		} as unknown as SentryFailureEvent;
+		};
 		expect(unpermittedKeys(event)).toEqual(['codeLocation.requestId']);
 	});
 
@@ -202,7 +201,7 @@ describe('sentry permitted-key guard', () => {
 		const event = {
 			...projectFault(occurrence, labels),
 			codeLocation: { file: 'f', line: 1, frame: 'x', stack: 'at ...' }
-		} as unknown as SentryFailureEvent;
+		};
 		/* `codeLocation.stack`, never a bare `stack` — the reader needs to know where to look. */
 		expect(unpermittedKeys(event)).toEqual(['codeLocation.stack']);
 	});
@@ -216,16 +215,16 @@ describe('sentry permitted-key guard', () => {
 			occurrence,
 			labels
 		);
-		expect(unpermittedKeys(rest as SentryFailureEvent)).toEqual([
-			'codeLocation'
-		]);
+		// @ts-expect-error an event with no location; the guard must refuse it
+		expect(unpermittedKeys(rest)).toEqual(['codeLocation']);
 	});
 
 	it('refuses an event whose code location is not an object', () => {
 		const event = {
 			...projectFault(occurrence, labels),
 			codeLocation: 'lib/actions/token.ts:42'
-		} as unknown as SentryFailureEvent;
+		};
+		// @ts-expect-error a location that is not an object; the guard must refuse it
 		expect(unpermittedKeys(event)).toEqual(['codeLocation']);
 	});
 
@@ -234,7 +233,7 @@ describe('sentry permitted-key guard', () => {
 			...projectFault(occurrence, labels),
 			actor: { id: 'user-1' },
 			codeLocation: { file: 'f', line: 1, frame: 'x', secret: 'shh' }
-		} as unknown as SentryFailureEvent;
+		};
 		expect(unpermittedKeys(event).sort()).toEqual([
 			'actor',
 			'codeLocation.secret'

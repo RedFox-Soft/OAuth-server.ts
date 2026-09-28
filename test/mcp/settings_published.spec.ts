@@ -12,6 +12,8 @@ import {
 	MCP_RESOURCE,
 	MCP_ROUTE
 } from 'lib/mcp/consts.ts';
+import { shaped } from 'test/shape.js';
+import { Type, type Static } from '@sinclair/typebox';
 
 /*
  * The schema an agent reads is the one `tools/list` returns, and that is two layers below where the
@@ -63,7 +65,7 @@ async function session() {
 		scope: 'openid'
 	});
 	at.setAudience(MCP_RESOURCE);
-	const token = (await at.save()) as unknown as string;
+	const token = await at.save();
 	await rpc(
 		{
 			jsonrpc: '2.0',
@@ -80,21 +82,24 @@ async function session() {
 	return token;
 }
 
-interface Published {
-	type?: string;
-	items?: { type?: string };
-	enum?: string[];
-}
+// What an agent reads of one published setting; the values themselves are left to the assertions.
+const Published = Type.Object({
+	type: Type.Optional(Type.Unknown()),
+	items: Type.Optional(Type.Object({ type: Type.Optional(Type.Unknown()) })),
+	enum: Type.Optional(Type.Unknown())
+});
+
+const InputSchema = Type.Object({
+	properties: Type.Optional(Type.Record(Type.String(), Published)),
+	additionalProperties: Type.Optional(Type.Unknown())
+});
 
 /**
  * @proves An agent listing the tools is told what each server setting accepts, so it sends a typed
  * value rather than the text of one, and may still name a setting the catalogue does not declare.
  */
 describe('the settings tool as an agent receives it', () => {
-	let schema: {
-		properties?: Record<string, Published>;
-		additionalProperties?: boolean;
-	};
+	let schema: Static<typeof InputSchema>;
 
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'mcp' });
@@ -104,13 +109,18 @@ describe('the settings tool as an agent receives it', () => {
 			{ jsonrpc: '2.0', id: ++rpcId, method: 'tools/list', params: {} },
 			token
 		);
-		const tools = (listed.result?.tools ?? []) as {
-			name: string;
-			inputSchema?: typeof schema;
-		}[];
+		const tools = shaped(
+			Type.Array(
+				Type.Object({
+					name: Type.String(),
+					inputSchema: Type.Optional(Type.Unknown())
+				})
+			),
+			listed.result?.tools ?? []
+		);
 		const tool = tools.find((t) => t.name === 'settings_update');
 		if (!tool) throw new Error('settings_update is not published');
-		schema = tool.inputSchema ?? {};
+		schema = shaped(InputSchema, tool.inputSchema ?? {});
 	});
 
 	it('states the type of a switch, a list and a choice', () => {

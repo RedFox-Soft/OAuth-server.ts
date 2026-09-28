@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { Elysia } from 'elysia';
+import { Type, type Static } from '@sinclair/typebox';
 
 import type { ErrorOccurrence, ErrorRecord } from 'lib/adapters/types.ts';
 import { ApplicationConfig } from 'lib/configs/application.ts';
@@ -13,6 +14,7 @@ import {
 	resetForTest as resetDispatch
 } from 'lib/sentry/dispatch.ts';
 import { clearRecorded, recordedEnvelopes } from 'lib/sentry/transport.ts';
+import { shaped } from 'test/shape.js';
 
 /*
  * What a reported failure reads like when the location is not the happy case.
@@ -63,20 +65,36 @@ function occurrenceWith(
 	};
 }
 
-function capturedEvents(): Record<string, unknown>[] {
-	const events: Record<string, unknown>[] = [];
+/* What this file reads off an outbound event: the members `send` in lib/sentry/dispatch.ts sets. */
+const CapturedEvent = Type.Object({
+	message: Type.String(),
+	transaction: Type.String(),
+	fingerprint: Type.Array(Type.String()),
+	tags: Type.Record(Type.String(), Type.String()),
+	contexts: Type.Object({
+		fault: Type.Object({
+			codeLocation: Type.Record(Type.String(), Type.Unknown())
+		})
+	})
+});
+type CapturedEvent = Static<typeof CapturedEvent>;
+
+function capturedEvents(): CapturedEvent[] {
+	const events: CapturedEvent[] = [];
 	for (const [, items] of recordedEnvelopes()) {
-		for (const [header, payload] of items as [{ type?: string }, unknown][]) {
-			if (header?.type === 'event') {
-				events.push(payload as Record<string, unknown>);
+		for (const [header, payload] of items) {
+			if (header.type === 'event') {
+				events.push(shaped(CapturedEvent, payload));
 			}
 		}
 	}
 	return events;
 }
 
-function faultContext(event: Record<string, unknown>): Record<string, unknown> {
-	return (event.contexts as Record<string, Record<string, unknown>>).fault;
+function faultContext(
+	event: CapturedEvent
+): CapturedEvent['contexts']['fault'] {
+	return event.contexts.fault;
 }
 
 async function settle() {
@@ -85,9 +103,7 @@ async function settle() {
 }
 
 /* Reports one occurrence and returns the single event it produced. */
-async function reported(
-	occurrence: ErrorOccurrence
-): Promise<Record<string, unknown>> {
+async function reported(occurrence: ErrorOccurrence): Promise<CapturedEvent> {
 	reportFault(occurrence);
 	await settle();
 	const events = capturedEvents();
@@ -128,11 +144,7 @@ describe('sentry fault location', () => {
 		await app.handle(new Request('http://e.ly/loc-real'));
 		await settle();
 
-		const location = faultContext(capturedEvents()[0]).codeLocation as {
-			file: string;
-			line: number | null;
-			frame: string;
-		};
+		const location = faultContext(capturedEvents()[0]).codeLocation;
 		/* The spec file itself is where the throw is, which is what makes this assertion meaningful. */
 		expect(location.file).toContain('location.spec.ts');
 		expect(typeof location.line).toBe('number');
@@ -168,10 +180,7 @@ describe('sentry fault location', () => {
 		const event = await reported(
 			occurrenceWith({ file: 'lib/x.ts', line: null, frame: 'handler' })
 		);
-		const location = faultContext(event).codeLocation as Record<
-			string,
-			unknown
-		>;
+		const location = faultContext(event).codeLocation;
 		expect(location).toHaveProperty('line');
 		expect(location.line).toBeNull();
 		expect(location.line).not.toBe(0);
@@ -262,7 +271,7 @@ describe('sentry fault location', () => {
 		const event = await reported(
 			occurrenceWith({ file: 'unknown', line: null, frame: 'unknown' })
 		);
-		expect((event.tags as Record<string, string>).codeFile).toBe('unknown');
+		expect(event.tags.codeFile).toBe('unknown');
 	});
 
 	it('tags faults from different files with different values', async () => {
@@ -280,9 +289,7 @@ describe('sentry fault location', () => {
 		);
 		await settle();
 
-		const files = capturedEvents().map(
-			(e) => (e.tags as Record<string, string>).codeFile
-		);
+		const files = capturedEvents().map((e) => e.tags.codeFile);
 		expect(files).toEqual(['lib/a.ts', 'lib/b.ts']);
 	});
 

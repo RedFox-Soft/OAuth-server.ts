@@ -12,6 +12,7 @@ import {
 import type { AdminAuditEntry } from 'lib/adapters/types.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
+import { answered } from './answered.ts';
 
 /*
  * The read surface — specs/016-admin-audit-completeness/contracts/admin-audit-api.md.
@@ -29,13 +30,6 @@ const client = treaty(app);
 
 let seq = 0;
 const unique = (prefix: string) => `${prefix}-${Date.now()}-${(seq += 1)}`;
-
-interface AuditPage {
-	entries: AdminAuditEntry[];
-	total: number;
-	page: number;
-	pageSize: number;
-}
 
 async function cookieFor(roles: string[]) {
 	const user = await getUserStore(ADMIN_BUCKET_ID).create(
@@ -125,7 +119,7 @@ describe('GET /admin/api/audit', () => {
 			});
 
 			expect(res.status).toBe(200);
-			expect((res.data as AuditPage).total).toBe(1);
+			expect(answered(res.data).total).toBe(1);
 		});
 	});
 
@@ -154,7 +148,7 @@ describe('GET /admin/api/audit', () => {
 				headers: { cookie }
 			});
 
-			expect((res.data as AuditPage).entries.map((e) => e.targetId)).toEqual([
+			expect(answered(res.data).entries.map((e) => e.targetId)).toEqual([
 				'newest',
 				'middle',
 				'oldest'
@@ -177,7 +171,7 @@ describe('GET /admin/api/audit', () => {
 				headers: { cookie }
 			});
 
-			const [entry] = (res.data as AuditPage).entries;
+			const [entry] = answered(res.data).entries;
 			expect(entry!.targetScope).toBeNull();
 			expect(entry!.attributes).toEqual([]);
 		});
@@ -192,7 +186,7 @@ describe('GET /admin/api/audit', () => {
 				headers: { cookie }
 			});
 
-			const page = res.data as AuditPage;
+			const page = answered(res.data);
 			expect(page.page).toBe(1);
 			expect(page.pageSize).toBe(50);
 		});
@@ -214,10 +208,10 @@ describe('GET /admin/api/audit', () => {
 				headers: { cookie }
 			});
 
-			expect((byId.data as AuditPage).total).toBe(1);
-			expect((byId.data as AuditPage).entries[0]!.actorId).toBe('a-one');
-			expect((byEmail.data as AuditPage).total).toBe(1);
-			expect((byEmail.data as AuditPage).entries[0]!.actorId).toBe('a-two');
+			expect(answered(byId.data).total).toBe(1);
+			expect(answered(byId.data).entries[0]!.actorId).toBe('a-one');
+			expect(answered(byEmail.data).total).toBe(1);
+			expect(answered(byEmail.data).entries[0]!.actorId).toBe('a-two');
 		});
 
 		it('matches action, target type, target id and scope, combining conjunctively', async () => {
@@ -234,19 +228,19 @@ describe('GET /admin/api/audit', () => {
 				query: { targetScope: scope, action: 'project.delete' },
 				headers: { cookie }
 			});
-			expect((byAction.data as AuditPage).total).toBe(1);
+			expect(answered(byAction.data).total).toBe(1);
 
 			const byType = await client.admin.api.audit.get({
 				query: { targetScope: scope, targetType: 'EndUser' },
 				headers: { cookie }
 			});
-			expect((byType.data as AuditPage).total).toBe(1);
+			expect(answered(byType.data).total).toBe(1);
 
 			const byId = await client.admin.api.audit.get({
 				query: { targetScope: scope, targetId: 'p-gone' },
 				headers: { cookie }
 			});
-			expect((byId.data as AuditPage).total).toBe(1);
+			expect(answered(byId.data).total).toBe(1);
 
 			// Conjunctive: both clauses match different entries, so together they match none.
 			const both = await client.admin.api.audit.get({
@@ -257,7 +251,7 @@ describe('GET /admin/api/audit', () => {
 				},
 				headers: { cookie }
 			});
-			expect((both.data as AuditPage).total).toBe(0);
+			expect(answered(both.data).total).toBe(0);
 		});
 
 		it('still returns entries whose actor and target no longer exist', async () => {
@@ -274,7 +268,7 @@ describe('GET /admin/api/audit', () => {
 				headers: { cookie }
 			});
 
-			const [entry] = (res.data as AuditPage).entries;
+			const [entry] = answered(res.data).entries;
 			expect(entry!.actorEmail).toBe('gone@x.io');
 			expect(entry!.targetId).toBe('deleted-project');
 		});
@@ -300,7 +294,7 @@ describe('GET /admin/api/audit', () => {
 				query: { targetScope: scope, from: march.toISOString() },
 				headers: { cookie }
 			});
-			expect((since.data as AuditPage).entries.map((e) => e.targetId)).toEqual([
+			expect(answered(since.data).entries.map((e) => e.targetId)).toEqual([
 				'jun',
 				'mar'
 			]);
@@ -309,7 +303,7 @@ describe('GET /admin/api/audit', () => {
 				query: { targetScope: scope, to: march.toISOString() },
 				headers: { cookie }
 			});
-			expect((until.data as AuditPage).entries.map((e) => e.targetId)).toEqual([
+			expect(answered(until.data).entries.map((e) => e.targetId)).toEqual([
 				'mar',
 				'jan'
 			]);
@@ -322,9 +316,9 @@ describe('GET /admin/api/audit', () => {
 				},
 				headers: { cookie }
 			});
-			expect(
-				(between.data as AuditPage).entries.map((e) => e.targetId)
-			).toEqual(['mar']);
+			expect(answered(between.data).entries.map((e) => e.targetId)).toEqual([
+				'mar'
+			]);
 		});
 
 		// A window far from the newest end must be one request, not a walk back through the pages —
@@ -346,7 +340,7 @@ describe('GET /admin/api/audit', () => {
 				headers: { cookie }
 			});
 
-			const page = res.data as AuditPage;
+			const page = answered(res.data);
 			expect(page.total).toBe(1);
 			expect(page.entries[0]!.targetId).toBe('deep');
 		});
@@ -396,7 +390,7 @@ describe('GET /admin/api/audit', () => {
 					query: { targetScope: scope, page: String(page), pageSize: '3' },
 					headers: { cookie }
 				});
-				seen.push(...(res.data as AuditPage).entries.map((e) => e._id));
+				seen.push(...answered(res.data).entries.map((e) => e._id));
 			}
 
 			expect(seen).toHaveLength(7);
@@ -415,7 +409,7 @@ describe('GET /admin/api/audit', () => {
 			});
 
 			expect(res.status).toBe(200);
-			expect((res.data as AuditPage).pageSize).toBe(200);
+			expect(answered(res.data).pageSize).toBe(200);
 		});
 
 		it('treats a page below one as the first page', async () => {
@@ -428,8 +422,8 @@ describe('GET /admin/api/audit', () => {
 				headers: { cookie }
 			});
 
-			expect((res.data as AuditPage).page).toBe(1);
-			expect((res.data as AuditPage).entries).toHaveLength(1);
+			expect(answered(res.data).page).toBe(1);
+			expect(answered(res.data).entries).toHaveLength(1);
 		});
 
 		it('returns an empty page past the end, with the real total', async () => {
@@ -443,8 +437,8 @@ describe('GET /admin/api/audit', () => {
 			});
 
 			expect(res.status).toBe(200);
-			expect((res.data as AuditPage).entries).toEqual([]);
-			expect((res.data as AuditPage).total).toBe(1);
+			expect(answered(res.data).entries).toEqual([]);
+			expect(answered(res.data).total).toBe(1);
 		});
 	});
 
@@ -455,7 +449,8 @@ describe('GET /admin/api/audit', () => {
 			const { cookie } = await cookieFor(['super_admin']);
 
 			const res = await client.admin.api.audit.get({
-				query: { targetTyp: 'Project' } as unknown as Record<string, string>,
+				// @ts-expect-error a mistyped filter name; the route must refuse it
+				query: { targetTyp: 'Project' },
 				headers: { cookie }
 			});
 

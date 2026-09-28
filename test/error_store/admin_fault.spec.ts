@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, spyOn } from 'bun:test';
 import { Elysia } from 'elysia';
+import { Type } from '@sinclair/typebox';
 
 import { ApplicationConfig } from 'lib/configs/application.ts';
 import { errorStore } from 'lib/adapters/index.ts';
@@ -14,6 +15,7 @@ import {
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { flushForTest, resetQueue } from 'lib/error_store/queue.ts';
 import { sessionFor } from '../admin_session.ts';
+import { shaped } from 'test/shape.js';
 
 /*
  * The second capture site.
@@ -83,7 +85,14 @@ describe('admin-plane fault capture', () => {
 					body: JSON.stringify({ name: unique('p'), slug: unique('s') })
 				})
 			);
-			const body = (await response.json()) as Record<string, string>;
+			const body = shaped(
+				Type.Object({
+					error: Type.String(),
+					message: Type.String(),
+					error_reference: Type.String()
+				}),
+				await response.json()
+			);
 			await flushForTest();
 
 			expect(response.status).toBe(500);
@@ -113,7 +122,13 @@ describe('admin-plane fault capture', () => {
 				body: JSON.stringify({ name: 'x', slug: 'y' })
 			})
 		);
-		const body = (await response.json()) as Record<string, string>;
+		const body = shaped(
+			Type.Object({
+				error: Type.String(),
+				error_reference: Type.Optional(Type.String())
+			}),
+			await response.json()
+		);
 		await flushForTest();
 
 		expect(response.status).toBe(401);

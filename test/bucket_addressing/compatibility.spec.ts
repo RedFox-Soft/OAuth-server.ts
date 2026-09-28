@@ -5,6 +5,8 @@ import { elysia } from 'lib/index.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
+import { Type } from '@sinclair/typebox';
+import { present, shaped } from 'test/shape.js';
 
 async function get(path: string) {
 	return elysia.handle(new Request(`http://localhost${path}`));
@@ -28,9 +30,10 @@ describe('a deployment upgraded to per-bucket issuers', () => {
 	 * moved together.
 	 */
 	it('declares the instance issuer and unprefixed endpoints at the bare well-known location', async () => {
-		const doc = (await (
-			await get('/.well-known/openid-configuration')
-		).json()) as Record<string, unknown>;
+		const doc = shaped(
+			Type.Record(Type.String(), Type.Unknown()),
+			await (await get('/.well-known/openid-configuration')).json()
+		);
 
 		expect(doc.issuer).toBe(ISSUER);
 		for (const [member, value] of Object.entries(doc)) {
@@ -65,15 +68,18 @@ describe('a deployment upgraded to per-bucket issuers', () => {
 		const authorized = await elysia.handle(
 			new Request(`http://localhost/auth?${query}`, { headers: { cookie } })
 		);
-		const code = new URL(
-			authorized.headers.get('location') ?? ''
-		).searchParams.get('code') as string;
+		const code = present(
+			new URL(authorized.headers.get('location') ?? '').searchParams.get(
+				'code'
+			),
+			'an authorization code'
+		);
 		const { data } = await auth.getToken(code);
-		const token = data?.access_token as string;
+		const token = present(data?.access_token, 'an access token');
 
 		/* Aged back to what a pre-upgrade record looks like: the field simply absent. */
 		const stored = await AccessToken.find(token);
-		delete (stored.payload as { bucketId?: string }).bucketId;
+		delete stored.payload.bucketId;
 		await stored.save();
 
 		const response = await elysia.handle(

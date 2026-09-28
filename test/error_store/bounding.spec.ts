@@ -96,10 +96,7 @@ describe('error store bounding, driven by configuration', () => {
 
 		const seen: unknown[] = [];
 		const original = errorStore.record.bind(errorStore);
-		(errorStore as { record: unknown }).record = async (
-			occurrence: Parameters<typeof original>[0],
-			bounds: Parameters<typeof original>[1]
-		) => {
+		errorStore.record = async (occurrence, bounds) => {
 			seen.push(bounds);
 			return original(occurrence, bounds);
 		};
@@ -109,7 +106,7 @@ describe('error store bounding, driven by configuration', () => {
 			await faultingApp([route]).handle(new Request(`http://e.ly${route}`));
 			await flushForTest();
 		} finally {
-			(errorStore as { record: unknown }).record = original;
+			errorStore.record = original;
 		}
 
 		expect(seen).toHaveLength(1);

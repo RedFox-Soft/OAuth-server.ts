@@ -1,9 +1,11 @@
 import { createHash, randomBytes } from 'node:crypto';
 
 import { describe, it, expect } from 'bun:test';
+import { Type } from '@sinclair/typebox';
 
 import bootstrap, { agent, formAgent } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
+import { shaped } from 'test/shape.js';
 import { ISSUER } from 'lib/configs/env.js';
 import type { AuthorizationParameters } from 'lib/consts/param_list.js';
 import type { Static } from 'elysia';
@@ -61,7 +63,14 @@ function outcome({
 		};
 	}
 
-	const body = (error?.value ?? data) as { error?: string } | undefined;
+	const body = shaped(
+		Type.Union([
+			Type.Object({ error: Type.Optional(Type.String()) }),
+			Type.Null(),
+			Type.Undefined()
+		]),
+		error?.value ?? data
+	);
 	return { status: response.status, error: body?.error ?? null };
 }
 

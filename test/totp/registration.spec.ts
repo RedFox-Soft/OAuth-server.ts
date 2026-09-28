@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll } from 'bun:test';
+import { Type } from '@sinclair/typebox';
 import bootstrap, {
 	SESSION_COOKIE_PREFIX,
 	agent,
@@ -18,6 +19,7 @@ import { hotp, stepFor } from 'lib/totp/code.ts';
 import epochTime from 'lib/helpers/epoch_time.ts';
 import { resetSentEmails, sentEmails } from '../mail_capture.ts';
 import { TestAdapter } from 'test/models.js';
+import { present, shaped } from 'test/shape.js';
 import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 
 const PASSWORD = 'correct horse battery';
@@ -108,7 +110,10 @@ async function getPage(path: string, cookie?: string) {
 function secretFrom(html: string): string {
 	const props = /window\.PROPS=(\{.*?\})<\/script>/s.exec(html)?.[1];
 	if (!props) throw new Error('the enrolment page carried no props script');
-	const parsed = JSON.parse(props) as { secretText?: string };
+	const parsed = shaped(
+		Type.Object({ secretText: Type.Optional(Type.String()) }),
+		JSON.parse(props)
+	);
 	if (!parsed.secretText) throw new Error('the props carried no secret');
 	return parsed.secretText.replace(/\s+/g, '');
 }
@@ -306,8 +311,11 @@ describe('enrolment at registration (US2)', () => {
 		const page = await getPage(`/ui/${uid}/totp/enroll`, cookie);
 		const secret = secretFrom(page.text);
 
-		const user = await getUserStore(requiredBucketId).findByEmail(email);
-		await getUserStore(requiredBucketId).destroy(user!._id);
+		const user = present(
+			await getUserStore(requiredBucketId).findByEmail(email),
+			'the registered account'
+		);
+		await getUserStore(requiredBucketId).destroy(user._id);
 
 		const res = await postForm(`/ui/${uid}/totp/enroll`, cookie, {
 			code: codeFor(secret)

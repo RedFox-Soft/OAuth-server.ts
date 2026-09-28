@@ -3,6 +3,7 @@ import { describe, it, beforeEach, expect } from 'bun:test';
 import bootstrap from '../test_helper.js';
 import { elysia } from '../../lib/index.ts';
 import { ISSUER } from 'lib/configs/env.js';
+import { present } from '../shape.js';
 import {
 	renderSecurityTxt,
 	SECURITY_CONTACT,
@@ -44,7 +45,9 @@ describe('GET /.well-known/security.txt', () => {
 		const line = renderSecurityTxt(now)
 			.split('\n')
 			.find((l) => l.startsWith('Expires: '));
-		const expires = new Date((line as string).slice('Expires: '.length));
+		const expires = new Date(
+			present(line, 'an Expires line').slice('Expires: '.length)
+		);
 		expect(expires.getTime()).toBeGreaterThan(now.getTime());
 		expect(expires.getTime()).toBeLessThan(now.getTime() + 365 * DAY);
 	});

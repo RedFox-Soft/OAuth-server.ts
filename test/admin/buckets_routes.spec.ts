@@ -14,8 +14,8 @@ import {
 	ADMIN_SESSION_COOKIE,
 	UNASSIGNED_GROUP_ID
 } from 'lib/admin/consts.ts';
-import type { UserBucket } from 'lib/adapters/types.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
+import { answered } from './answered.ts';
 
 const app = new Elysia().use(resolveAdmin).use(bucketRoutes);
 const client = treaty(app);
@@ -50,11 +50,11 @@ describe('buckets API', () => {
 			{ headers: { cookie } }
 		);
 		expect(res.status).toBe(201);
-		const created = res.data as UserBucket | undefined;
+		const created = answered(res.data);
 		// Was `authMethods: ['password']`, a field nothing read. The coverage moves to the setting that
 		// replaced it: a new bucket accepts passwords and holds no upstream providers.
-		expect(created?.passwordLogin).toBe(true);
-		expect(created?.federation).toEqual([]);
+		expect(created.passwordLogin).toBe(true);
+		expect(created.federation).toEqual([]);
 	});
 
 	it('refuses to delete a bucket still referenced by a project', async () => {
@@ -63,7 +63,7 @@ describe('buckets API', () => {
 			{ name: 'Shared', slug: 'shared-2' },
 			{ headers: { cookie } }
 		);
-		const bucket = res1.data as UserBucket;
+		const bucket = answered(res1.data);
 		const project = await getProjectStore().create({
 			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'P',
@@ -89,10 +89,10 @@ describe('buckets API', () => {
 			{ name: 'Bucket B', slug: 'bucket-b-4' },
 			{ headers: { cookie: otherPa.cookie } }
 		);
-		const bucketA = a.data as UserBucket;
-		const bucketB = b.data as UserBucket;
+		const bucketA = answered(a.data);
+		const bucketB = answered(b.data);
 		const list = await client.admin.api.buckets.get({ headers: { cookie } });
-		const buckets = list.data as UserBucket[];
+		const buckets = answered(list.data);
 		const ids = buckets.map((bucket) => bucket._id);
 		expect(ids).toContain(bucketA._id);
 		expect(ids).toContain(bucketB._id);
@@ -109,11 +109,11 @@ describe('buckets API', () => {
 			{ name: 'Other', slug: 'other-6' },
 			{ headers: { cookie: otherPa.cookie } }
 		);
-		const bucketMine = mine.data as UserBucket;
+		const bucketMine = answered(mine.data);
 		const list = await client.admin.api.buckets.get({
 			headers: { cookie: pa.cookie }
 		});
-		const buckets = list.data as UserBucket[];
+		const buckets = answered(list.data);
 		expect(buckets.map((bucket) => bucket._id)).toEqual([bucketMine._id]);
 	});
 
@@ -128,7 +128,7 @@ describe('buckets API', () => {
 			{ headers: { cookie: pa.cookie } }
 		);
 		expect(res.status).toBe(201);
-		expect((res.data as UserBucket).ownerGroupId).toBe(
+		expect(answered(res.data).ownerGroupId).toBe(
 			await personalGroupId(pa.userId)
 		);
 	});
@@ -140,7 +140,7 @@ describe('buckets API', () => {
 			{ name: 'Not managed by pa', slug: 'not-managed-by-pa-8' },
 			{ headers: { cookie: superSession.cookie } }
 		);
-		const bucket = created.data as UserBucket;
+		const bucket = answered(created.data);
 		const res = await client.admin.api
 			.buckets({ id: bucket._id })
 			.delete(undefined, { headers: { cookie: pa.cookie } });
@@ -153,7 +153,7 @@ describe('buckets API', () => {
 			{ name: 'To delete', slug: 'to-delete-9' },
 			{ headers: { cookie } }
 		);
-		const bucket = created.data as UserBucket;
+		const bucket = answered(created.data);
 		const res = await client.admin.api
 			.buckets({ id: bucket._id })
 			.delete(undefined, { headers: { cookie } });
@@ -166,19 +166,19 @@ describe('buckets API', () => {
 			{ name: 'Editable', slug: 'editable-10', roles: ['viewer'] },
 			{ headers: { cookie } }
 		);
-		const bucket = created.data as UserBucket;
+		const bucket = answered(created.data);
 		const got = await client.admin.api
 			.buckets({ id: bucket._id })
 			.get({ headers: { cookie } });
-		expect((got.data as UserBucket).name).toBe('Editable');
+		expect(answered(got.data).name).toBe('Editable');
 		const patched = await client.admin.api
 			.buckets({ id: bucket._id })
 			.patch(
 				{ name: 'Renamed', roles: ['viewer', 'editor'] },
 				{ headers: { cookie } }
 			);
-		expect((patched.data as UserBucket).name).toBe('Renamed');
-		expect((patched.data as UserBucket).roles).toEqual(['viewer', 'editor']);
+		expect(answered(patched.data).name).toBe('Renamed');
+		expect(answered(patched.data).roles).toEqual(['viewer', 'editor']);
 	});
 
 	it('lets a project_admin read a bucket backing a project they manage', async () => {
@@ -189,7 +189,7 @@ describe('buckets API', () => {
 			{ name: 'Backing', slug: 'backing-11' },
 			{ headers: { cookie: su.cookie } }
 		);
-		const bucket = created.data as UserBucket;
+		const bucket = answered(created.data);
 		// a project pa manages points at it
 		const proj = await getProjectStore().create({
 			ownerGroupId: await personalGroupId(pa.userId),
@@ -210,7 +210,7 @@ describe('buckets API', () => {
 			{ name: 'BackingRO', slug: 'backingro-12' },
 			{ headers: { cookie: su.cookie } }
 		);
-		const bucket = created.data as UserBucket;
+		const bucket = answered(created.data);
 		const proj = await getProjectStore().create({
 			name: 'PB2',
 			slug: `pb2-${Math.random()}`,
@@ -230,9 +230,9 @@ describe('buckets API', () => {
 			.get({ headers: { cookie } });
 		expect(got.status).toBe(403);
 		const list = await client.admin.api.buckets.get({ headers: { cookie } });
-		expect(
-			(list.data as UserBucket[]).some((b) => b._id === ADMIN_BUCKET_ID)
-		).toBe(false);
+		expect(answered(list.data).some((b) => b._id === ADMIN_BUCKET_ID)).toBe(
+			false
+		);
 	});
 
 	/*
@@ -247,12 +247,12 @@ describe('buckets API', () => {
 			{ name: 'MB', slug: 'mb-13' },
 			{ headers: { cookie: pa.cookie } }
 		);
-		const bucket = created.data as UserBucket;
+		const bucket = answered(created.data);
 		const before = bucket.ownerGroupId;
 
 		const res = await client.admin.api.buckets({ id: bucket._id }).patch(
-			// Submitted as an unknown field; the schema does not accept it.
-			{ name: 'MB renamed', ownerGroupId: 'somewhere-else' } as never,
+			// @ts-expect-error submitted as an unknown field; the schema does not accept it.
+			{ name: 'MB renamed', ownerGroupId: 'somewhere-else' },
 			{ headers: { cookie: su.cookie } }
 		);
 
@@ -260,7 +260,7 @@ describe('buckets API', () => {
 		const after = await client.admin.api
 			.buckets({ id: bucket._id })
 			.get({ headers: { cookie: su.cookie } });
-		expect((after.data as UserBucket).ownerGroupId).toBe(before);
+		expect(answered(after.data).ownerGroupId).toBe(before);
 	});
 
 	it('lets a group member rename a bucket their group owns', async () => {
@@ -269,7 +269,7 @@ describe('buckets API', () => {
 			{ name: 'MBOwned', slug: 'mbowned-14' },
 			{ headers: { cookie: pa.cookie } }
 		);
-		const bucket = created.data as UserBucket;
+		const bucket = answered(created.data);
 		const ok = await client.admin.api
 			.buckets({ id: bucket._id })
 			.patch({ name: 'renamed' }, { headers: { cookie: pa.cookie } });

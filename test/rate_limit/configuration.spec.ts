@@ -245,7 +245,7 @@ describe('rate limit configuration in force', () => {
 			const afterOn = await flood(
 				'/token',
 				ORIGIN_A,
-				ApplicationConfig['rateLimit.strict.max'] as number,
+				ApplicationConfig['rateLimit.strict.max'],
 				{ method: 'POST' }
 			);
 

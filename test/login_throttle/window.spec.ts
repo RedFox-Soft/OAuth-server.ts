@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
+import { Type } from '@sinclair/typebox';
 
 import { adapter } from 'lib/adapters/index.ts';
 import { ApplicationConfig } from 'lib/configs/application.ts';
@@ -13,8 +14,9 @@ import {
 	recordFailure,
 	throttleKey
 } from 'lib/login_throttle/throttle.ts';
-import type { LoginThrottlePayload } from 'lib/login_throttle/types.ts';
+import { LoginThrottlePayload } from 'lib/login_throttle/types.ts';
 import { TestAdapter } from 'test/models.js';
+import { present, shaped } from 'test/shape.js';
 
 /*
  * The throttle engine at its own seam, before any HTTP is involved. Its eight contract properties are
@@ -26,11 +28,9 @@ import { TestAdapter } from 'test/models.js';
  * storage-only: no interaction, no client, no bucket.
  */
 
-const CAP = ApplicationConfig['loginThrottle.failureCap'] as number;
-const WINDOW = ApplicationConfig['loginThrottle.windowSeconds'] as number;
-const CEILING = ApplicationConfig[
-	'loginThrottle.windowCeilingSeconds'
-] as number;
+const CAP = ApplicationConfig['loginThrottle.failureCap'];
+const WINDOW = ApplicationConfig['loginThrottle.windowSeconds'];
+const CEILING = ApplicationConfig['loginThrottle.windowCeilingSeconds'];
 
 const BUCKET = 'window-spec';
 let seq = 0;
@@ -39,9 +39,10 @@ const address = () => `case-${(seq += 1)}@x.io`;
 
 /* The memory adapter stores the payload flat under its prefixed key, so this is the record itself. */
 function record(email: string): LoginThrottlePayload | undefined {
-	return TestAdapter.for('LoginThrottle').syncFind(
-		throttleKey(BUCKET, email)
-	) as LoginThrottlePayload | undefined;
+	return shaped(
+		Type.Union([LoginThrottlePayload, Type.Undefined()]),
+		TestAdapter.for('LoginThrottle').syncFind(throttleKey(BUCKET, email))
+	);
 }
 
 /* Exhaust one window's worth of attempts. */
@@ -193,7 +194,7 @@ describe('login throttle: escalation', () => {
 		}
 
 		expect(seen[0]).toBe(WINDOW);
-		expect(seen[1]).toBeGreaterThan(seen[0] as number);
+		expect(seen[1]).toBeGreaterThan(present(seen[0], 'a first window'));
 		expect(seen[3]).toBe(CEILING);
 		expect(seen[3]).toBe(seen[2]);
 	});
@@ -273,7 +274,10 @@ describe('login throttle: clearing and keying', () => {
 
 		const spellings = ['Alice@x.io', 'aLICE@x.io', 'ALICE@X.IO', 'alice@x.IO'];
 		for (let i = 0; i < CAP; i += 1) {
-			await recordFailure(BUCKET, spellings[i % spellings.length] as string);
+			await recordFailure(
+				BUCKET,
+				present(spellings[i % spellings.length], 'a spelling')
+			);
 		}
 
 		expect(await isThrottled(BUCKET, 'alice@x.io', false)).toBe(true);

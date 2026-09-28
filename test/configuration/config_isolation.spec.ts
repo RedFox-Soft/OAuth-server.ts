@@ -18,8 +18,7 @@ describe('ApplicationConfig isolation between specs', () => {
 	});
 
 	it('drops an in-place mutation of a nested object on the next bootstrap', async () => {
-		(ApplicationConfig.discovery as Record<string, unknown>).leaked_key =
-			'leaked';
+		Object.assign(ApplicationConfig.discovery, { leaked_key: 'leaked' });
 
 		await bootstrap(import.meta.url);
 

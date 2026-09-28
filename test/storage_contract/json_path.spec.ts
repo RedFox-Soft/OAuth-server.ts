@@ -90,12 +90,12 @@ describe('jsonPath', () => {
 
 describe('columnFor', () => {
 	it('gives model areas the payload column their declared keys already name', () => {
-		expect(columnFor({ kind: 'model' } as StorageArea)).toBe('payload');
+		expect(columnFor({ kind: 'model' })).toBe('payload');
 	});
 
 	it('gives store and per-bucket areas the doc column', () => {
-		expect(columnFor({ kind: 'store' } as StorageArea)).toBe('doc');
-		expect(columnFor({ kind: 'perBucket' } as StorageArea)).toBe('doc');
+		expect(columnFor({ kind: 'store' })).toBe('doc');
+		expect(columnFor({ kind: 'perBucket' })).toBe('doc');
 	});
 });
 

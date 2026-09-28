@@ -9,6 +9,8 @@ import bootstrap, {
 import { elysia } from 'lib/index.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
+import { Type } from '@sinclair/typebox';
+import { present, shaped } from 'test/shape.js';
 
 const SLUG = 'acme';
 
@@ -79,9 +81,11 @@ describe('a token minted by a named bucket', () => {
 
 		/* Through the suite's own exchange helper, which carries the PKCE verifier and whatever client
 		 * authentication this client is configured for. */
-		const { data } = await auth.getToken(code as string);
+		const { data } = await auth.getToken(
+			present(code, 'an authorization code')
+		);
 		expect(data?.access_token).toBeTruthy();
-		return { token: data?.access_token as string, clientId };
+		return { token: present(data?.access_token, 'an access token'), clientId };
 	}
 
 	async function introspect(at: string, clientId: string) {
@@ -89,7 +93,13 @@ describe('a token minted by a named bucket', () => {
 			token: at,
 			client_id: clientId
 		});
-		return (await response.json()) as { active: boolean; iss?: string };
+		return shaped(
+			Type.Object({
+				active: Type.Boolean(),
+				iss: Type.Optional(Type.String())
+			}),
+			await response.json()
+		);
 	}
 
 	/*
@@ -142,33 +152,39 @@ describe('a token minted by a named bucket', () => {
 				headers: { cookie }
 			})
 		);
-		const code = new URL(
-			authorized.headers.get('location') ?? ''
-		).searchParams.get('code') as string;
+		const code = present(
+			new URL(authorized.headers.get('location') ?? '').searchParams.get(
+				'code'
+			),
+			'an authorization code'
+		);
 
 		const tokens = await post(`/${SLUG}/token`, {
 			grant_type: 'authorization_code',
 			code,
 			redirect_uri: 'https://acme.example.com/cb',
 			client_id: 'acme-app',
-			code_verifier: auth.code_verifier as string
+			code_verifier: auth.code_verifier
 		});
-		const body = (await tokens.json()) as {
-			access_token?: string;
-			id_token?: string;
-		};
+		const body = shaped(
+			Type.Object({
+				access_token: Type.Optional(Type.String()),
+				id_token: Type.Optional(Type.String())
+			}),
+			await tokens.json()
+		);
 		expect(body.access_token).toBeTruthy();
 
 		const claims = JSON.parse(
 			Buffer.from(
-				(body.id_token as string).split('.')[1],
+				present(body.id_token, 'an ID token').split('.')[1],
 				'base64url'
 			).toString()
 		);
 		expect(claims.iss).toBe(`${ISSUER}/${SLUG}`);
 
 		const introspected = await post(`/${SLUG}/token/introspect`, {
-			token: body.access_token as string,
+			token: present(body.access_token, 'an access token'),
 			client_id: 'acme-app'
 		});
 		expect(await introspected.json()).toMatchObject({

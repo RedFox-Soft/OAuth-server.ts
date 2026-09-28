@@ -6,8 +6,10 @@ import bootstrap, {
 	redirectParameter
 } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
+import { present } from 'test/shape.js';
 import { TestAdapter } from 'test/models.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';
+import { AuthorizationCodePayload } from 'lib/models/authorization_code.js';
 
 const POLICY_REFUSAL =
 	'Authorization Server policy requires PKCE to be used for this request';
@@ -76,7 +78,8 @@ describe('PKCE not required', () => {
 			auth.validatePresence(response, ['code', 'state']);
 
 			const code = redirectParameter(response, 'code');
-			const stored = TestAdapter.for('AuthorizationCode').syncFind(
+			const stored = TestAdapter.for('AuthorizationCode').syncFindAs(
+				AuthorizationCodePayload,
 				setup.getTokenJti(code)
 			);
 			expect(stored.codeChallenge).toBeUndefined();
@@ -97,7 +100,8 @@ describe('PKCE not required', () => {
 			});
 
 			const code = redirectParameter(response, 'code');
-			const stored = TestAdapter.for('AuthorizationCode').syncFind(
+			const stored = TestAdapter.for('AuthorizationCode').syncFindAs(
+				AuthorizationCodePayload,
 				setup.getTokenJti(code)
 			);
 			expect(stored).toHaveProperty('codeChallengeMethod', 'S256');
@@ -153,8 +157,10 @@ describe('PKCE not required', () => {
 	 * it by being refused rather than by reading the document.
 	 */
 	it('offers S256 among the published proof methods', async function () {
-		const doc = (await agent['.well-known']['openid-configuration'].get())
-			.data as Record<string, string[]>;
+		const doc = present(
+			(await agent['.well-known']['openid-configuration'].get()).data,
+			'the discovery document'
+		);
 
 		expect(doc.code_challenge_methods_supported).toEqual(['S256']);
 	});

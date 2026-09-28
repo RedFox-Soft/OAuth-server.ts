@@ -918,8 +918,9 @@ describe('features.richAuthorizationRequests', () => {
 				client_id: 'client',
 				grant_type: 'refresh_token',
 				refresh_token: 'whatever',
+				// @ts-expect-error deliberately off-schema: the token body schema refuses this parameter.
 				authorization_details: details(payment())
-			} as never);
+			});
 
 			expect(status).toBe(400);
 		});

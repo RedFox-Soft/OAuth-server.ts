@@ -17,8 +17,7 @@ function codeFromResponse(response: Response) {
 	if (!location) {
 		throw new Error('location header is missing');
 	}
-	const code = locationParameter(location, 'code');
-	return code as string;
+	return locationParameter(location, 'code');
 }
 
 /**

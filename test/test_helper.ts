@@ -18,23 +18,19 @@ import {
 	jwksStore
 } from '../lib/adapters/index.ts';
 import { reloadJWKSKeys } from '../lib/configs/keys.ts';
-import { verifyJWKs, type UnnormalizedJWK } from '../lib/configs/verifyJWKs.ts';
+import { verifyJWKs } from '../lib/configs/verifyJWKs.ts';
+import { UserStore as MemoryUserStore } from '../lib/adapters/memory/userStore.ts';
 import { testSigningKeys } from './jwks/fixtures.js';
 import sharedTestClaims from './default.config.js';
 import type { User } from '../lib/adapters/types.ts';
 
 import { TestAdapter } from './models.js';
+import { present, shaped } from './shape.js';
+import { SessionPayload } from '../lib/models/session.ts';
 import { AuthorizationRequest } from './AuthorizationRequest.js';
 import { setAddonBaseline } from './addon_baseline.js';
 import { interactionPolicy } from '../lib/addon/index.js';
 import { base as basePolicy } from '../lib/helpers/interaction_policy/index.js';
-
-// In test mode getUserStore() returns the in-memory UserStore, which exposes a
-// test-only `seed()` (see lib/adapters/memory/userStore.ts). The mongo store is
-// never constructed under NODE_ENV=test, so this cast is always sound here.
-type SeedableUserStore = ReturnType<typeof getUserStore> & {
-	seed(user: { _id: string } & Partial<Omit<User, '_id'>>): User;
-};
 
 import {
 	ApplicationConfig,
@@ -78,7 +74,7 @@ export async function seedJwks(keys: Array<Record<string, unknown>>) {
 	// means the store key always equals key.kid, so clearing by kid is exact — storing a
 	// kid-less key would otherwise leave an entry keyed `undefined` that no cleanup can find.
 	// It is an assertion, so `seeded.keys` is a normalized JWKS[] from here on.
-	const seeded = { keys: structuredClone(keys) as UnnormalizedJWK[] };
+	const seeded = { keys: structuredClone(keys) };
 	verifyJWKs(seeded);
 
 	for (const existing of await jwksStore.getAll()) {
@@ -160,9 +156,14 @@ export const formAgent = treaty(elysia, {
 //
 // Applied per test, not once in beforeAll: the global afterEach resets the interaction policy, so
 // a single beforeAll mutation would survive only until the first test finished.
-export function passInteractionChecks(...args: unknown[]) {
-	const fn = args[args.length - 1] as () => void;
-	const reasons = args.slice(0, -1) as string[];
+export function passInteractionChecks(
+	...args: [...reasons: string[], cases: () => void]
+) {
+	const fn = args.at(-1);
+	if (typeof fn !== 'function') {
+		throw new TypeError('passInteractionChecks takes the cases callback last');
+	}
+	const reasons = args.filter((arg) => typeof arg === 'string');
 	const disabled: Array<{ check: { check: unknown }; original: unknown }> = [];
 
 	beforeEach(() => {
@@ -242,7 +243,12 @@ export function seedAccount(
 	overrides: Partial<Omit<User, '_id'>> = {},
 	bucket = 'redfox'
 ): User {
-	return (getUserStore(bucket) as unknown as SeedableUserStore).seed({
+	const store = getUserStore(bucket);
+	// Only the in-memory store can take a caller-chosen id, and it is the one every spec runs on.
+	if (!(store instanceof MemoryUserStore)) {
+		throw new Error('seedAccount needs the in-memory user store');
+	}
+	return store.seed({
 		_id: accountId,
 		active: true,
 		verified: true,
@@ -598,9 +604,16 @@ async function bootstrap(
 		return getLastSession().id;
 	}
 
+	// The stored session, checked against the model's own schema, as `Session.fromStored` checks it.
 	function getSession(id?: string) {
 		const sessionId = id ?? getLastSession().id;
-		return TestAdapter.for('Session').syncFind(sessionId);
+		return shaped(
+			SessionPayload,
+			present(
+				TestAdapter.for('Session').syncFind(sessionId),
+				'the session record'
+			)
+		);
 	}
 
 	function getGrantId(clientId?: string) {
@@ -610,7 +623,7 @@ async function bootstrap(
 		if (!clientId && clients) clientId = clients[0].clientId;
 		try {
 			if (!clientId) throw new Error('no client');
-			return session.authorizations[clientId].grantId;
+			return present(session.authorizations?.[clientId]?.grantId, 'a grant');
 		} catch (err) {
 			throw new Error('getGrantId() failed');
 		}

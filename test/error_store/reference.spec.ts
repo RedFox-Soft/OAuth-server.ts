@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { Elysia } from 'elysia';
+import { Type } from '@sinclair/typebox';
 
 import { ApplicationConfig } from 'lib/configs/application.ts';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
@@ -10,6 +11,7 @@ import { adminSessionStore, getUserStore } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { flushForTest, resetQueue } from 'lib/error_store/queue.ts';
 import { sessionFor } from '../admin_session.ts';
+import { shaped } from 'test/shape.js';
 
 /*
  * US3 — matching a caller's complaint to a record.
@@ -69,16 +71,20 @@ describe('error reference lookup', () => {
 		});
 
 		const response = await faulting.handle(new Request(`http://e.ly${route}`));
-		const { error_reference: reference } = (await response.json()) as {
-			error_reference: string;
-		};
+		const { error_reference: reference } = shaped(
+			Type.Object({ error_reference: Type.String() }),
+			await response.json()
+		);
 		await flushForTest();
 
 		const found = await lookup(reference, await superCookie());
-		const body = (await found.json()) as {
-			group: { route: string; message: string };
-			sample: { reference: string };
-		};
+		const body = shaped(
+			Type.Object({
+				group: Type.Object({ route: Type.String(), message: Type.String() }),
+				sample: Type.Object({ reference: Type.String() })
+			}),
+			await found.json()
+		);
 
 		expect(found.status).toBe(200);
 		expect(body.group.route).toBe(route);
@@ -94,7 +100,10 @@ describe('error reference lookup', () => {
 	it('answers 404 for a reference that resolves to nothing', async () => {
 		const cookie = await superCookie();
 		const response = await lookup('err_AAAAAAAAAAAAAAAA', cookie);
-		const body = (await response.json()) as { message?: string };
+		const body = shaped(
+			Type.Object({ message: Type.Optional(Type.String()) }),
+			await response.json()
+		);
 
 		expect(response.status).toBe(404);
 		expect(body.message).toBe('no such error record');
@@ -132,7 +141,10 @@ describe('error reference lookup', () => {
 			const response = await app.handle(
 				new Request('http://e.ly/no-such-route-at-all')
 			);
-			const body = (await response.json()) as Record<string, string>;
+			const body = shaped(
+				Type.Object({ error_reference: Type.Optional(Type.String()) }),
+				await response.json()
+			);
 
 			expect(response.status).toBe(404);
 			expect(body.error_reference).toBeUndefined();

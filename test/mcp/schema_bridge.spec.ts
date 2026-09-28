@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'bun:test';
-import { fromJsonSchema } from '@modelcontextprotocol/server';
 import { t } from 'elysia';
 
 import {
@@ -16,6 +15,7 @@ import {
 	UpdateClientBody
 } from 'lib/admin/clients/schema.ts';
 import { mcpCatalogue } from 'lib/mcp/catalogue.ts';
+import { bridgeSchema } from 'lib/mcp/schema_bridge.ts';
 
 /*
  * T004. The feature's schema story (research.md D2) is that a tool's input schema IS the TypeBox
@@ -52,9 +52,7 @@ describe('TypeBox admin schemas bridge into MCP tool schemas', () => {
 
 	it('bridges every admin schema into a tool schema an agent can read', () => {
 		for (const [name, schema] of Object.entries(schemas)) {
-			const bridged = fromJsonSchema(
-				schema as Parameters<typeof fromJsonSchema>[0]
-			);
+			const bridged = bridgeSchema(schema);
 			expect(bridged, name).toBeDefined();
 		}
 	});
@@ -66,17 +64,8 @@ describe('TypeBox admin schemas bridge into MCP tool schemas', () => {
 		// Record how TypeBox actually renders it, so a future TypeBox change is visible here.
 		expect(JSON.stringify(raw)).toMatch(/anyOf|enum|const/);
 
-		const bridged = fromJsonSchema(
-			CreateBucketBody as Parameters<typeof fromJsonSchema>[0]
-		);
-		type Validator = {
-			validate?: (v: unknown) => unknown;
-			['~standard']?: {
-				validate: (v: unknown) => { issues?: unknown[] } | Promise<unknown>;
-			};
-		};
-		const v = bridged as unknown as Validator;
-		const std = v['~standard'];
+		const bridged = bridgeSchema(CreateBucketBody);
+		const std = bridged['~standard'];
 		if (!std) {
 			throw new Error(
 				'the bridged schema exposes no Standard Schema validator'
@@ -87,16 +76,20 @@ describe('TypeBox admin schemas bridge into MCP tool schemas', () => {
 			name: 'B',
 			slug: 'b',
 			verificationMethod: 'link'
-		}) as {
-			issues?: unknown[];
-		};
+		});
+		if (ok instanceof Promise) {
+			throw new Error('the bridged schema validates asynchronously');
+		}
 		expect(ok.issues ?? []).toBeArrayOfSize(0);
 
 		const bad = std.validate({
 			name: 'B',
 			slug: 'b',
 			verificationMethod: 'carrier-pigeon'
-		}) as { issues?: unknown[] };
+		});
+		if (bad instanceof Promise) {
+			throw new Error('the bridged schema validates asynchronously');
+		}
 		expect((bad.issues ?? []).length).toBeGreaterThan(0);
 	});
 

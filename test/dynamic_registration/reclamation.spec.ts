@@ -10,6 +10,7 @@ import {
 import bootstrap, { agent } from '../test_helper.js';
 import { adapter } from 'lib/adapters/index.ts';
 import { UNUSED_REGISTRATION_TTL_SECONDS } from 'lib/models/client/dynamic_registration.ts';
+import { present } from 'test/shape.js';
 
 /*
  * Bounding what dynamic registration can accumulate.
@@ -30,7 +31,7 @@ async function register() {
 		{ headers: json }
 	);
 	expect(res.status).toBe(201);
-	return res.data?.client_id as string;
+	return present(res.data?.client_id, 'a client_id');
 }
 
 function exists(clientId: string) {
@@ -123,9 +124,10 @@ describe('reclaiming registrations nobody took up', () => {
 
 		await markRegistrationUsed({ clientId, registeredDynamically: true });
 
-		const stored = (await adapter('Client').find(clientId)) as {
-			registrationUsedAt?: number;
-		};
+		const stored = present(
+			await adapter('Client').find(clientId),
+			'the stored registration'
+		);
 		expect(typeof stored.registrationUsedAt).toBe('number');
 	});
 });

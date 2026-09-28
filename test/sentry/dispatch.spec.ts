@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { Elysia } from 'elysia';
+import { Type, type Static } from '@sinclair/typebox';
 
 import { ApplicationConfig } from 'lib/configs/application.ts';
 import { errorStore } from 'lib/adapters/index.ts';
@@ -17,6 +18,7 @@ import {
 } from 'lib/sentry/dispatch.ts';
 import type { ErrorOccurrence, ErrorRecord } from 'lib/adapters/types.ts';
 import { clearRecorded, recordedEnvelopes } from 'lib/sentry/transport.ts';
+import { shaped } from 'test/shape.js';
 
 /*
  * What becomes an outbound event, exercised through the real global error handler.
@@ -39,13 +41,31 @@ function appThrowing(route: string, thrown: () => never) {
 	return new Elysia().onError(errorHandler).get(route, () => thrown());
 }
 
+/* What this file reads off an outbound event: the members `send` in lib/sentry/dispatch.ts sets. */
+const CapturedEvent = Type.Object({
+	message: Type.String(),
+	transaction: Type.String(),
+	fingerprint: Type.Array(Type.String()),
+	tags: Type.Record(Type.String(), Type.String()),
+	contexts: Type.Object({
+		fault: Type.Object({
+			detail: Type.String(),
+			codeLocation: Type.Object({
+				file: Type.String(),
+				line: Type.Union([Type.Number(), Type.Null()]),
+				frame: Type.String()
+			})
+		})
+	})
+});
+
 /* The event payloads of everything the transport was handed, in order. */
-function capturedEvents(): Record<string, unknown>[] {
-	const events: Record<string, unknown>[] = [];
+function capturedEvents(): Static<typeof CapturedEvent>[] {
+	const events: Static<typeof CapturedEvent>[] = [];
 	for (const [, items] of recordedEnvelopes()) {
-		for (const [header, payload] of items as [{ type?: string }, unknown][]) {
-			if (header?.type === 'event') {
-				events.push(payload as Record<string, unknown>);
+		for (const [header, payload] of items) {
+			if (header.type === 'event') {
+				events.push(shaped(CapturedEvent, payload));
 			}
 		}
 	}
@@ -107,13 +127,16 @@ describe('sentry dispatch', () => {
 		});
 
 		const response = await app.handle(new Request('http://e.ly/sentry-ref'));
-		const body = (await response.json()) as { error_reference?: string };
+		const body = shaped(
+			Type.Object({ error_reference: Type.Optional(Type.String()) }),
+			await response.json()
+		);
 		expect(body.error_reference).toMatch(/^err_/);
 		await settle();
 
 		const reference = body.error_reference ?? '';
 		const [event] = capturedEvents();
-		expect((event.tags as Record<string, string>).reference).toBe(reference);
+		expect(event.tags.reference).toBe(reference);
 	});
 
 	/*
@@ -152,7 +175,7 @@ describe('sentry dispatch', () => {
 		await app.handle(new Request('http://e.ly/sentry-group'));
 		await settle();
 
-		const fingerprint = capturedEvents()[0].fingerprint as string[];
+		const fingerprint = capturedEvents()[0].fingerprint;
 		expect(fingerprint).toHaveLength(1);
 		expect(fingerprint[0]).toMatch(/^[0-9a-f]{32}$/);
 		expect(fingerprint).not.toContain('{{ default }}');
@@ -194,7 +217,7 @@ describe('sentry dispatch', () => {
 		await app.handle(new Request('http://e.ly/sentry-locator'));
 		await settle();
 
-		const transaction = capturedEvents()[0].transaction as string;
+		const transaction = capturedEvents()[0].transaction;
 		expect(transaction).toStartWith('GET /sentry-locator ');
 		expect(transaction).toMatch(/dispatch\.spec\.ts:\d+\)$/);
 	});
@@ -227,7 +250,7 @@ describe('sentry dispatch', () => {
 		expect(events).toHaveLength(2);
 
 		/* Same endpoint on both, so the difference can only come from the code location. */
-		const routes = events.map((e) => (e.tags as Record<string, string>).route);
+		const routes = events.map((e) => e.tags.route);
 		expect(routes).toEqual(['/sentry-two/:which', '/sentry-two/:which']);
 		expect(events[0].transaction).not.toBe(events[1].transaction);
 		expect(events[0].message).not.toBe(events[1].message);
@@ -249,9 +272,8 @@ describe('sentry dispatch', () => {
 		await settle();
 
 		const event = capturedEvents()[0];
-		const tags = event.tags as Record<string, string>;
-		const location = (event.contexts as Record<string, Record<string, unknown>>)
-			.fault.codeLocation as { file: string };
+		const tags = event.tags;
+		const location = event.contexts.fault.codeLocation;
 
 		expect(tags.codeFile).toBe(location.file);
 		expect(tags).not.toHaveProperty('codeLine');
@@ -272,10 +294,8 @@ describe('sentry dispatch', () => {
 		await app.handle(new Request('http://e.ly/sentry-location'));
 		await settle();
 
-		const fault = (
-			capturedEvents()[0].contexts as Record<string, Record<string, unknown>>
-		).fault;
-		const location = fault.codeLocation as Record<string, unknown>;
+		const fault = capturedEvents()[0].contexts.fault;
+		const location = fault.codeLocation;
 		expect(Object.keys(location).sort()).toEqual(['file', 'frame', 'line']);
 		expect(location.file).toContain('dispatch.spec.ts');
 		expect(typeof location.line).toBe('number');
@@ -306,22 +326,24 @@ describe('sentry dispatch', () => {
 			userAgent: null,
 			submittedFields: []
 		};
-		const occurrence = {
+		// Named first: written inline, the excess-property check would refuse the stray member under test.
+		const origin = {
+			file: 'lib/x.ts',
+			line: 1,
+			frame: 'x',
+			requestId: 'ZZsmuggledZZ'
+		};
+		const occurrence: ErrorOccurrence = {
 			fingerprint: 'fp-refuse',
 			errorCode: 'server_error',
 			status: 500,
 			surface: 'oauth',
 			route: '/sentry-refuse',
 			method: 'GET',
-			origin: {
-				file: 'lib/x.ts',
-				line: 1,
-				frame: 'x',
-				requestId: 'ZZsmuggledZZ'
-			},
+			origin,
 			message: 'deliberate fault',
 			record
-		} as unknown as ErrorOccurrence;
+		};
 
 		reportFault(occurrence);
 		await settle();
@@ -400,9 +422,7 @@ describe('sentry dispatch', () => {
 		expect(prints.size).toBe(1);
 
 		const page = await errorStore.list({ route: '/sentry-group' });
-		expect((events[0].fingerprint as string[])[0]).toBe(
-			page.groups[0].fingerprint
-		);
+		expect(events[0].fingerprint[0]).toBe(page.groups[0].fingerprint);
 	});
 
 	it('starts with no drops', () => {

@@ -12,6 +12,7 @@ import { elysia } from 'lib/index.js';
 import { getUserStore } from 'lib/adapters/index.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { eventBus } from 'lib/event_bus.js';
+import { present } from 'test/shape.js';
 
 const PASSWORD = 'sup3rsecret';
 const SLUG = 'acmeout';
@@ -49,7 +50,7 @@ async function signInToAcme(held: string): Promise<string> {
 	);
 	const written = findSessionSetCookie(loggedIn.headers.getSetCookie());
 	expect(written).toBeDefined();
-	return (written as string).split(';')[0];
+	return present(written, 'a session cookie').split(';')[0];
 }
 
 /* Signs out at a bucket's address, following the confirmation the browser is shown. */
@@ -77,7 +78,10 @@ async function signOutAt(prefix: string, cookie: string) {
 				cookie: `${cookie}; ${pageCookie}`,
 				accept: 'text/html'
 			},
-			body: new URLSearchParams({ xsrf: secret as string, logout: 'true' })
+			body: new URLSearchParams({
+				xsrf: present(secret, 'the xsrf secret'),
+				logout: 'true'
+			})
 		})
 	);
 }

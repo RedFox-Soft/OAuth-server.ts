@@ -1,4 +1,5 @@
 import { describe, it, expect, spyOn } from 'bun:test';
+import { Type } from '@sinclair/typebox';
 
 import {
 	generateNonceSecret,
@@ -8,6 +9,7 @@ import {
 import type { SecretStoreInstance } from 'lib/adapters/types.ts';
 import { SingletonSecretStore } from 'lib/adapters/memory/singletonSecretStore.ts';
 import { DPoPNonces } from 'lib/helpers/dpop_nonces.ts';
+import { shaped } from 'test/shape.js';
 
 // The narrowing predicate and the generator — specs/014-dpop-nonce-safety/data-model.md.
 //
@@ -112,7 +114,7 @@ class StubStore implements SecretStoreInstance {
 
 // A 32-byte buffer that has been through a JSON round trip: the exact shape a document store hands
 // back, and the one that used to reach the nonce generator's constructor and throw.
-const mangled = () => JSON.parse(JSON.stringify(Buffer.alloc(32, 1)));
+const mangled = (): unknown => JSON.parse(JSON.stringify(Buffer.alloc(32, 1)));
 
 const quiet = () => spyOn(console, 'warn').mockImplementation(() => {});
 
@@ -270,7 +272,9 @@ describe('nonce secret: concurrent provisioning', () => {
 		// use_dpop_nonce forever, since neither would ever accept the other's nonce.
 		expect(Buffer.from(first).equals(Buffer.from(second))).toBe(true);
 		expect(
-			Buffer.from((await store.read()) as Uint8Array).equals(Buffer.from(first))
+			Buffer.from(shaped(Type.Uint8Array(), await store.read())).equals(
+				Buffer.from(first)
+			)
 		).toBe(true);
 		warn.mockRestore();
 	});
@@ -279,7 +283,8 @@ describe('nonce secret: concurrent provisioning', () => {
 		const store = new SingletonSecretStore('dpopNonceSecret');
 		await store.create(Buffer.alloc(32, 9));
 		// Force the stored value into an unusable shape, the way a storage round trip would.
-		await store.replace(await store.read(), mangled() as unknown as Buffer);
+		// @ts-expect-error deliberately not a Buffer: the shape a storage round trip leaves behind.
+		await store.replace(await store.read(), mangled());
 		const warn = quiet();
 
 		const [first, second] = await Promise.all([

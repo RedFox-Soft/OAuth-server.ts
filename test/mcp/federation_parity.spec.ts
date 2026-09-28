@@ -31,6 +31,8 @@ import {
 	githubStub,
 	microsoftStub
 } from '../federation/recognised_stubs.ts';
+import { shaped } from 'test/shape.js';
+import { Type } from '@sinclair/typebox';
 
 /*
  * An agent connects a recognised provider through the same operation the console uses.
@@ -92,7 +94,7 @@ async function agentSession() {
 		scope: 'openid'
 	});
 	at.setAudience(MCP_RESOURCE);
-	const token = (await at.save()) as unknown as string;
+	const token = await at.save();
 	await rpc(
 		{
 			jsonrpc: '2.0',
@@ -118,7 +120,10 @@ async function seedBucket() {
 }
 
 function resultOf(response: { result?: { structuredContent?: unknown } }) {
-	return (response.result?.structuredContent ?? {}) as Record<string, unknown>;
+	return shaped(
+		Type.Record(Type.String(), Type.Unknown()),
+		response.result?.structuredContent ?? {}
+	);
 }
 
 /**
@@ -150,14 +155,23 @@ describe('an agent connecting a recognised provider', () => {
 			call('federation_catalogue_list', { id: bucket._id }),
 			token
 		);
-		const providers = (resultOf(response).result ?? resultOf(response)) as {
-			providers?: {
-				catalogueId: string;
-				requiredValues?: unknown[];
-				choices?: { options: unknown[] }[];
-				callbackUri?: string;
-			}[];
-		};
+		const providers = shaped(
+			Type.Object({
+				providers: Type.Optional(
+					Type.Array(
+						Type.Object({
+							catalogueId: Type.String(),
+							requiredValues: Type.Optional(Type.Array(Type.Unknown())),
+							choices: Type.Optional(
+								Type.Array(Type.Object({ options: Type.Array(Type.Unknown()) }))
+							),
+							callbackUri: Type.Optional(Type.String())
+						})
+					)
+				)
+			}),
+			resultOf(response).result ?? resultOf(response)
+		);
 
 		const byId = new Map(
 			(providers.providers ?? []).map((entry) => [entry.catalogueId, entry])

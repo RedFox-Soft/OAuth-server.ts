@@ -45,8 +45,20 @@ export function isIndexConflict(error: unknown): boolean {
 	return code === INDEX_OPTIONS_CONFLICT || code === INDEX_KEY_SPECS_CONFLICT;
 }
 
+/*
+ * What creating a collection asks of a database — the two calls below and nothing else. The driver's
+ * `Db` satisfies it, and so does a test's stand-in without pretending to be a whole `Db`.
+ */
+export interface CollectionHost {
+	listCollections(
+		filter: { name: string },
+		options: { nameOnly: true }
+	): { hasNext(): Promise<boolean> };
+	createCollection(name: string): Promise<unknown>;
+}
+
 export async function collectionExists(
-	target: Db,
+	target: CollectionHost,
 	name: string
 ): Promise<boolean> {
 	return target.listCollections({ name }, { nameOnly: true }).hasNext();
@@ -61,7 +73,7 @@ export async function collectionExists(
  * assumed. The NamespaceExists catch stays as the race guard it always was, for two runs at once.
  */
 export async function ensureCollection(
-	target: Db,
+	target: CollectionHost,
 	name: string
 ): Promise<boolean> {
 	if (await collectionExists(target, name)) {

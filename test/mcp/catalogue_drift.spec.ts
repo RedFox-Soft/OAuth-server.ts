@@ -5,10 +5,13 @@ import {
 	mcpCatalogue,
 	excludedConsoleOperations,
 	withheldConsoleOperations,
-	pathArgName
+	pathArgName,
+	type McpTool
 } from 'lib/mcp/catalogue.ts';
 import { auditedAdminRoutes } from 'lib/consts/admin_audit_routes.ts';
 import { adminApiRoutes } from 'lib/admin/routes.ts';
+import { shaped } from 'test/shape.js';
+import { Type } from '@sinclair/typebox';
 
 /*
  * The parity guard. FR-003 and FR-032 require that the console cannot gain an administrative operation
@@ -23,6 +26,12 @@ const mounted = new Elysia({ strictPath: true, normalize: false }).use(
 );
 
 const key = (r: { method: string; path: string }) => `${r.method} ${r.path}`;
+
+const PropertyMap = Type.Record(Type.String(), Type.Unknown());
+
+// The argument names a tool's body or query schema declares; none for a tool that takes neither.
+const propertyNames = (schema: McpTool['bodySchema']) =>
+	Object.keys(shaped(PropertyMap, schema?.properties ?? {}));
 
 const mountedApi = mounted.routes
 	.filter((r) => r.path.startsWith('/admin/api'))
@@ -228,12 +237,8 @@ describe('MCP tool catalogue', () => {
 		for (const tool of mcpCatalogue) {
 			const names = [
 				...tool.pathParams.map((p) => pathArgName(tool, p)),
-				...Object.keys(
-					(tool.querySchema?.properties ?? {}) as Record<string, unknown>
-				),
-				...Object.keys(
-					(tool.bodySchema?.properties ?? {}) as Record<string, unknown>
-				)
+				...propertyNames(tool.querySchema),
+				...propertyNames(tool.bodySchema)
 			];
 			const duplicates = names.filter((n, i) => names.indexOf(n) !== i);
 			expect(
@@ -251,9 +256,7 @@ describe('MCP tool catalogue', () => {
 					tool.pathParams,
 					`${tool.tool}: aliases unknown param`
 				).toContain(param);
-				const bodyProps = Object.keys(
-					(tool.bodySchema?.properties ?? {}) as Record<string, unknown>
-				);
+				const bodyProps = propertyNames(tool.bodySchema);
 				expect(
 					bodyProps,
 					`${tool.tool}: aliases ${param} to ${alias} but nothing collides with it`
@@ -295,9 +298,7 @@ describe('MCP tool catalogue', () => {
 			// A literal declaration form, not a wildcard or a caller-supplied segment.
 			expect(tool.path, tool.tool).not.toContain('*');
 
-			const props = Object.keys(
-				(tool.bodySchema?.properties ?? {}) as Record<string, unknown>
-			);
+			const props = propertyNames(tool.bodySchema);
 			for (const f of forbidden) {
 				expect(props, `${tool.tool} accepts a ${f} field`).not.toContain(f);
 			}

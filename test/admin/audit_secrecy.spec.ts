@@ -22,6 +22,7 @@ import {
 	UNASSIGNED_GROUP_ID
 } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
+import { answered } from './answered.ts';
 
 /*
  * No secret value may reach the trail — from any operation, in any field.
@@ -84,22 +85,24 @@ describe('admin audit secrecy', () => {
 			name: 'P',
 			slug: unique('p')
 		});
-		const created = (
-			await client.admin.api.projects({ id: project._id }).clients.post(
-				{
-					grantTypes: ['authorization_code'],
-					tokenEndpointAuthMethod: 'client_secret_basic',
-					redirectUris: ['https://rp.example.com/cb']
-				},
-				{ headers: { cookie } }
-			)
-		).data as { clientId: string; secret?: string };
+		const created = answered(
+			(
+				await client.admin.api.projects({ id: project._id }).clients.post(
+					{
+						grantTypes: ['authorization_code'],
+						tokenEndpointAuthMethod: 'client_secret_basic',
+						redirectUris: ['https://rp.example.com/cb']
+					},
+					{ headers: { cookie } }
+				)
+			).data
+		);
 
 		const rotated = await client.admin.api
 			.projects({ id: project._id })
 			.clients({ clientId: created.clientId })
 			.secret.post(undefined, { headers: { cookie } });
-		const { secret } = rotated.data as { secret: string };
+		const { secret } = answered(rotated.data);
 
 		const trail = await trailFor(created.clientId);
 		expect(secret).toBeTruthy();
@@ -144,16 +147,18 @@ describe('admin audit secrecy', () => {
 			name: 'P',
 			slug: unique('p')
 		});
-		const created = (
-			await client.admin.api.projects({ id: project._id }).clients.post(
-				{
-					grantTypes: ['authorization_code'],
-					tokenEndpointAuthMethod: 'client_secret_basic',
-					redirectUris: ['https://rp.example.com/cb']
-				},
-				{ headers: { cookie } }
-			)
-		).data as { clientId: string; secret?: string };
+		const created = answered(
+			(
+				await client.admin.api.projects({ id: project._id }).clients.post(
+					{
+						grantTypes: ['authorization_code'],
+						tokenEndpointAuthMethod: 'client_secret_basic',
+						redirectUris: ['https://rp.example.com/cb']
+					},
+					{ headers: { cookie } }
+				)
+			).data
+		);
 
 		await client.admin.api.projects({ id: project._id }).delete(undefined, {
 			headers: { cookie },
@@ -174,14 +179,16 @@ describe('admin audit secrecy', () => {
 			name: 'B'
 		});
 		const email = `${unique('resident')}@x.io`;
-		const created = (
-			await client.admin.api
-				.buckets({ id: bucket._id })
-				.users.post(
-					{ email, password: PASSWORD_MARKER },
-					{ headers: { cookie } }
-				)
-		).data as { _id: string };
+		const created = answered(
+			(
+				await client.admin.api
+					.buckets({ id: bucket._id })
+					.users.post(
+						{ email, password: PASSWORD_MARKER },
+						{ headers: { cookie } }
+					)
+			).data
+		);
 
 		await client.admin.api.buckets({ id: bucket._id }).delete(undefined, {
 			headers: { cookie },
@@ -201,14 +208,16 @@ describe('admin audit secrecy', () => {
 			name: 'B'
 		});
 
-		const created = (
-			await client.admin.api
-				.buckets({ id: bucket._id })
-				.users.post(
-					{ email: `${unique('end')}@x.io`, password: PASSWORD_MARKER },
-					{ headers: { cookie } }
-				)
-		).data as { _id: string };
+		const created = answered(
+			(
+				await client.admin.api
+					.buckets({ id: bucket._id })
+					.users.post(
+						{ email: `${unique('end')}@x.io`, password: PASSWORD_MARKER },
+						{ headers: { cookie } }
+					)
+			).data
+		);
 
 		expect(await trailFor(created._id)).not.toContain(PASSWORD_MARKER);
 	});
@@ -216,16 +225,18 @@ describe('admin audit secrecy', () => {
 	it('records an administrator creation without the password', async () => {
 		const cookie = await superCookie();
 
-		const created = (
-			await client.admin.api.admins.post(
-				{
-					email: `${unique('made')}@x.io`,
-					password: `${PASSWORD_MARKER}-admin`,
-					roles: ['project_admin']
-				},
-				{ headers: { cookie } }
-			)
-		).data as { _id: string };
+		const created = answered(
+			(
+				await client.admin.api.admins.post(
+					{
+						email: `${unique('made')}@x.io`,
+						password: `${PASSWORD_MARKER}-admin`,
+						roles: ['project_admin']
+					},
+					{ headers: { cookie } }
+				)
+			).data
+		);
 
 		expect(await trailFor(created._id)).not.toContain(PASSWORD_MARKER);
 	});
@@ -260,17 +271,19 @@ describe('admin audit secrecy', () => {
 			slug: unique('p')
 		});
 
-		const created = (
-			await client.admin.api.projects({ id: project._id }).clients.post(
-				{
-					clientName: CLIENT_SECRET_MARKER,
-					grantTypes: ['authorization_code'],
-					tokenEndpointAuthMethod: 'client_secret_basic',
-					redirectUris: ['https://rp.example.com/cb']
-				},
-				{ headers: { cookie } }
-			)
-		).data as { clientId: string; secret?: string };
+		const created = answered(
+			(
+				await client.admin.api.projects({ id: project._id }).clients.post(
+					{
+						clientName: CLIENT_SECRET_MARKER,
+						grantTypes: ['authorization_code'],
+						tokenEndpointAuthMethod: 'client_secret_basic',
+						redirectUris: ['https://rp.example.com/cb']
+					},
+					{ headers: { cookie } }
+				)
+			).data
+		);
 
 		const trail = await trailFor(created.clientId);
 		expect(created.secret).toBeTruthy();
