@@ -8,6 +8,7 @@ import { assertNoPendingInterceptors } from '../fetch_mock.ts';
 import { idpStub } from './idp_stub.ts';
 import { ApplicationConfig } from 'lib/configs/application.ts';
 import { eventBus } from 'lib/event_bus.ts';
+import { elysia } from 'lib/index.ts';
 import {
 	CLIENT,
 	get,
@@ -94,6 +95,10 @@ describe('federated sign-in', () => {
 		assertNoPendingInterceptors();
 	});
 
+	/*
+	 * The link waits for the account's own password sign-in — why is test/federation/link_existing.spec.ts.
+	 * What this case holds is the other half: the result is one account holding both, never a second.
+	 */
 	it('links a trusted, verified assertion to the existing password account rather than making a second', async () => {
 		const idp = await idpStub('https://idp-trusted.test');
 		const bucketId = await seedBucket(CLIENT, {
@@ -102,7 +107,7 @@ describe('federated sign-in', () => {
 		const store = getUserStore(bucketId);
 		const existing = await store.create(
 			'both@acme.test',
-			'password-hash',
+			await Bun.password.hash('both-password'),
 			[],
 			true
 		);
@@ -113,8 +118,22 @@ describe('federated sign-in', () => {
 			idp,
 			claims: { email: 'both@acme.test', email_verified: true }
 		});
-
 		expect(complete?.status).toBe(303);
+
+		await elysia.handle(
+			new Request(`http://e.ly/ui/${uid}/login`, {
+				method: 'POST',
+				headers: {
+					'content-type': 'application/x-www-form-urlencoded',
+					cookie
+				},
+				body: new URLSearchParams({
+					username: 'both@acme.test',
+					password: 'both-password'
+				}).toString()
+			})
+		);
+
 		expect(signedInAccountIds()).toContain(existing._id);
 
 		const all = await store.list();

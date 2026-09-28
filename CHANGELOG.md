@@ -32,6 +32,12 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   alone: someone holding a victim's password but not their authenticator could sign in as an
   unenrolled account of their own, take its secret, submit the victim's password and prove that
   secret, leaving signed in as the victim with two factors recorded.
+- **A federated sign-in no longer links to an account that holds only a password on its own.** The
+  assertion proved control of the address, not of whoever set the matching account's password, and a
+  bucket that does not verify addresses lets anybody register one: registering a victim's address first
+  turned the victim's first federated sign-in into access for the registrant. The identity now waits on
+  the interaction and is linked once that account's own sign-in completes, second factor included; an
+  account that already holds an upstream identity links as before.
 
 ## [0.6.0] - 2026-09-28
 

@@ -79,13 +79,28 @@ records carry no `accountId`, are matched by no sweep, and simply expire.
 2. **email** at the provider's `emailClaim` → absent means refuse; a subject alone matches no human.
 3. **domain** allow-list → **before** the collision check. Reversed, it would answer "does an account exist
    for this address?" for addresses the provider is not allowed to speak for.
-4. **collision** → link only if `emailTrusted && email_verified === true`. Both halves required.
+4. **collision** → link only if `emailTrusted && email_verified === true`. Both halves required. And
+   immediately only if the account already holds an upstream identity (or the bucket has no password
+   door); an account holding only a password links once its own sign-in completes.
 5. **provisioning** → `jit` creates; `existing_only` refuses.
 6. **active**, 7. **verification**, 8. sign in through the same `resume()` a password sign-in uses.
 
 Step 4 is the takeover boundary. `=== true` exactly — a provider that stringifies its booleans does not
 clear it. Failing it, the refusal says "sign in with your password": no second account for one address, no
 silent takeover.
+
+**Passing it is not enough on its own** (corrected 2026-09-28). The assertion proves who controls the
+address, not who set the matching account's password — and in a bucket that does not verify addresses,
+`verified` is written `true` at registration, so anybody could register a victim's address first. Their
+first federated sign-in then attached to that account and the registrant kept signing in with the
+password. The step now answers `password_required` for an account with no `federated` entry
+(`lib/federation/resolve.ts:178`): leg two hands back as usual but carrying the identity instead of a
+sign-in, leg three writes it to `interaction.payload.pendingLink` and redirects to the login page with the
+`federation_link` notice, and `settlePendingLink` (`lib/federation/pending_link.ts:17`) links it at every
+door that completes a sign-in — after the second factor where there is one — only if the sign-in is of
+that account in that bucket. It is the shape Firebase's `account-exists-with-different-credential` and
+Keycloak's first-broker-login "verify existing account by re-authentication" both take.
+`test/federation/link_existing.spec.ts` is the attack.
 
 A provisioned account's password is a hash of 32 bytes discarded on the next line — deliberately not a
 sentinel string, which would be a value someone could eventually type.

@@ -165,6 +165,19 @@ async function completeReturn(params: ReturnParams) {
 			claims: identity.claims
 		});
 
+		/*
+		 * Handed back like a sign-in, because leg three is where the interaction cookie applies again and so
+		 * the only place the identity may be written onto the interaction. Leg three signs nobody in for it.
+		 */
+		if (!resolution.ok && resolution.reason === 'password_required') {
+			const ref = await openHandoff({
+				interactionUid: uid,
+				accountId: resolution.account._id,
+				link: resolution.link
+			});
+			return Response.redirect(buildUIFederationCompletePath(uid, ref), 303);
+		}
+
 		if (!resolution.ok) {
 			switch (resolution.reason) {
 				case 'no_email':

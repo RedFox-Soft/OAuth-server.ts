@@ -24,11 +24,19 @@ export const NOTICE_VERIFY = 'verify';
  */
 export const NOTICE_FEDERATION_ABORTED = 'federation_aborted';
 
+/*
+ * A federated sign-in whose address matched an account that holds only a password. The identity is
+ * linked once this interaction's sign-in completes as that account, so the page asks for exactly that.
+ */
+export const NOTICE_FEDERATION_LINK = 'federation_link';
+
 const NOTICES: Record<string, string> = {
 	[NOTICE_VERIFY]:
 		'Check your inbox — we have emailed you a link to verify your address. You will be able to sign in once you have opened it.',
 	[NOTICE_FEDERATION_ABORTED]:
-		'Sign-in with your identity provider was not completed. You can try again, or sign in with your password.'
+		'Sign-in with your identity provider was not completed. You can try again, or sign in with your password.',
+	[NOTICE_FEDERATION_LINK]:
+		'An account with this email address already exists here. Sign in with its password once to link it to your identity provider.'
 };
 
 // No trimming, no case folding, no normalisation: an identifier is either one the server minted or it is

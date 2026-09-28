@@ -111,6 +111,17 @@ export type FederatedIdentity = Static<typeof FederatedIdentity>;
  * field: the id is the digest, so a datastore dump yields nothing replayable (the PasswordResetChallenge
  * rule, applied to both identifiers because a `ref` in a URL is exactly as capturable as a `state`).
  */
+/*
+ * An upstream identity waiting to be linked to an account, until that account's own sign-in completes.
+ * `claims` are the profile claims a link copies, taken from the assertion that proved the address.
+ */
+export const PendingLinkIdentity = t.Object({
+	providerId: t.String(),
+	sub: t.String(),
+	claims: t.Optional(t.Record(t.String(), t.Unknown()))
+});
+export type PendingLinkIdentity = Static<typeof PendingLinkIdentity>;
+
 export const FederationStatePayload = t.Object({
 	stage: t.Union([t.Literal('pending'), t.Literal('complete')]),
 	/*
@@ -136,6 +147,12 @@ export const FederationStatePayload = t.Object({
 	 * makes unimplementable — see specs/022-oidc-federation-login/research.md D5.)
 	 */
 	accountId: t.Optional(t.String()),
+	/*
+	 * Stage 2 only, and only when the address matched an account the assertion may not simply claim:
+	 * the identity is then carried into the interaction to be linked once that account signs in, and
+	 * nobody is signed in by this handoff.
+	 */
+	link: t.Optional(PendingLinkIdentity),
 	/*
 	 * Epoch seconds. Mirrors the adapter's expiry *and* is compared to now on every read: MongoDB's TTL
 	 * monitor deletes lazily, so a record can outlive its expiry by a minute or more — and a stale handoff

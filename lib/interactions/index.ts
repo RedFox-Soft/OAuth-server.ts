@@ -11,6 +11,7 @@ import { upstreamMetadata } from 'lib/federation/upstream.js';
 import { authorizationUrl, supportsPkce } from 'lib/federation/flow.js';
 import { findEnabledProvider } from 'lib/federation/providers.js';
 import { consumeHandoff, openPending } from 'lib/federation/state.js';
+import { settlePendingLink } from 'lib/federation/pending_link.js';
 import {
 	federationExpiredPage,
 	federationInactivePage,
@@ -93,7 +94,11 @@ import {
 	documentIdentityFor,
 	type PromptDetails
 } from './consentView.js';
-import { NOTICE_VERIFY, resolveNotice } from './notices.js';
+import {
+	NOTICE_FEDERATION_LINK,
+	NOTICE_VERIFY,
+	resolveNotice
+} from './notices.js';
 import {
 	registrationClosedPage,
 	registrationSendFailedPage
@@ -620,6 +625,7 @@ export const ui = new Elysia()
 					acr: configuration.acrMap.password
 				}
 			};
+			await settlePendingLink(interaction.payload, bucketId);
 			return resume(interaction, cookie);
 		},
 		{
@@ -716,6 +722,7 @@ export const ui = new Elysia()
 				}
 			};
 			delete interaction.payload.secondFactor;
+			await settlePendingLink(interaction.payload, bucketId);
 			return resume(interaction, cookie);
 		},
 		{ body: t.Object({ code: t.String() }) }
@@ -845,6 +852,7 @@ export const ui = new Elysia()
 				}
 			};
 			delete interaction.payload.secondFactor;
+			await settlePendingLink(interaction.payload, bucketId);
 			return resume(interaction, cookie);
 		},
 		{ body: t.Object({ code: t.String() }) }
@@ -943,6 +951,24 @@ export const ui = new Elysia()
 				return federationInactivePage();
 			}
 
+			/*
+			 * The address matched an account holding only a password. Nobody is signed in: the identity is
+			 * kept on the interaction, whose cookie this hop is bound to, until the sign-in completes as that
+			 * account at one of the password doors.
+			 */
+			if (handoff.link) {
+				interaction.payload.pendingLink = {
+					accountId: user._id,
+					bucketId,
+					...handoff.link
+				};
+				await interaction.persist();
+				return Response.redirect(
+					buildUILoginPath(uid, NOTICE_FEDERATION_LINK),
+					303
+				);
+			}
+
 			const bucket = await getBucketStore().find(bucketId);
 			if (bucket?.emailVerificationRequired && !user.verified) {
 				/*
@@ -967,6 +993,7 @@ export const ui = new Elysia()
 				// No `transient`: there is no "remember me" on a federated sign-in.
 				login: { accountId: user._id, acr: configuration.acrMap.federated }
 			};
+			await settlePendingLink(interaction.payload, bucketId);
 			return resume(interaction, cookie);
 		},
 		{

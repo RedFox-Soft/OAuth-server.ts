@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import { checkedAdapter } from '../adapters/index.js';
 import epochTime from '../helpers/epoch_time.js';
 import { HANDOFF_TTL_SECONDS, STATE_TTL_SECONDS } from './consts.js';
-import { FederationStatePayload } from './types.js';
+import { FederationStatePayload, type PendingLinkIdentity } from './types.js';
 
 /*
  * The two-stage round-trip record. This module owns both the secrets and their storage, deliberately:
@@ -110,6 +110,7 @@ export async function consumePending(
 export async function openHandoff(handoff: {
 	interactionUid: string;
 	accountId: string;
+	link?: PendingLinkIdentity;
 }): Promise<string> {
 	const ref = secret();
 	await records().upsert(
@@ -118,6 +119,7 @@ export async function openHandoff(handoff: {
 			stage: 'complete',
 			interactionUid: handoff.interactionUid,
 			accountId: handoff.accountId,
+			...(handoff.link ? { link: handoff.link } : {}),
 			exp: epochTime() + HANDOFF_TTL_SECONDS
 		},
 		HANDOFF_TTL_SECONDS

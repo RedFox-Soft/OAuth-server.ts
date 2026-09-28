@@ -87,6 +87,21 @@ export const InteractionPayload = t.Object({
 			attempts: t.Number()
 		})
 	),
+	/*
+	 * An upstream identity whose address matched an account holding only a password. Linked when this
+	 * interaction's sign-in completes as that account, and dropped when it completes as any other — the
+	 * assertion proved control of the address, not of whoever set the password. Declared inline rather
+	 * than imported from lib/federation/types.ts, which would put the federation graph in every model's.
+	 */
+	pendingLink: t.Optional(
+		t.Object({
+			accountId: t.String(),
+			bucketId: t.String(),
+			providerId: t.String(),
+			sub: t.String(),
+			claims: t.Optional(t.Record(t.String(), t.Unknown()))
+		})
+	),
 	result: t.Optional(Outcome)
 });
 export type InteractionPayloadType = Static<typeof InteractionPayload>;

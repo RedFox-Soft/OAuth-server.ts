@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import { getUserStore } from '../adapters/index.js';
 import type { User, UserBucket } from '../adapters/types.js';
 import { COPIED_CLAIMS } from './consts.js';
-import type { FederationProvider } from './types.js';
+import type { FederationProvider, PendingLinkIdentity } from './types.js';
 
 /*
  * Turn a verified assertion into a signed-in account, or into a refusal.
@@ -29,7 +29,18 @@ export type RefusalReason =
 
 export type Resolution =
 	| { ok: true; account: User; provisioned: boolean }
-	| { ok: false; reason: RefusalReason };
+	| { ok: false; reason: RefusalReason }
+	/*
+	 * The address belongs to an account whose password somebody set without proving the address, so the
+	 * assertion may not claim it on its own. Nobody is signed in; the identity waits for that account's
+	 * own sign-in to complete.
+	 */
+	| {
+			ok: false;
+			reason: 'password_required';
+			account: User;
+			link: PendingLinkIdentity;
+	  };
 
 /*
  * A password no one can type. The hash is of 32 random bytes discarded on the next line — deliberately not
@@ -85,6 +96,32 @@ function copiedClaims(
 	return Object.keys(copied).length > 0 ? copied : undefined;
 }
 
+/*
+ * Attach an upstream identity to an account. `profile` is copied when a link is established, never on a
+ * later sign-in through it: a provider should not silently rewrite a user's name on every login, and an
+ * operator's edit should survive.
+ *
+ * Uniqueness of (providerId, sub) is enforced by the callers rather than by a unique index, which cannot
+ * be expressed for a multikey field the inventory can model: each has just proved the pair resolves to
+ * nobody, so a second holder can only appear through a concurrent double-link — whose outcome is a
+ * duplicate entry naming this same account, not a shared identity.
+ */
+export async function linkIdentity(
+	store: ReturnType<typeof getUserStore>,
+	account: User,
+	identity: PendingLinkIdentity
+): Promise<User | null> {
+	const federated = [
+		...(account.federated ?? []),
+		{ providerId: identity.providerId, sub: identity.sub, linkedAt: new Date() }
+	];
+	const profile = identity.claims;
+	return store.update(account._id, {
+		federated,
+		...(profile ? { claims: { ...account.claims, ...profile } } : {})
+	});
+}
+
 export async function resolveFederatedAccount(input: {
 	bucket: UserBucket;
 	provider: FederationProvider;
@@ -123,23 +160,31 @@ export async function resolveFederatedAccount(input: {
 		if (!existing.active) {
 			return { ok: false, reason: 'inactive' };
 		}
+		const identity: PendingLinkIdentity = {
+			providerId: provider.id,
+			sub: subject,
+			claims: copiedClaims(claims)
+		};
 		/*
-		 * Uniqueness of (providerId, sub) is enforced here rather than by a unique index, which cannot be
-		 * expressed for a multikey field the inventory can model. Step 1 already proved this pair resolves to
-		 * nobody, so a second holder can only appear through a concurrent double-link — whose outcome is a
-		 * duplicate entry naming this same account, not a shared identity.
+		 * The assertion proves who controls the address; it proves nothing about whoever set this account's
+		 * password, and in a bucket that does not verify addresses anybody can register one. An account that
+		 * already holds an upstream identity had its address established by a trusted assertion, so it links
+		 * as before. One holding only a password links once its own sign-in completes — otherwise
+		 * registering a victim's address first turned their federated sign-in into access for whoever did.
+		 *
+		 * A bucket with no password door is the exception: there is no sign-in to prove the account with,
+		 * and nobody can have registered one there with a password.
 		 */
-		const federated = [
-			...(existing.federated ?? []),
-			{ providerId: provider.id, sub: subject, linkedAt: new Date() }
-		];
-		const profile = copiedClaims(claims);
-		const updated = await store.update(existing._id, {
-			federated,
-			// Copied when a link is established, never on a later sign-in through it: an provider should not
-			// silently rewrite a user's name on every login, and an operator's edit should survive.
-			...(profile ? { claims: { ...existing.claims, ...profile } } : {})
-		});
+		if (bucket.passwordLogin && !existing.federated?.length) {
+			return {
+				ok: false,
+				reason: 'password_required',
+				account: existing,
+				link: identity
+			};
+		}
+		// Step 1 already proved this pair resolves to nobody.
+		const updated = await linkIdentity(store, existing, identity);
 		return updated
 			? { ok: true, account: updated, provisioned: false }
 			: { ok: false, reason: 'link_not_permitted' };
