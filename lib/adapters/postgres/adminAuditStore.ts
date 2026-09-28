@@ -70,7 +70,10 @@ function conditionsFor(handle: SQL, query: AdminAuditQuery) {
 	 * `$in: []` gives — both adapters have to agree with `matchesAuditQuery` here.
 	 */
 	if (query.ownerGroupIds !== undefined) {
-		and(handle`doc->>'ownerGroupId' = ANY(${query.ownerGroupIds}::text[])`);
+		// `handle.array`: Bun binds a bare JS array as text PostgreSQL cannot read as an array.
+		and(
+			handle`doc->>'ownerGroupId' = ANY(${handle.array(query.ownerGroupIds, 'text')})`
+		);
 	}
 
 	if (query.viaSurface !== undefined) {

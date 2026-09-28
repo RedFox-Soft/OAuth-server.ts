@@ -6,18 +6,9 @@ import { documentOf } from '../documents.js';
 import { UserBucket, type UserBucketStoreInstance } from '../types.js';
 import type { FederationProvider } from '../../federation/types.js';
 import { UniqueValueTaken } from '../conflicts.js';
+import { isUniqueViolation } from './sqlState.js';
 import { isRecord } from '../../helpers/_/object.js';
 import nanoid from '../../helpers/nanoid.js';
-
-/* SQLSTATE 23505, classified here the way provision.ts classifies its own states. */
-function isUniqueViolation(error: unknown): boolean {
-	return (
-		typeof error === 'object' &&
-		error !== null &&
-		'code' in error &&
-		error.code === '23505'
-	);
-}
 
 /*
  * Buckets written before a setting existed hold no value for it, so the safe default is projected on

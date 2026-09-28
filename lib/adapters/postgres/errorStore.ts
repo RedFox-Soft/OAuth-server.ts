@@ -25,22 +25,10 @@ import {
 } from '../../helpers/error_store_query.js';
 import nanoid from '../../helpers/nanoid.js';
 import { member } from '../../helpers/_/object.js';
+import { isUniqueViolation } from './sqlState.js';
 
 /* A group as the summary reads select it: `samples` projected away, being the whole weight of a row. */
 const SummarizedGroup = Type.Omit(ErrorGroup, ['samples']);
-
-/* A unique-violation, which here means only one thing: two instances recorded the same new fault in
- * the same instant and the fingerprint index refused the second. */
-const UNIQUE_VIOLATION = '23505';
-
-function isUniqueViolation(error: unknown): boolean {
-	return (
-		typeof error === 'object' &&
-		error !== null &&
-		'code' in error &&
-		error.code === UNIQUE_VIOLATION
-	);
-}
 
 /*
  * A sample-scoped clause. `samples.clientId` in MongoDB matches a group any of whose retained samples
@@ -223,6 +211,7 @@ export class ErrorStore implements ErrorStoreInstance {
 			 * Narrowed to the unique violation, unlike the MongoDB store's bare catch: a connection failure
 			 * here would otherwise recurse into the same failure instead of surfacing.
 			 */
+			// Here it means one thing: two instances recorded the same new fault in the same instant.
 			if (!isUniqueViolation(error)) throw error;
 			return this.record(occurrence, bounds);
 		}

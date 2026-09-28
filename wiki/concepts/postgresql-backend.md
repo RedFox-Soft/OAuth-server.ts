@@ -94,6 +94,19 @@ Two smaller instances of the same shape:
   reported missing and were "created" on every run, and `--check` called a healthy schema broken.
   The already-quoted identifier is what must be passed.
 
+Two more, found on 2026-09-28 by running every store's write and read against a real server — both
+invisible to the in-memory suite, and one of them total:
+
+- **A JS array bound as a parameter is not a PostgreSQL array.** `${values}::text[]` reaches the server
+  as text it cannot parse ("malformed array literal", even for `[]`), so every account update threw —
+  the statement always sends the list of keys it clears — and so did every audit read filtered by
+  group. `handle.array(values, 'text')` binds a real array (`userStore.ts`, `adminAuditStore.ts`).
+- **Bun reports SQLSTATE in `errno`, not `code`.** `code` is the client's own
+  `ERR_POSTGRES_SERVER_ERROR` for every server error, so the classifiers that compared it with `23505`
+  never matched: a lost race for a bucket hostname answered 500 rather than "taken", and two instances
+  recording one new fault threw rather than merged. `lib/adapters/postgres/sqlState.ts` reads it for all
+  of them. `database/verify_postgres.ts` checks both.
+
 ## Why the fidelity tier is a script and not a spec
 
 Constitution Principle III permits a suite that uses a real database under three binding conditions:

@@ -94,3 +94,4 @@ Operations:
 - 2026-09-28 — corrected [[rich-authorization-requests]] and [[elysia-lifecycle]]: `authorization_details` is `t.ArrayString` (RFC 9396 §3 wire form), `parseJsonParams` removed, a repeat refused; tests send it via `AuthorizationRequest.authorize()`.
 - 2026-09-28 — corrected [[client-identity-from-database]] and [[token-payload-access-contract]]: `adapter()` answers `Record<string, unknown>` from every backend; directly read areas go through `checkedAdapter(name, schema)`.
 - 2026-09-28 — added [[stored-document-schemas]]; corrected [[postgresql-backend]]: `postgres/dates.ts` is gone, dates are revived by schema in `documentOf`.
+- 2026-09-28 — corrected [[postgresql-backend]]: array parameters need `handle.array` (every account update and group-filtered audit read threw), and Bun's SQLSTATE is in `errno` (unique-violation classification never matched).

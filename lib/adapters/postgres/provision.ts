@@ -8,7 +8,7 @@ import {
 	type StorageArea
 } from '../../consts/storage_inventory.js';
 import { columnFor, jsonPath, translateIndex } from './jsonPath.js';
-import { member } from '../../helpers/_/object.js';
+import { sqlState } from './sqlState.js';
 
 /*
  * Applying the inventory to a PostgreSQL database.
@@ -149,11 +149,6 @@ export function planFor(area: StorageArea): AreaPlan {
 const DUPLICATE_TABLE = '42P07';
 const DUPLICATE_OBJECT = '42710';
 const INSUFFICIENT_PRIVILEGE = '42501';
-
-function sqlState(error: unknown): string | undefined {
-	const code = member(error, 'code');
-	return typeof code === 'string' ? code : undefined;
-}
 
 export function isDuplicateTable(error: unknown): boolean {
 	return sqlState(error) === DUPLICATE_TABLE;

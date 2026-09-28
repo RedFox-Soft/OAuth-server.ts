@@ -11,6 +11,9 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- PostgreSQL: account updates (roles, password, TOTP, federated links) and group-filtered audit reads
+  failed on every call — a JS array was bound as text PostgreSQL cannot read as an array. A lost race
+  for a bucket hostname answered 500 instead of "taken", because Bun reports SQLSTATE in `errno`.
 - Device verification refuses a confirmation when the session holds no form secret, instead of
   comparing two absent values as a match; resuming an interaction after an account change re-saves it
   with the same TTL floor the sign-in screens use, so a record about to expire is not left

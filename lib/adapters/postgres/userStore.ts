@@ -144,9 +144,14 @@ export class UserStore implements UserStoreInstance {
 		}
 
 		const handle = sql();
+		/*
+		 * `handle.array`, not `${remove}::text[]`: Bun binds a bare JS array as text PostgreSQL cannot read
+		 * as an array ("malformed array literal"), so every update threw — found by a round trip against a
+		 * real server, which the in-memory suite cannot see.
+		 */
 		const rows = await handle`
 			UPDATE ${handle(this.area)}
-			SET doc = (doc - ${remove}::text[]) || ${set}
+			SET doc = (doc - ${handle.array(remove, 'text')}) || ${set}
 			WHERE id = ${_id}
 			RETURNING doc
 		`;

@@ -61,6 +61,7 @@ if (!THROWAWAY.test(database)) {
  * both connection strings set — before this script had a chance to reject the database name.
  */
 const {
+	AdminAuditStore,
 	ProtectedResourceStore,
 	SingletonSecretStore,
 	UserBucketStore,
@@ -401,6 +402,59 @@ check(
 	'two buckets with no hostname do not collide, which is what sparse buys',
 	hostless.every((r) => r.status === 'fulfilled'),
 	hostless.map((r) => r.status).join(', ')
+);
+
+/*
+ * Array parameters. Bun binds a bare JS array as text PostgreSQL cannot read as an array — "malformed
+ * array literal" — so the two statements that pass one threw on every call: an account update (it
+ * sends the keys it clears) and an audit read filtered by group. Found by a round trip through every
+ * store against a real server; neither statement reaches the in-memory suite.
+ *
+ * The same update is where a nested date comes back: the stores' schema-driven reading revives dates
+ * at any depth, where the per-store field lists it replaced stopped at the top level.
+ */
+const account = await runtimeUsers.create(
+	`update-${Date.now()}@example.com`,
+	'hash'
+);
+const linkedAt = new Date();
+const linked = await runtimeUsers.update(account._id, {
+	federated: [{ providerId: 'fidelity', sub: 'sub-1', linkedAt }]
+});
+check(
+	'an account update is accepted, and its nested dates read back as Dates',
+	linked?.federated?.[0]?.linkedAt instanceof Date &&
+		linked.federated[0].linkedAt.getTime() === linkedAt.getTime()
+);
+const cleared = await runtimeUsers.update(account._id, {
+	federated: undefined
+});
+check(
+	'an update that clears a field removes it',
+	cleared !== null && !('federated' in cleared)
+);
+
+const audit = new AdminAuditStore();
+const auditGroup = `fidelity-group-${Date.now()}`;
+await audit.record({
+	actorId: account._id,
+	actorEmail: account.email,
+	action: 'fidelity.check',
+	targetType: 'group',
+	targetId: auditGroup,
+	ownerGroupId: auditGroup
+});
+const scoped = await audit.list({ ownerGroupIds: [auditGroup] });
+check(
+	"an audit read filtered by group finds that group's entries",
+	scoped.entries.length === 1 && scoped.entries[0]?.action === 'fidelity.check',
+	`${scoped.entries.length} entries`
+);
+const nobody = await audit.list({ ownerGroupIds: [] });
+check(
+	'and an empty group list selects nothing, as the memory adapter does',
+	nobody.entries.length === 0,
+	`${nobody.entries.length} entries`
 );
 
 /*
