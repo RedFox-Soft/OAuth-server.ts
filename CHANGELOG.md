@@ -45,6 +45,11 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   key without confirmation. The token is now accepted there only for requests the agent surface
   dispatches itself. The threat model also states that the confirmation step is answered by the same
   agent it asks.
+- **A client credentials token for a declared resource goes only to that project's clients.** No end
+  user consents to such a token, and the grant took its bucket from the request address, so any
+  confidential client of any tenant, or one that registered itself, could mint a token carrying another
+  tenant's resource as its audience, that tenant's issuer and its scopes. It is now refused with
+  `invalid_target` unless the client belongs to the project that declared the resource.
 
 ## [0.6.0] - 2026-09-28
 

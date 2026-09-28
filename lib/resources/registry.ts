@@ -1,4 +1,8 @@
-import { getProtectedResourceStore } from '../adapters/index.js';
+import {
+	getProjectStore,
+	getProtectedResourceStore
+} from '../adapters/index.js';
+import type { ProtectedResource } from '../adapters/types.js';
 import { canonicalizeResourceIdentifier } from './canonical.js';
 
 /*
@@ -33,9 +37,9 @@ export interface DeclaredResourceInfo {
  * in a slash and the slash-free candidate does not, so the two cannot collide. That is why no extra
  * guard is needed here, and why one would be dead code if added.
  */
-export async function resolveDeclaredResource(
+async function findDeclaredResource(
 	identifier: string
-): Promise<DeclaredResourceInfo | undefined> {
+): Promise<ProtectedResource | undefined> {
 	const exact = canonicalizeResourceIdentifier(identifier, {
 		trailingSlashSignificant: true
 	});
@@ -53,20 +57,46 @@ export async function resolveDeclaredResource(
 
 	for (const candidate of candidates) {
 		const resource = await store.find(candidate);
-		if (!resource) continue;
-
-		return {
-			audience: resource._id,
-			/*
-			 * Joined here rather than stored joined. A space-delimited string is the wire shape the
-			 * `ResourceServer` descriptor speaks; an array is the storage shape. Translating at this one
-			 * seam is what keeps a scope containing a space from being silently declarable.
-			 */
-			scope: resource.scopes.join(' '),
-			accessTokenFormat: resource.tokenFormat,
-			accessTokenTTL: resource.accessTokenTTL
-		};
+		if (resource) return resource;
 	}
 
 	return undefined;
+}
+
+export async function resolveDeclaredResource(
+	identifier: string
+): Promise<DeclaredResourceInfo | undefined> {
+	const resource = await findDeclaredResource(identifier);
+	if (!resource) return undefined;
+
+	return {
+		audience: resource._id,
+		/*
+		 * Joined here rather than stored joined. A space-delimited string is the wire shape the
+		 * `ResourceServer` descriptor speaks; an array is the storage shape. Translating at this one
+		 * seam is what keeps a scope containing a space from being silently declarable.
+		 */
+		scope: resource.scopes.join(' '),
+		accessTokenFormat: resource.tokenFormat,
+		accessTokenTTL: resource.accessTokenTTL
+	};
+}
+
+/*
+ * Whether a client may hold a token for this resource that acts for nobody — the client credentials
+ * grant, where no end user signs in and nobody consents. A declared resource belongs to the project
+ * that declared it, and such a token goes to that project's clients alone; otherwise any client of any
+ * tenant, or one that registered itself, could mint a token carrying another tenant's audience and
+ * scopes. An identifier nobody declared is not this function's question — the built-in MCP audience and
+ * a deployment's override answer for themselves — so it is permitted here and resolved as before.
+ */
+export async function machineTokenPermitted(
+	identifier: string,
+	clientId: string
+): Promise<boolean> {
+	const resource = await findDeclaredResource(identifier);
+	if (!resource) return true;
+
+	const project = await getProjectStore().findByClientId(clientId);
+	return project?._id === resource.projectId;
 }

@@ -5,6 +5,7 @@ import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { getProtectedResourceStore } from 'lib/adapters/index.ts';
 import { shaped } from 'test/shape.js';
 import { Type } from '@sinclair/typebox';
+import { projectOf } from './owning_project.js';
 
 /*
  * The token endpoint resolving a declared resource. This is the integration half of what
@@ -13,6 +14,8 @@ import { Type } from '@sinclair/typebox';
  */
 
 const AUDIENCE = 'https://mcp.example.com/mcp';
+
+let projectId: string;
 
 const auth = {
 	headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
@@ -28,7 +31,7 @@ async function declare(
 ) {
 	return getProtectedResourceStore().create({
 		_id: identifier,
-		projectId: 'acme',
+		projectId,
 		name: 'Acme MCP',
 		scopes: overrides.scopes ?? ['mcp:tools-basic', 'mcp:files-read'],
 		tokenFormat: overrides.tokenFormat,
@@ -59,6 +62,7 @@ const OAuthError = Type.Object({ error: Type.String() });
 describe('issuing tokens for a declared protected resource', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);
+		projectId = await projectOf('client');
 	});
 
 	beforeEach(async () => {

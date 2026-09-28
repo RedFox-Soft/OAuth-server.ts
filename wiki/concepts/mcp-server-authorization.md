@@ -4,7 +4,7 @@ title: 'Authorization for MCP servers'
 tags: [architecture, contract, gotcha, config]
 sources: [oauth-server-codebase]
 created: 2026-09-08
-updated: 2026-09-23
+updated: 2026-09-28
 graph:
   node_type: concept
 ---
@@ -69,6 +69,21 @@ through rule 3.
 first: login resolved the project bucket and found the user, `findAccount` resolved `redfox` and did
 not, so `loadGrant` left the grant unset and the consent prompt crashed with a 500 rather than
 refusing. A caller that omits the resource silently resolves a different bucket than login did.
+
+## A machine token goes only to the declaring project's clients
+
+Rule 3 is safe for a sign-in because an end user consents: any client, one belonging to no project
+included, may *ask* a person for a token to a declared resource. A client credentials token asks
+nobody. Until 2026-09-28 `getResourceServerInfo` ignored the client, and the grant took its bucket from
+the request address, so any confidential client of any tenant — or one that registered itself —
+could call `/b/<victim-slug>/token` and receive a token with the victim resource as its audience, the
+victim bucket as its issuer and the victim's scopes: everything a resource server checks. Only
+`client_id` differed.
+
+`machineTokenPermitted` (`lib/resources/registry.ts:93`) now refuses it with `invalid_target` unless
+the client belongs to the project that declared the resource, and `client_credentials.ts` asks before
+minting. An identifier nobody declared is not its question — the built-in MCP audience and an addon
+override answer for themselves. `test/resources/machine_access.spec.ts` is the attack.
 
 ## A client whose id is a URL, stored nowhere
 

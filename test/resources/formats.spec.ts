@@ -4,6 +4,7 @@ import { decodeJwt } from 'jose';
 import bootstrap, { agent } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { getProtectedResourceStore } from 'lib/adapters/index.ts';
+import { projectOf } from './owning_project.js';
 
 /*
  * How a declared resource's tokens are verified, and how long they live.
@@ -17,6 +18,8 @@ import { getProtectedResourceStore } from 'lib/adapters/index.ts';
 
 const AUDIENCE = 'https://mcp.example.com/mcp';
 
+let projectId: string;
+
 const auth = {
 	headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
 };
@@ -27,7 +30,7 @@ async function declare(overrides: {
 }) {
 	return getProtectedResourceStore().create({
 		_id: AUDIENCE,
-		projectId: 'acme',
+		projectId,
 		name: 'Acme MCP',
 		scopes: ['mcp:tools-basic'],
 		...overrides
@@ -55,6 +58,7 @@ async function token() {
 describe('token format and lifetime for a declared resource', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'resources' });
+		projectId = await projectOf('client');
 	});
 
 	beforeEach(async () => {
@@ -126,7 +130,7 @@ describe('token format and lifetime for a declared resource', () => {
 		await declare({});
 		await getProtectedResourceStore().create({
 			_id: 'https://other.example.com/mcp',
-			projectId: 'acme',
+			projectId,
 			name: 'Other MCP',
 			scopes: ['mcp:tools-basic']
 		});

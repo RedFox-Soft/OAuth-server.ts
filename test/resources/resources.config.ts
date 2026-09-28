@@ -21,10 +21,29 @@ export const ApplicationConfig = {
 	'introspection.enabled': true
 };
 
+/*
+ * `client` belongs to the project that declares the resources these specs use (seeded per spec, since
+ * projects are not configuration); `outsider` is a confidential client of some other project, and
+ * `stranger` belongs to none — the two a machine token must not reach a declared resource for.
+ */
 export const clients = [
 	{
 		clientId: 'client',
 		clientSecret: 'secret',
+		grantTypes: ['client_credentials'],
+		responseTypes: [],
+		redirectUris: []
+	},
+	{
+		clientId: 'outsider',
+		clientSecret: 'outsider-secret',
+		grantTypes: ['client_credentials'],
+		responseTypes: [],
+		redirectUris: []
+	},
+	{
+		clientId: 'stranger',
+		clientSecret: 'stranger-secret',
 		grantTypes: ['client_credentials'],
 		responseTypes: [],
 		redirectUris: []

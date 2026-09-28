@@ -8,6 +8,7 @@ import {
 } from '../../helpers/errors.js';
 import { configuration } from 'lib/configs/application.js';
 import checkResource from '../../shared/check_resource.ts';
+import { machineTokenPermitted } from '../../resources/registry.js';
 import { ClientCredentials } from 'lib/models/client_credentials.js';
 import type { DPoPProof } from 'lib/helpers/validate_dpop.js';
 
@@ -50,6 +51,13 @@ export async function clientCredentials(
 		if (length !== 1) {
 			throw new InvalidTarget(
 				'only a single resource indicator value is supported for this grant type'
+			);
+		}
+		const [indicator] = Object.keys(oidc.resourceServers);
+		// This token acts for nobody, so no end user's consent stands behind it — only who the client is.
+		if (!(await machineTokenPermitted(indicator, client.clientId))) {
+			throw new InvalidTarget(
+				'the client is not permitted to access this resource'
 			);
 		}
 		token.resourceServer = resourceServer;
