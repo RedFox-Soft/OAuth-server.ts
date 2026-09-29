@@ -4,7 +4,7 @@ title: 'Self-service password reset'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-04
-updated: 2026-09-01
+updated: 2026-09-29
 graph:
   node_type: concept
   relationships:
@@ -89,13 +89,20 @@ address that does have an account, so surfacing it would answer the question the
 refuse. (Registration surfaces its 502 for the opposite reason — there, the failure reveals nothing about
 anyone else.)
 
-The exception is the rate-limited page (429, distinct wording for cooldown vs cap). Reaching it requires
-having already caused accepted sends to that address, so it confirms nothing a first request would reveal,
-and refusing to state a limit just produces a user who retries and stays locked out.
+**There is no longer a rate-limited page** (corrected 2026-09-29). There used to be one — 429, distinct
+wording for cooldown and cap — on the argument that reaching it required having already caused accepted
+sends to that address, so it confirmed nothing a first request would reveal. The first request is anybody's
+to make: submitting an address twice within a minute showed "please wait" for a registered one and the
+accepted page for any other, because the throttle record exists only for addresses with an account. Every
+outcome, the cooldown and the cap included, now renders the accepted page, which states the limits for
+everyone instead (`lib/interactions/resetPages.tsx`). The user who retries too soon gets no second mail and
+is told why in the same words as everyone else.
 
-**Timing is not a claim.** The accepted path hashes, writes and sends; the unresolvable one returns
-immediately. The two are distinguishable by duration, and constant-time behaviour would mean doing the work
-either way.
+**Timing is a smaller claim than it was.** The send is no longer awaited (`issueAndSend` in
+`lib/password_reset/challenge.ts`), which removes the SMTP round-trip — hundreds of milliseconds, and the
+one difference large enough to read reliably. The accepted path still writes the challenge and the throttle
+record where the unresolvable one only reads, so the two remain distinguishable by a few milliseconds of
+datastore time; constant-time behaviour would mean doing that work either way.
 
 ## Consuming a reset marks the address verified
 

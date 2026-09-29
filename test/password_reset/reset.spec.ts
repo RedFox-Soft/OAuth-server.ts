@@ -27,7 +27,6 @@ import {
 } from 'lib/admin/consts.ts';
 import { REQUEST_COOLDOWN_SECONDS } from 'lib/password_reset/consts.ts';
 import { throttleKey as throttleKeyFor } from 'lib/login_throttle/throttle.ts';
-import { elysia } from 'lib/index.ts';
 import { present } from 'test/shape.js';
 
 const CLIENT_ID = 'reset-app';
@@ -101,29 +100,6 @@ function bodyOf(result: {
 	if (typeof result.data === 'string') return result.data;
 	const value = result.error?.value;
 	return typeof value === 'string' ? value : String(result.data ?? value);
-}
-
-/*
- * Post the request form through the app directly. Needed only where a *refusal* page's text matters: the
- * Eden client hands back no readable body for some non-2xx HTML responses, and elysia.handle returns the
- * real Response.
- */
-async function postRequestForm(
-	uid: string,
-	cookie: string,
-	email: string
-): Promise<{ status: number; text: string }> {
-	const res = await elysia.handle(
-		new Request(`http://e.ly/ui/${uid}/forgot-password`, {
-			method: 'POST',
-			headers: {
-				'content-type': 'application/x-www-form-urlencoded',
-				cookie
-			},
-			body: new URLSearchParams({ email }).toString()
-		})
-	);
-	return { status: res.status, text: await res.text() };
 }
 
 // Clear the per-address cooldown without touching the cap, for tests about something other than the clock.
@@ -594,15 +570,30 @@ describe('password reset — not a prober, not a mailer (US4)', () => {
 		expect(sentEmails[0]?.to).toBe(registered);
 	});
 
-	it('refuses a second request inside the cooldown (scenario 4)', async () => {
+	/*
+	 * The throttle exists only for an address that has an account — nothing is stored for one that does
+	 * not — so a refusal page shown for it was an answer in itself: asking twice within a minute told
+	 * anybody whether the address was registered. The limit still holds, silently.
+	 */
+	it('answers a second request inside the cooldown as it answers an unknown address (scenario 4)', async () => {
 		const email = 'mailer-cooldown@x.io';
 		await seedUser(email);
 
-		const first = await requestReset(email);
-		expect(first.response.status).toBe(200);
+		await requestReset(email);
 		const second = await requestReset(email);
+		const unknown = await requestReset('mailer-cooldown-nobody@x.io');
 
-		expect(second.response.status).toBe(429);
+		expect(second.response.status).toBe(unknown.response.status);
+		expect(bodyOf(second)).toBe(bodyOf(unknown));
+	});
+
+	it('sends nothing for a second request inside the cooldown (scenario 4)', async () => {
+		const email = 'mailer-cooldown-quiet@x.io';
+		await seedUser(email);
+
+		await requestReset(email);
+		await requestReset(email);
+
 		expect(sentEmails.length).toBe(1);
 	});
 
@@ -610,7 +601,7 @@ describe('password reset — not a prober, not a mailer (US4)', () => {
 	 * Past the cooldown but at the cap. The window is aged rather than filled by five real requests: the
 	 * cooldown would refuse those, and what is under test here is the cap, not the clock.
 	 */
-	it('refuses a request past the daily cap, and says something different (scenario 5)', async () => {
+	it('sends nothing past the daily cap, and answers as it answers an unknown address (scenario 5)', async () => {
 		const email = 'mailer-cap@x.io';
 		await seedUser(email);
 		await requestReset(email);
@@ -625,24 +616,12 @@ describe('password reset — not a prober, not a mailer (US4)', () => {
 		);
 		resetSentEmails();
 
-		const start = await startInteraction();
-		const capped = await postRequestForm(start.uid, start.cookie, email);
+		const capped = await requestReset(email);
+		const unknown = await requestReset('mailer-cap-nobody@x.io');
 
-		expect(capped.status).toBe(429);
 		expect(sentEmails.length).toBe(0);
-
-		// The two refusals are distinguishable, so a user knows whether to wait a minute or a day.
-		const cooldownEmail = 'mailer-cap-other@x.io';
-		await seedUser(cooldownEmail);
-		await requestReset(cooldownEmail);
-		const cooldownStart = await startInteraction();
-		const cooled = await postRequestForm(
-			cooldownStart.uid,
-			cooldownStart.cookie,
-			cooldownEmail
-		);
-		expect(cooled.status).toBe(429);
-		expect(capped.text).not.toBe(cooled.text);
+		expect(capped.response.status).toBe(unknown.response.status);
+		expect(bodyOf(capped)).toBe(bodyOf(unknown));
 	});
 
 	/*

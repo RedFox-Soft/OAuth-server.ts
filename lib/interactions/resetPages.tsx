@@ -26,23 +26,16 @@ export function resetRequestPage(uid: string, error?: string): Response {
 }
 
 /*
- * The one answer every accepted request gets: registered, unregistered, another bucket's address, a
- * deactivated account, the reserved admin bucket, or a send that failed. A constant with nothing
+ * The one answer every request gets: registered, unregistered, another bucket's address, a deactivated
+ * account, the reserved admin bucket, a send that failed, or one the cooldown or daily cap held back —
+ * that last because the throttle exists only for addresses with an account. A constant with nothing
  * interpolated, so "byte-identical across outcomes" is a property of this function rather than a promise
  * made by its callers.
  */
 export function resetRequestAcceptedPage(): Response {
 	return page(
 		'Check your email',
-		`<h2 style="color:#1f1f1f;">Check your email</h2><p style="color:#595959;">If that address has an account, a password reset link is on its way. The link expires in one hour.</p><p style="color:#8c8c8c; font-size:13px;">Not seeing it? Check your spam folder before requesting another.</p>`
-	);
-}
-
-export function resetRateLimitedPage(message: string): Response {
-	return page(
-		'Please wait',
-		`<h2 style="color:#1f1f1f;">Too many requests</h2><p style="color:#595959;">${esc(message)}</p>`,
-		429
+		`<h2 style="color:#1f1f1f;">Check your email</h2><p style="color:#595959;">If that address has an account, a password reset link is on its way. The link expires in one hour.</p><p style="color:#8c8c8c; font-size:13px;">Not seeing it? Check your spam folder first. A new link is sent at most once a minute and a few times a day, so a request made sooner than that sends nothing.</p>`
 	);
 }
 

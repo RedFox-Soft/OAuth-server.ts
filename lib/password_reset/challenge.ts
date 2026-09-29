@@ -119,19 +119,30 @@ async function issueAndSend(
 		REQUEST_WINDOW_SECONDS
 	);
 
+	/*
+	 * Sent off the request path. A send happens only for an address that has an account, and an SMTP
+	 * round-trip is hundreds of milliseconds, so awaiting it made the response time answer the question
+	 * the uniform page refuses to. A failure is logged for the operator and is invisible to the
+	 * requester, as it was when awaited; the secret stays valid, so a retry after the cooldown costs
+	 * nothing.
+	 */
 	const appName = bucket.name || 'the application';
-	await sendPasswordResetEmail({
+	void sendPasswordResetEmail({
 		email: user.email,
 		appName,
 		resetUrl: resetUrlFor(token)
+	}).catch((err: unknown) => {
+		console.error('password reset email could not be delivered:', err);
 	});
 }
 
 /*
  * Handle a reset request for an address in one bucket.
  *
- * `sent` is for tests and logs only — the route renders the same page either way, because a response that
- * varied with the outcome would answer "does this address have an account here?" for anyone who asked.
+ * The outcome — `sent`, and a throttle refusal's reason — is for tests and logs only. The route renders the
+ * same page for every one of them, the refusals included, because a response that varied with the outcome
+ * would answer "does this address have an account here?" for anyone who asked. `sent` means queued: the
+ * mail itself goes out after the response (see `issueAndSend`).
  */
 export async function request(
 	email: string,
@@ -171,11 +182,11 @@ export async function request(
 		await issueAndSend(user, bucket);
 	} catch (err) {
 		/*
-		 * A send only happens for an address that *does* have an account here, so surfacing the failure would
-		 * answer the question the uniform response exists to refuse. Logged for the operator, invisible to the
-		 * requester; the secret stays valid, so a retry after the cooldown costs nothing.
+		 * Issuing only happens for an address that *does* have an account here, so surfacing a failure to
+		 * store the secret would answer the question the uniform response exists to refuse. Logged for the
+		 * operator, invisible to the requester. A delivery failure never reaches here: the send is not awaited.
 		 */
-		console.error('password reset email could not be delivered:', err);
+		console.error('password reset could not be issued:', err);
 		return { ok: true, sent: false };
 	}
 

@@ -79,11 +79,7 @@ import { Interaction } from 'lib/models/interaction.js';
 import { getUserStore, getBucketStore } from 'lib/adapters/index.js';
 import { issueAndSend } from 'lib/verification/challenge.js';
 import { request as requestPasswordReset } from 'lib/password_reset/challenge.js';
-import {
-	resetRequestPage,
-	resetRequestAcceptedPage,
-	resetRateLimitedPage
-} from './resetPages.js';
+import { resetRequestPage, resetRequestAcceptedPage } from './resetPages.js';
 import { Grant } from 'lib/models/grant.js';
 import { Client } from 'lib/models/client.js';
 import { responseModes } from 'lib/response_modes/index.js';
@@ -1035,18 +1031,14 @@ export const ui = new Elysia()
 				clientId,
 				resourceOf(interaction)
 			);
-			const outcome = await requestPasswordReset(body.email, bucketId);
-
-			if (!outcome.ok) {
-				return resetRateLimitedPage(
-					outcome.reason === 'cooldown'
-						? 'Please wait a moment before requesting another reset email.'
-						: 'You have requested too many reset emails today. Please try again later.'
-				);
-			}
-
-			// One page for every accepted outcome — sent or not. A response that varied would answer "does
-			// this address have an account here?" for anyone who asked.
+			/*
+			 * One page for every outcome — sent, not sent, or held back by the per-address cooldown or daily
+			 * cap. The throttle exists only for an address that has an account (nothing is stored for one that
+			 * does not), so a "please wait" page was itself the answer to "does this address have an account
+			 * here?": asking twice within a minute told anybody. The limits still apply, silently, and the
+			 * page says what they are.
+			 */
+			await requestPasswordReset(body.email, bucketId);
 			return resetRequestAcceptedPage();
 		},
 		{

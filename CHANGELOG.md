@@ -74,6 +74,11 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   colleague added them to theirs, sign-in could land them in the colleague's group and their new
   projects, clients and buckets were created there. It is now the one whose first member, its owner,
   they are, in every backend and in the scope fallback.
+- **The password reset request no longer reveals whether an address has an account.** Its cooldown
+  and daily cap are kept only for addresses with an account, and refusing with a "please wait" page
+  meant that asking twice within a minute told anybody the address was registered; the SMTP send,
+  awaited only for such an address, told the same by response time. Every outcome now renders the
+  one accepted page, which states the limits, and the mail is sent after the response.
 
 ## [0.6.0] - 2026-09-28
 
