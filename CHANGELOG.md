@@ -79,6 +79,10 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   meant that asking twice within a minute told anybody the address was registered; the SMTP send,
   awaited only for such an address, told the same by response time. Every outcome now renders the
   one accepted page, which states the limits, and the mail is sent after the response.
+- **The server image no longer takes in environment files or the repository's history.** The image is
+  built with `COPY . .` and `.dockerignore` excluded only four conventional dotenv names, so a
+  `.env.production` on the building machine would have been baked in and loaded; it now excludes every
+  `.env*`, `.git`, CI and agent configuration, specs, wiki and docs.
 
 ## [0.6.0] - 2026-09-28
 

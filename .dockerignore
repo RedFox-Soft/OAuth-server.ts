@@ -140,3 +140,15 @@ test/
 
 # The website is built by its own workflow and never ships in the server image.
 website/
+
+# Everything else the server does not run. The build is `COPY . .`, so a file left out of this list is in
+# the image: the dotenv entries above named only the conventional four, and a `.env.production` on a
+# workstation would have been baked in — and loaded, since Bun reads it by itself under NODE_ENV=production.
+.env*
+.git/
+.github/
+.claude/
+.specify/
+specs/
+wiki/
+docs/
