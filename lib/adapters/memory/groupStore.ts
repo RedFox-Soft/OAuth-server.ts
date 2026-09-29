@@ -39,7 +39,7 @@ export class GroupStore implements GroupStoreInstance {
 
 	async findPersonalFor(userId: string): Promise<Group | null> {
 		for (const g of this.groups.values()) {
-			if (g.kind === 'personal' && g.members.some((m) => m.userId === userId)) {
+			if (g.kind === 'personal' && g.members[0]?.userId === userId) {
 				return g;
 			}
 		}

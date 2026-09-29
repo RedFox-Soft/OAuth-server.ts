@@ -252,6 +252,7 @@ async function contextFor(
 		bucketId,
 		memberships,
 		activeGroupId: await resolveActiveGroup(
+			user._id,
 			user.roles,
 			memberships,
 			groups,
@@ -280,6 +281,7 @@ async function contextFor(
  * of the role and so has no personal group in `groups` unless they are a member of one.
  */
 async function resolveActiveGroup(
+	userId: string,
 	roles: string[],
 	memberships: { groupId: string; role: 'owner' | 'member' }[],
 	groups: Group[],
@@ -293,7 +295,14 @@ async function resolveActiveGroup(
 		const chosen = await getGroupStore().find(sessionGroupId);
 		if (chosen && chosen.kind !== 'personal') return chosen._id;
 	}
-	const personal = groups.find((g) => g.kind === 'personal');
+	/*
+	 * Their own personal group — its first member — and not merely a personal group they belong to: one
+	 * may be shared, and falling back to somebody else's put this administrator's new containers in
+	 * that person's group.
+	 */
+	const personal = groups.find(
+		(g) => g.kind === 'personal' && g.members[0]?.userId === userId
+	);
 	return personal?._id ?? memberships[0]?.groupId ?? '';
 }
 

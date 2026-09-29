@@ -4,7 +4,7 @@ title: 'Group ownership of projects and buckets'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-29
-updated: 2026-09-23
+updated: 2026-09-29
 graph:
   node_type: concept
   relationships:
@@ -73,6 +73,16 @@ Re-reading per request rather than caching at sign-in is what makes a removed me
 their *next* call rather than at their next sign-in.
 
 ## The active scope
+
+**"Their personal group" means the one they own, not one they belong to** (corrected 2026-09-29).
+`findPersonalFor` matched any personal group the administrator was a member of, and so did
+`resolveActiveGroup`'s fallback; once someone added a colleague to their own personal group, both could
+answer with that group — stores return in insertion order, so the older account's won. It was the
+colleague's default scope at every sign-in, and whatever they then created landed in the other
+person's group. The owner is the first member, the invariant `assertPersonalOwnerKept` already holds
+(every membership write appends, maps or filters, so `members[0]` never moves), and all three backends
+and the fallback now match on it (`lib/admin/auth/rbac.ts:303`). `own` in `GET /admin/api/scope` always
+did. `test/admin/personal_group_ownership.spec.ts` is the attack.
 
 `AdminSession.activeGroupId` is the group the console is pointed at: what is listed, and where a new
 container is created. Server-held rather than caller-asserted, because it sits on an authorization

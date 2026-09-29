@@ -69,6 +69,11 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   code was accepted after fifteen wrong ones. Each now counts the attempt first through a new atomic
   `increment` and admits it only within the cap; the verification code's expiry is also checked on
   read.
+- **Being added to someone else's personal group no longer changes your default scope.** An
+  administrator's personal group was found as any personal group they belonged to, so after a
+  colleague added them to theirs, sign-in could land them in the colleague's group and their new
+  projects, clients and buckets were created there. It is now the one whose first member, its owner,
+  they are, in every backend and in the scope fallback.
 
 ## [0.6.0] - 2026-09-28
 

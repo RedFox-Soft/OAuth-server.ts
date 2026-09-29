@@ -788,6 +788,11 @@ export interface GroupStoreInstance {
 	list(): Promise<Group[]>;
 	/* Runs on every admin request, for both credential types. Indexed on `members.userId`. */
 	listByMember(userId: string): Promise<Group[]>;
+	/*
+	 * The personal group this administrator *owns* — the one whose first member they are, which is the
+	 * invariant `assertPersonalOwnerKept` holds — not any personal group they belong to. A personal
+	 * group may be shared, and "one they are a member of" answered with somebody else's once they were.
+	 */
 	findPersonalFor(userId: string): Promise<Group | null>;
 	update(
 		id: string,

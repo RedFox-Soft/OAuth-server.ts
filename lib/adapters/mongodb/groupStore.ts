@@ -57,7 +57,9 @@ export class GroupStore implements GroupStoreInstance {
 		return groupOf(
 			await this.collection.findOne({
 				kind: 'personal',
-				'members.userId': userId
+				// Kept for the multikey index; the positional condition is the one that decides.
+				'members.userId': userId,
+				'members.0.userId': userId
 			})
 		);
 	}

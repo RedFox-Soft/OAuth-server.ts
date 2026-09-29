@@ -82,6 +82,7 @@ export class GroupStore implements GroupStoreInstance {
 			SELECT doc FROM ${handle(this.area)}
 			WHERE doc->>'kind' = 'personal'
 			  AND doc->'members' @> ${memberFilter(userId)}
+			  AND doc->'members'->0->>'userId' = ${userId}
 			LIMIT 1
 		`;
 		return this.groupOf(rows[0]);
