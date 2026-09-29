@@ -2,6 +2,7 @@ import { Grant } from '../models/grant.js';
 import { getUserStore } from '../adapters/index.js';
 import { resolveBucketForRequest } from '../admin/auth/resolveBucket.js';
 import type { OIDCContext } from '../helpers/oidc_context.ts';
+import { consentWaived } from '../shared/consent_waiver.js';
 
 // The token an account is loaded for at the token and userinfo endpoints.
 type AccountToken = {
@@ -90,13 +91,14 @@ export async function loadExistingGrant(oidc: OIDCContext) {
 		 * is re-derived here rather than frozen at the moment the grant was created. Not persisted: the
 		 * derivation is free on every load, and writing on every authorization is not.
 		 */
-		if (existing && oidc.client['consent.require'] === false) {
+		if (existing && (await consentWaived(oidc))) {
 			existing.payload.trusted = true;
 		}
 		return existing;
 	}
 	const accountId = oidc.entities.Account?.accountId;
-	if (oidc.client['consent.require'] === false && accountId) {
+	// Honoured only in a bucket the client's own group owns — see lib/shared/consent_waiver.ts.
+	if (accountId && (await consentWaived(oidc))) {
 		// Mark the auto-created grant `trusted` (this is a consent-not-required
 		// client). A trusted grant's getOIDCScopeFiltered()/getResourceScopeFiltered()
 		// return the full requested scope set. Without it the grant has no scopes,

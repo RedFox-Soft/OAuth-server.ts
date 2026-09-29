@@ -109,3 +109,4 @@ Operations:
 - 2026-09-29 — corrected [[self-service-password-reset]]: the rate-limited page (429) is gone — it showed only for registered addresses, so asking twice was an existence oracle; every outcome renders the accepted page, and the reset mail is sent off the request path.
 - 2026-09-29 — corrected [[mcp-server-authorization]]: the egress range check is numeric (`BlockList`) and judges embedded IPv4; the text version let `[::ffff:a9fe:a9fe]` through.
 - 2026-09-29 — corrected [[mcp-server-authorization]] and [[self-service-password-reset]]: the password, reset, registration and enrolment doors resolve the bucket with the request's resource; a federated-only bucket also refuses resets at issue and at redemption.
+- 2026-09-29 — corrected [[group-ownership]]: `consent.require: false` is honoured only in a bucket owned by the client's project group (`consentWaived`); a tenant client in the shared default bucket skipped consent for every user there.

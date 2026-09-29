@@ -8,6 +8,7 @@ import { cookieNames } from 'lib/consts/param_list.js';
 import { ttl } from 'lib/configs/liveTime.js';
 import { Interaction } from 'lib/models/interaction.js';
 import { eventBus } from '../../event_bus.js';
+import { consentWaived } from '../../shared/consent_waiver.js';
 
 /*
  * The two login-prompt checks that compare a requested authentication context against the one the
@@ -40,7 +41,7 @@ export const expiredInteractionCookie = (uid: string) => ({
 // The first prompt of the policy whose checks this request fails, or null when none does.
 async function pendingPrompt(oidc: OIDCContext<PipelineParams>) {
 	for (const poly of interactionPolicy()) {
-		if (poly.name === 'consent' && oidc.client['consent.require'] === false) {
+		if (poly.name === 'consent' && (await consentWaived(oidc))) {
 			continue;
 		}
 		const result = await poly.executeChecks(oidc);

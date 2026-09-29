@@ -79,6 +79,10 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   meant that asking twice within a minute told anybody the address was registered; the SMTP send,
   awaited only for such an address, told the same by response time. Every outcome now renders the
   one accepted page, which states the limits, and the mail is sent after the response.
+- **A client that skips consent does so only for its own group's users.** Any group member could
+  create a project with no bucket and a consent-free client in it; such a client signs into the shared
+  default bucket, where it received any signed-in user's claims with `prompt=none` and no page shown.
+  The flag is now honoured only when the sign-in bucket belongs to the client's project group.
 - **A bucket's password, reset, registration and second-factor policy holds for a client in no
   project.** Those doors resolved the bucket from the client alone while the sign-in used the resource
   the request named, so a federated-only bucket reached through a declared resource verified

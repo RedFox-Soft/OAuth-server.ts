@@ -125,6 +125,16 @@ be probing. Caught by `test/admin/group_isolation.spec.ts`, which exists to ask 
 from every other spec: not "can this administrator do what they should" but "is anything at all of
 another tenant observable".
 
+**Skipping consent is a decision about your own users only** (added 2026-09-29). A client's
+`consent.require: false` is honoured only when the bucket it signs into is owned by the group that owns
+its project (`consentWaived`, `lib/shared/consent_waiver.ts`), decided per request. Any member of a group
+can create a project and a consent-free client, and a project with no bucket signs into the default
+bucket, which every tenant shares — so honouring the flag there gave a tenant every default-bucket user's
+claims with `prompt=none` and no page. A client in no project keeps the flag as stored, since only the
+operator can have set it (registration and client documents cannot); the console's own client passes
+because the admin project and the admin bucket are both the System group's. The spec is
+`test/consent_waiver/`.
+
 **A project and its bucket must share a group.** Enforced on `PUT /admin/api/projects/:id/bucket`, and
 it is a coherence rule about the data rather than a statement about authority — so a super
 administrator is refused too. Joining them across groups would leave a project's end-users administered
