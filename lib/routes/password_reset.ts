@@ -2,6 +2,10 @@ import { Elysia, t } from 'elysia';
 
 import { load, consume } from '../password_reset/challenge.js';
 import {
+	END_USER_PASSWORD_MIN_LENGTH,
+	END_USER_PASSWORD_TOO_SHORT
+} from '../consts/password_policy.js';
+import {
 	resetFormPage,
 	resetSuccessPage,
 	resetFailurePage
@@ -33,6 +37,10 @@ export const passwordResetRoutes = new Elysia({ name: 'password-reset' })
 			 */
 			if (body.password !== body.confirmPassword) {
 				return resetFormPage(body.token, 'Those passwords do not match.');
+			}
+			// Before `consume`, for the same reason the check above is: a refused form spends nothing.
+			if (body.password.length < END_USER_PASSWORD_MIN_LENGTH) {
+				return resetFormPage(body.token, END_USER_PASSWORD_TOO_SHORT);
 			}
 
 			const result = await consume(body.token, body.password);

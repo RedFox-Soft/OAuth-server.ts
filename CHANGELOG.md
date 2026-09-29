@@ -123,6 +123,10 @@ dup key: { email: "…" }`, and the fault's message is stored and sent. The user
   built with `COPY . .` and `.dockerignore` excluded only four conventional dotenv names, so a
   `.env.production` on the building machine would have been baked in and loaded; it now excludes every
   `.env*`, `.git`, CI and agent configuration, specs, wiki and docs.
+- **An end user's own password is held to eight characters.** Registration and the reset form enforced
+  the minimum only through the form's `required` attribute, so a direct POST set any password, and an
+  empty one reached the hash and answered 500. Both now refuse a short password as a form to correct,
+  the same eight every administrator-set password is held to.
 
 ## [0.6.0] - 2026-09-28
 

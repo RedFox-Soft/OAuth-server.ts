@@ -1,4 +1,8 @@
 import { hostOfRequest } from 'lib/consts/request_host.js';
+import {
+	END_USER_PASSWORD_MIN_LENGTH,
+	END_USER_PASSWORD_TOO_SHORT
+} from 'lib/consts/password_policy.js';
 import { bucketAtHost, isCanonicalHost } from 'lib/admin/auth/bucketAddress.js';
 // Aliased: this module already imports a `NotFoundError` from helpers/re_render_errors.js, which is the
 // device-flow re-render error and a different thing entirely. Elysia's is the one that produces the same
@@ -1100,6 +1104,15 @@ export const ui = new Elysia()
 			if (body.password !== body.confirmPassword) {
 				return registrationServer(uid, {
 					errorMessage: 'Passwords do not match',
+					email: body.email,
+					handOffTo: redirectUriOf(interaction)
+				});
+			}
+			// Before the existing-address branch, so a short password is refused the same way whether or
+			// not the address is taken — answering it differently would say which one it is.
+			if (body.password.length < END_USER_PASSWORD_MIN_LENGTH) {
+				return registrationServer(uid, {
+					errorMessage: END_USER_PASSWORD_TOO_SHORT,
 					email: body.email,
 					handOffTo: redirectUriOf(interaction)
 				});
