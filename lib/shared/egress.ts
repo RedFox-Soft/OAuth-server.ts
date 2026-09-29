@@ -1,5 +1,5 @@
 import { lookup as dnsLookup } from 'node:dns/promises';
-import { isIP } from 'node:net';
+import { BlockList, isIP } from 'node:net';
 
 /*
  * Outbound requests to an address somebody other than the operator chose — a client's sector document,
@@ -61,47 +61,112 @@ export class EgressRefused extends Error {
 }
 
 /*
- * Whether an address is one this server must refuse to talk to.
- *
- * Written against the textual forms because that is what resolution returns, and kept to prefix and
- * range tests rather than a general CIDR engine — the set is fixed and small, and a general parser
- * would be more code to get subtly wrong. The MCP guidance warns against hand-rolling IP validation
- * because "attackers exploit encoding tricks (octal, hex, IPv4-mapped IPv6) that custom parsers often
- * miss"; that warning is about validating *user input*, and it is why this function is applied to a
- * resolver's answer instead. A resolver returns a normalised address, never `0x7f.1`.
+ * The ranges this server refuses to reach, as a `node:net` BlockList, which compares addresses as
+ * numbers rather than as text. Text was the first version and it was wrong the first time it met URL
+ * parsing: `https://[::ffff:169.254.169.254]/` arrives with the hostname `[::ffff:a9fe:a9fe]`, which a
+ * pattern written for the dotted form let through to the cloud metadata endpoint.
+ */
+const BLOCKED = new BlockList();
+for (const [network, prefix] of [
+	['0.0.0.0', 8],
+	['10.0.0.0', 8],
+	/* Carrier-grade NAT: not public, not ours to probe. */
+	['100.64.0.0', 10],
+	['127.0.0.0', 8],
+	['169.254.0.0', 16],
+	['172.16.0.0', 12],
+	/* IETF protocol assignments, the documentation ranges and the retired 6to4 relay anycast. */
+	['192.0.0.0', 24],
+	['192.0.2.0', 24],
+	['192.88.99.0', 24],
+	['192.168.0.0', 16],
+	/* The benchmarking range. */
+	['198.18.0.0', 15],
+	['198.51.100.0', 24],
+	['203.0.113.0', 24],
+	/* Multicast, the reserved block and broadcast. */
+	['224.0.0.0', 3]
+] as const) {
+	BLOCKED.addSubnet(network, prefix, 'ipv4');
+}
+for (const [network, prefix] of [
+	['::', 128],
+	['::1', 128],
+	/* Discard-only, Teredo (which carries an obfuscated IPv4) and the documentation ranges. */
+	['100::', 64],
+	['2001::', 32],
+	['2001:db8::', 32],
+	['3fff::', 20],
+	/* The NAT64 local-use prefix, whose IPv4 layout depends on how a network configured it. */
+	['64:ff9b:1::', 48],
+	/* Unique-local, link-local, the deprecated site-local, and multicast. */
+	['fc00::', 7],
+	['fe80::', 10],
+	['fec0::', 10],
+	['ff00::', 8]
+] as const) {
+	BLOCKED.addSubnet(network, prefix, 'ipv6');
+}
+
+/* An IPv6 address as its sixteen bytes, embedded dotted IPv4 tail included. */
+function ipv6Bytes(address: string): number[] {
+	let text = address;
+	const tail = text.match(/(\d+\.\d+\.\d+\.\d+)$/);
+	if (tail) {
+		const [a, b, c, d] = tail[1].split('.').map(Number);
+		text = `${text.slice(0, -tail[1].length)}${((a << 8) | b).toString(16)}:${((c << 8) | d).toString(16)}`;
+	}
+	const [head, rest] = text.split('::');
+	const left = head ? head.split(':') : [];
+	const right = rest ? rest.split(':') : [];
+	const groups =
+		rest === undefined
+			? left
+			: [...left, ...Array(8 - left.length - right.length).fill('0'), ...right];
+	return groups.flatMap((group) => {
+		const value = parseInt(group, 16);
+		return [value >> 8, value & 0xff];
+	});
+}
+
+/*
+ * The IPv4 address an IPv6 one carries, in the layouts where reaching the IPv6 address reaches that IPv4
+ * host: mapped (`::ffff:0:0/96`), compatible (`::/96`), SIIT (`::ffff:0:0:0/96`), well-known NAT64
+ * (`64:ff9b::/96`) and 6to4 (`2002::/16`). The NAT64 prefix is not refused outright: on an IPv6-only
+ * network with DNS64 every IPv4-only public host is reached through it, so it is judged by what it carries.
+ */
+function embeddedIPv4(address: string): string | undefined {
+	const b = ipv6Bytes(address);
+	const zero = (from: number, to: number) =>
+		b.slice(from, to).every((byte) => byte === 0);
+	const dotted = (at: number) => b.slice(at, at + 4).join('.');
+
+	if (zero(0, 10) && b[10] === 0xff && b[11] === 0xff) return dotted(12);
+	if (zero(0, 12)) return dotted(12);
+	if (zero(0, 8) && b[8] === 0xff && b[9] === 0xff && zero(10, 12)) {
+		return dotted(12);
+	}
+	if (b[0] === 0x00 && b[1] === 0x64 && b[2] === 0xff && b[3] === 0x9b) {
+		if (zero(4, 12)) return dotted(12);
+	}
+	if (b[0] === 0x20 && b[1] === 0x02) return dotted(2);
+	return undefined;
+}
+
+/*
+ * Whether an address is one this server must refuse to talk to. Applied to a literal from a URL and to
+ * every answer a resolver gives, so it cannot assume either arrives in one spelling.
  */
 export function isBlockedAddress(address: string): boolean {
-	const version = isIP(address);
+	/* A zone index names an interface, not a host; it is not part of the address being judged. */
+	const literal = address.replace(/%.*$/, '');
+	const version = isIP(literal);
 	if (version === 0) return true;
+	if (version === 4) return BLOCKED.check(literal, 'ipv4');
 
-	if (version === 4) {
-		const octets = address.split('.').map(Number);
-		const [a, b] = octets;
-		if (a === 10) return true;
-		if (a === 127) return true;
-		if (a === 0) return true;
-		if (a === 169 && b === 254) return true;
-		if (a === 172 && b >= 16 && b <= 31) return true;
-		if (a === 192 && b === 168) return true;
-		/* Carrier-grade NAT and the benchmarking range: not public, not ours to probe. */
-		if (a === 100 && b >= 64 && b <= 127) return true;
-		if (a === 198 && (b === 18 || b === 19)) return true;
-		if (a >= 224) return true;
-		return false;
-	}
-
-	const normalized = address.toLowerCase();
-	if (normalized === '::' || normalized === '::1') return true;
-	/* Unique-local (fc00::/7) and link-local (fe80::/10). */
-	if (/^f[cd]/.test(normalized)) return true;
-	if (/^fe[89ab]/.test(normalized)) return true;
-	/*
-	 * An IPv4-mapped address carries the v4 rules with it. Checking the mapped form is what stops
-	 * `::ffff:169.254.169.254` from being treated as an ordinary v6 address.
-	 */
-	const mapped = normalized.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
-	if (mapped) return isBlockedAddress(mapped[1]);
-	return false;
+	if (BLOCKED.check(literal, 'ipv6')) return true;
+	const carried = embeddedIPv4(literal);
+	return carried !== undefined && BLOCKED.check(carried, 'ipv4');
 }
 
 async function assertReachable(host: string): Promise<EgressFailure | null> {

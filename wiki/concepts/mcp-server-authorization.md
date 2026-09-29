@@ -106,7 +106,7 @@ Redirects were followed wherever they led, nothing refused `169.254.169.254` or 
 time or size, and the sector refusal repeated the status the target answered, which made it a port
 scanner. The egress rules moved out of `fetch.ts` into `lib/shared/egress.ts` — `guardedFetch`
 (`:157`) and `readBounded` (`:211`), a streaming byte bound rather than a read-then-measure — and all
-four go through them. The sector refusal is now one message whatever went wrong.
+four go through them. The sector refusal is now one message whatever went wrong. The range check compares addresses as numbers (a `node:net` `BlockList`) and judges the IPv4 an IPv6 address carries — mapped, compatible, SIIT, NAT64, 6to4 — because URL parsing rewrites `[::ffff:169.254.169.254]` as `[::ffff:a9fe:a9fe]`, which the first, text-matching version let through (corrected 2026-09-29).
 `test/egress/client_addresses.spec.ts` is the attack, and `test/preload.ts` resolves every name to one
 public address so no spec depends on the machine's DNS.
 

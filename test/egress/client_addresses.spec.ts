@@ -4,6 +4,7 @@ import bootstrap from '../test_helper.js';
 import { mock } from '../fetch_mock.js';
 import { clientKeys, registerClient } from 'lib/models/client.js';
 import { clientNotifications } from 'lib/shared/client_notifications.js';
+import { EgressRefused, guardedFetch, resolver } from 'lib/shared/egress.js';
 
 /*
  * Addresses a client names in its own metadata, which this server then contacts: the sector document,
@@ -120,6 +121,83 @@ describe('outbound requests to an address a client supplied', () => {
 		await expect(clientKeys(client).asymmetric.refresh()).rejects.toThrow();
 
 		expect(requestsTo(fetchSpy.mock.calls, PRIVATE)).toHaveLength(0);
+	});
+
+	/*
+	 * An address can be written many ways, and URL parsing picks one of them for us:
+	 * `[::ffff:169.254.169.254]` arrives as `[::ffff:a9fe:a9fe]`. IPv6 also carries IPv4 inside it in
+	 * several standard layouts — mapped, compatible, NAT64, 6to4 — each of which reaches the IPv4 host
+	 * named inside. The check has to be about the address, not about how it was spelled.
+	 */
+	it('refuses a reserved address however it is written', async () => {
+		for (const address of [
+			'::ffff:a9fe:a9fe',
+			'::ffff:169.254.169.254',
+			'::ffff:7f00:1',
+			'::ffff:0:a9fe:a9fe',
+			'::a9fe:a9fe',
+			'64:ff9b::a9fe:a9fe',
+			'64:ff9b::a00:1',
+			'2002:a9fe:a9fe::',
+			'2001::1',
+			'2001:db8::1',
+			'100::1',
+			'fec0::1',
+			'ff02::1',
+			'192.0.0.8',
+			'192.0.2.1',
+			'198.51.100.1',
+			'203.0.113.1',
+			'192.88.99.1',
+			'255.255.255.255'
+		]) {
+			resolver.lookup = async () => [address];
+
+			const refused = await guardedFetch('https://target.example.com/x', {
+				timeoutMs: 1_000
+			}).then(
+				() => undefined,
+				(err: unknown) => err
+			);
+
+			expect(refused, address).toBeInstanceOf(EgressRefused);
+			// Named, because a fetch the mock refuses for want of an interceptor is an EgressRefused too.
+			expect((refused as EgressRefused).reason, address).toBe(
+				'blocked_address'
+			);
+		}
+	});
+
+	it('reaches a public address written in an IPv6 form that carries it', async () => {
+		for (const address of ['64:ff9b::5db8:d822', '::ffff:5db8:d822']) {
+			resolver.lookup = async () => [address];
+			mock('https://target.example.com')
+				.intercept({ path: '/x' })
+				.reply(200, 'ok');
+
+			const response = await guardedFetch('https://target.example.com/x', {
+				timeoutMs: 1_000
+			});
+
+			expect(response.status, address).toBe(200);
+		}
+	});
+
+	it('refuses a key set named by an IPv4-mapped literal without requesting it', async () => {
+		const client = await registerClient(
+			{
+				clientId: 'mapped-jwks-client',
+				redirectUris: ['https://client.example.com/cb'],
+				token_endpoint_auth_method: 'private_key_jwt',
+				jwks_uri: 'https://[::ffff:169.254.169.254]/jwks'
+			},
+			{ store: false }
+		);
+		const fetchSpy = spyOn(globalThis, 'fetch');
+
+		await expect(clientKeys(client).asymmetric.refresh()).rejects.toThrow();
+
+		expect(requestsTo(fetchSpy.mock.calls, 'https://[')).toHaveLength(0);
 	});
 
 	it('sends no back-channel logout to a private address', async () => {
