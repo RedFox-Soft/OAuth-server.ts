@@ -1,21 +1,25 @@
 import type {
 	ProtectedResource,
+	ProtectedResourcePatch,
 	ProtectedResourceStoreInstance
 } from '../types.js';
+import { UniqueValueTaken } from '../conflicts.js';
+import { declarationId } from '../../resources/declaration_id.js';
 
 /*
  * In-memory declared protected resources.
  *
- * `create` refuses a duplicate identifier rather than overwriting, so the uniqueness the Mongo
- * primary key gives is observable in the default test run too. It is not the same guarantee — this
- * cannot survive a concurrent write, and that gap is recorded in the feature's quickstart — but a
- * store that silently replaced a declaration would make the *behavioural* rule untestable as well.
+ * `create` refuses a duplicate within a namespace rather than overwriting, so the uniqueness the
+ * datastores' primary key gives is observable in the default test run too. It is not the same
+ * guarantee — this cannot survive a concurrent write, which is what database/verify_postgres.ts is for —
+ * but a store that silently replaced a declaration would make the *behavioural* rule untestable as well.
  */
 export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 	private resources = new Map<string, ProtectedResource>();
 
 	async create(data: {
-		_id: string;
+		namespace: string;
+		identifier: string;
 		projectId: string;
 		name: string;
 		scopes: string[];
@@ -23,13 +27,16 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 		accessTokenTTL?: number;
 		trailingSlashSignificant?: boolean;
 	}): Promise<ProtectedResource> {
-		if (this.resources.has(data._id)) {
-			throw new Error(`protected resource already declared: ${data._id}`);
+		const _id = declarationId(data.namespace, data.identifier);
+		if (this.resources.has(_id)) {
+			throw new UniqueValueTaken('resource', data.identifier);
 		}
 
 		const now = new Date();
 		const resource: ProtectedResource = {
-			_id: data._id,
+			_id,
+			namespace: data.namespace,
+			identifier: data.identifier,
 			projectId: data.projectId,
 			name: data.name,
 			scopes: [...data.scopes],
@@ -39,12 +46,15 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 			createdAt: now,
 			updatedAt: now
 		};
-		this.resources.set(resource._id, resource);
-		return resource;
+		this.resources.set(_id, resource);
+		return { ...resource, scopes: [...resource.scopes] };
 	}
 
-	async find(id: string): Promise<ProtectedResource | null> {
-		return this.resources.get(id) ?? null;
+	async find(
+		namespace: string,
+		identifier: string
+	): Promise<ProtectedResource | null> {
+		return this.resources.get(declarationId(namespace, identifier)) ?? null;
 	}
 
 	async listByProject(projectId: string): Promise<ProtectedResource[]> {
@@ -58,22 +68,18 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 	}
 
 	async update(
-		id: string,
-		patch: Partial<
-			Pick<
-				ProtectedResource,
-				'name' | 'scopes' | 'tokenFormat' | 'accessTokenTTL'
-			>
-		>
+		namespace: string,
+		identifier: string,
+		patch: ProtectedResourcePatch
 	): Promise<ProtectedResource | null> {
-		const resource = this.resources.get(id);
+		const resource = this.resources.get(declarationId(namespace, identifier));
 		if (!resource) return null;
 		Object.assign(resource, patch, { updatedAt: new Date() });
 		return resource;
 	}
 
-	async destroy(id: string): Promise<void> {
-		this.resources.delete(id);
+	async destroy(namespace: string, identifier: string): Promise<void> {
+		this.resources.delete(declarationId(namespace, identifier));
 	}
 
 	/*
@@ -90,5 +96,31 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 			}
 		}
 		return removed;
+	}
+
+	async moveProject(
+		projectId: string,
+		from: string,
+		to: string
+	): Promise<{ moved: number } | { conflicts: string[] }> {
+		const moving = [...this.resources.values()].filter(
+			(r) => r.projectId === projectId && r.namespace === from
+		);
+		const conflicts = moving
+			.filter((r) => this.resources.has(declarationId(to, r.identifier)))
+			.map((r) => r.identifier);
+		if (conflicts.length > 0) return { conflicts };
+
+		for (const resource of moving) {
+			this.resources.delete(resource._id);
+			const _id = declarationId(to, resource.identifier);
+			this.resources.set(_id, {
+				...resource,
+				_id,
+				namespace: to,
+				updatedAt: new Date()
+			});
+		}
+		return { moved: moving.length };
 	}
 }

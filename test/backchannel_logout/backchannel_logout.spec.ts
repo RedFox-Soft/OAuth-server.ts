@@ -282,7 +282,12 @@ describe('Back-Channel Logout 1.0', () => {
 					session.authorizations?.client,
 					'the client authorization'
 				);
-				expect(logout).toHaveBeenCalledWith(client, accountId, sid);
+				expect(logout).toHaveBeenCalledWith(
+					client,
+					accountId,
+					sid,
+					session.bucketId
+				);
 				expect(successSpy).toHaveBeenCalledTimes(1);
 			}
 			{
@@ -290,7 +295,12 @@ describe('Back-Channel Logout 1.0', () => {
 					session.authorizations?.['second-client'],
 					'the second client authorization'
 				);
-				expect(logout).toHaveBeenCalledWith(client2, accountId, sid);
+				expect(logout).toHaveBeenCalledWith(
+					client2,
+					accountId,
+					sid,
+					session.bucketId
+				);
 				expect(errorSpy).toHaveBeenCalledTimes(1);
 			}
 		});
@@ -323,7 +333,12 @@ describe('Back-Channel Logout 1.0', () => {
 			);
 			expect(response.status).toBe(303);
 
-			expect(logout).toHaveBeenCalledWith(client, accountId, sid);
+			expect(logout).toHaveBeenCalledWith(
+				client,
+				accountId,
+				sid,
+				session.bucketId
+			);
 			expect(logout.mock.calls.map(([called]) => called.clientId)).toEqual([
 				'client'
 			]);

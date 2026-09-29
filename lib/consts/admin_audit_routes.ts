@@ -67,9 +67,10 @@ const routes = [
 	},
 
 	/*
-	 * Declared protected resources. `targetId` is the canonical resource identifier, which is also the
-	 * document's primary key — so an entry names the audience itself rather than an opaque id nobody
-	 * can resolve after the declaration is gone.
+	 * Declared protected resources. `targetId` is the canonical resource identifier and `targetScope`
+	 * the namespace it is unique within — the bucket, or `@root` — so an entry names the audience itself
+	 * rather than an opaque id nobody can resolve after the declaration is gone, and says whose it was
+	 * now that two tenants may declare the same one.
 	 */
 	{
 		action: 'resource.create',
@@ -333,6 +334,28 @@ const routes = [
 		action: 'federation.provider.delete',
 		method: 'DELETE',
 		path: '/admin/api/buckets/:id/federation/:providerId',
+		targetType: 'UserBucket'
+	},
+	/*
+	 * An addressable bucket's own signing keys. The target is the bucket, the issuer whose keys changed;
+	 * which key is a property of the change rather than a managed entity of its own.
+	 */
+	{
+		action: 'bucket.key.generate',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/keys',
+		targetType: 'UserBucket'
+	},
+	{
+		action: 'bucket.key.promote',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/keys/:kid/promote',
+		targetType: 'UserBucket'
+	},
+	{
+		action: 'bucket.key.retire',
+		method: 'DELETE',
+		path: '/admin/api/buckets/:id/keys/:kid',
 		targetType: 'UserBucket'
 	},
 	/*

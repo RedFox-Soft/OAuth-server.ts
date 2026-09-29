@@ -9,9 +9,8 @@ import { MIGRATIONS, isNoop, type Migration } from 'lib/consts/migrations.js';
  * A reused id silently marks a new migration as already applied. A missing backend half leaves one
  * datastore quietly unmigrated. An unordered set applies changes in an order nobody chose.
  *
- * The set ships empty, so most of this currently guards an empty array. That is deliberate: the rules
- * have to be in place before the first entry, because the first entry is the one written by somebody
- * who has never seen this file.
+ * The rules were in place before the first entry, because the first entry is the one written by
+ * somebody who has never seen this file.
  */
 
 function ids(set: readonly Migration[]): string[] {

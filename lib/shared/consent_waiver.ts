@@ -37,7 +37,11 @@ async function decide(oidc: OIDCContext): Promise<boolean> {
 	if (!project) return true;
 
 	const bucket = await getBucketStore().find(
-		await resolveBucketForRequest(client.clientId, oidc.params?.resource)
+		await resolveBucketForRequest(
+			client.clientId,
+			oidc.params?.resource,
+			oidc.bucket
+		)
 	);
 	return bucket?.ownerGroupId === project.ownerGroupId;
 }

@@ -20,7 +20,7 @@ export default async function jwtResponseModes(
 	const carrier = (params.response_mode ?? 'jwt').split('.')[0];
 	const deliver = carrier === 'form_post' ? modes.form_post : modes.query;
 
-	const token = new IdToken(oidc.client);
+	const token = new IdToken(oidc.client, {}, oidc.bucket);
 	token.extra = payload;
 
 	const response = await token.issue('authorization');

@@ -14,6 +14,7 @@ import {
 	getUserStore,
 	resetAdminMemoryStores
 } from 'lib/adapters/index.ts';
+import { ROOT_NAMESPACE } from 'lib/resources/namespace.ts';
 import { elysia } from 'lib/index.ts';
 import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import {
@@ -56,7 +57,8 @@ async function bucketBehind(resource: string, fields: Record<string, unknown>) {
 		bucketId: bucket._id
 	});
 	await getProtectedResourceStore().create({
-		_id: resource,
+		namespace: ROOT_NAMESPACE,
+		identifier: resource,
 		projectId: project._id,
 		name: resource,
 		scopes: ['mcp:tools-basic']

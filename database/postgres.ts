@@ -238,6 +238,15 @@ for (const area of FIXED_AREAS) {
 }
 
 /*
+ * Whether this run built the database from nothing — every fixed area created now, none found. The
+ * one fact the baseline below may rest on, and the only place it is known: the setup routine is re-run
+ * on every upgrade (the deployment's release command runs it ahead of `db:migrate`), so baselining on
+ * every run marked each newly declared migration applied on exactly the deployments that needed it
+ * run. Invisible while the declared set was empty; the first real migration is what it would have eaten.
+ */
+const provisionedFromEmpty = summary.collectionsCreated === FIXED_AREAS.length;
+
+/*
  * The initial signing key, so a freshly provisioned database already holds a persisted RS256 key. The
  * runtime loader keeps an equivalent generate-on-empty fallback, but doing it here means the key
  * exists before anything reads it — and makes the provisioning run, rather than the first request,
@@ -283,14 +292,16 @@ try {
  */
 const { getMigrationLeaseStore, getSchemaMigrationStore } =
 	await import('../lib/adapters/index.js');
-const marked = await baseline(
-	MIGRATIONS,
-	migrationBackend('postgres', {
-		readAll: () => getSchemaMigrationStore().all(),
-		write: (entry) => getSchemaMigrationStore().record(entry),
-		lease: getMigrationLeaseStore()
-	})
-);
+const marked = provisionedFromEmpty
+	? await baseline(
+			MIGRATIONS,
+			migrationBackend('postgres', {
+				readAll: () => getSchemaMigrationStore().all(),
+				write: (entry) => getSchemaMigrationStore().record(entry),
+				lease: getMigrationLeaseStore()
+			})
+		)
+	: [];
 if (marked.length > 0) {
 	console.log(`baselined ${marked.length} declared migration(s) as applied`);
 }

@@ -1,6 +1,7 @@
 import { Grant } from '../models/grant.js';
 import { getUserStore } from '../adapters/index.js';
 import { resolveBucketForRequest } from '../admin/auth/resolveBucket.js';
+import { DEFAULT_REQUEST_BUCKET } from '../configs/issuer.js';
 import type { OIDCContext } from '../helpers/oidc_context.ts';
 import { consentWaived } from '../shared/consent_waiver.js';
 
@@ -44,7 +45,11 @@ export async function findAccount<
 	 * client fallback directly above.
 	 */
 	const resource = oidc?.params?.resource ?? _token?.payload?.resource;
-	const bucketId = await resolveBucketForRequest(clientId, resource);
+	const bucketId = await resolveBucketForRequest(
+		clientId,
+		resource,
+		oidc?.bucket ?? DEFAULT_REQUEST_BUCKET
+	);
 	const user = await getUserStore(bucketId).find(sub);
 
 	// A missing or deactivated user resolves to nothing so the calling flow

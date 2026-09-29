@@ -6,6 +6,7 @@ import {
 	GroupInvitationStore as MemoryGroupInvitationStore,
 	ProjectStore as MemoryProjectStore,
 	ProtectedResourceStore as MemoryProtectedResourceStore,
+	BucketKeysStore as MemoryBucketKeysStore,
 	McpClientPermissionStore as MemoryMcpClientPermissionStore,
 	UserBucketStore as MemoryUserBucketStore,
 	AdminSessionStore as MemoryAdminSessionStore,
@@ -39,6 +40,8 @@ import type {
 	ProjectStoreConstructor,
 	ProjectStoreInstance,
 	ProtectedResourceStoreConstructor,
+	BucketKeysStoreConstructor,
+	BucketKeysStoreInstance,
 	ProtectedResourceStoreInstance,
 	McpClientPermissionStoreConstructor,
 	McpClientPermissionStoreInstance,
@@ -69,6 +72,7 @@ let GroupInvitationStoreClass: GroupInvitationStoreConstructor =
 let ProjectStoreClass: ProjectStoreConstructor = MemoryProjectStore;
 let ProtectedResourceStoreClass: ProtectedResourceStoreConstructor =
 	MemoryProtectedResourceStore;
+let BucketKeysStoreClass: BucketKeysStoreConstructor = MemoryBucketKeysStore;
 let McpClientPermissionStoreClass: McpClientPermissionStoreConstructor =
 	MemoryMcpClientPermissionStore;
 let BucketStoreClass: UserBucketStoreConstructor = MemoryUserBucketStore;
@@ -105,6 +109,7 @@ if (backend === 'postgres') {
 	GroupInvitationStoreClass = postgres.GroupInvitationStore;
 	ProjectStoreClass = postgres.ProjectStore;
 	ProtectedResourceStoreClass = postgres.ProtectedResourceStore;
+	BucketKeysStoreClass = postgres.BucketKeysStore;
 	McpClientPermissionStoreClass = postgres.McpClientPermissionStore;
 	BucketStoreClass = postgres.UserBucketStore;
 	AdminSessionStoreClass = postgres.AdminSessionStore;
@@ -135,6 +140,7 @@ if (backend === 'mongodb') {
 	GroupInvitationStoreClass = mongodb.GroupInvitationStore;
 	ProjectStoreClass = mongodb.ProjectStore;
 	ProtectedResourceStoreClass = mongodb.ProtectedResourceStore;
+	BucketKeysStoreClass = mongodb.BucketKeysStore;
 	McpClientPermissionStoreClass = mongodb.McpClientPermissionStore;
 	BucketStoreClass = mongodb.UserBucketStore;
 	AdminSessionStoreClass = mongodb.AdminSessionStore;
@@ -342,6 +348,18 @@ export function getProtectedResourceStore(): ProtectedResourceStoreInstance {
 		protectedResourceStoreSingleton = new ProtectedResourceStoreClass();
 	}
 	return protectedResourceStoreSingleton;
+}
+
+/*
+ * Addressable buckets' own signing keys. Read through the per-instance cache in lib/keys/issuer_keys.ts
+ * rather than on every signature.
+ */
+let bucketKeysStoreSingleton: BucketKeysStoreInstance | null = null;
+export function getBucketKeysStore(): BucketKeysStoreInstance {
+	if (!bucketKeysStoreSingleton) {
+		bucketKeysStoreSingleton = new BucketKeysStoreClass();
+	}
+	return bucketKeysStoreSingleton;
 }
 
 let bucketStoreSingleton: UserBucketStoreInstance | null = null;

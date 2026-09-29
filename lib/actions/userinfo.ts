@@ -211,7 +211,8 @@ async function userInfo({
 	if (client.userinfoSignedResponseAlg || client.userinfoEncryptedResponseAlg) {
 		const token = new IdToken(
 			client,
-			await account.claims('userinfo', scope, claims, rejected)
+			await account.claims('userinfo', scope, claims, rejected),
+			bucket
 		);
 
 		token.scope = scope;

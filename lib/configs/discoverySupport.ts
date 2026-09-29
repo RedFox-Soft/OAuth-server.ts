@@ -4,6 +4,7 @@ import { routeNames } from 'lib/consts/param_list.js';
 import { ClientDefaults } from 'lib/configs/clientBase.js';
 import { ApplicationConfig } from './application.js';
 import { isPlainObject } from '../helpers/_/object.js';
+import type { IssuerKeys } from '../keys/issuer_keys.js';
 import {
 	authorizationEncryptionAlgValues,
 	authorizationEncryptionEncValues,
@@ -124,9 +125,29 @@ function endpoint(issuer: string, route: string): string {
 // Builds the full candidate discovery document as if every feature were enabled, reading all
 // values live from ApplicationConfig. The request handler prunes disabled features via
 // featuresKeyMap and applies operator discovery overrides.
-export function calculateDiscovery(bucket?: { _id: string; slug?: string }) {
+export function calculateDiscovery(
+	bucket?: { _id: string; slug?: string; host?: string },
+	keys?: IssuerKeys
+) {
 	const config = ApplicationConfig;
 	const acrValues = deriveAcrValues(config);
+	/*
+	 * A bucket with keys of its own advertises what those keys sign and decrypt with; the root's lists
+	 * are the ones fixed at boot from the instance key set. HS256 and the symmetric key-wrapping
+	 * algorithms use the client's own secret, so every issuer offers them.
+	 */
+	const signing = <T extends string>(root: T[]): T[] =>
+		keys?.signingAlgorithms
+			? (['HS256', ...keys.signingAlgorithms] as T[])
+			: root;
+	const requestObjectEncryption = keys?.encryptionAlgorithms
+		? ([
+				...keys.encryptionAlgorithms,
+				'A128KW',
+				'A256KW',
+				'dir'
+			] as typeof requestObjectEncryptionAlgValues)
+		: requestObjectEncryptionAlgValues;
 	/*
 	 * Every endpoint below is built from the issuer of the bucket this document is being served for, so
 	 * a client reading it reaches that bucket and no other. Absent a bucket this is the instance's own
@@ -138,9 +159,11 @@ export function calculateDiscovery(bucket?: { _id: string; slug?: string }) {
 		issuer,
 		authorization_endpoint: endpoint(issuer, routeNames.authorization),
 		token_endpoint: endpoint(issuer, routeNames.token),
-		/* Instance-wide: buckets are populations, not cryptographic boundaries, so every bucket's
-		 * document points at the same key set. */
-		jwks_uri: endpoint(ISSUER, routeNames.jwks),
+		/*
+		 * The issuer's own key set: an addressable bucket signs with keys of its own, so a resource
+		 * server that trusts it fetches exactly the keys that bucket signs with and no other tenant's.
+		 */
+		jwks_uri: endpoint(issuer, routeNames.jwks),
 		userinfo_endpoint: endpoint(issuer, routeNames.userinfo),
 		registration_endpoint: endpoint(issuer, routeNames.registration),
 		device_authorization_endpoint: endpoint(
@@ -171,7 +194,7 @@ export function calculateDiscovery(bucket?: { _id: string; slug?: string }) {
 			: ['form_post', 'query'],
 		subject_types_supported: ['public', 'pairwise'],
 		code_challenge_methods_supported: ['S256'],
-		id_token_signing_alg_values_supported: idTokenSigningAlgValues,
+		id_token_signing_alg_values_supported: signing(idTokenSigningAlgValues),
 		token_endpoint_auth_signing_alg_values_supported:
 			clientAuthSigningAlgValues,
 		authorization_response_iss_parameter_supported: true,
@@ -203,22 +226,25 @@ export function calculateDiscovery(bucket?: { _id: string; slug?: string }) {
 		]
 			? true
 			: undefined,
-		request_object_encryption_alg_values_supported:
-			requestObjectEncryptionAlgValues,
+		request_object_encryption_alg_values_supported: requestObjectEncryption,
 		request_object_encryption_enc_values_supported:
 			requestObjectEncryptionEncValues,
 
-		userinfo_signing_alg_values_supported: userinfoSigningAlgValues,
+		userinfo_signing_alg_values_supported: signing(userinfoSigningAlgValues),
 		userinfo_encryption_alg_values_supported: userinfoEncryptionAlgValues,
 		userinfo_encryption_enc_values_supported: userinfoEncryptionEncValues,
 
-		authorization_signing_alg_values_supported: authorizationSigningAlgValues,
+		authorization_signing_alg_values_supported: signing(
+			authorizationSigningAlgValues
+		),
 		authorization_encryption_alg_values_supported:
 			authorizationEncryptionAlgValues,
 		authorization_encryption_enc_values_supported:
 			authorizationEncryptionEncValues,
 
-		introspection_signing_alg_values_supported: introspectionSigningAlgValues,
+		introspection_signing_alg_values_supported: signing(
+			introspectionSigningAlgValues
+		),
 		introspection_encryption_alg_values_supported:
 			introspectionEncryptionAlgValues,
 		introspection_encryption_enc_values_supported:

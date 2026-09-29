@@ -30,6 +30,16 @@ import { loadProject } from './access.js';
 import { recordAdminAudit } from '../audit/record.js';
 import { Client } from '../../models/client.js';
 import nanoid from '../../helpers/nanoid.js';
+import {
+	namespaceOf,
+	namespaceOfProject,
+	ROOT_NAMESPACE
+} from '../../resources/namespace.js';
+import {
+	applyMove,
+	DeclarationsConflict,
+	planMove
+} from '../resources/move.js';
 
 /*
  * Normalizes a submitted origin list, or refuses the whole request. All-or-nothing on purpose: half a
@@ -75,7 +85,10 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 	.onError(({ error, set }) => {
 		if (error instanceof AdminError) {
 			set.status = error.status;
-			return adminErrorBody(error);
+			// The identifiers in the way, so an operator knows which declaration to remove or rename.
+			return error instanceof DeclarationsConflict
+				? { ...adminErrorBody(error), conflicts: error.conflicts }
+				: adminErrorBody(error);
 		}
 	})
 	.get('/admin/api/projects', async ({ admin }) => {
@@ -313,12 +326,19 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 					'project and bucket must belong to the same group'
 				);
 			}
+			const move = await planMove(
+				ctx,
+				project._id,
+				await namespaceOfProject(project),
+				namespaceOf(bucket)
+			);
 			// The project is the entity being changed; which bucket it was pointed at is a submitted
 			// field, so it is recorded as a field name rather than a value.
 			await recordAdminAudit(ctx, 'project.bucket.assign', params.id, {
 				attributes: Object.keys(body),
 				ownerGroupId: project.ownerGroupId
 			});
+			await applyMove(project._id, move);
 			return getProjectStore().update(params.id, { bucketId: body.bucketId });
 		},
 		{ body: SetBucketBody }
@@ -338,10 +358,18 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 		/*
 		 * Project access only, deliberately. The entity changed is the project, and dropping a pointer
 		 * needs no authority over what it pointed at — a caller who has lost access to the bucket is
-		 * precisely somebody who needs to clear it.
+		 * precisely somebody who needs to clear it. Its declarations are another matter: clearing moves
+		 * them into the shared root namespace, which only a super administrator writes.
 		 */
+		const move = await planMove(
+			ctx,
+			project._id,
+			await namespaceOfProject(project),
+			ROOT_NAMESPACE
+		);
 		await recordAdminAudit(ctx, 'project.bucket.clear', params.id, {
 			ownerGroupId: project.ownerGroupId
 		});
+		await applyMove(project._id, move);
 		return getProjectStore().update(params.id, { bucketId: null });
 	});

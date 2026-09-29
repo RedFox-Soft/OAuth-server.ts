@@ -225,7 +225,7 @@ export const introspect = new Elysia().use(AuthPlugin).post(
 			const body = await renderTokenResponse(oidc);
 
 			if ((encrypt || sign) && accepts === JWT) {
-				const token = new IdToken(client);
+				const token = new IdToken(client, {}, oidc.bucket);
 				token.extra = {
 					token_introspection: body,
 					aud: body.active ? body.aud : undefined

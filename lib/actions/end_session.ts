@@ -106,7 +106,12 @@ export const logoutAction = new Elysia()
 				}
 				client = await Client.find(clientId, { error: unrecognized });
 				try {
-					await IdToken.validate(params.id_token_hint, client, oidc.issuer);
+					await IdToken.validate(
+						params.id_token_hint,
+						client,
+						oidc.issuer,
+						oidc.bucket
+					);
 				} catch (err) {
 					if (err instanceof OIDCProviderError) {
 						throw err;
@@ -143,7 +148,8 @@ export const logoutAction = new Elysia()
 			 */
 			if (client) {
 				const signsInto = await issuingBucket(
-					await resolveBucketForRequest(client.clientId)
+					/* No resource here, so rule 3 cannot apply and the address only fills the slot. */
+					await resolveBucketForRequest(client.clientId, undefined, oidc.bucket)
 				);
 				if (sessionCookieName(signsInto) !== sessionCookieName(oidc.bucket)) {
 					throw new InvalidRequest(

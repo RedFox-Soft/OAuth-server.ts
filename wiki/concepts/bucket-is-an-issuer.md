@@ -4,7 +4,7 @@ title: 'A user bucket is a tenant with its own issuer'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-15
-updated: 2026-09-24
+updated: 2026-09-29
 graph:
   node_type: concept
   relationships:
@@ -50,6 +50,14 @@ of reserved ids is precisely how this returns.
 
 Any later change that gives the default bucket a prefix, for uniformity or to remove that branch, is a
 breaking release for every integration and every token in circulation, not a refactor.
+
+## An issuer has one key set, and a bucket's is its own
+
+A bucket with an address signs with keys of its own and advertises `jwks_uri` beneath its own issuer
+(since 2026-09-29, [[signing-keys]]); everything served at the root shares the root's. Keys follow the
+issuer, not the bucket record — which is why a bucket without an address has none of its own: it has no
+issuer to publish them under. They are keyed by the bucket's id, so a move between path and hostname
+keeps them.
 
 ## Two reserved buckets are not addressable
 

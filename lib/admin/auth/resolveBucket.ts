@@ -1,10 +1,11 @@
 import {
 	getProjectStore,
-	getProtectedResourceStore,
 	mcpClientPermissionStore
 } from '../../adapters/index.js';
 import { ADMIN_CLIENT_ID, ADMIN_BUCKET_ID } from '../consts.js';
-import { canonicalizeResourceIdentifier } from '../../resources/canonical.js';
+import { findDeclaredResource } from '../../resources/registry.js';
+import { namespaceOf } from '../../resources/namespace.js';
+import type { RequestBucket } from '../../configs/issuer.js';
 import { MCP_RESOURCE } from '../../mcp/consts.js';
 
 /*
@@ -12,7 +13,8 @@ import { MCP_RESOURCE } from '../../mcp/consts.js';
  *
  *   1. the reserved admin client → the admin bucket
  *   2. a client assigned to a project → that project's bucket
- *   3. a request naming ONE declared protected resource → that resource's project's bucket
+ *   3. a request naming ONE resource declared in the addressed issuer's namespace → that resource's
+ *      project's bucket
  *   4. a permitted client identity naming the administrative MCP audience → the admin bucket
  *   5. otherwise → the default 'redfox' bucket
  *
@@ -29,12 +31,19 @@ import { MCP_RESOURCE } from '../../mcp/consts.js';
  * whose bucket is that administrator's own choice. The parameter selects among an operator's options;
  * it cannot create one. An attacker who cannot declare a resource cannot steer this.
  *
+ * It chooses only among buckets that share the addressed issuer, which is what `addressed` is for. At
+ * a named bucket's address the only declarations it can see are that bucket's own, so it can only
+ * confirm the address; at the root it chooses among the buckets served there, where a declaration is
+ * a super administrator's. Before declarations were namespaced it read every tenant's, so whoever
+ * declared another tenant's MCP server first had that server's clients signed into their population.
+ *
  * Rule 2 still comes first, so a client explicitly assigned to a project is never redirected elsewhere
  * by a parameter — the stronger, operator-established relationship wins.
  */
 export async function resolveBucketForRequest(
 	clientId: string | undefined,
-	resource?: string | readonly string[] | undefined
+	resource: string | readonly string[] | undefined,
+	addressed: RequestBucket
 ): Promise<string> {
 	if (clientId === ADMIN_CLIENT_ID) return ADMIN_BUCKET_ID;
 
@@ -43,7 +52,7 @@ export async function resolveBucketForRequest(
 		if (project?.bucketId) return project.bucketId;
 	}
 
-	const derived = await bucketForResource(resource);
+	const derived = await bucketForResource(resource, namespaceOf(addressed));
 	if (derived) return derived;
 
 	if (await permittedAtAdministrativePlane(clientId, resource)) {
@@ -83,7 +92,8 @@ async function permittedAtAdministrativePlane(
  * Falling through to the default instead is the answer that cannot be wrong in a way nobody notices.
  */
 async function bucketForResource(
-	resource: string | readonly string[] | undefined
+	resource: string | readonly string[] | undefined,
+	namespace: string
 ): Promise<string | undefined> {
 	const identifiers =
 		resource === undefined
@@ -94,14 +104,12 @@ async function bucketForResource(
 	if (identifiers.length !== 1) return undefined;
 
 	/*
-	 * Canonicalized the same way a declaration is, so an upper-case host or a trailing slash resolves
-	 * the bucket exactly as it resolves the token. Two paths deriving different answers from one
-	 * request would be a bug nobody could see from either side.
+	 * Through the registry's own lookup, so an upper-case host, a dropped trailing slash or a significant
+	 * one resolves the bucket exactly as it resolves the token. Two paths deriving different answers
+	 * from one request would be a bug nobody could see from either side — which this was, while it read
+	 * the slash-free spelling alone and missed every resource whose slash is significant.
 	 */
-	const canonical = canonicalizeResourceIdentifier(identifiers[0]);
-	if (!canonical.ok) return undefined;
-
-	const declared = await getProtectedResourceStore().find(canonical.identifier);
+	const declared = await findDeclaredResource(identifiers[0], namespace);
 	if (!declared) return undefined;
 
 	const project = await getProjectStore().find(declared.projectId);

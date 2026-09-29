@@ -18,6 +18,7 @@ import {
 	MCP_ROUTE
 } from 'lib/mcp/consts.ts';
 import { clearPermissions } from './permissions.ts';
+import { DEFAULT_REQUEST_BUCKET } from 'lib/configs/issuer.ts';
 
 /*
  * The refusal an operator cannot see.
@@ -99,7 +100,8 @@ describe('connecting an agent to a freshly provisioned instance', () => {
 	it('routes the reserved agent client to the administrators bucket', async () => {
 		const bucketId = await resolveBucketForRequest(
 			ADMIN_MCP_CLIENT_ID,
-			MCP_RESOURCE
+			MCP_RESOURCE,
+			DEFAULT_REQUEST_BUCKET
 		);
 
 		expect(bucketId).toBe(ADMIN_BUCKET_ID);

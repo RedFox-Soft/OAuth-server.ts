@@ -158,6 +158,15 @@ for (const area of FIXED_AREAS) {
 	await provisionArea(area);
 }
 
+/*
+ * Whether this run built the database from nothing — every fixed area created now, none found. The
+ * one fact the baseline below may rest on, and the only place it is known: the setup routine is re-run
+ * on every upgrade (the deployment's release command runs it ahead of `db:migrate`), so baselining on
+ * every run marked each newly declared migration applied on exactly the deployments that needed it
+ * run. Invisible while the declared set was empty; the first real migration is what it would have eaten.
+ */
+const provisionedFromEmpty = summary.collectionsCreated === FIXED_AREAS.length;
+
 // Provision the initial signing key at schema-creation time so a freshly created database already
 // holds a persisted RS256 signing key. The runtime loader (lib/configs/keys.ts) keeps an equivalent
 // generate-on-empty fallback for the in-memory adapter and any un-provisioned store.
@@ -387,7 +396,7 @@ for (const bucket of buckets) {
  * the import because its adapter's handle is a module singleton it closes at the end; MongoDB's is not.
  */
 const baselined: string[] = [];
-for (const migration of MIGRATIONS) {
+for (const migration of provisionedFromEmpty ? MIGRATIONS : []) {
 	const result = await db
 		.collection<{ _id: string }>(STORE_AREAS.schemaMigrations)
 		.updateOne(

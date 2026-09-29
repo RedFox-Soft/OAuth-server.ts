@@ -20,6 +20,7 @@ import {
 	isWithinDeploymentDomain
 } from 'lib/admin/auth/bucketAddress.js';
 import { hostOfRequest, normaliseHost } from 'lib/consts/request_host.js';
+import { keysFor } from 'lib/keys/issuer_keys.js';
 
 type BucketAddress = { _id: string; slug?: string; host?: string };
 
@@ -61,13 +62,22 @@ function gateAndExtend(body: DiscoveryDocument): DiscoveryDocument {
 	return body;
 }
 
-/* Compute the full candidate document from the live ApplicationConfig, then gate it. */
-function openidConfiguration(bucket?: BucketAddress) {
-	return gateAndExtend(calculateDiscovery(bucket));
+/*
+ * Compute the full candidate document from the live ApplicationConfig, then gate it. The bucket's keys
+ * are read here, where awaiting is free, so the document itself stays a pure function of what it is
+ * handed.
+ */
+async function openidConfiguration(bucket?: BucketAddress) {
+	return gateAndExtend(
+		calculateDiscovery(bucket, bucket ? await keysFor(bucket) : undefined)
+	);
 }
 
-function oauthAuthorizationServer(bucket?: BucketAddress) {
-	const body: DiscoveryDocument = calculateDiscovery(bucket);
+async function oauthAuthorizationServer(bucket?: BucketAddress) {
+	const body: DiscoveryDocument = calculateDiscovery(
+		bucket,
+		bucket ? await keysFor(bucket) : undefined
+	);
 
 	/*
 	 * Narrow to the OAuth surface BEFORE gating. Order is load-bearing: the override stage
@@ -99,7 +109,7 @@ function oauthAuthorizationServer(bucket?: BucketAddress) {
  */
 async function forSlug(
 	slug: string,
-	build: (bucket?: BucketAddress) => DiscoveryDocument,
+	build: (bucket?: BucketAddress) => Promise<DiscoveryDocument>,
 	set: { status?: number | string }
 ) {
 	const bucket = await bucketAtAddress(slug);
@@ -128,7 +138,7 @@ async function forSlug(
  */
 async function forHost(
 	host: string | null,
-	build: (bucket?: BucketAddress) => DiscoveryDocument,
+	build: (bucket?: BucketAddress) => Promise<DiscoveryDocument>,
 	set: { status?: number | string }
 ) {
 	const normalised = normaliseHost(host ?? undefined);

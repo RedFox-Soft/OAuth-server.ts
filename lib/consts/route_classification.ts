@@ -60,6 +60,7 @@ function beneathBucket<T extends { path: string }>(
  * and the mounting can be read against each other; nothing derives one from the other, because the
  * mounting needs plugin instances and this needs paths. */
 export const bucketScopedPaths: readonly string[] = [
+	routeNames.jwks,
 	routeNames.authorization,
 	routeNames.token,
 	routeNames.userinfo,

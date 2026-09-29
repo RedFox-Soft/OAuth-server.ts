@@ -11,6 +11,8 @@ import {
 	Popconfirm,
 	Alert,
 	Tag,
+	Checkbox,
+	Tooltip,
 	message
 } from 'antd';
 import { PlusOutlined, ArrowLeftOutlined } from '@ant-design/icons';
@@ -44,11 +46,12 @@ const TOKEN_FORMAT_OPTIONS = [
 ];
 
 interface ResourceView {
-	_id: string;
+	identifier: string;
 	name: string;
 	scopes: string[];
 	tokenFormat: 'jwt' | 'opaque';
 	accessTokenTTL: number;
+	trailingSlashSignificant: boolean;
 }
 
 interface FormValues {
@@ -57,6 +60,7 @@ interface FormValues {
 	scopes: string;
 	tokenFormat: 'jwt' | 'opaque';
 	accessTokenTTL: number;
+	trailingSlashSignificant: boolean;
 }
 
 const DEFAULT_VALUES: FormValues = {
@@ -64,7 +68,8 @@ const DEFAULT_VALUES: FormValues = {
 	name: '',
 	scopes: '',
 	tokenFormat: 'jwt',
-	accessTokenTTL: 900
+	accessTokenTTL: 900,
+	trailingSlashSignificant: false
 };
 
 function splitScopes(raw: string): string[] {
@@ -105,6 +110,76 @@ function scopeAdvice(raw: string): string | null {
 		return `A client given no scope guidance requests all ${scopes.length} of these at once. This list is the baseline for basic use, not a catalogue of everything the resource could ever permit.`;
 	}
 	return null;
+}
+
+interface Vouching {
+	status: 'vouched' | 'not_vouched' | 'not_checked';
+	step?: 'challenge' | 'path_inserted' | 'root';
+	reason?: string;
+	expectedIssuer: string;
+}
+
+const STEP_LABEL: Record<NonNullable<Vouching['step']>, string> = {
+	challenge: 'the 401 challenge',
+	path_inserted: 'the path-inserted well-known address',
+	root: 'the root well-known address'
+};
+
+const REASON_LABEL: Record<string, string> = {
+	unreachable: 'the resource could not be reached',
+	blocked_address:
+		'the resource is on a private address this server does not fetch',
+	not_https: 'the resource is not served over https',
+	no_metadata: 'no protected resource metadata was found',
+	resource_mismatch: 'the metadata describes a different resource',
+	issuer_not_listed: 'the metadata does not list this server',
+	malformed: 'the metadata is not valid JSON'
+};
+
+/*
+ * Whether the resource's own metadata vouches for this declaration. Fetched per row once the list is
+ * on screen, so a slow resource delays its own cell and nothing else; informational, since nothing is
+ * refused on it — it answers why an MCP client might not find this server.
+ */
+function VouchingCell({ url }: { url: string }) {
+	const [vouching, setVouching] = useState<Vouching | null>(null);
+	const [checking, setChecking] = useState(true);
+	// Every state write follows an await, so the effect below sets nothing synchronously.
+	const fetchVouching = useCallback(async () => {
+		try {
+			const res = await fetch(url);
+			setVouching(res.ok ? ((await res.json()) as Vouching) : null);
+		} finally {
+			setChecking(false);
+		}
+	}, [url]);
+	useEffect(() => {
+		void fetchVouching();
+	}, [fetchVouching]);
+
+	if (checking) return <Tag>checking…</Tag>;
+	if (!vouching) return <Tag>unavailable</Tag>;
+	const detail =
+		vouching.status === 'vouched'
+			? `Found through ${STEP_LABEL[vouching.step ?? 'path_inserted']}.`
+			: `${REASON_LABEL[vouching.reason ?? ''] ?? 'not vouched'}. It must list ${vouching.expectedIssuer} in authorization_servers.`;
+	const color =
+		vouching.status === 'vouched'
+			? 'green'
+			: vouching.status === 'not_checked'
+				? 'default'
+				: 'orange';
+	const label =
+		vouching.status === 'vouched'
+			? 'vouched'
+			: vouching.status === 'not_checked'
+				? 'not checked'
+				: 'not vouched';
+	return (
+		<Tooltip title={detail}>
+			<Tag color={color}>{label}</Tag>
+		</Tooltip>
+	);
 }
 
 export function Resources({
@@ -160,13 +235,14 @@ export function Resources({
 
 	function openEditModal(row: ResourceView) {
 		setMode('edit');
-		setEditing(row._id);
+		setEditing(row.identifier);
 		form.setFieldsValue({
-			identifier: row._id,
+			identifier: row.identifier,
 			name: row.name,
 			scopes: row.scopes.join(' '),
 			tokenFormat: row.tokenFormat,
-			accessTokenTTL: row.accessTokenTTL
+			accessTokenTTL: row.accessTokenTTL,
+			trailingSlashSignificant: row.trailingSlashSignificant
 		});
 		setOpen(true);
 	}
@@ -188,7 +264,8 @@ export function Resources({
 							name: values.name,
 							scopes,
 							tokenFormat: values.tokenFormat,
-							accessTokenTTL: values.accessTokenTTL
+							accessTokenTTL: values.accessTokenTTL,
+							trailingSlashSignificant: values.trailingSlashSignificant
 						}
 					: {
 							name: values.name,
@@ -273,14 +350,14 @@ export function Resources({
 			</div>
 
 			<Table
-				rowKey="_id"
+				rowKey="identifier"
 				loading={loading}
 				dataSource={rows}
 				pagination={false}
 				columns={[
 					{
 						title: 'Resource',
-						dataIndex: '_id',
+						dataIndex: 'identifier',
 						render: (identifier: string, row: ResourceView) => (
 							<Space
 								direction="vertical"
@@ -289,6 +366,15 @@ export function Resources({
 								<Typography.Text strong>{row.name}</Typography.Text>
 								<Typography.Text code>{identifier}</Typography.Text>
 							</Space>
+						)
+					},
+					{
+						title: 'Metadata',
+						key: 'vouching',
+						render: (_: unknown, row: ResourceView) => (
+							<VouchingCell
+								url={`${base}/${encodeURIComponent(row.identifier)}/vouching`}
+							/>
 						)
 					},
 					{
@@ -342,7 +428,7 @@ export function Resources({
 									title="Remove this resource?"
 									description="Token issuance for this audience stops on the next request. A live integration loses access as its current tokens expire."
 									okText="Remove"
-									onConfirm={() => remove(row._id)}
+									onConfirm={() => remove(row.identifier)}
 								>
 									<Button
 										size="small"
@@ -374,13 +460,26 @@ export function Resources({
 					<Form.Item
 						name="identifier"
 						label="Resource identifier"
-						extra="The canonical URI of your MCP server, exactly as its clients will name it — for example https://mcp.example.com/mcp. No fragment, and no trailing slash."
+						extra="The canonical URI of your MCP server, exactly as its clients will name it — for example https://mcp.example.com/mcp. No fragment. A trailing slash is dropped unless you mark it significant below."
 						rules={[{ required: true, message: 'an identifier is required' }]}
 					>
 						<Input
 							placeholder="https://mcp.example.com/mcp"
 							disabled={mode === 'edit'}
 						/>
+					</Form.Item>
+					{/*
+					 * Off by default because the MCP specification asks clients for the slash-free form; on, the
+					 * slash-free spelling becomes a different audience that is not declared.
+					 */}
+					<Form.Item
+						name="trailingSlashSignificant"
+						valuePropName="checked"
+						extra="Only for a server that really serves a different resource at …/mcp/ than at …/mcp. When on, only the exact spelling is issued tokens."
+					>
+						<Checkbox disabled={mode === 'edit'}>
+							The trailing slash is significant
+						</Checkbox>
 					</Form.Item>
 					{mode === 'edit' && (
 						<Alert

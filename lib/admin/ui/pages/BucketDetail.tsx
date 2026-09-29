@@ -17,6 +17,7 @@ import {
 import { ArrowLeftOutlined, PlusOutlined } from '@ant-design/icons';
 import type { UserBucket, User } from '../../../adapters/types.js';
 import { FederationPanel } from './FederationPanel.js';
+import { BucketKeysPanel } from './BucketKeysPanel.js';
 import { UserIdentities } from './UserIdentities.js';
 
 /*
@@ -366,6 +367,8 @@ export function BucketDetail({
 				// password-sign-in switch is validated against.
 				onChanged={() => void load()}
 			/>
+
+			<BucketKeysPanel bucketId={bucketId} />
 
 			<UserIdentities
 				bucketId={bucketId}

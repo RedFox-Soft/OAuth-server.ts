@@ -41,7 +41,8 @@ export default async function checkBucket(
 ): Promise<string> {
 	const belongsTo = await resolveBucketForRequest(
 		oidc.client.clientId,
-		oidc.params.resource
+		oidc.params.resource,
+		oidc.bucket
 	);
 
 	if (belongsTo === oidc.bucket._id) return belongsTo;

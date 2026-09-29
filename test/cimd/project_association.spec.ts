@@ -10,6 +10,7 @@ import {
 	getUserStore,
 	resetAdminMemoryStores
 } from 'lib/adapters/index.ts';
+import { ROOT_NAMESPACE } from 'lib/resources/namespace.ts';
 import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 
 /*
@@ -75,7 +76,8 @@ describe('bucket resolution for a client that belongs to no project', () => {
 			bucketId: bucket._id
 		});
 		await getProtectedResourceStore().create({
-			_id: AUDIENCE,
+			namespace: ROOT_NAMESPACE,
+			identifier: AUDIENCE,
 			projectId: project._id,
 			name: 'Acme MCP',
 			scopes: ['mcp:tools-basic']

@@ -6,6 +6,7 @@ import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { resourceRoutes } from 'lib/admin/resources/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
+	getBucketStore,
 	getProjectStore,
 	getProtectedResourceStore,
 	getUserStore
@@ -13,7 +14,6 @@ import {
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
 import { answered } from '../admin/answered.ts';
-import { serveResourceMetadata } from './resource_metadata.ts';
 
 /*
  * Declaring a protected resource through the admin API.
@@ -52,11 +52,27 @@ async function admin(roles = ['project_admin']) {
 	};
 }
 
-async function projectFor(userId: string) {
+/*
+ * A project in a bucket of its own, owned by the administrator's group — the case this file is about.
+ * A bucket with an address is its own issuer, so its declarations are its own namespace; the shared
+ * root namespace, where declaring is reserved, is root_namespace.spec.ts.
+ */
+async function projectFor(userId: string, bucketId?: string) {
+	const ownerGroupId = await personalGroupId(userId);
+	const bucket =
+		bucketId ??
+		(
+			await getBucketStore().create({
+				name: 'Acme users',
+				slug: `acme-${Math.random().toString(36).slice(2)}`,
+				ownerGroupId
+			})
+		)._id;
 	return getProjectStore().create({
 		name: 'Acme',
 		slug: `acme-${Math.random().toString(36).slice(2)}`,
-		ownerGroupId: await personalGroupId(userId)
+		ownerGroupId,
+		bucketId: bucket
 	});
 }
 
@@ -67,15 +83,16 @@ const body = {
 };
 
 /**
- * @proves An administrator declares a third-party protected resource, uniquely across projects,
- * and cannot claim an identifier this server serves or amend one already issuing tokens.
+ * @proves An administrator declares a third-party protected resource in their own bucket without the
+ * resource having to be reachable, uniquely within that bucket and independently of every other, and
+ * cannot claim an identifier this server serves or amend one already issuing tokens.
  */
-describe('protected resources API', () => {
+describe('declaring a protected resource for a project in an addressable bucket', () => {
 	beforeEach(async () => {
 		await ensureAdminSeed();
 		const store = getProtectedResourceStore();
 		for (const resource of await store.list()) {
-			await store.destroy(resource._id);
+			await store.destroy(resource.namespace, resource.identifier);
 		}
 	});
 
@@ -99,13 +116,12 @@ describe('protected resources API', () => {
 		const headers = { cookie };
 		const resources = api.admin.api.projects({ id: project._id }).resources;
 
-		serveResourceMetadata(AUDIENCE);
 		const created = await resources.post(body, { headers });
 		expect(created.status).toBe(201);
 
 		const listed = await resources.get({ headers });
 		expect(listed.status).toBe(200);
-		expect(answered(listed.data).map((r) => r._id)).toEqual([AUDIENCE]);
+		expect(answered(listed.data).map((r) => r.identifier)).toEqual([AUDIENCE]);
 
 		const read = await resources({ resourceId: encoded }).get({ headers });
 		expect(read.status).toBe(200);
@@ -134,14 +150,13 @@ describe('protected resources API', () => {
 		const headers = { cookie };
 		const resources = api.admin.api.projects({ id: project._id }).resources;
 
-		serveResourceMetadata(AUDIENCE);
 		const created = await resources.post(
 			{ ...body, identifier: 'HTTPS://MCP.Example.com/mcp/' },
 			{ headers }
 		);
 
 		expect(created.status).toBe(201);
-		expect(answered(created.data)._id).toBe(AUDIENCE);
+		expect(answered(created.data).identifier).toBe(AUDIENCE);
 	});
 
 	it('refuses an identifier carrying a fragment', async () => {
@@ -173,28 +188,73 @@ describe('protected resources API', () => {
 	});
 
 	/*
-	 * Instance-wide uniqueness, across projects rather than within one. Two projects declaring the same
-	 * audience would mean one token being valid at two owners' resources, which is the boundary an
-	 * audience exists to draw.
+	 * Nothing about the resource is fetched or judged, which is what makes a server on an internal
+	 * network, one on the developer's own machine, and one not yet deployed declarable at all. Each of
+	 * these is refused by the outbound boundary, so a declaration that consulted the resource could not
+	 * have succeeded.
 	 */
-	it('refuses an identifier already declared, including in another project', async () => {
+	for (const identifier of [
+		'http://localhost:8080/mcp',
+		'http://10.1.2.3/mcp',
+		'https://not-deployed-yet.invalid/mcp'
+	]) {
+		it(`is created with no outbound request for ${identifier}`, async () => {
+			const { cookie, userId } = await admin();
+			const project = await projectFor(userId);
+
+			const res = await api.admin.api
+				.projects({ id: project._id })
+				.resources.post({ ...body, identifier }, { headers: { cookie } });
+
+			expect(res.status).toBe(201);
+		});
+	}
+
+	/*
+	 * Two tenants with issuers of their own may each protect a server at the same URL — the same
+	 * product deployed twice, or the same identifier chosen twice. Neither declaration is a claim on the
+	 * other's, because a token either bucket mints names that bucket's issuer.
+	 */
+	it('is created in two buckets without either affecting the other', async () => {
 		const first = await admin();
 		const second = await admin();
 		const projectA = await projectFor(first.userId);
 		const projectB = await projectFor(second.userId);
 
-		serveResourceMetadata(AUDIENCE);
-		expect(
-			(
-				await api.admin.api
-					.projects({ id: projectA._id })
-					.resources.post(body, { headers: { cookie: first.cookie } })
-			).status
-		).toBe(201);
+		const inA = await api.admin.api
+			.projects({ id: projectA._id })
+			.resources.post(body, { headers: { cookie: first.cookie } });
+		const inB = await api.admin.api
+			.projects({ id: projectB._id })
+			.resources.post(
+				{ ...body, name: 'Globex MCP' },
+				{ headers: { cookie: second.cookie } }
+			);
 
+		expect(inA.status).toBe(201);
+		expect(inB.status).toBe(201);
+		const readA = await api.admin.api
+			.projects({ id: projectA._id })
+			.resources({ resourceId: encoded })
+			.get({ headers: { cookie: first.cookie } });
+		expect(answered(readA.data).name).toBe('Acme MCP');
+	});
+
+	/*
+	 * Within one bucket the identifier is still the boundary an audience draws: two projects of one
+	 * issuer declaring it would make one token valid at two owners' resources.
+	 */
+	it('refuses a second declaration of one identifier in one bucket', async () => {
+		const { cookie, userId } = await admin();
+		const projectA = await projectFor(userId);
+		const projectB = await projectFor(userId, projectA.bucketId ?? undefined);
+
+		await api.admin.api
+			.projects({ id: projectA._id })
+			.resources.post(body, { headers: { cookie } });
 		const clash = await api.admin.api
 			.projects({ id: projectB._id })
-			.resources.post(body, { headers: { cookie: second.cookie } });
+			.resources.post(body, { headers: { cookie } });
 
 		expect(clash.status).toBe(409);
 	});
@@ -252,7 +312,6 @@ describe('protected resources API', () => {
 		const project = await projectFor(userId);
 		const headers = { cookie };
 		const resources = api.admin.api.projects({ id: project._id }).resources;
-		serveResourceMetadata(AUDIENCE);
 		await resources.post(body, { headers });
 
 		const res = await resources({ resourceId: encoded }).patch(

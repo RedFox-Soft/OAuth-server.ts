@@ -26,19 +26,25 @@ export interface DeclaredResourceInfo {
 }
 
 /*
- * Two point reads at most, and the order is what makes a significant trailing slash mean anything.
+ * Two point reads at most, both inside one namespace, and the order is what makes a significant
+ * trailing slash mean anything.
  *
  * The exact spelling is tried first, so a resource declared as `.../mcp/` answers a request for
  * `.../mcp/` rather than being shadowed by its slash-free sibling. Only then is the slash-free form
  * tried, which is what lets a client that dropped the slash — as the MCP specification tells clients
  * to prefer — still reach an ordinary declaration.
  *
- * A resource whose slash is significant can never be reached by the second read: its stored id ends
- * in a slash and the slash-free candidate does not, so the two cannot collide. That is why no extra
+ * A resource whose slash is significant can never be reached by the second read: its stored identifier
+ * ends in a slash and the slash-free candidate does not, so the two cannot collide. That is why no extra
  * guard is needed here, and why one would be dead code if added.
+ *
+ * The namespace is the caller's to supply, from the address the request arrived at, and nothing here
+ * falls back to another one: a declaration in another tenant's namespace does not exist for this
+ * request, which is what stops one tenant's declaration shadowing or redirecting another's.
  */
-async function findDeclaredResource(
-	identifier: string
+export async function findDeclaredResource(
+	identifier: string,
+	namespace: string
 ): Promise<ProtectedResource | undefined> {
 	const exact = canonicalizeResourceIdentifier(identifier, {
 		trailingSlashSignificant: true
@@ -56,7 +62,7 @@ async function findDeclaredResource(
 			: [exact.identifier, trimmed.identifier];
 
 	for (const candidate of candidates) {
-		const resource = await store.find(candidate);
+		const resource = await store.find(namespace, candidate);
 		if (resource) return resource;
 	}
 
@@ -64,13 +70,14 @@ async function findDeclaredResource(
 }
 
 export async function resolveDeclaredResource(
-	identifier: string
+	identifier: string,
+	namespace: string
 ): Promise<DeclaredResourceInfo | undefined> {
-	const resource = await findDeclaredResource(identifier);
+	const resource = await findDeclaredResource(identifier, namespace);
 	if (!resource) return undefined;
 
 	return {
-		audience: resource._id,
+		audience: resource.identifier,
 		/*
 		 * Joined here rather than stored joined. A space-delimited string is the wire shape the
 		 * `ResourceServer` descriptor speaks; an array is the storage shape. Translating at this one
@@ -92,9 +99,10 @@ export async function resolveDeclaredResource(
  */
 export async function machineTokenPermitted(
 	identifier: string,
-	clientId: string
+	clientId: string,
+	namespace: string
 ): Promise<boolean> {
-	const resource = await findDeclaredResource(identifier);
+	const resource = await findDeclaredResource(identifier, namespace);
 	if (!resource) return true;
 
 	const project = await getProjectStore().findByClientId(clientId);

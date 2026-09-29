@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { resolveBucketForRequest } from 'lib/admin/auth/resolveBucket.ts';
 import {
+	getBucketStore,
 	getProjectStore,
 	getProtectedResourceStore,
 	resetAdminMemoryStores
@@ -10,6 +11,11 @@ import {
 	ADMIN_BUCKET_ID,
 	UNASSIGNED_GROUP_ID
 } from 'lib/admin/consts.ts';
+import { DEFAULT_REQUEST_BUCKET } from 'lib/configs/issuer.ts';
+import { ROOT_NAMESPACE } from 'lib/resources/namespace.ts';
+
+/* Every case below signs in at the bare address, where rule 3 chooses among root-served buckets. */
+const AT_ROOT = DEFAULT_REQUEST_BUCKET;
 
 const AUDIENCE = 'https://mcp.acme.example/mcp';
 
@@ -21,7 +27,8 @@ async function declaredResourceIn(bucketId: string) {
 		bucketId
 	});
 	await getProtectedResourceStore().create({
-		_id: AUDIENCE,
+		namespace: ROOT_NAMESPACE,
+		identifier: AUDIENCE,
 		projectId: project._id,
 		name: 'Acme MCP',
 		scopes: ['mcp:tools-basic']
@@ -38,14 +45,14 @@ describe('resolveBucketForRequest', () => {
 		resetAdminMemoryStores();
 		const store = getProtectedResourceStore();
 		for (const resource of await store.list()) {
-			await store.destroy(resource._id);
+			await store.destroy(resource.namespace, resource.identifier);
 		}
 	});
 
 	it('routes the admin client to the admin bucket', async () => {
-		expect(await resolveBucketForRequest(ADMIN_CLIENT_ID)).toBe(
-			ADMIN_BUCKET_ID
-		);
+		expect(
+			await resolveBucketForRequest(ADMIN_CLIENT_ID, undefined, AT_ROOT)
+		).toBe(ADMIN_BUCKET_ID);
 	});
 
 	it('routes an assigned client to its project bucket', async () => {
@@ -56,12 +63,18 @@ describe('resolveBucketForRequest', () => {
 			bucketId: 'devs',
 			clientIds: ['app-1']
 		});
-		expect(await resolveBucketForRequest('app-1')).toBe('devs');
+		expect(await resolveBucketForRequest('app-1', undefined, AT_ROOT)).toBe(
+			'devs'
+		);
 	});
 
 	it('falls back to redfox for an unassigned or missing client', async () => {
-		expect(await resolveBucketForRequest('unknown')).toBe('redfox');
-		expect(await resolveBucketForRequest(undefined)).toBe('redfox');
+		expect(await resolveBucketForRequest('unknown', undefined, AT_ROOT)).toBe(
+			'redfox'
+		);
+		expect(await resolveBucketForRequest(undefined, undefined, AT_ROOT)).toBe(
+			'redfox'
+		);
 	});
 
 	/*
@@ -72,9 +85,9 @@ describe('resolveBucketForRequest', () => {
 	it('derives the bucket from a declared resource the request names', async () => {
 		await declaredResourceIn('acme-users');
 
-		expect(await resolveBucketForRequest('unaffiliated', AUDIENCE)).toBe(
-			'acme-users'
-		);
+		expect(
+			await resolveBucketForRequest('unaffiliated', AUDIENCE, AT_ROOT)
+		).toBe('acme-users');
 	});
 
 	it('canonicalizes the named resource, so a spelling variant resolves alike', async () => {
@@ -85,9 +98,9 @@ describe('resolveBucketForRequest', () => {
 			'HTTPS://mcp.acme.example/mcp',
 			'https://MCP.ACME.EXAMPLE/mcp'
 		]) {
-			expect(await resolveBucketForRequest('unaffiliated', named)).toBe(
-				'acme-users'
-			);
+			expect(
+				await resolveBucketForRequest('unaffiliated', named, AT_ROOT)
+			).toBe('acme-users');
 		}
 	});
 
@@ -95,7 +108,8 @@ describe('resolveBucketForRequest', () => {
 		expect(
 			await resolveBucketForRequest(
 				'unaffiliated',
-				'https://nobody.example.com/mcp'
+				'https://nobody.example.com/mcp',
+				AT_ROOT
 			)
 		).toBe('redfox');
 	});
@@ -108,19 +122,20 @@ describe('resolveBucketForRequest', () => {
 		await declaredResourceIn('acme-users');
 
 		expect(
-			await resolveBucketForRequest('unaffiliated', [
-				AUDIENCE,
-				'https://other.example.com/mcp'
-			])
+			await resolveBucketForRequest(
+				'unaffiliated',
+				[AUDIENCE, 'https://other.example.com/mcp'],
+				AT_ROOT
+			)
 		).toBe('redfox');
 	});
 
 	it('accepts a single-element array, which is how the parameter often arrives', async () => {
 		await declaredResourceIn('acme-users');
 
-		expect(await resolveBucketForRequest('unaffiliated', [AUDIENCE])).toBe(
-			'acme-users'
-		);
+		expect(
+			await resolveBucketForRequest('unaffiliated', [AUDIENCE], AT_ROOT)
+		).toBe('acme-users');
 	});
 
 	/*
@@ -137,7 +152,9 @@ describe('resolveBucketForRequest', () => {
 			clientIds: ['app-1']
 		});
 
-		expect(await resolveBucketForRequest('app-1', AUDIENCE)).toBe('devs');
+		expect(await resolveBucketForRequest('app-1', AUDIENCE, AT_ROOT)).toBe(
+			'devs'
+		);
 	});
 
 	/*
@@ -148,7 +165,43 @@ describe('resolveBucketForRequest', () => {
 	 */
 	it('cannot reach the admin bucket through a named resource', async () => {
 		expect(
-			await resolveBucketForRequest('unaffiliated', 'http://e.ly/mcp')
+			await resolveBucketForRequest('unaffiliated', 'http://e.ly/mcp', AT_ROOT)
 		).toBe('redfox');
+	});
+
+	/*
+	 * The squatting route, closed. A declaration in a bucket with an address of its own is that
+	 * bucket's namespace, and the root address reads only the root's — so a tenant declaring somebody
+	 * else's MCP server in its own bucket steers nobody who signs in anywhere else.
+	 */
+	it('never reaches a declaration in an addressable bucket from the root address', async () => {
+		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: 'Squatter',
+			slug: `squat-${Math.random().toString(36).slice(2)}`
+		});
+		const project = await getProjectStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: 'Squatter',
+			slug: `squatter-${Math.random()}`,
+			bucketId: bucket._id
+		});
+		await getProtectedResourceStore().create({
+			namespace: bucket._id,
+			identifier: AUDIENCE,
+			projectId: project._id,
+			name: 'Somebody else',
+			scopes: ['mcp:tools-basic']
+		});
+
+		expect(
+			await resolveBucketForRequest('unaffiliated', AUDIENCE, AT_ROOT)
+		).toBe('redfox');
+		expect(
+			await resolveBucketForRequest('unaffiliated', AUDIENCE, {
+				_id: bucket._id,
+				slug: bucket.slug
+			})
+		).toBe(bucket._id);
 	});
 });

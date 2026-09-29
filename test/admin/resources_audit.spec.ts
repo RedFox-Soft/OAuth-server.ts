@@ -8,6 +8,7 @@ import { projectRoutes } from 'lib/admin/projects/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
 	adminAuditStore,
+	getBucketStore,
 	getProjectStore,
 	getProtectedResourceStore,
 	getUserStore
@@ -15,7 +16,6 @@ import {
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
 import { answered } from './answered.ts';
-import { serveResourceMetadata } from '../resources/resource_metadata.ts';
 
 /*
  * The audit trail for protected-resource operations, and the one cascade a project delete performs.
@@ -51,6 +51,25 @@ async function entriesFor(action: string) {
 	return page.entries;
 }
 
+/*
+ * A project in a bucket of its own, so its administrator declares without a super administrator: at the
+ * root, declaring is reserved (root_namespace.spec.ts).
+ */
+async function ownedProject(userId: string, prefix: string) {
+	const ownerGroupId = await personalGroupId(userId);
+	const bucket = await getBucketStore().create({
+		name: `${prefix} users`,
+		slug: `${prefix}-${Math.random().toString(36).slice(2)}`,
+		ownerGroupId
+	});
+	return getProjectStore().create({
+		name: 'Acme',
+		slug: `${prefix}-${Math.random().toString(36).slice(2)}`,
+		ownerGroupId,
+		bucketId: bucket._id
+	});
+}
+
 /**
  * @proves Declaring, amending or removing a protected resource is recorded against the actor,
  * and a refused declaration leaves no entry.
@@ -60,21 +79,16 @@ describe('protected resource audit trail', () => {
 		await ensureAdminSeed();
 		const store = getProtectedResourceStore();
 		for (const resource of await store.list()) {
-			await store.destroy(resource._id);
+			await store.destroy(resource.namespace, resource.identifier);
 		}
 	});
 
 	it('records the actor, the action and the identifier for every change', async () => {
 		const { cookie, userId } = await admin();
-		const project = await getProjectStore().create({
-			name: 'Acme',
-			slug: `audit-${Math.random().toString(36).slice(2)}`,
-			ownerGroupId: await personalGroupId(userId)
-		});
+		const project = await ownedProject(userId, 'audit');
 		const headers = { cookie };
 		const resources = api.admin.api.projects({ id: project._id }).resources;
 
-		serveResourceMetadata(AUDIENCE);
 		await resources.post(
 			{ identifier: AUDIENCE, name: 'Acme MCP', scopes: ['mcp:tools-basic'] },
 			{ headers }
@@ -105,11 +119,7 @@ describe('protected resource audit trail', () => {
 
 	it('leaves no entry for a declaration it refused', async () => {
 		const { cookie, userId } = await admin();
-		const project = await getProjectStore().create({
-			name: 'Acme',
-			slug: `refused-${Math.random().toString(36).slice(2)}`,
-			ownerGroupId: await personalGroupId(userId)
-		});
+		const project = await ownedProject(userId, 'refused');
 
 		const res = await api.admin.api
 			.projects({ id: project._id })
@@ -133,20 +143,14 @@ describe('protected resource audit trail', () => {
 	 */
 	it('cascades a project delete onto its declarations and says how many went', async () => {
 		const { cookie, userId } = await admin();
-		const project = await getProjectStore().create({
-			name: 'Acme',
-			slug: `cascade-${Math.random().toString(36).slice(2)}`,
-			ownerGroupId: await personalGroupId(userId)
-		});
+		const project = await ownedProject(userId, 'cascade');
 		const headers = { cookie };
 		const resources = api.admin.api.projects({ id: project._id }).resources;
 
-		serveResourceMetadata(AUDIENCE);
 		await resources.post(
 			{ identifier: AUDIENCE, name: 'One', scopes: ['mcp:tools-basic'] },
 			{ headers }
 		);
-		serveResourceMetadata('https://other.example.com/mcp');
 		await resources.post(
 			{
 				identifier: 'https://other.example.com/mcp',

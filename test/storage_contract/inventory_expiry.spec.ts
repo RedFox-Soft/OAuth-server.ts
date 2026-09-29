@@ -78,6 +78,12 @@ const REAPED_ON_EXPIRES_AT = [
 const PERMANENT = [
 	'Client',
 	'jwks',
+	/*
+	 * A bucket's keys leave by their state — retired, and past the lifetime of every token they could
+	 * have signed — never by the record's age. An expiry here would drop the key a bucket is signing
+	 * with, and every token it minted would stop verifying at once.
+	 */
+	'bucketKeys',
 	'projects',
 	/*
 	 * A declared protected resource outlives everything except the project that owns it. An expiry

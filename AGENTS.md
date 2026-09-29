@@ -46,7 +46,7 @@ bun run db:setup:pg     # provision PostgreSQL (idempotent; --check reports only
 bun run db:migrate      # apply declared schema migrations (--plan to gate a deploy)
 ```
 
-`bun test` never touches a real database: it runs on the in-memory adapter, and the two verification
+`bun test` never touches a real database: it runs on the in-memory adapter, and the verification
 scripts under `database/` are scripts, not specs, precisely so the default run cannot reach them.
 
 ---
@@ -135,8 +135,10 @@ Each rule is the part that is easy to break. Read the named page before changing
 - **Persisted models** — only the keys a model's TypeBox schema declares are stored; add the field to
   the schema. Read model fields through `.payload`. Use `tryFind` where absence is handled and `find`
   where it is not. → `token-payload-access-contract.md`
-- **Signing keys** — import `keystore`/`publicJWKS` from `lib/configs/keystore.ts`, which stays a leaf
-  module. → `signing-keys.md`, `model-graph-import-order.md`
+- **Signing keys** — an addressable bucket signs with keys of its own: sign, verify and decrypt through
+  `keysFor(bucket)` (`lib/keys/issuer_keys.ts`) with the issuing bucket, never the root `keystore`
+  directly. `lib/configs/keystore.ts` holds the root set and stays a leaf module.
+  → `signing-keys.md`, `per-issuer-isolation.md`, `model-graph-import-order.md`
 - **Clients** — a client is a validated plain object read from `adapter('Client')` on every
   resolution; there is no boot-time `clients` option. A URL `client_id` may resolve to a metadata
   document, and that branch must stay after the adapter read. Registration attributes are declared once,
@@ -147,8 +149,10 @@ Each rule is the part that is easy to break. Read the named page before changing
   `client-registration-attributes.md`, `mcp-server-authorization.md`
 - **Buckets** — a bucket is addressed by a path segment or a hostname, never both, and is its own
   issuer. The request host is read only by `hostOfRequest`, never from `X-Forwarded-Host`. Which bucket
-  a sign-in uses is `resolveBucketForRequest`, and every caller passes the resource it has.
-  → `bucket-is-an-issuer.md`, `cookie-path-scoping.md`, `account-resolution.md`
+  a sign-in uses is `resolveBucketForRequest`, and every caller passes the resource it has and the
+  bucket it was addressed at. A declared resource is unique per issuer namespace, and only a super
+  administrator declares at the root. → `bucket-is-an-issuer.md`, `per-issuer-isolation.md`,
+  `cookie-path-scoping.md`, `account-resolution.md`
 - **Ownership** — a group owns every project and bucket, and membership is the only grant of access;
   instance-wide things stay super-admin-only. → `group-ownership.md`
 - **Audit** — a mutating admin route records audit-first, after authorization, inside the handler.

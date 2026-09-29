@@ -24,9 +24,9 @@ export async function backchannelLogoutFor(
 		if (client) {
 			const sid = session.sidFor(client.clientId);
 			if (client.backchannelLogoutUri) {
-				const { accountId } = session.payload;
+				const { accountId, bucketId } = session.payload;
 				back.push(
-					clientNotifications.logout(client, accountId, sid).then(
+					clientNotifications.logout(client, accountId, sid, bucketId).then(
 						() => {
 							eventBus.emit(
 								'backchannel.success',

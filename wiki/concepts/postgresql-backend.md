@@ -111,8 +111,10 @@ invisible to the in-memory suite, and one of them total:
 
 Constitution Principle III permits a suite that uses a real database under three binding conditions:
 invoked separately, unreachable from the default run, and confined to what an in-memory double
-cannot exhibit. `database/verify_postgres.ts` and `database/verify_migrations.ts` are scripts rather
-than spec files precisely so `bun test` can never reach them, and
+cannot exhibit. `database/verify_postgres.ts`, `database/verify_migrations.ts` and, since 2026-09-29,
+`database/verify_mongodb.ts` (the namespaced declaration key, the bucket first-key claim, the
+all-or-none move and the first real migration, against a scratch MongoDB) are scripts rather than spec
+files precisely so `bun test` can never reach them, and
 `test/storage_contract/adapter_isolation.spec.ts` asserts that neither matches the runner's
 discovery patterns — no `bunfig.toml` exclusion to forget.
 

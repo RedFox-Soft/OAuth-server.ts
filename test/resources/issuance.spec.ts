@@ -3,6 +3,7 @@ import { describe, beforeAll, beforeEach, it, expect } from 'bun:test';
 import bootstrap, { agent } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { getProtectedResourceStore } from 'lib/adapters/index.ts';
+import { ROOT_NAMESPACE } from 'lib/resources/namespace.ts';
 import { shaped } from 'test/shape.js';
 import { Type } from '@sinclair/typebox';
 import { projectOf } from './owning_project.js';
@@ -30,7 +31,8 @@ async function declare(
 	}> = {}
 ) {
 	return getProtectedResourceStore().create({
-		_id: identifier,
+		namespace: ROOT_NAMESPACE,
+		identifier: identifier,
 		projectId,
 		name: 'Acme MCP',
 		scopes: overrides.scopes ?? ['mcp:tools-basic', 'mcp:files-read'],
@@ -49,7 +51,7 @@ async function tokenFor(resource: string, scope = 'mcp:tools-basic') {
 async function clearResources() {
 	const store = getProtectedResourceStore();
 	for (const resource of await store.list()) {
-		await store.destroy(resource._id);
+		await store.destroy(resource.namespace, resource.identifier);
 	}
 }
 
@@ -148,7 +150,7 @@ describe('issuing tokens for a declared protected resource', () => {
 		await declare(AUDIENCE);
 		expect((await tokenFor(AUDIENCE)).status).toBe(200);
 
-		await getProtectedResourceStore().destroy(AUDIENCE);
+		await getProtectedResourceStore().destroy(ROOT_NAMESPACE, AUDIENCE);
 
 		const res = await tokenFor(AUDIENCE);
 		expect(res.status).toBe(400);

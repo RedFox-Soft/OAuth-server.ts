@@ -30,10 +30,15 @@ Compose](/docs/get-started/docker-compose/) should take about two of them.
 
 ## 1. Declare your MCP server as a resource
 
-Publish the metadata from [step 2](#2-publish-what-an-mcp-server-has-to-publish) first. Unless you are
-a super administrator, declaring a resource fetches that document and refuses the declaration if it
-does not name this server: identifiers are unique across the instance, so this is what stops somebody
-else claiming your server's address before you do.
+Declare it in a project whose user bucket has an address of its own — a path like `/acme` or a
+hostname. Such a bucket is its own issuer, and a resource identifier is unique only within its issuer,
+so nothing about your MCP server is fetched or checked when you declare it. It can be on an internal
+network, on `localhost` while you develop, or not deployed yet. Another tenant with a bucket of its own
+may declare the same URL without affecting yours.
+
+A project with no bucket of its own is served at the instance's root issuer, which every such tenant
+shares. There, only a super administrator can declare a resource, because the resource's own metadata
+cannot say which of those tenants it belongs to.
 
 <Steps>
 
@@ -80,17 +85,20 @@ you. This is the only part the specification makes a `MUST` for an MCP server:
 ```json
 {
 	"resource": "https://mcp.example.com/mcp",
-	"authorization_servers": ["https://auth.example.com"],
+	"authorization_servers": ["https://auth.example.com/acme"],
 	"scopes_supported": ["mcp:tools-basic"],
 	"bearer_methods_supported": ["header"]
 }
 ```
 
 `resource` is the identifier you declared in step 1, character for character. `authorization_servers`
-names the issuer of the user bucket your project signs into: the instance's `ISSUER` for the default
-bucket, or the bucket's own issuer when it has an address. The document may live at
-`/.well-known/oauth-protected-resource` followed by your resource's path, as RFC 9728 forms it, or at
-the root as above.
+names the issuer of the user bucket your project signs into: the bucket's own issuer when it has an
+address — `https://auth.example.com/acme`, or its hostname — and the instance's `ISSUER` otherwise. The
+document may live at `/.well-known/oauth-protected-resource` followed by your resource's path, as RFC
+9728 forms it, at the root as above, or wherever the challenge below points.
+
+The resource's row in the console shows whether this document currently vouches for your declaration,
+and which of the three places it was found at. It is a diagnostic only: it blocks nothing.
 
 ### A challenge that says where to go
 
@@ -112,20 +120,22 @@ Your MCP server has to establish two things about every token: that it is genuin
 issued **for you**. The second is not optional. Accepting a token minted for something else is the
 confused-deputy hole that audience binding exists to close, and the specification forbids it outright.
 
-With the default token format there is nothing to ask this server at request time. Fetch its public
-keys once from `/jwks`, cache them, and check four claims:
+With the default token format there is nothing to ask this server at request time. Fetch the issuer's
+public keys once from the `jwks_uri` its metadata advertises, cache them, and check four claims. A
+bucket with an address signs with keys of its own, so its key set is beneath its own issuer —
+`https://auth.example.com/acme/jwks` below — and holds no other tenant's keys:
 
 ```js
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 
-const keys = createRemoteJWKSet(new URL('https://auth.example.com/jwks'));
+const keys = createRemoteJWKSet(new URL('https://auth.example.com/acme/jwks'));
 
 export async function principalFor(authorization) {
 	const token = authorization?.replace(/^Bearer /i, '');
 	if (!token) return null;
 
 	const { payload } = await jwtVerify(token, keys, {
-		issuer: 'https://auth.example.com',
+		issuer: 'https://auth.example.com/acme',
 		// The identifier you declared. This is the check that makes the token yours.
 		audience: 'https://mcp.example.com/mcp'
 	});

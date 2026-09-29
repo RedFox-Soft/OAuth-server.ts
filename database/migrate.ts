@@ -14,9 +14,7 @@ import { isNoop, type Migration } from '../lib/consts/migrations.js';
  * One command for both backends, with the same output shape and the same exit codes, because an
  * operator moving a deployment between datastores should not have to learn a second procedure.
  *
- * The declared set currently ships empty, so on any deployment this reports "current" and exits. That
- * is the correct behaviour and not a placeholder: the machinery has to be in operators' hands before
- * the first migration ships, or the first migration is also the first time anybody runs this.
+ * On a deployment with nothing outstanding this reports "current" and exits.
  */
 
 const PLAN_ONLY = process.argv.includes('--plan');
@@ -43,11 +41,25 @@ const { getMigrationLeaseStore, getSchemaMigrationStore } =
 const records = getSchemaMigrationStore();
 const lease = getMigrationLeaseStore();
 
-const backend = migrationBackend(backendName, {
-	readAll: () => records.all(),
-	write: (entry) => records.record(entry),
-	lease
-});
+/*
+ * The handle a step's `apply` receives: the driver's database for MongoDB, the SQL client for
+ * PostgreSQL. Omitted while every declared migration was a no-op, which is how the first real one would
+ * have been handed `undefined`.
+ */
+const handle =
+	backendName === 'postgres'
+		? (await import('../lib/adapters/postgres/db.js')).sql()
+		: (await import('../lib/adapters/mongodb/db.js')).db;
+
+const backend = migrationBackend(
+	backendName,
+	{
+		readAll: () => records.all(),
+		write: (entry) => records.record(entry),
+		lease
+	},
+	handle
+);
 
 function describe(migration: Migration): string {
 	const half =

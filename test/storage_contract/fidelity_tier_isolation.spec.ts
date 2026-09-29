@@ -33,6 +33,7 @@ describe('the storage fidelity tier', () => {
 	it('finds the scripts it is guarding, so it cannot pass vacuously', () => {
 		expect(files).toContain('verify_postgres.ts');
 		expect(files).toContain('verify_migrations.ts');
+		expect(files).toContain('verify_mongodb.ts');
 	});
 
 	it('names nothing under database/ the way the test runner discovers a spec', () => {

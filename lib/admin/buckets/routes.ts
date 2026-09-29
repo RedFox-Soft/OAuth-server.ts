@@ -1,5 +1,6 @@
 import { Elysia } from 'elysia';
 import {
+	getBucketKeysStore,
 	getBucketStore,
 	getProjectStore,
 	getUserStore
@@ -21,6 +22,17 @@ import { cascadeForAccount } from '../../helpers/cascade.js';
 import { emailScopedId } from '../../helpers/email_scoped_id.js';
 import { recordAdminAudit } from '../audit/record.js';
 import nanoid from '../../helpers/nanoid.js';
+import {
+	ensureBucketKey,
+	invalidateBucketKeys
+} from '../../keys/issuer_keys.js';
+import { namespaceOf, ROOT_NAMESPACE } from '../../resources/namespace.js';
+import {
+	applyMove,
+	DeclarationsConflict,
+	planMove,
+	type MovePlan
+} from '../resources/move.js';
 import { loadBucketForUsers, loadBucketForEdit } from './access.js';
 import {
 	assertSomeWayToSignIn,
@@ -271,7 +283,10 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 	.onError(({ error, set }) => {
 		if (error instanceof AdminError) {
 			set.status = error.status;
-			return adminErrorBody(error);
+			// The identifiers in the way, so an operator knows which declaration to remove or rename.
+			return error instanceof DeclarationsConflict
+				? { ...adminErrorBody(error), conflicts: error.conflicts }
+				: adminErrorBody(error);
 		}
 	})
 	.get('/admin/api/buckets', async ({ admin }) => {
@@ -351,6 +366,12 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			);
 			/* A new address exists; the resolver's positive cache must be able to see it. */
 			forgetBucketAddresses();
+			/*
+			 * An addressable bucket is an issuer from this moment, so it gets its signing key now rather
+			 * than on the first sign-in. Not undone if this fails: the bucket exists, the failure reaches the
+			 * admin plane as the fault it is, and the bucket's first use creates the key anyway.
+			 */
+			await ensureBucketKey(bucketId);
 			set.status = 201;
 			// No advisory is reachable here: the guard above proves a new bucket accepts passwords, so
 			// the requirement can never be inert at creation.
@@ -453,10 +474,40 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 				return { ...preview, confirmationRequired: true };
 			}
 
+			/*
+			 * A legacy bucket gaining its first address leaves the shared root namespace for one of its own,
+			 * and its projects' declarations have to come with it or they would stop resolving. A bucket
+			 * that already had an address keeps its namespace, which is keyed by id, not by address.
+			 */
+			const moves: Array<{ projectId: string; plan: MovePlan }> = [];
+			if (namespaceOf(bucket) === ROOT_NAMESPACE) {
+				const to = namespaceOf({ ...bucket, ...address });
+				const inBucket = (await getProjectStore().list()).filter(
+					(project) => project.bucketId === params.id
+				);
+				for (const project of inBucket) {
+					moves.push({
+						projectId: project._id,
+						plan: await planMove(ctx, project._id, ROOT_NAMESPACE, to)
+					});
+				}
+			}
+
 			await recordAdminAudit(ctx, 'bucket.address.change', params.id, {
 				from: preview.from,
 				to: preview.to
 			});
+			for (const { projectId, plan } of moves) {
+				await applyMove(projectId, plan);
+			}
+			/*
+			 * A legacy bucket gaining its first address becomes an issuer, and gets its key with it. A
+			 * bucket that already had one keeps its keys: they are keyed by id, and a new issuer string for
+			 * the same tenant is still that tenant.
+			 */
+			if (namespaceOf(bucket) === ROOT_NAMESPACE) {
+				await ensureBucketKey(params.id);
+			}
 
 			const moved = await refusingATakenHostname(() =>
 				getBucketStore().setAddress(params.id, address)
@@ -554,6 +605,12 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			}
 
 			await getBucketStore().destroy(params.id);
+			/*
+			 * Its keys go with it. They sign for an issuer that no longer exists, and leaving the private
+			 * halves behind would keep key material nobody can manage any more.
+			 */
+			await getBucketKeysStore().destroyByBucket(params.id);
+			invalidateBucketKeys(params.id);
 			/* The address is gone; a cached entry would keep answering for a bucket that no longer exists. */
 			forgetBucketAddresses();
 			/* The half that was missing: without this a deleted bucket left its `user_<bucket>` area behind

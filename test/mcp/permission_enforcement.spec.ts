@@ -10,6 +10,7 @@ import { ADMIN_BUCKET_ID } from 'lib/admin/consts.ts';
 import { MCP_RESOURCE, MCP_ROUTE } from 'lib/mcp/consts.ts';
 import { resolveBucketForRequest } from 'lib/admin/auth/resolveBucket.ts';
 import { clearPermissions, permitIdentifier } from './permissions.ts';
+import { DEFAULT_REQUEST_BUCKET } from 'lib/configs/issuer.ts';
 
 /*
  * The three refusals the allowlist has to make, and the one thing it must never break.
@@ -160,13 +161,15 @@ describe('signing in through a permitted identity', () => {
 	it('routes a permitted identity naming the administrative audience to the admin bucket', async () => {
 		await permitIdentifier(DOC);
 
-		expect(await resolveBucketForRequest(DOC, MCP_RESOURCE)).toBe(
-			ADMIN_BUCKET_ID
-		);
+		expect(
+			await resolveBucketForRequest(DOC, MCP_RESOURCE, DEFAULT_REQUEST_BUCKET)
+		).toBe(ADMIN_BUCKET_ID);
 	});
 
 	it('routes it nowhere special without a permission', async () => {
-		expect(await resolveBucketForRequest(DOC, MCP_RESOURCE)).toBe('redfox');
+		expect(
+			await resolveBucketForRequest(DOC, MCP_RESOURCE, DEFAULT_REQUEST_BUCKET)
+		).toBe('redfox');
 	});
 
 	/*
@@ -177,8 +180,14 @@ describe('signing in through a permitted identity', () => {
 		await permitIdentifier(DOC);
 
 		expect(
-			await resolveBucketForRequest(DOC, 'https://elsewhere.example.com/mcp')
+			await resolveBucketForRequest(
+				DOC,
+				'https://elsewhere.example.com/mcp',
+				DEFAULT_REQUEST_BUCKET
+			)
 		).toBe('redfox');
-		expect(await resolveBucketForRequest(DOC, undefined)).toBe('redfox');
+		expect(
+			await resolveBucketForRequest(DOC, undefined, DEFAULT_REQUEST_BUCKET)
+		).toBe('redfox');
 	});
 });

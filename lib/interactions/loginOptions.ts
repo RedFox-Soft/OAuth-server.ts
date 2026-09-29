@@ -5,6 +5,7 @@ import {
 	knownProviderByIssuer
 } from '../consts/known_providers.js';
 import { resolveBucketForRequest } from '../admin/auth/resolveBucket.js';
+import type { RequestBucket } from '../configs/issuer.js';
 
 /*
  * What the login page needs to know about a bucket in order to render itself: whether it accepts a password
@@ -97,9 +98,10 @@ function orderedForDisplay<T extends { id: string; issuer: string }>(
  * the default bucket's options instead of the bucket the request named. */
 export async function loginOptionsForClient(
 	clientId: string | undefined,
-	resource: string | readonly string[] | undefined
+	resource: string | readonly string[] | undefined,
+	addressed: RequestBucket
 ): Promise<LoginOptions> {
 	return loginOptionsForBucket(
-		await resolveBucketForRequest(clientId, resource)
+		await resolveBucketForRequest(clientId, resource, addressed)
 	);
 }

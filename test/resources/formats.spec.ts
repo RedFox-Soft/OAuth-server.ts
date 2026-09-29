@@ -4,6 +4,7 @@ import { decodeJwt } from 'jose';
 import bootstrap, { agent } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { getProtectedResourceStore } from 'lib/adapters/index.ts';
+import { ROOT_NAMESPACE } from 'lib/resources/namespace.ts';
 import { projectOf } from './owning_project.js';
 
 /*
@@ -29,7 +30,8 @@ async function declare(overrides: {
 	accessTokenTTL?: number;
 }) {
 	return getProtectedResourceStore().create({
-		_id: AUDIENCE,
+		namespace: ROOT_NAMESPACE,
+		identifier: AUDIENCE,
 		projectId,
 		name: 'Acme MCP',
 		scopes: ['mcp:tools-basic'],
@@ -64,7 +66,7 @@ describe('token format and lifetime for a declared resource', () => {
 	beforeEach(async () => {
 		const store = getProtectedResourceStore();
 		for (const resource of await store.list()) {
-			await store.destroy(resource._id);
+			await store.destroy(resource.namespace, resource.identifier);
 		}
 	});
 
@@ -129,7 +131,8 @@ describe('token format and lifetime for a declared resource', () => {
 	it('mints a token one declared resource can tell was not for it', async () => {
 		await declare({});
 		await getProtectedResourceStore().create({
-			_id: 'https://other.example.com/mcp',
+			namespace: ROOT_NAMESPACE,
+			identifier: 'https://other.example.com/mcp',
 			projectId,
 			name: 'Other MCP',
 			scopes: ['mcp:tools-basic']

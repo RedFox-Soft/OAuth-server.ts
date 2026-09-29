@@ -9,6 +9,7 @@ import {
 import { configuration } from 'lib/configs/application.js';
 import checkResource from '../../shared/check_resource.ts';
 import { machineTokenPermitted } from '../../resources/registry.js';
+import { namespaceOf } from '../../resources/namespace.js';
 import { ClientCredentials } from 'lib/models/client_credentials.js';
 import type { DPoPProof } from 'lib/helpers/validate_dpop.js';
 
@@ -55,7 +56,13 @@ export async function clientCredentials(
 		}
 		const [indicator] = Object.keys(oidc.resourceServers);
 		// This token acts for nobody, so no end user's consent stands behind it — only who the client is.
-		if (!(await machineTokenPermitted(indicator, client.clientId))) {
+		if (
+			!(await machineTokenPermitted(
+				indicator,
+				client.clientId,
+				namespaceOf(oidc.bucket)
+			))
+		) {
 			throw new InvalidTarget(
 				'the client is not permitted to access this resource'
 			);

@@ -2,7 +2,8 @@ import * as crypto from 'node:crypto';
 
 import * as JWT from '../../helpers/jwt.ts';
 import nanoid from '../../helpers/nanoid.js';
-import { keystore } from 'lib/configs/keystore.js';
+import { keysFor } from 'lib/keys/issuer_keys.js';
+import type { RequestBucket } from 'lib/configs/issuer.js';
 import { issuerFor } from 'lib/configs/issuer.js';
 import { issuingBucket } from 'lib/admin/auth/bucketAddress.js';
 import { ClientDefaults } from 'lib/configs/clientBase.js';
@@ -13,9 +14,12 @@ import type { BaseToken } from '../base_token.ts';
 
 type TokenKey = crypto.KeyObject | CryptoKey | JWK | Uint8Array | string;
 
-async function getResourceServerConfig(token: {
-	resourceServer?: ResourceServer;
-}) {
+async function getResourceServerConfig(
+	token: {
+		resourceServer?: ResourceServer;
+	},
+	bucket: RequestBucket
+) {
 	const defaultAlg = ClientDefaults.idTokenSignedResponseAlg;
 
 	// Resolved to a key object or one of this server's keys; raw secrets are converted first.
@@ -71,14 +75,25 @@ async function getResourceServerConfig(token: {
 					);
 				}
 			} else {
-				const [jwk] = keystore.selectForVerify({ alg, use: 'sig', kid });
+				/*
+				 * The issuing bucket's own signing keys, so a resource server trusting one bucket cannot be
+				 * handed another's token. The default algorithm yields to whatever the bucket signs with
+				 * when it holds no key of that algorithm — a bucket rotated to ES256 still issues — while
+				 * an algorithm a resource server was configured to expect is never substituted.
+				 */
+				const { signing } = await keysFor(bucket);
+				let [jwk] = signing.selectForSign({ alg, use: 'sig', kid });
+				if (!jwk && !token.resourceServer?.jwt?.sign) {
+					[jwk] = [...signing];
+					if (typeof jwk?.alg === 'string') alg = jwk.alg;
+				}
 				if (!jwk) {
 					throw new Error(
 						"resolved Resource Server jwt configuration has no corresponding key in the provider's keystore"
 					);
 				}
 				kid = jwk.kid;
-				key = keystore.getKeyObject(jwk);
+				key = signing.getKeyObject(jwk);
 			}
 			if (kid !== undefined && typeof kid !== 'string') {
 				throw new Error('jwt.sign.kid must be a string when provided');
@@ -169,11 +184,10 @@ export const jwt = {
 		 * bare one such a token was minted with, so reading the absence that way is exact rather than a
 		 * fallback.
 		 */
-		const iss = issuerFor(
-			await issuingBucket(
-				typeof payload.bucketId === 'string' ? payload.bucketId : undefined
-			)
+		const issuedBy = await issuingBucket(
+			typeof payload.bucketId === 'string' ? payload.bucketId : undefined
 		);
+		const iss = issuerFor(issuedBy);
 
 		if (sub) {
 			const { client } = this;
@@ -214,7 +228,7 @@ export const jwt = {
 			);
 		}
 
-		const config = await getResourceServerConfig(this);
+		const config = await getResourceServerConfig(this, issuedBy);
 
 		if (config.sign) {
 			const signed = await JWT.sign(

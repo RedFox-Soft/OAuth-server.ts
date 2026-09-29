@@ -37,7 +37,8 @@ export default async function resumeAction(
 	 */
 	const bucketId = await resolveBucketForRequest(
 		storedParams.client_id,
-		storedParams.resource
+		storedParams.resource,
+		oidc.bucket
 	);
 
 	/*

@@ -3,6 +3,7 @@ import { describe, beforeAll, beforeEach, it, expect } from 'bun:test';
 import bootstrap, { agent } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { getProtectedResourceStore } from 'lib/adapters/index.ts';
+import { ROOT_NAMESPACE } from 'lib/resources/namespace.ts';
 import { shaped } from 'test/shape.js';
 import { projectOf } from './owning_project.js';
 import { Type } from '@sinclair/typebox';
@@ -46,10 +47,11 @@ describe('a client credentials token for a declared resource', () => {
 	beforeEach(async () => {
 		const store = getProtectedResourceStore();
 		for (const resource of await store.list()) {
-			await store.destroy(resource._id);
+			await store.destroy(resource.namespace, resource.identifier);
 		}
 		await store.create({
-			_id: AUDIENCE,
+			namespace: ROOT_NAMESPACE,
+			identifier: AUDIENCE,
 			projectId: await projectOf('client'),
 			name: 'Acme MCP',
 			scopes: ['mcp:tools-basic']

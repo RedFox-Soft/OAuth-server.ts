@@ -62,6 +62,7 @@ if (!THROWAWAY.test(database)) {
  */
 const {
 	AdminAuditStore,
+	BucketKeysStore,
 	ProtectedResourceStore,
 	SingletonSecretStore,
 	UserBucketStore,
@@ -239,26 +240,28 @@ check(
 	both.map((r) => r.status).join(', ')
 );
 
-/* The same property one level up, on a different key: a resource identifier is instance-wide unique
- * because it is the primary key, not because a route remembered to look first. */
+/* The same property one level up, on a different key: a resource identifier is unique within its
+ * namespace because the two joined are the primary key, not because a route remembered to look first. */
 const resources = new ProtectedResourceStore();
 const identifier = `https://fidelity.invalid/api/${Date.now()}`;
 const declaredTwice = await Promise.allSettled([
 	resources.create({
-		_id: identifier,
+		namespace: '@root',
+		identifier,
 		projectId: 'fidelity',
 		name: 'first',
 		scopes: ['read']
 	}),
 	resources.create({
-		_id: identifier,
+		namespace: '@root',
+		identifier,
 		projectId: 'fidelity',
 		name: 'second',
 		scopes: ['read']
 	})
 ]);
 check(
-	'two simultaneous declarations of one resource identifier: exactly one wins',
+	'two simultaneous declarations of one identifier in one namespace: exactly one wins',
 	declaredTwice.filter((r) => r.status === 'fulfilled').length === 1,
 	declaredTwice.map((r) => r.status).join(', ')
 );
@@ -316,6 +319,116 @@ check(
 	'an identifier held only by an expired, unreaped row can be created again',
 	await adapter('ReplayDetection').create(staleId, { iss: 'fidelity' }, 60)
 );
+
+/* A bucket's first key is claimed under one fixed id, which is what leaves exactly one key when two
+ * instances create it at the same moment. Two different candidate keys, one id. */
+const bucketKeys = new BucketKeysStore();
+const claimBucket = `fidelity-bucket-${Date.now()}`;
+const { generateJWKS } = await import('../lib/helpers/jwks.js');
+const {
+	keys: [material]
+} = await generateJWKS('RS256');
+const candidate = (kid: string) => ({
+	_id: `${claimBucket} #initial`,
+	bucketId: claimBucket,
+	kid,
+	jwk: { ...material, kid },
+	alg: 'RS256',
+	use: 'sig' as const,
+	state: 'signing' as const,
+	createdAt: new Date(),
+	stateChangedAt: new Date()
+});
+const claimedBy = await Promise.all(
+	['first', 'second', 'third'].map((kid) =>
+		bucketKeys.createIfAbsent(candidate(`${claimBucket}-${kid}`))
+	)
+);
+check(
+	'three simultaneous first keys for one bucket: exactly one is stored',
+	claimedBy.filter(Boolean).length === 1 &&
+		(await bucketKeys.listByBucket(claimBucket)).length === 1,
+	claimedBy.join(', ')
+);
+
+/* A project's declarations move all or none. The target already declares one of the two, so the move
+ * is refused and both stay where they were — in one transaction here, which the hermetic store can
+ * only imitate. */
+const moveProject = `fidelity-move-${Date.now()}`;
+const moveFrom = `${moveProject}-from`;
+const moveTo = `${moveProject}-to`;
+for (const suffix of ['a', 'b']) {
+	await resources.create({
+		namespace: moveFrom,
+		identifier: `https://move.invalid/${suffix}`,
+		projectId: moveProject,
+		name: suffix,
+		scopes: ['read']
+	});
+}
+await resources.create({
+	namespace: moveTo,
+	identifier: 'https://move.invalid/b',
+	projectId: 'someone-else',
+	name: 'taken',
+	scopes: ['read']
+});
+const refusedMove = await resources.moveProject(moveProject, moveFrom, moveTo);
+check(
+	'a move into a namespace already declaring one identifier moves nothing',
+	'conflicts' in refusedMove &&
+		(await resources.find(moveFrom, 'https://move.invalid/a')) !== null &&
+		(await resources.find(moveTo, 'https://move.invalid/a')) === null,
+	JSON.stringify(refusedMove)
+);
+
+/* The first declared migration, applied twice to a legacy record: re-keyed once, then left alone. */
+const { MIGRATIONS } = await import('../lib/consts/migrations.js');
+const namespacing = MIGRATIONS.find((m) =>
+	m.id.endsWith('protected-resources-namespaced')
+);
+const legacyBucket = `fidelity-legacy-bucket-${Date.now()}`;
+const legacyProject = `fidelity-legacy-project-${Date.now()}`;
+const legacyIdentifier = `https://legacy.invalid/${Date.now()}`;
+await handle`
+	INSERT INTO ${handle(STORE_AREAS.userBuckets)} (id, doc, expires_at)
+	VALUES (${legacyBucket}, ${{ _id: legacyBucket, name: 'legacy', slug: `legacy${Date.now()}` }}, NULL)
+`;
+await handle`
+	INSERT INTO ${handle(STORE_AREAS.projects)} (id, doc, expires_at)
+	VALUES (${legacyProject}, ${{ _id: legacyProject, bucketId: legacyBucket }}, NULL)
+`;
+await handle`
+	INSERT INTO ${handle(STORE_AREAS.protectedResources)} (id, doc, expires_at)
+	VALUES (${legacyIdentifier}, ${{
+		_id: legacyIdentifier,
+		projectId: legacyProject,
+		name: 'legacy',
+		scopes: ['read'],
+		tokenFormat: 'jwt',
+		accessTokenTTL: 900,
+		trailingSlashSignificant: false,
+		createdAt: new Date(),
+		updatedAt: new Date()
+	}}, NULL)
+`;
+if (namespacing && !('noop' in namespacing.postgres)) {
+	await namespacing.postgres.apply(handle);
+	await namespacing.postgres.apply(handle);
+}
+const rekeyed = await resources.find(legacyBucket, legacyIdentifier);
+const leftovers = await handle`
+	SELECT id FROM ${handle(STORE_AREAS.protectedResources)} WHERE doc->>'projectId' = ${legacyProject}
+`;
+check(
+	'the namespacing migration re-keys a legacy declaration once, applied twice',
+	rekeyed?.identifier === legacyIdentifier && leftovers.length === 1,
+	`${leftovers.length} row(s) for the project`
+);
+/* The fixture rows go, so the provisioning checks below see only what provisioning made. */
+await handle`DELETE FROM ${handle(STORE_AREAS.protectedResources)} WHERE doc->>'projectId' = ${legacyProject}`;
+await handle`DELETE FROM ${handle(STORE_AREAS.projects)} WHERE id = ${legacyProject}`;
+await handle`DELETE FROM ${handle(STORE_AREAS.userBuckets)} WHERE id = ${legacyBucket}`;
 
 /* ---- 5. the sweeper removes what expired, and nothing else ---------------------------------- */
 

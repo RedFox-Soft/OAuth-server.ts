@@ -74,14 +74,14 @@ describe('a named bucket publishes its own metadata', () => {
 	});
 
 	/*
-	 * One key set for the whole server, advertised identically by every bucket: buckets are
-	 * populations, not cryptographic boundaries. The one member deliberately exempt from the rule
-	 * above, which is why it is asserted rather than left to the loop's `_endpoint` filter to skip.
+	 * A named bucket is its own issuer and signs with keys of its own, so its key set lives beneath it
+	 * like every other endpoint — asserted rather than left to the loop's `_endpoint` filter, which
+	 * `jwks_uri` does not match.
 	 */
-	it('advertises the instance key set rather than one of its own', async () => {
+	it('advertises a key set of its own beneath its issuer', async () => {
 		const metadata = await doc(`/${SLUG}/.well-known/openid-configuration`);
 
-		expect(metadata.jwks_uri).toBe(`${ISSUER}/jwks`);
+		expect(metadata.jwks_uri).toBe(`${ISSUER}/${SLUG}/jwks`);
 	});
 
 	it('answers no metadata at an address naming no bucket', async () => {

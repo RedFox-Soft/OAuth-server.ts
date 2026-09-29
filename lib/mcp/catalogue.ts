@@ -37,6 +37,7 @@ import { PublishedSettingsBody } from '../admin/settings/schema.js';
 import { UpdateSmtpBody } from '../admin/settings/smtp/schema.js';
 import { UpdateSentryBody } from '../admin/settings/sentry/schema.js';
 import { GenerateKeyBody } from '../admin/jwks/schema.js';
+import { GenerateBucketKeyBody } from '../admin/bucket_keys/schema.js';
 import { AuditQuery } from '../admin/audit/schema.js';
 import {
 	CreateGroupBody,
@@ -184,7 +185,20 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'resourceId'],
 		summary:
-			'One declared protected resource. The resourceId is the canonical resource identifier itself, percent-encoded into the path.'
+			"One declared protected resource. The resourceId is the canonical resource identifier itself, percent-encoded into the path, and names the declaration in this project's bucket: another tenant may declare the same identifier in its own."
+	},
+	{
+		tool: 'resource_vouching_check',
+		method: 'GET',
+		path: '/admin/api/projects/:id/resources/:resourceId/vouching',
+		action: null,
+		consequence: 'read',
+		requiredRole: null,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'resourceId'],
+		summary:
+			"Whether a declared resource's own protected resource metadata currently vouches for it — describes this identifier and lists the issuer its tokens carry — found by the MCP discovery order (a 401 challenge's resource_metadata, then the path-inserted, then the root well-known). A diagnostic: it blocks nothing, and returns only a status, the step that answered, a reason, and the expected issuer."
 	},
 	{
 		tool: 'client_list',
@@ -425,6 +439,19 @@ const catalogue = [
 			'The signing keys, each with its status, plus whether a restart is needed to apply pending changes. Public key material only — private components are never returned.'
 	},
 	{
+		tool: 'bucket_key_list',
+		method: 'GET',
+		path: '/admin/api/buckets/:id/keys',
+		action: null,
+		consequence: 'read',
+		requiredRole: null,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			"The signing keys of a bucket that has an address of its own, each with its state — published (verifies, may be promoted once promotableAt has passed), signing, or retired (still verifies until removableAt). No key material is returned; the public keys are at the bucket's jwks_uri. A bucket served at the root signs with the instance keys (jwks_list)."
+	},
+	{
 		tool: 'audit_list',
 		method: 'GET',
 		path: '/admin/api/audit',
@@ -578,7 +605,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"Declare an MCP server (or any API) as a protected resource of this project, so this server will mint tokens whose audience is exactly that resource. The scope list is the baseline a general-purpose client requests in full, not a catalogue — an omnibus scope is refused. Tokens default to a self-contained JWT the resource verifies against this server's published keys, with a fifteen-minute lifetime."
+			"Declare an MCP server (or any API) as a protected resource of this project, so this server will mint tokens whose audience is exactly that resource. The scope list is the baseline a general-purpose client requests in full, not a catalogue — an omnibus scope is refused. Tokens default to a self-contained JWT the resource verifies against this server's published keys, with a fifteen-minute lifetime. Nothing about the resource is fetched: the identifier is unique within the project's bucket, so it need not be reachable or deployed yet. A project without an addressable bucket of its own shares the root namespace, where only a super administrator may declare, amend or remove a resource."
 	},
 	{
 		tool: 'resource_update',
@@ -982,7 +1009,7 @@ const catalogue = [
 			"Sever one end-user's link to one upstream provider. The account survives; only the link is removed."
 	},
 
-	/* ---------------------------------------------------- writes: keys (2) */
+	/* ---------------------------------------------------- writes: keys (5) */
 	{
 		tool: 'jwks_generate',
 		method: 'POST',
@@ -994,7 +1021,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: [],
 		summary:
-			'Generate a new RSA signing key. Takes effect for signing only after a restart; the key is published immediately so verifiers can pick it up first.'
+			'Generate a signing key for the instance key set, in any supported algorithm. It is published and can sign at once; an algorithm the instance did not boot with is advertised in discovery only after a restart.'
 	},
 	{
 		tool: 'jwks_delete',
@@ -1007,7 +1034,46 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['kid'],
 		summary:
-			'Delete a signing key. Refused if it would leave no signing key. Tokens already signed with it stop verifying once it is gone.'
+			'Delete a signing key of the instance key set. Refused if it would leave no signing key. The key keeps being served and honoured until a restart, after which tokens signed with it stop verifying.'
+	},
+	{
+		tool: 'bucket_key_generate',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/keys',
+		action: 'bucket.key.generate',
+		consequence: 'ordinary',
+		requiredRole: null,
+		bodySchema: GenerateBucketKeyBody,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			'Generate a signing key for a bucket with an address of its own. The key is published at once and signs only once promoted, which the server allows after the publication window so every instance serves it first.'
+	},
+	{
+		tool: 'bucket_key_promote',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/keys/:kid/promote',
+		action: 'bucket.key.promote',
+		consequence: 'ordinary',
+		requiredRole: null,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'kid'],
+		summary:
+			"Make a published key the one the bucket signs with for its key type. The key it replaces keeps verifying. Refused before the key's promotableAt, and when it would leave no key in an algorithm the bucket's clients require."
+	},
+	{
+		tool: 'bucket_key_retire',
+		method: 'DELETE',
+		path: '/admin/api/buckets/:id/keys/:kid',
+		action: 'bucket.key.retire',
+		consequence: 'high',
+		requiredRole: null,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'kid'],
+		summary:
+			'Retire a key the bucket no longer signs with. It stays published until every token it could have signed has expired, then tokens signed with it stop verifying. Refused for the signing key. High-consequence: describe it and confirm before running.'
 	},
 
 	/* ------------------------------------------------ writes: settings (3) */

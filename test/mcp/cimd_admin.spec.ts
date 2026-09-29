@@ -25,6 +25,7 @@ import { clearDocumentCache } from 'lib/client_metadata_document/cache.ts';
 import { resolver } from 'lib/client_metadata_document/fetch.ts';
 import { serveDocument, mock } from '../cimd/document_host.js';
 import { clearPermissions, permitIdentifier } from './permissions.ts';
+import { DEFAULT_REQUEST_BUCKET } from 'lib/configs/issuer.ts';
 
 /*
  * Does the administrative plane actually work through a client identity document, end to end?
@@ -116,9 +117,13 @@ describe('the administrative plane through a client identity document', () => {
 		const { identifier } = serveDocument();
 		await permitIdentifier(identifier);
 
-		expect(await resolveBucketForRequest(identifier, MCP_RESOURCE)).toBe(
-			ADMIN_BUCKET_ID
-		);
+		expect(
+			await resolveBucketForRequest(
+				identifier,
+				MCP_RESOURCE,
+				DEFAULT_REQUEST_BUCKET
+			)
+		).toBe(ADMIN_BUCKET_ID);
 	});
 
 	/*

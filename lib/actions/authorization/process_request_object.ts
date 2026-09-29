@@ -1,7 +1,7 @@
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import type { PipelineParams } from 'lib/consts/param_list.js';
 import * as JWT from '../../helpers/jwt.ts';
-import { keystore } from 'lib/configs/keystore.js';
+import { keysFor } from 'lib/keys/issuer_keys.js';
 import { clientKeys, checkClientSecretExpiration } from 'lib/models/client.js';
 import { assertJwtClaimsAndHeader } from '../../addon/index.js';
 import {
@@ -106,7 +106,12 @@ export default async function processRequestObject(
 				);
 				trusted = true;
 			} else {
-				decrypted = await JWT.decrypt(params.request, keystore);
+				// Only the addressed issuer's own keys: a request object encrypted to another bucket's key
+				// was meant for that bucket.
+				decrypted = await JWT.decrypt(
+					params.request,
+					(await keysFor(oidc.bucket)).decryption
+				);
 			}
 
 			params.request = decrypted.toString('utf8');

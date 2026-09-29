@@ -2,6 +2,7 @@ import { mustChange } from './_warn.ts';
 import * as errors from '../helpers/errors.ts';
 import { MCP_RESOURCE_SERVER, isMcpResource } from '../mcp/resource_server.js';
 import { resolveDeclaredResource } from '../resources/registry.js';
+import { namespaceOf } from '../resources/namespace.js';
 import type { OIDCContext } from '../helpers/oidc_context.ts';
 import type { ResourceServerInfo } from '../helpers/resource_server.ts';
 import type { Client } from '../models/client.ts';
@@ -41,7 +42,7 @@ export async function useGrantedResource(
 }
 
 export async function getResourceServerInfo(
-	_oidc: OIDCContext,
+	oidc: OIDCContext,
 	resourceIndicator: string,
 	_client: Client
 ): Promise<ResourceServerInfo> {
@@ -72,8 +73,13 @@ export async function getResourceServerInfo(
 	 * This is what makes the capability data rather than code. Before it, an audience this server had
 	 * not been compiled to know about fell to the stub below, so protecting a third-party MCP server
 	 * meant writing an override in this repository.
+	 *
+	 * Looked up only in the namespace of the address this request arrived at: the same identifier may be
+	 * declared by another tenant with an issuer of its own, and that declaration is not this one.
 	 */
-	const declared = await resolveDeclaredResource(resourceIndicator);
+	const declared = oidc
+		? await resolveDeclaredResource(resourceIndicator, namespaceOf(oidc.bucket))
+		: undefined;
 	if (declared) {
 		return declared;
 	}

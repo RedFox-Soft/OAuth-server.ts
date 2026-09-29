@@ -123,10 +123,41 @@ dup key: { email: "…" }`, and the fault's message is stored and sent. The user
   built with `COPY . .` and `.dockerignore` excluded only four conventional dotenv names, so a
   `.env.production` on the building machine would have been baked in and loaded; it now excludes every
   `.env*`, `.git`, CI and agent configuration, specs, wiki and docs.
+- **A tenant can no longer claim another tenant's MCP server.** A declared protected resource was
+  unique across the instance and first come, first served, so any group member could declare someone
+  else's server, leave its owner a permanent conflict and route its clients into their own bucket. A
+  declaration is now unique within its issuer: a bucket with an address of its own declares without any
+  outbound check, and at the shared root issuer only a super administrator declares.
+- **A token from one bucket no longer verifies at another bucket's resource server.** Every bucket
+  signed with the instance keys, so tenant separation there rested on the resource server checking
+  `iss`. A bucket with an address now signs with keys of its own and publishes them at its own
+  `jwks_uri`; the root issuer's keys and metadata are unchanged.
 - **An end user's own password is held to eight characters.** Registration and the reset form enforced
   the minimum only through the form's `required` attribute, so a direct POST set any password, and an
   empty one reached the hash and answered 500. Both now refuse a short password as a form to correct,
   the same eight every administrator-set password is held to.
+
+### Added
+
+- **Per-bucket key rotation.** A bucket's owning group generates, promotes and retires its keys from the
+  bucket's page or through MCP; a new key is published before it may sign and a retired one stays
+  published until every token it signed has expired.
+- **Whether a resource vouches for its declaration.** The console and the `resource_vouching_check`
+  tool report whether a declared resource's own RFC 9728 metadata lists the issuer its tokens carry,
+  following the full MCP discovery order. It blocks nothing.
+
+### Fixed
+
+- **The first schema migration would never have run.** Both provisioning scripts marked every
+  declared migration applied on every run, and the release command runs them before `db:migrate`; they
+  now baseline only a database they provisioned from empty, and `db:migrate` hands a step its handle.
+- **A resource declared with a significant trailing slash keeps it.** Declaration canonicalized with
+  the default options, so the flag had no effect and both spellings were issued tokens.
+- **Every signed response from a named bucket carries that bucket's issuer.** The signed userinfo
+  response, the JWT introspection response, the JWT-secured authorization response and the back-channel
+  logout token were minted without the bucket and named the root issuer, so a relying party checking
+  `iss` against the bucket's metadata rejected them. The logout token now names the bucket the ended
+  session signed in to.
 
 ## [0.6.0] - 2026-09-28
 

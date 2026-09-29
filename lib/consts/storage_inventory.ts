@@ -122,11 +122,16 @@ export type ModelAreaName = (typeof MODEL_AREAS)[number];
  */
 export const STORE_AREAS = {
 	jwks: 'jwks',
+	/*
+	 * The signing and encryption keys of each addressable bucket, which is its own issuer. The root
+	 * issuer's keys are `jwks` above.
+	 */
+	bucketKeys: 'bucketKeys',
 	projects: 'projects',
 	/*
 	 * Audiences this server will mint tokens for, declared by an administrator. The document `_id` is
-	 * the canonical resource identifier, so instance-wide uniqueness is the primary key rather than a
-	 * rule a route has to remember.
+	 * the namespace and the canonical resource identifier joined, so uniqueness within a namespace is
+	 * the primary key rather than a rule a route has to remember.
 	 */
 	protectedResources: 'protectedResources',
 	userBuckets: 'userBuckets',
@@ -433,6 +438,20 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 		[{ key: { kid: 1 }, unique: true }]
 	),
 	/*
+	 * Never reaped by age: a key leaves when its state says so — retired, and past the lifetime of every
+	 * token it could have signed — which a TTL on the record could not know. Owned by a bucket, which is
+	 * not a principal, so the bucket-delete route cascades it explicitly. Indexed on `bucketId` because
+	 * every read is one bucket's set.
+	 */
+	storeArea(
+		STORE_AREAS.bucketKeys,
+		null,
+		unowned(
+			'owned by a bucket, which is not a principal; cascaded by the bucket-delete route'
+		),
+		[{ key: { bucketId: 1 } }]
+	),
+	/*
 	 * `clientIds` is not unique — a client belongs to one project, but nothing in the schema enforces
 	 * that. It is indexed because projectStore.findByClientId runs on every browser-origin request to
 	 * a client-based CORS endpoint, so the lookup has to be a point read rather than a scan.
@@ -460,7 +479,8 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 	 * explicitly instead, and reports how many went.
 	 *
 	 * `projectId` is indexed because the console lists a project's resources and the delete cascade
-	 * reads by it; the identifier needs no index, being the `_id`.
+	 * reads by it; the identifier needs no index, being half of the `_id`, and every resolution reads
+	 * by the whole of it.
 	 */
 	storeArea(
 		STORE_AREAS.protectedResources,

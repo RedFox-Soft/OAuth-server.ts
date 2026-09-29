@@ -1,4 +1,4 @@
-import type { UnnormalizedJWK } from 'lib/configs/verifyJWKs.ts';
+import { StoredJWK, type UnnormalizedJWK } from 'lib/configs/verifyJWKs.ts';
 import { Type as t, type Static } from '@sinclair/typebox';
 import { FederatedIdentity, FederationProvider } from '../federation/types.js';
 
@@ -288,6 +288,58 @@ export interface JWKSStoreInstance {
 
 export interface JWKSStoreConstructor {
 	new (): JWKSStoreInstance;
+}
+
+/*
+ * One signing or encryption key of an addressable bucket, which is its own issuer and so signs with
+ * keys of its own. The root issuer's keys stay in `jwksStore`; a bucket with no address has no issuer
+ * of its own and signs with those.
+ *
+ * `state` is what makes rotation safe across instances that each cache the set for a short while: a
+ * key is `published` before it may sign, so every instance serves it before any signs with it, and a
+ * `retired` key stays published until every token it could have signed has expired.
+ *
+ * The private members are stored the way `jwksStore` stores the root's, and never leave the server:
+ * every surface projects a key through `toPublicJwk`.
+ */
+export const BucketKey = t.Object({
+	_id: t.String(),
+	bucketId: t.String(),
+	kid: t.String(),
+	jwk: StoredJWK,
+	alg: t.String(),
+	use: t.Union([t.Literal('sig'), t.Literal('enc')]),
+	state: t.Union([
+		t.Literal('published'),
+		t.Literal('signing'),
+		t.Literal('retired')
+	]),
+	createdAt: t.Date(),
+	stateChangedAt: t.Date()
+});
+export type BucketKey = Static<typeof BucketKey>;
+export type BucketKeyState = BucketKey['state'];
+
+export interface BucketKeysStoreInstance {
+	listByBucket(bucketId: string): Promise<BucketKey[]>;
+	find(bucketId: string, kid: string): Promise<BucketKey | null>;
+	/*
+	 * Insert-if-absent on `_id`: `true` when this call wrote the record, `false` when one was already
+	 * there. What makes a bucket's first key exactly one key when two instances create it at once.
+	 */
+	createIfAbsent(key: BucketKey): Promise<boolean>;
+	setState(
+		bucketId: string,
+		kid: string,
+		state: BucketKeyState,
+		at: Date
+	): Promise<BucketKey | null>;
+	destroy(bucketId: string, kid: string): Promise<void>;
+	destroyByBucket(bucketId: string): Promise<number>;
+}
+
+export interface BucketKeysStoreConstructor {
+	new (): BucketKeysStoreInstance;
 }
 
 /*
@@ -902,13 +954,19 @@ export interface ProjectStoreConstructor {
 /*
  * An audience this server will mint tokens for, declared by an administrator rather than compiled in.
  *
- * `_id` IS the canonical resource identifier, so instance-wide uniqueness is the primary key rather
- * than a rule somebody has to remember to check. Ownership is not stored here: the resource names its
- * project, the project names its owning group, and every access decision resolves through that — one
- * source of ownership, as everywhere else.
+ * Unique within its namespace — one per addressable bucket, one for everything served at the root —
+ * and `_id` is the two joined (`lib/resources/namespace.ts`), so the uniqueness is still the primary key
+ * rather than a rule somebody has to remember to check. The same identifier may be declared by two
+ * tenants that each have an issuer of their own; resolution only ever reads the namespace of the
+ * address a request arrived at. Ownership is not stored here: the resource names its project, the
+ * project names its owning group, and every access decision resolves through that — one source of
+ * ownership, as everywhere else.
  */
 export const ProtectedResource = t.Object({
 	_id: t.String(),
+	namespace: t.String(),
+	/* The canonical identifier: the token audience, and what the admin API addresses. */
+	identifier: t.String(),
 	projectId: t.String(),
 	name: t.String(),
 	/*
@@ -933,9 +991,15 @@ export const ProtectedResource = t.Object({
 });
 export type ProtectedResource = Static<typeof ProtectedResource>;
 
+export type ProtectedResourcePatch = Partial<
+	Pick<ProtectedResource, 'name' | 'scopes' | 'tokenFormat' | 'accessTokenTTL'>
+>;
+
 export interface ProtectedResourceStoreInstance {
+	/* Throws `UniqueValueTaken` when the identifier is already declared in that namespace. */
 	create(data: {
-		_id: string;
+		namespace: string;
+		identifier: string;
 		projectId: string;
 		name: string;
 		scopes: string[];
@@ -943,20 +1007,30 @@ export interface ProtectedResourceStoreInstance {
 		accessTokenTTL?: number;
 		trailingSlashSignificant?: boolean;
 	}): Promise<ProtectedResource>;
-	find(id: string): Promise<ProtectedResource | null>;
+	find(
+		namespace: string,
+		identifier: string
+	): Promise<ProtectedResource | null>;
 	listByProject(projectId: string): Promise<ProtectedResource[]>;
 	list(): Promise<ProtectedResource[]>;
 	update(
-		id: string,
-		patch: Partial<
-			Pick<
-				ProtectedResource,
-				'name' | 'scopes' | 'tokenFormat' | 'accessTokenTTL'
-			>
-		>
+		namespace: string,
+		identifier: string,
+		patch: ProtectedResourcePatch
 	): Promise<ProtectedResource | null>;
-	destroy(id: string): Promise<void>;
+	destroy(namespace: string, identifier: string): Promise<void>;
 	destroyByProject(projectId: string): Promise<number>;
+	/*
+	 * Moves every declaration of a project from one namespace to another, all or nothing. Answers the
+	 * identifiers already taken in the target instead of moving any, including one taken by a
+	 * concurrent declaration part-way through — the adapter contract has no multi-record transaction,
+	 * so the moves already made are undone rather than left half-applied.
+	 */
+	moveProject(
+		projectId: string,
+		from: string,
+		to: string
+	): Promise<{ moved: number } | { conflicts: string[] }>;
 }
 
 export interface ProtectedResourceStoreConstructor {

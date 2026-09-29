@@ -5,6 +5,7 @@ import { IdToken } from '../models/id_token.ts';
 import { type Client } from '../models/client/types.ts';
 import { type BackchannelAuthenticationRequest } from '../models/backchannel_authentication_request.ts';
 import { guardedFetch } from './egress.ts';
+import { issuingBucket } from '../admin/auth/bucketAddress.ts';
 
 /*
  * The notifications this server sends to a client. They perform network requests and mint a logout
@@ -60,13 +61,25 @@ async function ping(
 	});
 }
 
-// sid is absent when the session never recorded one for this client; it is only sent when required.
+/*
+ * sid is absent when the session never recorded one for this client; it is only sent when required.
+ *
+ * The issuer is the bucket the ended session signed in to, not one derived from the client: the token
+ * is a statement by the authorization server that ended the session, and a relying party checks its
+ * `iss` against the issuer it discovered. A session without a bucket predates buckets and was the
+ * default bucket's.
+ */
 async function logout(
 	client: Client,
 	sub: string | undefined,
-	sid: string | undefined
+	sid: string | undefined,
+	bucketId?: string
 ) {
-	const logoutToken = new IdToken(client, { sub });
+	const logoutToken = new IdToken(
+		client,
+		{ sub },
+		await issuingBucket(bucketId)
+	);
 	logoutToken.mask = { sub: null };
 	logoutToken.set('events', {
 		'http://schemas.openid.net/event/backchannel-logout': {}

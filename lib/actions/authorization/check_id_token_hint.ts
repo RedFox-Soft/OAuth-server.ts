@@ -15,7 +15,8 @@ export default async function checkIdTokenHint(
 			idTokenHint = await IdToken.validate(
 				oidc.params.id_token_hint,
 				oidc.client,
-				oidc.issuer
+				oidc.issuer,
+				oidc.bucket
 			);
 		} catch (err) {
 			if (err instanceof OIDCProviderError) {

@@ -8,7 +8,7 @@ import {
 	DEFAULT_REQUEST_BUCKET,
 	type RequestBucket
 } from 'lib/configs/issuer.js';
-import { keystore } from 'lib/configs/keystore.js';
+import { keysFor } from 'lib/keys/issuer_keys.js';
 import { type Client } from './client.js';
 // From the module itself, not the seam: the seam reaches this module back through the notifications.
 import { clientKeys } from './client/keys.ts';
@@ -181,11 +181,13 @@ export class IdToken {
 				[jwk] = clientKeys(client).symmetric.selectForSign({ alg, use: 'sig' });
 				key = clientKeys(client).symmetric.getKeyObject(jwk);
 			} else {
-				[jwk] = keystore.selectForSign({
+				// The issuing bucket's own keys: a token of one bucket must not verify against another's.
+				const { signing } = await keysFor(this.bucket);
+				[jwk] = signing.selectForSign({
 					alg,
 					use: 'sig'
 				});
-				key = keystore.getKeyObject(jwk);
+				key = signing.getKeyObject(jwk);
 			}
 
 			if (jwk) {
@@ -263,9 +265,16 @@ export class IdToken {
 	/*
 	 * `issuer` is a parameter and not `this.issuer`: this is static, so there is no instance to read a
 	 * bucket from, and the value that must match is the issuer of the address the hint was presented
-	 * at. A constant here would accept a hint minted by any bucket at every bucket's endpoint.
+	 * at. A constant here would accept a hint minted by any bucket at every bucket's endpoint. The keys
+	 * are that address's for the same reason, including the ones it has stopped signing with, since a
+	 * hint may be older than the last rotation.
 	 */
-	static async validate(jwt: string, client: Client, issuer: string) {
+	static async validate(
+		jwt: string,
+		client: Client,
+		issuer: string,
+		bucket: RequestBucket
+	) {
 		const alg = client.idTokenSignedResponseAlg;
 
 		let keyOrStore;
@@ -276,7 +285,7 @@ export class IdToken {
 			);
 			keyOrStore = clientKeys(client).symmetric;
 		} else {
-			keyOrStore = keystore;
+			keyOrStore = (await keysFor(bucket)).verification;
 		}
 
 		const opts = {

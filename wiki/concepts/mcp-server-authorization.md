@@ -4,7 +4,7 @@ title: 'Authorization for MCP servers'
 tags: [architecture, contract, gotcha, config]
 sources: [oauth-server-codebase]
 created: 2026-09-08
-updated: 2026-09-28
+updated: 2026-09-29
 graph:
   node_type: concept
 ---
@@ -37,12 +37,24 @@ The descriptor and the `jwt` access-token format already existed
 (`base_token.ts` reads `resourceServer.accessTokenFormat`), so **no issuance code changed at all**. That was the largest
 simplification in the feature and it was not visible from the spec.
 
-## The identifier is the primary key
+## Unique within a namespace, and the namespace is the issuer
 
-`protectedResources._id` **is** the canonical resource identifier, so instance-wide uniqueness is what
-the datastore enforces rather than a rule a route remembers. The route reads before inserting for a
-better message and treats the insert failure as the same conflict, because the read is a race and the
-key is not.
+A declaration is unique within its **namespace**: the bucket id of an addressable bucket, or `@root` for
+everything served at the root issuer — the default bucket, the administrators bucket, a legacy bucket
+with no address, a project with no bucket (`namespaceOf`, `lib/resources/namespace.ts:19`). The stored
+`_id` is the two joined by one space (`lib/resources/declaration_id.ts`), which a canonical identifier
+cannot contain, so the datastore's primary key is still what enforces uniqueness rather than a rule a
+route remembers. The route reads before inserting for a better message and answers only the store's
+`UniqueValueTaken` as the same conflict, because the read is a race and the key is not. Until
+2026-09-29 the identifier alone was the key — instance-wide and first come, first served (changed in
+3e377b8).
+
+Keyed by bucket id, not issuer string, because a move from path to hostname changes the issuer and not
+the tenant. Every resolution reads only the namespace of the address the request arrived at
+(`getResourceServerInfo` from `oidc.bucket`, `lib/addon/resources.ts`), so two tenants with issuers of
+their own may declare the same URL, and a request at one never reaches — or learns of — the other's:
+it gets the `invalid_target` an undeclared identifier gets. `test/resources/namespace_resolution.spec.ts`
+is the case.
 
 Canonicalization is one function used by *both* sides — declaration and request — which is what makes
 them unable to disagree. `resourceIdentifierMatches` takes the same options as
@@ -53,7 +65,7 @@ that bug; the test did not catch it, reasoning did.
 
 ## Which bucket a request signs into: five rules, and every caller must pass the resource
 
-`resolveBucketForRequest(clientId, resource?)` resolves, in order: reserved console client → admin
+`resolveBucketForRequest(clientId, resource, addressed)` resolves, in order: reserved console client → admin
 bucket; client in a project → that project's bucket; **one** declared resource named → that resource's
 project's bucket; a permitted client identity naming the administrative MCP audience → admin bucket;
 otherwise `redfox`.
@@ -66,13 +78,41 @@ resource — the built-in arm claims it and declaration refuses it — so the ad
 through rule 3.
 
 "An attacker cannot declare a resource" held only for attackers without a console account (corrected
-2026-09-29). Any member of any group can declare, identifiers are unique across the instance, and first
-wins — so a hostile tenant could declare somebody else's MCP server, leave the real owner a permanent
-409, and route that server's clients into the tenant's own bucket. A declaration by anyone but a super
-administrator now has to be vouched for by the resource itself: its protected resource metadata (RFC
-9728, path-inserted or at the host root) must describe that exact identifier and list the issuer of the
-project's bucket in `authorization_servers` (`resourceVouchesFor`, `lib/resources/ownership.ts`), fetched
-through the egress boundary. `test/resources/ownership.spec.ts` is the attack.
+2026-09-29). Any member of any group could declare, identifiers were unique across the instance, and
+first won — so a hostile tenant could declare somebody else's MCP server, leave the real owner a
+permanent 409, and route that server's clients into the tenant's own bucket. The first fix (7322716)
+made every non-super-admin declaration prove itself through the resource's RFC 9728 metadata, which also
+refused every internal-network, loopback and not-yet-deployed server. It was replaced the same day by
+namespaces: a declaration in a bucket with its own address makes no outbound request at all — it can
+only be a claim on that bucket's own namespace — and rule 3 takes the addressed bucket as a required
+argument and chooses only among buckets sharing that issuer (`lib/admin/auth/resolveBucket.ts`). At a
+named address it can therefore only confirm the address. `test/resources/declaration.spec.ts` covers the
+declarations that now need nothing.
+
+**What is left of the proof is a diagnostic.** `checkVouching` (`lib/resources/vouching.ts`) answers,
+for any declaration and blocking nothing, whether the resource's metadata currently describes it and
+lists the issuer its tokens carry — the bucket's own, or `ISSUER` at the root, never `issuerFor` of a
+bucket with no address, which would be `<ISSUER>/<id>`. It follows the MCP discovery order the old proof
+skipped the first step of: a `Bearer` challenge's `resource_metadata` on an unauthenticated **GET** (a
+diagnostic must not POST to somebody else's server), then path-inserted, then root well-known, all
+through the egress boundary. It returns only enums and the expected issuer — no fetched text — so an
+agent reading it through `resource_vouching_check` reads nothing a third party wrote. The console
+fetches it per row after the list renders. `test/resources/vouching.spec.ts`.
+
+**The root namespace is a super administrator's.** Every tenant served at the root shares its issuer,
+and a resource's metadata can say it trusts that issuer but not which of those tenants it belongs to —
+so no proof closes squatting there. Create, amend and remove at `@root` answer 403 for anyone else,
+naming the way out: give the project an addressable bucket (`assertMayWrite`,
+`lib/admin/resources/routes.ts`). `test/resources/root_namespace.spec.ts` is the attack, through the
+console and through an agent.
+
+**Declarations move with their project.** A declaration's namespace is derived from its project's
+bucket, so a project that changed bucket without them would leave declarations that no longer resolve
+anywhere. `planMove`/`applyMove` (`lib/admin/resources/move.ts`) carry them on a bucket assign or
+clear, and when a legacy bucket gains its first address; a target that already declares one of the
+identifiers answers 409 with the list, and a move into `@root` is held to the rule above. The plan is
+checked before the audit write; the store undoes its own moves on a race the plan could not see.
+`test/resources/project_move.spec.ts`.
 
 **The gotcha.** Every caller must pass the resource it has, `findAccount` included. It did not, at
 first: login resolved the project bucket and found the user, `findAccount` resolved `redfox` and did
@@ -207,6 +247,7 @@ this server is naming the required scopes in a challenge — which `/mcp` now do
 
 ## See also
 
+- [[per-issuer-isolation]] — why declarations are unique per issuer and the root namespace is super-admin only
 - [[admin-mcp-control-plane]] — the plane this feature makes reachable by a second kind of client
 - [[group-ownership]] — what a project's owning group decides, which a declared resource inherits
 - [[client-identity-from-database]] — the adapter-every-call rule the resource registry follows, and the memo whose staleness is why the registry has none

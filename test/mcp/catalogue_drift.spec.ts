@@ -167,6 +167,7 @@ describe('MCP tool catalogue', () => {
 		expect(high.map((t) => t.tool).sort()).toEqual([
 			'admin_deactivate',
 			'bucket_address_change',
+			'bucket_key_retire',
 			'bucket_user_delete',
 			'bucket_user_password_reset',
 			'client_delete',

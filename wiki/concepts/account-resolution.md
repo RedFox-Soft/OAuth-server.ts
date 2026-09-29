@@ -11,7 +11,7 @@ graph:
     - predicate: depends_on
       object: concept:client-identity-from-database
       source: oauth-server-codebase
-      evidence: "const clientId = oidc?.client?.clientId ?? _token?.payload?.clientId; const bucketId = await resolveBucketForRequest(clientId);"
+      evidence: "const bucketId = await resolveBucketForRequest(clientId, resource, oidc?.bucket ?? DEFAULT_REQUEST_BUCKET);"
       confidence: high
       status: current
 ---
@@ -57,10 +57,19 @@ The resolver picks the user bucket exactly as login does, via `resolveBucketForR
 client (`account.ts:11-16`):
 
 ```ts
-const clientId = oidc?.client?.clientId ?? _token?.payload?.clientId;
-const bucketId = await resolveBucketForRequest(clientId);
+const clientId = oidc?.entities.Client?.clientId ?? _token?.payload?.clientId;
+const resource = oidc?.params?.resource ?? _token?.payload?.resource;
+const bucketId = await resolveBucketForRequest(
+	clientId,
+	resource,
+	oidc?.bucket ?? DEFAULT_REQUEST_BUCKET
+);
 const user = await getUserStore(bucketId).find(sub);
 ```
+
+The third argument is the bucket whose address the request arrived at, required since 2026-09-29:
+rule 3 reads a declared resource only in that issuer's namespace ([[mcp-server-authorization]]), so a
+caller that could omit it would resolve against every tenant's declarations again.
 
 The fallback is required because `oidc.client` may not be populated on the token and userinfo flows.
 The token side of that expression is also a concrete instance of

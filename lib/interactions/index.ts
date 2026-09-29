@@ -131,7 +131,8 @@ async function resume(interaction: Interaction, cookie: OIDCCookies) {
 	const bucket = await issuingBucket(
 		await resolveBucketForRequest(
 			clientIdOf(interaction),
-			resourceOf(interaction)
+			resourceOf(interaction),
+			await addressedBucketOf(interaction)
 		)
 	);
 	const oidc = new OIDCContext<PipelineParams>({
@@ -295,7 +296,8 @@ async function passwordDoorClosed(
 	const bucket = await getBucketStore().find(
 		await resolveBucketForRequest(
 			clientIdOf(interaction),
-			resourceOf(interaction)
+			resourceOf(interaction),
+			await addressedBucketOf(interaction)
 		)
 	);
 	// `=== false` exactly: absent means available, which is what a bucket predating the field must get.
@@ -347,6 +349,16 @@ function clientIdOf(interaction: Interaction): string | undefined {
  */
 function resourceOf(interaction: Interaction): string | string[] | undefined {
 	return interaction.payload.params?.resource;
+}
+
+/*
+ * The bucket whose address the authorization request that began this interaction arrived at. Recorded
+ * on the interaction when it was created, and read back rather than taken from the current request for
+ * the reason `clientIdOf` gives: these screens are served at the root, whatever address began them.
+ * An interaction written before the field existed began at the root.
+ */
+async function addressedBucketOf(interaction: Interaction) {
+	return issuingBucket(interaction.payload.bucketId);
 }
 
 /*
@@ -493,7 +505,11 @@ export const ui = new Elysia()
 			return loginServer(uid, {
 				notice: resolveNotice(query.notice),
 				handOffTo: redirectUriOf(interaction),
-				...(await loginOptionsForClient(clientId, resourceOf(interaction)))
+				...(await loginOptionsForClient(
+					clientId,
+					resourceOf(interaction),
+					await addressedBucketOf(interaction)
+				))
 			});
 		},
 		{ query: t.Object({ notice: t.Optional(t.String()) }) }
@@ -508,7 +524,8 @@ export const ui = new Elysia()
 
 			const bucketId = await resolveBucketForRequest(
 				clientId,
-				resourceOf(interaction)
+				resourceOf(interaction),
+				await addressedBucketOf(interaction)
 			);
 			/*
 			 * Resolved once, and used twice: the throttle needs to know whether a password alone can
@@ -669,7 +686,8 @@ export const ui = new Elysia()
 		}
 		const bucketId = await resolveBucketForRequest(
 			clientIdOf(interaction),
-			resourceOf(interaction)
+			resourceOf(interaction),
+			await addressedBucketOf(interaction)
 		);
 		const user = await getUserStore(bucketId).find(pending.accountId);
 		// Enrolment cleared between the password and now: send them to set one up rather than ask for a
@@ -692,7 +710,8 @@ export const ui = new Elysia()
 
 			const bucketId = await resolveBucketForRequest(
 				clientIdOf(interaction),
-				resourceOf(interaction)
+				resourceOf(interaction),
+				await addressedBucketOf(interaction)
 			);
 			const refuse = () =>
 				totpServer(uid, {
@@ -764,11 +783,13 @@ export const ui = new Elysia()
 		const clientId = clientIdOf(interaction);
 		const bucketId = await resolveBucketForRequest(
 			clientId,
-			resourceOf(interaction)
+			resourceOf(interaction),
+			await addressedBucketOf(interaction)
 		);
 		const { totpRequired } = await loginOptionsForClient(
 			clientId,
-			resourceOf(interaction)
+			resourceOf(interaction),
+			await addressedBucketOf(interaction)
 		);
 		// Lowered while this person was mid-flow: there is nothing left to enrol for.
 		if (!totpRequired) {
@@ -809,7 +830,8 @@ export const ui = new Elysia()
 			const clientId = clientIdOf(interaction);
 			const bucketId = await resolveBucketForRequest(
 				clientId,
-				resourceOf(interaction)
+				resourceOf(interaction),
+				await addressedBucketOf(interaction)
 			);
 
 			/*
@@ -897,7 +919,8 @@ export const ui = new Elysia()
 			// taken from a parameter would let anyone aim this at any tenant's provider.
 			const bucketId = await resolveBucketForRequest(
 				clientId,
-				resourceOf(interaction)
+				resourceOf(interaction),
+				await addressedBucketOf(interaction)
 			);
 			const bucket = await getBucketStore().find(bucketId);
 			/*
@@ -968,7 +991,8 @@ export const ui = new Elysia()
 			const clientId = clientIdOf(interaction);
 			const bucketId = await resolveBucketForRequest(
 				clientId,
-				resourceOf(interaction)
+				resourceOf(interaction),
+				await addressedBucketOf(interaction)
 			);
 			const user = await getUserStore(bucketId).find(handoff.accountId);
 			// Re-read rather than trusted from the record: an account frozen between hops must not sign in.
@@ -1045,7 +1069,8 @@ export const ui = new Elysia()
 			 */
 			const bucketId = await resolveBucketForRequest(
 				clientId,
-				resourceOf(interaction)
+				resourceOf(interaction),
+				await addressedBucketOf(interaction)
 			);
 			/*
 			 * One page for every outcome — sent, not sent, or held back by the per-address cooldown or daily
@@ -1073,7 +1098,11 @@ export const ui = new Elysia()
 		if (closed) return closed;
 
 		const bucket = await getBucketStore().find(
-			await resolveBucketForRequest(clientId, resourceOf(interaction))
+			await resolveBucketForRequest(
+				clientId,
+				resourceOf(interaction),
+				await addressedBucketOf(interaction)
+			)
 		);
 		if (bucket && !bucket.registrationOpen) {
 			return registrationClosedPage();
@@ -1090,7 +1119,8 @@ export const ui = new Elysia()
 
 			const bucketId = await resolveBucketForRequest(
 				clientId,
-				resourceOf(interaction)
+				resourceOf(interaction),
+				await addressedBucketOf(interaction)
 			);
 			const bucket = await getBucketStore().find(bucketId);
 
@@ -1229,7 +1259,8 @@ export const ui = new Elysia()
 		const bucket = await issuingBucket(
 			await resolveBucketForRequest(
 				clientIdOf(interaction),
-				resourceOf(interaction)
+				resourceOf(interaction),
+				await addressedBucketOf(interaction)
 			)
 		);
 		const oidc = new OIDCContext<PipelineParams>({

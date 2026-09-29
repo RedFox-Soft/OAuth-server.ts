@@ -114,3 +114,11 @@ Operations:
 - 2026-09-29 — corrected [[mcp-server-authorization]]: a non-super declaration must be vouched for by the resource's RFC 9728 metadata naming the project bucket's issuer; any group member could squat another tenant's identifier.
 - 2026-09-29 — corrected [[single-use-under-concurrency]]: password reset links, group invitations and first-run setup are claimed through `ReplayDetection.unique`.
 - 2026-09-29 — corrected [[error-store-capture-sites]]: a duplicate-key message is replaced with `duplicate key`; MongoDB's quoted the email of a racing registration into the store and Sentry.
+- 2026-09-29 — corrected [[mcp-server-authorization]]: a declared resource is unique within its namespace (the bucket id of an addressable bucket, or `@root`), not across the instance; declaring in an own bucket makes no outbound request, and rule 3 reads only the addressed issuer's namespace. Replaces the RFC 9728 proof from 7322716.
+- 2026-09-29 — corrected [[account-resolution]]: `resolveBucketForRequest` takes the resource and the addressed bucket; the page still showed the one-argument call.
+- 2026-09-29 — corrected [[mcp-server-authorization]]: declaring, amending or removing at the shared root namespace is super-admin only; a project's declarations move with it between buckets, all or none.
+- 2026-09-29 — corrected [[signing-keys]] and [[bucket-is-an-issuer]]: an addressable bucket signs with keys of its own (`bucketKeys`, `keysFor`), published at its own `jwks_uri`; the root key set is unchanged.
+- 2026-09-29 — corrected [[postgresql-backend]]: `database/verify_mongodb.ts` joins the fidelity tier.
+- 2026-09-29 — corrected [[signing-keys]]: a bucket's owning group rotates its keys (generate, promote after the publication window, retire with a day's grace) through the console and MCP.
+- 2026-09-29 — corrected [[mcp-server-authorization]]: the RFC 9728 check is now a non-blocking diagnostic (`checkVouching`) following the full MCP discovery order, challenge header first.
+- 2026-09-29 — added [[per-issuer-isolation]]: why the issuer is the unit of isolation for resource namespaces and signing keys.

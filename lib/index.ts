@@ -163,12 +163,14 @@ export const elysia = new Elysia({ strictPath: true, normalize: false })
 	 * here can shadow `/auth`, `/token` or any other endpoint above. The reserved-slug list is what
 	 * stops an operator choosing a confusing address, not what makes this correct.
 	 *
-	 * Instance-wide surfaces are deliberately absent: the key set, the management surface, the console
-	 * and static assets belong to the server rather than to a population, and each of their first
-	 * segments is a name a bucket may not take.
+	 * Instance-wide surfaces are deliberately absent: the management surface, the console and static
+	 * assets belong to the server rather than to a population, and each of their first segments is a
+	 * name a bucket may not take. The key set is not among them: a bucket is its own issuer and signs
+	 * with keys of its own.
 	 */
 	.group('/:bucket', (bucketScoped) =>
 		bucketScoped
+			.use(jwks)
 			.use(authGet)
 			.use(authPost)
 			.use(tokenAction)
