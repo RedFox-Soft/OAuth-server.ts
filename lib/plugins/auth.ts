@@ -8,15 +8,14 @@ import { tokenAuth } from 'lib/shared/token_auth.js';
 /*
  * The request headers these endpoints read. `accept` picks an error page or JSON in the shared error
  * handler (and a JWT introspection response); `x-client-cert` is where the default getCertificate
- * finds a mutual-TLS client certificate forwarded by the proxy, and `x-client-cert-secret` the proxy's
- * secret without which it ignores that header.
+ * finds a mutual-TLS client certificate forwarded by the proxy, beside RFC 9440's `client-cert`.
  */
 export const authHeaders = t.Object({
 	authorization: t.Optional(t.String()),
 	dpop: t.Optional(t.String()),
 	accept: t.Optional(t.String()),
 	'x-client-cert': t.Optional(t.String()),
-	'x-client-cert-secret': t.Optional(t.String())
+	'client-cert': t.Optional(t.String())
 });
 
 export const authParams = t.Object({

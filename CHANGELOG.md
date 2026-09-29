@@ -81,7 +81,7 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   one accepted page, which states the limits, and the mail is sent after the response.
 - **A datastore's duplicate-key error no longer carries an end user's address into the error store
   or Sentry.** Two registrations of one address racing past the lookup made MongoDB raise `E11000 …
-  dup key: { email: "…" }`, and the fault's message is stored and sent. The user stores now raise
+dup key: { email: "…" }`, and the fault's message is stored and sent. The user stores now raise
   their value-free "already exists" error for it, and any duplicate-key message is recorded as
   `duplicate key`.
 - **First-run setup, reset links and group invitations are single use under concurrency.** Each
@@ -93,11 +93,12 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   lock its owner out with a 409 and route its clients into their own bucket. A declaration by anyone
   but a super administrator now needs the resource's RFC 9728 metadata to describe that identifier and
   list the project bucket's issuer.
-- **A forwarded client certificate is believed only beside the proxy's secret.** With the mTLS
-  features on, the default hook took the certificate from any `x-client-cert` header, and a certificate
-  is public, so a caller the proxy did not strip the header from could authenticate as a self-signed
-  TLS client or present a stolen certificate-bound token. The header now counts only with
-  `x-client-cert-secret` carrying the new `MTLS_PROXY_SECRET`, and is ignored when none is configured.
+- **A forwarded client certificate is read only when the operator says the proxy sets it.** With the
+  mTLS features on, the default hook took the certificate from any `x-client-cert` header, and a
+  certificate is public, so a caller the proxy did not strip the header from could authenticate as a
+  self-signed TLS client or present a stolen certificate-bound token. The new
+  `mTLS.trustProxyCertificateHeader` setting, off by default, gates it; when on, RFC 9440's
+  `Client-Cert` is read, with `x-client-cert` as the fallback.
 - **Requests to an upstream identity provider go through the egress boundary.** Discovery, the code
   exchange, GitHub's token exchange and the upstream key set used plain `fetch`, although any group
   member can set a provider's issuer and an unauthenticated visitor re-triggers the requests by

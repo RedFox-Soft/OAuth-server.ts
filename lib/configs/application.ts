@@ -317,6 +317,14 @@ export const ApplicationConfig = {
 	 * description: Enables the `tls_client_auth` client authentication method.
 	 */
 	'mTLS.tlsClientAuth': false,
+	/*
+	 * Whether a client certificate forwarded by the TLS-terminating proxy in a request header is
+	 * believed. TLS ends at the proxy, so a header is the only way a certificate reaches this server —
+	 * and a header is something any caller can send. RFC 9440 has the proxy remove or overwrite the
+	 * field on every incoming request; whether it does is a property of the deployment this server
+	 * cannot see, so it is the operator's to state. Off: no certificate header is read at all.
+	 */
+	'mTLS.trustProxyCertificateHeader': false,
 
 	/*
 	 * features.deviceFlow

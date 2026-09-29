@@ -398,7 +398,19 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 		summary: 'Authenticate clients by TLS certificate',
 		type: 'boolean',
 		description:
-			'Enables Mutual TLS client authentication / certificate-bound tokens. TLS ends at the proxy in front of this server, so the proxy forwards the client certificate base64-encoded in `x-client-cert` and must also send the MTLS_PROXY_SECRET environment value in `x-client-cert-secret`; a certificate header without that secret is ignored, because any caller could otherwise send one.'
+			'Enables Mutual TLS client authentication / certificate-bound tokens. TLS ends at the proxy in front of this server, so the client certificate arrives in a header the proxy sets; see "Trust the proxy’s certificate header".'
+	},
+	{
+		key: 'mTLS.trustProxyCertificateHeader',
+		domain: 'request-security',
+		group: 'mTLS',
+		label: 'Trust the proxy’s certificate header',
+		summary: 'Read the client certificate from the header the proxy sets',
+		type: 'boolean',
+		dependsOn: 'mTLS.enabled',
+		risk: 'security',
+		description:
+			'Whether the client certificate is read from the `Client-Cert` header (RFC 9440) or, failing that, a base64 `x-client-cert`. This one has a wrong answer in each direction. Turn it ON only when the TLS-terminating proxy in front of this server verifies the client certificate, sets the header, and removes or overwrites any copy an incoming request already carries: with it on and a proxy that passes the header through, anyone can send a certificate — which is public — and authenticate as a self-signed TLS client or present a stolen certificate-bound token. Leave it OFF and no certificate is ever read, so the mTLS methods and certificate binding cannot succeed.'
 	},
 	{
 		key: 'mTLS.certificateBoundAccessTokens',

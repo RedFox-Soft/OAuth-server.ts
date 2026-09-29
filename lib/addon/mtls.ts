@@ -1,43 +1,51 @@
 import { X509Certificate } from 'node:crypto';
 
 import { mustChange } from './_warn.ts';
-import { mtlsProxySecret } from '../configs/env.js';
-import constantEquals from '../helpers/constant_equals.js';
+import { ApplicationConfig } from '../configs/application.js';
 import type { OIDCContext } from '../helpers/oidc_context.ts';
 
-// RFC 8705 does not mandate how the TLS-terminating proxy forwards the client certificate, so the
-// source expresses it as an overridable hook. The default expects the PEM/DER certificate base64
-// encoded in the `x-client-cert` header; deployments whose proxy uses a different header (e.g.
-// `x-ssl-client-cert`) override `features.mTLS.getCertificate`. `oidc` is the request context, whose
-// `get()` reads a request header.
-//
-// A header is something any caller can send, and the certificate is public — a self-signed client
-// publishes it in its key set — so the header is believed only beside `x-client-cert-secret` carrying
-// MTLS_PROXY_SECRET, which the proxy alone holds. Without it, any caller the proxy did not strip the
-// header from could authenticate as a self-signed TLS client, or present a stolen certificate-bound
-// token with its certificate. No secret configured means no certificate at all.
+/*
+ * The client certificate a TLS-terminating proxy forwarded, or undefined.
+ *
+ * RFC 8705 leaves how the certificate reaches the server to the deployment; RFC 9440 standardises the
+ * `Client-Cert` header for it — the DER certificate as a structured-field byte sequence, `:<base64>:` —
+ * and a bare base64 `x-client-cert`, which proxies configured before RFC 9440 send, is read when that is
+ * absent. A deployment whose proxy uses yet another header overrides `features.mTLS.getCertificate`.
+ *
+ * Read only when `mTLS.trustProxyCertificateHeader` says so. A header is something any caller can send
+ * and the certificate is public — a self-signed client publishes it in its key set — so believing the
+ * header is safe only when the proxy removes or overwrites it on every incoming request, as RFC 9440
+ * requires of it. Whether it does is a fact about the deployment this server cannot observe, so the
+ * operator states it; until they do, no certificate is read at all.
+ */
 export function getCertificate(oidc: OIDCContext) {
-	const cert = oidc.get('x-client-cert');
-	if (!cert) {
+	const standard = oidc.get('client-cert');
+	const legacy = oidc.get('x-client-cert');
+	if (!standard && !legacy) {
 		return undefined;
 	}
-	const secret = mtlsProxySecret();
-	if (!secret) {
+	if (ApplicationConfig['mTLS.trustProxyCertificateHeader'] !== true) {
 		mustChange(
 			'features.mTLS.getCertificate',
-			'trust a client certificate header: set MTLS_PROXY_SECRET and have the TLS-terminating proxy send it as x-client-cert-secret (certificate headers are ignored until then)'
+			'read a forwarded client certificate: switch on mTLS.trustProxyCertificateHeader once the TLS-terminating proxy sets Client-Cert and strips any incoming copy (certificate headers are ignored until then)'
 		);
 		return undefined;
 	}
-	const vouched = oidc.get('x-client-cert-secret');
-	if (typeof vouched !== 'string' || !constantEquals(vouched, secret)) {
+	const encoded = standard ? byteSequence(standard) : legacy;
+	if (!encoded) {
 		return undefined;
 	}
 	try {
-		return new X509Certificate(Buffer.from(cert, 'base64'));
+		return new X509Certificate(Buffer.from(encoded, 'base64'));
 	} catch {
 		return undefined;
 	}
+}
+
+/* RFC 8941 §3.3.5: a byte sequence is base64 between colons. Anything else is not one. */
+function byteSequence(value: string): string | undefined {
+	const match = value.trim().match(/^:([A-Za-z0-9+/=]*):$/);
+	return match?.[1] || undefined;
 }
 
 // Whether the client certificate is verified and chains to a trusted CA; the deployment decides.

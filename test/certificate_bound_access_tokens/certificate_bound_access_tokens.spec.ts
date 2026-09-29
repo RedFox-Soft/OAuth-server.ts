@@ -29,9 +29,6 @@ import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { BackchannelAuthenticationRequestPayload } from 'lib/models/backchannel_authentication_request.js';
 import { present } from 'test/shape.js';
 
-/* The proxy's secret, which the default certificate hook requires beside the header (.env.test). */
-const PROXY_SECRET = 'test-proxy-secret';
-
 const crt = new X509Certificate(
 	readFileSync('./test/jwks/client.crt', { encoding: 'ascii' })
 );
@@ -90,7 +87,6 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 			const res = await agent.userinfo.get({
 				headers: {
 					authorization: `Bearer ${bearer}`,
-					'x-client-cert-secret': PROXY_SECRET,
 					'x-client-cert': 'foobar'
 				}
 			});
@@ -99,7 +95,6 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 			const { status } = await agent.userinfo.get({
 				headers: {
 					authorization: `Bearer ${bearer}`,
-					'x-client-cert-secret': PROXY_SECRET,
 					'x-client-cert': crt.raw.toString('base64')
 				}
 			});
@@ -170,7 +165,6 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 				{
 					headers: {
 						...AuthorizationRequest.basicAuthHeader('client', 'secret'),
-						'x-client-cert-secret': PROXY_SECRET,
 						'x-client-cert': crt.raw.toString('base64')
 					}
 				}
@@ -229,7 +223,6 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 				},
 				{
 					headers: {
-						'x-client-cert-secret': PROXY_SECRET,
 						'x-client-cert': crt.raw.toString('base64')
 					}
 				}
@@ -274,7 +267,6 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 				{
 					headers: {
 						...AuthorizationRequest.basicAuthHeader('client', 'secret'),
-						'x-client-cert-secret': PROXY_SECRET,
 						'x-client-cert': crt.raw.toString('base64')
 					}
 				}
@@ -343,7 +335,6 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 				},
 				{
 					headers: {
-						'x-client-cert-secret': PROXY_SECRET,
 						'x-client-cert': crt.raw.toString('base64')
 					}
 				}
@@ -388,7 +379,6 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 				eventBus.once('grant.success', spy);
 				const { status } = await auth.getToken(code, {
 					headers: {
-						'x-client-cert-secret': PROXY_SECRET,
 						'x-client-cert': crt.raw.toString('base64')
 					}
 				});
@@ -426,7 +416,6 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 			beforeEach(async function () {
 				const { data } = await auth.getToken(code, {
 					headers: {
-						'x-client-cert-secret': PROXY_SECRET,
 						'x-client-cert': crt.raw.toString('base64')
 					}
 				});
@@ -445,7 +434,6 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 					},
 					{
 						headers: {
-							'x-client-cert-secret': PROXY_SECRET,
 							'x-client-cert': crt.raw.toString('base64'),
 							...auth.basicAuthHeader
 						}
@@ -525,7 +513,6 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 				const { status } = await auth.getToken(code, {
 					headers: {
-						'x-client-cert-secret': PROXY_SECRET,
 						'x-client-cert': crt.raw.toString('base64')
 					}
 				});
@@ -563,7 +550,6 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 			beforeEach(async function () {
 				const { data } = await auth.getToken(code, {
 					headers: {
-						'x-client-cert-secret': PROXY_SECRET,
 						'x-client-cert': crt.raw.toString('base64')
 					}
 				});
@@ -583,7 +569,6 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 					},
 					{
 						headers: {
-							'x-client-cert-secret': PROXY_SECRET,
 							'x-client-cert': crt.raw.toString('base64')
 						}
 					}
@@ -633,7 +618,6 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 					},
 					{
 						headers: {
-							'x-client-cert-secret': PROXY_SECRET,
 							'x-client-cert': new X509Certificate(
 								readFileSync('./test/jwks/rsa.crt', { encoding: 'ascii' })
 							).raw.toString('base64')
@@ -668,7 +652,6 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 				{
 					headers: {
 						...AuthorizationRequest.basicAuthHeader('client', 'secret'),
-						'x-client-cert-secret': PROXY_SECRET,
 						'x-client-cert': crt.raw.toString('base64')
 					}
 				}

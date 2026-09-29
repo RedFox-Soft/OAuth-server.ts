@@ -27,6 +27,8 @@ export const ApplicationConfig = {
 	'clientCredentials.enabled': true,
 	'mTLS.enabled': true,
 	'mTLS.certificateBoundAccessTokens': true,
+	/* The deployment states that its proxy sets the certificate header and strips incoming copies. */
+	'mTLS.trustProxyCertificateHeader': true,
 	'introspection.enabled': true,
 	'deviceFlow.enabled': true,
 	'ciba.enabled': true
