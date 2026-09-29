@@ -79,6 +79,11 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   meant that asking twice within a minute told anybody the address was registered; the SMTP send,
   awaited only for such an address, told the same by response time. Every outcome now renders the
   one accepted page, which states the limits, and the mail is sent after the response.
+- **A datastore's duplicate-key error no longer carries an end user's address into the error store
+  or Sentry.** Two registrations of one address racing past the lookup made MongoDB raise `E11000 …
+  dup key: { email: "…" }`, and the fault's message is stored and sent. The user stores now raise
+  their value-free "already exists" error for it, and any duplicate-key message is recorded as
+  `duplicate key`.
 - **First-run setup, reset links and group invitations are single use under concurrency.** Each
   checked, then acted, then marked, so parallel requests all got through: two setups made two super
   administrators, two submissions of one reset link both set a password, and two acceptances of one

@@ -61,6 +61,16 @@ history and whatever third party the redirect targets.
 That coupling is structural: `captureFault` returns the reference only when it recorded something, so
 "unrecorded responses carry no reference" cannot drift.
 
+## A message is stored, so a datastore's is not
+
+The record keeps the fault's message, and the Sentry event carries it. A driver's duplicate-key error
+quotes the value it refused — MongoDB's `E11000 … dup key: { email: "…" }` is an end user's address when
+two registrations race — so `faultMessage` (`lib/error_store/fingerprint.ts`) replaces any duplicate-key
+message with `duplicate key` (added 2026-09-29), and both user stores turn their unique-email refusal into
+the value-free error their own lookup already raised. Nothing else is scrubbed from a message: one the
+server builds from a value it holds is stored as written, which `test/error_store/redaction.spec.ts`
+states.
+
 ## Related
 
 - [[admin-plane-error-shape]] — why an admin error returns early from the global handler at all

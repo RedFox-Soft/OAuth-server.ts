@@ -2,6 +2,7 @@ import crypto from 'crypto';
 
 import { sql } from './db.js';
 import { docOf } from './json.js';
+import { isUniqueViolation } from './sqlState.js';
 import { userAreaFor } from '../../consts/storage_inventory.js';
 import { documentOf } from '../documents.js';
 import { User, type UserStoreInstance } from '../types.js';
@@ -95,10 +96,23 @@ export class UserStore implements UserStoreInstance {
 		};
 
 		const handle = sql();
-		await handle`
-			INSERT INTO ${handle(this.area)} (id, doc, expires_at)
-			VALUES (${user._id}, ${user}, NULL)
-		`;
+		try {
+			await handle`
+				INSERT INTO ${handle(this.area)} (id, doc, expires_at)
+				VALUES (${user._id}, ${user}, NULL)
+			`;
+		} catch (error) {
+			/*
+			 * The unique email index refused a concurrent registration of the same address, which the lookup
+			 * above could not see. The same error that lookup raises, so every caller handles one outcome —
+			 * and no driver text naming the address travels on into the error store.
+			 */
+			if (isUniqueViolation(error)) {
+				// eslint-disable-next-line preserve-caught-error -- the cause quotes the address this drops
+				throw new Error('User with this email already exists');
+			}
+			throw error;
+		}
 
 		return user;
 	}

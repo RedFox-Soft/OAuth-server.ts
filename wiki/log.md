@@ -113,3 +113,4 @@ Operations:
 - 2026-09-29 — corrected [[mcp-server-authorization]] and [[upstream-federation]]: federation discovery, code exchange, GitHub token exchange and the upstream key set go through the egress boundary; discovery refuses non-https endpoints.
 - 2026-09-29 — corrected [[mcp-server-authorization]]: a non-super declaration must be vouched for by the resource's RFC 9728 metadata naming the project bucket's issuer; any group member could squat another tenant's identifier.
 - 2026-09-29 — corrected [[single-use-under-concurrency]]: password reset links, group invitations and first-run setup are claimed through `ReplayDetection.unique`.
+- 2026-09-29 — corrected [[error-store-capture-sites]]: a duplicate-key message is replaced with `duplicate key`; MongoDB's quoted the email of a racing registration into the store and Sentry.

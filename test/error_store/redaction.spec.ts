@@ -152,6 +152,27 @@ describe('error store redaction', () => {
 	 * and the honest answer is that a message the server itself builds from a secret WILL be stored, so
 	 * what is pinned here is that nothing the *request* carried arrives via the message on its own.
 	 */
+	/*
+	 * A datastore's own error text quotes the values it refused. MongoDB's duplicate-key error names the
+	 * key — an end user's email address when two registrations race — and that text was stored here and
+	 * sent to Sentry as the fault's message.
+	 */
+	it('stores no value a datastore quoted in a duplicate-key fault', async () => {
+		const route = '/redact-duplicate-key';
+		const app = new Elysia().onError(errorHandler).get(route, () => {
+			throw Object.assign(
+				new Error(
+					'E11000 duplicate key error collection: oauth.user_x index: email_1 dup key: { email: "victim@x.io" }'
+				),
+				{ code: 11000 }
+			);
+		});
+
+		await app.handle(new Request(`http://e.ly${route}`));
+
+		expect(await storedFor(route)).not.toContain('victim@x.io');
+	});
+
 	it('stores the fault message without the request that caused it', async () => {
 		const route = '/redact-message';
 		const app = new Elysia().onError(errorHandler).get(route, () => {

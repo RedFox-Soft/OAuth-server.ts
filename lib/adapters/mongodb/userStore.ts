@@ -79,9 +79,27 @@ export class UserStore implements UserStoreInstance {
 			updatedAt: now,
 			lastLoginAt: null
 		};
-		await db
-			.collection<User>(this.collectionName)
-			.insertOne(user, ABSENT_UNDEFINED);
+		try {
+			await db
+				.collection<User>(this.collectionName)
+				.insertOne(user, ABSENT_UNDEFINED);
+		} catch (error) {
+			/*
+			 * The unique email index refused a concurrent registration of the same address, which the lookup
+			 * above could not see. The same error that lookup raises, so every caller handles one outcome —
+			 * and the driver's E11000 text, which quotes the address, never reaches the error store.
+			 */
+			if (
+				typeof error === 'object' &&
+				error !== null &&
+				'code' in error &&
+				error.code === 11000
+			) {
+				// eslint-disable-next-line preserve-caught-error -- the cause quotes the address this drops
+				throw new Error('User with this email already exists');
+			}
+			throw error;
+		}
 		return user;
 	}
 
