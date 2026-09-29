@@ -13,6 +13,7 @@ import {
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
 import { answered } from '../admin/answered.ts';
+import { serveResourceMetadata } from './resource_metadata.ts';
 
 /*
  * Declaring a protected resource through the admin API.
@@ -98,6 +99,7 @@ describe('protected resources API', () => {
 		const headers = { cookie };
 		const resources = api.admin.api.projects({ id: project._id }).resources;
 
+		serveResourceMetadata(AUDIENCE);
 		const created = await resources.post(body, { headers });
 		expect(created.status).toBe(201);
 
@@ -132,6 +134,7 @@ describe('protected resources API', () => {
 		const headers = { cookie };
 		const resources = api.admin.api.projects({ id: project._id }).resources;
 
+		serveResourceMetadata(AUDIENCE);
 		const created = await resources.post(
 			{ ...body, identifier: 'HTTPS://MCP.Example.com/mcp/' },
 			{ headers }
@@ -180,6 +183,7 @@ describe('protected resources API', () => {
 		const projectA = await projectFor(first.userId);
 		const projectB = await projectFor(second.userId);
 
+		serveResourceMetadata(AUDIENCE);
 		expect(
 			(
 				await api.admin.api
@@ -248,6 +252,7 @@ describe('protected resources API', () => {
 		const project = await projectFor(userId);
 		const headers = { cookie };
 		const resources = api.admin.api.projects({ id: project._id }).resources;
+		serveResourceMetadata(AUDIENCE);
 		await resources.post(body, { headers });
 
 		const res = await resources({ resourceId: encoded }).patch(

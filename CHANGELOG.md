@@ -79,6 +79,11 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   meant that asking twice within a minute told anybody the address was registered; the SMTP send,
   awaited only for such an address, told the same by response time. Every outcome now renders the
   one accepted page, which states the limits, and the mail is sent after the response.
+- **Declaring a protected resource requires the resource to vouch for it.** Identifiers are unique
+  across the instance and first wins, so any group member could declare another tenant's MCP server,
+  lock its owner out with a 409 and route its clients into their own bucket. A declaration by anyone
+  but a super administrator now needs the resource's RFC 9728 metadata to describe that identifier and
+  list the project bucket's issuer.
 - **A forwarded client certificate is believed only beside the proxy's secret.** With the mTLS
   features on, the default hook took the certificate from any `x-client-cert` header, and a certificate
   is public, so a caller the proxy did not strip the header from could authenticate as a self-signed

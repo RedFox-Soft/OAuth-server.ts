@@ -13,6 +13,12 @@ import { recordAdminAudit } from '../audit/record.js';
 import { canonicalizeResourceIdentifier } from '../../resources/canonical.js';
 import { validateScopes, scopeFailureMessage } from '../../resources/scopes.js';
 import { isMcpResource } from '../../mcp/resource_server.js';
+import {
+	resourceVouchesFor,
+	type OwnershipRefusal
+} from '../../resources/ownership.js';
+import { issuerFor } from '../../configs/issuer.js';
+import { issuingBucket } from '../auth/bucketAddress.js';
 import { CreateResourceBody, UpdateResourceBody } from './schema.js';
 
 /*
@@ -50,6 +56,21 @@ function canonicalIdentifier(input: string): string {
 		);
 	}
 	return result.identifier;
+}
+
+/* What the administrator has to change, in words they can act on at the resource. */
+function ownershipRefusal(reason: OwnershipRefusal, issuer: string): string {
+	switch (reason) {
+		case 'not_https':
+			return 'a resource declared by a group administrator must be an https URL';
+		case 'unreachable':
+		case 'malformed':
+			return `the resource must serve its protected resource metadata (RFC 9728) listing ${issuer} in authorization_servers`;
+		case 'other_resource':
+			return 'the resource metadata describes a different resource identifier';
+		case 'not_trusted':
+			return `the resource metadata must list ${issuer} in authorization_servers`;
+	}
 }
 
 function acceptedScopes(scopes: string[]): string[] {
@@ -106,6 +127,22 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 			 */
 			if (await getProtectedResourceStore().find(identifier)) {
 				throw new AdminError(409, 'that identifier is already declared');
+			}
+
+			/*
+			 * A claim on somebody's server, since identifiers are unique across the instance and the
+			 * declaration decides where sign-ins for the resource land. The resource settles it: its own
+			 * metadata has to name the issuer this project's tokens will carry. A super administrator's
+			 * authority is instance-wide already, so their declaration is not asked to prove it.
+			 */
+			if (!ctx.roles.includes('super_admin')) {
+				const issuer = issuerFor(
+					await issuingBucket(project.bucketId ?? undefined)
+				);
+				const vouched = await resourceVouchesFor(identifier, issuer);
+				if (!vouched.ok) {
+					throw new AdminError(422, ownershipRefusal(vouched.reason, issuer));
+				}
 			}
 
 			await recordAdminAudit(ctx, 'resource.create', identifier, {

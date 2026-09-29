@@ -30,6 +30,11 @@ Compose](/docs/get-started/docker-compose/) should take about two of them.
 
 ## 1. Declare your MCP server as a resource
 
+Publish the metadata from [step 2](#2-publish-what-an-mcp-server-has-to-publish) first. Unless you are
+a super administrator, declaring a resource fetches that document and refuses the declaration if it
+does not name this server: identifiers are unique across the instance, so this is what stops somebody
+else claiming your server's address before you do.
+
 <Steps>
 
 1. In the console, open your project and choose **Resources**, then **Declare a resource**.
@@ -82,7 +87,10 @@ you. This is the only part the specification makes a `MUST` for an MCP server:
 ```
 
 `resource` is the identifier you declared in step 1, character for character. `authorization_servers`
-is your instance's issuer, the same URL as its `ISSUER` setting.
+names the issuer of the user bucket your project signs into: the instance's `ISSUER` for the default
+bucket, or the bucket's own issuer when it has an address. The document may live at
+`/.well-known/oauth-protected-resource` followed by your resource's path, as RFC 9728 forms it, or at
+the root as above.
 
 ### A challenge that says where to go
 

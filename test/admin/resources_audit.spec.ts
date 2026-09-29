@@ -15,6 +15,7 @@ import {
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
 import { answered } from './answered.ts';
+import { serveResourceMetadata } from '../resources/resource_metadata.ts';
 
 /*
  * The audit trail for protected-resource operations, and the one cascade a project delete performs.
@@ -73,6 +74,7 @@ describe('protected resource audit trail', () => {
 		const headers = { cookie };
 		const resources = api.admin.api.projects({ id: project._id }).resources;
 
+		serveResourceMetadata(AUDIENCE);
 		await resources.post(
 			{ identifier: AUDIENCE, name: 'Acme MCP', scopes: ['mcp:tools-basic'] },
 			{ headers }
@@ -139,10 +141,12 @@ describe('protected resource audit trail', () => {
 		const headers = { cookie };
 		const resources = api.admin.api.projects({ id: project._id }).resources;
 
+		serveResourceMetadata(AUDIENCE);
 		await resources.post(
 			{ identifier: AUDIENCE, name: 'One', scopes: ['mcp:tools-basic'] },
 			{ headers }
 		);
+		serveResourceMetadata('https://other.example.com/mcp');
 		await resources.post(
 			{
 				identifier: 'https://other.example.com/mcp',

@@ -65,6 +65,15 @@ parameter selects among an operator's options and cannot create one. `${ISSUER}/
 resource — the built-in arm claims it and declaration refuses it — so the admin bucket is unreachable
 through rule 3.
 
+"An attacker cannot declare a resource" held only for attackers without a console account (corrected
+2026-09-29). Any member of any group can declare, identifiers are unique across the instance, and first
+wins — so a hostile tenant could declare somebody else's MCP server, leave the real owner a permanent
+409, and route that server's clients into the tenant's own bucket. A declaration by anyone but a super
+administrator now has to be vouched for by the resource itself: its protected resource metadata (RFC
+9728, path-inserted or at the host root) must describe that exact identifier and list the issuer of the
+project's bucket in `authorization_servers` (`resourceVouchesFor`, `lib/resources/ownership.ts`), fetched
+through the egress boundary. `test/resources/ownership.spec.ts` is the attack.
+
 **The gotcha.** Every caller must pass the resource it has, `findAccount` included. It did not, at
 first: login resolved the project bucket and found the user, `findAccount` resolved `redfox` and did
 not, so `loadGrant` left the grant unset and the consent prompt crashed with a 500 rather than
